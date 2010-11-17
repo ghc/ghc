@@ -421,22 +421,41 @@ loop. Here is a (simplified) example from the vector library:
   {-# INLINE foldl #-}
   foldl f z (Stream step s _) = foldl_loop SPEC z s
     where
-      foldl_loop SPEC z s = case step s of
-                              Yield x s' -> foldl_loop SPEC (f z x) s'
-                              Skip       -> foldl_loop SPEC z s'
+      foldl_loop !sPEC z s = case step s of
+                              Yield x s' -> foldl_loop sPEC (f z x) s'
+                              Skip       -> foldl_loop sPEC z s'
                               Done       -> z
 
 SpecConstr will spot the SPEC parameter and always fully specialise
-foldl_loop. Note that we can't just annotate foldl_loop since it isn't a
-top-level function but even if we could, inlining etc. could easily drop the
-annotation. We also have to prevent the SPEC argument from being removed by
-w/w which is why SPEC is a sum type. This is all quite ugly; we ought to come
+foldl_loop. Note that
+
+  * We have to prevent the SPEC argument from being removed by
+    w/w which is why (a) SPEC is a sum type, and (b) we have to seq on
+    the SPEC argument.
+
+  * And lastly, the SPEC argument is ultimately eliminated by
+    SpecConstr itself so there is no runtime overhead.
+
+This is all quite ugly; we ought to come
 up with a better design.
 
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
 force_spec to True when calling specLoop. This flag makes specLoop and
 specialise ignore specConstrCount and specConstrThreshold when deciding
 whether to specialise a function.
+
+What alternatives did I consider? Annotating the loop itself doesn't
+work because (a) it is local and (b) it will be w/w'ed and I having
+w/w propagating annotation somehow doesn't seem like a good idea. The
+types of the loop arguments really seem to be the most persistent
+thing.
+
+Annotating the types that make up the loop state s doesn't work,
+either, because (a) it would prevent us from using types like Either
+or tuples here, (b) we don't want to restrict the set of types that
+can be used in Stream states and (c) some types are fixed by the user
+(e.g., the accumulator here) but we still want to specialise as much
+as possible.
 
 -----------------------------------------------------
 		Stuff not yet handled
