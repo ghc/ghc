@@ -299,7 +299,7 @@ DPH_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
 # packages:
-STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010
+STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010 random
 # Packages that we shouldn't build if we don't have TH (e.g. because
 # we're building a profiled compiler):
 TH_PACKAGES := $(DPH_PACKAGES)
