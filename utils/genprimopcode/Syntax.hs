@@ -109,8 +109,8 @@ sane_ty Compare (TyF t1 (TyF t2 td))
    | t1 == t2 && td == TyApp "Bool" []  = True
 sane_ty Monadic (TyF t1 td) 
    | t1 == td  = True
-sane_ty Dyadic (TyF t1 (TyF t2 _))
-   | t1 == t2 && t2 == t2  = True
+sane_ty Dyadic (TyF t1 (TyF t2 td))
+   | t1 == td && t2 == td  = True
 sane_ty GenPrimOp _
    = True
 sane_ty _ _
