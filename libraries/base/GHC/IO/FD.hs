@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -XBangPatterns #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude -XBangPatterns -fno-warn-identities #-}
+-- Whether there are identities depends on the platform
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -395,13 +396,14 @@ setRaw fd raw = System.Posix.Internals.setCooked (fdFD fd) (not raw)
 
 fdRead :: FD -> Ptr Word8 -> Int -> IO Int
 fdRead fd ptr bytes
-  = readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0 (fromIntegral bytes)
+  = do { r <- readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0 (fromIntegral bytes)
+       ; return (fromIntegral r) }
 
 fdReadNonBlocking :: FD -> Ptr Word8 -> Int -> IO (Maybe Int)
 fdReadNonBlocking fd ptr bytes = do
   r <- readRawBufferPtrNoBlock "GHC.IO.FD.fdReadNonBlocking" fd ptr 
            0 (fromIntegral bytes)
-  case r of
+  case fromIntegral r of
     (-1) -> return (Nothing)
     n    -> return (Just n)
 
