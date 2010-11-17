@@ -7712,27 +7712,48 @@ itself, so an INLINE pragma is always ignored.</para>
       <sect3 id="inlinable-pragma">
 	<title>INLINABLE pragma</title>
 
-<para>An INLINABLE pragma works very like an INLINE pragma, except that:
+<para>An <literal>{-# INLINABLE f #-}</literal> pragma on a
+function <literal>f</literal> has the following behaviour:
 <itemizedlist>
 <listitem><para>
-INLINE says "please inline me", but INLINABLE says "feel free to inline me; use your
+While <literal>INLINE</literal> says "please inline me", the <literal>INLINABLE</literal>
+says "feel free to inline me; use your
 discretion".  In other words the choice is left to GHC, which uses the same
-rules as for pragma-free functions.  Unlike INLINE, That decision is made at 
+rules as for pragma-free functions.  Unlike <literal>INLINE</literal>, that decision is made at
 the <emphasis>call site</emphasis>, and
 will therefore be affected by the inlining threshold, optimisation level etc.
 </para></listitem>
 <listitem><para>
-Like INLINE, the INLINABLE pragma retains a copy of the original RHS for 
+Like <literal>INLINE</literal>, the <literal>INLINABLE</literal> pragma retains a
+copy of the original RHS for
 inlining purposes, and persists it in the interface file, regardless of
 the size of the RHS.
 </para></listitem>
+
 <listitem><para>
-If you use the special function <literal>inline</literal> (<xref linkend="special-ids"/>) 
-to force inlining at a
-call site, you will get a copy of the the original RHS.
-Indeed, if you intend to use <literal>inline f</literal> it
-is a good idea to mark the definition of <literal>f</literal> INLINABLE, 
+One way to use <literal>INLINABLE</literal> is in conjunction with
+the special function <literal>inline</literal> (<xref linkend="special-ids"/>).
+The call <literal>inline f</literal> tries very hard to inline <literal>f</literal>.
+To make sure that <literal>f</literal> can be inlined,
+it is a good idea to mark the definition
+of <literal>f</literal> as <literal>INLINABLE</literal>,
 so that GHC guarantees to expose an unfolding regardless of how big it is.
+Moreover, by annotating <literal>f</literal> as <literal>INLINABLE</literal>,
+you ensure that <literal>f</literal>'s original RHS is inlined, rather than
+whatever random optimised version of <literal>f</literal> GHC's optimiser
+has produced.
+</para></listitem>
+
+<listitem><para>
+The <literal>INLINABLE</literal> pragma also works with <literal>SPECIALISE</literal>:
+if you mark function <literal>f</literal> as <literal>INLINABLE</literal>, then
+you can subsequently <literal>SPECIALISE</literal> in another module
+(see <xref linkend="specialize-pragma"/>).</para></listitem>
+
+<listitem><para>
+Unlike <literal>INLINE</literal>, it is OK to use
+an <literal>INLINABLE</literal> pragma on a recursive function.
+The principal reason do to so to allow later use of <literal>SPECIALISE</literal>
 </para></listitem>
 </itemizedlist>
 </para>
@@ -7995,6 +8016,9 @@ RULE with a somewhat-complex left-hand side (try it yourself), so it might not f
 well.  If you use this kind of specialisation, let us know how well it works.
 </para>
 
+    <sect3 id="specialize-inline">
+      <title>SPECIALIZE INLINE</title>
+
 <para>A <literal>SPECIALIZE</literal> pragma can optionally be followed with a
 <literal>INLINE</literal> or <literal>NOINLINE</literal> pragma, optionally 
 followed by a phase, as described in <xref linkend="inline-noinline-pragma"/>.
@@ -8023,6 +8047,66 @@ specialisation, whose body is also inlined.  The result is a type-based
 unrolling of the indexing function.</para>
 <para>Warning: you can make GHC diverge by using <literal>SPECIALISE INLINE</literal>
 on an ordinarily-recursive function.</para>
+</sect3>
+
+<sect3><title>SPECIALIZE for imported functions</title>
+
+<para>
+Generally, you can only give a <literal>SPECIALIZE</literal> pragma
+for a function defined in the same module.
+However if a function <literal>f</literal> is given an <literal>INLINABLE</literal>
+pragma at its definition site, then it can subequently be specialised by
+importing modules (see <xref linkend="inlinable-pragma"/>).
+For example
+<programlisting>
+module Map( lookup, blah blah ) where
+  lookup :: Ord key => [(key,a)] -> key -> Maybe a
+  lookup = ...
+  {-# INLINABLE lookup #-}
+
+module Client where
+  import Map( lookup )
+
+  data T = T1 | T2 deriving( Eq, Ord )
+  {-# SPECIALISE lookup :: [(T,a)] -> T -> Maybe a
+</programlisting>
+Here, <literal>lookup</literal> is declared <literal>INLINABLE</literal>, but
+it cannot be specialised for type <literal>T</literal> at its definition site,
+because that type does not exist yet.  Instead a client module can define <literal>T</literal>
+and then specialise <literal>lookup</literal> at that type.
+</para>
+<para>
+Moreover, every module that imports <literal>Client</literal> (or imports a module
+that imports <literal>Client</literal>, transitively) will "see", and make use of,
+the specialised version of <literal>lookup</literal>.  You don't need to put
+a <literal>SPECIALIZE</literal> pragma in every module.
+</para>
+<para>
+Moreover you often don't even need the <literal>SPECIALIZE</literal> pragma in the
+first place. When compiling a module M,
+GHC's optimiser (with -O) automatically considers each top-level
+overloaded function declared in M, and specialises it
+for the different types at which it is called in M.  The optimiser
+<emphasis>also</emphasis> considers each <emphasis>imported</emphasis>
+<literal>INLINABLE</literal> overloaded function, and specialises it
+for the different types at which it is called in M.
+So in our example, it would be enough for <literal>lookup</literal> to
+be called at type <literal>T</literal>:
+<programlisting>
+module Client where
+  import Map( lookup )
+
+  data T = T1 | T2 deriving( Eq, Ord )
+
+  findT1 :: [(T,a)] -> Maybe a
+  findT1 m = lookup m T1   -- A call of lookup at type T
+</programlisting>
+However, sometimes there are no such calls, in which case the
+pragma can be useful.
+</para>
+</sect3>
+
+<sect3><title>Obselete SPECIALIZE syntax</title>
 
       <para>Note: In earlier versions of GHC, it was possible to provide your own
       specialised function for a given type:
@@ -8033,6 +8117,7 @@ on an ordinarily-recursive function.</para>
 
       This feature has been removed, as it is now subsumed by the
       <literal>RULES</literal> pragma (see <xref linkend="rule-spec"/>).</para>
+</sect3>
 
     </sect2>
 
