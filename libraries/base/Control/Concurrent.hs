@@ -495,7 +495,7 @@ withThread io = do
 waitFd :: Fd -> CInt -> IO ()
 waitFd fd write = do
    throwErrnoIfMinus1_ "fdReady" $
-        fdReady (fromIntegral fd) write (fromIntegral iNFINITE) 0
+        fdReady (fromIntegral fd) write iNFINITE 0
 
 iNFINITE :: CInt
 iNFINITE = 0xFFFFFFFF -- urgh
