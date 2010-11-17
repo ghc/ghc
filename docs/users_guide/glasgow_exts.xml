@@ -7200,16 +7200,23 @@ forces evaluation anyway does nothing.
 There is one (apparent) exception to this general rule that a bang only
 makes a difference when it precedes a variable or wild-card: a bang at the
 top level of a <literal>let</literal> or <literal>where</literal>
-binding makes the binding strict, regardless of the pattern. For example:
+binding makes the binding strict, regardless of the pattern.
+(We say "apparent" exception because the Right Way to think of it is that the bang
+at the top of a binding is not part of the <emphasis>pattern</emphasis>; rather it
+is part of the syntax of the <emphasis>binding</emphasis>,
+creating a "bang-pattern binding".)
+For example:
 <programlisting>
 let ![x,y] = e in b
 </programlisting>
-is a strict binding: operationally, it evaluates <literal>e</literal>, matches
-it against the pattern <literal>[x,y]</literal>, and then evaluates <literal>b</literal>.
-(We say "apparent" exception because the Right Way to think of it is that the bang
-at the top of a binding is not part of the <emphasis>pattern</emphasis>; rather it
-is part of the syntax of the <emphasis>binding</emphasis>.)
-Nested bangs in a pattern binding behave uniformly with all other forms of 
+is a bang-pattern binding. Operationally, it behaves just like a case expression:
+<programlisting>
+case e of [x,y] -> b
+</programlisting>
+Like a case expression, a bang-pattern binding must be non-recursive, and
+is monomorphic.
+
+However, <emphasis>nested</emphasis> bangs in a pattern binding behave uniformly with all other forms of
 pattern matching.  For example
 <programlisting>
 let (!x,[y]) = e in b

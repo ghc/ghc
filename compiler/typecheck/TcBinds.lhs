@@ -1076,6 +1076,7 @@ instance Outputable GeneralisationPlan where
 decideGeneralisationPlan 
    :: DynFlags -> TopLevelFlag -> [Name] -> [LHsBind Name] -> TcSigFun -> GeneralisationPlan
 decideGeneralisationPlan dflags top_lvl _bndrs binds sig_fn
+  | bang_pat_binds                         = NoGen
   | mono_pat_binds                         = NoGen
   | Just sig <- one_funbind_with_sig binds = if null (sig_tvs sig) && null (sig_theta sig)
                                              then NoGen	      -- Optimise common case
@@ -1085,7 +1086,12 @@ decideGeneralisationPlan dflags top_lvl _bndrs binds sig_fn
   | otherwise                              = InferGen mono_restriction
 
   where
-    mono_pat_binds = xopt Opt_MonoPatBinds dflags 
+    bang_pat_binds = any (isBangHsBind . unLoc) binds
+       -- Bang patterns must not be polymorphic,
+       -- because we are going to force them
+       -- See Trac #4498
+
+    mono_pat_binds = xopt Opt_MonoPatBinds dflags
                   && any (is_pat_bind . unLoc) binds
 
     mono_restriction = xopt Opt_MonomorphismRestriction dflags 
@@ -1129,7 +1135,7 @@ checkStrictBinds top_lvl rec_group binds poly_ids
         ; checkTc (isNonRec rec_group)
                   (strictBindErr "Recursive" unlifted binds)
         ; checkTc (isSingleton binds)
-                  (strictBindErr "Multiple" unlifted binds) 
+                  (strictBindErr "Multiple" unlifted binds)
         -- This should be a checkTc, not a warnTc, but as of GHC 6.11
         -- the versions of alex and happy available have non-conforming
         -- templates, so the GHC build fails if it's an error:
