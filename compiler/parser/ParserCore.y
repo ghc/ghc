@@ -1,4 +1,5 @@
 {
+{-# LANGUAGE BangPatterns #-} -- required for versions of Happy before 1.18.6
 {-# OPTIONS -Wwarn -w -XNoMonomorphismRestriction #-}
 -- The NoMonomorphismRestriction deals with a Happy infelicity
 --    With OutsideIn's more conservativ monomorphism restriction
