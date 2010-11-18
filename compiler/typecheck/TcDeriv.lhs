@@ -936,10 +936,7 @@ cond_functorOK :: Bool -> Condition
 --            (c) don't use argument in the wrong place, e.g. data T a = T (X a a)
 --            (d) optionally: don't use function types
 --            (e) no "stupid context" on data type
-cond_functorOK allowFunctions (dflags, rep_tc) 
-  | not (xopt Opt_DeriveFunctor dflags)
-  = Just (ptext (sLit "You need -XDeriveFunctor to derive an instance for this class"))
-
+cond_functorOK allowFunctions (_, rep_tc)
   | null tc_tvs
   = Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc) 
           <+> ptext (sLit "has no parameters"))
