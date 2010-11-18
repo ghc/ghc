@@ -440,9 +440,10 @@ This is all quite ugly; we ought to come
 up with a better design.
 
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
-force_spec to True when calling specLoop. This flag makes specLoop and
+sc_force to True when calling specLoop. This flag makes specLoop and
 specialise ignore specConstrCount and specConstrThreshold when deciding
-whether to specialise a function.
+whether to specialise a function. It also specialises even for arguments that
+aren't inspected in the loop.
 
 What alternatives did I consider? Annotating the loop itself doesn't
 work because (a) it is local and (b) it will be w/w'ed and I having
@@ -588,6 +589,8 @@ specConstrProgram guts
 data ScEnv = SCE { sc_size  :: Maybe Int,	-- Size threshold
 		   sc_count :: Maybe Int,	-- Max # of specialisations for any one fn
 						-- See Note [Avoiding exponential blowup]
+                   sc_force :: Bool,            -- Force specialisation?
+                                                -- See Note [Forcing specialisation]
 
 		   sc_subst :: Subst,   	-- Current substitution
 						-- Maps InIds to OutExprs
@@ -630,6 +633,7 @@ initScEnv :: DynFlags -> UniqFM SpecConstrAnnotation -> ScEnv
 initScEnv dflags anns
   = SCE { sc_size = specConstrThreshold dflags,
 	  sc_count = specConstrCount dflags,
+          sc_force = False,
 	  sc_subst = emptySubst, 
 	  sc_how_bound = emptyVarEnv, 
 	  sc_vals = emptyVarEnv,
@@ -644,6 +648,9 @@ data HowBound = RecFun	-- These are the recursive functions for which
 instance Outputable HowBound where
   ppr RecFun = text "RecFun"
   ppr RecArg = text "RecArg"
+
+scForce :: ScEnv -> Bool -> ScEnv
+scForce env b = env { sc_force = b }
 
 lookupHowBound :: ScEnv -> Id -> Maybe HowBound
 lookupHowBound env id = lookupVarEnv (sc_how_bound env) id
@@ -1014,8 +1021,8 @@ scExpr' env (Let (NonRec bndr rhs) body)
           -- NB: We don't use the ForceSpecConstr mechanism (see
           -- Note [Forcing specialisation]) for non-recursive bindings
           -- at the moment. I'm not sure if this is the right thing to do.
-	; let force_spec = False
-	; (spec_usg, specs) <- specialise env force_spec 
+	; let env' = scForce env False
+	; (spec_usg, specs) <- specialise env'
                                           (scu_calls body_usg) 
 					  rhs_info
                                           (SI [] 0 (Just rhs_usg))
@@ -1038,7 +1045,7 @@ scExpr' env (Let (Rec prs) body)
 	; (body_usg, body')     <- scExpr rhs_env2 body
 
 	-- NB: start specLoop from body_usg
-	; (spec_usg, specs) <- specLoop rhs_env2 force_spec
+	; (spec_usg, specs) <- specLoop (scForce rhs_env2 force_spec)
                                         (scu_calls body_usg) rhs_infos nullUsage
 					[SI [] 0 (Just usg) | usg <- rhs_usgs]
 		-- Do not unconditionally use rhs_usgs. 
@@ -1127,7 +1134,7 @@ scTopBind env (Rec prs)
 	; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
 	; let rhs_usg = combineUsages rhs_usgs
 
-	; (_, specs) <- specLoop rhs_env2 force_spec
+	; (_, specs) <- specLoop (scForce rhs_env2 force_spec)
                                  (scu_calls rhs_usg) rhs_infos nullUsage
 				 [SI [] 0 Nothing | _ <- bndrs]
 
@@ -1205,14 +1212,12 @@ data OneSpec  = OS CallPat 		-- Call pattern that generated this specialisation
 
 
 specLoop :: ScEnv
-         -> Bool                                -- force specialisation?
-                                                -- Note [Forcing specialisation]
 	 -> CallEnv
 	 -> [RhsInfo]
 	 -> ScUsage -> [SpecInfo]		-- One per binder; acccumulating parameter
 	 -> UniqSM (ScUsage, [SpecInfo])	-- ...ditto...
-specLoop env force_spec all_calls rhs_infos usg_so_far specs_so_far
-  = do	{ specs_w_usg <- zipWithM (specialise env force_spec all_calls) rhs_infos specs_so_far
+specLoop env all_calls rhs_infos usg_so_far specs_so_far
+  = do	{ specs_w_usg <- zipWithM (specialise env all_calls) rhs_infos specs_so_far
 	; let (new_usg_s, all_specs) = unzip specs_w_usg
 	      new_usg   = combineUsages new_usg_s
 	      new_calls = scu_calls new_usg
@@ -1220,12 +1225,10 @@ specLoop env force_spec all_calls rhs_infos usg_so_far specs_so_far
 	; if isEmptyVarEnv new_calls then
 		return (all_usg, all_specs) 
  	  else 
-		specLoop env force_spec new_calls rhs_infos all_usg all_specs }
+		specLoop env new_calls rhs_infos all_usg all_specs }
 
 specialise 
    :: ScEnv
-   -> Bool                              -- force specialisation?
-                                        --   Note [Forcing specialisation]
    -> CallEnv				-- Info on calls
    -> RhsInfo
    -> SpecInfo				-- Original RHS plus patterns dealt with
@@ -1235,8 +1238,8 @@ specialise
 -- So when we make a specialised copy of the RHS, we're starting
 -- from an RHS whose nested functions have been optimised already.
 
-specialise env force_spec bind_calls (RI fn _ arg_bndrs body arg_occs) 
-			  spec_info@(SI specs spec_count mb_unspec)
+specialise env bind_calls (RI fn _ arg_bndrs body arg_occs) 
+               spec_info@(SI specs spec_count mb_unspec)
   | not (isBottomingId fn)      -- Note [Do not specialise diverging functions]
   , not (isNeverActive (idInlineActivation fn))	-- See Note [Transfer activation]
   , notNull arg_bndrs		-- Only specialise functions
@@ -1252,7 +1255,7 @@ specialise env force_spec bind_calls (RI fn _ arg_bndrs body arg_occs)
 	; let n_pats      = length pats
               spec_count' = n_pats + spec_count
 	; case sc_count env of
-	    Just max | not force_spec && spec_count' > max
+	    Just max | not (sc_force env) && spec_count' > max
 		-> pprTrace "SpecConstr" msg $  
                    return (nullUsage, spec_info)
 		where
@@ -1555,14 +1558,18 @@ argToPat in_scope val_env arg arg_occ
 argToPat env in_scope val_env arg arg_occ
   | Just (ConVal dc args) <- isValue val_env arg
   , not (ignoreAltCon env dc)
-  , case arg_occ of
-	ScrutOcc _ -> True		-- Used only by case scrutinee
-	BothOcc    -> case arg of	-- Used elsewhere
-			App {} -> True	--     see Note [Reboxing]
-			_other -> False
-	_other	   -> False	-- No point; the arg is not decomposed
+  , sc_force env || scrutinised
   = do	{ args' <- argsToPats env in_scope val_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
+  where
+    scrutinised
+      = case arg_occ of
+          ScrutOcc _ -> True		-- Used only by case scrutinee
+          BothOcc    -> case arg of	-- Used elsewhere
+                          App {} -> True	--     see Note [Reboxing]
+                          _other -> False
+          _other     -> False           -- No point; the arg is not decomposed
+
 
   -- Check if the argument is a variable that 
   -- is in scope at the function definition site
@@ -1570,8 +1577,8 @@ argToPat env in_scope val_env arg arg_occ
   --	(a) it's used in an interesting way in the body
   --	(b) we know what its value is
 argToPat env in_scope val_env (Var v) arg_occ
-  | case arg_occ of { UnkOcc -> False; _other -> True },	-- (a)
-    is_value,							-- (b)
+  | sc_force env || case arg_occ of { UnkOcc -> False; _other -> True }, -- (a)
+    is_value,                                                            -- (b)
     not (ignoreType env (varType v))
   = return (True, Var v)
   where
