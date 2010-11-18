@@ -1,8 +1,9 @@
 
 tcfail032.hs:14:8:
     Couldn't match type `t' with `a -> Int'
-      because this skolem type variable would escape: `a'
-    This skolem is bound by an expression type signature
+      because type variable `a' would escape its scope
+    This (rigid, skolem) type variable is bound by
+      an expression type signature
     The following variables have types that mention t
       x :: t (bound at tcfail032.hs:14:3)
     In the expression: (x :: Eq a => a -> Int)

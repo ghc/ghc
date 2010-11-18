@@ -1,8 +1,8 @@
 
 tcfail099.hs:9:7:
     Couldn't match type `t' with `a'
-      because this skolem type variable would escape: `a'
-    This skolem is bound by
+      because type variable `a' would escape its scope
+    This (rigid, skolem) type variable is bound by
       a pattern with constructor C :: forall a. (a -> Int) -> DS
     In the pattern: C f
     In an equation for `call': call (C f) arg = f arg
