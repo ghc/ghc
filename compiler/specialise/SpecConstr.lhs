@@ -457,6 +457,29 @@ can be used in Stream states and (c) some types are fixed by the user
 (e.g., the accumulator here) but we still want to specialise as much
 as possible.
 
+Alternatives to ForceSpecConstr
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Instead of giving the loop an extra argument of type SPEC, we
+also considered *wrapping* arguments in SPEC, thus
+  data SPEC a = SPEC a | SPEC2
+
+  loop = \arg -> case arg of
+                     SPEC state ->
+                        case state of (x,y) -> ... loop (SPEC (x',y')) ...
+                        S2 -> error ...
+The idea is that a SPEC argument says "specialise this argument
+regardless of whether the function case-analyses it.  But this
+doesn't work well:
+  * SPEC must still be a sum type, else the strictness analyser
+    eliminates it
+  * But that means that 'loop' won't be strict in its real payload
+This loss of strictness in turn screws up specialisation, because
+we may end up with calls like
+   loop (SPEC (case z of (p,q) -> (q,p)))
+Without the SPEC, if 'loop' was strict, the case would move out
+and we'd see loop applied to a pair. But if 'loop' isn' strict
+this doesn't look like a specialisable call.
+
 -----------------------------------------------------
 		Stuff not yet handled
 -----------------------------------------------------
