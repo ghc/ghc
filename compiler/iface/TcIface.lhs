@@ -1103,7 +1103,9 @@ tcPragExpr name expr
           Just fail_msg -> do { mod <- getIfModule 
                               ; pprPanic "Iface Lint failure" 
                                   (vcat [ ptext (sLit "In interface for") <+> ppr mod
-                                        , hang doc 2 fail_msg ]) }
+                                        , hang doc 2 fail_msg
+                                        , ppr name <+> equals <+> ppr core_expr'
+                                        , ptext (sLit "Iface expr =") <+> ppr expr ]) }
     return core_expr'
   where
     doc = text "Unfolding of" <+> ppr name
@@ -1111,14 +1113,14 @@ tcPragExpr name expr
     get_in_scope :: IfL [Var] -- Totally disgusting; but just for linting
     get_in_scope 	
 	= do { (gbl_env, lcl_env) <- getEnvs
-             ; setLclEnv () $ do
-	     { case if_rec_types gbl_env of {
-		  Nothing -> return [] ;
-		  Just (_, get_env) -> do
-	     { type_env <- get_env
+             ; rec_ids <- case if_rec_types gbl_env of
+                            Nothing -> return []
+                            Just (_, get_env) -> do
+                               { type_env <- setLclEnv () get_env
+                               ; return (typeEnvIds type_env) }
              ; return (varEnvElts (if_tv_env lcl_env) ++
                        varEnvElts (if_id_env lcl_env) ++
-                       typeEnvIds type_env) }}}}
+                       rec_ids) }
 \end{code}
 
 
