@@ -36,7 +36,7 @@ import TcSMonad
 import Bag
 import qualified Data.Map as Map
 
-import Control.Monad( zipWithM, unless )
+import Control.Monad( unless )
 import FastString ( sLit ) 
 import DynFlags
 \end{code}
@@ -897,23 +897,18 @@ doInteractWithInert _fdimprs
                     (CDictCan { cc_id = dv, cc_flavor = wfl, cc_class = cl, cc_tyargs = xis }) 
   | ifl `canRewrite` wfl 
   , tv `elemVarSet` tyVarsOfTypes xis
-  = if isDerivedSC wfl then 
-        mkIRStop KeepInert $ emptyWorkList -- See Note [Adding Derived Superclasses]
-    else do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,wfl,cl,xis)
+  = do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,wfl,cl,xis)
             -- Continue with rewritten Dictionary because we can only be in the 
             -- interactWithEqsStage, so the dictionary is inert. 
-            ; mkIRContinue rewritten_dict KeepInert emptyWorkList }
+       ; mkIRContinue rewritten_dict KeepInert emptyWorkList }
     
 doInteractWithInert _fdimprs 
                     (CDictCan { cc_id = dv, cc_flavor = ifl, cc_class = cl, cc_tyargs = xis }) 
            workItem@(CTyEqCan { cc_id = cv, cc_flavor = wfl, cc_tyvar = tv, cc_rhs = xi })
   | wfl `canRewrite` ifl
   , tv `elemVarSet` tyVarsOfTypes xis
-  = if isDerivedSC ifl then
-        mkIRContinue workItem DropInert emptyWorkList -- No need to do any rewriting, 
-                                                      -- see Note [Adding Derived Superclasses]
-    else do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,ifl,cl,xis) 
-            ; mkIRContinue workItem DropInert (workListFromCCan rewritten_dict) }
+  = do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,ifl,cl,xis)
+       ; mkIRContinue workItem DropInert (workListFromCCan rewritten_dict) }
 
 -- Class constraint and given equality: use the equality to rewrite
 -- the class constraint.
@@ -1569,20 +1564,17 @@ allowedTopReaction _        _             = True
 
 
 doTopReact :: WorkItem -> TcS TopInteractResult 
--- The work item does not react with the inert set, 
--- so try interaction with top-level instances
+-- The work item does not react with the inert set, so try interaction with top-level instances
+-- NB: The place to add superclasses in *not* in doTopReact stage. Instead superclasses are 
+--     added in the worklist as part of the canonicalisation process. 
+-- See Note [Adding superclasses] in TcCanonical.
 
--- Given dictionary; just add superclasses
+-- Given dictionary
 -- See Note [Given constraint that matches an instance declaration]
-doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Given loc
-                              , cc_class = cls, cc_tyargs = xis })
-  = do { sc_work <- newGivenSCWork dv loc cls xis 
-       ; return $ SomeTopInt sc_work (ContinueWith workItem) }
+doTopReact (CDictCan { cc_flavor = Given {} })
+  = return NoTopInt -- NB: Superclasses already added since it's canonical
 
--- Derived dictionary
--- Do not add any further derived superclasses; their 
--- full transitive closure has already been added. 
--- But do look for functional dependencies
+-- Derived dictionary: just look for functional dependencies
 doTopReact workItem@(CDictCan { cc_flavor = Derived loc _
                               , cc_class = cls, cc_tyargs = xis })
   = do { fd_work <- findClassFunDeps cls xis loc
@@ -1590,7 +1582,7 @@ doTopReact workItem@(CDictCan { cc_flavor = Derived loc _
               return NoTopInt
          else return $ SomeTopInt { tir_new_work = fd_work
                                   , tir_new_inert = ContinueWith workItem } }
-
+-- Wanted dictionary
 doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Wanted loc
                               , cc_class = cls, cc_tyargs = xis }) 
   = do { -- See Note [MATCHING-SYNONYMS]
@@ -1600,22 +1592,13 @@ doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Wanted loc
              do { traceTcS "doTopReact/ no class instance for" (ppr dv) 
                 ; fd_work <- findClassFunDeps cls xis loc
                 ; if isEmptyWorkList fd_work then 
-                      do { sc_work <- newDerivedSCWork dv loc cls xis
-                                 -- See Note [Adding Derived Superclasses] 
-				 -- NB: workItem is inert, but it isn't solved
-				 -- keep it as inert, although it's not solved 
-				 -- because we have now reacted all its 
- 				 -- top-level fundep-induced equalities!
-                         ; return $ SomeTopInt 
-                              { tir_new_work = fd_work `unionWorkLists` sc_work
-                              , tir_new_inert = ContinueWith workItem } }
-
-                  else -- More fundep work produced, don't do any superclass stuff, 
-                       -- just thow him back in the worklist, which will prioritize 
-                       -- the solution of fd equalities
+                      return $ SomeTopInt 
+                              { tir_new_work  = emptyWorkList
+                              , tir_new_inert = ContinueWith workItem }
+                  else -- More fundep work produced, just thow him back in the
+                       -- worklist to prioritize the solution of fd equalities
                        return $ SomeTopInt 
-                              { tir_new_work = fd_work `unionWorkLists` 
-                                               workListFromCCan workItem
+                              { tir_new_work  = fd_work `unionWorkLists` workListFromCCan workItem
                               , tir_new_inert = Stop } }
 
            GenInst wtvs ev_term ->  -- Solved 
@@ -1628,17 +1611,15 @@ doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = Wanted loc
                   ; if null wtvs
                     -- Solved in one step and no new wanted work produced. 
                     -- i.e we directly matched a top-level instance
-		    -- No point in caching this in 'inert', nor in adding superclasses
+		    -- No point in caching this in 'inert' 
                     then return $ SomeTopInt { tir_new_work  = emptyWorkList 
                                              , tir_new_inert = Stop }
 
                     -- Solved and new wanted work produced, you may cache the 
-		    -- (tentatively solved) dictionary as Derived and its superclasses
+		    -- (tentatively solved) dictionary as Derived
                     else do { let solved = makeSolvedByInst workItem
-                            ; sc_work <- newDerivedSCWork dv loc cls xis
-                                         -- See Note [Adding Derived Superclasses]
                             ; return $ SomeTopInt 
-                                  { tir_new_work  = inst_work `unionWorkLists` sc_work 
+                                  { tir_new_work  = inst_work
                                   , tir_new_inert = ContinueWith solved } }
        }          }
 
@@ -1690,64 +1671,6 @@ findClassFunDeps cls xis loc
 	   	      --     we don't use their evidence for anything
       ; canWanteds wevvars }
 \end{code}
-
-Note [Adding Derived Superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-Generally speaking, we want to be able to add derived superclasses of
-unsolved wanteds, and wanteds that have been partially being solved
-via an instance. This is important to be able to simplify the inferred
-constraints more (and to allow for recursive dictionaries, less
-importantly). Example:
-
-Inferred wanted constraint is (Eq a, Ord a), but we'd only like to
-quantify over Ord a, hence we would like to be able to add the
-superclass of Ord a as Derived and use it to solve the wanted Eq a.
-
-Hence we will add Derived superclasses in the following two cases: 
-    (1) When we meet an unsolved wanted in top-level reactions
-    (2) When we partially solve a wanted in top-level reactions using an instance decl.
-
-At that point, we have two options:
-    (1) Add transitively add *ALL* of the superclasses of the Derived
-    (2) Add only the immediate ones, but whenever we meet a Derived in
-        the future, add its own superclasses as Derived.
-
-Option (2) is terrible, because deriveds may be rewritten or kicked
-out of the inert set, which will result in slightly rewritten
-superclasses being reintroduced in the worklist and the inert set. Eg:
-
-    class C a => B a 
-    instance Foo a => B [a] 
-
-Original constraints: 
-[Wanted] d : B [a] 
-[Given] co : a ~ Int 
-
-We apply the instance to the wanted and put it and its superclasses as
-as Deriveds in the inerts:
-
-[Derived] d : B [a] 
-[Derived] (sel d) : C [a]
-
-The work is now: 
-[Given] co  : a ~ Int 
-[Wanted] d' : Foo a 
-
-Now, suppose that we interact the Derived with the Given equality, and
-kick him out of the inert, the next time around a superclass C [Int]
-will be produced -- but we already *have* C [a] in the inerts which
-will anyway get rewritten to C [Int].
-
-So we choose (1), and *never* introduce any more superclass work from
-Deriveds.  This enables yet another optimisation: If we ever meet an
-equality that can rewrite a Derived, if that Derived is a superclass
-derived (like C [a] above), i.e. not a partially solved one (like B
-[a]) above, we may simply completely *discard* that Derived. The
-reason is because somewhere in the inert lies the original wanted, or
-partially solved constraint that gave rise to that superclass, and
-that constraint *will* be kicked out, and *will* result in the
-rewritten superclass to be added in the inerts later on, anyway.
-
 
 
 Note [FunDep and implicit parameter reactions] 
@@ -1952,6 +1875,7 @@ NB: The desugarer needs be more clever to deal with equalities
 
 \begin{code}
 
+{- 
 newGivenSCWork :: EvVar -> GivenLoc -> Class -> [Xi] -> TcS WorkList
 newGivenSCWork ev loc cls xis
   | NoScSkol <- ctLocOrigin loc  -- Very important!
@@ -1976,15 +1900,7 @@ newDerivedSCWork ev loc cls xis
 
     flavor = Derived loc DerSC 
 
-newImmSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS WorkList
--- Returns immediate superclasses 
-newImmSCWorkFromFlavored ev flavor cls xis 
-  = do { let (tyvars, sc_theta, _, _) = classBigSig cls 
-             sc_theta1 = substTheta (zipTopTvSubst tyvars xis) sc_theta
-       ; sc_vars <- zipWithM inst_one sc_theta1 [0..]
-       ; mkCanonicals flavor sc_vars }
-  where
-    inst_one pred n = newGivOrDerEvVar pred (EvSuperClass ev n)
+-}
 
 
 data LookupInstResult

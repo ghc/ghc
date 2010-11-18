@@ -247,10 +247,94 @@ canClass fl v cn tys
                             else setDictBind v' (EvCast v (mkSymCoercion dict_co))
                           ; return v' }
 
-       ; return (ccs `extendCCans` CDictCan { cc_id     = v_new
-                                            , cc_flavor = fl
-                                            , cc_class  = cn 
-                                            , cc_tyargs = xis }) }
+       -- Add the superclasses of this one here, See Note [Adding superclasses]
+       ; sc_cts <- newSCWorkFromFlavored v_new fl cn xis
+
+       ; return (sc_cts `andCCan` ccs `extendCCans` CDictCan { cc_id     = v_new
+                                                             , cc_flavor = fl
+                                                             , cc_class  = cn 
+                                                             , cc_tyargs = xis }) }
+
+\end{code}
+
+Note [Adding superclasses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+Since dictionaries are canonicalized only once in their lifetime, the
+place to add their superclasses is canonicalisation (The alternative
+would be to do it during constraint solving, but we'd have to be
+extremely careful to not repeatedly introduced the same superclass in
+our worklist). Here is what we do:
+
+For Givens: 
+       We add all their superclasses as Givens. 
+
+For Wanteds: 
+       Generally speaking, we want to be able to add derived
+       superclasses of unsolved wanteds, and wanteds that have been
+       partially being solved via an instance. This is important to be
+       able to simplify the inferred constraints more (and to allow
+       for recursive dictionaries, less importantly).
+
+       Example: Inferred wanted constraint is (Eq a, Ord a), but we'd
+       only like to quantify over Ord a, hence we would like to be
+       able to add the superclass of Ord a as Derived and use it to
+       solve the wanted Eq a.
+
+For Deriveds: 
+       Deriveds either arise as wanteds that have been partially
+       solved, or as superclasses of other wanteds or deriveds. Hence,
+       their superclasses must be already there so we must do nothing
+       at al.
+
+       DV: In fact, it is probably true that the canonicaliser is
+          *never* asked to canonicalise Derived dictionaries
+
+There is one disadvantage to this. Suppose the wanted constraints are
+(Num a, Num a).  Then we'll add all the superclasses of both during
+canonicalisation, only to eliminate them later when they are
+interacted.  That seems like a waste of work.  Still, it's simple.
+
+Here's an example that demonstrates why we chose to NOT add
+superclasses during simplification: [Comes from ticket #4497]
+
+   class Num (RealOf t) => Normed t
+   type family RealOf x
+
+Assume the generated wanted constraint is: 
+   RealOf e ~ e, Normed e 
+If we were to be adding the superclasses during simplification we'd get: 
+   Num uf, Normed e, RealOf e ~ e, RealOf e ~ uf 
+==> 
+   e ~ uf, Num uf, Normed e, RealOf e ~ e 
+==> [Spontaneous solve] 
+   Num uf, Normed uf, RealOf uf ~ uf 
+
+While looks exactly like our original constraint. If we add the superclass again we'd loop. 
+By adding superclasses definitely only once, during canonicalisation, this situation can't 
+happen.
+
+\begin{code}
+newSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS CanonicalCts
+-- Returns superclasses, see Note [Adding superclasses]
+newSCWorkFromFlavored ev orig_flavor cls xis 
+  | Given loc <- orig_flavor   -- Very important!
+  , NoScSkol  <- ctLocOrigin loc
+  = return emptyCCan
+  | otherwise
+  = do { let (tyvars, sc_theta, _, _) = classBigSig cls 
+             sc_theta1 = substTheta (zipTopTvSubst tyvars xis) sc_theta
+       ; sc_vars <- zipWithM inst_one sc_theta1 [0..]
+       ; mkCanonicals flavor sc_vars }
+             -- NB: Since there is a call to mkCanonicals,
+             -- this will add *recursively* all superclasses
+  where
+    inst_one pred n = newGivOrDerEvVar pred (EvSuperClass ev n)
+    flavor = case orig_flavor of 
+               Given loc  -> Given loc
+               Wanted loc -> Derived loc DerSC
+               Derived {} -> orig_flavor
+                   -- NB: the non-immediate superclasses will show up as
+                   --     Derived, and we want their superclasses too!
 
 canIP :: CtFlavor -> EvVar -> IPName Name -> TcType -> TcS CanonicalCts
 -- See Note [Canonical implicit parameter constraints] to see why we don't 
