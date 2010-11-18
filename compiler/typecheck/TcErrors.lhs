@@ -437,14 +437,15 @@ reportTyVarEqErr ctxt tv1 ty2
     	     			-- place the equality arose to the implication site
     do { (env1, env_sigs) <- findGlobals ctxt (unitVarSet tv1)
        ; let msg = misMatchMsg ty1 ty2
-             esc_doc | isSingleton esc_skols 
-                     = ptext (sLit "because this skolem type variable would escape:")
-                     | otherwise
-                     = ptext (sLit "because these skolem type variables would escape:")
-             extra1 = vcat [ nest 2 $ esc_doc <+> pprQuotedList esc_skols
+             esc_doc = sep [ ptext (sLit "because type variable") <> plural esc_skols
+                             <+> pprQuotedList esc_skols
+                           , ptext (sLit "would escape") <+>
+                             if isSingleton esc_skols then ptext (sLit "its scope")
+                                                      else ptext (sLit "their scope") ]
+             extra1 = vcat [ nest 2 $ esc_doc
                            , sep [ (if isSingleton esc_skols 
-                                      then ptext (sLit "This skolem is")
-                                      else ptext (sLit "These skolems are"))
+                                    then ptext (sLit "This (rigid, skolem) type variable is")
+                                    else ptext (sLit "These (rigid, skolem) type variables are"))
                                    <+> ptext (sLit "bound by")
                                  , nest 2 $ pprSkolInfo (ctLocOrigin implic_loc) ] ]
        ; addErrTcM (env1, msg $$ extra1 $$ mkEnvSigMsg (ppr tv1) env_sigs) }
