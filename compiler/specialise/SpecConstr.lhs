@@ -1,3 +1,8 @@
+ToDo [Nov 2010]
+~~~~~~~~~~~~~~~
+1. Use a library type rather than an annotation for ForceSpecConstr
+2. Nuke NoSpecConstr
+
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
@@ -436,14 +441,16 @@ foldl_loop. Note that
   * And lastly, the SPEC argument is ultimately eliminated by
     SpecConstr itself so there is no runtime overhead.
 
-This is all quite ugly; we ought to come
-up with a better design.
+This is all quite ugly; we ought to come up with a better design.
 
 ForceSpecConstr arguments are spotted in scExpr' and scTopBinds which then set
-sc_force to True when calling specLoop. This flag makes specLoop and
-specialise ignore specConstrCount and specConstrThreshold when deciding
-whether to specialise a function. It also specialises even for arguments that
-aren't inspected in the loop.
+sc_force to True when calling specLoop. This flag does three things:
+  * Ignore specConstrThreshold, to specialise functions of arbitrary size
+        (see scTopBind)
+  * Ignore specConstrCount, to make arbitrary numbers of specialisations
+        (see specialise)
+  * Specialise even for arguments that are not scrutinised in the loop
+        (see argToPat; Trac #4488)
 
 What alternatives did I consider? Annotating the loop itself doesn't
 work because (a) it is local and (b) it will be w/w'ed and I having
@@ -451,12 +458,18 @@ w/w propagating annotation somehow doesn't seem like a good idea. The
 types of the loop arguments really seem to be the most persistent
 thing.
 
-Annotating the types that make up the loop state s doesn't work,
+Annotating the types that make up the loop state doesn't work,
 either, because (a) it would prevent us from using types like Either
 or tuples here, (b) we don't want to restrict the set of types that
 can be used in Stream states and (c) some types are fixed by the user
 (e.g., the accumulator here) but we still want to specialise as much
 as possible.
+
+ForceSpecConstr is done by way of an annotation:
+  data SPEC = SPEC | SPEC2
+  {-# ANN type SPEC ForceSpecConstr #-}
+But SPEC is the *only* type so annotated, so it'd be better to
+use a particular library type.
 
 Alternatives to ForceSpecConstr
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -480,6 +493,16 @@ we may end up with calls like
 Without the SPEC, if 'loop' was strict, the case would move out
 and we'd see loop applied to a pair. But if 'loop' isn' strict
 this doesn't look like a specialisable call.
+
+Note [NoSpecConstr]
+~~~~~~~~~~~~~~~~~~~
+The ignoreAltCon stuff allows you to say
+    {-# ANN type T NoSpecConstr #-}
+to mean "don't specialise on arguments of this type.  It was added
+before we had ForceSpecConstr.  Lacking ForceSpecConstr we specialised
+regardless of size; and then we needed a way to turn that *off*.  Now
+that we have ForceSpecConstr, this NoSpecConstr is probably redundant.
+(Used only for PArray.)
 
 -----------------------------------------------------
 		Stuff not yet handled
@@ -1557,7 +1580,7 @@ argToPat in_scope val_env arg arg_occ
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
 argToPat env in_scope val_env arg arg_occ
   | Just (ConVal dc args) <- isValue val_env arg
-  , not (ignoreAltCon env dc)
+  , not (ignoreAltCon env dc)        -- See Note [NoSpecConstr]
   , sc_force env || scrutinised
   = do	{ args' <- argsToPats env in_scope val_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
