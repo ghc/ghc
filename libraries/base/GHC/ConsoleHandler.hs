@@ -147,7 +147,7 @@ flushConsole h =
                         "handle is not a file descriptor" Nothing Nothing
       Just fd -> do
         throwErrnoIfMinus1Retry_ "flushConsole" $
-           flush_console_fd (fromIntegral (fdFD fd))
+           flush_console_fd (fdFD fd)
 
 foreign import ccall unsafe "consUtils.h flush_input_console__"
         flush_console_fd :: CInt -> IO CInt
