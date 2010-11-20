@@ -106,8 +106,8 @@ data Interface = Interface {
   ifaceHaddockCoverage  :: (Int,Int)
 }
 
--- | A smaller version of 'Interface' that can be created from Haddock's
--- interface files ('InterfaceFile').
+-- | A subset of the fields of 'Interface' that we store in the interface
+-- files.
 data InstalledInterface = InstalledInterface {
 
   -- | The module represented by this interface.
@@ -221,18 +221,24 @@ unrenameDocForDecl (mbDoc, fnArgsDoc) =
 
 
 -----------------------------------------------------------------------------
--- * Hyperlinking
+-- * Cross-referencing
 -----------------------------------------------------------------------------
 
 
--- | An environment used to create hyper-linked syntax.
+-- | Type of environment used to cross-reference identifiers in the syntax.
 type LinkEnv = Map Name Module
 
 
--- | An extension of 'Name' that may contain the preferred place to link to in
--- the documentation.
-data DocName = Documented Name Module | Undocumented Name deriving Eq
--- TODO: simplify to data DocName = DocName Name (Maybe Module)
+-- | Extends 'Name' with cross-reference information.
+data DocName
+  = Documented Name Module
+     -- ^ This thing is part of the (existing or resulting)
+     -- documentation. The 'Module' is the preferred place
+     -- in the documentation to refer to.
+  | Undocumented Name
+     -- ^ This thing is not part of the (existing or resulting)
+     -- documentation, as far as Haddock knows.
+  deriving Eq
 
 
 instance NamedThing DocName where
