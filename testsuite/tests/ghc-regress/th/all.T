@@ -101,8 +101,7 @@ test('TH_bracket3', normal, compile, [''])
 test('TH_class1', normal, compile, ['-v0'])
 test('TH_tuple1', normal, compile, ['-v0'])
 test('TH_genEx',
-     [extra_clean(['TH_genExLib.hi', 'TH_genExLib.o']),
-      if_compiler_lt('ghc', '6.11', expect_fail)],
+     extra_clean(['TH_genExLib.hi', 'TH_genExLib.o']),
      multimod_compile,
      ['TH_genEx', '-v0'])
 
@@ -145,14 +144,11 @@ test('T2685', extra_clean(['T2685a.hi','T2685a.o']),
 
 test('TH_sections', normal, compile, ['-v0'])
 
-test('TH_tf1', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
-test('TH_tf2', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
-test('TH_tf3', if_compiler_lt('ghc', '6.11', expect_fail), compile, ['-v0'])
+test('TH_tf1', normal, compile, ['-v0'])
+test('TH_tf2', normal, compile, ['-v0'])
+test('TH_tf3', normal, compile, ['-v0'])
 
-test('TH_pragma',
-     if_compiler_lt('ghc', '6.11', expect_fail),
-     compile,
-     ['-v0 -dsuppress-uniques'])
+test('TH_pragma', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T3177', normal, compile, ['-v0'])
 test('T3177a', normal, compile_fail, ['-v0'])
 

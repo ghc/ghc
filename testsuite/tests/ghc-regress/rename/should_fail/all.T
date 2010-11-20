@@ -65,7 +65,7 @@ test('rnfail055',
                   'RnFail055_aux.hi',  'RnFail055_aux.o']),
      multimod_compile_fail,
      ['RnFail055','-v0'])
-test('rnfail056', if_compiler_lt('ghc', '6.11', expect_fail), compile_fail, [''])
+test('rnfail056', normal, compile_fail, [''])
 
 test('rn_dup', normal, compile_fail, [''])
 test('T2310', normal, compile_fail, [''])

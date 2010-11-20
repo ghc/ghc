@@ -25,18 +25,8 @@ test('drvrun019', normal, compile_and_run, [''])
 test('drvrun020', normal, compile_and_run, [''])
 test('drvrun021', normal, compile_and_run, [''])
 test('drvrun022', reqlib('syb'), compile_and_run, ['-package syb'])
-test('T3087',
-     [if_compiler_lt('ghc', '6.11', expect_fail),
-      reqlib('syb')],
-     compile_and_run,
-     ['-package syb'])
+test('T3087', reqlib('syb'), compile_and_run, ['-package syb'])
 test('T2529', normal, compile_and_run, [''])
-test('drvrun-functor1',
-     if_compiler_lt('ghc', '6.11', expect_fail),
-     compile_and_run,
-     [''])
-test('drvrun-foldable1',
-     if_compiler_lt('ghc', '6.11', expect_fail),
-     compile_and_run,
-     [''])
+test('drvrun-functor1', normal, compile_and_run, [''])
+test('drvrun-foldable1', normal, compile_and_run, [''])
 test('T4136', normal, compile_and_run, [''])

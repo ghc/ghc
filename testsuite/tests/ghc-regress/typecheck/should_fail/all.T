@@ -161,10 +161,7 @@ test('tcfail170', normal, compile_fail, [''])
 test('tcfail171', normal, compile_fail, [''])
 test('tcfail172', normal, compile, [''])
 test('tcfail173', normal, compile_fail, [''])
-test('tcfail174',
-     if_compiler_lt('ghc', '6.11', expect_fail),
-     compile_fail,
-     [''])
+test('tcfail174', normal, compile_fail, [''])
 test('tcfail175', normal, compile_fail, [''])
 test('tcfail176', normal, compile_fail, [''])
 test('tcfail177', normal, compile_fail, [''])
@@ -181,8 +178,7 @@ test('tcfail186',
      multimod_compile_fail, ['tcfail186', '-v0'])
 test('tcfail187', normal, compile_fail, [''])
 
-test('tcfail188', if_compiler_lt('ghc', '6.13', expect_fail), compile, [''])
-# Now that #959 is fixed, tcfail188 should compile
+test('tcfail188', normal, compile, [''])
 
 test('tcfail189', normal, compile_fail, [''])
 test('tcfail190', normal, compile_fail, [''])
@@ -201,7 +197,7 @@ test('tcfail202', normal, compile_fail, [''])
 test('tcfail203', normal, compile, [''])
 test('tcfail203a', normal, compile_fail, [''])
 test('tcfail204', normal, compile_fail, [''])
-test('tcfail206', if_compiler_lt('ghc', '6.11', expect_fail), compile_fail, [''])
+test('tcfail206', normal, compile_fail, [''])
 
 test('T1899', normal, compile_fail, [''])
 test('T2126', normal, compile_fail, [''])

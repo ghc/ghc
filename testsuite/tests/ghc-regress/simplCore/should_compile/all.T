@@ -34,9 +34,7 @@ test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
 
 test('rule1', normal, compile, [''])
-test('rule2', [only_ways(['optc','optasm']),
-               if_compiler_lt('ghc', '6.13', expect_fail)],
-              compile, ['-dsuppress-uniques'])
+test('rule2', only_ways(['optc','optasm']), compile, ['-dsuppress-uniques'])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
@@ -63,8 +61,7 @@ test('spec-inline', only_ways(['optc','optasm']),
               	    ['-O2 -ddump-simpl -dsuppress-uniques'])
 
 test('T3055',
-     [extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
-      if_compiler_lt('ghc', '6.11', expect_fail)],
+     extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
      run_command,
      ['$MAKE -s --no-print-directory T3055'])
 
