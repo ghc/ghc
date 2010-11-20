@@ -43,6 +43,14 @@ ppLDocName :: Qualification -> Located DocName -> Html
 ppLDocName qual (L _ d) = ppDocName qual d
 
 
+ppDocName :: Qualification -> DocName -> Html
+ppDocName qual docName =
+  case docName of
+    Documented name mdl ->
+      linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual name mdl
+    Undocumented name -> ppQualifyName qual name (nameModule name)
+
+
 -- | Render a name depending on the selected qualification mode
 ppQualifyName :: Qualification -> Name -> Module -> Html
 ppQualifyName qual name mdl =
@@ -66,14 +74,6 @@ ppQualifyName qual name mdl =
         Just _       -> ppQualifyName FullQual name mdl
         -- some other module, D.x -> D.x
         Nothing      -> ppQualifyName FullQual name mdl
-
-
-ppDocName :: Qualification -> DocName -> Html
-ppDocName qual docName =
-  case docName of
-    Documented name mdl ->
-      linkIdOcc mdl (Just (nameOccName name)) << ppQualifyName qual name mdl
-    Undocumented name -> ppQualifyName qual name (nameModule name)
 
 
 ppFullQualName :: Module -> Name -> Html
