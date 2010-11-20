@@ -1199,27 +1199,53 @@ case $fptools_cv_timer_create_works in
 esac
 ])
 
-# FP_ARG_GMP
+# FP_ICONV
 # -------------
-AC_DEFUN([FP_ARG_GMP],
+AC_DEFUN([FP_ICONV],
 [
-AC_ARG_WITH([gmp-includes],
-  [AC_HELP_STRING([--with-gmp-includes],
-    [directory containing gmp.h])],
-    [gmp_includes=$withval],
-    [gmp_includes=NONE])
+  dnl--------------------------------------------------------------------
+  dnl * Deal with arguments telling us iconv is somewhere odd
+  dnl--------------------------------------------------------------------
 
-AC_ARG_WITH([gmp-libraries],
-  [AC_HELP_STRING([--with-gmp-libraries],
-    [directory containing gmp library])],
-    [gmp_libraries=$withval],
-    [gmp_libraries=NONE])
-])# FP_ARG_GMP
+  dnl Note: ICONV_LIB_DIRS and ICONV_INCLUDE_DIRS are not predefined
+  dnl to the empty string to allow them to be overridden from the
+  dnl environment.
 
-AC_DEFUN([CHECK_GMP],
-[AC_REQUIRE([AC_PROG_CPP])
-AC_REQUIRE([AC_PROG_CC])
-])
+  AC_ARG_WITH([iconv-includes],
+    [AC_HELP_STRING([--with-iconv-includes],
+      [directory containing iconv.h])],
+      [ICONV_INCLUDE_DIRS=$withval])
+
+  AC_ARG_WITH([iconv-libraries],
+    [AC_HELP_STRING([--with-iconv-libraries],
+      [directory containing iconv library])],
+      [ICONV_LIB_DIRS=$withval])
+
+  AC_SUBST(ICONV_INCLUDE_DIRS)
+  AC_SUBST(ICONV_LIB_DIRS)
+])# FP_ICONV
+
+# FP_GMP
+# -------------
+AC_DEFUN([FP_GMP],
+[
+  dnl--------------------------------------------------------------------
+  dnl * Deal with arguments telling us gmp is somewhere odd
+  dnl--------------------------------------------------------------------
+
+  AC_ARG_WITH([gmp-includes],
+    [AC_HELP_STRING([--with-gmp-includes],
+      [directory containing gmp.h])],
+      [GMP_INCLUDE_DIRS=$withval])
+
+  AC_ARG_WITH([gmp-libraries],
+    [AC_HELP_STRING([--with-gmp-libraries],
+      [directory containing gmp library])],
+      [GMP_LIB_DIRS=$withval])
+
+  AC_SUBST(GMP_INCLUDE_DIRS)
+  AC_SUBST(GMP_LIB_DIRS)
+])# FP_GMP
 
 # FP_CHECK_MACOSX_DEPLOYMENT_TARGET
 # ---------------------------------

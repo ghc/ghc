@@ -175,40 +175,8 @@ AC_SUBST([WithGhc])
 dnl ** Without optimization some INLINE trickery fails for GHCi
 SRC_CC_OPTS="-O"
 
-dnl Allow to specify iconv options to the toplevel configure script
-dnl so they can be properly passed to sub-builds.
-dnl Note: ICONV_LIB_DIRS and ICONV_INCLUDE_DIRS are not predefined
-dnl to the empty string to allow them to be overridden from the
-dnl environment.
-
-AC_ARG_WITH([iconv-includes],
-  [AC_HELP_STRING([--with-iconv-includes],
-    [directory containing iconv.h])],
-    [ICONV_INCLUDE_DIRS=$withval])
-
-AC_ARG_WITH([iconv-libraries],
-  [AC_HELP_STRING([--with-iconv-libraries],
-    [directory containing iconv library])],
-    [ICONV_LIB_DIRS=$withval])
-
-AC_SUBST(ICONV_INCLUDE_DIRS)
-AC_SUBST(ICONV_LIB_DIRS)
-
-dnl Allow to specify gmp options to the toplevel configure script
-dnl so they can be properly passed to sub-builds.
-
-AC_ARG_WITH([gmp-includes],
-  [AC_HELP_STRING([--with-gmp-includes],
-    [directory containing gmp.h])],
-    [GMP_INCLUDE_DIRS=$withval])
-
-AC_ARG_WITH([gmp-libraries],
-  [AC_HELP_STRING([--with-gmp-libraries],
-    [directory containing gmp library])],
-    [GMP_LIB_DIRS=$withval])
-
-AC_SUBST(GMP_INCLUDE_DIRS)
-AC_SUBST(GMP_LIB_DIRS)
+FP_ICONV
+FP_GMP
 
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
@@ -533,26 +501,22 @@ AC_SUBST([GhcLibsWithUnix])
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 
-dnl ** look for `perl', but only in /bin on Windows
+dnl ** look for `perl'
 case $HostOS_CPP in
 cygwin32|mingw32)
-      AC_CHECK_PROG(PerlCmd,perl,/bin/perl,,/bin)
-      if test -z "$PerlCmd"; then
-         echo "You must install the version of Perl shipped with GHC"
-         echo "(or a compatible one) in /bin."
-         exit 1
-      fi
-   ;;
+    PerlCmd=$hardtop/inplace/perl/perl
+    ;;
 *)
-   AC_PATH_PROG(PerlCmd,perl)
-   if test -z "$PerlCmd"; then
-      echo "You must install perl before you can continue"
-      echo "Perhaps it is already installed, but not in your PATH?"
-      exit 1
-   else
-   FPTOOLS_CHECK_PERL_VERSION
-   fi
-   ;;
+    AC_PATH_PROG(PerlCmd,perl)
+    if test -z "$PerlCmd"
+    then
+        echo "You must install perl before you can continue"
+        echo "Perhaps it is already installed, but not in your PATH?"
+        exit 1
+    else
+        FPTOOLS_CHECK_PERL_VERSION
+    fi
+    ;;
 esac
 
 dnl ** does #! path/to/perl work? (sometimes it's too long...)
