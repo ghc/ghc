@@ -1107,10 +1107,12 @@ new_layout_context strict span _buf _len = do
     (AI l _) <- getInput
     let offset = srcLocCol l
     ctx <- getContext
+    relaxed <- extension relaxedLayout
+    let strict' = strict || not relaxed
     case ctx of
 	Layout prev_off : _  | 
-	   (strict     && prev_off >= offset  ||
-	    not strict && prev_off > offset) -> do
+	   (strict'     && prev_off >= offset  ||
+	    not strict' && prev_off > offset) -> do
 		-- token is indented to the left of the previous context.
 		-- we must generate a {} sequence now.
 		pushLexState layout_left
@@ -1761,6 +1763,8 @@ recBit :: Int
 recBit = 22 -- rec
 alternativeLayoutRuleBit :: Int
 alternativeLayoutRuleBit = 23
+relaxedLayoutBit :: Int
+relaxedLayoutBit = 24
 
 always :: Int -> Bool
 always           _     = True
@@ -1804,6 +1808,8 @@ oldQualOps :: Int -> Bool
 oldQualOps flags = not (newQualOps flags)
 alternativeLayoutRule :: Int -> Bool
 alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
+relaxedLayout :: Int -> Bool
+relaxedLayout flags = testBit flags relaxedLayoutBit
 
 -- PState for parsing options pragmas
 --
@@ -1857,6 +1863,7 @@ mkPState flags buf loc =
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
                .|. newQualOpsBit `setBitIf` xopt Opt_NewQualifiedOperators flags
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
+               .|. relaxedLayoutBit `setBitIf` xopt Opt_RelaxedLayout flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
