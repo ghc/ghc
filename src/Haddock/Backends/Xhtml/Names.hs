@@ -66,8 +66,7 @@ qualifyName qual docName@(Documented name mdl) = case qual of
             -- some other module, D.x -> D.x
             Nothing      -> qualifyName FullQual docName
 
--- this is just for exhaustiveness, but already handled by ppDocName
-qualifyName _ (Undocumented name) = ppName name
+qualifyName qual (Undocumented name) = qualifyName qual (Documented name (nameModule name))
 
 
 ppDocName :: Qualification -> DocName -> Html
@@ -75,7 +74,7 @@ ppDocName qual docName@(Documented name mdl) =
   linkIdOcc mdl (Just occName) << qualifyName qual docName
     where occName = nameOccName name
 
-ppDocName _ (Undocumented name) = ppName name
+ppDocName qual docName@(Undocumented name) = qualifyName qual docName
 
 
 ppFullQualName :: Module -> Name -> Html
