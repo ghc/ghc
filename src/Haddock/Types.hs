@@ -53,99 +53,100 @@ type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
 -- lies in creating this structure. Note that the record contains some fields
 -- that are only used to create the final record, and that are not used by the
 -- backends.
-data Interface = Interface {
+data Interface = Interface
+  {
+    -- | The module behind this interface.
+    ifaceMod             :: Module
 
-  -- | The module represented by this interface.
-  ifaceMod             :: Module,
+    -- | Original file name of the module.
+  , ifaceOrigFilename    :: FilePath
 
-  -- | Original file name of the module.
-  ifaceOrigFilename    :: FilePath,
+    -- | Textual information about the module.
+  , ifaceInfo            :: !(HaddockModInfo Name)
 
-  -- | Textual information about the module.
-  ifaceInfo            :: !(HaddockModInfo Name),
+    -- | Documentation header.
+  , ifaceDoc             :: !(Maybe (Doc Name))
 
-  -- | Documentation header.
-  ifaceDoc             :: !(Maybe (Doc Name)),
+    -- | Documentation header with cross-reference information.
+  , ifaceRnDoc           :: Maybe (Doc DocName)
 
-  -- | Documentation header with link information.
-  ifaceRnDoc           :: Maybe (Doc DocName),
+    -- | Haddock options for this module (prune, ignore-exports, etc).
+  , ifaceOptions         :: ![DocOption]
 
-  -- | Haddock options for this module (prune, ignore-exports, etc).
-  ifaceOptions         :: ![DocOption],
+    -- | Declarations originating from the module. Excludes declarations without
+    -- names (instances and stand-alone documentation comments). Includes
+    -- names of subordinate declarations mapped to their parent declarations.
+  , ifaceDeclMap         :: Map Name DeclInfo
 
-  -- | Declarations originating from the module. Excludes declarations without
-  -- names (instances and stand-alone documentation comments). Includes
-  -- names of subordinate declarations mapped to their parent declarations.
-  ifaceDeclMap         :: Map Name DeclInfo,
+    -- | Documentation of declarations originating from the module (including
+    -- subordinates).
+  , ifaceRnDocMap        :: Map Name (DocForDecl DocName)
 
-  -- | Documentation of declarations originating from the module (including
-  -- subordinates).
-  ifaceRnDocMap        :: Map Name (DocForDecl DocName),
+  , ifaceSubMap          :: Map Name [Name]
 
-  ifaceSubMap          :: Map Name [Name],
+  , ifaceExportItems     :: ![ExportItem Name]
+  , ifaceRnExportItems   :: [ExportItem DocName]
 
-  ifaceExportItems     :: ![ExportItem Name],
-  ifaceRnExportItems   :: [ExportItem DocName],
+    -- | All names exported by the module.
+  , ifaceExports         :: ![Name]
 
-  -- | All names exported by the module.
-  ifaceExports         :: ![Name],
+    -- | All \"visible\" names exported by the module.
+    -- A visible name is a name that will show up in the documentation of the
+    -- module.
+  , ifaceVisibleExports  :: ![Name]
 
-  -- | All \"visible\" names exported by the module.
-  -- A visible name is a name that will show up in the documentation of the
-  -- module.
-  ifaceVisibleExports  :: ![Name],
+    -- | Instances exported by the module.
+  , ifaceInstances       :: ![Instance]
 
-  -- | Instances exported by the module.
-  ifaceInstances       :: ![Instance],
+    -- | Documentation of instances defined in the module.
+  , ifaceInstanceDocMap  :: Map Name (Doc Name)
 
-  -- | Documentation of instances defined in the module.
-  ifaceInstanceDocMap  :: Map Name (Doc Name),
+    -- | The number of haddockable and haddocked items in the module, as a
+    -- tuple. Haddockable items are the exports and the module itself.
+  , ifaceHaddockCoverage  :: (Int,Int)
+  }
 
-  -- | The number of haddockable and haddocked items in the module, as a
-  -- tuple. Haddockable items are the exports and the module itself.
-  ifaceHaddockCoverage  :: (Int,Int)
-}
 
 -- | A subset of the fields of 'Interface' that we store in the interface
 -- files.
-data InstalledInterface = InstalledInterface {
+data InstalledInterface = InstalledInterface
+  {
+    -- | The module represented by this interface.
+    instMod            :: Module
 
-  -- | The module represented by this interface.
-  instMod            :: Module,
+    -- | Textual information about the module.
+  , instInfo           :: HaddockModInfo Name
 
-  -- | Textual information about the module.
-  instInfo           :: HaddockModInfo Name,
+    -- | Documentation of declarations originating from the module (including
+    -- subordinates).
+  , instDocMap         :: Map Name (DocForDecl Name)
 
-  -- | Documentation of declarations originating from the module (including
-  -- subordinates).
-  instDocMap         :: Map Name (DocForDecl Name),
+    -- | All names exported by this module.
+  , instExports        :: [Name]
 
-  -- | All names exported by this module.
-  instExports        :: [Name],
+    -- | All \"visible\" names exported by the module.
+    -- A visible name is a name that will show up in the documentation of the
+    -- module.
+  , instVisibleExports :: [Name]
 
-  -- | All \"visible\" names exported by the module.
-  -- A visible name is a name that will show up in the documentation of the
-  -- module.
-  instVisibleExports :: [Name],
+    -- | Haddock options for this module (prune, ignore-exports, etc).
+  , instOptions        :: [DocOption]
 
-  -- | Haddock options for this module (prune, ignore-exports, etc).
-  instOptions        :: [DocOption],
-
-  instSubMap         :: Map Name [Name]
-}
+  , instSubMap         :: Map Name [Name]
+  }
 
 
 -- | Convert an 'Interface' to an 'InstalledInterface'
 toInstalledIface :: Interface -> InstalledInterface
-toInstalledIface interface = InstalledInterface {
-  instMod            = ifaceMod            interface,
-  instInfo           = ifaceInfo           interface,
-  instDocMap         = fmap unrenameDocForDecl $ ifaceRnDocMap interface,
-  instExports        = ifaceExports        interface,
-  instVisibleExports = ifaceVisibleExports interface,
-  instOptions        = ifaceOptions        interface,
-  instSubMap         = ifaceSubMap         interface
-}
+toInstalledIface interface = InstalledInterface
+  { instMod            = ifaceMod            interface
+  , instInfo           = ifaceInfo           interface
+  , instDocMap         = fmap unrenameDocForDecl $ ifaceRnDocMap interface
+  , instExports        = ifaceExports        interface
+  , instVisibleExports = ifaceVisibleExports interface
+  , instOptions        = ifaceOptions        interface
+  , instSubMap         = ifaceSubMap         interface
+  }
 
 
 -----------------------------------------------------------------------------
@@ -155,53 +156,55 @@ toInstalledIface interface = InstalledInterface {
 
 data ExportItem name
 
-  = ExportDecl {
+  -- | An exported declaration.
+  = ExportDecl
+      {
+        -- | A declaration.
+        expItemDecl :: LHsDecl name
 
-      -- | A declaration
-      expItemDecl :: LHsDecl name,
+        -- | Maybe a doc comment, and possibly docs for arguments (if this
+        -- decl is a function or type-synonym).
+      , expItemMbDoc :: DocForDecl name
 
-      -- | Maybe a doc comment, and possibly docs for arguments (if this
-      -- decl is a function or type-synonym)
-      expItemMbDoc :: DocForDecl name,
+        -- | Subordinate names, possibly with documentation.
+      , expItemSubDocs :: [(name, DocForDecl name)]
 
-      -- | Subordinate names, possibly with documentation
-      expItemSubDocs :: [(name, DocForDecl name)],
+        -- | Instances relevant to this declaration, possibly with
+        -- documentation.
+      , expItemInstances :: [DocInstance name]
+      }
 
-      -- | Instances relevant to this declaration, possibly with documentation
-      expItemInstances :: [DocInstance name]
+  -- | An exported entity for which we have no documentation (perhaps because it
+  -- resides in another package).
+  | ExportNoDecl
+      { expItemName :: name
 
-    } -- ^ An exported declaration
+        -- | Subordinate names.
+      , expItemSubs :: [name]
+      }
 
-  | ExportNoDecl {
-      expItemName :: name,
+  -- | A section heading. 
+  | ExportGroup
+      {
+        -- | Section level (1, 2, 3, ...).
+        expItemSectionLevel :: Int
 
-      -- | Subordinate names
-      expItemSubs :: [name]
+        -- | Section id (for hyperlinks).
+      , expItemSectionId :: String
 
-    } -- ^ An exported entity for which we have no
-      -- documentation (perhaps because it resides in
-      -- another package)
+        -- | Section heading text.
+      , expItemSectionText :: Doc name
+      }
 
-  | ExportGroup {
+  -- | Some documentation.
+  | ExportDoc (Doc name)
 
-      -- | Section level (1, 2, 3, ... )
-      expItemSectionLevel :: Int,
-
-      -- | Section id (for hyperlinks)
-      expItemSectionId :: String,
-
-      -- | Section heading text
-      expItemSectionText :: Doc name
-
-    } -- ^ A section heading
-
-  | ExportDoc (Doc name) -- ^ Some documentation
-
-  | ExportModule Module    -- ^ A cross-reference to another module
+  -- | A cross-reference to another module.
+  | ExportModule Module
 
 
 -- | A declaration that may have documentation, including its subordinates,
--- which may also have documentation
+-- which may also have documentation.
 type DeclInfo = (Decl, DocForDecl Name, [(Name, DocForDecl Name)])
 
 
@@ -255,8 +258,8 @@ instance NamedThing DocName where
 type DocInstance name = (InstHead name, Maybe (Doc name))
 
 
--- | The head of an instance. Consists of a context, a class name and a list of
--- instance types.
+-- | The head of an instance. Consists of a context, a class name and a list
+-- of instance types.
 type InstHead name = ([HsPred name], name, [HsType name])
 
 
@@ -303,41 +306,41 @@ exampleToString (Example expression result) =
     ">>> " ++ expression ++ "\n" ++  unlines result
 
 
-data DocMarkup id a = Markup {
-  markupEmpty         :: a,
-  markupString        :: String -> a,
-  markupParagraph     :: a -> a,
-  markupAppend        :: a -> a -> a,
-  markupIdentifier    :: [id] -> a,
-  markupModule        :: String -> a,
-  markupEmphasis      :: a -> a,
-  markupMonospaced    :: a -> a,
-  markupUnorderedList :: [a] -> a,
-  markupOrderedList   :: [a] -> a,
-  markupDefList       :: [(a,a)] -> a,
-  markupCodeBlock     :: a -> a,
-  markupURL           :: String -> a,
-  markupAName         :: String -> a,
-  markupPic           :: String -> a,
-  markupExample       :: [Example] -> a
-}
+data DocMarkup id a = Markup
+  { markupEmpty         :: a
+  , markupString        :: String -> a
+  , markupParagraph     :: a -> a
+  , markupAppend        :: a -> a -> a
+  , markupIdentifier    :: [id] -> a
+  , markupModule        :: String -> a
+  , markupEmphasis      :: a -> a
+  , markupMonospaced    :: a -> a
+  , markupUnorderedList :: [a] -> a
+  , markupOrderedList   :: [a] -> a
+  , markupDefList       :: [(a,a)] -> a
+  , markupCodeBlock     :: a -> a
+  , markupURL           :: String -> a
+  , markupAName         :: String -> a
+  , markupPic           :: String -> a
+  , markupExample       :: [Example] -> a
+  }
 
 
-data HaddockModInfo name = HaddockModInfo {
-  hmi_description :: Maybe (Doc name),
-  hmi_portability :: Maybe String,
-  hmi_stability   :: Maybe String,
-  hmi_maintainer  :: Maybe String
-}
+data HaddockModInfo name = HaddockModInfo
+  { hmi_description :: Maybe (Doc name)
+  , hmi_portability :: Maybe String
+  , hmi_stability   :: Maybe String
+  , hmi_maintainer  :: Maybe String
+  }
 
 
 emptyHaddockModInfo :: HaddockModInfo a
-emptyHaddockModInfo = HaddockModInfo {
-  hmi_description = Nothing,
-  hmi_portability = Nothing,
-  hmi_stability   = Nothing,
-  hmi_maintainer  = Nothing
-}
+emptyHaddockModInfo = HaddockModInfo
+  { hmi_description = Nothing
+  , hmi_portability = Nothing
+  , hmi_stability   = Nothing
+  , hmi_maintainer  = Nothing
+  }
 
 
 -----------------------------------------------------------------------------
@@ -348,21 +351,22 @@ emptyHaddockModInfo = HaddockModInfo {
 {-! for DocOption derive: Binary !-}
 -- | Source-level options for controlling the documentation.
 data DocOption
-  = OptHide           -- ^ This module should not appear in the docs
+  = OptHide            -- ^ This module should not appear in the docs.
   | OptPrune
-  | OptIgnoreExports  -- ^ Pretend everything is exported
-  | OptNotHome        -- ^ Not the best place to get docs for things
-                      -- exported by this module.
+  | OptIgnoreExports   -- ^ Pretend everything is exported.
+  | OptNotHome         -- ^ Not the best place to get docs for things
+                       -- exported by this module.
   deriving (Eq, Show)
 
 
 -- | Option controlling how to qualify names
 data Qualification
-  = NoQual                      -- ^ Never qualify any names
-  | FullQual                    -- ^ Qualify all names fully
-  | LocalQual (Maybe Module)    -- ^ Qualify all imported names fully
-  | RelativeQual (Maybe Module) -- ^ Like local, but strip module prefix
-                                --   from modules in the same hierarchy
+  = NoQual                       -- ^ Never qualify any names.
+  | FullQual                     -- ^ Qualify all names fully.
+  | LocalQual (Maybe Module)     -- ^ Qualify all imported names fully.
+  | RelativeQual (Maybe Module)  -- ^ Like local, but strip module prefix.
+                                 --   from modules in the same hierarchy.
+
 
 -----------------------------------------------------------------------------
 -- * Error handling
@@ -395,7 +399,7 @@ tell w = Writer ((), w)
 -- Exceptions
 
 
--- | Haddock's own exception type
+-- | Haddock's own exception type.
 data HaddockException = HaddockException String deriving Typeable
 
 
