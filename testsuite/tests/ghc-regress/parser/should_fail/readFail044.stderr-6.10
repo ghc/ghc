@@ -1,4 +1,0 @@
-read044.hs:3:15-60:
-    unknown flag in  {-# OPTIONS #-} pragma: -this-flag-does-not-exist
-read044.hs:3:15-60:
-    unknown flag in  {-# OPTIONS #-} pragma: -nor-does-this-one

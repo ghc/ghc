@@ -1,9 +1,0 @@
-
-tcfail019.hs:18:9:
-    Could not deduce (C [a], B [a]) from the context ()
-      arising from the superclasses of an instance declaration
-                   at tcfail019.hs:18:9-13
-    Possible fix:
-      add (C [a], B [a]) to the context of the instance declaration
-      or add an instance declaration for (C [a], B [a])
-    In the instance declaration for `D [a]'

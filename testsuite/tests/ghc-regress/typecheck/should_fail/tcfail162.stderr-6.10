@@ -1,5 +1,0 @@
-
-tcfail162.hs:10:15:
-    `ForeignPtr' is not applied to enough type arguments
-    Expected kind `?', but `ForeignPtr' has kind `* -> *'
-    In the data type declaration for `Foo'

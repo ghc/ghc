@@ -1,6 +1,0 @@
-
-gadt13.hs:12:5:
-    GADT pattern match in non-rigid context for `I'
-      Solution: add a type signature
-    In the pattern: I t
-    In the definition of `shw': shw (I t) = ("I " ++) . shows t

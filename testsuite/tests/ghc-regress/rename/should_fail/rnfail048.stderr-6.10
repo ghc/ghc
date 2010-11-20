@@ -1,9 +1,0 @@
-
-rnfail048.hs:11:0:
-    Duplicate INLINE pragma:
-      rnfail048.hs:11:0-17: {-# INLINE foo #-}
-      rnfail048.hs:10:0-21: {-# INLINE[~2] foo #-}
-      rnfail048.hs:9:0-20: {-# INLINE[1] foo #-}
-      rnfail048.hs:8:0-19: {-# NOINLINE foo #-}
-      rnfail048.hs:7:0-23: {-# NOINLINE[~2] foo #-}
-      rnfail048.hs:6:0-22: {-# NOINLINE[1] foo #-}

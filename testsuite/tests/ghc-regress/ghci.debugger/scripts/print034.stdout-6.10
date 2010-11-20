@@ -1,6 +1,0 @@
-o = O (_t1::t)
-()
-_t1 :: SafeList Bool NonEmpty
-o = O (One (GHC.Classes.:DEq (_t2::Bool -> Bool -> Bool)
-                             (_t3::Bool -> Bool -> Bool))
-           False (_t4::SafeList Bool Empty))

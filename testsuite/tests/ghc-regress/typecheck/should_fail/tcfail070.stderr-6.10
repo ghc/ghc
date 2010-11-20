@@ -1,4 +1,0 @@
-
-tcfail070.hs:15:14:
-    Kind error: `[Int]' is applied to too many type arguments
-    In the type synonym declaration for `State'

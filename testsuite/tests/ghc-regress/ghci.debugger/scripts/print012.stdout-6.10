@@ -1,8 +1,0 @@
-o = O (_t1::t)
-()
-_t1 :: SafeList x NonEmpty
-o = O (Cons (_t2::(GHC.Classes.:TEq) x1) (_t3::x1)
-            (_t4::SafeList x1 y))
-()
-o = O (Cons (_t5::(GHC.Classes.:TEq) Integer) 3
-            (_t6::SafeList Integer y1))
