@@ -15,20 +15,7 @@ dnl--------------------------------------------------------------------
 dnl * Deal with arguments telling us gmp is somewhere odd
 dnl--------------------------------------------------------------------
 
-FP_ARG_GMP
-
-GMP_INCLUDE_DIRS=
-GMP_LIB_DIRS=
-if test "x$gmp_libraries" != "xNONE"; then
-  LDFLAGS="-L$gmp_libraries $LDFLAGS"
-  GMP_LIB_DIRS=$gmp_libraries
-fi
-if test "x$gmp_includes" != "xNONE"; then
-  CPPFLAGS="-I$gmp_includes $CPPFLAGS"
-  GMP_INCLUDE_DIRS=$gmp_includes
-fi
-AC_SUBST(GMP_INCLUDE_DIRS)
-AC_SUBST(GMP_LIB_DIRS)
+FP_GMP
 
 #
 dnl ** Check Perl installation **
@@ -52,14 +39,9 @@ dnl ** how to do symlinks **
 AC_PROG_LN_S()
 
 #
-dnl ** how to invoke `ar' and `ranlib'
-#
-FP_PROG_AR_NEEDS_RANLIB
-
-#
 dnl ** Find the path to sed **
 #
-AC_PATH_PROG(SedCmd,sed)
+AC_PATH_PROG(SedCmd,gsed sed,sed)
 
 #
 dnl ** How to invoke gcc/cpp **
@@ -88,6 +70,11 @@ AC_SUBST(CONF_CC_OPTS_STAGE2)
 AC_SUBST(CONF_LD_OPTS_STAGE0)
 AC_SUBST(CONF_LD_OPTS_STAGE1)
 AC_SUBST(CONF_LD_OPTS_STAGE2)
+
+#
+dnl ** how to invoke `ar' and `ranlib'
+#
+FP_PROG_AR_NEEDS_RANLIB
 
 #
 AC_CONFIG_FILES(extra-gcc-opts mk/config.mk mk/install.mk)
