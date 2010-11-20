@@ -42,7 +42,6 @@ import Data.Typeable
 #ifdef mingw32_HOST_OS
 import Data.Maybe
 import GHC.Base
-import GHC.Real
 #endif
 
 data Handler
