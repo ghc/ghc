@@ -34,7 +34,7 @@ test_bindist:
 ifeq "$(Windows)" "YES"
 	mv bindisttest/a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
-	cd bindisttest/a/b/c/$(BIN_DIST_NAME) && ./configure --prefix=$(TOP)/$(BIN_DIST_INST_DIR)
+	cd bindisttest/a/b/c/$(BIN_DIST_NAME) && ./configure --prefix=$(TOP)/$(BIN_DIST_INST_DIR) --with-gcc="$(WhatGccIsCalled)"
 	cd bindisttest/a/b/c/$(BIN_DIST_NAME) && $(MAKE) install
 endif
 ifeq "$(GhcProfiled)" "NO"
