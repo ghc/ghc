@@ -104,7 +104,7 @@ threadDelay :: Int -> IO ()
 threadDelay time
   | threaded  = waitForDelayEvent time
   | otherwise = IO $ \s ->
-        case fromIntegral time of { I# time# ->
+        case time of { I# time# ->
         case delay# time# s of { s' -> (# s', () #)
         }}
 
