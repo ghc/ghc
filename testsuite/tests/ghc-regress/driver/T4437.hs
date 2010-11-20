@@ -13,6 +13,7 @@ main = do let ghcExtensions = [ ext | (ext, _, _) <- xFlags ]
               -- registered with Cabal
               expectedGhcOnlyExtensions
                   = ["PArr",
+                     "RelaxedLayout",
                      "AlternativeLayoutRule",
                      "AlternativeLayoutRuleTransitional"]
               unexpectedGhcOnlyExtension = ghcOnlyExtensions
