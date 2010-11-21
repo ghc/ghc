@@ -77,7 +77,7 @@ if [ $no_clean -eq 0 ]; then
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
-thisdir=`utils/ghc-pwd/ghc-pwd`
+thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 
 echo "Validating=YES" > mk/are-validating.mk
 

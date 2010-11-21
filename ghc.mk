@@ -435,6 +435,7 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # package-data.mk is sufficient, as that in turn depends on all the
 # libraries
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/ghc-pwd/dist/package-data.mk: compiler/stage2/package-data.mk
 
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
@@ -598,10 +599,6 @@ BUILD_DIRS += \
    $(GHC_GENAPPLY_DIR)
 endif
 
-BUILD_DIRS += \
-   utils/haddock \
-   utils/haddock/doc
-
 ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
    $(patsubst %, libraries/%, $(PACKAGES))
@@ -612,11 +609,14 @@ BUILD_DIRS += libraries/integer-gmp/gmp
 endif
 
 BUILD_DIRS += \
+   utils/haddock \
+   utils/haddock/doc \
    compiler \
    $(GHC_HSC2HS_DIR) \
    $(GHC_PKG_DIR) \
    utils/testremove \
    utils/ghctags \
+   utils/ghc-pwd \
    utils/hpc \
    utils/runghc \
    ghc
@@ -664,6 +664,7 @@ utils/ghctags_dist_DISABLE = YES
 utils/hpc_dist_DISABLE = YES
 utils/hsc2hs_dist-install_DISABLE = YES
 utils/ghc-pkg_dist-install_DISABLE = YES
+utils/ghc-pwd_dist_DISABLE = YES
 utils/mkUserGuidePart_dist_DISABLE = YES
 utils/compare_sizes_dist_DISABLE = YES
 compiler_stage2_DISABLE = YES
@@ -985,7 +986,7 @@ $(eval $(call bindist,.,\
     mk/config.mk.in \
     $(INPLACE_BIN)/mkdirhier \
     $(INPLACE_BIN)/ghc-cabal \
-    utils/ghc-pwd/ghc-pwd \
+    utils/ghc-pwd/dist/build/tmp/ghc-pwd \
     $(BINDIST_WRAPPERS) \
     $(BINDIST_PERL_SOURCES) \
     $(BINDIST_LIBS) \
@@ -1199,10 +1200,6 @@ sdist_%:
 
 .PHONY: clean
 
-CLEAN_FILES += utils/ghc-pwd/ghc-pwd
-CLEAN_FILES += utils/ghc-pwd/ghc-pwd.exe
-CLEAN_FILES += utils/ghc-pwd/ghc-pwd.hi
-CLEAN_FILES += utils/ghc-pwd/ghc-pwd.o
 CLEAN_FILES += libraries/bootstrapping.conf
 CLEAN_FILES += libraries/integer-gmp/cbits/GmpDerivedConstants.h
 CLEAN_FILES += libraries/integer-gmp/cbits/mkGmpDerivedConstants
@@ -1256,6 +1253,7 @@ distclean : clean
 	"$(RM)" $(RM_OPTS) libraries/process/include/HsProcessConfig.h
 	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h
 	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h
+	"$(RM)" $(RM_OPTS_REC) utils/ghc-pwd/dist
 
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))

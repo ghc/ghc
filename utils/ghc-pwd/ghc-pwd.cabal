@@ -11,14 +11,8 @@ Description:
 build-type: Simple
 cabal-version: >=1.2
 
-Flag base3
-  Description: Choose the new smaller, split-up base package.
-
 Executable ghc-pwd
     Main-Is: ghc-pwd.hs
-    if flag(base3)
-        Build-Depends: base       >= 3   && < 5,
-                       directory  >= 1   && < 1.1
-    else
-        Build-Depends: base < 3
+    Build-Depends: base       >= 3   && < 5,
+                   directory  >= 1   && < 1.2
 
