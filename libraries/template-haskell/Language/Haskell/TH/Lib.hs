@@ -516,12 +516,7 @@ typeFam = TypeFam
 dataFam = DataFam
 
 --------------------------------------------------------------
--- * Useful helper functions
-
-alpha :: [(Name, Name)] -> Name -> ExpQ
-alpha env s = case lookup s env of
-               Just x -> varE x
-               Nothing -> varE s
+-- * Useful helper function
 
 appsE :: [ExpQ] -> ExpQ
 appsE [] = error "appsE []"
