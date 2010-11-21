@@ -139,11 +139,15 @@ endif
 # need to depend on the libraries too.  NB. since $(ALL_STAGE1_LIBS) and
 # $(ALL_RTS_LIBS) are not defined until after libraries/*/ghc.mk have
 # been included, this introduces an ordering dependency.
+ifneq "$$(CLEANING)" "YES"
 ifneq "$3" "0"
-ifeq "$$(ALL_STAGE1_LIBS)" ""
-$$(error ordering failure in $1: $$(ALL_STAGE1_LIBS) is empty)
+ifneq "$$($1_$2_HS_SRCS)" ""
+ifeq "$$(strip $$(ALL_STAGE1_LIBS))" ""
+$$(error ordering failure in $1 ($2): ALL_STAGE1_LIBS is empty)
+endif
 endif
 $1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
+endif
 endif
 endif
 
