@@ -142,7 +142,7 @@ data History
 
 mkHistory :: HscEnv -> HValue -> BreakInfo -> History
 mkHistory hsc_env hval bi = let
-    decls = findEnclosingDecl hsc_env bi
+    decls = findEnclosingDecls hsc_env bi
     in History hval bi decls
 
 
@@ -169,9 +169,9 @@ getModBreaks hmi
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
 -- by the coverage pass, which gives the list of lexically-enclosing bindings
 -- for each tick.
-findEnclosingDecl :: HscEnv -> BreakInfo -> [String]
-findEnclosingDecl hsc_env inf =
-   let hmi = expectJust "findEnclosingDecl" $
+findEnclosingDecls :: HscEnv -> BreakInfo -> [String]
+findEnclosingDecls hsc_env inf =
+   let hmi = expectJust "findEnclosingDecls" $
              lookupUFM (hsc_HPT hsc_env) (moduleName $ breakInfo_module inf)
        mb = getModBreaks hmi
    in modBreaks_decls mb ! breakInfo_number inf

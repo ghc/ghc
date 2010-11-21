@@ -673,11 +673,11 @@ allocTickBox boxLabel pos m | isGoodSrcSpan' pos =
   sameFileName pos 
     (do e <- m; return (L pos e)) $ do
   (fvs, e) <- getFreeVars m
-  TM $ \ _env st ->
+  TM $ \ env st ->
     let c = tickBoxCount st
         ids = occEnvElts fvs
         mes = mixEntries st
-        me = (pos, declPath _env, map (nameOccName.idName) ids, boxLabel)
+        me = (pos, declPath env, map (nameOccName.idName) ids, boxLabel)
     in
     ( L pos (HsTick c ids (L pos e))
     , fvs
@@ -690,8 +690,8 @@ allocTickBox _boxLabel pos m = do e <- m; return (L pos e)
 allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
 allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
   sameFileName pos 
-    (return Nothing) $ TM $ \ _env st ->
-  let me = (pos, declPath _env, map (nameOccName.idName) ids, boxLabel)
+    (return Nothing) $ TM $ \ env st ->
+  let me = (pos, declPath env, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
       ids = occEnvElts fvs
@@ -708,10 +708,10 @@ allocBinTickBox boxLabel pos m
  | isGoodSrcSpan' pos =
  do
  e <- m
- TM $ \ _env st ->
-  let meT = (pos,declPath _env, [],boxLabel True)
-      meF = (pos,declPath _env, [],boxLabel False)
-      meE = (pos,declPath _env, [],ExpBox False)
+ TM $ \ env st ->
+  let meT = (pos,declPath env, [],boxLabel True)
+      meF = (pos,declPath env, [],boxLabel False)
+      meE = (pos,declPath env, [],ExpBox False)
       c = tickBoxCount st
       mes = mixEntries st
   in 
