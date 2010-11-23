@@ -31,7 +31,7 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     then
         $2="$$2 -fno-stack-protector"
     fi
-    rm conftest.c conftest.o
+    rm -f conftest.c conftest.o
 ])
 
 
