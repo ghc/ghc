@@ -294,6 +294,11 @@ findEditor = do
 
 foreign import ccall unsafe "rts_isProfiled" isProfiled :: IO CInt
 
+default_progname = "<interactive>"
+default_args = []
+default_prompt = "%s> "
+default_stop = ""
+
 interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI srcs maybe_exprs = do
@@ -344,10 +349,10 @@ interactiveUI srcs maybe_exprs = do
    default_editor <- liftIO $ findEditor
 
    startGHCi (runGHCi srcs maybe_exprs)
-        GHCiState{ progname = "<interactive>",
-                   args = [],
-                   prompt = "%s> ",
-                   stop = "",
+        GHCiState{ progname = default_progname,
+                   args = default_args,
+                   prompt = default_prompt,
+                   stop = default_stop,
                    editor = default_editor,
 --                   session = session,
                    options = [],
@@ -1518,22 +1523,32 @@ newDynFlags minus_opts = do
 
 unsetOptions :: String -> GHCi ()
 unsetOptions str
-  = do -- first, deal with the GHCi opts (+s, +t, etc.)
-       let opts = words str
-	   (minus_opts, rest1) = partition isMinus opts
-	   (plus_opts, rest2)  = partitionWith isPlus rest1
+  =   -- first, deal with the GHCi opts (+s, +t, etc.)
+     let opts = words str
+         (minus_opts, rest1) = partition isMinus opts
+         (plus_opts, rest2)  = partitionWith isPlus rest1
+         (other_opts, rest3) = partition (`elem` map fst defaulters) rest2
 
-       if (not (null rest2)) 
-	  then liftIO (putStrLn ("unknown option: '" ++ head rest2 ++ "'"))
-	  else do
+         defaulters = 
+           [ ("args"  , setArgs default_args)
+           , ("prog"  , setProg default_progname)
+           , ("prompt", setPrompt default_prompt)
+           , ("editor", liftIO findEditor >>= setEditor)
+           , ("stop"  , setStop default_stop)
+           ]
 
-       mapM_ unsetOpt plus_opts
- 
-       let no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
-           no_flag f = ghcError (ProgramError ("don't know how to reverse " ++ f))
+         no_flag ('-':'f':rest) = return ("-fno-" ++ rest)
+         no_flag f = ghcError (ProgramError ("don't know how to reverse " ++ f))
 
-       no_flags <- mapM no_flag minus_opts
-       newDynFlags no_flags
+     in if (not (null rest3))
+           then liftIO (putStrLn ("unknown option: '" ++ head rest3 ++ "'"))
+           else do
+             mapM_ (fromJust.flip lookup defaulters) other_opts
+
+             mapM_ unsetOpt plus_opts
+
+             no_flags <- mapM no_flag minus_opts
+             newDynFlags no_flags
 
 isMinus :: String -> Bool
 isMinus ('-':_) = True
