@@ -462,7 +462,6 @@ EXECUTABLE_FILE = chmod +x
 # $(GHC), $(HBC) and $(NHC) point to installed versions of the relevant
 # compilers, if available.
 #
-# $(HC) is a generic Haskell 98 compiler, set to $(GHC) by default.
 # $(MKDEPENDHS) is the Haskell dependency generator (ghc -M).
 #
 # NOTE: Don't override $(GHC) in build.mk, use configure --with-ghc instead

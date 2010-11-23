@@ -584,7 +584,7 @@ pprTvBndr tv | isLiftedTypeKind kind = ppr tv
 
 Note [Infix type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Haskell 98 you can say
+With TypeOperators you can say
 
    f :: (a ~> b) -> b
 

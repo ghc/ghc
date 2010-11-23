@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 2007-2009
  *
- * File locking support as required by Haskell 98
+ * File locking support as required by Haskell
  *
  * Do not #include this file directly: #include "Rts.h" instead.
  *

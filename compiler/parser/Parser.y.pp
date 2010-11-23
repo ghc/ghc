@@ -1356,8 +1356,8 @@ aexp2	:: { LHsExpr RdrName }
 	| RATIONAL			{ sL (getLoc $1) (HsOverLit $! mkHsFractional (getRATIONAL $1) placeHolderType) }
 
         -- N.B.: sections get parsed by these next two productions.
-        -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't correct Haskell98
-        -- (you'd have to write '((+ 3), (4 -))')
+        -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't
+        -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
 	| '(' texp ')'			{ LL (HsPar $2) }
 	| '(' tup_exprs ')'             { LL (ExplicitTuple $2 Boxed) }
@@ -1417,8 +1417,8 @@ texp :: { LHsExpr RdrName }
 	-- Note [Parsing sections]
 	-- ~~~~~~~~~~~~~~~~~~~~~~~
 	-- We include left and right sections here, which isn't
-	-- technically right according to Haskell 98.  For example
-	--	(3 +, True) isn't legal
+	-- technically right according to the Haskell standard.
+        -- For example (3 +, True) isn't legal.
 	-- However, we want to parse bang patterns like
 	--	(!x, !y)
 	-- and it's convenient to do so here as a section

@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 2005
  *
- * RTS entry points as mandated by the FFI addendum to the Haskell 98 report
+ * RTS entry points as mandated by the FFI section of the Haskell report
  *
  * ---------------------------------------------------------------------------*/
 

@@ -3,8 +3,9 @@
 <indexterm><primary>language, GHC</primary></indexterm>
 <indexterm><primary>extensions, GHC</primary></indexterm>
 As with all known Haskell systems, GHC implements some extensions to
-the language.  They are all enabled by options; by default GHC
-understands only plain Haskell 98.
+the language.  They can all be enabled or disabled by commandline flags
+or language pragmas. By default GHC understands the most recent Haskell
+version it supports, plus a handful of extensions.
 </para>
 
 <para>
@@ -39,8 +40,7 @@ documentation</ulink> describes all the libraries that come with GHC.
     </indexterm>
 
     <para>The language option flags control what variation of the language are
-    permitted.  Leaving out all of them gives you standard Haskell
-    98.</para>
+    permitted.</para>
 
     <para>Language options can be controlled in two ways:
     <itemizedlist>
@@ -439,10 +439,10 @@ Indeed, the bindings can even be recursive.
 	  <listitem><para> <literal>'x'&num;</literal> has type <literal>Char&num;</literal></para> </listitem>
 	  <listitem><para> <literal>&quot;foo&quot;&num;</literal> has type <literal>Addr&num;</literal></para> </listitem>
 	  <listitem><para> <literal>3&num;</literal> has type <literal>Int&num;</literal>. In general,
-	  any Haskell 98 integer lexeme followed by a <literal>&num;</literal> is an <literal>Int&num;</literal> literal, e.g.
+	  any Haskell integer lexeme followed by a <literal>&num;</literal> is an <literal>Int&num;</literal> literal, e.g.
             <literal>-0x3A&num;</literal> as well as <literal>32&num;</literal></para>.</listitem>
 	  <listitem><para> <literal>3&num;&num;</literal> has type <literal>Word&num;</literal>. In general,
-	  any non-negative Haskell 98 integer lexeme followed by <literal>&num;&num;</literal> 
+	  any non-negative Haskell integer lexeme followed by <literal>&num;&num;</literal>
 	      is a <literal>Word&num;</literal>. </para> </listitem>
 	  <listitem><para> <literal>3.2&num;</literal> has type <literal>Float&num;</literal>.</para> </listitem>
 	  <listitem><para> <literal>3.2&num;&num;</literal> has type <literal>Double&num;</literal></para> </listitem>
@@ -460,11 +460,11 @@ Indeed, the bindings can even be recursive.
         option.  In the new syntax, the prefix form of a qualified
         operator is
         written <literal><replaceable>module</replaceable>.(<replaceable>symbol</replaceable>)</literal>
-        (in Haskell 98 this would
+        (without NewQualifiedOperators this would
         be <literal>(<replaceable>module</replaceable>.<replaceable>symbol</replaceable>)</literal>),
         and the infix form is
         written <literal>`<replaceable>module</replaceable>.(<replaceable>symbol</replaceable>)`</literal>
-        (in Haskell 98 this would
+        (without NewQualifiedOperators this would
         be <literal>`<replaceable>module</replaceable>.<replaceable>symbol</replaceable>`</literal>.
         For example:
 <programlisting>
@@ -476,13 +476,13 @@ Indeed, the bindings can even be recursive.
         like <literal>Prelude..</literal>.  For example,
         when <literal>NewQualifiedOperators</literal> is on, it is possible to
         write the enumerated sequence <literal>[Monday..]</literal>
-        without spaces, whereas in Haskell 98 this would be a
+        without spaces, whereas without NewQualifiedOperators this would be a
         reference to the operator &lsquo;<literal>.</literal>&lsquo;
         from module <literal>Monday</literal>.</para>
 
-      <para>When <option>-XNewQualifiedOperators</option> is on, the old Haskell
-        98 syntax for qualified operators is not accepted, so this
-        option may cause existing Haskell 98 code to break.</para>
+      <para>When <option>-XNewQualifiedOperators</option> is on, the old
+        syntax for qualified operators is not accepted, so this
+        option may cause existing code to break.</para>
 
     </sect2>
         

@@ -49,9 +49,7 @@ system isn't available yet, please try again later.
 Background
 ~~~~~~~~~~
 
-Haskell is a standard lazy functional programming language; the
-current language version is Haskell 98, agreed in December 1998 and
-revised December 2002.
+Haskell is a standard lazy functional programming language.
 
 GHC is a state-of-the-art programming suite for Haskell.  Included is
 an optimising compiler generating good code for a variety of

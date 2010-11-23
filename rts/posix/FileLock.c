@@ -2,7 +2,7 @@
  *
  * (c) The GHC Team, 2007
  *
- * File locking support as required by Haskell 98
+ * File locking support as required by Haskell
  *
  * ---------------------------------------------------------------------------*/
  

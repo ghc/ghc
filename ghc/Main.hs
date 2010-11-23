@@ -639,7 +639,7 @@ showBanner _postLoadMode dflags = do
    when (verb >= 2) $
     do hPutStr stderr "Glasgow Haskell Compiler, Version "
        hPutStr stderr cProjectVersion
-       hPutStr stderr ", for Haskell 98, stage "
+       hPutStr stderr ", stage "
        hPutStr stderr cStage
        hPutStr stderr " booted by GHC version "
        hPutStrLn stderr cBooterVersion
