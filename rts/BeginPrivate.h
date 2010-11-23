@@ -5,6 +5,6 @@
 /* On Windows, with gcc 4.5.0-1, using visibility hidden gives:
        error: visibility attribute not supported in this configuration; ignored
    */
-#if __GNUC__ >= 4 && !defined(freebsd_HOST_OS) && !defined(mingw32_HOST_OS)
+#if defined(HAS_VISIBILITY_HIDDEN) && !defined(freebsd_HOST_OS)
 #pragma GCC visibility push(hidden)
 #endif

@@ -835,6 +835,8 @@ AC_COMPILE_IFELSE(
     [AC_MSG_RESULT(no)])
 CFLAGS="$CFLAGS2"
 
+FP_VISIBILITY_HIDDEN
+
 dnl ** check for librt
 AC_CHECK_LIB(rt, clock_gettime)
 AC_CHECK_FUNCS(clock_gettime timer_create timer_settime)
