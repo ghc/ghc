@@ -1,8 +1,10 @@
-Changes in version 2.8.2
+Changes in the version that comes with GHC 7.0.1
+  
+  [This version claims it is 2.8.0 but is actually based on 2.8.1]
 
-  * Add support for GHC 7.0.1 and drop support for older versions
+  * Fix URL creation on Windows: Use / not \ in URLs.
 
-  * Various fixes
+  * Support GHC 7.0
 
 Changes in version 2.8.1
 
