@@ -788,6 +788,61 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
         <term>
+          <indexterm><primary><option>-q</option></primary></indexterm>
+          <option>-q</option> <replaceable>mode</replaceable>
+        </term>
+        <term>
+          <indexterm><primary><option>--qual</option></primary></indexterm>
+          <option>--qual</option>=<replaceable>mode</replaceable>
+        </term>
+        <listitem>
+            <para>
+                Specify how identifiers are qualified.
+            </para>
+            <para>
+                <replaceable>mode</replaceable> should be one of
+                <itemizedlist>
+                    <listitem>
+                        <para>none (default): don't qualify any identifiers</para>
+                    </listitem>
+                    <listitem>
+                        <para>full: always qualify identifiers completely</para>
+                    </listitem>
+                    <listitem>
+                        <para>local: only qualify identifiers that are not part
+                            of the module</para>
+                    </listitem>
+                    <listitem>
+                        <para>relative: like local, but strip name of the module
+                            from qualifications of identifiers in submodules</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <para>
+                Example: If you generate documentation for module A, then the
+                identifiers A.x, A.B.y and C.z are qualified as follows.
+            </para>
+            <para>
+                <itemizedlist>
+                    <listitem>
+                        none: x, y, z
+                    </listitem>
+                    <listitem>
+                        full: A.x, A.B.y, C.z
+                    </listitem>
+                    <listitem>
+                        local: x, A.B.y, C.z
+                    </listitem>
+                    <listitem>
+                        relative: x, B.y, C.z
+                    </listitem>
+                </itemizedlist>
+	        </para>
+	    </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <indexterm><primary><option>-d</option></primary></indexterm>
           <option>-d</option>
         </term>
