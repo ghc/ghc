@@ -1120,8 +1120,8 @@ new_layout_context strict span _buf _len = do
     (AI l _) <- getInput
     let offset = srcLocCol l
     ctx <- getContext
-    relaxed <- extension relaxedLayout
-    let strict' = strict || not relaxed
+    nondecreasing <- extension nondecreasingIndentation
+    let strict' = strict || not nondecreasing
     case ctx of
 	Layout prev_off : _  | 
 	   (strict'     && prev_off >= offset  ||
@@ -1778,6 +1778,8 @@ alternativeLayoutRuleBit :: Int
 alternativeLayoutRuleBit = 23
 relaxedLayoutBit :: Int
 relaxedLayoutBit = 24
+nondecreasingIndentationBit :: Int
+nondecreasingIndentationBit = 25
 
 always :: Int -> Bool
 always           _     = True
@@ -1823,6 +1825,8 @@ alternativeLayoutRule :: Int -> Bool
 alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
 relaxedLayout :: Int -> Bool
 relaxedLayout flags = testBit flags relaxedLayoutBit
+nondecreasingIndentation :: Int -> Bool
+nondecreasingIndentation flags = testBit flags nondecreasingIndentationBit
 
 -- PState for parsing options pragmas
 --
@@ -1877,6 +1881,7 @@ mkPState flags buf loc =
                .|. newQualOpsBit `setBitIf` xopt Opt_NewQualifiedOperators flags
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
                .|. relaxedLayoutBit `setBitIf` xopt Opt_RelaxedLayout flags
+               .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

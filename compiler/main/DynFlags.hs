@@ -361,6 +361,7 @@ data ExtensionFlag
    | Opt_AlternativeLayoutRule
    | Opt_AlternativeLayoutRuleTransitional
    | Opt_DatatypeContexts
+   | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
    deriving (Eq, Show)
 
@@ -795,6 +796,7 @@ languageExtensions Nothing
       -- In due course I'd like Opt_MonoLocalBinds to be on by default
       -- But NB it's implied by GADTs etc
       -- SLPJ September 2010
+    : Opt_NondecreasingIndentation -- This has been on by default for some time
     : Opt_RelaxedLayout -- This has been on by default for some time
     : languageExtensions (Just Haskell2010)
 
@@ -1593,6 +1595,7 @@ xFlags = [
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
   ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, nop ),
   ( "DatatypeContexts",                 Opt_DatatypeContexts, nop ),
+  ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
   ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec, 
