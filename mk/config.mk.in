@@ -457,12 +457,9 @@ GENERATED_FILE  = chmod a-w
 EXECUTABLE_FILE = chmod +x
 
 #-----------------------------------------------------------------------------
-# Haskell compilers and mkdependHS
+# Installed GHC
 
-# $(GHC), $(HBC) and $(NHC) point to installed versions of the relevant
-# compilers, if available.
-#
-# $(MKDEPENDHS) is the Haskell dependency generator (ghc -M).
+# $(GHC) points to installed version of the compiler.
 #
 # NOTE: Don't override $(GHC) in build.mk, use configure --with-ghc instead
 # (because the version numbers have to be calculated).
@@ -479,9 +476,6 @@ GhcDir          = $(dir $(GHC))
 
 # Set to YES if $(GHC) has the editline package installed
 GhcHasEditline	= @GhcHasEditline@
-
-HBC		= @HBC@
-NHC		= @NHC@
 
 # Sometimes we want to invoke ghc from the build tree in different
 # places (eg. it's handy to have a nofib & a ghc build in the same

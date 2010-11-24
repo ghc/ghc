@@ -381,9 +381,6 @@ AC_ARG_WITH(hc,
 )
 AC_SUBST(WithHc)
 
-AC_PATH_PROGS(NHC,nhc nhc98)
-AC_PATH_PROG(HBC,hbc)
-
 # This uses GHC, so put it after the "GHC is required" check above:
 FP_INTREE_GHC_PWD
 FP_FIND_ROOT
