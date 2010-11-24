@@ -194,11 +194,10 @@ iconvRecode iconv_t
 	else do
       errno <- getErrno
       case errno of
-	e |  e == eINVAL 
-          || (e == e2BIG || e == eILSEQ) && new_inleft' /= (iw-ir) -> do
+        e |  e == eINVAL || e == e2BIG
+          || e == eILSEQ && new_inleft' /= (iw-ir) -> do
             iconv_trace ("iconv ignoring error: " ++ show (errnoToIOError "iconv" e Nothing Nothing))
-		-- Output overflow is relatively harmless, unless
-		-- we made no progress at all.  
+                -- Output overflow is harmless
                 --
                 -- Similarly, we ignore EILSEQ unless we converted no
                 -- characters.  Sometimes iconv reports EILSEQ for a
@@ -211,8 +210,9 @@ iconvRecode iconv_t
                 -- the buffer have been drained.
             return (new_input, new_output)
 
-	_other -> 
-		throwErrno "iconvRecoder" 
+        e -> do
+                iconv_trace ("iconv returned error: " ++ show (errnoToIOError "iconv" e Nothing Nothing))
+                throwErrno "iconvRecoder"
 			-- illegal sequence, or some other error
 
 #endif /* !mingw32_HOST_OS */
