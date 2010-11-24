@@ -211,7 +211,7 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- context if the curly brace is missing.
 -- Careful! This stuff is quite delicate.
 <layout, layout_do> {
-  \{ / { notFollowedBy '-' }		{ pop_and open_brace }
+  \{ / { notFollowedBy '-' }		{ hopefully_open_brace }
 	-- we might encounter {-# here, but {- has been handled already
   \n					;
   ^\# (line)?				{ begin line_prag1 }
@@ -756,6 +756,19 @@ begin code _span _str _len = do pushLexState code; lexToken
 pop :: Action
 pop _span _buf _len = do _ <- popLexState
                          lexToken
+
+hopefully_open_brace :: Action
+hopefully_open_brace span buf len
+ = do relaxed <- extension relaxedLayout
+      ctx <- getContext
+      (AI l _) <- getInput
+      let offset = srcLocCol l
+          isOK = relaxed ||
+                 case ctx of
+                 Layout prev_off : _ -> prev_off < offset
+                 _                   -> True
+      if isOK then pop_and open_brace span buf len
+              else failSpanMsgP span (text "Missing block")
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
