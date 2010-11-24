@@ -1,8 +1,7 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -#include "HsBase.h" #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
-{-# OPTIONS_GHC -XRecordWildCards #-}
 {-# OPTIONS_HADDOCK hide #-}
+{-# LANGUAGE NoImplicitPrelude, RecordWildCards, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |

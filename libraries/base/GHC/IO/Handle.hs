@@ -1,5 +1,6 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -XRecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
+{-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Handle
