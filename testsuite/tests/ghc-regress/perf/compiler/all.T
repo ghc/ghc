@@ -6,7 +6,7 @@ test('T1969',
                              #                 15 (x86/OS X)
                              #                 19 (x86/OS X)
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 26,
+          compiler_stats_num_field('peak_megabytes_allocated', 24,
                                                                32)),
                                              # expected value: 28 (amd64/Linux)
                                              # expected value: 32 (amd64/Linux)
