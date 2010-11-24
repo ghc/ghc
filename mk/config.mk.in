@@ -474,9 +474,6 @@ endif
 
 GhcDir          = $(dir $(GHC))
 
-# Set to YES if $(GHC) has the editline package installed
-GhcHasEditline	= @GhcHasEditline@
-
 # Sometimes we want to invoke ghc from the build tree in different
 # places (eg. it's handy to have a nofib & a ghc build in the same
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
