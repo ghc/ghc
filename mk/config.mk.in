@@ -472,8 +472,6 @@ ifneq "$(wildcard $(GHC).exe)" ""
 GHC := $(GHC).exe
 endif
 
-GhcDir          = $(dir $(GHC))
-
 # Sometimes we want to invoke ghc from the build tree in different
 # places (eg. it's handy to have a nofib & a ghc build in the same
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
