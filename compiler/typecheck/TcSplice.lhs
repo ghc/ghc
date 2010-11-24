@@ -943,8 +943,8 @@ illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (withou
 lookupClassInstances :: TH.Name -> [TH.Type] -> TcM [TH.Name]
 lookupClassInstances c ts
    = do { loc <- getSrcSpanM
-        ; case convertToHsPred loc (TH.ClassP c ts) of
-            Left msg -> failWithTc msg
+        ; case convertToHsPred loc (TH.ClassP c ts) of {
+            Left msg -> failWithTc msg;
             Right rdr_pred -> do
         { rn_pred <- rnLPred doc rdr_pred	-- Rename
         ; kc_pred <- kcHsLPred rn_pred		-- Kind check
@@ -954,7 +954,7 @@ lookupClassInstances c ts
         ; inst_envs <- tcGetInstEnvs
         ; let (matches, unifies) = lookupInstEnv inst_envs cls tys
               dfuns = map is_dfun (map fst matches ++ unifies)
-        ; return (map reifyName dfuns) } }
+        ; return (map reifyName dfuns) } } }
   where
     doc = ptext (sLit "TcSplice.classInstances")
 \end{code}
