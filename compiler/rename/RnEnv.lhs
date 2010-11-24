@@ -551,21 +551,21 @@ lookupBindGroupOcc :: Maybe NameSet  -- See notes on the (Maybe NameSet)
 --
 -- See Note [Looking up signature names]
 lookupBindGroupOcc mb_bound_names what rdr_name
-  = do	{ local_env <- getLocalRdrEnv
-	; case lookupLocalRdrEnv local_env rdr_name of 
-  	    Just n  -> check_local_name n
-  	    Nothing -> do	-- Not defined in a nested scope
+  = do  { local_env <- getLocalRdrEnv
+        ; case lookupLocalRdrEnv local_env rdr_name of 
+            Just n  -> check_local_name n
+            Nothing -> do       -- Not defined in a nested scope
 
         { env <- getGlobalRdrEnv 
-  	; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-	; case (filter isLocalGRE gres) of
-	    (gre:_) -> check_local_name (gre_name gre)
-			-- If there is more than one local GRE for the 
-			-- same OccName 'f', that will be reported separately
-			-- as a duplicate top-level binding for 'f'
-	    [] | null gres -> bale_out_with empty
-	       | otherwise -> bale_out_with import_msg
-  	}}
+        ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+        ; case (filter isLocalGRE gres) of
+            (gre:_) -> check_local_name (gre_name gre)
+                        -- If there is more than one local GRE for the 
+                        -- same OccName 'f', that will be reported separately
+                        -- as a duplicate top-level binding for 'f'
+            [] | null gres -> bale_out_with empty
+               | otherwise -> bale_out_with import_msg
+        }}
     where
       check_local_name name 	-- The name is in scope, and not imported
   	  = case mb_bound_names of
