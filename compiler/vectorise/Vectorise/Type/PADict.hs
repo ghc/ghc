@@ -60,6 +60,7 @@ buildPADict vect_tc prepr_tc arr_tc repr
 			tvs		-- tyvars of class
 			[]		-- fundeps
 			[]		-- superclass predicates
+			0		-- number of equalities
 			[]		-- superclass dict selectors
 			[]		-- associated type families
 			pa_opitems	-- class op items
