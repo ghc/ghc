@@ -1549,6 +1549,9 @@ argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
 -}
 
 argToPat env in_scope val_env (Cast arg co) arg_occ
+  | isIdentityCoercion co     -- Substitution in the SpecConstr itself
+                              -- can lead to identity coercions
+  = argToPat env in_scope val_env arg arg_occ
   | not (ignoreType env ty2)
   = do	{ (interesting, arg') <- argToPat env in_scope val_env arg arg_occ
 	; if not interesting then 
