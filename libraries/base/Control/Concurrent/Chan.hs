@@ -46,6 +46,7 @@ import Data.Typeable
 data Chan a
  = Chan (MVar (Stream a))
         (MVar (Stream a))
+   deriving Eq
 
 INSTANCE_TYPEABLE1(Chan,chanTc,"Chan")
 
@@ -93,6 +94,9 @@ readChan (Chan readVar _) = do
 -- either channel from then on will be available from both.  Hence this creates
 -- a kind of broadcast channel, where data written by anyone is seen by
 -- everyone else.
+--
+-- (Note that a duplicated channel is not equal to its original.
+-- So: @fmap (c /=) $ dupChan c@ returns @True@ for all @c@.)
 dupChan :: Chan a -> IO (Chan a)
 dupChan (Chan _ writeVar) = do
    hole       <- readMVar writeVar
