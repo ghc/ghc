@@ -156,3 +156,5 @@ test('openTempFile001', normal, compile_and_run, [''])
 test('T4113', normal, compile_and_run, [''])
 
 test('T4144', normal, compile_and_run, [''])
+
+test('encodingerror001', normal, compile_and_run, [''])
