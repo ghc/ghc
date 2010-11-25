@@ -28,7 +28,7 @@ module CoreSubst (
 	cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
 	-- ** Simple expression optimiser
-	simpleOptPgm, simpleOptExpr
+        simpleOptPgm, simpleOptExpr, simpleOptExprWith
     ) where
 
 #include "HsVersions.h"
@@ -307,13 +307,12 @@ subst_expr subst expr
     go (Lit lit)       = Lit lit
     go (App fun arg)   = App (go fun) (go arg)
     go (Note note e)   = Note (go_note note) (go e)
-    go (Cast e co) 
-      | isIdentityCoercion co' = go e
-      | otherwise              = Cast (go e) co'
-      where
-        co' = optCoercion (getTvSubst subst) co
-	-- Optimise coercions as we go; this is good, for example
-	-- in the RHS of rules, which are only substituted in
+    go (Cast e co)     = Cast (go e) (optCoercion (getTvSubst subst) co)
+       -- Do not optimise even identity coercions
+       -- Reason: substitution applies to the LHS of RULES, and
+       --         if you "optimise" an identity coercion, you may
+       --         lose a binder. We optimise the LHS of rules at
+       --         construction time
 
     go (Lam bndr body) = Lam bndr' (subst_expr subst' body)
 		       where
@@ -633,7 +632,9 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
                       	then subst_ru_fn fn_name 
                       	else fn_name,
 	   ru_args  = map (substExpr (text "subst-rule" <+> ppr fn_name) subst') args,
-	   ru_rhs   = substExpr (text "subst-rule" <+> ppr fn_name) subst' rhs }
+           ru_rhs   = simpleOptExprWith subst' rhs }
+           -- Do simple optimisation on RHS, in case substitution lets
+           -- you improve it.  The real simplifier never gets to look at it.
   where
     (subst', bndrs') = substBndrs subst bndrs
 
@@ -678,7 +679,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 
 simpleOptExpr expr
   = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    simple_opt_expr init_subst (occurAnalyseExpr expr)
+    simpleOptExprWith init_subst expr
   where
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
 	-- It's potentially important to make a proper in-scope set
@@ -690,6 +691,9 @@ simpleOptExpr expr
 	--
 	-- It's a bit painful to call exprFreeVars, because it makes
 	-- three passes instead of two (occ-anal, and go)
+
+simpleOptExprWith :: Subst -> InExpr -> OutExpr
+simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
 
 ----------------------
 simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> IO ([CoreBind], [CoreRule])
