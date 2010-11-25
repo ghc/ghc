@@ -19,11 +19,11 @@ import TypeRep
 import Id
 import Var
 import Name
-import Outputable
 import Class
+import Outputable
 
-debug		= False
-dtrace s x	= if debug then pprTrace "Vectoris.Type.PADict" s x else x
+-- debug		= False
+-- dtrace s x	= if debug then pprTrace "Vectoris.Type.PADict" s x else x
 
 -- | Build the PA dictionary for some type and hoist it to top level.
 --   The PA dictionary holds fns that convert values to and from their vectorised representations.
@@ -35,9 +35,10 @@ buildPADict
 	-> VM Var	-- ^ name of the top-level dictionary function.
 
 buildPADict vect_tc prepr_tc arr_tc repr
- = dtrace (text "buildPADict" <+> ppr vect_tc <+> ppr prepr_tc <+> ppr arr_tc)
- $ polyAbstract tvs $ \args@[] ->
- do
+ = polyAbstract tvs $ \args ->
+ case args of
+  (_:_) -> pprPanic "Vectorise.Type.PADict.buildPADict" (text "why do we need superclass dicts?")
+  [] -> do
       -- TODO: I'm forcing args to [] because I'm not sure why we need them.
       --       class PA has superclass (PR (PRepr a)) but we're not using
       --       the superclass dictionary to build the PA dictionary.
@@ -50,8 +51,6 @@ buildPADict vect_tc prepr_tc arr_tc repr
       let dict = mkLams (tvs ++ args)
                $ mkConApp pa_dc
                $ Type inst_ty : map (method_call args) method_ids
-
-      dtrace (text "dict    = " <+> ppr dict) $ return ()
 
       -- Build the type of the dictionary function.
       pa_tc          <- builtin paTyCon
