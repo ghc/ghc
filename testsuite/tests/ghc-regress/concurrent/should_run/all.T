@@ -43,6 +43,10 @@ test('async001', normal, compile_and_run, [''])
 
 test('numsparks001', only_ways(['threaded1']), compile_and_run, [''])
 
+test('4262', [ only_ways(['threaded1']),
+               unless_os('linux',skip) ],
+             compile_and_run, [''])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
