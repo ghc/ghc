@@ -63,9 +63,9 @@ buildPADict vect_tc prepr_tc arr_tc repr
       $ do
           expr     <- build vect_tc prepr_tc arr_tc repr
           let body = mkLams (tvs ++ args) expr
-          raw_var <- newExportedVar (method_name name) (exprType body)
-          let var = raw_var
-                      `setIdUnfolding` mkInlineRule body (Just (length args))
+          raw_var  <- newExportedVar (method_name name) (exprType body)
+          let var  = raw_var
+                      `setIdUnfolding` mkInlineUnfolding (Just (length args)) body
                       `setInlinePragma` alwaysInlinePragma
           hoistBinding var body
           return var
