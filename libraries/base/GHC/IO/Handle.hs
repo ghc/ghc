@@ -417,14 +417,17 @@ hTell handle =
 
       posn <- IODevice.tell haDevice
 
-      cbuf <- readIORef haCharBuffer
+      -- we can't tell the real byte offset if there are buffered
+      -- Chars, so must flush first:
+      flushCharBuffer handle_
+
       bbuf <- readIORef haByteBuffer
 
-      let real_posn 
-           | isWriteBuffer cbuf = posn + fromIntegral (bufR cbuf)
-           | otherwise = posn - fromIntegral (bufR cbuf - bufL cbuf)
-                              - fromIntegral (bufR bbuf - bufL bbuf)
+      let real_posn
+           | isWriteBuffer bbuf = posn + fromIntegral (bufferElems bbuf)
+           | otherwise          = posn - fromIntegral (bufferElems bbuf)
 
+      cbuf <- readIORef haCharBuffer
       debugIO ("\nhGetPosn: (posn, real_posn) = " ++ show (posn, real_posn))
       debugIO ("   cbuf: " ++ summaryBuffer cbuf ++
             "   bbuf: " ++ summaryBuffer bbuf)
