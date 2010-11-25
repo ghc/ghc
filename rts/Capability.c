@@ -219,6 +219,7 @@ initCapability( Capability *cap, nat i )
     initMutex(&cap->lock);
     cap->running_task      = NULL; // indicates cap is free
     cap->spare_workers     = NULL;
+    cap->n_spare_workers   = 0;
     cap->suspended_ccalls  = NULL;
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
@@ -460,9 +461,24 @@ releaseCapabilityAndQueueWorker (Capability* cap USED_IF_THREADS)
     // in which case it is not replaced on the spare_worker queue.
     // This happens when the system is shutting down (see
     // Schedule.c:workerStart()).
-    if (!isBoundTask(task) && !task->stopped) {
-	task->next = cap->spare_workers;
-	cap->spare_workers = task;
+    if (!isBoundTask(task) && !task->stopped)
+    {
+        if (cap->n_spare_workers < MAX_SPARE_WORKERS)
+        {
+            task->next = cap->spare_workers;
+            cap->spare_workers = task;
+            cap->n_spare_workers++;
+        }
+        else
+        {
+            debugTrace(DEBUG_sched, "%d spare workers already, exiting",
+                       cap->n_spare_workers);
+            releaseCapability_(cap,rtsFalse);
+            // hold the lock until after workerTaskStop; c.f. scheduleWorker()
+            workerTaskStop(task);
+            RELEASE_LOCK(&cap->lock);
+            shutdownThread();
+        }
     }
     // Bound tasks just float around attached to their TSOs.
 
@@ -619,7 +635,8 @@ yieldCapability (Capability** pCap, Task *task)
 		}
 		cap->spare_workers = task->next;
 		task->next = NULL;
-	    }
+                cap->n_spare_workers--;
+            }
 	    cap->running_task = task;
 	    RELEASE_LOCK(&cap->lock);
 	    break;
@@ -708,12 +725,13 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
                 if (!osThreadIsAlive(t->id)) {
                     debugTrace(DEBUG_sched, 
                                "worker thread %p has died unexpectedly", (void *)t->id);
-                        if (!prev) {
-                            cap->spare_workers = t->next;
-                        } else {
-                            prev->next = t->next;
-                        }
-                        prev = t;
+                    cap->n_spare_workers--;
+                    if (!prev) {
+                        cap->spare_workers = t->next;
+                    } else {
+                        prev->next = t->next;
+                    }
+                    prev = t;
                 }
             }
         }

@@ -1607,7 +1607,8 @@ forkProcess(HsStablePtr *entry
 	// Wipe our spare workers list, they no longer exist.  New
 	// workers will be created if necessary.
 	cap->spare_workers = NULL;
-	cap->returning_tasks_hd = NULL;
+        cap->n_spare_workers = 0;
+        cap->returning_tasks_hd = NULL;
 	cap->returning_tasks_tl = NULL;
 #endif
 

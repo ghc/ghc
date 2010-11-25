@@ -311,4 +311,13 @@
  */
 #define SPIN_COUNT 1000
 
+/* -----------------------------------------------------------------------------
+   Spare workers per Capability in the threaded RTS
+
+   No more than MAX_SPARE_WORKERS will be kept in the thread pool
+   associated with each Capability.
+   -------------------------------------------------------------------------- */
+
+#define MAX_SPARE_WORKERS 6
+
 #endif /* RTS_CONSTANTS_H */

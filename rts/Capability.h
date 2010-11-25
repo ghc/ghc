@@ -79,6 +79,7 @@ struct Capability_ {
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;
+    nat n_spare_workers; // count of above
 
     // This lock protects running_task, returning_tasks_{hd,tl}, wakeup_queue.
     Mutex lock;
