@@ -173,8 +173,8 @@ an INLINABLE pragma could make a program a bit less efficient,
 because you lose the worker/wrapper stuff.  But I don't see a way 
 to avoid that.
 
-Note [Don't w/w inline small non-loop-breker things]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Don't w/w inline small non-loop-breaker things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general, we refrain from w/w-ing *small* functions, which are not
 loop breakers, because they'll inline anyway.  But we must take care:
 it may look small now, but get to be big later after other inlining
