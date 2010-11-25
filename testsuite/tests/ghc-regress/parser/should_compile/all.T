@@ -80,6 +80,7 @@ test('read065', omit_ways(['optc', 'profc']), compile, [''])
 test('read066', normal, compile, [''])
 test('read067', normal, compile, [''])
 test('read068', normal, compile, [''])
+test('read069', normal, compile, [''])
 test('read_1821', normal, compile, [''])
 test('T3303', extra_clean(['T3303A.hi', 'T3303A.o']),
      multimod_compile, ['T3303', '-v0'])

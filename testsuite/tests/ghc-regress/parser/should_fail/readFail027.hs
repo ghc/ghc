@@ -1,3 +1,5 @@
+{-# LANGUAGE NoRelaxedLayout #-}
+
 module ShouldFail where
 
 -- Erroneously allowed by GHC 6.2.x
