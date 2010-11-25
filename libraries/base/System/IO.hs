@@ -249,7 +249,7 @@ import GHC.IO.IOMode
 import GHC.IO.Handle.FD
 import qualified GHC.IO.FD as FD
 import GHC.IO.Handle
-import GHC.IO.Handle.Text ( hGetBufSome )
+import GHC.IO.Handle.Text ( hGetBufSome, hPutStrLn )
 import GHC.IORef
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
@@ -325,8 +325,7 @@ putStr s        =  hPutStr stdout s
 -- | The same as 'putStr', but adds a newline character.
 
 putStrLn        :: String -> IO ()
-putStrLn s      =  do putStr s
-                      putChar '\n'
+putStrLn s      =  hPutStrLn stdout s
 
 -- | The 'print' function outputs a value of any printable type to the
 -- standard output device.
@@ -423,13 +422,6 @@ readIO s        =  case (do { (x,t) <- reads s ;
 
 hReady          :: Handle -> IO Bool
 hReady h        =  hWaitForInput h 0
-
--- | The same as 'hPutStr', but adds a newline character.
-
-hPutStrLn       :: Handle -> String -> IO ()
-hPutStrLn hndl str = do
- hPutStr  hndl str
- hPutChar hndl '\n'
 
 -- | Computation 'hPrint' @hdl t@ writes the string representation of @t@
 -- given by the 'shows' function to the file or channel managed by @hdl@

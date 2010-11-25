@@ -41,6 +41,9 @@ import GHC.Read
 import GHC.Word
 import GHC.IO.Device
 import Data.Typeable
+#ifdef DEBUG
+import Control.Monad
+#endif
 
 -- ---------------------------------------------------------------------------
 -- Handle type
@@ -179,6 +182,13 @@ checkHandleInvariants h_ = do
  checkBuffer bbuf
  cbuf <- readIORef (haCharBuffer h_)
  checkBuffer cbuf
+ when (isWriteBuffer cbuf && not (isEmptyBuffer cbuf)) $
+   error ("checkHandleInvariants: char write buffer non-empty: " ++
+          summaryBuffer bbuf ++ ", " ++ summaryBuffer cbuf)
+ when (isWriteBuffer bbuf /= isWriteBuffer cbuf) $
+   error ("checkHandleInvariants: buffer modes differ: " ++
+          summaryBuffer bbuf ++ ", " ++ summaryBuffer cbuf)
+
 #else
 checkHandleInvariants _ = return ()
 #endif
@@ -257,25 +267,46 @@ buffer, and then provide it immediately to the caller.
 
 [note Buffered Writing]
 
-Characters are written into the Char buffer by e.g. hPutStr.  When the
-buffer is full, we call writeTextDevice, which encodes the Char buffer
-into the byte buffer, and then immediately writes it all out to the
-underlying device.  The Char buffer will always be empty afterward.
-This might require multiple decoding/writing cycles.
+Characters are written into the Char buffer by e.g. hPutStr.  At the
+end of the operation, or when the char buffer is full, the buffer is
+decoded to the byte buffer (see writeCharBuffer).  This is so that we
+can detect encoding errors at the right point.
+
+Hence, the Char buffer is always empty between Handle operations.
 
 [note Buffer Sizing]
 
-Since the buffer mode makes no difference when reading, we can just
-use the default buffer size for both the byte and the Char buffer.
-Ineed, we must have room for at least one Char in the Char buffer,
-because we have to implement hLookAhead, which requires caching a Char
-in the Handle.  Furthermore, when doing newline translation, we need
-room for at least two Chars in the read buffer, so we can spot the
-\r\n sequence.
+The char buffer is always a default size (dEFAULT_CHAR_BUFFER_SIZE).
+The byte buffer size is chosen by the underlying device (via its
+IODevice.newBuffer).  Hence the size of these buffers is not under
+user control.
 
-For writing, however, when the buffer mode is NoBuffering, we use a
-1-element Char buffer to force flushing of the buffer after each Char
-is read.
+There are certain minimum sizes for these buffers imposed by the
+library (but not checked):
+
+ - we must be able to buffer at least one character, so that
+   hLookAhead can work
+
+ - the byte buffer must be able to store at least one encoded
+   character in the current encoding (6 bytes?)
+
+ - when reading, the char buffer must have room for two characters, so
+   that we can spot the \r\n sequence.
+
+How do we implement hSetBuffering?
+
+For reading, we have never used the user-supplied buffer size, because
+there's no point: we always pass all available data to the reader
+immediately.  Buffering would imply waiting until a certain amount of
+data is available, which has no advantages.  So hSetBuffering is
+essentially a no-op for read handles, except that it turns on/off raw
+mode for the underlying device if necessary.
+
+For writing, the buffering mode is handled by the write operations
+themselves (hPutChar and hPutStr).  Every write ends with
+writeCharBuffer, which checks whether the buffer should be flushed
+according to the current buffering mode.  Additionally, we look for
+newlines and flush if the mode is LineBuffering.
 
 [note Buffer Flushing]
 
@@ -284,8 +315,7 @@ is read.
 We must be able to flush the Char buffer, in order to implement
 hSetEncoding, and things like hGetBuf which want to read raw bytes.
 
-Flushing the Char buffer on a write Handle is easy: just call
-writeTextDevice to encode and write the date.
+Flushing the Char buffer on a write Handle is easy: it is always empty.
 
 Flushing the Char buffer on a read Handle involves rewinding the byte
 buffer to the point representing the next Char in the Char buffer.

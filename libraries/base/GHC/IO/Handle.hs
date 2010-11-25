@@ -206,32 +206,12 @@ hSetBuffering handle mode =
     _ -> do
          if mode == haBufferMode then return handle_ else do
 
-         {- Note:
-            - we flush the old buffer regardless of whether
-              the new buffer could fit the contents of the old buffer 
-              or not.
-            - allow a handle's buffering to change even if IO has
-              occurred (ANSI C spec. does not allow this, nor did
-              the previous implementation of IO.hSetBuffering).
-            - a non-standard extension is to allow the buffering
-              of semi-closed handles to change [sof 6/98]
-          -}
-          flushCharBuffer handle_
+         -- See [note Buffer Sizing] in GHC.IO.Handle.Types
 
-          let state = initBufferState haType
-              reading = not (isWritableHandleType haType)
-
-          new_buf <-
-            case mode of
-                --  See [note Buffer Sizing], GHC.IO.Handle.Types
-              NoBuffering | reading   -> newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
-                          | otherwise -> newCharBuffer 1 state
-              LineBuffering          -> newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
-              BlockBuffering Nothing -> newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
+          -- check for errors:
+          case mode of
               BlockBuffering (Just n) | n <= 0    -> ioe_bufsiz n
-                                      | otherwise -> newCharBuffer n state
-
-          writeIORef haCharBuffer new_buf
+              _ -> return ()
 
           -- for input terminals we need to put the terminal into
           -- cooked or raw mode depending on the type of buffering.

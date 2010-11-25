@@ -30,10 +30,10 @@ module GHC.IO.Handle.Internals (
   openTextEncoding, closeTextCodecs, initBufferState,
   dEFAULT_CHAR_BUFFER_SIZE,
 
-  flushBuffer, flushWriteBuffer, flushWriteBuffer_, flushCharReadBuffer,
-  flushCharBuffer, flushByteReadBuffer,
+  flushBuffer, flushWriteBuffer, flushCharReadBuffer,
+  flushCharBuffer, flushByteReadBuffer, flushByteWriteBuffer,
 
-  readTextDevice, writeTextDevice, readTextDeviceNonBlocking,
+  readTextDevice, writeCharBuffer, readTextDeviceNonBlocking,
   decodeByteBuf,
 
   augmentIOError,
@@ -275,9 +275,10 @@ checkReadableHandle act h_@Handle__{..} =
       ReadWriteHandle      -> do
           -- a read/write handle and we want to read from it.  We must
           -- flush all buffered write data first.
-          cbuf <- readIORef haCharBuffer
-          when (isWriteBuffer cbuf) $ do
-             cbuf' <- flushWriteBuffer_ h_ cbuf
+          bbuf <- readIORef haByteBuffer
+          when (isWriteBuffer bbuf) $ do
+             when (not (isEmptyBuffer bbuf)) $ flushByteWriteBuffer h_
+             cbuf' <- readIORef haCharBuffer
              writeIORef haCharBuffer cbuf'{ bufState = ReadBuffer }
              bbuf <- readIORef haByteBuffer
              writeIORef haByteBuffer bbuf{ bufState = ReadBuffer }
@@ -402,9 +403,8 @@ getCharBuffer dev state = do
 
 mkUnBuffer :: BufferState -> IO (IORef CharBuffer, BufferMode)
 mkUnBuffer state = do
-  buffer <- case state of  --  See [note Buffer Sizing], GHC.IO.Handle.Types
-              ReadBuffer  -> newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
-              WriteBuffer -> newCharBuffer 1 state
+  buffer <- newCharBuffer dEFAULT_CHAR_BUFFER_SIZE state
+              --  See [note Buffer Sizing], GHC.IO.Handle.Types
   ref <- newIORef buffer
   return (ref, NoBuffering)
 
@@ -422,20 +422,18 @@ flushBuffer h_@Handle__{..} = do
         flushCharReadBuffer h_
         flushByteReadBuffer h_
     WriteBuffer -> do
-        buf' <- flushWriteBuffer_ h_ buf
-        writeIORef haCharBuffer buf'
+        flushByteWriteBuffer h_
 
--- | flushes at least the Char buffer, and the byte buffer for a write
--- Handle.  Works on all Handles.
+-- | flushes the Char buffer only.  Works on all Handles.
 flushCharBuffer :: Handle__ -> IO ()
 flushCharBuffer h_@Handle__{..} = do
-  buf <- readIORef haCharBuffer
-  case bufState buf of
+  cbuf <- readIORef haCharBuffer
+  case bufState cbuf of
     ReadBuffer  -> do
         flushCharReadBuffer h_
-    WriteBuffer -> do
-        buf' <- flushWriteBuffer_ h_ buf
-        writeIORef haCharBuffer buf'
+    WriteBuffer ->
+        when (not (isEmptyBuffer cbuf)) $
+           error "internal IO library error: Char buffer non-empty"
 
 -- -----------------------------------------------------------------------------
 -- Writing data (flushing write buffers)
@@ -445,19 +443,52 @@ flushCharBuffer h_@Handle__{..} = do
 -- empty.
 flushWriteBuffer :: Handle__ -> IO ()
 flushWriteBuffer h_@Handle__{..} = do
-  buf <- readIORef haCharBuffer
-  if isWriteBuffer buf
-         then do buf' <- flushWriteBuffer_ h_ buf
-                 writeIORef haCharBuffer buf'
-         else return ()
+  buf <- readIORef haByteBuffer
+  when (isWriteBuffer buf) $ flushByteWriteBuffer h_
 
-flushWriteBuffer_ :: Handle__ -> CharBuffer -> IO CharBuffer
-flushWriteBuffer_ h_@Handle__{..} cbuf = do
+flushByteWriteBuffer :: Handle__ -> IO ()
+flushByteWriteBuffer h_@Handle__{..} = do
   bbuf <- readIORef haByteBuffer
-  if not (isEmptyBuffer cbuf) || not (isEmptyBuffer bbuf)
-     then do writeTextDevice h_ cbuf
-             return cbuf{ bufL=0, bufR=0 }
-     else return cbuf
+  when (not (isEmptyBuffer bbuf)) $ do
+    bbuf' <- Buffered.flushWriteBuffer haDevice bbuf
+    writeIORef haByteBuffer bbuf'
+
+-- write the contents of the CharBuffer to the Handle__.
+-- The data will be encoded and pushed to the byte buffer,
+-- flushing if the buffer becomes full.
+writeCharBuffer :: Handle__ -> CharBuffer -> IO ()
+writeCharBuffer h_@Handle__{..} !cbuf = do
+  --
+  bbuf <- readIORef haByteBuffer
+
+  debugIO ("writeCharBuffer: cbuf=" ++ summaryBuffer cbuf ++
+        " bbuf=" ++ summaryBuffer bbuf)
+
+  (cbuf',bbuf') <- case haEncoder of
+    Nothing      -> latin1_encode cbuf bbuf
+    Just encoder -> (encode encoder) cbuf bbuf
+
+  debugIO ("writeCharBuffer after encoding: cbuf=" ++ summaryBuffer cbuf' ++
+        " bbuf=" ++ summaryBuffer bbuf')
+
+          -- flush if the write buffer is full
+  if isFullBuffer bbuf'
+          --  or we made no progress
+     || not (isEmptyBuffer cbuf') && bufL cbuf' == bufL cbuf
+          -- or the byte buffer has more elements than the user wanted buffered
+     || (case haBufferMode of
+          BlockBuffering (Just s) -> bufferElems bbuf' >= s
+          NoBuffering -> True
+          _other -> False)
+    then do
+      bbuf'' <- Buffered.flushWriteBuffer haDevice bbuf'
+      writeIORef haByteBuffer bbuf''
+    else
+      writeIORef haByteBuffer bbuf'
+
+  if not (isEmptyBuffer cbuf')
+     then writeCharBuffer h_ cbuf'
+     else return ()
 
 -- -----------------------------------------------------------------------------
 -- Flushing read buffers
@@ -731,29 +762,6 @@ debugIO s
 
 -- ----------------------------------------------------------------------------
 -- Text input/output
-
--- Write the contents of the supplied Char buffer to the device, return
--- only when all the data has been written.
-writeTextDevice :: Handle__ -> CharBuffer -> IO ()
-writeTextDevice h_@Handle__{..} cbuf = do
-  --
-  bbuf <- readIORef haByteBuffer
-
-  debugIO ("writeTextDevice: cbuf=" ++ summaryBuffer cbuf ++ 
-        " bbuf=" ++ summaryBuffer bbuf)
-
-  (cbuf',bbuf') <- case haEncoder of
-    Nothing      -> latin1_encode cbuf bbuf
-    Just encoder -> (encode encoder) cbuf bbuf
-
-  debugIO ("writeTextDevice after encoding: cbuf=" ++ summaryBuffer cbuf' ++ 
-        " bbuf=" ++ summaryBuffer bbuf')
-
-  bbuf' <- Buffered.flushWriteBuffer haDevice bbuf'
-  writeIORef haByteBuffer bbuf'
-  if not (isEmptyBuffer cbuf')
-     then writeTextDevice h_ cbuf'
-     else return ()
 
 -- Read characters into the provided buffer.  Return when any
 -- characters are available; raise an exception if the end of 

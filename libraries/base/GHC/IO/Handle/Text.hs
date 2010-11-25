@@ -22,7 +22,7 @@ module GHC.IO.Handle.Text (
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
    commitBuffer',       -- hack, see below
    hGetBuf, hGetBufSome, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking,
-   memcpy,
+   memcpy, hPutStrLn,
  ) where
 
 import GHC.IO
@@ -439,12 +439,10 @@ hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = do
     c `seq` return ()
     wantWritableHandle "hPutChar" handle $ \ handle_  -> do
-    case haBufferMode handle_ of
-        LineBuffering -> hPutcBuffered handle_ True  c
-        _other        -> hPutcBuffered handle_ False c
+     hPutcBuffered handle_ c
 
-hPutcBuffered :: Handle__ -> Bool -> Char -> IO ()
-hPutcBuffered handle_@Handle__{..} is_line c = do
+hPutcBuffered :: Handle__ -> Char -> IO ()
+hPutcBuffered handle_@Handle__{..} c = do
   buf <- readIORef haCharBuffer
   if c == '\n'
      then do buf1 <- if haOutputNL == CRLF
@@ -453,23 +451,21 @@ hPutcBuffered handle_@Handle__{..} is_line c = do
                           putc buf1 '\n'
                         else do
                           putc buf '\n'
-             if is_line 
-                then do
-                  flushed_buf <- flushWriteBuffer_ handle_ buf1
-                  writeIORef haCharBuffer flushed_buf
-                else
-                  writeIORef haCharBuffer buf1
+             writeCharBuffer handle_ buf1
+             when is_line $ flushByteWriteBuffer handle_
       else do
           buf1 <- putc buf c
-          writeIORef haCharBuffer buf1
+          writeCharBuffer handle_ buf1
+          return ()
   where
+    is_line = case haBufferMode of
+                LineBuffering -> True
+                _             -> False
+
     putc buf@Buffer{ bufRaw=raw, bufR=w } c = do
        debugIO ("putc: " ++ summaryBuffer buf)
        w'  <- writeCharBuf raw w c
-       let buf' = buf{ bufR = w' }
-       if isFullCharBuffer buf'
-          then flushWriteBuffer_ handle_ buf'
-          else return buf'
+       return buf{ bufR = w' }
 
 -- ---------------------------------------------------------------------------
 -- hPutStr
@@ -501,8 +497,19 @@ hPutcBuffered handle_@Handle__{..} is_line c = do
 --  * 'isPermissionError' if another system resource limit would be exceeded.
 
 hPutStr :: Handle -> String -> IO ()
-hPutStr handle str = do
-    (buffer_mode, nl) <- 
+hPutStr handle str = hPutStr' handle str False
+
+-- | The same as 'hPutStr', but adds a newline character.
+hPutStrLn :: Handle -> String -> IO ()
+hPutStrLn handle str = hPutStr' handle str True
+  -- An optimisation: we treat hPutStrLn specially, to avoid the
+  -- overhead of a single putChar '\n', which is quite high now that we
+  -- have to encode eagerly.
+
+hPutStr' :: Handle -> String -> Bool -> IO ()
+hPutStr' handle str add_nl =
+  do
+    (buffer_mode, nl) <-
          wantWritableHandle "hPutStr" handle $ \h_ -> do
                        bmode <- getSpareBuffer h_
                        return (bmode, haOutputNL h_)
@@ -510,10 +517,11 @@ hPutStr handle str = do
     case buffer_mode of
        (NoBuffering, _) -> do
             hPutChars handle str        -- v. slow, but we don't care
+            when add_nl $ hPutChar handle '\n'
        (LineBuffering, buf) -> do
-            writeBlocks handle True  nl buf str
+            writeBlocks handle True  add_nl nl buf str
        (BlockBuffering _, buf) -> do
-            writeBlocks handle False nl buf str
+            writeBlocks handle False add_nl nl buf str
 
 hPutChars :: Handle -> [Char] -> IO ()
 hPutChars _      [] = return ()
@@ -539,19 +547,20 @@ getSpareBuffer Handle__{haCharBuffer=ref,
 
 
 -- NB. performance-critical code: eyeball the Core.
-writeBlocks :: Handle -> Bool -> Newline -> Buffer CharBufElem -> String -> IO ()
-writeBlocks hdl line_buffered nl
+writeBlocks :: Handle -> Bool -> Bool -> Newline -> Buffer CharBufElem -> String -> IO ()
+writeBlocks hdl line_buffered add_nl nl
             buf@Buffer{ bufRaw=raw, bufSize=len } s =
   let
-   shoveString :: Int -> [Char] -> IO ()
-   shoveString !n [] = do
-        _ <- commitBuffer hdl raw len n False{-no flush-} True{-release-}
-        return ()
-   shoveString !n (c:cs)
+   shoveString :: Int -> [Char] -> [Char] -> IO ()
+   shoveString !n [] [] = do
+        commitBuffer hdl raw len n False{-no flush-} True{-release-}
+   shoveString !n [] rest = do
+        shoveString n rest []
+   shoveString !n (c:cs) rest
      -- n+1 so we have enough room to write '\r\n' if necessary
      | n + 1 >= len = do
-        new_buf <- commitBuffer hdl raw len n True{-needs flush-} False
-        writeBlocks hdl line_buffered nl new_buf (c:cs)
+        commitBuffer hdl raw len n False{-flush-} False
+        shoveString 0 (c:cs) rest
      | c == '\n'  =  do
         n' <- if nl == CRLF
                  then do 
@@ -561,36 +570,22 @@ writeBlocks hdl line_buffered nl
                     writeCharBuf raw n c
         if line_buffered
            then do
-               new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
-               writeBlocks hdl line_buffered nl new_buf cs
+                -- end of line, so write and flush
+               commitBuffer hdl raw len n' True{-flush-} False
+               shoveString 0 cs rest
            else do
-               shoveString n' cs
+               shoveString n' cs rest
      | otherwise = do
         n' <- writeCharBuf raw n c
-        shoveString n' cs
+        shoveString n' cs rest
   in
-  shoveString 0 s
+  shoveString 0 s (if add_nl then "\n" else "")
 
 -- -----------------------------------------------------------------------------
 -- commitBuffer handle buf sz count flush release
 -- 
 -- Write the contents of the buffer 'buf' ('sz' bytes long, containing
 -- 'count' bytes of data) to handle (handle must be block or line buffered).
--- 
--- Implementation:
--- 
---    for block/line buffering,
---       1. If there isn't room in the handle buffer, flush the handle
---          buffer.
--- 
---       2. If the handle buffer is empty,
---               if flush, 
---                   then write buf directly to the device.
---                   else swap the handle buffer with buf.
--- 
---       3. If the handle buffer is non-empty, copy buf into the
---          handle buffer.  Then, if flush != 0, flush
---          the buffer.
 
 commitBuffer
         :: Handle                       -- handle to commit to
@@ -598,93 +593,52 @@ commitBuffer
         -> Int                          -- number of bytes of data in buffer
         -> Bool                         -- True <=> flush the handle afterward
         -> Bool                         -- release the buffer?
-        -> IO CharBuffer
+        -> IO ()
 
 commitBuffer hdl !raw !sz !count flush release = 
-  wantWritableHandle "commitAndReleaseBuffer" hdl $
-     commitBuffer' raw sz count flush release
-{-# NOINLINE commitBuffer #-}
-
--- Explicitly lambda-lift this function to subvert GHC's full laziness
--- optimisations, which otherwise tends to float out subexpressions
--- past the \handle, which is really a pessimisation in this case because
--- that lambda is a one-shot lambda.
---
--- Don't forget to export the function, to stop it being inlined too
--- (this appears to be better than NOINLINE, because the strictness
--- analyser still gets to worker-wrapper it).
---
--- This hack is a fairly big win for hPutStr performance.  --SDM 18/9/2001
---
-commitBuffer' :: RawCharBuffer -> Int -> Int -> Bool -> Bool -> Handle__
-              -> IO CharBuffer
-commitBuffer' raw sz@(I# _) count@(I# _) flush release
-  handle_@Handle__{ haCharBuffer=ref, haBuffers=spare_buf_ref } = do
-
+  wantWritableHandle "commitBuffer" hdl $ \h_@Handle__{..} -> do
       debugIO ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
             ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
 
-      old_buf@Buffer{ bufRaw=old_raw, bufR=w, bufSize=size }
-          <- readIORef ref
+      writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer,
+                                 bufL=0, bufR=count, bufSize=sz }
 
-      buf_ret <-
-        -- enough room in handle buffer?
-         if (not flush && (size - w > count))
-                -- The > is to be sure that we never exactly fill
-                -- up the buffer, which would require a flush.  So
-                -- if copying the new data into the buffer would
-                -- make the buffer full, we just flush the existing
-                -- buffer and the new data immediately, rather than
-                -- copying before flushing.
-
-                -- not flushing, and there's enough room in the buffer:
-                -- just copy the data in and update bufR.
-            then do withRawBuffer raw     $ \praw ->
-                      copyToRawBuffer old_raw (w*charSize)
-                                      praw (count*charSize)
-                    writeIORef ref old_buf{ bufR = w + count }
-                    return (emptyBuffer raw sz WriteBuffer)
-
-                -- else, we have to flush
-            else do flushed_buf <- flushWriteBuffer_ handle_ old_buf
-
-                    let this_buf = 
-                            Buffer{ bufRaw=raw, bufState=WriteBuffer, 
-                                    bufL=0, bufR=count, bufSize=sz }
-
-                        -- if:  (a) we don't have to flush, and
-                        --      (b) size(new buffer) == size(old buffer), and
-                        --      (c) new buffer is not full,
-                        -- we can just just swap them over...
-                    if (not flush && sz == size && count /= sz)
-                        then do 
-                          writeIORef ref this_buf
-                          return flushed_buf                         
-
-                        -- otherwise, we have to flush the new data too,
-                        -- and start with a fresh buffer
-                        else do
-                          -- We're aren't going to use this buffer again
-                          -- so we ignore the result of flushWriteBuffer_
-                          _ <- flushWriteBuffer_ handle_ this_buf
-                          writeIORef ref flushed_buf
-                            -- if the sizes were different, then allocate
-                            -- a new buffer of the correct size.
-                          if sz == size
-                             then return (emptyBuffer raw sz WriteBuffer)
-                             else newCharBuffer size WriteBuffer
+      when flush $ flushByteWriteBuffer h_
 
       -- release the buffer if necessary
-      case buf_ret of
-        Buffer{ bufSize=buf_ret_sz, bufRaw=buf_ret_raw } -> do
-          if release && buf_ret_sz == size
-            then do
-              spare_bufs <- readIORef spare_buf_ref
-              writeIORef spare_buf_ref 
-                (BufferListCons buf_ret_raw spare_bufs)
-              return buf_ret
-            else
-              return buf_ret
+      when release $ do
+          -- find size of current buffer
+          old_buf@Buffer{ bufSize=size } <- readIORef haCharBuffer
+          when (sz == size) $ do
+               spare_bufs <- readIORef haBuffers
+               writeIORef haBuffers (BufferListCons raw spare_bufs)
+
+      return ()
+
+-- backwards compatibility; the text package uses this
+commitBuffer' :: RawCharBuffer -> Int -> Int -> Bool -> Bool -> Handle__
+              -> IO CharBuffer
+commitBuffer' raw sz@(I# _) count@(I# _) flush release h_@Handle__{..}
+   = do
+      debugIO ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
+            ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
+
+      let this_buf = Buffer{ bufRaw=raw, bufState=WriteBuffer,
+                             bufL=0, bufR=count, bufSize=sz }
+
+      writeCharBuffer h_ this_buf
+
+      when flush $ flushByteWriteBuffer h_
+
+      -- release the buffer if necessary
+      when release $ do
+          -- find size of current buffer
+          old_buf@Buffer{ bufSize=size } <- readIORef haCharBuffer
+          when (sz == size) $ do
+               spare_bufs <- readIORef haBuffers
+               writeIORef haBuffers (BufferListCons raw spare_bufs)
+
+      return this_buf
 
 -- ---------------------------------------------------------------------------
 -- Reading/writing sequences of bytes.
@@ -734,10 +688,6 @@ hPutBuf' handle ptr count can_block
     wantWritableHandle "hPutBuf" handle $ 
       \ h_@Handle__{..} -> do
           debugIO ("hPutBuf count=" ++ show count)
-          -- first flush the Char buffer if it is non-empty, then we
-          -- can work directly with the byte buffer
-          cbuf <- readIORef haCharBuffer
-          when (not (isEmptyBuffer cbuf)) $ flushWriteBuffer h_
 
           r <- bufWrite h_ (castPtr ptr) count can_block
 
