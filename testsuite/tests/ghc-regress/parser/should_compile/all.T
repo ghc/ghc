@@ -85,3 +85,4 @@ test('T3303', extra_clean(['T3303A.hi', 'T3303A.o']),
      multimod_compile, ['T3303', '-v0'])
 test('T3741', normal, compile, [''])
 test('DoAndIfThenElse', normal, compile, [''])
+test('NondecreasingIndentation', normal, compile, [''])
