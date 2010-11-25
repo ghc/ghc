@@ -7,7 +7,8 @@ import Directory
 
 main :: IO ()
 main = do
-  h <- openBinaryFile "tst-seek" WriteMode
+  h <- openFile "tst-seek" WriteMode
+  hSetEncoding h utf8 -- hSeek/hTell work with Unicode streams
   hPutStr h "test string1"
    -- seek to EOF should be cool..
   hSeek h SeekFromEnd 0
@@ -19,8 +20,15 @@ main = do
   hPutStr h "test string4"
   x <- hTell h
   print x
+  hSeek h AbsoluteSeek 30
+  x1 <- hTell h
+  hPutStr h "人間虫" -- we should be able to output Unicode too
+  x2 <- hTell h
+  print (x2 - x1)
   hPutStr h "filler"
   hClose h
-  ls <- readFile "tst-seek"
-  putStrLn ls
+  h <- openFile "tst-seek" ReadMode
+  hSetEncoding h utf8
+  str <- hGetContents h
+  putStrLn str
   removeFile "tst-seek"
