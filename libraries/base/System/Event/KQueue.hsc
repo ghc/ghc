@@ -278,7 +278,7 @@ toEvent :: Filter -> E.Event
 toEvent (Filter f)
     | f == (#const EVFILT_READ) = E.evtRead
     | f == (#const EVFILT_WRITE) = E.evtWrite
-    | otherwise = error $ "toEvent: unknonwn filter " ++ show f
+    | otherwise = error $ "toEvent: unknown filter " ++ show f
 
 foreign import ccall unsafe "kqueue"
     c_kqueue :: IO CInt
