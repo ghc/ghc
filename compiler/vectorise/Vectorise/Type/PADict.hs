@@ -54,7 +54,6 @@ buildPADict vect_tc prepr_tc arr_tc repr
 
       -- Build the type of the dictionary function.
       pa_tc		<- builtin paTyCon
-      let pa_opitems	= [(id, NoDefMeth) | id <- method_ids]
       let Just pa_cls	= tyConClass_maybe pa_tc
 
       let dfun_ty	= mkForAllTys tvs
