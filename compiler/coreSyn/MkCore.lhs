@@ -65,7 +65,6 @@ import Name
 import Outputable
 import FastString
 import UniqSupply
-import Unique		( mkBuiltinUnique )
 import BasicTypes
 import Util             ( notNull, zipEqual )
 import Constants
@@ -156,8 +155,9 @@ mkWildEvBinder pred             = mkWildValBinder (mkPredTy pred)
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
+-- See Note [WildCard binders] in SimplEnv
 mkWildValBinder :: Type -> Id
-mkWildValBinder ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
+mkWildValBinder ty = mkLocalId wildCardName ty
 
 mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused

@@ -46,6 +46,8 @@ import VarEnv
 import VarSet
 import OrdList
 import Id
+import MkCore
+import TysWiredIn
 import qualified CoreSubst
 import qualified Type		( substTy, substTyVarBndr, substTyVar )
 import Type hiding		( substTy, substTyVarBndr, substTyVar )
@@ -220,13 +222,31 @@ seIdSubst:
 \begin{code}
 mkSimplEnv :: SimplifierMode -> SimplEnv
 mkSimplEnv mode
-  = SimplEnv { seCC = subsumedCCS,
-	       seMode = mode, seInScope = emptyInScopeSet, 
-	       seFloats = emptyFloats,
-	       seTvSubst = emptyVarEnv, seIdSubst = emptyVarEnv }
+  = SimplEnv { seCC = subsumedCCS
+             , seMode = mode
+             , seInScope = init_in_scope
+             , seFloats = emptyFloats
+             , seTvSubst = emptyVarEnv
+             , seIdSubst = emptyVarEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
 
----------------------
+init_in_scope :: InScopeSet
+init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder unitTy))
+              -- See Note [WildCard binders]
+\end{code}
+
+Note [WildCard binders]
+~~~~~~~~~~~~~~~~~~~~~~~
+The program to be simplified may have wild binders
+    case e of wild { p -> ... }
+We want to *rename* them away, so that there are no
+occurrences of 'wild' (with wildCardKey).  The easy
+way to do that is to start of with a representative
+Id in the in-scope set
+
+There should be no *occurrences* of wild.
+
+\begin{code}
 getMode :: SimplEnv -> SimplifierMode
 getMode env = seMode env
 

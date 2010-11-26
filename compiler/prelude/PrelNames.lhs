@@ -58,7 +58,7 @@ import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkTupleTyConUnique
 		  ) 
 import BasicTypes ( Boxity(..), Arity )
-import Name	  ( Name, mkInternalName, mkExternalName )
+import Name       ( Name, mkInternalName, mkExternalName, mkSystemVarName )
 import SrcLoc
 import FastString
 \end{code}
@@ -542,6 +542,9 @@ and it's convenient to write them all down in one place.
 
 
 \begin{code}
+wildCardName :: Name
+wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
+
 runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
@@ -1127,10 +1130,11 @@ absentErrorIdKey, augmentIdKey, appendIdKey, buildIdKey, errorIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, parErrorIdKey, parIdKey, patErrorIdKey,
     realWorldPrimIdKey, recConErrorIdKey, recUpdErrorIdKey,
-    traceIdKey,
+    traceIdKey, wildCardKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey :: Unique
-absentErrorIdKey	      = mkPreludeMiscIdUnique  1
+wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard]
+absentErrorIdKey              = mkPreludeMiscIdUnique  1
 augmentIdKey		      = mkPreludeMiscIdUnique  3
 appendIdKey		      = mkPreludeMiscIdUnique  4
 buildIdKey		      = mkPreludeMiscIdUnique  5

@@ -227,7 +227,11 @@ lintCoreExpr (Var var)
   = do	{ checkL (not (var == oneTupleDataConId))
 		 (ptext (sLit "Illegal one-tuple"))
 
-	; checkDeadIdOcc var
+        ; checkL (not (var `hasKey` wildCardKey))
+                 (ptext (sLit "Occurence of a wild-card binder") <+> ppr var)
+                 -- See Note [WildCard binders] in SimplEnv
+
+        ; checkDeadIdOcc var
 	; var' <- lookupIdInScope var
         ; return (idType var') }
 
