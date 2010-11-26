@@ -646,7 +646,65 @@ int main(int argc, char *argv[])
           <literal>shutdownHaskellAndExit()</literal> instead).</para> 
       </sect3>
     </sect2>
-        
+
+    <sect2 id="ffi-floating-point">
+      <title>Floating point and the FFI</title>
+
+      <para>
+        On POSIX systems, the <literal>fenv.h</literal> header
+        provides operations for inspecting and modifying the state of
+        the floating point unit.  In particular, the rounding mode
+        used by floating point operations can be changed, and the
+        exception flags can be tested.
+      </para>
+
+      <para>
+        In Haskell, floating-point operations have pure types, and the
+        evaluation order is unspecified.  So strictly speaking, since
+        the <literal>fenv.h</literal> functions let you change the
+        results of, or observe the effects of floating point
+        operations, use of <literal>fenv.h</literal> renders the
+        behaviour of floating-point operations anywhere in the program
+        undefined.
+      </para>
+
+      <para>
+        Having said that, we <emphasis>can</emphasis> document exactly
+        what GHC does with respect to the floating point state, so
+        that if you really need to use <literal>fenv.h</literal> then
+        you can do so with full knowledge of the pitfalls:
+        <itemizedlist>
+          <listitem>
+            <para>
+              GHC completely ignores the floating-point
+              environment, the runtime neither modifies nor reads it.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              The floating-point environment is not saved over a
+              normal thread context-switch.  So if you modify the
+              floating-point state in one thread, those changes may be
+              visible in other threads.  Furthermore, testing the
+              exception state is not reliable, because a context
+              switch may change it.  If you need to modify or test the
+              floating point state and use threads, then you must use
+              bound threads
+              (<literal>Control.Concurrent.forkOS</literal>), because
+              a bound thread has its own OS thread, and OS threads do
+              save and restore the floating-point state.
+            </para>
+          </listitem>
+          <listitem>
+            <para>
+              It is safe to modify the floating-point unit state
+              temporarily during a foreign call, because foreign calls
+              are never pre-empted by GHC.
+            </para>
+          </listitem>
+        </itemizedlist>
+      </para>
+    </sect2>
   </sect1>
 </chapter>
 
