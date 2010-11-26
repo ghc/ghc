@@ -53,21 +53,12 @@ buildPADict vect_tc prepr_tc arr_tc repr
                $ Type inst_ty : map (method_call args) method_ids
 
       -- Build the type of the dictionary function.
-      pa_tc          <- builtin paTyCon
-      let pa_opitems = [(id, NoDefMeth) | id <- method_ids]
-      let pa_cls     = mkClass 
-			(tyConName pa_tc)
-			tvs		-- tyvars of class
-			[]		-- fundeps
-			[]		-- superclass predicates
-			0		-- number of equalities
-			[]		-- superclass dict selectors
-			[]		-- associated type families
-			pa_opitems	-- class op items
-			pa_tc		-- dictionary type constructor
-			
-      let dfun_ty = mkForAllTys tvs
-                  $ mkFunTys (map varType args) (PredTy $ ClassP pa_cls [inst_ty])
+      pa_tc		<- builtin paTyCon
+      let pa_opitems	= [(id, NoDefMeth) | id <- method_ids]
+      let Just pa_cls	= tyConClass_maybe pa_tc
+
+      let dfun_ty	= mkForAllTys tvs
+			$ mkFunTys (map varType args) (PredTy $ ClassP pa_cls [inst_ty])
 
       -- Set the unfolding for the inliner.
       raw_dfun <- newExportedVar dfun_name dfun_ty
