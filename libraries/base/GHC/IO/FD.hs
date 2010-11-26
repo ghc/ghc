@@ -281,13 +281,15 @@ close fd =
 #ifndef mingw32_HOST_OS
   (flip finally) (release fd) $ do
 #endif
-  throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
+  let closer realFd =
+        throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
 #ifdef mingw32_HOST_OS
-    if fdIsSocket fd then
-       c_closesocket (fdFD fd)
-    else
+        if fdIsSocket fd then
+          c_closesocket (fromIntegral realFd)
+        else
 #endif
-       c_close (fdFD fd)
+          c_close (fromIntegral realFd)
+  closeFd closer (fromIntegral (fdFD fd))
 
 release :: FD -> IO ()
 #ifdef mingw32_HOST_OS

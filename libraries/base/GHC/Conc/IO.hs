@@ -31,6 +31,7 @@ module GHC.Conc.IO
         , registerDelay         -- :: Int -> IO (TVar Bool)
         , threadWaitRead        -- :: Int -> IO ()
         , threadWaitWrite       -- :: Int -> IO ()
+        , closeFd               -- :: (Int -> IO ()) -> Int -> IO ()
 
 #ifdef mingw32_HOST_OS
         , asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
@@ -82,6 +83,9 @@ threadWaitRead fd
 
 -- | Block the current thread until data can be written to the
 -- given file descriptor (GHC only).
+--
+-- This will throw an 'IOError' if the file descriptor was closed
+-- while this thread was blocked.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #ifndef mingw32_HOST_OS
@@ -91,6 +95,23 @@ threadWaitWrite fd
         case fromIntegral fd of { I# fd# ->
         case waitWrite# fd# s of { s' -> (# s', () #)
         }}
+
+-- | Close a file descriptor in a concurrency-safe way (GHC only).  If
+-- you are using 'threadWaitRead' or 'threadWaitWrite' to perform
+-- blocking I\/O, you /must/ use this function to close file
+-- descriptors, or blocked threads may not be woken.
+--
+-- Any threads that are blocked on the file descriptor via
+-- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
+-- IO exceptions thrown.
+closeFd :: (Fd -> IO ())        -- ^ Low-level action that performs the real close.
+        -> Fd                   -- ^ File descriptor to close.
+        -> IO ()
+closeFd close fd
+#ifndef mingw32_HOST_OS
+  | threaded  = Event.closeFd close fd
+#endif
+  | otherwise = close fd
 
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).

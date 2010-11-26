@@ -12,6 +12,7 @@ module System.Event.Internal
     , Event
     , evtRead
     , evtWrite
+    , evtClose
     , eventIs
     -- * Timeout type
     , Timeout(..)
@@ -29,7 +30,7 @@ import GHC.Num (Num(..))
 import GHC.Show (Show(..))
 import GHC.List (filter, null)
 
--- | An I/O event.
+-- | An I\/O event.
 newtype Event = Event Int
     deriving (Eq)
 
@@ -37,20 +38,29 @@ evtNothing :: Event
 evtNothing = Event 0
 {-# INLINE evtNothing #-}
 
+-- | Data is available to be read.
 evtRead :: Event
 evtRead = Event 1
 {-# INLINE evtRead #-}
 
+-- | The file descriptor is ready to accept a write.
 evtWrite :: Event
 evtWrite = Event 2
 {-# INLINE evtWrite #-}
+
+-- | Another thread closed the file descriptor.
+evtClose :: Event
+evtClose = Event 4
+{-# INLINE evtClose #-}
 
 eventIs :: Event -> Event -> Bool
 eventIs (Event a) (Event b) = a .&. b /= 0
 
 instance Show Event where
     show e = '[' : (intercalate "," . filter (not . null) $
-                    [evtRead `so` "evtRead", evtWrite `so` "evtWrite"]) ++ "]"
+                    [evtRead `so` "evtRead",
+                     evtWrite `so` "evtWrite",
+                     evtClose `so` "evtClose"]) ++ "]"
         where ev `so` disp | e `eventIs` ev = disp
                            | otherwise      = ""
 

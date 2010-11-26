@@ -26,7 +26,7 @@ module System.Event.Manager
     , registerFd
     , unregisterFd_
     , unregisterFd
-    , fdWasClosed
+    , closeFd
 
       -- * Registering interest in timeout events
     , TimeoutCallback
@@ -48,7 +48,7 @@ import Control.Monad ((=<<), forM_, liftM, sequence_, when)
 import Data.IORef (IORef, atomicModifyIORef, mkWeakIORef, newIORef, readIORef,
                    writeIORef)
 import Data.Maybe (Maybe(..))
-import Data.Monoid (mconcat, mempty)
+import Data.Monoid (mappend, mconcat, mempty)
 import GHC.Base
 import GHC.Conc.Signal (runHandlers)
 import GHC.List (filter)
@@ -57,7 +57,8 @@ import GHC.Real ((/), fromIntegral )
 import GHC.Show (Show(..))
 import System.Event.Clock (getCurrentTime)
 import System.Event.Control
-import System.Event.Internal (Backend, Event, evtRead, evtWrite, Timeout(..))
+import System.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
+                              Timeout(..))
 import System.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
@@ -331,15 +332,17 @@ unregisterFd mgr reg = do
   wake <- unregisterFd_ mgr reg
   when wake $ wakeManager mgr
 
--- | Notify the event manager that a file descriptor has been closed.
-fdWasClosed :: EventManager -> Fd -> IO ()
-fdWasClosed mgr fd =
-  modifyMVar_ (emFds mgr) $ \oldMap ->
+-- | Close a file descriptor in a race-safe way.
+closeFd :: EventManager -> (Fd -> IO ()) -> Fd -> IO ()
+closeFd mgr close fd = do
+  fds <- modifyMVar (emFds mgr) $ \oldMap -> do
+    close fd
     case IM.delete (fromIntegral fd) oldMap of
-      (Nothing,  _)       -> return oldMap
+      (Nothing,  _)       -> return (oldMap, [])
       (Just fds, !newMap) -> do
         when (eventsOf fds /= mempty) $ wakeManager mgr
-        return newMap
+        return (newMap, fds)
+  forM_ fds $ \(FdData reg ev cb) -> cb reg (ev `mappend` evtClose)
 
 ------------------------------------------------------------------------
 -- Registering interest in timeout events
