@@ -19,7 +19,6 @@ import TypeRep
 import Id
 import Var
 import Name
-import Class
 import Outputable
 
 -- debug		= False
