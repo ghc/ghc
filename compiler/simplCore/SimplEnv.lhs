@@ -240,11 +240,18 @@ Note [WildCard binders]
 The program to be simplified may have wild binders
     case e of wild { p -> ... }
 We want to *rename* them away, so that there are no
-occurrences of 'wild' (with wildCardKey).  The easy
+occurrences of 'wild-id' (with wildCardKey).  The easy
 way to do that is to start of with a representative
 Id in the in-scope set
 
-There should be no *occurrences* of wild.
+There can be be *occurrences* of wild-id.  For example,
+MkCore.mkCoreApp transforms
+   e (a /# b)   -->   case (a /# b) of wild { DEFAULT -> e wild }
+This is ok provided 'wild' isn't free in 'e', and that's the delicate
+thing. Generally, you want to run the simplifier to get rid of the
+wild-ids before doing much else.
+
+It's a very dark corner of GHC.  Maybe it should be cleaned up.
 
 \begin{code}
 getMode :: SimplEnv -> SimplifierMode
