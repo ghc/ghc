@@ -1031,10 +1031,8 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    cap->r.rNursery->n_blocks == 1) {  // paranoia to prevent infinite loop
 	                                       // if the nursery has only one block.
 	    
-	    ACQUIRE_SM_LOCK
-	    bd = allocGroup( blocks );
-	    RELEASE_SM_LOCK
-	    cap->r.rNursery->n_blocks += blocks;
+            bd = allocGroup_lock(blocks);
+            cap->r.rNursery->n_blocks += blocks;
 	    
 	    // link the new group into the list
 	    bd->link = cap->r.rCurrentNursery;
