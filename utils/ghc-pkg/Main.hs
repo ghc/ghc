@@ -1320,7 +1320,7 @@ checkHSLib dirs auto_ghci_libs lib = do
   case m of
     Nothing -> verror ForceFiles ("cannot find " ++ batch_lib_file ++
                                    " on library path")
-    Just dir -> liftIO $ checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
+    Just dir -> liftIO $ checkGHCiLib dir batch_lib_file lib auto_ghci_libs
 
 doesFileExistOnPath :: String -> [FilePath] -> IO (Maybe FilePath)
 doesFileExistOnPath file path = go path
@@ -1346,13 +1346,10 @@ checkModules pkg = do
       when (isNothing m) $
          verror ForceFiles ("file " ++ file ++ " is missing")
 
-checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
-checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build
+checkGHCiLib :: String -> String -> String -> Bool -> IO ()
+checkGHCiLib batch_lib_dir batch_lib_file lib auto_build
   | auto_build = autoBuildGHCiLib batch_lib_dir batch_lib_file ghci_lib_file
-  | otherwise  = do
-      m <- doesFileExistOnPath ghci_lib_file dirs
-      when (isNothing m && ghci_lib_file /= "HSrts.o") $
-        warn ("warning: can't find GHCi lib " ++ ghci_lib_file)
+  | otherwise  = return ()
  where
     ghci_lib_file = lib <.> "o"
 
