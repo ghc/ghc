@@ -1673,157 +1673,161 @@ mkOc( char *path, char *image, int imageSize,
 HsInt
 loadArchive( char *path )
 {
-   ObjectCode* oc;
-   char *image;
-   int imageSize;
-   FILE *f;
-   int n;
-   size_t fileNameSize;
-   char *file;
-   size_t fileSize;
-   int isObject;
-   char tmp[12];
+    ObjectCode* oc;
+    char *image;
+    int imageSize;
+    FILE *f;
+    int n;
+    size_t fileNameSize;
+    char *file;
+    size_t fileSize;
+    int isObject;
+    char tmp[12];
 
-   IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
+    IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
 
-   fileSize = 32;
-   file = stgMallocBytes(fileSize, "loadArchive(file)");
+    fileSize = 32;
+    file = stgMallocBytes(fileSize, "loadArchive(file)");
 
-   f = fopen(path, "rb");
-   if (!f)
-       barf("loadObj: can't read `%s'", path);
+    f = fopen(path, "rb");
+    if (!f)
+        barf("loadObj: can't read `%s'", path);
 
-   n = fread ( tmp, 1, 8, f );
-   if (strncmp(tmp, "!<arch>\n", 8) != 0)
-       barf("loadArchive: Not an archive: `%s'", path);
+    n = fread ( tmp, 1, 8, f );
+    if (strncmp(tmp, "!<arch>\n", 8) != 0)
+        barf("loadArchive: Not an archive: `%s'", path);
 
-   while(1) {
-       n = fread ( file, 1, 16, f );
-       if (n != 16) {
-           if (feof(f)) {
-               break;
-           }
-           else {
-               barf("loadArchive: Failed reading file name from `%s'", path);
-           }
-       }
-       n = fread ( tmp, 1, 12, f );
-       if (n != 12)
-           barf("loadArchive: Failed reading mod time from `%s'", path);
-       n = fread ( tmp, 1, 6, f );
-       if (n != 6)
-           barf("loadArchive: Failed reading owner from `%s'", path);
-       n = fread ( tmp, 1, 6, f );
-       if (n != 6)
-           barf("loadArchive: Failed reading group from `%s'", path);
-       n = fread ( tmp, 1, 8, f );
-       if (n != 8)
-           barf("loadArchive: Failed reading mode from `%s'", path);
-       n = fread ( tmp, 1, 10, f );
-       if (n != 10)
-           barf("loadArchive: Failed reading size from `%s'", path);
-       tmp[10] = '\0';
-       for (n = 0; isdigit(tmp[n]); n++);
-       tmp[n] = '\0';
-       imageSize = atoi(tmp);
-       n = fread ( tmp, 1, 2, f );
-       if (strncmp(tmp, "\x60\x0A", 2) != 0)
-           barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c", path, ftell(f), tmp[0], tmp[1]);
+    while(1) {
+        n = fread ( file, 1, 16, f );
+        if (n != 16) {
+            if (feof(f)) {
+                break;
+            }
+            else {
+                barf("loadArchive: Failed reading file name from `%s'", path);
+            }
+        }
+        n = fread ( tmp, 1, 12, f );
+        if (n != 12)
+            barf("loadArchive: Failed reading mod time from `%s'", path);
+        n = fread ( tmp, 1, 6, f );
+        if (n != 6)
+            barf("loadArchive: Failed reading owner from `%s'", path);
+        n = fread ( tmp, 1, 6, f );
+        if (n != 6)
+            barf("loadArchive: Failed reading group from `%s'", path);
+        n = fread ( tmp, 1, 8, f );
+        if (n != 8)
+            barf("loadArchive: Failed reading mode from `%s'", path);
+        n = fread ( tmp, 1, 10, f );
+        if (n != 10)
+            barf("loadArchive: Failed reading size from `%s'", path);
+        tmp[10] = '\0';
+        for (n = 0; isdigit(tmp[n]); n++);
+        tmp[n] = '\0';
+        imageSize = atoi(tmp);
+        n = fread ( tmp, 1, 2, f );
+        if (strncmp(tmp, "\x60\x0A", 2) != 0)
+            barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c",
+                 path, ftell(f), tmp[0], tmp[1]);
 
-       /* Check for BSD-variant large filenames */
-       if (0 == strncmp(file, "#1/", 3)) {
-           file[16] = '\0';
-           for (n = 3; isdigit(file[n]); n++);
-           file[n] = '\0';
-           fileNameSize = atoi(file + 3);
-           imageSize -= fileNameSize;
-           if (fileNameSize > fileSize) {
-               /* Double it to avoid potentially continually
-                  increasing it by 1 */
-               fileSize = fileNameSize * 2;
-               file = stgReallocBytes(file, fileSize, "loadArchive(file)");
-           }
-           n = fread ( file, 1, fileNameSize, f );
-           if (n != (int)fileNameSize)
-               barf("loadArchive: Failed reading filename from `%s'", path);
-       }
-       else {
-           fileNameSize = 16;
-       }
+        /* Check for BSD-variant large filenames */
+        if (0 == strncmp(file, "#1/", 3)) {
+            file[16] = '\0';
+            for (n = 3; isdigit(file[n]); n++);
+            file[n] = '\0';
+            fileNameSize = atoi(file + 3);
+            imageSize -= fileNameSize;
+            if (fileNameSize > fileSize) {
+                /* Double it to avoid potentially continually
+                   increasing it by 1 */
+                fileSize = fileNameSize * 2;
+                file = stgReallocBytes(file, fileSize, "loadArchive(file)");
+            }
+            n = fread ( file, 1, fileNameSize, f );
+            if (n != (int)fileNameSize)
+                barf("loadArchive: Failed reading filename from `%s'", path);
+        }
+        else {
+            fileNameSize = 16;
+        }
 
-       IF_DEBUG(linker, debugBelch("loadArchive: Found member file `%s'\n", file));
+        IF_DEBUG(linker,
+                 debugBelch("loadArchive: Found member file `%s'\n", file));
 
-       isObject = 0;
-       for (n = 0; n < (int)fileNameSize - 1; n++) {
-           if ((file[n] == '.') && (file[n + 1] == 'o')) {
-               isObject = 1;
-               break;
-           }
-       }
+        isObject = 0;
+        for (n = 0; n < (int)fileNameSize - 1; n++) {
+            if ((file[n] == '.') && (file[n + 1] == 'o')) {
+                isObject = 1;
+                break;
+            }
+        }
 
-       if (isObject) {
-           char *archiveMemberName;
+        if (isObject) {
+            char *archiveMemberName;
 
-           IF_DEBUG(linker, debugBelch("loadArchive: Member is an object file...loading...\n"));
+            IF_DEBUG(linker, debugBelch("loadArchive: Member is an object file...loading...\n"));
 
-           /* We can't mmap from the archive directly, as object
-              files need to be 8-byte aligned but files in .ar
-              archives are 2-byte aligned. When possible we use mmap
-              to get some anonymous memory, as on 64-bit platforms if
-              we use malloc then we can be given memory above 2^32.
-              In the mmap case we're probably wasting lots of space;
-              we could do better. */
+            /* We can't mmap from the archive directly, as object
+               files need to be 8-byte aligned but files in .ar
+               archives are 2-byte aligned. When possible we use mmap
+               to get some anonymous memory, as on 64-bit platforms if
+               we use malloc then we can be given memory above 2^32.
+               In the mmap case we're probably wasting lots of space;
+               we could do better. */
 #ifdef USE_MMAP
-           image = mmapForLinker(imageSize, MAP_ANONYMOUS, -1);
+            image = mmapForLinker(imageSize, MAP_ANONYMOUS, -1);
 #else
-           image = stgMallocBytes(imageSize, "loadArchive(image)");
+            image = stgMallocBytes(imageSize, "loadArchive(image)");
 #endif
-           n = fread ( image, 1, imageSize, f );
-           if (n != imageSize)
-               barf("loadObj: error whilst reading `%s'", path);
+            n = fread ( image, 1, imageSize, f );
+            if (n != imageSize)
+                barf("loadObj: error whilst reading `%s'", path);
 
-           archiveMemberName = stgMallocBytes(strlen(path) + fileNameSize + 3, "loadArchive(file)");
-           sprintf(archiveMemberName, "%s(%.*s)", path, (int)fileNameSize, file);
+            archiveMemberName = stgMallocBytes(strlen(path) + fileNameSize + 3,
+                                               "loadArchive(file)");
+            sprintf(archiveMemberName, "%s(%.*s)",
+                    path, (int)fileNameSize, file);
 
-           oc = mkOc(path, image, imageSize, archiveMemberName
+            oc = mkOc(path, image, imageSize, archiveMemberName
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
-                    , 0
+                     , 0
 #endif
 #endif
-                    );
+                     );
 
-           stgFree(archiveMemberName);
+            stgFree(archiveMemberName);
 
-           if (0 == loadOc(oc)) {
-               stgFree(file);
-               return 0;
-           }
-       }
-       else {
-           n = fseek(f, imageSize, SEEK_CUR);
-           if (n != 0)
-               barf("loadArchive: error whilst seeking by %d in `%s'",
-                    imageSize, path);
-       }
-       /* .ar files are 2-byte aligned */
-       if (imageSize % 2) {
-           n = fread ( tmp, 1, 1, f );
-           if (n != 1) {
-               if (feof(f)) {
-                   break;
-               }
-               else {
-                   barf("loadArchive: Failed reading padding from `%s'", path);
-               }
-           }
-       }
-   }
+            if (0 == loadOc(oc)) {
+                stgFree(file);
+                return 0;
+            }
+        }
+        else {
+            n = fseek(f, imageSize, SEEK_CUR);
+            if (n != 0)
+                barf("loadArchive: error whilst seeking by %d in `%s'",
+                     imageSize, path);
+        }
+        /* .ar files are 2-byte aligned */
+        if (imageSize % 2) {
+            n = fread ( tmp, 1, 1, f );
+            if (n != 1) {
+                if (feof(f)) {
+                    break;
+                }
+                else {
+                    barf("loadArchive: Failed reading padding from `%s'", path);
+                }
+            }
+        }
+    }
 
-   fclose(f);
+    fclose(f);
 
-   stgFree(file);
-   return 1;
+    stgFree(file);
+    return 1;
 }
 
 /* -----------------------------------------------------------------------------
