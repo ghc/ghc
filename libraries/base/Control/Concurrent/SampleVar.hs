@@ -34,6 +34,10 @@ import Control.Exception ( mask_ )
 
 import Data.Functor ( (<$>) )
 
+import Data.Typeable
+
+#include "Typeable.h"
+
 -- |
 -- Sample variables are slightly different from a normal 'MVar':
 -- 
@@ -57,6 +61,8 @@ newtype SampleVar a = SampleVar ( MVar ( Int    -- 1  == full
                                        )
                                 )
     deriving (Eq)
+
+INSTANCE_TYPEABLE1(SampleVar,sampleVarTc,"SampleVar")
 
 -- |Build a new, empty, 'SampleVar'
 newEmptySampleVar :: IO (SampleVar a)
