@@ -8242,7 +8242,7 @@ Here is an example:
 <para>
 Use the debug flag <option>-ddump-simpl-stats</option> to see what rules fired.
 If you need more information, then <option>-ddump-rule-firings</option> shows you
-each individual rule firing in detail.
+each individual rule firing and <option>-ddump-rule-rewrites</option> also shows what the code looks like before and after the rewrite.
 </para>
 
 <sect2>
@@ -8827,7 +8827,8 @@ If you add <option>-dppr-debug</option> you get a more detailed listing.
 
 <listitem>
 <para>
- Use <option>-ddump-rule-firings</option> to see in great detail what rules are being fired.
+ Use <option>-ddump-rule-firings</option> or <option>-ddump-rule-rewrites</option>
+to see in great detail what rules are being fired.
 If you add <option>-dppr-debug</option> you get a still more detailed listing.
 </para>
 </listitem>

@@ -2326,6 +2326,18 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-rule-firings</option></entry>
+	      <entry>Dump rule firing info</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-rule-rewrites</option></entry>
+	      <entry>Dump detailed rule firing info</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-rules</option></entry>
 	      <entry>Dump rules</entry>
 	      <entry>dynamic</entry>
