@@ -1684,7 +1684,7 @@ loadArchive( char *path )
    int isObject;
    char tmp[12];
 
-   IF_DEBUG(linker, debugBelch("loadArchive `%s'\n", path));
+   IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
 
    fileSize = 32;
    file = stgMallocBytes(fileSize, "loadArchive(file)");
@@ -1751,6 +1751,8 @@ loadArchive( char *path )
            fileNameSize = 16;
        }
 
+       IF_DEBUG(linker, debugBelch("loadArchive: Found member file `%s'\n", file));
+
        isObject = 0;
        for (n = 0; n < (int)fileNameSize - 1; n++) {
            if ((file[n] == '.') && (file[n + 1] == 'o')) {
@@ -1761,6 +1763,8 @@ loadArchive( char *path )
 
        if (isObject) {
            char *archiveMemberName;
+
+           IF_DEBUG(linker, debugBelch("loadArchive: Member is an object file...loading...\n"));
 
            /* We can't mmap from the archive directly, as object
               files need to be 8-byte aligned but files in .ar
