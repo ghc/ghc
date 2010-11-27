@@ -452,6 +452,10 @@ sc_force to True when calling specLoop. This flag does three things:
   * Specialise even for arguments that are not scrutinised in the loop
         (see argToPat; Trac #4488)
 
+This flag is inherited for nested non-recursive bindings (which are likely to
+be join points and hence should be fully specialised) but reset for nested
+recursive bindings.
+
 What alternatives did I consider? Annotating the loop itself doesn't
 work because (a) it is local and (b) it will be w/w'ed and I having
 w/w propagating annotation somehow doesn't seem like a good idea. The
@@ -1041,11 +1045,9 @@ scExpr' env (Let (NonRec bndr rhs) body)
 
 	; (body_usg, body') <- scExpr body_env3 body
 
-          -- NB: We don't use the ForceSpecConstr mechanism (see
-          -- Note [Forcing specialisation]) for non-recursive bindings
-          -- at the moment. I'm not sure if this is the right thing to do.
-	; let env' = scForce env False
-	; (spec_usg, specs) <- specialise env'
+          -- NB: For non-recursive bindings we inherit sc_force flag from
+          -- the parent function (see Note [Forcing specialisation])
+	; (spec_usg, specs) <- specialise env
                                           (scu_calls body_usg) 
 					  rhs_info
                                           (SI [] 0 (Just rhs_usg))
