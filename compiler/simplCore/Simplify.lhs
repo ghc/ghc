@@ -1363,14 +1363,15 @@ tryRules env rules fn args call_cont
                   return (Just (ruleArity rule, rule_rhs)) }}}}
   where
     trace_dump dflags rule rule_rhs stuff
-      | not (dopt Opt_D_dump_rule_firings dflags) = stuff
-      | not (dopt Opt_D_verbose_core2core dflags) 
+      | not (dopt Opt_D_dump_rule_firings dflags)
+      , not (dopt Opt_D_dump_rule_rewrites dflags) = stuff
+      | not (dopt Opt_D_dump_rule_rewrites dflags)
 
       = pprTrace "Rule fired:" (ftext (ru_name rule)) stuff
       | otherwise
       = pprTrace "Rule fired"
            (vcat [text "Rule:" <+> ftext (ru_name rule),
-           	  text "Before:" <+> ppr fn <+> sep (map pprParendExpr args),
+           	  text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args)),
            	  text "After: " <+> pprCoreExpr rule_rhs,
            	  text "Cont:  " <+> ppr call_cont])
            stuff
