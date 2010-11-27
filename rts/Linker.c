@@ -1675,19 +1675,24 @@ loadArchive( char *path )
 {
     ObjectCode* oc;
     char *image;
-    int imageSize;
+    int memberSize;
     FILE *f;
     int n;
+    size_t thisFileNameSize;
+    char *fileName;
     size_t fileNameSize;
-    char *file;
-    size_t fileSize;
-    int isObject;
+    int isObject, isGnuIndex;
     char tmp[12];
+    char *gnuFileIndex;
+    int gnuFileIndexSize;
 
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
 
-    fileSize = 32;
-    file = stgMallocBytes(fileSize, "loadArchive(file)");
+    gnuFileIndex = NULL;
+    gnuFileIndexSize = 0;
+
+    fileNameSize = 32;
+    fileName = stgMallocBytes(fileNameSize, "loadArchive(fileName)");
 
     f = fopen(path, "rb");
     if (!f)
@@ -1698,7 +1703,7 @@ loadArchive( char *path )
         barf("loadArchive: Not an archive: `%s'", path);
 
     while(1) {
-        n = fread ( file, 1, 16, f );
+        n = fread ( fileName, 1, 16, f );
         if (n != 16) {
             if (feof(f)) {
                 break;
@@ -1725,43 +1730,117 @@ loadArchive( char *path )
         tmp[10] = '\0';
         for (n = 0; isdigit(tmp[n]); n++);
         tmp[n] = '\0';
-        imageSize = atoi(tmp);
+        memberSize = atoi(tmp);
         n = fread ( tmp, 1, 2, f );
         if (strncmp(tmp, "\x60\x0A", 2) != 0)
             barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c",
                  path, ftell(f), tmp[0], tmp[1]);
 
+        isGnuIndex = 0;
         /* Check for BSD-variant large filenames */
-        if (0 == strncmp(file, "#1/", 3)) {
-            file[16] = '\0';
-            for (n = 3; isdigit(file[n]); n++);
-            file[n] = '\0';
-            fileNameSize = atoi(file + 3);
-            imageSize -= fileNameSize;
-            if (fileNameSize > fileSize) {
-                /* Double it to avoid potentially continually
-                   increasing it by 1 */
-                fileSize = fileNameSize * 2;
-                file = stgReallocBytes(file, fileSize, "loadArchive(file)");
+        if (0 == strncmp(fileName, "#1/", 3)) {
+            fileName[16] = '\0';
+            if (isdigit(fileName[3])) {
+                for (n = 4; isdigit(fileName[n]); n++);
+                fileName[n] = '\0';
+                thisFileNameSize = atoi(fileName + 3);
+                memberSize -= thisFileNameSize;
+                if (thisFileNameSize >= fileNameSize) {
+                    /* Double it to avoid potentially continually
+                       increasing it by 1 */
+                    fileNameSize = thisFileNameSize * 2;
+                    fileName = stgReallocBytes(fileName, fileNameSize, "loadArchive(fileName)");
+                }
+                n = fread ( fileName, 1, thisFileNameSize, f );
+                if (n != (int)thisFileNameSize) {
+                    barf("loadArchive: Failed reading filename from `%s'",
+                         path);
+                }
+                fileName[thisFileNameSize] = 0;
             }
-            n = fread ( file, 1, fileNameSize, f );
-            if (n != (int)fileNameSize)
-                barf("loadArchive: Failed reading filename from `%s'", path);
+            else {
+                barf("loadArchive: BSD-variant filename size not found while reading filename from `%s'", path);
+            }
         }
+        /* Check for GNU file index file */
+        else if (0 == strncmp(fileName, "//", 2)) {
+            fileName[0] = '\0';
+            thisFileNameSize = 0;
+            isGnuIndex = 1;
+        }
+        /* Check for a file in the GNU file index */
+        else if (fileName[0] == '/') {
+            if (isdigit(fileName[1])) {
+                int i;
+
+                for (n = 2; isdigit(fileName[n]); n++);
+                fileName[n] = '\0';
+                n = atoi(fileName + 1);
+
+                if (gnuFileIndex == NULL) {
+                    barf("loadArchive: GNU-variant filename without an index while reading from `%s'", path);
+                }
+                if (n < 0 || n > gnuFileIndexSize) {
+                    barf("loadArchive: GNU-variant filename offset %d out of range [0..%d] while reading filename from `%s'", n, gnuFileIndexSize, path);
+                }
+                if (n != 0 && gnuFileIndex[n - 1] != '\n') {
+                    barf("loadArchive: GNU-variant filename offset %d invalid (range [0..%d]) while reading filename from `%s'", n, gnuFileIndexSize, path);
+                }
+                for (i = n; gnuFileIndex[i] != '/'; i++);
+                thisFileNameSize = i - n;
+                if (thisFileNameSize >= fileNameSize) {
+                    /* Double it to avoid potentially continually
+                       increasing it by 1 */
+                    fileNameSize = thisFileNameSize * 2;
+                    fileName = stgReallocBytes(fileName, fileNameSize, "loadArchive(fileName)");
+                }
+                memcpy(fileName, gnuFileIndex + n, thisFileNameSize);
+                fileName[thisFileNameSize] = '\0';
+            }
+            else if (fileName[1] == ' ') {
+                fileName[0] = '\0';
+                thisFileNameSize = 0;
+            }
+            else {
+                barf("loadArchive: GNU-variant filename offset not found while reading filename from `%s'", path);
+            }
+        }
+        /* Finally, the case where the filename field actually contains
+           the filename */
         else {
-            fileNameSize = 16;
+            /* GNU ar terminates filenames with a '/', this allowing
+               spaces in filenames. So first look to see if there is a
+               terminating '/'. */
+            for (thisFileNameSize = 0;
+                 thisFileNameSize < 16;
+                 thisFileNameSize++) {
+                if (fileName[thisFileNameSize] == '/') {
+                    fileName[thisFileNameSize] = '\0';
+                    break;
+                }
+            }
+            /* If we didn't find a '/', then a space teminates the
+               filename. Note that if we don't find one, then
+               thisFileNameSize ends up as 16, and we already have the
+               '\0' at the end. */
+            if (thisFileNameSize == 16) {
+                for (thisFileNameSize = 0;
+                     thisFileNameSize < 16;
+                     thisFileNameSize++) {
+                    if (fileName[thisFileNameSize] == ' ') {
+                        fileName[thisFileNameSize] = '\0';
+                        break;
+                    }
+                }
+            }
         }
 
         IF_DEBUG(linker,
-                 debugBelch("loadArchive: Found member file `%s'\n", file));
+                 debugBelch("loadArchive: Found member file `%s'\n", fileName));
 
-        isObject = 0;
-        for (n = 0; n < (int)fileNameSize - 1; n++) {
-            if ((file[n] == '.') && (file[n + 1] == 'o')) {
-                isObject = 1;
-                break;
-            }
-        }
+        isObject = thisFileNameSize >= 2
+                && fileName[thisFileNameSize - 2] == '.'
+                && fileName[thisFileNameSize - 1] == 'o';
 
         if (isObject) {
             char *archiveMemberName;
@@ -1776,20 +1855,21 @@ loadArchive( char *path )
                In the mmap case we're probably wasting lots of space;
                we could do better. */
 #ifdef USE_MMAP
-            image = mmapForLinker(imageSize, MAP_ANONYMOUS, -1);
+            image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1);
 #else
-            image = stgMallocBytes(imageSize, "loadArchive(image)");
+            image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
-            n = fread ( image, 1, imageSize, f );
-            if (n != imageSize)
-                barf("loadObj: error whilst reading `%s'", path);
+            n = fread ( image, 1, memberSize, f );
+            if (n != memberSize) {
+                barf("loadArchive: error whilst reading `%s'", path);
+            }
 
-            archiveMemberName = stgMallocBytes(strlen(path) + fileNameSize + 3,
+            archiveMemberName = stgMallocBytes(strlen(path) + thisFileNameSize + 3,
                                                "loadArchive(file)");
             sprintf(archiveMemberName, "%s(%.*s)",
-                    path, (int)fileNameSize, file);
+                    path, (int)thisFileNameSize, fileName);
 
-            oc = mkOc(path, image, imageSize, archiveMemberName
+            oc = mkOc(path, image, memberSize, archiveMemberName
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
                      , 0
@@ -1800,18 +1880,35 @@ loadArchive( char *path )
             stgFree(archiveMemberName);
 
             if (0 == loadOc(oc)) {
-                stgFree(file);
+                stgFree(fileName);
                 return 0;
             }
         }
+        else if (isGnuIndex) {
+            if (gnuFileIndex != NULL) {
+                barf("loadArchive: GNU-variant index found, but already have an index, while reading filename from `%s'", path);
+            }
+            IF_DEBUG(linker, debugBelch("loadArchive: Found GNU-variant file index\n"));
+#ifdef USE_MMAP
+            gnuFileIndex = mmapForLinker(memberSize + 1, MAP_ANONYMOUS, -1);
+#else
+            gnuFileIndex = stgMallocBytes(memberSize + 1, "loadArchive(image)");
+#endif
+            n = fread ( gnuFileIndex, 1, memberSize, f );
+            if (n != memberSize) {
+                barf("loadArchive: error whilst reading `%s'", path);
+            }
+            gnuFileIndex[memberSize] = '/';
+            gnuFileIndexSize = memberSize;
+        }
         else {
-            n = fseek(f, imageSize, SEEK_CUR);
+            n = fseek(f, memberSize, SEEK_CUR);
             if (n != 0)
                 barf("loadArchive: error whilst seeking by %d in `%s'",
-                     imageSize, path);
+                     memberSize, path);
         }
         /* .ar files are 2-byte aligned */
-        if (imageSize % 2) {
+        if (memberSize % 2) {
             n = fread ( tmp, 1, 1, f );
             if (n != 1) {
                 if (feof(f)) {
@@ -1826,7 +1923,15 @@ loadArchive( char *path )
 
     fclose(f);
 
-    stgFree(file);
+    stgFree(fileName);
+    if (gnuFileIndex != NULL) {
+#ifdef USE_MMAP
+        munmap(gnuFileIndex, gnuFileIndexSize + 1);
+#else
+        stgFree(gnuFileIndex);
+#endif
+    }
+
     return 1;
 }
 
