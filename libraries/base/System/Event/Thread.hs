@@ -10,6 +10,7 @@ module System.Event.Thread
     , registerDelay
     ) where
 
+import Control.Exception (SomeException, catch, throw)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (Maybe(..))
 import Foreign.C.Error (eBADF, errnoToIOError)
@@ -38,8 +39,9 @@ threadDelay :: Int -> IO ()
 threadDelay usecs = do
   Just mgr <- readIORef eventManager
   m <- newEmptyMVar
-  _ <- registerTimeout mgr usecs (putMVar m ())
-  takeMVar m
+  reg <- registerTimeout mgr usecs (putMVar m ())
+  takeMVar m `catch` \(e::SomeException) ->
+    M.unregisterTimeout mgr reg >> throw e
 
 -- | Set the value of returned TVar to True after a given number of
 -- microseconds. The caveats associated with threadDelay also apply.
@@ -85,8 +87,9 @@ threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = do
   m <- newEmptyMVar
   Just mgr <- readIORef eventManager
-  _ <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> putMVar m e) fd evt
-  evt' <- takeMVar m
+  reg <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> putMVar m e) fd evt
+  evt' <- takeMVar m `catch` \(e::SomeException) ->
+            unregisterFd_ mgr reg >> throw e
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
