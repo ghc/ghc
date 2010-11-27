@@ -102,17 +102,21 @@ endif
 # Build the GHCi library
 ifeq "$3" "v"
 $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_PACKAGE)-$$($1_$2_VERSION).$$($3_osuf)
+ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't put bootstrapping packages in the bindist
 ifneq "$4" "0"
-ifeq "$$(UseArchivesForGhci)" "NO"
 BINDIST_LIBS += $$($1_$2_GHCI_LIB)
 endif
 endif
 $$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
 	"$$(LD)" -r -o $$@ $$(EXTRA_LD_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) `$$($1_$2_$3_MKSTUBOBJS)` $$($1_$2_EXTRA_OBJS)
 
-ifeq "$$(UseArchivesForGhci)" "NO"
+ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
+# Don't bother making ghci libs for bootstrapping packages
+ifneq "$4" "0"
+# $$(info Here $1 $2 $$($1_$2_BUILD_GHCI_LIB) Q1)
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
+endif
 endif
 endif
 

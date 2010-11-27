@@ -1670,7 +1670,6 @@ mkOc( char *path, char *image, int imageSize,
    return oc;
 }
 
-#if defined(USE_ARCHIVES_FOR_GHCI)
 HsInt
 loadArchive( char *path )
 {
@@ -1765,11 +1764,16 @@ loadArchive( char *path )
 
            /* We can't mmap from the archive directly, as object
               files need to be 8-byte aligned but files in .ar
-              archives are 2-byte aligned, and if we malloc the
-              memory then we can be given memory above 2^32, so we
-              mmap some anonymous memory and use that. We could
-              do better here. */
+              archives are 2-byte aligned. When possible we use mmap
+              to get some anonymous memory, as on 64-bit platforms if
+              we use malloc then we can be given memory above 2^32.
+              In the mmap case we're probably wasting lots of space;
+              we could do better. */
+#ifdef USE_MMAP
            image = mmapForLinker(imageSize, MAP_ANONYMOUS, -1);
+#else
+           image = stgMallocBytes(imageSize, "loadArchive(image)");
+#endif
            n = fread ( image, 1, imageSize, f );
            if (n != imageSize)
                barf("loadObj: error whilst reading `%s'", path);
@@ -1817,12 +1821,6 @@ loadArchive( char *path )
    stgFree(file);
    return 1;
 }
-#else
-HsInt GNU_ATTRIBUTE(__noreturn__)
-loadArchive( char *path STG_UNUSED ) {
-    barf("loadArchive: not enabled");
-}
-#endif
 
 /* -----------------------------------------------------------------------------
  * Load an obj (populate the global symbol table, but don't resolve yet)

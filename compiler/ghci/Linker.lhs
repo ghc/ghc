@@ -1106,41 +1106,28 @@ loadFrameworks pkg
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec
 locateOneObj dirs lib
   | not isDynamicGhcLib
-    -- When the GHC package was not compiled as dynamic library 
-    -- (=DYNAMIC not set), we search for .o libraries.
-  = do mb_libSpec <- if cUseArchivesForGhci
-                     then do mb_arch_path <- findFile mk_arch_path dirs
-                             case mb_arch_path of
-                                 Just arch_path ->
-                                     return (Just (Archive arch_path))
-                                 Nothing ->
-                                     return Nothing
-                     else do mb_obj_path <- findFile mk_obj_path dirs
-                             case mb_obj_path of
-                                 Just obj_path ->
-                                     return (Just (Object obj_path))
-                                 Nothing ->
-                                     return Nothing
-       case mb_libSpec of
-	   Just ls -> return ls
-	   Nothing -> return (DLL lib)
-
+    -- When the GHC package was not compiled as dynamic library
+    -- (=DYNAMIC not set), we search for .o libraries or, if they
+    -- don't exist, .a libraries.
+  = findObject `orElse` findArchive `orElse` assumeDll
   | otherwise
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
-  = do	{ mb_lib_path <- findFile mk_dyn_lib_path dirs
-	; case mb_lib_path of
-	    Just _ -> return (DLL dyn_lib_name)
-	    Nothing	  ->
-                do { mb_obj_path <- findFile mk_obj_path dirs
-                   ; case mb_obj_path of
-                       Just obj_path -> return (Object obj_path)
-                       Nothing       -> return (DLL lib) }}		-- We assume
+  = findDll `orElse` findObject `orElse` findArchive `orElse` assumeDll
    where
      mk_obj_path dir = dir </> (lib <.> "o")
      mk_arch_path dir = dir </> ("lib" ++ lib <.> "a")
      dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
      mk_dyn_lib_path dir = dir </> mkSOName dyn_lib_name
+     findObject  = liftM (fmap Object)  $ findFile mk_obj_path  dirs
+     findArchive = liftM (fmap Archive) $ findFile mk_arch_path dirs
+     findDll     = liftM (fmap DLL)     $ findFile mk_dyn_lib_path dirs
+     assumeDll   = return (DLL lib)
+     infixr `orElse`
+     f `orElse` g = do m <- f
+                       case m of
+                           Just x -> return x
+                           Nothing -> g
 
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)

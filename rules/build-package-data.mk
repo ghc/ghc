@@ -25,7 +25,7 @@ ifeq "$$(filter dyn,$$(GhcLibWays))" "dyn"
 $1_$2_CONFIGURE_OPTS += --enable-shared
 endif
 
-ifeq "$$(GhcWithInterpreter) $$(UseArchivesForGhci)" "YES NO"
+ifeq "$$(GhcWithInterpreter)" "YES"
 $1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
 else
 $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci

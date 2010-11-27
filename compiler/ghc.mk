@@ -136,12 +136,6 @@ ifeq "$(RelocatableBuild)" "YES"
 else
 	@echo 'cRelocatableBuild     = False'                               >> $@
 endif
-	@echo 'cUseArchivesForGhci   :: Bool'                               >> $@
-ifeq "$(UseArchivesForGhci)" "YES"
-	@echo 'cUseArchivesForGhci   = True'                                >> $@
-else
-	@echo 'cUseArchivesForGhci   = False'                               >> $@
-endif
 	@echo 'cLibFFI               :: Bool'                               >> $@
 ifeq "$(UseLibFFIForAdjustors)" "YES"
 	@echo 'cLibFFI               = True'                                >> $@
@@ -363,10 +357,9 @@ compiler_CONFIGURE_OPTS += --ghc-option=-DNO_REGS
 endif
 
 # If we're profiling GHC then we want lots of SCCs, so -auto-all
-# We also don't want to waste time building the non-profiling library,
-# either normally or for ghci. Unfortunately this means that we have to
-# tell ghc-pkg --force as it gets upset when libHSghc-6.9.a doesn't
-# exist.
+# We also don't want to waste time building the non-profiling library.
+# Unfortunately this means that we have to tell ghc-pkg --force as it
+# gets upset when libHSghc-6.9.a doesn't exist.
 ifeq "$(GhcProfiled)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --ghc-option=-auto-all
 # We seem to still build the vanilla libraries even if we say
@@ -375,7 +368,6 @@ compiler_stage2_CONFIGURE_OPTS += --ghc-option=-auto-all
 # their absence when we register the package. So for now, we just
 # leave the vanilla libraries enabled.
 # compiler_stage2_CONFIGURE_OPTS += --disable-library-vanilla
-compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
 endif
 
@@ -471,6 +463,16 @@ endif
 $(eval $(call build-package,compiler,stage1,0))
 $(eval $(call build-package,compiler,stage2,1))
 $(eval $(call build-package,compiler,stage3,2))
+
+# after build-package, because that adds --enable-library-for-ghci
+# to compiler_stage*_CONFIGURE_OPTS:
+# We don't build the GHCi library for the ghc package. We can load it
+# the .a file instead, and as object splitting isn't on for the ghc
+# package this isn't much slower.However, not building the package saves
+# a significant chunk of disk space.
+compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci
+compiler_stage2_CONFIGURE_OPTS += --disable-library-for-ghci
+compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 
 # after build-package, because that sets compiler_stage1_HC_OPTS:
 compiler_stage1_HC_OPTS += $(GhcStage1HcOpts)

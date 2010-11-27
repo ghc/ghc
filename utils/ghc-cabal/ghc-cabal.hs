@@ -372,7 +372,8 @@ generate config_args distdir directory
                 variablePrefix ++ "_DEP_CC_OPTS = "    ++ unwords (forDeps Installed.ccOptions),
                 variablePrefix ++ "_DEP_LIB_DIRS = "   ++ unwords (wrap $ forDeps Installed.libraryDirs),
                 variablePrefix ++ "_DEP_EXTRA_LIBS = " ++ unwords (forDeps Installed.extraLibraries),
-                variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions)]
+                variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions),
+                variablePrefix ++ "_BUILD_GHCI_LIB = " ++ boolToYesNo (withGHCiLib lbi)]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
       writeFile (distdir ++ "/haddock-prologue.txt") $ 
           if null (description pd) then synopsis pd
@@ -380,3 +381,5 @@ generate config_args distdir directory
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = map (\s -> "\'" ++ s ++ "\'")
+     boolToYesNo True = "YES"
+     boolToYesNo False = "NO"

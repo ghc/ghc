@@ -246,10 +246,6 @@ ifeq "$(UseLibFFIForAdjustors)" "YES"
 rts_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
-ifeq "$(UseArchivesForGhci)" "YES"
-rts_CC_OPTS += -DUSE_ARCHIVES_FOR_GHCI
-endif
-
 # Mac OS X: make sure we compile for the right OS version
 rts_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
 rts_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
