@@ -1061,8 +1061,13 @@ check_occs ie occs names
           Nothing -> return (extendOccEnv occs name_occ (name, ie))
 
           Just (name', ie')
-            | name == name'    -- Duplicate export
-            ->  do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
+            | name == name'   -- Duplicate export
+            -- But we don't want to warn if the same thing is exported
+            -- by two different module exports. See ticket #4478.
+            -> if diffModules ie ie'
+                 then return occs
+                 else do
+                   { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
                      warnIf warn_dup_exports (dupExportWarn name_occ ie ie') ;
                      return occs }
 
@@ -1072,6 +1077,9 @@ check_occs ie occs names
                      return occs }
       where
         name_occ = nameOccName name
+        -- True if the two IE RdrName are different module exports.
+        diffModules (IEModuleContents n1) (IEModuleContents n2) = n1 /= n2
+        diffModules _                     _                     = False
 \end{code}
 
 %*********************************************************
