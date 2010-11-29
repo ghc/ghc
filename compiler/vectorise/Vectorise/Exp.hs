@@ -203,7 +203,11 @@ vectScalarLam args body
 
     is_scalar vs (Var v)     = v `elemVarSet` vs
     is_scalar _ e@(Lit _)    = is_scalar_ty $ exprType e
-    is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2
+    
+    is_scalar _ (App (Var v) (Lit lit)) 
+       | Just con <- isDataConId_maybe v = con `elem` [intDataCon, floatDataCon, doubleDataCon]
+
+    is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2    
     is_scalar vs (Let (NonRec b letExpr) body) 
                              = is_scalar vs letExpr && is_scalar (extendVarSet vs b) body
     is_scalar vs (Let (Rec bnds) body) 
@@ -214,7 +218,7 @@ vectScalarLam args body
 	                           in is_scalar_ty ty &&
                                   is_scalar vs' e   &&
                                   (all (is_scalar_alt vs') alts)
-
+                                    
     is_scalar _ e            = False
 
     is_scalar_alt vs (_, bs, e) 
