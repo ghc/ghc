@@ -1685,6 +1685,9 @@ loadArchive( char *path )
     char tmp[12];
     char *gnuFileIndex;
     int gnuFileIndexSize;
+#if !defined(USE_MMAP) && defined(darwin_HOST_OS)
+    int misalignment;
+#endif
 
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
 
@@ -1854,8 +1857,13 @@ loadArchive( char *path )
                we use malloc then we can be given memory above 2^32.
                In the mmap case we're probably wasting lots of space;
                we could do better. */
-#ifdef USE_MMAP
+#if defined(USE_MMAP)
             image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1);
+#elif defined(darwin_HOST_OS)
+            /* See loadObj() */
+            misalignment = machoGetMisalignment(f);
+            image = stgMallocBytes(memberSize + misalignment, "loadArchive(image)");
+            image += misalignment;
 #else
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
@@ -1872,7 +1880,7 @@ loadArchive( char *path )
             oc = mkOc(path, image, memberSize, archiveMemberName
 #ifndef USE_MMAP
 #ifdef darwin_HOST_OS
-                     , 0
+                     , misalignment
 #endif
 #endif
                      );
