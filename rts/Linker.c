@@ -2393,13 +2393,12 @@ static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
    Because the PPC has split data/instruction caches, we have to
    do that whenever we modify code at runtime.
  */
-
-static void ocFlushInstructionCache( ObjectCode *oc )
+static void ocFlushInstructionCacheFrom(void* begin, size_t length)
 {
-    int n = (oc->fileSize + sizeof( SymbolExtra ) * oc->n_symbol_extras + 3) / 4;
-    unsigned long *p = (unsigned long *) oc->image;
+    size_t         n = (length + 3) / 4;
+    unsigned long* p = begin;
 
-    while( n-- )
+    while (n--)
     {
         __asm__ volatile ( "dcbf 0,%0\n\t"
                            "sync\n\t"
@@ -2412,6 +2411,14 @@ static void ocFlushInstructionCache( ObjectCode *oc )
     __asm__ volatile ( "sync\n\t"
                        "isync"
                      );
+}
+static void ocFlushInstructionCache( ObjectCode *oc )
+{
+    /* The main object code */
+    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
+
+    /* Jump Islands */
+    ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
 }
 #endif
 
