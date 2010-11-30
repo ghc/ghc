@@ -69,7 +69,15 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(linux_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(darwin_HOST_OS)
+#if defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
+    defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
+    defined(openbsd_HOST_OS  ) || \
+    ( defined(darwin_HOST_OS ) && !defined(powerpc_HOST_ARCH) )
+/* Don't use mmap on powerpc-apple-darwin as mmap doesn't support
+ * reallocating but we need to allocate jump islands just after each
+ * object images. Otherwise relative branches to jump islands can fail
+ * due to 24-bits displacement overflow.
+ */
 #define USE_MMAP
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -1960,6 +1968,9 @@ loadObj( char *path )
    int fd;
 #else
    FILE *f;
+#  if defined(darwin_HOST_OS)
+   int misalignment;
+#  endif
 #endif
    IF_DEBUG(linker, debugBelch("loadObj %s\n", path));
 
