@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-{-# LANGUAGE PArr #-}
+{-# LANGUAGE ParallelArrays #-}
 
 -----------------------------------------------------------------------------
 -- |
