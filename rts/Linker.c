@@ -5328,21 +5328,24 @@ static int machoGetMisalignment( FILE * f )
 {
     struct mach_header header;
     int misalignment;
-    
-    fread(&header, sizeof(header), 1, f);
-    rewind(f);
+
+    {
+        int n = fread(&header, sizeof(header), 1, f);
+        if (n != 1) {
+            barf("machoGetMisalignment: can't read the Mach-O header");
+        }
+    }
+    fseek(f, -sizeof(header), SEEK_CUR);
 
 #if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
     if(header.magic != MH_MAGIC_64) {
-        errorBelch("Bad magic. Expected: %08x, got: %08x.\n",
-                   MH_MAGIC_64, header->magic);
-        return 0;
+        barf("Bad magic. Expected: %08x, got: %08x.",
+             MH_MAGIC_64, header.magic);
     }
 #else
     if(header.magic != MH_MAGIC) {
-        errorBelch("Bad magic. Expected: %08x, got: %08x.\n",
-                   MH_MAGIC, header->magic);
-        return 0;
+        barf("Bad magic. Expected: %08x, got: %08x.",
+             MH_MAGIC, header.magic);
     }
 #endif
 
