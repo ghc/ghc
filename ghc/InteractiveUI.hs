@@ -1562,7 +1562,9 @@ newDynFlags minus_opts = do
       liftIO $ handleFlagWarnings dflags' warns
 
       if (not (null leftovers))
-        then ghcError $ errorsToGhcException leftovers
+        then ghcError . CmdLineError
+           $ "Some flags have not been recognized: "
+          ++ (concat . intersperse ", " $ map unLoc leftovers)
         else return ()
 
       new_pkgs <- setDynFlags dflags'
