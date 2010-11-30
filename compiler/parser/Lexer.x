@@ -510,8 +510,8 @@ data Token
   | ITvocurly
   | ITvccurly
   | ITobrack
-  | ITopabrack			-- [:, for parallel arrays with -XParr
-  | ITcpabrack			-- :], for parallel arrays with -XParr
+  | ITopabrack			-- [:, for parallel arrays with -XParallelArrays
+  | ITcpabrack			-- :], for parallel arrays with -XParallelArrays
   | ITcbrack
   | IToparen
   | ITcparen
@@ -1724,7 +1724,7 @@ setAlrExpectingOCurly :: Maybe ALRLayout -> P ()
 setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 
 -- for reasons of efficiency, flags indicating language extensions (eg,
--- -fglasgow-exts or -XParr) are represented by a bitmap stored in an unboxed
+-- -fglasgow-exts or -XParallelArrays) are represented by a bitmap stored in an unboxed
 -- integer
 
 genericsBit :: Int
@@ -1851,12 +1851,12 @@ mkPState flags buf loc =
     where
       bitmap = genericsBit `setBitIf` xopt Opt_Generics flags
 	       .|. ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
-	       .|. parrBit           `setBitIf` xopt Opt_PArr         flags
-	       .|. arrowsBit         `setBitIf` xopt Opt_Arrows       flags
+	       .|. parrBit           `setBitIf` xopt Opt_ParallelArrays  flags
+	       .|. arrowsBit         `setBitIf` xopt Opt_Arrows          flags
 	       .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
-	       .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes flags
-	       .|. ipBit             `setBitIf` xopt Opt_ImplicitParams flags
-	       .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll flags
+	       .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes	 flags
+	       .|. ipBit             `setBitIf` xopt Opt_ImplicitParams	 flags
+	       .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll  flags
 	       .|. bangPatBit        `setBitIf` xopt Opt_BangPatterns flags
 	       .|. tyFamBit          `setBitIf` xopt Opt_TypeFamilies flags
 	       .|. haddockBit        `setBitIf` dopt Opt_Haddock      flags

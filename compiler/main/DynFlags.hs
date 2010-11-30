@@ -304,7 +304,7 @@ data ExtensionFlag
    | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
    | Opt_GHCForeignImportPrim
-   | Opt_PArr                           -- Syntactic support for parallel arrays
+   | Opt_ParallelArrays                 -- Syntactic support for parallel arrays
    | Opt_Arrows                         -- Arrow-notation syntax
    | Opt_TemplateHaskell
    | Opt_QuasiQuotes
@@ -1519,8 +1519,10 @@ fLangFlags = [
     deprecatedForExtension "ImplicitParams" ),
   ( "scoped-type-variables",            Opt_ScopedTypeVariables,
     deprecatedForExtension "ScopedTypeVariables" ),
-  ( "parr",                             Opt_PArr,
-    deprecatedForExtension "PArr" ),
+  ( "parr",                             Opt_ParallelArrays,
+    deprecatedForExtension "ParallelArrays" ),
+  ( "PArr",                             Opt_ParallelArrays,
+    deprecatedForExtension "ParallelArrays" ),
   ( "allow-overlapping-instances",      Opt_OverlappingInstances,
     deprecatedForExtension "OverlappingInstances" ),
   ( "allow-undecidable-instances",      Opt_UndecidableInstances,
@@ -1572,7 +1574,7 @@ xFlags = [
     deprecatedForExtension "DoRec"),
   ( "DoRec",                            Opt_DoRec, nop ),
   ( "Arrows",                           Opt_Arrows, nop ),
-  ( "PArr",                             Opt_PArr, nop ),
+  ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
   ( "QuasiQuotes",                      Opt_QuasiQuotes, nop ),
   ( "Generics",                         Opt_Generics, nop ),
