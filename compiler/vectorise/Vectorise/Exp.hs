@@ -204,7 +204,7 @@ vectScalarLam args body
     is_scalar vs (Var v)     = v `elemVarSet` vs
     is_scalar _ e@(Lit _)    = is_scalar_ty $ exprType e
     
-    is_scalar _ (App (Var v) (Lit lit)) 
+    is_scalar _ (App (Var v) (Lit _)) 
        | Just con <- isDataConId_maybe v = con `elem` [intDataCon, floatDataCon, doubleDataCon]
 
     is_scalar vs (App e1 e2) = is_scalar vs e1 && is_scalar vs e2    
@@ -219,7 +219,7 @@ vectScalarLam args body
                                   is_scalar vs' e   &&
                                   (all (is_scalar_alt vs') alts)
                                     
-    is_scalar _ e            = False
+    is_scalar _ _            = False
 
     is_scalar_alt vs (_, bs, e) 
                              = is_scalar (extendVarSetList vs bs) e
@@ -230,13 +230,13 @@ vectScalarLam args body
     -- (\n# x -> x) which is what we want.
     uses funs (Var v)     = v `elemVarSet` funs 
     uses funs (App e1 e2) = uses funs e1 || uses funs e2
-    uses funs (Let (NonRec b letExpr) body) 
+    uses funs (Let (NonRec _b letExpr) body) 
                           = uses funs letExpr || uses funs  body
-    uses funs (Case e eId ty alts) 
+    uses funs (Case e _eId _ty alts) 
                           = uses funs e || any (uses_alt funs) alts
     uses _ _              = False
 
-    uses_alt funs (_, bs, e)   
+    uses_alt funs (_, _bs, e)   
                           = uses funs e 
 
 -- | Vectorise a lambda abstraction.
