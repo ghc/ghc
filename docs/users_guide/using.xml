@@ -2210,9 +2210,8 @@ statements or clauses.
   <filename>.hcr</filename>. The Core format is described in <ulink url="../../core.pdf">
   <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>, 
   and sample tools
-  for manipulating Core files (in Haskell) are in the GHC source distribution 
-  directory under <literal>utils/ext-core</literal>.  
-  Note that the format of <literal>.hcr</literal> 
+  for manipulating Core files (in Haskell) are available in the
+  <ulink url="http://hackage.haskell.org/package/extcore">extcore package on Hackage</ulink>.  Note that the format of <literal>.hcr</literal>
   files is <emphasis>different</emphasis> from the Core output format that GHC generates 
   for debugging purposes (<xref linkend="options-debugging"/>), though the two formats appear somewhat similar.</para>
 
