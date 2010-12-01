@@ -82,14 +82,11 @@ hClose h@(FileHandle _ m)     = do
   mb_exc <- hClose' h m
   hClose_maybethrow mb_exc h
 hClose h@(DuplexHandle _ r w) = do
-  mb_exc1 <- hClose' h w
-  mb_exc2 <- hClose' h r
-  case mb_exc1 of
-    Nothing -> return ()
-    Just e  -> hClose_maybethrow mb_exc2 h
+  excs <- mapM (hClose' h) [r,w]
+  hClose_maybethrow (listToMaybe (catMaybes excs)) h
 
 hClose_maybethrow :: Maybe SomeException -> Handle -> IO ()
-hClose_maybethrow Nothing  h  = return ()
+hClose_maybethrow Nothing  h = return ()
 hClose_maybethrow (Just e) h = hClose_rethrow e h
 
 hClose_rethrow :: SomeException -> Handle -> IO ()
