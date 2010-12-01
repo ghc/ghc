@@ -243,7 +243,7 @@ The primary source of asynchronous exceptions, however, is
 
 >  throwTo :: ThreadId -> Exception -> IO ()
 
-'throwTo' (also 'throwDynTo' and 'Control.Concurrent.killThread') allows one
+'throwTo' (also 'Control.Concurrent.killThread') allows one
 running thread to raise an arbitrary exception in another thread.  The
 exception is therefore asynchronous with respect to the target thread,
 which could be doing anything at the time it receives the exception.
@@ -301,6 +301,49 @@ safe in the knowledge that the thread can receive exceptions right up
 until the point when the 'Control.Concurrent.MVar.takeMVar' succeeds.
 Similar arguments apply for other interruptible operations like
 'System.IO.openFile'.
+
+It is useful to think of 'mask' not as a way to completely prevent
+asynchronous exceptions, but as a filter that allows them to be raised
+only at certain places.  The main difficulty with asynchronous
+exceptions is that they normally can occur anywhere, but within a
+'mask' an asynchronous exception is only raised by operations that are
+interruptible (or call other interruptible operations).  In many cases
+these operations may themselves raise exceptions, such as I\/O errors,
+so the caller should be prepared to handle exceptions arising from the
+operation anyway.
+
+Sometimes it is too onerous to handle exceptions in the middle of a
+critical piece of stateful code.  There are three ways to handle this
+kind of situation:
+
+ * Use STM.  Since a transaction is always either completely executed
+   or not at all, transactions are a good way to maintain invariants
+   over state in the presence of asynchronous (and indeed synchronous)
+   exceptions.
+
+ * Use 'mask', and avoid interruptible operations.  In order to do
+   this, we have to know which operations are interruptible.  It is
+   impossible to know for any given library function whether it might
+   invoke an interruptible operation internally; so instead we give a
+   list of guaranteed-not-to-be-interruptible operations below.
+
+ * Use 'uninterruptibleMask'.  This is generally not recommended,
+   unless you can guarantee that any interruptible operations invoked
+   during the scope of 'uninterruptibleMask' can only ever block for
+   a short time.  Otherwise, 'uninterruptibleMask' is a good way to
+   make your program deadlock and be unresponsive to user interrupts.
+
+The following operations are guaranteed not to be interruptible:
+
+ * operations on 'IORef' from "Data.IORef"
+ * STM transactions that do not use 'retry'
+ * everything from the @Foreign@ modules
+ * everything from @Control.Exception@
+ * @tryTakeMVar@, @tryPutMVar@, @isEmptyMVar@
+ * @takeMVar@ if the @MVar@ is definitely full, and conversely @putMVar@ if the @MVar@ is definitely empty
+ * @newEmptyMVar@, @newMVar@
+ * @forkIO@, @forkIOUnmasked@, @myThreadId@
+
 -}
 
 {- $catchall
