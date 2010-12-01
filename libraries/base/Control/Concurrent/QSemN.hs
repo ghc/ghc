@@ -31,7 +31,7 @@ import Data.Typeable
 
 -- |A 'QSemN' is a quantity semaphore, in which the available
 -- \"quantity\" may be signalled or waited for in arbitrary amounts.
-newtype QSemN = QSemN (MVar (Int,[(Int,MVar ())]))
+newtype QSemN = QSemN (MVar (Int,[(Int,MVar ())])) deriving Eq
 
 INSTANCE_TYPEABLE0(QSemN,qSemNTc,"QSemN")
 

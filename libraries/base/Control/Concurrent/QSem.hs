@@ -36,7 +36,7 @@ import Data.Typeable
 
 -- |A 'QSem' is a simple quantity semaphore, in which the available
 -- \"quantity\" is always dealt with in units of one.
-newtype QSem = QSem (MVar (Int, [MVar ()]))
+newtype QSem = QSem (MVar (Int, [MVar ()])) deriving Eq
 
 INSTANCE_TYPEABLE0(QSem,qSemTc,"QSem")
 
