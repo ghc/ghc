@@ -6,4 +6,4 @@ module QuasiQuote where
 import QuasiExpr
 
 val :: Integer
-val = eval [$expr|1 + 2|]
+val = eval [expr|1 + 2|]

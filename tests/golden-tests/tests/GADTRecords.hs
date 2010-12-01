@@ -1,4 +1,4 @@
-
+{-# LANGUAGE GADTs #-}
 module GADTRecords (H1(..)) where
 
 -- | h1
