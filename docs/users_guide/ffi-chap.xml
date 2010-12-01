@@ -651,7 +651,7 @@ int main(int argc, char *argv[])
       <title>Floating point and the FFI</title>
 
       <para>
-        On POSIX systems, the <literal>fenv.h</literal> header
+        The standard C99 <literal>fenv.h</literal> header
         provides operations for inspecting and modifying the state of
         the floating point unit.  In particular, the rounding mode
         used by floating point operations can be changed, and the
