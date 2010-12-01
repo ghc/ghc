@@ -220,7 +220,9 @@ wantWritableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWritableHandle fun h@(FileHandle _ m) act
   = wantWritableHandle' fun h m act
 wantWritableHandle fun h@(DuplexHandle _ _ m) act
-  = withHandle_' fun h m  act
+  = wantWritableHandle' fun h m act
+    -- we know it's not a ReadHandle or ReadWriteHandle, but we have to
+    -- check for ClosedHandle/SemiClosedHandle. (#4808)
 
 wantWritableHandle'
         :: String -> Handle -> MVar Handle__
@@ -257,7 +259,9 @@ wantReadableHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle_ fun h@(FileHandle  _ m)   act
   = wantReadableHandle' fun h m act
 wantReadableHandle_ fun h@(DuplexHandle _ m _) act
-  = withHandle_' fun h m act
+  = wantReadableHandle' fun h m act
+    -- we know it's not a WriteHandle or ReadWriteHandle, but we have to
+    -- check for ClosedHandle/SemiClosedHandle. (#4808)
 
 wantReadableHandle'
         :: String -> Handle -> MVar Handle__
