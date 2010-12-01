@@ -317,14 +317,14 @@ cgLookupPanic :: Id -> FCode a
 cgLookupPanic id
   = do	static_binds <- getStaticBinds
 	local_binds <- getBinds
-	srt <- getSRTLabel
-	pprPanic "cgPanic"
+--      srt <- getSRTLabel
+        pprPanic "cgLookupPanic (probably invalid Core; try -dcore-lint)"
 		(vcat [ppr id,
 		ptext (sLit "static binds for:"),
 		vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
 		ptext (sLit "local binds for:"),
-		vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ],
-	        ptext (sLit "SRT label") <+> pprCLabel srt
+                vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ]
+--              ptext (sLit "SRT label") <+> pprCLabel srt
 	      ])
 \end{code}
 
