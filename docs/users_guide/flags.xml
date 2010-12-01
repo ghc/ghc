@@ -832,13 +832,6 @@
 	      <entry><option>-XNoMagicHash</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XNewQualifiedOperators</option></entry>
-	      <entry>Enable <link linkend="new-qualified-operators">new
-	      qualified operator syntax</link></entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-XNoNewQualifiedOperators</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-XExplicitForALl</option></entry>
 	      <entry>Enable <link linkend="explicit-foralls">explicit universal quantification</link>.
               Implied by <option>-XScopedTypeVariables</option>,

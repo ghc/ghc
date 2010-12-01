@@ -450,43 +450,6 @@ Indeed, the bindings can even be recursive.
       </para>
    </sect2>
 
-    <sect2 id="new-qualified-operators">
-      <title>New qualified operator syntax</title>
-
-      <para>A new syntax for referencing qualified operators is
-        planned to be introduced by Haskell', and is enabled in GHC
-        with
-        the <option>-XNewQualifiedOperators</option><indexterm><primary><option>-XNewQualifiedOperators</option></primary></indexterm>
-        option.  In the new syntax, the prefix form of a qualified
-        operator is
-        written <literal><replaceable>module</replaceable>.(<replaceable>symbol</replaceable>)</literal>
-        (without NewQualifiedOperators this would
-        be <literal>(<replaceable>module</replaceable>.<replaceable>symbol</replaceable>)</literal>),
-        and the infix form is
-        written <literal>`<replaceable>module</replaceable>.(<replaceable>symbol</replaceable>)`</literal>
-        (without NewQualifiedOperators this would
-        be <literal>`<replaceable>module</replaceable>.<replaceable>symbol</replaceable>`</literal>.
-        For example:
-<programlisting>
-  add x y = Prelude.(+) x y
-  subtract y = (`Prelude.(-)` y)
-</programlisting>
-        The new form of qualified operators is intended to regularise
-        the syntax by eliminating odd cases
-        like <literal>Prelude..</literal>.  For example,
-        when <literal>NewQualifiedOperators</literal> is on, it is possible to
-        write the enumerated sequence <literal>[Monday..]</literal>
-        without spaces, whereas without NewQualifiedOperators this would be a
-        reference to the operator &lsquo;<literal>.</literal>&lsquo;
-        from module <literal>Monday</literal>.</para>
-
-      <para>When <option>-XNewQualifiedOperators</option> is on, the old
-        syntax for qualified operators is not accepted, so this
-        option may cause existing code to break.</para>
-
-    </sect2>
-        
-
     <!-- ====================== HIERARCHICAL MODULES =======================  -->
 
 

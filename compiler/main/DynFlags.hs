@@ -357,7 +357,6 @@ data ExtensionFlag
    | Opt_ImpredicativeTypes
    | Opt_TypeOperators
    | Opt_PackageImports
-   | Opt_NewQualifiedOperators
    | Opt_ExplicitForAll
    | Opt_AlternativeLayoutRule
    | Opt_AlternativeLayoutRuleTransitional
@@ -1627,9 +1626,7 @@ xFlags = [
   ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
-  ( "PackageImports",                   Opt_PackageImports, nop ),
-  ( "NewQualifiedOperators",            Opt_NewQualifiedOperators,
-    \_ -> deprecate "The new qualified operator syntax was rejected by Haskell'" )
+  ( "PackageImports",                   Opt_PackageImports, nop )
   ]
 
 defaultFlags :: [DynFlag]

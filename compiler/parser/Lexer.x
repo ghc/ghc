@@ -369,10 +369,8 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
 <0> {
-  @qual @varsym       / { ifExtension oldQualOps } { idtoken qvarsym }
-  @qual @consym       / { ifExtension oldQualOps } { idtoken qconsym }
-  @qual \( @varsym \) / { ifExtension newQualOps } { idtoken prefixqvarsym }
-  @qual \( @consym \) / { ifExtension newQualOps } { idtoken prefixqconsym }
+  @qual @varsym                                    { idtoken qvarsym }
+  @qual @consym                                    { idtoken qconsym }
   @varsym                                          { varsym }
   @consym                                          { consym }
 }
@@ -1770,8 +1768,6 @@ inRulePragBit :: Int
 inRulePragBit = 19
 rawTokenStreamBit :: Int
 rawTokenStreamBit = 20 -- producing a token stream with all comments included
-newQualOpsBit :: Int
-newQualOpsBit = 21 -- Haskell' qualified operator syntax, e.g. Prelude.(+)
 recBit :: Int
 recBit = 22 -- rec
 alternativeLayoutRuleBit :: Int
@@ -1817,10 +1813,6 @@ qqEnabled        flags = testBit flags qqBit
 -- inRulePrag       flags = testBit flags inRulePragBit
 rawTokenStreamEnabled :: Int -> Bool
 rawTokenStreamEnabled flags = testBit flags rawTokenStreamBit
-newQualOps :: Int -> Bool
-newQualOps       flags = testBit flags newQualOpsBit
-oldQualOps :: Int -> Bool
-oldQualOps flags = not (newQualOps flags)
 alternativeLayoutRule :: Int -> Bool
 alternativeLayoutRule flags = testBit flags alternativeLayoutRuleBit
 relaxedLayout :: Int -> Bool
@@ -1878,7 +1870,6 @@ mkPState flags buf loc =
                .|. datatypeContextsBit `setBitIf` xopt Opt_DatatypeContexts flags
                .|. transformComprehensionsBit `setBitIf` xopt Opt_TransformListComp flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
-               .|. newQualOpsBit `setBitIf` xopt Opt_NewQualifiedOperators flags
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
                .|. relaxedLayoutBit `setBitIf` xopt Opt_RelaxedLayout flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
