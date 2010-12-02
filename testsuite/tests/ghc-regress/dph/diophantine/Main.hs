@@ -1,4 +1,4 @@
-{-# LANGUAGE PArr #-}
+{-# LANGUAGE ParallelArrays #-}
 
 import Data.List
 import DiophantineVect

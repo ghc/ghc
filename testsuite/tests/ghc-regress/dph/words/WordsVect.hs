@@ -10,7 +10,7 @@
 --       If we actually cared about performance we wouldn't want to recursively
 --       subdivide the string right down to individual characters.
 --
-{-# LANGUAGE PArr, ParallelListComp #-}
+{-# LANGUAGE ParallelArrays, ParallelListComp #-}
 {-# OPTIONS -fvectorise #-}
 
 module WordsVect

@@ -1,4 +1,4 @@
-{-# LANGUAGE PArr #-}
+{-# LANGUAGE ParallelArrays #-}
 {-# OPTIONS -fvectorise -XParallelListComp #-}
 module DiophantineVect (solution3) where
 

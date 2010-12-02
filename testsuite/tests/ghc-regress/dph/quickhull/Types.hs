@@ -1,4 +1,4 @@
-{-# LANGUAGE PArr #-}
+{-# LANGUAGE ParallelArrays #-}
 {-# OPTIONS -fvectorise #-}
 
 module Types ( Point, Line, points, xsOf, ysOf) where
