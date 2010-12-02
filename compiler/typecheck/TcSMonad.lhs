@@ -861,7 +861,7 @@ newDictVar cl tys = wrapTcS $ TcM.newDict cl tys
 
 
 \begin{code} 
-isGoodRecEv :: EvVar -> WantedEvVar -> TcS Bool 
+isGoodRecEv :: EvVar -> EvVar -> TcS Bool
 -- In a call (isGoodRecEv ev wv), we are considering solving wv 
 -- using some term that involves ev, such as:
 -- by setting		wv = ev
@@ -876,7 +876,7 @@ isGoodRecEv :: EvVar -> WantedEvVar -> TcS Bool
 -- call (constructor) and -1 for every superclass selection (destructor).
 --
 -- See Note [Superclasses and recursive dictionaries] in TcInteract
-isGoodRecEv ev_var (WantedEvVar wv _)
+isGoodRecEv ev_var wv
   = do { tc_evbinds <- getTcEvBindsBag 
        ; mb <- chase_ev_var tc_evbinds wv 0 [] ev_var 
        ; return $ case mb of 
@@ -896,16 +896,7 @@ isGoodRecEv ev_var (WantedEvVar wv _)
             | Just (EvBind _ ev_trm) <- lookupEvBind assocs orig
             = chase_ev assocs trg curr_grav (orig:visited) ev_trm
 
-{-  No longer needed: evidence is in the EvBinds
-            | isTcTyVar orig && isMetaTyVar orig 
-            = do { meta_details <- wrapTcS $ TcM.readWantedCoVar orig
-                 ; case meta_details of 
-                     Flexi -> return Nothing 
-                     Indirect tyco -> chase_ev assocs trg curr_grav 
-                                             (orig:visited) (EvCoercion tyco)
-                           }
--}
-            | otherwise = return Nothing 
+            | otherwise = return Nothing
 
         chase_ev assocs trg curr_grav visited (EvId v) 
             = chase_ev_var assocs trg curr_grav visited v

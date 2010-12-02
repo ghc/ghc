@@ -840,9 +840,9 @@ interactWithInert fdimprs inert workitem
         -- We don't have to do this for givens, as we fully know the evidence for them.
         ; rec_ev_ok <- 
             case (cc_flavor inert, cc_flavor workitem) of 
-              (Wanted loc, Derived {}) -> isGoodRecEv work_ev  (WantedEvVar inert_ev loc)
-              (Derived {}, Wanted loc) -> isGoodRecEv inert_ev (WantedEvVar work_ev loc)
-              _                        -> return True 
+              (Wanted {}, Derived {}) -> isGoodRecEv work_ev  inert_ev
+              (Derived {}, Wanted {}) -> isGoodRecEv inert_ev work_ev
+              _                       -> return True
 
         ; if is_allowed && rec_ev_ok then 
               doInteractWithInert fdimprs inert workitem 
