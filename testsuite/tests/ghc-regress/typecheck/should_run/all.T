@@ -76,5 +76,6 @@ test('IPRun', normal, compile_and_run, [''])
 test('T1735', normal, multimod_compile_and_run, ['T1735',''])
 
 test('T3731', normal, compile_and_run, [''])
+test('T3731-short', normal, compile_and_run, [''])
 test('T3500a', normal, compile_and_run, [''])
 test('T3500b', normal, compile_and_run, [''])
