@@ -1033,10 +1033,10 @@ zonkEvTerm env (EvCast v co)      = ASSERT( isId v)
                                     do { co' <- zonkTcTypeToType env co
                                        ; return (EvCast (zonkIdOcc env v) co') }
 zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)
-zonkEvTerm env (EvDFunApp df tys tms) 
+zonkEvTerm env (EvDFunApp df tys tms _deps) -- Ignore the dependencies
   = do { tys' <- zonkTcTypeToTypes env tys
        ; let tms' = map (zonkEvVarOcc env) tms
-       ; return (EvDFunApp (zonkIdOcc env df) tys' tms') }
+       ; return (EvDFunApp (zonkIdOcc env df) tys' tms' _deps) }
 
 zonkTcEvBinds :: ZonkEnv -> TcEvBinds -> TcM (ZonkEnv, TcEvBinds)
 zonkTcEvBinds env (TcEvBinds var) = do { (env', bs') <- zonkEvBindsVar env var

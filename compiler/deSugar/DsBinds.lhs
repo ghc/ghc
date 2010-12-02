@@ -230,11 +230,11 @@ dsEvBinds bs = return (map dsEvGroup sccs)
     mk_node b@(EvBind var term) = (b, var, free_vars_of term)
 
     free_vars_of :: EvTerm -> [EvVar]
-    free_vars_of (EvId v)           = [v]
-    free_vars_of (EvCast v co)      = v : varSetElems (tyVarsOfType co)
-    free_vars_of (EvCoercion co)    = varSetElems (tyVarsOfType co)
-    free_vars_of (EvDFunApp _ _ vs) = vs
-    free_vars_of (EvSuperClass d _) = [d]
+    free_vars_of (EvId v)             = [v]
+    free_vars_of (EvCast v co)        = v : varSetElems (tyVarsOfType co)
+    free_vars_of (EvCoercion co)      = varSetElems (tyVarsOfType co)
+    free_vars_of (EvDFunApp _ _ vs _) = vs
+    free_vars_of (EvSuperClass d _)   = [d]
 
 dsEvGroup :: SCC EvBind -> DsEvBind
 dsEvGroup (AcyclicSCC (EvBind co_var (EvSuperClass dict n)))
@@ -261,10 +261,10 @@ dsEvGroup (CyclicSCC bs)
     ds_pair (EvBind v r) = (v, dsEvTerm r)
 
 dsEvTerm :: EvTerm -> CoreExpr
-dsEvTerm (EvId v)      		 = Var v
-dsEvTerm (EvCast v co) 		 = Cast (Var v) co 
-dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
-dsEvTerm (EvCoercion co)         = Type co
+dsEvTerm (EvId v)      		       = Var v
+dsEvTerm (EvCast v co) 		       = Cast (Var v) co 
+dsEvTerm (EvDFunApp df tys vars _deps) = Var df `mkTyApps` tys `mkVarApps` vars
+dsEvTerm (EvCoercion co)               = Type co
 dsEvTerm (EvSuperClass d n)
   = ASSERT( isClassPred (classSCTheta cls !! n) )
     	    -- We can only select *dictionary* superclasses

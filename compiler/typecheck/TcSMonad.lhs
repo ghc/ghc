@@ -11,7 +11,7 @@ module TcSMonad (
     mkWantedConstraints, deCanonicaliseWanted, 
     makeGivens, makeSolvedByInst,
 
-    CtFlavor (..), isWanted, isGiven, isDerived, isDerivedSC, isDerivedByInst, 
+    CtFlavor (..), isWanted, isGiven, isDerived, 
     isGivenCt, isWantedCt, pprFlavorArising,
 
     isFlexiTcsTv,
@@ -300,9 +300,10 @@ data CtFlavor
                       --   these wanteds 
   | Wanted WantedLoc  -- We have no evidence bindings for this constraint. 
 
-data DerivedOrig = DerSC | DerInst 
+data DerivedOrig = DerSC | DerInst | DerSelf
 -- Deriveds are either superclasses of other wanteds or deriveds, or partially 
--- solved wanteds from instances. 
+-- solved wanteds from instances, or 'self' dictionaries containing yet wanted
+-- superclasses. 
 
 instance Outputable CtFlavor where 
   ppr (Given _)    = ptext (sLit "[Given]")
@@ -320,14 +321,6 @@ isGiven _          = False
 isDerived :: CtFlavor -> Bool 
 isDerived (Derived {}) = True
 isDerived _            = False
-
-isDerivedSC :: CtFlavor -> Bool 
-isDerivedSC (Derived _ DerSC) = True 
-isDerivedSC _                 = False 
-
-isDerivedByInst :: CtFlavor -> Bool 
-isDerivedByInst (Derived _ DerInst) = True 
-isDerivedByInst _                   = False 
 
 pprFlavorArising :: CtFlavor -> SDoc
 pprFlavorArising (Derived wl _) = pprArisingAt wl
@@ -909,9 +902,11 @@ isGoodRecEv ev_var wv
 
         chase_ev assocs trg curr_grav visited (EvCoercion co)
             = chase_co assocs trg curr_grav visited co
-        chase_ev assocs trg curr_grav visited (EvDFunApp _ _ ev_vars) 
-            = do { chase_results <- mapM (chase_ev_var assocs trg (curr_grav+1) visited) ev_vars
-                 ; return (comb_chase_res Nothing chase_results) } 
+        chase_ev assocs trg curr_grav visited (EvDFunApp _ _ _ev_vars ev_deps)
+            = do { chase_results <- mapM (chase_ev_var assocs trg (curr_grav+1) visited) ev_deps
+                                    -- Notice that we chase the ev_deps and not the ev_vars
+                                    -- See Note [Dependencies in self dictionaries] in TcSimplify
+                 ; return (comb_chase_res Nothing chase_results) }
 
         chase_co assocs trg curr_grav visited co 
             = -- Look for all the coercion variables in the coercion 

@@ -317,10 +317,6 @@ happen.
 newSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS CanonicalCts
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored ev orig_flavor cls xis 
-  | Given loc <- orig_flavor   -- Very important!
-  , NoScSkol  <- ctLocOrigin loc
-  = return emptyCCan
-  | otherwise
   = do { let (tyvars, sc_theta, _, _) = classBigSig cls 
              sc_theta1 = substTheta (zipTopTvSubst tyvars xis) sc_theta
        ; sc_vars <- zipWithM inst_one sc_theta1 [0..]

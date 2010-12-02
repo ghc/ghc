@@ -1875,33 +1875,6 @@ NB: The desugarer needs be more clever to deal with equalities
 
 \begin{code}
 
-{- 
-newGivenSCWork :: EvVar -> GivenLoc -> Class -> [Xi] -> TcS WorkList
-newGivenSCWork ev loc cls xis
-  | NoScSkol <- ctLocOrigin loc  -- Very important!
-  = return emptyWorkList
-  | otherwise
-  = newImmSCWorkFromFlavored ev (Given loc) cls xis >>= return 
-
-newDerivedSCWork :: EvVar -> WantedLoc -> Class -> [Xi] -> TcS WorkList 
-newDerivedSCWork ev loc cls xis 
-  =  do { ims <- newImmSCWorkFromFlavored ev flavor cls xis 
-        ; rec_sc_work ims  }
-  where 
-    rec_sc_work :: CanonicalCts -> TcS CanonicalCts 
-    rec_sc_work cts 
-      = do { bg <- mapBagM (\c -> do { ims <- imm_sc_work c 
-                                     ; recs_ims <- rec_sc_work ims 
-                                     ; return $ consBag c recs_ims }) cts 
-           ; return $ concatBag bg } 
-    imm_sc_work (CDictCan { cc_id = dv, cc_flavor = fl, cc_class = cls, cc_tyargs = xis })
-       = newImmSCWorkFromFlavored dv fl cls xis 
-    imm_sc_work _ct = return emptyCCan 
-
-    flavor = Derived loc DerSC 
-
--}
-
 
 data LookupInstResult
   = NoInstance
@@ -1927,11 +1900,12 @@ matchClassInst clas tys loc
                  ; tys <- instDFunTypes mb_inst_tys 
                  ; let (theta, _) = tcSplitPhiTy (applyTys (idType dfun_id) tys)
                  ; if null theta then
-                       return (GenInst [] (EvDFunApp dfun_id tys [])) 
+                       return (GenInst [] (EvDFunApp dfun_id tys [] []))
                    else do
                      { ev_vars <- instDFunConstraints theta
                      ; let wevs = [WantedEvVar w loc | w <- ev_vars]
-                     ; return $ GenInst wevs (EvDFunApp dfun_id tys ev_vars) }
+                     ; return $ GenInst wevs (EvDFunApp dfun_id tys ev_vars ev_vars) }
+                                                           -- NB: All the dependencies are ev_vars
                  }
         }
 \end{code}

@@ -616,7 +616,9 @@ tc_inst_decl2 dfun_id inst_binds
 	-- to use in each method binding
  	-- Why?  See Note [Subtle interaction of recursion and overlap]
        ; let self_ev_bind = EvBind self_dict $ 
-                            EvDFunApp dfun_id (mkTyVarTys inst_tyvars') dfun_ev_vars
+                            EvDFunApp dfun_id (mkTyVarTys inst_tyvars') dfun_ev_vars []
+                                      -- Empty dependencies [], since it only
+                                      -- depends on "given" things
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]

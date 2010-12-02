@@ -339,9 +339,6 @@ data SkolemInfo
   | RuntimeUnkSkol      -- a type variable used to represent an unknown
                         -- runtime type (used in the GHCi debugger)
 
-  | NoScSkol		-- Used for the "self" superclass when solving
-    			-- superclasses; don't generate superclasses of me
-
   | UnkSkol		-- Unhelpful info (until I improve it)
 
 -------------------------------------
@@ -461,7 +458,6 @@ pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter bindings for")
                               <+> pprWithCommas ppr ips
 pprSkolInfo (ClsSkol cls)   = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
 pprSkolInfo InstSkol        = ptext (sLit "the instance declaration")
-pprSkolInfo NoScSkol        = ptext (sLit "the instance declaration (self)")
 pprSkolInfo FamInstSkol     = ptext (sLit "the family instance declaration")
 pprSkolInfo (RuleSkol name) = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
 pprSkolInfo ArrowSkol       = ptext (sLit "the arrow form")

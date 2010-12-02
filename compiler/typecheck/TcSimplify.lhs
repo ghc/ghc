@@ -33,6 +33,7 @@ import BasicTypes	( RuleName )
 import Data.List	( partition )
 import Outputable
 import FastString
+import Control.Monad    ( unless )
 \end{code}
 
 
@@ -440,8 +441,7 @@ over implicit parameters. See the predicate isFreeWhenInferring.
 ***********************************************************************************
 
 When constructing evidence for superclasses in an instance declaration, 
-  * we MUST have the "self" dictionary available, but
-  * we must NOT have its superclasses derived from "self"
+  * we MUST have the "self" dictionary available
 
 Moreover, we must *completely* solve the constraints right now,
 not wrap them in an implication constraint to solve later.  Why?
@@ -461,25 +461,86 @@ Now, if there is some *other* top-level constraint solved
 looking like
 	foo :: Ord [Int]
         foo = scsel dCInt
-we must not solve the (Ord [Int]) wanted from foo!!
+we must not solve the (Ord [Int]) wanted from foo!
+
+Note [Dependencies in self dictionaries] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Moreover, notice that when solving for a superclass, we record the dependency of 
+self on the superclass. This is because this dependency is not evident in the 
+EvBind of the self dictionary, which only involves a call to a DFun. Example: 
+
+class A a => C a 
+instance B a => C a 
+
+When we check the instance declaration, we pass in a self dictionary that is merely
+     self = dfun b
+But we will be asked to solve that from: 
+   [Given] d : B a 
+   [Derived] self : C a 
+We can show: 
+   [Wanted] sc : A a
+The problem is that self *depends* on the sc variable, but that is not apparent in 
+the binding self = dfun b. So we record the extra dependency, using the evidence bind: 
+   EvBind self (EvDFunApp dfun [b] [b,sc])
+It is these dependencies that are the ''true'' dependencies in an EvDFunApp, and those 
+that we must chase in function isGoodRecEv (in TcSMonad) 
 
 \begin{code}
-simplifySuperClass :: EvVar	-- The "self" dictionary
-		   -> WantedConstraints
-		   -> TcM ()
-simplifySuperClass self wanteds
-  = do { wanteds <- mapBagM zonkWanted wanteds
-       ; loc <- getCtLoc NoScSkol
-       ; ((unsolved_flats,unsolved_impls), frozen_errors, ev_binds)
+simplifySuperClass :: [TyVar]
+                   -> [EvVar]          -- givens
+                   -> EvVar            -- the superclass we must solve for
+                   -> EvBind           -- the 'self' evidence bind 
+                   -> TcM TcEvBinds
+-- Post:  
+--   ev_binds <- simplifySuperClasses tvs inst_givens sc_dict self_ev_bind
+-- Then: 
+--    1) ev_binds already contains self_ev_bind
+--    2) if successful then ev_binds contains binding for
+--       the wanted superclass, sc_dict
+simplifySuperClass tvs inst_givens sc_dict (EvBind self_dict self_ev)
+  = do { giv_loc      <- getCtLoc InstSkol  -- For the inst_givens
+       ; want_loc     <- getCtLoc ScOrigin  -- As wanted/derived (for the superclass and self)
+       ; lcl_env      <- getLclTypeEnv
+
+       -- Record the dependency of self_dict to sc_dict, see Note [Dependencies in self dictionaries]
+       ; let wanted = unitBag $ WcEvVar $ WantedEvVar sc_dict want_loc
+             self_ev_with_dep
+               = case self_ev of 
+                   EvDFunApp df tys insts deps -> EvDFunApp df tys insts (sc_dict:deps)
+                   _ -> panic "Self-dictionary not EvDFunApp!"
+
+       -- And solve for it
+       ; ((unsolved_flats, unsolved_implics), frozen_errors, ev_binds)
              <- runTcS SimplCheck NoUntouchables $
-         	do { can_self <- canGivens loc [self]
-         	   ; let inert = foldlBag updInertSet emptyInert can_self
-	 	     -- No need for solveInteract; we know it's inert
+                do {   -- Record a binding for self_dict that *depends on sc_dict*
+                       -- And canonicalise self_dict (which adds its superclasses)
+                       -- with a Derived origin, which in turn triggers the
+                       -- goodRecEv recursive-evidence check
+                   ; setEvBind self_dict self_ev_with_dep
+                   ; can_selfs <- mkCanonical  (Derived want_loc DerSelf) self_dict
 
-	 	   ; solveWanteds inert wanteds }
+                       -- The rest is just like solveImplication
+                   ; can_inst_givens <- mkCanonicals (Given giv_loc) inst_givens
+                   ; inert           <- solveInteract emptyInert $
+                                        can_inst_givens `andCCan` can_selfs
+                   ; solveWanteds inert wanted }
 
-       ; ASSERT2( isEmptyBag ev_binds, ppr ev_binds )
-         reportUnsolved (unsolved_flats,unsolved_impls) frozen_errors }
+       -- For error reporting, conjure up a fake implication,
+       -- so that we get decent error messages
+       ; let implic = Implic { ic_untch  = NoUntouchables
+                             , ic_env    = lcl_env
+                             , ic_skols  = mkVarSet tvs
+                             , ic_given  = inst_givens
+                             , ic_wanted = mapBag WcEvVar unsolved_flats
+                             , ic_scoped = panic "super1"
+                             , ic_binds  = panic "super2"
+                             , ic_loc    = giv_loc }
+        ; ASSERT (isEmptyBag unsolved_implics) -- Impossible to have any implications!
+          unless (isEmptyBag unsolved_flats) $
+          reportUnsolved (emptyBag, unitBag implic) frozen_errors
+
+        ; return (EvBinds ev_binds) }
 \end{code}
 
 
