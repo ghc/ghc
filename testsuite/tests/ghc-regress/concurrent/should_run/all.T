@@ -48,6 +48,8 @@ test('4262', [ skip, # skip for now, it doesn't give reliable results
                unless_os('linux',skip) ],
              compile_and_run, [''])
 
+test('4813', normal, compile_and_run, ['-debug'])
+
 # -----------------------------------------------------------------------------
 # These tests we only do for a full run
 
