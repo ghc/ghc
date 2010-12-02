@@ -163,9 +163,11 @@ removeThreadFromQueue (Capability *cap, StgTSO **queue, StgTSO *tso)
 	if (t == tso) {
 	    if (prev) {
 		setTSOLink(cap,prev,t->_link);
+                t->_link = END_TSO_QUEUE;
                 return rtsFalse;
 	    } else {
 		*queue = t->_link;
+                t->_link = END_TSO_QUEUE;
                 return rtsTrue;
 	    }
 	}
@@ -190,7 +192,8 @@ removeThreadFromDeQueue (Capability *cap,
 		*head = t->_link;
                 flag = rtsTrue;
 	    }
-	    if (*tail == tso) {
+            t->_link = END_TSO_QUEUE;
+            if (*tail == tso) {
 		if (prev) {
 		    *tail = prev;
 		} else {
