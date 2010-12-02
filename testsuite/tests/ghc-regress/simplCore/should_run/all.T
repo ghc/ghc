@@ -36,6 +36,7 @@ test('SeqRule', only_ways(['optc','optasm']), compile_and_run, [''])
 
 test('T3403', normal, compile_and_run, ['-package containers'])
 test('T3591', normal, compile_and_run, [''])
+test('T4814', normal, compile_and_run, [''])
 
 # Run this test *without* optimisation too
 test('T3959', only_ways(['normal','optc','optasm']), compile_and_run, [''])
