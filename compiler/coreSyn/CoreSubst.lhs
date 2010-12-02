@@ -20,8 +20,9 @@ module CoreSubst (
 	emptySubst, mkEmptySubst, mkSubst, mkOpenSubst, substInScope, isEmptySubst, 
  	extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
 	extendSubst, extendSubstList, zapSubstEnv,
-	extendInScope, extendInScopeList, extendInScopeIds, 
-	isInScope,
+        addInScopeSet, extendInScope, extendInScopeList, extendInScopeIds,
+        isInScope, setInScope,
+        delBndr, delBndrs,
 
 	-- ** Substituting and cloning binders
 	substBndr, substBndrs, substRecBndrs,
@@ -232,6 +233,17 @@ lookupIdSubst doc (Subst in_scope ids _) v
 lookupTvSubst :: Subst -> TyVar -> Type
 lookupTvSubst (Subst _ _ tvs) v = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
 
+delBndr :: Subst -> Var -> Subst
+delBndr (Subst in_scope tvs ids) v
+  | isId v    = Subst in_scope tvs (delVarEnv ids v)
+  | otherwise = Subst in_scope (delVarEnv tvs v) ids
+
+delBndrs :: Subst -> [Var] -> Subst
+delBndrs (Subst in_scope tvs ids) vs
+  = Subst in_scope (delVarEnvList tvs vs_tv) (delVarEnvList ids vs_id)
+  where
+    (vs_id, vs_tv) = partition isId vs
+
 -- | Simultaneously substitute for a bunch of variables
 --   No left-right shadowing
 --   ie the substitution for   (\x \y. e) a1 a2
@@ -245,7 +257,14 @@ mkOpenSubst in_scope pairs = Subst in_scope
 isInScope :: Var -> Subst -> Bool
 isInScope v (Subst in_scope _ _) = v `elemInScopeSet` in_scope
 
--- | Add the 'Var' to the in-scope set: as a side effect, removes any existing substitutions for it
+-- | Add the 'Var' to the in-scope set, but do not remove
+-- any existing substitutions for it
+addInScopeSet :: Subst -> VarSet -> Subst
+addInScopeSet (Subst in_scope ids tvs) vs
+  = Subst (in_scope `extendInScopeSetSet` vs) ids tvs
+
+-- | Add the 'Var' to the in-scope set: as a side effect,
+-- and remove any existing substitutions for it
 extendInScope :: Subst -> Var -> Subst
 extendInScope (Subst in_scope ids tvs) v
   = Subst (in_scope `extendInScopeSet` v) 
@@ -263,6 +282,9 @@ extendInScopeIds :: Subst -> [Id] -> Subst
 extendInScopeIds (Subst in_scope ids tvs) vs 
   = Subst (in_scope `extendInScopeSetList` vs) 
 	  (ids `delVarEnvList` vs) tvs
+
+setInScope :: Subst -> InScopeSet -> Subst
+setInScope (Subst _ ids tvs) in_scope = Subst in_scope ids tvs
 \end{code}
 
 Pretty printing, for debugging only

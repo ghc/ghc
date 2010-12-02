@@ -30,11 +30,12 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
-import OccurAnal	( occurAnalyseExpr )
+import CoreSubst
+import OccurAnal        ( occurAnalyseExpr )
 import CoreFVs		( exprFreeVars, exprsFreeVars, bindFreeVars, rulesFreeVars )
-import CoreUtils	( exprType, eqExprX )
+import CoreUtils        ( exprType, eqExpr )
 import PprCore		( pprRules )
-import Type		( Type, TvSubstEnv )
+import Type             ( Type )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
 import Id
@@ -487,30 +488,31 @@ matchN	:: IdUnfoldingFun
 -- Fail if there are two few actual arguments from the target to match the template
 
 matchN id_unf in_scope tmpl_vars tmpl_es target_es
-  = do	{ (tv_subst, id_subst, binds)
-		<- go init_menv emptySubstEnv tmpl_es target_es
-	; return (binds, 
-		  map (lookup_tmpl tv_subst id_subst) tmpl_vars') }
+  = do  { subst <- go init_menv emptyRuleSubst tmpl_es target_es
+        ; return (rs_binds subst,
+                  map (lookup_tmpl subst) tmpl_vars') }
   where
     (init_rn_env, tmpl_vars') = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
-	-- See Note [Template binders]
+        -- See Note [Template binders]
 
-    init_menv = ME { me_tmpls = mkVarSet tmpl_vars', me_env = init_rn_env }
+    init_menv = RV { rv_tmpls = mkVarSet tmpl_vars', rv_lcl = init_rn_env
+                   , rv_fltR = mkEmptySubst (rnInScopeSet init_rn_env)
+                   , rv_unf = id_unf }
 		
     go _    subst []     _  	= Just subst
     go _    _     _      [] 	= Nothing	-- Fail if too few actual args
-    go menv subst (t:ts) (e:es) = do { subst1 <- match id_unf menv subst t e 
+    go menv subst (t:ts) (e:es) = do { subst1 <- match menv subst t e
 				     ; go menv subst1 ts es }
 
-    lookup_tmpl :: TvSubstEnv -> IdSubstEnv -> Var -> CoreExpr
-    lookup_tmpl tv_subst id_subst tmpl_var'
-	| isTyCoVar tmpl_var' = case lookupVarEnv tv_subst tmpl_var' of
-				Just ty 	-> Type ty
-				Nothing 	-> unbound tmpl_var'
-	| otherwise	    = case lookupVarEnv id_subst tmpl_var' of
-				Just e -> e
-				_      -> unbound tmpl_var'
- 
+    lookup_tmpl :: RuleSubst -> Var -> CoreExpr
+    lookup_tmpl (RS { rs_tv_subst = tv_subst, rs_id_subst = id_subst }) tmpl_var'
+        | isId tmpl_var' = case lookupVarEnv id_subst tmpl_var' of
+                             Just e -> e
+                             _      -> unbound tmpl_var'
+        | otherwise      = case lookupVarEnv tv_subst tmpl_var' of
+                             Just ty -> Type ty
+                             Nothing -> unbound tmpl_var'
+
     unbound var = pprPanic "Template variable unbound in rewrite rule" 
 			(ppr var $$ ppr tmpl_vars $$ ppr tmpl_vars' $$ ppr tmpl_es $$ ppr target_es)
 \end{code}
@@ -532,30 +534,45 @@ To achive this, we use rnBndrL to rename the template variables if
 necessary; the renamed ones are the tmpl_vars'
 
 
-	---------------------------------------------
+%************************************************************************
+%*									*
+                   The main matcher
+%*									*
+%************************************************************************
+
+        ---------------------------------------------
 		The inner workings of matching
 	---------------------------------------------
 
 \begin{code}
--- These two definitions are not the same as in Subst,
--- but they simple and direct, and purely local to this module
---
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.
 --
--- * The BindWrapper in a SubstEnv are the bindings floated out
+-- * The BindWrapper in a RuleSubst are the bindings floated out
 --   from nested matches; see the Let case of match, below
 --
-type SubstEnv = (TvSubstEnv, IdSubstEnv, BindWrapper)
-                   
+data RuleEnv = RV { rv_tmpls :: VarSet          -- Template variables
+                  , rv_lcl   :: RnEnv2          -- Renamings for *local bindings*
+                                                --   (lambda/case)
+                  , rv_fltR  :: Subst           -- Renamings for floated let-bindings
+                                                --   domain disjoint from envR of rv_lcl
+                                                -- See Note [Matching lets]
+                  , rv_unf :: IdUnfoldingFun
+                  }
+
+data RuleSubst = RS { rs_tv_subst :: TvSubstEnv   -- Range is the
+                    , rs_id_subst :: IdSubstEnv   --   template variables
+                    , rs_binds    :: BindWrapper  -- Floated bindings
+                    , rs_bndrs    :: VarSet       -- Variables bound by floated lets
+                    }
+
 type BindWrapper = CoreExpr -> CoreExpr
   -- See Notes [Matching lets] and [Matching cases]
   -- we represent the floated bindings as a core-to-core function
 
-type IdSubstEnv = IdEnv CoreExpr		
-
-emptySubstEnv :: SubstEnv
-emptySubstEnv = (emptyVarEnv, emptyVarEnv, \e -> e)
+emptyRuleSubst :: RuleSubst
+emptyRuleSubst = RS { rs_tv_subst = emptyVarEnv, rs_id_subst = emptyVarEnv
+                    , rs_binds = \e -> e, rs_bndrs = emptyVarSet }
 
 --	At one stage I tried to match even if there are more 
 --	template args than real args.
@@ -566,12 +583,11 @@ emptySubstEnv = (emptyVarEnv, emptyVarEnv, \e -> e)
 --	SLPJ July 99
 
 
-match :: IdUnfoldingFun
-      -> MatchEnv
-      -> SubstEnv
+match :: RuleEnv
+      -> RuleSubst
       -> CoreExpr		-- Template
       -> CoreExpr		-- Target
-      -> Maybe SubstEnv
+      -> Maybe RuleSubst
 
 -- See the notes with Unify.match, which matches types
 -- Everything is very similar for terms
@@ -589,196 +605,227 @@ match :: IdUnfoldingFun
 -- succeed in matching what looks like the template variable 'a' against 3.
 
 -- The Var case follows closely what happens in Unify.match
-match idu menv subst (Var v1) e2 
-  | Just subst <- match_var idu menv subst v1 e2
+match renv subst (Var v1) e2
+  | Just subst <- match_var renv subst v1 e2
   = Just subst
 
-match idu menv subst (Note _ e1) e2 = match idu menv subst e1 e2
-match idu menv subst e1 (Note _ e2) = match idu menv subst e1 e2
+match renv subst (Note _ e1) e2 = match renv subst e1 e2
+match renv subst e1 (Note _ e2) = match renv subst e1 e2
       -- Ignore notes in both template and thing to be matched
       -- See Note [Notes in RULE matching]
 
-match id_unfolding_fun menv subst e1 (Var v2)      -- Note [Expanding variables]
+match renv subst e1 (Var v2)      -- Note [Expanding variables]
   | not (inRnEnvR rn_env v2) -- Note [Do not expand locally-bound variables]
-  , Just e2' <- expandUnfolding_maybe (id_unfolding_fun v2')
-  = match id_unfolding_fun (menv { me_env = nukeRnEnvR rn_env }) subst e1 e2'
+  , Just e2' <- expandUnfolding_maybe (rv_unf renv v2')
+  = match (renv { rv_lcl = nukeRnEnvR rn_env }) subst e1 e2'
   where
     v2'    = lookupRnInScope rn_env v2
-    rn_env = me_env menv
+    rn_env = rv_lcl renv
 	-- Notice that we look up v2 in the in-scope set
 	-- See Note [Lookup in-scope]
 	-- No need to apply any renaming first (hence no rnOccR)
 	-- because of the not-inRnEnvR
 
-match idu menv (tv_subst, id_subst, binds) e1 (Let bind e2)
-  | okToFloat rn_env bndrs (bindFreeVars bind) 	-- See Note [Matching lets]
-  = match idu (menv { me_env = rn_env' }) 
-	  (tv_subst, id_subst, binds . Let bind)
+match renv subst e1 (Let bind e2)
+  | okToFloat (rv_lcl renv) (bindFreeVars bind)        -- See Note [Matching lets]
+  = match (renv { rv_fltR = flt_subst' })
+          (subst { rs_binds = rs_binds subst . Let bind'
+                 , rs_bndrs = extendVarSetList (rs_bndrs subst) new_bndrs })
 	  e1 e2
   where
-    rn_env   = me_env menv
-    rn_env'  = extendRnInScopeList rn_env bndrs
-    bndrs    = bindersOf bind
+    flt_subst = addInScopeSet (rv_fltR renv) (rs_bndrs subst)
+    (flt_subst', bind') = substBind flt_subst bind
+    new_bndrs = bindersOf bind'
 
 {- Disabled: see Note [Matching cases] below
-match idu menv (tv_subst, id_subst, binds) e1 
+match renv (tv_subst, id_subst, binds) e1 
       (Case scrut case_bndr ty [(con, alt_bndrs, rhs)])
   | exprOkForSpeculation scrut	-- See Note [Matching cases]
   , okToFloat rn_env bndrs (exprFreeVars scrut)
-  = match idu (menv { me_env = rn_env' })
+  = match (renv { me_env = rn_env' })
           (tv_subst, id_subst, binds . case_wrap)
           e1 rhs 
   where
-    rn_env   = me_env menv
+    rn_env   = me_env renv
     rn_env'  = extendRnInScopeList rn_env bndrs
     bndrs    = case_bndr : alt_bndrs
     case_wrap rhs' = Case scrut case_bndr ty [(con, alt_bndrs, rhs')]
 -}
 
-match _ _ subst (Lit lit1) (Lit lit2)
+match _ subst (Lit lit1) (Lit lit2)
   | lit1 == lit2
   = Just subst
 
-match idu menv subst (App f1 a1) (App f2 a2)
-  = do 	{ subst' <- match idu menv subst f1 f2
-	; match idu menv subst' a1 a2 }
+match renv subst (App f1 a1) (App f2 a2)
+  = do 	{ subst' <- match renv subst f1 f2
+	; match renv subst' a1 a2 }
 
-match idu menv subst (Lam x1 e1) (Lam x2 e2)
-  = match idu menv' subst e1 e2
+match renv subst (Lam x1 e1) (Lam x2 e2)
+  = match renv' subst e1 e2
   where
-    menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
+    renv' = renv { rv_lcl = rnBndr2 (rv_lcl renv) x1 x2
+                 , rv_fltR = delBndr (rv_fltR renv) x2 }
 
 -- This rule does eta expansion
 --		(\x.M)  ~  N 	iff	M  ~  N x
 -- It's important that this is *after* the let rule,
 -- so that 	(\x.M)  ~  (let y = e in \y.N)
 -- does the let thing, and then gets the lam/lam rule above
-match idu menv subst (Lam x1 e1) e2
-  = match idu menv' subst e1 (App e2 (varToCoreExpr new_x))
+match renv subst (Lam x1 e1) e2
+  = match renv' subst e1 (App e2 (varToCoreExpr new_x))
   where
-    (rn_env', new_x) = rnEtaL (me_env menv) x1
-    menv' = menv { me_env = rn_env' }
+    (rn_env', new_x) = rnEtaL (rv_lcl renv) x1
+    renv' = renv { rv_lcl = rn_env' }
 
 -- Eta expansion the other way
 --	M  ~  (\y.N)	iff   M	y     ~  N
-match idu menv subst e1 (Lam x2 e2)
-  = match idu menv' subst (App e1 (varToCoreExpr new_x)) e2
+match renv subst e1 (Lam x2 e2)
+  = match renv' subst (App e1 (varToCoreExpr new_x)) e2
   where
-    (rn_env', new_x) = rnEtaR (me_env menv) x2
-    menv' = menv { me_env = rn_env' }
+    (rn_env', new_x) = rnEtaR (rv_lcl renv) x2
+    renv' = renv { rv_lcl = rn_env' }
 
-match idu menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
-  = do	{ subst1 <- match_ty menv subst ty1 ty2
-	; subst2 <- match idu menv subst1 e1 e2
-	; let menv' = menv { me_env = rnBndr2 (me_env menv) x1 x2 }
-	; match_alts idu menv' subst2 alts1 alts2	-- Alts are both sorted
+match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
+  = do	{ subst1 <- match_ty renv subst ty1 ty2
+	; subst2 <- match renv subst1 e1 e2
+        ; let renv' = rnMatchBndr2 renv subst x1 x2
+        ; match_alts renv' subst2 alts1 alts2   -- Alts are both sorted
 	}
 
-match _ menv subst (Type ty1) (Type ty2)
-  = match_ty menv subst ty1 ty2
+match renv subst (Type ty1) (Type ty2)
+  = match_ty renv subst ty1 ty2
 
-match idu menv subst (Cast e1 co1) (Cast e2 co2)
-  = do	{ subst1 <- match_ty menv subst co1 co2
-	; match idu menv subst1 e1 e2 }
+match renv subst (Cast e1 co1) (Cast e2 co2)
+  = do	{ subst1 <- match_ty renv subst co1 co2
+	; match renv subst1 e1 e2 }
 
 -- Everything else fails
-match _ _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $ 
-			 Nothing
+match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
+                    Nothing
+
+rnMatchBndr2 :: RuleEnv -> RuleSubst -> Var -> Var -> RuleEnv
+rnMatchBndr2 renv subst x1 x2
+  = renv { rv_lcl  = rnBndr2 rn_env x1 x2
+         , rv_fltR = delBndr (rv_fltR renv) x2 }
+  where
+    rn_env = addRnInScopeSet (rv_lcl renv) (rs_bndrs subst)
+    -- Typically this is a no-op, but it may matter if
+    -- there are some floated let-bindings
 
 ------------------------------------------
-okToFloat :: RnEnv2 -> [Var] -> VarSet -> Bool
-okToFloat rn_env bndrs bind_fvs
-  = all freshly_bound bndrs 
-    && foldVarSet ((&&) . not_captured) True bind_fvs
+match_alts :: RuleEnv
+      	   -> RuleSubst
+      	   -> [CoreAlt]		-- Template
+      	   -> [CoreAlt]		-- Target
+      	   -> Maybe RuleSubst
+match_alts _ subst [] []
+  = return subst
+match_alts renv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
+  | c1 == c2
+  = do  { subst1 <- match renv' subst r1 r2
+        ; match_alts renv subst1 alts1 alts2 }
   where
-    freshly_bound x = not (x `rnInScope` rn_env)
+    renv' = foldl mb renv (vs1 `zip` vs2)
+    mb renv (v1,v2) = rnMatchBndr2 renv subst v1 v2
+
+match_alts _ _ _ _
+  = Nothing
+
+------------------------------------------
+okToFloat :: RnEnv2 -> VarSet -> Bool
+okToFloat rn_env bind_fvs
+  = foldVarSet ((&&) . not_captured) True bind_fvs
+  where
     not_captured fv = not (inRnEnvR rn_env fv)
 
 ------------------------------------------
-match_var :: IdUnfoldingFun
-          -> MatchEnv
-      	  -> SubstEnv
-      	  -> Var		-- Template
-      	  -> CoreExpr		-- Target
-      	  -> Maybe SubstEnv
-match_var idu menv subst@(tv_subst, id_subst, binds) v1 e2
-  | v1' `elemVarSet` me_tmpls menv
-  = case lookupVarEnv id_subst v1' of
-	Nothing	| any (inRnEnvR rn_env) (varSetElems (exprFreeVars e2))
-		-> Nothing	-- Occurs check failure
+match_var :: RuleEnv
+     	  -> RuleSubst
+     	  -> Var		-- Template
+     	  -> CoreExpr        -- Target
+     	  -> Maybe RuleSubst
+match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
+          subst v1 e2
+  | v1' `elemVarSet` tmpls
+  = match_tmpl_var renv subst v1' e2
+
+  | otherwise   -- v1' is not a template variable; check for an exact match with e2
+  = case e2 of  -- Remember, envR of rn_env is disjoint from rv_fltR
+       Var v2 | v1' == rnOccR rn_env v2
+              -> Just subst
+
+              | Var v2' <- lookupIdSubst (text "match_var") flt_env v2
+              , v1' == v2'
+              -> Just subst
+
+       _ -> Nothing
+
+  where
+    v1' = rnOccL rn_env v1
+	-- If the template is
+	--	forall x. f x (\x -> x) = ...
+	-- Then the x inside the lambda isn't the 
+	-- template x, so we must rename first!
+
+------------------------------------------
+match_tmpl_var :: RuleEnv
+               -> RuleSubst
+	       -> Var                -- Template
+	       -> CoreExpr		-- Target
+	       -> Maybe RuleSubst
+
+match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
+               subst@(RS { rs_id_subst = id_subst, rs_bndrs = let_bndrs })
+               v1' e2
+  | any (inRnEnvR rn_env) (varSetElems (exprFreeVars e2))
+  = Nothing     -- Occurs check failure
 		-- e.g. match forall a. (\x-> a x) against (\y. y y)
 
-		| otherwise	-- No renaming to do on e2, because no free var
-				-- of e2 is in the rnEnvR of the envt
-		-- Note [Matching variable types]
+  | Just e1' <- lookupVarEnv id_subst v1'
+  = if eqExpr (rnInScopeSet rn_env) e1' e2'
+    then Just subst
+    else Nothing
+
+  | otherwise
+  =             -- Note [Matching variable types]
 		-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 		-- However, we must match the *types*; e.g.
 		--   forall (c::Char->Int) (x::Char). 
-		--	f (c x) = "RULE FIRED"
+                --      f (c x) = "RULE FIRED"
 		-- We must only match on args that have the right type
 		-- It's actually quite difficult to come up with an example that shows
 		-- you need type matching, esp since matching is left-to-right, so type
 		-- args get matched first.  But it's possible (e.g. simplrun008) and
 		-- this is the Right Thing to do
-		-> do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst (idType v1') (exprType e2)
-						-- c.f. match_ty below
-			; return (tv_subst', extendVarEnv id_subst v1' e2, binds) }
-
-	Just e1' | eqExprX idu (nukeRnEnvL rn_env) e1' e2 
-		 -> Just subst
-
-		 | otherwise
-		 -> Nothing
-
-  | otherwise	-- v1 is not a template variable; check for an exact match with e2
-  = case e2 of
-       Var v2 | v1' == rnOccR rn_env v2 -> Just subst
-       _    				-> Nothing
-
+    do { subst' <- match_ty renv subst (idType v1') (exprType e2)
+       ; return (subst' { rs_id_subst = id_subst' }) }
   where
-    rn_env = me_env menv
-    v1'    = rnOccL rn_env v1	
-	-- If the template is
-	--	forall x. f x (\x -> x) = ...
-	-- Then the x inside the lambda isn't the 
-	-- template x, so we must rename first!
-				
+    -- e2' is the result of applying flt_env to e2
+    e2' | isEmptyVarSet let_bndrs = e2
+        | otherwise = substExpr (text "match_tmpl_var") flt_env e2
+
+    id_subst' = extendVarEnv (rs_id_subst subst) v1' e2'
+         -- No further renaming to do on e2',
+         -- because no free var of e2' is in the rnEnvR of the envt
 
 ------------------------------------------
-match_alts :: IdUnfoldingFun
-           -> MatchEnv
-      	   -> SubstEnv
-      	   -> [CoreAlt]		-- Template
-      	   -> [CoreAlt]		-- Target
-      	   -> Maybe SubstEnv
-match_alts _ _ subst [] []
-  = return subst
-match_alts idu menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
-  | c1 == c2
-  = do	{ subst1 <- match idu menv' subst r1 r2
-	; match_alts idu menv subst1 alts1 alts2 }
-  where
-    menv' :: MatchEnv
-    menv' = menv { me_env = rnBndrs2 (me_env menv) vs1 vs2 }
-
-match_alts _ _ _ _ _
-  = Nothing
-
-------------------------------------------
-match_ty :: MatchEnv
-      	 -> SubstEnv
+match_ty :: RuleEnv
+      	 -> RuleSubst
       	 -> Type		-- Template
       	 -> Type		-- Target
-      	 -> Maybe SubstEnv
+      	 -> Maybe RuleSubst
 -- Matching Core types: use the matcher in TcType.
 -- Notice that we treat newtypes as opaque.  For example, suppose 
 -- we have a specialised version of a function at a newtype, say 
 --	newtype T = MkT Int
 -- We only want to replace (f T) with f', not (f Int).
 
-match_ty menv (tv_subst, id_subst, binds) ty1 ty2
-  = do	{ tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
-	; return (tv_subst', id_subst, binds) }
+match_ty renv subst ty1 ty2
+  = do  { tv_subst' <- Unify.ruleMatchTyX menv tv_subst ty1 ty2
+        ; return (subst { rs_tv_subst = tv_subst' }) }
+  where
+    tv_subst = rs_tv_subst subst
+    menv = ME { me_tmpls = rv_tmpls renv, me_env = rv_lcl renv }
 \end{code}
 
 Note [Expanding variables]
@@ -825,40 +872,47 @@ Then we'd like the rule to match, to generate
 	let { w=R } in (\x. <rhs>) E
 In effect, we want to float the let-binding outward, to enable
 the match to happen.  This is the WHOLE REASON for accumulating
-bindings in the SubstEnv
+bindings in the RuleSubst
 
-We can only do this if
-  (a) Widening the scope of w does not capture any variables
-      We use a conservative test: w is not already in scope
-      If not, we clone the binders, and substitute
-  (b) The free variables of R are not bound by the part of the
-      target expression outside the let binding; e.g.
-  	f (\v. let w = v+1 in g E)
-      Here we obviously cannot float the let-binding for w.
+We can only do this if the free variables of R are not bound by the
+part of the target expression outside the let binding; e.g.
+        f (\v. let w = v+1 in g E)
+Here we obviously cannot float the let-binding for w.  Hence the
+use of okToFloat.
 
-You may think rule (a) would never apply, because rule matching is
-mostly invoked from the simplifier, when we have just run substExpr 
-over the argument, so there will be no shadowing anyway.
-The fly in the ointment is that the forall'd variables of the
-RULE itself are considered in scope.
+There are a couple of tricky points.
+  (a) What if floating the binding captures a variable?
+        f (let v = x+1 in v) v
+      --> NOT!
+        let v = x+1 in f (x+1) v
 
-I though of various ways to solve (a).  One plan was to 
-clone the binders if they are in scope.  But watch out!
-	(let x=y+1 in let z=x+1 in (z,z)
-		--> should match (p,p) but watch out that 
-		    the use of x on z's rhs is OK!
-If we clone x, then the let-binding for 'z' is then caught by (b), 
-at least unless we elaborate the RnEnv stuff a bit.
+  (b) What if two non-nested let bindings bind the same variable?
+        f (let v = e1 in b1) (let v = e2 in b2)
+      --> NOT!
+        let v = e1 in let v = e2 in (f b2 b2)
+      See testsuite test "RuleFloatLet".
 
-So for we simply fail to match unless both (a) and (b) hold.
+Our cunning plan is this:
+  * Along with the growing substitution for template variables
+    we maintain a growing set of floated let-bindings (rs_binds)
+    plus the set of variables thus bound.
 
-Other cases to think about
-	(let x=y+1 in \x. (x,x))
-		--> let x=y+1 in (\x1. (x1,x1))
-	(\x. let x = y+1 in (x,x))
-		--> let x1 = y+1 in (\x. (x1,x1)
-	(let x=y+1 in (x,x), let x=y-1 in (x,x))
-		--> let x=y+1 in let x1=y-1 in ((x,x),(x1,x1))
+  * The RnEnv2 in the MatchEnv binds only the local binders
+    in the term (lambdas, case)
+
+  * When we encounter a let in the term to be matched, we
+    check that does not mention any locally bound (lambda, case)
+    variables.  If so we fail
+
+  * We use CoreSubst.substBind to freshen the binding, using an
+    in-scope set that is the original in-scope variables plus the
+    rs_bndrs (currently floated let-bindings).  So in (a) above
+    we'll freshen the 'v' binding; in (b) above we'll freshen
+    the *second* 'v' binding.
+
+  * We apply that freshening substitution, in a lexically-scoped
+    way to the term, although lazily; this is the rv_fltR field.
+
 
 Note [Matching cases]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1027,10 +1081,12 @@ ruleAppCheck_help env fn args rules
 			      not (isJust (match_fn rule_arg arg))]
 
 	  lhs_fvs = exprsFreeVars rule_args	-- Includes template tyvars
-	  match_fn rule_arg arg = match (rc_id_unf env) menv emptySubstEnv rule_arg arg
+          match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg
 		where
-		  in_scope = lhs_fvs `unionVarSet` exprFreeVars arg
-		  menv = ME { me_env   = mkRnEnv2 (mkInScopeSet in_scope)
-			    , me_tmpls = mkVarSet rule_bndrs }
+                  in_scope = mkInScopeSet (lhs_fvs `unionVarSet` exprFreeVars arg)
+                  renv = RV { rv_lcl   = mkRnEnv2 in_scope
+                            , rv_tmpls = mkVarSet rule_bndrs
+                            , rv_fltR  = mkEmptySubst in_scope
+                            , rv_unf   = rc_id_unf env }
 \end{code}
 

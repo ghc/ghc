@@ -36,7 +36,8 @@ module VarEnv (
 	
 	-- ** Operations on RnEnv2s
 	mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
-	rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR, extendRnInScopeList,
+        rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR,
+        addRnInScopeSet,
         rnEtaL, rnEtaR,
 	rnInScope, rnInScopeSet, lookupRnInScope,
 
@@ -204,9 +205,10 @@ mkRnEnv2 vars = RV2	{ envL 	   = emptyVarEnv
 			, envR 	   = emptyVarEnv
 			, in_scope = vars }
 
-extendRnInScopeList :: RnEnv2 -> [Var] -> RnEnv2
-extendRnInScopeList env vs
-  = env { in_scope = extendInScopeSetList (in_scope env) vs }
+addRnInScopeSet :: RnEnv2 -> VarEnv Var -> RnEnv2
+addRnInScopeSet env vs
+  | isEmptyVarEnv vs = env
+  | otherwise        = env { in_scope = extendInScopeSetSet (in_scope env) vs }
 
 rnInScope :: Var -> RnEnv2 -> Bool
 rnInScope x env = x `elemInScopeSet` in_scope env
