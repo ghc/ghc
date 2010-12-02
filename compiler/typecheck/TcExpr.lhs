@@ -398,14 +398,20 @@ tcExpr (HsIf Nothing pred b1 b2) res_ty	   -- Ordinary 'if'
        ; b2' <- tcMonoExpr b2 res_ty
        ; return (HsIf Nothing pred' b1' b2') }
 
-tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Rebindable syntax
+tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
   = do { pred_ty <- newFlexiTyVarTy openTypeKind
-       ; b_ty <- newFlexiTyVarTy openTypeKind
-       ; let if_ty = mkFunTys [pred_ty, b_ty, b_ty] res_ty
-       ; fun' <- tcSyntaxOp IfOrigin fun if_ty
+       ; b1_ty   <- newFlexiTyVarTy openTypeKind
+       ; b2_ty   <- newFlexiTyVarTy openTypeKind
+       ; let if_ty = mkFunTys [pred_ty, b1_ty, b2_ty] res_ty
+       ; fun'  <- tcSyntaxOp IfOrigin fun if_ty
        ; pred' <- tcMonoExpr pred pred_ty
-       ; b1' <- tcMonoExpr b1 b_ty
-       ; b2' <- tcMonoExpr b2 b_ty
+       ; b1'   <- tcMonoExpr b1 b1_ty
+       ; b2'   <- tcMonoExpr b2 b2_ty
+       -- Fundamentally we are just typing (ifThenElse e1 e2 e3)
+       -- so maybe we should use the code for function applications
+       -- (which would allow ifThenElse to be higher rank).
+       -- But it's a little awkward, so I'm leaving it alone for now
+       -- and it maintains uniformity with other rebindable syntax
        ; return (HsIf (Just fun') pred' b1' b2') }
 
 tcExpr (HsDo do_or_lc stmts body _) res_ty
@@ -423,6 +429,22 @@ tcExpr e@(HsArrForm _ _ _) _
   = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
                       ptext (sLit "was found where an expression was expected")])
 \end{code}
+
+Note [Rebindable syntax for if]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The rebindable syntax for 'if' uses the most flexible possible type
+for conditionals:
+  ifThenElse :: p -> b1 -> b2 -> res
+to support expressions like this:
+
+ ifThenElse :: Maybe a -> (a -> b) -> b -> b
+ ifThenElse (Just a) f _ = f a  ifThenElse Nothing  _ e = e
+
+ example :: String
+ example = if Just 2
+              then \v -> show v
+              else "No value"
+
 
 %************************************************************************
 %*									*
