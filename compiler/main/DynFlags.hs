@@ -797,7 +797,6 @@ languageExtensions Nothing
       -- But NB it's implied by GADTs etc
       -- SLPJ September 2010
     : Opt_NondecreasingIndentation -- This has been on by default for some time
-    : Opt_RelaxedLayout -- This has been on by default for some time
     : languageExtensions (Just Haskell2010)
 
 languageExtensions (Just Haskell98)
