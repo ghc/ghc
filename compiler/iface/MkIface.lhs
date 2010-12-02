@@ -153,7 +153,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
                       tcg_hpc = other_hpc_info
                     }
   = do
-          used_names <- mkUsedNames tc_result
+          let used_names = mkUsedNames tc_result
           deps <- mkDependencies tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           mkIface_ hsc_env maybe_old_fingerprint
@@ -161,13 +161,8 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
                    fix_env warns hpc_info (imp_mods imports) mod_details
         
 
-mkUsedNames :: TcGblEnv -> IO NameSet
-mkUsedNames 
-          TcGblEnv{ tcg_inst_uses = dfun_uses_var,
-                    tcg_dus = dus
-                  }
- = do { dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
-      ; return (allUses dus `unionNameSets` dfun_uses) }
+mkUsedNames :: TcGblEnv -> NameSet
+mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
         
 mkDependencies :: TcGblEnv -> IO Dependencies
 mkDependencies
@@ -515,7 +510,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
    orphan_hash <- computeFingerprint dflags (mk_put_name local_env)
-                      (map IfaceInstABI orph_insts, orph_rules, fam_insts)
+                      (map ifDFun orph_insts, orph_rules, fam_insts)
 
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
@@ -630,8 +625,8 @@ The ABI of a declaration consists of:
 
 Items (c)-(f) are not stored in the IfaceDecl, but instead appear
 elsewhere in the interface file.  But they are *fingerprinted* with
-the Id itself. This is done by grouping (c)-(f) in IfaceDeclExtras,
-and fingerprinting that as part of the Id.
+the declaration itself. This is done by grouping (c)-(f) in IfaceDeclExtras,
+and fingerprinting that as part of the declaration.
 
 \begin{code}
 type IfaceDeclABI = (Module, IfaceDecl, IfaceDeclExtras)
@@ -657,10 +652,10 @@ freeNamesDeclABI (_mod, decl, extras) =
 freeNamesDeclExtras :: IfaceDeclExtras -> NameSet
 freeNamesDeclExtras (IfaceIdExtras    _ rules)
   = unionManyNameSets (map freeNamesIfRule rules)
-freeNamesDeclExtras (IfaceDataExtras  _ _insts subs)
-  = unionManyNameSets (map freeNamesSub subs)
-freeNamesDeclExtras (IfaceClassExtras _ _insts subs)
-  = unionManyNameSets (map freeNamesSub subs)
+freeNamesDeclExtras (IfaceDataExtras  _ insts subs)
+  = unionManyNameSets (mkNameSet insts : map freeNamesSub subs)
+freeNamesDeclExtras (IfaceClassExtras _ insts subs)
+  = unionManyNameSets (mkNameSet insts : map freeNamesSub subs)
 freeNamesDeclExtras (IfaceSynExtras _)
   = emptyNameSet
 freeNamesDeclExtras IfaceOtherDeclExtras
@@ -713,11 +708,11 @@ declExtras fix_fn rule_env inst_env decl
                         (lookupOccEnvL rule_env n)
       IfaceData{ifCons=cons} -> 
                      IfaceDataExtras (fix_fn n)
-                        (map IfaceInstABI $ lookupOccEnvL inst_env n)
+                        (map ifDFun $ lookupOccEnvL inst_env n)
                         (map (id_extras . ifConOcc) (visibleIfConDecls cons))
       IfaceClass{ifSigs=sigs} -> 
                      IfaceClassExtras (fix_fn n)
-                        (map IfaceInstABI $ lookupOccEnvL inst_env n)
+                        (map ifDFun $ lookupOccEnvL inst_env n)
                         [id_extras op | IfaceClassOp op _ _ <- sigs]
       IfaceSyn{} -> IfaceSynExtras (fix_fn n)
       _other -> IfaceOtherDeclExtras
@@ -726,19 +721,10 @@ declExtras fix_fn rule_env inst_env decl
         id_extras occ = (fix_fn occ, lookupOccEnvL rule_env occ)
 
 --
--- When hashing an instance, we hash only its structure, not the
--- fingerprints of the things it mentions.  See the section on instances
--- in the commentary,
---    http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance
+-- When hashing an instance, we hash only the DFunId, because that
+-- depends on all the information about the instance.
 --
-newtype IfaceInstABI = IfaceInstABI IfaceInst
-
-instance Binary IfaceInstABI where
-  get = panic "no get for IfaceInstABI"
-  put_ bh (IfaceInstABI inst) = do
-    let ud  = getUserData bh
-        bh' = setUserData bh (ud{ ud_put_name = putNameLiterally })
-    put_ bh' inst
+type IfaceInstABI = IfExtName
 
 lookupOccEnvL :: OccEnv [v] -> OccName -> [v]
 lookupOccEnvL env k = lookupOccEnv env k `orElse` []

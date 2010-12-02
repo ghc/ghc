@@ -87,14 +87,11 @@ import InstEnv
 import FamInst 
 import FamInstEnv
 
-import NameSet ( addOneToNameSet ) 
-
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
        ( checkWellStaged, topIdLvl, tcLookupFamInst, tcGetDefaultTys )
 import TcType
-import Module 
 import DynFlags
 
 import Coercion
@@ -952,8 +949,7 @@ matchClass clas tys
 				          text "witness" <+> ppr dfun_id
 					   <+> ppr (idType dfun_id) ])
 				  -- Record that this dfun is needed
-			; record_dfun_usage dfun_id
-			; return $ MatchInstSingle (dfun_id, inst_tys) 
+                        ; return $ MatchInstSingle (dfun_id, inst_tys)
                         } ;
      	    (matches, unifs)          -- More than one matches 
 		-> do	{ traceTcS "matchClass multiple matches, deferring choice"
@@ -964,26 +960,8 @@ matchClass clas tys
 		        }
 	}
         }
-  where record_dfun_usage :: Id -> TcS () 
-        record_dfun_usage dfun_id 
-          = do { hsc_env <- getTopEnv 
-               ; let  dfun_name = idName dfun_id
-        	      dfun_mod  = ASSERT( isExternalName dfun_name ) 
-        	         	  nameModule dfun_name
-               ; if isInternalName dfun_name ||    -- Internal name => defined in this module
-        	    modulePackageId dfun_mod /= thisPackage (hsc_dflags hsc_env)
-        	 then return () -- internal, or in another package
-        	 else do updInstUses dfun_id 
-               }
 
-        updInstUses :: Id -> TcS () 
-        updInstUses dfun_id 
-            = do { tcg_env <- getGblEnv 
-                 ; wrapTcS $ TcM.updMutVar (tcg_inst_uses tcg_env) 
-                                            (`addOneToNameSet` idName dfun_id) 
-                 }
-
-matchFam :: TyCon 
+matchFam :: TyCon
          -> [Type] 
          -> TcS (MatchInstResult (TyCon, [Type]))
 matchFam tycon args

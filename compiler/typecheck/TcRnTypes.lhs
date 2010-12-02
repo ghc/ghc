@@ -217,22 +217,13 @@ data TcGblEnv
           --
           --   * Top-level variables appearing free in a TH bracket
 
-	tcg_inst_uses :: TcRef NameSet,
-          -- ^ Home-package Dfuns actually used.
-          --
-          -- Used to generate version dependencies This records usages, rather
-          -- like tcg_dus, but it has to be a mutable variable so it can be
-          -- augmented when we look up an instance.  These uses of dfuns are
-          -- rather like the free variables of the program, but are implicit
-          -- instead of explicit.
-
-	tcg_th_used :: TcRef Bool,
+        tcg_th_used :: TcRef Bool,
           -- ^ @True@ <=> Template Haskell syntax used.
           --
-          -- We need this so that we can generate a dependency on the Template
-          -- Haskell package, becuase the desugarer is going to emit loads of
-          -- references to TH symbols.  It's rather like tcg_inst_uses; the
-          -- reference is implicit rather than explicit, so we have to zap a
+          -- We need this so that we can generate a dependency on the
+          -- Template Haskell package, becuase the desugarer is going
+          -- to emit loads of references to TH symbols.  The reference
+          -- is implicit rather than explicit, so we have to zap a
           -- mutable variable.
 
 	tcg_dfun_n  :: TcRef OccSet,

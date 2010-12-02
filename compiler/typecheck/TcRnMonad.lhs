@@ -71,8 +71,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
  = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
         meta_var     <- newIORef initTyVarUnique ;
       	tvs_var      <- newIORef emptyVarSet ;
-	dfuns_var    <- newIORef emptyNameSet ;
-	keep_var     <- newIORef emptyNameSet ;
+        keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
 	th_var	     <- newIORef False ;
 	lie_var	     <- newIORef emptyBag ;
@@ -97,8 +96,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_type_env_var = type_env_var,
 		tcg_inst_env  = emptyInstEnv,
 		tcg_fam_inst_env  = emptyFamInstEnv,
-		tcg_inst_uses = dfuns_var,
-		tcg_th_used   = th_var,
+                tcg_th_used   = th_var,
 		tcg_exports  = [],
 		tcg_imports  = emptyImportAvails,
                 tcg_used_rdrnames = used_rdr_var,

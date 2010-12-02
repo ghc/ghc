@@ -137,7 +137,7 @@ deSugar hsc_env
 
 	; endPass dflags CoreDesugar ds_binds ds_rules_for_imps
 
-        ; used_names <- mkUsedNames tcg_env
+        ; let used_names = mkUsedNames tcg_env
 	; deps <- mkDependencies tcg_env
 
         ; let mod_guts = ModGuts {	
