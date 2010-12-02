@@ -583,8 +583,8 @@ tcImpSpec p = pprPanic "tcImpSpec" (ppr p)
 impSpecErr :: Name -> SDoc
 impSpecErr name
   = hang (ptext (sLit "You cannot SPECIALISE") <+> quotes (ppr name))
-       2 (ptext (sLit "because its definition has no INLINE/INLINABLE pragma"))
-
+       2 (vcat [ ptext (sLit "because its definition has no INLINE/INLINABLE pragma")
+               , ptext (sLit "(or you compiled its definining module without -O)")])
 --------------
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise 
