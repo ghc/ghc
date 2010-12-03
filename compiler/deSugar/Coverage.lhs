@@ -691,7 +691,10 @@ allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
 allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
   sameFileName pos 
     (return Nothing) $ TM $ \ env st ->
-  let me = (pos, declPath env, map (nameOccName.idName) ids, boxLabel)
+  let mydecl_path
+        | null (declPath env), TopLevelBox x <- boxLabel = x
+        | otherwise = declPath env
+      me = (pos, mydecl_path, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
       ids = occEnvElts fvs
