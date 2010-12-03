@@ -17,8 +17,17 @@
 #include "Stats.h"
 #include "EventLog.h"
 
-#include <string.h> 
+#include <string.h>
 #include <stdio.h>
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+// PID of the process that writes to event_log_filename (#4512)
+static pid_t event_log_pid = -1;
 
 static char *event_log_filename = NULL;
 
@@ -171,9 +180,18 @@ initEventLogging(void)
     if (sizeof(EventDesc) / sizeof(char*) != NUM_EVENT_TAGS) {
         barf("EventDesc array has the wrong number of elements");
     }
-  
-    sprintf(event_log_filename, "%s.eventlog", prog_name);
-    
+
+    if (event_log_pid == -1) { // #4512
+        // Single process
+        sprintf(event_log_filename, "%s.eventlog", prog_name);
+        event_log_pid = getpid();
+    } else {
+        // Forked process, eventlog already started by the parent
+        // before fork
+        event_log_pid = getpid();
+        sprintf(event_log_filename, "%s.%d.eventlog", prog_name, event_log_pid);
+    }
+
     /* Open event log file for writing. */
     if ((event_log_file = fopen(event_log_filename, "wb")) == NULL) {
         sysErrorBelch("initEventLogging: can't open %s", event_log_filename);
@@ -338,6 +356,22 @@ freeEventLogging(void)
     }
 }
 
+void 
+flushEventLog(void)
+{
+    if (event_log_file != NULL) {
+        fflush(event_log_file);
+    }
+}
+
+void 
+abortEventLogging(void)
+{
+    freeEventLogging();
+    if (event_log_file != NULL) {
+        fclose(event_log_file);
+    }
+}
 /*
  * Post an event message to the capability's eventlog buffer.
  * If the buffer is full, prints out the buffer and clears it.

@@ -56,6 +56,9 @@
 #include <errno.h>
 #endif
 
+#ifdef TRACING
+#include "eventlog/EventLog.h"
+#endif
 /* -----------------------------------------------------------------------------
  * Global variables
  * -------------------------------------------------------------------------- */
@@ -1533,6 +1536,10 @@ forkProcess(HsStablePtr *entry
 
     stopTimer(); // See #4074
 
+#if defined(TRACING)
+    flushEventLog(); // so that child won't inherit dirty file buffers
+#endif
+
     pid = fork();
     
     if (pid) { // parent
@@ -1555,6 +1562,10 @@ forkProcess(HsStablePtr *entry
         initMutex(&cap->running_task->lock);
 #endif
 
+#if defined(TRACING)
+        abortEventLogging(); // abort eventlog inherited from parent
+        initEventLogging(); // child starts its own eventlog
+#endif
 	// Now, all OS threads except the thread that forked are
 	// stopped.  We need to stop all Haskell threads, including
 	// those involved in foreign calls.  Also we need to delete
