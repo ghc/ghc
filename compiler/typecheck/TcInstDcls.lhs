@@ -697,7 +697,7 @@ tcSpecInstPrags dfun_id (VanillaInst binds uprags _)
 ------------------------------
 tcSuperClass :: [TyVar] -> [EvVar]
 	     -> EvBind
-	     -> (Id, PredType) -> TcM (Id, LHsBind Id)
+             -> (Id, PredType) -> TcM (Id, LHsBind Id)
 -- Build a top level decl like
 --	sc_op = /\a \d. let this = ... in 
 --		        let sc = ... in
@@ -705,16 +705,10 @@ tcSuperClass :: [TyVar] -> [EvVar]
 -- The "this" part is just-in-case (discarded if not used)
 -- See Note [Recursive superclasses]
 tcSuperClass tyvars dicts 
-             self_ev_bind@(EvBind self_dict _)
-	     (sc_sel, sc_pred)
-  = do { (ev_binds, wanted, sc_dict)
-             <- newImplication InstSkol tyvars dicts $
-                emitWanted ScOrigin sc_pred
-
-       ; simplifySuperClass self_dict wanted
-         -- We include self_dict in the 'givens'; the simplifier
-         -- is clever enough to stop sc_pred geting bound by just 
-         -- selecting from self_dict!!
+             self_ev_bind
+             (sc_sel, sc_pred)
+ = do { sc_dict <- newWantedEvVar sc_pred
+      ; ev_binds <- simplifySuperClass tyvars dicts sc_dict self_ev_bind
 
        ; uniq <- newUnique
        ; let sc_op_ty   = mkForAllTys tyvars $ mkPiTypes dicts (varType sc_dict)
@@ -725,8 +719,7 @@ tcSuperClass tyvars dicts
                                   , var_rhs = L noSrcSpan $ wrapId sc_wrapper sc_dict }
              sc_wrapper = mkWpTyLams tyvars
                           <.> mkWpLams dicts
-                          <.> mkWpLet (EvBinds (unitBag self_ev_bind))
-			  <.> mkWpLet ev_binds
+                          <.> mkWpLet ev_binds
 
        ; return (sc_op_id, noLoc sc_op_bind) }
 \end{code}
