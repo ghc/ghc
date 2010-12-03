@@ -142,5 +142,7 @@ def get_compiler_info():
     else:
         config.compiler_profiled = False
 
-    config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
-
+    try:
+            config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
+    except:
+            config.package_conf_cache_file = ''
