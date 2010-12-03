@@ -449,7 +449,7 @@ check_target:
         goto retry;
 
     default:
-	barf("throwTo: unrecognised why_blocked value");
+        barf("throwTo: unrecognised why_blocked (%d)", target->why_blocked);
     }
     barf("throwTo");
 }
