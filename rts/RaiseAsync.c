@@ -436,6 +436,18 @@ check_target:
 	}
 #endif
 
+    case ThreadMigrating:
+        // if is is ThreadMigrating and tso->cap is ours, then it
+        // *must* be migrating *to* this capability.  If it were
+        // migrating away from the capability, then tso->cap would
+        // point to the destination.
+        //
+        // There is a MSG_WAKEUP in the message queue for this thread,
+        // but we can just do it preemptively:
+        tryWakeupThread(cap, target);
+        // and now retry, the thread should be runnable.
+        goto retry;
+
     default:
 	barf("throwTo: unrecognised why_blocked value");
     }
