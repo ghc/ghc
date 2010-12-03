@@ -24,6 +24,14 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         ;;
     esac
 
+    case $$1 in
+    i386-apple-darwin|x86_64-apple-darwin)
+        # We support back to OS X 10.5
+        $2="$$2 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
+        $3="$$3 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
+        ;;
+    esac
+
     # If gcc knows about the stack protector, turn it off.
     # Otherwise the stack-smash handler gets triggered.
     echo 'int main(void) {return 0;}' > conftest.c
