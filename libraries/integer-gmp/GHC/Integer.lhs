@@ -494,27 +494,31 @@ foreign import ccall unsafe "__int_encodeDouble"
 %*                                                      *
 %*********************************************************
 
+We explicitly pattern match against J# and S# in order to produce
+Core that doesn't have pattern matching errors, as that would
+introduce a spurious dependency to base.
+
 \begin{code}
 andInteger :: Integer -> Integer -> Integer
 (S# x) `andInteger` (S# y) = S# (word2Int# (int2Word# x `and#` int2Word# y))
-x@(S# _) `andInteger` y = toBig x `andInteger` y
-x `andInteger` y@(S# _) = x `andInteger` toBig y
+x@(S# _) `andInteger` y@(J# _ _) = toBig x `andInteger` y
+x@(J# _ _) `andInteger` y@(S# _) = x `andInteger` toBig y
 (J# s1 d1) `andInteger` (J# s2 d2) =
      case andInteger# s1 d1 s2 d2 of
        (# s, d #) -> J# s d
 
 orInteger :: Integer -> Integer -> Integer
 (S# x) `orInteger` (S# y) = S# (word2Int# (int2Word# x `or#` int2Word# y))
-x@(S# _) `orInteger` y = toBig x `orInteger` y
-x `orInteger` y@(S# _) = x `orInteger` toBig y
+x@(S# _) `orInteger` y@(J# _ _) = toBig x `orInteger` y
+x@(J# _ _) `orInteger` y@(S# _) = x `orInteger` toBig y
 (J# s1 d1) `orInteger` (J# s2 d2) =
      case orInteger# s1 d1 s2 d2 of
        (# s, d #) -> J# s d
 
 xorInteger :: Integer -> Integer -> Integer
 (S# x) `xorInteger` (S# y) = S# (word2Int# (int2Word# x `xor#` int2Word# y))
-x@(S# _) `xorInteger` y = toBig x `xorInteger` y
-x `xorInteger` y@(S# _) = x `xorInteger` toBig y
+x@(S# _) `xorInteger` y@(J# _ _) = toBig x `xorInteger` y
+x@(J# _ _) `xorInteger` y@(S# _) = x `xorInteger` toBig y
 (J# s1 d1) `xorInteger` (J# s2 d2) =
      case xorInteger# s1 d1 s2 d2 of
        (# s, d #) -> J# s d
