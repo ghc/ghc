@@ -404,8 +404,10 @@ runGHCi paths maybe_exprs = do
            -- NOTE: this assumes that runInputT won't affect the terminal;
            -- can we assume this will always be the case?
            -- This would be a good place for runFileInputT.
-           Right hdl -> runInputTWithPrefs defaultPrefs defaultSettings $ do
+           Right hdl ->
+               do runInputTWithPrefs defaultPrefs defaultSettings $
                             runCommands $ fileLoop hdl
+                  liftIO (hClose hdl `IO.catch` \_ -> return ())
      where
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
 
