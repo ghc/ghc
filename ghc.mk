@@ -155,7 +155,7 @@ include rules/clean-target.mk
 # -----------------------------------------------------------------------------
 # The inplace tree
 
-$(eval $(call clean-target,inplace,,inplace))
+$(eval $(call clean-target,inplace,,inplace/bin inplace/lib))
 
 # -----------------------------------------------------------------------------
 # Whether to build dependencies or not
@@ -1254,6 +1254,7 @@ distclean : clean
 	"$(RM)" $(RM_OPTS) libraries/unix/include/HsUnixConfig.h
 	"$(RM)" $(RM_OPTS) libraries/old-time/include/HsTimeConfig.h
 	"$(RM)" $(RM_OPTS_REC) utils/ghc-pwd/dist
+	"$(RM)" $(RM_OPTS_REC) inplace
 
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.log, $(PACKAGES) $(PACKAGES_STAGE2))
 	"$(RM)" $(RM_OPTS) $(patsubst %, libraries/%/config.status, $(PACKAGES) $(PACKAGES_STAGE2))

@@ -387,6 +387,8 @@ FP_FIND_ROOT
 
 if test "$HostOS" = "mingw32"
 then
+    test -d inplace || mkdir inplace
+
     CC="$hardtop/inplace/mingw/bin/gcc.exe"
     LD="$hardtop/inplace/mingw/bin/ld.exe"
     NM="$hardtop/inplace/mingw/bin/nm.exe"
@@ -404,7 +406,6 @@ then
     then
         AC_MSG_NOTICE([Making in-tree mingw tree])
         rm -rf inplace/mingw
-        test -d inplace || mkdir inplace
         mkdir inplace/mingw
         (
             cd inplace/mingw &&
