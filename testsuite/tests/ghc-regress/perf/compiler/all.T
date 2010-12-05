@@ -101,3 +101,8 @@ test('T3064',
      compile,
      [''])
 
+test('T4007',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T4007'])
+
