@@ -163,3 +163,4 @@ test('T4240',
      ['$MAKE -s --no-print-directory T4240'])
 
 test('T4489', normal, compile, [''])
+test('T4478', normal, compile, [''])
