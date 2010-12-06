@@ -9,6 +9,7 @@
 # Set the C and LD flags for a given platform
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
+    AC_MSG_CHECKING([Setting up $2 and $3])
     case $$1 in
     i386-apple-darwin)
         # By default, gcc on OS X will generate SSE
@@ -40,6 +41,7 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -fno-stack-protector"
     fi
     rm -f conftest.c conftest.o
+    AC_MSG_RESULT([done])
 ])
 
 
