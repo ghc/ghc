@@ -12,7 +12,7 @@ main = do let ghcExtensions = [ ext | (ext, _, _) <- xFlags ]
               -- These are extensions which are deliberately not yet
               -- registered with Cabal
               expectedGhcOnlyExtensions
-                  = ["PArr",
+                  = ["ParallelArrays",
                      "RelaxedLayout",
                      "AlternativeLayoutRule",
                      "AlternativeLayoutRuleTransitional"]
