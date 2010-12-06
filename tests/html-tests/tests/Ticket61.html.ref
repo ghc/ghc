@@ -62,7 +62,7 @@ window.onload = function () {pageLoad();setSynopsis("mini_Ticket61.html");};
     ><div id="footer"
     ><p
       >Produced by <A HREF="">Haddock</a
-	> version 2.8.2</p
+	> version 2.9.0</p
       ></div
     ></body
   ></html
