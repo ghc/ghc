@@ -85,9 +85,10 @@ spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
   run (c:rest) = c : run rest
 
 
-renderToString :: Html -> String
-renderToString = showHtml     -- for production
---renderToString = prettyHtml   -- for debugging
+renderToString :: Bool -> Html -> String
+renderToString debug html
+  | debug = renderHtml html
+  | otherwise = showHtml html
 
 
 hsep :: [Html] -> Html

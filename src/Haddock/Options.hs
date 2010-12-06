@@ -77,6 +77,7 @@ data Flag
   | Flag_UseUnicode
   | Flag_NoTmpCompDir
   | Flag_Qualification String
+  | Flag_PrettyHtml
   deriving (Eq)
 
 
@@ -153,7 +154,9 @@ options backwardsCompat =
       "output GHC lib dir",
     Option ['w'] ["no-warnings"] (NoArg Flag_NoWarnings) "turn off all warnings",
     Option [] ["no-tmp-comp-dir"] (NoArg Flag_NoTmpCompDir)
-      "do not re-direct compilation output to a temporary directory"
+      "do not re-direct compilation output to a temporary directory",
+    Option [] ["pretty-html"] (NoArg Flag_PrettyHtml)
+      "generate html with newlines and indenting (for use with --html)"
   ]
 
 

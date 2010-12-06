@@ -66,12 +66,13 @@ ppHtml :: String
        -> Maybe String                 -- the index URL (--use-index)
        -> Bool                         -- whether to use unicode in output (--use-unicode)
        -> Qualification                -- how to qualify names
+       -> Bool                         -- output pretty html (newlines and indenting)
        -> IO ()
 
 ppHtml doctitle maybe_package ifaces odir prologue
         themes maybe_source_url maybe_wiki_url
         maybe_contents_url maybe_index_url unicode
-        qual =  do
+        qual debug =  do
   let
     visible_ifaces = filter visible ifaces
     visible i = OptHide `notElem` ifaceOptions i
@@ -82,15 +83,16 @@ ppHtml doctitle maybe_package ifaces odir prologue
         (map toInstalledIface visible_ifaces)
         False -- we don't want to display the packages in a single-package contents
         prologue
+        debug
 
   when (isNothing maybe_index_url) $
     ppHtmlIndex odir doctitle maybe_package
       themes maybe_contents_url maybe_source_url maybe_wiki_url
-      (map toInstalledIface visible_ifaces)
+      (map toInstalledIface visible_ifaces) debug
 
   mapM_ (ppHtmlModule odir doctitle themes
            maybe_source_url maybe_wiki_url
-           maybe_contents_url maybe_index_url unicode qual) visible_ifaces
+           maybe_contents_url maybe_index_url unicode qual debug) visible_ifaces
 
 
 copyHtmlBits :: FilePath -> FilePath -> Themes -> IO ()
@@ -219,10 +221,11 @@ ppHtmlContents
    -> SourceURLs
    -> WikiURLs
    -> [InstalledInterface] -> Bool -> Maybe (Doc GHC.RdrName)
+   -> Bool
    -> IO ()
 ppHtmlContents odir doctitle _maybe_package
   themes maybe_index_url
-  maybe_source_url maybe_wiki_url ifaces showPkgs prologue = do
+  maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug = do
   let tree = mkModuleTree showPkgs
          [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
       html =
@@ -234,10 +237,10 @@ ppHtmlContents odir doctitle _maybe_package
             ppModuleTree tree
           ]
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, contentsHtmlFile]) (renderToString html)
+  writeFile (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
 
   -- XXX: think of a better place for this?
-  ppHtmlContentsFrame odir doctitle themes ifaces
+  ppHtmlContentsFrame odir doctitle themes ifaces debug
 
 
 ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
@@ -311,8 +314,8 @@ flatModuleTree ifaces =
 
 
 ppHtmlContentsFrame :: FilePath -> String -> Themes
-  -> [InstalledInterface] -> IO ()
-ppHtmlContentsFrame odir doctitle themes ifaces = do
+  -> [InstalledInterface] -> Bool -> IO ()
+ppHtmlContentsFrame odir doctitle themes ifaces debug = do
   let mods = flatModuleTree ifaces
       html =
         headHtml doctitle Nothing themes +++
@@ -320,7 +323,7 @@ ppHtmlContentsFrame odir doctitle themes ifaces = do
           (sectionName << "Modules" +++
            ulist << [ li ! [theclass "module"] << m | m <- mods ])
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString html)
+  writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString debug html)
 
 
 --------------------------------------------------------------------------------
@@ -336,9 +339,10 @@ ppHtmlIndex :: FilePath
             -> SourceURLs
             -> WikiURLs
             -> [InstalledInterface]
+            -> Bool
             -> IO ()
 ppHtmlIndex odir doctitle _maybe_package themes
-  maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
+  maybe_contents_url maybe_source_url maybe_wiki_url ifaces debug = do
   let html = indexPage split_indices Nothing
               (if split_indices then [] else index)
 
@@ -348,9 +352,9 @@ ppHtmlIndex odir doctitle _maybe_package themes
     mapM_ (do_sub_index index) initialChars
     -- Let's add a single large index as well for those who don't know exactly what they're looking for:
     let mergedhtml = indexPage False Nothing index
-    writeFile (joinPath [odir, subIndexHtmlFile merged_name]) (renderToString mergedhtml)
+    writeFile (joinPath [odir, subIndexHtmlFile merged_name]) (renderToString debug mergedhtml)
 
-  writeFile (joinPath [odir, indexHtmlFile]) (renderToString html)
+  writeFile (joinPath [odir, indexHtmlFile]) (renderToString debug html)
 
   where
     indexPage showLetters ch items =
@@ -391,7 +395,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
     do_sub_index this_ix c
       = unless (null index_part) $
-          writeFile (joinPath [odir, subIndexHtmlFile [c]]) (renderToString html)
+          writeFile (joinPath [odir, subIndexHtmlFile [c]]) (renderToString debug html)
       where
         html = indexPage True (Just c) index_part
         index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
@@ -454,10 +458,10 @@ ppHtmlModule
         :: FilePath -> String -> Themes
         -> SourceURLs -> WikiURLs
         -> Maybe String -> Maybe String -> Bool -> Qualification
-        -> Interface -> IO ()
+        -> Bool -> Interface -> IO ()
 ppHtmlModule odir doctitle themes
   maybe_source_url maybe_wiki_url
-  maybe_contents_url maybe_index_url unicode qual iface = do
+  maybe_contents_url maybe_index_url unicode qual debug iface = do
   let
       mdl = ifaceMod iface
       mdl_str = moduleString mdl
@@ -475,13 +479,13 @@ ppHtmlModule odir doctitle themes
           ]
 
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString html)
-  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode qual
+  writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
+  ppHtmlModuleMiniSynopsis odir doctitle themes iface unicode qual debug
 
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
-  -> Interface -> Bool -> Qualification -> IO ()
-ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode qual = do
+  -> Interface -> Bool -> Qualification -> Bool -> IO ()
+ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode qual debug = do
   let mdl = ifaceMod iface
       html =
         headHtml (moduleString mdl) Nothing themes +++
@@ -489,7 +493,7 @@ ppHtmlModuleMiniSynopsis odir _doctitle themes iface unicode qual = do
           (divModuleHeader << sectionName << moduleString mdl +++
            miniSynopsis mdl iface unicode qual)
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString html)
+  writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString debug html)
 
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html

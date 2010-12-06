@@ -30,7 +30,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Options
 import Haddock.Utils
-import Haddock.GhcUtils
+import Haddock.GhcUtils hiding (pretty)
 
 import Control.Monad
 import Control.Exception
@@ -190,6 +190,7 @@ render flags ifaces installedIfaces srcMap = do
   let
     title                = fromMaybe "" (optTitle flags)
     unicode              = Flag_UseUnicode `elem` flags
+    pretty               = Flag_PrettyHtml `elem` flags
     opt_wiki_urls        = wikiUrls          flags
     opt_contents_url     = optContentsUrl    flags
     opt_index_url        = optIndexUrl       flags
@@ -219,13 +220,13 @@ render flags ifaces installedIfaces srcMap = do
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title pkgStr
                 themes opt_contents_url sourceUrls' opt_wiki_urls
-                allVisibleIfaces
+                allVisibleIfaces pretty
     copyHtmlBits odir libDir themes
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title pkgStr
                    themes opt_index_url sourceUrls' opt_wiki_urls
-                   allVisibleIfaces True prologue
+                   allVisibleIfaces True prologue pretty
     copyHtmlBits odir libDir themes
 
   when (Flag_Html `elem` flags) $ do
@@ -233,6 +234,7 @@ render flags ifaces installedIfaces srcMap = do
                 prologue
                 themes sourceUrls' opt_wiki_urls
                 opt_contents_url opt_index_url unicode opt_qualification
+                pretty
     copyHtmlBits odir libDir themes
 
   when (Flag_Hoogle `elem` flags) $ do
