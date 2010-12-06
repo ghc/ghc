@@ -843,20 +843,6 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 
       <varlistentry>
         <term>
-          <indexterm><primary><option>-d</option></primary></indexterm>
-          <option>-d</option>
-        </term>
-        <term>
-          <indexterm><primary><option>--debug</option></primary></indexterm>
-          <option>--debug</option>
-        </term>
-	<listitem>
-	  <para>Produce extra debugging output.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
           <indexterm><primary><option>-?</option></primary></indexterm>
           <option>-?</option>
         </term>

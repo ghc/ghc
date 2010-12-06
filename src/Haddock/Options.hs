@@ -42,7 +42,6 @@ import qualified Data.Char as Char
 data Flag
   = Flag_BuiltInThemes
   | Flag_CSS String
-  | Flag_Debug
 --  | Flag_DocBook
   | Flag_ReadInterface String
   | Flag_DumpInterface String
@@ -126,8 +125,6 @@ options backwardsCompat =
       "page heading",
     Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUALI")
       "qualification of names, one of \n'none' (default), 'full', 'local'\nor 'relative'",
-    Option ['d']  ["debug"]  (NoArg Flag_Debug)
-      "extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)
       "display this help and exit",
     Option ['V']  ["version"]  (NoArg Flag_Version)
