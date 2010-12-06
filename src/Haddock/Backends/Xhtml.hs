@@ -55,18 +55,18 @@ import Module
 
 
 ppHtml :: String
-       -> Maybe String                 -- package
+       -> Maybe String                 -- ^ Package
        -> [Interface]
-       -> FilePath                     -- destination directory
-       -> Maybe (Doc GHC.RdrName)      -- prologue text, maybe
-       -> Themes                       -- themes
-       -> SourceURLs                   -- the source URL (--source)
-       -> WikiURLs                     -- the wiki URL (--wiki)
-       -> Maybe String                 -- the contents URL (--use-contents)
-       -> Maybe String                 -- the index URL (--use-index)
-       -> Bool                         -- whether to use unicode in output (--use-unicode)
-       -> Qualification                -- how to qualify names
-       -> Bool                         -- output pretty html (newlines and indenting)
+       -> FilePath                     -- ^ Destination directory
+       -> Maybe (Doc GHC.RdrName)      -- ^ Prologue text, maybe
+       -> Themes                       -- ^ Themes
+       -> SourceURLs                   -- ^ The source URL (--source)
+       -> WikiURLs                     -- ^ The wiki URL (--wiki)
+       -> Maybe String                 -- ^ The contents URL (--use-contents)
+       -> Maybe String                 -- ^ The index URL (--use-index)
+       -> Bool                         -- ^ Whether to use unicode in output (--use-unicode)
+       -> Qualification                -- ^ How to qualify names
+       -> Bool                         -- ^ Output pretty html (newlines and indenting)
        -> IO ()
 
 ppHtml doctitle maybe_package ifaces odir prologue
