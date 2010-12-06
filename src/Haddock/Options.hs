@@ -123,7 +123,7 @@ options backwardsCompat =
       "file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
       "page heading",
-    Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUALI")
+    Option ['q']  ["qual"] (ReqArg Flag_Qualification "QUAL")
       "qualification of names, one of \n'none' (default), 'full', 'local'\nor 'relative'",
     Option ['?']  ["help"]  (NoArg Flag_Help)
       "display this help and exit",
