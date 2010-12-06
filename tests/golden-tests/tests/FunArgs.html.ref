@@ -10,4 +10,4 @@ window.onload = function () {pageLoad();setSynopsis("mini_FunArgs.html");};
 </p></td></tr><tr><td class="src">-&gt; b</td><td class="doc"><p>Second argument
 </p></td></tr><tr><td class="src">-&gt; c</td><td class="doc"><p>Third argument
 </p></td></tr><tr><td class="src">-&gt; d</td><td class="doc"><p>Result
-</p></td></tr></table></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.0</p></div></body></html>
+</p></td></tr></table></div></div></div></div><div id="footer"><p>Produced by <A HREF="">Haddock</a> version 2.8.2</p></div></body></html>
