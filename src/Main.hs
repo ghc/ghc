@@ -245,6 +245,7 @@ render flags ifaces installedIfaces srcMap = do
     ppLaTeX title pkgStr visibleIfaces odir prologue opt_latex_style
                   libDir
 
+
 -------------------------------------------------------------------------------
 -- * Reading and dumping interface files
 -------------------------------------------------------------------------------
