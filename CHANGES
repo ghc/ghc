@@ -1,3 +1,17 @@
+Changes in version 2.9.0
+
+  * Drop support for ghc < 7
+
+  * New flag --qual for qualification of names
+
+  * Print doc coverage information to stdout when generating docs
+
+  * Include an 'All' option in the A-Z subdivided index
+
+  * Make TOC group header identifiers validate
+
+  * Minor changes to the API
+
 Changes in the version that comes with GHC 7.0.1
   
   [This version claims it is 2.8.0 but is actually based on 2.8.1]
