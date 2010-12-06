@@ -10,7 +10,6 @@ module System.Event.Thread
     , registerDelay
     ) where
 
-import Control.Exception (SomeException, catch, throw)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (Maybe(..))
 import Foreign.C.Error (eBADF, errnoToIOError)
@@ -19,6 +18,7 @@ import GHC.Base
 import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
                       labelThread, modifyMVar_, newTVar, sharedCAF,
                       threadStatus, writeTVar)
+import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Real (fromIntegral)
@@ -36,12 +36,11 @@ import System.Posix.Types (Fd)
 -- when the delay has expired, but the thread will never continue to
 -- run /earlier/ than specified.
 threadDelay :: Int -> IO ()
-threadDelay usecs = do
+threadDelay usecs = mask_ $ do
   Just mgr <- readIORef eventManager
   m <- newEmptyMVar
   reg <- registerTimeout mgr usecs (putMVar m ())
-  takeMVar m `catch` \(e::SomeException) ->
-    M.unregisterTimeout mgr reg >> throw e
+  takeMVar m `onException` M.unregisterTimeout mgr reg
 
 -- | Set the value of returned TVar to True after a given number of
 -- microseconds. The caveats associated with threadDelay also apply.
@@ -86,12 +85,11 @@ closeFdWith close fd = do
   M.closeFd mgr close fd
 
 threadWait :: Event -> Fd -> IO ()
-threadWait evt fd = do
+threadWait evt fd = mask_ $ do
   m <- newEmptyMVar
   Just mgr <- readIORef eventManager
   reg <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> putMVar m e) fd evt
-  evt' <- takeMVar m `catch` \(e::SomeException) ->
-            unregisterFd_ mgr reg >> throw e
+  evt' <- takeMVar m `onException` unregisterFd_ mgr reg
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
