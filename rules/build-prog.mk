@@ -123,9 +123,6 @@ $1_$2_LINK_WITH_GCC = NO
 ifeq "$$(BootingFromHc)" "YES"
 $1_$2_LINK_WITH_GCC = YES
 endif
-ifeq "$$($1_$2_v_HS_OBJS)" ""
-$1_$2_LINK_WITH_GCC = YES
-endif
 
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
