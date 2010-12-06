@@ -31,7 +31,7 @@ module GHC.Conc.IO
         , registerDelay         -- :: Int -> IO (TVar Bool)
         , threadWaitRead        -- :: Int -> IO ()
         , threadWaitWrite       -- :: Int -> IO ()
-        , closeFd               -- :: (Int -> IO ()) -> Int -> IO ()
+        , closeFdWith           -- :: (Fd -> IO ()) -> Fd -> IO ()
 
 #ifdef mingw32_HOST_OS
         , asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
@@ -71,6 +71,10 @@ ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
 
 -- | Block the current thread until data is available to read on the
 -- given file descriptor (GHC only).
+--
+-- This will throw an 'IOError' if the file descriptor was closed
+-- while this thread was blocked.  To safely close a file descriptor
+-- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
 #ifndef mingw32_HOST_OS
@@ -85,7 +89,8 @@ threadWaitRead fd
 -- given file descriptor (GHC only).
 --
 -- This will throw an 'IOError' if the file descriptor was closed
--- while this thread was blocked.
+-- while this thread was blocked.  To safely close a file descriptor
+-- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #ifndef mingw32_HOST_OS
@@ -104,12 +109,12 @@ threadWaitWrite fd
 -- Any threads that are blocked on the file descriptor via
 -- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
 -- IO exceptions thrown.
-closeFd :: (Fd -> IO ())        -- ^ Low-level action that performs the real close.
-        -> Fd                   -- ^ File descriptor to close.
-        -> IO ()
-closeFd close fd
+closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
+            -> Fd            -- ^ File descriptor to close.
+            -> IO ()
+closeFdWith close fd
 #ifndef mingw32_HOST_OS
-  | threaded  = Event.closeFd close fd
+  | threaded  = Event.closeFdWith close fd
 #endif
   | otherwise = close fd
 

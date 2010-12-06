@@ -5,7 +5,7 @@ module System.Event.Thread
       ensureIOManagerIsRunning
     , threadWaitRead
     , threadWaitWrite
-    , closeFd
+    , closeFdWith
     , threadDelay
     , registerDelay
     ) where
@@ -57,7 +57,8 @@ registerDelay usecs = do
 -- given file descriptor.
 --
 -- This will throw an 'IOError' if the file descriptor was closed
--- while this thread is blocked.
+-- while this thread was blocked.  To safely close a file descriptor
+-- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead = threadWait evtRead
 {-# INLINE threadWaitRead #-}
@@ -66,7 +67,8 @@ threadWaitRead = threadWait evtRead
 -- accept data to write.
 --
 -- This will throw an 'IOError' if the file descriptor was closed
--- while this thread is blocked.
+-- while this thread was blocked.  To safely close a file descriptor
+-- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite = threadWait evtWrite
 {-# INLINE threadWaitWrite #-}
@@ -76,10 +78,10 @@ threadWaitWrite = threadWait evtWrite
 -- Any threads that are blocked on the file descriptor via
 -- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
 -- IO exceptions thrown.
-closeFd :: (Fd -> IO ())        -- ^ Action that performs the close.
-        -> Fd                   -- ^ File descriptor to close.
-        -> IO ()
-closeFd close fd = do
+closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
+            -> Fd                   -- ^ File descriptor to close.
+            -> IO ()
+closeFdWith close fd = do
   Just mgr <- readIORef eventManager
   M.closeFd mgr close fd
 

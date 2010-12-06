@@ -289,7 +289,7 @@ close fd =
         else
 #endif
           c_close (fromIntegral realFd)
-  closeFd closer (fromIntegral (fdFD fd))
+  closeFdWith closer (fromIntegral (fdFD fd))
 
 release :: FD -> IO ()
 #ifdef mingw32_HOST_OS

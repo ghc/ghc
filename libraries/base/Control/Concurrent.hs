@@ -47,7 +47,6 @@ module Control.Concurrent (
         threadDelay,            -- :: Int -> IO ()
         threadWaitRead,         -- :: Int -> IO ()
         threadWaitWrite,        -- :: Int -> IO ()
-        closeFd,                -- :: (Int -> IO ()) -> Int -> IO ()
 #endif
 
         -- * Communication abstractions
@@ -454,7 +453,9 @@ unsafeResult = either Exception.throwIO return
 -- given file descriptor (GHC only).
 --
 -- This will throw an 'IOError' if the file descriptor was closed
--- while this thread was blocked.
+-- while this thread was blocked.  To safely close a file descriptor
+-- that has been used with 'threadWaitRead', use
+-- 'GHC.Conc.closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
 #ifdef mingw32_HOST_OS
@@ -477,7 +478,9 @@ threadWaitRead fd
 -- given file descriptor (GHC only).
 --
 -- This will throw an 'IOError' if the file descriptor was closed
--- while this thread was blocked.
+-- while this thread was blocked.  To safely close a file descriptor
+-- that has been used with 'threadWaitWrite', use
+-- 'GHC.Conc.closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
 #ifdef mingw32_HOST_OS
@@ -485,24 +488,6 @@ threadWaitWrite fd
   | otherwise = error "threadWaitWrite requires -threaded on Windows"
 #else
   = GHC.Conc.threadWaitWrite fd
-#endif
-
--- | Close a file descriptor in a concurrency-safe way (GHC only).  If
--- you are using 'threadWaitRead' or 'threadWaitWrite' to perform
--- blocking I\/O, you /must/ use this function to close file
--- descriptors, or blocked threads may not be woken.
---
--- Any threads that are blocked on the file descriptor via
--- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
--- IO exceptions thrown.
-closeFd :: (Fd -> IO ())        -- ^ Low-level action that performs the real close.
-        -> Fd                   -- ^ File descriptor to close.
-        -> IO ()
-closeFd close fd
-#ifdef mingw32_HOST_OS
-  = close fd
-#else
-  = GHC.Conc.closeFd close fd
 #endif
 
 #ifdef mingw32_HOST_OS
