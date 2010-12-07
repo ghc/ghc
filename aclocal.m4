@@ -9,7 +9,7 @@
 # Set the C and LD flags for a given platform
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
-    AC_MSG_CHECKING([Setting up $2 and $3])
+    AC_MSG_CHECKING([Setting up $2, $3 and $4])
     case $$1 in
     i386-apple-darwin)
         # By default, gcc on OS X will generate SSE
@@ -18,10 +18,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         # back to generic i686 compatibility. Trac #2983.
         $2="$$2 -march=i686 -m32"
         $3="$$3 -march=i686 -m32"
+        $4="$$4 -march=i686 -m32"
         ;;
     x86_64-apple-darwin)
         $2="$$2 -m64"
         $3="$$3 -m64"
+        $4="$$4 -m64"
         ;;
     esac
 
@@ -30,6 +32,7 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         # We support back to OS X 10.5
         $2="$$2 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
         $3="$$3 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
+        $4="$$4 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
         ;;
     esac
 
