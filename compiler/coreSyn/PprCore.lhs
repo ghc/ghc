@@ -233,8 +233,13 @@ ppr_case_pat con args
   where
     ppr_bndr = pprBndr CaseBind
 
+
+-- | Pretty print the argument in a function application.
 pprArg :: OutputableBndr a => Expr a -> SDoc
-pprArg (Type ty) = ptext (sLit "@") <+> pprParendType ty
+pprArg (Type ty) 
+ | opt_SuppressTypeApplications	= empty
+ | otherwise			= ptext (sLit "@") <+> pprParendType ty
+
 pprArg expr      = pprParendExpr expr
 \end{code}
 
@@ -325,6 +330,8 @@ pprIdBndrInfo info
 \begin{code}
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo id info
+  | opt_SuppressIdInfo	= empty
+  | otherwise
   = showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,      ptext (sLit "Arity=") <> int arity)

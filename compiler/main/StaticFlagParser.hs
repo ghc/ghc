@@ -121,15 +121,18 @@ static_flags = [
     -- is required to get the RTS ticky support.
 
         ------ Debugging ----------------------------------------------------
-  , Flag "dppr-debug"                (PassFlag addOpt)
-  , Flag "dsuppress-uniques"         (PassFlag addOpt)
-  , Flag "dsuppress-coercions"       (PassFlag addOpt)
-  , Flag "dsuppress-module-prefixes" (PassFlag addOpt)
-  , Flag "dppr-user-length"          (AnySuffix addOpt)
-  , Flag "dopt-fuel"                 (AnySuffix addOpt)
-  , Flag "dtrace-level"              (AnySuffix addOpt)
-  , Flag "dno-debug-output"          (PassFlag addOpt)
-  , Flag "dstub-dead-values"         (PassFlag addOpt)
+  , Flag "dppr-debug"                  (PassFlag addOpt)
+  , Flag "dsuppress-all"               (PassFlag addOpt)
+  , Flag "dsuppress-uniques"           (PassFlag addOpt)
+  , Flag "dsuppress-coercions"         (PassFlag addOpt)
+  , Flag "dsuppress-module-prefixes"   (PassFlag addOpt)
+  , Flag "dsuppress-type-applications" (PassFlag addOpt)
+  , Flag "dsuppress-idinfo"            (PassFlag addOpt)
+  , Flag "dppr-user-length"            (AnySuffix addOpt)
+  , Flag "dopt-fuel"                   (AnySuffix addOpt)
+  , Flag "dtrace-level"                (AnySuffix addOpt)
+  , Flag "dno-debug-output"            (PassFlag addOpt)
+  , Flag "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
         ----- Linker --------------------------------------------------------

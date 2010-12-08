@@ -21,9 +21,12 @@ module StaticFlags (
 
 	-- Output style options
 	opt_PprUserLength,
+	opt_SuppressAll,
 	opt_SuppressUniques,
         opt_SuppressCoercions,
 	opt_SuppressModulePrefixes,
+	opt_SuppressTypeApplications,
+	opt_SuppressIdInfo,
 	opt_PprStyle_Debug, opt_TraceLevel,
         opt_NoDebugOutput,
 
@@ -181,15 +184,42 @@ unpacked_opts =
 opt_IgnoreDotGhci :: Bool
 opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 
--- debugging opts
+-- debugging options
+-- | Suppress all that is suppressable in core dumps.
+opt_SuppressAll :: Bool
+opt_SuppressAll	
+	= lookUp  (fsLit "-dsuppress-all")
+
+-- | Suppress unique ids on variables.
 opt_SuppressUniques :: Bool
-opt_SuppressUniques		= lookUp  (fsLit "-dsuppress-uniques")
+opt_SuppressUniques
+	=  lookUp  (fsLit "-dsuppress-all")
+	|| lookUp  (fsLit "-dsuppress-uniques")
 
+-- | Suppress all coercions, them replacing with '...'
 opt_SuppressCoercions :: Bool
-opt_SuppressCoercions           = lookUp  (fsLit "-dsuppress-coercions")
+opt_SuppressCoercions
+	=  lookUp  (fsLit "-dsuppress-all") 
+	|| lookUp  (fsLit "-dsuppress-coercions")
 
+-- | Suppress module id prefixes on variables.
 opt_SuppressModulePrefixes :: Bool
-opt_SuppressModulePrefixes	= lookUp  (fsLit "-dsuppress-module-prefixes")
+opt_SuppressModulePrefixes
+	=  lookUp  (fsLit "-dsuppress-all")
+	|| lookUp  (fsLit "-dsuppress-module-prefixes")
+
+-- | Suppress type applications.
+opt_SuppressTypeApplications :: Bool
+opt_SuppressTypeApplications
+	=  lookUp  (fsLit "-dsuppress-all")
+	|| lookUp  (fsLit "-dsuppress-type-applications")
+
+-- | Suppress info such as arity and unfoldings on identifiers.
+opt_SuppressIdInfo :: Bool
+opt_SuppressIdInfo 
+	=  lookUp  (fsLit "-dsuppress-all")
+	|| lookUp  (fsLit "-dsuppress-idinfo")
+	
 
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")
