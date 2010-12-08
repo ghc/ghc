@@ -245,3 +245,9 @@ getourtimeofday(void)
   return (lnat)((StgWord64)tv.tv_sec * 1000 / interval +
                 (StgWord64)tv.tv_usec / (interval * 1000));
 }
+
+int
+rtsTimerSignal(void)
+{
+    return ITIMER_SIGNAL;
+}

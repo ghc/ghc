@@ -888,6 +888,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(rts_unlock)				\
       SymI_HasProto(rts_unsafeGetMyCapability)          \
       SymI_HasProto(rtsSupportsBoundThreads)		\
+      SymI_HasProto(rtsTimerSignal)		\
       SymI_HasProto(rts_isProfiled)			\
       SymI_HasProto(setProgArgv)			\
       SymI_HasProto(startupHaskell)			\

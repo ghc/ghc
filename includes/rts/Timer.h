@@ -16,5 +16,6 @@
 
 void startTimer (void);
 void stopTimer  (void);
+int rtsTimerSignal (void);
 
 #endif /* RTS_TIMER_H */
