@@ -1444,6 +1444,17 @@ Lastly, the code in SimplUtils.mkCase combines identical RHSs.  So
 
 Now again the case may be elminated by the CaseElim transformation.
 
+Note [CaseElimination: lifted case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do not use exprOkForSpeculation in the lifted case.  Consider
+   case (case a ># b of { True -> (p,q); False -> (q,p) }) of
+     r -> blah
+The scrutinee is ok-for-speculation (it looks inside cases), but we do
+not want to transform to
+   let r = case a ># b of { True -> (p,q); False -> (q,p) }
+   in blah
+because that builds an unnecessary thunk.
+
 
 Further notes about case elimination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1536,28 +1547,23 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
  | all isDeadBinder bndrs       -- bndrs are [InId]
 
         -- Check that the scrutinee can be let-bound instead of case-bound
- , exprOkForSpeculation scrut
-                -- OK not to evaluate it
-                -- This includes things like (==# a# b#)::Bool
-                -- so that we simplify
-                --      case ==# a# b# of { True -> x; False -> x }
-                -- to just
-                --      x
-                -- This particular example shows up in default methods for
-                -- comparision operations (e.g. in (>=) for Int.Int32)
-        || exprIsHNF scrut                      -- It's already evaluated
-        || var_demanded_later scrut             -- It'll be demanded later
+ , if isUnLiftedType (idType case_bndr)
+   then exprOkForSpeculation scrut
+        -- Satisfy the let-binding invariant
+        -- This includes things like (==# a# b#)::Bool
+        -- so that we simplify
+        --      case ==# a# b# of { True -> x; False -> x }
+        -- to just
+        --      x
+        -- This particular example shows up in default methods for
+        -- comparision operations (e.g. in (>=) for Int.Int32)
 
---      || not opt_SimplPedanticBottoms)        -- Or we don't care!
---      We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
---      but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
---      its argument:  case x of { y -> dataToTag# y }
---      Here we must *not* discard the case, because dataToTag# just fetches the tag from
---      the info pointer.  So we'll be pedantic all the time, and see if that gives any
---      other problems
---      Also we don't want to discard 'seq's
+   else exprIsHNF scrut || var_demanded_later scrut
+        -- It's already evaluated, or will be demanded later
+        -- See Note [Case elimination: lifted case]
   = do  { tick (CaseElim case_bndr)
         ; env' <- simplNonRecX env case_bndr scrut
+          -- If case_bndr is deads, simplNonRecX will discard
         ; simplExprF env' rhs cont }
   where
         -- The case binder is going to be evaluated later,
