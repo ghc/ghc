@@ -133,7 +133,7 @@ showGhcException exception
 
 	Sorry s
    	 -> showString $
-		"sorry! (this is work in progress)\n"
+		"sorry! (unimplemented feature or known bug)\n"
 		 ++ "  (GHC version " ++ cProjectVersion ++ " for " ++ TargetPlatform_NAME ++ "):\n\t"
 	         ++ s ++ "\n"
 
