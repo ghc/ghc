@@ -152,11 +152,27 @@ ppr_expr add_par expr@(App {})
     }
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
+  | opt_PprCaseAsLet
+  = add_par $
+    sep [sep 	[ ptext (sLit "let")
+			<+> char '{'
+			<+> ppr_case_pat con args 
+			<+> ptext (sLit "~")
+			<+> ppr_bndr var
+		, ptext (sLit "<-") 
+		  	<+> ppr_expr id expr
+		, char '}' 
+			<+> ptext (sLit "in")
+	  	]
+	, pprCoreExpr rhs
+    	]
+
+  | otherwise
   = add_par $
     sep [sep [ptext (sLit "case") <+> pprCoreExpr expr,
 	      ifPprDebug (braces (ppr ty)),
 	      sep [ptext (sLit "of") <+> ppr_bndr var, 
-		   char '{' <+> ppr_case_pat con args]
+		   char '{' <+> ppr_case_pat con args <+> arrow]
 	  ],
 	 pprCoreExpr rhs,
 	 char '}'
@@ -218,18 +234,18 @@ ppr_expr add_par (Note (CoreNote s) expr)
 
 pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs) 
-  = hang (ppr_case_pat con args) 2 (pprCoreExpr rhs)
+  = hang (ppr_case_pat con args <+> arrow) 2 (pprCoreExpr rhs)
 
 ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
 ppr_case_pat (DataAlt dc) args
   | isTupleTyCon tc
-  = tupleParens (tupleTyConBoxity tc) (hsep (punctuate comma (map ppr_bndr args))) <+> arrow
+  = tupleParens (tupleTyConBoxity tc) (hsep (punctuate comma (map ppr_bndr args)))
   where
     ppr_bndr = pprBndr CaseBind
     tc = dataConTyCon dc
 
 ppr_case_pat con args
-  = ppr con <+> sep (map ppr_bndr args) <+> arrow
+  = ppr con <+> sep (map ppr_bndr args)
   where
     ppr_bndr = pprBndr CaseBind
 

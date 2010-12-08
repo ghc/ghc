@@ -21,6 +21,7 @@ module StaticFlags (
 
 	-- Output style options
 	opt_PprUserLength,
+	opt_PprCaseAsLet,
 	opt_PprStyle_Debug, opt_TraceLevel,
         opt_NoDebugOutput,
 
@@ -229,6 +230,11 @@ opt_SuppressTypeSignatures
 	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-type-signatures")
 
+
+-- | Display case expressions with a single alternative as strict let bindings
+opt_PprCaseAsLet :: Bool
+opt_PprCaseAsLet
+	= lookUp   (fsLit "-dppr-case-as-let")
 
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")

@@ -122,6 +122,8 @@ static_flags = [
 
         ------ Debugging ----------------------------------------------------
   , Flag "dppr-debug"                  (PassFlag addOpt)
+  , Flag "dppr-user-length"            (AnySuffix addOpt)
+  , Flag "dppr-case-as-let"            (PassFlag addOpt)
   , Flag "dsuppress-all"               (PassFlag addOpt)
   , Flag "dsuppress-uniques"           (PassFlag addOpt)
   , Flag "dsuppress-coercions"         (PassFlag addOpt)
@@ -129,7 +131,6 @@ static_flags = [
   , Flag "dsuppress-type-applications" (PassFlag addOpt)
   , Flag "dsuppress-idinfo"            (PassFlag addOpt)
   , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
-  , Flag "dppr-user-length"            (AnySuffix addOpt)
   , Flag "dopt-fuel"                   (AnySuffix addOpt)
   , Flag "dtrace-level"                (AnySuffix addOpt)
   , Flag "dno-debug-output"            (PassFlag addOpt)
