@@ -265,57 +265,68 @@ void osReleaseFreeMemory(void)
 
     while (a != NULL) {
         a_end = a->base + a->size;
+        /* If a is freeable then there is a single freeblock in fb that
+           covers it. The end of this free block must be >= the end of
+           a, so skip anything in fb that ends before a. */
         while (fb != NULL && fb->base + fb->size < a_end) {
             prev_fb = fb;
             fb = fb->next;
         }
 
-        fb_end = fb->base + fb->size;
-        if (fb->base <= a->base) {
-            /* The alloc is within the free block. Now we need to know
-               if it sticks out at either end. */
-            if (fb_end == a_end) {
-                if (fb->base == a->base) {
-                    /* fb and a are identical, so just free fb */
-                    prev_fb->next = fb->next;
-                    stgFree(fb);
-                    fb = prev_fb->next;
-                }
-                else {
-                    /* fb begins earlier, so truncate it to not include a */
-                    fb->size = a->base - fb->base;
-                }
-            }
-            else {
-                /* fb ends later, so we'll make fb just be the part
-                   after a. First though, if it also starts earlier,
-                   we make a new free block record for the before bit. */
-                if (fb->base != a->base) {
-                    block_rec *new_fb;
-
-                    new_fb = (block_rec *)stgMallocBytes(sizeof(block_rec),"osReleaseFreeMemory");
-                    new_fb->base = fb->base;
-                    new_fb->size = a->base - fb->base;
-                    new_fb->next = fb;
-                    prev_fb->next = new_fb;
-                }
-                fb->size = fb_end - a_end;
-                fb->base = a_end;
-            }
-            /* Now we can free the alloc */
-            prev_a->next = a->next;
-            if(!VirtualFree((void *)a->base, 0, MEM_RELEASE)) {
-                sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed");
-                stg_exit(EXIT_FAILURE);
-            }
-            stgFree(a);
-            a = prev_a->next;
+        if (fb == NULL) {
+            /* If we have nothing left in fb, then neither a nor
+               anything later in the list is freeable, so we are done. */
+            break;
         }
         else {
-            /* Otherwise this alloc is not freeable, so go on to the
-               next one */
-            prev_a = a;
-            a = a->next;
+            fb_end = fb->base + fb->size;
+            /* We have a candidate fb. But does it really cover a? */
+            if (fb->base <= a->base) {
+                /* Yes, the alloc is within the free block. Now we need
+                   to know if it sticks out at either end. */
+                if (fb_end == a_end) {
+                    if (fb->base == a->base) {
+                        /* fb and a are identical, so just free fb */
+                        prev_fb->next = fb->next;
+                        stgFree(fb);
+                        fb = prev_fb->next;
+                    }
+                    else {
+                        /* fb begins earlier, so truncate it to not include a */
+                        fb->size = a->base - fb->base;
+                    }
+                }
+                else {
+                    /* fb ends later, so we'll make fb just be the part
+                       after a. First though, if it also starts earlier,
+                       we make a new free block record for the before bit. */
+                    if (fb->base != a->base) {
+                        block_rec *new_fb;
+
+                        new_fb = (block_rec *)stgMallocBytes(sizeof(block_rec),"osReleaseFreeMemory");
+                        new_fb->base = fb->base;
+                        new_fb->size = a->base - fb->base;
+                        new_fb->next = fb;
+                        prev_fb->next = new_fb;
+                    }
+                    fb->size = fb_end - a_end;
+                    fb->base = a_end;
+                }
+                /* Now we can free the alloc */
+                prev_a->next = a->next;
+                if(!VirtualFree((void *)a->base, 0, MEM_RELEASE)) {
+                    sysErrorBelch("freeAllMBlocks: VirtualFree MEM_RELEASE failed");
+                    stg_exit(EXIT_FAILURE);
+                }
+                stgFree(a);
+                a = prev_a->next;
+            }
+            else {
+                /* Otherwise this alloc is not freeable, so go on to the
+                   next one */
+                prev_a = a;
+                a = a->next;
+            }
         }
     }
 
