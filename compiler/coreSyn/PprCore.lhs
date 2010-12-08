@@ -303,6 +303,8 @@ pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info 
+  | opt_SuppressIdInfo = empty
+  | otherwise
   = megaSeqIdInfo info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
