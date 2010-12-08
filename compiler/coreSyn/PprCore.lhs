@@ -282,8 +282,9 @@ pprTypedLCBinder bind_site debug_on var
 pprTypedBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
 pprTypedBinder binder
-  | isTyCoVar binder  = pprKindedTyVarBndr binder
-  | otherwise	    = hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
+  | isTyCoVar binder		= pprKindedTyVarBndr binder
+  | opt_SuppressTypeSignatures	= empty
+  | otherwise			= hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)

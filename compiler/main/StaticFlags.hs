@@ -21,14 +21,17 @@ module StaticFlags (
 
 	-- Output style options
 	opt_PprUserLength,
+	opt_PprStyle_Debug, opt_TraceLevel,
+        opt_NoDebugOutput,
+
+	-- Suppressing boring aspects of core dumps
 	opt_SuppressAll,
 	opt_SuppressUniques,
         opt_SuppressCoercions,
 	opt_SuppressModulePrefixes,
 	opt_SuppressTypeApplications,
 	opt_SuppressIdInfo,
-	opt_PprStyle_Debug, opt_TraceLevel,
-        opt_NoDebugOutput,
+	opt_SuppressTypeSignatures,
 
 	-- profiling opts
 	opt_SccProfilingOn,
@@ -219,7 +222,13 @@ opt_SuppressIdInfo :: Bool
 opt_SuppressIdInfo 
 	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-idinfo")
-	
+
+-- | Suppress seprate type signatures in core, but leave types on lambda bound vars
+opt_SuppressTypeSignatures :: Bool
+opt_SuppressTypeSignatures
+	=  lookUp  (fsLit "-dsuppress-all")
+	|| lookUp  (fsLit "-dsuppress-type-signatures")
+
 
 opt_PprStyle_Debug  :: Bool
 opt_PprStyle_Debug              = lookUp  (fsLit "-dppr-debug")

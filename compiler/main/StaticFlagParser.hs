@@ -128,6 +128,7 @@ static_flags = [
   , Flag "dsuppress-module-prefixes"   (PassFlag addOpt)
   , Flag "dsuppress-type-applications" (PassFlag addOpt)
   , Flag "dsuppress-idinfo"            (PassFlag addOpt)
+  , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
   , Flag "dppr-user-length"            (AnySuffix addOpt)
   , Flag "dopt-fuel"                   (AnySuffix addOpt)
   , Flag "dtrace-level"                (AnySuffix addOpt)
