@@ -185,7 +185,7 @@ import BufWrite
 import FastString
 import FastTypes
 import Panic
-
+import StaticFlags
 import Numeric (fromRat)
 import System.IO
 --import Foreign.Ptr (castPtr)
@@ -999,7 +999,7 @@ spaces n | n <=# _ILIT(0) = ""
 
 \begin{code}
 pprCols :: Int
-pprCols = 100 -- could make configurable
+pprCols = opt_PprCols
 
 printDoc :: Mode -> Handle -> Doc -> IO ()
 printDoc LeftMode hdl doc

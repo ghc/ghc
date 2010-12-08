@@ -122,6 +122,7 @@ static_flags = [
 
         ------ Debugging ----------------------------------------------------
   , Flag "dppr-debug"                  (PassFlag addOpt)
+  , Flag "dppr-cols"                   (AnySuffix addOpt)
   , Flag "dppr-user-length"            (AnySuffix addOpt)
   , Flag "dppr-case-as-let"            (PassFlag addOpt)
   , Flag "dsuppress-all"               (PassFlag addOpt)
