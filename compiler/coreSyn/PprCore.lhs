@@ -186,7 +186,7 @@ ppr_expr add_par (Case expr var ty alts)
 		<+> pprCoreExpr expr
 		<+> ifPprDebug (braces (ppr ty)),
 	      ptext (sLit "of") <+> ppr_bndr var <+> char '{'],
-	 nest 2 (sep (punctuate semi (map pprCoreAlt alts))),
+	 nest 2 (vcat (punctuate semi (map pprCoreAlt alts))),
 	 char '}'
     ]
   where
