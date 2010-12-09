@@ -1580,7 +1580,7 @@ module A where
 	<title>Special characters</title>
 
 	<para>The following characters have special meanings in
-	documentation comments: <literal>/</literal>,
+	documentation comments: <literal>\</literal>, <literal>/</literal>,
 	<literal>'</literal>, <literal>`</literal>,
 	<literal>"</literal>, <literal>@</literal>,
 	<literal>&lt;</literal>.  To insert a literal occurrence of
