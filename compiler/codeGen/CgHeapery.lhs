@@ -439,7 +439,7 @@ do_checks _ hp _ _
   = sorry (unlines [
             "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK * bLOCK_SIZE) ++ " bytes.", 
             "",
-            "See: http://hackage.haskell.org/trac/ghc/ticket/4550",
+            "See: http://hackage.haskell.org/trac/ghc/ticket/4505",
             "Suggestion: read data from a file instead of having large static data",
             "structures in the code."])
 
