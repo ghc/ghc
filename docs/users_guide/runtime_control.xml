@@ -49,8 +49,8 @@
   wraparound in the counters is <emphasis>your</emphasis>
   fault!)</para>
 
-  <para>Giving a <literal>+RTS -f</literal>
-  <indexterm><primary><option>-f</option></primary><secondary>RTS option</secondary></indexterm> option
+  <para>Giving a <literal>+RTS -?</literal>
+  <indexterm><primary><option>-?</option></primary><secondary>RTS option</secondary></indexterm> option
   will print out the RTS options actually available in your program
   (which vary, depending on how you compiled).</para>
 
