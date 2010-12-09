@@ -1025,6 +1025,10 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	
 	blocks = (lnat)BLOCK_ROUND_UP(cap->r.rHpAlloc) / BLOCK_SIZE;
 	
+        if (blocks > BLOCKS_PER_MBLOCK) {
+            barf("allocation of %ld bytes too large (GHC should have complained at compile-time)", (long)cap->r.rHpAlloc);
+        }
+
 	debugTrace(DEBUG_sched,
 		   "--<< thread %ld (%s) stopped: requesting a large block (size %ld)\n", 
 		   (long)t->id, what_next_strs[t->what_next], blocks);

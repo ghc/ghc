@@ -433,6 +433,16 @@ do_checks :: WordOff	-- Stack headroom
 	  -> CmmExpr	-- Rts address to jump to on failure
 	  -> Code
 do_checks 0 0 _ _   = nopC
+
+do_checks _ hp _ _
+  | hp > bLOCKS_PER_MBLOCK * bLOCK_SIZE_W
+  = sorry (unlines [
+            "Trying to allocate more than " ++ show (bLOCKS_PER_MBLOCK * bLOCK_SIZE) ++ " bytes.", 
+            "",
+            "See: http://hackage.haskell.org/trac/ghc/ticket/4550",
+            "Suggestion: read data from a file instead of having large static data",
+            "structures in the code."])
+
 do_checks stk hp reg_save_code rts_lbl
   = do_checks' (CmmLit (mkIntCLit (stk*wORD_SIZE))) 
 	       (CmmLit (mkIntCLit (hp*wORD_SIZE)))

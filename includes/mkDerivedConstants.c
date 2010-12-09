@@ -195,6 +195,8 @@ main(int argc, char *argv[])
 
     printf("#define BLOCK_SIZE   %u\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %u\n", MBLOCK_SIZE);
+    printf("#define BLOCKS_PER_MBLOCK  %lu\n", (lnat)BLOCKS_PER_MBLOCK);
+    // could be derived, but better to save doing the calculation twice
 
     printf("\n\n");
 #endif

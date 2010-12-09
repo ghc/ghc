@@ -183,6 +183,11 @@ bLOCK_SIZE = BLOCK_SIZE
 bLOCK_SIZE_W :: Int
 bLOCK_SIZE_W = bLOCK_SIZE `quot` wORD_SIZE
 
+-- blocks that fit in an MBlock, leaving space for the block descriptors
+
+bLOCKS_PER_MBLOCK :: Int
+bLOCKS_PER_MBLOCK = BLOCKS_PER_MBLOCK
+
 -- Number of bits to shift a bitfield left by in an info table.
 
 bITMAP_BITS_SHIFT :: Int
