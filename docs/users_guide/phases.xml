@@ -991,6 +991,64 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
+          <option>-rtsopts</option>
+          <indexterm><primary><option>-rtsopts</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            This option affects the processing of RTS control options given either
+            on the command line or via the <envar>GHCRTS</envar> environment variable.
+            There are three possibilities:
+          </para>
+          <itemizedlist>
+            <listitem>
+              <option>-rtsopts=none</option> disables all processing of RTS options.
+              Passing <option>+RTS</option> anywhere on the command line causes the program
+              to abort with an error message. Setting the <envar>GHCRTS</envar> environment
+              variable causes a warning is printed before the main Haskell program runs.
+            </listitem>
+            <listitem>
+              <option>-rtsopts=some</option> enables only the "safe" RTS options on the
+              command line. (Currently only <option>-?</option> and <option>--info</option>.)
+              Any other RTS options on the command line abort the program with an error
+              message. All RTS options in the <envar>GHCRTS</envar> environment variable are
+              processed as normal. This is the default setting.
+            </listitem>
+            <listitem>
+              <option>-rtsopts=all</option> (or just <option>-rtsopts</option>) enables
+              <emphasis>all</emphasis> RTS option processing, both on the command line and
+              through the <envar>GHCRTS</envar> environment variable.
+            </listitem>
+          </itemizedlist>
+          <para>
+            Prior to GHC 7.0, the default was to process all RTS options. However, since
+            RTS options can be used to write logging data to arbitrary files under the
+            security context of the running program, there is a potential security problem.
+            For this reason, GHC 7.0 defaults to <option>-rtsops=some</option>.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-with-rtsopts</option>
+          <indexterm><primary><option>-with-rtsopts</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            This option allows you to set the default RTS options at link-time. For example,
+            <option>-with-rtsopts="-H128m"</option> sets the default heap size to 128MB.
+            This will now always be the default heap size, unless the user overrides it.
+            (Depending on the setting of the <option>-rtsopts</option> option, the user might
+            not have the ability to change RTS options at run-time, in which case 
+            <option>-with-rtsopts</option> would be the <emphasis>only</emphasis> way to set
+            them.)
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
           <option>-fno-gen-manifest</option>
           <indexterm><primary><option>-fno-gen-manifest</option></primary>
           </indexterm>
