@@ -332,10 +332,7 @@ allocGroup (nat n)
         bd = alloc_mega_group(mblocks);
         // only the bdescrs of the first MB are required to be initialised
         initGroup(bd);
-
-        IF_DEBUG(sanity,memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
-        IF_DEBUG(sanity, checkFreeListSanity());
-        return bd;
+        goto finish;
     }
     
     n_alloc_blocks += n;
@@ -364,8 +361,7 @@ allocGroup (nat n)
         initGroup(rem); // init the slop
         n_alloc_blocks += rem->blocks;
         freeGroup(rem);      	         // add the slop on to the free list
-        IF_DEBUG(sanity, checkFreeListSanity());
-        return bd;
+        goto finish;
     }
 
     bd = free_list[ln];
@@ -373,19 +369,22 @@ allocGroup (nat n)
     if (bd->blocks == n)	        // exactly the right size!
     {
         dbl_link_remove(bd, &free_list[ln]);
+        initGroup(bd);
     }
     else if (bd->blocks >  n)            // block too big...
     {                              
         bd = split_free_block(bd, n, ln);
+        ASSERT(bd->blocks == n);
+        initGroup(bd);
     }
     else
     {
         barf("allocGroup: free list corrupted");
     }
-    initGroup(bd);		// initialise it
-    IF_DEBUG(sanity,memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
+
+finish:
+    IF_DEBUG(sanity, memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
     IF_DEBUG(sanity, checkFreeListSanity());
-    ASSERT(bd->blocks == n);
     return bd;
 }
 
