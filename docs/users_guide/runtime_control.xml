@@ -10,7 +10,7 @@
   code and then links it with a non-trivial runtime system (RTS),
   which handles storage management, profiling, etc.</para>
 
-  <para>If you use the <literal>-rtsopts</literal> flag when linking,
+  <para>If you set the <literal>-rtsopts</literal> flag appropriately when linking,
   you have some control over the behaviour of the RTS, by giving
   special command-line arguments to your program.</para>
 
@@ -69,7 +69,8 @@
     <indexterm><primary>environment variable</primary><secondary>for
     setting RTS options</secondary></indexterm>
 
-    <para>When the <literal>-rtsopts</literal> flag is used when linking,
+    <para>If the <literal>-rtsopts</literal> flag is set to
+    something other than <literal>none</literal> when linking,
     RTS options are also taken from the environment variable
     <envar>GHCRTS</envar><indexterm><primary><envar>GHCRTS</envar></primary>
       </indexterm>.  For example, to set the maximum heap size
@@ -1160,7 +1161,8 @@
 
     <para>The hook <literal>ghc_rts_opts</literal><indexterm><primary><literal>ghc_rts_opts</literal></primary>
       </indexterm>lets you set RTS
-    options permanently for a given program.  A common use for this is
+    options permanently for a given program, in the same way as the
+    newer <option>-with-rtsopts</option> linker option does.  A common use for this is
     to give your program a default heap and/or stack size that is
     greater than the default.  For example, to set <literal>-H128m
     -K1m</literal>, place the following definition in a C source
