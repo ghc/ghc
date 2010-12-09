@@ -10,7 +10,6 @@ module TcSimplify(
 import HsSyn	       
 import TcRnMonad
 import TcErrors
-import TcCanonical
 import TcMType
 import TcType 
 import TcSMonad 
@@ -518,12 +517,11 @@ simplifySuperClass tvs inst_givens sc_dict (EvBind self_dict self_ev)
                        -- with a Derived origin, which in turn triggers the
                        -- goodRecEv recursive-evidence check
                    ; setEvBind self_dict self_ev_with_dep
-                   ; can_selfs <- mkCanonical  (Derived want_loc DerSelf) self_dict
-
                        -- The rest is just like solveImplication
-                   ; can_inst_givens <- mkCanonicals (Given giv_loc) inst_givens
-                   ; inert           <- solveInteract emptyInert $
-                                        can_inst_givens `andCCan` can_selfs
+                   ; let cts = mapBag (\d -> (Given giv_loc, d)) (listToBag inst_givens)
+                                          `snocBag` (Derived want_loc DerSelf, self_dict)
+                   ; inert           <- solveInteract emptyInert cts
+                                        
                    ; solveWanteds inert wanted }
 
        -- For error reporting, conjure up a fake implication,
@@ -705,12 +703,11 @@ solveWanteds :: InertSet	      -- Given
 -- out of one or more of the implications 
 solveWanteds inert wanteds
   = do { let (flat_wanteds, implic_wanteds) = splitWanteds wanteds
-       ; can_flats <- canWanteds $ bagToList flat_wanteds
        ; traceTcS "solveWanteds {" $
                  vcat [ text "wanteds =" <+> ppr wanteds
                       , text "inert =" <+> ppr inert ]
        ; (unsolved_flats, unsolved_implics) 
-               <- simpl_loop 1 inert can_flats implic_wanteds
+               <- simpl_loop 1 inert flat_wanteds implic_wanteds
        ; bb <- getTcEvBindsBag
        ; tb <- getTcSTyBindsMap
        ; traceTcS "solveWanteds }" $
@@ -726,63 +723,66 @@ solveWanteds inert wanteds
   where
     simpl_loop :: Int 
                -> InertSet 
-               -> CanonicalCts	-- May inlude givens (in the recursive call)
+               -> Bag WantedEvVar
                -> Bag Implication
                -> TcS (CanonicalCts, Bag Implication)
-    simpl_loop n inert can_ws implics
+    simpl_loop n inert work_items implics
       | n>10
-      = trace "solveWanteds: loop" $	-- Always bleat
+      = trace "solveWanteds: loop" $	                -- Always bleat
         do { traceTcS "solveWanteds: loop" (ppr inert)  -- Bleat more informatively
-           ; return (can_ws, implics) }
+
+             -- We don't want to call the canonicalizer on those wanted ev vars
+             -- so try one last time to solveInteract them 
+           ; inert1 <- solveInteract inert $ 
+                       mapBag (\(WantedEvVar ev wloc) -> (Wanted wloc, ev)) work_items
+           ; let (_, unsolved_cans) = extractUnsolved inert1
+           ; return (unsolved_cans, implics) }
 
       | otherwise
       = do { traceTcS "solveWanteds: simpl_loop start {" $
                  vcat [ text "n =" <+> ppr n
-                      , text "can_ws =" <+> ppr can_ws
+                      , text "work_items =" <+> ppr work_items
                       , text "implics =" <+> ppr implics
                       , text "inert =" <+> ppr inert ]
-           ; inert1 <- solveInteract inert can_ws
-           ; let (inert2, unsolved_flats) = extractUnsolved inert1
+           ; inert1 <- solveInteract inert $ 
+                       mapBag (\(WantedEvVar ev wloc) -> (Wanted wloc,ev)) work_items
+           ; let (inert2, unsolved_cans) = extractUnsolved inert1
+                 unsolved_wevvars 
+                     = mapBag (\ct -> WantedEvVar (cc_id ct) (getWantedLoc ct)) unsolved_cans
 
            -- NB: Importantly, inerts2 may contain *more* givens than inert 
            -- because of having solved equalities from can_ws 
            ; traceTcS "solveWanteds: done flats"  $
                  vcat [ text "inerts =" <+> ppr inert2
-                      , text "unsolved =" <+> ppr unsolved_flats ]
+                      , text "unsolved =" <+> ppr unsolved_cans ]
 
                 -- Go inside each implication
            ; (implic_eqs, unsolved_implics) 
-               <- solveNestedImplications inert2 unsolved_flats implics
+               <- solveNestedImplications inert2 unsolved_wevvars implics
 
                 -- Apply defaulting rules if and only if there
 		-- no floated equalities.  If there are, they may
 		-- solve the remaining wanteds, so don't do defaulting.
            ; final_eqs <- if not (isEmptyBag implic_eqs)
 			  then return implic_eqs
-                          else applyDefaultingRules inert2 unsolved_flats
-                                     
-	        -- default_eqs are *givens*, so simpl_loop may 
-		-- recurse with givens in the argument
+                          else applyDefaultingRules inert2 unsolved_cans
 
            ; traceTcS "solveWanteds: simpl_loop end }" $
                  vcat [ text "final_eqs =" <+> ppr final_eqs
-                      , text "unsolved_flats =" <+> ppr unsolved_flats
+                      , text "unsolved_flats =" <+> ppr unsolved_cans
                       , text "unsolved_implics =" <+> ppr unsolved_implics ]
 
            ; if isEmptyBag final_eqs then
-                 return (unsolved_flats, unsolved_implics)
+                 return (unsolved_cans, unsolved_implics)
              else 
-                 do { can_final_eqs <- canWanteds (Bag.bagToList final_eqs)
-                       -- final eqs is *just* a bunch of WantedEvVars
-                    ; simpl_loop (n+1) inert2 
-                          (can_final_eqs `andCCan` unsolved_flats) unsolved_implics 
+                 simpl_loop (n+1) inert2 -- final_eqs are just some WantedEvVars
+                            (final_eqs `unionBags` unsolved_wevvars) unsolved_implics
                        -- Important: reiterate with inert2, not plainly inert
                        -- because inert2 may contain more givens, as the result of solving
-                       -- some wanteds in the incoming can_ws 
-                     }       
+                       -- some wanteds in the incoming can_ws
            }
 
-solveNestedImplications :: InertSet -> CanonicalCts -> Bag Implication
+solveNestedImplications :: InertSet -> Bag WantedEvVar -> Bag Implication
                         -> TcS (Bag WantedEvVar, Bag Implication)
 solveNestedImplications inerts unsolved implics
   | isEmptyBag implics
@@ -836,8 +836,10 @@ solveImplication tcs_untouchables inert
     do { traceTcS "solveImplication {" (ppr imp) 
 
          -- Solve flat givens
-       ; can_givens  <- canGivens loc givens
-       ; given_inert <- solveInteract inert can_givens
+--       ; can_givens  <- canGivens loc givens
+--       ; let given_fl = Given loc
+       ; given_inert <- solveInteract inert $ 
+                        mapBag (\c -> (Given loc,c)) (listToBag givens)
 
          -- Simplify the wanteds
        ; (unsolved_flats, unsolved_implics) <- solveWanteds given_inert wanteds
@@ -1096,7 +1098,7 @@ Basic plan behind applyDefaulting rules:
 
 \begin{code}
 applyDefaultingRules :: InertSet
-                     -> CanonicalCts 	       -- All wanteds
+                     -> CanonicalCts        -- All wanteds
                      -> TcS (Bag WantedEvVar)  -- All wanteds again!  
 -- Return some *extra* givens, which express the 
 -- type-class-default choice
@@ -1212,16 +1214,12 @@ disambigGroup (default_ty:default_tys) inert group
   = do { traceTcS "disambigGroup" (ppr group $$ ppr default_ty)
        ; let ct_loc = get_ct_loc (cc_flavor the_ct) 
        ; ev <- TcSMonad.newWantedCoVar (mkTyVarTy the_tv) default_ty
-       ; let wanted_eq = CTyEqCan { cc_id = ev
-                                  , cc_flavor = Wanted ct_loc
-                                  , cc_tyvar  = the_tv 
-                                  , cc_rhs    = default_ty }
        ; success <- tryTcS $ 
-           	    do { final_inert <- solveInteract inert(listToBag $ wanted_eq:wanteds)
-           	       ; let (_, unsolved) = extractUnsolved final_inert                                    
-                       ; errs <- getTcSErrorsBag 
+           	    do { final_inert <- solveInteract inert $
+                                        consBag (Wanted ct_loc, ev) wanted_to_solve
+           	       ; let (_, unsolved) = extractUnsolved final_inert                         
+                       ; errs <- getTcSErrorsBag
            	       ; return (isEmptyBag unsolved && isEmptyBag errs) }
-
        ; case success of
            True  ->  -- Success: record the type variable binding, and return
                     do { wrapWarnTcS $ warnDefaulting wanted_ev_vars default_ty
@@ -1232,8 +1230,10 @@ disambigGroup (default_ty:default_tys) inert group
                        ; disambigGroup default_tys inert group } }
   where
     ((the_ct,the_tv):_) = group
-    wanteds = map fst group
-    wanted_ev_vars = map deCanonicaliseWanted wanteds
+    wanteds             = map fst group
+    wanted_ev_vars      = map deCanonicaliseWanted wanteds
+    wanted_to_solve     = listToBag $ 
+                          map (\(WantedEvVar ev wloc) -> (Wanted wloc,ev)) wanted_ev_vars
 
     get_ct_loc (Wanted l) = l
     get_ct_loc _ = panic "Asked  to disambiguate given or derived!"

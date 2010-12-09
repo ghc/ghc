@@ -181,8 +181,9 @@ data CanonicalCt
 compatKind :: Kind -> Kind -> Bool 
 compatKind k1 k2 = k1 `isSubKind` k2 || k2 `isSubKind` k1 
 
-makeGivens :: CanonicalCts -> CanonicalCts
-makeGivens = mapBag (\ct -> ct { cc_flavor = mkGivenFlavor (cc_flavor ct) UnkSkol })
+makeGivens :: Bag WantedEvVar -> Bag (CtFlavor,EvVar) 
+makeGivens = mapBag (\(WantedEvVar ev wloc) -> (mkGivenFlavor (Wanted wloc) UnkSkol, ev))
+-- ct { cc_flavor = mkGivenFlavor (cc_flavor ct) UnkSkol })
 	   -- The UnkSkol doesn't matter because these givens are
 	   -- not contradictory (else we'd have rejected them already)
 

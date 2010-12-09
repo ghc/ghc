@@ -187,6 +187,8 @@ foldISEqCts k z IS { inert_eqs = eqs }
   = Bag.foldlBag k z eqs
 
 extractUnsolved :: InertSet -> (InertSet, CanonicalCts)
+-- Postcondition: the canonical cts returnd are the very same as the 
+-- WantedEvVars in their canonical form. 
 extractUnsolved is@(IS {inert_eqs = eqs}) 
   = let is_solved  = is { inert_eqs    = solved_eqs
                         , inert_dicts  = solved_dicts
@@ -397,11 +399,62 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 -- returning an extended inert set.
 --
 -- See Note [Touchables and givens].
-solveInteract :: InertSet -> CanonicalCts -> TcS InertSet
+solveInteract :: InertSet -> Bag (CtFlavor,EvVar) -> TcS InertSet
 solveInteract inert ws 
   = do { dyn_flags <- getDynFlags
-       ; solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) inert ws
-       }
+       ; can_ws    <- foldlBagM (tryPreSolveAndCanon inert) emptyCCan ws
+       ; solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) inert can_ws }
+
+tryPreSolveAndCanon :: InertSet -> CanonicalCts -> (CtFlavor, EvVar) -> TcS CanonicalCts
+-- Checks if this constraint can be immediately solved from a constraint in the 
+-- inert set or in the previously encountered CanonicalCts and only then  
+-- canonicalise it. See Note [Avoiding the superclass explosion]
+tryPreSolveAndCanon is cts_acc (fl,ev_var)
+  | ClassP clas tys <- evVarPred ev_var 
+  = do { let (relevant_inert_dicts,_) = getRelevantCts clas (inert_dicts is) 
+       ; b <- dischargeFromCans (cts_acc `unionBags` relevant_inert_dicts)
+                                (fl,ev_var,clas,tys)
+       ; extra_cts <- if b then return emptyCCan else mkCanonical fl ev_var 
+       ; return (cts_acc `unionBags` extra_cts) }
+  | otherwise 
+  = do { extra_cts <- mkCanonical fl ev_var
+       ; return (cts_acc `unionBags` extra_cts) }
+
+dischargeFromCans :: CanonicalCts -> (CtFlavor,EvVar,Class,[Type]) -> TcS Bool
+dischargeFromCans cans (fl,ev,clas,tys) 
+  = Bag.foldlBagM discharge_ct False cans 
+  where discharge_ct :: Bool -> CanonicalCt -> TcS Bool 
+        discharge_ct True _ct = return True
+        discharge_ct False (CDictCan { cc_id = ev1, cc_flavor = fl1
+                                     , cc_class = clas1, cc_tyargs = tys1 })
+          | clas1 == clas
+          , (and $ zipWith tcEqType tys tys1)
+          , fl1 `canSolve` fl 
+          = setEvBind ev (EvId ev1) >> return True
+        discharge_ct False _ct = return False
+\end{code}
+
+Note [Avoiding the superclass explosion] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+
+Consider the example: 
+  f = [(0,1,0,1,0)] 
+We have 5 wanted (Num alpha) constraints. If we simply try to canonicalize and add them
+in our worklist, we will also get all of their superclasses as Derived, hence we will 
+have an inert set that contains 5*n constraints, where n is the number of superclasses 
+of of Num. That is bad for the additional reason that we keep *all* the Derived, even 
+for identical class constraints (for reasons related to recursive dictionaries). 
+
+Instead, what we do with tryPreSolveAndCanon, is when we encounter a new constraint, 
+such as the second (Num alpha) above we very quickly see if it can be immediately 
+discharged by a class constraint in our inert set or the previous canonicals. If so, 
+we add nothing to the returned canonical constraints.
+
+For our particular example this will reduce the size of the inert set that we use from 
+5*n to just n. And hence the number of all possible interactions that we have to look 
+through is significantly smaller!
+
+\begin{code}
 solveOne :: InertSet -> WorkItem -> TcS InertSet 
 solveOne inerts workItem 
   = do { dyn_flags <- getDynFlags
