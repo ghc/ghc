@@ -294,10 +294,13 @@ findEditor = do
 
 foreign import ccall unsafe "rts_isProfiled" isProfiled :: IO CInt
 
+default_progname, default_prompt, default_stop :: String
 default_progname = "<interactive>"
-default_args = []
 default_prompt = "%s> "
 default_stop = ""
+
+default_args :: [String]
+default_args = []
 
 interactiveUI :: [(FilePath, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
