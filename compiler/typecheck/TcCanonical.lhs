@@ -247,8 +247,11 @@ canClass fl v cn tys
                             else setDictBind v' (EvCast v (mkSymCoercion dict_co))
                           ; return v' }
 
-       -- Add the superclasses of this one here, See Note [Adding superclasses]
-       ; sc_cts <- newSCWorkFromFlavored v_new fl cn xis
+       -- Add the superclasses of this one here, See Note [Adding superclasses]. 
+       -- But only if we are not simplifying the LHS of a rule. 
+       ; sctx <- getTcSContext
+       ; sc_cts <- if simplEqsOnly sctx then return emptyCCan 
+                   else newSCWorkFromFlavored v_new fl cn xis
 
        ; return (sc_cts `andCCan` ccs `extendCCans` CDictCan { cc_id     = v_new
                                                              , cc_flavor = fl

@@ -402,15 +402,25 @@ React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canoni
 solveInteract :: InertSet -> Bag (CtFlavor,EvVar) -> TcS InertSet
 solveInteract inert ws 
   = do { dyn_flags <- getDynFlags
-       ; can_ws    <- foldlBagM (tryPreSolveAndCanon inert) emptyCCan ws
+       ; sctx <- getTcSContext 
+
+       ; traceTcS "solveInteract, before clever canonicalization:" $ 
+         ppr (mapBag (\(ct,ev) -> (ct,evVarPred ev)) ws)
+
+       ; can_ws    <- foldlBagM (tryPreSolveAndCanon sctx inert) emptyCCan ws
+
+       ; traceTcS "solveInteract, after clever canonicalization:" $ 
+         ppr can_ws
+
        ; solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) inert can_ws }
 
-tryPreSolveAndCanon :: InertSet -> CanonicalCts -> (CtFlavor, EvVar) -> TcS CanonicalCts
+tryPreSolveAndCanon :: SimplContext -> InertSet -> CanonicalCts -> (CtFlavor, EvVar) -> TcS CanonicalCts
 -- Checks if this constraint can be immediately solved from a constraint in the 
 -- inert set or in the previously encountered CanonicalCts and only then  
 -- canonicalise it. See Note [Avoiding the superclass explosion]
-tryPreSolveAndCanon is cts_acc (fl,ev_var)
+tryPreSolveAndCanon sctx is cts_acc (fl,ev_var)
   | ClassP clas tys <- evVarPred ev_var 
+  , not $ simplEqsOnly sctx -- And we *can* discharge constraints from other constraints
   = do { let (relevant_inert_dicts,_) = getRelevantCts clas (inert_dicts is) 
        ; b <- dischargeFromCans (cts_acc `unionBags` relevant_inert_dicts)
                                 (fl,ev_var,clas,tys)

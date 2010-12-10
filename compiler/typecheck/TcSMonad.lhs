@@ -460,6 +460,7 @@ data SimplContext
   | SimplRuleLhs	-- Inferring type of a RULE lhs
   | SimplInteractive	-- Inferring type at GHCi prompt
   | SimplCheck		-- Checking a type signature or RULE rhs
+  deriving Eq
 
 instance Outputable SimplContext where
   ppr SimplInfer       = ptext (sLit "SimplInfer")
