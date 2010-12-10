@@ -92,12 +92,12 @@ dsInnerListComp (stmts, bndrs) = do
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
 dsTransformStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr) = do
-    (expr, binders_tuple_type) <- dsInnerListComp (stmts, binders)
-    usingExpr' <- dsLExpr usingExpr
+dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr)
+ = do { (expr, binders_tuple_type) <- dsInnerListComp (stmts, binders)
+      ; usingExpr' <- dsLExpr usingExpr
     
-    using_args <- 
-        case maybeByExpr of
+      ; using_args <-
+          case maybeByExpr of
             Nothing -> return [expr]
             Just byExpr -> do
                 byExpr' <- dsLExpr byExpr
@@ -108,10 +108,9 @@ dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr) = do
                 
                 return [Lam tuple_binder byExprWrapper, expr]
 
-    let inner_list_expr = mkApps usingExpr' ((Type binders_tuple_type) : using_args)
-    
-    let pat = mkBigLHsVarPatTup binders
-    return (inner_list_expr, pat)
+      ; let inner_list_expr = mkApps usingExpr' ((Type binders_tuple_type) : using_args)
+            pat = mkBigLHsVarPatTup binders
+      ; return (inner_list_expr, pat) }
     
 -- This function factors out commonality between the desugaring strategies for GroupStmt.
 -- Given such a statement it gives you back an expression representing how to compute the transformed

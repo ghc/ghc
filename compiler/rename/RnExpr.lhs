@@ -759,7 +759,9 @@ rnStmt ctxt (L loc (TransformStmt stmts _ using by)) thing_inside
                                         Just e  -> do { (e', fvs) <- rnLExpr e; return (Just e', fvs) }
                    ; (thing, fvs_thing) <- thing_inside bndrs
                    ; let fvs        = fvs_by `plusFV` fvs_thing
-                         used_bndrs = filter (`elemNameSet` fvs_thing) bndrs
+                         used_bndrs = filter (`elemNameSet` fvs) bndrs
+                         -- The paper (Fig 5) has a bug here; we must treat any free varaible of
+                         -- the "thing inside", **or of the by-expression**, as used
                    ; return ((by', used_bndrs, thing), fvs) }
 
        ; return (([L loc (TransformStmt stmts' used_bndrs using' by')], thing), 

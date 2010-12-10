@@ -1008,8 +1008,8 @@ pprStmt (ExprStmt expr _ _)       = ppr expr
 pprStmt (ParStmt stmtss)          = hsep (map doStmts stmtss)
   where doStmts stmts = ptext (sLit "| ") <> ppr stmts
 
-pprStmt (TransformStmt stmts _ using by)
-  = sep (ppr_lc_stmts stmts ++ [pprTransformStmt using by])
+pprStmt (TransformStmt stmts bndrs using by)
+  = sep (ppr_lc_stmts stmts ++ [pprTransformStmt bndrs using by])
 
 pprStmt (GroupStmt stmts _ by using) 
   = sep (ppr_lc_stmts stmts ++ [pprGroupStmt by using])
@@ -1021,8 +1021,11 @@ pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
          , ifPprDebug (vcat [ ptext (sLit "rec_ids=") <> ppr rec_ids
                             , ptext (sLit "later_ids=") <> ppr later_ids])]
 
-pprTransformStmt :: OutputableBndr id => LHsExpr id -> Maybe (LHsExpr id) -> SDoc
-pprTransformStmt using by = sep [ ptext (sLit "then"), nest 2 (ppr using), nest 2 (pprBy by)]
+pprTransformStmt :: OutputableBndr id => [id] -> LHsExpr id -> Maybe (LHsExpr id) -> SDoc
+pprTransformStmt bndrs using by
+  = sep [ ptext (sLit "then") <+> ifPprDebug (braces (ppr bndrs))
+        , nest 2 (ppr using)
+        , nest 2 (pprBy by)]
 
 pprGroupStmt :: OutputableBndr id => Maybe (LHsExpr id)
                                   -> Either (LHsExpr id) (SyntaxExpr is)
@@ -1288,7 +1291,7 @@ pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext c
 		    	  4 (ppr_stmt stmt)
   where
     -- For Group and Transform Stmts, don't print the nested stmts!
-    ppr_stmt (GroupStmt _ _ by using)     = pprGroupStmt by using
-    ppr_stmt (TransformStmt _ _ using by) = pprTransformStmt using by
-    ppr_stmt stmt                         = pprStmt stmt
+    ppr_stmt (GroupStmt _ _ by using)         = pprGroupStmt by using
+    ppr_stmt (TransformStmt _ bndrs using by) = pprTransformStmt bndrs using by
+    ppr_stmt stmt                             = pprStmt stmt
 \end{code}
