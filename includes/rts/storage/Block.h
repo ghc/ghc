@@ -149,7 +149,9 @@ EXTERN_INLINE bdescr *Bdescr(StgPtr p)
 
 /* Number of usable blocks in a megablock */
 
+#ifndef CMINUSMINUS // already defined in DerivedConstants.h
 #define BLOCKS_PER_MBLOCK ((MBLOCK_SIZE - FIRST_BLOCK_OFF) / BLOCK_SIZE)
+#endif
 
 /* How many blocks in this megablock group */
 
