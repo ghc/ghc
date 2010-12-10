@@ -15,6 +15,15 @@ test('3586',
      compile_and_run,
      ['-O'])
 
+test('T4830',
+     [stats_num_field('bytes allocated', 60000,
+                                         200000),
+                                     # expected value: 127,000 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O2'])
+
 test('T3245', normal, compile_and_run, ['-O'])
 
 # Test that bytestring reading/writing isn't over-allocating.  We had
