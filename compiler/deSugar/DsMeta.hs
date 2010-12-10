@@ -959,7 +959,7 @@ rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
         ; ans <- repVal patcore x empty_decls
         ; return (srcLocSpan (getSrcLoc v), ans) }
 
-rep_bind (L _ (AbsBinds {})) = panic "rep_bind: AbsBinds"
+rep_bind (L _ (AbsBinds {}))  = panic "rep_bind: AbsBinds"
 
 -----------------------------------------------------------------------------
 -- Since everything in a Bind is mutually recursive we need rename all

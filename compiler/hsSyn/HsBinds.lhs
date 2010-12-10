@@ -155,6 +155,7 @@ data HsBindLR idL idR
         abs_ev_binds :: TcEvBinds,     -- Evidence bindings
 	abs_binds    :: LHsBinds idL   -- Typechecked user bindings
     }
+
   deriving (Data, Typeable)
 	-- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
 	-- 
@@ -299,8 +300,8 @@ ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
     $$  pprFunBind (unLoc fun) inf matches
     $$  ifPprDebug (ppr wrap)
 
-ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars 
-		       , abs_exports = exports, abs_binds = val_binds
+ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
+                       , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
   = sep [ptext (sLit "AbsBinds"),
   	 brackets (interpp'SP tyvars),
