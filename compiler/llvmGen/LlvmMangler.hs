@@ -98,18 +98,18 @@ oneTable f str =
     let last' xs = if (null xs) then 0 else last xs
 
         -- get the function
-        (bl, al) = BS.breakSubstring functionSuf str
-        start = last' $ BS.findSubstrings funDivider bl
+        (bl, al)          = BS.breakSubstring functionSuf str
+        start             = last' $ BS.findSubstrings funDivider bl
         (before, fheader) = BS.splitAt start bl
-        (fun, after) = BS.breakSubstring funDivider al
-        label = snd $ BS.breakEnd eolPred bl
+        (fun, after)      = BS.breakSubstring funDivider al
+        label             = snd $ BS.breakEnd eolPred bl
 
         -- get the info table
-        ilabel = label `BS.append` tableSuf
-        (bit, itable) = BS.breakSubstring ilabel after
-        (itable', ait) = BS.breakSubstring funDivider itable
-        istart = last' $ BS.findSubstrings funDivider bit
-        (bit', iheader) = BS.splitAt istart bit
+        ilabel            = label `BS.append` tableSuf
+        (bit, itable)     = BS.breakSubstring ilabel after
+        (itable', ait)    = BS.breakSubstring funDivider itable
+        istart            = last' $ BS.findSubstrings funDivider bit
+        (bit', iheader)   = BS.splitAt istart bit
 
         -- fixup stack alignment
         fun' = fixupStack fun BS.empty
@@ -143,8 +143,8 @@ oneTable f str =
 replaceSection :: ByteString -> ByteString
 replaceSection sec =
     let (s1, s2) = BS.breakSubstring oldSection sec
-        s1' = fst $ BS.breakEnd eolPred s1
-        s2' = snd $ BS.break eolPred s2
+        s1'      = fst $ BS.breakEnd eolPred s1
+        s2'      = snd $ BS.break eolPred s2
     in s1' `BS.append` newSection `BS.append` s2'
 
 
@@ -161,10 +161,10 @@ replaceSection sec =
 fixupStack :: ByteString -> ByteString -> ByteString
 fixupStack fun nfun | BS.null nfun =
     let -- fixup sub op
-        (a, b) = BS.breakSubstring (BS.pack ", %esp\n") fun
+        (a, b)    = BS.breakSubstring (BS.pack ", %esp\n") fun
         (a', num) = BS.breakEnd dollarPred a
-        num' = BS.pack $ show (read (BS.unpack num) + 4::Int)
-        fix = a' `BS.append` num'
+        num'      = BS.pack $ show (read (BS.unpack num) + 4::Int)
+        fix       = a' `BS.append` num'
     in if BS.null b
           then nfun `BS.append` a
           else fixupStack b (nfun `BS.append` fix)
@@ -174,12 +174,12 @@ fixupStack fun nfun =
         (a, b) = BS.breakSubstring (BS.pack "jmp") fun
         -- We need to avoid processing jumps to labels, they are of the form:
         -- jmp\tL..., jmp\t_f..., jmpl\t_f..., jmpl\t*%eax...
-        labelJump = BS.index b 4 == 'L'
-        (jmp, b') = BS.break eolPred b
+        labelJump  = BS.index b 4 == 'L'
+        (jmp, b')  = BS.break eolPred b
         (a', numx) = BS.breakEnd dollarPred a
-        (num, x) = BS.break commaPred numx
-        num' = BS.pack $ show (read (BS.unpack num) + 4::Int)
-        fix = a' `BS.append` num' `BS.append` x `BS.append` jmp
+        (num, x)   = BS.break commaPred numx
+        num'       = BS.pack $ show (read (BS.unpack num) + 4::Int)
+        fix        = a' `BS.append` num' `BS.append` x `BS.append` jmp
     in if BS.null b
           then nfun `BS.append` a
           else if labelJump
