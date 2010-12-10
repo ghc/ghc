@@ -174,7 +174,9 @@ initEventLogging(void)
     StgWord8 t, c;
     nat n_caps;
 
-    event_log_filename = stgMallocBytes(strlen(prog_name) + 10,
+    event_log_filename = stgMallocBytes(strlen(prog_name)
+                                        + 10 /* .%d */
+                                        + 10 /* .eventlog */,
                                         "initEventLogging");
 
     if (sizeof(EventDesc) / sizeof(char*) != NUM_EVENT_TAGS) {
