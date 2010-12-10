@@ -1174,16 +1174,22 @@ Note [Specialisation of dictionary functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here is a nasty example that bit us badly: see Trac #3591
 
+     class Eq a => C a
+     instance Eq [a] => C [a]
+
+---------------
+     dfun :: Eq [a] -> C [a]
      dfun a d = MkD a d (meth d)
-     d4 = <blah>
-     d2 = dfun T d4
-     d1 = $p1 d2
-     d3 = dfun T d1
+
+     d4 :: Eq [T] = <blah>
+     d2 ::  C [T] = dfun T d4
+     d1 :: Eq [T] = $p1 d2
+     d3 ::  C [T] = dfun T d1
 
 None of these definitions is recursive. What happened was that we 
 generated a specialisation:
 
-     RULE forall d. dfun T d = dT
+     RULE forall d. dfun T d = dT  :: C [T]
      dT = (MkD a d (meth d)) [T/a, d1/d]
         = MkD T d1 (meth d1)
 
