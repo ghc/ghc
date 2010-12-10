@@ -436,6 +436,7 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # libraries
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-pwd/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
@@ -595,7 +596,6 @@ BUILD_DIRS += \
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
    bindisttest \
-   $(GHC_CABAL_DIR) \
    $(GHC_GENAPPLY_DIR)
 endif
 
@@ -617,6 +617,8 @@ BUILD_DIRS += \
    utils/testremove \
    utils/ghctags \
    utils/ghc-pwd \
+   utils/dummy-ghc \
+   $(GHC_CABAL_DIR) \
    utils/hpc \
    utils/runghc \
    ghc
@@ -663,6 +665,7 @@ utils/runghc_dist_DISABLE = YES
 utils/ghctags_dist_DISABLE = YES
 utils/hpc_dist_DISABLE = YES
 utils/hsc2hs_dist-install_DISABLE = YES
+utils/ghc-cabal_dist-install_DISABLE = YES
 utils/ghc-pkg_dist-install_DISABLE = YES
 utils/ghc-pwd_dist_DISABLE = YES
 utils/mkUserGuidePart_dist_DISABLE = YES
@@ -985,7 +988,7 @@ $(eval $(call bindist,.,\
     Makefile \
     mk/config.mk.in \
     $(INPLACE_BIN)/mkdirhier \
-    $(INPLACE_BIN)/ghc-cabal \
+    utils/ghc-cabal/dist-install/build/tmp/ghc-cabal \
     utils/ghc-pwd/dist/build/tmp/ghc-pwd \
     $(BINDIST_WRAPPERS) \
     $(BINDIST_PERL_SOURCES) \
@@ -1038,6 +1041,7 @@ unix-binary-dist-prep:
 	echo "BUILD_DOCBOOK_PS   = $(BUILD_DOCBOOK_PS)"   >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_PDF  = $(BUILD_DOCBOOK_PDF)"  >> $(BIN_DIST_MK)
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
+	echo "GHC_CABAL_INPLACE  = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal" >> $(BIN_DIST_MK)
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	"$(RM)" $(RM_OPTS) $(BIN_DIST_PREP_TAR)
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
