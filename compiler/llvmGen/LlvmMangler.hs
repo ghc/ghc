@@ -19,7 +19,10 @@ import qualified Data.ByteString.Char8 as BS
 
 import LlvmCodeGen.Ppr ( infoSection, iTableSuf )
 
+import Data.Char
+import Outputable
 import Util
+
 
 {- Configuration. -}
 newSection, oldSection, functionSuf, tableSuf, funDivider, eol :: ByteString
@@ -161,10 +164,11 @@ replaceSection sec =
 fixupStack :: ByteString -> ByteString -> ByteString
 fixupStack fun nfun | BS.null nfun =
     let -- fixup sub op
-        (a, b)    = BS.breakSubstring (BS.pack ", %esp\n") fun
-        (a', num) = BS.breakEnd dollarPred a
-        num'      = BS.pack $ show (read (BS.unpack num) + 4::Int)
-        fix       = a' `BS.append` num'
+        (a, b)       = BS.breakSubstring (BS.pack ", %esp\n") fun
+        (a', strNum) = BS.breakEnd dollarPred a
+        Just num     = readInt (BS.unpack strNum)
+        num'         = BS.pack $ show (num + 4::Int)
+        fix          = a' `BS.append` num'
     in if BS.null b
           then nfun `BS.append` a
           else fixupStack b (nfun `BS.append` fix)
@@ -174,15 +178,28 @@ fixupStack fun nfun =
         (a, b) = BS.breakSubstring (BS.pack "jmp") fun
         -- We need to avoid processing jumps to labels, they are of the form:
         -- jmp\tL..., jmp\t_f..., jmpl\t_f..., jmpl\t*%eax...
-        labelJump  = BS.index b 4 == 'L'
-        (jmp, b')  = BS.break eolPred b
-        (a', numx) = BS.breakEnd dollarPred a
-        (num, x)   = BS.break commaPred numx
-        num'       = BS.pack $ show (read (BS.unpack num) + 4::Int)
-        fix        = a' `BS.append` num' `BS.append` x `BS.append` jmp
+        labelJump   = BS.index b 4 == 'L'
+        (jmp, b')   = BS.break eolPred b
+        (a', numx)  = BS.breakEnd dollarPred a
+        (strNum, x) = BS.break commaPred numx
+        Just num    = readInt (BS.unpack strNum)
+        num'        = BS.pack $ show (num + 4::Int)
+        fix         = a' `BS.append` num' `BS.append` x `BS.append` jmp
     in if BS.null b
           then nfun `BS.append` a
           else if labelJump
                 then fixupStack b' (nfun `BS.append` a `BS.append` jmp)
                 else fixupStack b' (nfun `BS.append` fix)
+
+
+-- | 'read' is one of my least favourite functions.
+readInt :: String -> Maybe Int
+readInt str
+	| not $ null $ filter (not . isDigit) str
+	= pprTrace "LLvmMangler"
+		(text "Cannot read" <+> text (show str) <+> text "as it's not an Int")
+		Nothing
+
+	| otherwise
+	= Just $ read str
 
