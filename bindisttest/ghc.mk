@@ -31,6 +31,7 @@ test_bindist:
 # c:/foo is a remote file), so it's safer to bzip and then pipe into
 # tar rather than using tar -xjf:
 	cd bindisttest/a/b/c/ && $(BZIP2_CMD) -cd ../../../../$(BIN_DIST_TEST_TAR_BZ2) | $(TAR_CMD) -xf -
+	$(SHELL) bindisttest/checkBinaries.sh $(ProjectVersion)
 ifeq "$(Windows)" "YES"
 	mv bindisttest/a/b/c/$(BIN_DIST_NAME) $(BIN_DIST_INST_DIR)
 else
