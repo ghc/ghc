@@ -237,8 +237,17 @@ opt_PprCaseAsLet :: Bool
 opt_PprCaseAsLet		= lookUp   (fsLit "-dppr-case-as-let")
 
 -- | Set the maximum width of the dumps
+--   If GHC's command line options are bad then the options parser uses the
+--   pretty printer display the error message. In this case the staticFlags
+--   won't be initialized yet, so we must check for this case explicitly 
+--   and return the default value.
 opt_PprCols :: Int
-opt_PprCols			= lookup_def_int "-dppr-cols" 100
+opt_PprCols 
+ = unsafePerformIO
+ $ do	ready <- readIORef v_opt_C_ready
+	if (not ready)
+		then return 100
+		else return $ lookup_def_int "-dppr-cols" 100
 
 
 opt_PprStyle_Debug  :: Bool
