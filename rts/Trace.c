@@ -106,6 +106,14 @@ void freeTracing (void)
     }
 }
 
+void resetTracing (void)
+{
+    if (eventlog_enabled) {
+        abortEventLogging(); // abort eventlog inherited from parent
+        initEventLogging(); // child starts its own eventlog
+    }
+}
+
 /* ---------------------------------------------------------------------------
    Emitting trace messages/events
  --------------------------------------------------------------------------- */

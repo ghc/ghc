@@ -1566,11 +1566,11 @@ forkProcess(HsStablePtr *entry
         initMutex(&cap->running_task->lock);
 #endif
 
-#if defined(TRACING)
-        abortEventLogging(); // abort eventlog inherited from parent
-        initEventLogging(); // child starts its own eventlog
+#ifdef TRACING
+        resetTracing();
 #endif
-	// Now, all OS threads except the thread that forked are
+
+        // Now, all OS threads except the thread that forked are
 	// stopped.  We need to stop all Haskell threads, including
 	// those involved in foreign calls.  Also we need to delete
 	// all Tasks, because they correspond to OS threads that are

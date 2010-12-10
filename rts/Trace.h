@@ -27,6 +27,7 @@
 void initTracing (void);
 void endTracing  (void);
 void freeTracing (void);
+void resetTracing (void);
 
 #endif /* TRACING */
 
