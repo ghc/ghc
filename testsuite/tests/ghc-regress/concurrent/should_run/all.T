@@ -45,7 +45,8 @@ test('numsparks001', only_ways(['threaded1']), compile_and_run, [''])
 
 test('4262', [ skip, # skip for now, it doesn't give reliable results
                only_ways(['threaded1']),
-               unless_os('linux',skip) ],
+               unless_os('linux',skip),
+               if_compiler_lt('ghc', '7.1', expect_fail) ],
              compile_and_run, [''])
 
 test('4813', normal, compile_and_run, ['-debug'])
