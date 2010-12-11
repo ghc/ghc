@@ -403,14 +403,14 @@ getPrologue flags =
 #ifdef IN_GHC_TREE
 
 getInTreeLibDir :: IO String
-getInTreeLibDir =
-  do m <- getExecDir
-    case m of
-      Nothing -> error "No GhcLibDir found"
+getInTreeLibDir = do
+  m <- getExecDir
+  case m of
+    Nothing -> error "No GhcLibDir found"
 #ifdef NEW_GHC_LAYOUT
-      Just d -> return (d </> ".." </> "lib")
+    Just d -> return (d </> ".." </> "lib")
 #else
-      Just d -> return (d </> "..")
+    Just d -> return (d </> "..")
 #endif
 
 
