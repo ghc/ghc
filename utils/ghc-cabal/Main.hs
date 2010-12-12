@@ -46,6 +46,8 @@ main = do args <- getArgs
                    _ -> die syntax_error
               "sdist" : dir : distDir : [] ->
                   doSdist dir distDir
+              ["--version"] ->
+                  defaultMainArgs ["--version"]
               _ -> die syntax_error
 
 syntax_error :: [String]
