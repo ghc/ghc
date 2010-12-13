@@ -20,7 +20,7 @@ rebindable6.hs:107:17:
                       HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
       arising from a do statement
     Possible fix:
-      add an instance declaration for
+      add instance declarations for
       (HasFail ([Prelude.Char] -> t1),
        HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
     In a stmt of a 'do' expression: Just (b :: b) <- g
