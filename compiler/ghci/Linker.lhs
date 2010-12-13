@@ -1105,6 +1105,9 @@ loadFrameworks pkg
 -- If it isn't present, we assume it's a dynamic library.
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec
 locateOneObj dirs lib
+  | not ("HS" `isPrefixOf` lib)
+    -- For non-Haskell libraries (e.g. gmp, iconv) we assume dynamic library
+  = assumeDll
   | not isDynamicGhcLib
     -- When the GHC package was not compiled as dynamic library
     -- (=DYNAMIC not set), we search for .o libraries or, if they
