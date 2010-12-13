@@ -279,17 +279,17 @@ stderr = stdFD 2
 close :: FD -> IO ()
 close fd =
 #ifndef mingw32_HOST_OS
-  (flip finally) (release fd) $ do
+  (flip finally) (release fd) $
 #endif
-  let closer realFd =
-        throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
+  do let closer realFd =
+           throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
 #ifdef mingw32_HOST_OS
-        if fdIsSocket fd then
-          c_closesocket (fromIntegral realFd)
-        else
+           if fdIsSocket fd then
+             c_closesocket (fromIntegral realFd)
+           else
 #endif
-          c_close (fromIntegral realFd)
-  closeFdWith closer (fromIntegral (fdFD fd))
+             c_close (fromIntegral realFd)
+     closeFdWith closer (fromIntegral (fdFD fd))
 
 release :: FD -> IO ()
 #ifdef mingw32_HOST_OS
