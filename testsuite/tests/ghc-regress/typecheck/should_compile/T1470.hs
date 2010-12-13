@@ -16,11 +16,23 @@ data FooD a = FooD
 instance Foo t => Sat (FooD t)
 
 instance Data FooD a => Foo a
+
+
 instance Foo a       => Foo [a]
-  -- Have: Foo a, Data FooD a, Foo [a]
-  --
-  -- Want superclasses: (Data FooD [a])
-  -- and hence: Sat (FooD [a]), Data FooD a
-  -- and hence: Foo [a]
+{-
+ Given:                Foo a,
+ and its superclasses: Data FooD a
+
+ Want superclass: Data FooD [a]
+
+ by instance Data FooD [a]
+ want:   Sat (FooD [a])
+         Data FooD a      -- We have this
+
+ by instance Sat (FooD t)
+ want:   Foo [a]
+
+BUT THIS INSTANCE OVERLAPS
+-}
 
 instance                Foo [Char]
