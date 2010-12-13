@@ -400,6 +400,7 @@ then
          test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
          test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
          test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libstdc*.tar.lzma   ||
          test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dev.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/mingwrt*-dll.tar.gz ||
          test inplace/mingw -ot ghc-tarballs/mingw/w32api*.tar.lzma
@@ -415,6 +416,7 @@ then
             tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
             tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
             tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libstdc*.tar.lzma   &&
             tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dev.tar.gz &&
             tar -z     -xf ../../ghc-tarballs/mingw/mingwrt*-dll.tar.gz &&
             tar --lzma -xf ../../ghc-tarballs/mingw/w32api*.tar.lzma    &&
