@@ -21,7 +21,6 @@ import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
 import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
-import GHC.Real (fromIntegral)
 import System.Event.Internal (eventIs, evtClose)
 import System.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_, registerTimeout)
