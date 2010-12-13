@@ -26,7 +26,7 @@ module TcMType (
   -- Creating new evidence variables
   newEvVar, newCoVar, newEvVars,
   newWantedCoVar, writeWantedCoVar, readWantedCoVar, 
-  newIP, newDict, newSelfDict, isSelfDict,
+  newIP, newDict, newSilentGiven, isSilentEvVar,
 
   newWantedEvVar, newWantedEvVars,
   newTcEvBinds, addTcEvBind,
@@ -42,8 +42,8 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   SourceTyCtxt(..), checkValidTheta, 
-  checkValidInstHead, checkValidInstance, 
-  checkInstTermination, checkValidTypeInst, checkTyFamFreeness, 
+  checkValidInstance,
+  checkValidTypeInst, checkTyFamFreeness,
   arityErr, 
   growPredTyVars, growThetaTyVars, validDerivPred,
 
@@ -163,20 +163,23 @@ newName occ
        ; return (mkInternalName uniq occ loc) }
 
 -----------------
-newSelfDict :: Class -> [TcType] -> TcM DictId
--- Make a dictionary for "self". It behaves just like a normal DictId
--- except that it responds True to isSelfDict
+newSilentGiven :: PredType -> TcM EvVar
+-- Make a dictionary for a "silent" given dictionary
+-- Behaves just like any EvVar except that it responds True to isSilentDict
 -- This is used only to suppress confusing error reports
-newSelfDict cls tys 
+newSilentGiven (ClassP cls tys)
   = do { uniq <- newUnique
-       ; let name = mkSystemName uniq selfDictOcc
+       ; let name = mkSystemName uniq (mkDictOcc (getOccName cls))
        ; return (mkLocalId name (mkPredTy (ClassP cls tys))) }
+newSilentGiven (EqPred ty1 ty2)
+  = do { uniq <- newUnique
+       ; let name = mkSystemName uniq (mkTyVarOccFS (fsLit "co"))
+       ; return (mkCoVar name (mkPredTy (EqPred ty1 ty2))) }
+newSilentGiven pred@(IParam {})
+  = pprPanic "newSilentDict" (ppr pred) -- Implicit parameters rejected earlier
 
-selfDictOcc :: OccName
-selfDictOcc = mkVarOcc "self"
-
-isSelfDict :: EvVar -> Bool
-isSelfDict v = isSystemName (Var.varName v)
+isSilentEvVar :: EvVar -> Bool
+isSilentEvVar v = isSystemName (Var.varName v)
   -- Notice that all *other* evidence variables get Internal Names
 \end{code}
 
@@ -1339,34 +1342,20 @@ compiled elsewhere). In these cases, we let them go through anyway.
 We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
-checkValidInstHead :: Type -> TcM (Class, [TcType])
+checkValidInstHead :: Class -> [Type] -> TcM ()
+checkValidInstHead clas tys
+  = do { dflags <- getDOpts
 
-checkValidInstHead ty	-- Should be a source type
-  = case tcSplitPredTy_maybe ty of {
-	Nothing -> failWithTc (instTypeErr (ppr ty) empty) ;
-	Just pred -> 
-
-    case getClassPredTys_maybe pred of {
-	Nothing -> failWithTc (instTypeErr (pprPred pred) empty) ;
-        Just (clas,tys) -> do
-
-    dflags <- getDOpts
-    check_inst_head dflags clas tys
-    return (clas, tys)
-    }}
-
-check_inst_head :: DynFlags -> Class -> [Type] -> TcM ()
-check_inst_head dflags clas tys
-  = do { -- If GlasgowExts then check at least one isn't a type variable
+           -- If GlasgowExts then check at least one isn't a type variable
        ; checkTc (xopt Opt_TypeSynonymInstances dflags ||
                   all tcInstHeadTyNotSynonym tys)
-                 (instTypeErr (pprClassPred clas tys) head_type_synonym_msg)
+                 (instTypeErr pp_pred head_type_synonym_msg)
        ; checkTc (xopt Opt_FlexibleInstances dflags ||
                   all tcInstHeadTyAppAllTyVars tys)
-                 (instTypeErr (pprClassPred clas tys) head_type_args_tyvars_msg)
+                 (instTypeErr pp_pred head_type_args_tyvars_msg)
        ; checkTc (xopt Opt_MultiParamTypeClasses dflags ||
                   isSingleton tys)
-                 (instTypeErr (pprClassPred clas tys) head_one_type_msg)
+                 (instTypeErr pp_pred head_one_type_msg)
          -- May not contain type family applications
        ; mapM_ checkTyFamFreeness tys
 
@@ -1379,6 +1368,7 @@ check_inst_head dflags clas tys
        }
 
   where
+    pp_pred = pprClassPred clas tys
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
                 text "where T is not a synonym." $$
@@ -1386,7 +1376,7 @@ check_inst_head dflags clas tys
 
     head_type_args_tyvars_msg = parens (vcat [
                 text "All instance types must be of the form (T a1 ... an)",
-                text "where a1 ... an are type *variables*,",
+                text "where a1 ... an are *distinct type variables*,",
                 text "and each type variable appears at most once in the instance head.",
                 text "Use -XFlexibleInstances if you want to disable this."])
 
@@ -1408,35 +1398,30 @@ instTypeErr pp_ty msg
 %************************************************************************
 
 \begin{code}
-checkValidInstance :: LHsType Name -> [TyVar] -> ThetaType -> Type 
-                   -> TcM (Class, [TcType])
-checkValidInstance hs_type tyvars theta tau
+checkValidInstance :: LHsType Name -> [TyVar] -> ThetaType
+                   -> Class -> [TcType] -> TcM ()
+checkValidInstance hs_type tyvars theta clas inst_tys
   = setSrcSpan (getLoc hs_type) $
-    do	{ (clas, inst_tys) <- setSrcSpan head_loc $
-                              checkValidInstHead tau
-
-        ; undecidable_ok <- xoptM Opt_UndecidableInstances
-
-	; checkValidTheta InstThetaCtxt theta
+    do  { setSrcSpan head_loc (checkValidInstHead clas inst_tys)
+        ; checkValidTheta InstThetaCtxt theta
 	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
 
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98 this will already have been done by checkValidTheta,
         -- but as we may be using other extensions we need to check.
-	; unless undecidable_ok $
+	; undecidable_ok <- xoptM Opt_UndecidableInstances
+        ; unless undecidable_ok $
 	  mapM_ addErrTc (checkInstTermination inst_tys theta)
 	
 	-- The Coverage Condition
 	; checkTc (undecidable_ok || checkInstCoverage clas inst_tys)
 	  	  (instTypeErr (pprClassPred clas inst_tys) msg)
-
-        ; return (clas, inst_tys)
-	}
+        }
   where
     msg  = parens (vcat [ptext (sLit "the Coverage Condition fails for one of the functional dependencies;"),
 			 undecidableMsg])
 
-	-- The location of the "head" of the instance
+        -- The location of the "head" of the instance
     head_loc = case hs_type of
                  L _ (HsForAllTy _ _ _ (L loc _)) -> loc
                  L loc _                          -> loc

@@ -402,14 +402,11 @@ checkConstraints skol_info skol_tvs given thing_inside
       -- tcPolyExpr, which uses tcGen and hence checkConstraints.
 
   | otherwise
-  = do { (ev_binds, wanted, result) <- newImplication skol_info 
-                                             skol_tvs given thing_inside
-       ; emitConstraints wanted
-       ; return (ev_binds, result) }
+  = newImplication skol_info skol_tvs given thing_inside
 
 newImplication :: SkolemInfo -> [TcTyVar]
 	       -> [EvVar] -> TcM result
-               -> TcM (TcEvBinds, WantedConstraints, result)
+               -> TcM (TcEvBinds, result)
 newImplication skol_info skol_tvs given thing_inside
   = ASSERT2( all isTcTyVar skol_tvs, ppr skol_tvs )
     ASSERT2( all isSkolemTyVar skol_tvs, ppr skol_tvs )
@@ -424,7 +421,7 @@ newImplication skol_info skol_tvs given thing_inside
 	    -- we don't want to lose the "inaccessible alternative"
 	    -- error check
          then 
-            return (emptyTcEvBinds, emptyWanteds, result)
+            return (emptyTcEvBinds, result)
          else do
        { ev_binds_var <- newTcEvBinds
        ; lcl_env <- getLclTypeEnv
@@ -438,7 +435,8 @@ newImplication skol_info skol_tvs given thing_inside
              		     , ic_binds = ev_binds_var
              		     , ic_loc = loc }
 
-       ; return (TcEvBinds ev_binds_var, unitBag (WcImplic implic), result) } }
+       ; emitConstraint (WcImplic implic)
+       ; return (TcEvBinds ev_binds_var, result) } }
 \end{code}
 
 %************************************************************************

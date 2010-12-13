@@ -343,11 +343,9 @@ getUserGivens (CEC {cec_encl = ctxt})
   where 
     givens = foldl (\gs ic -> ic_given ic ++ gs) [] ctxt
     user_givens | opt_PprStyle_Debug = givens
-                | otherwise          = filterOut isSelfDict givens
-       -- In user mode, don't show the "self-dict" given
-       -- which is only added to do co-inductive solving
-       -- Rather an awkward hack, but there we are
-       -- This is the only use of isSelfDict, so it's not in an inner loop
+                | otherwise          = filterOut isSilentEvVar givens
+       -- In user mode, don't show the "silent" givens, used for
+       -- the "self" dictionary and silent superclass arguments for dfuns
 \end{code}
 
 
@@ -595,10 +593,13 @@ reportDictErrs ctxt wanteds orig
                           <+> ptext (sLit "to the context of")
 	           , nest 2 $ pprErrCtxtLoc ctxt ]
 
-    	fixes2 | null instance_dicts = []
-	       | otherwise	     = [sep [ptext (sLit "add an instance declaration for"),
-				        pprTheta instance_dicts]]
-	instance_dicts = filterOut isTyVarClassPred wanteds
+        fixes2 = case instance_dicts of
+                   []  -> []
+                   [_] -> [sep [ptext (sLit "add an instance declaration for"),
+                                pprTheta instance_dicts]]
+                   _   -> [sep [ptext (sLit "add instance declarations for"),
+                                pprTheta instance_dicts]]
+        instance_dicts = filterOut isTyVarClassPred wanteds
 		-- Insts for which it is worth suggesting an adding an 
 		-- instance declaration.  Exclude tyvar dicts.
 

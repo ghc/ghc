@@ -151,10 +151,15 @@ pprInstance ispec
 pprInstanceHdr :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
 pprInstanceHdr ispec@(Instance { is_flag = flag })
-  = ptext (sLit "instance") <+> ppr flag
-    <+> sep [pprThetaArrow theta, ppr res_ty]
+  = getPprStyle $ \ sty ->
+    let theta_to_print
+          | debugStyle sty = theta
+          | otherwise = drop (dfunNSilent dfun) theta
+    in ptext (sLit "instance") <+> ppr flag
+       <+> sep [pprThetaArrow theta_to_print, ppr res_ty]
   where
-    (_, theta, res_ty) = tcSplitSigmaTy (idType (is_dfun ispec))
+    dfun = is_dfun ispec
+    (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)
 	-- Print without the for-all, which the programmer doesn't write
 
 pprInstances :: [Instance] -> SDoc
@@ -167,12 +172,14 @@ instanceHead ispec
      (tvs, theta, tau) = tcSplitSigmaTy (idType (is_dfun ispec))
      (cls, tys) = tcSplitDFunHead tau
 
-mkLocalInstance :: DFunId -> OverlapFlag -> Instance
+mkLocalInstance :: DFunId
+                -> OverlapFlag
+                -> Instance
 -- Used for local instances, where we can safely pull on the DFunId
 mkLocalInstance dfun oflag
   = Instance {	is_flag = oflag, is_dfun = dfun,
 		is_tvs = mkVarSet tvs, is_tys = tys,
-		is_cls = className cls, is_tcs = roughMatchTcs tys }
+                is_cls = className cls, is_tcs = roughMatchTcs tys }
   where
     (tvs, cls, tys) = tcSplitDFunTy (idType dfun)
 
@@ -352,6 +359,9 @@ data ClsInstEnv
   	  Bool 		-- True <=> there is an instance of form C a b c
 			-- 	If *not* then the common case of looking up
 			--	(C a b c) can fail immediately
+
+instance Outputable ClsInstEnv where
+  ppr (ClsIE is b) = ptext (sLit "ClsIE") <+> ppr b <+> pprInstances is
 
 -- INVARIANTS:
 --  * The is_tvs are distinct in each Instance
@@ -539,8 +549,8 @@ insert_overlapping new_item (item:items)
 
 \begin{code}
 instanceBindFun :: TyVar -> BindFlag
-instanceBindFun tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
-	           | otherwise	 		 	   = BindMe
+instanceBindFun tv | isTcTyVar tv && isOverlappableTyVar tv = Skolem
+                   | otherwise                              = BindMe
    -- Note [Binding when looking up instances]
 \end{code}
 
@@ -563,7 +573,7 @@ The op [x,x] means we need (Foo [a]).  Without the filterVarSet we'd
 complain, saying that the choice of instance depended on the instantiation
 of 'a'; but of course it isn't *going* to be instantiated.
 
-We do this only for pattern-bound skolems.  For example we reject
+We do this only for isOverlappableTyVar skolems.  For example we reject
 	g :: forall a => [a] -> Int
 	g x = op x
 on the grounds that the correct instance depends on the instantiation of 'a'

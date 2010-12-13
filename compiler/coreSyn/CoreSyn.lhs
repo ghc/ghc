@@ -4,7 +4,7 @@
 %
 
 \begin{code}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
@@ -37,9 +37,9 @@ module CoreSyn (
 	notSccNote,
 
 	-- * Unfolding data types
-	Unfolding(..),	UnfoldingGuidance(..), UnfoldingSource(..),
-		-- Abstract everywhere but in CoreUnfold.lhs
-	
+        Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
+        DFunArg(..), dfunArgExprs,
+
 	-- ** Constructing 'Unfolding's
 	noUnfolding, evaldUnfolding, mkOtherCon,
         unSaturatedOk, needSaturated, boringCxtOk, boringCxtNotOk,
@@ -437,10 +437,7 @@ data Unfolding
 
         DataCon 	-- The dictionary data constructor (possibly a newtype datacon)
 
-        [CoreExpr]	-- The [CoreExpr] are the superclasses and methods [op1,op2], 
-			-- in positional order.
-			-- They are usually variables, but can be trivial expressions
-			-- instead (e.g. a type application).  
+        [DFunArg CoreExpr]  -- Specification of superclasses and methods, in positional order
 
   | CoreUnfolding {		-- An unfolding for an Id with no pragma, 
                                 -- or perhaps a NOINLINE pragma
@@ -478,7 +475,24 @@ data Unfolding
   --  uf_guidance:  Tells us about the /size/ of the unfolding template
 
 ------------------------------------------------
-data UnfoldingSource 
+data DFunArg e   -- Given (df a b d1 d2 d3)
+  = DFunPolyArg  e      -- Arg is (e a b d1 d2 d3)
+  | DFunConstArg e      -- Arg is e, which is constant
+  | DFunLamArg   Int    -- Arg is one of [a,b,d1,d2,d3], zero indexed
+  deriving( Functor )
+
+  -- 'e' is often CoreExpr, which are usually variables, but can
+  -- be trivial expressions instead (e.g. a type application).
+
+dfunArgExprs :: [DFunArg e] -> [e]
+dfunArgExprs [] = []
+dfunArgExprs (DFunPolyArg  e : as) = e : dfunArgExprs as
+dfunArgExprs (DFunConstArg e : as) = e : dfunArgExprs as
+dfunArgExprs (DFunLamArg {}  : as) =     dfunArgExprs as
+
+
+------------------------------------------------
+data UnfoldingSource
   = InlineRhs          -- The current rhs of the function
     		       -- Replace uf_tmpl each time around
 

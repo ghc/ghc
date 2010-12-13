@@ -27,7 +27,8 @@ module IfaceSyn (
 #include "HsVersions.h"
 
 import IfaceType
-
+import CoreSyn( DFunArg, dfunArgExprs )
+import PprCore()            -- Printing DFunArgs
 import Demand
 import Annotations
 import Class
@@ -183,7 +184,7 @@ type IfaceAnnTarget = AnnTarget OccName
 data IfaceIdDetails
   = IfVanillaId
   | IfRecSelId IfaceTyCon Bool
-  | IfDFunId
+  | IfDFunId Int          -- Number of silent args
 
 data IfaceIdInfo
   = NoInfo			-- When writing interface file without -O
@@ -226,7 +227,7 @@ data IfaceUnfolding
   | IfLclWrapper Arity IfLclName  --     because the worker can simplify to a function in 
     		       		  --     another module.
 
-  | IfDFunUnfold [IfaceExpr]
+  | IfDFunUnfold [DFunArg IfaceExpr]
 
 --------------------------------
 data IfaceExpr
@@ -675,7 +676,7 @@ instance Outputable IfaceIdDetails where
   ppr IfVanillaId    = empty
   ppr (IfRecSelId tc b) = ptext (sLit "RecSel") <+> ppr tc
       		          <+> if b then ptext (sLit "<naughty>") else empty
-  ppr IfDFunId       = ptext (sLit "DFunId")
+  ppr (IfDFunId ns)     = ptext (sLit "DFunId") <> brackets (int ns)
 
 instance Outputable IfaceIdInfo where
   ppr NoInfo       = empty
@@ -699,8 +700,7 @@ instance Outputable IfaceUnfolding where
   ppr (IfExtWrapper a wkr) = ptext (sLit "Worker(ext0:") <+> ppr wkr
                              <+> parens (ptext (sLit "arity") <+> int a)
   ppr (IfDFunUnfold ns)    = ptext (sLit "DFun:")
-                             <+> brackets (pprWithCommas pprParendIfaceExpr ns)
-
+                             <+> brackets (pprWithCommas ppr ns)
 
 -- -----------------------------------------------------------------------------
 -- Finding the Names in IfaceSyn
@@ -822,7 +822,7 @@ freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfExtWrapper _ v)     = unitNameSet v
 freeNamesIfUnfold (IfLclWrapper {})      = emptyNameSet
-freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr vs
+freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr (dfunArgExprs vs)
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)	  = unitNameSet v
@@ -857,7 +857,6 @@ freeNamesIfExpr (IfaceLet (IfaceRec as) x)
     fn_pair (bndr, rhs) = freeNamesIfLetBndr bndr &&& freeNamesIfExpr rhs
 
 freeNamesIfExpr _ = emptyNameSet
-
 
 freeNamesIfTc :: IfaceTyCon -> NameSet
 freeNamesIfTc (IfaceTc tc) = unitNameSet tc

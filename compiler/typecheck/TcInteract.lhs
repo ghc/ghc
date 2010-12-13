@@ -1963,12 +1963,11 @@ matchClassInst clas tys loc
                  ; tys <- instDFunTypes mb_inst_tys 
                  ; let (theta, _) = tcSplitPhiTy (applyTys (idType dfun_id) tys)
                  ; if null theta then
-                       return (GenInst [] (EvDFunApp dfun_id tys [] []))
+                       return (GenInst [] (EvDFunApp dfun_id tys []))
                    else do
                      { ev_vars <- instDFunConstraints theta
                      ; let wevs = [WantedEvVar w loc | w <- ev_vars]
-                     ; return $ GenInst wevs (EvDFunApp dfun_id tys ev_vars ev_vars) }
-                                                           -- NB: All the dependencies are ev_vars
+                     ; return $ GenInst wevs (EvDFunApp dfun_id tys ev_vars) }
                  }
         }
 \end{code}

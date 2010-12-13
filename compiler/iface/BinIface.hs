@@ -19,6 +19,7 @@ import HscTypes
 import BasicTypes
 import Demand
 import Annotations
+import CoreSyn
 import IfaceSyn
 import Module
 import Name
@@ -1145,7 +1146,7 @@ instance Binary IfaceBinding where
 instance Binary IfaceIdDetails where
     put_ bh IfVanillaId      = putByte bh 0
     put_ bh (IfRecSelId a b) = do { putByte bh 1; put_ bh a; put_ bh b }
-    put_ bh IfDFunId         = putByte bh 2
+    put_ bh (IfDFunId n)     = do { putByte bh 2; put_ bh n }
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -1153,7 +1154,7 @@ instance Binary IfaceIdDetails where
 	      1 -> do a <- get bh
 		      b <- get bh
 		      return (IfRecSelId a b)
-	      _ -> return IfDFunId
+              _ -> do { n <- get bh; return (IfDFunId n) }
 
 instance Binary IfaceIdInfo where
     put_ bh NoInfo = putByte bh 0
@@ -1244,6 +1245,16 @@ instance Binary IfaceUnfolding where
 		  return (IfDFunUnfold as)
 	  _ -> do e <- get bh
 		  return (IfCompulsory e)
+
+instance Binary (DFunArg IfaceExpr) where
+    put_ bh (DFunPolyArg  e) = putByte bh 0 >> put_ bh e
+    put_ bh (DFunConstArg e) = putByte bh 1 >> put_ bh e
+    put_ bh (DFunLamArg i)   = putByte bh 2 >> put_ bh i
+    get bh = do { h <- getByte bh
+                ; case h of
+                    0 -> do { a <- get bh; return (DFunPolyArg a) }
+                    1 -> do { a <- get bh; return (DFunConstArg a) }
+                    _ -> do { a <- get bh; return (DFunLamArg a) } }
 
 instance Binary IfaceNote where
     put_ bh (IfaceSCC aa) = do

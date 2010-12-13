@@ -1471,7 +1471,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 --------------------------
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId 		        = IfVanillaId
-toIfaceIdDetails (DFunId {})   		        = IfDFunId
+toIfaceIdDetails (DFunId ns _)                  = IfDFunId ns
 toIfaceIdDetails (RecSelId { sel_naughty = n
 		 	   , sel_tycon = tc })  = IfRecSelId (toIfaceTyCon tc) n
 toIfaceIdDetails other	     		        = pprTrace "toIfaceIdDetails" (ppr other) 
@@ -1536,7 +1536,7 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs, uf_arity = arity
     if_rhs = toIfaceExpr rhs
 
 toIfUnfolding lb (DFunUnfolding _ar _con ops)
-  = Just (HsUnfold lb (IfDFunUnfold (map toIfaceExpr ops)))
+  = Just (HsUnfold lb (IfDFunUnfold (map (fmap toIfaceExpr) ops)))
       -- No need to serialise the data constructor; 
       -- we can recover it from the type of the dfun
 

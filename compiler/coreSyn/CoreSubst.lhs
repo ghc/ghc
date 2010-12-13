@@ -574,7 +574,9 @@ substUnfoldingSC subst unf 	 -- Short-cut version
   | otherwise          = substUnfolding subst unf
 
 substUnfolding subst (DFunUnfolding ar con args)
-  = DFunUnfolding ar con (map (substExpr (text "dfun-unf") subst) args)
+  = DFunUnfolding ar con (map subst_arg args)
+  where
+    subst_arg = fmap (substExpr (text "dfun-unf") subst)
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!

@@ -986,8 +986,8 @@ do_one (IfaceRec pairs) thing_inside
 \begin{code}
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
-tcIdDetails ty IfDFunId
-  = return (DFunId (isNewTyCon (classTyCon cls)))
+tcIdDetails ty (IfDFunId ns)
+  = return (DFunId ns (isNewTyCon (classTyCon cls)))
   where
     (_, cls, _) = tcSplitDFunTy ty
 
@@ -1051,12 +1051,15 @@ tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
     }
 
 tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
-  = do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
+  = do { mb_ops1 <- forkM_maybe doc $ mapM tc_arg ops
        ; return (case mb_ops1 of
        	 	    Nothing   -> noUnfolding
                     Just ops1 -> mkDFunUnfolding dfun_ty ops1) }
   where
     doc = text "Class ops for dfun" <+> ppr name
+    tc_arg (DFunPolyArg  e) = do { e' <- tcIfaceExpr e; return (DFunPolyArg e') }
+    tc_arg (DFunConstArg e) = do { e' <- tcIfaceExpr e; return (DFunConstArg e') }
+    tc_arg (DFunLamArg i)   = return (DFunLamArg i)
 
 tcUnfolding name ty info (IfExtWrapper arity wkr)
   = tcIfaceWrapper name ty info arity (tcIfaceExtId wkr)

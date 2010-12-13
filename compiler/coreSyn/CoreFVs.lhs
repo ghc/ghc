@@ -432,7 +432,7 @@ idUnfoldingVars id = stableUnfoldingVars (realIdUnfolding id)
 stableUnfoldingVars :: Unfolding -> VarSet
 stableUnfoldingVars (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
   | isStableSource src                       = exprFreeVars rhs
-stableUnfoldingVars (DFunUnfolding _ _ args) = exprsFreeVars args
+stableUnfoldingVars (DFunUnfolding _ _ args) = exprsFreeVars (dfunArgExprs args)
 stableUnfoldingVars _                        = emptyVarSet
 \end{code}
 

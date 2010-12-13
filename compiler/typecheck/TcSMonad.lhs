@@ -901,10 +901,8 @@ isGoodRecEv ev_var wv
 
         chase_ev assocs trg curr_grav visited (EvCoercion co)
             = chase_co assocs trg curr_grav visited co
-        chase_ev assocs trg curr_grav visited (EvDFunApp _ _ _ev_vars ev_deps)
+        chase_ev assocs trg curr_grav visited (EvDFunApp _ _ ev_deps)
             = do { chase_results <- mapM (chase_ev_var assocs trg (curr_grav+1) visited) ev_deps
-                                    -- Notice that we chase the ev_deps and not the ev_vars
-                                    -- See Note [Dependencies in self dictionaries] in TcSimplify
                  ; return (comb_chase_res Nothing chase_results) }
 
         chase_co assocs trg curr_grav visited co 
@@ -937,7 +935,7 @@ matchClass :: Class -> [Type] -> TcS (MatchInstResult (DFunId, [Either TyVar TcT
 matchClass clas tys
   = do	{ let pred = mkClassPred clas tys 
         ; instEnvs <- getInstEnvs
-	; case lookupInstEnv instEnvs clas tys of {
+        ; case lookupInstEnv instEnvs clas tys of {
             ([], unifs)               -- Nothing matches  
                 -> do { traceTcS "matchClass not matching"
                                  (vcat [ text "dict" <+> ppr pred, 
@@ -949,7 +947,7 @@ matchClass clas tys
 			; traceTcS "matchClass success"
 				   (vcat [text "dict" <+> ppr pred, 
 				          text "witness" <+> ppr dfun_id
-					   <+> ppr (idType dfun_id) ])
+                                           <+> ppr (idType dfun_id), ppr instEnvs ])
 				  -- Record that this dfun is needed
                         ; return $ MatchInstSingle (dfun_id, inst_tys)
                         } ;

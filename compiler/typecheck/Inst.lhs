@@ -404,10 +404,18 @@ addLocalInst home_ie ispec
 		-- This is important because the template variables must
 		-- not overlap with anything in the things being looked up
 		-- (since we do unification).  
-		-- We use tcInstSkolType because we don't want to allocate fresh
-		--  *meta* type variables.  
+                --
+                -- We use tcInstSkolType because we don't want to allocate fresh
+                --  *meta* type variables.
+                --
+                -- We use UnkSkol --- and *not* InstSkol or PatSkol --- because
+                -- these variables must be bindable by tcUnifyTys.  See
+                -- the call to tcUnifyTys in InstEnv, and the special
+                -- treatment that instanceBindFun gives to isOverlappableTyVar
+                -- This is absurdly delicate.
+
 	  let dfun = instanceDFunId ispec
-	; (tvs', theta', tau') <- tcInstSkolType InstSkol (idType dfun)
+        ; (tvs', theta', tau') <- tcInstSkolType UnkSkol (idType dfun)
 	; let	(cls, tys') = tcSplitDFunHead tau'
 		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
 	  	ispec'      = setInstanceDFunId ispec dfun'

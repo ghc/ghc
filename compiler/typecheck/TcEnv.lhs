@@ -606,8 +606,8 @@ as well as explicit user written ones.
 \begin{code}
 data InstInfo a
   = InstInfo {
-      iSpec  :: Instance,		-- Includes the dfun id.  Its forall'd type 
-      iBinds :: InstBindings a		-- variables scope over the stuff in InstBindings!
+      iSpec   :: Instance,        -- Includes the dfun id.  Its forall'd type
+      iBinds  :: InstBindings a   -- variables scope over the stuff in InstBindings!
     }
 
 iDFunId :: InstInfo a -> DFunId

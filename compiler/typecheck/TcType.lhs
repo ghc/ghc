@@ -28,7 +28,7 @@ module TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..), 
   SkolemInfo(..), pprSkolTvBinding, pprSkolInfo,
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy,
-  isSigTyVar, isExistentialTyVar,  isTyConableTyVar,
+  isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
   metaTvRef, 
   isFlexi, isIndirect, isUnkSkol, isRuntimeUnkSkol,
 
@@ -614,7 +614,7 @@ isImmutableTyVar tv
   | isTcTyVar tv = isSkolemTyVar tv
   | otherwise    = True
 
-isTyConableTyVar, isSkolemTyVar, isExistentialTyVar, 
+isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
   isMetaTyVar :: TcTyVar -> Bool 
 
 isTyConableTyVar tv	
@@ -633,11 +633,14 @@ isSkolemTyVar tv
         FlatSkol {} -> True
  	MetaTv {}   -> False
 
-isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
+-- isOverlappableTyVar has a unique purpose.
+-- See Note [Binding when looking up instances] in InstEnv.
+isOverlappableTyVar tv
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	SkolemTv (PatSkol {}) -> True
-	_                     -> False
+        SkolemTv (PatSkol {})  -> True
+        SkolemTv (InstSkol {}) -> True
+        _                      -> False
 
 isMetaTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )

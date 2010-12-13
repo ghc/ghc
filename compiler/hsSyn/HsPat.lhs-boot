@@ -7,5 +7,6 @@ import Data.Data
 data Pat i
 type LPat i = Located (Pat i)
 
+instance Typeable1 Pat
 instance Data i => Data (Pat i)
 \end{code}

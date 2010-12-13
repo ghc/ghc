@@ -373,14 +373,14 @@ renameDeriv is_boot gen_binds insts
                  , mkFVs (map dataConName (tyConDataCons tc)))
 	  -- See Note [Newtype deriving and unused constructors]
 
-    rn_inst_info (InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs standalone_deriv })
+    rn_inst_info inst_info@(InstInfo { iSpec = inst, iBinds = VanillaInst binds sigs standalone_deriv })
 	= 	-- Bring the right type variables into 
 		-- scope (yuk), and rename the method binds
 	   ASSERT( null sigs )
 	   bindLocalNames (map Var.varName tyvars) $
  	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
 	      ; let binds' = VanillaInst rn_binds [] standalone_deriv
-	      ; return (InstInfo { iSpec = inst, iBinds = binds' }, fvs) }
+              ; return (inst_info { iBinds = binds' }, fvs) }
 	where
 	  (tyvars,_, clas,_) = instanceHead inst
 	  clas_nm            = className clas
@@ -467,12 +467,13 @@ deriveStandalone (L loc (DerivDecl deriv_ty))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; (tvs, theta, tau) <- tcHsInstHead deriv_ty
+       ; (tvs, theta, cls, inst_tys) <- tcHsInstHead deriv_ty
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
               , text "theta:" <+> ppr theta
-              , text "tau:" <+> ppr tau ]
-       ; (cls, inst_tys) <- checkValidInstance deriv_ty tvs theta tau
+              , text "cls:" <+> ppr cls
+              , text "tys:" <+> ppr inst_tys ]
+       ; checkValidInstance deriv_ty tvs theta cls inst_tys
 		-- C.f. TcInstDcls.tcLocalInstDecl1
 
        ; let cls_tys = take (length inst_tys - 1) inst_tys
@@ -1400,26 +1401,26 @@ the renamer.  What a great hack!
 genInst :: Bool 	-- True <=> standalone deriving
 	-> OverlapFlag
         -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
-genInst standalone_deriv oflag spec
-  | ds_newtype spec
-  = return (InstInfo { iSpec  = mkInstance oflag (ds_theta spec) spec
-		     , iBinds = NewTypeDerived co rep_tycon }, [])
+genInst standalone_deriv oflag
+        spec@(DS { ds_tc = rep_tycon, ds_tc_args = rep_tc_args
+                 , ds_theta = theta, ds_newtype = is_newtype
+                 , ds_name = name, ds_cls = clas })
+  | is_newtype
+  = return (InstInfo { iSpec   = inst_spec
+                     , iBinds  = NewTypeDerived co rep_tycon }, [])
 
   | otherwise
-  = do	{ let loc  = getSrcSpan (ds_name spec)
-	      inst = mkInstance oflag (ds_theta spec) spec
-   	      clas = ds_cls spec
+  = do  { fix_env <- getFixityEnv
+        ; let loc   = getSrcSpan name
+              (meth_binds, aux_binds) = genDerivBinds loc fix_env clas rep_tycon
+                   -- In case of a family instance, we need to use the representation
+                   -- tycon (after all, it has the data constructors)
 
-          -- In case of a family instance, we need to use the representation
-          -- tycon (after all, it has the data constructors)
-	; fix_env <- getFixityEnv
-	; let (meth_binds, aux_binds) = genDerivBinds loc fix_env clas rep_tycon
-	      binds = VanillaInst meth_binds [] standalone_deriv
-	; return (InstInfo { iSpec = inst, iBinds = binds }, aux_binds)
-        }
+        ; return (InstInfo { iSpec   = inst_spec
+                           , iBinds  = VanillaInst meth_binds [] standalone_deriv }
+                 , aux_binds) }
   where
-    rep_tycon   = ds_tc spec
-    rep_tc_args = ds_tc_args spec
+    inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
 	      Just co_con -> ACo (mkTyConApp co_con rep_tc_args)
     	      Nothing     -> id_co

@@ -11,7 +11,7 @@ lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-		 dsHsWrapper, dsTcEvBinds, dsEvBinds, wrapDsEvBinds, 
+                 dsHsWrapper, dsTcEvBinds, dsEvBinds, wrapDsEvBinds,
 		 DsEvBind(..), AutoScc(..)
   ) where
 
@@ -90,7 +90,7 @@ dsLHsBind auto_scc (L loc bind)
 dsHsBind :: AutoScc -> HsBind Id -> DsM (OrdList (Id,CoreExpr))
 
 dsHsBind _ (VarBind { var_id = var, var_rhs = expr, var_inline = inline_regardless })
-  = do	{ core_expr <- dsLExpr expr
+  = do  { core_expr <- dsLExpr expr
 
 	        -- Dictionary bindings are always VarBinds,
 	        -- so we only need do this here
@@ -230,11 +230,11 @@ dsEvBinds bs = return (map dsEvGroup sccs)
     mk_node b@(EvBind var term) = (b, var, free_vars_of term)
 
     free_vars_of :: EvTerm -> [EvVar]
-    free_vars_of (EvId v)             = [v]
-    free_vars_of (EvCast v co)        = v : varSetElems (tyVarsOfType co)
-    free_vars_of (EvCoercion co)      = varSetElems (tyVarsOfType co)
-    free_vars_of (EvDFunApp _ _ vs _) = vs
-    free_vars_of (EvSuperClass d _)   = [d]
+    free_vars_of (EvId v)           = [v]
+    free_vars_of (EvCast v co)      = v : varSetElems (tyVarsOfType co)
+    free_vars_of (EvCoercion co)    = varSetElems (tyVarsOfType co)
+    free_vars_of (EvDFunApp _ _ vs) = vs
+    free_vars_of (EvSuperClass d _) = [d]
 
 dsEvGroup :: SCC EvBind -> DsEvBind
 dsEvGroup (AcyclicSCC (EvBind co_var (EvSuperClass dict n)))
@@ -261,10 +261,10 @@ dsEvGroup (CyclicSCC bs)
     ds_pair (EvBind v r) = (v, dsEvTerm r)
 
 dsEvTerm :: EvTerm -> CoreExpr
-dsEvTerm (EvId v)      		       = Var v
-dsEvTerm (EvCast v co) 		       = Cast (Var v) co 
-dsEvTerm (EvDFunApp df tys vars _deps) = Var df `mkTyApps` tys `mkVarApps` vars
-dsEvTerm (EvCoercion co)               = Type co
+dsEvTerm (EvId v)                = Var v
+dsEvTerm (EvCast v co)           = Cast (Var v) co
+dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
+dsEvTerm (EvCoercion co)         = Type co
 dsEvTerm (EvSuperClass d n)
   = ASSERT( isClassPred (classSCTheta cls !! n) )
     	    -- We can only select *dictionary* superclasses
@@ -537,30 +537,16 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
 specUnfolding :: (CoreExpr -> CoreExpr) -> Type 
               -> Unfolding -> DsM (Unfolding, OrdList (Id,CoreExpr))
+{-   [Dec 10: TEMPORARILY commented out, until we can straighten out how to
+              generate unfoldings for specialised DFuns
+
 specUnfolding wrap_fn spec_ty (DFunUnfolding _ _ ops)
   = do { let spec_rhss = map wrap_fn ops
        ; spec_ids <- mapM (mkSysLocalM (fsLit "spec") . exprType) spec_rhss
        ; return (mkDFunUnfolding spec_ty (map Var spec_ids), toOL (spec_ids `zip` spec_rhss)) }
+-}
 specUnfolding _ _ _
   = return (noUnfolding, nilOL)
-
-{-
-mkArbitraryTypeEnv :: [TyVar] -> [([TyVar], a, b, c)] -> TyVarEnv Type
--- If any of the tyvars is missing from any of the lists in 
--- the second arg, return a binding in the result
-mkArbitraryTypeEnv tyvars exports
-  = go emptyVarEnv exports
-  where
-    go env [] = env
-    go env ((ltvs, _, _, _) : exports)
-	= go env' exports
-        where
-          env' = foldl extend env [tv | tv <- tyvars
-			              , not (tv `elem` ltvs)
-				      , not (tv `elemVarEnv` env)]
-
-    extend env tv = extendVarEnv env tv (dsMkArbitraryType tv)
--}
 
 dsMkArbitraryType :: TcTyVar -> Type
 dsMkArbitraryType tv = anyTypeOfKind (tyVarKind tv)

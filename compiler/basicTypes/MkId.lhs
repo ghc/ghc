@@ -13,8 +13,7 @@ have a standard form, namely:
 
 \begin{code}
 module MkId (
-        mkDictFunId, mkDefaultMethodId,
-        mkDictSelId, 
+        mkDictFunId, mkDictFunTy, mkDefaultMethodId, mkDictSelId,
 
         mkDataConIds,
         mkPrimOpId, mkFCallId, mkTickBoxOpId, mkBreakPointOpId,
@@ -492,15 +491,11 @@ mkDictSelId no_unf name clas
 
 dictSelRule :: Int -> Arity -> Arity 
             -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
--- Oh, very clever
---       sel_i t1..tk (df s1..sn d1..dm) = op_i_helper s1..sn d1..dm
+-- Tries to persuade the argument to look like a constructor
+-- application, using exprIsConApp_maybe, and then selects
+-- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
--- NB: the data constructor has the same number of type and 
---     coercion args as the selector
---
--- This only works for *value* superclasses
--- There are no selector functions for equality superclasses
 dictSelRule val_index n_ty_args n_eq_args id_unf args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
@@ -839,12 +834,29 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
             -> Class 
             -> [Type]
             -> Id
+-- Implements the DFun Superclass Invariant (see TcInstDcls)
 
-mkDictFunId dfun_name inst_tyvars dfun_theta clas inst_tys
-  = mkExportedLocalVar (DFunId is_nt) dfun_name dfun_ty vanillaIdInfo
+mkDictFunId dfun_name tvs theta clas tys
+  = mkExportedLocalVar (DFunId n_silent is_nt)
+                       dfun_name
+                       dfun_ty
+                       vanillaIdInfo
   where
     is_nt = isNewTyCon (classTyCon clas)
-    dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
+    (n_silent, dfun_ty) = mkDictFunTy tvs theta clas tys
+
+mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> (Int, Type)
+mkDictFunTy tvs theta clas tys
+  = (length silent_theta, dfun_ty)
+  where
+    dfun_ty = mkSigmaTy tvs (silent_theta ++ theta) (mkDictTy clas tys)
+    silent_theta = filterOut discard $
+                   substTheta (zipTopTvSubst (classTyVars clas) tys)
+                              (classSCTheta clas)
+                   -- See Note [Silent Superclass Arguments]
+    discard pred = isEmptyVarSet (tyVarsOfPred pred)
+                 || any (`tcEqPred` pred) theta
+                 -- See the DFun Superclass Invariant in TcInstDcls
 \end{code}
 
 

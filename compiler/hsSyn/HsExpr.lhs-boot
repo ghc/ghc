@@ -12,9 +12,13 @@ data HsSplice i
 data MatchGroup a
 data GRHSs a
 
+instance Typeable1 HsSplice
 instance Data i => Data (HsSplice i)
+instance Typeable1 HsExpr
 instance Data i => Data (HsExpr i)
+instance Typeable1 MatchGroup
 instance Data i => Data (MatchGroup i)
+instance Typeable1 GRHSs
 instance Data i => Data (GRHSs i)
 
 type LHsExpr a = Located (HsExpr a)

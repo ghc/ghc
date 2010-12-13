@@ -415,8 +415,7 @@ instance Outputable Unfolding where
   ppr NoUnfolding             	 = ptext (sLit "No unfolding")
   ppr (OtherCon cs)           	 = ptext (sLit "OtherCon") <+> ppr cs
   ppr (DFunUnfolding ar con ops) = ptext (sLit "DFun") <> parens (ptext (sLit "arity=") <> int ar)  
-                                   <+> ppr con
-                                   <+> brackets (pprWithCommas pprParendExpr ops)
+                                   <+> ppr con <+> brackets (pprWithCommas ppr ops)
   ppr (CoreUnfolding { uf_src = src
                      , uf_tmpl=rhs, uf_is_top=top, uf_is_value=hnf
                      , uf_is_conlike=conlike, uf_is_cheap=cheap
@@ -437,6 +436,11 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic 
 	    -- blowup in the size of the printout!
+
+instance Outputable e => Outputable (DFunArg e) where
+  ppr (DFunPolyArg e)  = braces (ppr e)
+  ppr (DFunConstArg e) = ppr e
+  ppr (DFunLamArg i)   = char '<' <> int i <> char '>'
 \end{code}
 
 -----------------------------------------------------
