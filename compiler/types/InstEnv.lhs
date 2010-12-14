@@ -166,11 +166,14 @@ pprInstances :: [Instance] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
 
 instanceHead :: Instance -> ([TyVar], ThetaType, Class, [Type])
-instanceHead ispec 
-   = (tvs, theta, cls, tys)
+-- Returns the *source* theta, without the silent arguments
+instanceHead ispec
+   = (tvs, drop n_silent theta, cls, tys)
    where
-     (tvs, theta, tau) = tcSplitSigmaTy (idType (is_dfun ispec))
-     (cls, tys) = tcSplitDFunHead tau
+     (tvs, theta, tau) = tcSplitSigmaTy (idType dfun)
+     (cls, tys)        = tcSplitDFunHead tau
+     dfun              = is_dfun ispec
+     n_silent          = dfunNSilent dfun
 
 mkLocalInstance :: DFunId
                 -> OverlapFlag
