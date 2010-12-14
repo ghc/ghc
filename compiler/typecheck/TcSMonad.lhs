@@ -947,7 +947,7 @@ matchClass clas tys
 			; traceTcS "matchClass success"
 				   (vcat [text "dict" <+> ppr pred, 
 				          text "witness" <+> ppr dfun_id
-                                           <+> ppr (idType dfun_id), ppr instEnvs ])
+                                           <+> ppr (idType dfun_id) ])
 				  -- Record that this dfun is needed
                         ; return $ MatchInstSingle (dfun_id, inst_tys)
                         } ;
