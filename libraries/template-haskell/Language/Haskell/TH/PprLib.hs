@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 
 -- | Monadic front-end to Text.PrettyPrint.HughesPJ
 
