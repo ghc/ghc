@@ -3,22 +3,43 @@
 
     This file is part of the Streaming Component Combinators (SCC) project.
 
-    The SCC project is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-    License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
-    version.
+    The SCC project is free software: you can redistribute it and/or
+    modify it under the terms of the GNU General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
 
-    SCC is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
-    of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+    SCC is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+    License for more details.
 
-    You should have received a copy of the GNU General Public License along with SCC.  If not, see
-    <http://www.gnu.org/licenses/>.
+    You should have received a copy of the GNU General Public License
+    along with SCC.  If not, see <http://www.gnu.org/licenses/>.
 -}
 
 -- | Module "Trampoline" defines the pipe computations and their basic building blocks.
 
-{-# LANGUAGE ScopedTypeVariables, Rank2Types, MultiParamTypeClasses, TypeFamilies, KindSignatures,
-             FlexibleContexts, FlexibleInstances, OverlappingInstances, UndecidableInstances
+{-# LANGUAGE ScopedTypeVariables, Rank2Types, MultiParamTypeClasses,
+             TypeFamilies, KindSignatures, FlexibleContexts,
+             FlexibleInstances, OverlappingInstances, UndecidableInstances
  #-}
+
+{-   Somewhere we get:
+
+  Wanted: AncestorFunctor (EitherFunctor a (TryYield a)) d
+  This should not reduce because of overlapping instances
+
+  If it (erroneously) does reduce, via dfun2 we get
+  Wanted: Functor (EitherFunctor a (TryYield a)
+          Functor d'
+          Functor d
+          d ~ EitherFunctor d' s
+          AncestorFunctor (EitherFunctor a (TryYield a) d'
+
+
+  And that gives an infinite loop in the type checker!
+-}
+
 
 module Main where
 
@@ -27,6 +48,28 @@ import Control.Monad (liftM, liftM2, when)
 
 import Debug.Trace (trace)
 
+
+-------------
+class (Functor a, Functor d) => AncestorFunctor a d where
+   liftFunctor :: a x -> d x
+
+-- dfun 1
+instance Functor a => AncestorFunctor a a where
+   liftFunctor = trace "liftFunctor id" . id
+
+-- dfun 2
+instance ( Functor a
+         , Functor d'
+         , Functor d
+         , d ~ EitherFunctor d' s
+         , AncestorFunctor a d')
+      => AncestorFunctor a d where
+   liftFunctor = LeftF . (trace "liftFunctor other" . liftFunctor :: a x -> d' x)
+
+
+
+
+-------------
 newtype Identity a = Identity { runIdentity :: a }
 instance Monad Identity where
     return a = Identity a
@@ -113,14 +156,6 @@ out (Trampoline ml) = Trampoline (liftM inject ml)
    where inject :: TrampolineState m l x -> TrampolineState m (EitherFunctor l r) x
          inject (Done x) = Done x
          inject (Suspend l) = Suspend (LeftF $ fmap out l)
-
-class (Functor a, Functor d) => AncestorFunctor a d where
-   liftFunctor :: a x -> d x
-
-instance Functor a => AncestorFunctor a a where
-   liftFunctor = trace "liftFunctor id" . id
-instance (Functor a, Functor d', Functor d, d ~ EitherFunctor d' s, AncestorFunctor a d') => AncestorFunctor a d where
-   liftFunctor = LeftF . (trace "liftFunctor other" . liftFunctor :: a x -> d' x)
 
 liftOut :: forall m a d x. (Monad m, Functor a, AncestorFunctor a d) => Trampoline m a x -> Trampoline m d x
 liftOut (Trampoline ma) = trace "liftOut" $ Trampoline (liftM inject ma)

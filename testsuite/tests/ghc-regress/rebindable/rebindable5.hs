@@ -1,4 +1,4 @@
-{-# LANGUAGE RebindableSyntax, NPlusKPatterns, TypeSynonymInstances,
+{-# LANGUAGE RebindableSyntax, NPlusKPatterns, FlexibleInstances,
              MultiParamTypeClasses, FunctionalDependencies #-}
 
 module Main where

@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, TypeSynonymInstances #-}
+{-# LANGUAGE Rank2Types, TypeSynonymInstances, FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
 module Bug2 where
 
