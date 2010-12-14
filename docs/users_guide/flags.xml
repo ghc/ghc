@@ -990,8 +990,9 @@
 	    </row>
 	    <row>
 	      <entry><option>-XFlexibleInstances</option></entry>
-	      <entry>Enable <link linkend="instance-rules">flexible instances</link>.</entry>
-	      <entry>dynamic</entry>
+              <entry>Enable <link linkend="instance-rules">flexible instances</link>.
+              Implies <option>-XTypeSynonymInstances</option> </entry>
+              <entry>dynamic</entry>
 	      <entry><option>-XNoFlexibleInstances</option></entry>
 	    </row>
 	    <row>

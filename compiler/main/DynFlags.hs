@@ -1658,6 +1658,7 @@ impliedFlags
     , (Opt_LiberalTypeSynonyms,       turnOn, Opt_ExplicitForAll)
     , (Opt_ExistentialQuantification, turnOn, Opt_ExplicitForAll)
     , (Opt_PolymorphicComponents,     turnOn, Opt_ExplicitForAll)
+    , (Opt_FlexibleInstances,         turnOn, Opt_TypeSynonymInstances)
 
     , (Opt_RebindableSyntax, turnOff, Opt_ImplicitPrelude)      -- NB: turn off!
 

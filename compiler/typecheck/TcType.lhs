@@ -956,6 +956,9 @@ tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must be a constructor applied to type variable arguments
 tcInstHeadTyAppAllTyVars ty
+  | Just ty' <- tcView ty       -- Look through synonyms
+  = tcInstHeadTyAppAllTyVars ty'
+  | otherwise
   = case ty of
 	TyConApp _ tys  -> ok tys
 	FunTy arg res   -> ok [arg, res]
