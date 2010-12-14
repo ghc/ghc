@@ -533,14 +533,18 @@ insert_overlapping new_item (item:items)
     old_beats_new = item `beats` new_item
 
     (instA, _) `beats` (instB, _)
-	= overlap_ok && 
-	  isJust (tcMatchTys (is_tvs instB) (is_tys instB) (is_tys instA))
-		-- A beats B if A is more specific than B, and B admits overlap
-		-- I.e. if B can be instantiated to match A
-	where
-	  overlap_ok = case is_flag instB of
-			NoOverlap -> False
-			_         -> True
+          = overlap_ok && 
+            isJust (tcMatchTys (is_tvs instB) (is_tys instB) (is_tys instA))
+                    -- A beats B if A is more specific than B,
+                    -- (ie. if B can be instantiated to match A)
+                    -- and overlap is permitted
+          where
+            -- Overlap permitted if *either* instance permits overlap
+            -- This is a change (Trac #3877, Dec 10). It used to
+            -- require that instB (the less specific one) permitted overlap.
+            overlap_ok = case (is_flag instA, is_flag instB) of
+                              (NoOverlap, NoOverlap) -> False
+                              _                      -> True
 \end{code}
 
 
