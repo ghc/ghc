@@ -139,8 +139,8 @@ if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
   if test "$WithGhc" = ""; then
      AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
   fi
-  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.10],
-    [AC_MSG_ERROR([GHC version 6.10 or later is required to compile GHC.])])dnl
+  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.12],
+    [AC_MSG_ERROR([GHC version 6.12 or later is required to compile GHC.])])dnl
 
   if test `expr $GhcMinVersion % 2` = "1"; then
      if test "$EnableBootstrapWithDevelSnaphost" = "NO"; then
