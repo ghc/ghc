@@ -495,8 +495,6 @@ GhcMajVersion	= @GhcMajVersion@
 GhcMinVersion	= @GhcMinVersion@
 
 # Keep this in sync with the variables in package-config.mk
-ghc_ge_6102 = @ghc_ge_6102@
-ghc_ge_611 = @ghc_ge_611@
 ghc_ge_613 = @ghc_ge_613@
 
 # Canonicalised ghc version number, used for easy (integer) version

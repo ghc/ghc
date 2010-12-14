@@ -371,28 +371,6 @@ compiler_stage2_CONFIGURE_OPTS += --ghc-option=-auto-all
 compiler_stage2_CONFIGURE_OPTS += --ghc-pkg-option=--force
 endif
 
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-# The #include is vital for the via-C route with older compilers, else the C
-# compiler doesn't realise that the stcall foreign imports are indeed
-# stdcall, and doesn't generate the Foo@8 name for them
-# It's only important for older compilers, and in fact newer compilers
-# will give a warning if the -#include flag is used. We therefore only
-# do it for stage1, and only for < 6.11.
-ifeq "$(ghc_ge_611)" "NO"
-compiler_stage1_CONFIGURE_OPTS += --ghc-option='-\#include'    \
-                          --ghc-option='"<windows.h>"' \
-                          --ghc-option='-\#include'    \
-                          --ghc-option='"<process.h>"'
-endif
-endif
-
-# ghc_strlen percolates through so many modules that it is easier to get its
-# prototype via a global option instead of a myriad of per-file OPTIONS.
-# Again, this is only done for older compilers.
-ifeq "$(ghc_ge_611)" "NO"
-compiler_stage1_CONFIGURE_OPTS += --ghc-options='-\#include "cutils.h"'
-endif
-
 compiler_stage3_CONFIGURE_OPTS := $(compiler_stage2_CONFIGURE_OPTS)
 
 compiler_stage1_CONFIGURE_OPTS += --ghc-option=-DSTAGE=1

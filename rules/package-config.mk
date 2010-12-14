@@ -18,8 +18,6 @@ $1_$2_HC = $$(GHC_STAGE$3)
 
 # configuration stuff that depends on which GHC we're building with
 ifeq "$3" "0"
-$1_$2_ghc_ge_6102 = $$(ghc_ge_6102)
-$1_$2_ghc_ge_611 = $$(ghc_ge_611)
 $1_$2_ghc_ge_613 = $$(ghc_ge_613)
 $1_$2_HC_CONFIG = $$(GHC_STAGE0)
 $1_$2_HC_CONFIG_DEP =
@@ -38,8 +36,6 @@ ifeq "$(ghc_ge_613)" "YES"
 $1_$2_HC_OPTS += -rtsopts
 endif
 else
-$1_$2_ghc_ge_6102 = YES
-$1_$2_ghc_ge_611 = YES
 $1_$2_ghc_ge_613 = YES
 $1_$2_HC_PKGCONF = 
 $1_$2_HC_CONFIG = $$(TOP)/$$(DUMMY_GHC_INPLACE)
