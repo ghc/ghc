@@ -1457,11 +1457,13 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
             where (_, xc) = go co x
                   (yr,yc) = go co y
         go co ty@(TyConApp con args)
-               | isTupleTyCon con = (caseTuple (tupleTyConBoxity con) xrs,True)
-               | null args        = (caseTrivial,False)	 -- T
-               | or (init xcs)    = (caseWrongArg,True)	 -- T (..var..)    ty
-               | last xcs         = 			 -- T (..no var..) ty
-	       	      		    (caseTyApp (fst (splitAppTy ty)) (last xrs),True)
+               | not (or xcs)     = (caseTrivial, False)   -- Variable does not occur
+               -- At this point we know that xrs, xcs is not empty,
+               -- and at least one xr is True
+               | isTupleTyCon con = (caseTuple (tupleTyConBoxity con) xrs, True)
+               | or (init xcs)    = (caseWrongArg, True)   -- T (..var..)    ty
+               | otherwise        =                        -- T (..no var..) ty
+                                    (caseTyApp (fst (splitAppTy ty)) (last xrs), True)
             where (xrs,xcs) = unzip (map (go co) args)
         go co (ForAllTy v x) | v /= var && xc = (caseForAll v xr,True)
             where (xr,xc) = go co x

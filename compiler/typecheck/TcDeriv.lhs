@@ -750,7 +750,7 @@ inferConstraints _ cls inst_tys rep_tc rep_tc_args
 
     get_constrained_tys :: [Type] -> [Type]
     get_constrained_tys tys 
-    	| is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
+        | is_functor_like = concatMap (deepSubtypesContaining last_tv) tys
     	| otherwise	  = tys
 
     rep_tc_tvs = tyConTyVars rep_tc
