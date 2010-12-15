@@ -704,7 +704,6 @@ loop:
 
   case TSO:
       copy(p,info,q,sizeofW(StgTSO),gen);
-      evacuate((StgClosure**)&(((StgTSO*)(*p))->stackobj));
       return;
 
   case STACK:
