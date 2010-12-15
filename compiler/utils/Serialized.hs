@@ -82,11 +82,7 @@ serializeConstr :: ConstrRep -> [Word8] -> [Word8]
 serializeConstr (AlgConstr ix)   = serializeWord8 1 . serializeInt ix
 serializeConstr (IntConstr i)    = serializeWord8 2 . serializeInteger i
 serializeConstr (FloatConstr r)  = serializeWord8 3 . serializeRational r
-#if __GLASGOW_HASKELL__ < 611
-serializeConstr (StringConstr s) = serializeWord8 4 . serializeString s
-#else
 serializeConstr (CharConstr c)   = serializeWord8 4 . serializeChar c
-#endif
 
 
 deserializeConstr :: [Word8] -> (ConstrRep -> [Word8] -> a) -> a
@@ -95,11 +91,7 @@ deserializeConstr bytes k = deserializeWord8 bytes $ \constr_ix bytes ->
                                 1 -> deserializeInt      bytes $ \ix -> k (AlgConstr ix)
                                 2 -> deserializeInteger  bytes $ \i  -> k (IntConstr i)
                                 3 -> deserializeRational bytes $ \r  -> k (FloatConstr r)
-#if __GLASGOW_HASKELL__ >= 611
                                 4 -> deserializeChar     bytes $ \c  -> k (CharConstr c)
-#else
-                                4 -> deserializeString   bytes $ \s  -> k (StringConstr s)
-#endif
                                 x -> error $ "deserializeConstr: unrecognised serialized constructor type " ++ show x ++ " in context " ++ show bytes
 
 
@@ -158,13 +150,11 @@ deserializeInteger :: [Word8] -> (Integer -> [Word8] -> a) -> a
 deserializeInteger bytes k = deserializeString bytes (k . read)
 
 
-#if __GLASGOW_HASKELL__ >= 611
 serializeChar :: Char -> [Word8] -> [Word8]
 serializeChar = serializeString . show
 
 deserializeChar :: [Word8] -> (Char -> [Word8] -> a) -> a
 deserializeChar bytes k = deserializeString bytes (k . read)
-#endif
 
 
 serializeString :: String -> [Word8] -> [Word8]

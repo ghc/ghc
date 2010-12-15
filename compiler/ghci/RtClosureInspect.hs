@@ -59,12 +59,7 @@ import Constants        ( wORD_SIZE )
 
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
-
-#if __GLASGOW_HASKELL__ >= 611
 import GHC.IO ( IO(..) )
-#else
-import GHC.IOBase ( IO(..) )
-#endif
 
 import Control.Monad
 import Data.Maybe

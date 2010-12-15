@@ -26,11 +26,7 @@ module BreakArray
   ) where
 #ifdef GHCI
 import GHC.Exts
-#if __GLASGOW_HASKELL__ >= 611
 import GHC.IO ( IO(..) )
-#else
-import GHC.IOBase ( IO(..) )
-#endif
 import Constants
 
 data BreakArray = BA (MutableByteArray# RealWorld)

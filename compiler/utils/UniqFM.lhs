@@ -183,20 +183,7 @@ plusUFM (UFM x) (UFM y) = UFM (M.union y x)
 plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
-#if __GLASGOW_HASKELL__ >= 611
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
-#else
--- In GHC 6.10, intersectionWith is (a -> b -> a) instead of (a -> b -> c),
--- so we need to jump through some hoops to get the more general type.
-intersectUFM_C f (UFM x) (UFM y) = UFM z
-    where z = let x' = M.map Left x
-                  f' (Left a) b = Right (f a b)
-                  f' (Right _) _ = panic "intersectUFM_C: f': Right"
-                  z' = M.intersectionWith f' x' y
-                  fromRight (Right a) = a
-                  fromRight _ = panic "intersectUFM_C: Left"
-              in M.map fromRight z'
-#endif
 
 foldUFM k z (UFM m) = M.fold k z m
 foldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m

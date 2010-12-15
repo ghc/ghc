@@ -81,12 +81,7 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Exts
 import GHC.Word                 ( Word8(..) )
-
-#if __GLASGOW_HASKELL__ >= 611
 import GHC.IO ( IO(..) )
-#else
-import GHC.IOBase ( IO(..) )
-#endif
 
 type BinArray = ForeignPtr Word8
 

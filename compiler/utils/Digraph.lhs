@@ -50,12 +50,7 @@ import Control.Monad.ST
 import Data.Maybe
 import Data.Array
 import Data.List   ( (\\) )
-
-#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
 import Data.Array.ST
-#else
-import Data.Array.ST  hiding ( indices, bounds )
-#endif
 \end{code}
 
 %************************************************************************

@@ -1019,11 +1019,3 @@ abstractDataType :: String -> DataType
 abstractDataType n = mkDataType n [abstractConstr n]
 \end{code}
 
-\begin{code}
--- Old GHC versions come with a base library with this function misspelled.
-#if __GLASGOW_HASKELL__ < 612
-mkNoRepType :: String -> DataType
-mkNoRepType = mkNorepType
-#endif
-\end{code}
-

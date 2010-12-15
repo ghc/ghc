@@ -31,11 +31,7 @@ import FastTypes
 
 import MonadUtils
 import Control.Monad
-#if __GLASGOW_HASKELL__ >= 611
 import GHC.IO (unsafeDupableInterleaveIO)
-#else
-import GHC.IOBase (unsafeDupableInterleaveIO)
-#endif
 
 \end{code}
 

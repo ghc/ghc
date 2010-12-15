@@ -4,9 +4,6 @@ places in the GHC library.
 */
 
 #include "Rts.h"
-#if __GLASGOW_HASKELL__ <= 610
-#include "RtsFlags.h"
-#endif
 
 #include "HsFFI.h"
 

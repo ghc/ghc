@@ -107,16 +107,6 @@ import Data.Char
 import Data.Data
 \end{code}
 
-\begin{code}
--- Unicode TODO: put isSymbol in libcompat
-#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
-#else
-isSymbol :: a -> Bool
-isSymbol = const False
-#endif
-
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection{Name space}
