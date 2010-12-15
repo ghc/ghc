@@ -49,7 +49,7 @@ test('4262', [ skip, # skip for now, it doesn't give reliable results
                if_compiler_lt('ghc', '7.1', expect_fail) ],
              compile_and_run, [''])
 
-test('4813', normal, compile_and_run, ['-debug'])
+test('4813', normal, compile_and_run, [''])
 test('4811', normal, compile_and_run, [''])
 
 # -----------------------------------------------------------------------------
