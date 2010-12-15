@@ -46,15 +46,10 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.Binary as Bin
 import qualified Data.Binary.Get as Bin
 
-#if __GLASGOW_HASKELL__ < 612 || defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 -- mingw32 needs these for getExecDir, GHC <6.12 needs them for openNewFile
 import Foreign
 import Foreign.C
-#endif
-
-#if __GLASGOW_HASKELL__ < 612
-import System.Posix.Internals
-import GHC.Handle (fdToHandle)
 #endif
 
 #ifdef mingw32_HOST_OS
@@ -68,7 +63,7 @@ import System.Process(runInteractiveCommand)
 import qualified System.Info(os)
 #endif
 
-#if !defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 611 && !defined(BOOTSTRAPPING)
+#if !defined(mingw32_HOST_OS) && !defined(BOOTSTRAPPING)
 import System.Console.Terminfo as Terminfo
 #endif
 
@@ -645,10 +640,8 @@ registerPackage input verbosity my_flags auto_ghci_libs update force = do
       "-" -> do
         when (verbosity >= Normal) $
             putStr "Reading package info from stdin ... "
-#if __GLASGOW_HASKELL__ >= 612
         -- fix the encoding to UTF-8, since this is an interchange format
         hSetEncoding stdin utf8
-#endif
         getContents
       f   -> do
         when (verbosity >= Normal) $
@@ -852,7 +845,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 
   if simple_output then show_simple stack else do
 
-#if defined(mingw32_HOST_OS) || __GLASGOW_HASKELL__ < 611 || defined(BOOTSTRAPPING)
+#if defined(mingw32_HOST_OS) || defined(BOOTSTRAPPING)
   mapM_ show_normal stack
 #else
   let
@@ -942,10 +935,8 @@ dumpPackages verbosity my_flags = do
 
 doDump :: [InstalledPackageInfo] -> IO ()
 doDump pkgs = do
-#if __GLASGOW_HASKELL__ >= 612
   -- fix the encoding to UTF-8, since this is an interchange format
   hSetEncoding stdout utf8
-#endif
   mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo $ pkgs
 
 -- PackageId is can have globVersion for the version
@@ -1561,9 +1552,7 @@ writeBinaryFileAtomic targetFile obj =
 writeFileUtf8Atomic :: FilePath -> String -> IO ()
 writeFileUtf8Atomic targetFile content =
   withFileAtomic targetFile $ \h -> do
-#if __GLASGOW_HASKELL__ >= 612
      hSetEncoding h utf8
-#endif
      hPutStr h content
 
 -- copied from Cabal's Distribution.Simple.Utils, except that we want
@@ -1600,65 +1589,10 @@ withFileAtomic targetFile write_content = do
 
 openNewFile :: FilePath -> String -> IO (FilePath, Handle)
 openNewFile dir template = do
-#if __GLASGOW_HASKELL__ >= 612
   -- this was added to System.IO in 6.12.1
   -- we must use this version because the version below opens the file
   -- in binary mode.
   openTempFileWithDefaultPermissions dir template
-#else
-  -- Ugh, this is a copy/paste of code from the base library, but
-  -- if uses 666 rather than 600 for the permissions.
-  pid <- c_getpid
-  findTempName pid
-  where
-    -- We split off the last extension, so we can use .foo.ext files
-    -- for temporary files (hidden on Unix OSes). Unfortunately we're
-    -- below filepath in the hierarchy here.
-    (prefix,suffix) =
-       case break (== '.') $ reverse template of
-         -- First case: template contains no '.'s. Just re-reverse it.
-         (rev_suffix, "")       -> (reverse rev_suffix, "")
-         -- Second case: template contains at least one '.'. Strip the
-         -- dot from the prefix and prepend it to the suffix (if we don't
-         -- do this, the unique number will get added after the '.' and
-         -- thus be part of the extension, which is wrong.)
-         (rev_suffix, '.':rest) -> (reverse rest, '.':reverse rev_suffix)
-         -- Otherwise, something is wrong, because (break (== '.')) should
-         -- always return a pair with either the empty string or a string
-         -- beginning with '.' as the second component.
-         _                      -> error "bug in System.IO.openTempFile"
-
-    oflags = rw_flags .|. o_EXCL
-
-    withFilePath = withCString
-
-    findTempName x = do
-      fd <- withFilePath filepath $ \ f ->
-              c_open f oflags 0o666
-      if fd < 0
-       then do
-         errno <- getErrno
-         if errno == eEXIST
-           then findTempName (x+1)
-           else ioError (errnoToIOError "openNewBinaryFile" errno Nothing (Just dir))
-       else do
-         -- XXX We want to tell fdToHandle what the filepath is,
-         -- as any exceptions etc will only be able to report the
-         -- fd currently
-         h <-
-              fdToHandle fd
-              `Exception.onException` c_close fd
-         return (filepath, h)
-      where
-        filename        = prefix ++ show x ++ suffix
-        filepath        = dir `combine` filename
-
--- XXX Copied from GHC.Handle
-std_flags, output_flags, rw_flags :: CInt
-std_flags    = o_NONBLOCK   .|. o_NOCTTY
-output_flags = std_flags    .|. o_CREAT
-rw_flags     = output_flags .|. o_RDWR
-#endif /* GLASGOW_HASKELL < 612 */
 
 -- | The function splits the given string to substrings
 -- using 'isSearchPathSeparator'.
@@ -1683,10 +1617,8 @@ parseSearchPath path = split path
 readUTF8File :: FilePath -> IO String
 readUTF8File file = do
   h <- openFile file ReadMode
-#if __GLASGOW_HASKELL__ >= 612
   -- fix the encoding to UTF-8
   hSetEncoding h utf8
-#endif
   hGetContents h
 
 -- removeFileSave doesn't throw an exceptions, if the file is already deleted

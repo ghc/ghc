@@ -1,9 +1,5 @@
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
-#if __GLASGOW_HASKELL__ < 603
-#include "config.h"
-#else
 #include "ghcconfig.h"
-#endif
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2004
