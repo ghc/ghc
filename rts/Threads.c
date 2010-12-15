@@ -490,6 +490,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
 {
     StgStack *new_stack, *old_stack;
     StgUnderflowFrame *frame;
+    lnat chunk_size;
 
     IF_DEBUG(sanity,checkTSO(tso));
 
@@ -543,18 +544,37 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
         return;
     }
 
-    debugTraceCap(DEBUG_sched, cap,
-                  "allocating new stack chunk of size %d bytes",
-                  RtsFlags.GcFlags.stkChunkSize * sizeof(W_));
-
     old_stack = tso->stackobj;
 
-    new_stack = (StgStack*) allocate(cap, RtsFlags.GcFlags.stkChunkSize);
+    // If we used less than half of the previous stack chunk, then we
+    // must have failed a stack check for a large amount of stack.  In
+    // this case we allocate a double-sized chunk to try to
+    // accommodate the large stack request.  If that also fails, the
+    // next chunk will be 4x normal size, and so on.
+    //
+    // It would be better to have the mutator tell us how much stack
+    // was needed, as we do with heap allocations, but this works for
+    // now.
+    //
+    if (old_stack->sp > old_stack->stack + old_stack->stack_size / 2)
+    {
+        chunk_size = 2 * (old_stack->stack_size + sizeofW(StgStack));
+    }
+    else
+    {
+        chunk_size = RtsFlags.GcFlags.stkChunkSize;
+    }
+
+    debugTraceCap(DEBUG_sched, cap,
+                  "allocating new stack chunk of size %d bytes",
+                  chunk_size * sizeof(W_));
+
+    new_stack = (StgStack*) allocate(cap, chunk_size);
     SET_HDR(new_stack, &stg_STACK_info, CCS_SYSTEM);
-    TICK_ALLOC_STACK(RtsFlags.GcFlags.stkChunkSize);
+    TICK_ALLOC_STACK(chunk_size);
 
     new_stack->dirty = 0; // begin clean, we'll mark it dirty below
-    new_stack->stack_size = RtsFlags.GcFlags.stkChunkSize - sizeofW(StgStack);
+    new_stack->stack_size = chunk_size - sizeofW(StgStack);
     new_stack->sp = new_stack->stack + new_stack->stack_size;
 
     tso->tot_stack_size += new_stack->stack_size;
