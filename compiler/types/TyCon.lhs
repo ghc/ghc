@@ -582,13 +582,23 @@ data CoTyConDesc
 
 Note [Enumeration types]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-We define datatypes with no constructors to not be
+We define datatypes with no constructors to *not* be
 enumerations; this fixes trac #2578,  Otherwise we
 end up generating an empty table for
   <mod>_<type>_closure_tbl
 which is used by tagToEnum# to map Int# to constructors
 in an enumeration. The empty table apparently upset
 the linker.
+
+Moreover, all the data constructor must be enumerations, meaning
+they have type  (forall abc. T a b c).  GADTs are not enumerations.
+For example consider
+    data T a where
+      T1 :: T Int
+      T2 :: T Bool
+      T3 :: T a
+What would [T1 ..] be?  [T1,T3] :: T Int? Easiest thing is to exclude them.
+See Trac #4528.
 
 Note [Newtype coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
