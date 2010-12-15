@@ -2,5 +2,5 @@
 mod55.hs:3:26:
     Can't make a derived instance of `Enum T':
       `T' is not an enumeration type
-        (an enumeration consists of one or more nullary constructors)
+      (an enumeration consists of one or more nullary, non-GADT constructors)
     In the data type declaration for `T'
