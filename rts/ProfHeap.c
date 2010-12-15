@@ -947,19 +947,35 @@ heapCensusChain( Census *census, bdescr *bd )
 		prim = rtsTrue;
 #ifdef PROFILING
 		if (RtsFlags.ProfFlags.includeTSOs) {
-		    size = tso_sizeW((StgTSO *)p);
+                    size = sizeofW(StgTSO);
 		    break;
 		} else {
 		    // Skip this TSO and move on to the next object
-		    p += tso_sizeW((StgTSO *)p);
+                    p += sizeofW(StgTSO);
 		    continue;
 		}
 #else
-		size = tso_sizeW((StgTSO *)p);
+                size = sizeofW(StgTSO);
 		break;
 #endif
 
-	    case TREC_CHUNK:
+            case STACK:
+		prim = rtsTrue;
+#ifdef PROFILING
+		if (RtsFlags.ProfFlags.includeTSOs) {
+                    size = stack_sizeW((StgStack*)p);
+                    break;
+		} else {
+		    // Skip this TSO and move on to the next object
+                    p += stack_sizeW((StgStack*)p);
+		    continue;
+		}
+#else
+                size = stack_sizeW((StgStack*)p);
+		break;
+#endif
+
+            case TREC_CHUNK:
 		prim = rtsTrue;
 		size = sizeofW(StgTRecChunk);
 		break;

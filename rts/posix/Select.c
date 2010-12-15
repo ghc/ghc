@@ -63,10 +63,6 @@ wakeUpSleepingThreads(lnat ticks)
 
     while (sleeping_queue != END_TSO_QUEUE) {
 	tso = sleeping_queue;
-        if (tso->what_next == ThreadRelocated) {
-            sleeping_queue = tso->_link;
-            continue;
-        }
         if (((long)ticks - (long)tso->block_info.target) < 0) {
             break;
         }
@@ -259,11 +255,7 @@ awaitEvent(rtsBool wait)
 	  for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
 	      next = tso->_link;
 
-              if (tso->what_next == ThreadRelocated) {
-                  continue;
-              }
-
-	      switch (tso->why_blocked) {
+              switch (tso->why_blocked) {
 	      case BlockedOnRead:
 		  ready = unblock_all || FD_ISSET(tso->block_info.fd, &rfd);
 		  break;

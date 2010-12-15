@@ -331,8 +331,8 @@ nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
 tso_SP, tso_STACK, tso_CCCS :: ByteOff
-tso_SP    = tsoFieldB     oFFSET_StgTSO_sp
-tso_STACK = tsoFieldB     oFFSET_StgTSO_stack
+tso_SP    = tsoFieldB     undefined --oFFSET_StgTSO_sp
+tso_STACK = tsoFieldB     undefined --oFFSET_StgTSO_stack
 tso_CCCS  = tsoProfFieldB oFFSET_StgTSO_CCCS
 
 -- The TSO struct has a variable header, and an optional StgTSOProfInfo in

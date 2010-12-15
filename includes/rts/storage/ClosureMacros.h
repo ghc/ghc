@@ -131,9 +131,9 @@
 
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \
-   LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)(c));       \
-   SET_INFO((c), (new_info));                                  \
-   LDV_RECORD_CREATE(c);
+    OVERWRITING_CLOSURE((StgClosure *)(c));                     \
+    SET_INFO((c), (new_info));                                  \
+    LDV_RECORD_CREATE(c);
 
 /* -----------------------------------------------------------------------------
    How to get hold of the static link field for a static closure.
@@ -289,8 +289,8 @@ INLINE_HEADER StgOffset arr_words_sizeW( StgArrWords* x )
 INLINE_HEADER StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->size; }
 
-INLINE_HEADER StgWord tso_sizeW ( StgTSO *tso )
-{ return TSO_STRUCT_SIZEW + tso->stack_size; }
+INLINE_HEADER StgWord stack_sizeW ( StgStack *stack )
+{ return sizeofW(StgStack) + stack->stack_size; }
 
 INLINE_HEADER StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
@@ -339,7 +339,9 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
     case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
     case TSO:
-	return tso_sizeW((StgTSO *)p);
+        return sizeofW(StgTSO);
+    case STACK:
+        return stack_sizeW((StgStack*)p);
     case BCO:
 	return bco_sizeW((StgBCO *)p);
     case TREC_CHUNK:
@@ -415,6 +417,64 @@ INLINE_HEADER lnat mutArrPtrsCardTableSize (lnat elems)
 INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, lnat n)
 {
     return ((StgWord8 *)&(a->payload[a->ptrs]) + n);
+}
+
+/* -----------------------------------------------------------------------------
+   Replacing a closure with a different one.  We must call
+   OVERWRITING_CLOSURE(p) on the old closure that is about to be
+   overwritten.
+
+   In PROFILING mode, LDV profiling requires that we fill the slop
+   with zeroes, and record the old closure as dead (LDV_recordDead()).
+
+   In DEBUG mode, we must overwrite the slop with zeroes, because the
+   sanity checker wants to walk through the heap checking all the
+   pointers.
+
+   In multicore mode, we *cannot* overwrite slop with zeroes, because
+   another thread might be reading it.  So,
+
+      PROFILING is not compatible with  +RTS -N<n> (for n > 1)
+
+      THREADED_RTS can be used with DEBUG, but full heap sanity
+      checking is disabled.
+
+   -------------------------------------------------------------------------- */
+
+#if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
+#define OVERWRITING_CLOSURE(c) overwritingClosure(c)
+#else
+#define OVERWRITING_CLOSURE(c) /* nothing */
+#endif
+
+#ifdef PROFILING
+void LDV_recordDead (StgClosure *c, nat size);
+#endif
+
+#ifdef KEEP_INLINES
+void overwritingClosure (StgClosure *p);
+#else
+INLINE_HEADER
+#endif
+void
+overwritingClosure (StgClosure *p)
+{
+    nat size, i;
+
+#if defined(PROFILING)
+    if (era <= 0) return;
+#endif
+
+    size = closure_sizeW(p);
+
+    // For LDV profiling, we need to record the closure as dead
+#if defined(PROFILING)
+    LDV_recordDead((StgClosure *)(p), size);
+#endif
+
+    for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
+        ((StgThunk *)(p))->payload[i] = 0;
+    }
 }
 
 #endif /* RTS_STORAGE_CLOSUREMACROS_H */

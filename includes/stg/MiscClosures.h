@@ -61,6 +61,7 @@ RTS_RET(stg_catch_stm_frame);
 RTS_RET(stg_unmaskAsyncExceptionszh_ret);
 RTS_RET(stg_maskUninterruptiblezh_ret);
 RTS_RET(stg_maskAsyncExceptionszh_ret);
+RTS_RET(stg_stack_underflow_frame);
 
 // RTS_FUN(stg_interp_constr_entry);
 //
@@ -100,6 +101,7 @@ RTS_ENTRY(stg_STABLE_NAME);
 RTS_ENTRY(stg_MVAR_CLEAN);
 RTS_ENTRY(stg_MVAR_DIRTY);
 RTS_ENTRY(stg_TSO);
+RTS_ENTRY(stg_STACK);
 RTS_ENTRY(stg_ARR_WORDS);
 RTS_ENTRY(stg_MUT_ARR_WORDS);
 RTS_ENTRY(stg_MUT_ARR_PTRS_CLEAN);
@@ -119,6 +121,7 @@ RTS_ENTRY(stg_PAP);
 RTS_ENTRY(stg_AP);
 RTS_ENTRY(stg_AP_NOUPD);
 RTS_ENTRY(stg_AP_STACK);
+RTS_ENTRY(stg_AP_STACK_NOUPD);
 RTS_ENTRY(stg_dummy_ret);
 RTS_ENTRY(stg_raise);
 RTS_ENTRY(stg_raise_ret);

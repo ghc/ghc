@@ -424,22 +424,88 @@
 
       <varlistentry>
 	<term>
-         <option>-k</option><replaceable>size</replaceable>
+         <option>-ki</option><replaceable>size</replaceable>
          <indexterm><primary><option>-k</option></primary><secondary>RTS option</secondary></indexterm>
-         <indexterm><primary>stack, minimum size</primary></indexterm>
+         <indexterm><primary>stack, initial size</primary></indexterm>
         </term>
 	<listitem>
-	  <para>&lsqb;Default: 1k&rsqb; Set the initial stack size for
-          new threads.  Thread stacks (including the main thread's
-          stack) live on the heap, and grow as required.  The default
-          value is good for concurrent applications with lots of small
-          threads; if your program doesn't fit this model then
-          increasing this option may help performance.</para>
+          <para>
+            &lsqb;Default: 1k&rsqb; Set the initial stack size for new
+            threads.  (Note: this flag used to be
+            simply <option>-k</option>, but was renamed
+            to <option>-ki</option> in GHC 7.2.1.  The old name is
+            still accepted for backwards compatibility, but that may
+            be removed in a future version).
+          </para>
 
-	  <para>The main thread is normally started with a slightly
-          larger heap to cut down on unnecessary stack growth while
-          the program is starting up.</para>
-	</listitem>
+          <para>
+            Thread stacks (including the main thread's stack) live on
+            the heap.  As the stack grows, new stack chunks are added
+            as required; if the stack shrinks again, these extra stack
+            chunks are reclaimed by the garbage collector.  The
+            default initial stack size is deliberately small, in order
+            to keep the time and space overhead for thread creation to
+            a minimum, and to make it practical to spawn threads for
+            even tiny pieces of work.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-kc</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-kc</option></primary><secondary>RTS
+          option</secondary></indexterm>
+          <indexterm><primary>stack</primary><secondary>chunk size</secondary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            &lsqb;Default: 32k&rsqb; Set the size of &ldquo;stack
+            chunks&rdquo;.  When a thread's current stack overflows, a
+            new stack chunk is created and added to the thread's
+            stack, until the limit set by <option>-K</option> is
+            reached.
+          </para>
+
+          <para>
+            The advantage of smaller stack chunks is that the garbage
+            collector can avoid traversing stack chunks if they are
+            known to be unmodified since the last collection, so
+            reducing the chunk size means that the garbage collector
+            can identify more stack as unmodified, and the GC overhead
+            might be reduced.  On the other hand, making stack chunks
+            too small adds some overhead as there will be more
+            overflow/underflow between chunks.  The default setting of
+            32k appears to be a reasonable compromise in most cases.
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-kb</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-kc</option></primary><secondary>RTS
+          option</secondary></indexterm>
+          <indexterm><primary>stack</primary><secondary>chunk buffer size</secondary></indexterm>
+        </term>
+        <listitem>
+          <para>
+            &lsqb;Default: 1k&rsqb; Sets the stack chunk buffer size.
+            When a stack chunk overflows and a new stack chunk is
+            created, some of the data from the previous stack chunk is
+            moved into the new chunk, to avoid an immediate underflow
+            and repeated overflow/underflow at the boundary.  The
+            amount of stack moved is set by the <option>-kb</option>
+            option.
+          </para>
+          <para>
+            Note that to avoid wasting space, this value should
+            typically be less than 10&percnt; of the size of a stack
+            chunk (<option>-kc</option>), because in a chain of stack
+            chunks, each chunk will have a gap of unused space of this
+            size.
+          </para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>
@@ -451,9 +517,14 @@
 	<listitem>
 	  <para>&lsqb;Default: 8M&rsqb; Set the maximum stack size for
           an individual thread to <replaceable>size</replaceable>
-          bytes.  This option is there purely to stop the program
-          eating up all the available memory in the machine if it gets
-          into an infinite loop.</para>
+          bytes.  If the thread attempts to exceed this limit, it will
+            be send the <literal>StackOverflow</literal> exception.
+          </para>
+          <para>
+            This option is there mainly to stop the program eating up
+            all the available memory in the machine if it gets into an
+            infinite loop.
+          </para>
 	</listitem>
       </varlistentry>
 

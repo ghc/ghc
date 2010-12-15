@@ -19,6 +19,23 @@ import EnterCriticalSection;
 import LeaveCriticalSection;
 
 /* ----------------------------------------------------------------------------
+   Stack underflow
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME, P_ unused)
+{
+    W_ new_tso;
+    W_ ret_off;
+
+    SAVE_THREAD_STATE();
+    ("ptr" ret_off) = foreign "C" threadStackUnderflow(MyCapability(),
+                                                       CurrentTSO);
+    LOAD_THREAD_STATE();
+
+    jump %ENTRY_CODE(Sp(ret_off));
+}
+
+/* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
 
@@ -352,6 +369,9 @@ loop:
 
 INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
 { foreign "C" barf("TSO object entered!") never returns; }
+
+INFO_TABLE(stg_STACK, 0,0, STACK, "STACK", "STACK")
+{ foreign "C" barf("STACK object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Weak pointers

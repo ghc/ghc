@@ -467,6 +467,12 @@
 #define mutArrPtrsCardWords(n) \
     ROUNDUP_BYTES_TO_WDS(((n) + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) >> MUT_ARR_PTRS_CARD_BITS)
 
+#if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
+#define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
+#else
+#define OVERWRITING_CLOSURE(c) /* nothing */
+#endif
+
 /* -----------------------------------------------------------------------------
    Voluntary Yields/Blocks
 

@@ -375,8 +375,8 @@ rts_getBool (HaskellObj p)
    -------------------------------------------------------------------------- */
 
 INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
-  tso->sp--;
-  tso->sp[0] = (W_) c;
+  tso->stackobj->sp--;
+  tso->stackobj->sp[0] = (W_) c;
 }
 
 StgTSO *

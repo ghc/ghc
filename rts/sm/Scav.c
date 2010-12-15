@@ -51,14 +51,6 @@ scavengeTSO (StgTSO *tso)
 {
     rtsBool saved_eager;
 
-    if (tso->what_next == ThreadRelocated) {
-        // the only way this can happen is if the old TSO was on the
-        // mutable list.  We might have other links to this defunct
-        // TSO, so we must update its link field.
-        evacuate((StgClosure**)&tso->_link);
-        return;
-    }
-
     debugTrace(DEBUG_gc,"scavenging thread %d",(int)tso->id);
 
     // update the pointer from the Task.
@@ -69,17 +61,13 @@ scavengeTSO (StgTSO *tso)
     saved_eager = gct->eager_promotion;
     gct->eager_promotion = rtsFalse;
 
-
     evacuate((StgClosure **)&tso->blocked_exceptions);
     evacuate((StgClosure **)&tso->bq);
     
     // scavange current transaction record
     evacuate((StgClosure **)&tso->trec);
-    
-    // scavenge this thread's stack 
-    scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
 
-    tso->dirty = gct->failed_to_evac;
+    evacuate((StgClosure **)&tso->stackobj);
 
     evacuate((StgClosure **)&tso->_link);
     if (   tso->why_blocked == BlockedOnMVar
@@ -99,11 +87,7 @@ scavengeTSO (StgTSO *tso)
     }
 #endif
 
-    if (tso->dirty == 0 && gct->failed_to_evac) {
-        tso->flags |= TSO_LINK_DIRTY;
-    } else {
-        tso->flags &= ~TSO_LINK_DIRTY;
-    }
+    tso->dirty = gct->failed_to_evac;
 
     gct->eager_promotion = saved_eager;
 }
@@ -661,10 +645,23 @@ scavenge_block (bdescr *bd)
 
     case TSO:
     { 
-	StgTSO *tso = (StgTSO *)p;
-        scavengeTSO(tso);
-	p += tso_sizeW(tso);
+        scavengeTSO((StgTSO *)p);
+        p += sizeofW(StgTSO);
 	break;
+    }
+
+    case STACK:
+    {
+        StgStack *stack = (StgStack*)p;
+
+        gct->eager_promotion = rtsFalse;
+
+        scavenge_stack(stack->sp, stack->stack + stack->stack_size);
+        stack->dirty = gct->failed_to_evac;
+        p += stack_sizeW(stack);
+
+        gct->eager_promotion = saved_eager_promotion;
+        break;
     }
 
     case MUT_PRIM:
@@ -991,6 +988,19 @@ scavenge_mark_stack(void)
 	    break;
 	}
 
+        case STACK:
+        {
+            StgStack *stack = (StgStack*)p;
+
+            gct->eager_promotion = rtsFalse;
+
+            scavenge_stack(stack->sp, stack->stack + stack->stack_size);
+            stack->dirty = gct->failed_to_evac;
+
+            gct->eager_promotion = saved_eager_promotion;
+            break;
+        }
+
         case MUT_PRIM:
         {
             StgPtr end;
@@ -1227,6 +1237,19 @@ scavenge_one(StgPtr p)
 	break;
     }
   
+    case STACK:
+    {
+        StgStack *stack = (StgStack*)p;
+
+        gct->eager_promotion = rtsFalse;
+
+        scavenge_stack(stack->sp, stack->stack + stack->stack_size);
+        stack->dirty = gct->failed_to_evac;
+
+        gct->eager_promotion = saved_eager_promotion;
+        break;
+    }
+
     case MUT_PRIM:
     {
 	StgPtr end;
@@ -1374,33 +1397,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 		recordMutableGen_GC((StgClosure *)p,gen->no);
 		continue;
             }
-	    case TSO: {
-		StgTSO *tso = (StgTSO *)p;
-		if (tso->dirty == 0) {
-                    // Should be on the mutable list because its link
-                    // field is dirty.  However, in parallel GC we may
-                    // have a thread on multiple mutable lists, so
-                    // this assertion would be invalid:
-                    // ASSERT(tso->flags & TSO_LINK_DIRTY);
-
-                    evacuate((StgClosure **)&tso->_link);
-                    if (   tso->why_blocked == BlockedOnMVar
-                        || tso->why_blocked == BlockedOnBlackHole
-                        || tso->why_blocked == BlockedOnMsgThrowTo
-                        || tso->why_blocked == NotBlocked
-                        ) {
-                        evacuate((StgClosure **)&tso->block_info.prev);
-                    }
-                    if (gct->failed_to_evac) {
-                        recordMutableGen_GC((StgClosure *)p,gen->no);
-                        gct->failed_to_evac = rtsFalse;
-                    } else {
-                        tso->flags &= ~TSO_LINK_DIRTY;
-                    }
-		    continue;
-		}
-	    }
-	    default:
+            default:
 		;
 	    }
 
@@ -1643,6 +1640,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
     case CATCH_STM_FRAME:
     case CATCH_RETRY_FRAME:
     case ATOMICALLY_FRAME:
+    case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case CATCH_FRAME:
     case RET_SMALL:

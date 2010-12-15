@@ -67,12 +67,7 @@ isAlive(StgClosure *p)
 
     // large objects use the evacuated flag
     if (bd->flags & BF_LARGE) {
-        if (get_itbl(q)->type == TSO &&
-            ((StgTSO *)p)->what_next == ThreadRelocated) {
-            p = (StgClosure *)((StgTSO *)p)->_link;
-            continue;
-        }
-	return NULL;
+        return NULL;
     }
 
     // check the mark bit for compacted steps
@@ -97,13 +92,6 @@ isAlive(StgClosure *p)
       // follow indirections 
       p = ((StgInd *)q)->indirectee;
       continue;
-
-    case TSO:
-      if (((StgTSO *)q)->what_next == ThreadRelocated) {
-	p = (StgClosure *)((StgTSO *)q)->_link;
-	continue;
-      } 
-      return NULL;
 
     default:
       // dead. 

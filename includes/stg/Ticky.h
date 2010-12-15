@@ -190,7 +190,8 @@ EXTERN StgInt RET_SEMI_loads_avoided INIT(0);
 #define TICK_UPD_SQUEEZED()
 #define TICK_ALLOC_HEAP_NOCTR(x)
 #define TICK_GC_FAILED_PROMOTION()
-#define TICK_ALLOC_TSO(g,s)
+#define TICK_ALLOC_TSO()
+#define TICK_ALLOC_STACK(g)
 #define TICK_ALLOC_UP_THK(g,s)
 #define TICK_ALLOC_SE_THK(g,s)
 

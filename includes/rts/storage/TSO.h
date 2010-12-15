@@ -83,7 +83,7 @@ typedef struct StgTSO_ {
       Currently used for linking TSOs on:
       * cap->run_queue_{hd,tl}
       * (non-THREADED_RTS); the blocked_queue
-      * and pointing to the relocated version of a ThreadRelocated
+      * and pointing to the next chunk for a ThreadOldStack
 
        NOTE!!!  do not modify _link directly, it is subject to
        a write barrier for generational GC.  Instead use the
@@ -97,7 +97,11 @@ typedef struct StgTSO_ {
     struct StgTSO_*         global_link;    // Links threads on the
                                             // generation->threads lists
     
-    StgWord                 dirty;          /* non-zero => dirty */
+    /*
+     * The thread's stack
+     */
+    struct StgStack_       *stackobj;
+
     /*
      * The tso->dirty flag indicates that this TSO's stack should be
      * scanned during garbage collection.  It also indicates that this
@@ -110,10 +114,6 @@ typedef struct StgTSO_ {
      *
      * tso->dirty is set by dirty_TSO(), and unset by the garbage
      * collector (only).
-     *
-     * The link field has a separate dirty bit of its own, namely the
-     * bit TSO_LINK_DIRTY in the tso->flags field, set by
-     * setTSOLink().
      */
 
     StgWord16               what_next;      // Values defined in Constants.h
@@ -121,21 +121,21 @@ typedef struct StgTSO_ {
     StgWord32               flags;          // Values defined in Constants.h
     StgTSOBlockInfo         block_info;
     StgThreadID             id;
-    int                     saved_errno;
+    StgWord32               saved_errno;
+    StgWord32               dirty;          /* non-zero => dirty */
     struct InCall_*         bound;
     struct Capability_*     cap;
+
     struct StgTRecHeader_ * trec;       /* STM transaction record */
 
     /*
-       A list of threads blocked on this TSO waiting to throw
-       exceptions.  In order to access this field, the TSO must be
-       locked using lockClosure/unlockClosure (see SMP.h).
+     * A list of threads blocked on this TSO waiting to throw exceptions.
     */
     struct MessageThrowTo_ * blocked_exceptions;
 
     /*
-      A list of StgBlockingQueue objects, representing threads blocked
-      on thunks that are under evaluation by this thread.
+     * A list of StgBlockingQueue objects, representing threads
+     * blocked on thunks that are under evaluation by this thread.
     */
     struct StgBlockingQueue_ *bq;
 
@@ -149,13 +149,35 @@ typedef struct StgTSO_ {
     StgWord32 saved_winerror;
 #endif
 
-    /* The thread stack... */
-    StgWord32	       stack_size;     /* stack size in *words* */
-    StgWord32          max_stack_size; /* maximum stack size in *words* */
-    StgPtr             sp;
-    
-    StgWord            stack[FLEXIBLE_ARRAY];
+    /*
+     * sum of the sizes of all stack chunks (in words), used to decide
+     * whether to throw the StackOverflow exception when the stack
+     * overflows, or whether to just chain on another stack chunk.
+     *
+     * Note that this overestimates the real stack size, because each
+     * chunk will have a gap at the end, of +RTS -kb<size> words.
+     * This means stack overflows are not entirely accurate, because
+     * the more gaps there are, the sooner the stack will run into the
+     * hard +RTS -K<size> limit.
+     */
+    StgWord32  tot_stack_size;
+
 } *StgTSOPtr;
+
+typedef struct StgStack_ {
+    StgHeader  header;
+    StgWord32  stack_size;     // stack size in *words*
+    StgWord32  dirty;          // non-zero => dirty
+    StgPtr     sp;             // current stack pointer
+    StgWord    stack[FLEXIBLE_ARRAY];
+} StgStack;
+
+// Calculate SpLim from a TSO (reads tso->stackobj, but no fields from
+// the stackobj itself).
+INLINE_HEADER StgPtr tso_SpLim (StgTSO* tso)
+{
+    return tso->stackobj->stack + RESERVED_STACK_WORDS;
+}
 
 /* -----------------------------------------------------------------------------
    functions
@@ -165,17 +187,7 @@ void dirty_TSO  (Capability *cap, StgTSO *tso);
 void setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target);
 void setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target);
 
-// Apply to a TSO before looking at it if you are not sure whether it
-// might be ThreadRelocated or not (basically, that's most of the time
-// unless the TSO is the current TSO).
-//
-INLINE_HEADER StgTSO * deRefTSO(StgTSO *tso)
-{
-    while (tso->what_next == ThreadRelocated) {
-	tso = tso->_link;
-    }
-    return tso;
-}
+void dirty_STACK (Capability *cap, StgStack *stack);
 
 /* -----------------------------------------------------------------------------
    Invariants:
@@ -231,18 +243,6 @@ INLINE_HEADER StgTSO * deRefTSO(StgTSO *tso)
    BlockedOnBlackHole case for that.   -- HWL
 
  ---------------------------------------------------------------------------- */
-
-/* Workaround for a bug/quirk in gcc on certain architectures.
- * symptom is that (&tso->stack - &tso->header) /=  sizeof(StgTSO)
- * in other words, gcc pads the structure at the end.
- */
-
-extern StgTSO dummy_tso;
-
-#define TSO_STRUCT_SIZE \
-   ((char *)&dummy_tso.stack - (char *)&dummy_tso.header)
-
-#define TSO_STRUCT_SIZEW (TSO_STRUCT_SIZE / sizeof(W_))
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)

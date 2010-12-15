@@ -283,11 +283,6 @@ stg_killThreadzh
      * If the exception went to a catch frame, we'll just continue from
      * the handler.
      */
-  loop:
-    if (StgTSO_what_next(target) == ThreadRelocated::I16) {
-        target = StgTSO__link(target);
-        goto loop;
-    }
     if (target == CurrentTSO) {
         /*
          * So what should happen if a thread calls "throwTo self" inside
@@ -436,9 +431,9 @@ stg_raisezh
 #endif
     
 retry_pop_stack:
-    StgTSO_sp(CurrentTSO) = Sp;
+    SAVE_THREAD_STATE();
     (frame_type) = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", exception "ptr") [];
-    Sp = StgTSO_sp(CurrentTSO);
+    LOAD_THREAD_STATE();
     if (frame_type == ATOMICALLY_FRAME) {
       /* The exception has reached the edge of a memory transaction.  Check that 
        * the transaction is valid.  If not then perhaps the exception should
@@ -511,8 +506,10 @@ retry_pop_stack:
 	 * We will leave the stack in a GC'able state, see the stg_stop_thread
 	 * entry code in StgStartup.cmm.
 	 */
-	Sp = CurrentTSO + TSO_OFFSET_StgTSO_stack 
-		+ WDS(TO_W_(StgTSO_stack_size(CurrentTSO))) - WDS(2);
+        W_ stack;
+        stack = StgTSO_stackobj(CurrentTSO);
+        Sp = stack + OFFSET_StgStack_stack
+                + WDS(TO_W_(StgStack_stack_size(stack))) - WDS(2);
 	Sp(1) = exception;	/* save the exception */
 	Sp(0) = stg_enter_info; /* so that GC can traverse this stack */
 	StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;

@@ -14,7 +14,6 @@
 void    heapCensus         (void);
 nat     initHeapProfiling  (void);
 void    endHeapProfiling   (void);
-void    LDV_recordDead     (StgClosure *c, nat size);
 rtsBool strMatchesSelector (char* str, char* sel);
 
 #include "EndPrivate.h"

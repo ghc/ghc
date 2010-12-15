@@ -350,3 +350,56 @@ for:
 
   ENTER();
 }
+
+/* -----------------------------------------------------------------------------
+   AP_STACK_NOUPD - exactly like AP_STACK, but doesn't push an update frame.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_AP_STACK_NOUPD,/*special layout*/0,0,AP_STACK,
+                                        "AP_STACK_NOUPD","AP_STACK_NOUPD")
+{
+  W_ Words;
+  W_ ap;
+
+  ap = R1;
+  
+  Words = StgAP_STACK_size(ap);
+
+  /* 
+   * Check for stack overflow.  IMPORTANT: use a _NP check here,
+   * because if the check fails, we might end up blackholing this very
+   * closure, in which case we must enter the blackhole on return rather
+   * than continuing to evaluate the now-defunct closure.
+   */
+  STK_CHK_NP(WDS(Words) + WDS(AP_STACK_SPLIM));
+  /* ensure there is at least AP_STACK_SPLIM words of headroom available
+   * after unpacking the AP_STACK. See bug #1466 */
+
+  Sp = Sp - WDS(Words);
+
+  TICK_ENT_AP();
+  LDV_ENTER(ap);
+
+  // Enter PAP cost centre
+  ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
+
+  // Reload the stack
+  W_ i;
+  W_ p;
+  p = ap + SIZEOF_StgHeader + OFFSET_StgAP_STACK_payload;
+  i = 0;
+for:
+  if (i < Words) {
+    Sp(i) = W_[p];
+    p = p + WDS(1);
+    i = i + 1;
+    goto for;
+  }
+
+  // Off we go!
+  TICK_ENT_VIA_NODE();
+
+  R1 = StgAP_STACK_fun(ap);
+
+  ENTER();
+}

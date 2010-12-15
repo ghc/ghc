@@ -495,57 +495,18 @@ resizeNurseries (nat blocks)
 
 
 /* -----------------------------------------------------------------------------
-   move_TSO is called to update the TSO structure after it has been
+   move_STACK is called to update the TSO structure after it has been
    moved from one place to another.
    -------------------------------------------------------------------------- */
 
 void
-move_TSO (StgTSO *src, StgTSO *dest)
+move_STACK (StgStack *src, StgStack *dest)
 {
     ptrdiff_t diff;
 
     // relocate the stack pointer... 
     diff = (StgPtr)dest - (StgPtr)src; // In *words* 
     dest->sp = (StgPtr)dest->sp + diff;
-}
-
-/* -----------------------------------------------------------------------------
-   split N blocks off the front of the given bdescr, returning the
-   new block group.  We add the remainder to the large_blocks list
-   in the same step as the original block.
-   -------------------------------------------------------------------------- */
-
-bdescr *
-splitLargeBlock (bdescr *bd, nat blocks)
-{
-    bdescr *new_bd;
-
-    ACQUIRE_SM_LOCK;
-
-    ASSERT(countBlocks(bd->gen->large_objects) == bd->gen->n_large_blocks);
-
-    // subtract the original number of blocks from the counter first
-    bd->gen->n_large_blocks -= bd->blocks;
-
-    new_bd = splitBlockGroup (bd, blocks);
-    initBdescr(new_bd, bd->gen, bd->gen->to);
-    new_bd->flags   = BF_LARGE | (bd->flags & BF_EVACUATED); 
-    // if new_bd is in an old generation, we have to set BF_EVACUATED
-    new_bd->free    = bd->free;
-    dbl_link_onto(new_bd, &bd->gen->large_objects);
-
-    ASSERT(new_bd->free <= new_bd->start + new_bd->blocks * BLOCK_SIZE_W);
-
-    // add the new number of blocks to the counter.  Due to the gaps
-    // for block descriptors, new_bd->blocks + bd->blocks might not be
-    // equal to the original bd->blocks, which is why we do it this way.
-    bd->gen->n_large_blocks += bd->blocks + new_bd->blocks;
-
-    ASSERT(countBlocks(bd->gen->large_objects) == bd->gen->n_large_blocks);
-
-    RELEASE_SM_LOCK;
-
-    return new_bd;
 }
 
 /* -----------------------------------------------------------------------------
@@ -731,8 +692,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0 && (tso->flags & TSO_LINK_DIRTY) == 0) {
-        tso->flags |= TSO_LINK_DIRTY;
+    if (tso->dirty == 0) {
+        tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->_link = target;
@@ -741,8 +702,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
-    if (tso->dirty == 0 && (tso->flags & TSO_LINK_DIRTY) == 0) {
-        tso->flags |= TSO_LINK_DIRTY;
+    if (tso->dirty == 0) {
+        tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
     }
     tso->block_info.prev = target;
@@ -751,10 +712,19 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
-    if (tso->dirty == 0 && (tso->flags & TSO_LINK_DIRTY) == 0) {
+    if (tso->dirty == 0) {
+        tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
     }
-    tso->dirty = 1;
+}
+
+void
+dirty_STACK (Capability *cap, StgStack *stack)
+{
+    if (stack->dirty == 0) {
+        stack->dirty = 1;
+        recordClosureMutated(cap,(StgClosure*)stack);
+    }
 }
 
 /*

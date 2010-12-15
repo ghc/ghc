@@ -98,11 +98,13 @@ loop:
         r = throwToMsg(cap, t);
 
         switch (r) {
-        case THROWTO_SUCCESS:
+        case THROWTO_SUCCESS: {
             // this message is done
-            unlockClosure((StgClosure*)m, &stg_MSG_NULL_info);
-            tryWakeupThread(cap, t->source);
+            StgTSO *source = t->source;
+            doneWithMsgThrowTo(t);
+            tryWakeupThread(cap, source);
             break;
+        }
         case THROWTO_BLOCKED:
             // unlock the message
             unlockClosure((StgClosure*)m, &stg_MSG_THROWTO_info);
@@ -203,7 +205,7 @@ loop:
 
     else if (info == &stg_TSO_info)
     {
-        owner = deRefTSO((StgTSO *)p);
+        owner = (StgTSO*)p;
 
 #ifdef THREADED_RTS
         if (owner->cap != cap) {
@@ -265,7 +267,7 @@ loop:
 
         ASSERT(bq->bh == bh);
 
-        owner = deRefTSO(bq->owner);
+        owner = bq->owner;
 
         ASSERT(owner != END_TSO_QUEUE);
 

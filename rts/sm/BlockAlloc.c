@@ -577,48 +577,6 @@ freeChain_lock(bdescr *bd)
     RELEASE_SM_LOCK;
 }
 
-// splitBlockGroup(bd,B) splits bd in two.  Afterward, bd will have B
-// blocks, and a new block descriptor pointing to the remainder is
-// returned.
-bdescr *
-splitBlockGroup (bdescr *bd, nat blocks)
-{
-    bdescr *new_bd;
-
-    if (bd->blocks <= blocks) {
-        barf("splitLargeBlock: too small");
-    }
-
-    if (bd->blocks > BLOCKS_PER_MBLOCK) {
-        nat low_mblocks, high_mblocks;
-        void *new_mblock;
-        if ((blocks - BLOCKS_PER_MBLOCK) % (MBLOCK_SIZE / BLOCK_SIZE) != 0) {
-            barf("splitLargeBlock: not a multiple of a megablock");
-        }
-        low_mblocks = 1 + (blocks - BLOCKS_PER_MBLOCK) / (MBLOCK_SIZE / BLOCK_SIZE);
-        high_mblocks = (bd->blocks - blocks) / (MBLOCK_SIZE / BLOCK_SIZE);
-
-        new_mblock = (void *) ((P_)MBLOCK_ROUND_DOWN(bd) + (W_)low_mblocks * MBLOCK_SIZE_W);
-        initMBlock(new_mblock);
-        new_bd = FIRST_BDESCR(new_mblock);
-        new_bd->blocks = MBLOCK_GROUP_BLOCKS(high_mblocks);
-
-        ASSERT(blocks + new_bd->blocks == 
-               bd->blocks + BLOCKS_PER_MBLOCK - MBLOCK_SIZE/BLOCK_SIZE);
-    }
-    else
-    {
-        // NB. we're not updating all the bdescrs in the split groups to
-        // point to the new heads, so this can only be used for large
-        // objects which do not start in the non-head block.
-        new_bd = bd + blocks;
-        new_bd->blocks = bd->blocks - blocks;
-    }
-    bd->blocks = blocks;
-
-    return new_bd;
-}
-
 static void
 initMBlock(void *mblock)
 {

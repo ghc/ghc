@@ -265,7 +265,7 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
 INLINE_HEADER void traceEventCreateThread(Capability *cap STG_UNUSED, 
                                           StgTSO     *tso STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_CREATE_THREAD, tso, tso->stack_size);
+    traceSchedEvent(cap, EVENT_CREATE_THREAD, tso, tso->stackobj->stack_size);
     dtraceCreateThread((EventCapNo)cap->no, (EventThreadID)tso->id);
 }
 

@@ -260,12 +260,6 @@ static rtsBool tidyThreadList (generation *gen)
         }
         
         ASSERT(get_itbl(t)->type == TSO);
-        if (t->what_next == ThreadRelocated) {
-            next = t->_link;
-            *prev = next;
-            continue;
-        }
-        
         next = t->global_link;
         
         // if the thread is not masking exceptions but there are

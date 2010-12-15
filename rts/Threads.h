@@ -21,9 +21,6 @@ void wakeBlockingQueue   (Capability *cap, StgBlockingQueue *bq);
 void tryWakeupThread     (Capability *cap, StgTSO *tso);
 void migrateThread       (Capability *from, StgTSO *tso, Capability *to);
 
-// like tryWakeupThread(), but assumes the TSO is not ThreadRelocated
-void tryWakeupThread_    (Capability *cap, StgTSO *tso);
-
 // Wakes up a thread on a Capability (probably a different Capability
 // from the one held by the current Task).
 //
@@ -40,6 +37,10 @@ rtsBool removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso)
 rtsBool removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, StgTSO *tso);
 
 StgBool isThreadBound (StgTSO* tso);
+
+// Overfow/underflow
+void threadStackOverflow  (Capability *cap, StgTSO *tso);
+nat  threadStackUnderflow (Capability *cap, StgTSO *tso);
 
 #ifdef DEBUG
 void printThreadBlockage (StgTSO *tso);

@@ -29,6 +29,8 @@ struct GC_FLAGS {
 
     nat     maxStkSize;         /* in *words* */
     nat     initialStkSize;     /* in *words* */
+    nat     stkChunkSize;       /* in *words* */
+    nat     stkChunkBufferSize; /* in *words* */
 
     nat	    maxHeapSize;        /* in *blocks* */
     nat     minAllocAreaSize;   /* in *blocks* */

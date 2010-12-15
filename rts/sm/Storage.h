@@ -146,7 +146,7 @@ extern bdescr *exec_block;
 
 #define END_OF_STATIC_LIST ((StgClosure*)1)
 
-void move_TSO  (StgTSO *src, StgTSO *dest);
+void move_STACK  (StgStack *src, StgStack *dest);
 
 extern StgClosure * caf_list;
 extern StgClosure * revertible_caf_list;

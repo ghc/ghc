@@ -276,20 +276,7 @@ start:
 	    prev = NULL;
 	    for(tso = blocked_queue_hd ; tso != END_TSO_QUEUE; tso = tso->_link) {
 	
-                if (tso->what_next == ThreadRelocated) {
-                    /* Drop the TSO from blocked_queue */
-                    if (prev) {
-                        setTSOLink(&MainCapability, prev, tso->_link);
-                    } else {
-                        blocked_queue_hd = tso->_link;
-                    }
-                    if (blocked_queue_tl == tso) {
-                        blocked_queue_tl = prev ? prev : END_TSO_QUEUE;
-                    }
-                    continue;
-                }
-
-		switch(tso->why_blocked) {
+                switch(tso->why_blocked) {
 		case BlockedOnRead:
 		case BlockedOnWrite:
 		case BlockedOnDoProc:

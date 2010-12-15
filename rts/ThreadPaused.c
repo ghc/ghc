@@ -44,13 +44,13 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
     //    contains two values: the size of the gap, and the distance
     //    to the next gap (or the stack top).
 
-    frame = tso->sp;
+    frame = tso->stackobj->sp;
 
     ASSERT(frame < bottom);
     
     prev_was_update_frame = rtsFalse;
     current_gap_size = 0;
-    gap = (struct stack_gap *) (tso->sp - sizeofW(StgUpdateFrame));
+    gap = (struct stack_gap *) (frame - sizeofW(StgUpdateFrame));
 
     while (frame <= bottom) {
 	
@@ -150,7 +150,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
 	next_gap_start = (StgWord8*)gap + sizeof(StgUpdateFrame);
 	sp = next_gap_start;
 
-	while ((StgPtr)gap > tso->sp) {
+        while ((StgPtr)gap > tso->stackobj->sp) {
 
 	    // we're working in *bytes* now...
 	    gap_start = next_gap_start;
@@ -164,7 +164,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
 	    memmove(sp, next_gap_start, chunk_size);
 	}
 
-	tso->sp = (StgPtr)sp;
+        tso->stackobj->sp = (StgPtr)sp;
     }
 }    
 
@@ -201,26 +201,26 @@ threadPaused(Capability *cap, StgTSO *tso)
     // blackholing, or eager blackholing consistently.  See Note
     // [upd-black-hole] in sm/Scav.c.
 
-    stack_end = &tso->stack[tso->stack_size];
+    stack_end = tso->stackobj->stack + tso->stackobj->stack_size;
     
-    frame = (StgClosure *)tso->sp;
+    frame = (StgClosure *)tso->stackobj->sp;
 
-    while (1) {
-	// If we've already marked this frame, then stop here.
-	if (frame->header.info == (StgInfoTable *)&stg_marked_upd_frame_info) {
-	    if (prev_was_update_frame) {
-		words_to_squeeze += sizeofW(StgUpdateFrame);
-		weight += weight_pending;
-		weight_pending = 0;
-	    }
-	    goto end;
-	}
-
-	info = get_ret_itbl(frame);
+    while ((P_)frame < stack_end) {
+        info = get_ret_itbl(frame);
 	
 	switch (info->i.type) {
-	    
+
 	case UPDATE_FRAME:
+
+            // If we've already marked this frame, then stop here.
+            if (frame->header.info == (StgInfoTable *)&stg_marked_upd_frame_info) {
+                if (prev_was_update_frame) {
+                    words_to_squeeze += sizeofW(StgUpdateFrame);
+                    weight += weight_pending;
+                    weight_pending = 0;
+                }
+                goto end;
+            }
 
 	    SET_INFO(frame, (StgInfoTable *)&stg_marked_upd_frame_info);
 
@@ -235,7 +235,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             {
 		debugTrace(DEBUG_squeeze,
 			   "suspending duplicate work: %ld words of stack",
-			   (long)((StgPtr)frame - tso->sp));
+                           (long)((StgPtr)frame - tso->stackobj->sp));
 
 		// If this closure is already an indirection, then
 		// suspend the computation up to this point.
@@ -245,25 +245,22 @@ threadPaused(Capability *cap, StgTSO *tso)
 
 		// Now drop the update frame, and arrange to return
 		// the value to the frame underneath:
-		tso->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - 2;
-		tso->sp[1] = (StgWord)bh;
+                tso->stackobj->sp = (StgPtr)frame + sizeofW(StgUpdateFrame) - 2;
+                tso->stackobj->sp[1] = (StgWord)bh;
                 ASSERT(bh->header.info != &stg_TSO_info);
-		tso->sp[0] = (W_)&stg_enter_info;
+                tso->stackobj->sp[0] = (W_)&stg_enter_info;
 
 		// And continue with threadPaused; there might be
 		// yet more computation to suspend.
-                frame = (StgClosure *)(tso->sp + 2);
+                frame = (StgClosure *)(tso->stackobj->sp + 2);
                 prev_was_update_frame = rtsFalse;
                 continue;
 	    }
 
+
             // zero out the slop so that the sanity checker can tell
             // where the next closure is.
-            DEBUG_FILL_SLOP(bh);
-
-            // @LDV profiling
-            // We pretend that bh is now dead.
-            LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)bh);
+            OVERWRITING_CLOSURE(bh);
 
             // an EAGER_BLACKHOLE or CAF_BLACKHOLE gets turned into a
             // BLACKHOLE here.
@@ -301,7 +298,8 @@ threadPaused(Capability *cap, StgTSO *tso)
 	    prev_was_update_frame = rtsTrue;
 	    break;
 	    
-	case STOP_FRAME:
+        case UNDERFLOW_FRAME:
+        case STOP_FRAME:
 	    goto end;
 	    
 	    // normal stack frames; do nothing except advance the pointer

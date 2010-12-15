@@ -198,8 +198,7 @@
 #define ThreadRunGHC    1	/* return to address on top of stack */
 #define ThreadInterpret 2	/* interpret this thread */
 #define ThreadKilled	3	/* thread has died, don't run it */
-#define ThreadRelocated	4	/* thread has moved, link points to new locn */
-#define ThreadComplete	5	/* thread has finished */
+#define ThreadComplete  4       /* thread has finished */
 
 /*
  * Constants for the why_blocked field of a TSO
@@ -264,11 +263,6 @@
 #define TSO_BLOCKEX       4
 #define TSO_INTERRUPTIBLE 8
 #define TSO_STOPPED_ON_BREAKPOINT 16 
-
-/*
- * TSO_LINK_DIRTY is set when a TSO's link field is modified
- */
-#define TSO_LINK_DIRTY 32
 
 /*
  * Used by the sanity checker to check whether TSOs are on the correct

@@ -69,6 +69,8 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.GcFlags.maxStkSize		= (8 * 1024 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize	= 1024 / sizeof(W_);
+    RtsFlags.GcFlags.stkChunkSize       = (32 * 1024) / sizeof(W_);
+    RtsFlags.GcFlags.stkChunkBufferSize = (1 * 1024) / sizeof(W_);
 
     RtsFlags.GcFlags.minAllocAreaSize   = (512 * 1024)        / BLOCK_SIZE;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
@@ -194,7 +196,9 @@ usage_text[] = {
 "  --info   Print information about the RTS used by this program",
 "",
 "  -K<size> Sets the maximum stack size (default 8M)  Egs: -K32k   -K512k",
-"  -k<size> Sets the initial thread stack size (default 1k)  Egs: -k4k   -k2m",
+"  -ki<size> Sets the initial thread stack size (default 1k)  Egs: -ki4k -ki2m",
+"  -kc<size> Sets the stack chunk size (default 32k)",
+"  -kb<size> Sets the stack chunk buffer size (default 1k)",
 "",
 "  -A<size> Sets the minimum allocation area size (default 512k) Egs: -A1m -A10k",
 "  -M<size> Sets the maximum heap size (default unlimited)  Egs: -M256k -M1G",
@@ -693,15 +697,31 @@ error = rtsTrue;
 
 	      case 'K':
                   RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, 1, HS_WORD_MAX) / sizeof(W_);
+                      decodeSize(rts_argv[arg], 2, sizeof(W_), HS_WORD_MAX) / sizeof(W_);
                   break;
 
 	      case 'k':
-                  RtsFlags.GcFlags.initialStkSize =
-                      decodeSize(rts_argv[arg], 2, 1, HS_WORD_MAX) / sizeof(W_);
+		switch(rts_argv[arg][2]) {
+                case 'c':
+                  RtsFlags.GcFlags.stkChunkSize =
+                      decodeSize(rts_argv[arg], 3, sizeof(W_), HS_WORD_MAX) / sizeof(W_);
                   break;
+                case 'b':
+                  RtsFlags.GcFlags.stkChunkBufferSize =
+                      decodeSize(rts_argv[arg], 3, sizeof(W_), HS_WORD_MAX) / sizeof(W_);
+                  break;
+                case 'i':
+                  RtsFlags.GcFlags.initialStkSize =
+                      decodeSize(rts_argv[arg], 3, sizeof(W_), HS_WORD_MAX) / sizeof(W_);
+                  break;
+                default:
+                  RtsFlags.GcFlags.initialStkSize =
+                      decodeSize(rts_argv[arg], 2, sizeof(W_), HS_WORD_MAX) / sizeof(W_);
+                  break;
+                }
+                break;
 
-	      case 'M':
+              case 'M':
                   RtsFlags.GcFlags.maxHeapSize =
                       decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE;
                   /* user give size in *bytes* but "maxHeapSize" is in *blocks* */
@@ -1201,6 +1221,12 @@ error = rtsTrue;
             RtsFlags.MiscFlags.tickInterval;
     } else {
         RtsFlags.ProfFlags.profileIntervalTicks = 0;
+    }
+
+    if (RtsFlags.GcFlags.stkChunkBufferSize >
+        RtsFlags.GcFlags.stkChunkSize / 2) {
+        errorBelch("stack chunk buffer size (-kb) must be less than 50%% of the stack chunk size (-kc)");
+        error = rtsTrue;
     }
 
     if (error) {

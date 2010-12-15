@@ -485,14 +485,7 @@ loop:
       /* evacuate large objects by re-linking them onto a different list.
        */
       if (bd->flags & BF_LARGE) {
-	  info = get_itbl(q);
-	  if (info->type == TSO && 
-	      ((StgTSO *)q)->what_next == ThreadRelocated) {
-	      q = (StgClosure *)((StgTSO *)q)->_link;
-              *p = q;
-	      goto loop;
-	  }
-	  evacuate_large((P_)q);
+          evacuate_large((P_)q);
 	  return;
       }
       
@@ -675,6 +668,7 @@ loop:
   case RET_BIG:
   case RET_DYN:
   case UPDATE_FRAME:
+  case UNDERFLOW_FRAME:
   case STOP_FRAME:
   case CATCH_FRAME:
   case CATCH_STM_FRAME:
@@ -709,31 +703,28 @@ loop:
       return;
 
   case TSO:
+      copy(p,info,q,sizeofW(StgTSO),gen);
+      evacuate((StgClosure**)&(((StgTSO*)(*p))->stackobj));
+      return;
+
+  case STACK:
     {
-      StgTSO *tso = (StgTSO *)q;
+      StgStack *stack = (StgStack *)q;
 
-      /* Deal with redirected TSOs (a TSO that's had its stack enlarged).
-       */
-      if (tso->what_next == ThreadRelocated) {
-	q = (StgClosure *)tso->_link;
-	*p = q;
-	goto loop;
-      }
-
-      /* To evacuate a small TSO, we need to adjust the stack pointer
+      /* To evacuate a small STACK, we need to adjust the stack pointer
        */
       {
-	  StgTSO *new_tso;
+          StgStack *new_stack;
 	  StgPtr r, s;
           rtsBool mine;
 
-	  mine = copyPart(p,(StgClosure *)tso, tso_sizeW(tso), 
-                          sizeofW(StgTSO), gen);
+          mine = copyPart(p,(StgClosure *)stack, stack_sizeW(stack),
+                          sizeofW(StgStack), gen);
           if (mine) {
-              new_tso = (StgTSO *)*p;
-              move_TSO(tso, new_tso);
-              for (r = tso->sp, s = new_tso->sp;
-                   r < tso->stack+tso->stack_size;) {
+              new_stack = (StgStack *)*p;
+              move_STACK(stack, new_stack);
+              for (r = stack->sp, s = new_stack->sp;
+                   r < stack->stack + stack->stack_size;) {
                   *s++ = *r++;
               }
           }
@@ -952,7 +943,7 @@ selector_loop:
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
               SET_INFO(p, (StgInfoTable *)info_ptr);
-              LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)p);
+              OVERWRITING_CLOSURE(p);
               SET_INFO(p, &stg_WHITEHOLE_info);
 #endif
 

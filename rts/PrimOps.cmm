@@ -634,11 +634,6 @@ stg_threadStatuszh
     W_ ret;
 
     tso = R1;
-    loop:
-      if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
-          tso = StgTSO__link(tso);
-          goto loop;
-      }
 
     what_next   = TO_W_(StgTSO_what_next(tso));
     why_blocked = TO_W_(StgTSO_why_blocked(tso));
@@ -939,9 +934,9 @@ stg_retryzh
 
   // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
 retry_pop_stack:
-  StgTSO_sp(CurrentTSO) = Sp;
-  (frame_type) = foreign "C" findRetryFrameHelper(CurrentTSO "ptr") [];
-  Sp = StgTSO_sp(CurrentTSO);
+  SAVE_THREAD_STATE();
+  (frame_type) = foreign "C" findRetryFrameHelper(MyCapability(), CurrentTSO "ptr") [];
+  LOAD_THREAD_STATE();
   frame = Sp;
   trec = StgTSO_trec(CurrentTSO);
   outer  = StgTRecHeader_enclosing_trec(trec);
@@ -1138,13 +1133,13 @@ stg_newMVarzh
 }
 
 
-#define PerformTake(tso, value)				\
-    W_[StgTSO_sp(tso) + WDS(1)] = value;		\
-    W_[StgTSO_sp(tso) + WDS(0)] = stg_gc_unpt_r1_info;
+#define PerformTake(stack, value)                       \
+    W_[StgStack_sp(stack) + WDS(1)] = value;            \
+    W_[StgStack_sp(stack) + WDS(0)] = stg_gc_unpt_r1_info;
 
-#define PerformPut(tso,lval)			\
-    StgTSO_sp(tso) = StgTSO_sp(tso) + WDS(3);	\
-    lval = W_[StgTSO_sp(tso) - WDS(1)];
+#define PerformPut(stack,lval)                      \
+    StgStack_sp(stack) = StgStack_sp(stack) + WDS(3);   \
+    lval = W_[StgStack_sp(stack) - WDS(1)];
 
 stg_takeMVarzh
 {
@@ -1224,24 +1219,20 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-loop2:
-    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
-        tso = StgTSO__link(tso);
-        goto loop2;
-    }
-
     ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
     ASSERT(StgTSO_block_info(tso) == mvar);
 
     // actually perform the putMVar for the thread that we just woke up
-    PerformPut(tso,StgMVar_value(mvar));
+    W_ stack;
+    stack = StgTSO_stackobj(tso);
+    PerformPut(stack, StgMVar_value(mvar));
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
     // no need to mark the TSO dirty, we have only written END_TSO_QUEUE.
 
-    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
+    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
     
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_P(val);
@@ -1303,24 +1294,20 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-loop2:
-    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
-        tso = StgTSO__link(tso);
-        goto loop2;
-    }
-
     ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
     ASSERT(StgTSO_block_info(tso) == mvar);
 
     // actually perform the putMVar for the thread that we just woke up
-    PerformPut(tso,StgMVar_value(mvar));
+    W_ stack;
+    stack = StgTSO_stackobj(tso);
+    PerformPut(stack, StgMVar_value(mvar));
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
     // no need to mark the TSO dirty, we have only written END_TSO_QUEUE.
 
-    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
+    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
     
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_NP(1,val);
@@ -1395,26 +1382,22 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-loop2:
-    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
-        tso = StgTSO__link(tso);
-        goto loop2;
-    }
-
     ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
     ASSERT(StgTSO_block_info(tso) == mvar);
 
     // actually perform the takeMVar
-    PerformTake(tso, val);
+    W_ stack;
+    stack = StgTSO_stackobj(tso);
+    PerformTake(stack, val);
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
-    
-    if (TO_W_(StgTSO_dirty(tso)) == 0) {
-        foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
+
+    if (TO_W_(StgStack_dirty(stack)) == 0) {
+        foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
     }
     
-    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
+    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     jump %ENTRY_CODE(Sp(0));
@@ -1468,26 +1451,22 @@ loop:
         StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
     }
 
-loop2:
-    if (TO_W_(StgTSO_what_next(tso)) == ThreadRelocated) {
-        tso = StgTSO__link(tso);
-        goto loop2;
-    }
-
     ASSERT(StgTSO_why_blocked(tso) == BlockedOnMVar::I16);
     ASSERT(StgTSO_block_info(tso) == mvar);
 
     // actually perform the takeMVar
-    PerformTake(tso, val);
+    W_ stack;
+    stack = StgTSO_stackobj(tso);
+    PerformTake(stack, val);
 
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
-    if (TO_W_(StgTSO_dirty(tso)) == 0) {
-        foreign "C" dirty_TSO(MyCapability() "ptr", tso "ptr") [];
+    if (TO_W_(StgStack_dirty(stack)) == 0) {
+        foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
     }
     
-    foreign "C" tryWakeupThread_(MyCapability() "ptr", tso) [];
+    foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
     RET_N(1);

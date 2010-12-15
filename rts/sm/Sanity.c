@@ -35,6 +35,7 @@
 static void      checkSmallBitmap    ( StgPtr payload, StgWord bitmap, nat );
 static void      checkLargeBitmap    ( StgPtr payload, StgLargeBitmap*, nat );
 static void      checkClosureShallow ( StgClosure * );
+static void      checkSTACK          (StgStack *stack);
 
 /* -----------------------------------------------------------------------------
    Check stack sanity
@@ -139,6 +140,7 @@ checkStackFrame( StgPtr c )
     case CATCH_STM_FRAME:
     case CATCH_FRAME:
       // small bitmap cases (<= 32 entries)
+    case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case RET_SMALL:
 	size = BITMAP_SIZE(info->i.layout.bitmap);
@@ -331,7 +333,7 @@ checkClosure( StgClosure* p )
 
         ASSERT(get_itbl(bq->owner)->type == TSO);
         ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE 
-               || get_itbl(bq->queue)->type == TSO);
+               || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
         ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
                get_itbl(bq->link)->type == IND ||
                get_itbl(bq->link)->type == BLOCKING_QUEUE);
@@ -384,6 +386,7 @@ checkClosure( StgClosure* p )
     case RET_BIG:
     case RET_DYN:
     case UPDATE_FRAME:
+    case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case CATCH_FRAME:
     case ATOMICALLY_FRAME:
@@ -431,7 +434,11 @@ checkClosure( StgClosure* p )
 
     case TSO:
         checkTSO((StgTSO *)p);
-        return tso_sizeW((StgTSO *)p);
+        return sizeofW(StgTSO);
+
+    case STACK:
+        checkSTACK((StgStack*)p);
+        return stack_sizeW((StgStack*)p);
 
     case TREC_CHUNK:
       {
@@ -514,19 +521,21 @@ checkLargeObjects(bdescr *bd)
   }
 }
 
+static void
+checkSTACK (StgStack *stack)
+{
+    StgPtr sp = stack->sp;
+    StgOffset stack_size = stack->stack_size;
+    StgPtr stack_end = stack->stack + stack_size;
+
+    ASSERT(stack->stack <= sp && sp <= stack_end);
+
+    checkStackChunk(sp, stack_end);
+}
+
 void
 checkTSO(StgTSO *tso)
 {
-    StgPtr sp = tso->sp;
-    StgPtr stack = tso->stack;
-    StgOffset stack_size = tso->stack_size;
-    StgPtr stack_end = stack + stack_size;
-
-    if (tso->what_next == ThreadRelocated) {
-      checkTSO(tso->_link);
-      return;
-    }
-
     if (tso->what_next == ThreadKilled) {
       /* The garbage collector doesn't bother following any pointers
        * from dead threads, so don't check sanity here.  
@@ -537,16 +546,24 @@ checkTSO(StgTSO *tso)
     ASSERT(tso->_link == END_TSO_QUEUE || 
            tso->_link->header.info == &stg_MVAR_TSO_QUEUE_info ||
            tso->_link->header.info == &stg_TSO_info);
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
+
+    if (   tso->why_blocked == BlockedOnMVar
+	|| tso->why_blocked == BlockedOnBlackHole
+	|| tso->why_blocked == BlockedOnMsgThrowTo
+        || tso->why_blocked == NotBlocked
+	) {
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
+    }
+
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->bq));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->blocked_exceptions));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->stackobj));
 
-    ASSERT(stack <= sp && sp < stack_end);
-
-    checkStackChunk(sp, stack_end);
+    // XXX are we checking the stack twice?
+    checkSTACK(tso->stackobj);
 }
 
-/* 
+/*
    Check that all TSOs have been evacuated.
    Optionally also check the sanity of the TSOs.
 */
@@ -564,11 +581,9 @@ checkGlobalTSOList (rtsBool checkTSOs)
           if (checkTSOs)
               checkTSO(tso);
 
-          tso = deRefTSO(tso);
-
           // If this TSO is dirty and in an old generation, it better
           // be on the mutable list.
-          if (tso->dirty || (tso->flags & TSO_LINK_DIRTY)) {
+          if (tso->dirty) {
               ASSERT(Bdescr((P_)tso)->gen_no == 0 || (tso->flags & TSO_MARKED));
               tso->flags &= ~TSO_MARKED;
           }

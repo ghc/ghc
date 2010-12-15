@@ -335,8 +335,9 @@ thread_stack(StgPtr p, StgPtr stack_end)
         case CATCH_STM_FRAME:
         case ATOMICALLY_FRAME:
 	case UPDATE_FRAME:
-	case STOP_FRAME:
-	case CATCH_FRAME:
+        case UNDERFLOW_FRAME:
+        case STOP_FRAME:
+        case CATCH_FRAME:
 	case RET_SMALL:
 	    bitmap = BITMAP_BITS(info->i.layout.bitmap);
 	    size   = BITMAP_SIZE(info->i.layout.bitmap);
@@ -480,8 +481,8 @@ thread_TSO (StgTSO *tso)
     
     thread_(&tso->trec);
 
-    thread_stack(tso->sp, &(tso->stack[tso->stack_size]));
-    return (StgPtr)tso + tso_sizeW(tso);
+    thread_(&tso->stackobj);
+    return (StgPtr)tso + sizeofW(StgTSO);
 }
 
 
@@ -521,9 +522,12 @@ update_fwd_large( bdescr *bd )
           continue;
       }
 
-    case TSO:
-	thread_TSO((StgTSO *)p);
-	continue;
+    case STACK:
+    {
+        StgStack *stack = (StgStack*)p;
+        thread_stack(stack->sp, stack->stack + stack->stack_size);
+        continue;
+    }
 
     case AP_STACK:
 	thread_AP_STACK((StgAP_STACK *)p);
@@ -706,6 +710,13 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case TSO:
 	return thread_TSO((StgTSO *)p);
     
+    case STACK:
+    {
+        StgStack *stack = (StgStack*)p;
+        thread_stack(stack->sp, stack->stack + stack->stack_size);
+        return p + stack_sizeW(stack);
+    }
+
     case TREC_CHUNK:
     {
         StgWord i;
@@ -899,8 +910,8 @@ update_bkwd_compact( generation *gen )
 	    }
 
 	    // relocate TSOs
-	    if (info->type == TSO) {
-		move_TSO((StgTSO *)p, (StgTSO *)free);
+            if (info->type == STACK) {
+                move_STACK((StgStack *)p, (StgStack *)free);
 	    }
 
 	    free += size;

@@ -168,6 +168,7 @@ processHeapClosureForDead( StgClosure *c )
 	// stack objects
     case UPDATE_FRAME:
     case CATCH_FRAME:
+    case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case RET_DYN:
     case RET_BCO:

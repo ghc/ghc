@@ -44,7 +44,7 @@ void wakeUpRts(void);
 StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception);
 
 /* findRetryFrameHelper */
-StgWord findRetryFrameHelper (StgTSO *tso);
+StgWord findRetryFrameHelper (Capability *cap, StgTSO *tso);
 
 /* Entry point for a new worker */
 void scheduleWorker (Capability *cap, Task *task);

@@ -243,9 +243,11 @@ nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
 tso_SP, tso_STACK, tso_CCCS :: ByteOff
-tso_SP    = tsoFieldB     oFFSET_StgTSO_sp
-tso_STACK = tsoFieldB     oFFSET_StgTSO_stack
 tso_CCCS  = tsoProfFieldB oFFSET_StgTSO_CCCS
+
+ --ToDo: needs merging with changes to CgForeign
+tso_STACK = tsoFieldB     undefined
+tso_SP    = tsoFieldB     undefined
 
 -- The TSO struct has a variable header, and an optional StgTSOProfInfo in
 -- the middle.  The fields we're interested in are after the StgTSOProfInfo.

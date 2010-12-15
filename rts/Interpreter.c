@@ -65,13 +65,13 @@
 #define BCO_LIT(n)    literals[n]
 
 #define LOAD_STACK_POINTERS					\
-    Sp = cap->r.rCurrentTSO->sp;				\
+    Sp = cap->r.rCurrentTSO->stackobj->sp;                      \
     /* We don't change this ... */				\
-    SpLim = cap->r.rCurrentTSO->stack + RESERVED_STACK_WORDS;
+    SpLim = tso_SpLim(cap->r.rCurrentTSO);
 
 #define SAVE_STACK_POINTERS			\
     ASSERT(Sp > SpLim); \
-    cap->r.rCurrentTSO->sp = Sp
+    cap->r.rCurrentTSO->stackobj->sp = Sp
 
 #define RETURN_TO_SCHEDULER(todo,retcode)	\
    SAVE_STACK_POINTERS;				\
@@ -266,7 +266,7 @@ eval_obj:
              debugBelch("Sp = %p\n", Sp);
              debugBelch("\n" );
 
-             printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
+             printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
              debugBelch("\n\n");
             );
 
@@ -381,11 +381,11 @@ do_return:
              debugBelch("Returning: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
              debugBelch("\n" );
-             printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
+             printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
              debugBelch("\n\n");
             );
 
-    IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
+    IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size));
 
     switch (get_itbl((StgClosure *)Sp)->type) {
 
@@ -466,7 +466,7 @@ do_return:
 	INTERP_TICK(it_retto_other);
 	IF_DEBUG(interpreter,
 		 debugBelch("returning to unknown frame -- yielding to sched\n"); 
-		 printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
+                 printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
 	    );
 	Sp -= 2;
 	Sp[1] = (W_)tagged_obj;
@@ -529,8 +529,8 @@ do_return_unboxed:
 	    INTERP_TICK(it_retto_other);
 	    IF_DEBUG(interpreter,
 		     debugBelch("returning to unknown frame -- yielding to sched\n"); 
-		     printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
-		);
+                     printStackChunk(Sp,cap->r.rCurrentTSO->stackobj->stack+cap->r.rCurrentTSO->stackobj->stack_size);
+                );
 	    RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
 	}
 	}
