@@ -608,6 +608,14 @@ addLongErrAt loc msg extra
 	 let { err = mkLongErrMsg loc (mkPrintUnqualified dflags rdr_env) msg extra } ;
 	 (warns, errs) <- readTcRef errs_var ;
   	 writeTcRef errs_var (warns, errs `snocBag` err) }
+
+dumpDerivingInfo :: SDoc -> TcM ()
+dumpDerivingInfo doc
+  = do { dflags <- getDOpts
+       ; when (dopt Opt_D_dump_deriv dflags) $ do
+       { rdr_env <- getGlobalRdrEnv
+       ; let unqual = mkPrintUnqualified dflags rdr_env
+       ; liftIO (putMsgWith dflags unqual doc) } }
 \end{code}
 
 

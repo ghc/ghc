@@ -637,7 +637,13 @@ data InstBindings a
                         -- in TcDeriv
 
 pprInstInfo :: InstInfo a -> SDoc
-pprInstInfo info = vcat [ptext (sLit "InstInfo:") <+> ppr (idType (iDFunId info))]
+pprInstInfo info = hang (ptext (sLit "instance"))
+                      2 (sep [ ifPprDebug (pprForAll tvs)
+                             , pprThetaArrow theta, ppr tau
+                             , ptext (sLit "where")])
+  where
+    (tvs, theta, tau) = tcSplitSigmaTy (idType (iDFunId info))
+
 
 pprInstInfoDetails :: OutputableBndr a => InstInfo a -> SDoc
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))

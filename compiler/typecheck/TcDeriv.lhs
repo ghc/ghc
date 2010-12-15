@@ -317,15 +317,16 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	; gen_binds <- mkGenericBinds is_boot tycl_decls
 	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
 
-	; dflags <- getDOpts
-	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-	         (ddump_deriving inst_info rn_binds))
+        ; when (not (null inst_info)) $
+          dumpDerivingInfo (ddump_deriving inst_info rn_binds)
 
 	; return (inst_info, rn_binds, rn_dus) }
   where
     ddump_deriving :: [InstInfo Name] -> HsValBinds Name -> SDoc
     ddump_deriving inst_infos extra_binds
-      = vcat (map pprInstInfoDetails inst_infos) $$ ppr extra_binds
+      = hang (ptext (sLit "Derived instances"))
+           2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos)
+              $$ ppr extra_binds)
 
 renameDeriv :: Bool -> LHsBinds RdrName
 	    -> [(InstInfo RdrName, DerivAuxBinds)]
@@ -901,7 +902,7 @@ cond_isEnumeration (_, rep_tc)
   where
     why = sep [ quotes (pprSourceTyCon rep_tc) <+> 
 	          ptext (sLit "is not an enumeration type")
-              , nest 2 $ ptext (sLit "(an enumeration consists of one or more nullary constructors)") ]
+              , ptext (sLit "(an enumeration consists of one or more nullary, non-GADT constructors)") ]
 		  -- See Note [Enumeration types] in TyCon
 
 cond_isProduct :: Condition

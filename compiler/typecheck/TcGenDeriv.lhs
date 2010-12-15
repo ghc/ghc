@@ -168,7 +168,7 @@ gen_Eq_binds loc tycon
   where
     (nullary_cons, nonnullary_cons)
        | isNewTyCon tycon = ([], tyConDataCons tycon)
-       | otherwise	      = partition isNullarySrcDataCon (tyConDataCons tycon)
+       | otherwise        = partition isNullarySrcDataCon (tyConDataCons tycon)
 
     no_nullary_cons = null nullary_cons
 

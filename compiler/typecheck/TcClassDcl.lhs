@@ -408,9 +408,8 @@ getGenericInstances class_decls
 	  else do 
 
 	-- Otherwise print it out
-	{ dflags <- getDOpts
-	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances"
-	         (vcat (map pprInstInfoDetails gen_inst_info)))	
+        { dumpDerivingInfo $ hang (ptext (sLit "Generic instances"))
+                                2 (vcat (map pprInstInfoDetails gen_inst_info))
 	; return gen_inst_info }}
 
 get_generics :: TyClDecl Name -> TcM [InstInfo Name]

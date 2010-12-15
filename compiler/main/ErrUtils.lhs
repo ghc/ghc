@@ -22,7 +22,7 @@ module ErrUtils (
         mkDumpDoc, dumpSDoc,
 
 	--  * Messages during compilation
-	putMsg,
+        putMsg, putMsgWith,
 	errorMsg,
 	fatalErrorMsg,
 	compilationProgressMsg,
@@ -274,6 +274,12 @@ ifVerbose dflags val act
 
 putMsg :: DynFlags -> Message -> IO ()
 putMsg dflags msg = log_action dflags SevInfo noSrcSpan defaultUserStyle msg
+
+putMsgWith :: DynFlags -> PrintUnqualified -> Message -> IO ()
+putMsgWith dflags print_unqual msg
+  = log_action dflags SevInfo noSrcSpan sty msg
+  where
+    sty = mkUserStyle print_unqual AllTheWay
 
 errorMsg :: DynFlags -> Message -> IO ()
 errorMsg dflags msg = log_action dflags SevError noSrcSpan defaultErrStyle msg
