@@ -15,11 +15,7 @@ class Sat a where
 
 data Proxy (a :: * -> *)
 
-class (Typeable a, Sat (ctx a)) => Data ctx a where
-    gfoldl :: Proxy ctx
-           -> (forall b c. Data ctx b => w (b -> c) -> b -> w c)
-           -> (forall g. g -> w g)
-           -> a -> w a
+class ( Sat (ctx a)) => Data ctx a where
     gunfold :: Proxy ctx
             -> (forall b r. Data ctx b => c (b -> r) -> c r)
             -> (forall r. r -> c r)
@@ -108,8 +104,6 @@ listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 
 instance (Sat (ctx [a]), Data ctx a) =>
          Data ctx [a] where
-  gfoldl _ _ z []     = z []
-  gfoldl _ f z (x:xs) = z (:) `f` x `f` xs
   gunfold _ k z c = case constrIndex c of
                       1 -> z []
                       2 -> k (k (z (:)))
@@ -120,7 +114,8 @@ class (Data DefaultD a) => Default a where
     defaultValue :: a
     defaultValue = defaultDefaultValue
 
-defaultDefaultValue :: (Data DefaultD a,Default a) => a
+defaultDefaultValue :: Data DefaultD a => a
+{-# NOINLINE defaultDefaultValue #-}
 defaultDefaultValue = res
     where res = case datarep $ dataTypeOf defaultProxy res of
                     AlgRep (c:_) ->
@@ -133,9 +128,11 @@ data DefaultD a = DefaultD { defaultValueD :: a }
 defaultProxy :: Proxy DefaultD
 defaultProxy = error "defaultProxy"
 
+-- dfun3
 instance Default t => Sat (DefaultD t) where
     dict = DefaultD { defaultValueD = defaultValue }
 
+-- dfun5
 instance Default a => Default [a] where
     defaultValue = []
 data Proposition = Proposition Expression deriving (Show, Typeable)
@@ -146,11 +143,9 @@ constr_Proposition = mkConstr dataType_Proposition "Proposition" [] Prefix
 dataType_Proposition :: DataType
 dataType_Proposition = mkDataType "Proposition" [constr_Proposition]
 
-instance (Data ctx Expression, Sat (ctx Proposition), Sat (ctx Expression))
-      => Data ctx Proposition
-    where gfoldl _ f z x = case x of
-                           Proposition arg -> f (z Proposition) arg
-          gunfold _ k z c = case constrIndex c of
+-- dfun1
+instance Data DefaultD Proposition
+    where gunfold _ k z c = case constrIndex c of
                             1 -> k (z Proposition)
                             _ -> error "gunfold: fallthrough"
           dataTypeOf _ _ = dataType_Proposition
@@ -160,18 +155,59 @@ constr_Conjunction = mkConstr dataType_Expression "Conjunction" [] Prefix
 dataType_Expression :: DataType
 dataType_Expression = mkDataType "Expression" [constr_Conjunction]
 
-instance (Data ctx [Expression], Sat (ctx Expression), Sat (ctx [Expression]))
+-- dfun2
+instance (Sat (ctx [Expression]), Sat (ctx Expression))
       => Data ctx Expression
-    where gfoldl _ f z x = case x of
-                           Conjunction arg -> f (z Conjunction) arg
-          gunfold _ k z c = case constrIndex c of
+    where gunfold _ k z c = case constrIndex c of
                             1 -> k (z Conjunction)
                             _ -> error "gunfold: fallthrough"
           dataTypeOf _ _ = dataType_Expression
 
-instance Default Proposition
-instance Default Expression
+-- dfun0
+instance Default Proposition where
+    defaultValue = defaultDefaultValue
+
+-- dfun4
+instance Default Expression where
+    defaultValue = defaultDefaultValue
 
 main :: IO ()
 main = putStrLn (show (defaultValue :: Proposition))
 
+{- The trouble comes from "instance Default Expression"
+
+Define:  dfun4 : Default Expression = MkDefault d_aCl (..)
+
+Simplify the superclass:
+  Wanted:  d_aCl : Data DefaultD Expression
+  Derived: d_aCn : Sat DefaultD Expression       d_aCn = $p1 d_aCl  {irrelevant}
+
+  by dfun2                                       d_aCl = dfun2 d_aCo d_aCp
+  Wanted: d_aCo : Sat (DefaultD [Expression])
+          d_aCp : Sat (DefaultD Expression)
+
+  by dfun3                                       d_aCo = dfun3 d_aCq
+  Wanted:  d_aCq : Default [Expression]
+  Derived: d_aCr : Data DefaultD [Expression]    d_aCr = $p1 d_aCq  {irrelevant}
+
+  by dfun5                                       d_aCq = dfun5 aCu
+  Wanted:  d_aCu : Default Expression
+  Derived: d_aCw : Data DefaultD Expression      d_aCw = $p1 d_aCu
+  Derived: d_aCx : Sat (DefaultD Expression)     d_aCx = $p1 d_aCw
+     -- These two deriveds are unnecessary,
+     -- and dangerous, because we later satisfy
+     -- d_aCu from dfun4 which does not visibly
+     -- depend on d_aCl
+
+Now we satisfy                                   d_aCu = dfun4
+                                                 d_aCp = d_aCx
+Result = disaster:
+                d_aCp = d_aCx
+                      = $p1 d_aCw
+                      = $p1 ($p1 d_aCu)
+                      = $p1 ($p1 dfun4)
+                      = $p1 ($p1 (MkDefault d_aCl ...))
+                      = $p1 d_aCl
+                      = $p1 (dfun2 d_aCo d_aCp)
+                      = d_aCp
+-}
