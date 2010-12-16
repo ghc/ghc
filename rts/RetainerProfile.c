@@ -1684,6 +1684,23 @@ inner_loop:
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
 	goto loop;
 
+    case TSO:
+    {
+        StgTSO *tso = (StgTSO *)c;
+
+        retainClosure(tso->stackobj,           c, c_child_r);
+        retainClosure(tso->blocked_exceptions, c, c_child_r);
+        retainClosure(tso->bq,                 c, c_child_r);
+        retainClosure(tso->trec,               c, c_child_r);
+        if (   tso->why_blocked == BlockedOnMVar
+               || tso->why_blocked == BlockedOnBlackHole
+               || tso->why_blocked == BlockedOnMsgThrowTo
+            ) {
+            retainClosure(tso->block_info.closure, c, c_child_r);
+        }
+        goto loop;
+    }
+
     case PAP:
     {
 	StgPAP *pap = (StgPAP *)c;
