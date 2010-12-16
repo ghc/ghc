@@ -85,9 +85,7 @@ int main (int argc, char *argv[])
         printf("%d\n", j);
     }
 
-#if __GLASGOW_HASKELL__ >=611
     printf("misses: %ld, %ld%\n", mpc_misses, mpc_misses / (LOOPS*20));
-#endif
 
     for (i=0; i < ARRSIZE; i++)
     {
