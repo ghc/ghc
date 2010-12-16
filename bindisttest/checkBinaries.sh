@@ -4,7 +4,7 @@ EXPECTED_VERSION="$1"
 
 # Our shared libraries are currently executable (is that a bug?), so
 # we exclude anything that looks like a shared library
-for f in `find bindisttest/a/b/c -type f -executable ! -name '*.so' ! -name '*.dynlib' ! -name '*.dll'`
+for f in `find bindisttest/a/b/c -type f -perm -u+x ! -name '*.so' ! -name '*.dynlib' ! -name '*.dll'`
 do
     if grep -q '("GHC RTS", "YES")' "$f"
     then
