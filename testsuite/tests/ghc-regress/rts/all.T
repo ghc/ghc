@@ -56,6 +56,12 @@ test('3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_a
 test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
 test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
 
+# run this test with very small stack chunks to exercise the stack
+# overflow/underflow machinery.
+test('stack003', [ omit_ways('ghci'), # uses unboxed tuples
+                   extra_run_opts('500000 +RTS -kc1k -kb100 -K96m -RTS') ],
+                 compile_and_run, [''])
+
 test('atomicinc', [ c_src, only_ways(['normal']) ], compile_and_run, [''])
 
 test('3424', # it's slow:
