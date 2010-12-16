@@ -18,7 +18,7 @@ import Data.Maybe(fromJust)
 import Data.Array
 import Data.Monoid
 import Control.Monad
-import qualified HpcSet as Set
+import qualified Data.Set as Set
 
 ------------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ import Trace.Hpc.Tix
 
 import HpcFlags
 
-import qualified HpcSet as Set
+import qualified Data.Set as Set
 
 showtix_options :: FlagOptSeq
 showtix_options 

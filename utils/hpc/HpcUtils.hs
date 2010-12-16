@@ -1,7 +1,7 @@
 module HpcUtils where
 
 import Trace.Hpc.Util
-import qualified HpcMap as Map
+import qualified Data.Map as Map
 
 -- turns \n into ' '
 -- | grab's the text behind a HpcPos; 

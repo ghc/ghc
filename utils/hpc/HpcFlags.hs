@@ -3,7 +3,7 @@
 module HpcFlags where
 
 import System.Console.GetOpt
-import qualified HpcSet as Set
+import qualified Data.Set as Set
 import Data.Char
 import Trace.Hpc.Tix
 import Trace.Hpc.Mix

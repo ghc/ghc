@@ -10,8 +10,8 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/hpc_dist_MODULES = Main HpcCombine HpcDraft HpcFlags HpcLexer HpcMap \
-			 HpcMarkup HpcOverlay HpcParser HpcReport HpcSet \
+utils/hpc_dist_MODULES = Main HpcCombine HpcDraft HpcFlags HpcLexer \
+			 HpcMarkup HpcOverlay HpcParser HpcReport \
 			 HpcShowTix HpcUtils
 utils/hpc_dist_HC_OPTS = -cpp -package hpc
 utils/hpc_dist_INSTALL = YES

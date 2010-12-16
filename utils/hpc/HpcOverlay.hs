@@ -6,7 +6,7 @@ import HpcUtils
 import Trace.Hpc.Tix
 import Trace.Hpc.Mix
 import Trace.Hpc.Util
-import HpcMap as Map
+import qualified Data.Map as Map
 import Data.Tree
 
 overlay_options :: FlagOptSeq

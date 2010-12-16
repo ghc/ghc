@@ -6,8 +6,8 @@ import Trace.Hpc.Util
 
 import HpcFlags
 
-import qualified HpcSet as Set
-import qualified HpcMap as Map
+import qualified Data.Set as Set
+import qualified Data.Map as Map
 import HpcUtils
 import Data.Tree
 
