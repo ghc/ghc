@@ -98,6 +98,7 @@ processHeapClosureForDead( StgClosure *c )
 	  'inherently used' cases: do nothing.
 	*/
     case TSO:
+    case STACK:
     case MVAR_CLEAN:
     case MVAR_DIRTY:
     case MUT_ARR_PTRS_CLEAN:
