@@ -239,63 +239,80 @@ INLINE_HEADER rtsBool LOOKS_LIKE_CLOSURE_PTR (void *p)
    Macros for calculating the size of a closure
    -------------------------------------------------------------------------- */
 
-INLINE_HEADER StgOffset PAP_sizeW   ( nat n_args )
+EXTERN_INLINE StgOffset PAP_sizeW   ( nat n_args );
+EXTERN_INLINE StgOffset PAP_sizeW   ( nat n_args )
 { return sizeofW(StgPAP) + n_args; }
 
-INLINE_HEADER StgOffset AP_sizeW   ( nat n_args )
+EXTERN_INLINE StgOffset AP_sizeW   ( nat n_args );
+EXTERN_INLINE StgOffset AP_sizeW   ( nat n_args )
 { return sizeofW(StgAP) + n_args; }
 
-INLINE_HEADER StgOffset AP_STACK_sizeW ( nat size )
+EXTERN_INLINE StgOffset AP_STACK_sizeW ( nat size );
+EXTERN_INLINE StgOffset AP_STACK_sizeW ( nat size )
 { return sizeofW(StgAP_STACK) + size; }
 
-INLINE_HEADER StgOffset CONSTR_sizeW( nat p, nat np )
+EXTERN_INLINE StgOffset CONSTR_sizeW( nat p, nat np );
+EXTERN_INLINE StgOffset CONSTR_sizeW( nat p, nat np )
 { return sizeofW(StgHeader) + p + np; }
 
-INLINE_HEADER StgOffset THUNK_SELECTOR_sizeW ( void )
+EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void );
+EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void )
 { return sizeofW(StgSelector); }
 
-INLINE_HEADER StgOffset BLACKHOLE_sizeW ( void )
+EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void );
+EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void )
 { return sizeofW(StgInd); } // a BLACKHOLE is a kind of indirection
 
 /* --------------------------------------------------------------------------
    Sizes of closures
    ------------------------------------------------------------------------*/
 
-INLINE_HEADER StgOffset sizeW_fromITBL( const StgInfoTable* itbl )
+EXTERN_INLINE StgOffset sizeW_fromITBL( const StgInfoTable* itbl );
+EXTERN_INLINE StgOffset sizeW_fromITBL( const StgInfoTable* itbl )
 { return sizeofW(StgClosure)
        + sizeofW(StgPtr)  * itbl->layout.payload.ptrs
        + sizeofW(StgWord) * itbl->layout.payload.nptrs; }
 
-INLINE_HEADER StgOffset thunk_sizeW_fromITBL( const StgInfoTable* itbl )
+EXTERN_INLINE StgOffset thunk_sizeW_fromITBL( const StgInfoTable* itbl );
+EXTERN_INLINE StgOffset thunk_sizeW_fromITBL( const StgInfoTable* itbl )
 { return sizeofW(StgThunk)
        + sizeofW(StgPtr)  * itbl->layout.payload.ptrs
        + sizeofW(StgWord) * itbl->layout.payload.nptrs; }
 
-INLINE_HEADER StgOffset ap_stack_sizeW( StgAP_STACK* x )
+EXTERN_INLINE StgOffset ap_stack_sizeW( StgAP_STACK* x );
+EXTERN_INLINE StgOffset ap_stack_sizeW( StgAP_STACK* x )
 { return AP_STACK_sizeW(x->size); }
 
-INLINE_HEADER StgOffset ap_sizeW( StgAP* x )
+EXTERN_INLINE StgOffset ap_sizeW( StgAP* x );
+EXTERN_INLINE StgOffset ap_sizeW( StgAP* x )
 { return AP_sizeW(x->n_args); }
 
-INLINE_HEADER StgOffset pap_sizeW( StgPAP* x )
+EXTERN_INLINE StgOffset pap_sizeW( StgPAP* x );
+EXTERN_INLINE StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }
 
-INLINE_HEADER StgWord arr_words_words( StgArrWords* x)
+EXTERN_INLINE StgWord arr_words_words( StgArrWords* x);
+EXTERN_INLINE StgWord arr_words_words( StgArrWords* x)
 { return ROUNDUP_BYTES_TO_WDS(x->bytes); }
 
-INLINE_HEADER StgOffset arr_words_sizeW( StgArrWords* x )
+EXTERN_INLINE StgOffset arr_words_sizeW( StgArrWords* x );
+EXTERN_INLINE StgOffset arr_words_sizeW( StgArrWords* x )
 { return sizeofW(StgArrWords) + arr_words_words(x); }
 
-INLINE_HEADER StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
+EXTERN_INLINE StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x );
+EXTERN_INLINE StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->size; }
 
-INLINE_HEADER StgWord stack_sizeW ( StgStack *stack )
+EXTERN_INLINE StgWord stack_sizeW ( StgStack *stack );
+EXTERN_INLINE StgWord stack_sizeW ( StgStack *stack )
 { return sizeofW(StgStack) + stack->stack_size; }
 
-INLINE_HEADER StgWord bco_sizeW ( StgBCO *bco )
+EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco );
+EXTERN_INLINE StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
 
-INLINE_HEADER nat
+EXTERN_INLINE nat closure_sizeW_ (StgClosure *p, StgInfoTable *info);
+EXTERN_INLINE nat
 closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 {
     switch (info->type) {
@@ -352,8 +369,8 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 }
 
 // The definitive way to find the size, in words, of a heap-allocated closure
-INLINE_HEADER nat
-closure_sizeW (StgClosure *p)
+EXTERN_INLINE nat closure_sizeW (StgClosure *p);
+EXTERN_INLINE nat closure_sizeW (StgClosure *p)
 {
     return closure_sizeW_(p, get_itbl(p));
 }
@@ -362,7 +379,8 @@ closure_sizeW (StgClosure *p)
    Sizes of stack frames
    -------------------------------------------------------------------------- */
 
-INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
+EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame );
+EXTERN_INLINE StgWord stack_frame_sizeW( StgClosure *frame )
 {
     StgRetInfoTable *info;
 
@@ -451,13 +469,8 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, lnat n)
 void LDV_recordDead (StgClosure *c, nat size);
 #endif
 
-#ifdef KEEP_INLINES
-void overwritingClosure (StgClosure *p);
-#else
-INLINE_HEADER
-#endif
-void
-overwritingClosure (StgClosure *p)
+EXTERN_INLINE void overwritingClosure (StgClosure *p);
+EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
     nat size, i;
 
