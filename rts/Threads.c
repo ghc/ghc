@@ -667,7 +667,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
     if (retvals != 0)
     {
         // we have some return values to copy to the old stack
-        if ((new_stack->sp - new_stack->stack) < retvals)
+        if ((nat)(new_stack->sp - new_stack->stack) < retvals)
         {
             barf("threadStackUnderflow: not enough space for return values");
         }
