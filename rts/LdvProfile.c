@@ -19,44 +19,6 @@
 #include "Schedule.h"
 
 /* --------------------------------------------------------------------------
- * Fills in the slop when a *dynamic* closure changes its type.
- * First calls LDV_recordDead() to declare the closure is dead, and then
- * fills in the slop.
- * 
- *  Invoked when:
- *    1) blackholing, UPD_BH_UPDATABLE() and UPD_BH_SINGLE_ENTRY (in
- * 	 includes/StgMacros.h), threadLazyBlackHole() and 
- * 	 threadSqueezeStack() (in GC.c).
- *    2) updating with indirection closures, updateWithIndirection() 
- * 	 and updateWithPermIndirection() (in Storage.h).
- * 
- *  LDV_recordDead_FILL_SLOP_DYNAMIC() is not called on 'inherently used' 
- *  closures such as TSO. It is not called on PAP because PAP is not updatable.
- *  ----------------------------------------------------------------------- */
-void 
-LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
-{
-    nat size, i;
-
-#if defined(__GNUC__) && __GNUC__ < 3 && defined(DEBUG)
-#error Please use gcc 3.0+ to compile this file with DEBUG; gcc < 3.0 miscompiles it
-#endif
-
-    if (era > 0) {
-	// very like FILL_SLOP(), except that we call LDV_recordDead().
-	size = closure_sizeW(p);
-
-	LDV_recordDead((StgClosure *)(p), size);
-
-	if (size > sizeofW(StgThunkHeader)) {
-	    for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
-		((StgThunk *)(p))->payload[i] = 0;
-	    }
-	}
-    }
-}
-
-/* --------------------------------------------------------------------------
  * This function is called eventually on every object destroyed during
  * a garbage collection, whether it is a major garbage collection or
  * not.  If c is an 'inherently used' closure, nothing happens.  If c
