@@ -1,6 +1,5 @@
 #!/bin/sh
 
-echo "1 is $1 done"
 EXPECTED_VERSION="$1"
 
 # Our shared libraries are currently executable (is that a bug?), so
