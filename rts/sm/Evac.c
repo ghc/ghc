@@ -943,7 +943,7 @@ selector_loop:
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
               SET_INFO(p, (StgInfoTable *)info_ptr);
-              OVERWRITING_CLOSURE(p);
+              OVERWRITING_CLOSURE((StgClosure*)p);
               SET_INFO(p, &stg_WHITEHOLE_info);
 #endif
 
