@@ -454,16 +454,9 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	    mode = PGM;
 	}
 	else if (mode == RTS && *rts_argc < MAX_RTS_ARGS-1) {
-	    if ((rtsOptsEnabled == rtsOptsAll) ||
-            strequal(argv[arg], "--info")) {
             rts_argv[(*rts_argc)++] = argv[arg];
         }
-        else {
-            errorBelch("Most RTS options are disabled. Link with -rtsopts to enable them.");
-            stg_exit(EXIT_FAILURE);
-        }
-	}
-	else if (mode == PGM) {
+        else if (mode == PGM) {
 	    argv[(*argc)++] = argv[arg];
 	}
 	else {
@@ -485,7 +478,25 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	    error = rtsTrue;
 
         } else {
-	    switch(rts_argv[arg][1]) {
+
+            switch(rts_argv[arg][1]) {
+            case '-':
+                if (strequal("info", &rts_argv[arg][2])) {
+                    printRtsInfo();
+                    stg_exit(0);
+                }
+                break;
+            default:
+                break;
+            }
+
+            if (rtsOptsEnabled != rtsOptsAll)
+            {
+                errorBelch("Most RTS options are disabled. Link with -rtsopts to enable them.");
+                stg_exit(EXIT_FAILURE);
+            }
+
+            switch(rts_argv[arg][1]) {
 
 	      /* process: general args, then PROFILING-only ones, then
 		 CONCURRENT-only, TICKY-only (same order as defined in
