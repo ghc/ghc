@@ -1000,31 +1000,53 @@ $ cat foo.hspp</screen>
             on the command line or via the <envar>GHCRTS</envar> environment variable.
             There are three possibilities:
           </para>
-          <itemizedlist>
-            <listitem>
-              <option>-rtsopts=none</option> disables all processing of RTS options.
-              Passing <option>+RTS</option> anywhere on the command line causes the program
-              to abort with an error message. Setting the <envar>GHCRTS</envar> environment
-              variable causes a warning is printed before the main Haskell program runs.
-            </listitem>
-            <listitem>
-              <option>-rtsopts=some</option> enables only the "safe" RTS options on the
-              command line. (Currently only <option>-?</option> and <option>--info</option>.)
-              Any other RTS options on the command line abort the program with an error
-              message. All RTS options in the <envar>GHCRTS</envar> environment variable are
-              processed as normal. This is the default setting.
-            </listitem>
-            <listitem>
-              <option>-rtsopts=all</option> (or just <option>-rtsopts</option>) enables
-              <emphasis>all</emphasis> RTS option processing, both on the command line and
-              through the <envar>GHCRTS</envar> environment variable.
-            </listitem>
-          </itemizedlist>
+          <variablelist>
+            <varlistentry>
+              <term><option>-rtsopts=none</option></term>
+              <listitem>
+                <para>
+                  Disable all processing of RTS options.
+                  If <option>+RTS</option> appears anywhere on the command
+                  line, then the program will abort with an error message.
+                  If the <envar>GHCRTS</envar> environment variable is
+                  set, then the program will emit a warning message,
+                  <envar>GHCRTS</envar> will be ignored, and the program
+                  will run as normal.
+                </para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><option>-rtsopts=some</option></term>
+              <listitem>
+                <para>&lsqb;this is the default setting&rsqb; Enable
+                  only the "safe" RTS options: (Currently
+                  only <option>-?</option>
+                  and <option>--info</option>.)  Any other RTS options
+                  on the command line or in the <envar>GHCRTS</envar>
+                  environment variable causes the program with to abort
+                  with an error message.
+                </para>
+              </listitem>
+            </varlistentry>
+            <varlistentry>
+              <term><option>-rtsopts=all</option>, or
+ just <option>-rtsopts</option></term>
+              <listitem>
+                <para>
+                  Enable <emphasis>all</emphasis> RTS option
+                  processing, both on the command line and through
+                  the <envar>GHCRTS</envar> environment variable.
+                </para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
           <para>
-            Prior to GHC 7.0, the default was to process all RTS options. However, since
-            RTS options can be used to write logging data to arbitrary files under the
-            security context of the running program, there is a potential security problem.
-            For this reason, GHC 7.0 defaults to <option>-rtsops=some</option>.
+            In GHC 6.12.3 and earlier, the default was to process all
+            RTS options. However, since RTS options can be used to
+            write logging data to arbitrary files under the security
+            context of the running program, there is a potential
+            security problem.  For this reason, GHC 7.0.1 and later
+            default to <option>-rtsops=some</option>.
           </para>
         </listitem>
       </varlistentry>
@@ -1038,7 +1060,7 @@ $ cat foo.hspp</screen>
           <para>
             This option allows you to set the default RTS options at link-time. For example,
             <option>-with-rtsopts="-H128m"</option> sets the default heap size to 128MB.
-            This will now always be the default heap size, unless the user overrides it.
+            This will always be the default heap size for this program, unless the user overrides it.
             (Depending on the setting of the <option>-rtsopts</option> option, the user might
             not have the ability to change RTS options at run-time, in which case 
             <option>-with-rtsopts</option> would be the <emphasis>only</emphasis> way to set

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<sect1 id="runtime-control">
+<section id="runtime-control">
   <title>Running a compiled program</title>
 
   <indexterm><primary>runtime control of Haskell programs</primary></indexterm>
@@ -8,87 +8,262 @@
 
   <para>To make an executable program, the GHC system compiles your
   code and then links it with a non-trivial runtime system (RTS),
-  which handles storage management, profiling, etc.</para>
+  which handles storage management, thread scheduling, profiling, and
+  so on.</para>
 
-  <para>If you set the <literal>-rtsopts</literal> flag appropriately when linking,
-  you have some control over the behaviour of the RTS, by giving
-  special command-line arguments to your program.</para>
+  <para>
+    The RTS has a lot of options to control its behaviour.  For
+    example, you can change the context-switch interval, the default
+    size of the heap, and enable heap profiling.  These options can be
+    passed to the runtime system in a variety of different ways; the
+    next section (<xref linkend="setting-rts-options" />) describes
+    the various methods, and the following sections describe the RTS
+    options themselves.
+  </para>
 
-  <para>When your Haskell program starts up, its RTS extracts
-  command-line arguments bracketed between
-  <option>+RTS</option><indexterm><primary><option>+RTS</option></primary></indexterm>
-  and
-  <option>-RTS</option><indexterm><primary><option>-RTS</option></primary></indexterm>
-  as its own.  For example:</para>
+  <section id="setting-rts-options">
+    <title>Setting RTS options</title>
+    <indexterm><primary>RTS options, setting</primary></indexterm>
+
+    <para>
+      There are four ways to set RTS options:
+
+      <itemizedlist>
+        <listitem>
+          <para>
+          on the command line between <literal>+RTS ... -RTS</literal>, when running the program
+           (<xref linkend="rts-opts-cmdline" />)
+          </para>
+        </listitem>
+        <listitem>
+          <para>at compile-time, using <option>--with-rtsopts</option>
+            (<xref linkend="rts-opts-compile-time" />)
+          </para>
+        </listitem>
+        <listitem>
+          <para>with the environment variable <envar>GHCRTS</envar>
+          (<xref linkend="rts-options-environment" />)
+          </para>
+        </listitem>
+        <listitem>
+          <para>by overriding &ldquo;hooks&rdquo; in the runtime system
+            (<xref linkend="rts-hooks" />)
+          </para>
+        </listitem>
+      </itemizedlist>
+    </para>
+
+    <section id="rts-opts-cmdline">
+      <title>Setting RTS options on the command line</title>
+
+      <para>
+        If you set the <literal>-rtsopts</literal> flag appropriately
+        when linking (see <xref linkend="options-linker" />), you can
+        give RTS options on the command line when running your
+        program.
+      </para>
+
+      <para>
+        When your Haskell program starts up, the RTS extracts
+        command-line arguments bracketed between
+        <option>+RTS</option><indexterm><primary><option>+RTS</option></primary></indexterm>
+        and
+        <option>-RTS</option><indexterm><primary><option>-RTS</option></primary></indexterm>
+        as its own.  For example:
+      </para>
 
 <screen>
-% ./a.out -f +RTS -p -S -RTS -h foo bar
+$ ghc prog.hs -rtsopts
+[1 of 1] Compiling Main             ( prog.hs, prog.o )
+Linking prog ...
+$ ./prog -f +RTS -H32m -S -RTS -h foo bar
 </screen>
 
-  <para>The RTS will snaffle <option>-p</option> <option>-S</option>
-  for itself, and the remaining arguments <literal>-f -h foo bar</literal>
-  will be handed to your program if/when it calls
-  <function>System.getArgs</function>.</para>
+        <para>
+          The RTS will
+          snaffle <option>-H32m</option> <option>-S</option> for itself,
+          and the remaining arguments <literal>-f -h foo bar</literal>
+          will be available to your program if/when it calls
+          <function>System.Environment.getArgs</function>.
+        </para>
 
-  <para>No <option>-RTS</option> option is required if the
-  runtime-system options extend to the end of the command line, as in
-  this example:</para>
+        <para>
+          No <option>-RTS</option> option is required if the
+          runtime-system options extend to the end of the command line, as in
+          this example:
+        </para>
 
 <screen>
 % hls -ltr /usr/etc +RTS -A5m
 </screen>
 
-  <para>If you absolutely positively want all the rest of the options
-  in a command line to go to the program (and not the RTS), use a
-  <option>&ndash;&ndash;RTS</option><indexterm><primary><option>--RTS</option></primary></indexterm>.</para>
+        <para>
+          If you absolutely positively want all the rest of the options
+          in a command line to go to the program (and not the RTS), use a
+          <option>&ndash;&ndash;RTS</option><indexterm><primary><option>--RTS</option></primary></indexterm>.
+        </para>
 
-  <para>As always, for RTS options that take
-  <replaceable>size</replaceable>s: If the last character of
-  <replaceable>size</replaceable> is a K or k, multiply by 1000; if an
-  M or m, by 1,000,000; if a G or G, by 1,000,000,000.  (And any
-  wraparound in the counters is <emphasis>your</emphasis>
-  fault!)</para>
+        <para>
+          As always, for RTS options that take
+          <replaceable>size</replaceable>s: If the last character of
+          <replaceable>size</replaceable> is a K or k, multiply by 1000; if an
+          M or m, by 1,000,000; if a G or G, by 1,000,000,000.  (And any
+          wraparound in the counters is <emphasis>your</emphasis>
+          fault!)
+        </para>
 
-  <para>Giving a <literal>+RTS -?</literal>
-  <indexterm><primary><option>-?</option></primary><secondary>RTS option</secondary></indexterm> option
-  will print out the RTS options actually available in your program
-  (which vary, depending on how you compiled).</para>
+        <para>
+          Giving a <literal>+RTS -?</literal>
+          <indexterm><primary><option>-?</option></primary><secondary>RTS option</secondary></indexterm> option
+          will print out the RTS options actually available in your program
+          (which vary, depending on how you compiled).</para>
 
-  <para>NOTE: since GHC is itself compiled by GHC, you can change RTS
-  options in the compiler using the normal
-  <literal>+RTS ... -RTS</literal>
-  combination.  eg. to increase the maximum heap
-  size for a compilation to 128M, you would add
-  <literal>+RTS -M128m -RTS</literal>
-  to the command line.</para>
+        <para>
+          NOTE: since GHC is itself compiled by GHC, you can change RTS
+          options in the compiler using the normal
+          <literal>+RTS ... -RTS</literal>
+          combination.  eg. to set the maximum heap
+          size for a compilation to 128M, you would add
+          <literal>+RTS -M128m -RTS</literal>
+          to the command line.
+        </para>
+      </section>
 
-  <sect2 id="rts-options-environment">
-    <title>Setting global RTS options</title>
+      <section id="rts-opts-compile-time">
+        <title>Setting RTS options at compile time</title>
 
-    <indexterm><primary>RTS options</primary><secondary>from the environment</secondary></indexterm>
-    <indexterm><primary>environment variable</primary><secondary>for
-    setting RTS options</secondary></indexterm>
+        <para>
+          GHC lets you change the default RTS options for a program at
+          compile time, using the <literal>-with-rtsopts</literal>
+          flag (<xref linkend="options-linker" />). For example, to
+          set <literal>-H128m -K64m</literal>, link
+          with <literal>-with-rtsopts="-H128m -K64m"</literal>.
+        </para>
+      </section>
 
-    <para>If the <literal>-rtsopts</literal> flag is set to
-    something other than <literal>none</literal> when linking,
-    RTS options are also taken from the environment variable
-    <envar>GHCRTS</envar><indexterm><primary><envar>GHCRTS</envar></primary>
-      </indexterm>.  For example, to set the maximum heap size
-    to 128M for all GHC-compiled programs (using an
-    <literal>sh</literal>-like shell):</para>
+      <section id="rts-options-environment">
+        <title>Setting RTS options with the <envar>GHCRTS</envar>
+          environment variable</title>
+
+        <indexterm><primary>RTS options</primary><secondary>from the environment</secondary></indexterm>
+        <indexterm><primary>environment variable</primary><secondary>for
+            setting RTS options</secondary></indexterm>
+
+        <para>
+          If the <literal>-rtsopts</literal> flag is set to
+          something other than <literal>none</literal> when linking,
+          RTS options are also taken from the environment variable
+          <envar>GHCRTS</envar><indexterm><primary><envar>GHCRTS</envar></primary>
+          </indexterm>.  For example, to set the maximum heap size
+          to 2G for all GHC-compiled programs (using an
+          <literal>sh</literal>-like shell):
+        </para>
 
 <screen>
-   GHCRTS='-M128m'
+   GHCRTS='-M2G'
    export GHCRTS
 </screen>
 
-    <para>RTS options taken from the <envar>GHCRTS</envar> environment
-    variable can be overridden by options given on the command
-    line.</para>
+        <para>
+          RTS options taken from the <envar>GHCRTS</envar> environment
+          variable can be overridden by options given on the command
+          line.
+        </para>
 
-  </sect2>
+        <para>
+          Tip: setting something like <literal>GHCRTS=-M2G</literal>
+          in your environment is a handy way to avoid Haskell programs
+          growing beyond the real memory in your machine, which is
+          easy to do by accident and can cause the machine to slow to
+          a crawl until the OS decides to kill the process (and you
+          hope it kills the right one).
+        </para>
+      </section>
 
-  <sect2 id="rts-options-misc">
+  <section id="rts-hooks">
+    <title>&ldquo;Hooks&rdquo; to change RTS behaviour</title>
+
+    <indexterm><primary>hooks</primary><secondary>RTS</secondary></indexterm>
+    <indexterm><primary>RTS hooks</primary></indexterm>
+    <indexterm><primary>RTS behaviour, changing</primary></indexterm>
+
+    <para>GHC lets you exercise rudimentary control over the RTS
+    settings for any given program, by compiling in a
+    &ldquo;hook&rdquo; that is called by the run-time system.  The RTS
+    contains stub definitions for all these hooks, but by writing your
+    own version and linking it on the GHC command line, you can
+    override the defaults.</para>
+
+    <para>Owing to the vagaries of DLL linking, these hooks don't work
+    under Windows when the program is built dynamically.</para>
+
+    <para>The hook <literal>ghc_rts_opts</literal><indexterm><primary><literal>ghc_rts_opts</literal></primary>
+      </indexterm>lets you set RTS
+    options permanently for a given program, in the same way as the
+    newer <option>-with-rtsopts</option> linker option does.  A common use for this is
+    to give your program a default heap and/or stack size that is
+    greater than the default.  For example, to set <literal>-H128m
+    -K1m</literal>, place the following definition in a C source
+    file:</para>
+
+<programlisting>
+char *ghc_rts_opts = "-H128m -K1m";
+</programlisting>
+
+    <para>Compile the C file, and include the object file on the
+    command line when you link your Haskell program.</para>
+
+    <para>These flags are interpreted first, before any RTS flags from
+    the <literal>GHCRTS</literal> environment variable and any flags
+    on the command line.</para>
+
+    <para>You can also change the messages printed when the runtime
+    system &ldquo;blows up,&rdquo; e.g., on stack overflow.  The hooks
+    for these are as follows:</para>
+
+    <variablelist>
+
+      <varlistentry>
+	<term>
+          <function>void OutOfHeapHook (unsigned long, unsigned long)</function>
+          <indexterm><primary><function>OutOfHeapHook</function></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>The heap-overflow message.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <function>void StackOverflowHook (long int)</function>
+          <indexterm><primary><function>StackOverflowHook</function></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>The stack-overflow message.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <function>void MallocFailHook (long int)</function>
+          <indexterm><primary><function>MallocFailHook</function></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>The message printed if <function>malloc</function>
+	  fails.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>For examples of the use of these hooks, see GHC's own
+    versions in the file
+    <filename>ghc/compiler/parser/hschooks.c</filename> in a GHC
+    source tree.</para>
+  </section>
+
+    </section>
+
+  <section id="rts-options-misc">
     <title>Miscellaneous RTS options</title>
 
     <variablelist>
@@ -172,9 +347,9 @@
        </listitem>
      </varlistentry>
     </variablelist>
-  </sect2>
+  </section>
 
-  <sect2 id="rts-options-gc">
+  <section id="rts-options-gc">
     <title>RTS options to control the garbage collector</title>
 
     <indexterm><primary>garbage collector</primary><secondary>options</secondary></indexterm>
@@ -857,17 +1032,17 @@
       </varlistentry>
     </variablelist>
 
-  </sect2>
+  </section>
 
-  <sect2>
+  <section>
     <title>RTS options for concurrency and parallelism</title>
 
     <para>The RTS options related to concurrency are described in
       <xref linkend="using-concurrent" />, and those for parallelism in
       <xref linkend="parallel-options"/>.</para>
-  </sect2>
+  </section>
 
-  <sect2 id="rts-profiling">
+  <section id="rts-profiling">
     <title>RTS options for profiling</title>
 
     <para>Most profiling runtime options are only available when you
@@ -898,9 +1073,9 @@
         </listitem>
       </varlistentry>
     </variablelist>
-  </sect2>
+  </section>
 
-  <sect2 id="rts-eventlog">
+  <section id="rts-eventlog">
     <title>Tracing</title>
 
     <indexterm><primary>tracing</primary></indexterm>
@@ -991,9 +1166,9 @@
       the binary eventlog file by using the <option>-l</option>
       option.
     </para>
-  </sect2>
+  </section>
 
-  <sect2 id="rts-options-debugging">
+  <section id="rts-options-debugging">
     <title>RTS options for hackers, debuggers, and over-interested
     souls</title>
 
@@ -1126,104 +1301,9 @@
       </varlistentry>
     </variablelist>
 
-  </sect2>
+  </section>
 
-  <sect2>
-    <title>Linker flags to change RTS behaviour</title>
-
-    <indexterm><primary>RTS behaviour, changing</primary></indexterm>
-
-    <para>
-      GHC lets you exercise rudimentary control over the RTS settings
-      for any given program, by using the <literal>-with-rtsopts</literal>
-      linker flag. For example, to set <literal>-H128m -K1m</literal>,
-      link with <literal>-with-rtsopts="-H128m -K1m"</literal>.
-    </para>
-
-  </sect2>
-
-  <sect2 id="rts-hooks">
-    <title>&ldquo;Hooks&rdquo; to change RTS behaviour</title>
-
-    <indexterm><primary>hooks</primary><secondary>RTS</secondary></indexterm>
-    <indexterm><primary>RTS hooks</primary></indexterm>
-    <indexterm><primary>RTS behaviour, changing</primary></indexterm>
-
-    <para>GHC lets you exercise rudimentary control over the RTS
-    settings for any given program, by compiling in a
-    &ldquo;hook&rdquo; that is called by the run-time system.  The RTS
-    contains stub definitions for all these hooks, but by writing your
-    own version and linking it on the GHC command line, you can
-    override the defaults.</para>
-
-    <para>Owing to the vagaries of DLL linking, these hooks don't work
-    under Windows when the program is built dynamically.</para>
-
-    <para>The hook <literal>ghc_rts_opts</literal><indexterm><primary><literal>ghc_rts_opts</literal></primary>
-      </indexterm>lets you set RTS
-    options permanently for a given program, in the same way as the
-    newer <option>-with-rtsopts</option> linker option does.  A common use for this is
-    to give your program a default heap and/or stack size that is
-    greater than the default.  For example, to set <literal>-H128m
-    -K1m</literal>, place the following definition in a C source
-    file:</para>
-
-<programlisting>
-char *ghc_rts_opts = "-H128m -K1m";
-</programlisting>
-
-    <para>Compile the C file, and include the object file on the
-    command line when you link your Haskell program.</para>
-
-    <para>These flags are interpreted first, before any RTS flags from
-    the <literal>GHCRTS</literal> environment variable and any flags
-    on the command line.</para>
-
-    <para>You can also change the messages printed when the runtime
-    system &ldquo;blows up,&rdquo; e.g., on stack overflow.  The hooks
-    for these are as follows:</para>
-
-    <variablelist>
-
-      <varlistentry>
-	<term>
-          <function>void OutOfHeapHook (unsigned long, unsigned long)</function>
-          <indexterm><primary><function>OutOfHeapHook</function></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>The heap-overflow message.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <function>void StackOverflowHook (long int)</function>
-          <indexterm><primary><function>StackOverflowHook</function></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>The stack-overflow message.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <function>void MallocFailHook (long int)</function>
-          <indexterm><primary><function>MallocFailHook</function></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>The message printed if <function>malloc</function>
-	  fails.</para>
-	</listitem>
-      </varlistentry>
-    </variablelist>
-
-    <para>For examples of the use of these hooks, see GHC's own
-    versions in the file
-    <filename>ghc/compiler/parser/hschooks.c</filename> in a GHC
-    source tree.</para>
-  </sect2>
-
-  <sect2>
+  <section>
     <title>Getting information about the RTS</title>
 
     <indexterm><primary>RTS</primary></indexterm>
@@ -1363,8 +1443,8 @@ $ ./a.out +RTS --info
 
     </variablelist>
 
-  </sect2>
-</sect1>
+  </section>
+</section>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
