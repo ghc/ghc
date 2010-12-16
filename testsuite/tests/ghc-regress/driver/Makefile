@@ -485,8 +485,8 @@ shared001:
 	"$(TEST_HC)" --make 3674_pre.hs
 	"$(TEST_HC)" --make 3674.hs
 
-.PHONY: rtsOpts
-rtsOpts:
+.PHONY: rtsopts001
+rtsopts001:
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
 	"$(TEST_HC)" -v0 --make rtsOpts -rtsopts
 	echo "Normal"
@@ -495,6 +495,17 @@ rtsOpts:
 	"$(TEST_HC)" -v0 --make rtsOpts
 	echo "No RTS opts"
 	-./rtsOpts +RTS -C0 2>&1
+
+.PHONY: rtsopts002
+rtsopts002:
+	$(RM) rtsopts002$(exeext) rtsopts002.hi rtsopts002.o
+	"$(TEST_HC)" -v0 --make rtsopts002 -rtsopts=some
+	./rtsopts002
+	./rtsopts002 +RTS --info >/dev/null
+	if ./rtsopts002 +RTS -C0; then exit 1; else exit 0; fi
+	GHCRTS= ./rtsopts002
+	GHCRTS=--info ./rtsopts002 >/dev/null
+	if GHCRTS=-C0 ./rtsopts002; then exit 1; else exit 0; fi
 
 .PHONY: withRtsOpts
 withRtsOpts:
