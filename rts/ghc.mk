@@ -309,8 +309,8 @@ rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCod
 # by the default small memory can't be resolved at runtime).  So we
 # only do this on i386.
 #
-# This apparently doesn't work on OS X (Darwin) where we get errors of
-# the form
+# This apparently doesn't work on OS X (Darwin) nor on Solaris.
+# On Darwin we get errors of the form
 #
 #  ld: absolute addressing (perhaps -mdynamic-no-pic) used in _stg_ap_0_fast from rts/dist/build/Apply.dyn_o not allowed in slidable image
 #
@@ -318,8 +318,27 @@ rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCod
 #
 #  ld: warning codegen in _stg_ap_pppv_fast (offset 0x0000005E) prevents image from loading in dyld shared cache
 #
+# On Solaris we get errors like:
+#
+# Text relocation remains                         referenced
+#     against symbol                  offset      in file
+# .rodata (section)                   0x11        rts/dist/build/Apply.dyn_o
+#   ...
+# ld: fatal: relocations remain against allocatable but non-writable sections
+# collect2: ld returned 1 exit status
+
 ifeq "$(TargetArch_CPP)" "i386"
-ifneq "$(TargetOS_CPP)" "darwin"
+i386_SPEED_HACK := "YES"
+ifeq "$(TargetOS_CPP)" "darwin"
+i386_SPEED_HACK := "NO"
+endif
+ifeq "$(TargetOS_CPP)" "solaris2"
+i386_SPEED_HACK := "NO"
+endif
+endif
+
+ifeq "$(TargetArch_CPP)" "i386"
+ifeq "$(i386_SPEED_HACK)" "YES"
 rts/sm/Evac_HC_OPTS           += -fno-PIC
 rts/sm/Evac_thr_HC_OPTS       += -fno-PIC
 rts/sm/Scav_HC_OPTS           += -fno-PIC
