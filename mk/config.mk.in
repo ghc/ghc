@@ -109,6 +109,7 @@ PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
 	i386-unknown-freebsd x86_64-unknown-freebsd \
 	i386-unknown-openbsd x86_64-unknown-openbsd \
 	i386-unknown-mingw32 \
+	i386-unknown-solaris2 \
 	i386-apple-darwin powerpc-apple-darwin),YES,NO)
 
 # Build a compiler that will build *unregisterised* libraries and

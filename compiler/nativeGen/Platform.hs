@@ -58,6 +58,7 @@ osElfTarget :: OS -> Bool
 osElfTarget OSLinux   = True
 osElfTarget OSFreeBSD = True
 osElfTarget OSOpenBSD = True
+osElfTarget OSSolaris2 = True
 osElfTarget _         = False
 
 -- | This is the target platform as far as the #ifdefs are concerned.
