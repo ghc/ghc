@@ -46,7 +46,7 @@ data OS
 	= OSUnknown
 	| OSLinux
 	| OSDarwin
-	| OSSolaris
+	| OSSolaris2
 	| OSMinGW32
 	| OSFreeBSD
 	| OSOpenBSD
@@ -92,8 +92,8 @@ defaultTargetOS :: OS
 defaultTargetOS	= OSLinux
 #elif darwin_TARGET_OS
 defaultTargetOS	= OSDarwin
-#elif solaris_TARGET_OS
-defaultTargetOS	= OSSolaris
+#elif solaris2_TARGET_OS
+defaultTargetOS	= OSSolaris2
 #elif mingw32_TARGET_OS
 defaultTargetOS	= OSMinGW32
 #elif freebsd_TARGET_OS
