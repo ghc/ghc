@@ -4675,15 +4675,15 @@ static int relocateSection(
 	    IF_DEBUG(linker, debugBelch("               : type  = %d\n", symbol->n_type));
 	    IF_DEBUG(linker, debugBelch("               : sect  = %d\n", symbol->n_sect));
 	    IF_DEBUG(linker, debugBelch("               : desc  = %d\n", symbol->n_desc));
-	    IF_DEBUG(linker, debugBelch("               : value = %d\n", symbol->n_value));
+	    IF_DEBUG(linker, debugBelch("               : value = %p\n", (void *)symbol->n_value));
             if ((symbol->n_type & N_TYPE) == N_SECT) {
                 value = relocateAddress(oc, nSections, sections,
                                         symbol->n_value);
-		IF_DEBUG(linker, debugBelch("relocateSection, defined external symbol %s, relocated address %p\n", nm, value));
+		IF_DEBUG(linker, debugBelch("relocateSection, defined external symbol %s, relocated address %p\n", nm, (void *)value));
 	    }
             else {
                 value = (uint64_t) lookupSymbol(nm);
-		IF_DEBUG(linker, debugBelch("relocateSection: external symbol %s, address %p\n", nm, value));
+		IF_DEBUG(linker, debugBelch("relocateSection: external symbol %s, address %p\n", nm, (void *)value));
 	    }
         }
         else
@@ -4693,7 +4693,7 @@ static int relocateSection(
 		  + (uint64_t) image;
         }
       
-	IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", value));
+	IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", (void *)value));
 
         if (type == X86_64_RELOC_BRANCH)
         {
