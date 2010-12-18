@@ -1,4 +1,4 @@
-setTestOpts(compose(alone,only_compiler_types(['ghc'])))
+setTestOpts(only_compiler_types(['ghc']))
 
 test('ghcpkg01',
      extra_clean(['local01.package.conf',
