@@ -21,6 +21,11 @@ import FastString
 import Control.Monad
 
 
+-- | Construct the PA argument type for the tyvar. For the tyvar (v :: *) it's
+-- just PA v. For (v :: (* -> *) -> *) it's
+--
+-- > forall (a :: * -> *). (forall (b :: *). PA b -> PA (a b)) -> PA (v a)
+--
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
   where
@@ -43,6 +48,7 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
 
 
 -- | Get the PA dictionary for some type
+--
 paDictOfType :: Type -> VM CoreExpr
 paDictOfType ty 
   = paDictOfTyApp ty_fn ty_args
@@ -57,20 +63,30 @@ paDictOfType ty
     -- for type variables, look up the dfun and apply to the PA dictionaries
     -- of the type arguments
     paDictOfTyApp (TyVarTy tv) ty_args
-     = do dfun <- maybeV (lookupTyVarPA tv)
+     = do dfun <- maybeCantVectoriseM "No PA dictionary for type variable"
+                                      (ppr tv <+> text "in" <+> ppr ty)
+                $ lookupTyVarPA tv
           dicts <- mapM paDictOfType ty_args
           return $ dfun `mkTyApps` ty_args `mkApps` dicts
 
     -- for tycons, we also need to apply the dfun to the PR dictionary of
-    -- the representation type
+    -- the representation type if the tycon is polymorphic
     paDictOfTyApp (TyConApp tc []) ty_args
      = do
-         dfun <- maybeV $ lookupTyConPA tc
-         pr <- prDictOfPRepr tc ty_args
+         dfun <- maybeCantVectoriseM "No PA dictionary for type constructor"
+                                      (ppr tc <+> text "in" <+> ppr ty)
+                $ lookupTyConPA tc
+         super <- super_dict tc ty_args
          dicts <- mapM paDictOfType ty_args
-         return $ Var dfun `mkTyApps` ty_args `mkApps` (pr:dicts)
+         return $ Var dfun `mkTyApps` ty_args `mkApps` super `mkApps` dicts
 
     paDictOfTyApp _ _ = failure
+
+    super_dict _ [] = return []
+    super_dict tycon ty_args
+      = do
+          pr <- prDictOfPReprInst (TyConApp tycon ty_args)
+          return [pr]
 
     failure = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
 
@@ -87,12 +103,11 @@ paMethod method _ ty
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
 
--- | Get the PR (PRepr t) dictionary, where t is the tycon applied to the type
--- arguments
-prDictOfPRepr :: TyCon -> [Type] -> VM CoreExpr
-prDictOfPRepr tycon tys
+-- | Given a type @ty@, return the PR dictionary for @PRepr ty@.
+prDictOfPReprInst :: Type -> VM CoreExpr
+prDictOfPReprInst ty
   = do
-      (prepr_tc, prepr_args) <- preprSynTyCon (mkTyConApp tycon tys)
+      (prepr_tc, prepr_args) <- preprSynTyCon ty
       case coreView (mkTyConApp prepr_tc prepr_args) of
         Just rhs -> do
                       dict <- prDictOfReprType rhs
@@ -103,7 +118,7 @@ prDictOfPRepr tycon tys
                              $ mkTyConApp arg_co prepr_args
                       return $ mkCoerce co dict
         Nothing  -> cantVectorise "Invalid PRepr type instance"
-                                  $ ppr $ mkTyConApp prepr_tc prepr_args
+                                  $ ppr ty
 
 -- | Get the PR dictionary for a type. The argument must be a representation
 -- type.
@@ -111,9 +126,18 @@ prDictOfReprType :: Type -> VM CoreExpr
 prDictOfReprType ty
   | Just (tycon, tyargs) <- splitTyConApp_maybe ty
     = do
-        -- a representation tycon must have a PR instance
-        dfun <- maybeV $ lookupTyConPR tycon
-        prDFunApply dfun tyargs
+        prepr <- builtin preprTyCon
+        if tycon == prepr
+          then do
+                 [ty'] <- return tyargs
+                 prDictOfPReprInst ty'
+          else do 
+                 -- a representation tycon must have a PR instance
+                 dfun <- maybeCantVectoriseM
+                           "No PR dictionary for type constructor"
+                           (ppr tycon <+> text "in" <+> ppr ty)
+                       $ lookupTyConPR tycon
+                 prDFunApply dfun tyargs
 
   | otherwise
     = do
