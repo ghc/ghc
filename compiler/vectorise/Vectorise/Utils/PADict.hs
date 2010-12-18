@@ -1,9 +1,7 @@
 
 module Vectorise.Utils.PADict (
-	mkPADictType,
 	paDictArgType,
 	paDictOfType,
-	paDFunType,
 	paMethod	
 )
 where
@@ -23,10 +21,6 @@ import FastString
 import Control.Monad
 
 
-mkPADictType :: Type -> VM Type
-mkPADictType ty = mkBuiltinTyConApp paTyCon [ty]
-
-
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
   where
@@ -43,7 +37,7 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
 
     go ty k
       | isLiftedTypeKind k
-      = liftM Just (mkPADictType ty)
+      = liftM Just (mkBuiltinTyConApp paTyCon [ty])
 
     go _ _ = return Nothing
 
@@ -79,19 +73,6 @@ paDictOfType ty
     paDictOfTyApp _ _ = failure
 
     failure = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
-
-
-
-paDFunType :: TyCon -> VM Type
-paDFunType tc
-  = do
-      margs <- mapM paDictArgType tvs
-      res   <- mkPADictType (mkTyConApp tc arg_tys)
-      return . mkForAllTys tvs
-             $ mkFunTys [arg | Just arg <- margs] res
-  where
-    tvs = tyConTyVars tc
-    arg_tys = mkTyVarTys tvs
 
 paMethod :: (Builtins -> Var) -> String -> Type -> VM CoreExpr
 paMethod _ name ty
