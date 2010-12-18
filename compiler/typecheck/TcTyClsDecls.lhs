@@ -753,11 +753,12 @@ tcTyClDecl1 parent calc_isrec
   ; kind_signatures <- xoptM Opt_KindSignatures
   ; existential_ok <- xoptM Opt_ExistentialQuantification
   ; gadt_ok      <- xoptM Opt_GADTs
+  ; gadtSyntax_ok <- xoptM Opt_GADTSyntax
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
   ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
 
 	-- Check that we don't use GADT syntax in H98 world
-  ; checkTc (gadt_ok || h98_syntax) (badGadtDecl tc_name)
+  ; checkTc (gadtSyntax_ok || h98_syntax) (badGadtDecl tc_name)
 
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc (kind_signatures || isNothing mb_ksig) (badSigTyDecl tc_name)
@@ -846,12 +847,12 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> TcM DataCon
 
 tcConDecl unbox_strict existential_ok rep_tycon res_tmpl 	-- Data types
-	  (ConDecl {con_name =name, con_qvars = tvs, con_cxt = ctxt
+	  con@(ConDecl {con_name = name, con_qvars = tvs, con_cxt = ctxt
                    , con_details = details, con_res = res_ty })
   = addErrCtxt (dataConCtxt name)	$ 
     tcTyVarBndrs tvs			$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
-    ; checkTc (existential_ok || (null tvs && null (unLoc ctxt)))
+    ; checkTc (existential_ok || conRepresentibleWithH98Syntax con)
 	      (badExistential name)
     ; (univ_tvs, ex_tvs, eq_preds, res_ty') <- tcResultType res_tmpl tvs' res_ty
     ; let 
@@ -945,6 +946,21 @@ consUseH98Syntax :: [LConDecl a] -> Bool
 consUseH98Syntax (L _ (ConDecl { con_res = ResTyGADT _ }) : _) = False
 consUseH98Syntax _                                             = True
 		 -- All constructors have same shape
+
+conRepresentibleWithH98Syntax :: ConDecl Name -> Bool
+conRepresentibleWithH98Syntax
+    (ConDecl {con_qvars = tvs, con_cxt = ctxt, con_res = ResTyH98 })
+        = null tvs && null (unLoc ctxt)
+conRepresentibleWithH98Syntax
+    (ConDecl {con_qvars = tvs, con_cxt = ctxt, con_res = ResTyGADT (L _ t) })
+        = null (unLoc ctxt) && f t (map (hsTyVarName . unLoc) tvs)
+    where -- Each type variable should be used exactly once in the
+          -- result type, and the result type must just be the type
+          -- constructor applied to type variables
+          f (HsAppTy (L _ t1) (L _ (HsTyVar v2))) vs
+              = (v2 `elem` vs) && f t1 (delete v2 vs)
+          f (HsTyVar _) [] = True
+          f _ _ = False
 
 -------------------
 tcConArg :: Bool		-- True <=> -funbox-strict_fields
@@ -1536,7 +1552,7 @@ badGadtDecl tc_name
 badExistential :: Located Name -> SDoc
 badExistential con_name
   = hang (ptext (sLit "Data constructor") <+> quotes (ppr con_name) <+>
-		ptext (sLit "has existential type variables, or a context"))
+		ptext (sLit "has existential type variables, a context, or a specialised result type"))
        2 (parens $ ptext (sLit "Use -XExistentialQuantification or -XGADTs to allow this"))
 
 badStupidTheta :: Name -> SDoc

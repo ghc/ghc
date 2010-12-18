@@ -321,6 +321,7 @@ data ExtensionFlag
    | Opt_RecordPuns
    | Opt_ViewPatterns
    | Opt_GADTs
+   | Opt_GADTSyntax
    | Opt_NPlusKPatterns
    | Opt_DoAndIfThenElse
    | Opt_RebindableSyntax
@@ -1585,6 +1586,7 @@ xFlags = [
   ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields, nop ),
   ( "OverloadedStrings",                Opt_OverloadedStrings, nop ),
   ( "GADTs",                            Opt_GADTs, nop ),
+  ( "GADTSyntax",                       Opt_GADTSyntax, nop ),
   ( "ViewPatterns",                     Opt_ViewPatterns, nop ),
   ( "TypeFamilies",                     Opt_TypeFamilies, nop ),
   ( "BangPatterns",                     Opt_BangPatterns, nop ),
@@ -1662,6 +1664,7 @@ impliedFlags
 
     , (Opt_RebindableSyntax, turnOff, Opt_ImplicitPrelude)      -- NB: turn off!
 
+    , (Opt_GADTs,            turnOn, Opt_GADTSyntax)
     , (Opt_GADTs,            turnOn, Opt_MonoLocalBinds)
     , (Opt_TypeFamilies,     turnOn, Opt_MonoLocalBinds)
 
