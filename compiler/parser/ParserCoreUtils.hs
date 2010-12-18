@@ -1,5 +1,6 @@
 module ParserCoreUtils where
 
+import Exception
 import System.IO
 
 data ParseResult a = OkP a | FailP String
@@ -19,7 +20,7 @@ failP s s' _ = FailP (s ++ ":" ++ s')
 
 getCoreModuleName :: FilePath -> IO String
 getCoreModuleName fpath = 
-   catch (do 
+   catchIO (do
      h  <- openFile fpath ReadMode
      ls <- hGetContents h
      let mo = findMod (words ls)

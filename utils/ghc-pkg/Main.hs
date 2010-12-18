@@ -724,7 +724,7 @@ updateDBCache verbosity db = do
   when (verbosity > Normal) $
       putStrLn ("writing cache " ++ filename)
   writeBinaryFileAtomic filename (map convertPackageInfoOut (packages db))
-    `catch` \e ->
+    `catchIO` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
@@ -1138,7 +1138,7 @@ writeNewConfig verbosity filename ipis = do
                      $ map (show . convertPackageInfoOut) ipis
       fileContents = "[" ++ shown ++ "\n]"
   writeFileUtf8Atomic filename fileContents
-    `catch` \e ->
+    `catchIO` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
@@ -1374,7 +1374,7 @@ findModules paths =
   return (concat mms)
 
 searchDir path prefix = do
-  fs <- getDirectoryEntries path `catch` \_ -> return []
+  fs <- getDirectoryEntries path `catchIO` \_ -> return []
   searchEntries path prefix fs
 
 searchEntries path prefix [] = return []
@@ -1417,7 +1417,7 @@ expandEnvVars str0 force = go str0 ""
 
    lookupEnvVar :: String -> IO String
    lookupEnvVar nm =
-        catch (System.Environment.getEnv nm)
+        catchIO (System.Environment.getEnv nm)
            (\ _ -> do dieOrForceAll force ("Unable to expand variable " ++
                                         show nm)
                       return "")
@@ -1533,10 +1533,10 @@ installSignalHandlers = do
 #if mingw32_HOST_OS || mingw32_TARGET_OS
 throwIOIO :: Exception.IOException -> IO a
 throwIOIO = Exception.throwIO
+#endif
 
 catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a
 catchIO = Exception.catch
-#endif
 
 catchError :: IO a -> (String -> IO a) -> IO a
 catchError io handler = io `Exception.catch` handler'
@@ -1624,5 +1624,5 @@ readUTF8File file = do
 -- removeFileSave doesn't throw an exceptions, if the file is already deleted
 removeFileSafe :: FilePath -> IO ()
 removeFileSafe fn =
-  removeFile fn `catch` \ e ->
+  removeFile fn `catchIO` \ e ->
     when (not $ isDoesNotExistError e) $ ioError e

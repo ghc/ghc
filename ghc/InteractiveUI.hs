@@ -280,7 +280,7 @@ helpText =
 findEditor :: IO String
 findEditor = do
   getEnv "EDITOR" 
-    `IO.catch` \_ -> do
+    `catchIO` \_ -> do
 #if mingw32_HOST_OS
         win <- System.Win32.getWindowsDirectory
         return (win </> "notepad.exe")
@@ -413,7 +413,7 @@ runGHCi paths maybe_exprs = do
            Right hdl ->
                do runInputTWithPrefs defaultPrefs defaultSettings $
                             runCommands $ fileLoop hdl
-                  liftIO (hClose hdl `IO.catch` \_ -> return ())
+                  liftIO (hClose hdl `catchIO` \_ -> return ())
      where
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
 

@@ -45,8 +45,8 @@ import ErrUtils
 import Panic
 import Util
 import DynFlags
-
 import Exception
+
 import Data.IORef
 import Control.Monad
 import System.Exit
@@ -528,7 +528,7 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
                                writeIORef ref mapping'
                                debugTraceMsg dflags 2 (ptext (sLit "Created temporary directory:") <+> text dirname)
                                return dirname
-                            `IO.catch` \e ->
+                            `catchIO` \e ->
                                     if isAlreadyExistsError e
                                     then mkTempDir (x+1)
                                     else ioError e
@@ -567,7 +567,7 @@ removeTmpFiles dflags fs
     (non_deletees, deletees) = partition isHaskellUserSrcFilename fs
 
 removeWith :: DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
-removeWith dflags remover f = remover f `IO.catch`
+removeWith dflags remover f = remover f `catchIO`
   (\e ->
    let msg = if isDoesNotExistError e
              then ptext (sLit "Warning: deleting non-existent") <+> text f
@@ -604,7 +604,7 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
 #endif
   traceCmd dflags phase_name cmdLine $ do
   (exit_code, doesn'tExist) <-
-     IO.catch (do
+     catchIO (do
          rc <- builderMainLoop dflags filter_fn pgm real_args mb_env
          case rc of
            ExitSuccess{} -> return (rc, False)
@@ -756,7 +756,7 @@ traceCmd dflags phase_name cmd_line action
         ; unless (dopt Opt_DryRun dflags) $ do {
 
            -- And run it!
-        ; action `IO.catch` handle_exn verb
+        ; action `catchIO` handle_exn verb
         }}
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')

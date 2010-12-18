@@ -27,6 +27,7 @@ import Encoding
 import ForeignCall
 import DynFlags
 import FastString
+import Exception
 
 import Data.Char
 import System.IO
@@ -35,10 +36,10 @@ emitExternalCore :: DynFlags -> CgGuts -> IO ()
 emitExternalCore dflags cg_guts
  | dopt Opt_EmitExternalCore dflags
  = (do handle <- openFile corename WriteMode
-       hPutStrLn handle (show (mkExternalCore cg_guts))      
+       hPutStrLn handle (show (mkExternalCore cg_guts))
        hClose handle)
-   `catch` (\_ -> pprPanic "Failed to open or write external core output file"
-                           (text corename))
+   `catchIO` (\_ -> pprPanic "Failed to open or write external core output file"
+                             (text corename))
    where corename = extCoreName dflags
 emitExternalCore _ _
  | otherwise

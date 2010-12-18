@@ -23,9 +23,9 @@ readFileFromPath :: (String -> IO String) -> String -> [String] -> IO String
 readFileFromPath _ filename@('/':_) _ = readFile filename
 readFileFromPath err filename path0 = readTheFile path0
   where
-	readTheFile [] = err $ "could not find " ++ show filename 
-			         ++ " in path " ++ show path0
-	readTheFile (dir:dirs) = 
-		catch (do str <- readFile (dir ++ "/" ++ filename) 
-			  return str) 
-		      (\ _ -> readTheFile dirs)
+        readTheFile [] = err $ "could not find " ++ show filename
+                                 ++ " in path " ++ show path0
+        readTheFile (dir:dirs) =
+                catchIO (do str <- readFile (dir ++ "/" ++ filename)
+                            return str)
+                        (\ _ -> readTheFile dirs)

@@ -86,6 +86,7 @@ module Util (
 
 #include "HsVersions.h"
 
+import Exception
 import Panic
 
 import Data.Data
@@ -99,7 +100,7 @@ import FastTypes
 #endif
 
 import Control.Monad    ( unless )
-import System.IO.Error as IO ( catch, isDoesNotExistError )
+import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, createDirectory,
                           getModificationTime )
 import System.FilePath
@@ -939,9 +940,9 @@ doesDirNameExist fpath = case takeDirectory fpath of
 modificationTimeIfExists :: FilePath -> IO (Maybe ClockTime)
 modificationTimeIfExists f = do
   (do t <- getModificationTime f; return (Just t))
-        `IO.catch` \e -> if isDoesNotExistError e
-                         then return Nothing
-                         else ioError e
+        `catchIO` \e -> if isDoesNotExistError e
+                        then return Nothing
+                        else ioError e
 
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string
