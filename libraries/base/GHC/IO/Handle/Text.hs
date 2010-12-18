@@ -39,6 +39,7 @@ import qualified GHC.IO.Device as RawIO
 import Foreign
 import Foreign.C
 
+import qualified Control.Exception as Exception
 import Data.Typeable
 import System.IO.Error
 import Data.Maybe
@@ -240,12 +241,12 @@ hGetLineBufferedLoop handle_@Handle__{..}
 
 maybeFillReadBuffer :: Handle__ -> CharBuffer -> IO (Maybe CharBuffer)
 maybeFillReadBuffer handle_ buf
-  = catch 
+  = Exception.catch
      (do buf' <- getSomeCharacters handle_ buf
          return (Just buf')
      )
-     (\e -> do if isEOFError e 
-                  then return Nothing 
+     (\e -> do if isEOFError e
+                  then return Nothing
                   else ioError e)
 
 -- See GHC.IO.Buffer
@@ -370,8 +371,8 @@ lazyRead handle =
 lazyReadBuffered :: Handle -> Handle__ -> IO (Handle__, [Char])
 lazyReadBuffered h handle_@Handle__{..} = do
    buf <- readIORef haCharBuffer
-   catch 
-        (do 
+   Exception.catch
+        (do
             buf'@Buffer{..} <- getSomeCharacters handle_ buf
             lazy_rest <- lazyRead h
             (s,r) <- if haInputNL == CRLF
