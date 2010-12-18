@@ -63,6 +63,7 @@ data Builtins
         , pdataTyCon       :: TyCon			-- ^ PData
         , paTyCon          :: TyCon			-- ^ PA
         , paDataCon        :: DataCon			-- ^ PA
+        , paPRSel          :: Var                       -- ^ PA
         , preprTyCon       :: TyCon			-- ^ PRepr
         , prTyCon          :: TyCon			-- ^ PR
         , prDataCon        :: DataCon			-- ^ PR

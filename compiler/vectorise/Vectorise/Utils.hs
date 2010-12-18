@@ -146,8 +146,8 @@ zipScalars arg_tys res_ty
 scalarClosure :: [Type] -> Type -> CoreExpr -> CoreExpr -> VM CoreExpr
 scalarClosure arg_tys res_ty scalar_fun array_fun
   = do
-      ctr      <- builtin (closureCtrFun $ length arg_tys)
-      Just pas <- liftM sequence $ mapM paDictOfType (init arg_tys)
+      ctr <- builtin (closureCtrFun $ length arg_tys)
+      pas <- mapM paDictOfType (init arg_tys)
       return $ Var ctr `mkTyApps` (arg_tys ++ [res_ty])
                        `mkApps`   (pas ++ [scalar_fun, array_fun])
 

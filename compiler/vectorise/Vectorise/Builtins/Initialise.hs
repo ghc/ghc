@@ -46,8 +46,10 @@ initBuiltins pkg
       let [parrayDataCon] = tyConDataCons parrayTyCon
 
       pdataTyCon	<- externalTyCon	dph_PArray	(fsLit "PData")
-      paTyCon		<- externalClassTyCon	dph_PArray	(fsLit "PA")
-      let [paDataCon]	= tyConDataCons paTyCon
+      pa                <- externalClass        dph_PArray      (fsLit "PA")
+      let paTyCon     = classTyCon pa
+          [paDataCon] = tyConDataCons paTyCon
+          paPRSel     = classSCSelId pa 0
 
       preprTyCon	<- externalTyCon 	dph_PArray	(fsLit "PRepr")
       prTyCon		<- externalClassTyCon	dph_PArray	(fsLit "PR")
@@ -127,6 +129,7 @@ initBuiltins pkg
                , pdataTyCon       = pdataTyCon
                , paTyCon          = paTyCon
                , paDataCon        = paDataCon
+               , paPRSel          = paPRSel
                , preprTyCon       = preprTyCon
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon

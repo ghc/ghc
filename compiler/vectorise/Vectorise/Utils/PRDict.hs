@@ -2,13 +2,12 @@
 module Vectorise.Utils.PRDict (
 	prDFunOfTyCon,
 	prDictOfType,
-	prDictOfTyApp,
-	prDFunApply,
 	wrapPR
 )
 where
 import Vectorise.Monad
 import Vectorise.Builtins
+import Vectorise.Utils.Base
 import Vectorise.Utils.PADict
 
 import CoreSyn
@@ -17,14 +16,6 @@ import TypeRep
 import TyCon
 import Outputable
 import Control.Monad
-
-
-prDFunOfTyCon :: TyCon -> VM CoreExpr
-prDFunOfTyCon tycon
-  = liftM Var
-  . maybeCantVectoriseM "No PR dictionary for tycon" (ppr tycon)
-  $ lookupTyConPR tycon
-
 
 
 prDictOfType :: Type -> VM CoreExpr
@@ -50,6 +41,6 @@ prDFunApply dfun tys
 wrapPR :: Type -> VM CoreExpr
 wrapPR ty
   = do
-      Just  pa_dict <- paDictOfType ty
-      pr_dfun       <- prDFunOfTyCon =<< builtin wrapTyCon
+      pa_dict <- paDictOfType ty
+      pr_dfun <- prDFunOfTyCon =<< builtin wrapTyCon
       return $ mkApps pr_dfun [Type ty, pa_dict]
