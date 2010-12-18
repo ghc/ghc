@@ -449,7 +449,7 @@ getPkgDatabases verbosity modify use_cache my_flags = do
 
   -- get the location of the user package database, and create it if necessary
   -- getAppUserDataDirectory can fail (e.g. if $HOME isn't set)
-  e_appdir <- try $ getAppUserDataDirectory "ghc"
+  e_appdir <- tryIO $ getAppUserDataDirectory "ghc"
 
   mb_user_conf <-
      if no_user_db then return Nothing else
@@ -470,7 +470,7 @@ getPkgDatabases verbosity modify use_cache my_flags = do
           modify || user_exists = [user_conf, global_conf]
         | otherwise             = [global_conf]
 
-  e_pkg_path <- try (System.Environment.getEnv "GHC_PACKAGE_PATH")
+  e_pkg_path <- tryIO (System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
         case e_pkg_path of
                 Left  _ -> sys_databases
@@ -541,7 +541,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
   | Just (user_conf,False) <- mb_user_conf, path == user_conf
   = return PackageDB { location = path, packages = [] }
   | otherwise
-  = do e <- try $ getDirectoryContents path
+  = do e <- tryIO $ getDirectoryContents path
        case e of
          Left _   -> do
               pkgs <- parseMultiPackageConf verbosity path
@@ -551,7 +551,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
            | otherwise -> do
               let cache = path </> cachefilename
               tdir     <- getModificationTime path
-              e_tcache <- try $ getModificationTime cache
+              e_tcache <- tryIO $ getModificationTime cache
               case e_tcache of
                 Left ex -> do
                      when (verbosity > Normal) $
@@ -1542,6 +1542,8 @@ catchError :: IO a -> (String -> IO a) -> IO a
 catchError io handler = io `Exception.catch` handler'
     where handler' (Exception.ErrorCall err) = handler err
 
+tryIO :: IO a -> IO (Either Exception.IOException a)
+tryIO = Exception.try
 
 writeBinaryFileAtomic :: Bin.Binary a => FilePath -> a -> IO ()
 writeBinaryFileAtomic targetFile obj =

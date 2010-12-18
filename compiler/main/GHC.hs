@@ -312,7 +312,7 @@ import Exception
 import Data.IORef
 import System.FilePath
 import System.IO
-import System.IO.Error	( try, isDoesNotExistError )
+import System.IO.Error	( isDoesNotExistError )
 import Prelude hiding (init)
 
 
@@ -2067,7 +2067,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 	case maybe_buf of
 	   Just (_,t) -> check_timestamp old_summary location src_fn t
 	   Nothing    -> do
-		m <- System.IO.Error.try (getModificationTime src_fn)
+		m <- tryIO (getModificationTime src_fn)
 		case m of
 		   Right t -> check_timestamp old_summary location src_fn t
 		   Left e | isDoesNotExistError e -> find_it

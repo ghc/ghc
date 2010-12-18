@@ -13,6 +13,7 @@ module GhciTags (
   createETagsFileCmd
 ) where
 
+import Exception
 import GHC
 import GhciMonad
 import Outputable
@@ -29,7 +30,7 @@ import Panic
 import Data.List
 import Control.Monad
 import System.IO
-import System.IO.Error as IO
+import System.IO.Error
 
 -----------------------------------------------------------------------------
 -- create tags file for currently loaded modules.
@@ -130,18 +131,18 @@ collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError (
 -- ctags style with the Ex exresion being just the line number, Vim et al
 collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
   let tags = unlines $ sortLe (<=) $ map showCTag tagInfos
-  IO.try (writeFile file tags)
+  tryIO (writeFile file tags)
 
 -- ctags style with the Ex exresion being a regex searching the line, Vim et al
 collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
   tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
   let tags = unlines $ sortLe (<=) $ map showCTag $concat tagInfoGroups
-  IO.try (writeFile file tags)
+  tryIO (writeFile file tags)
 
 collateAndWriteTags ETags file tagInfos = do -- etags style, Emacs/XEmacs
   tagInfoGroups <- makeTagGroupsWithSrcInfo $filter tagExported tagInfos
   let tagGroups = map processGroup tagInfoGroups
-  IO.try (writeFile file $ concat tagGroups)
+  tryIO (writeFile file $ concat tagGroups)
 
   where
     processGroup [] = ghcError (CmdLineError "empty tag file group??")

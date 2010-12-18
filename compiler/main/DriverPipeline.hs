@@ -58,7 +58,6 @@ import Data.IORef       ( readIORef )
 import System.Directory
 import System.FilePath
 import System.IO
-import System.IO.Error as IO
 import Control.Monad
 import Data.List        ( isSuffixOf )
 import Data.Maybe
@@ -365,13 +364,13 @@ linkingNeeded dflags linkables pkg_deps = do
         -- modification times on all of the objects and libraries, then omit
         -- linking (unless the -fforce-recomp flag was given).
   let exe_file = exeFileName dflags
-  e_exe_time <- IO.try $ getModificationTime exe_file
+  e_exe_time <- tryIO $ getModificationTime exe_file
   case e_exe_time of
     Left _  -> return True
     Right t -> do
         -- first check object files and extra_ld_inputs
         extra_ld_inputs <- readIORef v_Ld_inputs
-        e_extra_times <- mapM (IO.try . getModificationTime) extra_ld_inputs
+        e_extra_times <- mapM (tryIO . getModificationTime) extra_ld_inputs
         let (errs,extra_times) = splitEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
@@ -387,7 +386,7 @@ linkingNeeded dflags linkables pkg_deps = do
 
         pkg_libfiles <- mapM (uncurry findHSLib) pkg_hslibs
         if any isNothing pkg_libfiles then return True else do
-        e_lib_times <- mapM (IO.try . getModificationTime)
+        e_lib_times <- mapM (tryIO . getModificationTime)
                           (catMaybes pkg_libfiles)
         let (lib_errs,lib_times) = splitEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times

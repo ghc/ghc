@@ -81,7 +81,7 @@ import System.Environment
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
-import System.IO.Error as IO
+import System.IO.Error
 import Data.Char
 import Data.Array
 import Control.Monad as Monad
@@ -369,7 +369,7 @@ interactiveUI srcs maybe_exprs = do
 
 withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
 withGhcAppData right left = do
-    either_dir <- IO.try (getAppUserDataDirectory "ghc")
+    either_dir <- tryIO (getAppUserDataDirectory "ghc")
     case either_dir of
         Right dir ->
             do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
@@ -388,7 +388,7 @@ runGHCi paths maybe_exprs = do
                     (return Nothing)
 
    home_dir = do
-    either_dir <- liftIO $ IO.try (getEnv "HOME")
+    either_dir <- liftIO $ tryIO (getEnv "HOME")
     case either_dir of
       Right home -> return (Just (home </> ".ghci"))
       _ -> return Nothing
@@ -404,7 +404,7 @@ runGHCi paths maybe_exprs = do
        dir_ok  <- liftIO $ checkPerms (getDirectory file)
        file_ok <- liftIO $ checkPerms file
        when (dir_ok && file_ok) $ do
-         either_hdl <- liftIO $ IO.try (openFile file ReadMode)
+         either_hdl <- liftIO $ tryIO (openFile file ReadMode)
          case either_hdl of
            Left _e   -> return ()
            -- NOTE: this assumes that runInputT won't affect the terminal;
@@ -517,7 +517,7 @@ checkPerms name =
 
 fileLoop :: MonadIO m => Handle -> InputT m (Maybe String)
 fileLoop hdl = do
-   l <- liftIO $ IO.try $ hGetLine hdl
+   l <- liftIO $ tryIO $ hGetLine hdl
    case l of
         Left e | isEOFError e              -> return Nothing
                | InvalidArgument <- etype  -> return Nothing
@@ -661,7 +661,7 @@ runStmt stmt step
       -- are really two stdin Handles.  So we flush any bufferred data in
       -- GHCi's stdin Handle here (only relevant if stdin is attached to
       -- a file, otherwise the read buffer can't be flushed).
-      _ <- liftIO $ IO.try $ hFlushAll stdin
+      _ <- liftIO $ tryIO $ hFlushAll stdin
       result <- GhciMonad.runStmt stmt step
       afterRunStmt (const True) result
 
@@ -890,7 +890,7 @@ addModule files = do
 changeDirectory :: String -> InputT GHCi ()
 changeDirectory "" = do
   -- :cd on its own changes to the user's home directory
-  either_dir <- liftIO $ IO.try getHomeDirectory
+  either_dir <- liftIO $ tryIO getHomeDirectory
   case either_dir of
      Left _e -> return ()
      Right dir -> changeDirectory dir
