@@ -2434,7 +2434,8 @@ declarations.  Define your own instances!
 <sect2 id="gadt-style">
 <title>Declaring data types with explicit constructor signatures</title>
 
-<para>GHC allows you to declare an algebraic data type by 
+<para>When the <literal>GADTSyntax</literal> extension is enabled,
+GHC allows you to declare an algebraic data type by
 giving the type signatures of constructors explicitly.  For example:
 <programlisting>
   data Maybe a where

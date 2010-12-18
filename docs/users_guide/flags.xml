@@ -763,6 +763,13 @@
 	      <entry><option>-XNoGADTs</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XGADTSyntax</option></entry>
+	      <entry>Enable <link linkend="gadt-style">generalised algebraic data type syntax</link>.
+	      </entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoGADTSyntax</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XTypeFamilies</option></entry>
 	      <entry>Enable <link linkend="type-families">type families</link>.</entry>
 	      <entry>dynamic</entry>
