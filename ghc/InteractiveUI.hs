@@ -369,14 +369,16 @@ interactiveUI srcs maybe_exprs = do
 
 withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
 withGhcAppData right left = do
-   either_dir <- IO.try (getAppUserDataDirectory "ghc")
-   case either_dir of
-      Right dir -> right dir
-      _ -> left
+    either_dir <- IO.try (getAppUserDataDirectory "ghc")
+    case either_dir of
+        Right dir ->
+            do createDirectoryIfMissing False dir `catchIO` \_ -> return ()
+               right dir
+        _ -> left
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
-  let 
+  let
    read_dot_files = not opt_IgnoreDotGhci
 
    current_dir = return (Just ".ghci")
