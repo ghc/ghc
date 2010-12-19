@@ -48,6 +48,7 @@ endif
 	  --no-tmp-comp-dir \
 	  --dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
 	  --html \
+	  --hoogle \
 	  --title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
 	  --prologue="$1/$2/haddock-prologue.txt" \
 	  $$(foreach mod,$$($1_$2_HIDDEN_MODULES),--hide=$$(mod)) \
