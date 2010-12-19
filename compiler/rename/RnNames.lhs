@@ -1064,12 +1064,10 @@ check_occs ie occs names
             | name == name'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> if diffModules ie ie'
-                 then return occs
-                 else do
-                   { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
-                     warnIf warn_dup_exports (dupExportWarn name_occ ie ie') ;
-                     return occs }
+            -> do unless (diffModules ie ie') $ do
+                      warn_dup_exports <- doptM Opt_WarnDuplicateExports
+                      warnIf warn_dup_exports (dupExportWarn name_occ ie ie')
+                  return occs
 
             | otherwise    -- Same occ name but different names: an error
             ->  do { global_env <- getGlobalRdrEnv ;
