@@ -588,14 +588,14 @@ makeFarBranches blocks
         handleBlock addr (BasicBlock id instrs)
                 = BasicBlock id (zipWith makeFar [addr..] instrs)
         
-        makeFar addr (BCC ALWAYS tgt) = BCC ALWAYS tgt
+        makeFar _ (BCC ALWAYS tgt) = BCC ALWAYS tgt
         makeFar addr (BCC cond tgt)
             | abs (addr - targetAddr) >= nearLimit
             = BCCFAR cond tgt
             | otherwise
             = BCC cond tgt
             where Just targetAddr = lookupUFM blockAddressMap tgt
-        makeFar addr other            = other
+        makeFar _ other            = other
         
         nearLimit = 7000 -- 8192 instructions are allowed; let's keep some
                          -- distance, as we have a few pseudo-insns that are
