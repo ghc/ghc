@@ -87,6 +87,7 @@ import Outputable
 import FastString
 import UniqSet
 import ErrUtils
+import Module
 
 -- DEBUGGING ONLY
 --import OrdList
