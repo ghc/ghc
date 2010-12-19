@@ -1,3 +1,9 @@
+Changes in version 2.9.1
+
+  * Fix build in GHC tree
+
+  * Improve .cabal file
+
 Changes in version 2.9.0
 
   * Drop support for ghc < 7
