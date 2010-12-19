@@ -1,6 +1,5 @@
 
 module Vectorise.Utils.PRDict (
-	prDFunOfTyCon,
 	prDictOfType,
 	wrapPR
 )
@@ -13,8 +12,6 @@ import Vectorise.Utils.PADict
 import CoreSyn
 import Type
 import TypeRep
-import TyCon
-import Outputable
 import Control.Monad
 
 
