@@ -82,8 +82,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cGhcWithInterpreter   = "$(GhcWithInterpreter)"'             >> $@
 	@echo 'cGhcWithNativeCodeGen :: String'                             >> $@
 	@echo 'cGhcWithNativeCodeGen = "$(GhcWithNativeCodeGen)"'           >> $@
-	@echo 'cGhcWithLlvmCodeGen   :: String'                             >> $@
-	@echo 'cGhcWithLlvmCodeGen   = "YES"'                               >> $@
 	@echo 'cGhcWithSMP           :: String'                             >> $@
 	@echo 'cGhcWithSMP           = "$(GhcWithSMP)"'                     >> $@
 	@echo 'cGhcRTSWays           :: String'                             >> $@

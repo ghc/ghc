@@ -146,9 +146,6 @@ GhcWithNativeCodeGen=$(strip\
     $(if $(filter YESYESNO,\
 		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
 
-# Build a compiler with the llvm code generator backend
-GhcWithLlvmCodeGen=NO
-
 HaveLibDL = @HaveLibDL@
 
 # ArchSupportsSMP should be set iff there is support for that arch in
