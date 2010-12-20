@@ -577,10 +577,7 @@ cpeApp env expr
 cpeArg :: CorePrepEnv -> RhsDemand -> CoreArg -> Type
        -> UniqSM (Floats, CpeTriv)
 cpeArg env is_strict arg arg_ty
-  | cpe_ExprIsTrivial arg   -- Do not eta expand etc a trivial argument
-  = cpeBody env arg	    -- Must still do substitution though
-  | otherwise
-  = do { (floats1, arg1) <- cpeRhsE env arg	-- arg1 can be a lambda
+  = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; (floats2, arg2) <- if want_float floats1 arg1 
        	 	   	    then return (floats1, arg1)
        	 	   	    else do { body1 <- rhsToBodyNF arg1
@@ -588,10 +585,13 @@ cpeArg env is_strict arg arg_ty
 	 	-- Else case: arg1 might have lambdas, and we can't
 		--            put them inside a wrapBinds
 
-       ; v <- newVar arg_ty
+       ; if cpe_ExprIsTrivial arg2    -- Do not eta expand a trivial argument
+         then return (floats2, arg2)
+         else do
+       { v <- newVar arg_ty
        ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
        	     arg_float = mkFloat is_strict is_unlifted v arg3
-       ; return (addFloat floats2 arg_float, Var v) }
+       ; return (addFloat floats2 arg_float, Var v) } }
   where
     is_unlifted = isUnLiftedType arg_ty
     want_float = wantFloatNested NonRecursive (is_strict || is_unlifted)
