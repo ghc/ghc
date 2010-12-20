@@ -2296,6 +2296,8 @@ compilerInfo = [("Project name",                String cProjectName),
                 ("Leading underscore",          String cLeadingUnderscore),
                 ("Debug on",                    String (show debugIsOn)),
                 ("LibDir",                      FromDynFlags topDir),
-                ("Global Package DB",           FromDynFlags systemPackageConfig)
+                ("Global Package DB",           FromDynFlags systemPackageConfig),
+                ("C compiler flags",            String (show cCcOpts)),
+                ("Linker flags",                String (show cLdOpts))
                ]
 
