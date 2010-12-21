@@ -659,12 +659,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                 op_items ibinds
 
        -- Create the result bindings
-       ; let dict_constr       = classDataCon clas
-	     dict_bind         = mkVarBind self_dict dict_rhs
-             dict_rhs          = foldl mk_app inst_constr $
-                                 map HsVar sc_dicts ++ map (wrapId arg_wrapper) meth_ids
-             inst_constr       = L loc $ wrapId (mkWpTyApps inst_tys)
-                                                (dataConWrapId dict_constr)
+       ; self_dict <- newEvVar (ClassP clas inst_tys)
+       ; let class_tc      = classTyCon clas
+             [dict_constr] = tyConDataCons class_tc
+             dict_bind     = mkVarBind self_dict dict_rhs
+             dict_rhs      = foldl mk_app inst_constr $
+                             map HsVar sc_dicts ++ map (wrapId arg_wrapper) meth_ids
+             inst_constr   = L loc $ wrapId (mkWpTyApps inst_tys)
+                                            (dataConWrapId dict_constr)
                      -- We don't produce a binding for the dict_constr; instead we
                      -- rely on the simplifier to unfold this saturated application
                      -- We do this rather than generate an HsCon directly, because
@@ -672,17 +674,21 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      -- member) are dealt with by the common MkId.mkDataConWrapId 
 		     -- code rather than needing to be repeated here.
 
-	     mk_app :: LHsExpr Id -> Id -> LHsExpr Id
- 	     mk_app fun arg_id = L loc (HsApp fun (L loc (wrapId arg_wrapper arg_id)))
-	     arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars')
+             mk_app :: LHsExpr Id -> HsExpr Id -> LHsExpr Id
+             mk_app fun arg = L loc (HsApp fun (L loc arg))
+
+             arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars)
 
 	        -- Do not inline the dfun; instead give it a magic DFunFunfolding
 	        -- See Note [ClassOp/DFun selection]
 		-- See also note [Single-method classes]
-             dfun_id_w_fun = dfun_id  
-                             `setIdUnfolding`  mkDFunUnfolding inst_ty (map Var dict_and_meth_ids)
-			     		       		-- Not right for equality superclasses
-                             `setInlinePragma` dfunInlinePragma
+             dfun_id_w_fun
+                | isNewTyCon class_tc
+                = dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+                | otherwise
+                = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_ty (sc_args ++ meth_args)
+                          `setInlinePragma` dfunInlinePragma
+             meth_args = map (DFunPolyArg . Var) meth_ids
 
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
@@ -744,16 +750,11 @@ Consider the following (extreme) situation:
 Although this looks wrong (assume D [a] to prove D [a]), it is only a
 more extreme case of what happens with recursive dictionaries.
 
-       ; uniq <- newUnique
-       ; let sc_op_ty   = mkForAllTys tyvars $ mkPiTypes dicts (varType sc_dict)
-	     sc_op_name = mkDerivedInternalName mkClassOpAuxOcc uniq
-						(getName sc_sel)
-	     sc_op_id   = mkLocalId sc_op_name sc_op_ty
-	     sc_op_bind = VarBind { var_id = sc_op_id, var_inline = False
-                                  , var_rhs = L noSrcSpan $ wrapId sc_wrapper sc_dict }
-             sc_wrapper = mkWpTyLams tyvars
-                          <.> mkWpLams dicts
-                          <.> mkWpLet ev_binds
+To implement the dfun we must generate code for the superclass C [a],
+which we can get by superclass selection from the supplied argument!
+So we’d generate:
+       dfun :: forall a. D [a] -> D [a]
+       dfun = \d::D [a] -> MkD (scsel d) ..
 
 However this means that if we later encounter a situation where
 we have a [Wanted] dw::D [a] we could solve it thus:

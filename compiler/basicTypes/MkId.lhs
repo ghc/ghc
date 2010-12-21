@@ -235,9 +235,9 @@ mkDataConIds wrap_name wkr_name data_con
 
     wkr_arity = dataConRepArity data_con
     wkr_info  = noCafIdInfo
-                `setArityInfo`          wkr_arity
+                `setArityInfo`       wkr_arity
                 `setStrictnessInfo`  Just wkr_sig
-                `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
+                `setUnfoldingInfo`   evaldUnfolding  -- Record that it's evaluated,
                                                         -- even if arity = 0
 
     wkr_sig = mkStrictSig (mkTopDmdType (replicate wkr_arity topDmd) cpr_info)
@@ -270,6 +270,7 @@ mkDataConIds wrap_name wkr_name data_con
     nt_work_id   = mkGlobalId (DataConWrapId data_con) wkr_name wrap_ty nt_work_info
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
+                  `setInlinePragInfo`    alwaysInlinePragma
                   `setUnfoldingInfo`     newtype_unf
     id_arg1      = mkTemplateLocal 1 (head orig_arg_tys)
     newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
@@ -899,7 +900,8 @@ unsafeCoerceId :: Id
 unsafeCoerceId
   = pcMiscPrelId unsafeCoerceName ty info
   where
-    info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
            
 
     ty  = mkForAllTys [argAlphaTyVar,openBetaTyVar]
@@ -915,15 +917,16 @@ nullAddrId :: Id
 -- a way to write this literal in Haskell.
 nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
-    info = noCafIdInfo `setUnfoldingInfo` 
-           mkCompulsoryUnfolding (Lit nullAddrLit)
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
 
 ------------------------------------------------
 seqId :: Id	-- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
-    info = noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
-                       `setSpecInfo` mkSpecInfo [seq_cast_rule]
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setSpecInfo`       mkSpecInfo [seq_cast_rule]
            
 
     ty  = mkForAllTys [alphaTyVar,argBetaTyVar]
