@@ -498,7 +498,7 @@ data UnfoldingSource
 
   | InlineStable       -- From an INLINE or INLINABLE pragma 
                        --   INLINE     if guidance is UnfWhen
-                       --   INLINABLE  if guidance is UnfIfGoodArgs
+                       --   INLINABLE  if guidance is UnfIfGoodArgs/UnfoldNever
                        -- (well, technically an INLINABLE might be made
                        -- UnfWhen if it was small enough, and then
                        -- it will behave like INLINE outside the current
