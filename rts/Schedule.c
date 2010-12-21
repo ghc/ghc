@@ -2220,6 +2220,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
             return CATCH_STM_FRAME;
 	    
         case UNDERFLOW_FRAME:
+            tso->stackobj->sp = p;
             threadStackUnderflow(cap,tso);
             p = tso->stackobj->sp;
             continue;
