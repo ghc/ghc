@@ -34,6 +34,20 @@ FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES \
 	+$(TOPMAKE) stage=3 all_ghc_stage3 $(FAST_MAKE_OPTS) NO_STAGE3_DEPS=YES
 
 
+# 'make re2' rebuilds stage2, removing the old executable first.  Useful for
+# something like 'make re2 GhcDebugged=YES'.
+
+.PHONY: re1 re2 re3
+re1:
+	$(RM) stage1/build/tmp/ghc-stage1
+	$(MAKE) 1
+re2:
+	$(RM) stage2/build/tmp/ghc-stage2
+	$(MAKE) 2
+re3:
+	$(RM) stage3/build/tmp/ghc-stage3
+	$(MAKE) 3
+
 .PHONY: extra-help
 help : extra-help
 extra-help :
