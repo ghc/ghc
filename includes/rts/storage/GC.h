@@ -67,7 +67,8 @@ typedef struct generation_ {
 
     bdescr *       large_objects;	// large objects (doubly linked)
     unsigned int   n_large_blocks;      // no. of blocks used by large objs
-    unsigned int   n_new_large_blocks;  // count freshly allocated large objects
+    unsigned long  n_new_large_words;   // words of new large objects
+                                        // (for allocation stats)
 
     unsigned int   max_blocks;		// max blocks
     bdescr        *mut_list;      	// mut objects in this gen (not G0)
@@ -154,7 +155,7 @@ void * allocateExec(unsigned int len, void **exec_addr);
 void   freeExec (void *p);
 
 // Used by GC checks in external .cmm code:
-extern nat alloc_blocks_lim;
+extern nat large_alloc_lim;
 
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection

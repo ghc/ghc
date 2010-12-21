@@ -383,7 +383,7 @@
 // allocate() - this includes many of the primops.
 #define MAYBE_GC(liveness,reentry)			\
     if (bdescr_link(CurrentNursery) == NULL || \
-        generation_n_new_large_blocks(W_[g0]) >= CInt[alloc_blocks_lim]) {   \
+        generation_n_new_large_words(W_[g0]) >= CLong[large_alloc_lim]) {   \
 	R9  = liveness;					\
         R10 = reentry;					\
         HpAlloc = 0;					\

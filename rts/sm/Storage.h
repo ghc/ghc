@@ -29,7 +29,7 @@ INLINE_HEADER rtsBool
 doYouWantToGC( Capability *cap )
 {
   return (cap->r.rCurrentNursery->link == NULL ||
-          g0->n_large_blocks >= alloc_blocks_lim);
+          g0->n_new_large_words >= large_alloc_lim);
 }
 
 /* for splitting blocks groups in two */
@@ -124,6 +124,7 @@ void dirty_MVAR(StgRegTable *reg, StgClosure *p);
 extern nursery *nurseries;
 
 void     resetNurseries       ( void );
+lnat     clearNurseries       ( void );
 void     resizeNurseries      ( nat blocks );
 void     resizeNurseriesFixed ( nat blocks );
 lnat     countNurseryBlocks   ( void );
@@ -132,7 +133,7 @@ lnat     countNurseryBlocks   ( void );
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-lnat    calcAllocated  (void);
+lnat    calcAllocated  (rtsBool count_nurseries);
 lnat    calcLiveBlocks (void);
 lnat    calcLiveWords  (void);
 lnat    countOccupied  (bdescr *bd);

@@ -40,8 +40,8 @@ StgClosure    *caf_list         = NULL;
 StgClosure    *revertible_caf_list = NULL;
 rtsBool       keepCAFs;
 
-nat alloc_blocks_lim;    /* GC if n_large_blocks in any nursery
-                          * reaches this. */
+nat large_alloc_lim;    /* GC if n_large_blocks in any nursery
+                         * reaches this. */
 
 bdescr *exec_block;
 
@@ -77,7 +77,7 @@ initGeneration (generation *gen, int g)
     gen->n_old_blocks = 0;
     gen->large_objects = NULL;
     gen->n_large_blocks = 0;
-    gen->n_new_large_blocks = 0;
+    gen->n_new_large_words = 0;
     gen->mut_list = allocBlock();
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
@@ -181,7 +181,7 @@ initStorage( void )
   revertible_caf_list = END_OF_STATIC_LIST;
    
   /* initialise the allocate() interface */
-  alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
+  large_alloc_lim = RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W;
 
   exec_block = NULL;
 
@@ -209,7 +209,7 @@ initStorage( void )
 void
 exitStorage (void)
 {
-    stat_exit(calcAllocated());
+    stat_exit(calcAllocated(rtsTrue));
 }
 
 void
@@ -401,21 +401,31 @@ allocNurseries( void )
     assignNurseriesToCapabilities();
 }
       
-void
-resetNurseries( void )
+lnat // words allocated
+clearNurseries (void)
 {
+    lnat allocated = 0;
     nat i;
     bdescr *bd;
 
     for (i = 0; i < n_capabilities; i++) {
 	for (bd = nurseries[i].blocks; bd; bd = bd->link) {
-	    bd->free = bd->start;
+            allocated += (lnat)(bd->free - bd->start);
+            bd->free = bd->start;
 	    ASSERT(bd->gen_no == 0);
 	    ASSERT(bd->gen == g0);
 	    IF_DEBUG(sanity,memset(bd->start, 0xaa, BLOCK_SIZE));
 	}
     }
+
+    return allocated;
+}
+
+void
+resetNurseries (void)
+{
     assignNurseriesToCapabilities();
+
 }
 
 lnat
@@ -549,7 +559,7 @@ allocate (Capability *cap, lnat n)
 	bd = allocGroup(req_blocks);
 	dbl_link_onto(bd, &g0->large_objects);
 	g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
-	g0->n_new_large_blocks += bd->blocks;
+        g0->n_new_large_words += n;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
 	bd->flags = BF_LARGE;
@@ -651,13 +661,13 @@ allocatePinned (Capability *cap, lnat n)
 	cap->pinned_object_block = bd = allocBlock();
 	dbl_link_onto(bd, &g0->large_objects);
 	g0->n_large_blocks++;
-	g0->n_new_large_blocks++;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
 	bd->flags  = BF_PINNED | BF_LARGE;
 	bd->free   = bd->start;
     }
 
+    g0->n_new_large_words += n;
     p = bd->free;
     bd->free += n;
     return p;
@@ -754,33 +764,26 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 lnat
-calcAllocated( void )
+calcAllocated (rtsBool include_nurseries)
 {
-  nat allocated;
+  nat allocated = 0;
   bdescr *bd;
   nat i;
 
-  allocated = countNurseryBlocks() * BLOCK_SIZE_W;
-  
-  for (i = 0; i < n_capabilities; i++) {
-      Capability *cap;
-      for ( bd = capabilities[i].r.rCurrentNursery->link; 
-	    bd != NULL; bd = bd->link ) {
-	  allocated -= BLOCK_SIZE_W;
-      }
-      cap = &capabilities[i];
-      if (cap->r.rCurrentNursery->free < 
-	  cap->r.rCurrentNursery->start + BLOCK_SIZE_W) {
-	  allocated -= (cap->r.rCurrentNursery->start + BLOCK_SIZE_W)
-	      - cap->r.rCurrentNursery->free;
-      }
-      if (cap->pinned_object_block != NULL) {
-          allocated -= (cap->pinned_object_block->start + BLOCK_SIZE_W) - 
-              cap->pinned_object_block->free;
+  // When called from GC.c, we already have the allocation count for
+  // the nursery from resetNurseries(), so we don't need to walk
+  // through these block lists again.
+  if (include_nurseries)
+  {
+      for (i = 0; i < n_capabilities; i++) {
+          for (bd = nurseries[i].blocks; bd; bd = bd->link) {
+              allocated += (lnat)(bd->free - bd->start);
+          }
       }
   }
 
-  allocated += g0->n_new_large_blocks * BLOCK_SIZE_W;
+  // add in sizes of new large and pinned objects
+  allocated += g0->n_new_large_words;
 
   return allocated;
 }  

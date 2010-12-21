@@ -221,7 +221,7 @@ GarbageCollect (rtsBool force_major_gc,
   /* Approximate how much we allocated.  
    * Todo: only when generating stats? 
    */
-  allocated = calcAllocated();
+  allocated = calcAllocated(rtsFalse/* don't count the nursery yet */);
 
   /* Figure out which generation to collect
    */
@@ -648,7 +648,7 @@ SET_GCT(gc_threads[0]);
         freeChain(gen->large_objects);
         gen->large_objects  = gen->scavenged_large_objects;
         gen->n_large_blocks = gen->n_scavenged_large_blocks;
-	gen->n_new_large_blocks = 0;
+        gen->n_new_large_words = 0;
         ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
     }
     else // for generations > N
@@ -674,10 +674,6 @@ SET_GCT(gc_threads[0]);
   // Calculate the amount of live data for stats.
   live = calcLiveWords();
 
-  // Free the small objects allocated via allocate(), since this will
-  // all have been copied into G0S1 now.  
-  alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
-
   // Start a new pinned_object_block
   for (n = 0; n < n_capabilities; n++) {
       capabilities[n].pinned_object_block = NULL;
@@ -699,9 +695,14 @@ SET_GCT(gc_threads[0]);
       }
   }
 
+  // Reset the nursery: make the blocks empty
+  allocated += clearNurseries();
+
   resize_nursery();
 
- // mark the garbage collected CAFs as dead 
+  resetNurseries();
+
+ // mark the garbage collected CAFs as dead
 #if 0 && defined(DEBUG) // doesn't work at the moment 
   if (major_gc) { gcCAFs(); }
 #endif
@@ -724,10 +725,7 @@ SET_GCT(gc_threads[0]);
       }
   }
 
-  // Reset the nursery
-  resetNurseries();
-
-  // send exceptions to any threads which were about to die 
+  // send exceptions to any threads which were about to die
   RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
   ACQUIRE_SM_LOCK;
