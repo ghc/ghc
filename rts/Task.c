@@ -270,14 +270,20 @@ newBoundTask (void)
 void
 boundTaskExiting (Task *task)
 {
-    task->stopped = rtsTrue;
-
 #if defined(THREADED_RTS)
     ASSERT(osThreadId() == task->id);
 #endif
     ASSERT(myTask() == task);
 
     endInCall(task);
+
+    // Set task->stopped, but only if this is the last call (#4850).
+    // Remember that we might have a worker Task that makes a foreign
+    // call and then a callback, so it can transform into a bound
+    // Task for the duration of the callback.
+    if (task->incall == NULL) {
+        task->stopped = rtsTrue;
+    }
 
     debugTrace(DEBUG_sched, "task exiting");
 }
