@@ -304,7 +304,7 @@ start:
                         // stg_block_async_info stack frame, because
                         // the block_info field will be overwritten by
                         // pushOnRunQueue().
-                        tso->sp[1] = (W_)tso->block_info.async_result;
+                        tso->stackobj->sp[1] = (W_)tso->block_info.async_result;
 			pushOnRunQueue(&MainCapability, tso);
 			break;
 		    }
