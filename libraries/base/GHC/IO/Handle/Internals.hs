@@ -390,7 +390,7 @@ handleFinalizer fp m = do
 -- using an 8k char buffer instead of 32k improved performance for a
 -- basic "cat" program by ~30% for me.  --SDM
 dEFAULT_CHAR_BUFFER_SIZE :: Int
-dEFAULT_CHAR_BUFFER_SIZE = dEFAULT_BUFFER_SIZE `div` 4
+dEFAULT_CHAR_BUFFER_SIZE = 2048 -- 8k/sizeof(HsChar)
 
 getCharBuffer :: IODevice dev => dev -> BufferState
               -> IO (IORef CharBuffer, BufferMode)
