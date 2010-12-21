@@ -30,3 +30,9 @@ T4059:
 exec_signals-prep:
 	$(CC) -o exec_signals_child exec_signals_child.c
 	$(CC) -o exec_signals_prepare exec_signals_prepare.c
+
+.PHONY: 4850
+4850:
+	$(RM) 4850.o 4850.hi 4850$(exeext)
+	"$(TEST_HC)" -v0 -rtsopts -debug -threaded --make 4850
+	./4850 +RTS -s 2>&1 | grep Task | wc -l

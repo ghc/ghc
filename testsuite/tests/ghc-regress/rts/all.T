@@ -99,3 +99,6 @@ test('exec_signals', [
     ], compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
+
+test('4850', extra_clean(['4850.o','4850.hi','4850']),
+             run_command, ['$MAKE -s --no-print-directory 4850'])
