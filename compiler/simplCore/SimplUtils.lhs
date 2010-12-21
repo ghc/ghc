@@ -45,6 +45,7 @@ import Id
 import Var
 import Demand
 import SimplMonad
+import TcType	( isDictLikeTy )
 import Type	hiding( substTy )
 import Coercion ( coercionKind )
 import TyCon
@@ -1069,6 +1070,9 @@ because the latter is not well-kinded.
 %*									*
 %************************************************************************
 
+When we meet a let-binding we try eta-expansion.  To find the 
+arity of the RHS we use a little fixpoint analysis; see Note [Arity analysis]
+
 \begin{code}
 tryEtaExpand :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
@@ -1085,7 +1089,8 @@ tryEtaExpand env bndr rhs
     try_expand dflags
       | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
       , not (exprIsTrivial rhs)
-      , let new_arity = exprEtaExpandArity dflags rhs
+      , let dicts_cheap = dopt Opt_DictsCheap dflags
+            new_arity   = findArity dicts_cheap bndr rhs old_arity
       , new_arity > rhs_arity
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }
@@ -1095,6 +1100,67 @@ tryEtaExpand env bndr rhs
     rhs_arity  = exprArity rhs
     old_arity  = idArity bndr
     _dmd_arity = length $ fst $ splitStrictSig $ idStrictness bndr
+
+findArity :: Bool -> Id -> CoreExpr -> Arity -> Arity
+-- This implements the fixpoint loop for arity analysis
+-- See Note [Arity analysis]
+findArity dicts_cheap bndr rhs old_arity
+  = go (exprEtaExpandArity (mk_cheap_fn dicts_cheap init_cheap_app) rhs)
+       -- We always call exprEtaExpandArity once, but usually 
+       -- that produces a result equal to old_arity, and then
+       -- we stop right away (since arities should not decrease)
+       -- Result: the common case is that there is just one iteration
+  where
+    go :: Arity -> Arity
+    go cur_arity
+      | cur_arity <= old_arity = cur_arity	
+      | new_arity == cur_arity = cur_arity
+      | otherwise = ASSERT( new_arity < cur_arity )
+                    pprTrace "Exciting arity" 
+                       (vcat [ ppr bndr <+> ppr cur_arity <+> ppr new_arity
+                             , ppr rhs])
+                    go new_arity
+      where
+        new_arity = exprEtaExpandArity (mk_cheap_fn dicts_cheap cheap_app) rhs
+      
+        cheap_app :: CheapAppFun
+        cheap_app fn n_val_args
+          | fn == bndr = n_val_args < cur_arity
+          | otherwise  = isCheapApp fn n_val_args
+
+    init_cheap_app :: CheapAppFun
+    init_cheap_app fn n_val_args
+      | fn == bndr = True
+      | otherwise  = isCheapApp fn n_val_args
+ 
+mk_cheap_fn :: Bool -> CheapAppFun -> CheapFun
+mk_cheap_fn dicts_cheap cheap_app
+  | not dicts_cheap
+  = \e _     -> exprIsCheap' cheap_app e
+  | otherwise
+  = \e mb_ty -> exprIsCheap' cheap_app e
+             || case mb_ty of
+                  Nothing -> False
+                  Just ty -> isDictLikeTy ty
+	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
+	-- dictionary bindings.  This improves arities. Thereby, it also
+	-- means that full laziness is less prone to floating out the
+	-- application of a function to its dictionary arguments, which
+	-- can thereby lose opportunities for fusion.  Example:
+	-- 	foo :: Ord a => a -> ...
+	--	foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
+	--		-- So foo has arity 1
+	--
+	--	f = \x. foo dInt $ bar x
+	--
+	-- The (foo DInt) is floated out, and makes ineffective a RULE 
+	--	foo (bar x) = ...
+	--
+	-- One could go further and make exprIsCheap reply True to any
+	-- dictionary-typed expression, but that's more work.
+	-- 
+	-- See Note [Dictionary-like types] in TcType.lhs for why we use
+  	-- isDictLikeTy here rather than isDictTy
 \end{code}
 
 Note [Eta-expanding at let bindings]
@@ -1119,6 +1185,33 @@ We do not want to eta-expand to
 because then 'genMap' will inline, and it really shouldn't: at least
 as far as the programmer is concerned, it's not applied to two
 arguments!
+
+Note [Arity analysis]
+~~~~~~~~~~~~~~~~~~~~~
+The motivating example for arity analysis is this:
+ 
+  f = \x. let g = f (x+1) 
+          in \y. ...g...
+
+What arity does f have?  Really it should have arity 2, but a naive
+look at the RHS won't see that.  You need a fixpoint analysis which
+says it has arity "infinity" the first time round.
+
+This example happens a lot; it first showed up in Andy Gill's thesis,
+fifteen years ago!  It also shows up in the code for 'rnf' on lists
+in Trac #4138.
+
+The analysis is easy to achieve because exprEtaExpandArity takes an
+argument
+     type CheapFun = CoreExpr -> Maybe Type -> Bool
+used to decide if an expression is cheap enough to push inside a 
+lambda.  And exprIsCheap' in turn takes an argument
+     type CheapAppFun = Id -> Int -> Bool
+which tells when an application is cheap. This makes it easy to
+write the analysis loop.
+
+The analysis is cheap-and-cheerful because it doesn't deal with
+mutual recursion.  But the self-recursive case is the important one.
 
 
 %************************************************************************

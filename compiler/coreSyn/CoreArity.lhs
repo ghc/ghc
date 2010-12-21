@@ -9,7 +9,7 @@
 -- | Arit and eta expansion
 module CoreArity (
 	manifestArity, exprArity, exprBotStrictness_maybe,
-	exprEtaExpandArity, etaExpand
+	exprEtaExpandArity, CheapFun, etaExpand
     ) where
 
 #include "HsVersions.h"
@@ -24,12 +24,10 @@ import VarEnv
 import Id
 import Type
 import TyCon	( isRecursiveTyCon, isClassTyCon )
-import TcType	( isDictLikeTy )
 import Coercion
 import BasicTypes
 import Unique
 import Outputable
-import DynFlags
 import FastString
 \end{code}
 
@@ -120,9 +118,11 @@ exprBotStrictness_maybe :: CoreExpr -> Maybe (Arity, StrictSig)
 -- and gives them a suitable strictness signatures.  It's used during
 -- float-out
 exprBotStrictness_maybe e
-  = case getBotArity (arityType False e) of
+  = case getBotArity (arityType is_cheap e) of
 	Nothing -> Nothing
 	Just ar -> Just (ar, mkStrictSig (mkTopDmdType (replicate ar topDmd) BotRes))
+  where
+    is_cheap _ _ = False  -- Irrelevant for this purpose
 \end{code}
 
 Note [exprArity invariant]
@@ -436,18 +436,17 @@ vanillaArityType = ATop []	-- Totally uninformative
 
 -- ^ The Arity returned is the number of value args the [_$_]
 -- expression can be applied to without doing much work
-exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
+exprEtaExpandArity :: CheapFun -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
 -- 	e  ==>  \xy -> e x y
-exprEtaExpandArity dflags e
-  = case (arityType dicts_cheap e) of
+exprEtaExpandArity cheap_fun e
+  = case (arityType cheap_fun e) of
       ATop (os:oss) 
         | os || has_lam e -> 1 + length oss	-- Note [Eta expanding thunks]
         | otherwise       -> 0
       ATop []             -> 0
       ABot n              -> n
   where
-    dicts_cheap = dopt Opt_DictsCheap dflags
     has_lam (Note _ e) = has_lam e
     has_lam (Lam b e)  = isId b || has_lam e
     has_lam _          = False
@@ -484,13 +483,13 @@ floatIn True  (ATop as) = ATop as
 floatIn False (ATop as) = ATop (takeWhile id as)
    -- If E is not cheap, keep arity only for one-shots
 
-arityApp :: ArityType -> CoreExpr -> ArityType
+arityApp :: ArityType -> Bool -> ArityType
 -- Processing (fun arg) where at is the ArityType of fun,
 -- Knock off an argument and behave like 'let'
-arityApp (ABot 0)      _   = ABot 0
-arityApp (ABot n)      _   = ABot (n-1)
-arityApp (ATop [])     _   = ATop []
-arityApp (ATop (_:as)) arg = floatIn (exprIsCheap arg) (ATop as)
+arityApp (ABot 0)      _     = ABot 0
+arityApp (ABot n)      _     = ABot (n-1)
+arityApp (ATop [])     _     = ATop []
+arityApp (ATop (_:as)) cheap = floatIn cheap (ATop as)
 
 andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
 andArityType (ABot n1) (ABot n2) 
@@ -527,7 +526,12 @@ lambda wasn't one-shot we don't want to do this.
 
 \begin{code}
 ---------------------------
-arityType :: Bool -> CoreExpr -> ArityType
+type CheapFun = CoreExpr -> Maybe Type -> Bool
+     	-- How to decide if an expression is cheap
+	-- If the Maybe is Just, the type is the type
+	-- of the expression; Nothing means "don't know"
+
+arityType :: CheapFun -> CoreExpr -> ArityType
 arityType _ (Var v)
   | Just strict_sig <- idStrictness_maybe v
   , (ds, res) <- splitStrictSig strict_sig
@@ -541,15 +545,15 @@ arityType _ (Var v)
     one_shots = typeArity (idType v)
 
 	-- Lambdas; increase arity
-arityType dicts_cheap (Lam x e)
-  | isId x    = arityLam x (arityType dicts_cheap e)
-  | otherwise = arityType dicts_cheap e
+arityType cheap_fn (Lam x e)
+  | isId x    = arityLam x (arityType cheap_fn e)
+  | otherwise = arityType cheap_fn e
 
 	-- Applications; decrease arity
-arityType dicts_cheap (App fun (Type _))
-   = arityType dicts_cheap fun
-arityType dicts_cheap (App fun arg )
-   = arityApp (arityType dicts_cheap fun) arg 
+arityType cheap_fn (App fun (Type _))
+   = arityType cheap_fn fun
+arityType cheap_fn (App fun arg )
+   = arityApp (arityType cheap_fn fun) (cheap_fn arg Nothing) 
 
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
@@ -558,41 +562,21 @@ arityType dicts_cheap (App fun arg )
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
-arityType dicts_cheap (Case scrut _ _ alts)
-  = floatIn (exprIsCheap scrut)
-	      (foldr1 andArityType [arityType dicts_cheap rhs | (_,_,rhs) <- alts])
+arityType cheap_fn (Case scrut bndr _ alts)
+  = floatIn (cheap_fn scrut (Just (idType bndr)))
+	    (foldr1 andArityType [arityType cheap_fn rhs | (_,_,rhs) <- alts])
 
-arityType dicts_cheap (Let b e) 
-  = floatIn (cheap_bind b) (arityType dicts_cheap e)
+arityType cheap_fn (Let b e) 
+  = floatIn (cheap_bind b) (arityType cheap_fn e)
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
-    is_cheap (b,e) = (dicts_cheap && isDictLikeTy (idType b))
-		   || exprIsCheap e
-	-- If the experimental -fdicts-cheap flag is on, we eta-expand through
-	-- dictionary bindings.  This improves arities. Thereby, it also
-	-- means that full laziness is less prone to floating out the
-  	-- application of a function to its dictionary arguments, which
-	-- can thereby lose opportunities for fusion.  Example:
-	-- 	foo :: Ord a => a -> ...
-	--	foo = /\a \(d:Ord a). let d' = ...d... in \(x:a). ....
-	--		-- So foo has arity 1
-	--
-	--	f = \x. foo dInt $ bar x
-	--
-	-- The (foo DInt) is floated out, and makes ineffective a RULE 
-	--	foo (bar x) = ...
-  	--
-	-- One could go further and make exprIsCheap reply True to any
-	-- dictionary-typed expression, but that's more work.
-	-- 
-	-- See Note [Dictionary-like types] in TcType.lhs for why we use
-	-- isDictLikeTy here rather than isDictTy
+    is_cheap (b,e) = cheap_fn e (Just (idType b))
 
-arityType dicts_cheap (Note n e) 
-  | notSccNote n                 = arityType dicts_cheap e
-arityType dicts_cheap (Cast e _) = arityType dicts_cheap e
-arityType _           _          = vanillaArityType
+arityType cheap_fn (Note n e) 
+  | notSccNote n              = arityType cheap_fn e
+arityType cheap_fn (Cast e _) = arityType cheap_fn e
+arityType _           _       = vanillaArityType
 \end{code}
   
   
