@@ -28,9 +28,7 @@ import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
 import Demand           ( isStrictDmd )
 import PprCore          ( pprParendExpr, pprCoreExpr )
-import CoreUnfold       ( mkUnfolding, mkCoreUnfolding
-                        , mkInlineUnfolding, mkSimpleUnfolding
-                        , exprIsConApp_maybe, callSiteInline, CallCtxt(..) )
+import CoreUnfold 
 import CoreUtils
 import qualified CoreSubst
 import CoreArity
@@ -638,7 +636,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
       ; (new_arity, final_rhs) <- tryEtaExpand env new_bndr new_rhs
 
       	-- Simplify the unfolding
-      ; new_unfolding <- simplUnfolding env top_lvl old_bndr occ_info final_rhs old_unf
+      ; new_unfolding <- simplUnfolding env top_lvl old_bndr final_rhs old_unf
 
       ; if postInlineUnconditionally env top_lvl new_bndr occ_info final_rhs new_unfolding
 	                -- Inline and discard the binding
@@ -678,7 +676,7 @@ addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplM SimplEnv
 -- opportunity to inline 'y' too.
 
 addPolyBind top_lvl env (NonRec poly_id rhs)
-  = do	{ unfolding <- simplUnfolding env top_lvl poly_id NoOccInfo rhs noUnfolding
+  = do  { unfolding <- simplUnfolding env top_lvl poly_id rhs noUnfolding
     	  		-- Assumes that poly_id did not have an INLINE prag
 			-- which is perhaps wrong.  ToDo: think about this
         ; let final_id = setIdInfo poly_id $
@@ -695,16 +693,16 @@ addPolyBind _ env bind@(Rec _)
 
 ------------------------------
 simplUnfolding :: SimplEnv-> TopLevelFlag
-	       -> Id
-	       -> OccInfo -> OutExpr
+               -> InId
+               -> OutExpr
 	       -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplUnfolding env _ _ _ _ (DFunUnfolding ar con ops)
+simplUnfolding env _ _ _ (DFunUnfolding ar con ops)
   = return (DFunUnfolding ar con ops')
   where
     ops' = map (fmap (substExpr (text "simplUnfolding") env)) ops
 
-simplUnfolding env top_lvl id _ _ 
+simplUnfolding env top_lvl id _
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
                    , uf_src = src, uf_guidance = guide })
   | isStableSource src
@@ -712,35 +710,45 @@ simplUnfolding env top_lvl id _ _
        ; let src' = CoreSubst.substUnfoldingSource (mkCoreSubst (text "inline-unf") env) src
              is_top_lvl = isTopLevel top_lvl
        ; case guide of
-           UnfIfGoodArgs{} ->
-              -- We need to force bottoming, or the new unfolding holds
-              -- on to the old unfolding (which is part of the id).
-              let bottoming = isBottomingId id
-              in bottoming `seq` return (mkUnfolding src' is_top_lvl bottoming expr')
+           UnfWhen sat_ok _    -- Happens for INLINE things
+              -> let guide' = UnfWhen sat_ok (inlineBoringOk expr')
+	      	     -- Refresh the boring-ok flag, in case expr'
+		     -- has got small. This happens, notably in the inlinings
+		     -- for dfuns for single-method classes; see
+		     -- Note [Single-method classes] in TcInstDcls.
+		     -- A test case is Trac #4138
+                 in return (mkCoreUnfolding src' is_top_lvl expr' arity guide')
+		 -- See Note [Top-level flag on inline rules] in CoreUnfold
+
+           _other              -- Happens for INLINABLE things
+              -> let bottoming = isBottomingId id
+                 in bottoming `seq` -- See Note [Force bottoming field]
+                    return (mkUnfolding src' is_top_lvl bottoming expr')
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.
-           _other -> 
-              return (mkCoreUnfolding src' is_top_lvl expr' arity guide)
-		-- See Note [Top-level flag on inline rules] in CoreUnfold
        }
   where
     act      = idInlineActivation id
     rule_env = updMode (updModeForInlineRules act) env
        	       -- See Note [Simplifying inside InlineRules] in SimplUtils
 
-simplUnfolding _ top_lvl id _occ_info new_rhs _
-  = -- We need to force bottoming, or the new unfolding holds
-    -- on to the old unfolding (which is part of the id).
-    let bottoming = isBottomingId id
-    in bottoming `seq` return (mkUnfolding InlineRhs (isTopLevel top_lvl) bottoming new_rhs)
-  -- We make an  unfolding *even for loop-breakers*.
-  -- Reason: (a) It might be useful to know that they are WHNF
-  -- 	     (b) In TidyPgm we currently assume that, if we want to
-  --	         expose the unfolding then indeed we *have* an unfolding
-  --		 to expose.  (We could instead use the RHS, but currently
-  --		 we don't.)  The simple thing is always to have one.
+simplUnfolding _ top_lvl id new_rhs _
+  = let bottoming = isBottomingId id
+    in bottoming `seq`  -- See Note [Force bottoming field]
+       return (mkUnfolding InlineRhs (isTopLevel top_lvl) bottoming new_rhs)
+	  -- We make an  unfolding *even for loop-breakers*.
+	  -- Reason: (a) It might be useful to know that they are WHNF
+	  -- 	     (b) In TidyPgm we currently assume that, if we want to
+	  --	         expose the unfolding then indeed we *have* an unfolding
+	  --		 to expose.  (We could instead use the RHS, but currently
+	  --		 we don't.)  The simple thing is always to have one.
 \end{code}
+
+Note [Force bottoming field]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to force bottoming, or the new unfolding holds
+on to the old unfolding (which is part of the id).
 
 Note [Arity decrease]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1052,6 +1060,19 @@ simplCast env body co0 cont0
 %*                                                                      *
 %************************************************************************
 
+Note [Zap unfolding when beta-reducing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lambda-bound variables can have stable unfoldings, such as
+   $j = \x. \b{Unf=Just x}. e
+See Note [Case binders and join points] below; the unfolding for lets
+us optimise e better.  However when we beta-reduce it we want to
+revert to using the actual value, otherwise we can end up in the
+stupid situation of
+          let x = blah in
+          let b{Unf=Just x} = y
+          in ...b...
+Here it'd be far better to drop the unfolding and use the actual RHS.
+
 \begin{code}
 simplLam :: SimplEnv -> [InId] -> InExpr -> SimplCont
          -> SimplM (SimplEnv, OutExpr)
@@ -1061,7 +1082,12 @@ simplLam env [] body cont = simplExprF env body cont
         -- Beta reduction
 simplLam env (bndr:bndrs) body (ApplyTo _ arg arg_se cont)
   = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env bndr (arg, arg_se) (bndrs, body) cont }
+        ; simplNonRecE env (zap_unfolding bndr) (arg, arg_se) (bndrs, body) cont }
+  where
+    zap_unfolding bndr  -- See Note [Zap unfolding when beta-reducing]
+      | isId bndr, isStableUnfolding (realIdUnfolding bndr)
+      = setIdUnfolding bndr NoUnfolding
+      | otherwise = bndr
 
         -- Not enough args, so there are real lambdas left to put in the result
 simplLam env bndrs body cont
