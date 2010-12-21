@@ -460,9 +460,14 @@ ifeq "$(HaveDtrace)" "YES"
 rts_CC_OPTS		+= -DDTRACE
 rts_HC_OPTS		+= -DDTRACE
 
+# Apple's dtrace (the only one supported by ghc at the moment) uses
+# gcc as its preprocessor. If gcc isn't at /usr/bin/gcc, or we need
+# to force it to use a different gcc, we need to give the path in
+# the option cpppath.
+
 DTRACEPROBES_SRC = rts/RtsProbes.d
 $(DTRACEPROBES_H): $(DTRACEPROBES_SRC) includes/ghcplatform.h | $(dir $@)/.
-	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C -h -o $@ -s $<
+	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C -x cpppath=$(WhatGccIsCalled) -h -o $@ -s $<
 
 endif
 
