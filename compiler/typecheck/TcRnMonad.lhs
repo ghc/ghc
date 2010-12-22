@@ -22,6 +22,7 @@ import Name
 import TcType
 import InstEnv
 import FamInstEnv
+import PrelNames        ( iNTERACTIVE )
 
 import Var
 import Id
@@ -450,6 +451,9 @@ getModule = do { env <- getGblEnv; return (tcg_mod env) }
 
 setModule :: Module -> TcRn a -> TcRn a
 setModule mod thing_inside = updGblEnv (\env -> env { tcg_mod = mod }) thing_inside
+
+getIsGHCi :: TcRn Bool
+getIsGHCi = do { mod <- getModule; return (mod == iNTERACTIVE) }
 
 tcIsHsBoot :: TcRn Bool
 tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }

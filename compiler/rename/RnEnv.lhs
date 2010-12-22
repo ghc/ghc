@@ -8,8 +8,7 @@ module RnEnv (
 	newTopSrcBinder, lookupFamInstDeclBndr,
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
 	lookupLocatedOccRn, lookupOccRn, 
-	lookupLocatedGlobalOccRn, 
-	lookupGlobalOccRn, lookupGlobalOccRn_maybe,
+        lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 	lookupLocalDataTcNames, lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupSubBndr, lookupConstructorFields,
@@ -44,15 +43,13 @@ import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
 import TcEnv		( tcLookupDataCon, tcLookupField, isBrackStage )
 import TcRnMonad
 import Id		( isRecordSelector )
-import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
-			  nameSrcLoc, nameSrcSpan, nameOccName, nameModule, isExternalName )
+import Name
 import NameSet
 import NameEnv
+import Module           ( ModuleName, moduleName )
 import UniqFM
 import DataCon		( dataConFieldLabels )
-import OccName
-import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, 
-			  consDataConKey, forall_tv_RDR )
+import PrelNames        ( mkUnboundName, rOOT_MAIN, consDataConKey, forall_tv_RDR )
 import Unique
 import BasicTypes
 import ErrUtils		( Message )
@@ -168,7 +165,7 @@ lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
                        case nopt of 
                          Just n' -> return n'
                          Nothing -> do traceRn $ text "lookupTopBndrRn"
-                                       unboundName n
+                                       unboundName WL_LocalTop n
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
@@ -361,22 +358,12 @@ lookupLocatedOccRn = wrapLocM lookupOccRn
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnM Name
 lookupOccRn rdr_name
-  = getLocalRdrEnv			`thenM` \ local_env ->
-    case lookupLocalRdrEnv local_env rdr_name of
-	  Just name -> return name
-	  Nothing   -> lookupGlobalOccRn rdr_name
+  = do { local_env <- getLocalRdrEnv
+       ; case lookupLocalRdrEnv local_env rdr_name of {
+          Just name -> return name ;
+          Nothing   -> do
 
-lookupLocatedGlobalOccRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedGlobalOccRn = wrapLocM lookupGlobalOccRn
-
-lookupGlobalOccRn :: RdrName -> RnM Name
--- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
--- environment.  Adds an error message if the RdrName is not in scope.
--- Also has a special case for GHCi.
-
-lookupGlobalOccRn rdr_name
-  = do { -- First look up the name in the normal environment.
-         mb_name <- lookupGlobalOccRn_maybe rdr_name
+       { mb_name <- lookupGlobalOccRn_maybe rdr_name
        ; case mb_name of {
 		Just n  -> return n ;
 		Nothing -> do
@@ -385,12 +372,22 @@ lookupGlobalOccRn rdr_name
 	 --  *any* name exported by any module in scope, just as if there
 	 -- was an "import qualified M" declaration for every module.
 	 allow_qual <- doptM Opt_ImplicitImportQualified
-       ; mod <- getModule
+       ; is_ghci <- getIsGHCi
                -- This test is not expensive,
                -- and only happens for failed lookups
-       ; if isQual rdr_name && allow_qual && mod == iNTERACTIVE
+       ; if isQual rdr_name && allow_qual && is_ghci
          then lookupQualifiedName rdr_name
-         else unboundName rdr_name } } }
+         else unboundName WL_Any rdr_name } } } } }
+
+
+lookupGlobalOccRn :: RdrName -> RnM Name
+-- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
+-- environment.  Adds an error message if the RdrName is not in scope.
+lookupGlobalOccRn rdr_name
+  = do { mb_name <- lookupGlobalOccRn_maybe rdr_name
+       ; case mb_name of
+           Just n  -> return n
+           Nothing -> unboundName WL_Global rdr_name }
 
 lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- No filter function; does not report an error on failure
@@ -409,15 +406,6 @@ lookupGlobalOccRn_maybe rdr_name
 		Just gre -> return (Just (gre_name gre)) }
 
 
-unboundName :: RdrName -> RnM Name
-unboundName rdr_name 
-  = do	{ addErr (unknownNameErr rdr_name)
-	; env <- getGlobalRdrEnv;
-	; traceRn (vcat [unknownNameErr rdr_name, 
-			 ptext (sLit "Global envt is:"),
-			 nest 3 (pprGlobalRdrEnv env)])
-	; return (mkUnboundName rdr_name) }
-
 --------------------------------------------------
 --	Lookup in the Global RdrEnv of the module
 --------------------------------------------------
@@ -435,7 +423,7 @@ lookupGreRn rdr_name
 	    Just gre -> return gre ;
 	    Nothing  -> do
 	{ traceRn $ text "lookupGreRn"
-	; name <- unboundName rdr_name
+        ; name <- unboundName WL_Global rdr_name
 	; return (GRE { gre_name = name, gre_par = NoParent,
 		        gre_prov = LocalDef }) }}}
 
@@ -497,7 +485,7 @@ lookupQualifiedName rdr_name
     	   name == occ ] of
       ((mod,occ):ns) -> ASSERT (null ns) 
 			lookupOrig mod occ
-      _ -> unboundName rdr_name
+      _ -> unboundName WL_Any rdr_name
 
   | otherwise
   = pprPanic "RnEnv.lookupQualifiedName" (ppr rdr_name)
@@ -993,6 +981,157 @@ checkShadowedOccs (global_env,local_env) loc_occs
 
 %************************************************************************
 %*									*
+               What to do when a lookup fails
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+data WhereLooking = WL_Any        -- Any binding
+                  | WL_Global     -- Any top-level binding (local or imported)
+                  | WL_LocalTop   -- Any top-level binding in this module
+
+unboundName :: WhereLooking -> RdrName -> RnM Name
+unboundName where_look rdr_name
+  = do  { show_helpful_errors <- doptM Opt_HelpfulErrors
+        ; let err = unknownNameErr rdr_name
+        ; if not show_helpful_errors
+          then addErr err
+          else do { extra_err <- unknownNameSuggestErr where_look rdr_name
+                  ; addErr (err $$ extra_err) }
+
+        ; env <- getGlobalRdrEnv;
+	; traceRn (vcat [unknownNameErr rdr_name, 
+			 ptext (sLit "Global envt is:"),
+			 nest 3 (pprGlobalRdrEnv env)])
+
+        ; return (mkUnboundName rdr_name) }
+
+unknownNameErr :: RdrName -> SDoc
+unknownNameErr rdr_name
+  = vcat [ hang (ptext (sLit "Not in scope:")) 
+	      2 (pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
+			  <+> quotes (ppr rdr_name))
+	 , extra ]
+  where
+    extra | rdr_name == forall_tv_RDR = perhapsForallMsg
+	  | otherwise 		      = empty
+
+type HowInScope = Either SrcSpan ImpDeclSpec
+     -- Left loc    =>  locally bound at loc
+     -- Right ispec =>  imported as specified by ispec
+
+unknownNameSuggestErr :: WhereLooking -> RdrName -> RnM SDoc
+unknownNameSuggestErr where_look tried_rdr_name
+  = do { local_env <- getLocalRdrEnv
+       ; global_env <- getGlobalRdrEnv
+
+       ; let all_possibilities :: [(String, (RdrName, HowInScope))]
+             all_possibilities
+                =  [ (showSDoc (ppr r), (r, Left loc))
+                   | (r,loc) <- local_possibilities local_env ]
+                ++ [ (showSDoc (ppr r), rp) | (r,rp) <- global_possibilities global_env ]
+
+             suggest = fuzzyLookup (showSDoc (ppr tried_rdr_name)) all_possibilities
+             perhaps = ptext (sLit "Perhaps you meant")
+             extra_err = case suggest of
+                           []  -> empty
+                           [p] -> perhaps <+> pp_item p
+                           ps  -> sep [ perhaps <+> ptext (sLit "one of these:")
+                                      , nest 2 (pprWithCommas pp_item ps) ]
+       ; return extra_err }
+  where
+    pp_item :: (RdrName, HowInScope) -> SDoc
+    pp_item (rdr, Left loc) = quotes (ppr rdr) <+>   -- Locally defined
+                              parens (ptext (sLit "line") <+> int (srcSpanStartLine loc))
+    pp_item (rdr, Right is) = quotes (ppr rdr) <+>   -- Imported
+                              parens (ptext (sLit "imported from") <+> ppr (is_mod is))
+
+    tried_occ     = rdrNameOcc tried_rdr_name
+    tried_is_sym  = isSymOcc tried_occ
+    tried_ns      = occNameSpace tried_occ
+    tried_is_qual = isQual tried_rdr_name
+
+    correct_name_space occ =  occNameSpace occ == tried_ns
+                           && isSymOcc occ == tried_is_sym
+        -- Treat operator and non-operators as non-matching
+        -- This heuristic avoids things like
+        --      Not in scope 'f'; perhaps you meant '+' (from Prelude)
+
+    local_ok = case where_look of { WL_Any -> True; _ -> False }
+    local_possibilities :: LocalRdrEnv -> [(RdrName, SrcSpan)]
+    local_possibilities env
+      | tried_is_qual = []
+      | not local_ok  = []
+      | otherwise     = [ (mkRdrUnqual occ, nameSrcSpan name)
+                      	| name <- occEnvElts env
+                      	, let occ = nameOccName name
+                      	, correct_name_space occ]
+
+    gre_ok :: GlobalRdrElt -> Bool
+    gre_ok = case where_look of
+                   WL_LocalTop -> isLocalGRE
+                   _           -> \_ -> True
+
+    global_possibilities :: GlobalRdrEnv -> [(RdrName, (RdrName, HowInScope))]
+    global_possibilities global_env
+      | tried_is_qual = [ (rdr_qual, (rdr_qual, how))
+                        | gre <- globalRdrEnvElts global_env
+                        , gre_ok gre
+                        , let name = gre_name gre
+        		      occ  = nameOccName name
+                        , correct_name_space occ
+                        , (mod, how) <- quals_in_scope name (gre_prov gre)
+                        , let rdr_qual = mkRdrQual mod occ ]
+
+      | otherwise = [ (rdr_unqual, pair)
+                    | gre <- globalRdrEnvElts global_env
+                    , gre_ok gre
+                    , let name = gre_name gre
+                          prov = gre_prov gre
+                          occ  = nameOccName name
+                          rdr_unqual = mkRdrUnqual occ
+                    , correct_name_space occ
+                    , pair <- case (unquals_in_scope name prov, quals_only occ prov) of
+                                (how:_, _)    -> [ (rdr_unqual, how) ]
+                                ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
+                                ([],    [])   -> [] ]
+
+              -- Note [Only-quals]
+              -- The second alternative returns those names with the same
+              -- OccName as the one we tried, but live in *qualified* imports
+       	      -- e.g. if you have:
+       	      --
+       	      -- > import qualified Data.Map as Map
+       	      -- > foo :: Map
+       	      --
+       	      -- then we suggest @Map.Map@.
+
+    --------------------
+    unquals_in_scope :: Name -> Provenance -> [HowInScope]
+    unquals_in_scope n LocalDef      = [ Left (nameSrcSpan n) ]
+    unquals_in_scope _ (Imported is) = [ Right ispec
+                                       | i <- is, let ispec = is_decl i
+                                       , not (is_qual ispec) ]
+
+    --------------------
+    quals_in_scope :: Name -> Provenance -> [(ModuleName, HowInScope)]
+    -- Ones for which the qualified version is in scope
+    quals_in_scope n LocalDef      = case nameModule_maybe n of
+                                       Nothing -> []
+                                       Just m  -> [(moduleName m, Left (nameSrcSpan n))]
+    quals_in_scope _ (Imported is) = [ (is_as ispec, Right ispec)
+                                     | i <- is, let ispec = is_decl i ]
+
+    --------------------
+    quals_only :: OccName -> Provenance -> [(RdrName, HowInScope)]
+    -- Ones for which *only* the qualified version is in scope
+    quals_only _   LocalDef      = []
+    quals_only occ (Imported is) = [ (mkRdrQual (is_as ispec) occ, Right ispec)
+                                   | i <- is, let ispec = is_decl i, is_qual ispec ]
+\end{code}
+
+%************************************************************************
+%*									*
 \subsection{Free variable manipulation}
 %*									*
 %************************************************************************
@@ -1112,16 +1251,6 @@ shadowedNameWarn occ shadowed_locs
   = sep [ptext (sLit "This binding for") <+> quotes (ppr occ)
 	    <+> ptext (sLit "shadows the existing binding") <> plural shadowed_locs,
 	 nest 2 (vcat shadowed_locs)]
-
-unknownNameErr :: RdrName -> SDoc
-unknownNameErr rdr_name
-  = vcat [ hang (ptext (sLit "Not in scope:")) 
-	      2 (pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-			  <+> quotes (ppr rdr_name))
-	 , extra ]
-  where
-    extra | rdr_name == forall_tv_RDR = perhapsForallMsg
-	  | otherwise 		      = empty
 
 perhapsForallMsg :: SDoc
 perhapsForallMsg 

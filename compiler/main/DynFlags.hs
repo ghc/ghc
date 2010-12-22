@@ -269,6 +269,7 @@ data DynFlag
    | Opt_BuildingCabalPackage
    | Opt_SSE2
    | Opt_GhciSandbox
+   | Opt_HelpfulErrors
 
 	-- temporary flags
    | Opt_RunCPS
@@ -1488,6 +1489,7 @@ fFlags = [
   ( "ext-core",                         Opt_EmitExternalCore, nop ),
   ( "shared-implib",                    Opt_SharedImplib, nop ),
   ( "ghci-sandbox",                     Opt_GhciSandbox, nop ),
+  ( "helpful-errors",                   Opt_HelpfulErrors, nop ),
   ( "building-cabal-package",           Opt_BuildingCabalPackage, nop ),
   ( "implicit-import-qualified",        Opt_ImplicitImportQualified, nop )
   ]
@@ -1644,7 +1646,8 @@ defaultFlags
       Opt_GenManifest,
       Opt_EmbedManifest,
       Opt_PrintBindContents,
-      Opt_GhciSandbox
+      Opt_GhciSandbox,
+      Opt_HelpfulErrors
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
