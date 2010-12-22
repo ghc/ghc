@@ -131,7 +131,7 @@ findImportedModule hsc_env mod_name mb_pkg =
     pkg_import    = findExposedPackageModule hsc_env mod_name mb_pkg
 
     unqual_import = home_import 
-			`orIfNotFound`
+                        `orIfNotFound`
 		      findExposedPackageModule hsc_env mod_name Nothing
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
@@ -151,18 +151,21 @@ findExactModule hsc_env mod =
 -- Helpers
 
 orIfNotFound :: IO FindResult -> IO FindResult -> IO FindResult
-this `orIfNotFound` or_this = do
+orIfNotFound this or_this = do
   res <- this
   case res of
-    NotFound places1 _mb_pkg1 mod_hiddens1 pkg_hiddens1 -> do
-	res2 <- or_this
-	case res2 of
-	   NotFound places2 mb_pkg2 mod_hiddens2 pkg_hiddens2 -> 
-              return (NotFound (places1 ++ places2)
-                               mb_pkg2 -- snd arg is the package search
-                               (mod_hiddens1 ++ mod_hiddens2)
-                               (pkg_hiddens1 ++ pkg_hiddens2))
-	   _other -> return res2
+    NotFound { fr_paths = paths1, fr_mods_hidden = mh1
+             , fr_pkgs_hidden = ph1, fr_suggestions = s1 }
+     -> do res2 <- or_this
+           case res2 of
+             NotFound { fr_paths = paths2, fr_pkg = mb_pkg2, fr_mods_hidden = mh2
+                      , fr_pkgs_hidden = ph2, fr_suggestions = s2 }
+              -> return (NotFound { fr_paths = paths1 ++ paths2
+                                  , fr_pkg = mb_pkg2 -- snd arg is the package search
+                                  , fr_mods_hidden = mh1 ++ mh2
+                                  , fr_pkgs_hidden = ph1 ++ ph2
+                                  , fr_suggestions = s1  ++ s2 })
+             _other -> return res2
     _other -> return res
 
 
@@ -183,36 +186,38 @@ findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
                          -> IO FindResult
 findExposedPackageModule hsc_env mod_name mb_pkg
         -- not found in any package:
-  | null found_exposed = return (NotFound [] Nothing mod_hiddens pkg_hiddens)
-        -- found in just one exposed package:
-  | [(pkg_conf, _)] <- found_exposed
-        = let pkgid = packageConfigId pkg_conf in
-          findPackageModule_ hsc_env (mkModule pkgid mod_name) pkg_conf
-  | otherwise
-        = return (FoundMultiple (map (packageConfigId.fst) found_exposed))
-  where
-	dflags = hsc_dflags hsc_env
-        found = lookupModuleInAllPackages dflags mod_name
+  = case lookupModuleWithSuggestions (hsc_dflags hsc_env) mod_name of
+       Left suggest -> return (NotFound { fr_paths = [], fr_pkg = Nothing
+                                        , fr_pkgs_hidden = [], fr_mods_hidden = []
+                                        , fr_suggestions = suggest })
+       Right found
+         | null found_exposed   -- Found, but with no exposed copies
+          -> return (NotFound { fr_paths = [], fr_pkg = Nothing
+                              , fr_pkgs_hidden = mod_hiddens, fr_mods_hidden = pkg_hiddens
+                              , fr_suggestions = [] })
 
-        for_this_pkg = filter ((`matches` mb_pkg) . fst) found
+         | [(pkg_conf,_)] <- found_exposed     -- Found uniquely
+         -> let pkgid = packageConfigId pkg_conf in
+            findPackageModule_ hsc_env (mkModule pkgid mod_name) pkg_conf
 
-        found_exposed = [ (pkg_conf,exposed_mod) 
-                        | x@(pkg_conf,exposed_mod) <- for_this_pkg,
-                          is_exposed x ]
+         | otherwise           -- Found in more than one place
+         -> return (FoundMultiple (map (packageConfigId.fst) found_exposed))
+         where
+           for_this_pkg  = case mb_pkg of
+                             Nothing -> found
+                             Just p  -> filter ((`matches` p) . fst) found
+           found_exposed = filter is_exposed for_this_pkg
+           is_exposed (pkg_conf,exposed_mod) = exposed pkg_conf && exposed_mod
 
-        is_exposed (pkg_conf,exposed_mod) = exposed pkg_conf && exposed_mod
+           mod_hiddens = [ packageConfigId pkg_conf
+                         | (pkg_conf,False) <- found ]
 
-        mod_hiddens = [ packageConfigId pkg_conf
-                      | (pkg_conf,False) <- found ]
+           pkg_hiddens = [ packageConfigId pkg_conf
+                         | (pkg_conf,_) <- found, not (exposed pkg_conf) ]
 
-        pkg_hiddens = [ packageConfigId pkg_conf
-                      | (pkg_conf,_) <- found, not (exposed pkg_conf) ]
-
-        _pkg_conf `matches` Nothing  = True
-        pkg_conf  `matches` Just pkg =
-           case packageName pkg_conf of 
-              PackageName n -> pkg == mkFastString n
-
+           pkg_conf  `matches` pkg
+              = case packageName pkg_conf of
+                  PackageName n -> pkg == mkFastString n
 
 modLocationCache :: HscEnv -> Module -> IO FindResult -> IO FindResult
 modLocationCache hsc_env mod do_this = do
@@ -362,8 +367,11 @@ searchPathExts paths mod exts
 	              file = base <.> ext
 		]
 
-    search [] = return (NotFound (map fst to_search) (Just (modulePackageId mod))
-                        [] [])
+    search [] = return (NotFound { fr_paths = map fst to_search
+                                 , fr_pkg   = Just (modulePackageId mod)
+                                 , fr_mods_hidden = [], fr_pkgs_hidden = []
+                                 , fr_suggestions = [] })
+
     search ((file, mk_result) : rest) = do
       b <- doesFileExist file
       if b 
@@ -562,22 +570,22 @@ cantFindErr cannot_find _ dflags mod_name find_result
 		-> ptext (sLit "no package matching") <+> quotes (ppr pkg) <+>
 		   ptext (sLit "was found")
 
-	    NotFound files mb_pkg mod_hiddens pkg_hiddens
+            NotFound { fr_paths = files, fr_pkg = mb_pkg
+                     , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
+                     , fr_suggestions = suggest }
 		| Just pkg <- mb_pkg, pkg /= thisPackage dflags
 		-> not_found_in_package pkg files
 
                 | null files && null mod_hiddens && null pkg_hiddens
-		-> ptext (sLit "it is not a module in the current program, or in any known package.")
+                -> vcat [ ptext (sLit "it is not a module in the current program, or in any known package.")
+                        , pp_suggestions suggest ]
 
 		| otherwise
 		-> vcat (map pkg_hidden pkg_hiddens) $$
-                   vcat (map mod_hidden mod_hiddens) $$ 
+                   vcat (map mod_hidden mod_hiddens) $$
                    tried_these files
 
-	    NotFoundInPackage pkg
-		-> ptext (sLit "it is not in package") <+> quotes (ppr pkg)
-
-	    _ -> panic "cantFindErr"
+            _ -> panic "cantFindErr"
 
     build_tag = buildTag dflags
 
@@ -619,4 +627,10 @@ cantFindErr cannot_find _ dflags mod_name find_result
 
     mod_hidden pkg =
         ptext (sLit "it is a hidden module in the package") <+> quotes (ppr pkg)
+
+    pp_suggestions sugs
+      | null sugs = empty
+      | otherwise = ptext (sLit "Perhaps you meant") <+> vcat (map pp sugs)
+      where
+        pp mod = ppr mod <+> parens (ptext (sLit "package") <+> ppr (modulePackageId mod))
 \end{code}

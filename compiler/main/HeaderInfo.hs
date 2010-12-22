@@ -284,7 +284,8 @@ unsupportedExtnError loc unsup =
     mkPlainErrMsg loc $
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
-  where suggestions = fuzzyMatch unsup supportedLanguagesAndExtensions
+  where
+     suggestions = fuzzyMatch unsup supportedLanguagesAndExtensions
 
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages

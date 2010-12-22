@@ -14,7 +14,7 @@ module Packages (
 	PackageState(..),
 	initPackages,
 	getPackageDetails,
-	lookupModuleInAllPackages,
+        lookupModuleInAllPackages, lookupModuleWithSuggestions,
 
 	-- * Inspecting the set of packages in scope
 	getPackageIncludePath,
@@ -879,10 +879,32 @@ getPackageFrameworks dflags pkgs = do
 -- @(pkgconf, exposed)@ where pkgconf is the PackageConfig for that package,
 -- and exposed is @True@ if the package exposes the module.
 lookupModuleInAllPackages :: DynFlags -> ModuleName -> [(PackageConfig,Bool)]
-lookupModuleInAllPackages dflags m =
-  case lookupUFM (moduleToPkgConfAll (pkgState dflags)) m of
-	Nothing -> []
-	Just ps -> ps
+lookupModuleInAllPackages dflags m
+  = case lookupModuleWithSuggestions dflags m of
+      Right pbs -> pbs
+      Left  _   -> []
+
+lookupModuleWithSuggestions
+  :: DynFlags -> ModuleName
+  -> Either [Module] [(PackageConfig,Bool)]
+         -- Lookup module in all packages
+         -- Right pbs   =>   found in pbs
+         -- Left  ms    =>   not found; but here are sugestions
+lookupModuleWithSuggestions dflags m
+  = case lookupUFM (moduleToPkgConfAll pkg_state) m of
+        Nothing -> Left suggestions
+        Just ps -> Right ps
+  where
+    pkg_state = pkgState dflags
+    suggestions
+      | dopt Opt_HelpfulErrors dflags = fuzzyLookup (moduleNameString m) all_mods
+      | otherwise                     = []
+
+    all_mods :: [(String, Module)]     -- All modules
+    all_mods = [ (moduleNameString mod_nm, mkModule pkg_id mod_nm)
+               | pkg_config <- eltsUFM (pkgIdMap pkg_state)
+               , let pkg_id = packageConfigId pkg_config
+               , mod_nm <- exposedModules pkg_config ]
 
 -- | Find all the 'PackageConfig' in both the preload packages from 'DynFlags' and corresponding to the list of
 -- 'PackageConfig's

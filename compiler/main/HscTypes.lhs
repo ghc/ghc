@@ -547,14 +547,22 @@ data FindResult
 	-- ^ The requested package was not found
   | FoundMultiple [PackageId]
 	-- ^ _Error_: both in multiple packages
-  | NotFound [FilePath] (Maybe PackageId) [PackageId] [PackageId]
-	-- ^ The module was not found, including either
-        --    * the specified places were searched
-        --    * the package that this module should have been in
-        --    * list of packages in which the module was hidden,
-        --    * list of hidden packages containing this module
-  | NotFoundInPackage PackageId
-	-- ^ The module was not found in this package
+
+  | NotFound          -- Not found
+      { fr_paths       :: [FilePath]       -- Places where I looked
+
+      , fr_pkg         :: Maybe PackageId  -- Just p => module is in this package's
+                                           --           manifest, but couldn't find
+                                           --           the .hi file
+
+      , fr_mods_hidden :: [PackageId]      -- Module is in these packages,
+                                           --   but the *module* is hidden
+
+      , fr_pkgs_hidden :: [PackageId]      -- Module is in these packages,
+                                           --   but the *package* is hidden
+
+      , fr_suggestions :: [Module]         -- Possible mis-spelled modules
+      }
 
 -- | Cache that remembers where we found a particular module.  Contains both
 -- home modules and package modules.  On @:load@, only home modules are
