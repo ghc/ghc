@@ -2,11 +2,15 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-TESTS = hsc2hs001 hsc2hs002
+ALL_TESTS = hsc2hs001 hsc2hs002
 
 .PHONY: $(TESTS)
 
-$(TESTS):
+$(ALL_TESTS):
 	'$(HSC2HS)' $@.hsc
 	'$(TEST_HC)' -c $@.hs
 
+.PHONY: 3837
+3837:
+	LANG=C '$(HSC2HS)' $@.hsc
+	'$(TEST_HC)' -c $@.hs
