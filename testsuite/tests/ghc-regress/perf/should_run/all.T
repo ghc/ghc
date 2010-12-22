@@ -61,9 +61,9 @@ test('T3738',
           stats_num_field('bytes allocated', 12700,
                                              14000)),
       if_wordsize(64,
-          stats_num_field('bytes allocated', 60000,
-                                             80000)),
-                                     # expected value: 72608 (amd64/Linux)
+          stats_num_field('bytes allocated', 40000,
+                                             60000)),
+                                     # expected value: 49400 (amd64/Linux)
       only_ways(['normal'])
       ],
      compile_and_run,
