@@ -114,6 +114,7 @@ module Control.Exception (
         uninterruptibleMask_,
         MaskingState(..),
         getMaskingState,
+        allowInterrupt,
 #endif
 
         -- ** (deprecated) Asynchronous exception control
@@ -149,6 +150,7 @@ import Control.Exception.Base
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
+import GHC.IO (unsafeUnmask)
 import Data.Maybe
 #else
 import Prelude hiding (catch)
@@ -231,6 +233,16 @@ A typical use of 'tryJust' for recovery looks like this:
 -- -----------------------------------------------------------------------------
 -- Asynchronous exceptions
 
+-- | When invoked inside 'mask', this function allows a blocked
+-- asynchronous exception to be raised, if one exists.  It is
+-- equivalent to performing an interruptible operation (see
+-- #interruptible#), but does not involve any actual blocking.
+--
+-- When called outside 'mask', or inside 'uninterruptibleMask', this
+-- function has no effect.
+allowInterrupt :: IO ()
+allowInterrupt = unsafeUnmask $ return ()
+
 {- $async
 
  #AsynchronousExceptions# Asynchronous exceptions are so-called because they arise due to
@@ -303,14 +315,15 @@ Similar arguments apply for other interruptible operations like
 'System.IO.openFile'.
 
 It is useful to think of 'mask' not as a way to completely prevent
-asynchronous exceptions, but as a filter that allows them to be raised
-only at certain places.  The main difficulty with asynchronous
+asynchronous exceptions, but as a way to switch from asynchronous mode
+to polling mode.  The main difficulty with asynchronous
 exceptions is that they normally can occur anywhere, but within a
 'mask' an asynchronous exception is only raised by operations that are
 interruptible (or call other interruptible operations).  In many cases
 these operations may themselves raise exceptions, such as I\/O errors,
-so the caller should be prepared to handle exceptions arising from the
-operation anyway.
+so the caller will usually be prepared to handle exceptions arising from the
+operation anyway.  To perfom an explicit poll for asynchronous exceptions
+inside 'mask', use 'allowInterrupt'.
 
 Sometimes it is too onerous to handle exceptions in the middle of a
 critical piece of stateful code.  There are three ways to handle this
