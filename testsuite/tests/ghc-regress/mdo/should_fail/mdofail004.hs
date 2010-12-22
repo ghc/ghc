@@ -1,7 +1,10 @@
 {-# OPTIONS -XRecursiveDo #-}
 
--- mdo requires MonadFix instance, even
--- if no recursion is present
+-- OLD: mdo requires MonadFix instance, even
+--      if no recursion is present
+
+-- Dec 2010: Small change of behaviour
+--     MonadFix is only required if recursion is present
 
 module Main (main) where
 
@@ -14,6 +17,6 @@ instance Monad X where
   (X a) >>= f = f a
 
 z :: X [Int]
-z = mdo return [1,2,3,4]
+z = mdo { a <- return 1; return [a] }
 
 main = print z
