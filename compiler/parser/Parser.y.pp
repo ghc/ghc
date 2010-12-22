@@ -1284,7 +1284,9 @@ exp10 :: { LHsExpr RdrName }
 					   return (L loc (mkHsDo DoExpr stmts body)) }
   	| 'mdo' stmtlist		{% let loc = comb2 $1 $2 in
 					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
-					   return (L loc (mkHsDo (MDoExpr noPostTcTable) stmts body)) }
+                                           return (L loc (mkHsDo MDoExpr
+                                                                 [L loc (mkRecStmt stmts)]
+                                                                 body)) }
         | scc_annot exp		    		{ LL $ if opt_SccProfilingOn
 							then HsSCC (unLoc $1) $2
 							else HsPar $2 }

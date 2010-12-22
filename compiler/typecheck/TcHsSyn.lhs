@@ -580,8 +580,7 @@ zonkExpr env (HsDo do_or_lc stmts body ty)
   = zonkStmts env stmts 	`thenM` \ (new_env, new_stmts) ->
     zonkLExpr new_env body	`thenM` \ new_body ->
     zonkTcTypeToType env ty	`thenM` \ new_ty   ->
-    zonkDo env do_or_lc	 	`thenM` \ new_do_or_lc ->
-    returnM (HsDo new_do_or_lc new_stmts new_body new_ty)
+    returnM (HsDo do_or_lc new_stmts new_body new_ty)
 
 zonkExpr env (ExplicitList ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
@@ -689,13 +688,6 @@ zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
 				 ; return (env1, WpLet bs') }
 
 -------------------------------------------------------------------------
-zonkDo :: ZonkEnv -> HsStmtContext Name -> TcM (HsStmtContext Name)
--- Only used for 'do', so the only Ids are in a MDoExpr table
-zonkDo env (MDoExpr tbl) = do { tbl' <- mapSndM (zonkExpr env) tbl
-                              ; return (MDoExpr tbl') }
-zonkDo _   do_or_lc      = return do_or_lc
-
--------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit TcId -> TcM (HsOverLit Id)
 zonkOverLit env lit@(OverLit { ol_witness = e, ol_type = ty })
   = do	{ ty' <- zonkTcTypeToType env ty
@@ -747,7 +739,7 @@ zonkStmt env (ParStmt stmts_w_bndrs)
 
 zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                       , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id, recS_bind_fn = bind_id
-                      , recS_rec_rets = rets, recS_dicts = binds })
+                      , recS_rec_rets = rets })
   = do { new_rvs <- zonkIdBndrs env rvs
        ; new_lvs <- zonkIdBndrs env lvs
        ; new_ret_id  <- zonkExpr env ret_id
@@ -758,13 +750,11 @@ zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_id
 	-- Zonk the ret-expressions in an envt that 
 	-- has the polymorphic bindings in the envt
        ; new_rets <- mapM (zonkExpr env2) rets
-       ; let env3 = extendZonkEnv env new_lvs	-- Only the lvs are needed
-       ; (env4, new_binds) <- zonkTcEvBinds env3 binds
-       ; return (env4,
+       ; return (extendZonkEnv env new_lvs,     -- Only the lvs are needed
                  RecStmt { recS_stmts = new_segStmts, recS_later_ids = new_lvs
                          , recS_rec_ids = new_rvs, recS_ret_fn = new_ret_id
                          , recS_mfix_fn = new_mfix_id, recS_bind_fn = new_bind_id
-                         , recS_rec_rets = new_rets, recS_dicts = new_binds }) }
+                         , recS_rec_rets = new_rets }) }
 
 zonkStmt env (ExprStmt expr then_op ty)
   = zonkLExpr env expr		`thenM` \ new_expr ->

@@ -34,7 +34,6 @@ import DsMeta
 #endif
 
 import HsSyn
-import TcHsSyn
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
@@ -338,10 +337,8 @@ dsExpr (HsDo DoExpr stmts body result_ty)
 dsExpr (HsDo GhciStmt stmts body result_ty)
   = dsDo stmts body result_ty
 
-dsExpr (HsDo ctxt@(MDoExpr tbl) stmts body result_ty)
-  = do { (meth_binds, tbl') <- dsSyntaxTable tbl
-       ; core_expr <- dsMDo ctxt tbl' stmts body result_ty
-       ; return (mkLets meth_binds core_expr) }
+dsExpr (HsDo MDoExpr stmts body result_ty)
+  = dsDo stmts body result_ty
 
 dsExpr (HsDo PArrComp stmts body result_ty)
   =	-- Special case for array comprehensions
@@ -753,16 +750,15 @@ dsDo stmts body result_ty
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
-                    , recS_rec_rets = rec_rets, recS_dicts = _ev_binds }) stmts 
+                    , recS_rec_rets = rec_rets }) stmts
       = ASSERT( length rec_ids > 0 )
-        ASSERT( isEmptyTcEvBinds _ev_binds )   -- No method binds
         goL (new_bind_stmt : stmts)
       where
         -- returnE <- dsExpr return_id
         -- mfixE <- dsExpr mfix_id
         new_bind_stmt = L loc $ BindStmt (mkLHsPatTup later_pats) mfix_app
                                          bind_op 
-		                             noSyntaxExpr  -- Tuple cannot fail
+                                         noSyntaxExpr  -- Tuple cannot fail
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         rec_tup_pats = map nlVarPat tup_ids
@@ -778,15 +774,16 @@ dsDo stmts body result_ty
 	body_ty    = mkAppTy m_ty tup_ty
         tup_ty     = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
 
+handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-    handle_failure pat match fail_op
-      | matchCanFail match
-      = do { fail_op' <- dsExpr fail_op
-	   ; fail_msg <- mkStringExpr (mk_fail_msg pat)
-    	   ; extractMatchResult match (App fail_op' fail_msg) }
-      | otherwise
-      = extractMatchResult match (error "It can't fail") 
+handle_failure pat match fail_op
+  | matchCanFail match
+  = do { fail_op' <- dsExpr fail_op
+       ; fail_msg <- mkStringExpr (mk_fail_msg pat)
+       ; extractMatchResult match (App fail_op' fail_msg) }
+  | otherwise
+  = extractMatchResult match (error "It can't fail")
 
 mk_fail_msg :: Located e -> String
 mk_fail_msg pat = "Pattern match failure in do expression at " ++ 
@@ -801,7 +798,8 @@ We turn (RecStmt [v1,..vn] stmts) into:
 				      return (v1,..vn))
 
 \begin{code}
-dsMDo	:: HsStmtContext Name
+{-
+dsMDo   :: HsStmtContext Name
         -> [(Name,Id)]
 	-> [LStmt Id]
 	-> LHsExpr Id
@@ -815,7 +813,6 @@ dsMDo ctxt tbl stmts body result_ty
     goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
   
     (m_ty, b_ty) = tcSplitAppTy result_ty	-- result_ty must be of the form (m b)
-    mfix_id   = lookupEvidence tbl mfixName
     return_id = lookupEvidence tbl returnMName
     bind_id   = lookupEvidence tbl bindMName
     then_id   = lookupEvidence tbl thenMName
@@ -825,35 +822,34 @@ dsMDo ctxt tbl stmts body result_ty
       = do { rest <- goL stmts
 	   ; dsLocalBinds binds rest }
 
-    go _ (ExprStmt rhs _ rhs_ty) stmts
+    go _ (ExprStmt rhs then_expr rhs_ty) stmts
       = do { rhs2 <- dsLExpr rhs
 	   ; warnDiscardedDoBindings rhs m_ty rhs_ty
+           ; then_expr2 <- dsExpr then_expr
            ; rest <- goL stmts
-	   ; return (mkApps (Var then_id) [Type rhs_ty, Type b_ty, rhs2, rest]) }
+           ; return (mkApps then_expr2 [rhs2, rest]) }
     
-    go _ (BindStmt pat rhs _ _) stmts
-      = do { body  <- goL stmts
-	   ; var   <- selectSimpleMatchVarL pat
+    go _ (BindStmt pat rhs bind_op _) stmts
+      = do { body     <- goL stmts
+           ; rhs'     <- dsLExpr rhs
+           ; bind_op' <- dsExpr bind_op
+           ; var   <- selectSimpleMatchVarL pat
 	   ; match <- matchSinglePat (Var var) (StmtCtxt ctxt) pat
-    				  result_ty (cantFailMatchResult body)
-	   ; fail_msg   <- mkStringExpr (mk_fail_msg pat)
-	   ; let fail_expr = mkApps (Var fail_id) [Type b_ty, fail_msg]
-	   ; match_code <- extractMatchResult match fail_expr
-
-	   ; rhs'       <- dsLExpr rhs
-	   ; return (mkApps (Var bind_id) [Type (hsLPatType pat), Type b_ty, 
-					     rhs', Lam var match_code]) }
+                                     result_ty (cantFailMatchResult body)
+           ; match_code <- handle_failure pat match fail_op
+           ; return (mkApps bind_op [rhs', Lam var match_code]) }
     
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
-                    , recS_rec_ids = rec_ids, recS_rec_rets = rec_rets 
-                    , recS_dicts = _ev_binds }) stmts
+                    , recS_rec_ids = rec_ids, recS_rec_rets = rec_rets
+                    , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op }) stmts
       = ASSERT( length rec_ids > 0 )
         ASSERT( length rec_ids == length rec_rets )
         ASSERT( isEmptyTcEvBinds _ev_binds )
         pprTrace "dsMDo" (ppr later_ids) $
 	 goL (new_bind_stmt : stmts)
       where
-        new_bind_stmt = L loc $ mkBindStmt (mk_tup_pat later_pats) mfix_app
+        new_bind_stmt = L loc $ BindStmt (mk_tup_pat later_pats) mfix_app
+                                         bind_op noSyntaxExpr
 	
 		-- Remove the later_ids that appear (without fancy coercions) 
 		-- in rec_rets, because there's no need to knot-tie them separately
@@ -861,7 +857,7 @@ dsMDo ctxt tbl stmts body result_ty
 	later_ids'   = filter (`notElem` mono_rec_ids) later_ids
 	mono_rec_ids = [ id | HsVar id <- rec_rets ]
     
-	mfix_app = nlHsApp (nlHsTyApp mfix_id [tup_ty]) mfix_arg
+        mfix_app = nlHsApp (noLoc mfix_op) mfix_arg
 	mfix_arg = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
 					     (mkFunTy tup_ty body_ty))
 
@@ -877,8 +873,7 @@ dsMDo ctxt tbl stmts body result_ty
 	body_ty = mkAppTy m_ty tup_ty
 	tup_ty  = mkBoxedTupleTy (map idType (later_ids' ++ rec_ids))  -- Deals with singleton case
 
-	return_app  = nlHsApp (nlHsTyApp return_id [tup_ty]) 
-			      (mkLHsTupleExpr rets)
+        return_app  = nlHsApp (noLoc return_op) (mkLHsTupleExpr rets)
 
 	mk_wild_pat :: Id -> LPat Id 
    	mk_wild_pat v = noLoc $ WildPat $ idType v
@@ -890,6 +885,7 @@ dsMDo ctxt tbl stmts body result_ty
  	mk_tup_pat :: [LPat Id] -> LPat Id
   	mk_tup_pat [p] = p
 	mk_tup_pat ps  = noLoc $ mkVanillaTuplePat ps Boxed
+-}
 \end{code}
 
 

@@ -465,10 +465,8 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)
        ; mfix'  <- addTickSyntaxExpr hpcSrcSpan (recS_mfix_fn stmt)
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
-       ; dicts' <- addTickEvBinds (recS_dicts stmt)
        ; return (stmt { recS_stmts = stmts', recS_ret_fn = ret'
-                      , recS_mfix_fn = mfix', recS_bind_fn = bind'
-                      , recS_dicts = dicts' }) }
+                      , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
@@ -538,9 +536,6 @@ addTickHsCmdTop (HsCmdTop cmd tys ty syntaxtable) =
 
 addTickLHsCmd ::  LHsCmd Id -> TM (LHsCmd Id)
 addTickLHsCmd x = addTickLHsExpr x
-
-addTickEvBinds :: TcEvBinds -> TM TcEvBinds
-addTickEvBinds x = return x   -- No coverage testing for dictionary binding
 
 addTickHsRecordBinds :: HsRecordBinds Id -> TM (HsRecordBinds Id)
 addTickHsRecordBinds (HsRecFields fields dd) 

@@ -1082,7 +1082,8 @@ tcRnStmt hsc_env ictxt rdr_stmt
     setInteractiveContext hsc_env ictxt $ do {
 
     -- Rename; use CmdLineMode because tcRnStmt is only used interactively
-    (([rn_stmt], _), fvs) <- rnStmts GhciStmt [rdr_stmt] (return ((), emptyFVs)) ;
+    (([rn_stmt], _), fvs) <- rnStmts GhciStmt [rdr_stmt] $ \_ ->
+                             return ((), emptyFVs) ;
     traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
     failIfErrsM ;
     rnDump (ppr rn_stmt) ;

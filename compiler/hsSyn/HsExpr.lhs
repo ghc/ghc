@@ -905,9 +905,6 @@ data StmtLR idL idR
                                      -- because the Id may be *polymorphic*, but
                                      -- the returned thing has to be *monomorphic*, 
 				     -- so they may be type applications
-
-      , recS_dicts :: TcEvBinds    -- Method bindings of Ids bound by the
-                                   -- RecStmt, and used afterwards
       }
   deriving (Data, Typeable)
 \end{code}
@@ -1043,7 +1040,7 @@ pprBy (Just e) = ptext (sLit "by") <+> ppr e
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
 pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
 pprDo GhciStmt    stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
-pprDo (MDoExpr _) stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
+pprDo MDoExpr     stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
 pprDo ListComp    stmts body = brackets    $ pprComp stmts body
 pprDo PArrComp    stmts body = pa_brackets $ pprComp stmts body
 pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
@@ -1176,9 +1173,7 @@ data HsStmtContext id
   = ListComp
   | DoExpr
   | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
-  | MDoExpr PostTcTable                  -- Recursive do-expression
-                                         -- (tiresomely, it needs table
-                                         --  of its return/bind ops)
+  | MDoExpr                              -- Recursive do-expression
   | PArrComp                             -- Parallel array comprehension
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
@@ -1188,9 +1183,9 @@ data HsStmtContext id
 
 \begin{code}
 isDoExpr :: HsStmtContext id -> Bool
-isDoExpr DoExpr      = True
-isDoExpr (MDoExpr _) = True
-isDoExpr _           = False
+isDoExpr DoExpr  = True
+isDoExpr MDoExpr = True
+isDoExpr _       = False
 
 isListCompExpr :: HsStmtContext id -> Bool
 isListCompExpr ListComp = True
@@ -1241,7 +1236,7 @@ pprStmtContext (PatGuard ctxt)
  = ptext (sLit "a pattern guard for") $$ pprMatchContext ctxt
 pprStmtContext GhciStmt        = ptext (sLit "an interactive GHCi command")
 pprStmtContext DoExpr          = ptext (sLit "a 'do' expression")
-pprStmtContext (MDoExpr _)     = ptext (sLit "an 'mdo' expression")
+pprStmtContext MDoExpr         = ptext (sLit "an 'mdo' expression")
 pprStmtContext ListComp        = ptext (sLit "a list comprehension")
 pprStmtContext PArrComp        = ptext (sLit "an array comprehension")
 
@@ -1274,7 +1269,7 @@ matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (
 matchContextErrString (StmtCtxt (PatGuard _))    = ptext (sLit "pattern guard")
 matchContextErrString (StmtCtxt GhciStmt)        = ptext (sLit "interactive GHCi command")
 matchContextErrString (StmtCtxt DoExpr)          = ptext (sLit "'do' expression")
-matchContextErrString (StmtCtxt (MDoExpr _))     = ptext (sLit "'mdo' expression")
+matchContextErrString (StmtCtxt MDoExpr)         = ptext (sLit "'mdo' expression")
 matchContextErrString (StmtCtxt ListComp)        = ptext (sLit "list comprehension")
 matchContextErrString (StmtCtxt PArrComp)        = ptext (sLit "array comprehension")
 \end{code}

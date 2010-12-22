@@ -17,7 +17,6 @@ import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRhoNC, tcCheckId,
 
 import HsSyn
 import TcRnMonad
-import Inst
 import TcEnv
 import TcPat
 import TcMType
@@ -26,7 +25,6 @@ import TcBinds
 import TcUnify
 import Name
 import TysWiredIn
-import PrelNames
 import Id
 import TyCon
 import TysPrim
@@ -264,19 +262,10 @@ tcDoStmts DoExpr stmts body res_ty
 			     tcBody body
 	; return (HsDo DoExpr stmts' body' res_ty) }
 
-tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
-  = do	{ (coi, (m_ty, elt_ty)) <- matchExpectedAppTy res_ty
- 	; let res_ty' = mkAppTy m_ty elt_ty	-- The matchExpected consumes res_ty
-	      tc_rhs rhs = tcInfer $ \ pat_ty ->
-			   tcMonoExpr rhs (mkAppTy m_ty pat_ty)
-
-	; (stmts', body') <- tcStmts ctxt (tcMDoStmt tc_rhs) stmts res_ty' $
+tcDoStmts MDoExpr stmts body res_ty
+  = do  { (stmts', body') <- tcStmts MDoExpr tcDoStmt stmts res_ty $
 			     tcBody body
-
-	; let names = [mfixName, bindMName, thenMName, returnMName, failMName]
-	; insts <- mapM (\name -> newMethodFromName DoOrigin name m_ty) names
-	; return $ mkHsWrapCoI coi $ 
-          HsDo (MDoExpr (names `zip` insts)) stmts' body' res_ty' }
+        ; return (HsDo MDoExpr stmts' body' res_ty) }
 
 tcDoStmts ctxt _ _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
@@ -571,7 +560,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; return (RecStmt { recS_stmts = stmts', recS_later_ids = later_ids
                           , recS_rec_ids = rec_ids, recS_ret_fn = ret_op' 
                           , recS_mfix_fn = mfix_op', recS_bind_fn = bind_op'
-                          , recS_rec_rets = tup_rets, recS_dicts = emptyTcEvBinds }, thing)
+                          , recS_rec_rets = tup_rets }, thing)
         }}
 
 tcDoStmt _ stmt _ _
@@ -608,7 +597,8 @@ tcMDoStmt tc_rhs _ (ExprStmt rhs _ _) res_ty thing_inside
 	; thing 	 <- thing_inside res_ty
 	; return (ExprStmt rhs' noSyntaxExpr elt_ty, thing) }
 
-tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _ _ _ _) res_ty thing_inside
+tcMDoStmt tc_rhs ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = laterNames
+                               , recS_rec_ids = recNames }) res_ty thing_inside
   = do	{ rec_tys <- newFlexiTyVarTys (length recNames) liftedTypeKind
 	; let rec_ids = zipWith mkLocalId recNames rec_tys
 	; tcExtendIdEnv rec_ids			$ do
@@ -625,11 +615,7 @@ tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _ _ _ _) res_ty thing
 		--	some of them with polymorphic things with the same Name
 		--	(see note [RecStmt] in HsExpr)
 
--- Need the bindLocalMethods if we re-add Method constraints
---	; lie_binds <- bindLocalMethods lie later_ids
-	; let lie_binds = emptyTcEvBinds
-  
-	; return (RecStmt stmts' later_ids rec_ids noSyntaxExpr noSyntaxExpr noSyntaxExpr rec_rets lie_binds, thing)
+        ; return (RecStmt stmts' later_ids rec_ids noSyntaxExpr noSyntaxExpr noSyntaxExpr rec_rets, thing)
 	}}
 
 tcMDoStmt _ _ stmt _ _

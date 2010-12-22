@@ -221,7 +221,7 @@ rnExpr (HsLet binds expr)
     return (HsLet binds' expr', fvExpr)
 
 rnExpr (HsDo do_or_lc stmts body _)
-  = do 	{ ((stmts', body'), fvs) <- rnStmts do_or_lc stmts $
+  = do  { ((stmts', body'), fvs) <- rnStmts do_or_lc stmts $ \ _ ->
 				    rnLExpr body
 	; return (HsDo do_or_lc stmts' body' placeHolderType, fvs) }
 
@@ -637,16 +637,7 @@ rnBracket (DecBrG _) = panic "rnBracket: unexpected DecBrG"
 %************************************************************************
 
 \begin{code}
-rnStmts :: HsStmtContext Name -> [LStmt RdrName] 
-	-> RnM (thing, FreeVars)
-	-> RnM (([LStmt Name], thing), FreeVars)
--- Variables bound by the Stmts, and mentioned in thing_inside,
--- do not appear in the result FreeVars
-
-rnStmts (MDoExpr _) stmts thing_inside = rnMDoStmts    stmts thing_inside
-rnStmts ctxt        stmts thing_inside = rnNormalStmts ctxt stmts (\ _ -> thing_inside)
-
-rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName]
+rnStmts :: HsStmtContext Name -> [LStmt RdrName]
 	      -> ([Name] -> RnM (thing, FreeVars))
 	      -> RnM (([LStmt Name], thing), FreeVars)	
 -- Variables bound by the Stmts, and mentioned in thing_inside,
@@ -654,15 +645,15 @@ rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName]
 --
 -- Renaming a single RecStmt can give a sequence of smaller Stmts
 
-rnNormalStmts _ [] thing_inside 
+rnStmts _ [] thing_inside
   = do { (res, fvs) <- thing_inside []
        ; return (([], res), fvs) }
 
-rnNormalStmts ctxt (stmt@(L loc _) : stmts) thing_inside
+rnStmts ctxt (stmt@(L loc _) : stmts) thing_inside
   = do { ((stmts1, (stmts2, thing)), fvs) 
             <- setSrcSpan loc           $
                rnStmt ctxt stmt         $ \ bndrs1 ->
-               rnNormalStmts ctxt stmts $ \ bndrs2 ->
+               rnStmts ctxt stmts $ \ bndrs2 ->
                thing_inside (bndrs1 ++ bndrs2)
 	; return (((stmts1 ++ stmts2), thing), fvs) }
 
@@ -710,7 +701,7 @@ rnStmt ctxt (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
 	-- for which it's the fwd refs within the bind itself
 	-- (This set may not be empty, because we're in a recursive 
 	-- context.)
-        ; rn_rec_stmts_and_then rec_stmts	$ \ segs -> do
+        ; rnRecStmtsAndThen rec_stmts   $ \ segs -> do
 
 	{ let bndrs = nameSetToList $ foldr (unionNameSets . (\(ds,_,_,_) -> ds)) 
                                             emptyNameSet segs
@@ -753,7 +744,7 @@ rnStmt ctxt (L loc (TransformStmt stmts _ using by)) thing_inside
        ; (using', fvs1) <- rnLExpr using
 
        ; ((stmts', (by', used_bndrs, thing)), fvs2)
-             <- rnNormalStmts (TransformStmtCtxt ctxt) stmts $ \ bndrs ->
+             <- rnStmts (TransformStmtCtxt ctxt) stmts $ \ bndrs ->
                 do { (by', fvs_by) <- case by of
                                         Nothing -> return (Nothing, emptyFVs)
                                         Just e  -> do { (e', fvs) <- rnLExpr e; return (Just e', fvs) }
@@ -779,7 +770,7 @@ rnStmt ctxt (L loc (GroupStmt stmts _ by using)) thing_inside
          -- Rename the stmts and the 'by' expression
 	 -- Keep track of the variables mentioned in the 'by' expression
        ; ((stmts', (by', used_bndrs, thing)), fvs2) 
-             <- rnNormalStmts (TransformStmtCtxt ctxt) stmts $ \ bndrs ->
+             <- rnStmts (TransformStmtCtxt ctxt) stmts $ \ bndrs ->
                 do { (by',   fvs_by) <- mapMaybeFvRn rnLExpr by
                    ; (thing, fvs_thing) <- thing_inside bndrs
                    ; let fvs = fvs_by `plusFV` fvs_thing
@@ -816,7 +807,7 @@ rnParallelStmts ctxt segs thing_inside
 
     rn_segs env bndrs_so_far ((stmts,_) : segs) 
       = do { ((stmts', (used_bndrs, segs', thing)), fvs)
-                    <- rnNormalStmts ctxt stmts $ \ bndrs ->
+                    <- rnStmts ctxt stmts $ \ bndrs ->
                        setLocalRdrEnv env       $ do
                        { ((segs', thing), fvs) <- rn_segs env (bndrs ++ bndrs_so_far) segs
 		       ; let used_bndrs = filter (`elemNameSet` fvs) bndrs
@@ -864,28 +855,13 @@ type Segment stmts = (Defs,
 		      stmts)	-- Either Stmt or [Stmt]
 
 
-----------------------------------------------------
-
-rnMDoStmts :: [LStmt RdrName]
-	   -> RnM (thing, FreeVars)
-	   -> RnM (([LStmt Name], thing), FreeVars)	
-rnMDoStmts stmts thing_inside
-  = rn_rec_stmts_and_then stmts $ \ segs -> do
-    { (thing, fvs_later) <- thing_inside
-    ; let   segs_w_fwd_refs = addFwdRefs segs
-	    grouped_segs = glomSegments segs_w_fwd_refs
-	    (stmts', fvs) = segsToStmts emptyRecStmt grouped_segs fvs_later
-    ; return ((stmts', thing), fvs) }
-
----------------------------------------------
-
 -- wrapper that does both the left- and right-hand sides
-rn_rec_stmts_and_then :: [LStmt RdrName]
+rnRecStmtsAndThen :: [LStmt RdrName]
                          -- assumes that the FreeVars returned includes
                          -- the FreeVars of the Segments
                       -> ([Segment (LStmt Name)] -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
-rn_rec_stmts_and_then s cont
+rnRecStmtsAndThen s cont
   = do	{ -- (A) Make the mini fixity env for all of the stmts
 	  fix_env <- makeMiniFixityEnv (collectRecStmtsFixities s)
 
@@ -1000,7 +976,7 @@ rn_rec_stmt _ (L _ (LetStmt binds@(HsIPBinds _))) _
 
 rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do 
   (binds', du_binds) <- 
-      -- fixities and unused are handled above in rn_rec_stmts_and_then
+      -- fixities and unused are handled above in rnRecStmtsAndThen
       rnLocalValBindsRHS (mkNameSet all_bndrs) binds'
   return [(duDefs du_binds, allUses du_binds, 
 	   emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
@@ -1173,9 +1149,9 @@ checkLetStmt _ctxt 	     _binds	       = return ()
 
 ---------
 checkRecStmt :: HsStmtContext Name -> RnM ()
-checkRecStmt (MDoExpr {}) = return ()	-- Recursive stmt ok in 'mdo'
-checkRecStmt (DoExpr {})  = return ()	-- and in 'do'
-checkRecStmt ctxt	  = addErr msg
+checkRecStmt MDoExpr = return ()      -- Recursive stmt ok in 'mdo'
+checkRecStmt DoExpr  = return ()      -- and in 'do'
+checkRecStmt ctxt    = addErr msg
   where
     msg = ptext (sLit "Illegal 'rec' stmt in") <+> pprStmtContext ctxt
 
