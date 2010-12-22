@@ -549,7 +549,7 @@ exprIsCheap' good_app other_expr 	-- Applications and variables
     go (Var _) [] = True	-- Just a type application of a variable
 				-- (f t1 t2 t3) counts as WHNF
     go (Var f) args
- 	= case idDetails f of
+        = case idDetails f of
 		RecSelId {}  	    	     -> go_sel args
 		ClassOpId {} 	    	     -> go_sel args
 		PrimOpId op  	    	     -> go_primop op args
