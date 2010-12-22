@@ -989,7 +989,7 @@ tcIdDetails _  IfVanillaId = return VanillaId
 tcIdDetails ty (IfDFunId ns)
   = return (DFunId ns (isNewTyCon (classTyCon cls)))
   where
-    (_, cls, _) = tcSplitDFunTy ty
+    (_, _, cls, _) = tcSplitDFunTy ty
 
 tcIdDetails _ (IfRecSelId tc naughty)
   = do { tc' <- tcIfaceTyCon tc

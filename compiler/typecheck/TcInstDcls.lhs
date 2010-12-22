@@ -1249,7 +1249,7 @@ instDeclCtxt2 :: Type -> SDoc
 instDeclCtxt2 dfun_ty
   = inst_decl_ctxt (ppr (mkClassPred cls tys))
   where
-    (_,cls,tys) = tcSplitDFunTy dfun_ty
+    (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes doc

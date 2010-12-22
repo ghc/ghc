@@ -41,8 +41,8 @@ import StaticFlags
 import DynFlags
 import CoreSyn
 import PprCore		()	-- Instances
-import TcType	 	( tcSplitSigmaTy, tcSplitDFunHead )
-import OccurAnal
+import TcType           ( tcSplitDFunTy )
+import OccurAnal        ( occurAnalyseExpr )
 import CoreSubst hiding( substTy )
 import CoreFVs         ( exprFreeVars )
 import CoreArity       ( manifestArity, exprBotStrictness_maybe )
@@ -54,8 +54,7 @@ import Literal
 import PrimOp
 import IdInfo
 import BasicTypes	( Arity )
-import TcType		( tcSplitDFunTy )
-import Type 
+import Type
 import Coercion
 import PrelNames
 import VarEnv           ( mkInScopeSet )
@@ -95,11 +94,8 @@ mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
 mkDFunUnfolding dfun_ty ops 
   = DFunUnfolding dfun_nargs data_con ops
   where
-    (tvs, theta, head_ty) = tcSplitSigmaTy dfun_ty
-    	  -- NB: tcSplitSigmaTy: do not look through a newtype
-	  --     when the dictionary type is a newtype
-    (cls, _)   = tcSplitDFunHead head_ty
-    dfun_nargs = length tvs + length theta
+    (tvs, n_theta, cls, _) = tcSplitDFunTy dfun_ty
+    dfun_nargs = length tvs + n_theta
     data_con   = classDataCon cls
 
 mkWwInlineRule :: Id -> CoreExpr -> Arity -> Unfolding
@@ -1285,7 +1281,7 @@ exprIsConApp_maybe id_unf expr
         , let sat = length args == dfun_nargs    -- See Note [DFun arity check]
           in if sat then True else 
              pprTrace "Unsaturated dfun" (ppr fun <+> int dfun_nargs $$ ppr args) False   
-        , let (dfun_tvs, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
+        , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
               subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
               mk_arg (DFunConstArg e) = e
               mk_arg (DFunLamArg i)   = args !! i

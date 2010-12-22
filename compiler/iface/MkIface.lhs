@@ -1428,7 +1428,7 @@ instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
     is_local name = nameIsLocalOrFrom mod name
 
 	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
-    (_, cls, tys) = tcSplitDFunTy (idType dfun_id)
+    (_, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
 		-- Slightly awkward: we need the Class to get the fundeps
     (tvs, fds) = classTvsFds cls
     arg_names = [filterNameSet is_local (tyClsNamesOfType ty) | ty <- tys]

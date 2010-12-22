@@ -128,7 +128,7 @@ setInstanceDFunId ispec dfun
 	-- are ok; hence the assert
      ispec { is_dfun = dfun, is_tvs = mkVarSet tvs, is_tys = tys }
    where 
-     (tvs, _, tys) = tcSplitDFunTy (idType dfun)
+     (tvs, _, _, tys) = tcSplitDFunTy (idType dfun)
 
 instanceRoughTcs :: Instance -> [Maybe Name]
 instanceRoughTcs = is_tcs
@@ -184,7 +184,7 @@ mkLocalInstance dfun oflag
 		is_tvs = mkVarSet tvs, is_tys = tys,
                 is_cls = className cls, is_tcs = roughMatchTcs tys }
   where
-    (tvs, cls, tys) = tcSplitDFunTy (idType dfun)
+    (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
 
 mkImportedInstance :: Name -> [Maybe Name]
 		   -> DFunId -> OverlapFlag -> Instance
@@ -195,7 +195,7 @@ mkImportedInstance cls mb_tcs dfun oflag
 		is_tvs = mkVarSet tvs, is_tys = tys,
 		is_cls = cls, is_tcs = mb_tcs }
   where
-    (tvs, _, tys) = tcSplitDFunTy (idType dfun)
+    (tvs, _, _, tys) = tcSplitDFunTy (idType dfun)
 
 roughMatchTcs :: [Type] -> [Maybe Name]
 roughMatchTcs tys = map rough tys
