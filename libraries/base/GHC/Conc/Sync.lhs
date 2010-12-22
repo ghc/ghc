@@ -426,16 +426,16 @@ data ThreadStatus
 threadStatus :: ThreadId -> IO ThreadStatus
 threadStatus (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
-     (# s', stat #) -> (# s', mk_stat (I# stat) #)
+    (# s', stat, _cap #) -> (# s', mk_stat (I# stat) #)
    where
         -- NB. keep these in sync with includes/Constants.h
      mk_stat 0  = ThreadRunning
      mk_stat 1  = ThreadBlocked BlockedOnMVar
      mk_stat 2  = ThreadBlocked BlockedOnBlackHole
-     mk_stat 3  = ThreadBlocked BlockedOnException
-     mk_stat 7  = ThreadBlocked BlockedOnSTM
+     mk_stat 6  = ThreadBlocked BlockedOnSTM
+     mk_stat 10 = ThreadBlocked BlockedOnForeignCall
      mk_stat 11 = ThreadBlocked BlockedOnForeignCall
-     mk_stat 12 = ThreadBlocked BlockedOnForeignCall
+     mk_stat 12 = ThreadBlocked BlockedOnException
      mk_stat 16 = ThreadFinished
      mk_stat 17 = ThreadDied
      mk_stat _  = ThreadBlocked BlockedOnOther
