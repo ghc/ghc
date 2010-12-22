@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, TypeSynonymInstances #-}
+{-# LANGUAGE ImplicitParams, TypeSynonymInstances, FlexibleInstances #-}
 
 -- Class ops that bind no new type variables
 

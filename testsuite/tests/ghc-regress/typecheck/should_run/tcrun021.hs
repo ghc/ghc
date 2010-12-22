@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies,
-             TypeSynonymInstances #-}
+             TypeSynonymInstances, FlexibleInstances #-}
 
 -- This bizarre program failed because TcSimplify built a loop of
 -- dictionaries, due to an obscure bug in the way in which superclasses

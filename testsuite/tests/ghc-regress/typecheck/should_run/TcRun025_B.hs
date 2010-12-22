@@ -1,4 +1,4 @@
-{-# LANGUAGE ImplicitParams, TypeSynonymInstances #-}
+{-# LANGUAGE ImplicitParams, TypeSynonymInstances, FlexibleInstances #-}
 
 -- Similar to tc024, but cross module
 
