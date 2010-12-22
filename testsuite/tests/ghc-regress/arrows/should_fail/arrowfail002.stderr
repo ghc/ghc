@@ -1,2 +1,4 @@
 
-arrowfail002.hs:6:17: Not in scope: `x'
+arrowfail002.hs:6:17:
+    Not in scope: `x'
+    Perhaps you meant one of these: `f' (line 7), `g' (line 6)

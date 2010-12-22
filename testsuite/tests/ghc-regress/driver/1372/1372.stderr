@@ -1,2 +1,6 @@
 
-Main.hs:5:5: Not in scope: data constructor `T'
+Main.hs:5:5:
+    Not in scope: data constructor `T'
+    Perhaps you meant one of these:
+      `GT' (imported from Prelude), `LT' (imported from Prelude),
+      `T'' (imported from A)

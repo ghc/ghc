@@ -1,2 +1,4 @@
 
-mod72.hs:3:7: Not in scope: `g'
+mod72.hs:3:7:
+    Not in scope: `g'
+    Perhaps you meant one of these: `x' (line 3), `f' (line 3)

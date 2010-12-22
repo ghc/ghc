@@ -7,7 +7,9 @@
 
 <interactive>:1:1: Not in scope: `nub'
 
-<interactive>:1:1: Not in scope: `nub'
+<interactive>:1:1:
+    Not in scope: `nub'
+    Perhaps you meant `L.nub' (imported from Data.List)
 
 <interactive>:1:1:
     Failed to load interface for `L':

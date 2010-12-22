@@ -1,2 +1,4 @@
 
-tcfail048.hs:3:7: Not in scope: type constructor or class `B'
+tcfail048.hs:3:7:
+    Not in scope: type constructor or class `B'
+    Perhaps you meant `C' (line 3)

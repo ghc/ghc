@@ -2,13 +2,21 @@
 readFail001.hs:25:11:
     The fixity signature for `+#' lacks an accompanying binding
 
-readFail001.hs:38:48: Not in scope: type constructor or class `EqLeaf'
+readFail001.hs:38:48:
+    Not in scope: type constructor or class `EqLeaf'
 
-readFail001.hs:38:59: Not in scope: type constructor or class `EqLeaf'
+readFail001.hs:38:59:
+    Not in scope: type constructor or class `EqLeaf'
 
-readFail001.hs:87:11: Not in scope: `x'
+readFail001.hs:87:11:
+    Not in scope: `x'
+    Perhaps you meant one of these:
+      `a' (line 79), `b' (line 79), `c' (line 79)
 
-readFail001.hs:88:19: Not in scope: `x'
+readFail001.hs:88:19:
+    Not in scope: `x'
+    Perhaps you meant one of these:
+      `a' (line 79), `b' (line 79), `c' (line 79)
 
 readFail001.hs:94:19: Not in scope: `isSpace'
 
@@ -18,4 +26,5 @@ readFail001.hs:107:30: Not in scope: data constructor `Foo'
 
 readFail001.hs:107:42: Not in scope: data constructor `Bar'
 
-readFail001.hs:112:23: Not in scope: type constructor or class `Foo'
+readFail001.hs:112:23:
+    Not in scope: type constructor or class `Foo'

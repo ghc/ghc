@@ -1,3 +1,6 @@
 
-mod158.hs:12:5: Not in scope: data constructor `C'
+mod158.hs:12:5:
+    Not in scope: data constructor `C'
+    Perhaps you meant one of these:
+      `A' (imported from Mod157_D), `B' (imported from Mod157_D)
 exit(1)

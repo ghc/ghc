@@ -1,2 +1,4 @@
 
-rnfail033.hs:2:21: Not in scope: `List.map'
+rnfail033.hs:2:21:
+    Not in scope: `List.map'
+    Perhaps you meant `List.zip' (imported from List)
