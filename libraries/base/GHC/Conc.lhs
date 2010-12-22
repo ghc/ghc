@@ -34,6 +34,7 @@ module GHC.Conc
         , forkOnIO      -- :: Int -> IO a -> IO ThreadId
         , forkOnIOUnmasked
         , numCapabilities -- :: Int
+        , getNumCapabilities -- :: IO Int
         , numSparks       -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId

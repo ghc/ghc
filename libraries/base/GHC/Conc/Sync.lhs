@@ -42,6 +42,7 @@ module GHC.Conc.Sync
         , forkOnIO      -- :: Int -> IO a -> IO ThreadId
         , forkOnIOUnmasked
         , numCapabilities -- :: Int
+        , getNumCapabilities -- :: IO Int
         , numSparks      -- :: IO Int
         , childHandler  -- :: Exception -> IO ()
         , myThreadId    -- :: IO ThreadId
@@ -207,9 +208,7 @@ can migrate between CPUs according to the scheduling policy).
 know in advance how best to distribute the threads.
 
 The `Int` argument specifies the CPU number; it is interpreted modulo
-'numCapabilities' (note that it actually specifies a capability number
-rather than a CPU number, but to a first approximation the two are
-equivalent).
+the value returned by 'getNumCapabilities'.
 -}
 forkOnIO :: Int -> IO () -> IO ThreadId
 forkOnIO (I# cpu) action = IO $ \ s ->
@@ -226,10 +225,35 @@ forkOnIOUnmasked cpu io = forkOnIO cpu (unsafeUnmask io)
 -- Haskell threads that can run truly simultaneously at any given
 -- time, and is typically set to the number of physical CPU cores on
 -- the machine.
+-- 
+-- Strictly speaking it is better to use 'getNumCapabilities', because
+-- the number of capabilities might vary at runtime.
+--
 numCapabilities :: Int
-numCapabilities = unsafePerformIO $  do
-                    n <- peek n_capabilities
-                    return (fromIntegral n)
+numCapabilities = unsafePerformIO $ getNumCapabilities
+
+{- |
+Returns the number of Haskell threads that can run truly
+simultaneously (on separate physical processors) at any given time.
+The CPU number passed to `forkOnIO` is interpreted modulo this
+value.
+
+An implementation in which Haskell threads are mapped directly to
+OS threads might return the number of physical processor cores in
+the machine, and 'forkOnIO' would be implemented using the OS's
+affinity facilities.  An implementation that schedules Haskell
+threads onto a smaller number of OS threads (like GHC) would return
+the number of such OS threads that can be running simultaneously.
+
+GHC notes: this returns the number passed as the argument to the
+@+RTS -N@ flag.  In current implementations, the value is fixed
+when the program starts and never changes, but it is possible that
+in the future the number of capabilities might vary at runtime.
+-}
+getNumCapabilities :: IO Int
+getNumCapabilities = do
+   n <- peek n_capabilities
+   return (fromIntegral n)
 
 -- | Returns the number of sparks currently in the local spark pool
 numSparks :: IO Int
