@@ -107,7 +107,7 @@ occAnalBind env _ (NonRec binder rhs) body_usage
   = (body_usage' +++ rhs_usage3, [NonRec tagged_binder rhs'])
   where
     (body_usage', tagged_binder) = tagBinder body_usage binder
-    (rhs_usage1, rhs')           = occAnalRhs env (idOccInfo tagged_binder) rhs
+    (rhs_usage1, rhs')           = occAnalRhs env (Just tagged_binder) rhs
     rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
     rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
        -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
@@ -385,7 +385,7 @@ occAnalBind _ env (Rec pairs) body_usage
           details = ND { nd_bndr = bndr, nd_rhs = rhs'
                        , nd_uds = rhs_usage3, nd_inl = inl_fvs}
 
-          (rhs_usage1, rhs') = occAnalRhs env NoOccInfo rhs
+          (rhs_usage1, rhs') = occAnalRhs env Nothing rhs
           rhs_usage2 = addIdOccs rhs_usage1 rule_fvs -- Note [Rules are extra RHSs]
           rhs_usage3 = addIdOccs rhs_usage2 unf_fvs
           unf        = realIdUnfolding bndr     -- Ignore any current loop-breaker flag
@@ -790,36 +790,27 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 \begin{code}
 occAnalRhs :: OccEnv
-           -> OccInfo -> CoreExpr    -- Binder and rhs
-                                -- For non-recs the binder is alrady tagged
-                                -- with occurrence info
+           -> Maybe Id -> CoreExpr    -- Binder and rhs
+                 -- Just b  => non-rec, and alrady tagged with occurrence info
+                 -- Nothing => Rec, no occ info
            -> (UsageDetails, CoreExpr)
               -- Returned usage details covers only the RHS,
               -- and *not* the RULE or INLINE template for the Id
-occAnalRhs env occ rhs
+occAnalRhs env mb_bndr rhs
   = occAnal ctxt rhs
   where
-    ctxt | certainly_inline = env
-         | otherwise        = rhsCtxt env
-        -- Note that we generally use an rhsCtxt.  This tells the occ anal n
-        -- that it's looking at an RHS, which has an effect in occAnalApp
-        --
-        -- But there's a problem.  Consider
-        --      x1 = a0 : []
-        --      x2 = a1 : x1
-        --      x3 = a2 : x2
-        --      g  = f x3
-        -- First time round, it looks as if x1 and x2 occur as an arg of a
-        -- let-bound constructor ==> give them a many-occurrence.
-        -- But then x3 is inlined (unconditionally as it happens) and
-        -- next time round, x2 will be, and the next time round x1 will be
-        -- Result: multiple simplifier iterations.  Sigh.
-        -- Crude solution: use rhsCtxt for things that occur just once...
+    -- See Note [Cascading inlines]
+    ctxt = case mb_bndr of
+             Just b | certainly_inline b -> env
+             _other                      -> rhsCtxt env
 
-    certainly_inline = case occ of
-                            OneOcc in_lam one_br _ -> not in_lam && one_br
-                            _                      -> False
-
+    certainly_inline bndr  -- See Note [Cascading inlines]
+      = case idOccInfo bndr of
+          OneOcc in_lam one_br _ -> not in_lam && one_br && active && not_stable
+          _                      -> False
+      where
+        active     = isAlwaysActive (idInlineActivation bndr)
+        not_stable = not (isStableUnfolding (idUnfolding bndr))
 
 addIdOccs :: UsageDetails -> VarSet -> UsageDetails
 addIdOccs usage id_set = foldVarSet add usage id_set
@@ -832,6 +823,46 @@ addIdOccs usage id_set = foldVarSet add usage id_set
 	--	even if that's the only occurrence of the thing
 	--	(Same goes for INLINE.)
 \end{code}
+
+Note [Cascading inlines]
+~~~~~~~~~~~~~~~~~~~~~~~~
+By default we use an rhsCtxt for the RHS of a binding.  This tells the
+occ anal n that it's looking at an RHS, which has an effect in
+occAnalApp.  In particular, for constructor applications, it makes
+the arguments appear to have NoOccInfo, so that we don't inline into
+them. Thus    x = f y
+              k = Just x
+we do not want to inline x.
+
+But there's a problem.  Consider
+     x1 = a0 : []
+     x2 = a1 : x1
+     x3 = a2 : x2
+     g  = f x3
+First time round, it looks as if x1 and x2 occur as an arg of a
+let-bound constructor ==> give them a many-occurrence.
+But then x3 is inlined (unconditionally as it happens) and
+next time round, x2 will be, and the next time round x1 will be
+Result: multiple simplifier iterations.  Sigh.
+
+So, when analysing the RHS of x3 we notice that x3 will itself
+definitely inline the next time round, and so we analyse x3's rhs in
+an ordinary context, not rhsCtxt.  Hence the "certainly_inline" stuff.
+
+Annoyingly, we have to approximiate SimplUtils.preInlineUnconditionally.
+If we say "yes" when preInlineUnconditionally says "no" the simplifier iterates
+indefinitely:
+        x = f y
+        k = Just x
+inline ==>
+        k = Just (f y)
+float ==>
+        x1 = f y
+        k = Just x1
+
+This is worse than the slow cascade, so we only want to say "certainly_inline"
+if it really is certain.  Look at the note with preInlineUnconditionally
+for the various clauses.
 
 Expressions
 ~~~~~~~~~~~
