@@ -538,7 +538,7 @@ uType_np origin orig_ty1 orig_ty2
   = do { traceTc "u_tys " $ vcat 
               [ sep [ ppr orig_ty1, text "~", ppr orig_ty2]
               , ppr origin]
-       ; coi <- go origin orig_ty1 orig_ty2
+       ; coi <- go orig_ty1 orig_ty2
        ; case coi of
             ACo co -> traceTc "u_tys yields coercion:" (ppr co)
             IdCo _ -> traceTc "u_tys yields no coercion" empty
@@ -547,7 +547,7 @@ uType_np origin orig_ty1 orig_ty2
     bale_out :: [EqOrigin] -> TcM a
     bale_out origin = failWithMisMatch origin
 
-    go :: [EqOrigin] -> TcType -> TcType -> TcM CoercionI
+    go :: TcType -> TcType -> TcM CoercionI
 	-- The arguments to 'go' are always semantically identical 
 	-- to orig_ty{1,2} except for looking through type synonyms
 
@@ -555,22 +555,30 @@ uType_np origin orig_ty1 orig_ty2
 	-- Note that we pass in *original* (before synonym expansion), 
         -- so that type variables tend to get filled in with 
         -- the most informative version of the type
-    go origin (TyVarTy tyvar1) ty2 = uVar origin NotSwapped tyvar1 ty2
-    go origin ty1 (TyVarTy tyvar2) = uVar origin IsSwapped  tyvar2 ty1
+    go (TyVarTy tyvar1) ty2 = uVar origin NotSwapped tyvar1 ty2
+    go ty1 (TyVarTy tyvar2) = uVar origin IsSwapped  tyvar2 ty1
 
         -- Expand synonyms: 
 	--      see Note [Unification and synonyms]
 	-- Do this after the variable case so that we tend to unify
-	-- variables with un-expended type synonym
-    go origin ty1 ty2
-      | Just ty1' <- tcView ty1 = uType origin ty1' ty2
-      | Just ty2' <- tcView ty2 = uType origin ty1  ty2'
+	-- variables with un-expanded type synonym
+	--
+	-- Also NB that we recurse to 'go' so that we don't push a
+	-- new item on the origin stack. As a result if we have
+	--   type Foo = Int
+	-- and we try to unify  Foo ~ Bool
+	-- we'll end up saying "can't match Foo with Bool"
+	-- rather than "can't match "Int with Bool".  See Trac #4535.
+    go ty1 ty2
+      | Just ty1' <- tcView ty1 = go ty1' ty2
+      | Just ty2' <- tcView ty2 = go ty1  ty2'
+      	     
 
         -- Predicates
-    go origin (PredTy p1) (PredTy p2) = uPred origin p1 p2
+    go (PredTy p1) (PredTy p2) = uPred origin p1 p2
 
         -- Coercion functions: (t1a ~ t1b) => t1c  ~  (t2a ~ t2b) => t2c
-    go origin ty1 ty2 
+    go ty1 ty2 
       | Just (t1a,t1b,t1c) <- splitCoPredTy_maybe ty1, 
         Just (t2a,t2b,t2c) <- splitCoPredTy_maybe ty2
       = do { co1 <- uType origin t1a t2a 
@@ -579,42 +587,42 @@ uType_np origin orig_ty1 orig_ty2
            ; return $ mkCoPredCoI co1 co2 co3 }
 
         -- Functions (or predicate functions) just check the two parts
-    go origin (FunTy fun1 arg1) (FunTy fun2 arg2)
+    go (FunTy fun1 arg1) (FunTy fun2 arg2)
       = do { coi_l <- uType origin fun1 fun2
            ; coi_r <- uType origin arg1 arg2
            ; return $ mkFunTyCoI coi_l coi_r }
 
         -- Always defer if a type synonym family (type function)
       	-- is involved.  (Data families behave rigidly.)
-    go origin ty1@(TyConApp tc1 _) ty2
+    go ty1@(TyConApp tc1 _) ty2
       | isSynFamilyTyCon tc1 = uType_defer origin ty1 ty2   
-    go origin ty1 ty2@(TyConApp tc2 _)
+    go ty1 ty2@(TyConApp tc2 _)
       | isSynFamilyTyCon tc2 = uType_defer origin ty1 ty2   
 
-    go origin (TyConApp tc1 tys1) (TyConApp tc2 tys2)
+    go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2	   -- See Note [TyCon app]
       = do { cois <- uList origin uType tys1 tys2
            ; return $ mkTyConAppCoI tc1 cois }
      
 	-- See Note [Care with type applications]
-    go origin (AppTy s1 t1) ty2
+    go (AppTy s1 t1) ty2
       | Just (s2,t2) <- tcSplitAppTy_maybe ty2
       = do { coi_s <- uType_np origin s1 s2  -- See Note [Unifying AppTy]
            ; coi_t <- uType origin t1 t2        
            ; return $ mkAppTyCoI coi_s coi_t }
 
-    go origin ty1 (AppTy s2 t2)
+    go ty1 (AppTy s2 t2)
       | Just (s1,t1) <- tcSplitAppTy_maybe ty1
       = do { coi_s <- uType_np origin s1 s2
            ; coi_t <- uType origin t1 t2
            ; return $ mkAppTyCoI coi_s coi_t }
 
-    go _ ty1 ty2
+    go ty1 ty2
       | tcIsForAllTy ty1 || tcIsForAllTy ty2 
       = unifySigmaTy origin ty1 ty2
 
         -- Anything else fails
-    go origin _ _ = bale_out origin
+    go _ _ = bale_out origin
 
 unifySigmaTy :: [EqOrigin] -> TcType -> TcType -> TcM CoercionI
 unifySigmaTy origin ty1 ty2
