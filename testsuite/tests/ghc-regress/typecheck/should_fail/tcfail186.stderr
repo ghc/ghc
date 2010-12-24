@@ -1,7 +1,7 @@
 
 tcfail186.hs:7:9:
-    Couldn't match expected type `Int' with actual type `[Char]'
-      Expected type: PhantomSyn a
-        Actual type: [Char]
+    Couldn't match expected type `PhantomSyn a'
+                with actual type `[Char]'
     In the first argument of `f', namely `"hoo"'
     In the expression: f "hoo"
+    In an equation for `foo': foo = f "hoo"

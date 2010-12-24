@@ -1,8 +1,6 @@
 
 tcfail016.hs:9:20:
-    Couldn't match expected type `Expr t'
-                with actual type `(t, Expr t)'
-      Expected type: Expr t
-        Actual type: AnnExpr t
+    Couldn't match expected type `Expr t' with actual type `AnnExpr t'
     In the first argument of `g', namely `e1'
     In the first argument of `(++)', namely `(g e1)'
+    In the expression: (g e1) ++ (g e2)
