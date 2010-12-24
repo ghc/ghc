@@ -77,7 +77,8 @@ data GHCiState = GHCiState
         ghc_e :: Bool -- True if this is 'ghc -e' (or runghc)
      }
 
-data CtxtCmd
+data CtxtCmd	-- In each case, the first [String] are the starred modules
+     		-- and the second are the unstarred ones
   = SetContext [String] [String]
   | AddModules [String] [String]
   | RemModules [String] [String]
