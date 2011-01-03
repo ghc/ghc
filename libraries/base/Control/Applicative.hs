@@ -42,6 +42,8 @@ import Control.Arrow
         (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
 import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.Instances ()
+import Control.Monad.ST (ST)
+import qualified Control.Monad.ST.Lazy as Lazy (ST)
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
 
@@ -146,6 +148,14 @@ instance Alternative [] where
         (<|>) = (++)
 
 instance Applicative IO where
+        pure = return
+        (<*>) = ap
+
+instance Applicative (ST s) where
+        pure = return
+        (<*>) = ap
+
+instance Applicative (Lazy.ST s) where
         pure = return
         (<*>) = ap
 
