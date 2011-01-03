@@ -20,11 +20,11 @@ infixr 1 >>>, <<<
 -- | A class for categories.
 --   id and (.) must form a monoid.
 class Category cat where
-        -- | the identity morphism
-        id :: cat a a
+    -- | the identity morphism
+    id :: cat a a
 
-        -- | morphism composition
-        (.) :: cat b c -> cat a b -> cat a c
+    -- | morphism composition
+    (.) :: cat b c -> cat a b -> cat a c
 
 {-# RULES
 "identity/left" forall p .
@@ -36,10 +36,10 @@ class Category cat where
  #-}
 
 instance Category (->) where
-        id = Prelude.id
+    id = Prelude.id
 #ifndef __HADDOCK__
 -- Haddock 1.x cannot parse this:
-        (.) = (Prelude..)
+    (.) = (Prelude..)
 #endif
 
 -- | Right-to-left composition

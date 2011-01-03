@@ -28,14 +28,14 @@
 -- or qualify uses of these function names with an alias for this module.
 
 module Data.Traversable (
-        Traversable(..),
-        for,
-        forM,
-        mapAccumL,
-        mapAccumR,
-        fmapDefault,
-        foldMapDefault,
-        ) where
+    Traversable(..),
+    for,
+    forM,
+    mapAccumL,
+    mapAccumR,
+    fmapDefault,
+    foldMapDefault,
+    ) where
 
 import Prelude hiding (mapM, sequence, foldr)
 import qualified Prelude (mapM, foldr)
@@ -80,41 +80,41 @@ import Array
 --    ('foldMapDefault').
 --
 class (Functor t, Foldable t) => Traversable t where
-        -- | Map each element of a structure to an action, evaluate
-        -- these actions from left to right, and collect the results.
-        traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
-        traverse f = sequenceA . fmap f
+    -- | Map each element of a structure to an action, evaluate
+    -- these actions from left to right, and collect the results.
+    traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
+    traverse f = sequenceA . fmap f
 
-        -- | Evaluate each action in the structure from left to right,
-        -- and collect the results.
-        sequenceA :: Applicative f => t (f a) -> f (t a)
-        sequenceA = traverse id
+    -- | Evaluate each action in the structure from left to right,
+    -- and collect the results.
+    sequenceA :: Applicative f => t (f a) -> f (t a)
+    sequenceA = traverse id
 
-        -- | Map each element of a structure to a monadic action, evaluate
-        -- these actions from left to right, and collect the results.
-        mapM :: Monad m => (a -> m b) -> t a -> m (t b)
-        mapM f = unwrapMonad . traverse (WrapMonad . f)
+    -- | Map each element of a structure to a monadic action, evaluate
+    -- these actions from left to right, and collect the results.
+    mapM :: Monad m => (a -> m b) -> t a -> m (t b)
+    mapM f = unwrapMonad . traverse (WrapMonad . f)
 
-        -- | Evaluate each monadic action in the structure from left to right,
-        -- and collect the results.
-        sequence :: Monad m => t (m a) -> m (t a)
-        sequence = mapM id
+    -- | Evaluate each monadic action in the structure from left to right,
+    -- and collect the results.
+    sequence :: Monad m => t (m a) -> m (t a)
+    sequence = mapM id
 
 -- instances for Prelude types
 
 instance Traversable Maybe where
-        traverse _ Nothing = pure Nothing
-        traverse f (Just x) = Just <$> f x
+    traverse _ Nothing = pure Nothing
+    traverse f (Just x) = Just <$> f x
 
 instance Traversable [] where
-        {-# INLINE traverse #-} -- so that traverse can fuse
-        traverse f = Prelude.foldr cons_f (pure [])
-          where cons_f x ys = (:) <$> f x <*> ys
+    {-# INLINE traverse #-} -- so that traverse can fuse
+    traverse f = Prelude.foldr cons_f (pure [])
+      where cons_f x ys = (:) <$> f x <*> ys
 
-        mapM = Prelude.mapM
+    mapM = Prelude.mapM
 
 instance Ix i => Traversable (Array i) where
-        traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
+    traverse f arr = listArray (bounds arr) `fmap` traverse f (elems arr)
 
 -- general functions
 
@@ -132,15 +132,14 @@ forM = flip mapM
 newtype StateL s a = StateL { runStateL :: s -> (s, a) }
 
 instance Functor (StateL s) where
-        fmap f (StateL k) = StateL $ \ s ->
-                let (s', v) = k s in (s', f v)
+    fmap f (StateL k) = StateL $ \ s -> let (s', v) = k s in (s', f v)
 
 instance Applicative (StateL s) where
-        pure x = StateL (\ s -> (s, x))
-        StateL kf <*> StateL kv = StateL $ \ s ->
-                let (s', f) = kf s
-                    (s'', v) = kv s'
-                in (s'', f v)
+    pure x = StateL (\ s -> (s, x))
+    StateL kf <*> StateL kv = StateL $ \ s ->
+        let (s', f) = kf s
+            (s'', v) = kv s'
+        in (s'', f v)
 
 -- |The 'mapAccumL' function behaves like a combination of 'fmap'
 -- and 'foldl'; it applies a function to each element of a structure,
@@ -153,15 +152,14 @@ mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
 newtype StateR s a = StateR { runStateR :: s -> (s, a) }
 
 instance Functor (StateR s) where
-        fmap f (StateR k) = StateR $ \ s ->
-                let (s', v) = k s in (s', f v)
+    fmap f (StateR k) = StateR $ \ s -> let (s', v) = k s in (s', f v)
 
 instance Applicative (StateR s) where
-        pure x = StateR (\ s -> (s, x))
-        StateR kf <*> StateR kv = StateR $ \ s ->
-                let (s', v) = kv s
-                    (s'', f) = kf s'
-                in (s'', f v)
+    pure x = StateR (\ s -> (s, x))
+    StateR kf <*> StateR kv = StateR $ \ s ->
+        let (s', v) = kv s
+            (s'', f) = kf s'
+        in (s'', f v)
 
 -- |The 'mapAccumR' function behaves like a combination of 'fmap'
 -- and 'foldr'; it applies a function to each element of a structure,
@@ -185,8 +183,8 @@ foldMapDefault f = getConst . traverse (Const . f)
 newtype Id a = Id { getId :: a }
 
 instance Functor Id where
-        fmap f (Id x) = Id (f x)
+    fmap f (Id x) = Id (f x)
 
 instance Applicative Id where
-        pure = Id
-        Id f <*> Id x = Id (f x)
+    pure = Id
+    Id f <*> Id x = Id (f x)

@@ -17,43 +17,43 @@
 -- for this module.
 
 module Data.Foldable (
-        -- * Folds
-        Foldable(..),
-        -- ** Special biased folds
-        foldr',
-        foldl',
-        foldrM,
-        foldlM,
-        -- ** Folding actions
-        -- *** Applicative actions
-        traverse_,
-        for_,
-        sequenceA_,
-        asum,
-        -- *** Monadic actions
-        mapM_,
-        forM_,
-        sequence_,
-        msum,
-        -- ** Specialized folds
-        toList,
-        concat,
-        concatMap,
-        and,
-        or,
-        any,
-        all,
-        sum,
-        product,
-        maximum,
-        maximumBy,
-        minimum,
-        minimumBy,
-        -- ** Searches
-        elem,
-        notElem,
-        find
-        ) where
+    -- * Folds
+    Foldable(..),
+    -- ** Special biased folds
+    foldr',
+    foldl',
+    foldrM,
+    foldlM,
+    -- ** Folding actions
+    -- *** Applicative actions
+    traverse_,
+    for_,
+    sequenceA_,
+    asum,
+    -- *** Monadic actions
+    mapM_,
+    forM_,
+    sequence_,
+    msum,
+    -- ** Specialized folds
+    toList,
+    concat,
+    concatMap,
+    and,
+    or,
+    any,
+    all,
+    sum,
+    product,
+    maximum,
+    maximumBy,
+    minimum,
+    minimumBy,
+    -- ** Searches
+    elem,
+    notElem,
+    find
+    ) where
 
 import Prelude hiding (foldl, foldr, foldl1, foldr1, mapM_, sequence_,
                 elem, notElem, concat, concatMap, and, or, any, all,
@@ -104,67 +104,69 @@ import Array
 -- >    foldr f z (Node l k r) = foldr f (f k (foldr f z r)) l
 --
 class Foldable t where
-        -- | Combine the elements of a structure using a monoid.
-        fold :: Monoid m => t m -> m
-        fold = foldMap id
+    -- | Combine the elements of a structure using a monoid.
+    fold :: Monoid m => t m -> m
+    fold = foldMap id
 
-        -- | Map each element of the structure to a monoid,
-        -- and combine the results.
-        foldMap :: Monoid m => (a -> m) -> t a -> m
-        foldMap f = foldr (mappend . f) mempty
+    -- | Map each element of the structure to a monoid,
+    -- and combine the results.
+    foldMap :: Monoid m => (a -> m) -> t a -> m
+    foldMap f = foldr (mappend . f) mempty
 
-        -- | Right-associative fold of a structure.
-        --
-        -- @'foldr' f z = 'Prelude.foldr' f z . 'toList'@
-        foldr :: (a -> b -> b) -> b -> t a -> b
-        foldr f z t = appEndo (foldMap (Endo . f) t) z
+    -- | Right-associative fold of a structure.
+    --
+    -- @'foldr' f z = 'Prelude.foldr' f z . 'toList'@
+    foldr :: (a -> b -> b) -> b -> t a -> b
+    foldr f z t = appEndo (foldMap (Endo . f) t) z
 
-        -- | Left-associative fold of a structure.
-        --
-        -- @'foldl' f z = 'Prelude.foldl' f z . 'toList'@
-        foldl :: (a -> b -> a) -> a -> t b -> a
-        foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
+    -- | Left-associative fold of a structure.
+    --
+    -- @'foldl' f z = 'Prelude.foldl' f z . 'toList'@
+    foldl :: (a -> b -> a) -> a -> t b -> a
+    foldl f z t = appEndo (getDual (foldMap (Dual . Endo . flip f) t)) z
 
-        -- | A variant of 'foldr' that has no base case,
-        -- and thus may only be applied to non-empty structures.
-        --
-        -- @'foldr1' f = 'Prelude.foldr1' f . 'toList'@
-        foldr1 :: (a -> a -> a) -> t a -> a
-        foldr1 f xs = fromMaybe (error "foldr1: empty structure")
-                        (foldr mf Nothing xs)
-          where mf x Nothing = Just x
-                mf x (Just y) = Just (f x y)
+    -- | A variant of 'foldr' that has no base case,
+    -- and thus may only be applied to non-empty structures.
+    --
+    -- @'foldr1' f = 'Prelude.foldr1' f . 'toList'@
+    foldr1 :: (a -> a -> a) -> t a -> a
+    foldr1 f xs = fromMaybe (error "foldr1: empty structure")
+                    (foldr mf Nothing xs)
+      where
+        mf x Nothing = Just x
+        mf x (Just y) = Just (f x y)
 
-        -- | A variant of 'foldl' that has no base case,
-        -- and thus may only be applied to non-empty structures.
-        --
-        -- @'foldl1' f = 'Prelude.foldl1' f . 'toList'@
-        foldl1 :: (a -> a -> a) -> t a -> a
-        foldl1 f xs = fromMaybe (error "foldl1: empty structure")
-                        (foldl mf Nothing xs)
-          where mf Nothing y = Just y
-                mf (Just x) y = Just (f x y)
+    -- | A variant of 'foldl' that has no base case,
+    -- and thus may only be applied to non-empty structures.
+    --
+    -- @'foldl1' f = 'Prelude.foldl1' f . 'toList'@
+    foldl1 :: (a -> a -> a) -> t a -> a
+    foldl1 f xs = fromMaybe (error "foldl1: empty structure")
+                    (foldl mf Nothing xs)
+      where
+        mf Nothing y = Just y
+        mf (Just x) y = Just (f x y)
 
 -- instances for Prelude types
 
 instance Foldable Maybe where
-        foldr _ z Nothing = z
-        foldr f z (Just x) = f x z
+    foldr _ z Nothing = z
+    foldr f z (Just x) = f x z
 
-        foldl _ z Nothing = z
-        foldl f z (Just x) = f z x
+    foldl _ z Nothing = z
+    foldl f z (Just x) = f z x
 
 instance Foldable [] where
-        foldr = Prelude.foldr
-        foldl = Prelude.foldl
-        foldr1 = Prelude.foldr1
-        foldl1 = Prelude.foldl1
+    foldr = Prelude.foldr
+    foldl = Prelude.foldl
+    foldr1 = Prelude.foldr1
+    foldl1 = Prelude.foldl1
 
 instance Ix i => Foldable (Array i) where
-        foldr f z = Prelude.foldr f z . elems
-        foldl f z = Prelude.foldl f z . elems
-        foldr1 f = Prelude.foldr1 f . elems
-        foldl1 f = Prelude.foldl1 f . elems
+    foldr f z = Prelude.foldr f z . elems
+    foldl f z = Prelude.foldl f z . elems
+    foldr1 f = Prelude.foldr1 f . elems
+    foldl1 f = Prelude.foldl1 f . elems
 
 -- | Fold over the elements of a structure,
 -- associating to the right, but strictly.
