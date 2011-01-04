@@ -51,12 +51,12 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
-	@echo 'cBuildPlatform :: String'                                    >> $@
-	@echo 'cBuildPlatform = BuildPlatform_NAME'                         >> $@
-	@echo 'cHostPlatform :: String'                                     >> $@
-	@echo 'cHostPlatform = HostPlatform_NAME'                           >> $@
-	@echo 'cTargetPlatform :: String'                                   >> $@
-	@echo 'cTargetPlatform = TargetPlatform_NAME'                       >> $@
+	@echo 'cBuildPlatformString :: String'                              >> $@
+	@echo 'cBuildPlatformString = BuildPlatform_NAME'                   >> $@
+	@echo 'cHostPlatformString :: String'                               >> $@
+	@echo 'cHostPlatformString = HostPlatform_NAME'                     >> $@
+	@echo 'cTargetPlatformString :: String'                             >> $@
+	@echo 'cTargetPlatformString = TargetPlatform_NAME'                 >> $@
 	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
