@@ -41,8 +41,10 @@ import Control.Category
 import Control.Arrow (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
 import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.Instances ()
+#ifndef __NHC__
 import Control.Monad.ST (ST)
 import qualified Control.Monad.ST.Lazy as Lazy (ST)
+#endif
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))
 
@@ -152,6 +154,7 @@ instance Applicative IO where
     pure = return
     (<*>) = ap
 
+#ifndef __NHC__
 instance Applicative (ST s) where
     pure = return
     (<*>) = ap
@@ -159,6 +162,7 @@ instance Applicative (ST s) where
 instance Applicative (Lazy.ST s) where
     pure = return
     (<*>) = ap
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 instance Applicative STM where
