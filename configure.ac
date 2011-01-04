@@ -282,6 +282,7 @@ x86_64-apple-darwin)
     ;;
 esac
 
+# Sync this with cTargetArch in compiler/ghc.mk
 checkArch() {
     case $1 in
     alpha|arm|hppa|hppa1_1|i386|ia64|m68k|mips|mipseb|mipsel|powerpc|powerpc64|rs6000|s390|sparc|sparc64|vax|x86_64)

@@ -72,13 +72,9 @@ import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
 import DynFlags
-#if powerpc_TARGET_ARCH
-import StaticFlags	( opt_Static, opt_PIC )
-#endif
+import StaticFlags
 import Util
-#if !defined(darwin_TARGET_OS)
-import Config           ( cProjectVersion )
-#endif
+import Config
 
 import Digraph
 import qualified Pretty
@@ -96,6 +92,7 @@ import Data.List
 import Data.Maybe
 import Control.Monad
 import System.IO
+import Distribution.System
 
 {-
 The native-code generator has machine-independent and
@@ -836,23 +833,21 @@ cmmExprConFold referenceKind expr
                      (CmmLit $ CmmInt (fromIntegral off) wordWidth)
                    ]
 
-#if powerpc_TARGET_ARCH
-           -- On powerpc (non-PIC), it's easier to jump directly to a label than
-           -- to use the register table, so we replace these registers
-           -- with the corresponding labels:
+        -- On powerpc (non-PIC), it's easier to jump directly to a label than
+        -- to use the register table, so we replace these registers
+        -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | not opt_PIC
+          | cTargetArch == PPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | not opt_PIC
+          | cTargetArch == PPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
-          | not opt_PIC
+          | cTargetArch == PPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
-#endif
 
         other
            -> return other
