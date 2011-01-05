@@ -77,3 +77,9 @@ test('T2395', normal, compile, [''])
 test('T4371', normal, compile, [''])
 test('T4439', normal, compile, [''])
 test('T4488', normal, compile, [''])
+test('T4870',
+     [only_ways(['optc','optasm']),
+      only_compiler_types(['ghc']),
+      extra_clean(['T4870a.hi', 'T4870a.o'])],
+     multimod_compile,
+     ['T4870', '-v0'])
