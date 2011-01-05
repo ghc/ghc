@@ -526,13 +526,14 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   where
     is_local_id = isJust mb_poly_rhs
     poly_rhs | Just rhs <-  mb_poly_rhs
-             = rhs
-             | Just unfolding <- maybeUnfoldingTemplate (idUnfolding poly_id)
-             = unfolding
+             = rhs  	    -- Local Id; this is its rhs
+             | Just unfolding <- maybeUnfoldingTemplate (realIdUnfolding poly_id)
+             = unfolding    -- Imported Id; this is its unfolding
+	       		    -- Use realIdUnfolding so we get the unfolding 
+			    -- even when it is a loop breaker. 
+			    -- We want to specialise recursive functions!
              | otherwise = pprPanic "dsImpSpecs" (ppr poly_id)
-	-- In the Nothing case the specialisation is for an imported Id
-	-- whose unfolding gives the RHS to be specialised
-        -- The type checker has checked that it has an unfolding
+	                    -- The type checker has checked that it *has* an unfolding
 
 specUnfolding :: (CoreExpr -> CoreExpr) -> Type 
               -> Unfolding -> DsM (Unfolding, OrdList (Id,CoreExpr))
