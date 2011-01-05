@@ -56,10 +56,10 @@ test('T3738',
      [stats_num_field('peak_megabytes_allocated', 1,
                                                   1),
                                      # expected value: 1 (amd64/Linux)
-      # expected value: 12800 (x86/OS X):
+      # expected value: 45648 (x86/Linux):
       if_wordsize(32,
-          stats_num_field('bytes allocated', 12700,
-                                             14000)),
+          stats_num_field('bytes allocated', 40000,
+                                             50000)),
       if_wordsize(64,
           stats_num_field('bytes allocated', 40000,
                                              60000)),
