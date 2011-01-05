@@ -35,6 +35,7 @@ import PprBase
 import BlockId
 import Cmm
 import CLabel
+import Config
 import Unique           ( pprUnique )
 import Pretty
 import FastString
@@ -42,6 +43,7 @@ import qualified Outputable
 import Outputable       (panic, Outputable)
 
 import Data.Word
+import Distribution.System
 
 #if i386_TARGET_ARCH && darwin_TARGET_OS
 import Data.Bits
@@ -161,15 +163,11 @@ instance Outputable Instr where
     ppr instr = Outputable.docToSDoc $ pprInstr instr
 
 
-#if  i386_TARGET_ARCH || x86_64_TARGET_ARCH
 pprUserReg :: Reg -> Doc
-pprUserReg = pprReg IF_ARCH_i386(II32,) IF_ARCH_x86_64(II64,)
-
-#else
-pprUserReg :: Reg -> Doc
-pprUserReg = panic "X86.Ppr.pprUserReg: not defined"
-
-#endif
+pprUserReg
+ | cTargetArch == I386   = pprReg II32
+ | cTargetArch == X86_64 = pprReg II64
+ | otherwise             = panic "X86.Ppr.pprUserReg: not defined"
 
 pprReg :: Size -> Reg -> Doc
 
