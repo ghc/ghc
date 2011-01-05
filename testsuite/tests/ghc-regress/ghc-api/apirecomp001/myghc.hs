@@ -28,13 +28,13 @@ main = do
                                 }
     root_mod <- guessTarget "A.hs" Nothing
     setTargets [root_mod]
-    ok <- loadWithLogger myLogger LoadAllTargets
+    ok <- load LoadAllTargets
     when (failed ok) $ error "Couldn't load A.hs in nothing mode"
     prn "target nothing: ok"
 
     dflags <- getSessionDynFlags
     setSessionDynFlags $ dflags { hscTarget = HscInterpreted }
-    ok <- loadWithLogger myLogger LoadAllTargets
+    ok <- load LoadAllTargets
     when (failed ok) $ error "Couldn't load A.hs in interpreted mode"
     prn "target interpreted: ok"
 
@@ -44,8 +44,6 @@ main = do
     setContext [mod] []
     liftIO $ hFlush stdout  -- make sure things above are printed before
                             -- interactive output
-    dflags <- getSessionDynFlags
-    setSessionDynFlags $ flattenExtensionFlags dflags
     r <- runStmt "main" RunToCompletion
     case r of
       RunOk _        -> prn "ok"
@@ -54,14 +52,6 @@ main = do
       RunBreak _ _ _ -> prn "breakpoint"
     liftIO $ hFlush stdout
     return ()
-
--- prints number of warnings; this is our indicator for recompilation.  We ignore
--- the number of warnings since this might change, however, there should always
--- be at least one.
-myLogger _ = do 
-  ws <- getWarnings 
-  clearWarnings
-  liftIO $ print (length (bagToList ws) > 0)
 
 prn :: MonadIO m => String -> m ()
 prn = liftIO . putStrLn
