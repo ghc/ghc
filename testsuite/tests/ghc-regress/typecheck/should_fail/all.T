@@ -226,3 +226,4 @@ test('T3468', extra_clean(['T3468.hi-boot']),
 test('T2846b', normal, compile_fail, [''])
 test('FrozenErrorTests', normal, compile_fail, [''])
 test('SCLoop', normal, compile_fail, [''])
+test('T4875', normal, compile_fail, [''])
