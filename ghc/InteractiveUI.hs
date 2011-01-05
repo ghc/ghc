@@ -655,7 +655,7 @@ runOneCommand eh getCmd = do
       ml <- lift $ isOptionSet Multiline
       if ml
         then do 
-          mb_stmt <- checkInputForLayout stmt getCmd 
+          mb_stmt <- checkInputForLayout stmt 1 getCmd
           case mb_stmt of
             Nothing      -> return $ Just True
             Just ml_stmt -> do
@@ -667,14 +667,14 @@ runOneCommand eh getCmd = do
 
 -- #4316
 -- lex the input.  If there is an unclosed layout context, request input
-checkInputForLayout :: String -> InputT GHCi (Maybe String) 
+checkInputForLayout :: String -> Int -> InputT GHCi (Maybe String)
                     -> InputT GHCi (Maybe String)
-checkInputForLayout stmt getStmt = do
+checkInputForLayout stmt line_number getStmt = do
    dflags' <- lift $ getDynFlags
    let dflags = xopt_set dflags' Opt_AlternativeLayoutRule
    st <- lift $ getGHCiState
    let buf =  stringToStringBuffer stmt
-       loc  = mkSrcLoc (fsLit (progname st)) (line_number st) 1
+       loc  = mkSrcLoc (fsLit (progname st)) line_number 1
        pstate = Lexer.mkPState dflags buf loc
    case Lexer.unP goToEnd pstate of
      (Lexer.POk _ False) -> return $ Just stmt
@@ -697,7 +697,7 @@ checkInputForLayout stmt getStmt = do
          Nothing  -> return Nothing
          Just str -> if str == ""
            then return $ Just stmt
-           else checkInputForLayout (stmt++"\n"++str) getStmt
+           else checkInputForLayout (stmt++"\n"++str) (line_number+1) getStmt
      where goToEnd = do
              eof <- Lexer.nextIsEOF
              if eof 
