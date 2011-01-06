@@ -60,8 +60,8 @@ install: install_$1_$2
 
 .PHONY: install_$1_$2
 install_$1_$2: $1/$2/$$($1_$2_PROG)
-	$$(INSTALL_DIR) "$$($1_$2_INSTALL_IN)"
-	$$(INSTALL_SCRIPT) $$(INSTALL_OPTS) $$< "$$($1_$2_INSTALL_IN)"
+	$$(call INSTALL_DIR,"$$($1_$2_INSTALL_IN)")
+	$$(call INSTALL_SCRIPT,$$(INSTALL_OPTS),$$<,"$$($1_$2_INSTALL_IN)")
 endif
 endif
 

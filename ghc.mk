@@ -836,26 +836,26 @@ install: install_docs
 endif
 
 install_bins: $(INSTALL_BINS)
-	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(bindir)")
 	for i in $(INSTALL_BINS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
+		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(bindir)") ;  \
 	done
 
 install_libs: $(INSTALL_LIBS)
-	$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibdir)")
 	for i in $(INSTALL_LIBS); do \
 		case $$i in \
 		  *.a) \
-		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)"; \
+		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
 		    $(RANLIB) $(DESTDIR)$(ghclibdir)/`basename $$i` ;; \
 		  *.dll) \
-		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)" ;; \
+		    $(call INSTALL_DATA,-s $(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
 		  *.so) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)" ;; \
+		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)") ;; \
 		  *.dylib) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)";; \
+		    $(call INSTALL_SHLIB,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)");; \
 		  *) \
-		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibdir)"; \
+		    $(call INSTALL_DATA,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibdir)"); \
 		esac; \
 	done
 
@@ -863,9 +863,9 @@ install_libexec_scripts: $(INSTALL_LIBEXEC_SCRIPTS)
 ifeq "$(INSTALL_LIBEXEC_SCRIPTS)" ""
 	@:
 else
-	$(INSTALL_DIR) "$(DESTDIR)$(ghclibexecdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)")
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)"; \
+		$(call INSTALL_SCRIPT,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)"); \
 	done
 endif
 
@@ -873,9 +873,9 @@ install_libexecs:  $(INSTALL_LIBEXECS)
 ifeq "$(INSTALL_LIBEXECS)" ""
 	@:
 else
-	$(INSTALL_DIR) "$(DESTDIR)$(ghclibexecdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghclibexecdir)")
 	for i in $(INSTALL_LIBEXECS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)"; \
+		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(ghclibexecdir)"); \
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
@@ -883,38 +883,38 @@ else
 endif
 
 install_topdirs: $(INSTALL_TOPDIRS)
-	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	for i in $(INSTALL_TOPDIRS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(topdir)"; \
+		$(call INSTALL_PROGRAM,$(INSTALL_BIN_OPTS),$$i,"$(DESTDIR)$(topdir)"); \
 	done
 
 install_headers: $(INSTALL_HEADERS)
-	$(INSTALL_DIR) "$(DESTDIR)$(ghcheaderdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(ghcheaderdir)")
 	for i in $(INSTALL_HEADERS); do \
-		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i "$(DESTDIR)$(ghcheaderdir)"; \
+		$(call INSTALL_HEADER,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(ghcheaderdir)"); \
 	done
 
 install_docs: $(INSTALL_DOCS)
-	$(INSTALL_DIR) "$(DESTDIR)$(docdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)")
 ifneq "$(INSTALL_DOCS)" ""
 	for i in $(INSTALL_DOCS); do \
-		$(INSTALL_DOC) $(INSTALL_OPTS) $$i "$(DESTDIR)$(docdir)"; \
+		$(call INSTALL_DOC,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(docdir)"); \
 	done
 endif
-	$(INSTALL_DIR) $(INSTALL_OPTS) "$(DESTDIR)$(docdir)/html"
-	$(INSTALL_DOC) $(INSTALL_OPTS) docs/index.html "$(DESTDIR)$(docdir)/html"
+	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html")
+	$(call INSTALL_DOC,$(INSTALL_OPTS),docs/index.html,"$(DESTDIR)$(docdir)/html")
 ifneq "$(INSTALL_LIBRARY_DOCS)" ""
-	$(INSTALL_DIR) $(INSTALL_OPTS) "$(DESTDIR)$(docdir)/html/libraries"
+	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html/libraries")
 	for i in $(INSTALL_LIBRARY_DOCS); do \
-		$(INSTALL_DOC) $(INSTALL_OPTS) $$i "$(DESTDIR)$(docdir)/html/libraries/"; \
+		$(call INSTALL_DOC,$(INSTALL_OPTS),$$i,"$(DESTDIR)$(docdir)/html/libraries/"); \
 	done
-	$(INSTALL_DATA) $(INSTALL_OPTS) libraries/prologue.txt "$(DESTDIR)$(docdir)/html/libraries/"
-	$(INSTALL_SCRIPT) $(INSTALL_OPTS) libraries/gen_contents_index "$(DESTDIR)$(docdir)/html/libraries/"
+	$(call INSTALL_DATA,$(INSTALL_OPTS),libraries/prologue.txt,"$(DESTDIR)$(docdir)/html/libraries/")
+	$(call INSTALL_SCRIPT,$(INSTALL_OPTS),libraries/gen_contents_index,"$(DESTDIR)$(docdir)/html/libraries/")
 endif
 ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
-		$(INSTALL_DIR) $(INSTALL_OPTS) "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
-		$(INSTALL_DOC) $(INSTALL_OPTS) $$i/* "$(DESTDIR)$(docdir)/html/`basename $$i`"; \
+		$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html/`basename $$i`"); \
+		$(call INSTALL_DOC,$(INSTALL_OPTS),$$i/*,"$(DESTDIR)$(docdir)/html/`basename $$i`"); \
 	done
 endif
 
@@ -948,9 +948,9 @@ INSTALL_DISTDIR_compiler = stage2
 # Now we can do the installation
 install_packages: install_libexecs
 install_packages: libffi/package.conf.install rts/package.conf.install
-	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(topdir)")
 	"$(RM)" $(RM_OPTS_REC) "$(INSTALLED_PACKAGE_CONF)"
-	$(INSTALL_DIR) "$(INSTALLED_PACKAGE_CONF)"
+	$(call INSTALL_DIR,"$(INSTALLED_PACKAGE_CONF)")
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update libffi/package.conf.install
 	"$(INSTALLED_GHC_PKG_REAL)" --force --global-conf "$(INSTALLED_PACKAGE_CONF)" update rts/package.conf.install
 	$(foreach p, $(INSTALLED_PKG_DIRS),                           \

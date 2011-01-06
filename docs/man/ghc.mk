@@ -47,9 +47,9 @@ install: install_man
 
 .PHONY: install_man
 install_man: $(MAN_PATH)
-	$(INSTALL_DIR) "$(DESTDIR)$(mandir)"
-	$(INSTALL_DIR) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"
-	$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PATH) "$(DESTDIR)$(mandir)/man$(MAN_SECTION)"
+	$(call INSTALL_DIR,"$(DESTDIR)$(mandir)")
+	$(call INSTALL_DIR,"$(DESTDIR)$(mandir)/man$(MAN_SECTION)")
+	$(call INSTALL_MAN,$(INSTALL_OPTS),$(MAN_PATH),"$(DESTDIR)$(mandir)/man$(MAN_SECTION)")
 endif
 
 $(eval $(call clean-target,docs/man,,$(MAN_PATH) docs/man/flags.xsl docs/man/flags.xml))

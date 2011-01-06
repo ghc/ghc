@@ -132,14 +132,39 @@ INSTALL_GROUP =
 #
 CREATE_SCRIPT   = create () { touch "$$1" && chmod 755 "$$1" ; } && create
 CREATE_DATA     = create () { touch "$$1" && chmod 644 "$$1" ; } && create
-INSTALL_PROGRAM = $(INSTALL) -m 755
-INSTALL_SCRIPT  = $(INSTALL) -m 755
-INSTALL_SHLIB   = $(INSTALL) -m 755
-INSTALL_DATA    = $(INSTALL) -m 644
-INSTALL_HEADER  = $(INSTALL) -m 644
-INSTALL_MAN     = $(INSTALL) -m 644
-INSTALL_DOC     = $(INSTALL) -m 644
-INSTALL_DIR     = $(INSTALL) -m 755 -d
+# These takes 3 arguments:
+# $1 = flags
+# $2 = files
+# $3 = dest
+INSTALL_PROGRAM = $(INSTALL) -m 755 $1 $2 $(call MK_INSTALL_DEST,$3)
+INSTALL_SCRIPT  = $(INSTALL) -m 755 $1 $2 $(call MK_INSTALL_DEST,$3)
+INSTALL_SHLIB   = $(INSTALL) -m 755 $1 $2 $(call MK_INSTALL_DEST,$3)
+INSTALL_DATA    = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
+INSTALL_HEADER  = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
+INSTALL_MAN     = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
+INSTALL_DOC     = $(INSTALL) -m 644 $1 $2 $(call MK_INSTALL_DEST,$3)
+# Only 1 argument, the directory to create:
+INSTALL_DIR     = $(INSTALL) -m 755 -d $(call MK_INSTALL_DEST,$1)
+
+# cygwin's /bin/install doesn't set file modes correctly if the
+# destination path is a C: style path:
+#
+# $ /bin/install -c -m 644 foo /cygdrive/c/cygwin/home/ian/foo2
+# $ /bin/install -c -m 644 foo c:/cygwin/home/ian/foo3
+# $ ls -l foo*
+# -rw-r--r-- 1 ian None 0 2011-01-06 18:28 foo
+# -rw-r--r-- 1 ian None 0 2011-01-06 18:29 foo2
+# -rwxrwxrwx 1 ian None 0 2011-01-06 18:29 foo3
+#
+# This causes problems for bindisttest/checkBinaries.sh which then
+# thinks that e.g. the userguide HTML files are binaries.
+#
+# We therefore use a /cygdrive path if we are on cygwin
+ifeq '$(shell cygpath "c:/" 2> /dev/null)' ''
+MK_INSTALL_DEST = $1
+else
+MK_INSTALL_DEST = "$(shell cygpath $1)"
+endif
 
 #
 # runhaskell and hsc2hs are special, in that other compilers besides

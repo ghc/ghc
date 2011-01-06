@@ -63,7 +63,7 @@ install: install_$1_$2_wrapper
 .PHONY: install_$1_$2_wrapper
 install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
-	$$(INSTALL_DIR) "$$(DESTDIR)$$(bindir)"
+	$$(call INSTALL_DIR,"$$(DESTDIR)$$(bindir)")
 	"$$(RM)" $$(RM_OPTS)                                        "$$(WRAPPER)"
 	$$(CREATE_SCRIPT)                                           "$$(WRAPPER)"
 	echo '#!$$(SHELL)'                                       >> "$$(WRAPPER)"
