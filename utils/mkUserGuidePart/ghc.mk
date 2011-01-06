@@ -11,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 utils/mkUserGuidePart_dist_MODULES = Main
-utils/mkUserGuidePart_dist_PROG    = mkUserGuidePart
+utils/mkUserGuidePart_dist_PROG    = mkUserGuidePart$(exeext)
 utils/mkUserGuidePart_HC_OPTS      = -package ghc
 
 utils/mkUserGuidePart/dist/build/Main.o: $(ALL_STAGE1_LIBS) $(compiler_stage2_v_LIB)
