@@ -20,7 +20,7 @@ module GHC.Types (Bool(..), Char(..), Int(..), Float(..), Double(..), IO(..)) wh
 
 import GHC.Prim
 -- We need Inl etc behind the scenes for the type definitions
-import GHC.Generics ()
+import GHC.Generics () -- JPM: Do we really need this?
 
 infixr 5 :
 

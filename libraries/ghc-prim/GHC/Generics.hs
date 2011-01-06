@@ -20,7 +20,6 @@ data (:*:) a b = a :*: b
 {-# OPTIONS_GHC -XTypeSynonymInstances   #-}
 {-# OPTIONS_GHC -XTypeOperators          #-}
 {-# OPTIONS_GHC -XKindSignatures         #-}
-{-# OPTIONS_GHC -XTypeFamilies           #-}
 
 module GHC.Generics  (
   -- * Generic representation types
@@ -49,7 +48,7 @@ module GHC.Generics  (
 -}
   ) where
   
-import {-# SOURCE #-} GHC.Types
+import {-# SOURCE #-} GHC.Types -- ([](..), Int, Char, Bool(..))
 
 --------------------------------------------------------------------------------
 -- Representation types
@@ -175,9 +174,7 @@ data Associativity =  LeftAssociative
 
 
 -- | Representable types of kind *
-class Representable0 a where
-  -- | Representation type
-  type Rep0 a :: * -> *
+class Representable0 a rep where
   -- | Convert from the datatype to its representation
   from0  :: a -> Rep0 a x
   -- | Convert from the representation to the datatype
@@ -185,8 +182,6 @@ class Representable0 a where
 
 -- | Representable types of kind * -> *
 class Representable1 f rep where
-  -- | Representation type
-  type Rep1 f :: * -> *
   -- | Convert from the datatype to its representation
   from1  :: f a -> Rep1 f a
   -- | Convert from the representation to the datatype
