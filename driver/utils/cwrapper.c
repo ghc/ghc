@@ -6,12 +6,11 @@
    so that it uses our in-tree mingw. Hence this wrapper. */
 
 #include "cwrapper.h"
-#include <errno.h>
-#include <process.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <windows.h>
 
 void die(const char *fmt, ...) {
     va_list argp;
@@ -51,49 +50,107 @@ char *mkString(const char *fmt, ...) {
     return p;
 }
 
-char *quote(char *str) {
-    char *quotedStr;
-    char *p;
+char *flattenAndQuoteArgs(char *ptr, int argc, char *argv[])
+{
+    int i;
+    char *src;
 
-    quotedStr = malloc(2 * strlen(str) + 2 + 1);
-    if (quotedStr == NULL) {
-        die("malloc failed: errno %d: %s\n", errno, strerror(errno));
-    }
-    p = quotedStr;
-    *p++ = '"';
-    while (*str) {
-        if (*str == '"') {
-            *p++ = '\\';
+    for (i = 0; i < argc; i++) {
+        *ptr++ = '"';
+        src = argv[i];
+        while(*src) {
+            if (*src == '"') {
+                *ptr++ = '\\';
+            }
+            *ptr++ = *src++;
         }
-        *p++ = *str++;
+        *ptr++ = '"';
+        *ptr++ = ' ';
     }
-    *p++ = '"';
-    *p = '\0';
-
-    return quotedStr;
+    return ptr;
 }
 
-__attribute__((noreturn)) int run(char *exePath, int numArgs1, char **args1, int numArgs2, char **args2) {
-    char **p;
-    char **newArgv;
-    int i, ret;
+__attribute__((noreturn)) int run (char *exePath,
+                                   int numArgs1, char **args1,
+                                   int numArgs2, char **args2)
+{
+    int i, cmdline_len;
+    char *new_cmdline, *ptr;
 
-    newArgv = malloc(sizeof(char *) * (1 + numArgs1 + numArgs2 + 1));
-    if (newArgv == NULL) {
-        die("malloc failed: errno %d: %s\n", errno, strerror(errno));
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+
+    ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
+    ZeroMemory(&si, sizeof(STARTUPINFO));
+    si.cb = sizeof(STARTUPINFO);
+
+    /* Compute length of the flattened 'argv'.  for each arg:
+     *   + 1 for the space
+     *   + chars * 2 (accounting for possible escaping)
+     *   + 2 for quotes
+     */
+    cmdline_len = 1 + strlen(exePath)*2 + 2;
+    for (i=0; i < numArgs1; i++) {
+        cmdline_len += 1 + strlen(args1[i])*2 + 2;
     }
-    p = newArgv;
-    *p++ = quote(exePath);
-    for (i = 0; i < numArgs1; i++) {
-        *p++ = quote(args1[i]);
+    for (i=0; i < numArgs2; i++) {
+        cmdline_len += 1 + strlen(args2[i])*2 + 2;
     }
-    for (i = 0; i < numArgs2; i++) {
-        *p++ = quote(args2[i]);
+
+    new_cmdline = (char*)malloc(sizeof(char) * (cmdline_len + 1));
+    if (!new_cmdline) {
+        die("failed to start up %s; insufficient memory", exePath);
     }
-    *p = NULL;
-    ret = spawnv(_P_WAIT, exePath, (const char* const*)newArgv);
-    if (errno) {
-        die("spawnv failed: errno %d: %s\n", errno, strerror(errno));
+
+    ptr = flattenAndQuoteArgs(new_cmdline, 1, &exePath);
+    ptr = flattenAndQuoteArgs(ptr, numArgs1, args1);
+    ptr = flattenAndQuoteArgs(ptr, numArgs2, args2);
+    *--ptr = '\0'; // replace the final space with \0
+
+    /* Note: Used to use _spawnv(_P_WAIT, ...) here, but it suffered
+       from the parent intercepting console events such as Ctrl-C,
+       which it shouldn't. Installing an ignore-all console handler
+       didn't do the trick either.
+
+       Irrespective of this issue, using CreateProcess() is preferable,
+       as it makes this wrapper work on both mingw and cygwin.
+    */
+#if 0
+    fprintf(stderr, "Invoking %s\n", new_cmdline); fflush(stderr);
+#endif
+    if (!CreateProcess(exePath,
+                       new_cmdline,
+                       NULL,
+                       NULL,
+                       TRUE,
+                       0, /* dwCreationFlags */
+                       NULL, /* lpEnvironment */
+                       NULL, /* lpCurrentDirectory */
+                       &si,  /* lpStartupInfo */
+                       &pi) ) {
+        die("Unable to start %s (error code: %lu)\n", exePath, GetLastError());
     }
-    exit(ret);
+    /* Disable handling of console events in the parent by dropping its
+     * connection to the console. This has the (minor) downside of not being
+     * able to subsequently emit any error messages to the console.
+     */
+    FreeConsole();
+
+    switch (WaitForSingleObject(pi.hProcess, INFINITE) ) {
+    case WAIT_OBJECT_0:
+    {
+        DWORD pExitCode;
+        if (GetExitCodeProcess(pi.hProcess, &pExitCode) == 0) {
+            exit(1);
+        }
+        exit(pExitCode);
+    }
+    case WAIT_ABANDONED:
+    case WAIT_FAILED:
+        /* in the event we get any hard errors, bring the child to a halt. */
+        TerminateProcess(pi.hProcess,1);
+        exit(1);
+    default:
+        exit(1);
+    }
 }
