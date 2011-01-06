@@ -389,6 +389,9 @@ then
     LD="$hardtop/inplace/mingw/bin/ld.exe"
     NM="$hardtop/inplace/mingw/bin/nm.exe"
     fp_prog_ar_raw="$hardtop/inplace/mingw/bin/ar.exe"
+
+    # NB. If you update the tarbballs to a new version of gcc, don't
+    # forget to tweak the paths in driver/gcc/gcc.c.
     if ! test -d inplace/mingw ||
          test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
