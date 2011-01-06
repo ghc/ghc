@@ -81,11 +81,11 @@ Prelude>
     as in the above example.</para>
 
     <para>Multiline mode is useful when entering monadic 
-    <literal>do<literal> statements:</para>
+    <literal>do</literal> statements:</para>
 
 <screen>
 Control.Monad.State> flip evalStateT 0 $ do
-Control.Monad.State| i <- get
+Control.Monad.State| i &lt;- get
 Control.Monad.State| lift $ do
 Control.Monad.State|   putStrLn "Hello World!"
 Control.Monad.State|   print i
