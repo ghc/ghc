@@ -20,6 +20,7 @@ data (:*:) a b = a :*: b
 {-# OPTIONS_GHC -XTypeSynonymInstances   #-}
 {-# OPTIONS_GHC -XTypeOperators          #-}
 {-# OPTIONS_GHC -XKindSignatures         #-}
+{-# OPTIONS_GHC -XFunctionalDependencies #-}
 
 module GHC.Generics  (
   -- * Generic representation types
@@ -33,9 +34,6 @@ module GHC.Generics  (
   -- * Meta-information
   , Datatype(..), Constructor(..), Selector(..), NoSelector
   , Fixity(..), Associativity(..), Arity(..), prec
-
-  -- * Representation type families
-  , Rep0, Rep1
 
   -- * Representable type classes
   , Representable0(..), Representable1(..)
@@ -174,18 +172,18 @@ data Associativity =  LeftAssociative
 
 
 -- | Representable types of kind *
-class Representable0 a rep where
+class Representable0 a rep | a -> rep where
   -- | Convert from the datatype to its representation
-  from0  :: a -> Rep0 a x
+  from0  :: a -> rep x
   -- | Convert from the representation to the datatype
-  to0    :: Rep0 a x -> a
+  to0    :: rep x -> a
 
 -- | Representable types of kind * -> *
-class Representable1 f rep where
+class Representable1 f rep | f -> rep where
   -- | Convert from the datatype to its representation
-  from1  :: f a -> Rep1 f a
+  from1  :: f a -> rep a
   -- | Convert from the representation to the datatype
-  to1    :: Rep1 f a -> f a
+  to1    :: rep a -> f a
 
 --------------------------------------------------------------------------------
 -- Representation for base types
