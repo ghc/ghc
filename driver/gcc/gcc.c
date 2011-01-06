@@ -47,8 +47,8 @@ int main(int argc, char** argv) {
        from that in preference to the in-tree files. */
     preArgv[0] = mkString("-B%s", binDir);
     preArgv[1] = mkString("-B%s/../lib", binDir);
-    preArgv[2] = mkString("-B%s/../lib/gcc/mingw32/3.4.5", binDir);
-    preArgv[3] = mkString("-B%s/../libexec/gcc/mingw32/3.4.5", binDir);
+    preArgv[2] = mkString("-B%s/../lib/gcc/mingw32/4.5.0", binDir);
+    preArgv[3] = mkString("-B%s/../libexec/gcc/mingw32/4.5.0", binDir);
 
     run(exePath, 4, preArgv, argc - 1, argv + 1);
 }
