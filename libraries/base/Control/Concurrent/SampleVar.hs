@@ -120,5 +120,5 @@ writeSampleVar (SampleVar svar) v = mask_ $ do
 isEmptySampleVar :: SampleVar a -> IO Bool
 isEmptySampleVar (SampleVar svar) = do
    (readers, _) <- readMVar svar
-   return (readers == 0)
+   return (readers <= 0)
 
