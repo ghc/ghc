@@ -40,6 +40,10 @@
 # include <sys/eventfd.h>
 #endif
 
+#ifdef HAVE_TERMIOS_H
+#include <termios.h>
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -480,6 +484,75 @@ empty_handler (int sig STG_UNUSED)
 }
 
 /* -----------------------------------------------------------------------------
+   SIGTSTP handling
+
+   When a process is suspeended with ^Z and resumed again, the shell
+   makes no attempt to save and restore the terminal settings.  So on
+   resume, any terminal setting modificaions we made (e.g. turning off
+   ICANON due to hSetBuffering NoBuffering) may well be lost.  Hence,
+   we arrange to save and restore the terminal settings ourselves.
+
+   The trick we use is:
+     - catch SIGTSTP
+     - in the handler,  kill(getpid(),SIGTSTP)
+     - when this returns, restore the TTY settings
+   This means we don't have to catch SIGCONT too.
+
+   -------------------------------------------------------------------------- */
+
+static void sigtstp_handler(int sig);
+static void set_sigtstp_action (rtsBool handle);
+
+static void
+sigtstp_handler (int sig)
+{
+    int fd;
+    struct termios ts[3];
+
+    // save the current TTY state for TTYs we modified
+    for (fd = 0; fd <= 2; fd++) {
+        if (__hscore_get_saved_termios(fd) != NULL) {
+            tcgetattr(fd,&ts[fd]);
+        }
+    }
+
+    // de-install the SIGTSTP handler
+    set_sigtstp_action(rtsFalse);
+
+    // really stop the process now
+    {
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, sig);
+        sigprocmask(SIG_UNBLOCK, &mask, NULL);
+        kill(getpid(), sig);
+    }
+
+    // on return, restore the TTY state
+    for (fd = 0; fd <= 2; fd++) {
+        if (__hscore_get_saved_termios(fd) != NULL) {
+            tcsetattr(0,TCSANOW,&ts[fd]);
+        }
+    }
+
+    set_sigtstp_action(rtsTrue);
+}
+
+static void
+set_sigtstp_action (rtsBool handle)
+{
+    struct sigaction sa;
+    if (handle) {
+        sa.sa_handler = sigtstp_handler;
+    } else {
+        sa.sa_handler = SIG_DFL;
+    }
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGTSTP, &sa, NULL);
+}
+
+/* -----------------------------------------------------------------------------
  * Install default signal handlers.
  *
  * The RTS installs a default signal handler for catching
@@ -543,6 +616,8 @@ initDefaultHandlers(void)
     if (sigaction(SIGPIPE, &action, &oact) != 0) {
 	sysErrorBelch("warning: failed to install SIGPIPE handler");
     }
+
+    set_sigtstp_action(rtsTrue);
 }
 
 void
@@ -562,6 +637,8 @@ resetDefaultHandlers(void)
     if (sigaction(SIGPIPE, &action, NULL) != 0) {
 	sysErrorBelch("warning: failed to uninstall SIGPIPE handler");
     }
+
+    set_sigtstp_action(rtsFalse);
 }
 
 void
