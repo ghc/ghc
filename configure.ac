@@ -346,6 +346,16 @@ checkArch "$TargetArch"
 checkVendor "$TargetVendor"
 checkOS "$TargetOS"
 
+# Verify that the installed (bootstrap) GHC is capable of generating
+# code for the requested build platform.
+if test "$build" != "$bootstrap_target"
+then
+    echo "This GHC (${WithGhc}) does not generate code for the build platform"
+    echo "   GHC target platform    : $bootstrap_target"
+    echo "   Desired build platform : $BuildPlatform"
+    exit 1
+fi
+
 AC_SUBST(BuildPlatform)
 AC_SUBST(HostPlatform)
 AC_SUBST(TargetPlatform)
