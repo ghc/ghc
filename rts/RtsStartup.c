@@ -69,8 +69,8 @@ void exitLinker( void );	// there is no Linker.h file to include
 static int hs_init_count = 0;
 
 /* -----------------------------------------------------------------------------
-   Initialise floating point unit on x86 (currently disabled. why?)
-   (see comment in ghc/compiler/nativeGen/MachInstrs.lhs).
+   Initialise floating point unit on x86 (currently disabled; See Note
+   [x86 Floating point precision] in compiler/nativeGen/X86/Instr.hs)
    -------------------------------------------------------------------------- */
 
 #define X86_INIT_FPU 0

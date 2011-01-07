@@ -102,7 +102,7 @@ Hence GLDZ and GLD1.  Bwahahahahahahaha!
 -}
 
 {-
-MORE FLOATING POINT MUSINGS...
+Note [x86 Floating point precision]
 
 Intel's internal floating point registers are by default 80 bit
 extended precision.  This means that all operations done on values in
@@ -141,11 +141,12 @@ This is what gcc does.  Spilling at 80 bits requires taking up a full
 128 bit slot (so we get alignment).  We spill at 80-bits and ignore
 the alignment problems.
 
-In the future, we'll use the SSE registers for floating point.  This
-requires a CPU that supports SSE2 (ordinary SSE only supports 32 bit
-precision float ops), which means P4 or Xeon and above.  Using SSE
-will solve all these problems, because the SSE registers use fixed 32
-bit or 64 bit precision.
+In the future [edit: now available in GHC 7.0.1, with the -msse2
+flag], we'll use the SSE registers for floating point.  This requires
+a CPU that supports SSE2 (ordinary SSE only supports 32 bit precision
+float ops), which means P4 or Xeon and above.  Using SSE will solve
+all these problems, because the SSE registers use fixed 32 bit or 64
+bit precision.
 
 --SDM 1/2003
 -}
