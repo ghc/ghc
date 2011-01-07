@@ -40,15 +40,15 @@ endif
 
 .PHONY: install_utils/haddock_html
 install_utils/haddock_html:
-	$(INSTALL_DIR) "$(DESTDIR)$(docdir)/html"
+	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html")
 	"$(CP)" -R utils/haddock/html "$(DESTDIR)$(docdir)/html"
 
 .PHONY: install_utils/haddock_data
 install_utils/haddock_data:
 	$(foreach i,$(sort $(dir $(utils/haddock_dist_DATA_FILES))), \
-	    $(call make-command,$(INSTALL_DIR) "$(DESTDIR)$(ghclibdir)/$i"))
+	    $(call make-command,$(call INSTALL_DIR,"$(DESTDIR)$(ghclibdir)/$i")))
 	$(foreach i,$(utils/haddock_dist_DATA_FILES), \
-	    $(call make-command,$(INSTALL_DATA) $(INSTALL_OPTS) utils/haddock/$i "$(DESTDIR)$(ghclibdir)/$(dir $i)"))
+	    $(call make-command,$(call INSTALL_DATA,$(INSTALL_OPTS),utils/haddock/$i,"$(DESTDIR)$(ghclibdir)/$(dir $i)")))
 
 .PHONY: install_utils/haddock_link
 install_utils/haddock_link:
