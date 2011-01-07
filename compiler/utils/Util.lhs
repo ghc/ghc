@@ -801,9 +801,18 @@ fuzzyLookup user_entered possibilites
                                             poss_str user_entered
                        , distance <= fuzzy_threshold ]
   where
-    -- Work out an approriate match threshold
-    -- (about a quarter of the # of characters the user entered)
-    fuzzy_threshold = max (round $ fromInteger (genericLength user_entered) / (4 :: Rational)) 1
+    -- Work out an approriate match threshold: 
+    -- We report a candidate if its edit distance is <= the threshold, 
+    -- The threshhold is set to about a quarter of the # of characters the user entered
+    -- 	 Length    Threshold
+    --	   1	     0		-- Don't suggest *any* candidates
+    --	   2	     1		-- for single-char identifiers
+    -- 	   3	     1
+    --	   4	     1
+    --	   5	     1
+    --	   6	     2
+    --
+    fuzzy_threshold = truncate $ fromIntegral (length user_entered + 2) / (4 :: Rational)
     mAX_RESULTS = 3
 \end{code}
 
