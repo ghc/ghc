@@ -5,7 +5,7 @@ utils/haddock_CONFIGURE_OPTS = --flag in-ghc-tree
 utils/haddock_HC_OPTS += -DNEW_GHC_LAYOUT
 utils/haddock_dist_SHELL_WRAPPER = YES
 utils/haddock_dist_INSTALL_SHELL_WRAPPER = YES
-utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME = haddock-$(ProjectVersion)
+utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME = haddock-ghc-$(ProjectVersion)
 utils/haddock_dist_PROG = haddock$(exeext)
 
 ifneq "$(BINDIST)" "YES"
@@ -53,7 +53,7 @@ install_utils/haddock_data:
 .PHONY: install_utils/haddock_link
 install_utils/haddock_link:
 	"$(RM)" $(RM_OPTS) "$(DESTDIR)$(bindir)/haddock"
-	$(LN_S) haddock-$(ProjectVersion) "$(DESTDIR)$(bindir)/haddock"
+	$(LN_S) $(utils/haddock_dist_INSTALL_SHELL_WRAPPER_NAME) "$(DESTDIR)$(bindir)/haddock"
 
 BINDIST_EXTRAS += $(addprefix utils/haddock/,$(utils/haddock_dist_DATA_FILES))
 
