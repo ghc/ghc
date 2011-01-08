@@ -179,3 +179,7 @@ endif
 # NB. we use negative tests here because for binary-distributions we cannot
 # test build-time variables at install-time, so they must default to on.
 
+ifneq "$(DESTDIR)" ""
+override DESTDIR := $(abspath $(DESTDIR))
+endif
+
