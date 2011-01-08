@@ -44,7 +44,6 @@ import Name
 import SrcLoc
 
 -- Other random utilities
-import CmdLineParser
 import Digraph
 import BasicTypes hiding (isTopLevel)
 import Panic      hiding (showException)
