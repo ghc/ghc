@@ -4,7 +4,7 @@ T4246.hs:8:9:
       type F a -- Defined at T4246.hs:8:9
       type F Int -- Defined at T4246.hs:11:9
 
-T4246.hs:14:15:
+T4246.hs:15:15:
     Conflicting family instance declarations:
-      type instance G Int -- Defined at T4246.hs:14:15
       type instance G Int -- Defined at T4246.hs:15:15
+      type instance G Int -- Defined at T4246.hs:14:15
