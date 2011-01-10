@@ -242,8 +242,10 @@ import BreakArray
 import InteractiveEval
 #endif
 
+import HscMain
+import DriverPipeline
 import GhcMonad
-import TcIface
+import TcIface          ( typecheckIface )
 import TcRnTypes
 import TcRnMonad        ( initIfaceCheck )
 import Packages
@@ -267,11 +269,9 @@ import InstEnv
 import SrcLoc
 import CoreSyn          ( CoreBind )
 import TidyPgm
-import DriverPipeline
-import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
+import DriverPhases     ( Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo
 import Finder
-import HscMain
 import HscTypes
 import DynFlags
 import StaticFlagParser
