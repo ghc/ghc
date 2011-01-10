@@ -279,13 +279,13 @@ filterOutInstances = filter (\(L _ d, _, _) -> not (isInstD d))
 -- bindings from an 'HsGroup'.
 declsFromGroup :: HsGroup Name -> [Decl]
 declsFromGroup group_ =
-  mkDecls hs_tyclds  TyClD    group_ ++
-  mkDecls hs_derivds DerivD   group_ ++
-  mkDecls hs_defds   DefD     group_ ++
-  mkDecls hs_fords   ForD     group_ ++
-  mkDecls hs_docs    DocD     group_ ++
-  mkDecls hs_instds  InstD    group_ ++
-  mkDecls (typesigs . hs_valds) SigD group_
+  mkDecls (concat . hs_tyclds)  TyClD  group_ ++
+  mkDecls hs_derivds            DerivD group_ ++
+  mkDecls hs_defds              DefD   group_ ++
+  mkDecls hs_fords              ForD   group_ ++
+  mkDecls hs_docs               DocD   group_ ++
+  mkDecls hs_instds             InstD  group_ ++
+  mkDecls (typesigs . hs_valds) SigD   group_
   where
     typesigs (ValBindsOut _ sigs) = filter isVanillaLSig sigs
     typesigs _ = error "expected ValBindsOut"
