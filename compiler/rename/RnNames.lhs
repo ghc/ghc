@@ -446,7 +446,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
                                     hs_fords  = foreign_decls })
   = do  { -- separate out the family instance declarations
           let (tyinst_decls1, tycl_decls_noinsts)
-                           = partition (isFamInstDecl . unLoc) tycl_decls
+                           = partition (isFamInstDecl . unLoc) (concat tycl_decls)
               tyinst_decls = tyinst_decls1 ++ instDeclATs inst_decls
 
           -- process all type/class decls except family instances

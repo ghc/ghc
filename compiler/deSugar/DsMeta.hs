@@ -119,7 +119,7 @@ repTopDs group
 	
 	decls <- addBinds ss (do {
 			val_ds  <- rep_val_binds (hs_valds group) ;
-			tycl_ds <- mapM repTyClD (hs_tyclds group) ;
+			tycl_ds <- mapM repTyClD (concat (hs_tyclds group)) ;
 			inst_ds <- mapM repInstD' (hs_instds group) ;
 			for_ds <- mapM repForD (hs_fords group) ;
 			-- more needed

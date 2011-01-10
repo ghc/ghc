@@ -50,9 +50,10 @@ import DynFlags
 import HscTypes		( HscEnv, hsc_dflags )
 import BasicTypes       ( Boxity(..) )
 import ListSetOps       ( findDupsEq )
-
+import Digraph		( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 
 import Control.Monad
+import Maybes( orElse )
 import Data.Maybe
 \end{code}
 
@@ -146,7 +147,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- means we'll only report a declaration as unused if it isn't
    -- mentioned at all.  Ah well.
    traceRn (text "Start rnTyClDecls") ;
-   (rn_tycl_decls, src_fvs1) <- rnList rnTyClDecl tycl_decls ;
+   (rn_tycl_decls, src_fvs1) <- rnTyClDecls tycl_decls ;
 
    -- (F) Rename Value declarations right-hand sides
    traceRn (text "Start rnmono") ;
@@ -217,11 +218,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 inNewEnv :: TcM TcGblEnv -> (TcGblEnv -> TcM a) -> TcM a
 inNewEnv env cont = do e <- env
                        setGblEnv e $ cont e
-
-rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
--- Used for external core
-rnTyClDecls tycl_decls = do  (decls', _fvs) <- rnList rnTyClDecl tycl_decls
-			     return decls'
 
 addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv 
 -- This function could be defined lower down in the module hierarchy, 
@@ -681,6 +677,18 @@ and then go over it again to rename the tyvars!
 However, we can also do some scoping checks at the same time.
 
 \begin{code}
+rnTyClDecls :: [[LTyClDecl RdrName]] -> RnM ([[LTyClDecl Name]], FreeVars)
+-- Renamed the declarations and do depedency analysis on them
+rnTyClDecls tycl_ds
+  = do { ds_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (concat tycl_ds)
+
+       ; let sccs :: [SCC (LTyClDecl Name)]
+             sccs = depAnalTyClDecls ds_w_fvs
+
+             all_fvs = foldr (plusFV . snd) emptyFVs ds_w_fvs
+
+       ; return (map flattenSCC sccs, all_fvs) }
+
 rnTyClDecl :: TyClDecl RdrName -> RnM (TyClDecl Name, FreeVars)
 rnTyClDecl (ForeignType {tcdLName = name, tcdExtName = ext_name})
   = lookupLocatedTopBndrRn name		`thenM` \ name' ->
@@ -830,6 +838,35 @@ There is no reason not to allow the stupid theta if there are no data
 constructors.  It's still stupid, but does no harm, and I don't want
 to cause programs to break unnecessarily (notably HList).  So if there
 are no data constructors we allow h98_style = True
+
+
+\begin{code}
+depAnalTyClDecls :: [(LTyClDecl Name, FreeVars)] -> [SCC (LTyClDecl Name)]
+-- See Note [Dependency analysis of type and class decls]
+depAnalTyClDecls ds_w_fvs
+  = stronglyConnCompFromEdgedVertices edges
+  where
+    edges = [ (d, tcdName (unLoc d), map get_assoc (nameSetToList fvs))
+            | (d, fvs) <- ds_w_fvs ]
+    get_assoc n = lookupNameEnv assoc_env n `orElse` n
+    assoc_env = mkNameEnv [ (tcdName assoc_decl, cls_name) 
+                          | (L _ (ClassDecl { tcdLName = L _ cls_name
+                                            , tcdATs   = ats }) ,_) <- ds_w_fvs
+                          , L _ assoc_decl <- ats ]
+\end{code}
+
+Note [Dependency analysis of type and class decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to do dependency analysis on type and class declarations
+else we get bad error messages.  Consider
+
+     data T f a = MkT f a
+     data S f a = MkS f (T f a)
+
+This has a kind error, but the error message is better if you
+check T first, (fixing its kind) and *then* S.  If you do kind
+inference together, you might get an error reported in S, which
+is jolly confusing.  See Trac #4875
 
 
 %*********************************************************
@@ -1041,7 +1078,7 @@ badDataCon name
 Get the mapping from constructors to fields for this module.
 It's convenient to do this after the data type decls have been renamed
 \begin{code}
-extendRecordFieldEnv :: [LTyClDecl RdrName] -> [LInstDecl RdrName] -> TcM TcGblEnv
+extendRecordFieldEnv :: [[LTyClDecl RdrName]] -> [LInstDecl RdrName] -> TcM TcGblEnv
 extendRecordFieldEnv tycl_decls inst_decls
   = do	{ tcg_env <- getGblEnv
 	; field_env' <- foldrM get_con (tcg_field_env tcg_env) all_data_cons
@@ -1059,7 +1096,7 @@ extendRecordFieldEnv tycl_decls inst_decls
     all_data_cons :: [ConDecl RdrName]
     all_data_cons = [con | L _ (TyData { tcdCons = cons }) <- all_tycl_decls
     		         , L _ con <- cons ]
-    all_tycl_decls = at_tycl_decls ++ tycl_decls
+    all_tycl_decls = at_tycl_decls ++ concat tycl_decls
     at_tycl_decls = instDeclATs inst_decls  -- Do not forget associated types!
 
     get_con (ConDecl { con_name = con, con_details = RecCon flds })
@@ -1148,9 +1185,9 @@ add gp _ (QuasiQuoteD qq) ds		-- Expand quasiquotes
 add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD d) ds
   | isClassDecl d
   = let fsigs = [ L l f | L l (FixSig f) <- tcdSigs d ] in
-    addl (gp { hs_tyclds = L l d : ts, hs_fixds = fsigs ++ fs}) ds
+    addl (gp { hs_tyclds = add_tycld (L l d) ts, hs_fixds = fsigs ++ fs}) ds
   | otherwise
-  = addl (gp { hs_tyclds = L l d : ts }) ds
+  = addl (gp { hs_tyclds = add_tycld (L l d) ts }) ds
 
 -- Signatures: fixity sigs go a different place than all others
 add gp@(HsGroup {hs_fixds = ts}) l (SigD (FixSig f)) ds
@@ -1179,6 +1216,10 @@ add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
 add gp l (DocD d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
+
+add_tycld :: LTyClDecl a -> [[LTyClDecl a]] -> [[LTyClDecl a]]
+add_tycld d []       = [[d]]
+add_tycld d (ds:dss) = (d:ds) : dss
 
 add_bind :: LHsBind a -> HsValBinds a -> HsValBinds a
 add_bind b (ValBindsIn bs sigs) = ValBindsIn (bs `snocBag` b) sigs

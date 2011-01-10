@@ -132,6 +132,42 @@ calcClassCycles decls
 %*                                                                      *
 %************************************************************************
 
+Identification of recursive TyCons
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
+@TyThing@s.
+
+Identifying a TyCon as recursive serves two purposes
+
+1.  Avoid infinite types.  Non-recursive newtypes are treated as
+"transparent", like type synonyms, after the type checker.  If we did
+this for all newtypes, we'd get infinite types.  So we figure out for
+each newtype whether it is "recursive", and add a coercion if so.  In
+effect, we are trying to "cut the loops" by identifying a loop-breaker.
+
+2.  Avoid infinite unboxing.  This is nothing to do with newtypes.
+Suppose we have
+        data T = MkT Int T
+        f (MkT x t) = f t
+Well, this function diverges, but we don't want the strictness analyser
+to diverge.  But the strictness analyser will diverge because it looks
+deeper and deeper into the structure of T.   (I believe there are
+examples where the function does something sane, and the strictness
+analyser still diverges, but I can't see one now.)
+
+Now, concerning (1), the FC2 branch currently adds a coercion for ALL
+newtypes.  I did this as an experiment, to try to expose cases in which
+the coercions got in the way of optimisations.  If it turns out that we
+can indeed always use a coercion, then we don't risk recursive types,
+and don't need to figure out what the loop breakers are.
+
+For newtype *families* though, we will always have a coercion, so they
+are always loop breakers!  So you can easily adjust the current
+algorithm by simply treating all newtype families as loop breakers (and
+indeed type families).  I think.
+
+
+
 For newtypes, we label some as "recursive" such that
 
     INVARIANT: there is no cycle of non-recursive newtypes
@@ -159,6 +195,7 @@ T's source module is compiled.  We don't want T's recursiveness to change.
 
 The "recursive" flag for algebraic data types is irrelevant (never consulted)
 for types with more than one constructor.
+
 
 An algebraic data type M.T is "recursive" iff
         it has just one constructor, and

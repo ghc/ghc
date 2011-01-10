@@ -60,7 +60,7 @@ module HsUtils(
   collectLStmtBinders, collectStmtBinders,
   collectSigTysFromPats, collectSigTysFromPat,
 
-  hsTyClDeclBinders, hsTyClDeclsBinders, hsConDeclsBinders, 
+  hsTyClDeclBinders, hsTyClDeclsBinders, 
   hsForeignDeclsBinders, hsGroupBinders
   ) where
 
@@ -572,9 +572,10 @@ hsForeignDeclsBinders :: [LForeignDecl Name] -> [Name]
 hsForeignDeclsBinders foreign_decls
   = [n | L _ (ForeignImport (L _ n) _ _) <- foreign_decls]
 
-hsTyClDeclsBinders :: [Located (TyClDecl Name)] -> [Located (InstDecl Name)] -> [Name]
+hsTyClDeclsBinders :: [[LTyClDecl Name]] -> [Located (InstDecl Name)] -> [Name]
 hsTyClDeclsBinders tycl_decls inst_decls
-  = [n | d <- instDeclATs inst_decls ++ tycl_decls, L _ n <- hsTyClDeclBinders d]
+  = [n | d <- instDeclATs inst_decls ++ concat tycl_decls
+       , L _ n <- hsTyClDeclBinders d]
 
 hsTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- ^ Returns all the /binding/ names of the decl, along with their SrcLocs.

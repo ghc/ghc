@@ -126,7 +126,12 @@ data HsDecl id
 data HsGroup id
   = HsGroup {
 	hs_valds  :: HsValBinds id,
-	hs_tyclds :: [LTyClDecl id],
+
+	hs_tyclds :: [[LTyClDecl id]],	
+		-- A list of mutually-recursive groups
+		-- Parser generates a singleton list;
+		-- renamer does dependency analysis
+
 	hs_instds :: [LInstDecl id],
         hs_derivds :: [LDerivDecl id],
 
@@ -228,7 +233,8 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 	     if isEmptyValBinds val_decls 
                 then Nothing 
                 else Just (ppr val_decls),
-	     ppr_ds tycl_decls, ppr_ds inst_decls,
+	     ppr_ds (concat tycl_decls), 
+             ppr_ds inst_decls,
              ppr_ds deriv_decls,
 	     ppr_ds foreign_decls]
 	where

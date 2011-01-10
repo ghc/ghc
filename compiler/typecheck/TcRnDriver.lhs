@@ -290,7 +290,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
    setEnvs tc_envs $ do {
 
-   rn_decls <- checkNoErrs $ rnTyClDecls ldecls ;
+   (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [ldecls] ;
 
 	-- Dump trace of renaming part
    rnDump (ppr rn_decls) ;
@@ -348,7 +348,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 mkFakeGroup :: [LTyClDecl a] -> HsGroup a
 mkFakeGroup decls -- Rather clumsy; lots of unused fields
-  = emptyRdrGroup { hs_tyclds = decls }
+  = emptyRdrGroup { hs_tyclds = [decls] }
 \end{code}
 
 
@@ -504,7 +504,7 @@ tcRnHsBootDecls decls
 		-- Family instance declarations are rejected here
 	; traceTc "Tc3" empty
 	; (tcg_env, inst_infos, _deriv_binds) 
-            <- tcInstDecls1 tycl_decls inst_decls deriv_decls
+            <- tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck value declarations
@@ -846,7 +846,7 @@ tcTopSrcDecls boot_details
 		-- and import the supporting declarations
         traceTc "Tc3" empty ;
 	(tcg_env, inst_infos, deriv_binds) 
-            <- tcInstDecls1 tycl_decls inst_decls deriv_decls;
+            <- tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls;
 	setGblEnv tcg_env	$ do {
 
 	        -- Foreign import declarations next. 
@@ -875,7 +875,7 @@ tcTopSrcDecls boot_details
 
 	     	-- Second pass over class and instance declarations, 
         traceTc "Tc6" empty ;
-	inst_binds <- tcInstDecls2 tycl_decls inst_infos ;
+	inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
 
 		-- Foreign exports
         traceTc "Tc7" empty ;
