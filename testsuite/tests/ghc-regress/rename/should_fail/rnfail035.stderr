@@ -1,4 +1,2 @@
 
-rnfail035.hs:2:21:
-    Not in scope: type constructor or class `C'
-    Perhaps you meant `T' (line 3)
+rnfail035.hs:2:21: Not in scope: type constructor or class `C'

@@ -8,15 +8,9 @@ readFail001.hs:38:48:
 readFail001.hs:38:59:
     Not in scope: type constructor or class `EqLeaf'
 
-readFail001.hs:87:11:
-    Not in scope: `x'
-    Perhaps you meant one of these:
-      `a' (line 79), `b' (line 79), `c' (line 79)
+readFail001.hs:87:11: Not in scope: `x'
 
-readFail001.hs:88:19:
-    Not in scope: `x'
-    Perhaps you meant one of these:
-      `a' (line 79), `b' (line 79), `c' (line 79)
+readFail001.hs:88:19: Not in scope: `x'
 
 readFail001.hs:94:19: Not in scope: `isSpace'
 

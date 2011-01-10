@@ -1,4 +1,2 @@
 
-tcfail049.hs:3:7:
-    Not in scope: `g'
-    Perhaps you meant one of these: `x' (line 3), `f' (line 3)
+tcfail049.hs:3:7: Not in scope: `g'

@@ -1,6 +1,2 @@
 
-mod130.hs:7:5:
-    Not in scope: `<'
-    Perhaps you meant one of these:
-      `-' (imported from Prelude), `*' (imported from Prelude),
-      `.' (imported from Prelude)
+mod130.hs:7:5: Not in scope: `<'

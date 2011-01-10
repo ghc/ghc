@@ -1,4 +1,2 @@
 
-mod25.hs:3:16:
-    Not in scope: type variable `b'
-    Perhaps you meant `a' (line 3)
+mod25.hs:3:16: Not in scope: type variable `b'
