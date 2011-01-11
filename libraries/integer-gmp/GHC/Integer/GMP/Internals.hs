@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, GHCForeignImportPrim,
+{-# LANGUAGE ForeignFunctionInterface, GHCForeignImportPrim, CPP,
              MagicHash, UnboxedTuples, UnliftedFFITypes, BangPatterns #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}

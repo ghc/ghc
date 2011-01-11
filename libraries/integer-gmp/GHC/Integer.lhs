@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, CPP, MagicHash #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
