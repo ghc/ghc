@@ -1,5 +1,5 @@
 
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, CPP, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
