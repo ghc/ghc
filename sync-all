@@ -39,7 +39,7 @@ my $local_repo_unnecessary = 0;
 
 # Always define the empty tag so that we fetch the /required/ packages
 my %tags;
-$tags{""} = 1;
+$tags{"-"} = 1;
 
 sub message {
     if ($verbose >= 2) {
@@ -80,6 +80,7 @@ sub scmall {
     my $tag;
     my $remotepath;
     my $scm;
+    my $upstream;
 
     my $path;
     my $wd_before = getcwd;
@@ -89,11 +90,12 @@ sub scmall {
     open IN, "< packages" or die "Can't open packages file";
     while (<IN>) {
         chomp;
-        if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+) +([^ ]+)$/) {
             $localpath = $1;
             $tag = defined($2) ? $2 : "";
             $remotepath = $3;
             $scm = $4;
+            $upstream = $5;
 
             # Check the SCM is OK as early as possible
             die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
