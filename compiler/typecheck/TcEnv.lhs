@@ -203,6 +203,7 @@ tcLookupFamInst tycon tys
   = do { env <- getGblEnv
        ; eps <- getEps
        ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
+       ; traceTc "lookupFamInst" ((ppr tycon <+> ppr tys) $$ ppr instEnv)
        ; case lookupFamInstEnv instEnv tycon tys of
 	   []                      -> return Nothing
 	   ((fam_inst, rep_tys):_) 

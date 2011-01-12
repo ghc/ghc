@@ -576,13 +576,10 @@ type RttiInstantiation = [(TcTyVar, TyVar)]
 
 -- | Returns the instantiated type scheme ty', and the 
 --   mapping from new (instantiated) -to- old (skolem) type variables
---   We want this mapping just for old RuntimeUnkSkols, to avoid
---   gratuitously changing their unique on every trip
 instScheme :: QuantifiedType -> TR (TcType, RttiInstantiation)
 instScheme (tvs, ty) 
   = liftTcM $ do { (tvs', _, subst) <- tcInstTyVars tvs
-                 ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs
-                                             , isRuntimeUnkSkol tv]
+                 ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs]
                  ; return (substTy subst ty, rtti_inst) }
 
 applyRevSubst :: RttiInstantiation -> TR ()
@@ -1132,7 +1129,7 @@ zonkRttiType = zonkType (mkZonkTcTyVar zonk_unbound_meta)
   where
     zonk_unbound_meta tv 
       = ASSERT( isTcTyVar tv )
-        do { tv' <- skolemiseUnboundMetaTyVar RuntimeUnkSkol tv
+        do { tv' <- skolemiseUnboundMetaTyVar tv RuntimeUnk
 	     -- This is where RuntimeUnkSkols are born: 
 	     -- otherwise-unconstrained unification variables are
 	     -- turned into RuntimeUnkSkols as they leave the

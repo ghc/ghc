@@ -33,7 +33,6 @@ import Var
 import Name
 import NameSet
 import NameEnv
-import VarSet
 import SrcLoc
 import Bag
 import ErrUtils
@@ -388,11 +387,10 @@ tcPolyCheck :: TcSigInfo -> PragFun
 --   it binds a single variable,
 --   it has a signature,
 tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
-                           , sig_theta = theta, sig_loc = loc })
+                           , sig_theta = theta, sig_tau = tau, sig_loc = loc })
     prag_fn rec_tc bind_list
   = do { ev_vars <- newEvVars theta
-
-       ; let skol_info = SigSkol (FunSigCtxt (idName id))
+       ; let skol_info = SigSkol (FunSigCtxt (idName id)) (mkPhiTy theta tau)
        ; (ev_binds, (binds', [mono_info])) 
             <- checkConstraints skol_info tvs ev_vars $
                tcExtendTyVarEnv2 (scoped `zip` mkTyVarTys tvs)    $
@@ -423,12 +421,8 @@ tcPolyInfer top_lvl mono sig_fn prag_fn rec_tc bind_list
 
        ; unifyCtxts [sig | (_, Just sig, _) <- mono_infos] 
 
-       ; let get_tvs | isTopLevel top_lvl = tyVarsOfType  
-                     | otherwise          = exactTyVarsOfType
-		     -- See Note [Silly type synonym] in TcType
-             tau_tvs = foldr (unionVarSet . get_tvs . getMonoType) emptyVarSet mono_infos
-
-       ; (qtvs, givens, ev_binds) <- simplifyInfer mono tau_tvs wanted
+       ; let name_taus = [(name, idType mono_id) | (name, _, mono_id) <- mono_infos]
+       ; (qtvs, givens, ev_binds) <- simplifyInfer top_lvl mono name_taus wanted
 
        ; exports <- mapM (mkExport prag_fn qtvs (map evVarPred givens))
                     mono_infos
@@ -545,14 +539,13 @@ tcSpec poly_id prag@(SpecSig _ hs_ty inl)
         ; warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
                  (ptext (sLit "SPECIALISE pragma for non-overloaded function") <+> quotes (ppr poly_id))
 		  -- Note [SPECIALISE pragmas]
-        ; wrap <- tcSubType origin skol_info (idType poly_id) spec_ty
+        ; wrap <- tcSubType origin sig_ctxt (idType poly_id) spec_ty
         ; return (SpecPrag poly_id wrap inl) }
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
     origin    = SpecPragOrigin name
     sig_ctxt  = FunSigCtxt name
-    skol_info = SigSkol sig_ctxt
     spec_ctxt prag = hang (ptext (sLit "In the SPECIALISE pragma")) 2 (ppr prag)
 
 tcSpec _ prag = pprPanic "tcSpec" (ppr prag)
@@ -699,9 +692,6 @@ data TcMonoBind         -- Half completed; LHS done, RHS not done
 type MonoBindInfo = (Name, Maybe TcSigInfo, TcId)
         -- Type signature (if any), and
         -- the monomorphic bound things
-
-getMonoType :: MonoBindInfo -> TcTauType
-getMonoType (_,_,mono_id) = idType mono_id
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind Name -> TcM TcMonoBind
 tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_infix = inf, fun_matches = matches })
@@ -1049,7 +1039,10 @@ tcInstSig sig_fn use_skols name
   | Just (scoped_tvs, loc) <- sig_fn name
   = do  { poly_id <- tcLookupId name    -- Cannot fail; the poly ids are put into 
                                         -- scope when starting the binding group
-        ; (tvs, theta, tau) <- tcInstSigType use_skols name (idType poly_id)
+        ; let poly_ty = idType poly_id
+        ; (tvs, theta, tau) <- if use_skols
+                               then tcInstType tcInstSkolTyVars poly_ty
+                               else tcInstType tcInstSigTyVars  poly_ty
         ; let sig = TcSigInfo { sig_id = poly_id
 	  	 	      , sig_scoped = scoped_tvs
                               , sig_tvs = tvs, sig_theta = theta, sig_tau = tau

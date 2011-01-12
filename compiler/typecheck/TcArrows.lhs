@@ -237,7 +237,7 @@ tc_cmd env cmd@(HsDo do_or_lc stmts body _ty) (cmd_stk, res_ty)
 tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)	
   = addErrCtxt (cmdCtxt cmd)	$
     do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
-	; [w_tv]     <- tcInstSkolTyVars ArrowSkol [alphaTyVar]
+        ; [w_tv]     <- tcInstSkolTyVars [alphaTyVar]
 	; let w_ty = mkTyVarTy w_tv 	-- Just a convenient starting point
 
 		--  a ((w,t1) .. tn) t

@@ -669,10 +669,7 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
 	; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
 	; checkExistentials ex_tvs penv 
-        ; let skol_info = case pe_ctxt penv of
-                            LamPat mc -> PatSkol data_con mc
-                            LetPat {} -> UnkSkol -- Doesn't matter
-	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	
+        ; ex_tvs' <- tcInstSuperSkolTyVars ex_tvs
                      -- Get location from monad, not from ex_tvs
 
         ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
@@ -704,14 +701,17 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
 	      no_equalities = not (any isEqPred theta')
-
+              skol_info = case pe_ctxt penv of
+                            LamPat mc -> PatSkol data_con mc
+                            LetPat {} -> UnkSkol -- Doesn't matter
+ 
         ; gadts_on <- xoptM Opt_GADTs
 	; checkTc (no_equalities || gadts_on)
 	  	  (ptext (sLit "A pattern match on a GADT requires -XGADTs"))
 		  -- Trac #2905 decided that a *pattern-match* of a GADT
 		  -- should require the GADT language flag
 
-	; given <- newEvVars theta'
+        ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
 	     <- checkConstraints skol_info ex_tvs' given $
                 tcConArgs data_con arg_tys' arg_pats penv thing_inside

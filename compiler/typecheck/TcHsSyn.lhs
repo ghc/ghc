@@ -1075,7 +1075,7 @@ zonkTypeCollecting unbound_tv_set
   = zonkType (mkZonkTcTyVar zonk_unbound_tyvar)
   where
     zonk_unbound_tyvar tv 
-	= do { tv' <- zonkQuantifiedTyVar tv
+        = do { tv' <- zonkQuantifiedTyVar tv
 	     ; tv_set <- readMutVar unbound_tv_set
 	     ; writeMutVar unbound_tv_set (extendVarSet tv_set tv')
 	     ; return (mkTyVarTy tv') }

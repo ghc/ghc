@@ -18,7 +18,7 @@ module Bag (
         listToBag, bagToList,
         foldlBagM, mapBagM, mapBagM_, 
         flatMapBagM, flatMapBagPairM,
-        mapAndUnzipBagM
+        mapAndUnzipBagM, mapAccumBagLM
     ) where
 
 #include "Typeable.h"
@@ -230,6 +230,19 @@ mapAndUnzipBagM f (TwoBags b1 b2) = do (r1,s1) <- mapAndUnzipBagM f b1
 mapAndUnzipBagM f (ListBag xs)    = do ts <- mapM f xs
                                        let (rs,ss) = unzip ts
                                        return (ListBag rs, ListBag ss)
+
+mapAccumBagLM :: Monad m
+            => (acc -> x -> m (acc, y)) -- ^ combining funcction
+            -> acc                      -- ^ initial state
+            -> Bag x                    -- ^ inputs
+            -> m (acc, Bag y)           -- ^ final state, outputs
+mapAccumBagLM _ s EmptyBag        = return (s, EmptyBag)
+mapAccumBagLM f s (UnitBag x)     = do { (s1, x1) <- f s x; return (s1, UnitBag x1) }
+mapAccumBagLM f s (TwoBags b1 b2) = do { (s1, b1') <- mapAccumBagLM f s  b1
+                                       ; (s2, b2') <- mapAccumBagLM f s1 b2
+                                       ; return (s2, TwoBags b1' b2') }
+mapAccumBagLM f s (ListBag xs)    = do { (s', xs') <- mapAccumLM f s xs
+                                       ; return (s', ListBag xs') }
 
 listToBag :: [a] -> Bag a
 listToBag [] = EmptyBag

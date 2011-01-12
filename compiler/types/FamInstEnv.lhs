@@ -187,6 +187,9 @@ data FamilyInstEnv
 			-- 	If *not* then the common case of looking up
 			--	(T a b c) can fail immediately
 
+instance Outputable FamilyInstEnv where
+  ppr (FamIE fs b) = ptext (sLit "FamIE") <+> ppr b <+> vcat (map ppr fs)
+
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
 --	of a range value of the map (so we can safely unify them)

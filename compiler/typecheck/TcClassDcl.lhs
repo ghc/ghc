@@ -168,10 +168,9 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 	-- default methods.  Better to make separate AbsBinds for each
 	; let
 	      (tyvars, _, _, op_items) = classBigSig clas
-	      rigid_info  = ClsSkol clas
-	      prag_fn	  = mkPragFun sigs default_binds
+              prag_fn     = mkPragFun sigs default_binds
 	      sig_fn	  = mkSigFun sigs
-	      clas_tyvars = tcSkolSigTyVars rigid_info tyvars
+              clas_tyvars = tcSuperSkolTyVars tyvars
 	      pred  	  = mkClassPred clas (mkTyVarTys clas_tyvars)
 	; this_dict <- newEvVar pred
 
