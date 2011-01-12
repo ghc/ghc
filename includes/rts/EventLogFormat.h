@@ -155,11 +155,11 @@
 #ifndef EVENTLOG_CONSTANTS_ONLY
 
 typedef StgWord16 EventTypeNum;
-typedef StgWord64 EventTimestamp; // in nanoseconds
+typedef StgWord64 EventTimestamp; /* in nanoseconds */
 typedef StgWord32 EventThreadID;
 typedef StgWord16 EventCapNo;
-typedef StgWord16 EventPayloadSize; // variable-size events
-typedef StgWord16 EventThreadStatus; // status for EVENT_STOP_THREAD
+typedef StgWord16 EventPayloadSize; /* variable-size events */
+typedef StgWord16 EventThreadStatus; /* status for EVENT_STOP_THREAD */
 
 #endif
 

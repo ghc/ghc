@@ -10,30 +10,32 @@
 #include "rts/EventLogFormat.h"
 
 
-// -----------------------------------------------------------------------------
-// Payload datatypes for Haskell events
-// -----------------------------------------------------------------------------
+/* -----------------------------------------------------------------------------
+ * Payload datatypes for Haskell events
+ * -----------------------------------------------------------------------------
+ */
 
-// We effectively have:
-//
-// typedef uint16_t EventTypeNum;
-// typedef uint64_t EventTimestamp;   // in nanoseconds
-// typedef uint32_t EventThreadID;
-// typedef uint16_t EventCapNo;
-// typedef uint16_t EventPayloadSize; // variable-size events
-// typedef uint16_t EventThreadStatus;
+/* We effectively have:
+ *
+ * typedef uint16_t EventTypeNum;
+ * typedef uint64_t EventTimestamp;   // in nanoseconds
+ * typedef uint32_t EventThreadID;
+ * typedef uint16_t EventCapNo;
+ * typedef uint16_t EventPayloadSize; // variable-size events
+ * typedef uint16_t EventThreadStatus;
+ */
 
+/* -----------------------------------------------------------------------------
+ * The HaskellEvent provider captures everything from eventlog for use with
+ * dtrace
+ * -----------------------------------------------------------------------------
+ */
 
-// -----------------------------------------------------------------------------
-// The HaskellEvent provider captures everything from eventlog for use with
-// dtrace
-// -----------------------------------------------------------------------------
-
-// These probes correspond to the events defined in EventLogFormat.h
-//
+/* These probes correspond to the events defined in EventLogFormat.h
+ */
 provider HaskellEvent {
 
-  // scheduler events
+  /* scheduler events */
   probe create__thread (EventCapNo, EventThreadID);
   probe run__thread (EventCapNo, EventThreadID);
   probe stop__thread (EventCapNo, EventThreadID, EventThreadStatus, EventThreadID);
@@ -49,11 +51,11 @@ provider HaskellEvent {
   probe request__par__gc (EventCapNo);
   probe create__spark__thread (EventCapNo, EventThreadID);
 
-  // other events
-//This one doesn't seem to be used at all at the moment:
-//  probe log__msg (char *);
+  /* other events */
+/* This one doesn't seem to be used at all at the moment: */
+/*  probe log__msg (char *); */
   probe startup (EventCapNo);
-  // we don't need EVENT_BLOCK_MARKER with dtrace
+  /* we don't need EVENT_BLOCK_MARKER with dtrace */
   probe user__msg (EventCapNo, char *);
   probe gc__idle (EventCapNo);
   probe gc__work (EventCapNo);
