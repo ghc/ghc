@@ -1,10 +1,14 @@
 
 tcfail032.hs:14:8:
-    Couldn't match type `t' with `a -> Int'
-      because type variable `a' would escape its scope
-    This (rigid, skolem) type variable is bound by
-      an expression type signature
-    The following variables have types that mention t
-      x :: t (bound at tcfail032.hs:14:3)
+    Could not deduce (t ~ (a1 -> Int))
+    from the context (Eq a)
+      bound by the inferred type of f :: Eq a => t -> a -> Int
+      at tcfail032.hs:14:1-31
+    or from (Eq a1)
+      bound by an expression type signature: Eq a1 => a1 -> Int
+      at tcfail032.hs:14:8-30
+      `t' is a rigid type variable bound by
+          the inferred type of f :: Eq a => t -> a -> Int
+          at tcfail032.hs:14:1
     In the expression: (x :: Eq a => a -> Int)
     In an equation for `f': f x = (x :: Eq a => a -> Int)

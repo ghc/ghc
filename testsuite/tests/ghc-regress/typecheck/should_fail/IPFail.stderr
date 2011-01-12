@@ -1,9 +1,12 @@
 
 IPFail.hs:6:18:
-    Could not deduce (Num Bool) from the context (?x::Int)
-      arising from the literal `5'
+    Could not deduce (Num Bool) arising from the literal `5'
+    from the context (?x::Int)
+      bound by the type signature for f0 :: (?x::Int) => () -> Bool
+      at IPFail.hs:6:1-24
     Possible fix:
-      add (Num Bool) to the context of the type signature for `f0'
+      add (Num Bool) to the context of
+        the type signature for f0 :: (?x::Int) => () -> Bool
       or add an instance declaration for (Num Bool)
     In the expression: 5
     In the expression: let ?x = 5 in ?x

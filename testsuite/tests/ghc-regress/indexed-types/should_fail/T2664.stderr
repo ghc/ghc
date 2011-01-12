@@ -1,17 +1,18 @@
 
-T2664.hs:31:52:
-    Could not deduce (b ~ a)
-      from the context (Connect a,
-                        Connect b,
-                        (a :*: b) ~ Dual c,
-                        c ~ Dual (a :*: b))
-      `b' is a rigid type variable bound by
-          the instance declaration at T2664.hs:22:30
-      `a' is a rigid type variable bound by
-          the instance declaration at T2664.hs:22:19
-    Expected type: Dual (Dual a)
-      Actual type: b
-    In the third argument of `pchoose', namely `newPChan'
-    In the first argument of `E', namely `(pchoose Right v newPChan)'
+T2664.hs:31:33:
+    Could not deduce (Dual a ~ Dual b)
+    from the context (Connect a, Connect b)
+      bound by the instance declaration at T2664.hs:22:10-52
+    or from ((a :*: b) ~ Dual c, c ~ Dual (a :*: b))
+      bound by the type signature for
+                 newPChan :: ((a :*: b) ~ Dual c, c ~ Dual (a :*: b)) =>
+                             IO (PChan (a :*: b), PChan c)
+      at T2664.hs:(23,5)-(31,87)
+    NB: `Dual' is a type function, and may not be injective
+    Expected type: c
+      Actual type: Dual b :+: Dual a
+    Expected type: PChan c
+      Actual type: PChan (Dual b :+: Dual a)
+    In the return type of a call of `E'
     In the expression:
       E (pchoose Right v newPChan) (pchoose Left v newPChan)

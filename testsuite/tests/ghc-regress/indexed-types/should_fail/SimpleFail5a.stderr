@@ -2,6 +2,9 @@
 SimpleFail5a.hs:31:11:
     Couldn't match type `a' with `Int'
       `a' is a rigid type variable bound by
-          the type signature for `bar3wrong' at SimpleFail5a.hs:30:17
+          the type signature for bar3wrong :: S3 a -> a
+          at SimpleFail5a.hs:31:1
+    Expected type: S3 a
+      Actual type: S3 Int
     In the pattern: D3Int
     In an equation for `bar3wrong': bar3wrong D3Int = 1

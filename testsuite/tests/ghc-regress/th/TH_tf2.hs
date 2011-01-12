@@ -2,6 +2,7 @@
 
 module TH_tf2 where
 
+{-
 $( [d| class C a where
          data T a
          foo :: Bool -> T a |] )
@@ -13,11 +14,12 @@ $( [d| instance C Int where
 $( [d| instance C Float where
          data T Float = TFloat {flag :: Bool}
          foo b = TFloat {flag = b && b} |] )
+-}
 
-$( [d| class D a where
+class D a where
          type S a 
-         bar :: S a -> Int |] )
+         bar :: S a -> Int
 
-$( [d| instance D Int where
+instance D Int where
          type S Int = Bool 
-         bar c = if c then 1 else 2 |] )
+         bar c = if c then 1 else 2

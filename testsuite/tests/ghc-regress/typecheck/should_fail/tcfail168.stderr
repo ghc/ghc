@@ -1,15 +1,11 @@
 
 tcfail168.hs:8:11:
-    Couldn't match expected type `Char -> a' with actual type `IO ()'
+    Couldn't match expected type `Char -> a0' with actual type `IO ()'
+    In the return type of a call of `putChar'
     In a stmt of a 'do' expression: putChar 'a'
     In the expression:
-        do { putChar;
-             putChar 'a';
-             putChar 'a';
-             putChar 'a';
-             .... }
-    In an equation for `foo':
-        foo = do { putChar;
-                   putChar 'a';
-                   putChar 'a';
-                   .... }
+      do { putChar;
+           putChar 'a';
+           putChar 'a';
+           putChar 'a';
+           .... }

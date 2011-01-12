@@ -2,9 +2,10 @@
 tcfail103.hs:15:23:
     Couldn't match type `t' with `s'
       `t' is a rigid type variable bound by
-          the type signature for `f' at tcfail103.hs:10:8
+          the type signature for f :: ST t Int at tcfail103.hs:11:1
       `s' is a rigid type variable bound by
-          the type signature for `g' at tcfail103.hs:13:17
+          the type signature for g :: ST s Int at tcfail103.hs:15:9
+    Expected type: STRef s Int
+      Actual type: STRef t Int
     In the first argument of `readSTRef', namely `v'
     In the expression: readSTRef v
-    In an equation for `g': g = readSTRef v

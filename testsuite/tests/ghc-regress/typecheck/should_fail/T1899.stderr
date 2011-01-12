@@ -1,8 +1,15 @@
 
-T1899.hs:12:29:
-    Couldn't match type `a1' with `Proposition a'
-      `a1' is a rigid type variable bound by
-           the type signature for `transRHS' at T1899.hs:9:15
-    In the first argument of `Prop', namely `(Auxiliary undefined)'
-    In the expression: Prop (Auxiliary undefined)
-    In the expression: [Prop (Auxiliary undefined)]
+T1899.hs:13:13:
+    Couldn't match type `a' with `Proposition a0'
+      `a' is a rigid type variable bound by
+          the type signature for transRHS :: [a] -> Int -> Constraint a
+          at T1899.hs:10:2
+    Expected type: Constraint a
+      Actual type: Constraint (Proposition a0)
+    In the expression:
+        Formula $ [[Prop (Auxiliary varSet), Prop (Auxiliary varSet)]]
+    In the expression:
+      if b < 0 then
+          Formula [[Prop (Auxiliary undefined)]]
+      else  Formula
+          $ [[Prop (Auxiliary varSet), Prop (Auxiliary varSet)]]

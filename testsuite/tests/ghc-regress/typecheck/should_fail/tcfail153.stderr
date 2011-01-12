@@ -1,10 +1,12 @@
 
-tcfail153.hs:6:7:
+tcfail153.hs:6:9:
     Couldn't match type `a' with `Bool'
       `a' is a rigid type variable bound by
-          the type signature for `f' at tcfail153.hs:5:6
+          the type signature for f :: a -> [a] at tcfail153.hs:6:1
+    In the first argument of `g', namely `x'
     In the expression: g x
     In an equation for `f':
-        f x = g x
-            where
-                g y = if y then [] else [...]
+        f x
+          = g x
+          where
+              g y = if y then [] else [...]

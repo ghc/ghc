@@ -1,11 +1,25 @@
 
-FD2.hs:26:34:
-    Could not deduce (e ~ e1)
-      from the context (Foldable a, Elem a e, Elem a e1)
-      `e' is a rigid type variable bound by
-          the type signature for `foldr1' at FD2.hs:21:20
+FD2.hs:26:38:
+    Could not deduce (e1 ~ e)
+    from the context (Foldable a)
+      bound by the class declaration for `Foldable'
+      at FD2.hs:(17,1)-(26,39)
+    or from (Elem a e)
+      bound by the type signature for
+                 foldr1 :: Elem a e => (e -> e -> e) -> a -> e
+      at FD2.hs:(22,3)-(26,39)
+    or from (Elem a e1)
+      bound by the type signature for
+                 mf :: Elem a e1 => e1 -> Maybe e1 -> Maybe e1
+      at FD2.hs:(25,12)-(26,39)
       `e1' is a rigid type variable bound by
-           the type signature for `mf' at FD2.hs:24:25
+           the type signature for
+             mf :: Elem a e1 => e1 -> Maybe e1 -> Maybe e1
+           at FD2.hs:25:12
+      `e' is a rigid type variable bound by
+          the type signature for
+            foldr1 :: Elem a e => (e -> e -> e) -> a -> e
+          at FD2.hs:22:3
+    In the second argument of `f', namely `y'
     In the first argument of `Just', namely `(f x y)'
     In the expression: Just (f x y)
-    In an equation for `mf': mf x (Just y) = Just (f x y)

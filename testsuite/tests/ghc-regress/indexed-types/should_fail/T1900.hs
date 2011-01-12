@@ -65,7 +65,7 @@ check d = d == trans d
           Bug sigma,                (invocation of trans at sigma)
           {der}Eq fsk)
 
-==> discharde {der} Eq fsk
+==> discharge {der} Eq fsk
  Wanted: ({given}uf ~ fsk
           Depend sigma ~ uf      (second arg of ==)
           Bug sigma,                (invocation of trans at sigma)

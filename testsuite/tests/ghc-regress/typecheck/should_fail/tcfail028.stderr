@@ -1,7 +1,7 @@
 
 tcfail028.hs:4:17:
     `A a' is not applied to enough type arguments
-    Expected kind `?', but `A a' has kind `k -> *'
+    Expected kind `?', but `A a' has kind `k0 -> *'
     In the type `A a'
     In the definition of data constructor `B'
     In the data type declaration for `A'

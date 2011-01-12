@@ -1,7 +1,7 @@
 
 tcfail200.hs:5:15:
     Kind incompatibility when matching types:
-      t :: *
+      t0 :: *
       GHC.Prim.Int# :: #
     In the expression: 1#
     In the expression: (1#, 'c')

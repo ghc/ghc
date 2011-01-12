@@ -1,12 +1,8 @@
 
-T4272.hs:11:26:
-    Couldn't match type `a' with `TermFamily a a'
-      `a' is a rigid type variable bound by
-          the type signature for `laws' at T4272.hs:10:16
-    Expected type: TermFamily a (TermFamily a a)
-      Actual type: TermFamily a a
-    In the first argument of `terms', namely
-      `(undefined :: TermFamily a a)'
-    In the second argument of `prune', namely
-      `(terms (undefined :: TermFamily a a))'
+T4272.hs:11:16:
+    Occurs check: cannot construct the infinite type:
+      a0 = TermFamily a0 a0
+    In the first argument of `prune', namely `t'
     In the expression: prune t (terms (undefined :: TermFamily a a))
+    In an equation for `laws':
+        laws t = prune t (terms (undefined :: TermFamily a a))

@@ -1,6 +1,6 @@
 
 SimpleFail16.hs:10:12:
-    Couldn't match type `F ()' with `p a'
+    Couldn't match type `F ()' with `p0 a0'
     In the first argument of `foo', namely `(undefined :: F ())'
     In the expression: foo (undefined :: F ())
     In an equation for `bar': bar = foo (undefined :: F ())

@@ -20,10 +20,9 @@ wib x = bar x
 -- instance Concrete Bool Bool
 
 {- This is a nice example of the trickiness of functional dependencies.
-Here's what is happening.  First a very cut-down version of your
-example:
+Here's what is happening.
 
-Now consider type inference for 'wib'.  GHC 6.6 figures out that the call
+Consider type inference for 'wib'.  GHC 6.6 figures out that the call
 of 'bar' gives rise to the constraint (Concrete p q), where x has type
 'p'.  Ah, but x must have type 'a', so the constraint is (Concrete a
 q).

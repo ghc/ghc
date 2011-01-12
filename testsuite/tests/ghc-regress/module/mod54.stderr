@@ -2,7 +2,8 @@
 mod54.hs:3:22:
     No instance for (Eq T)
       arising from the 'deriving' clause of a data type declaration
-    Possible fix: add an instance declaration for (Eq T)
-    Alternatively, use a standalone 'deriving instance' declaration,
-      so you can specify the instance context yourself
+    Possible fix:
+      add an instance declaration for (Eq T)
+      or use a standalone 'deriving instance' declaration,
+           so you can specify the instance context yourself
     When deriving the instance for (Ord T)

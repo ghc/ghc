@@ -1,7 +1,7 @@
 
 tcfail159.hs:9:11:
     Kind incompatibility when matching types:
-      t :: *
+      t0 :: *
       (# Int, Int #) :: (#)
     In the pattern: ~(# p, q #)
     In a case alternative: ~(# p, q #) -> p

@@ -114,8 +114,8 @@ test('T3064',
                                                       80000000)),
       # expected value: 145038576 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 140000000,
-                                                      170000000)),
+          compiler_stats_num_field('bytes allocated', 120000000,
+                                                      140000000)),
       # expected value: 3404504 (x86/OSX):
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 3000000,

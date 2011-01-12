@@ -1,19 +1,11 @@
 
-T3330a.hs:17:34:
-    Occurs check: cannot construct the infinite type:
-      s = (->) (s ix -> ix)
-    Expected type: r ix -> Writer [AnyF s1] (r ix)
-      Actual type: ix2
-    In the first argument of `hmapM', namely `p'
-    In the first argument of `execWriter', namely `(hmapM p collect x)'
-    In the expression: execWriter (hmapM p collect x)
-
 T3330a.hs:17:44:
-    Couldn't match type `ix2' with `r ix1 -> Writer [AnyF s] (r ix1)'
-      `ix2' is a rigid type variable bound by
-            the type signature for `children' at T3330a.hs:16:15
-    Expected type: PF s1 r (r ix1 -> Writer [AnyF s] (r ix1))
-      Actual type: PF s1 r ix2
+    Couldn't match type `ix' with `r0 ix0 -> Writer [AnyF s0] (r0 ix0)'
+      `ix' is a rigid type variable bound by
+           the type signature for children :: s ix -> PF s r ix -> [AnyF s]
+           at T3330a.hs:17:1
+    Expected type: PF s r (r0 ix0 -> Writer [AnyF s0] (r0 ix0))
+      Actual type: PF s r ix
     In the third argument of `hmapM', namely `x'
     In the first argument of `execWriter', namely `(hmapM p collect x)'
     In the expression: execWriter (hmapM p collect x)

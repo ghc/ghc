@@ -1,17 +1,22 @@
 
 T3208b.hs:15:10:
-    Could not deduce (OTerm o ~ STerm a)
-      from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
-    Expected type: STerm o
-      Actual type: OTerm o
+    Could not deduce (STerm a0 ~ STerm a)
+    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
+      bound by the type signature for
+                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+      at T3208b.hs:15:1-22
+    NB: `STerm' is a type function, and may not be injective
+    Expected type: STerm a0
+      Actual type: OTerm a0
     In the expression: fce (apply f)
     In an equation for `fce'': fce' f = fce (apply f)
 
-T3208b.hs:15:10:
-    Could not deduce (STerm o ~ STerm a)
-      from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
-    NB: `STerm' is a type function, and may not be injective
-    Expected type: STerm o
-      Actual type: OTerm o
+T3208b.hs:15:15:
+    Could not deduce (OTerm a0 ~ STerm a)
+    from the context (OTerm a ~ STerm a, OBJECT a, SUBST a)
+      bound by the type signature for
+                 fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+      at T3208b.hs:15:1-22
+    In the first argument of `fce', namely `(apply f)'
     In the expression: fce (apply f)
     In an equation for `fce'': fce' f = fce (apply f)

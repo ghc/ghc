@@ -1,5 +1,5 @@
 
 tcfail002.hs:4:7:
-    Occurs check: cannot construct the infinite type: t = [t]
+    Occurs check: cannot construct the infinite type: t0 = [t0]
     In the expression: z
     In an equation for `c': c z = z

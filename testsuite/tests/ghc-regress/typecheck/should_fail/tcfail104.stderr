@@ -1,7 +1,7 @@
 
 tcfail104.hs:16:19:
-    Couldn't match expected type `a -> a'
-                with actual type `forall a1. a1 -> a1'
+    Couldn't match expected type `a0 -> a0'
+                with actual type `forall a. a -> a'
     In the expression: x
     In the expression: (\ x -> x)
     In the expression:
@@ -9,7 +9,7 @@ tcfail104.hs:16:19:
 
 tcfail104.hs:22:39:
     Couldn't match expected type `forall a. a -> a'
-                with actual type `a -> a'
+                with actual type `a0 -> a0'
     In the expression: x
     In the expression: (\ (x :: forall a. a -> a) -> x)
     In the expression:

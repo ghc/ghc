@@ -1,13 +1,13 @@
 
 Simple14.hs:17:12:
-    Couldn't match type `z' with `n'
-      `z' is untouchable
-          inside the constraints (Maybe m ~ Maybe n)
-          bound at the polymorphic type `x ~ y => EQ_ z z'
+    Couldn't match type `z0' with `n'
+      `z0' is untouchable
+           inside the constraints (Maybe m ~ Maybe n)
+           bound at a type expected by the context:
+                      Maybe m ~ Maybe n => EQ_ z0 z0
       `n' is a rigid type variable bound by
-          the type signature for `foo' at Simple14.hs:16:17
-    Expected type: z
-      Actual type: m
+          the type signature for foo :: EQ_ (Maybe m) (Maybe n)
+          at Simple14.hs:17:1
     In the second argument of `eqE', namely `(eqI :: EQ_ m n)'
     In the first argument of `ntI', namely `(`eqE` (eqI :: EQ_ m n))'
     In the expression: ntI (`eqE` (eqI :: EQ_ m n))

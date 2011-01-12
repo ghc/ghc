@@ -1,9 +1,9 @@
 
 rebindable6.hs:106:17:
-    No instance for (HasSeq (IO a -> t -> IO b))
+    No instance for (HasSeq (IO a -> t0 -> IO b))
       arising from a do statement
     Possible fix:
-      add an instance declaration for (HasSeq (IO a -> t -> IO b))
+      add an instance declaration for (HasSeq (IO a -> t0 -> IO b))
     In a stmt of a 'do' expression: f
     In the expression:
       do { f;
@@ -16,13 +16,27 @@ rebindable6.hs:106:17:
                  return b }
 
 rebindable6.hs:107:17:
-    No instances for (HasFail ([Prelude.Char] -> t1),
-                      HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
+    No instance for (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t0))
       arising from a do statement
     Possible fix:
-      add instance declarations for
-      (HasFail ([Prelude.Char] -> t1),
-       HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
+      add an instance declaration for
+      (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t0))
+    In a stmt of a 'do' expression: Just (b :: b) <- g
+    In the expression:
+      do { f;
+           Just (b :: b) <- g;
+           return b }
+    In an equation for `test_do':
+        test_do f g
+          = do { f;
+                 Just (b :: b) <- g;
+                 return b }
+
+rebindable6.hs:107:17:
+    No instance for (HasFail ([Prelude.Char] -> t1))
+      arising from a do statement
+    Possible fix:
+      add an instance declaration for (HasFail ([Prelude.Char] -> t1))
     In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
       do { f;

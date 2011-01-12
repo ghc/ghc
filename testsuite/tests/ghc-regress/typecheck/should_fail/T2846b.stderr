@@ -1,7 +1,7 @@
 
 T2846b.hs:5:5:
-    No instance for (Show (Num a => a))
+    No instance for (Show (Num a0 => a0))
       arising from a use of `show'
-    Possible fix: add an instance declaration for (Show (Num a => a))
+    Possible fix: add an instance declaration for (Show (Num a0 => a0))
     In the expression: show ([1, 2, 3] :: [Num a => a])
     In an equation for `f': f = show ([1, 2, 3] :: [Num a => a])

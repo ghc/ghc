@@ -1,14 +1,14 @@
 
 tcfail072.hs:23:13:
-    Ambiguous type variable `p' in the constraint:
-      (Ord p) arising from a use of `g'
+    Ambiguous type variable `p0' in the constraint:
+      (Ord p0) arising from a use of `g'
     Probable fix: add a type signature that fixes these type variable(s)
     In the expression: g A
     In an equation for `g': g (B _ _) = g A
 
 tcfail072.hs:23:13:
-    Ambiguous type variable `q' in the constraint:
-      (Ord q) arising from a use of `g'
+    Ambiguous type variable `q0' in the constraint:
+      (Ord q0) arising from a use of `g'
     Probable fix: add a type signature that fixes these type variable(s)
     In the expression: g A
     In an equation for `g': g (B _ _) = g A

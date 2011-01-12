@@ -1,6 +1,6 @@
 
 tcfail186.hs:7:9:
-    Couldn't match expected type `PhantomSyn a'
+    Couldn't match expected type `PhantomSyn a0'
                 with actual type `[Char]'
     In the first argument of `f', namely `"hoo"'
     In the expression: f "hoo"

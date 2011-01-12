@@ -1,7 +1,11 @@
 
-tcfail131.hs:7:9:
-    Could not deduce (b ~ Integer) from the context (Num b)
+tcfail131.hs:7:13:
+    Could not deduce (b ~ Integer)
+    from the context (Num b)
+      bound by the type signature for g :: Num b => b -> b
+      at tcfail131.hs:7:3-13
       `b' is a rigid type variable bound by
-          the type signature for `g' at tcfail131.hs:6:12
+          the type signature for g :: Num b => b -> b at tcfail131.hs:7:3
+    In the second argument of `f', namely `x'
     In the expression: f x x
     In an equation for `g': g x = f x x

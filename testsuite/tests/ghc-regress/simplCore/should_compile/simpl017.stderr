@@ -1,7 +1,7 @@
 
 simpl017.hs:44:12:
     Couldn't match expected type `forall v. [E m i] -> E' v m a'
-                with actual type `[E m i] -> E' v m a'
+                with actual type `[E m i] -> E' v0 m a'
     In the first argument of `return', namely `f'
     In the expression: return f
     In the first argument of `E', namely
@@ -12,9 +12,9 @@ simpl017.hs:44:12:
              return f })'
 
 simpl017.hs:63:5:
-    Couldn't match expected type `t -> t1'
-                with actual type `forall v. [E m Int] -> E' v m Int'
+    Couldn't match expected type `t0 -> t1'
+                with actual type `forall v. [E m0 Int] -> E' v m0 Int'
     The function `a' is applied to one argument,
-    but its type `forall v. [E m Int] -> E' v m Int' has none
+    but its type `forall v. [E m0 Int] -> E' v m0 Int' has none
     In the first argument of `plus', namely `a [one]'
     In the expression: a [one] `plus` a [one]

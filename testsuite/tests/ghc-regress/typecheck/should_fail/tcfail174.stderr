@@ -1,23 +1,23 @@
 
 tcfail174.hs:9:10:
     Couldn't match expected type `forall a. a -> a'
-                with actual type `a -> a'
+                with actual type `a0 -> a0'
     In the first argument of `Base', namely `id'
     In the expression: Base id
     In an equation for `g': g = Base id
 
 tcfail174.hs:13:14:
-    Couldn't match expected type `forall x. x -> a'
-                with actual type `forall a1. a1 -> a1'
-      Expected type: Capture (forall x. x -> a)
-        Actual type: Capture (forall a1. a1 -> a1)
+    Couldn't match expected type `forall x. x -> a0'
+                with actual type `forall a. a -> a'
+    Expected type: Capture (forall x. x -> a0)
+      Actual type: Capture (forall a. a -> a)
     In the first argument of `Capture', namely `g'
     In the expression: Capture g
 
 tcfail174.hs:16:14:
     Couldn't match expected type `forall x. x -> b'
                 with actual type `forall a. a -> a'
-      Expected type: Capture (forall x. x -> b)
-        Actual type: Capture (forall a. a -> a)
+    Expected type: Capture (forall x. x -> b)
+      Actual type: Capture (forall a. a -> a)
     In the first argument of `Capture', namely `g'
     In the expression: Capture g

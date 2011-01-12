@@ -1,70 +1,92 @@
 
 tcfail068.hs:14:9:
-    Could not deduce (s1 ~ s) from the context (Constructed a)
+    Could not deduce (s1 ~ s)
+    from the context (Constructed a)
+      bound by the type signature for
+                 itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
+      at tcfail068.hs:(12,1)-(14,31)
       `s1' is a rigid type variable bound by
-           the polymorphic type `forall s. GHC.ST.ST s a' at tcfail068.hs:13:9
+           a type expected by the context: GHC.ST.ST s1 (IndTree s a)
+           at tcfail068.hs:13:9
       `s' is a rigid type variable bound by
-          the type signature for `itgen' at tcfail068.hs:11:53
+          the type signature for
+            itgen :: Constructed a => (Int, Int) -> a -> IndTree s a
+          at tcfail068.hs:12:1
+    Expected type: GHC.ST.ST s (IndTree s1 a)
+      Actual type: GHC.ST.ST s (STArray s (Int, Int) a)
+    In the return type of a call of `newSTArray'
     In the first argument of `runST', namely
       `(newSTArray ((1, 1), n) x)'
-    In the expression: runST (newSTArray ((1, 1), n) x)
-    In an equation for `itgen':
-        itgen n x = runST (newSTArray ((1, 1), n) x)
 
-tcfail068.hs:19:21:
-    Could not deduce (s ~ s1) from the context (Constructed a)
+tcfail068.hs:20:22:
+    Could not deduce (s ~ s1)
+    from the context (Constructed a)
+      bound by the type signature for
+                 itiap :: Constructed a =>
+                          (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
+      at tcfail068.hs:(17,1)-(21,19)
       `s' is a rigid type variable bound by
-          the type signature for `itiap' at tcfail068.hs:16:58
+          the type signature for
+            itiap :: Constructed a =>
+                     (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
+          at tcfail068.hs:17:1
       `s1' is a rigid type variable bound by
-           the polymorphic type `forall s. GHC.ST.ST s a' at tcfail068.hs:18:9
-    In the first argument of `readSTArray', namely `arr'
-    In the first argument of `(>>=)', namely `readSTArray arr i'
-    In the first argument of `runST', namely
-      `(readSTArray arr i
-      >>=
-        \ val -> writeSTArray arr i (f val) >> return arr)'
+           a type expected by the context: GHC.ST.ST s1 (IndTree s a)
+           at tcfail068.hs:18:9
+    Expected type: STArray s1 (Int, Int) a
+      Actual type: IndTree s a
+    In the first argument of `writeSTArray', namely `arr'
+    In the first argument of `(>>)', namely
+      `writeSTArray arr i (f val)'
 
 tcfail068.hs:24:35:
-    Could not deduce (s ~ s1) from the context (Constructed a)
+    Could not deduce (s ~ s1)
+    from the context (Constructed a)
+      bound by the type signature for
+                 itrap :: Constructed a =>
+                          ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
+      at tcfail068.hs:(24,1)-(32,41)
       `s' is a rigid type variable bound by
-          the type signature for `itrap' at tcfail068.hs:23:70
+          the type signature for
+            itrap :: Constructed a =>
+                     ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
+          at tcfail068.hs:24:1
       `s1' is a rigid type variable bound by
-           the polymorphic type `forall s. GHC.ST.ST s a'
-             at tcfail068.hs:24:29
+           a type expected by the context: GHC.ST.ST s1 (IndTree s a)
+           at tcfail068.hs:24:29
+    Expected type: GHC.ST.ST s1 (IndTree s a)
+      Actual type: GHC.ST.ST s (IndTree s a)
+    In the return type of a call of `itrap''
     In the first argument of `runST', namely `(itrap' i k)'
-    In the expression: runST (itrap' i k)
-    In an equation for `itrap':
-        itrap ((i, k), (j, l)) f arr
-          = runST (itrap' i k)
-          where
-              itrap' i k
-                = if k > l then return arr else (itrapsnd i k >> itrap' i (k + 1))
-              itrapsnd i k
-                = if i > j then
-                      return arr
-                  else
-                      (readSTArray arr (i, k) >>= \ val -> ...)
 
 tcfail068.hs:36:46:
-    Could not deduce (s ~ s1) from the context (Constructed b)
+    Could not deduce (s ~ s1)
+    from the context (Constructed b)
+      bound by the type signature for
+                 itrapstate :: Constructed b =>
+                               ((Int, Int), (Int, Int))
+                               -> (a -> b -> (a, b))
+                               -> ((Int, Int) -> c -> a)
+                               -> (a -> c)
+                               -> c
+                               -> IndTree s b
+                               -> (c, IndTree s b)
+      at tcfail068.hs:(36,1)-(45,66)
       `s' is a rigid type variable bound by
-          the type signature for `itrapstate' at tcfail068.hs:35:40
+          the type signature for
+            itrapstate :: Constructed b =>
+                          ((Int, Int), (Int, Int))
+                          -> (a -> b -> (a, b))
+                          -> ((Int, Int) -> c -> a)
+                          -> (a -> c)
+                          -> c
+                          -> IndTree s b
+                          -> (c, IndTree s b)
+          at tcfail068.hs:36:1
       `s1' is a rigid type variable bound by
-           the polymorphic type `forall s. GHC.ST.ST s a'
-             at tcfail068.hs:36:40
+           a type expected by the context: GHC.ST.ST s1 (c, IndTree s b)
+           at tcfail068.hs:36:40
+    Expected type: GHC.ST.ST s1 (c, IndTree s b)
+      Actual type: GHC.ST.ST s (c, IndTree s b)
+    In the return type of a call of `itrapstate''
     In the first argument of `runST', namely `(itrapstate' i k s)'
-    In the expression: runST (itrapstate' i k s)
-    In an equation for `itrapstate':
-        itrapstate ((i, k), (j, l)) f c d s arr
-          = runST (itrapstate' i k s)
-          where
-              itrapstate' i k s
-                = if k > l then
-                      return (s, arr)
-                  else
-                      (itrapstatesnd i k s >>= \ (s, arr) -> ...)
-              itrapstatesnd i k s
-                = if i > j then
-                      return (s, arr)
-                  else
-                      (readSTArray arr (i, k) >>= \ val -> ...)

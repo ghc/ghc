@@ -116,7 +116,9 @@ test('GivenCheckSwap', normal, compile, [''])
 test('GivenCheckDecomp', normal, compile, [''])
 test('GivenCheckTop', normal, compile, [''])
 
-test('Gentle', normal, compile, [''])
+# A very delicate test
+test('Gentle', normal, compile_fail, [''])
+
 test('T1981', normal, compile, [''])
 test('T2238', expect_fail, compile, [''])
 test('OversatDecomp', normal, compile, [''])

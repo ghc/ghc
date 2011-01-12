@@ -1,7 +1,22 @@
 
 T2714.hs:8:5:
-    Couldn't match type `a' with `f b'
+    Couldn't match type `a' with `f0 b'
       `a' is a rigid type variable bound by
-          the type signature for `f' at T2714.hs:7:8
+          the type signature for f :: ((a -> b) -> b) -> forall c. c -> a
+          at T2714.hs:8:1
+    Expected type: ((a -> b) -> b) -> c -> a
+      Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
+    In the expression: ffmap
+    In an equation for `f': f = ffmap
+
+T2714.hs:8:5:
+    Couldn't match type `c' with `f0 (f0 b -> b)'
+      `c' is a rigid type variable bound by
+          the type signature for f :: ((a -> b) -> b) -> c -> a
+          at T2714.hs:8:1
+    Expected type: c
+      Actual type: f0 (a -> b)
+    Expected type: ((a -> b) -> b) -> c -> a
+      Actual type: ((a -> b) -> b) -> f0 (a -> b) -> f0 b
     In the expression: ffmap
     In an equation for `f': f = ffmap

@@ -2,6 +2,6 @@
 tcfail175.hs:11:1:
     Couldn't match type `a' with `String -> String -> String'
       `a' is a rigid type variable bound by
-          the type signature for `evalRHS' at tcfail175.hs:10:19
+          the type signature for evalRHS :: Int -> a at tcfail175.hs:11:1
     The equation(s) for `evalRHS' have three arguments,
     but its type `Int -> a' has only one

@@ -11,7 +11,7 @@ f1 = let ?x = 5 in \() -> ?x
    -- Should always return 5
 
 f2 () = let ?x = 5 in \() -> ?x
-   -- Inferred type: (?x::Integer) => () -> () -> Integer
+   -- Inferred type: (Num a, ?x::a) => () -> () -> a
    -- should always return 5
 
 f3 :: () -> ((?x :: Int) => Int)

@@ -1,6 +1,6 @@
 
 tcfail033.hs:4:12:
-    Occurs check: cannot construct the infinite type: t = (t, t1)
+    Occurs check: cannot construct the infinite type: t0 = (t0, t1)
     In the expression: x
     In a stmt of a list comprehension: (x, y) <- buglet
     In the expression: [x | (x, y) <- buglet]

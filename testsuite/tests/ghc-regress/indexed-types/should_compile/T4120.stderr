@@ -1,8 +1,8 @@
 
 T4120.hs:17:10:
     Couldn't match expected type `forall s. MVector s a'
-                with actual type `forall s. Mutable Vector s a1'
-      Expected type: (forall s. MVector s a) -> Int
-        Actual type: (forall s. Mutable Vector s a1) -> Int
+                with actual type `forall s. Mutable Vector s a0'
+    Expected type: (forall s. MVector s a) -> Int
+      Actual type: (forall s. Mutable Vector s a0) -> Int
     In the expression: create1
     In an equation for `create': create = create1

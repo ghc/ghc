@@ -2,10 +2,10 @@
 mdofail001.hs:1:12:
     Warning: -XRecursiveDo is deprecated: use -XDoRec or pragma {-# LANGUAGE DoRec #-} instead
 
-mdofail001.hs:10:32:
+mdofail001.hs:10:36:
     No instance for (Num Char)
-      arising from the literal `1'
+      arising from the literal `3'
     Possible fix: add an instance declaration for (Num Char)
-    In the expression: 1
+    In the expression: 3
     In the first argument of `l', namely `[1, 2, 3]'
     In the expression: l [1, 2, 3]

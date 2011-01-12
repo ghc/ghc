@@ -1,8 +1,13 @@
 
-tcfail099.hs:9:7:
+tcfail099.hs:9:20:
     Couldn't match type `t' with `a'
-      because type variable `a' would escape its scope
-    This (rigid, skolem) type variable is bound by
-      a pattern with constructor C :: forall a. (a -> Int) -> DS
-    In the pattern: C f
+      `t' is a rigid type variable bound by
+          the inferred type of call :: DS -> t -> Int at tcfail099.hs:9:1
+      `a' is a rigid type variable bound by
+          a pattern with constructor
+            C :: forall a. (a -> Int) -> DS,
+          in an equation for `call'
+          at tcfail099.hs:9:7
+    In the first argument of `f', namely `arg'
+    In the expression: f arg
     In an equation for `call': call (C f) arg = f arg

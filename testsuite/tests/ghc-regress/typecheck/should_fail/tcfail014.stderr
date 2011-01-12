@@ -1,6 +1,6 @@
 
 tcfail014.hs:5:33:
-    Occurs check: cannot construct the infinite type: t1 = t1 -> t
+    Occurs check: cannot construct the infinite type: t1 = t1 -> t0
     In the first argument of `z', namely `z'
     In the expression: z z
     In an equation for `h': h z = z z

@@ -1,20 +1,22 @@
 
-T2494.hs:15:14:
-    Couldn't match type `b' with `a'
-      `b' is a rigid type variable bound by
-          the type signature for `g' at T2494.hs:14:46
+T2494.hs:15:7:
+    Couldn't match type `a' with `b'
       `a' is a rigid type variable bound by
-          the type signature for `f' at T2494.hs:13:46
-    In the first argument of `foo', namely `g'
-    In the second argument of `foo', namely `(foo g x)'
+          the RULE "foo/foo" at T2494.hs:13:46
+      `b' is a rigid type variable bound by
+          the RULE "foo/foo" at T2494.hs:14:46
+    Expected type: Maybe (m b) -> Maybe (m b)
+      Actual type: Maybe (m a) -> Maybe (m a)
+    In the first argument of `foo', namely `f'
     In the expression: foo f (foo g x)
 
 T2494.hs:15:30:
     Couldn't match type `b' with `a'
       `b' is a rigid type variable bound by
-          the type signature for `g' at T2494.hs:14:46
+          the RULE "foo/foo" at T2494.hs:14:46
       `a' is a rigid type variable bound by
-          the type signature for `f' at T2494.hs:13:46
+          the RULE "foo/foo" at T2494.hs:13:46
+    Expected type: Maybe (m b) -> Maybe (m a)
+      Actual type: Maybe (m b) -> Maybe (m b)
     In the second argument of `(.)', namely `g'
     In the first argument of `foo', namely `(f . g)'
-    In the expression: foo (f . g) x

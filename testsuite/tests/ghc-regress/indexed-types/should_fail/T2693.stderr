@@ -1,9 +1,7 @@
 
 T2693.hs:9:16:
-    Couldn't match type `TFn a' with `(a1, b)'
+    Couldn't match type `TFn a0' with `(a1, b0)'
+    Expected type: Maybe (a1, b0)
+      Actual type: Maybe (TFn a0)
     In the expression: undefined :: Maybe (TFn a)
     In a pattern binding: Just x = undefined :: Maybe (TFn a)
-    In the expression:
-      do { let Just x = ...;
-           let n = fst x + fst x;
-           return () }

@@ -1,6 +1,7 @@
 
 tcfail016.hs:9:20:
-    Couldn't match expected type `Expr t' with actual type `AnnExpr t'
+    Couldn't match expected type `Expr t0'
+                with actual type `AnnExpr t0'
     In the first argument of `g', namely `e1'
     In the first argument of `(++)', namely `(g e1)'
     In the expression: (g e1) ++ (g e2)

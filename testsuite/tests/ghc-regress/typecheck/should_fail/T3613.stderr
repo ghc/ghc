@@ -1,17 +1,17 @@
 
 T3613.hs:14:20:
-    Couldn't match expected type `Maybe a' with actual type `IO ()'
+    Couldn't match expected type `Maybe a0' with actual type `IO ()'
     In the first argument of `(>>)', namely `bar'
     In the first argument of `fooThen', namely `(bar >> undefined)'
     In the expression: fooThen (bar >> undefined)
 
 T3613.hs:17:24:
-    Couldn't match expected type `Maybe a' with actual type `IO ()'
+    Couldn't match expected type `Maybe a0' with actual type `IO ()'
     In a stmt of a 'do' expression: bar
     In the first argument of `fooThen', namely
-        `(do { bar;
-               undefined })'
+      `(do { bar;
+             undefined })'
     In the expression:
-        fooThen
-          (do { bar;
-                undefined })
+      fooThen
+        (do { bar;
+              undefined })

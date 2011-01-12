@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleInstances, FunctionalDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, MultiParamTypeClasses, FlexibleInstances, FunctionalDependencies, FlexibleContexts, UndecidableInstances, StandaloneDeriving #-}
 module T3621 where
 
 -- This one is ok, even though the deriving clause mentions 'a'
@@ -18,6 +18,19 @@ instance Monad (State s) where {}
 instance MonadState s (State s) where {}
 
 newtype WrappedState s a = WS { runWS :: State s a }
-    deriving (Monad, MonadState state)
+   deriving (Monad, MonadState state)
+--   deriving (Monad)
+
+deriving instance (MonadState state (State s))
+      => MonadState state (WrappedState s)
+
+-- ASSERT error
+-- deriving instance (MonadState state (State s), Monad (WrappedState s))
+--      => MonadState s (WrappedState s)
 
 
+-- We try
+--   instance MonadState state (State state a)
+--         => MonadState state (WrappedState state a)
+--
+-- Superclass needs (Monad (WrappedState state a))

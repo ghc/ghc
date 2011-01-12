@@ -1,12 +1,12 @@
 
 tcfail133.hs:68:14:
-    No instance for (AddDigit (Zero :@ (One :@ One)) One c)
+    No instance for (AddDigit (Zero :@ (One :@ One)) One a0)
       arising from a use of `add'
     Possible fix:
       add an instance declaration for
-      (AddDigit (Zero :@ (One :@ One)) One c)
+      (AddDigit (Zero :@ (One :@ One)) One a0)
     In the second argument of `($)', namely
-        `add (One :@ Zero) (One :@ One)'
+      `add (One :@ Zero) (One :@ One)'
     In the expression: show $ add (One :@ Zero) (One :@ One)
     In an equation for `foo':
         foo = show $ add (One :@ Zero) (One :@ One)

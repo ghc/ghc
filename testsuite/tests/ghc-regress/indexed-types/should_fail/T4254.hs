@@ -17,4 +17,5 @@ ok2    = op
 
 fails :: forall a b. (a~Int,FD a b) => a -> Bool 
 fails  = op
--- Should fail: no proof that b~Bool
+-- Could fail: no proof that b~Bool
+-- But can also succeed; it's not a *wanted* constraint

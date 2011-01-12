@@ -13,26 +13,33 @@ tcfail067.hs:15:11:
     In an equation for `subRange': subRange (SubRange r value) = r
 
 tcfail067.hs:46:12:
-    Could not deduce (Ord a) from the context (Show a)
-      arising from a use of `SubRange'
+    Could not deduce (Ord a) arising from a use of `SubRange'
+    from the context (Show a)
+      bound by the type signature for
+                 showRange :: Show a => SubRange a -> String
+      at tcfail067.hs:(46,1)-(47,58)
     Possible fix:
-      add (Ord a) to the context of the type signature for `showRange'
+      add (Ord a) to the context of
+        the type signature for showRange :: Show a => SubRange a -> String
     In the pattern: SubRange (lower, upper) value
     In an equation for `showRange':
         showRange (SubRange (lower, upper) value)
-                    = show value ++ " :" ++ show lower ++ ".." ++ show upper
+          = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
 tcfail067.hs:60:10:
-    Could not deduce (Show (SubRange a)) from the context (Num a)
+    Could not deduce (Show (SubRange a))
       arising from the superclasses of an instance declaration
+    from the context (Num a)
+      bound by the instance declaration at tcfail067.hs:60:10-34
     Possible fix:
       add (Show (SubRange a)) to the context of the instance declaration
       or add an instance declaration for (Show (SubRange a))
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:61:12:
-    Could not deduce (Ord a) from the context (Num a)
-      arising from a use of `numSubRangeNegate'
+    Could not deduce (Ord a) arising from a use of `numSubRangeNegate'
+    from the context (Num a)
+      bound by the instance declaration at tcfail067.hs:60:10-34
     Possible fix:
       add (Ord a) to the context of the instance declaration
     In the expression: numSubRangeNegate
@@ -40,26 +47,33 @@ tcfail067.hs:61:12:
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:65:19:
-    Could not deduce (Ord a) from the context (Num a)
-      arising from a use of `SubRange'
+    Could not deduce (Ord a) arising from a use of `SubRange'
+    from the context (Num a)
+      bound by the instance declaration at tcfail067.hs:60:10-34
     Possible fix:
       add (Ord a) to the context of the instance declaration
     In the expression:
-        SubRange (fromInteger a, fromInteger a) (fromInteger a)
+      SubRange (fromInteger a, fromInteger a) (fromInteger a)
     In an equation for `fromInteger':
-        fromInteger a = SubRange
-                          (fromInteger a, fromInteger a) (fromInteger a)
+        fromInteger a
+          = SubRange (fromInteger a, fromInteger a) (fromInteger a)
     In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:74:5:
-    Could not deduce (Ord a) from the context (Num a)
-      arising from a use of `SubRange'
+    Could not deduce (Ord a) arising from a use of `SubRange'
+    from the context (Num a)
+      bound by the type signature for
+                 numSubRangeBinOp :: Num a =>
+                                     (a -> a -> a) -> SubRange a -> SubRange a -> SubRange a
+      at tcfail067.hs:(73,1)-(76,53)
     Possible fix:
       add (Ord a) to the context of
-        the type signature for `numSubRangeBinOp'
+        the type signature for
+          numSubRangeBinOp :: Num a =>
+                              (a -> a -> a) -> SubRange a -> SubRange a -> SubRange a
     In the expression: SubRange (result, result) result
     In an equation for `numSubRangeBinOp':
         numSubRangeBinOp op a b
-                           = SubRange (result, result) result
-                           where
-                               result = (subRangeValue a) `op` (subRangeValue b)
+          = SubRange (result, result) result
+          where
+              result = (subRangeValue a) `op` (subRangeValue b)

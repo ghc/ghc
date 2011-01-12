@@ -227,7 +227,10 @@ test('tc212', normal, compile, [''])
 test('tc213', normal, compile, [''])
 test('tc214', normal, compile, [''])
 test('tc215', normal, compile, [''])
-test('tc216', normal, compile_fail, [''])
+
+# This one is very delicate, but I don't think the result really matters
+test('tc216', normal, compile, [''])
+
 test('tc217', reqlib('mtl'), compile, [''])
 test('tc218', normal, compile, [''])
 test('tc219', normal, compile, [''])

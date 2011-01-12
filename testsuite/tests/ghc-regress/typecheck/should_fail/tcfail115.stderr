@@ -1,7 +1,7 @@
 
 tcfail115.hs:9:24:
     Kind incompatibility when matching types:
-      t :: ??
+      t0 :: ??
       (# Int, Int #) :: (#)
     In the expression: (r :: (# Int, Int #))
     In a case alternative: r -> (r :: (# Int, Int #))
