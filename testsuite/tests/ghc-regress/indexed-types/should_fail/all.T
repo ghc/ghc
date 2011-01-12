@@ -68,4 +68,5 @@ test('T4174', normal, compile_fail, [''])
 test('DerivUnsatFam', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
 test('T2664', normal, compile_fail, [''])
 test('T2664a', normal, compile, [''])
+test('T2544', normal, compile_fail, [''])
 
