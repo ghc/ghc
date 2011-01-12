@@ -96,6 +96,7 @@ type IOCallback = FdKey -> Event -> IO ()
 instance Show IOCallback where
     show _ = "IOCallback"
 
+-- | A timeout registration cookie.
 newtype TimeoutKey   = TK Unique
     deriving (Eq)
 
@@ -217,7 +218,8 @@ cleanup EventManager{..} = do
 ------------------------------------------------------------------------
 -- Event loop
 
--- | Start handling events.  This function loops until told to stop.
+-- | Start handling events.  This function loops until told to stop,
+-- using 'shutdown'.
 --
 -- /Note/: This loop can only be run once per 'EventManager', as it
 -- closes all of its control resources when it finishes.
@@ -346,7 +348,10 @@ closeFd mgr close fd = do
 ------------------------------------------------------------------------
 -- Registering interest in timeout events
 
--- | Register a timeout in the given number of microseconds.
+-- | Register a timeout in the given number of microseconds.  The
+-- returned 'TimeoutKey' can be used to later unregister or update the
+-- timeout.  The timeout is automatically unregistered after the given
+-- time has passed.
 registerTimeout :: EventManager -> Int -> TimeoutCallback -> IO TimeoutKey
 registerTimeout mgr us cb = do
   !key <- newUnique (emUniqueSource mgr)
@@ -365,12 +370,15 @@ registerTimeout mgr us cb = do
       wakeManager mgr
   return $ TK key
 
+-- | Unregister an active timeout.
 unregisterTimeout :: EventManager -> TimeoutKey -> IO ()
 unregisterTimeout mgr (TK key) = do
   atomicModifyIORef (emTimeouts mgr) $ \f ->
       let f' = (Q.delete key) . f in (f', ())
   wakeManager mgr
 
+-- | Update an active timeout to fire in the given number of
+-- microseconds.
 updateTimeout :: EventManager -> TimeoutKey -> Int -> IO ()
 updateTimeout mgr (TK key) us = do
   now <- getCurrentTime
