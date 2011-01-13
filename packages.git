@@ -1,0 +1,84 @@
+# Despite the name "package", this file contains the master list of 
+# the *repositories* that make up GHC. It is parsed by boot and darcs-all.
+#
+# Some of this information is duplicated elsewhere in the build system:
+#    See Trac #3896
+# In particular when adding libraries to this file, you also need to add
+# the library to the SUBDIRS variable in libraries/Makefile so that they
+# actually get built
+#
+# The repos are of several kinds:
+#    - The main GHC source repo
+#    - Each boot package lives in a repo
+#    - DPH is a repo that contains several packages
+#    - Haddock and hsc2hs are applications, built on top of GHC, 
+#        and in turn needed to bootstrap GHC
+#    - ghc-tarballs is need to build GHC
+#    - nofib and testsuite are optional helpers
+#
+# The format of the lines in this file is:
+#   localpath    tag    remotepath    VCS    upstream
+# where
+#   * 'localpath' is where to put the repository in a checked out tree.
+#   * 'remotepath' is where the repository is in the central repository.
+#   * 'VCS' is what version control system the repo uses.
+#
+#   * The 'tag' determines when "darcs-all get" will get the
+#     repo. If the tag is "-" then it will always get it, but if there
+#     is a tag then a corresponding flag must be given to darcs-all, e.g.
+#     if you want to get the packages with an "extralibs" or "testsuite"
+#     tag then you need to use "darcs-all --extra --testsuite get".
+#     Support for new tags must be manually added to the darcs-all script.
+# 
+#     'tag' is also used to determine which packages the build system
+#     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra' 
+#     both give this property
+#
+#   * 'upstream' is the URL of the upstream repo, where there is one, or
+#     "-" if there is no upstream.
+#
+# Lines that start with a '#' are comments.
+.                               -           ghc.git                             git   -
+ghc-tarballs                    -           ghc-tarballs.git                    git   -
+utils/hsc2hs                    -           hsc2hs.git                          git   -
+# haddock does have an upstream:
+#   http://code.haskell.org/haddock/
+# but it stays buildable with the last stable release rather than tracking HEAD,
+# and is resynced with the GHC HEAD branch by David Waern when appropriate
+utils/haddock                   -           haddock2.git                        git   -
+libraries/array                 -           packages/array.git                  git   -
+libraries/base                  -           packages/base.git                   git   -
+libraries/binary                -           packages/binary.git                 git   http://code.haskell.org/binary/
+libraries/bytestring            -           packages/bytestring.git             git   http://darcs.haskell.org/bytestring/
+libraries/Cabal                 -           packages/Cabal.git                  git   http://darcs.haskell.org/cabal/
+libraries/containers            -           packages/containers.git             git   -
+libraries/directory             -           packages/directory.git              git   -
+libraries/extensible-exceptions -           packages/extensible-exceptions.git  git   -
+libraries/filepath              -           packages/filepath.git               git   -
+libraries/ghc-prim              -           packages/ghc-prim.git               git   -
+libraries/haskeline             -           packages/haskeline.git              git   http://code.haskell.org/haskeline/
+libraries/haskell98             -           packages/haskell98.git              git   -
+libraries/haskell2010           -           packages/haskell2010.git            git   -
+libraries/hpc                   -           packages/hpc.git                    git   -
+libraries/integer-gmp           -           packages/integer-gmp.git            git   -
+libraries/integer-simple        -           packages/integer-simple.git         git   -
+libraries/mtl                   -           packages/mtl.git                    git   -
+libraries/old-locale            -           packages/old-locale.git             git   -
+libraries/old-time              -           packages/old-time.git               git   -
+libraries/pretty                -           packages/pretty.git                 git   -
+libraries/process               -           packages/process.git                git   -
+libraries/random                -           packages/random.git                 git   -
+libraries/template-haskell      -           packages/template-haskell.git       git   -
+libraries/terminfo              -           packages/terminfo.git               git   http://code.haskell.org/terminfo/
+libraries/unix                  -           packages/unix.git                   git   -
+libraries/utf8-string           -           packages/utf8-string.git            git   http://code.haskell.org/utf8-string/
+libraries/Win32                 -           packages/Win32.git                  git   -
+libraries/xhtml                 -           packages/xhtml.git                  git   -
+testsuite                       testsuite   testsuite.git                       git   -
+nofib                           nofib       nofib.git                           git   -
+libraries/deepseq               extra       packages/deepseq.git                git   -
+libraries/parallel              extra       packages/parallel.git               git   -
+libraries/stm                   extra       packages/stm.git                    git   -
+libraries/primitive             dph         packages/primitive.git              git   http://code.haskell.org/primitive
+libraries/vector                dph         packages/vector.git                 git   http://code.haskell.org/vector
+libraries/dph                   dph         packages/dph.git                    git   -
