@@ -159,11 +159,13 @@ INSTALL_DIR     = $(INSTALL) -m 755 -d $(call MK_INSTALL_DEST,$1)
 # This causes problems for bindisttest/checkBinaries.sh which then
 # thinks that e.g. the userguide HTML files are binaries.
 #
-# We therefore use a /cygdrive path if we are on cygwin
-ifeq '$(shell cygpath "c:/" 2> /dev/null)' ''
-MK_INSTALL_DEST = $1
-else
+# We therefore use a /cygdrive path if we are on cygwin (only)
+#   (This will make a Cygwin build run slowly 
+#    becuase of all those shell invocations.)
+ifeq "$OSTYPE" "cygwin" 
 MK_INSTALL_DEST = "$(shell cygpath $1)"
+else
+MK_INSTALL_DEST = $1
 endif
 
 #

@@ -596,16 +596,18 @@ CTAGS 			= $(ETAGS)
 RAWCPP_FLAGS            = -undef -traditional
 FIND			= @FindCmd@
 SORT		        = @SortCmd@
-INSTALL			= @INSTALL@
+
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
 # install-sh script (if chosen). This not terribly useful to us, so we convert
 # it into an abs. path.
 # 
+INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
+
 LATEX			= latex
-PDFLATEX        = pdflatex
-BIBTEX          = bibtex
+PDFLATEX                = pdflatex
+BIBTEX                  = bibtex
 LN_S			= @LN_S@
 MV			= mv
 NROFF			= nroff

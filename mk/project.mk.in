@@ -135,3 +135,7 @@ else
 Windows=NO
 endif
 
+# Tell the build system what the host operating system is
+# This distinguishes "msys" and "cygwin", which are not
+# not distinguished by HOST_OS_CPP
+OSTYPE=@OSTYPE@

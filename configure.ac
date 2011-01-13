@@ -89,6 +89,11 @@ AC_ARG_WITH([ghc],
   fi
   WithGhc="$GHC"])
 
+
+dnl ** Tell the make system which OS we are using
+dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something 
+AC_SUBST(OSTYPE)
+
 dnl ** Booting from .hc files?
 dnl --------------------------------------------------------------
 AC_ARG_ENABLE(hc-boot,
