@@ -642,6 +642,11 @@ solve_wanteds inert wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = 
   = do { traceTcS "solveWanteds {" (ppr wanted)
 
                  -- Try the flat bit
+                 -- Discard from insols all the derived/given constraints
+                 -- because they will show up again when we try to solve
+                 -- everything else.  Solving them a second time is a bit
+                 -- of a waste, but the code is simple, and the program is
+                 -- wrong anyway!
        ; let all_flats = flats `unionBags` keepWanted insols
        ; inert1 <- solveInteractWanted inert (bagToList all_flats)
 

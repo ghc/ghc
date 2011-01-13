@@ -792,7 +792,7 @@ data Implication
                                  --   which is also the location of all the
                                  --   given evidence variables
 
-      ic_wanted  :: WantedConstraints, -- The wanted
+      ic_wanted :: WantedConstraints,  -- The wanted
       ic_insol  :: Bool,               -- True iff insolubleWC ic_wantted is true
 
       ic_binds  :: EvBindsVar   -- Points to the place to fill in the
