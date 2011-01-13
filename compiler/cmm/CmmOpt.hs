@@ -153,7 +153,7 @@ inlineStmt u a (CmmAssign r e) = CmmAssign r (inlineExpr u a e)
 inlineStmt u a (CmmStore e1 e2) = CmmStore (inlineExpr u a e1) (inlineExpr u a e2)
 inlineStmt u a (CmmCall target regs es srt ret)
    = CmmCall (infn target) regs es' srt ret
-   where infn (CmmCallee fn cconv) = CmmCallee fn cconv
+   where infn (CmmCallee fn cconv) = CmmCallee (inlineExpr u a fn) cconv
 	 infn (CmmPrim p) = CmmPrim p
 	 es' = [ (CmmHinted (inlineExpr u a e) hint) | (CmmHinted e hint) <- es ]
 inlineStmt u a (CmmCondBranch e d) = CmmCondBranch (inlineExpr u a e) d
