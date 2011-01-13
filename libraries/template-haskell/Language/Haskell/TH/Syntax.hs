@@ -80,7 +80,7 @@ class (Monad m, Functor m) => Quasi m where
  
 	-- Inspect the type-checker's environment
   qReify :: Name -> m Info
-  qClassInstances :: Name -> [Type] -> m [Name]
+  qClassInstances :: Name -> [Type] -> m [ClassInstance]
   		      -- Is (cls tys) an instance?
 		      -- Returns list of matching witnesses
 
@@ -164,7 +164,7 @@ reify :: Name -> Q Info
 reify v = Q (qReify v)
 
 -- | 'classInstances' looks up instaces of a class
-classInstances :: Name -> [Type] -> Q [Name]
+classInstances :: Name -> [Type] -> Q [ClassInstance]
 classInstances cls tys = Q (qClassInstances cls tys)
 
 isClassInstance :: Name -> [Type] -> Q Bool

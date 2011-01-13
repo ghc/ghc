@@ -91,7 +91,7 @@ module Language.Haskell.TH(
     pragInlD, pragSpecD,
 
 	-- * Pretty-printer
-	Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
+    Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
 	
    ) where
 
