@@ -941,7 +941,7 @@ illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (withou
 %************************************************************************
 
 \begin{code}
-lookupClassInstances :: TH.Name -> [TH.Type] -> TcM [TH.Name]
+lookupClassInstances :: TH.Name -> [TH.Type] -> TcM [TH.ClassInstance]
 lookupClassInstances c ts
    = do { loc <- getSrcSpanM
         ; case convertToHsPred loc (TH.ClassP c ts) of {
@@ -954,8 +954,7 @@ lookupClassInstances c ts
 	-- Now look up instances
         ; inst_envs <- tcGetInstEnvs
         ; let (matches, unifies) = lookupInstEnv inst_envs cls tys
-              dfuns = map is_dfun (map fst matches ++ unifies)
-        ; return (map reifyName dfuns) } } }
+        ; mapM reifyClassInstance (map fst matches ++ unifies) } } }
   where
     doc = ptext (sLit "TcSplice.classInstances")
 \end{code}
