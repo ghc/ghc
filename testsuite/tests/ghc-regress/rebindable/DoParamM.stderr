@@ -7,19 +7,19 @@ DoParamM.hs:146:25:
 
 DoParamM.hs:286:28:
     Couldn't match expected type `Locked' with actual type `Unlocked'
-      Expected type: LIO Locked r b
-        Actual type: LIO Unlocked Locked ()
+    Expected type: LIO Locked r0 b0
+      Actual type: LIO Unlocked Locked ()
     In the expression: tlock2_do
     In the expression:
-        do { tlock2_do;
-             tlock2_do }
+      do { tlock2_do;
+           tlock2_do }
 
 DoParamM.hs:302:37:
     Couldn't match expected type `Unlocked' with actual type `Locked'
-      Expected type: LIO Unlocked r b
-        Actual type: LIO Locked Unlocked ()
+    Expected type: LIO Unlocked r0 b0
+      Actual type: LIO Locked Unlocked ()
     In the expression: unlock
     In the expression:
-        do { tlock2_do;
-             unlock;
-             unlock }
+      do { tlock2_do;
+           unlock;
+           unlock }
