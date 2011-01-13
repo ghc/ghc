@@ -3,22 +3,12 @@
 use strict;
 use Cwd;
 
-# Figure out where to get the other repositories from,
-# based on where this GHC repo came from.
-my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
-my $remote = `git config branch.$branch.remote`;         chomp $remote;
-my $defaultrepo = `git config remote.$remote.url`;       chomp $defaultrepo;
-
-my $defaultrepo_base;
-my $checked_out_tree;
-
+my $defaultrepo;
 my @packages;
-
 my $verbose = 2;
 my $ignore_failure = 0;
 my $want_remote_repo = 0;
 my $checked_out_flag = 0;
-
 my $get_mode;
 
 # Flags specific to a particular command
@@ -29,8 +19,18 @@ my %tags;
 # Figure out where to get the other repositories from.
 sub getrepo {
     my $basedir = ".";
-    my $repo = $defaultrepo || `cat $basedir/_darcs/prefs/defaultrepo`;
-    chomp $repo;
+    my $repo;
+
+    if (defined($defaultrepo)) {
+        $repo = $defaultrepo;
+        chomp $repo;
+    } else {
+        # Figure out where to get the other repositories from,
+        # based on where this GHC repo came from.
+        my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
+        my $remote = `git config branch.$branch.remote`;         chomp $remote;
+        $repo = `git config remote.$remote.url`;       chomp $repo;
+    }
 
     my $repo_base;
     my $checked_out_tree;
