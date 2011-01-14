@@ -182,10 +182,22 @@ has happened.  So we take the precaution of adding an INLINE pragma to
 any such functions.
 
 I made this change when I observed a big function at the end of
-compilation with a useful strictness signature but no w-w.  When 
-I measured it on nofib, it didn't make much difference; just a few
-percent improved allocation on one benchmark (bspt/Euclid.space).  
-But nothing got worse.
+compilation with a useful strictness signature but no w-w.  (It was
+small during demand analysis, we refrained from w/w, and then got big
+when something was inlined in its rhs.) When I measured it on nofib,
+it didn't make much difference; just a few percent improved allocation
+on one benchmark (bspt/Euclid.space).  But nothing got worse.
+
+There is an infelicity though.  We may get something like
+      f = g val
+==>
+      g x = case gw x of r -> I# r
+
+      f {- InlineStable, Template = g val -}
+      f = case gw x of r -> I# r
+
+The code for f duplicates that for g, without any real benefit. It
+won't really be executed, because calls to f will go via the inlining.
 
 Note [Wrapper activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
