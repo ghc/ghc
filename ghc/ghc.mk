@@ -11,8 +11,8 @@
 # -----------------------------------------------------------------------------
 
 # ToDo
-ghc_USES_CABAL = NO
-# ghc_PACKAGE = ghc-bin
+ghc_USES_CABAL = YES
+ghc_PACKAGE = ghc-bin
 
 ghc_stage1_HC_OPTS = $(GhcStage1HcOpts)
 ghc_stage2_HC_OPTS = $(GhcStage2HcOpts)

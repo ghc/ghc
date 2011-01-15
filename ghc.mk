@@ -282,6 +282,115 @@ include rules/bindist.mk
 	"$(MKDIRHIER)" $@
 
 # -----------------------------------------------------------------------------
+# Phase handling
+
+phase_0_or_later = YES
+ifeq "$(findstring $(phase),0)" ""
+phase_0_done = YES
+phase_1_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1)" ""
+phase_1_done = YES
+phase_2_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1 2)" ""
+phase_2_done = YES
+phase_3_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1 2 3)" ""
+phase_3_done = YES
+phase_4_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1 2 3 4)" ""
+phase_4_done = YES
+endif
+
+includes_dist-derivedconstants_CONFIGURE_PHASE = 0
+includes_dist-ghcconstants_CONFIGURE_PHASE = 0
+
+# We do these first, as making the sources for some later
+# packages needs them, and we need the sources before we can
+# work out dependencies
+utils/hsc2hs_dist_CONFIGURE_PHASE = 0
+utils/unlit_dist_CONFIGURE_PHASE = 0
+utils/genprimopcode_dist_CONFIGURE_PHASE = 0
+
+# Then the bootlibs
+libraries/hpc_dist-boot_CONFIGURE_PHASE = 1
+libraries/extensible-exceptions_dist-boot_CONFIGURE_PHASE = 1
+libraries/Cabal_dist-boot_CONFIGURE_PHASE = 1
+libraries/binary_dist-boot_CONFIGURE_PHASE = 1
+libraries/bin-package-db_dist-boot_CONFIGURE_PHASE = 1
+
+# We put the stage 1 compiler package in a later phase than the bootlibs
+# for the same reasone we have the
+#     $(compiler_stage1_depfile_haskell) : $(BOOT_LIBS)
+# dependency below
+compiler_stage1_CONFIGURE_PHASE = 2
+
+# Now we make the stage 1 compiler binary. Again, in a later phase than
+# its package for the same reason as the
+#     $(ghc_stage1_depfile_haskell) : $(compiler_stage1_v_LIB)
+# dep below
+ghc_stage1_CONFIGURE_PHASE = 3
+
+# Finally, the stage1 compiler is used to make the dependencies for
+# everything else, so we can now build the rest.
+compiler_stage2_CONFIGURE_PHASE = 4
+ghc_stage2_CONFIGURE_PHASE = 4
+
+libraries/ghc-prim_dist-install_CONFIGURE_PHASE = 4
+libraries/integer-gmp_dist-install_CONFIGURE_PHASE = 4
+libraries/base_dist-install_CONFIGURE_PHASE = 4
+libraries/filepath_dist-install_CONFIGURE_PHASE = 4
+libraries/array_dist-install_CONFIGURE_PHASE = 4
+libraries/bytestring_dist-install_CONFIGURE_PHASE = 4
+libraries/containers_dist-install_CONFIGURE_PHASE = 4
+libraries/unix_dist-install_CONFIGURE_PHASE = 4
+libraries/old-locale_dist-install_CONFIGURE_PHASE = 4
+libraries/old-time_dist-install_CONFIGURE_PHASE = 4
+libraries/time_dist-install_CONFIGURE_PHASE = 4
+libraries/directory_dist-install_CONFIGURE_PHASE = 4
+libraries/process_dist-install_CONFIGURE_PHASE = 4
+libraries/extensible-exceptions_dist-install_CONFIGURE_PHASE = 4
+libraries/hpc_dist-install_CONFIGURE_PHASE = 4
+libraries/pretty_dist-install_CONFIGURE_PHASE = 4
+libraries/template-haskell_dist-install_CONFIGURE_PHASE = 4
+libraries/Cabal_dist-install_CONFIGURE_PHASE = 4
+libraries/binary_dist-install_CONFIGURE_PHASE = 4
+libraries/bin-package-db_dist-install_CONFIGURE_PHASE = 4
+libraries/mtl_dist-install_CONFIGURE_PHASE = 4
+libraries/utf8-string_dist-install_CONFIGURE_PHASE = 4
+libraries/xhtml_dist-install_CONFIGURE_PHASE = 4
+libraries/terminfo_dist-install_CONFIGURE_PHASE = 4
+libraries/haskeline_dist-install_CONFIGURE_PHASE = 4
+libraries/random_dist-install_CONFIGURE_PHASE = 4
+libraries/haskell98_dist-install_CONFIGURE_PHASE = 4
+libraries/haskell2010_dist-install_CONFIGURE_PHASE = 4
+libraries/primitive_dist-install_CONFIGURE_PHASE = 4
+libraries/vector_dist-install_CONFIGURE_PHASE = 4
+libraries/dph/dph-base_dist-install_CONFIGURE_PHASE = 4
+libraries/dph/dph-prim-interface_dist-install_CONFIGURE_PHASE = 4
+libraries/dph/dph-prim-seq_dist-install_CONFIGURE_PHASE = 4
+libraries/dph/dph-prim-par_dist-install_CONFIGURE_PHASE = 4
+libraries/dph/dph-seq_dist-install_CONFIGURE_PHASE = 4
+libraries/dph/dph-par_dist-install_CONFIGURE_PHASE = 4
+
+utils/hp2ps_dist_CONFIGURE_PHASE = 4
+utils/genapply_dist_CONFIGURE_PHASE = 4
+utils/haddock_dist_CONFIGURE_PHASE = 4
+utils/hsc2hs_dist-install_CONFIGURE_PHASE = 4
+utils/ghc-pkg_dist-install_CONFIGURE_PHASE = 4
+utils/hpc_dist_CONFIGURE_PHASE = 4
+utils/runghc_dist_CONFIGURE_PHASE = 4
+utils/ghctags_dist_CONFIGURE_PHASE = 4
+utils/ghc-pwd_dist_CONFIGURE_PHASE = 4
+utils/ghc-cabal_dist-install_CONFIGURE_PHASE = 4
+utils/mkUserGuidePart_dist_CONFIGURE_PHASE = 4
+utils/compare_sizes_dist_CONFIGURE_PHASE = 4
+
+
+# -----------------------------------------------------------------------------
 # Packages
 
 # --------------------------------
@@ -510,8 +619,10 @@ endif
 # ----------------------------------------------
 # Checking packages with 'cabal check'
 
+ifeq "$(phase)" ""
 ifeq "$(CHECK_PACKAGES)" "YES"
 all: check_packages
+endif
 endif
 
 # These packages don't pass the Cabal checks because hs-source-dirs
@@ -551,7 +662,7 @@ CHECKED_compiler = YES
 # So this is the final ordering:
 
 # Phase 0 : all package-data.mk files
-#           (requires ghc-cabal, ghc-pkg, mkdirhier, dummy-ghc etc.)
+#           (requires ghc-cabal, ghc-pkg, mkdirhier etc.)
 # Phase 1 : .depend files for bootstrap libs
 #           (requires hsc2hs)
 # Phase 2 : compiler/stage1/.depend
@@ -617,7 +728,6 @@ BUILD_DIRS += \
    utils/testremove \
    utils/ghctags \
    utils/ghc-pwd \
-   utils/dummy-ghc \
    $(GHC_CABAL_DIR) \
    utils/hpc \
    utils/runghc \
@@ -710,9 +820,11 @@ $(foreach p,$(STAGE0_PACKAGES),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
-libraries/index.html: $(ALL_HADDOCK_FILES)
+libraries/index.html: inplace/bin/haddock $(ALL_HADDOCK_FILES)
 	cd libraries && sh gen_contents_index --inplace
+ifeq "$(phase)" ""
 $(eval $(call all-target,library_doc_index,libraries/index.html))
+endif
 INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js
 CLEAN_FILES += libraries/doc-index* libraries/haddock*.css \
 	       libraries/haddock*.js libraries/index*.html libraries/*.gif

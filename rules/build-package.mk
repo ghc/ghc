@@ -60,11 +60,55 @@ define build-package-helper
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
+# --- CONFIGURATION
+
+$(call package-config,$1,$2,$3)
+
+########################################
+ifeq "$$($1_$2_CONFIGURE_PHASE)" ""
+$$(error No configure phase for $1_$2)
+else ifeq "$$($1_$2_CONFIGURE_PHASE)" "$$(phase)"
+
+ifeq "$$(DEBUG)" "YES"
+$$(warning $1/$2 configure phase)
+endif
+
+ifneq "$$(BINDIST)" "YES"
+$(call build-package-data,$1,$2,$3)
+endif
+
+ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+include $1/$2/package-data.mk
+endif
+
+else ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_or_later)" "YES"
+
+ifeq "$$(DEBUG)" "YES"
+$$(warning $1/$2 build phase)
+endif
+
+ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+include $1/$2/package-data.mk
+ifeq "$$($1_$2_VERSION)" ""
+$$(error No version for $1_$2 found)
+endif
+endif
+
+$(call all-target,$1,all_$1_$2)
+
+else
+
+ifeq "$$(DEBUG)" "YES"
+$$(warning $1/$2 disabled phase)
+endif
+
+endif
+########################################
+
 # We don't install things compiled by stage 0, so no need to put them
 # in the bindist.
 ifneq "$$(BINDIST) $3" "YES 0"
 
-$(call all-target,$1,all_$1_$2)
 # This give us things like
 #     all_libraries: all_libraries/base_dist-install
 ifneq "$$($1_$2_GROUP)" ""
@@ -79,38 +123,7 @@ check_$1: $$(GHC_CABAL_INPLACE)
 	$$(GHC_CABAL_INPLACE) check $1
 endif
 
-# --- CONFIGURATION
-
-ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
-include $1/$2/package-data.mk
-endif
-
-$(call package-config,$1,$2,$3)
-
-ifeq "$$($1_$2_DISABLE)" "YES"
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 disabled)
-endif
-
-# A package is disabled when we want to bring its package-data.mk file
-# up-to-date first, or due to other build dependencies.
-
-$(call all-target,$1_$2,$1/$2/package-data.mk)
-
-ifneq "$$(BINDIST)" "YES"
-# We have a rule for package-data.mk only when the package is
-# disabled, because we want the build to fail if we haven't run phase 0.
-$(call build-package-data,$1,$2,$3)
-endif
-
-else
-
-ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
-ifeq "$$($1_$2_VERSION)" ""
-$$(error phase ordering error: $1/$2 is enabled, but $1/$2/package-data.mk does not exist)
-endif
-endif
+ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_done)" "YES"
 
 # Sometimes we need to modify the automatically-generated package-data.mk
 # bindings in a special way for the GHC build system, so allow that here:

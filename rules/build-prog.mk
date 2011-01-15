@@ -48,10 +48,42 @@ define build-prog-helper
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
-$(call all-target,$1,all_$1_$2)
-
 ifeq "$$($1_USES_CABAL)" "YES"
 $1_$2_USES_CABAL = YES
+endif
+
+$(call package-config,$1,$2,$3)
+
+ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+$1_$2_INPLACE = $$(error $1_$2 should not be installed inplace, but INPLACE var evaluated)
+else
+$1_$2_INPLACE =
+endif
+else
+# Where do we install the inplace version?
+ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
+$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
+else
+ifeq "$$($1_$2_TOPDIR)" "YES"
+$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
+else
+$1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
+endif
+endif
+endif
+
+########################################
+ifeq "$$($1_$2_CONFIGURE_PHASE)" ""
+$$(error No configure phase for $1_$2)
+else ifeq "$$($1_$2_CONFIGURE_PHASE)" "$$(phase)"
+
+ifeq "$$(DEBUG)" "YES"
+$$(warning $1/$2 configure phase)
+endif
+
+ifneq "$$(BINDIST)" "YES"
+$(call build-package-data,$1,$2,$3)
 endif
 
 ifeq "$$($1_$2_USES_CABAL)" "YES"
@@ -60,32 +92,61 @@ include $1/$2/package-data.mk
 endif
 endif
 
-$(call package-config,$1,$2,$3)
-
-ifeq "$$($1_$2_USES_CABAL)$$($1_$2_VERSION)" "YES"
-$1_$2_DISABLE = YES
+# INPLACE_BIN might be empty if we're distcleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
+$$($1_$2_INPLACE) :
+	$$(error $1_$2 is configuring, but trying to build $$($1_$2_INPLACE)")
+endif
 endif
 
-ifeq "$$($1_$2_DISABLE)" "YES"
+else ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_or_later)" "YES"
 
 ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 disabled)
+$$(warning $1/$2 build phase)
 endif
 
-# The following code to build the package all depends on settings
-# obtained from package-data.mk.  If we don't have package-data.mk
-# yet, then don't try to do anything else with this package.  Make will
-# try to build package-data.mk, then restart itself and we'll be in business.
+ifeq "$$($1_$2_USES_CABAL)" "YES"
+ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+include $1/$2/package-data.mk
+ifeq "$$($1_$2_VERSION)" ""
+$$(error No version for $1_$2 found)
+endif
+endif
+endif
 
-$(call all-target,$1_$2,$1/$2/package-data.mk)
+$(call all-target,$1,all_$1_$2)
+$(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
 
-# We have a rule for package-data.mk only when the package is
-# disabled, because we want the build to fail if we haven't run phase 0.
-ifneq "$$(BINDIST)" "YES"
-$(call build-package-data,$1,$2,$3)
+# INPLACE_BIN might be empty if we're distcleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
+$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
+	"$$(CP)" -p $$< $$@
+	touch $$@
+endif
 endif
 
 else
+
+ifeq "$$(DEBUG)" "YES"
+$$(warning $1/$2 disabled phase)
+endif
+
+# INPLACE_BIN might be empty if we're distcleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
+$$($1_$2_INPLACE) :
+	$$(error $1_$2 is disabled, but trying to build $$($1_$2_INPLACE)")
+endif
+endif
+
+endif
+########################################
+
+$(call shell-wrapper,$1,$2)
+
+ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_done)" "YES"
 
 ifneq "$$(BINDIST)" "YES"
 $1_$2_WAYS = v
@@ -153,36 +214,14 @@ endif
 $1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
 endif
 endif
-endif
 
-ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
-else
-# Where do we install the inplace version?
-ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
-$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
-else
-ifeq "$$($1_$2_TOPDIR)" "YES"
-$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
-else
-$1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
-endif
-endif
-
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 $(call all-target,$1_$2,$$($1_$2_INPLACE))
-$(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
-
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
-	"$$(CP)" -p $$< $$@
-	touch $$@
 endif
+$(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
 
 # touch is necessary; cp doesn't update the file time.
 endif
-
-$(call shell-wrapper,$1,$2)
 
 ifeq "$$($1_$2_INSTALL)" "YES"
 ifeq "$$($1_$2_TOPDIR)" "YES"

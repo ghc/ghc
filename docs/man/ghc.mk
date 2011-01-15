@@ -39,7 +39,9 @@ docs/man/flags.xml: docs/users_guide/flags.xml
 	sed 1d $< >> $@
 
 ifeq "$(BUILD_MAN)" "YES"
+ifeq "$(phase)" ""
 $(eval $(call all-target,docs/man,$(MAN_PATH)))
+endif
 
 INSTALL_MANPAGES += $(MAN_PATH)
 

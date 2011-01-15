@@ -60,21 +60,25 @@ REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framewor
 # it does nothing if we specify a target that already exists.
 .PHONY: $(REALGOALS)
 $(REALGOALS) all: mk/config.mk.old mk/project.mk.old compiler/ghc.cabal.old
-	@echo "===--- updating makefiles phase 0"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 just-makefiles
+	@echo "===--- building phase 0"
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 all
 ifneq "$(OMIT_PHASE_1)" "YES"
-	@echo "===--- updating makefiles phase 1"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 just-makefiles
+	@echo "===--- building phase 1"
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 all
 endif
 ifneq "$(OMIT_PHASE_2)" "YES"
-	@echo "===--- updating makefiles phase 2"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=2 just-makefiles
+	@echo "===--- building phase 2"
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=2 all
 endif
 ifneq "$(OMIT_PHASE_3)" "YES"
-	@echo "===--- updating makefiles phase 3"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=3 just-makefiles
+	@echo "===--- building phase 3"
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=3 all
 endif
-	@echo "===--- finished updating makefiles"
+ifneq "$(OMIT_PHASE_4)" "YES"
+	@echo "===--- building phase 4"
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=4 all
+endif
+	@echo "===--- building final phase"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
 binary-dist: binary-dist-prep
