@@ -161,8 +161,10 @@ $(libffi_STATIC_LIB): $(libffi_STAMP_BUILD)
 	@test -f $@ || { echo "$< exits, but $@ does not."; echo "Suggest removing $<."; exit 1; }
 
 # Rename libffi.a to libHSffi.a
-libffi/dist-install/build/libHSffi.a libffi/dist-install/build/libHSffi_p.a: $(libffi_STATIC_LIB)
+libffi/dist-install/build/libHSffi.a: $(libffi_STATIC_LIB)
 	"$(CP)" $(libffi_STATIC_LIB) libffi/dist-install/build/libHSffi.a
+
+libffi/dist-install/build/libHSffi_p.a: $(libffi_STATIC_LIB)
 	"$(CP)" $(libffi_STATIC_LIB) libffi/dist-install/build/libHSffi_p.a
 
 $(eval $(call all-target,libffi,$(INSTALL_HEADERS) $(INSTALL_LIBS)))
