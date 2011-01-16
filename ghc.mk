@@ -638,6 +638,9 @@ $(foreach lib,$(STAGE0_PACKAGES),$(eval \
   libraries/$(lib)_dist-boot_CONFIGURE_PHASE = 1))
 compiler_stage1_CONFIGURE_PHASE = 1
 ghc_stage1_CONFIGURE_PHASE = 1
+driver/ghc_dist_CONFIGURE_PHASE = 1
+driver/ghci_dist_CONFIGURE_PHASE = 1
+driver/haddock_dist_CONFIGURE_PHASE = 1
 
 # In phase 2, the phase 1 things actually get built
 
@@ -649,6 +652,7 @@ ghc_stage2_CONFIGURE_PHASE = 3
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
   libraries/$(lib)_dist-install_CONFIGURE_PHASE = 3))
 
+utils/touchy_dist_CONFIGURE_PHASE = 3
 utils/hp2ps_dist_CONFIGURE_PHASE = 3
 utils/genapply_dist_CONFIGURE_PHASE = 3
 utils/haddock_dist_CONFIGURE_PHASE = 3
