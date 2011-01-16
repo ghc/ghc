@@ -738,11 +738,7 @@ $(eval $(call build-package,libraries/bin-package-db,dist-boot,0))
 fixed_pkg_prev=
 $(foreach pkg,$(STAGE0_PACKAGES),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
 
-compiler/stage1/package-data.mk : \
-    libraries/Cabal/dist-boot/package-data.mk \
-    libraries/hpc/dist-boot/package-data.mk \
-    libraries/extensible-exceptions/dist-boot/package-data.mk \
-    libraries/bin-package-db/dist-boot/package-data.mk
+compiler/stage1/package-data.mk : $(fixed_pkg_prev)
 
 # Make sure we have all the GHCi libs by the time we've built
 # ghc-stage2.  DPH includes a bit of Template Haskell which needs the
