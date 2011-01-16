@@ -192,6 +192,14 @@ ifeq "$$($1_$2_v_HS_OBJS)" ""
 $1_$2_GHC_LD_OPTS = -no-auto-link-packages -no-hs-main
 endif
 
+# The quadrupled $'s here are because the _v_LIB variables aren't
+# necessarily set when this part of the makefile is read
+ifeq "$3" "0"
+$1/$2/build/tmp/$$($1_$2_PROG) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-boot_v_LIB))
+else
+$1/$2/build/tmp/$$($1_$2_PROG) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-install_v_LIB))
+endif
+
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_GHC_LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))

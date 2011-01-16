@@ -109,11 +109,6 @@ $(eval $(call build-prog,ghc,stage3,2))
 
 ifneq "$(BINDIST)" "YES"
 
-# ToDo: should we add these in the build-prog macro?
-ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(compiler_stage1_v_LIB)
-ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_v_LIB)
-ghc/stage3/build/tmp/$(ghc_stage3_PROG) : $(compiler_stage3_v_LIB)
-
 ifeq "$(GhcProfiled)" "YES"
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_p_LIB)
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_p_LIB))
