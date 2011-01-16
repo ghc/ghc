@@ -69,7 +69,7 @@ rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
 
 rts_H_FILES = $(wildcard includes/*.h) $(wildcard rts/*.h)
 
-ifeq "$(HaveDtrace)" "YES"
+ifeq "$(USE_DTRACE)" "YES"
 DTRACEPROBES_H = rts/dist/build/RtsProbes.h
 rts_H_FILES += $(DTRACEPROBES_H)
 endif
@@ -434,7 +434,7 @@ rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 # TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
 rts_dist_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
 
-ifeq "$(HaveDtrace)" "YES"
+ifeq "$(USE_DTRACE)" "YES"
 
 rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
 
@@ -455,7 +455,7 @@ rts_LD_OPTS     += -Llibffi/build/include
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
 
-ifeq "$(HaveDtrace)" "YES"
+ifeq "$(USE_DTRACE)" "YES"
 
 rts_CC_OPTS		+= -DDTRACE
 rts_HC_OPTS		+= -DDTRACE
