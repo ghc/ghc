@@ -25,6 +25,8 @@ module RdrHsSyn (
         parseCImport,
 	mkExport,
 	mkExtName,           -- RdrName -> CLabelString
+        Subordinates(..),
+        mkExportSpec,
 	mkGadtDecl,          -- [Located RdrName] -> LHsType RdrName -> ConDecl RdrName
 	mkSimpleConDecl, 
 	mkDeprecatedGadtRecordDecl,
@@ -60,7 +62,7 @@ import Lexer
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
-			  occNameString )
+			  occNameString, tcClsName )
 import PrelNames	( forall_tv_RDR )
 import DynFlags
 import SrcLoc
@@ -1028,6 +1030,21 @@ mkExport cconv (L _ entity, v, ty) = return $
 --
 mkExtName :: RdrName -> CLabelString
 mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
+
+data Subordinates = SubordinateAll | SubordinateList [RdrName]
+
+mkExportSpec :: RdrName -> Maybe Subordinates -> IE RdrName
+mkExportSpec x subs =
+  case subs of
+    Nothing
+      | isRdrDataCon x        -> IEThingAbs ty
+      | otherwise             -> IEVar x
+    Just SubordinateAll       -> IEThingAll ty
+    Just (SubordinateList xs) -> IEThingWith ty xs
+  where ty  = setRdrNameSpace x tcClsName
+
+
+
 \end{code}
 
 

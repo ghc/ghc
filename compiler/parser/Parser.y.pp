@@ -43,7 +43,7 @@ import OccName		( varName, dataName, tcClsName, tvName )
 import DataCon		( DataCon, dataConName )
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc, combineSrcSpans,
 			  SrcSpan, combineLocs, srcLocFile, 
-			  mkSrcLoc, mkSrcSpan )
+			  mkSrcLoc, mkSrcSpan, noSrcSpan )
 import Module
 import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, liftedTypeKind, unliftedTypeKind )
@@ -447,8 +447,8 @@ exportlist :: { [LIE RdrName] }
 	| exportlist1				{ $1 }
 
 exportlist1 :: { [LIE RdrName] }
-        : expdoclist export expdoclist ',' exportlist  { $1 ++ ($2 : $3) ++ $5 }
- 	| expdoclist export expdoclist	               { $1 ++ ($2 : $3) }
+        : expdoclist export expdoclist ',' exportlist  { $1 ++ ($2 ++ $3) ++ $5 }
+ 	| expdoclist export expdoclist	               { $1 ++ ($2 ++ $3) }
 	| expdoclist				       { $1 }
 
 expdoclist :: { [LIE RdrName] }
@@ -460,15 +460,22 @@ exp_doc :: { LIE RdrName }
         | docnamed      { L1 (IEDocNamed ((fst . unLoc) $1)) } 
         | docnext       { L1 (IEDoc (unLoc $1)) }       
                        
-   -- No longer allow things like [] and (,,,) to be exported
+   -- NOTE 1: No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
-export 	:: { LIE RdrName }
-	:  qvar				{ L1 (IEVar (unLoc $1)) }
-	|  oqtycon			{ L1 (IEThingAbs (unLoc $1)) }
-	|  oqtycon '(' '..' ')'		{ LL (IEThingAll (unLoc $1)) }
-	|  oqtycon '(' ')'		{ LL (IEThingWith (unLoc $1) []) }
-	|  oqtycon '(' qcnames ')'	{ LL (IEThingWith (unLoc $1) (reverse $3)) }
-	|  'module' modid		{ LL (IEModuleContents (unLoc $2)) }
+   -- NOTE 2: There is a lot of overlap between value and type names,
+   -- so, in the general case, we parse everything as values,
+   -- and post-process the declaration to determine what is being exported.
+export 	:: { [LIE RdrName] }
+	: qcname opt_subordinates { [L (comb3 $1 $1 $2)
+                                       (mkExportSpec (unLoc $1) (unLoc $2))] }
+        | 'type' oqtycons1        { map (fmap IEThingAbs) $2 }
+	| 'module' modid          { [LL (IEModuleContents (unLoc $2))] }
+
+opt_subordinates :: { Located (Maybe Subordinates) }
+        : {- empty -}             { L0 Nothing }
+        | '(' '..' ')'            { LL (Just SubordinateAll) }
+        | '(' ')'		  { LL (Just (SubordinateList [])) }
+        | '(' qcnames ')'         { LL (Just (SubordinateList (reverse $2))) }
 
 qcnames :: { [RdrName] }
 	:  qcnames ',' qcname_ext	{ unLoc $3 : $1 }
@@ -1722,6 +1729,10 @@ gtycon 	:: { Located RdrName }	-- A "general" qualified tycon
 	| '[' ']'			{ LL $ listTyCon_RDR }
 	| '[:' ':]'			{ LL $ parrTyCon_RDR }
 
+oqtycons1 :: { [Located RdrName] }
+        : oqtycon                       { [$1] }
+        | oqtycons1 oqtycon             { $2 : $1 }
+
 oqtycon :: { Located RdrName }	-- An "ordinary" qualified tycon
 	: qtycon			{ $1 }
  	| '(' qtyconsym ')'		{ LL (unLoc $2) }
@@ -1744,6 +1755,15 @@ qtyconsym :: { Located RdrName }
 
 tyconsym :: { Located RdrName }
 	: CONSYM			{ L1 $! mkUnqual tcClsName (getCONSYM $1) }
+        -- Does not include "!", because that is used for strictness marks
+        -- or ".", because that separates the quantified type vars from the rest
+        -- or "*", because that's used for kinds  (XXX: Add this)
+        | VARSYM		        { L1 $! mkUnqual tcClsName (getVARSYM $1) }
+        | '*'                           { L1 $! mkUnqual tcClsName (fsLit "*") }
+    
+
+
+
 
 -----------------------------------------------------------------------------
 -- Operators
@@ -1777,11 +1797,9 @@ qvaropm :: { Located RdrName }
 
 tyvar   :: { Located RdrName }
 tyvar   : tyvarid		{ $1 }
-	| '(' tyvarsym ')'	{ LL (unLoc $2) }
 
 tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'	{ LL (unLoc $2) }
-	| tyvarsym		{ $1 }
 	| '.'			{% parseErrorSDoc (getLoc $1) 
 	  			      (vcat [ptext (sLit "Illegal symbol '.' in type"), 
 				             ptext (sLit "Perhaps you intended -XRankNTypes or similar flag"),
@@ -1795,12 +1813,6 @@ tyvarid	:: { Located RdrName }
 	| 'safe' 		{ L1 $! mkUnqual tvName (fsLit "safe") }
 	| 'interruptible' 	{ L1 $! mkUnqual tvName (fsLit "interruptible") }
 	| 'threadsafe' 		{ L1 $! mkUnqual tvName (fsLit "threadsafe") }
-
-tyvarsym :: { Located RdrName }
--- Does not include "!", because that is used for strictness marks
---	         or ".", because that separates the quantified type vars from the rest
---		 or "*", because that's used for kinds
-tyvarsym : VARSYM		{ L1 $! mkUnqual tvName (getVARSYM $1) }
 
 -----------------------------------------------------------------------------
 -- Variables 
