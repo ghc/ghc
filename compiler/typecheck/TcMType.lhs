@@ -508,7 +508,8 @@ zonkTcTypeAndSubst :: TvSubst -> TcType -> TcM TcType
 zonkTcTypeAndSubst subst ty = zonkType zonk_tv ty
   where
     zonk_tv tv 
-      = case tcTyVarDetails tv of
+      = ASSERT ( isTcTyVar tv )
+        case tcTyVarDetails tv of
       	  SkolemTv {}    -> return (TyVarTy tv)
       	  FlatSkol ty    -> zonkType zonk_tv ty
       	  MetaTv _ ref   -> do { cts <- readMutVar ref
