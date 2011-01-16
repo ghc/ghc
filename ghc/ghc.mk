@@ -14,9 +14,9 @@
 ghc_USES_CABAL = YES
 ghc_PACKAGE = ghc-bin
 
-ghc_stage1_HC_OPTS = $(GhcStage1HcOpts)
-ghc_stage2_HC_OPTS = $(GhcStage2HcOpts)
-ghc_stage3_HC_OPTS = $(GhcStage3HcOpts)
+ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
+ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
+ghc_stage3_MORE_HC_OPTS = $(GhcStage3HcOpts)
 
 ghc_stage2_CC_OPTS = -Iincludes
 ghc_stage3_CC_OPTS = -Iincludes
@@ -27,27 +27,29 @@ ghc_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 ghc_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 
 ifeq "$(GhcWithInterpreter)" "YES"
-ghc_stage2_HC_OPTS += -DGHCI
-ghc_stage3_HC_OPTS += -DGHCI
+ghc_stage2_MORE_HC_OPTS += -DGHCI
+ghc_stage3_MORE_HC_OPTS += -DGHCI
 endif
 
 ifeq "$(GhcDebugged)" "YES"
-ghc_HC_OPTS += -debug
+ghc_stage1_MORE_HC_OPTS += -debug
+ghc_stage2_MORE_HC_OPTS += -debug
+ghc_stage3_MORE_HC_OPTS += -debug
 endif
 
 ifeq "$(GhcDynamic)" "YES"
-ghc_stage2_HC_OPTS += -dynamic
-ghc_stage3_HC_OPTS += -dynamic
+ghc_stage2_MORE_HC_OPTS += -dynamic
+ghc_stage3_MORE_HC_OPTS += -dynamic
 endif
 
 ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
-ghc_stage2_HC_OPTS += -threaded
-ghc_stage3_HC_OPTS += -threaded
+ghc_stage2_MORE_HC_OPTS += -threaded
+ghc_stage3_MORE_HC_OPTS += -threaded
 endif
 
 ifeq "$(GhcProfiled)" "YES"
-ghc_stage2_HC_OPTS += -prof
+ghc_stage2_MORE_HC_OPTS += -prof
 endif
 
 ghc_stage1_MODULES = Main
@@ -67,11 +69,11 @@ ghc_stage2_PROG = ghc-stage2$(exeext)
 ghc_stage3_PROG = ghc-stage3$(exeext)
 
 # ToDo: perhaps use ghc-cabal to configure ghc-bin
-ghc_stage1_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage1_VERSION)
-ghc_stage2_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage2_VERSION)
-ghc_stage3_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSION)
-ghc_stage2_HC_OPTS += -package haskeline
-ghc_stage3_HC_OPTS += -package haskeline
+ghc_stage1_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage1_VERSION)
+ghc_stage2_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage2_VERSION)
+ghc_stage3_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSION)
+ghc_stage2_MORE_HC_OPTS += -package haskeline
+ghc_stage3_MORE_HC_OPTS += -package haskeline
 
 ghc_language_extension_flags = -XCPP \
                                -XPatternGuards \
@@ -79,9 +81,9 @@ ghc_language_extension_flags = -XCPP \
                                -XUnboxedTuples \
                                -XFlexibleInstances \
                                -XMagicHash
-ghc_stage1_HC_OPTS += $(ghc_language_extension_flags)
-ghc_stage2_HC_OPTS += $(ghc_language_extension_flags)
-ghc_stage3_HC_OPTS += $(ghc_language_extension_flags)
+ghc_stage1_MORE_HC_OPTS += $(ghc_language_extension_flags)
+ghc_stage2_MORE_HC_OPTS += $(ghc_language_extension_flags)
+ghc_stage3_MORE_HC_OPTS += $(ghc_language_extension_flags)
 
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES

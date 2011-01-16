@@ -20,7 +20,10 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #				   configure-time
 #   - SRC_HC_OPTS                  source-tree-wide options from build.mk
 #				   (optimisation, heap settings)
-#   - libraries/base_HC_OPTS       options from libraries/base for all ways
+#   - libraries/base_HC_OPTS       options from Cabal for libraries/base
+#                                  for all ways
+#   - libraries/base_MORE_HC_OPTS  options from elsewhere in the build
+#                                  system for libraries/base for all ways
 #   - libraries/base_v_HC_OPTS     options from libraries/base for way v
 #   - WAY_v_HC_OPTS                options for this way
 #   - EXTRA_HC_OPTS                options from the command-line
@@ -48,6 +51,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$(foreach pkg,$$($1_$2_DEPS),-package $$(pkg)) \
  $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
  $$($1_$2_HC_OPTS) \
+ $$($1_$2_MORE_HC_OPTS) \
  $$($1_$2_EXTRA_HC_OPTS) \
  $$($1_$2_$3_HC_OPTS) \
  $$($$(basename $$<)_HC_OPTS) \
