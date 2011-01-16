@@ -10,7 +10,103 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (concurrency)
 --
--- Synchronising variables
+-- An @'MVar' t@ is mutable location that is either empty or contains a
+-- value of type @t@.  It has two fundamental operations: 'putMVar'
+-- which fills an 'MVar' if it is empty and blocks otherwise, and
+-- 'takeMVar' which empties an 'MVar' if it is full and blocks
+-- otherwise.  They can be used in multiple different ways:
+--
+--  1. As synchronized mutable variables,
+--  2. As channels, with 'takeMVar' and 'putMVar' as receive and send, and
+--  3. As a binary semaphore @'MVar' ()@, with 'takeMVar' and 'putMVar' as
+--     wait and signal.
+--
+-- They were introduced in the paper "Concurrent Haskell" by Simon
+-- Peyton Jones, Andrew Gordon and Sigbjorn Finne, though some details
+-- of their implementation have since then changed (in particular, a
+-- put on a full MVar used to error, but now merely blocks.)
+--
+-- * Applicability
+--
+-- 'MVar's offer more flexibility than 'IORef's, but less flexibility
+-- than 'STM'.  They are appropriate for building synchronization
+-- primitives and performing simple interthread communication; however
+-- they are very simple and susceptible to race conditions, deadlocks or
+-- uncaught exceptions.  Do not use them if you need perform larger
+-- atomic operations such as reading from multiple variables: use 'STM'
+-- instead.
+--
+-- In particular, the "bigger" functions in this module ('readMVar',
+-- 'swapMVar', 'withMVar', 'modifyMVar_' and 'modifyMVar') are simply
+-- compositions a 'takeMVar' followed by a 'putMVar' with exception safety.
+-- These only have atomicity guarantees if all other threads
+-- perform a 'takeMVar' before a 'putMVar' as well;  otherwise, they may
+-- block.
+--
+-- * Fairness
+--
+-- No thread can be blocked indefinitely on an 'MVar' unless another
+-- thread holds that 'MVar' indefinitely.  One usual implementation of
+-- this fairness guarantee is that threads blocked on an 'MVar' are
+-- served in a first-in-first-out fashion, but this is not guaranteed
+-- in the semantics.
+--
+-- * Gotchas
+--
+-- Like many other Haskell data structures, 'MVar's are lazy.  This
+-- means that if you place an expensive unevaluated thunk inside an
+-- 'MVar', it will be evaluated by the thread that consumes it, not the
+-- thread that produced it.  Be sure to 'evaluate' values to be placed
+-- in an 'MVar' to the appropriate normal form, or utilize a strict
+-- MVar provided by the strict-concurrency package.
+--
+-- * Example
+--
+-- Consider the following concurrent data structure, a skip channel.
+-- This is a channel for an intermittent source of high bandwidth
+-- information (for example, mouse movement events.)  Writing to the
+-- channel never blocks, and reading from the channel only returns the
+-- most recent value, or blocks if there are no new values.  Multiple
+-- readers are supported with a @dupSkipChan@ operation.
+--
+-- A skip channel is a pair of 'MVar's: the second 'MVar' is a semaphore
+-- for this particular reader: it is full if there is a value in the
+-- channel that this reader has not read yet, and empty otherwise.
+--
+-- @
+--     data SkipChan a = SkipChan (MVar (a, [MVar ()])) (MVar ())
+--
+--     newSkipChan :: IO (SkipChan a)
+--     newSkipChan = do
+--         sem <- newEmptyMVar
+--         main <- newMVar (undefined, [sem])
+--         return (SkipChan main sem)
+--
+--     putSkipChan :: SkipChan a -> a -> IO ()
+--     putSkipChan (SkipChan main _) v = do
+--         (_, sems) <- takeMVar main
+--         putMVar main (v, [])
+--         mapM_ (\sem -> putMVar sem ()) sems
+--
+--     getSkipChan :: SkipChan a -> IO a
+--     getSkipChan (SkipChan main sem) = do
+--         takeMVar sem
+--         (v, sems) <- takeMVar main
+--         putMVar main (v, sem:sems)
+--         return v
+--
+--     dupSkipChan :: SkipChan a -> IO (SkipChan a)
+--     dupSkipChan (SkipChan main _) = do
+--         sem <- newEmptyMVar
+--         (v, sems) <- takeMVar main
+--         putMVar main (v, sem:sems)
+--         return (SkipChan main sem)
+-- @
+--
+-- This example was adapted from the original Concurrent Haskell paper.
+-- For more examples of 'MVar's being used to build higher-level
+-- synchronization primitives, see 'Control.Concurrent.Chan' and
+-- 'Control.Concurrent.QSem'.
 --
 -----------------------------------------------------------------------------
 
@@ -57,7 +153,9 @@ import Control.Exception.Base
 
 {-|
   This is a combination of 'takeMVar' and 'putMVar'; ie. it takes the value
-  from the 'MVar', puts it back, and also returns it.
+  from the 'MVar', puts it back, and also returns it.  This function
+  is atomic only if there are no other producers (i.e. threads calling
+  'putMVar') for this 'MVar'.
 -}
 readMVar :: MVar a -> IO a
 readMVar m =
@@ -68,9 +166,8 @@ readMVar m =
 
 {-|
   Take a value from an 'MVar', put a new value into the 'MVar' and
-  return the value taken. Note that there is a race condition whereby
-  another process can put something in the 'MVar' after the take
-  happens but before the put does.
+  return the value taken. This function is atomic only if there are
+  no other producers for this 'MVar'.
 -}
 swapMVar :: MVar a -> a -> IO a
 swapMVar mvar new =
@@ -80,10 +177,11 @@ swapMVar mvar new =
     return old
 
 {-|
-  'withMVar' is a safe wrapper for operating on the contents of an
-  'MVar'.  This operation is exception-safe: it will replace the
+  'withMVar' is an exception-safe wrapper for operating on the contents
+  of an 'MVar'.  This operation is exception-safe: it will replace the
   original contents of the 'MVar' if an exception is raised (see
-  "Control.Exception").
+  "Control.Exception").  However, it is only atomic if there are no
+  other producers for this 'MVar'.
 -}
 {-# INLINE withMVar #-}
 -- inlining has been reported to have dramatic effects; see
@@ -97,9 +195,11 @@ withMVar m io =
     return b
 
 {-|
-  A safe wrapper for modifying the contents of an 'MVar'.  Like 'withMVar', 
-  'modifyMVar' will replace the original contents of the 'MVar' if an
-  exception is raised during the operation.
+  An exception-safe wrapper for modifying the contents of an 'MVar'.
+  Like 'withMVar', 'modifyMVar' will replace the original contents of
+  the 'MVar' if an exception is raised during the operation.  This
+  function is only atomic if there are no other producers for this
+  'MVar'.
 -}
 {-# INLINE modifyMVar_ #-}
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
