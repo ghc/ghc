@@ -75,16 +75,6 @@ ghc_stage3_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSIO
 ghc_stage2_MORE_HC_OPTS += -package haskeline
 ghc_stage3_MORE_HC_OPTS += -package haskeline
 
-ghc_language_extension_flags = -XCPP \
-                               -XPatternGuards \
-                               -XForeignFunctionInterface \
-                               -XUnboxedTuples \
-                               -XFlexibleInstances \
-                               -XMagicHash
-ghc_stage1_MORE_HC_OPTS += $(ghc_language_extension_flags)
-ghc_stage2_MORE_HC_OPTS += $(ghc_language_extension_flags)
-ghc_stage3_MORE_HC_OPTS += $(ghc_language_extension_flags)
-
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES
 ghc_stage3_SHELL_WRAPPER = YES
