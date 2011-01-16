@@ -85,11 +85,6 @@ else
 $(error Make has restarted itself $(MAKE_RESTARTS) times; is there a makefile bug?)
 endif
 
-# Just bring makefiles up to date:
-.PHONY: just-makefiles
-just-makefiles:
-	@:
-
 ifneq "$(CLEANING)" "YES"
 CLEANING = NO
 endif
@@ -280,115 +275,6 @@ include rules/bindist.mk
 # directories if mkdirhier changes.
 %/. : | $(MKDIRHIER)
 	"$(MKDIRHIER)" $@
-
-# -----------------------------------------------------------------------------
-# Phase handling
-
-phase_0_or_later = YES
-ifeq "$(findstring $(phase),0)" ""
-phase_0_done = YES
-phase_1_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1)" ""
-phase_1_done = YES
-phase_2_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1 2)" ""
-phase_2_done = YES
-phase_3_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1 2 3)" ""
-phase_3_done = YES
-phase_4_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1 2 3 4)" ""
-phase_4_done = YES
-endif
-
-includes_dist-derivedconstants_CONFIGURE_PHASE = 0
-includes_dist-ghcconstants_CONFIGURE_PHASE = 0
-
-# We do these first, as making the sources for some later
-# packages needs them, and we need the sources before we can
-# work out dependencies
-utils/hsc2hs_dist_CONFIGURE_PHASE = 0
-utils/unlit_dist_CONFIGURE_PHASE = 0
-utils/genprimopcode_dist_CONFIGURE_PHASE = 0
-
-# Then the bootlibs
-libraries/hpc_dist-boot_CONFIGURE_PHASE = 1
-libraries/extensible-exceptions_dist-boot_CONFIGURE_PHASE = 1
-libraries/Cabal_dist-boot_CONFIGURE_PHASE = 1
-libraries/binary_dist-boot_CONFIGURE_PHASE = 1
-libraries/bin-package-db_dist-boot_CONFIGURE_PHASE = 1
-
-# We put the stage 1 compiler package in a later phase than the bootlibs
-# for the same reasone we have the
-#     $(compiler_stage1_depfile_haskell) : $(BOOT_LIBS)
-# dependency below
-compiler_stage1_CONFIGURE_PHASE = 2
-
-# Now we make the stage 1 compiler binary. Again, in a later phase than
-# its package for the same reason as the
-#     $(ghc_stage1_depfile_haskell) : $(compiler_stage1_v_LIB)
-# dep below
-ghc_stage1_CONFIGURE_PHASE = 3
-
-# Finally, the stage1 compiler is used to make the dependencies for
-# everything else, so we can now build the rest.
-compiler_stage2_CONFIGURE_PHASE = 4
-ghc_stage2_CONFIGURE_PHASE = 4
-
-libraries/ghc-prim_dist-install_CONFIGURE_PHASE = 4
-libraries/integer-gmp_dist-install_CONFIGURE_PHASE = 4
-libraries/base_dist-install_CONFIGURE_PHASE = 4
-libraries/filepath_dist-install_CONFIGURE_PHASE = 4
-libraries/array_dist-install_CONFIGURE_PHASE = 4
-libraries/bytestring_dist-install_CONFIGURE_PHASE = 4
-libraries/containers_dist-install_CONFIGURE_PHASE = 4
-libraries/unix_dist-install_CONFIGURE_PHASE = 4
-libraries/old-locale_dist-install_CONFIGURE_PHASE = 4
-libraries/old-time_dist-install_CONFIGURE_PHASE = 4
-libraries/time_dist-install_CONFIGURE_PHASE = 4
-libraries/directory_dist-install_CONFIGURE_PHASE = 4
-libraries/process_dist-install_CONFIGURE_PHASE = 4
-libraries/extensible-exceptions_dist-install_CONFIGURE_PHASE = 4
-libraries/hpc_dist-install_CONFIGURE_PHASE = 4
-libraries/pretty_dist-install_CONFIGURE_PHASE = 4
-libraries/template-haskell_dist-install_CONFIGURE_PHASE = 4
-libraries/Cabal_dist-install_CONFIGURE_PHASE = 4
-libraries/binary_dist-install_CONFIGURE_PHASE = 4
-libraries/bin-package-db_dist-install_CONFIGURE_PHASE = 4
-libraries/mtl_dist-install_CONFIGURE_PHASE = 4
-libraries/utf8-string_dist-install_CONFIGURE_PHASE = 4
-libraries/xhtml_dist-install_CONFIGURE_PHASE = 4
-libraries/terminfo_dist-install_CONFIGURE_PHASE = 4
-libraries/haskeline_dist-install_CONFIGURE_PHASE = 4
-libraries/random_dist-install_CONFIGURE_PHASE = 4
-libraries/haskell98_dist-install_CONFIGURE_PHASE = 4
-libraries/haskell2010_dist-install_CONFIGURE_PHASE = 4
-libraries/primitive_dist-install_CONFIGURE_PHASE = 4
-libraries/vector_dist-install_CONFIGURE_PHASE = 4
-libraries/dph/dph-base_dist-install_CONFIGURE_PHASE = 4
-libraries/dph/dph-prim-interface_dist-install_CONFIGURE_PHASE = 4
-libraries/dph/dph-prim-seq_dist-install_CONFIGURE_PHASE = 4
-libraries/dph/dph-prim-par_dist-install_CONFIGURE_PHASE = 4
-libraries/dph/dph-seq_dist-install_CONFIGURE_PHASE = 4
-libraries/dph/dph-par_dist-install_CONFIGURE_PHASE = 4
-
-utils/hp2ps_dist_CONFIGURE_PHASE = 4
-utils/genapply_dist_CONFIGURE_PHASE = 4
-utils/haddock_dist_CONFIGURE_PHASE = 4
-utils/hsc2hs_dist-install_CONFIGURE_PHASE = 4
-utils/ghc-pkg_dist-install_CONFIGURE_PHASE = 4
-utils/hpc_dist_CONFIGURE_PHASE = 4
-utils/runghc_dist_CONFIGURE_PHASE = 4
-utils/ghctags_dist_CONFIGURE_PHASE = 4
-utils/ghc-pwd_dist_CONFIGURE_PHASE = 4
-utils/ghc-cabal_dist-install_CONFIGURE_PHASE = 4
-utils/mkUserGuidePart_dist_CONFIGURE_PHASE = 4
-utils/compare_sizes_dist_CONFIGURE_PHASE = 4
-
 
 # -----------------------------------------------------------------------------
 # Packages
@@ -638,40 +524,6 @@ CHECKED_compiler = YES
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 
-# For the rationale behind the build phases, see
-#   http://hackage.haskell.org/trac/ghc/wiki/Building/Architecture/Idiom/PhaseOrdering
-
-# Setting foo_dist_DISABLE=YES means "in directory foo, for build
-# "dist", just read the package-data.mk file, do not build anything".
-
-# We carefully engineer things so that we can build the
-# package-data.mk files early on: they depend only on a few tools also
-# built early.  Having got the package-data.mk files built, we can
-# restart make with up-to-date information about all the packages
-# (this is phase 0).  The remaining problem is the .depend files:
-#
-#   - .depend files in libraries need the stage 1 compiler to build
-#   - ghc/stage1/.depend needs compiler/stage1 built
-#   - compiler/stage1/.depend needs the bootstrap libs built
-#
-# GHC 6.11+ can build a .depend file without having built the
-# dependencies of the package, but we can't rely on the bootstrapping
-# compiler being able to do this, which is why we have to separate the
-# three phases above.
-
-# So this is the final ordering:
-
-# Phase 0 : all package-data.mk files
-#           (requires ghc-cabal, ghc-pkg, mkdirhier etc.)
-# Phase 1 : .depend files for bootstrap libs
-#           (requires hsc2hs)
-# Phase 2 : compiler/stage1/.depend
-#           (requires bootstrap libs and genprimopcode)
-# Phase 3 : ghc/stage1/.depend
-#           (requires compiler/stage1)
-#
-# The rest : libraries/*/dist-install, compiler/stage2, ghc/stage2
-
 ifneq "$(BINDIST)" "YES"
 BUILD_DIRS += \
    $(GHC_MKDIRHIER_DIR)
@@ -751,42 +603,79 @@ BUILD_DIRS += \
    $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 endif
 
-# XXX libraries/% must come before any programs built with stage1, see
-# Note [lib-depends].
+# -----------------------------------------------------------------------------
+# Phase handling
 
-ifeq "$(phase)" "0"
+phase_0_or_later = YES
+ifeq "$(findstring $(phase),0)" ""
+phase_0_done = YES
+phase_1_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1)" ""
+phase_1_done = YES
+phase_2_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1 2)" ""
+phase_2_done = YES
+phase_3_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1 2 3)" ""
+phase_3_done = YES
+phase_4_or_later = YES
+endif
+ifeq "$(findstring $(phase),0 1 2 3 4)" ""
+phase_4_done = YES
+endif
+
+includes_dist-derivedconstants_CONFIGURE_PHASE = 0
+includes_dist-ghcconstants_CONFIGURE_PHASE = 0
+
+# We do these first, as making the sources for some later
+# packages needs them, and we need the sources before we can
+# work out dependencies
+utils/hsc2hs_dist_CONFIGURE_PHASE = 0
+utils/unlit_dist_CONFIGURE_PHASE = 0
+utils/genprimopcode_dist_CONFIGURE_PHASE = 0
+
+# Then the bootlibs
 $(foreach lib,$(STAGE0_PACKAGES),$(eval \
-  libraries/$(lib)_dist-boot_DISABLE = YES))
-endif
+  libraries/$(lib)_dist-boot_CONFIGURE_PHASE = 1))
 
-ifneq "$(findstring $(phase),0 1)" ""
-# We can build deps for compiler/stage1 in phase 2
-compiler_stage1_DISABLE = YES
-endif
+# We put the stage 1 compiler package in a later phase than the bootlibs
+# for the same reasone we have the
+#     $(compiler_stage1_depfile_haskell) : $(BOOT_LIBS)
+# dependency below
+compiler_stage1_CONFIGURE_PHASE = 2
 
-ifneq "$(findstring $(phase),0 1 2)" ""
-ghc_stage1_DISABLE = YES
-endif
+# Now we make the stage 1 compiler binary. Again, in a later phase than
+# its package for the same reason as the
+#     $(ghc_stage1_depfile_haskell) : $(compiler_stage1_v_LIB)
+# dep below
+ghc_stage1_CONFIGURE_PHASE = 3
 
-ifneq "$(findstring $(phase),0 1 2 3)" ""
-# In phases 0-3, we disable stage2-3, the full libraries and haddock
-utils/haddock_dist_DISABLE = YES
-utils/runghc_dist_DISABLE = YES
-utils/ghctags_dist_DISABLE = YES
-utils/hpc_dist_DISABLE = YES
-utils/hsc2hs_dist-install_DISABLE = YES
-utils/ghc-cabal_dist-install_DISABLE = YES
-utils/ghc-pkg_dist-install_DISABLE = YES
-utils/ghc-pwd_dist_DISABLE = YES
-utils/mkUserGuidePart_dist_DISABLE = YES
-utils/compare_sizes_dist_DISABLE = YES
-compiler_stage2_DISABLE = YES
-compiler_stage3_DISABLE = YES
-ghc_stage2_DISABLE = YES
-ghc_stage3_DISABLE = YES
+# Finally, the stage1 compiler is used to make the dependencies for
+# everything else, so we can now build the rest.
+compiler_stage2_CONFIGURE_PHASE = 4
+ghc_stage2_CONFIGURE_PHASE = 4
+
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
-  libraries/$(lib)_dist-install_DISABLE = YES))
-endif
+  libraries/$(lib)_dist-install_CONFIGURE_PHASE = 4))
+
+utils/hp2ps_dist_CONFIGURE_PHASE = 4
+utils/genapply_dist_CONFIGURE_PHASE = 4
+utils/haddock_dist_CONFIGURE_PHASE = 4
+utils/hsc2hs_dist-install_CONFIGURE_PHASE = 4
+utils/ghc-pkg_dist-install_CONFIGURE_PHASE = 4
+utils/hpc_dist_CONFIGURE_PHASE = 4
+utils/runghc_dist_CONFIGURE_PHASE = 4
+utils/ghctags_dist_CONFIGURE_PHASE = 4
+utils/ghc-pwd_dist_CONFIGURE_PHASE = 4
+utils/ghc-cabal_dist-install_CONFIGURE_PHASE = 4
+utils/mkUserGuidePart_dist_CONFIGURE_PHASE = 4
+utils/compare_sizes_dist_CONFIGURE_PHASE = 4
+
+# ----------------------------------------------
+# Actually include all the sub-ghc.mk's
 
 include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
 
