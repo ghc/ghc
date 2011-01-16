@@ -91,7 +91,6 @@
 # Other library bits that get generated:
 ^libraries/bootstrapping/
 ^libraries/stamp/
-^libraries/cabal-bin$
 ^libraries/ifBuildable(/|$)
 ^libraries/installPackage(/|$)
 ^libraries/index.html
