@@ -83,15 +83,6 @@ ghc_stage1_HC_OPTS += $(ghc_language_extension_flags)
 ghc_stage2_HC_OPTS += $(ghc_language_extension_flags)
 ghc_stage3_HC_OPTS += $(ghc_language_extension_flags)
 
-# In stage1 we might not benefit from cross-package dependencies and
-# recompilation checking.  We must force recompilation here, otherwise
-# Main.o won't necessarily be rebuilt when the ghc package has changed:
-ghc_stage1_HC_OPTS += -fforce-recomp
-
-# Further dependencies we need only in stage 1, due to no
-# cross-package dependencies or recompilation checking.
-ghc/stage1/build/Main.o : $(compiler_stage1_v_LIB)
-
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES
 ghc_stage3_SHELL_WRAPPER = YES
