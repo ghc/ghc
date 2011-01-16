@@ -40,7 +40,10 @@ ifneq "$$($1_$2_SLASH_MODS)" ""
 		if test ! -d $$$$dir; then mkdir -p $$$$dir; fi \
 	done
 endif
-	mv $$@.tmp $$@
+#    Some packages are from the bootstrapping compiler, so are not
+#    within the build tree. On Windows this causes a problem as they look
+#    like bad rules, due to the two colons, so we filter them out.
+	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@
 
 # Some of the C files depend on the generated includes files.
 $$($1_$2_depfile_c_asm) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
