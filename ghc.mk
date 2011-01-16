@@ -621,10 +621,6 @@ phase_3_or_later = YES
 endif
 ifeq "$(findstring $(phase),0 1 2 3)" ""
 phase_3_done = YES
-phase_4_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1 2 3 4)" ""
-phase_4_done = YES
 endif
 
 includes_dist-derivedconstants_CONFIGURE_PHASE = 0
@@ -640,39 +636,31 @@ utils/genprimopcode_dist_CONFIGURE_PHASE = 0
 # Then the bootlibs
 $(foreach lib,$(STAGE0_PACKAGES),$(eval \
   libraries/$(lib)_dist-boot_CONFIGURE_PHASE = 1))
+compiler_stage1_CONFIGURE_PHASE = 1
+ghc_stage1_CONFIGURE_PHASE = 1
 
-# We put the stage 1 compiler package in a later phase than the bootlibs
-# for the same reasone we have the
-#     $(compiler_stage1_depfile_haskell) : $(BOOT_LIBS)
-# dependency below
-compiler_stage1_CONFIGURE_PHASE = 2
-
-# Now we make the stage 1 compiler binary. Again, in a later phase than
-# its package for the same reason as the
-#     $(ghc_stage1_depfile_haskell) : $(compiler_stage1_v_LIB)
-# dep below
-ghc_stage1_CONFIGURE_PHASE = 3
+# In phase 2, the phase 1 things actually get built
 
 # Finally, the stage1 compiler is used to make the dependencies for
 # everything else, so we can now build the rest.
-compiler_stage2_CONFIGURE_PHASE = 4
-ghc_stage2_CONFIGURE_PHASE = 4
+compiler_stage2_CONFIGURE_PHASE = 3
+ghc_stage2_CONFIGURE_PHASE = 3
 
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
-  libraries/$(lib)_dist-install_CONFIGURE_PHASE = 4))
+  libraries/$(lib)_dist-install_CONFIGURE_PHASE = 3))
 
-utils/hp2ps_dist_CONFIGURE_PHASE = 4
-utils/genapply_dist_CONFIGURE_PHASE = 4
-utils/haddock_dist_CONFIGURE_PHASE = 4
-utils/hsc2hs_dist-install_CONFIGURE_PHASE = 4
-utils/ghc-pkg_dist-install_CONFIGURE_PHASE = 4
-utils/hpc_dist_CONFIGURE_PHASE = 4
-utils/runghc_dist_CONFIGURE_PHASE = 4
-utils/ghctags_dist_CONFIGURE_PHASE = 4
-utils/ghc-pwd_dist_CONFIGURE_PHASE = 4
-utils/ghc-cabal_dist-install_CONFIGURE_PHASE = 4
-utils/mkUserGuidePart_dist_CONFIGURE_PHASE = 4
-utils/compare_sizes_dist_CONFIGURE_PHASE = 4
+utils/hp2ps_dist_CONFIGURE_PHASE = 3
+utils/genapply_dist_CONFIGURE_PHASE = 3
+utils/haddock_dist_CONFIGURE_PHASE = 3
+utils/hsc2hs_dist-install_CONFIGURE_PHASE = 3
+utils/ghc-pkg_dist-install_CONFIGURE_PHASE = 3
+utils/hpc_dist_CONFIGURE_PHASE = 3
+utils/runghc_dist_CONFIGURE_PHASE = 3
+utils/ghctags_dist_CONFIGURE_PHASE = 3
+utils/ghc-pwd_dist_CONFIGURE_PHASE = 3
+utils/ghc-cabal_dist-install_CONFIGURE_PHASE = 3
+utils/mkUserGuidePart_dist_CONFIGURE_PHASE = 3
+utils/compare_sizes_dist_CONFIGURE_PHASE = 3
 
 # ----------------------------------------------
 # Actually include all the sub-ghc.mk's
@@ -755,20 +743,6 @@ compiler/stage1/package-data.mk : \
     libraries/hpc/dist-boot/package-data.mk \
     libraries/extensible-exceptions/dist-boot/package-data.mk \
     libraries/bin-package-db/dist-boot/package-data.mk
-
-# These are necessary because the bootstrapping compiler may not know
-# about cross-package dependencies:
-$(compiler_stage1_depfile_haskell) : $(BOOT_LIBS)
-$(ghc_stage1_depfile_haskell) : $(compiler_stage1_v_LIB)
-
-# A few careful dependencies between bootstrapping packages.  When we
-# can rely on the stage 0 compiler being able to generate
-# cross-package dependencies with -M (fixed in GHC 6.12.1) we can drop
-# these, and also some of the phases.
-#
-# If you miss any out here, then 'make -j8' will probably tell you.
-#
-libraries/bin-package-db/dist-boot/build/Distribution/InstalledPackageInfo/Binary.$(v_osuf) : libraries/binary/dist-boot/build/Data/Binary.$(v_hisuf) libraries/Cabal/dist-boot/build/Distribution/InstalledPackageInfo.$(v_hisuf)
 
 # Make sure we have all the GHCi libs by the time we've built
 # ghc-stage2.  DPH includes a bit of Template Haskell which needs the

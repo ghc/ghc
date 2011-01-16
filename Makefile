@@ -74,10 +74,6 @@ ifneq "$(OMIT_PHASE_3)" "YES"
 	@echo "===--- building phase 3"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=3 all
 endif
-ifneq "$(OMIT_PHASE_4)" "YES"
-	@echo "===--- building phase 4"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=4 all
-endif
 	@echo "===--- building final phase"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@
 
