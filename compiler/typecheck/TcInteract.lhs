@@ -973,7 +973,7 @@ doInteractWithInert _fdimprs
   = do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,ifl,cl,xis)
        ; mkIRContinue workItem DropInert (workListFromCCan rewritten_dict) }
 
--- Class constraint and given equality: use the equality to rewrite
+-- Implicit parameter and given equality: use the equality to rewrite
 -- the class constraint.
 doInteractWithInert _fdimprs 
                     (CTyEqCan { cc_id = cv, cc_flavor = ifl, cc_tyvar = tv, cc_rhs = xi }) 
