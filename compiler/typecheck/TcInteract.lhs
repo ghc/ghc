@@ -22,7 +22,8 @@ import InstEnv
 import Class
 import TyCon
 import Name
-
+import PrelNames (typeNatClassName,lessThanEqualClassName,
+                  addTyFamName, mulTyFamName, expTyFamName)
 import FunDeps
 
 import Control.Monad ( when ) 
@@ -31,6 +32,7 @@ import Coercion
 import Outputable
 
 import TcRnTypes
+import TcTypeNats
 import TcErrors
 import TcSMonad
 import Bag
@@ -516,7 +518,9 @@ thePipeline :: [(String,SimplifierStage)]
 thePipeline = [ ("interact with inert eqs", interactWithInertEqsStage)
               , ("interact with inerts",    interactWithInertsStage)
               , ("spontaneous solve",       spontaneousSolveStage)
-              , ("top-level reactions",     topReactionsStage) ]
+              , ("numeric reactions",       numericReactionsStage)
+              , ("top-level reactions",     topReactionsStage)
+              ]
 \end{code}
 
 *********************************************************************************
@@ -1086,6 +1090,69 @@ doInteractWithInert _fdimprs
 
 -- Fall-through case for all other situations
 doInteractWithInert _fdimprs _ workItem = noInteraction workItem
+
+
+numericReactionsStage :: SimplifierStage
+numericReactionsStage workItem inert
+  | isNumWork =
+    if isWanted (cc_flavor workItem) then
+        do (val,new) <- solveNumWanted grelevant wrelevant workItem
+           return
+            SR { sr_stop = case val of
+                             Nothing -> Stop
+                             Just v  -> ContinueWith v
+               , sr_new_work = new
+               , sr_inerts = inert
+               }
+    else do (val,ins,new) <- addNumGiven grelevant wrelevant workItem
+            return
+              SR { sr_stop = case val of
+                               Nothing -> Stop
+                               Just v  -> ContinueWith v
+                 , sr_new_work = new
+                 , sr_inerts = foldrBag (flip updInertSet) inert_residual ins
+                 }
+
+  where (grelevant, wrelevant, inert_residual) = getNumInerts inert
+
+        isNumWork = case workItem of
+                      CFunEqCan { cc_fun   = f }  -> isNumFun f
+                      CDictCan  { cc_class = c }  -> isNumClass c
+                      _                           -> False
+
+numericReactionsStage workItem inert = return
+  SR { sr_inerts    = inert
+     , sr_new_work  = emptyBag
+     , sr_stop      = ContinueWith workItem
+     }
+
+-- Extract constraints which may interact with numeric predicates.
+getNumInerts :: InertSet -> (CanonicalCts, CanonicalCts, InertSet)
+getNumInerts i =
+  let (gfuns, wfuns, other_funs) = partitionCCanMap isNumFun (inert_funeqs i)
+      (gcls,  wcls, other_cls)   = partitionCCanMap isNumClass (inert_dicts i)
+  in ( unionWorkLists gfuns gcls
+     , unionWorkLists wfuns wcls
+     , i { inert_funeqs = other_funs, inert_dicts = other_cls }
+     )
+
+
+isNumFun :: TyCon -> Bool
+isNumFun tc = tyConName tc `elem` [ addTyFamName, mulTyFamName, expTyFamName ]
+
+-- Does not include 'TypeNat' (it does not interact with numeric predicates).
+isNumClass :: Class -> Bool
+isNumClass cls  = className cls == lessThanEqualClassName
+
+partitionCCanMap ::
+  Ord a => (a -> Bool) -> CCanMap a -> (CanonicalCts, CanonicalCts, CCanMap a)
+partitionCCanMap p cmap =
+  let (relw,not_relw) = Map.partitionWithKey (\k _ -> p k) (cts_wanted cmap)
+      (relg,not_relg) = Map.partitionWithKey (\k _ -> p k) (cts_givder cmap)
+  in ( unionManyBags (Map.elems relg)
+     , unionManyBags (Map.elems relw)
+     , cmap { cts_wanted = not_relw, cts_givder = not_relg }
+     )
 
 -------------------------
 -- Equational Rewriting 
@@ -1944,6 +2011,11 @@ data LookupInstResult
   | GenInst [WantedEvVar] EvTerm 
 
 matchClassInst :: Class -> [Type] -> WantedLoc -> TcS LookupInstResult
+
+matchClassInst clas [ ty ] _
+  | className clas == typeNatClassName
+  , Just n <- isNumberTy ty = return (GenInst [] (EvInteger n))
+
 matchClassInst clas tys loc
    = do { let pred = mkClassPred clas tys 
         ; mb_result <- matchClass clas tys

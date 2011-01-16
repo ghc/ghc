@@ -453,6 +453,9 @@ data EvTerm
   | EvSuperClass DictId Int    -- n'th superclass. Used for both equalities and
                                -- dictionaries, even though the former have no
 			       -- selector Id.  We count up from _0_ 
+
+  | EvInteger Integer          -- (e.g., evidence for "TypeNat n")
+  | EvAxiom String Type        -- Unused evidence (see Note [EvAxiom])
 			       
   deriving( Data, Typeable)
 
@@ -460,6 +463,30 @@ evVarTerm :: EvVar -> EvTerm
 evVarTerm v | isCoVar v = EvCoercion (mkCoVarCoercion v)
             | otherwise = EvId v
 \end{code}
+
+Note [EvAxiom]
+~~~~~~~~~~~~~~
+"EvAxiom description evidence_type"  is "evidence" which should not
+be used/needed at run-time.  Such values are generated when solving
+predicates for built-in "classes" (e.g., the <= operator on
+type-level naturals, see TcTypeNats for more details).
+
+The situation is similar to what happens with equality predicates:
+it would be nice if we could avoid having the evidence at run-time at all.
+
+Unfortunately, the mechanism used to avoid passing runtime evidence for
+equalities (lifting the evidence to the type level and using a dependent
+kind to classify it) is not easy to generalize to other predicates.
+
+One alternative might be to teach GHC core about "irrelevant" arguments,
+so when we emit code we skip such arguments in function definitions and
+applications.  This would allow us to treat all erasable entities in the
+same way (i.e., both types and evidence which is not needed
+at run-time such as the evidence for (a ~ b), (a <= b), or ordinary classes
+with no methods and super-classes).
+
+
+
 
 Note [EvBinds/EvTerm]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -576,6 +603,9 @@ instance Outputable EvTerm where
   ppr (EvCoercion co)    = ppr co
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
+  ppr (EvInteger n)      = integer n
+  ppr (EvAxiom x t)      = parens (ptext (sLit ("axiom " ++ x)) <+> 
+                                            ptext (sLit "::") <+> ppr t)
 \end{code}
 
 %************************************************************************

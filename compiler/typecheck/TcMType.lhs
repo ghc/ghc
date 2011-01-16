@@ -89,6 +89,7 @@ import BasicTypes
 import SrcLoc
 import Outputable
 import FastString
+import PrelNames (typeNatClassName, lessThanEqualClassName)
 import Bag
 
 import Control.Monad
@@ -1364,6 +1365,10 @@ checkValidInstHead clas tys
          -- May not contain type family applications
        ; mapM_ checkTyFamFreeness tys
 
+        -- Check that this is not a built-in type
+       ; checkTc (not (isBuiltInClass clas))
+                 (instTypeErr pp_pred builtin_class_msg)
+
        ; mapM_ checkValidMonoType tys
 	-- For now, I only allow tau-types (not polytypes) in 
 	-- the head of an instance decl.  
@@ -1389,10 +1394,17 @@ checkValidInstHead clas tys
                 text "Only one type can be given in an instance head." $$
                 text "Use -XMultiParamTypeClasses if you want to allow more.")
 
+    builtin_class_msg = parens (
+                text "Built-in classes may not have custom instances.")
+
 instTypeErr :: SDoc -> SDoc -> SDoc
 instTypeErr pp_ty msg
   = sep [ptext (sLit "Illegal instance declaration for") <+> quotes pp_ty, 
 	 nest 2 msg]
+
+isBuiltInClass :: Class -> Bool
+isBuiltInClass c = name == typeNatClassName || name == lessThanEqualClassName
+  where name = className c
 \end{code}
 
 

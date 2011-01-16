@@ -211,6 +211,13 @@ basicKnownKeyNames
 	-- Other classes
 	randomClassName, randomGenClassName, monadPlusClassName,
 
+        -- Type-level naturals
+        typeNatClassName,
+        lessThanEqualClassName,
+        addTyFamName,
+        mulTyFamName,
+        expTyFamName,
+
         -- Annotation type checking
         toAnnotationWrapperName
 
@@ -248,7 +255,8 @@ gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW, cONTROL_APPLICATIVE,
-    gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION_BASE :: Module
+    gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION_BASE,
+    gHC_TYPENATS :: Module
 
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -303,6 +311,7 @@ gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
 rANDOM		= mkBaseModule (fsLit "System.Random")
 gHC_EXTS	= mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
+gHC_TYPENATS    = mkBaseModule (fsLit "GHC.TypeNats")
 
 mAIN, rOOT_MAIN :: Module
 mAIN	        = mkMainModule_ mAIN_NAME
@@ -826,6 +835,15 @@ randomClassName     = clsQual rANDOM (fsLit "Random")    randomClassKey
 randomGenClassName  = clsQual rANDOM (fsLit "RandomGen") randomGenClassKey
 isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 
+-- Type-level naturals
+typeNatClassName, lessThanEqualClassName,
+  addTyFamName, mulTyFamName, expTyFamName :: Name
+typeNatClassName    = clsQual gHC_TYPENATS (fsLit "TypeNat") typeNatClassKey
+lessThanEqualClassName = clsQual gHC_TYPENATS (fsLit "<=") lessThanEqualClassKey
+addTyFamName        = tcQual gHC_TYPENATS (fsLit "+")   addTyFamNameKey
+mulTyFamName        = tcQual gHC_TYPENATS (fsLit "*")   mulTyFamNameKey
+expTyFamName        = tcQual gHC_TYPENATS (fsLit "^")   expTyFamNameKey
+
 -- dotnet interop
 objectTyConName :: Name
 objectTyConName	    = tcQual   dOTNET (fsLit "Object") objectTyConKey
@@ -924,6 +942,12 @@ applicativeClassKey, foldableClassKey, traversableClassKey :: Unique
 applicativeClassKey	= mkPreludeClassUnique 34
 foldableClassKey	= mkPreludeClassUnique 35
 traversableClassKey	= mkPreludeClassUnique 36
+
+typeNatClassKey, lessThanEqualClassKey :: Unique
+typeNatClassKey         = mkPreludeClassUnique 37
+lessThanEqualClassKey   = mkPreludeClassUnique 38
+
+
 \end{code}
 
 %************************************************************************
@@ -1066,6 +1090,13 @@ opaqueTyConKey                          = mkPreludeTyConUnique 133
 
 stringTyConKey :: Unique
 stringTyConKey				= mkPreludeTyConUnique 134
+
+addTyFamNameKey, mulTyFamNameKey, expTyFamNameKey :: Unique
+addTyFamNameKey                         = mkPreludeTyConUnique 135
+mulTyFamNameKey                         = mkPreludeTyConUnique 136
+expTyFamNameKey                         = mkPreludeTyConUnique 137
+
+
 
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129

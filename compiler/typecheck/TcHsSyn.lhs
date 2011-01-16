@@ -1027,6 +1027,10 @@ zonkEvTerm env (EvDFunApp df tys tms)
   = do { tys' <- zonkTcTypeToTypes env tys
        ; let tms' = map (zonkEvVarOcc env) tms
        ; return (EvDFunApp (zonkIdOcc env df) tys' tms') }
+zonkEvTerm _env t@(EvInteger _)   = return t
+zonkEvTerm env (EvAxiom x t)
+  = do { t' <- zonkTcTypeToType env t
+       ; return (EvAxiom x t') }
 
 zonkTcEvBinds :: ZonkEnv -> TcEvBinds -> TcM (ZonkEnv, TcEvBinds)
 zonkTcEvBinds env (TcEvBinds var) = do { (env', bs') <- zonkEvBindsVar env var

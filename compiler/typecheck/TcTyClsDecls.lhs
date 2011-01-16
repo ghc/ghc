@@ -47,6 +47,7 @@ import DynFlags
 import FastString
 import Unique		( mkBuiltinUnique )
 import BasicTypes
+import PrelNames        ( addTyFamName, mulTyFamName, expTyFamName )
 
 import Bag
 import Control.Monad
@@ -159,6 +160,10 @@ tcFamInstDecl top_lvl (L loc decl)
        ; checkTc type_families $ badFamInstDecl (tcdLName decl)
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
+         -- Check that this in not a built-in name
+       ; when (isBuiltinFamily (tcdName decl))
+              (addErr $ builtinFamilyErr (tcdName decl))
+ 
 	 -- Perform kind and type checking
        ; tc <- tcFamInstDecl1 decl
        ; checkValidTyCon tc	-- Remember to check validity;
@@ -175,6 +180,16 @@ isAssocFamily tycon
   = case tyConFamInst_maybe tycon of
           Nothing       -> panic "isAssocFamily: no family?!?"
           Just (fam, _) -> isTyConAssoc fam
+
+isBuiltinFamily :: Name -> Bool
+isBuiltinFamily tc = tc `elem`
+                        [ addTyFamName, mulTyFamName, expTyFamName ]
+
+builtinFamilyErr :: Name -> SDoc
+builtinFamilyErr name
+  = ptext (sLit "Built-in type familiy") <+> quotes (ppr name) <+>
+    ptext (sLit "may not have user-defined instances.")
+
 
 assocInClassErr :: Name -> SDoc
 assocInClassErr name

@@ -40,6 +40,7 @@ module TcSMonad (
  
     getInstEnvs, getFamInstEnvs,                -- Getting the environments 
     getTopEnv, getGblEnv, getTcEvBinds, getUntouchables,
+    tcsLookupClass, tcsLookupTyCon,
     getTcEvBindsBag, getTcSContext, getTcSTyBinds, getTcSTyBindsMap, getTcSErrors,
     getTcSErrorsBag, FrozenError (..),
     addErrorTcS,
@@ -90,7 +91,8 @@ import FamInstEnv
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
-       ( checkWellStaged, topIdLvl, tcLookupFamInst, tcGetDefaultTys )
+       ( checkWellStaged, topIdLvl, tcLookupFamInst, tcGetDefaultTys
+       , tcLookupClass, tcLookupTyCon )
 import TcType
 import DynFlags
 
@@ -706,6 +708,12 @@ getTopEnv = wrapTcS $ TcM.getTopEnv
 getGblEnv :: TcS TcGblEnv 
 getGblEnv = wrapTcS $ TcM.getGblEnv 
 
+tcsLookupClass :: Name -> TcS Class
+tcsLookupClass name = wrapTcS (TcM.tcLookupClass name)
+
+tcsLookupTyCon :: Name -> TcS TyCon
+tcsLookupTyCon name = wrapTcS (TcM.tcLookupTyCon name)
+
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -904,6 +912,8 @@ isGoodRecEv ev_var wv
         chase_ev assocs trg curr_grav visited (EvDFunApp _ _ ev_deps)
             = do { chase_results <- mapM (chase_ev_var assocs trg (curr_grav+1) visited) ev_deps
                  ; return (comb_chase_res Nothing chase_results) }
+        chase_ev _assocs _trg _curr_grav _visited (EvInteger _) = return Nothing
+        chase_ev _assocs _trg _curr_grav _visited (EvAxiom _ _) = return Nothing
 
         chase_co assocs trg curr_grav visited co 
             = -- Look for all the coercion variables in the coercion 

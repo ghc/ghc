@@ -59,6 +59,7 @@ import FastString
 import Util
 
 import MonadUtils
+import HscTypes (MonadThings)
 \end{code}
 
 %************************************************************************
@@ -217,7 +218,7 @@ dsTcEvBinds (TcEvBinds {}) = panic "dsEvBinds"	-- Zonker has got rid of this
 dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 
 dsEvBinds :: Bag EvBind -> DsM [DsEvBind]
-dsEvBinds bs = return (map dsEvGroup sccs)
+dsEvBinds bs = mapM dsEvGroup sccs
   where
     sccs :: [SCC EvBind]
     sccs = stronglyConnCompFromEdgedVertices edges
@@ -234,12 +235,14 @@ dsEvBinds bs = return (map dsEvGroup sccs)
     free_vars_of (EvCoercion co)    = varSetElems (tyVarsOfType co)
     free_vars_of (EvDFunApp _ _ vs) = vs
     free_vars_of (EvSuperClass d _) = [d]
+    free_vars_of (EvInteger _)      = []
+    free_vars_of (EvAxiom _ _)      = []
 
-dsEvGroup :: SCC EvBind -> DsEvBind
+dsEvGroup :: MonadThings m => SCC EvBind -> m DsEvBind
 dsEvGroup (AcyclicSCC (EvBind co_var (EvSuperClass dict n)))
   | isCoVar co_var	 -- An equality superclass
   = ASSERT( null other_data_cons )
-    CaseEvBind dict (DataAlt data_con) bndrs
+    return (CaseEvBind dict (DataAlt data_con) bndrs)
   where
     (cls, tys) = getClassPredTys (evVarPred dict)
     (data_con:other_data_cons) = tyConDataCons (classTyCon cls)
@@ -252,24 +255,30 @@ dsEvGroup (AcyclicSCC (EvBind co_var (EvSuperClass dict n)))
                         | otherwise = mkWildEvBinder p
     
 dsEvGroup (AcyclicSCC (EvBind v r))
-  = LetEvBind (NonRec v (dsEvTerm r))
+  = do d <- dsEvTerm r
+       return (LetEvBind (NonRec v d))
 
 dsEvGroup (CyclicSCC bs)
-  = LetEvBind (Rec (map ds_pair bs))
+  = do ds <- mapM ds_pair bs
+       return (LetEvBind (Rec ds))
   where
-    ds_pair (EvBind v r) = (v, dsEvTerm r)
+    ds_pair (EvBind v r) = do ev <- dsEvTerm r
+                              return (v, ev)
 
-dsEvTerm :: EvTerm -> CoreExpr
-dsEvTerm (EvId v)                = Var v
-dsEvTerm (EvCast v co)           = Cast (Var v) co
-dsEvTerm (EvDFunApp df tys vars) = Var df `mkTyApps` tys `mkVarApps` vars
-dsEvTerm (EvCoercion co)         = Type co
+dsEvTerm :: MonadThings m => EvTerm -> m CoreExpr
+dsEvTerm (EvId v)         = return (Var v)
+dsEvTerm (EvCast v co)    = return (Cast (Var v) co)
+dsEvTerm (EvDFunApp df tys vars) =
+                            return (Var df `mkTyApps` tys `mkVarApps` vars)
+dsEvTerm (EvCoercion co)  = return (Type co)
+dsEvTerm (EvInteger n)    = mkIntegerExpr n
+dsEvTerm (EvAxiom x t)    = return (mkRuntimeErrorApp rUNTIME_ERROR_ID t x)
 dsEvTerm (EvSuperClass d n)
   = ASSERT( isClassPred (classSCTheta cls !! n) )
     	    -- We can only select *dictionary* superclasses
 	    -- in terms.  Equality superclasses are dealt with
 	    -- in dsEvGroup, where they can generate a case expression
-    Var sc_sel_id `mkTyApps` tys `App` Var d
+    return (Var sc_sel_id `mkTyApps` tys `App` Var d)
   where
     sc_sel_id  = classSCSelId cls n	-- Zero-indexed
     (cls, tys) = getClassPredTys (evVarPred d)    
@@ -747,5 +756,6 @@ dsHsWrapper (WpCompose c1 c2) = do { k1 <- dsHsWrapper c1
 dsHsWrapper (WpCast co)       = return (\e -> Cast e co) 
 dsHsWrapper (WpEvLam ev)      = return (\e -> Lam ev e) 
 dsHsWrapper (WpTyLam tv)      = return (\e -> Lam tv e) 
-dsHsWrapper (WpEvApp evtrm)   = return (\e -> App e (dsEvTerm evtrm))
+dsHsWrapper (WpEvApp evtrm)   = do ev <- dsEvTerm evtrm
+                                   return (\e -> App e ev)
 \end{code}
