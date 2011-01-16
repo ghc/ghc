@@ -240,7 +240,7 @@ type CoercionKind = Kind
 ------------------------------
 
 -- | This breaks a 'Coercion' with 'CoercionKind' @T A B C ~ T D E F@ into
--- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @E ~ F@. Hence:
+-- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @C ~ F@. Hence:
 --
 -- > decomposeCo 3 c = [right (left (left c)), right (left c), right c]
 decomposeCo :: Arity -> Coercion -> [Coercion]
