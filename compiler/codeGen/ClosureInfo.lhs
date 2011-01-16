@@ -1044,6 +1044,7 @@ getTyDescription ty
       TyConApp tycon _ 	     -> getOccString tycon
       PredTy sty	     -> getPredTyDescription sty
       ForAllTy _ ty          -> getTyDescription ty
+      LiteralTy _            -> panic "getTyDecription LiteralTy"
     }
   where
     fun_result (FunTy _ res) = '>' : fun_result res

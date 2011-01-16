@@ -56,6 +56,7 @@ data Ty
   | Tcon (Qual Tcon)
   | Tapp Ty Ty
   | Tforall Tbind Ty 
+  | Tliteral TLit
 -- We distinguish primitive coercions
 -- (represented in GHC by wired-in names), because
 -- External Core treats them specially, so we have
@@ -74,6 +75,10 @@ data Kind
   | Kopen
   | Karrow Kind Kind
   | Keq Ty Ty
+  | Knat
+
+data TLit
+  = TLnumber Integer
 
 data Lit 
   = Lint Integer Ty

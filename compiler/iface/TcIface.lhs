@@ -787,6 +787,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
 \begin{code}
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType (IfaceTyVar n)        = do { tv <- tcIfaceTyVar n; return (TyVarTy tv) }
+tcIfaceType (IfaceLiteralTy l)    = do { l <- tcIfaceTyLit l; return (LiteralTy l) }
 tcIfaceType (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (AppTy t1' t2') }
 tcIfaceType (IfaceFunTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
 tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkTyConApp tc' ts') }
@@ -805,6 +806,15 @@ tcIfacePredType (IfaceEqPred t1 t2)  = do { t1' <- tcIfaceType t1; t2' <- tcIfac
 -----------------------------------------
 tcIfaceCtxt :: IfaceContext -> IfL ThetaType
 tcIfaceCtxt sts = mapM tcIfacePredType sts
+
+
+-----------------------------------------
+tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
+tcIfaceTyLit (IfaceNumberTyLit n) = return (NumberTyLit n)
+
+
+
+
 \end{code}
 
 
@@ -1205,6 +1215,7 @@ tcIfaceTyCon IfaceOpenTypeKindTc     = return openTypeKindTyCon
 tcIfaceTyCon IfaceUnliftedTypeKindTc = return unliftedTypeKindTyCon
 tcIfaceTyCon IfaceArgTypeKindTc      = return argTypeKindTyCon
 tcIfaceTyCon IfaceUbxTupleKindTc     = return ubxTupleKindTyCon
+tcIfaceTyCon IfaceNatKindTc          = return natKindTyCon
 
 -- Even though we are in an interface file, we want to make
 -- sure the instances and RULES of this tycon are loaded 

@@ -500,6 +500,7 @@ normaliseType env ty
   | Just ty' <- coreView ty = normaliseType env ty' 
 normaliseType env (TyConApp tc tys)
   = normaliseTcApp env tc tys
+normaliseType _env ty@(LiteralTy _) = (IdCo ty, ty)
 normaliseType env (AppTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2

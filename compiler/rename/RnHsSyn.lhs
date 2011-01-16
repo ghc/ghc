@@ -66,6 +66,7 @@ extractHsTyNames ty
     get (HsParTy ty)           = getl ty
     get (HsBangTy _ ty)        = getl ty
     get (HsRecTy flds)         = extractHsTyNames_s (map cd_fld_type flds)
+    get (HsNumberTy _)         = emptyNameSet
     get (HsNumTy _)            = emptyNameSet
     get (HsTyVar tv)           = unitNameSet tv
     get (HsSpliceTy _ fvs _)   = fvs

@@ -38,6 +38,8 @@ module Type (
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, applyTysD, isForAllTy, dropForAlls,
+
+        mkLiteralTy, mkNumberTyLit, mkNumberTy, isNumberTy,
 	
 	-- (Newtypes)
 	newTyConInstRhs, carefullySplitNewType_maybe,
@@ -65,12 +67,14 @@ module Type (
         -- ** Common Kinds and SuperKinds
         liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind,
+        natKind,
 
         tySuperKind, coSuperKind, 
 
         -- ** Common Kind type constructors
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
         argTypeKindTyCon, ubxTupleKindTyCon,
+        natKindTyCon,
 
 	-- * Type free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -114,6 +118,7 @@ module Type (
 	-- * Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
 	pprPred, pprEqPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind,
+        pprTyLit,
 	
 	pprSourceTyCon
     ) where
@@ -188,6 +193,7 @@ infixr 3 `mkFunTy`	-- Associates to the right
 -- (\# a, b \#)   Yes             No              No              Yes
 -- (  a, b  )   No              Yes             Yes             Yes
 -- [a]          No              Yes             Yes             Yes
+-- 42           Yes             n/a             No              No
 -- @
 
 -- $representation_types
@@ -278,6 +284,7 @@ expandTypeSynonyms ty
     go (FunTy t1 t2)   = FunTy (go t1) (go t2)
     go (ForAllTy tv t) = ForAllTy tv (go t)
     go (PredTy p)      = PredTy (go_pred p)
+    go (LiteralTy x)   = LiteralTy x
 
     go_pred (ClassP c ts)  = ClassP c (map go ts)
     go_pred (IParam ip t)  = IParam ip (go t)
@@ -416,6 +423,26 @@ splitAppTys ty = split ty ty []
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty _                     args = (orig_ty, args)
 
+\end{code}
+
+
+---------------------------------------------------------------------
+                      LiteralTy
+                      ~~~~~~~~~
+
+\begin{code}
+mkLiteralTy :: TyLit -> Type
+mkLiteralTy = LiteralTy
+
+mkNumberTyLit :: Integer -> TyLit
+mkNumberTyLit = NumberTyLit
+
+mkNumberTy :: Integer -> Type
+mkNumberTy n = mkLiteralTy (mkNumberTyLit n)
+
+isNumberTy :: Type -> Maybe Integer
+isNumberTy (LiteralTy (NumberTyLit n)) = Just n
+isNumberTy _                           = Nothing
 \end{code}
 
 
@@ -834,6 +861,7 @@ tyVarsOfType (TyConApp _ tys) = tyVarsOfTypes tys
 tyVarsOfType (PredTy sty)     = tyVarsOfPred sty
 tyVarsOfType (FunTy arg res)  = tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)  = tyVarsOfType fun `unionVarSet` tyVarsOfType arg
+tyVarsOfType (LiteralTy _)    = emptyVarSet
 tyVarsOfType (ForAllTy tv ty) -- The kind of a coercion binder 
 	     	       	      -- can mention type variables!
   | isTyVar tv		      = inner_tvs `delVarSet` tv
@@ -874,6 +902,7 @@ tyFamInsts (FunTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
 tyFamInsts (AppTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
 tyFamInsts (ForAllTy _ ty)      = tyFamInsts ty
 tyFamInsts (PredTy pty)         = predFamInsts pty
+tyFamInsts (LiteralTy _)        = []
 
 -- | Finds type family instances occuring in a predicate type after expanding 
 -- synonyms.
@@ -902,6 +931,13 @@ isUnLiftedType :: Type -> Bool
 isUnLiftedType ty | Just ty' <- coreView ty = isUnLiftedType ty'
 isUnLiftedType (ForAllTy _ ty)   = isUnLiftedType ty
 isUnLiftedType (TyConApp tc _)   = isUnLiftedTyCon tc
+isUnLiftedType (LiteralTy _)     = False
+  -- Literal types are not really lifted (they are empty) but this
+  -- probably does not matter a lot.  We return 'False' here because
+  -- the rest of the typechecker assumes that only lifted types can be
+  -- unified with type variables (see the note at the top of this file).
+  -- This is a bit odd.
+
 isUnLiftedType _                 = False
 
 isUnboxedTupleType :: Type -> Bool
@@ -962,6 +998,7 @@ isPrimitiveType :: Type -> Bool
 -- ^ Returns true of types that are opaque to Haskell.
 -- Most of these are unlifted, but now that we interact with .NET, we
 -- may have primtive (foreign-imported) types that are lifted
+isPrimitiveType (LiteralTy _) = True
 isPrimitiveType ty = case splitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
 					      isPrimTyCon tc
@@ -983,6 +1020,7 @@ seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (PredTy p) 	  = seqPred p
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
+seqType (LiteralTy x)     = seqTyLit x
 
 seqTypes :: [Type] -> ()
 seqTypes []       = ()
@@ -992,6 +1030,9 @@ seqPred :: PredType -> ()
 seqPred (ClassP c tys)   = c `seq` seqTypes tys
 seqPred (IParam n ty)    = n `seq` seqType ty
 seqPred (EqPred ty1 ty2) = seqType ty1 `seq` seqType ty2
+
+seqTyLit :: TyLit -> ()
+seqTyLit (NumberTyLit x) = x `seq` ()
 \end{code}
 
 
@@ -1020,6 +1061,7 @@ coreEqType2 rn_env t1 t2
     eq env (ForAllTy tv1 t1)   (ForAllTy tv2 t2) = eq (rnBndr2 env tv1 tv2) t1 t2
     eq env (AppTy s1 t1)       (AppTy s2 t2)     = eq env s1 s2 && eq env t1 t2
     eq env (FunTy s1 t1)       (FunTy s2 t2)     = eq env s1 s2 && eq env t1 t2
+    eq _   (LiteralTy x)       (LiteralTy y)     = x == y
     eq env (TyConApp tc1 tys1) (TyConApp tc2 tys2) 
 	| tc1 == tc2, all2 (eq env) tys1 tys2 = True
 			-- The lengths should be equal because
@@ -1092,6 +1134,9 @@ tcPartOfType t1 (AppTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
 tcPartOfType t1 (FunTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
 tcPartOfType t1 (PredTy p2)     = tcPartOfPred t1 p2
 tcPartOfType t1 (TyConApp _ ts) = any (tcPartOfType t1) ts
+tcPartOfType _  (LiteralTy _)   = False
+-- XXX: Is the equation for type literals correct?  What is this function for?
+-- It does not seem to be used...
 
 tcPartOfPred :: Type -> PredType -> Bool
 tcPartOfPred t1 (IParam _ t2)  = tcPartOfType t1 t2
@@ -1127,18 +1172,23 @@ cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenC
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (PredTy p1)         (PredTy p2)         = cmpPredX env p1 p2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
+cmpTypeX _ (LiteralTy x) (LiteralTy y)               = compare x y
 
-    -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
+    -- Deal with the rest: TyVarTy < LiteralTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
 cmpTypeX _ (AppTy _ _)    (TyVarTy _)    = GT
+cmpTypeX _ (AppTy _ _)    (LiteralTy _)  = GT
 
 cmpTypeX _ (FunTy _ _)    (TyVarTy _)    = GT
+cmpTypeX _ (FunTy _ _)    (LiteralTy _)  = GT
 cmpTypeX _ (FunTy _ _)    (AppTy _ _)    = GT
 
 cmpTypeX _ (TyConApp _ _) (TyVarTy _)    = GT
+cmpTypeX _ (TyConApp _ _) (LiteralTy _)  = GT
 cmpTypeX _ (TyConApp _ _) (AppTy _ _)    = GT
 cmpTypeX _ (TyConApp _ _) (FunTy _ _)    = GT
 
 cmpTypeX _ (ForAllTy _ _) (TyVarTy _)    = GT
+cmpTypeX _ (ForAllTy _ _) (LiteralTy _)  = GT
 cmpTypeX _ (ForAllTy _ _) (AppTy _ _)    = GT
 cmpTypeX _ (ForAllTy _ _) (FunTy _ _)    = GT
 cmpTypeX _ (ForAllTy _ _) (TyConApp _ _) = GT
@@ -1474,6 +1524,7 @@ subst_ty subst ty
     go (ForAllTy tv ty)  = case substTyVarBndr subst tv of
                               (subst', tv') ->
                                  ForAllTy tv' $! (subst_ty subst' ty)
+    go (LiteralTy x)     = LiteralTy x
 
 substTyVar :: TvSubst -> TyVar  -> Type
 substTyVar subst@(TvSubst _ _) tv

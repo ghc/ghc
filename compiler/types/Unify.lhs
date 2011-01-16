@@ -193,6 +193,8 @@ match menv subst (AppTy ty1a ty1b) ty2
 	-- 'repSplit' used because the tcView stuff is done above
   = do { subst' <- match menv subst ty1a ty2a
        ; match menv subst' ty1b ty2b }
+match _menv subst (LiteralTy x) (LiteralTy y)
+  | x == y = Just subst
 
 match _ _ _ _
   = Nothing
@@ -361,6 +363,11 @@ dataConCannotMatch tys con
 	| Just (f1, a1) <- repSplitAppTy_maybe ty1
 	= cant_match f1 f2 || cant_match a1 a2
 
+    -- We don't add equations for FunTy, TyConApp on data/newtypes etc.
+    -- because these types have different kinds then type literal,
+    -- and so should not be compared against literals.
+    cant_match (LiteralTy x) (LiteralTy y) = x /= y
+
     cant_match _ _ = False      -- Safe!
 
 -- Things we could add;
@@ -457,6 +464,9 @@ unify subst ty1 (AppTy ty2a ty2b)
   | Just (ty1a, ty1b) <- repSplitAppTy_maybe ty1
   = do	{ subst' <- unify subst ty1a ty2a
         ; unify subst' ty1b ty2b }
+
+unify subst (LiteralTy x) (LiteralTy y)
+  | x == y  = return subst
 
 unify _ ty1 ty2 = failWith (misMatch ty1 ty2)
 	-- ForAlls??

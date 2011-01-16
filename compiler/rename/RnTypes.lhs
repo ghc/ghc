@@ -139,6 +139,8 @@ rnHsType doc (HsRecTy flds)
   = do { flds' <- rnConDeclFields doc flds
        ; return (HsRecTy flds') }
 
+rnHsType _ (HsNumberTy i) = return (HsNumberTy i)
+
 rnHsType _ (HsNumTy i)
   | i == 1    = return (HsNumTy i)
   | otherwise = addErr err_msg >> return (HsNumTy i)

@@ -38,6 +38,8 @@ module RdrHsSyn (
 	checkPred,	      -- HsType -> P HsPred
 	checkTyVars,          -- [LHsType RdrName] -> P ()
 	checkKindSigs,	      -- [LTyClDecl RdrName] -> P ()
+    checkKindCon,         -- Located RdrName -> P (Located Kind)
+    mkNumberType,
 	checkInstType,	      -- HsType -> P HsType
 	checkPattern,	      -- HsExp -> P HsPat
 	bang_RDR,
@@ -53,7 +55,7 @@ module RdrHsSyn (
 
 import HsSyn		-- Lots of it
 import Class            ( FunDep )
-import TypeRep          ( Kind )
+import TypeRep          ( Kind, natKind )
 import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc, 
 			  isRdrDataCon, isUnqual, getRdrName, setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation(..), RuleMatchInfo,
@@ -129,6 +131,7 @@ extract_lty (L loc ty) acc
       HsPredTy p		-> extract_pred p acc
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty               	-> extract_lty ty acc
+      HsNumberTy {}             -> acc
       HsNumTy {}                -> acc
       HsCoreTy {}               -> acc  -- The type is closed
       HsQuasiQuoteTy {}	        -> acc  -- Quasi quotes mention no type variables
@@ -571,6 +574,28 @@ checkKindSigs = mapM_ check
         || isSynDecl tydecl  = return ()
       | otherwise	     = 
 	parseErrorSDoc l (text "Type declaration in a class must be a kind signature or synonym default:" $$ ppr tydecl)
+
+checkKindCon :: Located RdrName -> P (Located Kind)
+checkKindCon (L l name)
+  | occNameString (rdrNameOcc name) == "Nat" =
+    do type_nats_on <- extension typeNaturalsEnabled
+       if type_nats_on
+         then return (L l natKind)
+         else parseErrorSDoc l
+              (text "Invalid kind" <+> ppr name <+> parens
+                (text "Use -XTypeNaturals to enable type-level naturals"))
+checkKindCon name@(L l _) =
+  parseErrorSDoc l (text "Invalid kind" <+> ppr name)
+
+mkNumberType :: Located Integer -> P (LHsType RdrName)
+mkNumberType (L l n) =
+  do type_nats_on <- extension typeNaturalsEnabled
+     if type_nats_on
+       then return (L l (HsNumberTy n))
+       else parseErrorSDoc l
+              (text "Invalid number type," <+> integer n <> dot <+> parens
+                (text "Use -XTypeNaturals to enable type-level naturals"))
+
 
 checkContext :: LHsType RdrName -> P (LHsContext RdrName)
 checkContext (L l t)

@@ -130,6 +130,8 @@ opt_co' env sym (TyConApp tc cos)
   | otherwise
   = TyConApp tc (map (opt_co env sym) cos)
 
+opt_co' _ _ co@(LiteralTy _) = co
+
 --------
 opt_co_tc_app :: TvSubst -> Bool -> TyCon -> CoTyConDesc -> [Coercion] -> NormalCo
 -- Used for CoercionTyCons only
@@ -450,4 +452,6 @@ isIdNormCo ty = go ty
     go (PredTy (IParam _ ty))  = go ty
     go (PredTy (ClassP _ tys)) = all go tys
     go (PredTy (EqPred t1 t2)) = go t1 && go t2
+    go (LiteralTy _)           = True
 \end{code}  
+

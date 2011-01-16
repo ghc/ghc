@@ -699,6 +699,8 @@ zonkType zonk_tc_tyvar ty
     go (PredTy p)        = do p' <- go_pred p
                               return (PredTy p')
 
+    go (LiteralTy n)     = return (LiteralTy n)
+
     go (FunTy arg res)   = do arg' <- go arg
                               res' <- go res
                               return (FunTy arg' res')
@@ -985,6 +987,8 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 
     arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
     ubx_tup_msg = ubxArgTyErr ty
+
+check_type _ _ (LiteralTy _) = return ()
 
 check_type _ _ ty = pprPanic "check_type" (ppr ty)
 
@@ -1581,6 +1585,7 @@ fvType (PredTy pred)       = fvPred pred
 fvType (FunTy arg res)     = fvType arg ++ fvType res
 fvType (AppTy fun arg)     = fvType fun ++ fvType arg
 fvType (ForAllTy tyvar ty) = filter (/= tyvar) (fvType ty)
+fvType (LiteralTy _)       = []
 
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
@@ -1599,6 +1604,7 @@ sizeType (PredTy pred)     = sizePred pred
 sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
 sizeType (ForAllTy _ ty)   = sizeType ty
+sizeType (LiteralTy _)     = 1
 
 sizeTypes :: [Type] -> Int
 sizeTypes xs               = sum (map sizeType xs)

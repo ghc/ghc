@@ -537,6 +537,7 @@ tidyType env@(_, subst) ty
     go (PredTy sty)	    = PredTy (tidyPred env sty)
     go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
     go (FunTy fun arg)	    = (FunTy $! (go fun)) $! (go arg)
+    go (LiteralTy n)  	    = LiteralTy n
     go (ForAllTy tv ty)	    = ForAllTy tvp $! (tidyType envp ty)
 			      where
 			        (envp, tvp) = tidyTyVarBndr env tv
@@ -746,8 +747,13 @@ getDFunTyKey (TyConApp tc _) = getOccName tc
 getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
 getDFunTyKey (FunTy _ _)     = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
+getDFunTyKey (LiteralTy x)   = getDFunTyLitKey x
 getDFunTyKey ty		     = pprPanic "getDFunTyKey" (pprType ty)
 -- PredTy shouldn't happen
+
+getDFunTyLitKey :: TyLit -> OccName
+getDFunTyLitKey (NumberTyLit n) = mkOccName Name.varName (show n)
+
 \end{code}
 
 
@@ -1176,6 +1182,7 @@ tcTyVarsOfType (TyVarTy tv)	    = if isTcTyVar tv then unitVarSet tv
 tcTyVarsOfType (TyConApp _ tys)     = tcTyVarsOfTypes tys
 tcTyVarsOfType (PredTy sty)	    = tcTyVarsOfPred sty
 tcTyVarsOfType (FunTy arg res)	    = tcTyVarsOfType arg `unionVarSet` tcTyVarsOfType res
+tcTyVarsOfType (LiteralTy _)        = emptyVarSet
 tcTyVarsOfType (AppTy fun arg)	    = tcTyVarsOfType fun `unionVarSet` tcTyVarsOfType arg
 tcTyVarsOfType (ForAllTy tyvar ty)  = (tcTyVarsOfType ty `delVarSet` tyvar)
                                       `unionVarSet` tcTyVarsOfTyVar tyvar
@@ -1232,6 +1239,7 @@ exactTyVarsOfType ty
     go ty | Just ty' <- tcView ty = go ty'	-- This is the key line
     go (TyVarTy tv)         	  = unitVarSet tv
     go (TyConApp _ tys)     	  = exactTyVarsOfTypes tys
+    go (LiteralTy _)              = emptyVarSet
     go (PredTy ty)	    	  = go_pred ty
     go (FunTy arg res)	    	  = go arg `unionVarSet` go res
     go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
@@ -1262,6 +1270,7 @@ tyClsNamesOfType (PredTy (EqPred ty1 ty2))  = tyClsNamesOfType ty1 `unionNameSet
 tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
 tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
 tyClsNamesOfType (ForAllTy _ ty)	    = tyClsNamesOfType ty
+tyClsNamesOfType (LiteralTy _)              = emptyNameSet
 
 tyClsNamesOfTypes :: [Type] -> NameSet
 tyClsNamesOfTypes tys = foldr (unionNameSets . tyClsNamesOfType) emptyNameSet tys

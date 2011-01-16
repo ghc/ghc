@@ -651,6 +651,7 @@ quickFlattenTy :: TcType -> TcM TcType
 -- See Note [Flattening in error message generation]
 quickFlattenTy ty | Just ty' <- tcView ty = quickFlattenTy ty'
 quickFlattenTy ty@(TyVarTy {})  = return ty
+quickFlattenTy ty@(LiteralTy {})= return ty
 quickFlattenTy ty@(ForAllTy {}) = return ty     -- See
 quickFlattenTy ty@(PredTy {})   = return ty     -- Note [Quick-flatten polytypes]
   -- Don't flatten because of the danger or removing a bound variable

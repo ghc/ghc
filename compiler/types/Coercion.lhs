@@ -153,6 +153,7 @@ isSubOpenTypeKind :: Kind -> Bool
 isSubOpenTypeKind (FunTy k1 k2)    = ASSERT2 ( isKind k1, text "isSubOpenTypeKind" <+> ppr k1 <+> text "::" <+> ppr (typeKind k1) ) 
                                      ASSERT2 ( isKind k2, text "isSubOpenTypeKind" <+> ppr k2 <+> text "::" <+> ppr (typeKind k2) ) 
                                      False
+isSubOpenTypeKind k | isNatKind k  = False
 isSubOpenTypeKind (TyConApp kc []) = ASSERT( isKind (TyConApp kc []) ) True
 isSubOpenTypeKind other            = ASSERT( isKind other ) False
          -- This is a conservative answer
@@ -196,6 +197,7 @@ isSubKindCon kc1 kc2
   | isLiftedTypeKindCon kc1   && isLiftedTypeKindCon kc2   = True
   | isUnliftedTypeKindCon kc1 && isUnliftedTypeKindCon kc2 = True
   | isUbxTupleKindCon kc1     && isUbxTupleKindCon kc2     = True
+  | isNatKindCon kc1                                       = isNatKindCon kc2
   | isOpenTypeKindCon kc2                                  = True 
                            -- we already know kc1 is not a fun, its a TyCon
   | isArgTypeKindCon kc2      && isSubArgTypeKindCon kc1   = True
@@ -735,12 +737,18 @@ typeKind (FunTy _arg res)
     | otherwise               = ASSERT( isSubOpenTypeKind k) liftedTypeKind 
     where
       k = typeKind res
+typeKind (LiteralTy x)        = tyLitKind x
 
 ------------------
 predKind :: PredType -> Kind
 predKind (EqPred {}) = coSuperKind	-- A coercion kind!
 predKind (ClassP {}) = liftedTypeKind	-- Class and implicitPredicates are
 predKind (IParam {}) = liftedTypeKind 	-- always represented by lifted types
+
+
+-----------------
+tyLitKind :: TyLit -> Kind
+tyLitKind (NumberTyLit _) = natKind
 
 ------------------
 -- | If it is the case that
@@ -772,6 +780,8 @@ coercionKind (FunTy ty1 ty2)
   = let (t1, t2) = coercionKind ty1
         (s1, s2) = coercionKind ty2 in
     (mkFunTy t1 s1, mkFunTy t2 s2)
+
+coercionKind t@(LiteralTy _)  = (t,t)
 
 coercionKind (ForAllTy tv ty)
   | isCoVar tv

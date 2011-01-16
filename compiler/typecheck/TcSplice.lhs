@@ -1183,6 +1183,10 @@ reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synony
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
 reifyType (FunTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
 reifyType ty@(PredTy {})    = pprPanic "reifyType PredTy" (ppr ty)
+reifyType (LiteralTy n)     = do { l <- reifyTyLit n; return (TH.LiteralT l) }
+
+reifyTyLit :: TypeRep.TyLit -> TcM TH.TyLit
+reifyTyLit (NumberTyLit n) = return (TH.NumberTL n)
 
 reify_for_all :: TypeRep.Type -> TcM TH.Type
 reify_for_all ty

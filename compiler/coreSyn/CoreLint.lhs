@@ -661,6 +661,8 @@ lintCoercion' ty@(TyConApp tc tys)
        ; check_co_app ty (tyConKind tc) ss
        ; return (TyConApp tc ss, TyConApp tc ts) }
 
+lintCoercion' ty@(LiteralTy _) = return (ty, ty)
+
 lintCoercion' ty@(PredTy (ClassP cls tys))
   = do { (ss,ts) <- mapAndUnzipM lintCoercion tys
        ; check_co_app ty (tyConKind (classTyCon cls)) ss
@@ -766,6 +768,8 @@ lintType ty@(AppTy t1 t2)
 lintType ty@(FunTy t1 t2)
   = lint_ty_app ty (tyConKind funTyCon) [t1,t2]
 
+lintType ty@(LiteralTy l) = lintTyLit l >> return (typeKind ty)
+
 lintType ty@(TyConApp tc tys)
   | tyConHasKind tc
   = lint_ty_app ty (tyConKind tc) tys
@@ -784,6 +788,18 @@ lintType (PredTy (IParam _ p_ty))
 
 lintType ty@(PredTy (EqPred {}))
   = failWithL (badEq ty)
+
+
+---
+
+lintTyLit :: TyLit -> LintM ()
+lintTyLit (NumberTyLit n)
+  | n >= 0    = return ()
+  | otherwise = failWithL msg
+    where msg = ptext (sLit "Negative type literal:") <+> integer n
+
+
+
 
 ----------------
 lint_ty_app :: Type -> Kind -> [OutType] -> LintM Kind

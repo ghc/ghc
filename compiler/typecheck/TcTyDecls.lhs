@@ -357,6 +357,7 @@ tcTyConsOfType ty
      go (PredTy (IParam _ ty))     = go ty
      go (PredTy (ClassP cls tys))  = go_tc (classTyCon cls) tys
      go (ForAllTy _ ty)            = go ty
+     go (LiteralTy _)              = emptyNameEnv
      go _                          = panic "tcTyConsOfType"
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc

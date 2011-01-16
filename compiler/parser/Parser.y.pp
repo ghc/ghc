@@ -1025,8 +1025,7 @@ atype :: { LHsType RdrName }
 	| '$(' exp ')'	      		{ LL $ mkHsSpliceTy $2 }
 	| TH_ID_SPLICE	      		{ LL $ mkHsSpliceTy $ L1 $ HsVar $ 
 					  mkUnqual varName (getTH_ID_SPLICE $1) }
--- Generics
-        | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
+        | INTEGER                       {% mkNumberType (L1 (getINTEGER $1)) }
 
 -- An inst_type is what occurs in the head of an instance decl
 --	e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1082,6 +1081,7 @@ kind	:: { Located Kind }
 akind	:: { Located Kind }
 	: '*'			{ L1 liftedTypeKind }
 	| '!'			{ L1 unliftedTypeKind }
+	| tycon                 {% checkKindCon $1 }
 	| '(' kind ')'		{ LL (unLoc $2) }
 
 

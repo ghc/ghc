@@ -270,6 +270,7 @@ cvt_tyinst_hdr cxt tc tys
     collect (TupleT _)   = return []
     collect ArrowT       = return []
     collect ListT        = return []
+    collect (LiteralT _) = return []
     collect (AppT t1 t2)
       = do { tvs1 <- collect t1
            ; tvs2 <- collect t2

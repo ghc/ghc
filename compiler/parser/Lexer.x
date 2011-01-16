@@ -53,7 +53,7 @@ module Lexer (
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
-   extension, bangPatEnabled, datatypeContextsEnabled,
+   extension, bangPatEnabled, datatypeContextsEnabled, typeNaturalsEnabled,
    addWarning,
    lexTokenStream
   ) where
@@ -1798,6 +1798,8 @@ relaxedLayoutBit :: Int
 relaxedLayoutBit = 24
 nondecreasingIndentationBit :: Int
 nondecreasingIndentationBit = 25
+typeNaturalsBit :: Int
+typeNaturalsBit = 26
 
 always :: Int -> Bool
 always           _     = True
@@ -1841,6 +1843,8 @@ relaxedLayout :: Int -> Bool
 relaxedLayout flags = testBit flags relaxedLayoutBit
 nondecreasingIndentation :: Int -> Bool
 nondecreasingIndentation flags = testBit flags nondecreasingIndentationBit
+typeNaturalsEnabled :: Int -> Bool
+typeNaturalsEnabled flags = testBit flags typeNaturalsBit
 
 -- PState for parsing options pragmas
 --
@@ -1895,6 +1899,7 @@ mkPState flags buf loc =
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
                .|. relaxedLayoutBit `setBitIf` xopt Opt_RelaxedLayout flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
+               .|. typeNaturalsBit `setBitIf` xopt Opt_TypeNaturals flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

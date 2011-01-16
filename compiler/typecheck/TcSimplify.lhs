@@ -768,6 +768,7 @@ floatEqualities skols can_given wanteds
           | not (isTcTyVar tv)               = unitVarSet tv
           | FlatSkol ty <- tcTyVarDetails tv = tvs_under_fsks ty
           | otherwise                        = unitVarSet tv
+        tvs_under_fsks (LiteralTy _)    = emptyVarSet
         tvs_under_fsks (TyConApp _ tys) = unionVarSets (map tvs_under_fsks tys)
         tvs_under_fsks (PredTy sty)     = predTvs_under_fsks sty
         tvs_under_fsks (FunTy arg res)  = tvs_under_fsks arg `unionVarSet` tvs_under_fsks res

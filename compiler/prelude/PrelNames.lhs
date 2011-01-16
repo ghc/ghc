@@ -1033,12 +1033,13 @@ coSuperKindTyConKey                    = mkPreludeTyConUnique 86
 
 -- Kind constructors
 liftedTypeKindTyConKey, openTypeKindTyConKey, unliftedTypeKindTyConKey,
-    ubxTupleKindTyConKey, argTypeKindTyConKey :: Unique
+    ubxTupleKindTyConKey, argTypeKindTyConKey, natKindTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 openTypeKindTyConKey                    = mkPreludeTyConUnique 88
 unliftedTypeKindTyConKey                = mkPreludeTyConUnique 89
 ubxTupleKindTyConKey                    = mkPreludeTyConUnique 90
 argTypeKindTyConKey                     = mkPreludeTyConUnique 91
+natKindTyConKey                         = mkPreludeTyConUnique 92
 
 -- Coercion constructors
 symCoercionTyConKey, transCoercionTyConKey, leftCoercionTyConKey,
@@ -1332,7 +1333,9 @@ kindKeys = [ liftedTypeKindTyConKey
 	   , openTypeKindTyConKey
 	   , unliftedTypeKindTyConKey
 	   , ubxTupleKindTyConKey 
-	   , argTypeKindTyConKey ]
+	   , argTypeKindTyConKey
+           , natKindTyConKey
+           ]
 \end{code}
 
 

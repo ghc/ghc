@@ -365,6 +365,8 @@ kc_hs_type (HsPArrTy ty) = do
     ty' <- kcLiftedType ty
     return (HsPArrTy ty', liftedTypeKind)
 
+kc_hs_type (HsNumberTy n) = return (HsNumberTy n, natKind)
+
 kc_hs_type (HsNumTy n)
    = return (HsNumTy n, liftedTypeKind)
 
@@ -605,6 +607,8 @@ ds_type (HsOpTy ty1 (L span op) ty2) = do
     tau_ty1 <- dsHsType ty1
     tau_ty2 <- dsHsType ty2
     setSrcSpan span (ds_var_app op [tau_ty1,tau_ty2])
+
+ds_type (HsNumberTy n) = return (mkNumberTy n)
 
 ds_type (HsNumTy n)
   = ASSERT(n==1) do

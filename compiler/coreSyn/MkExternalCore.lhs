@@ -209,6 +209,7 @@ make_ty t = make_ty' t
 -- note calls to make_ty so as to expand types recursively
 make_ty' :: Type -> C.Ty
 make_ty' (TyVarTy tv)    	 = C.Tvar (make_var_id (tyVarName tv))
+make_ty' (LiteralTy n)           = C.Tliteral (make_tlit n)
 make_ty' (AppTy t1 t2) 		 = C.Tapp (make_ty t1) (make_ty t2)
 make_ty' (FunTy t1 t2) 		 = make_ty (TyConApp funTyCon [t1,t2])
 make_ty' (ForAllTy tv t) 	 = C.Tforall (make_tbind tv) (make_ty t)
@@ -227,6 +228,9 @@ make_ty' (TyConApp tc ts) 	 = make_tyConApp tc ts
 -- Maybe CoreTidy should know whether to expand newtypes or not?
 
 make_ty' (PredTy p)	= make_ty (predTypeRep p)
+
+make_tlit :: TyLit -> C.TLit
+make_tlit (NumberTyLit n) = C.TLnumber n
 
 make_tyConApp :: TyCon -> [Type] -> C.Ty
 make_tyConApp tc [t1, t2] | tc == transCoercionTyCon =
@@ -257,6 +261,7 @@ make_kind k
   | isLiftedTypeKind k   = C.Klifted
   | isUnliftedTypeKind k = C.Kunlifted
   | isOpenTypeKind k     = C.Kopen
+  | isNatKind k          = C.Knat
 make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}

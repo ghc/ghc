@@ -13,6 +13,7 @@ module TypeRep (
 	TyThing(..), 
 	Type(..),
 	PredType(..),	 		-- to friends
+        TyLit(..),                      -- to friends
 	
  	Kind, ThetaType,		-- Synonyms
 
@@ -22,22 +23,27 @@ module TypeRep (
 	pprType, pprParendType, pprTypeApp,
 	pprTyThing, pprTyThingCategory, 
 	pprPred, pprEqPred, pprTheta, pprForAll, pprThetaArrow, pprClassPred,
+        pprTyLit,
 
 	-- Kinds
 	liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind,
+        natKind,
 	isLiftedTypeKindCon, isLiftedTypeKind,
+        isNatKindCon, isNatKind,
 	mkArrowKind, mkArrowKinds, isCoercionKind,
   	coVarPred,
 
         -- Kind constructors...
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
         argTypeKindTyCon, ubxTupleKindTyCon,
+        natKindTyCon,
 
         -- And their names
         unliftedTypeKindTyConName, openTypeKindTyConName,
         ubxTupleKindTyConName, argTypeKindTyConName,
         liftedTypeKindTyConName,
+        natKindTyConName,
 
         -- Super Kinds
 	tySuperKind, coSuperKind,
@@ -159,7 +165,18 @@ data Type
 	                -- of a 'FunTy' (unlike the 'PredType' constructors 'ClassP' or 'IParam')
 	                
 	                -- See Note [PredTy], and Note [Equality predicates]
+
+  | LiteralTy TyLit     -- Type literals are simillar to type constructors.
+
   deriving (Data, Typeable)
+
+
+-- NOTE:  Other parts of the code assume that type literals do not contain
+-- other types or type variables.
+data TyLit
+  = NumberTyLit Integer
+  deriving (Eq, Ord, Data, Typeable)
+
 
 -- | The key type representing kinds in the compiler.
 -- Invariant: a kind is always in one of these forms:
@@ -290,11 +307,11 @@ We define a few wired-in type constructors here to avoid module knots
 -- | See "Type#kind_subtyping" for details of the distinction between the 'Kind' 'TyCon's
 funTyCon, tySuperKindTyCon, coSuperKindTyCon, liftedTypeKindTyCon,
       openTypeKindTyCon, unliftedTypeKindTyCon,
-      ubxTupleKindTyCon, argTypeKindTyCon
+      ubxTupleKindTyCon, argTypeKindTyCon, natKindTyCon
    :: TyCon
 funTyConName, tySuperKindTyConName, coSuperKindTyConName, liftedTypeKindTyConName,
       openTypeKindTyConName, unliftedTypeKindTyConName,
-      ubxTupleKindTyConName, argTypeKindTyConName
+      ubxTupleKindTyConName, argTypeKindTyConName, natKindTyConName
    :: Name
 
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind)
@@ -315,6 +332,7 @@ openTypeKindTyCon     = mkKindTyCon openTypeKindTyConName     tySuperKind
 unliftedTypeKindTyCon = mkKindTyCon unliftedTypeKindTyConName tySuperKind
 ubxTupleKindTyCon     = mkKindTyCon ubxTupleKindTyConName     tySuperKind
 argTypeKindTyCon      = mkKindTyCon argTypeKindTyConName      tySuperKind
+natKindTyCon          = mkKindTyCon natKindTyConName          tySuperKind
 
 --------------------------
 -- ... and now their names
@@ -327,6 +345,7 @@ unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#") unliftedTypeKindTyConKey
 ubxTupleKindTyConName     = mkPrimTyConName (fsLit "(#)") ubxTupleKindTyConKey ubxTupleKindTyCon
 argTypeKindTyConName      = mkPrimTyConName (fsLit "??") argTypeKindTyConKey argTypeKindTyCon
 funTyConName              = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
+natKindTyConName          = mkPrimTyConName (fsLit "Nat") natKindTyConKey natKindTyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
 mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkTcOccFS occ) 
@@ -343,13 +362,15 @@ kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []
 
 -- | See "Type#kind_subtyping" for details of the distinction between these 'Kind's
-liftedTypeKind, unliftedTypeKind, openTypeKind, argTypeKind, ubxTupleKind :: Kind
+liftedTypeKind, unliftedTypeKind, openTypeKind, argTypeKind, ubxTupleKind,
+  natKind :: Kind
 
 liftedTypeKind   = kindTyConType liftedTypeKindTyCon
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
 openTypeKind     = kindTyConType openTypeKindTyCon
 argTypeKind      = kindTyConType argTypeKindTyCon
 ubxTupleKind	 = kindTyConType ubxTupleKindTyCon
+natKind          = kindTyConType natKindTyCon
 
 -- | Given two kinds @k1@ and @k2@, creates the 'Kind' @k1 -> k2@
 mkArrowKind :: Kind -> Kind -> Kind
@@ -377,9 +398,16 @@ isCoSuperKind _                = False
 isLiftedTypeKindCon :: TyCon -> Bool
 isLiftedTypeKindCon tc    = tc `hasKey` liftedTypeKindTyConKey
 
+isNatKindCon :: TyCon -> Bool
+isNatKindCon tc           =  tc `hasKey` natKindTyConKey
+
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind (TyConApp tc []) = isLiftedTypeKindCon tc
 isLiftedTypeKind _                = False
+
+isNatKind :: Kind -> Bool
+isNatKind (TyConApp tc [])        = isNatKindCon tc
+isNatKind _                       = False
 
 isCoercionKind :: Kind -> Bool
 -- All coercions are of form (ty1 ~ ty2)
@@ -430,6 +458,9 @@ pprTypeApp :: NamedThing a => a -> [Type] -> SDoc
 -- Print infix if the tycon/class looks like an operator
 pprTypeApp tc tys = ppr_type_app TopPrec (getName tc) tys
 
+pprTyLit :: TyLit -> SDoc
+pprTyLit = ppr_tylit TopPrec
+
 ------------------
 pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
@@ -474,6 +505,9 @@ instance Outputable Type where
 instance Outputable PredType where
     ppr = pprPred
 
+instance Outputable TyLit where
+   ppr = pprTyLit
+
 instance Outputable name => OutputableBndr (IPName name) where
     pprBndr _ n = ppr n	-- Simple for now
 
@@ -509,6 +543,12 @@ ppr_type p (FunTy ty1 ty2)
     is_pred (PredTy {}) = True
     is_pred _           = False
 
+ppr_type p (LiteralTy x) = ppr_tylit p x
+
+
+ppr_tylit :: Prec -> TyLit -> SDoc
+ppr_tylit _ (NumberTyLit n) = integer n
+
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
   = maybeParen p FunPrec $
@@ -541,6 +581,7 @@ ppr_tc_app _ tc [ty]
   | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "(?)")
   | tc `hasKey` ubxTupleKindTyConKey     = ptext (sLit "(#)")
   | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "??")
+  | tc `hasKey` natKindTyConKey          = ptext (sLit "Nat")
 
 ppr_tc_app p tc tys
   | isTupleTyCon tc && tyConArity tc == length tys

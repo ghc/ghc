@@ -82,6 +82,7 @@ pakind, pkind :: Kind -> Doc
 pakind (Klifted) = char '*'
 pakind (Kunlifted) = char '#'
 pakind (Kopen) = char '?'
+pakind (Knat) = text "Nat"
 pakind k = parens (pkind k)
 
 pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
@@ -92,6 +93,7 @@ pkind k = pakind k
 paty, pbty, pty :: Ty -> Doc
 paty (Tvar n) = pname n
 paty (Tcon c) = pqname c
+paty (Tliteral n) = ptlit n
 paty t = parens (pty t)
 
 pbty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = parens(fsep [pbty t1, text "->",pty t2])
@@ -113,6 +115,9 @@ pty (RightCoercion t) =
 pty (InstCoercion t1 t2) =
   sep [text "%inst", paty t1, paty t2]
 pty t = pbty t
+
+ptlit :: TLit -> Doc
+ptlit (TLnumber n) = integer n
 
 pappty :: Ty -> [Ty] -> Doc
 pappty (Tapp t1 t2) ts = pappty t1 (t2:ts)

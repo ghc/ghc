@@ -10,6 +10,7 @@ module IfaceType (
 	IfExtName, IfLclName,
 
         IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
+        IfaceTyLit(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 	ifaceTyConName,
 
@@ -67,11 +68,15 @@ data IfaceType
   | IfaceTyConApp IfaceTyCon [IfaceType]	-- Not necessarily saturated
 						-- Includes newtypes, synonyms, tuples
   | IfaceFunTy  IfaceType IfaceType
+  | IfaceLiteralTy IfaceTyLit
 
 data IfacePredType 	-- NewTypes are handled as ordinary TyConApps
   = IfaceClassP IfExtName [IfaceType]
   | IfaceIParam (IPName OccName) IfaceType
   | IfaceEqPred IfaceType IfaceType
+
+data IfaceTyLit
+  = IfaceNumberTyLit Integer
 
 type IfaceContext = [IfacePredType]
 
@@ -84,6 +89,7 @@ data IfaceTyCon 	-- Abbreviations for common tycons with known names
     	       		     -- other than 'Any :: *' itself
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
+  | IfaceNatKindTc 
 
 ifaceTyConName :: IfaceTyCon -> IfExtName
 ifaceTyConName IfaceIntTc  	       = intTyConName
@@ -97,6 +103,7 @@ ifaceTyConName IfaceOpenTypeKindTc     = openTypeKindTyConName
 ifaceTyConName IfaceUnliftedTypeKindTc = unliftedTypeKindTyConName
 ifaceTyConName IfaceUbxTupleKindTc     = ubxTupleKindTyConName
 ifaceTyConName IfaceArgTypeKindTc      = argTypeKindTyConName
+ifaceTyConName IfaceNatKindTc          = natKindTyConName
 ifaceTyConName (IfaceTc ext)           = ext
 ifaceTyConName (IfaceAnyTc k)          = pprPanic "ifaceTyConName" (ppr k)
 	       		    	       	 -- Note [The Name of an IfaceAnyTc]
@@ -227,6 +234,8 @@ ppr_ty ctxt_prec ty@(IfaceForAllTy _ _)
   = maybeParen ctxt_prec fUN_PREC (pprIfaceForAllPart tvs theta (pprIfaceType tau))
  where		
     (tvs, theta, tau) = splitIfaceSigmaTy ty
+
+ppr_ty _ (IfaceLiteralTy n) = ppr_tylit n
     
 -------------------
 pprIfaceForAllPart :: [IfaceTvBndr] -> IfaceContext -> SDoc -> SDoc
@@ -253,6 +262,9 @@ ppr_tc :: IfaceTyCon -> SDoc
 ppr_tc tc@(IfaceTc ext_nm) = parenSymOcc (getOccName ext_nm) (ppr tc)
 ppr_tc tc		   = ppr tc
 
+ppr_tylit :: IfaceTyLit -> SDoc
+ppr_tylit (IfaceNumberTyLit n) = integer n
+
 -------------------
 instance Outputable IfacePredType where
 	-- Print without parens
@@ -267,6 +279,9 @@ instance Outputable IfaceTyCon where
 			     -- (see Note [The Name of an IfaceAnyTc])
 			     -- so we fake it.  It's only for debug printing!
   ppr other_tc       = ppr (ifaceTyConName other_tc)
+
+instance Outputable IfaceTyLit where
+  ppr = ppr_tylit
 
 -------------------
 pprIfaceContext :: IfaceContext -> SDoc
@@ -321,6 +336,7 @@ toIfaceType (ForAllTy tv t) =
   IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 toIfaceType (PredTy st) =
   IfacePredTy (toIfacePred st)
+toIfaceType (LiteralTy n) = IfaceLiteralTy (toIfaceTyLit n)
 
 ----------------
 -- A little bit of (perhaps optional) trickiness here.  When
@@ -357,6 +373,7 @@ toIfaceWiredInTyCon tc nm
   | nm == openTypeKindTyConName     = IfaceOpenTypeKindTc
   | nm == argTypeKindTyConName      = IfaceArgTypeKindTc
   | nm == ubxTupleKindTyConName     = IfaceUbxTupleKindTc
+  | nm == natKindTyConName          = IfaceNatKindTc
   | otherwise		            = IfaceTc nm
 
 ----------------
@@ -371,6 +388,10 @@ toIfacePred (IParam ip t) =
   IfaceIParam (mapIPName getOccName ip) (toIfaceType t)
 toIfacePred (EqPred ty1 ty2) =
   IfaceEqPred (toIfaceType ty1) (toIfaceType ty2)
+
+toIfaceTyLit :: TyLit -> IfaceTyLit
+toIfaceTyLit (NumberTyLit x) = IfaceNumberTyLit x
+
 
 ----------------
 toIfaceContext :: ThetaType -> IfaceContext

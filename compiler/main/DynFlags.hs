@@ -365,6 +365,7 @@ data ExtensionFlag
    | Opt_DatatypeContexts
    | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
+   | Opt_TypeNaturals
    deriving (Eq, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -1631,7 +1632,8 @@ xFlags = [
   ( "OverlappingInstances",             Opt_OverlappingInstances, nop ),
   ( "UndecidableInstances",             Opt_UndecidableInstances, nop ),
   ( "IncoherentInstances",              Opt_IncoherentInstances, nop ),
-  ( "PackageImports",                   Opt_PackageImports, nop )
+  ( "PackageImports",                   Opt_PackageImports, nop ),
+  ( "TypeNaturals",                     Opt_TypeNaturals, nop)
   ]
 
 defaultFlags :: [DynFlag]
@@ -1681,6 +1683,9 @@ impliedFlags
 	-- stuff like " 'a' not in scope ", which is a bit silly
  	-- if the compiler has just filled in field 'a' of constructor 'C'
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
+
+    , (Opt_TypeNaturals,        turnOn, Opt_TypeOperators)
+    , (Opt_TypeNaturals,        turnOn, Opt_KindSignatures)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]

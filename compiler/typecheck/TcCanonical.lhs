@@ -116,6 +116,8 @@ flatten ctxt ty
 flatten _ v@(TyVarTy _)
   = return (v, v, emptyCCan)
 
+flatten _ t@(LiteralTy _) = return (t, t, emptyCCan)
+
 flatten ctxt (AppTy ty1 ty2)
   = do { (xi1,co1,c1) <- flatten ctxt ty1
        ; (xi2,co2,c2) <- flatten ctxt ty2
@@ -814,6 +816,7 @@ expandAway tv t@(TyVarTy tv')
   | otherwise = Just t
 expandAway tv xi
   | not (tv `elemVarSet` tyVarsOfType xi) = Just xi
+expandAway _ t@(LiteralTy _) = Just t -- (To avoid incompleteness warning)
 expandAway tv (AppTy ty1 ty2) 
   = do { ty1' <- expandAway tv ty1
        ; ty2' <- expandAway tv ty2 

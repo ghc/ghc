@@ -577,6 +577,9 @@ uType_np origin orig_ty1 orig_ty2
         -- Predicates
     go (PredTy p1) (PredTy p2) = uPred origin p1 p2
 
+    go ty1@(LiteralTy m) (LiteralTy n)
+      | m == n  = return (IdCo ty1)
+
         -- Coercion functions: (t1a ~ t1b) => t1c  ~  (t2a ~ t2b) => t2c
     go ty1 ty2 
       | Just (t1a,t1b,t1c) <- splitCoPredTy_maybe ty1, 
@@ -938,6 +941,7 @@ checkTauTvUpdate tv ty
         ok (AppTy fun arg) | Just fun' <- ok fun, Just arg' <- ok arg 
                            = Just (AppTy fun' arg') 
         ok (ForAllTy tv1 ty1) | Just ty1' <- ok ty1 = Just (ForAllTy tv1 ty1') 
+        ok t@(LiteralTy _) = Just t
         -- Fall-through 
         ok _ty = Nothing 
        
@@ -1212,6 +1216,8 @@ kindSimpleKind orig_swapped orig_kind
     go sw (FunTy k1 k2) = do { k1' <- go (not sw) k1
                              ; k2' <- go sw k2
                              ; return (mkArrowKind k1' k2') }
+    go _ k
+      | isNatKind k     = return natKind
     go True k
      | isOpenTypeKind k = return liftedTypeKind
      | isArgTypeKind k  = return liftedTypeKind
