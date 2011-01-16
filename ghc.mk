@@ -493,12 +493,10 @@ libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-ins
 ifneq "$(CLEANING)" "YES"
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 libraries/base_dist-install_CONFIGURE_OPTS += --flags=-integer-simple
+else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
+libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
 else
-    ifeq "$(INTEGER_LIBRARY)" "integer-simple"
-	libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
-    else
 $(error Unknown integer library: $(INTEGER_LIBRARY))
-    endif
 endif
 endif
 
