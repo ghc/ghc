@@ -280,7 +280,7 @@ mkSystemVarName :: Unique -> FastString -> Name
 mkSystemVarName uniq fs = mkSystemName uniq (mkVarOccFS fs)
 
 mkSysTvName :: Unique -> FastString -> Name
-mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs) 
+mkSysTvName uniq fs = mkSystemName uniq (mkOccNameFS tvName fs)
 
 -- | Make a name for a foreign call
 mkFCallName :: Unique -> String -> Name

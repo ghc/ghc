@@ -82,7 +82,7 @@ tcPolyExpr expr res_ty
 
 tcPolyExprNC expr res_ty
   = do { traceTc "tcPolyExprNC" (ppr res_ty)
-       ; (gen_fn, expr') <- tcGen (GenSkol res_ty) res_ty $ \ _ rho ->
+       ; (gen_fn, expr') <- tcGen GenSigCtxt res_ty $ \ _ rho ->
 			    tcMonoExprNC expr rho
        ; return (mkLHsWrap gen_fn expr') }
 
@@ -191,7 +191,7 @@ tcExpr (ExprWithTySig expr sig_ty) res_ty
 
       -- Remember to extend the lexical type-variable environment
       ; (gen_fn, expr') 
-            <- tcGen (SigSkol ExprSigCtxt) sig_tc_ty $ \ skol_tvs res_ty ->
+            <- tcGen ExprSigCtxt sig_tc_ty $ \ skol_tvs res_ty ->
       	       tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
 	             	       	-- See Note [More instantiated than scoped] in TcBinds
       	       tcMonoExprNC expr res_ty
@@ -819,7 +819,8 @@ tcApp fun args res_ty
 	-- Typecheck the result, thereby propagating 
         -- info (if any) from result into the argument types
         -- Both actual_res_ty and res_ty are deeply skolemised
-        ; co_res <- unifyType actual_res_ty res_ty
+        ; co_res <- addErrCtxt (funResCtxt fun) $
+                    unifyType actual_res_ty res_ty
 
 	-- Typecheck the arguments
 	; args1 <- tcArgs fun args expected_arg_tys
@@ -1383,6 +1384,10 @@ funAppCtxt fun arg arg_no
   = hang (hsep [ ptext (sLit "In the"), speakNth arg_no, ptext (sLit "argument of"), 
 		    quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
+
+funResCtxt :: LHsExpr Name -> SDoc
+funResCtxt fun
+  = ptext (sLit "In the return type of a call of") <+> quotes (ppr fun)
 
 badFieldTypes :: [(Name,TcType)] -> SDoc
 badFieldTypes prs

@@ -75,7 +75,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
         keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
 	th_var	     <- newIORef False ;
-	lie_var	     <- newIORef emptyBag ;
+        lie_var      <- newIORef emptyWC ;
 	dfun_n_var   <- newIORef emptyOccSet ;
 	type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
@@ -147,7 +147,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 
         -- Check for unsolved constraints
 	lie <- readIORef lie_var ;
-        if isEmptyBag lie 
+        if isEmptyWC lie
            then return ()
            else pprPanic "initTc: unsolved constraints" 
                          (pprWantedsWithLocs lie) ;
@@ -965,17 +965,32 @@ setConstraintVar lie_var = updLclEnv (\ env -> env { tcl_lie = lie_var })
 emitConstraints :: WantedConstraints -> TcM ()
 emitConstraints ct
   = do { lie_var <- getConstraintVar ;
-	 updTcRef lie_var (`andWanteds` ct) }
+         updTcRef lie_var (`andWC` ct) }
 
-emitConstraint :: WantedConstraint -> TcM ()
-emitConstraint ct
+emitFlat :: WantedEvVar -> TcM ()
+emitFlat ct
   = do { lie_var <- getConstraintVar ;
-	 updTcRef lie_var (`extendWanteds` ct) }
+         updTcRef lie_var (`addFlats` unitBag ct) }
+
+emitFlats :: Bag WantedEvVar -> TcM ()
+emitFlats ct
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addFlats` ct) }
+
+emitImplication :: Implication -> TcM ()
+emitImplication ct
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addImplics` unitBag ct) }
+
+emitImplications :: Bag Implication -> TcM ()
+emitImplications ct
+  = do { lie_var <- getConstraintVar ;
+         updTcRef lie_var (`addImplics` ct) }
 
 captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
 captureConstraints thing_inside
-  = do { lie_var <- newTcRef emptyWanteds ;
+  = do { lie_var <- newTcRef emptyWC ;
 	 res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) 
 			  thing_inside ;
 	 lie <- readTcRef lie_var ;

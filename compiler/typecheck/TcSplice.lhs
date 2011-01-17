@@ -343,16 +343,17 @@ tcBracket brack res_ty
        ; lie_var <- getConstraintVar
        ; let brack_stage = Brack cur_stage pending_splices lie_var
 
-       ; (meta_ty, lie) <- setStage brack_stage $
-                           captureConstraints $
-                           tc_bracket cur_stage brack
+          -- We want to check that there aren't any constraints that
+          -- can't be satisfied (e.g. Show Foo, where Foo has no Show
+          -- instance), but we aren't otherwise interested in the
+          -- results. Nor do we care about ambiguous dictionaries etc.
+          -- We will type check this bracket again at its usage site.
+       ; _ <- newImplication BracketSkol [] [] $
+              setStage brack_stage $
+              do { meta_ty <- tc_bracket cur_stage brack
+                 ; unifyType meta_ty res_ty }
 
-       ; simplifyBracket lie
-
-	-- Make the expected type have the right shape
-       ; _ <- unifyType meta_ty res_ty
-
-	-- Return the original expression, not the type-decorated one
+        -- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
        ; return (noLoc (HsBracketOut brack pendings)) }
 
@@ -940,7 +941,7 @@ illegalBracket = ptext (sLit "Template Haskell brackets cannot be nested (withou
 %************************************************************************
 
 \begin{code}
-lookupClassInstances :: TH.Name -> [TH.Type] -> TcM [TH.Name]
+lookupClassInstances :: TH.Name -> [TH.Type] -> TcM [TH.ClassInstance]
 lookupClassInstances c ts
    = do { loc <- getSrcSpanM
         ; case convertToHsPred loc (TH.ClassP c ts) of {
@@ -953,8 +954,7 @@ lookupClassInstances c ts
 	-- Now look up instances
         ; inst_envs <- tcGetInstEnvs
         ; let (matches, unifies) = lookupInstEnv inst_envs cls tys
-              dfuns = map is_dfun (map fst matches ++ unifies)
-        ; return (map reifyName dfuns) } } }
+        ; mapM reifyClassInstance (map fst matches ++ unifies) } } }
   where
     doc = ptext (sLit "TcSplice.classInstances")
 \end{code}

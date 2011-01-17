@@ -18,13 +18,16 @@ module Inst (
        tcSyntaxName,
 
        -- Simple functions over evidence variables
-       hasEqualities,
+       hasEqualities, unitImplication,
        
-       tyVarsOfWanteds, tyVarsOfWanted, tyVarsOfWantedEvVar, tyVarsOfWantedEvVars, 
+       tyVarsOfWC, tyVarsOfBag, tyVarsOfEvVarXs, tyVarsOfEvVarX,
        tyVarsOfEvVar, tyVarsOfEvVars, tyVarsOfImplication,
-       tidyWanteds, tidyWanted, tidyWantedEvVar, tidyWantedEvVars,
-       tidyEvVar, tidyImplication
 
+       tidyWantedEvVar, tidyWantedEvVars, tidyWC,
+       tidyEvVar, tidyImplication, tidyFlavoredEvVar,
+
+       substWantedEvVar, substWantedEvVars, substFlavoredEvVar,
+       substEvVar, substImplication
     ) where
 
 #include "HsVersions.h"
@@ -47,7 +50,7 @@ import Coercion
 import HscTypes
 import Id
 import Name
-import Var      ( Var, TyVar, EvVar, varType, setVarType )
+import Var
 import VarEnv
 import VarSet
 import PrelNames
@@ -57,7 +60,7 @@ import Bag
 import Maybes
 import Util
 import Outputable
-import Data.List
+import Data.List( mapAccumL )
 \end{code}
 
 
@@ -75,7 +78,7 @@ emitWanteds origin theta = mapM (emitWanted origin) theta
 emitWanted :: CtOrigin -> TcPredType -> TcM EvVar
 emitWanted origin pred = do { loc <- getCtLoc origin
                             ; ev  <- newWantedEvVar pred
-                            ; emitConstraint (WcEvVar (WantedEvVar ev loc))
+                            ; emitFlat (mkEvVarX ev loc)
                             ; return ev }
 
 newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
@@ -136,17 +139,16 @@ ToDo: this eta-abstraction plays fast and loose with termination,
 
 \begin{code}
 deeplySkolemise
-  :: SkolemInfo
-  -> TcSigmaType 
+  :: TcSigmaType
   -> TcM (HsWrapper, [TyVar], [EvVar], TcRhoType)
 
-deeplySkolemise skol_info ty
+deeplySkolemise ty
   | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
   = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
-       ; tvs1 <- mapM (tcInstSkolTyVar skol_info) tvs
+       ; tvs1 <- tcInstSkolTyVars tvs
        ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs1)
        ; ev_vars1 <- newEvVars (substTheta subst theta)
-       ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise skol_info (substTy subst ty')
+       ; (wrap, tvs2, ev_vars2, rho) <- deeplySkolemise (substTy subst ty')
        ; return ( mkWpLams ids1
                    <.> mkWpTyLams tvs1
                    <.> mkWpLams ev_vars1
@@ -415,7 +417,7 @@ addLocalInst home_ie ispec
                 -- This is absurdly delicate.
 
 	  let dfun = instanceDFunId ispec
-        ; (tvs', theta', tau') <- tcInstSkolType UnkSkol (idType dfun)
+        ; (tvs', theta', tau') <- tcInstSkolType (idType dfun)
 	; let	(cls, tys') = tcSplitDFunHead tau'
 		dfun' 	    = setIdType dfun (mkSigmaTy tvs' theta' tau')	    
 	  	ispec'      = setInstanceDFunId ispec dfun'
@@ -477,6 +479,11 @@ addDictLoc ispec thing_inside
 %************************************************************************
 
 \begin{code}
+unitImplication :: Implication -> Bag Implication
+unitImplication implic
+  | isEmptyWC (ic_wanted implic) = emptyBag
+  | otherwise                    = unitBag implic
+
 hasEqualities :: [EvVar] -> Bool
 -- Has a bunch of canonical constraints (all givens) got any equalities in it?
 hasEqualities givens = any (has_eq . evVarPred) givens
@@ -485,23 +492,22 @@ hasEqualities givens = any (has_eq . evVarPred) givens
     has_eq (IParam {}) 	     = False
     has_eq (ClassP cls _tys) = any has_eq (classSCTheta cls)
 
-----------------
-tyVarsOfWanteds :: WantedConstraints -> TyVarSet
-tyVarsOfWanteds = foldrBag (unionVarSet . tyVarsOfWanted) emptyVarSet
-
-tyVarsOfWanted :: WantedConstraint -> TyVarSet
-tyVarsOfWanted (WcEvVar wev)   = tyVarsOfWantedEvVar wev
-tyVarsOfWanted (WcImplic impl) = tyVarsOfImplication impl
+---------------- Getting free tyvars -------------------------
+tyVarsOfWC :: WantedConstraints -> TyVarSet
+tyVarsOfWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+  = tyVarsOfEvVarXs flat `unionVarSet`
+    tyVarsOfBag tyVarsOfImplication implic `unionVarSet`
+    tyVarsOfEvVarXs insol
 
 tyVarsOfImplication :: Implication -> TyVarSet
-tyVarsOfImplication implic = tyVarsOfWanteds (ic_wanted implic)
-                             `minusVarSet` (ic_skols implic)
+tyVarsOfImplication (Implic { ic_skols = skols, ic_wanted = wanted })
+  = tyVarsOfWC wanted `minusVarSet` skols
 
-tyVarsOfWantedEvVar :: WantedEvVar -> TyVarSet
-tyVarsOfWantedEvVar (WantedEvVar ev _) = tyVarsOfEvVar ev
+tyVarsOfEvVarX :: EvVarX a -> TyVarSet
+tyVarsOfEvVarX (EvVarX ev _) = tyVarsOfEvVar ev
 
-tyVarsOfWantedEvVars :: Bag WantedEvVar -> TyVarSet
-tyVarsOfWantedEvVars = foldrBag (unionVarSet . tyVarsOfWantedEvVar) emptyVarSet
+tyVarsOfEvVarXs :: Bag (EvVarX a) -> TyVarSet
+tyVarsOfEvVarXs = tyVarsOfBag tyVarsOfEvVarX
 
 tyVarsOfEvVar :: EvVar -> TyVarSet
 tyVarsOfEvVar ev = tyVarsOfPred $ evVarPred ev
@@ -509,29 +515,94 @@ tyVarsOfEvVar ev = tyVarsOfPred $ evVarPred ev
 tyVarsOfEvVars :: [EvVar] -> TyVarSet
 tyVarsOfEvVars = foldr (unionVarSet . tyVarsOfEvVar) emptyVarSet
 
----------------
-tidyWanteds :: TidyEnv -> WantedConstraints -> WantedConstraints
-tidyWanteds env = mapBag (tidyWanted env) 
+tyVarsOfBag :: (a -> TyVarSet) -> Bag a -> TyVarSet
+tyVarsOfBag tvs_of = foldrBag (unionVarSet . tvs_of) emptyVarSet
 
-tidyWanted :: TidyEnv -> WantedConstraint -> WantedConstraint
-tidyWanted env (WcEvVar wev)     = WcEvVar (tidyWantedEvVar env wev)
-tidyWanted env (WcImplic implic) = WcImplic (tidyImplication env implic)
+---------------- Tidying -------------------------
+tidyWC :: TidyEnv -> WantedConstraints -> WantedConstraints
+tidyWC env (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+  = WC { wc_flat  = tidyWantedEvVars env flat
+       , wc_impl  = mapBag (tidyImplication env) implic
+       , wc_insol = mapBag (tidyFlavoredEvVar env) insol }
+
+tidyImplication :: TidyEnv -> Implication -> Implication
+tidyImplication env implic@(Implic { ic_skols = tvs
+                                   , ic_given = given
+                                   , ic_wanted = wanted
+                                   , ic_loc = loc })
+  = implic { ic_skols = mkVarSet tvs'
+           , ic_given = map (tidyEvVar env1) given
+           , ic_wanted = tidyWC env1 wanted
+           , ic_loc = tidyGivenLoc env1 loc }
+  where
+   (env1, tvs') = mapAccumL tidyTyVarBndr env (varSetElems tvs)
+
+tidyEvVar :: TidyEnv -> EvVar -> EvVar
+tidyEvVar env var = setVarType var (tidyType env (varType var))
 
 tidyWantedEvVar :: TidyEnv -> WantedEvVar -> WantedEvVar
-tidyWantedEvVar env (WantedEvVar ev loc) = WantedEvVar (tidyEvVar env ev) loc
+tidyWantedEvVar env (EvVarX v l) = EvVarX (tidyEvVar env v) l
 
 tidyWantedEvVars :: TidyEnv -> Bag WantedEvVar -> Bag WantedEvVar
 tidyWantedEvVars env = mapBag (tidyWantedEvVar env)
 
-tidyEvVar :: TidyEnv -> EvVar -> EvVar
-tidyEvVar env v = setVarType v (tidyType env (varType v))
+tidyFlavoredEvVar :: TidyEnv -> FlavoredEvVar -> FlavoredEvVar
+tidyFlavoredEvVar env (EvVarX v fl)
+  = EvVarX (tidyEvVar env v) (tidyFlavor env fl)
 
-tidyImplication :: TidyEnv -> Implication -> Implication
-tidyImplication env implic@(Implic { ic_skols = skols, ic_given = given
-                                   , ic_wanted = wanted })
-  = implic { ic_skols  = mkVarSet skols'
-           , ic_given  = map (tidyEvVar env') given
-           , ic_wanted = tidyWanteds env' wanted }
+tidyFlavor :: TidyEnv -> CtFlavor -> CtFlavor
+tidyFlavor env (Given loc) = Given (tidyGivenLoc env loc)
+tidyFlavor _   fl          = fl
+
+tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
+tidyGivenLoc env (CtLoc skol span ctxt) = CtLoc (tidySkolemInfo env skol) span ctxt
+
+tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
+tidySkolemInfo env (SigSkol cx ty) = SigSkol cx (tidyType env ty)
+tidySkolemInfo env (InferSkol ids) = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfo _   info            = info
+
+---------------- Substitution -------------------------
+substWC :: TvSubst -> WantedConstraints -> WantedConstraints
+substWC subst (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+  = WC { wc_flat = substWantedEvVars subst flat
+       , wc_impl = mapBag (substImplication subst) implic
+       , wc_insol = mapBag (substFlavoredEvVar subst) insol }
+
+substImplication :: TvSubst -> Implication -> Implication
+substImplication subst implic@(Implic { ic_skols = tvs
+                                      , ic_given = given
+                                      , ic_wanted = wanted
+                                      , ic_loc = loc })
+  = implic { ic_skols  = mkVarSet tvs'
+           , ic_given  = map (substEvVar subst1) given
+           , ic_wanted = substWC subst1 wanted
+           , ic_loc    = substGivenLoc subst1 loc }
   where
-    (env', skols') = mapAccumL tidyTyVarBndr env (varSetElems skols)
+   (subst1, tvs') = mapAccumL substTyVarBndr subst (varSetElems tvs)
+
+substEvVar :: TvSubst -> EvVar -> EvVar
+substEvVar subst var = setVarType var (substTy subst (varType var))
+
+substWantedEvVars :: TvSubst -> Bag WantedEvVar -> Bag WantedEvVar
+substWantedEvVars subst = mapBag (substWantedEvVar subst)
+
+substWantedEvVar :: TvSubst -> WantedEvVar -> WantedEvVar
+substWantedEvVar subst (EvVarX v l) = EvVarX (substEvVar subst v) l
+
+substFlavoredEvVar :: TvSubst -> FlavoredEvVar -> FlavoredEvVar
+substFlavoredEvVar subst (EvVarX v fl)
+  = EvVarX (substEvVar subst v) (substFlavor subst fl)
+
+substFlavor :: TvSubst -> CtFlavor -> CtFlavor
+substFlavor subst (Given loc) = Given (substGivenLoc subst loc)
+substFlavor _     fl          = fl
+
+substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
+substGivenLoc subst (CtLoc skol span ctxt) = CtLoc (substSkolemInfo subst skol) span ctxt
+
+substSkolemInfo :: TvSubst -> SkolemInfo -> SkolemInfo
+substSkolemInfo subst (SigSkol cx ty) = SigSkol cx (substTy subst ty)
+substSkolemInfo subst (InferSkol ids) = InferSkol (mapSnd (substTy subst) ids)
+substSkolemInfo _     info            = info
 \end{code}

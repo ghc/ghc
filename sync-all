@@ -3,43 +3,105 @@
 use strict;
 use Cwd;
 
-# Figure out where to get the other repositories from,
-# based on where this GHC repo came from.
-my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
-my $remote = `git config branch.$branch.remote`;         chomp $remote;
-my $defaultrepo = `git config remote.$remote.url`;       chomp $defaultrepo;
-
-my $defaultrepo_base;
-my $checked_out_tree;
-
-if ($defaultrepo =~ /^...*:/) {
-    # HTTP or SSH
-    # Above regex says "at least two chars before the :", to avoid
-    # catching Win32 drives ("C:\").
-    $defaultrepo_base = $defaultrepo;
-    $defaultrepo_base =~ s#/[^/]+/?$##;
-    $checked_out_tree = 0;
-}
-elsif ($defaultrepo =~ /^\/|\.\.\/|.:(\/|\\)/) {
-    # Local filesystem, either absolute or relative path
-    # (assumes a checked-out tree):
-    $defaultrepo_base = $defaultrepo;
-    $checked_out_tree = 1;
-}
-else {
-    die "Couldn't work out defaultrepo";
-}
-
+my $defaultrepo;
+my @packages;
 my $verbose = 2;
+my $ignore_failure = 0;
+my $want_remote_repo = 0;
+my $checked_out_flag = 0;
 my $get_mode;
 
 # Flags specific to a particular command
-my $ignore_failure = 0;
 my $local_repo_unnecessary = 0;
 
-# Always define the empty tag so that we fetch the /required/ packages
 my %tags;
-$tags{""} = 1;
+
+# Figure out where to get the other repositories from.
+sub getrepo {
+    my $basedir = ".";
+    my $repo;
+
+    if (defined($defaultrepo)) {
+        $repo = $defaultrepo;
+        chomp $repo;
+    } else {
+        # Figure out where to get the other repositories from,
+        # based on where this GHC repo came from.
+        my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
+        my $remote = `git config branch.$branch.remote`;         chomp $remote;
+        $repo = `git config remote.$remote.url`;       chomp $repo;
+    }
+
+    my $repo_base;
+    my $checked_out_tree;
+
+    if ($repo =~ /^...*:/) {
+        # HTTP or SSH
+        # Above regex says "at least two chars before the :", to avoid
+        # catching Win32 drives ("C:\").
+        $repo_base = $repo;
+
+        # --checked-out is needed if you want to use a checked-out repo
+        # over SSH or HTTP
+        if ($checked_out_flag) {
+            $checked_out_tree = 1;
+        } else {
+            $checked_out_tree = 0;
+        }
+
+        # Don't drop the last part of the path if specified with -r, as
+        # it expects repos of the form:
+        #
+        #   http://darcs.haskell.org
+        #
+        # rather than
+        #   
+        #   http://darcs.haskell.org/ghc
+        #
+        if (!$defaultrepo) {
+            $repo_base =~ s#/[^/]+/?$##;
+        }
+    }
+    elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
+        # Local filesystem, either absolute or relative path
+        # (assumes a checked-out tree):
+        $repo_base = $repo;
+        $checked_out_tree = 1;
+    }
+    else {
+        die "Couldn't work out repo";
+    }
+
+    return $repo_base, $checked_out_tree;
+}
+
+sub parsePackages {
+    my @repos;
+    my $lineNum;
+
+    open IN, "< packages.git" or die "Can't open packages file";
+    @repos = <IN>;
+    close IN;
+
+    @packages = ();
+    $lineNum = 0;
+    foreach (@repos) {
+        chomp;
+        $lineNum++;
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
+            my %line;
+            $line{"localpath"}  = $1;
+            $line{"tag"}        = $2;
+            $line{"remotepath"} = $3;
+            $line{"vcs"}        = $4;
+            $line{"upstream"}   = $5;
+            push @packages, \%line;
+        }
+        elsif (! /^(#.*)?$/) {
+            die "Bad content on line $lineNum of packages file: $_";
+        }
+    }
+}
 
 sub message {
     if ($verbose >= 2) {
@@ -80,32 +142,37 @@ sub scmall {
     my $tag;
     my $remotepath;
     my $scm;
+    my $upstream;
+    my $line;
 
     my $path;
     my $wd_before = getcwd;
 
     my @scm_args;
 
-    open IN, "< packages" or die "Can't open packages file";
-    while (<IN>) {
-        chomp;
-        if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)$/) {
-            $localpath = $1;
-            $tag = defined($2) ? $2 : "";
-            $remotepath = $3;
-            $scm = $4;
+    my ($repo_base, $checked_out_tree) = getrepo();
+
+    parsePackages;
+
+    for $line (@packages) {
+
+            $localpath  = $$line{"localpath"};
+            $tag        = $$line{"tag"};
+            $remotepath = $$line{"remotepath"};
+            $scm        = $$line{"vcs"};
+            $upstream   = $$line{"upstream"};
 
             # Check the SCM is OK as early as possible
             die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
 
             # Work out the path for this package in the repo we pulled from
             if ($checked_out_tree) {
-                $path = "$defaultrepo_base/$localpath";
+                $path = "$repo_base/$localpath";
             }
             else {
-                $path = "$defaultrepo_base/$remotepath";
+                $path = "$repo_base/$remotepath";
             }
-            
+
             # Work out the arguments we should give to the SCM
             if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew)$/) {
                 @scm_args = (($scm eq "darcs" and "whatsnew")
@@ -116,9 +183,11 @@ sub scmall {
             }
             elsif ($command =~ /^(?:pus|push)$/) {
                 @scm_args = "push";
+                $want_remote_repo = 1;
             }
             elsif ($command =~ /^(?:pul|pull)$/) {
                 @scm_args = "pull";
+                $want_remote_repo = 1;
                 # Q: should we append the -a argument for darcs repos?
             }
             elsif ($command =~ /^(?:g|ge|get)$/) {
@@ -152,16 +221,25 @@ sub scmall {
             elsif ($command =~ /^(?:s|se|sen|send)$/) {
                 @scm_args = (($scm eq "darcs" and "send")
                           or ($scm eq "git" and "send-email"));
+                $want_remote_repo = 1;
             }
             else {
                 die "Unknown command: $command";
             }
             
             # Actually execute the command
-            chdir $wd_before or die "Could not change to $wd_before";
             if (repoexists ($scm, $localpath)) {
-                chdir $localpath or die "Could not change to $localpath";
-                scm ($scm, @scm_args, @_);
+                if ($want_remote_repo) {
+                    if ($scm eq "darcs") {
+                        scm ($scm, @scm_args, @_, "--repodir=$localpath", $path);
+                    } else {
+                        # git pull doesn't like to be used with --work-dir
+                        scm ($scm, "--git-dir=$localpath/.git", @scm_args, @_, $path, "master");
+                    }
+                } else {
+                    # git status *must* be used with --work-dir, if we don't chdir() to the dir
+                    scm ($scm, "--git-dir=$localpath/.git", "--work-tree=$localpath", @scm_args, @_);
+                }
             }
             elsif ($local_repo_unnecessary) {
                 # Don't bother to change directory in this case
@@ -173,18 +251,16 @@ sub scmall {
             else {
                 message "== $localpath repo not present; skipping";
             }
-        }
-        elsif (! /^(#.*)?$/) {
-            die "Bad line: $_";
-        }
     }
-    close IN;
 }
 
 sub main {
     if (! -d ".git" || ! -d "compiler") {
         die "error: sync-all must be run from the top level of the ghc tree."
     }
+
+    $tags{"-"} = 1;
+    $tags{"dph"} = 1;
 
     while ($#_ ne -1) {
         my $arg = shift;
@@ -196,11 +272,19 @@ sub main {
         elsif ($arg eq "-s") {
             $verbose = 0;
         }
+        elsif ($arg eq "-r") {
+            $defaultrepo = shift;
+        }
         elsif ($arg eq "--ignore-failure") {
             $ignore_failure = 1;
         }
         elsif ($arg eq "--complete" || $arg eq "--partial") {
             $get_mode = $arg;
+        }
+        # Use --checked-out if the remote repos are a checked-out tree,
+        # rather than the master trees.
+        elsif ($arg eq "--checked-out") {
+            $checked_out_flag = 1;
         }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
@@ -241,7 +325,7 @@ END
         while (<IN>) {
             chomp;
             if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
-                if (defined($2)) {
+                if (defined($2) && $2 ne "-") {
                     $available_tags{$2} = 1;
                 }
             }
@@ -253,7 +337,7 @@ END
         
         # Show those tags and the help text
         my @available_tags = keys %available_tags;
-        print "$help@available_tags";
+        print "$help@available_tags\n";
         exit 1;
     }
     else {

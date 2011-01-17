@@ -91,7 +91,8 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 	     -- c.f. TcSimplify.simplifyInfer
        ; zonked_forall_tvs <- zonkTcTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
-       ; qtvs <- zonkQuantifiedTyVars (varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs))
+       ; qtvs <- zonkQuantifiedTyVars $
+                 varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs)
 
        ; return (HsRule name act
 		    (map (RuleBndr . noLoc) (qtvs ++ tpl_ids))	-- yuk
@@ -111,7 +112,7 @@ tcRuleBndrs (RuleBndrSig var rn_ty : rule_bndrs)
 --		a::*, x :: a->a
   = do	{ let ctxt = FunSigCtxt (unLoc var)
 	; (tyvars, ty) <- tcHsPatSigType ctxt rn_ty
-	; let skol_tvs = tcSkolSigTyVars (SigSkol ctxt) tyvars
+        ; let skol_tvs = tcSuperSkolTyVars tyvars
 	      id_ty = substTyWith tyvars (mkTyVarTys skol_tvs) ty
 	      id = mkLocalId (unLoc var) id_ty
 

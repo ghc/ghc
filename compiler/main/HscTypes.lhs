@@ -860,17 +860,21 @@ emptyModIface mod
 -- | Interactive context, recording information relevant to GHCi
 data InteractiveContext 
   = InteractiveContext { 
-	ic_toplev_scope :: [Module],	-- ^ The context includes the "top-level" scope of
+          ic_toplev_scope :: [Module]   -- ^ The context includes the "top-level" scope of
 					-- these modules
 
-	ic_exports :: [(Module, Maybe (ImportDecl RdrName))],		-- ^ The context includes just the exported parts of these
+        , ic_exports :: [(Module, Maybe (ImportDecl RdrName))]    -- ^ The context includes just the exported parts of these
 					-- modules
 
-	ic_rn_gbl_env :: GlobalRdrEnv,	-- ^ The contexts' cached 'GlobalRdrEnv', built from
+        , ic_rn_gbl_env :: GlobalRdrEnv -- ^ The contexts' cached 'GlobalRdrEnv', built from
 					-- 'ic_toplev_scope' and 'ic_exports'
 
-	ic_tmp_ids :: [Id]              -- ^ Names bound during interaction with the user.
-                                        -- Later Ids shadow earlier ones with the same OccName.
+        , ic_tmp_ids :: [Id]   -- ^ Names bound during interaction with the user.
+                               -- Later Ids shadow earlier ones with the same OccName
+                               -- Expressions are typed with these Ids in the envt
+                               -- For runtime-debugging, these Ids may have free
+                               -- TcTyVars of RuntimUnkSkol flavour, but no free TyVars
+                               -- (because the typechecker doesn't expect that)
 
 #ifdef GHCI
         , ic_resume :: [Resume]         -- ^ The stack of breakpoint contexts

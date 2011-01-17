@@ -50,7 +50,7 @@ module Var (
 	mkTyVar, mkTcTyVar, mkWildCoVar,
 
 	-- ** Taking 'TyVar's apart
-	tyVarName, tyVarKind, tcTyVarDetails,
+        tyVarName, tyVarKind, tcTyVarDetails, setTcTyVarDetails,
 
 	-- ** Modifying 'TyVar's
 	setTyVarName, setTyVarUnique, setTyVarKind,
@@ -283,6 +283,9 @@ mkTcTyVar name kind details
 tcTyVarDetails :: TyVar -> TcTyVarDetails
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
 tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var)
+
+setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
+setTcTyVarDetails tv details = tv { tc_tv_details = details }
 \end{code}
 
 %************************************************************************

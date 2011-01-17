@@ -26,6 +26,8 @@ module Finder (
 
   ) where
 
+#include "HsVersions.h"
+
 import Module
 import HscTypes
 import Packages
@@ -45,6 +47,7 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import System.Time	( ClockTime )
+import Data.List        ( partition )
 
 
 type FileExt = String	-- Filename extension
@@ -561,9 +564,12 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple pkgs)
 		hsep (map (text.packageIdString) pkgs)]
     )
 cantFindErr cannot_find _ dflags mod_name find_result
-  = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon)
-       2 more_info
+  = ptext cannot_find <+> quotes (ppr mod_name)
+    $$ more_info
   where
+    pkg_map :: PackageConfigMap
+    pkg_map = pkgIdMap (pkgState dflags)
+
     more_info
       = case find_result of
 	    NoPackage pkg
@@ -576,9 +582,11 @@ cantFindErr cannot_find _ dflags mod_name find_result
 		| Just pkg <- mb_pkg, pkg /= thisPackage dflags
 		-> not_found_in_package pkg files
 
+                | not (null suggest)
+                -> pp_suggestions suggest $$ tried_these files
+
                 | null files && null mod_hiddens && null pkg_hiddens
-                -> vcat [ ptext (sLit "it is not a module in the current program, or in any known package.")
-                        , pp_suggestions suggest ]
+                -> ptext (sLit "It is not a module in the current program, or in any known package.")
 
 		| otherwise
 		-> vcat (map pkg_hidden pkg_hiddens) $$
@@ -610,7 +618,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
         | verbosity dflags < 3 =
    	      ptext (sLit "Use -v to see a list of the files searched for.")
         | otherwise =
-               hang (ptext (sLit "locations searched:")) 2 $ vcat (map text files)
+               hang (ptext (sLit "Locations searched:")) 2 $ vcat (map text files)
         
     pkg_hidden pkg =
         ptext (sLit "It is a member of the hidden package") <+> quotes (ppr pkg)
@@ -628,9 +636,22 @@ cantFindErr cannot_find _ dflags mod_name find_result
     mod_hidden pkg =
         ptext (sLit "it is a hidden module in the package") <+> quotes (ppr pkg)
 
+    pp_suggestions :: [Module] -> SDoc
     pp_suggestions sugs
       | null sugs = empty
-      | otherwise = ptext (sLit "Perhaps you meant") <+> vcat (map pp sugs)
+      | otherwise = hang (ptext (sLit "Perhaps you meant"))
+                       2 (vcat [ vcat (map pp_exp exposed_sugs)
+                               , vcat (map pp_hid hidden_sugs) ])
       where
-        pp mod = ppr mod <+> parens (ptext (sLit "package") <+> ppr (modulePackageId mod))
+        (exposed_sugs, hidden_sugs) = partition from_exposed_pkg sugs
+
+    from_exposed_pkg m = case lookupPackage pkg_map (modulePackageId m) of
+                            Just pkg_config -> exposed pkg_config
+                            Nothing         -> WARN( True, ppr m ) -- Should not happen
+                                               False
+
+    pp_exp mod = ppr (moduleName mod)
+                 <+> parens (ptext (sLit "from") <+> ppr (modulePackageId mod))
+    pp_hid mod = ppr (moduleName mod)
+                 <+> parens (ptext (sLit "needs flag -package") <+> ppr (modulePackageId mod))
 \end{code}

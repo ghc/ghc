@@ -42,7 +42,7 @@ module OccName (
 	mkTyVarOcc, mkTyVarOccFS,
 	mkTcOcc, mkTcOccFS,
 	mkClsOcc, mkClsOccFS,
-	mkDFunOcc,
+        mkDFunOcc,
 	mkTupleOcc, 
 	setOccNameSpace,
 
@@ -720,7 +720,9 @@ tidyOccName in_scope occ@(OccName occ_sp fs)
 	Just n  -> 	-- Already used: make a new guess, 
 			-- change the guess base, and try again
 		   tidyOccName  (extendOccEnv in_scope occ (n+1))
-				(mkOccName occ_sp (unpackFS fs ++ show n))
+                                (mkOccName occ_sp (base_occ ++ show n))
+  where
+    base_occ = reverse (dropWhile isDigit (reverse (unpackFS fs)))
 \end{code}
 
 %************************************************************************

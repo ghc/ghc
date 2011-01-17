@@ -18,6 +18,7 @@ module TcMType (
   newFlexiTyVarTy,		-- Kind -> TcM TcType
   newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
   newKindVar, newKindVars, 
+  mkTcTyVarName,
 
   newMetaTyVar, readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   isFilledMetaTyVar, isFlexiMetaTyVar,
@@ -34,9 +35,9 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstTyVars, tcInstSigTyVars,
-  tcInstType, tcInstSigType, instMetaTyVar,
-  tcInstSkolTyVars, tcInstSkolTyVar, tcInstSkolType, 
-  tcSkolSigType, tcSkolSigTyVars, 
+  tcInstType, instMetaTyVar,
+  tcInstSkolTyVars, tcInstSuperSkolTyVars, tcInstSkolTyVar, tcInstSkolType,
+  tcSkolDFunType, tcSuperSkolTyVars,
 
   --------------------------------
   -- Checking type validity
@@ -50,14 +51,17 @@ module TcMType (
   --------------------------------
   -- Zonking
   zonkType, mkZonkTcTyVar, zonkTcPredType, 
-  zonkTcTypeCarefully, skolemiseUnboundMetaTyVar,
+  zonkTcTypeCarefully,
+  skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
   zonkTcKindToKind, zonkTcKind, 
-  zonkImplication, zonkWanted, zonkEvVar, zonkWantedEvVar,
+  zonkImplication, zonkEvVar, zonkWantedEvVar, zonkFlavoredEvVar,
+  zonkWC, zonkWantedEvVars,
   zonkTcTypeAndSubst,
   tcGetGlobalTyVars, 
+
 
   readKindVar, writeKindVar
   ) where
@@ -90,10 +94,11 @@ import SrcLoc
 import Outputable
 import FastString
 import PrelNames (typeNatClassName, lessThanEqualClassName)
+import Unique( Unique )
 import Bag
 
 import Control.Monad
-import Data.List	( (\\) )
+import Data.List        ( (\\) )
 \end{code}
 
 
@@ -208,62 +213,51 @@ tcInstType inst_tyvars ty
 
 			    ; let  tenv = zipTopTvSubst tyvars (mkTyVarTys tyvars')
 				-- Either the tyvars are freshly made, by inst_tyvars,
-				-- or (in the call from tcSkolSigType) any nested foralls
-				-- have different binders.  Either way, zipTopTvSubst is ok
+                                -- or any nested foralls have different binders.
+                                -- Either way, zipTopTvSubst is ok
 
 			    ; let  (theta, tau) = tcSplitPhiTy (substTy tenv rho)
 			    ; return (tyvars', theta, tau) }
 
-mkSkolTyVar :: Name -> Kind -> SkolemInfo -> TcTyVar
-mkSkolTyVar name kind info = mkTcTyVar name kind (SkolemTv info)
-
-tcSkolSigType :: SkolemInfo -> Type -> TcM ([TcTyVar], TcThetaType, TcType)
+tcSkolDFunType :: Type -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants, but 
 -- do *not* give them fresh names, because we want the name to
 -- be in the type environment: it is lexically scoped.
-tcSkolSigType info ty = tcInstType (\tvs -> return (tcSkolSigTyVars info tvs)) ty
+tcSkolDFunType ty = tcInstType (\tvs -> return (tcSuperSkolTyVars tvs)) ty
 
-tcSkolSigTyVars :: SkolemInfo -> [TyVar] -> [TcTyVar]
+tcSuperSkolTyVars :: [TyVar] -> [TcTyVar]
 -- Make skolem constants, but do *not* give them new names, as above
-tcSkolSigTyVars info tyvars = [ mkSkolTyVar (tyVarName tv) (tyVarKind tv) info
-			      | tv <- tyvars ]
+-- Moreover, make them "super skolems"; see comments with superSkolemTv
+tcSuperSkolTyVars tyvars
+  = [ mkTcTyVar (tyVarName tv) (tyVarKind tv) superSkolemTv
+    | tv <- tyvars ]
 
-tcInstSkolTyVar :: SkolemInfo -> TyVar -> TcM TcTyVar
+tcInstSkolTyVar :: Bool -> TyVar -> TcM TcTyVar
 -- Instantiate the tyvar, using 
 --	* the occ-name and kind of the supplied tyvar, 
 --	* the unique from the monad,
 --	* the location either from the tyvar (skol_info = SigSkol)
---	               or from the monad (otehrwise)
-tcInstSkolTyVar skol_info tyvar
+--                     or from the monad (otherwise)
+tcInstSkolTyVar overlappable tyvar
   = do	{ uniq <- newUnique
-	; loc <- case skol_info of
-                    SigSkol {} -> return (getSrcSpan old_name)
-                    _          -> getSrcSpanM
+        ; loc <-  getSrcSpanM
 	; let new_name = mkInternalName uniq occ loc
-	; return (mkSkolTyVar new_name kind skol_info) }
+        ; return (mkTcTyVar new_name kind (SkolemTv overlappable)) }
   where
     old_name = tyVarName tyvar
     occ      = nameOccName old_name
     kind     = tyVarKind tyvar
 
-tcInstSkolTyVars :: SkolemInfo -> [TyVar] -> TcM [TcTyVar]
--- Get the location from the monad
-tcInstSkolTyVars info tyvars 
-  = mapM (tcInstSkolTyVar info) tyvars
+tcInstSkolTyVars :: [TyVar] -> TcM [TcTyVar]
+tcInstSkolTyVars tyvars = mapM (tcInstSkolTyVar False) tyvars
 
-tcInstSkolType :: SkolemInfo -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+tcInstSuperSkolTyVars :: [TyVar] -> TcM [TcTyVar]
+tcInstSuperSkolTyVars tyvars = mapM (tcInstSkolTyVar True) tyvars
+
+tcInstSkolType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type with fresh skolem constants
 -- Binding location comes from the monad
-tcInstSkolType info ty = tcInstType (tcInstSkolTyVars info) ty
-
-tcInstSigType :: Bool -> Name -> TcType -> TcM ([TcTyVar], TcThetaType, TcRhoType)
--- Instantiate with skolems or meta SigTvs; depending on use_skols
--- Always take location info from the supplied tyvars
-tcInstSigType use_skols name ty
-  | use_skols
-  = tcInstType (tcInstSkolTyVars (SigSkol (FunSigCtxt name))) ty
-  | otherwise
-  = tcInstType tcInstSigTyVars ty
+tcInstSkolType ty = tcInstType tcInstSkolTyVars ty
 
 tcInstSigTyVars :: [TyVar] -> TcM [TcTyVar]
 -- Make meta SigTv type variables for patten-bound scoped type varaibles
@@ -285,12 +279,17 @@ newMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newMetaTyVar meta_info kind
   = do	{ uniq <- newMetaUnique
  	; ref <- newMutVar Flexi
-	; let name = mkSysTvName uniq fs 
-	      fs = case meta_info of
-			TauTv   -> fsLit "t"
-			TcsTv   -> fsLit "u"
-			SigTv _ -> fsLit "a"
+        ; let name = mkTcTyVarName uniq s
+              s = case meta_info of
+                        TauTv   -> fsLit "t"
+                        TcsTv   -> fsLit "u"
+                        SigTv _ -> fsLit "a"
 	; return (mkTcTyVar name kind (MetaTv meta_info ref)) }
+
+mkTcTyVarName :: Unique -> FastString -> Name
+-- Make sure that fresh TcTyVar names finish with a digit
+-- leaving the un-cluttered names free for user names
+mkTcTyVarName uniq str = mkSysTvName uniq str
 
 instMetaTyVar :: MetaInfo -> TyVar -> TcM TcTyVar
 -- Make a new meta tyvar whose Name and Kind 
@@ -298,7 +297,7 @@ instMetaTyVar :: MetaInfo -> TyVar -> TcM TcTyVar
 instMetaTyVar meta_info tyvar
   = do	{ uniq <- newMetaUnique
  	; ref <- newMutVar Flexi
-	; let name = setNameUnique (tyVarName tyvar) uniq
+        ; let name = mkSystemName uniq (getOccName tyvar)
 	      kind = tyVarKind tyvar
 	; return (mkTcTyVar name kind (MetaTv meta_info ref)) }
 
@@ -309,8 +308,6 @@ readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
 readWantedCoVar :: CoVar -> TcM MetaDetails
 readWantedCoVar covar = ASSERT2( isMetaTyVar covar, ppr covar )
 		        readMutVar (metaTvRef covar)
-
-
 
 isFilledMetaTyVar :: TyVar -> TcM Bool
 -- True of a filled-in (Indirect) meta type variable
@@ -468,7 +465,6 @@ zonkTcTyVarsAndFV :: TcTyVarSet -> TcM TcTyVarSet
 zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar (varSetElems tyvars)
 
 -----------------  Types
-
 zonkTcTypeCarefully :: TcType -> TcM TcType
 -- Do not zonk type variables free in the environment
 zonkTcTypeCarefully ty
@@ -481,10 +477,11 @@ zonkTcTypeCarefully ty
       | otherwise
       = ASSERT( isTcTyVar tv )
     	case tcTyVarDetails tv of
-    	  SkolemTv {}  -> return (TyVarTy tv)
-    	  FlatSkol ty  -> zonkType (zonk_tv env_tvs) ty
-    	  MetaTv _ ref -> do { cts <- readMutVar ref
-		             ; case cts of    
+          SkolemTv {}   -> return (TyVarTy tv)
+          RuntimeUnk {} -> return (TyVarTy tv)
+          FlatSkol ty   -> zonkType (zonk_tv env_tvs) ty
+          MetaTv _ ref  -> do { cts <- readMutVar ref
+                              ; case cts of
 			           Flexi       -> return (TyVarTy tv)
 			           Indirect ty -> zonkType (zonk_tv env_tvs) ty }
 
@@ -497,10 +494,11 @@ zonkTcTyVar :: TcTyVar -> TcM TcType
 zonkTcTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-      SkolemTv {}  -> return (TyVarTy tv)
-      FlatSkol ty  -> zonkTcType ty
-      MetaTv _ ref -> do { cts <- readMutVar ref
-		         ; case cts of    
+      SkolemTv {}   -> return (TyVarTy tv)
+      RuntimeUnk {} -> return (TyVarTy tv)
+      FlatSkol ty   -> zonkTcType ty
+      MetaTv _ ref  -> do { cts <- readMutVar ref
+                          ; case cts of
 		               Flexi       -> return (TyVarTy tv)
 			       Indirect ty -> zonkTcType ty }
 
@@ -511,10 +509,11 @@ zonkTcTypeAndSubst subst ty = zonkType zonk_tv ty
     zonk_tv tv 
       = ASSERT ( isTcTyVar tv )
         case tcTyVarDetails tv of
-      	  SkolemTv {}    -> return (TyVarTy tv)
-      	  FlatSkol ty    -> zonkType zonk_tv ty
-      	  MetaTv _ ref   -> do { cts <- readMutVar ref
-			       ; case cts of    
+          SkolemTv {}   -> return (TyVarTy tv)
+          RuntimeUnk {} -> return (TyVarTy tv)
+          FlatSkol ty   -> zonkType zonk_tv ty
+          MetaTv _ ref  -> do { cts <- readMutVar ref
+                              ; case cts of
 			           Flexi       -> zonk_flexi tv
 			           Indirect ty -> zonkType zonk_tv ty }
     zonk_flexi tv
@@ -554,8 +553,8 @@ zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 zonkQuantifiedTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv ) 
     case tcTyVarDetails tv of
-      FlatSkol {} -> pprPanic "zonkQuantifiedTyVar" (ppr tv)
-      SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
+      SkolemTv {} -> WARN( True, ppr tv )  -- Dec10: Can this really happen?
+                     do { kind <- zonkTcType (tyVarKind tv)
                         ; return $ setTyVarKind tv kind }
 	-- It might be a skolem type variable, 
 	-- for example from a user type signature
@@ -567,23 +566,26 @@ zonkQuantifiedTyVar tv
                       (readMutVar _ref >>= \cts -> 
                        case cts of 
                              Flexi -> return ()
-                             Indirect ty -> WARN( True, ppr tv $$ ppr ty ) 
+                             Indirect ty -> WARN( True, ppr tv $$ ppr ty )
                                             return ()) >>
 #endif
-                      skolemiseUnboundMetaTyVar UnkSkol tv 
-                             
-skolemiseUnboundMetaTyVar :: SkolemInfo -> TcTyVar -> TcM TyVar
+                      skolemiseUnboundMetaTyVar tv vanillaSkolemTv
+      _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
+
+skolemiseUnboundMetaTyVar :: TcTyVar -> TcTyVarDetails -> TcM TyVar
 -- We have a Meta tyvar with a ref-cell inside it
 -- Skolemise it, including giving it a new Name, so that
 --   we are totally out of Meta-tyvar-land
 -- We create a skolem TyVar, not a regular TyVar
 --   See Note [Zonking to Skolem]
-skolemiseUnboundMetaTyVar skol_info tv
+skolemiseUnboundMetaTyVar tv details
   = ASSERT2( isMetaTyVar tv, ppr tv ) 
-    do	{ uniq <- newUnique  -- Remove it from TcMetaTyVar unique land
+    do  { span <- getSrcSpanM    -- Get the location from "here"
+                                 -- ie where we are generalising
+        ; uniq <- newUnique      -- Remove it from TcMetaTyVar unique land
 	; let final_kind = defaultKind (tyVarKind tv)
-              final_name = setNameUnique (tyVarName tv) uniq
-	      final_tv   = mkSkolTyVar final_name final_kind skol_info
+              final_name = mkInternalName uniq (getOccName tv) span
+              final_tv   = mkTcTyVar final_name final_kind details
 	; writeMetaTyVar tv (mkTyVarTy final_tv)
 	; return final_tv }
 \end{code}
@@ -591,23 +593,58 @@ skolemiseUnboundMetaTyVar skol_info tv
 \begin{code}
 zonkImplication :: Implication -> TcM Implication
 zonkImplication implic@(Implic { ic_given = given 
-                               , ic_wanted = wanted })
-  = do { given'   <- mapM zonkEvVar given
-       ; wanted'  <- mapBagM zonkWanted wanted
-       ; return (implic { ic_given = given', ic_wanted = wanted' }) }
+                               , ic_wanted = wanted
+                               , ic_loc = loc })
+  = do {    -- No need to zonk the skolems
+       ; given'  <- mapM zonkEvVar given
+       ; loc'    <- zonkGivenLoc loc
+       ; wanted' <- zonkWC wanted
+       ; return (implic { ic_given = given'
+                        , ic_wanted = wanted'
+                        , ic_loc = loc' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar
 zonkEvVar var = do { ty' <- zonkTcType (varType var)
                    ; return (setVarType var ty') }
 
-zonkWanted :: WantedConstraint -> TcM WantedConstraint
-zonkWanted (WcImplic imp) = do { imp' <- zonkImplication imp; return (WcImplic imp') }
-zonkWanted (WcEvVar ev)   = do { ev' <- zonkWantedEvVar ev; return (WcEvVar ev') }
+zonkFlavoredEvVar :: FlavoredEvVar -> TcM FlavoredEvVar
+zonkFlavoredEvVar (EvVarX ev fl)
+  = do { ev' <- zonkEvVar ev
+       ; fl' <- zonkFlavor fl
+       ; return (EvVarX ev' fl') }
+
+zonkWC :: WantedConstraints -> TcM WantedConstraints
+zonkWC (WC { wc_flat = flat, wc_impl = implic, wc_insol = insol })
+  = do { flat'   <- zonkWantedEvVars flat
+       ; implic' <- mapBagM zonkImplication implic
+       ; insol'  <- mapBagM zonkFlavoredEvVar insol
+       ; return (WC { wc_flat = flat', wc_impl = implic', wc_insol = insol' }) }
+
+zonkWantedEvVars :: Bag WantedEvVar -> TcM (Bag WantedEvVar)
+zonkWantedEvVars = mapBagM zonkWantedEvVar
 
 zonkWantedEvVar :: WantedEvVar -> TcM WantedEvVar
-zonkWantedEvVar (WantedEvVar v l) = do { v' <- zonkEvVar v; return (WantedEvVar v' l) }
-\end{code}
+zonkWantedEvVar (EvVarX v l) = do { v' <- zonkEvVar v; return (EvVarX v' l) }
 
+zonkFlavor :: CtFlavor -> TcM CtFlavor
+zonkFlavor (Given loc) = do { loc' <- zonkGivenLoc loc; return (Given loc') }
+zonkFlavor fl          = return fl
+
+zonkGivenLoc :: GivenLoc -> TcM GivenLoc
+-- GivenLocs may have unification variables inside them!
+zonkGivenLoc (CtLoc skol_info span ctxt)
+  = do { skol_info' <- zonkSkolemInfo skol_info
+       ; return (CtLoc skol_info' span ctxt) }
+
+zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
+zonkSkolemInfo (SigSkol cx ty)  = do { ty' <- zonkTcType ty
+                                     ; return (SigSkol cx ty') }
+zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
+                                     ; return (InferSkol ntys') }
+  where
+    do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
+zonkSkolemInfo skol_info = return skol_info
+\end{code}
 
 Note [Silly Type Synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -738,6 +775,7 @@ mkZonkTcTyVar unbound_var_fn tyvar
   = ASSERT( isTcTyVar tyvar )
     case tcTyVarDetails tyvar of
       SkolemTv {}    -> return (TyVarTy tyvar)
+      RuntimeUnk {}  -> return (TyVarTy tyvar)
       FlatSkol ty    -> zonkType (mkZonkTcTyVar unbound_var_fn) ty
       MetaTv _ ref   -> do { cts <- readMutVar ref
 			   ; case cts of    
@@ -848,7 +886,9 @@ checkValidType ctxt ty = do
 
 		 ForSigCtxt _	-> gen_rank 1
 		 SpecInstCtxt   -> gen_rank 1
-		 ThBrackCtxt    -> gen_rank 1
+                 ThBrackCtxt    -> gen_rank 1
+                 GenSigCtxt     -> panic "checkValidType"
+                                     -- Can't happen; GenSigCtxt not used for *user* sigs
 
 	actual_kind = typeKind ty
 

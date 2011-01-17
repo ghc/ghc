@@ -26,6 +26,9 @@ for $tarball (@tarballs) {
         print "Ignoring libraries/$package as it looks like a darcs checkout\n"
     }
     else {
+        if (! -d "libraries/stamp") {
+            mkdir "libraries/stamp";
+        }
         $stamp = "libraries/stamp/$package";
         if ((! -d "libraries/$package") || (! -f "$stamp")
          || ((-M "libraries/stamp/$package") > (-M $tarball))) {

@@ -13,7 +13,8 @@ module Unify (
 	dataConCannotMatch,
 
         -- Side-effect free unification
-        tcUnifyTys, BindFlag(..)
+        tcUnifyTys, BindFlag(..),
+        niFixTvSubst, niSubstTvSet
 
    ) where
 
@@ -31,7 +32,6 @@ import Outputable
 import ErrUtils
 import Util
 import Maybes
-import UniqFM
 import FastString
 \end{code}
 
@@ -380,8 +380,8 @@ dataConCannotMatch tys con
 
 %************************************************************************
 %*									*
-		Unification
-%*									*
+             Unification
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -396,27 +396,47 @@ tcUnifyTys bind_fn tys1 tys2
     do { subst <- unifyList emptyTvSubstEnv tys1 tys2
 
 	-- Find the fixed point of the resulting non-idempotent substitution
-	; let in_scope = mkInScopeSet (tvs1 `unionVarSet` tvs2)
-	      tv_env   = fixTvSubstEnv in_scope subst
-
-	; return (mkTvSubst in_scope tv_env) }
-  where
-    tvs1 = tyVarsOfTypes tys1
-    tvs2 = tyVarsOfTypes tys2
-
-----------------------------
--- XXX Can we do this more nicely, by exploiting laziness?
--- Or avoid needing it in the first place?
-fixTvSubstEnv :: InScopeSet -> TvSubstEnv -> TvSubstEnv
-fixTvSubstEnv in_scope env = f env
-  where
-    f e = let e' = mapUFM (substTy (mkTvSubst in_scope e)) e
-          in if and $ eltsUFM $ intersectUFM_C tcEqType e e'
-             then e
-             else f e'
-
+        ; return (niFixTvSubst subst) }
 \end{code}
 
+
+%************************************************************************
+%*									*
+                Non-idempotent substitution
+%*									*
+%************************************************************************
+
+Note [Non-idempotent substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+During unification we use a TvSubstEnv that is
+  (a) non-idempotent
+  (b) loop-free; ie repeatedly applying it yields a fixed point
+
+\begin{code}
+niFixTvSubst :: TvSubstEnv -> TvSubst
+-- Find the idempotent fixed point of the non-idempotent substitution
+-- ToDo: use laziness instead of iteration?
+niFixTvSubst env = f env
+  where
+    f e | not_fixpoint = f (mapVarEnv (substTy subst) e)
+        | otherwise    = subst
+        where
+          range_tvs    = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet e
+          subst        = mkTvSubst (mkInScopeSet range_tvs) e
+          not_fixpoint = foldVarSet ((||) . in_domain) False range_tvs
+          in_domain tv = tv `elemVarEnv` e
+
+niSubstTvSet :: TvSubstEnv -> TyVarSet -> TyVarSet
+-- Apply the non-idempotent substitution to a set of type variables,
+-- remembering that the substitution isn't necessarily idempotent
+-- This is used in the occurs check, before extending the substitution
+niSubstTvSet subst tvs
+  = foldVarSet (unionVarSet . get) emptyVarSet tvs
+  where
+    get tv = case lookupVarEnv subst tv of
+	       Nothing -> unitVarSet tv
+               Just ty -> niSubstTvSet subst (tyVarsOfType ty)
+\end{code}
 
 %************************************************************************
 %*									*
@@ -553,7 +573,7 @@ uUnrefined subst tv1 ty2 (TyVarTy tv2)
     bind tv ty = return $ extendVarEnv subst tv ty
 
 uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
-  | tv1 `elemVarSet` substTvSet subst (tyVarsOfType ty2')
+  | tv1 `elemVarSet` niSubstTvSet subst (tyVarsOfType ty2')
   = failWith (occursCheck tv1 ty2)	-- Occurs check
   | not (k2 `isSubKind` k1)
   = failWith (kindMisMatch tv1 ty2)	-- Kind check
@@ -562,16 +582,6 @@ uUnrefined subst tv1 ty2 ty2'	-- ty2 is not a type variable
   where
     k1 = tyVarKind tv1
     k2 = typeKind ty2'
-
-substTvSet :: TvSubstEnv -> TyVarSet -> TyVarSet
--- Apply the non-idempotent substitution to a set of type variables,
--- remembering that the substitution isn't necessarily idempotent
-substTvSet subst tvs
-  = foldVarSet (unionVarSet . get) emptyVarSet tvs
-  where
-    get tv = case lookupVarEnv subst tv of
-	       Nothing -> unitVarSet tv
-	       Just ty -> substTvSet subst (tyVarsOfType ty)
 
 bindTv :: TvSubstEnv -> TyVar -> Type -> UM TvSubstEnv
 bindTv subst tv ty	-- ty is not a type variable

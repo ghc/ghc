@@ -27,8 +27,8 @@ module TcUnify (
 
 import HsSyn
 import TypeRep
-
-import TcErrors	( typeExtraInfoMsg, unifyCtxt )
+import CoreUtils( mkPiTypes )
+import TcErrors ( unifyCtxt )
 import TcMType
 import TcIface
 import TcRnMonad
@@ -44,7 +44,6 @@ import VarEnv
 import Name
 import ErrUtils
 import BasicTypes
-import Bag
 
 import Maybes ( allMaybes )  
 import Util
@@ -298,14 +297,14 @@ which takes an HsExpr of type actual_ty into one of type
 expected_ty.
 
 \begin{code}
-tcSubType :: CtOrigin -> SkolemInfo -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
+tcSubType :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Check that ty_actual is more polymorphic than ty_expected
 -- Both arguments might be polytypes, so we must instantiate and skolemise
 -- Returns a wrapper of shape   ty_actual ~ ty_expected
-tcSubType origin skol_info ty_actual ty_expected 
+tcSubType origin ctxt ty_actual ty_expected
   | isSigmaTy ty_actual
   = do { (sk_wrap, inst_wrap) 
-            <- tcGen skol_info ty_expected $ \ _ sk_rho -> do 
+            <- tcGen ctxt ty_expected $ \ _ sk_rho -> do
             { (in_wrap, in_rho) <- deeplyInstantiate origin ty_actual
             ; coi <- unifyType in_rho sk_rho
             ; return (coiToHsWrapper coi <.> in_wrap) }
@@ -353,16 +352,16 @@ wrapFunResCoercion arg_tys co_fn_res
 %************************************************************************
 
 \begin{code}
-tcGen :: SkolemInfo -> TcType  
+tcGen :: UserTypeCtxt -> TcType
       -> ([TcTyVar] -> TcRhoType -> TcM result)
       -> TcM (HsWrapper, result)
         -- The expression has type: spec_ty -> expected_ty
 
-tcGen skol_info expected_ty thing_inside 
+tcGen ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
   = do  { traceTc "tcGen" empty
-        ; (wrap, tvs', given, rho') <- deeplySkolemise skol_info expected_ty
+        ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
 
         ; when debugIsOn $
               traceTc "tcGen" $ vcat [
@@ -379,8 +378,12 @@ tcGen skol_info expected_ty thing_inside
         -- So now s' isn't unconstrained because it's linked to a.
         -- 
 	-- However [Oct 10] now that the untouchables are a range of 
-	-- TcTyVars, all tihs is handled automatically with no need for 
+        -- TcTyVars, all this is handled automatically with no need for
 	-- extra faffing around
+
+        -- Use the *instantiated* type in the SkolemInfo
+        -- so that the names of displayed type variables line up
+        ; let skol_info = SigSkol ctxt (mkPiTypes given rho')
 
         ; (ev_binds, result) <- checkConstraints skol_info tvs' given $
                                 thing_inside tvs' rho'
@@ -414,7 +417,7 @@ newImplication skol_info skol_tvs given thing_inside
                                       captureUntouchables $
                                       thing_inside
 
-       ; if isEmptyBag wanted && not (hasEqualities given) 
+       ; if isEmptyWC wanted && not (hasEqualities given)
        	    -- Optimisation : if there are no wanteds, and the givens
        	    -- are sufficiently simple, don't generate an implication
        	    -- at all.  Reason for the hasEqualities test:
@@ -426,16 +429,15 @@ newImplication skol_info skol_tvs given thing_inside
        { ev_binds_var <- newTcEvBinds
        ; lcl_env <- getLclTypeEnv
        ; loc <- getCtLoc skol_info
-       ; let implic = Implic { ic_untch = untch
-             		     , ic_env = lcl_env
-             		     , ic_skols = mkVarSet skol_tvs
-             		     , ic_scoped = panic "emitImplication"
-             		     , ic_given = given
-             		     , ic_wanted = wanted
-             		     , ic_binds = ev_binds_var
-             		     , ic_loc = loc }
+       ; emitImplication $ Implic { ic_untch = untch
+             		     	  , ic_env = lcl_env
+             		     	  , ic_skols = mkVarSet skol_tvs
+                             	  , ic_given = given
+                                  , ic_wanted = wanted
+                                  , ic_insol  = insolubleWC wanted
+                                  , ic_binds = ev_binds_var
+             		     	  , ic_loc = loc }
 
-       ; emitConstraint (WcImplic implic)
        ; return (TcEvBinds ev_binds_var, result) } }
 \end{code}
 
@@ -518,11 +520,16 @@ uType, uType_np, uType_defer
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
 uType_defer (item : origin) ty1 ty2
-  = do { co_var <- newWantedCoVar ty1 ty2
-       ; traceTc "utype_defer" (vcat [ppr co_var, ppr ty1, ppr ty2, ppr origin])
+  = wrapEqCtxt origin $
+    do { co_var <- newWantedCoVar ty1 ty2
        ; loc <- getCtLoc (TypeEqOrigin item)
-       ; wrapEqCtxt origin $
-         emitConstraint (WcEvVar (WantedEvVar co_var loc)) 
+       ; emitFlat (mkEvVarX co_var loc)
+
+       -- Error trace only
+       ; ctxt <- getErrCtxt
+       ; doc <- mkErrInfo emptyTidyEnv ctxt
+       ; traceTc "utype_defer" (vcat [ppr co_var, ppr ty1, ppr ty2, ppr origin, doc])
+
        ; return $ ACo $ mkTyVarTy co_var }
 uType_defer [] _ _
   = panic "uType_defer"
@@ -632,7 +639,7 @@ unifySigmaTy origin ty1 ty2
   = do { let (tvs1, body1) = tcSplitForAllTys ty1
              (tvs2, body2) = tcSplitForAllTys ty2
        ; unless (equalLength tvs1 tvs2) (failWithMisMatch origin)
-       ; skol_tvs <- tcInstSkolTyVars UnkSkol tvs1     -- Not a helpful SkolemInfo
+       ; skol_tvs <- tcInstSkolTyVars tvs1
                   -- Get location from monad, not from tvs1
        ; let tys      = mkTyVarTys skol_tvs
              in_scope = mkInScopeSet (mkVarSet skol_tvs)
@@ -644,9 +651,7 @@ unifySigmaTy origin ty1 ty2
                                  captureUntouchables $ 
                        		 uType origin phi1 phi2
           -- Check for escape; e.g. (forall a. a->b) ~ (forall a. a->a)
-       ; let bad_lie  = filterBag is_bad lie
-             is_bad w = any (`elemVarSet` tyVarsOfWanted w) skol_tvs
-       ; when (not (isEmptyBag bad_lie))
+         ; when (any (`elemVarSet` tyVarsOfWC lie) skol_tvs)
               (failWithMisMatch origin)	-- ToDo: give details from bad_lie
 
        ; emitConstraints lie
@@ -1023,7 +1028,7 @@ lookupTcTyVar tyvar
            Indirect ty -> return (Filled ty)
            Flexi -> do { is_untch <- isUntouchable tyvar
                        ; let    -- Note [Unifying untouchables]
-                             ret_details | is_untch = SkolemTv UnkSkol
+                             ret_details | is_untch  = vanillaSkolemTv
                                          | otherwise = details
        	               ; return (Unfilled ret_details) } }
   | otherwise
@@ -1079,18 +1084,14 @@ failWithMisMatch (item:origin)
         ; env0 <- tcInitTidyEnv
         ; let (env1, pp_exp) = tidyOpenType env0 ty_exp
               (env2, pp_act) = tidyOpenType env1 ty_act
-        ; failWithTcM (misMatchMsg env2 pp_act pp_exp) }
+        ; failWithTcM (env2, misMatchMsg pp_act pp_exp) }
 failWithMisMatch [] 
   = panic "failWithMisMatch"
 
-misMatchMsg :: TidyEnv -> TcType -> TcType -> (TidyEnv, SDoc)
-misMatchMsg env ty_act ty_exp
-  = (env2, sep [sep [ ptext (sLit "Couldn't match expected type") <+> quotes (ppr ty_exp)
-	            , nest 12 $   ptext (sLit "with actual type") <+> quotes (ppr ty_act)]
-               , nest 2 (extra1 $$ extra2) ])
-  where
-    (env1, extra1) = typeExtraInfoMsg env  ty_exp
-    (env2, extra2) = typeExtraInfoMsg env1 ty_act
+misMatchMsg :: TcType -> TcType -> SDoc
+misMatchMsg ty_act ty_exp
+  = sep [ ptext (sLit "Couldn't match expected type") <+> quotes (ppr ty_exp)
+        , nest 12 $   ptext (sLit "with actual type") <+> quotes (ppr ty_act)]
 \end{code}
 
 

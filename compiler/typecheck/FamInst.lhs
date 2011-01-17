@@ -178,8 +178,7 @@ checkForConflicts inst_envs famInst
 		-- We use tcInstSkolType because we don't want to allocate
 		-- fresh *meta* type variables.  
 
-       ; skol_tvs <- tcInstSkolTyVars FamInstSkol 
-                                      (tyConTyVars (famInstTyCon famInst))
+       ; skol_tvs <- tcInstSkolTyVars (tyConTyVars (famInstTyCon famInst))
        ; let conflicts = lookupFamInstEnvConflicts inst_envs famInst skol_tvs
        ; unless (null conflicts) $
 	   conflictInstErr famInst (fst (head conflicts))

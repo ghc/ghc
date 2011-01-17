@@ -505,6 +505,7 @@ tcRnHsBootDecls decls
 	; traceTc "Tc3" empty
 	; (tcg_env, inst_infos, _deriv_binds) 
             <- tcInstDecls1 (concat tycl_decls) inst_decls deriv_decls
+
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck value declarations
@@ -639,7 +640,11 @@ checkHiBootIface
 	= case [dfun | inst <- local_insts, 
 		       let dfun = instanceDFunId inst,
 		       idType dfun `tcEqType` boot_inst_ty ] of
-	    [] -> do { addErrTc (instMisMatch boot_inst); return Nothing }
+	    [] -> do { traceTc "check_inst" (vcat [ text "local_insts" <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
+                                                  , text "boot_inst"   <+> ppr boot_inst
+                                                  , text "boot_inst_ty" <+> ppr boot_inst_ty
+                                                  ]) 
+                     ; addErrTc (instMisMatch boot_inst); return Nothing }
 	    (dfun:_) -> return (Just (local_boot_dfun, dfun))
 	where
 	  boot_dfun = instanceDFunId boot_inst
@@ -1308,9 +1313,16 @@ tcRnExpr hsc_env ictxt rdr_expr
 
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
-    ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
-    ((qtvs, dicts, _), lie_top) <- captureConstraints (simplifyInfer False {- No MR for now -}
-                                                      (tyVarsOfType res_ty) lie)  ;
+
+    uniq <- newUnique ;
+    let { fresh_it  = itName uniq } ;
+    ((_tc_expr, res_ty), lie)   <- captureConstraints (tcInferRho rn_expr) ;
+    ((qtvs, dicts, _), lie_top) <- captureConstraints $
+                                   simplifyInfer TopLevel
+                                                 False {- No MR for now -}
+                                                 [(fresh_it, res_ty)]
+                                                 lie  ;
+
     _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;

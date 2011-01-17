@@ -871,7 +871,7 @@ tcPatSig ctxt sig res_ty
 	; if null sig_tvs then do {
 		-- The type signature binds no type variables, 
 		-- and hence is rigid, so use it to zap the res_ty
-         	  wrap <- tcSubType PatSigOrigin (SigSkol ctxt) res_ty sig_ty
+                  wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty
 		; return (sig_ty, [], wrap)
 
 	} else do {
@@ -900,7 +900,7 @@ tcPatSig ctxt sig res_ty
 	; sig_tvs' <- tcInstSigTyVars sig_tvs
         ; let sig_ty' = substTyWith sig_tvs sig_tv_tys' sig_ty
               sig_tv_tys' = mkTyVarTys sig_tvs'
-	; wrap <- tcSubType PatSigOrigin (SigSkol ctxt) res_ty sig_ty'
+        ; wrap <- tcSubType PatSigOrigin ctxt res_ty sig_ty'
 
 	-- Check that each is bound to a distinct type variable,
 	-- and one that is not already in scope

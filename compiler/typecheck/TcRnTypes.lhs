@@ -29,22 +29,28 @@ module TcRnTypes(
 
 	-- Constraints
         Untouchables(..), inTouchableRange, isNoUntouchables,
-  	WantedConstraints, emptyWanteds, andWanteds, extendWanteds,
-	WantedConstraint(..), WantedEvVar(..), wantedEvVarLoc, 
-        wantedEvVarToVar, wantedEvVarPred, splitWanteds,
 
-	evVarsToWanteds,
-	Implication(..), 
+        WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
+        andWC, addFlats, addImplics, mkFlatWC,
+
+        EvVarX(..), mkEvVarX, evVarOf, evVarX, evVarOfPred,
+        WantedEvVar, wantedToFlavored,
+        keepWanted,
+
+        Implication(..),
         CtLoc(..), ctLocSpan, ctLocOrigin, setCtLocOrigin,
 	CtOrigin(..), EqOrigin(..), 
         WantedLoc, GivenLoc, pushErrCtxt,
 
-	SkolemInfo(..),
+        SkolemInfo(..),
+
+        CtFlavor(..), pprFlavorArising, isWanted, isGiven, isDerived,
+        FlavoredEvVar,
 
 	-- Pretty printing
-	pprEvVarTheta, pprWantedsWithLocs, pprWantedWithLoc, 
+        pprEvVarTheta, pprWantedEvVar, pprWantedsWithLocs,
 	pprEvVars, pprEvVarWithType,
-	pprArising, pprArisingAt,
+        pprArising, pprArisingAt,
 
 	-- Misc other types
 	TcId, TcIdSet, TcTyVarBind(..), TcTyVarBinds
@@ -56,6 +62,8 @@ module TcRnTypes(
 import HsSyn
 import HscTypes
 import Type
+import Class    ( Class )
+import DataCon  ( DataCon, dataConUserType )
 import TcType
 import Annotations
 import InstEnv
@@ -79,7 +87,6 @@ import Bag
 import Outputable
 import ListSetOps
 import FastString
-import StaticFlags( opt_ErrorSpans )
 
 import Data.Set (Set)
 \end{code}
@@ -676,6 +683,58 @@ instance Outputable WhereFrom where
 v%************************************************************************
 
 \begin{code}
+data WantedConstraints
+  = WC { wc_flat  :: Bag WantedEvVar   -- Unsolved constraints, all wanted
+       , wc_impl  :: Bag Implication
+       , wc_insol :: Bag FlavoredEvVar -- Insoluble constraints, can be
+                                       -- wanted, given, or derived
+                                       -- See Note [Insoluble constraints]
+    }
+
+emptyWC :: WantedConstraints
+emptyWC = WC { wc_flat = emptyBag, wc_impl = emptyBag, wc_insol = emptyBag }
+
+mkFlatWC :: Bag WantedEvVar -> WantedConstraints
+mkFlatWC wevs = WC { wc_flat = wevs, wc_impl = emptyBag, wc_insol = emptyBag }
+
+isEmptyWC :: WantedConstraints -> Bool
+isEmptyWC (WC { wc_flat = f, wc_impl = i, wc_insol = n })
+  = isEmptyBag f && isEmptyBag i && isEmptyBag n
+
+insolubleWC :: WantedConstraints -> Bool
+-- True if there are any insoluble constraints in the wanted bag
+insolubleWC wc = not (isEmptyBag (wc_insol wc))
+               || anyBag ic_insol (wc_impl wc)
+
+andWC :: WantedConstraints -> WantedConstraints -> WantedConstraints
+andWC (WC { wc_flat = f1, wc_impl = i1, wc_insol = n1 })
+      (WC { wc_flat = f2, wc_impl = i2, wc_insol = n2 })
+  = WC { wc_flat  = f1 `unionBags` f2
+       , wc_impl  = i1 `unionBags` i2
+       , wc_insol = n1 `unionBags` n2 }
+
+addFlats :: WantedConstraints -> Bag WantedEvVar -> WantedConstraints
+addFlats wc wevs = wc { wc_flat = wevs `unionBags` wc_flat wc }
+
+addImplics :: WantedConstraints -> Bag Implication -> WantedConstraints
+addImplics wc implic = wc { wc_impl = implic `unionBags` wc_impl wc }
+
+instance Outputable WantedConstraints where
+  ppr (WC {wc_flat = f, wc_impl = i, wc_insol = n})
+   = ptext (sLit "WC") <+> braces (vcat
+        [ if isEmptyBag f then empty else
+          ptext (sLit "wc_flat =")  <+> pprBag pprWantedEvVar f
+        , if isEmptyBag i then empty else
+          ptext (sLit "wc_impl =")  <+> pprBag ppr i
+        , if isEmptyBag n then empty else
+          ptext (sLit "wc_insol =") <+> pprBag ppr n ])
+
+pprBag :: (a -> SDoc) -> Bag a -> SDoc
+pprBag pp b = foldrBag (($$) . pp) empty b
+\end{code}
+ 
+
+\begin{code}
 data Untouchables = NoUntouchables
                   | TouchableRange
                           Unique  -- Low end
@@ -700,34 +759,26 @@ inTouchableRange (TouchableRange low high) tv
   where
     uniq = varUnique tv
 
-type WantedConstraints = Bag WantedConstraint
-
-data WantedConstraint
-  = WcEvVar  WantedEvVar
-  | WcImplic Implication
-  -- ToDo: add literals, methods
-
--- EvVar defined in module Var.lhs: 
+-- EvVar defined in module Var.lhs:
 -- Evidence variables include all *quantifiable* constraints
 --   dictionaries
 --   implicit parameters
 --   coercion variables
+\end{code}
 
-data WantedEvVar   -- The sort of constraint over which one can lambda-abstract
-   = WantedEvVar 
-         EvVar 	     -- The variable itself; make a binding for it please
-         WantedLoc   -- How the constraint arose in the first place
-	 	     -- (used for error messages only)
+%************************************************************************
+%*									*
+                Implication constraints
+%*                                                                      *
+%************************************************************************
 
-type WantedLoc = CtLoc CtOrigin
-type GivenLoc  = CtLoc SkolemInfo
-
+\begin{code}
 data Implication
   = Implic {  
       ic_untch :: Untouchables, -- Untouchables: unification variables
-                                  -- free in the environment
+                                -- free in the environment
       ic_env   :: TcTypeEnv,    -- The type environment
-      		      	      	  -- Used only when generating error messages
+                                -- Used only when generating error messages
 	  -- Generally, ic_untch is a superset of tvsof(ic_env)
 	  -- However, we don't zonk ic_env when zonking the Implication
 	  -- Instead we do that when generating a skolem-escape error message
@@ -735,37 +786,31 @@ data Implication
       ic_skols  :: TcTyVarSet,   -- Introduced skolems 
       		   	         -- See Note [Skolems in an implication]
 
-      ic_scoped :: [TcTyVar],    -- List of scoped variables to be unified 
-                                 -- bijectively to a subset of ic_tyvars
-				 -- Note [Scoped pattern variable]
-
       ic_given  :: [EvVar],      -- Given evidence variables
       		   		 --   (order does not matter)
+      ic_loc   :: GivenLoc,      -- Binding location of the implication,
+                                 --   which is also the location of all the
+                                 --   given evidence variables
 
-      ic_wanted :: WantedConstraints,    -- Wanted constraints
+      ic_wanted :: WantedConstraints,  -- The wanted
+      ic_insol  :: Bool,               -- True iff insolubleWC ic_wantted is true
 
-      ic_binds  :: EvBindsVar,   -- Points to the place to fill in the
-      		      	    	 -- abstraction and bindings
+      ic_binds  :: EvBindsVar   -- Points to the place to fill in the
+                                -- abstraction and bindings
+    }
 
-      ic_loc   :: GivenLoc }
-
-evVarsToWanteds :: WantedLoc -> [EvVar] -> WantedConstraints
-evVarsToWanteds loc evs = listToBag [WcEvVar (WantedEvVar ev loc) | ev <- evs]
-
-wantedEvVarLoc :: WantedEvVar -> WantedLoc 
-wantedEvVarLoc (WantedEvVar _ loc) = loc 
-
-wantedEvVarToVar :: WantedEvVar -> EvVar 
-wantedEvVarToVar (WantedEvVar ev _) = ev 
-
-wantedEvVarPred :: WantedEvVar -> PredType 
-wantedEvVarPred (WantedEvVar ev _)  = evVarPred ev 
-
-splitWanteds :: WantedConstraints -> (Bag WantedEvVar, Bag Implication)
-splitWanteds wanted = partitionBagWith pick wanted
-  where
-    pick (WcEvVar v)  = Left v
-    pick (WcImplic i) = Right i
+instance Outputable Implication where
+  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_given = given
+              , ic_wanted = wanted
+              , ic_binds = binds, ic_loc = loc })
+   = ptext (sLit "Implic") <+> braces 
+     (sep [ ptext (sLit "Untouchables = ") <+> ppr untch
+          , ptext (sLit "Skolems = ") <+> ppr skols
+          , ptext (sLit "Given = ") <+> pprEvVars given
+          , ptext (sLit "Wanted = ") <+> ppr wanted
+          , ptext (sLit "Binds = ") <+> ppr binds
+          , pprSkolInfo (ctLocOrigin loc)
+          , ppr (ctLocSpan loc) ])
 \end{code}
 
 Note [Skolems in an implication]
@@ -779,29 +824,73 @@ Instead, ic_skols is used only when considering floating a constraint
 outside the implication in TcSimplify.floatEqualities or 
 TcSimplify.approximateImplications
 
-Note [Scoped pattern variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   data T where K :: forall a,b. a -> b -> T
+Note [Insoluble constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some of the errors that we get during canonicalization are best
+reported when all constraints have been simplified as much as
+possible. For instance, assume that during simplification the
+following constraints arise:
+   
+ [Wanted]   F alpha ~  uf1 
+ [Wanted]   beta ~ uf1 beta 
 
-   ...(case x of K (p::c) (q::d) -> ...)...
+When canonicalizing the wanted (beta ~ uf1 beta), if we eagerly fail
+we will simply see a message:
+    'Can't construct the infinite type  beta ~ uf1 beta' 
+and the user has no idea what the uf1 variable is.
 
-We create fresh MetaTvs for c,d, and later check that they are
-bound bijectively to the skolems we created for a,b.  So the
-implication constraint looks like
-	    ic_skols  = {a',b'}  -- Skolem tvs created from a,b
-	    ic_scoped = {c',d'}  -- Meta tvs created from c,d
+Instead our plan is that we will NOT fail immediately, but:
+    (1) Record the "frozen" error in the ic_insols field
+    (2) Isolate the offending constraint from the rest of the inerts 
+    (3) Keep on simplifying/canonicalizing
+
+At the end, we will hopefully have substituted uf1 := F alpha, and we
+will be able to report a more informative error:
+    'Can't construct the infinite type beta ~ F alpha beta'
+
+%************************************************************************
+%*									*
+            EvVarX, WantedEvVar, FlavoredEvVar
+%*									*
+%************************************************************************
 
 \begin{code}
-emptyWanteds :: WantedConstraints
-emptyWanteds = emptyBag
+data EvVarX a = EvVarX EvVar a
+     -- An evidence variable with accompanying info
 
-andWanteds :: WantedConstraints -> WantedConstraints -> WantedConstraints
-andWanteds = unionBags
+type WantedEvVar   = EvVarX WantedLoc     -- The location where it arose
+type FlavoredEvVar = EvVarX CtFlavor
 
-extendWanteds :: WantedConstraints -> WantedConstraint -> WantedConstraints
-extendWanteds = snocBag
+instance Outputable (EvVarX a) where
+  ppr (EvVarX ev _) = pprEvVarWithType ev
+  -- If you want to see the associated info,
+  -- use a more specific printing function
+
+mkEvVarX :: EvVar -> a -> EvVarX a
+mkEvVarX = EvVarX
+
+evVarOf :: EvVarX a -> EvVar
+evVarOf (EvVarX ev _) = ev
+
+evVarX :: EvVarX a -> a
+evVarX (EvVarX _ a) = a
+
+evVarOfPred :: EvVarX a -> PredType
+evVarOfPred wev = evVarPred (evVarOf wev)
+
+wantedToFlavored :: WantedEvVar -> FlavoredEvVar
+wantedToFlavored (EvVarX v wl) = EvVarX v (Wanted wl)
+
+keepWanted :: Bag FlavoredEvVar -> Bag WantedEvVar
+keepWanted flevs
+  = foldlBag keep_wanted emptyBag flevs
+  where
+    keep_wanted :: Bag WantedEvVar -> FlavoredEvVar -> Bag WantedEvVar
+    keep_wanted r (EvVarX ev (Wanted wloc)) = consBag (EvVarX ev wloc) r
+    keep_wanted r _ = r
 \end{code}
- 
+
+
 \begin{code}
 pprEvVars :: [EvVar] -> SDoc	-- Print with their types
 pprEvVars ev_vars = vcat (map pprEvVarWithType ev_vars)
@@ -812,54 +901,78 @@ pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
 pprEvVarWithType :: EvVar -> SDoc
 pprEvVarWithType v = ppr v <+> dcolon <+> pprPred (evVarPred v)
 
-pprWantedsWithLocs :: Bag WantedConstraint -> SDoc
-pprWantedsWithLocs = foldrBag (($$) . pprWantedWithLoc) empty 
-
-pprWantedWithLoc :: WantedConstraint -> SDoc
-pprWantedWithLoc (WcImplic i) = ppr i
-pprWantedWithLoc (WcEvVar v)  = pprWantedEvVarWithLoc v
-
-instance Outputable WantedConstraint where
-  ppr (WcEvVar v)  = ppr v
-  ppr (WcImplic i) = ppr i
-
--- Adding -ferror-spans makes the output more voluminous
-instance Outputable WantedEvVar where
-  ppr wev | opt_ErrorSpans = pprWantedEvVarWithLoc wev
-          | otherwise      = pprWantedEvVar wev
+pprWantedsWithLocs :: WantedConstraints -> SDoc
+pprWantedsWithLocs wcs
+  =  vcat [ pprBag pprWantedEvVarWithLoc (wc_flat wcs)
+          , pprBag ppr (wc_impl wcs)
+          , pprBag ppr (wc_insol wcs) ]
 
 pprWantedEvVarWithLoc, pprWantedEvVar :: WantedEvVar -> SDoc
-pprWantedEvVarWithLoc (WantedEvVar v loc) = hang (pprEvVarWithType v) 
-                                               2 (pprArisingAt loc) 
-pprWantedEvVar        (WantedEvVar v _)   = pprEvVarWithType v
-
-instance Outputable Implication where
-  ppr (Implic { ic_untch = untch, ic_skols = skols, ic_given = given
-              , ic_wanted = wanted, ic_binds = binds, ic_loc = loc })
-   = ptext (sLit "Implic") <+> braces 
-     (sep [ ptext (sLit "Untouchables = ") <+> ppr untch
-          , ptext (sLit "Skolems = ") <+> ppr skols
-          , ptext (sLit "Given = ") <+> pprEvVars given
-          , ptext (sLit "Wanted = ") <+> ppr wanted
-	  , ptext (sLit "Binds = ") <+> ppr binds
-          , pprSkolInfo (ctLocOrigin loc)
-          , ppr (ctLocSpan loc) ])
+pprWantedEvVarWithLoc (EvVarX v loc) = hang (pprEvVarWithType v)
+                                          2 (pprArisingAt loc)
+pprWantedEvVar        (EvVarX v _)   = pprEvVarWithType v
 \end{code}
 
 %************************************************************************
 %*									*
-            CtLoc, CtOrigin
+            CtLoc
 %*									*
 %************************************************************************
 
-The 'CtLoc' and 'CtOrigin' types gives information about where a
-*wanted constraint* came from.  This is important for decent error
-message reporting because dictionaries don't appear in the original
-source code.  Doubtless this type will evolve...
+\begin{code}
+data CtFlavor
+  = Given   GivenLoc  -- We have evidence for this constraint in TcEvBinds
+  | Derived WantedLoc 
+                      -- We have evidence for this constraint in TcEvBinds;
+                      --   *however* this evidence can contain wanteds, so 
+                      --   it's valid only provisionally to the solution of
+                      --   these wanteds 
+  | Wanted WantedLoc  -- We have no evidence bindings for this constraint. 
+
+-- data DerivedOrig = DerSC | DerInst | DerSelf
+-- Deriveds are either superclasses of other wanteds or deriveds, or partially
+-- solved wanteds from instances, or 'self' dictionaries containing yet wanted
+-- superclasses. 
+
+instance Outputable CtFlavor where
+  ppr (Given _)    = ptext (sLit "[Given]")
+  ppr (Wanted _)   = ptext (sLit "[Wanted]")
+  ppr (Derived {}) = ptext (sLit "[Derived]") 
+
+pprFlavorArising :: CtFlavor -> SDoc
+pprFlavorArising (Derived wl )  = pprArisingAt wl
+pprFlavorArising (Wanted  wl)   = pprArisingAt wl
+pprFlavorArising (Given gl)     = pprArisingAt gl
+
+isWanted :: CtFlavor -> Bool
+isWanted (Wanted {}) = True
+isWanted _           = False
+
+isGiven :: CtFlavor -> Bool 
+isGiven (Given {}) = True 
+isGiven _          = False 
+
+isDerived :: CtFlavor -> Bool 
+isDerived (Derived {}) = True
+isDerived _            = False
+\end{code}
+
+%************************************************************************
+%*									*
+            CtLoc
+%*									*
+%************************************************************************
+
+The 'CtLoc' gives information about where a constraint came from.
+This is important for decent error message reporting because
+dictionaries don't appear in the original source code.
+type will evolve...
 
 \begin{code}
--------------------------------------------
 data CtLoc orig = CtLoc orig SrcSpan [ErrCtxt]
+
+type WantedLoc = CtLoc CtOrigin      -- Instantiation for wanted constraints
+type GivenLoc  = CtLoc SkolemInfo    -- Instantiation for given constraints
 
 ctLocSpan :: CtLoc o -> SrcSpan
 ctLocSpan (CtLoc _ s _) = s
@@ -883,8 +996,96 @@ pprArising orig              = text "arising from" <+> ppr orig
 pprArisingAt :: Outputable o => CtLoc o -> SDoc
 pprArisingAt (CtLoc o s _) = sep [ text "arising from" <+> ppr o
                                  , text "at" <+> ppr s]
+\end{code}
 
--------------------------------------------
+%************************************************************************
+%*                                                                      *
+                SkolemInfo
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- SkolemInfo gives the origin of *given* constraints
+--   a) type variables are skolemised
+--   b) an implication constraint is generated
+data SkolemInfo
+  = SigSkol UserTypeCtxt	-- A skolem that is created by instantiating
+            Type                -- a programmer-supplied type signature
+				-- Location of the binding site is on the TyVar
+
+	-- The rest are for non-scoped skolems
+  | ClsSkol Class	-- Bound at a class decl
+  | InstSkol 		-- Bound at an instance decl
+  | DataSkol            -- Bound at a data type declaration
+  | FamInstSkol         -- Bound at a family instance decl
+  | PatSkol 	        -- An existential type variable bound by a pattern for
+      DataCon           -- a data constructor with an existential type.
+      (HsMatchContext Name)	
+	     --	e.g.   data T = forall a. Eq a => MkT a
+	     --        f (MkT x) = ...
+	     -- The pattern MkT x will allocate an existential type
+	     -- variable for 'a'.  
+
+  | ArrowSkol 	  	-- An arrow form (see TcArrows)
+
+  | IPSkol [IPName Name]  -- Binding site of an implicit parameter
+
+  | RuleSkol RuleName	-- The LHS of a RULE
+
+  | InferSkol [(Name,TcType)]
+                        -- We have inferred a type for these (mutually-recursivive)
+                        -- polymorphic Ids, and are now checking that their RHS
+                        -- constraints are satisfied.
+
+  | RuntimeUnkSkol      -- a type variable used to represent an unknown
+                        -- runtime type (used in the GHCi debugger)
+
+  | BracketSkol         -- Template Haskell bracket
+
+  | UnkSkol             -- Unhelpful info (until I improve it)
+
+instance Outputable SkolemInfo where
+  ppr = pprSkolInfo
+
+pprSkolInfo :: SkolemInfo -> SDoc
+-- Complete the sentence "is a rigid type variable bound by..."
+pprSkolInfo (SigSkol (FunSigCtxt f) ty)
+                            = hang (ptext (sLit "the type signature for"))
+                                 2 (ppr f <+> dcolon <+> ppr ty)
+pprSkolInfo (SigSkol cx ty) = hang (pprUserTypeCtxt cx <> colon)
+                                 2 (ppr ty)
+pprSkolInfo (IPSkol ips)    = ptext (sLit "the implicit-parameter bindings for")
+                              <+> pprWithCommas ppr ips
+pprSkolInfo (ClsSkol cls)   = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo InstSkol        = ptext (sLit "the instance declaration")
+pprSkolInfo DataSkol        = ptext (sLit "the data type declaration")
+pprSkolInfo FamInstSkol     = ptext (sLit "the family instance declaration")
+pprSkolInfo BracketSkol     = ptext (sLit "a Template Haskell bracket")
+pprSkolInfo (RuleSkol name) = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo ArrowSkol       = ptext (sLit "the arrow form")
+pprSkolInfo (PatSkol dc mc)  = sep [ ptext (sLit "a pattern with constructor")
+                                   , nest 2 $ ppr dc <+> dcolon
+                                              <+> ppr (dataConUserType dc) <> comma
+                                  , ptext (sLit "in") <+> pprMatchContext mc ]
+pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
+                                  , vcat [ ppr name <+> dcolon <+> ppr ty
+                                         | (name,ty) <- ids ]]
+
+-- UnkSkol
+-- For type variables the others are dealt with by pprSkolTvBinding.  
+-- For Insts, these cases should not happen
+pprSkolInfo UnkSkol        = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
+pprSkolInfo RuntimeUnkSkol = WARN( True, text "pprSkolInfo: RuntimeUnkSkol" ) ptext (sLit "RuntimeUnkSkol")
+\end{code}
+
+
+%************************************************************************
+%*									*
+            CtOrigin
+%*									*
+%************************************************************************
+
+\begin{code}
 -- CtOrigin gives the origin of *wanted* constraints
 data CtOrigin
   = OccurrenceOf Name		-- Occurrence of an overloaded identifier
@@ -957,3 +1158,4 @@ pprO FunDepOrigin          = ptext (sLit "a functional dependency")
 instance Outputable EqOrigin where
   ppr (UnifyOrigin t1 t2) = ppr t1 <+> char '~' <+> ppr t2
 \end{code}
+
