@@ -194,11 +194,14 @@ endif
 
 # The quadrupled $'s here are because the _v_LIB variables aren't
 # necessarily set when this part of the makefile is read
-ifeq "$3" "0"
-$1/$2/build/tmp/$$($1_$2_PROG) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-boot_v_LIB))
-else
-$1/$2/build/tmp/$$($1_$2_PROG) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-install_v_LIB))
-endif
+$1/$2/build/tmp/$$($1_$2_PROG) : \
+    $$(foreach dep,$$($1_$2_DEP_NAMES),\
+        $$(if $$(filter ghc,$$(dep)),\
+            $(if $(filter 0,$3),$$(compiler_stage1_v_LIB),\
+            $(if $(filter 1,$3),$$(compiler_stage2_v_LIB),\
+            $(if $(filter 2,$3),$$(compiler_stage2_v_LIB),\
+            $$(error Bad build stage)))),\
+        $$$$(libraries/$$(dep)_dist-$(if $(filter 0,$3),boot,install)_v_LIB)))
 
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
