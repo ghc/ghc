@@ -104,7 +104,8 @@ Library {
                     ForeignFunctionInterface, UnliftedFFITypes,
                     DeriveDataTypeable, GeneralizedNewtypeDeriving,
                     FlexibleInstances, StandaloneDeriving,
-                    PatternGuards, EmptyDataDecls, NoImplicitPrelude
+                    PatternGuards, EmptyDataDecls, NoImplicitPrelude,
+                    NondecreasingIndentation
     }
     exposed-modules:
         Control.Applicative,
