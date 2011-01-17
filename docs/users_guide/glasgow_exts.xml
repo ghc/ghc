@@ -8920,7 +8920,7 @@ An example will give the idea:
 </para>
 
 <programlisting>
-  import Generics
+  import Data.Generics
 
   class Bin a where
     toBin   :: a -> [Int]
@@ -8940,7 +8940,7 @@ An example will give the idea:
 <para>
 This class declaration explains how <literal>toBin</literal> and <literal>fromBin</literal>
 work for arbitrary data types.  They do so by giving cases for unit, product, and sum,
-which are defined thus in the library module <literal>Generics</literal>:
+which are defined thus in the library module <literal>Data.Generics</literal>:
 </para>
 <programlisting>
   data Unit    = Unit
@@ -8962,14 +8962,16 @@ where clause and over-ride whichever methods you please.
       <para>To use generics you need to</para>
       <itemizedlist>
 	<listitem>
-	  <para>Use the flags <option>-fglasgow-exts</option> (to enable the extra syntax), 
-                <option>-XGenerics</option> (to generate extra per-data-type code),
-                and <option>-package lang</option> (to make the <literal>Generics</literal> library
-                available.  </para>
+	  <para>
+            Use the flags <option>-XGenerics</option> (to enable the
+            extra syntax and generate extra per-data-type code),
+            and <option>-package syb</option> (to make the
+            <literal>Data.Generics</literal> module available.
+          </para>
 	</listitem>
 	<listitem>
-	  <para>Import the module <literal>Generics</literal> from the
-          <literal>lang</literal> package.  This import brings into
+	  <para>Import the module <literal>Data.Generics</literal> from the
+          <literal>syb</literal> package.  This import brings into
           scope the data types <literal>Unit</literal>,
           <literal>:*:</literal>, and <literal>:+:</literal>.  (You
           don't need this import if you don't mention these types
