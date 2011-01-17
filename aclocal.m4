@@ -21,16 +21,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         # but we don't 16-byte align things. Thus drop
         # back to generic i686 compatibility. Trac #2983.
         $2="$$2 -march=i686 -m32"
-        # It's not clear if $3 flags will be given to gcc or ld,
-        # and they accept different flags, so for now do nothing
-        # $3="$$3 -march=i686 -m32"
+        $3="$$3 -march=i686 -m32"
         $4="$$4 -march=i686 -m32"
         ;;
     x86_64-apple-darwin)
         $2="$$2 -m64"
-        # It's not clear if $3 flags will be given to gcc or ld,
-        # and they accept different flags, so for now do nothing
-        # $3="$$3 -m64"
+        $3="$$3 -m64"
         $4="$$4 -m64"
         ;;
     esac
@@ -39,9 +35,7 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     i386-apple-darwin|x86_64-apple-darwin)
         # We support back to OS X 10.5
         $2="$$2 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
-        # It's not clear if $3 flags will be given to gcc or ld,
-        # and they accept different flags, so for now do nothing
-        # $3="$$3 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
+        $3="$$3 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
         $4="$$4 -isysroot /Developer/SDKs/MacOSX10.5.sdk -mmacosx-version-min=10.5"
         ;;
     esac
