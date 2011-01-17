@@ -105,10 +105,6 @@ Library {
                     DeriveDataTypeable, GeneralizedNewtypeDeriving,
                     FlexibleInstances, StandaloneDeriving,
                     PatternGuards, EmptyDataDecls, NoImplicitPrelude
-
-        if impl(ghc < 6.10)
-           -- PatternSignatures was deprecated in 6.10
-           extensions: PatternSignatures
     }
     exposed-modules:
         Control.Applicative,
