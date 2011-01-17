@@ -10,6 +10,29 @@
 #
 # -----------------------------------------------------------------------------
 
+# We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
+# gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
+# That's because the doc/ directory contents are under the GFDL,
+# which causes problems for Debian.
+
+GMP_TARBALL := $(wildcard libraries/integer-gmp/gmp/tarball/gmp*.tar.bz2)
+GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc-patched.tar.bz2,%,$(GMP_TARBALL))
+
+ifneq "$(NO_CLEAN_GMP)" "YES"
+$(eval $(call clean-target,gmp,,\
+  libraries/integer-gmp/gmp/config.mk \
+  libraries/integer-gmp/gmp/libgmp.a \
+  libraries/integer-gmp/gmp/gmp.h \
+  libraries/integer-gmp/gmp/gmpbuild \
+  libraries/integer-gmp/gmp/$(GMP_DIR)))
+
+clean : clean_gmp
+.PHONY: clean_gmp
+clean_gmp:
+	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/objs
+	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/gmpbuild
+endif
+
 ifneq "$(phase)" "0"
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
@@ -99,14 +122,6 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 # follow, as it isn't used consistently. Instead we put an ln.bat in
 # path that always fails.
 
-# We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
-# gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
-# That's because the doc/ directory contents are under the GFDL,
-# which causes problems for Debian.
-
-GMP_TARBALL := $(wildcard libraries/integer-gmp/gmp/tarball/gmp*.tar.bz2)
-GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc-patched.tar.bz2,%,$(GMP_TARBALL))
-
 libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(RM) -rf libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild libraries/integer-gmp/gmp/objs
 	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp/gmp && $(TAR_CMD) -xf - ; }
@@ -124,14 +139,6 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	$(MKDIRHIER) libraries/integer-gmp/gmp/objs
 	cd libraries/integer-gmp/gmp/objs && $(AR) x ../libgmp.a
 	$(RANLIB) libraries/integer-gmp/gmp/libgmp.a
-
-ifneq "$(NO_CLEAN_GMP)" "YES"
-$(eval $(call clean-target,gmp,,\
-  libraries/integer-gmp/gmp/libgmp.a \
-  libraries/integer-gmp/gmp/gmp.h \
-  libraries/integer-gmp/gmp/gmpbuild \
-  libraries/integer-gmp/gmp/$(GMP_DIR)))
-endif
 
 # XXX TODO:
 #stamp.gmp.shared:
