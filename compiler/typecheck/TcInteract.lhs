@@ -1075,10 +1075,12 @@ numericReactionsStage workItem inert
                                Nothing -> Stop
                                Just v  -> ContinueWith v
                  , sr_new_work = new
-                 , sr_inerts = foldrBag (flip updInertSet) inert_residual ins
+                 , sr_inerts = foldrBag (flip updInertSet) inert_residual1 ins
                  }
 
   where (grelevant, drelevant, wrelevant, inert_residual) = getNumInerts inert
+        inert_residual1 = foldrBag (flip updInertSet) inert_residual drelevant
+        -- XXX: so that we don't loose things
 
         isNumWork = case workItem of
                       CFunEqCan { cc_fun   = f }  -> isNumFun f
