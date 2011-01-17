@@ -567,6 +567,8 @@ endif
 
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 BUILD_DIRS += libraries/integer-gmp/gmp
+else ifneq "$(findstring clean,$(MAKECMDGOALS))" ""
+BUILD_DIRS += libraries/integer-gmp/gmp
 endif
 
 BUILD_DIRS += \
@@ -1186,17 +1188,6 @@ clean : clean_files clean_libraries
 .PHONY: clean_files
 clean_files :
 	"$(RM)" $(RM_OPTS) $(CLEAN_FILES)
-
-ifneq "$(NO_CLEAN_GMP)" "YES"
-CLEAN_FILES += libraries/integer-gmp/gmp/gmp.h
-CLEAN_FILES += libraries/integer-gmp/gmp/libgmp.a
-
-clean : clean_gmp
-.PHONY: clean_gmp
-clean_gmp:
-	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/objs
-	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/gmpbuild
-endif
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES) $(PACKAGES_STAGE2))
