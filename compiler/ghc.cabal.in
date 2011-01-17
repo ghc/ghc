@@ -99,6 +99,8 @@ Library
                 TypeSynonymInstances, MultiParamTypeClasses,
                 FlexibleInstances, Rank2Types, ScopedTypeVariables,
                 DeriveDataTypeable
+    if impl(ghc >= 7.1)
+        Extensions: NondecreasingIndentation
 
     Include-Dirs: . parser utils
 
