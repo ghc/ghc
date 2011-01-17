@@ -47,4 +47,6 @@ Executable ghc
                     MagicHash
 
     Extensions: CPP, PatternGuards
+    if impl(ghc >= 7.1)
+        Extensions: NondecreasingIndentation
 
