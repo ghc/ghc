@@ -183,7 +183,7 @@ $(eval $(call all-target,libffi,libffi/dist-install/build/HSffi.o))
 
 ifeq "$(BuildSharedLibs)" "YES"
 ifeq "$(Windows)" "YES"
-libffi/libffi.dll.a $(libffi_HS_DYN_LIB): $(libffi_STAMP_BUILD)
+libffi/dist-install/build/libffi.dll.a $(libffi_HS_DYN_LIB): $(libffi_STAMP_BUILD)
 	@test -f $@ || { echo "$< exits, but $@ does not."; echo "Suggest removing $<."; exit 1; }
 
 # Windows libtool creates <soname>.dll, and as we already patched that
