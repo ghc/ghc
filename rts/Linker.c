@@ -13,8 +13,8 @@
 /* Linux needs _GNU_SOURCE to get RTLD_DEFAULT from <dlfcn.h> and
    MREMAP_MAYMOVE from <sys/mman.h>.
  */
-#ifdef __linux__
-#define _GNU_SOURCE
+#if defined(__linux__)  || defined(__GLIBC__)
+#define _GNU_SOURCE 1
 #endif
 
 #include "Rts.h"
@@ -72,7 +72,8 @@
 #if defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
     defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
     defined(openbsd_HOST_OS  ) || \
-    ( defined(darwin_HOST_OS ) && !defined(powerpc_HOST_ARCH) )
+    ( defined(darwin_HOST_OS ) && !defined(powerpc_HOST_ARCH) ) || \
+    defined(kfreebsdgnu_HOST_OS)
 /* Don't use mmap on powerpc-apple-darwin as mmap doesn't support
  * reallocating but we need to allocate jump islands just after each
  * object images. Otherwise relative branches to jump islands can fail
@@ -88,7 +89,7 @@
 
 #endif
 
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS)
 #  define OBJFORMAT_ELF
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
@@ -1589,7 +1590,7 @@ mmap_again:
        } else {
            if ((W_)result > 0x80000000) {
                // oops, we were given memory over 2Gb
-#if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS)
+#if defined(freebsd_HOST_OS)  || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS)
                // Some platforms require MAP_FIXED.  This is normally
                // a bad idea, because MAP_FIXED will overwrite
                // existing mappings.
