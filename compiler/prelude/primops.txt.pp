@@ -578,7 +578,7 @@ primtype MutableArray# s a
 
 primop  NewArrayOp "newArray#" GenPrimOp
    Int# -> a -> State# s -> (# State# s, MutableArray# s a #)
-   {Create a new mutable array of specified size (in words),
+   {Create a new mutable array with the specified number of elements,
     in the specified state thread,
     with each element containing the specified initial value.}
    with
