@@ -499,7 +499,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
  	find ((item, map (lookup_tv subst) dfun_tvs) : ms) us rest
 
 	-- Does not match, so next check whether the things unify
-	-- See Note [overlapping instances] above
+	-- See Note [Overlapping instances] above
       | Incoherent <- oflag
       = find ms us rest
 
