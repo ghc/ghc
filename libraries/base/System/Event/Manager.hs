@@ -14,6 +14,7 @@ module System.Event.Manager
     , loop
     , step
     , shutdown
+    , cleanup
     , wakeManager
 
       -- * Registering interest in I/O events

@@ -127,7 +127,17 @@ ensureIOManagerIsRunning
       s <- threadStatus t
       case s of
         ThreadFinished -> create
-        ThreadDied     -> create
+        ThreadDied     -> do 
+          -- Sanity check: if the thread has died, there is a chance
+          -- that event manager is still alive. This could happend during
+          -- the fork, for example. In this case we should clean up
+          -- open pipes and everything else related to the event manager.
+          -- See #4449
+          mem <- readIORef eventManager
+          _ <- case mem of
+                 Nothing -> return ()
+                 Just em -> M.cleanup em
+          create
         _other         -> return st
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
