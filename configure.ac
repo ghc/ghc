@@ -411,6 +411,7 @@ then
          test inplace/mingw -ot ghc-tarballs/mingw/binutils*.tar.lzma  ||
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-core*.tar.lzma  ||
          test inplace/mingw -ot ghc-tarballs/mingw/gcc-c++*.tar.lzma   ||
+         test inplace/mingw -ot ghc-tarballs/mingw/libgcc*.tar.gz      ||
          test inplace/mingw -ot ghc-tarballs/mingw/libgmp*.tar.gz      ||
          test inplace/mingw -ot ghc-tarballs/mingw/libmpc*.tar.gz      ||
          test inplace/mingw -ot ghc-tarballs/mingw/libmpfr*.tar.gz     ||
@@ -427,6 +428,7 @@ then
             tar --lzma -xf ../../ghc-tarballs/mingw/binutils*.tar.lzma  &&
             tar --lzma -xf ../../ghc-tarballs/mingw/gcc-core*.tar.lzma  &&
             tar --lzma -xf ../../ghc-tarballs/mingw/gcc-c++*.tar.lzma   &&
+            tar --lzma -xf ../../ghc-tarballs/mingw/libgcc*.tar.lzma    &&
             tar --lzma -xf ../../ghc-tarballs/mingw/libgmp*.tar.lzma    &&
             tar --lzma -xf ../../ghc-tarballs/mingw/libmpc*.tar.lzma    &&
             tar --lzma -xf ../../ghc-tarballs/mingw/libmpfr*.tar.lzma   &&
