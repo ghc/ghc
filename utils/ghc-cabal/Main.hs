@@ -376,9 +376,14 @@ generate config_args distdir directory
                 variablePrefix ++ "_DEP_LIB_DIRS = "   ++ unwords (wrap $ forDeps Installed.libraryDirs),
                 variablePrefix ++ "_DEP_EXTRA_LIBS = " ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions),
-                variablePrefix ++ "_BUILD_GHCI_LIB = " ++ boolToYesNo (withGHCiLib lbi)]
+                variablePrefix ++ "_BUILD_GHCI_LIB = " ++ boolToYesNo (withGHCiLib lbi),
+                "",
+                -- Sometimes we need to modify the automatically-generated package-data.mk
+                -- bindings in a special way for the GHC build system, so allow that here:
+                "$(eval $(" ++ directory ++ "_PACKAGE_MAGIC))",
+                ]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
-      writeFile (distdir ++ "/haddock-prologue.txt") $ 
+      writeFile (distdir ++ "/haddock-prologue.txt") $
           if null (description pd) then synopsis pd
                                    else description pd
   where

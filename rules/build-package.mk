@@ -125,10 +125,6 @@ endif
 
 ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_done)" "YES"
 
-# Sometimes we need to modify the automatically-generated package-data.mk
-# bindings in a special way for the GHC build system, so allow that here:
-$($1_PACKAGE_MAGIC)
-
 # Bootstrapping libs are only built one way
 ifeq "$3" "0"
 $1_$2_WAYS = v
