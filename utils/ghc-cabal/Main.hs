@@ -380,7 +380,7 @@ generate config_args distdir directory
                 "",
                 -- Sometimes we need to modify the automatically-generated package-data.mk
                 -- bindings in a special way for the GHC build system, so allow that here:
-                "$(eval $(" ++ directory ++ "_PACKAGE_MAGIC))",
+                "$(eval $(" ++ directory ++ "_PACKAGE_MAGIC))"
                 ]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
       writeFile (distdir ++ "/haddock-prologue.txt") $
