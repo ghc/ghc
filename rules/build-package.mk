@@ -64,6 +64,18 @@ define build-package-helper
 
 $(call package-config,$1,$2,$3)
 
+# Bootstrapping libs are only built one way
+ifeq "$3" "0"
+$1_$2_WAYS = v
+else
+$1_$2_WAYS = $$(GhcLibWays)
+endif
+
+# We must use a different dependency file if $(GhcLibWays) changes, so
+# encode the ways into the name of the file.
+$1_$2_WAYS_DASHED = $$(subst $$(space),,$$(patsubst %,-%,$$(strip $$($1_$2_WAYS))))
+$1_$2_depfile_base = $1/$2/build/.depend$$($1_$2_WAYS_DASHED)
+
 ########################################
 ifeq "$$($1_$2_CONFIGURE_PHASE)" ""
 $$(error No configure phase for $1_$2)
@@ -125,23 +137,11 @@ endif
 
 ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_done)" "YES"
 
-# Bootstrapping libs are only built one way
-ifeq "$3" "0"
-$1_$2_WAYS = v
-else
-$1_$2_WAYS = $$(GhcLibWays)
-endif
-
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 $(call includes-sources,$1,$2)
 
 # --- DEPENDENCIES
-
-# We must use a different dependency file if $(GhcLibWays) changes, so
-# encode the ways into the name of the file.
-$1_$2_WAYS_DASHED = $$(subst $$(space),,$$(patsubst %,-%,$$(strip $$($1_$2_WAYS))))
-$1_$2_depfile_base = $1/$2/build/.depend$$($1_$2_WAYS_DASHED)
 
 $(call build-dependencies,$1,$2,$3)
 

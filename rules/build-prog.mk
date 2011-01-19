@@ -54,6 +54,8 @@ endif
 
 $(call package-config,$1,$2,$3)
 
+$1_$2_depfile_base = $1/$2/build/.depend
+
 ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 $1_$2_INPLACE = $$(error $1_$2 should not be installed inplace, but INPLACE var evaluated)
@@ -155,8 +157,6 @@ $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 
 # --- DEPENDENCIES
-
-$1_$2_depfile_base = $1/$2/build/.depend
 
 $(call build-dependencies,$1,$2,$3)
 
