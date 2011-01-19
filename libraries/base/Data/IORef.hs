@@ -55,7 +55,8 @@ import NHC.IOExtras
 #endif
 
 #if defined(__GLASGOW_HASKELL__) && !defined(__PARALLEL_HASKELL__)
--- |Make a 'Weak' pointer to an 'IORef'
+-- |Make a 'Weak' pointer to an 'IORef', using the second argument as a finalizer
+-- to run when 'IORef' is garbage-collected
 mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
 mkWeakIORef r@(IORef (STRef r#)) f = IO $ \s ->
   case mkWeak# r# r f s of (# s1, w #) -> (# s1, Weak w #)
