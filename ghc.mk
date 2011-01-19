@@ -648,7 +648,9 @@ utils/touchy_dist_CONFIGURE_PHASE = 1
 # Finally, the stage1 compiler is used to make the dependencies for
 # everything else, so we can now build the rest.
 compiler_stage2_CONFIGURE_PHASE = 3
+compiler_stage3_CONFIGURE_PHASE = 3
 ghc_stage2_CONFIGURE_PHASE = 3
+ghc_stage3_CONFIGURE_PHASE = 3
 
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
   libraries/$(lib)_dist-install_CONFIGURE_PHASE = 3))
