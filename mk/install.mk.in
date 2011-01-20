@@ -161,8 +161,8 @@ INSTALL_DIR     = $(INSTALL) -m 755 -d $(call MK_INSTALL_DEST,$1)
 #
 # We therefore use a /cygdrive path if we are on cygwin (only)
 #   (This will make a Cygwin build run slowly 
-#    becuase of all those shell invocations.)
-ifeq "$OSTYPE" "cygwin" 
+#    because of all those shell invocations.)
+ifeq "$(OSTYPE)" "cygwin"
 MK_INSTALL_DEST = "$(shell cygpath $1)"
 else
 MK_INSTALL_DEST = $1
