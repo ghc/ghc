@@ -20,6 +20,8 @@ Cabal-Version: >= 1.2
 
 Flag ghci
     Description: Build GHCi support.
+    Default: False
+    Manual: True
 
 Executable ghc
     Main-Is: Main.hs
