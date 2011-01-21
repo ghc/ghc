@@ -35,6 +35,8 @@ Executable ghc
     else
         Build-Depends: unix
 
+    C-Sources: hschooks.c
+
     GHC-Options: -Wall
     if flag(ghci)
         CPP-Options: -DGHCI

@@ -52,28 +52,9 @@ ifeq "$(GhcProfiled)" "YES"
 ghc_stage2_MORE_HC_OPTS += -prof
 endif
 
-ghc_stage1_MODULES = Main
-
-ghc_stage2_MODULES = $(ghc_stage1_MODULES)
-ifeq "$(GhcWithInterpreter)" "YES"
-ghc_stage2_MODULES += GhciMonad GhciTags InteractiveUI
-endif
-ghc_stage3_MODULES = $(ghc_stage2_MODULES)
-
-ghc_stage1_C_SRCS = hschooks.c
-ghc_stage2_C_SRCS = hschooks.c
-ghc_stage3_C_SRCS = hschooks.c
-
 ghc_stage1_PROG = ghc-stage1$(exeext)
 ghc_stage2_PROG = ghc-stage2$(exeext)
 ghc_stage3_PROG = ghc-stage3$(exeext)
-
-# ToDo: perhaps use ghc-cabal to configure ghc-bin
-ghc_stage1_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage1_VERSION)
-ghc_stage2_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage2_VERSION)
-ghc_stage3_MORE_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSION)
-ghc_stage2_MORE_HC_OPTS += -package haskeline
-ghc_stage3_MORE_HC_OPTS += -package haskeline
 
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES
