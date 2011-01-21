@@ -1,0 +1,8 @@
+
+mdofail001.hs:10:36:
+    No instance for (Num Char)
+      arising from the literal `3'
+    Possible fix: add an instance declaration for (Num Char)
+    In the expression: 3
+    In the first argument of `l', namely `[1, 2, 3]'
+    In the expression: l [1, 2, 3]
