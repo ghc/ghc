@@ -858,7 +858,7 @@ hGetBufSome h ptr count
                                         -- that bufReadNBNonEmpty will not
                                         -- issue another read.
             else
-              bufReadNBEmpty h_ buf (castPtr ptr) 0 count
+              bufReadNBNonEmpty h_ buf (castPtr ptr) 0 count
 
 haFD :: Handle__ -> FD
 haFD h_@Handle__{..} =
