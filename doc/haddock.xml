@@ -936,7 +936,7 @@ $ pdflatex <replaceable>package</replaceable>.tex</screen>
 	    <literal>ignore-exports</literal> attribute (<xref
 	      linkend="module-attributes" />).  This might be useful for
 	    generating implementation documentation rather than interface
-	    documetnation, for example.</para>
+	    documentation, for example.</para>
 	</listitem>
       </varlistentry>
 
