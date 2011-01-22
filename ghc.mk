@@ -222,6 +222,7 @@ include rules/package-config.mk
 # Building dependencies
 
 include rules/build-dependencies.mk
+include rules/include-dependencies.mk
 
 # -----------------------------------------------------------------------------
 # Build package-data.mk files
@@ -602,71 +603,6 @@ ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += \
    $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 endif
-
-# -----------------------------------------------------------------------------
-# Phase handling
-
-phase_0_or_later = YES
-ifeq "$(findstring $(phase),0)" ""
-phase_0_done = YES
-phase_1_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1)" ""
-phase_1_done = YES
-phase_2_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1 2)" ""
-phase_2_done = YES
-phase_3_or_later = YES
-endif
-ifeq "$(findstring $(phase),0 1 2 3)" ""
-phase_3_done = YES
-endif
-
-includes_dist-derivedconstants_CONFIGURE_PHASE = 0
-includes_dist-ghcconstants_CONFIGURE_PHASE = 0
-
-# We do these first, as making the sources for some later
-# packages needs them, and we need the sources before we can
-# work out dependencies
-utils/hsc2hs_dist_CONFIGURE_PHASE = 0
-utils/unlit_dist_CONFIGURE_PHASE = 0
-utils/genprimopcode_dist_CONFIGURE_PHASE = 0
-
-# Then the bootlibs
-$(foreach lib,$(STAGE0_PACKAGES),$(eval \
-  libraries/$(lib)_dist-boot_CONFIGURE_PHASE = 1))
-compiler_stage1_CONFIGURE_PHASE = 1
-ghc_stage1_CONFIGURE_PHASE = 1
-driver/ghc_dist_CONFIGURE_PHASE = 1
-driver/ghci_dist_CONFIGURE_PHASE = 1
-driver/haddock_dist_CONFIGURE_PHASE = 1
-utils/touchy_dist_CONFIGURE_PHASE = 1
-
-# In phase 2, the phase 1 things actually get built
-
-# Finally, the stage1 compiler is used to make the dependencies for
-# everything else, so we can now build the rest.
-compiler_stage2_CONFIGURE_PHASE = 3
-compiler_stage3_CONFIGURE_PHASE = 3
-ghc_stage2_CONFIGURE_PHASE = 3
-ghc_stage3_CONFIGURE_PHASE = 3
-
-$(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),$(eval \
-  libraries/$(lib)_dist-install_CONFIGURE_PHASE = 3))
-
-utils/hp2ps_dist_CONFIGURE_PHASE = 3
-utils/genapply_dist_CONFIGURE_PHASE = 3
-utils/haddock_dist_CONFIGURE_PHASE = 3
-utils/hsc2hs_dist-install_CONFIGURE_PHASE = 3
-utils/ghc-pkg_dist-install_CONFIGURE_PHASE = 3
-utils/hpc_dist_CONFIGURE_PHASE = 3
-utils/runghc_dist_CONFIGURE_PHASE = 3
-utils/ghctags_dist_CONFIGURE_PHASE = 3
-utils/ghc-pwd_dist_CONFIGURE_PHASE = 3
-utils/ghc-cabal_dist-install_CONFIGURE_PHASE = 3
-utils/mkUserGuidePart_dist_CONFIGURE_PHASE = 3
-utils/compare_sizes_dist_CONFIGURE_PHASE = 3
 
 # ----------------------------------------------
 # Actually include all the sub-ghc.mk's
@@ -1255,4 +1191,16 @@ bootstrapping-files: includes/DerivedConstants.h
 bootstrapping-files: includes/GHCConstants.h
 
 .DELETE_ON_ERROR:
+
+# -----------------------------------------------------------------------------
+# Numbered phase targets
+
+.PHONY: phase_0_builds
+phase_0_builds: $(utils/hsc2hs_dist_depfile_haskell)
+phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
+phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)
+phase_0_builds: $(utils/genprimopcode_dist_depfile_c_asm)
+
+.PHONY: phase_1_builds
+phase_1_builds: $(PACKAGE_DATA_MKS)
 

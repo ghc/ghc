@@ -62,6 +62,7 @@ ifeq "$3" "0"
 $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
 
+ifneq "$$(BINDIST)" "YES"
 $1/$2/inplace-pkg-config : $1/$2/package-data.mk
 $1/$2/build/autogen/cabal_macros.h : $1/$2/package-data.mk
 
@@ -75,5 +76,8 @@ ifneq "$$($1_$2_REGISTER_PACKAGE)" "NO"
 	"$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
 endif
 endif
+endif
+
+PACKAGE_DATA_MKS += $1/$2/package-data.mk
 
 endef

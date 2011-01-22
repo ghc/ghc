@@ -61,18 +61,10 @@ REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framewor
 .PHONY: $(REALGOALS)
 $(REALGOALS) all: mk/config.mk.old mk/project.mk.old compiler/ghc.cabal.old
 	@echo "===--- building phase 0"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 all
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=0 phase_0_builds
 ifneq "$(OMIT_PHASE_1)" "YES"
 	@echo "===--- building phase 1"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 all
-endif
-ifneq "$(OMIT_PHASE_2)" "YES"
-	@echo "===--- building phase 2"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=2 all
-endif
-ifneq "$(OMIT_PHASE_3)" "YES"
-	@echo "===--- building phase 3"
-	$(MAKE) -r --no-print-directory -f ghc.mk phase=3 all
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 phase_1_builds
 endif
 	@echo "===--- building final phase"
 	$(MAKE) -r --no-print-directory -f ghc.mk $@

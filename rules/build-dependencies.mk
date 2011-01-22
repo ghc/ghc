@@ -68,22 +68,6 @@ endif # $1_$2_NO_BUILD_DEPS
 # Note sed magic above: mkdependC can't do -odir stuff, so we have to
 # munge the dependencies it generates to refer to the correct targets.
 
-# Seems as good a place as any to attach the unlit dependency
-$$($1_$2_depfile_haskell) : $$(UNLIT)
-
-ifneq "$$(NO_INCLUDE_DEPS)" "YES"
-ifneq "$$(strip $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS))" ""
-ifneq "$$(NO_STAGE$3_DEPS)" "YES"
-include $$($1_$2_depfile_haskell)
-endif
-endif
-include $$($1_$2_depfile_c_asm)
-else
-ifeq "$$(DEBUG)" "YES"
-$$(warning not building dependencies in $1)
-endif
-endif
-
 endef
 
 # This comment is outside the "define addCFileDeps" as that definition

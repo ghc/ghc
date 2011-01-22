@@ -76,51 +76,60 @@ endif
 $1_$2_WAYS_DASHED = $$(subst $$(space),,$$(patsubst %,-%,$$(strip $$($1_$2_WAYS))))
 $1_$2_depfile_base = $1/$2/build/.depend$$($1_$2_WAYS_DASHED)
 
-########################################
-ifeq "$$($1_$2_CONFIGURE_PHASE)" ""
-$$(error No configure phase for $1_$2)
-else ifeq "$$($1_$2_CONFIGURE_PHASE)" "$$(phase)"
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 configure phase)
-endif
-
-ifneq "$$(BINDIST)" "YES"
 $(call build-package-data,$1,$2,$3)
-endif
-
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+ifeq "$3" "0"
+include $1/$2/package-data.mk
+else ifeq "$(phase)" ""
 include $1/$2/package-data.mk
 endif
-
-else ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_or_later)" "YES"
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 build phase)
 endif
 
-ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
-include $1/$2/package-data.mk
-ifeq "$$($1_$2_VERSION)" ""
-$$(error No version for $1_$2 found)
+# We don't bother splitting the bootstrap packages (built with stage 0)
+ifeq "$$($1_$2_SplitObjs)" ""
+ifeq "$$(SplitObjs) $3" "YES 1"
+$1_$2_SplitObjs = YES
+else
+$1_$2_SplitObjs = NO
 endif
+endif
+
+$(call hs-sources,$1,$2)
+$(call c-sources,$1,$2)
+$(call includes-sources,$1,$2)
+
+# --- DEPENDENCIES
+# We always have the dependency rules available, as we need to know
+# how to build hsc2hs's dependency file in phase 0
+$(call build-dependencies,$1,$2,$3)
+ifneq "$(phase)" "0"
+# From phase 1 we actually include the dependency files for the
+# bootstrapping stuff
+ifeq "$3" "0"
+$(call include-dependencies,$1,$2,$3)
+else ifeq "$(phase)" ""
+# In the final phase, we also include the dependency files for
+# everything else
+$(call include-dependencies,$1,$2,$3)
+endif
+endif
+
+# Now generate all the build rules for each way in this directory:
+$$(foreach way,$$($1_$2_WAYS),$$(eval \
+    $$(call c-objs,$1,$2,$$(way)) \
+    $$(call c-suffix-rules,$1,$2,$$(way),YES) \
+    $$(call cmm-objs,$1,$2,$$(way)) \
+    $$(call cmm-suffix-rules,$1,$2,$$(way)) \
+    $$(call build-package-way,$1,$2,$$(way),$3) \
+  ))
+
+# C and S files are possibly built the "dyn" way.
+ifeq "$$(BuildSharedLibs)" "YES"
+$(call c-objs,$1,$2,dyn)
+$(call c-suffix-rules,$1,$2,dyn,YES)
 endif
 
 $(call all-target,$1,all_$1_$2)
-
-else
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 disabled phase)
-endif
-
-endif
-########################################
-
-# We don't install things compiled by stage 0, so no need to put them
-# in the bindist.
-ifneq "$$(BINDIST) $3" "YES 0"
-
 # This give us things like
 #     all_libraries: all_libraries/base_dist-install
 ifneq "$$($1_$2_GROUP)" ""
@@ -135,52 +144,12 @@ check_$1: $$(GHC_CABAL_INPLACE)
 	$$(GHC_CABAL_INPLACE) check $1
 endif
 
-ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_done)" "YES"
-
-$(call hs-sources,$1,$2)
-$(call c-sources,$1,$2)
-$(call includes-sources,$1,$2)
-
-# --- DEPENDENCIES
-
-$(call build-dependencies,$1,$2,$3)
-
-# --- BUILDING
-
-# We don't bother splitting the bootstrap packages (built with stage 0)
-ifeq "$$($1_$2_SplitObjs)" ""
-ifeq "$$(SplitObjs) $3" "YES 1"
-$1_$2_SplitObjs = YES
-else
-$1_$2_SplitObjs = NO
-endif
-endif
-
-# C and S files are possibly built the "dyn" way.
-ifeq "$$(BuildSharedLibs)" "YES"
-$(call c-objs,$1,$2,dyn)
-$(call c-suffix-rules,$1,$2,dyn,YES)
-endif
-
-# Now generate all the build rules for each way in this directory:
-$$(foreach way,$$($1_$2_WAYS),$$(eval \
-    $$(call c-objs,$1,$2,$$(way)) \
-	$$(call c-suffix-rules,$1,$2,$$(way),YES) \
-    $$(call cmm-objs,$1,$2,$$(way)) \
-    $$(call cmm-suffix-rules,$1,$2,$$(way)) \
-    $$(call build-package-way,$1,$2,$$(way),$3) \
-  ))
-
 $(call haddock,$1,$2)
-
-endif # package-data.mk exists
 
 # Don't put bootstrapping packages in the bindist
 ifneq "$3" "0"
 BINDIST_EXTRAS += $1/*.cabal $$(wildcard $1/*.buildinfo) $1/$2/setup-config $1/LICENSE
 BINDIST_EXTRAS += $$($1_$2_INSTALL_INCLUDES_SRCS)
-endif
-
 endif
 
 endef

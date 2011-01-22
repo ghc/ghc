@@ -29,9 +29,7 @@ else
 $1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
 endif
 
-ifeq "$$(phase_1_or_later)" "YES"
 $(call all-target,$1_$2,$$($1_$2_INPLACE))
-endif
 
 $(call clean-target,$1,$2,$1/$2 $$($1_$2_INPLACE))
 .PHONY: clean_$1

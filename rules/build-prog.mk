@@ -75,44 +75,13 @@ endif
 endif
 endif
 
-########################################
-ifeq "$$($1_$2_CONFIGURE_PHASE)" ""
-$$(error No configure phase for $1_$2)
-else ifeq "$$($1_$2_CONFIGURE_PHASE)" "$$(phase)"
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 configure phase)
-endif
-
-ifneq "$$(BINDIST)" "YES"
+ifeq "$$($1_$2_USES_CABAL)" "YES"
 $(call build-package-data,$1,$2,$3)
-endif
-
-ifeq "$$($1_$2_USES_CABAL)" "YES"
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+ifeq "$3" "0"
 include $1/$2/package-data.mk
-endif
-endif
-
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$$($1_$2_INPLACE) :
-	$$(error $1_$2 is configuring, but trying to build $$($1_$2_INPLACE)")
-endif
-endif
-
-else ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_or_later)" "YES"
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 build phase)
-endif
-
-ifeq "$$($1_$2_USES_CABAL)" "YES"
-ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+else ifeq "$(phase)" ""
 include $1/$2/package-data.mk
-ifeq "$$($1_$2_VERSION)" ""
-$$(error No version for $1_$2 found)
 endif
 endif
 endif
@@ -129,36 +98,12 @@ $$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
 endif
 endif
 
-else
-
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 disabled phase)
-endif
-
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$$($1_$2_INPLACE) :
-	$$(error $1_$2 is disabled, but trying to build $$($1_$2_INPLACE)")
-endif
-endif
-
-endif
-########################################
-
 $(call shell-wrapper,$1,$2)
 
-ifeq "$$(phase_$$($1_$2_CONFIGURE_PHASE)_done)" "YES"
-
-ifneq "$$(BINDIST)" "YES"
 $1_$2_WAYS = v
 
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
-
-# --- DEPENDENCIES
-
-$(call build-dependencies,$1,$2,$3)
 
 # --- IMPLICIT RULES
 
@@ -192,6 +137,7 @@ ifeq "$$($1_$2_v_HS_OBJS)" ""
 $1_$2_GHC_LD_OPTS = -no-auto-link-packages -no-hs-main
 endif
 
+ifneq "$$(BINDIST)" "YES"
 # The quadrupled $'s here are because the _v_LIB variables aren't
 # necessarily set when this part of the makefile is read
 $1/$2/build/tmp/$$($1_$2_PROG) : \
@@ -225,14 +171,12 @@ endif
 $1/$2/build/tmp/$$($1_$2_PROG) : $$(ALL_STAGE1_LIBS) $$(ALL_RTS_LIBS) $$(OTHER_LIBS)
 endif
 endif
+endif
 
 ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 $(call all-target,$1_$2,$$($1_$2_INPLACE))
 endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
-
-# touch is necessary; cp doesn't update the file time.
-endif
 
 ifeq "$$($1_$2_INSTALL)" "YES"
 ifeq "$$($1_$2_TOPDIR)" "YES"
@@ -242,6 +186,20 @@ INSTALL_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
 endif
 endif
 
-endif # package-data.mk exists
+# --- DEPENDENCIES
+# We always have the dependency rules available, as we need to know
+# how to build hsc2hs's dependency file in phase 0
+$(call build-dependencies,$1,$2,$3)
+ifneq "$(phase)" "0"
+# From phase 1 we actually include the dependency files for the
+# bootstrapping stuff
+ifeq "$3" "0"
+$(call include-dependencies,$1,$2,$3)
+else ifeq "$(phase)" ""
+# In the final phase, we also include the dependency files for
+# everything else
+$(call include-dependencies,$1,$2,$3)
+endif
+endif
 
 endef
