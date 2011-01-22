@@ -246,7 +246,7 @@ ppHtmlContents odir doctitle _maybe_package
 ppPrologue :: String -> Maybe (Doc GHC.RdrName) -> Html
 ppPrologue _ Nothing = noHtml
 ppPrologue title (Just doc) =
-  docElement divDescription << (h1 << title +++ rdrDocToHtml doc)
+  divDescription << (h1 << title +++ docElement thediv (rdrDocToHtml doc))
 
 
 ppModuleTree :: [ModuleTree] -> Html
