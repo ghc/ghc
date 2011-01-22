@@ -35,12 +35,13 @@ else
 ALL_DIRS += posix
 endif
 
+EXCLUDED_SRCS :=
 EXCLUDED_SRCS += rts/Main.c
 EXCLUDED_SRCS += rts/parallel/SysMan.c
 EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
 
-rts_C_SRCS = $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
-rts_CMM_SRCS = $(wildcard rts/*.cmm)
+rts_C_SRCS := $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
+rts_CMM_SRCS := $(wildcard rts/*.cmm)
 
 # Don't compile .S files when bootstrapping a new arch
 ifneq "$(PORTING_HOST)" "YES"
@@ -67,7 +68,7 @@ rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c | $$(dir $$@)/.
 rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
 	cp $< $@
 
-rts_H_FILES = $(wildcard includes/*.h) $(wildcard rts/*.h)
+rts_H_FILES := $(wildcard includes/*.h) $(wildcard rts/*.h)
 
 ifeq "$(USE_DTRACE)" "YES"
 DTRACEPROBES_H = rts/dist/build/RtsProbes.h
