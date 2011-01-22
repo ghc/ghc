@@ -33,7 +33,7 @@ clean_gmp:
 	"$(RM)" $(RM_OPTS_REC) libraries/integer-gmp/gmp/gmpbuild
 endif
 
-ifeq "$(phase_3_done)" "YES"
+ifeq "$(phase)" ""
 
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 include libraries/integer-gmp/gmp/config.mk
