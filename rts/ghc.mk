@@ -68,7 +68,7 @@ rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c | $$(dir $$@)/.
 rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
 	cp $< $@
 
-rts_H_FILES := $(wildcard includes/*.h) $(wildcard rts/*.h)
+rts_H_FILES := $(wildcard rts/*.h)
 
 ifeq "$(USE_DTRACE)" "YES"
 DTRACEPROBES_H = rts/dist/build/RtsProbes.h
