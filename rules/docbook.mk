@@ -15,6 +15,7 @@
 
 define docbook
 $(call trace, docbook($1,$2))
+$(call profStart, docbook($1,$2))
 # $1 = dir
 # $2 = docname
 
@@ -80,5 +81,6 @@ $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	[ -f $$@ ]
 endif
 
+$(call profEnd, docbook($1,$2))
 endef
 

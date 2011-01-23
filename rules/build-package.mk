@@ -30,6 +30,7 @@
 
 define build-package
 $(call trace, build-package($1,$2,$3))
+$(call profStart, build-package($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -52,6 +53,7 @@ clean_$1_$2_config:
 ifneq "$$($1_$2_NOT_NEEDED)" "YES"
 $$(eval $$(call build-package-helper,$1,$2,$3))
 endif
+$(call profEnd, build-package($1,$2,$3))
 endef
 
 

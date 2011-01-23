@@ -12,6 +12,7 @@
 
 define include-dependencies
 $(call trace, include-dependencies($1,$2,$3))
+$(call profStart, include-dependencies($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -29,5 +30,6 @@ $$(warning not building dependencies in $1)
 endif
 endif
 
+$(call profEnd, include-dependencies($1,$2,$3))
 endef
 

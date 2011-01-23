@@ -21,6 +21,7 @@
 
 define build-prog
 $(call trace, build-prog($1,$2,$3))
+$(call profStart, build-prog($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -40,6 +41,7 @@ $(call clean-target,$1,$2,$1/$2)
 ifneq "$$($1_$2_NOT_NEEDED)" "YES"
 $$(eval $$(call build-prog-helper,$1,$2,$3))
 endif
+$(call profEnd, build-prog($1,$2,$3))
 endef
 
 

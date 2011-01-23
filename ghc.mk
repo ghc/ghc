@@ -139,6 +139,7 @@ endif
 # -----------------------------------------------------------------------------
 # Utility definitions
 
+include rules/prof.mk
 include rules/trace.mk
 include rules/make-command.mk
 

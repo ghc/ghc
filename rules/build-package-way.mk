@@ -13,6 +13,7 @@
 
 define build-package-way # $1 = dir, $2 = distdir, $3 = way, $4 = stage
 $(call trace, build-package-way($1,$2,$3))
+$(call profStart, build-package-way($1,$2,$3))
 
 $(call distdir-way-opts,$1,$2,$3,$4)
 $(call hs-suffix-rules,$1,$2,$3)
@@ -130,5 +131,6 @@ endif
 endif
 endif
 
+$(call profEnd, build-package-way($1,$2,$3))
 endef
 

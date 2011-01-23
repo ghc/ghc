@@ -13,6 +13,7 @@
 
 define package-config # args: $1 = dir, $2 = distdir, $3 = GHC stage
 $(call trace, package-config($1,$2,$3))
+$(call profStart, package-config($1,$2,$3))
 
 $1_$2_HC = $$(GHC_STAGE$3)
 
@@ -55,4 +56,5 @@ endif
 # Useful later
 $1_$2_SLASH_MODS = $$(subst .,/,$$($1_$2_MODULES))
 
+$(call profEnd, package-config($1,$2,$3))
 endef

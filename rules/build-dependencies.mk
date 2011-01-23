@@ -12,6 +12,7 @@
 
 define build-dependencies
 $(call trace, build-dependencies($1,$2,$3))
+$(call profStart, build-dependencies($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -73,6 +74,7 @@ endif # $1_$2_NO_BUILD_DEPS
 # Note sed magic above: mkdependC can't do -odir stuff, so we have to
 # munge the dependencies it generates to refer to the correct targets.
 
+$(call profEnd, build-dependencies($1,$2,$3))
 endef
 
 # This comment is outside the "define addCFileDeps" as that definition

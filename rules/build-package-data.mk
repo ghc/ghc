@@ -12,6 +12,7 @@
 
 define build-package-data
 $(call trace, build-package-data($1,$2,$3))
+$(call profStart, build-package-data($1,$2,$3))
 # args:
 # $1 = dir
 # $2 = distdir
@@ -80,4 +81,5 @@ endif
 
 PACKAGE_DATA_MKS += $1/$2/package-data.mk
 
+$(call profEnd, build-package-data($1,$2,$3))
 endef
