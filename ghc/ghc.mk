@@ -20,6 +20,7 @@ ghc_stage3_CONFIGURE_OPTS += --flags=stage3
 
 ifeq "$(GhcWithInterpreter)" "YES"
 ghc_stage2_CONFIGURE_OPTS += --flags=ghci
+ghc_stage3_CONFIGURE_OPTS += --flags=ghci
 endif
 
 ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
@@ -33,11 +34,6 @@ ghc_stage1_C_FILES_NODEPS = ghc/hschooks.c
 
 ghc_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 ghc_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
-
-ifeq "$(GhcWithInterpreter)" "YES"
-ghc_stage2_MORE_HC_OPTS += -DGHCI
-ghc_stage3_MORE_HC_OPTS += -DGHCI
-endif
 
 ifeq "$(GhcDebugged)" "YES"
 ghc_stage1_MORE_HC_OPTS += -debug
