@@ -26,6 +26,10 @@ $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
 
 ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
 
+# Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
+# indirectly) include the generated includes files.
+$$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
+
 $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
 	"$$(RM)" $$(RM_OPTS) $$@.tmp
 	touch $$@.tmp
@@ -45,7 +49,8 @@ endif
 #    like bad rules, due to the two colons, so we filter them out.
 	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@
 
-# Some of the C files depend on the generated includes files.
+# Some of the C files (directly or indirectly) include the generated
+# includes files.
 $$($1_$2_depfile_c_asm) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 
 $$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) | $$$$(dir $$$$@)/.
