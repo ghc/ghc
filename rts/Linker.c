@@ -40,6 +40,7 @@
 #include <sys/types.h>
 #endif
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -4652,8 +4653,8 @@ static int relocateSection(
         }
 
         IF_DEBUG(linker,
-                 debugBelch("relocateSection: length = %d, thing = %d, baseValue = %p\n",
-                            reloc->r_length, thing, baseValue));
+                 debugBelch("relocateSection: length = %d, thing = %" PRId64 ", baseValue = %p\n",
+                            reloc->r_length, thing, (char *)baseValue));
 
         if (type == X86_64_RELOC_GOT
            || type == X86_64_RELOC_GOT_LOAD)
