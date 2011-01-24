@@ -40,7 +40,7 @@ endif
 # for a feature it may not generate warning-free C code, and thus may
 # think that the feature doesn't exist if -Werror is on.
 $1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$(filter-out -Werror,$$(SRC_CC_OPTS)) $$(CONF_CC_OPTS_STAGE$3) $$($1_CC_OPTS) $$($1_$2_CC_OPTS)"
-$1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$(CONF_LD_OPTS_STAGE$3) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
+$1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$(CONF_GCC_LINKER_OPTS_STAGE$3) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
 $1_$2_CONFIGURE_OPTS += --configure-option=CPPFLAGS="$$(SRC_CPP_OPTS) $$(CONF_CPP_OPTS_STAGE$3) $$($1_CPP_OPTS) $$($1_$2_CPP_OPTS)"
 
 ifneq "$$(ICONV_INCLUDE_DIRS)" ""

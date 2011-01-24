@@ -109,7 +109,7 @@ $1_$2_DIST_LD_LIB_DIRS:=$$(shell for i in $$($1_$2_DEP_LIB_DIRS); do echo \"-L$$
 endif
 
 $1_$2_DIST_LD_OPTS = \
- $$(CONF_LD_OPTS_STAGE$4) \
+ $$(CONF_GCC_LINKER_OPTS_STAGE$4) \
  $$(SRC_LD_OPTS) \
  $$($1_LD_OPTS) \
  $$($1_$2_LD_OPTS) \

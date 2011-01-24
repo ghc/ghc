@@ -119,7 +119,7 @@ $(libffi_STAMP_CONFIGURE):
 	    AR=$(AR) \
 	    NM=$(NM) \
         CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -w" \
-        LDFLAGS="$(SRC_LD_OPTS) $(CONF_LD_OPTS_STAGE1) -w" \
+        LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \

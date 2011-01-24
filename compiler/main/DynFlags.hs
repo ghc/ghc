@@ -2296,6 +2296,7 @@ compilerInfo = [("Project name",                String cProjectName),
                 ("LibDir",                      FromDynFlags topDir),
                 ("Global Package DB",           FromDynFlags systemPackageConfig),
                 ("C compiler flags",            String (show cCcOpts)),
-                ("Linker flags",                String (show cLdOpts))
+                ("Gcc Linker flags",            String (show cGccLinkerOpts)),
+                ("Ld Linker flags",             String (show cLdLinkerOpts))
                ]
 
