@@ -7,7 +7,7 @@ test    ('dph-primespj-opt'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -funbox-strict-fields -fcpr-off -package dph-par -package dph-prim-par'])
+          , '-Odph -fdph-par'])
 
 test    ('dph-primespj-fast' 
         , [ reqlib('dph-par')
@@ -15,6 +15,6 @@ test    ('dph-primespj-fast'
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-rewrite-rules -package dph-par -package dph-prim-par'])
+          , '-O -fno-enable-rewrite-rules -fdph-par'])
 
 

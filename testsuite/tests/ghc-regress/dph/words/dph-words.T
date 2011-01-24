@@ -7,7 +7,7 @@ test    ('dph-words-opt'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -funbox-strict-fields -fcpr-off -package dph-par -package dph-prim-par'])
+          , '-Odph -fdph-par'])
 
 
 test    ('dph-words-fast' 
@@ -16,6 +16,6 @@ test    ('dph-words-fast'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-O -fno-rewrite-rules -package dph-par -package dph-prim-par'])
+          , '-O -fno-enable-rewrite-rules -fdph-par'])
 
 
