@@ -48,8 +48,8 @@ import StgCmmMonad
 import SMRep
 
 import StgSyn
-import Cmm
-import MkZipCfgCmm
+import CmmExpr
+import MkGraph
 import CmmUtils
 import CLabel
 

@@ -61,10 +61,9 @@ import Id
 import IdInfo
 import Constants
 import SMRep
-import PprCmm		( {- instances -} )
-import Cmm
+import OldCmm
+import OldCmmUtils
 import CLabel
-import CmmUtils
 import ForeignCall
 import ClosureInfo
 import StgSyn (SRT(..))
@@ -1081,9 +1080,9 @@ get_Regtable_addr_from_offset rep offset =
 fixStgRegisters :: RawCmmTop -> RawCmmTop
 fixStgRegisters top@(CmmData _ _) = top
 
-fixStgRegisters (CmmProc info lbl params (ListGraph blocks)) =
+fixStgRegisters (CmmProc info lbl (ListGraph blocks)) =
   let blocks' = map fixStgRegBlock blocks
-  in CmmProc info lbl params $ ListGraph blocks'
+  in CmmProc info lbl $ ListGraph blocks'
 
 fixStgRegBlock :: CmmBasicBlock -> CmmBasicBlock
 fixStgRegBlock (BasicBlock id stmts) =

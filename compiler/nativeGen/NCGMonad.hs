@@ -120,7 +120,7 @@ addImportNat imp
 getBlockIdNat :: NatM BlockId
 getBlockIdNat 
  = do	u <- getUniqueNat
- 	return (BlockId u)
+ 	return (mkBlockId u)
 
 
 getNewLabelNat :: NatM CLabel

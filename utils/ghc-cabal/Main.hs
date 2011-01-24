@@ -11,7 +11,7 @@ import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
 import Distribution.Simple.Program.HcPkg
-import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic)
+import Distribution.Simple.Utils (defaultPackageDesc, writeFileAtomic, toUTF8)
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
 import Distribution.Text
@@ -298,7 +298,7 @@ generate config_args distdir directory
                                   Installed.haddockHTMLs = ["../" ++ display (packageId pd)]
                               }
                   content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
-              writeFileAtomic (distdir </> "inplace-pkg-config") content
+              writeFileAtomic (distdir </> "inplace-pkg-config") (toUTF8 content)
           _ -> error "Inconsistent lib components; can't happen?"
 
       let

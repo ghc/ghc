@@ -102,7 +102,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Cmm hiding (RegSet)
+import OldCmm hiding (RegSet)
 
 import Digraph
 import Unique
@@ -132,11 +132,11 @@ regAlloc (CmmData sec d)
 		( CmmData sec d
 		, Nothing )
 	
-regAlloc (CmmProc (LiveInfo info _ _ _) lbl params [])
-	= return ( CmmProc info lbl params (ListGraph [])
+regAlloc (CmmProc (LiveInfo info _ _ _) lbl [])
+	= return ( CmmProc info lbl (ListGraph [])
 		 , Nothing )
 	
-regAlloc (CmmProc static lbl params sccs)
+regAlloc (CmmProc static lbl sccs)
 	| LiveInfo info (Just first_id) (Just block_live) _	<- static
 	= do	
  		-- do register allocation on each component.
@@ -148,11 +148,11 @@ regAlloc (CmmProc static lbl params sccs)
 		let ((first':_), rest')
 				= partition ((== first_id) . blockId) final_blocks
 
-		return	( CmmProc info lbl params (ListGraph (first' : rest'))
+		return	( CmmProc info lbl (ListGraph (first' : rest'))
 			, Just stats)
 	
 -- bogus. to make non-exhaustive match warning go away.
-regAlloc (CmmProc _ _ _ _)
+regAlloc (CmmProc _ _ _)
 	= panic "RegAllocLinear.regAlloc: no match"
 
 
@@ -228,7 +228,7 @@ process first_id block_live (b@(BasicBlock id _) : blocks)
  = do 	
 	block_assig <- getBlockAssigR
 
-    	if isJust (lookupBlockEnv block_assig id) 
+    	if isJust (mapLookup id block_assig) 
              || id == first_id
          then do 
 		b'  <- processBlock block_live b
@@ -259,7 +259,7 @@ processBlock block_live (BasicBlock id instrs)
 initBlock :: BlockId -> RegM ()
 initBlock id
  = do	block_assig	<- getBlockAssigR
-  	case lookupBlockEnv block_assig id of
+  	case mapLookup id block_assig of
 	        -- no prior info about this block: assume everything is
 	        -- free and the assignment is empty.
 	 	Nothing

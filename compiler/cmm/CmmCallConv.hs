@@ -8,9 +8,10 @@ module CmmCallConv (
 
 #include "HsVersions.h"
 
-import Cmm
+import CmmExpr
 import SMRep
-import ZipCfgCmmRep (Convention(..))
+import Cmm (Convention(..))
+import PprCmm ()
 
 import Constants
 import qualified Data.List as L

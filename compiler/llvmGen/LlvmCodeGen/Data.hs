@@ -13,7 +13,7 @@ import LlvmCodeGen.Base
 
 import BlockId
 import CLabel
-import Cmm
+import OldCmm
 
 import FastString
 import qualified Outputable

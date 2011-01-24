@@ -51,10 +51,11 @@ module StgCmmMonad (
 
 import StgCmmClosure
 import DynFlags
-import MkZipCfgCmm
-import ZipCfgCmmRep (UpdFrameOffset)
+import MkGraph
 import BlockId
-import Cmm
+import CmmDecl
+import CmmExpr
+import CmmNode (UpdFrameOffset)
 import CLabel
 import TyCon	( PrimRep )
 import SMRep
@@ -243,7 +244,7 @@ data CgState
   = MkCgState {
      cgs_stmts :: CmmAGraph,	  -- Current procedure
 
-     cgs_tops  :: OrdList CmmTopZ,
+     cgs_tops  :: OrdList CmmTop,
 	-- Other procedures and data blocks in this compilation unit
 	-- Both are ordered only so that we can 
 	-- reduce forward references, when it's easy to do so
@@ -599,25 +600,25 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProcWithConvention :: Convention -> CmmInfo -> CLabel -> CmmFormals ->
+emitProcWithConvention :: Convention -> CmmInfoTable -> CLabel -> CmmFormals ->
                           CmmAGraph -> FCode ()
 emitProcWithConvention conv info lbl args blocks
   = do  { us <- newUniqSupply
-        ; let (uniq, us') = takeUniqFromSupply us
-              (offset, entry) = mkEntry (mkBlockId uniq) conv args
-              blks = initUs_ us' $ lgraphOfAGraph $ entry <*> blocks
-        ; let proc_block = CmmProc info lbl args ((offset, Just initUpdFrameOff), blks)
+        ; let (offset, entry) = mkCallEntry conv args
+              blks = initUs_ us $ lgraphOfAGraph $ entry <*> blocks
+        ; let sinfo = StackInfo {arg_space = offset, updfr_space = Just initUpdFrameOff}
+              proc_block = CmmProc (TopInfo {info_tbl=info, stack_info=sinfo}) lbl blks
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
-emitProc :: CmmInfo -> CLabel -> CmmFormals -> CmmAGraph -> FCode ()
+emitProc :: CmmInfoTable -> CLabel -> CmmFormals -> CmmAGraph -> FCode ()
 emitProc = emitProcWithConvention NativeNodeCall
 
 emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()
 emitSimpleProc lbl code = 
-  emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] code
+  emitProc CmmNonInfoTable lbl [] code
 
-getCmm :: FCode () -> FCode CmmZ
+getCmm :: FCode () -> FCode Cmm
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)

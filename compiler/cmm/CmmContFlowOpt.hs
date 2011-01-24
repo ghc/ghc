@@ -1,88 +1,84 @@
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations -fno-warn-incomplete-patterns #-}
 
 module CmmContFlowOpt
-    ( runCmmOpts, cmmCfgOpts, cmmCfgOptsZ
-    , branchChainElimZ, removeUnreachableBlocksZ, predMap
-    , replaceLabelsZ, replaceBranches, runCmmContFlowOptsZs
+    ( runCmmOpts, oldCmmCfgOpts, cmmCfgOpts
+    , branchChainElim, removeUnreachableBlocks, predMap
+    , replaceLabels, replaceBranches, runCmmContFlowOpts
     )
 where
 
 import BlockId
 import Cmm
-import CmmTx
-import qualified ZipCfg as G
-import ZipCfg
-import ZipCfgCmmRep
+import CmmDecl
+import CmmExpr
+import qualified OldCmm as Old
 
 import Maybes
+import Compiler.Hoopl
 import Control.Monad
 import Outputable
-import Prelude hiding (unzip, zip)
+import Prelude hiding (succ, unzip, zip)
 import Util
 
 ------------------------------------
-runCmmContFlowOptsZs :: [CmmZ] -> [CmmZ]
-runCmmContFlowOptsZs prog
-  = [ runTx (runCmmOpts cmmCfgOptsZ) cmm_top
-    | cmm_top <- prog ]
+runCmmContFlowOpts :: Cmm -> Cmm
+runCmmContFlowOpts prog = runCmmOpts cmmCfgOpts prog
 
-cmmCfgOpts  :: Tx (ListGraph CmmStmt)
-cmmCfgOptsZ :: Tx (a, CmmGraph)
+oldCmmCfgOpts :: Old.ListGraph Old.CmmStmt -> Old.ListGraph Old.CmmStmt
+cmmCfgOpts    :: CmmGraph -> CmmGraph
 
-cmmCfgOpts  = branchChainElim  -- boring, but will get more exciting later
-cmmCfgOptsZ g =
-  optGraph
-    (branchChainElimZ `seqTx` blockConcatZ `seqTx` removeUnreachableBlocksZ) g
+oldCmmCfgOpts = oldBranchChainElim  -- boring, but will get more exciting later
+cmmCfgOpts    =
+  removeUnreachableBlocks . blockConcat . branchChainElim
         -- Here branchChainElim can ultimately be replaced
         -- with a more exciting combination of optimisations
 
-runCmmOpts :: Tx g -> Tx (GenCmm d h g)
+runCmmOpts :: (g -> g) -> GenCmm d h g -> GenCmm d h g
 -- Lifts a transformer on a single graph to one on the whole program
 runCmmOpts opt = mapProcs (optProc opt)
 
-optProc :: Tx g -> Tx (GenCmmTop d h g)
-optProc _   top@(CmmData {}) = noTx top
-optProc opt (CmmProc info lbl formals g) =
-  fmap (CmmProc info lbl formals) (opt g)
-
-optGraph :: Tx g -> Tx (a, g)
-optGraph opt (a, g) = fmap (\g' -> (a, g')) (opt g)
+optProc :: (g -> g) -> GenCmmTop d h g -> GenCmmTop d h g
+optProc _   top@(CmmData {}) = top
+optProc opt (CmmProc info lbl g) = CmmProc info lbl (opt g)
 
 ------------------------------------
-mapProcs :: Tx (GenCmmTop d h s) -> Tx (GenCmm d h s)
-mapProcs f (Cmm tops) = fmap Cmm (mapTx f tops)
+mapProcs :: (GenCmmTop d h s -> GenCmmTop d h s) -> GenCmm d h s -> GenCmm d h s
+mapProcs f (Cmm tops) = Cmm (map f tops)
 
 ----------------------------------------------------------------
-branchChainElim :: Tx (ListGraph CmmStmt)
+oldBranchChainElim :: Old.ListGraph Old.CmmStmt -> Old.ListGraph Old.CmmStmt
 -- If L is not captured in an instruction, we can remove any
 -- basic block of the form L: goto L', and replace L with L' everywhere else.
 -- How does L get captured? In a CallArea.
-branchChainElim (ListGraph blocks)
+oldBranchChainElim (Old.ListGraph blocks)
   | null lone_branch_blocks     -- No blocks to remove
-  = noTx (ListGraph blocks)
+  = Old.ListGraph blocks
   | otherwise
-  = aTx (ListGraph new_blocks)
+  = Old.ListGraph new_blocks
   where
     (lone_branch_blocks, others) = partitionWith isLoneBranch blocks
     new_blocks = map (replaceLabels env) others
     env = mkClosureBlockEnv lone_branch_blocks
 
-isLoneBranch :: CmmBasicBlock -> Either (BlockId, BlockId) CmmBasicBlock
-isLoneBranch (BasicBlock id [CmmBranch target]) | id /= target = Left (id, target)
-isLoneBranch other_block                                       = Right other_block
-   -- An infinite loop is not a link in a branch chain!
+    isLoneBranch :: Old.CmmBasicBlock -> Either (BlockId, BlockId) Old.CmmBasicBlock
+    isLoneBranch (Old.BasicBlock id [Old.CmmBranch target]) | id /= target = Left (id, target)
+    isLoneBranch other_block                                           = Right other_block
+       -- An infinite loop is not a link in a branch chain!
 
-replaceLabels :: BlockEnv BlockId -> CmmBasicBlock -> CmmBasicBlock
-replaceLabels env (BasicBlock id stmts)
-  = BasicBlock id (map replace stmts)
-  where
-    replace (CmmBranch id)       = CmmBranch (lookup id)
-    replace (CmmCondBranch e id) = CmmCondBranch e (lookup id)
-    replace (CmmSwitch e tbl)    = CmmSwitch e (map (fmap lookup) tbl)
-    replace other_stmt           = other_stmt
+    replaceLabels :: BlockEnv BlockId -> Old.CmmBasicBlock -> Old.CmmBasicBlock
+    replaceLabels env (Old.BasicBlock id stmts)
+      = Old.BasicBlock id (map replace stmts)
+      where
+        replace (Old.CmmBranch id)       = Old.CmmBranch (lookup id)
+        replace (Old.CmmCondBranch e id) = Old.CmmCondBranch e (lookup id)
+        replace (Old.CmmSwitch e tbl)    = Old.CmmSwitch e (map (fmap lookup) tbl)
+        replace other_stmt           = other_stmt
 
-    lookup id = lookupBlockEnv env id `orElse` id 
+        lookup id = mapLookup id env `orElse` id 
+
 ----------------------------------------------------------------
-branchChainElimZ :: Tx CmmGraph
+branchChainElim :: CmmGraph -> CmmGraph
 -- Remove any basic block of the form L: goto L',
 -- and replace L with L' everywhere else,
 -- unless L is the successor of a call instruction and L'
@@ -94,131 +90,129 @@ branchChainElimZ :: Tx CmmGraph
 -- JD isn't quite sure when it's safe to share continuations for different
 -- function calls -- have to think about where the SP will be,
 -- so we'll table that problem for now by leaving all call successors alone.
-branchChainElimZ g@(G.LGraph eid _)
+branchChainElim g
   | null lone_branch_blocks     -- No blocks to remove
-  = noTx g
+  = g
   | otherwise
-  = aTx $ replaceLabelsZ env $ G.of_block_list eid (self_branches ++ others)
+  = replaceLabels env $ ofBlockList (g_entry g) (self_branches ++ others)
   where
-    blocks = G.to_block_list g
-    (lone_branch_blocks, others) = partitionWith isLoneBranchZ blocks
-    env = mkClosureBlockEnvZ lone_branch_blocks
+    blocks = toBlockList g
+    (lone_branch_blocks, others) = partitionWith isLoneBranch blocks
+    env = mkClosureBlockEnv lone_branch_blocks
     self_branches =
       let loop_to (id, _) =
             if lookup id == id then
-              Just (G.Block id (G.ZLast (G.mkBranchNode id)))
+              Just $ blockOfNodeList (JustC (CmmEntry id), [], JustC (mkBranchNode id))
             else
               Nothing
       in  mapMaybe loop_to lone_branch_blocks
-    lookup id = lookupBlockEnv env id `orElse` id 
+    lookup id = mapLookup id env `orElse` id
 
     call_succs = foldl add emptyBlockSet blocks
-      where add succs b =
-              case G.last (G.unzip b) of
-                LastOther (LastCall _ (Just k) _ _ _) -> extendBlockSet succs k
-                _ -> succs
-    isLoneBranchZ :: CmmBlock -> Either (BlockId, BlockId) CmmBlock
-    isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target))))
-        | id /= target && not (elemBlockSet id call_succs) = Left (id,target)
-    isLoneBranchZ other = Right other
+      where add :: BlockSet -> CmmBlock -> BlockSet
+            add succs b =
+              case lastNode b of
+                (CmmCall _ (Just k) _ _ _) -> setInsert k succs
+                (CmmForeignCall {succ=k})  -> setInsert k succs
+                _                          -> succs
+    isLoneBranch :: CmmBlock -> Either (BlockId, BlockId) CmmBlock
+    isLoneBranch block | (JustC (CmmEntry id), [], JustC (CmmBranch target)) <- blockToNodeList block,
+                         id /= target && not (setMember id call_succs)
+                       = Left (id,target)
+    isLoneBranch other = Right other
        -- An infinite loop is not a link in a branch chain!
 
-maybeReplaceLabels :: (Last -> Bool) -> BlockEnv BlockId -> CmmGraph -> CmmGraph
+maybeReplaceLabels :: (CmmNode O C -> Bool) -> BlockEnv BlockId -> CmmGraph -> CmmGraph
 maybeReplaceLabels lpred env =
-  replace_eid . G.map_nodes id middle last
+  replace_eid . mapGraphNodes (id, middle, last)
    where
-     replace_eid (G.LGraph eid blocks) = G.LGraph (lookup eid) blocks
-     middle = mapExpDeepMiddle exp
-     last l = if lpred l then mapExpDeepLast exp (last' l) else l
-     last' (LastBranch bid) = LastBranch (lookup bid)
-     last' (LastCondBranch p t f) = LastCondBranch p (lookup t) (lookup f)
-     last' (LastSwitch e arms) = LastSwitch e (map (liftM lookup) arms)
-     last' (LastCall t k a res r) = LastCall t (liftM lookup k) a res r
-     exp (CmmLit (CmmBlock bid)) = CmmLit (CmmBlock (lookup bid))
-     exp   (CmmStackSlot (CallArea (Young id)) i) =
-       CmmStackSlot (CallArea (Young (lookup id))) i
-     exp e = e
-     lookup id = fmap lookup (lookupBlockEnv env id) `orElse` id 
+     replace_eid g = g {g_entry = lookup (g_entry g)}
+     lookup id = fmap lookup (mapLookup id env) `orElse` id
+     
+     middle = mapExpDeep exp
+     last l = if lpred l then mapExpDeep exp (last' l) else l
+     last' :: CmmNode O C -> CmmNode O C
+     last' (CmmBranch bid)             = CmmBranch (lookup bid)
+     last' (CmmCondBranch p t f)       = CmmCondBranch p (lookup t) (lookup f)
+     last' (CmmSwitch e arms)          = CmmSwitch e (map (liftM lookup) arms)
+     last' (CmmCall t k a res r)       = CmmCall t (liftM lookup k) a res r
+     last' (CmmForeignCall t r a bid u i) = CmmForeignCall t r a (lookup bid) u i
 
-replaceLabelsZ :: BlockEnv BlockId -> CmmGraph -> CmmGraph
-replaceLabelsZ = maybeReplaceLabels (const True)
+     exp (CmmLit (CmmBlock bid))                = CmmLit (CmmBlock (lookup bid))
+     exp (CmmStackSlot (CallArea (Young id)) i) = CmmStackSlot (CallArea (Young (lookup id))) i
+     exp e                                      = e
 
--- replaceBranchLabels :: BlockEnv BlockId -> CmmGraph -> CmmGraph
--- replaceBranchLabels env g@(LGraph _ _) = maybeReplaceLabels lpred env g
---   where lpred (LastBranch _) = True
---         lpred _ = False
+
+replaceLabels :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+replaceLabels = maybeReplaceLabels (const True)
 
 replaceBranches :: BlockEnv BlockId -> CmmGraph -> CmmGraph
-replaceBranches env g = map_nodes id id last g
+replaceBranches env g = mapGraphNodes (id, id, last) g
   where
-    last (LastBranch id)          = LastBranch (lookup id)
-    last (LastCondBranch e ti fi) = LastCondBranch e (lookup ti) (lookup fi)
-    last (LastSwitch e tbl)       = LastSwitch e (map (fmap lookup) tbl)
-    last l@(LastCall {})          = l
-    lookup id = fmap lookup (lookupBlockEnv env id) `orElse` id 
+    last :: CmmNode O C -> CmmNode O C
+    last (CmmBranch id)          = CmmBranch (lookup id)
+    last (CmmCondBranch e ti fi) = CmmCondBranch e (lookup ti) (lookup fi)
+    last (CmmSwitch e tbl)       = CmmSwitch e (map (fmap lookup) tbl)
+    last l@(CmmCall {})          = l
+    last l@(CmmForeignCall {})   = l
+    lookup id = fmap lookup (mapLookup id env) `orElse` id
 
 ----------------------------------------------------------------
 -- Build a map from a block to its set of predecessors. Very useful.
-predMap :: G.LastNode l => G.LGraph m l -> BlockEnv BlockSet
-predMap g = G.fold_blocks add_preds emptyBlockEnv g -- find the back edges
-  where add_preds b env = foldl (add b) env (G.succs b)
-        add (G.Block bid _) env b' =
-          extendBlockEnv env b' $
-                extendBlockSet (lookupBlockEnv env b' `orElse` emptyBlockSet) bid
+predMap :: [CmmBlock] -> BlockEnv BlockSet
+predMap blocks = foldr add_preds mapEmpty blocks -- find the back edges
+  where add_preds block env = foldl (add (entryLabel block)) env (successors block)
+        add bid env b' =
+          mapInsert b' (setInsert bid (mapLookup b' env `orElse` setEmpty)) env
 ----------------------------------------------------------------
 -- If a block B branches to a label L, L is not the entry block,
 -- and L has no other predecessors,
 -- then we can splice the block starting with L onto the end of B.
--- Because this optimization can be inhibited by unreachable blocks,
--- we first take a pass to drops unreachable blocks.
 -- Order matters, so we work bottom up (reverse postorder DFS).
+-- This optimization can be inhibited by unreachable blocks, but
+-- the reverse postorder DFS returns only reachable blocks.
 --
 -- To ensure correctness, we have to make sure that the BlockId of the block
 -- we are about to eliminate is not named in another instruction.
 --
 -- Note: This optimization does _not_ subsume branch chain elimination.
-blockConcatZ  :: Tx CmmGraph
-blockConcatZ = removeUnreachableBlocksZ `seqTx` blockConcatZ'
-blockConcatZ' :: Tx CmmGraph
-blockConcatZ' g@(G.LGraph eid blocks) =
-  tx $ replaceLabelsZ concatMap $ G.LGraph eid blocks'
-  where (changed, blocks', concatMap) =
-           foldr maybe_concat (False, blocks, emptyBlockEnv) $ G.postorder_dfs g
-        maybe_concat b@(G.Block bid _) (changed, blocks', concatMap) =
-          let unchanged = (changed, extendBlockEnv blocks' bid b, concatMap)
-          in case G.goto_end $ G.unzip b of
-               (h, G.LastOther (LastBranch b')) ->
+blockConcat  :: CmmGraph -> CmmGraph
+blockConcat g@(CmmGraph {g_entry=eid}) =
+  replaceLabels concatMap $ ofBlockMap (g_entry g) blocks'
+  where blocks = postorderDfs g
+        (blocks', concatMap) =
+           foldr maybe_concat (toBlockMap g, mapEmpty) $ blocks
+        maybe_concat :: CmmBlock -> (LabelMap CmmBlock, LabelMap Label) -> (LabelMap CmmBlock, LabelMap Label)
+        maybe_concat b unchanged@(blocks', concatMap) =
+          let bid = entryLabel b
+          in case blockToNodeList b of
+               (JustC h, m, JustC (CmmBranch b')) ->
                   if canConcatWith b' then
-                    (True, extendBlockEnv blocks' bid $ splice blocks' h b',
-                     extendBlockEnv concatMap b' bid)
+                    (mapInsert bid (splice blocks' h m b') blocks',
+                     mapInsert b' bid concatMap)
                   else unchanged
                _ -> unchanged
-        num_preds bid = liftM sizeBlockSet (lookupBlockEnv backEdges bid) `orElse` 0
+        num_preds bid = liftM setSize (mapLookup bid backEdges) `orElse` 0
         canConcatWith b' = b' /= eid && num_preds b' == 1
-        backEdges = predMap g
-        splice blocks' h bid' =
-          case lookupBlockEnv blocks' bid' of
-            Just (G.Block _ t) -> G.zip $ G.ZBlock h t
+        backEdges = predMap blocks
+        splice :: forall map n e x.
+                  IsMap map =>
+                  map (Block n e x) -> n C O -> [n O O] -> KeyOf map -> Block n C x
+        splice blocks' h m bid' =
+          case mapLookup bid' blocks' of
             Nothing -> panic "unknown successor block"
-        tx = if changed then aTx else noTx
+            Just block | (_, m', l') <- blockToNodeList block -> blockOfNodeList (JustC h, (m ++ m'), l')
 ----------------------------------------------------------------
 mkClosureBlockEnv :: [(BlockId, BlockId)] -> BlockEnv BlockId
-mkClosureBlockEnv blocks = mkBlockEnv $ map follow blocks
-    where singleEnv = mkBlockEnv blocks
+mkClosureBlockEnv blocks = mapFromList $ map follow blocks
+    where singleEnv = mapFromList blocks :: BlockEnv BlockId
           follow (id, next) = (id, endChain id next)
-          endChain orig id = case lookupBlockEnv singleEnv id of
-                               Just id' | id /= orig -> endChain orig id'
-                               _ -> id
-mkClosureBlockEnvZ :: [(BlockId, BlockId)] -> BlockEnv BlockId
-mkClosureBlockEnvZ blocks = mkBlockEnv $ map follow blocks
-    where singleEnv = mkBlockEnv blocks
-          follow (id, next) = (id, endChain id next)
-          endChain orig id = case lookupBlockEnv singleEnv id of
+          endChain orig id = case mapLookup id singleEnv of
                                Just id' | id /= orig -> endChain orig id'
                                _ -> id
 ----------------------------------------------------------------
-removeUnreachableBlocksZ :: Tx CmmGraph
-removeUnreachableBlocksZ g@(G.LGraph id blocks) =
-  if length blocks' < sizeBEnv blocks then aTx $ G.of_block_list id blocks'
-  else noTx g
-    where blocks' = G.postorder_dfs g
+removeUnreachableBlocks :: CmmGraph -> CmmGraph
+removeUnreachableBlocks g =
+  if length blocks < mapSize (toBlockMap g) then ofBlockList (g_entry g) blocks
+                                           else g
+    where blocks = postorderDfs g

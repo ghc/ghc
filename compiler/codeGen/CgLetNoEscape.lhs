@@ -24,8 +24,8 @@ import CgCon
 import CgHeapery
 import CgInfoTbls
 import CgStackery
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import CLabel
 import ClosureInfo
 import CostCentre

@@ -55,7 +55,7 @@ import RegClass
 import Size
 
 import BlockId
-import Cmm
+import OldCmm
 import CLabel           ( CLabel )
 import Unique
 

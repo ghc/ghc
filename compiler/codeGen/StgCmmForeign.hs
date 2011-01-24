@@ -24,9 +24,11 @@ import StgCmmUtils
 import StgCmmClosure
 
 import BlockId
-import Cmm
+import CmmDecl
+import CmmExpr
 import CmmUtils
-import MkZipCfgCmm hiding (CmmAGraph)
+import OldCmm ( CmmReturnInfo(..) )
+import MkGraph
 import Type
 import TysPrim
 import CLabel
@@ -36,7 +38,6 @@ import Constants
 import StaticFlags
 import Maybes
 import Outputable
-import ZipCfgCmmRep
 import BasicTypes
 
 import Control.Monad
@@ -111,7 +112,7 @@ emitPrimCall res op args
 emitForeignCall
 	:: Safety
 	-> CmmFormals		-- where to put the results
-	-> MidCallTarget	-- the op
+	-> ForeignTarget	-- the op
 	-> CmmActuals		-- arguments
         -> C_SRT                -- the SRT of the calls continuation
         -> CmmReturnInfo	-- This can say "never returns"
@@ -145,7 +146,7 @@ load_args_into_temps = mapM arg_assign_temp
 	   return (tmp,hint)
 -}
 	
-load_target_into_temp :: MidCallTarget -> FCode MidCallTarget
+load_target_into_temp :: ForeignTarget -> FCode ForeignTarget
 load_target_into_temp (ForeignTarget expr conv) = do 
   tmp <- maybe_assign_temp expr
   return (ForeignTarget tmp conv)
@@ -171,8 +172,8 @@ maybe_assign_temp e
 
 saveThreadState :: CmmAGraph
 saveThreadState =
-  -- CurrentTSO->sp = Sp;
-  mkStore (cmmOffset stgCurrentTSO tso_SP) stgSp
+  -- CurrentTSO->stackobj->sp = Sp;
+  mkStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP) stgSp
   <*> closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
   <*> if opt_SccProfilingOn then
@@ -181,8 +182,8 @@ saveThreadState =
 
 emitSaveThreadState :: BlockId -> FCode ()
 emitSaveThreadState bid = do
-  -- CurrentTSO->sp = Sp;
-  emit $ mkStore (cmmOffset stgCurrentTSO tso_SP)
+  -- CurrentTSO->stackobj->sp = Sp;
+  emit $ mkStore (cmmOffset (CmmLoad (cmmOffset stgCurrentTSO tso_stackobj) bWord) stack_SP)
                  (CmmStackSlot (CallArea (Young bid)) (widthInBytes (typeWidth gcWord)))
   emit closeNursery
   -- and save the current cost centre stack in the TSO when profiling:
@@ -193,17 +194,19 @@ emitSaveThreadState bid = do
 closeNursery :: CmmAGraph
 closeNursery = mkStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
-loadThreadState :: LocalReg -> CmmAGraph
-loadThreadState tso = do
+loadThreadState :: LocalReg -> LocalReg -> CmmAGraph
+loadThreadState tso stack = do
   -- tso <- newTemp gcWord -- TODO FIXME NOW
+  -- stack <- newTemp gcWord -- TODO FIXME NOW
   catAGraphs [
 	-- tso = CurrentTSO;
   	mkAssign (CmmLocal tso) stgCurrentTSO,
-	-- Sp = tso->sp;
-	mkAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_SP)
-	                      bWord),
-	-- SpLim = tso->stack + RESERVED_STACK_WORDS;
-	mkAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal tso)) tso_STACK)
+	-- stack = tso->stackobj;
+	mkAssign (CmmLocal stack) (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_stackobj) bWord),
+	-- Sp = stack->sp;
+	mkAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal stack)) stack_SP) bWord),
+	-- SpLim = stack->stack + RESERVED_STACK_WORDS;
+	mkAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal stack)) stack_STACK)
 			            rESERVED_STACK_WORDS),
         openNursery,
         -- and load the current cost centre stack from the TSO when profiling:
@@ -211,8 +214,8 @@ loadThreadState tso = do
 	  mkStore curCCSAddr
                   (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) ccsType)
         else mkNop]
-emitLoadThreadState :: LocalReg -> FCode ()
-emitLoadThreadState tso = emit $ loadThreadState tso
+emitLoadThreadState :: LocalReg -> LocalReg -> FCode ()
+emitLoadThreadState tso stack = emit $ loadThreadState tso stack
 
 openNursery :: CmmAGraph
 openNursery = catAGraphs [
@@ -242,22 +245,15 @@ nursery_bdescr_free   = cmmOffset stgCurrentNursery oFFSET_bdescr_free
 nursery_bdescr_start  = cmmOffset stgCurrentNursery oFFSET_bdescr_start
 nursery_bdescr_blocks = cmmOffset stgCurrentNursery oFFSET_bdescr_blocks
 
-tso_SP, tso_STACK, tso_CCCS :: ByteOff
-tso_CCCS  = tsoProfFieldB oFFSET_StgTSO_CCCS
+tso_stackobj, tso_CCCS, stack_STACK, stack_SP :: ByteOff
+tso_stackobj = closureField oFFSET_StgTSO_stackobj
+tso_CCCS     = closureField oFFSET_StgTSO_CCCS
+stack_STACK  = closureField oFFSET_StgStack_stack
+stack_SP     = closureField oFFSET_StgStack_sp
 
- --ToDo: needs merging with changes to CgForeign
-tso_STACK = tsoFieldB     undefined
-tso_SP    = tsoFieldB     undefined
 
--- The TSO struct has a variable header, and an optional StgTSOProfInfo in
--- the middle.  The fields we're interested in are after the StgTSOProfInfo.
-tsoFieldB :: ByteOff -> ByteOff
-tsoFieldB off
-  | opt_SccProfilingOn = off + sIZEOF_StgTSOProfInfo + fixedHdrSize * wORD_SIZE
-  | otherwise          = off + fixedHdrSize * wORD_SIZE
-
-tsoProfFieldB :: ByteOff -> ByteOff
-tsoProfFieldB off = off + fixedHdrSize * wORD_SIZE
+closureField :: ByteOff -> ByteOff
+closureField off = off + fixedHdrSize * wORD_SIZE
 
 stgSp, stgHp, stgCurrentTSO, stgCurrentNursery :: CmmExpr
 stgSp		  = CmmReg sp

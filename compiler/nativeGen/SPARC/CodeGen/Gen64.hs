@@ -21,7 +21,7 @@ import Instruction
 import Size
 import Reg
 
-import Cmm
+import OldCmm
 
 import OrdList
 import Outputable

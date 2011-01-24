@@ -6,10 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module CmmUtils(
-	CmmStmts, noStmts, oneStmt, mkStmts, plusStmts, stmtList,
-	isNopStmt,
-
+module CmmUtils( 
 	primRepCmmType, primRepForeignHint,
 	typeCmmType, typeForeignHint,
 
@@ -21,8 +18,6 @@ module CmmUtils(
  	mkIntCLit, zeroCLit,
 
 	mkLblExpr,
-
-        maybeAssignTemp, loadArgsIntoTemps
   ) where
 
 #include "HsVersions.h"
@@ -31,10 +26,9 @@ import TyCon	( PrimRep(..) )
 import Type	( Type, typePrimRep )
 
 import CLabel
-import Cmm
-import OrdList
+import CmmDecl
+import CmmExpr
 import Outputable
-import Unique
 
 ---------------------------------------------------
 --
@@ -70,55 +64,6 @@ primRepForeignHint DoubleRep	= NoHint
 typeForeignHint :: Type -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep
 
-
----------------------------------------------------
---
---	CmmStmts
---
----------------------------------------------------
-
-type CmmStmts = OrdList CmmStmt
-
-noStmts :: CmmStmts
-noStmts = nilOL
-
-oneStmt :: CmmStmt -> CmmStmts
-oneStmt = unitOL
-
-mkStmts :: [CmmStmt] -> CmmStmts
-mkStmts = toOL
-
-plusStmts :: CmmStmts -> CmmStmts -> CmmStmts
-plusStmts = appOL
-
-stmtList :: CmmStmts -> [CmmStmt]
-stmtList = fromOL
-
-
----------------------------------------------------
---
---	CmmStmt
---
----------------------------------------------------
-
-isNopStmt :: CmmStmt -> Bool
--- If isNopStmt returns True, the stmt is definitely a no-op;
--- but it might be a no-op even if isNopStmt returns False
-isNopStmt CmmNop 		       = True
-isNopStmt (CmmAssign r e) 	       = cheapEqReg r e
-isNopStmt (CmmStore e1 (CmmLoad e2 _)) = cheapEqExpr e1 e2
-isNopStmt _ 			       = False
-
-cheapEqExpr :: CmmExpr -> CmmExpr -> Bool
-cheapEqExpr (CmmReg r)      e 		      = cheapEqReg r e
-cheapEqExpr (CmmRegOff r 0) e 		      = cheapEqReg r e
-cheapEqExpr (CmmRegOff r n) (CmmRegOff r' n') = r==r' && n==n'
-cheapEqExpr _  		    _ 		      = False
-
-cheapEqReg :: CmmReg -> CmmExpr -> Bool
-cheapEqReg r (CmmReg r')      = r==r'
-cheapEqReg r (CmmRegOff r' 0) = r==r'
-cheapEqReg _ _		      = False
 
 ---------------------------------------------------
 --
@@ -225,29 +170,3 @@ zeroCLit = CmmInt 0 wordWidth
 
 mkLblExpr :: CLabel -> CmmExpr
 mkLblExpr lbl = CmmLit (CmmLabel lbl)
-
----------------------------------------------------
---
---	Helpers for foreign call arguments
---
----------------------------------------------------
-
-loadArgsIntoTemps :: [Unique]
-                  -> HintedCmmActuals
-                  -> ([Unique], [CmmStmt], HintedCmmActuals)
-loadArgsIntoTemps uniques [] = (uniques, [], [])
-loadArgsIntoTemps uniques ((CmmHinted e hint):args) =
-    (uniques'',
-     new_stmts ++ remaining_stmts,
-     (CmmHinted new_e hint) : remaining_e)
-    where
-      (uniques', new_stmts, new_e) = maybeAssignTemp uniques e
-      (uniques'', remaining_stmts, remaining_e) =
-          loadArgsIntoTemps uniques' args
-
-
-maybeAssignTemp :: [Unique] -> CmmExpr -> ([Unique], [CmmStmt], CmmExpr)
-maybeAssignTemp uniques e
-    | hasNoGlobalRegs e = (uniques, [], e)
-    | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
-    where local = CmmLocal (LocalReg (head uniques) (cmmExprType e))

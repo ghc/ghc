@@ -32,13 +32,13 @@ import CgUtils
 import CgMonad
 import SMRep
 
-import Cmm
+import OldCmm
 import CLabel
 
 import Constants
 import ClosureInfo
 import CgStackery
-import CmmUtils
+import OldCmmUtils
 import Maybes
 import Id
 import Name

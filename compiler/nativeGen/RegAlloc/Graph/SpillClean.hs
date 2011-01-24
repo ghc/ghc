@@ -33,7 +33,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Cmm
+import OldCmm
 import UniqSet
 import UniqFM
 import Unique
@@ -46,7 +46,6 @@ import Data.Map			(Map)
 import Data.Set			(Set)
 import qualified Data.Map	as Map
 import qualified Data.Set	as Set
-
 
 --
 type Slot = Int
@@ -291,10 +290,10 @@ cleanTopBackward cmm
 	CmmData{}
 	 -> return cmm
 	
-	CmmProc info label params sccs
+	CmmProc info label sccs
 	 | LiveInfo _ _ _ liveSlotsOnEntry <- info
 	 -> do	sccs'	<- mapM (mapSCCM (cleanBlockBackward liveSlotsOnEntry)) sccs
-		return	$ CmmProc info label params sccs' 
+		return	$ CmmProc info label sccs' 
 
 
 cleanBlockBackward 

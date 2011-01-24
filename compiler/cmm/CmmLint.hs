@@ -17,10 +17,10 @@ module CmmLint (
   ) where
 
 import BlockId
-import Cmm
+import OldCmm
 import CLabel
 import Outputable
-import PprCmm
+import OldPprCmm()
 import Constants
 import FastString
 
@@ -48,9 +48,9 @@ runCmmLint l p =
   	Right _  -> Nothing
 
 lintCmmTop :: (GenCmmTop h i (ListGraph CmmStmt)) -> CmmLint ()
-lintCmmTop (CmmProc _ lbl _ (ListGraph blocks))
+lintCmmTop (CmmProc _ lbl (ListGraph blocks))
   = addLintInfo (text "in proc " <> pprCLabel lbl) $
-        let labels = foldl (\s b -> extendBlockSet s (blockId b)) emptyBlockSet blocks
+        let labels = foldl (\s b -> setInsert (blockId b) s) setEmpty blocks
 	in  mapM_ (lintCmmBlock labels) blocks
 
 lintCmmTop (CmmData {})
@@ -142,7 +142,7 @@ lintCmmStmt labels = lint
           lint (CmmJump e args) = lintCmmExpr e >> mapM_ (lintCmmExpr . hintlessCmm) args
           lint (CmmReturn ress) = mapM_ (lintCmmExpr . hintlessCmm) ress
           lint (CmmBranch id)    = checkTarget id
-          checkTarget id = if elemBlockSet id labels then return ()
+          checkTarget id = if setMember id labels then return ()
                            else cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
 lintTarget :: CmmCallTarget -> CmmLint ()
@@ -180,14 +180,14 @@ addLintInfo info thing = CmmLint $
 cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
 cmmLintMachOpErr expr argsRep opExpectsRep
      = cmmLintErr (text "in MachOp application: " $$ 
-					nest 2 (pprExpr expr) $$
+					nest 2 (ppr expr) $$
 				        (text "op is expecting: " <+> ppr opExpectsRep) $$
 					(text "arguments provide: " <+> ppr argsRep))
 
 cmmLintAssignErr :: CmmStmt -> CmmType -> CmmType -> CmmLint a
 cmmLintAssignErr stmt e_ty r_ty
   = cmmLintErr (text "in assignment: " $$ 
-		nest 2 (vcat [pprStmt stmt, 
+		nest 2 (vcat [ppr stmt, 
 			      text "Reg ty:" <+> ppr r_ty,
 			      text "Rhs ty:" <+> ppr e_ty]))
 			 
@@ -196,4 +196,4 @@ cmmLintAssignErr stmt e_ty r_ty
 cmmLintDubiousWordOffset :: CmmExpr -> CmmLint a
 cmmLintDubiousWordOffset expr
    = cmmLintErr (text "offset is not a multiple of words: " $$
-			nest 2 (pprExpr expr))
+			nest 2 (ppr expr))

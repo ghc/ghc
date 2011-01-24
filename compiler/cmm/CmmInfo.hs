@@ -2,12 +2,11 @@ module CmmInfo (
   emptyContInfoTable,
   cmmToRawCmm,
   mkInfoTable,
-  mkBareInfoTable
 ) where
 
 #include "HsVersions.h"
 
-import Cmm
+import OldCmm
 import CmmUtils
 
 import CLabel
@@ -18,7 +17,6 @@ import CgInfoTbls
 import CgCallConv
 import CgUtils
 import SMRep
-import ZipCfgCmmRep
 
 import Constants
 import Panic
@@ -29,10 +27,9 @@ import UniqSupply
 import Data.Bits
 
 -- When we split at proc points, we need an empty info table.
-emptyContInfoTable :: CmmInfo
-emptyContInfoTable =
-  CmmInfo Nothing Nothing (CmmInfoTable False (ProfilingInfo zero zero) rET_SMALL
-                                              (ContInfo [] NoC_SRT))
+emptyContInfoTable :: CmmInfoTable
+emptyContInfoTable = CmmInfoTable False (ProfilingInfo zero zero) rET_SMALL
+                                  (ContInfo [] NoC_SRT)
     where zero = CmmInt 0 wordWidth
 
 cmmToRawCmm :: [Cmm] -> IO [RawCmm]
@@ -78,10 +75,10 @@ cmmToRawCmm cmm = do
 
 mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
 mkInfoTable _    (CmmData sec dat) = [CmmData sec dat]
-mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
+mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label blocks) =
     case info of
       -- Code without an info table.  Easy.
-      CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
+      CmmNonInfoTable -> [CmmProc [] entry_label blocks]
 
       CmmInfoTable _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
           let info_label = entryLblToInfoLbl entry_label
@@ -91,7 +88,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
           -- A function entry point.
           FunInfo (ptrs, nptrs) srt fun_arity pap_bitmap slow_entry ->
               mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
-                                 arguments blocks
+                                 blocks
             where
               fun_type = argDescrType pap_bitmap
               fun_extra_bits =
@@ -110,7 +107,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
           -- A constructor.
           ConstrInfo (ptrs, nptrs) con_tag descr ->
               mkInfoTableAndCode info_label std_info [con_name] entry_label
-                                 arguments blocks
+                                 blocks
               where
                 std_info = mkStdInfoTable ty_prof' cl_prof' type_tag con_tag layout
                 con_name = makeRelativeRefTo info_label descr
@@ -118,7 +115,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
           -- A thunk.
           ThunkInfo (ptrs, nptrs) srt ->
               mkInfoTableAndCode info_label std_info srt_label entry_label
-                                 arguments blocks
+                                 blocks
               where
                 std_info = mkStdInfoTable ty_prof' cl_prof' type_tag srt_bitmap layout
                 (srt_label, srt_bitmap) = mkSRTLit info_label srt
@@ -127,7 +124,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
           -- A selector thunk.
           ThunkSelectorInfo offset _srt ->
               mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
-                                 arguments blocks
+                                 blocks
               where
                 std_info = mkStdInfoTable ty_prof' cl_prof' type_tag 0 (mkWordCLit offset)
 
@@ -135,7 +132,7 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
           ContInfo stack_layout srt ->
               liveness_data ++
               mkInfoTableAndCode info_label std_info srt_label entry_label
-                                 arguments blocks
+                                 blocks
               where
                 std_info = mkStdInfoTable ty_prof' cl_prof' maybe_big_type_tag srt_bitmap
                                           (makeRelativeRefTo info_label liveness_lit)
@@ -146,30 +143,18 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
                                      else type_tag
                 (srt_label, srt_bitmap) = mkSRTLit info_label srt
 
--- Generate a bare info table, not attached to any procedure.
-mkBareInfoTable :: CLabel -> Unique -> CmmInfoTable -> [CmmTopZ]
-mkBareInfoTable lbl uniq info =
-  case mkInfoTable uniq (CmmProc (CmmInfo Nothing Nothing info) lbl [] (ListGraph [])) of
-    [CmmProc d _ _ _] ->
-      ASSERT (tablesNextToCode)
-      [CmmData Data (d ++ [CmmDataLabel (entryLblToInfoLbl lbl)])]
-    [CmmData d s]     -> [CmmData d s]
-    _ -> panic "mkBareInfoTable expected to produce only data"
-
-
 -- Handle the differences between tables-next-to-code
 -- and not tables-next-to-code
 mkInfoTableAndCode :: CLabel
                    -> [CmmLit]
                    -> [CmmLit]
                    -> CLabel
-                   -> CmmFormals
                    -> ListGraph CmmStmt
                    -> [RawCmmTop]
-mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
+mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl blocks
   | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
   = [CmmProc (map CmmStaticLit (reverse extra_bits ++ std_info))
-             entry_lbl args blocks]
+             entry_lbl blocks]
 
   | ListGraph [] <- blocks -- No code; only the info table is significant
   =		-- Use a zero place-holder in place of the 
@@ -178,7 +163,7 @@ mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
 
   | otherwise	-- Separately emit info table (with the function entry 
   =		-- point as first entry) and the entry code 
-    [CmmProc [] entry_lbl args blocks,
+    [CmmProc [] entry_lbl blocks,
      mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)]
 
 mkSRTLit :: CLabel

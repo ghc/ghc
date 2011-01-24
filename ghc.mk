@@ -308,7 +308,7 @@ TH_PACKAGES := $(DPH_PACKAGES)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-STAGE0_PACKAGES = Cabal hpc extensible-exceptions binary bin-package-db
+STAGE0_PACKAGES = Cabal hpc extensible-exceptions binary bin-package-db hoopl
 
 # These packages are installed, but are installed hidden
 # Why install them at all?  Because the 'ghc' package depends on them
@@ -391,6 +391,7 @@ $(eval $(call addPackage,template-haskell))
 $(eval $(call addPackage,Cabal))
 $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
+$(eval $(call addPackage,hoopl))
 $(eval $(call addPackage,mtl))
 $(eval $(call addPackage,utf8-string))
 $(eval $(call addPackage,xhtml))
@@ -675,6 +676,7 @@ $(eval $(call build-package,libraries/extensible-exceptions,dist-boot,0))
 $(eval $(call build-package,libraries/Cabal,dist-boot,0))
 $(eval $(call build-package,libraries/binary,dist-boot,0))
 $(eval $(call build-package,libraries/bin-package-db,dist-boot,0))
+$(eval $(call build-package,libraries/hoopl,dist-boot,0))
 
 # register the boot packages in strict sequence, because running
 # multiple ghc-pkgs in parallel doesn't work (registrations may get

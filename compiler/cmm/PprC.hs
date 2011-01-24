@@ -34,8 +34,8 @@ module PprC (
 
 -- Cmm stuff
 import BlockId
-import Cmm
-import PprCmm	()	-- Instances only
+import OldCmm
+import OldPprCmm	()	-- Instances only
 import CLabel
 import ForeignCall
 import ClosureInfo
@@ -99,7 +99,7 @@ pprC (Cmm tops) = vcat $ intersperse blankLine $ map pprTop tops
 -- top level procs
 -- 
 pprTop :: RawCmmTop -> SDoc
-pprTop (CmmProc info clbl _params (ListGraph blocks)) =
+pprTop (CmmProc info clbl (ListGraph blocks)) =
     (if not (null info)
         then pprDataExterns info $$
              pprWordArray (entryLblToInfoLbl clbl) info

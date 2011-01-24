@@ -8,10 +8,10 @@
 
 module CgHpc (cgTickBox, initHpc, hpcTable) where
 
-import Cmm
+import OldCmm
 import CLabel
 import Module
-import CmmUtils
+import OldCmmUtils
 import CgUtils
 import CgMonad
 import CgForeignCall

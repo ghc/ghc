@@ -23,7 +23,7 @@ module CmmLex (
    CmmToken(..), cmmlex,
   ) where
 
-import Cmm
+import OldCmm
 import Lexer
 
 import SrcLoc

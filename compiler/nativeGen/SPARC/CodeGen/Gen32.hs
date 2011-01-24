@@ -22,9 +22,9 @@ import NCGMonad
 import Size
 import Reg
 
-import Cmm
-import BlockId
+import OldCmm
 
+import Control.Monad (liftM)
 import OrdList
 import Outputable
 
@@ -638,8 +638,8 @@ condIntReg NE x y = do
     return (Any II32 code__2)
 
 condIntReg cond x y = do
-    bid1@(BlockId _) <- getBlockIdNat
-    bid2@(BlockId _) <- getBlockIdNat
+    bid1 <- liftM (\a -> seq a a) getBlockIdNat
+    bid2 <- liftM (\a -> seq a a) getBlockIdNat
     CondCode _ cond cond_code <- condIntCode cond x y
     let
 	code__2 dst 
@@ -664,8 +664,8 @@ condIntReg cond x y = do
 
 condFltReg :: Cond -> CmmExpr -> CmmExpr -> NatM Register
 condFltReg cond x y = do
-    bid1@(BlockId _) <- getBlockIdNat
-    bid2@(BlockId _) <- getBlockIdNat
+    bid1 <- liftM (\a -> seq a a) getBlockIdNat
+    bid2 <- liftM (\a -> seq a a) getBlockIdNat
 
     CondCode _ cond cond_code <- condFltCode cond x y
     let

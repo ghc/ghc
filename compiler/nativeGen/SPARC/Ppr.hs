@@ -34,11 +34,11 @@ import Reg
 import Size
 import PprBase
 
-import BlockId
-import Cmm
+import OldCmm
+import OldPprCmm()
 import CLabel
 
-import Unique		( pprUnique )
+import Unique		( Uniquable(..), pprUnique )
 import qualified Outputable
 import Outputable	(Outputable, panic)
 import Pretty
@@ -53,9 +53,9 @@ pprNatCmmTop (CmmData section dats) =
   pprSectionHeader section $$ vcat (map pprData dats)
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
+pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
 
-pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) = 
+pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) = 
   pprSectionHeader Text $$
   (if null info then -- blocks guaranteed not null, so label needed
        pprLabel lbl
@@ -87,8 +87,8 @@ pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) =
 
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
-pprBasicBlock (BasicBlock (BlockId id) instrs) =
-  pprLabel (mkAsmTempLabel id) $$
+pprBasicBlock (BasicBlock blockid instrs) =
+  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
 
@@ -526,20 +526,20 @@ pprInstr (FxTOy size1 size2 reg1 reg2)
     ]
 
 
-pprInstr (BI cond b (BlockId id))
+pprInstr (BI cond b blockid)
   = hcat [
 	ptext (sLit "\tb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprCLabel_asm (mkAsmTempLabel id)
+	pprCLabel_asm (mkAsmTempLabel (getUnique blockid))
     ]
 
-pprInstr (BF cond b (BlockId id))
+pprInstr (BF cond b blockid)
   = hcat [
 	ptext (sLit "\tfb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
-	pprCLabel_asm (mkAsmTempLabel id)
+	pprCLabel_asm (mkAsmTempLabel (getUnique blockid))
     ]
 
 pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)

@@ -41,7 +41,7 @@ import Platform
 -- Our intermediate code:
 import BlockId
 import PprCmm		( pprExpr )
-import Cmm
+import OldCmm
 import CLabel
 
 -- The rest:
@@ -49,6 +49,7 @@ import StaticFlags	( opt_PIC )
 import OrdList
 import qualified Outputable as O
 import Outputable
+import Unique
 import DynFlags
 
 import Control.Monad	( mapAndUnzipM )
@@ -74,10 +75,10 @@ cmmTopCodeGen
 	-> RawCmmTop 
 	-> NatM [NatCmmTop Instr]
 
-cmmTopCodeGen dflags (CmmProc info lab params (ListGraph blocks)) = do
+cmmTopCodeGen dflags (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
-  let proc = CmmProc info lab params (ListGraph $ concat nat_blocks)
+  let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dflags
   case picBaseMb of
@@ -221,8 +222,8 @@ is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
 -- | Convert a BlockId to some CmmStatic data
 jumpTableEntry :: Maybe BlockId -> CmmStatic
 jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just (BlockId id)) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel id
+jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+    where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
 
@@ -1130,9 +1131,9 @@ genSwitch expr ids
             
             jumpTableEntryRel Nothing
                 = CmmStaticLit (CmmInt 0 wordWidth)
-            jumpTableEntryRel (Just (BlockId id))
+            jumpTableEntryRel (Just blockid)
                 = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                where blockLabel = mkAsmTempLabel id
+                where blockLabel = mkAsmTempLabel (getUnique blockid)
 
             code = e_code `appOL` t_code `appOL` toOL [
                             LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),

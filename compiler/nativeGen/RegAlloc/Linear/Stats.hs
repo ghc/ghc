@@ -10,7 +10,7 @@ import RegAlloc.Linear.Base
 import RegAlloc.Liveness
 import Instruction
 
-import Cmm		(GenBasicBlock(..))
+import OldCmm  (GenBasicBlock(..))
 
 import UniqFM
 import Outputable

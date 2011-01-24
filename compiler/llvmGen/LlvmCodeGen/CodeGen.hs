@@ -13,8 +13,8 @@ import LlvmCodeGen.Regs
 import BlockId
 import CgUtils ( activeStgRegs, callerSaves )
 import CLabel
-import Cmm
-import qualified PprCmm
+import OldCmm
+import qualified OldPprCmm as PprCmm
 import OrdList
 
 import BasicTypes
@@ -39,14 +39,14 @@ genLlvmProc :: LlvmEnv -> RawCmmTop -> UniqSM (LlvmEnv, [LlvmCmmTop])
 genLlvmProc env (CmmData _ _)
   = return (env, [])
 
-genLlvmProc env (CmmProc _ _ _ (ListGraph []))
+genLlvmProc env (CmmProc _ _ (ListGraph []))
   = return (env, [])
 
-genLlvmProc env (CmmProc info lbl params (ListGraph blocks))
+genLlvmProc env (CmmProc info lbl (ListGraph blocks))
   = do
         (env', lmblocks, lmdata) <- basicBlocksCodeGen env blocks ([], [])
 
-        let proc    = CmmProc info lbl params (ListGraph lmblocks)
+        let proc    = CmmProc info lbl (ListGraph lmblocks)
         let tops    = lmdata ++ [proc]
 
         return (env', tops)

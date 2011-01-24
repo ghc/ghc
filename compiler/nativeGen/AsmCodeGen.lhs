@@ -63,9 +63,9 @@ import NCGMonad
 
 import BlockId
 import CgUtils		( fixStgRegisters )
-import Cmm
+import OldCmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
-import PprCmm
+import OldPprCmm
 import CLabel
 
 import UniqFM
@@ -205,7 +205,7 @@ nativeCodeGen dflags h us cmms
 		| dopt Opt_SplitObjs dflags = split_marker : tops
 		| otherwise		    = tops
 
-	split_marker = CmmProc [] mkSplitMarkerLabel [] (ListGraph [])
+	split_marker = CmmProc [] mkSplitMarkerLabel (ListGraph [])
 
 
 -- | Do native code generation on all these cmms.
@@ -421,8 +421,8 @@ cmmNativeGen dflags us cmm count
 #if i386_TARGET_ARCH
 x86fp_kludge :: NatCmmTop Instr -> NatCmmTop Instr
 x86fp_kludge top@(CmmData _ _) = top
-x86fp_kludge (CmmProc info lbl params (ListGraph code)) = 
-	CmmProc info lbl params (ListGraph $ i386_insert_ffrees code)
+x86fp_kludge (CmmProc info lbl (ListGraph code)) = 
+	CmmProc info lbl (ListGraph $ i386_insert_ffrees code)
 #endif
 
 
@@ -498,8 +498,8 @@ sequenceTop
 	-> NatCmmTop Instr
 
 sequenceTop top@(CmmData _ _) = top
-sequenceTop (CmmProc info lbl params (ListGraph blocks)) = 
-  CmmProc info lbl params (ListGraph $ makeFarBranches $ sequenceBlocks blocks)
+sequenceTop (CmmProc info lbl (ListGraph blocks)) = 
+  CmmProc info lbl (ListGraph $ makeFarBranches $ sequenceBlocks blocks)
 
 -- The algorithm is very simple (and stupid): we make a graph out of
 -- the blocks where there is an edge from one block to another iff the
@@ -509,7 +509,7 @@ sequenceTop (CmmProc info lbl params (ListGraph blocks)) =
 -- destination of the out edge to the front of the list, and continue.
 
 -- FYI, the classic layout for basic blocks uses postorder DFS; this
--- algorithm is implemented in cmm/ZipCfg.hs (NR 6 Sep 2007).
+-- algorithm is implemented in Hoopl.
 
 sequenceBlocks 
 	:: Instruction instr
@@ -626,10 +626,10 @@ shortcutBranches dflags tops
 build_mapping :: GenCmmTop d t (ListGraph Instr)
               -> (GenCmmTop d t (ListGraph Instr), UniqFM JumpDest)
 build_mapping top@(CmmData _ _) = (top, emptyUFM)
-build_mapping (CmmProc info lbl params (ListGraph []))
-  = (CmmProc info lbl params (ListGraph []), emptyUFM)
-build_mapping (CmmProc info lbl params (ListGraph (head:blocks)))
-  = (CmmProc info lbl params (ListGraph (head:others)), mapping)
+build_mapping (CmmProc info lbl (ListGraph []))
+  = (CmmProc info lbl (ListGraph []), emptyUFM)
+build_mapping (CmmProc info lbl (ListGraph (head:blocks)))
+  = (CmmProc info lbl (ListGraph (head:others)), mapping)
         -- drop the shorted blocks, but don't ever drop the first one,
         -- because it is pointed to by a global label.
   where
@@ -639,11 +639,11 @@ build_mapping (CmmProc info lbl params (ListGraph (head:blocks)))
     (_, shortcut_blocks, others) = foldl split (emptyBlockSet, [], []) blocks
     split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
         | Just (DestBlockId dest) <- canShortcut insn,
-          (elemBlockSet dest s) || dest == id -- loop checks
+          (setMember dest s) || dest == id -- loop checks
         = (s, shortcut_blocks, b : others)
     split (s, shortcut_blocks, others) (BasicBlock id [insn])
         | Just dest <- canShortcut insn
-        = (extendBlockSet s id, (id,dest) : shortcut_blocks, others)
+        = (setInsert id s, (id,dest) : shortcut_blocks, others)
     split (s, shortcut_blocks, others) other = (s, shortcut_blocks, other : others)
 
 
@@ -658,8 +658,8 @@ apply_mapping ufm (CmmData sec statics)
   = CmmData sec (map (shortcutStatic (lookupUFM ufm)) statics)
   -- we need to get the jump tables, so apply the mapping to the entries
   -- of a CmmData too.
-apply_mapping ufm (CmmProc info lbl params (ListGraph blocks))
-  = CmmProc info lbl params (ListGraph $ map short_bb blocks)
+apply_mapping ufm (CmmProc info lbl (ListGraph blocks))
+  = CmmProc info lbl (ListGraph $ map short_bb blocks)
   where
     short_bb (BasicBlock id insns) = BasicBlock id $! map short_insn insns
     short_insn i = shortcutJump (lookupUFM ufm) i
@@ -704,7 +704,6 @@ genMachCode dflags cmm_top
           else pprPanic "genMachCode: nonzero final delta" (int final_delta)
     }
 
-
 -- -----------------------------------------------------------------------------
 -- Generic Cmm optimiser
 
@@ -730,9 +729,9 @@ Ideas for other things we could do (ToDo):
 
 cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
-cmmToCmm dflags (CmmProc info lbl params (ListGraph blocks)) = runCmmOpt dflags $ do
+cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
   blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)
-  return $ CmmProc info lbl params (ListGraph blocks')
+  return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
 

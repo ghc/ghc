@@ -63,8 +63,8 @@ import {-# SOURCE #-} CgBindery ( CgBindings, nukeVolatileBinds )
 
 import DynFlags
 import BlockId
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import CLabel
 import StgSyn (SRT)
 import SMRep
@@ -709,7 +709,7 @@ labelC id = emitCgStmt (CgLabel id)
 
 newLabelC :: FCode BlockId
 newLabelC = do { u <- newUnique
-               ; return $ BlockId u }
+               ; return $ mkBlockId u }
 
 checkedAbsC :: CmmStmt -> Code
 -- Emit code, eliminating no-ops
@@ -742,10 +742,11 @@ emitData sect lits
     data_block = CmmData sect lits
 
 emitProc :: CmmInfo -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
-emitProc info lbl args blocks
-  = do  { let proc_block = CmmProc info lbl args (ListGraph blocks)
+emitProc info lbl [] blocks
+  = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
 	; state <- getState
 	; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
+emitProc _ _ (_:_) _ = panic "emitProc called with nonempty args"
 
 emitSimpleProc :: CLabel -> Code -> Code
 -- Emit a procedure whose body is the specified code; no info table

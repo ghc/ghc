@@ -35,10 +35,9 @@ import StgCmmClosure
 import CLabel
 
 import BlockId
-import Cmm
+import CmmExpr
 import CmmUtils
 import FastString
-import PprCmm		( {- instance Outputable -} )
 import Id
 import VarEnv
 import Control.Monad

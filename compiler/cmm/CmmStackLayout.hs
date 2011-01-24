@@ -1,6 +1,9 @@
-{-# OPTIONS_GHC -XNoMonoLocalBinds #-}
+{-# OPTIONS_GHC -XGADTs -XNoMonoLocalBinds #-}
 -- Norman likes local bindings
 -- If this module lives on I'd like to get rid of this flag in due course
+
+-- Todo: remove
+{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
 module CmmStackLayout
     ( SlotEnv, liveSlotAnal, liveSlotTransfers, removeLiveSlotDefs
@@ -9,23 +12,20 @@ module CmmStackLayout
 where
 
 import Constants
-import Prelude hiding (zip, unzip, last)
+import Prelude hiding (succ, zip, unzip, last)
 
 import BlockId
+import Cmm
 import CmmExpr
-import CmmProcPointZ
-import CmmTx
-import DFMonad
+import CmmProcPoint
 import Maybes
-import MkZipCfg
-import MkZipCfgCmm hiding (CmmBlock, CmmGraph)
+import MkGraph (stackStubExpr)
 import Control.Monad
+import OptimizationFuel
 import Outputable
 import SMRep (ByteOff)
-import ZipCfg
-import ZipCfg as Z
-import ZipCfgCmmRep
-import ZipDataflow
+
+import Compiler.Hoopl
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -64,24 +64,23 @@ import qualified FiniteMap as Map
 -- a single slot, on insertion.
 
 slotLattice :: DataflowLattice SubAreaSet
-slotLattice = DataflowLattice "live slots" Map.empty add False
-  where add new old = case Map.foldRightWithKey addArea (False, old) new of
-                        (True,  x) -> aTx  x
-                        (False, x) -> noTx x
+slotLattice = DataflowLattice "live slots" Map.empty add
+  where add _ (OldFact old) (NewFact new) = case Map.foldRightWithKey addArea (False, old) new of
+                                              (change, x) -> (changeIf change, x)
         addArea a newSlots z = foldr (addSlot a) z newSlots
         addSlot a slot (changed, map) =
           let (c, live) = liveGen slot $ Map.findWithDefault [] a map
           in (c || changed, Map.insert a live map)
 
+slotLatticeJoin :: [SubAreaSet] -> SubAreaSet
+slotLatticeJoin facts = foldr extend (fact_bot slotLattice) facts
+  where extend fact res = snd $ fact_join slotLattice undefined (OldFact fact) (NewFact res)
+
 type SlotEnv   = BlockEnv SubAreaSet
   -- The sub-areas live on entry to the block
 
-type SlotFix a = FuelMonad (BackwardFixedPoint Middle Last SubAreaSet a)
-
-liveSlotAnal :: LGraph Middle Last -> FuelMonad SlotEnv
-liveSlotAnal g = liftM zdfFpFacts (res :: SlotFix ())
-  where res = zdfSolveFromL emptyBlockEnv "live slot analysis" slotLattice
-                            liveSlotTransfers (fact_bot slotLattice) g
+liveSlotAnal :: CmmGraph -> FuelUniqSM SlotEnv
+liveSlotAnal g = liftM snd $ dataflowPassBwd g [] $ analBwd slotLattice liveSlotTransfers
 
 -- Add the subarea s to the subareas in the list-set (possibly coalescing it with
 -- adjacent subareas), and also return whether s was a new addition.
@@ -120,10 +119,21 @@ liveKill (a, hi, w) set = -- pprTrace "killing slots in area" (ppr a) $
 -- considered live in to the block -- we treat the first node as a definition site.
 -- BEWARE?: Am I being a little careless here in failing to check for the
 -- entry Id (which would use the CallArea Old).
-liveSlotTransfers :: BackwardTransfers Middle Last SubAreaSet
-liveSlotTransfers =
-  BackwardTransfers first liveInSlots liveLastIn
-    where first id live = Map.delete (CallArea (Young id)) live
+liveSlotTransfers :: BwdTransfer CmmNode SubAreaSet
+liveSlotTransfers = mkBTransfer3 frt mid lst
+  where frt :: CmmNode C O -> SubAreaSet -> SubAreaSet
+        frt (CmmEntry l) f = Map.delete (CallArea (Young l)) f
+        mid :: CmmNode O O -> SubAreaSet -> SubAreaSet
+        mid n f = foldSlotsUsed addSlot (removeLiveSlotDefs f n) n
+        lst :: CmmNode O C -> FactBase SubAreaSet -> SubAreaSet
+        lst n f = liveInSlots n $ case n of
+          CmmCall {cml_cont=Nothing, cml_args=args} -> add_area (CallArea Old) args out
+          CmmCall {cml_cont=Just k, cml_args=args}  -> add_area (CallArea Old) args (add_area (CallArea (Young k)) args out)
+          CmmForeignCall {succ=k, updfr=oldend}     -> add_area (CallArea Old) oldend (add_area (CallArea (Young k)) wORD_SIZE out)
+          _                                         -> out
+         where out = joinOutFacts slotLattice n f
+               add_area _ n live | n == 0 = live
+               add_area a n live = Map.insert a (snd $ liveGen (a, n, n) $ Map.findWithDefault [] a live) live
 
 -- Slot sets: adding slots, removing slots, and checking for membership.
 liftToArea :: Area -> ([SubArea] -> [SubArea]) -> SubAreaSet -> SubAreaSet 
@@ -141,7 +151,7 @@ removeLiveSlotDefs = foldSlotsDefd removeSlot
 liveInSlots :: (DefinerOfSlots s, UserOfSlots s) => s -> SubAreaSet -> SubAreaSet
 liveInSlots x live = foldSlotsUsed addSlot (removeLiveSlotDefs live x) x
 
-liveLastIn :: Last -> (BlockId -> SubAreaSet) -> SubAreaSet
+liveLastIn :: CmmNode O C -> (BlockId -> SubAreaSet) -> SubAreaSet
 liveLastIn l env = liveInSlots l (liveLastOut env l)
 
 -- Don't forget to keep the outgoing parameters in the CallArea live,
@@ -151,17 +161,17 @@ liveLastIn l env = liveInSlots l (liveLastOut env l)
 -- be a return to keep the update frame live. We'd still better keep the
 -- info pointer in the update frame live at any call site;
 -- otherwise we could screw up the garbage collector.
-liveLastOut :: (BlockId -> SubAreaSet) -> Last -> SubAreaSet
+liveLastOut :: (BlockId -> SubAreaSet) -> CmmNode O C -> SubAreaSet
 liveLastOut env l =
   case l of
-    LastCall _ Nothing n _ _ -> 
+    CmmCall _ Nothing n _ _ -> 
       add_area (CallArea Old) n out -- add outgoing args (includes upd frame)
-    LastCall _ (Just k) n _ (Just _) ->
+    CmmCall _ (Just k) n _ _ ->
       add_area (CallArea Old) n (add_area (CallArea (Young k)) n out)
-    LastCall _ (Just k) n _ Nothing ->
-      add_area (CallArea (Young k)) n out
+    CmmForeignCall { succ = k, updfr = oldend } ->
+      add_area (CallArea Old) oldend (add_area (CallArea (Young k)) wORD_SIZE out)
     _ -> out
-  where out = joinOuts slotLattice env l
+  where out = slotLatticeJoin $ map env $ successors l
         add_area _ n live | n == 0 = live
         add_area a n live =
           Map.insert a (snd $ liveGen (a, n, n) $ Map.findWithDefault [] a live) live
@@ -187,7 +197,7 @@ areaBuilder = Builder fold words
         words areaSize areaMap a =
           case Map.lookup a areaMap of
             Just addr -> [addr .. addr + (Map.lookup a areaSize `orElse`
-                                          pprPanic "wordsOccupied: unknown area" (ppr a))]
+                                          pprPanic "wordsOccupied: unknown area" (ppr areaSize <+> ppr a))]
             Nothing   -> []
 
 --slotBuilder :: IGraphBuilder (Area, Int)
@@ -198,48 +208,49 @@ areaBuilder = Builder fold words
 -- definitions.
 type IGraph x = Map x (Set x)
 type IGPair x = (IGraph x, IGraphBuilder x)
-igraph :: (Ord x) => IGraphBuilder x -> SlotEnv -> LGraph Middle Last -> IGraph x
-igraph builder env g = foldr interfere Map.empty (postorder_dfs g)
+igraph :: (Ord x) => IGraphBuilder x -> SlotEnv -> CmmGraph -> IGraph x
+igraph builder env g = foldr interfere Map.empty (postorderDfs g)
   where foldN = foldNodes builder
-        interfere block igraph =
-          let (h, l) = goto_end (unzip block)
-              --heads :: ZHead Middle -> (IGraph x, SubAreaSet) -> IGraph x
-              heads (ZFirst _) (igraph, _)       = igraph
-              heads (ZHead h m)    (igraph, liveOut) =
-                heads h (addEdges igraph m liveOut, liveInSlots m liveOut)
-              -- add edges between a def and the other defs and liveouts
-              addEdges igraph i out = fst $ foldSlotsDefd addDef (igraph, out) i
-              addDef (igraph, out) def@(a, _, _) =
-                (foldN def (addDefN out) igraph,
-                 Map.insert a (snd $ liveGen def (Map.findWithDefault [] a out)) out)
-              addDefN out n igraph =
-                let addEdgeNO o igraph = foldN o addEdgeNN igraph
-                    addEdgeNN n' igraph = addEdgeNN' n n' $ addEdgeNN' n' n igraph
-                    addEdgeNN' n n' igraph = Map.insert n (Map.insert n' () set) igraph
-                      where set = Map.findWithDefault Map.empty n igraph
-                in Map.foldRightWithKey (\ _ os igraph -> foldr addEdgeNO igraph os) igraph out
-              env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
-          in heads h $ case l of LastExit    -> (igraph, Map.empty)
-                                 LastOther l -> (addEdges igraph l $ liveLastOut env' l,
-                                                 liveLastIn l env')
+        interfere block igraph = foldBlockNodesB3 (first, middle, last) block igraph
+          where first _ (igraph, _) = igraph
+                middle node (igraph, liveOut) =
+                  (addEdges igraph node liveOut, liveInSlots node liveOut)
+                last node igraph =
+                  (addEdges igraph node $ liveLastOut env' node, liveLastIn node env')
+
+                -- add edges between a def and the other defs and liveouts
+                addEdges igraph i out = fst $ foldSlotsDefd addDef (igraph, out) i
+                addDef (igraph, out) def@(a, _, _) =
+                  (foldN def (addDefN out) igraph,
+                   Map.insert a (snd $ liveGen def (Map.findWithDefault [] a out)) out)
+                addDefN out n igraph =
+                  let addEdgeNO o igraph = foldN o addEdgeNN igraph
+                      addEdgeNN n' igraph = addEdgeNN' n n' $ addEdgeNN' n' n igraph
+                      addEdgeNN' n n' igraph = Map.insert n (Map.insert n' () set) igraph
+                        where set = Map.findWithDefault Map.empty n igraph
+                  in Map.foldRightWithKey (\ _ os igraph -> foldr addEdgeNO igraph os) igraph out
+                env' bid = mapLookup bid env `orElse` panic "unknown blockId in igraph"
 
 -- Before allocating stack slots, we need to collect one more piece of information:
 -- what's the highest offset (in bytes) used in each Area?
 -- We'll need to allocate that much space for each Area.
-getAreaSize :: ByteOff -> LGraph Middle Last -> AreaMap
+
+-- JD: WHY CAN'T THIS COME FROM THE slot-liveness info?
+getAreaSize :: ByteOff -> CmmGraph -> AreaMap
   -- The domain of the returned mapping consists only of Areas
   -- used for (a) variable spill slots, and (b) parameter passing ares for calls
-getAreaSize entry_off g@(LGraph _ _) =
-  fold_blocks (fold_fwd_block first add_regslots last)
+getAreaSize entry_off g =
+  foldGraphBlocks (foldBlockNodesF3 (first, add_regslots, last))
               (Map.singleton (CallArea Old) entry_off) g
   where first _  z = z
-        last l@(LastOther (LastCall _ Nothing args res _)) z =
-          add_regslots l (add (add z area args) area res)
+        last :: CmmNode O C -> Map Area Int -> Map Area Int
+        last l@(CmmCall _ Nothing args res _) z  =  add_regslots l (add (add z area args) area res)
           where area = CallArea Old
-        last l@(LastOther (LastCall _ (Just k) args res _)) z =
-          add_regslots l (add (add z area args) area res)
+        last l@(CmmCall _ (Just k) args res _) z =  add_regslots l (add (add z area args) area res)
           where area = CallArea (Young k)
-        last l z = add_regslots l z
+        last l@(CmmForeignCall {succ = k}) z     =  add_regslots l (add z area wORD_SIZE)
+          where area = CallArea (Young k)
+        last l z                                 =  add_regslots l z
         add_regslots i z = foldSlotsUsed addSlot (foldSlotsDefd addSlot z i) i
         addSlot z (a@(RegSlot (LocalReg _ ty)), _, _) =
           add z a $ widthInBytes $ typeWidth ty
@@ -308,19 +319,15 @@ allocSlotFrom ig areaSize from areaMap area =
 -- Note: The stack pointer only has to be younger than the youngest live stack slot
 -- at proc points. Otherwise, the stack pointer can point anywhere.
 
-layout :: ProcPointSet -> SlotEnv -> ByteOff -> LGraph Middle Last -> AreaMap
+layout :: ProcPointSet -> SlotEnv -> ByteOff -> CmmGraph -> AreaMap
 -- The domain of the returned map includes an Area for EVERY block
 -- including each block that is not the successor of a call (ie is not a proc-point)
 -- That's how we return the info of what the SP should be at the entry of every block
 
 layout procPoints env entry_off g =
   let ig = (igraph areaBuilder env g, areaBuilder)
-      env' bid = lookupBlockEnv env bid `orElse` panic "unknown blockId in igraph"
+      env' bid = mapLookup bid env `orElse` panic "unknown blockId in igraph"
       areaSize = getAreaSize entry_off g
-      -- Find the slots that are live-in to a block tail
-      live_in (ZTail m l) = liveInSlots m (live_in l)
-      live_in (ZLast (LastOther l)) = liveLastIn l env'
-      live_in (ZLast LastExit) = Map.empty 
 
       -- Find the youngest live stack slot that has already been allocated
       youngest_live :: AreaMap 	   -- Already allocated
@@ -338,10 +345,10 @@ layout procPoints env entry_off g =
 
       -- Update the successor's incoming SP.
       setSuccSPs inSp bid areaMap =
-        case (Map.lookup area areaMap, lookupBlockEnv (lg_blocks g) bid) of
+        case (Map.lookup area areaMap , mapLookup bid (toBlockMap g)) of
           (Just _, _) -> areaMap -- succ already knows incoming SP
-          (Nothing, Just (Block _ _)) ->
-            if elemBlockSet bid procPoints then
+          (Nothing, Just _) ->
+            if setMember bid procPoints then
               let young = youngest_live areaMap $ env' bid
                   -- start = case returnOff stackInfo of Just b  -> max b young
                   --                                     Nothing -> young
@@ -352,28 +359,19 @@ layout procPoints env entry_off g =
           (_, Nothing) -> panic "Block not found in cfg"
         where area = CallArea (Young bid)
 
-      allocLast (Block id _) areaMap l =
-        fold_succs (setSuccSPs inSp) l areaMap
-        where inSp = expectJust "sp in" $ Map.lookup (CallArea (Young id)) areaMap
+      layoutAreas areaMap block = foldBlockNodesF3 (flip const, allocMid, allocLast (entryLabel block)) block areaMap
+      allocMid m areaMap = foldSlotsDefd alloc' (foldSlotsUsed alloc' areaMap m) m
+      allocLast bid l areaMap =
+        foldr (setSuccSPs inSp) areaMap' (successors l)
+        where inSp = expectJust "sp in" $ Map.lookup (CallArea (Young bid)) areaMap
+              areaMap' = foldSlotsDefd alloc' (foldSlotsUsed alloc' areaMap l) l
+      alloc' areaMap (a@(RegSlot _), _, _) = allocVarSlot areaMap a
+      alloc' areaMap _ = areaMap
 
-      allocMidCall m@(MidForeignCall (Safe bid _ _) _ _ _) t areaMap =
-        let young     = youngest_live areaMap $ removeLiveSlotDefs (live_in t) m
-            area      = CallArea (Young bid)
-            areaSize' = Map.insert area (widthInBytes (typeWidth gcWord)) areaSize
-        in  allocSlotFrom ig areaSize' young areaMap area
-      allocMidCall _ _ areaMap = areaMap
-
-      alloc m t areaMap =
-          foldSlotsDefd alloc' (foldSlotsUsed alloc' (allocMidCall m t areaMap) m) m
-        where alloc' areaMap (a@(RegSlot _), _, _) = allocVarSlot areaMap a
-              alloc' areaMap _ = areaMap
-
-      layoutAreas areaMap b@(Block _ t) = layout areaMap t
-        where layout areaMap (ZTail m t) = layout (alloc m t areaMap) t
-              layout areaMap (ZLast l)   = allocLast b areaMap l
-      initMap = Map.insert (CallArea (Young (lg_entry g))) 0
-                           (Map.insert (CallArea Old) 0 Map.empty)
-      areaMap = foldl layoutAreas initMap (postorder_dfs g)
+      initMap = Map.insert (CallArea (Young (g_entry g))) 0 $
+                  Map.insert (CallArea Old) 0 Map.empty
+                        
+      areaMap = foldl layoutAreas initMap (postorderDfs g)
   in -- pprTrace "ProcPoints" (ppr procPoints) $
         -- pprTrace "Area SizeMap" (ppr areaSize) $
          -- pprTrace "Entry SP" (ppr entrySp) $
@@ -389,9 +387,9 @@ layout procPoints env entry_off g =
 --    stack pointer to be younger than the live values on the stack at proc points.
 -- 3. Compute the maximum stack offset used in the procedure and replace
 --    the stack high-water mark with that offset.
-manifestSP :: AreaMap -> ByteOff -> LGraph Middle Last -> FuelMonad (LGraph Middle Last)
-manifestSP areaMap entry_off g@(LGraph entry _blocks) =
-  liftM (LGraph entry) $ foldl replB (return emptyBlockEnv) (postorder_dfs g)
+manifestSP :: AreaMap -> ByteOff -> CmmGraph -> FuelUniqSM CmmGraph
+manifestSP areaMap entry_off g@(CmmGraph {g_entry=entry}) =
+  ofBlockMap entry `liftM` foldl replB (return mapEmpty) (postorderDfs g)
   where slot a = -- pprTrace "slot" (ppr a) $
                    Map.lookup a areaMap `orElse` panic "unallocated Area"
         slot' (Just id) = slot $ CallArea (Young id)
@@ -399,68 +397,64 @@ manifestSP areaMap entry_off g@(LGraph entry _blocks) =
         sp_high = maxSlot slot g
         proc_entry_sp = slot (CallArea Old) + entry_off
 
+        add_sp_off :: CmmBlock -> BlockEnv Int -> BlockEnv Int
         add_sp_off b env =
-          case Z.last (unzip b) of
-            LastOther (LastCall {cml_cont = Just succ, cml_ret_args = off}) ->
-              extendBlockEnv env succ off
-            _ -> env
-        spEntryMap = fold_blocks add_sp_off (mkBlockEnv [(entry, entry_off)]) g
-        spOffset id = lookupBlockEnv spEntryMap id `orElse` 0
+          case lastNode b of
+            CmmCall {cml_cont=Just succ, cml_ret_args=off} -> mapInsert succ off env
+            CmmForeignCall {succ=succ}                     -> mapInsert succ wORD_SIZE env
+            _                                              -> env
+        spEntryMap = foldGraphBlocks add_sp_off (mapInsert entry entry_off emptyBlockMap) g
+        spOffset id = mapLookup id spEntryMap `orElse` 0
 
         sp_on_entry id | id == entry = proc_entry_sp
         sp_on_entry id = slot' (Just id) + spOffset id
 
         -- On entry to procpoints, the stack pointer is conventional;
         -- otherwise, we check the SP set by predecessors.
-        replB :: FuelMonad (BlockEnv CmmBlock) -> CmmBlock -> FuelMonad (BlockEnv CmmBlock)
-        replB blocks (Block id t) =
-          do bs <- replTail (Block id) spIn t
-             -- pprTrace "spIn" (ppr id <+> ppr spIn) $ do
-             liftM (flip (foldr insertBlock) bs) blocks
-          where spIn = sp_on_entry id
-        replTail :: (ZTail Middle Last -> CmmBlock) -> Int -> (ZTail Middle Last) -> 
-                    FuelMonad ([CmmBlock])
-        replTail h spOff (ZTail m@(MidForeignCall (Safe bid _ _) _ _ _) t) =
-          replTail (\t' -> h (setSp spOff spOff' (ZTail (middle spOff m) t'))) spOff' t
-            where spOff' = slot' (Just bid) + widthInBytes (typeWidth gcWord)
-        replTail h spOff (ZTail m t) = replTail (h . ZTail (middle spOff m)) spOff t
-        replTail h spOff (ZLast (LastOther l)) = fixSp h spOff l
-        replTail h _   l@(ZLast LastExit) = return [h l]
-        middle spOff m = mapExpDeepMiddle (replSlot spOff) m
-        last   spOff l = mapExpDeepLast   (replSlot spOff) l
-        replSlot spOff (CmmStackSlot a i) = CmmRegOff (CmmGlobal Sp) (spOff - (slot a + i))
-        replSlot _ (CmmLit CmmHighStackMark) = -- replacing the high water mark
-          CmmLit (CmmInt (toInteger (max 0 (sp_high - proc_entry_sp))) (typeWidth bWord))
-        replSlot _ e = e
-        -- The block must establish the SP expected at each successsor.
-        fixSp :: (ZTail Middle Last -> CmmBlock) -> Int -> Last -> FuelMonad ([CmmBlock])
-        fixSp h spOff l@(LastCall _ k n _ _) = updSp h spOff (slot' k + n) l
-        fixSp h spOff l@(LastBranch k) =
-          let succSp = sp_on_entry k in
-          if succSp /= spOff then
-               -- pprTrace "updSp" (ppr k <> ppr spOff <> ppr (sp_on_entry k)) $
-               updSp h spOff succSp l
-          else return $ [h (ZLast (LastOther (last spOff l)))]
-        fixSp h spOff l = liftM (uncurry (:)) $ fold_succs succ l $ return (b, [])
-          where b = h (ZLast (LastOther (last spOff l)))
-                succ succId z =
-                  let succSp = sp_on_entry succId in
-                  if succSp /= spOff then
-                    do (b,  bs)  <- z
-                       (b', bs') <- insertBetween b [setSpMid spOff succSp] succId
-                       return (b', bs ++ bs')
-                  else z
-        updSp h old new l = return [h $ setSp old new $ ZLast $ LastOther (last new l)]
-        setSpMid sp sp' = MidAssign (CmmGlobal Sp) e
-          where e = CmmMachOp (MO_Add wordWidth) [CmmReg (CmmGlobal Sp), off]
-                off = CmmLit $ CmmInt (toInteger $ sp - sp') wordWidth
-        setSp sp sp' t = if sp == sp' then t else ZTail (setSpMid sp sp') t
+        replB :: FuelUniqSM (BlockEnv CmmBlock) -> CmmBlock -> FuelUniqSM (BlockEnv CmmBlock)
+        replB blocks block =
+          do let (head, middles, JustC tail :: MaybeC C (CmmNode O C)) = blockToNodeList block
+                 middles' = map (middle spIn) middles
+             bs <- replLast head middles' tail
+             flip (foldr insertBlock) bs `liftM` blocks
+          where spIn = sp_on_entry (entryLabel block)
+
+                middle spOff m = mapExpDeep (replSlot spOff) m
+                last   spOff l = mapExpDeep (replSlot spOff) l
+                replSlot spOff (CmmStackSlot a i) = CmmRegOff (CmmGlobal Sp) (spOff - (slot a + i))
+                replSlot _ (CmmLit CmmHighStackMark) = -- replacing the high water mark
+                  CmmLit (CmmInt (toInteger (max 0 (sp_high - proc_entry_sp))) (typeWidth bWord))
+                replSlot _ e = e
+
+                replLast :: MaybeC C (CmmNode C O) -> [CmmNode O O] -> CmmNode O C -> FuelUniqSM [CmmBlock]
+                replLast h m l@(CmmCall _ k n _ _)       = updSp (slot' k + n) h m l
+                -- JD: LastForeignCall probably ought to have an outgoing
+                --     arg size, just like LastCall
+                replLast h m l@(CmmForeignCall {succ=k}) = updSp (slot' (Just k) + wORD_SIZE) h m l
+                replLast h m l@(CmmBranch k)             = updSp (sp_on_entry k) h m l
+                replLast h m l                           = uncurry (:) `liftM` foldr succ (return (b, [])) (successors l)
+                  where b :: CmmBlock
+                        b = updSp' spIn h m l
+                        succ succId z =
+                          let succSp = sp_on_entry succId in
+                          if succSp /= spIn then
+                            do (b,  bs)  <- z
+                               (b', bs') <- insertBetween b (adjustSp succSp) succId
+                               return (b', bs' ++ bs)
+                          else z
+
+                updSp sp h m l = return [updSp' sp h m l]
+                updSp' sp h m l | sp == spIn = blockOfNodeList (h, m, JustC $ last sp l)
+                                | otherwise  = blockOfNodeList (h, m ++ adjustSp sp, JustC $ last sp l)
+                adjustSp sp = [CmmAssign (CmmGlobal Sp) e]
+                  where e = CmmMachOp (MO_Add wordWidth) [CmmReg (CmmGlobal Sp), off]
+                        off = CmmLit $ CmmInt (toInteger $ spIn - sp) wordWidth
 
 
 -- To compute the stack high-water mark, we fold over the graph and
 -- compute the highest slot offset.
 maxSlot :: (Area -> Int) -> CmmGraph -> Int
-maxSlot slotOff g = fold_blocks (fold_fwd_block (\ _ x -> x) highSlot highSlot) 0 g
+maxSlot slotOff g = foldGraphBlocks (foldBlockNodesF3 (flip const, highSlot, highSlot)) 0 g
   where highSlot i z = foldSlotsUsed add (foldSlotsDefd add z i) i
         add z (a, i, _) = max z (slotOff a + i)
 
@@ -470,19 +464,17 @@ maxSlot slotOff g = fold_blocks (fold_fwd_block (\ _ x -> x) highSlot highSlot) 
 -- This will miss stack slots that are last used in a Last node,
 -- but it should do pretty well...
 
-type StubPtrFix = FuelMonad (BackwardFixedPoint Middle Last SubAreaSet CmmGraph)
-
-stubSlotsOnDeath :: (LGraph Middle Last) -> FuelMonad (LGraph Middle Last)
-stubSlotsOnDeath g = liftM zdfFpContents $ (res :: StubPtrFix)
-    where res = zdfBRewriteFromL RewriteShallow emptyBlockEnv "stub ptrs" slotLattice
-                                 liveSlotTransfers rewrites (fact_bot slotLattice) g
-          rewrites = BackwardRewrites first middle last Nothing
-          first _ _ = Nothing
-          last  _ _ = Nothing
-          middle m liveSlots = foldSlotsUsed (stub liveSlots m) Nothing m
+stubSlotsOnDeath :: CmmGraph -> FuelUniqSM CmmGraph
+stubSlotsOnDeath g = liftM fst $ dataflowPassBwd g [] $ analRewBwd slotLattice
+                                                                   liveSlotTransfers
+                                                                   rewrites
+    where rewrites = mkBRewrite3 frt mid lst
+          frt _ _ = return Nothing
+          mid m liveSlots = return $ foldSlotsUsed (stub liveSlots m) Nothing m
+          lst _ _ = return Nothing
           stub liveSlots m rst subarea@(a, off, w) =
             if elemSlot liveSlots subarea then rst
-            else let store = mkStore (CmmStackSlot a off)
-                                     (stackStubExpr (widthFromBytes w))
+            else let store = mkMiddle $ CmmStore (CmmStackSlot a off)
+                                                 (stackStubExpr (widthFromBytes w))
                  in case rst of Nothing -> Just (mkMiddle m <*> store)
                                 Just g  -> Just (g <*> store)

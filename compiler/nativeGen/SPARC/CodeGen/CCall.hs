@@ -19,7 +19,7 @@ import Instruction
 import Size
 import Reg
 
-import Cmm
+import OldCmm
 import CLabel
 import BasicTypes
 

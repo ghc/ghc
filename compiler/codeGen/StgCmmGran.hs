@@ -19,7 +19,7 @@ module StgCmmGran (
 -- I've left the calls, though, in case anyone wants to resurrect it
 
 import StgCmmMonad
-import Cmm
+import CmmExpr
 
 staticGranHdr :: [CmmLit]
 staticGranHdr = []

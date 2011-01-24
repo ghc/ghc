@@ -25,8 +25,8 @@ import CgUtils
 import Type
 import TysPrim
 import CLabel
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import SMRep
 import ForeignCall
 import ClosureInfo

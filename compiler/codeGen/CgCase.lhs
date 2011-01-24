@@ -27,8 +27,8 @@ import CgInfoTbls
 
 import ClosureInfo
 import SMRep
-import CmmUtils
-import Cmm
+import OldCmmUtils
+import OldCmm
 
 import StgSyn
 import StaticFlags

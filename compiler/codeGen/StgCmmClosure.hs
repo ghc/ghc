@@ -11,7 +11,6 @@
 --
 -----------------------------------------------------------------------------
 
-
 module StgCmmClosure (
         SMRep, 
 	DynTag,  tagForCon, isSmallFamily,
@@ -73,7 +72,7 @@ import ClosureInfo (ArgDescr(..), C_SRT(..), Liveness(..))
 
 import StgSyn
 import SMRep
-import Cmm	( ClosureTypeInfo(..), ConstrDescription )
+import CmmDecl ( ClosureTypeInfo(..), ConstrDescription )
 import CmmExpr
 
 import CLabel

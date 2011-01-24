@@ -22,7 +22,7 @@ module Size (
 
 where
 
-import Cmm
+import OldCmm
 import Outputable
 
 -- It looks very like the old MachRep, but it's now of purely local

@@ -54,7 +54,7 @@ import Reg
 import RegClass
 
 import BlockId
-import Cmm
+import OldCmm
 import CLabel           ( CLabel )
 import Pretty
 import Outputable	( panic )

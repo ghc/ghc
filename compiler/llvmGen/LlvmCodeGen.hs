@@ -16,9 +16,9 @@ import LlvmCodeGen.Ppr
 import LlvmMangler
 
 import CLabel
-import Cmm
 import CgUtils ( fixStgRegisters )
-import PprCmm
+import OldCmm
+import OldPprCmm
 
 import BufWrite
 import DynFlags
@@ -38,8 +38,8 @@ llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 llvmCodeGen dflags h us cmms
   = let cmm = concat $ map (\(Cmm top) -> top) cmms
         (cdata,env) = foldr split ([],initLlvmEnv) cmm
-        split (CmmData s d'   ) (d,e) = ((s,d'):d,e)
-        split (CmmProc i l _ _) (d,e) =
+        split (CmmData s d' ) (d,e) = ((s,d'):d,e)
+        split (CmmProc i l _) (d,e) =
             let lbl = strCLabel_llvm $ if not (null i)
                    then entryLblToInfoLbl l
                    else l

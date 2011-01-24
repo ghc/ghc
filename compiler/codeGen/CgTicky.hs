@@ -44,8 +44,8 @@ import CgUtils
 import CgMonad
 import SMRep
 
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import CLabel
 
 import Name

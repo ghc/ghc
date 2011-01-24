@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS  #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module StgCmmLayout (
 	mkArgDescr, 
 	emitCall, emitReturn,
@@ -42,10 +35,11 @@ import StgCmmTicky
 import StgCmmUtils
 import StgCmmMonad
 
-import MkZipCfgCmm
+import MkGraph
 import SMRep
+import CmmDecl
+import CmmExpr
 import CmmUtils
-import Cmm
 import CLabel
 import StgSyn
 import DataCon
@@ -462,7 +456,7 @@ emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> Id                      -- name of the closure
                             -> ClosureInfo             -- lots of info abt the closure
                             -> [NonVoid Id]            -- incoming arguments
-                            -> ((LocalReg, [LocalReg]) -> FCode ()) -- function body
+                            -> ((Int, LocalReg, [LocalReg]) -> FCode ()) -- function body
                             -> FCode ()
 emitClosureProcAndInfoTable top_lvl bndr cl_info args body
  = do	{ let lf_info = closureLFInfo cl_info
@@ -474,9 +468,10 @@ emitClosureProcAndInfoTable top_lvl bndr cl_info args body
         ; let node_points = nodeMustPointToIt lf_info
         ; arg_regs <- bindArgsToRegs args
         ; let args' = if node_points then (node : arg_regs) else arg_regs
-              conv = if nodeMustPointToIt lf_info
-                     then NativeNodeCall else NativeDirectCall
-        ; emitClosureAndInfoTable cl_info conv args' $ body (node, arg_regs)
+              conv  = if nodeMustPointToIt lf_info then NativeNodeCall
+                                                   else NativeDirectCall
+              (offset, _) = mkCallEntry conv args'
+        ; emitClosureAndInfoTable cl_info conv args' $ body (offset, node, arg_regs)
         }
 
 -- Data constructors need closures, but not with all the argument handling
@@ -491,9 +486,9 @@ emitClosureAndInfoTable cl_info conv args body
   where
     info_lbl = infoTableLabelFromCI cl_info
 
--- Convert from 'ClosureInfo' to 'CmmInfo'.
+-- Convert from 'ClosureInfo' to 'CmmInfoTable'.
 -- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
-mkCmmInfo :: ClosureInfo -> FCode CmmInfo
+mkCmmInfo :: ClosureInfo -> FCode CmmInfoTable
 mkCmmInfo cl_info
   = do	{ info <- closureTypeInfo cl_info k_with_con_name return 
         ; prof <- if opt_SccProfilingOn then
@@ -501,24 +496,12 @@ mkCmmInfo cl_info
 	               ad_lit <- mkStringCLit (closureValDescr  cl_info)
 	               return $ ProfilingInfo fd_lit ad_lit
                   else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
-	; return (CmmInfo gc_target Nothing
-                   (CmmInfoTable (isStaticClosure cl_info) prof cl_type info)) }
+	; return (CmmInfoTable (isStaticClosure cl_info) prof cl_type info) }
   where
     k_with_con_name con_info con info_lbl =
       do cstr <- mkByteStringCLit $ dataConIdentity con
          return $ con_info $ makeRelativeRefTo info_lbl cstr
     cl_type  = smRepClosureTypeInt (closureSMRep cl_info)
-
-    -- The gc_target is to inform the CPS pass when it inserts a stack check.
-    -- Since that pass isn't used yet we'll punt for now.
-    -- When the CPS pass is fully integrated, this should
-    -- be replaced by the label that any heap check jumped to,
-    -- so that branch can be shared by both the heap (from codeGen)
-    -- and stack checks (from the CPS pass).
-    -- JD: Actually, we've decided to go a different route here:
-    --     the code generator is now responsible for producing the
-    --     stack limit check explicitly, so this field is now obsolete.
-    gc_target = Nothing
 
 -----------------------------------------------------------------------------
 --

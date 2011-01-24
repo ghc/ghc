@@ -6,8 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
-module StgCmmBind ( 
-	cgTopRhsClosure, 
+module StgCmmBind (
+	cgTopRhsClosure,
 	cgBind,
 	emitBlackHoleCode,
         pushUpdateFrame
@@ -26,15 +26,17 @@ import StgCmmGran
 import StgCmmLayout
 import StgCmmUtils
 import StgCmmClosure
+import StgCmmForeign    (emitPrimCall)
 
-import MkZipCfgCmm
+import MkGraph
 import CoreSyn		( AltCon(..) )
 import SMRep
-import Cmm
+import CmmDecl
+import CmmExpr
 import CmmUtils
 import CLabel
 import StgSyn
-import CostCentre	
+import CostCentre
 import Id
 import Control.Monad
 import Name
@@ -78,7 +80,7 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
   ; let fv_details :: [(NonVoid Id, VirtualHpOffset)]
-	(_, _, fv_details) = mkVirtHeapOffsets (isLFThunk lf_info) 
+	(_, _, fv_details) = mkVirtHeapOffsets (isLFThunk lf_info)
 				               (addIdReps [])
   -- Don't drop the non-void args until the closure info has been made
   ; forkClosureBody (closureCodeBody True id closure_info ccs
@@ -97,7 +99,7 @@ cgBind (StgNonRec name rhs)
         ; emit (init <*> body) }
 
 cgBind (StgRec pairs)
-  = do	{ ((new_binds, inits), body) <- getCodeR $ fixC (\ new_binds_inits -> 
+  = do	{ ((new_binds, inits), body) <- getCodeR $ fixC (\ new_binds_inits ->
                do { addBindsC $ fst new_binds_inits -- avoid premature deconstruction
                   ; liftM unzip $ listFCs [ cgRhs b e | (b,e) <- pairs ] })
        ; addBindsC new_binds
@@ -125,7 +127,7 @@ cgBind (StgRec pairs)
      m[hp-40] = y_info;
      // allocate and initialize z
      ...
-     
+
    For each closure, we must generate not only the code to allocate and
    initialize the closure itself, but also some Initialization Code that
    sets a variable holding the closure pointer.
@@ -239,9 +241,9 @@ mkRhsClosure    bndr cc bi
 		body@(StgApp fun_id args)
 
   | args `lengthIs` (arity-1)
- 	&& all isFollowableArg (map (idCgRep . stripNV) fvs) 
+ 	&& all isFollowableArg (map (idCgRep . stripNV) fvs)
  	&& isUpdatable upd_flag
- 	&& arity <= mAX_SPEC_AP_SIZE 
+ 	&& arity <= mAX_SPEC_AP_SIZE
 
  		   -- Ha! an Ap thunk
   = cgStdThunk bndr cc bi body lf_info payload
@@ -268,7 +270,7 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 		reduced_fvs | bndr_is_a_fv = fvs `minusList` [NonVoid bndr]
 			    | otherwise	   = fvs
 
-		
+
 	-- MAKE CLOSURE INFO FOR THIS CLOSURE
 	; lf_info <- mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
 	; mod_name <- getModuleName
@@ -276,8 +278,8 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 	; let	name  = idName bndr
 		descr = closureDescription mod_name name
 		fv_details :: [(NonVoid Id, VirtualHpOffset)]
-		(tot_wds, ptr_wds, fv_details) 
-		   = mkVirtHeapOffsets (isLFThunk lf_info) 
+		(tot_wds, ptr_wds, fv_details)
+		   = mkVirtHeapOffsets (isLFThunk lf_info)
 				       (addIdReps (map stripNV reduced_fvs))
 		closure_info = mkClosureInfo False	-- Not static
 					     bndr lf_info tot_wds ptr_wds
@@ -295,9 +297,9 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 	; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
-	; (tmp, init) <- allocDynClosure closure_info use_cc blame_cc 
+	; (tmp, init) <- allocDynClosure closure_info use_cc blame_cc
 				         (map toVarArg fv_details)
-	
+
 	-- RETURN
 	; return $ (regIdInfo bndr lf_info tmp, init) }
 
@@ -319,12 +321,12 @@ cgStdThunk bndr cc _bndr_info body lf_info payload
   = do	-- AHA!  A STANDARD-FORM THUNK
   {	-- LAY OUT THE OBJECT
     mod_name <- getModuleName
-  ; let (tot_wds, ptr_wds, payload_w_offsets) 
+  ; let (tot_wds, ptr_wds, payload_w_offsets)
 	    = mkVirtHeapOffsets (isLFThunk lf_info) (addArgReps payload)
 
 	descr = closureDescription mod_name (idName bndr)
 	closure_info = mkClosureInfo False 	-- Not static
-				     bndr lf_info tot_wds ptr_wds 
+				     bndr lf_info tot_wds ptr_wds
 				     NoC_SRT	-- No SRT for a std-form closure
 				     descr
 
@@ -359,10 +361,10 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
 	 	-> [NonVoid Id]    -- incoming args to the closure
 	 	-> Int             -- arity, including void args
 		-> StgExpr
-		-> [(NonVoid Id, VirtualHpOffset)] -- the closure's free variables
+		-> [(NonVoid Id, VirtualHpOffset)] -- the closure's free vars
 		-> FCode ()
 
-{- There are two main cases for the code for closures.  
+{- There are two main cases for the code for closures.
 
 * If there are *no arguments*, then the closure is a thunk, and not in
   normal form. So it should set up an update frame (if it is
@@ -372,42 +374,46 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
   normal form, so there is no need to set up an update frame.
 
   The Macros for GrAnSim are produced at the beginning of the
-  argSatisfactionCheck (by calling fetchAndReschedule).  
+  argSatisfactionCheck (by calling fetchAndReschedule).
   There info if Node points to closure is available. -- HWL -}
 
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   | length args == 0 -- No args i.e. thunk
   = emitClosureProcAndInfoTable top_lvl bndr cl_info [] $
-      (\ (node, _) -> thunkCode cl_info fv_details cc node arity body)
+      \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
 
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   = ASSERT( length args > 0 )
-    do	{ 	-- Allocate the global ticky counter,
-	   	-- and establish the ticky-counter 
-		-- label for this block
-	  let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) $ clHasCafRefs cl_info
-	; emitTickyCounter cl_info (map stripNV args)
-	; setTickyCtrLabel ticky_ctr_lbl $ do
+    do  { -- Allocate the global ticky counter,
+          -- and establish the ticky-counter
+          -- label for this block
+          let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) $
+                                  clHasCafRefs cl_info
+        ; emitTickyCounter cl_info (map stripNV args)
+        ; setTickyCtrLabel ticky_ctr_lbl $ do
 
-	-- Emit the main entry code
-        ; emitClosureProcAndInfoTable top_lvl bndr cl_info args $ \(node, arg_regs) -> do
-                    -- Emit the slow-entry code (for entering a closure through a PAP)
+        -- Emit the main entry code
+        ; emitClosureProcAndInfoTable top_lvl bndr cl_info args $
+            \(offset, node, arg_regs) -> do
+                -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode cl_info arg_regs
 
                 ; let lf_info = closureLFInfo cl_info
                       node_points = nodeMustPointToIt lf_info
+                      node' = if node_points then Just node else Nothing
                 ; tickyEnterFun cl_info
                 ; whenC node_points (ldvEnterClosure cl_info)
                 ; granYield arg_regs node_points
 
-                        -- Main payload
-                ; entryHeapCheck (if node_points then Just node else Nothing) arity arg_regs $ do
+                -- Main payload
+                ; entryHeapCheck cl_info offset node' arity arg_regs $ do
                 { enterCostCentre cl_info cc body
                 ; fv_bindings <- mapM bind_fv fv_details
                 -- Load free vars out of closure *after*
-                ; if node_points then load_fvs node lf_info fv_bindings else return ()
-                ; cgExpr body }}	    -- heap check, to reduce live vars over check
-
+                -- heap check, to reduce live vars over check
+                ; if node_points then load_fvs node lf_info fv_bindings
+                                 else return ()
+                ; cgExpr body }}
   }
 
 -- A function closure pointer may be tagged, so we
@@ -426,55 +432,56 @@ load_fvs node lf_info = mapCs (\ (reg, off) ->
 -- according to the calling convention, and jumps to the function's
 -- normal entry point.  The function's closure is assumed to be in
 -- R1/node.
--- 
--- The slow entry point is used for unknown calls: eg. stg_PAP_entry 
+--
+-- The slow entry point is used for unknown calls: eg. stg_PAP_entry
 
 mkSlowEntryCode :: ClosureInfo -> [LocalReg] -> FCode ()
 -- If this function doesn't have a specialised ArgDescr, we need
 -- to generate the function's arg bitmap and slow-entry code.
 -- Here, we emit the slow-entry code.
-mkSlowEntryCode cl_info (_ : arg_regs) -- first arg should already be in `Node'
+mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
+mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
   | Just (_, ArgGen _) <- closureFunInfo cl_info
-  = emitProcWithConvention Slow (CmmInfo Nothing Nothing CmmNonInfoTable) slow_lbl
-                           arg_regs jump
+  = emitProcWithConvention Slow CmmNonInfoTable slow_lbl arg_regs jump
   | otherwise = return ()
   where
      caf_refs = clHasCafRefs cl_info
      name     = closureName cl_info
      slow_lbl = mkSlowEntryLabel  name caf_refs
      fast_lbl = enterLocalIdLabel name caf_refs
-     jump = mkJump (mkLblExpr fast_lbl) (map (CmmReg . CmmLocal) arg_regs)
-                   initUpdFrameOff
-mkSlowEntryCode _ [] = panic "entering a closure with no arguments?"
+     -- mkDirectJump does not clobber `Node' containing function closure
+     jump = mkDirectJump (mkLblExpr fast_lbl) (map (CmmReg . CmmLocal) arg_regs)
+                         initUpdFrameOff
 
 -----------------------------------------
-thunkCode :: ClosureInfo -> [(NonVoid Id, VirtualHpOffset)] -> CostCentreStack ->
-             LocalReg -> Int -> StgExpr -> FCode ()
-thunkCode cl_info fv_details cc node arity body 
-  = do	{ let node_points = nodeMustPointToIt (closureLFInfo cl_info)
-   	; tickyEnterThunk cl_info
-	; ldvEnterClosure cl_info  -- NB: Node always points when profiling
-	; granThunk node_points
+thunkCode :: ClosureInfo -> [(NonVoid Id, VirtualHpOffset)] -> CostCentreStack
+          -> LocalReg -> Int -> StgExpr -> FCode ()
+thunkCode cl_info fv_details cc node arity body
+  = do { let node_points = nodeMustPointToIt (closureLFInfo cl_info)
+             node'       = if node_points then Just node else Nothing
+        ; tickyEnterThunk cl_info
+        ; ldvEnterClosure cl_info -- NB: Node always points when profiling
+        ; granThunk node_points
 
         -- Heap overflow check
-	; entryHeapCheck (if node_points then Just node else Nothing) arity [] $ do
-      	{	-- Overwrite with black hole if necessary
-		-- but *after* the heap-overflow check
-	  dflags <- getDynFlags
-	; whenC (blackHoleOnEntry dflags cl_info && node_points)
- 	        (blackHoleIt cl_info)
+        ; entryHeapCheck cl_info 0 node' arity [] $ do
+        { -- Overwrite with black hole if necessary
+          -- but *after* the heap-overflow check
+          dflags <- getDynFlags
+        ; whenC (blackHoleOnEntry dflags cl_info && node_points)
+                (blackHoleIt cl_info)
 
-		-- Push update frame
-	; setupUpdate cl_info node $
-	    	-- We only enter cc after setting up update so
-	    	-- that cc of enclosing scope will be recorded
-	    	-- in update frame CAF/DICT functions will be
-	    	-- subsumed by this enclosing cc
+          -- Push update frame
+        ; setupUpdate cl_info node $
+            -- We only enter cc after setting up update so
+            -- that cc of enclosing scope will be recorded
+            -- in update frame CAF/DICT functions will be
+            -- subsumed by this enclosing cc
             do { enterCostCentre cl_info cc body
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings
-	       ; cgExpr body }}}
+               ; cgExpr body }}}
 
 
 ------------------------------------------------------------------------
@@ -487,11 +494,13 @@ blackHoleIt :: ClosureInfo -> FCode ()
 blackHoleIt closure_info = emitBlackHoleCode (closureSingleEntry closure_info)
 
 emitBlackHoleCode :: Bool -> FCode ()
-emitBlackHoleCode is_single_entry 
-  | eager_blackholing = do 
+emitBlackHoleCode is_single_entry
+  | eager_blackholing = do
 	tickyBlackHole (not is_single_entry)
+        emit (mkStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize) (CmmReg (CmmGlobal CurrentTSO)))
+        emitPrimCall [] MO_WriteBarrier []
 	emit (mkStore (CmmReg nodeReg) (CmmLit (CmmLabel bh_lbl)))
-  | otherwise = 
+  | otherwise =
 	nopC
   where
     bh_lbl | is_single_entry = mkCmmDataLabel rtsPackageId (fsLit "stg_SE_BLACKHOLE_info")
@@ -507,11 +516,11 @@ emitBlackHoleCode is_single_entry
 	-- currently eager blackholing doesn't work with profiling.
 	--
         -- Previously, eager blackholing was enabled when ticky-ticky
-        -- was on. But it didn't work, and it wasn't strictly necessary 
-        -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
+        -- was on. But it didn't work, and it wasn't strictly necessary
+        -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING
         -- is unconditionally disabled. -- krc 1/2007
 
-    eager_blackholing = False 
+    eager_blackholing = False
 
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
 	-- Nota Bene: this function does not change Node (even if it's a CAF),
@@ -522,12 +531,17 @@ setupUpdate closure_info node body
   = body
 
   | not (isStaticClosure closure_info)
-  = if closureUpdReqd closure_info
-    then do { tickyPushUpdateFrame;
-	    ; pushUpdateFrame [CmmReg (CmmLocal node),
-                               mkLblExpr mkUpdInfoLabel] body }
-    else do { tickyUpdateFrameOmitted; body}
- 
+  = if not (closureUpdReqd closure_info)
+      then do tickyUpdateFrameOmitted; body
+      else do
+          tickyPushUpdateFrame
+          --dflags <- getDynFlags
+          let es = [CmmReg (CmmLocal node), mkLblExpr mkUpdInfoLabel]
+          --if not opt_SccProfilingOn && dopt Opt_EagerBlackHoling dflags
+          --  then pushUpdateFrame es body -- XXX black hole
+          --  else pushUpdateFrame es body
+          pushUpdateFrame es body
+
   | otherwise	-- A static closure
   = do 	{ tickyUpdateBhCaf closure_info
 
@@ -535,16 +549,20 @@ setupUpdate closure_info node body
 	  then do	-- Blackhole the (updatable) CAF:
 		{ upd_closure <- link_caf closure_info True
 		; pushUpdateFrame [CmmReg (CmmLocal upd_closure),
-                                   mkLblExpr mkUpdInfoLabel] body }
+                                     mkLblExpr mkUpdInfoLabel] body } -- XXX black hole
 	  else do {tickyUpdateFrameOmitted; body}
     }
+
+-----------------------------------------------------------------------------
+-- Setting up update frames
 
 -- Push the update frame on the stack in the Entry area,
 -- leaving room for the return address that is already
 -- at the old end of the area.
 pushUpdateFrame :: [CmmExpr] -> FCode () -> FCode ()
 pushUpdateFrame es body
-  = do updfr  <- getUpdFrameOff
+  = do -- [EZY] I'm not sure if we need to special-case for BH too
+       updfr  <- getUpdFrameOff
        offset <- foldM push updfr es
        withUpdFrameOff offset body
      where push off e =
@@ -563,7 +581,7 @@ pushUpdateFrame es body
 -- allocated black hole to be empty.
 --
 -- Why do we make a black hole in the heap when we enter a CAF?
---    
+--
 --     - for a  generational garbage collector, which needs a fast
 --       test for whether an updatee is in an old generation or not
 --
@@ -581,7 +599,7 @@ pushUpdateFrame es body
 -- ToDo [Feb 04]  This entire link_caf nonsense could all be moved
 -- into the "newCAF" RTS procedure, which we call anyway, including
 -- the allocation of the black-hole indirection closure.
--- That way, code size would fall, the CAF-handling code would 
+-- That way, code size would fall, the CAF-handling code would
 -- be closer together, and the compiler wouldn't need to know
 -- about off_indirectee etc.
 
@@ -598,12 +616,14 @@ link_caf cl_info _is_upd = do
   { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
         blame_cc = use_cc
-  ; (hp_rel, init) <- allocDynClosure bh_cl_info use_cc blame_cc []
+        tso      = CmmReg (CmmGlobal CurrentTSO)
+    -- XXX ezyang: FIXME
+  ; (hp_rel, init) <- allocDynClosureCmm bh_cl_info use_cc blame_cc [(tso,fixedHdrSize)]
   ; emit init
 
 	-- Call the RTS function newCAF to add the CAF to the CafList
 	-- so that the garbage collector can find them
-	-- This must be done *before* the info table pointer is overwritten, 
+	-- This must be done *before* the info table pointer is overwritten,
 	-- because the old info table ptr is needed for reversion
   ; emitRtsCallWithVols rtsPackageId (fsLit "newCAF")
       [ (CmmReg (CmmGlobal BaseReg),  AddrHint),
@@ -611,7 +631,7 @@ link_caf cl_info _is_upd = do
       [node] False
 	-- node is live, so save it.
 
-	-- Overwrite the closure with a (static) indirection 
+	-- Overwrite the closure with a (static) indirection
 	-- to the newly-allocated black hole
   ; emit (mkStore (cmmRegOffW nodeReg off_indirectee) (CmmReg (CmmLocal hp_rel)) <*>
 	  mkStore (CmmReg nodeReg) ind_static_info)
@@ -629,7 +649,7 @@ link_caf cl_info _is_upd = do
 
 
 ------------------------------------------------------------------------
---		Profiling 
+--		Profiling
 ------------------------------------------------------------------------
 
 -- For "global" data constructors the description is simply occurrence
@@ -648,4 +668,4 @@ closureDescription mod_name name
 		      else pprModule mod_name <> char '.' <> ppr name) <>
 		    char '>')
    -- showSDocDump, because we want to see the unique on the Name.
-  
+

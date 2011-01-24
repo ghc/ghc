@@ -25,9 +25,9 @@ import StgCmmUtils
 import StgCmmClosure
 import StgCmmProf
 
-import Cmm
+import CmmExpr
 import CLabel
-import MkZipCfgCmm (CmmAGraph, mkNop)
+import MkGraph
 import SMRep
 import CostCentre
 import Module

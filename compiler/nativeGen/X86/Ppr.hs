@@ -32,11 +32,10 @@ import Reg
 import PprBase
 
 
-import BlockId
-import Cmm
+import OldCmm
 import CLabel
 import Config
-import Unique           ( pprUnique )
+import Unique           ( pprUnique, Uniquable(..) )
 import Pretty
 import FastString
 import qualified Outputable
@@ -57,9 +56,9 @@ pprNatCmmTop (CmmData section dats) =
   pprSectionHeader section $$ vcat (map pprData dats)
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
+pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
 
-pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) =
+pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (if null info then -- blocks guaranteed not null, so label needed
        pprLabel lbl
@@ -91,8 +90,8 @@ pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) =
 
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
-pprBasicBlock (BasicBlock (BlockId id) instrs) =
-  pprLabel (mkAsmTempLabel id) $$
+pprBasicBlock (BasicBlock blockid instrs) =
+  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
 
@@ -619,9 +618,9 @@ pprInstr (CLTD II64) = ptext (sLit "\tcqto")
 
 pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand II8 op)
 
-pprInstr (JXX cond (BlockId id))
+pprInstr (JXX cond blockid)
   = pprCondInstr (sLit "j") cond (pprCLabel_asm lab)
-  where lab = mkAsmTempLabel id
+  where lab = mkAsmTempLabel (getUnique blockid)
 
 pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 

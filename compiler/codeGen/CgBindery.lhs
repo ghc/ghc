@@ -39,7 +39,7 @@ import CLabel
 import ClosureInfo
 import Constants
 
-import Cmm
+import OldCmm
 import PprCmm		( {- instance Outputable -} )
 import SMRep
 import Id

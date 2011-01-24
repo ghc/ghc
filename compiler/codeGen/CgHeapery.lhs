@@ -34,8 +34,8 @@ import CgCallConv
 import ClosureInfo
 import SMRep
 
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import Id
 import DataCon
 import TyCon
