@@ -351,7 +351,7 @@ integerPackageId, primPackageId,
 primPackageId      = fsToPackageId (fsLit "ghc-prim")
 integerPackageId   = fsToPackageId (fsLit cIntegerLibrary)
 basePackageId      = fsToPackageId (fsLit "base")
-rtsPackageId	   = fsToPackageId (fsLit "rts")
+rtsPackageId       = fsToPackageId (fsLit "rts")
 thPackageId        = fsToPackageId (fsLit "template-haskell")
 dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
 dphParPackageId    = fsToPackageId (fsLit "dph-par")

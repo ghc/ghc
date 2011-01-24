@@ -36,7 +36,7 @@ where
 #include "HsVersions.h"
 
 import PackageConfig	
-import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..) )
+import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..), DPHBackend(..) )
 import StaticFlags
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
@@ -622,7 +622,6 @@ mkPackageState
     -> IO (PackageState,
            [PackageId],         -- new packages to preload
            PackageId) -- this package, might be modified if the current
-
                       -- package is a wired-in package.
 
 mkPackageState dflags pkgs0 preload0 this_package = do
@@ -666,7 +665,13 @@ mkPackageState dflags pkgs0 preload0 this_package = do
 -}
 
   let
-      flags = reverse (packageFlags dflags)
+      flags = reverse (packageFlags dflags) ++ dphPackage
+      -- expose the appropriate DPH backend library
+      dphPackage = case dphBackend dflags of
+                     DPHPar  -> [ExposePackage "dph-prim-par", ExposePackage "dph-par"]
+                     DPHSeq  -> [ExposePackage "dph-prim-seq", ExposePackage "dph-seq"]
+                     DPHThis -> []
+                     DPHNone -> []
 
       -- pkgs0 with duplicate packages filtered out.  This is
       -- important: it is possible for a package in the global package
@@ -750,19 +755,19 @@ mkPackageState dflags pkgs0 preload0 this_package = do
       -- set up preloaded package when we are just building it
       preload3 = nub $ filter (/= this_package)
                      $ (basicLinkedPackages ++ preload2)
-
+ 
   -- Close the preload packages with their dependencies
   dep_preload <- closeDeps pkg_db ipid_map (zip preload3 (repeat Nothing))
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let pstate = PackageState{ preloadPackages     = dep_preload,
-		             pkgIdMap   	 = pkg_db,
-		             moduleToPkgConfAll  = mkModuleMap pkg_db,
+                             pkgIdMap            = pkg_db,
+                             moduleToPkgConfAll  = mkModuleMap pkg_db,
                              installedPackageIdMap = ipid_map
-		           }
+                           }
 
   return (pstate, new_dep_preload, this_package)
-
+  
 
 -- -----------------------------------------------------------------------------
 -- Make the mapping from module to package info

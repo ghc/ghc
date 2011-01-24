@@ -32,7 +32,7 @@ module DynFlags (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
-        dphPackage,
+        DPHBackend(..), dphPackage,
         wayNames,
 
         -- ** Manipulating DynFlags
@@ -669,7 +669,7 @@ defaultDynFlags =
         mainFunIs               = Nothing,
         ctxtStkDepth            = mAX_CONTEXT_REDUCTION_DEPTH,
 
-        dphBackend              = DPHPar,
+        dphBackend              = DPHNone,
 
         thisPackage             = mainPackageId,
 
@@ -1334,6 +1334,7 @@ dynamic_flags = [
   , Flag "fdph-seq"         (NoArg (setDPHBackend DPHSeq))
   , Flag "fdph-par"         (NoArg (setDPHBackend DPHPar))
   , Flag "fdph-this"        (NoArg (setDPHBackend DPHThis))
+  , Flag "fdph-none"        (NoArg (setDPHBackend DPHNone))
 
         ------ Compiler flags -----------------------------------------------
 
@@ -1681,6 +1682,8 @@ impliedFlags
 	-- stuff like " 'a' not in scope ", which is a bit silly
  	-- if the compiler has just filled in field 'a' of constructor 'C'
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
+    
+    , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]
@@ -1977,44 +1980,39 @@ setOptLevel n dflags
 -- -Odph is equivalent to
 --
 --    -O2                               optimise as much as possible
---    -fno-method-sharing               sharing specialisation defeats fusion
---                                      sometimes
---    -fdicts-cheap                     always inline dictionaries
 --    -fmax-simplifier-iterations20     this is necessary sometimes
---    -fsimplifier-phases=3             we use an additional simplifier phase
---                                      for fusion
---    -fno-spec-constr-threshold        run SpecConstr even for big loops
---    -fno-spec-constr-count            SpecConstr as much as possible
---    -finline-enough-args              hack to prevent excessive inlining
+--    -fsimplifier-phases=3             we use an additional simplifier phase for fusion
 --
 setDPHOpt :: DynFlags -> DynFlags
 setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , simplPhases         = 3
-                                         , specConstrThreshold = Nothing
-                                         , specConstrCount     = Nothing
                                          })
-                   `dopt_set`   Opt_DictsCheap
 
-data DPHBackend = DPHPar
-                | DPHSeq
-                | DPHThis
+-- Determines the package used by the vectoriser for the symbols of the vectorised code.
+-- 'DPHNone' indicates that no data-parallel backend library is available; hence, the
+-- vectoriser cannot be used.
+--
+data DPHBackend = DPHPar    -- "dph-par"
+                | DPHSeq    -- "dph-seq"
+                | DPHThis   -- the currently compiled package
+                | DPHNone   -- no DPH library available
         deriving(Eq, Ord, Enum, Show)
 
 setDPHBackend :: DPHBackend -> DynP ()
-setDPHBackend backend 
-  = do
-      upd $ \dflags -> dflags { dphBackend = backend }
-      mapM_ exposePackage (dph_packages backend)
-  where
-    dph_packages DPHThis = []
-    dph_packages DPHPar  = ["dph-prim-par", "dph-par"]
-    dph_packages DPHSeq  = ["dph-prim-seq", "dph-seq"]
+setDPHBackend backend = upd $ \dflags -> dflags { dphBackend = backend }
 
+-- Query the DPH backend package to be used by the vectoriser.
+--
 dphPackage :: DynFlags -> PackageId
-dphPackage dflags = case dphBackend dflags of
-                      DPHPar  -> dphParPackageId
-                      DPHSeq  -> dphSeqPackageId
-                      DPHThis -> thisPackage dflags
+dphPackage dflags 
+  = case dphBackend dflags of
+      DPHPar  -> dphParPackageId
+      DPHSeq  -> dphSeqPackageId
+      DPHThis -> thisPackage dflags
+      DPHNone -> ghcError (CmdLineError dphBackendError)
+
+dphBackendError :: String
+dphBackendError = "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
 
 setMainIs :: String -> DynP ()
 setMainIs arg
