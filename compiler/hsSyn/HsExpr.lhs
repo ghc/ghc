@@ -1161,7 +1161,8 @@ data HsMatchContext id  -- Context of a Match
   | LambdaExpr                  -- Patterns of a lambda
   | CaseAlt                     -- Patterns and guards on a case alternative
   | ProcExpr                    -- Patterns of a proc
-  | PatBindRhs                  -- Patterns in the *guards* of a pattern binding
+  | PatBindRhs                  -- A pattern binding, or its guards
+    				--     [x] = e,   or    x | [y] <- e = e
   | RecUpd                      -- Record update [used only in DsExpr to
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
