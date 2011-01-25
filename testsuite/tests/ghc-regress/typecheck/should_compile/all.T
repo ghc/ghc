@@ -335,4 +335,5 @@ test('T4418', normal, compile, [''])
 test('T4444', normal, compile, [''])
 test('T4498', normal, compile, [''])
 test('T4524', normal, compile, [''])
+test('T4917', normal, compile, [''])
 
