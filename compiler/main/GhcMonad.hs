@@ -18,7 +18,8 @@ module GhcMonad (
 	Session(..), withSession, modifySession, withTempSession,
 
         -- ** Warnings
-        logWarnings
+        logWarnings, printException, printExceptionAndWarnings,
+	WarnErrLogger, defaultWarnErrLogger
   ) where
 
 import MonadUtils
@@ -175,3 +176,23 @@ instance ExceptionMonad m => ExceptionMonad (GhcT m) where
 instance (Functor m, ExceptionMonad m, MonadIO m) => GhcMonad (GhcT m) where
   getSession = GhcT $ \(Session r) -> liftIO $ readIORef r
   setSession s' = GhcT $ \(Session r) -> liftIO $ writeIORef r s'
+
+
+-- | Print the error message and all warnings.  Useful inside exception
+--   handlers.  Clears warnings after printing.
+printException :: GhcMonad m => SourceError -> m ()
+printException err = do
+  dflags <- getSessionDynFlags
+  liftIO $ printBagOfErrors dflags (srcErrorMessages err)
+
+{-# DEPRECATED printExceptionAndWarnings "use printException instead" #-}
+printExceptionAndWarnings :: GhcMonad m => SourceError -> m ()
+printExceptionAndWarnings = printException
+
+-- | A function called to log warnings and errors.
+type WarnErrLogger = GhcMonad m => Maybe SourceError -> m ()
+
+defaultWarnErrLogger :: WarnErrLogger
+defaultWarnErrLogger Nothing  = return ()
+defaultWarnErrLogger (Just e) = printException e
+

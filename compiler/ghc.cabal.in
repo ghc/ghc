@@ -327,6 +327,7 @@ Library
         ErrUtils
         Finder
         GHC
+        GhcMake
         HeaderInfo
         HscMain
         HscStats
