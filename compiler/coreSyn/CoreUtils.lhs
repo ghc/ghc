@@ -687,6 +687,9 @@ exprOkForSpeculation other_expr
 		-- Often there is a literal divisor, and this 
 		-- can get rid of a thunk in an inner looop
 
+      | DataToTagOp <- op      -- See Note [dataToTag speculation]
+      = True
+
       | otherwise
       = primOpOkForSpeculation op && 
 	all exprOkForSpeculation args
@@ -741,6 +744,27 @@ If exprOkForSpeculation doesn't look through case expressions, you get this:
         }
 
 The inner case is redundant, and should be nuked.
+
+Note [dataToTag speculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Is this OK?
+   f x = let v::Int# = dataToTag# x
+         in ...
+We say "yes", even though 'x' may not be evaluated.  Reasons
+
+  * dataToTag#'s strictness means that its argument often will be
+    evaluated, but FloatOut makes that temporarily untrue
+         case x of y -> let v = dataToTag# y in ...
+    -->
+         case x of y -> let v = dataToTag# x in ...
+    Note that we look at 'x' instead of 'y' (this is to improve
+    floating in FloatOut).  So Lint complains.    
+ 
+    Moreover, it really *might* improve floating to let the
+    v-binding float out
+         
+  * CorePrep makes sure dataToTag#'s argument is evaluated, just
+    before code gen.  Until then, it's not guaranteed
 
 
 %************************************************************************

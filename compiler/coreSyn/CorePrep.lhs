@@ -637,9 +637,7 @@ maybeSaturate fn expr n_args
 
 -------------
 saturateDataToTag :: CpeApp -> UniqSM CpeApp
--- Horrid: ensure that the arg of data2TagOp is evaluated
---   (data2tag x) -->  (case x of y -> data2tag y)
--- (yuk yuk) take into account the lambdas we've now introduced
+-- See Note [dataToTag magic]
 saturateDataToTag sat_expr
   = do { let (eta_bndrs, eta_body) = collectBinders sat_expr
        ; eta_body' <- eval_data2tag_arg eta_body
@@ -663,7 +661,14 @@ saturateDataToTag sat_expr
 	= pprPanic "eval_data2tag" (ppr other)
 \end{code}
 
+Note [dataToTag magic]
+~~~~~~~~~~~~~~~~~~~~~~
+Horrid: we must ensure that the arg of data2TagOp is evaluated
+  (data2tag x) -->  (case x of y -> data2tag y)
+(yuk yuk) take into account the lambdas we've now introduced
 
+How might it not be evaluated?  Well, we might have floated it out
+of the scope of a `seq`, or dropped the `seq` altogether.
 
 
 %************************************************************************
