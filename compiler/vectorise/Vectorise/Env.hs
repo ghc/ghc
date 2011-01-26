@@ -11,7 +11,8 @@ module Vectorise.Env (
 	initGlobalEnv,
 	extendImportedVarsEnv,
 	extendScalars,
-	setFamInstEnv,
+	setFamEnv,
+        extendFamEnv,
 	extendTyConsEnv,
 	extendDataConsEnv,
 	extendPAFunsEnv,
@@ -142,10 +143,15 @@ extendScalars vs genv
 
 
 -- | Set the list of type family instances in an environment.
-setFamInstEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
-setFamInstEnv l_fam_inst genv
+setFamEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
+setFamEnv l_fam_inst genv
   = genv { global_fam_inst_env = (g_fam_inst, l_fam_inst) }
   where (g_fam_inst, _) = global_fam_inst_env genv
+
+extendFamEnv :: [FamInst] -> GlobalEnv -> GlobalEnv
+extendFamEnv new genv
+  = genv { global_fam_inst_env = (g_fam_inst, extendFamInstEnvList l_fam_inst new) }
+  where (g_fam_inst, l_fam_inst) = global_fam_inst_env genv
 
 
 -- | Extend the list of type constructors in an environment.

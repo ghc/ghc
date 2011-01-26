@@ -479,7 +479,6 @@ Library
         Vectorise.Utils.Closure
         Vectorise.Utils.Hoisting
         Vectorise.Utils.PADict
-        Vectorise.Utils.PRDict
         Vectorise.Utils.Poly
         Vectorise.Utils
         Vectorise.Type.Env
@@ -487,7 +486,6 @@ Library
         Vectorise.Type.PData
         Vectorise.Type.PRepr
         Vectorise.Type.PADict
-        Vectorise.Type.PRDict
         Vectorise.Type.Type
         Vectorise.Type.TyConDecl
         Vectorise.Type.Classify

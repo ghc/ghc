@@ -82,7 +82,7 @@ tyConRepr tc = sum_repr (tyConDataCons tc)
       where
         arity = length tys
     
-    comp_repr ty = liftM (Keep ty) (prDictOfType ty)
+    comp_repr ty = liftM (Keep ty) (prDictOfReprType ty)
                    `orElseV` return (Wrap ty)
 
 sumReprType :: SumRepr -> VM Type

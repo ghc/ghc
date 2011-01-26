@@ -82,6 +82,13 @@ vectTypeEnv env
       let vect_tcs  = filter (not . isClassTyCon) 
                     $ keep_tcs ++ new_tcs
 
+      reprs <- mapM tyConRepr vect_tcs
+      repr_tcs  <- zipWith3M buildPReprTyCon orig_tcs vect_tcs reprs
+      pdata_tcs <- zipWith3M buildPDataTyCon orig_tcs vect_tcs reprs
+      updGEnv $ extendFamEnv
+              $ map mkLocalFamInst
+              $ repr_tcs ++ pdata_tcs
+
       -- Create PRepr and PData instances for the vectorised types.
       -- We get back the binds for the instance functions, 
       -- and some new type constructors for the representation types.
@@ -89,8 +96,6 @@ vectTypeEnv env
         do
           defTyConPAs (zipLazy vect_tcs dfuns')
           reprs     <- mapM tyConRepr vect_tcs
-          repr_tcs  <- zipWith3M buildPReprTyCon orig_tcs vect_tcs reprs
-          pdata_tcs <- zipWith3M buildPDataTyCon orig_tcs vect_tcs reprs
 
           dfuns     <- sequence 
                     $  zipWith5 buildTyConBindings

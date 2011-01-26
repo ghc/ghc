@@ -77,7 +77,6 @@ maybeCantVectoriseM s d p
         Just x  -> return x
         Nothing -> cantVectorise s d
 
-
 -- Control --------------------------------------------------------------------
 -- | Return some result saying we've failed.
 noV :: VM a
