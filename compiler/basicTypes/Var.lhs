@@ -17,13 +17,19 @@
 --
 -- * 'Id.Id': see "Id#name_types"
 --
--- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally potentially contain type variables, 
---   which have a 'TypeRep.Kind' rather than a 'TypeRep.Type' and only contain some extra details during typechecking.
+-- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally 
+--   potentially contain type variables, which have a 'TypeRep.Kind' 
+--   rather than a 'TypeRep.Type' and only contain some extra 
+--   details during typechecking.
+-- 
 --   These 'Var.Var' names may either be global or local, see "Var#globalvslocal"
 --
 -- #globalvslocal#
--- Global 'Id's and 'Var's are those that are imported or correspond to a data constructor, primitive operation, or record selectors.
--- Local 'Id's and 'Var's are those bound within an expression (e.g. by a lambda) or at the top level of the module being compiled.
+-- Global 'Id's and 'Var's are those that are imported or correspond 
+--    to a data constructor, primitive operation, or record selectors.
+-- Local 'Id's and 'Var's are those bound within an expression 
+--    (e.g. by a lambda) or at the top level of the module being compiled.
+
 module Var (
         -- * The main data type and synonyms
 	Var, TyVar, CoVar, Id, DictId, DFunId, EvVar, EvId, IpId,
