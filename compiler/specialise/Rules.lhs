@@ -187,8 +187,9 @@ roughTopName (Type ty) = case tcSplitTyConApp_maybe ty of
 			  Just (tc,_) -> Just (getName tc)
 			  Nothing     -> Nothing
 roughTopName (App f _) = roughTopName f
-roughTopName (Var f) | isGlobalId f = Just (idName f)
-		     | otherwise    = Nothing
+roughTopName (Var f)   | isGlobalId f	-- Note [Care with roughTopName]
+                       , isDataConWorkId f || idArity f > 0
+                       = Just (idName f)
 roughTopName _ = Nothing
 
 ruleCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
@@ -209,6 +210,25 @@ ruleCantMatch (_       : ts) (_       : as) = ruleCantMatch ts as
 ruleCantMatch _ 	     _ 		    = False
 \end{code}
 
+Note [Care with roughTopName]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+    module M where { x = a:b }
+    module N where { ...f x...
+                     RULE f (p:q) = ... }
+You'd expect the rule to match, because the matcher can 
+look through the unfolding of 'x'.  So we must avoid roughTopName
+returning 'M.x' for the call (f x), or else it'll say "can't match"
+and we won't even try!!
+
+However, suppose we have
+	 RULE g (M.h x) = ...
+	 foo = ...(g (M.k v))....
+where k is a *function* exported by M.  We never really match
+functions (lambdas) except by name, so in this case it seems like
+a good idea to treat 'M.k' as a roughTopName of the call.
+
+    
 \begin{code}
 pprRulesForUser :: [CoreRule] -> SDoc
 -- (a) tidy the rules
@@ -340,7 +360,7 @@ lookupRule :: (Activation -> Bool)	-- When rule is active
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
 lookupRule is_active id_unf in_scope fn args rules
-  = -- pprTrace "matchRules" (ppr fn <+> ppr rules) $
+  = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
 	[]     -> Nothing
 	(m:ms) -> Just (findBest (fn,args) m ms)
