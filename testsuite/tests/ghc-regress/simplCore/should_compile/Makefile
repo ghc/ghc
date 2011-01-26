@@ -28,3 +28,9 @@ T4903:
 	'$(TEST_HC)' -c -O T4903a.hs -dcore-lint
 	'$(TEST_HC)' -c -O T4903.hs -dcore-lint
 
+T4918:
+	$(RM) -f T4918.hi T4918.o T4918a.hi T4918a.o
+	'$(TEST_HC)' -c -O T4918a.hs 
+	'$(TEST_HC)' -c -O T4918.hs 
+	'$(TEST_HC)' --show-iface T4918.hi | grep 'C#'
+
