@@ -600,6 +600,14 @@ primop  WriteArrayOp "writeArray#" GenPrimOp
    with
    has_side_effects = True
 
+primop  SizeofArrayOp "sizeofArray#" GenPrimOp
+   Array# a -> Int#
+   {Return the number of elements in the array.}
+
+primop  SizeofMutableArrayOp "sizeofMutableArray#" GenPrimOp
+   MutableArray# s a -> Int#
+   {Return the number of elements in the array.}
+
 primop  IndexArrayOp "indexArray#" GenPrimOp
    Array# a -> Int# -> (# a #)
    {Read from specified index of immutable array. Result is packaged into

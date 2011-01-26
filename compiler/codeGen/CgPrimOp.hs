@@ -211,6 +211,11 @@ emitPrimOp [r] ReadArrayOp  [obj,ix]   _  = doReadPtrArrayOp r obj ix
 emitPrimOp [r] IndexArrayOp [obj,ix]   _  = doReadPtrArrayOp r obj ix
 emitPrimOp []  WriteArrayOp [obj,ix,v] _  = doWritePtrArrayOp obj ix v
 
+emitPrimOp [res] SizeofArrayOp [arg] _
+   = stmtC $ CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord)
+emitPrimOp [res] SizeofMutableArrayOp [arg] live
+   = emitPrimOp [res] SizeofArrayOp [arg] live
+
 -- IndexXXXoffAddr
 
 emitPrimOp res IndexOffAddrOp_Char      args _ = doIndexOffAddrOp (Just mo_u_8ToWord) b8 res args
