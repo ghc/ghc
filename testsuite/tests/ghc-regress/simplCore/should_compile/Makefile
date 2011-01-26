@@ -22,3 +22,9 @@ T4201:
 	'$(TEST_HC)' -c -O T4201.hs 
 	'$(TEST_HC)' --show-iface T4201.hi | grep 'Unfolding.*sym'
 
+# This one looped as a result of bogus specialisation
+T4903:
+	$(RM) -f T4903a.o T4903.o
+	'$(TEST_HC)' -c -O T4903a.hs -dcore-lint
+	'$(TEST_HC)' -c -O T4903.hs -dcore-lint
+
