@@ -337,3 +337,5 @@ test('T4498', normal, compile, [''])
 test('T4524', normal, compile, [''])
 test('T4917', normal, compile, [''])
 
+test('T4912', extra_clean(['T4912a.hi', 'T4912a.o']), 
+     multimod_compile, ['T4912', '-v0'])
