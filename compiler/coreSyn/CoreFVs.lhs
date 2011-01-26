@@ -23,14 +23,13 @@ module CoreFVs (
         -- * Selective free variables of expressions
         InterestingVarFun,
 	exprSomeFreeVars, exprsSomeFreeVars,
-	exprFreeNames, exprsFreeNames,
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyVars, varTypeTcTyVars, 
 	idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
 	ruleRhsFreeVars, rulesFreeVars,
-	ruleLhsFreeNames, ruleLhsFreeIds, 
+	ruleLhsOrphNames, ruleLhsFreeIds, 
 
         -- * Core syntax tree annotation with free variables
 	CoreExprWithFVs,	-- = AnnExpr Id VarSet
@@ -219,7 +218,7 @@ exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
 %************************************************************************
 
 \begin{code}
--- | Similar to 'exprFreeNames'. However, this is used when deciding whether 
+-- | ruleLhsOrphNames is used when deciding whether 
 -- a rule is an orphan.  In particular, suppose that T is defined in this 
 -- module; we want to avoid declaring that a rule like:
 -- 
@@ -227,18 +226,20 @@ exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
 --
 -- is an orphan. Of course it isn't, and declaring it an orphan would
 -- make the whole module an orphan module, which is bad.
-ruleLhsFreeNames :: CoreRule -> NameSet
-ruleLhsFreeNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
-ruleLhsFreeNames (Rule { ru_fn = fn, ru_args = tpl_args })
-  = addOneToNameSet (exprsFreeNames tpl_args) fn
+ruleLhsOrphNames :: CoreRule -> NameSet
+ruleLhsOrphNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
+ruleLhsOrphNames (Rule { ru_fn = fn, ru_args = tpl_args })
+  = addOneToNameSet (exprsOrphNames tpl_args) fn
+		-- No need to delete bndrs, because
+		-- exprsOrphNames finds only External names
 
 -- | Finds the free /external/ names of an expression, notably
 -- including the names of type constructors (which of course do not show
 -- up in 'exprFreeVars').
-exprFreeNames :: CoreExpr -> NameSet
+exprOrphNames :: CoreExpr -> NameSet
 -- There's no need to delete local binders, because they will all
 -- be /internal/ names.
-exprFreeNames e
+exprOrphNames e
   = go e
   where
     go (Var v) 
@@ -246,21 +247,21 @@ exprFreeNames e
       | otherwise	    = emptyNameSet
       where n = idName v
     go (Lit _) 	   	    = emptyNameSet
-    go (Type ty)   	    = tyClsNamesOfType ty	-- Don't need free tyvars
+    go (Type ty)   	    = orphNamesOfType ty	-- Don't need free tyvars
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
     go (Lam v e)   	    = go e `delFromNameSet` idName v
     go (Note _ e)           = go e
-    go (Cast e co)          = go e `unionNameSets` tyClsNamesOfType co
+    go (Cast e co)          = go e `unionNameSets` orphNamesOfType co
     go (Let (NonRec _ r) e) = go e `unionNameSets` go r
-    go (Let (Rec prs) e)    = exprsFreeNames (map snd prs) `unionNameSets` go e
-    go (Case e _ ty as)     = go e `unionNameSets` tyClsNamesOfType ty
+    go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSets` go e
+    go (Case e _ ty as)     = go e `unionNameSets` orphNamesOfType ty
                               `unionNameSets` unionManyNameSets (map go_alt as)
 
     go_alt (_,_,r) = go r
 
--- | Finds the free /external/ names of several expressions: see 'exprFreeNames' for details
-exprsFreeNames :: [CoreExpr] -> NameSet
-exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
+-- | Finds the free /external/ names of several expressions: see 'exprOrphNames' for details
+exprsOrphNames :: [CoreExpr] -> NameSet
+exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
 \end{code}
 
 %************************************************************************

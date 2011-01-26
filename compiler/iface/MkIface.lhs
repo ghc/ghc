@@ -1431,7 +1431,7 @@ instanceToIfaceInst (Instance { is_dfun = dfun_id, is_flag = oflag,
     (_, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
 		-- Slightly awkward: we need the Class to get the fundeps
     (tvs, fds) = classTvsFds cls
-    arg_names = [filterNameSet is_local (tyClsNamesOfType ty) | ty <- tys]
+    arg_names = [filterNameSet is_local (orphNamesOfType ty) | ty <- tys]
     orph | is_local cls_name = Just (nameOccName cls_name)
 	 | all isJust mb_ns  = ASSERT( not (null mb_ns) ) head mb_ns
 	 | otherwise	     = Nothing
@@ -1549,10 +1549,10 @@ coreRuleToIfaceRule _ (BuiltinRule { ru_fn = fn})
   = pprTrace "toHsRule: builtin" (ppr fn) $
     bogusIfaceRule fn
 
-coreRuleToIfaceRule mod (Rule { ru_name = name, ru_fn = fn, 
-                                ru_act = act, ru_bndrs = bndrs,
-	                        ru_args = args, ru_rhs = rhs, 
-                                ru_auto = auto })
+coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn, 
+                                     ru_act = act, ru_bndrs = bndrs,
+	                             ru_args = args, ru_rhs = rhs, 
+                                     ru_auto = auto })
   = IfaceRule { ifRuleName  = name, ifActivation = act, 
 		ifRuleBndrs = map toIfaceBndr bndrs,
 		ifRuleHead  = fn, 
@@ -1571,9 +1571,7 @@ coreRuleToIfaceRule mod (Rule { ru_name = name, ru_fn = fn,
 	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
 	-- A rule is an orphan only if none of the variables
 	-- mentioned on its left-hand side are locally defined
-    lhs_names = fn : nameSetToList (exprsFreeNames args)
-		-- No need to delete bndrs, because
-		-- exprsFreeNames finds only External names
+    lhs_names = nameSetToList (ruleLhsOrphNames rule)
 
     orph = case filter (nameIsLocalOrFrom mod) lhs_names of
 			(n : _) -> Just (nameOccName n)

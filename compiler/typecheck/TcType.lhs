@@ -61,7 +61,7 @@ module TcType (
   ---------------------------------
   -- Misc type manipulators
   deNoteType,
-  tyClsNamesOfType, tyClsNamesOfDFunHead, 
+  orphNamesOfType, orphNamesOfDFunHead, 
   getDFunTyKey,
 
   ---------------------------------
@@ -1162,13 +1162,13 @@ exactTyVarsOfType ty
   = go ty
   where
     go ty | Just ty' <- tcView ty = go ty'	-- This is the key line
-    go (TyVarTy tv)         	  = unitVarSet tv
-    go (TyConApp _ tys)     	  = exactTyVarsOfTypes tys
-    go (PredTy ty)	    	  = go_pred ty
-    go (FunTy arg res)	    	  = go arg `unionVarSet` go res
-    go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
-    go (ForAllTy tyvar ty)  	  = delVarSet (go ty) tyvar
-                                    `unionVarSet` go_tv tyvar
+    go (TyVarTy tv)         = unitVarSet tv
+    go (TyConApp _ tys)     = exactTyVarsOfTypes tys
+    go (PredTy ty)	    = go_pred ty
+    go (FunTy arg res)	    = go arg `unionVarSet` go res
+    go (AppTy fun arg)	    = go fun `unionVarSet` go arg
+    go (ForAllTy tyvar ty)  = delVarSet (go ty) tyvar
+                              `unionVarSet` go_tv tyvar
 
     go_pred (IParam _ ty)    = go ty
     go_pred (ClassP _ tys)   = exactTyVarsOfTypes tys
@@ -1185,29 +1185,34 @@ Find the free tycons and classes of a type.  This is used in the front
 end of the compiler.
 
 \begin{code}
-tyClsNamesOfType :: Type -> NameSet
-tyClsNamesOfType (TyVarTy _)		    = emptyNameSet
-tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (PredTy (IParam _ ty))     = tyClsNamesOfType ty
-tyClsNamesOfType (PredTy (ClassP cl tys))   = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (PredTy (EqPred ty1 ty2))  = tyClsNamesOfType ty1 `unionNameSets` tyClsNamesOfType ty2
-tyClsNamesOfType (FunTy arg res)	    = tyClsNamesOfType arg `unionNameSets` tyClsNamesOfType res
-tyClsNamesOfType (AppTy fun arg)	    = tyClsNamesOfType fun `unionNameSets` tyClsNamesOfType arg
-tyClsNamesOfType (ForAllTy _ ty)	    = tyClsNamesOfType ty
+orphNamesOfType :: Type -> NameSet
+orphNamesOfType ty | Just ty' <- tcView ty = orphNamesOfType ty'
+		-- Look through type synonyms (Trac #4912)
+orphNamesOfType (TyVarTy _)		   = emptyNameSet
+orphNamesOfType (TyConApp tycon tys)       = unitNameSet (getName tycon) 
+                                             `unionNameSets` orphNamesOfTypes tys
+orphNamesOfType (PredTy (IParam _ ty))    = orphNamesOfType ty
+orphNamesOfType (PredTy (ClassP cl tys))  = unitNameSet (getName cl) 
+                                            `unionNameSets` orphNamesOfTypes tys
+orphNamesOfType (PredTy (EqPred ty1 ty2)) = orphNamesOfType ty1 
+                                            `unionNameSets` orphNamesOfType ty2
+orphNamesOfType (FunTy arg res)	    = orphNamesOfType arg `unionNameSets` orphNamesOfType res
+orphNamesOfType (AppTy fun arg)	    = orphNamesOfType fun `unionNameSets` orphNamesOfType arg
+orphNamesOfType (ForAllTy _ ty)	    = orphNamesOfType ty
 
-tyClsNamesOfTypes :: [Type] -> NameSet
-tyClsNamesOfTypes tys = foldr (unionNameSets . tyClsNamesOfType) emptyNameSet tys
+orphNamesOfTypes :: [Type] -> NameSet
+orphNamesOfTypes tys = foldr (unionNameSets . orphNamesOfType) emptyNameSet tys
 
-tyClsNamesOfDFunHead :: Type -> NameSet
+orphNamesOfDFunHead :: Type -> NameSet
 -- Find the free type constructors and classes 
 -- of the head of the dfun instance type
 -- The 'dfun_head_type' is because of
 --	instance Foo a => Baz T where ...
 -- The decl is an orphan if Baz and T are both not locally defined,
 --	even if Foo *is* locally defined
-tyClsNamesOfDFunHead dfun_ty 
+orphNamesOfDFunHead dfun_ty 
   = case tcSplitSigmaTy dfun_ty of
-	(_, _, head_ty) -> tyClsNamesOfType head_ty
+	(_, _, head_ty) -> orphNamesOfType head_ty
 \end{code}
 
 

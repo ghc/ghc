@@ -860,7 +860,7 @@ getInfo name
            return (Just (thing, fixity, filter (plausible rdr_env) ispecs))
   where
     plausible rdr_env ispec	-- Dfun involving only names that are in ic_rn_glb_env
-	= all ok $ nameSetToList $ tyClsNamesOfType $ idType $ instanceDFunId ispec
+	= all ok $ nameSetToList $ orphNamesOfType $ idType $ instanceDFunId ispec
 	where	-- A name is ok if it's in the rdr_env, 
 		-- whether qualified or not
 	  ok n | n == name	   = True	-- The one we looked for in the first place!
