@@ -12,6 +12,7 @@
 
 define build-package-data
 $(call trace, build-package-data($1,$2,$3))
+$(call profStart, build-package-data($1,$2,$3))
 # args:
 # $1 = dir
 # $2 = distdir
@@ -62,15 +63,23 @@ ifeq "$3" "0"
 $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
 
+ifneq "$$(BINDIST)" "YES"
+$1/$2/inplace-pkg-config : $1/$2/package-data.mk
+$1/$2/build/autogen/cabal_macros.h : $1/$2/package-data.mk
+
 # This rule configures the package, generates the package-data.mk file
 # for our build system, and registers the package for use in-place in
 # the build tree.
-$1/$2/package-data.mk $1/$2/inplace-pkg-config $1/$2/build/autogen/cabal_macros.h : $$(GHC_CABAL_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$($1_$2_HC_CONFIG_DEP)
+$1/$2/package-data.mk : $$(GHC_CABAL_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PACKAGE).cabal $$(wildcard $1/configure) $$($1_$2_HC_CONFIG_DEP)
 	"$$(GHC_CABAL_INPLACE)" configure --with-ghc="$$($1_$2_HC_CONFIG)" --with-ghc-pkg="$$($1_$2_GHC_PKG)" --with-gcc="$$(WhatGccIsCalled)" --configure-option=--with-cc="$$(WhatGccIsCalled)" $$($1_CONFIGURE_OPTS) $$($1_$2_CONFIGURE_OPTS) -- $2 $1
 ifeq "$$($1_$2_PROG)" ""
 ifneq "$$($1_$2_REGISTER_PACKAGE)" "NO"
-	    "$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
+	"$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
+endif
 endif
 endif
 
+PACKAGE_DATA_MKS += $1/$2/package-data.mk
+
+$(call profEnd, build-package-data($1,$2,$3))
 endef

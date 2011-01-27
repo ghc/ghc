@@ -1091,20 +1091,28 @@ specCalls subst rules_for_me calls_for_me fn rhs
 		-- Add the { d1' = dx1; d2' = dx2 } usage stuff
 	   	final_uds = foldr consDictBind rhs_uds dx_binds
 
-		-- Add an InlineRule if the parent has one
+		--------------------------------------
+		-- Add a suitable unfolding if the spec_inl_prag says so
 		-- See Note [Inline specialisations]
+		spec_inl_prag 
+		  = case inl_prag of
+                       InlinePragma { inl_inline = Inlinable } 
+                          -> inl_prag { inl_inline = NoInline }
+		       _ -> inl_prag
+
 		spec_unf
-                  = case inlinePragmaSpec inl_prag of
+                  = case inlinePragmaSpec spec_inl_prag of
                       Inline    -> mkInlineUnfolding (Just spec_arity) spec_rhs
                       Inlinable -> mkInlinableUnfolding spec_rhs
                       _         -> NoUnfolding
 
+		--------------------------------------
 		-- Adding arity information just propagates it a bit faster
 		-- 	See Note [Arity decrease] in Simplify
 		-- Copy InlinePragma information from the parent Id.
 		-- So if f has INLINE[1] so does spec_f
-  	        spec_f_w_arity = spec_f `setIdArity`          max 0 (fn_arity - n_dicts)
-                                        `setInlinePragma` inl_prag
+  	        spec_f_w_arity = spec_f `setIdArity`      max 0 (fn_arity - n_dicts)
+                                        `setInlinePragma` spec_inl_prag
                                         `setIdUnfolding`  spec_unf
 
 	   ; return (Just ((spec_f_w_arity, spec_rhs), final_uds, spec_env_rule)) } }
@@ -1353,27 +1361,48 @@ tried to fix this (wait till there's a real example).
 
 Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We transfer to the specialised function any INLINE stuff from the
-original.  This means 
-   (a) the Activation for its inlining (from its InlinePragma)
-   (b) any InlineRule
+Here is what we do with the InlinePragma of the original function
+  * Activation/RuleMatchInfo: both transferred to the
+                              specialised function
+  * InlineSpec:
+       (a) An INLINE pragma is transferred
+       (b) An INLINABLE pragma is *not* transferred
 
-This is a change (Jun06).  Previously the idea is that the point of
-inlining was precisely to specialise the function at its call site,
-and that's not so important for the specialised copies.  But
-*pragma-directed* specialisation now takes place in the
-typechecker/desugarer, with manually specified INLINEs.  The
-specialiation here is automatic.  It'd be very odd if a function
-marked INLINE was specialised (because of some local use), and then
-forever after (including importing modules) the specialised version
-wasn't INLINEd.  After all, the programmer said INLINE!
+Why (a)? Previously the idea is that the point of INLINE was
+precisely to specialise the function at its call site, and that's not
+so important for the specialised copies.  But *pragma-directed*
+specialisation now takes place in the typechecker/desugarer, with
+manually specified INLINEs.  The specialiation here is automatic.
+It'd be very odd if a function marked INLINE was specialised (because
+of some local use), and then forever after (including importing
+modules) the specialised version wasn't INLINEd.  After all, the
+programmer said INLINE!
 
-You might wonder why we don't just not specialise INLINE functions.
+You might wonder why we don't just not-specialise INLINE functions.
 It's because even INLINE functions are sometimes not inlined, when 
 they aren't applied to interesting arguments.  But perhaps the type
 arguments alone are enough to specialise (even though the args are too
 boring to trigger inlining), and it's certainly better to call the 
 specialised version.
+
+Why (b)? See Trac #4874 for persuasive examples.  Suppose we have
+    {-# INLINABLE f #-}
+    f :: Ord a => [a] -> Int
+    f xs = letrec f' = ...f'... in f'
+Then, when f is specialised and optimised we might get
+    wgo :: [Int] -> Int#
+    wgo = ...wgo...
+    f_spec :: [Int] -> Int
+    f_spec xs = case wgo xs of { r -> I# r }
+and we clearly want to inline f_spec at call sites.  But if we still
+have the big, un-optimised of f (albeit specialised) captured in an
+INLINABLE pragma for f_spec, we won't get that optimisation.
+
+So we simply drop INLINABLE pragmas when specialising. It's not really
+a complete solution; ignoring specalisation for now, INLINABLE functions
+don't get properly strictness analysed, for example. But it works well
+for examples involving specialisation, which is the dominant use of
+INLINABLE.  See Trac #4874.
 
 
 %************************************************************************

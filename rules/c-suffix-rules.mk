@@ -17,6 +17,8 @@ define c-suffix-rules
 # $3 = way
 # $4 = use GHC (YES/NO)
 
+ifneq "$$(BINDIST)" "YES"
+
 # UseGhcForCc is only relevant when not booting from HC files.
 ifeq "$4 $$(BootingFromHc)" "YES NO"
 
@@ -54,6 +56,8 @@ $1/$2/build/%.$$($3_osuf) : $1/%.S | $$$$(dir $$$$@)/.
 
 $1/$2/build/%.$$($3_way_)s : $1/$2/build/%.c
 	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -S $$< -o $$@
+
+endif
 
 endif
 

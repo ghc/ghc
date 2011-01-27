@@ -15,6 +15,7 @@
 
 define docbook
 $(call trace, docbook($1,$2))
+$(call profStart, docbook($1,$2))
 # $1 = dir
 # $2 = docname
 
@@ -25,9 +26,11 @@ $(call all-target,$1,)
 
 .PHONY: html_$1
 
+ifeq "$$(phase)" ""
 ifeq "$$(BUILD_DOCBOOK_HTML)" "YES"
 $(call all-target,$1,html_$1)
 INSTALL_HTML_DOC_DIRS += $1/$2
+endif
 endif
 
 html_$1 : $1/$2/index.html
@@ -47,9 +50,11 @@ endif
 
 
 .PHONY: ps_$1
+ifeq "$$(phase)" ""
 ifeq "$$(BUILD_DOCBOOK_PS)" "YES"
 $(call all-target,$1,ps_$1)
 INSTALL_DOCS += $1/$2.ps
+endif
 endif
 
 ps_$1 : $1/$2.ps
@@ -60,9 +65,11 @@ $1/$2.ps: $$($1_DOCBOOK_SOURCES)
 	[ -f $$@ ]
 endif
 
+ifeq "$$(phase)" ""
 ifeq "$$(BUILD_DOCBOOK_PDF)" "YES"
 $(call all-target,$1,pdf_$1)
 INSTALL_DOCS += $1/$2.pdf
+endif
 endif
 
 .PHONY: pdf_$1
@@ -74,5 +81,6 @@ $1/$2.pdf: $$($1_DOCBOOK_SOURCES)
 	[ -f $$@ ]
 endif
 
+$(call profEnd, docbook($1,$2))
 endef
 

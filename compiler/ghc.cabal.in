@@ -44,14 +44,17 @@ Flag ncg
 Flag stage1
     Description: Is this stage 1?
     Default: False
+    Manual: True
 
 Flag stage2
     Description: Is this stage 2?
     Default: False
+    Manual: True
 
 Flag stage3
     Description: Is this stage 3?
     Default: False
+    Manual: True
 
 Library
     Exposed: False
@@ -99,6 +102,8 @@ Library
                 TypeSynonymInstances, MultiParamTypeClasses,
                 FlexibleInstances, Rank2Types, ScopedTypeVariables,
                 DeriveDataTypeable
+    if impl(ghc >= 7.1)
+        Extensions: NondecreasingIndentation
 
     Include-Dirs: . parser utils
 

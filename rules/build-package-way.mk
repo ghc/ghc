@@ -13,6 +13,7 @@
 
 define build-package-way # $1 = dir, $2 = distdir, $3 = way, $4 = stage
 $(call trace, build-package-way($1,$2,$3))
+$(call profStart, build-package-way($1,$2,$3))
 
 $(call distdir-way-opts,$1,$2,$3,$4)
 $(call hs-suffix-rules,$1,$2,$3)
@@ -50,6 +51,17 @@ endif
 
 $1_$2_$3_NON_HS_OBJS = $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS)  $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
 $1_$2_$3_ALL_OBJS = $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS)
+
+# The quadrupled $'s here are because the _v_LIB variables aren't
+# necessarily set when this part of the makefile is read.
+# These deps aren't technically necessary in themselves, but they
+# turn the dependencies of programs on libraries into transitive
+# dependencies.
+ifeq "$4" "0"
+$$($1_$2_$3_LIB) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-boot_v_LIB))
+else
+$$($1_$2_$3_LIB) : $$(foreach dep,$$($1_$2_DEP_NAMES),$$$$(libraries/$$(dep)_dist-install_v_LIB))
+endif
 
 ifeq "$3" "dyn"
 
@@ -114,11 +126,11 @@ $$($1_$2_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OB
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages
 ifneq "$4" "0"
-# $$(info Here $1 $2 $$($1_$2_BUILD_GHCI_LIB) Q1)
 $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
 endif
 endif
 endif
 
+$(call profEnd, build-package-way($1,$2,$3))
 endef
 

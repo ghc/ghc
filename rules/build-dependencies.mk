@@ -12,6 +12,7 @@
 
 define build-dependencies
 $(call trace, build-dependencies($1,$2,$3))
+$(call profStart, build-dependencies($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -22,11 +23,13 @@ $1_$2_depfile_c_asm = $$($1_$2_depfile_base).c_asm
 $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 
 $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-dep-suffix $$(way))
-ifneq "$3" "0"
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
-endif
 
 ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
+
+# Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
+# indirectly) include the generated includes files.
+$$($1_$2_depfile_haskell) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 
 $$($1_$2_depfile_haskell) : $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS) $$($1_$2_HC_MK_DEPEND_DEP) | $$$$(dir $$$$@)/.
 	"$$(RM)" $$(RM_OPTS) $$@.tmp
@@ -42,9 +45,13 @@ ifneq "$$($1_$2_SLASH_MODS)" ""
 		if test ! -d $$$$dir; then mkdir -p $$$$dir; fi \
 	done
 endif
-	mv $$@.tmp $$@
+#    Some packages are from the bootstrapping compiler, so are not
+#    within the build tree. On Windows this causes a problem as they look
+#    like bad rules, due to the two colons, so we filter them out.
+	grep -v ' : [a-zA-Z]:/' $$@.tmp > $$@
 
-# Some of the C files depend on the generated includes files.
+# Some of the C files (directly or indirectly) include the generated
+# includes files.
 $$($1_$2_depfile_c_asm) : $$(includes_H_CONFIG) $$(includes_H_PLATFORM)
 
 $$($1_$2_depfile_c_asm) : $$($1_$2_C_FILES_DEPS) $$($1_$2_S_FILES) | $$$$(dir $$$$@)/.
@@ -67,22 +74,7 @@ endif # $1_$2_NO_BUILD_DEPS
 # Note sed magic above: mkdependC can't do -odir stuff, so we have to
 # munge the dependencies it generates to refer to the correct targets.
 
-# Seems as good a place as any to attach the unlit dependency
-$$($1_$2_depfile_haskell) : $$(UNLIT)
-
-ifneq "$$(NO_INCLUDE_DEPS)" "YES"
-ifneq "$$(strip $$($1_$2_HS_SRCS) $$($1_$2_HS_BOOT_SRCS))" ""
-ifneq "$$(NO_STAGE$3_DEPS)" "YES"
-include $$($1_$2_depfile_haskell)
-endif
-endif
-include $$($1_$2_depfile_c_asm)
-else
-ifeq "$$(DEBUG)" "YES"
-$$(warning not building dependencies in $1)
-endif
-endif
-
+$(call profEnd, build-dependencies($1,$2,$3))
 endef
 
 # This comment is outside the "define addCFileDeps" as that definition

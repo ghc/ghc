@@ -21,6 +21,7 @@
 
 define build-prog
 $(call trace, build-prog($1,$2,$3))
+$(call profStart, build-prog($1,$2,$3))
 # $1 = dir
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
@@ -40,6 +41,7 @@ $(call clean-target,$1,$2,$1/$2)
 ifneq "$$($1_$2_NOT_NEEDED)" "YES"
 $$(eval $$(call build-prog-helper,$1,$2,$3))
 endif
+$(call profEnd, build-prog($1,$2,$3))
 endef
 
 
@@ -48,56 +50,62 @@ define build-prog-helper
 # $2 = distdir
 # $3 = GHC stage to use (0 == bootstrapping compiler)
 
-$(call all-target,$1,all_$1_$2)
-
 ifeq "$$($1_USES_CABAL)" "YES"
 $1_$2_USES_CABAL = YES
 endif
 
+$(call package-config,$1,$2,$3)
+
+$1_$2_depfile_base = $1/$2/build/.depend
+
+ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+$1_$2_INPLACE = $$(error $1_$2 should not be installed inplace, but INPLACE var evaluated)
+else
+$1_$2_INPLACE =
+endif
+else
+# Where do we install the inplace version?
+ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
+$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
+else
+ifeq "$$($1_$2_TOPDIR)" "YES"
+$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
+else
+$1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
+endif
+endif
+endif
+
 ifeq "$$($1_$2_USES_CABAL)" "YES"
+$(call build-package-data,$1,$2,$3)
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
+ifeq "$3" "0"
+include $1/$2/package-data.mk
+else ifeq "$(phase)" ""
 include $1/$2/package-data.mk
 endif
 endif
-
-$(call package-config,$1,$2,$3)
-
-ifeq "$$($1_$2_USES_CABAL)$$($1_$2_VERSION)" "YES"
-$1_$2_DISABLE = YES
 endif
 
-ifeq "$$($1_$2_DISABLE)" "YES"
+$(call all-target,$1,all_$1_$2)
+$(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
 
-ifeq "$$(DEBUG)" "YES"
-$$(warning $1/$2 disabled)
+# INPLACE_BIN might be empty if we're distcleaning
+ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
+$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
+	"$$(CP)" -p $$< $$@
+	touch $$@
+endif
 endif
 
-# The following code to build the package all depends on settings
-# obtained from package-data.mk.  If we don't have package-data.mk
-# yet, then don't try to do anything else with this package.  Make will
-# try to build package-data.mk, then restart itself and we'll be in business.
+$(call shell-wrapper,$1,$2)
 
-$(call all-target,$1_$2,$1/$2/package-data.mk)
-
-# We have a rule for package-data.mk only when the package is
-# disabled, because we want the build to fail if we haven't run phase 0.
-ifneq "$$(BINDIST)" "YES"
-$(call build-package-data,$1,$2,$3)
-endif
-
-else
-
-ifneq "$$(BINDIST)" "YES"
 $1_$2_WAYS = v
 
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
-
-# --- DEPENDENCIES
-
-$1_$2_depfile_base = $1/$2/build/.depend
-
-$(call build-dependencies,$1,$2,$3)
 
 # --- IMPLICIT RULES
 
@@ -131,6 +139,18 @@ ifeq "$$($1_$2_v_HS_OBJS)" ""
 $1_$2_GHC_LD_OPTS = -no-auto-link-packages -no-hs-main
 endif
 
+ifneq "$$(BINDIST)" "YES"
+# The quadrupled $'s here are because the _v_LIB variables aren't
+# necessarily set when this part of the makefile is read
+$1/$2/build/tmp/$$($1_$2_PROG) : \
+    $$(foreach dep,$$($1_$2_DEP_NAMES),\
+        $$(if $$(filter ghc,$$(dep)),\
+            $(if $(filter 0,$3),$$(compiler_stage1_v_LIB),\
+            $(if $(filter 1,$3),$$(compiler_stage2_v_LIB),\
+            $(if $(filter 2,$3),$$(compiler_stage2_v_LIB),\
+            $$(error Bad build stage)))),\
+        $$$$(libraries/$$(dep)_dist-$(if $(filter 0,$3),boot,install)_v_LIB)))
+
 ifeq "$$($1_$2_LINK_WITH_GCC)" "NO"
 $1/$2/build/tmp/$$($1_$2_PROG) : $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) | $$$$(dir $$$$@)/.
 	"$$($1_$2_HC)" -o $$@ $$($1_$2_v_ALL_HC_OPTS) $$(LD_OPTS) $$($1_$2_GHC_LD_OPTS) $$($1_$2_v_HS_OBJS) $$($1_$2_v_C_OBJS) $$($1_$2_v_S_OBJS) $$($1_$2_OTHER_OBJS) $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES))
@@ -155,34 +175,10 @@ endif
 endif
 endif
 
-ifeq "$$($1_$2_INSTALL_INPLACE)" "NO"
-$(call all-target,$1_$2,$1/$2/build/tmp/$$($1_$2_PROG))
-else
-# Where do we install the inplace version?
-ifeq "$$($1_$2_SHELL_WRAPPER) $$(Windows)" "YES NO"
-$1_$2_INPLACE = $$(INPLACE_LIB)/$$($1_$2_PROG)
-else
-ifeq "$$($1_$2_TOPDIR)" "YES"
-$1_$2_INPLACE = $$(INPLACE_TOPDIR)/$$($1_$2_PROG)
-else
-$1_$2_INPLACE = $$(INPLACE_BIN)/$$($1_$2_PROG)
-endif
-endif
-
+ifneq "$$($1_$2_INSTALL_INPLACE)" "NO"
 $(call all-target,$1_$2,$$($1_$2_INPLACE))
+endif
 $(call clean-target,$1,$2_inplace,$$($1_$2_INPLACE))
-
-# INPLACE_BIN might be empty if we're distcleaning
-ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
-$$($1_$2_INPLACE) : $1/$2/build/tmp/$$($1_$2_PROG) | $$$$(dir $$$$@)/.
-	"$$(CP)" -p $$< $$@
-	touch $$@
-endif
-
-# touch is necessary; cp doesn't update the file time.
-endif
-
-$(call shell-wrapper,$1,$2)
 
 ifeq "$$($1_$2_INSTALL)" "YES"
 ifeq "$$($1_$2_TOPDIR)" "YES"
@@ -192,6 +188,20 @@ INSTALL_BINS += $1/$2/build/tmp/$$($1_$2_PROG)
 endif
 endif
 
-endif # package-data.mk exists
+# --- DEPENDENCIES
+# We always have the dependency rules available, as we need to know
+# how to build hsc2hs's dependency file in phase 0
+$(call build-dependencies,$1,$2,$3)
+ifneq "$(phase)" "0"
+# From phase 1 we actually include the dependency files for the
+# bootstrapping stuff
+ifeq "$3" "0"
+$(call include-dependencies,$1,$2,$3)
+else ifeq "$(phase)" ""
+# In the final phase, we also include the dependency files for
+# everything else
+$(call include-dependencies,$1,$2,$3)
+endif
+endif
 
 endef

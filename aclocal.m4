@@ -6,7 +6,11 @@
 
 # FPTOOLS_SET_C_LD_FLAGS
 # ----------------------------------
-# Set the C and LD flags for a given platform
+# Set the C, LD and CPP flags for a given platform
+# $1 is the platform
+# $2 is the name of the C flags variable
+# $3 is the name of the LD flags variable
+# $4 is the name of the CPP flags variable
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
     AC_MSG_CHECKING([Setting up $2, $3 and $4])

@@ -11,12 +11,21 @@
 # -----------------------------------------------------------------------------
 
 # ToDo
-ghc_USES_CABAL = NO
-# ghc_PACKAGE = ghc-bin
+ghc_USES_CABAL = YES
+ghc_PACKAGE = ghc-bin
 
-ghc_stage1_HC_OPTS = $(GhcStage1HcOpts)
-ghc_stage2_HC_OPTS = $(GhcStage2HcOpts)
-ghc_stage3_HC_OPTS = $(GhcStage3HcOpts)
+ghc_stage1_CONFIGURE_OPTS += --flags=stage1
+ghc_stage2_CONFIGURE_OPTS += --flags=stage2
+ghc_stage3_CONFIGURE_OPTS += --flags=stage3
+
+ifeq "$(GhcWithInterpreter)" "YES"
+ghc_stage2_CONFIGURE_OPTS += --flags=ghci
+ghc_stage3_CONFIGURE_OPTS += --flags=ghci
+endif
+
+ghc_stage1_MORE_HC_OPTS = $(GhcStage1HcOpts)
+ghc_stage2_MORE_HC_OPTS = $(GhcStage2HcOpts)
+ghc_stage3_MORE_HC_OPTS = $(GhcStage3HcOpts)
 
 ghc_stage2_CC_OPTS = -Iincludes
 ghc_stage3_CC_OPTS = -Iincludes
@@ -26,71 +35,30 @@ ghc_stage1_C_FILES_NODEPS = ghc/hschooks.c
 ghc_stage2_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 ghc_stage3_MKDEPENDC_OPTS = -DMAKING_GHC_BUILD_SYSTEM_DEPENDENCIES
 
-ifeq "$(GhcWithInterpreter)" "YES"
-ghc_stage2_HC_OPTS += -DGHCI
-ghc_stage3_HC_OPTS += -DGHCI
-endif
-
 ifeq "$(GhcDebugged)" "YES"
-ghc_HC_OPTS += -debug
+ghc_stage1_MORE_HC_OPTS += -debug
+ghc_stage2_MORE_HC_OPTS += -debug
+ghc_stage3_MORE_HC_OPTS += -debug
 endif
 
 ifeq "$(GhcDynamic)" "YES"
-ghc_stage2_HC_OPTS += -dynamic
-ghc_stage3_HC_OPTS += -dynamic
+ghc_stage2_MORE_HC_OPTS += -dynamic
+ghc_stage3_MORE_HC_OPTS += -dynamic
 endif
 
 ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
-ghc_stage2_HC_OPTS += -threaded
-ghc_stage3_HC_OPTS += -threaded
+ghc_stage2_MORE_HC_OPTS += -threaded
+ghc_stage3_MORE_HC_OPTS += -threaded
 endif
 
 ifeq "$(GhcProfiled)" "YES"
-ghc_stage2_HC_OPTS += -prof
+ghc_stage2_MORE_HC_OPTS += -prof
 endif
-
-ghc_stage1_MODULES = Main
-
-ghc_stage2_MODULES = $(ghc_stage1_MODULES)
-ifeq "$(GhcWithInterpreter)" "YES"
-ghc_stage2_MODULES += GhciMonad GhciTags InteractiveUI
-endif
-ghc_stage3_MODULES = $(ghc_stage2_MODULES)
-
-ghc_stage1_C_SRCS = hschooks.c
-ghc_stage2_C_SRCS = hschooks.c
-ghc_stage3_C_SRCS = hschooks.c
 
 ghc_stage1_PROG = ghc-stage1$(exeext)
 ghc_stage2_PROG = ghc-stage2$(exeext)
 ghc_stage3_PROG = ghc-stage3$(exeext)
-
-# ToDo: perhaps use ghc-cabal to configure ghc-bin
-ghc_stage1_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage1_VERSION)
-ghc_stage2_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage2_VERSION)
-ghc_stage3_HC_OPTS += -package $(compiler_PACKAGE)-$(compiler_stage3_VERSION)
-ghc_stage2_HC_OPTS += -package haskeline
-ghc_stage3_HC_OPTS += -package haskeline
-
-ghc_language_extension_flags = -XCPP \
-                               -XPatternGuards \
-                               -XForeignFunctionInterface \
-                               -XUnboxedTuples \
-                               -XFlexibleInstances \
-                               -XMagicHash
-ghc_stage1_HC_OPTS += $(ghc_language_extension_flags)
-ghc_stage2_HC_OPTS += $(ghc_language_extension_flags)
-ghc_stage3_HC_OPTS += $(ghc_language_extension_flags)
-
-# In stage1 we might not benefit from cross-package dependencies and
-# recompilation checking.  We must force recompilation here, otherwise
-# Main.o won't necessarily be rebuilt when the ghc package has changed:
-ghc_stage1_HC_OPTS += -fforce-recomp
-
-# Further dependencies we need only in stage 1, due to no
-# cross-package dependencies or recompilation checking.
-ghc/stage1/build/Main.o : $(compiler_stage1_v_LIB)
 
 ghc_stage1_SHELL_WRAPPER = YES
 ghc_stage2_SHELL_WRAPPER = YES
@@ -125,11 +93,6 @@ $(eval $(call build-prog,ghc,stage2,1))
 $(eval $(call build-prog,ghc,stage3,2))
 
 ifneq "$(BINDIST)" "YES"
-
-# ToDo: should we add these in the build-prog macro?
-ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(compiler_stage1_v_LIB)
-ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_v_LIB)
-ghc/stage3/build/tmp/$(ghc_stage3_PROG) : $(compiler_stage3_v_LIB)
 
 ifeq "$(GhcProfiled)" "YES"
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_p_LIB)

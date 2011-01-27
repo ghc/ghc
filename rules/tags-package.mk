@@ -19,6 +19,7 @@
 
 define tags-package
 $(call trace, tags-package($1,$2))
+$(call profStart, tags-package($1,$2))
 # $1 = dir
 # $2 = distdir
 
@@ -30,5 +31,6 @@ tags_$1:
 TAGS_$1:
 	inplace/bin/ghctags --topdir $$(TOP)/inplace/lib -e --use-cabal-config $1/$2 -- $$($1_$2_TAGS_HC_OPTS) $$($1_$2_v_ALL_HC_OPTS) -- $$($1_$2_HS_SRCS)
 
+$(call profEnd, tags-package($1,$2))
 endef
 

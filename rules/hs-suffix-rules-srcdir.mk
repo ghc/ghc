@@ -16,6 +16,8 @@ define hs-suffix-rules-srcdir
 
 # Preprocessing Haskell source
 
+ifneq "$$(BINDIST)" "YES"
+
 ifneq "$$(BootingFromHc)" "YES"
 
 $1/$2/build/%.hs : $1/$4/%.ly | $$$$(dir $$$$@)/.
@@ -83,6 +85,8 @@ ifneq "$$(BootingFromHc)" "YES"
 
 $1/$2/build/%_stub.$$($3_osuf): $1/$2/build/%.$$($3_osuf)
 	@:
+endif
+
 endif
 
 endef

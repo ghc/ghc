@@ -535,7 +535,9 @@ compiler/stage1/inplace-pkg-config-munged: compiler/stage1/inplace-pkg-config
 	  < $< > $@
 	"$(compiler_stage1_GHC_PKG)" update --force $(compiler_stage1_GHC_PKG_OPTS) $@
 
-$(compiler_stage1_v_LIB) : compiler/stage1/inplace-pkg-config-munged
+# We need to make sure the munged config is in the database before we
+# try to configure ghc-bin
+ghc/stage1/package-data.mk : compiler/stage1/inplace-pkg-config-munged
 endif
 
 endif

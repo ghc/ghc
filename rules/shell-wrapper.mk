@@ -12,6 +12,7 @@
 
 define shell-wrapper
 $(call trace, shell-wrapper($1,$2))
+$(call profStart, shell-wrapper($1,$2))
 # $1 = dir
 # $2 = distdir
 
@@ -85,4 +86,5 @@ endif
 
 endif # $1_$2_SHELL_WRAPPER
 
+$(call profEnd, shell-wrapper($1,$2))
 endef

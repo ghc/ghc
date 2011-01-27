@@ -434,7 +434,6 @@ GHC_PKG_PGM             = ghc-pkg$(exeext)
 GHC_LTX_PGM             = ltx$(exeext)
 GHC_MKDIRHIER_PGM       = mkdirhier
 GHC_LNDIR_PGM           = lndir
-GHC_DUMMY_GHC_PGM       = dummy-ghc$(exeext)
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 GHC_CP			= "xcopy /y"
@@ -460,7 +459,6 @@ GHC_PKG_INPLACE		= $(INPLACE_BIN)/$(GHC_PKG_PGM)
 GHCTAGS_INPLACE		= $(INPLACE_BIN)/$(GHC_GHCTAGS_PGM)
 HSC2HS_INPLACE		= $(INPLACE_BIN)/$(GHC_HSC2HS_PGM)
 GENPRIMOP_INPLACE	= $(INPLACE_BIN)/$(GHC_GENPRIMOP_PGM)
-DUMMY_GHC_INPLACE	= $(INPLACE_BIN)/$(GHC_DUMMY_GHC_PGM)
 
 GENERATED_FILE  = chmod a-w
 EXECUTABLE_FILE = chmod +x
@@ -598,16 +596,18 @@ CTAGS 			= $(ETAGS)
 RAWCPP_FLAGS            = -undef -traditional
 FIND			= @FindCmd@
 SORT		        = @SortCmd@
-INSTALL			= @INSTALL@
+
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
 # install-sh script (if chosen). This not terribly useful to us, so we convert
 # it into an abs. path.
 # 
+INSTALL			= @INSTALL@
 INSTALL			:= $(subst .././install-sh,$(TOP)/install-sh,$(INSTALL))
+
 LATEX			= latex
-PDFLATEX        = pdflatex
-BIBTEX          = bibtex
+PDFLATEX                = pdflatex
+BIBTEX                  = bibtex
 LN_S			= @LN_S@
 MV			= mv
 NROFF			= nroff
@@ -621,6 +621,9 @@ TR 			= tr
 SHELL			= /bin/sh
 
 HaveDtrace		= @HaveDtrace@
+# There are problems with dtrace on 64bit 10.5. For now at least, we
+# just turn dtrace off unless you override USE_DTRACE
+USE_DTRACE = NO
 DTRACE			= @DtraceCmd@
 
 LD = @LdCmd@

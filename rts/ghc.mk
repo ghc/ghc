@@ -35,12 +35,13 @@ else
 ALL_DIRS += posix
 endif
 
+EXCLUDED_SRCS :=
 EXCLUDED_SRCS += rts/Main.c
 EXCLUDED_SRCS += rts/parallel/SysMan.c
 EXCLUDED_SRCS += $(wildcard rts/Vis*.c)
 
-rts_C_SRCS = $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
-rts_CMM_SRCS = $(wildcard rts/*.cmm)
+rts_C_SRCS := $(filter-out $(EXCLUDED_SRCS),$(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c)))
+rts_CMM_SRCS := $(wildcard rts/*.cmm)
 
 # Don't compile .S files when bootstrapping a new arch
 ifneq "$(PORTING_HOST)" "YES"
@@ -67,9 +68,9 @@ rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c | $$(dir $$@)/.
 rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
 	cp $< $@
 
-rts_H_FILES = $(wildcard includes/*.h) $(wildcard rts/*.h)
+rts_H_FILES := $(wildcard rts/*.h)
 
-ifeq "$(HaveDtrace)" "YES"
+ifeq "$(USE_DTRACE)" "YES"
 DTRACEPROBES_H = rts/dist/build/RtsProbes.h
 rts_H_FILES += $(DTRACEPROBES_H)
 endif
@@ -145,7 +146,7 @@ endif
 $(call distdir-way-opts,rts,dist,$1)
 $(call c-suffix-rules,rts,dist,$1,YES)
 $(call cmm-suffix-rules,rts,dist,$1)
-$(call hs-suffix-rules-srcdir,rts,dist,$1,$$(dir))
+$(call hs-suffix-rules-srcdir,rts,dist,$1,.)
 # hs-suffix-rules-srcdir is needed when BootingFromHc to get the .hc rules
 
 rts_$1_LIB_NAME = libHSrts$$($1_libsuf)
@@ -434,7 +435,7 @@ rts_dist_C_FILES = $(rts_C_SRCS) $(rts_thr_EXTRA_C_SRCS) $(rts_S_SRCS)
 # TICKY_TICKY can't be used together, so we omit TICKY_TICKY for now.
 rts_dist_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
 
-ifeq "$(HaveDtrace)" "YES"
+ifeq "$(USE_DTRACE)" "YES"
 
 rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
 
@@ -455,7 +456,7 @@ rts_LD_OPTS     += -Llibffi/build/include
 # -----------------------------------------------------------------------------
 # compile dtrace probes if dtrace is supported
 
-ifeq "$(HaveDtrace)" "YES"
+ifeq "$(USE_DTRACE)" "YES"
 
 rts_CC_OPTS		+= -DDTRACE
 rts_HC_OPTS		+= -DDTRACE

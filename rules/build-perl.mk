@@ -20,6 +20,7 @@
 
 define build-perl
 $(call trace, build-perl($1,$2))
+$(call profStart, build-perl($1,$2))
 # $1 = dir
 # $2 = distdir
 
@@ -65,4 +66,5 @@ install_$1_$2: $1/$2/$$($1_$2_PROG)
 endif
 endif
 
+$(call profEnd, build-perl($1,$2))
 endef

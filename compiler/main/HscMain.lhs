@@ -1257,15 +1257,13 @@ hscCompileCoreExpr hsc_env srcspan ds_expr
 
   	-- Lint if necessary
   	-- ToDo: improve SrcLoc
-    if lint_on then 
+    when lint_on $
        let ictxt = hsc_IC hsc_env
            tyvars = varSetElems (tyVarsOfTypes (map idType (ic_tmp_ids ictxt)))
        in
            case lintUnfolding noSrcLoc tyvars prepd_expr of
   	      Just err -> pprPanic "hscCompileCoreExpr" err
   	      Nothing  -> return ()
-    else
-       return ()
 
           -- Convert to BCOs
     bcos <- coreExprToBCOs dflags prepd_expr

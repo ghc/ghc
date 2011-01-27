@@ -13,6 +13,7 @@
 
 define manual-package-config # args: $1 = dir
 $(call trace, manual-package-config($1))
+$(call profStart, manual-package-config($1))
 
 $1/package.conf.inplace : $1/package.conf.in $(GHC_PKG_INPLACE)
 	$$(CPP) $$(RAWCPP_FLAGS) -P \
@@ -42,4 +43,5 @@ distclean : clean_$1_package.conf
 clean_$1_package.conf :
 	"$$(RM)" $$(RM_OPTS) $1/package.conf.install $1/package.conf.inplace
 
+$(call profEnd, manual-package-config($1))
 endef

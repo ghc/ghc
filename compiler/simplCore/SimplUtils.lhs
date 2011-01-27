@@ -857,7 +857,7 @@ a thing based on the form of its RHS; in particular if it has a
 trivial RHS.  If so, we can inline and discard the binding altogether.
 
 NB: a loop breaker has must_keep_binding = True and non-loop-breakers
-only have *forward* references Hence, it's safe to discard the binding
+only have *forward* references. Hence, it's safe to discard the binding
 	
 NOTE: This isn't our last opportunity to inline.  We're at the binding
 site right now, and we'll get another opportunity when we get to the
@@ -892,8 +892,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 					-- because it might be referred to "earlier"
   | isExportedId bndr           = False
   | isStableUnfolding unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
-  | exprIsTrivial rhs 	        = True
   | isTopLevel top_lvl          = False	-- Note [Top level and postInlineUnconditionally]
+  | exprIsTrivial rhs 	        = True
   | otherwise
   = case occ_info of
 	-- The point of examining occ_info here is that for *non-values* 
@@ -960,13 +960,28 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't do postInlineUnconditionally for top-level things (exept ones that
-are trivial):
-  * There is no point, because the main goal is to get rid of local
-    bindings used in multiple case branches.
+We don't do postInlineUnconditionally for top-level things (even for
+ones that are trivial):
+
   * Doing so will inline top-level error expressions that have been
     carefully floated out by FloatOut.  More generally, it might 
     replace static allocation with dynamic.
+
+  * Even for trivial expressions there's a problem.  Consider
+      {-# RULE "foo" forall (xs::[T]). reverse xs = ruggle xs #-}
+      blah xs = reverse xs
+      ruggle = sort
+    In one simplifier pass we might fire the rule, getting 
+      blah xs = ruggle xs
+    but in *that* simplifier pass we must not do postInlineUnconditionally
+    on 'ruggle' because then we'll have an unbound occurrence of 'ruggle'
+
+    If the rhs is trivial it'll be inlined by callSiteInline, and then
+    the binding will be dead and discarded by the next use of OccurAnal
+
+  * There is less point, because the main goal is to get rid of local
+    bindings used in multiple case branches.  
+    
 
 Note [InlineRule and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
