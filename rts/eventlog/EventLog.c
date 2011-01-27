@@ -252,7 +252,7 @@ initEventLogging(void)
 
         case EVENT_STOP_THREAD:     // (cap, thread, status)
             eventTypes[t].size =
-                sizeof(EventThreadID) + sizeof(StgWord16);
+                sizeof(EventThreadID) + sizeof(StgWord16) + sizeof(EventThreadID);
             break;
 
         case EVENT_STARTUP:         // (cap count)
@@ -382,7 +382,8 @@ void
 postSchedEvent (Capability *cap, 
                 EventTypeNum tag, 
                 StgThreadID thread, 
-                StgWord64 other)
+                StgWord info1,
+                StgWord info2)
 {
     EventsBuf *eb;
 
@@ -407,7 +408,7 @@ postSchedEvent (Capability *cap,
 
     case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
     {
-        postThreadID(eb,other /* spark_thread */);
+        postThreadID(eb,info1 /* spark_thread */);
         break;
     }
 
@@ -416,14 +417,15 @@ postSchedEvent (Capability *cap,
     case EVENT_THREAD_WAKEUP:   // (cap, thread, other_cap)
     {
         postThreadID(eb,thread);
-        postCapNo(eb,other /* new_cap | victim_cap | other_cap */);
+        postCapNo(eb,info1 /* new_cap | victim_cap | other_cap */);
         break;
    }
 
     case EVENT_STOP_THREAD:     // (cap, thread, status)
     {
         postThreadID(eb,thread);
-        postWord16(eb,other /* status */);
+        postWord16(eb,info1 /* status */);
+        postThreadID(eb,info2 /* blocked on thread */);
         break;
     }
 

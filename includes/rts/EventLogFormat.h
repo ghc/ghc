@@ -101,7 +101,7 @@
  */
 #define EVENT_CREATE_THREAD        0 /* (thread)               */
 #define EVENT_RUN_THREAD           1 /* (thread)               */
-#define EVENT_STOP_THREAD          2 /* (thread, status)       */
+#define EVENT_STOP_THREAD          2 /* (thread, status, blockinfo) */
 #define EVENT_THREAD_RUNNABLE      3 /* (thread)               */
 #define EVENT_MIGRATE_THREAD       4 /* (thread, new_cap)      */
 #define EVENT_RUN_SPARK            5 /* (thread)               */
@@ -138,6 +138,17 @@
  * #define ThreadYielding 3
  * #define ThreadBlocked  4
  * #define ThreadFinished 5
+ * #define ForeignCall                  6
+ * #define BlockedOnMVar                7
+ * #define BlockedOnBlackHole           8
+ * #define BlockedOnRead                9
+ * #define BlockedOnWrite               10
+ * #define BlockedOnDelay               11
+ * #define BlockedOnSTM                 12
+ * #define BlockedOnDoProc              13
+ * #define BlockedOnCCall               -- not used (see ForeignCall)
+ * #define BlockedOnCCall_NoUnblockExc  -- not used (see ForeignCall)
+ * #define BlockedOnMsgThrowTo          16
  */
 #define THREAD_SUSPENDED_FOREIGN_CALL 6
 

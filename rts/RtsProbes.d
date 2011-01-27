@@ -36,7 +36,7 @@ provider HaskellEvent {
   // scheduler events
   probe create__thread (EventCapNo, EventThreadID);
   probe run__thread (EventCapNo, EventThreadID);
-  probe stop__thread (EventCapNo, EventThreadID, EventThreadStatus);
+  probe stop__thread (EventCapNo, EventThreadID, EventThreadStatus, EventThreadID);
   probe thread__runnable (EventCapNo, EventThreadID);
   probe migrate__thread (EventCapNo, EventThreadID, EventCapNo);
   probe run__spark (EventCapNo, EventThreadID);

@@ -303,3 +303,46 @@ loop:
     return 0; // not blocked
 }
 
+// A shorter version of messageBlackHole(), that just returns the
+// owner (or NULL if the owner cannot be found, because the blackhole
+// has been updated in the meantime).
+
+StgTSO * blackHoleOwner (StgClosure *bh)
+{
+    const StgInfoTable *info;
+    StgClosure *p;
+
+    info = bh->header.info;
+
+    if (info != &stg_BLACKHOLE_info &&
+        info != &stg_CAF_BLACKHOLE_info && 
+        info != &__stg_EAGER_BLACKHOLE_info &&
+        info != &stg_WHITEHOLE_info) {
+        return NULL;
+    }
+
+    // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
+    // or a value.
+loop:
+    // NB. VOLATILE_LOAD(), because otherwise gcc hoists the load
+    // and turns this into an infinite loop.
+    p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
+    info = p->header.info;
+
+    if (info == &stg_IND_info) goto loop;
+
+    else if (info == &stg_TSO_info)
+    {
+        return (StgTSO*)p;
+    }
+    else if (info == &stg_BLOCKING_QUEUE_CLEAN_info || 
+             info == &stg_BLOCKING_QUEUE_DIRTY_info)
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+        return bq->owner;
+    }
+    
+    return NULL; // not blocked
+}
+
+

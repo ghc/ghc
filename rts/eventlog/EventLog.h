@@ -32,7 +32,7 @@ void flushEventLog(void);     // event log inherited from parent
  * that has an associated thread).
  */
 void postSchedEvent(Capability *cap, EventTypeNum tag, 
-                    StgThreadID id, StgWord64 other);
+                    StgThreadID id, StgWord info1, StgWord info2);
 
 /*
  * Post a nullary event.
@@ -50,7 +50,8 @@ void postCapMsg(Capability *cap, char *msg, va_list ap);
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
                                    EventTypeNum tag STG_UNUSED,
                                    StgThreadID id   STG_UNUSED,
-                                   StgWord64 other  STG_UNUSED)
+                                   StgWord info1    STG_UNUSED,
+                                   StgWord info2    STG_UNUSED)
 { /* nothing */ }
 
 INLINE_HEADER void postEvent (Capability *cap  STG_UNUSED,

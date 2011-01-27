@@ -484,7 +484,17 @@ run_thread:
     t->saved_winerror = GetLastError();
 #endif
 
-    traceEventStopThread(cap, t, ret);
+    if (ret == ThreadBlocked) {
+        if (t->why_blocked == BlockedOnBlackHole) {
+            StgTSO *owner = blackHoleOwner(t->block_info.bh->bh);
+            traceEventStopThread(cap, t, t->why_blocked + 6,
+                                 owner != NULL ? owner->id : 0);
+        } else {
+            traceEventStopThread(cap, t, t->why_blocked + 6, 0);
+        }
+    } else {
+        traceEventStopThread(cap, t, ret, 0);
+    }
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT(t->cap == cap);
@@ -1724,7 +1734,7 @@ suspendThread (StgRegTable *reg, rtsBool interruptible)
   task = cap->running_task;
   tso = cap->r.rCurrentTSO;
 
-  traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL);
+  traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL, 0);
 
   // XXX this might not be necessary --SDM
   tso->what_next = ThreadRunGHC;
