@@ -64,6 +64,7 @@ $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
 
 ifneq "$$(BINDIST)" "YES"
+ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 $1/$2/inplace-pkg-config : $1/$2/package-data.mk
 $1/$2/build/autogen/cabal_macros.h : $1/$2/package-data.mk
 
@@ -75,6 +76,7 @@ $1/$2/package-data.mk : $$(GHC_CABAL_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PAC
 ifeq "$$($1_$2_PROG)" ""
 ifneq "$$($1_$2_REGISTER_PACKAGE)" "NO"
 	"$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
+endif
 endif
 endif
 endif
