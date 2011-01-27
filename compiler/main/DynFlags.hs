@@ -181,6 +181,7 @@ data DynFlag
    | Opt_WarnHiShadows
    | Opt_WarnImplicitPrelude
    | Opt_WarnIncompletePatterns
+   | Opt_WarnIncompleteUniPatterns
    | Opt_WarnIncompletePatternsRecUpd
    | Opt_WarnMissingFields
    | Opt_WarnMissingImportList
@@ -1420,6 +1421,7 @@ fFlags = [
   ( "warn-hi-shadowing",                Opt_WarnHiShadows, nop ),
   ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude, nop ),
   ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns, nop ),
+  ( "warn-incomplete-uni-patterns",     Opt_WarnIncompleteUniPatterns, nop ),
   ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd, nop ),
   ( "warn-missing-fields",              Opt_WarnMissingFields, nop ),
   ( "warn-missing-import-lists",        Opt_WarnMissingImportList, nop ),
@@ -1742,6 +1744,7 @@ standardWarnings
       ]
 
 minusWOpts :: [DynFlag]
+-- Things you get with -W
 minusWOpts
     = standardWarnings ++
       [ Opt_WarnUnusedBinds,
@@ -1753,6 +1756,7 @@ minusWOpts
       ]
 
 minusWallOpts :: [DynFlag]
+-- Things you get with -Wall
 minusWallOpts
     = minusWOpts ++
       [ Opt_WarnTypeDefaults,
@@ -1760,21 +1764,21 @@ minusWallOpts
         Opt_WarnMissingSigs,
         Opt_WarnHiShadows,
         Opt_WarnOrphans,
-        Opt_WarnUnusedDoBind,
-        Opt_WarnIdentities
+        Opt_WarnUnusedDoBind
       ]
 
--- minuswRemovesOpts should be every warning option
 minuswRemovesOpts :: [DynFlag]
+-- minuswRemovesOpts should be every warning option 
 minuswRemovesOpts
     = minusWallOpts ++
-      [Opt_WarnImplicitPrelude,
+      [Opt_WarnTabs,
        Opt_WarnIncompletePatternsRecUpd,
+       Opt_WarnIncompleteUniPatterns,
        Opt_WarnMonomorphism,
        Opt_WarnUnrecognisedPragmas,
        Opt_WarnAutoOrphans,
-       Opt_WarnTabs
-      ]
+       Opt_WarnImplicitPrelude
+     ]       
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setDynFlag Opt_PrintExplicitForalls

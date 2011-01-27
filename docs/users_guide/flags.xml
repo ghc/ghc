@@ -1137,6 +1137,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-incomplete-uni-patterns</option></entry>
+	    <entry>warn when a pattern match in a lambda expression or pattern binding could fail</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-incomplete-uni-patterns</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-incomplete-record-updates</option></entry>
 	    <entry>warn when a record update could fail</entry>
 	    <entry>dynamic</entry>

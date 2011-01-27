@@ -38,6 +38,7 @@ import Name
 import Outputable
 import FastString
 
+import Control.Monad( when )
 import qualified Data.Map as Map
 \end{code}
 
@@ -55,9 +56,9 @@ matchCheck ::  DsMatchContext
             -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
             -> DsM MatchResult  -- Desugared result!
 
-matchCheck ctx vars ty qs = do
-    dflags <- getDOptsDs
-    matchCheck_really dflags ctx vars ty qs
+matchCheck ctx vars ty qs
+  = do { dflags <- getDOptsDs
+       ; matchCheck_really dflags ctx vars ty qs }
 
 matchCheck_really :: DynFlags
                   -> DsMatchContext
@@ -65,28 +66,31 @@ matchCheck_really :: DynFlags
                   -> Type
                   -> [EquationInfo]
                   -> DsM MatchResult
-matchCheck_really dflags ctx vars ty qs
-  | incomplete && shadow  = do
-      dsShadowWarn ctx eqns_shadow
-      dsIncompleteWarn ctx pats
-      match vars ty qs
-  | incomplete            = do
-      dsIncompleteWarn ctx pats
-      match vars ty qs
-  | shadow                = do
-      dsShadowWarn ctx eqns_shadow
-      match vars ty qs
-  | otherwise             =
-      match vars ty qs
-  where (pats, eqns_shadow) = check qs
-        incomplete    = want_incomplete && (notNull pats)
-        want_incomplete = case ctx of
-                              DsMatchContext RecUpd _ ->
-                                  dopt Opt_WarnIncompletePatternsRecUpd dflags
-                              _ ->
-                                  dopt Opt_WarnIncompletePatterns       dflags
-        shadow        = dopt Opt_WarnOverlappingPatterns dflags
-			&& not (null eqns_shadow)
+matchCheck_really dflags ctx@(DsMatchContext hs_ctx _) vars ty qs
+  = do { when shadow (dsShadowWarn ctx eqns_shadow)
+       ; when incomplete (dsIncompleteWarn ctx pats)
+       ; match vars ty qs }
+  where 
+    (pats, eqns_shadow) = check qs
+    incomplete = incomplete_flag hs_ctx && (notNull pats)
+    shadow     = dopt Opt_WarnOverlappingPatterns dflags
+              	 && notNull eqns_shadow
+
+    incomplete_flag :: HsMatchContext id -> Bool
+    incomplete_flag (FunRhs {})   = dopt Opt_WarnIncompletePatterns dflags
+    incomplete_flag CaseAlt       = dopt Opt_WarnIncompletePatterns dflags
+
+    incomplete_flag LambdaExpr    = dopt Opt_WarnIncompleteUniPatterns dflags
+    incomplete_flag PatBindRhs    = dopt Opt_WarnIncompleteUniPatterns dflags
+    incomplete_flag ProcExpr      = dopt Opt_WarnIncompleteUniPatterns dflags
+
+    incomplete_flag RecUpd        = dopt Opt_WarnIncompletePatternsRecUpd dflags
+
+    incomplete_flag ThPatQuote    = False
+    incomplete_flag (StmtCtxt {}) = False  -- Don't warn about incomplete patterns
+    		    	      	    	   -- in list comprehensions, pattern guards
+					   -- etc.  They are often *supposed* to be
+					   -- incomplete 
 \end{code}
 
 This variable shows the maximum number of lines of output generated for warnings.
@@ -735,19 +739,21 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-
 matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
 	       -> Type -> MatchResult -> DsM MatchResult
 -- Do not warn about incomplete patterns
 -- Used for things like [ e | pat <- stuff ], where 
 -- incomplete patterns are just fine
-matchSinglePat (Var var) _ (L _ pat) ty match_result 
-  = match [var] ty [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }]
+matchSinglePat (Var var) ctx (L _ pat) ty match_result 
+  = do { locn <- getSrcSpanDs
+       ; matchCheck (DsMatchContext ctx locn)
+                    [var] ty  
+                    [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }] }
 
-matchSinglePat scrut hs_ctx pat ty match_result = do
-    var <- selectSimpleMatchVarL pat
-    match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
-    return (adjustMatchResult (bindNonRec var scrut) match_result')
+matchSinglePat scrut hs_ctx pat ty match_result
+  = do { var <- selectSimpleMatchVarL pat
+       ; match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
+       ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 \end{code}
 
 
