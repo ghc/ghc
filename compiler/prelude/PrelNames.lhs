@@ -838,7 +838,7 @@ isStringClassName   = clsQual dATA_STRING (fsLit "IsString") isStringClassKey
 -- Type-level naturals
 typeNatClassName, lessThanEqualClassName,
   addTyFamName, mulTyFamName, expTyFamName :: Name
-typeNatClassName    = clsQual gHC_TYPENATS (fsLit "TypeNat") typeNatClassKey
+typeNatClassName    = clsQual gHC_TYPENATS (fsLit "NatI") typeNatClassKey
 lessThanEqualClassName = clsQual gHC_TYPENATS (fsLit "<=") lessThanEqualClassKey
 addTyFamName        = tcQual gHC_TYPENATS (fsLit "+")   addTyFamNameKey
 mulTyFamName        = tcQual gHC_TYPENATS (fsLit "*")   mulTyFamNameKey
