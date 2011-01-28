@@ -1,4 +1,8 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , ForeignFunctionInterface
+           , ExistentialQuantification
+  #-}
 
 #include "Typeable.h"
 

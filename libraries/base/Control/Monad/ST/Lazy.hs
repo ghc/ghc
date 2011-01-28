@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, MagicHash, UnboxedTuples, Rank2Types #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.ST.Lazy

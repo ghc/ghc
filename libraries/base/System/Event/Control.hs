@@ -1,5 +1,9 @@
-{-# LANGUAGE CPP, ForeignFunctionInterface, NoImplicitPrelude,
-    ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE CPP
+           , ForeignFunctionInterface
+           , NoImplicitPrelude
+           , ScopedTypeVariables
+           , BangPatterns
+  #-}
 
 module System.Event.Control
     (

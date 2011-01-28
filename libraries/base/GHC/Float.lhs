@@ -1,9 +1,15 @@
 \begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , MagicHash
+           , UnboxedTuples
+           , ForeignFunctionInterface
+  #-}
 -- We believe we could deorphan this module, by moving lots of things
 -- around, but we haven't got there yet:
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Float

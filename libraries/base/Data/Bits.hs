@@ -1,5 +1,5 @@
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Bits

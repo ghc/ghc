@@ -1,7 +1,14 @@
 \begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , ForeignFunctionInterface
+           , MagicHash
+           , UnboxedTuples
+           , PatternGuards
+  #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.TopHandler

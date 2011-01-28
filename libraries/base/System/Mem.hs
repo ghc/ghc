@@ -1,3 +1,9 @@
+{-# LANGUAGE CPP #-}
+
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE ForeignFunctionInterface #-}
+#endif
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Mem

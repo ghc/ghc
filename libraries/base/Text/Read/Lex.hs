@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.Read.Lex

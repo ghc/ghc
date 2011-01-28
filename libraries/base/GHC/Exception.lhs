@@ -1,5 +1,9 @@
 \begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude
+           , ExistentialQuantification
+           , MagicHash
+           , DeriveDataTypeable
+  #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

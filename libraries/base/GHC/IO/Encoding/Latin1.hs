@@ -1,5 +1,9 @@
-{-# OPTIONS_GHC  -XNoImplicitPrelude -funbox-strict-fields #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NoImplicitPrelude
+           , BangPatterns
+           , NondecreasingIndentation
+  #-}
+{-# OPTIONS_GHC  -funbox-strict-fields #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding.Latin1

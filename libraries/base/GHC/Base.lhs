@@ -62,12 +62,20 @@ GHC.Float       Classes: Floating, RealFloat
 Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , BangPatterns
+           , ExplicitForAll
+           , MagicHash
+           , UnboxedTuples
+           , ExistentialQuantification
+           , Rank2Types
+  #-}
 -- -fno-warn-orphans is needed for things like:
 -- Orphan rule: "x# -# x#" ALWAYS forall x# :: Int# -# x# x# = 0
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Base

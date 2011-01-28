@@ -1,7 +1,12 @@
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , BangPatterns
+           , MagicHash
+           , UnboxedTuples
+  #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Weak

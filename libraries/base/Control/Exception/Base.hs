@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
 
 #include "Typeable.h"
 

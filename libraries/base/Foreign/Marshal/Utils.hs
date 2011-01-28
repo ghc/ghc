@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Utils

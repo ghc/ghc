@@ -1,8 +1,16 @@
 \begin{code}
-{-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , BangPatterns
+           , MagicHash
+           , UnboxedTuples
+           , UnliftedFFITypes
+           , ForeignFunctionInterface
+           , DeriveDataTypeable
+  #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Conc.Sync

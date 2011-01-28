@@ -1,4 +1,9 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , ForeignFunctionInterface
+           , NondecreasingIndentation
+  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding.Iconv

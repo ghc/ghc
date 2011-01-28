@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

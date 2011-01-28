@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module GHC.IO.Handle.FD where
 
 import GHC.IO.Handle.Types

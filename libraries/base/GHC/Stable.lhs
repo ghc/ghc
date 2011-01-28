@@ -1,6 +1,11 @@
 \begin{code}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude
+           , MagicHash
+           , UnboxedTuples
+           , ForeignFunctionInterface
+  #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Stable

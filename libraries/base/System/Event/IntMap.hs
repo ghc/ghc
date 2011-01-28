@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, MagicHash, NoImplicitPrelude #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Event.IntMap

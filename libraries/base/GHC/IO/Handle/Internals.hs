@@ -1,7 +1,13 @@
+{-# LANGUAGE NoImplicitPrelude
+           , RecordWildCards
+           , BangPatterns
+           , PatternGuards
+           , NondecreasingIndentation
+           , Rank2Types
+  #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE NoImplicitPrelude, RecordWildCards, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |

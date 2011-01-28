@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, ForeignFunctionInterface #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Debug.Trace

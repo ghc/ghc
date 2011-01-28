@@ -1,5 +1,9 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 
+#ifndef __NHC__
+{-# LANGUAGE DeriveDataTypeable #-}
+#endif
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Fixed

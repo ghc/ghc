@@ -1,4 +1,10 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , ForeignFunctionInterface
+           , MagicHash
+           , GeneralizedNewtypeDeriving
+  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Ptr

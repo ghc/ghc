@@ -1,6 +1,7 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ForeignFunctionInterface #-}
 {-# OPTIONS -#include "WCsubst.h" #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Unicode

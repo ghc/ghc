@@ -1,5 +1,10 @@
+{-# LANGUAGE NoImplicitPrelude
+           , BangPatterns
+           , RankNTypes
+           , MagicHash
+           , UnboxedTuples
+  #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-{-# LANGUAGE NoImplicitPrelude, BangPatterns, RankNTypes #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |

@@ -1,5 +1,10 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , MagicHash
+           , GeneralizedNewtypeDeriving
+  #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Posix.Types

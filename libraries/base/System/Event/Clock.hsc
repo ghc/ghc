@@ -1,5 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface #-}
 
 module System.Event.Clock (getCurrentTime) where
 

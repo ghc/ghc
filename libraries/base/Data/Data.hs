@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, Rank2Types, ScopedTypeVariables #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Data

@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, NondecreasingIndentation, ForeignFunctionInterface #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.CPUTime

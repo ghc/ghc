@@ -1,6 +1,6 @@
+{-# LANGUAGE CPP, ParallelArrays, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-{-# LANGUAGE ParallelArrays #-}
 
 -----------------------------------------------------------------------------
 -- |

@@ -1,5 +1,9 @@
-{-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving,
-    NoImplicitPrelude, BangPatterns #-}
+{-# LANGUAGE CPP
+           , ForeignFunctionInterface
+           , GeneralizedNewtypeDeriving
+           , NoImplicitPrelude
+           , BangPatterns
+  #-}
 
 --
 -- | A binding to the epoll I/O event notification facility

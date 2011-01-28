@@ -1,5 +1,11 @@
-{-# OPTIONS_GHC  -XNoImplicitPrelude -funbox-strict-fields #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , BangPatterns
+           , NondecreasingIndentation
+           , MagicHash
+  #-}
+{-# OPTIONS_GHC  -funbox-strict-fields #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding.UTF16

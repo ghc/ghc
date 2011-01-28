@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP, DeriveDataTypeable #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Version

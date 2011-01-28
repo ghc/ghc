@@ -1,5 +1,12 @@
-{-# LANGUAGE BangPatterns, CPP, ExistentialQuantification, NoImplicitPrelude,
-    RecordWildCards, TypeSynonymInstances #-}
+{-# LANGUAGE BangPatterns
+           , CPP
+           , ExistentialQuantification
+           , NoImplicitPrelude
+           , RecordWildCards
+           , TypeSynonymInstances
+           , FlexibleInstances
+  #-}
+
 module System.Event.Manager
     ( -- * Types
       EventManager

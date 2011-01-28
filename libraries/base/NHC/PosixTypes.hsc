@@ -1,4 +1,6 @@
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_NHC98 -I/usr/include #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  NHC.PosixTypes

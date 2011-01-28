@@ -1,7 +1,12 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , MagicHash
+           , GeneralizedNewtypeDeriving
+  #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.C.Types

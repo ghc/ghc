@@ -99,13 +99,6 @@ Library {
         if os(windows)
             exposed-modules: GHC.IO.Encoding.CodePage.Table
                              GHC.Conc.Windows
-        extensions: MagicHash, ExistentialQuantification, Rank2Types,
-                    ScopedTypeVariables, UnboxedTuples,
-                    ForeignFunctionInterface, UnliftedFFITypes,
-                    DeriveDataTypeable, GeneralizedNewtypeDeriving,
-                    FlexibleInstances, StandaloneDeriving,
-                    PatternGuards, EmptyDataDecls, NoImplicitPrelude,
-                    NondecreasingIndentation
     }
     exposed-modules:
         Control.Applicative,
@@ -228,7 +221,6 @@ Library {
             System.Event.Thread
             System.Event.Unique
     }
-    extensions: CPP
     -- We need to set the package name to base (without a version number)
     -- as it's magic.
     ghc-options: -package-name base

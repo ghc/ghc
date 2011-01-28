@@ -1,4 +1,6 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding.Types

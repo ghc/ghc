@@ -1,7 +1,8 @@
 \begin{code}
+{-# LANGUAGE NoImplicitPrelude, NoBangPatterns, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-{-# LANGUAGE NoImplicitPrelude, NoBangPatterns #-}
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Arr

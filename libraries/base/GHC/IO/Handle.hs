@@ -1,5 +1,9 @@
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , RecordWildCards
+           , NondecreasingIndentation
+  #-}
 {-# OPTIONS_GHC -fno-warn-unused-matches #-}
-{-# LANGUAGE NoImplicitPrelude, RecordWildCards #-}
 
 -----------------------------------------------------------------------------
 -- |

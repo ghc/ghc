@@ -1,6 +1,13 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -XBangPatterns -fno-warn-identities #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , BangPatterns
+           , ForeignFunctionInterface
+           , DeriveDataTypeable
+  #-}
+{-# OPTIONS_GHC -fno-warn-identities #-}
 -- Whether there are identities depends on the platform
 {-# OPTIONS_HADDOCK hide #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.FD

@@ -1,4 +1,10 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , MagicHash
+           , UnboxedTuples
+           , ForeignFunctionInterface
+  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Alloc

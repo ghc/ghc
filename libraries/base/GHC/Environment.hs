@@ -1,3 +1,4 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 module GHC.Environment (getFullArgs) where
 

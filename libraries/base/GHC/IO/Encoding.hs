@@ -1,4 +1,6 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -funbox-strict-fields #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Encoding

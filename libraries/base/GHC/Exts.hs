@@ -1,3 +1,5 @@
+{-# LANGUAGE MagicHash, UnboxedTuples, DeriveDataTypeable #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Exts

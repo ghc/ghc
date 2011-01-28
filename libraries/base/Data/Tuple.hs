@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 -- XXX -fno-warn-unused-imports needed for the GHC.Tuple import below. Sigh.
 -----------------------------------------------------------------------------

@@ -1,5 +1,10 @@
-{-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving,
-    NoImplicitPrelude, RecordWildCards, BangPatterns #-}
+{-# LANGUAGE CPP
+           , ForeignFunctionInterface
+           , GeneralizedNewtypeDeriving
+           , NoImplicitPrelude
+           , RecordWildCards
+           , BangPatterns
+  #-}
 
 module System.Event.KQueue
     (

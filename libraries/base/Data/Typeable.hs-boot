@@ -1,5 +1,4 @@
-
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module Data.Typeable where
 

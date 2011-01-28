@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.Handle.FD

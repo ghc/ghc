@@ -1,4 +1,11 @@
+{-# LANGUAGE CPP
+           , ForeignFunctionInterface
+           , MagicHash
+           , UnboxedTuples
+           , ScopedTypeVariables
+  #-}
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Concurrent

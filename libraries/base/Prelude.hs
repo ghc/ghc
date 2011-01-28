@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -XBangPatterns #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Prelude

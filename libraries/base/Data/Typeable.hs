@@ -1,4 +1,11 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude -XOverlappingInstances -funbox-strict-fields #-}
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , OverlappingInstances
+           , ScopedTypeVariables
+           , ForeignFunctionInterface
+           , FlexibleInstances
+  #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- The -XOverlappingInstances flag allows the user to over-ride
 -- the instances for Typeable given here.  In particular, we provide an instance

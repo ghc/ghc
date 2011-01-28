@@ -1,5 +1,9 @@
-{-# LANGUAGE ForeignFunctionInterface, GeneralizedNewtypeDeriving,
-    NoImplicitPrelude, BangPatterns #-}
+{-# LANGUAGE CPP
+           , ForeignFunctionInterface
+           , GeneralizedNewtypeDeriving
+           , NoImplicitPrelude
+           , BangPatterns
+  #-}
 
 module System.Event.Poll
     (
