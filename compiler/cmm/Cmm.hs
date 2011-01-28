@@ -2,6 +2,12 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#if __GLASGOW_HASKELL__ >= 701
+-- GHC 7.0.1 improved incomplete pattern warnings with GADTs
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+#endif
+
 module Cmm
   ( CmmGraph(..), CmmBlock
   , CmmStackInfo(..), CmmTopInfo(..), Cmm, CmmTop
@@ -52,7 +58,6 @@ type CmmTop       = GenCmmTop CmmStatic CmmTopInfo CmmGraph
 
 toBlockMap :: CmmGraph -> LabelMap CmmBlock
 toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
---toBlockMap _ = panic "Cmm.toBlockMap"
 
 ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
 ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
@@ -131,7 +136,6 @@ insertBetween b ms succId = insert $ lastNode b
           panic "unimp: insertBetween after a call -- probably not a good idea"
         insert (CmmForeignCall {}) =
           panic "unimp: insertBetween after a foreign call -- probably not a good idea"
-        --insert _ = panic "Cmm.insertBetween.insert"
 
         newBlocks :: MonadUnique m => m (BlockId, [CmmBlock])
         newBlocks = do id <- liftM mkBlockId $ getUniqueM

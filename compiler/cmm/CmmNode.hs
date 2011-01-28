@@ -1,5 +1,12 @@
 -- CmmNode type for representation using Hoopl graphs.
 {-# LANGUAGE GADTs #-}
+
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#if __GLASGOW_HASKELL__ >= 701
+-- GHC 7.0.1 improved incomplete pattern warnings with GADTs
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+#endif
+
 module CmmNode
   ( CmmNode(..)
   , UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..)
@@ -129,14 +136,12 @@ instance Eq (CmmNode e x) where
 
 instance NonLocal CmmNode where
   entryLabel (CmmEntry l) = l
-  -- entryLabel _ = error "CmmNode.entryLabel"
 
   successors (CmmBranch l) = [l]
   successors (CmmCondBranch {cml_true=t, cml_false=f}) = [f, t] -- meets layout constraint
   successors (CmmSwitch _ ls) = catMaybes ls
   successors (CmmCall {cml_cont=l}) = maybeToList l
   successors (CmmForeignCall {succ=l}) = [l]
-  -- successors _ = error "CmmNode.successors"
 
 
 instance HooplNode CmmNode where

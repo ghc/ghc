@@ -5,6 +5,12 @@
 -- Todo: remove
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#if __GLASGOW_HASKELL__ >= 701
+-- GHC 7.0.1 improved incomplete pattern warnings with GADTs
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+#endif
+
 module CmmStackLayout
     ( SlotEnv, liveSlotAnal, liveSlotTransfers, removeLiveSlotDefs
     , layout, manifestSP, igraph, areaBuilder
@@ -123,6 +129,7 @@ liveSlotTransfers :: BwdTransfer CmmNode SubAreaSet
 liveSlotTransfers = mkBTransfer3 frt mid lst
   where frt :: CmmNode C O -> SubAreaSet -> SubAreaSet
         frt (CmmEntry l) f = Map.delete (CallArea (Young l)) f
+
         mid :: CmmNode O O -> SubAreaSet -> SubAreaSet
         mid n f = foldSlotsUsed addSlot (removeLiveSlotDefs f n) n
         lst :: CmmNode O C -> FactBase SubAreaSet -> SubAreaSet
