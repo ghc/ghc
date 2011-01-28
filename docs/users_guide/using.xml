@@ -1218,7 +1218,8 @@ foreign import "&amp;f" f :: FunPtr t
 
       <varlistentry>
 	<term><option>-fwarn-incomplete-patterns</option>, 
-              <option>-fwarn-incomplete-uni-patterns</option>, 
+              <option>-fwarn-incomplete-uni-patterns</option>:
+        </term> 
 	<listitem>
 	  <indexterm><primary><option>-fwarn-incomplete-patterns</option></primary></indexterm>
 	  <indexterm><primary><option>-fwarn-incomplete-uni-patterns</option></primary></indexterm>
