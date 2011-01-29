@@ -1,8 +1,10 @@
 -- -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow, 2005
+-- (c) The University of Glasgow, 2011
 --
---       This module deals with --make
+--       This module implements multi-module compilation, and is used
+--       by --make and GHCi.
+--
 -- -----------------------------------------------------------------------------
 
 module GhcMake( 
