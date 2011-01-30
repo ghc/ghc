@@ -23,7 +23,8 @@ import PrelNames  ( lessThanEqualClassName
                   )
 import Bag        (bagToList, emptyBag, unionBags)
 import Data.Maybe (fromMaybe)
-import Control.Monad (msum, mplus, zipWithM, (<=<))
+import Data.List  (nub, partition)
+import Control.Monad (msum, mplus, zipWithM, (<=<), guard)
 
 
 
@@ -188,6 +189,15 @@ data Result = Impossible            -- We know that the goal cannot be solved.
             | Improved   [Prop]     -- We learned some new facts.
 
 solve :: [Prop] -> Prop -> Result
+solve asmps (Leq a b) =
+  let ps = propsToOrd asmps
+  in case isLeq ps a b of
+       True  -> Simplified []
+       False ->
+         case improveLeq ps a b of
+           Nothing -> Impossible
+           Just ps -> Improved ps
+
 solve asmps prop =
   case solveWanted1 prop of
     Just sgs -> Simplified sgs
@@ -208,9 +218,6 @@ solve asmps prop =
 improve1 :: Prop -> Maybe [Prop]
 improve1 prop =
   case prop of
-
-    Leq s t@(Num 0 _)                -> Just [ Eq s t ]
-
 
     EqFun Add (Num m _) (Num n _) t         -> Just [ Eq (num (m+n)) t ]
     EqFun Add (Num 0 _) s         t         -> Just [ Eq s t ]
@@ -281,10 +288,6 @@ solveWanted1 :: Prop -> Maybe [ Prop ]
 solveWanted1 prop =
   case prop of
 
-    Leq (Num m _) (Num n _) | m <= n      -> Just []
-    Leq (Num 0 _) _                       -> Just []
-    Leq s t                 | s == t      -> Just []
-
     EqFun Add (Num m _) (Num n _) (Num mn _)  | m + n == mn -> Just []
     EqFun Add (Num 0 _) s         t           | s == t      -> Just []
     EqFun Add r         s         t           | r == s      ->
@@ -314,21 +317,6 @@ solveWanted2 :: Prop -> Prop -> Maybe [Prop]
 solveWanted2 asmp prop =
   case (asmp, prop) of
 
-    (Leq s1 t1, Leq s2 t2)
-      | s1 == s2 && t1 == t2    -> Just []
-
-    (Leq (Num m _) t1, Leq (Num n _) t2)
-      | t1 == t2 && m >= n      -> Just []
-
-    (Leq s1 (Num m _), Leq s2 (Num n _))
-      | s1 == s2 && m <= n      -> Just []
-
-    (EqFun Add r1 s1 t1, Leq r2 t2)
-      | t1 == t2 && r1 == r2    -> Just []
-      | t1 == t2 && s1 == r2    -> Just []
-
-    -- XXX: others, transitivity
-
     (EqFun op1 r1 s1 t1, EqFun op2 r2 s2 t2)
       | op1 == op2 && t1 == t2 &&
       (  r1 == r2 && s1 == s2
@@ -351,6 +339,58 @@ solveWanted2 asmp prop =
     _                           -> Nothing
 
 
+--------------------------------------------------------------------------------
+-- Reasoning about ordering.
+--------------------------------------------------------------------------------
+
+-- This function assumes that the assumptions are acyclic.
+isLeq :: [(Term, Term)] -> Term -> Term -> Bool
+isLeq _ (Num 0 _) _         = True
+isLeq _ (Num m _) (Num n _) = m <= n
+isLeq _ a b | a == b        = True
+isLeq ps (Num m _) a        = or [ isLeq ps b a  | (Num x _, b) <- ps, m <= x ]
+isLeq ps a (Num m _)        = or [ isLeq ps a b  | (b, Num x _) <- ps, x <= m ]
+isLeq ps a b                = or [ isLeq ps c b  | (a',c)       <- ps, a == a' ]
+
+isGt :: [(Term, Term)] -> Term -> Term -> Bool
+isGt _ (Num m _) (Num n _)  = m > n
+isGt ps (Num m _) a         = (m > 0) && isLeq ps a (num (m - 1))
+isGt ps a (Num m _)         = isLeq ps (num (m + 1)) a
+isGt _ _ _                  = False
+
+improveLeq :: [(Term,Term)] -> Term -> Term -> Maybe [Prop]
+improveLeq ps a b | isLeq ps b a  = Just [Eq a b]
+                  | isGt ps a b   = Nothing
+                  | otherwise     = Just []
+
+-- Ordering constraints derived from numeric predicates.
+-- We do not consider equlities because they should be substituted away.
+propsToOrd :: [Prop] -> [(Term,Term)]
+propsToOrd props = loop (step [] unconditional)
+  where
+  loop ps = let new = filter (`notElem` ps) (step ps conditional)
+            in if null new then ps else loop (new ++ ps)
+
+  step ps = nub . concatMap (toOrd ps)
+
+  isConditional (EqFun op _ _ _)  = op == Mul || op == Exp
+  isConditional _                 = False
+
+  (conditional,unconditional)     = partition isConditional props
+
+  toOrd _ (Leq a b) = [(a,b)]
+  toOrd _ (Eq _ _)  = []      -- Would lead to a cycle, should be subst. away
+  toOrd ps (EqFun op a b c) =
+    case op of
+      Add               -> [(a,c),(b,c)]
+
+      Mul               -> (guard (isLeq ps (num 1) a) >> return (b,c)) ++
+                           (guard (isLeq ps (num 1) b) >> return (a,c))
+      Exp
+        | Num 0 _ <- a  -> [(c, num 1)]
+        | a == c        -> [(a, num 1)]
+        | otherwise     -> (guard (isLeq ps (num 2) a) >> return (b,c)) ++
+                           (guard (isLeq ps (num 1) b) >> return (a,c))
 
 
 --------------------------------------------------------------------------------
