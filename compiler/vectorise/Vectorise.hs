@@ -18,7 +18,6 @@ import CoreSyn
 import CoreUnfold           ( mkInlineUnfolding )
 import CoreFVs
 import CoreMonad            ( CoreM, getHscEnv )
-import FamInstEnv           ( extendFamInstEnvList )
 import Var
 import Id
 import OccName
@@ -62,9 +61,7 @@ vectModule guts
       -- TODO: What new binds do we get back here?
       (types', fam_insts, tc_binds) <- vectTypeEnv (mg_types guts)
 
-      -- TODO: What is this?
-      let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
-      updGEnv (setFamInstEnv fam_inst_env')
+      (_, fam_inst_env) <- readGEnv global_fam_inst_env
 
       -- dicts   <- mapM buildPADict pa_insts
       -- workers <- mapM vectDataConWorkers pa_insts
@@ -74,7 +71,7 @@ vectModule guts
 
       return $ guts { mg_types        = types'
                     , mg_binds        = Rec tc_binds : binds'
-                    , mg_fam_inst_env = fam_inst_env'
+                    , mg_fam_inst_env = fam_inst_env
                     , mg_fam_insts    = mg_fam_insts guts ++ fam_insts
                     }
 

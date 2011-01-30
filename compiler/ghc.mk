@@ -110,8 +110,10 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
 	@echo 'cCcOpts               :: [String]'                           >> $@
 	@echo 'cCcOpts               = words "$(CONF_CC_OPTS_STAGE$*)"'     >> $@
-	@echo 'cLdOpts               :: [String]'                           >> $@
-	@echo 'cLdOpts               = words "$(CONF_LD_OPTS_STAGE$*)"'     >> $@
+	@echo 'cGccLinkerOpts        :: [String]'                           >> $@
+	@echo 'cGccLinkerOpts        = words "$(CONF_GCC_LINKER_OPTS_STAGE$*)"' >> $@
+	@echo 'cLdLinkerOpts         :: [String]'                           >> $@
+	@echo 'cLdLinkerOpts         = words "$(CONF_LD_LINKER_OPTS_STAGE$*)"'  >> $@
 	@echo 'cIntegerLibrary       :: String'                             >> $@
 	@echo 'cIntegerLibrary       = "$(INTEGER_LIBRARY)"'                >> $@
 	@echo 'cSplitObjs            :: String'                             >> $@

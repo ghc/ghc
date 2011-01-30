@@ -12,7 +12,7 @@ where
 import RegAlloc.Liveness
 import Instruction
 import Reg
-import Cmm	hiding (RegSet)
+import OldCmm hiding (RegSet)
 import BlockId
 
 import State
@@ -89,12 +89,12 @@ regSpill_top regSlotMap cmm
 	CmmData{}				
 	 -> return cmm
 
-	CmmProc info label params sccs
+	CmmProc info label sccs
 	 |  LiveInfo static firstId mLiveVRegsOnEntry liveSlotsOnEntry <- info
 	 -> do	
 		-- We should only passed Cmms with the liveness maps filled in,  but we'll
 		-- create empty ones if they're not there just in case.
-		let liveVRegsOnEntry	= fromMaybe emptyBlockEnv mLiveVRegsOnEntry
+		let liveVRegsOnEntry	= fromMaybe mapEmpty mLiveVRegsOnEntry
 		
 		-- The liveVRegsOnEntry contains the set of vregs that are live on entry to
 		-- each basic block. If we spill one of those vregs we remove it from that
@@ -103,7 +103,7 @@ regSpill_top regSlotMap cmm
 		-- reload instructions after we've done a successful allocation.
 		let liveSlotsOnEntry' :: Map BlockId (Set Int)
 		    liveSlotsOnEntry'
-			= foldBlockEnv patchLiveSlot liveSlotsOnEntry liveVRegsOnEntry
+			= mapFoldWithKey patchLiveSlot liveSlotsOnEntry liveVRegsOnEntry
 
 		let info'
 			= LiveInfo static firstId
@@ -113,7 +113,7 @@ regSpill_top regSlotMap cmm
 		-- Apply the spiller to all the basic blocks in the CmmProc.
 		sccs'		<- mapM (mapSCCM (regSpill_block regSlotMap)) sccs
 
-		return	$ CmmProc info' label params sccs'
+		return	$ CmmProc info' label sccs'
 
  where	-- | Given a BlockId and the set of registers live in it, 
 	--   if registers in this block are being spilled to stack slots, 

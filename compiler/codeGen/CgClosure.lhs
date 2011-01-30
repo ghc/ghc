@@ -31,8 +31,8 @@ import CgCallConv
 import CgUtils
 import ClosureInfo
 import SMRep
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import CLabel
 import StgSyn
 import CostCentre	

@@ -23,7 +23,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Cmm	hiding (RegSet)
+import OldCmm  hiding (RegSet)
 import Digraph
 import Outputable
 import Unique
@@ -86,7 +86,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 	-- adjust the current assignment to remove any vregs that are not live
 	-- on entry to the destination block.
-	let Just live_set 	= lookupBlockEnv block_live dest
+	let Just live_set 	= mapLookup dest block_live
 	let still_live uniq _ 	= uniq `elemUniqSet_Directly` live_set
 	let adjusted_assig	= filterUFM_Directly still_live assig
 
@@ -96,7 +96,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 			, not (elemUniqSet_Directly reg live_set)
 			, r 	     <- regsOfLoc loc ]
 
-	case lookupBlockEnv block_assig dest of
+	case mapLookup dest block_assig of
 	 Nothing 
 	  -> joinToTargets_first 
 	  		block_live new_blocks block_id instr dest dests
@@ -118,8 +118,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 	let freeregs' 	= foldr releaseReg freeregs to_free 
 	
 	-- remember the current assignment on entry to this block.
-	setBlockAssigR (extendBlockEnv block_assig dest 
-				(freeregs', src_assig))
+	setBlockAssigR (mapInsert dest (freeregs', src_assig) block_assig)
 
 	joinToTargets' block_live new_blocks block_id instr dests
 
@@ -173,7 +172,7 @@ joinToTargets_again
 		--	A the end of the current block we will jump to the fixup one, 
 		--	then that will jump to our original destination.
 		fixup_block_id <- getUniqueR
-		let block = BasicBlock (BlockId fixup_block_id) 
+		let block = BasicBlock (mkBlockId fixup_block_id) 
 				$ fixUpInstrs ++ mkJumpInstr dest
 		
 {-		pprTrace
@@ -190,7 +189,7 @@ joinToTargets_again
 		 --	fixup block instead.
 		 _	-> let	instr'	=  patchJumpInstr instr 
 		 				(\bid -> if bid == dest 
-								then BlockId fixup_block_id 
+								then mkBlockId fixup_block_id 
 								else dest)
 						
 		 	   in	joinToTargets' block_live (block : new_blocks) block_id instr' dests

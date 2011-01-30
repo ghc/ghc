@@ -17,7 +17,7 @@ module CgParallel(
 import CgMonad
 import CgCallConv
 import Id
-import Cmm
+import OldCmm
 import StaticFlags
 import Outputable
 import SMRep

@@ -29,8 +29,8 @@ import CgPrimOp
 import CgHpc
 import CgUtils
 import ClosureInfo
-import Cmm
-import CmmUtils
+import OldCmm
+import OldCmmUtils
 import VarSet
 import Literal
 import PrimOp

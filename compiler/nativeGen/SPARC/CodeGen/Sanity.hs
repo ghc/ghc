@@ -12,7 +12,7 @@ import SPARC.Instr
 import SPARC.Ppr	()
 import Instruction
 
-import Cmm
+import OldCmm
 
 import Outputable
 

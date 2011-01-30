@@ -1420,7 +1420,7 @@ So it's up to the programmer: rules can cause divergence
 
 %************************************************************************
 %*                                                                      *
-                Rebuilding a cse expression
+                Rebuilding a case expression
 %*                                                                      *
 %************************************************************************
 
@@ -1429,7 +1429,7 @@ Note [Case elimination]
 The case-elimination transformation discards redundant case expressions.
 Start with a simple situation:
 
-        case x# of      ===>   e[x#/y#]
+        case x# of      ===>   let y# = x# in e
           y# -> e
 
 (when x#, y# are of primitive type, of course).  We can't (in general)
@@ -1450,7 +1450,24 @@ Here the inner case is first trimmed to have only one alternative, the
 DEFAULT, after which it's an instance of the previous case.  This
 really only shows up in eliminating error-checking code.
 
-We also make sure that we deal with this very common case:
+Note that SimplUtils.mkCase combines identical RHSs.  So
+
+        case e of       ===> case e of DEFAULT -> r
+           True  -> r
+           False -> r
+
+Now again the case may be elminated by the CaseElim transformation.
+This includes things like (==# a# b#)::Bool so that we simplify
+      case ==# a# b# of { True -> x; False -> x }
+to just
+      x
+This particular example shows up in default methods for
+comparision operations (e.g. in (>=) for Int.Int32)
+
+Note [CaseElimination: lifted case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We also make sure that we deal with this very common case,
+where x has a lifted type:
 
         case e of
           x -> ...x...
@@ -1459,20 +1476,14 @@ Here we are using the case as a strict let; if x is used only once
 then we want to inline it.  We have to be careful that this doesn't
 make the program terminate when it would have diverged before, so we
 check that
-        - e is already evaluated (it may so if e is a variable)
-        - x is used strictly, or
+        (a) 'e' is already evaluated (it may so if e is a variable)
+	    Specifically we check (exprIsHNF e)
+or
+        (b) the scrutinee is a variable and 'x' is used strictly
+or
+        (c) 'x' is not used at all and e is ok-for-speculation
 
-Lastly, the code in SimplUtils.mkCase combines identical RHSs.  So
-
-        case e of       ===> case e of DEFAULT -> r
-           True  -> r
-           False -> r
-
-Now again the case may be elminated by the CaseElim transformation.
-
-Note [CaseElimination: lifted case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We do not use exprOkForSpeculation in the lifted case.  Consider
+For the (c), consider
    case (case a ># b of { True -> (p,q); False -> (q,p) }) of
      r -> blah
 The scrutinee is ok-for-speculation (it looks inside cases), but we do
@@ -1572,33 +1583,33 @@ rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
   -- then there is now only one (DEFAULT) rhs
  | all isDeadBinder bndrs       -- bndrs are [InId]
 
-        -- Check that the scrutinee can be let-bound instead of case-bound
  , if isUnLiftedType (idType case_bndr)
-   then exprOkForSpeculation scrut
-        -- Satisfy the let-binding invariant
-        -- This includes things like (==# a# b#)::Bool
-        -- so that we simplify
-        --      case ==# a# b# of { True -> x; False -> x }
-        -- to just
-        --      x
-        -- This particular example shows up in default methods for
-        -- comparision operations (e.g. in (>=) for Int.Int32)
-
-   else exprIsHNF scrut || var_demanded_later scrut
-        -- It's already evaluated, or will be demanded later
-        -- See Note [Case elimination: lifted case]
+   then ok_for_spec         -- Satisfy the let-binding invariant
+   else elim_lifted
   = do  { tick (CaseElim case_bndr)
         ; env' <- simplNonRecX env case_bndr scrut
           -- If case_bndr is deads, simplNonRecX will discard
         ; simplExprF env' rhs cont }
   where
-        -- The case binder is going to be evaluated later,
-        -- and the scrutinee is a simple variable
-    var_demanded_later (Var v) = isStrictDmd (idDemandInfo case_bndr)
-                                 && not (isTickBoxOp v)
+    elim_lifted   -- See Note [Case elimination: lifted case]
+      = exprIsHNF scrut
+     || (strict_case_bndr && scrut_is_var scrut) 
+              -- The case binder is going to be evaluated later,
+              -- and the scrutinee is a simple variable
+
+     || (is_plain_seq && ok_for_spec)
+              -- Note: not the same as exprIsHNF
+
+    ok_for_spec      = exprOkForSpeculation scrut
+    is_plain_seq     = isDeadBinder case_bndr	-- Evaluation *only* for effect
+    strict_case_bndr = isStrictDmd (idDemandInfo case_bndr)
+
+    scrut_is_var (Cast s _) = scrut_is_var s
+    scrut_is_var (Var v)    = not (isTickBoxOp v)
                                     -- ugly hack; covering this case is what
                                     -- exprOkForSpeculation was intended for.
-    var_demanded_later _       = False
+    scrut_is_var _          = False
+
 
 --------------------------------------------------
 --      3. Try seq rules; see Note [User-defined RULES for seq] in MkId
@@ -1764,7 +1775,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 	   -> SimplM (SimplEnv, OutExpr, OutId)
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
-  | not (isDeadBinder case_bndr)	-- Not a pure seq!  See the Note!
+  | not (isDeadBinder case_bndr)	-- Not a pure seq!  See Note [Improving seq]
   , Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)

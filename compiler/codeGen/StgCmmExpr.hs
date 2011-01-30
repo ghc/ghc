@@ -27,7 +27,7 @@ import StgCmmClosure
 
 import StgSyn
 
-import MkZipCfgCmm
+import MkGraph
 import BlockId
 import CmmExpr
 import CoreSyn
@@ -455,10 +455,8 @@ cgAltRhss gc_plan bndr alts
 	   ; return con }
 
 maybeAltHeapCheck :: GcPlan -> FCode a -> FCode a
-maybeAltHeapCheck NoGcInAlts code
-  = code
-maybeAltHeapCheck (GcInAlts regs _) code
-  = altHeapCheck regs code
+maybeAltHeapCheck NoGcInAlts        code = code
+maybeAltHeapCheck (GcInAlts regs _) code = altHeapCheck regs code
 
 -----------------------------------------------------------------------------
 -- 	Tail calls
@@ -610,3 +608,4 @@ we should still generate the same code:
    L2:
       <default-case code>
 -}
+

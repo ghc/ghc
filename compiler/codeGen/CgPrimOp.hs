@@ -18,9 +18,9 @@ import CgBindery
 import CgMonad
 import CgInfoTbls
 import CgUtils
-import Cmm
+import OldCmm
 import CLabel
-import CmmUtils
+import OldCmmUtils
 import PrimOp
 import SMRep
 import Module

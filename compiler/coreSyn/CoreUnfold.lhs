@@ -783,21 +783,21 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- be a loop breaker  (maybe the knot is not yet untied)
 	CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top 
 		      , uf_is_cheap = is_cheap, uf_arity = uf_arity
-                      , uf_guidance = guidance }
+                      , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding -> tryUnfolding dflags id lone_variable 
                                     arg_infos cont_info unf_template is_top 
-                                    is_cheap uf_arity guidance
+                                    is_cheap is_exp uf_arity guidance
           | otherwise    -> Nothing
 	NoUnfolding 	 -> Nothing 
 	OtherCon {} 	 -> Nothing 
 	DFunUnfolding {} -> Nothing 	-- Never unfold a DFun
 
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
-             -> CoreExpr -> Bool -> Bool -> Arity -> UnfoldingGuidance
+             -> CoreExpr -> Bool -> Bool -> Bool -> Arity -> UnfoldingGuidance
 	     -> Maybe CoreExpr	
 tryUnfolding dflags id lone_variable 
              arg_infos cont_info unf_template is_top 
-             is_cheap uf_arity guidance
+             is_cheap is_exp uf_arity guidance
 			-- uf_arity will typically be equal to (idArity id), 
 			-- but may be less for InlineRules
  | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
@@ -806,6 +806,7 @@ tryUnfolding dflags id lone_variable
 			text "uf arity" <+> ppr uf_arity,
 			text "interesting continuation" <+> ppr cont_info,
 			text "some_benefit" <+> ppr some_benefit,
+                        text "is exp:" <+> ppr is_exp,
                         text "is cheap:" <+> ppr is_cheap,
 			text "guidance" <+> ppr guidance,
 			extra_doc,
@@ -839,10 +840,10 @@ tryUnfolding dflags id lone_variable
 
     interesting_saturated_call 
       = case cont_info of
-          BoringCtxt -> not is_top && uf_arity > 0	      -- Note [Nested functions]
+          BoringCtxt -> not is_top && uf_arity > 0	  -- Note [Nested functions]
           CaseCtxt   -> not (lone_variable && is_cheap)   -- Note [Lone variables]
-          ArgCtxt {} -> uf_arity > 0     		      -- Note [Inlining in ArgCtxt]
-          ValAppCtxt -> True			      -- Note [Cast then apply]
+          ArgCtxt {} -> uf_arity > 0     		  -- Note [Inlining in ArgCtxt]
+          ValAppCtxt -> True			          -- Note [Cast then apply]
 
     (yes_or_no, extra_doc)
       = case guidance of

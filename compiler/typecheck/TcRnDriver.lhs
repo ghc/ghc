@@ -72,7 +72,7 @@ import Outputable
 import DataCon
 import Type
 import Class
-import TcType   ( tyClsNamesOfDFunHead )
+import TcType   ( orphNamesOfDFunHead )
 import Inst	( tcGetInstEnvs )
 import Data.List ( sortBy )
 
@@ -1499,7 +1499,7 @@ lookupInsts (ATyCon tc)
 		 , let dfun = instanceDFunId ispec
 		 , relevant dfun ] } 
   where
-    relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
+    relevant df = tc_name `elemNameSet` orphNamesOfDFunHead (idType df)
     tc_name     = tyConName tc		  
 
 lookupInsts _ = return []

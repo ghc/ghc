@@ -18,9 +18,10 @@ import StgCmmEnv
 import StgCmmMonad
 import StgCmmUtils
 
-import MkZipCfgCmm
+import MkGraph
 import StgSyn
-import Cmm
+import CmmDecl
+import CmmExpr
 import Type	( Type, tyConAppTyCon )
 import TyCon
 import CLabel

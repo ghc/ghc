@@ -631,6 +631,11 @@ it's applied only to dictionaries.
 --
 --  * Safe /not/ to evaluate even if normal order would do so
 --
+-- It is usually called on arguments of unlifted type, but not always
+-- In particular, Simplify.rebuildCase calls it on lifted types
+-- when a 'case' is a plain 'seq'. See the example in 
+-- Note [exprOkForSpeculation: case expressions] below
+--
 -- Precisely, it returns @True@ iff:
 --
 --  * The expression guarantees to terminate, 
@@ -656,9 +661,14 @@ it's applied only to dictionaries.
 exprOkForSpeculation :: CoreExpr -> Bool
 exprOkForSpeculation (Lit _)     = True
 exprOkForSpeculation (Type _)    = True
-    -- Tick boxes are *not* suitable for speculation
-exprOkForSpeculation (Var v)     = isUnLiftedType (idType v)
-				 && not (isTickBoxOp v)
+
+exprOkForSpeculation (Var v)     
+  | isTickBoxOp v = False     -- Tick boxes are *not* suitable for speculation
+  | otherwise     =  isUnLiftedType (idType v)	-- c.f. the Var case of exprIsHNF
+    		  || isDataConWorkId v	    	-- Nullary constructors
+    		  || idArity v > 0   		-- Functions
+    		  || isEvaldUnfolding (idUnfolding v)	-- Let-bound values
+
 exprOkForSpeculation (Note _ e)  = exprOkForSpeculation e
 exprOkForSpeculation (Cast e _)  = exprOkForSpeculation e
 
@@ -686,6 +696,9 @@ exprOkForSpeculation other_expr
       = not (isZeroLit lit) && exprOkForSpeculation arg1
 		-- Often there is a literal divisor, and this 
 		-- can get rid of a thunk in an inner looop
+
+      | DataToTagOp <- op      -- See Note [dataToTag speculation]
+      = True
 
       | otherwise
       = primOpOkForSpeculation op && 
@@ -715,7 +728,6 @@ isDivOp _                = False
 
 Note [exprOkForSpeculation: case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-
 It's always sound for exprOkForSpeculation to return False, and we
 don't want it to take too long, so it bales out on complicated-looking
 terms.  Notably lets, which can be stacked very deeply; and in any 
@@ -723,7 +735,7 @@ case the argument of exprOkForSpeculation is usually in a strict context,
 so any lets will have been floated away.
 
 However, we keep going on case-expressions.  An example like this one
-showed up in DPH code:
+showed up in DPH code (Trac #3717):
     foo :: Int -> Int
     foo 0 = 0
     foo n = (if n < 5 then 1 else 2) `seq` foo (n-1)
@@ -741,6 +753,27 @@ If exprOkForSpeculation doesn't look through case expressions, you get this:
         }
 
 The inner case is redundant, and should be nuked.
+
+Note [dataToTag speculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Is this OK?
+   f x = let v::Int# = dataToTag# x
+         in ...
+We say "yes", even though 'x' may not be evaluated.  Reasons
+
+  * dataToTag#'s strictness means that its argument often will be
+    evaluated, but FloatOut makes that temporarily untrue
+         case x of y -> let v = dataToTag# y in ...
+    -->
+         case x of y -> let v = dataToTag# x in ...
+    Note that we look at 'x' instead of 'y' (this is to improve
+    floating in FloatOut).  So Lint complains.    
+ 
+    Moreover, it really *might* improve floating to let the
+    v-binding float out
+         
+  * CorePrep makes sure dataToTag#'s argument is evaluated, just
+    before code gen.  Until then, it's not guaranteed
 
 
 %************************************************************************

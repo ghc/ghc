@@ -4,7 +4,6 @@ module Vectorise.Utils (
   module Vectorise.Utils.Closure,
   module Vectorise.Utils.Hoisting,
   module Vectorise.Utils.PADict,
-  module Vectorise.Utils.PRDict,
   module Vectorise.Utils.Poly,
 
   -- * Annotated Exprs
@@ -28,7 +27,6 @@ import Vectorise.Utils.Base
 import Vectorise.Utils.Closure
 import Vectorise.Utils.Hoisting
 import Vectorise.Utils.PADict
-import Vectorise.Utils.PRDict
 import Vectorise.Utils.Poly
 import Vectorise.Monad
 import Vectorise.Builtins

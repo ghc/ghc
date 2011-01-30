@@ -37,7 +37,7 @@ import Reg
 import RegClass
 import Size
 
-import PprCmm		()
+-- import PprCmm ()
 
 import Unique
 import Outputable

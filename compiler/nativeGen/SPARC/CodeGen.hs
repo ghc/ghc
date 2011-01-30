@@ -36,13 +36,14 @@ import NCGMonad
 
 -- Our intermediate code:
 import BlockId
-import Cmm
+import OldCmm
 import CLabel
 
 -- The rest:
 import StaticFlags	( opt_PIC )
 import OrdList
 import Outputable
+import Unique
 
 import Control.Monad	( mapAndUnzipM )
 import DynFlags
@@ -54,11 +55,11 @@ cmmTopCodeGen
 	-> NatM [NatCmmTop Instr]
 
 cmmTopCodeGen _
-	(CmmProc info lab params (ListGraph blocks)) 
+	(CmmProc info lab (ListGraph blocks)) 
  = do	
  	(nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
 
-	let proc 	= CmmProc info lab params (ListGraph $ concat nat_blocks)
+	let proc 	= CmmProc info lab (ListGraph $ concat nat_blocks)
 	let tops 	= proc : concat statics
 
   	return tops
@@ -161,8 +162,8 @@ temporary, then do the other computation, and then use the temporary:
 -- | Convert a BlockId to some CmmStatic data
 jumpTableEntry :: Maybe BlockId -> CmmStatic
 jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just (BlockId id)) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel id
+jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+    where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
 

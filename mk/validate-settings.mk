@@ -62,6 +62,15 @@ libraries/haskeline_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-boot_EXTRA_HC_OPTS += -fno-warn-unused-imports
 libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
 
+# Temporarily turn off -Werror for some Hoopl modules that have
+# non-exhaustive pattern-match warnings
+libraries/hoopl/src/Compiler/Hoopl/Util_HC_OPTS += -Wwarn
+libraries/hoopl/src/Compiler/Hoopl/GraphUtil_HC_OPTS += -Wwarn
+libraries/hoopl/src/Compiler/Hoopl/MkGraph_HC_OPTS += -Wwarn
+libraries/hoopl/src/Compiler/Hoopl/XUtil_HC_OPTS += -Wwarn
+libraries/hoopl/src/Compiler/Hoopl/Pointed_HC_OPTS += -Wwarn
+libraries/hoopl/src/Compiler/Hoopl/Passes/Dominator_HC_OPTS += -Wwarn
+
 # primitive has a warning about deprecated use of GHC.IOBase
 libraries/primitive_dist-install_EXTRA_HC_OPTS += -Wwarn
 

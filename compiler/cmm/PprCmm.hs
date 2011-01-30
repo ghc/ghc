@@ -5,9 +5,8 @@
 -- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
-
 --
--- This is where we walk over Cmm emitting an external representation,
+-- This is where we walk over CmmNode emitting an external representation,
 -- suitable for parsing, in a syntax strongly reminiscent of C--. This
 -- is the "External Core" for the Cmm layer.
 --
@@ -30,601 +29,234 @@
 -- These conventions produce much more readable Cmm output.
 --
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
---
 
+{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts #-}
 module PprCmm
-    ( writeCmms, pprCmms, pprCmm, pprStmt, pprExpr, 
-      pprSection, pprStatic, pprLit
-    )
+  ( module PprCmmDecl
+  , module PprCmmExpr
+  )
 where
 
-import BlockId
-import Cmm
-import CmmUtils
+import BlockId ()
 import CLabel
-import BasicTypes
-
-
-import ForeignCall
-import Outputable
+import Cmm
+import CmmExpr
+import CmmUtils (isTrivialCmmExpr)
 import FastString
+import Outputable
+import PprCmmDecl
+import PprCmmExpr
+import Util
 
+import BasicTypes
+import Compiler.Hoopl
 import Data.List
-import System.IO
-import Data.Maybe
-
--- Temp Jan08
-import SMRep
-import ClosureInfo
-#include "../includes/rts/storage/FunTypes.h"
-
-
-pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatic info g] -> SDoc
-pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
-        where
-          separator = space $$ ptext (sLit "-------------------") $$ space
-
-writeCmms :: Handle -> [Cmm] -> IO ()
-writeCmms handle cmms = printForC handle (pprCmms cmms)
-
------------------------------------------------------------------------------
-
-instance (Outputable d, Outputable info, Outputable g)
-    => Outputable (GenCmm d info g) where
-    ppr c = pprCmm c
-
-instance (Outputable d, Outputable info, Outputable i)
-	=> Outputable (GenCmmTop d info i) where
-    ppr t = pprTop t
-
-instance (Outputable instr) => Outputable (ListGraph instr) where
-    ppr (ListGraph blocks) = vcat (map ppr blocks)
-
-instance (Outputable instr) => Outputable (GenBasicBlock instr) where
-    ppr b = pprBBlock b
-
-instance Outputable CmmStmt where
-    ppr s = pprStmt s
-
-instance Outputable CmmExpr where
-    ppr e = pprExpr e
-
-instance Outputable CmmReg where
-    ppr e = pprReg e
-
-instance Outputable CmmLit where
-    ppr l = pprLit l
-
-instance Outputable LocalReg where
-    ppr e = pprLocalReg e
-
-instance Outputable Area where
-    ppr e = pprArea e
-
-instance Outputable GlobalReg where
-    ppr e = pprGlobalReg e
-
-instance Outputable CmmStatic where
-    ppr e = pprStatic e
-
-instance Outputable CmmInfo where
-    ppr e = pprInfo e
-
-
-
------------------------------------------------------------------------------
-
-pprCmm :: (Outputable d, Outputable info, Outputable g) => GenCmm d info g -> SDoc
-pprCmm (Cmm tops) = vcat $ intersperse blankLine $ map pprTop tops
-
--- --------------------------------------------------------------------------
--- Top level `procedure' blocks.
---
-pprTop 	:: (Outputable d, Outputable info, Outputable i)
-	=> GenCmmTop d info i -> SDoc
-
-pprTop (CmmProc info lbl params graph )
-
-  = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params)
-         , nest 8 $ lbrace <+> ppr info $$ rbrace
-         , nest 4 $ ppr graph
-         , rbrace ]
-
--- --------------------------------------------------------------------------
--- We follow [1], 4.5
---
---      section "data" { ... }
---
-pprTop (CmmData section ds) = 
-    (hang (pprSection section <+> lbrace) 4 (vcat (map ppr ds)))
-    $$ rbrace
-
--- --------------------------------------------------------------------------
-instance Outputable CmmSafety where
-  ppr CmmUnsafe = ptext (sLit "_unsafe_call_")
-  ppr (CmmSafe srt) = ppr srt
-  ppr CmmInterruptible = ptext (sLit "_interruptible_call_")
-
--- --------------------------------------------------------------------------
--- Info tables. The current pretty printer needs refinement
--- but will work for now.
---
--- For ideas on how to refine it, they used to be printed in the
--- style of C--'s 'stackdata' declaration, just inside the proc body,
--- and were labelled with the procedure name ++ "_info".
-pprInfo :: CmmInfo -> SDoc
-pprInfo (CmmInfo _gc_target update_frame CmmNonInfoTable) =
-    vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) ppr gc_target,-}
-          ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
-pprInfo (CmmInfo _gc_target update_frame
-         (CmmInfoTable stat_clos (ProfilingInfo closure_type closure_desc) tag info)) =
-    vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) ppr gc_target,-}
-          ptext (sLit "has static closure: ") <> ppr stat_clos <+>
-          ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
-          ptext (sLit "type: ") <> pprLit closure_type,
-          ptext (sLit "desc: ") <> pprLit closure_desc,
-          ptext (sLit "tag: ") <> integer (toInteger tag),
-          pprTypeInfo info]
-
-pprTypeInfo :: ClosureTypeInfo -> SDoc
-pprTypeInfo (ConstrInfo layout constr descr) =
-    vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
-          ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
-          ptext (sLit "constructor: ") <> integer (toInteger constr),
-          pprLit descr]
-pprTypeInfo (FunInfo layout srt arity _args slow_entry) =
-    vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
-          ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
-          ptext (sLit "srt: ") <> ppr srt,
--- Temp Jan08
-          ptext (sLit ("fun_type: ")) <> integer (toInteger (argDescrType _args)),
-
-          ptext (sLit "arity: ") <> integer (toInteger arity),
-          --ptext (sLit "args: ") <> ppr args, -- TODO: needs to be printed
-          ptext (sLit "slow: ") <> pprLit slow_entry
-         ]
-pprTypeInfo (ThunkInfo layout srt) =
-    vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
-          ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
-          ptext (sLit "srt: ") <> ppr srt]
-pprTypeInfo (ThunkSelectorInfo offset srt) =
-    vcat [ptext (sLit "ptrs: ") <> integer (toInteger offset),
-          ptext (sLit "srt: ") <> ppr srt]
-pprTypeInfo (ContInfo stack srt) =
-    vcat [ptext (sLit "stack: ") <> ppr stack,
-          ptext (sLit "srt: ") <> ppr srt]
-
--- Temp Jan08
-argDescrType :: ArgDescr -> StgHalfWord
--- The "argument type" RTS field type
-argDescrType (ArgSpec n) = n
-argDescrType (ArgGen liveness)
-  | isBigLiveness liveness = ARG_GEN_BIG
-  | otherwise		   = ARG_GEN
-
--- Temp Jan08
-isBigLiveness :: Liveness -> Bool
-isBigLiveness (BigLiveness _)   = True
-isBigLiveness (SmallLiveness _) = False
-
-
-pprUpdateFrame :: UpdateFrame -> SDoc
-pprUpdateFrame (UpdateFrame expr args) = 
-    hcat [ ptext (sLit "jump")
-         , space
-         , if isTrivialCmmExpr expr
-                then pprExpr expr
-                else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr expr 
-                    _ -> parens (pprExpr expr)
-         , space
-         , parens  ( commafy $ map ppr args ) ]
-
-
--- --------------------------------------------------------------------------
--- Basic blocks look like assembly blocks.
---      lbl: stmt ; stmt ; .. 
-pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
-pprBBlock (BasicBlock ident stmts) =
-    hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
-
--- --------------------------------------------------------------------------
--- Statements. C-- usually, exceptions to this should be obvious.
---
-pprStmt :: CmmStmt -> SDoc    
-pprStmt stmt = case stmt of
-
-    -- ;
-    CmmNop -> semi
-
-    --  // text
-    CmmComment s -> text "//" <+> ftext s
-
-    -- reg = expr;
-    CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
-
-    -- rep[lv] = expr;
-    CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
-        where
-          rep = ppr ( cmmExprType expr )
-
-    -- call "ccall" foo(x, y)[r1, r2];
-    -- ToDo ppr volatile
-    CmmCall (CmmCallee fn cconv) results args safety ret ->
-        sep  [ pp_lhs <+> pp_conv
-	     , nest 2 (pprExpr9 fn <> 
-		       parens (commafy (map ppr_ar args)))
-               <> brackets (ppr safety)
-             , case ret of CmmMayReturn -> empty
-                           CmmNeverReturns -> ptext $ sLit (" never returns")
-             ] <> semi
-        where
-	  pp_lhs | null results = empty
-		 | otherwise    = commafy (map ppr_ar results) <+> equals
-		-- Don't print the hints on a native C-- call
-
-          ppr_ar :: Outputable a => CmmHinted a -> SDoc
-	  ppr_ar (CmmHinted ar k) = case cconv of
-			    CmmCallConv -> ppr ar
-			    _           -> ppr (ar,k)
-	  pp_conv = case cconv of
-		      CmmCallConv -> empty
-		      _           -> ptext (sLit("foreign")) <+> doubleQuotes (ppr cconv)
-
-    -- Call a CallishMachOp, like sin or cos that might be implemented as a library call.
-    CmmCall (CmmPrim op) results args safety ret ->
-        pprStmt (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
-                        results args safety ret)
-        where
-	  -- HACK: A CallishMachOp doesn't really correspond to a ForeignLabel, but we
-	  --	   use one to get the label printed.
-          lbl = CmmLabel (mkForeignLabel 
-	  			(mkFastString (show op)) 
-	  			Nothing ForeignLabelInThisPackage IsFunction)
-
-    CmmBranch ident          -> genBranch ident
-    CmmCondBranch expr ident -> genCondBranch expr ident
-    CmmJump expr params      -> genJump expr params
-    CmmReturn params         -> genReturn params
-    CmmSwitch arg ids        -> genSwitch arg ids
-
-instance Outputable ForeignHint where
-  ppr NoHint     = empty
-  ppr SignedHint = quotes(text "signed")
---  ppr AddrHint   = quotes(text "address")
--- Temp Jan08
-  ppr AddrHint   = (text "PtrHint")
-
--- Just look like a tuple, since it was a tuple before
--- ... is that a good idea? --Isaac Dupree
-instance (Outputable a) => Outputable (CmmHinted a) where
-  ppr (CmmHinted a k) = ppr (a, k)
-
--- --------------------------------------------------------------------------
--- goto local label. [1], section 6.6
---
---     goto lbl;
---
-genBranch :: BlockId -> SDoc
-genBranch ident = 
-    ptext (sLit "goto") <+> ppr ident <> semi
-
--- --------------------------------------------------------------------------
--- Conditional. [1], section 6.4
---
---     if (expr) { goto lbl; } 
---
-genCondBranch :: CmmExpr -> BlockId -> SDoc
-genCondBranch expr ident =
-    hsep [ ptext (sLit "if")
-         , parens(ppr expr)
-         , ptext (sLit "goto")
-         , ppr ident <> semi ]
-
--- --------------------------------------------------------------------------
--- A tail call. [1], Section 6.9
---
---     jump foo(a, b, c);
---
-genJump :: CmmExpr -> [CmmHinted CmmExpr] -> SDoc
-genJump expr args = 
-    hcat [ ptext (sLit "jump")
-         , space
-         , if isTrivialCmmExpr expr
-                then pprExpr expr
-                else case expr of
-                    CmmLoad (CmmReg _) _ -> pprExpr expr 
-                    _ -> parens (pprExpr expr)
-         , space
-         , parens  ( commafy $ map ppr args )
-         , semi ]
-
-
--- --------------------------------------------------------------------------
--- Return from a function. [1], Section 6.8.2 of version 1.128
---
---     return (a, b, c);
---
-genReturn :: [CmmHinted CmmExpr] -> SDoc
-genReturn args = 
-    hcat [ ptext (sLit "return")
-         , space
-         , parens  ( commafy $ map ppr args )
-         , semi ]
-
--- --------------------------------------------------------------------------
--- Tabled jump to local label
---
--- The syntax is from [1], section 6.5
---
---      switch [0 .. n] (expr) { case ... ; }
---
-genSwitch :: CmmExpr -> [Maybe BlockId] -> SDoc
-genSwitch expr maybe_ids 
-
-    = let pairs = groupBy snds (zip [0 .. ] maybe_ids )
-
-      in hang (hcat [ ptext (sLit "switch [0 .. ") 
-                    , int (length maybe_ids - 1)
-                    , ptext (sLit "] ")
-                    , if isTrivialCmmExpr expr
-                        then pprExpr expr
-                        else parens (pprExpr expr)
-                    , ptext (sLit " {") 
-                    ]) 
-            4 (vcat ( map caseify pairs )) $$ rbrace
-
-    where
-      snds a b = (snd a) == (snd b)
-
-      caseify :: [(Int,Maybe BlockId)] -> SDoc
-      caseify ixs@((_,Nothing):_)
-        = ptext (sLit "/* impossible: ") <> hcat (intersperse comma (map (int.fst) ixs))
-		<> ptext (sLit " */")
-      caseify as 
-        = let (is,ids) = unzip as 
-          in hsep [ ptext (sLit "case")
-                  , hcat (punctuate comma (map int is))
-                  , ptext (sLit ": goto")
-                  , ppr (head [ id | Just id <- ids]) <> semi ]
-
--- --------------------------------------------------------------------------
--- Expressions
---
-
-pprExpr :: CmmExpr -> SDoc
-pprExpr e 
-    = case e of
-        CmmRegOff reg i -> 
-		pprExpr (CmmMachOp (MO_Add rep)
-			   [CmmReg reg, CmmLit (CmmInt (fromIntegral i) rep)])
-		where rep = typeWidth (cmmRegType reg)
-	CmmLit lit -> pprLit lit
-	_other     -> pprExpr1 e
-
--- Here's the precedence table from CmmParse.y:
--- %nonassoc '>=' '>' '<=' '<' '!=' '=='
--- %left '|'
--- %left '^'
--- %left '&'
--- %left '>>' '<<'
--- %left '-' '+'
--- %left '/' '*' '%'
--- %right '~'
-
--- We just cope with the common operators for now, the rest will get
--- a default conservative behaviour.
-
--- %nonassoc '>=' '>' '<=' '<' '!=' '=='
-pprExpr1, pprExpr7, pprExpr8 :: CmmExpr -> SDoc
-pprExpr1 (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
-   = pprExpr7 x <+> doc <+> pprExpr7 y
-pprExpr1 e = pprExpr7 e
-
-infixMachOp1, infixMachOp7, infixMachOp8 :: MachOp -> Maybe SDoc
-
-infixMachOp1 (MO_Eq     _) = Just (ptext (sLit "=="))
-infixMachOp1 (MO_Ne     _) = Just (ptext (sLit "!="))
-infixMachOp1 (MO_Shl    _) = Just (ptext (sLit "<<"))
-infixMachOp1 (MO_U_Shr  _) = Just (ptext (sLit ">>"))
-infixMachOp1 (MO_U_Ge   _) = Just (ptext (sLit ">="))
-infixMachOp1 (MO_U_Le   _) = Just (ptext (sLit "<="))
-infixMachOp1 (MO_U_Gt   _) = Just (char '>')
-infixMachOp1 (MO_U_Lt   _) = Just (char '<')
-infixMachOp1 _             = Nothing
-
--- %left '-' '+'
-pprExpr7 (CmmMachOp (MO_Add rep1) [x, CmmLit (CmmInt i rep2)]) | i < 0
-   = pprExpr7 (CmmMachOp (MO_Sub rep1) [x, CmmLit (CmmInt (negate i) rep2)])
-pprExpr7 (CmmMachOp op [x,y]) | Just doc <- infixMachOp7 op
-   = pprExpr7 x <+> doc <+> pprExpr8 y
-pprExpr7 e = pprExpr8 e
-
-infixMachOp7 (MO_Add _)  = Just (char '+')
-infixMachOp7 (MO_Sub _)  = Just (char '-')
-infixMachOp7 _           = Nothing
-
--- %left '/' '*' '%'
-pprExpr8 (CmmMachOp op [x,y]) | Just doc <- infixMachOp8 op
-   = pprExpr8 x <+> doc <+> pprExpr9 y
-pprExpr8 e = pprExpr9 e
-
-infixMachOp8 (MO_U_Quot _) = Just (char '/')
-infixMachOp8 (MO_Mul _)    = Just (char '*')
-infixMachOp8 (MO_U_Rem _)  = Just (char '%')
-infixMachOp8 _             = Nothing
-
-pprExpr9 :: CmmExpr -> SDoc
-pprExpr9 e = 
-   case e of
-        CmmLit    lit       -> pprLit1 lit
-        CmmLoad   expr rep  -> ppr rep <> brackets( ppr expr )
-        CmmReg    reg       -> ppr reg
-        CmmRegOff  reg off  -> parens (ppr reg <+> char '+' <+> int off)
-        CmmStackSlot a off  -> parens (ppr a   <+> char '+' <+> int off)
-	CmmMachOp mop args  -> genMachOp mop args
-
-genMachOp :: MachOp -> [CmmExpr] -> SDoc
-genMachOp mop args
-   | Just doc <- infixMachOp mop = case args of
-        -- dyadic
-        [x,y] -> pprExpr9 x <+> doc <+> pprExpr9 y
-
-        -- unary
-        [x]   -> doc <> pprExpr9 x
-
-        _     -> pprTrace "PprCmm.genMachOp: machop with strange number of args"
-                          (pprMachOp mop <+>
-                            parens (hcat $ punctuate comma (map pprExpr args)))
-                          empty
-
-   | isJust (infixMachOp1 mop)
-   || isJust (infixMachOp7 mop)
-   || isJust (infixMachOp8 mop)	 = parens (pprExpr (CmmMachOp mop args))
-
-   | otherwise = char '%' <> ppr_op <> parens (commafy (map pprExpr args))
-        where ppr_op = text (map (\c -> if c == ' ' then '_' else c)
-                                 (show mop))
-                -- replace spaces in (show mop) with underscores,
-
---
--- Unsigned ops on the word size of the machine get nice symbols.
--- All else get dumped in their ugly format.
---
-infixMachOp :: MachOp -> Maybe SDoc
-infixMachOp mop
-	= case mop of
-            MO_And    _ -> Just $ char '&'
-            MO_Or     _ -> Just $ char '|'
-            MO_Xor    _ -> Just $ char '^'
-            MO_Not    _ -> Just $ char '~'
-            MO_S_Neg  _ -> Just $ char '-' -- there is no unsigned neg :)
-            _ -> Nothing
-
--- --------------------------------------------------------------------------
--- Literals.
---  To minimise line noise we adopt the convention that if the literal
---  has the natural machine word size, we do not append the type
---
-pprLit :: CmmLit -> SDoc
-pprLit lit = case lit of
-    CmmInt i rep ->
-        hcat [ (if i < 0 then parens else id)(integer i)
-             , ppUnless (rep == wordWidth) $
-               space <> dcolon <+> ppr rep ]
-
-    CmmFloat f rep     -> hsep [ rational f, dcolon, ppr rep ]
-    CmmLabel clbl      -> pprCLabel clbl
-    CmmLabelOff clbl i -> pprCLabel clbl <> ppr_offset i
-    CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel clbl1 <> char '-'  
-                                  <> pprCLabel clbl2 <> ppr_offset i
-    CmmBlock id        -> ppr id
-    CmmHighStackMark -> text "<highSp>"
-
-pprLit1 :: CmmLit -> SDoc
-pprLit1 lit@(CmmLabelOff {}) = parens (pprLit lit)
-pprLit1 lit                  = pprLit lit
-
-ppr_offset :: Int -> SDoc
-ppr_offset i
-    | i==0      = empty
-    | i>=0      = char '+' <> int i
-    | otherwise = char '-' <> int (-i)
-
--- --------------------------------------------------------------------------
--- Static data.
---      Strings are printed as C strings, and we print them as I8[],
---      following C--
---
-pprStatic :: CmmStatic -> SDoc
-pprStatic s = case s of
-    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
-    CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
-    CmmAlign i         -> nest 4 $ text "align" <+> int i
-    CmmDataLabel clbl  -> pprCLabel clbl <> colon
-    CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
-
--- --------------------------------------------------------------------------
--- Registers, whether local (temps) or global
---
-pprReg :: CmmReg -> SDoc
-pprReg r 
-    = case r of
-        CmmLocal  local  -> pprLocalReg  local
-        CmmGlobal global -> pprGlobalReg global
-
---
--- We only print the type of the local reg if it isn't wordRep
---
-pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq rep) 
---   = ppr rep <> char '_' <> ppr uniq
--- Temp Jan08
-   = char '_' <> ppr uniq <> 
-       (if isWord32 rep -- && not (isGcPtrType rep) -- Temp Jan08		-- sigh
-                    then dcolon <> ptr <> ppr rep
-                    else dcolon <> ptr <> ppr rep)
-   where
-     ptr = empty
-	 --if isGcPtrType rep
-	 --      then doubleQuotes (text "ptr")
-         --      else empty
-
--- Stack areas
-pprArea :: Area -> SDoc
-pprArea (RegSlot r)   = hcat [ text "slot<", ppr r, text ">" ]
-pprArea (CallArea id) = pprAreaId id
-
-pprAreaId :: AreaId -> SDoc
-pprAreaId Old        = text "old"
-pprAreaId (Young id) = hcat [ text "young<", ppr id, text ">" ]
-
--- needs to be kept in syn with Cmm.hs.GlobalReg
---
-pprGlobalReg :: GlobalReg -> SDoc
-pprGlobalReg gr 
-    = case gr of
-        VanillaReg n _ -> char 'R' <> int n
--- Temp Jan08
---        VanillaReg n VNonGcPtr -> char 'R' <> int n
---        VanillaReg n VGcPtr    -> char 'P' <> int n
-        FloatReg   n   -> char 'F' <> int n
-        DoubleReg  n   -> char 'D' <> int n
-        LongReg    n   -> char 'L' <> int n
-        Sp             -> ptext (sLit "Sp")
-        SpLim          -> ptext (sLit "SpLim")
-        Hp             -> ptext (sLit "Hp")
-        HpLim          -> ptext (sLit "HpLim")
-        CurrentTSO     -> ptext (sLit "CurrentTSO")
-        CurrentNursery -> ptext (sLit "CurrentNursery")
-        HpAlloc        -> ptext (sLit "HpAlloc")
-        EagerBlackholeInfo -> ptext (sLit "stg_EAGER_BLACKHOLE_info")
-        GCEnter1       -> ptext (sLit "stg_gc_enter_1")
-        GCFun          -> ptext (sLit "stg_gc_fun")
-        BaseReg        -> ptext (sLit "BaseReg")
-        PicBaseReg     -> ptext (sLit "PicBaseReg")
-
--- --------------------------------------------------------------------------
--- data sections
---
-pprSection :: Section -> SDoc
-pprSection s = case s of
-    Text              -> section <+> doubleQuotes (ptext (sLit "text"))
-    Data              -> section <+> doubleQuotes (ptext (sLit "data"))
-    ReadOnlyData      -> section <+> doubleQuotes (ptext (sLit "readonly"))
-    ReadOnlyData16    -> section <+> doubleQuotes (ptext (sLit "readonly16"))
-    RelocatableReadOnlyData
-                      -> section <+> doubleQuotes (ptext (sLit "relreadonly"))
-    UninitialisedData -> section <+> doubleQuotes (ptext (sLit "uninitialised"))
-    OtherSection s'   -> section <+> doubleQuotes (text s')
- where
-    section = ptext (sLit "section")
-
------------------------------------------------------------------------------
-
-commafy :: [SDoc] -> SDoc
-commafy xs = fsep $ punctuate comma xs
+import Prelude hiding (succ)
+
+-------------------------------------------------
+-- Outputable instances
+
+instance Outputable CmmStackInfo where
+    ppr = pprStackInfo
+
+instance Outputable CmmTopInfo where
+    ppr = pprTopInfo
+
+
+instance Outputable (CmmNode e x) where
+    ppr = pprNode
+
+instance Outputable Convention where
+    ppr = pprConvention
+
+instance Outputable ForeignConvention where
+    ppr = pprForeignConvention
+
+instance Outputable ForeignTarget where
+    ppr = pprForeignTarget
+
+
+instance Outputable (Block CmmNode C C) where
+    ppr = pprBlock
+instance Outputable (Block CmmNode C O) where
+    ppr = pprBlock
+instance Outputable (Block CmmNode O C) where
+    ppr = pprBlock
+instance Outputable (Block CmmNode O O) where
+    ppr = pprBlock
+
+instance Outputable (Graph CmmNode e x) where
+    ppr = pprGraph
+
+instance Outputable CmmGraph where
+    ppr = pprCmmGraph
+
+----------------------------------------------------------
+-- Outputting types Cmm contains
+
+pprStackInfo :: CmmStackInfo -> SDoc
+pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
+  ptext (sLit "arg_space: ") <> ppr arg_space <+>
+  ptext (sLit "updfr_space: ") <> ppr updfr_space
+
+pprTopInfo :: CmmTopInfo -> SDoc
+pprTopInfo (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
+  vcat [ptext (sLit "info_tbl: ") <> ppr info_tbl,
+        ptext (sLit "stack_info: ") <> ppr stack_info]
+
+----------------------------------------------------------
+-- Outputting blocks and graphs
+
+pprBlock :: IndexedCO x SDoc SDoc ~ SDoc => Block CmmNode e x -> IndexedCO e SDoc SDoc
+pprBlock block = foldBlockNodesB3 ( ($$) . ppr
+                                  , ($$) . (nest 4) . ppr
+                                  , ($$) . (nest 4) . ppr
+                                  )
+                                  block
+                                  empty
+
+pprGraph :: Graph CmmNode e x -> SDoc
+pprGraph GNil = empty
+pprGraph (GUnit block) = ppr block
+pprGraph (GMany entry body exit)
+   = text "{"
+  $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
+  $$ text "}"
+  where pprMaybeO :: Outputable (Block CmmNode e x) => MaybeO ex (Block CmmNode e x) -> SDoc
+        pprMaybeO NothingO = empty
+        pprMaybeO (JustO block) = ppr block
+
+pprCmmGraph :: CmmGraph -> SDoc
+pprCmmGraph g
+   = text "{" <> text "offset"
+  $$ nest 2 (vcat $ map ppr blocks)
+  $$ text "}"
+  where blocks = postorderDfs g
+
+---------------------------------------------
+-- Outputting CmmNode and types which it contains
+
+pprConvention :: Convention -> SDoc
+pprConvention (NativeNodeCall   {}) = text "<native-node-call-convention>"
+pprConvention (NativeDirectCall {}) = text "<native-direct-call-convention>"
+pprConvention (NativeReturn {})     = text "<native-ret-convention>"
+pprConvention  Slow                 = text "<slow-convention>"
+pprConvention  GC                   = text "<gc-convention>"
+pprConvention  PrimOpCall           = text "<primop-call-convention>"
+pprConvention  PrimOpReturn         = text "<primop-ret-convention>"
+pprConvention (Foreign c)           = ppr c
+pprConvention (Private {})          = text "<private-convention>"
+
+pprForeignConvention :: ForeignConvention -> SDoc
+pprForeignConvention (ForeignConvention c as rs) = ppr c <> ppr as <> ppr rs
+
+pprForeignTarget :: ForeignTarget -> SDoc
+pprForeignTarget (ForeignTarget fn c) = ppr_fc c <+> ppr_target fn
+  where ppr_fc :: ForeignConvention -> SDoc
+        ppr_fc (ForeignConvention c args res) =
+          doubleQuotes (ppr c) <+> text "arg hints: " <+> ppr args <+> text " result hints: " <+> ppr res
+        ppr_target :: CmmExpr -> SDoc
+        ppr_target t@(CmmLit _) = ppr t
+        ppr_target fn'          = parens (ppr fn')
+
+pprForeignTarget (PrimTarget op)
+ -- HACK: We're just using a ForeignLabel to get this printed, the label
+ --       might not really be foreign.
+ = ppr (CmmLabel (mkForeignLabel
+                        (mkFastString (show op))
+                        Nothing ForeignLabelInThisPackage IsFunction))
+pprNode :: CmmNode e x -> SDoc
+pprNode node = pp_node <+> pp_debug
+  where
+    pp_node :: SDoc
+    pp_node = case node of
+      -- label:
+      CmmEntry id -> ppr id <> colon
+
+      -- // text
+      CmmComment s -> text "//" <+> ftext s
+
+      -- reg = expr;
+      CmmAssign reg expr -> ppr reg <+> equals <+> ppr expr <> semi
+
+      -- rep[lv] = expr;
+      CmmStore lv expr -> rep <> brackets(ppr lv) <+> equals <+> ppr expr <> semi
+          where
+            rep = ppr ( cmmExprType expr )
+
+      -- call "ccall" foo(x, y)[r1, r2];
+      -- ToDo ppr volatile
+      CmmUnsafeForeignCall target results args ->
+          hsep [ ppUnless (null results) $
+                    parens (commafy $ map ppr results) <+> equals,
+                 ptext $ sLit "call",
+                 ppr target <> parens (commafy $ map ppr args) <> semi]
+
+      -- goto label;
+      CmmBranch ident -> ptext (sLit "goto") <+> ppr ident <> semi
+
+      -- if (expr) goto t; else goto f;
+      CmmCondBranch expr t f ->
+          hsep [ ptext (sLit "if")
+               , parens(ppr expr)
+               , ptext (sLit "goto")
+               , ppr t <> semi
+               , ptext (sLit "else goto")
+               , ppr f <> semi
+               ]
+
+      CmmSwitch expr maybe_ids ->
+          hang (hcat [ ptext (sLit "switch [0 .. ")
+                     , int (length maybe_ids - 1)
+                     , ptext (sLit "] ")
+                     , if isTrivialCmmExpr expr then ppr expr else parens (ppr expr)
+                     , ptext (sLit " {")
+                     ])
+             4 (vcat ( map caseify pairs )) $$ rbrace
+          where pairs = groupBy snds (zip [0 .. ] maybe_ids )
+                snds a b = (snd a) == (snd b)
+                caseify ixs@((_,Nothing):_) = ptext (sLit "/* impossible: ")
+                                              <> hcat (intersperse comma (map (int.fst) ixs)) <> ptext (sLit " */")
+                caseify as = let (is,ids) = unzip as
+                             in hsep [ ptext (sLit "case")
+                                     , hcat (punctuate comma (map int is))
+                                     , ptext (sLit ": goto")
+                                     , ppr (head [ id | Just id <- ids]) <> semi ]
+
+      CmmCall tgt k out res updfr_off ->
+          hcat [ ptext (sLit "call"), space
+               , pprFun tgt, ptext (sLit "(...)"), space
+               , ptext (sLit "returns to") <+> ppr k <+> parens (ppr out)
+                                                     <+> parens (ppr res)
+               , ptext (sLit " with update frame") <+> ppr updfr_off
+               , semi ]
+          where pprFun f@(CmmLit _) = ppr f
+                pprFun f = parens (ppr f)
+
+      CmmForeignCall {tgt=t, res=rs, args=as, succ=s, updfr=u, intrbl=i} ->
+          hcat $ if i then [ptext (sLit "interruptible"), space] else [] ++
+               [ ptext (sLit "foreign call"), space
+               , ppr t, ptext (sLit "(...)"), space
+               , ptext (sLit "returns to") <+> ppr s
+                    <+> ptext (sLit "args:") <+> parens (ppr as)
+                    <+> ptext (sLit "ress:") <+> parens (ppr rs)
+               , ptext (sLit " with update frame") <+> ppr u
+               , semi ]
+
+    pp_debug :: SDoc
+    pp_debug =
+      if not debugIsOn then empty
+      else case node of
+             CmmEntry {}             -> empty -- Looks terrible with text "  // CmmEntry"
+             CmmComment {}           -> empty -- Looks also terrible with text "  // CmmComment"
+             CmmAssign {}            -> text "  // CmmAssign"
+             CmmStore {}             -> text "  // CmmStore"
+             CmmUnsafeForeignCall {} -> text "  // CmmUnsafeForeignCall"
+             CmmBranch {}            -> text "  // CmmBranch"
+             CmmCondBranch {}        -> text "  // CmmCondBranch"
+             CmmSwitch {}            -> text "  // CmmSwitch"
+             CmmCall {}              -> text "  // CmmCall"
+             CmmForeignCall {}       -> text "  // CmmForeignCall"
+
+    commafy :: [SDoc] -> SDoc
+    commafy xs = hsep $ punctuate comma xs

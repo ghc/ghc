@@ -13,7 +13,7 @@ where
 import Reg
 
 import BlockId
-import Cmm
+import OldCmm
 
 -- | Holds a list of source and destination registers used by a
 --	particular instruction. 

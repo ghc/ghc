@@ -27,9 +27,9 @@ import LlvmCodeGen.Regs
 
 import CLabel
 import CgUtils ( activeStgRegs )
-import Cmm
 import Constants
 import FastString
+import OldCmm
 import qualified Outputable as Outp
 import UniqFM
 import Unique

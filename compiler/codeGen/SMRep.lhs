@@ -39,7 +39,7 @@ module SMRep (
 
 #include "../includes/MachDeps.h"
 
-import CmmExpr	-- CmmType and friends
+import CmmType
 import Id
 import Type
 import TyCon

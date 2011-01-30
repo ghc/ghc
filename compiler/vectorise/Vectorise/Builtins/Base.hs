@@ -61,10 +61,12 @@ data Builtins
         , parrayTyCon      :: TyCon			-- ^ PArray
         , parrayDataCon    :: DataCon			-- ^ PArray
         , pdataTyCon       :: TyCon			-- ^ PData
+        , paClass          :: Class                     -- ^ PA
         , paTyCon          :: TyCon			-- ^ PA
         , paDataCon        :: DataCon			-- ^ PA
         , paPRSel          :: Var                       -- ^ PA
         , preprTyCon       :: TyCon			-- ^ PRepr
+        , prClass          :: Class                     -- ^ PR
         , prTyCon          :: TyCon			-- ^ PR
         , prDataCon        :: DataCon			-- ^ PR
         , replicatePDVar   :: Var			-- ^ replicatePD

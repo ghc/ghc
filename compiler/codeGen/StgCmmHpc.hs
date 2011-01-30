@@ -12,8 +12,9 @@ import StgCmmUtils
 import StgCmmMonad
 import StgCmmForeign
 
-import MkZipCfgCmm
-import Cmm
+import MkGraph
+import CmmDecl
+import CmmExpr
 import CLabel
 import Module
 import CmmUtils

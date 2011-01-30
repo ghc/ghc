@@ -24,7 +24,7 @@ import Reg
 import GraphBase
 
 import BlockId
-import Cmm
+import OldCmm
 import UniqFM
 import UniqSet
 import Digraph		(flattenSCCs)
@@ -71,7 +71,7 @@ slurpSpillCostInfo cmm
 	= execState (countCmm cmm) zeroSpillCostInfo
  where
 	countCmm CmmData{}		= return ()
-	countCmm (CmmProc info _ _ sccs)
+	countCmm (CmmProc info _ sccs)
 		= mapM_ (countBlock info)
 		$ flattenSCCs sccs
 
@@ -79,7 +79,7 @@ slurpSpillCostInfo cmm
 	--	the info table from the CmmProc
  	countBlock info (BasicBlock blockId instrs)
 		| LiveInfo _ _ (Just blockLive) _ <- info
-		, Just rsLiveEntry  <- lookupBlockEnv blockLive blockId
+		, Just rsLiveEntry  <- mapLookup blockId blockLive
 		, rsLiveEntry_virt  <- takeVirtuals rsLiveEntry
 		= countLIs rsLiveEntry_virt instrs
 

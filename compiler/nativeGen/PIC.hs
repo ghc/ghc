@@ -63,7 +63,7 @@ import Reg
 import NCGMonad
 
 
-import Cmm
+import OldCmm
 import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
@@ -713,7 +713,7 @@ initializePicBase_ppc
 	-> NatM [NatCmmTop PPC.Instr]
 
 initializePicBase_ppc ArchPPC os picReg
-    (CmmProc info lab params (ListGraph blocks) : statics)
+    (CmmProc info lab (ListGraph blocks) : statics)
     | osElfTarget os
     = do
         gotOffLabel <- getNewLabelNat
@@ -739,11 +739,11 @@ initializePicBase_ppc ArchPPC os picReg
                                : PPC.ADD picReg picReg (PPC.RIReg tmp)
                                : insns)
 
-        return (CmmProc info lab params (ListGraph (b' : tail blocks)) : gotOffset : statics)
+        return (CmmProc info lab (ListGraph (b' : tail blocks)) : gotOffset : statics)
 
 initializePicBase_ppc ArchPPC OSDarwin picReg
-	(CmmProc info lab params (ListGraph blocks) : statics)
-	= return (CmmProc info lab params (ListGraph (b':tail blocks)) : statics)
+	(CmmProc info lab (ListGraph blocks) : statics)
+	= return (CmmProc info lab (ListGraph (b':tail blocks)) : statics)
 
 	where 	BasicBlock bID insns = head blocks
           	b' = BasicBlock bID (PPC.FETCHPC picReg : insns)
@@ -766,15 +766,15 @@ initializePicBase_x86
 	-> NatM [NatCmmTop X86.Instr]
 
 initializePicBase_x86 ArchX86 os picReg 
-	(CmmProc info lab params (ListGraph blocks) : statics)
+	(CmmProc info lab (ListGraph blocks) : statics)
     | osElfTarget os
-    = return (CmmProc info lab params (ListGraph (b':tail blocks)) : statics)
+    = return (CmmProc info lab (ListGraph (b':tail blocks)) : statics)
     where BasicBlock bID insns = head blocks
           b' = BasicBlock bID (X86.FETCHGOT picReg : insns)
 
 initializePicBase_x86 ArchX86 OSDarwin picReg
-	(CmmProc info lab params (ListGraph blocks) : statics)
-	= return (CmmProc info lab params (ListGraph (b':tail blocks)) : statics)
+	(CmmProc info lab (ListGraph blocks) : statics)
+	= return (CmmProc info lab (ListGraph (b':tail blocks)) : statics)
 
 	where 	BasicBlock bID insns = head blocks
           	b' = BasicBlock bID (X86.FETCHPC picReg : insns)

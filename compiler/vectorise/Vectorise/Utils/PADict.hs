@@ -2,7 +2,9 @@
 module Vectorise.Utils.PADict (
 	paDictArgType,
 	paDictOfType,
-	paMethod	
+	paMethod,
+        prDictOfReprType,
+        prDictOfPReprInstTyCon
 )
 where
 import Vectorise.Monad
@@ -42,7 +44,9 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
 
     go ty k
       | isLiftedTypeKind k
-      = liftM Just (mkBuiltinTyConApp paTyCon [ty])
+      = do
+          pa_cls <- builtin paClass
+          return $ Just $ PredTy $ ClassP pa_cls [ty]
 
     go _ _ = return Nothing
 
@@ -108,17 +112,36 @@ prDictOfPReprInst :: Type -> VM CoreExpr
 prDictOfPReprInst ty
   = do
       (prepr_tc, prepr_args) <- preprSynTyCon ty
-      case coreView (mkTyConApp prepr_tc prepr_args) of
-        Just rhs -> do
-                      dict <- prDictOfReprType rhs
-                      pr_co <- mkBuiltinCo prTyCon
-                      let Just arg_co = tyConFamilyCoercion_maybe prepr_tc
-                      let co = mkAppCoercion pr_co
-                             $ mkSymCoercion
-                             $ mkTyConApp arg_co prepr_args
-                      return $ mkCoerce co dict
-        Nothing  -> cantVectorise "Invalid PRepr type instance"
-                                  $ ppr ty
+      prDictOfPReprInstTyCon ty prepr_tc prepr_args
+
+-- | Given a type @ty@, its PRepr synonym tycon and its type arguments,
+-- return the PR @PRepr ty@. Suppose we have:
+--
+-- > type instance PRepr (T a1 ... an) = t
+--
+-- which is internally translated into
+--
+-- > type :R:PRepr a1 ... an = t
+--
+-- and the corresponding coercion. Then,
+--
+-- > prDictOfPReprInstTyCon (T a1 ... an) :R:PRepr u1 ... un = PR (T u1 ... un)
+--
+-- Note that @ty@ is only used for error messages
+--
+prDictOfPReprInstTyCon :: Type -> TyCon -> [Type] -> VM CoreExpr
+prDictOfPReprInstTyCon ty prepr_tc prepr_args
+  | Just rhs <- coreView (mkTyConApp prepr_tc prepr_args)
+  = do
+      dict <- prDictOfReprType' rhs
+      pr_co <- mkBuiltinCo prTyCon
+      let Just arg_co = tyConFamilyCoercion_maybe prepr_tc
+      let co = mkAppCoercion pr_co
+             $ mkSymCoercion
+             $ mkTyConApp arg_co prepr_args
+      return $ mkCoerce co dict
+
+  | otherwise = cantVectorise "Invalid PRepr type instance" (ppr ty)
 
 -- | Get the PR dictionary for a type. The argument must be a representation
 -- type.
@@ -129,14 +152,13 @@ prDictOfReprType ty
         prepr <- builtin preprTyCon
         if tycon == prepr
           then do
-                 [ty'] <- return tyargs
-                 prDictOfPReprInst ty'
+                 let [ty'] = tyargs
+                 pa <- paDictOfType ty'
+                 sel <- builtin paPRSel
+                 return $ Var sel `App` Type ty' `App` pa
           else do 
                  -- a representation tycon must have a PR instance
-                 dfun <- maybeCantVectoriseM
-                           "No PR dictionary for type constructor"
-                           (ppr tycon <+> text "in" <+> ppr ty)
-                       $ lookupTyConPR tycon
+                 dfun <- maybeV $ lookupTyConPR tycon
                  prDFunApply dfun tyargs
 
   | otherwise
@@ -152,6 +174,11 @@ prDictOfReprType ty
         pa    <- paDictOfType ty
         prsel <- builtin paPRSel
         return $ Var prsel `mkApps` [Type ty, pa]
+
+prDictOfReprType' :: Type -> VM CoreExpr
+prDictOfReprType' ty = prDictOfReprType ty `orElseV`
+                       cantVectorise "No PR dictionary for representation type"
+                                     (ppr ty)
 
 -- | Apply a tycon's PR dfun to dictionary arguments (PR or PA) corresponding
 -- to the argument types.

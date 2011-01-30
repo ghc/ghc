@@ -20,7 +20,7 @@ module StgCmmUtils (
 
 	tagToClosure, mkTaggedObjectLoad,
 
-        callerSaveVolatileRegs, get_GlobalReg_addr,
+        callerSaves, callerSaveVolatileRegs, get_GlobalReg_addr,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
         cmmUGtWord,
@@ -49,11 +49,11 @@ module StgCmmUtils (
 import StgCmmMonad
 import StgCmmClosure
 import BlockId
-import Cmm hiding (regUsedIn)
-import MkZipCfgCmm
+import CmmDecl
+import CmmExpr hiding (regUsedIn)
+import MkGraph
 import CLabel
 import CmmUtils
-import PprCmm		( {- instances -} )
 
 import ForeignCall
 import IdInfo

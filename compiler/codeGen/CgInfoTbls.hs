@@ -31,8 +31,8 @@ import CgCallConv
 import CgUtils
 import CgMonad
 
-import CmmUtils
-import Cmm
+import OldCmmUtils
+import OldCmm
 import CLabel
 import Name
 import DataCon

@@ -38,8 +38,9 @@ import StgCmmUtils
 import StgCmmMonad
 import SMRep
 
-import MkZipCfgCmm
-import Cmm
+import MkGraph
+import CmmExpr
+import CmmDecl
 import CmmUtils
 import CLabel
 

@@ -990,9 +990,11 @@ ghc -c Foo.hs</screen>
 	  <emphasis>not</emphasis> enabled by <option>-Wall</option>
 	  are
             <option>-fwarn-tabs</option>,
+            <option>-fwarn-incomplete-uni-patterns</option>,
             <option>-fwarn-incomplete-record-updates</option>,
             <option>-fwarn-monomorphism-restriction</option>,
-            <option>-fwarn-unused-do-bind</option>, and
+            <option>-fwarn-unrecognised-pragmas</option>,
+            <option>-fwarn-auto-orphans</option>,
             <option>-fwarn-implicit-prelude</option>.</para>
 	</listitem>
       </varlistentry>
@@ -1215,27 +1217,41 @@ foreign import "&amp;f" f :: FunPtr t
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-incomplete-patterns</option>:</term>
+	<term><option>-fwarn-incomplete-patterns</option>, 
+              <option>-fwarn-incomplete-uni-patterns</option>:
+        </term> 
 	<listitem>
 	  <indexterm><primary><option>-fwarn-incomplete-patterns</option></primary></indexterm>
+	  <indexterm><primary><option>-fwarn-incomplete-uni-patterns</option></primary></indexterm>
 	  <indexterm><primary>incomplete patterns, warning</primary></indexterm>
 	  <indexterm><primary>patterns, incomplete</primary></indexterm>
 
-          <para>Similarly for incomplete patterns, the functions
-          <function>g</function> and <function>h</function> below will fail when applied to
+          <para>The option <option>-fwarn-incomplete-patterns</option> warns 
+            about places where
+	    a pattern-match might fail at runtime.  
+          The function
+          <function>g</function> below will fail when applied to
           non-empty lists, so the compiler will emit a warning about
           this when <option>-fwarn-incomplete-patterns</option> is
-          enabled.</para>
-
+          enabled.
 <programlisting>
 g [] = 2
-h = \[] -> 2
 </programlisting>
-
-	  <para>This option isn't enabled by default because it can be
+	  This option isn't enabled by default because it can be
           a bit noisy, and it doesn't always indicate a bug in the
           program.  However, it's generally considered good practice
-          to cover all the cases in your functions.</para>
+          to cover all the cases in your functions, and it is switched 
+          on by <option>-W</option>.</para>
+
+          <para>The flag <option>-fwarn-incomplete-uni-patterns</option> is
+          similar, except that it
+          applies only to lambda-expressions and pattern bindings, constructs
+	  that only allow a single pattern:
+<programlisting>
+h = \[] -> 2
+Just k = f y
+</programlisting>
+          </para>
 	</listitem>
       </varlistentry>
 

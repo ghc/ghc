@@ -12,7 +12,7 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import Cmm
+import OldCmm
 import Bag
 import Digraph
 import UniqFM
@@ -67,11 +67,11 @@ slurpJoinMovs
 slurpJoinMovs live
 	= slurpCmm emptyBag live
  where	
-  	slurpCmm   rs  CmmData{}		= rs
-	slurpCmm   rs (CmmProc _ _ _ sccs) 	= foldl' slurpBlock rs (flattenSCCs sccs)
-        slurpBlock rs (BasicBlock _ instrs)	= foldl' slurpLI    rs instrs
+  	slurpCmm   rs  CmmData{}		    = rs
+	slurpCmm   rs (CmmProc _ _ sccs) 	= foldl' slurpBlock rs (flattenSCCs sccs)
+	slurpBlock rs (BasicBlock _ instrs)	= foldl' slurpLI    rs instrs
                 
-        slurpLI    rs (LiveInstr _	Nothing) = rs
+	slurpLI    rs (LiveInstr _	Nothing)    = rs
 	slurpLI    rs (LiveInstr instr (Just live))
 	 	| Just (r1, r2)	<- takeRegRegMoveInstr instr
 		, elementOfUniqSet r1 $ liveDieRead live

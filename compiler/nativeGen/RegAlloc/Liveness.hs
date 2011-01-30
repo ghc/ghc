@@ -35,8 +35,8 @@ import Reg
 import Instruction
 
 import BlockId
-import Cmm hiding (RegSet)
-import PprCmm()
+import OldCmm hiding (RegSet)
+import OldPprCmm()
 
 import Digraph
 import Outputable
@@ -63,9 +63,6 @@ emptyRegMap :: UniqFM a
 emptyRegMap = emptyUFM
 
 type BlockMap a = BlockEnv a
-
-emptyBlockMap :: BlockEnv a
-emptyBlockMap = emptyBlockEnv
 
 
 -- | A top level thing which carries liveness information.
@@ -243,9 +240,9 @@ mapBlockTopM
 mapBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
-mapBlockTopM f (CmmProc header label params sccs)
+mapBlockTopM f (CmmProc header label sccs)
  = do	sccs'	<- mapM (mapSCCM f) sccs
- 	return	$ CmmProc header label params sccs'
+ 	return	$ CmmProc header label sccs'
 
 mapSCCM :: Monad m => (a -> m b) -> SCC a -> m (SCC b)
 mapSCCM	f (AcyclicSCC x)	
@@ -275,9 +272,9 @@ mapGenBlockTopM
 mapGenBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
-mapGenBlockTopM f (CmmProc header label params (ListGraph blocks))
+mapGenBlockTopM f (CmmProc header label (ListGraph blocks))
  = do	blocks'	<- mapM f blocks
- 	return	$ CmmProc header label params (ListGraph blocks')
+ 	return	$ CmmProc header label (ListGraph blocks')
 
 
 -- | Slurp out the list of register conflicts and reg-reg moves from this top level thing.
@@ -293,7 +290,7 @@ slurpConflicts live
 	= slurpCmm (emptyBag, emptyBag) live
 
  where	slurpCmm   rs  CmmData{}		= rs
- 	slurpCmm   rs (CmmProc info _ _ sccs)
+ 	slurpCmm   rs (CmmProc info _ sccs)
 		= foldl' (slurpSCC info) rs sccs
 
 	slurpSCC  info rs (AcyclicSCC b)	
@@ -304,7 +301,7 @@ slurpConflicts live
 
 	slurpBlock info rs (BasicBlock blockId instrs)	
 		| LiveInfo _ _ (Just blockLive)	_ <- info
-		, Just rsLiveEntry		  <- lookupBlockEnv blockLive blockId
+		, Just rsLiveEntry		  <- mapLookup blockId blockLive
 		, (conflicts, moves)		  <- slurpLIs rsLiveEntry rs instrs
 		= (consBag rsLiveEntry conflicts, moves)
 
@@ -372,7 +369,7 @@ slurpReloadCoalesce live
                  -> GenCmmTop t t1 [SCC (LiveBasicBlock instr)]
                  -> Bag (Reg, Reg)
         slurpCmm cs CmmData{}	= cs
- 	slurpCmm cs (CmmProc _ _ _ sccs)
+ 	slurpCmm cs (CmmProc _ _ sccs)
 		= slurpComp cs (flattenSCCs sccs)
 
         slurpComp :: Bag (Reg, Reg)
@@ -469,8 +466,7 @@ stripLive live
 	= stripCmm live
 
  where	stripCmm (CmmData sec ds)	= CmmData sec ds
-
- 	stripCmm (CmmProc (LiveInfo info (Just first_id) _ _) label params sccs)
+ 	stripCmm (CmmProc (LiveInfo info (Just first_id) _ _) label sccs)
 	 = let	final_blocks	= flattenSCCs sccs
 		
 		-- make sure the block that was first in the input list
@@ -479,17 +475,17 @@ stripLive live
 		((first':_), rest')
 				= partition ((== first_id) . blockId) final_blocks
 
-	   in	CmmProc info label params
+	   in	CmmProc info label 
                           (ListGraph $ map stripLiveBlock $ first' : rest')
 
 	-- procs used for stg_split_markers don't contain any blocks, and have no first_id.
-	stripCmm (CmmProc (LiveInfo info Nothing _ _) label params [])
-	 =	CmmProc info label params (ListGraph [])
+	stripCmm (CmmProc (LiveInfo info Nothing _ _) label [])
+	 =	CmmProc info label (ListGraph [])
 
 	-- If the proc has blocks but we don't know what the first one was, then we're dead.
 	stripCmm proc
 		 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (ppr proc)
-			
+
 
 -- | Strip away liveness information from a basic block,
 --	and make real spill instructions out of SPILL, RELOAD pseudos along the way.
@@ -554,14 +550,14 @@ patchEraseLive patchF cmm
  where
 	patchCmm cmm@CmmData{}	= cmm
 
-	patchCmm (CmmProc info label params sccs)
+	patchCmm (CmmProc info label sccs)
 	 | LiveInfo static id (Just blockMap) mLiveSlots <- info
 	 = let 	
 	 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
-		blockMap'	= mapBlockEnv patchRegSet blockMap
+		blockMap'	= mapMap patchRegSet blockMap
 
 		info'		= LiveInfo static id (Just blockMap') mLiveSlots
-	   in	CmmProc info' label params $ map patchSCC sccs
+	   in	CmmProc info' label $ map patchSCC sccs
 
 	 | otherwise
 	 = panic "RegAlloc.Liveness.patchEraseLive: no blockMap"
@@ -630,19 +626,17 @@ natCmmTopToLive
 natCmmTopToLive (CmmData i d)
 	= CmmData i d
 
-natCmmTopToLive (CmmProc info lbl params (ListGraph []))
-	= CmmProc (LiveInfo info Nothing Nothing Map.empty)
-		  lbl params []
+natCmmTopToLive (CmmProc info lbl (ListGraph []))
+	= CmmProc (LiveInfo info Nothing Nothing Map.empty) lbl []
 
-natCmmTopToLive (CmmProc info lbl params (ListGraph blocks@(first : _)))
+natCmmTopToLive (CmmProc info lbl (ListGraph blocks@(first : _)))
  = let	first_id	= blockId first
 	sccs		= sccBlocks blocks
 	sccsLive	= map (fmap (\(BasicBlock l instrs) -> 
 					BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
 			$ sccs
 				
-   in	CmmProc (LiveInfo info (Just first_id) Nothing Map.empty)
-		lbl params sccsLive
+   in	CmmProc (LiveInfo info (Just first_id) Nothing Map.empty) lbl sccsLive
 
 
 sccBlocks 
@@ -670,18 +664,18 @@ regLiveness
 regLiveness (CmmData i d)
 	= returnUs $ CmmData i d
 
-regLiveness (CmmProc info lbl params [])
+regLiveness (CmmProc info lbl [])
 	| LiveInfo static mFirst _ _	<- info
 	= returnUs $ CmmProc
-			(LiveInfo static mFirst (Just emptyBlockEnv) Map.empty)
-			lbl params []
+			(LiveInfo static mFirst (Just mapEmpty) Map.empty)
+			lbl []
 
-regLiveness (CmmProc info lbl params sccs)
+regLiveness (CmmProc info lbl sccs)
 	| LiveInfo static mFirst _ liveSlotsOnEntry	<- info
 	= let	(ann_sccs, block_live)	= computeLiveness sccs
 
    	  in	returnUs $ CmmProc (LiveInfo static mFirst (Just block_live) liveSlotsOnEntry)
-			   lbl params ann_sccs
+			   lbl ann_sccs
 
 
 -- -----------------------------------------------------------------------------
@@ -730,7 +724,7 @@ reverseBlocksInTops :: LiveCmmTop instr -> LiveCmmTop instr
 reverseBlocksInTops top
  = case top of
 	CmmData{}			-> top
-	CmmProc info lbl params sccs	-> CmmProc info lbl params (reverse sccs)
+	CmmProc info lbl sccs	-> CmmProc info lbl (reverse sccs)
 
 	
 -- | Computing liveness
@@ -803,8 +797,8 @@ livenessSCCs blockmap done
                 -- BlockMaps for equality.
 	    equalBlockMaps a b
 	        = a' == b'
-	      where a' = map f $ blockEnvToList a
-	            b' = map f $ blockEnvToList b
+	      where a' = map f $ mapToList a
+	            b' = map f $ mapToList b
 	            f (key,elt) = (key, uniqSetToList elt)
 
 
@@ -821,7 +815,7 @@ livenessBlock blockmap (BasicBlock block_id instrs)
  = let
  	(regsLiveOnEntry, instrs1)
  		= livenessBack emptyUniqSet blockmap [] (reverse instrs)
- 	blockmap'	= extendBlockEnv blockmap block_id regsLiveOnEntry
+ 	blockmap'	= mapInsert block_id regsLiveOnEntry blockmap
 
 	instrs2		= livenessForward regsLiveOnEntry instrs1
 
@@ -928,7 +922,7 @@ liveness1 liveregs blockmap (LiveInstr instr _)
 	    not_a_branch = null targets
 
 	    targetLiveRegs target
-                  = case lookupBlockEnv blockmap target of
+                  = case mapLookup target blockmap of
                                 Just ra -> ra
                                 Nothing -> emptyRegMap
 

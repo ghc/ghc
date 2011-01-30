@@ -39,7 +39,7 @@ where
 import CgMonad
 
 import CLabel
-import Cmm
+import OldCmm
 
 -- import BasicTypes
 import BlockId
@@ -128,8 +128,8 @@ newLocal ty name = do
 newLabel :: FastString -> ExtFCode BlockId
 newLabel name = do
    u <- code newUnique
-   addLabel name (BlockId u)
-   return (BlockId u)
+   addLabel name (mkBlockId u)
+   return (mkBlockId u)
 
 
 -- | Add add a local function to the environment.
@@ -162,7 +162,7 @@ lookupLabel name = do
   return $ 
      case lookupUFM env name of
 	Just (Label l) 	-> l
-	_other 		-> BlockId (newTagUnique (getUnique name) 'L')
+	_other 		-> mkBlockId (newTagUnique (getUnique name) 'L')
 
 
 -- | Lookup the location of a named variable.

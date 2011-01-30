@@ -75,7 +75,7 @@ dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty = do
 
 dsGRHS :: HsMatchContext Name -> [Pat Id] -> Type -> LGRHS Id -> DsM MatchResult
 dsGRHS hs_ctx _ rhs_ty (L _ (GRHS guards rhs))
-  = matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
+  = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
 \end{code}
 
 
@@ -87,7 +87,7 @@ dsGRHS hs_ctx _ rhs_ty (L _ (GRHS guards rhs))
 
 \begin{code}
 matchGuards :: [Stmt Id] 		-- Guard
-            -> HsMatchContext Name	-- Context
+            -> HsStmtContext Name	-- Context
 	    -> LHsExpr Id		-- RHS
 	    -> Type			-- Type of RHS of guard
 	    -> DsM MatchResult
@@ -126,7 +126,7 @@ matchGuards (LetStmt binds : stmts) ctx rhs rhs_ty = do
 matchGuards (BindStmt pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
-    matchSinglePat core_rhs ctx pat rhs_ty match_result
+    matchSinglePat core_rhs (StmtCtxt ctx) pat rhs_ty match_result
 
 isTrueLHsExpr :: LHsExpr Id -> Maybe (CoreExpr -> DsM CoreExpr)
 

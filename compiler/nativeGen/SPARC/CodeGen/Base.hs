@@ -22,7 +22,8 @@ import SPARC.RegPlate
 import Size
 import Reg
 
-import Cmm
+import OldCmm
+import OldPprCmm ()
 
 import Outputable
 import OrdList

@@ -28,7 +28,7 @@ import Reg
 
 import Constants	(rESERVED_C_STACK_BYTES)
 import BlockId
-import Cmm
+import OldCmm
 import FastString
 import CLabel
 import Outputable

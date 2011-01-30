@@ -32,8 +32,8 @@ import CgTicky
 import CgInfoTbls
 import CLabel
 import ClosureInfo
-import CmmUtils
-import Cmm
+import OldCmmUtils
+import OldCmm
 import SMRep
 import CostCentre
 import Constants

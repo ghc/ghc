@@ -8,7 +8,7 @@ module SPARC.Imm (
 
 where
 
-import Cmm
+import OldCmm
 import CLabel
 import BlockId
 

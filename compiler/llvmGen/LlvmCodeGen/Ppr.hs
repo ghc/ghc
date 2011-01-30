@@ -13,7 +13,7 @@ import LlvmCodeGen.Base
 import LlvmCodeGen.Data
 
 import CLabel
-import Cmm
+import OldCmm
 
 import FastString
 import qualified Outputable
@@ -82,7 +82,7 @@ pprLlvmCmmTop :: LlvmEnv -> Int -> LlvmCmmTop -> (Doc, [LlvmVar])
 pprLlvmCmmTop _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmTop env count (CmmProc info lbl _ (ListGraph blks))
+pprLlvmCmmTop env count (CmmProc info lbl (ListGraph blks))
   = let static = CmmDataLabel lbl : info
         (idoc, ivar) = if not (null info)
                           then pprInfoTable env count lbl static

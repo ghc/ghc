@@ -38,7 +38,7 @@ import Reg
 import Size
 
 import BlockId
-import Cmm
+import OldCmm
 import FastString
 import FastBool
 import Outputable

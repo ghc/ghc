@@ -27,7 +27,7 @@ import Reg
 import RegClass
 import Size
 
-import CmmExpr	(wordWidth)
+import CmmType	(wordWidth)
 import Outputable
 import Unique
 import FastTypes

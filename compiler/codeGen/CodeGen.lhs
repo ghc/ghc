@@ -28,9 +28,9 @@ import CgUtils
 import CgHpc
 
 import CLabel
-import Cmm
-import CmmUtils
-import PprCmm
+import OldCmm
+import OldCmmUtils
+import OldPprCmm
 
 import StgSyn
 import PrelNames

@@ -26,7 +26,7 @@ import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
 import Util
-import Cmm		( RawCmm )
+import OldCmm		( RawCmm )
 import HscTypes
 import DynFlags
 import Config

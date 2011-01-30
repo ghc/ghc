@@ -1,35 +1,89 @@
-Notes on new codegen (Sept 09)
+Notes on new codegen (Aug 10)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Things to do:
+ - We insert spills for variables before the stack check! This is the reason for
+   some fishy code in StgCmmHeap.entryHeapCheck where we are doing some strange
+	things to fix up the stack pointer before GC calls/jumps.
+
+	The reason spills are inserted before the sp check is that at the entry to a
+	function we always store the parameters passed in registers to local variables.
+	The spill pass simply inserts spills at variable definitions. We instead should
+	sink the spills so that we can avoid spilling them on branches that never
+	reload them.
+
+	This will fix the spill before stack check problem but only really as a side
+	effect. A 'real fix' probably requires making the spiller know about sp checks.
+
+ - There is some silly stuff happening with the Sp. We end up with code like:
+   Sp = Sp + 8; R1 = _vwf::I64; Sp = Sp -8
+	Seems to be perhaps caused by the issue above but also maybe a optimisation
+	pass needed?
+
+ - Proc pass all arguments on the stack, adding more code and slowing down things
+   a lot. We either need to fix this or even better would be to get rid of
+	proc points.
+
+ - CmmInfo.cmmToRawCmm uses Old.Cmm, so it is called after converting Cmm.Cmm to
+   Old.Cmm. We should abstract it to work on both representations, it needs only to
+   convert a CmmInfoTable to [CmmStatic].
+
+ - The MkGraph currenty uses a different semantics for <*> than Hoopl. Maybe
+   we could convert codeGen/StgCmm* clients to the Hoopl's semantics?
+   It's all deeply unsatisfactory.
+
+ - Improve preformance of Hoopl.
+
+   A nofib comparison of -fasm vs -fnewcodegen nofib compilation parameters
+   (using the same ghc-cmm branch +libraries compiled by the old codegenerator)
+   is at http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.oldghchoopl.txt
+   - the code produced is 10.9% slower, the compilation is +118% slower!
+
+   The same comparison with ghc-head with zip representation is at
+   http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.oldghczip.txt
+   - the code produced is 11.7% slower, the compilation is +78% slower.
+
+   When compiling nofib, ghc-cmm + libraries compiled with -fnew-codegen
+   is 23.7% slower (http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.hooplghcoldgen.txt).
+   When compiling nofib, ghc-head + libraries compiled with -fnew-codegen
+   is 31.4% slower (http://fox.auryn.cz/msrc/0517_hoopl/32bit.oldghcoldgen.zipghcoldgen.txt).
+
+   So we generate a bit better code, but it takes us longer!
+
+ - Are all blockToNodeList and blockOfNodeList really needed? Maybe we could
+   splice blocks instead?
+
+   In the CmmContFlowOpt.blockConcat, using Dataflow seems too clumsy. Still,
+   a block catenation function would be probably nicer than blockToNodeList
+   / blockOfNodeList combo.
+
+ - loweSafeForeignCall seems too lowlevel. Just use Dataflow. After that
+   delete splitEntrySeq from HooplUtils.
+
+ - manifestSP seems to touch a lot of the graph representation. It is
+   also slow for CmmSwitch nodes O(block_nodes * switch_statements).
+   Maybe rewrite manifestSP to use Dataflow?
+
+ - Sort out Label, LabelMap, LabelSet versus BlockId, BlockEnv, BlockSet
+   dichotomy. Mostly this means global replace, but we also need to make
+   Label an instance of Outputable (probably in the Outputable module).
+
+ - NB that CmmProcPoint line 283 has a hack that works around a GADT-related
+   bug in 6.10.
 
  - SDM (2010-02-26) can we remove the Foreign constructor from Convention?
    Reason: we never generate code for a function with the Foreign
    calling convention, and the code for calling foreign calls is generated
 
- - All dataflow analyses are in the FuelMonad, even though they
-   are guarnteed to consume no fuel.  This seems silly
-
- - CmmContFlowOpt.runCmmContFlowOptZs is not called!
- - Why is runCmmOpts called from HscMain?  Seems too "high up".
-   In fact HscMain calls (runCmmOpts cmmCfgOptsZ) which is what
-   runCmmContFlowOptZs does.  Tidy up!
-
-
  - AsmCodeGen has a generic Cmm optimiser; move this into new pipeline
 
- - AsmCodeGen has post-native-cg branch elimiator (shortCutBranches);
+ - AsmCodeGen has post-native-cg branch eliminator (shortCutBranches);
    we ultimately want to share this with the Cmm branch eliminator.
 
  - At the moment, references to global registers like Hp are "lowered" 
-   late (in AsmCodeGen.fixAssignTop and cmmToCmm). We should do this
-   early, in the new native codegen, much in the way that we lower 
-   calling conventions.  Might need to be a bit sophisticated about
-   aliasing.
-
- - Refactor Cmm so that it contains only shared stuff
-   Add a module MoribundCmm which contains stuff from
-   Cmm for old code gen path
+   late (in CgUtils.fixStgRegisters). We should do this early, in the
+	new native codegen, much in the way that we lower calling conventions.
+	Might need to be a bit sophisticated about aliasing.
 
  - Question: currently we lift procpoints to become separate
    CmmProcs.  Do we still want to do this?
@@ -58,20 +112,6 @@ Things to do:
 
  - See "CAFs" below; we want to totally refactor the way SRTs are calculated
 
- - Change  
-      type CmmZ = GenCmm CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
-   to
-      type CmmZ = GenCmm CmmStatic (CmmInfo, CmmStackInfo) CmmGraph
-	-- And perhaps take opportunity to prune CmmInfo?
-
- - Clarify which fields of CmmInfo are still used
- - Maybe get rid of CmmFormals arg of CmmProc in all versions?
-
- - We aren't sure whether cmmToRawCmm is actively used by the new pipeline; check
-   And what does CmmBuildInfoTables do?!
-
- - Nuke CmmZipUtil, move zipPreds into ZipCfg
-
  - Pull out Areas into its own module
    Parameterise AreaMap
    Add ByteWidth = Int
@@ -82,6 +122,9 @@ Things to do:
 	-- ByteOff etc   ==>  CmmExpr
         -- rET_SMALL etc ==> CmmInfo
    Check that there are no other imports from codeGen in cmm/
+
+ - If you eliminate a label by branch chain elimination,
+   what happens if there's an Area associated with that label?
 
  - Think about a non-flattened representation?
 
@@ -105,7 +148,7 @@ Things to do:
    http://hackage.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
 
 
- - We believe that all of CmmProcPointZ.addProcPointProtocols is dead.  What
+ - We believe that all of CmmProcPoint.addProcPointProtocols is dead.  What
    goes wrong if we simply never call it?
 
  - Something fishy in CmmStackLayout.hs
@@ -150,75 +193,57 @@ Things to do:
      move the whole splitting game into the C back end *only*
 	 (guided by the procpoint set)
 
-      
 ----------------------------------------------------
 	Modules in cmm/
 ----------------------------------------------------
 
--------- Dead stuff ------------
-CmmProcPoint        Dead: Michael Adams
-CmmCPS              Dead: Michael Adams
-CmmCPSGen.hs        Dead: Michael Adams
-CmmBrokenBlock.hs   Dead: Michael Adams
-CmmLive.hs          Dead: Michael Adams
-CmmProcPoint.hs     Dead: Michael Adams
-Dataflow.hs         Dead: Michael Adams
-StackColor.hs       Norman?
-StackPlacements.hs  Norman?
-
+-------- Testing stuff ------------
 HscMain.optionallyConvertAndOrCPS
         testCmmConversion
-DynFlags:  -fconvert-to-zipper-and-back, -frun-cps, -frun-cpsz
+DynFlags:  -fconvert-to-zipper-and-back, -frun-cpsz
 
 -------- Moribund stuff ------------
+OldCmm.hs      Definition of flowgraph of old representation
+OldCmmUtil.hs  Utilites that operates mostly on on CmmStmt
+OldPprCmm.hs   Pretty print for CmmStmt, GenBasicBlock and ListGraph
 CmmCvt.hs      Conversion between old and new Cmm reps
 CmmOpt.hs      Hopefully-redundant optimiser
-CmmZipUtil.hs  Only one function; move elsewhere
 
 -------- Stuff to keep ------------
-CmmCPSZ.hs	          Driver for new pipeline
+CmmCPS.hs                 Driver for new pipeline
 
-CmmLiveZ.hs	          Liveness analysis, dead code elim
-CmmProcPointZ.hs          Identifying and splitting out proc-points
+CmmLive.hs                Liveness analysis, dead code elim
+CmmProcPoint.hs           Identifying and splitting out proc-points
 
 CmmSpillReload.hs         Save and restore across calls
 
-CmmCommonBlockElimZ.hs    Common block elim
+CmmCommonBlockElim.hs     Common block elim
 CmmContFlowOpt.hs         Other optimisations (branch-chain, merging)
 
 CmmBuildInfoTables.hs     New info-table 
 CmmStackLayout.hs         and stack layout 
 CmmCallConv.hs
-CmmInfo.hs                Defn of InfoTables, and conversion to exact layout
+CmmInfo.hs                Defn of InfoTables, and conversion to exact byte layout
 
 ---------- Cmm data types --------------
-ZipCfgCmmRep.hs	    Cmm instantiations of dataflow graph framework
-MkZipCfgCmm.hs      Cmm instantiations of dataflow graph framework
+Cmm.hs              Cmm instantiations of dataflow graph framework
+MkGraph.hs          Interface for building Cmm for codeGen/Stg*.hs modules
 
-Cmm.hs	      Key module; a mix of old and new stuff
-                  so needs tidying up in due course
-CmmExpr.hs
+CmmDecl.hs          Shared Cmm types of both representations
+CmmExpr.hs          Type of Cmm expression
+CmmType.hs          Type of Cmm types and their widths
+CmmMachOp.hs        MachOp type and accompanying utilities
+
 CmmUtils.hs
 CmmLint.hs
 
 PprC.hs	            Pretty print Cmm in C syntax
-PprCmm.hs	    Pretty printer for Cmm
-PprCmmZ.hs	    Additional stuff for zipper rep
+PprCmm.hs	    Pretty printer for CmmGraph.
+PprCmmDecl.hs       Pretty printer for common Cmm types.
+PprCmmExpr.hs       Pretty printer for Cmm expressions.
 
-CLabel.hs     CLabel
-
-----------  Dataflow modules --------------
-   Goal: separate library; for now, separate directory
-
-MkZipCfg.hs
-ZipCfg.hs
-ZipCfgExtras.hs
-ZipDataflow.hs
-CmmTx.hs	      Transactions
-OptimizationFuel.hs   Fuel
-BlockId.hs    BlockId, BlockEnv, BlockSet
-DFMonad.hs	      
-
+CLabel.hs           CLabel
+BlockId.hs          BlockId, BlockEnv, BlockSet
 
 ----------------------------------------------------
       Top-level structure
@@ -234,7 +259,7 @@ DFMonad.hs
 * HscMain.tryNewCodeGen
     - STG->Cmm:    StgCmm.codeGen (new codegen)
     - Optimise:    CmmContFlowOpt (simple optimisations, very self contained)
-    - Cps convert: CmmCPSZ.protoCmmCPSZ 
+    - Cps convert: CmmCPS.protoCmmCPS 
     - Optimise:    CmmContFlowOpt again
     - Convert:     CmmCvt.cmmOfZgraph (convert to old rep) very self contained
 
@@ -243,23 +268,23 @@ DFMonad.hs
 
 
 ----------------------------------------------------
-      CmmCPSZ.protoCmmCPSZ   The new pipeline
+      CmmCPS.protoCmmCPS   The new pipeline
 ----------------------------------------------------
 
-CmmCPSZprotoCmmCPSZ:
+CmmCPS.protoCmmCPS:
    1. Do cpsTop for each procedures separately
    2. Build SRT representation; this spans multiple procedures
 	(unless split-objs)
 
 cpsTop:
-  * CmmCommonBlockElimZ.elimCommonBlocks:
+  * CmmCommonBlockElim.elimCommonBlocks:
 	eliminate common blocks 
 
-  * CmmProcPointZ.minimalProcPointSet
+  * CmmProcPoint.minimalProcPointSet
 	identify proc-points
         no change to graph
 
-  * CmmProcPointZ.addProcPointProtocols
+  * CmmProcPoint.addProcPointProtocols
 	something to do with the MA optimisation
         probably entirely unnecessary
 
@@ -289,11 +314,11 @@ cpsTop:
        Manifest the stack pointer
 
    * Split into separate procedures
-      - CmmProcPointZ.procPointAnalysis
+      - CmmProcPoint.procPointAnalysis
         Given set of proc points, which blocks are reachable from each
         Claim: too few proc-points => code duplication, but program still works??
 
-      - CmmProcPointZ.splitAtProcPoints
+      - CmmProcPoint.splitAtProcPoints
 	Using this info, split into separate procedures
 
       - CmmBuildInfoTables.setInfoTableStackMap
@@ -334,7 +359,7 @@ of calls don't need an info table.
 Figuring out proc-points
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Proc-points are identified by
-CmmProcPointZ.minimalProcPointSet/extendPPSet Although there isn't
+CmmProcPoint.minimalProcPointSet/extendPPSet Although there isn't
 that much code, JD thinks that it could be done much more nicely using
 a dominator analysis, using the Dataflow Engine.
 
@@ -387,7 +412,7 @@ a dominator analysis, using the Dataflow Engine.
   f's keep-alive refs to include h1.
 
 * The SRT info is the C_SRT field of Cmm.ClosureTypeInfo in a
-  CmmInfoTable attached to each CmmProc.  CmmCPSZ.toTops actually does
+  CmmInfoTable attached to each CmmProc.  CmmCPS.toTops actually does
   the attaching, right at the end of the pipeline.  The C_SRT part
   gives offsets within a single, shared table of closure pointers.
 
@@ -398,7 +423,7 @@ a dominator analysis, using the Dataflow Engine.
 		Foreign calls
 ----------------------------------------------------
 
-See Note [Foreign calls] in ZipCfgCmmRep!  This explains that a safe
+See Note [Foreign calls] in CmmNode!  This explains that a safe
 foreign call must do this:
   save thread state
   push info table (on thread stack) to describe frame
@@ -433,7 +458,7 @@ NEW PLAN for foreign calls:
 		Cmm representations
 ----------------------------------------------------
 
-* Cmm.hs
+* CmmDecl.hs
      The type [GenCmm d h g] represents a whole module, 
 	** one list element per .o file **
 	Without SplitObjs, the list has exactly one element
@@ -448,7 +473,7 @@ NEW PLAN for foreign calls:
 
 
 -------------
-OLD BACK END representations (Cmm.hs):  
+OLD BACK END representations (OldCmm.hs):  
       type Cmm = GenCmm CmmStatic CmmInfo (ListGraph CmmStmt)
 				-- A whole module
       newtype ListGraph i = ListGraph [GenBasicBlock i]
@@ -463,49 +488,47 @@ OLD BACK END representations (Cmm.hs):
   
 -------------
 NEW BACK END representations 
-* Not Cmm-specific at all
-    ZipCfg.hs defines  Graph, LGraph, FGraph,
-                       ZHead, ZTail, ZBlock ...
+* Uses Hoopl library, a zero-boot package
+* CmmNode defines a node of a flow graph.
+* Cmm defines CmmGraph, CmmTop, Cmm
+   - CmmGraph is a closed/closed graph + an entry node.
 
-              classes  LastNode, HavingSuccessors
+       data CmmGraph = CmmGraph { g_entry :: BlockId
+                                , g_graph :: Graph CmmNode C C }
 
-    MkZipCfg.hs: AGraph: building graphs
+   - CmmTop is a top level chunk, specialization of GenCmmTop from CmmDecl.hs
+       with CmmGraph as a flow graph.
+   - Cmm is a collection of CmmTops.
 
-* ZipCfgCmmRep: instantiates ZipCfg for Cmm
-      data Middle = ...CmmExpr...
-      data Last = ...CmmExpr...
-      type CmmGraph = Graph Middle Last
+       type Cmm          = GenCmm    CmmStatic CmmTopInfo CmmGraph
+       type CmmTop       = GenCmmTop CmmStatic CmmTopInfo CmmGraph
 
-      type CmmZ = GenCmm CmmStatic CmmInfo (CmmStackInfo, CmmGraph)
-      type CmmStackInfo = (ByteOff, Maybe ByteOff)
-                -- (SP offset on entry, update frame space = SP offset on exit)
-		-- The new codegen produces CmmZ, but once the stack is 
-		-- manifested we can drop that in favour of 
-		--    GenCmm CmmStatic CmmInfo CmmGraph
+   - CmmTop uses CmmTopInfo, which is a CmmInfoTable and CmmStackInfo
 
-      Inside a CmmProc:
-	   - CLabel: used
-	   - CmmInfo: partly used by NEW
-           - CmmFormals: not used at all  PERHAPS NOT EVEN BY OLD PIPELINE!
+       data CmmTopInfo   = TopInfo {info_tbl :: CmmInfoTable, stack_info :: CmmStackInfo}
 
-* MkZipCfgCmm.hs: smart constructors for ZipCfgCmmRep
-   Depends on (a) MkZipCfg (Cmm-independent)
-   	      (b) ZipCfgCmmRep (Cmm-specific)
+   - CmmStackInfo
+
+       data CmmStackInfo = StackInfo {arg_space :: ByteOff, updfr_space :: Maybe ByteOff}
+
+         * arg_space = SP offset on entry
+         * updfr_space space = SP offset on exit
+       Once the staci is manifested, we could drom CmmStackInfo, ie. get
+         GenCmm CmmStatic CmmInfoTable CmmGraph, but we do not do that currently.
+
+
+* MkGraph.hs: smart constructors for Cmm.hs
+  Beware, the CmmAGraph defined here does not use AGraph from Hoopl,
+  as CmmAGraph can be opened or closed at exit, See the notes in that module.
 
 -------------
 * SHARED stuff
-  CmmExpr.hs defines the Cmm expression types
-	- CmmExpr, CmmReg, Width, CmmLit, LocalReg, GlobalReg
-	- CmmType, Width etc   (saparate module?)
-	- MachOp               (separate module?)
-	- Area, AreaId etc     (separate module?)
+  CmmDecl.hs - GenCmm and GenCmmTop types
+  CmmExpr.hs - defines the Cmm expression types
+             - CmmExpr, CmmReg, CmmLit, LocalReg, GlobalReg
+             - Area, AreaId etc     (separate module?)
+  CmmType.hs - CmmType, Width etc   (saparate module?)
+  CmmMachOp.hs - MachOp and CallishMachOp types
 
   BlockId.hs defines  BlockId, BlockEnv, BlockSet
-
 -------------
-
-
--------------
-* Transactions indicate whether or not the result changes: CmmTx 
-     type Tx a = a -> TxRes a
-     data TxRes a = TxRes ChangeFlag a

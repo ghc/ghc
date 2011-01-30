@@ -33,12 +33,11 @@ import Reg
 import RegClass
 import TargetReg
 
-import BlockId
-import Cmm
+import OldCmm
 
 import CLabel
 
-import Unique		( pprUnique )
+import Unique		( pprUnique, Uniquable(..) )
 import Pretty
 import FastString
 import qualified Outputable
@@ -56,9 +55,9 @@ pprNatCmmTop (CmmData section dats) =
   pprSectionHeader section $$ vcat (map pprData dats)
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
+pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
 
-pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) = 
+pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) = 
   pprSectionHeader Text $$
   (if null info then -- blocks guaranteed not null, so label needed
        pprLabel lbl
@@ -90,8 +89,8 @@ pprNatCmmTop (CmmProc info lbl _ (ListGraph blocks)) =
 
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
-pprBasicBlock (BasicBlock (BlockId id) instrs) =
-  pprLabel (mkAsmTempLabel id) $$
+pprBasicBlock (BasicBlock blockid instrs) =
+  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
 
@@ -511,16 +510,16 @@ pprInstr (CMPL sz reg ri) = hcat [
 		    RIReg _ -> empty
 		    RIImm _ -> char 'i'
 	    ]
-pprInstr (BCC cond (BlockId id)) = hcat [
+pprInstr (BCC cond blockid) = hcat [
 	char '\t',
 	ptext (sLit "b"),
 	pprCond cond,
 	char '\t',
 	pprCLabel_asm lbl
     ]
-    where lbl = mkAsmTempLabel id
+    where lbl = mkAsmTempLabel (getUnique blockid)
 
-pprInstr (BCCFAR cond (BlockId id)) = vcat [
+pprInstr (BCCFAR cond blockid) = vcat [
         hcat [
             ptext (sLit "\tb"),
             pprCond (condNegate cond),
@@ -531,7 +530,7 @@ pprInstr (BCCFAR cond (BlockId id)) = vcat [
             pprCLabel_asm lbl
         ]
     ]
-    where lbl = mkAsmTempLabel id
+    where lbl = mkAsmTempLabel (getUnique blockid)
 
 pprInstr (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
 	char '\t',

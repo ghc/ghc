@@ -59,6 +59,7 @@ libraries/ghc-prim              -           packages/ghc-prim               darc
 libraries/haskeline             -           packages/haskeline              darcs   http://code.haskell.org/haskeline/
 libraries/haskell98             -           packages/haskell98              darcs   -
 libraries/haskell2010           -           packages/haskell2010            darcs   -
+libraries/hoopl                 -           packages/hoopl                  darcs   -
 libraries/hpc                   -           packages/hpc                    darcs   -
 libraries/integer-gmp           -           packages/integer-gmp            darcs   -
 libraries/integer-simple        -           packages/integer-simple         darcs   -

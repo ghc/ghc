@@ -16,32 +16,9 @@
 default_to_ghc : all_ghc
 
 dir = compiler
-TOP = ..
-SPEC_TARGETS = 1 2 3
-include $(TOP)/mk/sub-makefile.mk
+
+include ../mk/compiler-ghc.mk
 
 all_ghc :
 	+$(TOPMAKE) all_ghc $(EXTRA_MAKE_OPTS)
 
-FAST_MAKE_OPTS += compiler_stage1_NO_BUILD_DEPS=YES compiler_stage2_NO_BUILD_DEPS=YES compiler_stage3_NO_BUILD_DEPS=YES
-
-.PHONY: 1 2 3
-
-1:
-	+$(TOPMAKE) stage=1 all_ghc_stage1 $(FAST_MAKE_OPTS) NO_STAGE1_DEPS=YES NO_STAGE2_DEPS=YES
-
-2:
-	+$(TOPMAKE) stage=2 all_ghc_stage2 $(FAST_MAKE_OPTS) NO_STAGE2_DEPS=YES
-
-3:
-	+$(TOPMAKE) stage=3 all_ghc_stage3 $(FAST_MAKE_OPTS) NO_STAGE3_DEPS=YES
-
-.PHONY: extra-help
-help : extra-help
-extra-help :
-	@echo "  make 1"
-	@echo "  make 2"
-	@echo "  make 3"
-	@echo
-	@echo "     Build the stage 1, 2 or 3 GHC respectively, omitting dependencies"
-	@echo "     and initial phases for speed."

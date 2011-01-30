@@ -47,7 +47,8 @@ import Platform
 import BasicTypes
 import BlockId
 import PprCmm		( pprExpr )
-import Cmm
+import OldCmm
+import OldPprCmm
 import CLabel
 import ClosureInfo	( C_SRT(..) )
 
@@ -58,6 +59,7 @@ import OrdList
 import Pretty
 import qualified Outputable as O
 import Outputable
+import Unique
 import FastString
 import FastBool		( isFastTrue )
 import Constants	( wORD_SIZE )
@@ -93,11 +95,10 @@ cmmTopCodeGen
 	-> RawCmmTop
 	-> NatM [NatCmmTop Instr]
 
-cmmTopCodeGen dynflags 
-	(CmmProc info lab params (ListGraph blocks)) = do
+cmmTopCodeGen dynflags (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
-  let proc = CmmProc info lab params (ListGraph $ concat nat_blocks)
+  let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dynflags
 
@@ -271,8 +272,8 @@ is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
 -- | Convert a BlockId to some CmmStatic data
 jumpTableEntry :: Maybe BlockId -> CmmStatic
 jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
-jumpTableEntry (Just (BlockId id)) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel id
+jumpTableEntry (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+    where blockLabel = mkAsmTempLabel (getUnique blockid)
 
 
 -- -----------------------------------------------------------------------------
@@ -1926,9 +1927,9 @@ genSwitch expr ids
             
             jumpTableEntryRel Nothing
                 = CmmStaticLit (CmmInt 0 wordWidth)
-            jumpTableEntryRel (Just (BlockId id))
+            jumpTableEntryRel (Just blockid)
                 = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                where blockLabel = mkAsmTempLabel id
+                where blockLabel = mkAsmTempLabel (getUnique blockid)
 
             op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg wORD_SIZE) (ImmInt 0))

@@ -40,7 +40,7 @@ endif
 # for a feature it may not generate warning-free C code, and thus may
 # think that the feature doesn't exist if -Werror is on.
 $1_$2_CONFIGURE_OPTS += --configure-option=CFLAGS="$$(filter-out -Werror,$$(SRC_CC_OPTS)) $$(CONF_CC_OPTS_STAGE$3) $$($1_CC_OPTS) $$($1_$2_CC_OPTS)"
-$1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$(CONF_LD_OPTS_STAGE$3) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
+$1_$2_CONFIGURE_OPTS += --configure-option=LDFLAGS="$$(SRC_LD_OPTS) $$(CONF_GCC_LINKER_OPTS_STAGE$3) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)"
 $1_$2_CONFIGURE_OPTS += --configure-option=CPPFLAGS="$$(SRC_CPP_OPTS) $$(CONF_CPP_OPTS_STAGE$3) $$($1_CPP_OPTS) $$($1_$2_CPP_OPTS)"
 
 ifneq "$$(ICONV_INCLUDE_DIRS)" ""
@@ -64,6 +64,7 @@ $1_$2_CONFIGURE_OPTS += $$(BOOT_PKG_CONSTRAINTS)
 endif
 
 ifneq "$$(BINDIST)" "YES"
+ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 $1/$2/inplace-pkg-config : $1/$2/package-data.mk
 $1/$2/build/autogen/cabal_macros.h : $1/$2/package-data.mk
 
@@ -75,6 +76,7 @@ $1/$2/package-data.mk : $$(GHC_CABAL_INPLACE) $$($1_$2_GHC_PKG_DEP) $1/$$($1_PAC
 ifeq "$$($1_$2_PROG)" ""
 ifneq "$$($1_$2_REGISTER_PACKAGE)" "NO"
 	"$$($1_$2_GHC_PKG)" update --force $$($1_$2_GHC_PKG_OPTS) $1/$2/inplace-pkg-config
+endif
 endif
 endif
 endif

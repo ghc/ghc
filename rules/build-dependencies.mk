@@ -25,7 +25,7 @@ $1_$2_C_FILES_DEPS = $$(filter-out $$($1_$2_C_FILES_NODEPS),$$($1_$2_C_FILES))
 $1_$2_MKDEPENDHS_FLAGS = -dep-makefile $$($1_$2_depfile_haskell).tmp $$(foreach way,$$(filter-out v,$$($1_$2_WAYS)),-dep-suffix $$(way))
 $1_$2_MKDEPENDHS_FLAGS += -include-pkg-deps
 
-ifneq "$$($1_$2_NO_BUILD_DEPS)" "YES"
+ifneq "$$(NO_GENERATED_MAKEFILE_RULES)" "YES"
 
 # Some of the Haskell files (e.g. utils/hsc2hs/Main.hs) (directly or
 # indirectly) include the generated includes files.
@@ -69,7 +69,7 @@ endif
 	echo "$1_$2_depfile_c_asm_EXISTS = YES" >> $$@.tmp
 	mv $$@.tmp $$@
 
-endif # $1_$2_NO_BUILD_DEPS
+endif # NO_GENERATED_MAKEFILE_RULES
 
 # Note sed magic above: mkdependC can't do -odir stuff, so we have to
 # munge the dependencies it generates to refer to the correct targets.

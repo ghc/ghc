@@ -46,14 +46,15 @@ initBuiltins pkg
       let [parrayDataCon] = tyConDataCons parrayTyCon
 
       pdataTyCon	<- externalTyCon	dph_PArray	(fsLit "PData")
-      pa                <- externalClass        dph_PArray      (fsLit "PA")
-      let paTyCon     = classTyCon pa
+      paClass           <- externalClass        dph_PArray      (fsLit "PA")
+      let paTyCon     = classTyCon paClass
           [paDataCon] = tyConDataCons paTyCon
-          paPRSel     = classSCSelId pa 0
+          paPRSel     = classSCSelId paClass 0
 
       preprTyCon	<- externalTyCon 	dph_PArray	(fsLit "PRepr")
-      prTyCon		<- externalClassTyCon	dph_PArray	(fsLit "PR")
-      let [prDataCon]	= tyConDataCons prTyCon
+      prClass           <- externalClass        dph_PArray      (fsLit "PR")
+      let prTyCon     = classTyCon prClass
+          [prDataCon] = tyConDataCons prTyCon
 
       closureTyCon	<- externalTyCon dph_Closure		(fsLit ":->")
 
@@ -127,10 +128,12 @@ initBuiltins pkg
                , parrayTyCon      = parrayTyCon
                , parrayDataCon    = parrayDataCon
                , pdataTyCon       = pdataTyCon
+               , paClass          = paClass
                , paTyCon          = paTyCon
                , paDataCon        = paDataCon
                , paPRSel          = paPRSel
                , preprTyCon       = preprTyCon
+               , prClass          = prClass
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
                , voidTyCon        = voidTyCon
@@ -307,10 +310,4 @@ externalType mod fs
 externalClass :: Module -> FastString -> DsM Class
 externalClass mod fs
   = dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
-
-
--- | Like `externalClass`, but get the TyCon of of the class.
-externalClassTyCon :: Module -> FastString -> DsM TyCon
-externalClassTyCon mod fs = liftM classTyCon (externalClass mod fs)
-
 

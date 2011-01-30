@@ -1,4 +1,6 @@
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE GADTs #-}
+-- ToDo: remove
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module CmmCvt
   ( cmmToZgraph, cmmOfZgraph )
@@ -6,179 +8,170 @@ where
 
 import BlockId
 import Cmm
-import MkZipCfgCmm hiding (CmmGraph)
-import ZipCfgCmmRep -- imported for reverse conversion
-import CmmZipUtil
-import PprCmm()
-import qualified ZipCfg as G
+import CmmDecl
+import CmmExpr
+import MkGraph
+import qualified OldCmm as Old
+import OldPprCmm ()
 
-import FastString
+import Compiler.Hoopl hiding ((<*>), mkLabel, mkBranch)
 import Control.Monad
+import Data.Maybe
+import Maybes
 import Outputable
 import UniqSupply
 
-cmmToZgraph :: GenCmm d h (ListGraph CmmStmt) -> UniqSM (GenCmm d h (CmmStackInfo, CmmGraph))
-cmmOfZgraph :: GenCmm d h (CmmStackInfo, CmmGraph)          ->         GenCmm d h (ListGraph CmmStmt)
+cmmToZgraph :: Old.Cmm -> UniqSM Cmm
+cmmOfZgraph :: Cmm     -> Old.Cmm
 
 cmmToZgraph (Cmm tops) = liftM Cmm $ mapM mapTop tops
-  where mapTop (CmmProc h l args g) =
-          toZgraph (showSDoc $ ppr l) args g >>= return . CmmProc h l args
+  where mapTop (CmmProc (Old.CmmInfo _ _ info_tbl) l g) =
+          do (stack_info, g) <- toZgraph (showSDoc $ ppr l) g
+             return $ CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) l g
         mapTop (CmmData s ds) = return $ CmmData s ds
-cmmOfZgraph = cmmMapGraph (ofZgraph . snd)
+cmmOfZgraph (Cmm tops) = Cmm $ map mapTop tops
+  where mapTop (CmmProc h l g) = CmmProc (Old.CmmInfo Nothing Nothing (info_tbl h)) l (ofZgraph g)
+        mapTop (CmmData s ds) = CmmData s ds
 
-toZgraph :: String -> CmmFormals -> ListGraph CmmStmt -> UniqSM (CmmStackInfo, CmmGraph)
-toZgraph _ _ (ListGraph []) =
+toZgraph :: String -> Old.ListGraph Old.CmmStmt -> UniqSM (CmmStackInfo, CmmGraph)
+toZgraph _ (Old.ListGraph []) =
   do g <- lgraphOfAGraph emptyAGraph
-     return ((0, Nothing), g)
-toZgraph fun_name args g@(ListGraph (BasicBlock id ss : other_blocks)) = 
-           let (offset, entry) = mkEntry id NativeNodeCall args in
+     return (StackInfo {arg_space=0, updfr_space=Nothing}, g)
+toZgraph fun_name g@(Old.ListGraph (Old.BasicBlock id ss : other_blocks)) = 
+           let (offset, entry) = mkCallEntry NativeNodeCall [] in
            do g <- labelAGraph id $
                      entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
-              return ((offset, Nothing), g)
-  where addBlock (BasicBlock id ss) g =
+              return (StackInfo {arg_space = offset, updfr_space = Nothing}, g)
+  where addBlock (Old.BasicBlock id ss) g =
           mkLabel id <*> mkStmts ss <*> g
         updfr_sz = 0 -- panic "upd frame size lost in cmm conversion"
-        mkStmts (CmmNop        : ss)  = mkNop        <*> mkStmts ss 
-        mkStmts (CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
-        mkStmts (CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
-        mkStmts (CmmStore  l r : ss)  = mkStore  l r <*> mkStmts ss
-        mkStmts (CmmCall (CmmCallee f conv) res args (CmmSafe _) CmmMayReturn : ss) =
-            mkCall f (conv', conv') (map hintlessCmm res) (map hintlessCmm args) updfr_sz
-            <*> mkStmts ss 
+        mkStmts (Old.CmmNop        : ss)  = mkNop        <*> mkStmts ss 
+        mkStmts (Old.CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
+        mkStmts (Old.CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
+        mkStmts (Old.CmmStore  l r : ss)  = mkStore  l r <*> mkStmts ss
+        mkStmts (Old.CmmCall (Old.CmmCallee f conv) res args (Old.CmmSafe _) Old.CmmMayReturn : ss) =
+            mkCall f (conv', conv') (map Old.hintlessCmm res) (map Old.hintlessCmm args) updfr_sz
+            <*> mkStmts ss
               where conv' = Foreign (ForeignConvention conv [] []) -- JD: DUBIOUS
-        mkStmts (CmmCall (CmmPrim {}) _ _ (CmmSafe _) _ : _) =
+        mkStmts (Old.CmmCall (Old.CmmPrim {}) _ _ (Old.CmmSafe _) _ : _) =
             panic "safe call to a primitive CmmPrim CallishMachOp"
-        mkStmts (CmmCall f res args CmmUnsafe CmmMayReturn : ss) =
+        mkStmts (Old.CmmCall f res args Old.CmmUnsafe Old.CmmMayReturn : ss) =
                       mkUnsafeCall (convert_target f res args)
-			(strip_hints res) (strip_hints args)
+                        (strip_hints res) (strip_hints args)
                       <*> mkStmts ss
-        mkStmts (CmmCondBranch e l : fbranch) =
+        mkStmts (Old.CmmCondBranch e l : fbranch) =
             mkCmmIfThenElse e (mkBranch l) (mkStmts fbranch)
         mkStmts (last : []) = mkLast last
         mkStmts []          = bad "fell off end"
         mkStmts (_ : _ : _) = bad "last node not at end"
         bad msg = pprPanic (msg ++ " in function " ++ fun_name) (ppr g)
-        mkLast (CmmCall (CmmCallee f conv) []     args _ CmmNeverReturns) =
-            mkFinalCall f conv (map hintlessCmm args) updfr_sz
-        mkLast (CmmCall (CmmPrim {}) _ _ _ CmmNeverReturns) =
+        mkLast (Old.CmmCall (Old.CmmCallee f conv) []     args _ Old.CmmNeverReturns) =
+            mkFinalCall f conv (map Old.hintlessCmm args) updfr_sz
+        mkLast (Old.CmmCall (Old.CmmPrim {}) _ _ _ Old.CmmNeverReturns) =
             panic "Call to CmmPrim never returns?!"
-        mkLast (CmmSwitch scrutinee table) = mkSwitch scrutinee table
+        mkLast (Old.CmmSwitch scrutinee table) = mkSwitch scrutinee table
         -- SURELY, THESE HINTLESS ARGS ARE WRONG AND WILL BE FIXED WHEN CALLING
         -- CONVENTIONS ARE HONORED?
-        mkLast (CmmJump tgt args)          = mkJump   tgt (map hintlessCmm args) updfr_sz
-        mkLast (CmmReturn ress)            =
-          mkReturnSimple (map hintlessCmm ress) updfr_sz
-        mkLast (CmmBranch tgt)             = mkBranch tgt
-        mkLast (CmmCall _f (_:_) _args _ CmmNeverReturns) =
+        mkLast (Old.CmmJump tgt args)          = mkJump   tgt (map Old.hintlessCmm args) updfr_sz
+        mkLast (Old.CmmReturn ress)            =
+          mkReturnSimple (map Old.hintlessCmm ress) updfr_sz
+        mkLast (Old.CmmBranch tgt)             = mkBranch tgt
+        mkLast (Old.CmmCall _f (_:_) _args _ Old.CmmNeverReturns) =
                    panic "Call never returns but has results?!"
         mkLast _ = panic "fell off end of block"
 
-strip_hints :: [CmmHinted a] -> [a]
-strip_hints = map hintlessCmm
+strip_hints :: [Old.CmmHinted a] -> [a]
+strip_hints = map Old.hintlessCmm
 
-convert_target :: CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals -> MidCallTarget
-convert_target (CmmCallee e cc) ress  args  = ForeignTarget e (ForeignConvention cc (map cmmHint args) (map cmmHint ress))
-convert_target (CmmPrim op)	   _ress _args = PrimTarget op
+convert_target :: Old.CmmCallTarget -> Old.HintedCmmFormals -> Old.HintedCmmActuals -> ForeignTarget
+convert_target (Old.CmmCallee e cc) ress  args  = ForeignTarget e (ForeignConvention cc (map Old.cmmHint args) (map Old.cmmHint ress))
+convert_target (Old.CmmPrim op)	   _ress _args = PrimTarget op
 
-add_hints :: Convention -> ValueDirection -> [a] -> [CmmHinted a]
-add_hints conv vd args = zipWith CmmHinted args (get_hints conv vd)
+data ValueDirection = Arguments | Results
+
+add_hints :: Convention -> ValueDirection -> [a] -> [Old.CmmHinted a]
+add_hints conv vd args = zipWith Old.CmmHinted args (get_hints conv vd)
 
 get_hints :: Convention -> ValueDirection -> [ForeignHint]
 get_hints (Foreign (ForeignConvention _ hints _)) Arguments = hints
 get_hints (Foreign (ForeignConvention _ _ hints)) Results   = hints
-get_hints _other_conv		  		  _vd       = repeat NoHint
+get_hints _other_conv                             _vd       = repeat NoHint
 
-get_conv :: MidCallTarget -> Convention
+get_conv :: ForeignTarget -> Convention
 get_conv (PrimTarget _)       = NativeNodeCall -- JD: SUSPICIOUS
 get_conv (ForeignTarget _ fc) = Foreign fc
 
-cmm_target :: MidCallTarget -> CmmCallTarget
-cmm_target (PrimTarget op) = CmmPrim op
-cmm_target (ForeignTarget e (ForeignConvention cc _ _)) = CmmCallee e cc
+cmm_target :: ForeignTarget -> Old.CmmCallTarget
+cmm_target (PrimTarget op) = Old.CmmPrim op
+cmm_target (ForeignTarget e (ForeignConvention cc _ _)) = Old.CmmCallee e cc
 
-ofZgraph :: CmmGraph -> ListGraph CmmStmt
-ofZgraph g = ListGraph $ swallow blocks
-    where blocks = G.postorder_dfs g
-          -- | the next two functions are hooks on which to hang debugging info
-          extend_entry stmts = stmts
-          extend_block _id stmts = stmts
-          _extend_entry stmts = scomment showblocks : scomment cscomm : stmts
-          showblocks = "LGraph has " ++ show (length blocks) ++ " blocks:" ++
-                       concat (map (\(G.Block id _) -> " " ++ show id) blocks)
-          cscomm = "Call successors are" ++
-                   (concat $ map (\id -> " " ++ show id) $ blockSetToList call_succs)
-          swallow [] = []
-          swallow (G.Block id t : rest) = tail id [] t rest
-          tail id prev' (G.ZTail m t)             rest = tail id (mid m : prev') t rest
-          tail id prev' (G.ZLast G.LastExit)      rest = exit id prev' rest
-          tail id prev' (G.ZLast (G.LastOther l)) rest = last id prev' l rest
-          mid (MidComment s)  = CmmComment s
-          mid (MidAssign l r) = CmmAssign l r
-          mid (MidStore  l r) = CmmStore  l r
-          mid (MidForeignCall _ (PrimTarget MO_Touch) _ _) = CmmNop
-          mid (MidForeignCall _ target ress args)
-		= CmmCall (cmm_target target)
-			  (add_hints conv Results   ress) 
-			  (add_hints conv Arguments args) 
-			  CmmUnsafe CmmMayReturn
-		where
-		  conv = get_conv target
-          block' id prev'
-              | id == G.lg_entry g = BasicBlock id $ extend_entry    (reverse prev')
-              | otherwise          = BasicBlock id $ extend_block id (reverse prev')
-          last id prev' l n =
-            let endblock stmt = block' id (stmt : prev') : swallow n in
-            case l of
-              LastBranch tgt ->
-                  case n of
-                    -- THIS OPT IS WRONG -- LABELS CAN SHOW UP ELSEWHERE IN THE GRAPH
-                    --G.Block id' _ t : bs
-                    --    | tgt == id', unique_pred id' 
-                    --    -> tail id prev' t bs -- optimize out redundant labels
-                    _ -> endblock (CmmBranch tgt)
-              LastCondBranch expr tid fid ->
-                  case n of
-                    G.Block id' t : bs
-                      -- It would be better to handle earlier, but we still must
-                      -- generate correct code here.
-                      | id' == fid, tid == fid, unique_pred id' ->
-                                 tail id prev' t bs
-                      | id' == fid, unique_pred id' ->
-                                 tail id (CmmCondBranch expr tid : prev') t bs
-                      | id' == tid, unique_pred id',
-                        Just e' <- maybeInvertCmmExpr expr ->
-                                 tail id (CmmCondBranch e'   fid : prev') t bs
-                    _ -> let instrs' = CmmBranch fid : CmmCondBranch expr tid : prev'
-                         in block' id instrs' : swallow n
-              LastSwitch arg ids   -> endblock $ CmmSwitch arg $ ids
-              LastCall e _ _ _ _ -> endblock $ CmmJump e []
-          exit id prev' n = -- highly irregular (assertion violation?)
-              let endblock stmt = block' id (stmt : prev') : swallow n in
-              case n of [] -> endblock (scomment "procedure falls off end")
-                        G.Block id' t : bs -> 
-                            if unique_pred id' then
-                                tail id (scomment "went thru exit" : prev') t bs 
-                            else
-                                endblock (CmmBranch id')
-          preds = zipPreds g
-          single_preds =
-              let add b single =
-                    let id = G.blockId b
-                    in  case lookupBlockEnv preds id of
-                          Nothing -> single
-                          Just s -> if sizeBlockSet s == 1 then
-                                        extendBlockSet single id
-                                    else single
-              in  G.fold_blocks add emptyBlockSet g
-          unique_pred id = elemBlockSet id single_preds
-          call_succs = 
-              let add b succs =
-                      case G.last (G.unzip b) of
-                        G.LastOther (LastCall _ (Just id) _ _ _) ->
-                          extendBlockSet succs id
-                        _ -> succs
-              in  G.fold_blocks add emptyBlockSet g
-          _is_call_succ id = elemBlockSet id call_succs
+ofZgraph :: CmmGraph -> Old.ListGraph Old.CmmStmt
+ofZgraph g = Old.ListGraph $ mapMaybe convert_block $ postorderDfs g
+  -- We catenated some blocks in the conversion process,
+  -- because of the CmmCondBranch -- the machine code does not have
+  -- 'jump here or there' instruction, but has 'jump if true' instruction.
+  -- As OldCmm has the same instruction, so we use it.
+  -- When we are doing this, we also catenate normal goto-s (it is for free).
 
-scomment :: String -> CmmStmt
-scomment s = CmmComment $ mkFastString s
+  -- Exactly, we catenate blocks with nonentry labes, that are
+  --   a) mentioned exactly once as a successor
+  --   b) any of 1) are a target of a goto
+  --             2) are false branch target of a conditional jump
+  --             3) are true branch target of a conditional jump, and
+  --                  the false branch target is a successor of at least 2 blocks
+  --                  and the condition can be inverted
+  -- The complicated rule 3) is here because we need to assign at most one
+  -- catenable block to a CmmCondBranch.
+    where preds :: BlockEnv [CmmNode O C]
+          preds = mapFold add mapEmpty $ toBlockMap g
+            where add block env = foldr (add' $ lastNode block) env (successors block)
+                  add' :: CmmNode O C -> BlockId -> BlockEnv [CmmNode O C] -> BlockEnv [CmmNode O C]
+                  add' node succ env = mapInsert succ (node : (mapLookup succ env `orElse` [])) env
+
+          to_be_catenated :: BlockId -> Bool
+          to_be_catenated id | id == g_entry g = False
+                             | Just [CmmBranch _] <- mapLookup id preds = True
+                             | Just [CmmCondBranch _ _ f] <- mapLookup id preds
+                             , f == id = True
+                             | Just [CmmCondBranch e t f] <- mapLookup id preds
+                             , t == id
+                             , Just (_:_:_) <- mapLookup f preds
+                             , Just _ <- maybeInvertCmmExpr e = True
+          to_be_catenated _ = False
+
+          convert_block block | to_be_catenated (entryLabel block) = Nothing
+          convert_block block = Just $ foldBlockNodesB3 (first, middle, last) block ()
+            where first :: CmmNode C O -> [Old.CmmStmt] -> Old.CmmBasicBlock
+                  first (CmmEntry bid) stmts = Old.BasicBlock bid stmts
+
+                  middle :: CmmNode O O -> [Old.CmmStmt] -> [Old.CmmStmt]
+                  middle node stmts = stmt : stmts
+                    where stmt :: Old.CmmStmt
+                          stmt = case node of
+                            CmmComment s                                   -> Old.CmmComment s
+                            CmmAssign l r                                  -> Old.CmmAssign l r
+                            CmmStore  l r                                  -> Old.CmmStore  l r
+                            CmmUnsafeForeignCall (PrimTarget MO_Touch) _ _ -> Old.CmmNop
+                            CmmUnsafeForeignCall target ress args          -> 
+                              Old.CmmCall (cmm_target target)
+                                          (add_hints (get_conv target) Results   ress)
+                                          (add_hints (get_conv target) Arguments args)
+                                          Old.CmmUnsafe Old.CmmMayReturn
+
+                  last :: CmmNode O C -> () -> [Old.CmmStmt]
+                  last node _ = stmts
+                    where stmts :: [Old.CmmStmt]
+                          stmts = case node of
+                            CmmBranch tgt | to_be_catenated tgt -> tail_of tgt
+                                          | otherwise -> [Old.CmmBranch tgt]
+                            CmmCondBranch expr tid fid
+                              | to_be_catenated fid -> Old.CmmCondBranch expr tid : tail_of fid
+                              | to_be_catenated tid
+                              , Just expr' <- maybeInvertCmmExpr expr -> Old.CmmCondBranch expr' fid : tail_of tid
+                              | otherwise -> [Old.CmmCondBranch expr tid, Old.CmmBranch fid]
+                            CmmSwitch arg ids -> [Old.CmmSwitch arg ids]
+                            CmmCall e _ _ _ _ -> [Old.CmmJump e []]
+                            CmmForeignCall {} -> panic "ofZgraph: CmmForeignCall"
+                          tail_of bid = case foldBlockNodesB3 (first, middle, last) block () of
+                                          Old.BasicBlock _ stmts -> stmts
+                            where Just block = mapLookup bid $ toBlockMap g

@@ -283,7 +283,6 @@ matchExpectedAppTy orig_ty
 %************************************************************************
 
 All the tcSub calls have the form
-
                 tcSub actual_ty expected_ty
 which checks
                 actual_ty <= expected_ty
@@ -651,6 +650,11 @@ unifySigmaTy origin ty1 ty2
                                  captureUntouchables $ 
                        		 uType origin phi1 phi2
           -- Check for escape; e.g. (forall a. a->b) ~ (forall a. a->a)
+          -- VERY UNSATISFACTORY; the constraint might be fine, but
+	  -- we fail eagerly because we don't have any place to put 
+	  -- the bindings from an implication constraint
+	  -- This only works because most constraints get solved on the fly
+	  -- See Note [Avoid deferring]
          ; when (any (`elemVarSet` tyVarsOfWC lie) skol_tvs)
               (failWithMisMatch origin)	-- ToDo: give details from bad_lie
 
@@ -857,9 +861,13 @@ uUnfilledVar origin swapped tv1 details1 non_var_ty2  -- ty2 is not a type varia
                   Just ty2' -> updateMeta tv1 ref1 ty2'
               }
 
-      _other -> do { traceTc "Skolem defer" (ppr tv1); defer }		-- Skolems of all sorts
+      _other -> do { traceTc "Skolem defer" (ppr tv1); defer }	-- Skolems of all sorts
   where
-    defer = unSwap swapped (uType_defer origin) (mkTyVarTy tv1) non_var_ty2
+    defer | Just ty2' <- tcView non_var_ty2	-- Note [Avoid deferring]
+    	    	         	   		-- non_var_ty2 isn't expanded yet
+          = uUnfilledVar origin swapped tv1 details1 ty2'
+          | otherwise
+          = unSwap swapped (uType_defer origin) (mkTyVarTy tv1) non_var_ty2
           -- Occurs check or an untouchable: just defer
 	  -- NB: occurs check isn't necessarily fatal: 
 	  --     eg tv1 occured in type family parameter
@@ -959,14 +967,26 @@ checkTauTvUpdate tv ty
           = Just (EqPred ty1' ty2') 
         -- Fall-through 
         ok_pred _pty = Nothing 
-
 \end{code}
 
+Note [Avoid deferring]
+~~~~~~~~~~~~~~~~~~~~~~
+We try to avoid creating deferred constraints for two reasons.  
+  * First, efficiency.  
+  * Second, currently we can only defer some constraints 
+    under a forall.  See unifySigmaTy.
+So expanding synonyms here is a good thing to do.  Example (Trac #4917)
+       a ~ Const a b
+where type Const a b = a.  We can solve this immediately, even when
+'a' is a skolem, just by expanding the synonym; and we should do so
+ in case this unification happens inside unifySigmaTy (sigh).
+
 Note [Type synonyms and the occur check]
-~~~~~~~~~~~~~~~~~~~~
-Generally speaking we need to update a variable with type synonyms not expanded, which
-improves later error messages, except for when looking inside a type synonym may help resolve
-a spurious occurs check error. Consider: 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Generally speaking we try to update a variable with type synonyms not
+expanded, which improves later error messages, unless looking
+inside a type synonym may help resolve a spurious occurs check
+error. Consider:
           type A a = ()
 
           f :: (A a -> a -> ()) -> ()

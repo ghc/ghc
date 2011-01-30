@@ -92,6 +92,7 @@ Library
         CPP-Options: -DOMIT_NATIVE_CODEGEN
 
     Build-Depends: bin-package-db
+    Build-Depends: hoopl
 
     -- GHC 6.4.2 needs to be able to find WCsubst.c, which needs to be
     -- able to find WCsubst.h
@@ -188,45 +189,37 @@ Library
         BlockId
         CLabel
         Cmm
-        CmmBrokenBlock
         CmmBuildInfoTables
         CmmCPS
-        CmmCPSGen
-        CmmCPSZ
         CmmCallConv
-        CmmCommonBlockElimZ
+        CmmCommonBlockElim
         CmmContFlowOpt
         CmmCvt
+        CmmDecl
         CmmExpr
         CmmInfo
         CmmLex
         CmmLint
         CmmLive
-        CmmLiveZ
+        CmmMachOp
+        CmmNode
         CmmOpt
         CmmParse
         CmmProcPoint
-        CmmProcPointZ
         CmmSpillReload
         CmmStackLayout
-        CmmTx
+        CmmType
         CmmUtils
-        CmmZipUtil
-        DFMonad
-        Dataflow
-        MkZipCfg
-        MkZipCfgCmm
+        MkGraph
+        OldCmm
+        OldCmmUtils
+        OldPprCmm
         OptimizationFuel
         PprBase
         PprC
         PprCmm
-        PprCmmZ
-        StackColor
-        StackPlacements
-        ZipCfg
-        ZipCfgCmmRep
-        ZipCfgExtras
-        ZipDataflow
+        PprCmmDecl
+        PprCmmExpr
         Bitmap
         CgBindery
         CgCallConv
@@ -327,6 +320,7 @@ Library
         ErrUtils
         Finder
         GHC
+        GhcMake
         HeaderInfo
         HscMain
         HscStats
@@ -479,7 +473,6 @@ Library
         Vectorise.Utils.Closure
         Vectorise.Utils.Hoisting
         Vectorise.Utils.PADict
-        Vectorise.Utils.PRDict
         Vectorise.Utils.Poly
         Vectorise.Utils
         Vectorise.Type.Env
@@ -487,7 +480,6 @@ Library
         Vectorise.Type.PData
         Vectorise.Type.PRepr
         Vectorise.Type.PADict
-        Vectorise.Type.PRDict
         Vectorise.Type.Type
         Vectorise.Type.TyConDecl
         Vectorise.Type.Classify
