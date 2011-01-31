@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, BangPatterns #-}
+{-# LANGUAGE CPP, BangPatterns, NoImplicitPrelude #-}
 module GHC.IO.Encoding.CodePage(
 #if !defined(mingw32_HOST_OS)
  ) where
