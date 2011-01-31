@@ -265,13 +265,12 @@ freeMBlocks(void *addr, nat n)
 void
 freeAllMBlocks(void)
 {
-    nat n;
-
     debugTrace(DEBUG_gc, "freeing all megablocks");
 
     osFreeAllMBlocks();
 
 #if SIZEOF_VOID_P == 8
+    nat n;
     for (n = 0; n < mblock_map_count; n++) {
         stgFree(mblock_maps[n]);
     }
