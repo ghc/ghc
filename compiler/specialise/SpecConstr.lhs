@@ -736,7 +736,7 @@ extendValEnv :: ScEnv -> Id -> Maybe Value -> ScEnv
 extendValEnv env _  Nothing   = env
 extendValEnv env id (Just cv) = env { sc_vals = extendVarEnv (sc_vals env) id cv }
 
-extendCaseBndrs :: ScEnv -> Id -> AltCon -> [Var] -> (ScEnv, [Var])
+extendCaseBndrs :: ScEnv -> OutExpr -> OutId -> AltCon -> [Var] -> (ScEnv, [Var])
 -- When we encounter
 --	case scrut of b
 --	    C x y -> ...
@@ -744,21 +744,20 @@ extendCaseBndrs :: ScEnv -> Id -> AltCon -> [Var] -> (ScEnv, [Var])
 -- NB1: Extends only the sc_vals part of the envt
 -- NB2: Kill the dead-ness info on the pattern binders x,y, since
 --      they are potentially made alive by the [b -> C x y] binding
-extendCaseBndrs env case_bndr con alt_bndrs
-  | isDeadBinder case_bndr
-  = (env, alt_bndrs)
-  | otherwise
-  = (env1, map zap alt_bndrs)
-	-- NB: We used to bind v too, if scrut = (Var v); but
-        --     the simplifer has already done this so it seems
-        --     redundant to do so here
- 	-- case scrut of
-  	--	Var v  -> extendValEnv env1 v cval
-	--	_other -> env1
+extendCaseBndrs env scrut case_bndr con alt_bndrs
+   = (env2, alt_bndrs')
  where
-   zap v | isTyCoVar v = v		-- See NB2 above
-         | otherwise = zapIdOccInfo v
-   env1 = extendValEnv env case_bndr cval
+   live_case_bndr = not (isDeadBinder case_bndr)
+   env1 | Var v <- scrut = extendValEnv env v cval
+        | otherwise      = env	-- See Note [Add scrutinee to ValueEnv too]
+   env2 | live_case_bndr = extendValEnv env case_bndr cval
+        | otherwise      = env1
+
+   alt_bndrs' | case scrut of { Var {} -> True; _ -> live_case_bndr }
+              = map zap alt_bndrs
+              | otherwise
+              = alt_bndrs
+
    cval = case con of
 		DEFAULT    -> Nothing
 		LitAlt {}  -> Just (ConVal con [])
@@ -766,6 +765,9 @@ extendCaseBndrs env case_bndr con alt_bndrs
 		      where
 		       	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
 				       varsToCoreExprs alt_bndrs
+
+   zap v | isTyCoVar v = v		-- See NB2 above
+         | otherwise = zapIdOccInfo v
 
 
 decreaseSpecCount :: ScEnv -> Int -> ScEnv
@@ -820,6 +822,25 @@ forceSpecArgTy env ty
 forceSpecArgTy _ _ = False
 #endif /* GHCI */
 \end{code}
+
+Note [Add scrutinee to ValueEnv too]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+   case x of y
+     (a,b) -> case b of c
+                I# v -> ...(f y)...
+By the time we get to the call (f y), the ValueEnv
+will have a binding for y, and for c
+    y -> (a,b)
+    c -> I# v
+BUT that's not enough!  Looking at the call (f y) we
+see that y is pair (a,b), but we also need to know what 'b' is.
+So in extendCaseBndrs we must *also* add the binding 
+   b -> I# v
+else we lose a useful specialisation for f.  This is necessary even
+though the simplifier has systematically replaced uses of 'x' with 'y'
+and 'b' with 'c' in the code.  The use of 'b' in the ValueEnv came
+from outside the case.  See Trac #4908 for the live example.
 
 Note [Avoiding exponential blowup]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1020,9 +1041,9 @@ scExpr' env (Case scrut b ty alts)
 	  ; return (alt_usg `combineUsage` scrut_usg',
 	  	    Case scrut' b' (scSubstTy env ty) alts') }
 
-    sc_alt env _scrut' b' (con,bs,rhs)
-      = do { let (env1, bs1)  = extendBndrsWith RecArg env bs
-		 (env2, bs2) = extendCaseBndrs env1 b' con bs1
+    sc_alt env scrut' b' (con,bs,rhs)
+      = do { let (env1, bs1) = extendBndrsWith RecArg env bs
+		 (env2, bs2) = extendCaseBndrs env1 scrut' b' con bs1
 	   ; (usg,rhs') <- scExpr env2 rhs
 	   ; let (usg', arg_occs) = lookupOccs usg bs2
 		 scrut_occ = case con of
