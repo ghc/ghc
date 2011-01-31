@@ -75,22 +75,22 @@ test('T3294',
 test('T4801',
      [# expected value: 11 (x86/OSX):
       if_wordsize(32,
-          compiler_stats_num_field('peak_megabytes_allocated', 70, 80)),
+          compiler_stats_num_field('peak_megabytes_allocated', 35, 45)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 70, 80)),
-      # expected value: 76579788 (x86/OSX):
+      # expected value: 353463196 (x86/Windows)
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 70000000,
-                                                      80000000)),
+          compiler_stats_num_field('bytes allocated', 330000000,
+                                                      370000000)),
       # expected value: 145038576 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 600000000,
                                                       750000000)),
-      # expected value: 3404504 (x86/OSX):
+      # expected value: 16277524 (x86/Windows)
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 3000000,
-                                                     4000000)),
+          compiler_stats_num_field('max_bytes_used', 15000000,
+                                                     17000000)),
       # expected value: 7001696 (amd64/Linux, bindist)
       # expected value: 7189848 (amd64/Linux, intree):
       if_wordsize(64,
@@ -108,10 +108,10 @@ test('T3064',
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 14, 18)),
-      # expected value: 76579788 (x86/OSX):
+      # expected value: 68181508 (x86/Windows)
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 70000000,
-                                                      80000000)),
+          compiler_stats_num_field('bytes allocated', 65000000,
+                                                      75000000)),
       # expected value: 145038576 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 120000000,
