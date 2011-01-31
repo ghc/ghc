@@ -21,7 +21,9 @@ import Data.IORef
 import Control.Monad
 import StaticFlags (opt_Fuel)
 import UniqSupply
-import Panic ()
+#ifdef DEBUG
+import Panic
+#endif
 
 import Compiler.Hoopl
 import Compiler.Hoopl.GHC (getFuel, setFuel)
