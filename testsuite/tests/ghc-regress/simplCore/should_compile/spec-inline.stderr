@@ -18,9 +18,9 @@ Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
          Guidance=IF_ARGS [] 1 2}]
 Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
 
-lvl :: GHC.Types.Int
+Roman.foo3 :: GHC.Types.Int
 [GblId, Str=DmdType b]
-lvl =
+Roman.foo3 =
   Control.Exception.Base.patError
     @ GHC.Types.Int "spec-inline.hs:(19,5)-(29,25)|function go"
 
@@ -55,18 +55,22 @@ Roman.foo_$s$wgo =
     }
 end Rec }
 
-Rec {
-Roman.$wgo [Occ=LoopBreaker]
+Roman.$wgo
   :: Data.Maybe.Maybe GHC.Types.Int
      -> Data.Maybe.Maybe GHC.Types.Int
      -> GHC.Prim.Int#
-[GblId, Arity=2, Str=DmdType SS]
+[GblId,
+ Arity=2,
+ Str=DmdType SS,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [6 3] 37 0}]
 Roman.$wgo =
   \ (w :: Data.Maybe.Maybe GHC.Types.Int)
     (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->
-    case w1 of wild {
+    case w1 of _ {
       Data.Maybe.Nothing ->
-        lvl
+        Roman.foo3
         `cast` (CoUnsafe GHC.Types.Int GHC.Prim.Int#
                 :: GHC.Types.Int ~ GHC.Prim.Int#);
       Data.Maybe.Just x ->
@@ -94,10 +98,7 @@ Roman.$wgo =
                         Roman.foo_$s$wgo (GHC.Prim.+# a a) (GHC.Prim.-# x2 1);
                       GHC.Types.True -> Roman.foo_$s$wgo a (GHC.Prim.-# x2 3)
                     };
-                  GHC.Types.True ->
-                    Roman.$wgo
-                      (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# (GHC.Prim.-# x2 2)))
-                      wild
+                  GHC.Types.True -> Roman.foo_$s$wgo ipv (GHC.Prim.-# x2 2)
                 };
               GHC.Types.True -> 0
             }
@@ -105,7 +106,6 @@ Roman.$wgo =
         }
         }
     }
-end Rec }
 
 Roman.foo_go [InlPrag=INLINE[0]]
   :: Data.Maybe.Maybe GHC.Types.Int
