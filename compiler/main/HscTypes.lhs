@@ -25,8 +25,9 @@ module HscTypes (
 	
 	-- * State relating to modules in this package
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
-	hptInstances, hptRules, hptVectInfo,
-	
+        hptInstances, hptRules, hptVectInfo,
+        hptObjs,
+
 	-- * State relating to known packages
 	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
@@ -76,7 +77,7 @@ module HscTypes (
 	Warnings(..), WarningTxt(..), plusWarns,
 
 	-- * Linker stuff
-	Linkable(..), isObjectLinkable,
+        Linkable(..), isObjectLinkable, linkableObjs,
 	Unlinked(..), CompiledByteCode,
 	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
         
@@ -494,6 +495,9 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
 
 	-- And get its dfuns
     , thing <- things ]
+
+hptObjs :: HomePackageTable -> [FilePath]
+hptObjs hpt = concat (map (maybe [] linkableObjs . hm_linkable) (eltsUFM hpt))
 \end{code}
 
 %************************************************************************
@@ -1789,6 +1793,9 @@ isObjectLinkable l = not (null unlinked) && all isObject unlinked
 	-- generate a linkable with no Unlinked's as a result of
 	-- compiling a module in HscNothing mode, and this choice
 	-- happens to work well with checkStability in module GHC.
+
+linkableObjs :: Linkable -> [FilePath]
+linkableObjs l = [ f | DotO f <- linkableUnlinked l ]
 
 instance Outputable Linkable where
    ppr (LM when_made mod unlinkeds)

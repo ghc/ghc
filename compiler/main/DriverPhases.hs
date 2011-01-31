@@ -84,6 +84,7 @@ data Phase
         | LlvmMangle    -- Fix up TNTC by processing assembly produced by LLVM
         | CmmCpp        -- pre-process Cmm source
         | Cmm           -- parse & compile Cmm code
+        | MergeStub     -- merge in the stub object file
 
         -- The final phase is a pseudo-phase that tells the pipeline to stop.
         -- There is no runPhase case for it.
@@ -118,6 +119,7 @@ eqPhase LlvmLlc	    LlvmLlc 	= True
 eqPhase LlvmMangle  LlvmMangle 	= True
 eqPhase CmmCpp      CmmCpp      = True
 eqPhase Cmm         Cmm         = True
+eqPhase MergeStub   MergeStub   = True
 eqPhase StopLn      StopLn      = True
 eqPhase _           _           = False
 
@@ -131,7 +133,7 @@ x      `happensBefore` y = after_x `eqPhase` y || after_x `happensBefore` y
           after_x = nextPhase x
 
 nextPhase :: Phase -> Phase
--- A conservative approximation the next phase, used in happensBefore
+-- A conservative approximation to the next phase, used in happensBefore
 nextPhase (Unlit sf)    = Cpp  sf
 nextPhase (Cpp   sf)    = HsPp sf
 nextPhase (HsPp  sf)    = Hsc  sf
@@ -145,12 +147,13 @@ nextPhase LlvmLlc       = LlvmMangle
 nextPhase LlvmLlc       = As
 #endif
 nextPhase LlvmMangle    = As
-nextPhase SplitAs       = StopLn
+nextPhase SplitAs       = MergeStub
 nextPhase Ccpp          = As
 nextPhase Cc            = As
 nextPhase CmmCpp        = Cmm
 nextPhase Cmm           = HCc
 nextPhase HCc           = As
+nextPhase MergeStub     = StopLn
 nextPhase StopLn        = panic "nextPhase: nothing after StopLn"
 
 -- the first compilation phase for a given file is determined
@@ -204,6 +207,7 @@ phaseInputExt LlvmMangle          = "lm_s"
 phaseInputExt SplitAs             = "split_s"   -- not really generated
 phaseInputExt CmmCpp              = "cmm"
 phaseInputExt Cmm                 = "cmmcpp"
+phaseInputExt MergeStub           = "o"
 phaseInputExt StopLn              = "o"
 
 haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,

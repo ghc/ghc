@@ -460,7 +460,8 @@ error. This is the only thing that isn't caught by the type-system.
 data HscStatus' a
     = HscNoRecomp
     | HscRecomp
-       Bool -- Has stub files.  This is a hack. We can't compile C files here
+       (Maybe FilePath)
+            -- Has stub files.  This is a hack. We can't compile C files here
             -- since it's done in DriverPipeline. For now we just return True
             -- if we want the caller to compile them for us.
        a
@@ -596,14 +597,14 @@ hscOneShotCompiler =
   , hscBackend = \ tc_result mod_summary mb_old_hash -> do
        dflags <- getDynFlags
        case hscTarget dflags of
-         HscNothing -> return (HscRecomp False ())
+         HscNothing -> return (HscRecomp Nothing ())
          _otherw    -> genericHscBackend hscOneShotCompiler
                                          tc_result mod_summary mb_old_hash
 
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
        hscWriteIface iface changed mod_summary
-       return (HscRecomp False ())
+       return (HscRecomp Nothing ())
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify' guts0
@@ -649,7 +650,7 @@ hscBatchCompiler =
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, details) <- hscSimpleIface tc_result mb_old_iface
        hscWriteIface iface changed mod_summary
-       return (HscRecomp False (), iface, details)
+       return (HscRecomp Nothing (), iface, details)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify' guts0
@@ -681,7 +682,7 @@ hscInteractiveCompiler =
 
   , hscGenBootOutput = \tc_result _mod_summary mb_old_iface -> do
        (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
-       return (HscRecomp False Nothing, iface, details)
+       return (HscRecomp Nothing Nothing, iface, details)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify' guts0
@@ -710,7 +711,7 @@ hscNothingCompiler =
   , hscBackend = \tc_result _mod_summary mb_old_iface -> do
        handleWarnings
        (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
-       return (HscRecomp False (), iface, details)
+       return (HscRecomp Nothing (), iface, details)
 
   , hscGenBootOutput = \_ _ _ ->
         panic "hscCompileNothing: hscGenBootOutput should not be called"
@@ -852,7 +853,7 @@ hscWriteIface iface no_change mod_summary
 
 -- | Compile to hard-code.
 hscGenHardCode :: CgGuts -> ModSummary
-               -> Hsc Bool -- ^ @True@ <=> stub.c exists
+               -> Hsc (Maybe FilePath) -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode cgguts mod_summary
   = do
     hsc_env <- getHscEnv
