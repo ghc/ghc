@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------

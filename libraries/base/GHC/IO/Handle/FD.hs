@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards, ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
 -- |

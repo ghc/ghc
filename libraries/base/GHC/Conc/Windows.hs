@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples, ForeignFunctionInterface,
+             DeriveDataTypeable #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 

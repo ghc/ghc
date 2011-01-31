@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, BangPatterns, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, BangPatterns, ForeignFunctionInterface, NoImplicitPrelude,
+             NondecreasingIndentation, MagicHash #-}
 module GHC.IO.Encoding.CodePage(
 #if !defined(mingw32_HOST_OS)
  ) where
