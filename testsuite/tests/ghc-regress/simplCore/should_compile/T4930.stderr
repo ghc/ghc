@@ -1,0 +1,35 @@
+
+==================== Tidy Core ====================
+lvl :: [GHC.Types.Char]
+[GblId]
+lvl = GHC.Base.unpackCString# "Too small"
+
+T4930.foo1 :: GHC.Types.Int
+[GblId, Str=DmdType b]
+T4930.foo1 = GHC.Err.error @ GHC.Types.Int lvl
+
+T4930.foo :: GHC.Types.Int -> GHC.Types.Int
+[GblId,
+ Arity=1,
+ Str=DmdType U(L)m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
+                 case n of _ { GHC.Types.I# x ->
+                 case GHC.Prim.<# x 5 of _ {
+                   GHC.Types.False -> GHC.Types.I# (GHC.Prim.+# x 5);
+                   GHC.Types.True -> T4930.foo1
+                 }
+                 }}]
+T4930.foo =
+  \ (n :: GHC.Types.Int) ->
+    case n of _ { GHC.Types.I# x ->
+    case GHC.Prim.<# x 5 of _ {
+      GHC.Types.False -> GHC.Types.I# (GHC.Prim.+# x 5);
+      GHC.Types.True -> T4930.foo1
+    }
+    }
+
+
+

@@ -63,6 +63,10 @@ test('T4908', only_ways(['optc','optasm']),
               compile, 
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
+test('T4930', only_ways(['optc','optasm']), 
+              compile, 
+              ['-O -ddump-simpl -dsuppress-uniques'])
+
 test('T3055',
      extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
      run_command,
