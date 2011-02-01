@@ -25,7 +25,7 @@ module CoreUtils (
 
 	-- * Properties of expressions
 	exprType, coreAltType, coreAltsType,
-	exprIsDupable, exprIsTrivial, 
+	exprIsDupable, exprIsTrivial, exprIsBottom,
         exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
 	exprIsHNF, exprOkForSpeculation, exprIsBig, exprIsConLike,
 	rhsIsStatic, isCheapApp, isExpandableApp,
@@ -422,6 +422,25 @@ exprIsTrivial (Note _       e) = exprIsTrivial e  -- See Note [SCCs are trivial]
 exprIsTrivial (Cast e _)       = exprIsTrivial e
 exprIsTrivial (Lam b body)     = not (isRuntimeVar b) && exprIsTrivial body
 exprIsTrivial _                = False
+\end{code}
+
+exprIsBottom is a very cheap and cheerful function; it may return
+False for bottoming expressions, but it never costs much to ask.
+See also CoreArity.exprBotStrictness_maybe, but that's a bit more 
+expensive.
+
+\begin{code}
+exprIsBottom :: CoreExpr -> Bool
+exprIsBottom e 
+  = go 0 e
+  where
+    go n (Var v) = isBottomingId v &&  n >= idArity v 
+    go n (App e a) | isTypeArg a = go n e 
+                   | otherwise   = go (n+1) e 
+    go n (Note _ e) 		 = go n e     
+    go n (Cast e _) 		 = go n e
+    go n (Let _ e)  		 = go n e
+    go _ _          		 = False
 \end{code}
 
 

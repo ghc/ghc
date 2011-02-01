@@ -1992,15 +1992,43 @@ missingAlt env case_bndr alts cont
 \begin{code}
 prepareCaseCont :: SimplEnv
                 -> [InAlt] -> SimplCont
-                -> SimplM (SimplEnv, SimplCont,SimplCont)
-                        -- Return a duplicatable continuation, a non-duplicable part
-                        -- plus some extra bindings (that scope over the entire
-                        -- continunation)
+                -> SimplM (SimplEnv, SimplCont, SimplCont)
+-- We are considering
+--     K[case _ of { p1 -> r1; ...; pn -> rn }] 
+-- where K is some enclosing continuation for the case
+-- Goal: split K into two pieces Kdup,Knodup so that
+-- 	 a) Kdup can be duplicated
+--	 b) Knodup[Kdup[e]] = K[e]
+-- The idea is that we'll transform thus:
+--          Knodup[ (case _ of { p1 -> Kdup[r1]; ...; pn -> Kdup[rn] }
+--
+-- We also return some extra bindings in SimplEnv (that scope over 
+-- the entire continuation)
 
-        -- No need to make it duplicatable if there's only one alternative
-prepareCaseCont env [_] cont = return (env, cont, mkBoringStop)
-prepareCaseCont env _   cont = mkDupableCont env cont
+prepareCaseCont env alts cont 
+  | many_alts alts = mkDupableCont env cont 
+  | otherwise      = return (env, cont, mkBoringStop)
+  where
+    many_alts :: [InAlt] -> Bool  -- True iff strictly > 1 non-bottom alternative
+    many_alts []  = False   	  -- See Note [Bottom alternatives]
+    many_alts [_] = False
+    many_alts (alt:alts) 
+      | is_bot_alt alt = many_alts alts   
+      | otherwise      = not (all is_bot_alt alts)
+  
+    is_bot_alt (_,_,rhs) = exprIsBottom rhs
 \end{code}
+
+Note [Bottom alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have
+     case (case x of { A -> error .. ; B -> e; C -> error ..) 
+       of alts
+then we can just duplicate those alts because the A and C cases
+will disappear immediately.  This is more direct than creating
+join points and inlining them away; and in some cases we would
+not even create the join points (see Note [Single-alternative case])
+and we would keep the case-of-case which is silly.  See Trac #4930.
 
 \begin{code}
 mkDupableCont :: SimplEnv -> SimplCont
