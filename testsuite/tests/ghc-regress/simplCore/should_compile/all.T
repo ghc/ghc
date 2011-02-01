@@ -59,6 +59,9 @@ test('T3717', only_ways(['optc','optasm']),
 test('spec-inline', only_ways(['optc','optasm']), 
               	    compile, 
               	    ['-O2 -ddump-simpl -dsuppress-uniques'])
+test('T4908', only_ways(['optc','optasm']), 
+              compile, 
+              ['-O2 -ddump-simpl -dsuppress-uniques'])
 
 test('T3055',
      extra_clean(['T3055.hi', 'T3055.o', 'T3055.simpl']),
