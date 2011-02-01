@@ -104,15 +104,15 @@ tcMatchesCase ctxt scrut_ty matches res_ty
 
 tcMatchLambda :: MatchGroup Name -> TcRhoType -> TcM (HsWrapper, MatchGroup TcId)
 tcMatchLambda match res_ty 
-  = matchFunTys doc n_pats res_ty  $ \ pat_tys rhs_ty ->
+  = matchFunTys herald n_pats res_ty  $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats = matchGroupArity match
-    doc = sep [ ptext (sLit "The lambda expression")
-		 <+> quotes (pprSetDepth (PartWay 1) $ 
+    herald = sep [ ptext (sLit "The lambda expression")
+	        	 <+> quotes (pprSetDepth (PartWay 1) $ 
                              pprMatches (LambdaExpr :: HsMatchContext Name) match),
 			-- The pprSetDepth makes the abstraction print briefly
-		ptext (sLit "has") <+> speakNOf n_pats (ptext (sLit "argument"))]
+		ptext (sLit "has")]
     match_ctxt = MC { mc_what = LambdaExpr,
 		      mc_body = tcBody }
 \end{code}
