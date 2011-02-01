@@ -148,8 +148,7 @@ struct MISC_FLAGS {
 struct PAR_FLAGS {
   nat            nNodes;         /* number of threads to run simultaneously */
   rtsBool        migrate;        /* migrate threads between capabilities */
-  rtsBool        wakeupMigrate;  /* migrate a thread on wakeup */
-  unsigned int	 maxLocalSparks;
+  unsigned int   maxLocalSparks;
   rtsBool        parGcEnabled;   /* enable parallel GC */
   unsigned int   parGcGen;       /* do parallel GC in this generation
                                   * and higher only */
