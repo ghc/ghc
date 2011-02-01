@@ -212,7 +212,7 @@ emitPrimOp [r] IndexArrayOp [obj,ix]   _  = doReadPtrArrayOp r obj ix
 emitPrimOp []  WriteArrayOp [obj,ix,v] _  = doWritePtrArrayOp obj ix v
 
 emitPrimOp [res] SizeofArrayOp [arg] _
-   = stmtC $ CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord)
+   = stmtC $ CmmAssign (CmmLocal res) (cmmLoadIndexW arg (fixedHdrSize + oFFSET_StgMutArrPtrs_ptrs) bWord)
 emitPrimOp [res] SizeofMutableArrayOp [arg] live
    = emitPrimOp [res] SizeofArrayOp [arg] live
 

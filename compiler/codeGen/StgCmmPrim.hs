@@ -288,7 +288,7 @@ emitPrimOp [r] IndexArrayOp [obj,ix]    = doReadPtrArrayOp r obj ix
 emitPrimOp []  WriteArrayOp [obj,ix,v]  = doWritePtrArrayOp obj ix v
 
 emitPrimOp [res] SizeofArrayOp [arg]
-   = emit $	mkAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize bWord)
+   = emit $	mkAssign (CmmLocal res) (cmmLoadIndexW arg (fixedHdrSize + oFFSET_StgMutArrPtrs_ptrs) bWord)
 emitPrimOp [res] SizeofMutableArrayOp [arg]
    = emitPrimOp [res] SizeofArrayOp [arg]
 
