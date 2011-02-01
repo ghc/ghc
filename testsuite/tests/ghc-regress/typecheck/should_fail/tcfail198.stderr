@@ -2,8 +2,7 @@
 tcfail198.hs:6:17:
     Couldn't match expected type `t0 -> t1'
                 with actual type `forall a. [a] -> [a]'
-    The lambda expression `\ (x : xs) -> xs ++ ...'
-    has one argument one argument,
+    The lambda expression `\ (x : xs) -> xs ++ ...' has one argument,
     but its type `forall a. [a] -> [a]' has none
     In the first argument of `Just', namely
       `(\ (x : xs) -> xs ++ [x :: a])'
