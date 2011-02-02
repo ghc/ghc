@@ -1,0 +1,11 @@
+
+T3169.hs:13:13:
+    Couldn't match type `elt' with `Map b elt'
+      `elt' is a rigid type variable bound by
+            the type signature for
+              lookup :: (a, b) -> Map (a, b) elt -> Maybe elt
+            at T3169.hs:12:3
+    Expected type: Maybe (Map b elt)
+      Actual type: Maybe elt
+    In the return type of a call of `lookup'
+    In the expression: lookup a m :: Maybe (Map b elt)

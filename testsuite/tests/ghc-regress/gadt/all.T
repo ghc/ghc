@@ -104,4 +104,5 @@ test('gadtSyntax001', normal, compile, [''])
 test('gadtSyntaxFail001', normal, compile_fail, [''])
 test('gadtSyntaxFail002', normal, compile_fail, [''])
 test('gadtSyntaxFail003', normal, compile_fail, [''])
+test('T3169', normal, compile_fail, [''])
 
