@@ -14,6 +14,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "GCThread.h"
 #include "Storage.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
@@ -935,7 +936,7 @@ update_bkwd_compact( generation *gen )
 void
 compact(StgClosure *static_objects)
 {
-    nat g, blocks;
+    nat n, g, blocks;
     generation *gen;
 
     // 1. thread the roots
@@ -953,7 +954,6 @@ compact(StgClosure *static_objects)
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
 	bdescr *bd;
 	StgPtr p;
-        nat n;
         for (n = 0; n < n_capabilities; n++) {
             for (bd = capabilities[n].mut_lists[g]; 
                  bd != NULL; bd = bd->link) {
@@ -1001,6 +1001,10 @@ compact(StgClosure *static_objects)
         debugTrace(DEBUG_gc, "update_fwd:  %d", g);
 
         update_fwd(gen->blocks);
+        for (n = 0; n < n_capabilities; n++) {
+            update_fwd(gc_threads[n]->gens[g].todo_bd);
+            update_fwd(gc_threads[n]->gens[g].part_list);
+        }
         update_fwd_large(gen->scavenged_large_objects);
         if (g == RtsFlags.GcFlags.generations-1 && gen->old_blocks != NULL) {
             debugTrace(DEBUG_gc, "update_fwd:  %d (compact)", g);
