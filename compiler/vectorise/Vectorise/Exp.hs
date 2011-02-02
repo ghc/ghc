@@ -244,7 +244,7 @@ vectScalarLam args body
     is_scalar vs e@(Case eC eId ty alts)  
                              = let vs' = extendVarSet vs eId
 	                           in -- pprTrace "is_scalar  Case" (ppr e) $ 
-	                              cantbe_parr_expr e 
+	                              cantbe_parr_expr e && 
                                   is_prim_ty ty &&
                                   is_scalar vs' eC   &&
                                   (all (is_scalar_alt vs') alts)
