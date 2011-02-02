@@ -619,7 +619,6 @@ checkMutableLists (rtsBool checkTSOs)
     nat g, i;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        checkMutableList(generations[g].mut_list, g);
         for (i = 0; i < n_capabilities; i++) {
             checkMutableList(capabilities[i].mut_lists[g], g);
         }
@@ -738,7 +737,6 @@ findMemoryLeak (void)
       for (i = 0; i < n_capabilities; i++) {
 	  markBlocks(capabilities[i].mut_lists[g]);
       }
-      markBlocks(generations[g].mut_list);
       markBlocks(generations[g].blocks);
       markBlocks(generations[g].large_objects);
   }
@@ -826,7 +824,6 @@ memInventory (rtsBool show)
       for (i = 0; i < n_capabilities; i++) {
 	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
       }	  
-      gen_blocks[g] += countAllocdBlocks(generations[g].mut_list);
       gen_blocks[g] += genBlocks(&generations[g]);
   }
 

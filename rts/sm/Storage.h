@@ -38,11 +38,6 @@ bdescr * splitLargeBlock (bdescr *bd, nat blocks);
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
 
-   recordMutable(StgPtr p)       Informs the garbage collector that a
-				 previously immutable object has
-				 become (permanently) mutable.  Used
-				 by thawArray and similar.
-
    updateWithIndirection(p1,p2)  Updates the object at p1 with an
 				 indirection pointing to p2.  This is
 				 normally called for objects in an old
@@ -68,48 +63,6 @@ extern Mutex sm_mutex;
 #define RELEASE_SM_LOCK
 #define ASSERT_SM_LOCK()
 #endif
-
-INLINE_HEADER void
-recordMutableGen(StgClosure *p, nat gen_no)
-{
-    bdescr *bd;
-
-    bd = generations[gen_no].mut_list;
-    if (bd->free >= bd->start + BLOCK_SIZE_W) {
-	bdescr *new_bd;
-	new_bd = allocBlock();
-	new_bd->link = bd;
-	bd = new_bd;
-	generations[gen_no].mut_list = bd;
-    }
-    *bd->free++ = (StgWord)p;
-
-}
-
-INLINE_HEADER void
-recordMutableGenLock(StgClosure *p, nat gen_no)
-{
-    ACQUIRE_SM_LOCK;
-    recordMutableGen(p,gen_no);
-    RELEASE_SM_LOCK;
-}
-
-INLINE_HEADER void
-recordMutable(StgClosure *p)
-{
-    bdescr *bd;
-    ASSERT(closure_MUTABLE(p));
-    bd = Bdescr((P_)p);
-    if (bd->gen_no > 0) recordMutableGen(p, bd->gen_no);
-}
-
-INLINE_HEADER void
-recordMutableLock(StgClosure *p)
-{
-    ACQUIRE_SM_LOCK;
-    recordMutable(p);
-    RELEASE_SM_LOCK;
-}
 
 /* -----------------------------------------------------------------------------
    The write barrier for MVARs

@@ -71,7 +71,6 @@ typedef struct generation_ {
                                         // (for allocation stats)
 
     unsigned int   max_blocks;		// max blocks
-    bdescr        *mut_list;      	// mut objects in this gen (not G0)
 
     StgTSO *       threads;             // threads in this gen
                                         // linked via global_link
@@ -102,8 +101,6 @@ typedef struct generation_ {
     unsigned int n_old_blocks;		// number of blocks in from-space
     unsigned int live_estimate;         // for sweeping: estimate of live data
     
-    bdescr *     saved_mut_list;
-
     bdescr *     part_blocks;           // partially-full scanned blocks
     unsigned int n_part_blocks;         // count of above
 

@@ -771,7 +771,7 @@ stat_exit(int alloc)
 void
 statDescribeGens(void)
 {
-  nat g, mut, lge;
+  nat g, mut, lge, i;
   lnat live, slop;
   lnat tot_live, tot_slop;
   bdescr *bd;
@@ -787,8 +787,8 @@ statDescribeGens(void)
   tot_slop = 0;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       mut = 0;
-      for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	  mut += (bd->free - bd->start) * sizeof(W_);
+      for (i = 0; i < n_capabilities; i++) {
+          mut += countOccupied(capabilities[i].mut_lists[g]);
       }
 
       gen = &generations[g];

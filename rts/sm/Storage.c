@@ -78,7 +78,6 @@ initGeneration (generation *gen, int g)
     gen->large_objects = NULL;
     gen->n_large_blocks = 0;
     gen->n_new_large_words = 0;
-    gen->mut_list = allocBlock();
     gen->scavenged_large_objects = NULL;
     gen->n_scavenged_large_blocks = 0;
     gen->mark = 0;

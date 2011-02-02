@@ -327,27 +327,6 @@ SET_GCT(gc_threads[0]);
   inc_running();
   wakeup_gc_threads(n_gc_threads, gct->thread_index);
 
-  // Mutable lists from each generation > N
-  // we want to *scavenge* these roots, not evacuate them: they're not
-  // going to move in this GC.
-  // Also do them in reverse generation order, for the usual reason:
-  // namely to reduce the likelihood of spurious old->new pointers.
-  //
-  for (g = RtsFlags.GcFlags.generations-1; g > N; g--) {
-#if defined(THREADED_RTS)
-      if (n_gc_threads > 1) {
-          scavenge_mutable_list(generations[g].saved_mut_list, &generations[g]);
-      } else {
-          scavenge_mutable_list1(generations[g].saved_mut_list, &generations[g]);
-      }
-#else
-      scavenge_mutable_list(generations[g].saved_mut_list, &generations[g]);
-#endif
-      freeChain_sync(generations[g].saved_mut_list);
-      generations[g].saved_mut_list = NULL;
-
-  }
-
   // scavenge the capability-private mutable lists.  This isn't part
   // of markSomeCapabilities() because markSomeCapabilities() can only
   // call back into the GC via mark_root() (due to the gct register
@@ -557,14 +536,8 @@ SET_GCT(gc_threads[0]);
     // stats.  Every mutable list is copied during every GC.
     if (g > 0) {
 	nat mut_list_size = 0;
-	for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
-	    mut_list_size += bd->free - bd->start;
-	}
         for (n = 0; n < n_capabilities; n++) {
-            for (bd = capabilities[n].mut_lists[g]; 
-                 bd != NULL; bd = bd->link) {
-                mut_list_size += bd->free - bd->start;
-            }
+            mut_list_size += countOccupied(capabilities[n].mut_lists[g]);
         }
 	copied +=  mut_list_size;
 
@@ -1235,9 +1208,7 @@ init_collected_gen (nat g, nat n_threads)
     // list always has at least one block; this means we can avoid a
     // check for NULL in recordMutable().
     if (g != 0) {
-	freeChain(generations[g].mut_list);
-	generations[g].mut_list = allocBlock();
-	for (i = 0; i < n_capabilities; i++) {
+        for (i = 0; i < n_capabilities; i++) {
 	    freeChain(capabilities[i].mut_lists[g]);
 	    capabilities[i].mut_lists[g] = allocBlock();
 	}
@@ -1356,8 +1327,6 @@ init_uncollected_gen (nat g, nat threads)
     // save the current mutable lists for this generation, and
     // allocate a fresh block for each one.  We'll traverse these
     // mutable lists as roots early on in the GC.
-    generations[g].saved_mut_list = generations[g].mut_list;
-    generations[g].mut_list = allocBlock(); 
     for (n = 0; n < n_capabilities; n++) {
         capabilities[n].saved_mut_lists[g] = capabilities[n].mut_lists[g];
         capabilities[n].mut_lists[g] = allocBlock();

@@ -294,14 +294,13 @@ alloc_todo_block (gen_workspace *ws, nat size)
 
 #if DEBUG
 void
-printMutableList(generation *gen)
+printMutableList(bdescr *bd)
 {
-    bdescr *bd;
     StgPtr p;
 
-    debugBelch("mutable list %p: ", gen->mut_list);
+    debugBelch("mutable list %p: ", bd);
 
-    for (bd = gen->mut_list; bd != NULL; bd = bd->link) {
+    for (; bd != NULL; bd = bd->link) {
 	for (p = bd->start; p < bd->free; p++) {
 	    debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
 	}
