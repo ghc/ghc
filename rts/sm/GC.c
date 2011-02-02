@@ -344,11 +344,11 @@ SET_GCT(gc_threads[0]);
   }
 
   // follow roots from the CAF list (used by GHCi)
-  gct->evac_gen = 0;
+  gct->evac_gen_no = 0;
   markCAFs(mark_root, gct);
 
   // follow all the roots that the application knows about.
-  gct->evac_gen = 0;
+  gct->evac_gen_no = 0;
   markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
                        rtsTrue/*prune sparks*/);
 
@@ -1062,7 +1062,7 @@ gcWorkerThread (Capability *cap)
 #endif
     
     // Every thread evacuates some roots.
-    gct->evac_gen = 0;
+    gct->evac_gen_no = 0;
     markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
                          rtsTrue/*prune sparks*/);
     scavenge_capability_mut_lists(&capabilities[gct->thread_index]);
@@ -1399,7 +1399,7 @@ init_gc_thread (gc_thread *t)
     t->scavenged_static_objects = END_OF_STATIC_LIST;
     t->scan_bd = NULL;
     t->mut_lists = capabilities[t->thread_index].mut_lists;
-    t->evac_gen = 0;
+    t->evac_gen_no = 0;
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;

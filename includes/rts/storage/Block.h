@@ -46,26 +46,45 @@
  * on a 32-bit machine.
  */
 
+// Note: fields marked with [READ ONLY] must not be modified by the
+// client of the block allocator API.  All other fields can be
+// freely modified.
+
 #ifndef CMINUSMINUS
 typedef struct bdescr_ {
-    StgPtr start;              /* start addr of memory */
-    StgPtr free;               /* first free byte of memory */
-    struct bdescr_ *link;      /* used for chaining blocks together */
+
+    StgPtr start;              // [READ ONLY] start addr of memory
+
+    StgPtr free;               // first free byte of memory.
+                               // NB. during use this value should lie
+                               // between start and start + blocks *
+                               // BLOCK_SIZE.  Values outside this
+                               // range are reserved for use by the
+                               // block allocator.  In particular, the
+                               // value (StgPtr)(-1) is used to
+                               // indicate that a block is unallocated.
+
+    struct bdescr_ *link;      // used for chaining blocks together
+
     union {
-        struct bdescr_ *back;  /* used (occasionally) for doubly-linked lists*/
-        StgWord *bitmap;
-        StgPtr  scan;           /* scan pointer for copying GC */
+        struct bdescr_ *back;  // used (occasionally) for doubly-linked lists
+        StgWord *bitmap;       // bitmap for marking GC
+        StgPtr  scan;          // scan pointer for copying GC
     } u;
 
-    struct generation_ *gen;   /* generation */
-    struct generation_ *dest;  /* destination gen */
+    struct generation_ *gen;   // generation
 
-    StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
+    StgWord16 gen_no;          // gen->no, cached
+    StgWord16 dest_no;         // number of destination generation
+    StgWord16 _pad1;
 
-    StgWord16 gen_no;
-    StgWord16 flags;            /* block flags, see below */
+    StgWord16 flags;           // block flags, see below
+
+    StgWord32 blocks;          // [READ ONLY] no. of blocks in a group
+                               // (if group head, 0 otherwise)
+
 #if SIZEOF_VOID_P == 8
-    StgWord32 _padding[2];
+    StgWord32 _padding[3];
 #else
     StgWord32 _padding[0];
 #endif

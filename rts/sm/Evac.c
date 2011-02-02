@@ -51,7 +51,7 @@ STATIC_INLINE void evacuate_large(StgPtr p);
    -------------------------------------------------------------------------- */
 
 STATIC_INLINE StgPtr
-alloc_for_copy (nat size, generation *gen)
+alloc_for_copy (nat size, nat gen_no)
 {
     StgPtr to;
     gen_workspace *ws;
@@ -61,17 +61,16 @@ alloc_for_copy (nat size, generation *gen)
      * evacuate to an older generation, adjust it here (see comment
      * by evacuate()).
      */
-    if (gen < gct->evac_gen) {
+    if (gen_no < gct->evac_gen_no) {
 	if (gct->eager_promotion) {
-	    gen = gct->evac_gen;
+            gen_no = gct->evac_gen_no;
 	} else {
 	    gct->failed_to_evac = rtsTrue;
 	}
     }
     
-    ws = &gct->gens[gen->no];
-    // this compiles to a single mem access to gen->abs_no only
-    
+    ws = &gct->gens[gen_no];  // zero memory references here
+
     /* chain a new block onto the to-space for the destination gen if
      * necessary.
      */
@@ -91,12 +90,12 @@ alloc_for_copy (nat size, generation *gen)
 
 STATIC_INLINE GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info, 
-         StgClosure *src, nat size, generation *gen, StgWord tag)
+         StgClosure *src, nat size, nat gen_no, StgWord tag)
 {
     StgPtr to, from;
     nat i;
 
-    to = alloc_for_copy(size,gen);
+    to = alloc_for_copy(size,gen_no);
     
     from = (StgPtr)src;
     to[0] = (W_)info;
@@ -133,12 +132,12 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
 #if defined(PARALLEL_GC)
 STATIC_INLINE void
 copy_tag_nolock(StgClosure **p, const StgInfoTable *info, 
-         StgClosure *src, nat size, generation *gen, StgWord tag)
+         StgClosure *src, nat size, nat gen_no, StgWord tag)
 {
     StgPtr to, from;
     nat i;
 
-    to = alloc_for_copy(size,gen);
+    to = alloc_for_copy(size,gen_no);
 
     from = (StgPtr)src;
     to[0] = (W_)info;
@@ -170,7 +169,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
  */
 static rtsBool
 copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, 
-         nat size_to_copy, generation *gen)
+         nat size_to_copy, nat gen_no)
 {
     StgPtr to, from;
     nat i;
@@ -194,7 +193,7 @@ spin:
     info = (W_)src->header.info;
 #endif
 
-    to = alloc_for_copy(size_to_reserve, gen);
+    to = alloc_for_copy(size_to_reserve, gen_no);
 
     from = (StgPtr)src;
     to[0] = info;
@@ -222,9 +221,9 @@ spin:
 /* Copy wrappers that don't tag the closure after copying */
 STATIC_INLINE GNUC_ATTR_HOT void
 copy(StgClosure **p, const StgInfoTable *info, 
-     StgClosure *src, nat size, generation *gen)
+     StgClosure *src, nat size, nat gen_no)
 {
-    copy_tag(p,info,src,size,gen,0);
+    copy_tag(p,info,src,size,gen_no,0);
 }
 
 /* -----------------------------------------------------------------------------
@@ -243,10 +242,12 @@ evacuate_large(StgPtr p)
 {
   bdescr *bd;
   generation *gen, *new_gen;
+  nat gen_no, new_gen_no;
   gen_workspace *ws;
     
   bd = Bdescr(p);
   gen = bd->gen;
+  gen_no = bd->gen_no;
   ACQUIRE_SPIN_LOCK(&gen->sync_large_objects);
 
   // already evacuated? 
@@ -254,7 +255,7 @@ evacuate_large(StgPtr p)
     /* Don't forget to set the gct->failed_to_evac flag if we didn't get
      * the desired destination (see comments in evacuate()).
      */
-    if (gen < gct->evac_gen) {
+    if (gen_no < gct->evac_gen_no) {
 	gct->failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
     }
@@ -274,16 +275,18 @@ evacuate_large(StgPtr p)
   
   /* link it on to the evacuated large object list of the destination gen
    */
-  new_gen = bd->dest;
-  if (new_gen < gct->evac_gen) {
+  new_gen_no = bd->dest_no;
+
+  if (new_gen_no < gct->evac_gen_no) {
       if (gct->eager_promotion) {
-	  new_gen = gct->evac_gen;
+          new_gen_no = gct->evac_gen_no;
       } else {
 	  gct->failed_to_evac = rtsTrue;
       }
   }
 
-  ws = &gct->gens[new_gen->no];
+  ws = &gct->gens[new_gen_no];
+  new_gen = &generations[new_gen_no];
 
   bd->flags |= BF_EVACUATED;
   initBdescr(bd, new_gen, new_gen->to);
@@ -352,7 +355,7 @@ REGPARM1 GNUC_ATTR_HOT void
 evacuate(StgClosure **p)
 {
   bdescr *bd = NULL;
-  generation *gen;
+  nat gen_no;
   StgClosure *q;
   const StgInfoTable *info;
   StgWord tag;
@@ -475,7 +478,7 @@ loop:
           // We aren't copying this object, so we have to check
           // whether it is already in the target generation.  (this is
           // the write barrier).
-	  if (bd->gen < gct->evac_gen) {
+          if (bd->gen_no < gct->evac_gen_no) {
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
@@ -499,7 +502,7 @@ loop:
       return;
   }
       
-  gen = bd->dest;
+  gen_no = bd->dest_no;
 
   info = q->header.info;
   if (IS_FORWARDING_PTR(info))
@@ -522,8 +525,8 @@ loop:
      */
       StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
       *p = TAG_CLOSURE(tag,e);
-      if (gen < gct->evac_gen) {  // optimisation 
-	  if (Bdescr((P_)e)->gen < gct->evac_gen) {
+      if (gen_no < gct->evac_gen_no) {  // optimisation
+          if (Bdescr((P_)e)->gen_no < gct->evac_gen_no) {
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
@@ -540,7 +543,7 @@ loop:
   case MUT_VAR_DIRTY:
   case MVAR_CLEAN:
   case MVAR_DIRTY:
-      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen);
+      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
       return;
 
   // For ints and chars of low value, save space by replacing references to
@@ -552,7 +555,7 @@ loop:
   case CONSTR_0_1:
   {   
 #if defined(__PIC__) && defined(mingw32_HOST_OS) 
-      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen,tag);
+      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
 #else
       StgWord w = (StgWord)q->payload[0];
       if (info == Czh_con_info &&
@@ -569,7 +572,7 @@ loop:
 			     );
       }
       else {
-          copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen,tag);
+          copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
       }
 #endif
       return;
@@ -578,12 +581,12 @@ loop:
   case FUN_0_1:
   case FUN_1_0:
   case CONSTR_1_0:
-      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen,tag);
+      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
       return;
 
   case THUNK_1_0:
   case THUNK_0_1:
-      copy(p,info,q,sizeofW(StgThunk)+1,gen);
+      copy(p,info,q,sizeofW(StgThunk)+1,gen_no);
       return;
 
   case THUNK_1_1:
@@ -592,7 +595,7 @@ loop:
 #ifdef NO_PROMOTE_THUNKS
 #error bitrotted
 #endif
-    copy(p,info,q,sizeofW(StgThunk)+2,gen);
+    copy(p,info,q,sizeofW(StgThunk)+2,gen_no);
     return;
 
   case FUN_1_1:
@@ -600,21 +603,21 @@ loop:
   case FUN_0_2:
   case CONSTR_1_1:
   case CONSTR_2_0:
-      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+2,gen,tag);
+      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+2,gen_no,tag);
       return;
 
   case CONSTR_0_2:
-      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+2,gen,tag);
+      copy_tag_nolock(p,info,q,sizeofW(StgHeader)+2,gen_no,tag);
       return;
 
   case THUNK:
-      copy(p,info,q,thunk_sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen);
+      copy(p,info,q,thunk_sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
       return;
 
   case FUN:
   case IND_PERM:
   case CONSTR:
-      copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen,tag);
+      copy_tag_nolock(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no,tag);
       return;
 
   case BLACKHOLE:
@@ -632,7 +635,7 @@ loop:
               || i == &stg_WHITEHOLE_info 
               || i == &stg_BLOCKING_QUEUE_CLEAN_info
               || i == &stg_BLOCKING_QUEUE_DIRTY_info) {
-              copy(p,info,q,sizeofW(StgInd),gen);
+              copy(p,info,q,sizeofW(StgInd),gen_no);
               return;
           }
           ASSERT(i != &stg_IND_info);
@@ -646,11 +649,11 @@ loop:
   case WEAK:
   case PRIM:
   case MUT_PRIM:
-      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen);
+      copy(p,info,q,sizeW_fromITBL(INFO_PTR_TO_STRUCT(info)),gen_no);
       return;
 
   case BCO:
-      copy(p,info,q,bco_sizeW((StgBCO *)q),gen);
+      copy(p,info,q,bco_sizeW((StgBCO *)q),gen_no);
       return;
 
   case THUNK_SELECTOR:
@@ -678,20 +681,20 @@ loop:
     barf("evacuate: stack frame at %p\n", q);
 
   case PAP:
-      copy(p,info,q,pap_sizeW((StgPAP*)q),gen);
+      copy(p,info,q,pap_sizeW((StgPAP*)q),gen_no);
       return;
 
   case AP:
-      copy(p,info,q,ap_sizeW((StgAP*)q),gen);
+      copy(p,info,q,ap_sizeW((StgAP*)q),gen_no);
       return;
 
   case AP_STACK:
-      copy(p,info,q,ap_stack_sizeW((StgAP_STACK*)q),gen);
+      copy(p,info,q,ap_stack_sizeW((StgAP_STACK*)q),gen_no);
       return;
 
   case ARR_WORDS:
       // just copy the block 
-      copy(p,info,q,arr_words_sizeW((StgArrWords *)q),gen);
+      copy(p,info,q,arr_words_sizeW((StgArrWords *)q),gen_no);
       return;
 
   case MUT_ARR_PTRS_CLEAN:
@@ -699,11 +702,11 @@ loop:
   case MUT_ARR_PTRS_FROZEN:
   case MUT_ARR_PTRS_FROZEN0:
       // just copy the block 
-      copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen);
+      copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no);
       return;
 
   case TSO:
-      copy(p,info,q,sizeofW(StgTSO),gen);
+      copy(p,info,q,sizeofW(StgTSO),gen_no);
       return;
 
   case STACK:
@@ -718,7 +721,7 @@ loop:
           rtsBool mine;
 
           mine = copyPart(p,(StgClosure *)stack, stack_sizeW(stack),
-                          sizeofW(StgStack), gen);
+                          sizeofW(StgStack), gen_no);
           if (mine) {
               new_stack = (StgStack *)*p;
               move_STACK(stack, new_stack);
@@ -732,7 +735,7 @@ loop:
     }
 
   case TREC_CHUNK:
-      copy(p,info,q,sizeofW(StgTRecChunk),gen);
+      copy(p,info,q,sizeofW(StgTRecChunk),gen_no);
       return;
 
   default:
@@ -836,7 +839,7 @@ selector_chain:
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
-            if (evac && bd->gen < gct->evac_gen) {
+            if (evac && bd->gen_no < gct->evac_gen_no) {
                 gct->failed_to_evac = rtsTrue;
                 TICK_GC_FAILED_PROMOTION();
             }
@@ -1075,7 +1078,7 @@ bale_out:
     // check whether it was updated in the meantime.
     *q = (StgClosure *)p;
     if (evac) {
-        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest);
+        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest_no);
     }
     unchain_thunk_selectors(prev_thunk_selector, *q);
     return;

@@ -146,7 +146,7 @@ typedef struct gc_thread_ {
     // --------------------
     // evacuate flags
 
-    generation *evac_gen;          // Youngest generation that objects
+    nat evac_gen_no;               // Youngest generation that objects
                                    // should be evacuated to in
                                    // evacuate().  (Logically an
                                    // argument to evacuate, but it's

@@ -194,9 +194,9 @@ extern rtsBool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->gen    = gen;
-    bd->gen_no = gen->no;
-    bd->dest   = dest;
+    bd->gen     = gen;
+    bd->gen_no  = gen->no;
+    bd->dest_no = dest->no;
 }
 
 #endif /* RTS_STORAGE_GC_H */
