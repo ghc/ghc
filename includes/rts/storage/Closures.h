@@ -124,7 +124,7 @@ typedef struct {
     StgHeader     header;
     StgClosure   *indirectee;
     StgClosure   *static_link;
-    StgInfoTable *saved_info;
+    const StgInfoTable *saved_info;
 } StgIndStatic;
 
 typedef struct StgBlockingQueue_ {
