@@ -835,8 +835,7 @@ lnat calcLiveWords (void)
 {
     nat g;
     lnat live;
-    generation *gen;
-    
+
     live = 0;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         live += genLiveWords(&generations[g]);
