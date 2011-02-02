@@ -1,0 +1,154 @@
+
+==================== Tidy Core ====================
+Roman.foo2 :: GHC.Types.Int
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [] 1 2}]
+Roman.foo2 = GHC.Types.I# 6
+
+Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [] 1 2}]
+Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
+
+Roman.foo3 :: GHC.Types.Int
+[GblId, Str=DmdType b]
+Roman.foo3 =
+  Control.Exception.Base.patError
+    @ GHC.Types.Int "spec-inline.hs:(19,5)-(29,25)|function go"
+
+Rec {
+Roman.foo_$s$wgo [Occ=LoopBreaker]
+  :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=2, Caf=NoCafRefs, Str=DmdType LL]
+Roman.foo_$s$wgo =
+  \ (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#) ->
+    let {
+      a [Dmd=Just L] :: GHC.Prim.Int#
+      [LclId, Str=DmdType]
+      a =
+        GHC.Prim.+#
+          (GHC.Prim.+#
+             (GHC.Prim.+#
+                (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc sc) sc) sc) sc)
+             sc)
+          sc } in
+    case GHC.Prim.<=# sc1 0 of _ {
+      GHC.Bool.False ->
+        case GHC.Prim.<# sc1 100 of _ {
+          GHC.Bool.False ->
+            case GHC.Prim.<# sc1 500 of _ {
+              GHC.Bool.False ->
+                Roman.foo_$s$wgo (GHC.Prim.+# a a) (GHC.Prim.-# sc1 1);
+              GHC.Bool.True -> Roman.foo_$s$wgo a (GHC.Prim.-# sc1 3)
+            };
+          GHC.Bool.True -> Roman.foo_$s$wgo sc (GHC.Prim.-# sc1 2)
+        };
+      GHC.Bool.True -> 0
+    }
+end Rec }
+
+Roman.$wgo
+  :: Data.Maybe.Maybe GHC.Types.Int
+     -> Data.Maybe.Maybe GHC.Types.Int
+     -> GHC.Prim.Int#
+[GblId,
+ Arity=2,
+ Str=DmdType SS,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [6 3] 37 0}]
+Roman.$wgo =
+  \ (w :: Data.Maybe.Maybe GHC.Types.Int)
+    (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->
+    case w1 of _ {
+      Data.Maybe.Nothing ->
+        Roman.foo3
+        `cast` (CoUnsafe GHC.Types.Int GHC.Prim.Int#
+                :: GHC.Types.Int ~ GHC.Prim.Int#);
+      Data.Maybe.Just x ->
+        case x of _ { GHC.Types.I# ipv ->
+        let {
+          a [Dmd=Just L] :: GHC.Prim.Int#
+          [LclId, Str=DmdType]
+          a =
+            GHC.Prim.+#
+              (GHC.Prim.+#
+                 (GHC.Prim.+#
+                    (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# ipv ipv) ipv) ipv) ipv)
+                 ipv)
+              ipv } in
+        case w of _ {
+          Data.Maybe.Nothing -> Roman.foo_$s$wgo a 10;
+          Data.Maybe.Just n ->
+            case n of _ { GHC.Types.I# x2 ->
+            case GHC.Prim.<=# x2 0 of _ {
+              GHC.Bool.False ->
+                case GHC.Prim.<# x2 100 of _ {
+                  GHC.Bool.False ->
+                    case GHC.Prim.<# x2 500 of _ {
+                      GHC.Bool.False ->
+                        Roman.foo_$s$wgo (GHC.Prim.+# a a) (GHC.Prim.-# x2 1);
+                      GHC.Bool.True -> Roman.foo_$s$wgo a (GHC.Prim.-# x2 3)
+                    };
+                  GHC.Bool.True -> Roman.foo_$s$wgo ipv (GHC.Prim.-# x2 2)
+                };
+              GHC.Bool.True -> 0
+            }
+            }
+        }
+        }
+    }
+
+Roman.foo_go [InlPrag=INLINE[0]]
+  :: Data.Maybe.Maybe GHC.Types.Int
+     -> Data.Maybe.Maybe GHC.Types.Int
+     -> GHC.Types.Int
+[GblId,
+ Arity=2,
+ Str=DmdType SSm,
+ Unf=Unf{Src=Worker=Roman.$wgo, TopLvl=True, Arity=2, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once] :: Data.Maybe.Maybe GHC.Types.Int)
+                 (w1 [Occ=Once] :: Data.Maybe.Maybe GHC.Types.Int) ->
+                 case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }}]
+Roman.foo_go =
+  \ (w :: Data.Maybe.Maybe GHC.Types.Int)
+    (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->
+    case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }
+
+Roman.foo :: GHC.Types.Int -> GHC.Types.Int
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=DmdType S(A)m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Arity=1, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (n [Occ=Once!] :: GHC.Types.Int) ->
+                 case n of n1 { GHC.Types.I# _ ->
+                 Roman.foo_go (Data.Maybe.Just @ GHC.Types.Int n1) Roman.foo1
+                 }}]
+Roman.foo =
+  \ (n :: GHC.Types.Int) ->
+    case n of _ { GHC.Types.I# ipv ->
+    case Roman.foo_$s$wgo 6 ipv of ww { __DEFAULT -> GHC.Types.I# ww }
+    }
+
+
+------ Local rules for imported ids --------
+"SC:$wgo0" [ALWAYS]
+    forall {sc :: GHC.Prim.Int# sc1 :: GHC.Prim.Int#}
+      Roman.$wgo (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc1))
+                 (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc))
+      = Roman.foo_$s$wgo sc sc1
+
+

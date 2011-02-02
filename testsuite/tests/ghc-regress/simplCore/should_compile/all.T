@@ -63,7 +63,8 @@ test('T4908', only_ways(['optc','optasm']),
               compile, 
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
-test('T4930', only_ways(['optc','optasm']), 
+test('T4930', [if_compiler_lt('ghc', '7.1', expect_fail),
+               only_ways(['optc','optasm'])],
               compile, 
               ['-O -ddump-simpl -dsuppress-uniques'])
 
