@@ -1755,10 +1755,10 @@ scavenge_large (gen_workspace *ws)
 	// the front when evacuating.
 	ws->todo_large_objects = bd->link;
 	
-	ACQUIRE_SPIN_LOCK(&ws->gen->sync_large_objects);
+        ACQUIRE_SPIN_LOCK(&ws->gen->sync);
 	dbl_link_onto(bd, &ws->gen->scavenged_large_objects);
 	ws->gen->n_scavenged_large_blocks += bd->blocks;
-	RELEASE_SPIN_LOCK(&ws->gen->sync_large_objects);
+        RELEASE_SPIN_LOCK(&ws->gen->sync);
 	
 	p = bd->start;
 	if (scavenge_one(p)) {

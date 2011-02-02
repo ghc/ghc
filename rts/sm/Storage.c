@@ -15,6 +15,7 @@
 #include "Rts.h"
 
 #include "Storage.h"
+#include "GCThread.h"
 #include "RtsUtils.h"
 #include "Stats.h"
 #include "BlockAlloc.h"
@@ -84,7 +85,7 @@ initGeneration (generation *gen, int g)
     gen->compact = 0;
     gen->bitmap = NULL;
 #ifdef THREADED_RTS
-    initSpinLock(&gen->sync_large_objects);
+    initSpinLock(&gen->sync);
 #endif
     gen->threads = END_TSO_QUEUE;
     gen->old_threads = END_TSO_QUEUE;
@@ -766,7 +767,6 @@ lnat
 calcAllocated (rtsBool include_nurseries)
 {
   nat allocated = 0;
-  bdescr *bd;
   nat i;
 
   // When called from GC.c, we already have the allocation count for
@@ -775,9 +775,7 @@ calcAllocated (rtsBool include_nurseries)
   if (include_nurseries)
   {
       for (i = 0; i < n_capabilities; i++) {
-          for (bd = nurseries[i].blocks; bd; bd = bd->link) {
-              allocated += (lnat)(bd->free - bd->start);
-          }
+          allocated += countOccupied(nurseries[i].blocks);
       }
   }
 
@@ -786,25 +784,6 @@ calcAllocated (rtsBool include_nurseries)
 
   return allocated;
 }  
-
-/* Approximate the amount of live data in the heap.  To be called just
- * after garbage collection (see GarbageCollect()).
- */
-lnat calcLiveBlocks (void)
-{
-  nat g;
-  lnat live = 0;
-  generation *gen;
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      /* approximate amount of live data (doesn't take into account slop
-       * at end of each block).
-       */
-      gen = &generations[g];
-      live += gen->n_large_blocks + gen->n_blocks;
-  }
-  return live;
-}
 
 lnat countOccupied (bdescr *bd)
 {
@@ -818,6 +797,38 @@ lnat countOccupied (bdescr *bd)
     return words;
 }
 
+lnat genLiveWords (generation *gen)
+{
+    return gen->n_words + countOccupied(gen->large_objects);
+}
+
+lnat genLiveBlocks (generation *gen)
+{
+    return gen->n_blocks + gen->n_large_blocks;
+}
+
+lnat gcThreadLiveWords (nat i, nat g)
+{
+    lnat words;
+
+    words   = countOccupied(gc_threads[i]->gens[g].todo_bd);
+    words  += countOccupied(gc_threads[i]->gens[g].part_list);
+    words  += countOccupied(gc_threads[i]->gens[g].scavd_list);
+
+    return words;
+}
+
+lnat gcThreadLiveBlocks (nat i, nat g)
+{
+    lnat blocks;
+
+    blocks  = countBlocks(gc_threads[i]->gens[g].todo_bd);
+    blocks += gc_threads[i]->gens[g].n_part_blocks;
+    blocks += gc_threads[i]->gens[g].n_scavd_blocks;
+
+    return blocks;
+}
+
 // Return an accurate count of the live data in the heap, excluding
 // generation 0.
 lnat calcLiveWords (void)
@@ -828,8 +839,19 @@ lnat calcLiveWords (void)
     
     live = 0;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        gen = &generations[g];
-        live += gen->n_words + countOccupied(gen->large_objects);
+        live += genLiveWords(&generations[g]);
+    }
+    return live;
+}
+
+lnat calcLiveBlocks (void)
+{
+    nat g;
+    lnat live;
+
+    live = 0;
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        live += genLiveBlocks(&generations[g]);
     }
     return live;
 }

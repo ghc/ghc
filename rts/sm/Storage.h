@@ -87,10 +87,17 @@ lnat     countNurseryBlocks   ( void );
    -------------------------------------------------------------------------- */
 
 lnat    calcAllocated  (rtsBool count_nurseries);
-lnat    calcLiveBlocks (void);
-lnat    calcLiveWords  (void);
 lnat    countOccupied  (bdescr *bd);
 lnat    calcNeeded     (void);
+
+lnat    gcThreadLiveWords  (nat i, nat g);
+lnat    gcThreadLiveBlocks (nat i, nat g);
+
+lnat    genLiveWords  (generation *gen);
+lnat    genLiveBlocks (generation *gen);
+
+lnat    calcLiveBlocks (void);
+lnat    calcLiveWords  (void);
 
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals

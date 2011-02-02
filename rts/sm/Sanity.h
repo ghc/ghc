@@ -21,9 +21,9 @@
 # endif
 
 /* debugging routines */
-void checkSanity        ( rtsBool check_heap );
+void checkSanity        ( rtsBool after_gc, rtsBool major_gc );
 void checkNurserySanity ( nursery *nursery );
-void checkHeap          ( bdescr *bd );
+void checkHeapChain     ( bdescr *bd );
 void checkHeapChunk     ( StgPtr start, StgPtr end );
 void checkLargeObjects  ( bdescr *bd );
 void checkTSO           ( StgTSO* tso );
@@ -32,9 +32,6 @@ void checkStaticObjects ( StgClosure* static_objects );
 void checkStackChunk    ( StgPtr sp, StgPtr stack_end );
 StgOffset checkStackFrame ( StgPtr sp );
 StgOffset checkClosure  ( StgClosure* p );
-
-void checkMutableList   ( bdescr *bd, nat gen );
-void checkMutableLists  ( rtsBool checkTSOs );
 
 void checkRunQueue      (Capability *cap);
 

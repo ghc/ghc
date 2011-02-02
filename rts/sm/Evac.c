@@ -248,7 +248,7 @@ evacuate_large(StgPtr p)
   bd = Bdescr(p);
   gen = bd->gen;
   gen_no = bd->gen_no;
-  ACQUIRE_SPIN_LOCK(&gen->sync_large_objects);
+  ACQUIRE_SPIN_LOCK(&gen->sync);
 
   // already evacuated? 
   if (bd->flags & BF_EVACUATED) { 
@@ -259,7 +259,7 @@ evacuate_large(StgPtr p)
 	gct->failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
     }
-    RELEASE_SPIN_LOCK(&gen->sync_large_objects);
+    RELEASE_SPIN_LOCK(&gen->sync);
     return;
   }
 
@@ -297,16 +297,16 @@ evacuate_large(StgPtr p)
   // them straight on the scavenged_large_objects list.
   if (bd->flags & BF_PINNED) {
       ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS);
-      if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync_large_objects); }
+      if (new_gen != gen) { ACQUIRE_SPIN_LOCK(&new_gen->sync); }
       dbl_link_onto(bd, &new_gen->scavenged_large_objects);
       new_gen->n_scavenged_large_blocks += bd->blocks;
-      if (new_gen != gen) { RELEASE_SPIN_LOCK(&new_gen->sync_large_objects); }
+      if (new_gen != gen) { RELEASE_SPIN_LOCK(&new_gen->sync); }
   } else {
       bd->link = ws->todo_large_objects;
       ws->todo_large_objects = bd;
   }
 
-  RELEASE_SPIN_LOCK(&gen->sync_large_objects);
+  RELEASE_SPIN_LOCK(&gen->sync);
 }
 
 /* ----------------------------------------------------------------------------

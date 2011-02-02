@@ -710,7 +710,7 @@ stat_exit(int alloc)
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
                 statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
                 for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                    statsPrintf("gen[%d].sync_large_objects: %"FMT_Word64"\n", g, generations[g].sync_large_objects.spin);
+                    statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, generations[g].sync.spin);
                 }
             }
 #endif
@@ -772,8 +772,9 @@ void
 statDescribeGens(void)
 {
   nat g, mut, lge, i;
-  lnat live, slop;
+  lnat gen_slop;
   lnat tot_live, tot_slop;
+  lnat gen_live, gen_blocks;
   bdescr *bd;
   generation *gen;
   
@@ -785,25 +786,32 @@ statDescribeGens(void)
 
   tot_live = 0;
   tot_slop = 0;
+
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      mut = 0;
-      for (i = 0; i < n_capabilities; i++) {
-          mut += countOccupied(capabilities[i].mut_lists[g]);
-      }
-
       gen = &generations[g];
-
-      debugBelch("%5d %7d %9d", g, gen->max_blocks, mut);
 
       for (bd = gen->large_objects, lge = 0; bd; bd = bd->link) {
           lge++;
       }
-      live = gen->n_words + countOccupied(gen->large_objects);
-      slop = (gen->n_blocks + gen->n_large_blocks) * BLOCK_SIZE_W - live;
-      debugBelch("%8d %8d %8ld %8ld\n", gen->n_blocks, lge,
-                 live*sizeof(W_), slop*sizeof(W_));
-      tot_live += live;
-      tot_slop += slop;
+
+      gen_live   = genLiveWords(gen);
+      gen_blocks = genLiveBlocks(gen);
+
+      mut = 0;
+      for (i = 0; i < n_capabilities; i++) {
+          mut += countOccupied(capabilities[i].mut_lists[g]);
+          gen_live   += gcThreadLiveWords(i,g);
+          gen_blocks += gcThreadLiveBlocks(i,g);
+      }
+
+      debugBelch("%5d %7d %9d", g, gen->max_blocks, mut);
+
+      gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
+
+      debugBelch("%8ld %8d %8ld %8ld\n", gen_blocks, lge,
+                 gen_live*sizeof(W_), gen_slop*sizeof(W_));
+      tot_live += gen_live;
+      tot_slop += gen_slop;
   }
   debugBelch("----------------------------------------------------------\n");
   debugBelch("%41s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));

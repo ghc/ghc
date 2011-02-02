@@ -592,7 +592,7 @@ removeFromMVarBlockedQueue (StgTSO *tso)
 
     if (mvar->head == q) {
         mvar->head = q->link;
-        q->header.info = &stg_IND_info;
+        OVERWRITE_INFO(q, &stg_IND_info);
         if (mvar->tail == q) {
             mvar->tail = (StgMVarTSOQueue*)END_TSO_QUEUE;
         }
@@ -602,10 +602,10 @@ removeFromMVarBlockedQueue (StgTSO *tso)
         // we lose the tail pointer when the GC shorts out the IND.
         // So we use MSG_NULL as a kind of non-dupable indirection;
         // these are ignored by takeMVar/putMVar.
-        q->header.info = &stg_MSG_NULL_info;
+        OVERWRITE_INFO(q, &stg_MSG_NULL_info);
     }
     else {
-        q->header.info = &stg_IND_info;
+        OVERWRITE_INFO(q, &stg_IND_info);
     }
 
     // revoke the MVar operation
