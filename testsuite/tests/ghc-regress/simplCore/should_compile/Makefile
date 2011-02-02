@@ -34,3 +34,5 @@ T4918:
 	'$(TEST_HC)' -c -O T4918.hs 
 	'$(TEST_HC)' --show-iface T4918.hi | grep 'C#'
 
+EvalTest:
+	'$(TEST_HC)' -c -O EvalTest.hs -ddump-simpl -dsuppress-uniques | grep 'rght.*Dmd'

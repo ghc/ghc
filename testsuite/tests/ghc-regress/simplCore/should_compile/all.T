@@ -87,6 +87,11 @@ test('T3772',
      extra_clean(['T3772_A.hi', 'T3772_A.o']),
      run_command, ['$MAKE -s --no-print-directory T3772'])
 
+test('EvalTest',
+     normal,
+     run_command, 
+     ['$MAKE -s --no-print-directory EvalTest'])
+
 test('T3831', normal, compile, [''])
 test('T4345', normal, compile, [''])
 test('T4398', normal, compile, [''])
