@@ -53,6 +53,14 @@ typedef pthread_key_t   ThreadLocalKey;
     barf("multiple ACQUIRE_LOCK: %s %d", __FILE__,__LINE__); \
   }
 
+// Returns zero if the lock was acquired.
+EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex);
+EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
+{
+    LOCK_DEBUG_BELCH("TRY_ACQUIRE_LOCK", mutex);
+    return pthread_mutex_trylock(mutex);
+}
+
 #define RELEASE_LOCK(mutex) \
   LOCK_DEBUG_BELCH("RELEASE_LOCK", mutex); \
   if (pthread_mutex_unlock(mutex) != 0) { \
@@ -117,8 +125,9 @@ typedef CRITICAL_SECTION Mutex;
 
 #else
 
-#define ACQUIRE_LOCK(mutex)  EnterCriticalSection(mutex)
-#define RELEASE_LOCK(mutex)  LeaveCriticalSection(mutex)
+#define ACQUIRE_LOCK(mutex)      EnterCriticalSection(mutex)
+#define TRY_ACQUIRE_LOCK(mutex)  (TryEnterCriticalSection(mutex) != 0)
+#define RELEASE_LOCK(mutex)      LeaveCriticalSection(mutex)
 
 // I don't know how to do this.  TryEnterCriticalSection() doesn't do
 // the right thing.
