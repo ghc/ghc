@@ -176,8 +176,8 @@ vectScalarLam
 	
 vectScalarLam args body
  = do scalars <- globalScalars
-      onlyIfV (all is_scalar_ty arg_tys
-               && is_scalar_ty res_ty
+      onlyIfV (all is_prim_ty arg_tys
+               && is_prim_ty res_ty
                && is_scalar (extendVarSetList scalars args) body
                && uses scalars body)
         $ do
