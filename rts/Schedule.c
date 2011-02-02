@@ -951,14 +951,38 @@ static void
 scheduleProcessInbox (Capability *cap USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    Message *m;
+    Message *m, *next;
+    int r;
 
     while (!emptyInbox(cap)) {
-        ACQUIRE_LOCK(&cap->lock);
+        if (cap->r.rCurrentNursery->link == NULL ||
+            g0->n_new_large_words >= large_alloc_lim) {
+            scheduleDoGC(cap, cap->running_task, rtsFalse);
+        }
+
+        // don't use a blocking acquire; if the lock is held by
+        // another thread then just carry on.  This seems to avoid
+        // getting stuck in a message ping-pong situation with other
+        // processors.  We'll check the inbox again later anyway.
+        //
+        // We should really use a more efficient queue data structure
+        // here.  The trickiness is that we must ensure a Capability
+        // never goes idle if the inbox is non-empty, which is why we
+        // use cap->lock (cap->lock is released as the last thing
+        // before going idle; see Capability.c:releaseCapability()).
+        r = TRY_ACQUIRE_LOCK(&cap->lock);
+        if (r != 0) return;
+
         m = cap->inbox;
-        cap->inbox = m->link;
+        cap->inbox = (Message*)END_TSO_QUEUE;
+
         RELEASE_LOCK(&cap->lock);
-        executeMessage(cap, (Message *)m);
+
+        while (m != (Message*)END_TSO_QUEUE) {
+            next = m->link;
+            executeMessage(cap, m);
+            m = next;
+        }
     }
 #endif
 }
