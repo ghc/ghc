@@ -1133,13 +1133,17 @@ stg_newMVarzh
 }
 
 
-#define PerformTake(stack, value)                       \
-    W_[StgStack_sp(stack) + WDS(1)] = value;            \
-    W_[StgStack_sp(stack) + WDS(0)] = stg_gc_unpt_r1_info;
+#define PerformTake(stack, value)               \
+    W_ sp;                                      \
+    sp = StgStack_sp(stack);                    \
+    W_[sp + WDS(1)] = value;                    \
+    W_[sp + WDS(0)] = stg_gc_unpt_r1_info;
 
-#define PerformPut(stack,lval)                      \
-    StgStack_sp(stack) = StgStack_sp(stack) + WDS(3);   \
-    lval = W_[StgStack_sp(stack) - WDS(1)];
+#define PerformPut(stack,lval)                  \
+    W_ sp;                                      \
+    sp = StgStack_sp(stack) + WDS(3);           \
+    StgStack_sp(stack) = sp;                    \
+    lval = W_[sp - WDS(1)];
 
 stg_takeMVarzh
 {
