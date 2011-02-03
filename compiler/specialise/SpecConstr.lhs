@@ -749,7 +749,7 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
    live_case_bndr = not (isDeadBinder case_bndr)
    env1 | Var v <- scrut = extendValEnv env v cval
         | otherwise      = env	-- See Note [Add scrutinee to ValueEnv too]
-   env2 | live_case_bndr = extendValEnv env case_bndr cval
+   env2 | live_case_bndr = extendValEnv env1 case_bndr cval
         | otherwise      = env1
 
    alt_bndrs' | case scrut of { Var {} -> True; _ -> live_case_bndr }
