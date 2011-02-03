@@ -37,6 +37,9 @@ data Prop = EqFun Op Term Term Term
 commutative :: Op -> Bool
 commutative op = op == Add || op == Mul
 
+associative :: Op -> Bool
+associative op = op == Add || op == Mul
+
 num :: Integer -> Term
 num n = Num n Nothing
 
@@ -392,6 +395,52 @@ propsToOrd props = loop (step [] unconditional)
         | otherwise     -> (guard (isLeq ps (num 2) a) >> return (b,c)) ++
                            (guard (isLeq ps (num 1) b) >> return (a,c))
 
+--------------------------------------------------------------------------------
+-- Associativity
+--------------------------------------------------------------------------------
+
+-- We try to compute new equalities by moving parens to the right:
+-- if (a + b) + c = d then a + (b + c) = d
+--
+-- This desugars to:
+--   a + b = p, p + c = q, b + c = r  => a + r = q
+--
+-- Note that this fires only if we have a name, r, for the right-paren sum,
+-- or if we can compute it.
+-- a + 2 = p, p + 3 = q => a + 5 = q
+--
+-- So, when we add a new fact it could match any of the 3 positions
+-- in the RHS of this rule.
+
+impAssoc :: [Prop] -> Prop -> [Prop]
+impAssoc ps (EqFun op x y z) | associative op = concatMap imps asmps
+  where
+  asmps         = [ (a,b,c) | EqFun op' a b c <- ps, op == op' ]
+  imps (a,b,c)
+    -- new in position 2
+    | c == x    = [ EqFun op a by z | by <- y_plus b ]
+
+    -- new in position 1
+    | a == z    = [ EqFun op x yb c | yb <- y_plus b ]
+
+    -- new in position 3
+    | otherwise = [ EqFun op a z e | (c',d,e) <- asmps,
+                                              c == c' && sameSum b d x y ]
+                  ++
+                  [ EqFun op d z c | (d,e,a') <- asmps,
+                                              a == a' && sameSum e b x y ]
+
+  sameSum a b a' b' = (a == a' && b == b') || (a == b' && b == a')
+
+  y_plus (Num m _) | Num n _ <- y = doOp m n
+  y_plus b                        = [ w | (u,v,w) <- asmps, sameSum y b u v ]
+
+  doOp m n          = case op of
+                        Add -> [ num (m + n) ]
+                        Mul -> [ num (m * n) ]
+                        _   -> []
+
+impAssoc _ _ = []
 
 --------------------------------------------------------------------------------
 -- Descrete Math
