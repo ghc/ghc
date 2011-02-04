@@ -831,7 +831,8 @@ new_gc_thread (nat n, gc_thread *t)
         ws->todo_q = newWSDeque(128);
         ws->todo_overflow = NULL;
         ws->n_todo_overflow = 0;
-        
+        ws->todo_large_objects = NULL;
+
         ws->part_list = NULL;
         ws->n_part_blocks = 0;
 
