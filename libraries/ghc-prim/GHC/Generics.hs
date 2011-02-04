@@ -21,6 +21,7 @@ data (:*:) a b = a :*: b
 {-# OPTIONS_GHC -XTypeOperators          #-}
 {-# OPTIONS_GHC -XKindSignatures         #-}
 {-# OPTIONS_GHC -XFunctionalDependencies #-}
+{-# OPTIONS_GHC -XNoGenerics             #-}
 
 module GHC.Generics  (
   -- * Generic representation types

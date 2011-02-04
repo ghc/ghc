@@ -15,6 +15,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -XNoGenerics        #-}
 
 module GHC.Types (Bool(..), Char(..), Int(..), Float(..), Double(..), IO(..)) where
 
