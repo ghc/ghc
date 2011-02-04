@@ -806,7 +806,14 @@ languageExtensions (Just Haskell98)
     = [Opt_ImplicitPrelude,
        Opt_MonomorphismRestriction,
        Opt_NPlusKPatterns,
-       Opt_DatatypeContexts]
+       Opt_DatatypeContexts,
+       Opt_NondecreasingIndentation
+           -- strictly speaking non-standard, but we always had this
+           -- on implicitly before the option was added in 7.1, and
+           -- turning it off breaks code, so we're keeping it on for
+           -- backwards compatibility.  Cabal uses -XHaskell98 by
+           -- default unless you specify another language.
+      ]
 
 languageExtensions (Just Haskell2010)
     = [Opt_ImplicitPrelude,
