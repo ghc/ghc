@@ -5,7 +5,7 @@
 
 module Main where
 
-import Char
+import Data.Char
 
 lex' str = do
   putStr ("lex " ++ str ++ " = ")

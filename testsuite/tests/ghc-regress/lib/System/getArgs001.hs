@@ -1,4 +1,4 @@
-import System (getProgName, getArgs)
+import System.Environment (getProgName, getArgs)
 
 main = 
     getProgName >>= \ argv0 ->

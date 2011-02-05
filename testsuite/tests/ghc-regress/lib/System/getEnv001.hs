@@ -1,12 +1,12 @@
-import System (getEnv)
 
-import IO ( isDoesNotExistError )
+import System.Environment (getEnv)
+import System.IO.Error (catchIOError, isDoesNotExistError)
 
 main :: IO ()
 main = do
     term <- getEnv "PATH"
     putStrLn "Got $PATH"
-    fish <- getEnv "One fish, two fish, red fish, blue fish"  `catch` getEnv_except
+    fish <- getEnv "One fish, two fish, red fish, blue fish" `catchIOError` getEnv_except
     putStrLn fish
 
 getEnv_except :: IOError -> IO String

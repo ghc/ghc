@@ -1,7 +1,7 @@
 -- !!! Test getCPUTime
 
-import IO
-import CPUTime
+import System.CPUTime
+import System.IO
 
 main :: IO ()
 main = do

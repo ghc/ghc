@@ -1,6 +1,6 @@
 module Main(main) where
 
-import Random
+import System.Random
 
 tstRnd rng = checkRange rng (genRnd 50 rng)
  

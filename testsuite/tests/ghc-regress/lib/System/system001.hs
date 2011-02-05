@@ -1,6 +1,7 @@
 -- Not run on mingw, because of /dev/null use
 
-import System (system, ExitCode(..), exitWith)
+import System.Cmd (system)
+import System.Exit (ExitCode(..), exitWith)
 
 main = 
     system "cat dog 1>/dev/null 2>&1" >>= \ ec ->

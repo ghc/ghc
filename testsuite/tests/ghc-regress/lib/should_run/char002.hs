@@ -1,5 +1,5 @@
 -- !!! tests for large character values in literals
-import Char
+import Data.Char
 main = do
   print (ord '\xffff')
   print (ord '\o7777')
