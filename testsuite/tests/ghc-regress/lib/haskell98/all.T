@@ -1,1 +1,1 @@
-test('instance-leaks', normal, compile, ['-package haskell98'])
+test('instance-leaks', normal, compile, ['-hide-all-packages -package haskell98'])
