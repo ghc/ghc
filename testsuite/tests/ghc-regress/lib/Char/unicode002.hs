@@ -1,7 +1,7 @@
 module Main where
 
 
-import Char
+import Data.Char
 import Numeric
 
 header = "Code C P S U L A D"

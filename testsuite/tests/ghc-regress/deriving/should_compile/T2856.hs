@@ -4,7 +4,7 @@
 
 module T2856 where
 
-import Ratio
+import Data.Ratio
 
 ----------------------
 class C a where

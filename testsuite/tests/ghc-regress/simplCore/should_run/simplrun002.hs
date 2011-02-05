@@ -8,7 +8,7 @@
 
 module Main where
 
-import IO
+import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
 
 {-# NOINLINE [0] sndSnd #-}

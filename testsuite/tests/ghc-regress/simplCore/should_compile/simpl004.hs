@@ -2,7 +2,7 @@
 
 module ShouldCompile where
 
-import Ix
+import Data.Ix
 import GHC.Exts
 
 

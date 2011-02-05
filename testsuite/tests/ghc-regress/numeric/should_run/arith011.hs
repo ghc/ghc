@@ -1,9 +1,9 @@
 -- !!! Testing Int and Word
 module Main(main) where
-import Int
-import Word
-import Bits
-import Ix -- added SOF
+import Data.Int
+import Data.Word
+import Data.Bits
+import Data.Ix -- added SOF
 import Control.Exception
 
 main :: IO ()

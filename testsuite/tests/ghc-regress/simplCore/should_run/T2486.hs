@@ -7,7 +7,7 @@
 
 module Main where
 
-import System
+import System.Environment
 import Numeric
 
 main = do

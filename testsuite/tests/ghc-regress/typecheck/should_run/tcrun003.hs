@@ -2,7 +2,7 @@
 -- !!! One method class from Sergey Mechveliani 
 --     showed up problematic newtype dict rep.
 module Main where
-import Ratio 
+import Data.Ratio
 
 class MBConvertible a b  where  cm :: a -> b -> Maybe b
 

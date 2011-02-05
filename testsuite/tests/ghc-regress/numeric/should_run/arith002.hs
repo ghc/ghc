@@ -1,6 +1,6 @@
 -- !!! basic Rational operations
 --
-import Ratio
+import Data.Ratio
 
 main
   = putStr

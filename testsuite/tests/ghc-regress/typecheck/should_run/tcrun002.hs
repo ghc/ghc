@@ -4,7 +4,7 @@ module Main where
 -- This program develops a space leak if sfoldl isn't compiled with some
 -- care.  See comment about polymorphic recursion in TcMonoBinds.lhs
 
-import System(getArgs)
+import System.Environment (getArgs)
 import GHC.IOBase
 
 sfoldl :: (a -> Int -> a) -> a -> [Int] -> a

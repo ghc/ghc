@@ -6,7 +6,7 @@ module Main where
 
 import Prelude hiding (logBase)
 
-import Maybe
+import Data.Maybe
 
 -------------------------------------------------------------------------------
 

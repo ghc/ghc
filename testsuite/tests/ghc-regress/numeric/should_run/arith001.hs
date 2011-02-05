@@ -1,6 +1,6 @@
 -- !!! conversions: Double <=> Rational/Integer things
 --
-import Ratio
+import Data.Ratio
 
 main = putStr (show r42  ++ "\n" ++
 	       show nu42 ++ ", " ++

@@ -4,7 +4,7 @@ Exposed-Modules: A
 Other-Modules: B.A
 C-Sources: hello.c, c_src/hello.c
 Extensions: ForeignFunctionInterface
-Build-depends: base>=1.0, haskell98
+Build-depends: base>=1.0
 
 Executable: testA
 Other-Modules: A, MainA

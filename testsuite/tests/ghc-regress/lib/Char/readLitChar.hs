@@ -1,7 +1,7 @@
 module Main (main)
 where
 
-import Char (digitToInt, lexLitChar, readLitChar)
+import Data.Char (digitToInt, lexLitChar, readLitChar)
 
 main :: IO ()
 main =

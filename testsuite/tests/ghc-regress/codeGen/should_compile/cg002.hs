@@ -1,5 +1,5 @@
 
 module M where
-import Char
+import Data.Char
 {-# INLINE f #-}
 f = map ord . map chr
