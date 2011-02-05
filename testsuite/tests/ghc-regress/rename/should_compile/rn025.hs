@@ -1,5 +1,5 @@
 -- !!! Re-exporting a module whose contents is partially hidden.
-module ShouldCompile ( module List ) where
+module ShouldCompile ( module Data.List ) where
 
-import List hiding ( sort )
+import Data.List hiding ( sort )
 

@@ -1,4 +1,4 @@
 {-# OPTIONS -fwarn-unused-imports #-}
 -- !!! test unused import warning
-import Time
+import Data.List
 main = return () :: IO ()

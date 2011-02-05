@@ -3,7 +3,7 @@
 -- !!! entities.
 module ShouldCompile where
 
-import List ( sort )
+import Data.List ( sort )
 
 x :: Int
 x = 2
@@ -15,4 +15,4 @@ z :: Int
 z = ShouldCompile.x
 
 sortOf :: Ord a=> [a] -> [a]
-sortOf = List.sort
+sortOf = Data.List.sort

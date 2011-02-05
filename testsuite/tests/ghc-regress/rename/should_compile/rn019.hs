@@ -1,4 +1,4 @@
 module Silly (
-	Array.accum
+        Data.Array.accum
   ) where
-import qualified Array
+import qualified Data.Array

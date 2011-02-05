@@ -2,8 +2,8 @@
 -- !!! a local alias without having used 'qualified'.
 module ShouldCompile where
 
-import List  as X
-import Maybe as X
+import Data.List  as X
+import Data.Maybe as X
 
 x :: Ord a => [a] -> [a]
 x = X.sort
