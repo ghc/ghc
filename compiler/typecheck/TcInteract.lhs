@@ -1040,48 +1040,21 @@ doInteractWithInert (CFrozenErr { cc_id = cv2, cc_flavor = fl2 })
 -- Fall-through case for all other situations
 doInteractWithInert _ workItem = noInteraction workItem
 
--- XXX: Do something with the derived.
--- Derived example:
---
---   class (1 <= n) => C n where f :: ...
---
--- Using "f" generates a wanted "C n" constraint which, in turn,
--- results in a derived "1 <= n" constraint.
---
--- This is not something that we need to solve but, rather, we can use
--- this fact when solvoing other goals (wanteds).
---
--- Derived constraints may interact with assumptions (givens).
--- For example, if we were working in a context where we knew that
--- "n <= 1" (e.g., from a type signature), then we can generate another
--- derived constraint: "n ~ 1".
-
-
 numericReactionsStage :: SimplifierStage
-numericReactionsStage workItem inert
-  | isNumWork =
-    if isWanted (cc_flavor workItem) then
-        do (val,new) <- solveNumWanted grelevant wrelevant workItem
-           return
-            SR { sr_stop = case val of
-                             Nothing -> Stop
-                             Just v  -> ContinueWith v
-               , sr_new_work = new
-               , sr_inerts = inert
-               }
-    else do (val,ins,new) <- addNumGiven grelevant wrelevant workItem
-            return
-              SR { sr_stop = case val of
-                               Nothing -> Stop
-                               Just v  -> ContinueWith v
-                 , sr_new_work = new
-                 , sr_inerts = foldrBag (flip updInertSet) inert_residual1 ins
-                 }
+numericReactionsStage workItem inert | isNumWork =
+  do res <- canonicalNum grelevant drelevant wrelevant workItem
+     return SR
+       { sr_stop = case numNext res of
+                     Nothing -> Stop
+                     Just v  -> ContinueWith v
+       , sr_new_work = numNewWork res
+       , sr_inerts =
+           case numInert res of
+             Nothing  -> inert
+             Just ins -> foldrBag (flip updInertSet) inert_residual ins
+       }
 
   where (grelevant, drelevant, wrelevant, inert_residual) = getNumInerts inert
-        inert_residual1 = foldrBag (flip updInertSet) inert_residual drelevant
-        -- XXX: so that we don't loose things
-
         isNumWork = case workItem of
                       CFunEqCan { cc_fun   = f }  -> isNumFun f
                       CDictCan  { cc_class = c }  -> isNumClass c

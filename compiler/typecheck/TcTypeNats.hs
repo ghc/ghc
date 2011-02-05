@@ -1,13 +1,16 @@
 {-# LANGUAGE PatternGuards #-}
-module TcTypeNats (solveNumWanted, addNumGiven) where
+module TcTypeNats ( canonicalNum, NumericsResult(..) ) where
 
 import TcSMonad   ( TcS, Xi
                   , newWantedCoVar
                   , setWantedCoBind, setDictBind, newDictVar
+                  , getWantedLoc
                   , tcsLookupTyCon, tcsLookupClass
                   , CanonicalCt (..), CanonicalCts
+                  , mkFrozenError
                   , traceTcS
                   )
+import TcRnTypes  ( CtFlavor(..) )
 import TcCanonical (mkCanonicals)
 import HsBinds    (EvTerm(..))
 import Class      ( Class, className, classTyCon )
@@ -21,7 +24,7 @@ import Outputable
 import PrelNames  ( lessThanEqualClassName
                   , addTyFamName, mulTyFamName, expTyFamName
                   )
-import Bag        (bagToList, emptyBag, unionBags)
+import Bag        (bagToList, emptyBag, unionManyBags, unionBags)
 import Data.Maybe (fromMaybe)
 import Data.List  (nub, partition)
 import Control.Monad (msum, mplus, zipWithM, (<=<), guard)
@@ -53,6 +56,11 @@ instance Eq Term where
 -- Interface with the type checker
 --------------------------------------------------------------------------------
 
+data NumericsResult = NumericsResult
+  { numNewWork :: CanonicalCts
+  , numInert   :: Maybe CanonicalCts   -- Nothing for "no change"
+  , numNext    :: Maybe CanonicalCt
+  }
 
 -- We keep the original type in numeric constants to preserve type synonyms.
 toTerm :: Xi -> Term
@@ -81,10 +89,19 @@ toProp p = panic $
   "[TcTypeNats.toProp] Unexpected CanonicalCt: " ++ showSDoc (ppr p)
 
 
-solveNumWanted :: CanonicalCts -> CanonicalCts -> CanonicalCt ->
-                TcS (Maybe CanonicalCt, CanonicalCts)
-solveNumWanted given wanted prop =
-  do let asmps = map toProp $ bagToList $ unionBags given wanted
+canonicalNum :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
+                TcS NumericsResult
+canonicalNum given derived wanted prop =
+  case cc_flavor prop of
+    Wanted {}   -> solveNumWanted given derived wanted prop
+    Derived {}  -> addNumDerived  given derived wanted prop
+    Given {}    -> addNumGiven    given derived wanted prop
+
+
+solveNumWanted :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
+                TcS NumericsResult
+solveNumWanted given derived wanted prop =
+  do let asmps = map toProp $ bagToList $ unionManyBags [given,derived,wanted]
          goal  = toProp prop
 
      numTrace "solveNumWanted" (vmany asmps <+> text "|-" <+> ppr goal)
@@ -96,25 +113,57 @@ solveNumWanted given wanted prop =
             defineDummy (cc_id prop) =<< fromProp goal
             evs   <- mapM (newSubGoal <=< fromProp) sgs
             goals <- mkCanonicals (cc_flavor prop) evs
-            return (Nothing, goals)
+            return NumericsResult
+              { numNext = Nothing, numInert = Nothing, numNewWork = goals }
 
        -- XXX: The new wanted might imply some of the existing wanteds...
        Improved is ->
          do numTrace "Improved by" (vmany is)
             evs   <- mapM (newSubGoal <=< fromProp) is
             goals <- mkCanonicals (cc_flavor prop) evs
-            return (Just prop, goals)
+            return NumericsResult
+              { numNext = Just prop, numInert = Nothing, numNewWork = goals }
 
-       -- XXX: Report an error
-       Impossible ->
-         do numTrace "Impssoble" empty
-            return (Just prop, emptyBag)
+       Impossible -> impossible prop
 
 
-addNumGiven :: CanonicalCts -> CanonicalCts -> CanonicalCt ->
-              TcS (Maybe CanonicalCt, CanonicalCts, CanonicalCts)
-addNumGiven given wanted prop =
-  do let asmps = map toProp $ bagToList $ unionBags given wanted
+-- XXX: Need to understand derived work better.
+addNumDerived :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
+              TcS NumericsResult
+addNumDerived given derived wanted prop =
+  do let asmps = map toProp $ bagToList given
+         goal  = toProp prop
+
+     numTrace "addNumDerived" (vmany asmps <+> text "|-" <+> ppr goal)
+
+     case solve asmps goal of
+
+       Simplified sgs ->
+         do numTrace "Simplified to" (vmany sgs)
+            defineDummy (cc_id prop) =<< fromProp goal
+            evs   <- mapM (newSubGoal <=< fromProp) sgs
+            goals <- mkCanonicals (cc_flavor prop) evs
+            return NumericsResult
+              { numNext = Nothing, numInert = Nothing, numNewWork = goals }
+
+       -- XXX: watch out for cycles because of the wanteds being restarted:
+       -- W => D && D => W, we could solve W by W
+       -- if W <=> D, then we should simplify W to D, not make it derived.
+       Improved is ->
+         do numTrace "Improved by" (vmany is)
+            evs   <- mapM (newSubGoal <=< fromProp) is
+            goals <- mkCanonicals (Derived (getWantedLoc prop)) evs
+            return NumericsResult
+              { numNext = Just prop, numInert = Just (unionBags given derived)
+              , numNewWork = unionBags wanted goals }
+
+       Impossible -> impossible prop
+
+
+addNumGiven :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
+              TcS NumericsResult
+addNumGiven given derived wanted prop =
+  do let asmps = map toProp (bagToList given)
          goal  = toProp prop
 
      numTrace "addNumGiven" (vmany asmps <+> text " /\\ " <+> ppr goal)
@@ -124,18 +173,25 @@ addNumGiven given wanted prop =
          do numTrace "Simplified to" (vmany sgs)
             evs   <- mapM (newFact <=< fromProp) sgs
             facts <- mkCanonicals (cc_flavor prop) evs
-            return (Nothing, unionBags given wanted, facts)
+            return NumericsResult
+              { numNext = Nothing, numInert = Nothing, numNewWork = facts }
 
        Improved is ->
          do numTrace "Improved by" (vmany is)
             evs <- mapM (newFact <=< fromProp) is
             facts <- mkCanonicals (cc_flavor prop) evs
-            return (Just prop, given, unionBags wanted facts)
+            return NumericsResult
+              { numNext = Just prop, numInert = Just (unionBags given derived)
+              , numNewWork = unionBags wanted facts }
 
-       -- XXX: report error
-       Impossible ->
-         do numTrace "Impossible" empty
-            return (Just prop, unionBags given wanted, emptyBag)
+       Impossible -> impossible prop
+
+impossible :: CanonicalCt -> TcS NumericsResult
+impossible c =
+  do numTrace "Impossible" empty
+     let err = mkFrozenError (cc_flavor c) (cc_id c)
+     return NumericsResult
+       { numNext = Just err, numInert = Nothing, numNewWork = emptyBag }
 
 
 
@@ -396,39 +452,49 @@ propsToOrd props = loop (step [] unconditional)
                            (guard (isLeq ps (num 1) b) >> return (a,c))
 
 --------------------------------------------------------------------------------
--- Associativity
+-- Associativity (assumes commutative operators)
 --------------------------------------------------------------------------------
 
--- We try to compute new equalities by moving parens to the right:
--- if (a + b) + c = d then a + (b + c) = d
---
--- This desugars to:
---   a + b = p, p + c = q, b + c = r  => a + r = q
---
--- Note that this fires only if we have a name, r, for the right-paren sum,
--- or if we can compute it.
--- a + 2 = p, p + 3 = q => a + 5 = q
---
--- So, when we add a new fact it could match any of the 3 positions
--- in the RHS of this rule.
+{-
+We try to compute new equalities by moving parens to the right:
+if (a + b) + c = d then a + (b + c) = d
+                        a + (c + b) = d
+                        b + (a + c) = d
+                        b + (c + a) = d
+                        c + (a + b) = d
+                        x + (b + a) = d
+
+We use the rule when we already have a name for the intermediate sum
+(RHS parens), or if it is a constant because then we learn a new
+relationships between variables.
+
+Example for how it can be a constnat:
+(a + 2 = p, p + 3 = q) => a + 5 = q
+
 
 impAssoc :: [Prop] -> Prop -> [Prop]
 impAssoc ps (EqFun op x y z) | associative op = concatMap imps asmps
   where
   asmps         = [ (a,b,c) | EqFun op' a b c <- ps, op == op' ]
-  imps (a,b,c)
-    -- new in position 2
-    | c == x    = [ EqFun op a by z | by <- y_plus b ]
+  imps (a,b,c)  =
 
-    -- new in position 1
-    | a == z    = [ EqFun op x yb c | yb <- y_plus b ]
+    -- (a + b = cx, cx + y = z) => (a + by = z)
+    (guard (c == x) >> [ EqFun op a by z | by <- y_plus b ]) ++
 
-    -- new in position 3
-    | otherwise = [ EqFun op a z e | (c',d,e) <- asmps,
-                                              c == c' && sameSum b d x y ]
-                  ++
-                  [ EqFun op d z c | (d,e,a') <- asmps,
-                                              a == a' && sameSum e b x y ]
+    -- (az + b = c, x + y = az) => (x + yb = c)
+    (guard (a == z) >> [ EqFun op x yb c | yb <- y_plus b ]) ++
+
+    -- or, the new fact could be a name for the RHS paren intermediate:
+    [ EqFun op v z e | (c',d,e) <- asmps, c == c'   -- a + b + d = e
+                     , v <- [ d | sameSum x y a b ] ++
+                            [ a | sameSum x y b d ] ++
+                            [ b | sameSum x y a d ]
+    ] ++
+    [ EqFun op v z c | (d,e,a') <- asmps, a == a'   -- d + e + b = c
+                     , v <- [ b | sameSum x y d e ] ++
+                            [ d | sameSum x y e b ] ++
+                            [ e | sameSum x y d b ]
+    ]
 
   sameSum a b a' b' = (a == a' && b == b') || (a == b' && b == a')
 
@@ -442,6 +508,7 @@ impAssoc ps (EqFun op x y z) | associative op = concatMap imps asmps
 
 impAssoc _ _ = []
 
+-}
 --------------------------------------------------------------------------------
 -- Descrete Math
 --------------------------------------------------------------------------------
