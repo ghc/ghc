@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, StandaloneDeriving, FlexibleInstances, GADTs #-}
 module Main where
 
-import Ix
+import Data.Ix
 
 -- Deriving Enum with phantom type parameter
 data T a = R | S | T deriving( Enum, Show )

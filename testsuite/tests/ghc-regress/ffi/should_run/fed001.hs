@@ -1,5 +1,5 @@
+import Control.Monad
 import Foreign
-import Monad
 import Foreign.Ptr
 
 type CInt  = Int32

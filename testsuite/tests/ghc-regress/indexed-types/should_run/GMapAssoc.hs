@@ -3,7 +3,7 @@
 module Main where
 
 import Prelude hiding (lookup)
-import Char (ord)
+import Data.Char (ord)
 import qualified Data.Map as Map
 
 

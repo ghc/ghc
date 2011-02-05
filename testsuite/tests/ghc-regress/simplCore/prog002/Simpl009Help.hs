@@ -4,7 +4,7 @@
 
 module Simpl009Help where
   
-import Monad
+import Control.Monad
 
 newtype Parser s a
   = Parser (forall res . (a -> [String] -> P s res) -> [String] -> P s res)

@@ -3,7 +3,7 @@
 module T4188 where
 
 import Language.Haskell.TH
-import IO
+import System.IO
 
 class C a where {}
 

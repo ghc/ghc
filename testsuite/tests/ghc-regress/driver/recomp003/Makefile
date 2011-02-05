@@ -8,10 +8,10 @@ OBJSUFFIX = .o
 # recompilation.  Part of bug #1372.
 recomp003:
 	$(RM) A.hi A$(OBJSUFFIX) out
-	$(RM) Char.hs Char.hi Char$(OBJSUFFIX)
+	$(RM) Data/Char.hs Data/Char.hi Data/Char$(OBJSUFFIX)
 	'$(TEST_HC)' -c A.hs
-	echo "module Char where" >Char.hs
-	'$(TEST_HC)' -c Char.hs
+	echo "module Data.Char where" > Data/Char.hs
+	'$(TEST_HC)' -c Data/Char.hs
 	# Should now recompile A.hs, because Char is now a home module:
 	'$(TEST_HC)' -c A.hs 2>err
 	@if grep NOT err; then false; fi

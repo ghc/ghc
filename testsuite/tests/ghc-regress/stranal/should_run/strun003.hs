@@ -5,7 +5,9 @@
 -- See the io_hack_reqd in DmdAnal.lhs
 
 module Main where
-import System
+
+import System.Environment
+import System.Exit
 
 main    = do
             args <- getArgs

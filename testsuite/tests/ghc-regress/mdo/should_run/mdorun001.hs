@@ -4,7 +4,7 @@ module Main(main) where
 
 import Control.Monad.Fix
 import Data.Array.IO
-import Monad
+import Control.Monad
 
 norm a = mdo (_, sz) <- getBounds a
 	     s <- ioaA 1 s sz 0

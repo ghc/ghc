@@ -2,7 +2,6 @@
 
 module HO where 
 
-import IO
 import Data.IORef
 
 type family SMRef    (m::(* -> *)) :: * -> *

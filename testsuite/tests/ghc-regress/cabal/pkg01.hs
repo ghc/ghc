@@ -1,3 +1,3 @@
-module Char where
--- conflicts with module from haskell98 package
-import IO
+module Data.Map where
+-- conflicts with module from containers package
+import Data.Set

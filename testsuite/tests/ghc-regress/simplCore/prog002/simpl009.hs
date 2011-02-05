@@ -9,7 +9,7 @@
 
 module FormParse where
   
-import Monad
+import Control.Monad
 import Simpl009Help
 
 identifier :: Parser Char Char

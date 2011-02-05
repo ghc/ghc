@@ -1,3 +1,3 @@
 module A where
-import Char
+import Data.Char
 

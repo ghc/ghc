@@ -7,14 +7,14 @@ module Main where
  -
  -}
 
-import qualified Array
-import List
-import Monad ( liftM2, liftM3, liftM4 )
-import Random
+import qualified Data.Array as Array
+import Data.List
+import Control.Monad ( liftM2, liftM3, liftM4 )
+import System.Random
 
 
-import Ix
-import List( (\\) )
+import Data.Ix
+import Data.List( (\\) )
 
 infixl 9  !, //
 infixr 0 ==>
