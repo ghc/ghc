@@ -1,2 +1,2 @@
 -- bug: shouldn't kill the whole system
-System.exitFailure
+System.Exit.exitFailure
