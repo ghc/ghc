@@ -2,7 +2,7 @@
 
 module Main where
 
-import Directory
+import System.Directory
 
 data Error
     = ErrorFileNone

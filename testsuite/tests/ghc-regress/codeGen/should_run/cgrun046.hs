@@ -1,6 +1,6 @@
 module Main where
 
-import IO
+import System.IO
 
 -- !!! CAF space leaks
 

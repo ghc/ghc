@@ -1,5 +1,5 @@
 -- !! fromRational woes
-import Ratio -- 1.3
+import Data.Ratio -- 1.3
 
 main = putStr (
    shows tinyFloat  ( '\n'

@@ -3,7 +3,7 @@ module Main where
 import Control.Monad.ST.Lazy
 import Data.STRef.Lazy
 import Data.Array.ST
-import Int
+import Data.Int
 import Debug.Trace
 
 data Refs s = Refs

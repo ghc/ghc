@@ -3,7 +3,7 @@
 
 module Main where
 
-import System (getArgs)
+import System.Environment (getArgs)
 
 -- NOTE: When if you remove Eight (or any other constructor) everything works
 -- Having at least 9 constructors has something to do with the bug
