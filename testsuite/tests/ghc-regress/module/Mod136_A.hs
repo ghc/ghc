@@ -1,3 +1,3 @@
-module Mod136_A (module List) where 
+module Mod136_A (module Data.List) where
 
-import qualified List 
+import qualified Data.List

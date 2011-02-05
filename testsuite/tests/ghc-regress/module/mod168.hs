@@ -7,7 +7,7 @@ module M where
 import Prelude hiding ( negate, enumFrom, 
 		        enumFromThen, enumFromTo,
 		        enumFromThenTo )
-import Ix hiding ( rangeSize )
+import Data.Ix hiding ( rangeSize )
 negate = undefined
 enumFrom = undefined
 enumFromThen = undefined

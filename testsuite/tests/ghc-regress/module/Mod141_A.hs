@@ -1,6 +1,6 @@
-module Mod141_A (partition, module List) where
+module Mod141_A (partition, module Data.List) where
 
-import List hiding (partition)
+import Data.List hiding (partition)
 
 partition :: String
 partition = "partition"

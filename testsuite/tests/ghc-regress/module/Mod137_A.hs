@@ -1,6 +1,6 @@
-module Mod137_A (module Char) where 
+module Mod137_A (module Data.Char) where
 
-import Char
-import List as Char
+import Data.Char
+import Data.List as Data.Char
 
 

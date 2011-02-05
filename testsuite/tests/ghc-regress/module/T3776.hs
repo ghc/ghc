@@ -6,7 +6,7 @@
 
 module T3776 where
 
-import qualified Ix( Ix(index) )
+import qualified Data.Ix( Ix(index) )
 
-instance Ix.Ix Float where
+instance Data.Ix.Ix Float where
   index = error "urk"

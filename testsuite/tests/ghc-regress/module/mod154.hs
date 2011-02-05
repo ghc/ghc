@@ -5,5 +5,5 @@
 
 module M where 
 
-import List as M
+import Data.List as M
 sort = "foo"
