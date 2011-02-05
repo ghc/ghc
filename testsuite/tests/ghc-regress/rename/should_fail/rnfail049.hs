@@ -4,7 +4,7 @@
 
 module RnFail049 where
 
-import List(inits, tails)
+import Data.List(inits, tails)
 
 functions :: [forall a. [a] -> [[a]]]
 functions = [inits, tails]

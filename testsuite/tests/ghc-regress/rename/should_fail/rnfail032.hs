@@ -1,3 +1,3 @@
 -- !!! check that hiding works with qualified imports
-module ShouldFail ( List.map ) where
-import qualified List hiding ( map )
+module ShouldFail ( Data.List.map ) where
+import qualified Data.List hiding ( map )

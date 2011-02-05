@@ -1,5 +1,5 @@
 
-rnfail029.hs:2:31:
+rnfail029.hs:2:36:
     Conflicting exports for `map':
-      `List.map' exports `List.map' imported from List at rnfail029.hs:3:1-21
+      `Data.List.map' exports `Data.List.map' imported from Data.List at rnfail029.hs:3:1-26
       `module ShouldFail' exports `ShouldFail.map' defined at rnfail029.hs:4:1
