@@ -2,7 +2,7 @@
 --import StdLib
 module ShouldSucceed where
 
-import Char
+import Data.Char
 
 class Parse a where
        parseFile :: String -> [a]

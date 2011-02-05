@@ -4,7 +4,7 @@
 
 module ShouldCompile where
 
-import List(inits)
+import Data.List(inits)
 
 foo :: [[[Int]]]
 foo = [ x

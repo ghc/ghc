@@ -4,7 +4,7 @@
 
 module ShouldCompile where
 
-import Maybe
+import Data.Maybe
 
 type Env = ([(String,Int)],Int)
 
