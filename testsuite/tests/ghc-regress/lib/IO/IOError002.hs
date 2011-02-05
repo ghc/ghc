@@ -1,5 +1,5 @@
 -- !!! IOErrors should have Eq defined
 
-import IO
+import System.IO
 
 main = print (userError "urk" == userError "urk")

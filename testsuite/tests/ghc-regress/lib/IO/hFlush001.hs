@@ -1,9 +1,9 @@
 -- !!! Flushing
 module Main(main) where
 
-import IO
-import Directory ( removeFile, doesFileExist )
-import Monad
+import Control.Monad
+import System.Directory ( removeFile, doesFileExist )
+import System.IO
 
 main = do
   hFlush stdin `catch` \ _ -> putStrLn "No can do - flushing read-only handles isn't legal"

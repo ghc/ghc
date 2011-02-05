@@ -1,9 +1,9 @@
 -- !!! Open a non-existent file for writing
 
-import Char
-import IO
-import Directory
-import Monad
+import Control.Monad
+import Data.Char
+import System.Directory
+import System.IO
 
 file = "openFile004.out"
 

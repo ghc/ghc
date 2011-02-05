@@ -1,3 +1,3 @@
-import IO
+import System.IO
 
 main = isEOF >>= print

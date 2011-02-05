@@ -1,6 +1,6 @@
 -- !!! opening a file in WriteMode better truncate it
 
-import IO
+import System.IO
 
 main = do
   h <- openFile "openFile006.out" AppendMode

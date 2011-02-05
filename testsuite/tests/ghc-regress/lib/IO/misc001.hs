@@ -1,8 +1,8 @@
-import IO
+import System.IO
 
-import System (getArgs)
-import Char   (toUpper)
-import Directory (removeFile, doesFileExist)
+import Data.Char          (toUpper)
+import System.Directory   (removeFile, doesFileExist)
+import System.Environment (getArgs)
 
 main   =  do
   [f1,f2] <- getArgs

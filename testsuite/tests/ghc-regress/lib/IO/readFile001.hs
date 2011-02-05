@@ -1,6 +1,7 @@
 -- !!! readFile test
 
-import IO
+import System.IO
+import System.IO.Error
 
 source   = "readFile001.hs"
 filename = "readFile001.out"
@@ -14,7 +15,7 @@ main = do
 
   -- This open should fail, because the readFile hasn't been forced
   -- and the file is therefore still locked.
-  try (openFile filename WriteMode) >>= print
+  tryIOError (openFile filename WriteMode) >>= print
 
   putStrLn s
 

@@ -1,5 +1,5 @@
-import Char
-import IO
+import Data.Char
+import System.IO
 
 -- !!! Open a non-existent file for reading (should fail)
 

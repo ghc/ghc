@@ -5,7 +5,7 @@
 --
 -- However, we don't believe that this is the right behaviour.
 
-import IO
+import System.IO
 
 main = catch loop (\e -> print e)
 

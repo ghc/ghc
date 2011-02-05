@@ -1,9 +1,9 @@
 -- !!! Testing IO.hFileSize
 module Main(main) where
 
-import IO
-import Directory ( removeFile, doesFileExist )
-import Monad
+import Control.Monad
+import System.Directory ( removeFile, doesFileExist )
+import System.IO
 
 main = do
   sz <- hFileSize stdin `catch` (\ _ -> return (-1))

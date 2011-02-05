@@ -1,7 +1,7 @@
 -- !!! Reconfiguring the buffering of a handle
 module Main(main) where
 
-import IO
+import System.IO
 
 queryBuffering :: String -> Handle -> IO ()
 queryBuffering handle_nm handle = do

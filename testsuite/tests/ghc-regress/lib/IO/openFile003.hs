@@ -1,13 +1,14 @@
-import IO
+import System.IO
+import System.IO.Error
 
 -- !!! Open a directory (should fail)
 
 main = do
-  r <- try (openFile "." ReadMode)
+  r <- tryIOError (openFile "." ReadMode)
   print r
-  r <- try (openFile "." WriteMode)
+  r <- tryIOError (openFile "." WriteMode)
   print r
-  r <- try (openFile "." AppendMode)
+  r <- tryIOError (openFile "." AppendMode)
   print r
-  r <- try (openFile "." ReadWriteMode)
+  r <- tryIOError (openFile "." ReadWriteMode)
   print r

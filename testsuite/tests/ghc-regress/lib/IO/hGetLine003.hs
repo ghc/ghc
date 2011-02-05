@@ -1,4 +1,4 @@
-import IO
+import System.IO
 
 main = f stdin
   where f h = do p <- hIsEOF h

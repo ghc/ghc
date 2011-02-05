@@ -2,7 +2,8 @@
 -- there are rather than closing the first read handle causing the
 -- lock to be released.
 
-import IO
+import System.IO
+import System.IO.Error
 
 file = "countReaders001.txt"
 
@@ -12,5 +13,5 @@ main = do
   h1 <- openFile file ReadMode
   h2 <- openFile file ReadMode
   hClose h1
-  try (openFile file AppendMode) >>= print
+  tryIOError (openFile file AppendMode) >>= print
 

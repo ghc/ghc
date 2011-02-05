@@ -1,4 +1,4 @@
-import IO
+import System.IO
 
 main = do
  hSetBuffering stdout NoBuffering

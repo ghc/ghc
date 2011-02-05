@@ -1,6 +1,6 @@
 import GHC.Handle
 import GHC.IOBase
-import IO
+import System.IO
 import Control.Concurrent.MVar
 import Data.Typeable
 import qualified GHC.IO.FD as FD

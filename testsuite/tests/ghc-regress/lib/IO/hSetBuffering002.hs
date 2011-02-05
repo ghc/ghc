@@ -1,4 +1,4 @@
-import IO
+import System.IO
 
 main = 
     hSetBuffering stdin NoBuffering	>>

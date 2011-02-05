@@ -1,4 +1,4 @@
-import IO
+import System.IO
 
 main = 
     sequence (map hIsOpen [stdin, stdout, stderr]) >>= \ opens ->
