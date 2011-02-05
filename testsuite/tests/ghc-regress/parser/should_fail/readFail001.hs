@@ -15,9 +15,9 @@ module OneOfEverything (
     ) where
 
 import Prelude
-import IO		( putStr )
-import System hiding	( getArgs )
-import Monad
+import System.IO ( putStr )
+import System.Environment hiding ( getArgs )
+import Control.Monad
 
 -- HsDecls stuff
 

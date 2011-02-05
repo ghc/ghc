@@ -2,7 +2,7 @@
 
 module Foo where
 
-import List
+import Data.List
 import GHC.Exts
 
 foo = [ ()
