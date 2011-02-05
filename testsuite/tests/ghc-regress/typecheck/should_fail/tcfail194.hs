@@ -4,7 +4,7 @@
 
 module ShouldFail where
 
-import List(take)
+import Data.List(take)
 
 z = [x | x <- [1..10], then take 5 by x]
 

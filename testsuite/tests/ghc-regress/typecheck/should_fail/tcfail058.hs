@@ -1,5 +1,5 @@
 module ShouldFail where
-import Array
+import Data.Array
 
 -- !!! inadvertently using => instead of ->
 

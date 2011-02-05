@@ -1,6 +1,6 @@
 module ShouldFail where
 
-import Ratio
+import Data.Ratio
 
 data Integral a => P a = P { p :: a }
 

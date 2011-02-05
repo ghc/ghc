@@ -4,7 +4,7 @@
 
 module ShouldFail where
 
-import List(inits)
+import Data.List(inits)
 
 z :: [Int]
 z = [x | x <- [3, 2, 1], then inits]

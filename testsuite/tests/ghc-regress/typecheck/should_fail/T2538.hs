@@ -1,7 +1,7 @@
 
 -- Trac #2538
 module ShouldFail where
-import Ix
+import Data.Ix
 
 f :: (Eq a => a -> a) -> Int
 f = error "urk"
