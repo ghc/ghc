@@ -1,4 +1,4 @@
-import Time
+import System.Time
 
 main :: IO ()
 main = do

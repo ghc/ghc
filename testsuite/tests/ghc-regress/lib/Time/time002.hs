@@ -1,4 +1,4 @@
-import Time
+import System.Time
 
 -- !!! check that we can read the current ClockTime, convert it
 -- !!! to CalendarTime and back again, and that all three times when

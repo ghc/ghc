@@ -3,7 +3,7 @@
 module Main(main) where
 
 import Numeric
-import Char
+import Data.Char
 
 main = 
   let 

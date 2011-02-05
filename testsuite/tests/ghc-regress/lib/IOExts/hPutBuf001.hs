@@ -1,7 +1,6 @@
-import IO
 import System.IO
 import Foreign
-import CForeign
+import Foreign.C
 
 main = do
   hSetBinaryMode stdout True

@@ -1,7 +1,6 @@
 -- !!! Testing hGetPosn and hSetPosn
 module Main(main) where
 
-import IO
 import System.IO
 
 getPosnAndPrint h = do

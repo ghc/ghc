@@ -1,7 +1,6 @@
-import IO
 import System.IO
 import Foreign
-import CForeign
+import Foreign.C
 
 -- !!! this test failed to write anything in GHC 5.00.2
 main = do

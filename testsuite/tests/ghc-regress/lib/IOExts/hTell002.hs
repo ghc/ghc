@@ -1,9 +1,8 @@
 -- !!! Testing hSeek
 module Main(main) where
 
-import IO
+import System.Directory
 import System.IO
-import Directory
 
 main :: IO ()
 main = do

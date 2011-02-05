@@ -1,8 +1,7 @@
 module Main(main) where
 
-import IO
 import System.IO
-import Char
+import Data.Char
 
 main = do
   isT <- hIsTerminalDevice stdin

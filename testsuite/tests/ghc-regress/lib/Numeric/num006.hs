@@ -3,7 +3,7 @@
 module Main(main) where
 
 import Numeric
-import Char
+import Data.Char
 
 --showDec :: Integral a => a -> ShowS
 showDec = showInt
