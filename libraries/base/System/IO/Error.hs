@@ -76,7 +76,9 @@ module System.IO.Error (
 
     ioError,                    -- :: IOError -> IO a
 
+    catchIOError,               -- :: IO a -> (IOError -> IO a) -> IO a
     catch,                      -- :: IO a -> (IOError -> IO a) -> IO a
+    tryIOError,                 -- :: IO a -> IO (Either IOError a)
     try,                        -- :: IO a -> IO (Either IOError a)
 
     modifyIOError,              -- :: (IOError -> IOError) -> IO a -> IO a
@@ -128,13 +130,20 @@ import Data.Maybe (fromJust)
 import Control.Monad (MonadPlus(mplus))
 #endif
 
--- | The construct 'try' @comp@ exposes IO errors which occur within a
+#ifndef __NHC__
+-- | The construct 'tryIOError' @comp@ exposes IO errors which occur within a
 -- computation, and which are not fully handled.
 --
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.try' from "Control.Exception".
+tryIOError     :: IO a -> IO (Either IOError a)
+tryIOError f   =  catch (do r <- f
+                            return (Right r))
+                        (return . Left)
 
-#ifndef __NHC__
+{-# DEPRECATED try "Please use the new exceptions variant, Control.Exception.try" #-}
+-- | The 'try' function is deprecated. Please use the new exceptions
+-- variant, 'Control.Exception.try' from "Control.Exception", instead.
 try            :: IO a -> IO (Either IOError a)
 try f          =  catch (do r <- f
                             return (Right r))
@@ -436,14 +445,16 @@ annotateIOError (NHC.PatternError loc) msg' _ _ =
 #endif
 
 #ifndef __HUGS__
--- | The 'catch' function establishes a handler that receives any 'IOError'
--- raised in the action protected by 'catch'.  An 'IOError' is caught by
--- the most recent handler established by 'catch'.  These handlers are
+-- | The 'catchIOError' function establishes a handler that receives any
+-- 'IOError' raised in the action protected by 'catchIOError'.
+-- An 'IOError' is caught by
+-- the most recent handler established by one of the exception handling
+-- functions.  These handlers are
 -- not selective: all 'IOError's are caught.  Exception propagation
 -- must be explicitly provided in a handler by re-raising any unwanted
 -- exceptions.  For example, in
 --
--- > f = catch g (\e -> if IO.isEOFError e then return [] else ioError e)
+-- > f = catchIOError g (\e -> if IO.isEOFError e then return [] else ioError e)
 --
 -- the function @f@ returns @[]@ when an end-of-file exception
 -- (cf. 'System.IO.Error.isEOFError') occurs in @g@; otherwise, the
@@ -454,6 +465,12 @@ annotateIOError (NHC.PatternError loc) msg' _ _ =
 --
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.catch' from "Control.Exception".
+catchIOError :: IO a -> (IOError -> IO a) -> IO a
+catchIOError = New.catch
+
+{-# DEPRECATED catch "Please use the new exceptions variant, Control.Exception.catch" #-}
+-- | The 'catch' function is deprecated. Please use the new exceptions
+-- variant, 'Control.Exception.catch' from "Control.Exception", instead.
 catch :: IO a -> (IOError -> IO a) -> IO a
 catch = New.catch
 #endif /* !__HUGS__ */
