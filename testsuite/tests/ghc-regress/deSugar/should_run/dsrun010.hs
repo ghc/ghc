@@ -2,8 +2,8 @@
 -- is reflected by calling the monadic 'fail', not by a
 -- runtime exception
 
-import Maybe
 import Control.Monad
+import Data.Maybe
 
 test :: (MonadPlus m) => [a] -> m Bool
 test xs

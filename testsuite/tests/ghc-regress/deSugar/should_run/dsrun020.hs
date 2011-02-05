@@ -4,7 +4,7 @@
 
 module Main where
 
-import List(takeWhile)
+import Data.List(takeWhile)
 
 main = putStrLn (show output)
   where

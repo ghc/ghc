@@ -4,7 +4,7 @@
 
 module Main where
 
-import List(takeWhile)
+import Data.List(takeWhile)
 import GHC.Exts(sortWith)
 
 employees = [ ("Simon", "MS", 80)

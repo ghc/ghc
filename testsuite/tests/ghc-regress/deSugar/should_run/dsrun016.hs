@@ -4,7 +4,7 @@
 
 module Main where
 
-import List(inits)
+import Data.List(inits)
 
 main = putStrLn (show output)
   where

@@ -4,7 +4,7 @@
 
 module Main where
 
-import List(groupBy)
+import Data.List(groupBy)
 import GHC.Exts(the)
 
 groupRuns :: Eq b => (a -> b) -> [a] -> [[a]]
