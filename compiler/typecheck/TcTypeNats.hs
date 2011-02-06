@@ -15,7 +15,7 @@ import TcCanonical (mkCanonicals)
 import HsBinds    (EvTerm(..))
 import Class      ( Class, className, classTyCon )
 import Type       ( tcView, mkTyConApp, mkNumberTy, isNumberTy
-                  , tcEqType )
+                  , tcEqType, tcCmpType )
 import TypeRep    (Type(..))
 import TyCon      (TyCon, tyConName)
 import Var        (EvVar)
@@ -28,7 +28,6 @@ import Bag        (bagToList, emptyBag, unionManyBags, unionBags)
 import Data.Maybe (fromMaybe)
 import Data.List  (nub, partition)
 import Control.Monad (msum, mplus, zipWithM, (<=<), guard)
-
 
 
 data Term = Var Xi | Num Integer (Maybe Xi)
@@ -50,6 +49,12 @@ instance Eq Term where
   Var x   == Var y    = tcEqType x y
   Num x _ == Num y _  = x == y
   _       == _        = False
+
+instance Ord Term where
+  compare (Num x _) (Num y _) = compare x y
+  compare (Num _ _) (Var _)   = LT
+  compare (Var x)   (Var y)   = tcCmpType x y
+  compare (Var _)   (Num _ _) = GT
 
 
 --------------------------------------------------------------------------------
@@ -263,13 +268,15 @@ solve asmps prop =
     Nothing ->
       case msum $ zipWith solveWanted2 asmps (repeat prop) of
         Just sgs -> Simplified sgs
-        Nothing  ->
-          case improve1 prop of
-            Nothing   -> Impossible
-            Just eqs  ->
-              case zipWithM improve2 asmps (repeat prop) of
-                Nothing   -> Impossible
-                Just eqs1 -> Improved (concat (eqs : eqs1))
+        Nothing
+          | solveAC asmps prop  -> Simplified []
+          | otherwise ->
+            case improve1 prop of
+              Nothing   -> Impossible
+              Just eqs  ->
+                case zipWithM improve2 asmps (repeat prop) of
+                  Nothing   -> Impossible
+                  Just eqs1 -> Improved (concat (eqs : eqs1))
 
 
 
@@ -283,6 +290,7 @@ improve1 prop =
     EqFun Add (Num m _) s         (Num n _)
       | m <= n                              -> Just [ Eq (num (n-m)) s ]
       | otherwise                           -> Nothing
+    EqFun Add r s (Num 0 _)             -> Just [ Eq (num 0) r, Eq (num 0) s ]
     EqFun Add r         s         t
       | r == t                              -> Just [ Eq (num 0) s ]
       | s == t                              -> Just [ Eq (num 0) r ]
@@ -452,63 +460,48 @@ propsToOrd props = loop (step [] unconditional)
                            (guard (isLeq ps (num 1) b) >> return (a,c))
 
 --------------------------------------------------------------------------------
--- Associativity (assumes commutative operators)
+-- Associative and Commutative Operators
 --------------------------------------------------------------------------------
 
+-- XXX: recursion may non-terminate: x * y = x
+-- XXX: does not do improvements
+
+
+
+solveAC :: [Prop] -> Prop -> Bool
+solveAC ps (EqFun op x y z)
 {-
-We try to compute new equalities by moving parens to the right:
-if (a + b) + c = d then a + (b + c) = d
-                        a + (c + b) = d
-                        b + (a + c) = d
-                        b + (c + a) = d
-                        c + (a + b) = d
-                        x + (b + a) = d
+  | trace (showSDoc ( hang (text "solveAC") 2 $ vcat
+                         [ text "X:" <+> fsep (map ppr (sums x))
+                         , text "Y:" <+> fsep (map ppr (sums y))
+                         , text "Z:" <+> fsep (map ppr (sums z))
+                         ]
+                    )) False = undefined
+-}
+  | commutative op && associative op =
+      any (`elem` sums z) (add (sums x) (sums y))
 
-We use the rule when we already have a name for the intermediate sum
-(RHS parens), or if it is a constant because then we learn a new
-relationships between variables.
-
-Example for how it can be a constnat:
-(a + 2 = p, p + 3 = q) => a + 5 = q
-
-
-impAssoc :: [Prop] -> Prop -> [Prop]
-impAssoc ps (EqFun op x y z) | associative op = concatMap imps asmps
   where
   asmps         = [ (a,b,c) | EqFun op' a b c <- ps, op == op' ]
-  imps (a,b,c)  =
 
-    -- (a + b = cx, cx + y = z) => (a + by = z)
-    (guard (c == x) >> [ EqFun op a by z | by <- y_plus b ]) ++
+  candidates c  = [ (a,b) | (a,b,c') <- asmps, c == c' ]
 
-    -- (az + b = c, x + y = az) => (x + yb = c)
-    (guard (a == z) >> [ EqFun op x yb c | yb <- y_plus b ]) ++
+  sums a        = [a] : [ p | (b,c) <- candidates a, p <- add (sums b) (sums c)]
 
-    -- or, the new fact could be a name for the RHS paren intermediate:
-    [ EqFun op v z e | (c',d,e) <- asmps, c == c'   -- a + b + d = e
-                     , v <- [ d | sameSum x y a b ] ++
-                            [ a | sameSum x y b d ] ++
-                            [ b | sameSum x y a d ]
-    ] ++
-    [ EqFun op v z c | (d,e,a') <- asmps, a == a'   -- d + e + b = c
-                     , v <- [ b | sameSum x y d e ] ++
-                            [ d | sameSum x y e b ] ++
-                            [ e | sameSum x y d b ]
-    ]
+  add as bs     = [ merge u v | u <- as, v <- bs ]
 
-  sameSum a b a' b' = (a == a' && b == b') || (a == b' && b == a')
+solveAC _ _ = False
 
-  y_plus (Num m _) | Num n _ <- y = doOp m n
-  y_plus b                        = [ w | (u,v,w) <- asmps, sameSum y b u v ]
 
-  doOp m n          = case op of
-                        Add -> [ num (m + n) ]
-                        Mul -> [ num (m * n) ]
-                        _   -> []
+merge :: Ord a => [a] -> [a] -> [a]
+merge xs@(a:as) ys@(b:bs)
+  | a <= b    = a : merge as ys
+  | otherwise = b : merge xs bs
+merge [] ys = ys
+merge xs [] = xs
 
-impAssoc _ _ = []
 
--}
+
 --------------------------------------------------------------------------------
 -- Descrete Math
 --------------------------------------------------------------------------------
