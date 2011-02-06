@@ -15,7 +15,8 @@ import TcCanonical (mkCanonicals)
 import HsBinds    (EvTerm(..))
 import Class      ( Class, className, classTyCon )
 import Type       ( tcView, mkTyConApp, mkNumberTy, isNumberTy
-                  , tcEqType, tcCmpType )
+                  , tcEqType, tcCmpType, pprType
+                  )
 import TypeRep    (Type(..))
 import TyCon      (TyCon, tyConName)
 import Var        (EvVar)
@@ -28,6 +29,10 @@ import Bag        (bagToList, emptyBag, unionManyBags, unionBags)
 import Data.Maybe (fromMaybe)
 import Data.List  (nub, partition)
 import Control.Monad (msum, mplus, zipWithM, (<=<), guard)
+
+import Debug.Trace
+import Unique(getUnique)
+import Type(getTyVar)
 
 
 data Term = Var Xi | Num Integer (Maybe Xi)
@@ -470,25 +475,44 @@ propsToOrd props = loop (step [] unconditional)
 
 solveAC :: [Prop] -> Prop -> Bool
 solveAC ps (EqFun op x y z)
-{-
-  | trace (showSDoc ( hang (text "solveAC") 2 $ vcat
-                         [ text "X:" <+> fsep (map ppr (sums x))
-                         , text "Y:" <+> fsep (map ppr (sums y))
-                         , text "Z:" <+> fsep (map ppr (sums z))
-                         ]
-                    )) False = undefined
--}
   | commutative op && associative op =
-      any (`elem` sums z) (add (sums x) (sums y))
+      (xs_ys === z) || or [ add as xs_ys === r | (as,r) <- cancelCands z ]
 
   where
-  asmps         = [ (a,b,c) | EqFun op' a b c <- ps, op == op' ]
+  xs_ys         = add (sums x) (sums y)
 
   candidates c  = [ (a,b) | (a,b,c') <- asmps, c == c' ]
 
+  -- (xs,e) `elem` cancelCands g    ==> xs + g = e
+  cancelCands :: Term -> [([[Term]],Term)]
+  cancelCands g = do (a,b,c) <- asmps
+                     let us = filter (all mayCancel)
+                            $ case () of
+                                _ | a == g    -> sums b
+                                  | b == g    -> sums a
+                                  | otherwise -> [ ]
+                     guard (not (null us))
+                     (us,c) : [ (add us vs, e) | (vs,e) <- cancelCands c ]
+
+
+  mayCancel x   = case op of
+                    Add -> True
+                    Mul -> isLeq ordProps (num 1) x
+                    Exp -> False
+
+  -- xs `elem` sums a   ==>   sum xs = a
   sums a        = [a] : [ p | (b,c) <- candidates a, p <- add (sums b) (sums c)]
 
+  add :: [[Term]] -> [[Term]] -> [[Term]]
   add as bs     = [ merge u v | u <- as, v <- bs ]
+
+  (===) :: [[Term]] -> Term -> Bool
+  as === b      = any (`elem` sums b) as
+
+  -- Facts in a more convenient from
+  asmps         = [ (a,b,c) | EqFun op' a b c <- ps, op == op' ]
+  ordProps      = propsToOrd ps
+
 
 solveAC _ _ = False
 
@@ -538,11 +562,15 @@ divide x y  = case divMod x y of
 numTrace :: String -> SDoc -> TcS ()
 numTrace x y = traceTcS ("[numerics] " ++ x) y
 
+pNumTrace :: String -> SDoc -> a -> a
+pNumTrace x y = trace ("[numerics] " ++ x ++ " " ++ showSDoc y)
+
 vmany :: Outputable a => [a] -> SDoc
 vmany xs = braces $ hcat $ punctuate comma $ map ppr xs
 
 instance Outputable Term where
-  ppr (Var xi)  = ppr xi
+  ppr (Var xi)  = pprType xi <> un
+    where un = brackets $ text $ show $ getUnique (getTyVar "numerics dbg" xi)
   ppr (Num n _) = integer n
 
 instance Outputable Prop where
