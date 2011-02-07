@@ -82,7 +82,7 @@ $(call build-package-data,$1,$2,$3)
 ifneq "$$(NO_INCLUDE_PKGDATA)" "YES"
 ifeq "$3" "0"
 include $1/$2/package-data.mk
-else ifeq "$(phase)" ""
+else ifeq "$(phase)" "final"
 include $1/$2/package-data.mk
 endif
 endif
@@ -109,7 +109,7 @@ ifneq "$(phase)" "0"
 # bootstrapping stuff
 ifeq "$3" "0"
 $(call include-dependencies,$1,$2,$3)
-else ifeq "$(phase)" ""
+else ifeq "$(phase)" "final"
 # In the final phase, we also include the dependency files for
 # everything else
 $(call include-dependencies,$1,$2,$3)

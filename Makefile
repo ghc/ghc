@@ -69,7 +69,7 @@ ifneq "$(OMIT_PHASE_1)" "YES"
 	$(MAKE) -r --no-print-directory -f ghc.mk phase=1 phase_1_builds
 endif
 	@echo "===--- building final phase"
-	$(MAKE) -r --no-print-directory -f ghc.mk $@
+	$(MAKE) -r --no-print-directory -f ghc.mk phase=final $@
 
 binary-dist: binary-dist-prep
 ifeq "$(mingw32_TARGET_OS)" "1"
