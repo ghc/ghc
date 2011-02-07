@@ -386,6 +386,18 @@ specialising the loops arising from stream fusion, for example in NDP where
 we were getting literally hundreds of (mostly unused) specialisations of
 a local function.
 
+In a case like the above we end up never calling the original un-specialised
+function.  (Although we still leave its code around just in case.)
+
+However, if we find any boring calls in the body, including *unsaturated*
+ones, such as
+      letrec foo x y = ....foo...
+      in map foo xs
+then we will end up calling the un-specialised function, so then we *should*
+use the calls in the un-specialised RHS as seeds.  We call these "boring 
+call patterns, and callsToPats reports if it finds any of these.
+
+
 Note [Do not specialise diverging functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Specialising a function that just diverges is a waste of code.
@@ -981,7 +993,7 @@ scExpr env e = scExpr' env e
 
 
 scExpr' env (Var v)     = case scSubstId env v of
-		            Var v' -> return (varUsage env v' UnkOcc, Var v')
+		            Var v' -> return (mkVarUsage env v' [], Var v')
 		            e'     -> scExpr (zapScSubst env) e'
 
 scExpr' env (Type t)    = return (nullUsage, Type (scSubstTy env t))
@@ -1118,7 +1130,7 @@ scApp env (Var fn, args)	-- Function is a variable
 	    fn'@(Lam {}) -> scExpr (zapScSubst env) (doBeta fn' args')
 			-- Do beta-reduction and try again
 
-	    Var fn' -> return (arg_usg `combineUsage` mk_fn_usg fn' args',
+	    Var fn' -> return (arg_usg `combineUsage` mkVarUsage env fn' args',
                                mkApps (Var fn') args')
 
 	    other_fn' -> return (arg_usg, mkApps other_fn' args') }
@@ -1131,14 +1143,6 @@ scApp env (Var fn, args)	-- Function is a variable
     doBeta (Lam bndr body) (arg : args) = Let (NonRec bndr arg) (doBeta body args)
     doBeta fn	           args	        = mkApps fn args
 
-    mk_fn_usg fn' args'
-      = case lookupHowBound env fn' of
-	  Just RecFun -> SCU { scu_calls = unitVarEnv fn' [(sc_vals env, args')]
-	  	                 , scu_occs  = emptyVarEnv }
-	  Just RecArg -> SCU { scu_calls = emptyVarEnv
-	                     , scu_occs  = unitVarEnv fn' evalScrutOcc }
-	  Nothing     -> nullUsage
-
 -- The function is almost always a variable, but not always.  
 -- In particular, if this pass follows float-in,
 -- which it may, we can get 
@@ -1147,6 +1151,20 @@ scApp env (other_fn, args)
   = do 	{ (fn_usg,   fn')   <- scExpr env other_fn
 	; (arg_usgs, args') <- mapAndUnzipM (scExpr env) args
 	; return (combineUsages arg_usgs `combineUsage` fn_usg, mkApps fn' args') }
+
+----------------------
+mkVarUsage :: ScEnv -> Id -> [CoreExpr] -> ScUsage
+mkVarUsage env fn args
+  = case lookupHowBound env fn of
+	Just RecFun -> SCU { scu_calls = unitVarEnv fn [(sc_vals env, args)]
+	                   , scu_occs  = emptyVarEnv }
+	Just RecArg -> SCU { scu_calls = emptyVarEnv
+	                   , scu_occs  = unitVarEnv fn arg_occ }
+        Nothing     -> nullUsage
+  where
+    -- I rather think we could use UnkOcc all the time
+    arg_occ | null args = UnkOcc
+            | otherwise = evalScrutOcc
 
 ----------------------
 scTopBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, CoreBind)
@@ -1206,13 +1224,6 @@ specInfoBinds (RI fn new_rhs _ _ _) (SI specs _ _)
     	      -- And now the original binding
   where
     rules = [r | OS _ r _ _ <- specs]
-
-----------------------
-varUsage :: ScEnv -> OutVar -> ArgOcc -> ScUsage
-varUsage env v use 
-  | Just RecArg <- lookupHowBound env v = SCU { scu_calls = emptyVarEnv 
-					      , scu_occs = unitVarEnv v use }
-  | otherwise		   	        = nullUsage
 \end{code}
 
 
@@ -1233,10 +1244,13 @@ data SpecInfo = SI [OneSpec]		-- The specialisations we have generated
 
 		   Int			-- Length of specs; used for numbering them
 
-		   (Maybe ScUsage)	-- Nothing => we have generated specialisations
-					--	      from calls in the *original* RHS
-					-- Just cs => we haven't, and this is the usage
-					--	      of the original RHS
+		   (Maybe ScUsage)	-- Just cs  => we have not yet used calls in the
+					--	       from calls in the *original* RHS as
+				 	--	       seeds for new specialisations;
+					--	       if you decide to do so, here is the
+					-- 	       RHS usage (which has not yet been
+					--	       unleashed)
+					-- Nothing => we have
 					-- See Note [Local recursive groups]
 
 	-- One specialisation: Rule plus definition
