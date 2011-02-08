@@ -2,7 +2,7 @@
 -- 
 -- array does not evaluate the elements.
 --
-import Array
+import Data.Array
 
 main =
  let 

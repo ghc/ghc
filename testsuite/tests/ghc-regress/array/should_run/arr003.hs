@@ -9,7 +9,7 @@
 -- to have its spine be evaluated - so the indexing below
 -- should cause a failure.
 --
-import Array
+import Data.Array
 
 main =
  let a1 = array (1::Int,3) (zip ([1..4]) ['a'..'d']) in

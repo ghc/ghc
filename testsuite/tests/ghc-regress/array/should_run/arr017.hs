@@ -2,8 +2,8 @@
 
 -- Spectral Norm benchmark
 
-import Array
-import System(getArgs)
+import Data.Array
+import System.Environment (getArgs)
 
 main = do
         --[arg] <- getArgs

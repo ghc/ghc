@@ -1,5 +1,5 @@
-import Ratio -- 1.3
-import Array -- 1.3
+import Data.Ratio -- 1.3
+import Data.Array -- 1.3
 infix 1 =:
 (=:) a b = (a,b)
 

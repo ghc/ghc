@@ -3,7 +3,7 @@
 
 module Main where
 
-import Array
+import Data.Array
 
 -- All in main is only to show the strange behaviour.
 -- 

@@ -3,7 +3,7 @@
 -- Sample Haskell implementation in the 1.3 Lib report defines
 -- this as being undefined/error.
 
-import Array
+import Data.Array
 
 main =
  let a1 = array (1,3) (zip ([1,2]) ['a'..'d']) in

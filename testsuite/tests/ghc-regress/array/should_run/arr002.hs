@@ -13,7 +13,7 @@
 -- strict for the indices. To test this, we do (a!1)
 -- twice, expecting to see the same value..
 --
-import Array
+import Data.Array
 
 main =
  let a1 = array (1,3) (zip (1:[1..3]) ['a'..'d']) in

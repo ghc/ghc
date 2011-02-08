@@ -3,7 +3,7 @@
 -- testing the well-behavedness of 
 -- derived ops for empty and non-empty arrays
 --
-import Array
+import Data.Array
 
 main = 
  let 

@@ -4,7 +4,7 @@
 -- with out-of-range index is undefined.
 --
 --
-import Array
+import Data.Array
 
 main = 
  let 

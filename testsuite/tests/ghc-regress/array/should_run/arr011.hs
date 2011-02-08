@@ -3,8 +3,8 @@
 --
 module Main(main) where
 
-import Array
-import Ix
+import Data.Array
+import Data.Ix
 
 hist :: (Ix a, Num b) => (a,a) -> [a] -> Array a b
 hist bnds is = accumArray (+) 0 bnds [(i,1) | i <- is , inRange bnds i]

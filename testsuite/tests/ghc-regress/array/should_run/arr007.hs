@@ -2,7 +2,7 @@
 -- 
 -- empty arrays are legal, but indexing them is undefined!
 --
-import Array
+import Data.Array
 
 main =
  let 

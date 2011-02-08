@@ -2,7 +2,7 @@
 -- 
 -- print a couple of them to try to expose empty arrays 
 -- to a GC or two.
-import Array
+import Data.Array
 
 main =
  let 

@@ -3,8 +3,8 @@
 --
 module Main(main) where
 
-import Array
-import Char
+import Data.Array
+import Data.Char
 
 main = 
  let 
