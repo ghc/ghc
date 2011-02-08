@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP,PatternGuards #-}
 module ImmList where
 
-import IO
 import Control.Concurrent
 import Data.IORef
 import qualified Data.Sequence as S

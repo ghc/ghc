@@ -12,13 +12,12 @@ import Collection
 import Control.Monad
 import GHC.Conc
 import Text.Printf
-import List
+import Data.List
 import Data.IORef
 import Control.Concurrent
 --import Control.Concurrent.STM
 import System.Environment
 import Data.Time
-import System
 import System.Mem
 import System.Random
 import Control.Exception

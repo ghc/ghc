@@ -1,9 +1,7 @@
 {-# LANGUAGE BangPatterns,CPP #-}
 module MVarListLockCoupling where
 
-import IO
-import GHC.IOBase
-import Monad
+import Control.Monad
 import Data.IORef
 import Control.Concurrent
 import Control.Concurrent.Chan

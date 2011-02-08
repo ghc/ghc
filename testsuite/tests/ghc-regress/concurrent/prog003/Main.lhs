@@ -8,10 +8,9 @@
 > --import Control.Concurrent.STM
 > import System.Environment
 > import Data.Time
-> import System
 
 > import System.Mem
-> import List
+> import Data.List
 
 > import Collection
 > import RefInterface
