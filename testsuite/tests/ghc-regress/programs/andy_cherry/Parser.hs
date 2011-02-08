@@ -3,7 +3,7 @@
 
  import GenUtils
  import DataTypes
- import Char -- 1.3
+ import Data.Char -- 1.3
 
 
 

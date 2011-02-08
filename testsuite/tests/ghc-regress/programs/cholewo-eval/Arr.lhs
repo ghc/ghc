@@ -1,7 +1,7 @@
 
 \begin{code}
 module Arr (
-  module Array,
+  module Data.Array,
 
   safezipWith, safezip,
   row,
@@ -28,7 +28,7 @@ module Arr (
 -- showsVecList, showsMatList
 --  spy,
 ) where
-import Array
+import Data.Array
 import Numeric
 --import Trace
 --import IOExtensions(unsafePerformIO)

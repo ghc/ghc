@@ -3,7 +3,6 @@
 
 import Control.Concurrent
 import Control.Exception
-import IO
 
 import GHC.Exts		( fork# )
 import GHC.IO    	( IO(..) )

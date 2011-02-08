@@ -7,8 +7,8 @@ Date: Mon, 28 Oct 91 17:02:19 GMT
 I'm struggling with the following code fragment at the moment:
 -}
 
-import Array -- 1.3
-import Ix    -- 1.3
+import Data.Array -- 1.3
+import Data.Ix    -- 1.3
 
 conv_list :: (Ix a, Ix b) => [a] -> [b] -> [[c]] -> Array (a,b) c -> Array (a,b) c
 conv_list [] _ _ ar = ar

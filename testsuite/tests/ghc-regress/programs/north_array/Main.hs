@@ -1,4 +1,4 @@
-import Array -- 1.3
+import Data.Array -- 1.3
 
 val1, val2 :: Array (Int,Int) Int
 val1 = array ((1,2), (2,1)) []

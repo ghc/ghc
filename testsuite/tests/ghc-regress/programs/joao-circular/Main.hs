@@ -1,6 +1,6 @@
 module Main (main) where
 
-import System
+import System.Environment
 
 import LrcPrelude
 import Funcs_Parser_Lazy

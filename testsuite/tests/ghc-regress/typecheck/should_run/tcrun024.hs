@@ -4,7 +4,7 @@
 
 module Main where
 
-	import List( sort )
+	import Data.List( sort )
 	
 	just = [Just "fred",Just "bill"]
 

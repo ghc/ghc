@@ -5,8 +5,6 @@
 
 module Main where
 
-import Monad
-
 class Monad m => C1 m x
 
 class (C1 m x) => C2 m x where

@@ -8,7 +8,6 @@ The first line just gives the module name.  For the moment, I don't
 anticipate using any modules (although this may change).
 
 > module Plot where
-> import IO
 
 Now we give the type of the function.  This consists of a file name, a
 list of values, and a function that goes from the appropriate types.

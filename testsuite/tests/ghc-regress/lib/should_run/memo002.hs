@@ -1,8 +1,8 @@
 module Main where
 
-import Memo2 ( memo )
-import List	( genericLength, genericReplicate )
-import System	( getArgs )
+import Memo2              ( memo )
+import Data.List          ( genericLength, genericReplicate )
+import System.Environment ( getArgs )
 
 main :: IO ()
 main = do (arg:_) <- getArgs

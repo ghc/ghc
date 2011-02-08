@@ -1,8 +1,8 @@
 module Main (main) -- TEST
 where {
 import Fast2haskell;
-import Complex;--1.3
-import Array;--1.3
+import Data.Complex;--1.3
+import Data.Array;--1.3
 
     c_eps=(5.00000e-06 :: Double);
     c_t=True;

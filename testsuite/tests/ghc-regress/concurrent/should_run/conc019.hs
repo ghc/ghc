@@ -1,4 +1,3 @@
-import IO
 import Control.Concurrent
 import Control.Exception
 import Data.List

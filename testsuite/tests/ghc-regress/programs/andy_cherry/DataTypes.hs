@@ -2,9 +2,9 @@
  module DataTypes where
 
  import GenUtils
- import Array -- 1.3
- import Ix
- import Char
+ import Data.Array -- 1.3
+ import Data.Ix
+ import Data.Char
  infix 1 =: -- 1.3
  (=:) a b = (a,b)
 

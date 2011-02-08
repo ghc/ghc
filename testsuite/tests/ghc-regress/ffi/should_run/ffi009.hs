@@ -1,5 +1,5 @@
 import Foreign
-import Random
+import System.Random
 
 --------------------------------------------------------------------------------
 

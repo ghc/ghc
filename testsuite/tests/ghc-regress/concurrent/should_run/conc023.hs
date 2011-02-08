@@ -5,7 +5,7 @@
 -- random delay between 0 and m seconds.  We use a semaphore to wait
 -- for all the threads to finish.
 
-import Random
+import System.Random
 import Control.Concurrent
 import Control.Exception
 

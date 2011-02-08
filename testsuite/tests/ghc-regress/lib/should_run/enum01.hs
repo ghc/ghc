@@ -3,8 +3,8 @@ module Main(main) where
 
 import Control.Exception
 import Prelude hiding (catch)
-import Char
-import Ratio
+import Data.Char
+import Data.Ratio
 
 main = do
    -- Enum Int

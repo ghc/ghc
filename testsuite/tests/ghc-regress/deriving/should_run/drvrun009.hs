@@ -2,7 +2,7 @@
 -- [Not strictly a 'deriving' issue]
 
 module Main( main ) where
-import Array
+import Data.Array
 
 bds :: ((Int,Int),(Int,Int))
 bds = ((1,4),(2,5))

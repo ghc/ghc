@@ -3,7 +3,7 @@ module Main(main) where
 
 import Control.Exception
 import Prelude hiding (catch)
-import Int
+import Data.Int
 
 main = do
   putStrLn "Testing Enum Int8:"

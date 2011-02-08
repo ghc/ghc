@@ -38,8 +38,8 @@ module GenUtils (
       combinePairs,
       formatText ) where
 
-import Array	-- 1.3
-import Ix	-- 1.3
+import Data.Array -- 1.3
+import Data.Ix    -- 1.3
 
 import Debug.Trace ( trace )
 

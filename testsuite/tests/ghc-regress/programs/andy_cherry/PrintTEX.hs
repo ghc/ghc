@@ -3,8 +3,8 @@
 
  import GenUtils
  import DataTypes
- import Array -- 1.3
- import Char -- 1.3
+ import Data.Array -- 1.3
+ import Data.Char -- 1.3
 
 
 

@@ -7,8 +7,8 @@
  import Interp
  import PrintTEX
 
- import System -- 1.3 (partain)
- import Char -- 1.3
+ import System.Environment -- 1.3 (partain)
+ import Data.Char -- 1.3
 
  --fakeArgs = "game001.txt"
  --fakeArgs = "pca2.pgn"

@@ -3,7 +3,7 @@
 -- 
 module Main where 
 
-import Char -- 1.3
+import Data.Char -- 1.3
 
 --1.3:data Maybe a = Nothing | Just a
 

@@ -7,7 +7,7 @@
 
 
 module Funcs_Lexer where
-import Char
+import Data.Char
 
 --
 -- Tokens passed to the parser

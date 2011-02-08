@@ -4,8 +4,6 @@
 
 module Main where
 
-import IO
-
 class Foo a where
   bar :: a -> [a]
 

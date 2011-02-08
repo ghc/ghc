@@ -4,7 +4,7 @@
 
 module TcRun025_B where
 
-	import List( sort )
+	import Data.List( sort )
 
 	-- This class has no tyvars in its class op context
 	-- One uses a newtype, the other a data type
