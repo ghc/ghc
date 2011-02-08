@@ -431,10 +431,10 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
   = case mop of
     	MO_Mul rep
 	   | Just p <- exactLog2 n ->
-                 CmmMachOp (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
+                 cmmMachOpFold (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
     	MO_U_Quot rep
 	   | Just p <- exactLog2 n ->
-                 CmmMachOp (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)]
+                 cmmMachOpFold (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)]
     	MO_S_Quot rep
 	   | Just p <- exactLog2 n, 
 	     CmmReg _ <- x ->	-- We duplicate x below, hence require
@@ -462,7 +462,7 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
 			 CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
 		    x3 = CmmMachOp (MO_Add rep) [x, x2]
 		in
-                CmmMachOp (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)]
+                cmmMachOpFold (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)]
     	other
            -> unchanged
     where
