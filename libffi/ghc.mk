@@ -107,6 +107,8 @@ $(libffi_STAMP_CONFIGURE):
 	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
+	# don't report nonselinux systems as selinux
+	cd libffi/build && "$(PATCH_CMD)" -p0 < ../libffi.selinux-detection-3.0.8.patch
 
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
