@@ -4690,9 +4690,7 @@ static int relocateSection(
         }
         else
         {
-            value = sections[reloc->r_symbolnum-1].offset
-                  - sections[reloc->r_symbolnum-1].addr
-                  + (uint64_t) image;
+	    value = relocateAddress(oc, nSections, sections, reloc->r_address);
         }
 
         IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", (void *)value));
