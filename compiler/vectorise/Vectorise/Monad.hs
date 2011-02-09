@@ -16,6 +16,7 @@ module Vectorise.Monad (
 	lookupVar,
 	maybeCantVectoriseVarM,
 	dumpVar,
+	addGlobalScalar, 
 
 	-- * Primitives
 	lookupPrimPArray,
@@ -40,7 +41,7 @@ import Id
 import DsMonad
 import Outputable
 import Control.Monad
-
+import VarSet
 
 -- | Run a vectorisation computation.
 initV	:: PackageId
@@ -137,7 +138,14 @@ dumpVar var
 	| otherwise
 	= cantVectorise "Variable not vectorised:" (ppr var)
 
+-- local scalars --------------------------------------------------------------
+-- | Check if the variable is a locally defined scalar function
 
+
+addGlobalScalar :: Var -> VM ()
+addGlobalScalar var 
+  = updGEnv $ \env -> pprTrace "addGLobalScalar" (ppr var) env{global_scalars = extendVarSet (global_scalars env) var}
+     
 -- Primitives -----------------------------------------------------------------
 lookupPrimPArray :: TyCon -> VM (Maybe TyCon)
 lookupPrimPArray = liftBuiltinDs . primPArray

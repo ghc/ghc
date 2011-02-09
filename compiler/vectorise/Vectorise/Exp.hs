@@ -37,19 +37,19 @@ vectPolyExpr
 	:: Bool 		-- ^ When vectorising the RHS of a binding, whether that
 				--   binding is a loop breaker.
 	-> CoreExprWithFVs
-	-> VM (Inline, VExpr)
+	-> VM (Inline, Bool, VExpr)
 
 vectPolyExpr loop_breaker (_, AnnNote note expr)
- = do (inline, expr') <- vectPolyExpr loop_breaker expr
-      return (inline, vNote note expr')
+ = do (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker expr
+      return (inline, isScalarFn, vNote note expr')
 
 vectPolyExpr loop_breaker expr
  = do
       arity <- polyArity tvs
       polyAbstract tvs $ \args ->
         do
-          (inline, mono') <- vectFnExpr False loop_breaker mono
-          return (addInlineArity inline arity,
+          (inline, isScalarFn, mono') <- vectFnExpr False loop_breaker mono
+          return (addInlineArity inline arity, isScalarFn, 
                   mapVect (mkLams $ tvs ++ args) mono')
   where
     (tvs, mono) = collectAnnTypeBinders expr
@@ -111,12 +111,13 @@ vectExpr (_, AnnCase scrut bndr ty alts)
   | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
   , isAlgTyCon tycon
   = vectAlgCase tycon ty_args scrut bndr ty alts
+  | otherwise = cantVectorise "Can't vectorise expression" (ppr scrut_ty) 
   where
     scrut_ty = exprType (deAnnotate scrut)
 
 vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-      vrhs <- localV . inBind bndr . liftM snd $ vectPolyExpr False rhs
+      vrhs <- localV . inBind bndr . liftM (\(_,_,z)->z) $ vectPolyExpr False rhs
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vLet (vNonRec vbndr vrhs) vbody
 
@@ -132,11 +133,11 @@ vectExpr (_, AnnLet (AnnRec bs) body)
 
     vect_rhs bndr rhs = localV
                       . inBind bndr
-                      . liftM snd
+                      . liftM (\(_,_,z)->z)
                       $ vectPolyExpr (isLoopBreaker $ idOccInfo bndr) rhs
 
 vectExpr e@(_, AnnLam bndr _)
-  | isId bndr = liftM snd $ vectFnExpr True False e
+  | isId bndr = liftM (\(_,_,z) ->z) $ vectFnExpr True False e
 {-
 onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
                 `orElseV` vectLam True fvs bs body
@@ -144,7 +145,7 @@ onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
     (bs,body) = collectAnnValBinders e
 -}
 
-vectExpr e = cantVectorise "Can't vectorise expression" (ppr $ deAnnotate e)
+vectExpr e = cantVectorise "Can't vectorise expression (vectExpr)" (ppr $ deAnnotate e)
 
 
 -- | Vectorise an expression with an outer lambda abstraction.
@@ -152,19 +153,20 @@ vectFnExpr
 	:: Bool 		-- ^ When the RHS of a binding, whether that binding should be inlined.
 	-> Bool 		-- ^ Whether the binding is a loop breaker.
 	-> CoreExprWithFVs 	-- ^ Expression to vectorise. Must have an outer `AnnLam`.
-	-> VM (Inline, VExpr)
+	-> VM (Inline, Bool, VExpr)
 
 vectFnExpr inline loop_breaker e@(fvs, AnnLam bndr _)
-  | isId bndr = onlyIfV (isEmptyVarSet fvs)
-                        (mark DontInline . vectScalarLam bs $ deAnnotate body)
-                `orElseV` mark inlineMe (vectLam inline loop_breaker fvs bs body)
+  | isId bndr = pprTrace "vectFnExpr -- id" (ppr fvs )$
+                 onlyIfV True -- (isEmptyVarSet fvs)  -- we check for free variables later. TODO: clean up
+                        (mark DontInline True . vectScalarLam bs $ deAnnotate body)
+                `orElseV` mark inlineMe False (vectLam inline loop_breaker fvs bs body)
   where
     (bs,body) = collectAnnValBinders e
 
-vectFnExpr _ _ e = mark DontInline $ vectExpr e
+vectFnExpr _ _ e = pprTrace "vectFnExpr -- otherwise" (ppr "a" )$ mark DontInline False $ vectExpr e
 
-mark :: Inline -> VM a -> VM (Inline, a)
-mark b p = do { x <- p; return (b,x) }
+mark :: Inline -> Bool -> VM a -> VM (Inline, Bool, a)
+mark b isScalarFn p = do { x <- p; return (b, isScalarFn, x) }
 
 
 -- | Vectorise a function where are the args have scalar type,
@@ -176,7 +178,8 @@ vectScalarLam
 	
 vectScalarLam args body
  = do scalars <- globalScalars
-      onlyIfV (all is_prim_ty arg_tys
+      pprTrace "vectScalarLam" (ppr $ is_scalar (extendVarSetList scalars args) body) $
+        onlyIfV (all is_prim_ty arg_tys
                && is_prim_ty res_ty
                && is_scalar (extendVarSetList scalars args) body
                && uses scalars body)
@@ -187,7 +190,8 @@ vectScalarLam args body
                                                 (zipf `App` Var fn_var)
             clo_var <- hoistExpr (fsLit "clo") clo DontInline
             lclo    <- liftPD (Var clo_var)
-            return (Var clo_var, lclo)
+            pprTrace "  lam is scalar" (ppr "") $
+              return (Var clo_var, lclo)
   where
     arg_tys = map idType args
     res_ty  = exprType body
@@ -202,7 +206,9 @@ vectScalarLam args body
     
     cantbe_parr_expr expr = not $ maybe_parr_ty $ exprType expr
          
-    maybe_parr_ty ty = maybe_parr_ty' [] ty    
+    maybe_parr_ty ty = maybe_parr_ty' [] ty
+      
+    maybe_parr_ty' _           ty | Nothing <- splitTyConApp_maybe ty = False   -- TODO: is this really what we want to do with polym. types?
     maybe_parr_ty' alreadySeen ty
        | isPArrTyCon tycon     = True
        | isPrimTyCon tycon     = False
@@ -314,7 +320,7 @@ vectLam inline loop_breaker fvs bs body
 
 vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
-vectTyAppExpr e tys = cantVectorise "Can't vectorise expression"
+vectTyAppExpr e tys = cantVectorise "Can't vectorise expression (vectTyExpr)"
                         (ppr $ deAnnotate e `mkTyApps` tys)
 
 

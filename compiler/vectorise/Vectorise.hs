@@ -189,9 +189,13 @@ vectTopRhs
 vectTopRhs var expr
  = dtrace (vcat [text "vectTopRhs", ppr expr])
  $ closedV
- $ do (inline, vexpr) <- inBind var
+ $ do (inline, isScalar, vexpr) <- inBind var
+                      $ pprTrace "vectTopRhs" (ppr var)
                       $ vectPolyExpr (isLoopBreaker $ idOccInfo var)
                                       (freeVars expr)
+      if isScalar 
+         then addGlobalScalar var
+         else return ()
       return (inline, vectorised vexpr)
 
 
