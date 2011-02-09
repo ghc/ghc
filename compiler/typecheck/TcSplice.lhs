@@ -348,10 +348,22 @@ tcBracket brack res_ty
           -- instance), but we aren't otherwise interested in the
           -- results. Nor do we care about ambiguous dictionaries etc.
           -- We will type check this bracket again at its usage site.
-       ; _ <- newImplication BracketSkol [] [] $
-              setStage brack_stage $
-              do { meta_ty <- tc_bracket cur_stage brack
-                 ; unifyType meta_ty res_ty }
+	  --
+	  -- We build a single implication constraint with a BracketSkol;
+	  -- that in turn tells simplifyCheck to report only definite
+	  -- errors
+       ; (_,lie) <- captureConstraints $
+              	    newImplication BracketSkol [] [] $
+              	    setStage brack_stage $
+              	    do { meta_ty <- tc_bracket cur_stage brack
+              	       ; unifyType meta_ty res_ty }
+
+          -- It's best to simplify the constraint now, even though in 
+	  -- principle some later unification might be useful for it,
+	  -- because we don't want these essentially-junk TH implication
+	  -- contraints floating around nested inside other constraints
+	  -- See for example Trac #4949
+       ; _ <- simplifyTop lie
 
         -- Return the original expression, not the type-decorated one
        ; pendings <- readMutVar pending_splices
