@@ -36,3 +36,9 @@ T4918:
 
 EvalTest:
 	'$(TEST_HC)' -c -O EvalTest.hs -ddump-simpl -dsuppress-uniques | grep 'rght.*Dmd'
+
+# When SpecConstr works there are no STUArrays at all
+# The "-(...)" ignores the (expected) non-zero exit code from grep
+# when there are (as expected) no matches
+T4945:
+	-('$(TEST_HC)' -c -O2 -fno-liberate-case T4945.hs -ddump-simpl -dsuppress-uniques | grep 'STUArray')
