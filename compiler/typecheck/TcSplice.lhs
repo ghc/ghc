@@ -386,7 +386,7 @@ tc_bracket outer_stage (VarBr name) 	-- Note [Quoting names]
 	}
 
 tc_bracket _ (ExpBr expr) 
-  = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
+  = do	{ any_ty <- newFlexiTyVarTy openTypeKind
 	; _ <- tcMonoExprNC expr any_ty  -- NC for no context; tcBracket does that
 	; tcMetaTy expQTyConName }
 	-- Result type is ExpQ (= Q Exp)
@@ -407,7 +407,7 @@ tc_bracket _ (DecBrG decls)
 	; tcMetaTy decsQTyConName } -- Result type is Q [Dec]
 
 tc_bracket _ (PatBr pat)
-  = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
+  = do	{ any_ty <- newFlexiTyVarTy openTypeKind
 	; _ <- tcPat ThPatQuote pat any_ty $ 
                return ()
 	; tcMetaTy patQTyConName }
