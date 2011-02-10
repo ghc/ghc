@@ -624,9 +624,7 @@ TR 			= tr
 SHELL			= /bin/sh
 
 HaveDtrace		= @HaveDtrace@
-# There are problems with dtrace on 64bit 10.5. For now at least, we
-# just turn dtrace off unless you override USE_DTRACE
-USE_DTRACE = NO
+USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
 
 LD = @LdCmd@
