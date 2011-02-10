@@ -108,6 +108,7 @@ pprExp _ (InfixE me1 op me2) = parens $ pprMaybeExp noPrec me1
 pprExp i (LamE ps e) = parensIf (i > noPrec) $ char '\\' <> hsep (map (pprPat appPrec) ps)
                                            <+> text "->" <+> ppr e
 pprExp _ (TupE es) = parens $ sep $ punctuate comma $ map ppr es
+pprExp _ (UnboxedTupE es) = hashParens $ sep $ punctuate comma $ map ppr es
 -- Nesting in Cond is to avoid potential problems in do statments
 pprExp i (CondE guard true false)
  = parensIf (i > noPrec) $ sep [text "if"   <+> ppr guard,
@@ -190,6 +191,7 @@ pprPat :: Precedence -> Pat -> Doc
 pprPat i (LitP l)     = pprLit i l
 pprPat _ (VarP v)     = pprName' Applied v
 pprPat _ (TupP ps)    = parens $ sep $ punctuate comma $ map ppr ps
+pprPat _ (UnboxedTupP ps) = hashParens $ sep $ punctuate comma $ map ppr ps
 pprPat i (ConP s ps)  = parensIf (i >= appPrec) $ pprName' Applied s
                                               <+> sep (map (pprPat appPrec) ps)
 pprPat i (InfixP p1 n p2)
@@ -379,6 +381,7 @@ pprParendType (VarT v)   = ppr v
 pprParendType (ConT c)   = ppr c
 pprParendType (TupleT 0) = text "()"
 pprParendType (TupleT n) = parens (hcat (replicate (n-1) comma))
+pprParendType (UnboxedTupleT n) = hashParens $ hcat $ replicate (n-1) comma
 pprParendType ArrowT     = parens (text "->")
 pprParendType ListT      = text "[]"
 pprParendType other      = parens (ppr other)
@@ -452,4 +455,7 @@ where_clause ds = nest nestDepth $ text "where" <+> vcat (map (ppr_dec False) ds
 
 showtextl :: Show a => a -> Doc
 showtextl = text . map toLower . show
+
+hashParens :: Doc -> Doc
+hashParens d = text "(# " <> d <> text " #)"
 

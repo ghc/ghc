@@ -64,6 +64,8 @@ varP :: Name -> PatQ
 varP v = return (VarP v)
 tupP :: [PatQ] -> PatQ
 tupP ps = do { ps1 <- sequence ps; return (TupP ps1)}
+unboxedTupP :: [PatQ] -> PatQ
+unboxedTupP ps = do { ps1 <- sequence ps; return (UnboxedTupP ps1)}
 conP :: Name -> [PatQ] -> PatQ
 conP n ps = do ps' <- sequence ps
                return (ConP n ps')
@@ -225,6 +227,9 @@ lam1E p e = lamE [p] e
 
 tupE :: [ExpQ] -> ExpQ
 tupE es = do { es1 <- sequence es; return (TupE es1)}
+
+unboxedTupE :: [ExpQ] -> ExpQ
+unboxedTupE es = do { es1 <- sequence es; return (UnboxedTupE es1)}
 
 condE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
 condE x y z =  do { a <- x; b <- y; c <- z; return (CondE a b c)}
@@ -442,6 +447,9 @@ listT = return ListT
 
 tupleT :: Int -> TypeQ
 tupleT i = return (TupleT i)
+
+unboxedTupleT :: Int -> TypeQ
+unboxedTupleT i = return (UnboxedTupleT i)
 
 sigT :: TypeQ -> Kind -> TypeQ
 sigT t k

@@ -1,3 +1,4 @@
+{-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 -- The -fno-warn-warnings-deprecations flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
@@ -45,6 +46,7 @@ module Language.Haskell.TH.Syntax(
 	NameFlavour(..), NameSpace (..), 
 	mkNameG_v, mkNameG_d, mkNameG_tc, Uniq, mkNameL, mkNameU,
  	tupleTypeName, tupleDataName,
+	unboxedTupleTypeName, unboxedTupleDataName,
 	OccName, mkOccName, occString,
 	ModName, mkModName, modString,
 	PkgName, mkPkgName, pkgString
@@ -557,17 +559,17 @@ showName' ni nm
 instance Show Name where
   show = showName
 
--- 	Tuple data and type constructors
+-- Tuple data and type constructors
 tupleDataName :: Int -> Name    -- ^ Data constructor
 tupleTypeName :: Int -> Name    -- ^ Type constructor
 
-tupleDataName 0 = mk_tup_name 0 DataName 
+tupleDataName 0 = mk_tup_name 0 DataName
 tupleDataName 1 = error "tupleDataName 1"
-tupleDataName n = mk_tup_name (n-1) DataName 
+tupleDataName n = mk_tup_name (n-1) DataName
 
-tupleTypeName 0 = mk_tup_name 0 TcClsName 
+tupleTypeName 0 = mk_tup_name 0 TcClsName
 tupleTypeName 1 = error "tupleTypeName 1"
-tupleTypeName n = mk_tup_name (n-1) TcClsName 
+tupleTypeName n = mk_tup_name (n-1) TcClsName
 
 mk_tup_name :: Int -> NameSpace -> Name
 mk_tup_name n_commas space
@@ -575,6 +577,25 @@ mk_tup_name n_commas space
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
     -- XXX Should it be GHC.Unit for 0 commas?
+    tup_mod = mkModName "GHC.Tuple"
+
+-- Unboxed tuple data and type constructors
+unboxedTupleDataName :: Int -> Name    -- ^ Data constructor
+unboxedTupleTypeName :: Int -> Name    -- ^ Type constructor
+
+unboxedTupleDataName 0 = error "unboxedTupleDataName 0"
+unboxedTupleDataName 1 = error "unboxedTupleDataName 1"
+unboxedTupleDataName n = mk_unboxed_tup_name (n-1) DataName
+
+unboxedTupleTypeName 0 = error "unboxedTupleTypeName 0"
+unboxedTupleTypeName 1 = error "unboxedTupleTypeName 1"
+unboxedTupleTypeName n = mk_unboxed_tup_name (n-1) TcClsName
+
+mk_unboxed_tup_name :: Int -> NameSpace -> Name
+mk_unboxed_tup_name n_commas space
+  = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
+  where
+    occ = mkOccName ("(#" ++ replicate n_commas ',' ++ "#)")
     tup_mod = mkModName "GHC.Tuple"
 
 
@@ -691,6 +712,7 @@ data Pat
   = LitP Lit                      -- ^ @{ 5 or 'c' }@
   | VarP Name                     -- ^ @{ x }@
   | TupP [Pat]                    -- ^ @{ (p1,p2) }@
+  | UnboxedTupP [Pat]             -- ^ @{ (# p1,p2 #) }@
   | ConP Name [Pat]               -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
   | InfixP Pat Name Pat           -- ^ @foo ({x :+ y}) = e@
   | TildeP Pat                    -- ^ @{ ~p }@
@@ -736,6 +758,7 @@ data Exp
 
   | LamE [Pat] Exp                     -- ^ @{ \ p1 p2 -> e }@
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
+  | UnboxedTupE [Exp]                  -- ^ @{ (# e1,e2 #) }  @
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
   | LetE [Dec] Exp                     -- ^ @{ let x=e1;   y=e2 in e3 }@
   | CaseE Exp [Match]                  -- ^ @{ case e of m1; m2 }@
@@ -855,6 +878,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall <vars>. <ctxt> -> <type>@
           | VarT Name                     -- ^ @a@
           | ConT Name                     -- ^ @T@
           | TupleT Int                    -- ^ @(,), (,,), etc.@
+          | UnboxedTupleT Int             -- ^ @(#,#), (#,,#), etc.@
           | ArrowT                        -- ^ @->@
           | ListT                         -- ^ @[]@
           | AppT Type Type                -- ^ @T a b@
