@@ -306,9 +306,18 @@ cmmMachOpFold op [x@(CmmLit _), y]
 -- PicBaseReg from the corresponding label (or label difference).
 --
 cmmMachOpFold mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
-   | mop1 == mop2 && isAssociativeMachOp mop1
+   | mop2 `associates_with` mop1
      && not (isLit arg1) && not (isPicReg arg1)
-   = cmmMachOpFold mop1 [arg1, cmmMachOpFold mop2 [arg2,arg3]]
+   = cmmMachOpFold mop2 [arg1, cmmMachOpFold mop1 [arg2,arg3]]
+   where
+     MO_Add{} `associates_with` MO_Sub{} = True
+     mop1 `associates_with` mop2 =
+        mop1 == mop2 && isAssociativeMachOp mop1
+
+-- special case: (a - b) + c  ==>  a + (c - b)
+cmmMachOpFold mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
+   | not (isLit arg1) && not (isPicReg arg1)
+   = cmmMachOpFold mop1 [arg1, cmmMachOpFold mop2 [arg3,arg2]]
 
 -- Make a RegOff if we can
 cmmMachOpFold (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
