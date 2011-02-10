@@ -268,6 +268,7 @@ cvt_tyinst_hdr cxt tc tys
     collect (VarT tv)    = return [PlainTV tv]
     collect (ConT _)     = return []
     collect (TupleT _)   = return []
+    collect (UnboxedTupleT _) = return []
     collect ArrowT       = return []
     collect ListT        = return []
     collect (AppT t1 t2)
@@ -464,6 +465,8 @@ cvtl e = wrapL (cvt e)
 			    ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
     cvt (TupE [e])     = cvt e	-- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Boxed }
+    cvt (UnboxedTupE [e])     = cvt e	-- Singleton tuples treated like nothing (just parens)
+    cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Unboxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
 			    ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (ptext (sLit "a let expression")) ds
@@ -626,6 +629,8 @@ cvtp (TH.LitP l)
 cvtp (TH.VarP s)      = do { s' <- vName s; return $ Hs.VarPat s' }
 cvtp (TupP [p])       = cvtp p
 cvtp (TupP ps)        = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
+cvtp (UnboxedTupP [p]) = cvtp p
+cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed void }
 cvtp (ConP s ps)      = do { s' <- cNameL s; ps' <- cvtPats ps; return $ ConPatIn s' (PrefixCon ps') }
 cvtp (InfixP p1 s p2) = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
 			   ; return $ ConPatIn s' (InfixCon p1' p2') }
@@ -697,6 +702,15 @@ cvtType ty
              -> failWith (ptext (sLit "Illegal 1-tuple type constructor"))
              | otherwise 
              -> mk_apps (HsTyVar (getRdrName (tupleTyCon Boxed n))) tys'
+           UnboxedTupleT n
+             | length tys' == n 	-- Saturated
+             -> if n==1 then return (head tys')	-- Singleton tuples treated
+                                                -- like nothing (ie just parens)
+                        else returnL (HsTupleTy Unboxed tys')
+             | n == 1
+             -> failWith (ptext (sLit "Illegal 1-unboxed-tuple type constructor"))
+             | otherwise
+             -> mk_apps (HsTyVar (getRdrName (tupleTyCon Unboxed n))) tys'
            ArrowT 
              | [x',y'] <- tys' -> returnL (HsFunTy x' y')
              | otherwise       -> mk_apps (HsTyVar (getRdrName funTyCon)) tys'
