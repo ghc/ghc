@@ -126,7 +126,7 @@ typedef CRITICAL_SECTION Mutex;
 #else
 
 #define ACQUIRE_LOCK(mutex)      EnterCriticalSection(mutex)
-#define TRY_ACQUIRE_LOCK(mutex)  (TryEnterCriticalSection(mutex) != 0)
+#define TRY_ACQUIRE_LOCK(mutex)  (TryEnterCriticalSection(mutex) == 0)
 #define RELEASE_LOCK(mutex)      LeaveCriticalSection(mutex)
 
 // I don't know how to do this.  TryEnterCriticalSection() doesn't do
