@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2011
  *
  * Out-of-line primitive operations
  *
@@ -2035,7 +2035,20 @@ stg_traceEventzh
    // We should go through the macro HASKELLEVENT_USER_MSG_ENABLED from
    // RtsProbes.h, but that header file includes unistd.h, which doesn't
    // work in Cmm
+#if !defined(solaris2_TARGET_OS)
    (enabled) = foreign "C" __dtrace_isenabled$HaskellEvent$user__msg$v1() [];
+#else
+   // Solaris' DTrace can't handle the
+   //     __dtrace_isenabled$HaskellEvent$user__msg$v1
+   // call above. This call is just for testing whether the user__msg
+   // probe is enabled, and is here for just performance optimization.
+   // Since preparation for the probe is not that complex I disable usage of
+   // this test above for Solaris and enable the probe usage manually
+   // here. Please note that this does not mean that the probe will be
+   // used during the runtime! You still need to enable it by consumption
+   // in your dtrace script as you do with any other probe.
+   enabled = 1;
+#endif
    if (enabled != 0) {
      foreign "C" dtraceUserMsgWrapper(MyCapability() "ptr", msg "ptr") [];
    }
