@@ -17,7 +17,7 @@ SRCS	= \
 	Data/Ix.hs Data/List.hs Data/Maybe.hs \
 	Data/Ratio.hs Data/Tuple.hs Data/Word.hs \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
-	Data/Monoid.hs \
+	Data/Monoid.hs Data/String.hs \
 	Data/Eq.hs Data/Ord.hs Data/Fixed.hs \
 	Data/Functor.hs Data/Foldable.hs Data/Traversable.hs \
 	Data/Function.hs \
