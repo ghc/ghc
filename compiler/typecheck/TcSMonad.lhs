@@ -106,7 +106,6 @@ import FunDeps
 
 import TcRnTypes
 
-import Control.Monad
 import Data.IORef
 \end{code}
 
@@ -327,9 +326,10 @@ combineCtLoc _ (Derived loc )  = loc
 combineCtLoc _ _ = panic "combineCtLoc: both given"
 
 mkGivenFlavor :: CtFlavor -> SkolemInfo -> CtFlavor
-mkGivenFlavor (Wanted  loc) sk = Given (setCtLocOrigin loc sk)
-mkGivenFlavor (Derived loc) sk = Given (setCtLocOrigin loc sk)
-mkGivenFlavor (Given   loc) sk = Given (setCtLocOrigin loc sk)
+mkGivenFlavor (Wanted  loc) sk  = Given (setCtLocOrigin loc sk)
+mkGivenFlavor (Derived loc) sk  = Given (setCtLocOrigin loc sk)
+mkGivenFlavor (Given   loc) sk  = Given (setCtLocOrigin loc sk)
+
 
 mkWantedFlavor :: CtFlavor -> CtFlavor
 mkWantedFlavor (Wanted  loc) = Wanted loc
