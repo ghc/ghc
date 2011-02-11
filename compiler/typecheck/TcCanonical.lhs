@@ -683,37 +683,39 @@ classify ty                | Just ty' <- tcView ty
                            = OtherCls ty
 
 -- See note [Canonical ordering for equality constraints].
-reOrient :: TcsUntouchables -> TypeClassifier -> TypeClassifier -> Bool	
+reOrient :: CtFlavor -> TypeClassifier -> TypeClassifier -> Bool	
 -- (t1 `reOrient` t2) responds True 
 --   iff we should flip to (t2~t1)
 -- We try to say False if possible, to minimise evidence generation
 --
 -- Postcondition: After re-orienting, first arg is not OTherCls
-reOrient _untch (OtherCls {}) (FunCls {})   = True
-reOrient _untch (OtherCls {}) (FskCls {})   = True
-reOrient _untch (OtherCls {}) (VarCls {})   = True
-reOrient _untch (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
+reOrient _fl (OtherCls {}) (FunCls {})   = True
+reOrient _fl (OtherCls {}) (FskCls {})   = True
+reOrient _fl (OtherCls {}) (VarCls {})   = True
+reOrient _fl (OtherCls {}) (OtherCls {}) = panic "reOrient"  -- One must be Var/Fun
 
-reOrient _untch (FunCls {})   (VarCls {})    = False
+reOrient _fl (FunCls {})   (VarCls _tv)  = False  
+  -- But consider the following variation: isGiven fl && isMetaTyVar tv
+
   -- See Note [No touchables as FunEq RHS] in TcSMonad
-reOrient _untch (FunCls {}) _                = False             -- Fun/Other on rhs
+reOrient _fl (FunCls {}) _                = False             -- Fun/Other on rhs
 
-reOrient _untch (VarCls {}) (FunCls {})      = True 
+reOrient _fl (VarCls {}) (FunCls {})      = True 
 
-reOrient _untch (VarCls {}) (FskCls {})      = False
+reOrient _fl (VarCls {}) (FskCls {})      = False
 
-reOrient _untch (VarCls {})  (OtherCls {})   = False
-reOrient _untch (VarCls tv1)  (VarCls tv2)  
+reOrient _fl (VarCls {})  (OtherCls {})   = False
+reOrient _fl (VarCls tv1)  (VarCls tv2)  
   | isMetaTyVar tv2 && not (isMetaTyVar tv1) = True 
   | otherwise                                = False 
   -- Just for efficiency, see CTyEqCan invariants 
 
-reOrient _untch (FskCls {}) (VarCls tv2)     = isMetaTyVar tv2 
+reOrient _fl (FskCls {}) (VarCls tv2)     = isMetaTyVar tv2 
   -- Just for efficiency, see CTyEqCan invariants
 
-reOrient _untch (FskCls {}) (FskCls {})     = False
-reOrient _untch (FskCls {}) (FunCls {})     = True 
-reOrient _untch (FskCls {}) (OtherCls {})   = False 
+reOrient _fl (FskCls {}) (FskCls {})     = False
+reOrient _fl (FskCls {}) (FunCls {})     = True 
+reOrient _fl (FskCls {}) (OtherCls {})   = False 
 
 ------------------
 canEqLeaf :: TcsUntouchables 
@@ -726,7 +728,7 @@ canEqLeaf :: TcsUntouchables
   -- Preconditions: 
   --    * one of the two arguments is not OtherCls
   --    * the two types are not equal (looking through synonyms)
-canEqLeaf untch fl cv cls1 cls2 
+canEqLeaf _untch fl cv cls1 cls2 
   | cls1 `re_orient` cls2
   = do { cv' <- if isWanted fl 
                 then do { cv' <- newWantedCoVar s2 s1 
@@ -742,7 +744,7 @@ canEqLeaf untch fl cv cls1 cls2
   = do { traceTcS "canEqLeaf" (ppr (unClassify cls1) $$ ppr (unClassify cls2))
        ; canEqLeafOriented fl cv cls1 s2 }
   where
-    re_orient = reOrient untch 
+    re_orient = reOrient fl 
     s1 = unClassify cls1  
     s2 = unClassify cls2  
 
