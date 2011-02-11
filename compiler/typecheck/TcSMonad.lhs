@@ -186,8 +186,10 @@ makeSolvedByInst :: CanonicalCt -> CanonicalCt
 -- 	  Wanted         -> Given
 --	  Given, Derived -> no-op
 makeSolvedByInst ct 
-  | Wanted loc <- cc_flavor ct = ct { cc_flavor = mkGivenFlavor (Wanted loc) UnkSkol }
-  | otherwise                  = ct
+  | Wanted loc <- cc_flavor ct
+  = ct { cc_flavor = Given (setCtLocOrigin loc UnkSkol) }
+  | otherwise	   -- Only called on wanteds
+  = pprPanic "makeSolvedByInst" (ppr ct)
 
 deCanonicalise :: CanonicalCt -> FlavoredEvVar
 deCanonicalise ct = mkEvVarX (cc_id ct) (cc_flavor ct)
