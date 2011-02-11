@@ -130,7 +130,6 @@ import Data.Maybe (fromJust)
 import Control.Monad (MonadPlus(mplus))
 #endif
 
-#ifndef __NHC__
 -- | The construct 'tryIOError' @comp@ exposes IO errors which occur within a
 -- computation, and which are not fully handled.
 --
@@ -141,6 +140,7 @@ tryIOError f   =  catch (do r <- f
                             return (Right r))
                         (return . Left)
 
+#ifndef __NHC__
 {-# DEPRECATED try "Please use the new exceptions variant, Control.Exception.try" #-}
 -- | The 'try' function is deprecated. Please use the new exceptions
 -- variant, 'Control.Exception.try' from "Control.Exception", instead.
