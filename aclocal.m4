@@ -4,6 +4,83 @@
 # ensure we don't clash with any pre-supplied autoconf ones.
 
 
+# FPTOOLS_SET_PLATFORM_VARS
+# ----------------------------------
+# Set the platform variables
+AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
+[
+    # If no argument was given for a configuration variable, then discard
+    # the guessed canonical system and use the configuration of the
+    # bootstrapping ghc. If an argument was given, map it from gnu format
+    # to ghc format.
+    #
+    # For why we do it this way, see: #3637, #1717, #2951
+    #
+    # In bindists, we haven't called AC_CANONICAL_{BUILD,HOST,TARGET}
+    # so this justs uses $bootstrap_target.
+
+    if test "$build_alias" = ""
+    then
+        if test "$bootstrap_target" != ""
+        then
+            build=$bootstrap_target
+            echo "Build platform inferred as: $build"
+        else
+            echo "Can't work out build platform"
+            exit 1
+        fi
+
+        BuildArch=`echo "$build" | sed 's/-.*//'`
+        BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
+        BuildOS=`echo "$build" | sed 's/.*-//'`
+    else
+        GHC_CONVERT_CPU([$build_cpu], [BuildArch])
+        GHC_CONVERT_VENDOR([$build_vendor], [BuildVendor])
+        GHC_CONVERT_OS([$build_os], [BuildOS])
+    fi
+
+    if test "$host_alias" = ""
+    then
+        if test "$bootstrap_target" != ""
+        then
+            host=$bootstrap_target
+            echo "Host platform inferred as: $host"
+        else
+            echo "Can't work out host platform"
+            exit 1
+        fi
+
+        HostArch=`echo "$host" | sed 's/-.*//'`
+        HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
+        HostOS=`echo "$host" | sed 's/.*-//'`
+    else
+        GHC_CONVERT_CPU([$host_cpu], [HostArch])
+        GHC_CONVERT_VENDOR([$host_vendor], [HostVendor])
+        GHC_CONVERT_OS([$host_os], [HostOS])
+    fi
+
+    if test "$target_alias" = ""
+    then
+        if test "$bootstrap_target" != ""
+        then
+            target=$bootstrap_target
+            echo "Target platform inferred as: $target"
+        else
+            echo "Can't work out target platform"
+            exit 1
+        fi
+
+        TargetArch=`echo "$target" | sed 's/-.*//'`
+        TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
+        TargetOS=`echo "$target" | sed 's/.*-//'`
+    else
+        GHC_CONVERT_CPU([$target_cpu], [TargetArch])
+        GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
+        GHC_CONVERT_OS([$target_os], [TargetOS])
+    fi
+])
+
+
 # FPTOOLS_SET_C_LD_FLAGS
 # ----------------------------------
 # Set the C, LD and CPP flags for a given platform
