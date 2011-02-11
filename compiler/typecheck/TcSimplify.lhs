@@ -523,7 +523,7 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 
        ; (lhs_results, lhs_binds)
               <- runTcS SimplRuleLhs untch $
-                 solveWanteds emptyInert lhs_wanted
+                 solveWanteds emptyInert zonked_lhs
 
        ; traceTc "simplifyRule" $
          vcat [ text "zonked_lhs"   <+> ppr zonked_lhs 
