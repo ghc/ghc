@@ -186,7 +186,7 @@ vectScalarLam args recFns body
         pprTrace "vectScalarLam is prim res" (ppr $ is_prim_ty res_ty) $
         pprTrace "vectScalarLam is scalar body" (ppr $ is_scalar (extendVarSetList scalars args) body) $
         pprTrace "vectScalarLam arg tys" (ppr $ arg_tys) $ -}
-        onlyIfV (all is_prim_ty arg_tys
+      onlyIfV (all is_prim_ty arg_tys
                && is_prim_ty res_ty
                && is_scalar (extendVarSetList scalars args) body
                && uses scalars body)
@@ -198,7 +198,7 @@ vectScalarLam args recFns body
             clo_var <- hoistExpr (fsLit "clo") clo DontInline
             lclo    <- liftPD (Var clo_var)
             {- pprTrace "  lam is scalar" (ppr "") $ -}
-              return (Var clo_var, lclo)
+            return (Var clo_var, lclo)
   where
     arg_tys = map idType args
     res_ty  = exprType body
