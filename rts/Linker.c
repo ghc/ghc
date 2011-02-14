@@ -4690,7 +4690,12 @@ static int relocateSection(
         }
         else
         {
-	    value = relocateAddress(oc, nSections, sections, reloc->r_address);
+	    // If the relocation is not through the global offset table
+	    // or external, then set the value to the baseValue.  This
+	    // will leave displacements into the __const section
+	    // unchanged (as they ought to be).
+
+	    value = baseValue;
         }
 
         IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", (void *)value));
