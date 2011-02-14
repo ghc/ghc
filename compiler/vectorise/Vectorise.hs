@@ -115,7 +115,7 @@ vectModule guts
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
  = do
-      (inline, expr') 	<- vectTopRhs var expr
+      (inline, _, expr') 	<- vectTopRhs [] var expr
       var' 		<- vectTopBinder var inline expr'
 
       -- Vectorising the body may create other top-level bindings.
@@ -131,15 +131,23 @@ vectTopBind b@(NonRec var expr)
 
 vectTopBind b@(Rec bs)
  = do
+      -- pprTrace "in Rec" (ppr vars) $ return ()
       (vars', _, exprs') 
 	<- fixV $ \ ~(_, inlines, rhss) ->
             do vars' <- sequence [vectTopBinder var inline rhs
                                       | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
-               (inlines', exprs') 
-                     <- mapAndUnzipM (uncurry vectTopRhs) bs
-
-               return (vars', inlines', exprs')
-
+               (inlines', areScalars', exprs') 
+                     <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
+               if  (and areScalars') || (length bs <= 1)
+                  then do
+                    -- pprTrace "in Rec - all scalars??" (ppr areScalars') $ return ()
+                    return (vars', inlines', exprs')
+                  else do
+                    -- pprTrace "in Rec - not all scalars" (ppr areScalars') $ return ()
+                    mapM deleteGlobalScalar vars
+                    (inlines'', _, exprs'')  <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
+                    return (vars', inlines'', exprs'')
+                      
       hs     <- takeHoisted
       cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
       return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
@@ -147,7 +155,9 @@ vectTopBind b@(Rec bs)
     return b
   where
     (vars, exprs) = unzip bs
-
+    mapAndUnzip3M f xs = do
+       ys <- mapM f xs
+       return $ unzip3 ys
 
 -- | Make the vectorised version of this top level binder, and add the mapping
 --   between it and the original to the state. For some binder @foo@ the vectorised
@@ -182,21 +192,22 @@ vectTopBinder var inline expr
 
 -- | Vectorise the RHS of a top-level binding, in an empty local environment.
 vectTopRhs 
-	:: Var 		-- ^ Name of the binding.
+	:: [Var]    -- ^ Names of all functions in the rec block
+	-> Var 		-- ^ Name of the binding.
 	-> CoreExpr	-- ^ Body of the binding.
-	-> VM (Inline, CoreExpr)
+	-> VM (Inline, Bool, CoreExpr)
 
-vectTopRhs var expr
+vectTopRhs recFs var expr
  = dtrace (vcat [text "vectTopRhs", ppr expr])
  $ closedV
  $ do (inline, isScalar, vexpr) <- inBind var
-                      $ pprTrace "vectTopRhs" (ppr var)
-                      $ vectPolyExpr (isLoopBreaker $ idOccInfo var)
+                      -- $ pprTrace "vectTopRhs" (ppr var)
+                      $ vectPolyExpr  (isLoopBreaker $ idOccInfo var) recFs
                                       (freeVars expr)
       if isScalar 
          then addGlobalScalar var
-         else return ()
-      return (inline, vectorised vexpr)
+         else deleteGlobalScalar var
+      return (inline, isScalar, vectorised vexpr)
 
 
 -- | Project out the vectorised version of a binding from some closure,

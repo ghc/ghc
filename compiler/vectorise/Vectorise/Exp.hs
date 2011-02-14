@@ -35,20 +35,21 @@ import Data.List
 -- | Vectorise a polymorphic expression.
 vectPolyExpr 
 	:: Bool 		-- ^ When vectorising the RHS of a binding, whether that
-				--   binding is a loop breaker.
+			  	    --   binding is a loop breaker.
+	-> [Var] 			
 	-> CoreExprWithFVs
 	-> VM (Inline, Bool, VExpr)
 
-vectPolyExpr loop_breaker (_, AnnNote note expr)
- = do (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker expr
+vectPolyExpr loop_breaker recFns (_, AnnNote note expr)
+ = do (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker recFns expr
       return (inline, isScalarFn, vNote note expr')
 
-vectPolyExpr loop_breaker expr
+vectPolyExpr loop_breaker recFns expr
  = do
       arity <- polyArity tvs
       polyAbstract tvs $ \args ->
         do
-          (inline, isScalarFn, mono') <- vectFnExpr False loop_breaker mono
+          (inline, isScalarFn, mono') <- vectFnExpr False loop_breaker recFns mono
           return (addInlineArity inline arity, isScalarFn, 
                   mapVect (mkLams $ tvs ++ args) mono')
   where
@@ -117,7 +118,7 @@ vectExpr (_, AnnCase scrut bndr ty alts)
 
 vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-      vrhs <- localV . inBind bndr . liftM (\(_,_,z)->z) $ vectPolyExpr False rhs
+      vrhs <- localV . inBind bndr . liftM (\(_,_,z)->z) $ vectPolyExpr False [] rhs
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vLet (vNonRec vbndr vrhs) vbody
 
@@ -134,10 +135,10 @@ vectExpr (_, AnnLet (AnnRec bs) body)
     vect_rhs bndr rhs = localV
                       . inBind bndr
                       . liftM (\(_,_,z)->z)
-                      $ vectPolyExpr (isLoopBreaker $ idOccInfo bndr) rhs
+                      $ vectPolyExpr (isLoopBreaker $ idOccInfo bndr) [] rhs
 
 vectExpr e@(_, AnnLam bndr _)
-  | isId bndr = liftM (\(_,_,z) ->z) $ vectFnExpr True False e
+  | isId bndr = liftM (\(_,_,z) ->z) $ vectFnExpr True False [] e
 {-
 onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
                 `orElseV` vectLam True fvs bs body
@@ -152,18 +153,19 @@ vectExpr e = cantVectorise "Can't vectorise expression (vectExpr)" (ppr $ deAnno
 vectFnExpr 
 	:: Bool 		-- ^ When the RHS of a binding, whether that binding should be inlined.
 	-> Bool 		-- ^ Whether the binding is a loop breaker.
+	-> [Var]
 	-> CoreExprWithFVs 	-- ^ Expression to vectorise. Must have an outer `AnnLam`.
 	-> VM (Inline, Bool, VExpr)
 
-vectFnExpr inline loop_breaker e@(fvs, AnnLam bndr _)
-  | isId bndr = pprTrace "vectFnExpr -- id" (ppr fvs )$
+vectFnExpr inline loop_breaker recFns e@(fvs, AnnLam bndr _)
+  | isId bndr = -- pprTrace "vectFnExpr -- id" (ppr fvs )$
                  onlyIfV True -- (isEmptyVarSet fvs)  -- we check for free variables later. TODO: clean up
-                        (mark DontInline True . vectScalarLam bs $ deAnnotate body)
+                        (mark DontInline True . vectScalarLam bs recFns $ deAnnotate body)
                 `orElseV` mark inlineMe False (vectLam inline loop_breaker fvs bs body)
   where
     (bs,body) = collectAnnValBinders e
 
-vectFnExpr _ _ e = pprTrace "vectFnExpr -- otherwise" (ppr "a" )$ mark DontInline False $ vectExpr e
+vectFnExpr _ _ _  e = pprTrace "vectFnExpr -- otherwise" (ppr "a" )$ mark DontInline False $ vectExpr e
 
 mark :: Inline -> Bool -> VM a -> VM (Inline, Bool, a)
 mark b isScalarFn p = do { x <- p; return (b, isScalarFn, x) }
@@ -172,13 +174,18 @@ mark b isScalarFn p = do { x <- p; return (b, isScalarFn, x) }
 -- | Vectorise a function where are the args have scalar type,
 --   that is Int, Float, Double etc.
 vectScalarLam 
-	:: [Var]	-- ^ Bound variables of function.
+	:: [Var]	-- ^ Bound variables of function
+	-> [Var]
 	-> CoreExpr	-- ^ Function body.
 	-> VM VExpr
 	
-vectScalarLam args body
- = do scalars <- globalScalars
-      pprTrace "vectScalarLam" (ppr $ is_scalar (extendVarSetList scalars args) body) $
+vectScalarLam args recFns body
+ = do scalars' <- globalScalars
+      let scalars = unionVarSet (mkVarSet recFns) scalars'
+{-      pprTrace "vectScalarLam uses" (ppr $ uses scalars body) $
+        pprTrace "vectScalarLam is prim res" (ppr $ is_prim_ty res_ty) $
+        pprTrace "vectScalarLam is scalar body" (ppr $ is_scalar (extendVarSetList scalars args) body) $
+        pprTrace "vectScalarLam arg tys" (ppr $ arg_tys) $ -}
         onlyIfV (all is_prim_ty arg_tys
                && is_prim_ty res_ty
                && is_scalar (extendVarSetList scalars args) body
@@ -190,7 +197,7 @@ vectScalarLam args body
                                                 (zipf `App` Var fn_var)
             clo_var <- hoistExpr (fsLit "clo") clo DontInline
             lclo    <- liftPD (Var clo_var)
-            pprTrace "  lam is scalar" (ppr "") $
+            {- pprTrace "  lam is scalar" (ppr "") $ -}
               return (Var clo_var, lclo)
   where
     arg_tys = map idType args
@@ -214,7 +221,7 @@ vectScalarLam args body
        | isPrimTyCon tycon     = False
        | isAbstractTyCon tycon = True
        | isFunTyCon tycon || isProductTyCon tycon || isTupleTyCon tycon  = any (maybe_parr_ty' alreadySeen) args     
-       | isDataTyCon tycon = pprTrace "isDataTyCon" (ppr tycon) $ 
+       | isDataTyCon tycon = -- pprTrace "isDataTyCon" (ppr tycon) $ 
                              any (maybe_parr_ty' alreadySeen) args || 
                              hasParrDataCon alreadySeen tycon
        | otherwise = True

@@ -17,7 +17,8 @@ module Vectorise.Monad (
 	maybeCantVectoriseVarM,
 	dumpVar,
 	addGlobalScalar, 
-
+    deleteGlobalScalar,
+    
 	-- * Primitives
 	lookupPrimPArray,
 	lookupPrimMethod
@@ -145,6 +146,11 @@ dumpVar var
 addGlobalScalar :: Var -> VM ()
 addGlobalScalar var 
   = updGEnv $ \env -> pprTrace "addGLobalScalar" (ppr var) env{global_scalars = extendVarSet (global_scalars env) var}
+     
+deleteGlobalScalar :: Var -> VM ()
+deleteGlobalScalar var 
+  = updGEnv $ \env -> pprTrace "deleteGLobalScalar" (ppr var) env{global_scalars = delVarSet (global_scalars env) var}
+     
      
 -- Primitives -----------------------------------------------------------------
 lookupPrimPArray :: TyCon -> VM (Maybe TyCon)
