@@ -798,8 +798,10 @@ freeNamesIfBndr (IfaceTvBndr b) = freeNamesIfTvBndr b
 
 freeNamesIfLetBndr :: IfaceLetBndr -> NameSet
 -- Remember IfaceLetBndr is used only for *nested* bindings
--- The cut-down IdInfo never contains any Names, but the type may!
-freeNamesIfLetBndr (IfLetBndr _name ty _info) = freeNamesIfType ty
+-- The IdInfo can contain an unfolding (in the case of 
+-- local INLINE pragmas), so look there too
+freeNamesIfLetBndr (IfLetBndr _name ty info) = freeNamesIfType ty
+                                             &&& freeNamesIfIdInfo info
 
 freeNamesIfTvBndr :: IfaceTvBndr -> NameSet
 freeNamesIfTvBndr (_fs,k) = freeNamesIfType k
