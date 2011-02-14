@@ -932,10 +932,10 @@ NB: A consequence is that every simplifier-generated TcsTv variable
     constraints. In effect, by floating an equality out of the
     implication we are committing to have it solved in the outside.
 
-NB: A consequence is that every simplifier-generated TcsTv variable that gets floated out 
-    of an implication becomes now untouchable next time we go inside that implication to 
-    solve any residual constraints. In effect, by floating an equality out of the implication 
-    we are committing to have it solved in the outside. 
+Note [Float Equalities out of Implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+We want to float equalities out of vanilla existentials, but *not* out 
+of GADT pattern matches. 
 
 
 \begin{code}
