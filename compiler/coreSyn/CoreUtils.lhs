@@ -465,22 +465,24 @@ Note [exprIsDupable]
 
 \begin{code}
 exprIsDupable :: CoreExpr -> Bool
-exprIsDupable (Type _)   = True
-exprIsDupable (Var _)    = True
-exprIsDupable (Lit lit)  = litIsDupable lit
-exprIsDupable (Note _ e) = exprIsDupable e
-exprIsDupable (Cast e _) = exprIsDupable e
-exprIsDupable expr
-  = go expr 0
+exprIsDupable e
+  = isJust (go dupAppSize e)
   where
-    go (Var _)   _      = True
-    go (App f a) n_args =  n_args < dupAppSize
-			&& exprIsDupable a
-			&& go f (n_args+1)
-    go _         _      = False
+    go :: Int -> CoreExpr -> Maybe Int
+    go n (Type {}) = Just n
+    go n (Var {})  = decrement n
+    go n (Note _ e) = go n e
+    go n (Cast e _) = go n e
+    go n (App f a) | Just n' <- go n a = go n' f
+    go n (Lit lit) | litIsDupable lit = decrement n
+    go _ _ = Nothing
+
+    decrement :: Int -> Maybe Int
+    decrement 0 = Nothing
+    decrement n = Just (n-1)
 
 dupAppSize :: Int
-dupAppSize = 4		-- Size of application we are prepared to duplicate
+dupAppSize = 6	 -- Size of term we are prepared to duplicate
 \end{code}
 
 %************************************************************************
