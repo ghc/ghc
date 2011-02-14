@@ -2080,10 +2080,13 @@ mkDupableCont env (Select _ case_bndr alts se cont)
         --              let ji = \xij -> ei
         --              in case [...hole...] of { pi -> ji xij }
     do  { tick (CaseOfCase case_bndr)
-        ; (env', dup_cont, nodup_cont) <- mkDupableCont env cont
-                -- NB: call mkDupableCont here, *not* prepareCaseCont
-                -- We must make a duplicable continuation, whereas prepareCaseCont
-                -- doesn't when there is a single case branch
+        ; (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
+                -- NB: We call prepareCaseCont here.  If there is only one
+		-- alternative, then dup_cont may be big, but that's ok
+		-- becuase we push it into the single alternative, and then
+		-- use mkDupableAlt to turn that simplified alternative into
+		-- a join point if it's too big to duplicate.
+		-- And this is important: see Note [Fusing case continuations]
 
         ; let alt_env = se `setInScope` env'
         ; (alt_env', case_bndr') <- simplBinder alt_env case_bndr
@@ -2174,6 +2177,37 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
         ; return (env', (con, bndrs', join_call)) }
                 -- See Note [Duplicated env]
 \end{code}
+
+Note [Fusing case continuations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important to fuse two successive case continuations when the
+first has one alternative.  That's why we call prepareCaseCont here.
+Consider this, which arises from thunk splitting (see Note [Thunk
+splitting] in WorkWrap):
+
+      let
+	x* = case (case v of {pn -> rn}) of 
+               I# a -> I# a
+      in body
+
+The simplifier will find
+    (Var v) with continuation  
+            Select (pn -> rn) (
+            Select [I# a -> I# a] (
+            StrictBind body Stop
+
+So we'll call mkDupableCont on 
+   Select [I# a -> I# a] (StrictBind body Stop)
+There is just one alternative in the first Select, so we want to
+simplify the rhs (I# a) with continuation (StricgtBind body Stop)
+Supposing that body is big, we end up with
+	  let $j a = <let x = I# a in body> 
+          in case v of { pn -> case rn of 
+                                 I# a -> $j a }
+This is just what we want because the rn produces a box that
+the case rn cancels with.  
+
+See Trac #4957 a fuller example.
 
 Note [Case binders and join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2356,9 +2390,6 @@ Note [Duplicating StrictBind]
 Unlike StrictArg, there doesn't seem anything to gain from
 duplicating a StrictBind continuation, so we don't.
 
-The desire not to duplicate is the entire reason that
-mkDupableCont returns a pair of continuations.
-
 
 Note [Single-alternative cases]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2428,8 +2459,7 @@ Note [Single-alternative-unlifted]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here's another single-alternative where we really want to do case-of-case:
 
-data Mk1 = Mk1 Int#
-data Mk1 = Mk2 Int#
+data Mk1 = Mk1 Int# | Mk2 Int#
 
 M1.f =
     \r [x_s74 y_s6X]
@@ -2454,7 +2484,15 @@ M1.f =
 
 So the outer case is doing *nothing at all*, other than serving as a
 join-point.  In this case we really want to do case-of-case and decide
-whether to use a real join point or just duplicate the continuation.
+whether to use a real join point or just duplicate the continuation:
+
+    let $j s7c = case x of
+                   Mk1 ipv77 -> (==) s7c ipv77
+                   Mk1 ipv79 -> (==) s7c ipv79
+    in
+    case y of 
+      Mk1 ipv70 -> $j ipv70
+      Mk2 ipv72 -> $j ipv72
 
 Hence: check whether the case binder's type is unlifted, because then
 the outer case is *not* a seq.
