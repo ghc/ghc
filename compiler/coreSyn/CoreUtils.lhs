@@ -69,7 +69,6 @@ import CostCentre
 import Unique
 import Outputable
 import TysPrim
-import PrelNames( absentErrorIdKey )
 import FastString
 import Maybes
 import Util
@@ -699,10 +698,7 @@ exprOkForSpeculation (Case e _ _ alts)
 
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
-	(Var f, args) | f `hasKey` absentErrorIdKey	-- Note [Absent error Id]
-                      -> all exprOkForSpeculation args  --    in WwLib
-                      | otherwise 
-                      -> spec_ok (idDetails f) args
+	(Var f, args) -> spec_ok (idDetails f) args
         _             -> False
  
   where

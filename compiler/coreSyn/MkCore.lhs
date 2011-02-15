@@ -648,6 +648,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
+aBSENT_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
@@ -655,10 +656,7 @@ rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
 pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
-
-aBSENT_ERROR_ID :: Id
--- Not bottoming; no unfolding!  See Note [Absent error Id] in WwLib
-aBSENT_ERROR_ID = mkVanillaGlobal absentErrorName runtimeErrorTy
+aBSENT_ERROR_ID                 = mkRuntimeErrorId absentErrorName
 
 mkRuntimeErrorId :: Name -> Id
 mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy
