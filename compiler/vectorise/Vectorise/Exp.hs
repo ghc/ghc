@@ -158,14 +158,13 @@ vectFnExpr
 	-> VM (Inline, Bool, VExpr)
 
 vectFnExpr inline loop_breaker recFns e@(fvs, AnnLam bndr _)
-  | isId bndr = -- pprTrace "vectFnExpr -- id" (ppr fvs )$
-                 onlyIfV True -- (isEmptyVarSet fvs)  -- we check for free variables later. TODO: clean up
+  | isId bndr = onlyIfV True -- (isEmptyVarSet fvs)  -- we check for free variables later. TODO: clean up
                         (mark DontInline True . vectScalarLam bs recFns $ deAnnotate body)
                 `orElseV` mark inlineMe False (vectLam inline loop_breaker fvs bs body)
   where
     (bs,body) = collectAnnValBinders e
 
-vectFnExpr _ _ _  e = pprTrace "vectFnExpr -- otherwise" (ppr "a" )$ mark DontInline False $ vectExpr e
+vectFnExpr _ _ _  e = mark DontInline False $ vectExpr e
 
 mark :: Inline -> Bool -> VM a -> VM (Inline, Bool, a)
 mark b isScalarFn p = do { x <- p; return (b, isScalarFn, x) }
@@ -182,10 +181,6 @@ vectScalarLam
 vectScalarLam args recFns body
  = do scalars' <- globalScalars
       let scalars = unionVarSet (mkVarSet recFns) scalars'
-{-      pprTrace "vectScalarLam uses" (ppr $ uses scalars body) $
-        pprTrace "vectScalarLam is prim res" (ppr $ is_prim_ty res_ty) $
-        pprTrace "vectScalarLam is scalar body" (ppr $ is_scalar (extendVarSetList scalars args) body) $
-        pprTrace "vectScalarLam arg tys" (ppr $ arg_tys) $ -}
       onlyIfV (all is_prim_ty arg_tys
                && is_prim_ty res_ty
                && is_scalar (extendVarSetList scalars args) body
@@ -197,7 +192,6 @@ vectScalarLam args recFns body
                                                 (zipf `App` Var fn_var)
             clo_var <- hoistExpr (fsLit "clo") clo DontInline
             lclo    <- liftPD (Var clo_var)
-            {- pprTrace "  lam is scalar" (ppr "") $ -}
             return (Var clo_var, lclo)
   where
     arg_tys = map idType args
@@ -221,8 +215,7 @@ vectScalarLam args recFns body
        | isPrimTyCon tycon     = False
        | isAbstractTyCon tycon = True
        | isFunTyCon tycon || isProductTyCon tycon || isTupleTyCon tycon  = any (maybe_parr_ty' alreadySeen) args     
-       | isDataTyCon tycon = -- pprTrace "isDataTyCon" (ppr tycon) $ 
-                             any (maybe_parr_ty' alreadySeen) args || 
+       | isDataTyCon tycon = any (maybe_parr_ty' alreadySeen) args || 
                              hasParrDataCon alreadySeen tycon
        | otherwise = True
        where
@@ -239,31 +232,25 @@ vectScalarLam args recFns body
     is_scalar vs e@(Var v) 
       | Just _ <- isDataConId_maybe v = cantbe_parr_expr e
       | otherwise                     = cantbe_parr_expr e &&  (v `elemVarSet` vs)
-    is_scalar _ e@(Lit _)    = -- pprTrace "is_scalar  Lit" (ppr e) $ 
-                               cantbe_parr_expr e  
+    is_scalar _ e@(Lit _)    = cantbe_parr_expr e  
 
-    is_scalar vs e@(App e1 e2) = -- pprTrace "is_scalar  App" (ppr e) $  
-                               cantbe_parr_expr e &&
+    is_scalar vs e@(App e1 e2) = cantbe_parr_expr e &&
                                is_scalar vs e1 && is_scalar vs e2    
     is_scalar vs e@(Let (NonRec b letExpr) body) 
-                             = -- pprTrace "is_scalar  Let" (ppr e) $  
-                               cantbe_parr_expr e &&
+                             = cantbe_parr_expr e &&
                                is_scalar vs letExpr && is_scalar (extendVarSet vs b) body
-    is_scalar vs e@(Let (Rec bnds) body) 
+    is_scalar vs  e@(Let (Rec bnds) body) 
                              =  let vs' = extendVarSetList vs (map fst bnds)
-                                in -- pprTrace "is_scalar  Rec" (ppr e) $  
-                                   cantbe_parr_expr e &&  
+                                in cantbe_parr_expr e &&  
                                    all (is_scalar vs') (map snd bnds) && is_scalar vs' body
     is_scalar vs e@(Case eC eId ty alts)  
                              = let vs' = extendVarSet vs eId
-	                           in -- pprTrace "is_scalar  Case" (ppr e) $ 
-	                              cantbe_parr_expr e && 
+	                           in cantbe_parr_expr e && 
                                   is_prim_ty ty &&
                                   is_scalar vs' eC   &&
                                   (all (is_scalar_alt vs') alts)
                                     
-    is_scalar _ e            =  -- pprTrace "is_scalar  other" (ppr e) $  
-                                False
+    is_scalar _ _            =  False
 
     is_scalar_alt vs (_, bs, e) 
                              = is_scalar (extendVarSetList vs bs) e

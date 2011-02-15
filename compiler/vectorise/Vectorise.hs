@@ -131,7 +131,6 @@ vectTopBind b@(NonRec var expr)
 
 vectTopBind b@(Rec bs)
  = do
-      -- pprTrace "in Rec" (ppr vars) $ return ()
       (vars', _, exprs') 
 	<- fixV $ \ ~(_, inlines, rhss) ->
             do vars' <- sequence [vectTopBinder var inline rhs
@@ -140,11 +139,9 @@ vectTopBind b@(Rec bs)
                      <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
                if  (and areScalars') || (length bs <= 1)
                   then do
-                    -- pprTrace "in Rec - all scalars??" (ppr areScalars') $ return ()
                     return (vars', inlines', exprs')
                   else do
-                    -- pprTrace "in Rec - not all scalars" (ppr areScalars') $ return ()
-                    mapM deleteGlobalScalar vars
+                    _ <- mapM deleteGlobalScalar vars
                     (inlines'', _, exprs'')  <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
                     return (vars', inlines'', exprs'')
                       
@@ -200,10 +197,8 @@ vectTopRhs
 vectTopRhs recFs var expr
  = dtrace (vcat [text "vectTopRhs", ppr expr])
  $ closedV
- $ do (inline, isScalar, vexpr) <- inBind var
-                      -- $ pprTrace "vectTopRhs" (ppr var)
-                      $ vectPolyExpr  (isLoopBreaker $ idOccInfo var) recFs
-                                      (freeVars expr)
+ $ do (inline, isScalar, vexpr) <- 
+           inBind var $ vectPolyExpr  (isLoopBreaker $ idOccInfo var) recFs (freeVars expr)
       if isScalar 
          then addGlobalScalar var
          else deleteGlobalScalar var
