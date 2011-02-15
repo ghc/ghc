@@ -42,3 +42,7 @@ EvalTest:
 # when there are (as expected) no matches
 T4945:
 	-('$(TEST_HC)' -c -O2 -fno-liberate-case T4945.hs -ddump-simpl -dsuppress-uniques | grep 'STUArray')
+
+# When this one works there are no 'lets' at all
+T4957:
+	-('$(TEST_HC)' -c -O T4957.hs -ddump-simpl -dsuppress-uniques | grep 'let')
