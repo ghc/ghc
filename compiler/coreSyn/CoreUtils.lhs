@@ -481,7 +481,10 @@ exprIsDupable e
     decrement n = Just (n-1)
 
 dupAppSize :: Int
-dupAppSize = 6	 -- Size of term we are prepared to duplicate
+dupAppSize = 8	 -- Size of term we are prepared to duplicate
+	         -- This is *just* big enough to make test MethSharing
+		 -- inline enough join points.  Really it should be
+		 -- smaller, and could be if we fixed Trac #4960.
 \end{code}
 
 %************************************************************************
