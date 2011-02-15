@@ -1121,6 +1121,12 @@ primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop  CasMutVarOp "casMutVar#" GenPrimOp
+  MutVar# s a -> a -> a -> State# s -> (# State# s, Int#, a #)
+   with
+   out_of_line = True
+   has_side_effects = True
+
 ------------------------------------------------------------------------
 section "Exceptions"
 ------------------------------------------------------------------------
