@@ -563,6 +563,7 @@ exprIsCheap' good_app other_expr 	-- Applications and variables
   = go other_expr []
   where
 	-- Accumulate value arguments, then decide
+    go (Cast e _) val_args                 = go e val_args
     go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
 			  | otherwise      = go f val_args
 
