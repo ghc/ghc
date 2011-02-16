@@ -108,7 +108,7 @@ test('T4918',
      ['$MAKE -s --no-print-directory T4918'])
 
 test('T4945',
-     normal,
+     if_compiler_lt('ghc', '7.1', expect_fail),
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 

@@ -1,0 +1,77 @@
+
+==================== Tidy Core ====================
+Rec {
+T4908.f_$s$wf [Occ=LoopBreaker]
+  :: GHC.Types.Int
+     -> GHC.Prim.Int#
+     -> GHC.Prim.Int#
+     -> GHC.Bool.Bool
+[GblId, Arity=3, Caf=NoCafRefs, Str=DmdType LLL]
+T4908.f_$s$wf =
+  \ (sc :: GHC.Types.Int)
+    (sc1 :: GHC.Prim.Int#)
+    (sc2 :: GHC.Prim.Int#) ->
+    case sc2 of ds {
+      __DEFAULT ->
+        case sc1 of ds1 {
+          __DEFAULT -> T4908.f_$s$wf sc ds1 (GHC.Prim.-# ds 1);
+          0 -> GHC.Bool.True
+        };
+      0 -> GHC.Bool.True
+    }
+end Rec }
+
+T4908.$wf
+  :: GHC.Prim.Int#
+     -> (GHC.Types.Int, GHC.Types.Int)
+     -> GHC.Bool.Bool
+[GblId,
+ Arity=2,
+ Caf=NoCafRefs,
+ Str=DmdType LL,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [3 2] 11 2}]
+T4908.$wf =
+  \ (ww :: GHC.Prim.Int#) (w :: (GHC.Types.Int, GHC.Types.Int)) ->
+    case ww of ds {
+      __DEFAULT ->
+        case w of _ { (a, b) ->
+        case b of _ { GHC.Types.I# ds1 ->
+        case ds1 of ds2 {
+          __DEFAULT -> T4908.f_$s$wf a ds2 (GHC.Prim.-# ds 1);
+          0 -> GHC.Bool.True
+        }
+        }
+        };
+      0 -> GHC.Bool.True
+    }
+
+T4908.f [InlPrag=INLINE[0]]
+  :: GHC.Types.Int
+     -> (GHC.Types.Int, GHC.Types.Int)
+     -> GHC.Bool.Bool
+[GblId,
+ Arity=2,
+ Caf=NoCafRefs,
+ Str=DmdType U(L)L,
+ Unf=Unf{Src=Worker=T4908.$wf, TopLvl=True, Arity=2, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=ALWAYS_IF(unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once!] :: GHC.Types.Int)
+                 (w1 [Occ=Once] :: (GHC.Types.Int, GHC.Types.Int)) ->
+                 case w of _ { GHC.Types.I# ww [Occ=Once] -> T4908.$wf ww w1 }}]
+T4908.f =
+  \ (w :: GHC.Types.Int) (w1 :: (GHC.Types.Int, GHC.Types.Int)) ->
+    case w of _ { GHC.Types.I# ww -> T4908.$wf ww w1 }
+
+
+------ Local rules for imported ids --------
+"SC:$wf0" [ALWAYS]
+    forall {sc :: GHC.Types.Int
+            sc1 :: GHC.Prim.Int#
+            sc2 :: GHC.Prim.Int#}
+      T4908.$wf sc2 (sc, GHC.Types.I# sc1)
+      = T4908.f_$s$wf sc sc1 sc2
+
+

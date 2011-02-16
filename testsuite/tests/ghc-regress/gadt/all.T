@@ -100,9 +100,9 @@ test('gadt25', normal, compile, [''])
 test('T3651', normal, compile_fail, [''])
 test('T3638', normal, compile, [''])
 
-test('gadtSyntax001', normal, compile, [''])
-test('gadtSyntaxFail001', normal, compile_fail, [''])
-test('gadtSyntaxFail002', normal, compile_fail, [''])
-test('gadtSyntaxFail003', normal, compile_fail, [''])
+test('gadtSyntax001', if_compiler_lt('ghc', '7.1', expect_fail), compile, [''])
+test('gadtSyntaxFail001', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
+test('gadtSyntaxFail002', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
+test('gadtSyntaxFail003', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
 test('T3169', normal, compile_fail, [''])
 
