@@ -121,7 +121,9 @@ static  CostCentreStack * ActualPush_     ( CostCentreStack *ccs, CostCentre *cc
 static  rtsBool           ccs_to_ignore   ( CostCentreStack *ccs );
 static  void              count_ticks     ( CostCentreStack *ccs );
 static  void              inherit_costs   ( CostCentreStack *ccs );
-static  void              reportCCS       ( CostCentreStack *ccs, nat indent );
+static  void              findCCSMaxLens  ( CostCentreStack *ccs, nat indent, nat *max_label_len, nat *max_module_len );
+static  void              logCCS          ( CostCentreStack *ccs, nat indent, nat max_label_len, nat max_module_len );
+static  void              reportCCS       ( CostCentreStack *ccs );
 static  void              DecCCS          ( CostCentreStack *ccs );
 static  void              DecBackEdge     ( CostCentreStack *ccs, 
 					    CostCentreStack *oldccs );
@@ -664,9 +666,12 @@ static void
 report_per_cc_costs( void )
 {
   CostCentre *cc, *next;
+  nat max_label_len, max_module_len;
 
   aggregate_cc_costs(CCS_MAIN);
   sorted_cc_list = NULL;
+
+  max_label_len = max_module_len = 0;
 
   for (cc = CC_LIST; cc != NULL; cc = next) {
     next = cc->link;
@@ -674,10 +679,13 @@ report_per_cc_costs( void )
 	|| cc->mem_alloc > total_alloc/100
 	|| RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL) {
       insert_cc_in_sorted_list(cc);
+      
+      max_label_len = stg_max(strlen(cc->label), max_label_len);
+      max_module_len = stg_max(strlen(cc->module), max_module_len);
     }
   }
   
-  fprintf(prof_file, "%-30s %-20s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%-*s %-*s", max_label_len, "COST CENTRE", max_module_len, "MODULE");
   fprintf(prof_file, "%6s %6s", "%time", "%alloc");
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
     fprintf(prof_file, "  %5s %9s", "ticks", "bytes");
@@ -688,7 +696,7 @@ report_per_cc_costs( void )
       if (cc_to_ignore(cc)) {
 	  continue;
       }
-      fprintf(prof_file, "%-30s %-20s", cc->label, cc->module);
+      fprintf(prof_file, "%-*s %-*s", max_label_len, cc->label, max_module_len, cc->module);
       fprintf(prof_file, "%6.1f %6.1f",
 	      total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
 	      total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
@@ -710,11 +718,11 @@ report_per_cc_costs( void )
    -------------------------------------------------------------------------- */
 
 static void 
-fprint_header( void )
+fprint_header( nat max_label_len, nat max_module_len )
 {
   fprintf(prof_file, "%-24s %-10s                                                            individual    inherited\n", "", "");
 
-  fprintf(prof_file, "%-24s %-50s", "COST CENTRE", "MODULE");  
+  fprintf(prof_file, "%-*s %-*s", max_label_len, "COST CENTRE", max_module_len, "MODULE");  
   fprintf(prof_file, "%6s %10s  %5s %5s   %5s %5s", "no.", "entries", "%time", "%alloc", "%time", "%alloc");
 
   if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
@@ -733,7 +741,7 @@ reportCCSProfiling( void )
 {
     nat count;
     char temp[128]; /* sigh: magic constant */
-
+    
     stopProfTimer();
 
     total_prof_ticks = 0;
@@ -782,12 +790,28 @@ reportCCSProfiling( void )
 
     inherit_costs(CCS_MAIN);
 
-    fprint_header();
-    reportCCS(pruneCCSTree(CCS_MAIN), 0);
+    reportCCS(pruneCCSTree(CCS_MAIN));
 }
 
 static void 
-reportCCS(CostCentreStack *ccs, nat indent)
+findCCSMaxLens(CostCentreStack *ccs, nat indent, nat *max_label_len, nat *max_module_len) {
+  CostCentre *cc;
+  IndexTable *i;
+  
+  cc = ccs->cc;
+  
+  *max_label_len = stg_max(*max_label_len, indent + strlen(cc->label));
+  *max_module_len = stg_max(*max_module_len, strlen(cc->module));
+  
+  for (i = ccs->indexTable; i != 0; i = i->next) {
+    if (!i->back_edge) {
+      findCCSMaxLens(i->ccs, indent+1, max_label_len, max_module_len);
+    }
+  }
+}
+
+static void 
+logCCS(CostCentreStack *ccs, nat indent, nat max_label_len, nat max_module_len)
 {
   CostCentre *cc;
   IndexTable *i;
@@ -801,8 +825,8 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	/* force printing of *all* cost centres if -P -P */ 
     {
 
-    fprintf(prof_file, "%-*s%-*s %-50s", 
-	    indent, "", 24-indent, cc->label, cc->module);
+    fprintf(prof_file, "%-*s%-*s %-*s", 
+	    indent, "", max_label_len-indent, cc->label, max_module_len, cc->module);
 
     fprintf(prof_file, "%6ld %11.0f %5.1f  %5.1f   %5.1f  %5.1f",
 	    ccs->ccsID, (double) ccs->scc_count, 
@@ -828,9 +852,21 @@ reportCCS(CostCentreStack *ccs, nat indent)
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
     if (!i->back_edge) {
-      reportCCS(i->ccs, indent+1);
+      logCCS(i->ccs, indent+1, max_label_len, max_module_len);
     }
   }
+}
+
+static void
+reportCCS(CostCentreStack *ccs)
+{
+  nat max_label_len, max_module_len;
+  max_label_len = max_module_len = 0;
+  
+  findCCSMaxLens(ccs, 0, &max_label_len, &max_module_len);
+  
+  fprint_header(max_label_len, max_module_len);
+  logCCS(ccs, 0, max_label_len, max_module_len);
 }
 
 
