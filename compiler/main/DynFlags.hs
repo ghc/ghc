@@ -153,6 +153,7 @@ data DynFlag
    | Opt_D_dump_rn_stats
    | Opt_D_dump_opt_cmm
    | Opt_D_dump_simpl_stats
+   | Opt_D_dump_cs_trace	-- Constraint solver in type checker
    | Opt_D_dump_tc_trace
    | Opt_D_dump_if_trace
    | Opt_D_dump_splices
@@ -1259,6 +1260,7 @@ dynamic_flags = [
   , Flag "ddump-worker-wrapper"    (setDumpFlag Opt_D_dump_worker_wrapper)
   , Flag "ddump-rn-trace"          (setDumpFlag Opt_D_dump_rn_trace)
   , Flag "ddump-if-trace"          (setDumpFlag Opt_D_dump_if_trace)
+  , Flag "ddump-cs-trace"          (setDumpFlag Opt_D_dump_cs_trace)
   , Flag "ddump-tc-trace"          (setDumpFlag Opt_D_dump_tc_trace)
   , Flag "ddump-splices"           (setDumpFlag Opt_D_dump_splices)
   , Flag "ddump-rn-stats"          (setDumpFlag Opt_D_dump_rn_stats)

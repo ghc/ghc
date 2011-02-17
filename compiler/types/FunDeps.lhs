@@ -9,7 +9,8 @@ It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
 module FunDeps (
- 	Equation, pprEquation, 
+        FDEq (..),
+ 	Equation(..), pprEquation,
 	oclose, improveFromInstEnv, improveFromAnother,
 	checkInstCoverage, checkFunDeps,
 	pprFundeps
@@ -140,32 +141,67 @@ oclose preds fixed_tvs
 %************************************************************************
 
 
+Each functional dependency with one variable in the RHS is responsible
+for generating a single equality. For instance:
+     class C a b | a -> b
+The constraints ([Wanted] C Int Bool) and [Wanted] C Int alpha 
+     FDEq { fd_pos      = 1
+          , fd_ty_left  = Bool 
+          , fd_ty_right = alpha }
+However notice that a functional dependency may have more than one variable
+in the RHS which will create more than one FDEq. Example: 
+     class C a b c | a -> b c 
+     [Wanted] C Int alpha alpha 
+     [Wanted] C Int Bool beta 
+Will generate: 
+        fd1 = FDEq { fd_pos = 1, fd_ty_left = alpha, fd_ty_right = Bool } and
+        fd2 = FDEq { fd_pos = 2, fd_ty_left = alpha, fd_ty_right = beta }
+
+We record the paremeter position so that can immediately rewrite a constraint
+using the produced FDEqs and remove it from our worklist.
+
+
+INVARIANT: Corresponding types aren't already equal 
+That is, there exists at least one non-identity equality in FDEqs. 
+
+Assume:
+       class C a b c | a -> b c
+       instance C Int x x
+And:   [Wanted] C Int Bool alpha
+We will /match/ the LHS of fundep equations, producing a matching substitution
+and create equations for the RHS sides. In our last example we'd have generated:
+      ({x}, [fd1,fd2])
+where 
+       fd1 = FDEq 1 Bool x
+       fd2 = FDEq 2 alpha x
+To ``execute'' the equation, make fresh type variable for each tyvar in the set,
+instantiate the two types with these fresh variables, and then unify or generate 
+a new constraint. In the above example we would generate a new unification 
+variable 'beta' for x and produce the following constraints:
+     [Wanted] (Bool ~ beta)
+     [Wanted] (alpha ~ beta)
+
+Notice the subtle difference between the above class declaration and:
+       class C a b c | a -> b, a -> c 
+where we would generate: 
+      ({x},[fd1]),({x},[fd2]) 
+This means that the template variable would be instantiated to different 
+unification variables when producing the FD constraints. 
+
+Finally, the position parameters will help us rewrite the wanted constraint ``on the spot''
+
 \begin{code}
-type Equation = (TyVarSet, [(Type, Type)])
--- These pairs of types should be equal, for some
--- substitution of the tyvars in the tyvar set
--- INVARIANT: corresponding types aren't already equal
+type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
 
--- It's important that we have a *list* of pairs of types.  Consider
--- 	class C a b c | a -> b c where ...
---	instance C Int x x where ...
--- Then, given the constraint (C Int Bool v) we should improve v to Bool,
--- via the equation ({x}, [(Bool,x), (v,x)])
--- This would not happen if the class had looked like
---	class C a b c | a -> b, a -> c
+data Equation 
+   = FDEqn { fd_qtvs :: TyVarSet		-- Instantiate these to fresh unification vars
+           , fd_eqs  :: [FDEq]			--   and then make these equal
+           , fd_pred1, fd_pred2 :: Pred_Loc }	-- The Equation arose from
+	     	       		   	    	-- combining these two constraints
 
--- To "execute" the equation, make fresh type variable for each tyvar in the set,
--- instantiate the two types with these fresh variables, and then unify.
---
--- For example, ({a,b}, (a,Int,b), (Int,z,Bool))
--- We unify z with Int, but since a and b are quantified we do nothing to them
--- We usually act on an equation by instantiating the quantified type varaibles
--- to fresh type variables, and then calling the standard unifier.
-
-pprEquation :: Equation -> SDoc
-pprEquation (qtvs, pairs) 
-  = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
-	  nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (t1,t2) <- pairs])]
+data FDEq = FDEq { fd_pos      :: Int -- We use '0' for the first position
+                 , fd_ty_left  :: Type
+                 , fd_ty_right :: Type }
 \end{code}
 
 Given a bunch of predicates that must hold, such as
@@ -198,93 +234,97 @@ NOTA BENE:
 
 
 \begin{code}
-type Pred_Loc = (PredType, SDoc)	-- SDoc says where the Pred comes from
-
-improveFromInstEnv :: (Class -> [Instance]) 
-                     -> Pred_Loc 
-                     -> [(Equation,Pred_Loc,Pred_Loc)]
--- Improvement from top-level instances 
-improveFromInstEnv _inst_env pred 
-  = improveOne _inst_env pred []        -- TODO: Refactor to directly use instance_eqnd? 
-
-
-improveFromAnother :: Pred_Loc
-                   -> Pred_Loc
-                   -> [(Equation, Pred_Loc, Pred_Loc)]
--- Improvement from another local (given or wanted) constraint
-improveFromAnother pred1 pred2 
-  = improveOne (\_ -> []) pred1 [pred2] -- TODO: Refactor to directly use pairwise_eqns?
-
-
-improveOne :: (Class -> [Instance])		-- Gives instances for given class
-	   -> Pred_Loc				-- Do improvement triggered by this
-	   -> [Pred_Loc]			-- Current constraints 
-	   -> [(Equation,Pred_Loc,Pred_Loc)]	-- Derived equalities that must also hold
-						-- (NB the above INVARIANT for type Equation)
-						-- The Pred_Locs explain which two predicates were
-						-- combined (for error messages)
--- Just do improvement triggered by a single, distinguised predicate
-
-improveOne _inst_env pred@(IParam ip ty, _) preds
-  = [ ((emptyVarSet, [(ty,ty2)]), pred, p2) 
-    | p2@(IParam ip2 ty2, _) <- preds
-    , ip==ip2
-    , not (ty `tcEqType` ty2)]
-
-improveOne inst_env pred@(ClassP cls tys, _) preds
-  | tys `lengthAtLeast` 2
-  = instance_eqns ++ pairwise_eqns
-	-- NB: we put the instance equations first.   This biases the 
-	-- order so that we first improve individual constraints against the
-	-- instances (which are perhaps in a library and less likely to be
-	-- wrong; and THEN perform the pairwise checks.
-	-- The other way round, it's possible for the pairwise check to succeed
-	-- and cause a subsequent, misleading failure of one of the pair with an
-	-- instance declaration.  See tcfail143.hs for an example
+instFD_WithPos :: FunDep TyVar -> [TyVar] -> [Type] -> ([Type], [(Int,Type)]) 
+-- Returns a FunDep between the types accompanied along with their 
+-- position (<=0) in the types argument list.
+instFD_WithPos (ls,rs) tvs tys
+  = (map (snd . lookup) ls, map lookup rs)
   where
-    (cls_tvs, cls_fds) = classTvsFds cls
-    instances	       = inst_env cls
-    rough_tcs 	       = roughMatchTcs tys
+    ind_tys   = zip [0..] tys 
+    env       = zipVarEnv tvs ind_tys
+    lookup tv = lookupVarEnv_NF env tv
 
-	-- NOTE that we iterate over the fds first; they are typically
-	-- empty, which aborts the rest of the loop.
-    pairwise_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
-    pairwise_eqns	-- This group comes from pairwise comparison
-      = [ (eqn, pred, p2)
-	| fd <- cls_fds
-	, p2@(ClassP cls2 tys2, _) <- preds
-	, cls == cls2
-	, eqn <- checkClsFD emptyVarSet fd cls_tvs tys tys2
-	]
+zipAndComputeFDEqs :: (Type -> Type -> Bool) -- Discard this FDEq if true
+                   -> [Type] 
+                   -> [(Int,Type)] 
+                   -> [FDEq]
+-- Create a list of FDEqs from two lists of types, making sure
+-- that the types are not equal.
+zipAndComputeFDEqs discard (ty1:tys1) ((i2,ty2):tys2)
+ | discard ty1 ty2 = zipAndComputeFDEqs discard tys1 tys2
+ | otherwise = FDEq { fd_pos      = i2
+                    , fd_ty_left  = ty1
+                    , fd_ty_right = ty2 } : zipAndComputeFDEqs discard tys1 tys2
+zipAndComputeFDEqs _ _ _ = [] 
 
-    instance_eqns :: [(Equation,Pred_Loc,Pred_Loc)]
-    instance_eqns	-- This group comes from comparing with instance decls
-      = [ (eqn, p_inst, pred)
-	| fd <- cls_fds		-- Iterate through the fundeps first, 
+-- Improve a class constraint from another class constraint
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+improveFromAnother :: Pred_Loc -- Template item (usually given, or inert) 
+                   -> Pred_Loc -- Workitem [that can be improved]
+                   -> [Equation]
+-- Post: FDEqs always oriented from the other to the workitem 
+--       Equations have empty quantified variables 
+improveFromAnother pred1@(ClassP cls1 tys1, _) pred2@(ClassP cls2 tys2, _)
+  | tys1 `lengthAtLeast` 2 && cls1 == cls2
+  = [ FDEqn { fd_qtvs = emptyVarSet, fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2 }
+    | let (cls_tvs, cls_fds) = classTvsFds cls1
+    , fd <- cls_fds
+    , let (ltys1, rs1)  = instFD         fd cls_tvs tys1
+          (ltys2, irs2) = instFD_WithPos fd cls_tvs tys2
+    , tcEqTypes ltys1 ltys2		-- The LHSs match
+    , let eqs = zipAndComputeFDEqs tcEqType rs1 irs2
+    , not (null eqs) ]
+
+improveFromAnother _ _ = []
+
+
+-- Improve a class constraint from instance declarations
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+pprEquation :: Equation -> SDoc
+pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs }) 
+  = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
+	  nest 2 (vcat [ ppr t1 <+> ptext (sLit "~") <+> ppr t2 | (FDEq _ t1 t2) <- pairs])]
+
+improveFromInstEnv :: (InstEnv,InstEnv)
+                   -> Pred_Loc
+                   -> [Equation] -- Needs to be an Equation because
+                                 -- of quantified variables
+-- Post: Equations oriented from the template (matching instance) to the workitem!
+improveFromInstEnv _inst_env (pred,_loc)
+  | not (isClassPred pred)
+  = panic "improveFromInstEnv: not a class predicate"
+improveFromInstEnv inst_env pred@(ClassP cls tys, _)
+  | tys `lengthAtLeast` 2
+  = [ FDEqn { fd_qtvs = qtvs, fd_eqs = eqs, fd_pred1 = p_inst, fd_pred2=pred }
+    | fd <- cls_fds		-- Iterate through the fundeps first,
 				-- because there often are none!
-	, let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
+    , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
 		-- Trim the rough_tcs based on the head of the fundep.
 		-- Remember that instanceCantMatch treats both argumnents
 		-- symmetrically, so it's ok to trim the rough_tcs,
 		-- rather than trimming each inst_tcs in turn
-	, ispec@(Instance { is_tvs = qtvs, is_tys = tys_inst, 
-		 	    is_tcs = inst_tcs }) <- instances
-	, not (instanceCantMatch inst_tcs trimmed_tcs)
-	, eqn <- checkClsFD qtvs fd cls_tvs tys_inst tys
-	, let p_inst = (mkClassPred cls tys_inst, 
-		        sep [ ptext (sLit "arising from the dependency") <+> quotes (pprFunDep fd)
-			    , ptext (sLit "in the instance declaration at") 
-			          <+> ppr (getSrcLoc ispec)])
-	]
-
-improveOne _ _ _
-  = []
+    , ispec@(Instance { is_tvs = qtvs, is_tys = tys_inst,
+		 	is_tcs = inst_tcs }) <- instances
+    , not (instanceCantMatch inst_tcs trimmed_tcs)
+    , let p_inst = (mkClassPred cls tys_inst,
+		    sep [ ptext (sLit "arising from the dependency") <+> quotes (pprFunDep fd)	
+		        , ptext (sLit "in the instance declaration at")
+			            <+> ppr (getSrcLoc ispec)])
+    , (qtvs, eqs) <- checkClsFD qtvs fd cls_tvs tys_inst tys -- NB: orientation
+    , not (null eqs)
+    ]
+  where 
+     (cls_tvs, cls_fds) = classTvsFds cls
+     instances          = classInstances inst_env cls
+     rough_tcs          = roughMatchTcs tys
+improveFromInstEnv _ _ = []
 
 
 checkClsFD :: TyVarSet 			-- Quantified type variables; see note below
 	   -> FunDep TyVar -> [TyVar] 	-- One functional dependency from the class
 	   -> [Type] -> [Type]
-	   -> [Equation]
+	   -> [(TyVarSet, [FDEq])]
 
 checkClsFD qtvs fd clas_tvs tys1 tys2
 -- 'qtvs' are the quantified type variables, the ones which an be instantiated 
@@ -313,52 +353,69 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 	     length tys1 == length clas_tvs 
 	    , ppr tys1 <+> ppr tys2 )
 
-    case tcUnifyTys bind_fn ls1 ls2 of
+    case tcUnifyTys bind_fn ltys1 ltys2 of
 	Nothing  -> []
-	Just subst | isJust (tcUnifyTys bind_fn rs1' rs2') 
-			-- Don't include any equations that already hold. 
+	Just subst | isJust (tcUnifyTys bind_fn rtys1' rtys2')
+			-- Don't include any equations that already hold.
 			-- Reason: then we know if any actual improvement has happened,
 			-- 	   in which case we need to iterate the solver
-			-- In making this check we must taking account of the fact that any 
-			-- qtvs that aren't already instantiated can be instantiated to anything 
+			-- In making this check we must taking account of the fact that any
+			-- qtvs that aren't already instantiated can be instantiated to anything
 			-- at all
-		  -> []
+                        -- NB: We can't do this 'is-useful-equation' check element-wise 
+                        --     because of:
+                        --           class C a b c | a -> b c
+                        --           instance C Int x x
+                        --           [Wanted] C Int alpha Int
+                        -- We would get that  x -> alpha  (isJust) and x -> Int (isJust)
+                        -- so we would produce no FDs, which is clearly wrong. 
+                  -> [] 
 
-		  | otherwise	-- Aha!  A useful equation
-		  -> [ (qtvs', zip rs1' rs2')]
+                  | otherwise
+                  -> [(qtvs', fdeqs)]
 		  	-- We could avoid this substTy stuff by producing the eqn
 		  	-- (qtvs, ls1++rs1, ls2++rs2)
 		  	-- which will re-do the ls1/ls2 unification when the equation is
 		  	-- executed.  What we're doing instead is recording the partial
 		  	-- work of the ls1/ls2 unification leaving a smaller unification problem
-		  where
-		    rs1'  = substTys subst rs1 
-	 	    rs2'  = substTys subst rs2
+	          where
+                    rtys1' = map (substTy subst) rtys1
+                    irs2'  = map (\(i,x) -> (i,substTy subst x)) irs2
+                    rtys2' = map snd irs2'
+ 
+                    fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' irs2'
+                        -- Don't discard anything! 
+                        -- We could discard equal types but it's an overkill to call 
+                        -- tcEqType again, since we know for sure that /at least one/ 
+                        -- equation in there is useful)
+
 		    qtvs' = filterVarSet (`notElemTvSubst` subst) qtvs
-			-- qtvs' are the quantified type variables
-			-- that have not been substituted out
-			--	
-			-- Eg. 	class C a b | a -> b
-			--	instance C Int [y]
-			-- Given constraint C Int z
-			-- we generate the equation
-			--	({y}, [y], z)
+		        -- qtvs' are the quantified type variables
+		        -- that have not been substituted out
+		        --	
+		        -- Eg. 	class C a b | a -> b
+		        --	instance C Int [y]
+		        -- Given constraint C Int z
+		        -- we generate the equation
+		        --	({y}, [y], z)
   where
     bind_fn tv | tv `elemVarSet` qtvs = BindMe
 	       | otherwise	      = Skolem
 
-    (ls1, rs1) = instFD fd clas_tvs tys1
-    (ls2, rs2) = instFD fd clas_tvs tys2
+    (ltys1, rtys1) = instFD         fd clas_tvs tys1
+    (ltys2, irs2)  = instFD_WithPos fd clas_tvs tys2
+\end{code}
 
+
+\begin{code}
 instFD :: FunDep TyVar -> [TyVar] -> [Type] -> FunDep Type
+-- A simpler version of instFD_WithPos to be used in checking instance coverage etc.
 instFD (ls,rs) tvs tys
   = (map lookup ls, map lookup rs)
   where
     env       = zipVarEnv tvs tys
     lookup tv = lookupVarEnv_NF env tv
-\end{code}
 
-\begin{code}
 checkInstCoverage :: Class -> [Type] -> Bool
 -- Check that the Coverage Condition is obeyed in an instance decl
 -- For example, if we have 

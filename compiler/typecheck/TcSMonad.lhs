@@ -10,7 +10,6 @@ module TcSMonad (
 
     CanonicalCt(..), Xi, tyVarsOfCanonical, tyVarsOfCanonicals, tyVarsOfCDicts, 
     deCanonicalise, mkFrozenError,
-    makeSolvedByInst,
 
     isWanted, isGiven, isDerived,
     isGivenCt, isWantedCt, isDerivedCt, pprFlavorArising,
@@ -21,7 +20,8 @@ module TcSMonad (
     combineCtLoc, mkGivenFlavor, mkWantedFlavor,
     getWantedLoc,
 
-    TcS, runTcS, failTcS, panicTcS, traceTcS, traceTcS0,  -- Basic functionality 
+    TcS, runTcS, failTcS, panicTcS, traceTcS, -- Basic functionality 
+    traceFireTcS, bumpStepCountTcS,
     tryTcS, nestImplicTcS, recoverTcS, wrapErrTcS, wrapWarnTcS,
     SimplContext(..), isInteractive, simplEqsOnly, performDefaulting,
 
@@ -45,7 +45,7 @@ module TcSMonad (
 
     instDFunTypes,                              -- Instantiation
     instDFunConstraints,          
-    newFlexiTcSTy, 
+    newFlexiTcSTy, instFlexiTcS,
 
     compatKind,
 
@@ -58,15 +58,11 @@ module TcSMonad (
     matchClass, matchFam, MatchInstResult (..), 
     checkWellStagedDFun, 
     warnTcS,
-    pprEq,                                   -- Smaller utils, re-exported from TcM 
+    pprEq                                   -- Smaller utils, re-exported from TcM 
                                              -- TODO (DV): these are only really used in the 
                                              -- instance matcher in TcSimplify. I am wondering
                                              -- if the whole instance matcher simply belongs
                                              -- here 
-
-
-    mkDerivedFunDepEqns                       -- Instantiation of 'Equations' from FunDeps
-
 ) where 
 
 #include "HsVersions.h"
@@ -102,7 +98,6 @@ import FastString
 
 import HsBinds               -- for TcEvBinds stuff 
 import Id 
-import FunDeps
 
 import TcRnTypes
 
@@ -179,16 +174,6 @@ mkFrozenError fl ev = CFrozenErr { cc_id = ev, cc_flavor = fl }
 
 compatKind :: Kind -> Kind -> Bool
 compatKind k1 k2 = k1 `isSubKind` k2 || k2 `isSubKind` k1 
-
-makeSolvedByInst :: CanonicalCt -> CanonicalCt
--- Record that a constraint is now solved
--- 	  Wanted         -> Given
---	  Given, Derived -> no-op
-makeSolvedByInst ct 
-  | Wanted loc <- cc_flavor ct
-  = ct { cc_flavor = Given (setCtLocOrigin loc UnkSkol) }
-  | otherwise	   -- Only called on wanteds
-  = pprPanic "makeSolvedByInst" (ppr ct)
 
 deCanonicalise :: CanonicalCt -> FlavoredEvVar
 deCanonicalise ct = mkEvVarX (cc_id ct) (cc_flavor ct)
@@ -367,7 +352,10 @@ data TcSEnv
 
       tcs_context :: SimplContext,
                      
-      tcs_untch :: TcsUntouchables
+      tcs_untch :: TcsUntouchables,
+
+      tcs_ic_depth :: Int,	-- Implication nesting depth
+      tcs_count    :: IORef Int	-- Global step count
     }
 
 type TcsUntouchables = (Untouchables,TcTyVarSet)
@@ -443,8 +431,21 @@ panicTcS doc = pprPanic "TcCanonical" doc
 traceTcS :: String -> SDoc -> TcS ()
 traceTcS herald doc = TcS $ \_env -> TcM.traceTc herald doc
 
-traceTcS0 :: String -> SDoc -> TcS ()
-traceTcS0 herald doc = TcS $ \_env -> TcM.traceTcN 0 herald doc
+bumpStepCountTcS :: TcS ()
+bumpStepCountTcS = TcS $ \env -> do { let ref = tcs_count env
+                                    ; n <- TcM.readTcRef ref
+                                    ; TcM.writeTcRef ref (n+1) }
+
+traceFireTcS :: Int -> SDoc -> TcS ()
+-- Dump a rule-firing trace
+traceFireTcS depth doc 
+  = TcS $ \env -> 
+    TcM.ifDOptM Opt_D_dump_cs_trace $ 
+    do { n <- TcM.readTcRef (tcs_count env)
+       ; let msg = int n 
+                <> text (replicate (tcs_ic_depth env) '>')
+                <> brackets (int depth) <+> doc
+       ; TcM.dumpTcRn msg }
 
 runTcS :: SimplContext
        -> Untouchables 	       -- Untouchables
@@ -453,10 +454,13 @@ runTcS :: SimplContext
 runTcS context untouch tcs 
   = do { ty_binds_var <- TcM.newTcRef emptyVarEnv
        ; ev_binds_var@(EvBindsVar evb_ref _) <- TcM.newTcEvBinds
+       ; step_count <- TcM.newTcRef 0
        ; let env = TcSEnv { tcs_ev_binds = ev_binds_var
                           , tcs_ty_binds = ty_binds_var
                           , tcs_context  = context
                           , tcs_untch    = (untouch, emptyVarSet) -- No Tcs untouchables yet
+			  , tcs_count    = step_count
+			  , tcs_ic_depth = 0
                           }
 
 	     -- Run the computation
@@ -465,6 +469,10 @@ runTcS context untouch tcs
        ; ty_binds <- TcM.readTcRef ty_binds_var
        ; mapM_ do_unification (varEnvElts ty_binds)
 
+#ifdef DEBUG
+       ; count <- TcM.readTcRef step_count
+       ; TcM.dumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count)
+#endif
              -- And return
        ; ev_binds      <- TcM.readTcRef evb_ref
        ; return (res, evBindMapBinds ev_binds) }
@@ -472,13 +480,23 @@ runTcS context untouch tcs
     do_unification (tv,ty) = TcM.writeMetaTyVar tv ty
 
 nestImplicTcS :: EvBindsVar -> TcsUntouchables -> TcS a -> TcS a
-nestImplicTcS ref untch (TcS thing_inside)
-  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds, 
-                     tcs_context = ctxt } ->
+nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
+  = TcS $ \ TcSEnv { tcs_ty_binds = ty_binds 
+    	    	   , tcs_untch = (_outer_range, outer_tcs)
+		   , tcs_count = count
+		   , tcs_ic_depth = idepth
+                   , tcs_context = ctxt } ->
     let 
+       inner_untch = (inner_range, outer_tcs `unionVarSet` inner_tcs)
+       		   -- The inner_range should be narrower than the outer one
+		   -- (thus increasing the set of untouchables) but 
+		   -- the inner Tcs-untouchables must be unioned with the
+		   -- outer ones!
        nest_env = TcSEnv { tcs_ev_binds = ref
                          , tcs_ty_binds = ty_binds
-                         , tcs_untch    = untch
+                         , tcs_untch    = inner_untch
+                         , tcs_count    = count
+                         , tcs_ic_depth = idepth+1
                          , tcs_context  = ctxtUnderImplic ctxt }
     in 
     thing_inside nest_env
@@ -785,48 +803,4 @@ matchFam tycon args
        -- DV: We never return MatchInstMany, since tcLookupFamInst never returns 
        -- multiple matches. Check. 
        }
-
-
--- Functional dependencies, instantiation of equations
--------------------------------------------------------
-
-mkDerivedFunDepEqns :: WantedLoc
-                   -> [(Equation, (PredType, SDoc), (PredType, SDoc))]
-                   -> TcS [FlavoredEvVar]    -- All Derived
-mkDerivedFunDepEqns _   [] = return []
-mkDerivedFunDepEqns loc eqns
-  = do { traceTcS "Improve:" (vcat (map pprEquationDoc eqns))
-       ; evvars <- mapM to_work_item eqns
-       ; return $ concat evvars }
-  where
-    to_work_item :: (Equation, (PredType,SDoc), (PredType,SDoc)) -> TcS [FlavoredEvVar]
-    to_work_item ((qtvs, pairs), d1, d2)
-      = do { let tvs = varSetElems qtvs
-           ; tvs' <- mapM instFlexiTcS tvs
-           ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
-                 loc'  = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
-                 flav  = Derived loc'
-           ; mapM (do_one subst flav) pairs }
-
-    do_one subst flav (ty1, ty2)
-       = do { let sty1 = substTy subst ty1
-                  sty2 = substTy subst ty2
-            ; ev <- newCoVar sty1 sty2
-            ; return (mkEvVarX ev flav) }
-
-pprEquationDoc :: (Equation, (PredType, SDoc), (PredType, SDoc)) -> SDoc
-pprEquationDoc (eqn, (p1, _), (p2, _)) 
-  = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
-
-mkEqnMsg :: (TcPredType, SDoc) -> (TcPredType, SDoc) -> TidyEnv
-         -> TcM (TidyEnv, SDoc)
-mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
-  = do  { pred1' <- TcM.zonkTcPredType pred1
-        ; pred2' <- TcM.zonkTcPredType pred2
-	; let { pred1'' = tidyPred tidy_env pred1'
-              ; pred2'' = tidyPred tidy_env pred2' }
-	; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
-			  nest 2 (sep [ppr pred1'' <> comma, nest 2 from1]), 
-			  nest 2 (sep [ppr pred2'' <> comma, nest 2 from2])]
-	; return (tidy_env, msg) }
 \end{code}

@@ -935,10 +935,9 @@ data CtFlavor
 -- superclasses. 
 
 instance Outputable CtFlavor where
-  ppr (Given _)    = ptext (sLit "[Given]")
-  ppr (Wanted _)   = ptext (sLit "[Wanted]")
-  ppr (Derived {}) = ptext (sLit "[Derived]") 
-
+  ppr (Given {})   = ptext (sLit "[G]")
+  ppr (Wanted {})  = ptext (sLit "[W]")
+  ppr (Derived {}) = ptext (sLit "[D]") 
 pprFlavorArising :: CtFlavor -> SDoc
 pprFlavorArising (Derived wl )  = pprArisingAt wl
 pprFlavorArising (Wanted  wl)   = pprArisingAt wl
