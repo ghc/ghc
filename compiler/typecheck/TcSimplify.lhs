@@ -768,13 +768,14 @@ solveNestedImplications just_given_inert unsolved_cans implics
   | otherwise 
   = do {  -- See Note [Preparing inert set for implications]
 	  -- Push the unsolved wanteds inwards, but as givens
-         traceTcS "solveWanteds: preparing inerts for implications {"  empty
-     
-       ; let pushed_givens    = givensFromWanteds unsolved_cans
+         let pushed_givens    = givensFromWanteds unsolved_cans
              tcs_untouchables = filterVarSet isFlexiTcsTv $
                                 tyVarsOfEvVarXs pushed_givens
              -- See Note [Extra TcsTv untouchables]
 
+       ; traceTcS "solveWanteds: preparing inerts for implications {"  
+                  (vcat [ppr tcs_untouchables, ppr pushed_givens])
+     
        ; (_, inert_for_implics) <- solveInteract just_given_inert pushed_givens
 
        ; traceTcS "solveWanteds: } now doing nested implications {" $
