@@ -82,11 +82,11 @@ simplifyDeriv :: CtOrigin
 -- Simplify 'wanted' as much as possibles
 -- Fail if not possible
 simplifyDeriv orig tvs theta 
-  = do { tvs_skols <- tcInstSuperSkolTyVars tvs -- Skolemize
-       	 	   -- One reason is that the constraint solving machinery
-		   -- expects *TcTyVars* not TyVars.  Another is that
-		   -- when looking up instances we don't want overlap
-		   -- of type variables
+  = do { tvs_skols <- tcInstSkolTyVars tvs -- Skolemize
+      	 	-- The constraint solving machinery 
+		-- expects *TcTyVars* not TyVars.  
+		-- We use *non-overlappable* (vanilla) skolems
+		-- See Note [Overlap and deriving]
 
        ; let skol_subst = zipTopTvSubst tvs $ map mkTyVarTy tvs_skols
              subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
@@ -110,6 +110,31 @@ simplifyDeriv orig tvs theta
        ; let min_theta = mkMinimalBySCs (bagToList good)
        ; return (substTheta subst_skol min_theta) }
 \end{code}
+
+Note [Overlap and deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider some overlapping instances:
+  data Show a => Show [a] where ..
+  data Show [Char] where ...
+
+Now a data type with deriving:
+  data T a = MkT [a] deriving( Show )
+
+We want to get the derived instance
+  instance Show [a] => Show (T a) where...
+and NOT
+  instance Show a => Show (T a) where...
+so that the (Show (T Char)) instance does the Right Thing
+
+It's very like the situation when we're inferring the type
+of a function
+   f x = show [x]
+and we want to infer
+   f :: Show [a] => a -> String
+
+BOTTOM LINE: use vanilla, non-overlappable skolems when inferring
+             the context for the derived instance. 
+	     Hence tcInstSkolTyVars not tcInstSuperSkolTyVars
 
 Note [Exotic derived instance contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
