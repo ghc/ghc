@@ -25,6 +25,7 @@ test('T4220', normal, compile, [''])
 test('T4302', normal, compile, [''])
 test('T4325', normal, compile, [''])
 test('T4816', normal, compile, [''])
+test('T4966', normal, compile, [''])
 
 test('drv-functor1', normal, compile, [''])
 test('drv-functor2', normal, compile, [''])
