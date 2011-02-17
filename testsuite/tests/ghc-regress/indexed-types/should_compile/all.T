@@ -117,7 +117,7 @@ test('GivenCheckDecomp', normal, compile, [''])
 test('GivenCheckTop', normal, compile, [''])
 
 # A very delicate test
-test('Gentle', normal, compile_fail, [''])
+test('Gentle', normal, compile, [''])
 
 test('T1981', normal, compile, [''])
 test('T2238', expect_fail, compile, [''])

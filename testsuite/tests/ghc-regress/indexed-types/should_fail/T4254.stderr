@@ -1,0 +1,18 @@
+
+T4254.hs:19:10:
+    Could not deduce (b ~ Bool)
+    from the context (a ~ Int, FD a b)
+      bound by the type signature for
+                 fails :: (a ~ Int, FD a b) => a -> Bool
+      at T4254.hs:19:1-11
+      `b' is a rigid type variable bound by
+          the type signature for fails :: (a ~ Int, FD a b) => a -> Bool
+          at T4254.hs:19:1
+    When using functional dependencies to combine
+      FD Int b,
+        arising from the type signature for
+                       fails :: (a ~ Int, FD a b) => a -> Bool
+        at T4254.hs:19:1-11
+      FD Int Bool, arising from a use of `op' at T4254.hs:19:10-11
+    In the expression: op
+    In an equation for `fails': fails = op
