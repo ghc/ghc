@@ -1001,6 +1001,22 @@ itself, and so on.
 %*                                                                      *
 %************************************************************************
 
+When we spot an equality arising from a functional dependency,
+we now use that equality (a "wanted") to rewrite the work-item
+constraint right away.  This avoids two dangers
+
+ Danger 1: If we send the original constraint on down the pipeline
+           it may react with an instance declaration, and in delicate
+	   situations (when a Given overlaps with an instance) that
+	   may produce new insoluble goals: see Trac #4952
+
+ Danger 2: If we don't rewrite the constraint, it may re-react
+           with the same thing later, and produce the same equality
+           again --> termination worries.
+
+To achieve this required some refactoring of FunDeps.lhs (nicer
+now!).  
+
 \begin{code}
 rewriteWithFunDeps :: [Equation]
                    -> [Xi] -> CtFlavor
