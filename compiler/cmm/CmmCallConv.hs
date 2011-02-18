@@ -47,7 +47,8 @@ assignArgumentsPos conv arg_ty reps = assignments
                (_,   NativeDirectCall) -> getRegsWithoutNode
                ([_], NativeReturn)     -> allRegs
                (_,   NativeReturn)     -> getRegsWithNode
-               (_,   GC)               -> getRegsWithNode
+               -- GC calling convention *must* put values in registers
+               (_,   GC)               -> allRegs
                (_,   PrimOpCall)       -> allRegs
                ([_], PrimOpReturn)     -> allRegs
                (_,   PrimOpReturn)     -> getRegsWithNode
@@ -61,6 +62,7 @@ assignArgumentsPos conv arg_ty reps = assignments
       (reg_assts, stk_args) = assign_regs [] reps regs
       stk_args' = case conv of NativeReturn -> part
                                PrimOpReturn -> part
+                               GC | length stk_args /= 0 -> panic "Failed to allocate registers for GC call"
                                _            -> stk_args
                   where part = uncurry (++)
                                        (L.partition (not . isGcPtrType . arg_ty) stk_args)
