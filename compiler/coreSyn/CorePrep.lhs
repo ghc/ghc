@@ -18,6 +18,7 @@ import CoreFVs
 import CoreMonad	( endPass, CoreToDo(..) )
 import CoreSyn
 import CoreSubst
+import OccurAnal        ( occurAnalyseExpr )
 import Type
 import Coercion
 import TyCon
@@ -246,6 +247,61 @@ give a loop).  As Lennart says: the ice is thin here, but it works.
 Hmm.  Should we create bindings for dictionary constructors?  They are
 always fully applied, and the bindings are just there to support
 partial applications. But it's easier to let them through.
+
+
+Note [Dead code in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Imagine that we got an input program like this:
+
+  f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
+  f x = (g True (Just x) + g () (Just x), g)
+    where
+      g :: Show a => a -> Maybe Int -> Int
+      g _ Nothing = x
+      g y (Just z) = if z > 100 then g y (Just (z + length (show y))) else g y unknown
+
+After specialisation and SpecConstr, we would get something like this:
+
+  f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
+  f x = (g$Bool_True_Just x + g$Unit_Unit_Just x, g)
+    where
+      {-# RULES g $dBool = g$Bool 
+                g $dUnit = g$Unit #-}
+      g = ...
+      {-# RULES forall x. g$Bool True (Just x) = g$Bool_True_Just x #-}
+      g$Bool = ...
+      {-# RULES forall x. g$Unit () (Just x) = g$Unit_Unit_Just x #-}
+      g$Unit = ...
+      g$Bool_True_Just = ...
+      g$Unit_Unit_Just = ...
+
+Note that the g$Bool and g$Unit functions are actually dead code: they are only kept
+alive by the occurrence analyser because they are referred to by the rules of g,
+which is being kept alive by the fact that it is used (unspecialised) in the returned pair.
+
+However, at the CorePrep stage there is no way that the rules for g will ever fire,
+and it really seems like a shame to produce an output program that goes to the trouble
+of allocating a closure for the unreachable g$Bool and g$Unit functions.
+
+The way we fix this is to:
+ * In cloneBndr, drop all unfoldings/rules
+ * In deFloatTop, run the occurrence analyser on each top-level RHS to drop
+   the dead local bindings
+
+The reason we don't just OccAnal the whole output of CorePrep is that the tidier
+ensures that all top-level binders are GlobalIds, so they don't show up in the free
+variables any longer. So if you run the occurrence analyser on the output of CoreTidy
+(or later) you e.g. turn this program:
+
+  Rec {
+  f = ... f ...
+  }
+
+Into this one:
+
+  f = ... f ...
+
+(Since f is not considered to be free in its own RHS.)
 
 
 %************************************************************************
@@ -901,8 +957,12 @@ deFloatTop :: Floats -> [CoreBind]
 deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
-    get (FloatLet b) bs = b:bs
+    get (FloatLet b) bs = occurAnalyseRHSs b : bs
     get b            _  = pprPanic "corePrepPgm" (ppr b)
+    
+    -- See Note [Dead code in CorePrep]
+    occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr e)
+    occurAnalyseRHSs (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
 
 -------------------------------------------
 canFloatFromNoCaf ::  Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
@@ -1012,7 +1072,13 @@ cloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
 cloneBndr env bndr
   | isLocalId bndr
   = do bndr' <- setVarUnique bndr <$> getUniqueM
-       return (extendCorePrepEnv env bndr bndr', bndr')
+       
+       -- We are going to OccAnal soon, so drop (now-useless) rules/unfoldings
+       -- so that we can drop more stuff as dead code.
+       -- See also Note [Dead code in CorePrep]
+       let bndr'' = bndr' `setIdUnfolding` noUnfolding
+                          `setIdSpecialisation` emptySpecInfo
+       return (extendCorePrepEnv env bndr bndr'', bndr'')
 
   | otherwise	-- Top level things, which we don't want
 		-- to clone, have become GlobalIds by now

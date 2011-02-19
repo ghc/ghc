@@ -46,6 +46,7 @@ module IdInfo (
 	
 	-- ** The SpecInfo type
 	SpecInfo(..),
+	emptySpecInfo,
 	isEmptySpecInfo, specInfoFreeVars,
 	specInfoRules, seqSpecInfo, setSpecInfoHead,
         specInfo, setSpecInfo,
