@@ -116,8 +116,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cLdLinkerOpts         = words "$(CONF_LD_LINKER_OPTS_STAGE$*)"'  >> $@
 	@echo 'cIntegerLibrary       :: String'                             >> $@
 	@echo 'cIntegerLibrary       = "$(INTEGER_LIBRARY)"'                >> $@
-	@echo 'cSplitObjs            :: String'                             >> $@
-	@echo 'cSplitObjs            = "$(SupportsSplitObjs)"'              >> $@
+	@echo 'cSupportsSplitObjs    :: String'                             >> $@
+	@echo 'cSupportsSplitObjs    = "$(SupportsSplitObjs)"'              >> $@
 	@echo 'cGhcWithInterpreter   :: String'                             >> $@
 	@echo 'cGhcWithInterpreter   = "$(GhcWithInterpreter)"'             >> $@
 	@echo 'cGhcWithNativeCodeGen :: String'                             >> $@

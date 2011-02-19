@@ -2281,7 +2281,7 @@ picCCOpts _dflags
 -- Splitting
 
 can_split :: Bool
-can_split = cSplitObjs == "YES"
+can_split = cSupportsSplitObjs == "YES"
 
 -- -----------------------------------------------------------------------------
 -- Compiler Info
@@ -2298,7 +2298,7 @@ compilerInfo = [("Project name",                String cProjectName),
                 ("Host platform",               String cHostPlatformString),
                 ("Target platform",             String cTargetPlatformString),
                 ("Have interpreter",            String cGhcWithInterpreter),
-                ("Object splitting",            String cSplitObjs),
+                ("Object splitting supported",  String cSupportsSplitObjs),
                 ("Have native code generator",  String cGhcWithNativeCodeGen),
                 ("Support SMP",                 String cGhcWithSMP),
                 ("Unregisterised",              String cGhcUnregisterised),
