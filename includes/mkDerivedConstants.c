@@ -245,7 +245,6 @@ main(int argc, char *argv[])
     struct_field(bdescr, link);
 
     struct_size(generation);
-    struct_field(generation, mut_list);
     struct_field(generation, n_new_large_words);
 
     struct_size(CostCentreStack);

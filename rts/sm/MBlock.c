@@ -88,10 +88,11 @@ setHeapAlloced(void *p, StgWord8 i)
     if(map == NULL)
     {
     	mblock_map_count++;
-    	mblock_maps = realloc(mblock_maps,
-			      sizeof(MBlockMap*) * mblock_map_count);
+    	mblock_maps = stgReallocBytes(mblock_maps,
+                                      sizeof(MBlockMap*) * mblock_map_count,
+                                      "markHeapAlloced(1)");
 	map = mblock_maps[mblock_map_count-1] = 
-            stgMallocBytes(sizeof(MBlockMap),"markHeapAlloced");
+            stgMallocBytes(sizeof(MBlockMap),"markHeapAlloced(2)");
         memset(map,0,sizeof(MBlockMap));
 	map->addrHigh32 = (StgWord32) (((StgWord)p) >> 32);
     }
@@ -265,7 +266,16 @@ void
 freeAllMBlocks(void)
 {
     debugTrace(DEBUG_gc, "freeing all megablocks");
+
     osFreeAllMBlocks();
+
+#if SIZEOF_VOID_P == 8
+    nat n;
+    for (n = 0; n < mblock_map_count; n++) {
+        stgFree(mblock_maps[n]);
+    }
+    stgFree(mblock_maps);
+#endif
 }
 
 void

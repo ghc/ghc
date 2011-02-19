@@ -7,14 +7,16 @@
 
 # Uncomment one of these to select a build profile below:
 
-# Full build with max optimisation (slow build)
+# Full build with max optimisation and everything enabled (very slow build)
 #BuildFlavour = perf
 
-# Fastest build (libs unoptimised):
-#BuildFlavour = quickest
-
-# Fast build with optimised libraries:
+# Fast build with optimised libraries, no profiling (RECOMMENDED):
 #BuildFlavour = quick
+
+# Even faster build.  NOT RECOMMENDED: the libraries will be
+# completely unoptimised, so any code built with this compiler
+# (including stage2) will run very slowly:
+#BuildFlavour = quickest
 
 # Profile the stage2 compiler:
 #BuildFlavour = prof

@@ -628,7 +628,7 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
     // will be discarded after the first overflow, being replaced by a
     // non-moving 32k chunk.
     if (old_stack->sp == old_stack->stack + old_stack->stack_size) {
-        frame->next_chunk = new_stack;
+        frame->next_chunk = (StgStack*)END_TSO_QUEUE; // dummy
     }
 
     tso->stackobj = new_stack;

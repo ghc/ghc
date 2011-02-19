@@ -71,7 +71,6 @@ typedef struct generation_ {
                                         // (for allocation stats)
 
     unsigned int   max_blocks;		// max blocks
-    bdescr        *mut_list;      	// mut objects in this gen (not G0)
 
     StgTSO *       threads;             // threads in this gen
                                         // linked via global_link
@@ -88,7 +87,7 @@ typedef struct generation_ {
 #if defined(THREADED_RTS)
     char pad[128];                      // make sure the following is
                                         // on a separate cache line.
-    SpinLock     sync_large_objects;    // lock for large_objects
+    SpinLock     sync;                  // lock for large_objects
                                         //    and scavenged_large_objects
 #endif
 
@@ -102,11 +101,6 @@ typedef struct generation_ {
     unsigned int n_old_blocks;		// number of blocks in from-space
     unsigned int live_estimate;         // for sweeping: estimate of live data
     
-    bdescr *     saved_mut_list;
-
-    bdescr *     part_blocks;           // partially-full scanned blocks
-    unsigned int n_part_blocks;         // count of above
-
     bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
     unsigned int n_scavenged_large_blocks; // size (not count) of above
 
@@ -197,9 +191,9 @@ extern rtsBool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->gen    = gen;
-    bd->gen_no = gen->no;
-    bd->dest   = dest;
+    bd->gen     = gen;
+    bd->gen_no  = gen->no;
+    bd->dest_no = dest->no;
 }
 
 #endif /* RTS_STORAGE_GC_H */

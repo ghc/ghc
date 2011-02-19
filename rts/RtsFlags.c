@@ -156,7 +156,6 @@ void initRtsFlagsDefaults(void)
 #ifdef THREADED_RTS
     RtsFlags.ParFlags.nNodes	        = 1;
     RtsFlags.ParFlags.migrate           = rtsTrue;
-    RtsFlags.ParFlags.wakeupMigrate     = rtsFalse;
     RtsFlags.ParFlags.parGcEnabled      = 1;
     RtsFlags.ParFlags.parGcGen          = 0;
     RtsFlags.ParFlags.parGcLoadBalancingEnabled = rtsTrue;
@@ -323,7 +322,6 @@ usage_text[] = {
 "            (default: 1, -qb alone turns off load-balancing)",
 "  -qa       Use the OS to set thread affinity (experimental)",
 "  -qm       Don't automatically migrate threads between CPUs",
-"  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
 "  --install-signal-handlers=<yes|no>",
 "            Install signal handlers (default: yes)",
@@ -1067,10 +1065,10 @@ error = rtsTrue;
 		    case 'm':
 			RtsFlags.ParFlags.migrate = rtsFalse;
 			break;
-		    case 'w':
-			RtsFlags.ParFlags.wakeupMigrate = rtsTrue;
-			break;
-		    default:
+                    case 'w':
+                        // -qw was removed; accepted for backwards compat
+                        break;
+                    default:
 			errorBelch("unknown RTS option: %s",rts_argv[arg]);
 			error = rtsTrue;
 			break;

@@ -362,11 +362,11 @@ scavenge_fun_srt(const StgInfoTable *info)
 /* -----------------------------------------------------------------------------
    Scavenge a block from the given scan pointer up to bd->free.
 
-   evac_gen is set by the caller to be either zero (for a step in a
+   evac_gen_no is set by the caller to be either zero (for a step in a
    generation < N) or G where G is the generation of the step being
    scavenged.  
 
-   We sometimes temporarily change evac_gen back to zero if we're
+   We sometimes temporarily change evac_gen_no back to zero if we're
    scavenging a mutable object where eager promotion isn't such a good
    idea.  
    -------------------------------------------------------------------------- */
@@ -383,7 +383,7 @@ scavenge_block (bdescr *bd)
 	     bd->start, bd->gen_no, bd->u.scan);
 
   gct->scan_bd = bd;
-  gct->evac_gen = bd->gen;
+  gct->evac_gen_no = bd->gen_no;
   saved_eager_promotion = gct->eager_promotion;
   gct->failed_to_evac = rtsFalse;
 
@@ -754,7 +754,7 @@ scavenge_mark_stack(void)
     StgInfoTable *info;
     rtsBool saved_eager_promotion;
 
-    gct->evac_gen = oldest_gen;
+    gct->evac_gen_no = oldest_gen->no;
     saved_eager_promotion = gct->eager_promotion;
 
     while ((p = pop_mark_stack())) {
@@ -1041,8 +1041,8 @@ scavenge_mark_stack(void)
 
 	if (gct->failed_to_evac) {
 	    gct->failed_to_evac = rtsFalse;
-	    if (gct->evac_gen) {
-		recordMutableGen_GC((StgClosure *)q, gct->evac_gen->no);
+            if (gct->evac_gen_no) {
+                recordMutableGen_GC((StgClosure *)q, gct->evac_gen_no);
 	    }
 	}
     } // while (p = pop_mark_stack())
@@ -1340,8 +1340,10 @@ void
 scavenge_mutable_list(bdescr *bd, generation *gen)
 {
     StgPtr p, q;
+    nat gen_no;
 
-    gct->evac_gen = gen;
+    gen_no = gen->no;
+    gct->evac_gen_no = gen_no;
     for (; bd != NULL; bd = bd->link) {
 	for (q = bd->start; q < bd->free; q++) {
 	    p = (StgPtr)*q;
@@ -1376,7 +1378,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    //
 	    switch (get_itbl((StgClosure *)p)->type) {
 	    case MUT_ARR_PTRS_CLEAN:
-		recordMutableGen_GC((StgClosure *)p,gen->no);
+                recordMutableGen_GC((StgClosure *)p,gen_no);
 		continue;
 	    case MUT_ARR_PTRS_DIRTY:
             {
@@ -1394,7 +1396,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 
                 gct->eager_promotion = saved_eager_promotion;
                 gct->failed_to_evac = rtsFalse;
-		recordMutableGen_GC((StgClosure *)p,gen->no);
+                recordMutableGen_GC((StgClosure *)p,gen_no);
 		continue;
             }
             default:
@@ -1404,7 +1406,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
 	    if (scavenge_one(p)) {
 		// didn't manage to promote everything, so put the
 		// object back on the list.
-		recordMutableGen_GC((StgClosure *)p,gen->no);
+                recordMutableGen_GC((StgClosure *)p,gen_no);
 	    }
 	}
     }
@@ -1446,7 +1448,7 @@ scavenge_static(void)
 
   /* Always evacuate straight to the oldest generation for static
    * objects */
-  gct->evac_gen = oldest_gen;
+  gct->evac_gen_no = oldest_gen->no;
 
   /* keep going until we've scavenged all the objects on the linked
      list... */
@@ -1741,7 +1743,7 @@ scavenge_large (gen_workspace *ws)
     bdescr *bd;
     StgPtr p;
 
-    gct->evac_gen = ws->gen;
+    gct->evac_gen_no = ws->gen->no;
 
     bd = ws->todo_large_objects;
     
@@ -1753,10 +1755,10 @@ scavenge_large (gen_workspace *ws)
 	// the front when evacuating.
 	ws->todo_large_objects = bd->link;
 	
-	ACQUIRE_SPIN_LOCK(&ws->gen->sync_large_objects);
+        ACQUIRE_SPIN_LOCK(&ws->gen->sync);
 	dbl_link_onto(bd, &ws->gen->scavenged_large_objects);
 	ws->gen->n_scavenged_large_blocks += bd->blocks;
-	RELEASE_SPIN_LOCK(&ws->gen->sync_large_objects);
+        RELEASE_SPIN_LOCK(&ws->gen->sync);
 	
 	p = bd->start;
 	if (scavenge_one(p)) {

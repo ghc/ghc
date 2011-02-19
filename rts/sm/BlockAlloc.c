@@ -345,8 +345,9 @@ allocGroup (nat n)
     }
 
     if (ln == MAX_FREE_LIST) {
-#if 0
-        if (((W_)mblocks_allocated * MBLOCK_SIZE_W - (W_)n_alloc_blocks * BLOCK_SIZE_W) > (1024*1024)/sizeof(W_)) {
+#if 0  /* useful for debugging fragmentation */
+        if ((W_)mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W
+             - (W_)((n_alloc_blocks - n) * BLOCK_SIZE_W) > (2*1024*1024)/sizeof(W_)) {
             debugBelch("Fragmentation, wanted %d blocks:", n);
             RtsFlags.DebugFlags.block_alloc = 1;
             checkFreeListSanity();

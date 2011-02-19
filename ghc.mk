@@ -136,6 +136,10 @@ $(error $$(GhcLibWays) is empty, it must contain at least one way)
 endif
 endif
 
+ifeq "$(phase)" ""
+phase = final
+endif
+
 # -----------------------------------------------------------------------------
 # Utility definitions
 
@@ -507,7 +511,7 @@ endif
 # ----------------------------------------------
 # Checking packages with 'cabal check'
 
-ifeq "$(phase)" ""
+ifeq "$(phase)" "final"
 ifeq "$(CHECK_PACKAGES)" "YES"
 all: check_packages
 endif
@@ -644,7 +648,7 @@ $(foreach p,$(STAGE0_PACKAGES),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 ifeq "$(HADDOCK_DOCS)" "YES"
 libraries/index.html: inplace/bin/haddock$(exeext) $(ALL_HADDOCK_FILES)
 	cd libraries && sh gen_contents_index --inplace
-ifeq "$(phase)" ""
+ifeq "$(phase)" "final"
 $(eval $(call all-target,library_doc_index,libraries/index.html))
 endif
 INSTALL_LIBRARY_DOCS += libraries/*.html libraries/*.gif libraries/*.css libraries/*.js

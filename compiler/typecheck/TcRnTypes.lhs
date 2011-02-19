@@ -793,7 +793,7 @@ data Implication
                                  --   given evidence variables
 
       ic_wanted :: WantedConstraints,  -- The wanted
-      ic_insol  :: Bool,               -- True iff insolubleWC ic_wantted is true
+      ic_insol  :: Bool,               -- True iff insolubleWC ic_wanted is true
 
       ic_binds  :: EvBindsVar   -- Points to the place to fill in the
                                 -- abstraction and bindings

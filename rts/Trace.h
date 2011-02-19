@@ -78,11 +78,16 @@ void traceEnd (void);
  */
 #define traceSchedEvent(cap, tag, tso, other)   \
     if (RTS_UNLIKELY(TRACE_sched)) {            \
-        traceSchedEvent_(cap, tag, tso, other); \
+        traceSchedEvent_(cap, tag, tso, other, 0); \
+    }
+
+#define traceSchedEvent2(cap, tag, tso, info1, info2) \
+    if (RTS_UNLIKELY(TRACE_sched)) {            \
+        traceSchedEvent_(cap, tag, tso, info1, info2); \
     }
 
 void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
-                       StgTSO *tso, StgWord64 other);
+                       StgTSO *tso, StgWord info1, StgWord info2);
 
 
 /*
@@ -158,6 +163,7 @@ void traceThreadStatus_ (StgTSO *tso);
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
+#define traceSchedEvent2(cap, tag, tso, other, info) /* nothing */
 #define traceEvent(cap, tag) /* nothing */
 #define traceCap(class, cap, msg, ...) /* nothing */
 #define trace(class, msg, ...) /* nothing */
@@ -186,8 +192,8 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
     HASKELLEVENT_CREATE_THREAD(cap, tid)
 #define dtraceRunThread(cap, tid)                       \
     HASKELLEVENT_RUN_THREAD(cap, tid)
-#define dtraceStopThread(cap, tid, status)              \
-    HASKELLEVENT_STOP_THREAD(cap, tid, status)
+#define dtraceStopThread(cap, tid, status, info)        \
+    HASKELLEVENT_STOP_THREAD(cap, tid, status, info)
 #define dtraceThreadRunnable(cap, tid)                  \
     HASKELLEVENT_THREAD_RUNNABLE(cap, tid)
 #define dtraceMigrateThread(cap, tid, new_cap)          \
@@ -225,7 +231,7 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
 
 #define dtraceCreateThread(cap, tid)                    /* nothing */
 #define dtraceRunThread(cap, tid)                       /* nothing */
-#define dtraceStopThread(cap, tid, status)              /* nothing */
+#define dtraceStopThread(cap, tid, status, info)        /* nothing */
 #define dtraceThreadRunnable(cap, tid)                  /* nothing */
 #define dtraceMigrateThread(cap, tid, new_cap)          /* nothing */
 #define dtraceRunSpark(cap, tid)                        /* nothing */
@@ -278,11 +284,12 @@ INLINE_HEADER void traceEventRunThread(Capability *cap STG_UNUSED,
 
 INLINE_HEADER void traceEventStopThread(Capability          *cap    STG_UNUSED, 
                                         StgTSO              *tso    STG_UNUSED, 
-                                        StgThreadReturnCode  status STG_UNUSED)
+                                        StgThreadReturnCode  status STG_UNUSED,
+                                        StgWord32           info    STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_STOP_THREAD, tso, status);
+    traceSchedEvent2(cap, EVENT_STOP_THREAD, tso, status, info);
     dtraceStopThread((EventCapNo)cap->no, (EventThreadID)tso->id,
-                     (EventThreadStatus)status);
+                     (EventThreadStatus)status, (EventThreadID)info);
 }
 
 // needs to be EXTERN_INLINE as it is used in another EXTERN_INLINE function

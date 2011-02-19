@@ -2112,25 +2112,6 @@ f "2"    = 2
             </para>
           </listitem>
         </varlistentry>
-	<varlistentry>
-	  <term><option>-qw</option></term>
-          <indexterm><primary><option>-qw</option></primary><secondary>RTS
-          option</secondary></indexterm>
-	  <listitem>
-            <para>Migrate a thread to the current CPU when it is woken
-            up.  Normally when a thread is woken up after being
-            blocked it will be scheduled on the CPU it was running on
-            last; this option allows the thread to immediately migrate
-            to the CPU that unblocked it.</para> 
- 
-            <para>The rationale for allowing this eager migration is
-            that it tends to move threads that are communicating with
-            each other onto the same CPU; however there are
-            pathalogical situations where it turns out to be a poor
-            strategy.  Depending on the communication pattern in your
-            program, it may or may not be a good idea.</para>
-          </listitem>
-        </varlistentry>
        </variablelist>
     </sect2>
       

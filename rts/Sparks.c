@@ -71,9 +71,10 @@ newSpark (StgRegTable *reg, StgClosure *p)
 
     if (closure_SHOULD_SPARK(p)) {
         pushWSDeque(pool,p);
-    }	
-
-    cap->sparks_created++;
+        cap->sparks_created++;
+    } else {
+        cap->sparks_dud++;
+    }
 
     return 1;
 }
@@ -206,7 +207,7 @@ pruneSparkQueue (Capability *cap)
               n++;
           } else {
               pruned_sparks++; // discard spark
-              cap->sparks_pruned++;
+              cap->sparks_fizzled++;
           }
       } else if (HEAP_ALLOCED(spark) && 
                  (Bdescr((P_)spark)->flags & BF_EVACUATED)) {
@@ -216,11 +217,11 @@ pruneSparkQueue (Capability *cap)
               n++;
           } else {
               pruned_sparks++; // discard spark
-              cap->sparks_pruned++;
+              cap->sparks_fizzled++;
           }
       } else {
           pruned_sparks++; // discard spark
-          cap->sparks_pruned++;
+          cap->sparks_gcd++;
       }
 
       currInd++;
