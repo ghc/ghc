@@ -56,18 +56,18 @@ FrozenErrorTests.hs:52:15:
     In an equation for `test4': test4 = goo4 (goo3 False undefined)
 
 FrozenErrorTests.hs:53:9:
+    Occurs check: cannot construct the infinite type:
+      c0 = T2 (T2 c0 c0) c0
+    In the expression: goo3 False (goo4 undefined)
+    In an equation for `test5': test5 = goo3 False (goo4 undefined)
+
+FrozenErrorTests.hs:53:9:
+    Occurs check: cannot construct the infinite type:
+      c0 = T2 (T2 c0 c0) c0
+    In the expression: goo3 False (goo4 undefined)
+    In an equation for `test5': test5 = goo3 False (goo4 undefined)
+
+FrozenErrorTests.hs:53:9:
     Couldn't match type `T2 c0' with `M'
-    In the expression: goo3 False (goo4 undefined)
-    In an equation for `test5': test5 = goo3 False (goo4 undefined)
-
-FrozenErrorTests.hs:53:9:
-    Occurs check: cannot construct the infinite type:
-      c0 = T2 (T2 c0 c0) c0
-    In the expression: goo3 False (goo4 undefined)
-    In an equation for `test5': test5 = goo3 False (goo4 undefined)
-
-FrozenErrorTests.hs:53:9:
-    Occurs check: cannot construct the infinite type:
-      c0 = T2 (T2 c0 c0) c0
     In the expression: goo3 False (goo4 undefined)
     In an equation for `test5': test5 = goo3 False (goo4 undefined)

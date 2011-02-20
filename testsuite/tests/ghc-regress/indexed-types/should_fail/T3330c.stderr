@@ -1,11 +1,5 @@
 
 T3330c.hs:23:43:
-    Couldn't match type `Der ((->) x)' with `R'
-    In the first argument of `plug', namely `rf'
-    In the first argument of `Inl', namely `(plug rf df x)'
-    In the expression: Inl (plug rf df x)
-
-T3330c.hs:23:43:
     Couldn't match type `f1' with `f1 x'
       `f1' is a rigid type variable bound by
            a pattern with constructor
@@ -13,6 +7,12 @@ T3330c.hs:23:43:
                      R f -> R g -> R (f :+: g),
            in an equation for `plug''
            at T3330c.hs:23:8
+    In the first argument of `plug', namely `rf'
+    In the first argument of `Inl', namely `(plug rf df x)'
+    In the expression: Inl (plug rf df x)
+
+T3330c.hs:23:43:
+    Couldn't match type `Der ((->) x)' with `R'
     In the first argument of `plug', namely `rf'
     In the first argument of `Inl', namely `(plug rf df x)'
     In the expression: Inl (plug rf df x)
