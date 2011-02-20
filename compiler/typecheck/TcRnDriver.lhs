@@ -2,7 +2,7 @@
 % (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcModule]{Typechecking a whole module}
+\section[TcMovectle]{Typechecking a whole module}
 
 \begin{code}
 module TcRnDriver (
@@ -328,6 +328,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_inst_env  = tcg_inst_env tcg_env,
 				mg_fam_inst_env = tcg_fam_inst_env tcg_env,
 				mg_rules     = [],
+				mg_vect_decls = [],
 				mg_anns      = [],
 				mg_binds     = core_binds,
 
@@ -390,30 +391,32 @@ tcRnSrcDecls boot_iface decls
 			-- It's a waste of time; and we may get debug warnings
 			-- about strangely-typed TyCons!
 
-	-- Zonk the final code.  This must be done last.
-	-- Even simplifyTop may do some unification.
+        -- Zonk the final code.  This must be done last.
+        -- Even simplifyTop may do some unification.
         -- This pass also warns about missing type signatures
-	let { (tcg_env, _) = tc_envs
-	    ; TcGblEnv { tcg_type_env  = type_env,
-		         tcg_binds     = binds,
-		         tcg_sigs      = sig_ns,
-		         tcg_ev_binds  = cur_ev_binds,
-		         tcg_imp_specs = imp_specs,
-		         tcg_rules     = rules,
-		         tcg_fords     = fords } = tcg_env
+        let { (tcg_env, _) = tc_envs
+            ; TcGblEnv { tcg_type_env  = type_env,
+                         tcg_binds     = binds,
+                         tcg_sigs      = sig_ns,
+                         tcg_ev_binds  = cur_ev_binds,
+                         tcg_imp_specs = imp_specs,
+                         tcg_rules     = rules,
+                         tcg_vects     = vects,
+                         tcg_fords     = fords } = tcg_env
             ; all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
 
-	(bind_ids, ev_binds', binds', fords', imp_specs', rules') 
-            <- zonkTopDecls all_ev_binds binds sig_ns rules imp_specs fords ;
-	
-	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
-	    ; tcg_env' = tcg_env { tcg_binds    = binds',
-				   tcg_ev_binds = ev_binds',
-				   tcg_imp_specs = imp_specs',
-				   tcg_rules 	= rules', 
-				   tcg_fords 	= fords' } } ;
+        (bind_ids, ev_binds', binds', fords', imp_specs', rules', vects') 
+            <- zonkTopDecls all_ev_binds binds sig_ns rules vects imp_specs fords ;
+        
+        let { final_type_env = extendTypeEnvWithIds type_env bind_ids
+            ; tcg_env' = tcg_env { tcg_binds    = binds',
+                                   tcg_ev_binds = ev_binds',
+                                   tcg_imp_specs = imp_specs',
+                                   tcg_rules    = rules', 
+                                   tcg_vects    = vects', 
+                                   tcg_fords    = fords' } } ;
 
-        setGlobalTypeEnv tcg_env' final_type_env				   
+        setGlobalTypeEnv tcg_env' final_type_env                                   
    } }
 
 tc_rn_src_decls :: ModDetails -> [LHsDecl RdrName] -> TcM (TcGblEnv, TcLclEnv)
@@ -480,6 +483,7 @@ tcRnHsBootDecls decls
 		   hs_fords  = for_decls,
 		   hs_defds  = def_decls,  
 		   hs_ruleds = rule_decls, 
+		   hs_vects  = vect_decls, 
 		   hs_annds  = _,
 		   hs_valds  = val_binds }) <- rnTopSrcDecls first_group
 	; (gbl_env, lie) <- captureConstraints $ setGblEnv tcg_env $ do {
@@ -492,6 +496,7 @@ tcRnHsBootDecls decls
 	; mapM_ (badBootDecl "foreign") for_decls
 	; mapM_ (badBootDecl "default") def_decls
 	; mapM_ (badBootDecl "rule")    rule_decls
+	; mapM_ (badBootDecl "vect")    vect_decls
 
 		-- Typecheck type/class decls
 	; traceTc "Tc2" empty
@@ -836,6 +841,7 @@ tcTopSrcDecls boot_details
 		   hs_defds  = default_decls,
 		   hs_annds  = annotation_decls,
 		   hs_ruleds = rule_decls,
+		   hs_vects  = vect_decls,
 		   hs_valds  = val_binds })
  = do {		-- Type-check the type and class decls, and all imported decls
 		-- The latter come in via tycl_decls
@@ -878,21 +884,24 @@ tcTopSrcDecls boot_details
 
         setLclTypeEnv tcl_env $ do {	-- Environment doesn't change now
 
-	     	-- Second pass over class and instance declarations, 
+                -- Second pass over class and instance declarations, 
         traceTc "Tc6" empty ;
-	inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
 
-		-- Foreign exports
+                -- Foreign exports
         traceTc "Tc7" empty ;
-	(foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
+        (foe_binds, foe_decls) <- tcForeignExports foreign_decls ;
 
                 -- Annotations
-	annotations <- tcAnnotations annotation_decls ;
+        annotations <- tcAnnotations annotation_decls ;
 
-		-- Rules
-	rules <- tcRules rule_decls ;
+                -- Rules
+        rules <- tcRules rule_decls ;
 
-		-- Wrap up
+                -- Vectorisation declarations
+        vects <- tcVectDecls vect_decls ;
+
+                -- Wrap up
         traceTc "Tc7a" empty ;
 	tcg_env <- getGblEnv ;
 	let { all_binds = tc_val_binds	 `unionBags`
@@ -904,15 +913,17 @@ tcTopSrcDecls boot_details
             ; sig_names = mkNameSet (collectHsValBinders val_binds) 
                           `minusNameSet` getTypeSigNames val_binds
 
-		-- Extend the GblEnv with the (as yet un-zonked) 
-		-- bindings, rules, foreign decls
-	    ; tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` all_binds
-	      	       	 	 , tcg_imp_specs = tcg_imp_specs tcg_env ++ specs1 ++ specs2 ++ specs3
+                -- Extend the GblEnv with the (as yet un-zonked) 
+                -- bindings, rules, foreign decls
+            ; tcg_env' = tcg_env { tcg_binds = tcg_binds tcg_env `unionBags` all_binds
+                                 , tcg_imp_specs = tcg_imp_specs tcg_env ++ specs1 ++ specs2 ++
+                                                   specs3
                                  , tcg_sigs  = tcg_sigs tcg_env `unionNameSets` sig_names
-				 , tcg_rules = tcg_rules tcg_env ++ rules
-				 , tcg_anns  = tcg_anns tcg_env ++ annotations
-				 , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
-  	return (tcg_env', tcl_env)
+                                 , tcg_rules = tcg_rules tcg_env ++ rules
+                                 , tcg_vects = tcg_vects tcg_env ++ vects
+                                 , tcg_anns  = tcg_anns tcg_env ++ annotations
+                                 , tcg_fords = tcg_fords tcg_env ++ foe_decls ++ fi_decls } } ;
+        return (tcg_env', tcl_env)
     }}}}}}
 \end{code}
 
@@ -1563,18 +1574,20 @@ tcCoreDump mod_guts
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc
 pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env, 
-		        tcg_insts     = insts, 
-		        tcg_fam_insts = fam_insts, 
-		        tcg_rules     = rules,
-			tcg_imports   = imports })
+                        tcg_insts     = insts, 
+                        tcg_fam_insts = fam_insts, 
+                        tcg_rules     = rules,
+                        tcg_vects     = vects,
+                        tcg_imports   = imports })
   = vcat [ ppr_types insts type_env
 	 , ppr_tycons fam_insts type_env
-	 , ppr_insts insts
-	 , ppr_fam_insts fam_insts
-	 , vcat (map ppr rules)
-	 , ppr_gen_tycons (typeEnvTyCons type_env)
-	 , ptext (sLit "Dependent modules:") <+> 
-		ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
+         , ppr_insts insts
+         , ppr_fam_insts fam_insts
+         , vcat (map ppr rules)
+         , vcat (map ppr vects)
+         , ppr_gen_tycons (typeEnvTyCons type_env)
+         , ptext (sLit "Dependent modules:") <+> 
+                ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
 	 , ptext (sLit "Dependent packages:") <+> 
 		ppr (sortBy stablePackageIdCmp $ imp_dep_pkgs imports)]
   where		-- The two uses of sortBy are just to reduce unnecessary

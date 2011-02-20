@@ -365,7 +365,8 @@ solveInteract inert ws
                                                    -> (ct,evVarPred ev)) ws)
               , text "inert = " <+> ppr inert ]
 
-       ; (flag, inert_ret) <- foldlBagM (tryPreSolveAndInteract sctx dyn_flags) (True,inert) ws 
+       ; (flag, inert_ret) <- foldrBagM (tryPreSolveAndInteract sctx dyn_flags) (True,inert) ws 
+                        -- use foldr to preserve the order
 
        ; traceTcS "solveInteract, after clever canonicalization (and interaction):" $
          vcat [ text "No interaction happened = " <+> ppr flag
@@ -376,12 +377,11 @@ solveInteract inert ws
 
 tryPreSolveAndInteract :: SimplContext
                        -> DynFlags
-                       -> (Bool, InertSet)
                        -> FlavoredEvVar
+                       -> (Bool, InertSet)
                        -> TcS (Bool, InertSet)
 -- Returns: True if it was able to discharge this constraint AND all previous ones
-tryPreSolveAndInteract sctx dyn_flags (all_previous_discharged, inert)
-                       flavev@(EvVarX ev_var fl)
+tryPreSolveAndInteract sctx dyn_flags flavev@(EvVarX ev_var fl) (all_previous_discharged, inert)
   = do { let inert_cts = get_inert_cts (evVarPred ev_var)
 
        ; this_one_discharged <- dischargeFromCCans inert_cts flavev
@@ -391,8 +391,7 @@ tryPreSolveAndInteract sctx dyn_flags (all_previous_discharged, inert)
 
          else do
        { extra_cts <- mkCanonical fl ev_var
-       ; inert_ret <- solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[])
-                                             inert extra_cts
+       ; inert_ret <- solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) extra_cts inert
        ; return (False, inert_ret) } }
 
   where
@@ -439,16 +438,16 @@ canonicals. If so, we add nothing to the returned canonical
 constraints.
 
 \begin{code}
-solveOne :: InertSet -> WorkItem -> TcS InertSet 
-solveOne inerts workItem 
+solveOne :: WorkItem -> InertSet -> TcS InertSet 
+solveOne workItem inerts 
   = do { dyn_flags <- getDynFlags
-       ; solveOneWithDepth (ctxtStkDepth dyn_flags,0,[]) inerts workItem
+       ; solveOneWithDepth (ctxtStkDepth dyn_flags,0,[]) workItem inerts
        }
 
 -----------------
 solveInteractWithDepth :: (Int, Int, [WorkItem])
-                       -> InertSet -> WorkList -> TcS InertSet
-solveInteractWithDepth ctxt@(max_depth,n,stack) inert ws 
+                       -> WorkList -> InertSet -> TcS InertSet
+solveInteractWithDepth ctxt@(max_depth,n,stack) ws inert
   | isEmptyWorkList ws
   = return inert
 
@@ -458,26 +457,27 @@ solveInteractWithDepth ctxt@(max_depth,n,stack) inert ws
   | otherwise 
   = do { traceTcS "solveInteractWithDepth" $ 
               vcat [ text "Current depth =" <+> ppr n
-                   , text "Max depth =" <+> ppr max_depth ]
+                   , text "Max depth =" <+> ppr max_depth
+                   , text "ws =" <+> ppr ws ]
 
 	      -- Solve equalities first
        ; let (eqs, non_eqs) = Bag.partitionBag isCTyEqCan ws
-       ; is_from_eqs <- Bag.foldlBagM (solveOneWithDepth ctxt) inert eqs
-       ; Bag.foldlBagM (solveOneWithDepth ctxt) is_from_eqs non_eqs }
+       ; is_from_eqs <- Bag.foldrBagM (solveOneWithDepth ctxt) inert eqs
+       ; Bag.foldrBagM (solveOneWithDepth ctxt) is_from_eqs non_eqs }
+                        -- use foldr to preserve the order
 
 ------------------
 -- Fully interact the given work item with an inert set, and return a
 -- new inert set which has assimilated the new information.
 solveOneWithDepth :: (Int, Int, [WorkItem])
-                  -> InertSet -> WorkItem -> TcS InertSet
-solveOneWithDepth (max_depth, depth, stack) inert work
+                  -> WorkItem -> InertSet -> TcS InertSet
+solveOneWithDepth (max_depth, depth, stack) work inert
   = do { traceFireTcS depth (text "Solving {" <+> ppr work)
        ; (new_inert, new_work) <- runSolverPipeline depth thePipeline inert work
          
 	 -- Recursively solve the new work generated 
          -- from workItem, with a greater depth
-       ; res_inert <- solveInteractWithDepth (max_depth, depth+1, work:stack)
-                                new_inert new_work 
+       ; res_inert <- solveInteractWithDepth (max_depth, depth+1, work:stack) new_work new_inert 
 
        ; traceFireTcS depth (text "Done }" <+> ppr work) 
 
@@ -796,7 +796,8 @@ data WhichComesFromInert = LeftComesFromInert | RightComesFromInert
 
 interactWithInertEqsStage :: SimplifierStage 
 interactWithInertEqsStage depth workItem inert
-  = Bag.foldlBagM (interactNext depth) initITR (inert_eqs inert)
+  = Bag.foldrBagM (interactNext depth) initITR (inert_eqs inert)
+                        -- use foldr to preserve the order
   where
     initITR = SR { sr_inerts   = inert { inert_eqs = emptyCCan }
                  , sr_new_work = emptyWorkList
@@ -814,7 +815,8 @@ interactWithInertsStage depth workItem inert
         initITR = SR { sr_inerts   = inert_residual
                      , sr_new_work = emptyWorkList
                      , sr_stop     = ContinueWith workItem } 
-    in Bag.foldlBagM (interactNext depth) initITR relevant 
+    in Bag.foldrBagM (interactNext depth) initITR relevant 
+                        -- use foldr to preserve the order
   where 
     getISRelevant :: CanonicalCt -> InertSet -> (CanonicalCts, InertSet) 
     getISRelevant (CFrozenErr {}) is = (emptyCCan, is)
@@ -841,8 +843,8 @@ interactWithInertsStage depth workItem inert
                     , inert_ips    = emptyCCanMap
                     , inert_funeqs = emptyCCanMap })
 
-interactNext :: SubGoalDepth -> StageResult -> AtomicInert -> TcS StageResult 
-interactNext depth it inert  
+interactNext :: SubGoalDepth -> AtomicInert -> StageResult -> TcS StageResult 
+interactNext depth inert it
   | ContinueWith work_item <- sr_stop it
   = do { let inerts = sr_inerts it 
 

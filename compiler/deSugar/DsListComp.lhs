@@ -514,7 +514,7 @@ dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
 --    <<[:e' | qs:]>> p (filterP (\x -> case x of {p -> True; _ -> False}) e)
 --
 dsPArrComp (BindStmt p e _ _ : qs) body _ = do
-    filterP <- dsLookupGlobalId filterPName
+    filterP <- dsLookupDPHId filterPName
     ce <- dsLExpr e
     let ety'ce  = parrElemType ce
         false   = Var falseDataConId
@@ -526,7 +526,7 @@ dsPArrComp (BindStmt p e _ _ : qs) body _ = do
     dePArrComp qs body p gen
 
 dsPArrComp qs            body _  = do -- no ParStmt in `qs'
-    sglP <- dsLookupGlobalId singletonPName
+    sglP <- dsLookupDPHId singletonPName
     let unitArray = mkApps (Var sglP) [Type unitTy, mkCoreTup []]
     dePArrComp qs body (noLoc $ WildPat unitTy) unitArray
 
@@ -543,7 +543,7 @@ dePArrComp :: [Stmt Id]
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
 dePArrComp [] e' pa cea = do
-    mapP <- dsLookupGlobalId mapPName
+    mapP <- dsLookupDPHId mapPName
     let ty = parrElemType cea
     (clam, ty'e') <- deLambda ty pa e'
     return $ mkApps (Var mapP) [Type ty, Type ty'e', clam, cea]
@@ -551,7 +551,7 @@ dePArrComp [] e' pa cea = do
 --  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
 --
 dePArrComp (ExprStmt b _ _ : qs) body pa cea = do
-    filterP <- dsLookupGlobalId filterPName
+    filterP <- dsLookupDPHId filterPName
     let ty = parrElemType cea
     (clam,_) <- deLambda ty pa b
     dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
@@ -570,8 +570,8 @@ dePArrComp (ExprStmt b _ _ : qs) body pa cea = do
 --    <<[:e' | qs:]>> (pa, p) (crossMapP ea ef)
 --
 dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
-    filterP <- dsLookupGlobalId filterPName
-    crossMapP <- dsLookupGlobalId crossMapPName
+    filterP <- dsLookupDPHId filterPName
+    crossMapP <- dsLookupDPHId crossMapPName
     ce <- dsLExpr e
     let ety'cea = parrElemType cea
         ety'ce  = parrElemType ce
@@ -595,7 +595,7 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
 --    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
 --
 dePArrComp (LetStmt ds : qs) body pa cea = do
-    mapP <- dsLookupGlobalId mapPName
+    mapP <- dsLookupDPHId mapPName
     let xs     = collectLocalBinders ds
         ty'cea = parrElemType cea
     v <- newSysLocalDs ty'cea
@@ -640,7 +640,7 @@ dePArrParComp qss body = do
     ---
     parStmts []             pa cea = return (pa, cea)
     parStmts ((qs, xs):qss) pa cea = do  -- subsequent statements (zip'ed)
-      zipP <- dsLookupGlobalId zipPName
+      zipP <- dsLookupDPHId zipPName
       let pa'      = mkLHsPatTup [pa, mkLHsVarPatTup xs]
           ty'cea   = parrElemType cea
           res_expr = mkLHsVarTuple xs

@@ -161,9 +161,9 @@ import Data.IORef
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
-	; us      <- mkSplitUniqSupply 'r'
-	; nc_var  <- newIORef (initNameCache us knownKeyNames)
-	; fc_var  <- newIORef emptyUFM
+        ; us      <- mkSplitUniqSupply 'r'
+        ; nc_var  <- newIORef (initNameCache us knownKeyNames)
+        ; fc_var  <- newIORef emptyUFM
 	; mlc_var <- newIORef emptyModuleEnv
         ; optFuel <- initOptFuelState
 	; return (HscEnv { hsc_dflags = dflags,
@@ -179,12 +179,13 @@ newHscEnv dflags
                            hsc_type_env_var = Nothing } ) }
 
 
-knownKeyNames :: [Name]	-- Put here to avoid loops involving DsMeta,
-			-- where templateHaskellNames are defined
-knownKeyNames = map getName wiredInThings 
-	      ++ basicKnownKeyNames
+knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
+                             -- where templateHaskellNames are defined
+knownKeyNames
+  = map getName wiredInThings 
+    ++ basicKnownKeyNames
 #ifdef GHCI
-	      ++ templateHaskellNames
+    ++ templateHaskellNames
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -1207,6 +1208,7 @@ mkModGuts mod binds = ModGuts {
   mg_insts = [],
   mg_fam_insts = [],
   mg_rules = [],
+  mg_vect_decls = [],
   mg_binds = binds,
   mg_foreign = NoStubs,
   mg_warns = NoWarnings,

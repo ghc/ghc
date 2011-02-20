@@ -269,15 +269,16 @@ zonkTopLExpr e = zonkLExpr emptyZonkEnv e
 
 zonkTopDecls :: Bag EvBind 
              -> LHsBinds TcId -> NameSet
-             -> [LRuleDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
-	     -> TcM ([Id], 
-	             Bag EvBind,
-		     Bag (LHsBind  Id),
-		     [LForeignDecl Id],
-		     [LTcSpecPrag],
-		     [LRuleDecl    Id])
-zonkTopDecls ev_binds binds sig_ns rules imp_specs fords
-  = do	{ (env1, ev_binds') <- zonkEvBinds emptyZonkEnv ev_binds
+             -> [LRuleDecl TcId] -> [LVectDecl TcId] -> [LTcSpecPrag] -> [LForeignDecl TcId]
+             -> TcM ([Id], 
+                     Bag EvBind,
+                     Bag (LHsBind  Id),
+                     [LForeignDecl Id],
+                     [LTcSpecPrag],
+                     [LRuleDecl    Id],
+                     [LVectDecl    Id])
+zonkTopDecls ev_binds binds sig_ns rules vects imp_specs fords
+  = do  { (env1, ev_binds') <- zonkEvBinds emptyZonkEnv ev_binds
 
 	 -- Warn about missing signatures
 	 -- Do this only when we we have a type to offer
@@ -286,11 +287,12 @@ zonkTopDecls ev_binds binds sig_ns rules imp_specs fords
                        | otherwise         = noSigWarn
 
         ; (env2, binds') <- zonkRecMonoBinds env1 sig_warn binds
-			-- Top level is implicitly recursive
-	; rules' <- zonkRules env2 rules
+                        -- Top level is implicitly recursive
+        ; rules' <- zonkRules env2 rules
+        ; vects' <- zonkVects env2 vects
         ; specs' <- zonkLTcSpecPrags env2 imp_specs
-	; fords' <- zonkForeignExports env2 fords
-	; return (zonkEnvIds env2, ev_binds', binds', fords', specs', rules') }
+        ; fords' <- zonkForeignExports env2 fords
+        ; return (zonkEnvIds env2, ev_binds', binds', fords', specs', rules', vects') }
 
 ---------------------------------------------
 zonkLocalBinds :: ZonkEnv -> HsLocalBinds TcId -> TcM (ZonkEnv, HsLocalBinds Id)
@@ -1006,6 +1008,21 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
      | otherwise  = ASSERT( isImmutableTyVar v) return (env, v)
 \end{code}
 
+\begin{code}
+zonkVects :: ZonkEnv -> [LVectDecl TcId] -> TcM [LVectDecl Id]
+zonkVects env = mappM (wrapLocM (zonkVect env))
+
+zonkVect :: ZonkEnv -> VectDecl TcId -> TcM (VectDecl Id)
+zonkVect env (HsVect v Nothing)
+  = do { v' <- wrapLocM (zonkIdBndr env) v
+       ; return $ HsVect v' Nothing
+       }
+zonkVect env (HsVect v (Just e))
+  = do { v' <- wrapLocM (zonkIdBndr env) v
+       ; e' <- zonkLExpr env e
+       ; return $ HsVect v' (Just e')
+       }
+\end{code}
 
 %************************************************************************
 %*									*

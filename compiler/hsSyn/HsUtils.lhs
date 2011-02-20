@@ -20,7 +20,7 @@ module HsUtils(
   mkSimpleMatch, unguardedGRHSs, unguardedRHS, 
   mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCoI, mkLHsWrapCoI,
-  coiToHsWrapper, mkHsDictLet,
+  coiToHsWrapper, mkHsLams, mkHsDictLet,
   mkHsOpApp, mkHsDo, mkHsWrapPat, mkHsWrapPatCoI,
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
@@ -159,8 +159,11 @@ mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
 mkMatchGroup :: [LMatch id] -> MatchGroup id
 mkMatchGroup matches = MatchGroup matches placeHolderType
 
+mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr Id -> LHsExpr Id
+mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars <.> mkWpLams dicts) expr
+
 mkHsDictLet :: TcEvBinds -> LHsExpr Id -> LHsExpr Id
-mkHsDictLet ev_binds expr = mkLHsWrap (WpLet ev_binds) expr
+mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
 
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
 -- Used for constructing dictionary terms etc, so no locations 

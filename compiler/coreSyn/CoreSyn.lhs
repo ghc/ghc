@@ -72,7 +72,10 @@ module CoreSyn (
 	-- ** Operations on 'CoreRule's 
 	seqRules, ruleArity, ruleName, ruleIdName, ruleActivation,
 	setRuleIdName,
-	isBuiltinRule, isLocalRule
+	isBuiltinRule, isLocalRule,
+
+	-- * Core vectorisation declarations data type
+	CoreVect(..)
     ) where
 
 #include "HsVersions.h"
@@ -398,6 +401,20 @@ isLocalRule = ru_local
 -- | Set the 'Name' of the 'Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+\subsection{Vectorisation declarations}
+%*                                                                      *
+%************************************************************************
+
+Representation of desugared vectorisation declarations that are fed to the vectoriser (via
+'ModGuts').
+
+\begin{code}
+data CoreVect = Vect Id (Maybe CoreExpr)
 \end{code}
 
 

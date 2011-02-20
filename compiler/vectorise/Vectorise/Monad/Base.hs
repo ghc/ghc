@@ -13,6 +13,9 @@ module Vectorise.Monad.Base (
 	maybeCantVectorise,
 	maybeCantVectoriseM,
 	
+	-- * Debugging
+	traceVt, dumpOptVt, dumpVt,
+	
 	-- * Control
 	noV,	 traceNoV,
 	ensureV, traceEnsureV,
@@ -22,14 +25,23 @@ module Vectorise.Monad.Base (
 	orElseV,
 	fixV,
 ) where
+
 import Vectorise.Builtins
 import Vectorise.Env
 
 import DsMonad
+import TcRnMonad
+import ErrUtils
 import Outputable
-	
+import DynFlags
+import StaticFlags
+
+import Control.Monad
+import System.IO (stderr)
+
 
 -- The Vectorisation Monad ----------------------------------------------------
+
 -- | Vectorisation can either succeed with new envionment and a value,
 --   or return with failure.
 data VResult a 
@@ -45,6 +57,12 @@ instance Monad VM where
                                       case r of
                                         Yes genv' lenv' x -> runVM (f x) bi genv' lenv'
                                         No                -> return No
+
+instance Functor VM where
+  fmap = liftM
+  
+instance MonadIO VM where
+  liftIO = liftDs . liftIO
 
 
 -- Lifting --------------------------------------------------------------------
@@ -76,6 +94,36 @@ maybeCantVectoriseM s d p
       case r of
         Just x  -> return x
         Nothing -> cantVectorise s d
+
+
+-- Debugging ------------------------------------------------------------------
+
+-- |Output a trace message if -ddump-vt-trace is active.
+--
+traceVt :: String -> SDoc -> VM () 
+traceVt herald doc
+  | 1 <= opt_TraceLevel = liftDs $
+                            traceOptIf Opt_D_dump_vt_trace $
+                              hang (text herald) 2 doc
+  | otherwise           = return ()
+
+-- |Dump the given program conditionally.
+--
+dumpOptVt :: DynFlag -> String -> SDoc -> VM ()
+dumpOptVt flag header doc 
+  = do { b <- liftDs $ doptM flag
+       ; if b 
+         then dumpVt header doc 
+         else return () 
+       }
+
+-- |Dump the given program unconditionally.
+--
+dumpVt :: String -> SDoc -> VM ()
+dumpVt header doc 
+  = do { unqual <- liftDs mkPrintUnqualifiedDs
+       ; liftIO $ printForUser stderr unqual (mkDumpDoc header doc)
+       }
 
 -- Control --------------------------------------------------------------------
 -- | Return some result saying we've failed.

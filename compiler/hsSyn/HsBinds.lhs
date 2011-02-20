@@ -621,10 +621,10 @@ data Sig name	-- Signatures and pragmas
 				-- If it's just defaultInlinePragma, then we said
 				--    SPECIALISE, not SPECIALISE_INLINE
 
-	-- A specialisation pragma for instance declarations only
-	-- {-# SPECIALISE instance Eq [Int] #-}
-  | SpecInstSig (LHsType name)	-- (Class tys); should be a specialisation of the 
-				-- current instance decl
+        -- A specialisation pragma for instance declarations only
+        -- {-# SPECIALISE instance Eq [Int] #-}
+  | SpecInstSig (LHsType name)  -- (Class tys); should be a specialisation of the 
+                                -- current instance decl
   deriving (Data, Typeable)
 
 

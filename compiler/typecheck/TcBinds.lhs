@@ -7,7 +7,7 @@
 \begin{code}
 module TcBinds ( tcLocalBinds, tcTopBinds, 
                  tcHsBootSigs, tcPolyBinds,
-                 PragFun, tcSpecPrags, mkPragFun, 
+                 PragFun, tcSpecPrags, tcVectDecls, mkPragFun, 
                  TcSigInfo(..), SigFun, mkSigFun,
                  badBootDeclErr ) where
 
@@ -35,6 +35,7 @@ import NameSet
 import NameEnv
 import SrcLoc
 import Bag
+import ListSetOps
 import ErrUtils
 import Digraph
 import Maybes
@@ -577,7 +578,65 @@ impSpecErr :: Name -> SDoc
 impSpecErr name
   = hang (ptext (sLit "You cannot SPECIALISE") <+> quotes (ppr name))
        2 (vcat [ ptext (sLit "because its definition has no INLINE/INLINABLE pragma")
-               , ptext (sLit "(or you compiled its definining module without -O)")])
+               , ptext (sLit "(or you compiled its defining module without -O)")])
+
+--------------
+tcVectDecls :: [LVectDecl Name] -> TcM [LVectDecl TcId]
+tcVectDecls decls 
+  = do { decls' <- mapM (wrapLocM tcVect) decls
+       ; let ids  = [unLoc id | L _ (HsVect id _) <- decls']
+             dups = findDupsEq (==) ids
+       ; mapM_ reportVectDups dups
+       ; return decls'
+       }
+  where
+    reportVectDups (first:_second:_more) 
+      = addErrAt (getSrcSpan first) $
+          ptext (sLit "Duplicate vectorisation declarations for") <+> ppr first
+    reportVectDups _ = return ()
+
+--------------
+tcVect :: VectDecl Name -> TcM (VectDecl TcId)
+-- We can't typecheck the expression of a vectorisation declaration against the vectorised type
+-- of the original definition as this requires internals of the vectoriser not available during
+-- type checking.  Instead, we infer the type of the expression and leave it to the vectoriser
+-- to check the compatibility of the Core types.
+tcVect (HsVect name Nothing)
+  = addErrCtxt (vectCtxt name) $
+    do { id <- wrapLocM tcLookupId name
+       ; return (HsVect id Nothing)
+       }
+tcVect (HsVect name@(L loc _) (Just rhs))
+  = addErrCtxt (vectCtxt name) $
+    do { _id <- wrapLocM tcLookupId name     -- need to ensure that the name is already defined
+
+         -- turn the vectorisation declaration into a single non-recursive binding
+       ; let bind    = L loc $ mkFunBind name [mkSimpleMatch [] rhs] 
+             sigFun  = const Nothing
+             pragFun = mkPragFun [] (unitBag bind)
+
+         -- perform type inference (including generalisation)
+       ; (binds, [id']) <- tcPolyInfer TopLevel False sigFun pragFun NonRecursive [bind]
+
+       ; traceTc "tcVect inferred type" $ ppr (varType id')
+       
+         -- add the type variable and dictionary bindings produced by type generalisation to the
+         -- right-hand side of the vectorisation declaration
+       ; let [AbsBinds tvs evs _ evBinds actualBinds] = (map unLoc . bagToList) binds
+       ; let [bind']                                  = bagToList actualBinds
+             MatchGroup 
+               [L _ (Match _ _ (GRHSs [L _ (GRHS _ rhs')] _))]
+               _                                      = (fun_matches . unLoc) bind'
+             rhsWrapped                               = mkHsLams tvs evs (mkHsDictLet evBinds rhs')
+        
+        -- We return the type-checked 'Id', to propagate the inferred signature
+        -- to the vectoriser - see "Note [Typechecked vectorisation pragmas]" in HsDecls
+       ; return $ HsVect (L loc id') (Just rhsWrapped)
+       }
+
+vectCtxt :: Located Name -> SDoc
+vectCtxt name = ptext (sLit "When checking the vectorisation declaration for") <+> ppr name
+
 --------------
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise 

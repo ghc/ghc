@@ -49,6 +49,7 @@ import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
+import Module
 import DynFlags
 import SrcLoc
 import Util
@@ -737,7 +738,7 @@ tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_to <- newMethodFromName (PArrSeqOrigin seq) 
-				 enumFromToPName elt_ty 
+				 (enumFromToPName basePackageId) elt_ty    -- !!!FIXME: chak
 	; return $ mkHsWrapCoI coi 
                      (PArrSeq enum_from_to (FromTo expr1' expr2')) }
 
@@ -747,7 +748,7 @@ tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; expr3' <- tcPolyExpr expr3 elt_ty
 	; eft <- newMethodFromName (PArrSeqOrigin seq)
-		      enumFromThenToPName elt_ty
+		      (enumFromThenToPName basePackageId) elt_ty        -- !!!FIXME: chak
 	; return $ mkHsWrapCoI coi 
                      (PArrSeq eft (FromThenTo expr1' expr2' expr3')) }
 

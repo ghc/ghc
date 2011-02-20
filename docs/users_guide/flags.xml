@@ -2345,12 +2345,18 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
-	    <row>
-	      <entry><option>-ddump-rules</option></entry>
-	      <entry>Dump rules</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
+      <row>
+        <entry><option>-ddump-rules</option></entry>
+        <entry>Dump rules</entry>
+        <entry>dynamic</entry>
+        <entry>-</entry>
+      </row>
+      <row>
+        <entry><option>-ddump-vect</option></entry>
+        <entry>Dump vectoriser input and output</entry>
+        <entry>dynamic</entry>
+        <entry>-</entry>
+      </row>
 	    <row>
 	      <entry><option>-ddump-simpl</option></entry>
 	      <entry>Dump final simplifier output</entry>
@@ -2417,12 +2423,18 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
-	    <row>
-	      <entry><option>-ddump-tc-trace</option></entry>
-	      <entry>Trace typechecker</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
+      <row>
+        <entry><option>-ddump-tc-trace</option></entry>
+        <entry>Trace typechecker</entry>
+        <entry>dynamic</entry>
+        <entry>-</entry>
+      </row>
+      <row>
+        <entry><option>-ddump-vt-trace</option></entry>
+        <entry>Trace vectoriser</entry>
+        <entry>dynamic</entry>
+        <entry>-</entry>
+      </row>
 	    <row>
 	      <entry><option>-ddump-rn-trace</option></entry>
 	      <entry>Trace renamer</entry>

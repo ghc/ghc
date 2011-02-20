@@ -33,7 +33,7 @@ vectAndLiftType :: Type -> VM (Type, Type)
 vectAndLiftType ty | Just ty' <- coreView ty = vectAndLiftType ty'
 vectAndLiftType ty
   = do
-      mdicts   <- mapM paDictArgType tyvars
+      mdicts   <- mapM paDictArgType (reverse tyvars)
       let dicts = [dict | Just dict <- mdicts]
       vmono_ty <- vectType mono_ty
       lmono_ty <- mkPDataType vmono_ty
@@ -78,7 +78,8 @@ vectType ty@(ForAllTy _ _)
       dictsPA     <- liftM catMaybes $ mapM paDictArgType tyvars
 
       -- pack it all back together.
-      return $ abstractType tyvars (dictsVect ++ dictsPA) tyBody''
+      traceVt "vect ForAllTy: " $ ppr (abstractType tyvars (dictsPA ++ dictsVect) tyBody'')
+      return $ abstractType tyvars (dictsPA ++ dictsVect) tyBody''
 
 vectType ty = cantVectorise "Can't vectorise type" (ppr ty)
 

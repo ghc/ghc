@@ -150,6 +150,17 @@
 
 	    <varlistentry>
 	      <term>
+	        <option>-ddump-vect</option>:
+                <indexterm><primary><option>-ddump-vect</option></primary></indexterm>
+	      </term>
+	      <listitem>
+		<para>dumps the output of the vectoriser.
+                </para>
+	      </listitem>
+	    </varlistentry>
+
+	    <varlistentry>
+	      <term>
 	        <option>-ddump-simpl</option>:
                 <indexterm><primary><option>-ddump-simpl</option></primary></indexterm>
 	      </term>
@@ -350,14 +361,25 @@
       </varlistentry>
 
       <varlistentry>
-	<term>
+  <term>
           <option>-ddump-tc-trace</option>
           <indexterm><primary><option>-ddump-tc-trace</option></primary></indexterm>
         </term>
-	<listitem>
-	  <para>Make the type checker be *real* chatty about what it is
-	upto.</para>
-	</listitem>
+  <listitem>
+    <para>Make the type checker be *real* chatty about what it is
+  upto.</para>
+  </listitem>
+      </varlistentry>
+
+      <varlistentry>
+  <term>
+          <option>-ddump-vt-trace</option>
+          <indexterm><primary><option>-ddump-tv-trace</option></primary></indexterm>
+        </term>
+  <listitem>
+    <para>Make the vectoriser be *real* chatty about what it is
+  upto.</para>
+  </listitem>
       </varlistentry>
 
       <varlistentry>

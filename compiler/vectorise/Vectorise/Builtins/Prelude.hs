@@ -1,4 +1,7 @@
 
+-- WARNING: This module is a temporary kludge.  It will soon go away entirely (once 
+--   VECTORISE SCALAR pragmas are fully implemented.)
+
 -- | Mapping of prelude functions to vectorised versions.
 --     Functions like filterP currently have a working but naive version in GHC.PArr
 --     During vectorisation we replace these by calls to filterPA, which are
@@ -18,38 +21,36 @@ import Module
 import FastString
 
 
-preludeVars
-	:: Modules			-- ^ Modules containing the DPH backens
+preludeVars :: Modules
 	-> [( Module, FastString	--   Maps the original variable to the one in the DPH 
 	    , Module, FastString)]      --   packages that it should be rewritten to.
-
-preludeVars (Modules { dph_Combinators    = dph_Combinators
-                     , dph_PArray         = dph_PArray
+preludeVars (Modules { dph_Combinators    = _dph_Combinators
+                     , dph_PArray         = _dph_PArray
                      , dph_Prelude_Int    = dph_Prelude_Int
                      , dph_Prelude_Word8  = dph_Prelude_Word8
                      , dph_Prelude_Double = dph_Prelude_Double
                      , dph_Prelude_Bool   = dph_Prelude_Bool 
-                     , dph_Prelude_PArr   = dph_Prelude_PArr
+                     , dph_Prelude_PArr   = _dph_Prelude_PArr
                      })
 
     -- Functions that work on whole PArrays, defined in GHC.PArr
-  = [ mk gHC_PARR (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
-    , mk gHC_PARR (fsLit "zipWithP")   dph_Combinators (fsLit "zipWithPA")
-    , mk gHC_PARR (fsLit "zipP")       dph_Combinators (fsLit "zipPA")
-    , mk gHC_PARR (fsLit "unzipP")     dph_Combinators (fsLit "unzipPA")
-    , mk gHC_PARR (fsLit "filterP")    dph_Combinators (fsLit "filterPA")
-    , mk gHC_PARR (fsLit "lengthP")    dph_Combinators (fsLit "lengthPA")
-    , mk gHC_PARR (fsLit "replicateP") dph_Combinators (fsLit "replicatePA")
-    , mk gHC_PARR (fsLit "!:")         dph_Combinators (fsLit "indexPA")
-    , mk gHC_PARR (fsLit "sliceP")     dph_Combinators (fsLit "slicePA")
-    , mk gHC_PARR (fsLit "crossMapP")  dph_Combinators (fsLit "crossMapPA")
-    , mk gHC_PARR (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
-    , mk gHC_PARR (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
-    , mk gHC_PARR (fsLit "+:+")        dph_Combinators (fsLit "appPA")
-    , mk gHC_PARR (fsLit "emptyP")     dph_PArray      (fsLit "emptyPA")
+  = [ {- mk gHC_PARR' (fsLit "mapP")       dph_Combinators (fsLit "mapPA")
+    , mk gHC_PARR' (fsLit "zipWithP")   dph_Combinators (fsLit "zipWithPA")
+    , mk gHC_PARR' (fsLit "zipP")       dph_Combinators (fsLit "zipPA")
+    , mk gHC_PARR' (fsLit "unzipP")     dph_Combinators (fsLit "unzipPA")
+    , mk gHC_PARR' (fsLit "filterP")    dph_Combinators (fsLit "filterPA")
+    , mk gHC_PARR' (fsLit "lengthP")    dph_Combinators (fsLit "lengthPA")
+    , mk gHC_PARR' (fsLit "replicateP") dph_Combinators (fsLit "replicatePA")
+    , mk gHC_PARR' (fsLit "!:")         dph_Combinators (fsLit "indexPA")
+    , mk gHC_PARR' (fsLit "sliceP")     dph_Combinators (fsLit "slicePA")
+    , mk gHC_PARR' (fsLit "crossMapP")  dph_Combinators (fsLit "crossMapPA")
+    , mk gHC_PARR' (fsLit "singletonP") dph_Combinators (fsLit "singletonPA")
+    , mk gHC_PARR' (fsLit "concatP")    dph_Combinators (fsLit "concatPA")
+    , mk gHC_PARR' (fsLit "+:+")        dph_Combinators (fsLit "appPA")
+    , mk gHC_PARR' (fsLit "emptyP")     dph_PArray      (fsLit "emptyPA")
 
     -- Map scalar functions to versions using closures. 
-    , mk' dph_Prelude_Int "div"         "divV"
+    , -} mk' dph_Prelude_Int "div"         "divV"
     , mk' dph_Prelude_Int "mod"         "modV"
     , mk' dph_Prelude_Int "sqrt"        "sqrtV"
     , mk' dph_Prelude_Int "enumFromToP" "enumFromToPA"
@@ -80,6 +81,7 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk gHC_CLASSES (fsLit "&&")          dph_Prelude_Bool (fsLit "andV")
     , mk gHC_CLASSES (fsLit "||")          dph_Prelude_Bool (fsLit "orV")
 
+{-
     -- FIXME: temporary
     , mk dph_Prelude_PArr (fsLit "fromPArrayP")       dph_Prelude_PArr (fsLit "fromPArrayPA")
     , mk dph_Prelude_PArr (fsLit "toPArrayP")         dph_Prelude_PArr (fsLit "toPArrayPA")
@@ -88,7 +90,7 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
     , mk dph_Prelude_PArr (fsLit "updateP")           dph_Combinators  (fsLit "updatePA")
     , mk dph_Prelude_PArr (fsLit "bpermuteP")         dph_Combinators  (fsLit "bpermutePA")
     , mk dph_Prelude_PArr (fsLit "indexedP")          dph_Combinators  (fsLit "indexedPA")
-    ]
+-}    ]
   where
     mk  = (,,,)
     mk' mod v v' = mk mod (fsLit v) mod (fsLit v')
@@ -151,7 +153,6 @@ preludeVars (Modules { dph_Combinators    = dph_Combinators
        , mk' mod "ceiling"  "ceilingV"
        , mk' mod "floor"    "floorV"
        ]
-
 
 preludeScalars :: Modules -> [(Module, FastString)]
 preludeScalars (Modules { dph_Prelude_Int    = dph_Prelude_Int

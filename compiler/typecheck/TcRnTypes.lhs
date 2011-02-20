@@ -260,9 +260,10 @@ data TcGblEnv
 	tcg_warns     :: Warnings,	    -- ...Warnings and deprecations
 	tcg_anns      :: [Annotation],      -- ...Annotations
 	tcg_insts     :: [Instance],	    -- ...Instances
-	tcg_fam_insts :: [FamInst],	    -- ...Family instances
-	tcg_rules     :: [LRuleDecl Id],    -- ...Rules
-	tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
+        tcg_fam_insts :: [FamInst],         -- ...Family instances
+        tcg_rules     :: [LRuleDecl Id],    -- ...Rules
+        tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
+        tcg_vects     :: [LVectDecl Id],    -- ...Vectorisation declarations
 
 	tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
@@ -714,10 +715,10 @@ andWC (WC { wc_flat = f1, wc_impl = i1, wc_insol = n1 })
        , wc_insol = n1 `unionBags` n2 }
 
 addFlats :: WantedConstraints -> Bag WantedEvVar -> WantedConstraints
-addFlats wc wevs = wc { wc_flat = wevs `unionBags` wc_flat wc }
+addFlats wc wevs = wc { wc_flat = wc_flat wc `unionBags` wevs }
 
 addImplics :: WantedConstraints -> Bag Implication -> WantedConstraints
-addImplics wc implic = wc { wc_impl = implic `unionBags` wc_impl wc }
+addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_flat = f, wc_impl = i, wc_insol = n})
@@ -883,11 +884,12 @@ wantedToFlavored (EvVarX v wl) = EvVarX v (Wanted wl)
 
 keepWanted :: Bag FlavoredEvVar -> Bag WantedEvVar
 keepWanted flevs
-  = foldlBag keep_wanted emptyBag flevs
+  = foldrBag keep_wanted emptyBag flevs
+    -- Important: use fold*r*Bag to preserve the order of the evidence variables.
   where
-    keep_wanted :: Bag WantedEvVar -> FlavoredEvVar -> Bag WantedEvVar
-    keep_wanted r (EvVarX ev (Wanted wloc)) = consBag (EvVarX ev wloc) r
-    keep_wanted r _ = r
+    keep_wanted :: FlavoredEvVar -> Bag WantedEvVar -> Bag WantedEvVar
+    keep_wanted (EvVarX ev (Wanted wloc)) r = consBag (EvVarX ev wloc) r
+    keep_wanted _                         r = r
 \end{code}
 
 

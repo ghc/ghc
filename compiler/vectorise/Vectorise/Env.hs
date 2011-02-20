@@ -20,10 +20,12 @@ module Vectorise.Env (
 	setBoxedTyConsEnv,
 	updVectInfo
 ) where
+
 import HscTypes
 import InstEnv
 import FamInstEnv
 import CoreSyn
+import Type
 import TyCon
 import DataCon
 import VarEnv
@@ -70,15 +72,22 @@ emptyLocalEnv = LocalEnv {
 
 -- GlobalEnv ------------------------------------------------------------------
 -- | The global environment.
---	These are things the exist at top-level.
+--      These are things the exist at top-level.
 data GlobalEnv 
-	= GlobalEnv {
+        = GlobalEnv {
         -- | Mapping from global variables to their vectorised versions.
-          global_vars		:: VarEnv Var
+          global_vars           :: VarEnv Var
 
-        -- | Purely scalar variables. Code which mentions only these
-        --   variables doesn't have to be lifted.
-        , global_scalars	:: VarSet
+        -- | Mapping from global variables that have a vectorisation declaration to the right-hand
+        --   side of that declaration and its type.  This mapping only applies to non-scalar
+        --   vectorisation declarations.  All variables with a scalar vectorisation declaration are
+        --   mentioned in 'global_scalars'.
+        , global_vect_decls     :: VarEnv (Type, CoreExpr)
+
+        -- | Purely scalar variables. Code which mentions only these variables doesn't have to be
+        --   lifted.  This includes variables from the current module that have a scalar
+        --   vectorisation declaration and those that the vectoriser determines to be scalar.
+        , global_scalars        :: VarSet
 
         -- | Exported variables which have a vectorised version.
         , global_exported_vars	:: VarEnv (Var, Var)
@@ -88,10 +97,10 @@ data GlobalEnv
         , global_tycons		:: NameEnv TyCon
 
         -- | Mapping from DataCons to their vectorised versions.
-        , global_datacons	:: NameEnv DataCon
+        , global_datacons       :: NameEnv DataCon
 
         -- | Mapping from TyCons to their PA dfuns.
-	, global_pa_funs	:: NameEnv Var
+        , global_pa_funs        :: NameEnv Var
 
         -- | Mapping from TyCons to their PR dfuns.
         , global_pr_funs	:: NameEnv Var
@@ -109,24 +118,26 @@ data GlobalEnv
         , global_bindings	:: [(Var, CoreExpr)]
         }
 
-
 -- | Create an initial global environment
-initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
-initGlobalEnv info instEnvs famInstEnvs
-	= GlobalEnv 
-	{ global_vars          = mapVarEnv snd $ vectInfoVar info
-	, global_scalars       = emptyVarSet
-	, global_exported_vars = emptyVarEnv
-	, global_tycons        = mapNameEnv snd $ vectInfoTyCon info
-	, global_datacons      = mapNameEnv snd $ vectInfoDataCon info
-	, global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
-	, global_pr_funs       = emptyNameEnv
-	, global_boxed_tycons  = emptyNameEnv
-	, global_inst_env      = instEnvs
-	, global_fam_inst_env  = famInstEnvs
-	, global_bindings      = []
-	}
-
+initGlobalEnv :: VectInfo -> [CoreVect] -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
+initGlobalEnv info vectDecls instEnvs famInstEnvs
+  = GlobalEnv 
+  { global_vars          = mapVarEnv snd $ vectInfoVar info
+  , global_vect_decls    = mkVarEnv vects
+  , global_scalars       = mkVarSet scalars
+  , global_exported_vars = emptyVarEnv
+  , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
+  , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
+  , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
+  , global_pr_funs       = emptyNameEnv
+  , global_boxed_tycons  = emptyNameEnv
+  , global_inst_env      = instEnvs
+  , global_fam_inst_env  = famInstEnvs
+  , global_bindings      = []
+  }
+  where
+    vects   = [(var, (varType var, exp)) | Vect var (Just exp) <- vectDecls]
+    scalars = [var                       | Vect var Nothing    <- vectDecls]
 
 
 -- Operators on Global Environments -------------------------------------------
@@ -135,12 +146,10 @@ extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
 extendImportedVarsEnv ps genv
   = genv { global_vars	 = extendVarEnvList (global_vars genv) ps }
 
-
 -- | Extend the set of scalar variables in an environment.
 extendScalars :: [Var] -> GlobalEnv -> GlobalEnv
 extendScalars vs genv
   = genv { global_scalars = extendVarSetList (global_scalars genv) vs }
-
 
 -- | Set the list of type family instances in an environment.
 setFamEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv

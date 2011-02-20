@@ -58,7 +58,7 @@ import CoreUtils
 import CoreLint		( lintCoreBindings )
 import PrelNames        ( iNTERACTIVE )
 import HscTypes
-import Module           ( PackageId, Module )
+import Module           ( Module )
 import DynFlags
 import StaticFlags	
 import Rules            ( RuleBase )
@@ -219,7 +219,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
                                            -- matching this string
-  | CoreDoVectorisation PackageId
+  | CoreDoVectorisation
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
@@ -240,10 +240,10 @@ coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse 
-coreDumpFlag (CoreDoVectorisation {}) = Just Opt_D_dump_vect
-coreDumpFlag CoreDesugar	      = Just Opt_D_dump_ds 
-coreDumpFlag CoreTidy 		      = Just Opt_D_dump_simpl
-coreDumpFlag CorePrep 		      = Just Opt_D_dump_prep
+coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
+coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds 
+coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
+coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
 coreDumpFlag CoreDoPrintCore         = Nothing
 coreDumpFlag (CoreDoRuleCheck {})    = Nothing
@@ -264,9 +264,9 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecialising       = ptext (sLit "Specialise")
   ppr CoreDoSpecConstr         = ptext (sLit "SpecConstr")
   ppr CoreCSE                  = ptext (sLit "Common sub-expression")
-  ppr (CoreDoVectorisation {}) = ptext (sLit "Vectorisation")
-  ppr CoreDesugar	       = ptext (sLit "Desugar")
-  ppr CoreTidy 		       = ptext (sLit "Tidy Core")
+  ppr CoreDoVectorisation      = ptext (sLit "Vectorisation")
+  ppr CoreDesugar              = ptext (sLit "Desugar")
+  ppr CoreTidy                 = ptext (sLit "Tidy Core")
   ppr CorePrep 		       = ptext (sLit "CorePrep")
   ppr CoreDoPrintCore          = ptext (sLit "Print core")
   ppr (CoreDoRuleCheck {})     = ptext (sLit "Rule check")
@@ -379,9 +379,8 @@ getCoreToDo dflags
           ]
 
     vectorisation
-      = runWhen (dopt Opt_Vectorise dflags)
-        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphPackage dflags) ]
-
+      = runWhen (dopt Opt_Vectorise dflags) $
+          CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
 
                 -- By default, we have 2 phases before phase 0.
 

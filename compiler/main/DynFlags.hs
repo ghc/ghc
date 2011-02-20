@@ -32,7 +32,7 @@ module DynFlags (
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
-        DPHBackend(..), dphPackage,
+        DPHBackend(..), dphPackageMaybe,
         wayNames,
 
         -- ** Manipulating DynFlags
@@ -101,6 +101,7 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Maybe
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -156,6 +157,7 @@ data DynFlag
    | Opt_D_dump_cs_trace	-- Constraint solver in type checker
    | Opt_D_dump_tc_trace
    | Opt_D_dump_if_trace
+   | Opt_D_dump_vt_trace
    | Opt_D_dump_splices
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
@@ -1262,6 +1264,7 @@ dynamic_flags = [
   , Flag "ddump-if-trace"          (setDumpFlag Opt_D_dump_if_trace)
   , Flag "ddump-cs-trace"          (setDumpFlag Opt_D_dump_cs_trace)
   , Flag "ddump-tc-trace"          (setDumpFlag Opt_D_dump_tc_trace)
+  , Flag "ddump-vt-trace"          (setDumpFlag Opt_D_dump_vt_trace)
   , Flag "ddump-splices"           (setDumpFlag Opt_D_dump_splices)
   , Flag "ddump-rn-stats"          (setDumpFlag Opt_D_dump_rn_stats)
   , Flag "ddump-opt-cmm"           (setDumpFlag Opt_D_dump_opt_cmm)
@@ -2014,18 +2017,15 @@ data DPHBackend = DPHPar    -- "dph-par"
 setDPHBackend :: DPHBackend -> DynP ()
 setDPHBackend backend = upd $ \dflags -> dflags { dphBackend = backend }
 
--- Query the DPH backend package to be used by the vectoriser.
+-- Query the DPH backend package to be used by the vectoriser and desugaring of DPH syntax.
 --
-dphPackage :: DynFlags -> PackageId
-dphPackage dflags 
+dphPackageMaybe :: DynFlags -> Maybe PackageId
+dphPackageMaybe dflags 
   = case dphBackend dflags of
-      DPHPar  -> dphParPackageId
-      DPHSeq  -> dphSeqPackageId
-      DPHThis -> thisPackage dflags
-      DPHNone -> ghcError (CmdLineError dphBackendError)
-
-dphBackendError :: String
-dphBackendError = "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
+      DPHPar  -> Just dphParPackageId
+      DPHSeq  -> Just dphSeqPackageId
+      DPHThis -> Just (thisPackage dflags)
+      DPHNone -> Nothing
 
 setMainIs :: String -> DynP ()
 setMainIs arg

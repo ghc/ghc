@@ -383,7 +383,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     isPArrFakeAlts [] = panic "DsUtils: unexpectedly found an empty list of PArr fake alternatives"
     --
     mk_parrCase fail = do
-      lengthP <- dsLookupGlobalId lengthPName
+      lengthP <- dsLookupDPHId lengthPName
       alt <- unboxAlt
       return (mkWildCase (len lengthP) intTy ty [alt])
       where
@@ -395,7 +395,7 @@ mkCoAlgCaseMatchResult var ty match_alts
 	--
 	unboxAlt = do
 	  l      <- newSysLocalDs intPrimTy
-	  indexP <- dsLookupGlobalId indexPName
+	  indexP <- dsLookupDPHId indexPName
 	  alts   <- mapM (mkAlt indexP) sorted_alts
 	  return (DataAlt intDataCon, [l], mkWildCase (Var l) intPrimTy ty (dft : alts))
           where

@@ -97,6 +97,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                             hs_fords   = foreign_decls,
                             hs_defds   = default_decls,
                             hs_ruleds  = rule_decls,
+                            hs_vects   = vect_decls,
                             hs_docs    = docs })
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
@@ -169,12 +170,13 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    (rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
    (rn_rule_decls,    src_fvs3) <- setOptM Opt_ScopedTypeVariables $
-   		      		   rnList rnHsRuleDecl    rule_decls ;
-			   -- Inside RULES, scoped type variables are on
-   (rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
-   (rn_ann_decls,     src_fvs5) <- rnList rnAnnDecl       ann_decls ;
-   (rn_default_decls, src_fvs6) <- rnList rnDefaultDecl   default_decls ;
-   (rn_deriv_decls,   src_fvs7) <- rnList rnSrcDerivDecl  deriv_decls ;
+                                   rnList rnHsRuleDecl    rule_decls ;
+                           -- Inside RULES, scoped type variables are on
+   (rn_vect_decls,    src_fvs4) <- rnList rnHsVectDecl    vect_decls ;
+   (rn_foreign_decls, src_fvs5) <- rnList rnHsForeignDecl foreign_decls ;
+   (rn_ann_decls,     src_fvs6) <- rnList rnAnnDecl       ann_decls ;
+   (rn_default_decls, src_fvs7) <- rnList rnDefaultDecl   default_decls ;
+   (rn_deriv_decls,   src_fvs8) <- rnList rnSrcDerivDecl  deriv_decls ;
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
@@ -190,13 +192,14 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 			     hs_annds  = rn_ann_decls,
 			     hs_defds  = rn_default_decls,
 			     hs_ruleds = rn_rule_decls,
+			     hs_vects  = rn_vect_decls,
                              hs_docs   = rn_docs } ;
 
         tycl_bndrs = hsTyClDeclsBinders rn_tycl_decls rn_inst_decls ;
         ford_bndrs = hsForeignDeclsBinders rn_foreign_decls ;
 	other_def  = (Just (mkNameSet tycl_bndrs `unionNameSets` mkNameSet ford_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, 
-			      src_fvs5, src_fvs6, src_fvs7] ;
+			      src_fvs5, src_fvs6, src_fvs7, src_fvs8] ;
 		-- It is tiresome to gather the binders from type and class decls
 
 	src_dus = [other_def] `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
@@ -656,6 +659,25 @@ badRuleLhsErr name lhs bad_e
     ptext (sLit "LHS must be of form (f e1 .. en) where f is not forall'd")
 \end{code}
 
+
+%*********************************************************
+%*                                                      *
+\subsection{Vectorisation declarations}
+%*                                                      *
+%*********************************************************
+
+\begin{code}
+rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
+rnHsVectDecl (HsVect var Nothing)
+  = do { var' <- wrapLocM lookupTopBndrRn var
+       ; return (HsVect var' Nothing, unitFV (unLoc var'))
+       }
+rnHsVectDecl (HsVect var (Just rhs))
+  = do { var' <- wrapLocM lookupTopBndrRn var
+       ; (rhs', fv_rhs) <- rnLExpr rhs
+       ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
+       }
+\end{code}
 
 %*********************************************************
 %*							*
@@ -1214,6 +1236,8 @@ add gp@(HsGroup {hs_annds  = ts}) l (AnnD d) ds
   = addl (gp { hs_annds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
+add gp@(HsGroup {hs_vects  = ts}) l (VectD d) ds
+  = addl (gp { hs_vects = L l d : ts }) ds
 add gp l (DocD d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 

@@ -169,8 +169,10 @@ doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Double") 
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "D#") doubleDataConKey doubleDataCon
 
 parrTyConName, parrDataConName :: Name
-parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR (fsLit "[::]") parrTyConKey parrTyCon 
-parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR (fsLit "PArr") parrDataConKey parrDataCon
+parrTyConName   = mkWiredInTyConName   BuiltInSyntax 
+                    gHC_PARR' (fsLit "[::]") parrTyConKey parrTyCon 
+parrDataConName = mkWiredInDataConName UserSyntax    
+                    gHC_PARR' (fsLit "PArr") parrDataConKey parrDataCon
 
 boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR,
     intDataCon_RDR, listTyCon_RDR, consDataCon_RDR, parrTyCon_RDR:: RdrName
@@ -600,7 +602,7 @@ mkPArrFakeCon arity  = data_con
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName gHC_PARR (mkDataOccFS nameStr) unique
+	name      = mkWiredInName gHC_PARR' (mkDataOccFS nameStr) unique
 				  (ADataCon data_con) UserSyntax
 	unique      = mkPArrDataConUnique arity
 

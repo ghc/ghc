@@ -266,6 +266,8 @@ incorrect.
  '{-# WARNING'     { L _ ITwarning_prag }
  '{-# UNPACK'      { L _ ITunpack_prag }
  '{-# ANN'         { L _ ITann_prag }
+ '{-# VECTORISE'          { L _ ITvect_prag }
+ '{-# VECTORISE_SCALAR'   { L _ ITvect_scalar_prag }
  '#-}'		   { L _ ITclose_prag }
 
  '..'		{ L _ ITdotdot }  			-- reserved symbols
@@ -563,6 +565,8 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# DEPRECATED' deprecations '#-}'   { $2 }
         | '{-# WARNING' warnings '#-}'          { $2 }
 	| '{-# RULES' rules '#-}'		{ $2 }
+	| '{-# VECTORISE_SCALAR' qvar '#-}'	{ unitOL $ LL $ VectD (HsVect $2 Nothing) }
+	| '{-# VECTORISE' qvar '=' exp '#-}'	{ unitOL $ LL $ VectD (HsVect $2 (Just $4)) }
 	| annotation { unitOL $1 }
       	| decl					{ unLoc $1 }
 

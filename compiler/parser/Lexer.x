@@ -485,6 +485,8 @@ data Token
   | IToptions_prag String
   | ITinclude_prag String
   | ITlanguage_prag
+  | ITvect_prag
+  | ITvect_scalar_prag
 
   | ITdotdot  			-- reserved symbols
   | ITcolon
@@ -2275,13 +2277,14 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("generated", token ITgenerated_prag),
                            ("core", token ITcore_prag),
                            ("unpack", token ITunpack_prag),
-                           ("ann", token ITann_prag)])
+                           ("ann", token ITann_prag),
+                           ("vectorize", token ITvect_prag)])
 
 twoWordPrags = Map.fromList([("inline conlike", token (ITinline_prag Inline ConLike)),
                              ("notinline conlike", token (ITinline_prag NoInline ConLike)),
                              ("specialize inline", token (ITspec_inline_prag True)),
-                             ("specialize notinline", token (ITspec_inline_prag False))])
-
+                             ("specialize notinline", token (ITspec_inline_prag False)),
+                             ("vectorize scalar", token ITvect_scalar_prag)])
 
 dispatch_pragmas :: Map String Action -> Action
 dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToString buf len)) prags of
@@ -2300,6 +2303,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                           canonical prag' = case prag' of
                                               "noinline" -> "notinline"
                                               "specialise" -> "specialize"
+                                              "vectorise" -> "vectorize"
                                               "constructorlike" -> "conlike"
                                               _ -> prag'
                           canon_ws s = unwords (map canonical (words s))

@@ -191,10 +191,11 @@ initBuiltins pkg
              $ mkFastString ("elementsSel" ++ show i ++ "_" ++ show j ++ "#")
           return ((i,j), Var v)
 
-
 -- | Get the mapping of names in the Prelude to names in the DPH library.
-initBuiltinVars :: Builtins -> DsM [(Var, Var)]
-initBuiltinVars (Builtins { dphModules = mods })
+--
+initBuiltinVars :: Bool   -- FIXME
+                -> Builtins -> DsM [(Var, Var)]
+initBuiltinVars compilingDPH (Builtins { dphModules = mods })
   = do
       uvars <- zipWithM externalVar umods ufs
       vvars <- zipWithM externalVar vmods vfs
@@ -203,7 +204,7 @@ initBuiltinVars (Builtins { dphModules = mods })
                ++ zip (map dataConWorkId cons) cvars
                ++ zip uvars vvars
   where
-    (umods, ufs, vmods, vfs) = unzip4 (preludeVars mods)
+    (umods, ufs, vmods, vfs) = if compilingDPH then ([], [], [], []) else unzip4 (preludeVars mods)
     (cons, cmods, cfs)       = unzip3 (preludeDataCons mods)
 
     defaultDataConWorkers :: [DataCon]
@@ -273,12 +274,12 @@ initBuiltinBoxedTyCons
 	builtinBoxedTyCons _ 
   		= [(tyConName intPrimTyCon, intTyCon)]
 
-
 -- | Get a list of all scalar functions in the mock prelude.
-initBuiltinScalars :: Builtins -> DsM [Var]
-initBuiltinScalars bi
-  = mapM (uncurry externalVar) (preludeScalars $ dphModules bi)
-
+--
+initBuiltinScalars :: Bool 
+                   -> Builtins -> DsM [Var]
+initBuiltinScalars True  _bi = return []
+initBuiltinScalars False bi  = mapM (uncurry externalVar) (preludeScalars $ dphModules bi)
 
 -- | Lookup some variable given its name and the module that contains it.
 externalVar :: Module -> FastString -> DsM Var

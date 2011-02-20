@@ -89,20 +89,27 @@ isUnboundName name = name `hasKey` unboundKey
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Known key Names}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 This section tells what the compiler knows about the assocation of
 names with uniques.  These ones are the *non* wired-in ones.  The
 wired in ones are defined in TysWiredIn etc.
 
+The names for DPH can come from one of multiple backend packages. At the point where 
+'basicKnownKeyNames' is used, we don't know which backend it will be.  Hence, we list
+the names for multiple backends.  That works out fine, although they use the same uniques,
+as we are guaranteed to only load one backend; hence, only one of the different names
+sharing a unique will be used.
+
 \begin{code}
 basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
  ++ typeableClassNames
+ ++ dphKnownKeyNames dphSeqPackageId ++ dphKnownKeyNames dphParPackageId
  ++ [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
 	runMainIOName,
@@ -149,7 +156,6 @@ basicKnownKeyNames
 	-- Enum stuff
 	enumFromName, enumFromThenName,	
 	enumFromThenToName, enumFromToName,
-	enumFromToPName, enumFromThenToPName,
 
 	-- Monad stuff
 	thenIOName, bindIOName, returnIOName, failIOName,
@@ -187,11 +193,6 @@ basicKnownKeyNames
 
         dollarName,	    -- The ($) apply function
 
-        -- Parallel array operations
-	nullPName, lengthPName, replicatePName,	singletonPName, mapPName,
-	filterPName, zipPName, crossMapPName, indexPName,
-	toPName, emptyPName, appPName,
-
 	-- FFI primitive types that are not wired-in.
 	stablePtrTyConName, ptrTyConName, funPtrTyConName,
 	int8TyConName, int16TyConName, int32TyConName, int64TyConName,
@@ -224,6 +225,20 @@ basicKnownKeyNames
 
 genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
+
+-- Know names from the DPH package which vary depending on the selected DPH backend.
+--
+dphKnownKeyNames :: PackageId -> [Name]
+dphKnownKeyNames dphPkg
+  = map ($ dphPkg)
+    [
+        -- Parallel array operations
+	  nullPName, lengthPName, replicatePName,	singletonPName, mapPName,
+	  filterPName, zipPName, crossMapPName, indexPName,
+	  toPName, emptyPName, appPName,
+  	enumFromToPName, enumFromThenToPName
+
+    ]
 \end{code}
 
 
@@ -242,7 +257,7 @@ pRELUDE		= mkBaseModule_ pRELUDE_NAME
 gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM,
-    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST, gHC_PARR,
+    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -265,10 +280,9 @@ gHC_READ	= mkBaseModule (fsLit "GHC.Read")
 gHC_NUM		= mkBaseModule (fsLit "GHC.Num")
 gHC_INTEGER	= mkIntegerModule (fsLit "GHC.Integer")
 gHC_INTEGER_TYPE= mkIntegerModule (fsLit "GHC.Integer.Type")
-gHC_LIST	= mkBaseModule (fsLit "GHC.List")
-gHC_PARR	= mkBaseModule (fsLit "GHC.PArr")
-gHC_TUPLE	= mkPrimModule (fsLit "GHC.Tuple")
-dATA_TUPLE	= mkBaseModule (fsLit "Data.Tuple")
+gHC_LIST        = mkBaseModule (fsLit "GHC.List")
+gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
+dATA_TUPLE      = mkBaseModule (fsLit "Data.Tuple")
 dATA_EITHER	= mkBaseModule (fsLit "Data.Either")
 dATA_STRING	= mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE	= mkBaseModule (fsLit "Data.Foldable")
@@ -303,6 +317,12 @@ gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
 rANDOM		= mkBaseModule (fsLit "System.Random")
 gHC_EXTS	= mkBaseModule (fsLit "GHC.Exts")
 cONTROL_EXCEPTION_BASE = mkBaseModule (fsLit "Control.Exception.Base")
+
+gHC_PARR :: PackageId -> Module
+gHC_PARR pkg = mkModule pkg (mkModuleNameFS (fsLit "Data.Array.Parallel"))
+
+gHC_PARR' :: Module
+gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
 
 mAIN, rOOT_MAIN :: Module
 mAIN	        = mkMainModule_ mAIN_NAME
@@ -739,21 +759,21 @@ readClassName	   = clsQual gHC_READ (fsLit "Read") readClassKey
 enumFromToPName, enumFromThenToPName, nullPName, lengthPName,
     singletonPName, replicatePName, mapPName, filterPName,
     zipPName, crossMapPName, indexPName, toPName,
-    emptyPName, appPName :: Name
-enumFromToPName	   = varQual gHC_PARR (fsLit "enumFromToP") enumFromToPIdKey
-enumFromThenToPName= varQual gHC_PARR (fsLit "enumFromThenToP") enumFromThenToPIdKey
-nullPName	  = varQual gHC_PARR (fsLit "nullP")      	 nullPIdKey
-lengthPName	  = varQual gHC_PARR (fsLit "lengthP")    	 lengthPIdKey
-singletonPName    = varQual gHC_PARR (fsLit "singletonP")         singletonPIdKey
-replicatePName	  = varQual gHC_PARR (fsLit "replicateP") 	 replicatePIdKey
-mapPName	  = varQual gHC_PARR (fsLit "mapP")       	 mapPIdKey
-filterPName	  = varQual gHC_PARR (fsLit "filterP")    	 filterPIdKey
-zipPName	  = varQual gHC_PARR (fsLit "zipP")       	 zipPIdKey
-crossMapPName	  = varQual gHC_PARR (fsLit "crossMapP")     	 crossMapPIdKey
-indexPName	  = varQual gHC_PARR (fsLit "!:")	       	 indexPIdKey
-toPName	          = varQual gHC_PARR (fsLit "toP")	       	 toPIdKey
-emptyPName        = varQual gHC_PARR (fsLit "emptyP")            emptyPIdKey
-appPName          = varQual gHC_PARR (fsLit "+:+")               appPIdKey
+    emptyPName, appPName :: PackageId -> Name
+enumFromToPName     pkg = varQual (gHC_PARR pkg) (fsLit "enumFromToP")     enumFromToPIdKey
+enumFromThenToPName pkg = varQual (gHC_PARR pkg) (fsLit "enumFromThenToP") enumFromThenToPIdKey
+nullPName           pkg = varQual (gHC_PARR pkg) (fsLit "nullP")           nullPIdKey
+lengthPName         pkg = varQual (gHC_PARR pkg) (fsLit "lengthP")         lengthPIdKey
+singletonPName      pkg = varQual (gHC_PARR pkg) (fsLit "singletonP")      singletonPIdKey
+replicatePName      pkg = varQual (gHC_PARR pkg) (fsLit "replicateP")      replicatePIdKey
+mapPName            pkg = varQual (gHC_PARR pkg) (fsLit "mapP")            mapPIdKey
+filterPName         pkg = varQual (gHC_PARR pkg) (fsLit "filterP")         filterPIdKey
+zipPName            pkg = varQual (gHC_PARR pkg) (fsLit "zipP")            zipPIdKey
+crossMapPName       pkg = varQual (gHC_PARR pkg) (fsLit "crossMapP")       crossMapPIdKey
+indexPName          pkg = varQual (gHC_PARR pkg) (fsLit "!:")              indexPIdKey
+toPName             pkg = varQual (gHC_PARR pkg) (fsLit "toP")             toPIdKey
+emptyPName          pkg = varQual (gHC_PARR pkg) (fsLit "emptyP")          emptyPIdKey
+appPName            pkg = varQual (gHC_PARR pkg) (fsLit "+:+")             appPIdKey
 
 -- IO things
 ioTyConName, ioDataConName, thenIOName, bindIOName, returnIOName,

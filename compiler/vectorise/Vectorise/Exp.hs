@@ -33,17 +33,15 @@ import Data.List
 
 
 -- | Vectorise a polymorphic expression.
-vectPolyExpr 
-	:: Bool 		-- ^ When vectorising the RHS of a binding, whether that
-			  	    --   binding is a loop breaker.
-	-> [Var] 			
-	-> CoreExprWithFVs
-	-> VM (Inline, Bool, VExpr)
-
+--
+vectPolyExpr :: Bool 		-- ^ When vectorising the RHS of a binding, whether that
+			  	              --   binding is a loop breaker.
+	           -> [Var] 			
+	           -> CoreExprWithFVs
+	           -> VM (Inline, Bool, VExpr)
 vectPolyExpr loop_breaker recFns (_, AnnNote note expr)
  = do (inline, isScalarFn, expr') <- vectPolyExpr loop_breaker recFns expr
       return (inline, isScalarFn, vNote note expr')
-
 vectPolyExpr loop_breaker recFns expr
  = do
       arity <- polyArity tvs
@@ -148,22 +146,19 @@ onlyIfV (isEmptyVarSet fvs) (vectScalarLam bs $ deAnnotate body)
 
 vectExpr e = cantVectorise "Can't vectorise expression (vectExpr)" (ppr $ deAnnotate e)
 
-
 -- | Vectorise an expression with an outer lambda abstraction.
-vectFnExpr 
-	:: Bool 		-- ^ When the RHS of a binding, whether that binding should be inlined.
-	-> Bool 		-- ^ Whether the binding is a loop breaker.
-	-> [Var]
-	-> CoreExprWithFVs 	-- ^ Expression to vectorise. Must have an outer `AnnLam`.
-	-> VM (Inline, Bool, VExpr)
-
+--
+vectFnExpr :: Bool             -- ^ When the RHS of a binding, whether that binding should be inlined.
+           -> Bool             -- ^ Whether the binding is a loop breaker.
+           -> [Var]
+           -> CoreExprWithFVs  -- ^ Expression to vectorise. Must have an outer `AnnLam`.
+           -> VM (Inline, Bool, VExpr)
 vectFnExpr inline loop_breaker recFns e@(fvs, AnnLam bndr _)
   | isId bndr = onlyIfV True -- (isEmptyVarSet fvs)  -- we check for free variables later. TODO: clean up
                         (mark DontInline True . vectScalarLam bs recFns $ deAnnotate body)
                 `orElseV` mark inlineMe False (vectLam inline loop_breaker fvs bs body)
   where
     (bs,body) = collectAnnValBinders e
-
 vectFnExpr _ _ _  e = mark DontInline False $ vectExpr e
 
 mark :: Inline -> Bool -> VM a -> VM (Inline, Bool, a)

@@ -16,7 +16,7 @@ module Bag (
         concatBag, foldBag, foldrBag, foldlBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
         listToBag, bagToList,
-        foldlBagM, mapBagM, mapBagM_, 
+        foldrBagM, foldlBagM, mapBagM, mapBagM_, 
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM
     ) where
@@ -170,6 +170,12 @@ foldlBag _ z EmptyBag        = z
 foldlBag k z (UnitBag x)     = k z x
 foldlBag k z (TwoBags b1 b2) = foldlBag k (foldlBag k z b1) b2
 foldlBag k z (ListBag xs)    = foldl k z xs
+
+foldrBagM :: (Monad m) => (a -> b -> m b) -> b -> Bag a -> m b
+foldrBagM _ z EmptyBag        = return z
+foldrBagM k z (UnitBag x)     = k x z
+foldrBagM k z (TwoBags b1 b2) = do { z' <- foldrBagM k z b2; foldrBagM k z' b1 }
+foldrBagM k z (ListBag xs)    = foldrM k z xs
 
 foldlBagM :: (Monad m) => (b -> a -> m b) -> b -> Bag a -> m b
 foldlBagM _ z EmptyBag        = return z

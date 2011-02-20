@@ -123,8 +123,8 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
 
-doCorePass (CoreDoVectorisation be)  = {-# SCC "Vectorise" #-}
-                                       vectorise be
+doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
+                                       vectorise
 
 doCorePass CoreDoGlomBinds              = doPassDM  glomBinds
 doCorePass CoreDoPrintCore              = observe   printCore
