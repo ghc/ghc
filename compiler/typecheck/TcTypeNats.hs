@@ -26,8 +26,8 @@ import PrelNames  ( lessThanEqualClassName
                   , addTyFamName, mulTyFamName, expTyFamName
                   )
 import Bag        (bagToList, emptyBag, unionManyBags, unionBags)
-import Data.Maybe (fromMaybe)
-import Data.List  (nub, partition)
+import Data.Maybe (fromMaybe, listToMaybe, maybeToList)
+import Data.List  (nub, partition, sort)
 import Control.Monad (msum, mplus, zipWithM, (<=<), guard)
 
 import Debug.Trace
@@ -275,6 +275,7 @@ solve asmps prop =
         Just sgs -> Simplified sgs
         Nothing
           | solveAC asmps prop  -> Simplified []
+          | byDistr asmps prop  -> Simplified []
           | otherwise ->
             case improve1 prop of
               Nothing   -> Impossible
@@ -523,6 +524,49 @@ merge xs@(a:as) ys@(b:bs)
   | otherwise = b : merge xs bs
 merge [] ys = ys
 merge xs [] = xs
+
+
+-- XXX: This duplicates a lot of work done by AC.
+byDistr :: [Prop] -> Prop -> Bool
+byDistr ps (EqFun op x y z)
+  -- (a * b + a * c) = x |- a * (b + c) = x
+  | op == Mul = let zs = sumsFor z
+                    ps = sumProds x y
+                in -- pNumTrace "Distr *" (text "zs:" <+> vmany zs <> comma <+> text "ps:" <+> vmany ps) $
+                   any (`elem` zs) ps
+
+  -- a * (b + c) = x |- a * b + a * c = x
+  | op == Add = let as = sumsFor x
+                    bs = sumsFor y
+                    cs = [ merge a b | a <- as, b <- bs ]
+                    ds = do (a,b,z') <- prods
+                            guard (z == z')
+                            sumProds a b
+                in -- pNumTrace "Distr +" (text "cs:" <+> vmany cs <> comma <+> text "ds:" <+> vmany ds) $
+                   any (`elem` cs) ds
+
+  where
+  sums      = [ (a,b,c) | EqFun Add a b c <- ps ]
+  prods     = [ (a,b,c) | EqFun Mul a b c <- ps ]
+  sumsFor  :: Term -> [[Term]]
+  sumsFor c = [c] : do (a,b,c') <- sums
+                       guard (c == c')
+                       u <- sumsFor a
+                       v <- sumsFor b
+                       return (merge u v)
+
+  -- This is very ad-hock.
+  prod (Num 1 _, a) = Just a
+  prod (a, Num 1 _) = Just a
+  prod (a,b)  = listToMaybe [ c | (a',b',c) <- prods, a == a', b == b' ]
+
+  sumProds u v  = do s1 <- sumsFor u
+                     s2 <- sumsFor v
+                     maybeToList $
+                       do s3 <- mapM prod [ (a,b) | a <- s1, b <- s2 ]
+                          return (sort s3)
+byDistr _ _ = False
+
 
 
 
