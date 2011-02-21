@@ -50,6 +50,13 @@ associative op = op == Add || op == Mul
 num :: Integer -> Term
 num n = Num n Nothing
 
+opFun :: Op -> (Integer -> Integer -> Integer)
+opFun x = case x of
+            Add -> (+)
+            Mul -> (*)
+            Exp -> (^)
+
+
 instance Eq Term where
   Var x   == Var y    = tcEqType x y
   Num x _ == Num y _  = x == y
@@ -469,6 +476,11 @@ propsToOrd props = loop (step [] unconditional)
 -- Associative and Commutative Operators
 --------------------------------------------------------------------------------
 
+-- XXX: It'd be nice to go back to a "small-step" style solve.
+-- If we can get it to work, it is likely to be simpler,
+-- and it would be way easier to provide proofs.
+
+
 -- XXX: recursion may non-terminate: x * y = x
 -- XXX: does not do improvements
 
@@ -504,8 +516,8 @@ solveAC ps (EqFun op x y z)
   -- xs `elem` sums a   ==>   sum xs = a
   sums a        = [a] : [ p | (b,c) <- candidates a, p <- add (sums b) (sums c)]
 
-  add :: [[Term]] -> [[Term]] -> [[Term]]
-  add as bs     = [ merge u v | u <- as, v <- bs ]
+  add :: [Terms] -> [Terms] -> [Terms]
+  add as bs     = [ doOp2 (opFun op) u v | u <- as, v <- bs ]
 
   (===) :: [[Term]] -> Term -> Bool
   as === b      = any (`elem` sums b) as
@@ -517,6 +529,20 @@ solveAC ps (EqFun op x y z)
 
 solveAC _ _ = False
 
+
+
+
+-- Combining sequences of terms with the same operation.
+-- We preserve a normal form with at most 1 constant and variables sorted.
+-- Examples:
+--  (1 + c + y) + (2 + b + z) = 3 + b + c + y + z
+--  (2 * c * y) * (3 * b * z) = 6 * b * c * y * z
+
+type Terms = [Term]
+
+doOp2 :: (Integer -> Integer -> Integer) -> Terms -> Terms -> Terms
+doOp2 op (Num m _ : as) (Num n _ : bs) = num (op m n) : merge as bs
+doOp2 _ xs ys                          = merge xs ys
 
 merge :: Ord a => [a] -> [a] -> [a]
 merge xs@(a:as) ys@(b:bs)
@@ -538,7 +564,7 @@ byDistr ps (EqFun op x y z)
   -- a * (b + c) = x |- a * b + a * c = x
   | op == Add = let as = sumsFor x
                     bs = sumsFor y
-                    cs = [ merge a b | a <- as, b <- bs ]
+                    cs = [ doOp2 (opFun op) a b | a <- as, b <- bs ]
                     ds = do (a,b,z') <- prods
                             guard (z == z')
                             sumProds a b
@@ -553,7 +579,7 @@ byDistr ps (EqFun op x y z)
                        guard (c == c')
                        u <- sumsFor a
                        v <- sumsFor b
-                       return (merge u v)
+                       return (doOp2 (opFun Mul) u v)
 
   -- This is very ad-hock.
   prod (Num 1 _, a) = Just a
