@@ -26,7 +26,7 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newCoVar, newEvVars,
-  newWantedCoVar, writeWantedCoVar, readWantedCoVar, 
+  writeWantedCoVar, readWantedCoVar, 
   newIP, newDict, newSilentGiven, isSilentEvVar,
 
   newWantedEvVar, newWantedEvVars,
@@ -129,15 +129,12 @@ newEvVars :: TcThetaType -> TcM [EvVar]
 newEvVars theta = mapM newEvVar theta
 
 newWantedEvVar :: TcPredType -> TcM EvVar 
-newWantedEvVar (EqPred ty1 ty2) = newWantedCoVar ty1 ty2
+newWantedEvVar (EqPred ty1 ty2) = newCoVar ty1 ty2
 newWantedEvVar (ClassP cls tys) = newDict cls tys
 newWantedEvVar (IParam ip ty)   = newIP ip ty
 
 newWantedEvVars :: TcThetaType -> TcM [EvVar] 
 newWantedEvVars theta = mapM newWantedEvVar theta 
-
-newWantedCoVar :: TcType -> TcType -> TcM CoVar 
-newWantedCoVar ty1 ty2 = newCoVar ty1 ty2
 
 --------------
 newEvVar :: TcPredType -> TcM EvVar

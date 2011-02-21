@@ -26,13 +26,12 @@ module TcSMonad (
     SimplContext(..), isInteractive, simplEqsOnly, performDefaulting,
 
        -- Creation of evidence variables
-    newEvVar, newCoVar, newWantedCoVar, newGivenCoVar,
+    newEvVar, newCoVar, newGivenCoVar,
     newDerivedId, 
     newIPVar, newDictVar, newKindConstraint,
 
        -- Setting evidence variables 
-    setWantedCoBind,
-    setIPBind, setDictBind, setEvBind,
+    setCoBind, setIPBind, setDictBind, setEvBind,
 
     setWantedTyBind,
 
@@ -290,12 +289,14 @@ canSolve :: CtFlavor -> CtFlavor -> Bool
 --  active(tv ~ xi)    = tv 
 --  active(D xis)      = D xis 
 --  active(IP nm ty)   = nm 
+--
+-- NB:  either (a `canSolve` b) or (b `canSolve` a) must hold
 -----------------------------------------
 canSolve (Given {})   _            = True 
-canSolve (Derived {}) (Wanted {})  = False -- DV: changing the semantics
-canSolve (Derived {}) (Derived {}) = True  -- DV: changing the semantics of derived 
+canSolve (Wanted {})  (Derived {}) = True
 canSolve (Wanted {})  (Wanted {})  = True
-canSolve _ _ = False
+canSolve (Derived {}) (Derived {}) = True  -- Important: derived can't solve wanted/given
+canSolve _ _ = False  	       	     	   -- (There is no *evidence* for a derived.)
 
 canRewrite :: CtFlavor -> CtFlavor -> Bool 
 -- canRewrite ctid1 ctid2 
@@ -548,10 +549,8 @@ getTcEvBindsBag
   = do { EvBindsVar ev_ref _ <- getTcEvBinds 
        ; wrapTcS $ TcM.readTcRef ev_ref }
 
-setWantedCoBind :: CoVar -> Coercion -> TcS () 
-setWantedCoBind cv co 
-  = setEvBind cv (EvCoercion co)
-     -- Was: wrapTcS $ TcM.writeWantedCoVar cv co 
+setCoBind :: CoVar -> Coercion -> TcS () 
+setCoBind cv co = setEvBind cv (EvCoercion co)
 
 setWantedTyBind :: TcTyVar -> TcType -> TcS () 
 -- Add a type binding
@@ -706,7 +705,7 @@ newKindConstraint :: TcTyVar -> Kind -> TcS CoVar
 newKindConstraint tv knd 
   = do { tv_k <- instFlexiTcSHelper (tyVarName tv) knd 
        ; let ty_k = mkTyVarTy tv_k
-       ; co_var <- newWantedCoVar (mkTyVarTy tv) ty_k
+       ; co_var <- newCoVar (mkTyVarTy tv) ty_k
        ; return co_var }
 
 instFlexiTcSHelper :: Name -> Kind -> TcS TcTyVar
@@ -736,9 +735,6 @@ newGivenCoVar ty1 ty2 co
   = do { cv <- newCoVar ty1 ty2
        ; setEvBind cv (EvCoercion co) 
        ; return cv } 
-
-newWantedCoVar :: TcType -> TcType -> TcS EvVar 
-newWantedCoVar ty1 ty2 =  wrapTcS $ TcM.newWantedCoVar ty1 ty2 
 
 newCoVar :: TcType -> TcType -> TcS EvVar
 newCoVar ty1 ty2 = wrapTcS $ TcM.newCoVar ty1 ty2 

@@ -162,7 +162,7 @@ flatten fl (TyConApp tc tys)
                   ; return $ (mkCoVarCoercion cv, rhs_var, ct) }
              else -- Derived or Wanted: make a new *unification* flatten variable
                do { rhs_var <- newFlexiTcSTy (typeKind fam_ty)
-                  ; cv <- newWantedCoVar fam_ty rhs_var
+                  ; cv <- newCoVar fam_ty rhs_var
                   ; let ct = CFunEqCan { cc_id = cv
                                        , cc_flavor = mkWantedFlavor fl
                                            -- Always Wanted, not Derived
@@ -380,7 +380,7 @@ canEq :: CtFlavor -> EvVar -> Type -> Type -> TcS CanonicalCts
 canEq fl cv ty1 ty2 
   | tcEqType ty1 ty2	-- Dealing with equality here avoids
     	     	 	-- later spurious occurs checks for a~a
-  = do { when (isWanted fl) (setWantedCoBind cv ty1)
+  = do { when (isWanted fl) (setCoBind cv ty1)
        ; return emptyCCan }
 
 -- If one side is a variable, orient and flatten, 
@@ -408,12 +408,12 @@ canEq fl cv s1 s2
     Just (t2a,t2b,t2c) <- splitCoPredTy_maybe s2
   = do { (v1,v2,v3) 
              <- if isWanted fl then                   -- Wanted
-                    do { v1 <- newWantedCoVar t1a t2a
-                       ; v2 <- newWantedCoVar t1b t2b 
-                       ; v3 <- newWantedCoVar t1c t2c 
+                    do { v1 <- newCoVar t1a t2a
+                       ; v2 <- newCoVar t1b t2b 
+                       ; v3 <- newCoVar t1c t2c 
                        ; let res_co = mkCoPredCo (mkCoVarCoercion v1) 
                                         (mkCoVarCoercion v2) (mkCoVarCoercion v3)
-                       ; setWantedCoBind cv res_co
+                       ; setCoBind cv res_co
                        ; return (v1,v2,v3) }
                 else if isGiven fl then               -- Given 
                          let co_orig = mkCoVarCoercion cv 
@@ -439,9 +439,9 @@ canEq fl cv s1 s2
 canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
   = do { (argv, resv) <- 
              if isWanted fl then 
-                 do { argv <- newWantedCoVar s1 s2 
-                    ; resv <- newWantedCoVar t1 t2 
-                    ; setWantedCoBind cv $ 
+                 do { argv <- newCoVar s1 s2 
+                    ; resv <- newCoVar t1 t2 
+                    ; setCoBind cv $ 
                       mkFunCoercion (mkCoVarCoercion argv) (mkCoVarCoercion resv) 
                     ; return (argv,resv) } 
 
@@ -463,16 +463,16 @@ canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
 canEq fl cv (PredTy (IParam n1 t1)) (PredTy (IParam n2 t2))
   | n1 == n2
   = if isWanted fl then 
-        do { v <- newWantedCoVar t1 t2 
-           ; setWantedCoBind cv $ mkIParamPredCo n1 (mkCoVarCoercion cv)
+        do { v <- newCoVar t1 t2 
+           ; setCoBind cv $ mkIParamPredCo n1 (mkCoVarCoercion cv)
            ; canEq fl v t1 t2 } 
     else return emptyCCan -- DV: How to decompose given IP coercions? 
 
 canEq fl cv (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2))
   | c1 == c2
   = if isWanted fl then 
-       do { vs <- zipWithM newWantedCoVar tys1 tys2 
-          ; setWantedCoBind cv $ mkClassPPredCo c1 (map mkCoVarCoercion vs) 
+       do { vs <- zipWithM newCoVar tys1 tys2 
+          ; setCoBind cv $ mkClassPPredCo c1 (map mkCoVarCoercion vs) 
           ; andCCans <$> zipWith3M (canEq fl) vs tys1 tys2
           }
     else return emptyCCan 
@@ -492,8 +492,8 @@ canEq fl cv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
   = -- Generate equalities for each of the corresponding arguments
     do { argsv 
              <- if isWanted fl then
-                    do { argsv <- zipWithM newWantedCoVar tys1 tys2
-                       ; setWantedCoBind cv $ 
+                    do { argsv <- zipWithM newCoVar tys1 tys2
+                       ; setCoBind cv $ 
                          mkTyConCoercion tc1 (map mkCoVarCoercion argsv)
                        ; return argsv } 
 
@@ -513,9 +513,9 @@ canEq fl cv ty1 ty2
   , Just (s2,t2) <- tcSplitAppTy_maybe ty2
     = do { (cv1,cv2) <- 
              if isWanted fl 
-             then do { cv1 <- newWantedCoVar s1 s2 
-                     ; cv2 <- newWantedCoVar t1 t2 
-                     ; setWantedCoBind cv $ 
+             then do { cv1 <- newCoVar s1 s2 
+                     ; cv2 <- newCoVar t1 t2 
+                     ; setCoBind cv $ 
                        mkAppCoercion (mkCoVarCoercion cv1) (mkCoVarCoercion cv2) 
                      ; return (cv1,cv2) } 
 
@@ -735,8 +735,8 @@ canEqLeaf :: TcsUntouchables
 canEqLeaf _untch fl cv cls1 cls2 
   | cls1 `re_orient` cls2
   = do { cv' <- if isWanted fl 
-                then do { cv' <- newWantedCoVar s2 s1 
-                        ; setWantedCoBind cv $ mkSymCoercion (mkCoVarCoercion cv') 
+                then do { cv' <- newCoVar s2 s1 
+                        ; setCoBind cv $ mkSymCoercion (mkCoVarCoercion cv') 
                         ; return cv' } 
                 else if isGiven fl then 
                          newGivenCoVar s2 s1 (mkSymCoercion (mkCoVarCoercion cv))
@@ -774,7 +774,7 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys1) s2         -- cv : F tys1
        ; cv_new <- if no_flattening_happened then return cv
                    else if isGiven fl        then return cv
                    else if isWanted fl then 
-                         do { cv' <- newWantedCoVar (unClassify (FunCls fn xis1)) xi2
+                         do { cv' <- newCoVar (unClassify (FunCls fn xis1)) xi2
                                  -- cv' : F xis ~ xi2
                             ; let -- fun_co :: F xis1 ~ F tys1
                                  fun_co = mkTyConCoercion fn cos1
@@ -782,7 +782,7 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys1) s2         -- cv : F tys1
                                  want_co = mkSymCoercion fun_co
                                            `mkTransCoercion` mkCoVarCoercion cv'
                                            `mkTransCoercion` co2
-                            ; setWantedCoBind cv  want_co
+                            ; setCoBind cv  want_co
                             ; return cv' }
                    else -- Derived 
                        newDerivedId (EqPred (unClassify (FunCls fn xis1)) xi2)
@@ -820,8 +820,8 @@ canEqLeafTyVarLeft fl cv tv s2       -- cv : tv ~ s2
        ; cv_new <- if no_flattening_happened then return cv
                    else if isGiven fl        then return cv
                    else if isWanted fl then 
-                         do { cv' <- newWantedCoVar (mkTyVarTy tv) xi2'  -- cv' : tv ~ xi2
-                            ; setWantedCoBind cv  (mkCoVarCoercion cv' `mkTransCoercion` co)
+                         do { cv' <- newCoVar (mkTyVarTy tv) xi2'  -- cv' : tv ~ xi2
+                            ; setCoBind cv  (mkCoVarCoercion cv' `mkTransCoercion` co)
                             ; return cv' }
                    else -- Derived
                        newDerivedId (EqPred (mkTyVarTy tv) xi2')

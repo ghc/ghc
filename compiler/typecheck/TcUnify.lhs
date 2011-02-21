@@ -520,7 +520,7 @@ uType, uType_np, uType_defer
 -- See Note [Deferred unification]
 uType_defer (item : origin) ty1 ty2
   = wrapEqCtxt origin $
-    do { co_var <- newWantedCoVar ty1 ty2
+    do { co_var <- newCoVar ty1 ty2
        ; loc <- getCtLoc (TypeEqOrigin item)
        ; emitFlat (mkEvVarX co_var loc)
 

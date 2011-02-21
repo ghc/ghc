@@ -982,7 +982,7 @@ solveCTyFunEqs cts
 
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
-    solve_one (cv,tv,ty) = setWantedTyBind tv ty >> setWantedCoBind cv ty
+    solve_one (cv,tv,ty) = setWantedTyBind tv ty >> setCoBind cv ty
 
 ------------
 type FunEqBinds = (TvSubstEnv, [(CoVar, TcTyVar, TcType)])
