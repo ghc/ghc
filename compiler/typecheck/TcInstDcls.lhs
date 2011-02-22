@@ -644,7 +644,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]
-       ; spec_info <- tcSpecInstPrags dfun_id ibinds
+       ; spec_info@(spec_inst_prags,_) <- tcSpecInstPrags dfun_id ibinds
 
         -- Typecheck the methods
        ; (meth_ids, meth_binds) 
@@ -691,7 +691,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [(inst_tyvars, dfun_id_w_fun, self_dict,
-                                                    SpecPrags [] {- spec_inst_prags -})]
+                                                    SpecPrags spec_inst_prags)]
                                   , abs_ev_binds = emptyTcEvBinds
                                   , abs_binds = unitBag dict_bind }
 
