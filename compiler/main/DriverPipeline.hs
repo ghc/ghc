@@ -1771,7 +1771,9 @@ linkDynLib dflags o_files dep_packages = do
          ++ o_files
          ++ [ "-shared" ]
          ++ bsymbolicFlag
-         ++ [ "-Wl,-soname," ++ takeFileName output_fn ] -- set the library soname
+            -- Set the library soname. We use -h rather than -soname as
+            -- Solaris 10 doesn't support the latter:
+         ++ [ "-Wl,-h," ++ takeFileName output_fn ]
          ++ extra_ld_inputs
          ++ lib_path_opts
          ++ extra_ld_opts
