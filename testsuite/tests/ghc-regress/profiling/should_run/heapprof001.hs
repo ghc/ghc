@@ -36,7 +36,7 @@ David
 
 module Main(main) where
 
-import Ix -- 1.3
+import Data.Ix
 import System.Environment
 
 main = do
