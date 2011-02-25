@@ -38,7 +38,8 @@
 --
 -- In particular, the "bigger" functions in this module ('readMVar',
 -- 'swapMVar', 'withMVar', 'modifyMVar_' and 'modifyMVar') are simply
--- compositions a 'takeMVar' followed by a 'putMVar' with exception safety.
+-- the composition of a 'takeMVar' followed by a 'putMVar' with
+-- exception safety.
 -- These only have atomicity guarantees if all other threads
 -- perform a 'takeMVar' before a 'putMVar' as well;  otherwise, they may
 -- block.
