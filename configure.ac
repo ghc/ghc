@@ -414,6 +414,29 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
+SplitObjsBroken=NO
+if test "$TargetOS_CPP" = "darwin"
+then
+    XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`
+    XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+    XCodeVersion2=`echo "$XCodeVersion" | sed 's/.*\.//'`
+    # Old XCode versions don't actually give the XCode version
+    if test "$XCodeVersion" = ""
+    then
+        SplitObjsBroken=YES
+    fi
+    # Split objects is broken (#4013) with XCode < 3.2
+    if test "$XCodeVersion1" -lt 3
+    then
+        SplitObjsBroken=YES
+    fi
+    if test "$XCodeVersion1" -eq 3 && test "$XCodeVersion2" -lt 2
+    then
+        SplitObjsBroken=YES
+    fi
+fi
+AC_SUBST([SplitObjsBroken])
+
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
 AC_ARG_WITH([macosx-deployment-target],

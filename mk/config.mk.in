@@ -295,11 +295,13 @@ PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
 
 ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO))
 OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
+SplitObjsBroken = @SplitObjsBroken@
 
 # lazy test, so that $(GhcUnregisterised) can be set in build.mk
 SupportsSplitObjs=$(strip \
                     $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
                                $(filter YES,$(OsSupportsSplitObjs)),\
+                               $(filter NO,$(SplitObjsBroken)),\
                                $(filter NO,$(BootingFromHc)),\
                                $(filter NO,$(GhcUnregisterised))),\
                           YES,NO))
