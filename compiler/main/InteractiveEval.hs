@@ -9,7 +9,8 @@
 module InteractiveEval (
 #ifdef GHCI
         RunResult(..), Status(..), Resume(..), History(..),
-	runStmt, parseImportDecl, SingleStep(..),
+	runStmt, runStmtWithLocation,
+        parseImportDecl, SingleStep(..),
         resume,
         abandon, abandonAll,
         getResumeContext,
@@ -180,7 +181,13 @@ findEnclosingDecls hsc_env inf =
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
 runStmt :: GhcMonad m => String -> SingleStep -> m RunResult
-runStmt expr step =
+runStmt = runStmtWithLocation "<interactive>" 1
+
+-- | Run a statement in the current interactive context.  Passing debug information
+--   Statement may bind multple values.
+runStmtWithLocation :: GhcMonad m => String -> Int -> 
+                       String -> SingleStep -> m RunResult 
+runStmtWithLocation source linenumber expr step =
   do
     hsc_env <- getSession
 
@@ -192,7 +199,7 @@ runStmt expr step =
     let dflags'  = dopt_unset (hsc_dflags hsc_env) Opt_WarnUnusedBinds
         hsc_env' = hsc_env{ hsc_dflags = dflags' }
 
-    r <- liftIO $ hscStmt hsc_env' expr
+    r <- liftIO $ hscStmtWithLocation hsc_env' expr source linenumber
 
     case r of
       Nothing -> return RunFailed -- empty statement / comment

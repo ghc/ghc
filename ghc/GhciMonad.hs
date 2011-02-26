@@ -57,6 +57,7 @@ data GHCiState = GHCiState
         stop           :: String,
 	options        :: [GHCiOption],
         prelude        :: GHC.Module,
+        line_number    :: !Int,         -- input line
         break_ctr      :: !Int,
         breaks         :: ![(Int, BreakLocation)],
         tickarrays     :: ModuleEnv TickArray,
@@ -254,7 +255,7 @@ runStmt expr step = do
       reflectGHCi x $ do
         GHC.handleSourceError (\e -> do GHC.printException e
                                         return GHC.RunFailed) $ do
-          GHC.runStmt expr step
+          GHC.runStmtWithLocation (progname st) (line_number st) expr step 
 
 resume :: (SrcSpan -> Bool) -> GHC.SingleStep -> GHCi GHC.RunResult
 resume canLogSpan step = do

@@ -2389,6 +2389,19 @@ bar
 
       <varlistentry>
 	<term>
+          <literal>:script</literal> <optional><replaceable>n</replaceable></optional> 
+	  <literal>filename</literal>
+          <indexterm><primary><literal>:script</literal></primary></indexterm>
+        </term>
+	<listitem>
+    <para>Executes the lines of a file as a series of GHCi commands.  This command
+    is compatible with multiline statements as set by <literal>:set +m</literal>
+    </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:set</literal> <optional><replaceable>option</replaceable>...</optional>
           <indexterm><primary><literal>:set</literal></primary></indexterm>
         </term>

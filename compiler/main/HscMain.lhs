@@ -62,7 +62,8 @@ module HscMain
 #ifdef GHCI
     , hscGetModuleExports
     , hscTcRnLookupRdrName
-    , hscStmt, hscTcExpr, hscImport, hscKcType
+    , hscStmt, hscStmtWithLocation
+    , hscTcExpr, hscImport, hscKcType
     , hscCompileCoreExpr
 #endif
 
@@ -1075,8 +1076,17 @@ hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
   -> String			-- The statement
   -> IO (Maybe ([Id], HValue))
      -- ^ 'Nothing' <==> empty statement (or comment only), but no parse error
-hscStmt hsc_env stmt = runHsc hsc_env $ do
-    maybe_stmt <- hscParseStmt stmt
+hscStmt hsc_env stmt = hscStmtWithLocation hsc_env stmt "<interactive>" 1
+
+hscStmtWithLocation	-- Compile a stmt all the way to an HValue, but don't run it
+  :: HscEnv
+  -> String			-- The statement
+  -> String                     -- the source
+  -> Int                        -- ^ starting line
+  -> IO (Maybe ([Id], HValue))
+     -- ^ 'Nothing' <==> empty statement (or comment only), but no parse error
+hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
+    maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
       Nothing -> return Nothing
       Just parsed_stmt -> do  -- The real stuff
@@ -1142,6 +1152,11 @@ hscKcType hsc_env str = runHsc hsc_env $ do
 hscParseStmt :: String -> Hsc (Maybe (LStmt RdrName))
 hscParseStmt = hscParseThing parseStmt
 
+hscParseStmtWithLocation :: String -> Int 
+                         -> String -> Hsc (Maybe (LStmt RdrName))
+hscParseStmtWithLocation source linenumber stmt = 
+  hscParseThingWithLocation source linenumber parseStmt stmt
+
 hscParseType :: String -> Hsc (LHsType RdrName)
 hscParseType = hscParseThing parseType
 #endif
@@ -1150,19 +1165,24 @@ hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
 hscParseIdentifier hsc_env str = runHsc hsc_env $ 
                                    hscParseThing parseIdentifier str
 
-
 hscParseThing :: (Outputable thing)
 	      => Lexer.P thing
 	      -> String
 	      -> Hsc thing
+hscParseThing = hscParseThingWithLocation "<interactive>" 1
 
-hscParseThing parser str
+hscParseThingWithLocation :: (Outputable thing)
+	      => String -> Int 
+              -> Lexer.P thing
+	      -> String
+	      -> Hsc thing
+hscParseThingWithLocation source linenumber parser str
  = {-# SCC "Parser" #-} do
       dflags <- getDynFlags
       liftIO $ showPass dflags "Parser"
-  
+
       let buf = stringToStringBuffer str
-          loc = mkSrcLoc (fsLit "<interactive>") 1 1
+          loc  = mkSrcLoc (fsLit source) linenumber 1
 
       case unP parser (mkPState dflags buf loc) of
 

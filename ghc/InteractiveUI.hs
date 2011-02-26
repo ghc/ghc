@@ -143,6 +143,7 @@ builtin_commands = [
   ("quit",      quit,                           noCompletion),
   ("reload",    keepGoing' reloadModule,        noCompletion),
   ("run",       keepGoing runRun,               completeFilename),
+  ("script",    keepGoing' scriptCmd,           completeFilename),
   ("set",       keepGoing setCmd,               completeSetOptions),
   ("show",      keepGoing showCmd,              completeShowOptions),
   ("sprint",    keepGoing sprintCmd,            completeExpression),
@@ -217,6 +218,7 @@ helpText =
  "   :quit                       exit GHCi\n" ++
  "   :reload                     reload the current module set\n" ++
  "   :run function [<arguments> ...] run the function with the given arguments\n" ++
+ "   :script <filename>          run the script <filename>" ++
  "   :type <expr>                show the type of <expr>\n" ++
  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
  "   :!<command>                 run the shell command <command>\n" ++
@@ -358,6 +360,7 @@ interactiveUI srcs maybe_exprs = do
 --                   session = session,
                    options = [],
                    prelude = prel_mod,
+                   line_number = 1,
                    break_ctr = 0,
                    breaks = [],
                    tickarrays = emptyModuleEnv,
@@ -517,7 +520,13 @@ checkPerms name =
    	  else return True
 #endif
 
-fileLoop :: MonadIO m => Handle -> InputT m (Maybe String)
+incrementLines :: InputT GHCi ()
+incrementLines = do
+   st <- lift $ getGHCiState
+   let ln = 1+(line_number st)
+   lift $ setGHCiState st{line_number=ln}
+
+fileLoop :: Handle -> InputT GHCi (Maybe String)
 fileLoop hdl = do
    l <- liftIO $ tryIO $ hGetLine hdl
    case l of
@@ -529,7 +538,9 @@ fileLoop hdl = do
                 -- this can happen if the user closed stdin, or
                 -- perhaps did getContents which closes stdin at
                 -- EOF.
-        Right l -> return (Just l)
+        Right l -> do
+           incrementLines
+           return (Just l)
 
 mkPrompt :: GHCi String
 mkPrompt = do
@@ -654,7 +665,7 @@ runOneCommand eh getCmd = do
       ml <- lift $ isOptionSet Multiline
       if ml
         then do 
-          mb_stmt <- checkInputForLayout stmt 1 getCmd
+          mb_stmt <- checkInputForLayout stmt getCmd
           case mb_stmt of
             Nothing      -> return $ Just True
             Just ml_stmt -> do
@@ -666,14 +677,14 @@ runOneCommand eh getCmd = do
 
 -- #4316
 -- lex the input.  If there is an unclosed layout context, request input
-checkInputForLayout :: String -> Int -> InputT GHCi (Maybe String)
+checkInputForLayout :: String -> InputT GHCi (Maybe String)
                     -> InputT GHCi (Maybe String)
-checkInputForLayout stmt line_number getStmt = do
+checkInputForLayout stmt getStmt = do
    dflags' <- lift $ getDynFlags
    let dflags = xopt_set dflags' Opt_AlternativeLayoutRule
    st <- lift $ getGHCiState
    let buf =  stringToStringBuffer stmt
-       loc  = mkSrcLoc (fsLit (progname st)) line_number 1
+       loc  = mkSrcLoc (fsLit (progname st)) (line_number st) 1
        pstate = Lexer.mkPState dflags buf loc
    case Lexer.unP goToEnd pstate of
      (Lexer.POk _ False) -> return $ Just stmt
@@ -696,7 +707,8 @@ checkInputForLayout stmt line_number getStmt = do
          Nothing  -> return Nothing
          Just str -> if str == ""
            then return $ Just stmt
-           else checkInputForLayout (stmt++"\n"++str) (line_number+1) getStmt
+           else do
+             checkInputForLayout (stmt++"\n"++str) getStmt
      where goToEnd = do
              eof <- Lexer.nextIsEOF
              if eof 
@@ -1250,6 +1262,39 @@ quit _ = return True
 
 shellEscape :: String -> GHCi Bool
 shellEscape str = liftIO (system str >> return False)
+
+-----------------------------------------------------------------------------
+-- running a script file #1363
+
+scriptCmd :: String -> InputT GHCi ()
+scriptCmd s = do
+  case words s of
+    [s]    -> runScript s
+    _      -> ghcError (CmdLineError "syntax:  :script <filename>")
+
+runScript :: String    -- ^ filename
+           -> InputT GHCi ()
+runScript filename = do
+  either_script <- liftIO $ tryIO (openFile filename ReadMode)
+  case either_script of
+    Left _err    -> ghcError (CmdLineError $ "IO error:  \""++filename++"\" "
+                      ++(ioeGetErrorString _err))
+    Right script -> do
+      st <- lift $ getGHCiState
+      let prog = progname st
+          line = line_number st
+      lift $ setGHCiState st{progname=filename,line_number=0}
+      scriptLoop script
+      liftIO $ hClose script
+      new_st <- lift $ getGHCiState
+      lift $ setGHCiState new_st{progname=prog,line_number=line}
+  where scriptLoop script = do
+          res <- runOneCommand handler $ fileLoop script
+          case res of
+            Nothing   -> return ()
+            Just succ -> if succ 
+              then scriptLoop script
+              else return ()
 
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
