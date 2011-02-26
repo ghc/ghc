@@ -70,9 +70,11 @@
 -- most recent value, or blocks if there are no new values.  Multiple
 -- readers are supported with a @dupSkipChan@ operation.
 --
--- A skip channel is a pair of 'MVar's: the second 'MVar' is a semaphore
--- for this particular reader: it is full if there is a value in the
--- channel that this reader has not read yet, and empty otherwise.
+-- A skip channel is a pair of 'MVar's. The first 'MVar' contains the
+-- current value, and a list of semaphores that need to be notified
+-- when it changes. The second 'MVar' is a semaphore for this particular
+-- reader: it is full if there is a value in the channel that this
+-- reader has not read yet, and empty otherwise.
 --
 -- @
 --     data SkipChan a = SkipChan (MVar (a, [MVar ()])) (MVar ())
