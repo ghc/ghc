@@ -417,7 +417,7 @@ runGHCi paths maybe_exprs = do
            -- This would be a good place for runFileInputT.
            Right hdl ->
                do runInputTWithPrefs defaultPrefs defaultSettings $
-                            runCommands $ fileLoop hdl
+                            runCommands False $ fileLoop hdl
                   liftIO (hClose hdl `catchIO` \_ -> return ())
      where
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
@@ -452,7 +452,7 @@ runGHCi paths maybe_exprs = do
         Nothing ->
           do
             -- enter the interactive loop
-            runGHCiInput $ runCommands $ nextInputLine show_prompt is_tty
+            runGHCiInput $ runCommands True $ nextInputLine show_prompt is_tty
         Just exprs -> do
             -- just evaluate the expression we were given
             enqueueCommands exprs
@@ -466,7 +466,7 @@ runGHCi paths maybe_exprs = do
                                    -- this used to be topHandlerFastExit, see #2228
                                      $ topHandler e
             runInputTWithPrefs defaultPrefs defaultSettings $ do
-                runCommands' handle (return Nothing)
+                runCommands' handle True (return Nothing)
 
   -- and finally, exit
   liftIO $ when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -591,12 +591,15 @@ queryQueue = do
     c:cs -> do setGHCiState st{ cmdqueue = cs }
                return (Just c)
 
-runCommands :: InputT GHCi (Maybe String) -> InputT GHCi ()
+runCommands :: Bool -> InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands = runCommands' handler
 
 runCommands' :: (SomeException -> GHCi Bool) -- Exception handler
+             -> Bool
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
-runCommands' eh getCmd = do
+runCommands' eh resetLineTo1 getCmd = do
+    when resetLineTo1 $ lift $ do st <- getGHCiState
+                                  setGHCiState $ st { line_number = 0 }
     b <- ghandle (\e -> case fromException e of
                           Just UserInterrupt -> return $ Just False
                           _ -> case fromException e of
@@ -608,7 +611,7 @@ runCommands' eh getCmd = do
             (runOneCommand eh getCmd)
     case b of
       Nothing -> return ()
-      Just _  -> runCommands' eh getCmd
+      Just _  -> runCommands' eh resetLineTo1 getCmd
 
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
