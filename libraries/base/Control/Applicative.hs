@@ -11,18 +11,25 @@
 -- Portability :  portable
 --
 -- This module describes a structure intermediate between a functor and
--- a monad: it provides pure expressions and sequencing, but no binding.
--- (Technically, a strong lax monoidal functor.)  For more details, see
--- /Applicative Programming with Effects/,
--- by Conor McBride and Ross Paterson, online at
--- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
+-- a monad (technically, a strong lax monoidal functor).  Compared with
+-- monads, this interface lacks the full power of the binding operation
+-- '>>=', but
+--
+-- * it has more instances.
+--
+-- * it is sufficient for many uses, e.g. context-free parsing, or the
+--   'Data.Traversable.Traversable' class.
+--
+-- * instances can perform analysis of computations before they are
+--   executed, and thus produce shared optimizations.
 --
 -- This interface was introduced for parsers by Niklas R&#xF6;jemo, because
 -- it admits more sharing than the monadic interface.  The names here are
--- mostly based on recent parsing work by Doaitse Swierstra.
+-- mostly based on parsing work by Doaitse Swierstra.
 --
--- This class is also useful with instances of the
--- 'Data.Traversable.Traversable' class.
+-- For more details, see /Applicative Programming with Effects/,
+-- by Conor McBride and Ross Paterson, online at
+-- <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
 
 module Control.Applicative (
     -- * Applicative functors
@@ -57,9 +64,14 @@ import GHC.Conc (STM, retry, orElse)
 infixl 3 <|>
 infixl 4 <*>, <*, *>, <**>
 
--- | A functor with application.
+-- | A functor with application, providing operations to
 --
--- Instances should satisfy the following laws:
+-- * embed pure expressions ('pure'), and
+--
+-- * sequence computations and combine their results ('<*>').
+--
+-- A minimal complete definition must include implementations of these
+-- functions satisfying the following laws:
 --
 -- [/identity/]
 --      @'pure' 'id' '<*>' v = v@
@@ -73,21 +85,23 @@ infixl 4 <*>, <*, *>, <**>
 -- [/interchange/]
 --      @u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
--- [/ignore left value/]
---      @u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v@
+-- The other methods have the following default definitions, which may
+-- be overridden with equivalent specialized implementations:
 --
--- [/ignore right value/]
---      @u '<*' v = 'pure' 'const' '<*>' u '<*>' v@
+-- @
+--      u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v
+--      u '<*' v = 'pure' 'const' '<*>' u '<*>' v
+-- @
 --
--- The 'Functor' instance should satisfy
+-- As a consequence of these laws, the 'Functor' instance for @f@ will satisfy
 --
 -- @
 --      'fmap' f x = 'pure' f '<*>' x
 -- @
 --
--- If @f@ is also a 'Monad', define @'pure' = 'return'@ and @('<*>') = 'ap'@.
---
--- Minimal complete definition: 'pure' and '<*>'.
+-- If @f@ is also a 'Monad', it should satisfy @'pure' = 'return'@ and
+-- @('<*>') = 'ap'@ (which implies that 'pure' and '<*>' satisfy the
+-- applicative functor laws).
 
 class Functor f => Applicative f where
     -- | Lift a value.
@@ -108,7 +122,8 @@ class Functor f => Applicative f where
 --
 -- Minimal complete definition: 'empty' and '<|>'.
 --
--- 'some' and 'many' should be the least solutions of the equations:
+-- If defined, 'some' and 'many' should be the least solutions
+-- of the equations:
 --
 -- * @some v = (:) '<$>' v '<*>' many v@
 --
