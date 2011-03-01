@@ -1449,7 +1449,7 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    has_side_effects = True
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
-   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int# #)
+   ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
    with
    out_of_line = True
    has_side_effects = True

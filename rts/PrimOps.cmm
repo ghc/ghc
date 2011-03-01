@@ -631,7 +631,7 @@ stg_threadStatuszh
     W_ tso;
     W_ why_blocked;
     W_ what_next;
-    W_ ret;
+    W_ ret, cap, locked;
 
     tso = R1;
 
@@ -651,7 +651,16 @@ stg_threadStatuszh
             ret = why_blocked;
         }
     }
-    RET_N(ret);
+
+    cap = TO_W_(Capability_no(StgTSO_cap(tso)));
+
+    if ((TO_W_(StgTSO_flags(tso)) & TSO_LOCKED) != 0) {
+        locked = 1;
+    } else {
+        locked = 0;
+    }
+
+    RET_NNN(ret,cap,locked);
 }
 
 /* -----------------------------------------------------------------------------
