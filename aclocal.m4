@@ -1458,7 +1458,7 @@ case "$1" in
   hppa*)
     $2="hppa"
     ;;
-  i386)
+  i386|i486|i586|i686)
     $2="i386"
     ;;
   ia64)
@@ -1511,7 +1511,15 @@ case "$1" in
 # --------------------------------
 # converts vendor from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_VENDOR],[
-$2="$1"
+  case "$1" in
+  pc|gentoo) # like i686-pc-linux-gnu and i686-gentoo-freebsd8
+    $2="unknown"
+    ;;
+  *)
+    #pass thru by default
+    $2="$1"
+    ;;
+  esac
 ])
 
 # GHC_CONVERT_OS(os, target_var)
@@ -1525,6 +1533,9 @@ case "$1" in
   # As far as I'm aware, none of these have relevant variants
   freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
     $2="$1"
+    ;;
+  freebsd8) # like i686-gentoo-freebsd8
+    $2="freebsd"
     ;;
   *)
     echo "Unknown OS $1"
