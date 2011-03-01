@@ -48,6 +48,7 @@ module GHC.Conc
 
         , ThreadStatus(..), BlockReason(..)
         , threadStatus  -- :: ThreadId -> IO ThreadStatus
+        , threadCapability
 
         -- * Waiting
         , threadDelay           -- :: Int -> IO ()

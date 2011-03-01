@@ -56,6 +56,7 @@ module GHC.Conc.Sync
 
         , ThreadStatus(..), BlockReason(..)
         , threadStatus  -- :: ThreadId -> IO ThreadStatus
+        , threadCapability
 
         -- * TVars
         , STM(..)
@@ -426,7 +427,7 @@ data ThreadStatus
 threadStatus :: ThreadId -> IO ThreadStatus
 threadStatus (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
-    (# s', stat, _cap #) -> (# s', mk_stat (I# stat) #)
+    (# s', stat, _cap, _locked #) -> (# s', mk_stat (I# stat) #)
    where
         -- NB. keep these in sync with includes/Constants.h
      mk_stat 0  = ThreadRunning
@@ -439,6 +440,15 @@ threadStatus (ThreadId t) = IO $ \s ->
      mk_stat 16 = ThreadFinished
      mk_stat 17 = ThreadDied
      mk_stat _  = ThreadBlocked BlockedOnOther
+
+-- | returns the number of the capability on which the thread is currently
+-- running, and a boolean indicating whether the thread is locked to
+-- that capability or not.  A thread is locked to a capability if it
+-- was created with @forkOnIO@.
+threadCapability :: ThreadId -> IO (Int, Bool)
+threadCapability (ThreadId t) = IO $ \s ->
+   case threadStatus# t s of
+     (# s', _, cap#, locked# #) -> (# s', (I# cap#, locked# /=# 0#) #)
 \end{code}
 
 
