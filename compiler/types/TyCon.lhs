@@ -129,15 +129,28 @@ Note [Type synonym families]
 
 * Translation of type instance decl:
 	type instance F [a] = Maybe a
-  translates to
-    A SynTyCon 'R:FList a', whose 
+  translates to a "representation TyCon", 'R:FList', where
+     R:FList is a SynTyCon, whose 
        SynTyConRhs is (SynonymTyCon (Maybe a))
        TyConParent is (FamInstTyCon F [a] co)
          where co :: F [a] ~ R:FList a
-    Notice that we introduce a gratuitous vanilla type synonym
+
+  It's very much as if the user had written
+       type instance F [a] = R:FList a
        type R:FList a = Maybe a
-    solely so that type and data families can be treated more
-    uniformly, via a single FamInstTyCon descriptor        
+  Indeed, in GHC's internal representation, the RHS of every
+  'type instance' is simply an application of the representation
+  TyCon to the quantified varaibles.
+
+  The intermediate representation TyCon is a bit gratuitous, but 
+  it means that:
+
+        each 'type instance' decls is in 1-1 correspondance 
+	with its representation TyCon
+
+  So the result of typechecking a 'type instance' decl is just a
+  TyCon.  In turn this means that type and data families can be
+  treated uniformly.
 
 * In the future we might want to support
     * closed type families (esp when we have proper kinds)
