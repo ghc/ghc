@@ -1391,9 +1391,10 @@ tryRules env rules fn args call_cont
     trace_dump dflags rule rule_rhs stuff
       | not (dopt Opt_D_dump_rule_firings dflags)
       , not (dopt Opt_D_dump_rule_rewrites dflags) = stuff
-      | not (dopt Opt_D_dump_rule_rewrites dflags)
 
+      | not (dopt Opt_D_dump_rule_rewrites dflags)
       = pprTrace "Rule fired:" (ftext (ru_name rule)) stuff
+
       | otherwise
       = pprTrace "Rule fired"
            (vcat [text "Rule:" <+> ftext (ru_name rule),

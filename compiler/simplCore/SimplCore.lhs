@@ -211,7 +211,7 @@ simplifyExpr dflags expr
 	; us <-  mkSplitUniqSupply 's'
 
 	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 simplExprGently simplEnvForGHCi expr
+				 simplExprGently (simplEnvForGHCi dflags) expr
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')

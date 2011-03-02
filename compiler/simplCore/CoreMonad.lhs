@@ -401,7 +401,7 @@ getCoreToDo dflags
     simpl_gently = CoreDoSimplify max_iter
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
-                                  , sm_rules = True     -- Note [RULEs enabled in SimplGently]
+                                  , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
                                   , sm_inline = False
                                   , sm_case_case = False })
                           -- Don't do case-of-case transformations.
@@ -567,9 +567,6 @@ RULES are enabled when doing "gentle" simplification.  Two reasons:
 
 But watch out: list fusion can prevent floating.  So use phase control
 to switch off those rules until after floating.
-
-Currently (Oct10) I think that sm_rules is always True, so we
-could remove it.
 
 
 %************************************************************************

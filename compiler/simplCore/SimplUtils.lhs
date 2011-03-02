@@ -468,12 +468,17 @@ CoreMonad
         sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
 
 \begin{code}
-simplEnvForGHCi :: SimplEnv
-simplEnvForGHCi = mkSimplEnv $
-                  SimplMode { sm_names = ["GHCi"]
-                            , sm_phase = InitialPhase
-                            , sm_rules = True, sm_inline = False
-                            , sm_eta_expand = False, sm_case_case = True }
+simplEnvForGHCi :: DynFlags -> SimplEnv
+simplEnvForGHCi dflags
+  = mkSimplEnv $ SimplMode { sm_names = ["GHCi"]
+                           , sm_phase = InitialPhase
+                           , sm_rules = rules_on
+                           , sm_inline = False
+                           , sm_eta_expand = eta_expand_on
+                           , sm_case_case = True }
+  where
+    rules_on      = dopt Opt_EnableRewriteRules   dflags
+    eta_expand_on = dopt Opt_DoLambdaEtaExpansion dflags
    -- Do not do any inlining, in case we expose some unboxed
    -- tuple stuff that confuses the bytecode interpreter
 
@@ -481,9 +486,10 @@ updModeForInlineRules :: Activation -> SimplifierMode -> SimplifierMode
 -- See Note [Simplifying inside InlineRules]
 updModeForInlineRules inline_rule_act current_mode
   = current_mode { sm_phase = phaseFromActivation inline_rule_act
-                 , sm_rules = True
                  , sm_inline = True
                  , sm_eta_expand = False }
+		 -- For sm_rules, just inherit; sm_rules might be "off"
+		 -- becuase of -fno-enable-rewrite-rules
   where
     phaseFromActivation (ActiveAfter n) = Phase n
     phaseFromActivation _               = InitialPhase
