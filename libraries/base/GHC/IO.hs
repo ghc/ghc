@@ -342,6 +342,7 @@ getMaskingState  = IO $ \s ->
                              1# -> MaskedUninterruptible
                              _  -> MaskedInterruptible #)
 
+{-# DEPRECATED blocked "use Control.Exception.getMaskingState instead" #-}
 -- | returns True if asynchronous exceptions are blocked in the
 -- current thread.
 blocked :: IO Bool
