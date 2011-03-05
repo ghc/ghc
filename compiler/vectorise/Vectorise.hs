@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
+{-# OPTIONS -fno-warn-missing-signatures -fno-warn-unused-do-bind #-}
 
 module Vectorise ( vectorise )
 where
@@ -121,44 +121,53 @@ vectModule guts@(ModGuts { mg_types     = types
 --
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
- = do
-      (inline, _, expr') 	<- vectTopRhs [] var expr
-      var' <- vectTopBinder var inline expr'
+ = do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it to
+          -- the vectorisation map.
+      ; (inline, isScalar, expr') <- vectTopRhs [] var expr
+      ; var' <- vectTopBinder var inline expr'
+      ; when isScalar $ 
+          addGlobalScalar var
 
-      -- Vectorising the body may create other top-level bindings.
-      hs <- takeHoisted
-
-      -- To get the same functionality as the original body we project
-      -- out its vectorised version from the closure.
-      cexpr <- tryConvert var var' expr
-
-      return . Rec $ (var, cexpr) : (var', expr') : hs
+          -- We replace the original top-level binding by a value projected from the vectorised
+          -- closure and add any newly created hoisted top-level bindings.
+      ; cexpr <- tryConvert var var' expr
+      ; hs <- takeHoisted
+      ; return . Rec $ (var, cexpr) : (var', expr') : hs
+      }
   `orElseV`
     return b
-
 vectTopBind b@(Rec bs)
- = do
-      (vars', _, exprs') 
-        <- fixV $ \ ~(_, inlines, rhss) ->
-            do vars' <- sequence [vectTopBinder var inline rhs
-                                      | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
-               (inlines', areScalars', exprs') 
-                     <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
-               if  (and areScalars') || (length bs <= 1)
-                  then do
-                    return (vars', inlines', exprs')
-                  else do
-                    _ <- mapM deleteGlobalScalar vars
-                    (inlines'', _, exprs'')  <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
-                    return (vars', inlines'', exprs'')
+ = let (vars, exprs) = unzip bs
+   in
+   do { (vars', _, exprs', hs) <- fixV $ 
+          \ ~(_, inlines, rhss, _) ->
+            do {   -- Vectorise the right-hand sides, create an appropriate top-level bindings and
+                   --  add them to the vectorisation map.
+               ; vars' <- sequence [vectTopBinder var inline rhs
+                                   | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
+               ; (inlines, areScalars, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
+               ; hs <- takeHoisted
+               ; if and areScalars
+                 then      -- (1) Entire recursive group is scalar
+                           --      => add all variables to the global set of scalars
+                      do { mapM addGlobalScalar vars
+                         ; return (vars', inlines, exprs', hs)
+                         }
+                 else      -- (2) At least one binding is not scalar
+                           --     => vectorise again with empty set of local scalars
+                      do { (inlines, _, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
+                         ; hs <- takeHoisted
+                         ; return (vars', inlines, exprs', hs)
+                         }
+               }
                       
-      hs     <- takeHoisted
-      cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
-      return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
+          -- Replace the original top-level bindings by a values projected from the vectorised
+          -- closures and add any newly created hoisted top-level bindings to the group.
+      ; cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
+      ; return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
+      }
   `orElseV`
-    return b
-  where
-    (vars, exprs) = unzip bs
+    return b    
     
 -- | Make the vectorised version of this top level binder, and add the mapping
 --   between it and the original to the state. For some binder @foo@ the vectorised
@@ -233,22 +242,16 @@ vectTopRhs recFs var expr
   where
     rhs _globalScalar (Just (_, expr'))               -- Case (1)
       = return (inlineMe, False, expr')
-    rhs True          _vectDecl                       -- Case (2)
-      = return (inlineMe, True, scalarRHS)
-                          -- FIXME: that True is not enough to register scalarness
-    rhs False         _vectDecl                       -- Case (3)
+    rhs True          Nothing                         -- Case (2)
+      = do { expr' <- vectScalarFun True recFs expr
+           ; return (inlineMe, True, vectorised expr')
+           }
+    rhs False         Nothing                         -- Case (3)
       = do { let fvs = freeVars expr
            ; (inline, isScalar, vexpr) <- inBind var $
                                             vectPolyExpr (isLoopBreaker $ idOccInfo var) recFs fvs
-           ; if isScalar 
-             then addGlobalScalar var
-             else deleteGlobalScalar var
            ; return (inline, isScalar, vectorised vexpr)
            }
-      
-    -- For scalar right-hand sides, we know that the original binding will remain unaltered
-    -- (hence, we can refer to it without risk of cycles) - cf, 'tryConvert'.
-    scalarRHS = panic "Vectorise.scalarRHS: not implemented yet"
 
 -- | Project out the vectorised version of a binding from some closure,
 --   or return the original body if that doesn't work or the binding is scalar. 

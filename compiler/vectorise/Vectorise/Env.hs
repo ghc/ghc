@@ -75,7 +75,8 @@ emptyLocalEnv = LocalEnv {
 --      These are things the exist at top-level.
 data GlobalEnv 
         = GlobalEnv {
-        -- | Mapping from global variables to their vectorised versions.
+        -- | Mapping from global variables to their vectorised versions — aka the /vectorisation
+        --   map/.
           global_vars           :: VarEnv Var
 
         -- | Mapping from global variables that have a vectorisation declaration to the right-hand
