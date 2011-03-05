@@ -393,13 +393,13 @@ generate config_args distdir directory
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1
      wrap1 s
-      | null s        = die "Wrapping empty value"
-      | '\'' `elem` s = die "Single quote in value to be wrapped"
+      | null s        = die ["Wrapping empty value"]
+      | '\'' `elem` s = die ["Single quote in value to be wrapped:", s]
       -- We want to be able to assume things like <space><quote> is the
       -- start of a value, so check there are no spaces in confusing
       -- positions
-      | head s == ' ' = die "Leading space in value to be wrapped"
-      | last s == ' ' = die "Trailing space in value to be wrapped"
+      | head s == ' ' = die ["Leading space in value to be wrapped:", s]
+      | last s == ' ' = die ["Trailing space in value to be wrapped:", s]
       | otherwise     = return ("\'" ++ s ++ "\'")
      boolToYesNo True = "YES"
      boolToYesNo False = "NO"
