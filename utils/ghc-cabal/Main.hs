@@ -344,6 +344,9 @@ generate config_args distdir directory
 
           dep_ids = map snd (externalPackageDeps lbi)
 
+      wrappedIncludeDirs <- wrap $ forDeps Installed.includeDirs
+      wrappedLibraryDirs <- wrap $ forDeps Installed.libraryDirs
+
       let variablePrefix = directory ++ '_':distdir
       let xs = [variablePrefix ++ "_VERSION = " ++ display (pkgVersion (package pd)),
                 variablePrefix ++ "_MODULES = " ++ unwords (map display modules),
@@ -371,9 +374,9 @@ generate config_args distdir directory
                 variablePrefix ++ "_CC_OPTS = " ++ unwords (ccOptions bi),
                 variablePrefix ++ "_CPP_OPTS = " ++ unwords (cppOptions bi),
                 variablePrefix ++ "_LD_OPTS = " ++ unwords (ldOptions bi),
-                variablePrefix ++ "_DEP_INCLUDE_DIRS_SINGLE_QUOTED = " ++ unwords (wrap $ forDeps Installed.includeDirs),
+                variablePrefix ++ "_DEP_INCLUDE_DIRS_SINGLE_QUOTED = " ++ unwords wrappedIncludeDirs,
                 variablePrefix ++ "_DEP_CC_OPTS = "    ++ unwords (forDeps Installed.ccOptions),
-                variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "   ++ unwords (wrap $ forDeps Installed.libraryDirs),
+                variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "   ++ unwords wrappedLibraryDirs,
                 variablePrefix ++ "_DEP_EXTRA_LIBS = " ++ unwords (forDeps Installed.extraLibraries),
                 variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions),
                 variablePrefix ++ "_BUILD_GHCI_LIB = " ++ boolToYesNo (withGHCiLib lbi),
@@ -388,6 +391,16 @@ generate config_args distdir directory
                                    else description pd
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
-     wrap = map (\s -> "\'" ++ s ++ "\'")
+     wrap = mapM wrap1
+     wrap1 s
+      | null s        = die "Wrapping empty value"
+      | '\'' `elem` s = die "Single quote in value to be wrapped"
+      -- We want to be able to assume things like <space><quote> is the
+      -- start of a value, so check there are no spaces in confusing
+      -- positions
+      | head s == ' ' = die "Leading space in value to be wrapped"
+      | last s == ' ' = die "Trailing space in value to be wrapped"
+      | otherwise     = return ("\'" ++ s ++ "\'")
      boolToYesNo True = "YES"
      boolToYesNo False = "NO"
+
