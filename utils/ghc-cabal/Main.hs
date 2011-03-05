@@ -371,15 +371,15 @@ generate config_args distdir directory
                         ++ languageToFlags (compiler lbi) (defaultLanguage bi)
                         ++ extensionsToFlags (compiler lbi) (usedExtensions bi)
                         ++ programOverrideArgs ghcProg)),
-                variablePrefix ++ "_CC_OPTS = " ++ unwords (ccOptions bi),
-                variablePrefix ++ "_CPP_OPTS = " ++ unwords (cppOptions bi),
-                variablePrefix ++ "_LD_OPTS = " ++ unwords (ldOptions bi),
+                variablePrefix ++ "_CC_OPTS = "                        ++ unwords (ccOptions bi),
+                variablePrefix ++ "_CPP_OPTS = "                       ++ unwords (cppOptions bi),
+                variablePrefix ++ "_LD_OPTS = "                        ++ unwords (ldOptions bi),
                 variablePrefix ++ "_DEP_INCLUDE_DIRS_SINGLE_QUOTED = " ++ unwords wrappedIncludeDirs,
-                variablePrefix ++ "_DEP_CC_OPTS = "    ++ unwords (forDeps Installed.ccOptions),
-                variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "   ++ unwords wrappedLibraryDirs,
-                variablePrefix ++ "_DEP_EXTRA_LIBS = " ++ unwords (forDeps Installed.extraLibraries),
-                variablePrefix ++ "_DEP_LD_OPTS = "    ++ unwords (forDeps Installed.ldOptions),
-                variablePrefix ++ "_BUILD_GHCI_LIB = " ++ boolToYesNo (withGHCiLib lbi),
+                variablePrefix ++ "_DEP_CC_OPTS = "                    ++ unwords (forDeps Installed.ccOptions),
+                variablePrefix ++ "_DEP_LIB_DIRS_SINGLE_QUOTED = "     ++ unwords wrappedLibraryDirs,
+                variablePrefix ++ "_DEP_EXTRA_LIBS = "                 ++ unwords (forDeps Installed.extraLibraries),
+                variablePrefix ++ "_DEP_LD_OPTS = "                    ++ unwords (forDeps Installed.ldOptions),
+                variablePrefix ++ "_BUILD_GHCI_LIB = "                 ++ boolToYesNo (withGHCiLib lbi),
                 "",
                 -- Sometimes we need to modify the automatically-generated package-data.mk
                 -- bindings in a special way for the GHC build system, so allow that here:
