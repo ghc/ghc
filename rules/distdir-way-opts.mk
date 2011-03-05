@@ -79,10 +79,8 @@ else
 $1_$2_DEP_INCLUDE_DIRS_FLAG = -I
 endif
 
-# We have to do this mangling using the shell, because words may contain
-# spaces and GNU make doesn't have any quoting interpretation.
-ifneq ($$(strip $$($1_$2_DEP_INCLUDE_DIRS)),)
-$1_$2_CC_INC_FLAGS:=$$(shell for i in $$($1_$2_DEP_INCLUDE_DIRS); do echo $$($1_$2_DEP_INCLUDE_DIRS_FLAG)\"$$$$i\"; done)
+ifneq ($$(strip $$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED)),)
+$1_$2_CC_INC_FLAGS := $$(subst $$(space)',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_FLAG)',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED))
 endif
 
 # The CONF_CC_OPTS_STAGE$4 options are what we use to get gcc to
@@ -104,8 +102,8 @@ $1_$2_DIST_CC_OPTS = \
  $$($1_$2_CC_INC_FLAGS) \
  $$($1_$2_DEP_CC_OPTS)
 
-ifneq ($$(strip $$($1_$2_DEP_LIB_DIRS)),)
-$1_$2_DIST_LD_LIB_DIRS:=$$(shell for i in $$($1_$2_DEP_LIB_DIRS); do echo \"-L$$$$i\"; done)
+ifneq ($$(strip $$($1_$2_DEP_LIB_DIRS_SINGLE_QUOTED)),)
+$1_$2_DIST_LD_LIB_DIRS := $$(subst $$(space)',$$(space)-L',$$(space)$$($1_$2_DEP_LIB_DIRS_SINGLE_QUOTED))
 endif
 
 $1_$2_DIST_LD_OPTS = \
