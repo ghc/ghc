@@ -5726,9 +5726,6 @@ for rank-2 types.
 <sect2 id="impredicative-polymorphism">
 <title>Impredicative polymorphism
 </title>
-<para><emphasis>NOTE: the impredicative-polymorphism feature is deprecated in GHC 6.12, and
-will be removed or replaced in GHC 6.14.</emphasis></para>
-
 <para>GHC supports <emphasis>impredicative polymorphism</emphasis>, 
 enabled with <option>-XImpredicativeTypes</option>.  
 This means
