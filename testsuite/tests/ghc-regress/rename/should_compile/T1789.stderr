@@ -10,6 +10,3 @@ T1789.hs:9:1:
 
 T1789.hs:10:1:
     Warning: The module `Data.Maybe' does not have an explicit import list
-
-T1789.hs:11:1:
-    Warning: The module `Data.Set' does not have an explicit import list
