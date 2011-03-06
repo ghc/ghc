@@ -1300,6 +1300,36 @@ f foo = foo { x = 6 }
       </varlistentry>
 
       <varlistentry>
+	<term>
+          <option>-fwarn-missing-import-lists</option>:
+	  <indexterm><primary><option>-fwarn-import-lists</option></primary></indexterm>
+	  <indexterm><primary>missing import lists, warning</primary></indexterm>
+	  <indexterm><primary>import lists, missing</primary></indexterm>
+        </term>
+	<listitem>
+
+	  <para>This flag warns if you use an unqualified 
+            <literal>import</literal> declaration
+	    that does not explicitly list the entities brought into scope. For 
+	    example
+<programlisting>
+module M where
+  import X( f )
+  import Y
+  import qualified Z
+  p x = f x x
+<programlisting>
+          The <option>-fwarn-import-lists</option> flag will warn about the import
+	  of <literal>Y</literal> but not <literal>X</literal>
+	  If module <literal>Y</literal> is later changed to export (say) <literal>f</literal>,
+          then the reference to <literal>f</literal> in <literal>M</literal> will become
+	  ambiguous.  No warning is produced for the import of <literal>Z</literal>
+	  because extending <literal>Z</literal>'s exports would be unlikely to produce
+	  ambiguity in <literal>M</literal>.
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-missing-methods</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-missing-methods</option></primary></indexterm>

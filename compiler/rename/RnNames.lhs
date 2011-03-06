@@ -112,8 +112,9 @@ rnImportDecl this_mod implicit_prelude
 	-- (Opt_WarnMissingImportList also checks for T(..) items
 	--  but that is done in checkDodgyImport below)
     case imp_details of
-        Just (False, _)       -> return ()
+        Just (False, _)       -> return ()	-- Explicit import list
         _  | implicit_prelude -> return ()
+           | qual_only	      -> return ()
            | otherwise        -> ifDOptM Opt_WarnMissingImportList $
                                  addWarn (missingImportListWarn imp_mod_name)
 
@@ -586,6 +587,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
                 = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
                 -- NB. use the RdrName for reporting the warning
 		| IEThingAll {} <- ieRdr
+		, not (is_qual decl_spec)
                 = ifDOptM Opt_WarnMissingImportList $
                   addWarn (missingImportListItem ieRdr)
             checkDodgyImport _
