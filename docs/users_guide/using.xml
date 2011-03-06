@@ -1312,13 +1312,15 @@ f foo = foo { x = 6 }
             <literal>import</literal> declaration
 	    that does not explicitly list the entities brought into scope. For 
 	    example
+      </para>
 <programlisting>
 module M where
   import X( f )
   import Y
   import qualified Z
   p x = f x x
-<programlisting>
+</programlisting>
+        <para>
           The <option>-fwarn-import-lists</option> flag will warn about the import
 	  of <literal>Y</literal> but not <literal>X</literal>
 	  If module <literal>Y</literal> is later changed to export (say) <literal>f</literal>,
@@ -1326,6 +1328,7 @@ module M where
 	  ambiguous.  No warning is produced for the import of <literal>Z</literal>
 	  because extending <literal>Z</literal>'s exports would be unlikely to produce
 	  ambiguity in <literal>M</literal>.
+        </para>
 	</listitem>
       </varlistentry>
 
