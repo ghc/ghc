@@ -421,22 +421,29 @@ AC_SUBST([NmCmd])
 SplitObjsBroken=NO
 if test "$TargetOS_CPP" = "darwin"
 then
+    AC_MSG_CHECKING(XCode version)
     XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`
-    XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
-    XCodeVersion2=`echo "$XCodeVersion" | sed 's/.*\.//'`
     # Old XCode versions don't actually give the XCode version
     if test "$XCodeVersion" = ""
     then
+        AC_MSG_RESULT(not found (too old?))
         SplitObjsBroken=YES
-    fi
-    # Split objects is broken (#4013) with XCode < 3.2
-    if test "$XCodeVersion1" -lt 3
-    then
-        SplitObjsBroken=YES
-    fi
-    if test "$XCodeVersion1" -eq 3 && test "$XCodeVersion2" -lt 2
-    then
-        SplitObjsBroken=YES
+    else
+        AC_MSG_RESULT($XCodeVersion)
+        XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+changequote(, )dnl
+        XCodeVersion2=`echo "$XCodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
+changequote([, ])dnl
+        AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
+        AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
+        # Split objects is broken (#4013) with XCode < 3.2
+        if test "$XCodeVersion1" -lt 3
+        then
+            SplitObjsBroken=YES
+        elif test "$XCodeVersion1" -eq 3 && test "$XCodeVersion2" -lt 2
+        then
+            SplitObjsBroken=YES
+        fi
     fi
 fi
 AC_SUBST([SplitObjsBroken])
