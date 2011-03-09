@@ -24,11 +24,12 @@ infoSec    = B.pack "\t.section\t__STRIP,__me"
 newInfoSec = B.pack "\n\t.text"
 newLine    = B.pack "\n"
 spInst     = B.pack ", %esp\n"
-jmpInst    = B.pack "jmp"
+jmpInst    = B.pack "\n\tjmp"
 
-infoLen, spFix :: Int
+infoLen, spFix, labelStart :: Int
 infoLen = B.length infoSec
 spFix   = 4
+labelStart = B.length jmpInst + 1
 
 -- Search Predicates
 eolPred, dollarPred, commaPred :: Char -> Bool
@@ -107,7 +108,9 @@ fixupStack f f' | B.null f' =
 fixupStack f f' =
     let -- fixup add ops
         (a, c)  = B.breakSubstring jmpInst f
-        (l, b)  = B.break eolPred c
+        -- we matched on a '\n' so go past it
+        (l', b) = B.break eolPred $ B.tail c
+        l       = (B.head c) `B.cons` l'
         (a', n) = B.breakEnd dollarPred a
         (n', x) = B.break commaPred n
         num     = B.pack $ show $ readInt n' + spFix
@@ -115,7 +118,7 @@ fixupStack f f' =
           then f' `B.append` f
           -- We need to avoid processing jumps to labels, they are of the form:
           -- jmp\tL..., jmp\t_f..., jmpl\t_f..., jmpl\t*%eax...
-          else if B.index c 4 == 'L'
+          else if B.index c labelStart == 'L'
                 then fixupStack b $ f' `B.append` a `B.append` l
                 else fixupStack b $ f' `B.append` a' `B.append` num `B.append`
                                     x `B.append` l
@@ -123,6 +126,6 @@ fixupStack f f' =
 -- | read an int or error
 readInt :: B.ByteString -> Int
 readInt str | B.all isDigit str = (read . B.unpack) str
-	        | otherwise = error $ "LLvmMangler Cannot read" ++ show str
+            | otherwise = error $ "LLvmMangler Cannot read" ++ show str
                                 ++ "as it's not an Int"
 
