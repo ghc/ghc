@@ -1738,7 +1738,10 @@ linkDynLib dflags o_files dep_packages = do
             md_c_flags
          ++ o_files
          ++ [ "-undefined", "dynamic_lookup", "-single_module",
-              "-Wl,-read_only_relocs,suppress", "-install_name", instName ]
+#if !defined(x86_64_TARGET_ARCH)
+              "-Wl,-read_only_relocs,suppress",
+#endif
+              "-install_name", instName ]
          ++ extra_ld_inputs
          ++ lib_path_opts
          ++ extra_ld_opts
