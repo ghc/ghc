@@ -57,7 +57,7 @@ module GHC.Float.RealFracMethods
 import GHC.Integer
 
 import GHC.Base
-import GHC.Num
+import GHC.Num ()
 
 #if WORD_SIZE_IN_BITS < 64
 
