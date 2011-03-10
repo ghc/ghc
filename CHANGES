@@ -1,5 +1,7 @@
 Changes in version 2.9.2
 
+  * Build with GHC 7.0.2
+
   * Write Hoogle output in utf8; fixes GHC build on Windows
 
 Changes in version 2.9.1
