@@ -51,9 +51,7 @@ import GHC.Num (Num(..))
 import GHC.Real (ceiling, fromIntegral)
 import GHC.Show (Show)
 import System.Posix.Internals (c_close)
-#if !defined(HAVE_EPOLL_CREATE1)
 import System.Posix.Internals (setCloseOnExec)
-#endif
 import System.Posix.Types (Fd(..))
 
 import qualified System.Event.Array    as A
@@ -163,12 +161,8 @@ newtype EventType = EventType {
 epollCreate :: IO EPollFd
 epollCreate = do
   fd <- throwErrnoIfMinus1 "epollCreate" $
-#if defined(HAVE_EPOLL_CREATE1)
-        c_epoll_create1 (#const EPOLL_CLOEXEC)
-#else
         c_epoll_create 256 -- argument is ignored
   setCloseOnExec fd
-#endif
   let !epollFd' = EPollFd fd
   return epollFd'
 
@@ -200,13 +194,8 @@ fromTimeout :: Timeout -> Int
 fromTimeout Forever     = -1
 fromTimeout (Timeout s) = ceiling $ 1000 * s
 
-#if defined(HAVE_EPOLL_CREATE1)
-foreign import ccall unsafe "sys/epoll.h epoll_create1"
-    c_epoll_create1 :: CInt -> IO CInt
-#else
 foreign import ccall unsafe "sys/epoll.h epoll_create"
     c_epoll_create :: CInt -> IO CInt
-#endif
 
 foreign import ccall unsafe "sys/epoll.h epoll_ctl"
     c_epoll_ctl :: CInt -> CInt -> CInt -> Ptr Event -> IO CInt

@@ -32,7 +32,7 @@ AC_CHECK_FUNCS([lstat])
 AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 
-AC_CHECK_FUNCS([epoll_create1 epoll_ctl eventfd kevent kevent64 kqueue poll])
+AC_CHECK_FUNCS([epoll_ctl eventfd kevent kevent64 kqueue poll])
 
 # event-related fun
 
