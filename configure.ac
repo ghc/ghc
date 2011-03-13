@@ -440,9 +440,14 @@ changequote([, ])dnl
         if test "$XCodeVersion1" -lt 3
         then
             SplitObjsBroken=YES
-        elif test "$XCodeVersion1" -eq 3 && test "$XCodeVersion2" -lt 2
-        then
-            SplitObjsBroken=YES
+        else
+            if test "$XCodeVersion1" -eq 3
+            then
+                if test "$XCodeVersion2" -lt 2
+                then
+                    SplitObjsBroken=YES
+                fi
+            fi
         fi
     fi
 fi
