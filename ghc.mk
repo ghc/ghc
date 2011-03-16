@@ -920,7 +920,6 @@ $(eval $(call bindist,.,\
     $(includes_H_PLATFORM) \
     $(includes_H_FILES) \
     includes/ghcconfig.h \
-    includes/rts/Config.h \
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
