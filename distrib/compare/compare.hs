@@ -198,6 +198,8 @@ findFileWay :: FilePath -> Maybe String
 findFileWay fp
  | Just [way] <- re "\\.([a-z_]+)_hi$" fp
     = Just way
+ | Just [_, _, way] <- re ("libHS.*-" ++ versionRE ++ "_([a-z_]+).a$") fp
+    = Just way
  | otherwise = Nothing
 
 compareTarLine :: TarLine -> TarLine -> [Problem]
