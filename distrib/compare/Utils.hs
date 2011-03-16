@@ -26,3 +26,10 @@ re r str = case matchM r' str :: Maybe (String, String, String, [String]) of
            Nothing -> Nothing
     where r' = makeRegex r :: Regex
 
+unSepList :: Eq a => a -> [a] -> [[a]]
+unSepList x xs = case break (x ==) xs of
+                 (this, _ : xs') ->
+                     this : unSepList x xs'
+                 (this, []) ->
+                     [this]
+

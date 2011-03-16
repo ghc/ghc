@@ -7,6 +7,7 @@ import Data.Function
 import Data.List
 import System.Environment
 
+import BuildInfo
 import FilenameDescr
 import Problem
 import Utils
@@ -34,27 +35,55 @@ doit :: FilePath -> FilePath -> IO ()
 doit bd1 bd2
  = do tls1 <- readTarLines bd1
       tls2 <- readTarLines bd2
-      content1 <- dieOnErrors $ mkContents tls1
-      content2 <- dieOnErrors $ mkContents tls2
+      ways1 <- dieOnErrors $ findWays tls1
+      ways2 <- dieOnErrors $ findWays tls2
+      content1 <- dieOnErrors $ mkContents ways1 tls1
+      content2 <- dieOnErrors $ mkContents ways2 tls2
       let mySort = sortBy (compare `on` fst)
           sortedContent1 = mySort content1
           sortedContent2 = mySort content2
           (nubProbs1, nubbedContent1) = nubContents sortedContent1
           (nubProbs2, nubbedContent2) = nubContents sortedContent2
-          differences = compareContent nubbedContent1
-                                       nubbedContent2
+          differences = compareContent ways1 nubbedContent1
+                                       ways2 nubbedContent2
           allProbs = map First nubProbs1 ++ map Second nubProbs2
+                  ++ diffWays ways1 ways2
                   ++ differences
       mapM_ (putStrLn . pprFileProblem) allProbs
 
-mkContents :: [TarLine] -> Either Errors [(FilenameDescr, TarLine)]
-mkContents tls = case runState (mapM f tls) [] of
-                 (xs, mapping) ->
-                     case concat $ map (checkContent mapping) xs of
-                     []   -> Right xs
-                     errs -> Left errs
+findWays :: [TarLine] -> Either Errors Ways
+findWays = foldr f (Left ["Couldn't find ways"])
+    where f tl res = case re regex (tlFileName tl) of
+                     Just [dashedWays] ->
+                         Right (unSepList '-' dashedWays)
+                     _ ->
+                         res
+          regex = "/libraries/base/dist-install/build/\\.depend-(.*)\\.haskell"
+
+diffWays :: Ways -> Ways -> [FileProblem]
+diffWays ws1 ws2 = f (sort ws1) (sort ws2)
+    where f [] [] = []
+          f xs [] = map (First . ExtraWay) xs
+          f [] ys = map (First . ExtraWay) ys
+          f xs@(x : xs') ys@(y : ys')
+              = case x `compare` y of
+                LT -> First  (ExtraWay x) : f xs' ys
+                GT -> Second (ExtraWay y) : f xs  ys'
+                EQ ->                       f xs' ys'
+
+mkContents :: Ways -> [TarLine] -> Either Errors [(FilenameDescr, TarLine)]
+mkContents ways tls
+    = case runState (mapM f tls) initialBuildInfo of
+      (xs, finalBuildInfo) ->
+          case concat $ map (checkContent finalBuildInfo) xs of
+          []   -> Right xs
+          errs -> Left errs
     where f tl = do fnd <- mkFilePathDescr (tlFileName tl)
                     return (fnd, tl)
+          initialBuildInfo = BuildInfo {
+                                 biThingVersionMap = [],
+                                 biWays = ways
+                             }
 
 nubContents :: [(FilenameDescr, TarLine)]
             -> ([Problem], [(FilenameDescr, TarLine)])
@@ -65,14 +94,14 @@ nubContents (x1@(fd1, tl1) : xs@((fd2, _) : _))
  | otherwise  = (ps, x1 : xs')
     where (ps, xs') = nubContents xs
 
-mkFilePathDescr :: FilePath -> State ThingVersionMap FilenameDescr
+mkFilePathDescr :: FilePath -> State BuildInfo FilenameDescr
 mkFilePathDescr fp
  | Just [ghcVersion, _, middle, filename]
      <- re ("^ghc-" ++ versionRE ++ "(/.*)?/([^/]*)$") fp
-    = do ghcVersionDescr <- do mapping <- get
+    = do ghcVersionDescr <- do mapping <- getThingVersionMap
                                case addThingVersion mapping "ghc" ghcVersion of
                                    Just mapping' ->
-                                       do put mapping'
+                                       do putThingVersionMap mapping'
                                           return (VersionOf "ghc")
                                    Nothing ->
                                        return (FP ghcVersion)
@@ -81,17 +110,17 @@ mkFilePathDescr fp
          return $ normalise fd
  | otherwise = return [FP fp]
 
-mkFileNameDescr :: FilePath -> State ThingVersionMap FilenameDescr
+mkFileNameDescr :: FilePath -> State BuildInfo FilenameDescr
 mkFileNameDescr filename
  | Just [thing, thingVersion, _, ghcVersion, _]
        <- re ("^libHS(.*)-" ++ versionRE ++ "-ghc" ++ versionRE ++ "\\.so$")
              filename
-    = do mapping <- get
+    = do mapping <- getThingVersionMap
          case addThingVersion mapping "ghc" ghcVersion of
              Just m ->
                  case addThingVersion m thing thingVersion of
                  Just m' ->
-                     do put m'
+                     do putThingVersionMap m'
                         return [FP "libHS", FP thing, FP "-", VersionOf thing,
                                 FP "-ghc", VersionOf "ghc", FP ".so"]
                  _ -> unchanged
@@ -99,46 +128,73 @@ mkFileNameDescr filename
  | Just [way, thingVersion, _]
        <- re ("^libHSrts(_.*)?-ghc" ++ versionRE ++ "\\.so$")
              filename
-    = do mapping <- get
+    = do mapping <- getThingVersionMap
          case addThingVersion mapping "ghc" thingVersion of
              Just mapping' ->
-                 do put mapping'
+                 do putThingVersionMap mapping'
                     return [FP "libHSrts", FP way, FP "-ghc", VersionOf "ghc",
                             FP ".so"]
              _ -> unchanged
  | Just [thing, thingVersion, _, way]
        <- re ("^libHS(.*)-" ++ versionRE ++ "(_.*)?\\.a$")
              filename
-    = do mapping <- get
+    = do mapping <- getThingVersionMap
          case addThingVersion mapping thing thingVersion of
              Just mapping' ->
-                 do put mapping'
+                 do putThingVersionMap mapping'
                     return [FP "libHS", FP thing, FP "-", VersionOf thing,
                             FP way, FP ".a"]
              _ -> unchanged
  | Just [thing, thingVersion, _]
        <- re ("^HS(.*)-" ++ versionRE ++ "\\.o$")
              filename
-    = do mapping <- get
+    = do mapping <- getThingVersionMap
          case addThingVersion mapping thing thingVersion of
              Just mapping' ->
-                 do put mapping'
+                 do putThingVersionMap mapping'
                     return [FP "HS", FP thing, FP "-", VersionOf thing,
                             FP ".o"]
              _ -> unchanged
+ | Just [dashedWays, depType]
+       <- re "^\\.depend-(.*)\\.(haskell|c_asm)"
+             filename
+    = do ways <- getWays
+         if unSepList '-' dashedWays == ways
+             then return [FP ".depend-", Ways, FP ".", FP depType]
+             else unchanged
  | otherwise = unchanged
     where unchanged = return [FP filename]
 
-compareContent :: [(FilenameDescr, TarLine)] -> [(FilenameDescr, TarLine)]
+compareContent :: Ways -> [(FilenameDescr, TarLine)]
+               -> Ways -> [(FilenameDescr, TarLine)]
                -> [FileProblem]
-compareContent [] [] = []
-compareContent xs [] = map (First  . ExtraFile . tlFileName . snd) xs
-compareContent [] ys = map (Second . ExtraFile . tlFileName . snd) ys
-compareContent xs1@((fd1, tl1) : xs1') xs2@((fd2, tl2) : xs2')
- = case fd1 `compare` fd2 of
-   EQ -> map Change (compareTarLine tl1 tl2) ++ compareContent xs1' xs2'
-   LT -> First  (ExtraFile (tlFileName tl1)) : compareContent xs1' xs2
-   GT -> Second (ExtraFile (tlFileName tl2)) : compareContent xs1  xs2'
+compareContent _ [] _ [] = []
+compareContent _ xs _ [] = map (First  . ExtraFile . tlFileName . snd) xs
+compareContent _ [] _ ys = map (Second . ExtraFile . tlFileName . snd) ys
+compareContent ways1 xs1 ways2 xs2
+    = case (xs1, xs2) of
+      ([], []) -> []
+      (xs, []) -> concatMap (mkExtraFile ways1 First  . tlFileName . snd) xs
+      ([], ys) -> concatMap (mkExtraFile ways2 Second . tlFileName . snd) ys
+      ((fd1, tl1) : xs1', (fd2, tl2) : xs2') ->
+          case fd1 `compare` fd2 of
+          EQ -> map Change (compareTarLine tl1 tl2)
+             ++ compareContent ways1 xs1' ways2 xs2'
+          LT -> mkExtraFile ways1 First  (tlFileName tl1)
+             ++ compareContent ways1 xs1' ways2 xs2
+          GT -> mkExtraFile ways2 Second (tlFileName tl2)
+             ++ compareContent ways1 xs1 ways2 xs2'
+    where mkExtraFile ways mkFileProblem filename
+              = case findFileWay filename of
+                Just way
+                 | way `elem` ways -> []
+                _                  -> [mkFileProblem (ExtraFile filename)]
+
+findFileWay :: FilePath -> Maybe String
+findFileWay fp
+ | Just [way] <- re "\\.([a-z_]+)_hi$" fp
+    = Just way
+ | otherwise = Nothing
 
 compareTarLine :: TarLine -> TarLine -> [Problem]
 compareTarLine tl1 tl2

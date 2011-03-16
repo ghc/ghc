@@ -7,6 +7,7 @@ data FileProblem = First  Problem
 
 data Problem = DuplicateFile FilePath
              | ExtraFile FilePath
+             | ExtraWay String
              | PermissionsChanged FilePath FilePath String String
              | FileSizeChanged FilePath FilePath Integer Integer
 
@@ -18,6 +19,7 @@ pprFileProblem (Change p) = "Change " ++ pprProblem p
 pprProblem :: Problem -> String
 pprProblem (DuplicateFile fp) = "Duplicate file: " ++ show fp
 pprProblem (ExtraFile fp) = "Extra file: " ++ show fp
+pprProblem (ExtraWay w) = "Extra way: " ++ show w
 pprProblem (PermissionsChanged fp1 fp2 p1 p2)
     = "Permissions changed:\n"
    ++ "    " ++ show fp1
