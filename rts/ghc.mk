@@ -531,5 +531,4 @@ INSTALL_LIBS += $(ALL_RTS_LIBS)
 $(eval $(call clean-target,rts,dist,rts/dist))
 
 BINDIST_EXTRAS += rts/package.conf.in
-BINDIST_EXTRAS += $(ALL_RTS_LIBS)
 
