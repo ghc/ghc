@@ -28,11 +28,12 @@ sizePercentage = 150
 main :: IO ()
 main = do args <- getArgs
           case args of
-              [bd1, bd2] -> doit bd1 bd2
+              [bd1, bd2]                          -> doit False bd1 bd2
+              ["--ignore-size-changes", bd1, bd2] -> doit True  bd1 bd2
               _ -> die ["Bad args. Need 2 bindists."]
 
-doit :: FilePath -> FilePath -> IO ()
-doit bd1 bd2
+doit :: Bool -> FilePath -> FilePath -> IO ()
+doit ignoreSizeChanges bd1 bd2
  = do tls1 <- readTarLines bd1
       tls2 <- readTarLines bd2
       ways1 <- dieOnErrors $ findWays tls1
@@ -49,7 +50,10 @@ doit bd1 bd2
           allProbs = map First nubProbs1 ++ map Second nubProbs2
                   ++ diffWays ways1 ways2
                   ++ differences
-      mapM_ (putStrLn . pprFileProblem) allProbs
+          wantedProbs = if ignoreSizeChanges
+                        then filter (not . isSizeChange) allProbs
+                        else allProbs
+      mapM_ (putStrLn . pprFileProblem) wantedProbs
 
 findWays :: [TarLine] -> Either Errors Ways
 findWays = foldr f (Left ["Couldn't find ways"])

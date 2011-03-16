@@ -11,6 +11,10 @@ data Problem = DuplicateFile FilePath
              | PermissionsChanged FilePath FilePath String String
              | FileSizeChanged FilePath FilePath Integer Integer
 
+isSizeChange :: FileProblem -> Bool
+isSizeChange (Change (FileSizeChanged {})) = True
+isSizeChange _ = False
+
 pprFileProblem :: FileProblem -> String
 pprFileProblem (First  p) = "First  " ++ pprProblem p
 pprFileProblem (Second p) = "Second " ++ pprProblem p
