@@ -1726,7 +1726,7 @@ templateHaskellNames = [
     varStrictTypeName,
     -- Type
     forallTName, varTName, conTName, appTName,
-    tupleTName, arrowTName, listTName, sigTName,
+    tupleTName, unboxedTupleTName, arrowTName, listTName, sigTName,
     -- TyVarBndr
     plainTVName, kindedTVName,
     -- Kind
