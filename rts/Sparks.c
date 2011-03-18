@@ -219,19 +219,34 @@ pruneSparkQueue (Capability *cap)
                   pruned_sparks++; // discard spark
                   cap->sparks_fizzled++;
               }
-          } else if (HEAP_ALLOCED(spark) &&
-                     (Bdescr((P_)spark)->flags & BF_EVACUATED)) {
-              if (closure_SHOULD_SPARK(spark)) {
-                  elements[botInd] = spark; // keep entry (new address)
-                  botInd++;
-                  n++;
+          } else if (HEAP_ALLOCED(spark)) {
+              if ((Bdescr((P_)spark)->flags & BF_EVACUATED)) {
+                  if (closure_SHOULD_SPARK(spark)) {
+                      elements[botInd] = spark; // keep entry (new address)
+                      botInd++;
+                      n++;
+                  } else {
+                      pruned_sparks++; // discard spark
+                      cap->sparks_fizzled++;
+                  }
+              } else {
+                  pruned_sparks++; // discard spark
+                  cap->sparks_gcd++;
+              }
+          } else {
+              if (INFO_PTR_TO_STRUCT(info)->type == THUNK_STATIC) {
+                  if (*THUNK_STATIC_LINK(spark) != NULL) {
+                      elements[botInd] = spark; // keep entry (new address)
+                      botInd++;
+                      n++;
+                  } else {
+                      pruned_sparks++; // discard spark
+                      cap->sparks_gcd++;
+                  }
               } else {
                   pruned_sparks++; // discard spark
                   cap->sparks_fizzled++;
               }
-          } else {
-              pruned_sparks++; // discard spark
-              cap->sparks_gcd++;
           }
       }
 
