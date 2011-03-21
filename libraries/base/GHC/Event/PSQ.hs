@@ -48,7 +48,7 @@
 -- Queues/, ICFP 2001, pp. 110-121
 --
 -- <http://citeseer.ist.psu.edu/hinze01simple.html>
-module System.Event.PSQ
+module GHC.Event.PSQ
     (
     -- * Binding Type
     Elem(..)
@@ -91,7 +91,7 @@ import Data.Maybe (Maybe(..))
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Show (Show(showsPrec))
-import System.Event.Unique (Unique)
+import GHC.Event.Unique (Unique)
 
 -- | @E k p@ binds the key @k@ with the priority @p@.
 data Elem a = E
@@ -458,7 +458,7 @@ tourView (Winner e (LLoser _ e' tl m tr) m') =
 -- Utility functions
 
 moduleError :: String -> String -> a
-moduleError fun msg = error ("System.Event.PSQ." ++ fun ++ ':' : ' ' : msg)
+moduleError fun msg = error ("GHC.Event.PSQ." ++ fun ++ ':' : ' ' : msg)
 {-# NOINLINE moduleError #-}
 
 ------------------------------------------------------------------------

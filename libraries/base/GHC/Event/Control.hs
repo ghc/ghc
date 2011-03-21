@@ -5,7 +5,7 @@
            , BangPatterns
   #-}
 
-module System.Event.Control
+module GHC.Event.Control
     (
     -- * Managing the IO manager
       Signal

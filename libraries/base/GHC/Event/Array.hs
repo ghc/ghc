@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, CPP, ForeignFunctionInterface, NoImplicitPrelude #-}
 
-module System.Event.Array
+module GHC.Event.Array
     (
       Array
     , capacity
@@ -46,7 +46,7 @@ import GHC.Show (show)
 -- This fugly hack is brought by GHC's apparent reluctance to deal
 -- with MagicHash and UnboxedTuples when inferring types. Eek!
 #define CHECK_BOUNDS(_func_,_len_,_k_) \
-if (_k_) < 0 || (_k_) >= (_len_) then error ("System.Event.Array." ++ (_func_) ++ ": bounds error, index " ++ show (_k_) ++ ", capacity " ++ show (_len_)) else
+if (_k_) < 0 || (_k_) >= (_len_) then error ("GHC.Event.Array." ++ (_func_) ++ ": bounds error, index " ++ show (_k_) ++ ", capacity " ++ show (_len_)) else
 #else
 #define CHECK_BOUNDS(_func_,_len_,_k_)
 #endif

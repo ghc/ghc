@@ -1,6 +1,6 @@
 {-# LANGUAGE BangPatterns, ForeignFunctionInterface, NoImplicitPrelude #-}
 
-module System.Event.Thread
+module GHC.Event.Thread
     (
       ensureIOManagerIsRunning
     , threadWaitRead
@@ -21,10 +21,10 @@ import GHC.Conc.Sync (TVar, ThreadId, ThreadStatus(..), atomically, forkIO,
 import GHC.IO (mask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
-import System.Event.Internal (eventIs, evtClose)
-import System.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
+import GHC.Event.Internal (eventIs, evtClose)
+import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
                              new, registerFd, unregisterFd_, registerTimeout)
-import qualified System.Event.Manager as M
+import qualified GHC.Event.Manager as M
 import System.IO.Unsafe (unsafePerformIO)
 import System.Posix.Types (Fd)
 

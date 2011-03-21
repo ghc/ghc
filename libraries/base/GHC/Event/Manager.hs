@@ -7,7 +7,7 @@
            , FlexibleInstances
   #-}
 
-module System.Event.Manager
+module GHC.Event.Manager
     ( -- * Types
       EventManager
 
@@ -62,23 +62,23 @@ import GHC.List (filter)
 import GHC.Num (Num(..))
 import GHC.Real ((/), fromIntegral )
 import GHC.Show (Show(..))
-import System.Event.Clock (getCurrentTime)
-import System.Event.Control
-import System.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
-                              Timeout(..))
-import System.Event.Unique (Unique, UniqueSource, newSource, newUnique)
+import GHC.Event.Clock (getCurrentTime)
+import GHC.Event.Control
+import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
+                           Timeout(..))
+import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)
 
-import qualified System.Event.IntMap as IM
-import qualified System.Event.Internal as I
-import qualified System.Event.PSQ as Q
+import qualified GHC.Event.IntMap as IM
+import qualified GHC.Event.Internal as I
+import qualified GHC.Event.PSQ as Q
 
 #if defined(HAVE_KQUEUE)
-import qualified System.Event.KQueue as KQueue
+import qualified GHC.Event.KQueue as KQueue
 #elif defined(HAVE_EPOLL)
-import qualified System.Event.EPoll  as EPoll
+import qualified GHC.Event.EPoll  as EPoll
 #elif defined(HAVE_POLL)
-import qualified System.Event.Poll   as Poll
+import qualified GHC.Event.Poll   as Poll
 #else
 # error not implemented for this operating system
 #endif
@@ -240,7 +240,7 @@ loop mgr@EventManager{..} = do
     Created -> go Q.empty `finally` cleanup mgr
     Dying   -> cleanup mgr
     _       -> do cleanup mgr
-                  error $ "System.Event.Manager.loop: state is already " ++
+                  error $ "GHC.Event.Manager.loop: state is already " ++
                       show state
  where
   go q = do (running, q') <- step mgr q

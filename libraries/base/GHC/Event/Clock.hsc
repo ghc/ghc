@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude, BangPatterns, ForeignFunctionInterface #-}
 
-module System.Event.Clock (getCurrentTime) where
+module GHC.Event.Clock (getCurrentTime) where
 
 #include <sys/time.h>
 

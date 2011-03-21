@@ -207,20 +207,20 @@ Library {
     }
     if !os(windows) {
         exposed-modules:
-            System.Event
+            GHC.Event
         other-modules:
-            System.Event.Array
-            System.Event.Clock
-            System.Event.Control
-            System.Event.EPoll
-            System.Event.IntMap
-            System.Event.Internal
-            System.Event.KQueue
-            System.Event.Manager
-            System.Event.PSQ
-            System.Event.Poll
-            System.Event.Thread
-            System.Event.Unique
+            GHC.Event.Array
+            GHC.Event.Clock
+            GHC.Event.Control
+            GHC.Event.EPoll
+            GHC.Event.IntMap
+            GHC.Event.Internal
+            GHC.Event.KQueue
+            GHC.Event.Manager
+            GHC.Event.PSQ
+            GHC.Event.Poll
+            GHC.Event.Thread
+            GHC.Event.Unique
     }
     -- We need to set the package name to base (without a version number)
     -- as it's magic.

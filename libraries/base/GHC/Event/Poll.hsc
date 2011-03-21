@@ -5,7 +5,7 @@
            , BangPatterns
   #-}
 
-module System.Event.Poll
+module GHC.Event.Poll
     (
       new
     , available
@@ -41,8 +41,8 @@ import GHC.Real (ceiling, fromIntegral)
 import GHC.Show (Show)
 import System.Posix.Types (Fd(..))
 
-import qualified System.Event.Array as A
-import qualified System.Event.Internal as E
+import qualified GHC.Event.Array as A
+import qualified GHC.Event.Internal as E
 
 available :: Bool
 available = True

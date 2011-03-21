@@ -1,5 +1,5 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, NoImplicitPrelude #-}
-module System.Event.Unique
+module GHC.Event.Unique
     (
       UniqueSource
     , Unique(..)

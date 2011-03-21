@@ -14,13 +14,13 @@
 --
 -- epoll decouples monitor an fd from the process of registering it.
 --
-module System.Event.EPoll
+module GHC.Event.EPoll
     (
       new
     , available
     ) where
 
-import qualified System.Event.Internal as E
+import qualified GHC.Event.Internal as E
 
 #include "EventConfig.h"
 #if !defined(HAVE_EPOLL)
@@ -54,8 +54,8 @@ import System.Posix.Internals (c_close)
 import System.Posix.Internals (setCloseOnExec)
 import System.Posix.Types (Fd(..))
 
-import qualified System.Event.Array    as A
-import           System.Event.Internal (Timeout(..))
+import qualified GHC.Event.Array    as A
+import           GHC.Event.Internal (Timeout(..))
 
 available :: Bool
 available = True

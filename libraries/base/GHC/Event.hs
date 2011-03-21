@@ -2,7 +2,7 @@
 -- descriptors and timeouts.
 --
 -- This module should be considered GHC internal.
-module System.Event
+module GHC.Event
     ( -- * Types
       EventManager
 
@@ -36,4 +36,4 @@ module System.Event
     , unregisterTimeout
     ) where
 
-import System.Event.Manager
+import GHC.Event.Manager

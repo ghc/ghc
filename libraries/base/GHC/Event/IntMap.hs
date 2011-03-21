@@ -2,7 +2,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  System.Event.IntMap
+-- Module      :  GHC.Event.IntMap
 -- Copyright   :  (c) Daan Leijen 2002
 --                (c) Andriy Palamarchuk 2008
 -- License     :  BSD-style
@@ -40,7 +40,7 @@
 -- (32 or 64).
 -----------------------------------------------------------------------------
 
-module System.Event.IntMap
+module GHC.Event.IntMap
     (
     -- * Map type
     IntMap

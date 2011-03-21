@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, NoImplicitPrelude #-}
 
-module System.Event.Internal
+module GHC.Event.Internal
     (
     -- * Event back end
       Backend

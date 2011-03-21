@@ -6,13 +6,13 @@
            , BangPatterns
   #-}
 
-module System.Event.KQueue
+module GHC.Event.KQueue
     (
       new
     , available
     ) where
 
-import qualified System.Event.Internal as E
+import qualified GHC.Event.Internal as E
 
 #include "EventConfig.h"
 #if !defined(HAVE_KQUEUE)
@@ -41,10 +41,10 @@ import GHC.Err (undefined)
 import GHC.Num (Num(..))
 import GHC.Real (ceiling, floor, fromIntegral)
 import GHC.Show (Show(show))
-import System.Event.Internal (Timeout(..))
+import GHC.Event.Internal (Timeout(..))
 import System.Posix.Internals (c_close)
 import System.Posix.Types (Fd(..))
-import qualified System.Event.Array as A
+import qualified GHC.Event.Array as A
 
 #if defined(HAVE_KEVENT64)
 import Data.Int (Int64)
