@@ -101,7 +101,7 @@ void
 setIOManagerWakeupFd (int fd)
 {
     // only called when THREADED_RTS, but unconditionally
-    // compiled here because System.Event.Control depends on it.
+    // compiled here because GHC.Event.Control depends on it.
     io_manager_wakeup_fd = fd;
 }
 
@@ -109,7 +109,7 @@ void
 setIOManagerControlFd (int fd)
 {
     // only called when THREADED_RTS, but unconditionally
-    // compiled here because System.Event.Control depends on it.
+    // compiled here because GHC.Event.Control depends on it.
     io_manager_control_fd = fd;
 }
 
