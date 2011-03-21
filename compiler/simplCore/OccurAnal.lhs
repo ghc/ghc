@@ -1352,9 +1352,11 @@ extendFvs env s
 %************************************************************************
 
 \begin{code}
-data ProxyEnv 
-   = PE (IdEnv (Id, [(Id,CoercionI)])) VarSet
-     	-- Main env, and its free variables (of both range and domain)
+data ProxyEnv	-- See Note [ProxyEnv]
+   = PE (IdEnv	-- Domain = scrutinee variables
+           (Id,                  -- The scrutinee variable again
+            [(Id,CoercionI)])) 	 -- The case binders that it maps to
+        VarSet	-- Free variables of both range and domain
 \end{code}
 
 Note [ProxyEnv]
@@ -1497,6 +1499,17 @@ From this we want to extract the bindings
 Notice that later bindings may mention earlier ones, and that
 we need to go "both ways".
 
+Note [Zap case binders in proxy bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+From the original
+     case x of cb(dead) { p -> ...x... }
+we will get
+     case x of cb(live) { p -> let x = cb in ...x... }
+
+Core Lint never expects to find an *occurence* of an Id marked
+as Dead, so we must zap the OccInfo on cb before making the 
+binding x = cb.  See Trac #5028.
+
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We *used* to suppress the binder-swap in case expressions when 
@@ -1569,7 +1582,8 @@ extendProxyEnv pe scrut co case_bndr
   | otherwise          = PE env2 fvs2	--   don't extend
   where
     PE env1 fvs1 = trimProxyEnv pe [case_bndr]
-    env2 = extendVarEnv_Acc add single env1 scrut1 (case_bndr,co)
+    zapped_case_bndr = zapIdOccInfo case_bndr  -- See Note [Zap case binders in proxy bindings]
+    env2 = extendVarEnv_Acc add single env1 scrut1 (zapped_case_bndr,co)
     single cb_co = (scrut1, [cb_co]) 
     add cb_co (x, cb_cos) = (x, cb_co:cb_cos)
     fvs2 = fvs1 `unionVarSet`  freeVarsCoI co
@@ -1580,10 +1594,11 @@ extendProxyEnv pe scrut co case_bndr
 	-- Localise the scrut_var before shadowing it; we're making a 
 	-- new binding for it, and it might have an External Name, or
 	-- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
-	-- Also we don't want any INLILNE or NOINLINE pragmas!
+	-- Also we don't want any INLINE or NOINLINE pragmas!
 
 -----------
 type ProxyBind = (Id, Id, CoercionI)
+     -- (scrut variable, case-binder variable, coercion)
 
 getProxies :: OccEnv -> Id -> Bag ProxyBind
 -- Return a bunch of bindings [...(xi,ei)...] 
