@@ -34,10 +34,15 @@ main = do args <- getArgs
 
 doit :: Bool -> FilePath -> FilePath -> IO ()
 doit ignoreSizeChanges bd1 bd2
- = do tls1 <- readTarLines bd1
+ = do let windows = any ("mingw" `isPrefixOf`) (tails bd1)
+      tls1 <- readTarLines bd1
       tls2 <- readTarLines bd2
-      ways1 <- dieOnErrors $ findWays tls1
-      ways2 <- dieOnErrors $ findWays tls2
+      -- If it looks like we have a Windows "bindist" then just
+      -- set ways to [] for now.
+      ways1 <- if windows then return []
+                          else dieOnErrors $ findWays tls1
+      ways2 <- if windows then return []
+                          else dieOnErrors $ findWays tls2
       content1 <- dieOnErrors $ mkContents ways1 tls1
       content2 <- dieOnErrors $ mkContents ways2 tls2
       let mySort = sortBy (compare `on` fst)
