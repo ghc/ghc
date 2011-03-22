@@ -556,6 +556,7 @@ entryLblToInfoLbl l
 cvtToClosureLbl   (IdLabel n c InfoTable)	= IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c Entry)		= IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c ConEntry)	= IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c RednCounts)	= IdLabel n c Closure
 cvtToClosureLbl l@(IdLabel n c Closure)		= l
 cvtToClosureLbl l 
 	= pprPanic "cvtToClosureLbl" (pprCLabel l)
