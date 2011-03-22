@@ -1,6 +1,8 @@
 
 module Utils where
 
+import Data.Function
+import Data.List
 import System.Exit
 import System.IO
 import Text.Regex.Posix
@@ -32,4 +34,7 @@ unSepList x xs = case break (x ==) xs of
                      this : unSepList x xs'
                  (this, []) ->
                      [this]
+
+sortByFst :: Ord a => [(a, b)] -> [(a, b)]
+sortByFst = sortBy (compare `on` fst)
 

@@ -13,6 +13,7 @@ import Tar
 -- abstracts out the version numbers.
 type FilenameDescr = [FilenameDescrBit]
 data FilenameDescrBit = VersionOf String
+                      | HashOf String
                       | FP String
                       | Ways
     deriving (Show, Eq, Ord)
@@ -45,5 +46,9 @@ flattenFilenameDescr buildInfo fd = case partitionEithers (map f fd) of
            = case lookup thing (biThingVersionMap buildInfo) of
              Just v -> Right v
              Nothing -> Left ["Can't happen: thing has no version in mapping"]
+          f (HashOf thing)
+           = case lookup thing (biThingHashMap buildInfo) of
+             Just v -> Right v
+             Nothing -> Left ["Can't happen: thing has no hash in mapping"]
           f Ways = Right $ intercalate "-" $ biWays buildInfo
 
