@@ -898,7 +898,7 @@ hscGenHardCode cgguts mod_summary
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
-         dumpIfSet_dyn dflags Opt_D_dump_cmmz "Raw Cmm" (ppr rawcmms)
+         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (ppr rawcmms)
          (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
                 dependencies rawcmms

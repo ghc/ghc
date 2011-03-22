@@ -113,6 +113,7 @@ data DynFlag
 
    -- debugging flags
    = Opt_D_dump_cmm
+   | Opt_D_dump_raw_cmm
    | Opt_D_dump_cmmz
    | Opt_D_dump_cmmz_pretty
    | Opt_D_dump_cps_cmm
@@ -1222,6 +1223,7 @@ dynamic_flags = [
   , Flag "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))
 
   , Flag "ddump-cmm"               (setDumpFlag Opt_D_dump_cmm)
+  , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
   , Flag "ddump-cmmz-pretty"       (setDumpFlag Opt_D_dump_cmmz_pretty)
   , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
