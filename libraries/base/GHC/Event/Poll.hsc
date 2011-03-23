@@ -107,15 +107,24 @@ data PollFd = PollFd {
 newtype Event = Event CShort
     deriving (Eq, Show, Num, Storable, Bits)
 
+-- We have to duplicate the whole enum like this in order for the
+-- hsc2hs cross-compilation mode to work
+#ifdef POLLRDHUP
 #{enum Event, Event
  , pollIn    = POLLIN
  , pollOut   = POLLOUT
-#ifdef POLLRDHUP
  , pollRdHup = POLLRDHUP
-#endif
  , pollErr   = POLLERR
  , pollHup   = POLLHUP
  }
+#else
+#{enum Event, Event
+ , pollIn    = POLLIN
+ , pollOut   = POLLOUT
+ , pollErr   = POLLERR
+ , pollHup   = POLLHUP
+ }
+#endif
 
 fromEvent :: E.Event -> Event
 fromEvent e = remap E.evtRead  pollIn .|.
