@@ -142,6 +142,7 @@ lookForInline u expr (stmt : rest)
    -- single-assignment.
     ok_to_skip = case stmt of
                  CmmNop -> True
+                 CmmComment{} -> True
                  CmmAssign (CmmLocal (LocalReg u' _)) rhs | u' /= u -> True
                  CmmAssign g@(CmmGlobal _) rhs -> not (g `regUsedIn` expr)
                  _other -> False
