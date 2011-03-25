@@ -161,7 +161,7 @@ mkFileNameDescr filename
          return [FP prog, FP "-", VersionOf "ghc", FP exe]
       `mplus` unchanged
  | Just [thing, thingVersion, _, ghcVersion, _, soDll]
-       <- re ("^libHS(.*)-" ++ versionRE ++ "-ghc" ++ versionRE ++ "\\.(so|dll)$")
+       <- re ("^libHS(.*)-" ++ versionRE ++ "-ghc" ++ versionRE ++ "\\.(so|dll|dylib)$")
              filename
     = do haveThingVersion "ghc" ghcVersion
          haveThingVersion thing thingVersion
@@ -169,14 +169,14 @@ mkFileNameDescr filename
                  FP "-ghc", VersionOf "ghc", FP ".", FP soDll]
       `mplus` unchanged
  | Just [way, thingVersion, _, soDll]
-       <- re ("^libHSrts(_.*)?-ghc" ++ versionRE ++ "\\.(so|dll)$")
+       <- re ("^libHSrts(_.*)?-ghc" ++ versionRE ++ "\\.(so|dll|dylib)$")
              filename
     = do haveThingVersion "ghc" thingVersion
          return [FP "libHSrts", FP way, FP "-ghc", VersionOf "ghc",
                  FP ".", FP soDll]
       `mplus` unchanged
  | Just [thingVersion, _, soDll]
-       <- re ("^libHSffi-ghc" ++ versionRE ++ "\\.(so|dll)$")
+       <- re ("^libHSffi-ghc" ++ versionRE ++ "\\.(so|dll|dylib)$")
              filename
     = do haveThingVersion "ghc" thingVersion
          return [FP "libHSffi-ghc", VersionOf "ghc", FP ".", FP soDll]
