@@ -19,8 +19,9 @@ test('derefnull',
              # Linux setups, so just ignore it. As long as we get
              # the right exit code we're OK.
              if_os('linux', ignore_output),
-             # SIGBUS on OX X
-             if_os('darwin', exit_code(138)),
+             # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
+             if_platform('i386-apple-darwin', exit_code(138)),
+             if_platform('powerpc-apple-darwin', exit_code(138)),
              if_platform('i386-unknown-mingw32', exit_code(1))]),
      compile_and_run, [''])
 test('divbyzero',
