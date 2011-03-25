@@ -5848,7 +5848,7 @@ signature is explicit.  For example:
   g (x:xs) = xs ++ [ x :: a ]
 </programlisting>
 This program will be rejected, because "<literal>a</literal>" does not scope
-over the definition of "<literal>f</literal>", so "<literal>x::a</literal>"
+over the definition of "<literal>g</literal>", so "<literal>x::a</literal>"
 means "<literal>x::forall a. a</literal>" by Haskell's usual implicit
 quantification rules.
 </para></listitem>
