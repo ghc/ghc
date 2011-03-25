@@ -735,6 +735,7 @@ i386_insert_ffrees blocks
      where p insn r = case insn of
                         CALL _ _ -> GFREE : insn : r
                         JMP _    -> GFREE : insn : r
+                        JXX_GBL _ _ -> GFREE : insn : r
                         _        -> insn : r
 
 -- if you ever add a new FP insn to the fake x86 FP insn set,
