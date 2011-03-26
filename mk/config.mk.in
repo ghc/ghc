@@ -560,7 +560,12 @@ ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
 CONF_CC_OPTS += -G0
 endif
 
+# The .hsc files aren't currently safe for cross-compilation on Windows:
+#     libraries\haskeline\.\System\Console\Haskeline\Backend\Win32.hsc:160
+#     directive "let" is not safe for cross-compilation
+ifneq "$(Windows)" "YES"
 SRC_HSC2HS_OPTS += --cross-safe
+endif
 SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)))
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
 
