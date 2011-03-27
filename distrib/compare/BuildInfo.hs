@@ -8,7 +8,7 @@ type BIMonad = StateT BuildInfo Maybe
 data BuildInfo = BuildInfo {
                      biThingVersionMap :: ThingVersionMap,
                      biThingHashMap :: ThingHashMap,
-                     biWays :: Ways
+                     biMaybeWays :: Maybe Ways
                  }
     deriving Show
 
@@ -22,12 +22,12 @@ type ThingHashMap = ThingMap
 -- ["v", "p", "dyn"] => we have ".depend-v-p-dyn.haskell" files
 type Ways = [String]
 
-emptyBuildInfo :: Ways -> BuildInfo
-emptyBuildInfo ways = BuildInfo {
-                          biThingVersionMap = [],
-                          biThingHashMap = [],
-                          biWays = ways
-                      }
+emptyBuildInfo :: Maybe Ways -> BuildInfo
+emptyBuildInfo mWays = BuildInfo {
+                           biThingVersionMap = [],
+                           biThingHashMap = [],
+                           biMaybeWays = mWays
+                       }
 
 addThingMap :: ThingMap -> String -> String -> Maybe ThingMap
 addThingMap mapping thing str
@@ -39,9 +39,9 @@ addThingMap mapping thing str
    Nothing ->
        Just ((thing, str) : mapping)
 
-getWays :: BIMonad Ways
-getWays = do st <- get
-             return $ biWays st
+getMaybeWays :: BIMonad (Maybe Ways)
+getMaybeWays = do st <- get
+                  return $ biMaybeWays st
 
 haveThingVersion :: String -> String -> BIMonad ()
 haveThingVersion thing thingVersion
@@ -56,8 +56,4 @@ haveThingHash thing thingHash
       case addThingMap (biThingHashMap st) thing thingHash of
           Nothing  -> fail "Inconsistent hash"
           Just thm -> put $ st { biThingHashMap = thm }
-
-putWays :: Ways -> BIMonad ()
-putWays ws = do st <- get
-                put $ st { biWays = ws }
 

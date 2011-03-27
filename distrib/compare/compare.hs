@@ -33,39 +33,41 @@ main = do args <- getArgs
 
 doit :: Bool -> FilePath -> FilePath -> IO ()
 doit ignoreSizeChanges bd1 bd2
- = do let windows = any ("mingw" `isPrefixOf`) (tails bd1)
-      tls1 <- readTarLines bd1
+ = do tls1 <- readTarLines bd1
       tls2 <- readTarLines bd2
-      -- If it looks like we have a Windows "bindist" then just
-      -- set ways to [] for now.
-      ways1 <- if windows then return []
-                          else dieOnErrors $ findWays tls1
-      ways2 <- if windows then return []
-                          else dieOnErrors $ findWays tls2
-      (content1, tvm1) <- dieOnErrors $ mkContents ways1 tls1
-      (content2, tvm2) <- dieOnErrors $ mkContents ways2 tls2
+      let mWays1 = findWays tls1
+          mWays2 = findWays tls2
+      wayDifferences <- case (mWays1, mWays2) of
+                        (Nothing, Nothing) ->
+                            return []
+                        (Just ways1, Just ways2) ->
+                            return $ diffWays ways1 ways2
+                        _ ->
+                            die ["One input has ways, but the other doesn't"]
+      (content1, tvm1) <- dieOnErrors $ mkContents mWays1 tls1
+      (content2, tvm2) <- dieOnErrors $ mkContents mWays2 tls2
       let sortedContent1 = sortByFst content1
           sortedContent2 = sortByFst content2
           (nubProbs1, nubbedContent1) = nubContents sortedContent1
           (nubProbs2, nubbedContent2) = nubContents sortedContent2
-          differences = compareContent ways1 nubbedContent1
-                                       ways2 nubbedContent2
+          differences = compareContent mWays1 nubbedContent1
+                                       mWays2 nubbedContent2
           allProbs = map First nubProbs1 ++ map Second nubProbs2
                   ++ diffThingVersionMap tvm1 tvm2
-                  ++ diffWays ways1 ways2
+                  ++ wayDifferences
                   ++ differences
           wantedProbs = if ignoreSizeChanges
                         then filter (not . isSizeChange) allProbs
                         else allProbs
       mapM_ (putStrLn . pprFileChange) wantedProbs
 
-findWays :: [TarLine] -> Either Errors Ways
-findWays = foldr f (Left ["Couldn't find ways"])
-    where f tl res = case re regex (tlFileName tl) of
-                     Just [dashedWays] ->
-                         Right (unSepList '-' dashedWays)
-                     _ ->
-                         res
+-- *nix bindists have ways.
+-- Windows "bindists", install trees, and testsuites don't.
+findWays :: [TarLine] -> Maybe Ways
+findWays tls = msum $ map f tls
+    where f tl = case re regex (tlFileName tl) of
+                 Just [dashedWays] -> Just (unSepList '-' dashedWays)
+                 _                 -> Nothing
           regex = "/libraries/base/dist-install/build/\\.depend-(.*)\\.haskell"
 
 diffWays :: Ways -> Ways -> [FileChange]
@@ -93,10 +95,10 @@ diffThingVersionMap tvm1 tvm2 = f (sortByFst tvm1) (sortByFst tvm2)
                                  else [Change (ThingVersionChanged xt xv yv)]
                       in this ++ f xs' ys'
 
-mkContents :: Ways -> [TarLine]
+mkContents :: Maybe Ways -> [TarLine]
            -> Either Errors ([(FilenameDescr, TarLine)], ThingVersionMap)
-mkContents ways tls
-    = case runStateT (mapM f tls) (emptyBuildInfo ways) of
+mkContents mWays tls
+    = case runStateT (mapM f tls) (emptyBuildInfo mWays) of
       Nothing -> Left ["Can't happen: mkContents: Nothing"]
       Just (xs, finalBuildInfo) ->
           case concat $ map (checkContent finalBuildInfo) xs of
@@ -211,36 +213,33 @@ mkFileNameDescr filename
  | Just [dashedWays, depType]
        <- re "^\\.depend-(.*)\\.(haskell|c_asm)"
              filename
-    = do ways <- getWays
-         if unSepList '-' dashedWays == ways
+    = do mWays <- getMaybeWays
+         if Just (unSepList '-' dashedWays) == mWays
              then return [FP ".depend-", Ways, FP ".", FP depType]
              else unchanged
  | otherwise = unchanged
     where unchanged = return [FP filename]
 
-compareContent :: Ways -> [(FilenameDescr, TarLine)]
-               -> Ways -> [(FilenameDescr, TarLine)]
+compareContent :: Maybe Ways -> [(FilenameDescr, TarLine)]
+               -> Maybe Ways -> [(FilenameDescr, TarLine)]
                -> [FileChange]
-compareContent _ [] _ [] = []
-compareContent _ xs _ [] = map (First  . ExtraFile . tlFileName . snd) xs
-compareContent _ [] _ ys = map (Second . ExtraFile . tlFileName . snd) ys
-compareContent ways1 xs1 ways2 xs2
-    = case (xs1, xs2) of
-      ([], []) -> []
-      (xs, []) -> concatMap (mkExtraFile ways1 First  . tlFileName . snd) xs
-      ([], ys) -> concatMap (mkExtraFile ways2 Second . tlFileName . snd) ys
-      ((fd1, tl1) : xs1', (fd2, tl2) : xs2') ->
-          case fd1 `compare` fd2 of
-          EQ -> map Change (compareTarLine tl1 tl2)
-             ++ compareContent ways1 xs1' ways2 xs2'
-          LT -> mkExtraFile ways1 First  (tlFileName tl1)
-             ++ compareContent ways1 xs1' ways2 xs2
-          GT -> mkExtraFile ways2 Second (tlFileName tl2)
-             ++ compareContent ways1 xs1 ways2 xs2'
-    where mkExtraFile ways mkFileChange filename
-              = case findFileWay filename of
-                Just way
-                 | way `elem` ways -> []
+compareContent mWays1 xs1all mWays2 xs2all
+ = f xs1all xs2all
+    where f [] [] = []
+          f xs [] = concatMap (mkExtraFile mWays1 mWays2 First  . tlFileName . snd) xs
+          f [] ys = concatMap (mkExtraFile mWays2 mWays1 Second . tlFileName . snd) ys
+          f xs1@((fd1, tl1) : xs1') xs2@((fd2, tl2) : xs2')
+           = case fd1 `compare` fd2 of
+             EQ -> map Change (compareTarLine tl1 tl2)
+                ++ f xs1' xs2'
+             LT -> mkExtraFile mWays1 mWays2 First  (tlFileName tl1)
+                ++ f xs1' xs2
+             GT -> mkExtraFile mWays2 mWays1 Second (tlFileName tl2)
+                ++ f xs1 xs2'
+          mkExtraFile mWaysMe mWaysThem mkFileChange filename
+              = case (findFileWay filename, mWaysMe, mWaysThem) of
+                (Just way, Just waysMe, Just waysThem)
+                 | (way `elem` waysMe) && not (way `elem` waysThem) -> []
                 _                  -> [mkFileChange (ExtraFile filename)]
 
 findFileWay :: FilePath -> Maybe String

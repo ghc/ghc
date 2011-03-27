@@ -50,5 +50,7 @@ flattenFilenameDescr buildInfo fd = case partitionEithers (map f fd) of
            = case lookup thing (biThingHashMap buildInfo) of
              Just v -> Right v
              Nothing -> Left ["Can't happen: thing has no hash in mapping"]
-          f Ways = Right $ intercalate "-" $ biWays buildInfo
+          f Ways = case biMaybeWays buildInfo of
+                   Just ways -> Right $ intercalate "-" ways
+                   Nothing   -> Left ["Can't happen: No ways, but Ways is used"]
 
