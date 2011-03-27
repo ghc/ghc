@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -e
+
+die () {
+    echo "$1" >&2
+    exit 1
+}
+
+[ "$#" -eq 2 ] || die "Bad args. Usage: $0 <Linux bindist> <Windows bindist>"
+
+LINUX_BINDIST=`realpath "$1"`
+WINDOWS_BINDIST=`realpath "$2"`
+
+mkdir docs
+cd docs
+tar -jxf "$LINUX_BINDIST"
+mv ghc* linux
+tar -jxf "$WINDOWS_BINDIST"
+mv ghc* windows
+cd linux
+./configure --prefix=`pwd`/inst
+make install
+cd inst/share/doc/ghc/html/libraries
+mv ../../../../../../../windows/doc/html/libraries/Win32-* .
+sh gen_contents_index
+cd ..
+for i in Cabal haddock libraries users_guide
+do
+    tar -jcf ../../../../../../$i.html.tar.bz2 $i
+done
+cd ..
+mv *.pdf *.ps ../../../../..
+
