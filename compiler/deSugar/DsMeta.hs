@@ -2191,23 +2191,23 @@ funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
     classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, familyNoKindDIdKey, familyKindDIdKey,
     dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey :: Unique 
-funDIdKey         = mkPreludeMiscIdUnique 272
-valDIdKey         = mkPreludeMiscIdUnique 273
-dataDIdKey        = mkPreludeMiscIdUnique 274
-newtypeDIdKey     = mkPreludeMiscIdUnique 275
-tySynDIdKey       = mkPreludeMiscIdUnique 276
-classDIdKey       = mkPreludeMiscIdUnique 277
-instanceDIdKey    = mkPreludeMiscIdUnique 278
-sigDIdKey         = mkPreludeMiscIdUnique 279
-forImpDIdKey      = mkPreludeMiscIdUnique 297
-pragInlDIdKey     = mkPreludeMiscIdUnique 348
-pragSpecDIdKey    = mkPreludeMiscIdUnique 349
-pragSpecInlDIdKey = mkPreludeMiscIdUnique 352
-familyNoKindDIdKey= mkPreludeMiscIdUnique 340
-familyKindDIdKey  = mkPreludeMiscIdUnique 353
-dataInstDIdKey    = mkPreludeMiscIdUnique 341
-newtypeInstDIdKey = mkPreludeMiscIdUnique 342
-tySynInstDIdKey   = mkPreludeMiscIdUnique 343
+funDIdKey          = mkPreludeMiscIdUnique 272
+valDIdKey          = mkPreludeMiscIdUnique 273
+dataDIdKey         = mkPreludeMiscIdUnique 274
+newtypeDIdKey      = mkPreludeMiscIdUnique 275
+tySynDIdKey        = mkPreludeMiscIdUnique 276
+classDIdKey        = mkPreludeMiscIdUnique 277
+instanceDIdKey     = mkPreludeMiscIdUnique 278
+sigDIdKey          = mkPreludeMiscIdUnique 279
+forImpDIdKey       = mkPreludeMiscIdUnique 297
+pragInlDIdKey      = mkPreludeMiscIdUnique 348
+pragSpecDIdKey     = mkPreludeMiscIdUnique 349
+pragSpecInlDIdKey  = mkPreludeMiscIdUnique 352
+familyNoKindDIdKey = mkPreludeMiscIdUnique 340
+familyKindDIdKey   = mkPreludeMiscIdUnique 353
+dataInstDIdKey     = mkPreludeMiscIdUnique 341
+newtypeInstDIdKey  = mkPreludeMiscIdUnique 342
+tySynInstDIdKey    = mkPreludeMiscIdUnique 343
 
 -- type Cxt = ...
 cxtIdKey :: Unique
