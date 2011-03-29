@@ -1743,13 +1743,7 @@ phase <replaceable>n</replaceable></entry>
 	      <entry><option>-fasm</option></entry>
 	      <entry>Use the native code generator</entry>
 	      <entry>dynamic</entry>
-	      <entry>-fvia-C</entry>
-	    </row>
-	    <row>
-	      <entry><option>-fvia-C</option></entry>
-	      <entry>Compile via C</entry>
-	      <entry>dynamic</entry>
-	      <entry>-fasm</entry>
+	      <entry>-fllvm</entry>
 	    </row>
 	    <row>
 	      <entry><option>-fllvm</option></entry>

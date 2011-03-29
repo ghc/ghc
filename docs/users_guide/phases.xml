@@ -543,21 +543,8 @@ $ cat foo.hspp</screen>
         </term>
         <listitem>
           <para>Use GHC's native code generator rather than
-          compiling via C.  This will compile faster (up to twice as
-          fast), but may produce code that is slightly slower than
-          compiling via C.  <option>-fasm</option> is the default.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
-          <option>-fvia-C</option>
-          <indexterm><primary><option>-fvia-C</option></primary></indexterm>
-        </term>
-        <listitem>
-          <para>Compile via C instead of using the native code
-          generator.  This is the default on architectures for which GHC
-          doesn't have a native code generator.</para>
+          compiling via LLVM.
+          <option>-fasm</option> is the default.</para>
         </listitem>
       </varlistentry>
 
@@ -569,8 +556,8 @@ $ cat foo.hspp</screen>
         <listitem>
           <para>Compile via LLVM instead of using the native code
           generator. This will generally take slightly longer than the
-          native code generator to compile but quicker than compiling
-          via C. Produced code is generally the same speed or faster
+          native code generator to compile.
+          Produced code is generally the same speed or faster
           than the other two code generators. Compiling via LLVM
           requires LLVM version 2.7 or later to be on the path.</para>
         </listitem>

@@ -1701,7 +1701,7 @@ f "2"    = 2
       <para>We don't use a <option>-O*</option> flag for day-to-day
       work.  We use <option>-O</option> to get respectable speed;
       e.g., when we want to measure something.  When we want to go for
-      broke, we tend to use <option>-O2 -fvia-C</option> (and we go for
+      broke, we tend to use <option>-O2</option> (and we go for
       lots of coffee breaks).</para>
 
       <para>The easiest way to see what <option>-O</option> (etc.)
