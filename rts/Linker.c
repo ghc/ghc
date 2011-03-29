@@ -272,6 +272,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
+      SymI_HasProto(atexit)                     \
       SymI_NeedsProto(nocldstop)
 #endif
 
