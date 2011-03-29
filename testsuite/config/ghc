@@ -18,8 +18,8 @@ config.confdir               = '.'
 # By default, we test the 'normal', 'opt' and 'hpc' ways.
 # 'optasm' is added by mk/test.mk if the compiler has a native code gen,
 # 'prof'   is added by mk/test.mk if the profiling way is enabled.
-config.compile_ways	     = ['normal', 'optc', 'hpc']
-config.run_ways		     = ['normal', 'optc', 'hpc']
+config.compile_ways	     = ['normal', 'hpc']
+config.run_ways		     = ['normal', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways            = ['extcore','optextcore',
@@ -35,8 +35,6 @@ if (ghc_with_native_codegen == 1):
 
 if (ghc_with_profiling == 1):
 	config.have_profiling = True
-	config.compile_ways.append('profc')
-	config.run_ways.append('profc')
 	if (ghc_with_native_codegen == 1):
 		config.compile_ways.append('profasm')
 		config.run_ways.append('profasm')
@@ -65,11 +63,9 @@ config.in_tree_compiler = in_tree_compiler
 
 config.way_flags = {
 	'normal'     : [],
-	'optc'       : ['-O -fno-warn-deprecated-flags -fvia-C'],
 	'optasm'     : ['-O -fasm'],
 	'llvm'       : ['-fllvm'],
 	'optllvm'    : ['-O -fllvm'],
-	'profc'      : ['-O -prof -auto-all -fno-warn-deprecated-flags -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
 	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
 	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
@@ -90,11 +86,9 @@ config.way_flags = {
 
 config.way_rts_flags = { 
 	'normal'     : [],
-	'optc'       : [],
 	'optasm'     : [],
 	'llvm'       : [],
 	'optllvm'    : [],
-	'profc'      : ['-p'],
 	'profasm'    : ['-hc'], # test heap profiling too
 	'profthreaded' : ['-p'],
 	'ghci'       : [],
@@ -116,7 +110,7 @@ config.way_rts_flags = {
 # Useful classes of ways:
 
 prof_ways = filter(lambda x: x in config.run_ways, 
-                   ['profc','profasm','profthreaded'])
+                   ['profasm','profthreaded'])
 
 threaded_ways = filter(lambda x: x in config.run_ways, 
                        ['threaded1','threaded2','ghci','profthreaded'])
