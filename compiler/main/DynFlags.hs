@@ -894,7 +894,8 @@ setObjectDir  f d = d{ objectDir  = Just f}
 setHiDir      f d = d{ hiDir      = Just f}
 setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
-  -- \#included from the .hc file when compiling with -fvia-C.
+  -- \#included from the .hc file when compiling via C (i.e. unregisterised
+  -- builds).
 setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
 setDylibInstallName  f d = d{ dylibInstallName = Just f}
 
@@ -1055,16 +1056,7 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
           = runCmdLine (processArgs flag_spec args') dflags0
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
-  -- Cannot use -fPIC with registerised -fvia-C, because the mangler
-  -- isn't up to the job.  We know that if hscTarget == HscC, then the
-  -- user has explicitly used -fvia-C, because -fasm is the default,
-  -- unless there is no NCG on this platform.  The latter case is
-  -- checked when the -fPIC flag is parsed.
-  --
   let (pic_warns, dflags2)
-        | opt_PIC && hscTarget dflags1 == HscC && cGhcUnregisterised == "NO"
-        = ([L noSrcSpan $ "Warning: -fvia-C is incompatible with -fPIC; ignoring -fvia-C"],
-                dflags1{ hscTarget = HscAsm })
 #if !(x86_64_TARGET_ARCH && linux_TARGET_OS)
         | (not opt_Static || opt_PIC) && hscTarget dflags1 == HscLlvm
         = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -"
@@ -1354,10 +1346,10 @@ dynamic_flags = [
         ------ Compiler flags -----------------------------------------------
 
   , Flag "fasm"             (NoArg (setObjTarget HscAsm))
-  , Flag "fvia-c"           (NoArg (setObjTarget HscC >>
-         (addWarn "The -fvia-c flag will be removed in a future GHC release")))
-  , Flag "fvia-C"           (NoArg (setObjTarget HscC >>
-         (addWarn "The -fvia-C flag will be removed in a future GHC release")))
+  , Flag "fvia-c"           (NoArg
+         (addWarn "The -fvia-c flag does nothing; it will be removed in a future GHC release"))
+  , Flag "fvia-C"           (NoArg
+         (addWarn "The -fvia-C flag does nothing; it will be removed in a future GHC release"))
   , Flag "fllvm"            (NoArg (setObjTarget HscLlvm))
 
   , Flag "fno-code"         (NoArg (do upd $ \d -> d{ ghcLink=NoLink }
@@ -1976,8 +1968,8 @@ setTarget l = upd set
      | otherwise = dfs
 
 -- Changes the target only if we're compiling object code.  This is
--- used by -fasm and -fvia-C, which switch from one to the other, but
--- not from bytecode to object-code.  The idea is that -fasm/-fvia-C
+-- used by -fasm and -fllvm, which switch from one to the other, but
+-- not from bytecode to object-code.  The idea is that -fasm/-fllvm
 -- can be safely used in an OPTIONS_GHC pragma.
 setObjTarget :: HscTarget -> DynP ()
 setObjTarget l = upd set
