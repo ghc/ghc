@@ -203,7 +203,7 @@ mkHandleFromFD
    -> IODeviceType
    -> FilePath  -- a string describing this file descriptor (e.g. the filename)
    -> IOMode
-   -> Bool      -- *set* non-blocking mode on the FD
+   -> Bool      --  *set* non-blocking mode on the FD
    -> Maybe TextEncoding
    -> IO Handle
 
