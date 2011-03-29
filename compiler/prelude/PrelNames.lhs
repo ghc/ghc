@@ -1087,7 +1087,7 @@ stringTyConKey :: Unique
 stringTyConKey				= mkPreludeTyConUnique 134
 
 ---------------- Template Haskell -------------------
---	USES TyConUniques 100-129
+--	USES TyConUniques 200-299
 -----------------------------------------------------
 
 unitTyConKey :: Unique
@@ -1326,7 +1326,7 @@ toIntegerClassOpKey  = mkPreludeMiscIdUnique 129
 toRationalClassOpKey = mkPreludeMiscIdUnique 130
 
 ---------------- Template Haskell -------------------
---	USES IdUniques 200-399
+--	USES IdUniques 200-499
 -----------------------------------------------------
 \end{code}
 

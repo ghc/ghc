@@ -2031,7 +2031,7 @@ quotePatName	    = qqFun (fsLit "quotePat")  quotePatKey
 quoteDecName	    = qqFun (fsLit "quoteDec")  quoteDecKey
 quoteTypeName	    = qqFun (fsLit "quoteType") quoteTypeKey
 
--- TyConUniques available: 100-129
+-- TyConUniques available: 200-299
 -- Check in PrelNames if you want to change this
 
 expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
@@ -2041,33 +2041,33 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     fieldExpTyConKey, fieldPatTyConKey, nameTyConKey, patQTyConKey,
     fieldPatQTyConKey, fieldExpQTyConKey, funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey :: Unique
-expTyConKey             = mkPreludeTyConUnique 100
-matchTyConKey           = mkPreludeTyConUnique 101
-clauseTyConKey          = mkPreludeTyConUnique 102
-qTyConKey               = mkPreludeTyConUnique 103
-expQTyConKey            = mkPreludeTyConUnique 104
-decQTyConKey            = mkPreludeTyConUnique 105
-patTyConKey             = mkPreludeTyConUnique 106
-matchQTyConKey          = mkPreludeTyConUnique 107
-clauseQTyConKey         = mkPreludeTyConUnique 108
-stmtQTyConKey           = mkPreludeTyConUnique 109
-conQTyConKey            = mkPreludeTyConUnique 110
-typeQTyConKey           = mkPreludeTyConUnique 111
-typeTyConKey            = mkPreludeTyConUnique 112
-decTyConKey             = mkPreludeTyConUnique 113
-varStrictTypeQTyConKey  = mkPreludeTyConUnique 114
-strictTypeQTyConKey     = mkPreludeTyConUnique 115
-fieldExpTyConKey        = mkPreludeTyConUnique 116
-fieldPatTyConKey        = mkPreludeTyConUnique 117
-nameTyConKey            = mkPreludeTyConUnique 118
-patQTyConKey            = mkPreludeTyConUnique 119
-fieldPatQTyConKey       = mkPreludeTyConUnique 120
-fieldExpQTyConKey       = mkPreludeTyConUnique 121
-funDepTyConKey          = mkPreludeTyConUnique 122
-predTyConKey            = mkPreludeTyConUnique 123
-predQTyConKey           = mkPreludeTyConUnique 124
-tyVarBndrTyConKey       = mkPreludeTyConUnique 125
-decsQTyConKey           = mkPreludeTyConUnique 126
+expTyConKey             = mkPreludeTyConUnique 200
+matchTyConKey           = mkPreludeTyConUnique 201
+clauseTyConKey          = mkPreludeTyConUnique 202
+qTyConKey               = mkPreludeTyConUnique 203
+expQTyConKey            = mkPreludeTyConUnique 204
+decQTyConKey            = mkPreludeTyConUnique 205
+patTyConKey             = mkPreludeTyConUnique 206
+matchQTyConKey          = mkPreludeTyConUnique 207
+clauseQTyConKey         = mkPreludeTyConUnique 208
+stmtQTyConKey           = mkPreludeTyConUnique 209
+conQTyConKey            = mkPreludeTyConUnique 210
+typeQTyConKey           = mkPreludeTyConUnique 211
+typeTyConKey            = mkPreludeTyConUnique 212
+decTyConKey             = mkPreludeTyConUnique 213
+varStrictTypeQTyConKey  = mkPreludeTyConUnique 214
+strictTypeQTyConKey     = mkPreludeTyConUnique 215
+fieldExpTyConKey        = mkPreludeTyConUnique 216
+fieldPatTyConKey        = mkPreludeTyConUnique 217
+nameTyConKey            = mkPreludeTyConUnique 218
+patQTyConKey            = mkPreludeTyConUnique 219
+fieldPatQTyConKey       = mkPreludeTyConUnique 220
+fieldExpQTyConKey       = mkPreludeTyConUnique 221
+funDepTyConKey          = mkPreludeTyConUnique 222
+predTyConKey            = mkPreludeTyConUnique 223
+predQTyConKey           = mkPreludeTyConUnique 224
+tyVarBndrTyConKey       = mkPreludeTyConUnique 225
+decsQTyConKey           = mkPreludeTyConUnique 226
 
 -- IdUniques available: 200-399
 -- If you want to change this, make sure you check in PrelNames
@@ -2090,47 +2090,47 @@ mkNameLIdKey         = mkPreludeMiscIdUnique 209
 -- data Lit = ...
 charLIdKey, stringLIdKey, integerLIdKey, intPrimLIdKey, wordPrimLIdKey,
     floatPrimLIdKey, doublePrimLIdKey, rationalLIdKey :: Unique
-charLIdKey        = mkPreludeMiscIdUnique 210
-stringLIdKey      = mkPreludeMiscIdUnique 211
-integerLIdKey     = mkPreludeMiscIdUnique 212
-intPrimLIdKey     = mkPreludeMiscIdUnique 213
-wordPrimLIdKey    = mkPreludeMiscIdUnique 214
-floatPrimLIdKey   = mkPreludeMiscIdUnique 215
-doublePrimLIdKey  = mkPreludeMiscIdUnique 216
-rationalLIdKey    = mkPreludeMiscIdUnique 217
+charLIdKey        = mkPreludeMiscIdUnique 220
+stringLIdKey      = mkPreludeMiscIdUnique 221
+integerLIdKey     = mkPreludeMiscIdUnique 222
+intPrimLIdKey     = mkPreludeMiscIdUnique 223
+wordPrimLIdKey    = mkPreludeMiscIdUnique 224
+floatPrimLIdKey   = mkPreludeMiscIdUnique 225
+doublePrimLIdKey  = mkPreludeMiscIdUnique 226
+rationalLIdKey    = mkPreludeMiscIdUnique 227
 
 liftStringIdKey :: Unique
-liftStringIdKey     = mkPreludeMiscIdUnique 218
+liftStringIdKey     = mkPreludeMiscIdUnique 228
 
 -- data Pat = ...
 litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
     asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey, viewPIdKey :: Unique
-litPIdKey         = mkPreludeMiscIdUnique 220
-varPIdKey         = mkPreludeMiscIdUnique 221
-tupPIdKey         = mkPreludeMiscIdUnique 222
-unboxedTupPIdKey  = mkPreludeMiscIdUnique 362
-conPIdKey         = mkPreludeMiscIdUnique 223
-infixPIdKey       = mkPreludeMiscIdUnique 312
-tildePIdKey       = mkPreludeMiscIdUnique 224
-bangPIdKey        = mkPreludeMiscIdUnique 359
-asPIdKey          = mkPreludeMiscIdUnique 225
-wildPIdKey        = mkPreludeMiscIdUnique 226
-recPIdKey         = mkPreludeMiscIdUnique 227
-listPIdKey        = mkPreludeMiscIdUnique 228
-sigPIdKey         = mkPreludeMiscIdUnique 229
-viewPIdKey        = mkPreludeMiscIdUnique 360
+litPIdKey         = mkPreludeMiscIdUnique 240
+varPIdKey         = mkPreludeMiscIdUnique 241
+tupPIdKey         = mkPreludeMiscIdUnique 242
+unboxedTupPIdKey  = mkPreludeMiscIdUnique 243
+conPIdKey         = mkPreludeMiscIdUnique 244
+infixPIdKey       = mkPreludeMiscIdUnique 245
+tildePIdKey       = mkPreludeMiscIdUnique 246
+bangPIdKey        = mkPreludeMiscIdUnique 247
+asPIdKey          = mkPreludeMiscIdUnique 248
+wildPIdKey        = mkPreludeMiscIdUnique 249
+recPIdKey         = mkPreludeMiscIdUnique 250
+listPIdKey        = mkPreludeMiscIdUnique 251
+sigPIdKey         = mkPreludeMiscIdUnique 252
+viewPIdKey        = mkPreludeMiscIdUnique 253
 
 -- type FieldPat = ...
 fieldPatIdKey :: Unique
-fieldPatIdKey       = mkPreludeMiscIdUnique 230
+fieldPatIdKey       = mkPreludeMiscIdUnique 260
 
 -- data Match = ...
 matchIdKey :: Unique
-matchIdKey          = mkPreludeMiscIdUnique 231
+matchIdKey          = mkPreludeMiscIdUnique 261
 
 -- data Clause = ...
 clauseIdKey :: Unique
-clauseIdKey         = mkPreludeMiscIdUnique 232
+clauseIdKey         = mkPreludeMiscIdUnique 262
 
 
 -- data Exp = ...
@@ -2140,156 +2140,156 @@ varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey :: Unique
-varEIdKey         = mkPreludeMiscIdUnique 240
-conEIdKey         = mkPreludeMiscIdUnique 241
-litEIdKey         = mkPreludeMiscIdUnique 242
-appEIdKey         = mkPreludeMiscIdUnique 243
-infixEIdKey       = mkPreludeMiscIdUnique 244
-infixAppIdKey     = mkPreludeMiscIdUnique 245
-sectionLIdKey     = mkPreludeMiscIdUnique 246
-sectionRIdKey     = mkPreludeMiscIdUnique 247
-lamEIdKey         = mkPreludeMiscIdUnique 248
-tupEIdKey         = mkPreludeMiscIdUnique 249
-unboxedTupEIdKey  = mkPreludeMiscIdUnique 263
-condEIdKey        = mkPreludeMiscIdUnique 250
-letEIdKey         = mkPreludeMiscIdUnique 251
-caseEIdKey        = mkPreludeMiscIdUnique 252
-doEIdKey          = mkPreludeMiscIdUnique 253
-compEIdKey        = mkPreludeMiscIdUnique 254
-fromEIdKey        = mkPreludeMiscIdUnique 255
-fromThenEIdKey    = mkPreludeMiscIdUnique 256
-fromToEIdKey      = mkPreludeMiscIdUnique 257
-fromThenToEIdKey  = mkPreludeMiscIdUnique 258
-listEIdKey        = mkPreludeMiscIdUnique 259
-sigEIdKey         = mkPreludeMiscIdUnique 260
-recConEIdKey      = mkPreludeMiscIdUnique 261
-recUpdEIdKey      = mkPreludeMiscIdUnique 262
+varEIdKey         = mkPreludeMiscIdUnique 270
+conEIdKey         = mkPreludeMiscIdUnique 271
+litEIdKey         = mkPreludeMiscIdUnique 272
+appEIdKey         = mkPreludeMiscIdUnique 273
+infixEIdKey       = mkPreludeMiscIdUnique 274
+infixAppIdKey     = mkPreludeMiscIdUnique 275
+sectionLIdKey     = mkPreludeMiscIdUnique 276
+sectionRIdKey     = mkPreludeMiscIdUnique 277
+lamEIdKey         = mkPreludeMiscIdUnique 278
+tupEIdKey         = mkPreludeMiscIdUnique 279
+unboxedTupEIdKey  = mkPreludeMiscIdUnique 280
+condEIdKey        = mkPreludeMiscIdUnique 281
+letEIdKey         = mkPreludeMiscIdUnique 282
+caseEIdKey        = mkPreludeMiscIdUnique 283
+doEIdKey          = mkPreludeMiscIdUnique 284
+compEIdKey        = mkPreludeMiscIdUnique 285
+fromEIdKey        = mkPreludeMiscIdUnique 286
+fromThenEIdKey    = mkPreludeMiscIdUnique 287
+fromToEIdKey      = mkPreludeMiscIdUnique 288
+fromThenToEIdKey  = mkPreludeMiscIdUnique 289
+listEIdKey        = mkPreludeMiscIdUnique 290
+sigEIdKey         = mkPreludeMiscIdUnique 291
+recConEIdKey      = mkPreludeMiscIdUnique 292
+recUpdEIdKey      = mkPreludeMiscIdUnique 293
 
 -- type FieldExp = ...
 fieldExpIdKey :: Unique
-fieldExpIdKey       = mkPreludeMiscIdUnique 265
+fieldExpIdKey       = mkPreludeMiscIdUnique 310
 
 -- data Body = ...
 guardedBIdKey, normalBIdKey :: Unique
-guardedBIdKey     = mkPreludeMiscIdUnique 266
-normalBIdKey      = mkPreludeMiscIdUnique 267
+guardedBIdKey     = mkPreludeMiscIdUnique 311
+normalBIdKey      = mkPreludeMiscIdUnique 312
 
 -- data Guard = ...
 normalGEIdKey, patGEIdKey :: Unique
-normalGEIdKey     = mkPreludeMiscIdUnique 310
-patGEIdKey        = mkPreludeMiscIdUnique 311
+normalGEIdKey     = mkPreludeMiscIdUnique 313
+patGEIdKey        = mkPreludeMiscIdUnique 314
 
 -- data Stmt = ...
 bindSIdKey, letSIdKey, noBindSIdKey, parSIdKey :: Unique
-bindSIdKey       = mkPreludeMiscIdUnique 268
-letSIdKey        = mkPreludeMiscIdUnique 269
-noBindSIdKey     = mkPreludeMiscIdUnique 270
-parSIdKey        = mkPreludeMiscIdUnique 271
+bindSIdKey       = mkPreludeMiscIdUnique 320
+letSIdKey        = mkPreludeMiscIdUnique 321
+noBindSIdKey     = mkPreludeMiscIdUnique 322
+parSIdKey        = mkPreludeMiscIdUnique 323
 
 -- data Dec = ...
 funDIdKey, valDIdKey, dataDIdKey, newtypeDIdKey, tySynDIdKey,
     classDIdKey, instanceDIdKey, sigDIdKey, forImpDIdKey, pragInlDIdKey,
     pragSpecDIdKey, pragSpecInlDIdKey, familyNoKindDIdKey, familyKindDIdKey,
     dataInstDIdKey, newtypeInstDIdKey, tySynInstDIdKey :: Unique 
-funDIdKey          = mkPreludeMiscIdUnique 272
-valDIdKey          = mkPreludeMiscIdUnique 273
-dataDIdKey         = mkPreludeMiscIdUnique 274
-newtypeDIdKey      = mkPreludeMiscIdUnique 275
-tySynDIdKey        = mkPreludeMiscIdUnique 276
-classDIdKey        = mkPreludeMiscIdUnique 277
-instanceDIdKey     = mkPreludeMiscIdUnique 278
-sigDIdKey          = mkPreludeMiscIdUnique 279
-forImpDIdKey       = mkPreludeMiscIdUnique 297
-pragInlDIdKey      = mkPreludeMiscIdUnique 348
-pragSpecDIdKey     = mkPreludeMiscIdUnique 349
-pragSpecInlDIdKey  = mkPreludeMiscIdUnique 352
-familyNoKindDIdKey = mkPreludeMiscIdUnique 340
-familyKindDIdKey   = mkPreludeMiscIdUnique 353
-dataInstDIdKey     = mkPreludeMiscIdUnique 341
-newtypeInstDIdKey  = mkPreludeMiscIdUnique 342
-tySynInstDIdKey    = mkPreludeMiscIdUnique 343
+funDIdKey          = mkPreludeMiscIdUnique 330
+valDIdKey          = mkPreludeMiscIdUnique 331
+dataDIdKey         = mkPreludeMiscIdUnique 332
+newtypeDIdKey      = mkPreludeMiscIdUnique 333
+tySynDIdKey        = mkPreludeMiscIdUnique 334
+classDIdKey        = mkPreludeMiscIdUnique 335
+instanceDIdKey     = mkPreludeMiscIdUnique 336
+sigDIdKey          = mkPreludeMiscIdUnique 337
+forImpDIdKey       = mkPreludeMiscIdUnique 338
+pragInlDIdKey      = mkPreludeMiscIdUnique 339
+pragSpecDIdKey     = mkPreludeMiscIdUnique 340
+pragSpecInlDIdKey  = mkPreludeMiscIdUnique 341
+familyNoKindDIdKey = mkPreludeMiscIdUnique 342
+familyKindDIdKey   = mkPreludeMiscIdUnique 343
+dataInstDIdKey     = mkPreludeMiscIdUnique 344
+newtypeInstDIdKey  = mkPreludeMiscIdUnique 345
+tySynInstDIdKey    = mkPreludeMiscIdUnique 346
 
 -- type Cxt = ...
 cxtIdKey :: Unique
-cxtIdKey            = mkPreludeMiscIdUnique 280
+cxtIdKey            = mkPreludeMiscIdUnique 360
 
 -- data Pred = ...
 classPIdKey, equalPIdKey :: Unique
-classPIdKey         = mkPreludeMiscIdUnique 346
-equalPIdKey         = mkPreludeMiscIdUnique 347
+classPIdKey         = mkPreludeMiscIdUnique 361
+equalPIdKey         = mkPreludeMiscIdUnique 362
 
 -- data Strict = ...
 isStrictKey, notStrictKey :: Unique
-isStrictKey         = mkPreludeMiscIdUnique 281
-notStrictKey        = mkPreludeMiscIdUnique 282
+isStrictKey         = mkPreludeMiscIdUnique 363
+notStrictKey        = mkPreludeMiscIdUnique 364
 
 -- data Con = ...
 normalCIdKey, recCIdKey, infixCIdKey, forallCIdKey :: Unique
-normalCIdKey      = mkPreludeMiscIdUnique 283
-recCIdKey         = mkPreludeMiscIdUnique 284
-infixCIdKey       = mkPreludeMiscIdUnique 285
-forallCIdKey      = mkPreludeMiscIdUnique 288
+normalCIdKey      = mkPreludeMiscIdUnique 370
+recCIdKey         = mkPreludeMiscIdUnique 371
+infixCIdKey       = mkPreludeMiscIdUnique 372
+forallCIdKey      = mkPreludeMiscIdUnique 373
 
 -- type StrictType = ...
 strictTKey :: Unique
-strictTKey        = mkPreludeMiscIdUnique 286
+strictTKey        = mkPreludeMiscIdUnique 374
 
 -- type VarStrictType = ...
 varStrictTKey :: Unique
-varStrictTKey     = mkPreludeMiscIdUnique 287
+varStrictTKey     = mkPreludeMiscIdUnique 375
 
 -- data Type = ...
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,
     listTIdKey, appTIdKey, sigTIdKey :: Unique
-forallTIdKey      = mkPreludeMiscIdUnique 290
-varTIdKey         = mkPreludeMiscIdUnique 291
-conTIdKey         = mkPreludeMiscIdUnique 292
-tupleTIdKey       = mkPreludeMiscIdUnique 294
-unboxedTupleTIdKey = mkPreludeMiscIdUnique 361
-arrowTIdKey       = mkPreludeMiscIdUnique 295
-listTIdKey        = mkPreludeMiscIdUnique 296
-appTIdKey         = mkPreludeMiscIdUnique 293
-sigTIdKey         = mkPreludeMiscIdUnique 358
+forallTIdKey       = mkPreludeMiscIdUnique 380
+varTIdKey          = mkPreludeMiscIdUnique 381
+conTIdKey          = mkPreludeMiscIdUnique 382
+tupleTIdKey        = mkPreludeMiscIdUnique 383
+unboxedTupleTIdKey = mkPreludeMiscIdUnique 384
+arrowTIdKey        = mkPreludeMiscIdUnique 385
+listTIdKey         = mkPreludeMiscIdUnique 386
+appTIdKey          = mkPreludeMiscIdUnique 387
+sigTIdKey          = mkPreludeMiscIdUnique 388
 
 -- data TyVarBndr = ...
 plainTVIdKey, kindedTVIdKey :: Unique
-plainTVIdKey      = mkPreludeMiscIdUnique 354
-kindedTVIdKey     = mkPreludeMiscIdUnique 355
+plainTVIdKey      = mkPreludeMiscIdUnique 390
+kindedTVIdKey     = mkPreludeMiscIdUnique 391
 
 -- data Kind = ...
 starKIdKey, arrowKIdKey :: Unique
-starKIdKey        = mkPreludeMiscIdUnique 356
-arrowKIdKey       = mkPreludeMiscIdUnique 357
+starKIdKey        = mkPreludeMiscIdUnique 392
+arrowKIdKey       = mkPreludeMiscIdUnique 393
 
 -- data Callconv = ...
 cCallIdKey, stdCallIdKey :: Unique
-cCallIdKey      = mkPreludeMiscIdUnique 300
-stdCallIdKey    = mkPreludeMiscIdUnique 301
+cCallIdKey      = mkPreludeMiscIdUnique 394
+stdCallIdKey    = mkPreludeMiscIdUnique 395
 
 -- data Safety = ...
 unsafeIdKey, safeIdKey, threadsafeIdKey, interruptibleIdKey :: Unique
-unsafeIdKey     = mkPreludeMiscIdUnique 305
-safeIdKey       = mkPreludeMiscIdUnique 306
-threadsafeIdKey = mkPreludeMiscIdUnique 307
-interruptibleIdKey = mkPreludeMiscIdUnique 308
+unsafeIdKey        = mkPreludeMiscIdUnique 400
+safeIdKey          = mkPreludeMiscIdUnique 401
+threadsafeIdKey    = mkPreludeMiscIdUnique 402
+interruptibleIdKey = mkPreludeMiscIdUnique 403
 
 -- data InlineSpec =
 inlineSpecNoPhaseIdKey, inlineSpecPhaseIdKey :: Unique
-inlineSpecNoPhaseIdKey = mkPreludeMiscIdUnique 350
-inlineSpecPhaseIdKey   = mkPreludeMiscIdUnique 351
+inlineSpecNoPhaseIdKey = mkPreludeMiscIdUnique 404
+inlineSpecPhaseIdKey   = mkPreludeMiscIdUnique 405
 
 -- data FunDep = ...
 funDepIdKey :: Unique
-funDepIdKey = mkPreludeMiscIdUnique 320
+funDepIdKey = mkPreludeMiscIdUnique 406
 
 -- data FamFlavour = ...
 typeFamIdKey, dataFamIdKey :: Unique
-typeFamIdKey = mkPreludeMiscIdUnique 344
-dataFamIdKey = mkPreludeMiscIdUnique 345
+typeFamIdKey = mkPreludeMiscIdUnique 407
+dataFamIdKey = mkPreludeMiscIdUnique 408
 
 -- quasiquoting
 quoteExpKey, quotePatKey, quoteDecKey, quoteTypeKey :: Unique
-quoteExpKey  = mkPreludeMiscIdUnique 321
-quotePatKey  = mkPreludeMiscIdUnique 322
-quoteDecKey  = mkPreludeMiscIdUnique 323
-quoteTypeKey = mkPreludeMiscIdUnique 324
+quoteExpKey  = mkPreludeMiscIdUnique 410
+quotePatKey  = mkPreludeMiscIdUnique 411
+quoteDecKey  = mkPreludeMiscIdUnique 412
+quoteTypeKey = mkPreludeMiscIdUnique 413
