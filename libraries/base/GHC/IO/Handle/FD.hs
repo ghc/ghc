@@ -16,7 +16,7 @@
 
 module GHC.IO.Handle.FD ( 
   stdin, stdout, stderr,
-  openFile, openBinaryFile,
+  openFile, openBinaryFile, openFileBlocking,
   mkHandleFromFD, fdToHandle, fdToHandle',
   isEOF
  ) where
@@ -148,7 +148,17 @@ addFilePathToIOError fun fp ioe
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
   catchException
-    (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE)
+    (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True)
+    (\e -> ioError (addFilePathToIOError "openFile" fp e))
+
+-- | Like 'openFile', but opens the file in ordinary blocking mode.
+-- This can be useful for opening a FIFO for reading: if we open in
+-- non-blocking mode then the open will fail if there are no writers,
+-- whereas a blocking open will block until a writer appears.
+openFileBlocking :: FilePath -> IOMode -> IO Handle
+openFileBlocking fp im =
+  catchException
+    (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False)
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
 -- | Like 'openFile', but open the file in binary mode.
@@ -163,18 +173,20 @@ openFile fp im =
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
   catchException
-    (openFile' fp m True)
+    (openFile' fp m True True)
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 
-openFile' :: String -> IOMode -> Bool -> IO Handle
-openFile' filepath iomode binary = do
+openFile' :: String -> IOMode -> Bool -> Bool -> IO Handle
+openFile' filepath iomode binary non_blocking = do
   -- first open the file to get an FD
-  (fd, fd_type) <- FD.openFile filepath iomode
+  (fd, fd_type) <- FD.openFile filepath iomode non_blocking
 
   let mb_codec = if binary then Nothing else Just localeEncoding
 
   -- then use it to make a Handle
-  mkHandleFromFD fd fd_type filepath iomode True{-non-blocking-} mb_codec
+  mkHandleFromFD fd fd_type filepath iomode
+                   False {- do not *set* non-blocking mode -}
+                   mb_codec
             `onException` IODevice.close fd
         -- NB. don't forget to close the FD if mkHandleFromFD fails, otherwise
         -- this FD leaks.
@@ -189,9 +201,9 @@ openFile' filepath iomode binary = do
 mkHandleFromFD
    :: FD
    -> IODeviceType
-   -> FilePath -- a string describing this file descriptor (e.g. the filename)
+   -> FilePath  -- a string describing this file descriptor (e.g. the filename)
    -> IOMode
-   -> Bool -- non_blocking (*sets* non-blocking mode on the FD)
+   -> Bool      -- *set* non-blocking mode on the FD
    -> Maybe TextEncoding
    -> IO Handle
 

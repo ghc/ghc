@@ -141,8 +141,8 @@ writeBuf' fd buf = do
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`.  Puts the file descriptor
 -- into non-blocking mode on Unix systems.
-openFile :: FilePath -> IOMode -> IO (FD,IODeviceType)
-openFile filepath iomode =
+openFile :: FilePath -> IOMode -> Bool -> IO (FD,IODeviceType)
+openFile filepath iomode non_blocking =
   withFilePath filepath $ \ f ->
 
     let 
@@ -162,7 +162,10 @@ openFile filepath iomode =
       binary_flags = 0
 #endif      
 
-      oflags = oflags1 .|. binary_flags
+      oflags2 = oflags1 .|. binary_flags
+
+      oflags | non_blocking = oflags2 .|. nonblock_flags
+             | otherwise    = oflags2
     in do
 
     -- the old implementation had a complicated series of three opens,
@@ -171,11 +174,12 @@ openFile filepath iomode =
     -- always returns EISDIR if the file is a directory and was opened
     -- for writing, so I think we're ok with a single open() here...
     fd <- throwErrnoIfMinus1Retry "openFile"
-                (c_open f oflags 0o666)
+                (if non_blocking then c_open      f oflags 0o666
+                                 else c_safe_open f oflags 0o666)
 
     (fD,fd_type) <- mkFD fd iomode Nothing{-no stat-}
                             False{-not a socket-} 
-                            True{-is non-blocking-}
+                            non_blocking
             `catchAny` \e -> do _ <- c_close fd
                                 throwIO e
 
@@ -191,13 +195,14 @@ openFile filepath iomode =
     return (fD,fd_type)
 
 std_flags, output_flags, read_flags, write_flags, rw_flags,
-    append_flags :: CInt
-std_flags    = o_NONBLOCK   .|. o_NOCTTY
+    append_flags, nonblock_flags :: CInt
+std_flags    = o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY 
 write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
+nonblock_flags = o_NONBLOCK
 
 
 -- | Make a 'FD' from an existing file descriptor.  Fails if the FD

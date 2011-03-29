@@ -396,6 +396,9 @@ foreign import ccall unsafe "HsBase.h __hscore_lstat"
 foreign import ccall unsafe "HsBase.h __hscore_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt
 
+foreign import ccall safe "HsBase.h __hscore_open"
+   c_safe_open :: CFilePath -> CInt -> CMode -> IO CInt
+
 foreign import ccall unsafe "HsBase.h read" 
    c_read :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
