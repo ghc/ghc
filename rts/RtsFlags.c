@@ -305,7 +305,7 @@ usage_text[] = {
 "  -Da  DEBUG: apply",
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
-"  -Dz  DEBUG: stack squezing",
+"  -Dz  DEBUG: stack squeezing",
 "  -Dc  DEBUG: program coverage",
 "  -Dr  DEBUG: sparks",
 "",
