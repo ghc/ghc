@@ -7,6 +7,7 @@
            , UnliftedFFITypes
            , ForeignFunctionInterface
            , DeriveDataTypeable
+           , RankNTypes
   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
@@ -39,8 +40,10 @@ module GHC.Conc.Sync
         -- * Forking and suchlike
         , forkIO        -- :: IO a -> IO ThreadId
         , forkIOUnmasked
+        , forkIOWithUnmask
         , forkOnIO      -- :: Int -> IO a -> IO ThreadId
         , forkOnIOUnmasked
+        , forkOnIOWithUnmask
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
         , numSparks      -- :: IO Int
@@ -195,10 +198,28 @@ forkIO action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
--- | Like 'forkIO', but the child thread is created with asynchronous exceptions
--- unmasked (see 'Control.Exception.mask').
+{-# DEPRECATED forkIOUnmasked "use forkIOWithUnmask instead" #-}
+-- | This function is deprecated; use 'forkIOWIthUnmask' instead
 forkIOUnmasked :: IO () -> IO ThreadId
 forkIOUnmasked io = forkIO (unsafeUnmask io)
+
+-- | Like 'forkIO', but the child thread is passed a function that can
+-- be used to unmask asynchronous exceptions.  This function is
+-- typically used in the following way
+--
+-- >  ... mask_ $ forkIOWithUnmask $ \unmask ->
+-- >                 catch (unmask ...) handler
+--
+-- so that the exception handler in the child thread is established
+-- with asynchronous exceptions masked, meanwhile the main body of
+-- the child thread is executed in the unmasked state.
+--
+-- Note that the unmask function passed to the child thread should
+-- only be used in that thread; the behaviour is undefined if it is
+-- invoked in a different thread.
+--
+forkIOWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
+forkIOWithUnmask io = forkIO (io unsafeUnmask)
 
 {- |
 Like 'forkIO', but lets you specify on which CPU the thread is
@@ -217,10 +238,15 @@ forkOnIO (I# cpu) action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
--- | Like 'forkOnIO', but the child thread is created with
--- asynchronous exceptions unmasked (see 'Control.Exception.mask').
+{-# DEPRECATED forkOnIOUnmasked "use forkOnIOWithUnmask instead" #-}
+-- | This function is deprecated; use 'forkOnIOWIthUnmask' instead
 forkOnIOUnmasked :: Int -> IO () -> IO ThreadId
 forkOnIOUnmasked cpu io = forkOnIO cpu (unsafeUnmask io)
+
+-- | Like 'forkIOWithUnmask', but the child thread is pinned to the
+-- given CPU, as with 'forkOnIO'.
+forkOnIOWithUnmask :: Int -> ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
+forkOnIOWithUnmask cpu io = forkOnIO cpu (io unsafeUnmask)
 
 -- | the value passed to the @+RTS -N@ flag.  This is the number of
 -- Haskell threads that can run truly simultaneously at any given

@@ -31,8 +31,10 @@ module GHC.Conc
         -- * Forking and suchlike
         , forkIO        -- :: IO a -> IO ThreadId
         , forkIOUnmasked
+        , forkIOWithUnmask
         , forkOnIO      -- :: Int -> IO a -> IO ThreadId
         , forkOnIOUnmasked
+        , forkOnIOWithUnmask
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
         , numSparks       -- :: IO Int

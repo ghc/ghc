@@ -35,7 +35,7 @@ module Control.Concurrent (
 
         forkIO,
 #ifdef __GLASGOW_HASKELL__
-        forkIOUnmasked,
+        forkIOWithUnmask,
         killThread,
         throwTo,
 #endif
@@ -78,7 +78,7 @@ module Control.Concurrent (
         forkOS,
         isCurrentThreadBound,
         runInBoundThread,
-        runInUnboundThread
+        runInUnboundThread,
 #endif
 
         -- * GHC's implementation of concurrency
@@ -97,6 +97,10 @@ module Control.Concurrent (
         -- ** Pre-emption
 
         -- $preemption
+
+        -- * Deprecated functions
+        forkIOUnmasked
+
     ) where
 
 import Prelude
@@ -105,8 +109,7 @@ import Control.Exception.Base as Exception
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exception
-import GHC.Conc         ( ThreadId(..), myThreadId, killThread, yield,
-                          threadDelay, forkIO, forkIOUnmasked, childHandler )
+import GHC.Conc hiding (threadWaitRead, threadWaitWrite)
 import qualified GHC.Conc
 import GHC.IO           ( IO(..), unsafeInterleaveIO, unsafeUnmask )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
