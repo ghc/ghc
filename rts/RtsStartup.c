@@ -345,6 +345,11 @@ hs_exit_(rtsBool wait_foreign)
     
     OnExitHook();
 
+    // sanity check
+#if defined(DEBUG)
+    checkFPUStack();
+#endif
+
     // Free the full argv storage
     freeFullProgArgv();
 
