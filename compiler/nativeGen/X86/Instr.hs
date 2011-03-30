@@ -228,6 +228,8 @@ data Instr
         | GITOF       Reg Reg -- src(intreg), dst(fpreg)
         | GITOD       Reg Reg -- src(intreg), dst(fpreg)
 	
+        | GDTOF       Reg Reg -- src(fpreg), dst(fpreg)
+
 	| GADD	      Size Reg Reg Reg -- src1, src2, dst
 	| GDIV	      Size Reg Reg Reg -- src1, src2, dst
 	| GSUB	      Size Reg Reg Reg -- src1, src2, dst
@@ -367,6 +369,8 @@ x86_regUsageOfInstr instr
     GITOF  src dst	-> mkRU [src] [dst]
     GITOD  src dst	-> mkRU [src] [dst]
 
+    GDTOF  src dst	-> mkRU [src] [dst]
+
     GADD   _ s1 s2 dst	-> mkRU [s1,s2] [dst]
     GSUB   _ s1 s2 dst	-> mkRU [s1,s2] [dst]
     GMUL   _ s1 s2 dst	-> mkRU [s1,s2] [dst]
@@ -492,6 +496,8 @@ x86_patchRegsOfInstr instr env
 
     GITOF src dst	-> GITOF (env src) (env dst)
     GITOD src dst	-> GITOD (env src) (env dst)
+
+    GDTOF src dst	-> GDTOF (env src) (env dst)
 
     GADD sz s1 s2 dst	-> GADD sz (env s1) (env s2) (env dst)
     GSUB sz s1 s2 dst	-> GSUB sz (env s1) (env s2) (env dst)
@@ -750,8 +756,9 @@ is_G_instr instr
 	GLD1{}		-> True
         GFTOI{}		-> True
 	GDTOI{}	 	-> True
-        GITOF{} 	-> True
-	GITOD{} 	-> True
+        GITOF{}		-> True
+	GITOD{}	 	-> True
+        GDTOF{}		-> True
 	GADD{}	 	-> True
 	GDIV{}	 	-> True
 	GSUB{} 		-> True

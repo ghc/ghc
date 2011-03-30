@@ -605,9 +605,7 @@ getRegister (CmmMachOp mop [x]) = do -- unary MachOps
         | sse2      -> coerceFP2FP W64 x
         | otherwise -> conversionNop FF80 x 
 
-      MO_FF_Conv W64 W32
-        | sse2      -> coerceFP2FP W32 x
-        | otherwise -> conversionNop FF80 x 
+      MO_FF_Conv W64 W32 -> coerceFP2FP W32 x
 
       MO_FS_Conv from to -> coerceFP2Int from to x
       MO_SF_Conv from to -> coerceInt2FP from to x
@@ -2257,12 +2255,14 @@ coerceFP2Int from to x = if_sse2 coerceFP2Int_sse2 coerceFP2Int_x87
 --------------------------------------------------------------------------------
 coerceFP2FP :: Width -> CmmExpr -> NatM Register
 coerceFP2FP to x = do
+  use_sse2 <- sse2Enabled
   (x_reg, x_code) <- getSomeReg x
   let
-        opc  = case to of W32 -> CVTSD2SS; W64 -> CVTSS2SD
+        opc | use_sse2  = case to of W32 -> CVTSD2SS; W64 -> CVTSS2SD
+            | otherwise = GDTOF
         code dst = x_code `snocOL` opc x_reg dst
   -- in
-  return (Any (floatSize to) code)
+  return (Any (if use_sse2 then floatSize to else FF80) code)
 
 --------------------------------------------------------------------------------
 

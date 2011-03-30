@@ -720,6 +720,11 @@ pprInstr g@(GITOD src dst)
                    text " ; fildl (%esp) ; ",
                    gpop dst 1, text " ; addl $4,%esp"])
 
+pprInstr g@(GDTOF src dst)
+  = pprG g (vcat [gtab <> gpush src 0,
+                  gtab <> text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ;",
+                  gtab <> gpop dst 1])
+
 {- Gruesome swamp follows.  If you're unfortunate enough to have ventured
    this far into the jungle AND you give a Rat's Ass (tm) what's going
    on, here's the deal.  Generate code to do a floating point comparison
@@ -975,6 +980,7 @@ pprGInstr (GDTOI src dst) = pprSizeSizeRegReg (sLit "gdtoi") FF64 II32 src dst
 
 pprGInstr (GITOF src dst) = pprSizeSizeRegReg (sLit "gitof") II32 FF32  src dst
 pprGInstr (GITOD src dst) = pprSizeSizeRegReg (sLit "gitod") II32 FF64 src dst
+pprGInstr (GDTOF src dst) = pprSizeSizeRegReg (sLit "gdtof") FF64 FF32 src dst
 
 pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") FF64 co src dst
 pprGInstr (GABS sz src dst) = pprSizeRegReg (sLit "gabs") sz src dst
