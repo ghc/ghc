@@ -79,4 +79,5 @@ test('2838', normal, compile_and_run, [''])
 test('3207', normal, compile_and_run, [''])
 test('3561', normal, compile_and_run, [''])
 test('3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
+test('4441', normal, compile_and_run, [''])
 
