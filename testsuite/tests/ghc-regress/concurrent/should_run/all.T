@@ -17,6 +17,9 @@ test('conc069a', only_threaded_ways, compile_and_run, [''])
 # those for now.
 test('conc070', only_threaded_ways, compile_and_run, [''])
 
+test('conc071', omit_ways(['threaded2']), compile_and_run, [''])
+test('conc072', only_ways(['threaded2']), compile_and_run, [''])
+
 test('1980', normal, compile_and_run, [''])
 test('2910', normal, compile_and_run, [''])
 test('2910a', normal, compile_and_run, [''])
