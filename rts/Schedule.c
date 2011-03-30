@@ -1874,9 +1874,9 @@ scheduleThread(Capability *cap, StgTSO *tso)
 void
 scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 {
-#if defined(THREADED_RTS)
     tso->flags |= TSO_LOCKED; // we requested explicit affinity; don't
 			      // move this thread from now on.
+#if defined(THREADED_RTS)
     cpu %= RtsFlags.ParFlags.nNodes;
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
