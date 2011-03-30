@@ -17,7 +17,7 @@
 
 #if defined(THREADED_RTS) /* to the end */
 
-# if defined(HAVE_PTHREAD_H) && !defined(WANT_NATIVE_WIN32_THREADS)
+#if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
 #if CMINUSMINUS
 
