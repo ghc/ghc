@@ -40,6 +40,12 @@ module Control.Concurrent (
         throwTo,
 #endif
 
+        -- ** Threads with affinity
+        forkOn,
+        forkOnWithUnmask,
+        getNumCapabilities,
+        threadCapability,
+
         -- * Scheduling
 
         -- $conc_scheduling     

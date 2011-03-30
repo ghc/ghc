@@ -41,9 +41,10 @@ module GHC.Conc.Sync
         , forkIO        -- :: IO a -> IO ThreadId
         , forkIOUnmasked
         , forkIOWithUnmask
-        , forkOnIO      -- :: Int -> IO a -> IO ThreadId
+        , forkOn      -- :: Int -> IO a -> IO ThreadId
+        , forkOnIO    -- DEPRECATED
         , forkOnIOUnmasked
-        , forkOnIOWithUnmask
+        , forkOnWithUnmask
         , numCapabilities -- :: Int
         , getNumCapabilities -- :: IO Int
         , numSparks      -- :: IO Int
@@ -222,35 +223,50 @@ forkIOWithUnmask :: ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
 forkIOWithUnmask io = forkIO (io unsafeUnmask)
 
 {- |
-Like 'forkIO', but lets you specify on which CPU the thread is
-created.  Unlike a `forkIO` thread, a thread created by `forkOnIO`
-will stay on the same CPU for its entire lifetime (`forkIO` threads
-can migrate between CPUs according to the scheduling policy).
-`forkOnIO` is useful for overriding the scheduling policy when you
-know in advance how best to distribute the threads.
+Like 'forkIO', but lets you specify on which processor the thread
+should run.  Unlike a `forkIO` thread, a thread created by `forkOn`
+will stay on the same processor for its entire lifetime (`forkIO`
+threads can migrate between processors according to the scheduling
+policy).  `forkOn` is useful for overriding the scheduling policy when
+you know in advance how best to distribute the threads.
 
-The `Int` argument specifies the CPU number; it is interpreted modulo
-the value returned by 'getNumCapabilities'.
+The `Int` argument specifies a /capability number/ (see
+'getNumCapabilities').  Typically capabilities correspond to physical
+processors, but the exact behaviour is implementation-dependent.  The
+value passed to 'forkOn' is interpreted modulo the total number of
+capabilities as returned by 'getNumCapabilities'.
+
+GHC note: the number of capabilities is specified by the @+RTS -N@
+option when the program is started.  Capabilities can be fixed to
+actual processor cores with @+RTS -qa@ if the underlying operating
+system supports that, although in practice this is usually unnecessary
+(and may actually degrade perforamnce in some cases - experimentation
+is recommended).
 -}
-forkOnIO :: Int -> IO () -> IO ThreadId
-forkOnIO (I# cpu) action = IO $ \ s ->
+forkOn :: Int -> IO () -> IO ThreadId
+forkOn (I# cpu) action = IO $ \ s ->
    case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
   action_plus = catchException action childHandler
 
-{-# DEPRECATED forkOnIOUnmasked "use forkOnIOWithUnmask instead" #-}
--- | This function is deprecated; use 'forkOnIOWIthUnmask' instead
+{-# DEPRECATED forkOnIO "renamed to forkOn" #-}
+-- | This function is deprecated; use 'forkOn' instead
+forkOnIO :: Int -> IO () -> IO ThreadId
+forkOnIO = forkOn
+
+{-# DEPRECATED forkOnIOUnmasked "use forkOnWithUnmask instead" #-}
+-- | This function is deprecated; use 'forkOnWIthUnmask' instead
 forkOnIOUnmasked :: Int -> IO () -> IO ThreadId
-forkOnIOUnmasked cpu io = forkOnIO cpu (unsafeUnmask io)
+forkOnIOUnmasked cpu io = forkOn cpu (unsafeUnmask io)
 
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
--- given CPU, as with 'forkOnIO'.
-forkOnIOWithUnmask :: Int -> ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
-forkOnIOWithUnmask cpu io = forkOnIO cpu (io unsafeUnmask)
+-- given CPU, as with 'forkOn'.
+forkOnWithUnmask :: Int -> ((forall a . IO a -> IO a) -> IO ()) -> IO ThreadId
+forkOnWithUnmask cpu io = forkOn cpu (io unsafeUnmask)
 
 -- | the value passed to the @+RTS -N@ flag.  This is the number of
 -- Haskell threads that can run truly simultaneously at any given
--- time, and is typically set to the number of physical CPU cores on
+-- time, and is typically set to the number of physical processor cores on
 -- the machine.
 -- 
 -- Strictly speaking it is better to use 'getNumCapabilities', because
@@ -262,12 +278,12 @@ numCapabilities = unsafePerformIO $ getNumCapabilities
 {- |
 Returns the number of Haskell threads that can run truly
 simultaneously (on separate physical processors) at any given time.
-The CPU number passed to `forkOnIO` is interpreted modulo this
+The number passed to `forkOn` is interpreted modulo this
 value.
 
 An implementation in which Haskell threads are mapped directly to
 OS threads might return the number of physical processor cores in
-the machine, and 'forkOnIO' would be implemented using the OS's
+the machine, and 'forkOn' would be implemented using the OS's
 affinity facilities.  An implementation that schedules Haskell
 threads onto a smaller number of OS threads (like GHC) would return
 the number of such OS threads that can be running simultaneously.
@@ -470,7 +486,7 @@ threadStatus (ThreadId t) = IO $ \s ->
 -- | returns the number of the capability on which the thread is currently
 -- running, and a boolean indicating whether the thread is locked to
 -- that capability or not.  A thread is locked to a capability if it
--- was created with @forkOnIO@.
+-- was created with @forkOn@.
 threadCapability :: ThreadId -> IO (Int, Bool)
 threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
