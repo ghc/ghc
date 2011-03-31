@@ -278,20 +278,18 @@ mkSrcSpan loc1 loc2
 combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
 combineSrcSpans	(UnhelpfulSpan _) r = r -- this seems more useful
 combineSrcSpans	l (UnhelpfulSpan _) = l
-combineSrcSpans	start end 
- = case line1 `compare` line2 of
-     EQ -> case col1 `compare` col2 of
-		EQ -> SrcSpanPoint file line1 col1
-		LT -> SrcSpanOneLine file line1 col1 col2
-		GT -> SrcSpanOneLine file line1 col2 col1
-     LT -> SrcSpanMultiLine file line1 col1 line2 col2
-     GT -> SrcSpanMultiLine file line2 col2 line1 col1
+combineSrcSpans	span1 span2
+ = if line_start == line_end 
+   then if col_start == col_end
+        then SrcSpanPoint     file line_start col_start
+        else SrcSpanOneLine   file line_start col_start col_end
+   else      SrcSpanMultiLine file line_start col_start line_end col_end
   where
-	line1 = srcSpanStartLine start
-	col1  = srcSpanStartCol start
-	line2 = srcSpanEndLine end
-	col2  = srcSpanEndCol end
-	file  = srcSpanFile start
+    (line_start, col_start) = min (srcSpanStartLine span1, srcSpanStartCol span1)
+    		 	          (srcSpanStartLine span2, srcSpanStartCol span2)
+    (line_end, col_end)     = max (srcSpanEndLine span1, srcSpanEndCol span1)
+    		  	          (srcSpanEndLine span2, srcSpanEndCol span2)
+    file = srcSpanFile span1
 \end{code}
 
 %************************************************************************

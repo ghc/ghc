@@ -350,9 +350,10 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     ; return (binds, poly_ids) }
   where
     binder_names = collectHsBindListBinders bind_list
-    loc = getLoc (head bind_list)
-         -- TODO: location a bit awkward, but the mbinds have been
-         --       dependency analysed and may no longer be adjacent
+    loc = foldr1 combineSrcSpans (map getLoc bind_list)
+         -- The mbinds have been dependency analysed and 
+         -- may no longer be adjacent; so find the narrowest
+	 -- span that includes them all
 
 ------------------
 tcPolyNoGen 
@@ -390,7 +391,7 @@ tcPolyCheck :: TcSigInfo -> PragFun
 --   it binds a single variable,
 --   it has a signature,
 tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
-                           , sig_theta = theta, sig_tau = tau, sig_loc = loc })
+                           , sig_theta = theta, sig_tau = tau })
     prag_fn rec_tc bind_list
   = do { ev_vars <- newEvVars theta
        ; let skol_info = SigSkol (FunSigCtxt (idName id)) (mkPhiTy theta tau)
@@ -401,6 +402,7 @@ tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
 
        ; export <- mkExport prag_fn tvs theta mono_info
 
+       ; loc <- getSrcSpanM
        ; let (_, poly_id, _, _) = export
              abs_bind = L loc $ AbsBinds 
                         { abs_tvs = tvs
