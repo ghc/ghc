@@ -325,11 +325,13 @@ tcPolyBinds :: TopLevelFlag -> SigFun -> PragFun
 tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
   = setSrcSpan loc                              $
     recoverM (recoveryCode binder_names sig_fn) $ do 
-        -- Set up main recoer; take advantage of any type sigs
+        -- Set up main recover; take advantage of any type sigs
 
     { traceTc "------------------------------------------------" empty
     ; traceTc "Bindings for" (ppr binder_names)
 
+    -- Instantiate the polytypes of any binders that have signatures
+    -- (as determined by sig_fn), returning a TcSigInfo for each
     ; tc_sig_fn <- tcInstSigs sig_fn binder_names
 
     ; dflags <- getDOpts
@@ -415,10 +417,10 @@ tcPolyInfer
                    -- dependencies based on type signatures
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
-tcPolyInfer top_lvl mono sig_fn prag_fn rec_tc bind_list
+tcPolyInfer top_lvl mono tc_sig_fn prag_fn rec_tc bind_list
   = do { ((binds', mono_infos), wanted) 
              <- captureConstraints $
-                tcMonoBinds sig_fn LetLclBndr rec_tc bind_list
+                tcMonoBinds tc_sig_fn LetLclBndr rec_tc bind_list
 
        ; unifyCtxts [sig | (_, Just sig, _) <- mono_infos] 
 
