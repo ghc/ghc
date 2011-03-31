@@ -32,6 +32,7 @@ module CoreUtils (
 
 	-- * Expression and bindings size
 	coreBindsSize, exprSize,
+        CoreStats(..), coreBindsStats, 
 
 	-- * Hashing
 	hashExpr,
@@ -1120,6 +1121,7 @@ coreBindsSize bs = foldr ((+) . bindSize) 0 bs
 exprSize :: CoreExpr -> Int
 -- ^ A measure of the size of the expressions, strictly greater than 0
 -- It also forces the expression pretty drastically as a side effect
+-- Counts *leaves*, not internal nodes. Types and coercions are not counted.
 exprSize (Var v)         = v `seq` 1
 exprSize (Lit lit)       = lit `seq` 1
 exprSize (App f a)       = exprSize f + exprSize a
@@ -1154,6 +1156,62 @@ altSize :: CoreAlt -> Int
 altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 \end{code}
 
+\begin{code}
+data CoreStats = CS { cs_tm, cs_ty, cs_co :: Int }
+
+plusCS :: CoreStats -> CoreStats -> CoreStats
+plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1 })
+       (CS { cs_tm = p2, cs_ty = q2, cs_co = r2 })
+  = CS { cs_tm = p1+p2, cs_ty = q1+q2, cs_co = r1+r2 }
+  
+zeroCS, oneTM :: CoreStats
+zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0 }
+oneTM  = zeroCS { cs_tm = 1 }
+
+sumCS :: (a -> CoreStats) -> [a] -> CoreStats
+sumCS f = foldr (plusCS . f) zeroCS 
+ 
+coreBindsStats :: [CoreBind] -> CoreStats
+coreBindsStats = sumCS bindStats
+
+bindStats :: CoreBind -> CoreStats
+bindStats (NonRec v r) = bindingStats v r
+bindStats (Rec prs)    = sumCS (\(v,r) -> bindingStats v r) prs
+
+bindingStats :: Var -> CoreExpr -> CoreStats
+bindingStats v r = bndrStats v `plusCS` exprStats r
+
+bndrStats :: Var -> CoreStats
+bndrStats v = oneTM `plusCS` tyStats (varType v)
+
+exprStats :: CoreExpr -> CoreStats
+exprStats (Var {})        = oneTM
+exprStats (Lit {})        = oneTM
+exprStats (App f (Type t))= tyCoStats (exprType f) t
+exprStats (App f a)       = exprStats f `plusCS` exprStats a 
+exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e 
+exprStats (Let b e)       = bindStats b `plusCS` exprStats e 
+exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b `plusCS` sumCS altStats as
+exprStats (Cast e co)     = coStats co `plusCS` exprStats e
+exprStats (Note _ e)      = exprStats e
+exprStats (Type ty)       = zeroCS { cs_ty = typeSize ty }
+	  -- Ugh (might be a co)
+
+altStats :: CoreAlt -> CoreStats
+altStats (_, bs, r) = sumCS bndrStats bs `plusCS` exprStats r
+
+tyCoStats :: Type -> Type -> CoreStats
+tyCoStats fun_ty arg
+  = case splitForAllTy_maybe fun_ty of
+      Just (tv,_) | isCoVar tv -> coStats arg
+      _                        -> tyStats arg
+
+tyStats :: Type -> CoreStats
+tyStats ty = zeroCS { cs_ty = typeSize ty }
+
+coStats :: Coercion -> CoreStats
+coStats co = zeroCS { cs_co = typeSize co }
+\end{code}
 
 %************************************************************************
 %*									*

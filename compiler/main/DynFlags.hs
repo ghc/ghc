@@ -128,6 +128,7 @@ data DynFlag
    | Opt_D_dump_asm_stats
    | Opt_D_dump_asm_expanded
    | Opt_D_dump_llvm
+   | Opt_D_dump_core_stats
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
@@ -1218,6 +1219,7 @@ dynamic_flags = [
   , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
   , Flag "ddump-cmmz-pretty"       (setDumpFlag Opt_D_dump_cmmz_pretty)
+  , Flag "ddump-core-stats"        (setDumpFlag Opt_D_dump_core_stats)
   , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
   , Flag "ddump-cvt-cmm"           (setDumpFlag Opt_D_dump_cvt_cmm)
   , Flag "ddump-asm"               (setDumpFlag Opt_D_dump_asm)

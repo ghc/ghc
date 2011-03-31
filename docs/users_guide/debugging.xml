@@ -437,6 +437,17 @@
 
       <varlistentry>
 	<term>
+          <option>-ddump-core-stats</option>
+          <indexterm><primary><option>-ddump-core-stats</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Print a one-line summary of the size of the Core program
+                     at the end of the optimisation pipeline.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-dfaststring-stats</option>
           <indexterm><primary><option>-dfaststring-stats</option></primary></indexterm>
         </term>

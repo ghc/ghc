@@ -74,7 +74,8 @@ module Type (
 
 	-- * Type free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-	expandTypeSynonyms,
+	expandTypeSynonyms, 
+	typeSize,
 
 	-- * Type comparison
 	coreEqType, coreEqType2,
@@ -852,6 +853,28 @@ tyVarsOfPred (EqPred ty1 ty2) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
 tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
+\end{code}
+
+
+%************************************************************************
+%*									*
+                   Size									
+%*									*
+%************************************************************************
+
+\begin{code}
+typeSize :: Type -> Int
+typeSize (TyVarTy _)     = 1
+typeSize (AppTy t1 t2)   = typeSize t1 + typeSize t2
+typeSize (FunTy t1 t2)   = typeSize t1 + typeSize t2
+typeSize (PredTy p)      = predSize p
+typeSize (ForAllTy _ t)  = 1 + typeSize t
+typeSize (TyConApp _ ts) = 1 + sum (map typeSize ts)
+
+predSize :: PredType -> Int
+predSize (IParam _ t)   = 1 + typeSize t
+predSize (ClassP _ ts)  = 1 + sum (map typeSize ts)
+predSize (EqPred t1 t2) = typeSize t1 + typeSize t2
 \end{code}
 
 

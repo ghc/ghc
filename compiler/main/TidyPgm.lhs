@@ -46,6 +46,7 @@ import FastBool hiding ( fastOr )
 import Util
 import FastString
 
+import Control.Monad	( when )
 import Data.List	( sortBy )
 import Data.IORef	( IORef, readIORef, writeIORef )
 \end{code}
@@ -352,6 +353,15 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		    CoreTidy
                     (ptext (sLit "rules"))
                     (pprRulesForUser tidy_rules)
+
+          -- Print one-line size info
+        ; let cs = coreBindsStats tidy_binds
+        ; when (dopt Opt_D_dump_core_stats dflags)
+	       (printDump (ptext (sLit "Tidy size (terms,types,coercions)") 
+                           <+> ppr (moduleName mod) <> colon 
+                           <+> int (cs_tm cs) 
+                           <+> int (cs_ty cs) 
+                           <+> int (cs_co cs) ))
 
         ; let dir_imp_mods = moduleEnvKeys dir_imps
 

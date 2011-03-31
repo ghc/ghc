@@ -2244,6 +2244,13 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-core-stats</option></entry>
+	      <entry>Print a one-line summary of the size of the Core program
+                     at the end of the optimisation pipeline </entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-cpranal</option></entry>
 	      <entry>Dump output from CPR analysis</entry>
 	      <entry>dynamic</entry>
