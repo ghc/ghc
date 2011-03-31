@@ -185,6 +185,7 @@ isStaticFlag f =
     "fsimple-list-literals",
     "fruntime-types",
     "fno-pre-inlining",
+    "fno-opt-coercion",
     "fexcess-precision",
     "static",
     "fhardwire-lib-paths",

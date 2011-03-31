@@ -24,7 +24,7 @@ module StaticFlags (
 	opt_PprCols,
 	opt_PprCaseAsLet,
 	opt_PprStyle_Debug, opt_TraceLevel,
-        opt_NoDebugOutput,
+        opt_NoDebugOutput, 
 
 	-- Suppressing boring aspects of core dumps
 	opt_SuppressAll,
@@ -52,6 +52,7 @@ module StaticFlags (
 	opt_CprOff,
 	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
+	opt_NoOptCoercion,
 	opt_MaxWorkerArgs,
 
 	-- Unfolding control
@@ -266,7 +267,6 @@ opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
 opt_NoDebugOutput   :: Bool
 opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
 
-
 -- profiling opts
 opt_SccProfilingOn :: Bool
 opt_SccProfilingOn		= lookUp  (fsLit "-fscc-profiling")
@@ -319,6 +319,9 @@ opt_SimplNoPreInlining		= lookUp  (fsLit "-fno-pre-inlining")
 	-- get if you don't do it!
 opt_SimplExcessPrecision :: Bool
 opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
+
+opt_NoOptCoercion :: Bool
+opt_NoOptCoercion    	        = lookUp  (fsLit "-fno-opt-coercion")
 
 -- Unfolding control
 -- See Note [Discounts and thresholds] in CoreUnfold

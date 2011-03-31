@@ -19,6 +19,7 @@ import Var
 import VarSet
 import VarEnv
 import PrelNames
+import StaticFlags	( opt_NoOptCoercion )
 import Util
 import Outputable
 \end{code}
@@ -50,7 +51,9 @@ mkCoPredTy in the ForAll case, where this note appears.
 optCoercion :: TvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion, 
 --   *and* optimises it to reduce its size
-optCoercion env co = opt_co env False co
+optCoercion env co 
+  | opt_NoOptCoercion = substTy env co
+  | otherwise         = opt_co env False co
 
 type NormalCo = Coercion
   -- Invariants: 
