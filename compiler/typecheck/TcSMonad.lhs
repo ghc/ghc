@@ -8,6 +8,10 @@ module TcSMonad (
     isCDictCan_Maybe, isCIPCan_Maybe, isCFunEqCan_Maybe,
     isCFrozenErr,
 
+    WorkList, unionWorkList, unionWorkLists, isEmptyWorkList, emptyWorkList,
+    workListFromEq, workListFromNonEq,
+    workListFromEqs, workListFromNonEqs, foldrWorkListM,
+
     CanonicalCt(..), Xi, tyVarsOfCanonical, tyVarsOfCanonicals, tyVarsOfCDicts, 
     deCanonicalise, mkFrozenError,
 
@@ -257,7 +261,57 @@ isCFunEqCan_Maybe _ = Nothing
 isCFrozenErr :: CanonicalCt -> Bool
 isCFrozenErr (CFrozenErr {}) = True
 isCFrozenErr _               = False
+
+
+-- A mixture of Given, Wanted, and Derived constraints. 
+-- We split between equalities and the rest to process equalities first. 
+data WorkList = WorkList { weqs  :: CanonicalCts 
+                                 -- NB: weqs includes equalities /and/ family equalities
+                         , wrest :: CanonicalCts }
+
+unionWorkList :: WorkList -> WorkList -> WorkList
+unionWorkList wl1 wl2
+  = WorkList { weqs = weqs wl1 `andCCan` weqs wl2
+             , wrest = wrest wl1 `andCCan` wrest wl2 }
+
+unionWorkLists :: [WorkList] -> WorkList 
+unionWorkLists = foldr unionWorkList emptyWorkList
+
+isEmptyWorkList :: WorkList -> Bool
+isEmptyWorkList wl = isEmptyCCan (weqs wl) && isEmptyCCan (wrest wl)
+
+emptyWorkList :: WorkList
+emptyWorkList
+  = WorkList { weqs = emptyBag, wrest = emptyBag }
+
+workListFromEq :: CanonicalCt -> WorkList
+workListFromEq = workListFromEqs . singleCCan
+
+workListFromNonEq :: CanonicalCt -> WorkList
+workListFromNonEq = workListFromNonEqs . singleCCan 
+
+workListFromNonEqs :: CanonicalCts -> WorkList
+workListFromNonEqs cts
+  = WorkList { weqs = emptyCCan, wrest = cts }
+
+workListFromEqs :: CanonicalCts -> WorkList
+workListFromEqs cts
+  = WorkList { weqs = cts, wrest = emptyCCan }
+
+foldrWorkListM :: (Monad m) => (CanonicalCt -> r -> m r) 
+                           -> r -> WorkList -> m r
+-- Prioritizes equalities
+foldrWorkListM on_ct r (WorkList {weqs = eqs, wrest = rest })
+  = do { r1 <- foldrBagM on_ct r eqs
+       ; foldrBagM on_ct r1 rest }
+
+instance Outputable WorkList where 
+  ppr wl = vcat [ text "WorkList (Equalities) = " <+> ppr (weqs wl)
+                , text "WorkList (Other)      = " <+> ppr (wrest wl) ]
+
 \end{code}
+
+
 
 %************************************************************************
 %*									*

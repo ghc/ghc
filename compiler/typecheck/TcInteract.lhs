@@ -225,22 +225,6 @@ Note [Basic plan]
 type AtomicInert = CanonicalCt     -- constraint pulled from InertSet
 type WorkItem    = CanonicalCt     -- constraint pulled from WorkList
 
--- A mixture of Given, Wanted, and Derived constraints. 
--- We split between equalities and the rest to process equalities first. 
-type WorkList = CanonicalCts
-
-unionWorkLists :: WorkList -> WorkList -> WorkList 
-unionWorkLists = andCCan
-
-isEmptyWorkList :: WorkList -> Bool 
-isEmptyWorkList = isEmptyCCan 
-
-emptyWorkList :: WorkList
-emptyWorkList = emptyCCan
-
-workListFromCCan :: CanonicalCt -> WorkList 
-workListFromCCan = singleCCan
-
 ------------------------
 data StopOrContinue 
   = Stop			-- Work item is consumed
@@ -305,7 +289,7 @@ runSolverPipeline depth pipeline inerts workItem
                      , sr_stop     = ContinueWith work_item })
       = do { itr <- stage depth work_item inerts 
            ; traceTcS ("Stage result (" ++ name ++ ")") (ppr itr)
-           ; let itr' = itr { sr_new_work = accum_work `unionWorkLists` sr_new_work itr }
+           ; let itr' = itr { sr_new_work = accum_work `unionWorkList` sr_new_work itr }
            ; run_pipeline stages itr' }
 \end{code}
 
@@ -365,8 +349,10 @@ solveInteract inert ws
                                                    -> (ct,evVarPred ev)) ws)
               , text "inert = " <+> ppr inert ]
 
-       ; (flag, inert_ret) <- foldrBagM (tryPreSolveAndInteract sctx dyn_flags) (True,inert) ws 
-                        -- use foldr to preserve the order
+       ; can_ws <- mkCanonicalFEVs ws
+
+       ; (flag, inert_ret)
+           <- foldrWorkListM (tryPreSolveAndInteract sctx dyn_flags) (True,inert) can_ws
 
        ; traceTcS "solveInteract, after clever canonicalization (and interaction):" $
          vcat [ text "No interaction happened = " <+> ppr flag
@@ -374,27 +360,32 @@ solveInteract inert ws
 
        ; return (flag, inert_ret) }
 
-
 tryPreSolveAndInteract :: SimplContext
                        -> DynFlags
-                       -> FlavoredEvVar
+                       -> CanonicalCt
                        -> (Bool, InertSet)
                        -> TcS (Bool, InertSet)
 -- Returns: True if it was able to discharge this constraint AND all previous ones
-tryPreSolveAndInteract sctx dyn_flags flavev@(EvVarX ev_var fl) (all_previous_discharged, inert)
+tryPreSolveAndInteract sctx dyn_flags ct (all_previous_discharged, inert)
   = do { let inert_cts = get_inert_cts (evVarPred ev_var)
 
-       ; this_one_discharged <- dischargeFromCCans inert_cts flavev
+       ; this_one_discharged <- 
+           if isCFrozenErr ct then 
+               return False
+           else
+               dischargeFromCCans inert_cts ev_var fl
 
        ; if this_one_discharged
          then return (all_previous_discharged, inert)
 
          else do
-       { extra_cts <- mkCanonical fl ev_var
-       ; inert_ret <- solveInteractWithDepth (ctxtStkDepth dyn_flags,0,[]) extra_cts inert
+       { inert_ret <- solveOneWithDepth (ctxtStkDepth dyn_flags,0,[]) ct inert
        ; return (False, inert_ret) } }
 
   where
+    ev_var = cc_id ct
+    fl = cc_flavor ct 
+
     get_inert_cts (ClassP clas _)
       | simplEqsOnly sctx = emptyCCan
       | otherwise         = fst (getRelevantCts clas (inert_dicts inert))
@@ -405,12 +396,12 @@ tryPreSolveAndInteract sctx dyn_flags flavev@(EvVarX ev_var fl) (all_previous_di
     get_inert_cts (EqPred {})
       = inert_eqs inert `unionBags` cCanMapToBag (inert_funeqs inert)
 
-dischargeFromCCans :: CanonicalCts -> FlavoredEvVar -> TcS Bool
+dischargeFromCCans :: CanonicalCts -> EvVar -> CtFlavor -> TcS Bool
 -- See if this (pre-canonicalised) work-item is identical to a 
 -- one already in the inert set. Reasons:
 --    a) Avoid creating superclass constraints for millions of incoming (Num a) constraints
 --    b) Termination for improve_eqs in TcSimplify.simpl_loop
-dischargeFromCCans cans (EvVarX ev fl)
+dischargeFromCCans cans ev fl
   = Bag.foldrBag discharge_ct (return False) cans
   where 
     the_pred = evVarPred ev
@@ -469,11 +460,9 @@ solveInteractWithDepth ctxt@(max_depth,n,stack) ws inert
                    , text "Max depth =" <+> ppr max_depth
                    , text "ws =" <+> ppr ws ]
 
-	      -- Solve equalities first
-       ; let (eqs, non_eqs) = Bag.partitionBag isCTyEqCan ws
-       ; is_from_eqs <- Bag.foldrBagM (solveOneWithDepth ctxt) inert eqs
-       ; Bag.foldrBagM (solveOneWithDepth ctxt) is_from_eqs non_eqs }
-                        -- use foldr to preserve the order
+
+       ; foldrWorkListM (solveOneWithDepth ctxt) inert ws }
+              -- use foldr to preserve the order
 
 ------------------
 -- Fully interact the given work item with an inert set, and return a
@@ -834,7 +823,7 @@ data WhichComesFromInert = LeftComesFromInert | RightComesFromInert
 interactWithInertEqsStage :: SimplifierStage 
 interactWithInertEqsStage depth workItem inert
   = Bag.foldrBagM (interactNext depth) initITR (inert_eqs inert)
-                        -- use foldr to preserve the order
+                        -- use foldr to preserve the order          
   where
     initITR = SR { sr_inerts   = inert { inert_eqs = emptyCCan }
                  , sr_new_work = emptyWorkList
@@ -893,7 +882,7 @@ interactNext depth inert it
       	       = text rule <+> keep_doc
       	         <+> vcat [ ptext (sLit "Inert =") <+> ppr inert
       	                  , ptext (sLit "Work =")  <+> ppr work_item
-      	                  , ppUnless (isEmptyBag new_work) $
+      	                  , ppUnless (isEmptyWorkList new_work) $
                             ptext (sLit "New =") <+> ppr new_work ]
              keep_doc = case inert_action of
                  	  KeepInert -> ptext (sLit "[keep]")
@@ -909,7 +898,7 @@ interactNext depth inert it
                             DropInert -> inerts
 
        ; return $ SR { sr_inerts   = inerts_new
-                     , sr_new_work = sr_new_work it `unionWorkLists` new_work
+                     , sr_new_work = sr_new_work it `unionWorkList` new_work
                      , sr_stop     = stop } }
   | otherwise 
   = return $ it { sr_inerts = (sr_inerts it) `updInertSet` inert }
@@ -971,8 +960,8 @@ doInteractWithInert
 			   -- and put it back into the work-list
 			   -- Maybe rather than starting again, we could *replace* the
 			   -- inert item, but its safe and simple to restart
-                         ; mkIRStopD "Cls/Cls fundep (solved)" (inert_w `consBag` fd_work) }
-
+                         ; mkIRStopD "Cls/Cls fundep (solved)" $ 
+                           workListFromNonEq inert_w `unionWorkList` fd_work }
 		    | otherwise 
                     -> do { setDictBind d2 (EvCast d1 dict_co)
                           ; mkIRStopK "Cls/Cls fundep (solved)" fd_work }
@@ -998,7 +987,8 @@ doInteractWithInert
                        Wanted {}  -> setDictBind d2 (EvCast d2' dict_co)
                        Derived {} -> return ()
                    ; let workItem' = workItem { cc_id = d2', cc_tyargs = rewritten_tys2 }
-                   ; mkIRStopK "Cls/Cls fundep (partial)" (workItem' `consBag` fd_work) } 
+                   ; mkIRStopK "Cls/Cls fundep (partial)" $ 
+                     workListFromNonEq workItem' `unionWorkList` fd_work } 
 
              where
                dict_co = mkTyConCoercion (classTyCon cls1) cos2
@@ -1020,7 +1010,7 @@ doInteractWithInert (CDictCan { cc_id = dv, cc_flavor = ifl, cc_class = cl, cc_t
   | wfl `canRewrite` ifl
   , tv `elemVarSet` tyVarsOfTypes xis
   = do { rewritten_dict <- rewriteDict (cv,tv,xi) (dv,ifl,cl,xis)
-       ; mkIRContinue "Cls/Eq" workItem DropInert (workListFromCCan rewritten_dict) }
+       ; mkIRContinue "Cls/Eq" workItem DropInert (workListFromNonEq rewritten_dict) }
 
 -- Class constraint and given equality: use the equality to rewrite
 -- the class constraint.
@@ -1036,7 +1026,7 @@ doInteractWithInert (CIPCan { cc_id = ipid, cc_flavor = ifl, cc_ip_nm = nm, cc_i
   | wfl `canRewrite` ifl
   , tv `elemVarSet` tyVarsOfType ty
   = do { rewritten_ip <- rewriteIP (cv,tv,xi) (ipid,ifl,nm,ty) 
-       ; mkIRContinue "IP/Eq" workItem DropInert (workListFromCCan rewritten_ip) }
+       ; mkIRContinue "IP/Eq" workItem DropInert (workListFromNonEq rewritten_ip) }
 
 -- Two implicit parameter constraints.  If the names are the same,
 -- but their types are not, we generate a wanted type equality 
@@ -1075,7 +1065,7 @@ doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = ifl, cc_tyvar = tv, cc_
   | ifl `canRewrite` wfl 
   , tv `elemVarSet` tyVarsOfTypes (xi2:args) -- Rewrite RHS as well
   = do { rewritten_funeq <- rewriteFunEq (cv1,tv,xi1) (cv2,wfl,tc,args,xi2) 
-       ; mkIRStopK "Eq/FunEq" (workListFromCCan rewritten_funeq) } 
+       ; mkIRStopK "Eq/FunEq" (workListFromEq rewritten_funeq) } 
          -- Must Stop here, because we may no longer be inert after the rewritting.
 
 -- Inert: function equality, work item: equality
@@ -1085,7 +1075,7 @@ doInteractWithInert (CFunEqCan {cc_id = cv1, cc_flavor = ifl, cc_fun = tc
   | wfl `canRewrite` ifl
   , tv `elemVarSet` tyVarsOfTypes (xi1:args) -- Rewrite RHS as well
   = do { rewritten_funeq <- rewriteFunEq (cv2,tv,xi2) (cv1,ifl,tc,args,xi1) 
-       ; mkIRContinue "FunEq/Eq" workItem DropInert (workListFromCCan rewritten_funeq) } 
+       ; mkIRContinue "FunEq/Eq" workItem DropInert (workListFromEq rewritten_funeq) } 
          -- One may think that we could (KeepTransformedInert rewritten_funeq) 
          -- but that is wrong, because it may end up not being inert with respect 
          -- to future inerts. Example: 
@@ -1214,7 +1204,7 @@ rewriteEqRHS (cv1,tv1,xi1) (cv2,gw,tv2,xi2)
   | Just tv2' <- tcGetTyVar_maybe xi2'
   , tv2 == tv2'	 -- In this case xi2[xi1/tv1] = tv2, so we have tv2~tv2
   = do { when (isWanted gw) (setCoBind cv2 (mkSymCoercion co2')) 
-       ; return emptyCCan } 
+       ; return emptyWorkList } 
   | otherwise
   = do { cv2' <- newCoVar (mkTyVarTy tv2) xi2'
        ; case gw of
@@ -1223,7 +1213,7 @@ rewriteEqRHS (cv1,tv1,xi1) (cv2,gw,tv2,xi2)
              Given {}  -> setCoBind cv2' $ mkCoVarCoercion cv2 `mkTransCoercion` 
                                            co2'
              Derived {} -> return ()
-       ; canEq gw cv2' (mkTyVarTy tv2) xi2' }
+       ; canEqToWorkList gw cv2' (mkTyVarTy tv2) xi2' }
   where 
     xi2' = substTyWith [tv1] [xi1] xi2 
     co2' = substTyWith [tv1] [mkCoVarCoercion cv1] xi2  -- xi2 ~ xi2[xi1/tv1]
@@ -1269,7 +1259,7 @@ rewriteFrozen (cv1, tv1, xi1) (cv2, fl2)
 
              Derived {} -> return ()
 
-      ; return (singleCCan $ CFrozenErr { cc_id = cv2', cc_flavor = fl2 }) }
+      ; return (workListFromNonEq $ CFrozenErr { cc_id = cv2', cc_flavor = fl2 }) }
   where
     (ty2a, ty2b) = coVarKind cv2          -- cv2 : ty2a ~ ty2b
     ty2a' = substTyWith [tv1] [xi1] ty2a
@@ -1750,7 +1740,7 @@ doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = fl@(Wanted loc)
                            ; let workItem' = CDictCan { cc_id = dv', cc_flavor = fl, 
                                                         cc_class = cls, cc_tyargs = xis' }
                            ; return $ 
-                             SomeTopInt { tir_new_work  = singleCCan workItem' `andCCan` fd_work
+                             SomeTopInt { tir_new_work  = workListFromNonEq workItem' `unionWorkList` fd_work
                                         , tir_new_inert = Stop } } }
 
            GenInst wtvs ev_term -- Solved 

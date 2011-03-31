@@ -1,7 +1,7 @@
 \begin{code}
 module TcCanonical(
-    mkCanonical, mkCanonicals, mkCanonicalFEV, canWanteds, canGivens,
-    canOccursCheck, canEq,
+    mkCanonical, mkCanonicals, mkCanonicalFEV, mkCanonicalFEVs, canWanteds, canGivens,
+    canOccursCheck, canEqToWorkList,
     rewriteWithFunDeps
  ) where
 
@@ -218,28 +218,35 @@ flattenPred ctxt (EqPred ty1 ty2)
 %************************************************************************
 
 \begin{code}
-canWanteds :: [WantedEvVar] -> TcS CanonicalCts 
-canWanteds = fmap andCCans . mapM (\(EvVarX ev loc) -> mkCanonical (Wanted loc) ev)
+canWanteds :: [WantedEvVar] -> TcS WorkList
+canWanteds = fmap unionWorkLists . mapM (\(EvVarX ev loc) -> mkCanonical (Wanted loc) ev)
 
-canGivens :: GivenLoc -> [EvVar] -> TcS CanonicalCts
+canGivens :: GivenLoc -> [EvVar] -> TcS WorkList
 canGivens loc givens = do { ccs <- mapM (mkCanonical (Given loc)) givens
-                          ; return (andCCans ccs) }
+                          ; return (unionWorkLists ccs) }
 
-mkCanonicals :: CtFlavor -> [EvVar] -> TcS CanonicalCts 
-mkCanonicals fl vs = fmap andCCans (mapM (mkCanonical fl) vs)
+mkCanonicals :: CtFlavor -> [EvVar] -> TcS WorkList
+mkCanonicals fl vs = fmap unionWorkLists (mapM (mkCanonical fl) vs)
 
-mkCanonicalFEV :: FlavoredEvVar -> TcS CanonicalCts
+mkCanonicalFEV :: FlavoredEvVar -> TcS WorkList
 mkCanonicalFEV (EvVarX ev fl) = mkCanonical fl ev
 
-mkCanonical :: CtFlavor -> EvVar -> TcS CanonicalCts
+mkCanonicalFEVs :: Bag FlavoredEvVar -> TcS WorkList
+mkCanonicalFEVs = foldrBagM canon_one emptyWorkList
+  where 	-- Preserves order (shouldn't be important, but curently
+  		--                  is important for the vectoriser)
+    canon_one fev wl = do { wl' <- mkCanonicalFEV fev
+                          ; return (unionWorkList wl' wl) }
+
+mkCanonical :: CtFlavor -> EvVar -> TcS WorkList
 mkCanonical fl ev = case evVarPred ev of 
-                        ClassP clas tys -> canClass fl ev clas tys 
-                        IParam ip ty    -> canIP    fl ev ip ty
-                        EqPred ty1 ty2  -> canEq    fl ev ty1 ty2 
+                        ClassP clas tys -> canClassToWorkList fl ev clas tys 
+                        IParam ip ty    -> canIPToWorkList    fl ev ip ty 
+                        EqPred ty1 ty2  -> canEqToWorkList    fl ev ty1 ty2 
                          
 
-canClass :: CtFlavor -> EvVar -> Class -> [TcType] -> TcS CanonicalCts 
-canClass fl v cn tys 
+canClassToWorkList :: CtFlavor -> EvVar -> Class -> [TcType] -> TcS WorkList
+canClassToWorkList fl v cn tys 
   = do { (xis,cos,ccs) <- flattenMany fl tys  -- cos :: xis ~ tys
        ; let no_flattening_happened = isEmptyCCan ccs
              dict_co = mkTyConCoercion (classTyCon cn) cos
@@ -256,13 +263,15 @@ canClass fl v cn tys
        -- Add the superclasses of this one here, See Note [Adding superclasses]. 
        -- But only if we are not simplifying the LHS of a rule. 
        ; sctx <- getTcSContext
-       ; sc_cts <- if simplEqsOnly sctx then return emptyCCan 
+       ; sc_cts <- if simplEqsOnly sctx then return emptyWorkList
                    else newSCWorkFromFlavored v_new fl cn xis
 
-       ; return (sc_cts `andCCan` ccs `extendCCans` CDictCan { cc_id     = v_new
-                                                             , cc_flavor = fl
-                                                             , cc_class  = cn 
-                                                             , cc_tyargs = xis }) }
+       ; return (sc_cts `unionWorkList` 
+                 workListFromEqs ccs `unionWorkList` 
+                 workListFromNonEq CDictCan { cc_id     = v_new
+                                           , cc_flavor = fl
+                                           , cc_class  = cn 
+                                           , cc_tyargs = xis }) }
 \end{code}
 
 Note [Adding superclasses]
@@ -330,12 +339,12 @@ happen.
 
 \begin{code}
 
-newSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS CanonicalCts
+newSCWorkFromFlavored :: EvVar -> CtFlavor -> Class -> [Xi] -> TcS WorkList
 -- Returns superclasses, see Note [Adding superclasses]
 newSCWorkFromFlavored ev orig_flavor cls xis 
   | isDerived orig_flavor 
-  = return emptyCCan  -- Deriveds don't yield more superclasses because we will
-                      -- add them transitively in the case of wanteds. 
+  = return emptyWorkList  -- Deriveds don't yield more superclasses because we will
+                          -- add them transitively in the case of wanteds. 
 
   | isGiven orig_flavor 
   = do { let sc_theta = immSuperClasses cls xis 
@@ -345,8 +354,8 @@ newSCWorkFromFlavored ev orig_flavor cls xis
        ; mkCanonicals flavor sc_vars }
 
   | isEmptyVarSet (tyVarsOfTypes xis) 
-  = return emptyCCan -- Wanteds with no variables yield no deriveds.
-                     -- See Note [Improvement from Ground Wanteds]
+  = return emptyWorkList -- Wanteds with no variables yield no deriveds.
+                         -- See Note [Improvement from Ground Wanteds]
 
   | otherwise -- Wanted case, just add those SC that can lead to improvement. 
   = do { let sc_rec_theta = transSuperClasses cls xis 
@@ -366,16 +375,20 @@ is_improvement_pty _ = False
 
 
 
-canIP :: CtFlavor -> EvVar -> IPName Name -> TcType -> TcS CanonicalCts
+canIPToWorkList :: CtFlavor -> EvVar -> IPName Name -> TcType -> TcS WorkList
 -- See Note [Canonical implicit parameter constraints] to see why we don't 
 -- immediately canonicalize (flatten) IP constraints. 
-canIP fl v nm ty 
-  = return $ singleCCan $ CIPCan { cc_id = v
-                                 , cc_flavor = fl
-                                 , cc_ip_nm = nm
-                                 , cc_ip_ty = ty } 
+canIPToWorkList fl v nm ty 
+  = return $ workListFromNonEq (CIPCan { cc_id = v
+                                      , cc_flavor = fl
+                                      , cc_ip_nm = nm
+                                      , cc_ip_ty = ty })
 
 -----------------
+canEqToWorkList :: CtFlavor -> EvVar -> Type -> Type -> TcS WorkList
+canEqToWorkList fl cv ty1 ty2 = do { cts <- canEq fl cv ty1 ty2 
+                         ; return $ workListFromEqs cts }
+
 canEq :: CtFlavor -> EvVar -> Type -> Type -> TcS CanonicalCts 
 canEq fl cv ty1 ty2 
   | tcEqType ty1 ty2	-- Dealing with equality here avoids
@@ -1020,15 +1033,15 @@ now!).
 \begin{code}
 rewriteWithFunDeps :: [Equation]
                    -> [Xi] -> CtFlavor
-                   -> TcS (Maybe ([Xi], [Coercion], CanonicalCts))
+                   -> TcS (Maybe ([Xi], [Coercion], WorkList))
 rewriteWithFunDeps eqn_pred_locs xis fl
  = do { fd_ev_poss <- mapM (instFunDepEqn fl) eqn_pred_locs
       ; let fd_ev_pos :: [(Int,FlavoredEvVar)]
             fd_ev_pos = concat fd_ev_poss
             (rewritten_xis, cos) = unzip (rewriteDictParams fd_ev_pos xis)
       ; fds <- mapM (\(_,fev) -> mkCanonicalFEV fev) fd_ev_pos
-      ; let fd_work = unionManyBags fds
-      ; if isEmptyBag fd_work 
+      ; let fd_work = unionWorkLists fds
+      ; if isEmptyWorkList fd_work 
         then return Nothing
         else return (Just (rewritten_xis, cos, fd_work)) }
 
