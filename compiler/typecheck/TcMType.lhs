@@ -364,8 +364,8 @@ writeMetaTyVarRef tyvar ref ty
 
   | otherwise
   = do { meta_details <- readMutVar ref; 
-       ; WARN( not (isFlexi meta_details), 
-                hang (text "Double update of meta tyvar")
+       ; ASSERT2( isFlexi meta_details, 
+                  hang (text "Double update of meta tyvar")
                    2 (ppr tyvar $$ ppr meta_details) )
 
          traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
