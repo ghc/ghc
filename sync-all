@@ -79,7 +79,7 @@ sub parsePackages {
     my @repos;
     my $lineNum;
 
-    open IN, "< packages.git" or die "Can't open packages file";
+    open IN, "< packages" or die "Can't open packages file";
     @repos = <IN>;
     close IN;
 

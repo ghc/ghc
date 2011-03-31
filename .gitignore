@@ -48,6 +48,7 @@ configure
 /libraries/haskeline/
 /libraries/haskell2010/
 /libraries/haskell98/
+/libraries/hoopl/
 /libraries/hpc/
 /libraries/integer-gmp/
 /libraries/integer-simple/
