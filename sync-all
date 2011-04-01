@@ -238,6 +238,9 @@ sub scmall {
                           or ($scm eq "git" and "send-email"));
                 $want_remote_repo = 1;
             }
+            elsif ($command =~ /^set-origin$/) {
+                @scm_args = ("remote", "set-url", "origin", $path);
+            }
             else {
                 die "Unknown command: $command";
             }
@@ -331,6 +334,7 @@ Supported commands:
   * --complete
   * --partial
  * send
+ * set-origin
 
 Available package-tags are:
 END
