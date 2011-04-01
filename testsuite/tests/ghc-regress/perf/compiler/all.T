@@ -102,9 +102,9 @@ test('T4801',
      [''])
 
 test('T3064',
-     [# expected value: 11 (x86/OSX):
+     [# expected value: 9 (x86/Linux 30-03-2011):
       if_wordsize(32,
-          compiler_stats_num_field('peak_megabytes_allocated', 11, 11)),
+          compiler_stats_num_field('peak_megabytes_allocated', 8, 11)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 14, 18)),
