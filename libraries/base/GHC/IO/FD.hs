@@ -139,9 +139,13 @@ writeBuf' fd buf = do
 -- opening files
 
 -- | Open a file and make an 'FD' for it.  Truncates the file to zero
--- size when the `IOMode` is `WriteMode`.  Puts the file descriptor
--- into non-blocking mode on Unix systems.
-openFile :: FilePath -> IOMode -> Bool -> IO (FD,IODeviceType)
+-- size when the `IOMode` is `WriteMode`.
+openFile
+  :: FilePath -- ^ file to open
+  -> IOMode   -- ^ mode in which to open the file
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> IO (FD,IODeviceType)
+
 openFile filepath iomode non_blocking =
   withFilePath filepath $ \ f ->
 
