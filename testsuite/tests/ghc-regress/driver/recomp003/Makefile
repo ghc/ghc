@@ -8,7 +8,8 @@ OBJSUFFIX = .o
 # recompilation.  Part of bug #1372.
 recomp003:
 	$(RM) A.hi A$(OBJSUFFIX) out
-	$(RM) Data/Char.hs Data/Char.hi Data/Char$(OBJSUFFIX)
+	$(RM) -rf Data
+	mkdir Data
 	'$(TEST_HC)' -c A.hs
 	echo "module Data.Char where" > Data/Char.hs
 	'$(TEST_HC)' -c Data/Char.hs
