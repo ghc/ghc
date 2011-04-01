@@ -133,8 +133,9 @@ test024:
 
 # test -odir with non-Haskell compilation
 test024a:
-	$(RM) -f B024a/stub.c
+	$(RM) -rf B024a
 	$(RM) -rf obj024a
+	mkdir B024a
 	mkdir obj024a
 	echo >B024a/stub.c
 	"$(TEST_HC)" -c B024a/stub.c -odir obj024a
