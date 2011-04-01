@@ -337,7 +337,9 @@ test062c:
 	"$(TEST_HC)" -v0 --make -main-is hello062c Hello062c.hs -o hello062c
 	./hello062c
 test062d:
-	$(RM) B062d/Hello062d.hs B062d/Hello062d.hi B062d/Hello062d$(OBJSUFFIX) B062d/Hello062d.hc hello062d
+	$(RM) -rf B062d
+	$(RM) hello062d
+	mkdir B062d
 	echo "module B062d.Hello062d (hello062d) where { hello062d = putStrLn \"ok\" }" >B062d/Hello062d.hs
 	"$(TEST_HC)" -v0 --make -main-is B062d.Hello062d.hello062d B062d/Hello062d.hs -o hello062d
 	./hello062d
