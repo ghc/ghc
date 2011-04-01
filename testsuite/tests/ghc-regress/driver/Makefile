@@ -344,7 +344,9 @@ test062d:
 	"$(TEST_HC)" -v0 --make -main-is B062d.Hello062d.hello062d B062d/Hello062d.hs -o hello062d
 	./hello062d
 test062e:
-	$(RM) B062e/Hello062e.hs B062e/Hello062e.hi B062e/Hello062e$(OBJSUFFIX) Hello062e.hc hello062e
+	$(RM) -rf B062e
+	$(RM) Hello062e.hc hello062e
+	mkdir B062e
 	echo "module B062e.Hello062e (main) where { main = putStrLn \"ok\" }" >B062e/Hello062e.hs
 	"$(TEST_HC)" -v0 --make -main-is B062e.Hello062e B062e/Hello062e.hs -o hello062e
 	./hello062e
