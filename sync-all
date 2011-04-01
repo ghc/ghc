@@ -116,12 +116,25 @@ sub warning {
 }
 
 sub scm {
+    my $dir = shift;
     my $scm = shift;
-    
-    message "== running $scm @_";
+    my $pwd;
+
+    if ($dir eq '.') {
+        message "== running $scm @_";
+    } else {
+        message "== $dir: running $scm @_";
+        $pwd = getcwd();
+        chdir($dir);
+    }
+
     system ($scm, @_) == 0
         or $ignore_failure
         or die "$scm failed: $?";
+
+    if ($dir ne '.') {
+        chdir($pwd);
+    }
 }
 
 sub repoexists {
@@ -149,6 +162,8 @@ sub scmall {
     my $wd_before = getcwd;
 
     my @scm_args;
+
+    my $pwd;
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
@@ -231,19 +246,20 @@ sub scmall {
             if (repoexists ($scm, $localpath)) {
                 if ($want_remote_repo) {
                     if ($scm eq "darcs") {
-                        scm ($scm, @scm_args, @_, "--repodir=$localpath", $path);
+                        scm (".", $scm, @scm_args, @_, "--repodir=$localpath", $path);
                     } else {
                         # git pull doesn't like to be used with --work-dir
-                        scm ($scm, "--git-dir=$localpath/.git", @scm_args, @_, $path, "master");
+                        # I couldn't find an alternative to chdir() here
+                        scm ($localpath, $scm, @scm_args, @_, $path, "master");
                     }
                 } else {
                     # git status *must* be used with --work-dir, if we don't chdir() to the dir
-                    scm ($scm, "--git-dir=$localpath/.git", "--work-tree=$localpath", @scm_args, @_);
+                    scm ($localpath, $scm, @scm_args, @_);
                 }
             }
             elsif ($local_repo_unnecessary) {
                 # Don't bother to change directory in this case
-                scm ($scm, @scm_args, @_);
+                scm (".", $scm, @scm_args, @_);
             }
             elsif ($tag eq "") {
                 message "== Required repo $localpath is missing! Skipping";
