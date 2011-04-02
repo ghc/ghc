@@ -27,35 +27,18 @@ There are two ways to get a source tree:
 
   which contains GHC itself and the "boot" libraries.
 
-  2. Check out the source code from darcs
-  ---------------------------------------
+  2. Check out the source code from git
+  -------------------------------------
 
-  The recommended way to get a darcs checkout is to start off by
-  downloading a snapshot with a name like:
+  First get the GHC git repository:
 
-      ghc-HEAD-2009-09-09-ghc-corelibs-testsuite.tar.bz2
-
-  from:
-
-      http://darcs.haskell.org/
-
-  and then untar it and bring it up-to-date with:
-
-     $ cd ghc
-     $ ./darcs-all get
-
-
-  Alternatively you can use darcs to get the repos, but it will take a
-  lot longer. First get the GHC darcs repository:
-
-    $ darcs get http://darcs.haskell.org/ghc/
+    $ git clone http://darcs.haskell.org/ghc.git/
 
   Then run the darcs-all script in that repository
   to get the other repositories:
 
      $ cd ghc
-     $ chmod +x darcs-all
-     $ ./darcs-all get
+     $ ./sync-all get
 
   This checks out the "boot" packages.
 
