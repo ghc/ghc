@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards, DoRec #-}
 
 module TT where
 
@@ -10,3 +10,10 @@ f d = x
 
 g :: T -> Int
 g (T {t1 = x, ..}) = x
+
+-- The fix to this test also affected the dorec checking code, hence this:
+h :: Maybe Int
+h = do
+    rec
+      T {t1 = x, ..} <- Just $ T 1 1
+    return x
