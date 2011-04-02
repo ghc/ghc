@@ -65,10 +65,10 @@ test('rn044',
      extra_clean(['Rn044_A.hi', 'Rn044_A.o', 'Rn044_B.hi', 'Rn044_B.o']),
      multimod_compile, ['rn044', '-v0'])
 test('rn045', normal, compile, [''])
-test('rn046', omit_ways(['optc', 'profc']), compile, ['-W'])
-test('rn047', omit_ways(['optc', 'profc']), compile, ['-W'])
-test('rn048', omit_ways(['optc', 'profc']), compile, ['-W'])
-test('rn049', omit_ways(['optc', 'profc']), compile, ['-W'])
+test('rn046', normal, compile, ['-W'])
+test('rn047', normal, compile, ['-W'])
+test('rn048', normal, compile, ['-W'])
+test('rn049', normal, compile, ['-W'])
 
 test('rn050',
      extra_clean(['Rn050_A.hi', 'Rn050_A.o']),
@@ -119,7 +119,7 @@ test('T2914', normal, compile, [''])
 test('T3221', normal, compile, [''])
 test('T3262', normal, compile, [''])
 test('T3371', normal, compile, [''])
-test('T1074b', omit_ways(['optc', 'profc']), compile, ['-Wall'])
+test('T1074b', normal, compile, ['-Wall'])
 test('T3640', normal, compile, [''])
 test('T3901', normal, compile, [''])
 test('T1954', normal, compile, [''])

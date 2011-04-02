@@ -15,7 +15,7 @@ test('simpl011', normal, compile, [''])
 test('simpl012', normal, compile, [''])
 test('simpl013', normal, compile, [''])
 test('simpl014', normal, compile, [''])
-test('simpl015', only_ways(['optc','optasm']), compile, [''])
+test('simpl015', only_ways(['optasm']), compile, [''])
 test('simpl016', normal, compile, [''])
 test('simpl017', normal, compile_fail, [''])
 test('simpl018', normal, compile, [''])
@@ -34,7 +34,7 @@ test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
 
 test('rule1', normal, compile, [''])
-test('rule2', only_ways(['optc','optasm']), compile, ['-dsuppress-uniques'])
+test('rule2', only_ways(['optasm']), compile, ['-dsuppress-uniques'])
 
 test('dfun-loop', normal, compile, [''])
 test('strict-float', normal, compile, [''])
@@ -43,28 +43,28 @@ test('T4203', normal, compile, [''])
 
 # With -prof -fvia-C, this test makes gcc go out to lunch, and the
 # testsuite driver times out.
-test('T3016', [ skip_if_fast, omit_ways(['optc','profc']) ], compile, [''])
+test('T3016', skip_if_fast, compile, [''])
 
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 
 test('T3234',
-     only_ways(['optc','optasm']),
+     only_ways(['optasm']),
      compile,
      ['-ddump-simpl-stats -dsuppress-uniques'])
 
-test('T3717', only_ways(['optc','optasm']), 
+test('T3717', only_ways(['optasm']), 
               compile, 
               ['-ddump-simpl -dsuppress-uniques'])
 
-test('spec-inline', only_ways(['optc','optasm']), 
+test('spec-inline', only_ways(['optasm']), 
               	    compile, 
               	    ['-O2 -ddump-simpl -dsuppress-uniques'])
-test('T4908', only_ways(['optc','optasm']), 
+test('T4908', only_ways(['optasm']), 
               compile, 
               ['-O2 -ddump-simpl -dsuppress-uniques'])
 
 test('T4930', [if_compiler_lt('ghc', '7.1', expect_fail),
-               only_ways(['optc','optasm'])],
+               only_ways(['optasm'])],
               compile, 
               ['-O -ddump-simpl -dsuppress-uniques'])
 
@@ -84,7 +84,7 @@ test('T4201',
      ['$MAKE -s --no-print-directory T4201'])
 
 test('T3772',
-#      only_ways(['optc','optasm']), 
+#      only_ways(['optasm']), 
      extra_clean(['T3772_A.hi', 'T3772_A.o']),
      run_command, ['$MAKE -s --no-print-directory T3772'])
 

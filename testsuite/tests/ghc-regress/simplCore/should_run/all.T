@@ -5,7 +5,7 @@
 
 # Only compile with optimisation
 def f( opts ):
-  opts.only_ways = ['optc','optasm']
+  opts.only_ways = ['optasm']
 
 setTestOpts(f)
 
@@ -32,15 +32,15 @@ test('T2486', normal, compile, [''])
 test('T2756', normal, compile_and_run, [''])
 test('T3437', extra_run_opts('+RTS -M10m'), compile_and_run, [''])
 
-test('SeqRule', only_ways(['optc','optasm']), compile_and_run, [''])
+test('SeqRule', only_ways(['optasm']), compile_and_run, [''])
 
 test('T3403', normal, compile_and_run, ['-package containers'])
 test('T3591', normal, compile_and_run, [''])
 test('T4814', normal, compile_and_run, [''])
 
 # Run this test *without* optimisation too
-test('T3959', only_ways(['normal','optc','optasm']), compile_and_run, [''])
-test('T3983', [only_ways(['normal','optc','optasm']),
+test('T3959', only_ways(['normal','optasm']), compile_and_run, [''])
+test('T3983', [only_ways(['normal','optasm']),
                extra_clean(['T3983_Foo.hi','T3983_Foo.o','T3983_Bar.hi','T3983_Bar.o',])], 
               multimod_compile_and_run, 
               ['T3983',''])
