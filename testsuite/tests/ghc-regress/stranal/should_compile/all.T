@@ -1,5 +1,5 @@
 # Only compile with optimisation
-setTestOpts( only_ways(['optc','optasm']) )
+setTestOpts( only_ways(['optasm']) )
 
 test('default', normal, compile, [''])
 test('fact', normal, compile, [''])

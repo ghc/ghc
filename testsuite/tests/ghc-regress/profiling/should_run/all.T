@@ -10,7 +10,7 @@ test('heapprof001',
      compile_and_run, [''])
 
 test('2592',
-     [only_ways(['profasm','profc']), req_profiling,
+     [only_ways(['profasm']), req_profiling,
       extra_run_opts('+RTS -M1m -RTS'), exit_code(251)],
      compile_and_run, [''])
 

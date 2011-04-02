@@ -16,7 +16,7 @@ test('space_leak_001',
                            #                 9331570416 (x86/Linux)
                            #                 9329073952 (x86/OS X)
                            #                 9327959840 (x86/Windows)
-      omit_ways(['profc','profasm','profthreaded','threaded1','threaded2'])
+      omit_ways(['profasm','profthreaded','threaded1','threaded2'])
       ],
      compile_and_run,
      [''])
@@ -26,6 +26,6 @@ test('T4334',
      [extra_run_opts('1000000 2 t'),
       stats_num_field('peak_megabytes_allocated', 1, 3),
       # prof ways don't work well with +RTS -V0
-      omit_ways(['profc','profasm','profthreaded'])
+      omit_ways(['profasm','profthreaded'])
       ],
      compile_and_run, [''])

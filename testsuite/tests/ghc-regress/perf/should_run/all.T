@@ -52,9 +52,7 @@ else:
 
 # I don't understand why optc and profc are giving slightly different results
 # on x86 here --SDM.
-test('T4321', [ omit_ways(['ghci']),
-                if_arch('i386', expect_fail_for(['optc','profc'])) ],
-                              compile_and_run, ['-O ' + sse2_opts])
+test('T4321', omit_ways(['ghci']), compile_and_run, ['-O ' + sse2_opts])
 
 test('T3736', normal, run_command, ['$MAKE -s --no-print-directory T3736'])
 test('T3738',
