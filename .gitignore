@@ -75,6 +75,12 @@ configure
 # -----------------------------------------------------------------------------
 # specific generated files
 
+/bindist-list
+/bindistprep/
+/bindisttest/HelloWorld
+/bindisttest/a/
+/bindisttest/install\ dir/
+/bindisttest/output
 /ch01.html
 /ch02.html
 /compiler/cmm/CmmLex.hs
@@ -109,6 +115,9 @@ configure
 /docs/man/ghc.1
 /docs/users_guide/ug-book.xml
 /docs/users_guide/ug-ent.xml
+/docs/users_guide/users_guide.xml
+/docs/users_guide/users_guide/
+/docs/users_guide/what_glasgow_exts_does.gen.xml
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
 /driver/mangler/dist/ghc-asm
@@ -144,6 +153,16 @@ configure
 /libraries/bin-package-db/ghc.mk
 /libraries/bootstrapping.conf
 /libraries/prologue.txt
+/libraries/doc-index*.html
+/libraries/frames.html
+/libraries/haddock-util.js
+/libraries/hslogo-16.png
+/libraries/index-frames.html
+/libraries/index.html
+/libraries/minus.gif
+/libraries/ocean.css
+/libraries/plus.gif
+/libraries/synopsis.png
 /libraries/stamp/
 /libraries/time/
 /libraries/*/dist-boot/
@@ -166,6 +185,7 @@ configure
 /rts/sm/Evac_thr.c
 /rts/sm/Scav_thr.c
 /stage3.package.conf
+/testsuite_summary.txt
 /testlog
 /utils/*/dist*/
 /utils/ext-core/Driver
