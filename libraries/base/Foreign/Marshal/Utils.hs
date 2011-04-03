@@ -118,8 +118,8 @@ toBool  = (/= 0)
 --
 -- * the 'nullPtr' is used to represent 'Nothing'
 --
-maybeNew :: (      a -> IO (Ptr a))
-         -> (Maybe a -> IO (Ptr a))
+maybeNew :: (      a -> IO (Ptr b))
+         -> (Maybe a -> IO (Ptr b))
 maybeNew  = maybe (return nullPtr)
 
 -- |Converts a @withXXX@ combinator into one marshalling a value wrapped
