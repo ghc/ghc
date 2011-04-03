@@ -74,8 +74,7 @@ this step has already been performed.
 
 These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).
-It can take a long time.  To customise the build, see the file
-HACKING.
+It can take a long time.  To customise the build, see the file HACKING.
 
 
 
