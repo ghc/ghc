@@ -825,7 +825,7 @@ readTextDevice' h_@Handle__{..} bbuf0 cbuf = do
                  then ioe_invalidCharacter
                  else return bbuf2
 
-  debugIO ("readTextDevice after reading: bbuf=" ++ summaryBuffer bbuf2)
+  debugIO ("readTextDevice' after reading: bbuf=" ++ summaryBuffer bbuf2)
 
   (bbuf3,cbuf') <- 
       case haDecoder of
@@ -837,7 +837,7 @@ readTextDevice' h_@Handle__{..} bbuf0 cbuf = do
                writeIORef haLastDecode (state, bbuf2)
                (encode decoder) bbuf2 cbuf
 
-  debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
+  debugIO ("readTextDevice' after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
         " bbuf=" ++ summaryBuffer bbuf3)
 
   writeIORef haByteBuffer bbuf3
