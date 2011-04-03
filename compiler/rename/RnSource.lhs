@@ -55,6 +55,7 @@ import Digraph		( SCC, flattenSCC, stronglyConnCompFromEdgedVertices )
 import Control.Monad
 import Maybes( orElse )
 import Data.Maybe
+import Data.List
 \end{code}
 
 \begin{code}
@@ -521,8 +522,8 @@ type variable environment iff -fglasgow-exts
 
 \begin{code}
 extendTyVarEnvForMethodBinds :: [LHsTyVarBndr Name]
-                             -> RnM (Bag (LHsBind Name), FreeVars)
-                             -> RnM (Bag (LHsBind Name), FreeVars)
+                             -> RnM (a, FreeVars)
+                             -> RnM (a, FreeVars)
 extendTyVarEnvForMethodBinds tyvars thing_inside
   = do	{ scoped_tvs <- xoptM Opt_ScopedTypeVariables
 	; if scoped_tvs then
@@ -791,19 +792,28 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 		       tcdMeths = mbinds, tcdATs = ats, tcdDocs = docs})
   = do	{ cname' <- lookupLocatedTopBndrRn cname
 
+          -- Split the signatures into those that apply to the class *methods*
+          -- and those that apply to the default instance *implementations*
+        ; let isMethodLSig (L _ sig) = case sig of
+                TypeSig _ _ -> True
+                IdSig _ -> True
+                FixSig _ -> True
+                _ -> False
+              (method_sigs, default_sigs) = partition isMethodLSig sigs
+
 	-- Tyvars scope over superclass context and method signatures
-	; ((tyvars', context', fds', ats', sigs'), stuff_fvs)
+	; ((tyvars', context', fds', ats', method_sigs'), stuff_fvs)
 	    <- bindTyVarsFV tyvars $ \ tyvars' -> do
          	 -- Checks for distinct tyvars
 	     { context' <- rnContext cls_doc context
 	     ; fds' <- rnFds cls_doc fds
 	     ; (ats', at_fvs) <- rnATs ats
-	     ; sigs' <- renameSigs Nothing okClsDclSig sigs
+	     ; method_sigs'    <- renameSigs Nothing okClsDclSig method_sigs
 	     ; let fvs = at_fvs `plusFV` 
                          extractHsCtxtTyNames context'	`plusFV`
-	                 hsSigsFVs sigs'
+	                 hsSigsFVs method_sigs'
 			 -- The fundeps have no free variables
-	     ; return ((tyvars', context', fds', ats', sigs'), fvs) }
+	     ; return ((tyvars', context', fds', ats', method_sigs'), fvs) }
 
 	-- No need to check for duplicate associated type decls
 	-- since that is done by RnNames.extendGlobalRdrEnvRn
@@ -825,7 +835,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	--	  op {| a*b |} (a*b)   = ...
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
-	; (mbinds', meth_fvs) 
+	; ((mbinds', default_sigs'), meth_fvs) 
 	    <- extendTyVarEnvForMethodBinds tyvars' $ do
 	    { name_env <- getLocalRdrEnv
 	    ; let gen_rdr_tyvars_w_locs = [ tv | tv <- extractGenericPatTyVars mbinds,
@@ -834,13 +844,21 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 		-- and the methods are already in scope
 	    ; gen_tyvars <- newLocalBndrsRn gen_rdr_tyvars_w_locs
-	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
+	    ; (mbinds', mbinds_fvs) <- rnMethodBinds (unLoc cname') (mkSigTvFn method_sigs') gen_tyvars mbinds
+	      -- Rename signatures that apply to the default implementations seperately,
+	      -- supplying the list of names for which the user supplied a default. This
+	      -- lets us error out if e.g. the user writes an INLINE signature for a method
+	      -- signature without supplying a default implementation.
+	    ; let default_xs = mkNameSet (collectHsBindsBinders mbinds')
+	    ; default_sigs' <- renameSigs (Just default_xs) okClsDclSig default_sigs
+	    ; let fvs = mbinds_fvs `plusFV` hsSigsFVs default_sigs'
+	    ; return ((mbinds', default_sigs'), fvs) }
 
   -- Haddock docs 
 	; docs' <- mapM (wrapLocM rnDocDecl) docs
 
 	; return (ClassDecl { tcdCtxt = context', tcdLName = cname', 
-			      tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
+			      tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = method_sigs' ++ default_sigs',
 			      tcdMeths = mbinds', tcdATs = ats', tcdDocs = docs'},
 	     	  meth_fvs `plusFV` stuff_fvs) }
   where
