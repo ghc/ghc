@@ -58,8 +58,8 @@ module HscMain
     , hscParseIdentifier
     , hscTcRcLookupName
     , hscTcRnGetInfo
-    , hscRnImportDecls
 #ifdef GHCI
+    , hscRnImportDecls
     , hscGetModuleExports
     , hscTcRnLookupRdrName
     , hscStmt, hscStmtWithLocation
@@ -294,7 +294,6 @@ hscTcRnGetInfo hsc_env name =
 hscGetModuleExports :: HscEnv -> Module -> IO (Maybe [AvailInfo])
 hscGetModuleExports hsc_env mdl =
   runHsc hsc_env $ ioMsgMaybe' $ getModuleExports hsc_env mdl
-#endif
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
@@ -311,6 +310,8 @@ hscRnImportDecls
 hscRnImportDecls hsc_env this_mod import_decls
   = runHsc hsc_env $ ioMsgMaybe $ initTc hsc_env HsSrcFile False this_mod $
           fmap tcg_rdr_env $ tcRnImports hsc_env this_mod import_decls
+
+#endif
 
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
