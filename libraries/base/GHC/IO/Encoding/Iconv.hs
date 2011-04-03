@@ -57,7 +57,8 @@ iconv_trace s
  | otherwise    = return ()
 
 puts :: String -> IO ()
-puts s = do _ <- withCStringLen (s ++ "\n") $ \(p, len) ->
+puts s = do _ <- withCAStringLen (s ++ "\n") $ \(p, len) ->
+                      -- In reality should be withCString, but assume ASCII to avoid loop
                      c_write 1 (castPtr p) (fromIntegral len)
             return ()
 
@@ -96,14 +97,17 @@ utf32le = unsafePerformIO (mkTextEncoding "UTF32LE")
 utf32be :: TextEncoding
 utf32be = unsafePerformIO (mkTextEncoding "UTF32BE")
 
-{-# NOINLINE localeEncoding #-}
-localeEncoding :: TextEncoding
-localeEncoding = unsafePerformIO $ do
+{-# NOINLINE localeEncodingName #-}
+localeEncodingName :: String
+localeEncodingName = unsafePerformIO $ do
    -- Use locale_charset() or nl_langinfo(CODESET) to get the encoding
    -- if we have either of them.
    cstr <- c_localeEncoding
-   r <- peekCString cstr
-   mkTextEncoding r
+   peekCAString cstr -- Assume charset names are ASCII
+
+{-# NOINLINE localeEncoding #-}
+localeEncoding :: TextEncoding
+localeEncoding = unsafePerformIO $ mkTextEncoding localeEncodingName
 
 -- We hope iconv_t is a storable type.  It should be, since it has at least the
 -- value -1, which is a possible return value from iconv_open.
@@ -139,8 +143,8 @@ mkTextEncoding :: String -> IO TextEncoding
 mkTextEncoding charset = do
   return (TextEncoding { 
                 textEncodingName = charset,
-		mkTextDecoder = newIConv raw_charset (haskellChar ++ suffix) (iconvDecode cfm),
-		mkTextEncoder = newIConv haskellChar charset (iconvEncode cfm)})
+		mkTextDecoder = newIConv raw_charset (haskellChar ++ suffix) iconvDecode,
+		mkTextEncoder = newIConv haskellChar charset iconvEncode})
   where
     -- An annoying feature of GNU iconv is that the //PREFIXES only take
     -- effect when they appear on the tocode parameter to iconv_open:
@@ -150,8 +154,9 @@ newIConv :: String -> String
    -> (IConv -> Buffer a -> Buffer b -> IO (Buffer a, Buffer b))
    -> IO (BufferCodec a b ())
 newIConv from to fn =
-  withCString from $ \ from_str ->
-  withCString to   $ \ to_str -> do
+  -- Assume charset names are ASCII
+  withCAString from $ \ from_str ->
+  withCAString to   $ \ to_str -> do
     iconvt <- throwErrnoIfMinus1 "mkTextEncoding" $ hs_iconv_open to_str from_str
     let iclose = throwErrnoIfMinus1_ "Iconv.close" $ hs_iconv_close iconvt
     return BufferCodec{
