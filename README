@@ -34,7 +34,7 @@ There are two ways to get a source tree:
 
     $ git clone http://darcs.haskell.org/ghc.git/
 
-  Then run the darcs-all script in that repository
+  Then run the sync-all script in that repository
   to get the other repositories:
 
      $ cd ghc
@@ -54,7 +54,7 @@ NB. you need GHC installed in order to build GHC, because the compiler
 is itself written in Haskell.  For instructions on how to port GHC to a
 new platform, see the Building Guide.
 
-If you're building from darcs sources (as opposed to a source
+If you're building from git sources (as opposed to a source
 distribution) then you also need to install Happy [4] and Alex [5].
 
 For building library documentation, you'll need Haddock [6].  To build
@@ -69,7 +69,7 @@ Quick start:  the following gives you a default build:
     $ make install
 
 The "perl boot" step is only necessary if this is a tree checked out
-from darcs.  For source distributions downloaded from GHC's web site,
+from git.  For source distributions downloaded from GHC's web site,
 this step has already been performed.
 
 These steps give you the default build, which includes everything
