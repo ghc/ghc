@@ -22,8 +22,9 @@
 -- foreign functions or to provide space in which compound result values
 -- are obtained from foreign functions.
 -- 
--- If any of the allocation functions fails, a value of 'nullPtr' is
--- produced.  If 'free' or 'reallocBytes' is applied to a memory area
+-- If any of the allocation functions fails, an exception is thrown.
+-- In some cases, memory exhaustion may mean the process is terminated.
+-- If 'free' or 'reallocBytes' is applied to a memory area
 -- that has been allocated with 'alloca' or 'allocaBytes', the
 -- behaviour is undefined.  Any further access to memory areas allocated with
 -- 'alloca' or 'allocaBytes', after the computation that was passed to
