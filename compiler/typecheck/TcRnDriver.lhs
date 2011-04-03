@@ -9,7 +9,7 @@ module TcRnDriver (
 #ifdef GHCI
 	tcRnStmt, tcRnExpr, tcRnType,
 	tcRnLookupRdrName,
-	getModuleExports, 
+	tcRnImports, getModuleExports, 
 #endif
 	tcRnLookupName,
 	tcRnGetInfo,

@@ -97,7 +97,6 @@ import SrcLoc
 import TcRnDriver
 import TcIface		( typecheckIface )
 import TcRnMonad
-import RnNames          ( rnImports )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
@@ -306,11 +305,12 @@ hscRnImportDecls
         -> [LImportDecl RdrName]
         -> IO GlobalRdrEnv
 
-hscRnImportDecls hsc_env this_mod import_decls = runHsc hsc_env $ do
-  (_, r, _, _) <- 
-       ioMsgMaybe $ initTc hsc_env HsSrcFile False this_mod $
-          rnImports import_decls
-  return r
+-- It is important that we use tcRnImports instead of calling rnImports directly
+-- because tcRnImports will force-load any orphan modules necessary, making extra
+-- instances/family instances visible (GHC #4832)
+hscRnImportDecls hsc_env this_mod import_decls
+  = runHsc hsc_env $ ioMsgMaybe $ initTc hsc_env HsSrcFile False this_mod $
+          fmap tcg_rdr_env $ tcRnImports hsc_env this_mod import_decls
 
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
