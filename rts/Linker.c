@@ -1565,6 +1565,7 @@ mmapForLinker (size_t bytes, nat flags, int fd)
    int pagesize, size;
    static nat fixed = 0;
 
+   IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    pagesize = getpagesize();
    size = ROUND_UP(bytes, pagesize);
 
@@ -1576,6 +1577,8 @@ mmap_again:
    }
 #endif
 
+   IF_DEBUG(linker, debugBelch("mmapForLinker: \tprotection %#0x\n", PROT_EXEC | PROT_READ | PROT_WRITE));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: \tflags      %#0x\n", MAP_PRIVATE | TRY_MAP_32BIT | fixed | flags));
    result = mmap(map_addr, size, PROT_EXEC|PROT_READ|PROT_WRITE,
                     MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
@@ -1623,6 +1626,8 @@ mmap_again:
    }
 #endif
 
+   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %lu bytes starting at %p\n", (lnat)size, result));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: done\n"));
    return result;
 }
 #endif // USE_MMAP
@@ -1638,6 +1643,7 @@ mkOc( char *path, char *image, int imageSize,
     ) {
    ObjectCode* oc;
 
+   IF_DEBUG(linker, debugBelch("mkOc: start\n"));
    oc = stgMallocBytes(sizeof(ObjectCode), "loadArchive(oc)");
 
 #  if defined(OBJFORMAT_ELF)
@@ -1679,6 +1685,7 @@ mkOc( char *path, char *image, int imageSize,
    oc->next              = objects;
    objects               = oc;
 
+   IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
 }
 
@@ -1701,6 +1708,7 @@ loadArchive( char *path )
     int misalignment;
 #endif
 
+    IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
 
     gnuFileIndex = NULL;
@@ -1714,19 +1722,32 @@ loadArchive( char *path )
         barf("loadObj: can't read `%s'", path);
 
     n = fread ( tmp, 1, 8, f );
-    if (strncmp(tmp, "!<arch>\n", 8) != 0)
+    if (strncmp(tmp, "!<arch>\n", 8) != 0) {
         barf("loadArchive: Not an archive: `%s'", path);
+    }
+
+    IF_DEBUG(linker, debugBelch("loadArchive: loading archive contents\n"));
 
     while(1) {
         n = fread ( fileName, 1, 16, f );
         if (n != 16) {
             if (feof(f)) {
+                IF_DEBUG(linker, debugBelch("loadArchive: EOF while reading from '%s'\n", path));
                 break;
             }
             else {
                 barf("loadArchive: Failed reading file name from `%s'", path);
             }
         }
+#if defined(darwin_HOST_OS)
+        else {
+            if (strncmp(fileName, "!<arch>\n", 8) == 0) {
+                IF_DEBUG(linker, debugBelch("loadArchive: found the start of another archive, breaking\n"));
+                break;
+            }
+        }
+#endif
+
         n = fread ( tmp, 1, 12, f );
         if (n != 12)
             barf("loadArchive: Failed reading mod time from `%s'", path);
@@ -1746,6 +1767,8 @@ loadArchive( char *path )
         for (n = 0; isdigit(tmp[n]); n++);
         tmp[n] = '\0';
         memberSize = atoi(tmp);
+
+        IF_DEBUG(linker, debugBelch("loadArchive: size of this archive member is %d\n", memberSize));
         n = fread ( tmp, 1, 2, f );
         if (strncmp(tmp, "\x60\x0A", 2) != 0)
             barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c",
@@ -1772,6 +1795,11 @@ loadArchive( char *path )
                          path);
                 }
                 fileName[thisFileNameSize] = 0;
+
+                /* On OS X at least, thisFileNameSize is the size of the
+                   fileName field, not the length of the fileName
+                   itself. */
+                thisFileNameSize = strlen(fileName);
             }
             else {
                 barf("loadArchive: BSD-variant filename size not found while reading filename from `%s'", path);
@@ -1857,6 +1885,9 @@ loadArchive( char *path )
                 && fileName[thisFileNameSize - 2] == '.'
                 && fileName[thisFileNameSize - 1] == 'o';
 
+        IF_DEBUG(linker, debugBelch("loadArchive: \tthisFileNameSize = %d\n", (int)thisFileNameSize));
+        IF_DEBUG(linker, debugBelch("loadArchive: \tisObject = %d\n", isObject));
+
         if (isObject) {
             char *archiveMemberName;
 
@@ -1922,23 +1953,29 @@ loadArchive( char *path )
             gnuFileIndexSize = memberSize;
         }
         else {
+            IF_DEBUG(linker, debugBelch("loadArchive: '%s' does not appear to be an object file\n", fileName));
             n = fseek(f, memberSize, SEEK_CUR);
             if (n != 0)
                 barf("loadArchive: error whilst seeking by %d in `%s'",
                      memberSize, path);
         }
+
         /* .ar files are 2-byte aligned */
         if (memberSize % 2) {
+            IF_DEBUG(linker, debugBelch("loadArchive: trying to read one pad byte\n"));
             n = fread ( tmp, 1, 1, f );
             if (n != 1) {
                 if (feof(f)) {
+                    IF_DEBUG(linker, debugBelch("loadArchive: found EOF while reading one pad byte\n"));
                     break;
                 }
                 else {
                     barf("loadArchive: Failed reading padding from `%s'", path);
                 }
             }
+            IF_DEBUG(linker, debugBelch("loadArchive: successfully read one pad byte\n"));
         }
+        IF_DEBUG(linker, debugBelch("loadArchive: reached end of archive loading while loop\n"));
     }
 
     fclose(f);
@@ -1952,6 +1989,7 @@ loadArchive( char *path )
 #endif
     }
 
+    IF_DEBUG(linker, debugBelch("loadArchive: done\n"));
     return 1;
 }
 
@@ -2079,18 +2117,18 @@ static HsInt
 loadOc( ObjectCode* oc ) {
    int r;
 
-   IF_DEBUG(linker, debugBelch("loadOc\n"));
+   IF_DEBUG(linker, debugBelch("loadOc: start\n"));
 
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_ELF) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_ELF failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
        return r;
    }
 #endif
@@ -2106,7 +2144,7 @@ loadOc( ObjectCode* oc ) {
    barf("loadObj: no verify method");
 #  endif
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocVerifyImage_* failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocVerifyImage_* failed\n"));
        return r;
    }
 
@@ -2121,13 +2159,13 @@ loadOc( ObjectCode* oc ) {
    barf("loadObj: no getNames method");
 #  endif
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocGetNames_* failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocGetNames_* failed\n"));
        return r;
    }
 
    /* loaded, but not resolved yet */
    oc->status = OBJECT_LOADED;
-   IF_DEBUG(linker, debugBelch("loadObj done.\n"));
+   IF_DEBUG(linker, debugBelch("loadOc: done.\n"));
 
    return 1;
 }
@@ -2233,11 +2271,13 @@ unloadObj( char *path )
  * which may be prodded during relocation, and abort if we try and write
  * outside any of these.
  */
-static void addProddableBlock ( ObjectCode* oc, void* start, int size )
+static void
+addProddableBlock ( ObjectCode* oc, void* start, int size )
 {
    ProddableBlock* pb
       = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
-   IF_DEBUG(linker, debugBelch("addProddableBlock %p %p %d\n", oc, start, size));
+
+   IF_DEBUG(linker, debugBelch("addProddableBlock: %p %p %d\n", oc, start, size));
    ASSERT(size > 0);
    pb->start      = start;
    pb->size       = size;
@@ -2245,9 +2285,11 @@ static void addProddableBlock ( ObjectCode* oc, void* start, int size )
    oc->proddables = pb;
 }
 
-static void checkProddableBlock ( ObjectCode* oc, void* addr )
+static void
+checkProddableBlock (ObjectCode *oc, void *addr )
 {
    ProddableBlock* pb;
+
    for (pb = oc->proddables; pb != NULL; pb = pb->next) {
       char* s = (char*)(pb->start);
       char* e = s + pb->size - 1;
@@ -2263,7 +2305,8 @@ static void checkProddableBlock ( ObjectCode* oc, void* addr )
 /* -----------------------------------------------------------------------------
  * Section management.
  */
-static void addSection ( ObjectCode* oc, SectionKind kind,
+static void
+addSection ( ObjectCode* oc, SectionKind kind,
                          void* start, void* end )
 {
    Section* s   = stgMallocBytes(sizeof(Section), "addSection");
@@ -2272,10 +2315,9 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
    s->kind      = kind;
    s->next      = oc->sections;
    oc->sections = s;
-   /*
-   debugBelch("addSection: %p-%p (size %d), kind %d\n",
-                   start, ((char*)end)-1, end - start + 1, kind );
-   */
+
+   IF_DEBUG(linker, debugBelch("addSection: %p-%p (size %ld), kind %d\n",
+                               start, ((char*)end)-1, (long)end - (long)start + 1, kind ));
 }
 
 
@@ -2416,7 +2458,9 @@ static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
    Because the PPC has split data/instruction caches, we have to
    do that whenever we modify code at runtime.
  */
-static void ocFlushInstructionCacheFrom(void* begin, size_t length)
+
+static void
+ocFlushInstructionCacheFrom(void* begin, size_t length)
 {
     size_t         n = (length + 3) / 4;
     unsigned long* p = begin;
@@ -2435,7 +2479,9 @@ static void ocFlushInstructionCacheFrom(void* begin, size_t length)
                        "isync"
                      );
 }
-static void ocFlushInstructionCache( ObjectCode *oc )
+
+static void
+ocFlushInstructionCache( ObjectCode *oc )
 {
     /* The main object code */
     ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
@@ -2443,7 +2489,8 @@ static void ocFlushInstructionCache( ObjectCode *oc )
     /* Jump Islands */
     ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
 }
-#endif
+#endif /* powerpc_HOST_ARCH */
+
 
 /* --------------------------------------------------------------------------
  * PEi386 specifics (Win32 targets)
@@ -4413,78 +4460,99 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 #endif
 
 #ifdef powerpc_HOST_ARCH
-static int ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+static int
+ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 {
     struct mach_header *header = (struct mach_header *) oc->image;
     struct load_command *lc = (struct load_command *) (header + 1);
     unsigned i;
 
-    for( i = 0; i < header->ncmds; i++ )
-    {
-        if( lc->cmd == LC_SYMTAB )
-        {
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
+
+    for (i = 0; i < header->ncmds; i++) {   
+        if (lc->cmd == LC_SYMTAB) {
+
                 // Find out the first and last undefined external
                 // symbol, so we don't have to allocate too many
-                // jump islands.
+            // jump islands/GOT entries.
+
             struct symtab_command *symLC = (struct symtab_command *) lc;
             unsigned min = symLC->nsyms, max = 0;
             struct nlist *nlist =
                 symLC ? (struct nlist*) ((char*) oc->image + symLC->symoff)
                       : NULL;
-            for(i=0;i<symLC->nsyms;i++)
-            {
-                if(nlist[i].n_type & N_STAB)
+
+            for (i = 0; i < symLC->nsyms; i++) {
+
+                if (nlist[i].n_type & N_STAB) {
                     ;
-                else if(nlist[i].n_type & N_EXT)
-                {
+                } else if (nlist[i].n_type & N_EXT) {
+
                     if((nlist[i].n_type & N_TYPE) == N_UNDF
-                        && (nlist[i].n_value == 0))
-                    {
-                        if(i < min)
+                        && (nlist[i].n_value == 0)) {
+
+                        if (i < min) {
                             min = i;
-                        if(i > max)
+                        }
+
+                        if (i > max) {
                             max = i;
                     }
                 }
             }
-            if(max >= min)
+            }
+
+            if (max >= min) {
                 return ocAllocateSymbolExtras(oc, max - min + 1, min);
+            }
 
             break;
         }
 
         lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
+
     return ocAllocateSymbolExtras(oc,0,0);
 }
+
 #endif
 #ifdef x86_64_HOST_ARCH
-static int ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+static int
+ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 {
     struct mach_header *header = (struct mach_header *) oc->image;
     struct load_command *lc = (struct load_command *) (header + 1);
     unsigned i;
 
-    for( i = 0; i < header->ncmds; i++ )
-    {
-        if( lc->cmd == LC_SYMTAB )
-        {
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
+
+    for (i = 0; i < header->ncmds; i++) {   
+        if (lc->cmd == LC_SYMTAB) {
+
                 // Just allocate one entry for every symbol
             struct symtab_command *symLC = (struct symtab_command *) lc;
 
+            IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: allocate %d symbols\n", symLC->nsyms));
+            IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: done\n"));
             return ocAllocateSymbolExtras(oc, symLC->nsyms, 0);
         }
 
         lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
+
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: allocated no symbols\n"));
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: done\n"));
     return ocAllocateSymbolExtras(oc,0,0);
 }
 #endif
 
-static int ocVerifyImage_MachO(ObjectCode* oc)
+static int
+ocVerifyImage_MachO(ObjectCode * oc)
 {
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
+
+    IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: start\n"));
 
 #if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
     if(header->magic != MH_MAGIC_64) {
@@ -4499,11 +4567,14 @@ static int ocVerifyImage_MachO(ObjectCode* oc)
         return 0;
     }
 #endif
+
     // FIXME: do some more verifying here
+    IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: done\n"));
     return 1;
 }
 
-static int resolveImports(
+static int
+resolveImports(
     ObjectCode* oc,
     char *image,
     struct symtab_command *symLC,
@@ -4518,12 +4589,13 @@ static int resolveImports(
 
 #if i386_HOST_ARCH
     int isJumpTable = 0;
-    if(!strcmp(sect->sectname,"__jump_table"))
-    {
+
+    if (strcmp(sect->sectname,"__jump_table") == 0) {
         isJumpTable = 1;
         itemSize = 5;
         ASSERT(sect->reserved2 == itemSize);
     }
+
 #endif
 
     for(i=0; i*itemSize < sect->size;i++)
@@ -4534,6 +4606,7 @@ static int resolveImports(
         void *addr = NULL;
 
         IF_DEBUG(linker, debugBelch("resolveImports: resolving %s\n", nm));
+
         if ((symbol->n_type & N_TYPE) == N_UNDF
             && (symbol->n_type & N_EXT) && (symbol->n_value != 0)) {
             addr = (void*) (symbol->n_value);
@@ -4550,10 +4623,10 @@ static int resolveImports(
         ASSERT(addr);
 
 #if i386_HOST_ARCH
-        if(isJumpTable)
-        {
+        if (isJumpTable) {
             checkProddableBlock(oc,image + sect->offset + i*itemSize);
-            *(image + sect->offset + i*itemSize) = 0xe9; // jmp
+
+            *(image + sect->offset + i * itemSize) = 0xe9; // jmp opcode
             *(unsigned*)(image + sect->offset + i*itemSize + 1)
                 = (char*)addr - (image + sect->offset + i*itemSize + 5);
         }
