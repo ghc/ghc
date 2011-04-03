@@ -43,13 +43,13 @@ while (<PACKAGES>) {
         # If $tag is not "-" then it is an optional repository, so its
         # absence isn't an error.
         if (defined($required_tag{$tag})) {
-            # We would like to just check for an _darcs directory here,
-            # but in an lndir tree we avoid making _darcs directories,
+            # We would like to just check for a .git directory here,
+            # but in an lndir tree we avoid making .git directories,
             # so it doesn't exist. We therefore require that every repo
             # has a LICENSE file instead.
             if (! -f "$dir/LICENSE") {
                 print STDERR "Error: $dir/LICENSE doesn't exist.\n";
-                die "Maybe you haven't done './darcs-all get'?";
+                die "Maybe you haven't done './sync-all get'?";
             }
         }
     }
@@ -70,10 +70,3 @@ foreach $dir (".", glob("libraries/*/")) {
     }
 }
 
-# Alas, darcs doesn't handle file permissions, so fix a few of them.
-for my $file ("boot", "darcs-all", "validate") {
-    if (-f $file) {
-        chmod 0755, $file
-            or die "Can't chmod 0755 $file: $!";
-    }
-}
