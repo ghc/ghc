@@ -744,19 +744,24 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 --
 -- > inits "abc" == ["","a","ab","abc"]
 --
+-- Note that 'inits' has the following strictness property:
+-- @inits _|_ = [] : _|_@
 inits                   :: [a] -> [[a]]
-inits []                =  [[]]
-inits (x:xs)            =  [[]] ++ map (x:) (inits xs)
+inits xs                =  [] : case xs of
+                                  []      -> []
+                                  x : xs' -> map (x :) (inits xs')
 
 -- | The 'tails' function returns all final segments of the argument,
 -- longest first.  For example,
 --
 -- > tails "abc" == ["abc", "bc", "c",""]
 --
+-- Note that 'tails' has the following strictness property:
+-- @tails _|_ = _|_ : _|_@
 tails                   :: [a] -> [[a]]
-tails []                =  [[]]
-tails xxs@(_:xs)        =  xxs : tails xs
-
+tails xs                =  xs : case xs of
+                                  []      -> []
+                                  _ : xs' -> tails xs'
 
 -- | The 'subsequences' function returns the list of all subsequences of the argument.
 --
