@@ -25,6 +25,9 @@ for $tarball (@tarballs) {
     if (-d "libraries/$package/_darcs") {
         print "Ignoring libraries/$package as it looks like a darcs checkout\n"
     }
+    elsif (-d "libraries/$package/.git") {
+        print "Ignoring libraries/$package as it looks like a git checkout\n"
+    }
     else {
         if (! -d "libraries/stamp") {
             mkdir "libraries/stamp";

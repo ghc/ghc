@@ -245,11 +245,18 @@ dataConInfoPtrToName x = do
          where
          (modWords, occWord) = ASSERT (length rest1 > 0) (parseModOcc [] (tail rest1))
       parseModOcc :: [[Word8]] -> [Word8] -> ([[Word8]], [Word8])
-      parseModOcc acc str
+      -- We only look for dots if str could start with a module name,
+      -- i.e. if it starts with an upper case character.
+      -- Otherwise we might think that "X.:->" is the module name in
+      -- "X.:->.+", whereas actually "X" is the module name and
+      -- ":->.+" is a constructor name.
+      parseModOcc acc str@(c : _)
+       | isUpper $ chr $ fromIntegral c
          = case break (== dot) str of
               (top, []) -> (acc, top)
-              (top, _:bot) -> parseModOcc (top : acc) bot
-       
+              (top, _ : bot) -> parseModOcc (top : acc) bot
+      parseModOcc acc str = (acc, str)
+
 -- | Get the 'HValue' associated with the given name.
 --
 -- May cause loading the module that contains the name.
