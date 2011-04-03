@@ -41,6 +41,7 @@ import Data.Maybe
 import GHC.Base
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Types
+import GHC.List (span)
 import GHC.Num
 import GHC.Show
 import GHC.Real
@@ -138,8 +139,12 @@ mkTextEncoding :: String -> IO TextEncoding
 mkTextEncoding charset = do
   return (TextEncoding { 
                 textEncodingName = charset,
-		mkTextDecoder = newIConv charset haskellChar iconvDecode,
-		mkTextEncoder = newIConv haskellChar charset iconvEncode})
+		mkTextDecoder = newIConv raw_charset (haskellChar ++ suffix) (iconvDecode cfm),
+		mkTextEncoder = newIConv haskellChar charset (iconvEncode cfm)})
+  where
+    -- An annoying feature of GNU iconv is that the //PREFIXES only take
+    -- effect when they appear on the tocode parameter to iconv_open:
+    (raw_charset, suffix) = span (/= '/') charset
 
 newIConv :: String -> String
    -> (IConv -> Buffer a -> Buffer b -> IO (Buffer a, Buffer b))
