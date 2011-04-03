@@ -163,7 +163,7 @@ module Pretty (
 
         empty, isEmpty, nest,
 
-        char, text, ftext, ptext,
+        char, text, ftext, ptext, zeroWidthText,
         int, integer, float, double, rational,
         parens, brackets, braces, quotes, doubleQuotes,
         semi, comma, colon, space, equals,
@@ -224,6 +224,10 @@ The primitive @Doc@ values
 \begin{code}
 empty                     :: Doc
 isEmpty                   :: Doc    -> Bool
+-- | Some text, but without any width. Use for non-printing text
+-- such as a HTML or Latex tags
+zeroWidthText :: String   -> Doc
+
 text                      :: String -> Doc
 char                      :: Char -> Doc
 
@@ -560,6 +564,7 @@ ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}
 ptext :: LitString -> Doc
 ptext s_= case iUnbox (lengthLS s) of {sl -> textBeside_ (LStr s sl) sl Empty}
   where s = {-castPtr-} s_
+zeroWidthText s = textBeside_ (Str s) (_ILIT(0)) Empty
 
 #if defined(__GLASGOW_HASKELL__)
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
