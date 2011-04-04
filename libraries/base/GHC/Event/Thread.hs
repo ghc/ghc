@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns, ForeignFunctionInterface, NoImplicitPrelude #-}
 
 module GHC.Event.Thread
-    (
-      ensureIOManagerIsRunning
+    ( getSystemEventManager
+    , ensureIOManagerIsRunning
     , threadWaitRead
     , threadWaitWrite
     , closeFdWith
@@ -36,7 +36,7 @@ import System.Posix.Types (Fd)
 -- run /earlier/ than specified.
 threadDelay :: Int -> IO ()
 threadDelay usecs = mask_ $ do
-  Just mgr <- readIORef eventManager
+  Just mgr <- getSystemEventManager
   m <- newEmptyMVar
   reg <- registerTimeout mgr usecs (putMVar m ())
   takeMVar m `onException` M.unregisterTimeout mgr reg
@@ -47,7 +47,7 @@ threadDelay usecs = mask_ $ do
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs = do
   t <- atomically $ newTVar False
-  Just mgr <- readIORef eventManager
+  Just mgr <- getSystemEventManager
   _ <- registerTimeout mgr usecs . atomically $ writeTVar t True
   return t
 
@@ -80,18 +80,25 @@ closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
 closeFdWith close fd = do
-  Just mgr <- readIORef eventManager
+  Just mgr <- getSystemEventManager
   M.closeFd mgr close fd
 
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
   m <- newEmptyMVar
-  Just mgr <- readIORef eventManager
+  Just mgr <- getSystemEventManager
   reg <- registerFd mgr (\reg e -> unregisterFd_ mgr reg >> putMVar m e) fd evt
   evt' <- takeMVar m `onException` unregisterFd_ mgr reg
   if evt' `eventIs` evtClose
     then ioError $ errnoToIOError "threadWait" eBADF Nothing Nothing
     else return ()
+
+-- | Retrieve the system event manager.
+--
+-- This function always returns 'Just' the system event manager when using the
+-- threaded RTS and 'Nothing' otherwise.
+getSystemEventManager :: IO (Maybe EventManager)
+getSystemEventManager = readIORef eventManager
 
 foreign import ccall unsafe "getOrSetSystemEventThreadEventManagerStore"
     getOrSetSystemEventThreadEventManagerStore :: Ptr a -> IO (Ptr a)
