@@ -59,6 +59,8 @@ use Cwd;
 # root one.  So the remote repos must be laid out in one of the two
 # formats given by <local-path> and <remote-path> in the file 'packages'.
 
+$| = 1; # autoflush stdout after each print, to avoid output after die
+
 my $defaultrepo;
 my @packages;
 my $verbose = 2;
