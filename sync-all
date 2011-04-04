@@ -167,6 +167,8 @@ sub scmall {
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
+    my $is_github_repo = $repo_base =~ m/(git@|git:\/\/)github.com/;
+
     parsePackages;
 
     for $line (@packages) {
@@ -176,6 +178,12 @@ sub scmall {
             $remotepath = $$line{"remotepath"};
             $scm        = $$line{"vcs"};
             $upstream   = $$line{"upstream"};
+
+            # We can't create directories on GitHub, so we translate
+            # "package/foo" into "package-foo".
+            if ($is_github_repo) {
+                $remotepath =~ s/\//-/;
+            }
 
             # Check the SCM is OK as early as possible
             die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
