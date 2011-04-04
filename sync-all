@@ -3,6 +3,62 @@
 use strict;
 use Cwd;
 
+# Usage:
+#
+# ./sync-all [-q] [-s] [--ignore-failure] [-r repo]
+#            [--nofib] [--testsuite] [--checked-out] cmd [git flags]
+#
+# Applies the command "cmd" to each repository in the tree.
+# sync-all will try to do the right thing for both git and darcs repositories.
+#
+# e.g.
+#      ./sync-all -r http://darcs.haskell.org/ghc get
+#          To get any repos which do not exist in the local tree
+#
+#      ./sync-all pull
+#          To pull everything from the default repos
+#
+# -------------- Flags -------------------
+#   -q says to be quite, and -s to be silent.
+#
+#   --ignore-failure says to ignore errors and move on to the next repository
+#
+#   -r repo says to use repo as the location of package repositories
+#
+#   --checked-out says that the remote repo is in checked-out layout, as
+#   opposed to the layout used for the main repo.  By default a repo on
+#   the local filesystem is assumed to be checked-out, and repos accessed
+#   via HTTP or SSH are assumed to be in the main repo layout; use
+#   --checked-out to override the latter.
+#
+#   --nofib, --testsuite also get the nofib and testsuite repos respectively
+#
+# ------------ Which repos to use -------------
+# sync-all uses the following algorithm to decide which remote repos to use
+#
+#  It always computes the remote repos from a single base, $repo_base
+#  How is $repo_base set?  
+#    If you say "-r repo", then that's $repo_base
+#    otherwise $repo_base is set by asking git where the ghc repo came
+#    from, and removing the last component (e.g. /ghc.git/ of /ghc/).
+#
+#  Then sync-all iterates over the package found in the file
+#  ./packages; see that file for a description of the contents.
+# 
+#    If $repo_base looks like a local filesystem path, or if you give
+#    the --checked-out flag, sync-all works on repos of form
+#          $repo_base/<local-path>
+#    otherwise sync-all works on repos of form
+#          $repo_base/<remote-path>
+#    This logic lets you say
+#      both    sync-all -r http://darcs.haskell.org/ghc-6.12 pull
+#      and     sync-all -r ../HEAD pull
+#    The latter is called a "checked-out tree".
+
+# NB: sync-all *ignores* the defaultrepo of all repos other than the
+# root one.  So the remote repos must be laid out in one of the two
+# formats given by <local-path> and <remote-path> in the file 'packages'.
+
 my $defaultrepo;
 my @packages;
 my $verbose = 2;
