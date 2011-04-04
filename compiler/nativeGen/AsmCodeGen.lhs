@@ -480,7 +480,7 @@ makeImportsDoc dflags imports
 		| otherwise
 		= Pretty.empty
 
-	doPpr lbl = (lbl, Pretty.render $ pprCLabel lbl astyle)
+	doPpr lbl = (lbl, renderWithStyle (pprCLabel lbl) astyle)
 	astyle = mkCodeStyle AsmStyle
 
 

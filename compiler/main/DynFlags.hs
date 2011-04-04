@@ -760,12 +760,12 @@ defaultDynFlags =
 
         log_action = \severity srcSpan style msg ->
                         case severity of
-                          SevOutput -> printOutput (msg style)
-                          SevInfo   -> printErrs (msg style)
-                          SevFatal  -> printErrs (msg style)
+                          SevOutput -> printSDoc msg style
+                          SevInfo   -> printErrs msg style
+                          SevFatal  -> printErrs msg style
                           _         -> do 
                                 hPutChar stderr '\n'
-                                printErrs ((mkLocMessage srcSpan msg) style)
+                                printErrs (mkLocMessage srcSpan msg) style
                      -- careful (#2302): printErrs prints in UTF-8, whereas
                      -- converting to string first and using hPutStr would
                      -- just emit the low 8 bits of each unicode char.

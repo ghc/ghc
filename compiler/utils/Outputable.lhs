@@ -33,6 +33,9 @@ module Outputable (
 	hang, punctuate, ppWhen, ppUnless,
 	speakNth, speakNTimes, speakN, speakNOf, plural,
 
+        coloured, PprColour, colType, colCoerc, colDataCon,
+        colGlobal, colLocal, bold, keyword,
+
         -- * Converting 'SDoc' into strings and outputing it
 	printSDoc, printErrs, printOutput, hPrintDump, printDump,
 	printForC, printForAsm, printForUser, printForUserPartWay,
@@ -41,6 +44,7 @@ module Outputable (
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
         showPpr,
 	showSDocUnqual, showsPrecSDoc,
+        renderWithStyle,
 
 	pprInfixVar, pprPrefixVar,
 	pprHsChar, pprHsString, pprHsInfix, pprHsVar,
@@ -218,24 +222,39 @@ code (either C or assembly), or generating interface files.
 %************************************************************************
 
 \begin{code}
-type SDoc = PprStyle -> Doc
+type SDoc = SDocContext -> Doc
+
+data SDocContext = SDC
+  { sdocStyle      :: !PprStyle
+  , sdocLastColour :: !PprColour
+    -- ^ The most recently used colour.  This allows nesting colours.
+  }
+
+initSDocContext :: PprStyle -> SDocContext
+initSDocContext sty = SDC
+  { sdocStyle = sty
+  , sdocLastColour = colReset
+  }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
-withPprStyle sty d _sty' = d sty
+withPprStyle sty d ctxt = d ctxt{sdocStyle=sty}
 
 withPprStyleDoc :: PprStyle -> SDoc -> Doc
-withPprStyleDoc sty d = d sty
+withPprStyleDoc sty d = d (initSDocContext sty)
 
 pprDeeper :: SDoc -> SDoc
-pprDeeper _ (PprUser _ (PartWay 0)) = Pretty.text "..."
-pprDeeper d (PprUser q (PartWay n)) = d (PprUser q (PartWay (n-1)))
-pprDeeper d other_sty        	    = d other_sty
+pprDeeper _ SDC{sdocStyle=PprUser _ (PartWay 0)} =
+  Pretty.text "..."
+pprDeeper d ctx@SDC{sdocStyle=PprUser q (PartWay n)} =
+  d ctx{sdocStyle = PprUser q (PartWay (n-1))}
+pprDeeper d other_sty =
+  d other_sty
 
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 -- Truncate a list that list that is longer than the current depth
-pprDeeperList f ds (PprUser q (PartWay n))
+pprDeeperList f ds ctx@SDC{sdocStyle=PprUser q (PartWay n)}
   | n==0      = Pretty.text "..."
-  | otherwise = f (go 0 ds) (PprUser q (PartWay (n-1)))
+  | otherwise = f (go 0 ds) ctx{sdocStyle = PprUser q (PartWay (n-1))}
   where
     go _ [] = []
     go i (d:ds) | i >= n    = [text "...."]
@@ -245,11 +264,12 @@ pprDeeperList f ds other_sty
   = f ds other_sty
 
 pprSetDepth :: Depth -> SDoc -> SDoc
-pprSetDepth depth  doc (PprUser q _) = doc (PprUser q depth)
+pprSetDepth depth  doc ctx@SDC{sdocStyle=PprUser q _} =
+  doc ctx{sdocStyle = PprUser q depth}
 pprSetDepth _depth doc other_sty     = doc other_sty
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
-getPprStyle df sty = df sty sty
+getPprStyle df sty = df (sdocStyle sty) sty
 \end{code}
 
 \begin{code}
@@ -282,22 +302,23 @@ userStyle (PprUser _ _) = True
 userStyle _other        = False
 
 ifPprDebug :: SDoc -> SDoc	  -- Empty for non-debug style
-ifPprDebug d sty@PprDebug = d sty
-ifPprDebug _ _  	  = Pretty.empty
+ifPprDebug d ctx@SDC{sdocStyle=PprDebug} = d ctx
+ifPprDebug _ _  	                 = Pretty.empty
 \end{code}
 
 \begin{code}
 -- Unused [7/02 sof]
 printSDoc :: SDoc -> PprStyle -> IO ()
 printSDoc d sty = do
-  Pretty.printDoc PageMode stdout (d sty)
+  Pretty.printDoc PageMode stdout (d (initSDocContext sty))
   hFlush stdout
 
 -- I'm not sure whether the direct-IO approach of Pretty.printDoc
 -- above is better or worse than the put-big-string approach here
-printErrs :: Doc -> IO ()
-printErrs doc = do Pretty.printDoc PageMode stderr doc
-		   hFlush stderr
+printErrs :: SDoc -> PprStyle -> IO ()
+printErrs doc sty = do
+  Pretty.printDoc PageMode stderr (doc (initSDocContext sty))
+  hFlush stderr
 
 printOutput :: Doc -> IO ()
 printOutput doc = Pretty.printDoc PageMode stdout doc
@@ -307,25 +328,27 @@ printDump doc = hPrintDump stdout doc
 
 hPrintDump :: Handle -> SDoc -> IO ()
 hPrintDump h doc = do
-   Pretty.printDoc PageMode h (better_doc defaultDumpStyle)
+   Pretty.printDoc PageMode h (better_doc (initSDocContext defaultDumpStyle))
    hFlush h
  where
    better_doc = doc $$ blankLine
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
-  = Pretty.printDoc PageMode handle (doc (mkUserStyle unqual AllTheWay))
+  = Pretty.printDoc PageMode handle (doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
 printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
 printForUserPartWay handle d unqual doc
-  = Pretty.printDoc PageMode handle (doc (mkUserStyle unqual (PartWay d)))
+  = Pretty.printDoc PageMode handle (doc (initSDocContext (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
-printForC handle doc = Pretty.printDoc LeftMode handle (doc (PprCode CStyle))
+printForC handle doc =
+  Pretty.printDoc LeftMode handle (doc (initSDocContext (PprCode CStyle)))
 
 printForAsm :: Handle -> SDoc -> IO ()
-printForAsm handle doc = Pretty.printDoc LeftMode handle (doc (PprCode AsmStyle))
+printForAsm handle doc =
+  Pretty.printDoc LeftMode handle (doc (initSDocContext (PprCode AsmStyle)))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
@@ -337,32 +360,40 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
-showSDoc d = Pretty.showDocWith PageMode (d defaultUserStyle)
+showSDoc d = Pretty.showDocWith PageMode (d (initSDocContext defaultUserStyle))
+
+renderWithStyle :: SDoc -> PprStyle -> String
+renderWithStyle sdoc sty =
+  Pretty.render (sdoc (initSDocContext sty))
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: SDoc -> String
-showSDocOneLine d = Pretty.showDocWith PageMode (d defaultUserStyle)
+showSDocOneLine d =
+  Pretty.showDocWith PageMode (d (initSDocContext defaultUserStyle))
 
 showSDocForUser :: PrintUnqualified -> SDoc -> String
-showSDocForUser unqual doc = show (doc (mkUserStyle unqual AllTheWay))
+showSDocForUser unqual doc =
+  show (doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
 showSDocUnqual :: SDoc -> String
 -- Only used in the gruesome isOperator
-showSDocUnqual d = show (d (mkUserStyle neverQualify AllTheWay))
+showSDocUnqual d =
+  show (d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
-showsPrecSDoc p d = showsPrec p (d defaultUserStyle)
+showsPrecSDoc p d = showsPrec p (d (initSDocContext defaultUserStyle))
 
 showSDocDump :: SDoc -> String
-showSDocDump d = Pretty.showDocWith PageMode (d PprDump)
+showSDocDump d = Pretty.showDocWith PageMode (d (initSDocContext PprDump))
 
 showSDocDumpOneLine :: SDoc -> String
-showSDocDumpOneLine d = Pretty.showDocWith OneLineMode (d PprDump)
+showSDocDumpOneLine d =
+  Pretty.showDocWith OneLineMode (d (initSDocContext PprDump))
 
 showSDocDebug :: SDoc -> String
-showSDocDebug d = show (d PprDebug)
+showSDocDebug d = show (d (initSDocContext PprDebug))
 
 showPpr :: Outputable a => a -> String
 showPpr = showSDoc . ppr
@@ -500,6 +531,50 @@ ppWhen False _   = empty
 
 ppUnless True  _   = empty
 ppUnless False doc = doc
+
+-- | A colour\/style for use with 'coloured'.
+newtype PprColour = PprColour String
+
+-- Colours
+
+colType :: PprColour
+colType = PprColour "\27[34m"
+
+colBold :: PprColour
+colBold = PprColour "\27[;1m"
+
+colCoerc :: PprColour
+colCoerc = PprColour "\27[34m"
+
+colDataCon :: PprColour
+colDataCon = PprColour "\27[31;1m"
+
+colGlobal :: PprColour
+colGlobal = PprColour "\27[32m"
+
+colLocal :: PprColour
+colLocal = PprColour "\27[35m"
+
+colReset :: PprColour
+colReset = PprColour "\27[0m"
+
+-- | Apply the given colour\/style for the argument.
+--
+-- Only takes effect if colours are enabled.
+coloured :: PprColour -> SDoc -> SDoc
+-- TODO: coloured _ sdoc ctxt | coloursDisabled = sdoc ctxt
+coloured col@(PprColour c) sdoc
+         ctx@SDC{ sdocLastColour = PprColour lc } =
+  Pretty.zeroWidthText c Pretty.<> sdoc ctx' Pretty.<> Pretty.zeroWidthText lc
+ where
+   ctx' = ctx{ sdocLastColour = col }
+
+bold :: SDoc -> SDoc
+bold = coloured colBold
+
+keyword :: SDoc -> SDoc
+keyword = bold
+
 \end{code}
 
 
@@ -803,21 +878,23 @@ pprTrace str doc x
 
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
-pprPanicFastInt heading pretty_msg = panicFastInt (show (doc PprDebug))
-			     where
-			       doc = text heading <+> pretty_msg
+pprPanicFastInt heading pretty_msg =
+    panicFastInt (show (doc (initSDocContext PprDebug)))
+  where
+    doc = text heading <+> pretty_msg
 
 
 pprAndThen :: (String -> a) -> String -> SDoc -> a
-pprAndThen cont heading pretty_msg = cont (show (doc PprDebug))
-    where
+pprAndThen cont heading pretty_msg =
+  cont (show (doc (initSDocContext PprDebug)))
+ where
      doc = sep [text heading, nest 4 pretty_msg]
 
 assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
 -- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
-  = panic (show (doc PprDebug))
+  = panic (show (doc (initSDocContext PprDebug)))
   where
     doc = sep [hsep[text "ASSERT failed! file", 
 		 	   text file, 
@@ -830,7 +907,7 @@ warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = trace (show (doc defaultDumpStyle)) x
+  = trace (show (doc (initSDocContext defaultDumpStyle))) x
   where
     doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
 	       msg]
