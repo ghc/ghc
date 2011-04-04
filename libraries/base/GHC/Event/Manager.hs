@@ -90,7 +90,7 @@ data FdData = FdData {
       fdKey       :: {-# UNPACK #-} !FdKey
     , fdEvents    :: {-# UNPACK #-} !Event
     , _fdCallback :: !IOCallback
-    } deriving (Show)
+    }
 
 -- | A file descriptor registration cookie.
 data FdKey = FdKey {
@@ -100,9 +100,6 @@ data FdKey = FdKey {
 
 -- | Callback invoked on I/O events.
 type IOCallback = FdKey -> Event -> IO ()
-
-instance Show IOCallback where
-    show _ = "IOCallback"
 
 -- | A timeout registration cookie.
 newtype TimeoutKey   = TK Unique
