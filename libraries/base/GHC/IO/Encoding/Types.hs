@@ -90,8 +90,12 @@ data TextEncoding
         textEncodingName :: String,
                    -- ^ a string that can be passed to 'mkTextEncoding' to
                    -- create an equivalent 'TextEncoding'.
-	mkTextDecoder :: IO (TextDecoder dstate),
-	mkTextEncoder :: IO (TextEncoder estate)
+        mkTextDecoder :: IO (TextDecoder dstate),
+                   -- ^ Creates a means of decoding bytes into characters: the result must not
+                   -- be shared between several byte sequences or simultaneously across threads
+        mkTextEncoder :: IO (TextEncoder estate)
+                   -- ^ Creates a means of encode characters into bytes: the result must not
+                   -- be shared between several character sequences or simultaneously across threads
   }
 
 instance Show TextEncoding where
