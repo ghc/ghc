@@ -241,6 +241,10 @@ sub scmall {
             elsif ($command =~ /^set-origin$/) {
                 @scm_args = ("remote", "set-url", "origin", $path);
             }
+            elsif ($command =~ /^set-push$/) {
+                @scm_args = ("remote", "set-url", "--push", "origin", $path);
+                print "foo\n", @scm_args;
+            }
             elsif ($command =~ /^fetch$/) {
                 @scm_args = ("fetch", "origin");
             }
@@ -342,6 +346,7 @@ Supported commands:
  * fetch
  * send
  * set-origin
+ * set-push
  * new
 
 Available package-tags are:
