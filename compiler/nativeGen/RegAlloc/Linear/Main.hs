@@ -48,7 +48,7 @@ The algorithm is roughly:
 
 	(c) Update the current assignment
 
-	(d) If the intstruction is a branch:
+	(d) If the instruction is a branch:
 	      if the destination block already has a register assignment,
 	        Generate a new block with fixup code and redirect the
 		jump to the new block.
@@ -331,7 +331,7 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
     -- register does not already have an assignment,
     -- and the source register is assigned to a register, not to a spill slot,
     -- then we can eliminate the instruction.
-    -- (we can't eliminitate it if the source register is on the stack, because
+    -- (we can't eliminate it if the source register is on the stack, because
     --  we do not want to use one spill slot for different virtual registers)
     case takeRegRegMoveInstr instr of
 	Just (src,dst)	| src `elementOfUniqSet` (liveDieRead live), 
@@ -497,7 +497,7 @@ releaseRegs regs = do
 
 
 saveClobberedTemps
-	:: Instruction instr
+	:: (Outputable instr, Instruction instr)
 	=> [RealReg]		-- real registers clobbered by this instruction
 	-> [Reg]		-- registers which are no longer live after this insn
 	-> RegM [instr]		-- return: instructions to spill any temps that will
@@ -536,7 +536,7 @@ saveClobberedTemps clobbered dying
 
 
 
--- | Mark all these regal regs as allocated,
+-- | Mark all these real regs as allocated,
 --	and kick out their vreg assignments.
 --
 clobberRegs :: [RealReg] -> RegM ()
@@ -579,7 +579,7 @@ clobberRegs clobbered
 --   the list of free registers and free stack slots.
 
 allocateRegsAndSpill
-	:: Instruction instr
+	:: (Outputable instr, Instruction instr)
 	=> Bool			-- True <=> reading (load up spilled regs)
 	-> [VirtualReg]		-- don't push these out
 	-> [instr]		-- spill insns
@@ -599,7 +599,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 			allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
 		-- case (1b): already in a register (and memory)
-		-- NB1. if we're writing this register, update its assignemnt to be
+		-- NB1. if we're writing this register, update its assignment to be
 		-- InReg, because the memory value is no longer valid.
 		-- NB2. This is why we must process written registers here, even if they
 		-- are also read by the same instruction.
@@ -709,7 +709,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
 
 -- | Load up a spilled temporary if we need to.
 loadTemp
-	:: Instruction instr
+	:: (Outputable instr, Instruction instr)
 	=> Bool
 	-> VirtualReg 	-- the temp being loaded
 	-> Maybe Loc	-- the current location of this temp

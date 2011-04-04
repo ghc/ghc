@@ -22,6 +22,7 @@
 *.o.cmd
 *.depend*
 log
+tags
 
 autom4te.cache
 config.log

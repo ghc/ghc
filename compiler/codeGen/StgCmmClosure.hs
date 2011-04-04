@@ -304,13 +304,15 @@ type DynTag = Int	-- The tag on a *pointer*
 
 {- 	Note [Data constructor dynamic tags]
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The family size of a data type (the number of constructors)
-can be either:
+The family size of a data type (the number of constructors
+or the arity of a function) can be either:
     * small, if the family size < 2**tag_bits
     * big, otherwise.
 
 Small families can have the constructor tag in the tag bits.
-Big families only use the tag value 1 to represent evaluatedness. -}
+Big families only use the tag value 1 to represent evaluatedness.
+We don't have very many tag bits: for example, we have 2 bits on
+x86-32 and 3 bits on x86-64. -}
 
 isSmallFamily :: Int -> Bool
 isSmallFamily fam_size = fam_size <= mAX_PTR_TAG
