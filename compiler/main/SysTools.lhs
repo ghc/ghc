@@ -14,7 +14,7 @@ module SysTools (
         -- Interface to system tools
         runUnlit, runCpp, runCc, -- [Option] -> IO ()
         runPp,                   -- [Option] -> IO ()
-        runMangle, runSplit,     -- [Option] -> IO ()
+        runSplit,                -- [Option] -> IO ()
         runAs, runLink,          -- [Option] -> IO ()
         runMkDLL,
         runWindres,
@@ -171,9 +171,8 @@ initSysTools mbMinusB dflags0
                 -- architecture-specific stuff is done when building Config.hs
               unlit_path = installed cGHC_UNLIT_PGM
 
-                -- split and mangle are Perl scripts
+                -- split is a Perl script
               split_script  = installed cGHC_SPLIT_PGM
-              mangle_script = installed cGHC_MANGLER_PGM
 
               windres_path  = installed_mingw_bin "windres"
 
@@ -194,7 +193,7 @@ initSysTools mbMinusB dflags0
                 | isWindowsHost = installed cGHC_TOUCHY_PGM
                 | otherwise     = "touch"
               -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-              -- a call to Perl to get the invocation of split and mangle.
+              -- a call to Perl to get the invocation of split.
               -- On Unix, scripts are invoked using the '#!' method.  Binary
               -- installations of GHC on Unix place the correct line on the
               -- front of the script at installation time, so we don't want
@@ -202,9 +201,6 @@ initSysTools mbMinusB dflags0
               (split_prog,  split_args)
                 | isWindowsHost = (perl_path,    [Option split_script])
                 | otherwise     = (split_script, [])
-              (mangle_prog, mangle_args)
-                | isWindowsHost = (perl_path,   [Option mangle_script])
-                | otherwise     = (mangle_script, [])
               (mkdll_prog, mkdll_args)
                 | not isWindowsHost
                     = panic "Can't build DLLs on a non-Win32 system"
@@ -234,7 +230,6 @@ initSysTools mbMinusB dflags0
                         pgm_P   = cpp_path,
                         pgm_F   = "",
                         pgm_c   = (gcc_prog,[]),
-                        pgm_m   = (mangle_prog,mangle_args),
                         pgm_s   = (split_prog,split_args),
                         pgm_a   = (as_prog,[]),
                         pgm_l   = (ld_prog,[]),
@@ -371,11 +366,6 @@ getGccEnv opts =
   mangle_path (path,paths) | map toUpper path == "PATH"
         = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
-
-runMangle :: DynFlags -> [Option] -> IO ()
-runMangle dflags args = do
-  let (p,args0) = pgm_m dflags
-  runSomething dflags "Mangler" p (args0++args)
 
 runSplit :: DynFlags -> [Option] -> IO ()
 runSplit dflags args = do

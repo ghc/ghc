@@ -76,7 +76,6 @@ data Phase
         | Ccpp
         | Cc
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
-        | Mangle        -- assembly mangling, now done by a separate script.
         | SplitMangle   -- after mangler if splitting
         | SplitAs
         | As
@@ -111,7 +110,6 @@ eqPhase (Hsc   _)   (Hsc   _)   = True
 eqPhase Ccpp        Ccpp        = True
 eqPhase Cc          Cc          = True
 eqPhase HCc         HCc         = True
-eqPhase Mangle      Mangle      = True
 eqPhase SplitMangle SplitMangle = True
 eqPhase SplitAs     SplitAs     = True
 eqPhase As          As          = True
@@ -138,8 +136,6 @@ nextPhase (Unlit sf)    = Cpp  sf
 nextPhase (Cpp   sf)    = HsPp sf
 nextPhase (HsPp  sf)    = Hsc  sf
 nextPhase (Hsc   _)     = HCc
-nextPhase HCc           = Mangle
-nextPhase Mangle        = SplitMangle
 nextPhase SplitMangle   = As
 nextPhase As            = SplitAs
 nextPhase LlvmOpt       = LlvmLlc
@@ -154,6 +150,7 @@ nextPhase Ccpp          = As
 nextPhase Cc            = As
 nextPhase CmmCpp        = Cmm
 nextPhase Cmm           = HCc
+nextPhase HCc           = As
 nextPhase StopLn        = panic "nextPhase: nothing after StopLn"
 
 -- the first compilation phase for a given file is determined
@@ -172,7 +169,6 @@ startPhase "cpp"      = Ccpp
 startPhase "C"        = Cc
 startPhase "cc"       = Ccpp
 startPhase "cxx"      = Ccpp
-startPhase "raw_s"    = Mangle
 startPhase "split_s"  = SplitMangle
 startPhase "s"        = As
 startPhase "S"        = As
@@ -200,7 +196,6 @@ phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
 phaseInputExt HCc                 = "hc"
 phaseInputExt Ccpp                = "cpp"
 phaseInputExt Cc                  = "c"
-phaseInputExt Mangle              = "raw_s"
 phaseInputExt SplitMangle         = "split_s"   -- not really generated
 phaseInputExt As                  = "s"
 phaseInputExt LlvmOpt             = "ll"

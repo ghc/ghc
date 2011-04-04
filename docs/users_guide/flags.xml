@@ -325,13 +325,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-keep-raw-s-file</option> or
-                 <option>-keep-raw-s-files</option></entry>
-	      <entry>retain intermediate <literal>.raw_s</literal> files</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-keep-tmp-files</option></entry>
 	      <entry>retain all intermediate temporary files</entry>
 	      <entry>dynamic</entry>
@@ -1999,12 +1992,6 @@ phase <replaceable>n</replaceable></entry>
 	    </row>
 	    </row>
 	    <row>
-	      <entry><option>-pgmm</option> <replaceable>cmd</replaceable></entry>
-	      <entry>Use <replaceable>cmd</replaceable> as the mangler</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-pgms</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the splitter</entry>
 	      <entry>dynamic</entry>
@@ -2592,12 +2579,6 @@ phase <replaceable>n</replaceable></entry>
 	      <entry><option>-funregisterised</option></entry>
 	      <entry>Unregisterised compilation (use <option>-unreg</option> instead)</entry>
 	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-fno-asm-mangling</option></entry>
-	      <entry>Turn off assembly mangling (use <option>-unreg</option> instead)</entry>
-	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>

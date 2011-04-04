@@ -141,7 +141,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
 
    -- Figure out what lang we're generating
-   let hsc_lang = hscMaybeAdjustTarget dflags StopLn src_flavour (hscTarget dflags)
+   let hsc_lang = hscTarget dflags
    -- ... and what the next phase should be
    let next_phase = hscNextPhase dflags src_flavour hsc_lang
    -- ... and what file to generate the output into
@@ -585,7 +585,6 @@ getOutputFilename stop_phase output basename
                 odir       = objectDir dflags
                 osuf       = objectSuf dflags
                 keep_hc    = dopt Opt_KeepHcFiles dflags
-                keep_raw_s = dopt Opt_KeepRawSFiles dflags
                 keep_s     = dopt Opt_KeepSFiles dflags
                 keep_bc    = dopt Opt_KeepLlvmFiles dflags
 
@@ -599,7 +598,6 @@ getOutputFilename stop_phase output basename
                 keep_this_output =
                      case next_phase of
                              StopLn               -> True
-                             Mangle  | keep_raw_s -> True
                              As      | keep_s     -> True
                              LlvmOpt | keep_bc    -> True
                              HCc     | keep_hc    -> True
@@ -809,7 +807,7 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
         src_timestamp <- getModificationTime (basename <.> suff)
 
         let force_recomp = dopt Opt_ForceRecomp dflags
-            hsc_lang = hscMaybeAdjustTarget dflags stop src_flavour (hscTarget dflags)
+            hsc_lang = hscTarget dflags
         source_unchanged <-
           if force_recomp || not (isStopLn stop)
                 -- Set source_unchanged to False unconditionally if
@@ -884,10 +882,10 @@ runPhase CmmCpp _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
        doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn
        return (Cmm, dflags, maybe_loc, output_fn)
 
-runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
+runPhase Cmm _ hsc_env basename _ input_fn get_output_fn maybe_loc
   = do
         let dflags = hsc_dflags hsc_env
-        let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
+        let hsc_lang = hscTarget dflags
         let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
         output_fn <- get_output_fn dflags next_phase maybe_loc
 
@@ -929,7 +927,7 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
                               (cmdline_include_paths ++ pkg_include_dirs)
 
-        let (md_c_flags, md_regd_c_flags) = machdepCCOpts dflags
+        let md_c_flags = machdepCCOpts dflags
         gcc_extra_viac_flags <- getExtraViaCOpts dflags
         let pic_c_flags = picCCOpts dflags
 
@@ -959,10 +957,7 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 
         -- Decide next phase
 
-        let mangle = dopt Opt_DoAsmMangling dflags
-            next_phase
-                | hcc && mangle     = Mangle
-                | otherwise         = As
+        let next_phase = As
         output_fn <- get_output_fn dflags next_phase maybe_loc
 
         let
@@ -1019,18 +1014,8 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         -- This is a temporary hack.
                        ++ ["-mcpu=v9"]
 #endif
-                       ++ (if hcc && mangle
-                             then md_regd_c_flags
-                             else [])
                        ++ (if hcc
-                             then if mangle
-                                     then gcc_extra_viac_flags
-                                     else filter (=="-fwrapv")
-                                                gcc_extra_viac_flags
-                                -- still want -fwrapv even for unreg'd
-                             else [])
-                       ++ (if hcc
-                             then more_hcc_opts
+                             then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
                        ++ [ verb, "-S", "-Wimplicit", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
@@ -1046,33 +1031,6 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         return (next_phase, dflags, maybe_loc, output_fn)
 
         -- ToDo: postprocess the output from gcc
-
------------------------------------------------------------------------------
--- Mangle phase
-
-runPhase Mangle _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
-   = do let dflags = hsc_dflags hsc_env
-        let mangler_opts = getOpts dflags opt_m
-
-#if i386_TARGET_ARCH
-        machdep_opts <- return [ show (stolen_x86_regs dflags) ]
-#else
-        machdep_opts <- return []
-#endif
-
-        let split = dopt Opt_SplitObjs dflags
-            next_phase
-                | split = SplitMangle
-                | otherwise = As
-        output_fn <- get_output_fn dflags next_phase maybe_loc
-
-        SysTools.runMangle dflags (map SysTools.Option mangler_opts
-                          ++ [ SysTools.FileOption "" input_fn
-                             , SysTools.FileOption "" output_fn
-                             ]
-                          ++ map SysTools.Option machdep_opts)
-
-        return (next_phase, dflags, maybe_loc, output_fn)
 
 -----------------------------------------------------------------------------
 -- Splitting phase
@@ -1116,7 +1074,7 @@ runPhase As _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         -- might be a hierarchical module.
         createDirectoryHierarchy (takeDirectory output_fn)
 
-        let (md_c_flags, _) = machdepCCOpts dflags
+        let md_c_flags = machdepCCOpts dflags
         SysTools.runAs dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
@@ -1166,7 +1124,7 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
             split_obj n = split_odir </>
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
-        let (md_c_flags, _) = machdepCCOpts dflags
+        let md_c_flags = machdepCCOpts dflags
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
@@ -1312,7 +1270,7 @@ mkExtraCObj dflags xs
       oFile <- newTempName dflags "o"
       writeFile cFile $ unlines xs
       let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
-          (md_c_flags, _) = machdepCCOpts dflags
+          md_c_flags = machdepCCOpts dflags
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,
@@ -1504,7 +1462,7 @@ linkBinary dflags o_files dep_packages = do
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    let (md_c_flags, _) = machdepCCOpts dflags
+    let md_c_flags = machdepCCOpts dflags
     SysTools.runLink dflags (
                        [ SysTools.Option verb
                        , SysTools.Option "-o"
@@ -1657,7 +1615,7 @@ linkDynLib dflags o_files dep_packages = do
         -- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
-    let (md_c_flags, _) = machdepCCOpts dflags
+    let md_c_flags = machdepCCOpts dflags
     let extra_ld_opts = getOpts dflags opt_l
 
     rtsEnabledObj <- mkRtsOptionsLevelObj dflags
@@ -1804,7 +1762,7 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
           | otherwise           = (optc ++ md_c_flags)
                 where
                       optc = getOpts dflags opt_c
-                      (md_c_flags, _) = machdepCCOpts dflags
+                      md_c_flags = machdepCCOpts dflags
 
     let cpp_prog args | raw       = SysTools.runCpp dflags args
                       | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
@@ -1860,7 +1818,7 @@ joinObjectFiles dflags o_files output_fn = do
       ld_x_flag | null cLD_X = ""
                 | otherwise  = "-Wl,-x"
 
-      (md_c_flags, _) = machdepCCOpts dflags
+      md_c_flags = machdepCCOpts dflags
   
   if cLdIsGNULd == "YES"
      then do
@@ -1884,20 +1842,4 @@ hscNextPhase dflags _ hsc_lang =
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
         _other         -> StopLn
-
-
-hscMaybeAdjustTarget :: DynFlags -> Phase -> HscSource -> HscTarget -> HscTarget
-hscMaybeAdjustTarget dflags stop _ current_hsc_lang
-  = hsc_lang
-  where
-        keep_hc = dopt Opt_KeepHcFiles dflags
-        hsc_lang
-                -- don't change the lang if we're interpreting
-                 | current_hsc_lang == HscInterpreted = current_hsc_lang
-
-                -- force -fvia-C if we are being asked for a .hc file
-                 | HCc <- stop = HscC
-                 | keep_hc     = HscC
-                -- otherwise, stick to the plan
-                 | otherwise = current_hsc_lang
 

@@ -425,7 +425,6 @@ GHC_HP2PS_PGM           = hp2ps$(exeext)
 GHC_GHCTAGS_PGM         = ghctags$(exeext)
 GHC_HSC2HS_PGM          = hsc2hs$(exeext)
 GHC_TOUCHY_PGM          = touchy$(exeext)
-GHC_MANGLER_PGM         = ghc-asm
 GHC_SPLIT_PGM           = ghc-split
 GHC_SYSMAN_PGM          = SysMan
 GHC_GENPRIMOP_PGM       = genprimopcode$(exeext)
@@ -445,7 +444,6 @@ GHC_PERL		= $(PERL)
 endif
 
 HP2PS			= $(GHC_HP2PS_DIR)/$(GHC_HP2PS_PGM)
-MANGLER			= $(INPLACE_LIB)/$(GHC_MANGLER_PGM)
 SPLIT			= $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
 SYSMAN 			= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
 LTX 			= $(GHC_LTX_DIR)/$(GHC_LTX_PGM)

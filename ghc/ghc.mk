@@ -113,9 +113,9 @@ $(INPLACE_LIB)/extra-gcc-opts : extra-gcc-opts
 
 # The GHC programs need to depend on all the helper programs they might call
 ifeq "$(GhcUnregisterised)" "NO"
-$(GHC_STAGE1) : $(MANGLER) $(SPLIT)
-$(GHC_STAGE2) : $(MANGLER) $(SPLIT)
-$(GHC_STAGE3) : $(MANGLER) $(SPLIT)
+$(GHC_STAGE1) : $(SPLIT)
+$(GHC_STAGE2) : $(SPLIT)
+$(GHC_STAGE3) : $(SPLIT)
 endif
 
 $(GHC_STAGE1) : $(INPLACE_LIB)/extra-gcc-opts
