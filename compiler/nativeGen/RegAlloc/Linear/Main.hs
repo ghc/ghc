@@ -571,6 +571,16 @@ clobberRegs clobbered
 -- -----------------------------------------------------------------------------
 -- allocateRegsAndSpill
 
+-- Why are we performing a spill?
+data SpillLoc = ReadMem StackSlot  -- reading from register only in memory
+              | WriteNew           -- writing to a new variable
+              | WriteMem           -- writing to register only in memory
+-- Note that ReadNew is not valid, since you don't want to be reading
+-- from an uninitialized register.  We also don't need the location of
+-- the register in memory, since that will be invalidated by the write.
+-- Technically, we could coalesce WriteNew and WriteMem into a single
+-- entry as well. -- EZY
+
 -- This function does several things:
 --   For each temporary referred to by this instruction,
 --   we allocate a real register (spilling another temporary if necessary).
@@ -593,6 +603,7 @@ allocateRegsAndSpill _       _    spills alloc []
 
 allocateRegsAndSpill reading keep spills alloc (r:rs) 
  = do	assig <- getAssigR
+	let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs assig
   	case lookupUFM assig r of
 		-- case (1a): already in a register
 		Just (InReg my_reg) ->
@@ -608,10 +619,15 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 			allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
 		-- Not already in a register, so we need to find a free one...
-		loc -> allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
+		Just (InMem slot) | reading   -> doSpill (ReadMem slot)
+				  | otherwise -> doSpill WriteMem
+		Nothing | reading   -> panic "allocateRegsAndSpill: Cannot read from uninitialized register"
+			| otherwise -> doSpill WriteNew
 	
 
-allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
+-- reading is redundant with reason, but we keep it around because it's
+-- convenient and it maintains the recursive structure of the allocator. -- EZY
+allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
  = do
 	freeRegs 		<- getFreeRegsR
 	let freeRegs_thisClass	= getFreeRegs (classOfVirtualReg r) freeRegs
@@ -620,19 +636,9 @@ allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
 
 	 -- case (2): we have a free register
 	 (my_reg : _) -> 
-	   do	spills'   <- loadTemp reading r loc my_reg spills
+	   do	spills'   <- loadTemp r spill_loc my_reg spills
 
-		let new_loc 
-			-- if the tmp was in a slot, then now its in a reg as well
-			| Just (InMem slot) <- loc
-			, reading 
-			= InBoth my_reg slot
-
-			-- tmp has been loaded into a reg
-			| otherwise
-			= InReg my_reg
-
-		setAssigR 	(addToUFM assig r $! new_loc)
+		setAssigR 	(addToUFM assig r $! newLocation spill_loc my_reg)
 		setFreeRegsR $ 	allocateReg my_reg freeRegs
 
 		allocateRegsAndSpill reading keep spills' (my_reg : alloc) rs
@@ -662,9 +668,9 @@ allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
 			-- we have a temporary that is in both register and mem,
 			-- just free up its register for use.
 			| (temp, my_reg, slot) : _ 	<- candidates_inBoth
-			= do	spills' <- loadTemp reading r loc my_reg spills
+			= do	spills' <- loadTemp r spill_loc my_reg spills
 				let assig1  = addToUFM assig temp (InMem slot)
-				let assig2  = addToUFM assig1 r   (InReg my_reg)
+				let assig2  = addToUFM assig1 r $! newLocation spill_loc my_reg
 
 				setAssigR assig2
 				allocateRegsAndSpill reading keep spills' (my_reg:alloc) rs
@@ -684,11 +690,11 @@ allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
 
 				-- update the register assignment
 		    	        let assig1  = addToUFM assig temp_to_push_out	(InMem slot)
-			        let assig2  = addToUFM assig1 r			(InReg my_reg)
+			        let assig2  = addToUFM assig1 r			$! newLocation spill_loc my_reg
 			        setAssigR assig2
 
 				-- if need be, load up a spilled temp into the reg we've just freed up.
-		    	        spills' <- loadTemp reading r loc my_reg spills
+		    	        spills' <- loadTemp r spill_loc my_reg spills
 
 		 	        allocateRegsAndSpill reading keep
 					(spill_store ++ spills')
@@ -707,22 +713,28 @@ allocRegsAndSpill_spill reading keep spills alloc r rs loc assig
 		result
 		
 
--- | Load up a spilled temporary if we need to.
+-- | Calculate a new location after a register has been loaded.
+newLocation :: SpillLoc -> RealReg -> Loc
+-- if the tmp was read from a slot, then now its in a reg as well
+newLocation (ReadMem slot) my_reg = InBoth my_reg slot
+-- writes will always result in only the register being available
+newLocation _ my_reg = InReg my_reg
+
+-- | Load up a spilled temporary if we need to (read from memory).
 loadTemp
 	:: (Outputable instr, Instruction instr)
-	=> Bool
-	-> VirtualReg 	-- the temp being loaded
-	-> Maybe Loc	-- the current location of this temp
+	=> VirtualReg 	-- the temp being loaded
+	-> SpillLoc	-- the current location of this temp
 	-> RealReg	-- the hreg to load the temp into
 	-> [instr]
 	-> RegM [instr]
 
-loadTemp True vreg (Just (InMem slot)) hreg spills
+loadTemp vreg (ReadMem slot) hreg spills
  = do
  	insn <- loadR (RegReal hreg) slot
 	recordSpill (SpillLoad $ getUnique vreg)
 	return	$  {- COMMENT (fsLit "spill load") : -} insn : spills
 
-loadTemp _ _ _ _ spills =
+loadTemp _ _ _ spills =
    return spills
 
