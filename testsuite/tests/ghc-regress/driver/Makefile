@@ -296,18 +296,6 @@ test053:
 # -----------------------------------------------------------------------------
 # Other tests
 
-# Test the -keep-hc-files works without --make
-test060:
-	$(RM) A060.hi A060$(OBJSUFFIX) A060.hc
-	"$(TEST_HC)" -c -keep-hc-files -fno-warn-deprecated-flags -fvia-C A060.hs
-	test -f A060.hc
-
-# Test the -keep-hc-files works with --make
-test061:
-	$(RM) A061.hi A061$(OBJSUFFIX) A061.hc
-	"$(TEST_HC)" -v0 --make -keep-hc-files -fno-warn-deprecated-flags -fvia-C A061.hs
-	test -f A061.hc
-
 # Test that -keep-s-files works with --make and -fvia-C
 test061a:
 	$(RM) A061a.hi A061a$(OBJSUFFIX) A061a.s
@@ -382,18 +370,6 @@ test067:
 	"$(TEST_HC)" -cpp -E A067.hs -o A067.tmp
 	test -f A067.tmp
 
-# Test -C
-test068:
-	$(RM) A068.hi A068.hc
-	"$(TEST_HC)" -fno-warn-deprecated-flags -C A068.hs
-	test -f A068.hc
-
-# Test -C/-o
-test069:
-	$(RM) A069.hi A069.tmp
-	"$(TEST_HC)" -fno-warn-deprecated-flags -C A069.hs -o A069.tmp
-	test -f A069.tmp
-
 # Test -S
 test070:
 	$(RM) A070.hi A070.s
@@ -405,15 +381,6 @@ test071:
 	$(RM) A071.hi A071.tmp
 	"$(TEST_HC)" -S A071.hs -o A071.tmp
 	test -f A071.tmp
-
-# No recompilation required, but we requested a .hc file --> should recompile
-# Broken briefy in ghc-6.3.
-test080:
-	$(RM) A080.hi A080$(OBJSUFFIX) A080.hc
-	"$(TEST_HC)" -c A080.hs
-	test -f A080$(OBJSUFFIX)
-	"$(TEST_HC)" -fno-warn-deprecated-flags -C A080.hs
-	test -f A080.hc
 
 
 # Tests for #2248, -o and .exe
