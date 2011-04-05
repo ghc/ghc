@@ -27,6 +27,6 @@ Library
     ghc-options: -package-name template-haskell
 
 source-repository head
-    type:     darcs
-    location: http://darcs.haskell.org/packages/template-haskell/
+    type:     git
+    location: http://darcs.haskell.org/packages/template-haskell.git/
 
