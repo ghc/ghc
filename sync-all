@@ -215,6 +215,8 @@ sub scmall {
     my $scm;
     my $upstream;
     my $line;
+    my $branch_name;
+    my $subcommand;
 
     my $path;
     my $wd_before = getcwd;
@@ -226,6 +228,17 @@ sub scmall {
     my ($repo_base, $checked_out_tree) = getrepo();
 
     parsePackages;
+
+    if ($command =~ /^remote$/) {
+        if (@_ < 2) {
+            help();
+        }
+        $subcommand = shift;
+        $branch_name = shift;
+        if ($subcommand ne 'add' && $subcommand ne 'rm') {
+            help();
+        }
+    }
 
     for $line (@packages) {
 
@@ -301,13 +314,19 @@ sub scmall {
             }
             elsif ($command =~ /^set-push$/) {
                 @scm_args = ("remote", "set-url", "--push", "origin", $path);
-                print "foo\n", @scm_args;
             }
             elsif ($command =~ /^fetch$/) {
                 @scm_args = ("fetch", "origin");
             }
             elsif ($command =~ /^new$/) {
                 @scm_args = ("log", "origin..");
+            }
+            elsif ($command =~ /^remote$/) {
+                if ($subcommand eq 'add') {
+                    @scm_args = ("remote", "add", $branch_name, $path);
+                } elsif ($subcommand eq 'rm') {
+                    @scm_args = ("remote", "rm", $branch_name);
+                }
             }
             else {
                 die "Unknown command: $command";
@@ -339,6 +358,54 @@ sub scmall {
                 message "== $localpath repo not present; skipping";
             }
     }
+}
+
+
+sub help()
+{
+        # Get the built in help
+        my $help = <<END;
+What do you want to do?
+Supported commands:
+
+ * whatsnew
+ * push
+ * pull
+ * get, with options:
+  * --<package-tag>
+  * --complete
+  * --partial
+ * fetch
+ * send
+ * set-origin
+ * set-push
+ * new
+ * remote add <branch-name>
+ * remote rm <branch-name>
+
+Available package-tags are:
+END
+
+        # Collect all the tags in the packages file
+        my %available_tags;
+        open IN, "< packages" or die "Can't open packages file";
+        while (<IN>) {
+            chomp;
+            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
+                if (defined($2) && $2 ne "-") {
+                    $available_tags{$2} = 1;
+                }
+            }
+            elsif (! /^(#.*)?$/) {
+                die "Bad line: $_";
+            }
+        }
+        close IN;
+        
+        # Show those tags and the help text
+        my @available_tags = keys %available_tags;
+        print "$help@available_tags\n";
+        exit 1;
 }
 
 sub main {
@@ -389,47 +456,7 @@ sub main {
     }
 
     if ($#_ eq -1) {
-        # Get the built in help
-        my $help = <<END;
-What do you want to do?
-Supported commands:
-
- * whatsnew
- * push
- * pull
- * get, with options:
-  * --<package-tag>
-  * --complete
-  * --partial
- * fetch
- * send
- * set-origin
- * set-push
- * new
-
-Available package-tags are:
-END
-
-        # Collect all the tags in the packages file
-        my %available_tags;
-        open IN, "< packages" or die "Can't open packages file";
-        while (<IN>) {
-            chomp;
-            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
-                if (defined($2) && $2 ne "-") {
-                    $available_tags{$2} = 1;
-                }
-            }
-            elsif (! /^(#.*)?$/) {
-                die "Bad line: $_";
-            }
-        }
-        close IN;
-        
-        # Show those tags and the help text
-        my @available_tags = keys %available_tags;
-        print "$help@available_tags\n";
-        exit 1;
+        help();
     }
     else {
         # Give the command and rest of the arguments to the main loop
