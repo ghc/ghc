@@ -49,7 +49,7 @@ module Foreign.C.Types
           -- foreign types, and are instances of
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable' and 'Storable'.
-        , CClock,   CTime
+        , CClock,   CTime, CUSeconds, CSUSeconds
 
         -- extracted from CTime, because we don't want this comment in
         -- the Haskell 2010 report:
@@ -78,7 +78,7 @@ module Foreign.C.Types
         , CLong(..),    CULong(..)
         , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
         , CLLong(..),   CULLong(..)
-        , CClock(..),   CTime(..)
+        , CClock(..),   CTime(..),   CUSeconds(..), CSUSeconds(..)
         , CFloat(..),   CDouble(..), CLDouble(..)
         , CIntPtr(..), CUIntPtr(..), CIntMax(..), CUIntMax(..)
 #endif
@@ -217,6 +217,10 @@ ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 -- | Haskell type representing the C @time_t@ type.
 --
 ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
+-- | Haskell type representing the C @useconds_t@ type.
+ARITHMETIC_TYPE(CUSeconds,tyConCUSeconds,"CUSeconds",HTYPE_USECONDS_T)
+-- | Haskell type representing the C @suseconds_t@ type.
+ARITHMETIC_TYPE(CSUSeconds,tyConCSUSeconds,"CSUSeconds",HTYPE_SUSECONDS_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
 -- | Haskell type representing the C @FILE@ type.
@@ -291,7 +295,7 @@ import NHC.FFI
   , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
   , CLong(..),    CULong(..),  CLLong(..), CULLong(..)
   , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
-  , CClock(..),   CTime(..)
+  , CClock(..),   CTime(..),   CUSeconds(..), CSUSeconds(..)
   , CFloat(..),   CDouble(..), CLDouble(..)
   , CIntPtr(..),  CUIntPtr(..),CIntMax(..), CUIntMax(..)
   , CFile,        CFpos,       CJmpBuf
