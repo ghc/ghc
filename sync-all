@@ -296,6 +296,11 @@ sub scmall {
                 # Hack around 'darcs whatsnew' failing if there are no changes
                 $ignore_failure = 1;
             }
+            elsif ($command =~ /^commit$/) {
+                @scm_args = ("commit");
+                # git fails if there is nothing to commit, so ignore failures
+                $ignore_failure = 1;
+            }
             elsif ($command =~ /^(?:pus|push)$/) {
                 @scm_args = "push";
                 $want_remote_repo = 1;
@@ -399,6 +404,7 @@ What do you want to do?
 Supported commands:
 
  * whatsnew
+ * commit
  * push
  * pull
  * get, with options:
