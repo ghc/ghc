@@ -6,7 +6,7 @@ module GHC.Event.Clock (getCurrentTime) where
 
 import Foreign (Ptr, Storable(..), nullPtr, with)
 import Foreign.C.Error (throwErrnoIfMinus1_)
-import Foreign.C.Types (CInt, CLong)
+import Foreign.C.Types (CInt, CLong, CTime, CSUSeconds)
 import GHC.Base
 import GHC.Err
 import GHC.Num
@@ -20,15 +20,15 @@ getCurrentTime = do
     tv <- with (CTimeval 0 0) $ \tvptr -> do
         throwErrnoIfMinus1_ "gettimeofday" (gettimeofday tvptr nullPtr)
         peek tvptr
-    let !t = fromIntegral (sec tv) + fromIntegral (usec tv) / 1000000.0
+    let !t = realToFrac (sec tv) + realToFrac (usec tv) / 1000000.0
     return t
 
 ------------------------------------------------------------------------
 -- FFI binding
 
 data CTimeval = CTimeval
-    { sec  :: {-# UNPACK #-} !CLong
-    , usec :: {-# UNPACK #-} !CLong
+    { sec  :: {-# UNPACK #-} !CTime
+    , usec :: {-# UNPACK #-} !CSUSeconds
     }
 
 instance Storable CTimeval where
