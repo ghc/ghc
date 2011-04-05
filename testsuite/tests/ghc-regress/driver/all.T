@@ -185,16 +185,6 @@ test('driver053',
      run_command,
      ['$MAKE -s --no-print-directory test053'])
 
-test('driver060',
-     extra_clean(['A060.hi', 'A060.o', 'A060.hc']),
-     run_command,
-     ['$MAKE -s --no-print-directory test060'])
-
-test('driver061',
-     extra_clean(['A061.hi', 'A061.o', 'A061.hc']),
-     run_command,
-     ['$MAKE -s --no-print-directory test061'])
-
 test('driver061a',
      extra_clean(['A061a.hi', 'A061a.o', 'A061a.s']),
      run_command,
@@ -253,16 +243,6 @@ test('driver067',
      run_command,
      ['$MAKE -s --no-print-directory test067'])
 
-test('driver068',
-     extra_clean(['A068.hi', 'A068.o', 'A068.hc']),
-     run_command,
-     ['$MAKE -s --no-print-directory test068'])
-
-test('driver069',
-     extra_clean(['A069.hi', 'A069.o', 'A069.tmp']),
-     run_command,
-     ['$MAKE -s --no-print-directory test069'])
-
 test('driver070',
      extra_clean(['A070.hi', 'A070.o', 'A070.s']),
      run_command,
@@ -272,11 +252,6 @@ test('driver071',
      extra_clean(['A071.hi', 'A071.o', 'A071.tmp']),
      run_command,
      ['$MAKE -s --no-print-directory test071'])
-
-test('driver080',
-     extra_clean(['A080.hi', 'A080.o', 'A080.hc']),
-     run_command,
-     ['$MAKE -s --no-print-directory test080'])
 
 test('driver081a',
      normal,

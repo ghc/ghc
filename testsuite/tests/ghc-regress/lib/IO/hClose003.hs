@@ -31,8 +31,11 @@ showPossibleException f = do
   e <- try f
   putStrLn (sanitise (show (e :: Either SomeException ())))
  where
-  sanitise = map (\c -> if isDigit c then 'X' else c)
   -- we don't care which file descriptor it is
+  sanitise [] = []
+  sanitise (x:xs) = if isDigit x then ('X':(sanitise' xs)) else (x:(sanitise xs))
+  sanitise' [] = []
+  sanitise' (x:xs) = if isDigit x then (sanitise' xs) else (x:(sanitise xs))
 
 naughtyClose h = 
   withHandle_ "naughtyClose" h $ \ Handle__{haDevice=dev} -> do
