@@ -275,7 +275,7 @@ sub scmall {
                 }
                 
                 # The first time round the loop, default the get-mode
-                if (not defined($get_mode)) {
+                if ($scm eq "darcs" && not defined($get_mode)) {
                     warning("adding --partial, to override use --complete");
                     $get_mode = "--partial";
                 }
