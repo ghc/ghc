@@ -11,8 +11,8 @@ cabal-version:  >=1.6
 build-type: Custom
 
 source-repository head
-    type:     darcs
-    location: http://darcs.haskell.org/packages/ghc-prim/
+    type:     git
+    location: http://darcs.haskell.org/packages/ghc-prim.git/
 
 flag include-ghc-prim {
     Description: Include GHC.Prim in exposed-modules
