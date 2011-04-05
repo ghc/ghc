@@ -238,6 +238,12 @@ sub scmall {
         if ($subcommand ne 'add' && $subcommand ne 'rm') {
             help();
         }
+    } elsif ($command eq 'new' || $command eq 'fetch') {
+        if (@_ < 1) {
+            $branch_name = 'origin';
+        } else {
+            $branch_name = shift;
+        }
     }
 
     for $line (@packages) {
@@ -316,10 +322,10 @@ sub scmall {
                 @scm_args = ("remote", "set-url", "--push", "origin", $path);
             }
             elsif ($command =~ /^fetch$/) {
-                @scm_args = ("fetch", "origin");
+                @scm_args = ("fetch", "$branch_name");
             }
             elsif ($command =~ /^new$/) {
-                @scm_args = ("log", "origin..");
+                @scm_args = ("log", "$branch_name..");
             }
             elsif ($command =~ /^remote$/) {
                 if ($subcommand eq 'add') {
