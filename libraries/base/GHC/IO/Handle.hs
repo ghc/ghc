@@ -551,7 +551,7 @@ hIsTerminalDevice handle = do
 -- | Select binary mode ('True') or text mode ('False') on a open handle.
 -- (See also 'openBinaryFile'.)
 --
--- This has the same effect as calling 'hSetEncoding' with 'latin1', together
+-- This has the same effect as calling 'hSetEncoding' with 'char8', together
 -- with 'hSetNewlineMode' with 'noNewlineTranslation'.
 --
 hSetBinaryMode :: Handle -> Bool -> IO ()
