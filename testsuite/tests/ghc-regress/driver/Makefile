@@ -58,36 +58,30 @@ test015:
 
 # test stub generation
 test016:
-	$(RM) F016.hi F016$(OBJSUFFIX) F016_stub.c F016_stub.h
+	$(RM) F016.hi F016$(OBJSUFFIX) F016_stub.h
 	"$(TEST_HC)" -c F016.hs
 	test -f F016_stub$(OBJSUFFIX)
-	test -f F016_stub.c
 	test -f F016_stub.h
 
 # test -stubdir (filename differs from module name)
 test017:
 	$(RM) F017.hi F017$(OBJSUFFIX)
-	$(RM) stub017/TestStub_stub.c stub017/TestStub_stub.h
-	$(RM) stub017/TestStub_stub$(OBJSUFFIX)
 	$(RM) F017_stub$(OBJSUFFIX)
 	"$(TEST_HC)" -c F017.hs -stubdir stub017
-	test -f F017_stub$(OBJSUFFIX)
-	test -f stub017/TestStub017_stub.c
 	test -f stub017/TestStub017_stub.h
 
 # test -odir with stubs (filename differs from module name)
 test018:
-	$(RM) -f F018.hi F018$(OBJSUFFIX) F018_stub.c F018_stub.h
+	$(RM) -f F018.hi F018$(OBJSUFFIX) F018_stub.h
 	$(RM) -rf obj018
 	mkdir obj018
 	"$(TEST_HC)" -c F018.hs -odir obj018
-	test -f obj018/TestStub018_stub$(OBJSUFFIX)
 
 # test for bug #3093
 test018a:
-	$(RM) -f F018a.hi F018a_stub.c F018a_stub.h *.obj.018
+	$(RM) -f F018a.hi F018a_stub.h *.obj.018
 	"$(TEST_HC)" -c F018a.hs -osuf obj.018
-	test -f F018a_stub.obj.018
+	test -f F018a.obj.018
 
 # test -outputdir
 test019:
@@ -95,8 +89,6 @@ test019:
 	"$(TEST_HC)" -c F019.hs -outputdir out019
 	test -f out019/TestStub019.hi
 	test -f out019/TestStub019$(OBJSUFFIX)
-	test -f out019/TestStub019_stub$(OBJSUFFIX)
-	test -f out019/TestStub019_stub.c
 	test -f out019/TestStub019_stub.h
 
 # -----------------------------------------------------------------------------
@@ -160,18 +152,16 @@ test026:
 # test stub generation
 # -fvia-C, because we want to check that the .hc file can #include the stub.h
 test027:
-	$(RM) B027/F.hi B027/F$(OBJSUFFIX) B027/F_stub.c B027/F_stub.h
+	$(RM) B027/F.hi B027/F$(OBJSUFFIX) B027/F_stub.h
 	"$(TEST_HC)" -c B027/F.hs -fno-warn-deprecated-flags -fvia-C
-	test -f B027/F_stub.c
 	test -f B027/F_stub.h
 
 # test -stubdir
 # -fvia-C, because we want to check that the .hc file can #include the stub.h
 test028:
 	$(RM) B028/F.hi B028/F$(OBJSUFFIX)
-	$(RM) stub028/B028/F_stub.c stub028/B028/F_stub.h
+	$(RM) stub028/B028/F_stub.h
 	"$(TEST_HC)" -c B028/F.hs -stubdir stub028 -fno-warn-deprecated-flags -fvia-C
-	test -f stub028/B028/F_stub.c
 	test -f stub028/B028/F_stub.h
 
 # -----------------------------------------------------------------------------
@@ -202,16 +192,14 @@ test033:
 
 # test stub generation
 test034:
-	$(RM) F034.hi F034$(OBJSUFFIX) F034_stub.c F034_stub.h
+	$(RM) F034.hi F034$(OBJSUFFIX) F034_stub.h
 	"$(TEST_HC)" -v0 --make F034.hs
-	test -f F034_stub.c
 	test -f F034_stub.h
 
 # test -stubdir (filename differs from module name)
 test035:
-	$(RM) F035.hi F$(OBJSUFFIX) stub035/Stubs_stub.c stub035/Stubs_stub.h
+	$(RM) F035.hi F$(OBJSUFFIX) stub035/Stubs_stub.h
 	"$(TEST_HC)" -v0 --make F035.hs -stubdir stub035
-	test -f stub035/TestStub035_stub.c
 	test -f stub035/TestStub035_stub.h
 
 # -----------------------------------------------------------------------------
@@ -242,17 +230,15 @@ test043:
 
 # test stub generation
 test044:
-	$(RM) B044/F.hi B044/F$(OBJSUFFIX) B044/F_stub.c B044/F_stub.h
+	$(RM) B044/F.hi B044/F$(OBJSUFFIX) B044/F_stub.h
 	"$(TEST_HC)" -v0 --make B044/F.hs
-	test -f B044/F_stub.c
 	test -f B044/F_stub.h
 
 # test -stubdir
 test045:
 	$(RM) B045/F.hi B045/F$(OBJSUFFIX)
-	$(RM) stub045/B045/F_stub.c stub045/B045/F_stub.h
+	$(RM) stub045/B045/F_stub.h
 	"$(TEST_HC)" -v0 --make B045/F.hs -stubdir stub045
-	test -f stub045/B045/F_stub.c
 	test -f stub045/B045/F_stub.h
 
 # -----------------------------------------------------------------------------
