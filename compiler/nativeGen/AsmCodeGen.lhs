@@ -58,7 +58,7 @@ import NCGMonad
 import BlockId
 import CgUtils		( fixStgRegisters )
 import OldCmm
-import CmmOpt		( cmmMiniInline, cmmMachOpFold )
+import CmmOpt		( cmmEliminateDeadBlocks, cmmMiniInline, cmmMachOpFold )
 import OldPprCmm
 import CLabel
 
@@ -729,10 +729,9 @@ Here we do:
              and position independent refs
         (ii) compile a list of imported symbols
 
-Ideas for other things we could do (ToDo):
+Ideas for other things we could do:
 
   - shortcut jumps-to-jumps
-  - eliminate dead code blocks
   - simple CSE: if an expr is assigned to a temp, then replace later occs of
     that expr with the temp, until the expr is no longer valid (can push through
     temp assignments, and certain assigns to mem...)
@@ -741,7 +740,7 @@ Ideas for other things we could do (ToDo):
 cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline (cmmEliminateDeadBlocks blocks))
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
