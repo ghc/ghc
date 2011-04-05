@@ -224,19 +224,32 @@ sub scmall {
     my @scm_args;
 
     my $pwd;
+    my @args;
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
     parsePackages;
 
+    @args = ();
+
     if ($command =~ /^remote$/) {
-        if (@_ < 2) {
+        while (@_ > 0 && $_[0] =~ /^-/) {
+            push(@args,shift);
+        }
+        if (@_ < 1) { help(); }
+        $subcommand = shift;
+        if ($subcommand ne 'add' && $subcommand ne 'rm' && $subcommand ne 'set-url') {
             help();
         }
-        $subcommand = shift;
-        $branch_name = shift;
-        if ($subcommand ne 'add' && $subcommand ne 'rm') {
+        while (@_ > 0 && $_[0] =~ /^-/) {
+            push(@args,shift);
+        }
+        if (($subcommand eq 'add' || $subcommand eq 'rm') && @_ < 1) {
             help();
+        } elsif (@_ < 1) { # set-url
+            $branch_name = 'origin';
+        } else {
+            $branch_name = shift;
         }
     } elsif ($command eq 'new' || $command eq 'fetch') {
         if (@_ < 1) {
@@ -245,6 +258,9 @@ sub scmall {
             $branch_name = shift;
         }
     }
+
+    push(@args, @_);
+    print "args: @args\n";
 
     for $line (@packages) {
 
@@ -315,12 +331,6 @@ sub scmall {
                           or ($scm eq "git" and "send-email"));
                 $want_remote_repo = 1;
             }
-            elsif ($command =~ /^set-origin$/) {
-                @scm_args = ("remote", "set-url", "origin", $path);
-            }
-            elsif ($command =~ /^set-push$/) {
-                @scm_args = ("remote", "set-url", "--push", "origin", $path);
-            }
             elsif ($command =~ /^fetch$/) {
                 @scm_args = ("fetch", "$branch_name");
             }
@@ -332,6 +342,8 @@ sub scmall {
                     @scm_args = ("remote", "add", $branch_name, $path);
                 } elsif ($subcommand eq 'rm') {
                     @scm_args = ("remote", "rm", $branch_name);
+                } elsif ($subcommand eq 'set-url') {
+                    @scm_args = ("remote", "set-url", $branch_name, $path);
                 }
             }
             else {
@@ -342,20 +354,20 @@ sub scmall {
             if (repoexists ($scm, $localpath)) {
                 if ($want_remote_repo) {
                     if ($scm eq "darcs") {
-                        scm (".", $scm, @scm_args, @_, "--repodir=$localpath", $path);
+                        scm (".", $scm, @scm_args, @args, "--repodir=$localpath", $path);
                     } else {
                         # git pull doesn't like to be used with --work-dir
                         # I couldn't find an alternative to chdir() here
-                        scm ($localpath, $scm, @scm_args, @_, $path, "master");
+                        scm ($localpath, $scm, @scm_args, @args, $path, "master");
                     }
                 } else {
                     # git status *must* be used with --work-dir, if we don't chdir() to the dir
-                    scm ($localpath, $scm, @scm_args, @_);
+                    scm ($localpath, $scm, @scm_args, @args);
                 }
             }
             elsif ($local_repo_unnecessary) {
                 # Don't bother to change directory in this case
-                scm (".", $scm, @scm_args, @_);
+                scm (".", $scm, @scm_args, @args);
             }
             elsif ($tag eq "") {
                 message "== Required repo $localpath is missing! Skipping";
@@ -383,11 +395,10 @@ Supported commands:
   * --partial
  * fetch
  * send
- * set-origin
- * set-push
  * new
  * remote add <branch-name>
  * remote rm <branch-name>
+ * remote set-url [--push] <branch-name>
 
 Available package-tags are:
 END
