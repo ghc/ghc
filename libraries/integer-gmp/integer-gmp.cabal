@@ -16,8 +16,8 @@ extra-source-files:
   cbits/longlong.c
 
 source-repository head
-    type:     darcs
-    location: http://darcs.haskell.org/packages/integer-gmp/
+    type:     git
+    location: http://darcs.haskell.org/packages/integer-gmp.git/
 
 Library {
     build-depends: ghc-prim
