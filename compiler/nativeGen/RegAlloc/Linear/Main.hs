@@ -621,7 +621,14 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 		-- Not already in a register, so we need to find a free one...
 		Just (InMem slot) | reading   -> doSpill (ReadMem slot)
 				  | otherwise -> doSpill WriteMem
-		Nothing | reading   -> panic "allocateRegsAndSpill: Cannot read from uninitialized register"
+                Nothing | reading   ->
+                   -- pprPanic "allocateRegsAndSpill: Cannot read from uninitialized register" (ppr r)
+                   -- ToDo: This case should be a panic, but we
+                   -- sometimes see an unreachable basic block which
+                   -- triggers this because the register allocator
+                   -- will start with an empty assignment.
+                   doSpill WriteNew
+
 			| otherwise -> doSpill WriteNew
 	
 
