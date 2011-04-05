@@ -73,14 +73,14 @@ module Foreign.C.Types
 #endif
 #else
           -- Exported non-abstractly in nhc98 to fix an interface file problem.
-          CChar(..),    CSChar(..),  CUChar(..)
-        , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
+          CChar(..),    CSChar(..),   CUChar(..)
+        , CShort(..),   CUShort(..),  CInt(..),      CUInt(..)
         , CLong(..),    CULong(..)
-        , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
+        , CPtrdiff(..), CSize(..),    CWchar(..),    CSigAtomic(..)
         , CLLong(..),   CULLong(..)
-        , CClock(..),   CTime(..),   CUSeconds(..), CSUSeconds(..)
-        , CFloat(..),   CDouble(..), CLDouble(..)
-        , CIntPtr(..), CUIntPtr(..), CIntMax(..), CUIntMax(..)
+        , CClock(..),   CTime(..),    CUSeconds(..), CSUSeconds(..)
+        , CFloat(..),   CDouble(..),  CLDouble(..)
+        , CIntPtr(..),  CUIntPtr(..), CIntMax(..),   CUIntMax(..)
 #endif
           -- ** Other types
 
@@ -215,7 +215,6 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 -- | Haskell type representing the C @clock_t@ type.
 ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 -- | Haskell type representing the C @time_t@ type.
---
 ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 -- | Haskell type representing the C @useconds_t@ type.
 ARITHMETIC_TYPE(CUSeconds,tyConCUSeconds,"CUSeconds",HTYPE_USECONDS_T)
@@ -291,14 +290,14 @@ representing a C type @t@:
 #else   /* __NHC__ */
 
 import NHC.FFI
-  ( CChar(..),    CSChar(..),  CUChar(..)
-  , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
-  , CLong(..),    CULong(..),  CLLong(..), CULLong(..)
-  , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
-  , CClock(..),   CTime(..),   CUSeconds(..), CSUSeconds(..)
-  , CFloat(..),   CDouble(..), CLDouble(..)
-  , CIntPtr(..),  CUIntPtr(..),CIntMax(..), CUIntMax(..)
-  , CFile,        CFpos,       CJmpBuf
+  ( CChar(..),    CSChar(..),   CUChar(..)
+  , CShort(..),   CUShort(..),  CInt(..),      CUInt(..)
+  , CLong(..),    CULong(..),   CLLong(..),    CULLong(..)
+  , CPtrdiff(..), CSize(..),    CWchar(..),    CSigAtomic(..)
+  , CClock(..),   CTime(..),    CUSeconds(..), CSUSeconds(..)
+  , CFloat(..),   CDouble(..),  CLDouble(..)
+  , CIntPtr(..),  CUIntPtr(..), CIntMax(..),   CUIntMax(..)
+  , CFile,        CFpos,        CJmpBuf
   , Storable(..)
   )
 import Data.Bits
