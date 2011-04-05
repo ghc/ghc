@@ -956,7 +956,7 @@ runPhase CmmCpp input_fn dflags
 
 runPhase Cmm input_fn dflags
   = do
-        PipeEnv{stop_phase,src_basename} <- getPipeEnv
+        PipeEnv{src_basename} <- getPipeEnv
         let hsc_lang = hscTarget dflags
 
         let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
