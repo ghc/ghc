@@ -22,6 +22,7 @@ recomp008 :
 	cp A1.hs A.hs
 	$(MAKE) prog
 	./prog
+	sleep 1
 	cp A2.hs A.hs
 	$(MAKE) prog
 	./prog
