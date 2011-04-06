@@ -307,7 +307,6 @@ sub scmall {
             }
             elsif ($command =~ /^(?:pul|pull)$/) {
                 @scm_args = "pull";
-                $want_remote_repo = 1;
                 # Q: should we append the -a argument for darcs repos?
             }
             elsif ($command =~ /^(?:g|ge|get)$/) {
