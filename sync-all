@@ -353,6 +353,11 @@ sub scmall {
                     @scm_args = ("remote", "set-url", $branch_name, $path);
                 }
             }
+            elsif ($command =~ /^grep$/) {
+              @scm_args = ("grep");
+              # Hack around 'git grep' failing if there are no matches
+              $ignore_failure = 1;
+            }
             else {
                 die "Unknown command: $command";
             }
@@ -406,6 +411,7 @@ Supported commands:
  * remote add <branch-name>
  * remote rm <branch-name>
  * remote set-url [--push] <branch-name>
+ * grep
 
 Available package-tags are:
 END
