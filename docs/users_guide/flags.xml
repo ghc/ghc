@@ -560,7 +560,7 @@
 	    <row>
 	      <entry><option>-package-name</option> <replaceable>P</replaceable></entry>
 	      <entry>Compile to be part of package <replaceable>P</replaceable></entry>
-	      <entry>dynamic</entry>
+              <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
