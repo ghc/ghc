@@ -75,6 +75,7 @@ data Phase
         | Hsc   HscSource
         | Ccpp
         | Cc
+        | Cobjc
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
         | SplitMangle   -- after mangler if splitting
         | SplitAs
@@ -110,6 +111,7 @@ eqPhase (HsPp  _)   (HsPp  _)   = True
 eqPhase (Hsc   _)   (Hsc   _)   = True
 eqPhase Ccpp        Ccpp        = True
 eqPhase Cc          Cc          = True
+eqPhase Cobjc       Cobjc       = True
 eqPhase HCc         HCc         = True
 eqPhase SplitMangle SplitMangle = True
 eqPhase SplitAs     SplitAs     = True
@@ -150,6 +152,7 @@ nextPhase LlvmMangle    = As
 nextPhase SplitAs       = MergeStub
 nextPhase Ccpp          = As
 nextPhase Cc            = As
+nextPhase Cobjc         = As
 nextPhase CmmCpp        = Cmm
 nextPhase Cmm           = HCc
 nextPhase HCc           = As
@@ -170,6 +173,7 @@ startPhase "hc"       = HCc
 startPhase "c"        = Cc
 startPhase "cpp"      = Ccpp
 startPhase "C"        = Cc
+startPhase "m"        = Cobjc
 startPhase "cc"       = Ccpp
 startPhase "cxx"      = Ccpp
 startPhase "split_s"  = SplitMangle
@@ -198,6 +202,7 @@ phaseInputExt (Hsc   _)           = "hspp"      -- intermediate only
         --     output filename.  That could be fixed, but watch out.
 phaseInputExt HCc                 = "hc"
 phaseInputExt Ccpp                = "cpp"
+phaseInputExt Cobjc               = "m"
 phaseInputExt Cc                  = "c"
 phaseInputExt SplitMangle         = "split_s"   -- not really generated
 phaseInputExt As                  = "s"
@@ -216,7 +221,7 @@ haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
                                [ "hspp", "hscpp", "hcr", "cmm", "cmmcpp" ]
 haskellish_suffixes          = haskellish_src_suffixes ++ ["hc", "raw_s"]
-cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc" ]
+cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "bc", "m" ]
 extcoreish_suffixes          = [ "hcr" ]
 -- Will not be deleted as temp files:
 haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]
