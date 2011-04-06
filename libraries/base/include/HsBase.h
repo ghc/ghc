@@ -652,10 +652,17 @@ INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
 }
 #endif /* !defined(__MINGW32__) */
 
+#if darwin_HOST_OS
+// You should not access _environ directly on Darwin in a bundle/shared library.
+// See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
+#include <crt_externs.h>
+INLINE char **__hscore_environ() { return *(_NSGetEnviron()); }
+#else
 /* ToDo: write a feature test that doesn't assume 'environ' to
  *    be in scope at link-time. */
 extern char** environ;
 INLINE char **__hscore_environ() { return environ; }
+#endif
 
 /* lossless conversions between pointers and integral types */
 INLINE void *    __hscore_from_uintptr(uintptr_t n) { return (void *)n; }
