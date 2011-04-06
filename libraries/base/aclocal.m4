@@ -10,7 +10,7 @@
 # The public AC_COMPUTE_INT macro isn't supported by some versions of
 # autoconf.
 AC_DEFUN([FP_COMPUTE_INT],
-[_AC_COMPUTE_INT([$1], [$2], [$3], [$4])[]dnl
+[_AC_COMPUTE_INT([$2], [$1], [$3], [$4])[]dnl
 ])# FP_COMPUTE_INT
 
 
@@ -21,7 +21,7 @@ AC_DEFUN([FP_COMPUTE_INT],
 AC_DEFUN([FP_CHECK_CONST],
 [AS_VAR_PUSHDEF([fp_Cache], [fp_cv_const_$1])[]dnl
 AC_CACHE_CHECK([value of $1], fp_Cache,
-[FP_COMPUTE_INT([$1], fp_check_const_result, [AC_INCLUDES_DEFAULT([$2])],
+[FP_COMPUTE_INT(fp_check_const_result, [$1], [AC_INCLUDES_DEFAULT([$2])],
                 [fp_check_const_result=m4_default([$3], ['-1'])])
 AS_VAR_SET(fp_Cache, [$fp_check_const_result])])[]dnl
 AC_DEFINE_UNQUOTED(AS_TR_CPP([CONST_$1]), AS_VAR_GET(fp_Cache), [The value of $1.])[]dnl
