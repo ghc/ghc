@@ -472,3 +472,10 @@ withRtsOpts:
 T3364:
 	-"$(TEST_HC)" -H
 
+.PHONY: T706
+T706:
+	cp T706a.hs T706.hs
+	"$(TEST_HC)" -c T706.hs
+	cp T706b.hs T706.hs
+	"$(TEST_HC)" -c T706.hs
+	echo "test" | "$(TEST_HC)" --interactive -v0 T706
