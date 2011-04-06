@@ -431,7 +431,7 @@ getRegister (CmmReg reg)
          size | not use_sse2 && isFloatSize sz = FF80
               | otherwise                      = sz
        --
-       return (Fixed sz (getRegisterReg use_sse2 reg) nilOL)
+       return (Fixed size (getRegisterReg use_sse2 reg) nilOL)
   
 
 getRegister tree@(CmmRegOff _ _) 
