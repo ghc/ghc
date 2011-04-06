@@ -262,7 +262,6 @@ sub scmall {
     }
 
     push(@args, @_);
-    print "args: @args\n";
 
     for $line (@packages) {
 
