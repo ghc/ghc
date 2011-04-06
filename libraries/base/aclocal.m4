@@ -7,6 +7,8 @@
 # Implementation note: We are lazy and use an internal autoconf macro, but it
 # is supported in autoconf versions 2.50 up to the actual 2.57, so there is
 # little risk.
+# The public AC_COMPUTE_INT macro isn't supported by some versions of
+# autoconf.
 AC_DEFUN([FP_COMPUTE_INT],
 [_AC_COMPUTE_INT([$1], [$2], [$3], [$4])[]dnl
 ])# FP_COMPUTE_INT
@@ -123,20 +125,20 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE],[
     AC_MSG_CHECKING(Haskell type for $1)
     AC_CACHE_VAL(AC_CV_NAME,[
         AC_CV_NAME_supported=yes
-        AC_COMPUTE_INT([HTYPE_IS_INTEGRAL],
+        FP_COMPUTE_INT([HTYPE_IS_INTEGRAL],
                        [(($1)((int)(($1)1.4))) == (($1)1.4)],
                        [FPTOOLS_HTYPE_INCLUDES],[AC_CV_NAME_supported=no])
         if test "$AC_CV_NAME_supported" = "yes"
         then
             if test "$HTYPE_IS_INTEGRAL" -eq 0
             then
-                AC_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
+                FP_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
                                [FPTOOLS_HTYPE_INCLUDES],
                                [AC_CV_NAME_supported=no])
-                AC_COMPUTE_INT([HTYPE_IS_DOUBLE],[sizeof($1) == sizeof(double)],
+                FP_COMPUTE_INT([HTYPE_IS_DOUBLE],[sizeof($1) == sizeof(double)],
                                [FPTOOLS_HTYPE_INCLUDES],
                                [AC_CV_NAME_supported=no])
-                AC_COMPUTE_INT([HTYPE_IS_LDOUBLE],[sizeof($1) == sizeof(long double)],
+                FP_COMPUTE_INT([HTYPE_IS_LDOUBLE],[sizeof($1) == sizeof(long double)],
                                [FPTOOLS_HTYPE_INCLUDES],
                                [AC_CV_NAME_supported=no])
                 if test "$HTYPE_IS_FLOAT" -eq 1
@@ -152,10 +154,10 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE],[
                     AC_CV_NAME_supported=no
                 fi
             else
-                AC_COMPUTE_INT([HTYPE_IS_SIGNED],[(($1)(-1)) < (($1)0)],
+                FP_COMPUTE_INT([HTYPE_IS_SIGNED],[(($1)(-1)) < (($1)0)],
                                [FPTOOLS_HTYPE_INCLUDES],
                                [AC_CV_NAME_supported=no])
-                AC_COMPUTE_INT([HTYPE_SIZE],[sizeof($1) * 8],
+                FP_COMPUTE_INT([HTYPE_SIZE],[sizeof($1) * 8],
                                [FPTOOLS_HTYPE_INCLUDES],
                                [AC_CV_NAME_supported=no])
                 if test "$HTYPE_IS_SIGNED" -eq 0
