@@ -290,7 +290,7 @@ sub scmall {
             }
 
             # Work out the arguments we should give to the SCM
-            if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew)$/) {
+            if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
                 @scm_args = (($scm eq "darcs" and "whatsnew")
                           or ($scm eq "git" and "status"));
                 
