@@ -228,7 +228,7 @@ sub scmall {
 
     my ($repo_base, $checked_out_tree) = getrepo();
 
-    my $is_github_repo = $repo_base =~ m/(git@|git:\/\/)github.com/;
+    my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
 
     parsePackages;
 
