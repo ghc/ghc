@@ -1178,7 +1178,9 @@ runPhase As input_fn dflags
 
 runPhase SplitAs _input_fn dflags
   = do
-        next_phase <- maybeMergeStub
+        -- we'll handle the stub_o file in this phase, so don't MergeStub,
+        -- just jump straight to StopLn afterwards.
+        let next_phase = StopLn
         output_fn <- phaseOutputFilename next_phase
 
         let base_o = dropExtension output_fn
@@ -1226,8 +1228,15 @@ runPhase SplitAs _input_fn dflags
 
         io $ mapM_ assemble_file [1..n]
 
+        -- If there's a stub_o file, then we make it the n+1th split object.
+        PipeState{maybe_stub_o} <- getPipeState
+        n' <- case maybe_stub_o of
+                  Nothing     -> return n
+                  Just stub_o -> do io $ copyFile stub_o (split_obj (n+1))
+                                    return (n+1)
+
         -- join them into a single .o file
-        io $ joinObjectFiles dflags (map split_obj [1..n]) output_fn
+        io $ joinObjectFiles dflags (map split_obj [1..n']) output_fn
 
         return (next_phase, output_fn)
 
