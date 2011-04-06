@@ -369,6 +369,9 @@ def literate( opts ):
 def c_src( opts ):
     opts.c_src = 1;
 
+def objc_src( opts ):
+    opts.objc_src = 1;
+
 # ----
 
 def pre_cmd( cmd ):
@@ -1451,6 +1454,8 @@ def add_suffix( name, suffix ):
 def add_hs_lhs_suffix(name):
     if getTestOpts().c_src:
         return add_suffix(name, 'c')
+    elif getTestOpts().objc_src:
+        return add_suffix(name, 'm')
     elif getTestOpts().literate:
         return add_suffix(name, 'lhs')
     else:
