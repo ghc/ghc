@@ -303,7 +303,6 @@ sub scmall {
             }
             elsif ($command =~ /^(?:pus|push)$/) {
                 @scm_args = "push";
-                $want_remote_repo = 1;
             }
             elsif ($command =~ /^(?:pul|pull)$/) {
                 @scm_args = "pull";
