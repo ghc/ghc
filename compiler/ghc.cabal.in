@@ -127,6 +127,7 @@ Library
         specialise
         stgSyn
         stranal
+        supercompile
         typecheck
         types
         utils
@@ -444,6 +445,12 @@ Library
         UniqFM
         UniqSet
         Util
+        Supercompile.Core.Renaming
+        Supercompile.Core.Syntax
+        Supercompile.Core.FreeVars
+        Supercompile.StaticFlags
+        Supercompile.Utilities
+        Supercompile
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins
