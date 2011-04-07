@@ -236,7 +236,7 @@ outputForeignStubs dflags mod location stubs
 	    stub_h_output_w = showSDoc stub_h_output_d
 	-- in
 
-	createDirectoryHierarchy (takeDirectory stub_c)
+        createDirectoryHierarchy (takeDirectory stub_h)
 
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
