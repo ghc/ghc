@@ -1,20 +1,17 @@
 module Supercompile.Evaluator.Syntax where
 
-import Supercompile.Evaluator.Deeds
-
 import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
 
-import Supercompile.Renaming
 import Supercompile.Utilities
 
 import qualified Data.Map as M
 
 
-type Anned = Tagged :.: Sized :.: FVed
+type Anned = O Tagged (O Sized FVed)
 type AnnedTerm = Anned (TermF Anned)
 type AnnedValue = ValueF Anned
 type AnnedAlt = AltF Anned
@@ -46,7 +43,7 @@ annedValueSize' = taggedSizedFVedValueSize'
 annedValueSize = taggedSizedFVedValueSize
 annedAltsSize = taggedSizedFVedAltsSize
 
-renameAnnedTerm = renameTaggedSizedFVedTerm :: IdSupply -> Renaming -> AnnedTerm -> AnnedTerm
+renameAnnedTerm = renameTaggedSizedFVedTerm :: InScopeSet -> Renaming -> AnnedTerm -> AnnedTerm
 renameAnnedValue = renameTaggedSizedFVedValue
 renameAnnedValue' = renameTaggedSizedFVedValue'
 renameAnnedAlts = renameTaggedSizedFVedAlts
@@ -67,27 +64,26 @@ annedValue :: Tag -> ValueF Anned -> Anned AnnedValue
 annedValue tg v = Comp (Tagged tg (Comp (Sized (annedValueSize' v) (FVed (annedValueFreeVars' v) v))))
 
 
-toAnnedTerm :: IdSupply -> Term -> AnnedTerm
+toAnnedTerm :: UniqSupply -> Term -> AnnedTerm
 toAnnedTerm tag_ids = tagFVedTerm tag_ids . reflect
 
 
 data QA = Question Var
         | Answer   (ValueF Anned)
-        deriving (Show)
 
-instance Pretty QA where
-    pPrintPrec level prec = pPrintPrec level prec . qaToAnnedTerm'
+instance Outputable QA where
+    pprPrec prec = pPrintPrec prec . qaToAnnedTerm'
 
 qaToAnnedTerm' :: QA -> TermF Anned
 qaToAnnedTerm' (Question x) = Var x
 qaToAnnedTerm' (Answer v)   = Value v
 
 
-type UnnormalisedState = (Deeds, Heap, Stack, In AnnedTerm)
-type State = (Deeds, Heap, Stack, In (Anned QA))
+type UnnormalisedState = (Heap, Stack, In AnnedTerm)
+type State = (Heap, Stack, In (Anned QA))
 
 denormalise :: State -> UnnormalisedState
-denormalise (deeds, h, k, (rn, qa)) = (deeds, h, k, (rn, fmap qaToAnnedTerm' qa))
+denormalise (h, k, (rn, qa)) = (h, k, (rn, fmap qaToAnnedTerm' qa))
 
 
 -- Invariant: LetBound things cannot refer to LambdaBound things.
@@ -100,25 +96,31 @@ denormalise (deeds, h, k, (rn, qa)) = (deeds, h, k, (rn, fmap qaToAnnedTerm' qa)
 data HowBound = InternallyBound | LambdaBound | LetBound
               deriving (Eq, Show)
 
-instance Pretty HowBound where
-    pPrint = text . show
-
-instance NFData HowBound
+instance Outputable HowBound where
+    ppr = text . show
 
 data HeapBinding = HB { howBound :: HowBound, heapBindingMeaning :: Either (Maybe Tag) (In AnnedTerm) }
-                 deriving (Show)
 
-instance NFData HeapBinding where
-    rnf (HB a b) = rnf a `seq` rnf b
+pPrintPrecAnned :: (Outputable1 f, Outputable a)
+                => (f a -> FreeVars)
+                -> (InScopeSet -> Renaming -> f a -> f a)
+                -> Rational -> In (f a) -> SDoc
+pPrintPrecAnned fvs rename prec in_e = pprPrec prec $ Wrapper1 $ renameIn (rename (mkInScopeSet (inFreeVars fvs in_e))) in_e
 
-instance NFData Heap where
-    rnf (Heap a b) = rnf a `seq` rnf b
+pPrintPrecAnnedAlts :: In [AnnedAlt] -> [(AltCon, PrettyFunction)]
+pPrintPrecAnnedAlts in_alts = map (second (\e -> PrettyFunction $ \prec -> pprPrec prec (Wrapper1 e))) $ renameIn (renameAnnedAlts (mkInScopeSet (inFreeVars annedAltsFreeVars in_alts))) in_alts
 
-instance Pretty HeapBinding where
-    pPrintPrec level prec (HB how mb_in_e) = case how of
-        InternallyBound -> either (const empty) (pPrintPrec level prec . renameIn (renameAnnedTerm prettyIdSupply)) mb_in_e
-        LambdaBound     -> text "λ" <> angles (either (const empty) (pPrintPrec level noPrec . renameIn (renameAnnedTerm prettyIdSupply)) mb_in_e)
-        LetBound        -> text "l" <> angles (either (const empty) (pPrintPrec level noPrec . renameIn (renameAnnedTerm prettyIdSupply)) mb_in_e)
+pPrintPrecAnnedValue :: Rational -> In (Anned AnnedValue) -> SDoc
+pPrintPrecAnnedValue prec in_e = pPrintPrecValue prec $ extract $ renameIn (renameAnnedValue (mkInScopeSet (inFreeVars annedValueFreeVars in_e))) in_e
+
+pPrintPrecAnnedTerm :: Rational -> In AnnedTerm -> SDoc
+pPrintPrecAnnedTerm prec in_e = pprPrec prec $ Wrapper1 $ renameIn (renameAnnedTerm (mkInScopeSet (inFreeVars annedTermFreeVars in_e))) in_e
+
+instance Outputable HeapBinding where
+    pprPrec prec (HB how mb_in_e) = case how of
+        InternallyBound -> either (const empty) (pPrintPrecAnnedTerm prec) mb_in_e
+        LambdaBound     -> text "λ" <> angles (either (const empty) (pPrintPrecAnnedTerm noPrec) mb_in_e)
+        LetBound        -> text "l" <> angles (either (const empty) (pPrintPrecAnnedTerm noPrec) mb_in_e)
 
 lambdaBound :: HeapBinding
 lambdaBound = HB LambdaBound (Left Nothing)
@@ -130,32 +132,24 @@ environmentallyBound :: Tag -> HeapBinding
 environmentallyBound tg = HB LetBound (Left (Just tg))
 
 type PureHeap = M.Map (Out Var) HeapBinding
-data Heap = Heap PureHeap IdSupply
-          deriving (Show)
+data Heap = Heap PureHeap InScopeSet
 
-instance Pretty Heap where
-    pPrintPrec level prec (Heap h _) = pPrintPrec level prec h
+instance Outputable Heap where
+    pprPrec prec (Heap h _) = pprPrec prec h
 
 
 type Stack = [Tagged StackFrame]
 data StackFrame = Apply (Out Var)
-                | Scrutinise (In [AnnedAlt])
+                | Scrutinise (Out Var) (Out Type) (In [AnnedAlt])
                 | PrimApply PrimOp [In (Anned AnnedValue)] [In AnnedTerm]
                 | Update (Out Var)
-                deriving (Show)
 
-instance NFData StackFrame where
-    rnf (Apply a)         = rnf a
-    rnf (Scrutinise a)    = rnf a
-    rnf (PrimApply a b c) = rnf a `seq` rnf b `seq` rnf c
-    rnf (Update a)        = rnf a
-
-instance Pretty StackFrame where
-    pPrintPrec level prec kf = case kf of
-        Apply x'                  -> pPrintPrecApp level prec (text "[_]") x'
-        Scrutinise in_alts        -> pPrintPrecCase level prec (text "[_]") (renameIn (renameAnnedAlts prettyIdSupply) in_alts)
-        PrimApply pop in_vs in_es -> pPrintPrecPrimOp level prec pop (map SomePretty in_vs ++ map SomePretty in_es)
-        Update x'                 -> pPrintPrecApp level prec (text "update") x'
+instance Outputable StackFrame where
+    pprPrec prec kf = case kf of
+        Apply x'                  -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
+        Scrutinise x' _ty in_alts -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
+        PrimApply pop in_vs in_es -> pPrintPrecPrimOp prec pop (map (PrettyFunction . flip pPrintPrecAnnedValue) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
+        Update x'                 -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
 
 
 heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)
@@ -172,28 +166,13 @@ heapBindingSize _                                   = 0
 -- | Size of StackFrame for Deeds purposes
 stackFrameSize :: StackFrame -> Size
 stackFrameSize kf = 1 + case kf of
-    Apply _                 -> 0
-    Scrutinise (_, alts)    -> annedAltsSize alts
-    PrimApply _ in_vs in_es -> sum (map (annedValueSize . snd) in_vs ++ map (annedTermSize . snd) in_es)
-    Update _                -> 0
+    Apply _                  -> 0
+    Scrutinise _ _ (_, alts) -> annedAltsSize alts
+    PrimApply _ in_vs in_es  -> sum (map (annedValueSize . snd) in_vs ++ map (annedTermSize . snd) in_es)
+    Update _                 -> 0
 
 stateSize :: State -> Size
-stateSize (_deeds, h, k, in_qa) = heapSize h + stackSize k + qaSize (snd in_qa)
+stateSize (h, k, in_qa) = heapSize h + stackSize k + qaSize (snd in_qa)
           where qaSize = annedSize . fmap qaToAnnedTerm'
                 heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
                 stackSize = sum . map (stackFrameSize . tagee)
-
-addStateDeeds :: Deeds -> (Deeds, Heap, Stack, In (Anned a)) -> (Deeds, Heap, Stack, In (Anned a))
-addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds + deeds, h, k, in_e)
-
-releaseHeapBindingDeeds :: Deeds -> HeapBinding -> Deeds
-releaseHeapBindingDeeds deeds hb = deeds + heapBindingSize hb
-
-releasePureHeapDeeds :: Deeds -> PureHeap -> Deeds
-releasePureHeapDeeds = M.fold (flip releaseHeapBindingDeeds)
-
-releaseStackDeeds :: Deeds -> Stack -> Deeds
-releaseStackDeeds = foldl' (\deeds kf -> deeds + stackFrameSize (tagee kf))
-
-releaseStateDeed :: (Deeds, Heap, Stack, In (Anned a)) -> Deeds
-releaseStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (releasePureHeapDeeds (deeds + annedSize e) h) k

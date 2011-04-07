@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types, FlexibleInstances #-}
 module Supercompile.Core.FreeVars (
-    module Supercompile.Core.FreeVars
+    module Supercompile.Core.FreeVars,
+    tyVarsOfType
   ) where
 
 import Supercompile.Core.Syntax
@@ -109,11 +110,13 @@ type FVedValue = ValueF FVed
 {-
 instance Symantics FVed where
     var = fvedTerm . Var
-    value = fvedTerm . Value
+    value = fvedValue
+    tyApp e = fvedTerm . TyApp e
     app e = fvedTerm . App e
     primOp pop = fvedTerm . PrimOp pop
-    case_ e = fvedTerm . Case e
-    letRec xes e = fvedTerm (LetRec xes e)
+    case_ e x ty = fvedTerm . Case e x ty
+    letRec xes = fvedTerm . LetRec xes
+    cast e = fvedTerm . Cast e
 
 fvedVar :: Var -> FVed Var
 fvedVar x = FVed (taggedTermVarFreeVars' x) x

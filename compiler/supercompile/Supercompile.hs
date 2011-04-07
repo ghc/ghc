@@ -5,6 +5,9 @@ import Supercompile.Core.Renaming
 import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
+import Supercompile.Evaluator.Syntax
+import Supercompile.Evaluator.FreeVars
+
 -- import CoreSyn
 -- 
 -- supercompile :: CoreExpr -> CoreExpr

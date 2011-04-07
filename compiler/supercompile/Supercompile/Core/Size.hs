@@ -9,7 +9,7 @@ import Supercompile.Utilities
 
 type SizedTerm = Sized (TermF Sized)
 
-type SizedFVedTerm = (Sized FVed) (TermF (O Sized FVed))
+type SizedFVedTerm = (O Sized FVed) (TermF (O Sized FVed))
 type SizedFVedAlt = AltF (O Sized FVed)
 type SizedFVedValue = ValueF (O Sized FVed)
 
@@ -45,6 +45,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
         PrimOp _ es     -> sum (map term es)
         Case e _ _ alts -> term e + alternatives alts
         LetRec xes e    -> sum (map (term . snd) xes) + term e
+        Cast e _        -> term e
     
     value = rec value'
     value' (_co, rv) = 1 + case rv of
@@ -70,22 +71,23 @@ instance Symantics Sized where
 
 sizedTerm :: TermF Sized -> SizedTerm
 sizedTerm e = Sized (sizedTermSize' e) e
+-}
 
-
-instance Symantics (Sized `O` FVed) where
+instance Symantics (O Sized FVed) where
     var = sizedFVedTerm . Var
-    value = sizedFVedTerm . Value
+    value = sizedFVedValue
+    tyApp e = sizedFVedTerm . TyApp e
     app e = sizedFVedTerm . App e
     primOp pop = sizedFVedTerm . PrimOp pop
-    case_ e = sizedFVedTerm . Case e
-    letRec xes e = sizedFVedTerm (LetRec xes e)
+    case_ e x ty = sizedFVedTerm . Case e x ty
+    letRec xes = sizedFVedTerm . LetRec xes
+    cast e = sizedFVedTerm . Cast e
 
-sizedFVedVar :: Var -> (Sized `O` FVed) Var
+sizedFVedVar :: Var -> (O Sized FVed) Var
 sizedFVedVar x = Comp (Sized (sizedFVedVarSize' x) (FVed (sizedFVedVarFreeVars' x) x))
 
-sizedFVedValue :: SizedFVedValue -> (Sized `O` FVed) SizedFVedValue
+sizedFVedValue :: SizedFVedValue -> (O Sized FVed) SizedFVedValue
 sizedFVedValue v = Comp (Sized (sizedFVedValueSize' v) (FVed (sizedFVedValueFreeVars' v) v))
 
-sizedFVedTerm :: TermF (Sized `O` FVed) -> SizedFVedTerm
+sizedFVedTerm :: TermF (O Sized FVed) -> SizedFVedTerm
 sizedFVedTerm e = Comp (Sized (sizedFVedTermSize' e) (FVed (sizedFVedTermFreeVars' e) e))
--}

@@ -1,7 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Supercompile.Core.Renaming (
     module Supercompile.Core.Renaming,
-    mkInScopeSet
+    InScopeSet, mkInScopeSet
   ) where
 
 import Supercompile.Core.FreeVars
@@ -9,13 +9,12 @@ import Supercompile.Core.Syntax
 
 import Supercompile.Utilities
 
-import qualified Data.Set as S
-
 import CoreSubst
 import qualified CoreSyn as CoreSyn (Expr(Var))
 import Type (mkTyVarTy)
 import Var  (isTyCoVar)
 import VarEnv
+import VarSet (varSetElems, mapVarSet)
 
 
 -- We are going to use GHC's substitution type in a rather stylised way, and only
@@ -30,7 +29,7 @@ import VarEnv
 type Renaming = (IdSubstEnv, TvSubstEnv)
 
 joinSubst :: InScopeSet -> Renaming -> Subst
-joinSubst iss (id_subst, tv_subst) = mkSubst iss id_subst tv_subst
+joinSubst iss (id_subst, tv_subst) = mkSubst iss tv_subst id_subst
 
 trivialSubst :: Renaming -> Subst
 trivialSubst = joinSubst emptyInScopeSet
@@ -39,9 +38,12 @@ splitSubst :: Subst -> (InScopeSet, Renaming)
 splitSubst (Subst iss id_subst tv_subst) = (iss, (id_subst, tv_subst))
 
 
+emptyRenaming :: Renaming
+emptyRenaming = (emptyVarEnv, emptyVarEnv)
+
 mkIdentityRenaming :: FreeVars -> Renaming
 mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv [(x, mkTyVarTy x) | x <- tv_list])
-  where (tv_list, id_list) = partition isTyCoVar (S.toList fvs)
+  where (tv_list, id_list) = partition isTyCoVar (varSetElems fvs)
 
 rename :: Renaming -> Var -> Out Var
 rename rn x = case lookupIdSubst (text "rename") (trivialSubst rn) x of CoreSyn.Var x' -> x'
@@ -51,24 +53,27 @@ type In a = (Renaming, a)
 type Out a = a
 
 
+inFreeVars :: (a -> FreeVars) -> In a -> FreeVars
+inFreeVars thing_fvs (rn, thing) = renameFreeVars rn (thing_fvs thing)
+
 renameFreeVars :: Renaming -> FreeVars -> FreeVars
-renameFreeVars rn = S.map (rename rn)
+renameFreeVars rn = mapVarSet (rename rn)
 
 
 renameIn :: (Renaming -> a -> a) -> In a -> a
 renameIn f (rn, x) = f rn x
 
-renameBinders, renameNonRecBinders :: InScopeSet -> Renaming -> [In Var] -> (InScopeSet, Renaming, [Out Var])
+renameBinders, renameNonRecBinders :: InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
 renameBinders       = renameBinders' substRecBndrs
 renameNonRecBinders = renameBinders' substBndrs
 
-renameBinders' :: (Subst -> [In Var] -> (Subst, [Out Var]))
-               -> InScopeSet -> Renaming -> [In Var] -> (InScopeSet, Renaming, [Out Var])
+renameBinders' :: (Subst -> [Var] -> (Subst, [Var]))
+               -> InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
 renameBinders' subst_bndrs iss rn xs = (iss', rn', xs')
   where (subst', xs') = subst_bndrs (joinSubst iss rn) xs
         (iss', rn') = splitSubst subst'
 
-renameBounds :: InScopeSet -> Renaming -> [(In Var, a)] -> (InScopeSet, Renaming, [(Out Var, a)])
+renameBounds :: InScopeSet -> Renaming -> [(Var, a)] -> (InScopeSet, Renaming, [(Var, In a)])
 renameBounds iss rn xes = (iss', rn', xs' `zip` map ((,) rn') es)
   where (xs, es) = unzip xes
         (iss', rn', xs') = renameBinders iss rn xs
@@ -94,18 +99,21 @@ mkRename rec = (term, alternatives, value, value')
       TyApp e ty -> TyApp (term ids rn e) (typ ids rn ty)
       App e x -> App (term ids rn e) (rename rn x)
       PrimOp pop es -> PrimOp pop (map (term ids rn) es)
-      Case e x ty alts -> Case (term ids rn e) (rename rn x) (typ ids rn ty) (alternatives ids rn alts)
-        where (ids', rn', x') = rename
+      Case e x ty alts -> Case (term ids rn e) x' (typ ids rn ty) (alternatives ids' rn' alts)
+        where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
       LetRec xes e -> LetRec (map (second (renameIn (term ids'))) xes') (term ids' rn' e)
-        where (ids', rn', xes') = renameBounds renameBinders ids rn xes
+        where (ids', rn', xes') = renameBounds ids rn xes
+      Cast e co -> Cast (term ids rn e) (typ ids rn co)
     
     value ids rn = rec (value' ids) rn
-    value' ids rn v = case v of
+    value' ids rn (mb_co, v) = (fmap (typ ids rn) mb_co, rvalue' ids rn v)
+    
+    rvalue' ids rn v = case v of
       Indirect x -> Indirect (rename rn x)
       TyLambda x v -> TyLambda x' (value ids' rn' v)
-        where (ids', rn', x') = renameNonRecBinders ids rn [x]
+        where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
       Lambda x e -> Lambda x' (term ids' rn' e)
-        where (ids', rn', x') = renameNonRecBinders ids rn [x]
+        where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
       Data dc xs -> Data dc (map (rename rn) xs)
       Literal l -> Literal l
     

@@ -2,6 +2,7 @@ module Supercompile.Utilities (
     module Supercompile.Utilities,
 
     module UniqSupply,
+    module Unique,
     module Outputable,
     
     module Control.Arrow,
@@ -12,7 +13,10 @@ module Supercompile.Utilities (
     module Data.List
   ) where
 
+#include "HsVersions.h"
+
 import UniqSupply
+import Unique (Unique, getKey)
 import Outputable
 
 import Control.Arrow (first, second, (***), (&&&))
@@ -21,11 +25,14 @@ import Control.Monad hiding (join)
 
 import Data.Function (on)
 import Data.Maybe
+import Data.Ord
 import Data.List
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
+
+import System.IO.Unsafe (unsafePerformIO)
 
 
 -- | Copointed functors. The defining property is:
@@ -79,7 +86,8 @@ opPrec  = 1    -- Argument of an infix operator
 noPrec  = 0    -- Others
 
 
-bananas :: SDoc -> SDoc
+angles, bananas :: SDoc -> SDoc
+angles d = Outputable.char '<' <> d <> Outputable.char '>'
 bananas d = text "(|" <> d <> text "|)"
 
 
@@ -90,6 +98,12 @@ instance Outputable PrettyFunction where
 
 asPrettyFunction :: Outputable a => a -> PrettyFunction
 asPrettyFunction x = PrettyFunction (\prec -> pprPrec prec x)
+
+
+newtype PrettyDoc = PrettyDoc SDoc
+
+instance Outputable PrettyDoc where
+    ppr (PrettyDoc doc) = doc
 
 
 newtype Identity a = I { unI :: a }
@@ -247,9 +261,54 @@ pPrintPrec :: Outputable a => Rational -> a -> SDoc
 pPrintPrec = pprPrec
 
 
+newtype Down a = Down { unDown :: a } deriving (Eq)
+
+instance Ord a => Ord (Down a) where
+    Down a `compare` Down b = b `compare` a
+
+
 orElse :: Maybe a -> a -> a
 orElse = flip fromMaybe
 
 
 third3 :: (c -> d) -> (a, b, c) -> (a, b, d)
 third3 f (a, b, c) = (a, b, f c)
+
+
+-- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.
+--
+-- > sum (apportion n weights) == n
+--
+-- Annoyingly, it is important that this works properly if n is negative as well -- these can occur
+-- when we have turned off deed checking. I don't care about handling negative weights.
+apportion :: Int -> [Int] -> [Int]
+apportion _      []        = error "apportion: empty list"
+apportion orig_n weighting
+  | orig_n < 0 = map negate $ apportion (negate orig_n) weighting
+  | otherwise  = result
+  where
+    fracs :: [Rational]
+    fracs = ASSERT2(denominator /= 0, text "apportion: must have at least one non-zero weight")
+            map (\numerator -> fromIntegral numerator / denominator) weighting
+      where denominator = fromIntegral (sum weighting)
+    
+    -- Here is the idea:
+    --  1) Do one pass through the list of fractians
+    --  2) Start by allocating the floor of the number of "n" that we should allocate to this weight of the fraction
+    --  3) Accumulate the fractional pieces and the indexes that generated them
+    --  4) Use circular programming to feed the list of fractional pieces that we actually allowed the allocation
+    --     of back in to the one pass we are doing over the list
+    ((_, remaining, final_deserving), result) = mapAccumL go (0 :: Int, orig_n, []) fracs
+    go (i, n, deserving) frac = ((i + 1, n - whole, (i, remainder) : deserving),
+                                 whole + if i `elem` final_deserving_allowed then 1 else 0)
+      where (whole, remainder) = properFraction (frac * fromIntegral orig_n)
+    
+    -- We should prefer to allocate pieces to those bits of the fraction where the error (i.e. the fractional part) is greatest.
+    -- We cannot allocate more of these "fixup" pieces than we had "n" left at the end of the first pass.
+    final_deserving_allowed = map fst (take remaining (sortBy (comparing (Down . snd)) final_deserving))
+
+
+{-# NOINLINE prettyUniqSupply #-}
+supercompileUniqSupply, parseUniqSupply, expandUniqSupply, reduceUniqSupply, tagUniqSupply, prettyUniqSupply, matchUniqSupply :: UniqSupply
+supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
+(parseUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply

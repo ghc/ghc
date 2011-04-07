@@ -1,7 +1,7 @@
 {-# LANGUAGE PatternGuards, TypeSynonymInstances, FlexibleInstances, Rank2Types #-}
 module Supercompile.Core.Syntax (
     module Supercompile.Core.Syntax,
-    DataCon, Var, Literal, Type, Coercion
+    DataCon, Var, Literal, Type, Coercion, PrimOp
   ) where
 
 import Supercompile.Utilities
@@ -170,22 +170,25 @@ termToVar e = case extract e of
     _                         -> Nothing
 
 
-{-
-class Symantics ann where
+class Functor ann => Symantics ann where
     var    :: Var -> ann (TermF ann)
-    value  :: ValueF ann -> ann (TermF ann)
+    value  :: ValueF ann -> ann (ValueF ann)
+    tyApp  :: ann (TermF ann) -> Type -> ann (TermF ann)
     app    :: ann (TermF ann) -> Var -> ann (TermF ann)
     primOp :: PrimOp -> [ann (TermF ann)] -> ann (TermF ann)
-    case_  :: ann (TermF ann) -> [AltF ann] -> ann (TermF ann)
+    case_  :: ann (TermF ann) -> Var -> Type -> [AltF ann] -> ann (TermF ann)
     letRec :: [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
+    cast   :: ann (TermF ann) -> Coercion -> ann (TermF ann)
 
 instance Symantics Identity where
     var = I . Var
-    value = I . Value
+    value = I
+    tyApp e = I . TyApp e
     app e = I . App e
-    primOp pop es = I (PrimOp pop es)
-    case_ e = I . Case e
-    letRec xes e = I $ LetRec xes e
+    primOp pop = I . PrimOp pop
+    case_ e x ty = I . Case e x ty
+    letRec xes = I . LetRec xes
+    cast e = I . Cast e
 
 
 reify :: (forall ann. Symantics ann => ann (TermF ann)) -> Term
@@ -193,17 +196,28 @@ reify x = x
 
 reflect :: Term -> (forall ann. Symantics ann => ann (TermF ann))
 reflect (I e) = case e of
-    Var x              -> var x
-    Value (Indirect x) -> value (Indirect x)
-    Value (Lambda x e) -> value (Lambda x (reflect e))
-    Value (Data dc xs) -> value (Data dc xs)
-    Value (Literal l)  -> value (Literal l)
-    App e1 x2          -> app (reflect e1) x2
-    PrimOp pop es      -> primOp pop (map reflect es)
-    Case e alts        -> case_ (reflect e) (map (second reflect) alts)
-    LetRec xes e       -> letRec (map (second reflect) xes) (reflect e)
+    Var x            -> var x
+    Value v          -> fmap Value $ value (reflectValue' v)
+    TyApp e ty       -> tyApp (reflect e) ty
+    App e x          -> app (reflect e) x
+    PrimOp pop es    -> primOp pop (map reflect es)
+    Case e x ty alts -> case_ (reflect e) x ty (map (second reflect) alts)
+    LetRec xes e     -> letRec (map (second reflect) xes) (reflect e)
+    Cast e co        -> cast (reflect e) co
+  where
+    reflectValue' :: Value -> (forall ann. Symantics ann => ValueF ann)
+    reflectValue' (mb_co, rv) = (mb_co, case rv of
+        Indirect x   -> Indirect x
+        TyLambda x v -> TyLambda x (reflectValue v)
+        Lambda x e   -> Lambda x (reflect e)
+        Data dc xs   -> Data dc xs
+        Literal l    -> Literal l)
+
+    reflectValue :: Identity Value -> (forall ann. Symantics ann => ann (ValueF ann))
+    reflectValue = value . reflectValue' . unI
 
 
+{-
 literal :: Symantics ann => Literal -> ann (TermF ann)
 literal = value . Literal
 
