@@ -60,13 +60,11 @@ test015:
 test016:
 	$(RM) F016.hi F016$(OBJSUFFIX) F016_stub.h
 	"$(TEST_HC)" -c F016.hs
-	test -f F016_stub$(OBJSUFFIX)
 	test -f F016_stub.h
 
 # test -stubdir (filename differs from module name)
 test017:
 	$(RM) F017.hi F017$(OBJSUFFIX)
-	$(RM) F017_stub$(OBJSUFFIX)
 	"$(TEST_HC)" -c F017.hs -stubdir stub017
 	test -f stub017/TestStub017_stub.h
 
@@ -88,7 +86,6 @@ test019:
 	$(RM) -rf out019
 	"$(TEST_HC)" -c F019.hs -outputdir out019
 	test -f out019/TestStub019.hi
-	test -f out019/TestStub019$(OBJSUFFIX)
 	test -f out019/TestStub019_stub.h
 
 # -----------------------------------------------------------------------------

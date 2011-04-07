@@ -26,24 +26,24 @@ test('driver015',
      ['$MAKE -s --no-print-directory test015'])
 
 test('driver016',
-     extra_clean(['F016.hi', 'F016.o', 'F016_stub.c', 'F016_stub.h']),
+     extra_clean(['F016.hi', 'F016.o', 'F016_stub.h']),
      run_command,
      ['$MAKE -s --no-print-directory test016'])
 
 test('driver017',
-     extra_clean(['F017.hi', 'F017.o', 'F017_stub.c', 'F017_stub.h']),
+     extra_clean(['F017.hi', 'F017.o', 'F017_stub.h']),
      run_command,
      ['$MAKE -s --no-print-directory test017'])
 
 test('driver018',
-     extra_clean(['F018.hi', 'F018_stub.c', 'F018_stub.h',
+     extra_clean(['F018.hi', 'F018_stub.h',
                   'obj018/TestStub018.o', 'obj018/TestStub018_stub.o',
                   'obj018']),
      run_command,
      ['$MAKE -s --no-print-directory test018'])
 
 test('driver018a',
-     extra_clean(['F018a.hi', 'F018a_stub.c', 'F018a_stub.h',
+     extra_clean(['F018a.hi', 'F018a_stub.h',
                   'TestStub018a.obj.018',
                   'obj018a/TestStub018a_stub.obj.018']),
      run_command,
@@ -52,7 +52,6 @@ test('driver018a',
 test('driver019',
      extra_clean(['out019/TestStub.hi',
                   'out019/TestStub.o',
-                  'out019/TestStub_stub.c',
                   'out019/TestStub_stub.h',
                   'out019/TestStub_stub.o']),
      run_command,
@@ -79,8 +78,7 @@ test('driver024',
      ['$MAKE -s --no-print-directory test024'])
 
 test('driver024a',
-     extra_clean(['B024a/stub.c',
-                  'obj024a/B024a/stub.o', 'obj024a/B024a', 'obj024a']),
+     extra_clean(['obj024a/B024a/stub.o', 'obj024a/B024a', 'obj024a']),
      run_command,
      ['$MAKE -s --no-print-directory test024a'])
 
@@ -97,13 +95,13 @@ test('driver026',
 
 test('driver027',
      extra_clean(['B027/F.hi', 'B027/F.o',
-                  'B027/F_stub.c', 'B027/F_stub.h', 'B027/F_stub.o']),
+                  'B027/F_stub.h', 'B027/F_stub.o']),
      run_command,
      ['$MAKE -s --no-print-directory test027'])
 
 test('driver028',
      extra_clean(['B028/F.hi', 'B028/F.o',
-                  'B028/F_stub.c', 'B028/F_stub.h', 'B028/F_stub.o']),
+                  'B028/F_stub.h', 'B028/F_stub.o']),
      run_command,
      ['$MAKE -s --no-print-directory test028'])
 
@@ -123,13 +121,13 @@ test('driver033',
      ['$MAKE -s --no-print-directory test033'])
 
 test('driver034',
-     extra_clean(['F034.hi', 'F034.o', 'F034_stub.c', 'F034_stub.h']),
+     extra_clean(['F034.hi', 'F034.o', 'F034_stub.h']),
      run_command,
      ['$MAKE -s --no-print-directory test034'])
 
 test('driver035',
      extra_clean(['F035.hi', 'F035.o',
-                  'stub035/F035_stub.c', 'stub035/F035_stub.h']),
+                  'stub035/F035_stub.h']),
      run_command,
      ['$MAKE -s --no-print-directory test035'])
 
@@ -151,13 +149,13 @@ test('driver043',
 
 test('driver044',
      extra_clean(['B044/F.hi', 'B044/F.o',
-                  'B044/F_stub.c', 'B044/F_stub.h', 'B044/F_stub.o']),
+                  'B044/F_stub.h', 'B044/F_stub.o']),
      run_command,
      ['$MAKE -s --no-print-directory test044'])
 
 test('driver045',
      extra_clean(['B045/F.hi', 'B045/F.o',
-                  'B045/F_stub.c', 'B045/F_stub.h', 'B045/F_stub.o']),
+                  'B045/F_stub.h', 'B045/F_stub.o']),
      run_command,
      ['$MAKE -s --no-print-directory test045'])
 
@@ -294,7 +292,7 @@ else:
 
 test('shared001',
      [only_windows,
-      extra_clean(['Shared001.hi', 'Shared001.o', 'HSdll.dll.a', 'HSdll.dll', 'Shared001_stub.c', 'Shared001_stub.h', 'Shared001_stub.o'])],
+      extra_clean(['Shared001.hi', 'Shared001.o', 'HSdll.dll.a', 'HSdll.dll', 'Shared001_stub.h', 'Shared001_stub.o'])],
      run_command,
      ['$MAKE -s --no-print-directory shared001'])
 
