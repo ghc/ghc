@@ -357,7 +357,9 @@ rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 		-- 	let x = x in 3
 		-- should report 'x' unused
 	; let real_uses = findUses dus result_fvs
-	; warnUnusedLocalBinds bound_names real_uses
+	      -- Insert fake uses for variables introduced implicitly by wildcards (#4404)
+	      implicit_uses = hsValBindsImplicits binds'
+	; warnUnusedLocalBinds bound_names (real_uses `unionNameSets` implicit_uses)
 
 	; let
             -- The variables "used" in the val binds are: 
