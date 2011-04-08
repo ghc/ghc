@@ -129,13 +129,20 @@ makeExample prompt expression result =
 				-- whitespace in expressions, so drop them
 	result'
   where
-	-- drop trailing whitespace from the prompt, remember the prefix
+	-- 1. drop trailing whitespace from the prompt, remember the prefix
 	(prefix, _) = span isSpace prompt
-	-- drop, if possible, the exact same sequence of whitespace characters
-	-- from each result line
-	result' = map (tryStripPrefix prefix) result
+
+	-- 2. drop, if possible, the exact same sequence of whitespace
+	-- characters from each result line
+	--
+	-- 3. interpret lines that only contain the string "<BLANKLINE>" as an
+	-- empty line
+	result' = map (substituteBlankLine . tryStripPrefix prefix) result
 	  where
 		tryStripPrefix xs ys = fromMaybe ys $ stripPrefix xs ys
+
+		substituteBlankLine "<BLANKLINE>" = ""
+		substituteBlankLine line          = line
 
 -- | Remove all leading and trailing whitespace
 strip :: String -> String

@@ -41,6 +41,12 @@ tests = [
       input  = "foobar\n> some code"
     , result = Nothing -- parse error
     }
+
+  -- test <BLANKLINE> support
+  , ParseTest {
+      input  = ">>> putFooBar\nfoo\n<BLANKLINE>\nbar"
+    , result = Just $ DocExamples $ [Example "putFooBar" ["foo","","bar"]]
+    }
   ]
 
 

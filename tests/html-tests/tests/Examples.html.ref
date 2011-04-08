@@ -136,6 +136,18 @@ window.onload = function () {pageLoad();setSynopsis("mini_Examples.html");};
 		></strong
 	      >False
 </pre
+	    ><pre class="screen"
+	    ><code class="prompt"
+	      >&gt;&gt;&gt; </code
+	      ><strong class="userinput"
+	      ><code
+		>putStrLn &quot;foo\n\nbar&quot;
+</code
+		></strong
+	      >foo
+
+bar
+</pre
 	    ></div
 	  ></div
 	></div

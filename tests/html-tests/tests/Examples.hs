@@ -28,6 +28,11 @@ module Examples where
 -- >>> isSpace 'a'
 -- False
 --
+-- >>> putStrLn "foo\n\nbar"
+-- foo
+-- <BLANKLINE>
+-- bar
+--
 fib :: Integer -> Integer
 fib 0 = 0
 fib 1 = 1
