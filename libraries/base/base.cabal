@@ -20,8 +20,8 @@ extra-source-files:
                 include/CTypes.h
 
 source-repository head
-    type:     darcs
-    location: http://darcs.haskell.org/packages/base/
+    type:     git
+    location: http://darcs.haskell.org/packages/base.git/
 
 Flag integer-simple
     Description: Use integer-simple
