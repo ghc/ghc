@@ -11,4 +11,5 @@ runhaskell -hide-all-packages -cpp \
     -packageHUnit \
     -i../../dist/build/ \
     -i../../src/ \
+    -optP-include -optP../../dist/build/autogen/cabal_macros.h \
     parsetests.hs
