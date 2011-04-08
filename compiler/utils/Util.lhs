@@ -81,7 +81,10 @@ module Util (
         Direction(..), reslash,
 
         -- * Utils for defining Data instances
-        abstractConstr, abstractDataType, mkNoRepType
+        abstractConstr, abstractDataType, mkNoRepType,
+
+        -- * Utils for printing C code
+        charToC
     ) where
 
 #include "HsVersions.h"
@@ -106,7 +109,7 @@ import System.Directory ( doesDirectoryExist, createDirectory,
 import System.FilePath
 import System.Time      ( ClockTime )
 
-import Data.Char        ( isUpper, isAlphaNum, isSpace, ord, isDigit )
+import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit )
 import Data.Ratio       ( (%) )
 import Data.Ord         ( comparing )
 import Data.Bits
@@ -1066,3 +1069,22 @@ abstractDataType :: String -> DataType
 abstractDataType n = mkDataType n [abstractConstr n]
 \end{code}
 
+%************************************************************************
+%*                                                                      *
+\subsection[Utils-C]{Utils for printing C code}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+charToC :: Word8 -> String
+charToC w = 
+  case chr (fromIntegral w) of
+	'\"' -> "\\\""
+	'\'' -> "\\\'"
+	'\\' -> "\\\\"
+	c | c >= ' ' && c <= '~' -> [c]
+          | otherwise -> ['\\',
+                         chr (ord '0' + ord c `div` 64),
+                         chr (ord '0' + ord c `div` 8 `mod` 8),
+                         chr (ord '0' + ord c         `mod` 8)]
+\end{code}

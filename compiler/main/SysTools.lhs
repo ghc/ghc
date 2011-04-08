@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
+{-# OPTIONS -fno-warn-unused-do-bind #-}
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -20,6 +21,7 @@ module SysTools (
         runWindres,
         runLlvmOpt,
         runLlvmLlc,
+        readElfSection,
 
         touch,                  -- String -> String -> IO ()
         copy,
@@ -58,6 +60,8 @@ import System.Directory
 import Data.Char
 import Data.List
 import qualified Data.Map as Map
+import Text.ParserCombinators.ReadP hiding (char)
+import qualified Text.ParserCombinators.ReadP as R
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -448,6 +452,27 @@ getExtraViaCOpts :: DynFlags -> IO [String]
 getExtraViaCOpts dflags = do
   f <- readFile (topDir dflags </> "extra-gcc-opts")
   return (words f)
+
+-- | read the contents of the named section in an ELF object as a
+-- String.
+readElfSection :: DynFlags -> String -> FilePath -> IO (Maybe String)
+readElfSection _dflags section exe = do
+  let
+     prog = "readelf"
+     args = [Option "-p", Option section, FileOption "" exe]
+  --
+  r <- readProcessWithExitCode prog (filter notNull (map showOpt args)) ""
+  case r of
+    (ExitSuccess, out, _err) -> return (doFilter (lines out))
+    _ -> return Nothing
+ where
+  doFilter [] = Nothing
+  doFilter (s:r) = case readP_to_S parse s of
+                    [(p,"")] -> Just p
+                    _r       -> doFilter r
+   where parse = do
+           skipSpaces; R.char '['; skipSpaces; string "0]"; skipSpaces;
+           munch (const True)
 \end{code}
 
 %************************************************************************

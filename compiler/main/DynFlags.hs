@@ -623,6 +623,7 @@ data DynLibLoader
   deriving Eq
 
 data RtsOptsEnabled = RtsOptsNone | RtsOptsSafeOnly | RtsOptsAll
+  deriving (Show)
 
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags

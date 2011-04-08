@@ -50,6 +50,7 @@ import Outputable
 import Constants
 import BasicTypes
 import CLabel
+import Util
 
 -- The rest
 import Data.List
@@ -1021,18 +1022,6 @@ machRep_S_CType _   = panic "machRep_S_CType"
 
 pprStringInCStyle :: [Word8] -> SDoc
 pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))
-
-charToC :: Word8 -> String
-charToC w = 
-  case chr (fromIntegral w) of
-	'\"' -> "\\\""
-	'\'' -> "\\\'"
-	'\\' -> "\\\\"
-	c | c >= ' ' && c <= '~' -> [c]
-          | otherwise -> ['\\',
-                         chr (ord '0' + ord c `div` 64),
-                         chr (ord '0' + ord c `div` 8 `mod` 8),
-                         chr (ord '0' + ord c         `mod` 8)]
 
 -- ---------------------------------------------------------------------------
 -- Initialising static objects with floating-point numbers.  We can't
