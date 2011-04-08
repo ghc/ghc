@@ -24,8 +24,14 @@ import Outputable
 import GhcMonad
 import X
 
+import System.Environment
+
 main :: IO ()
-main = runGhc (Just "/home/ian/ghc/git/ghc/inplace/lib") $ do
+main = do [libdir] <- getArgs
+          runGhc (Just libdir) doit
+
+doit :: Ghc ()
+doit = do
   dflags' <- getSessionDynFlags
   primPackages <- setSessionDynFlags dflags'
   dflags <- getSessionDynFlags
