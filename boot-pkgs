@@ -60,6 +60,7 @@ for $package (glob "libraries/*/") {
             or die "Failed to open $pkgs: $!";
         while (<PKGS>) {
             chomp;
+            s/\r//g;
             if (/.+/) {
                 push @library_dirs, "$package/$_";
             }
