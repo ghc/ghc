@@ -1667,6 +1667,9 @@ module A where
 -- foo
 -- bar
 </programlisting>
+	<para>Result lines that only contain the string
+	<literal>&lt;BLANKLINE&gt;</literal> are rendered as blank lines in the
+	generated documenation.</para>
       </section>
 
 
