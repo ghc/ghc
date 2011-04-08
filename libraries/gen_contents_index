@@ -7,7 +7,7 @@ HADDOCK_ARGS=
 case $* in
 --inplace)
     HADDOCK=../inplace/bin/haddock
-    for LIB in `grep '^libraries/[^ ]\+ \+- \+[^ ]\+ \+[^ ]\+ \+[^ ]\+' ../packages | sed -e 's#libraries/##' -e 's/ .*//'`
+    for LIB in `grep '^libraries/[^ ]*  *- ' ../packages | sed -e 's#libraries/##' -e 's/ .*//'`
     do
         HADDOCK_FILE="$LIB/dist-install/doc/html/$LIB/$LIB.haddock"
         if [ -f "$HADDOCK_FILE" ]
