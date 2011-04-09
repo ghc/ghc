@@ -101,6 +101,8 @@
 #elif defined(darwin_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include <regex.h>
+#  include <mach/machine.h>
+#  include <mach-o/fat.h>
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
 #  include <mach-o/reloc.h>
@@ -1701,11 +1703,30 @@ loadArchive( char *path )
     char *fileName;
     size_t fileNameSize;
     int isObject, isGnuIndex;
-    char tmp[12];
+    char tmp[20];
     char *gnuFileIndex;
     int gnuFileIndexSize;
-#if !defined(USE_MMAP) && defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS)
+    int i;
+    uint32_t nfat_arch, nfat_offset, cputype, cpusubtype;
+#if defined(i386_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_X86;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_X86_ALL;
+#elif defined(x86_64_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_X86_64;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_X86_64_ALL;
+#elif defined(powerpc_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_POWERPC;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
+#elif defined(powerpc64_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_POWERPC64;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
+#else
+#error Unknown Darwin architecture
+#endif
+#if !defined(USE_MMAP)
     int misalignment;
+#endif
 #endif
 
     IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
@@ -1721,9 +1742,74 @@ loadArchive( char *path )
     if (!f)
         barf("loadObj: can't read `%s'", path);
 
+    /* Check if this is an archive by looking for the magic "!<arch>\n"
+     * string.  Usually, if this fails, we barf and quit.  On Darwin however,
+     * we may have a fat archive, which contains archives for more than
+     * one architecture.  Fat archives start with the magic number 0xcafebabe,
+     * always stored big endian.  If we find a fat_header, we scan through
+     * the fat_arch structs, searching through for one for our host
+     * architecture.  If a matching struct is found, we read the offset
+     * of our archive data (nfat_offset) and seek forward nfat_offset bytes
+     * from the start of the file.
+     *
+     * A subtlety is that all of the members of the fat_header and fat_arch
+     * structs are stored big endian, so we need to call byte order
+     * conversion functions.
+     *
+     * If we find the appropriate architecture in a fat archive, we gobble
+     * its magic "!<arch>\n" string and continue processing just as if
+     * we had a single architecture archive.
+     */
+
     n = fread ( tmp, 1, 8, f );
+    if (n != 8)
+        barf("loadArchive: Failed reading header from `%s'", path);
     if (strncmp(tmp, "!<arch>\n", 8) != 0) {
+
+#if defined(darwin_HOST_OS)
+        /* Not a standard archive, look for a fat archive magic number: */
+        if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
+            nfat_arch = ntohl(*(uint32_t *)(tmp + 4));
+            IF_DEBUG(linker, debugBelch("loadArchive: found a fat archive containing %d architectures\n", nfat_arch));
+            nfat_offset = 0;
+
+            for (i = 0; i < (int)nfat_arch; i++) {
+                /* search for the right arch */
+                n = fread( tmp, 1, 20, f );
+                if (n != 8)
+                    barf("loadArchive: Failed reading arch from `%s'", path);
+                cputype = ntohl(*(uint32_t *)tmp);
+                cpusubtype = ntohl(*(uint32_t *)(tmp + 4));
+
+                if (cputype == mycputype && cpusubtype == mycpusubtype) {
+                    IF_DEBUG(linker, debugBelch("loadArchive: found my archive in a fat archive\n"));
+                    nfat_offset = ntohl(*(uint32_t *)(tmp + 8));
+                    break;
+                }
+            }
+
+            if (nfat_offset == 0) {
+               barf ("loadArchive: searched %d architectures, but no host arch found", (int)nfat_arch);
+            }
+            else {
+                n = fseek( f, nfat_offset, SEEK_SET );
+                if (n != 0)
+                    barf("loadArchive: Failed to seek to arch in `%s'", path);
+                n = fread ( tmp, 1, 8, f );
+                if (n != 8)
+                    barf("loadArchive: Failed reading header from `%s'", path);
+                if (strncmp(tmp, "!<arch>\n", 8) != 0) {
+                    barf("loadArchive: couldn't find archive in `%s' at offset %d", path, nfat_offset);
+                }
+            }
+        }
+        else {
+            barf("loadArchive: Neither an archive, nor a fat archive: `%s'", path);
+        }
+
+#else
         barf("loadArchive: Not an archive: `%s'", path);
+#endif
     }
 
     IF_DEBUG(linker, debugBelch("loadArchive: loading archive contents\n"));
@@ -1739,12 +1825,11 @@ loadArchive( char *path )
                 barf("loadArchive: Failed reading file name from `%s'", path);
             }
         }
+
 #if defined(darwin_HOST_OS)
-        else {
-            if (strncmp(fileName, "!<arch>\n", 8) == 0) {
-                IF_DEBUG(linker, debugBelch("loadArchive: found the start of another archive, breaking\n"));
-                break;
-            }
+        if (strncmp(fileName, "!<arch>\n", 8) == 0) {
+            IF_DEBUG(linker, debugBelch("loadArchive: found the start of another archive, breaking\n"));
+            break;
         }
 #endif
 
@@ -1770,6 +1855,8 @@ loadArchive( char *path )
 
         IF_DEBUG(linker, debugBelch("loadArchive: size of this archive member is %d\n", memberSize));
         n = fread ( tmp, 1, 2, f );
+        if (n != 2)
+            barf("loadArchive: Failed reading magic from `%s'", path);
         if (strncmp(tmp, "\x60\x0A", 2) != 0)
             barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c",
                  path, ftell(f), tmp[0], tmp[1]);
