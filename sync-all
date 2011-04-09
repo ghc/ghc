@@ -361,6 +361,9 @@ sub scmall {
               # Hack around 'git grep' failing if there are no matches
               $ignore_failure = 1;
             }
+            elsif ($command =~ /^reset$/) {
+                @scm_args = "reset";
+            }
             elsif ($command =~ /^config$/) {
                 @scm_args = "config";
             }
@@ -419,6 +422,7 @@ Supported commands:
  * remote rm <branch-name>
  * remote set-url [--push] <branch-name>
  * grep
+ * reset
  * config
 
 Available package-tags are:
