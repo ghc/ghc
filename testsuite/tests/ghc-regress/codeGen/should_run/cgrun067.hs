@@ -5,7 +5,7 @@
 
 -- Miscompiled code must be in another module, otherwise problem doesn't
 -- show up.
-import Cgrun067 (miscompiledFn)
+import Cgrun067A (miscompiledFn)
 import Foreign.C.String
 
 main = withCString "foobar" $ \p -> print =<< miscompiledFn p
