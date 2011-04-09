@@ -6,4 +6,4 @@ def if_not_platform(platforms, f):
 
 skip_if_not_osx = if_not_platform(['i386-apple-darwin','x86_64-apple-darwin'], skip)
 
-test('objc-hi', [ skip_if_not_osx, objc_src ], compile_and_run, ['-framework Foundation'])
+test('objc-hi', [ skip_if_not_osx, objc_src, if_platform('i386-apple-darwin', expect_broken(5106)) ], compile_and_run, ['-framework Foundation'])
