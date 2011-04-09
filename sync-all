@@ -361,6 +361,9 @@ sub scmall {
               # Hack around 'git grep' failing if there are no matches
               $ignore_failure = 1;
             }
+            elsif ($command =~ /^config$/) {
+                @scm_args = "config";
+            }
             else {
                 die "Unknown command: $command";
             }
@@ -416,6 +419,7 @@ Supported commands:
  * remote rm <branch-name>
  * remote set-url [--push] <branch-name>
  * grep
+ * config
 
 Available package-tags are:
 END
