@@ -15,7 +15,7 @@ module Outputable (
 	Outputable(..), OutputableBndr(..),
 
         -- * Pretty printing combinators
-	SDoc,
+	SDoc, runSDoc, initSDocContext,
 	docToSDoc,
 	interppSP, interpp'SP, pprQuotedList, pprWithCommas, quotedListWithOr,
 	empty, nest,
@@ -34,7 +34,7 @@ module Outputable (
 	speakNth, speakNTimes, speakN, speakNOf, plural,
 
         coloured, PprColour, colType, colCoerc, colDataCon,
-        colGlobal, colLocal, bold, keyword,
+        colBinder, bold, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
 	printSDoc, printErrs, printOutput, hPrintDump, printDump,
@@ -222,7 +222,7 @@ code (either C or assembly), or generating interface files.
 %************************************************************************
 
 \begin{code}
-type SDoc = SDocContext -> Doc
+newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
 data SDocContext = SDC
   { sdocStyle      :: !PprStyle
@@ -237,39 +237,41 @@ initSDocContext sty = SDC
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
-withPprStyle sty d ctxt = d ctxt{sdocStyle=sty}
+withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
 withPprStyleDoc :: PprStyle -> SDoc -> Doc
-withPprStyleDoc sty d = d (initSDocContext sty)
+withPprStyleDoc sty d = runSDoc d (initSDocContext sty)
 
 pprDeeper :: SDoc -> SDoc
-pprDeeper _ SDC{sdocStyle=PprUser _ (PartWay 0)} =
-  Pretty.text "..."
-pprDeeper d ctx@SDC{sdocStyle=PprUser q (PartWay n)} =
-  d ctx{sdocStyle = PprUser q (PartWay (n-1))}
-pprDeeper d other_sty =
-  d other_sty
+pprDeeper d = SDoc $ \ctx -> case ctx of
+  SDC{sdocStyle=PprUser _ (PartWay 0)} -> Pretty.text "..."
+  SDC{sdocStyle=PprUser q (PartWay n)} ->
+    runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1))}
+  _ -> runSDoc d ctx
 
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
 -- Truncate a list that list that is longer than the current depth
-pprDeeperList f ds ctx@SDC{sdocStyle=PprUser q (PartWay n)}
-  | n==0      = Pretty.text "..."
-  | otherwise = f (go 0 ds) ctx{sdocStyle = PprUser q (PartWay (n-1))}
-  where
-    go _ [] = []
-    go i (d:ds) | i >= n    = [text "...."]
-		| otherwise = d : go (i+1) ds
-
-pprDeeperList f ds other_sty
-  = f ds other_sty
+pprDeeperList f ds = SDoc work
+ where
+  work ctx@SDC{sdocStyle=PprUser q (PartWay n)}
+   | n==0      = Pretty.text "..."
+   | otherwise =
+      runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1))}
+   where
+     go _ [] = []
+     go i (d:ds) | i >= n    = [text "...."]
+                 | otherwise = d : go (i+1) ds
+  work other_ctx = runSDoc (f ds) other_ctx
 
 pprSetDepth :: Depth -> SDoc -> SDoc
-pprSetDepth depth  doc ctx@SDC{sdocStyle=PprUser q _} =
-  doc ctx{sdocStyle = PprUser q depth}
-pprSetDepth _depth doc other_sty     = doc other_sty
+pprSetDepth depth doc = SDoc $ \ctx -> case ctx of
+  SDC{sdocStyle=PprUser q _} ->
+    runSDoc doc ctx{sdocStyle = PprUser q depth}
+  _ ->
+    runSDoc doc ctx
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
-getPprStyle df sty = df (sdocStyle sty) sty
+getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
 \end{code}
 
 \begin{code}
@@ -302,22 +304,23 @@ userStyle (PprUser _ _) = True
 userStyle _other        = False
 
 ifPprDebug :: SDoc -> SDoc	  -- Empty for non-debug style
-ifPprDebug d ctx@SDC{sdocStyle=PprDebug} = d ctx
-ifPprDebug _ _  	                 = Pretty.empty
+ifPprDebug d = SDoc $ \ctx -> case ctx of
+  SDC{sdocStyle=PprDebug} -> runSDoc d ctx
+  _                       -> Pretty.empty
 \end{code}
 
 \begin{code}
 -- Unused [7/02 sof]
 printSDoc :: SDoc -> PprStyle -> IO ()
 printSDoc d sty = do
-  Pretty.printDoc PageMode stdout (d (initSDocContext sty))
+  Pretty.printDoc PageMode stdout (runSDoc d (initSDocContext sty))
   hFlush stdout
 
 -- I'm not sure whether the direct-IO approach of Pretty.printDoc
 -- above is better or worse than the put-big-string approach here
 printErrs :: SDoc -> PprStyle -> IO ()
 printErrs doc sty = do
-  Pretty.printDoc PageMode stderr (doc (initSDocContext sty))
+  Pretty.printDoc PageMode stderr (runSDoc doc (initSDocContext sty))
   hFlush stderr
 
 printOutput :: Doc -> IO ()
@@ -328,27 +331,32 @@ printDump doc = hPrintDump stdout doc
 
 hPrintDump :: Handle -> SDoc -> IO ()
 hPrintDump h doc = do
-   Pretty.printDoc PageMode h (better_doc (initSDocContext defaultDumpStyle))
+   Pretty.printDoc PageMode h
+     (runSDoc better_doc (initSDocContext defaultDumpStyle))
    hFlush h
  where
    better_doc = doc $$ blankLine
 
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
-  = Pretty.printDoc PageMode handle (doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+  = Pretty.printDoc PageMode handle
+      (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
 printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
 printForUserPartWay handle d unqual doc
-  = Pretty.printDoc PageMode handle (doc (initSDocContext (mkUserStyle unqual (PartWay d))))
+  = Pretty.printDoc PageMode handle
+      (runSDoc doc (initSDocContext (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
 printForC handle doc =
-  Pretty.printDoc LeftMode handle (doc (initSDocContext (PprCode CStyle)))
+  Pretty.printDoc LeftMode handle
+    (runSDoc doc (initSDocContext (PprCode CStyle)))
 
 printForAsm :: Handle -> SDoc -> IO ()
 printForAsm handle doc =
-  Pretty.printDoc LeftMode handle (doc (initSDocContext (PprCode AsmStyle)))
+  Pretty.printDoc LeftMode handle
+    (runSDoc doc (initSDocContext (PprCode AsmStyle)))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
@@ -360,40 +368,44 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
-showSDoc d = Pretty.showDocWith PageMode (d (initSDocContext defaultUserStyle))
+showSDoc d =
+  Pretty.showDocWith PageMode
+    (runSDoc d (initSDocContext defaultUserStyle))
 
 renderWithStyle :: SDoc -> PprStyle -> String
 renderWithStyle sdoc sty =
-  Pretty.render (sdoc (initSDocContext sty))
+  Pretty.render (runSDoc sdoc (initSDocContext sty))
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
 -- and "foo{uniq strictness}" so we don't want fancy layout anyway.
 showSDocOneLine :: SDoc -> String
 showSDocOneLine d =
-  Pretty.showDocWith PageMode (d (initSDocContext defaultUserStyle))
+  Pretty.showDocWith PageMode
+    (runSDoc d (initSDocContext defaultUserStyle))
 
 showSDocForUser :: PrintUnqualified -> SDoc -> String
 showSDocForUser unqual doc =
-  show (doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+  show (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
 
 showSDocUnqual :: SDoc -> String
 -- Only used in the gruesome isOperator
 showSDocUnqual d =
-  show (d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
+  show (runSDoc d (initSDocContext (mkUserStyle neverQualify AllTheWay)))
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
-showsPrecSDoc p d = showsPrec p (d (initSDocContext defaultUserStyle))
+showsPrecSDoc p d = showsPrec p (runSDoc d (initSDocContext defaultUserStyle))
 
 showSDocDump :: SDoc -> String
-showSDocDump d = Pretty.showDocWith PageMode (d (initSDocContext PprDump))
+showSDocDump d =
+  Pretty.showDocWith PageMode (runSDoc d (initSDocContext PprDump))
 
 showSDocDumpOneLine :: SDoc -> String
 showSDocDumpOneLine d =
-  Pretty.showDocWith OneLineMode (d (initSDocContext PprDump))
+  Pretty.showDocWith OneLineMode (runSDoc d (initSDocContext PprDump))
 
 showSDocDebug :: SDoc -> String
-showSDocDebug d = show (d (initSDocContext PprDebug))
+showSDocDebug d = show (runSDoc d (initSDocContext PprDebug))
 
 showPpr :: Outputable a => a -> String
 showPpr = showSDoc . ppr
@@ -401,7 +413,7 @@ showPpr = showSDoc . ppr
 
 \begin{code}
 docToSDoc :: Doc -> SDoc
-docToSDoc d = \_ -> d
+docToSDoc d = SDoc (\_ -> d)
 
 empty    :: SDoc
 char     :: Char       -> SDoc
@@ -414,58 +426,58 @@ float    :: Float      -> SDoc
 double   :: Double     -> SDoc
 rational :: Rational   -> SDoc
 
-empty _sty      = Pretty.empty
-char c _sty     = Pretty.char c
-text s _sty     = Pretty.text s
-ftext s _sty    = Pretty.ftext s
-ptext s _sty    = Pretty.ptext s
-int n _sty      = Pretty.int n
-integer n _sty  = Pretty.integer n
-float n _sty    = Pretty.float n
-double n _sty   = Pretty.double n
-rational n _sty = Pretty.rational n
+empty       = docToSDoc $ Pretty.empty
+char c      = docToSDoc $ Pretty.char c
+text s      = docToSDoc $ Pretty.text s
+ftext s     = docToSDoc $ Pretty.ftext s
+ptext s     = docToSDoc $ Pretty.ptext s
+int n       = docToSDoc $ Pretty.int n
+integer n   = docToSDoc $ Pretty.integer n
+float n     = docToSDoc $ Pretty.float n
+double n    = docToSDoc $ Pretty.double n
+rational n  = docToSDoc $ Pretty.rational n
 
 parens, braces, brackets, quotes, doubleQuotes, angleBrackets :: SDoc -> SDoc
 
-parens d sty       = Pretty.parens (d sty)
-braces d sty       = Pretty.braces (d sty)
-brackets d sty     = Pretty.brackets (d sty)
-doubleQuotes d sty = Pretty.doubleQuotes (d sty)
-angleBrackets d    = char '<' <> d <> char '>'
+parens d       = SDoc $ Pretty.parens . runSDoc d
+braces d       = SDoc $ Pretty.braces . runSDoc d
+brackets d     = SDoc $ Pretty.brackets . runSDoc d
+doubleQuotes d = SDoc $ Pretty.doubleQuotes . runSDoc d
+angleBrackets d = char '<' <> d <> char '>'
 
 cparen :: Bool -> SDoc -> SDoc
 
-cparen b d sty       = Pretty.cparen b (d sty)
+cparen b d     = SDoc $ Pretty.cparen b . runSDoc d
 
 -- quotes encloses something in single quotes...
 -- but it omits them if the thing ends in a single quote
 -- so that we don't get `foo''.  Instead we just have foo'.
-quotes d sty = case show pp_d of
-		 ('\'' : _) -> pp_d
-		 _other	    -> Pretty.quotes pp_d
-	     where
-	       pp_d = d sty
+quotes d = SDoc $ \sty -> 
+           let pp_d = runSDoc d sty in
+           case show pp_d of
+             ('\'' : _) -> pp_d
+             _other     -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
 darrow, lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
-blankLine _sty = Pretty.ptext (sLit "")
-dcolon _sty    = Pretty.ptext (sLit "::")
-arrow  _sty    = Pretty.ptext (sLit "->")
-darrow _sty    = Pretty.ptext (sLit "=>")
-semi _sty      = Pretty.semi
-comma _sty     = Pretty.comma
-colon _sty     = Pretty.colon
-equals _sty    = Pretty.equals
-space _sty     = Pretty.space
-underscore     = char '_'
-dot	       = char '.'
-lparen _sty    = Pretty.lparen
-rparen _sty    = Pretty.rparen
-lbrack _sty    = Pretty.lbrack
-rbrack _sty    = Pretty.rbrack
-lbrace _sty    = Pretty.lbrace
-rbrace _sty    = Pretty.rbrace
+blankLine  = docToSDoc $ Pretty.ptext (sLit "")
+dcolon     = docToSDoc $ Pretty.ptext (sLit "::")
+arrow      = docToSDoc $ Pretty.ptext (sLit "->")
+darrow     = docToSDoc $ Pretty.ptext (sLit "=>")
+semi       = docToSDoc $ Pretty.semi
+comma      = docToSDoc $ Pretty.comma
+colon      = docToSDoc $ Pretty.colon
+equals     = docToSDoc $ Pretty.equals
+space      = docToSDoc $ Pretty.space
+underscore = char '_'
+dot        = char '.'
+lparen     = docToSDoc $ Pretty.lparen
+rparen     = docToSDoc $ Pretty.rparen
+lbrack     = docToSDoc $ Pretty.lbrack
+rbrack     = docToSDoc $ Pretty.rbrack
+lbrace     = docToSDoc $ Pretty.lbrace
+rbrace     = docToSDoc $ Pretty.rbrace
 
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount
@@ -479,11 +491,11 @@ nest :: Int -> SDoc -> SDoc
 ($+$) :: SDoc -> SDoc -> SDoc
 -- ^ Join two 'SDoc' together vertically
 
-nest n d sty    = Pretty.nest n (d sty)
-(<>) d1 d2 sty  = (Pretty.<>)  (d1 sty) (d2 sty)
-(<+>) d1 d2 sty = (Pretty.<+>) (d1 sty) (d2 sty)
-($$) d1 d2 sty  = (Pretty.$$)  (d1 sty) (d2 sty)
-($+$) d1 d2 sty = (Pretty.$+$) (d1 sty) (d2 sty)
+nest n d    = SDoc $ Pretty.nest n . runSDoc d
+(<>) d1 d2  = SDoc $ \sty -> (Pretty.<>)  (runSDoc d1 sty) (runSDoc d2 sty)
+(<+>) d1 d2 = SDoc $ \sty -> (Pretty.<+>) (runSDoc d1 sty) (runSDoc d2 sty)
+($$) d1 d2  = SDoc $ \sty -> (Pretty.$$)  (runSDoc d1 sty) (runSDoc d2 sty)
+($+$) d1 d2 = SDoc $ \sty -> (Pretty.$+$) (runSDoc d1 sty) (runSDoc d2 sty)
 
 hcat :: [SDoc] -> SDoc
 -- ^ Concatenate 'SDoc' horizontally
@@ -502,19 +514,19 @@ fcat :: [SDoc] -> SDoc
 -- ^ This behaves like 'fsep', but it uses '<>' for horizontal conposition rather than '<+>'
 
 
-hcat ds sty = Pretty.hcat [d sty | d <- ds]
-hsep ds sty = Pretty.hsep [d sty | d <- ds]
-vcat ds sty = Pretty.vcat [d sty | d <- ds]
-sep ds sty  = Pretty.sep  [d sty | d <- ds]
-cat ds sty  = Pretty.cat  [d sty | d <- ds]
-fsep ds sty = Pretty.fsep [d sty | d <- ds]
-fcat ds sty = Pretty.fcat [d sty | d <- ds]
+hcat ds = SDoc $ \sty -> Pretty.hcat [runSDoc d sty | d <- ds]
+hsep ds = SDoc $ \sty -> Pretty.hsep [runSDoc d sty | d <- ds]
+vcat ds = SDoc $ \sty -> Pretty.vcat [runSDoc d sty | d <- ds]
+sep ds  = SDoc $ \sty -> Pretty.sep  [runSDoc d sty | d <- ds]
+cat ds  = SDoc $ \sty -> Pretty.cat  [runSDoc d sty | d <- ds]
+fsep ds = SDoc $ \sty -> Pretty.fsep [runSDoc d sty | d <- ds]
+fcat ds = SDoc $ \sty -> Pretty.fcat [runSDoc d sty | d <- ds]
 
 hang :: SDoc  -- ^ The header
       -> Int  -- ^ Amount to indent the hung body
       -> SDoc -- ^ The hung body, indented and placed below the header
       -> SDoc
-hang d1 n d2 sty   = Pretty.hang (d1 sty) n (d2 sty)
+hang d1 n d2   = SDoc $ \sty -> Pretty.hang (runSDoc d1 sty) n (runSDoc d2 sty)
 
 punctuate :: SDoc   -- ^ The punctuation
           -> [SDoc] -- ^ The list that will have punctuation added between every adjacent pair of elements
@@ -547,13 +559,10 @@ colCoerc :: PprColour
 colCoerc = PprColour "\27[34m"
 
 colDataCon :: PprColour
-colDataCon = PprColour "\27[31;1m"
+colDataCon = PprColour "\27[31m"
 
-colGlobal :: PprColour
-colGlobal = PprColour "\27[32m"
-
-colLocal :: PprColour
-colLocal = PprColour "\27[35m"
+colBinder :: PprColour
+colBinder = PprColour "\27[32m"
 
 colReset :: PprColour
 colReset = PprColour "\27[0m"
@@ -563,11 +572,10 @@ colReset = PprColour "\27[0m"
 -- Only takes effect if colours are enabled.
 coloured :: PprColour -> SDoc -> SDoc
 -- TODO: coloured _ sdoc ctxt | coloursDisabled = sdoc ctxt
-coloured col@(PprColour c) sdoc
-         ctx@SDC{ sdocLastColour = PprColour lc } =
-  Pretty.zeroWidthText c Pretty.<> sdoc ctx' Pretty.<> Pretty.zeroWidthText lc
- where
-   ctx' = ctx{ sdocLastColour = col }
+coloured col@(PprColour c) sdoc =
+  SDoc $ \ctx@SDC{ sdocLastColour = PprColour lc } ->
+    let ctx' = ctx{ sdocLastColour = col } in
+    Pretty.zeroWidthText c Pretty.<> runSDoc sdoc ctx' Pretty.<> Pretty.zeroWidthText lc
 
 bold :: SDoc -> SDoc
 bold = coloured colBold
@@ -879,14 +887,14 @@ pprTrace str doc x
 pprPanicFastInt :: String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
 pprPanicFastInt heading pretty_msg =
-    panicFastInt (show (doc (initSDocContext PprDebug)))
+    panicFastInt (show (runSDoc doc (initSDocContext PprDebug)))
   where
     doc = text heading <+> pretty_msg
 
 
 pprAndThen :: (String -> a) -> String -> SDoc -> a
 pprAndThen cont heading pretty_msg =
-  cont (show (doc (initSDocContext PprDebug)))
+  cont (show (runSDoc doc (initSDocContext PprDebug)))
  where
      doc = sep [text heading, nest 4 pretty_msg]
 
@@ -894,7 +902,7 @@ assertPprPanic :: String -> Int -> SDoc -> a
 -- ^ Panic with an assertation failure, recording the given file and line number.
 -- Should typically be accessed with the ASSERT family of macros
 assertPprPanic file line msg
-  = panic (show (doc (initSDocContext PprDebug)))
+  = panic (show (runSDoc doc (initSDocContext PprDebug)))
   where
     doc = sep [hsep[text "ASSERT failed! file", 
 		 	   text file, 
@@ -907,7 +915,7 @@ warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
 warnPprTrace _     _file _line _msg x | opt_NoDebugOutput = x
 warnPprTrace False _file _line _msg x = x
 warnPprTrace True   file  line  msg x
-  = trace (show (doc (initSDocContext defaultDumpStyle))) x
+  = trace (show (runSDoc doc (initSDocContext defaultDumpStyle))) x
   where
     doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
 	       msg]
