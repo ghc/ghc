@@ -92,6 +92,8 @@ data CmmNode e x where
 A MidForeign call is used for *unsafe* foreign calls;
 a LastForeign call is used for *safe* foreign calls.
 Unsafe ones are easy: think of them as a "fat machine instruction".
+In particular, they do *not* kill all live registers (there was a bit
+of code in GHC that conservatively assumed otherwise.)
 
 Safe ones are trickier.  A safe foreign call 
      r = f(x)

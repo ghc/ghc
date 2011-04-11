@@ -100,11 +100,11 @@ dualLiveTransfers entry procPoints = mkBTransfer3 first middle last
             where check live id x = if id == entry then noLiveOnEntry id (in_regs live) x else x
 
           middle :: CmmNode O O -> DualLive -> DualLive
-          middle m live = changeStack updSlots $ changeRegs (xferLiveMiddle m) (changeRegs regs_in live)
-            where xferLiveMiddle = case getBTransfer3 xferLive of (_, middle, _) -> middle
-	          regs_in :: RegSet -> RegSet
-                  regs_in live = case m of CmmUnsafeForeignCall {} -> emptyRegSet
-                                           _ -> live
+          middle m = changeStack updSlots
+                   . changeRegs  updRegs
+            where -- Reuse middle of liveness analysis from CmmLive
+                  updRegs = case getBTransfer3 xferLive of (_, middle, _) -> middle m
+
                   updSlots live = foldSlotsUsed reload (foldSlotsDefd spill live m) m
                   spill  live s@(RegSlot r, _, _) = check s $ deleteFromRegSet live r
                   spill  live _ = live
