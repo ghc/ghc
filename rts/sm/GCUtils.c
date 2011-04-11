@@ -18,6 +18,7 @@
 #include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"
+#include "GCTDecl.h"
 #include "GCUtils.h"
 #include "Printer.h"
 #include "Trace.h"

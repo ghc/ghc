@@ -16,6 +16,8 @@
 
 #include "BeginPrivate.h"
 
+#include "GCTDecl.h"
+
 bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
 

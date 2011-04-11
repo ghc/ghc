@@ -48,7 +48,7 @@
    --------------
 */
 
-void stmPreGCHook(void);
+void stmPreGCHook(Capability *cap);
 
 /*----------------------------------------------------------------------
 

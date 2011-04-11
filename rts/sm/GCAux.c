@@ -17,7 +17,7 @@
 #include "Capability.h"
 #include "Trace.h"
 #include "Schedule.h"
-// DO NOT include "GCThread.h", we don't want the register variable
+// DO NOT include "GCTDecl.h", we don't want the register variable
 
 /* -----------------------------------------------------------------------------
    isAlive determines whether the given closure is still alive (after

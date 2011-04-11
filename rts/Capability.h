@@ -278,9 +278,11 @@ INLINE_HEADER void contextSwitchCapability(Capability *cap);
 void freeCapabilities (void);
 
 // For the GC:
-void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
-                           rtsBool no_mark_sparks);
+void markCapability (evac_fn evac, void *user, Capability *cap,
+                     rtsBool no_mark_sparks USED_IF_THREADS);
+
 void markCapabilities (evac_fn evac, void *user);
+
 void traverseSparkQueues (evac_fn evac, void *user);
 
 /* -----------------------------------------------------------------------------
