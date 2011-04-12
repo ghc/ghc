@@ -76,9 +76,9 @@ test('T4801',
      [# expected value: 11 (x86/OSX):
       if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 35, 45)),
-      # expected value: 18 (amd64/Linux):
+      # expected value: 66 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 70, 80)),
+          compiler_stats_num_field('peak_megabytes_allocated', 60, 70)),
       # expected value: 353463196 (x86/Windows)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 330000000,
