@@ -27,7 +27,7 @@ module HsUtils(
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
 
-  -- Bindigns
+  -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, 
 
   -- Literals

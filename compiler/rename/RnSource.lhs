@@ -443,19 +443,8 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the bindings are for the right class
     let
-	meth_names  = collectMethodBinders mbinds
 	(inst_tyvars, _, cls,_) = splitHsInstDeclTy (unLoc inst_ty')
     in
-    checkDupRdrNames meth_names 	`thenM_`
-	-- Check that the same method is not given twice in the
-	-- same instance decl	instance C T where
-	--			      f x = ...
-	--			      g y = ...
-	--			      f x = ...
-	-- We must use checkDupRdrNames because the Name of the
-	-- method is the Name of the class selector, whose SrcSpan
-	-- points to the class declaration
-
     extendTyVarEnvForMethodBinds inst_tyvars (		
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too

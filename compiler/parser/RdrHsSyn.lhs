@@ -812,17 +812,20 @@ checkValSig lhs@(L l _) ty
                        ppr lhs <+> text "::" <+> ppr ty)
                    $$ text hint)
   where
-    hint = if looks_like_foreign lhs
+    hint = if foreign_RDR `looks_like` lhs
            then "Perhaps you meant to use -XForeignFunctionInterface?"
-           else "Should be of form <variable> :: <type>"
+           else if generic_RDR `looks_like` lhs
+                then "Perhaps you meant to use -XGenerics?"
+                else "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
-    looks_like_foreign (L _ (HsVar v))     = v == foreign_RDR
-    looks_like_foreign (L _ (HsApp lhs _)) = looks_like_foreign lhs
-    looks_like_foreign _                   = False
+    looks_like s (L _ (HsVar v))     = v == s
+    looks_like s (L _ (HsApp lhs _)) = looks_like s lhs
+    looks_like s _                   = False
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
+    generic_RDR = mkUnqual varName (fsLit "generic")
 
 checkDoAndIfThenElse :: LHsExpr RdrName
                      -> Bool

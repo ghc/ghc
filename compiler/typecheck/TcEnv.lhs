@@ -211,7 +211,7 @@ tcLookupFamInst tycon tys
        }
 
 tcLookupDataFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
--- Find the instance of a data famliy
+-- Find the instance of a data family
 -- Note [Looking up family instances for deriving]
 tcLookupDataFamInst tycon tys
   | not (isFamilyTyCon tycon)
@@ -461,7 +461,7 @@ tcExtendGlobalTyVars gtv_var extra_global_tvs
 \begin{code}
 tcExtendRules :: [LRuleDecl Id] -> TcM a -> TcM a
 	-- Just pop the new rules into the EPS and envt resp
-	-- All the rules come from an interface file, not soruce
+	-- All the rules come from an interface file, not source
 	-- Nevertheless, some may be for this module, if we read
 	-- its interface instead of its source code
 tcExtendRules lcl_rules thing_inside
@@ -681,7 +681,7 @@ newDFunName clas tys loc
 \end{code}
 
 Make a name for the representation tycon of a family instance.  It's an
-*external* name, like otber top-level names, and hence must be made with
+*external* name, like other top-level names, and hence must be made with
 newGlobalBinder.
 
 \begin{code}

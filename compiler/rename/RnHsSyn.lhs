@@ -120,10 +120,11 @@ hsSigsFVs :: [LSig Name] -> FreeVars
 hsSigsFVs sigs = plusFVs (map (hsSigFVs.unLoc) sigs)
 
 hsSigFVs :: Sig Name -> FreeVars
-hsSigFVs (TypeSig _ ty)   = extractHsTyNames ty
-hsSigFVs (SpecInstSig ty) = extractHsTyNames ty
-hsSigFVs (SpecSig _ ty _) = extractHsTyNames ty
-hsSigFVs _                = emptyFVs
+hsSigFVs (TypeSig _ ty)    = extractHsTyNames ty
+hsSigFVs (GenericSig _ ty) = extractHsTyNames ty
+hsSigFVs (SpecInstSig ty)  = extractHsTyNames ty
+hsSigFVs (SpecSig _ ty _)  = extractHsTyNames ty
+hsSigFVs _                 = emptyFVs
 
 ----------------
 conDeclFVs :: LConDecl Name -> FreeVars

@@ -48,11 +48,12 @@ module OccName (
 
 	-- ** Derived 'OccName's
         isDerivedOccName,
-	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc,
+	mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
 	mkDerivedTyConOcc, mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+ 	mkGenD, mkGenC, mkGenS, mkGenR0, mkGenR0Co,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
@@ -540,9 +541,10 @@ isDerivedOccName occ =
 \end{code}
 
 \begin{code}
-mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
-  	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
- 	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
+  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkDictOcc,
+ 	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+ 	mkGenD, mkGenR0, mkGenR0Co,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
@@ -554,6 +556,7 @@ mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
 mkDataConWrapperOcc = mk_simple_deriv varName  "$W"
 mkWorkerOcc         = mk_simple_deriv varName  "$w"
 mkDefaultMethodOcc  = mk_simple_deriv varName  "$dm"
+mkGenDefMethodOcc   = mk_simple_deriv varName  "$gdm"
 mkClassOpAuxOcc     = mk_simple_deriv varName  "$c"
 mkDerivedTyConOcc   = mk_simple_deriv tcName   ":"	-- The : prefix makes sure it classifies
 mkClassTyConOcc     = mk_simple_deriv tcName   "T:"	-- as a tycon/datacon
@@ -572,9 +575,18 @@ mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
--- Generic derivable classes
+-- Generic derivable classes (old)
 mkGenOcc1           = mk_simple_deriv varName  "$gfrom"
 mkGenOcc2           = mk_simple_deriv varName  "$gto" 
+
+-- Generic deriving mechanism (new)
+mkGenD         = mk_simple_deriv tcName "D1"
+mkGenC occ m   = mk_deriv tcName ("C1_" ++ show m) (occNameString occ)
+mkGenS occ m n = mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n)
+                   (occNameString occ)
+
+mkGenR0   = mk_simple_deriv tcName "Rep0_"
+mkGenR0Co = mk_simple_deriv tcName "CoRep0_"
 
 -- data T = MkT ... deriving( Data ) needs defintions for 
 --	$tT   :: Data.Generics.Basics.DataType

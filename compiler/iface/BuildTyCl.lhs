@@ -229,8 +229,9 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 \begin{code}
-type TcMethInfo = (Name, DefMethSpec, Type)  -- A temporary intermediate, to communicate 
-					     -- between tcClassSigs and buildClass
+type TcMethInfo = (Name, DefMethSpec, Type)  
+        -- A temporary intermediate, to communicate between tcClassSigs and
+        -- buildClass.
 
 buildClass :: Bool		-- True <=> do not include unfoldings 
 				--	    on dict selectors
@@ -332,7 +333,8 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
     mk_op_item rec_clas (op_name, dm_spec, _) 
       = do { dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
-                          GenericDM -> return GenDefMeth
+                          GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
+			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
            ; return (mkDictSelId no_unf op_name rec_clas, dm_info) }

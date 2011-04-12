@@ -299,7 +299,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- any mutually recursive types are done right
 	-- Just discard the auxiliary bindings; they are generated 
 	-- only for Haskell source code, and should already be in Core
-   (tcg_env, _aux_binds, _dm_ids) <- tcTyAndClassDecls emptyModDetails rn_decls ;
+   (tcg_env, _aux_binds, _dm_ids, _) <- tcTyAndClassDecls emptyModDetails rn_decls ;
 
    setGblEnv tcg_env $ do {
 	-- Make the new type env available to stuff slurped from interface files
@@ -500,7 +500,7 @@ tcRnHsBootDecls decls
 
 		-- Typecheck type/class decls
 	; traceTc "Tc2" empty
-	; (tcg_env, aux_binds, dm_ids) 
+	; (tcg_env, aux_binds, dm_ids, _) 
                <- tcTyAndClassDecls emptyModDetails tycl_decls
 	; setGblEnv tcg_env    $ 
           tcExtendIdEnv dm_ids $ do {
@@ -847,7 +847,7 @@ tcTopSrcDecls boot_details
 		-- The latter come in via tycl_decls
         traceTc "Tc2" empty ;
 
-	(tcg_env, aux_binds, dm_ids) <- tcTyAndClassDecls boot_details tycl_decls ;
+	(tcg_env, aux_binds, dm_ids, kc_decls) <- tcTyAndClassDecls boot_details tycl_decls ;
 		-- If there are any errors, tcTyAndClassDecls fails here
 	
 	setGblEnv tcg_env	$
@@ -885,8 +885,9 @@ tcTopSrcDecls boot_details
         setLclTypeEnv tcl_env $ do {	-- Environment doesn't change now
 
                 -- Second pass over class and instance declarations, 
+                -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
+        inst_binds <- tcInstDecls2 kc_decls inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;

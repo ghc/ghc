@@ -216,6 +216,7 @@ incorrect.
  'deriving' 	{ L _ ITderiving }
  'do' 		{ L _ ITdo }
  'else' 	{ L _ ITelse }
+ 'generic' 	{ L _ ITgeneric }
  'hiding' 	{ L _ IThiding }
  'if' 		{ L _ ITif }
  'import' 	{ L _ ITimport }
@@ -1232,9 +1233,13 @@ gdrh :: { LGRHS RdrName }
 	: '|' guardquals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
-	: infixexp '::' sigtypedoc	{% do s <- checkValSig $1 $3 
-				         ; return (LL $ unitOL (LL $ SigD s)) }
-		-- See Note [Declaration/signature overlap] for why we need infixexp here
+        : 'generic' infixexp '::' sigtypedoc
+                        {% do (TypeSig l ty) <- checkValSig $2 $4
+                        ; return (LL $ unitOL (LL $ SigD (GenericSig l ty))) }
+	-- See Note [Declaration/signature overlap] for why we need infixexp here
+	| infixexp '::' sigtypedoc
+                        {% do s <- checkValSig $1 $3 
+                        ; return (LL $ unitOL (LL $ SigD s)) }
 	| var ',' sig_vars '::' sigtypedoc
 				{ LL $ toOL [ LL $ SigD (TypeSig n $5) | n <- $1 : unLoc $3 ] }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))

@@ -55,6 +55,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 	      	("InstType         ", inst_type_ds),
 	      	("InstData         ", inst_data_ds),
 	      	("TypeSigs         ", bind_tys),
+	      	("GenericSigs      ", generic_sigs),
 	      	("ValBinds         ", val_bind_ds),
 	      	("FunBinds         ", fn_bind_ds),
 	      	("InlineMeths      ", method_inlines),
@@ -74,7 +75,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     
     trim ls     = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
-    (fixity_sigs, bind_tys, bind_specs, bind_inlines) 
+    (fixity_sigs, bind_tys, bind_specs, bind_inlines, generic_sigs) 
 	= count_sigs [d | SigD d <- decls]
 		-- NB: this omits fixity decls on local bindings and
 		-- in class decls.  ToDo
@@ -112,13 +113,14 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     count_bind (FunBind {})                           = (0,1)
     count_bind b = pprPanic "count_bind: Unhandled binder" (ppr b)
 
-    count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
+    count_sigs sigs = foldr add5 (0,0,0,0,0) (map sig_info sigs)
 
-    sig_info (FixSig _)		= (1,0,0,0)
-    sig_info (TypeSig _ _)      = (0,1,0,0)
-    sig_info (SpecSig _ _ _)    = (0,0,1,0)
-    sig_info (InlineSig _ _)    = (0,0,0,1)
-    sig_info _                  = (0,0,0,0)
+    sig_info (FixSig _)		= (1,0,0,0,0)
+    sig_info (TypeSig _ _)      = (0,1,0,0,0)
+    sig_info (SpecSig _ _ _)    = (0,0,1,0,0)
+    sig_info (InlineSig _ _)    = (0,0,0,1,0)
+    sig_info (GenericSig _ _)   = (0,0,0,0,1)
+    sig_info _                  = (0,0,0,0,0)
 
     import_info (L _ (ImportDecl _ _ _ qual as spec))
 	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
@@ -137,13 +139,13 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 
     class_info decl@(ClassDecl {})
 	= case count_sigs (map unLoc (tcdSigs decl)) of
-	    (_,classops,_,_) ->
+	    (_,classops,_,_,_) ->
 	       (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
     class_info _ = (0,0)
 
     inst_info (InstDecl _ inst_meths inst_sigs ats)
 	= case count_sigs (map unLoc inst_sigs) of
-	    (_,_,ss,is) ->
+	    (_,_,ss,is,_) ->
 	      case foldr add2 (0, 0) (map (countATDecl . unLoc) ats) of
 	        (tyDecl, dtDecl) ->
 	          (addpr (foldr add2 (0,0) 

@@ -40,10 +40,14 @@ import Name
 import NameSet
 import TyCon
 import TcType
+import BuildTyCl
+import BasicTypes
 import Var
 import VarSet
 import PrelNames
 import SrcLoc
+import Unique
+import UniqSupply
 import Util
 import ListSetOps
 import Outputable
@@ -292,12 +296,14 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 tcDeriving  :: [LTyClDecl Name]  -- All type constructors
             -> [LInstDecl Name]  -- All instance declarations
             -> [LDerivDecl Name] -- All stand-alone deriving declarations
-	    -> TcM ([InstInfo Name],	-- The generated "instance decls"
-		    HsValBinds Name,	-- Extra generated top-level bindings
-                    DefUses)
+            -> TcM ([InstInfo Name] -- The generated "instance decls"
+                   ,HsValBinds Name -- Extra generated top-level bindings
+                   ,DefUses
+                   ,[TyCon]         -- Extra generated top-level types
+                   ,[TyCon])        -- Extra generated type family instances
 
 tcDeriving tycl_decls inst_decls deriv_decls
-  = recoverM (return ([], emptyValBindsOut, emptyDUs)) $
+  = recoverM (return ([], emptyValBindsOut, emptyDUs, [], [])) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- And make the necessary "equations".
 	  is_boot <- tcIsHsBoot
@@ -313,14 +319,27 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
-		 -- Generate the generic to/from functions from each type declaration
-	; gen_binds <- mkGenericBinds is_boot tycl_decls
-	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
+		 -- Generate the (old) generic to/from functions from each type declaration
+	; gen_binds <- return emptyBag -- mkGenericBinds is_boot tycl_decls
+	
+	 -- Generate the generic Representable0/1 instances from each type declaration
+  ; repInstsMeta <- genGenericRepBinds is_boot tycl_decls
+	
+	; let repInsts   = concat (map (\(a,b,c) -> a) repInstsMeta)
+	      repMetaTys = map (\(a,b,c) -> b) repInstsMeta
+	      repTyCons  = map (\(a,b,c) -> c) repInstsMeta
+	-- Should we extendLocalInstEnv with repInsts?
+
+	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ repInsts)
+
+	; dflags <- getDOpts
+	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+	         (ddump_deriving inst_info rn_binds))
 
         ; when (not (null inst_info)) $
           dumpDerivingInfo (ddump_deriving inst_info rn_binds)
-
-	; return (inst_info, rn_binds, rn_dus) }
+	; return ( inst_info, rn_binds, rn_dus
+                 , concat (map metaTyCons2TyCons repMetaTys), repTyCons) }
   where
     ddump_deriving :: [InstInfo Name] -> HsValBinds Name -> SDoc
     ddump_deriving inst_infos extra_binds
@@ -1463,6 +1482,133 @@ genDerivBinds loc fix_env clas tycon
 	       ,(foldableClassKey, gen_Foldable_binds)
 	       ,(traversableClassKey, gen_Traversable_binds)
  	       ]
+
+-- Generate the binds for the generic representation
+genGenericRepBinds :: Bool -> [LTyClDecl Name] 
+                   -> TcM [([(InstInfo RdrName, DerivAuxBinds)]
+                           , MetaTyCons, TyCon)]
+genGenericRepBinds isBoot tyclDecls
+  | isBoot    = return []
+  | otherwise = do
+      allTyDecls <- mapM tcLookupTyCon [ tcdName d | L _ d <- tyclDecls
+                                       , isDataDecl d ]
+      let tyDecls = filter tyConHasGenerics allTyDecls
+      inst1 <- mapM genGenericRepBind tyDecls
+      let (repInsts, metaTyCons, repTys) = unzip3 inst1
+      metaInsts <- ASSERT (length tyDecls == length metaTyCons)
+                     mapM genDtMeta (zip tyDecls metaTyCons)
+      return (ASSERT (length inst1 == length metaInsts)
+                [ (ri : mi, ms, rt) 
+                | ((ri, ms, rt), mi) <- zip inst1 metaInsts ])
+
+genGenericRepBind :: TyCon -> TcM ((InstInfo RdrName, DerivAuxBinds)
+                                  , MetaTyCons, TyCon)
+genGenericRepBind tc =
+  do  clas <- tcLookupClass rep0ClassName
+      uniqS <- newUniqueSupply
+      dfun_name <- new_dfun_name clas tc
+      let
+        -- Uniques for everyone
+        (uniqD:uniqs) = uniqsFromSupply uniqS
+        (uniqsC,us) = splitAt (length tc_cons) uniqs
+        uniqsS :: [[Unique]] -- Unique supply for the S datatypes
+        uniqsS = mkUniqsS tc_arits us
+        mkUniqsS []    _  = []
+        mkUniqsS (n:t) us = case splitAt n us of
+                              (us1,us2) -> us1 : mkUniqsS t us2
+
+        tc_name   = tyConName tc
+        tc_cons   = tyConDataCons tc
+        tc_arits  = map dataConSourceArity tc_cons
+        
+        tc_occ    = nameOccName tc_name
+        d_occ     = mkGenD tc_occ
+        c_occ m   = mkGenC tc_occ m
+        s_occ m n = mkGenS tc_occ m n
+        mod_name  = nameModule (tyConName tc)
+        d_name    = mkExternalName uniqD mod_name d_occ wiredInSrcSpan
+        c_names   = [ mkExternalName u mod_name (c_occ m) wiredInSrcSpan
+                      | (u,m) <- zip uniqsC [0..] ]
+        s_names   = [ [ mkExternalName u mod_name (s_occ m n) wiredInSrcSpan 
+                        | (u,n) <- zip us [0..] ] | (us,m) <- zip uniqsS [0..] ]
+        tvs       = tyConTyVars tc
+        tc_ty     = mkTyConApp tc (mkTyVarTys tvs)
+        
+        mkTyCon name = ASSERT( isExternalName name )
+                         buildAlgTyCon name [] [] mkAbstractTyConRhs
+                           NonRecursive False False NoParentTyCon Nothing
+
+      metaDTyCon  <- mkTyCon d_name
+      metaCTyCons <- sequence [ mkTyCon c_name | c_name <- c_names ]
+      metaSTyCons <- mapM sequence 
+                       [ [ mkTyCon s_name 
+                         | s_name <- s_namesC ] | s_namesC <- s_names ]
+
+      let metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
+  
+      rep0_tycon <- tc_mkRep0TyCon tc metaDts
+
+      let
+        mkInstRep0 = (InstInfo { iSpec = inst, iBinds = binds }
+                               , [ {- No DerivAuxBinds -} ])
+        inst  = mkLocalInstance dfun NoOverlap
+        binds = VanillaInst (mkBindsRep0 tc) [] False
+        
+        dfun  = mkDictFunId dfun_name (tyConTyVars tc) [] clas [tc_ty]
+      return (mkInstRep0, metaDts, rep0_tycon)
+      
+genDtMeta :: (TyCon, MetaTyCons) -> TcM [(InstInfo RdrName, DerivAuxBinds)]
+genDtMeta (tc,metaDts) =
+  do  dClas <- tcLookupClass datatypeClassName
+      d_dfun_name <- new_dfun_name dClas tc
+      cClas <- tcLookupClass constructorClassName
+      c_dfun_names <- sequence [ new_dfun_name cClas tc | _ <- metaC metaDts ]
+      sClas <- tcLookupClass selectorClassName
+      s_dfun_names <- sequence (map sequence [ [ new_dfun_name sClas tc 
+                                               | _ <- x ] 
+                                             | x <- metaS metaDts ])
+      fix_env <- getFixityEnv
+
+      let
+        (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
+        
+        -- Datatype
+        d_metaTycon = metaD metaDts
+        d_inst = mkLocalInstance d_dfun NoOverlap
+        d_binds = VanillaInst dBinds [] False
+        d_dfun  = mkDictFunId d_dfun_name (tyConTyVars tc) [] dClas 
+                    [ mkTyConTy d_metaTycon ]
+        d_mkInst = (InstInfo { iSpec = d_inst, iBinds = d_binds }, [])
+        
+        -- Constructor
+        c_metaTycons = metaC metaDts
+        c_insts = [ mkLocalInstance (c_dfun c ds) NoOverlap 
+                  | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
+        c_binds = [ VanillaInst c [] False | c <- cBinds ]
+        c_dfun c dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] cClas 
+                               [ mkTyConTy c ]
+        c_mkInst = [ (InstInfo { iSpec = is, iBinds = bs }, []) 
+                   | (is,bs) <- myZip1 c_insts c_binds ]
+        
+        -- Selector
+        s_metaTycons = metaS metaDts
+        s_insts = map (map (\(s,ds) -> mkLocalInstance (s_dfun s ds) NoOverlap))
+                    (myZip2 s_metaTycons s_dfun_names)
+        s_binds = [ [ VanillaInst s [] False | s <- ss ] | ss <- sBinds ]
+        s_dfun s dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] sClas
+                               [ mkTyConTy s ]
+        s_mkInst = map (map (\(is,bs) -> (InstInfo {iSpec=is, iBinds=bs}, [])))
+                     (myZip2 s_insts s_binds)
+       
+        myZip1 :: [a] -> [b] -> [(a,b)]
+        myZip1 l1 l2 = ASSERT (length l1 == length l2) zip l1 l2
+        
+        myZip2 :: [[a]] -> [[b]] -> [[(a,b)]]
+        myZip2 l1 l2 =
+          ASSERT (and (zipWith (>=) (map length l1) (map length l2)))
+            [ zip x1 x2 | (x1,x2) <- zip l1 l2 ]
+        
+      return (d_mkInst : c_mkInst ++ concat s_mkInst)
 \end{code}
 
 

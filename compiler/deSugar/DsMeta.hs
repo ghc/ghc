@@ -420,6 +420,7 @@ rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
 rep_sig (L loc (TypeSig nm ty))       = rep_proto nm ty loc
+rep_sig (L loc (GenericSig nm ty))    = rep_proto nm ty loc -- JPM: ?
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig _                             = return []

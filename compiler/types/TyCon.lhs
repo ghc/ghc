@@ -67,7 +67,7 @@ module TyCon(
 	tyConExtName,		-- External name for foreign types
 	algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe, 
-        tupleTyConBoxity,
+        tupleTyConBoxity, tupleTyConArity,
 
         -- ** Manipulating TyCons
 	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -1086,6 +1086,11 @@ isBoxedTupleTyCon _                                  = False
 -- Panics otherwise
 tupleTyConBoxity :: TyCon -> Boxity
 tupleTyConBoxity tc = tyConBoxed tc
+
+-- | Extract the arity of the given 'TyCon', if it is a 'TupleTyCon'.
+-- Panics otherwise
+tupleTyConArity :: TyCon -> Arity
+tupleTyConArity tc = tyConArity tc
 
 -- | Is this a recursive 'TyCon'?
 isRecursiveTyCon :: TyCon -> Bool

@@ -586,8 +586,20 @@ rnMethodBinds :: Name			-- Class name
 	      -> RnM (LHsBinds Name, FreeVars)
 
 rnMethodBinds cls sig_fn gen_tyvars binds
-  = foldlM do_one (emptyBag,emptyFVs) (bagToList binds)
+  = do { checkDupRdrNames meth_names
+	     -- Check that the same method is not given twice in the
+	     -- same instance decl	instance C T where
+	     --			      f x = ...
+	     --			      g y = ...
+	     --			      f x = ...
+	     -- We must use checkDupRdrNames because the Name of the
+	     -- method is the Name of the class selector, whose SrcSpan
+	     -- points to the class declaration; and we use rnMethodBinds
+	     -- for instance decls too
+
+       ; foldlM do_one (emptyBag, emptyFVs) (bagToList binds) }
   where 
+    meth_names  = collectMethodBinders binds
     do_one (binds,fvs) bind 
        = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn gen_tyvars bind
 	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
@@ -663,7 +675,12 @@ renameSigs mb_names ok_sig sigs
 	  	-- Check for duplicates on RdrName version, 
 		-- because renamed version has unboundName for
 		-- not-in-scope binders, which gives bogus dup-sig errors
-
+		-- NB: in a class decl, a 'generic' sig is not considered 
+		--     equal to an ordinary sig, so we allow, say
+		--     	     class C a where
+		--	       op :: a -> a
+ 		--             generic op :: Eq a => a -> a
+		
 	; sigs' <- mapM (wrapLocM (renameSig mb_names)) sigs
 
 	; let (good_sigs, bad_sigs) = partition (ok_sig . unLoc) sigs'
@@ -689,6 +706,11 @@ renameSig mb_names sig@(TypeSig v ty)
   = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (TypeSig new_v new_ty) }
+
+renameSig mb_names sig@(GenericSig v ty)
+  = do	{ new_v <- lookupSigOccRn mb_names sig v
+	; new_ty <- rnHsSigType (quotes (ppr v)) ty
+	; return (GenericSig new_v new_ty) } -- JPM: ?
 
 renameSig _ (SpecInstSig ty)
   = do	{ new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty

@@ -397,12 +397,18 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 -- NB: class instance declarations can contain derivings as
                 --     part of associated data type declarations
 	 failIfErrsM		-- If the addInsts stuff gave any errors, don't
-				-- try the deriving stuff, becuase that may give
+				-- try the deriving stuff, because that may give
 				-- more errors still
-       ; (deriv_inst_info, deriv_binds, deriv_dus) 
+       ; (deriv_inst_info, deriv_binds, deriv_dus, deriv_tys, deriv_ty_insts) 
               <- tcDeriving tycl_decls inst_decls deriv_decls
-       ; gbl_env <- addInsts deriv_inst_info getGblEnv
-       ; return ( addTcgDUs gbl_env deriv_dus,
+
+       -- Extend the global environment also with the generated datatypes for
+       -- the generic representation
+       ; gbl_env <- addFamInsts (map ATyCon deriv_ty_insts) $
+                      tcExtendGlobalEnv (map ATyCon (deriv_tys ++ deriv_ty_insts)) $
+                        addInsts deriv_inst_info getGblEnv
+--       ; traceTc "Generic deriving" (vcat (map pprInstInfo deriv_inst_info))
+         ; return ( addTcgDUs gbl_env deriv_dus,
                   generic_inst_info ++ deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
     }}}
@@ -917,10 +923,14 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     ----------------------
     tc_default :: Id -> DefMeth -> TcM (TcId, LHsBind Id)
+
+    -- JPM: This is probably not that simple...
+    tc_default sel_id (GenDefMeth dm_name) = tc_default sel_id (DefMeth dm_name)
+{-
     tc_default sel_id GenDefMeth    -- Derivable type classes stuff
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id
            ; tc_body sel_id False {- Not generated code? -} meth_bind }
-    	  
+-}
     tc_default sel_id NoDefMeth	    -- No default method at all
       = do { warnMissingMethod sel_id
     	   ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars 

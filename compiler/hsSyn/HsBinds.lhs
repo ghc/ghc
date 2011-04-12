@@ -597,6 +597,10 @@ data Sig name	-- Signatures and pragmas
 	-- f :: Num a => a -> a
     TypeSig (Located name) (LHsType name)
 
+        -- A type signature for a generic function inside a class
+        -- generic eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
+  | GenericSig (Located name) (LHsType name)
+
 	-- A type signature in generated code, notably the code
 	-- generated for record selectors.  We simply record
 	-- the desired Id itself, replete with its name, type
@@ -666,18 +670,20 @@ okBindSig :: Sig a -> Bool
 okBindSig _ = True
 
 okHsBootSig :: Sig a -> Bool
-okHsBootSig (TypeSig  _ _) = True
-okHsBootSig (FixSig _) 	   = True
-okHsBootSig _              = False
+okHsBootSig (TypeSig  _ _)    = True
+okHsBootSig (GenericSig  _ _) = True -- JPM: Is this true?
+okHsBootSig (FixSig _) 	      = True
+okHsBootSig _                 = False
 
 okClsDclSig :: Sig a -> Bool
 okClsDclSig (SpecInstSig _) = False
 okClsDclSig _               = True        -- All others OK
 
 okInstDclSig :: Sig a -> Bool
-okInstDclSig (TypeSig _ _)   = False
-okInstDclSig (FixSig _)      = False
-okInstDclSig _ 	             = True
+okInstDclSig (TypeSig _ _)    = False
+okInstDclSig (GenericSig _ _) = False
+okInstDclSig (FixSig _)       = False
+okInstDclSig _ 	              = True
 
 sigForThisGroup :: NameSet -> LSig Name -> Bool
 sigForThisGroup ns sig
@@ -706,9 +712,10 @@ isVanillaLSig (L _(TypeSig {})) = True
 isVanillaLSig _                 = False
 
 isTypeLSig :: LSig name -> Bool	 -- Type signatures
-isTypeLSig (L _(TypeSig {})) = True
-isTypeLSig (L _(IdSig {}))   = True
-isTypeLSig _                 = False
+isTypeLSig (L _(TypeSig {}))    = True
+isTypeLSig (L _(GenericSig {})) = True
+isTypeLSig (L _(IdSig {}))      = True
+isTypeLSig _                    = False
 
 isSpecLSig :: LSig name -> Bool
 isSpecLSig (L _(SpecSig {})) = True
@@ -731,6 +738,7 @@ isInlineLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {}) 		= ptext (sLit "type signature")
+hsSigDoc (GenericSig {})	= ptext (sLit "generic default type signature")
 hsSigDoc (IdSig {}) 		= ptext (sLit "id signature")
 hsSigDoc (SpecSig {})	 	= ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
@@ -745,6 +753,7 @@ eqHsSig :: Eq a => LSig a -> LSig a -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
 eqHsSig (L _ (IdSig n1))         	(L _ (IdSig n2))                = n1 == n2
 eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
+eqHsSig (L _ (GenericSig n1 _))        	(L _ (GenericSig n2 _))         = unLoc n1 == unLoc n2
 eqHsSig (L _ (InlineSig n1 _))          (L _ (InlineSig n2 _))          = unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
@@ -758,6 +767,7 @@ instance (OutputableBndr name) => Outputable (Sig name) where
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
 ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) (ppr ty)
+ppr_sig (GenericSig var ty)	  = ptext (sLit "generic") <+> pprVarSig (unLoc var) (ppr ty)
 ppr_sig (IdSig id)	          = pprVarSig id (ppr (varType id))
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
 ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var (ppr ty) inl)

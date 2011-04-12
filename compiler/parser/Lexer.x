@@ -431,6 +431,7 @@ data Token
   | ITderiving
   | ITdo
   | ITelse
+  | ITgeneric
   | IThiding
   | ITif
   | ITimport
@@ -635,6 +636,7 @@ reservedWordsFM = listToUFM $
 	( "deriving",	ITderiving, 	0 ), 
 	( "do",		ITdo, 		0 ),       
 	( "else",	ITelse, 	0 ),     
+	( "generic",	ITgeneric, 	bit genericsBit ),     
 	( "hiding",	IThiding, 	0 ),
 	( "if",		ITif, 		0 ),       
 	( "import",	ITimport, 	0 ),   
@@ -1752,7 +1754,7 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 -- integer
 
 genericsBit :: Int
-genericsBit = 0 -- {| and |}
+genericsBit = 0 -- {|, |} and "generic"
 ffiBit :: Int
 ffiBit	   = 1
 parrBit :: Int

@@ -61,12 +61,14 @@ import Data.List
 %************************************************************************
 
 \begin{code}
+
 tcTyAndClassDecls :: ModDetails 
                    -> [[LTyClDecl Name]]     -- Mutually-recursive groups in dependency order
    	           -> TcM (TcGblEnv,   	     -- Input env extended by types and classes 
 					     -- and their implicit Ids,DataCons
 		           HsValBinds Name,  -- Renamed bindings for record selectors
-			   [Id])      	     -- Default method ids
+			   [Id],      	     -- Default method ids
+                           [LTyClDecl Name]) -- Kind-checked declarations
 -- Fails if there are any errors
 
 tcTyAndClassDecls boot_details decls_s
@@ -89,7 +91,7 @@ tcTyAndClassDecls boot_details decls_s
 
                       -- And now build the TyCons/Classes
                 ; let rec_flags = calcRecFlags boot_details rec_tyclss
-                 ; concatMapM (tcTyClDecl rec_flags) kc_decls }
+                ; concatMapM (tcTyClDecl rec_flags) kc_decls }
 
        ; tcExtendGlobalEnv tyclss $ do
        {  -- Perform the validity check
@@ -109,7 +111,10 @@ tcTyAndClassDecls boot_details decls_s
               ; dm_ids          = mkDefaultMethodIds tyclss }
 
   	; env <- tcExtendGlobalEnv implicit_things getGblEnv
-	; return (env, rec_sel_binds, dm_ids) } }
+          -- We need the kind-checked declarations later, so we return them
+          -- from here
+        ; kc_decls <- kcTyClDecls tyclds_s
+        ; return (env, rec_sel_binds, dm_ids, kc_decls) } }
                     
 zipRecTyClss :: [[LTyClDecl Name]]
              -> [TyThing]           -- Knot-tied
@@ -488,6 +493,8 @@ kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   where
     kc_sig (TypeSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
 				   ; return (TypeSig nm op_ty') }
+    kc_sig (GenericSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
+				      ; return (GenericSig nm op_ty') }
     kc_sig other_sig	      = return other_sig
 
 kcTyClDecl decl@(ForeignType {})
@@ -702,7 +709,7 @@ tcTyClDecl1 _parent calc_isrec
 		   NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-	    (want_generic && canDoGenerics data_cons) (not h98_syntax) 
+	    (want_generic && canDoGenerics stupid_theta data_cons) (not h98_syntax) 
             NoParentTyCon Nothing
 	})
   ; return [ATyCon tycon]
@@ -1134,7 +1141,7 @@ checkValidClass cls
   where
     (tyvars, fundeps, theta, _, _, op_stuff) = classExtraBigSig cls
     unary 	= isSingleton tyvars
-    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
+    no_generics = null [() | (_, (GenDefMeth _)) <- op_stuff]
 
     check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -1157,8 +1164,10 @@ checkValidClass cls
 
 		-- Check that for a generic method, the type of 
 		-- the method is sufficiently simple
+{- -- JPM TODO
 	; checkTc (dm /= GenDefMeth || validGenericMethodType tau)
 		  (badGenericMethodType op_name op_ty)
+-}
 	}
 	where
 	  op_name = idName sel_id

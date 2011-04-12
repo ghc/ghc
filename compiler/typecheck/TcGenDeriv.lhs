@@ -42,7 +42,7 @@ import Name
 import HscTypes
 import PrelInfo
 import MkCore	( eRROR_ID )
-import PrelNames
+import PrelNames hiding (error_RDR)
 import PrimOp
 import SrcLoc
 import TyCon
