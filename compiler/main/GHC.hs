@@ -756,9 +756,7 @@ data CoreModule
       -- | Type environment for types declared in this module
       cm_types    :: !TypeEnv,
       -- | Declarations
-      cm_binds    :: [CoreBind],
-      -- | Imports
-      cm_imports  :: ![Module]
+      cm_binds    :: [CoreBind]
     }
 
 instance Outputable CoreModule where
@@ -857,11 +855,11 @@ compileCore simplify fn = do
         gutsToCoreModule :: Either (CgGuts, ModDetails) ModGuts -> CoreModule
         gutsToCoreModule (Left (cg, md))  = CoreModule {
           cm_module = cg_module cg,    cm_types = md_types md,
-          cm_imports = cg_dir_imps cg, cm_binds = cg_binds cg
+          cm_binds = cg_binds cg
         }
         gutsToCoreModule (Right mg) = CoreModule {
           cm_module  = mg_module mg,                   cm_types   = mg_types mg,
-          cm_imports = moduleEnvKeys (mg_dir_imps mg), cm_binds   = mg_binds mg
+          cm_binds   = mg_binds mg
          }
 
 -- %************************************************************************

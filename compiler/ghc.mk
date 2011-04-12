@@ -140,6 +140,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cMKDLL                = "$(BLD_DLL)"'                        >> $@
 	@echo 'cLdIsGNULd            :: String'                             >> $@
 	@echo 'cLdIsGNULd            = "$(LdIsGNULd)"'                      >> $@
+	@echo 'cLdHasBuildId         :: String'                             >> $@
+	@echo 'cLdHasBuildId         = "$(LdHasBuildId)"'                   >> $@
 	@echo 'cLD_X                 :: String'                             >> $@
 	@echo 'cLD_X                 = "$(LD_X)"'                           >> $@
 	@echo 'cGHC_DRIVER_DIR       :: String'                             >> $@

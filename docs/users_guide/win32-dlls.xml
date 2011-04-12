@@ -429,8 +429,6 @@ foreign export stdcall adder :: Int -> Int -> IO Int
 // StartEnd.c
 #include &lt;Rts.h&gt;
 
-extern void __stginit_Adder(void);
-
 void HsStart()
 {
    int argc = 1;
@@ -439,9 +437,6 @@ void HsStart()
    // Initialize Haskell runtime
    char** args = argv;
    hs_init(&amp;argc, &amp;args);
-
-   // Tell Haskell about all root modules
-   hs_add_root(__stginit_Adder);
 }
 
 void HsEnd()

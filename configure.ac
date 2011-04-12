@@ -816,6 +816,7 @@ FP_LEADING_UNDERSCORE
 dnl ** check for ld, whether it has an -x option, and if it is GNU ld
 FP_PROG_LD_X
 FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
 
 dnl ** check for Apple-style dead-stripping support
 dnl    (.subsections-via-symbols assembler directive)

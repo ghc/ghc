@@ -659,6 +659,10 @@ LD_X			= @LdXFlag@
 # overflowing command-line length limits.
 LdIsGNULd		= @LdIsGNULd@
 
+# Set to YES if ld has the --build-id flag.  Sometimes we need to
+# disable it with --build-id=none.
+LdHasBuildId	        = @LdHasBuildId@
+
 # On MSYS, building with SplitObjs=YES fails with 
 #   ar: Bad file number
 # see #3201.  We need to specify a smaller max command-line size

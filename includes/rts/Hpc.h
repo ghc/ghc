@@ -18,16 +18,16 @@
 typedef struct _HpcModuleInfo {
   char *modName;		// name of module
   StgWord32 tickCount;		// number of ticks
-  StgWord32 tickOffset;		// offset into a single large .tix Array
-  StgWord32 hashNo;		// Hash number for this module's mix info
+  StgWord32 hashNo;             // Hash number for this module's mix info
   StgWord64 *tixArr;		// tix Array; local for this module
+  rtsBool from_file;            // data was read from the .tix file
   struct _HpcModuleInfo *next;
 } HpcModuleInfo;
 
-int hs_hpc_module (char *modName, 
-                   StgWord32 modCount, 
-                   StgWord32 modHashNo,
-                   StgWord64 *tixArr);
+void hs_hpc_module (char *modName,
+                    StgWord32 modCount,
+                    StgWord32 modHashNo,
+                    StgWord64 *tixArr);
 
 HpcModuleInfo * hs_hpc_rootModule (void);
 

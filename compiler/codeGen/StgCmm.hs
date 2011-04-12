@@ -24,16 +24,12 @@ import StgCmmHpc
 import StgCmmTicky
 
 import MkGraph
-import CmmDecl
 import CmmExpr
-import CmmUtils
 import CLabel
 import PprCmm
 
 import StgSyn
-import PrelNames
 import DynFlags
-import StaticFlags
 
 import HscTypes
 import CostCentre
@@ -50,17 +46,14 @@ import Outputable
 codeGen :: DynFlags
 	 -> Module
 	 -> [TyCon]
-	 -> [Module]			-- Directly-imported modules
-	 -> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
+         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
 	 -> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	 -> HpcInfo
 	 -> IO [Cmm]		-- Output
 
-codeGen dflags this_mod data_tycons imported_mods 
+codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
   = do  { showPass dflags "New CodeGen"
-        ; let way = buildTag dflags
-              main_mod = mainModIs dflags
 
 -- Why?
 --   ; mapM_ (\x -> seq x (return ())) data_tycons
@@ -68,10 +61,9 @@ codeGen dflags this_mod data_tycons imported_mods
         ; code_stuff <- initC dflags this_mod $ do 
                 { cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
                 ; cmm_tycons <- mapM cgTyCon data_tycons
-                ; cmm_init   <- getCmm (mkModuleInit way cost_centre_info 
-                                             this_mod main_mod
-                                             imported_mods hpc_info)
-                ; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
+                ; cmm_init   <- getCmm (mkModuleInit cost_centre_info
+                                             this_mod hpc_info)
+                ; return (cmm_init : cmm_binds ++ concat cmm_tycons)
                 }
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
@@ -81,6 +73,12 @@ codeGen dflags this_mod data_tycons imported_mods
                 -- N.B. returning '[Cmm]' and not 'Cmm' here makes it
                 -- possible for object splitting to split up the
                 -- pieces later.
+
+                -- Note [codegen-split-init] the cmm_init block must
+                -- come FIRST.  This is because when -split-objs is on
+                -- we need to combine this block with its
+                -- initialisation routines; see Note
+                -- [pipeline-split-init].
 
         ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms code_stuff)
 
@@ -173,89 +171,18 @@ We initialise the module tree by keeping a work-stack,
 -}
 
 mkModuleInit 
-	:: String		-- the "way"
-	-> CollectedCCs         -- cost centre info
+        :: CollectedCCs         -- cost centre info
 	-> Module
-	-> Module		-- name of the Main module
-	-> [Module]
-	-> HpcInfo
+        -> HpcInfo
 	-> FCode ()
-mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
-  = do	{ -- Allocate the static boolean that records if this
-          -- module has been registered already
-	  emitData Data [CmmDataLabel moduleRegdLabel, 
-		         CmmStaticLit zeroCLit]
 
-        ; init_hpc  <- initHpc this_mod hpc_info
-	; init_prof <- initCostCentres cost_centre_info
-
-          -- We emit a recursive descent module search for all modules
-	  -- and *choose* to chase it in :Main, below.
-          -- In this way, Hpc enabled modules can interact seamlessly with
-	  -- not Hpc enabled moduled, provided Main is compiled with Hpc.
-
-        ; updfr_sz <- getUpdFrameOff
-        ; tail <- getCode (pushUpdateFrame imports
-                       (do updfr_sz' <- getUpdFrameOff
-                           emit $ mkReturn (ret_e updfr_sz') [] (pop_ret_loc updfr_sz')))
-        ; emitSimpleProc real_init_lbl $ (withFreshLabel "ret_block" $ \retId -> catAGraphs
-		[ check_already_done retId updfr_sz
-		, init_prof
-		, init_hpc
-                , tail])
- 	    -- Make the "plain" procedure jump to the "real" init procedure
-	; emitSimpleProc plain_init_lbl (jump_to_init updfr_sz)
-
-	-- When compiling the module in which the 'main' function lives,
-	-- (that is, this_mod == main_mod)
-	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
-	-- RTS to invoke.  We must consult the -main-is flag in case the
-	-- user specified a different function to Main.main
- 
-        -- Notice that the recursive descent is optional, depending on what options
-	-- are enabled.
-
-
-	; whenC (this_mod == main_mod)
-		(emitSimpleProc plain_main_init_lbl (rec_descent_init updfr_sz))
-    }
-  where
-    plain_init_lbl = mkPlainModuleInitLabel this_mod
-    real_init_lbl  = mkModuleInitLabel this_mod way
-    plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
-
-    jump_to_init updfr_sz = mkJump (mkLblExpr real_init_lbl) [] updfr_sz
-
-
-    -- Main refers to GHC.TopHandler.runIO, so make sure we call the
-    -- init function for GHC.TopHandler.
-    extra_imported_mods
-	| this_mod == main_mod = [gHC_TOP_HANDLER]
-	| otherwise	       = []
-    all_imported_mods = imported_mods ++ extra_imported_mods
-    imports = map (\mod -> mkLblExpr (mkModuleInitLabel mod way))
-                  (filter (gHC_PRIM /=) all_imported_mods)
-
-    mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) bWord
-    check_already_done retId updfr_sz
-     = mkCmmIfThenElse (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
-		       (mkLabel retId <*> mkReturn (ret_e updfr_sz) [] (pop_ret_loc updfr_sz)) mkNop
-	<*>  	-- Set mod_reg to 1 to record that we've been here
-	    mkStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1))
-
-                    -- The return-code pops the work stack by 
-                    -- incrementing Sp, and then jumps to the popped item
-    ret_e updfr_sz = CmmLoad (CmmStackSlot (CallArea Old) updfr_sz) gcWord
-    ret_code updfr_sz = mkJump (ret_e updfr_sz) [] (pop_ret_loc updfr_sz)
-      -- mkAssign spReg (cmmRegOffW spReg 1) <*>
-      -- mkJump (CmmLoad (cmmRegOffW spReg (-1)) bWord) [] updfr_sz
-
-    pop_ret_loc updfr_sz = updfr_sz - widthInBytes (typeWidth bWord)
-
-    rec_descent_init updfr_sz =
-      if opt_SccProfilingOn || isHpcUsed hpc_info
-      then jump_to_init updfr_sz
-      else ret_code updfr_sz
+mkModuleInit cost_centre_info this_mod hpc_info
+  = do  { initHpc this_mod hpc_info
+        ; initCostCentres cost_centre_info
+            -- For backwards compatibility: user code may refer to this
+            -- label for calling hs_add_root().
+        ; emitSimpleProc (mkPlainModuleInitLabel this_mod) $ emptyAGraph
+        }
 
 ---------------------------------------------------------------
 --	Generating static stuff for algebraic data types

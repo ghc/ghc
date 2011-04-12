@@ -34,9 +34,9 @@ Arena *prof_arena;
  * closure_cats
  */
 
-unsigned int CC_ID;
-unsigned int CCS_ID;
-unsigned int HP_ID;
+unsigned int CC_ID  = 1;
+unsigned int CCS_ID = 1;
+unsigned int HP_ID  = 1;
 
 /* figures for the profiling report.
  */
@@ -58,8 +58,8 @@ CostCentreStack *CCCS;
 /* Linked lists to keep track of cc's and ccs's that haven't
  * been declared in the log file yet
  */
-CostCentre *CC_LIST;
-CostCentreStack *CCS_LIST;
+CostCentre      *CC_LIST  = NULL;
+CostCentreStack *CCS_LIST = NULL;
 
 /*
  * Built-in cost centres and cost-centre stacks:
@@ -152,41 +152,10 @@ initProfiling1 (void)
 
   /* for the benefit of allocate()... */
   CCCS = CCS_SYSTEM;
-  
-  /* Initialize counters for IDs */
-  CC_ID  = 1;
-  CCS_ID = 1;
-  HP_ID  = 1;
-  
-  /* Initialize Declaration lists to NULL */
-  CC_LIST  = NULL;
-  CCS_LIST = NULL;
-
-  /* Register all the cost centres / stacks in the program 
-   * CC_MAIN gets link = 0, all others have non-zero link.
-   */
-  REGISTER_CC(CC_MAIN);
-  REGISTER_CC(CC_SYSTEM);
-  REGISTER_CC(CC_GC);
-  REGISTER_CC(CC_OVERHEAD);
-  REGISTER_CC(CC_SUBSUMED);
-  REGISTER_CC(CC_DONT_CARE);
-  REGISTER_CCS(CCS_MAIN);
-  REGISTER_CCS(CCS_SYSTEM);
-  REGISTER_CCS(CCS_GC);
-  REGISTER_CCS(CCS_OVERHEAD);
-  REGISTER_CCS(CCS_SUBSUMED);
-  REGISTER_CCS(CCS_DONT_CARE);
-
-  CCCS = CCS_OVERHEAD;
-
-  /* cost centres are registered by the per-module 
-   * initialisation code now... 
-   */
 }
 
 void
-freeProfiling1 (void)
+freeProfiling (void)
 {
     arenaFree(prof_arena);
 }
@@ -202,17 +171,36 @@ initProfiling2 (void)
    * information into it.  */
   initProfilingLogFile();
 
+  /* Register all the cost centres / stacks in the program
+   * CC_MAIN gets link = 0, all others have non-zero link.
+   */
+  REGISTER_CC(CC_MAIN);
+  REGISTER_CC(CC_SYSTEM);
+  REGISTER_CC(CC_GC);
+  REGISTER_CC(CC_OVERHEAD);
+  REGISTER_CC(CC_SUBSUMED);
+  REGISTER_CC(CC_DONT_CARE);
+
+  REGISTER_CCS(CCS_SYSTEM);
+  REGISTER_CCS(CCS_GC);
+  REGISTER_CCS(CCS_OVERHEAD);
+  REGISTER_CCS(CCS_SUBSUMED);
+  REGISTER_CCS(CCS_DONT_CARE);
+  REGISTER_CCS(CCS_MAIN);
+
   /* find all the "special" cost centre stacks, and make them children
    * of CCS_MAIN.
    */
-  ASSERT(CCS_MAIN->prevStack == 0);
+  ASSERT(CCS_LIST == CCS_MAIN);
+  CCS_LIST = CCS_LIST->prevStack;
+  CCS_MAIN->prevStack = NULL;
   CCS_MAIN->root = CC_MAIN;
   ccsSetSelected(CCS_MAIN);
   DecCCS(CCS_MAIN);
 
-  for (ccs = CCS_LIST; ccs != CCS_MAIN; ) {
+  for (ccs = CCS_LIST; ccs != NULL; ) {
     next = ccs->prevStack;
-    ccs->prevStack = 0;
+    ccs->prevStack = NULL;
     ActualPush_(CCS_MAIN,ccs->cc,ccs);
     ccs->root = ccs->cc;
     ccs = next;

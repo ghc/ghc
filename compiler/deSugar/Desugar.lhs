@@ -105,10 +105,14 @@ deSugar hsc_env
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; ds_vects <- mapM dsVect vects
+                          ; let hpc_init
+                                  | opt_Hpc   = hpcInitCode mod ds_hpc_info
+                                  | otherwise = empty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
                                    , spec_rules ++ ds_rules, ds_vects
-                                   , ds_fords, ds_hpc_info, modBreaks) }
+                                   , ds_fords `appendStubC` hpc_init
+                                   , ds_hpc_info, modBreaks) }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
