@@ -79,7 +79,7 @@ isAlive(StgClosure *p)
 
     if (IS_FORWARDING_PTR(info)) {
         // alive! 
-        return (StgClosure*)UN_FORWARDING_PTR(info);
+        return TAG_CLOSURE(tag,(StgClosure*)UN_FORWARDING_PTR(info));
     }
 
     info = INFO_PTR_TO_STRUCT(info);
