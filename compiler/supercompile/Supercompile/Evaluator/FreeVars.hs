@@ -39,9 +39,11 @@ stackFrameFreeVars = snd . stackFrameOpenFreeVars
 stackFrameOpenFreeVars :: StackFrame -> (BoundVars, FreeVars)
 stackFrameOpenFreeVars kf = case kf of
     Apply x'                 -> (emptyVarSet, unitVarSet x')
+    TyApply ty'              -> (emptyVarSet, tyVarsOfType ty')
     Scrutinise x' ty in_alts -> (emptyVarSet, (inFreeVars annedAltsFreeVars in_alts `delVarSet` x') `unionVarSet` tyVarsOfType ty)
     PrimApply _ in_vs in_es  -> (emptyVarSet, unionVarSets (map (inFreeVars annedValueFreeVars) in_vs) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
     Update x'                -> (unitVarSet x', emptyVarSet)
+    CastIt co'               -> (emptyVarSet, tyVarsOfType co')
 
 
 -- | Computes the variables bound and free in a state

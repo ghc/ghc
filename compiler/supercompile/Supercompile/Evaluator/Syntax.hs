@@ -1,5 +1,7 @@
 module Supercompile.Evaluator.Syntax where
 
+import Supercompile.Evaluator.Deeds
+
 import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 import Supercompile.Core.Size
@@ -79,11 +81,11 @@ qaToAnnedTerm' (Question x) = Var x
 qaToAnnedTerm' (Answer v)   = Value v
 
 
-type UnnormalisedState = (Heap, Stack, In AnnedTerm)
-type State = (Heap, Stack, In (Anned QA))
+type UnnormalisedState = (Deeds, Heap, Stack, In AnnedTerm)
+type State = (Deeds, Heap, Stack, In (Anned QA))
 
 denormalise :: State -> UnnormalisedState
-denormalise (h, k, (rn, qa)) = (h, k, (rn, fmap qaToAnnedTerm' qa))
+denormalise (deeds, h, k, (rn, qa)) = (deeds, h, k, (rn, fmap qaToAnnedTerm' qa))
 
 
 -- Invariant: LetBound things cannot refer to LambdaBound things.
@@ -140,16 +142,20 @@ instance Outputable Heap where
 
 type Stack = [Tagged StackFrame]
 data StackFrame = Apply (Out Var)
+                | TyApply (Out Type)
                 | Scrutinise (Out Var) (Out Type) (In [AnnedAlt])
                 | PrimApply PrimOp [In (Anned AnnedValue)] [In AnnedTerm]
                 | Update (Out Var)
+                | CastIt (Out Coercion)
 
 instance Outputable StackFrame where
     pprPrec prec kf = case kf of
         Apply x'                  -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
+        TyApply ty'               -> pPrintPrecApp prec (PrettyDoc $ text "[_]") ty'
         Scrutinise x' _ty in_alts -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
         PrimApply pop in_vs in_es -> pPrintPrecPrimOp prec pop (map (PrettyFunction . flip pPrintPrecAnnedValue) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
         Update x'                 -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
+        CastIt co'                -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
 
 
 heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)
@@ -167,12 +173,29 @@ heapBindingSize _                                   = 0
 stackFrameSize :: StackFrame -> Size
 stackFrameSize kf = 1 + case kf of
     Apply _                  -> 0
+    TyApply _                -> 0
     Scrutinise _ _ (_, alts) -> annedAltsSize alts
     PrimApply _ in_vs in_es  -> sum (map (annedValueSize . snd) in_vs ++ map (annedTermSize . snd) in_es)
     Update _                 -> 0
+    CastIt _                 -> 0
 
 stateSize :: State -> Size
-stateSize (h, k, in_qa) = heapSize h + stackSize k + qaSize (snd in_qa)
+stateSize (_, h, k, in_qa) = heapSize h + stackSize k + qaSize (snd in_qa)
           where qaSize = annedSize . fmap qaToAnnedTerm'
                 heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
                 stackSize = sum . map (stackFrameSize . tagee)
+
+addStateDeeds :: Deeds -> (Deeds, Heap, Stack, In (Anned a)) -> (Deeds, Heap, Stack, In (Anned a))
+addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds + deeds, h, k, in_e)
+
+releaseHeapBindingDeeds :: Deeds -> HeapBinding -> Deeds
+releaseHeapBindingDeeds deeds hb = deeds + heapBindingSize hb
+
+releasePureHeapDeeds :: Deeds -> PureHeap -> Deeds
+releasePureHeapDeeds = M.fold (flip releaseHeapBindingDeeds)
+
+releaseStackDeeds :: Deeds -> Stack -> Deeds
+releaseStackDeeds = foldl' (\deeds kf -> deeds + stackFrameSize (tagee kf))
+
+releaseStateDeed :: (Deeds, Heap, Stack, In (Anned a)) -> Deeds
+releaseStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (releasePureHeapDeeds (deeds + annedSize e) h) k

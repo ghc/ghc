@@ -45,6 +45,12 @@ mkIdentityRenaming :: FreeVars -> Renaming
 mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv [(x, mkTyVarTy x) | x <- tv_list])
   where (tv_list, id_list) = partition isTyCoVar (varSetElems fvs)
 
+insertRenaming :: Renaming -> Var -> Var -> Renaming
+insertRenaming (id_subst, tv_subst) x x' = (extendVarEnv id_subst x (CoreSyn.Var x'), tv_subst)
+
+insertTypeSubst :: Renaming -> Var -> Type -> Renaming
+insertTypeSubst (id_subst, tv_subst) x ty' = (id_subst, extendVarEnv tv_subst x ty')
+
 rename :: Renaming -> Var -> Out Var
 rename rn x = case lookupIdSubst (text "rename") (trivialSubst rn) x of CoreSyn.Var x' -> x'
 
@@ -58,6 +64,9 @@ inFreeVars thing_fvs (rn, thing) = renameFreeVars rn (thing_fvs thing)
 
 renameFreeVars :: Renaming -> FreeVars -> FreeVars
 renameFreeVars rn = mapVarSet (rename rn)
+
+renameType :: InScopeSet -> Renaming -> Type -> Type
+renameType iss rn = substTy (joinSubst iss rn)
 
 
 renameIn :: (Renaming -> a -> a) -> In a -> a
@@ -96,21 +105,21 @@ mkRename rec = (term, alternatives, value, value')
     term' ids rn e = case e of
       Var x -> Var (rename rn x)
       Value v -> Value (value' ids rn v)
-      TyApp e ty -> TyApp (term ids rn e) (typ ids rn ty)
+      TyApp e ty -> TyApp (term ids rn e) (renameType ids rn ty)
       App e x -> App (term ids rn e) (rename rn x)
       PrimOp pop es -> PrimOp pop (map (term ids rn) es)
-      Case e x ty alts -> Case (term ids rn e) x' (typ ids rn ty) (alternatives ids' rn' alts)
+      Case e x ty alts -> Case (term ids rn e) x' (renameType ids rn ty) (alternatives ids' rn' alts)
         where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
       LetRec xes e -> LetRec (map (second (renameIn (term ids'))) xes') (term ids' rn' e)
         where (ids', rn', xes') = renameBounds ids rn xes
-      Cast e co -> Cast (term ids rn e) (typ ids rn co)
+      Cast e co -> Cast (term ids rn e) (renameType ids rn co)
     
     value ids rn = rec (value' ids) rn
-    value' ids rn (mb_co, v) = (fmap (typ ids rn) mb_co, rvalue' ids rn v)
+    value' ids rn (mb_co, v) = (fmap (renameType ids rn) mb_co, rvalue' ids rn v)
     
     rvalue' ids rn v = case v of
       Indirect x -> Indirect (rename rn x)
-      TyLambda x v -> TyLambda x' (value ids' rn' v)
+      TyLambda x e -> TyLambda x' (term ids' rn' e)
         where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
       Lambda x e -> Lambda x' (term ids' rn' e)
         where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
@@ -121,8 +130,6 @@ mkRename rec = (term, alternatives, value, value')
     
     alternative ids rn (alt_con, alt_e) = (alt_con', term ids' rn' alt_e)
         where (ids', rn', alt_con') = renameAltCon ids rn alt_con
-    
-    typ ids rn = substTy (joinSubst ids rn)
 
 renameAltCon :: InScopeSet -> Renaming -> AltCon -> (InScopeSet, Renaming, AltCon)
 renameAltCon ids rn_alt alt_con = case alt_con of

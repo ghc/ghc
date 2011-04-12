@@ -11,3 +11,5 @@ aRGS = unsafePerformIO getArgs
 cALL_BY_NAME :: Bool
 cALL_BY_NAME = "--call-by-name" `elem` aRGS
 
+dEEDS :: Bool
+dEEDS = "--deeds" `elem` aRGS

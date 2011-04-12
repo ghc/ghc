@@ -53,7 +53,7 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     value' (mb_co, rv) = maybe id (unionVarSet . typ) mb_co (rawvalue' rv)
     
     rawvalue' (Indirect x)   = idFreeVars x
-    rawvalue' (TyLambda x v) = value v `delVarSet` x
+    rawvalue' (TyLambda x e) = term e `delVarSet` x
     rawvalue' (Lambda x e)   = term e `delVarSet` x
     rawvalue' (Data _ xs)    = unionVarSets $ map idFreeVars xs
     rawvalue' (Literal _)    = emptyVarSet

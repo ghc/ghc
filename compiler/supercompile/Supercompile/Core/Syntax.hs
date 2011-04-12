@@ -74,7 +74,7 @@ type AltF ann = (AltCon, ann (TermF ann))
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
 type ValueF ann = (Maybe Coercion, RawValueF ann)
-data RawValueF ann = Indirect Var | TyLambda Var (ann (ValueF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Var] | Literal Literal
+data RawValueF ann = Indirect Var | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Var] | Literal Literal
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
@@ -123,7 +123,7 @@ pPrintPrecLetRec prec xes e_body
 instance (Functor ann, Outputable1 ann) => Outputable (RawValueF ann) where
     pprPrec prec v = case v of
         Indirect x    -> pPrintPrec prec x
-        TyLambda x v  -> pPrintPrecLam prec [x] (asPrettyFunction1 $ fmap (\v -> PrettyFunction $ \prec -> pPrintPrecValue prec v) v)
+        TyLambda x e  -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
         -- Unfortunately, this nicer pretty-printing doesn't work for general (TermF ann):
         --Lambda x e    -> pPrintPrecLam prec (x:xs) e'
         --  where (xs, e') = collectLambdas e
@@ -172,7 +172,7 @@ termToVar e = case extract e of
 
 class Functor ann => Symantics ann where
     var    :: Var -> ann (TermF ann)
-    value  :: ValueF ann -> ann (ValueF ann)
+    value  :: ValueF ann -> ann (TermF ann)
     tyApp  :: ann (TermF ann) -> Type -> ann (TermF ann)
     app    :: ann (TermF ann) -> Var -> ann (TermF ann)
     primOp :: PrimOp -> [ann (TermF ann)] -> ann (TermF ann)
@@ -182,7 +182,7 @@ class Functor ann => Symantics ann where
 
 instance Symantics Identity where
     var = I . Var
-    value = I
+    value = I . Value
     tyApp e = I . TyApp e
     app e = I . App e
     primOp pop = I . PrimOp pop
@@ -197,7 +197,7 @@ reify x = x
 reflect :: Term -> (forall ann. Symantics ann => ann (TermF ann))
 reflect (I e) = case e of
     Var x            -> var x
-    Value v          -> fmap Value $ value (reflectValue' v)
+    Value v          -> value (reflectValue v)
     TyApp e ty       -> tyApp (reflect e) ty
     App e x          -> app (reflect e) x
     PrimOp pop es    -> primOp pop (map reflect es)
@@ -205,16 +205,13 @@ reflect (I e) = case e of
     LetRec xes e     -> letRec (map (second reflect) xes) (reflect e)
     Cast e co        -> cast (reflect e) co
   where
-    reflectValue' :: Value -> (forall ann. Symantics ann => ValueF ann)
-    reflectValue' (mb_co, rv) = (mb_co, case rv of
+    reflectValue :: Value -> (forall ann. Symantics ann => ValueF ann)
+    reflectValue (mb_co, rv) = (mb_co, case rv of
         Indirect x   -> Indirect x
-        TyLambda x v -> TyLambda x (reflectValue v)
+        TyLambda x e -> TyLambda x (reflect e)
         Lambda x e   -> Lambda x (reflect e)
         Data dc xs   -> Data dc xs
         Literal l    -> Literal l)
-
-    reflectValue :: Identity Value -> (forall ann. Symantics ann => ann (ValueF ann))
-    reflectValue = value . reflectValue' . unI
 
 
 {-

@@ -449,6 +449,8 @@ Library
         Supercompile.Core.Syntax
         Supercompile.Core.Tag
         Supercompile.Core.FreeVars
+        Supercompile.Evaluator.Deeds
+        Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars
         Supercompile.Evaluator.Syntax
         Supercompile.StaticFlags

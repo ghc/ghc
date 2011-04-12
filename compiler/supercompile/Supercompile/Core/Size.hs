@@ -50,7 +50,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
     value = rec value'
     value' (_co, rv) = 1 + case rv of
         Indirect _   -> 0
-        TyLambda _ v -> value v
+        TyLambda _ e -> term e
         Lambda _ e   -> term e
         Data _ _     -> 0
         Literal _    -> 0
@@ -75,7 +75,7 @@ sizedTerm e = Sized (sizedTermSize' e) e
 
 instance Symantics (O Sized FVed) where
     var = sizedFVedTerm . Var
-    value = sizedFVedValue
+    value = fmap Value . sizedFVedValue
     tyApp e = sizedFVedTerm . TyApp e
     app e = sizedFVedTerm . App e
     primOp pop = sizedFVedTerm . PrimOp pop

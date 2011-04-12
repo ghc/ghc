@@ -36,13 +36,11 @@ mkTagger rec = term
                 idss' = listSplitUniqSupply ids0'
         Cast e co        -> Cast (term ids e) co
 
-    value ids = rec i (value' ids')
-      where (i, ids') = takeUniqFromSupply ids
     value' ids (co, rv) = (co, rvalue' ids rv)
 
     rvalue' ids rv = case rv of
         Indirect x   -> Indirect x
-        TyLambda x v -> TyLambda x (value ids v)
+        TyLambda x e -> TyLambda x (term ids e)
         Lambda x e   -> Lambda x (term ids e)
         Data dc xs   -> Data dc xs
         Literal l    -> Literal l
@@ -81,7 +79,7 @@ mkDetag rec = (term, alternatives, value, value')
     value' (mb_co, rv) = (mb_co, rvalue' rv)
     
     rvalue' (Indirect x)   = Indirect x
-    rvalue' (TyLambda x v) = TyLambda x (value v)
+    rvalue' (TyLambda x e) = TyLambda x (term e)
     rvalue' (Lambda x e)   = Lambda x (term e)
     rvalue' (Data dc xs)   = Data dc xs
     rvalue' (Literal l)    = Literal l
