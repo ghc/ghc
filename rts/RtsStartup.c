@@ -16,6 +16,7 @@
 #include "HsFFI.h"
 
 #include "sm/Storage.h"
+#include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Schedule.h"   /* initScheduler */
@@ -129,8 +130,7 @@ hs_init(int *argc, char **argv[])
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc != NULL && argv != NULL) {
 	setFullProgArgv(*argc,*argv);
-	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
-	setProgArgv(*argc,*argv);
+        setupRtsFlags(argc, *argv);
     }
 
     /* Initialise the stats department, phase 1 */
