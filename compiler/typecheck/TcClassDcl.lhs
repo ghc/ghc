@@ -361,42 +361,20 @@ gives rise to the instance declarations
 	  op Unit      = ...
 
 \begin{code}
-mkGenericDefMethBind :: Class -> [Type] -> Id -> TcM (LHsBind Name)
-mkGenericDefMethBind clas inst_tys sel_id
+mkGenericDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name)
+mkGenericDefMethBind clas inst_tys sel_id dm_name
   = 	-- A generic default method
-    	-- If the method is defined generically, we can only do the job if the
-	-- instance declaration is for a single-parameter type class with
-	-- a type constructor applied to type arguments in the instance decl
-	-- 	(checkTc, so False provokes the error)
-    do	{ checkTc (isJust maybe_tycon)
-	 	  (badGenericInstance sel_id (notSimple inst_tys))
-	; checkTc (tyConHasGenerics tycon)
-	   	  (badGenericInstance sel_id (notGeneric tycon))
-
-	; dflags <- getDOpts
+    	-- If the method is defined generically, we only have to call the
+        -- dm_name.
+    do	{ dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
 		   (vcat [ppr clas <+> ppr inst_tys,
 			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
-		-- Rename it before returning it
-	; (rn_rhs, _) <- rnLExpr rhs
         ; return (noLoc $ mkFunBind (noLoc (idName sel_id))
-                                    [mkSimpleMatch [] rn_rhs]) }
+                                    [mkSimpleMatch [] rhs]) }
   where
-    rhs = mkGenericRhs sel_id clas_tyvar tycon
-
-	  -- The tycon is only used in the generic case, and in that
-	  -- case we require that the instance decl is for a single-parameter
-	  -- type class with type variable arguments:
-	  --	instance (...) => C (T a b)
-    clas_tyvar  = ASSERT (not (null (classTyVars clas))) head (classTyVars clas)
-    Just tycon	= maybe_tycon
-    maybe_tycon = case inst_tys of 
-			[ty] -> case tcSplitTyConApp_maybe ty of
-				  Just (tycon, arg_tys) | all tcIsTyVarTy arg_tys -> Just tycon
-				  _    						  -> Nothing
-			_ -> Nothing
-
+    rhs = nlHsVar dm_name
 
 ---------------------------
 getGenericInstances :: [LTyClDecl Name] -> TcM [InstInfo Name] 

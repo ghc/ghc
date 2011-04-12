@@ -924,8 +924,9 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     ----------------------
     tc_default :: Id -> DefMeth -> TcM (TcId, LHsBind Id)
 
-    -- JPM: This is probably not that simple...
-    tc_default sel_id (GenDefMeth dm_name) = tc_default sel_id (DefMeth dm_name)
+    tc_default sel_id (GenDefMeth dm_name)
+      = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
+           ; tc_body sel_id False {- Not generated code? -} meth_bind }
 {-
     tc_default sel_id GenDefMeth    -- Derivable type classes stuff
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id
