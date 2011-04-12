@@ -1,5 +1,6 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -XNoGenerics        #-}
 
 module GHC.Unit where
 

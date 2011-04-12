@@ -15,12 +15,13 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -XNoGenerics        #-}
 
 module GHC.Types (Bool(..), Char(..), Int(..), Float(..), Double(..), IO(..)) where
 
 import GHC.Prim
 -- We need Inl etc behind the scenes for the type definitions
-import GHC.Generics ()
+import GHC.Generics () -- JPM: Do we really need this?
 
 infixr 5 :
 

@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# OPTIONS_GHC -XNoGenerics        #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Tuple
