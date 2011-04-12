@@ -10,10 +10,10 @@
 #
 # -----------------------------------------------------------------------------
 
-utils/hpc_dist_MODULES = Main HpcCombine HpcDraft HpcFlags HpcLexer \
+utils/hpc_dist-install_MODULES = Main HpcCombine HpcDraft HpcFlags HpcLexer \
 			 HpcMarkup HpcOverlay HpcParser HpcReport \
 			 HpcShowTix HpcUtils
-utils/hpc_dist_HC_OPTS = -cpp -package hpc
-utils/hpc_dist_INSTALL = YES
-utils/hpc_dist_PROG    = hpc$(exeext)
-$(eval $(call build-prog,utils/hpc,dist,1))
+utils/hpc_dist-install_HC_OPTS = -cpp -package hpc
+utils/hpc_dist-install_INSTALL = YES
+utils/hpc_dist-install_PROG    = hpc$(exeext)
+$(eval $(call build-prog,utils/hpc,dist-install,1))
