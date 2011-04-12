@@ -212,6 +212,112 @@ stg_unsafeThawArrayzh
   }
 }
 
+#define COPY_CARDS(src_start, src_cards_start, dst_start, dst_cards_start, n, copy) \
+  if (src_start & mutArrCardMask == dst_start & mutArrCardMask) { \
+    foreign "C" copy(dst_cards_start + mutArrPtrCardUp(dst_start), src_cards_start + mutArrPtrCardUp(src_start), mutArrPtrCardDown(n)); \
+    \
+    I8[dst_cards_start + mutArrPtrCardDown(dst_start)] = I8[dst_cards_start + mutArrPtrCardDown(dst_start)]     | I8[src_cards_start + mutArrPtrCardDown(src_start)]; \
+    I8[dst_cards_start + mutArrPtrCardUp(n)]           = I8[dst_cards_start + mutArrPtrCardUp(dst_start + n)] | I8[src_cards_start + mutArrPtrCardUp(src_start + n)]; \
+  } else { \
+    foreign "C" memset(dst_cards_start "ptr", 1, mutArrPtrCardDown(n)); \
+  }
+
+stg_copyArrayzh
+{
+  W_ bytes, n, src, dst, src_start, dst_start, src_start_ptr, dst_start_ptr;
+  W_ src_cards_start, dst_cards_start;
+
+  src = R1;
+  src_start = R2;
+  dst = R3;
+  dst_start = R4;
+  n = R5;
+  MAYBE_GC(R1_PTR & R3_PTR, stg_copyArrayzh);
+
+  bytes = WDS(n);
+
+  src_start_ptr = src + SIZEOF_StgMutArrPtrs + WDS(src_start);
+  dst_start_ptr = dst + SIZEOF_StgMutArrPtrs + WDS(dst_start);
+
+  // Copy data (we assume the arrays aren't overlapping since they're of different types)
+  foreign "C" memcpy(dst_start_ptr "ptr", src_start_ptr "ptr", bytes);
+
+  // The base address of both source and destination card tables
+  src_cards_start = src + SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_ptrs(src));
+  dst_cards_start = dst + SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_ptrs(dst));
+
+  COPY_CARDS(src_start, src_cards_start, dst_start, dst_cards_start, n, memcpy);
+
+  jump %ENTRY_CODE(Sp(0));
+}
+
+stg_copyMutableArrayzh
+{
+  W_ bytes, n, src, dst, src_start, dst_start, src_start_ptr, dst_start_ptr;
+  W_ src_cards_start, dst_cards_start;
+
+  src = R1;
+  src_start = R2;
+  dst = R3;
+  dst_start = R4;
+  n = R5;
+  MAYBE_GC(R1_PTR & R3_PTR, stg_copyMutableArrayzh);
+
+  bytes = WDS(n);
+
+  src_start_ptr = src + SIZEOF_StgMutArrPtrs + WDS(src_start);
+  dst_start_ptr = dst + SIZEOF_StgMutArrPtrs + WDS(dst_start);
+
+  src_cards_start = src + SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_ptrs(src));
+  dst_cards_start = dst + SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_ptrs(dst));
+
+  // The only time the memory might overlap is when the two arrays we were provided are the same array!
+  if (src == dst) {
+    foreign "C" memmove(dst_start_ptr "ptr", src_start_ptr "ptr", bytes);
+    COPY_CARDS(src_start, src_cards_start, dst_start, dst_cards_start, n, memmove);
+  } else {
+    foreign "C" memcpy(dst_start_ptr "ptr", src_start_ptr "ptr", bytes);
+    COPY_CARDS(src_start, src_cards_start, dst_start, dst_cards_start, n, memcpy);
+  }
+
+  jump %ENTRY_CODE(Sp(0));
+}
+
+#define ARRAY_CLONE(name, type) \
+  name \
+  { \
+    W_ src, src_off, words, n, init, arr, src_p, dst_p, size; \
+    \
+    src = R1; \
+    src_off = R2; \
+    n = R3; \
+    \
+    MAYBE_GC(R1_PTR, name); \
+    \
+    size = n + mutArrPtrsCardWords(n); \
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size; \
+    ("ptr" arr) = foreign "C" allocate(MyCapability() "ptr", words) [R2]; \
+    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0); \
+    \
+    SET_HDR(arr, type, W_[CCCS]); \
+    StgMutArrPtrs_ptrs(arr) = n; \
+    StgMutArrPtrs_size(arr) = size; \
+    \
+    dst_p = arr + SIZEOF_StgMutArrPtrs; \
+    src_p = src + SIZEOF_StgMutArrPtrs + WDS(src_off); \
+    \
+    foreign "C" memcpy(dst_p "ptr", src_p "ptr", WDS(n)); \
+    \
+    foreign "C" memset(dst_p + WDS(n), 0, WDS(mutArrPtrsCardWords(n))); \
+    RET_P(arr); \
+  }
+
+ARRAY_CLONE(stg_cloneArrayzh, stg_MUT_ARR_PTRS_FROZEN0_info)
+ARRAY_CLONE(stg_cloneMutableArrayzh, stg_MUT_ARR_PTRS_DIRTY_info)
+ARRAY_CLONE(stg_freezzeArrayzh, stg_MUT_ARR_PTRS_FROZEN0_info)
+ARRAY_CLONE(stg_thawArrayzh, stg_MUT_ARR_PTRS_DIRTY_info)
+
+
 /* -----------------------------------------------------------------------------
    MutVar primitives
    -------------------------------------------------------------------------- */

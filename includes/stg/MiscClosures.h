@@ -380,6 +380,12 @@ RTS_FUN_DECL(stg_newByteArrayzh);
 RTS_FUN_DECL(stg_newPinnedByteArrayzh);
 RTS_FUN_DECL(stg_newAlignedPinnedByteArrayzh);
 RTS_FUN_DECL(stg_newArrayzh);
+RTS_FUN_DECL(stg_copyArrayzh);
+RTS_FUN_DECL(stg_copyMutableArrayzh);
+RTS_FUN_DECL(stg_cloneArrayzh);
+RTS_FUN_DECL(stg_cloneMutableArrayzh);
+RTS_FUN_DECL(stg_freezzeArrayzh);
+RTS_FUN_DECL(stg_thawArrayzh);
 
 RTS_FUN_DECL(stg_newMutVarzh);
 RTS_FUN_DECL(stg_atomicModifyMutVarzh);

@@ -626,6 +626,55 @@ primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop  CopyArrayOp "copyArray#" GenPrimOp
+  Array# a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  {Copy a range of the Array# to the specified region in the MutableArray#.
+   Both arrays must fully contain the specified ranges, but this is not checked.
+   The two arrays must not be the same array in different states, but this is not checked either.}
+  with
+  out_of_line = True
+  has_side_effects = True
+
+primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
+  MutableArray# s a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
+  {Copy a range of the first MutableArray# to the specified region in the second MutableArray#.
+   Both arrays must fully contain the specified ranges, but this is not checked.}
+  with
+  out_of_line = True
+  has_side_effects = True
+
+primop  CloneArrayOp "cloneArray#" GenPrimOp
+  Array# a -> Int# -> Int# -> Array# a
+  {Return a newly allocated Array# with the specified subrange of the provided Array#. 
+   The provided Array# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  with
+  out_of_line = True
+  has_side_effects = True
+
+primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
+  MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
+  {Return a newly allocated Array# with the specified subrange of the provided Array#.
+   The provided MutableArray# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  with
+  out_of_line = True
+  has_side_effects = True
+
+primop  FreezeArrayOp "freezeArray#" GenPrimOp
+  MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, Array# a #)
+  {Return a newly allocated Array# with the specified subrange of the provided MutableArray#.
+   The provided MutableArray# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  with
+  out_of_line = True
+  has_side_effects = True
+
+primop  ThawArrayOp "thawArray#" GenPrimOp
+  Array# a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
+  {Return a newly allocated Array# with the specified subrange of the provided MutableArray#.
+   The provided Array# should contain the full subrange specified by the two Int#s, but this is not checked.}
+  with
+  out_of_line = True
+  has_side_effects = True
+
 ------------------------------------------------------------------------
 section "Byte Arrays"
 	{Operations on {\tt ByteArray\#}. A {\tt ByteArray\#} is a just a region of

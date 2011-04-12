@@ -464,8 +464,10 @@
 #define StgFunInfoExtra_bitmap(i)     StgFunInfoExtraFwd_bitmap(i)
 #endif
 
-#define mutArrPtrsCardWords(n) \
-    ROUNDUP_BYTES_TO_WDS(((n) + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrCardMask ((1 << MUT_ARR_PTRS_CARD_BITS) - 1)
+#define mutArrPtrCardDown(i) ((i) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrPtrCardUp(i)   (((i) + mutArrCardMask) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrPtrsCardWords(n) ROUNDUP_BYTES_TO_WDS(mutArrPtrCardUp(n))
 
 #if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
