@@ -61,14 +61,14 @@ addNode k node graph
  	-- add back conflict edges from other nodes to this one
  	map_conflict	
 		= foldUniqSet 
-			(adjustUFM (\n -> n { nodeConflicts = addOneToUniqSet (nodeConflicts n) k}))
+			(adjustUFM_C (\n -> n { nodeConflicts = addOneToUniqSet (nodeConflicts n) k}))
 			(graphMap graph)
 			(nodeConflicts node)
 			
 	-- add back coalesce edges from other nodes to this one
 	map_coalesce
 		= foldUniqSet
-			(adjustUFM (\n -> n { nodeCoalesce = addOneToUniqSet (nodeCoalesce n) k}))
+			(adjustUFM_C (\n -> n { nodeCoalesce = addOneToUniqSet (nodeCoalesce n) k}))
 			map_conflict
 			(nodeCoalesce node)
 	
@@ -434,7 +434,7 @@ freezeNode k
 		else node 	-- panic "GraphOps.freezeNode: edge to freeze wasn't in the coalesce set"
 				-- If the edge isn't actually in the coelesce set then just ignore it.
 
-	fm2	= foldUniqSet (adjustUFM (freezeEdge k)) fm1
+	fm2	= foldUniqSet (adjustUFM_C (freezeEdge k)) fm1
 	   		$ nodeCoalesce node
 
     in	fm2
@@ -604,7 +604,7 @@ setColor
 	
 setColor u color
  	= graphMapModify
- 	$ adjustUFM
+ 	$ adjustUFM_C
 		(\n -> n { nodeColor = Just color })
 		u 
 	
@@ -621,13 +621,14 @@ adjustWithDefaultUFM f def k map
 		map
 		k def
 		
-{-# INLINE adjustUFM #-}
-adjustUFM 
+-- Argument order different from UniqFM's adjustUFM
+{-# INLINE adjustUFM_C #-}
+adjustUFM_C 
 	:: Uniquable k
 	=> (a -> a)
 	-> k -> UniqFM a -> UniqFM a
 
-adjustUFM f k map
+adjustUFM_C f k map
  = case lookupUFM map k of
  	Nothing	-> map
 	Just a	-> addToUFM map k (f a)
