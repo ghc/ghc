@@ -42,8 +42,8 @@ data CmmExpr
   | CmmRegOff CmmReg Int	
 	-- CmmRegOff reg i
 	--        ** is shorthand only, meaning **
-	-- CmmMachOp (MO_S_Add rep (CmmReg reg) (CmmLit (CmmInt i rep)))
-	--	where rep = cmmRegType reg
+	-- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
+	--	where rep = typeWidth (cmmRegType reg)
 
 instance Eq CmmExpr where	-- Equality ignores the types
   CmmLit l1    	    == CmmLit l2    	 = l1==l2
@@ -124,6 +124,8 @@ cmmExprType (CmmReg reg)      	= cmmRegType reg
 cmmExprType (CmmMachOp op args) = machOpResultType op (map cmmExprType args)
 cmmExprType (CmmRegOff reg _)   = cmmRegType reg
 cmmExprType (CmmStackSlot _ _)  = bWord -- an address
+-- Careful though: what is stored at the stack slot may be bigger than
+-- an address
 
 cmmLitType :: CmmLit -> CmmType
 cmmLitType (CmmInt _ width)     = cmmBits  width

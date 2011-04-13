@@ -21,9 +21,7 @@ import Data.IORef
 import Control.Monad
 import StaticFlags (opt_Fuel)
 import UniqSupply
-#ifdef DEBUG
 import Panic
-#endif
 
 import Compiler.Hoopl
 import Compiler.Hoopl.GHC (getFuel, setFuel)
@@ -53,7 +51,6 @@ anyFuelLeft :: OptimizationFuel -> Bool
 oneLessFuel :: OptimizationFuel -> OptimizationFuel
 unlimitedFuel :: OptimizationFuel
 
-#ifdef DEBUG
 newtype OptimizationFuel = OptimizationFuel Int
   deriving Show
 
@@ -63,17 +60,6 @@ amountOfFuel (OptimizationFuel f) = f
 anyFuelLeft (OptimizationFuel f) = f > 0
 oneLessFuel (OptimizationFuel f) = ASSERT (f > 0) (OptimizationFuel (f - 1))
 unlimitedFuel = OptimizationFuel infiniteFuel
-#else
--- type OptimizationFuel = State# () -- would like this, but it won't work
-data OptimizationFuel = OptimizationFuel
-  deriving Show
-tankFilledTo _ = OptimizationFuel
-amountOfFuel _ = maxBound
-
-anyFuelLeft _ = True
-oneLessFuel _ = OptimizationFuel
-unlimitedFuel = OptimizationFuel
-#endif
 
 data FuelState = FuelState { fs_fuel :: OptimizationFuel, fs_lastpass :: String }
 newtype FuelUniqSM a = FUSM { unFUSM :: FuelState -> UniqSM (a, FuelState) }

@@ -643,8 +643,12 @@ GarbageCollect (rtsBool force_major_gc,
   // zero the scavenged static object list 
   if (major_gc) {
       nat i;
-      for (i = 0; i < n_gc_threads; i++) {
-          zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+      if (n_gc_threads == 1) {
+          zero_static_object_list(gct->scavenged_static_objects);
+      } else {
+          for (i = 0; i < n_gc_threads; i++) {
+              zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+          }
       }
   }
 
