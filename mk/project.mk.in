@@ -139,3 +139,7 @@ endif
 # This distinguishes "msys" and "cygwin", which are not
 # not distinguished by HOST_OS_CPP
 OSTYPE=@OSTYPE@
+
+# In case of Solaris OS, does it provide broken shared libs
+# linker or not?
+SOLARIS_BROKEN_SHLD=@SOLARIS_BROKEN_SHLD@

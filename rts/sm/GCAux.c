@@ -17,7 +17,7 @@
 #include "Capability.h"
 #include "Trace.h"
 #include "Schedule.h"
-// DO NOT include "GCThread.h", we don't want the register variable
+// DO NOT include "GCTDecl.h", we don't want the register variable
 
 /* -----------------------------------------------------------------------------
    isAlive determines whether the given closure is still alive (after
@@ -79,7 +79,7 @@ isAlive(StgClosure *p)
 
     if (IS_FORWARDING_PTR(info)) {
         // alive! 
-        return (StgClosure*)UN_FORWARDING_PTR(info);
+        return TAG_CLOSURE(tag,(StgClosure*)UN_FORWARDING_PTR(info));
     }
 
     info = INFO_PTR_TO_STRUCT(info);

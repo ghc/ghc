@@ -30,6 +30,7 @@ import OldCmm		( RawCmm )
 import HscTypes
 import DynFlags
 import Config
+import SysTools
 
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
@@ -56,7 +57,7 @@ codeOutput :: DynFlags
 	   -> ForeignStubs
 	   -> [PackageId]
 	   -> [RawCmm]			-- Compiled C--
-	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
+           -> IO (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-})
 
 codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
   = 
@@ -212,18 +213,21 @@ outputJava dflags filenm mod tycons core_binds
 \begin{code}
 outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
 		   -> IO (Bool, 	-- Header file created
-			  Bool)		-- C file created
+                          Maybe FilePath) -- C file created
 outputForeignStubs dflags mod location stubs
- = case stubs of
-   NoStubs -> do
+ = do
+   let stub_h = mkStubPaths dflags (moduleName mod) location
+   stub_c <- newTempName dflags "c"
+
+   case stubs of
+     NoStubs -> do
 	-- When compiling External Core files, may need to use stub
 	-- files from a previous compilation
-	stub_c_exists <- doesFileExist stub_c
-	stub_h_exists <- doesFileExist stub_h
-	return (stub_h_exists, stub_c_exists)
+        stub_h_exists <- doesFileExist stub_h
+        return (stub_h_exists, Nothing)
 
-   ForeignStubs h_code c_code -> do
-	let
+     ForeignStubs h_code c_code -> do
+        let
 	    stub_c_output_d = pprCode CStyle c_code
 	    stub_c_output_w = showSDoc stub_c_output_d
 	
@@ -232,7 +236,7 @@ outputForeignStubs dflags mod location stubs
 	    stub_h_output_w = showSDoc stub_h_output_d
 	-- in
 
-	createDirectoryHierarchy (takeDirectory stub_c)
+        createDirectoryHierarchy (takeDirectory stub_h)
 
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
@@ -266,10 +270,10 @@ outputForeignStubs dflags mod location stubs
 	   -- isn't really HC code, so we need to define IN_STG_CODE==0 to
 	   -- avoid the register variables etc. being enabled.
 
-        return (stub_h_file_exists, stub_c_file_exists)
-  where
-   (stub_c, stub_h, _) = mkStubPaths dflags (moduleName mod) location
-
+        return (stub_h_file_exists, if stub_c_file_exists
+                                       then Just stub_c
+                                       else Nothing )
+ where
    cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
    cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
 

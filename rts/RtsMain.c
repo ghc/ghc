@@ -28,13 +28,10 @@
 # include <windows.h>
 #endif
 
-extern void __stginit_ZCMain(void);
-
 /* Annoying global vars for passing parameters to real_main() below
  * This is to get around problem with Windows SEH, see hs_main(). */
 static int progargc;
 static char **progargv;
-static void (*progmain_init)(void);   /* This will be __stginit_ZCMain */
 static StgClosure *progmain_closure;  /* This will be ZCMain_main_closure */
 
 /* Hack: we assume that we're building a batch-mode system unless 
@@ -47,7 +44,7 @@ static void real_main(void)
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
-    startupHaskell(progargc,progargv,progmain_init);
+    startupHaskell(progargc,progargv,NULL);
 
     /* kick off the computation by creating the main thread with a pointer
        to mainIO_closure representing the computation of the overall program;
@@ -95,18 +92,17 @@ static void real_main(void)
  * This gets called from a tiny main function which gets linked into each
  * compiled Haskell program that uses a Haskell main function.
  *
- * We expect the caller to pass __stginit_ZCMain for main_init and
- * ZCMain_main_closure for main_closure. The reason we cannot refer to
- * these symbols directly is because we're inside the rts and we do not know
- * for sure that we'll be using a Haskell main function.
+ * We expect the caller to pass ZCMain_main_closure for
+ * main_closure. The reason we cannot refer to this symbol directly
+ * is because we're inside the rts and we do not know for sure that
+ * we'll be using a Haskell main function.
  */
-int hs_main(int argc, char *argv[], void (*main_init)(void), StgClosure *main_closure)
+int hs_main(int argc, char *argv[], StgClosure *main_closure)
 {
     /* We do this dance with argc and argv as otherwise the SEH exception
        stuff (the BEGIN/END CATCH below) on Windows gets confused */
     progargc = argc;
     progargv = argv;
-    progmain_init    = main_init;
     progmain_closure = main_closure;
 
 #if defined(mingw32_HOST_OS)

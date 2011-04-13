@@ -9,8 +9,12 @@
 #ifndef RTSOPTS_H
 #define RTSOPTS_H
 
-typedef enum {rtsOptsNone, rtsOptsSafeOnly, rtsOptsAll} rtsOptsEnabledEnum;
+typedef enum {
+    RtsOptsNone,         // +RTS causes an error
+    RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
+    RtsOptsAll           // all RTS options allowed
+  } RtsOptsEnabledEnum;
 
-extern const rtsOptsEnabledEnum rtsOptsEnabled;
+extern const RtsOptsEnabledEnum rtsOptsEnabled;
 
 #endif /* RTSOPTS_H */

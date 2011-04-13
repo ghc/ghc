@@ -219,13 +219,6 @@ extern RTS_FLAGS RtsFlags[];
 extern RTS_FLAGS RtsFlags;
 #endif
 
-/* Routines that operate-on/to-do-with RTS flags: */
-
-void initRtsFlagsDefaults(void);
-void setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[]);
-void setProgName(char *argv[]);
-
-
 /*
  * The printf formats are here, so we are less likely to make
  * overly-long filenames (with disastrous results).  No more than 128

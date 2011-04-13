@@ -1,4 +1,5 @@
 {-# OPTIONS -fno-cse #-}
+{-# LANGUAGE NamedFieldPuns #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -----------------------------------------------------------------------------
@@ -62,6 +63,7 @@ import Control.Monad
 import Data.List        ( isSuffixOf )
 import Data.Maybe
 import System.Environment
+import Data.Char
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -78,7 +80,7 @@ preprocess :: HscEnv
 preprocess hsc_env (filename, mb_phase) =
   ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename)
   runPipeline anyHsc hsc_env (filename, mb_phase)
-        Nothing Temporary Nothing{-no ModLocation-}
+        Nothing Temporary Nothing{-no ModLocation-} Nothing{-no stub-}
 
 -- ---------------------------------------------------------------------------
 
@@ -141,7 +143,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
 
    -- Figure out what lang we're generating
-   let hsc_lang = hscMaybeAdjustTarget dflags StopLn src_flavour (hscTarget dflags)
+   let hsc_lang = hscTarget dflags
    -- ... and what the next phase should be
    let next_phase = hscNextPhase dflags src_flavour hsc_lang
    -- ... and what file to generate the output into
@@ -158,12 +160,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
        source_unchanged = isJust maybe_old_linkable && not force_recomp
        object_filename = ml_obj_file location
 
-   let getStubLinkable False = return []
-       getStubLinkable True
-           = do stub_o <- compileStub hsc_env' this_mod location
-                return [ DotO stub_o ]
-
-       handleBatch HscNoRecomp
+   let handleBatch HscNoRecomp
            = ASSERT (isJust maybe_old_linkable)
              return maybe_old_linkable
 
@@ -175,22 +172,27 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
                     return maybe_old_linkable
 
            | otherwise
-               = do stub_unlinked <- getStubLinkable hasStub
-                    (hs_unlinked, unlinked_time) <-
+               = do (hs_unlinked, unlinked_time) <-
                         case hsc_lang of
-                          HscNothing
-                            -> return ([], ms_hs_date summary)
+                          HscNothing ->
+                            return ([], ms_hs_date summary)
                           -- We're in --make mode: finish the compilation pipeline.
-                          _other
-                            -> do _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
+                          _other -> do
+                            maybe_stub_o <- case hasStub of
+                               Nothing -> return Nothing
+                               Just stub_c -> do
+                                 stub_o <- compileStub hsc_env' stub_c
+                                 return (Just stub_o)
+                            _ <- runPipeline StopLn hsc_env' (output_fn,Nothing)
                                               (Just basename)
                                               Persistent
                                               (Just location)
+                                              maybe_stub_o
                                   -- The object filename comes from the ModLocation
-                                  o_time <- getModificationTime object_filename
-                                  return ([DotO object_filename], o_time)
-                    let linkable = LM unlinked_time this_mod
-                                   (hs_unlinked ++ stub_unlinked)
+                            o_time <- getModificationTime object_filename
+                            return ([DotO object_filename], o_time)
+                    
+                    let linkable = LM unlinked_time this_mod hs_unlinked
                     return (Just linkable)
 
        handleInterpreted HscNoRecomp
@@ -200,7 +202,12 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
            = ASSERT (isHsBoot src_flavour)
              return maybe_old_linkable
        handleInterpreted (HscRecomp hasStub (Just (comp_bc, modBreaks)))
-           = do stub_unlinked <- getStubLinkable hasStub
+           = do stub_o <- case hasStub of
+                            Nothing -> return []
+                            Just stub_c -> do
+                              stub_o <- compileStub hsc_env' stub_c
+                              return [DotO stub_o]
+
                 let hs_unlinked = [BCOs comp_bc modBreaks]
                     unlinked_time = ms_hs_date summary
                   -- Why do we use the timestamp of the source file here,
@@ -210,7 +217,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
                   -- if the source is modified, then the linkable will
                   -- be out of date.
                 let linkable = LM unlinked_time this_mod
-                               (hs_unlinked ++ stub_unlinked)
+                               (hs_unlinked ++ stub_o)
                 return (Just linkable)
 
    let -- runCompiler :: Compiler result -> (result -> Maybe Linkable)
@@ -235,30 +242,16 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
 -- The _stub.c file is derived from the haskell source file, possibly taking
 -- into account the -stubdir option.
 --
--- Consequently, we derive the _stub.o filename from the haskell object
--- filename.
---
--- This isn't necessarily the same as the object filename we
--- would get if we just compiled the _stub.c file using the pipeline.
--- For example:
---
---    ghc src/A.hs -odir obj
---
--- results in obj/A.o, and src/A_stub.c.  If we compile src/A_stub.c with
--- -odir obj, we would get obj/src/A_stub.o, which is wrong; we want
--- obj/A_stub.o.
+-- The object file created by compiling the _stub.c file is put into a
+-- temporary file, which will be later combined with the main .o file
+-- (see the MergeStubs phase).
 
-compileStub :: HscEnv -> Module -> ModLocation -> IO FilePath
-compileStub hsc_env mod location = do
-        -- compile the _stub.c file w/ gcc
-        let (stub_c,_,stub_o) = mkStubPaths (hsc_dflags hsc_env)
-                                   (moduleName mod) location
-
-        _ <- runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
-                (SpecificFile stub_o) Nothing{-no ModLocation-}
+compileStub :: HscEnv -> FilePath -> IO FilePath
+compileStub hsc_env stub_c = do
+        (_, stub_o) <- runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
+                                   Temporary Nothing{-no ModLocation-} Nothing
 
         return stub_o
-
 
 -- ---------------------------------------------------------------------------
 -- Link
@@ -391,7 +384,30 @@ linkingNeeded dflags linkables pkg_deps = do
         let (lib_errs,lib_times) = splitEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
            then return True
-           else return False
+           else checkLinkInfo dflags pkg_deps exe_file
+
+-- Returns 'False' if it was, and we can avoid linking, because the
+-- previous binary was linked with "the same options".
+checkLinkInfo :: DynFlags -> [PackageId] -> FilePath -> IO Bool
+checkLinkInfo dflags pkg_deps exe_file
+ | isWindowsTarget || isDarwinTarget
+ -- ToDo: Windows and OS X do not use the ELF binary format, so
+ -- readelf does not work there.  We need to find another way to do
+ -- this.
+ = return False -- conservatively we should return True, but not
+                -- linking in this case was the behaviour for a long
+                -- time so we leave it as-is.
+ | otherwise
+ = do
+   link_info <- getLinkInfo dflags pkg_deps
+   debugTraceMsg dflags 3 $ text ("Link info: " ++ link_info)
+   m_exe_link_info <- readElfSection dflags ghcLinkInfoSectionName exe_file
+   debugTraceMsg dflags 3 $ text ("Exe link info: " ++ show m_exe_link_info)
+   return (Just link_info /= m_exe_link_info)
+
+ghcLinkInfoSectionName :: String
+ghcLinkInfoSectionName = ".debug-ghc-link-info"
+   -- if we use the ".debug" prefix, then strip will strip it by default
 
 findHSLib :: [String] -> String -> IO (Maybe FilePath)
 findHSLib dirs lib = do
@@ -436,7 +452,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
 
    ( _, out_file) <- runPipeline stop_phase' hsc_env
                             (src, mb_phase) Nothing output
-                            Nothing{-no ModLocation-}
+                            Nothing{-no ModLocation-} Nothing
    return out_file
 
 
@@ -482,9 +498,11 @@ runPipeline
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
+  -> Maybe FilePath             -- ^ stub object, if we have one
   -> IO (DynFlags, FilePath)     -- ^ (final flags, output filename)
 
-runPipeline stop_phase hsc_env0 (input_fn, mb_phase) mb_basename output maybe_loc
+runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
+            mb_basename output maybe_loc maybe_stub_o
   = do
   let dflags0 = hsc_dflags hsc_env0
       (input_basename, suffix) = splitExtension input_fn
@@ -516,9 +534,17 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase) mb_basename output maybe_lo
   let get_output_fn = getOutputFilename stop_phase output basename
 
   -- Execute the pipeline...
-  (dflags', output_fn, maybe_loc) <-
-        pipeLoop hsc_env start_phase stop_phase input_fn
-                 basename suffix' get_output_fn maybe_loc
+  let env   = PipeEnv{ stop_phase,
+                       src_basename = basename,
+                       src_suffix = suffix',
+                       output_spec = output }
+
+      state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
+
+  (state', output_fn) <- unP (pipeLoop start_phase input_fn) env state
+
+  let PipeState{ hsc_env=hsc_env', maybe_loc } = state'
+      dflags' = hsc_dflags hsc_env'
 
   -- Sometimes, a compilation phase doesn't actually generate any output
   -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
@@ -536,38 +562,102 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase) mb_basename output maybe_lo
               copyWithHeader dflags msg line_prag output_fn final_fn
            return (dflags', final_fn)
 
+-- -----------------------------------------------------------------------------
+-- The pipeline uses a monad to carry around various bits of information
 
+-- PipeEnv: invariant information passed down
+data PipeEnv = PipeEnv {
+       stop_phase   :: Phase,       -- ^ Stop just before this phase
+       src_basename :: String,      -- ^ basename of original input source
+       src_suffix   :: String,      -- ^ its extension
+       output_spec  :: PipelineOutput -- ^ says where to put the pipeline output
+  }
 
-pipeLoop :: HscEnv -> Phase -> Phase
-         -> FilePath  -> String -> Suffix
-         -> (DynFlags -> Phase -> Maybe ModLocation -> IO FilePath)
-         -> Maybe ModLocation
-         -> IO (DynFlags, FilePath, Maybe ModLocation)
+-- PipeState: information that might change during a pipeline run
+data PipeState = PipeState {
+       hsc_env   :: HscEnv,
+          -- ^ only the DynFlags change in the HscEnv.  The DynFlags change
+          -- at various points, for example when we read the OPTIONS_GHC
+          -- pragmas in the Cpp phase.
+       maybe_loc :: Maybe ModLocation,
+          -- ^ the ModLocation.  This is discovered during compilation,
+          -- in the Hsc phase where we read the module header.
+       maybe_stub_o :: Maybe FilePath
+          -- ^ the stub object.  This is set by the Hsc phase if a stub
+          -- object was created.  The stub object will be joined with
+          -- the main compilation object using "ld -r" at the end.
+  }
 
-pipeLoop hsc_env phase stop_phase
-         input_fn orig_basename orig_suff
-         orig_get_output_fn maybe_loc
+getPipeEnv :: CompPipeline PipeEnv
+getPipeEnv = P $ \env state -> return (state, env)
 
-  | phase `eqPhase` stop_phase            -- All done
-  = return (hsc_dflags hsc_env, input_fn, maybe_loc)
+getPipeState :: CompPipeline PipeState
+getPipeState = P $ \_env state -> return (state, state)
 
-  | not (phase `happensBefore` stop_phase)
+getDynFlags :: CompPipeline DynFlags
+getDynFlags = P $ \_env state -> return (state, hsc_dflags (hsc_env state))
+
+setDynFlags :: DynFlags -> CompPipeline ()
+setDynFlags dflags = P $ \_env state ->
+  return (state{hsc_env= (hsc_env state){ hsc_dflags = dflags }}, ())
+
+setModLocation :: ModLocation -> CompPipeline ()
+setModLocation loc = P $ \_env state ->
+  return (state{ maybe_loc = Just loc }, ())
+
+setStubO :: FilePath -> CompPipeline ()
+setStubO stub_o = P $ \_env state ->
+  return (state{ maybe_stub_o = Just stub_o }, ())
+
+newtype CompPipeline a = P { unP :: PipeEnv -> PipeState -> IO (PipeState, a) }
+
+instance Monad CompPipeline where
+  return a = P $ \_env state -> return (state, a)
+  P m >>= k = P $ \env state -> do (state',a) <- m env state
+                                   unP (k a) env state'
+
+io :: IO a -> CompPipeline a
+io m = P $ \_env state -> do a <- m; return (state, a)
+
+phaseOutputFilename :: Phase{-next phase-} -> CompPipeline FilePath
+phaseOutputFilename next_phase = do
+  PipeEnv{stop_phase, src_basename, output_spec} <- getPipeEnv
+  PipeState{maybe_loc, hsc_env} <- getPipeState
+  let dflags = hsc_dflags hsc_env
+  io $ getOutputFilename stop_phase output_spec
+                         src_basename dflags next_phase maybe_loc
+
+-- ---------------------------------------------------------------------------
+-- outer pipeline loop
+
+-- | pipeLoop runs phases until we reach the stop phase
+pipeLoop :: Phase -> FilePath -> CompPipeline FilePath
+pipeLoop phase input_fn = do
+  PipeEnv{stop_phase} <- getPipeEnv
+  PipeState{hsc_env}  <- getPipeState
+  case () of
+   _ | phase `eqPhase` stop_phase            -- All done
+     -> return input_fn
+
+     | not (phase `happensBefore` stop_phase)
         -- Something has gone wrong.  We'll try to cover all the cases when
         -- this could happen, so if we reach here it is a panic.
         -- eg. it might happen if the -C flag is used on a source file that
         -- has {-# OPTIONS -fasm #-}.
-  = panic ("pipeLoop: at phase " ++ show phase ++
+     -> panic ("pipeLoop: at phase " ++ show phase ++
            " but I wanted to stop at phase " ++ show stop_phase)
 
-  | otherwise
-  = do debugTraceMsg (hsc_dflags hsc_env) 4
+     | otherwise
+     -> do io $ debugTraceMsg (hsc_dflags hsc_env) 4
                          (ptext (sLit "Running phase") <+> ppr phase)
-       (next_phase, dflags', maybe_loc, output_fn)
-          <- runPhase phase stop_phase hsc_env orig_basename
-                      orig_suff input_fn orig_get_output_fn maybe_loc
-       let hsc_env' = hsc_env {hsc_dflags = dflags'}
-       pipeLoop hsc_env' next_phase stop_phase output_fn
-                orig_basename orig_suff orig_get_output_fn maybe_loc
+           dflags <- getDynFlags
+           (next_phase, output_fn) <- runPhase phase input_fn dflags
+           pipeLoop next_phase output_fn
+
+-- -----------------------------------------------------------------------------
+-- In each phase, we need to know into what filename to generate the
+-- output.  All the logic about which filenames we generate output
+-- into is embodied in the following function.
 
 getOutputFilename
   :: Phase -> PipelineOutput -> String
@@ -585,21 +675,19 @@ getOutputFilename stop_phase output basename
                 odir       = objectDir dflags
                 osuf       = objectSuf dflags
                 keep_hc    = dopt Opt_KeepHcFiles dflags
-                keep_raw_s = dopt Opt_KeepRawSFiles dflags
                 keep_s     = dopt Opt_KeepSFiles dflags
                 keep_bc    = dopt Opt_KeepLlvmFiles dflags
 
-                myPhaseInputExt HCc    = hcsuf
-                myPhaseInputExt StopLn = osuf
-                myPhaseInputExt other  = phaseInputExt other
+                myPhaseInputExt HCc       = hcsuf
+                myPhaseInputExt MergeStub = osuf
+                myPhaseInputExt StopLn    = osuf
+                myPhaseInputExt other     = phaseInputExt other
 
                 is_last_phase = next_phase `eqPhase` stop_phase
 
                 -- sometimes, we keep output from intermediate stages
                 keep_this_output =
                      case next_phase of
-                             StopLn               -> True
-                             Mangle  | keep_raw_s -> True
                              As      | keep_s     -> True
                              LlvmOpt | keep_bc    -> True
                              HCc     | keep_hc    -> True
@@ -630,31 +718,23 @@ getOutputFilename stop_phase output basename
 -- of a source file can change the latter stages of the pipeline from
 -- taking the via-C route to using the native code generator.
 --
-runPhase :: Phase       -- ^ Do this phase first
-         -> Phase       -- ^ Stop just before this phase
-         -> HscEnv
-         -> String      -- ^ basename of original input source
-         -> String      -- ^ its extension
-         -> FilePath    -- ^ name of file which contains the input to this phase.
-         -> (DynFlags -> Phase -> Maybe ModLocation -> IO FilePath)
-                        -- ^ how to calculate the output filename
-         -> Maybe ModLocation           -- ^ the ModLocation, if we have one
-         -> IO (Phase,                   -- next phase
-                DynFlags,                -- new dynamic flags
-                Maybe ModLocation,       -- the ModLocation, if we have one
-                FilePath)                -- output filename
+runPhase :: Phase       -- ^ Run this phase
+         -> FilePath    -- ^ name of the input file
+         -> DynFlags    -- ^ for convenience, we pass the current dflags in
+         -> CompPipeline (Phase,               -- next phase to run
+                          FilePath)            -- output filename
 
         -- Invariant: the output filename always contains the output
         -- Interesting case: Hsc when there is no recompilation to do
         --                   Then the output filename is still a .o file
 
+
 -------------------------------------------------------------------------------
 -- Unlit phase
 
-runPhase (Unlit sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+runPhase (Unlit sf) input_fn dflags
   = do
-       let dflags = hsc_dflags hsc_env
-       output_fn <- get_output_fn dflags (Cpp sf) maybe_loc
+       output_fn <- phaseOutputFilename (Cpp sf)
 
        let unlit_flags = getOpts dflags opt_L
            flags = map SysTools.Option unlit_flags ++
@@ -668,56 +748,60 @@ runPhase (Unlit sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_l
                    , SysTools.FileOption "" output_fn
                    ]
 
-       SysTools.runUnlit dflags flags
+       io $ SysTools.runUnlit dflags flags
 
-       return (Cpp sf, dflags, maybe_loc, output_fn)
+       return (Cpp sf, output_fn)
 
 -------------------------------------------------------------------------------
 -- Cpp phase : (a) gets OPTIONS out of file
 --             (b) runs cpp if necessary
 
-runPhase (Cpp sf) _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
-  = do let dflags0 = hsc_dflags hsc_env
-       src_opts <- getOptionsFromFile dflags0 input_fn
+runPhase (Cpp sf) input_fn dflags0
+  = do
+       src_opts <- io $ getOptionsFromFile dflags0 input_fn
        (dflags1, unhandled_flags, warns)
-           <- parseDynamicNoPackageFlags dflags0 src_opts
-       checkProcessArgsResult unhandled_flags
+           <- io $ parseDynamicNoPackageFlags dflags0 src_opts
+       setDynFlags dflags1
+       io $ checkProcessArgsResult unhandled_flags
 
        if not (xopt Opt_Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
-           unless (dopt Opt_Pp dflags1) $ handleFlagWarnings dflags1 warns
+           unless (dopt Opt_Pp dflags1) $ io $ handleFlagWarnings dflags1 warns
 
            -- no need to preprocess CPP, just pass input file along
            -- to the next phase of the pipeline.
-           return (HsPp sf, dflags1, maybe_loc, input_fn)
+           return (HsPp sf, input_fn)
         else do
-            output_fn <- get_output_fn dflags1 (HsPp sf) maybe_loc
-            doCpp dflags1 True{-raw-} False{-no CC opts-} input_fn output_fn
+            output_fn <- phaseOutputFilename (HsPp sf)
+            io $ doCpp dflags1 True{-raw-} False{-no CC opts-} input_fn output_fn
             -- re-read the pragmas now that we've preprocessed the file
             -- See #2464,#3457
-            src_opts <- getOptionsFromFile dflags0 output_fn
+            src_opts <- io $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
-                <- parseDynamicNoPackageFlags dflags0 src_opts
-            unless (dopt Opt_Pp dflags2) $ handleFlagWarnings dflags2 warns
+                <- io $ parseDynamicNoPackageFlags dflags0 src_opts
+            unless (dopt Opt_Pp dflags2) $ io $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
-            checkProcessArgsResult unhandled_flags
+            io $ checkProcessArgsResult unhandled_flags
 
-            return (HsPp sf, dflags2, maybe_loc, output_fn)
+            setDynFlags dflags2
+
+            return (HsPp sf, output_fn)
 
 -------------------------------------------------------------------------------
 -- HsPp phase
 
-runPhase (HsPp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
-  = do let dflags = hsc_dflags hsc_env
+runPhase (HsPp sf) input_fn dflags
+  = do
        if not (dopt Opt_Pp dflags) then
            -- no need to preprocess, just pass input file along
            -- to the next phase of the pipeline.
-          return (Hsc sf, dflags, maybe_loc, input_fn)
+          return (Hsc sf, input_fn)
         else do
             let hspp_opts = getOpts dflags opt_F
-            let orig_fn = basename <.> suff
-            output_fn <- get_output_fn dflags (Hsc sf) maybe_loc
-            SysTools.runPp dflags
+            PipeEnv{src_basename, src_suffix} <- getPipeEnv
+            let orig_fn = src_basename <.> src_suffix
+            output_fn <- phaseOutputFilename (Hsc sf)
+            io $ SysTools.runPp dflags
                            ( [ SysTools.Option     orig_fn
                              , SysTools.Option     input_fn
                              , SysTools.FileOption "" output_fn
@@ -726,22 +810,26 @@ runPhase (HsPp sf) _stop hsc_env basename suff input_fn get_output_fn maybe_loc
                            )
 
             -- re-read pragmas now that we've parsed the file (see #3674)
-            src_opts <- getOptionsFromFile dflags output_fn
+            src_opts <- io $ getOptionsFromFile dflags output_fn
             (dflags1, unhandled_flags, warns)
-                <- parseDynamicNoPackageFlags dflags src_opts
-            handleFlagWarnings dflags1 warns
-            checkProcessArgsResult unhandled_flags
+                <- io $ parseDynamicNoPackageFlags dflags src_opts
+            setDynFlags dflags1
+            io $ handleFlagWarnings dflags1 warns
+            io $ checkProcessArgsResult unhandled_flags
 
-            return (Hsc sf, dflags1, maybe_loc, output_fn)
+            return (Hsc sf, output_fn)
 
 -----------------------------------------------------------------------------
 -- Hsc phase
 
 -- Compilation of a single module, in "legacy" mode (_not_ under
 -- the direction of the compilation manager).
-runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _maybe_loc
+runPhase (Hsc src_flavour) input_fn dflags0
  = do   -- normal Hsc mode, not mkdependHS
-        let dflags0 = hsc_dflags hsc_env
+
+        PipeEnv{ stop_phase=stop,
+                 src_basename=basename,
+                 src_suffix=suff } <- getPipeEnv
 
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the include path, since this is
@@ -753,8 +841,10 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
             paths = includePaths dflags0
             dflags = dflags0 { includePaths = current_dir : paths }
 
+        setDynFlags dflags
+
   -- gather the imports and module name
-        (hspp_buf,mod_name,imps,src_imps) <-
+        (hspp_buf,mod_name,imps,src_imps) <- io $
             case src_flavour of
                 ExtCoreFile -> do  -- no explicit imports in ExtCore input.
                     m <- getCoreModuleName input_fn
@@ -771,7 +861,7 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
   -- the .hi and .o filenames, and this is as good a way
   -- as any to generate them, and better than most. (e.g. takes
   -- into accout the -osuf flags)
-        location1 <- mkHomeModLocation2 dflags mod_name basename suff
+        location1 <- io $ mkHomeModLocation2 dflags mod_name basename suff
 
   -- Boot-ify it if necessary
         let location2 | isHsBoot src_flavour = addBootSuffixLocn location1
@@ -798,6 +888,7 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
 
             o_file = ml_obj_file location4      -- The real object file
 
+        setModLocation location4
 
   -- Figure out if the source has changed, for recompilation avoidance.
   --
@@ -806,11 +897,11 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-        src_timestamp <- getModificationTime (basename <.> suff)
+        src_timestamp <- io $ getModificationTime (basename <.> suff)
 
         let force_recomp = dopt Opt_ForceRecomp dflags
-            hsc_lang = hscMaybeAdjustTarget dflags stop src_flavour (hscTarget dflags)
-        source_unchanged <-
+            hsc_lang = hscTarget dflags
+        source_unchanged <- io $
           if force_recomp || not (isStopLn stop)
                 -- Set source_unchanged to False unconditionally if
                 --      (a) recompilation checker is off, or
@@ -827,16 +918,17 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
 
   -- get the DynFlags
         let next_phase = hscNextPhase dflags src_flavour hsc_lang
-        output_fn  <- get_output_fn dflags next_phase (Just location4)
+        output_fn  <- phaseOutputFilename next_phase
 
         let dflags' = dflags { hscTarget = hsc_lang,
                                hscOutName = output_fn,
                                extCoreName = basename ++ ".hcr" }
 
-        let hsc_env' = hsc_env {hsc_dflags = dflags'}
+        setDynFlags dflags'
+        PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
-        mod <- addHomeModuleToFinder hsc_env' mod_name location4
+        mod <- io $ addHomeModuleToFinder hsc_env' mod_name location4
 
   -- Make the ModSummary to hand to hscMain
         let
@@ -852,58 +944,64 @@ runPhase (Hsc src_flavour) stop hsc_env basename suff input_fn get_output_fn _ma
                                         ms_srcimps   = src_imps }
 
   -- run the compiler!
-        result <- hscCompileOneShot hsc_env'
+        result <- io $ hscCompileOneShot hsc_env'
                           mod_summary source_unchanged
                           Nothing       -- No iface
                           Nothing       -- No "module i of n" progress info
 
         case result of
           HscNoRecomp
-              -> do SysTools.touch dflags' "Touching object file" o_file
+              -> do io $ SysTools.touch dflags' "Touching object file" o_file
                     -- The .o file must have a later modification date
                     -- than the source file (else we wouldn't be in HscNoRecomp)
                     -- but we touch it anyway, to keep 'make' happy (we think).
-                    return (StopLn, dflags', Just location4, o_file)
+                    return (StopLn, o_file)
           (HscRecomp hasStub _)
-              -> do when hasStub $
-                         do stub_o <- compileStub hsc_env' mod location4
-                            liftIO $ consIORef v_Ld_inputs stub_o
+              -> do case hasStub of
+                      Nothing -> return ()
+                      Just stub_c ->
+                         do stub_o <- io $ compileStub hsc_env' stub_c
+                            setStubO stub_o
                     -- In the case of hs-boot files, generate a dummy .o-boot
                     -- stamp file for the benefit of Make
                     when (isHsBoot src_flavour) $
-                      SysTools.touch dflags' "Touching object file" o_file
-                    return (next_phase, dflags', Just location4, output_fn)
+                      io $ SysTools.touch dflags' "Touching object file" o_file
+                    return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cmm phase
 
-runPhase CmmCpp _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+runPhase CmmCpp input_fn dflags
   = do
-       let dflags = hsc_dflags hsc_env
-       output_fn <- get_output_fn dflags Cmm maybe_loc
-       doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn
-       return (Cmm, dflags, maybe_loc, output_fn)
+       output_fn <- phaseOutputFilename Cmm
+       io $ doCpp dflags False{-not raw-} True{-include CC opts-}
+              input_fn output_fn
+       return (Cmm, output_fn)
 
-runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
+runPhase Cmm input_fn dflags
   = do
-        let dflags = hsc_dflags hsc_env
-        let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
+        PipeEnv{src_basename} <- getPipeEnv
+        let hsc_lang = hscTarget dflags
+
         let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
-        output_fn <- get_output_fn dflags next_phase maybe_loc
+
+        output_fn <- phaseOutputFilename next_phase
 
         let dflags' = dflags { hscTarget = hsc_lang,
                                hscOutName = output_fn,
-                               extCoreName = basename ++ ".hcr" }
-        let hsc_env' = hsc_env {hsc_dflags = dflags'}
+                               extCoreName = src_basename ++ ".hcr" }
 
-        hscCompileCmmFile hsc_env' input_fn
+        setDynFlags dflags'
+        PipeState{hsc_env} <- getPipeState
+
+        io $ hscCompileCmmFile hsc_env input_fn
 
         -- XXX: catch errors above and convert them into ghcError?  Original
         -- code was:
         --
         --when (not ok) $ ghcError (PhaseFailed "cmm" (ExitFailure 1))
 
-        return (next_phase, dflags, maybe_loc, output_fn)
+        return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- Cc phase
@@ -911,26 +1009,26 @@ runPhase Cmm stop hsc_env basename _ input_fn get_output_fn maybe_loc
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
-   | cc_phase `eqPhase` Cc || cc_phase `eqPhase` Ccpp || cc_phase `eqPhase` HCc
-   = do let dflags = hsc_dflags hsc_env
+runPhase cc_phase input_fn dflags
+   | cc_phase `eqPhase` Cc || cc_phase `eqPhase` Ccpp || cc_phase `eqPhase` HCc || cc_phase `eqPhase` Cobjc
+   = do
         let cc_opts = getOpts dflags opt_c
             hcc = cc_phase `eqPhase` HCc
 
         let cmdline_include_paths = includePaths dflags
 
         -- HC files have the dependent packages stamped into them
-        pkgs <- if hcc then getHCFilePackages input_fn else return []
+        pkgs <- if hcc then io $ getHCFilePackages input_fn else return []
 
         -- add package include paths even if we're just compiling .c
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
-        pkg_include_dirs <- getPackageIncludePath dflags pkgs
+        pkg_include_dirs <- io $ getPackageIncludePath dflags pkgs
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
                               (cmdline_include_paths ++ pkg_include_dirs)
 
-        let (md_c_flags, md_regd_c_flags) = machdepCCOpts dflags
-        gcc_extra_viac_flags <- getExtraViaCOpts dflags
+        let md_c_flags = machdepCCOpts dflags
+        gcc_extra_viac_flags <- io $ getExtraViaCOpts dflags
         let pic_c_flags = picCCOpts dflags
 
         let verb = getVerbFlag dflags
@@ -938,13 +1036,13 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         -- cc-options are not passed when compiling .hc files.  Our
         -- hc code doesn't not #include any header files anyway, so these
         -- options aren't necessary.
-        pkg_extra_cc_opts <-
+        pkg_extra_cc_opts <- io $
           if cc_phase `eqPhase` HCc
              then return []
              else getPackageExtraCcOpts dflags pkgs
 
 #ifdef darwin_TARGET_OS
-        pkg_framework_paths <- getPackageFrameworkPath dflags pkgs
+        pkg_framework_paths <- io $ getPackageFrameworkPath dflags pkgs
         let cmdline_framework_paths = frameworkPaths dflags
         let framework_paths = map ("-F"++)
                         (cmdline_framework_paths ++ pkg_framework_paths)
@@ -959,11 +1057,8 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 
         -- Decide next phase
 
-        let mangle = dopt Opt_DoAsmMangling dflags
-            next_phase
-                | hcc && mangle     = Mangle
-                | otherwise         = As
-        output_fn <- get_output_fn dflags next_phase maybe_loc
+        let next_phase = As
+        output_fn <- phaseOutputFilename next_phase
 
         let
           more_hcc_opts =
@@ -983,15 +1078,16 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                 -- very weakly typed, being derived from C--.
                 ["-fno-strict-aliasing"]
 
-        SysTools.runCc dflags (
+        let gcc_lang_opt | cc_phase `eqPhase` Ccpp  = "c++"
+                         | cc_phase `eqPhase` Cobjc = "objective-c"
+                         | otherwise                = "c"
+        io $ SysTools.runCc dflags (
                 -- force the C compiler to interpret this file as C when
                 -- compiling .hc files, by adding the -x c option.
                 -- Also useful for plain .c files, just in case GHC saw a
                 -- -x c option.
-                        [ SysTools.Option "-x", if cc_phase `eqPhase` Ccpp
-                                                then SysTools.Option "c++"
-                                                else SysTools.Option "c"] ++
-                        [ SysTools.FileOption "" input_fn
+                        [ SysTools.Option "-x", SysTools.Option gcc_lang_opt
+                        , SysTools.FileOption "" input_fn
                         , SysTools.Option "-o"
                         , SysTools.FileOption "" output_fn
                         ]
@@ -1019,18 +1115,8 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
         -- This is a temporary hack.
                        ++ ["-mcpu=v9"]
 #endif
-                       ++ (if hcc && mangle
-                             then md_regd_c_flags
-                             else [])
                        ++ (if hcc
-                             then if mangle
-                                     then gcc_extra_viac_flags
-                                     else filter (=="-fwrapv")
-                                                gcc_extra_viac_flags
-                                -- still want -fwrapv even for unreg'd
-                             else [])
-                       ++ (if hcc
-                             then more_hcc_opts
+                             then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
                        ++ [ verb, "-S", "-Wimplicit", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
@@ -1043,81 +1129,56 @@ runPhase cc_phase _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                        ++ pkg_extra_cc_opts
                        ))
 
-        return (next_phase, dflags, maybe_loc, output_fn)
+        return (next_phase, output_fn)
 
         -- ToDo: postprocess the output from gcc
 
 -----------------------------------------------------------------------------
--- Mangle phase
-
-runPhase Mangle _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
-   = do let dflags = hsc_dflags hsc_env
-        let mangler_opts = getOpts dflags opt_m
-
-#if i386_TARGET_ARCH
-        machdep_opts <- return [ show (stolen_x86_regs dflags) ]
-#else
-        machdep_opts <- return []
-#endif
-
-        let split = dopt Opt_SplitObjs dflags
-            next_phase
-                | split = SplitMangle
-                | otherwise = As
-        output_fn <- get_output_fn dflags next_phase maybe_loc
-
-        SysTools.runMangle dflags (map SysTools.Option mangler_opts
-                          ++ [ SysTools.FileOption "" input_fn
-                             , SysTools.FileOption "" output_fn
-                             ]
-                          ++ map SysTools.Option machdep_opts)
-
-        return (next_phase, dflags, maybe_loc, output_fn)
-
------------------------------------------------------------------------------
 -- Splitting phase
 
-runPhase SplitMangle _stop hsc_env _basename _suff input_fn _get_output_fn maybe_loc
+runPhase SplitMangle input_fn dflags
   = do  -- tmp_pfx is the prefix used for the split .s files
-        -- We also use it as the file to contain the no. of split .s files (sigh)
-        let dflags = hsc_dflags hsc_env
-        split_s_prefix <- SysTools.newTempName dflags "split"
+
+        split_s_prefix <- io $ SysTools.newTempName dflags "split"
         let n_files_fn = split_s_prefix
 
-        SysTools.runSplit dflags
+        io $ SysTools.runSplit dflags
                           [ SysTools.FileOption "" input_fn
                           , SysTools.FileOption "" split_s_prefix
                           , SysTools.FileOption "" n_files_fn
                           ]
 
         -- Save the number of split files for future references
-        s <- readFile n_files_fn
+        s <- io $ readFile n_files_fn
         let n_files = read s :: Int
             dflags' = dflags { splitInfo = Just (split_s_prefix, n_files) }
 
-        -- Remember to delete all these files
-        addFilesToClean dflags' [ split_s_prefix ++ "__" ++ show n ++ ".s"
-                                | n <- [1..n_files]]
+        setDynFlags dflags'
 
-        return (SplitAs, dflags', maybe_loc, "**splitmangle**")
+        -- Remember to delete all these files
+        io $ addFilesToClean dflags' [ split_s_prefix ++ "__" ++ show n ++ ".s"
+                                     | n <- [1..n_files]]
+
+        return (SplitAs, "**splitmangle**")
           -- we don't use the filename
 
 -----------------------------------------------------------------------------
 -- As phase
 
-runPhase As _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
-  = do  let dflags = hsc_dflags hsc_env
+runPhase As input_fn dflags
+  = do
         let as_opts =  getOpts dflags opt_a
         let cmdline_include_paths = includePaths dflags
 
-        output_fn <- get_output_fn dflags StopLn maybe_loc
+        next_phase <- maybeMergeStub
+        output_fn <- phaseOutputFilename next_phase
 
         -- we create directories for the object file, because it
         -- might be a hierarchical module.
-        createDirectoryHierarchy (takeDirectory output_fn)
+        io $ createDirectoryHierarchy (takeDirectory output_fn)
 
-        let (md_c_flags, _) = machdepCCOpts dflags
-        SysTools.runAs dflags
+        let md_c_flags = machdepCCOpts dflags
+        io $ SysTools.runAs dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
 #ifdef sparc_TARGET_ARCH
@@ -1137,24 +1198,27 @@ runPhase As _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                           ]
                        ++ map SysTools.Option md_c_flags)
 
-        return (StopLn, dflags, maybe_loc, output_fn)
+        return (next_phase, output_fn)
 
 
-runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
+runPhase SplitAs _input_fn dflags
   = do
-        let dflags = hsc_dflags hsc_env
-        output_fn <- get_output_fn dflags StopLn maybe_loc
+        -- we'll handle the stub_o file in this phase, so don't MergeStub,
+        -- just jump straight to StopLn afterwards.
+        let next_phase = StopLn
+        output_fn <- phaseOutputFilename next_phase
 
         let base_o = dropExtension output_fn
             osuf = objectSuf dflags
             split_odir  = base_o ++ "_" ++ osuf ++ "_split"
 
-        createDirectoryHierarchy split_odir
+        io $ createDirectoryHierarchy split_odir
 
         -- remove M_split/ *.o, because we're going to archive M_split/ *.o
         -- later and we don't want to pick up any old objects.
-        fs <- getDirectoryContents split_odir
-        mapM_ removeFile $ map (split_odir </>) $ filter (osuf `isSuffixOf`) fs
+        fs <- io $ getDirectoryContents split_odir
+        io $ mapM_ removeFile $
+                map (split_odir </>) $ filter (osuf `isSuffixOf`) fs
 
         let as_opts = getOpts dflags opt_a
 
@@ -1163,10 +1227,12 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
                                   Just x -> x
 
         let split_s   n = split_s_prefix ++ "__" ++ show n <.> "s"
+
+            split_obj :: Int -> FilePath
             split_obj n = split_odir </>
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
-        let (md_c_flags, _) = machdepCCOpts dflags
+        let md_c_flags = machdepCCOpts dflags
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
@@ -1187,19 +1253,41 @@ runPhase SplitAs _stop hsc_env _basename _suff _input_fn get_output_fn maybe_loc
                           ]
                        ++ map SysTools.Option md_c_flags)
 
-        mapM_ assemble_file [1..n]
+        io $ mapM_ assemble_file [1..n]
+
+        -- Note [pipeline-split-init]
+        -- If we have a stub file, it may contain constructor
+        -- functions for initialisation of this module.  We can't
+        -- simply leave the stub as a separate object file, because it
+        -- will never be linked in: nothing refers to it.  We need to
+        -- ensure that if we ever refer to the data in this module
+        -- that needs initialisation, then we also pull in the
+        -- initialisation routine.
+        --
+        -- To that end, we make a DANGEROUS ASSUMPTION here: the data
+        -- that needs to be initialised is all in the FIRST split
+        -- object.  See Note [codegen-split-init].
+
+        PipeState{maybe_stub_o} <- getPipeState
+        case maybe_stub_o of
+            Nothing     -> return ()
+            Just stub_o -> io $ do
+                     tmp_split_1 <- newTempName dflags osuf
+                     let split_1 = split_obj 1
+                     copyFile split_1 tmp_split_1
+                     removeFile split_1
+                     joinObjectFiles dflags [tmp_split_1, stub_o] split_1
 
         -- join them into a single .o file
-        joinObjectFiles dflags (map split_obj [1..n]) output_fn
+        io $ joinObjectFiles dflags (map split_obj [1..n]) output_fn
 
-        return (StopLn, dflags, maybe_loc, output_fn)
+        return (next_phase, output_fn)
 
 -----------------------------------------------------------------------------
 -- LlvmOpt phase
 
-runPhase LlvmOpt _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+runPhase LlvmOpt input_fn dflags
   = do
-    let dflags  = hsc_dflags hsc_env
     let lo_opts = getOpts dflags opt_lo
     let opt_lvl = max 0 (min 2 $ optLevel dflags)
     -- don't specify anything if user has specified commands. We do this for
@@ -1210,16 +1298,16 @@ runPhase LlvmOpt _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                      then [SysTools.Option (llvmOpts !! opt_lvl)]
                      else []
 
-    output_fn <- get_output_fn dflags LlvmLlc maybe_loc
+    output_fn <- phaseOutputFilename LlvmLlc
 
-    SysTools.runLlvmOpt dflags
+    io $ SysTools.runLlvmOpt dflags
                ([ SysTools.FileOption "" input_fn,
                     SysTools.Option "-o",
                     SysTools.FileOption "" output_fn]
                 ++ optFlag
                 ++ map SysTools.Option lo_opts)
 
-    return (LlvmLlc, dflags, maybe_loc, output_fn)
+    return (LlvmLlc, output_fn)
   where 
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
@@ -1229,9 +1317,8 @@ runPhase LlvmOpt _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
 
-runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+runPhase LlvmLlc input_fn dflags
   = do
-    let dflags  = hsc_dflags hsc_env
     let lc_opts = getOpts dflags opt_lc
     let opt_lvl = max 0 (min 2 $ optLevel dflags)
 #if darwin_TARGET_OS
@@ -1243,16 +1330,16 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
 
-    output_fn <- get_output_fn dflags nphase maybe_loc
+    output_fn <- phaseOutputFilename nphase
 
-    SysTools.runLlvmLlc dflags
+    io $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.Option $ "-relocation-model=" ++ rmodel,
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts)
 
-    return (nphase, dflags, maybe_loc, output_fn)
+    return (nphase, output_fn)
   where
 #if darwin_TARGET_OS
         llvmOpts = ["-O1", "-O2", "-O2"]
@@ -1264,17 +1351,36 @@ runPhase LlvmLlc _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
 
-runPhase LlvmMangle _stop hsc_env _basename _suff input_fn get_output_fn maybe_loc
+runPhase LlvmMangle input_fn _dflags
   = do
-    let dflags = hsc_dflags hsc_env
-    output_fn <- get_output_fn dflags As maybe_loc
-    llvmFixupAsm input_fn output_fn
-    return (As, dflags, maybe_loc, output_fn)
+      output_fn <- phaseOutputFilename As
+      io $ llvmFixupAsm input_fn output_fn
+      return (As, output_fn)
 
+-----------------------------------------------------------------------------
+-- merge in stub objects
+
+runPhase MergeStub input_fn dflags
+ = do
+     PipeState{maybe_stub_o} <- getPipeState
+     output_fn <- phaseOutputFilename StopLn
+     case maybe_stub_o of
+       Nothing ->
+         panic "runPhase(MergeStub): no stub"
+       Just stub_o -> do
+         io $ joinObjectFiles dflags [input_fn, stub_o] output_fn
+         return (StopLn, output_fn)
 
 -- warning suppression
-runPhase other _stop _dflags _basename _suff _input_fn _get_output_fn _maybe_loc =
+runPhase other _input_fn _dflags =
    panic ("runPhase: don't know how to run phase " ++ show other)
+
+maybeMergeStub :: CompPipeline Phase
+maybeMergeStub
+ = do
+     PipeState{maybe_stub_o} <- getPipeState
+     if isJust maybe_stub_o then return MergeStub else return StopLn
+
 -----------------------------------------------------------------------------
 -- MoveBinary sort-of-phase
 -- After having produced a binary, move it somewhere else and generate a
@@ -1306,13 +1412,13 @@ runPhase_MoveBinary dflags input_fn
         return True
     | otherwise = return True
 
-mkExtraCObj :: DynFlags -> [String] -> IO FilePath
+mkExtraCObj :: DynFlags -> String -> IO FilePath
 mkExtraCObj dflags xs
  = do cFile <- newTempName dflags "c"
       oFile <- newTempName dflags "o"
-      writeFile cFile $ unlines xs
+      writeFile cFile xs
       let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
-          (md_c_flags, _) = machdepCCOpts dflags
+          md_c_flags = machdepCCOpts dflags
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,
@@ -1322,19 +1428,66 @@ mkExtraCObj dflags xs
                       map Option md_c_flags)
       return oFile
 
-mkRtsOptionsLevelObj :: DynFlags -> IO [FilePath]
-mkRtsOptionsLevelObj dflags
- = do let mkRtsEnabledObj val
-              = do fn <- mkExtraCObj dflags
-                             ["#include \"Rts.h\"",
-                              "#include \"RtsOpts.h\"",
-                              "const rtsOptsEnabledEnum rtsOptsEnabled = "
-                                  ++ val ++ ";"]
-                   return [fn]
-      case rtsOptsEnabled dflags of
-          RtsOptsNone     -> mkRtsEnabledObj "rtsOptsNone"
-          RtsOptsSafeOnly -> return [] -- The default
-          RtsOptsAll      -> mkRtsEnabledObj "rtsOptsAll"
+mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath
+mkExtraObjToLinkIntoBinary dflags dep_packages = do
+   link_info <- getLinkInfo dflags dep_packages
+   mkExtraCObj dflags (showSDoc (vcat [rts_opts_enabled,
+                                       extra_rts_opts,
+                                       link_opts link_info]))
+  where
+    mk_rts_opts_enabled val
+         = vcat [text "#include \"Rts.h\"",
+                 text "#include \"RtsOpts.h\"",
+                 text "const RtsOptsEnabledEnum rtsOptsEnabled = " <>
+                       text val <> semi ]
+
+    rts_opts_enabled = case rtsOptsEnabled dflags of
+          RtsOptsNone     -> mk_rts_opts_enabled "RtsOptsNone"
+          RtsOptsSafeOnly -> empty -- The default
+          RtsOptsAll      -> mk_rts_opts_enabled "RtsOptsAll"
+
+    extra_rts_opts = case rtsOpts dflags of
+          Nothing   -> empty
+          Just opts -> text "char *ghc_rts_opts = " <> text (show opts) <> semi
+
+    link_opts info
+      | isDarwinTarget  = empty
+      | isWindowsTarget = empty
+      | otherwise = hcat [
+          text "__asm__(\"\\t.section ", text ghcLinkInfoSectionName,
+                                    text ",\\\"\\\",@note\\n",
+                    text "\\t.ascii \\\"", info', text "\\\"\\n\");" ]
+          where
+            -- we need to escape twice: once because we're inside a C string,
+            -- and again because we're inside an asm string.
+            info' = text $ (escape.escape) info
+
+            escape :: String -> String
+            escape = concatMap (charToC.fromIntegral.ord)
+
+-- The "link info" is a string representing the parameters of the
+-- link.  We save this information in the binary, and the next time we
+-- link, if nothing else has changed, we use the link info stored in
+-- the existing binary to decide whether to re-link or not.
+getLinkInfo :: DynFlags -> [PackageId] -> IO String
+getLinkInfo dflags dep_packages = do
+   package_link_opts <- getPackageLinkOpts dflags dep_packages
+#ifdef darwin_TARGET_OS
+   pkg_frameworks <- getPackageFrameworks dflags dep_packages
+#endif
+   extra_ld_inputs <- readIORef v_Ld_inputs
+   let
+      link_info = (package_link_opts,
+#ifdef darwin_TARGET_OS
+                   pkg_frameworks,
+#endif
+                   rtsOpts dflags,
+                   rtsOptsEnabled dflags,
+                   dopt Opt_NoHsMain dflags,
+                   extra_ld_inputs,
+                   getOpts dflags opt_l)
+   --
+   return (show link_info)
 
 -- generates a Perl skript starting a parallel prg under PVM
 mk_pvm_wrapper_script :: String -> String -> String -> String
@@ -1446,15 +1599,8 @@ linkBinary dflags o_files dep_packages = do
     let no_hs_main = dopt Opt_NoHsMain dflags
     let main_lib | no_hs_main = []
                  | otherwise  = [ "-lHSrtsmain" ]
-    rtsEnabledObj <- mkRtsOptionsLevelObj dflags
-    rtsOptsObj <- case rtsOpts dflags of
-                  Just opts ->
-                      do fn <- mkExtraCObj dflags
-                                 -- We assume that the Haskell "show" does
-                                 -- the right thing here
-                                 ["char *ghc_rts_opts = " ++ show opts ++ ";"]
-                         return [fn]
-                  Nothing -> return []
+
+    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
 
     pkg_link_opts <- getPackageLinkOpts dflags dep_packages
 
@@ -1504,7 +1650,7 @@ linkBinary dflags o_files dep_packages = do
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    let (md_c_flags, _) = machdepCCOpts dflags
+    let md_c_flags = machdepCCOpts dflags
     SysTools.runLink dflags (
                        [ SysTools.Option verb
                        , SysTools.Option "-o"
@@ -1529,8 +1675,7 @@ linkBinary dflags o_files dep_packages = do
 #endif
                       ++ pkg_lib_path_opts
                       ++ main_lib
-                      ++ rtsEnabledObj
-                      ++ rtsOptsObj
+                      ++ [extraLinkObj]
                       ++ pkg_link_opts
 #ifdef darwin_TARGET_OS
                       ++ pkg_framework_path_opts
@@ -1657,10 +1802,10 @@ linkDynLib dflags o_files dep_packages = do
         -- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
-    let (md_c_flags, _) = machdepCCOpts dflags
+    let md_c_flags = machdepCCOpts dflags
     let extra_ld_opts = getOpts dflags opt_l
 
-    rtsEnabledObj <- mkRtsOptionsLevelObj dflags
+    extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
 
 #if defined(mingw32_HOST_OS)
     -----------------------------------------------------------------------------
@@ -1689,7 +1834,7 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
-         ++ rtsEnabledObj
+         ++ [extraLinkObj]
          ++ pkg_link_opts
         ))
 #elif defined(darwin_TARGET_OS)
@@ -1746,7 +1891,7 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
-         ++ rtsEnabledObj
+         ++ [extraLinkObj]
          ++ pkg_link_opts
         ))
 #else
@@ -1781,7 +1926,7 @@ linkDynLib dflags o_files dep_packages = do
          ++ lib_path_opts
          ++ extra_ld_opts
          ++ pkg_lib_path_opts
-         ++ rtsEnabledObj
+         ++ [extraLinkObj]
          ++ pkg_link_opts
         ))
 #endif
@@ -1804,7 +1949,7 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
           | otherwise           = (optc ++ md_c_flags)
                 where
                       optc = getOpts dflags opt_c
-                      (md_c_flags, _) = machdepCCOpts dflags
+                      md_c_flags = machdepCCOpts dflags
 
     let cpp_prog args | raw       = SysTools.runCpp dflags args
                       | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
@@ -1852,15 +1997,23 @@ joinObjectFiles dflags o_files output_fn = do
                             SysTools.Option "-nostdlib",
                             SysTools.Option "-nodefaultlibs",
                             SysTools.Option "-Wl,-r",
+                            SysTools.Option ld_build_id,
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
                             SysTools.FileOption "" output_fn ]
                          ++ map SysTools.Option md_c_flags
                          ++ args)
+
       ld_x_flag | null cLD_X = ""
                 | otherwise  = "-Wl,-x"
 
-      (md_c_flags, _) = machdepCCOpts dflags
+      -- suppress the generation of the .note.gnu.build-id section,
+      -- which we don't need and sometimes causes ld to emit a
+      -- warning:
+      ld_build_id | cLdHasBuildId == "YES"  = "-Wl,--build-id=none"
+                  | otherwise               = ""
+
+      md_c_flags = machdepCCOpts dflags
   
   if cLdIsGNULd == "YES"
      then do
@@ -1884,20 +2037,4 @@ hscNextPhase dflags _ hsc_lang =
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
         _other         -> StopLn
-
-
-hscMaybeAdjustTarget :: DynFlags -> Phase -> HscSource -> HscTarget -> HscTarget
-hscMaybeAdjustTarget dflags stop _ current_hsc_lang
-  = hsc_lang
-  where
-        keep_hc = dopt Opt_KeepHcFiles dflags
-        hsc_lang
-                -- don't change the lang if we're interpreting
-                 | current_hsc_lang == HscInterpreted = current_hsc_lang
-
-                -- force -fvia-C if we are being asked for a .hc file
-                 | HCc <- stop = HscC
-                 | keep_hc     = HscC
-                -- otherwise, stick to the plan
-                 | otherwise = current_hsc_lang
 

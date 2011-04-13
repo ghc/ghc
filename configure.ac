@@ -222,6 +222,21 @@ x86_64-apple-darwin)
     ;;
 esac
 
+# Testing if we shall enable shared libs support on Solaris.
+# Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
+
+SOLARIS_BROKEN_SHLD=NO
+
+case $host in
+     i386-*-solaris2)
+     # here we go with the test
+     MINOR=`uname -r|cut -d '.' -f 2-`
+     if test "$MINOR" -lt "11"; then
+     	SOLARIS_BROKEN_SHLD=YES
+     fi
+     ;;
+esac
+
 # Sync this with cTargetArch in compiler/ghc.mk
 checkArch() {
     case $1 in
@@ -321,6 +336,8 @@ AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 AC_SUBST(soext)
+
+AC_SUBST(SOLARIS_BROKEN_SHLD)
 
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
@@ -799,6 +816,7 @@ FP_LEADING_UNDERSCORE
 dnl ** check for ld, whether it has an -x option, and if it is GNU ld
 FP_PROG_LD_X
 FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
 
 dnl ** check for Apple-style dead-stripping support
 dnl    (.subsections-via-symbols assembler directive)

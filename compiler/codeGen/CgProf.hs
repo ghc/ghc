@@ -16,8 +16,7 @@ module CgProf (
 	costCentreFrom, 
 	curCCS, curCCSAddr,
 	emitCostCentreDecl, emitCostCentreStackDecl, 
-	emitRegisterCC, emitRegisterCCS,
-	emitSetCCC, emitCCS,
+        emitSetCCC, emitCCS,
 
 	-- Lag/drag/void stuff
 	ldvEnter, ldvEnterClosure, ldvRecordCreate
@@ -346,56 +345,6 @@ sizeof_ccs_words
   | otherwise = ws + 1
   where
    (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE
-
--- ---------------------------------------------------------------------------
--- Registering CCs and CCSs
-
---   (cc)->link = CC_LIST;
---   CC_LIST = (cc);
---   (cc)->ccID = CC_ID++;
-
-emitRegisterCC :: CostCentre -> Code
-emitRegisterCC cc = do
-  { tmp <- newTemp cInt
-  ; stmtsC [
-     CmmStore (cmmOffsetB cc_lit oFFSET_CostCentre_link)
-		 (CmmLoad cC_LIST bWord),
-     CmmStore cC_LIST cc_lit,
-     CmmAssign (CmmLocal tmp) (CmmLoad cC_ID cInt),
-     CmmStore (cmmOffsetB cc_lit oFFSET_CostCentre_ccID) (CmmReg (CmmLocal tmp)),
-     CmmStore cC_ID (cmmRegOffB (CmmLocal tmp) 1)
-   ]
-  }
-  where
-    cc_lit = CmmLit (CmmLabel (mkCCLabel cc))
-
---  (ccs)->prevStack = CCS_LIST;
---  CCS_LIST = (ccs);
---  (ccs)->ccsID = CCS_ID++;
-
-emitRegisterCCS :: CostCentreStack -> Code
-emitRegisterCCS ccs = do
-  { tmp <- newTemp cInt
-  ; stmtsC [
-     CmmStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_prevStack) 
-			(CmmLoad cCS_LIST bWord),
-     CmmStore cCS_LIST ccs_lit,
-     CmmAssign (CmmLocal tmp) (CmmLoad cCS_ID cInt),
-     CmmStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_ccsID) (CmmReg (CmmLocal tmp)),
-     CmmStore cCS_ID (cmmRegOffB (CmmLocal tmp) 1)
-   ]
-  }
-  where
-    ccs_lit = CmmLit (CmmLabel (mkCCSLabel ccs))
-
-
-cC_LIST, cC_ID :: CmmExpr
-cC_LIST = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CC_LIST")))
-cC_ID   = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CC_ID")))
-
-cCS_LIST, cCS_ID :: CmmExpr
-cCS_LIST = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CCS_LIST")))
-cCS_ID   = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CCS_ID")))
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack

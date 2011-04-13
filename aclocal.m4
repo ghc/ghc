@@ -484,6 +484,31 @@ AC_SUBST([LdXFlag])
 ])# FP_PROG_LD_X
 
 
+# FP_PROG_LD_BUILD_ID
+# ------------
+
+# Sets the output variable LdHasBuildId to YES if ld supports
+# --build-id, or NO otherwise.
+AC_DEFUN([FP_PROG_LD_BUILD_ID],
+[
+AC_CACHE_CHECK([whether ld understands --build-id], [fp_cv_ld_build_id],
+[echo 'foo() {}' > conftest.c
+${CC-cc} -c conftest.c
+if ${LdCmd} -r --build-id=none -o conftest2.o conftest.o > /dev/null 2>&1; then
+   fp_cv_ld_build_id=yes
+else
+   fp_cv_ld_build_id=no
+fi
+rm -rf conftest*])
+if test "$fp_cv_ld_build_id" = yes; then
+  LdHasBuildId=YES
+else
+  LdHasBuildId=NO
+fi
+AC_SUBST([LdHasBuildId])
+])# FP_PROG_LD_BUILD_ID
+
+
 # FP_PROG_LD_IS_GNU
 # -----------------
 # Sets the output variable LdIsGNULd to YES or NO, depending on whether it is
@@ -1069,17 +1094,8 @@ AC_SUBST([GhcPkgCmd])
 # Determine which extra flags we need to pass gcc when we invoke it
 # to compile .hc code.
 #
-# Some OSs (Mandrake Linux, in particular) configure GCC with
-# -momit-leaf-frame-pointer on by default. If this is the case, we
-# need to turn it off for mangling to work. The test is currently a
-# bit crude, using only the version number of gcc.
-# 
 # -fwrapv is needed for gcc to emit well-behaved code in the presence of
 # integer wrap around. (Trac #952)
-#
-# -fno-unit-at-a-time or -fno-toplevel-reoder is necessary to avoid gcc
-# reordering things in the module and confusing the manger and/or splitter.
-# (eg. Trac #1427)
 #
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_HAVE_GCC])
@@ -1088,24 +1104,6 @@ AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_
  FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
   [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fwrapv"],
   [])
- case $TargetPlatform in
-  i386-*|x86_64-*) 
-     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.2],
-      [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -mno-omit-leaf-frame-pointer"],
-      [])
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
-     [FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.2],
-       [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-toplevel-reorder"],
-       [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-unit-at-a-time"]
-     )],
-     [])
-  ;;
-  sparc-*-solaris2) 
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.2],
-      [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-toplevel-reorder"],
-      [])
-  ;;
- esac
 ])
 AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
 ])

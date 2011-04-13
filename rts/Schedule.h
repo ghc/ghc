@@ -23,6 +23,7 @@
 void initScheduler (void);
 void exitScheduler (rtsBool wait_foreign);
 void freeScheduler (void);
+void markScheduler (evac_fn evac, void *user);
 
 // Place a new thread on the run queue of the current Capability
 void scheduleThread (Capability *cap, StgTSO *tso);

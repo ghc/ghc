@@ -431,7 +431,7 @@ getRegister (CmmReg reg)
          size | not use_sse2 && isFloatSize sz = FF80
               | otherwise                      = sz
        --
-       return (Fixed sz (getRegisterReg use_sse2 reg) nilOL)
+       return (Fixed size (getRegisterReg use_sse2 reg) nilOL)
   
 
 getRegister tree@(CmmRegOff _ _) 
@@ -1587,12 +1587,24 @@ genCCall target dest_regs args = do
             | otherwise
 #endif
             = concatOL push_codes
+	
+	  -- Deallocate parameters after call for ccall;
+	  -- but not for stdcall (callee does it)
+	  --
+	  -- We have to pop any stack padding we added
+	  -- on Darwin even if we are doing stdcall, though (#5052)
+	pop_size | cconv /= StdCallConv = tot_arg_size
+	         | otherwise
+#if darwin_TARGET_OS
+                 = arg_pad_size
+#else
+                 = 0
+#endif
+	
 	call = callinsns `appOL`
                toOL (
-			-- Deallocate parameters after call for ccall;
-			-- but not for stdcall (callee does it)
-                  (if cconv == StdCallConv || tot_arg_size==0 then [] else 
-		   [ADD II32 (OpImm (ImmInt tot_arg_size)) (OpReg esp)])
+                  (if pop_size==0 then [] else 
+		   [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
                   ++
                   [DELTA (delta + tot_arg_size)]
                )

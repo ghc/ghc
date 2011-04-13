@@ -309,7 +309,7 @@ void initProfiling1 (void)
 {
 }
 
-void freeProfiling1 (void)
+void freeProfiling (void)
 {
 }
 

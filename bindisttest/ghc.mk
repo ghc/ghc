@@ -19,7 +19,7 @@ endif
 .PHONY: test_bindist
 test_bindist:
 	"$(RM)" $(RM_OPTS_REC) bindisttest/$(BIN_DIST_INST_SUBDIR)
-	"$(RM)" $(RM_OPTS_REC) bindisttest/a/b/c/*
+	"$(RM)" $(RM_OPTS_REC) bindisttest/a
 	"$(RM)" $(RM_OPTS) bindisttest/HelloWorld
 	"$(RM)" $(RM_OPTS) bindisttest/HelloWorld.o
 	"$(RM)" $(RM_OPTS) bindisttest/HelloWorld.hi
@@ -30,6 +30,9 @@ test_bindist:
 # NB. tar has funny interpretation of filenames sometimes (thinking
 # c:/foo is a remote file), so it's safer to bzip and then pipe into
 # tar rather than using tar -xjf:
+	mkdir bindisttest/a
+	mkdir bindisttest/a/b
+	mkdir bindisttest/a/b/c
 	cd bindisttest/a/b/c/ && $(BZIP2_CMD) -cd ../../../../$(BIN_DIST_TEST_TAR_BZ2) | $(TAR_CMD) -xf -
 	$(SHELL) bindisttest/checkBinaries.sh $(ProjectVersion)
 ifeq "$(Windows)" "YES"

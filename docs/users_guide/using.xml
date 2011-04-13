@@ -2203,27 +2203,6 @@ f "2"    = 2
         </listitem>
       </varlistentry>
 
-      <varlistentry>
-	<term><option>-monly-[32]-regs</option>:</term>
-	<listitem>
-	  <para>(x86 only)<indexterm><primary>-monly-N-regs
-          option (iX86 only)</primary></indexterm> GHC tries to
-          &ldquo;steal&rdquo; four registers from GCC, for performance
-          reasons; it almost always works.  However, when GCC is
-          compiling some modules with four stolen registers, it will
-          crash, probably saying:
-
-<screen>
-Foo.hc:533: fixed or forbidden register was spilled.
-This may be due to a compiler bug or to impossible asm
-statements or clauses.
-</screen>
-
-          Just give some registers back with
-          <option>-monly-N-regs</option>.  Try `3' first, then `2'.
-          If `2' doesn't work, please report the bug to us.</para>
-	</listitem>
-      </varlistentry>
     </variablelist>
 
   </sect1>

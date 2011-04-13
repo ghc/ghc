@@ -13,13 +13,18 @@
 
 #include "BeginPrivate.h"
 
+struct gc_thread_;
+
 void      stat_startInit(void);
 void      stat_endInit(void);
 
-void      stat_startGC(void);
-void      stat_endGC (lnat alloc, lnat live, 
-		      lnat copied, lnat gen,
-                      lnat max_copied, lnat avg_copied, lnat slop);
+void      stat_startGC(struct gc_thread_ *gct);
+void      stat_endGC  (struct gc_thread_ *gct, lnat alloc, lnat live, 
+		       lnat copied, nat gen,
+                       lnat max_copied, lnat avg_copied, lnat slop);
+
+void stat_gcWorkerThreadStart (struct gc_thread_ *gct);
+void stat_gcWorkerThreadDone  (struct gc_thread_ *gct);
 
 #ifdef PROFILING
 void      stat_startRP(void);

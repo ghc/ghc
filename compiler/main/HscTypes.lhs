@@ -14,7 +14,7 @@ module HscTypes (
 
         -- * Information about modules
 	ModDetails(..),	emptyModDetails,
-	ModGuts(..), CgGuts(..), ForeignStubs(..),
+        ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods,
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
@@ -25,8 +25,9 @@ module HscTypes (
 	
 	-- * State relating to modules in this package
 	HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
-	hptInstances, hptRules, hptVectInfo,
-	
+        hptInstances, hptRules, hptVectInfo,
+        hptObjs,
+
 	-- * State relating to known packages
 	ExternalPackageState(..), EpsStats(..), addEpsInStats,
 	PackageTypeEnv, PackageIfaceTable, emptyPackageIfaceTable,
@@ -76,7 +77,7 @@ module HscTypes (
 	Warnings(..), WarningTxt(..), plusWarns,
 
 	-- * Linker stuff
-	Linkable(..), isObjectLinkable,
+        Linkable(..), isObjectLinkable, linkableObjs,
 	Unlinked(..), CompiledByteCode,
 	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
         
@@ -494,6 +495,9 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
 
 	-- And get its dfuns
     , thing <- things ]
+
+hptObjs :: HomePackageTable -> [FilePath]
+hptObjs hpt = concat (map (maybe [] linkableObjs . hm_linkable) (eltsUFM hpt))
 \end{code}
 
 %************************************************************************
@@ -795,11 +799,7 @@ data CgGuts
 		-- data constructor workers; reason: we we regard them
 		-- as part of the code-gen of tycons
 
-	cg_dir_imps :: ![Module],
-		-- ^ Directly-imported modules; used to generate
-		-- initialisation code
-
-	cg_foreign  :: !ForeignStubs,	-- ^ Foreign export stubs
+        cg_foreign  :: !ForeignStubs,   -- ^ Foreign export stubs
 	cg_dep_pkgs :: ![PackageId],	-- ^ Dependent packages, used to 
 	                                -- generate #includes for C code gen
         cg_hpc_info :: !HpcInfo,        -- ^ Program coverage tick box information
@@ -819,6 +819,10 @@ data ForeignStubs = NoStubs             -- ^ We don't have any stubs
                    --
                    --  2) C stubs to use when calling
                    --     "foreign exported" functions
+
+appendStubC :: ForeignStubs -> SDoc -> ForeignStubs
+appendStubC NoStubs            c_code = ForeignStubs empty c_code
+appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 \end{code}
 
 \begin{code}
@@ -1789,6 +1793,9 @@ isObjectLinkable l = not (null unlinked) && all isObject unlinked
 	-- generate a linkable with no Unlinked's as a result of
 	-- compiling a module in HscNothing mode, and this choice
 	-- happens to work well with checkStability in module GHC.
+
+linkableObjs :: Linkable -> [FilePath]
+linkableObjs l = [ f | DotO f <- linkableUnlinked l ]
 
 instance Outputable Linkable where
    ppr (LM when_made mod unlinkeds)

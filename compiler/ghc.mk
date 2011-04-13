@@ -140,6 +140,8 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cMKDLL                = "$(BLD_DLL)"'                        >> $@
 	@echo 'cLdIsGNULd            :: String'                             >> $@
 	@echo 'cLdIsGNULd            = "$(LdIsGNULd)"'                      >> $@
+	@echo 'cLdHasBuildId         :: String'                             >> $@
+	@echo 'cLdHasBuildId         = "$(LdHasBuildId)"'                   >> $@
 	@echo 'cLD_X                 :: String'                             >> $@
 	@echo 'cLD_X                 = "$(LD_X)"'                           >> $@
 	@echo 'cGHC_DRIVER_DIR       :: String'                             >> $@
@@ -152,10 +154,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cGHC_UNLIT_PGM        = "$(GHC_UNLIT_PGM)"'                  >> $@
 	@echo 'cGHC_UNLIT_DIR        :: String'                             >> $@
 	@echo 'cGHC_UNLIT_DIR        = "$(GHC_UNLIT_DIR)"'                  >> $@
-	@echo 'cGHC_MANGLER_PGM      :: String'                             >> $@
-	@echo 'cGHC_MANGLER_PGM      = "$(GHC_MANGLER_PGM)"'                >> $@
-	@echo 'cGHC_MANGLER_DIR      :: String'                             >> $@
-	@echo 'cGHC_MANGLER_DIR      = "$(GHC_MANGLER_DIR)"'                >> $@
 	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
 	@echo 'cGHC_SPLIT_PGM        = "$(GHC_SPLIT_PGM)"'                  >> $@
 	@echo 'cGHC_SPLIT_DIR        :: String'                             >> $@
@@ -494,6 +492,18 @@ compiler_stage3_CONFIGURE_OPTS += --disable-library-for-ghci
 compiler_stage1_HC_OPTS += $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(GhcStage2HcOpts)
 compiler_stage3_HC_OPTS += $(GhcStage3HcOpts)
+
+ifeq "$(GhcStage1DefaultNewCodegen)" "YES"
+compiler_stage1_HC_OPTS += -DGHC_DEFAULT_NEW_CODEGEN
+endif
+
+ifeq "$(GhcStage2DefaultNewCodegen)" "YES"
+compiler_stage2_HC_OPTS += -DGHC_DEFAULT_NEW_CODEGEN
+endif
+
+ifeq "$(GhcStage3DefaultNewCodegen)" "YES"
+compiler_stage3_HC_OPTS += -DGHC_DEFAULT_NEW_CODEGEN
+endif
 
 ifneq "$(BINDIST)" "YES"
 

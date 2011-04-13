@@ -207,6 +207,9 @@ void workerTaskStop (Task *task);
 //
 void taskTimeStamp (Task *task);
 
+// The current Task has finished a GC, record the amount of time spent.
+void taskDoneGC (Task *task, Ticks cpu_time, Ticks elapsed_time);
+
 // Put the task back on the free list, mark it stopped.  Used by
 // forkProcess().
 //

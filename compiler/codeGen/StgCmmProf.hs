@@ -348,14 +348,12 @@ ifProfilingL xs
 --	Initialising Cost Centres & CCSs
 ---------------------------------------------------------------
 
-initCostCentres :: CollectedCCs -> FCode CmmAGraph
--- Emit the declarations, and return code to register them
+initCostCentres :: CollectedCCs -> FCode ()
+-- Emit the declarations
 initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
-  = getCode $ whenC opt_SccProfilingOn $
+  = whenC opt_SccProfilingOn $
     do	{ mapM_ emitCostCentreDecl local_CCs
-  	; mapM_ emitCostCentreStackDecl  singleton_CCSs 
-	; emit $ catAGraphs $ map mkRegisterCC local_CCs
-	; emit $ catAGraphs $ map mkRegisterCCS singleton_CCSs }
+        ; mapM_ emitCostCentreStackDecl  singleton_CCSs  }
 
 
 emitCostCentreDecl :: CostCentre -> FCode ()
@@ -407,54 +405,6 @@ sizeof_ccs_words
   | otherwise = ws + 1
   where
    (ws,ms) = SIZEOF_CostCentreStack `divMod` wORD_SIZE
-
--- ---------------------------------------------------------------------------
--- Registering CCs and CCSs
-
---   (cc)->link = CC_LIST;
---   CC_LIST = (cc);
---   (cc)->ccID = CC_ID++;
-
-mkRegisterCC :: CostCentre -> CmmAGraph
-mkRegisterCC cc
-  = withTemp cInt $ \tmp -> 
-    catAGraphs [
-     mkStore (cmmOffsetB cc_lit oFFSET_CostCentre_link)
-		 (CmmLoad cC_LIST bWord),
-     mkStore cC_LIST cc_lit,
-     mkAssign (CmmLocal tmp) (CmmLoad cC_ID cInt),
-     mkStore (cmmOffsetB cc_lit oFFSET_CostCentre_ccID) (CmmReg (CmmLocal tmp)),
-     mkStore cC_ID (cmmRegOffB (CmmLocal tmp) 1)
-   ]
-  where
-	cc_lit = CmmLit (CmmLabel (mkCCLabel cc))
-
---  (ccs)->prevStack = CCS_LIST;
---  CCS_LIST = (ccs);
---  (ccs)->ccsID = CCS_ID++;
-
-mkRegisterCCS :: CostCentreStack -> CmmAGraph
-mkRegisterCCS ccs
-  = withTemp cInt $ \ tmp ->
-    catAGraphs [
-     mkStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_prevStack) 
-			(CmmLoad cCS_LIST bWord),
-     mkStore cCS_LIST ccs_lit,
-     mkAssign (CmmLocal tmp) (CmmLoad cCS_ID cInt),
-     mkStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_ccsID) (CmmReg (CmmLocal tmp)),
-     mkStore cCS_ID (cmmRegOffB (CmmLocal tmp) 1)
-   ]
-  where
-    ccs_lit = CmmLit (CmmLabel (mkCCSLabel ccs))
-
-
-cC_LIST, cC_ID :: CmmExpr
-cC_LIST = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CC_LIST")))
-cC_ID   = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CC_ID")))
-
-cCS_LIST, cCS_ID :: CmmExpr
-cCS_LIST = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CCS_LIST")))
-cCS_ID   = CmmLit (CmmLabel (mkCmmDataLabel rtsPackageId (fsLit "CCS_ID")))
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack

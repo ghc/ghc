@@ -115,12 +115,15 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
 cmmMiniInlineStmts uses (stmt:stmts)
   = stmt : cmmMiniInlineStmts uses stmts
 
-lookForInline u expr (stmt : rest)
+lookForInline u expr stmts = lookForInline' u expr regset stmts
+    where regset = foldRegsUsed extendRegSet emptyRegSet expr
+
+lookForInline' u expr regset (stmt : rest)
   | Just 1 <- lookupUFM (countUses stmt) u, ok_to_inline
   = Just (inlineStmt u expr stmt : rest)
 
   | ok_to_skip
-  = case lookForInline u expr rest of
+  = case lookForInline' u expr regset rest of
            Nothing    -> Nothing
            Just stmts -> Just (stmt:stmts)
 
@@ -137,13 +140,18 @@ lookForInline u expr (stmt : rest)
 		     CmmCall{} -> hasNoGlobalRegs expr
 		     _ -> True
 
-   -- We can skip over assignments to other tempoararies, because we
-   -- know that expressions aren't side-effecting and temporaries are
-   -- single-assignment.
+   -- Expressions aren't side-effecting.  Temporaries may or may not
+   -- be single-assignment depending on the source (the old code
+   -- generator creates single-assignment code, but hand-written Cmm
+   -- and Cmm from the new code generator is not single-assignment.)
+   -- So we do an extra check to make sure that the register being
+   -- changed is not one we were relying on.  I don't know how much of a
+   -- performance hit this is (we have to create a regset for every
+   -- instruction.) -- EZY
     ok_to_skip = case stmt of
                  CmmNop -> True
                  CmmComment{} -> True
-                 CmmAssign (CmmLocal (LocalReg u' _)) rhs | u' /= u -> True
+                 CmmAssign (CmmLocal r@(LocalReg u' _)) rhs | u' /= u && not (r `elemRegSet` regset) -> True
                  CmmAssign g@(CmmGlobal _) rhs -> not (g `regUsedIn` expr)
                  _other -> False
 

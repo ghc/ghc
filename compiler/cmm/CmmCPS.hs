@@ -71,10 +71,10 @@ cpsTop _ p@(CmmData {}) = return ([], [(Map.empty, p)])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
        -- Why bother doing it this early?
-       -- g <- dual_rewrite Opt_D_dump_cmmz "spills and reloads"
+       -- g <- dual_rewrite run Opt_D_dump_cmmz "spills and reloads"
        --                       (dualLivenessWithInsertion callPPs) g
        -- g <- run $ insertLateReloads g -- Duplicate reloads just before uses
-       -- g <- dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
+       -- g <- dual_rewrite runOptimization Opt_D_dump_cmmz "Dead Assignment Elimination"
        --                   (removeDeadAssignmentsAndReloads callPPs) g
        dump Opt_D_dump_cmmz "Pre common block elimination" g
        g <- return $ elimCommonBlocks g
@@ -91,16 +91,16 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        ----------- Spills and reloads -------------------
        g     <- 
               -- pprTrace "pre Spills" (ppr g) $
-                dual_rewrite Opt_D_dump_cmmz "spills and reloads"
+                dual_rewrite run Opt_D_dump_cmmz "spills and reloads"
                              (dualLivenessWithInsertion procPoints) g
                     -- Insert spills at defns; reloads at return points
        g     <-
               -- pprTrace "pre insertLateReloads" (ppr g) $
-                run $ insertLateReloads g -- Duplicate reloads just before uses
+                runOptimization $ insertLateReloads g -- Duplicate reloads just before uses
        dump Opt_D_dump_cmmz "Post late reloads" g
        g     <-
                -- pprTrace "post insertLateReloads" (ppr g) $
-                dual_rewrite Opt_D_dump_cmmz "Dead Assignment Elimination"
+                dual_rewrite runOptimization Opt_D_dump_cmmz "Dead Assignment Elimination"
                                         (removeDeadAssignmentsAndReloads procPoints) g
                     -- Remove redundant reloads (and any other redundant asst)
 
@@ -146,12 +146,16 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
   where dflags = hsc_dflags hsc_env
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
         dump f txt g = dumpIfSet_dyn dflags f txt (ppr g)
+        -- Runs a required transformation/analysis
+        run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
+        -- Runs an optional transformation/analysis (and should
+        -- thus be subject to optimization fuel)
+        runOptimization = runFuelIO (hsc_OptFuel hsc_env)
 
-        run = runFuelIO (hsc_OptFuel hsc_env)
-
-        dual_rewrite flag txt pass g =
+        -- pass 'run' or 'runOptimization' for 'r'
+        dual_rewrite r flag txt pass g =
           do dump flag ("Pre " ++ txt)  g
-             g <- run $ pass g
+             g <- r $ pass g
              dump flag ("Post " ++ txt) $ g
              return g
 

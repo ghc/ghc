@@ -6,12 +6,12 @@
 -- the optimiser with varying amount of fuel to find out the exact number of
 -- steps where a bug is introduced in the output.
 module OptimizationFuel
-    ( OptimizationFuel, amountOfFuel, tankFilledTo, anyFuelLeft, oneLessFuel
+    ( OptimizationFuel, amountOfFuel, tankFilledTo, unlimitedFuel, anyFuelLeft, oneLessFuel
     , OptFuelState, initOptFuelState
     , FuelConsumer, FuelUsingMonad, FuelState
     , fuelGet, fuelSet, lastFuelPass, setFuelPass
     , fuelExhausted, fuelDec1, tryWithFuel
-    , runFuelIO, fuelConsumingPass
+    , runFuelIO, runInfiniteFuelIO, fuelConsumingPass
     , FuelUniqSM
     , liftUniq
     )
@@ -51,6 +51,7 @@ amountOfFuel :: OptimizationFuel -> Int
 
 anyFuelLeft :: OptimizationFuel -> Bool
 oneLessFuel :: OptimizationFuel -> OptimizationFuel
+unlimitedFuel :: OptimizationFuel
 
 #ifdef DEBUG
 newtype OptimizationFuel = OptimizationFuel Int
@@ -61,6 +62,7 @@ amountOfFuel (OptimizationFuel f) = f
 
 anyFuelLeft (OptimizationFuel f) = f > 0
 oneLessFuel (OptimizationFuel f) = ASSERT (f > 0) (OptimizationFuel (f - 1))
+unlimitedFuel = OptimizationFuel infiniteFuel
 #else
 -- type OptimizationFuel = State# () -- would like this, but it won't work
 data OptimizationFuel = OptimizationFuel
@@ -70,6 +72,7 @@ amountOfFuel _ = maxBound
 
 anyFuelLeft _ = True
 oneLessFuel _ = OptimizationFuel
+unlimitedFuel = OptimizationFuel
 #endif
 
 data FuelState = FuelState { fs_fuel :: OptimizationFuel, fs_lastpass :: String }
@@ -90,6 +93,16 @@ runFuelIO fs (FUSM f) =
        let (a, FuelState fuel' pass') = initUs_ u $ f (FuelState fuel pass)
        writeIORef (pass_ref fs) pass'
        writeIORef (fuel_ref fs) fuel'
+       return a
+
+-- ToDo: Do we need the pass_ref when we are doing infinite fueld
+-- transformations?
+runInfiniteFuelIO :: OptFuelState -> FuelUniqSM a -> IO a
+runInfiniteFuelIO fs (FUSM f) =
+    do pass <- readIORef (pass_ref fs)
+       u <- mkSplitUniqSupply 'u'
+       let (a, FuelState _ pass') = initUs_ u $ f (FuelState unlimitedFuel pass)
+       writeIORef (pass_ref fs) pass'
        return a
 
 instance Monad FuelUniqSM where

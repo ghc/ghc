@@ -50,6 +50,7 @@ import Outputable
 import Constants
 import BasicTypes
 import CLabel
+import Util
 
 -- The rest
 import Data.List
@@ -104,18 +105,19 @@ pprTop (CmmProc info clbl (ListGraph blocks)) =
         then pprDataExterns info $$
              pprWordArray (entryLblToInfoLbl clbl) info
         else empty) $$
-    (case blocks of
-        [] -> empty
-         -- the first block doesn't get a label:
-        (BasicBlock _ stmts : rest) -> vcat [
+    (vcat [
 	   blankLine,
 	   extern_decls,
            (if (externallyVisibleCLabel clbl)
                     then mkFN_ else mkIF_) (pprCLabel clbl) <+> lbrace,
            nest 8 temp_decls,
            nest 8 mkFB_,
-           nest 8 (vcat (map pprStmt stmts)) $$
-              vcat (map pprBBlock rest),
+           case blocks of
+               [] -> empty
+               -- the first block doesn't get a label:
+               (BasicBlock _ stmts : rest) ->
+                    nest 8 (vcat (map pprStmt stmts)) $$
+                       vcat (map pprBBlock rest),
            nest 8 mkFE_,
            rbrace ]
     )
@@ -1021,18 +1023,6 @@ machRep_S_CType _   = panic "machRep_S_CType"
 
 pprStringInCStyle :: [Word8] -> SDoc
 pprStringInCStyle s = doubleQuotes (text (concatMap charToC s))
-
-charToC :: Word8 -> String
-charToC w = 
-  case chr (fromIntegral w) of
-	'\"' -> "\\\""
-	'\'' -> "\\\'"
-	'\\' -> "\\\\"
-	c | c >= ' ' && c <= '~' -> [c]
-          | otherwise -> ['\\',
-                         chr (ord '0' + ord c `div` 64),
-                         chr (ord '0' + ord c `div` 8 `mod` 8),
-                         chr (ord '0' + ord c         `mod` 8)]
 
 -- ---------------------------------------------------------------------------
 -- Initialising static objects with floating-point numbers.  We can't

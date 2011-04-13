@@ -314,7 +314,8 @@ xchg(StgPtr p, StgWord w)
     return old;
 }
 
-STATIC_INLINE StgWord
+EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
     StgWord result;

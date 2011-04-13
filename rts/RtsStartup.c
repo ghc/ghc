@@ -16,6 +16,7 @@
 #include "HsFFI.h"
 
 #include "sm/Storage.h"
+#include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Schedule.h"   /* initScheduler */
@@ -129,8 +130,7 @@ hs_init(int *argc, char **argv[])
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc != NULL && argv != NULL) {
 	setFullProgArgv(*argc,*argv);
-	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
-	setProgArgv(*argc,*argv);
+        setupRtsFlags(argc, *argv);
     }
 
     /* Initialise the stats department, phase 1 */
@@ -224,90 +224,37 @@ hs_init(int *argc, char **argv[])
     x86_init_fpu();
 #endif
 
-    /* Record initialization times */
-    stat_endInit();
-}
-
-// Compatibility interface
-void
-startupHaskell(int argc, char *argv[], void (*init_root)(void))
-{
-    hs_init(&argc, &argv);
-    if(init_root)
-        hs_add_root(init_root);
-}
-
-
-/* -----------------------------------------------------------------------------
-   Per-module initialisation
-
-   This process traverses all the compiled modules in the program
-   starting with "Main", and performing per-module initialisation for
-   each one.
-
-   So far, two things happen at initialisation time:
-
-      - we register stable names for each foreign-exported function
-        in that module.  This prevents foreign-exported entities, and
-	things they depend on, from being garbage collected.
-
-      - we supply a unique integer to each statically declared cost
-        centre and cost centre stack in the program.
-
-   The code generator inserts a small function "__stginit_<module>" in each
-   module and calls the registration functions in each of the modules it
-   imports.
-
-   The init* functions are compiled in the same way as STG code,
-   i.e. without normal C call/return conventions.  Hence we must use
-   StgRun to call this stuff.
-   -------------------------------------------------------------------------- */
-
-/* The init functions use an explicit stack... 
- */
-#define INIT_STACK_BLOCKS  4
-static StgFunPtr *init_stack = NULL;
-
-void
-hs_add_root(void (*init_root)(void))
-{
-    bdescr *bd;
-    nat init_sp;
-    Capability *cap;
-
-    cap = rts_lock();
-
-    if (hs_init_count <= 0) {
-	barf("hs_add_root() must be called after hs_init()");
-    }
-
-    /* The initialisation stack grows downward, with sp pointing 
-       to the last occupied word */
-    init_sp = INIT_STACK_BLOCKS*BLOCK_SIZE_W;
-    bd = allocGroup_lock(INIT_STACK_BLOCKS);
-    init_stack = (StgFunPtr *)bd->start;
-    init_stack[--init_sp] = (StgFunPtr)stg_init_finish;
-    if (init_root != NULL) {
-	init_stack[--init_sp] = (StgFunPtr)init_root;
-    }
-    
-    cap->r.rSp = (P_)(init_stack + init_sp);
-    StgRun((StgFunPtr)stg_init, &cap->r);
-
-    freeGroup_lock(bd);
-
     startupHpc();
 
     // This must be done after module initialisation.
     // ToDo: make this work in the presence of multiple hs_add_root()s.
     initProfiling2();
 
-    rts_unlock(cap);
-
     // ditto.
 #if defined(THREADED_RTS)
     ioManagerStart();
 #endif
+
+    /* Record initialization times */
+    stat_endInit();
+}
+
+// Compatibility interface
+void
+startupHaskell(int argc, char *argv[], void (*init_root)(void) STG_UNUSED)
+{
+    hs_init(&argc, &argv);
+}
+
+
+/* -----------------------------------------------------------------------------
+   hs_add_root: backwards compatibility.  (see #3252)
+   -------------------------------------------------------------------------- */
+
+void
+hs_add_root(void (*init_root)(void) STG_UNUSED)
+{
+    /* nothing */
 }
 
 /* ----------------------------------------------------------------------------
@@ -424,7 +371,7 @@ hs_exit_(rtsBool wait_foreign)
 #endif
 
     endProfiling();
-    freeProfiling1();
+    freeProfiling();
 
 #ifdef PROFILING
     // Originally, this was in report_ccs_profiling().  Now, retainer

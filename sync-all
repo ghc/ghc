@@ -3,6 +3,64 @@
 use strict;
 use Cwd;
 
+# Usage:
+#
+# ./sync-all [-q] [-s] [--ignore-failure] [-r repo]
+#            [--nofib] [--testsuite] [--checked-out] cmd [git flags]
+#
+# Applies the command "cmd" to each repository in the tree.
+# sync-all will try to do the right thing for both git and darcs repositories.
+#
+# e.g.
+#      ./sync-all -r http://darcs.haskell.org/ghc get
+#          To get any repos which do not exist in the local tree
+#
+#      ./sync-all pull
+#          To pull everything from the default repos
+#
+# -------------- Flags -------------------
+#   -q says to be quite, and -s to be silent.
+#
+#   --ignore-failure says to ignore errors and move on to the next repository
+#
+#   -r repo says to use repo as the location of package repositories
+#
+#   --checked-out says that the remote repo is in checked-out layout, as
+#   opposed to the layout used for the main repo.  By default a repo on
+#   the local filesystem is assumed to be checked-out, and repos accessed
+#   via HTTP or SSH are assumed to be in the main repo layout; use
+#   --checked-out to override the latter.
+#
+#   --nofib, --testsuite also get the nofib and testsuite repos respectively
+#
+# ------------ Which repos to use -------------
+# sync-all uses the following algorithm to decide which remote repos to use
+#
+#  It always computes the remote repos from a single base, $repo_base
+#  How is $repo_base set?  
+#    If you say "-r repo", then that's $repo_base
+#    otherwise $repo_base is set by asking git where the ghc repo came
+#    from, and removing the last component (e.g. /ghc.git/ of /ghc/).
+#
+#  Then sync-all iterates over the package found in the file
+#  ./packages; see that file for a description of the contents.
+# 
+#    If $repo_base looks like a local filesystem path, or if you give
+#    the --checked-out flag, sync-all works on repos of form
+#          $repo_base/<local-path>
+#    otherwise sync-all works on repos of form
+#          $repo_base/<remote-path>
+#    This logic lets you say
+#      both    sync-all -r http://darcs.haskell.org/ghc-6.12 pull
+#      and     sync-all -r ../HEAD pull
+#    The latter is called a "checked-out tree".
+
+# NB: sync-all *ignores* the defaultrepo of all repos other than the
+# root one.  So the remote repos must be laid out in one of the two
+# formats given by <local-path> and <remote-path> in the file 'packages'.
+
+$| = 1; # autoflush stdout after each print, to avoid output after die
+
 my $defaultrepo;
 my @packages;
 my $verbose = 2;
@@ -79,7 +137,7 @@ sub parsePackages {
     my @repos;
     my $lineNum;
 
-    open IN, "< packages.git" or die "Can't open packages file";
+    open IN, "< packages" or die "Can't open packages file";
     @repos = <IN>;
     close IN;
 
@@ -116,12 +174,25 @@ sub warning {
 }
 
 sub scm {
+    my $dir = shift;
     my $scm = shift;
-    
-    message "== running $scm @_";
+    my $pwd;
+
+    if ($dir eq '.') {
+        message "== running $scm @_";
+    } else {
+        message "== $dir: running $scm @_";
+        $pwd = getcwd();
+        chdir($dir);
+    }
+
     system ($scm, @_) == 0
         or $ignore_failure
         or die "$scm failed: $?";
+
+    if ($dir ne '.') {
+        chdir($pwd);
+    }
 }
 
 sub repoexists {
@@ -144,15 +215,53 @@ sub scmall {
     my $scm;
     my $upstream;
     my $line;
+    my $branch_name;
+    my $subcommand;
 
     my $path;
     my $wd_before = getcwd;
 
     my @scm_args;
 
+    my $pwd;
+    my @args;
+
     my ($repo_base, $checked_out_tree) = getrepo();
 
+    my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
+
     parsePackages;
+
+    @args = ();
+
+    if ($command =~ /^remote$/) {
+        while (@_ > 0 && $_[0] =~ /^-/) {
+            push(@args,shift);
+        }
+        if (@_ < 1) { help(); }
+        $subcommand = shift;
+        if ($subcommand ne 'add' && $subcommand ne 'rm' && $subcommand ne 'set-url') {
+            help();
+        }
+        while (@_ > 0 && $_[0] =~ /^-/) {
+            push(@args,shift);
+        }
+        if (($subcommand eq 'add' || $subcommand eq 'rm') && @_ < 1) {
+            help();
+        } elsif (@_ < 1) { # set-url
+            $branch_name = 'origin';
+        } else {
+            $branch_name = shift;
+        }
+    } elsif ($command eq 'new' || $command eq 'fetch') {
+        if (@_ < 1) {
+            $branch_name = 'origin';
+        } else {
+            $branch_name = shift;
+        }
+    }
+
+    push(@args, @_);
 
     for $line (@packages) {
 
@@ -161,6 +270,12 @@ sub scmall {
             $remotepath = $$line{"remotepath"};
             $scm        = $$line{"vcs"};
             $upstream   = $$line{"upstream"};
+
+            # We can't create directories on GitHub, so we translate
+            # "package/foo" into "package-foo".
+            if ($is_github_repo) {
+                $remotepath =~ s/\//-/;
+            }
 
             # Check the SCM is OK as early as possible
             die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
@@ -174,20 +289,23 @@ sub scmall {
             }
 
             # Work out the arguments we should give to the SCM
-            if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew)$/) {
+            if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
                 @scm_args = (($scm eq "darcs" and "whatsnew")
                           or ($scm eq "git" and "status"));
                 
                 # Hack around 'darcs whatsnew' failing if there are no changes
                 $ignore_failure = 1;
             }
+            elsif ($command =~ /^commit$/) {
+                @scm_args = ("commit");
+                # git fails if there is nothing to commit, so ignore failures
+                $ignore_failure = 1;
+            }
             elsif ($command =~ /^(?:pus|push)$/) {
                 @scm_args = "push";
-                $want_remote_repo = 1;
             }
             elsif ($command =~ /^(?:pul|pull)$/) {
                 @scm_args = "pull";
-                $want_remote_repo = 1;
                 # Q: should we append the -a argument for darcs repos?
             }
             elsif ($command =~ /^(?:g|ge|get)$/) {
@@ -202,7 +320,7 @@ sub scmall {
                 }
                 
                 # The first time round the loop, default the get-mode
-                if (not defined($get_mode)) {
+                if ($scm eq "darcs" && not defined($get_mode)) {
                     warning("adding --partial, to override use --complete");
                     $get_mode = "--partial";
                 }
@@ -223,6 +341,32 @@ sub scmall {
                           or ($scm eq "git" and "send-email"));
                 $want_remote_repo = 1;
             }
+            elsif ($command =~ /^fetch$/) {
+                @scm_args = ("fetch", "$branch_name");
+            }
+            elsif ($command =~ /^new$/) {
+                @scm_args = ("log", "$branch_name..");
+            }
+            elsif ($command =~ /^remote$/) {
+                if ($subcommand eq 'add') {
+                    @scm_args = ("remote", "add", $branch_name, $path);
+                } elsif ($subcommand eq 'rm') {
+                    @scm_args = ("remote", "rm", $branch_name);
+                } elsif ($subcommand eq 'set-url') {
+                    @scm_args = ("remote", "set-url", $branch_name, $path);
+                }
+            }
+            elsif ($command =~ /^grep$/) {
+              @scm_args = ("grep");
+              # Hack around 'git grep' failing if there are no matches
+              $ignore_failure = 1;
+            }
+            elsif ($command =~ /^reset$/) {
+                @scm_args = "reset";
+            }
+            elsif ($command =~ /^config$/) {
+                @scm_args = "config";
+            }
             else {
                 die "Unknown command: $command";
             }
@@ -231,19 +375,20 @@ sub scmall {
             if (repoexists ($scm, $localpath)) {
                 if ($want_remote_repo) {
                     if ($scm eq "darcs") {
-                        scm ($scm, @scm_args, @_, "--repodir=$localpath", $path);
+                        scm (".", $scm, @scm_args, @args, "--repodir=$localpath", $path);
                     } else {
                         # git pull doesn't like to be used with --work-dir
-                        scm ($scm, "--git-dir=$localpath/.git", @scm_args, @_, $path, "master");
+                        # I couldn't find an alternative to chdir() here
+                        scm ($localpath, $scm, @scm_args, @args, $path, "master");
                     }
                 } else {
                     # git status *must* be used with --work-dir, if we don't chdir() to the dir
-                    scm ($scm, "--git-dir=$localpath/.git", "--work-tree=$localpath", @scm_args, @_);
+                    scm ($localpath, $scm, @scm_args, @args);
                 }
             }
             elsif ($local_repo_unnecessary) {
                 # Don't bother to change directory in this case
-                scm ($scm, @scm_args, @_);
+                scm (".", $scm, @scm_args, @args);
             }
             elsif ($tag eq "") {
                 message "== Required repo $localpath is missing! Skipping";
@@ -252,6 +397,57 @@ sub scmall {
                 message "== $localpath repo not present; skipping";
             }
     }
+}
+
+
+sub help()
+{
+        # Get the built in help
+        my $help = <<END;
+What do you want to do?
+Supported commands:
+
+ * whatsnew
+ * commit
+ * push
+ * pull
+ * get, with options:
+  * --<package-tag>
+  * --complete
+  * --partial
+ * fetch
+ * send
+ * new
+ * remote add <branch-name>
+ * remote rm <branch-name>
+ * remote set-url [--push] <branch-name>
+ * grep
+ * reset
+ * config
+
+Available package-tags are:
+END
+
+        # Collect all the tags in the packages file
+        my %available_tags;
+        open IN, "< packages" or die "Can't open packages file";
+        while (<IN>) {
+            chomp;
+            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
+                if (defined($2) && $2 ne "-") {
+                    $available_tags{$2} = 1;
+                }
+            }
+            elsif (! /^(#.*)?$/) {
+                die "Bad line: $_";
+            }
+        }
+        close IN;
+        
+        # Show those tags and the help text
+        my @available_tags = keys %available_tags;
+        print "$help@available_tags\n";
+        exit 1;
 }
 
 sub main {
@@ -302,43 +498,7 @@ sub main {
     }
 
     if ($#_ eq -1) {
-        # Get the built in help
-        my $help = <<END;
-What do you want to do?
-Supported commands:
-
- * whatsnew
- * push
- * pull
- * get, with options:
-  * --<package-tag>
-  * --complete
-  * --partial
- * send
-
-Available package-tags are:
-END
-
-        # Collect all the tags in the packages file
-        my %available_tags;
-        open IN, "< packages" or die "Can't open packages file";
-        while (<IN>) {
-            chomp;
-            if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
-                if (defined($2) && $2 ne "-") {
-                    $available_tags{$2} = 1;
-                }
-            }
-            elsif (! /^(#.*)?$/) {
-                die "Bad line: $_";
-            }
-        }
-        close IN;
-        
-        # Show those tags and the help text
-        my @available_tags = keys %available_tags;
-        print "$help@available_tags\n";
-        exit 1;
+        help();
     }
     else {
         # Give the command and rest of the arguments to the main loop

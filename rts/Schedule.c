@@ -2069,6 +2069,16 @@ freeScheduler( void )
 #endif
 }
 
+void markScheduler (evac_fn evac USED_IF_NOT_THREADS, 
+                    void *user USED_IF_NOT_THREADS)
+{
+#if !defined(THREADED_RTS)
+    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
+    evac(user, (StgClosure **)(void *)&sleeping_queue);
+#endif 
+}
+
 /* -----------------------------------------------------------------------------
    performGC
 
