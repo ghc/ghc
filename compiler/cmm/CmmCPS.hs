@@ -95,9 +95,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
                              (dualLivenessWithInsertion procPoints) g
                     -- Insert spills at defns; reloads at return points
        g     <-
-              -- pprTrace "pre insertLateReloads" (ppr g) $
-                runOptimization $ insertLateReloads g -- Duplicate reloads just before uses
-       dump Opt_D_dump_cmmz "Post late reloads" g
+                runOptimization $ rewriteAssignments g
+       dump Opt_D_dump_cmmz "Post rewrite assignments" g
        g     <-
                -- pprTrace "post insertLateReloads" (ppr g) $
                 dual_rewrite runOptimization Opt_D_dump_cmmz "Dead Assignment Elimination"
