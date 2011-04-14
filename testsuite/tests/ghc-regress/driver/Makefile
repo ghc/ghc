@@ -464,9 +464,15 @@ rtsopts002:
 
 .PHONY: withRtsOpts
 withRtsOpts:
-	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o
+	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o withRtsOpts.out
 	"$(TEST_HC)" -v0 --make withRtsOpts -with-rtsopts=--info
 	./withRtsOpts | head -1
+	# Also test for non-safe RTS opts, these should be allowed too,
+	# since the author has explicitly requested them. (#5114)
+	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o withRtsOpts.out
+	"$(TEST_HC)" -v0 --make withRtsOpts -with-rtsopts=-twithRtsOpts.out
+	./withRtsOpts | head -1
+	test -f withRtsOpts.out
 
 .PHONY: T3364
 T3364:

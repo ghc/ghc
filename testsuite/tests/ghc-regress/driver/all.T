@@ -310,7 +310,10 @@ test('rtsopts001', normal, run_command,
 test('rtsopts002', normal, run_command,
                 ['$MAKE -s --no-print-directory rtsopts002'])
 
-test('withRtsOpts', normal, run_command,
+test('withRtsOpts', [ extra_clean(['withRtsOpts', 'withRtsOpts.exe',
+                                   'withRtsOpts.hi', 'withRtsOpts.o',
+                                   'withRtsOpts.out']) ],
+                    run_command,
                     ['$MAKE -s --no-print-directory withRtsOpts'])
 test('T3389', normal, compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), run_command,
