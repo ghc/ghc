@@ -798,6 +798,15 @@ statDescribeGens(void)
       mut = 0;
       for (i = 0; i < n_capabilities; i++) {
           mut += countOccupied(capabilities[i].mut_lists[g]);
+
+          // Add the pinned object block.
+          bd = capabilities[i].pinned_object_block;
+          if (bd != NULL) {
+              gen_live   += bd->free - bd->start;
+              gen_blocks += bd->blocks;
+          }
+
+          gen_live   += gcThreadLiveWords(i,g);
           gen_live   += gcThreadLiveWords(i,g);
           gen_blocks += gcThreadLiveBlocks(i,g);
       }
