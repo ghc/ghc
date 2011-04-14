@@ -13,7 +13,7 @@
 
 module CmmStackLayout
     ( SlotEnv, liveSlotAnal, liveSlotTransfers, removeLiveSlotDefs
-    , layout, manifestSP, igraph, areaBuilder
+    , getSpEntryMap, layout, manifestSP, igraph, areaBuilder
     , stubSlotsOnDeath ) -- to help crash early during debugging
 where
 
@@ -134,6 +134,10 @@ liveSlotTransfers = mkBTransfer3 frt mid lst
         mid n f = foldSlotsUsed addSlot (removeLiveSlotDefs f n) n
         lst :: CmmNode O C -> FactBase SubAreaSet -> SubAreaSet
         lst n f = liveInSlots n $ case n of
+          -- EZY: There's something fishy going on here: the old area is
+          -- being kept alive too long.  In particular, the incoming
+          -- parameters can be safely clobbered after they've been read
+          -- out.
           CmmCall {cml_cont=Nothing, cml_args=args} -> add_area (CallArea Old) args out
           CmmCall {cml_cont=Just k, cml_args=args}  -> add_area (CallArea Old) args (add_area (CallArea (Young k)) args out)
           CmmForeignCall {succ=k, updfr=oldend}     -> add_area (CallArea Old) oldend (add_area (CallArea (Young k)) wORD_SIZE out)
@@ -195,7 +199,7 @@ liveLastOut env l =
 type Set x = Map x ()
 data IGraphBuilder n =
   Builder { foldNodes     :: forall z. SubArea -> (n -> z -> z) -> z -> z
-          , _wordsOccupied :: AreaMap -> AreaMap -> n -> [Int]
+          , _wordsOccupied :: AreaSizeMap -> AreaMap -> n -> [Int]
           }
 
 areaBuilder :: IGraphBuilder Area
@@ -242,10 +246,13 @@ igraph builder env g = foldr interfere Map.empty (postorderDfs g)
 -- what's the highest offset (in bytes) used in each Area?
 -- We'll need to allocate that much space for each Area.
 
+-- Mapping of areas to area sizes (not offsets!)
+type AreaSizeMap = AreaMap
+
 -- JD: WHY CAN'T THIS COME FROM THE slot-liveness info?
-getAreaSize :: ByteOff -> CmmGraph -> AreaMap
+getAreaSize :: ByteOff -> CmmGraph -> AreaSizeMap
   -- The domain of the returned mapping consists only of Areas
-  -- used for (a) variable spill slots, and (b) parameter passing ares for calls
+  -- used for (a) variable spill slots, and (b) parameter passing areas for calls
 getAreaSize entry_off g =
   foldGraphBlocks (foldBlockNodesF3 (first, add_regslots, last))
               (Map.singleton (CallArea Old) entry_off) g
@@ -266,10 +273,11 @@ getAreaSize entry_off g =
 	-- The 'max' is important.  Two calls, to f and g, might share a common
 	-- continuation (and hence a common CallArea), but their number of overflow
 	-- parameters might differ.
+        -- EZY: Ought to use insert with combining function...
 
 
 -- Find the Stack slots occupied by the subarea's conflicts
-conflictSlots :: Ord x => IGPair x -> AreaMap -> AreaMap -> SubArea -> Set Int
+conflictSlots :: Ord x => IGPair x -> AreaSizeMap -> AreaMap -> SubArea -> Set Int
 conflictSlots (ig, Builder foldNodes wordsOccupied) areaSize areaMap subarea =
   foldNodes subarea foldNode Map.empty
   where foldNode n set = Map.foldRightWithKey conflict set $ Map.findWithDefault Map.empty n ig
@@ -278,10 +286,10 @@ conflictSlots (ig, Builder foldNodes wordsOccupied) areaSize areaMap subarea =
         liveInSlots areaMap n set = foldr setAdd set (wordsOccupied areaSize areaMap n)
         setAdd w s = Map.insert w () s
 
--- Find any open space on the stack, starting from the offset.
--- If the area is a CallArea or a spill slot for a pointer, then it must
--- be word-aligned.
-freeSlotFrom :: Ord x => IGPair x -> AreaMap -> Int -> AreaMap -> Area -> Int
+-- Find any open space for 'area' on the stack, starting from the
+-- 'offset'.  If the area is a CallArea or a spill slot for a pointer,
+-- then it must be word-aligned.
+freeSlotFrom :: Ord x => IGPair x -> AreaSizeMap -> Int -> AreaMap -> Area -> Int
 freeSlotFrom ig areaSize offset areaMap area =
   let size = Map.lookup area areaSize `orElse` 0
       conflicts = conflictSlots ig areaSize areaMap (area, size, size)
@@ -299,10 +307,23 @@ freeSlotFrom ig areaSize offset areaMap area =
   in findSpace (align (offset + size)) size
 
 -- Find an open space on the stack, and assign it to the area.
-allocSlotFrom :: Ord x => IGPair x -> AreaMap -> Int -> AreaMap -> Area -> AreaMap
+allocSlotFrom :: Ord x => IGPair x -> AreaSizeMap -> Int -> AreaMap -> Area -> AreaMap
 allocSlotFrom ig areaSize from areaMap area =
   if Map.member area areaMap then areaMap
   else Map.insert area (freeSlotFrom ig areaSize from areaMap area) areaMap
+
+-- Figure out all of the offsets from the slot location; this will be
+-- non-zero for procpoints.
+type SpEntryMap = BlockEnv Int
+getSpEntryMap :: Int -> CmmGraph -> SpEntryMap
+getSpEntryMap entry_off g@(CmmGraph {g_entry = entry})
+    = foldGraphBlocks add_sp_off (mapInsert entry entry_off emptyBlockMap) g
+  where add_sp_off :: CmmBlock -> BlockEnv Int -> BlockEnv Int
+        add_sp_off b env =
+          case lastNode b of
+            CmmCall {cml_cont=Just succ, cml_ret_args=off} -> mapInsert succ off env
+            CmmForeignCall {succ=succ}                     -> mapInsert succ wORD_SIZE env
+            _                                              -> env
 
 -- | Greedy stack layout.
 -- Compute liveness, build the interference graph, and allocate slots for the areas.
@@ -326,12 +347,16 @@ allocSlotFrom ig areaSize from areaMap area =
 -- Note: The stack pointer only has to be younger than the youngest live stack slot
 -- at proc points. Otherwise, the stack pointer can point anywhere.
 
-layout :: ProcPointSet -> SlotEnv -> ByteOff -> CmmGraph -> AreaMap
+layout :: ProcPointSet -> SpEntryMap -> SlotEnv -> ByteOff -> CmmGraph -> AreaMap
 -- The domain of the returned map includes an Area for EVERY block
 -- including each block that is not the successor of a call (ie is not a proc-point)
--- That's how we return the info of what the SP should be at the entry of every block
+-- That's how we return the info of what the SP should be at the entry of every non
+-- procpoint block.  However, note that procpoint blocks have their
+-- /slot/ stored, which is not necessarily the value of the SP on entry
+-- to the block (in fact, it probably isn't, due to argument passing).
+-- See [Procpoint Sp offset]
 
-layout procPoints env entry_off g =
+layout procPoints spEntryMap env entry_off g =
   let ig = (igraph areaBuilder env g, areaBuilder)
       env' bid = mapLookup bid env `orElse` panic "unknown blockId in igraph"
       areaSize = getAreaSize entry_off g
@@ -370,20 +395,86 @@ layout procPoints env entry_off g =
       allocMid m areaMap = foldSlotsDefd alloc' (foldSlotsUsed alloc' areaMap m) m
       allocLast bid l areaMap =
         foldr (setSuccSPs inSp) areaMap' (successors l)
-        where inSp = expectJust "sp in" $ Map.lookup (CallArea (Young bid)) areaMap
+        where inSp = slot + spOffset -- [Procpoint Sp offset]
+              -- If it's not in the map, we should use our previous
+              -- calculation unchanged.
+              spOffset = mapLookup bid spEntryMap `orElse` 0
+              slot = expectJust "slot in" $ Map.lookup (CallArea (Young bid)) areaMap
               areaMap' = foldSlotsDefd alloc' (foldSlotsUsed alloc' areaMap l) l
       alloc' areaMap (a@(RegSlot _), _, _) = allocVarSlot areaMap a
       alloc' areaMap _ = areaMap
 
-      initMap = Map.insert (CallArea (Young (g_entry g))) 0 $
-                  Map.insert (CallArea Old) 0 Map.empty
-                        
+      initMap = Map.insert (CallArea (Young (g_entry g))) 0
+              . Map.insert (CallArea Old)                 0
+              $ Map.empty
+
       areaMap = foldl layoutAreas initMap (postorderDfs g)
   in -- pprTrace "ProcPoints" (ppr procPoints) $
-        -- pprTrace "Area SizeMap" (ppr areaSize) $
-         -- pprTrace "Entry SP" (ppr entrySp) $
-           -- pprTrace "Area Map" (ppr areaMap) $
+     -- pprTrace "Area SizeMap" (ppr areaSize) $
+     -- pprTrace "Entry offset" (ppr entry_off) $
+     -- pprTrace "Area Map" (ppr areaMap) $
      areaMap
+
+{- Note [Procpoint Sp offset]
+
+The calculation of inSp is a little tricky.  (Un)fortunately, if you get
+it wrong, you will get inefficient but correct code.  You know you've
+got it wrong if the generated stack pointer bounces up and down for no
+good reason.
+
+Why can't we just set inSp to the location of the slot?  (This is what
+the code used to do.)  The trouble is when we actually hit the proc
+point the start of the slot will not be the same as the actual Sp due
+to argument passing:
+
+  a:
+      I32[(young<b> + 4)] = cde;
+      // Stack pointer is moved to young end (bottom) of young<b> for call
+      // +-------+
+      // | arg 1 |
+      // +-------+ <- Sp
+      call (I32[foobar::I32])(...) returns to Just b (4) (4) with update frame 4;
+  b:
+      // After call, stack pointer is above the old end (top) of
+      // young<b> (the difference is spOffset)
+      // +-------+ <- Sp
+      // | arg 1 |
+      // +-------+
+
+If we blithely set the Sp to be the same as the slot (the young end of
+young<b>), an adjustment will be necessary when we go to the next block.
+This is wasteful.  So, instead, for the next block after a procpoint,
+the actual Sp should be set to the same as the true Sp when we just
+entered the procpoint.  Then manifestSP will automatically do the right
+thing.
+
+Questions you may ask:
+
+1. Why don't we need to change the mapping for the procpoint itself?
+   Because manifestSP does its own calculation of the true stack value,
+   manifestSP will notice the discrepancy between the actual stack
+   pointer and the slot start, and adjust all of its memory accesses
+   accordingly.  So the only problem is when we adjust the Sp in
+   preparation for the successor block; that's why this code is here and
+   not in setSuccSPs.
+
+2. Why don't we make the procpoint call area and the true offset match
+   up?  If we did that, we would never use memory above the true value
+   of the stack pointer, thus wasting all of the stack we used to store
+   arguments.  You might think that some clever changes to the slot
+   offsets, using negative offsets, might fix it, but this does not make
+   semantic sense.
+
+3. If manifestSP is already calculating the true stack value, why we can't
+   do this trick inside manifestSP itself?  The reason is that if two
+   branches join with inconsistent SPs, one of them has to be fixed: we
+   can't know what the fix should be without already knowing what the
+   chosen location of SP is on the next successor.  (This is
+   the "succ already knows incoming SP" case), This calculation cannot
+   be easily done in manifestSP, since it processes the nodes
+   /backwards/.  So we need to have figured this out before we hit
+   manifestSP.
+-}
 
 -- After determining the stack layout, we can:
 -- 1. Replace references to stack Areas with addresses relative to the stack
@@ -394,8 +485,8 @@ layout procPoints env entry_off g =
 --    stack pointer to be younger than the live values on the stack at proc points.
 -- 3. Compute the maximum stack offset used in the procedure and replace
 --    the stack high-water mark with that offset.
-manifestSP :: AreaMap -> ByteOff -> CmmGraph -> FuelUniqSM CmmGraph
-manifestSP areaMap entry_off g@(CmmGraph {g_entry=entry}) =
+manifestSP :: SpEntryMap -> AreaMap -> ByteOff -> CmmGraph -> FuelUniqSM CmmGraph
+manifestSP spEntryMap areaMap entry_off g@(CmmGraph {g_entry=entry}) =
   ofBlockMap entry `liftM` foldl replB (return mapEmpty) (postorderDfs g)
   where slot a = -- pprTrace "slot" (ppr a) $
                    Map.lookup a areaMap `orElse` panic "unallocated Area"
@@ -404,13 +495,6 @@ manifestSP areaMap entry_off g@(CmmGraph {g_entry=entry}) =
         sp_high = maxSlot slot g
         proc_entry_sp = slot (CallArea Old) + entry_off
 
-        add_sp_off :: CmmBlock -> BlockEnv Int -> BlockEnv Int
-        add_sp_off b env =
-          case lastNode b of
-            CmmCall {cml_cont=Just succ, cml_ret_args=off} -> mapInsert succ off env
-            CmmForeignCall {succ=succ}                     -> mapInsert succ wORD_SIZE env
-            _                                              -> env
-        spEntryMap = foldGraphBlocks add_sp_off (mapInsert entry entry_off emptyBlockMap) g
         spOffset id = mapLookup id spEntryMap `orElse` 0
 
         sp_on_entry id | id == entry = proc_entry_sp
@@ -427,6 +511,9 @@ manifestSP areaMap entry_off g@(CmmGraph {g_entry=entry}) =
           where spIn = sp_on_entry (entryLabel block)
 
                 middle spOff m = mapExpDeep (replSlot spOff) m
+                -- XXX there shouldn't be any global registers in the
+                -- CmmCall, so there shouldn't be any slots in
+                -- CmmCall... check that...
                 last   spOff l = mapExpDeep (replSlot spOff) l
                 replSlot spOff (CmmStackSlot a i) = CmmRegOff (CmmGlobal Sp) (spOff - (slot a + i))
                 replSlot _ (CmmLit CmmHighStackMark) = -- replacing the high water mark
