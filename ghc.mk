@@ -227,6 +227,7 @@ include rules/package-config.mk
 # -----------------------------------------------------------------------------
 # Building dependencies
 
+include rules/dependencies.mk
 include rules/build-dependencies.mk
 include rules/include-dependencies.mk
 
