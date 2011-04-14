@@ -53,7 +53,7 @@ module OccName (
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenC, mkGenS, mkGenR0, mkGenR0Co,
+ 	mkGenD, mkGenR0, mkGenR0Co, mkGenC, mkGenS,
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
@@ -581,7 +581,11 @@ mkGenOcc2           = mk_simple_deriv varName  "$gto"
 
 -- Generic deriving mechanism (new)
 mkGenD         = mk_simple_deriv tcName "D1"
+
+mkGenC :: OccName -> Int -> OccName
 mkGenC occ m   = mk_deriv tcName ("C1_" ++ show m) (occNameString occ)
+
+mkGenS :: OccName -> Int -> Int -> OccName
 mkGenS occ m n = mk_deriv tcName ("S1_" ++ show m ++ "_" ++ show n)
                    (occNameString occ)
 

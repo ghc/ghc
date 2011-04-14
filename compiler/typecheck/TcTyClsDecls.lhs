@@ -1143,7 +1143,7 @@ checkValidClass cls
     unary 	= isSingleton tyvars
     no_generics = null [() | (_, (GenDefMeth _)) <- op_stuff]
 
-    check_op constrained_class_methods (sel_id, dm) 
+    check_op constrained_class_methods (sel_id, _) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
 	{ checkValidTheta SigmaCtxt (tail theta)
 		-- The 'tail' removes the initial (C a) from the
@@ -1164,7 +1164,7 @@ checkValidClass cls
 
 		-- Check that for a generic method, the type of 
 		-- the method is sufficiently simple
-{- -- JPM TODO
+{- -- JPM TODO  (when reinstating, remove commenting-out of badGenericMethodType
 	; checkTc (dm /= GenDefMeth || validGenericMethodType tau)
 		  (badGenericMethodType op_name op_ty)
 -}
@@ -1433,11 +1433,13 @@ genericMultiParamErr clas
   = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
     ptext (sLit "cannot have generic methods")
 
+{-  Commented out until the call is reinstated
 badGenericMethodType :: Name -> Kind -> SDoc
 badGenericMethodType op op_ty
   = hang (ptext (sLit "Generic method type is too complex"))
        2 (vcat [ppr op <+> dcolon <+> ppr op_ty,
 		ptext (sLit "You can only use type variables, arrows, lists, and tuples")])
+-}
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls

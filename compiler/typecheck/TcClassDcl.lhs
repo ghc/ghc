@@ -16,10 +16,8 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import HsSyn
 import RnHsSyn
-import RnExpr
 import Inst
 import InstEnv
-import TcPat( addInlinePrags )
 import TcEnv
 import TcBinds
 import TcUnify
@@ -35,7 +33,6 @@ import MkId
 import Id
 import Name
 import Var
-import NameEnv
 import NameSet
 import Outputable
 import PrelNames
@@ -104,13 +101,13 @@ tcClassSigs clas sigs def_methods
        ; op_info <- mapM (addLocM tc_sig) [sig | sig@(L _ (TypeSig _ _)) <- sigs]
        ; let op_names = [ n | (n,_,_) <- op_info ]
 
-       ; sequence [ failWithTc (badMethodErr clas n)
-                  | n <- dm_bind_names, not (n `elem` op_names) ]
-		  -- Value binding for non class-method (ie no TypeSig)
+       ; sequence_ [ failWithTc (badMethodErr clas n)
+                   | n <- dm_bind_names, not (n `elem` op_names) ]
+		   -- Value binding for non class-method (ie no TypeSig)
 
-       ; sequence [ failWithTc (badGenericMethod clas n)
-                  | n <- genop_names, not (n `elem` dm_bind_names) ]
-		  -- Generic signature without value binding
+       ; sequence_ [ failWithTc (badGenericMethod clas n)
+                   | n <- genop_names, not (n `elem` dm_bind_names) ]
+		   -- Generic signature without value binding
 
        ; return op_info }
   where
@@ -183,7 +180,7 @@ tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name -> [LSig Name]
 -- default method for every class op, regardless of whether or not 
 -- the programmer supplied an explicit default decl for the class.  
 -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
-tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
+tcDefMeth _ tyvars _ binds_in sigs sig_fn prag_fn (sel_id, dm_info)
   | NoDefMeth <- dm_info = return emptyBag
   | otherwise
   = do	{ (dm_id, tvs, sig_loc) <- tc_dm_id dm_info 
@@ -556,22 +553,6 @@ omittedATWarn :: Name -> SDoc
 omittedATWarn at
   = ptext (sLit "No explicit AT declaration for") <+> quotes (ppr at)
 
-badGenericInstance :: Var -> SDoc -> SDoc
-badGenericInstance sel_id because
-  = sep [ptext (sLit "Can't derive generic code for") <+> quotes (ppr sel_id),
-	 because]
-
-notSimple :: [Type] -> SDoc
-notSimple inst_tys
-  = vcat [ptext (sLit "because the instance type(s)"), 
-	  nest 2 (ppr inst_tys),
-	  ptext (sLit "is not a simple type of form (T a1 ... an)")]
-
-notGeneric :: TyCon -> SDoc
-notGeneric tycon
-  = vcat [ptext (sLit "because the instance type constructor") <+> quotes (ppr tycon) <+> 
-	  ptext (sLit "was not compiled with -XGenerics")]
-
 badGenericInstanceType :: LHsBinds Name -> SDoc
 badGenericInstanceType binds
   = vcat [ptext (sLit "Illegal type pattern in the generic bindings"),
@@ -589,8 +570,4 @@ dupGenericInsts tc_inst_infos
     ]
   where 
     ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
-
-mixedGenericErr :: Name -> SDoc
-mixedGenericErr op
-  = ptext (sLit "Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)
 \end{code}

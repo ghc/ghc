@@ -822,7 +822,7 @@ checkValSig lhs@(L l _) ty
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
     looks_like s (L _ (HsVar v))     = v == s
     looks_like s (L _ (HsApp lhs _)) = looks_like s lhs
-    looks_like s _                   = False
+    looks_like _ _                   = False
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     generic_RDR = mkUnqual varName (fsLit "generic")

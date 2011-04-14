@@ -25,7 +25,6 @@ import DataCon
 
 import TyCon
 import Name hiding (varName)
-import OccName (varName)
 import Module (moduleName, moduleNameString)
 import RdrName
 import BasicTypes
@@ -37,7 +36,6 @@ import PrelNames
 -- For generation of representation types
 import TcEnv (tcLookupTyCon)
 import TcRnMonad (TcM, newUnique)
-import TcMType (newMetaTyVar)
 import HscTypes
 	
 import SrcLoc
@@ -45,9 +43,6 @@ import Util
 import Bag
 import Outputable 
 import FastString
-
-import Data.List (splitAt)
-import Debug.Trace (trace)
 
 #include "HsVersions.h"
 \end{code}
@@ -305,7 +300,7 @@ mkBindsRep0 tycon =
         
 -- Disabled
 mkTyConGenericBinds :: TyCon -> LHsBinds RdrName
-mkTyConGenericBinds tycon = 
+mkTyConGenericBinds _tycon = 
   {-
     unitBag (L loc (mkFunBind (L loc from0_RDR) from0_matches))
   `unionBags`
@@ -374,8 +369,6 @@ tc_mkRep0Ty tycon metaDts =
     v1 <- tcLookupTyCon v1TyConName
     plus <- tcLookupTyCon sumTyConName
     times <- tcLookupTyCon prodTyConName
-    noSel <- tcLookupTyCon noSelTyConName
-    freshTy <- newMetaTyVar TauTv liftedTypeKind
     
     let mkSum  a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
@@ -506,7 +499,7 @@ mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
         conName_matches     c = mkStringLHS . showPpr . nameOccName
                               . dataConName $ c
         conFixity_matches   c = [mkSimpleHsAlt nlWildPat (fixity c)]
-        conIsRecord_matches c = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
+        conIsRecord_matches _ = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
         -- TODO: check that this works
         conIsTuple_matches  c = [mkSimpleHsAlt nlWildPat 
                                   (nlHsApp (nlHsVar arityDataCon_RDR) 
@@ -590,8 +583,8 @@ genLR_E i n e
 mkProd_E :: US			        -- Base for unique names
 	       -> [RdrName]       -- List of variables matched on the lhs
 	       -> LHsExpr RdrName -- Resulting product expression
-mkProd_E us []   = mkM1_E (nlHsVar u1DataCon_RDR)
-mkProd_E us vars = mkM1_E (foldBal prod appVars)
+mkProd_E _ []   = mkM1_E (nlHsVar u1DataCon_RDR)
+mkProd_E _ vars = mkM1_E (foldBal prod appVars)
                    -- These M1s are meta-information for the constructor
   where
     appVars = map wrapArg_E vars
@@ -606,8 +599,8 @@ wrapArg_E v = mkM1_E (k1DataCon_RDR `nlHsVarApps` [v])
 mkProd_P :: US			      -- Base for unique names
 	       -> [RdrName]     -- List of variables to match
 	       -> LPat RdrName  -- Resulting product pattern
-mkProd_P us []   = mkM1_P (nlNullaryConPat u1DataCon_RDR)
-mkProd_P us vars = mkM1_P (foldBal prod appVars)
+mkProd_P _ []   = mkM1_P (nlNullaryConPat u1DataCon_RDR)
+mkProd_P _ vars = mkM1_P (foldBal prod appVars)
                    -- These M1s are meta-information for the constructor
   where
     appVars = map wrapArg_P vars

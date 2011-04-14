@@ -46,7 +46,6 @@ import Var
 import VarSet
 import PrelNames
 import SrcLoc
-import Unique
 import UniqSupply
 import Util
 import ListSetOps
@@ -325,9 +324,9 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	 -- Generate the generic Representable0/1 instances from each type declaration
   ; repInstsMeta <- genGenericRepBinds is_boot tycl_decls
 	
-	; let repInsts   = concat (map (\(a,b,c) -> a) repInstsMeta)
-	      repMetaTys = map (\(a,b,c) -> b) repInstsMeta
-	      repTyCons  = map (\(a,b,c) -> c) repInstsMeta
+	; let repInsts   = concat (map (\(a,_,_) -> a) repInstsMeta)
+	      repMetaTys = map (\(_,b,_) -> b) repInstsMeta
+	      repTyCons  = map (\(_,_,c) -> c) repInstsMeta
 	-- Should we extendLocalInstEnv with repInsts?
 
 	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ repInsts)
@@ -406,6 +405,7 @@ renameDeriv is_boot gen_binds insts
 	  clas_nm            = className clas
 
 -----------------------------------------
+{- Now unused 
 mkGenericBinds :: Bool -> [LTyClDecl Name] -> TcM (LHsBinds RdrName)
 mkGenericBinds is_boot tycl_decls
   | is_boot 
@@ -418,6 +418,7 @@ mkGenericBinds is_boot tycl_decls
 		-- We are only interested in the data type declarations,
 		-- and then only in the ones whose 'has-generics' flag is on
 		-- The predicate tyConHasGenerics finds both of these
+-}
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -1494,7 +1495,7 @@ genGenericRepBinds isBoot tyclDecls
                                        , isDataDecl d ]
       let tyDecls = filter tyConHasGenerics allTyDecls
       inst1 <- mapM genGenericRepBind tyDecls
-      let (repInsts, metaTyCons, repTys) = unzip3 inst1
+      let (_repInsts, metaTyCons, _repTys) = unzip3 inst1
       metaInsts <- ASSERT (length tyDecls == length metaTyCons)
                      mapM genDtMeta (zip tyDecls metaTyCons)
       return (ASSERT (length inst1 == length metaInsts)
