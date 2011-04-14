@@ -26,6 +26,7 @@ unpackProgName argv = do
 
    isPathSeparator :: Char -> Bool
    isPathSeparator '/'  = True
+   isPathSeparator '\\' = True
    isPathSeparator _    = False
 
 foreign import ccall unsafe "getProgArgv"
