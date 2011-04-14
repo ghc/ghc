@@ -125,7 +125,7 @@ $(libffi_STAMP_CONFIGURE):
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
-	          --host=$(PLATFORM) --build=$(PLATFORM)
+	          --host=$(PLATFORM)
 
 	# libffi.so needs to be built with the correct soname.
 	# NOTE: this builds libffi_convience.so with the incorrect
@@ -227,4 +227,3 @@ $(eval $(call manual-package-config,libffi))
 # binary-dist
 
 BINDIST_EXTRAS += libffi/package.conf.in
-
