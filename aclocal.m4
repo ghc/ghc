@@ -181,8 +181,8 @@ AC_DEFUN([FP_EVAL_STDERR],
 # --------------------
 # XXX
 #
-# $1 = the command to look for
-# $2 = the variable to set
+# $1 = the variable to set
+# $2 = the command to look for
 #
 AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
 [
