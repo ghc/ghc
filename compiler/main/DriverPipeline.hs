@@ -1433,7 +1433,10 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
    mkExtraCObj dflags (showSDoc (vcat [rts_opts_enabled,
                                        extra_rts_opts,
-                                       link_opts link_info]))
+                                       link_opts link_info]
+                                   <> char '\n')) -- final newline, to
+                                                  -- keep gcc happy
+
   where
     mk_rts_opts_enabled val
          = vcat [text "#include \"Rts.h\"",
