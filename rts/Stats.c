@@ -753,12 +753,18 @@ stat_exit(int alloc)
 	statsClose();
     }
 
-    if (GC_coll_cpu)
+    if (GC_coll_cpu) {
       stgFree(GC_coll_cpu);
-    GC_coll_cpu = NULL;
-    if (GC_coll_elapsed)
+      GC_coll_cpu = NULL;
+    }
+    if (GC_coll_elapsed) {
       stgFree(GC_coll_elapsed);
-    GC_coll_elapsed = NULL;
+      GC_coll_elapsed = NULL;
+    }
+    if (GC_coll_max_pause) {
+      stgFree(GC_coll_max_pause);
+      GC_coll_max_pause = NULL;
+    }
 }
 
 /* -----------------------------------------------------------------------------
