@@ -65,7 +65,6 @@ my $defaultrepo;
 my @packages;
 my $verbose = 2;
 my $ignore_failure = 0;
-my $want_remote_repo = 0;
 my $checked_out_flag = 0;
 my $get_mode;
 
@@ -195,17 +194,6 @@ sub scm {
     }
 }
 
-sub repoexists {
-    my ($scm, $localpath) = @_;
-    
-    if ($scm eq "darcs") {
-        -d "$localpath/_darcs";
-    }
-    else {
-        -d "$localpath/.git";
-    }
-}
-
 sub scmall {
     my $command = shift;
     
@@ -265,140 +253,142 @@ sub scmall {
 
     for $line (@packages) {
 
-            $localpath  = $$line{"localpath"};
-            $tag        = $$line{"tag"};
-            $remotepath = $$line{"remotepath"};
-            $scm        = $$line{"vcs"};
-            $upstream   = $$line{"upstream"};
+        $localpath  = $$line{"localpath"};
+        $tag        = $$line{"tag"};
+        $remotepath = $$line{"remotepath"};
+        $scm        = $$line{"vcs"};
+        $upstream   = $$line{"upstream"};
 
-            # We can't create directories on GitHub, so we translate
-            # "package/foo" into "package-foo".
-            if ($is_github_repo) {
-                $remotepath =~ s/\//-/;
-            }
+        # Check the SCM is OK as early as possible
+        die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
 
-            # Check the SCM is OK as early as possible
-            die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
+        # We can't create directories on GitHub, so we translate
+        # "package/foo" into "package-foo".
+        if ($is_github_repo) {
+            $remotepath =~ s/\//-/;
+        }
 
-            # Work out the path for this package in the repo we pulled from
-            if ($checked_out_tree) {
-                $path = "$repo_base/$localpath";
-            }
-            else {
-                $path = "$repo_base/$remotepath";
-            }
+        # Work out the path for this package in the repo we pulled from
+        if ($checked_out_tree) {
+            $path = "$repo_base/$localpath";
+        }
+        else {
+            $path = "$repo_base/$remotepath";
+        }
 
-            # Work out the arguments we should give to the SCM
-            if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
-                @scm_args = (($scm eq "darcs" and "whatsnew")
-                          or ($scm eq "git" and "status"));
-                
-                # Hack around 'darcs whatsnew' failing if there are no changes
-                $ignore_failure = 1;
+        if ($command =~ /^(?:g|ge|get)$/) {
+            # Skip any repositories we have not included the tag for
+            if (not defined($tags{$tag})) {
+                $tags{$tag} = 0;
             }
-            elsif ($command =~ /^commit$/) {
-                @scm_args = ("commit");
-                # git fails if there is nothing to commit, so ignore failures
-                $ignore_failure = 1;
-            }
-            elsif ($command =~ /^(?:pus|push)$/) {
-                @scm_args = "push";
-            }
-            elsif ($command =~ /^(?:pul|pull)$/) {
-                @scm_args = "pull";
-                # Q: should we append the -a argument for darcs repos?
-            }
-            elsif ($command =~ /^(?:g|ge|get)$/) {
-                # Skip any repositories we have not included the tag for
-                if (not defined($tags{$tag})) {
-                    $tags{$tag} = 0;
-                }
-                if ($tags{$tag} == 0) {
-                    next;
-                }
-                
-                if (-d $localpath) {
-                    warning("$localpath already present; omitting") if $localpath ne ".";
-                    next;
-                }
-                
-                # The first time round the loop, default the get-mode
-                if ($scm eq "darcs" && not defined($get_mode)) {
-                    warning("adding --partial, to override use --complete");
-                    $get_mode = "--partial";
-                }
-                
-                # The only command that doesn't need a repo
-                $local_repo_unnecessary = 1;
-                
-                if ($scm eq "darcs") {
-                    # Note: we can only use the get-mode with darcs for now
-                    @scm_args = ("get", $get_mode, $path, $localpath);
-                }
-                else {
-                    @scm_args = ("clone", $path, $localpath);
-                }
-            }
-            elsif ($command =~ /^(?:s|se|sen|send)$/) {
-                @scm_args = (($scm eq "darcs" and "send")
-                          or ($scm eq "git" and "send-email"));
-                $want_remote_repo = 1;
-            }
-            elsif ($command =~ /^fetch$/) {
-                @scm_args = ("fetch", "$branch_name");
-            }
-            elsif ($command =~ /^new$/) {
-                @scm_args = ("log", "$branch_name..");
-            }
-            elsif ($command =~ /^remote$/) {
-                if ($subcommand eq 'add') {
-                    @scm_args = ("remote", "add", $branch_name, $path);
-                } elsif ($subcommand eq 'rm') {
-                    @scm_args = ("remote", "rm", $branch_name);
-                } elsif ($subcommand eq 'set-url') {
-                    @scm_args = ("remote", "set-url", $branch_name, $path);
-                }
-            }
-            elsif ($command =~ /^grep$/) {
-              @scm_args = ("grep");
-              # Hack around 'git grep' failing if there are no matches
-              $ignore_failure = 1;
-            }
-            elsif ($command =~ /^reset$/) {
-                @scm_args = "reset";
-            }
-            elsif ($command =~ /^config$/) {
-                @scm_args = "config";
-            }
-            else {
-                die "Unknown command: $command";
+            if ($tags{$tag} == 0) {
+                next;
             }
             
-            # Actually execute the command
-            if (repoexists ($scm, $localpath)) {
-                if ($want_remote_repo) {
-                    if ($scm eq "darcs") {
-                        scm (".", $scm, @scm_args, @args, "--repodir=$localpath", $path);
-                    } else {
-                        # git pull doesn't like to be used with --work-dir
-                        # I couldn't find an alternative to chdir() here
-                        scm ($localpath, $scm, @scm_args, @args, $path, "master");
-                    }
-                } else {
-                    # git status *must* be used with --work-dir, if we don't chdir() to the dir
-                    scm ($localpath, $scm, @scm_args, @args);
-                }
+            if (-d $localpath) {
+                warning("$localpath already present; omitting")
+                    if $localpath ne ".";
+                next;
             }
-            elsif ($local_repo_unnecessary) {
-                # Don't bother to change directory in this case
-                scm (".", $scm, @scm_args, @args);
+            
+            # The first time round the loop, default the get-mode
+            if ($scm eq "darcs" && not defined($get_mode)) {
+                warning("adding --partial, to override use --complete");
+                $get_mode = "--partial";
+            }
+            
+            # The only command that doesn't need a repo
+            $local_repo_unnecessary = 1;
+            
+            if ($scm eq "darcs") {
+                # Note: we can only use the get-mode with darcs for now
+                @scm_args = ("get", $get_mode, $path, $localpath);
+            }
+            else {
+                @scm_args = ("clone", $path, $localpath);
+            }
+
+            # Note that we use "." as the path, as $localpath
+            # doesn't exist yet.
+            scm (".", $scm, @scm_args, @args);
+            next;
+        }
+
+        if (-d "$localpath/_darcs") {
+            if (-d "$localpath/.git") {
+                die "Found both _darcs and .git in $localpath";
+            }
+            else {
+                $scm = "darcs";
+            }
+        }
+        else {
+            if (-d "$localpath/.git") {
+                $scm = "git";
             }
             elsif ($tag eq "") {
-                message "== Required repo $localpath is missing! Skipping";
+                die "Required repo $localpath is missing";
             }
             else {
                 message "== $localpath repo not present; skipping";
             }
+        }
+
+        # Work out the arguments we should give to the SCM
+        if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
+            @scm_args = (($scm eq "darcs" and "whatsnew")
+                      or ($scm eq "git" and "status"));
+            
+            # Hack around 'darcs whatsnew' failing if there are no changes
+            $ignore_failure = 1;
+        }
+        elsif ($command =~ /^commit$/) {
+            @scm_args = ("commit");
+            # git fails if there is nothing to commit, so ignore failures
+            $ignore_failure = 1;
+        }
+        elsif ($command =~ /^(?:pus|push)$/) {
+            @scm_args = "push";
+        }
+        elsif ($command =~ /^(?:pul|pull)$/) {
+            @scm_args = "pull";
+        }
+        elsif ($command =~ /^(?:s|se|sen|send)$/) {
+            @scm_args = (($scm eq "darcs" and "send")
+                      or ($scm eq "git" and "send-email"));
+        }
+        elsif ($command =~ /^fetch$/) {
+            @scm_args = ("fetch", "$branch_name");
+        }
+        elsif ($command =~ /^new$/) {
+            @scm_args = ("log", "$branch_name..");
+        }
+        elsif ($command =~ /^remote$/) {
+            if ($subcommand eq 'add') {
+                @scm_args = ("remote", "add", $branch_name, $path);
+            } elsif ($subcommand eq 'rm') {
+                @scm_args = ("remote", "rm", $branch_name);
+            } elsif ($subcommand eq 'set-url') {
+                @scm_args = ("remote", "set-url", $branch_name, $path);
+            }
+        }
+        elsif ($command =~ /^grep$/) {
+          @scm_args = ("grep");
+          # Hack around 'git grep' failing if there are no matches
+          $ignore_failure = 1;
+        }
+        elsif ($command =~ /^reset$/) {
+            @scm_args = "reset";
+        }
+        elsif ($command =~ /^config$/) {
+            @scm_args = "config";
+        }
+        else {
+            die "Unknown command: $command";
+        }
+
+        # Actually execute the command
+        scm ($localpath, $scm, @scm_args, @args);
     }
 }
 
