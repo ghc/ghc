@@ -68,9 +68,6 @@ my $ignore_failure = 0;
 my $checked_out_flag = 0;
 my $get_mode;
 
-# Flags specific to a particular command
-my $local_repo_unnecessary = 0;
-
 my %tags;
 
 # Figure out where to get the other repositories from.
@@ -288,23 +285,20 @@ sub scmall {
                     if $localpath ne ".";
                 next;
             }
-            
-            # The first time round the loop, default the get-mode
-            if ($scm eq "darcs" && not defined($get_mode)) {
-                warning("adding --partial, to override use --complete");
-                $get_mode = "--partial";
-            }
-            
-            # The only command that doesn't need a repo
-            $local_repo_unnecessary = 1;
-            
+
             # Note that we use "." as the path, as $localpath
             # doesn't exist yet.
             if ($scm eq "darcs") {
+                # The first time round the loop, default the get-mode
+                if (not defined($get_mode)) {
+                    warning("adding --partial, to override use --complete");
+                    $get_mode = "--partial";
+                }
                 scm (".", $scm, "get", $get_mode, $path, $localpath, @args);
             }
             else {
                 scm (".", $scm, "clone", $path, $localpath, @args);
+                scm ($localpath, $scm, "config", "core.ignorecase", "true");
             }
             next;
         }
