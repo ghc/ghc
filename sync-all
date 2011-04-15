@@ -283,6 +283,9 @@ sub scmall {
             if (-d $localpath) {
                 warning("$localpath already present; omitting")
                     if $localpath ne ".";
+                if ($scm eq "git") {
+                    scm ($localpath, $scm, "config", "core.ignorecase", "true");
+                }
                 next;
             }
 
