@@ -311,6 +311,9 @@ sub scmall {
             elsif ($command =~ /^(?:g|ge|get)$/) {
                 # Skip any repositories we have not included the tag for
                 if (not defined($tags{$tag})) {
+                    $tags{$tag} = 0;
+                }
+                if ($tags{$tag} == 0) {
                     next;
                 }
                 
@@ -484,9 +487,11 @@ sub main {
         }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
-        elsif ($arg =~ m/^--/) {
-            $arg =~ s/^--//;
-            $tags{$arg} = 1;
+        elsif ($arg =~ m/^--no-(.*)$/) {
+            $tags{$1} = 0;
+        }
+        elsif ($arg =~ m/^--(.*)$/) {
+            $tags{$1} = 1;
         }
         else {
             unshift @_, $arg;
