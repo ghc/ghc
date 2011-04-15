@@ -209,8 +209,6 @@ sub scmall {
     my $path;
     my $wd_before = getcwd;
 
-    my @scm_args;
-
     my $pwd;
     my @args;
 
@@ -241,7 +239,7 @@ sub scmall {
         } else {
             $branch_name = shift;
         }
-    } elsif ($command eq 'new' || $command eq 'fetch') {
+    } elsif ($command eq 'new') {
         if (@_ < 1) {
             $branch_name = 'origin';
         } else {
@@ -300,17 +298,14 @@ sub scmall {
             # The only command that doesn't need a repo
             $local_repo_unnecessary = 1;
             
-            if ($scm eq "darcs") {
-                # Note: we can only use the get-mode with darcs for now
-                @scm_args = ("get", $get_mode, $path, $localpath);
-            }
-            else {
-                @scm_args = ("clone", $path, $localpath);
-            }
-
             # Note that we use "." as the path, as $localpath
             # doesn't exist yet.
-            scm (".", $scm, @scm_args, @args);
+            if ($scm eq "darcs") {
+                scm (".", $scm, "get", $get_mode, $path, $localpath, @args);
+            }
+            else {
+                scm (".", $scm, "clone", $path, $localpath, @args);
+            }
             next;
         }
 
@@ -336,34 +331,52 @@ sub scmall {
 
         # Work out the arguments we should give to the SCM
         if ($command =~ /^(?:w|wh|wha|what|whats|whatsn|whatsne|whatsnew|status)$/) {
-            @scm_args = (($scm eq "darcs" and "whatsnew")
-                      or ($scm eq "git" and "status"));
-            
+            if ($scm eq "darcs") {
+                $command = "whatsnew";
+            }
+            elsif ($scm eq "git") {
+                $command = "status";
+            }
+            else {
+                die "Unknown scm";
+            }
+
             # Hack around 'darcs whatsnew' failing if there are no changes
             $ignore_failure = 1;
+            scm ($localpath, $scm, $command, @args);
         }
         elsif ($command =~ /^commit$/) {
-            @scm_args = ("commit");
             # git fails if there is nothing to commit, so ignore failures
             $ignore_failure = 1;
+            scm ($localpath, $scm, "commit", @args);
         }
         elsif ($command =~ /^(?:pus|push)$/) {
-            @scm_args = "push";
+            scm ($localpath, $scm, "push", @args);
         }
         elsif ($command =~ /^(?:pul|pull)$/) {
-            @scm_args = "pull";
+            scm ($localpath, $scm, "pull", @args);
         }
         elsif ($command =~ /^(?:s|se|sen|send)$/) {
-            @scm_args = (($scm eq "darcs" and "send")
-                      or ($scm eq "git" and "send-email"));
+            if ($scm eq "darcs") {
+                $command = "send";
+            }
+            elsif ($scm eq "git") {
+                $command = "send-email";
+            }
+            else {
+                die "Unknown scm";
+            }
+            scm ($localpath, $scm, $command, @args);
         }
         elsif ($command =~ /^fetch$/) {
-            @scm_args = ("fetch", "$branch_name");
+            scm ($localpath, $scm, "fetch", @args);
         }
         elsif ($command =~ /^new$/) {
-            @scm_args = ("log", "$branch_name..");
+            my @scm_args = ("log", "$branch_name..");
+            scm ($localpath, $scm, @scm_args, @args);
         }
         elsif ($command =~ /^remote$/) {
+            my @scm_args;
             if ($subcommand eq 'add') {
                 @scm_args = ("remote", "add", $branch_name, $path);
             } elsif ($subcommand eq 'rm') {
@@ -371,24 +384,25 @@ sub scmall {
             } elsif ($subcommand eq 'set-url') {
                 @scm_args = ("remote", "set-url", $branch_name, $path);
             }
+            scm ($localpath, $scm, @scm_args, @args);
         }
         elsif ($command =~ /^grep$/) {
-          @scm_args = ("grep");
-          # Hack around 'git grep' failing if there are no matches
-          $ignore_failure = 1;
+            # Hack around 'git grep' failing if there are no matches
+            $ignore_failure = 1;
+            scm ($localpath, $scm, "grep", @args)
+                unless $scm eq "darcs";
         }
         elsif ($command =~ /^reset$/) {
-            @scm_args = "reset";
+            scm ($localpath, $scm, "reset", @args)
+                unless $scm eq "darcs";
         }
         elsif ($command =~ /^config$/) {
-            @scm_args = "config";
+            scm ($localpath, $scm, "config", @args)
+                unless $scm eq "darcs";
         }
         else {
             die "Unknown command: $command";
         }
-
-        # Actually execute the command
-        scm ($localpath, $scm, @scm_args, @args);
     }
 }
 
