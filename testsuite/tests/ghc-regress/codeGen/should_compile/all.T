@@ -13,3 +13,4 @@ test('T3286', extra_clean(['T3286b.o','T3286b.hi']),
               multimod_compile, ['T3286', '-v0'])
 test('3579', normal, compile, [''])
 test('2578', normal, run_command, ['$MAKE -s --no-print-directory 2578'])
+test('jmp_tbl', normal, compile, ['-fPIC -O'])
