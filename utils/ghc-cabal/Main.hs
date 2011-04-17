@@ -28,7 +28,8 @@ import System.Exit
 import System.FilePath
 
 main :: IO ()
-main = do args <- getArgs
+main = do hSetBuffering stdout LineBuffering
+          args <- getArgs
           case args of
               "hscolour" : distDir : dir : args' ->
                   runHsColour distDir dir args'
