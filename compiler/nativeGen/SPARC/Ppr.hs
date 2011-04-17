@@ -543,7 +543,7 @@ pprInstr (BF cond b blockid)
     ]
 
 pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
-pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
+pprInstr (JMP_TBL op _ _)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)
   = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]

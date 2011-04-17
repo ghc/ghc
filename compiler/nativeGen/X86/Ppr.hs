@@ -626,7 +626,7 @@ pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
 pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand archWordSize op)
-pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
+pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op)
 pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
 pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg archWordSize reg)
 

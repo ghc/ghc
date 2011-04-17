@@ -20,6 +20,7 @@
 
 module X86.CodeGen ( 
 	cmmTopCodeGen, 
+	generateJumpTableForInstr,
 	InstrBlock 
 ) 
 
@@ -1932,16 +1933,7 @@ genSwitch expr ids
         dflags <- getDynFlagsNat
         dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
-        let
-            jumpTable = map jumpTableEntryRel ids
-            
-            jumpTableEntryRel Nothing
-                = CmmStaticLit (CmmInt 0 wordWidth)
-            jumpTableEntryRel (Just blockid)
-                = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                where blockLabel = mkAsmTempLabel (getUnique blockid)
-
-            op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
+        let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg wORD_SIZE) (ImmInt 0))
 
 #if x86_64_TARGET_ARCH
@@ -1954,8 +1946,7 @@ genSwitch expr ids
     
             code = e_code `appOL` t_code `appOL` toOL [
                             ADD (intSize wordWidth) op (OpReg tableReg),
-                            JMP_TBL (OpReg tableReg) [ id | Just id <- ids ],
-                            LDATA Text (CmmDataLabel lbl : jumpTable)
+                            JMP_TBL (OpReg tableReg) ids Text lbl,
                     ]
 #else
     -- HACK: On x86_64 binutils<2.17 is only able to generate PC32
@@ -1965,20 +1956,18 @@ genSwitch expr ids
     -- conjunction with the hack in PprMach.hs/pprDataItem once
     -- binutils 2.17 is standard.
             code = e_code `appOL` t_code `appOL` toOL [
-			    LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
 			    MOVSxL II32
 				   (OpAddr (AddrBaseIndex (EABaseReg tableReg)
 							  (EAIndex reg wORD_SIZE) (ImmInt 0)))
 				   (OpReg reg),
 			    ADD (intSize wordWidth) (OpReg reg) (OpReg tableReg),
-			    JMP_TBL (OpReg tableReg) [ id | Just id <- ids ]
+			    JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
 		   ]
 #endif
 #else
             code = e_code `appOL` t_code `appOL` toOL [
-                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
                             ADD (intSize wordWidth) op (OpReg tableReg),
-                            JMP_TBL (OpReg tableReg) [ id | Just id <- ids ]
+                            JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
                     ]
 #endif
         return code
@@ -1987,15 +1976,28 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
         let
-            jumpTable = map jumpTableEntry ids
             op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
-                    LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
-                    JMP_TBL op [ id | Just id <- ids ]
+                    JMP_TBL op ids ReadOnlyData lbl
                  ]
         -- in
         return code
 
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr (JMP_TBL _ ids section lbl) = Just (createJumpTable ids section lbl)
+generateJumpTableForInstr _ = Nothing
+
+createJumpTable ids section lbl
+    = let jumpTable
+            | opt_PIC =
+                  let jumpTableEntryRel Nothing
+                          = CmmStaticLit (CmmInt 0 wordWidth)
+                      jumpTableEntryRel (Just blockid)
+                          = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
+                          where blockLabel = mkAsmTempLabel (getUnique blockid)
+                  in map jumpTableEntryRel ids
+            | otherwise = map jumpTableEntry ids
+      in CmmData section (CmmDataLabel lbl : jumpTable)
 
 -- -----------------------------------------------------------------------------
 -- 'condIntReg' and 'condFltReg': condition codes into registers
