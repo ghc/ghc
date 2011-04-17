@@ -29,3 +29,11 @@ test('T4334',
       omit_ways(['profasm','profthreaded'])
       ],
      compile_and_run, [''])
+
+test('T2762',
+     [# peak_megabytes_allocated is 2 with 7.0.2.
+      # Was 57 with 6.12.3.
+      stats_num_field('peak_megabytes_allocated', 1, 3),
+      only_ways(['normal']),
+      extra_clean(['T2762A.hi', 'T2762A.o'])],
+     compile_and_run, ['-O'])
