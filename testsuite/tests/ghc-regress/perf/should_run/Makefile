@@ -24,5 +24,13 @@ T2902:
 	$(RM) -f T2902_A_PairingSum.o  T2902_B_PairingSum.o  T2902_Sum.o
 	'$(TEST_HC)' -v0 -O --make T2902_A -rtsopts
 	'$(TEST_HC)' -v0 -O --make T2902_B -rtsopts
-	BAA=`./T2902_A +RTS -t --machine-readable 2>&1 | grep '"bytes allocated"' | sed -e 's/.*, "//' -e 's/")//'`; BAB=`./T2902_B +RTS -t --machine-readable 2>&1 | grep '"bytes allocated"' | sed -e 's/.*, "//' -e 's/")//'`; [ "$$BAA" = "" ] && echo 'T2902_A: No "bytes allocated"'; [ "$$BAA" = "$$BAB" ] || echo 'T2902: Mismatch in "bytes allocated"'
+	BAA=`./T2902_A +RTS -t --machine-readable 2>&1 | grep '"bytes allocated"' | sed -e 's/.*, "//' -e 's/")//'`; BAB=`./T2902_B +RTS -t --machine-readable 2>&1 | grep '"bytes allocated"' | sed -e 's/.*, "//' -e 's/")//'`; [ "$$BAA" = "" ] && echo 'T2902_A: No "bytes allocated"'; [ "$$BAA" = "$$BAB" ] || echo "T2902: Mismatch in \"bytes allocated\": $$BAA $$BAB"
+
+.PHONY: T149
+T149:
+	$(RM) -f T149_A T149_A.hi T149_A.o
+	$(RM) -f T149_B T149_B.hi T149_B.o
+	'$(TEST_HC)' -v0 -O --make T149_A -rtsopts
+	'$(TEST_HC)' -v0 -O --make T149_B -rtsopts
+	BAA=`./T149_A +RTS -t --machine-readable 2>&1 | grep '"bytes allocated"' | sed -e 's/.*, "//' -e 's/")//'`; BAB=`./T149_B +RTS -t --machine-readable 2>&1 | grep '"bytes allocated"' | sed -e 's/.*, "//' -e 's/")//'`; [ "$$BAA" = "" ] && echo 'T149_A: No "bytes allocated"'; [ "$$BAA" = "$$BAB" ] || echo "T149: Mismatch in \"bytes allocated\": $$BAA $$BAB"
 
