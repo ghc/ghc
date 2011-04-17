@@ -1,23 +1,10 @@
 {-# LANGUAGE CPP #-}
-import Char
-#if __GLASGOW_HASKELL__ >= 503
+import Data.Char
 import Data.Array
-#else
-import Array
-#endif
-#if __GLASGOW_HASKELL__ >= 503
 import GHC.Exts
-#else
-import GlaExts
-#endif
-#if __GLASGOW_HASKELL__ >= 503
 import System.IO
 import System.IO.Unsafe
 import Debug.Trace
-#else
-import IO
-import IOExts
-#endif
 
 -- parser produced by Happy Version 1.16
 
