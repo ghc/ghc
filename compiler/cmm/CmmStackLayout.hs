@@ -134,10 +134,6 @@ liveSlotTransfers = mkBTransfer3 frt mid lst
         mid n f = foldSlotsUsed addSlot (removeLiveSlotDefs f n) n
         lst :: CmmNode O C -> FactBase SubAreaSet -> SubAreaSet
         lst n f = liveInSlots n $ case n of
-          -- EZY: There's something fishy going on here: the old area is
-          -- being kept alive too long.  In particular, the incoming
-          -- parameters can be safely clobbered after they've been read
-          -- out.
           CmmCall {cml_cont=Nothing, cml_args=args} -> add_area (CallArea Old) args out
           CmmCall {cml_cont=Just k, cml_args=args}  -> add_area (CallArea Old) args (add_area (CallArea (Young k)) args out)
           CmmForeignCall {succ=k, updfr=oldend}     -> add_area (CallArea Old) oldend (add_area (CallArea (Young k)) wORD_SIZE out)
@@ -518,6 +514,19 @@ manifestSP spEntryMap areaMap entry_off g@(CmmGraph {g_entry=entry}) =
                 replSlot spOff (CmmStackSlot a i) = CmmRegOff (CmmGlobal Sp) (spOff - (slot a + i))
                 replSlot _ (CmmLit CmmHighStackMark) = -- replacing the high water mark
                   CmmLit (CmmInt (toInteger (max 0 (sp_high - proc_entry_sp))) (typeWidth bWord))
+                -- Invariant: Sp is always greater than SpLim.  Thus, if
+                -- the high water mark is zero, we can optimize away the
+                -- conditional branch.  Relies on dead code elimination
+                -- to get rid of the dead GC blocks.
+                -- EZY: Maybe turn this into a guard that checks if a
+                -- statement is stack-check ish?  Maybe we should make
+                -- an actual mach-op for it, so there's no chance of
+                -- mixing this up with something else...
+                replSlot _ (CmmMachOp (MO_U_Lt _)
+                              [CmmMachOp (MO_Sub _)
+                                         [ CmmReg (CmmGlobal Sp)
+                                         , CmmLit (CmmInt 0 _)],
+                               CmmReg (CmmGlobal SpLim)]) = CmmLit (CmmInt 0 wordWidth)
                 replSlot _ e = e
 
                 replLast :: MaybeC C (CmmNode C O) -> [CmmNode O O] -> CmmNode O C -> FuelUniqSM [CmmBlock]
