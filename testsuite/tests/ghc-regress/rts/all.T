@@ -77,6 +77,8 @@ test('T2615',
      [ if_platform('i386-unknown-mingw32',skip),
        # OS X doesn't seem to support linker scripts
        if_os('darwin', skip),
+       # Solaris' linker does not support GNUish linker scripts
+       if_os('solaris2', skip),
        cmd_prefix('$MAKE T2615-prep && ' +
                   # Add current directory to dlopen search path
                   'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. '),
