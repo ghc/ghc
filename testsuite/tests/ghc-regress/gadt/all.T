@@ -1,5 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
-setTestOpts(only_ways(['normal']));
+
+# setTestOpts(only_ways(['normal']));
+# Not only-normal: want optimisation too, to check coercion optimiser
 
 # In fast mode, we omit all the compile_and_run tests except a couple
 
