@@ -30,7 +30,6 @@ import Class
 import TyCon
 import DataCon
 import Id
-import MkId		( mkDefaultMethodId )
 import MkCore		( rEC_SEL_ERROR_ID )
 import IdInfo
 import Var
@@ -1195,7 +1194,7 @@ checkValidClass cls
 mkDefaultMethodIds :: [TyThing] -> [Id]
 -- See Note [Default method Ids and Template Haskell]
 mkDefaultMethodIds things
-  = [ mkDefaultMethodId sel_id dm_name
+  = [ mkExportedLocalId dm_name (idType sel_id)
     | AClass cls <- things
     , (sel_id, DefMeth dm_name) <- classOpItems cls ]
 \end{code}

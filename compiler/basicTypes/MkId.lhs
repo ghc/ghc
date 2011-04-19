@@ -13,7 +13,7 @@ have a standard form, namely:
 
 \begin{code}
 module MkId (
-        mkDictFunId, mkDictFunTy, mkDefaultMethodId, mkDictSelId,
+        mkDictFunId, mkDictFunTy, mkDictSelId,
 
         mkDataConIds,
         mkPrimOpId, mkFCallId, mkTickBoxOpId, mkBreakPointOpId,
@@ -826,11 +826,6 @@ BUT make sure they are *exported* LocalIds (mkExportedLocalId) so
 that they aren't discarded by the occurrence analyser.
 
 \begin{code}
-mkDefaultMethodId :: Id		-- Selector Id
-		  -> Name	-- Default method name
-		  -> Id		-- Default method Id
-mkDefaultMethodId sel_id dm_name = mkExportedLocalId dm_name (idType sel_id)
-
 mkDictFunId :: Name      -- Name to use for the dict fun;
             -> [TyVar]
             -> ThetaType
