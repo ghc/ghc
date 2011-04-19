@@ -12,7 +12,7 @@ module RnEnv (
 	lookupLocalDataTcNames, lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
 	lookupInstDeclBndr, lookupSubBndr, lookupConstructorFields,
-	lookupSyntaxName, lookupSyntaxTable, 
+	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn, addUsedRdrNames,
 
@@ -754,6 +754,17 @@ We treat the orignal (standard) names as free-vars too, because the type checker
 checks the type of the user thing against the type of the standard thing.
 
 \begin{code}
+lookupIfThenElse :: RnM (Maybe (SyntaxExpr Name), FreeVars)
+-- Different to lookupSyntaxName because in the non-rebindable
+-- case we desugar directly rather than calling an existing function
+-- Hence the (Maybe (SyntaxExpr Name)) return type
+lookupIfThenElse 
+  = do { rebind <- xoptM Opt_RebindableSyntax
+       ; if not rebind 
+         then return (Nothing, emptyFVs)
+         else do { ite <- lookupOccRn (mkVarUnqual (fsLit "ifThenElse"))
+                 ; return (Just (HsVar ite), unitFV ite) } }
+
 lookupSyntaxName :: Name 				-- The standard name
 	         -> RnM (SyntaxExpr Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name

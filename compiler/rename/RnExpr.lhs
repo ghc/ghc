@@ -268,13 +268,10 @@ rnExpr (ExprWithTySig expr pty)
 
 rnExpr (HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
-    ; (b1', fvB1) <- rnLExpr b1
-    ; (b2', fvB2) <- rnLExpr b2
-    ; rebind <- xoptM Opt_RebindableSyntax
-    ; if not rebind
-       then return (HsIf Nothing p' b1' b2', plusFVs [fvP, fvB1, fvB2])
-       else do { c <- liftM HsVar (lookupOccRn (mkVarUnqual (fsLit "ifThenElse")))
-               ; return (HsIf (Just c) p' b1' b2', plusFVs [fvP, fvB1, fvB2]) }}
+       ; (b1', fvB1) <- rnLExpr b1
+       ; (b2', fvB2) <- rnLExpr b2
+       ; (mb_ite, fvITE) <- lookupIfThenElse
+       ; return (HsIf mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
 rnExpr (HsType a)
   = rnHsTypeFVs doc a	`thenM` \ (t, fvT) -> 
