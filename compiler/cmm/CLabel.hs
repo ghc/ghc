@@ -101,7 +101,7 @@ module CLabel (
         hasCAF,
 	infoLblToEntryLbl, entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
-        isMathFun,
+        isMathFun, isCas,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
 
 	pprCLabel
@@ -590,9 +590,17 @@ maybeAsmTemp (AsmTempLabel uq) 		= Just uq
 maybeAsmTemp _ 	    	       		= Nothing
 
 
+-- | Check whether a label corresponds to our cas function.
+--      We #include the prototype for this, so we need to avoid
+--      generating out own C prototypes.
+isCas :: CLabel -> Bool
+isCas (CmmLabel pkgId fn _) = pkgId == rtsPackageId && fn == fsLit "cas"
+isCas _                     = False
+
+
 -- | Check whether a label corresponds to a C function that has 
 --      a prototype in a system header somehere, or is built-in
---      to the C compiler. For these labels we abovoid generating our
+--      to the C compiler. For these labels we avoid generating our
 --      own C prototypes.
 isMathFun :: CLabel -> Bool
 isMathFun (ForeignLabel fs _ _ _) 	= fs `elementOfUniqSet` math_funs
