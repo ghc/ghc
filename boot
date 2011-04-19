@@ -24,6 +24,24 @@ while ($#ARGV ne -1) {
     }
 }
 
+{
+    local $/ = undef;
+    open FILE, "packages" or die "Couldn't open file: $!";
+    binmode FILE;
+    my $string = <FILE>;
+    close FILE;
+
+    if ($string =~ /\r/) {
+        print STDERR <<EOF;
+Found ^M in packages.
+Perhaps you need to run
+    git config --global core.autocrlf false
+and re-check out the tree?
+EOF
+        exit 1;
+    }
+}
+
 # Create libraries/*/{ghc.mk,GNUmakefile}
 system("/usr/bin/perl", "-w", "boot-pkgs") == 0
     or die "Running boot-pkgs failed: $?";

@@ -24,7 +24,6 @@ import OldPprCmm()
 import Constants
 import FastString
 
-import Control.Monad
 import Data.Maybe
 
 -- -----------------------------------------------------------------------------
@@ -70,8 +69,10 @@ lintCmmBlock labels (BasicBlock id stmts)
 lintCmmExpr :: CmmExpr -> CmmLint CmmType
 lintCmmExpr (CmmLoad expr rep) = do
   _ <- lintCmmExpr expr
-  when (widthInBytes (typeWidth rep) >= wORD_SIZE) $
-     cmmCheckWordAddress expr
+  -- Disabled, if we have the inlining phase before the lint phase,
+  -- we can have funny offsets due to pointer tagging. -- EZY
+  -- when (widthInBytes (typeWidth rep) >= wORD_SIZE) $
+  --   cmmCheckWordAddress expr
   return rep
 lintCmmExpr expr@(CmmMachOp op args) = do
   tys <- mapM lintCmmExpr args
@@ -99,14 +100,14 @@ isOffsetOp _ = False
 
 -- This expression should be an address from which a word can be loaded:
 -- check for funny-looking sub-word offsets.
-cmmCheckWordAddress :: CmmExpr -> CmmLint ()
-cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
+_cmmCheckWordAddress :: CmmExpr -> CmmLint ()
+_cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
   | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset e
-cmmCheckWordAddress e@(CmmMachOp op [CmmLit (CmmInt i _), arg])
+_cmmCheckWordAddress e@(CmmMachOp op [CmmLit (CmmInt i _), arg])
   | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset e
-cmmCheckWordAddress _
+_cmmCheckWordAddress _
   = return ()
 
 -- No warnings for unaligned arithmetic with the node register,
