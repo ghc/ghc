@@ -27,3 +27,4 @@ test('T303', normal, compile, [''])
 # Tests from Oleg
 test('DoRestrictedM', normal, compile, [''])
 test('DoParamM', reqlib('mtl'), compile_fail, [''])
+test('T5038', normal, compile_and_run, [''])
