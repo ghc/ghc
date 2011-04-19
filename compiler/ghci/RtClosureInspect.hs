@@ -448,7 +448,7 @@ cPprTermBase y =
            --Note pprinting of list terms is not lazy
            doList p (Term{subTerms=[h,t]}) = do
                let elems      = h : getListTerms t
-                   isConsLast = not(termType(last elems) `coreEqType` termType h)
+                   isConsLast = not(termType(last elems) `eqType` termType h)
                print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
                      then cparen (p >= cons_prec) 
@@ -879,8 +879,8 @@ improveRTTIType _ base_ty new_ty
 
 myDataConInstArgTys :: DataCon -> [Type] -> [Type]
 myDataConInstArgTys dc args
-    | null (dataConExTyVars dc) && null (dataConEqTheta dc) = dataConInstArgTys dc args
-    | otherwise = dataConRepArgTys dc
+ | isVanillaDataCon dc = dataConInstArgTys dc args
+ | otherwise           = dataConRepArgTys dc
 
 mydataConType :: DataCon -> QuantifiedType
 -- ^ Custom version of DataCon.dataConUserType where we

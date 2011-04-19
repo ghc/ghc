@@ -60,6 +60,7 @@ import PrelNames
 import VarEnv           ( mkInScopeSet )
 import Bag
 import Util
+import Pair
 import FastTypes
 import FastString
 import Outputable
@@ -107,7 +108,7 @@ mkWwInlineRule id expr arity
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
   = mkCoreUnfolding InlineCompulsory True
-                    expr 0    -- Arity of unfolding doesn't matter
+                    (simpleOptExpr expr) 0    -- Arity of unfolding doesn't matter
                     (UnfWhen unSaturatedOk boringCxtOk)
 
 mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
@@ -348,11 +349,13 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (Cast e _) = size_up e
     size_up (Note _ e) = size_up e
     size_up (Type _)   = sizeZero           -- Types cost nothing
+    size_up (Coercion _) = sizeZero
     size_up (Lit lit)  = sizeN (litSize lit)
     size_up (Var f)    = size_up_call f []  -- Make sure we get constructor
     	    	       	 	      	    -- discounts even on nullary constructors
 
     size_up (App fun (Type _)) = size_up fun
+    size_up (App fun (Coercion _)) = size_up fun
     size_up (App fun arg)      = size_up arg  `addSizeNSD`
                                  size_up_app fun [arg]
 
@@ -408,7 +411,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     ------------ 
     -- size_up_app is used when there's ONE OR MORE value args
     size_up_app (App fun arg) args 
-	| isTypeArg arg		   = size_up_app fun args
+	| isTyCoArg arg		   = size_up_app fun args
 	| otherwise		   = size_up arg  `addSizeNSD`
                                      size_up_app fun (arg:args)
     size_up_app (Var fun)     args = size_up_call fun args
@@ -1147,12 +1150,14 @@ interestingArg e = go e 0
          conlike_unfolding = isConLikeUnfolding (idUnfolding v)
 
     go (Type _)          _ = TrivArg
-    go (App fn (Type _)) n = go fn n    
+    go (Coercion _)      _ = TrivArg
+    go (App fn (Type _)) n = go fn n
+    go (App fn (Coercion _)) n = go fn n
     go (App fn _)        n = go fn (n+1)
     go (Note _ a) 	 n = go a n
     go (Cast e _) 	 n = go e n
     go (Lam v e)  	 n 
-       | isTyCoVar v	   = go e n
+       | isTyVar v	   = go e n
        | n>0	 	   = go e (n-1)
        | otherwise	   = ValueArg
     go (Let _ e)  	 n = case go e n of { ValueArg -> ValueArg; _ -> NonTrivArg }
@@ -1208,7 +1213,7 @@ exprIsConApp_maybe id_unf (Cast expr co)
 	Nothing 	                 -> Nothing ;
 	Just (dc, _dc_univ_args, dc_args) -> 
 
-    let (_from_ty, to_ty) = coercionKind co
+    let Pair _from_ty to_ty = coercionKind co
 	dc_tc = dataConTyCon dc
     in
     case splitTyConApp_maybe to_ty of {
@@ -1228,41 +1233,28 @@ exprIsConApp_maybe id_unf (Cast expr co)
         dc_ex_tyvars   = dataConExTyVars dc
         arg_tys        = dataConRepArgTys dc
 
-        dc_eqs :: [(Type,Type)]	  -- All equalities from the DataCon
-        dc_eqs = [(mkTyVarTy tv, ty)   | (tv,ty) <- dataConEqSpec dc] ++
-                 [getEqPredTys eq_pred | eq_pred <- dataConEqTheta dc]
-
-        (ex_args, rest1)    = splitAtList dc_ex_tyvars dc_args
-	(co_args, val_args) = splitAtList dc_eqs rest1
+        (ex_args, val_args) = splitAtList dc_ex_tyvars dc_args
 
 	-- Make the "theta" from Fig 3 of the paper
         gammas = decomposeCo tc_arity co
-        theta  = zipOpenTvSubst (dc_univ_tyvars ++ dc_ex_tyvars)
-                                (gammas         ++ stripTypeArgs ex_args)
+        theta  = zipOpenCvSubst (dc_univ_tyvars ++ dc_ex_tyvars)
+                                (gammas         ++ map mkReflCo (stripTypeArgs ex_args))
 
-          -- Cast the existential coercion arguments
-        cast_co (ty1, ty2) (Type co) 
-          = Type $ mkSymCoercion (substTy theta ty1)
-		   `mkTransCoercion` co
-		   `mkTransCoercion` (substTy theta ty2)
-        cast_co _ other_arg = pprPanic "cast_co" (ppr other_arg)
-        new_co_args = zipWith cast_co dc_eqs co_args
-  
           -- Cast the value arguments (which include dictionaries)
 	new_val_args = zipWith cast_arg arg_tys val_args
-	cast_arg arg_ty arg = mkCoerce (substTy theta arg_ty) arg
+	cast_arg arg_ty arg = mkCoerce (liftCoSubst theta arg_ty) arg
     in
 #ifdef DEBUG
     let dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
                          ppr ex_args, ppr val_args]
     in
-    ASSERT2( coreEqType _from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
-    ASSERT2( all isTypeArg (ex_args ++ co_args), dump_doc )
+    ASSERT2( eqType _from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
+    ASSERT2( all isTypeArg ex_args, dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
 #endif
 
-    Just (dc, to_tc_arg_tys, ex_args ++ new_co_args ++ new_val_args)
+    Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
     }}
 
 exprIsConApp_maybe id_unf expr 
@@ -1301,7 +1293,7 @@ exprIsConApp_maybe id_unf expr
 
     -----------
     beta (Lam v body) pairs (arg : args) 
-        | isTypeArg arg
+        | isTyCoArg arg
         = beta body ((v,arg):pairs) args 
 
     beta (Lam {}) _ _    -- Un-saturated, or not a type lambda
@@ -1313,10 +1305,10 @@ exprIsConApp_maybe id_unf expr
           subst = mkOpenSubst (mkInScopeSet (exprFreeVars fun)) pairs
 	  -- doc = vcat [ppr fun, ppr expr, ppr pairs, ppr args]
 
-
 stripTypeArgs :: [CoreExpr] -> [Type]
 stripTypeArgs args = ASSERT2( all isTypeArg args, ppr args )
                      [ty | Type ty <- args]
+  -- We really do want isTypeArg here, not isTyCoArg!
 \end{code}
 
 Note [Unfolding DFuns]

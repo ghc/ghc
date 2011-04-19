@@ -854,7 +854,7 @@ unifyCtxts (sig1 : sigs)
                -- where F is a type function and (F a ~ [a])
                -- Then unification might succeed with a coercion.  But it's much
                -- much simpler to require that such signatures have identical contexts
-               checkTc (all isIdentityCoI cois)
+               checkTc (all isReflCo cois)
                        (ptext (sLit "Mutually dependent functions have syntactically distinct contexts"))
              }
 \end{code}

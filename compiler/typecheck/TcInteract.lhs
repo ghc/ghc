@@ -408,16 +408,12 @@ dischargeFromCCans cans ev fl
 
     discharge_ct :: CanonicalCt -> TcS Bool -> TcS Bool
     discharge_ct ct _rest
-      | evVarPred (cc_id ct) `tcEqPred` the_pred
+      | evVarPred (cc_id ct) `eqPred` the_pred
       , cc_flavor ct `canSolve` fl
-      = do { when (isWanted fl) $ set_ev_bind ev (cc_id ct) 
+      = do { when (isWanted fl) $ setEvBind ev (evVarTerm (cc_id ct))
            	 -- Deriveds need no evidence
     	         -- For Givens, we already have evidence, and we don't need it twice 
            ; return True }
-      where 
-         set_ev_bind x y
-            | EqPred {} <- evVarPred y = setEvBind x (EvCoercion (mkCoVarCoercion y))
-            | otherwise                = setEvBind x (EvId y)
 
     discharge_ct _ct rest = rest
 \end{code}
@@ -725,9 +721,10 @@ solveWithIdentity cv wd tv xi
                   ]
 
        ; setWantedTyBind tv xi
-       ; cv_given <- newGivenCoVar (mkTyVarTy tv) xi xi
+       ; let refl_xi = mkReflCo xi
+       ; cv_given <- newGivenCoVar (mkTyVarTy tv) xi refl_xi
 
-       ; when (isWanted wd) (setCoBind cv xi)
+       ; when (isWanted wd) (setCoBind cv refl_xi)
            -- We don't want to do this for Derived, that's why we use 'when (isWanted wd)'
 
        ; return $ SPSolved (CTyEqCan { cc_id = cv_given
@@ -928,7 +925,7 @@ doInteractWithInert :: CanonicalCt -> CanonicalCt -> TcS InteractResult
 doInteractWithInert
   inertItem@(CDictCan { cc_id = d1, cc_flavor = fl1, cc_class = cls1, cc_tyargs = tys1 }) 
    workItem@(CDictCan { cc_id = d2, cc_flavor = fl2, cc_class = cls2, cc_tyargs = tys2 })
-  | cls1 == cls2 && (and $ zipWith tcEqType tys1 tys2)
+  | cls1 == cls2 && eqTypes tys1 tys2
   = solveOneFromTheOther "Cls/Cls" (EvId d1,fl1) workItem 
 
   | cls1 == cls2 && (not (isGiven fl1 && isGiven fl2))
@@ -946,7 +943,7 @@ doInteractWithInert
        ; case m of 
            Nothing -> noInteraction workItem
            Just (rewritten_tys2, cos2, fd_work)
-             | tcEqTypes tys1 rewritten_tys2
+             | eqTypes tys1 rewritten_tys2
              -> -- Solve him on the spot in this case
 	     	case fl2 of
 	          Given   {} -> pprPanic "Unexpected given" (ppr inertItem $$ ppr workItem)
@@ -991,7 +988,7 @@ doInteractWithInert
                      workListFromNonEq workItem' `unionWorkList` fd_work } 
 
              where
-               dict_co = mkTyConCoercion (classTyCon cls1) cos2
+               dict_co = mkTyConAppCo (classTyCon cls1) cos2
   }
 
 -- Class constraint and given equality: use the equality to rewrite
@@ -1043,7 +1040,7 @@ doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_i
 	--              we must *override* the outer one with the inner one
     mkIRContinue "IP/IP override" workItem DropInert emptyWorkList
 
-  | nm1 == nm2 && ty1 `tcEqType` ty2 
+  | nm1 == nm2 && ty1 `eqType` ty2 
   = solveOneFromTheOther "IP/IP" (EvId id1,ifl) workItem 
 
   | nm1 == nm2
@@ -1090,23 +1087,23 @@ doInteractWithInert (CFunEqCan { cc_id = cv1, cc_flavor = fl1, cc_fun = tc1
            workItem@(CFunEqCan { cc_id = cv2, cc_flavor = fl2, cc_fun = tc2
                                , cc_tyargs = args2, cc_rhs = xi2 })
   | fl1 `canSolve` fl2 && lhss_match
-  = do { cans <- rewriteEqLHS LeftComesFromInert  (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
+  = do { cans <- rewriteEqLHS LeftComesFromInert  (mkCoVarCo cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStopK "FunEq/FunEq" cans } 
   | fl2 `canSolve` fl1 && lhss_match
-  = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
+  = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCo cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue "FunEq/FunEq" workItem DropInert cans }
   where
-    lhss_match = tc1 == tc2 && and (zipWith tcEqType args1 args2) 
+    lhss_match = tc1 == tc2 && eqTypes args1 args2 
 
 doInteractWithInert (CTyEqCan { cc_id = cv1, cc_flavor = fl1, cc_tyvar = tv1, cc_rhs = xi1 }) 
            workItem@(CTyEqCan { cc_id = cv2, cc_flavor = fl2, cc_tyvar = tv2, cc_rhs = xi2 })
 -- Check for matching LHS 
   | fl1 `canSolve` fl2 && tv1 == tv2 
-  = do { cans <- rewriteEqLHS LeftComesFromInert (mkCoVarCoercion cv1,xi1) (cv2,fl2,xi2) 
+  = do { cans <- rewriteEqLHS LeftComesFromInert (mkCoVarCo cv1,xi1) (cv2,fl2,xi2) 
        ; mkIRStopK "Eq/Eq lhs" cans } 
 
   | fl2 `canSolve` fl1 && tv1 == tv2 
-  = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCoercion cv2,xi2) (cv1,fl1,xi1) 
+  = do { cans <- rewriteEqLHS RightComesFromInert (mkCoVarCo cv2,xi2) (cv1,fl1,xi1) 
        ; mkIRContinue "Eq/Eq lhs" workItem DropInert cans }
 
 -- Check for rewriting RHS 
@@ -1137,13 +1134,13 @@ doInteractWithInert _ workItem = noInteraction workItem
 -- Equational Rewriting 
 rewriteDict  :: (CoVar, TcTyVar, Xi) -> (DictId, CtFlavor, Class, [Xi]) -> TcS CanonicalCt
 rewriteDict (cv,tv,xi) (dv,gw,cl,xis) 
-  = do { let cos  = substTysWith [tv] [mkCoVarCoercion cv] xis -- xis[tv] ~ xis[xi]
+  = do { let cos  = map (liftCoSubstWith [tv] [mkCoVarCo cv]) xis   -- xis[tv] ~ xis[xi]
              args = substTysWith [tv] [xi] xis
              con  = classTyCon cl 
-             dict_co = mkTyConCoercion con cos 
+             dict_co = mkTyConAppCo con cos 
        ; dv' <- newDictVar cl args 
        ; case gw of 
-           Wanted {}         -> setDictBind dv (EvCast dv' (mkSymCoercion dict_co))
+           Wanted {}         -> setDictBind dv (EvCast dv' (mkSymCo dict_co))
            Given {}          -> setDictBind dv' (EvCast dv dict_co) 
            Derived {}        -> return () -- Derived dicts we don't set any evidence
 
@@ -1154,11 +1151,11 @@ rewriteDict (cv,tv,xi) (dv,gw,cl,xis)
 
 rewriteIP :: (CoVar,TcTyVar,Xi) -> (EvVar,CtFlavor, IPName Name, TcType) -> TcS CanonicalCt 
 rewriteIP (cv,tv,xi) (ipid,gw,nm,ty) 
-  = do { let ip_co = substTyWith [tv] [mkCoVarCoercion cv] ty     -- ty[tv] ~ t[xi] 
-             ty'   = substTyWith [tv] [xi] ty
+  = do { let ip_co = liftCoSubstWith [tv] [mkCoVarCo cv] ty     -- ty[tv] ~ t[xi]
+             ty'   = substTyWith   [tv] [xi] ty
        ; ipid' <- newIPVar nm ty' 
        ; case gw of 
-           Wanted {}         -> setIPBind ipid  (EvCast ipid' (mkSymCoercion ip_co))
+           Wanted {}         -> setIPBind ipid  (EvCast ipid' (mkSymCo ip_co))
            Given {}          -> setIPBind ipid' (EvCast ipid ip_co) 
            Derived {}        -> return () -- Derived ips: we don't set any evidence
 
@@ -1169,20 +1166,21 @@ rewriteIP (cv,tv,xi) (ipid,gw,nm,ty)
    
 rewriteFunEq :: (CoVar,TcTyVar,Xi) -> (CoVar,CtFlavor,TyCon, [Xi], Xi) -> TcS CanonicalCt
 rewriteFunEq (cv1,tv,xi1) (cv2,gw, tc,args,xi2)                   -- cv2 :: F args ~ xi2
-  = do { let arg_cos = substTysWith [tv] [mkCoVarCoercion cv1] args 
-             args'   = substTysWith [tv] [xi1] args 
-             fun_co  = mkTyConCoercion tc arg_cos                 -- fun_co :: F args ~ F args'
+  = do { let co_subst = liftCoSubstWith [tv] [mkCoVarCo cv1]
+             arg_cos  = map co_subst args
+             args'    = substTysWith [tv] [xi1] args
+             fun_co   = mkTyConAppCo tc arg_cos                -- fun_co :: F args ~ F args'
 
              xi2'    = substTyWith [tv] [xi1] xi2
-             xi2_co  = substTyWith [tv] [mkCoVarCoercion cv1] xi2 -- xi2_co :: xi2 ~ xi2' 
+             xi2_co  = co_subst xi2 -- xi2_co :: xi2 ~ xi2'
 
        ; cv2' <- newCoVar (mkTyConApp tc args') xi2'
        ; case gw of 
-           Wanted {} -> setCoBind cv2  (fun_co               `mkTransCoercion` 
-                                        mkCoVarCoercion cv2' `mkTransCoercion` 
-                                        mkSymCoercion xi2_co)
-           Given {}  -> setCoBind cv2' (mkSymCoercion fun_co `mkTransCoercion` 
-                                        mkCoVarCoercion cv2  `mkTransCoercion` 
+           Wanted {} -> setCoBind cv2  (fun_co         `mkTransCo` 
+                                        mkCoVarCo cv2' `mkTransCo` 
+                                        mkSymCo xi2_co)
+           Given {}  -> setCoBind cv2' (mkSymCo fun_co `mkTransCo` 
+                                        mkCoVarCo cv2  `mkTransCo` 
                                         xi2_co)
            Derived {} -> return () 
 
@@ -1203,20 +1201,20 @@ rewriteEqRHS :: (CoVar,TcTyVar,Xi) -> (CoVar,CtFlavor,TcTyVar,Xi) -> TcS WorkLis
 rewriteEqRHS (cv1,tv1,xi1) (cv2,gw,tv2,xi2) 
   | Just tv2' <- tcGetTyVar_maybe xi2'
   , tv2 == tv2'	 -- In this case xi2[xi1/tv1] = tv2, so we have tv2~tv2
-  = do { when (isWanted gw) (setCoBind cv2 (mkSymCoercion co2')) 
+  = do { when (isWanted gw) (setCoBind cv2 (mkSymCo co2')) 
        ; return emptyWorkList } 
   | otherwise
   = do { cv2' <- newCoVar (mkTyVarTy tv2) xi2'
        ; case gw of
-             Wanted {} -> setCoBind cv2 $ mkCoVarCoercion cv2' `mkTransCoercion` 
-                                          mkSymCoercion co2'
-             Given {}  -> setCoBind cv2' $ mkCoVarCoercion cv2 `mkTransCoercion` 
+             Wanted {} -> setCoBind cv2 $ mkCoVarCo cv2' `mkTransCo` 
+                                          mkSymCo co2'
+             Given {}  -> setCoBind cv2' $ mkCoVarCo cv2 `mkTransCo` 
                                            co2'
              Derived {} -> return ()
        ; canEqToWorkList gw cv2' (mkTyVarTy tv2) xi2' }
   where 
     xi2' = substTyWith [tv1] [xi1] xi2 
-    co2' = substTyWith [tv1] [mkCoVarCoercion cv1] xi2  -- xi2 ~ xi2[xi1/tv1]
+    co2' = liftCoSubstWith [tv1] [mkCoVarCo cv1] xi2  -- xi2 ~ xi2[xi1/tv1]
 
 rewriteEqLHS :: WhichComesFromInert -> (Coercion,Xi) -> (CoVar,CtFlavor,Xi) -> TcS WorkList
 -- Used to ineract two equalities of the following form: 
@@ -1229,9 +1227,9 @@ rewriteEqLHS LeftComesFromInert (co1,xi1) (cv2,gw,xi2)
   = do { cv2' <- newCoVar xi2 xi1 
        ; case gw of 
            Wanted {} -> setCoBind cv2 $ 
-                        co1 `mkTransCoercion` mkSymCoercion (mkCoVarCoercion cv2')
+                        co1 `mkTransCo` mkSymCo (mkCoVarCo cv2')
            Given {}  -> setCoBind cv2' $ 
-                        mkSymCoercion (mkCoVarCoercion cv2) `mkTransCoercion` co1 
+                        mkSymCo (mkCoVarCo cv2) `mkTransCo` co1 
            Derived {} -> return ()
        ; mkCanonical gw cv2' }
 
@@ -1239,9 +1237,9 @@ rewriteEqLHS RightComesFromInert (co1,xi1) (cv2,gw,xi2)
   = do { cv2' <- newCoVar xi1 xi2
        ; case gw of
            Wanted {} -> setCoBind cv2 $
-                        co1 `mkTransCoercion` mkCoVarCoercion cv2'
+                        co1 `mkTransCo` mkCoVarCo cv2'
            Given {}  -> setCoBind cv2' $
-                        mkSymCoercion co1 `mkTransCoercion` mkCoVarCoercion cv2
+                        mkSymCo co1 `mkTransCo` mkCoVarCo cv2
            Derived {} -> return ()
        ; mkCanonical gw cv2' }
 
@@ -1249,12 +1247,12 @@ rewriteFrozen :: (CoVar,TcTyVar,Xi) -> (CoVar,CtFlavor) -> TcS WorkList
 rewriteFrozen (cv1, tv1, xi1) (cv2, fl2)
   = do { cv2' <- newCoVar ty2a' ty2b'  -- ty2a[xi1/tv1] ~ ty2b[xi1/tv1]
        ; case fl2 of
-             Wanted {} -> setCoBind cv2 $ co2a'                `mkTransCoercion`
-                       	         	  mkCoVarCoercion cv2' `mkTransCoercion`
-                       	         	  mkSymCoercion co2b'
+             Wanted {} -> setCoBind cv2 $ co2a'                `mkTransCo`
+                       	         	  mkCoVarCo cv2' `mkTransCo`
+                       	         	  mkSymCo co2b'
 
-             Given {} -> setCoBind cv2' $ mkSymCoercion co2a'  `mkTransCoercion`
-                      	 		  mkCoVarCoercion cv2  `mkTransCoercion`
+             Given {} -> setCoBind cv2' $ mkSymCo co2a'  `mkTransCo`
+                      	 		  mkCoVarCo cv2  `mkTransCo`
                       	 		  co2b'
 
              Derived {} -> return ()
@@ -1265,8 +1263,8 @@ rewriteFrozen (cv1, tv1, xi1) (cv2, fl2)
     ty2a' = substTyWith [tv1] [xi1] ty2a
     ty2b' = substTyWith [tv1] [xi1] ty2b
 
-    co2a' = substTyWith [tv1] [mkCoVarCoercion cv1] ty2a  -- ty2a ~ ty2a[xi1/tv1]
-    co2b' = substTyWith [tv1] [mkCoVarCoercion cv1] ty2b  -- ty2b ~ ty2b[xi1/tv1]
+    co2a' = liftCoSubstWith [tv1] [mkCoVarCo cv1] ty2a  -- ty2a ~ ty2a[xi1/tv1]
+    co2b' = liftCoSubstWith [tv1] [mkCoVarCo cv1] ty2b  -- ty2b ~ ty2b[xi1/tv1]
 
 solveOneFromTheOther :: String -> (EvTerm, CtFlavor) -> CanonicalCt -> TcS InteractResult
 -- First argument inert, second argument work-item. They both represent 
@@ -1734,7 +1732,7 @@ doTopReact workItem@(CDictCan { cc_id = dv, cc_flavor = fl@(Wanted loc)
                 ; case m of
                     Nothing -> return NoTopInt
                     Just (xis',cos,fd_work) ->
-                        do { let dict_co = mkTyConCoercion (classTyCon cls) cos
+                        do { let dict_co = mkTyConAppCo (classTyCon cls) cos
                            ; dv'<- newDictVar cls xis'
                            ; setDictBind dv (EvCast dv' dict_co)
                            ; let workItem' = CDictCan { cc_id = dv', cc_flavor = fl, 
@@ -1783,15 +1781,15 @@ doTopReact (CFunEqCan { cc_id = cv, cc_flavor = fl
 			    -- RHS of a type function, so that it never
 			    -- appears in an error message
                             -- See Note [Type synonym families] in TyCon
-                         coe = mkTyConApp coe_tc rep_tys 
+                         coe = mkAxInstCo coe_tc rep_tys
                    ; cv' <- case fl of
                               Wanted {} -> do { cv' <- newCoVar rhs_ty xi
                                               ; setCoBind cv $ 
-                                                    coe `mkTransCoercion`
-                                                      mkCoVarCoercion cv'
+                                                    coe `mkTransCo`
+                                                      mkCoVarCo cv'
                                               ; return cv' }
                               Given {}   -> newGivenCoVar xi rhs_ty $ 
-                                            mkSymCoercion (mkCoVarCoercion cv) `mkTransCoercion` coe 
+                                            mkSymCo (mkCoVarCo cv) `mkTransCo` coe 
                               Derived {} -> newDerivedId (EqPred xi rhs_ty)
                    ; can_cts <- mkCanonical fl cv'
                    ; return $ SomeTopInt can_cts Stop }

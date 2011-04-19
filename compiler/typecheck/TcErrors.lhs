@@ -15,14 +15,12 @@ import TcMType
 import TcSMonad
 import TcType
 import TypeRep
-
 import Inst
 import InstEnv
-
 import TyCon
 import Name
 import NameEnv
-import Id	( idType )
+import Id	( idType, evVarPred )
 import Var
 import VarSet
 import VarEnv
@@ -222,7 +220,7 @@ pprWithArising ev_vars
   where
     first_loc = evVarX (head ev_vars)
     ppr_one (EvVarX v loc)
-       = parens (pprPred (evVarPred v)) <+> pprArisingAt loc
+       = parens (pprPredTy (evVarPred v)) <+> pprArisingAt loc
 
 addErrorReport :: ReportErrCtxt -> SDoc -> TcM ()
 addErrorReport ctxt msg = addErrTcM (cec_tidy ctxt, msg $$ cec_extra ctxt)
@@ -299,8 +297,8 @@ getWantedEqExtra (TypeEqOrigin (UnifyOrigin { uo_actual = act, uo_expected = exp
                  ty1 ty2
   -- If the types in the error message are the same as the types we are unifying,
   -- don't add the extra expected/actual message
-  | act `tcEqType` ty1 && exp `tcEqType` ty2 = empty
-  | exp `tcEqType` ty1 && act `tcEqType` ty2 = empty
+  | act `eqType` ty1 && exp `eqType` ty2 = empty
+  | exp `eqType` ty1 && act `eqType` ty2 = empty
   | otherwise                                = mkExpectedActualMsg act exp
 
 getWantedEqExtra orig _ _ = pprArising orig
@@ -563,7 +561,7 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
     mk_overlap_msg (matches, unifiers)
       = ASSERT( not (null matches) )
         vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
-				<+> pprPred pred)
+				<+> pprPredTy pred)
     	     ,	sep [ptext (sLit "Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 	     ,	if not (isSingleton matches)
@@ -572,7 +570,7 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
     		else 	-- One match, plus some unifiers
 		ASSERT( not (null unifiers) )
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
-	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
+                                 quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
 			      ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
 			      ptext (sLit "when compiling the other instance declarations")])]
       where

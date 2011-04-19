@@ -32,7 +32,7 @@
 
 module Var (
         -- * The main data type and synonyms
-	Var, TyVar, CoVar, Id, DictId, DFunId, EvVar, EvId, IpId,
+        Var, TyVar, CoVar, TyCoVar, Id, DictId, DFunId, EvVar, EvId, IpId,
 
 	-- ** Taking 'Var's apart
 	varName, varUnique, varType, 
@@ -41,34 +41,25 @@ module Var (
 	setVarName, setVarUnique, setVarType,
 
 	-- ** Constructing, taking apart, modifying 'Id's
-	mkGlobalVar, mkLocalVar, mkExportedLocalVar, 
+	mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
 	idInfo, idDetails,
 	lazySetIdInfo, setIdDetails, globaliseId,
 	setIdExported, setIdNotExported,
 
         -- ** Predicates
-        isCoVar, isId, isTyCoVar, isTyVar, isTcTyVar,
+        isId, isTyVar, isTcTyVar,
         isLocalVar, isLocalId,
 	isGlobalId, isExportedId,
 	mustHaveLocalBinding,
 
 	-- ** Constructing 'TyVar's
-	mkTyVar, mkTcTyVar, mkWildCoVar,
+	mkTyVar, mkTcTyVar, 
 
 	-- ** Taking 'TyVar's apart
         tyVarName, tyVarKind, tcTyVarDetails, setTcTyVarDetails,
 
 	-- ** Modifying 'TyVar's
-	setTyVarName, setTyVarUnique, setTyVarKind,
-
-        -- ** Constructing 'CoVar's
-        mkCoVar,
-
-        -- ** Taking 'CoVar's apart
-        coVarName,
-
-        -- ** Modifying 'CoVar's
-        setCoVarUnique, setCoVarName
+	setTyVarName, setTyVarUnique, setTyVarKind
 
     ) where
 
@@ -77,8 +68,7 @@ module Var (
 
 import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
-import {-# SOURCE #-}	IdInfo( IdDetails, IdInfo, pprIdDetails )
-import {-# SOURCE #-}	TypeRep( isCoercionKind )
+import {-# SOURCE #-}	IdInfo( IdDetails, IdInfo, coVarDetails, vanillaIdInfo, pprIdDetails )
 
 import Name hiding (varName)
 import Unique
@@ -100,7 +90,7 @@ import Data.Data
 -- large number of SOURCE imports of Id.hs :-(
 
 \begin{code}
-type EvVar = Var	-- An evidence variable: dictionary or equality constraint
+type EvVar = Var        -- An evidence variable: dictionary or equality constraint
      	       		-- Could be an DictId or a CoVar
 
 type Id     = Var       -- A term-level identifier
@@ -110,9 +100,10 @@ type DictId = EvId	-- A dictionary variable
 type IpId   = EvId      -- A term-level implicit parameter
 
 type TyVar = Var
-type CoVar = TyVar	-- A coercion variable is simply a type 
+type CoVar = Id		-- A coercion variable is simply an Id
 			-- variable of kind @ty1 ~ ty2@. Hence its
 			-- 'varType' is always @PredTy (EqPred t1 t2)@
+type TyCoVar = TyVar    -- Something that is a type OR coercion variable.
 \end{code}
 
 %************************************************************************
@@ -136,8 +127,7 @@ data Var
 	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
-	varType       :: Kind,          -- ^ The type or kind of the 'Var' in question
-        isCoercionVar :: Bool
+	varType       :: Kind           -- ^ The type or kind of the 'Var' in question
  }
 
   | TcTyVar { 				-- Used only during type inference
@@ -187,9 +177,8 @@ instance Outputable Var where
   ppr var = ppr (varName var) <+> ifPprDebug (brackets (ppr_debug var))
 
 ppr_debug :: Var -> SDoc
-ppr_debug (TyVar { isCoercionVar = False })   = ptext (sLit "tv")
-ppr_debug (TyVar { isCoercionVar = True })    = ptext (sLit "co")
-ppr_debug (TcTyVar {tc_tv_details = d})       = pprTcTyVarDetails d
+ppr_debug (TyVar {})                           = ptext (sLit "tv")
+ppr_debug (TcTyVar {tc_tv_details = d})        = pprTcTyVarDetails d
 ppr_debug (Id { idScope = s, id_details = d }) = ppr_id_scope s <> pprIdDetails d
 
 ppr_id_scope :: IdScope -> SDoc
@@ -270,11 +259,9 @@ setTyVarKind tv k = tv {varType = k}
 
 \begin{code}
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = ASSERT( not (isCoercionKind kind ) )
-		    TyVar { varName    = name
+mkTyVar name kind = TyVar { varName    = name
 			  , realUnique = getKeyFastInt (nameUnique name)
 			  , varType  = kind
-                          , isCoercionVar    = False
 			}
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
@@ -292,36 +279,6 @@ tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var)
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Coercion variables}
-%*									*
-%************************************************************************
-
-\begin{code}
-coVarName :: CoVar -> Name
-coVarName = varName
-
-setCoVarUnique :: CoVar -> Unique -> CoVar
-setCoVarUnique = setVarUnique
-
-setCoVarName :: CoVar -> Name -> CoVar
-setCoVarName   = setVarName
-
-mkCoVar :: Name -> Kind -> CoVar
-mkCoVar name kind = ASSERT( isCoercionKind kind )
-		    TyVar { varName    	  = name
-			  , realUnique 	  = getKeyFastInt (nameUnique name)
-			  , varType    	  = kind
-                          , isCoercionVar = True
-			}
-
-mkWildCoVar :: Kind -> TyVar
--- ^ Create a type variable that is never referred to, so its unique doesn't 
--- matter
-mkWildCoVar = mkCoVar (mkSysTvName (mkBuiltinUnique 1) (fsLit "co_wild"))
 \end{code}
 
 %************************************************************************
@@ -348,6 +305,10 @@ mkGlobalVar details name ty info
 mkLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkLocalVar details name ty info
   = mk_id name ty (LocalId NotExported) details  info
+
+mkCoVar :: Name -> Type -> CoVar
+-- Coercion variables have no IdInfo
+mkCoVar name ty = mk_id name ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
@@ -394,19 +355,10 @@ setIdNotExported id = ASSERT( isLocalId id )
 %************************************************************************
 
 \begin{code}
-isTyCoVar :: Var -> Bool	-- True of both type and coercion variables
-isTyCoVar (TyVar {})   = True
-isTyCoVar (TcTyVar {}) = True
-isTyCoVar _            = False
-
-isTyVar :: Var -> Bool		-- True of both type variables only
-isTyVar v@(TyVar {}) = not (isCoercionVar v)
+isTyVar :: Var -> Bool          -- True of both type variables only
+isTyVar (TyVar {})   = True
 isTyVar (TcTyVar {}) = True
 isTyVar _            = False
-
-isCoVar :: Var -> Bool		-- Only works after type checking (sigh)
-isCoVar v@(TyVar {}) = isCoercionVar v
-isCoVar _            = False
 
 isTcTyVar :: Var -> Bool
 isTcTyVar (TcTyVar {}) = True

@@ -11,7 +11,6 @@ import Vectorise.Monad
 import Vectorise.Utils.PADict
 import CoreSyn
 import Type
-import Var
 import FastString
 import Control.Monad
 

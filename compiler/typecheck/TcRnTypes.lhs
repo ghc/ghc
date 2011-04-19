@@ -42,7 +42,7 @@ module TcRnTypes(
 	CtOrigin(..), EqOrigin(..), 
         WantedLoc, GivenLoc, pushErrCtxt,
 
-        SkolemInfo(..),
+	SkolemInfo(..),
 
         CtFlavor(..), pprFlavorArising, isWanted, isGiven, isDerived,
         FlavoredEvVar,
@@ -62,6 +62,7 @@ module TcRnTypes(
 import HsSyn
 import HscTypes
 import Type
+import Id	( evVarPred )
 import Class    ( Class )
 import DataCon  ( DataCon, dataConUserType )
 import TcType
@@ -324,6 +325,7 @@ data IfLclEnv
 		-- plus which bit is currently being examined
 
 	if_tv_env  :: UniqFM TyVar,	-- Nested tyvar bindings
+		      	     		-- (and coercions)
 	if_id_env  :: UniqFM Id		-- Nested id binding
     }
 \end{code}
@@ -674,7 +676,6 @@ instance Outputable WhereFrom where
 %************************************************************************
 %*									*
 		Wanted constraints
-
      These are forced to be in TcRnTypes because
      	   TcLclEnv mentions WantedConstraints
 	   WantedConstraint mentions CtLoc
@@ -901,7 +902,7 @@ pprEvVarTheta :: [EvVar] -> SDoc
 pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
                               
 pprEvVarWithType :: EvVar -> SDoc
-pprEvVarWithType v = ppr v <+> dcolon <+> pprPred (evVarPred v)
+pprEvVarWithType v = ppr v <+> dcolon <+> pprPredTy (evVarPred v)
 
 pprWantedsWithLocs :: WantedConstraints -> SDoc
 pprWantedsWithLocs wcs

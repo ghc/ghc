@@ -1,7 +1,7 @@
 \begin{code}
 module TcSimplify( 
        simplifyInfer,
-       simplifyDefault, simplifyDeriv,
+       simplifyDefault, simplifyDeriv, 
        simplifyRule, simplifyTop, simplifyInteractive
   ) where
 
@@ -15,10 +15,12 @@ import TcType
 import TcSMonad 
 import TcInteract
 import Inst
-import Unify( niFixTvSubst, niSubstTvSet )
+import Id	( evVarPred )
+import Unify	( niFixTvSubst, niSubstTvSet )
 import Var
 import VarSet
 import VarEnv 
+import Coercion
 import TypeRep
 
 import Name
@@ -982,7 +984,8 @@ solveCTyFunEqs cts
 
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
-    solve_one (cv,tv,ty) = setWantedTyBind tv ty >> setCoBind cv ty
+    solve_one (cv,tv,ty) = do { setWantedTyBind tv ty
+                              ; setCoBind cv (mkReflCo ty) }
 
 ------------
 type FunEqBinds = (TvSubstEnv, [(CoVar, TcTyVar, TcType)])

@@ -56,6 +56,7 @@ import Var
 import CoreSyn
 import CoreUtils
 import Type
+import Coercion
 import Id
 import Name
 import VarEnv
@@ -112,7 +113,7 @@ satBind (Rec pairs) interesting_ids = do
     return (Rec (zipEqual "satBind" binders rhss'), mergeIdSATInfos sat_info_rhss')
 \end{code}
 \begin{code}
-data App = VarApp Id | TypeApp Type
+data App = VarApp Id | TypeApp Type | CoApp Coercion
 data Staticness a = Static a | NotStatic
 
 type IdAppInfo = (Id, SATInfo)
@@ -133,6 +134,7 @@ pprSATInfo staticness = hcat $ map pprStaticness staticness
 pprStaticness :: Staticness App -> SDoc
 pprStaticness (Static (VarApp _))  = ptext (sLit "SV") 
 pprStaticness (Static (TypeApp _)) = ptext (sLit "ST") 
+pprStaticness (Static (CoApp _))   = ptext (sLit "SC")
 pprStaticness NotStatic            = ptext (sLit "NS")
 
 
@@ -142,7 +144,8 @@ mergeSATInfo _  [] = []
 mergeSATInfo (NotStatic:statics) (_:apps) = NotStatic : mergeSATInfo statics apps
 mergeSATInfo (_:statics) (NotStatic:apps) = NotStatic : mergeSATInfo statics apps
 mergeSATInfo ((Static (VarApp v)):statics)  ((Static (VarApp v')):apps)  = (if v == v' then Static (VarApp v) else NotStatic) : mergeSATInfo statics apps
-mergeSATInfo ((Static (TypeApp t)):statics) ((Static (TypeApp t')):apps) = (if t `coreEqType` t' then Static (TypeApp t) else NotStatic) : mergeSATInfo statics apps
+mergeSATInfo ((Static (TypeApp t)):statics) ((Static (TypeApp t')):apps) = (if t `eqType` t' then Static (TypeApp t) else NotStatic) : mergeSATInfo statics apps
+mergeSATInfo ((Static (CoApp c)):statics) ((Static (CoApp c')):apps)     = (if c `coreEqCoercion` c' then Static (CoApp c) else NotStatic) : mergeSATInfo statics apps
 mergeSATInfo l  r  = pprPanic "mergeSATInfo" $ ptext (sLit "Left:") <> pprSATInfo l <> ptext (sLit ", ")
                                             <> ptext (sLit "Right:") <> pprSATInfo r
 
@@ -154,9 +157,9 @@ mergeIdSATInfos = foldl' mergeIdSATInfo emptyIdSATInfo
 
 bindersToSATInfo :: [Id] -> SATInfo
 bindersToSATInfo vs = map (Static . binderToApp) vs
-    where binderToApp v = if isId v
-                          then VarApp v
-                          else TypeApp $ mkTyVarTy v
+    where binderToApp v | isId v    = VarApp v
+                        | isTyVar v = TypeApp $ mkTyVarTy v
+                        | otherwise = CoApp $ mkCoVarCo v
 
 finalizeApp :: Maybe IdAppInfo -> IdSATInfo -> IdSATInfo
 finalizeApp Nothing id_sat_info = id_sat_info
@@ -195,9 +198,10 @@ satExpr (App fn arg) interesting_ids = do
             -- TODO: remove this use of append somehow (use a data structure with O(1) append but a left-to-right kind of interface)
             let satRemainderWithStaticness arg_staticness = satRemainder $ Just (fn_id, fn_app_info ++ [arg_staticness])
             in case arg of
-                Type t -> satRemainderWithStaticness $ Static (TypeApp t)
-                Var v  -> satRemainderWithStaticness $ Static (VarApp v)
-                _      -> satRemainderWithStaticness $ NotStatic
+                Type t     -> satRemainderWithStaticness $ Static (TypeApp t)
+                Coercion c -> satRemainderWithStaticness $ Static (CoApp c)
+                Var v      -> satRemainderWithStaticness $ Static (VarApp v)
+                _          -> satRemainderWithStaticness $ NotStatic
   where
     boring :: CoreExpr -> IdSATInfo -> Maybe IdAppInfo -> SatM (CoreExpr, IdSATInfo, Maybe IdAppInfo)
     boring fn' sat_info_fn app_info = 
@@ -229,6 +233,9 @@ satExpr (Note note expr) interesting_ids = do
 
 satExpr ty@(Type _) _ = do
     return (ty, emptyIdSATInfo, Nothing)
+    
+satExpr co@(Coercion _) _ = do
+    return (co, emptyIdSATInfo, Nothing)
 
 satExpr (Cast expr coercion) interesting_ids = do
     (expr', sat_info_expr, expr_app) <- satExpr expr interesting_ids

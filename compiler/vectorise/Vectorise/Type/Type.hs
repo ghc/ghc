@@ -10,7 +10,6 @@ import Vectorise.Builtins
 import TypeRep
 import Type
 import TyCon
-import Var
 import Outputable
 import Control.Monad
 import Data.List

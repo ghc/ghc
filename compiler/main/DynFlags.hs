@@ -758,7 +758,7 @@ defaultDynFlags =
                           SevOutput -> printOutput (msg style)
                           SevInfo   -> printErrs (msg style)
                           SevFatal  -> printErrs (msg style)
-                          _         -> do 
+                          _         -> do
                                 hPutChar stderr '\n'
                                 printErrs ((mkLocMessage srcSpan msg) style)
                      -- careful (#2302): printErrs prints in UTF-8, whereas
@@ -1919,14 +1919,13 @@ forceRecompile :: DynP ()
 -- recompiled which probably isn't what you want
 forceRecompile = do { dfs <- liftEwM getCmdLineState
 	       	    ; when (force_recomp dfs) (setDynFlag Opt_ForceRecomp) }
-	where
+        where
 	  force_recomp dfs = isOneShot (ghcMode dfs)
 
 setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do forceRecompile
                          setDynFlag Opt_D_verbose_core2core 
                          upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
-		         
 
 setDumpSimplPhases :: String -> DynP ()
 setDumpSimplPhases s = do forceRecompile
@@ -2043,7 +2042,6 @@ addImportPath, addLibraryPath, addIncludePath, addFrameworkPath :: FilePath -> D
 -- -i on its own deletes the import paths
 addImportPath "" = upd (\s -> s{importPaths = []})
 addImportPath p  = upd (\s -> s{importPaths = importPaths s ++ splitPathList p})
-
 
 addLibraryPath p =
   upd (\s -> s{libraryPaths = libraryPaths s ++ splitPathList p})

@@ -54,13 +54,13 @@ module HscTypes (
 
         -- * TyThings and type environments
 	TyThing(..),
-	tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId,
+	tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId, tyThingCoAxiom,
 	implicitTyThings, isImplicitTyThing,
 	
 	TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
-	typeEnvDataCons,
+	typeEnvDataCons, typeEnvCoAxioms,
 
         -- * MonadThings
         MonadThings(..),
@@ -1037,7 +1037,10 @@ implicitTyThings (ATyCon tc)
       -- for each data constructor in order,
       --   the contructor, worker, and (possibly) wrapper
     concatMap (extras_plus . ADataCon) (tyConDataCons tc)
-		     
+
+implicitTyThings (ACoAxiom _cc)
+  = []
+	     
 implicitTyThings (AClass cl) 
   = -- dictionary datatype:
     --    [extras_plus:]
@@ -1069,10 +1072,10 @@ extras_plus thing = thing : implicitTyThings thing
 -- add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc 
-  = map ATyCon . catMaybes $ [-- Just if newtype, Nothing if not
-                              newTyConCo_maybe tc, 
+  = map ACoAxiom . catMaybes $ [-- Just if newtype, Nothing if not
+                              newTyConCo_maybe tc,
                               -- Just if family instance, Nothing if not
-			        tyConFamilyCoercion_maybe tc] 
+			      tyConFamilyCoercion_maybe tc] 
 
 -- sortByOcc = sortBy (\ x -> \ y -> getOccName x < getOccName y)
 
@@ -1082,10 +1085,11 @@ implicitCoTyCon tc
 -- of some other declaration, or it is generated implicitly by some
 -- other declaration.
 isImplicitTyThing :: TyThing -> Bool
-isImplicitTyThing (ADataCon _)  = True
-isImplicitTyThing (AnId     id) = isImplicitId id
-isImplicitTyThing (AClass   _)  = False
-isImplicitTyThing (ATyCon   tc) = isImplicitTyCon tc
+isImplicitTyThing (ADataCon {}) = True
+isImplicitTyThing (AnId id)     = isImplicitId id
+isImplicitTyThing (AClass {})   = False
+isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
+isImplicitTyThing (ACoAxiom {}) = True
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids
@@ -1107,6 +1111,7 @@ emptyTypeEnv    :: TypeEnv
 typeEnvElts     :: TypeEnv -> [TyThing]
 typeEnvClasses  :: TypeEnv -> [Class]
 typeEnvTyCons   :: TypeEnv -> [TyCon]
+typeEnvCoAxioms :: TypeEnv -> [CoAxiom]
 typeEnvIds      :: TypeEnv -> [Id]
 typeEnvDataCons :: TypeEnv -> [DataCon]
 lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
@@ -1115,6 +1120,7 @@ emptyTypeEnv 	    = emptyNameEnv
 typeEnvElts     env = nameEnvElts env
 typeEnvClasses  env = [cl | AClass cl   <- typeEnvElts env]
 typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env] 
+typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env] 
 typeEnvIds      env = [id | AnId id     <- typeEnvElts env] 
 typeEnvDataCons env = [dc | ADataCon dc <- typeEnvElts env] 
 
@@ -1169,6 +1175,11 @@ lookupTypeHscEnv hsc_env name = do
 tyThingTyCon :: TyThing -> TyCon
 tyThingTyCon (ATyCon tc) = tc
 tyThingTyCon other	 = pprPanic "tyThingTyCon" (pprTyThing other)
+
+-- | Get the 'CoAxiom' from a 'TyThing' if it is a coercion axiom thing. Panics otherwise
+tyThingCoAxiom :: TyThing -> CoAxiom
+tyThingCoAxiom (ACoAxiom ax) = ax
+tyThingCoAxiom other	     = pprPanic "tyThingCoAxiom" (pprTyThing other)
 
 -- | Get the 'Class' from a 'TyThing' if it is a class thing. Panics otherwise
 tyThingClass :: TyThing -> Class

@@ -27,7 +27,6 @@ import TysWiredIn
 import PrelNames
 import TyCon
 import Type
-import Unify( dataConCannotMatch )
 import SrcLoc
 import UniqSet
 import Util

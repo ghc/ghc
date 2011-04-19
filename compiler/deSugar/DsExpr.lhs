@@ -49,8 +49,8 @@ import DynFlags
 import StaticFlags
 import CostCentre
 import Id
-import Var
 import VarSet
+import VarEnv
 import DataCon
 import TysWiredIn
 import BasicTypes
@@ -527,12 +527,12 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec, 
-		  eq_theta, dict_theta, arg_tys, _) = dataConFullSig con
+		  theta, arg_tys, _) = dataConFullSig con
 		 subst = mkTopTvSubst (univ_tvs `zip` in_inst_tys)
 
 		-- I'm not bothering to clone the ex_tvs
 	   ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
-	   ; theta_vars <- mapM newPredVarDs (substTheta subst (eq_theta ++ dict_theta))
+	   ; theta_vars <- mapM newPredVarDs (substTheta subst theta)
 	   ; arg_ids    <- newSysLocalsDs (substTys subst arg_tys)
 	   ; let val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
     					 (dataConFieldLabels con) arg_ids
@@ -543,21 +543,21 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
 		 wrap = mkWpEvVarApps theta_vars          `WpCompose` 
 			mkWpTyApps    (mkTyVarTys ex_tvs) `WpCompose`
 			mkWpTyApps [ty | (tv, ty) <- univ_tvs `zip` out_inst_tys
-				       , isNothing (lookupTyVar wrap_subst tv) ]
+				       , not (tv `elemVarEnv` wrap_subst) ]
     	         rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
 
 			-- Tediously wrap the application in a cast
 			-- Note [Update for GADTs]
 		 wrapped_rhs | null eq_spec = rhs
 			     | otherwise    = mkLHsWrap (WpCast wrap_co) rhs
-		 wrap_co = mkTyConApp tycon [ lookup tv ty 
-					    | (tv,ty) <- univ_tvs `zip` out_inst_tys]
-		 lookup univ_tv ty = case lookupTyVar wrap_subst univ_tv of
-					Just ty' -> ty'
-					Nothing  -> ty
-		 wrap_subst = mkTopTvSubst [ (tv,mkSymCoercion (mkTyVarTy co_var))
-					   | ((tv,_),co_var) <- eq_spec `zip` eqs_vars ]
-		 
+		 wrap_co = mkTyConAppCo tycon [ lookup tv ty
+					      | (tv,ty) <- univ_tvs `zip` out_inst_tys]
+		 lookup univ_tv ty = case lookupVarEnv wrap_subst univ_tv of
+					Just co' -> co'
+					Nothing  -> mkReflCo ty
+		 wrap_subst = mkVarEnv [ (tv, mkSymCo (mkCoVarCo co_var))
+				       | ((tv,_),co_var) <- eq_spec `zip` eqs_vars ]
+
     	         pat = noLoc $ ConPatOut { pat_con = noLoc con, pat_tvs = ex_tvs
 					 , pat_dicts = eqs_vars ++ theta_vars
 					 , pat_binds = emptyTcEvBinds
@@ -597,7 +597,7 @@ dsExpr (HsTick ix vars e) = do
 
 dsExpr (HsBinTick ixT ixF e) = do
   e2 <- dsLExpr e
-  do { ASSERT(exprType e2 `coreEqType` boolTy)
+  do { ASSERT(exprType e2 `eqType` boolTy)
        mkBinaryTickBox ixT ixF e2
      }
 \end{code}
@@ -904,7 +904,7 @@ warnAboutIdentities (Var v) co_fn
   | idName v `elem` conversionNames
   , let fun_ty = exprType (co_fn (Var v))
   , Just (arg_ty, res_ty) <- splitFunTy_maybe fun_ty
-  , arg_ty `tcEqType` res_ty  -- So we are converting  ty -> ty
+  , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = warnDs (vcat [ ptext (sLit "Call of") <+> ppr v <+> dcolon <+> ppr fun_ty
                  , nest 2 $ ptext (sLit "can probably be omitted")
                  , parens (ptext (sLit "Use -fno-warn-identities to suppress this messsage)"))
@@ -931,14 +931,14 @@ warnDiscardedDoBindings :: LHsExpr Id -> Type -> Type -> DsM ()
 warnDiscardedDoBindings rhs container_ty returning_ty = do {
           -- Warn about discarding non-() things in 'monadic' binding
         ; warn_unused <- doptDs Opt_WarnUnusedDoBind
-        ; if warn_unused && not (returning_ty `tcEqType` unitTy)
+        ; if warn_unused && not (returning_ty `eqType` unitTy)
            then warnDs (unusedMonadBind rhs returning_ty)
            else do {
           -- Warn about discarding m a things in 'monadic' binding of the same type,
           -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
         ; warn_wrong <- doptDs Opt_WarnWrongDoBind
         ; case tcSplitAppTy_maybe returning_ty of
-                  Just (returning_container_ty, _) -> when (warn_wrong && container_ty `tcEqType` returning_container_ty) $
+                  Just (returning_container_ty, _) -> when (warn_wrong && container_ty `eqType` returning_container_ty) $
                                                             warnDs (wrongMonadBind rhs returning_ty)
                   _ -> return () } }
 

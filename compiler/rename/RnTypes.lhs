@@ -31,7 +31,7 @@ import RnEnv
 import TcRnMonad
 import RdrName
 import PrelNames
-import TypeRep		( funTyConName )
+import TysPrim          ( funTyConName )
 import Name
 import SrcLoc
 import NameSet

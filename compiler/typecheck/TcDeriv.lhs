@@ -1294,7 +1294,7 @@ inferInstanceContexts oflag infer_specs
 		  
  	   ; let tv_set = mkVarSet tyvars
 	         weird_preds = [pred | pred <- deriv_rhs
-                                     , not (tyVarsOfPred pred `subVarSet` tv_set)]  
+                                     , not (tyVarsOfPred pred `subVarSet` tv_set)]
 	   ; mapM_ (addErrTc . badDerivedPred) weird_preds	
 
            ; theta <- simplifyDeriv orig tyvars deriv_rhs
@@ -1423,14 +1423,12 @@ genInst standalone_deriv oflag
   where
     inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
-	      Just co_con -> ACo (mkTyConApp co_con rep_tc_args)
+              Just co_con -> mkAxInstCo co_con rep_tc_args
     	      Nothing     -> id_co
 	      -- Not a family => rep_tycon = main tycon
-    co2 = case newTyConCo_maybe rep_tycon of
-	      Just co_con -> ACo (mkTyConApp co_con rep_tc_args)
-              Nothing     -> id_co  -- The newtype is transparent; no need for a cast
-    co = co1 `mkTransCoI` co2
-    id_co = IdCo (mkTyConApp rep_tycon rep_tc_args)
+    co2 = mkAxInstCo (newTyConCo rep_tycon) rep_tc_args
+    co  = co1 `mkTransCo` co2
+    id_co = mkReflCo (mkTyConApp rep_tycon rep_tc_args)
 
 -- Example: newtype instance N [a] = N1 (Tree a) 
 --          deriving instance Eq b => Eq (N [(b,b)])

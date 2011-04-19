@@ -26,7 +26,6 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newCoVar, newEvVars,
-  writeWantedCoVar, readWantedCoVar, 
   newIP, newDict, newSilentGiven, isSilentEvVar,
 
   newWantedEvVar, newWantedEvVars,
@@ -43,16 +42,15 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   SourceTyCtxt(..), checkValidTheta, 
-  checkValidInstance,
-  checkValidTypeInst, checkTyFamFreeness,
+  checkValidInstHead, checkValidInstance, 
+  checkInstTermination, checkValidTypeInst, checkTyFamFreeness, 
   arityErr, 
   growPredTyVars, growThetaTyVars, validDerivPred,
 
   --------------------------------
   -- Zonking
   zonkType, mkZonkTcTyVar, zonkTcPredType, 
-  zonkTcTypeCarefully,
-  skolemiseUnboundMetaTyVar,
+  zonkTcTypeCarefully, skolemiseUnboundMetaTyVar,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcThetaType,
@@ -72,7 +70,6 @@ module TcMType (
 import TypeRep
 import TcType
 import Type
-import Coercion
 import Class
 import TyCon
 import Var
@@ -145,7 +142,7 @@ newEvVar (IParam ip ty)   = newIP    ip ty
 
 newCoVar :: TcType -> TcType -> TcM CoVar
 newCoVar ty1 ty2
-  = do { name <- newName (mkTyVarOccFS (fsLit "co"))
+  = do { name <- newName (mkVarOccFS (fsLit "co"))
        ; return (mkCoVar name (mkPredTy (EqPred ty1 ty2))) }
 
 newIP :: IPName Name -> TcType -> TcM IpId
@@ -301,10 +298,6 @@ readMetaTyVar :: TyVar -> TcM MetaDetails
 readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
 		      readMutVar (metaTvRef tyvar)
 
-readWantedCoVar :: CoVar -> TcM MetaDetails
-readWantedCoVar covar = ASSERT2( isMetaTyVar covar, ppr covar )
-		        readMutVar (metaTvRef covar)
-
 isFilledMetaTyVar :: TyVar -> TcM Bool
 -- True of a filled-in (Indirect) meta type variable
 isFilledMetaTyVar tv
@@ -342,9 +335,6 @@ writeMetaTyVar tyvar ty
   | otherwise
   = WARN( True, text "Writing to non-meta tyvar" <+> ppr tyvar )
     return ()
-
-writeWantedCoVar :: CoVar -> Coercion -> TcM () 
-writeWantedCoVar cv co = writeMetaTyVar cv co 
 
 --------------------
 writeMetaTyVarRef :: TcTyVar -> TcRef MetaDetails -> TcType -> TcM ()
@@ -745,13 +735,12 @@ zonkType zonk_tc_tyvar ty
 
 	-- The two interesting cases!
     go (TyVarTy tyvar) | isTcTyVar tyvar = zonk_tc_tyvar tyvar
-		       | otherwise	 = liftM TyVarTy $ 
-                                           zonkTyVar zonk_tc_tyvar tyvar
+		       | otherwise	 = return (TyVarTy tyvar)
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
     go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar ) do
                              ty' <- go ty
-                             tyvar' <- zonkTyVar zonk_tc_tyvar tyvar
+                             tyvar' <- return tyvar
                              return (ForAllTy tyvar' ty')
 
     go_pred (ClassP c tys)   = do tys' <- mapM go tys
@@ -774,16 +763,6 @@ mkZonkTcTyVar unbound_var_fn tyvar
 			   ; case cts of    
 			       Flexi       -> unbound_var_fn tyvar  
 			       Indirect ty -> zonkType (mkZonkTcTyVar unbound_var_fn) ty }
-
--- Zonk the kind of a non-TC tyvar in case it is a coercion variable 
--- (their kind contains types).
-zonkTyVar :: (TcTyVar -> TcM Type)      -- What to do for a TcTyVar
- 	  -> TyVar -> TcM TyVar
-zonkTyVar zonk_tc_tyvar tv 
-  | isCoVar tv
-  = do { kind <- zonkType zonk_tc_tyvar (tyVarKind tv)
-       ; return $ setTyVarKind tv kind }
-  | otherwise = return tv
 \end{code}
 
 
@@ -1154,7 +1133,7 @@ check_valid_theta ctxt theta = do
     warnTc (notNull dups) (dupPredWarn dups)
     mapM_ (check_pred_ty dflags ctxt) theta
   where
-    (_,dups) = removeDups tcCmpPred theta
+    (_,dups) = removeDups cmpPred theta
 
 -------------------------
 check_pred_ty :: DynFlags -> SourceTyCtxt -> PredType -> TcM ()
@@ -1276,7 +1255,7 @@ checkAmbiguity forall_tyvars theta tau_tyvars
 
 ambigErr :: PredType -> SDoc
 ambigErr pred
-  = sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprPred pred),
+  = sep [ptext (sLit "Ambiguous constraint") <+> quotes (pprPredTy pred),
 	 nest 2 (ptext (sLit "At least one of the forall'd type variables mentioned by the constraint") $$
 		 ptext (sLit "must be reachable from the type after the '=>'"))]
 \end{code}
@@ -1343,14 +1322,14 @@ eqSuperClassErr pred
        2 (ppr pred)
 
 badPredTyErr, eqPredTyErr, predTyVarErr :: PredType -> SDoc
-badPredTyErr pred = ptext (sLit "Illegal constraint") <+> pprPred pred
-eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprPred pred
+badPredTyErr pred = ptext (sLit "Illegal constraint") <+> pprPredTy pred
+eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprPredTy pred
 		    $$
 		    parens (ptext (sLit "Use -XTypeFamilies to permit this"))
 predTyVarErr pred  = sep [ptext (sLit "Non type-variable argument"),
-			  nest 2 (ptext (sLit "in the constraint:") <+> pprPred pred)]
+			  nest 2 (ptext (sLit "in the constraint:") <+> pprPredTy pred)]
 dupPredWarn :: [[PredType]] -> SDoc
-dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
+dupPredWarn dups   = ptext (sLit "Duplicate constraint(s):") <+> pprWithCommas pprPredTy (map head dups)
 
 arityErr :: Outputable a => String -> a -> Int -> Int -> SDoc
 arityErr kind name n m
@@ -1498,7 +1477,7 @@ checkInstTermination tys theta
 
 predUndecErr :: PredType -> SDoc -> SDoc
 predUndecErr pred msg = sep [msg,
-			nest 2 (ptext (sLit "in the constraint:") <+> pprPred pred)]
+			nest 2 (ptext (sLit "in the constraint:") <+> pprPredTy pred)]
 
 nomoreMsg, smallerMsg, undecidableMsg :: SDoc
 nomoreMsg = ptext (sLit "Variable occurs more often in a constraint than in the instance head")

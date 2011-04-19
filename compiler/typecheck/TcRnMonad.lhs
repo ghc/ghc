@@ -406,7 +406,6 @@ traceRn, traceSplice :: SDoc -> TcRn ()
 traceRn      = traceOptTcRn Opt_D_dump_rn_trace
 traceSplice  = traceOptTcRn Opt_D_dump_splices
 
-
 traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
 traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
@@ -897,6 +896,9 @@ add_err_tcm tidy_env err_msg loc ctxt
 mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
 -- Tidy the error info, trimming excessive contexts
 mkErrInfo env ctxts
+ | opt_PprStyle_Debug     -- In -dppr-debug style the output 
+ = return empty	          -- just becomes too voluminous
+ | otherwise
  = go 0 env ctxts
  where
    go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc

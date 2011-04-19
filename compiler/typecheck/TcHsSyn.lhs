@@ -35,6 +35,7 @@ import TcRnMonad
 import PrelNames
 import TcType
 import TcMType
+import Coercion
 import TysPrim
 import TysWiredIn
 import DataCon
@@ -43,14 +44,15 @@ import NameSet
 import Var
 import VarSet
 import VarEnv
+import DynFlags( DynFlag(..) )
 import Literal
 import BasicTypes
 import Maybes
 import SrcLoc
-import DynFlags( DynFlag(..) )
 import Bag
 import FastString
 import Outputable
+import Data.Traversable( traverse )
 \end{code}
 
 \begin{code}
@@ -676,7 +678,7 @@ zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpCast co)    = do { co' <- zonkTcTypeToType env co
+zonkCoFn env (WpCast co)    = do { co' <- zonkTcCoToCo env co
 				 ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
 				 ; return (env', WpEvLam ev') }
@@ -1004,7 +1006,6 @@ zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
 
    zonk_it env v
      | isId v     = do { v' <- zonkIdBndr env v; return (extendZonkEnv1 env v', v') }
-     | isCoVar v  = do { v' <- zonkEvBndr env v; return (extendZonkEnv1 env v', v') }
      | otherwise  = ASSERT( isImmutableTyVar v) return (env, v)
 \end{code}
 
@@ -1034,10 +1035,10 @@ zonkVect env (HsVect v (Just e))
 zonkEvTerm :: ZonkEnv -> EvTerm -> TcM EvTerm
 zonkEvTerm env (EvId v)           = ASSERT2( isId v, ppr v ) 
                                     return (EvId (zonkIdOcc env v))
-zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcTypeToType env co
+zonkEvTerm env (EvCoercion co)    = do { co' <- zonkTcCoToCo env co
                                        ; return (EvCoercion co') }
 zonkEvTerm env (EvCast v co)      = ASSERT( isId v) 
-                                    do { co' <- zonkTcTypeToType env co
+                                    do { co' <- zonkTcCoToCo env co
                                        ; return (EvCast (zonkIdOcc env v) co') }
 zonkEvTerm env (EvSuperClass d n) = return (EvSuperClass (zonkIdOcc env d) n)
 zonkEvTerm env (EvDFunApp df tys tms)
@@ -1112,4 +1113,28 @@ zonkTypeZapping ty
     zonk_unbound_tyvar tv = do { let ty = anyTypeOfKind (tyVarKind tv)
 			       ; writeMetaTyVar tv ty
 			       ; return ty }
+
+zonkTcCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
+zonkTcCoToCo env co
+  = go co
+  where
+    go (CoVarCo cv)         = return (CoVarCo (zonkEvVarOcc env cv))
+    go (Refl ty)            = do { ty' <- zonkTcTypeToType env ty
+                                 ; return (Refl ty') }
+    go (TyConAppCo tc cos)  = do { cos' <- mapM go cos; return (mkTyConAppCo tc cos') }
+    go (AxiomInstCo ax cos) = do { cos' <- mapM go cos; return (AxiomInstCo ax cos') }
+    go (AppCo co1 co2)      = do { co1' <- go co1; co2' <- go co2
+                                 ; return (mkAppCo co1' co2') }
+    go (PredCo pco)         = do { pco' <- go `traverse` pco; return (mkPredCo pco') }
+    go (UnsafeCo t1 t2)     = do { t1' <- zonkTcTypeToType env t1
+                                 ; t2' <- zonkTcTypeToType env t2
+                                 ; return (mkUnsafeCo t1' t2') }
+    go (SymCo co)           = do { co' <- go co; return (mkSymCo co')  }
+    go (NthCo n co)         = do { co' <- go co; return (mkNthCo n co')  }
+    go (TransCo co1 co2)    = do { co1' <- go co1; co2' <- go co2
+                                 ; return (mkTransCo co1' co2')  }
+    go (InstCo co ty)       = do { co' <- go co; ty' <- zonkTcTypeToType env ty
+                                 ; return (mkInstCo co' ty')  }
+    go (ForAllCo tv co)     = ASSERT( isImmutableTyVar tv )
+                              do { co' <- go co; return (mkForAllCo tv co') }
 \end{code}

@@ -82,6 +82,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
        ( checkWellStaged, topIdLvl, tcLookupFamInst, tcGetDefaultTys )
+import Kind
 import TcType
 import DynFlags
 
@@ -97,6 +98,7 @@ import Outputable
 import Bag
 import MonadUtils
 import VarSet
+import Pair
 import FastString
 
 import HsBinds               -- for TcEvBinds stuff 
@@ -204,9 +206,9 @@ instance Outputable CanonicalCt where
   ppr (CIPCan ip fl ip_nm ty)     
       = ppr fl <+> ppr ip <+> dcolon <+> parens (ppr ip_nm <> dcolon <> ppr ty)
   ppr (CTyEqCan co fl tv ty)      
-      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (mkTyVarTy tv, ty)
+      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (Pair (mkTyVarTy tv) ty)
   ppr (CFunEqCan co fl tc tys ty) 
-      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (mkTyConApp tc tys, ty)
+      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (Pair (mkTyConApp tc tys) ty)
   ppr (CFrozenErr co fl)
       = ppr fl <+> pprEvVarWithType co
 \end{code}
@@ -525,8 +527,8 @@ runTcS context untouch tcs
        ; mapM_ do_unification (varEnvElts ty_binds)
 
 #ifdef DEBUG
-       ; count <- TcM.readTcRef step_count
-       ; TcM.dumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count)
+--       ; count <- TcM.readTcRef step_count
+--       ; TcM.dumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count)
 #endif
              -- And return
        ; ev_binds      <- TcM.readTcRef evb_ref
@@ -672,7 +674,7 @@ checkWellStagedDFun pred dfun_id loc
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
-pprEq ty1 ty2 = pprPred $ mkEqPred (ty1,ty2)
+pprEq ty1 ty2 = pprPredTy $ mkEqPred (ty1,ty2)
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
 isTouchableMetaTyVar tv 

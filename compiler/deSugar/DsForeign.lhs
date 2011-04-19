@@ -28,7 +28,6 @@ import Type
 import TyCon
 import Coercion
 import TcType
-import Var
 
 import CmmExpr
 import CmmUtils
@@ -140,7 +139,7 @@ dsCImport id (CLabel cid) cconv _ = do
                  IsFunction
              _ -> IsData
    (resTy, foRhs) <- resultWrapper ty
-   ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
+   ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
     let
         rhs = foRhs (Lit (MachLabel cid stdcall_info fod))
         stdcall_info = fun_type_arg_stdcall_info cconv ty
@@ -382,9 +381,9 @@ dsFExportDynamic id cconv = do
     ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
         -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
 
-    let io_app = mkLams tvs                $
-                 Lam cback                 $
-                 mkCoerceI (mkSymCoI co)   $
+    let io_app = mkLams tvs                  $
+                 Lam cback                   $
+                 mkCoerce (mkSymCo co) $
                  mkApps (Var bindIOId)
                         [ Type stable_ptr_ty
                         , Type res_ty       
@@ -483,7 +482,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 	 typeCmmType (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
-  res_hty_is_unit = res_hty `coreEqType` unitTy	-- Look through any newtypes
+  res_hty_is_unit = res_hty `eqType` unitTy	-- Look through any newtypes
 
   cResType | res_hty_is_unit = text "void"
 	   | otherwise	     = showStgType res_hty
@@ -675,7 +674,7 @@ getPrimTyOf ty
 -- e.g. 'W' is a signed 32-bit integer.
 primTyDescChar :: Type -> Char
 primTyDescChar ty
- | ty `coreEqType` unitTy = 'v'
+ | ty `eqType` unitTy = 'v'
  | otherwise
  = case typePrimRep (getPrimTyOf ty) of
      IntRep	 -> signed_word

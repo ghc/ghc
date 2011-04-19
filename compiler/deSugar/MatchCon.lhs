@@ -28,7 +28,6 @@ import DsUtils
 import Util	( all2, takeList, zipEqual )
 import ListSetOps ( runs )
 import Id
-import Var      ( Var )
 import NameEnv
 import SrcLoc
 import Outputable

@@ -129,7 +129,9 @@ fiExpr :: FloatingBinds		-- Binds we're trying to drop
 fiExpr to_drop (_, AnnVar v) = mkCoLets' to_drop (Var v)
 
 fiExpr to_drop (_, AnnType ty) = ASSERT( null to_drop )
-				 Type ty
+                                  Type ty
+fiExpr to_drop (_, AnnCoercion co) = ASSERT( null to_drop )
+                                     Coercion co
 fiExpr to_drop (_, AnnCast expr co)
   = Cast (fiExpr to_drop expr) co	-- Just float in past coercion
 
@@ -198,7 +200,7 @@ fiExpr to_drop lam@(_, AnnLam _ _)
 
     go seen_one_shot_id [] = seen_one_shot_id
     go seen_one_shot_id (b:bs)
-      | isTyCoVar       b = go seen_one_shot_id bs
+      | isTyVar       b = go seen_one_shot_id bs
       | isOneShotBndr b = go True bs
       | otherwise       = False	 -- Give up at a non-one-shot Id
 \end{code}

@@ -17,10 +17,9 @@ import FamInstEnv	( FamInstEnv )
 import Id
 import MkId		( seqId, realWorldPrimId )
 import MkCore		( mkImpossibleExpr )
-import Var
 import IdInfo
 import Name		( mkSystemVarName, isExternalName )
-import Coercion
+import Coercion hiding  ( substCo, substTy, substCoVar, extendTvSubst )
 import OptCoercion	( optCoercion )
 import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
@@ -42,6 +41,7 @@ import Maybes           ( orElse, isNothing )
 import Data.List        ( mapAccumL )
 import Outputable
 import FastString
+import Pair
 \end{code}
 
 
@@ -371,6 +371,8 @@ simplNonRecX :: SimplEnv
 simplNonRecX env bndr new_rhs
   | isDeadBinder bndr	-- Not uncommon; e.g. case (a,b) of b { (p,q) -> p }
   = return env		-- 		 Here b is dead, and we avoid creating
+  | Coercion co <- new_rhs
+  = return (extendCvSubst env bndr co)
   | otherwise		--		 the binding b = (a,b)
   = do  { (env', bndr') <- simplBinder env bndr
         ; completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
@@ -438,7 +440,7 @@ That's what the 'go' loop in prepareRhs does
 prepareRhs :: TopLevelFlag -> SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
 prepareRhs top_lvl env id (Cast rhs co)    -- Note [Float coercions]
-  | (ty1, _ty2) <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
+  | Pair ty1 _ty2 <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
   , not (isUnLiftedType ty1)            -- see Note [Float coercions (unlifted)]
   = do  { (env', rhs') <- makeTrivialWithInfo top_lvl env sanitised_info rhs
         ; return (env', Cast rhs' co) }
@@ -658,7 +660,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 
             final_id = new_bndr `setIdInfo` info3
 
-      ; -- pprTrace "Binding" (ppr final_id <+> ppr unfolding) $
+      ; -- pprTrace "Binding" (ppr final_id <+> ppr new_unfolding) $
         return (addNonRec env final_id final_rhs) } }
 		-- The addNonRec adds it to the in-scope set too
 
@@ -874,14 +876,14 @@ simplExprF env e cont
 
 simplExprF' :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplEnv, OutExpr)
-simplExprF' env (Var v)        cont = simplVarF env v cont
+simplExprF' env (Var v)        cont = simplIdF env v cont
 simplExprF' env (Lit lit)      cont = rebuild env (Lit lit) cont
 simplExprF' env (Note n expr)  cont = simplNote env n expr cont
 simplExprF' env (Cast body co) cont = simplCast env body co cont
 simplExprF' env (App fun arg)  cont = simplExprF env fun $
                                       ApplyTo NoDup arg env cont
 
-simplExprF' env expr@(Lam _ _) cont
+simplExprF' env expr@(Lam {}) cont
   = simplLam env zapped_bndrs body cont
         -- The main issue here is under-saturated lambdas
         --   (\x1. \x2. e) arg1
@@ -898,15 +900,19 @@ simplExprF' env expr@(Lam _ _) cont
     n_args = countArgs cont
         -- NB: countArgs counts all the args (incl type args)
         -- and likewise drop counts all binders (incl type lambdas)
-        
+
     zappable_bndr b = isId b && not (isOneShotBndr b)
-    zap b | isTyCoVar b = b
-          | otherwise   = zapLamIdInfo b
+    zap b | isTyVar b = b
+          | otherwise = zapLamIdInfo b
 
 simplExprF' env (Type ty) cont
   = ASSERT( contIsRhsOrArg cont )
-    do  { ty' <- simplCoercion env ty
-        ; rebuild env (Type ty') cont }
+    rebuild env (Type (substTy env ty)) cont
+
+simplExprF' env (Coercion co) cont
+  = ASSERT( contIsRhsOrArg cont )
+    do  { co' <- simplCoercion env co
+        ; rebuild env (Coercion co') cont }
 
 simplExprF' env (Case scrut bndr _ alts) cont
   | sm_case_case (getMode env)
@@ -941,13 +947,12 @@ simplType env ty
     new_ty = substTy env ty
 
 ---------------------------------
-simplCoercion :: SimplEnv -> InType -> SimplM OutType
--- The InType isn't *necessarily* a coercion, but it might be
--- (in a type application, say) and optCoercion is a no-op on types
+simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = seqType new_co `seq` return new_co
+  = -- pprTrace "simplCoercion" (ppr co $$ ppr (getCvSubst env)) $
+    seqCo new_co `seq` return new_co
   where 
-    new_co = optCoercion (getTvSubst env) co
+    new_co = optCoercion (getCvSubst env) co
 \end{code}
 
 
@@ -991,11 +996,11 @@ simplCast env body co0 cont0
   where
        addCoerce co cont = add_coerce co (coercionKind co) cont
 
-       add_coerce _co (s1, k1) cont     -- co :: ty~ty
-         | s1 `coreEqType` k1 = cont    -- is a no-op
+       add_coerce _co (Pair s1 k1) cont     -- co :: ty~ty
+         | s1 `eqType` k1 = cont    -- is a no-op
 
-       add_coerce co1 (s1, _k2) (CoerceIt co2 cont)
-         | (_l1, t1) <- coercionKind co2
+       add_coerce co1 (Pair s1 _k2) (CoerceIt co2 cont)
+         | (Pair _l1 t1) <- coercionKind co2
 		-- 	e |> (g1 :: S1~L) |> (g2 :: L~T1)
                 -- ==>
                 --      e,                       if S1=T1
@@ -1005,28 +1010,40 @@ simplCast env body co0 cont0
                 -- we may find  (coerce T (coerce S (\x.e))) y
                 -- and we'd like it to simplify to e[y/x] in one round
                 -- of simplification
-         , s1 `coreEqType` t1  = cont            -- The coerces cancel out
-         | otherwise           = CoerceIt (mkTransCoercion co1 co2) cont
+         , s1 `eqType` t1  = cont            -- The coerces cancel out
+         | otherwise           = CoerceIt (mkTransCo co1 co2) cont
 
-       add_coerce co (s1s2, _t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
+       add_coerce co (Pair s1s2 _t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
                 -- (f |> g) ty  --->   (f ty) |> (g @ ty)
-                -- This implements the PushT and PushC rules from the paper
+                -- This implements the PushT rule from the paper
          | Just (tyvar,_) <- splitForAllTy_maybe s1s2
-         = let 
-             (new_arg_ty, new_cast)
-               | isCoVar tyvar = (new_arg_co, mkCselRCoercion co)       -- PushC rule
-               | otherwise     = (ty',        mkInstCoercion co ty')    -- PushT rule
-           in 
-           ApplyTo dup (Type new_arg_ty) (zapSubstEnv arg_se) (addCoerce new_cast cont)
+         = ASSERT( isTyVar tyvar )
+           ApplyTo Simplified (Type arg_ty') (zapSubstEnv arg_se) (addCoerce new_cast cont)
          where
-           ty' = substTy (arg_se `setInScope` env) arg_ty
-	   new_arg_co = mkCsel1Coercion co  `mkTransCoercion`
-                              ty'           `mkTransCoercion`
-                        mkSymCoercion (mkCsel2Coercion co)
+           new_cast = mkInstCo co arg_ty'
+           arg_ty' | isSimplified dup = arg_ty
+                   | otherwise        = substTy (arg_se `setInScope` env) arg_ty
 
-       add_coerce co (s1s2, _t1t2) (ApplyTo dup arg arg_se cont)
-         | not (isTypeArg arg)  -- This implements the Push rule from the paper
-         , isFunTy s1s2   -- t1t2 must be a function type, becuase it's applied
+{-
+       add_coerce co (Pair s1s2 _t1t2) (ApplyTo dup (Coercion arg_co) arg_se cont)
+                -- This implements the PushC rule from the paper
+         | Just (covar,_) <- splitForAllTy_maybe s1s2
+         = ASSERT( isCoVar covar )
+           ApplyTo Simplified (Coercion new_arg_co) (zapSubstEnv arg_se) (addCoerce co1 cont)
+         where
+           [co0, co1]   = decomposeCo 2 co
+           [co00, co01] = decomposeCo 2 co0
+
+           arg_co' | isSimplified dup = arg_co
+                   | otherwise        = substCo (arg_se `setInScope` env) arg_co
+           new_arg_co = co00    `mkTransCo`
+                        arg_co' `mkTransCo`
+                        mkSymCo co01
+-}
+
+       add_coerce co (Pair s1s2 t1t2) (ApplyTo dup arg arg_se cont)
+         | isFunTy s1s2   -- This implements the Push rule from the paper
+         , isFunTy t1t2   -- Check t1t2 to ensure 'arg' is a value arg
                 --      (e |> (g :: s1s2 ~ t1->t2)) f
                 -- ===>
                 --      (e (f |> (arg g :: t1~s1))
@@ -1047,7 +1064,7 @@ simplCast env body co0 cont0
            -- t2 ~ s2 with left and right on the curried form:
            --    (->) t1 t2 ~ (->) s1 s2
            [co1, co2] = decomposeCo 2 co
-           new_arg    = mkCoerce (mkSymCoercion co1) arg'
+           new_arg    = mkCoerce (mkSymCo co1) arg'
            arg'       = substExpr (text "move-cast") (arg_se `setInScope` env) arg
 
        add_coerce co _ cont = CoerceIt co cont
@@ -1120,9 +1137,14 @@ simplNonRecE :: SimplEnv
 	-- First deal with type applications and type lets
 	--   (/\a. e) (Type ty)   and   (let a = Type ty in e)
 simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
-  = ASSERT( isTyCoVar bndr )
+  = ASSERT( isTyVar bndr )
     do	{ ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
 	; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
+
+simplNonRecE env bndr (Coercion co_arg, rhs_se) (bndrs, body) cont
+  = ASSERT( isCoVar bndr )
+    do  { co_arg' <- simplCoercion (rhs_se `setInScope` env) co_arg
+        ; simplLam (extendCvSubst env bndr co_arg') bndrs body cont }
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   | preInlineUnconditionally env NotTopLevel bndr rhs
@@ -1135,7 +1157,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
                      (StrictBind bndr bndrs body env cont) }
 
   | otherwise
-  = ASSERT( not (isTyCoVar bndr) )
+  = ASSERT( not (isTyVar bndr) )
     do  { (env1, bndr1) <- simplNonRecBndr env bndr
         ; let (env2, bndr2) = addBndrRules env1 bndr bndr1
         ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
@@ -1177,20 +1199,20 @@ simplNote env (CoreNote s) e cont
 simplVar :: SimplEnv -> InVar -> SimplM OutExpr
 -- Look up an InVar in the environment
 simplVar env var
-  | isTyCoVar var 
-  = return (Type (substTyVar env var))
+  | isTyVar var = return (Type (substTyVar env var))
+  | isCoVar var = return (Coercion (substCoVar env var))
   | otherwise
   = case substId env var of
-        DoneId var1      -> return (Var var1)
-        DoneEx e         -> return e
-        ContEx tvs ids e -> simplExpr (setSubstEnv env tvs ids) e
+        DoneId var1          -> return (Var var1)
+        DoneEx e             -> return e
+        ContEx tvs cvs ids e -> simplExpr (setSubstEnv env tvs cvs ids) e
 
-simplVarF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplEnv, OutExpr)
-simplVarF env var cont
+simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplEnv, OutExpr)
+simplIdF env var cont
   = case substId env var of
-        DoneEx e         -> simplExprF (zapSubstEnv env) e cont
-        ContEx tvs ids e -> simplExprF (setSubstEnv env tvs ids) e cont
-        DoneId var1      -> completeCall env var1 cont
+        DoneEx e             -> simplExprF (zapSubstEnv env) e cont
+        ContEx tvs cvs ids e -> simplExprF (setSubstEnv env tvs cvs ids) e cont
+        DoneId var1          -> completeCall env var1 cont
                 -- Note [zapSubstEnv]
                 -- The template is already simplified, so don't re-substitute.
                 -- This is VITAL.  Consider
@@ -1266,13 +1288,19 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
     res     = mkApps (Var fun) (reverse rev_args)
     res_ty  = exprType res
     cont_ty = contResultType env res_ty cont
-    co      = mkUnsafeCoercion res_ty cont_ty
-    mk_coerce expr | cont_ty `coreEqType` res_ty = expr
+    co      = mkUnsafeCo res_ty cont_ty
+    mk_coerce expr | cont_ty `eqType` res_ty = expr
                    | otherwise = mkCoerce co expr
 
-rebuildCall env info (ApplyTo _ (Type arg_ty) se cont)
-  = do  { ty' <- simplCoercion (se `setInScope` env) arg_ty
-        ; rebuildCall env (info `addArgTo` Type ty') cont }
+rebuildCall env info (ApplyTo dup_flag (Type arg_ty) se cont)
+  = do { arg_ty' <- if isSimplified dup_flag then return arg_ty
+                    else simplType (se `setInScope` env) arg_ty
+       ; rebuildCall env (info `addArgTo` Type arg_ty') cont }
+
+rebuildCall env info (ApplyTo dup_flag (Coercion arg_co) se cont)
+  = do { arg_co' <- if isSimplified dup_flag then return arg_co
+                    else simplCoercion (se `setInScope` env) arg_co
+       ; rebuildCall env (info `addArgTo` Coercion arg_co') cont }
 
 rebuildCall env info@(ArgInfo { ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })
@@ -1280,7 +1308,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
   = rebuildCall env (addArgTo info' arg) cont
 
-  | str 	        -- Strict argument
+  | str                 -- Strict argument
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setFloats` env) arg
                (StrictArg info' cci cont)
@@ -1771,7 +1799,7 @@ improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
   | not (isDeadBinder case_bndr)	-- Not a pure seq!  See Note [Improving seq]
   , Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ty2
-        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)
+        ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co)
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
 
@@ -1834,7 +1862,7 @@ simplAlt env scrut _ case_bndr' cont' (DataAlt con, vs, rhs)
         = go vs the_strs
         where
           go [] [] = []
-          go (v:vs') strs | isTyCoVar v = v : go vs' strs
+          go (v:vs') strs | isTyVar v = v : go vs' strs
           go (v:vs') (str:strs)
             | isMarkedStrict str = evald_v  : go vs' strs
             | otherwise          = zapped_v : go vs' strs
@@ -1933,7 +1961,7 @@ knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
     bind_args env' [] _  = return env'
 
     bind_args env' (b:bs') (Type ty : args)
-      = ASSERT( isTyCoVar b )
+      = ASSERT( isTyVar b )
         bind_args (extendTvSubst env' b ty) bs' args
 
     bind_args env' (b:bs') (arg : args)
@@ -2151,7 +2179,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
 			  | otherwise		   = bndrs' ++ [case_bndr_w_unf]
 	      
               abstract_over bndr
-                  | isTyCoVar bndr = True -- Abstract over all type variables just in case
+                  | isTyVar bndr = True -- Abstract over all type variables just in case
                   | otherwise    = not (isDeadBinder bndr)
                         -- The deadness info on the new Ids is preserved by simplBinders
 

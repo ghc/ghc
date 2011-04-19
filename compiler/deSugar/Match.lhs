@@ -29,6 +29,7 @@ import DataCon
 import MatchCon
 import MatchLit
 import Type
+import Coercion
 import TysWiredIn
 import ListSetOps
 import SrcLoc
@@ -825,7 +826,7 @@ sameGroup (PgCon _)  (PgCon _)  = True		-- One case expression
 sameGroup (PgLit _)  (PgLit _)  = True		-- One case expression
 sameGroup (PgN l1)   (PgN l2)   = l1==l2	-- Order is significant
 sameGroup (PgNpK l1) (PgNpK l2) = l1==l2	-- See Note [Grouping overloaded literal patterns]
-sameGroup (PgCo	t1)  (PgCo t2)  = t1 `coreEqType` t2
+sameGroup (PgCo	t1)  (PgCo t2)  = t1 `eqType` t2
 	-- CoPats are in the same goup only if the type of the
 	-- enclosed pattern is the same. The patterns outside the CoPat
 	-- always have the same type, so this boils down to saying that
@@ -873,7 +874,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
         -- which resolve the overloading (e.g., fromInteger 1),
         -- because these expressions get written as a bunch of different variables
         -- (presumably to improve sharing)
-        tcEqType (overLitType l) (overLitType l') && l == l'
+        eqType (overLitType l) (overLitType l') && l == l'
     exp (HsApp e1 e2) (HsApp e1' e2') = lexp e1 e1' && lexp e2 e2'
     -- the fixities have been straightened out by now, so it's safe
     -- to ignore them?
@@ -897,7 +898,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     tup_arg (Present e1) (Present e2) = lexp e1 e2
-    tup_arg (Missing t1) (Missing t2) = tcEqType t1 t2
+    tup_arg (Missing t1) (Missing t2) = eqType t1 t2
     tup_arg _ _ = False
 
     ---------
@@ -910,9 +911,9 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpCast c)  (WpCast c')     = tcEqType c c'
+    wrap (WpCast c)  (WpCast c')     = coreEqCoercion c c'
     wrap (WpEvApp et1) (WpEvApp et2) = ev_term et1 et2
-    wrap (WpTyApp t) (WpTyApp t')    = tcEqType t t'
+    wrap (WpTyApp t) (WpTyApp t')    = eqType t t'
     -- Enhancement: could implement equality for more wrappers
     --   if it seems useful (lams and lets)
     wrap _ _ = False
@@ -920,7 +921,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     ---------
     ev_term :: EvTerm -> EvTerm -> Bool
     ev_term (EvId a)       (EvId b)       = a==b
-    ev_term (EvCoercion a) (EvCoercion b) = tcEqType a b
+    ev_term (EvCoercion a) (EvCoercion b) = coreEqCoercion a b
     ev_term _ _ = False	
 
     ---------
@@ -959,3 +960,4 @@ If the first arg matches '1' but the second does not match 'True', we
 cannot jump to the third equation!  Because the same argument might
 match '2'!
 Hence we don't regard 1 and 2, or (n+1) and (n+2), as part of the same group.
+

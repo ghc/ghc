@@ -50,7 +50,6 @@ import TcType
 import TysPrim
 import TysWiredIn
 import Type
-import Var( TyVar )
 import TypeRep
 import VarSet
 import State
@@ -1831,7 +1830,7 @@ assoc_ty_id cls_str _ tbl ty
 					      text "for primitive type" <+> ppr ty)
   | otherwise = head res
   where
-    res = [id | (ty',id) <- tbl, ty `tcEqType` ty']
+    res = [id | (ty',id) <- tbl, ty `eqType` ty']
 
 -----------------------------------------------------------------------
 

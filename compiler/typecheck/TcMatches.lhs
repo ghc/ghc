@@ -28,7 +28,7 @@ import TysWiredIn
 import Id
 import TyCon
 import TysPrim
-import Coercion		( mkSymCoI )
+import Coercion         ( mkSymCo )
 import Outputable
 import BasicTypes	( Arity )
 import Util
@@ -143,7 +143,7 @@ matchFunTys
 matchFunTys herald arity res_ty thing_inside
   = do	{ (coi, pat_tys, res_ty) <- matchExpectedFunTys herald arity res_ty
 	; res <- thing_inside pat_tys res_ty
-        ; return (coiToHsWrapper (mkSymCoI coi), res) }
+        ; return (coToHsWrapper (mkSymCo coi), res) }
 \end{code}
 
 %************************************************************************
@@ -246,7 +246,7 @@ tcDoStmts ListComp stmts body res_ty
 	; (stmts', body') <- tcStmts ListComp (tcLcStmt listTyCon) stmts 
 				     elt_ty $
 			     tcBody body
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                      (HsDo ListComp stmts' body' (mkListTy elt_ty)) }
 
 tcDoStmts PArrComp stmts body res_ty
@@ -254,7 +254,7 @@ tcDoStmts PArrComp stmts body res_ty
 	; (stmts', body') <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts 
 				     elt_ty $
 			     tcBody body
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                      (HsDo PArrComp stmts' body' (mkPArrTy elt_ty)) }
 
 tcDoStmts DoExpr stmts body res_ty
