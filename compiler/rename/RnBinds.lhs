@@ -699,7 +699,7 @@ renameSig _ (SpecInstSig ty)
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
 -- we use lookupOccRn.  If there's both an imported and a local 'f'
--- then the SPECIALISE pragma is ambiguous, unlike alll other signatures
+-- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig mb_names sig@(SpecSig v ty inl)
   = do	{ new_v <- case mb_names of
                      Just {} -> lookupSigOccRn mb_names sig v
