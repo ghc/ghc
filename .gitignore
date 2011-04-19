@@ -30,6 +30,12 @@ config.status
 configure
 
 # -----------------------------------------------------------------------------
+# Ignore any overlapped darcs repos and back up files
+
+*-darcs-backup*
+_darcs/
+
+# -----------------------------------------------------------------------------
 # sub-repositories
 
 /ghc-tarballs/
@@ -79,9 +85,7 @@ configure
 /bindist-list
 /bindistprep/
 /bindisttest/HelloWorld
-/bindisttest/a/
-/bindisttest/install\ dir/
-/bindisttest/output
+/bindisttest/
 /ch01.html
 /ch02.html
 /compiler/cmm/CmmLex.hs
@@ -119,8 +123,12 @@ configure
 /docs/users_guide/users_guide.xml
 /docs/users_guide/users_guide/
 /docs/users_guide/what_glasgow_exts_does.gen.xml
+/driver/ghc/dist/
+/driver/haddock/dist/
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
+/driver/ghci/dist/
+/driver/ghci/ghci.res
 /driver/mangler/dist/ghc-asm
 /driver/mangler/dist/ghc-asm.prl
 /driver/package.conf
@@ -150,6 +158,8 @@ configure
 /libffi/package.conf.inplace
 /libffi/package.conf.inplace.raw
 /libffi/stamp*
+/libffi/package.conf.install
+/libffi/package.conf.install.raw
 /libraries/bin-package-db/GNUmakefile
 /libraries/bin-package-db/ghc.mk
 /libraries/bootstrapping.conf
@@ -185,6 +195,8 @@ configure
 /rts/package.conf.inplace.raw
 /rts/sm/Evac_thr.c
 /rts/sm/Scav_thr.c
+/rts/package.conf.install
+/rts/package.conf.install.raw
 /stage3.package.conf
 /testsuite_summary.txt
 /testlog
@@ -218,3 +230,4 @@ configure
 /utils/runghc/runhaskell
 /utils/runstdtest/runstdtest
 /utils/unlit/unlit
+
