@@ -365,6 +365,20 @@ addTickHsExpr (HsWrap w e) =
 		(return w)
 		(addTickHsExpr e)	-- explicitly no tick on inside
 
+addTickHsExpr (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
+        liftM5 HsArrApp
+	       (addTickLHsExpr e1)
+	       (addTickLHsExpr e2)
+	       (return ty1)
+	       (return arr_ty)
+	       (return lr)
+
+addTickHsExpr (HsArrForm e fix cmdtop) = 
+        liftM3 HsArrForm
+	       (addTickLHsExpr e)
+	       (return fix)
+	       (mapM (liftL (addTickHsCmdTop)) cmdtop)
+
 addTickHsExpr e@(HsType _) = return e
 
 -- Others dhould never happen in expression content.
@@ -558,7 +572,7 @@ addTickHsCmd (HsLet binds c) =
 addTickHsCmd (HsDo cxt stmts last_exp srcloc) = do
         (stmts', last_exp') <- addTickLCmdStmts' stmts (addTickLHsCmd last_exp)
 	return (HsDo cxt stmts' last_exp' srcloc)
-  where
+
 addTickHsCmd (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
         liftM5 HsArrApp
 	       (addTickLHsExpr e1)
