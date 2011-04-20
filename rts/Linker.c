@@ -1186,7 +1186,7 @@ initLinker( void )
 #   endif /* RTLD_DEFAULT */
 
     compileResult = regcomp(&re_invalid,
-           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*invalid ELF header",
+           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short)",
            REG_EXTENDED);
     ASSERT( compileResult == 0 );
     compileResult = regcomp(&re_realso,
