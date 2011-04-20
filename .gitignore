@@ -7,6 +7,7 @@
 *.BAK
 *.orig
 *.prof
+*.rej
 
 *.hi
 *.hi-boot
