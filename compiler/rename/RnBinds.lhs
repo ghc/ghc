@@ -306,7 +306,10 @@ rnValBindsRHS trim mb_bound_names (ValBindsIn mbinds sigs)
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
               where
                 valbind' = ValBindsOut anal_binds sigs'
-                valbind'_dus = usesOnly (hsSigsFVs sigs') `plusDU` anal_dus
+                valbind'_dus = anal_dus `plusDU` usesOnly (hsSigsFVs sigs')
+			       -- Put the sig uses *after* the bindings
+			       -- so that the binders are removed from 
+			       -- the uses in the sigs
        }
 
 rnValBindsRHS _ _ b = pprPanic "rnValBindsRHS" (ppr b)
