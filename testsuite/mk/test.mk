@@ -25,6 +25,10 @@ COMPILER     = ghc
 CONFIGDIR    = $(TOP)/config
 CONFIG       = $(CONFIGDIR)/$(COMPILER)
 
+# TEST_HC_OPTS is passed to every invocation of TEST_HC 
+# in nested Makefiles
+TEST_HC_OPTS = -dno-debug-output $(EXTRA_HC_OPTS)
+
 RUNTEST_OPTS =
 
 $(eval $(call get-ghc-rts-field,WORDSIZE,Word size))

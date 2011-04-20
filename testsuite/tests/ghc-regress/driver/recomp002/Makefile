@@ -11,6 +11,6 @@ clean:
 # Only the first invocation should print any "Compiling" messages
 
 recomp002: clean
-	'$(TEST_HC)' --make Q.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make Q.hs
 	echo Middle >&2
-	'$(TEST_HC)' --make Q.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make Q.hs

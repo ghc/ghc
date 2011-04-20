@@ -11,4 +11,4 @@ clean:
 #      be on in when compiling other modules
 
 dynamic_flags_001: clean
-	'$(TEST_HC)' --make -Werror -v0 C.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -Werror -v0 C.hs

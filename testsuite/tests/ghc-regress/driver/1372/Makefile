@@ -30,7 +30,7 @@ prep:
 	cd p1 && ./setup build -v0
 
 prep.%:
-	cd $* && "$(TEST_HC)" -v0 --make -o setup Setup.hs
+	cd $* && "$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -o setup Setup.hs
 	cd $* && ./setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
 	cd $* && ./setup build -v0
 	cd $* && ./setup register -v0 --inplace

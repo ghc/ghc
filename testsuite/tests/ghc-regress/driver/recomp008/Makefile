@@ -6,13 +6,13 @@ Main.o : B.hi
 B.o : A.hi
 
 %.o : %.hs
-	'$(TEST_HC)' -O -c $< -o $@
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c $< -o $@
 
 # magic .hi rule: see rules/hi-rule.mk in the GHC source tree
 %.hi : %.o ;
 
 prog : A.o B.o Main.o
-	'$(TEST_HC)' -o prog A.o B.o Main.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -o prog A.o B.o Main.o
 
 clean :
 	$(RM) *.hi *.o prog

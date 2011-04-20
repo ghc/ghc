@@ -14,9 +14,9 @@ clean:
 TH_recompile:
 	$(MAKE) clean
 	cp Sub1.hs Sub.hs
-	'$(TEST_HC)' -v0 --make -XTemplateHaskell Main.hs -o test
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -XTemplateHaskell Main.hs -o test
 	cp Sub2.hs Sub.hs
-	'$(TEST_HC)' -v0 --make -XTemplateHaskell Main.hs -o test2
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -XTemplateHaskell Main.hs -o test2
 	./test
 	./test2
 

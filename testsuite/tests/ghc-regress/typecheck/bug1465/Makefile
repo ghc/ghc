@@ -16,15 +16,15 @@ clean:
 bug1465:
 	$(MAKE) clean
 	$(MAKE) prep
-	'$(TEST_HC)' -package-conf $(LOCAL_PKGCONF) -c C.hs || exit 0
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(LOCAL_PKGCONF) -c C.hs || exit 0
 	$(MAKE) clean
 
 prep:
 	echo "[]" >$(LOCAL_PKGCONF)
 	$(MAKE) prep.v1
 	$(MAKE) prep.v2
-	'$(TEST_HC)' -package-conf $(LOCAL_PKGCONF) -c -package $(PKG)-1.0 B1.hs
-	'$(TEST_HC)' -package-conf $(LOCAL_PKGCONF) -c -package $(PKG)-2.0 B2.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(LOCAL_PKGCONF) -c -package $(PKG)-1.0 B1.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-conf $(LOCAL_PKGCONF) -c -package $(PKG)-2.0 B2.hs
 
 prep.%:
 	cd $* && '$(TEST_HC)' -v0 --make -o setup Setup.hs

@@ -11,7 +11,7 @@ endef
 define scc001Rule
 	rm -f scc001.hi scc001.o scc001
 	@echo Compiling with $1
-	'$(TEST_HC)' -v0 --make scc001 -prof -auto-all -rtsopts $1
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make scc001 -prof -auto-all -rtsopts $1
 	./scc001 +RTS -p
 	$(call scc001Test,f)
 	$(call scc001Test,g)

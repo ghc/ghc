@@ -19,8 +19,8 @@ LOCAL_PKGCONF=local.package.conf
 LOCAL_GHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF)
 
 rn.prog006:
-	'$(TEST_HC)' --make pwd -v0
-	'$(TEST_HC)' --make -package-name test-1.0 B.C -fforce-recomp -v0
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make pwd -v0
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -package-name test-1.0 B.C -fforce-recomp -v0
 	rm -f pkg.conf
 	echo "name: test" >>pkg.conf
 	echo "version: 1.0" >>pkg.conf
@@ -29,9 +29,9 @@ rn.prog006:
 	echo "exposed-modules: B.C" >>pkg.conf
 	echo "[]" >$(LOCAL_PKGCONF)
 	$(LOCAL_GHC_PKG) register pkg.conf -v0
-	'$(TEST_HC)' -c -package-conf $(LOCAL_PKGCONF) -package test -fforce-recomp A.hs -i
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -package-conf $(LOCAL_PKGCONF) -package test -fforce-recomp A.hs -i
 # The -i clears the search path, so A.hs will find B.C from package test
-	-'$(TEST_HC)' -c -package-conf $(LOCAL_PKGCONF) -package test -fforce-recomp Main.hs
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -package-conf $(LOCAL_PKGCONF) -package test -fforce-recomp Main.hs
 # No -i when compiling Main, so a from-scratch search would find a home-pkg module B.C
 # However, A.hi remembers that B.C came from package test, so all is ok.
 

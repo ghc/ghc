@@ -20,7 +20,7 @@ OBJSUFFIX = .o
 test011:
 	$(RM) A011.hi
 	$(RM) A011$(OBJSUFFIX)
-	"$(TEST_HC)" -c A011.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(TEST_HC_OPTS) -c A011.hs
 	test -f A011.hi
 	test -f A011$(OBJSUFFIX)
 
@@ -28,14 +28,14 @@ test011:
 test012:
 	$(RM) A012.hi
 	$(RM) A012$(OBJSUFFIX)oo
-	"$(TEST_HC)" -c A012.hs -o A012$(OBJSUFFIX)oo
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c A012.hs -o A012$(OBJSUFFIX)oo
 	test -f A012$(OBJSUFFIX)oo
 
 # test -ohi
 test013:
 	$(RM) A013.xhi
 	$(RM) A013$(OBJSUFFIX)
-	"$(TEST_HC)" -c A013.hs -ohi A013.xhi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c A013.hs -ohi A013.xhi
 	test -f A013.xhi
 
 # test -odir
@@ -43,7 +43,7 @@ test014:
 	$(RM) -f A014.hi
 	$(RM) -rf obj014
 	mkdir obj014
-	"$(TEST_HC)" -c A014.hs -odir obj014
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c A014.hs -odir obj014
 	test -f obj014/A014$(OBJSUFFIX)
 	test -f A014.hi
 
@@ -52,20 +52,20 @@ test015:
 	$(RM) -f A015$(OBJSUFFIX)
 	$(RM) -rf hi015
 	mkdir hi015
-	"$(TEST_HC)" -c A015.hs -hidir hi015
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c A015.hs -hidir hi015
 	test -f A015$(OBJSUFFIX)
 	test -f hi015/A015.hi
 
 # test stub generation
 test016:
 	$(RM) F016.hi F016$(OBJSUFFIX) F016_stub.h
-	"$(TEST_HC)" -c F016.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c F016.hs
 	test -f F016_stub.h
 
 # test -stubdir (filename differs from module name)
 test017:
 	$(RM) F017.hi F017$(OBJSUFFIX)
-	"$(TEST_HC)" -c F017.hs -stubdir stub017
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c F017.hs -stubdir stub017
 	test -f stub017/TestStub017_stub.h
 
 # test -odir with stubs (filename differs from module name)
@@ -73,18 +73,18 @@ test018:
 	$(RM) -f F018.hi F018$(OBJSUFFIX) F018_stub.h
 	$(RM) -rf obj018
 	mkdir obj018
-	"$(TEST_HC)" -c F018.hs -odir obj018
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c F018.hs -odir obj018
 
 # test for bug #3093
 test018a:
 	$(RM) -f F018a.hi F018a_stub.h *.obj.018
-	"$(TEST_HC)" -c F018a.hs -osuf obj.018
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c F018a.hs -osuf obj.018
 	test -f F018a.obj.018
 
 # test -outputdir
 test019:
 	$(RM) -rf out019
-	"$(TEST_HC)" -c F019.hs -outputdir out019
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c F019.hs -outputdir out019
 	test -f out019/TestStub019.hi
 	test -f out019/TestStub019_stub.h
 
@@ -94,7 +94,7 @@ test019:
 test021:
 	$(RM) B021/C.hi
 	$(RM) B021/C$(OBJSUFFIX)
-	"$(TEST_HC)" -c B021/C.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B021/C.hs
 	test -f B021/C.hi
 	test -f B021/C$(OBJSUFFIX)
 
@@ -102,14 +102,14 @@ test021:
 test022:
 	$(RM) B022/C.hi
 	$(RM) B022/C$(OBJSUFFIX)oo
-	"$(TEST_HC)" -c B022/C.hs -o B022/C$(OBJSUFFIX)oo
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B022/C.hs -o B022/C$(OBJSUFFIX)oo
 	test -f B022/C$(OBJSUFFIX)oo
 
 # test -ohi
 test023:
 	$(RM) B023/C.xhi
 	$(RM) B023/C$(OBJSUFFIX)
-	"$(TEST_HC)" -c B023/C.hs -ohi B023/C.xhi
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B023/C.hs -ohi B023/C.xhi
 	test -f B023/C.xhi
 
 # test -odir
@@ -117,7 +117,7 @@ test024:
 	$(RM) -f B024/C.hi
 	$(RM) -rf obj024
 	mkdir obj024
-	"$(TEST_HC)" -c B024/C.hs -odir obj024
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B024/C.hs -odir obj024
 	test -f obj024/B024/C$(OBJSUFFIX)
 
 # test -odir with non-Haskell compilation
@@ -127,7 +127,7 @@ test024a:
 	mkdir B024a
 	mkdir obj024a
 	echo >B024a/stub.c
-	"$(TEST_HC)" -c B024a/stub.c -odir obj024a
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B024a/stub.c -odir obj024a
 	test -f obj024a/B024a/stub$(OBJSUFFIX)
 
 # test -hidir
@@ -135,14 +135,14 @@ test025:
 	$(RM) -rf hi025
 	mkdir hi025
 	$(RM) B025/C$(OBJSUFFIX)
-	"$(TEST_HC)" -c B025/C.hs -hidir hi025
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B025/C.hs -hidir hi025
 	test -f hi025/B025/C.hi
 
 # This is a hierarchical module that lives in a subdirectory.
 test026:
 	$(RM) d026/P/Q.hi
 	$(RM) d026/P/Q$(OBJSUFFIX)
-	"$(TEST_HC)" -c d026/P/Q.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c d026/P/Q.hs
 	test -f d026/P/Q.hi
 	test -f d026/P/Q$(OBJSUFFIX)
 
@@ -150,7 +150,7 @@ test026:
 # -fvia-C, because we want to check that the .hc file can #include the stub.h
 test027:
 	$(RM) B027/F.hi B027/F$(OBJSUFFIX) B027/F_stub.h
-	"$(TEST_HC)" -c B027/F.hs -fno-warn-deprecated-flags -fvia-C
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B027/F.hs -fno-warn-deprecated-flags -fvia-C
 	test -f B027/F_stub.h
 
 # test -stubdir
@@ -158,7 +158,7 @@ test027:
 test028:
 	$(RM) B028/F.hi B028/F$(OBJSUFFIX)
 	$(RM) stub028/B028/F_stub.h
-	"$(TEST_HC)" -c B028/F.hs -stubdir stub028 -fno-warn-deprecated-flags -fvia-C
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c B028/F.hs -stubdir stub028 -fno-warn-deprecated-flags -fvia-C
 	test -f stub028/B028/F_stub.h
 
 # -----------------------------------------------------------------------------
@@ -167,7 +167,7 @@ test028:
 test031:
 	$(RM) A031.hi
 	$(RM) A031$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make A031.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make A031.hs
 	test -f A031.hi
 	test -f A031$(OBJSUFFIX)
 
@@ -176,7 +176,7 @@ test032:
 	$(RM) A032.hi
 	$(RM) -rf obj032
 	mkdir obj032
-	"$(TEST_HC)" -v0 --make A032.hs -odir obj032
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make A032.hs -odir obj032
 	test -f obj032/A032$(OBJSUFFIX)
 
 # test -hidir
@@ -184,19 +184,19 @@ test033:
 	$(RM) -rf hi033
 	$(RM) A033$(OBJSUFFIX)
 	mkdir hi033
-	"$(TEST_HC)" -v0 --make A033.hs -hidir hi033
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make A033.hs -hidir hi033
 	test -f hi033/A033.hi
 
 # test stub generation
 test034:
 	$(RM) F034.hi F034$(OBJSUFFIX) F034_stub.h
-	"$(TEST_HC)" -v0 --make F034.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make F034.hs
 	test -f F034_stub.h
 
 # test -stubdir (filename differs from module name)
 test035:
 	$(RM) F035.hi F$(OBJSUFFIX) stub035/Stubs_stub.h
-	"$(TEST_HC)" -v0 --make F035.hs -stubdir stub035
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make F035.hs -stubdir stub035
 	test -f stub035/TestStub035_stub.h
 
 # -----------------------------------------------------------------------------
@@ -205,7 +205,7 @@ test035:
 test041:
 	$(RM) B041/C.hi
 	$(RM) B041/C$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make B041/C.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make B041/C.hs
 	test -f B041/C.hi
 	test -f B041/C$(OBJSUFFIX)
 
@@ -214,7 +214,7 @@ test042:
 	$(RM) -rf obj042
 	mkdir obj042
 	$(RM) B042/C.hi
-	"$(TEST_HC)" -v0 --make B042/C.hs -odir obj042
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make B042/C.hs -odir obj042
 	test -f obj042/B042/C$(OBJSUFFIX)
 
 # test -hidir
@@ -222,20 +222,20 @@ test043:
 	$(RM) -f B043/C$(OBJSUFFIX)
 	$(RM) -rf hi043
 	mkdir hi043
-	"$(TEST_HC)" -v0 --make B043/C.hs -hidir hi043
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make B043/C.hs -hidir hi043
 	test -f hi043/B043/C.hi
 
 # test stub generation
 test044:
 	$(RM) B044/F.hi B044/F$(OBJSUFFIX) B044/F_stub.h
-	"$(TEST_HC)" -v0 --make B044/F.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make B044/F.hs
 	test -f B044/F_stub.h
 
 # test -stubdir
 test045:
 	$(RM) B045/F.hi B045/F$(OBJSUFFIX)
 	$(RM) stub045/B045/F_stub.h
-	"$(TEST_HC)" -v0 --make B045/F.hs -stubdir stub045
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make B045/F.hs -stubdir stub045
 	test -f stub045/B045/F_stub.h
 
 # -----------------------------------------------------------------------------
@@ -246,7 +246,7 @@ test051:
 	$(RM) d051_2/R/S$(OBJSUFFIX)
 	$(RM) d051_1/P/Q.hi
 	$(RM) d051_1/P/Q$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make -id051_1 -id051_2 R.S
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -id051_1 -id051_2 R.S
 	test -f d051_2/R/S.hi
 	test -f d051_2/R/S$(OBJSUFFIX)
 	test -f d051_1/P/Q.hi
@@ -258,7 +258,7 @@ test052:
 	$(RM) d052_1/P/Q.hi
 	$(RM) -rf obj052
 	mkdir obj052
-	"$(TEST_HC)" -v0 --make -id052_1 -id052_2 -odir obj052 R.S
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -id052_1 -id052_2 -odir obj052 R.S
 	test -f d052_2/R/S.hi
 	test -f obj052/R/S$(OBJSUFFIX)
 	test -f d052_1/P/Q.hi
@@ -270,7 +270,7 @@ test053:
 	$(RM) d053_2/R/S$(OBJSUFFIX)
 	$(RM) hi053/P/Q.hi
 	$(RM) d053_1/P/Q$(OBJSUFFIX)
-	"$(TEST_HC)" -v0 --make -id053_1 -id053_2 -hidir hi053 R.S
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -id053_1 -id053_2 -hidir hi053 R.S
 	test -f hi053/R/S.hi
 	test -f d053_2/R/S$(OBJSUFFIX)
 	test -f hi053/P/Q.hi
@@ -282,44 +282,44 @@ test053:
 # Test that -keep-s-files works with --make and -fvia-C
 test061a:
 	$(RM) A061a.hi A061a$(OBJSUFFIX) A061a.s
-	"$(TEST_HC)" -v0 --make -keep-s-files -fno-warn-deprecated-flags -fvia-C A061a.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -keep-s-files -fno-warn-deprecated-flags -fvia-C A061a.hs
 	test -f A061a.s
 
 # Test that -keep-s-files works without --make
 test061b:
 	$(RM) A061b.hi A061b$(OBJSUFFIX) A061b.s
-	"$(TEST_HC)" -c -keep-s-files -fno-warn-deprecated-flags -fvia-C A061b.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c -keep-s-files -fno-warn-deprecated-flags -fvia-C A061b.hs
 	test -f A061b.s
 
 # Test that -main-is works with --make
 test062a:
 	$(RM) Hello062a.hs Hello062a.hi Hello062a$(OBJSUFFIX) Hello062a.hc hello062a
 	echo "module Hello062a where { hello062a = putStrLn \"ok\" }" >Hello062a.hs
-	"$(TEST_HC)" -v0 --make -main-is Hello062a.hello062a Hello062a -o hello062a
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is Hello062a.hello062a Hello062a -o hello062a
 	./hello062a
 test062b:
 	$(RM) Hello062b.hs Hello062b.hi Hello062b$(OBJSUFFIX) Hello062b.hc hello062b
 	echo "module Hello062b where { main = putStrLn \"ok\" }" >Hello062b.hs
-	"$(TEST_HC)" -v0 --make -main-is Hello062b Hello062b -o hello062b
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is Hello062b Hello062b -o hello062b
 	./hello062b
 test062c:
 	$(RM) Hello062c.hs Hello062c.hi Hello062c$(OBJSUFFIX) Hello062c.hc hello062c
 	echo "module Main (hello062c) where { hello062c = putStrLn \"ok\" }" >Hello062c.hs
-	"$(TEST_HC)" -v0 --make -main-is hello062c Hello062c.hs -o hello062c
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is hello062c Hello062c.hs -o hello062c
 	./hello062c
 test062d:
 	$(RM) -rf B062d
 	$(RM) hello062d
 	mkdir B062d
 	echo "module B062d.Hello062d (hello062d) where { hello062d = putStrLn \"ok\" }" >B062d/Hello062d.hs
-	"$(TEST_HC)" -v0 --make -main-is B062d.Hello062d.hello062d B062d/Hello062d.hs -o hello062d
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is B062d.Hello062d.hello062d B062d/Hello062d.hs -o hello062d
 	./hello062d
 test062e:
 	$(RM) -rf B062e
 	$(RM) Hello062e.hc hello062e
 	mkdir B062e
 	echo "module B062e.Hello062e (main) where { main = putStrLn \"ok\" }" >B062e/Hello062e.hs
-	"$(TEST_HC)" -v0 --make -main-is B062e.Hello062e B062e/Hello062e.hs -o hello062e
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is B062e.Hello062e B062e/Hello062e.hs -o hello062e
 	./hello062e
 
 # Test that -i deletes the list of search paths.
@@ -327,42 +327,42 @@ test062e:
 # compare the output, because make might give us a different exit code.
 test063:
 	$(RM) A063.hi A063$(OBJSUFFIX) A063.hc D063.hi D063$(OBJSUFFIX) D063.hc
-	-"$(TEST_HC)" --make -i -v0 D063.hs
+	-"$(TEST_HC)" $(TEST_HC_OPTS) --make -i -v0 D063.hs
 
 # Test -E
 test064:
 	$(RM) A064.hi A064.hspp
-	"$(TEST_HC)" -E A064.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -E A064.hs
 	test -f A064.hspp
 
 # Test -E/-cpp
 test065:
 	$(RM) A065.hi A065.hspp
-	"$(TEST_HC)" -E -cpp A065.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -E -cpp A065.hs
 	test -f A065.hspp
 
 # Test -E/-o
 test066:
 	$(RM) A066.hi A066.tmp
-	"$(TEST_HC)" -E A066.hs -o A066.tmp
+	"$(TEST_HC)" $(TEST_HC_OPTS) -E A066.hs -o A066.tmp
 	test -f A066.tmp
 
 # Test -E/-cpp/-o
 test067:
 	$(RM) A067.hi A067.tmp
-	"$(TEST_HC)" -cpp -E A067.hs -o A067.tmp
+	"$(TEST_HC)" $(TEST_HC_OPTS) -cpp -E A067.hs -o A067.tmp
 	test -f A067.tmp
 
 # Test -S
 test070:
 	$(RM) A070.hi A070.s
-	"$(TEST_HC)" -S A070.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -S A070.hs
 	test -f A070.s
 
 # Test -S/-o
 test071:
 	$(RM) A071.hi A071.tmp
-	"$(TEST_HC)" -S A071.hs -o A071.tmp
+	"$(TEST_HC)" $(TEST_HC_OPTS) -S A071.hs -o A071.tmp
 	test -f A071.tmp
 
 
@@ -371,7 +371,7 @@ test071:
 define test081
 $(RM) $(1).hs $(1).hi $(1)$(OBJSUFFIX) $(1).hc $(1)$(exeext)
 echo "module Main where { main = putStrLn \"ok\" }" >$(1).hs
-"$(TEST_HC)" --make -v0 $(1).hs
+"$(TEST_HC)" $(TEST_HC_OPTS) --make -v0 $(1).hs
 test -f $(1)$(exeext)
 endef
 
@@ -387,7 +387,7 @@ test081b:
 test100:
 	$(RM) overlap/List.hi overlap/List.o
 	$(RM) overlap/Overlap.hi overlap/Overlap.o
-	"$(TEST_HC)" -v0 --make -ioverlap Overlap
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -ioverlap Overlap
 
 # -----------------------------------------------------------------------------
 # dependency-generation tests
@@ -398,17 +398,17 @@ DEPFILE200 = depend200
 # modify an existing dependency file.
 test200:
 	$(RM) $(DEPFILE200)
-	"$(TEST_HC)" -M -dep-makefile $(DEPFILE200) D200
+	"$(TEST_HC)" $(TEST_HC_OPTS) -M -dep-makefile $(DEPFILE200) D200
 	test -f $(DEPFILE200)
-	"$(TEST_HC)" -M -dep-makefile $(DEPFILE200) D200 B200.C A200
+	"$(TEST_HC)" $(TEST_HC_OPTS) -M -dep-makefile $(DEPFILE200) D200 B200.C A200
 	test -f $(DEPFILE200)
-	"$(TEST_HC)" -M -dep-makefile $(DEPFILE200) D200.hs B200/C.hs A200.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -M -dep-makefile $(DEPFILE200) D200.hs B200/C.hs A200.hs
 	test -f $(DEPFILE200)
 
 # -----------------------------------------------------------------------------
 
 2566::
-	if "$(TEST_HC)" -c foo2566.bar; then false else true; fi
+	if "$(TEST_HC)" $(TEST_HC_OPTS) -c foo2566.bar; then false else true; fi
 
 .PHONY: mode001
 # We use
@@ -419,42 +419,42 @@ test200:
 #     ghc: <stdout>: hFlush: resource vanished (Broken pipe)
 # on OS X
 mode001:
-	"$(TEST_HC)" --make --help        | sed '2,$$d'
-	"$(TEST_HC)" --help --make        | sed '2,$$d'
-	"$(TEST_HC)" --interactive --help | sed '2,$$d'
-	"$(TEST_HC)" --help --interactive | sed '2,$$d'
-	"$(TEST_HC)" --version --help     | sed "s/, version.*//"
-	"$(TEST_HC)" --help --version        | sed '2,$$d'
-	"$(TEST_HC)" --interactive --version | sed "s/, version.*//"
-	"$(TEST_HC)" --version --interactive | sed "s/, version.*//"
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make --help        | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --help --make        | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --interactive --help | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --help --interactive | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --version --help     | sed "s/, version.*//"
+	"$(TEST_HC)" $(TEST_HC_OPTS) --help --version        | sed '2,$$d'
+	"$(TEST_HC)" $(TEST_HC_OPTS) --interactive --version | sed "s/, version.*//"
+	"$(TEST_HC)" $(TEST_HC_OPTS) --version --interactive | sed "s/, version.*//"
 
 # Test for building DLLs with ghc -shared, see #2745
 shared001:
 	$(RM) Shared001.hi Shared001.o HSdll.dll.a HSdll.dll Shared001_stub.*
-	"$(TEST_HC)" -v0 -shared Shared001.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -shared Shared001.hs
 
 # -----------------------------------------------------------------------------
 
 3674:
 	$(RM) 3674*.o 3674*.hi 3674_pre
-	"$(TEST_HC)" --make 3674_pre.hs
-	"$(TEST_HC)" --make 3674.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make 3674_pre.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) --make 3674.hs
 
 .PHONY: rtsopts001
 rtsopts001:
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
-	"$(TEST_HC)" -v0 --make rtsOpts -rtsopts
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make rtsOpts -rtsopts
 	echo "Normal"
 	-./rtsOpts +RTS -C0 2>&1
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
-	"$(TEST_HC)" -v0 --make rtsOpts
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make rtsOpts
 	echo "No RTS opts"
 	-./rtsOpts +RTS -C0 2>&1
 
 .PHONY: rtsopts002
 rtsopts002:
 	$(RM) rtsopts002$(exeext) rtsopts002.hi rtsopts002.o
-	"$(TEST_HC)" -v0 --make rtsopts002 -rtsopts=some
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make rtsopts002 -rtsopts=some
 	./rtsopts002
 	./rtsopts002 +RTS --info >/dev/null
 	if ./rtsopts002 +RTS -C0; then exit 1; else exit 0; fi
@@ -465,23 +465,23 @@ rtsopts002:
 .PHONY: withRtsOpts
 withRtsOpts:
 	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o withRtsOpts.out
-	"$(TEST_HC)" -v0 --make withRtsOpts -with-rtsopts=--info
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make withRtsOpts -with-rtsopts=--info
 	./withRtsOpts | head -1
 	# Also test for non-safe RTS opts, these should be allowed too,
 	# since the author has explicitly requested them. (#5114)
 	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o withRtsOpts.out
-	"$(TEST_HC)" -v0 --make withRtsOpts -with-rtsopts=-twithRtsOpts.out
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make withRtsOpts -with-rtsopts=-twithRtsOpts.out
 	./withRtsOpts | head -1
 	test -f withRtsOpts.out
 
 .PHONY: T3364
 T3364:
-	-"$(TEST_HC)" -H
+	-"$(TEST_HC)" $(TEST_HC_OPTS) -H
 
 .PHONY: T706
 T706:
 	cp T706a.hs T706.hs
-	"$(TEST_HC)" -c T706.hs
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T706.hs
 	cp T706b.hs T706.hs
-	"$(TEST_HC)" -c T706.hs
-	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 T706
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c T706.hs
+	echo "test" | "$(TEST_HC)" $(TEST_HC_OPTS) --interactive -ignore-dot-ghci -v0 T706

@@ -13,7 +13,7 @@ clean:
 
 recomp001: clean
 	cp B1.hs B.hs
-	'$(TEST_HC)' --make -v0 C.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 C.hs
 	sleep 1
 	cp B2.hs B.hs
-	-'$(TEST_HC)' --make -v0 C.hs
+	-'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 C.hs

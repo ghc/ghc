@@ -12,13 +12,13 @@ clean:
 recomp004:
 	$(RM) $(CLEAN_FILES)
 	$(CP) c1.c c.c
-	'$(TEST_HC)' -v0 -c c.c -o c.o
-	'$(TEST_HC)' -v0 --make Main.hs c.o -o $(EXECUTABLE)
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Main.hs c.o -o $(EXECUTABLE)
 	./$(EXECUTABLE)
 	$(CP) c2.c c.c
-	'$(TEST_HC)' -v0 -c c.c -o c.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
 	# Hack to make sure c.o is really newer
 	touch -t 01010000 Main.hs Main.hi Main.o c.c $(EXECUTABLE)
-	'$(TEST_HC)' -v0 --make Main.hs c.o -o $(EXECUTABLE)
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Main.hs c.o -o $(EXECUTABLE)
 	./$(EXECUTABLE)
 
