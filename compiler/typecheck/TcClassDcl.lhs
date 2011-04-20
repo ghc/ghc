@@ -19,6 +19,7 @@ import RnHsSyn
 import Inst
 import InstEnv
 import TcEnv
+import TcPat( addInlinePrags )
 import TcBinds
 import TcUnify
 import TcHsType
@@ -207,11 +208,11 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
 	   	             `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 
 	         dm_sig_fn  _  = sig_fn sel_name
-                 dm_prag_fn _  = prag_fn sel_name
+                 prags = prag_fn sel_name
 
-	         dm_ty = mkSigmaTy tyvars [mkClassPred clas tyvars] local_dm_ty
+	         dm_ty = mkSigmaTy tyvars [mkClassPred clas (mkTyVarTys tyvars)] local_dm_ty
 	         dm_id = mkExportedLocalId dm_name dm_ty
-	         local_dm_id = mkLocalId local_dm_name local_dm_type
+	         local_dm_id = mkLocalId local_dm_name local_dm_ty
 
            ; dm_id_w_inline <- addInlinePrags dm_id prags
            ; spec_prags     <- tcSpecPrags dm_id prags
@@ -222,7 +223,7 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
 
            ; dm_bind <- tcInstanceMethodBody (ClsSkol clas) tyvars [this_dict]
                                              dm_id_w_inline local_dm_id dm_sig_fn 
-                                             IsDefaultMethodId dm_bind
+                                             IsDefaultMethod meth_bind
 
            ; return (unitBag dm_bind) }
 
@@ -233,7 +234,7 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
             ; checkValidType (FunSigCtxt sel_name) tau	
             ; return tau }
 
-findGenericSig :: [LSig Name] -> Name -> LSig Name
+findGenericSig :: [LSig Name] -> Name -> LHsType Name
 -- Find the 'generic op :: ty' signature among the sigs
 -- If dm_info is GenDefMeth, the corresponding signature
 -- should jolly well exist!  Hence the panic
