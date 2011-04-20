@@ -1038,9 +1038,6 @@ data SkolemInfo
                         -- polymorphic Ids, and are now checking that their RHS
                         -- constraints are satisfied.
 
-  | RuntimeUnkSkol      -- a type variable used to represent an unknown
-                        -- runtime type (used in the GHCi debugger)
-
   | BracketSkol         -- Template Haskell bracket
 
   | UnkSkol             -- Unhelpful info (until I improve it)
@@ -1075,8 +1072,7 @@ pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.  
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol        = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
-pprSkolInfo RuntimeUnkSkol = WARN( True, text "pprSkolInfo: RuntimeUnkSkol" ) ptext (sLit "RuntimeUnkSkol")
+pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
 \end{code}
 
 

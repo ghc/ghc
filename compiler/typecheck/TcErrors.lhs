@@ -459,12 +459,22 @@ typeExtraInfoMsg :: [Implication] -> Type -> SDoc
 -- Shows a bit of extra info about skolem constants
 typeExtraInfoMsg implics ty
   | Just tv <- tcGetTyVar_maybe ty
-  , isTcTyVar tv
-  , isSkolemTyVar tv
- = pprSkolTvBinding implics tv
-  where
-typeExtraInfoMsg _ _ = empty            -- Normal case
+  , isTcTyVar tv, isSkolemTyVar tv
+  , let pp_tv = quotes (ppr tv)
+ = case tcTyVarDetails tv of
+    SkolemTv {}   -> pp_tv <+> ppr_skol (getSkolemInfo implics tv) (getSrcLoc tv)
+    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
+    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
+    MetaTv {}     -> empty
 
+ | otherwise             -- Normal case
+ = empty
+
+ where
+   ppr_skol UnkSkol _   = ptext (sLit "is an unknown type variable")  -- Unhelpful
+   ppr_skol info    loc = sep [ptext (sLit "is a rigid type variable bound by"),
+                               sep [ppr info, ptext (sLit "at") <+> ppr loc]]
+ 
 --------------------
 unifyCtxt :: EqOrigin -> TidyEnv -> TcM (TidyEnv, SDoc)
 unifyCtxt (UnifyOrigin { uo_actual = act_ty, uo_expected = exp_ty }) tidy_env
@@ -660,7 +670,6 @@ mkMonomorphismMsg :: ReportErrCtxt -> [TcTyVar] -> TcM (TidyEnv, SDoc)
 -- ASSUMPTION: the Insts are fully zonked
 mkMonomorphismMsg ctxt inst_tvs
   = do	{ dflags <- getDOpts
-        ; traceTc "Mono" (vcat (map (pprSkolTvBinding (cec_encl ctxt)) inst_tvs))
         ; (tidy_env, docs) <- findGlobals ctxt (mkVarSet inst_tvs)
 	; return (tidy_env, mk_msg dflags docs) }
   where
@@ -686,28 +695,6 @@ monomorphism_fix dflags
            else empty]	-- Only suggest adding "-XNoMonomorphismRestriction"
 			-- if it is not already set!
 
-
-pprSkolTvBinding :: [Implication] -> TcTyVar -> SDoc
--- Print info about the binding of a skolem tyvar, 
--- or nothing if we don't have anything useful to say
-pprSkolTvBinding implics tv
-  | isTcTyVar tv = quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
-  | otherwise    = quotes (ppr tv) <+> ppr_skol    (getSkolemInfo implics tv)
-  where
-    ppr_details (SkolemTv {})        = ppr_skol (getSkolemInfo implics tv)
-    ppr_details (FlatSkol {})        = ptext (sLit "is a flattening type variable")
-    ppr_details (RuntimeUnk {})      = ptext (sLit "is an interactive-debugger skolem")
-    ppr_details (MetaTv (SigTv n) _) = ptext (sLit "is bound by the type signature for")
-                                       <+> quotes (ppr n)
-    ppr_details (MetaTv _ _)         = ptext (sLit "is a meta type variable")
-
-
-    ppr_skol UnkSkol        = ptext (sLit "is an unknown type variable")        -- Unhelpful
-    ppr_skol RuntimeUnkSkol = ptext (sLit "is an unknown runtime type")
-    ppr_skol info           = sep [ptext (sLit "is a rigid type variable bound by"),
-                                   sep [ppr info,
-                                        ptext (sLit "at") <+> ppr (getSrcLoc tv)]]
- 
 getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
 getSkolemInfo [] tv
   = WARN( True, ptext (sLit "No skolem info:") <+> ppr tv )
