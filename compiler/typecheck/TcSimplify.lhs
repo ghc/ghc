@@ -49,7 +49,7 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- but when there is nothing to quantify we don't wrap
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds 
-  = simplifyCheck SimplCheck wanteds
+  = simplifyCheck (SimplCheck (ptext (sLit "top level"))) wanteds
 
 ------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
@@ -61,7 +61,8 @@ simplifyDefault :: ThetaType	-- Wanted; has no type variables in it
                 -> TcM ()	-- Succeeds iff the constraint is soluble
 simplifyDefault theta
   = do { wanted <- newFlatWanteds DefaultOrigin theta
-       ; _ignored_ev_binds <- simplifyCheck SimplCheck (mkFlatWC wanted)
+       ; _ignored_ev_binds <- simplifyCheck (SimplCheck (ptext (sLit "defaults"))) 
+                                            (mkFlatWC wanted)
        ; return () }
 \end{code}
 
@@ -75,13 +76,14 @@ simplifyDefault theta
 
 \begin{code}
 simplifyDeriv :: CtOrigin
-		-> [TyVar]	
-		-> ThetaType		-- Wanted
-	        -> TcM ThetaType	-- Needed
+              -> PredType
+	      -> [TyVar]	
+	      -> ThetaType		-- Wanted
+	      -> TcM ThetaType	-- Needed
 -- Given  instance (wanted) => C inst_ty 
 -- Simplify 'wanted' as much as possibles
 -- Fail if not possible
-simplifyDeriv orig tvs theta 
+simplifyDeriv orig pred tvs theta 
   = do { tvs_skols <- tcInstSkolTyVars tvs -- Skolemize
       	 	-- The constraint solving machinery 
 		-- expects *TcTyVars* not TyVars.  
@@ -90,12 +92,13 @@ simplifyDeriv orig tvs theta
 
        ; let skol_subst = zipTopTvSubst tvs $ map mkTyVarTy tvs_skols
              subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+	     doc = parens $ ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
 
        ; traceTc "simplifyDeriv" (ppr tvs $$ ppr theta $$ ppr wanted)
        ; (residual_wanted, _binds)
-             <- runTcS SimplInfer NoUntouchables $
+             <- runTcS (SimplInfer doc) NoUntouchables $
                 solveWanteds emptyInert (mkFlatWC wanted)
 
        ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
@@ -247,7 +250,7 @@ simplifyInfer top_lvl apply_mr name_taus wanteds
             -- Step 2 
        	    -- Now simplify the possibly-bound constraints
        ; (simpl_results, tc_binds0)
-           <- runTcS SimplInfer NoUntouchables $
+           <- runTcS (SimplInfer (ppr (map fst name_taus))) NoUntouchables $
               simplifyWithApprox (zonked_wanteds { wc_flat = perhaps_bound })
 
        ; when (insolubleWC simpl_results)  -- Fail fast if there is an insoluble constraint
@@ -547,7 +550,7 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 		 -- variables; hence *no untouchables*
 
        ; (lhs_results, lhs_binds)
-              <- runTcS SimplRuleLhs untch $
+              <- runTcS (SimplRuleLhs name) untch $
                  solveWanteds emptyInert zonked_lhs
 
        ; traceTc "simplifyRule" $
@@ -589,7 +592,8 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 
 	     -- Hence the rather painful ad-hoc treatement here
        ; rhs_binds_var@(EvBindsVar evb_ref _)  <- newTcEvBinds
-       ; rhs_binds1 <- simplifyCheck SimplCheck $
+       ; let doc = ptext (sLit "rhs of rule") <+> doubleQuotes (ftext name)
+       ; rhs_binds1 <- simplifyCheck (SimplCheck doc) $
             WC { wc_flat = emptyBag
                , wc_insol = emptyBag
                , wc_impl = unitBag $

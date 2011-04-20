@@ -685,16 +685,12 @@ okInstDclSig (GenericSig _ _) = False
 okInstDclSig (FixSig _)       = False
 okInstDclSig _ 	              = True
 
-sigForThisGroup :: NameSet -> LSig Name -> Bool
-sigForThisGroup ns sig
-  = case sigName sig of
-	Nothing -> False
-	Just n  -> n `elemNameSet` ns
-
 sigName :: LSig name -> Maybe name
+-- Used only in Haddock
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> Maybe name    
+-- Used only in Haddock
 sigNameNoLoc (TypeSig   n _)          = Just (unLoc n)
 sigNameNoLoc (SpecSig   n _ _)        = Just (unLoc n)
 sigNameNoLoc (InlineSig n _)          = Just (unLoc n)
