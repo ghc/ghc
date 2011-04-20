@@ -145,11 +145,12 @@ data Type
 	                --    can appear as the right hand side of a type synonym.
 
   | FunTy
-	Type
+	Type		
 	Type		-- ^ Special case of 'TyConApp': @TyConApp FunTyCon [t1, t2]@
+			-- See Note [Equality-constrained types]
 
   | ForAllTy
-	TyCoVar         -- ^ Type *or* coercion variable; see Note [Equality-constrained types]
+	TyCoVar         -- Type variable
 	Type	        -- ^ A polymorphic type
 
   | PredTy
@@ -183,20 +184,8 @@ The type   forall ab. (a ~ [b]) => blah
 is encoded like this:
 
    ForAllTy (a:*) $ ForAllTy (b:*) $
-   ForAllTy (wild_co : a ~ [b]) $
+   FunTy (PredTy (EqPred a [b]) $
    blah
-
-That is, the "(a ~ [b]) =>" part is encode as a for-all
-type with a coercion variable that is never mentioned.
-
-We could instead have used a FunTy with an EqPred on the 
-left.  But we want 
-
-  * FunTy to mean RUN-TIME abstraction,
-    passing a real value at runtime, 
-
-  * ForAllTy to mean COMPILE-TIME abstraction, 
-    erased at runtime
 
 -------------------------------------
  		Note [PredTy]

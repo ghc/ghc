@@ -300,7 +300,7 @@ data DataCon
 		-- the context constrains only universally quantified variables
 		--	MkT :: forall a b. (a ~ b, Ord b) => a -> T a b
 	dcOtherTheta :: ThetaType,  -- The other constraints in the data con's type
-		                    -- *other than* those in the dcEqSpec
+		                    -- other than those in the dcEqSpec
 
 	dcStupidTheta :: ThetaType,	-- The context of the data type declaration 
 					--	data Eq a => T a = ...
