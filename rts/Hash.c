@@ -27,13 +27,16 @@
 
 
 /* Linked list of (key, data) pairs for separate chaining */
-struct hashlist {
+typedef struct hashlist {
     StgWord key;
     void *data;
     struct hashlist *next;  /* Next cell in bucket chain (same hash value) */
-};
+} HashList;
 
-typedef struct hashlist HashList;
+typedef struct chunklist {
+  HashList *chunk;
+  struct chunklist *next;
+} HashListChunk;
 
 struct hashtable {
     int split;		    /* Next bucket to split when expanding */
@@ -43,7 +46,9 @@ struct hashtable {
     int kcount;		    /* Number of keys */
     int bcount;		    /* Number of buckets */
     HashList **dir[HDIRSIZE];	/* Directory of segments */
-    HashFunction *hash;		/* hash function */
+    HashList *freeList;         /* free list of HashLists */
+    HashListChunk *chunks;
+    HashFunction *hash;         /* hash function */
     CompareFunction *compare;   /* key comparison function */
 };
 
@@ -207,30 +212,23 @@ lookupHashTable(HashTable *table, StgWord key)
  * no effort to actually return the space to the malloc arena.
  * -------------------------------------------------------------------------- */
 
-static HashList *freeList = NULL;
-
-static struct chunkList {
-  void *chunk;
-  struct chunkList *next;
-} *chunks;
-
 static HashList *
-allocHashList(void)
+allocHashList (HashTable *table)
 {
     HashList *hl, *p;
-    struct chunkList *cl;
+    HashListChunk *cl;
 
-    if ((hl = freeList) != NULL) {
-	freeList = hl->next;
+    if ((hl = table->freeList) != NULL) {
+        table->freeList = hl->next;
     } else {
         hl = stgMallocBytes(HCHUNK * sizeof(HashList), "allocHashList");
 	cl = stgMallocBytes(sizeof (*cl), "allocHashList: chunkList");
-	cl->chunk = hl;
-	cl->next = chunks;
-	chunks = cl;
+        cl->chunk = hl;
+        cl->next = table->chunks;
+        table->chunks = cl;
 
-	freeList = hl + 1;
-	for (p = freeList; p < hl + HCHUNK - 1; p++)
+        table->freeList = hl + 1;
+        for (p = table->freeList; p < hl + HCHUNK - 1; p++)
 	    p->next = p + 1;
 	p->next = NULL;
     }
@@ -238,10 +236,10 @@ allocHashList(void)
 }
 
 static void
-freeHashList(HashList *hl)
+freeHashList (HashTable *table, HashList *hl)
 {
-    hl->next = freeList;
-    freeList = hl;
+    hl->next = table->freeList;
+    table->freeList = hl;
 }
 
 void
@@ -264,7 +262,7 @@ insertHashTable(HashTable *table, StgWord key, void *data)
     segment = bucket / HSEGSIZE;
     index = bucket % HSEGSIZE;
 
-    hl = allocHashList();
+    hl = allocHashList(table);
 
     hl->key = key;
     hl->data = data;
@@ -292,7 +290,7 @@ removeHashTable(HashTable *table, StgWord key, void *data)
 		table->dir[segment][index] = hl->next;
 	    else
 		prev->next = hl->next;
-	    freeHashList(hl);
+            freeHashList(table,hl);
 	    table->kcount--;
 	    return hl->data;
 	}
@@ -317,6 +315,7 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
     long index;
     HashList *hl;
     HashList *next;
+    HashListChunk *cl, *cl_next;
 
     /* The last bucket with something in it is table->max + table->split - 1 */
     segment = (table->max + table->split - 1) / HSEGSIZE;
@@ -328,13 +327,17 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
 		next = hl->next;
 		if (freeDataFun != NULL)
 		    (*freeDataFun)(hl->data);
-		freeHashList(hl);
-	    }
+            }
 	    index--;
 	}
 	stgFree(table->dir[segment]);
 	segment--;
 	index = HSEGSIZE - 1;
+    }
+    for (cl = table->chunks; cl != NULL; cl = cl_next) {
+        cl_next = cl->next;
+        stgFree(cl->chunk);
+        stgFree(cl);
     }
     stgFree(table);
 }
@@ -363,6 +366,8 @@ allocHashTable_(HashFunction *hash, CompareFunction *compare)
     table->mask2 = 2 * HSEGSIZE - 1;
     table->kcount = 0;
     table->bcount = HSEGSIZE;
+    table->freeList = NULL;
+    table->chunks = NULL;
     table->hash = hash;
     table->compare = compare;
 
@@ -385,11 +390,5 @@ allocStrHashTable(void)
 void
 exitHashTable(void)
 {
-  struct chunkList *cl;
-
-  while ((cl = chunks) != NULL) {
-    chunks = cl->next;
-    stgFree(cl->chunk);
-    stgFree(cl);
-  }
+    /* nothing to do */
 }

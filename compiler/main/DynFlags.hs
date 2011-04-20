@@ -40,7 +40,7 @@ module DynFlags (
         initDynFlags,                   -- DynFlags -> IO DynFlags
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
-        getVerbFlag,
+        getVerbFlags,
         updOptLevel,
         setTmpDir,
         setPackageName,
@@ -873,10 +873,10 @@ getOpts dflags opts = reverse (opts dflags)
 
 -- | Gets the verbosity flag for the current verbosity level. This is fed to
 -- other tools, so GHC-specific verbosity flags like @-ddump-most@ are not included
-getVerbFlag :: DynFlags -> String
-getVerbFlag dflags
-  | verbosity dflags >= 3  = "-v"
-  | otherwise =  ""
+getVerbFlags :: DynFlags -> [String]
+getVerbFlags dflags
+  | verbosity dflags >= 4 = ["-v"]
+  | otherwise             = []
 
 setObjectDir, setHiDir, setStubDir, setOutputDir, setDylibInstallName,
          setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,

@@ -70,12 +70,12 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
-    defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
-    defined(openbsd_HOST_OS  ) || \
-    ( defined(darwin_HOST_OS ) && !defined(powerpc_HOST_ARCH) ) || \
-    defined(kfreebsdgnu_HOST_OS)
-/* Don't use mmap on powerpc-apple-darwin as mmap doesn't support
+#if !defined(powerpc_HOST_ARCH) && \
+    (   defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
+        defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
+        defined(openbsd_HOST_OS  ) || defined(darwin_HOST_OS ) || \
+        defined(kfreebsdgnu_HOST_OS) )
+/* Don't use mmap on powerpc_HOST_ARCH as mmap doesn't support
  * reallocating but we need to allocate jump islands just after each
  * object images. Otherwise relative branches to jump islands can fail
  * due to 24-bits displacement overflow.
@@ -2572,7 +2572,11 @@ static void
 ocFlushInstructionCache( ObjectCode *oc )
 {
     /* The main object code */
-    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
+    ocFlushInstructionCacheFrom(oc->image
+#ifdef darwin_HOST_OS
+            + oc->misalignment
+#endif
+            , oc->fileSize);
 
     /* Jump Islands */
     ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);

@@ -753,12 +753,18 @@ stat_exit(int alloc)
 	statsClose();
     }
 
-    if (GC_coll_cpu)
+    if (GC_coll_cpu) {
       stgFree(GC_coll_cpu);
-    GC_coll_cpu = NULL;
-    if (GC_coll_elapsed)
+      GC_coll_cpu = NULL;
+    }
+    if (GC_coll_elapsed) {
       stgFree(GC_coll_elapsed);
-    GC_coll_elapsed = NULL;
+      GC_coll_elapsed = NULL;
+    }
+    if (GC_coll_max_pause) {
+      stgFree(GC_coll_max_pause);
+      GC_coll_max_pause = NULL;
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -798,6 +804,15 @@ statDescribeGens(void)
       mut = 0;
       for (i = 0; i < n_capabilities; i++) {
           mut += countOccupied(capabilities[i].mut_lists[g]);
+
+          // Add the pinned object block.
+          bd = capabilities[i].pinned_object_block;
+          if (bd != NULL) {
+              gen_live   += bd->free - bd->start;
+              gen_blocks += bd->blocks;
+          }
+
+          gen_live   += gcThreadLiveWords(i,g);
           gen_live   += gcThreadLiveWords(i,g);
           gen_blocks += gcThreadLiveBlocks(i,g);
       }

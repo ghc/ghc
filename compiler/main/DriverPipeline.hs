@@ -1031,7 +1031,7 @@ runPhase cc_phase input_fn dflags
         gcc_extra_viac_flags <- io $ getExtraViaCOpts dflags
         let pic_c_flags = picCCOpts dflags
 
-        let verb = getVerbFlag dflags
+        let verbFlags = getVerbFlags dflags
 
         -- cc-options are not passed when compiling .hc files.  Our
         -- hc code doesn't not #include any header files anyway, so these
@@ -1118,7 +1118,8 @@ runPhase cc_phase input_fn dflags
                        ++ (if hcc
                              then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
-                       ++ [ verb, "-S", "-Wimplicit", cc_opt ]
+                       ++ verbFlags
+                       ++ [ "-S", "-Wimplicit", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 #ifdef darwin_TARGET_OS
                        ++ framework_paths
@@ -1433,7 +1434,10 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
    mkExtraCObj dflags (showSDoc (vcat [rts_opts_enabled,
                                        extra_rts_opts,
-                                       link_opts link_info]))
+                                       link_opts link_info]
+                                   <> char '\n')) -- final newline, to
+                                                  -- keep gcc happy
+
   where
     mk_rts_opts_enabled val
          = vcat [text "#include \"Rts.h\"",
@@ -1574,7 +1578,7 @@ getHCFilePackages filename =
 
 linkBinary :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
 linkBinary dflags o_files dep_packages = do
-    let verb = getVerbFlag dflags
+    let verbFlags = getVerbFlags dflags
         output_fn = exeFileName dflags
 
     -- get the full list of packages to link with, by combining the
@@ -1652,10 +1656,10 @@ linkBinary dflags o_files dep_packages = do
 
     let md_c_flags = machdepCCOpts dflags
     SysTools.runLink dflags (
-                       [ SysTools.Option verb
-                       , SysTools.Option "-o"
-                       , SysTools.FileOption "" output_fn
-                       ]
+                       map SysTools.Option verbFlags
+                      ++ [ SysTools.Option "-o"
+                         , SysTools.FileOption "" output_fn
+                         ]
                       ++ map SysTools.Option (
                          md_c_flags
 
@@ -1768,7 +1772,7 @@ maybeCreateManifest dflags exe_filename = do
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
 linkDynLib dflags o_files dep_packages = do
-    let verb = getVerbFlag dflags
+    let verbFlags = getVerbFlags dflags
     let o_file = outputFile dflags
 
     pkgs <- getPreloadPackagesAnd dflags dep_packages
@@ -1813,15 +1817,15 @@ linkDynLib dflags o_files dep_packages = do
     -----------------------------------------------------------------------------
     let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
 
-    SysTools.runLink dflags
-         ([ SysTools.Option verb
-          , SysTools.Option "-o"
-          , SysTools.FileOption "" output_fn
-          , SysTools.Option "-shared"
-          ] ++
-          [ SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
-          | dopt Opt_SharedImplib dflags
-          ]
+    SysTools.runLink dflags (
+            map SysTools.Option verbFlags
+         ++ [ SysTools.Option "-o"
+            , SysTools.FileOption "" output_fn
+            , SysTools.Option "-shared"
+            ] ++
+            [ SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
+            | dopt Opt_SharedImplib dflags
+            ]
          ++ map (SysTools.FileOption "") o_files
          ++ map SysTools.Option (
             md_c_flags
@@ -1873,12 +1877,12 @@ linkDynLib dflags o_files dep_packages = do
         Nothing -> do
             pwd <- getCurrentDirectory
             return $ pwd `combine` output_fn
-    SysTools.runLink dflags
-         ([ SysTools.Option verb
-          , SysTools.Option "-dynamiclib"
-          , SysTools.Option "-o"
-          , SysTools.FileOption "" output_fn
-          ]
+    SysTools.runLink dflags (
+            map SysTools.Option verbFlags
+         ++ [ SysTools.Option "-dynamiclib"
+            , SysTools.Option "-o"
+            , SysTools.FileOption "" output_fn
+            ]
          ++ map SysTools.Option (
             md_c_flags
          ++ o_files
@@ -1909,11 +1913,11 @@ linkDynLib dflags o_files dep_packages = do
                              -- non-PIC intra-package-relocations
                              ["-Wl,-Bsymbolic"]
 
-    SysTools.runLink dflags
-         ([ SysTools.Option verb
-          , SysTools.Option "-o"
-          , SysTools.FileOption "" output_fn
-          ]
+    SysTools.runLink dflags (
+            map SysTools.Option verbFlags
+         ++ [ SysTools.Option "-o"
+            , SysTools.FileOption "" output_fn
+            ]
          ++ map SysTools.Option (
             md_c_flags
          ++ o_files
@@ -1942,7 +1946,7 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
     let include_paths = foldr (\ x xs -> "-I" : x : xs) []
                           (cmdline_include_paths ++ pkg_include_dirs)
 
-    let verb = getVerbFlag dflags
+    let verbFlags = getVerbFlags dflags
 
     let cc_opts
           | not include_cc_opts = []
@@ -1962,7 +1966,7 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 
-    cpp_prog       ([SysTools.Option verb]
+    cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
                     ++ map SysTools.Option target_defs

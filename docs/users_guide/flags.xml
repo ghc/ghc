@@ -1180,6 +1180,13 @@
 	  </row>
 
 	  <row>
+	    <entry><option>-fwarn-missing-local-sigs</option></entry>
+	    <entry>warn about polymorphic local bindings without signatures</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-missing-local-sigs</option></entry>
+	  </row>
+
+	  <row>
 	    <entry><option>-fwarn-name-shadowing</option></entry>
 	    <entry>warn when names are shadowed</entry>
 	    <entry>dynamic</entry>
