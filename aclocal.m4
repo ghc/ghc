@@ -94,14 +94,10 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
     case $$1 in
     i386-apple-darwin)
-        # By default, gcc on OS X will generate SSE
-        # instructions, which need things 16-byte aligned,
-        # but we don't 16-byte align things. Thus drop
-        # back to generic i686 compatibility. Trac #2983.
-        $2="$$2 -march=i686 -m32"
-        $3="$$3 -march=i686 -m32"
+        $2="$$2 -m32"
+        $3="$$3 -m32"
         $4="$$4 -arch i386"
-        $5="$$5 -march=i686 -m32"
+        $5="$$5 -m32"
         ;;
     x86_64-apple-darwin)
         $2="$$2 -m64"

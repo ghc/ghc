@@ -5884,7 +5884,7 @@ type variables, in the annotated expression.  For example:
 <programlisting>
   f = runST ( (op >>= \(x :: STRef s Int) -> g x) :: forall s. ST s Bool )
 </programlisting>
-Here, the type signature <literal>forall a. ST s Bool</literal> brings the 
+Here, the type signature <literal>forall s. ST s Bool</literal> brings the 
 type variable <literal>s</literal> into scope, in the annotated expression 
 <literal>(op >>= \(x :: STRef s Int) -> g x)</literal>.
 </para>

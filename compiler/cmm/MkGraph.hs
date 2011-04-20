@@ -24,7 +24,7 @@ module MkGraph
          , copyInOflow, copyInSlot, copyOutOflow, copyOutSlot
   -- Reexport of needed Cmm stuff
   , Convention(..), ForeignConvention(..), ForeignTarget(..)
-  , CmmStackInfo(..), CmmTopInfo(..), CmmGraph(..)
+  , CmmStackInfo(..), CmmTopInfo(..), CmmGraph, GenCmmGraph(..)
   , Cmm, CmmTop
   )
 where

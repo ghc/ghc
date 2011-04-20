@@ -5,8 +5,10 @@ use strict;
 use Cwd;
 
 my %required_tag;
+my $validate;
 
 $required_tag{"-"} = 1;
+$validate = 0;
 
 while ($#ARGV ne -1) {
     my $arg = shift @ARGV;
@@ -14,8 +16,29 @@ while ($#ARGV ne -1) {
     if ($arg =~ /^--required-tag=(.*)/) {
         $required_tag{$1} = 1;
     }
+    elsif ($arg =~ /^--validate$/) {
+        $validate = 1;
+    }
     else {
         die "Bad arg: $arg";
+    }
+}
+
+{
+    local $/ = undef;
+    open FILE, "packages" or die "Couldn't open file: $!";
+    binmode FILE;
+    my $string = <FILE>;
+    close FILE;
+
+    if ($string =~ /\r/) {
+        print STDERR <<EOF;
+Found ^M in packages.
+Perhaps you need to run
+    git config --global core.autocrlf false
+and re-check out the tree?
+EOF
+        exit 1;
     }
 }
 
@@ -68,5 +91,21 @@ foreach $dir (".", glob("libraries/*/")) {
             or die "Running autoreconf failed with exitcode $?";
         chdir $curdir or die "can't change to $curdir: $!";
     }
+}
+
+if ($validate eq 0 && ! -f "mk/build.mk") {
+    print <<EOF;
+
+WARNING: You don't have a mk/build.mk file.
+
+By default a standard GHC build will be done, which uses optimisation
+and builds the profiling libraries. This will take a long time, so may
+not be what you want if you are developing GHC or the libraries, rather
+than simply building it to use it.
+
+For information on creating a mk/build.mk file, please see:
+    http://hackage.haskell.org/trac/ghc/wiki/Building/Using#Buildconfiguration
+
+EOF
 }
 
