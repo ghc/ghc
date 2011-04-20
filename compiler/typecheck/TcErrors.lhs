@@ -15,6 +15,7 @@ import TcMType
 import TcSMonad
 import TcType
 import TypeRep
+import Type( isTyVarTy )
 
 import Inst
 import InstEnv
@@ -320,15 +321,10 @@ reportEqErr ctxt ty1 ty2
 reportTyVarEqErr :: ReportErrCtxt -> TcTyVar -> TcType -> TcM ()
 -- tv1 and ty2 are already tidied
 reportTyVarEqErr ctxt tv1 ty2
-  | not is_meta1
-  , Just tv2 <- tcGetTyVar_maybe ty2
-  , isMetaTyVar tv2
-  = -- sk ~ alpha: swap
-    reportTyVarEqErr ctxt tv2 ty1
-
-  | (not is_meta1)
-  = -- sk ~ ty, where ty isn't a meta-tyvar: mis-match
-    addErrorReport (addExtraInfo ctxt ty1 ty2)
+  |  isSkolemTyVar tv1 	  -- ty2 won't be a meta-tyvar, or else the thing would
+     		   	  -- be oriented the other way round; see TcCanonical.reOrient
+  || isSigTyVar tv1 && not (isTyVarTy ty2)
+  = addErrorReport (addExtraInfo ctxt ty1 ty2)
                    (misMatchOrCND ctxt ty1 ty2)
 
   -- So tv is a meta tyvar, and presumably it is
@@ -376,21 +372,26 @@ reportTyVarEqErr ctxt tv1 ty2
                          , ptext (sLit "bound at") <+> ppr (ctLocOrigin implic_loc)]
        ; addErrorReport (addExtraInfo ctxt ty1 ty2) (msg $$ nest 2 extra) }
 
-  | otherwise      -- This can happen, by a recursive decomposition of frozen
-                   -- occurs check constraints
-                   -- Example: alpha ~ T Int alpha has frozen.
-                   --          Then alpha gets unified to T beta gamma
-                   -- So now we have  T beta gamma ~ T Int (T beta gamma)
-                   -- Decompose to (beta ~ Int, gamma ~ T beta gamma)
-                   -- The (gamma ~ T beta gamma) is the occurs check, but
-                   -- the (beta ~ Int) isn't an error at all.  So return ()
-  = return ()
-
+  | otherwise
+  = pprTrace "reportTyVarEqErr" (ppr tv1 $$ ppr ty2 $$ ppr (cec_encl ctxt)) $
+    return () 
+    	-- I don't think this should happen, and if it does I want to know
+	-- Trac #5130 happened because an actual type error was not
+	-- reported at all!  So not reporting is pretty dangerous.
+	-- 
+	-- OLD, OUT OF DATE COMMENT
+        -- This can happen, by a recursive decomposition of frozen
+        -- occurs check constraints
+        -- Example: alpha ~ T Int alpha has frozen.
+        --          Then alpha gets unified to T beta gamma
+        -- So now we have  T beta gamma ~ T Int (T beta gamma)
+        -- Decompose to (beta ~ Int, gamma ~ T beta gamma)
+        -- The (gamma ~ T beta gamma) is the occurs check, but
+        -- the (beta ~ Int) isn't an error at all.  So return ()
   where         
-    is_meta1 = isMetaTyVar tv1
-    k1 	     = tyVarKind tv1
-    k2 	     = typeKind ty2
-    ty1      = mkTyVarTy tv1
+    k1 	= tyVarKind tv1
+    k2 	= typeKind ty2
+    ty1 = mkTyVarTy tv1
 
 mkTyFunInfoMsg :: TcType -> TcType -> SDoc
 -- See Note [Non-injective type functions]
