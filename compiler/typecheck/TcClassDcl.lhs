@@ -183,14 +183,19 @@ tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name -> [LSig Name]
 -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
 tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
   = case dm_info of
-      NoDefMeth          -> return emptyBag
+      NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id)) prags
+                               ; return emptyBag }
       DefMeth dm_name    -> tc_dm dm_name (instantiateMethod clas sel_id (mkTyVarTys tyvars))
       GenDefMeth dm_name -> do { tau <- tc_genop_ty (findGenericSig sigs sel_name)
                                ; tc_dm dm_name tau } 
            -- In the case of a generic default, we have to get the type from the signature
            -- Otherwise we can get it by instantiating the method selector
   where
-    sel_name = idName sel_id
+    sel_name      = idName sel_id
+    prags         = prag_fn sel_name
+    dm_sig_fn  _  = sig_fn sel_name
+    dm_bind       = findMethodBind sel_name binds_in
+	            `orElse` pprPanic "tcDefMeth" (ppr sel_id)
 
     -- Eg.   class C a where
     --          op :: forall b. Eq b => a -> [b] -> a
@@ -204,13 +209,7 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
  	     -- Base the local_dm_name on the selector name, because
  	     -- type errors from tcInstanceMethodBody come from here
 
-	   ; let meth_bind = findMethodBind sel_name binds_in
-	   	             `orElse` pprPanic "tcDefMeth" (ppr sel_id)
-
-	         dm_sig_fn  _  = sig_fn sel_name
-                 prags = prag_fn sel_name
-
-	         dm_ty = mkSigmaTy tyvars [mkClassPred clas (mkTyVarTys tyvars)] local_dm_ty
+	   ; let dm_ty = mkSigmaTy tyvars [mkClassPred clas (mkTyVarTys tyvars)] local_dm_ty
 	         dm_id = mkExportedLocalId dm_name dm_ty
 	         local_dm_id = mkLocalId local_dm_name local_dm_ty
 
@@ -221,11 +220,11 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
                     (ptext (sLit "Ignoring SPECIALISE pragmas on default method") 
                      <+> quotes (ppr sel_name))
 
-           ; dm_bind <- tcInstanceMethodBody (ClsSkol clas) tyvars [this_dict]
+           ; tc_bind <- tcInstanceMethodBody (ClsSkol clas) tyvars [this_dict]
                                              dm_id_w_inline local_dm_id dm_sig_fn 
-                                             IsDefaultMethod meth_bind
+                                             IsDefaultMethod dm_bind
 
-           ; return (unitBag dm_bind) }
+           ; return (unitBag tc_bind) }
 
     tc_genop_ty :: LHsType Name -> TcM Type
     tc_genop_ty hs_ty 
@@ -584,4 +583,10 @@ dupGenericInsts tc_inst_infos
     ]
   where 
     ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
+
+badDmPrag :: Id -> Sig Name -> TcM ()
+badDmPrag sel_id prag
+  = addErrTc (ptext (sLit "The") <+> hsSigDoc prag <+> ptext (sLit "for default method") 
+              <+> quotes (ppr sel_id) 
+              <+> ptext (sLit "lacks an accompanying binding"))
 \end{code}
