@@ -1028,7 +1028,7 @@ runPhase cc_phase input_fn dflags
                               (cmdline_include_paths ++ pkg_include_dirs)
 
         let md_c_flags = machdepCCOpts dflags
-        gcc_extra_viac_flags <- io $ getExtraViaCOpts dflags
+        let gcc_extra_viac_flags = extraGccViaCFlags dflags
         let pic_c_flags = picCCOpts dflags
 
         let verbFlags = getVerbFlags dflags

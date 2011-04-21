@@ -26,7 +26,6 @@ module SysTools (
         touch,                  -- String -> String -> IO ()
         copy,
         copyWithHeader,
-        getExtraViaCOpts,
 
         -- Temporary-file management
         setTmpDir,
@@ -162,6 +161,19 @@ initSysTools mbMinusB dflags0
                 -- NB: top_dir is assumed to be in standard Unix
                 -- format, '/' separated
 
+        ; let settingsFile = top_dir </> "settings"
+        ; settingsStr <- readFile settingsFile
+        ; mySettings <- case maybeReadFuzzy settingsStr of
+                        Just s ->
+                            return s
+                        Nothing ->
+                            pgmError ("Can't parse " ++ show settingsFile)
+        ; let getSetting key = case lookup key mySettings of
+                               Just xs ->
+                                   return xs
+                               Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+        ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
+
         ; let installed :: FilePath -> FilePath
               installed file = top_dir </> file
               installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
@@ -229,6 +241,8 @@ initSysTools mbMinusB dflags0
                         ghcUsagePath = ghc_usage_msg_path,
                         ghciUsagePath = ghci_usage_msg_path,
                         topDir  = top_dir,
+                        settings = mySettings,
+                        extraGccViaCFlags = words myExtraGccViaCFlags,
                         systemPackageConfig = pkgconfig_path,
                         pgm_L   = unlit_path,
                         pgm_P   = cpp_path,
@@ -447,11 +461,6 @@ copyWithHeader dflags purpose maybe_header from to = do
   hPutStr hout ls
   hClose hout
   hClose hin
-
-getExtraViaCOpts :: DynFlags -> IO [String]
-getExtraViaCOpts dflags = do
-  f <- readFile (topDir dflags </> "extra-gcc-opts")
-  return (words f)
 
 -- | read the contents of the named section in an ELF object as a
 -- String.

@@ -61,7 +61,6 @@ module DynFlags (
         getStgToDo,
 
         -- * Compiler configuration suitable for display to the user
-        Printable(..),
         compilerInfo
 #ifdef GHCI
 -- Only in stage 2 can we be sure that the RTS 
@@ -484,10 +483,12 @@ data DynFlags = DynFlags {
 
   --  Package flags
   extraPkgConfs         :: [FilePath],
-  topDir                :: FilePath,    -- filled in by SysTools
-  systemPackageConfig   :: FilePath,    -- ditto
         -- ^ The @-package-conf@ flags given on the command line, in the order
         -- they appeared.
+  topDir                :: FilePath,           -- filled in by SysTools
+  settings              :: [(String, String)], -- filled in by SysTools
+  extraGccViaCFlags     :: [String],           -- filled in by SysTools
+  systemPackageConfig   :: FilePath,           -- filled in by SysTools
 
   packageFlags          :: [PackageFlag],
         -- ^ The @-package@ and @-hide-package@ flags from the command-line
@@ -724,6 +725,8 @@ defaultDynFlags =
         ghcUsagePath            = panic "defaultDynFlags: No ghciUsagePath",
         ghciUsagePath           = panic "defaultDynFlags: No ghciUsagePath",
         topDir                  = panic "defaultDynFlags: No topDir",
+        settings                = panic "defaultDynFlags: No settings",
+        extraGccViaCFlags       = panic "defaultDynFlags: No extraGccViaCFlags",
         systemPackageConfig     = panic  "no systemPackageConfig: call GHC.setSessionDynFlags",
         pgm_L                   = panic "defaultDynFlags: No pgm_L",
         pgm_P                   = panic "defaultDynFlags: No pgm_P",
@@ -2140,11 +2143,10 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -- There are some options that we need to pass to gcc when compiling
 -- Haskell code via C, but are only supported by recent versions of
 -- gcc.  The configure script decides which of these options we need,
--- and puts them in the file "extra-gcc-opts" in $topdir, which is
--- read before each via-C compilation.  The advantage of having these
--- in a separate file is that the file can be created at install-time
--- depending on the available gcc version, and even re-generated  later
--- if gcc is upgraded.
+-- and puts them in the "settings" file in $topdir. The advantage of
+-- having these in a separate file is that the file can be created at
+-- install-time depending on the available gcc version, and even
+-- re-generated later if gcc is upgraded.
 --
 -- The options below are not dependent on the version of gcc, only the
 -- platform.
@@ -2222,30 +2224,35 @@ can_split = cSupportsSplitObjs == "YES"
 -- -----------------------------------------------------------------------------
 -- Compiler Info
 
-data Printable = String String
-               | FromDynFlags (DynFlags -> String)
-
-compilerInfo :: [(String, Printable)]
-compilerInfo = [("Project name",                String cProjectName),
-                ("Project version",             String cProjectVersion),
-                ("Booter version",              String cBooterVersion),
-                ("Stage",                       String cStage),
-                ("Build platform",              String cBuildPlatformString),
-                ("Host platform",               String cHostPlatformString),
-                ("Target platform",             String cTargetPlatformString),
-                ("Have interpreter",            String cGhcWithInterpreter),
-                ("Object splitting supported",  String cSupportsSplitObjs),
-                ("Have native code generator",  String cGhcWithNativeCodeGen),
-                ("Support SMP",                 String cGhcWithSMP),
-                ("Unregisterised",              String cGhcUnregisterised),
-                ("Tables next to code",         String cGhcEnableTablesNextToCode),
-                ("RTS ways",                    String cGhcRTSWays),
-                ("Leading underscore",          String cLeadingUnderscore),
-                ("Debug on",                    String (show debugIsOn)),
-                ("LibDir",                      FromDynFlags topDir),
-                ("Global Package DB",           FromDynFlags systemPackageConfig),
-                ("C compiler flags",            String (show cCcOpts)),
-                ("Gcc Linker flags",            String (show cGccLinkerOpts)),
-                ("Ld Linker flags",             String (show cLdLinkerOpts))
-               ]
+compilerInfo :: DynFlags -> [(String, String)]
+compilerInfo dflags
+    = -- We always make "Project name" be first to keep parsing in
+      -- other languages simple, i.e. when looking for other fields,
+      -- you don't have to worry whether there is a leading '[' or not
+      ("Project name",                 cProjectName)
+      -- Next come the settings, so anything else can be overridden
+      -- in the settings file (as "lookup" uses the first match for the
+      -- key)
+    : settings dflags
+   ++ [("Project version",             cProjectVersion),
+       ("Booter version",              cBooterVersion),
+       ("Stage",                       cStage),
+       ("Build platform",              cBuildPlatformString),
+       ("Host platform",               cHostPlatformString),
+       ("Target platform",             cTargetPlatformString),
+       ("Have interpreter",            cGhcWithInterpreter),
+       ("Object splitting supported",  cSupportsSplitObjs),
+       ("Have native code generator",  cGhcWithNativeCodeGen),
+       ("Support SMP",                 cGhcWithSMP),
+       ("Unregisterised",              cGhcUnregisterised),
+       ("Tables next to code",         cGhcEnableTablesNextToCode),
+       ("RTS ways",                    cGhcRTSWays),
+       ("Leading underscore",          cLeadingUnderscore),
+       ("Debug on",                    show debugIsOn),
+       ("LibDir",                      topDir dflags),
+       ("Global Package DB",           systemPackageConfig dflags),
+       ("C compiler flags",            show cCcOpts),
+       ("Gcc Linker flags",            show cGccLinkerOpts),
+       ("Ld Linker flags",             show cLdLinkerOpts)
+      ]
 

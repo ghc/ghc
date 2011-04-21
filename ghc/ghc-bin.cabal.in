@@ -14,7 +14,7 @@ Description:
         XXX
 Category: XXX
 Data-Dir: ..
-Data-Files: extra-gcc-opts
+Data-Files: settings
 Build-Type: Simple
 Cabal-Version: >= 1.2
 
