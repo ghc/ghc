@@ -35,6 +35,13 @@ module DynFlags (
         DPHBackend(..), dphPackageMaybe,
         wayNames,
 
+        Settings(..),
+        ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
+        extraGccViaCFlags, systemPackageConfig,
+        pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
+        pgm_sysman, pgm_windres, pgm_lo, pgm_lc,
+
+
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
@@ -439,10 +446,7 @@ data DynFlags = DynFlags {
   libraryPaths          :: [String],
   frameworkPaths        :: [String],    -- used on darwin only
   cmdlineFrameworks     :: [String],    -- ditto
-  tmpDir                :: String,      -- no trailing '/'
 
-  ghcUsagePath          :: FilePath,    -- Filled in by SysTools
-  ghciUsagePath         :: FilePath,    -- ditto
   rtsOpts               :: Maybe String,
   rtsOptsEnabled        :: RtsOptsEnabled,
 
@@ -460,20 +464,7 @@ data DynFlags = DynFlags {
   opt_lo                :: [String], -- LLVM: llvm optimiser
   opt_lc                :: [String], -- LLVM: llc static compiler
 
-  -- commands for particular phases
-  pgm_L                 :: String,
-  pgm_P                 :: (String,[Option]),
-  pgm_F                 :: String,
-  pgm_c                 :: (String,[Option]),
-  pgm_s                 :: (String,[Option]),
-  pgm_a                 :: (String,[Option]),
-  pgm_l                 :: (String,[Option]),
-  pgm_dll               :: (String,[Option]),
-  pgm_T                 :: String,
-  pgm_sysman            :: String,
-  pgm_windres           :: String,
-  pgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
-  pgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
+  settings              :: Settings,
 
   --  For ghc -M
   depMakefile           :: FilePath,
@@ -485,10 +476,6 @@ data DynFlags = DynFlags {
   extraPkgConfs         :: [FilePath],
         -- ^ The @-package-conf@ flags given on the command line, in the order
         -- they appeared.
-  topDir                :: FilePath,           -- filled in by SysTools
-  settings              :: [(String, String)], -- filled in by SysTools
-  extraGccViaCFlags     :: [String],           -- filled in by SysTools
-  systemPackageConfig   :: FilePath,           -- filled in by SysTools
 
   packageFlags          :: [PackageFlag],
         -- ^ The @-package@ and @-hide-package@ flags from the command-line
@@ -520,6 +507,73 @@ data DynFlags = DynFlags {
 
   haddockOptions :: Maybe String
  }
+
+data Settings = Settings {
+  sGhcUsagePath          :: FilePath,    -- Filled in by SysTools
+  sGhciUsagePath         :: FilePath,    -- ditto
+  sTopDir                :: FilePath,
+  sTmpDir                :: String,      -- no trailing '/'
+  -- You shouldn't need to look things up in rawSettings directly.
+  -- They should have their own fields instead.
+  sRawSettings           :: [(String, String)],
+  sExtraGccViaCFlags     :: [String],
+  sSystemPackageConfig   :: FilePath,
+  -- commands for particular phases
+  sPgm_L                 :: String,
+  sPgm_P                 :: (String,[Option]),
+  sPgm_F                 :: String,
+  sPgm_c                 :: (String,[Option]),
+  sPgm_s                 :: (String,[Option]),
+  sPgm_a                 :: (String,[Option]),
+  sPgm_l                 :: (String,[Option]),
+  sPgm_dll               :: (String,[Option]),
+  sPgm_T                 :: String,
+  sPgm_sysman            :: String,
+  sPgm_windres           :: String,
+  sPgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
+  sPgm_lc                :: (String,[Option])  -- LLVM: llc static compiler
+ }
+
+ghcUsagePath          :: DynFlags -> FilePath
+ghcUsagePath dflags = sGhcUsagePath (settings dflags)
+ghciUsagePath         :: DynFlags -> FilePath
+ghciUsagePath dflags = sGhciUsagePath (settings dflags)
+topDir                :: DynFlags -> FilePath
+topDir dflags = sTopDir (settings dflags)
+tmpDir                :: DynFlags -> String
+tmpDir dflags = sTmpDir (settings dflags)
+rawSettings           :: DynFlags -> [(String, String)]
+rawSettings dflags = sRawSettings (settings dflags)
+extraGccViaCFlags     :: DynFlags -> [String]
+extraGccViaCFlags dflags = sExtraGccViaCFlags (settings dflags)
+systemPackageConfig   :: DynFlags -> FilePath
+systemPackageConfig dflags = sSystemPackageConfig (settings dflags)
+pgm_L                 :: DynFlags -> String
+pgm_L dflags = sPgm_L (settings dflags)
+pgm_P                 :: DynFlags -> (String,[Option])
+pgm_P dflags = sPgm_P (settings dflags)
+pgm_F                 :: DynFlags -> String
+pgm_F dflags = sPgm_F (settings dflags)
+pgm_c                 :: DynFlags -> (String,[Option])
+pgm_c dflags = sPgm_c (settings dflags)
+pgm_s                 :: DynFlags -> (String,[Option])
+pgm_s dflags = sPgm_s (settings dflags)
+pgm_a                 :: DynFlags -> (String,[Option])
+pgm_a dflags = sPgm_a (settings dflags)
+pgm_l                 :: DynFlags -> (String,[Option])
+pgm_l dflags = sPgm_l (settings dflags)
+pgm_dll               :: DynFlags -> (String,[Option])
+pgm_dll dflags = sPgm_dll (settings dflags)
+pgm_T                 :: DynFlags -> String
+pgm_T dflags = sPgm_T (settings dflags)
+pgm_sysman            :: DynFlags -> String
+pgm_sysman dflags = sPgm_sysman (settings dflags)
+pgm_windres           :: DynFlags -> String
+pgm_windres dflags = sPgm_windres (settings dflags)
+pgm_lo                :: DynFlags -> (String,[Option])
+pgm_lo dflags = sPgm_lo (settings dflags)
+pgm_lc                :: DynFlags -> (String,[Option])
+pgm_lc dflags = sPgm_lc (settings dflags)
 
 wayNames :: DynFlags -> [WayName]
 wayNames = map wayName . ways
@@ -694,7 +748,6 @@ defaultDynFlags =
         libraryPaths            = [],
         frameworkPaths          = [],
         cmdlineFrameworks       = [],
-        tmpDir                  = cDEFAULT_TMPDIR,
         rtsOpts                 = Nothing,
         rtsOptsEnabled          = RtsOptsSafeOnly,
 
@@ -721,27 +774,8 @@ defaultDynFlags =
         buildTag                = panic "defaultDynFlags: No buildTag",
         rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
         splitInfo               = Nothing,
-        -- initSysTools fills all these in
-        ghcUsagePath            = panic "defaultDynFlags: No ghciUsagePath",
-        ghciUsagePath           = panic "defaultDynFlags: No ghciUsagePath",
-        topDir                  = panic "defaultDynFlags: No topDir",
+        -- initSysTools fills this in:
         settings                = panic "defaultDynFlags: No settings",
-        extraGccViaCFlags       = panic "defaultDynFlags: No extraGccViaCFlags",
-        systemPackageConfig     = panic  "no systemPackageConfig: call GHC.setSessionDynFlags",
-        pgm_L                   = panic "defaultDynFlags: No pgm_L",
-        pgm_P                   = panic "defaultDynFlags: No pgm_P",
-        pgm_F                   = panic "defaultDynFlags: No pgm_F",
-        pgm_c                   = panic "defaultDynFlags: No pgm_c",
-        pgm_s                   = panic "defaultDynFlags: No pgm_s",
-        pgm_a                   = panic "defaultDynFlags: No pgm_a",
-        pgm_l                   = panic "defaultDynFlags: No pgm_l",
-        pgm_dll                 = panic "defaultDynFlags: No pgm_dll",
-        pgm_T                   = panic "defaultDynFlags: No pgm_T",
-        pgm_sysman              = panic "defaultDynFlags: No pgm_sysman",
-        pgm_windres             = panic "defaultDynFlags: No pgm_windres",
-        pgm_lo                  = panic "defaultDynFlags: No pgm_lo",
-        pgm_lc                  = panic "defaultDynFlags: No pgm_lc",
-        -- end of initSysTools values
         -- ghc -M values
         depMakefile       = "Makefile",
         depIncludePkgDeps = False,
@@ -915,7 +949,7 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
-setPgmP   f d = let (pgm:args) = words f in d{ pgm_P   = (pgm, map Option args)}
+setPgmP   f = let (pgm:args) = words f in alterSettings (\s -> s { sPgm_P   = (pgm, map Option args)})
 addOptl   f d = d{ opt_l   = f : opt_l d}
 addOptP   f d = d{ opt_P   = f : opt_P d}
 
@@ -1098,18 +1132,18 @@ dynamic_flags = [
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
-  , Flag "pgmlo"          (hasArg (\f d -> d{ pgm_lo  = (f,[])}))
-  , Flag "pgmlc"          (hasArg (\f d -> d{ pgm_lc  = (f,[])}))
-  , Flag "pgmL"           (hasArg (\f d -> d{ pgm_L   = f}))
+  , Flag "pgmlo"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
+  , Flag "pgmlc"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
+  , Flag "pgmL"           (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
   , Flag "pgmP"           (hasArg setPgmP)
-  , Flag "pgmF"           (hasArg (\f d -> d{ pgm_F   = f}))
-  , Flag "pgmc"           (hasArg (\f d -> d{ pgm_c   = (f,[])}))
+  , Flag "pgmF"           (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
+  , Flag "pgmc"           (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
   , Flag "pgmm"           (HasArg (\_ -> addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
-  , Flag "pgms"           (hasArg (\f d -> d{ pgm_s   = (f,[])}))
-  , Flag "pgma"           (hasArg (\f d -> d{ pgm_a   = (f,[])}))
-  , Flag "pgml"           (hasArg (\f d -> d{ pgm_l   = (f,[])}))
-  , Flag "pgmdll"         (hasArg (\f d -> d{ pgm_dll = (f,[])}))
-  , Flag "pgmwindres"     (hasArg (\f d -> d{ pgm_windres = f}))
+  , Flag "pgms"           (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
+  , Flag "pgma"           (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
+  , Flag "pgml"           (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
+  , Flag "pgmdll"         (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
+  , Flag "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
   , Flag "optlo"          (hasArg (\f d -> d{ opt_lo  = f : opt_lo d}))
@@ -1904,6 +1938,10 @@ unSetExtensionFlag f = upd (\dfs -> xopt_unset dfs f)
    --      (except for -fno-glasgow-exts, which is treated specially)
 
 --------------------------
+alterSettings :: (Settings -> Settings) -> DynFlags -> DynFlags
+alterSettings f dflags = dflags { settings = f (settings dflags) }
+
+--------------------------
 setDumpFlag' :: DynFlag -> DynP ()
 setDumpFlag' dump_flag
   = do { setDynFlag dump_flag
@@ -2118,7 +2156,7 @@ splitPathList s = filter notNull (splitUp s)
 -- tmpDir, where we store temporary files.
 
 setTmpDir :: FilePath -> DynFlags -> DynFlags
-setTmpDir dir dflags = dflags{ tmpDir = normalise dir }
+setTmpDir dir = alterSettings (\s -> s { sTmpDir = normalise dir })
   -- we used to fix /cygdrive/c/.. on Windows, but this doesn't
   -- seem necessary now --SDM 7/2/2008
 
@@ -2233,7 +2271,7 @@ compilerInfo dflags
       -- Next come the settings, so anything else can be overridden
       -- in the settings file (as "lookup" uses the first match for the
       -- key)
-    : settings dflags
+    : rawSettings dflags
    ++ [("Project version",             cProjectVersion),
        ("Booter version",              cBooterVersion),
        ("Stage",                       cStage),

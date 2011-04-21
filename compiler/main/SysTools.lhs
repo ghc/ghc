@@ -147,15 +147,11 @@ stuff.
 
 \begin{code}
 initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
-
-             -> DynFlags
-             -> IO DynFlags     -- Set all the mutable variables above, holding
+             -> IO Settings     -- Set all the mutable variables above, holding
                                 --      (a) the system programs
                                 --      (b) the package-config file
                                 --      (c) the GHC usage message
-
-
-initSysTools mbMinusB dflags0
+initSysTools mbMinusB
   = do  { top_dir <- findTopDir mbMinusB
                 -- see [Note topdir]
                 -- NB: top_dir is assumed to be in standard Unix
@@ -193,7 +189,6 @@ initSysTools mbMinusB dflags0
               windres_path  = installed_mingw_bin "windres"
 
         ; tmpdir <- getTemporaryDirectory
-        ; let dflags1 = setTmpDir tmpdir dflags0
 
         -- On Windows, mingw is distributed with GHC,
         --      so we look in TopDir/../mingw/bin
@@ -237,26 +232,27 @@ initSysTools mbMinusB dflags0
         ; let lc_prog = "llc"
               lo_prog = "opt"
 
-        ; return dflags1{
-                        ghcUsagePath = ghc_usage_msg_path,
-                        ghciUsagePath = ghci_usage_msg_path,
-                        topDir  = top_dir,
-                        settings = mySettings,
-                        extraGccViaCFlags = words myExtraGccViaCFlags,
-                        systemPackageConfig = pkgconfig_path,
-                        pgm_L   = unlit_path,
-                        pgm_P   = cpp_path,
-                        pgm_F   = "",
-                        pgm_c   = (gcc_prog,[]),
-                        pgm_s   = (split_prog,split_args),
-                        pgm_a   = (as_prog,[]),
-                        pgm_l   = (ld_prog,[]),
-                        pgm_dll = (mkdll_prog,mkdll_args),
-                        pgm_T   = touch_path,
-                        pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
-                        pgm_windres = windres_path,
-                        pgm_lo  = (lo_prog,[]),
-                        pgm_lc  = (lc_prog,[])
+        ; return $ Settings {
+                        sTmpDir = normalise tmpdir,
+                        sGhcUsagePath = ghc_usage_msg_path,
+                        sGhciUsagePath = ghci_usage_msg_path,
+                        sTopDir  = top_dir,
+                        sRawSettings = mySettings,
+                        sExtraGccViaCFlags = words myExtraGccViaCFlags,
+                        sSystemPackageConfig = pkgconfig_path,
+                        sPgm_L   = unlit_path,
+                        sPgm_P   = cpp_path,
+                        sPgm_F   = "",
+                        sPgm_c   = (gcc_prog,[]),
+                        sPgm_s   = (split_prog,split_args),
+                        sPgm_a   = (as_prog,[]),
+                        sPgm_l   = (ld_prog,[]),
+                        sPgm_dll = (mkdll_prog,mkdll_args),
+                        sPgm_T   = touch_path,
+                        sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
+                        sPgm_windres = windres_path,
+                        sPgm_lo  = (lo_prog,[]),
+                        sPgm_lc  = (lc_prog,[])
                         -- Hans: this isn't right in general, but you can
                         -- elaborate it in the same way as the others
                 }
@@ -536,8 +532,9 @@ newTempName dflags extn
 -- return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet
 getTempDir :: DynFlags -> IO FilePath
-getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
+getTempDir dflags
   = do let ref = dirsToClean dflags
+           tmp_dir = tmpDir dflags
        mapping <- readIORef ref
        case Map.lookup tmp_dir mapping of
            Nothing ->
