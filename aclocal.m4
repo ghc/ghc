@@ -1116,7 +1116,7 @@ if test "$RELEASE" = "NO"; then
         AC_MSG_RESULT(given $PACKAGE_VERSION)
     elif test -d .git; then
         changequote(, )dnl
-        ver_date=`git log -n 1 --date=short --pretty=format:%ci | sed "s/^.*\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\).*$/\1\2\3/"`
+        ver_date=`git log -n 1 --date=short --pretty=format:%ci | cut -d ' ' -f 1 | tr -d -`
         if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
         changequote([, ])dnl
                 AC_MSG_ERROR([failed to detect version date: check that git is in your path])

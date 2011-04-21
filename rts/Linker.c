@@ -1186,11 +1186,11 @@ initLinker( void )
 #   endif /* RTLD_DEFAULT */
 
     compileResult = regcomp(&re_invalid,
-           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*invalid ELF header",
+           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short)",
            REG_EXTENDED);
     ASSERT( compileResult == 0 );
     compileResult = regcomp(&re_realso,
-           "GROUP *\\( *(([^ )])+)",
+           "(GROUP|INPUT) *\\( *(([^ )])+)",
            REG_EXTENDED);
     ASSERT( compileResult == 0 );
 #   endif
@@ -1361,8 +1361,8 @@ addDLL( char *dll_name )
          if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
             // success -- try to dlopen the first named file
             IF_DEBUG(linker, debugBelch("match%s\n",""));
-            line[match[1].rm_eo] = '\0';
-            errmsg = internal_dlopen(line+match[1].rm_so);
+            line[match[2].rm_eo] = '\0';
+            errmsg = internal_dlopen(line+match[2].rm_so);
             break;
          }
          // if control reaches here, no GROUP ( ... ) directive was found

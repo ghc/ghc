@@ -389,6 +389,10 @@ sub scmall {
             scm ($localpath, $scm, "grep", @args)
                 unless $scm eq "darcs";
         }
+        elsif ($command =~ /^clean$/) {
+            scm ($localpath, $scm, "clean", @args)
+                unless $scm eq "darcs";
+        }
         elsif ($command =~ /^reset$/) {
             scm ($localpath, $scm, "reset", @args)
                 unless $scm eq "darcs";
@@ -426,6 +430,7 @@ Supported commands:
  * remote rm <branch-name>
  * remote set-url [--push] <branch-name>
  * grep
+ * clean
  * reset
  * config
 
