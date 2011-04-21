@@ -167,7 +167,7 @@ try_read sw str
   = case reads str of
 	((x,_):_) -> x	-- Be forgiving: ignore trailing goop, and alternative parses
 	[]	  -> ghcError (UsageError ("Malformed argument " ++ str ++ " for flag " ++ sw))
-			-- ToDo: hack alert. We should really parse the arugments
+			-- ToDo: hack alert. We should really parse the arguments
 			-- 	 and announce errors in a more civilised way.
 
 
