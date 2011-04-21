@@ -78,7 +78,8 @@ import Data.Maybe
 main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
-   GHC.defaultErrorHandler defaultDynFlags $ do
+   let defaultErrorHandlerDynFlags = defaultDynFlags (panic "No settings")
+   GHC.defaultErrorHandler defaultErrorHandlerDynFlags $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 

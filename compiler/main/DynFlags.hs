@@ -43,7 +43,7 @@ module DynFlags (
 
 
         -- ** Manipulating DynFlags
-        defaultDynFlags,                -- DynFlags
+        defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
@@ -697,8 +697,8 @@ initDynFlags dflags = do
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
 -- and must be fully initialized by 'GHC.newSession' first.
-defaultDynFlags :: DynFlags
-defaultDynFlags =
+defaultDynFlags :: Settings -> DynFlags
+defaultDynFlags mySettings =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
@@ -774,8 +774,7 @@ defaultDynFlags =
         buildTag                = panic "defaultDynFlags: No buildTag",
         rtsBuildTag             = panic "defaultDynFlags: No rtsBuildTag",
         splitInfo               = Nothing,
-        -- initSysTools fills this in:
-        settings                = panic "defaultDynFlags: No settings",
+        settings                = mySettings,
         -- ghc -M values
         depMakefile       = "Makefile",
         depIncludePkgDeps = False,
