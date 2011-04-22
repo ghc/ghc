@@ -55,7 +55,7 @@ export CC
 WhatGccIsCalled="$CC"
 AC_SUBST(WhatGccIsCalled)
 
-FP_HAVE_GCC
+FP_GCC_VERSION
 AC_PROG_CPP
 
 #

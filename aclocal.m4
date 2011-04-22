@@ -691,11 +691,11 @@ rm -f conftest
 ])])
 
 
-# FP_HAVE_GCC
+# FP_GCC_VERSION
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
 # output variable GccVersion.
-AC_DEFUN([FP_HAVE_GCC],
+AC_DEFUN([FP_GCC_VERSION],
 [AC_REQUIRE([AC_PROG_CC])
 if test -z "$GCC"
 then
@@ -714,7 +714,7 @@ AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
-])# FP_HAVE_GCC
+])# FP_GCC_VERSION
 
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary.
@@ -1086,7 +1086,7 @@ AC_SUBST([GhcPkgCmd])
 # integer wrap around. (Trac #952)
 #
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
-[AC_REQUIRE([FP_HAVE_GCC])
+[AC_REQUIRE([FP_GCC_VERSION])
 AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
 [fp_cv_gcc_extra_opts=
  FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
