@@ -388,6 +388,9 @@ def c_src( opts ):
 def objc_src( opts ):
     opts.objc_src = 1;
 
+def objcpp_src( opts ):
+    opts.objcpp_src = 1;
+
 # ----
 
 def pre_cmd( cmd ):
@@ -1581,6 +1584,8 @@ def add_hs_lhs_suffix(name):
         return add_suffix(name, 'c')
     elif getTestOpts().objc_src:
         return add_suffix(name, 'm')
+    elif getTestOpts().objcpp_src:
+        return add_suffix(name, 'mm')
     elif getTestOpts().literate:
         return add_suffix(name, 'lhs')
     else:
