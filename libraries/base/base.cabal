@@ -53,6 +53,7 @@ Library {
             GHC.Exts,
             GHC.Float,
             GHC.Float.RealFracMethods,
+            GHC.Float.ConversionUtils,
             GHC.ForeignPtr,
             GHC.MVar,
             GHC.IO,
