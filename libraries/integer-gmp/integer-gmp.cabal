@@ -23,6 +23,8 @@ Library {
     build-depends: ghc-prim
     exposed-modules: GHC.Integer
                      GHC.Integer.GMP.Internals
+                     GHC.Integer.Logarithms
+                     GHC.Integer.Logarithms.Internals
     other-modules: GHC.Integer.Type
     extensions: CPP, MagicHash, UnboxedTuples, NoImplicitPrelude,
                 ForeignFunctionInterface, UnliftedFFITypes
