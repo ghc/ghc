@@ -694,32 +694,24 @@ rm -f conftest
 # FP_HAVE_GCC
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
-# output variables HaveGcc and GccVersion.
+# output variable GccVersion.
 AC_DEFUN([FP_HAVE_GCC],
 [AC_REQUIRE([AC_PROG_CC])
-if test -z "$GCC"; then
-   fp_have_gcc=NO
-else
-   fp_have_gcc=YES
-fi
-if test "$fp_have_gcc" = "NO"; then
+if test -z "$GCC"
+then
   AC_MSG_ERROR([gcc is required])
 fi
 GccLT34=
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
-[if test "$fp_have_gcc" = "YES"; then
-   fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
-   FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
-     [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
-   # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
-   # isn't a very good reason for that, but for now just make configure
-   # fail.
-   FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
- else
-   fp_cv_gcc_version="not-installed"
- fi
+[
+    fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
+                        [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
+    # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
+    # isn't a very good reason for that, but for now just make configure
+    # fail.
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
 ])
-AC_SUBST([HaveGcc], [$fp_have_gcc])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
 ])# FP_HAVE_GCC
