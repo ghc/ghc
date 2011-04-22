@@ -540,15 +540,10 @@ endif
 # the flag --with-gcc=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-UseGcc  	= YES
 WhatGccIsCalled = @WhatGccIsCalled@
 GccVersion      = @GccVersion@
-GccLT34		= @GccLT34@
-ifneq "$(strip $(UseGcc))"  "YES"
-  CC	= cc
-else
-  CC	= $(WhatGccIsCalled)
-endif
+GccLT34         = @GccLT34@
+CC              = $(WhatGccIsCalled)
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC
