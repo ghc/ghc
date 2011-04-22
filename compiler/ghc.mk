@@ -134,8 +134,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
 	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
-	@echo 'cGCC                  :: String'                             >> $@
-	@echo 'cGCC                  = "$(WhatGccIsCalled)"'                >> $@
 	@echo 'cMKDLL                :: String'                             >> $@
 	@echo 'cMKDLL                = "$(BLD_DLL)"'                        >> $@
 	@echo 'cLdIsGNULd            :: String'                             >> $@
@@ -162,8 +160,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cGHC_SYSMAN_PGM       = "$(GHC_SYSMAN)"'                     >> $@
 	@echo 'cGHC_SYSMAN_DIR       :: String'                             >> $@
 	@echo 'cGHC_SYSMAN_DIR       = "$(GHC_SYSMAN_DIR)"'                 >> $@
-	@echo 'cGHC_PERL             :: String'                             >> $@
-	@echo 'cGHC_PERL             = "$(GHC_PERL)"'                       >> $@
 	@echo 'cDEFAULT_TMPDIR       :: String'                             >> $@
 	@echo 'cDEFAULT_TMPDIR       = "$(DEFAULT_TMPDIR)"'                 >> $@
 	@echo 'cRelocatableBuild     :: Bool'                               >> $@

@@ -159,6 +159,11 @@ initSysTools mbMinusB
                 -- format, '/' separated
 
         ; let settingsFile = top_dir </> "settings"
+              installed :: FilePath -> FilePath
+              installed file = top_dir </> file
+              installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
+              installed_perl_bin file = top_dir </> ".." </> "perl" </> file
+
         ; settingsStr <- readFile settingsFile
         ; mySettings <- case maybeReadFuzzy settingsStr of
                         Just s ->
@@ -170,11 +175,16 @@ initSysTools mbMinusB
                                    return xs
                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
         ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
-
-        ; let installed :: FilePath -> FilePath
-              installed file = top_dir </> file
-              installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
-              installed_perl_bin file = top_dir </> ".." </> "perl" </> file
+        -- On Windows, mingw is distributed with GHC,
+        -- so we look in TopDir/../mingw/bin
+        -- It would perhaps be nice to be able to override this
+        -- with the settings file, but it would be a little fiddly
+        -- to make that possible, so for now you can't.
+        ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
+                                       else getSetting "GCC command"
+        ; perl_path <- if isWindowsHost
+                       then return $ installed_perl_bin "perl"
+                       else getSetting "perl command"
 
         ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -191,15 +201,7 @@ initSysTools mbMinusB
 
         ; tmpdir <- getTemporaryDirectory
 
-        -- On Windows, mingw is distributed with GHC,
-        --      so we look in TopDir/../mingw/bin
         ; let
-              gcc_prog
-                | isWindowsHost = installed_mingw_bin "gcc"
-                | otherwise     = cGCC
-              perl_path
-                | isWindowsHost = installed_perl_bin cGHC_PERL
-                | otherwise     = cGHC_PERL
               -- 'touch' is a GHC util for Windows
               touch_path
                 | isWindowsHost = installed cGHC_TOUCHY_PGM
