@@ -100,8 +100,6 @@ libraries/integer-gmp_dist-install_EXTRA_OBJS += libraries/integer-gmp/gmp/objs/
 endif
 endif
 
-PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
-
 # 2007-09-26
 #     set -o igncr 
 # is not a valid command on non-Cygwin-systems.
@@ -132,7 +130,8 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	    export PATH; \
 	    cd gmpbuild && \
 	    CC=$(WhatGccIsCalled) NM=$(NM) AR=$(AR) $(SHELL) configure \
-	          --enable-shared=no --host=$(PLATFORM) --build=$(PLATFORM)
+	          --enable-shared=no \
+	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp/gmp/
@@ -151,7 +150,8 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 #	    export PATH; \
 #	    cd gmpbuild-shared && \
 #	    CC=$(WhatGccIsCalled) $(SHELL) configure \
-#	          --enable-shared=yes --disable-static --host=$(PLATFORM) --build=$(PLATFORM)
+#	          --enable-shared=yes --disable-static \
+#	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 #	touch $@
 #
 #gmp.h: stamp.gmp.static
