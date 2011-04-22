@@ -34,8 +34,6 @@
 #
 # We use libffi's own configuration stuff.
 
-PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
-
 # 2007-07-05
 # Passing
 #     as_ln_s='cp -p'
@@ -125,7 +123,7 @@ $(libffi_STAMP_CONFIGURE):
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
-	          --host=$(PLATFORM)
+	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 
 	# libffi.so needs to be built with the correct soname.
 	# NOTE: this builds libffi_convience.so with the incorrect
