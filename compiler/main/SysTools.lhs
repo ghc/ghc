@@ -46,6 +46,7 @@ import ErrUtils
 import Panic
 import Util
 import DynFlags
+import StaticFlags
 import Exception
 
 import Data.IORef
@@ -252,9 +253,22 @@ initSysTools mbMinusB
                         sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
                         sPgm_windres = windres_path,
                         sPgm_lo  = (lo_prog,[]),
-                        sPgm_lc  = (lc_prog,[])
+                        sPgm_lc  = (lc_prog,[]),
                         -- Hans: this isn't right in general, but you can
                         -- elaborate it in the same way as the others
+                        sOpt_L       = [],
+                        sOpt_P       = (if opt_PIC
+                                        then -- this list gets reversed
+                                             ["-D__PIC__", "-U __PIC__"]
+                                        else []),
+                        sOpt_F       = [],
+                        sOpt_c       = [],
+                        sOpt_a       = [],
+                        sOpt_m       = [],
+                        sOpt_l       = [],
+                        sOpt_windres = [],
+                        sOpt_lo      = [],
+                        sOpt_lc      = []
                 }
         }
 \end{code}

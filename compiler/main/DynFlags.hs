@@ -40,6 +40,8 @@ module DynFlags (
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_sysman, pgm_windres, pgm_lo, pgm_lc,
+        opt_L, opt_P, opt_F, opt_c, opt_m, opt_a, opt_l,
+        opt_windres, opt_lo, opt_lc,
 
 
         -- ** Manipulating DynFlags
@@ -452,18 +454,6 @@ data DynFlags = DynFlags {
 
   hpcDir                :: String,      -- ^ Path to store the .mix files
 
-  -- options for particular phases
-  opt_L                 :: [String],
-  opt_P                 :: [String],
-  opt_F                 :: [String],
-  opt_c                 :: [String],
-  opt_m                 :: [String],
-  opt_a                 :: [String],
-  opt_l                 :: [String],
-  opt_windres           :: [String],
-  opt_lo                :: [String], -- LLVM: llvm optimiser
-  opt_lc                :: [String], -- LLVM: llc static compiler
-
   settings              :: Settings,
 
   --  For ghc -M
@@ -531,7 +521,19 @@ data Settings = Settings {
   sPgm_sysman            :: String,
   sPgm_windres           :: String,
   sPgm_lo                :: (String,[Option]), -- LLVM: opt llvm optimiser
-  sPgm_lc                :: (String,[Option])  -- LLVM: llc static compiler
+  sPgm_lc                :: (String,[Option]), -- LLVM: llc static compiler
+  -- options for particular phases
+  sOpt_L                 :: [String],
+  sOpt_P                 :: [String],
+  sOpt_F                 :: [String],
+  sOpt_c                 :: [String],
+  sOpt_m                 :: [String],
+  sOpt_a                 :: [String],
+  sOpt_l                 :: [String],
+  sOpt_windres           :: [String],
+  sOpt_lo                :: [String], -- LLVM: llvm optimiser
+  sOpt_lc                :: [String]  -- LLVM: llc static compiler
+
  }
 
 ghcUsagePath          :: DynFlags -> FilePath
@@ -574,6 +576,26 @@ pgm_lo                :: DynFlags -> (String,[Option])
 pgm_lo dflags = sPgm_lo (settings dflags)
 pgm_lc                :: DynFlags -> (String,[Option])
 pgm_lc dflags = sPgm_lc (settings dflags)
+opt_L                 :: DynFlags -> [String]
+opt_L dflags = sOpt_L (settings dflags)
+opt_P                 :: DynFlags -> [String]
+opt_P dflags = sOpt_P (settings dflags)
+opt_F                 :: DynFlags -> [String]
+opt_F dflags = sOpt_F (settings dflags)
+opt_c                 :: DynFlags -> [String]
+opt_c dflags = sOpt_c (settings dflags)
+opt_m                 :: DynFlags -> [String]
+opt_m dflags = sOpt_m (settings dflags)
+opt_a                 :: DynFlags -> [String]
+opt_a dflags = sOpt_a (settings dflags)
+opt_l                 :: DynFlags -> [String]
+opt_l dflags = sOpt_l (settings dflags)
+opt_windres           :: DynFlags -> [String]
+opt_windres dflags = sOpt_windres (settings dflags)
+opt_lo                :: DynFlags -> [String]
+opt_lo dflags = sOpt_lo (settings dflags)
+opt_lc                :: DynFlags -> [String]
+opt_lc dflags = sOpt_lc (settings dflags)
 
 wayNames :: DynFlags -> [WayName]
 wayNames = map wayName . ways
@@ -752,19 +774,6 @@ defaultDynFlags mySettings =
         rtsOptsEnabled          = RtsOptsSafeOnly,
 
         hpcDir                  = ".hpc",
-
-        opt_L                   = [],
-        opt_P                   = (if opt_PIC
-                                   then ["-D__PIC__", "-U __PIC__"] -- this list is reversed
-                                   else []),
-        opt_F                   = [],
-        opt_c                   = [],
-        opt_a                   = [],
-        opt_m                   = [],
-        opt_l                   = [],
-        opt_windres             = [],
-        opt_lo                  = [],
-        opt_lc                  = [],
 
         extraPkgConfs           = [],
         packageFlags            = [],
@@ -949,8 +958,8 @@ setDumpPrefixForce f d = d { dumpPrefixForce = f}
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
 setPgmP   f = let (pgm:args) = words f in alterSettings (\s -> s { sPgm_P   = (pgm, map Option args)})
-addOptl   f d = d{ opt_l   = f : opt_l d}
-addOptP   f d = d{ opt_P   = f : opt_P d}
+addOptl   f = alterSettings (\s -> s { sOpt_l   = f : sOpt_l s})
+addOptP   f = alterSettings (\s -> s { sOpt_P   = f : sOpt_P s})
 
 
 setDepMakefile :: FilePath -> DynFlags -> DynFlags
@@ -1145,16 +1154,16 @@ dynamic_flags = [
   , Flag "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
-  , Flag "optlo"          (hasArg (\f d -> d{ opt_lo  = f : opt_lo d}))
-  , Flag "optlc"          (hasArg (\f d -> d{ opt_lc  = f : opt_lc d}))
-  , Flag "optL"           (hasArg (\f d -> d{ opt_L   = f : opt_L d}))
+  , Flag "optlo"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
+  , Flag "optlc"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
+  , Flag "optL"           (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
   , Flag "optP"           (hasArg addOptP)
-  , Flag "optF"           (hasArg (\f d -> d{ opt_F   = f : opt_F d}))
-  , Flag "optc"           (hasArg (\f d -> d{ opt_c   = f : opt_c d}))
-  , Flag "optm"           (hasArg (\f d -> d{ opt_m   = f : opt_m d}))
-  , Flag "opta"           (hasArg (\f d -> d{ opt_a   = f : opt_a d}))
+  , Flag "optF"           (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
+  , Flag "optc"           (hasArg (\f -> alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})))
+  , Flag "optm"           (hasArg (\f -> alterSettings (\s -> s { sOpt_m   = f : sOpt_m s})))
+  , Flag "opta"           (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
   , Flag "optl"           (hasArg addOptl)
-  , Flag "optwindres"     (hasArg (\f d -> d{ opt_windres = f : opt_windres d}))
+  , Flag "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
 
   , Flag "split-objs"
          (NoArg (if can_split 
