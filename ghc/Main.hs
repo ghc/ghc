@@ -606,7 +606,7 @@ doMake srcs  = do
 	haskellish (f,Nothing) = 
 	  looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
 	haskellish (_,Just phase) = 
-	  phase `notElem` [As, Cc, Cobjc, CmmCpp, Cmm, StopLn]
+	  phase `notElem` [As, Cc, Cobjc, Cobjcpp, CmmCpp, Cmm, StopLn]
 
     hsc_env <- GHC.getSession
 

@@ -1008,7 +1008,7 @@ runPhase Cmm input_fn dflags
 -- way too many hacks, and I can't say I've ever used it anyway.
 
 runPhase cc_phase input_fn dflags
-   | cc_phase `eqPhase` Cc || cc_phase `eqPhase` Ccpp || cc_phase `eqPhase` HCc || cc_phase `eqPhase` Cobjc
+   | any (cc_phase `eqPhase`) [Cc, Ccpp, HCc, Cobjc, Cobjcpp]
    = do
         let cc_opts = getOpts dflags opt_c
             hcc = cc_phase `eqPhase` HCc
@@ -1076,6 +1076,7 @@ runPhase cc_phase input_fn dflags
 
         let gcc_lang_opt | cc_phase `eqPhase` Ccpp  = "c++"
                          | cc_phase `eqPhase` Cobjc = "objective-c"
+                         | cc_phase `eqPhase` Cobjcpp = "objective-c++"
                          | otherwise                = "c"
         io $ SysTools.runCc dflags (
                 -- force the C compiler to interpret this file as C when
