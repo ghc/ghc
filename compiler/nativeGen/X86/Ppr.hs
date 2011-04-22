@@ -56,19 +56,19 @@ pprNatCmmTop (CmmData section dats) =
   pprSectionHeader section $$ vcat (map pprData dats)
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel True lbl
+pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
 
 pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (if null info then -- blocks guaranteed not null, so label needed
-       pprLabel True lbl
+       pprLabel lbl
    else
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
             pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
                 <> char ':' $$
 #endif
        vcat (map pprData info) $$
-       pprLabel True (entryLblToInfoLbl lbl)
+       pprLabel (entryLblToInfoLbl lbl)
   ) $$
   vcat (map pprBasicBlock blocks)
      -- above: Even the first block gets a label, because with branch-chain
@@ -87,18 +87,17 @@ pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
                       <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
                     else empty
 #endif
-  $$ pprSizeDecl (if null info then lbl else entryLblToInfoLbl lbl)
 
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
 pprBasicBlock (BasicBlock blockid instrs) =
-  pprCLabel_asm (mkAsmTempLabel (getUnique blockid)) <> char ':' $$
+  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
 
 pprData :: CmmStatic -> Doc
 pprData (CmmAlign bytes)         = pprAlign bytes
-pprData (CmmDataLabel lbl)       = pprLabel False lbl
+pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
 
 #if  darwin_TARGET_OS
@@ -116,29 +115,19 @@ pprGloblDecl lbl
                                     (sLit ".globl ")) <>
                 pprCLabel_asm lbl
 
-pprTypeDecl :: Bool -> CLabel -> Doc
+pprTypeAndSizeDecl :: CLabel -> Doc
 #if elf_OBJ_FORMAT
-pprTypeDecl isCode lbl =
-    ptext (sLit "\t.type ") <> pprCLabel_asm lbl
-    <> ptext (sLit (if isCode then ", @function" else ", @object"))
+pprTypeAndSizeDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext (sLit ".type ") <>
+                pprCLabel_asm lbl <> ptext (sLit ", @object")
 #else
-pprTypeDecl _ _
+pprTypeAndSizeDecl _
   = empty
 #endif
 
--- | Output the ELF .size directive.
-pprSizeDecl :: CLabel -> Doc
-#if elf_OBJ_FORMAT
-pprSizeDecl lbl =
-    ptext (sLit "\t.size") <+> pprCLabel_asm lbl
-    <> ptext (sLit ", .-") <> pprCLabel_asm lbl
-#else
-pprSizeDecl _ = empty
-#endif
-
-pprLabel :: Bool -> CLabel -> Doc
-pprLabel isCode lbl = pprGloblDecl lbl $$ pprTypeDecl isCode lbl
-                      $$ (pprCLabel_asm lbl <> char ':')
+pprLabel :: CLabel -> Doc
+pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
 
 
 pprASCII :: [Word8] -> Doc
