@@ -135,7 +135,7 @@ if test "$WithGhc" != ""; then
 fi
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
+if test "$BootingFromHc" = "NO"; then
   if test "$WithGhc" = ""; then
      AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
   fi

@@ -702,7 +702,7 @@ if test -z "$GCC"; then
 else
    fp_have_gcc=YES
 fi
-if test "$fp_have_gcc" = "NO" -a -d $srcdir/ghc; then
+if test "$fp_have_gcc" = "NO"; then
   AC_MSG_ERROR([gcc is required])
 fi
 GccLT34=
