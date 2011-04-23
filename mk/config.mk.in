@@ -544,6 +544,10 @@ WhatGccIsCalled = @WhatGccIsCalled@
 GccVersion      = @GccVersion@
 GccLT34         = @GccLT34@
 CC              = $(WhatGccIsCalled)
+CC_STAGE0       = $(CC)
+CC_STAGE1       = $(CC)
+CC_STAGE2       = $(CC)
+CC_STAGE3       = $(CC)
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC

@@ -114,7 +114,7 @@ $(libffi_STAMP_CONFIGURE):
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd build && \
-	    CC=$(WhatGccIsCalled) \
+	    CC=$(CC_STAGE1) \
 	    LD=$(LD) \
 	    AR=$(AR) \
 	    NM=$(NM) \
@@ -177,7 +177,7 @@ $(eval $(call all-target,libffi,$(INSTALL_HEADERS) $(INSTALL_LIBS)))
 libffi/dist-install/build/HSffi.o: libffi/dist-install/build/libHSffi.a
 	cd libffi/dist-install/build && \
 	  touch empty.c && \
-	  "$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -c empty.c -o HSffi.o
+	  "$(CC_STAGE1)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -c empty.c -o HSffi.o
 
 $(eval $(call all-target,libffi,libffi/dist-install/build/HSffi.o))
 
