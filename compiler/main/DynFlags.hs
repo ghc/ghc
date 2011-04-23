@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -w #-}
--- Temporary, until rtsIsProfiled is fixed
-
 -- |
 -- Dynamic flags
 --
@@ -98,10 +95,14 @@ import Maybes           ( orElse )
 import SrcLoc
 import FastString
 import Outputable
+#ifdef GHCI
 import Foreign.C	( CInt )
+#endif
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 
+#ifdef GHCI
 import System.IO.Unsafe	( unsafePerformIO )
+#endif
 import Data.IORef
 import Control.Monad    ( when )
 
@@ -109,7 +110,7 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe
+-- import Data.Maybe
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -1362,7 +1363,7 @@ dynamic_flags = [
   , Flag "fcontext-stack"              (intSuffix (\n d -> d{ ctxtStkDepth = n }))
   , Flag "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , Flag "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
-  , Flag "ffloat-all-lams"             (intSuffix (\n d -> d{ floatLamArgs = Nothing }))
+  , Flag "ffloat-all-lams"             (noArg (\d -> d{ floatLamArgs = Nothing }))
 
         ------ Profiling ----------------------------------------------------
 
@@ -1878,18 +1879,20 @@ foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 
 rtsIsProfiled :: Bool
 rtsIsProfiled = unsafePerformIO rtsIsProfiledIO /= 0
+#endif
 
 checkTemplateHaskellOk :: Bool -> DynP ()
-checkTemplateHaskellOk turn_on 
+#ifdef GHCI
+checkTemplateHaskellOk turn_on
   | turn_on && rtsIsProfiled
   = addErr "You can't use Template Haskell with a profiled compiler"
   | otherwise
   = return ()
 #else
--- In stage 1 we don't know that the RTS has rts_isProfiled, 
+-- In stage 1 we don't know that the RTS has rts_isProfiled,
 -- so we simply say "ok".  It doesn't matter because TH isn't
 -- available in stage 1 anyway.
-checkTemplateHaskellOk turn_on = return ()
+checkTemplateHaskellOk _ = return ()
 #endif
 
 {- **********************************************************************
@@ -2198,7 +2201,7 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -- platform.
 
 machdepCCOpts :: DynFlags -> [String] -- flags for all C compilations
-machdepCCOpts dflags = cCcOpts ++ machdepCCOpts'
+machdepCCOpts _ = cCcOpts ++ machdepCCOpts'
 
 machdepCCOpts' :: [String] -- flags for all C compilations
 machdepCCOpts'
