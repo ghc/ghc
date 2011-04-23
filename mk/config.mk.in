@@ -599,6 +599,12 @@ AR			= @ArCmd@
 AR_OPTS			= @ArArgs@
 ArSupportsInput		= @ArSupportsInput@
 ArSupportsAtFile = @ArSupportsAtFile@
+
+AR_STAGE0 = $(AR)
+AR_STAGE1 = $(AR)
+AR_STAGE2 = $(AR)
+AR_STAGE3 = $(AR)
+
 # Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
 BASH                    = /usr/local/bin/bash
 

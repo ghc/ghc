@@ -88,9 +88,9 @@ else
 	echo $$($1_$2_$3_ALL_OBJS) >> $$@.contents
 endif
 ifeq "$$(ArSupportsAtFile)" "YES"
-	"$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ @$$@.contents
+	"$$($1_$2_AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ @$$@.contents
 else
-	"$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ < $$@.contents
+	"$$(XARGS)" $$(XARGS_OPTS) "$$($1_$2_AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@ < $$@.contents
 endif
 	"$$(RM)" $$(RM_OPTS) $$@.contents
 endif

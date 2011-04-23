@@ -116,7 +116,7 @@ $(libffi_STAMP_CONFIGURE):
 	    cd build && \
 	    CC=$(CC_STAGE1) \
 	    LD=$(LD) \
-	    AR=$(AR) \
+	    AR=$(AR_STAGE1) \
 	    NM=$(NM) \
         CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -w" \
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
