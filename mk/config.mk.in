@@ -597,7 +597,6 @@ DLLTOOL			= inplace/mingw/bin/dlltool.exe
 
 AR			= @ArCmd@
 AR_OPTS			= @ArArgs@
-ArSupportsInput		= @ArSupportsInput@
 ArSupportsAtFile = @ArSupportsAtFile@
 
 AR_STAGE0 = $(AR)

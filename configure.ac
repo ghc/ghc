@@ -578,7 +578,6 @@ AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
 dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
-FP_PROG_AR_SUPPORTS_INPUT
 
 dnl ** Check to see whether ln -s works
 AC_PROG_LN_S

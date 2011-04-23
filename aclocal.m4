@@ -646,32 +646,6 @@ fi
 ])# FP_PROG_AR_NEEDS_RANLIB
 
 
-# FP_PROG_AR_SUPPORTS_INPUT
-# -------------------------
-# Sets the output variable ArSupportsInput to "-input" or "", depending on
-# whether ar supports -input flag is supported or not.
-AC_DEFUN([FP_PROG_AR_SUPPORTS_INPUT],
-[AC_REQUIRE([FP_PROG_AR_IS_GNU])
-AC_REQUIRE([FP_PROG_AR_ARGS])
-AC_CACHE_CHECK([whether $fp_prog_ar_raw supports -input], [fp_cv_prog_ar_supports_input],
-[fp_cv_prog_ar_supports_input=no
-if test $fp_prog_ar_is_gnu = no; then
-  rm -f conftest*
-  touch conftest.lst
-  if FP_EVAL_STDERR(["$fp_prog_ar_raw" $fp_prog_ar_args conftest.a -input conftest.lst]) >/dev/null; then
-    test -s conftest.err || fp_cv_prog_ar_supports_input=yes
-  fi
-  rm -f conftest*
-fi])
-if test $fp_cv_prog_ar_supports_input = yes; then
-    ArSupportsInput="-input"
-else
-    ArSupportsInput=""
-fi
-AC_SUBST([ArSupportsInput])
-])# FP_PROG_AR_SUPPORTS_INPUT
-
-
 dnl
 dnl AC_SHEBANG_PERL - can we she-bang perl?
 dnl
