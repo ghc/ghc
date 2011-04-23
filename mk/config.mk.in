@@ -633,7 +633,6 @@ NROFF			= nroff
 PERL 			= @PerlCmd@
 PYTHON			= @PythonCmd@
 PIC			= pic
-PREPROCESSCMD		= $(CC) -E
 RANLIB			= @RANLIB@
 SED			= @SedCmd@
 TR 			= tr
