@@ -18,6 +18,9 @@ $(call profStart, package-config($1,$2,$3))
 $1_$2_HC = $$(GHC_STAGE$3)
 $1_$2_CC = $$(CC_STAGE$3)
 $1_$2_AR = $$(AR_STAGE$3)
+$1_$2_AR_OPTS = $$(AR_OPTS_STAGE$3)
+$1_$2_EXTRA_AR_ARGS = $$(EXTRA_AR_ARGS_STAGE$3)
+$1_$2_ArSupportsAtFile = $$(ArSupportsAtFile_STAGE$3)
 
 # configuration stuff that depends on which GHC we're building with
 ifeq "$3" "0"
