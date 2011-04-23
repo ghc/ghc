@@ -181,7 +181,7 @@ initSysTools mbMinusB
         -- with the settings file, but it would be a little fiddly
         -- to make that possible, so for now you can't.
         ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
-                                       else getSetting "GCC command"
+                                       else getSetting "C compiler command"
         ; perl_path <- if isWindowsHost
                        then return $ installed_perl_bin "perl"
                        else getSetting "perl command"
