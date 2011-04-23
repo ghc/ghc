@@ -137,7 +137,7 @@ _darcs/
 /driver/split/dist/ghc-split
 /driver/split/dist/ghc-split.prl
 /driver/stamp-pkg-conf-rts
-/extra-gcc-opts
+/settings
 /ghc.spec
 /ghc/ghc-bin.cabal
 /ghc/stage1/
