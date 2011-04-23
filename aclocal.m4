@@ -1494,6 +1494,21 @@ case "$1" in
   esac
 ])
 
+# BOOTSTRAPPING_GHC_INFO_FIELD
+# --------------------------------
+# If the bootstrapping compiler is >= 7.1, then set the variable
+# $1 to the value of the ghc --info field $2. Otherwise, set it to
+# $3.
+AC_DEFUN([BOOTSTRAPPING_GHC_INFO_FIELD],[
+if test $GhcCanonVersion -ge 701
+then
+    $1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
+else
+    $1=$3
+fi
+AC_SUBST($1)
+])
+
 # LIBRARY_VERSION(lib)
 # --------------------------------
 # Gets the version number of a library.

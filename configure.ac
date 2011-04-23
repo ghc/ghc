@@ -132,6 +132,8 @@ if test "$WithGhc" != ""; then
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
   if test $GhcCanonVersion -ge 613; then ghc_ge_613=YES; else ghc_ge_613=NO; fi
   AC_SUBST(ghc_ge_613)dnl
+
+  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[GCC command],['$(CC)'])
 fi
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
