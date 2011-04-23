@@ -1,4 +1,4 @@
 [("GCC extra via C opts", "@GccExtraViaCOpts@"),
  ("C compiler command", "@WhatGccIsCalled@"),
- ("perl command", "@WhatGccIsCalled@")]
+ ("perl command", "@PerlCmd@")]
 
