@@ -605,9 +605,6 @@ AR_STAGE1 = $(AR)
 AR_STAGE2 = $(AR)
 AR_STAGE3 = $(AR)
 
-# Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
-BASH                    = /usr/local/bin/bash
-
 CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
 # It's not easy to separate the CPP program from its flags, as
