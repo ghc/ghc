@@ -129,14 +129,14 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd gmpbuild && \
-	    CC=$(WhatGccIsCalled) NM=$(NM) AR=$(AR) $(SHELL) configure \
+	    CC=$(WhatGccIsCalled) NM=$(NM) AR=$(AR_STAGE1) $(SHELL) configure \
 	          --enable-shared=no \
 	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/.libs/libgmp.a libraries/integer-gmp/gmp/
 	$(MKDIRHIER) libraries/integer-gmp/gmp/objs
-	cd libraries/integer-gmp/gmp/objs && $(AR) x ../libgmp.a
+	cd libraries/integer-gmp/gmp/objs && $(AR_STAGE1) x ../libgmp.a
 	$(RANLIB) libraries/integer-gmp/gmp/libgmp.a
 
 # XXX TODO:
