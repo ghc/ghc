@@ -132,6 +132,12 @@ data LlvmStatement
   -}
   | Expr LlvmExpression
 
+  {- |
+    A nop LLVM statement. Useful as its often more efficient to use this
+    then to wrap LLvmStatement in a Just or [].
+  -}
+  | Nop
+
   deriving (Show, Eq)
 
 

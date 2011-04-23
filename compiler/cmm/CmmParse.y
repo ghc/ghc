@@ -735,7 +735,10 @@ machOps = listToUFM $
 
 callishMachOps = listToUFM $
 	map (\(x, y) -> (mkFastString x, y)) [
-        ( "write_barrier", MO_WriteBarrier )
+        ( "write_barrier", MO_WriteBarrier ),
+        ( "memcpy", MO_Memcpy ),
+        ( "memset", MO_Memset ),
+        ( "memmove", MO_Memmove )
         -- ToDo: the rest, maybe
     ]
 

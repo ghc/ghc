@@ -80,9 +80,19 @@ genCCall (CmmPrim (MO_WriteBarrier)) _ _
 
 genCCall target dest_regs argsAndHints 
  = do	 	
+        -- need to remove alignment information
+        let argsAndHints' | (CmmPrim mop) <- target,
+                            (mop == MO_Memcpy ||
+                             mop == MO_Memset ||
+                             mop == MO_Memmove)
+                          -> init argsAndHints
+
+                          | otherwise
+                          -> argsAndHints
+                
 	-- strip hints from the arg regs
 	let args :: [CmmExpr]
-	    args  = map hintlessCmm argsAndHints
+	    args  = map hintlessCmm argsAndHints'
 
 
 	-- work out the arguments, and assign them to integer regs
@@ -104,7 +114,7 @@ genCCall target dest_regs argsAndHints
 			return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 
 		CmmPrim mop 
-		 -> do	res	<- outOfLineFloatOp mop
+		 -> do	res	<- outOfLineMachOp mop
 			lblOrMopExpr <- case res of
 				Left lbl -> do
 					return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
@@ -253,13 +263,13 @@ assign_code _
 
 
 -- | Generate a call to implement an out-of-line floating point operation
-outOfLineFloatOp 
+outOfLineMachOp
 	:: CallishMachOp 
 	-> NatM (Either CLabel CmmExpr)
 
-outOfLineFloatOp mop 
+outOfLineMachOp mop 
  = do	let functionName
- 		= outOfLineFloatOp_table mop
+ 		= outOfLineMachOp_table mop
 	
  	dflags	<- getDynFlagsNat
 	mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference 
@@ -275,11 +285,11 @@ outOfLineFloatOp mop
 
 -- | Decide what C function to use to implement a CallishMachOp
 --
-outOfLineFloatOp_table 
+outOfLineMachOp_table 
 	:: CallishMachOp
 	-> FastString
 	
-outOfLineFloatOp_table mop
+outOfLineMachOp_table mop
  = case mop of
 	MO_F32_Exp    -> fsLit "expf"
 	MO_F32_Log    -> fsLit "logf"
@@ -315,5 +325,9 @@ outOfLineFloatOp_table mop
 	MO_F64_Cosh   -> fsLit "cosh"
 	MO_F64_Tanh   -> fsLit "tanh"
 
-	_ -> pprPanic "outOfLineFloatOp(sparc): Unknown callish mach op "
+        MO_Memcpy    -> fsLit "memcpy"
+        MO_Memset    -> fsLit "memset"
+        MO_Memmove   -> fsLit "memmove"
+
+	_ -> pprPanic "outOfLineMachOp(sparc): Unknown callish mach op "
               		(pprCallishMachOp mop)

@@ -910,7 +910,7 @@ genCCall target dest_regs argsAndHints
         (labelOrExpr, reduceToFF32) <- case target of
             CmmCallee (CmmLit (CmmLabel lbl)) conv -> return (Left lbl, False)
             CmmCallee expr conv -> return  (Right expr, False)
-            CmmPrim mop -> outOfLineFloatOp mop
+            CmmPrim mop -> outOfLineMachOp mop
                                                         
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode
             codeAfter = move_sp_up finalStack `appOL` moveResult reduceToFF32
@@ -937,7 +937,17 @@ genCCall target dest_regs argsAndHints
         initialStackOffset = 8
         stackDelta finalStack = roundTo 16 finalStack
 #endif
-	args = map hintlessCmm argsAndHints
+        -- need to remove alignment information
+        argsAndHints' | (CmmPrim mop) <- target,
+                        (mop == MO_Memcpy ||
+                         mop == MO_Memset ||
+                         mop == MO_Memmove)
+                      -> init argsAndHints
+
+                      | otherwise
+                      -> argsAndHints
+
+	args = map hintlessCmm argsAndHints'
 	argReps = map cmmExprType args
 
 	roundTo a x | x `mod` a == 0 = x
@@ -1062,7 +1072,7 @@ genCCall target dest_regs argsAndHints
                     where rep = cmmRegType (CmmLocal dest)
                           r_dest = getRegisterReg (CmmLocal dest)
                           
-        outOfLineFloatOp mop =
+        outOfLineMachOp mop =
             do
                 dflags <- getDynFlagsNat
                 mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
@@ -1106,6 +1116,11 @@ genCCall target dest_regs argsAndHints
                     MO_F64_Cosh  -> (fsLit "cosh", False)
                     MO_F64_Tanh  -> (fsLit "tanh", False)
                     MO_F64_Pwr   -> (fsLit "pow", False)
+
+                    MO_Memcpy    -> (fsLit "memcpy", False)
+                    MO_Memset    -> (fsLit "memset", False)
+                    MO_Memmove   -> (fsLit "memmove", False)
+
                     other -> pprPanic "genCCall(ppc): unknown callish op"
                                     (pprCallishMachOp other)
 

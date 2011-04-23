@@ -69,7 +69,7 @@ import DynFlags
 import Debug.Trace	( trace )
 
 import Control.Monad	( mapAndUnzipM )
-import Data.Maybe	( fromJust )
+import Data.Maybe	( fromJust, catMaybes )
 import Data.Bits
 import Data.Word
 import Data.Int
@@ -1519,14 +1519,18 @@ genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 	-- write barrier compiles to no code on x86/x86-64; 
 	-- we keep it this long in order to prevent earlier optimisations.
 
+-- void return type prim op
+genCCall (CmmPrim op) [] args =
+    outOfLineCmmOp op Nothing args
+
 -- we only cope with a single result for foreign calls
-genCCall (CmmPrim op) [CmmHinted r _] args = do
+genCCall (CmmPrim op) [r_hinted@(CmmHinted r _)] args = do
   l1 <- getNewLabelNat
   l2 <- getNewLabelNat
   sse2 <- sse2Enabled
   if sse2
     then
-      outOfLineFloatOp op r args
+      outOfLineCmmOp op (Just r_hinted) args
     else case op of
 	MO_F32_Sqrt -> actuallyInlineFloatOp GSQRT FF32 args
 	MO_F64_Sqrt -> actuallyInlineFloatOp GSQRT FF64 args
@@ -1540,7 +1544,7 @@ genCCall (CmmPrim op) [CmmHinted r _] args = do
 	MO_F32_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF32 args
 	MO_F64_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF64 args
 	
-	other_op    -> outOfLineFloatOp op r args
+	other_op    -> outOfLineCmmOp op (Just r_hinted) args
 
  where
   actuallyInlineFloatOp instr size [CmmHinted x _]
@@ -1569,7 +1573,6 @@ genCCall target dest_regs args = do
     -- deal with static vs dynamic call targets
     (callinsns,cconv) <-
       case target of
-	-- CmmPrim -> ...
         CmmCallee (CmmLit (CmmLabel lbl)) conv
            -> -- ToDo: stdcall arg sizes
 	      return (unitOL (CALL (Left fn_imm) []), conv)
@@ -1578,6 +1581,9 @@ genCCall target dest_regs args = do
            -> do { (dyn_r, dyn_c) <- getSomeReg expr
                  ; ASSERT( isWord32 (cmmExprType expr) )
                    return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
+        CmmPrim _
+            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
+                        ++ "probably because too many return values."
 
     let	push_code
 #if darwin_TARGET_OS
@@ -1649,7 +1655,6 @@ genCCall target dest_regs args = do
     roundTo a x | x `mod` a == 0 = x
                 | otherwise = x + a - (x `mod` a)
 
-
     push_arg :: Bool -> HintedCmmActual {-current argument-}
                     -> NatM InstrBlock  -- code
 
@@ -1703,9 +1708,13 @@ genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 	-- write barrier compiles to no code on x86/x86-64; 
 	-- we keep it this long in order to prevent earlier optimisations.
 
+-- void return type prim op
+genCCall (CmmPrim op) [] args =
+  outOfLineCmmOp op Nothing args
 
-genCCall (CmmPrim op) [CmmHinted r _] args = 
-  outOfLineFloatOp op r args
+-- we only cope with a single result for foreign calls
+genCCall (CmmPrim op) [res] args =
+  outOfLineCmmOp op (Just res) args
 
 genCCall target dest_regs args = do
 
@@ -1749,7 +1758,6 @@ genCCall target dest_regs args = do
     -- deal with static vs dynamic call targets
     (callinsns,cconv) <-
       case target of
-	-- CmmPrim -> ...
         CmmCallee (CmmLit (CmmLabel lbl)) conv
            -> -- ToDo: stdcall arg sizes
 	      return (unitOL (CALL (Left fn_imm) arg_regs), conv)
@@ -1757,6 +1765,9 @@ genCCall target dest_regs args = do
         CmmCallee expr conv
            -> do (dyn_r, dyn_c) <- getSomeReg expr
 		 return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
+        CmmPrim _
+            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
+                        ++ "probably because too many return values."
 
     let
 	-- The x86_64 ABI requires us to set %al to the number of SSE2
@@ -1867,21 +1878,25 @@ genCCall	= panic "X86.genCCAll: not defined"
 #endif /* x86_64_TARGET_ARCH */
 
 
-
-
-outOfLineFloatOp :: CallishMachOp -> CmmFormal -> HintedCmmActuals -> NatM InstrBlock
-outOfLineFloatOp mop res args
+outOfLineCmmOp :: CallishMachOp -> Maybe HintedCmmFormal -> HintedCmmActuals -> NatM InstrBlock
+outOfLineCmmOp mop res args
   = do
       dflags <- getDynFlagsNat
       targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
       let target = CmmCallee targetExpr CCallConv
      
-      stmtToInstrs (CmmCall target [CmmHinted res NoHint] args CmmUnsafe CmmMayReturn)
+      stmtToInstrs (CmmCall target (catMaybes [res]) args' CmmUnsafe CmmMayReturn)
   where
 	-- Assume we can call these functions directly, and that they're not in a dynamic library.
 	-- TODO: Why is this ok? Under linux this code will be in libm.so
 	--	 Is is because they're really implemented as a primitive instruction by the assembler??  -- BL 2009/12/31 
 	lbl = mkForeignLabel fn Nothing ForeignLabelInThisPackage IsFunction
+
+        args' = case mop of
+                    MO_Memcpy    -> init args
+                    MO_Memset    -> init args
+                    MO_Memmove   -> init args
+                    _            -> args
 
 	fn = case mop of
 	      MO_F32_Sqrt  -> fsLit "sqrtf"
@@ -1916,8 +1931,9 @@ outOfLineFloatOp mop res args
 	      MO_F64_Tanh  -> fsLit "tanh"
 	      MO_F64_Pwr   -> fsLit "pow"
 
-
-
+	      MO_Memcpy    -> fsLit "memcpy"
+	      MO_Memset    -> fsLit "memset"
+	      MO_Memmove   -> fsLit "memmove"
 
 
 -- -----------------------------------------------------------------------------

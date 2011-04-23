@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-type-defaults #-}
 -- ----------------------------------------------------------------------------
 -- | Handle conversion of CmmProc to LLVM code.
 --
@@ -17,7 +18,6 @@ import OldCmm
 import qualified OldPprCmm as PprCmm
 import OrdList
 
-import BasicTypes
 import FastString
 import ForeignCall
 import Outputable hiding ( panic, pprPanic )
@@ -175,8 +175,30 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
 
     where
         lmTrue :: LlvmVar
-        lmTrue  = LMLitVar $ LMIntLit (-1) i1
+        lmTrue  = mkIntLit i1 (-1)
 #endif
+
+-- Handle memcpy function specifically since llvm's intrinsic version takes
+-- some extra parameters.
+genCall env t@(CmmPrim op) [] args CmmMayReturn | op == MO_Memcpy ||
+                                                  op == MO_Memset ||
+                                                  op == MO_Memmove = do
+    let (isVolTy, isVolVal) = if getLlvmVer env >= 28
+                                 then ([i1], [mkIntLit i1 0]) else ([], [])
+        argTy | op == MO_Memset = [i8Ptr, i8,    llvmWord, i32] ++ isVolTy
+              | otherwise       = [i8Ptr, i8Ptr, llvmWord, i32] ++ isVolTy
+        funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
+                             CC_Ccc LMVoid FixedArgs (tysToParams argTy) Nothing
+
+    (env1, argVars, stmts1, top1) <- arg_vars env args ([], nilOL, [])
+    (env2, fptr, stmts2, top2)    <- getFunPtr env1 funTy t
+    (argVars', stmts3)            <- castVars $ zip argVars argTy
+
+    let arguments = argVars' ++ isVolVal
+        call = Expr $ Call StdCall fptr arguments []
+        stmts = stmts1 `appOL` stmts2 `appOL` stmts3
+                `appOL` trashStmts `snocOL` call
+    return (env2, stmts, top1 ++ top2)
 
 -- Handle all other foreign calls and prim ops.
 genCall env target res args ret = do
@@ -225,90 +247,16 @@ genCall env target res args ret = do
     let ccTy  = StdCall -- tail calls should be done through CmmJump
     let retTy = ret_type res
     let argTy = tysToParams $ map arg_type args
-    let funTy name = LMFunction $ LlvmFunctionDecl name ExternallyVisible
-                        lmconv retTy FixedArgs argTy llvmFunAlign
+    let funTy = \name -> LMFunction $ LlvmFunctionDecl name ExternallyVisible
+                             lmconv retTy FixedArgs argTy llvmFunAlign
 
-    -- get parameter values
+
     (env1, argVars, stmts1, top1) <- arg_vars env args ([], nilOL, [])
-
-    -- get the return register
-    let ret_reg ([CmmHinted reg hint]) = (reg, hint)
-        ret_reg t = panic $ "genCall: Bad number of registers! Can only handle"
-                        ++ " 1, given " ++ show (length t) ++ "."
-
-    -- deal with call types
-    let getFunPtr :: CmmCallTarget -> UniqSM ExprData
-        getFunPtr targ = case targ of
-            CmmCallee (CmmLit (CmmLabel lbl)) _ -> do
-                let name = strCLabel_llvm lbl
-                case funLookup name env1 of
-                    Just ty'@(LMFunction sig) -> do
-                        -- Function in module in right form
-                        let fun = LMGlobalVar name ty' (funcLinkage sig)
-                                        Nothing Nothing False
-                        return (env1, fun, nilOL, [])
-
-                    Just ty' -> do
-                        -- label in module but not function pointer, convert
-                        let fty@(LMFunction sig) = funTy name
-                        let fun = LMGlobalVar name (pLift ty') (funcLinkage sig)
-                                        Nothing Nothing False
-                        (v1, s1) <- doExpr (pLift fty)
-                                        $ Cast LM_Bitcast fun (pLift fty)
-                        return  (env1, v1, unitOL s1, [])
-
-                    Nothing -> do
-                        -- label not in module, create external reference
-                        let fty@(LMFunction sig) = funTy name
-                        let fun = LMGlobalVar name fty (funcLinkage sig)
-                                        Nothing Nothing False
-                        let top = CmmData Data [([],[fty])]
-                        let env' = funInsert name fty env1
-                        return (env', fun, nilOL, [top])
-
-            CmmCallee expr _ -> do
-                (env', v1, stmts, top) <- exprToVar env1 expr
-                let fty = funTy $ fsLit "dynamic"
-                let cast = case getVarType v1 of
-                     ty | isPointer ty -> LM_Bitcast
-                     ty | isInt ty     -> LM_Inttoptr
-
-                     ty -> panic $ "genCall: Expr is of bad type for function"
-                                ++ " call! (" ++ show (ty) ++ ")"
-
-                (v2,s1) <- doExpr (pLift fty) $ Cast cast v1 (pLift fty)
-                return (env', v2, stmts `snocOL` s1, top)
-
-            CmmPrim mop -> do
-                let name = cmmPrimOpFunctions mop
-                let lbl  = mkForeignLabel name Nothing
-                                    ForeignLabelInExternalPackage IsFunction
-                getFunPtr $ CmmCallee (CmmLit (CmmLabel lbl)) CCallConv
-
-    (env2, fptr, stmts2, top2) <- getFunPtr target
+    (env2, fptr, stmts2, top2)    <- getFunPtr env1 funTy target
 
     let retStmt | ccTy == TailCall       = unitOL $ Return Nothing
                 | ret == CmmNeverReturns = unitOL $ Unreachable
                 | otherwise              = nilOL
-
-    {- In LLVM we pass the STG registers around everywhere in function calls.
-       So this means LLVM considers them live across the entire function, when
-       in reality they usually aren't. For Caller save registers across C calls
-       the saving and restoring of them is done by the Cmm code generator,
-       using Cmm local vars. So to stop LLVM saving them as well (and saving
-       all of them since it thinks they're always live, we trash them just
-       before the call by assigning the 'undef' value to them. The ones we
-       need are restored from the Cmm local var and the ones we don't need
-       are fine to be trashed.
-    -}
-    let trashStmts = concatOL $ map trashReg activeStgRegs
-            where trashReg r =
-                    let reg   = lmGlobalRegVar r
-                        ty    = (pLower . getVarType) reg
-                        trash = unitOL $ Store (LMLitVar $ LMUndefLit ty) reg
-                    in case callerSaves r of
-                              True  -> trash
-                              False -> nilOL
 
     let stmts = stmts1 `appOL` stmts2 `appOL` trashStmts
 
@@ -321,6 +269,10 @@ genCall env target res args ret = do
 
         _ -> do
             (v1, s1) <- doExpr retTy $ Call ccTy fptr argVars fnAttrs
+            -- get the return register
+            let ret_reg ([CmmHinted reg hint]) = (reg, hint)
+                ret_reg t = panic $ "genCall: Bad number of registers! Can only handle"
+                                ++ " 1, given " ++ show (length t) ++ "."
             let (creg, _) = ret_reg res
             let (env3, vreg, stmts3, top3) = getCmmReg env2 (CmmLocal creg)
             let allStmts = stmts `snocOL` s1 `appOL` stmts3
@@ -342,6 +294,55 @@ genCall env target res args ret = do
                     let s3 = Store v2 vreg
                     return (env3, allStmts `snocOL` s2 `snocOL` s3
                                 `appOL` retStmt, top1 ++ top2 ++ top3)
+
+
+-- | Create a function pointer from a target.
+getFunPtr :: LlvmEnv -> (LMString -> LlvmType) -> CmmCallTarget
+          -> UniqSM ExprData
+getFunPtr env funTy targ = case targ of
+    CmmCallee (CmmLit (CmmLabel lbl)) _ -> litCase $ strCLabel_llvm lbl
+
+    CmmCallee expr _ -> do
+        (env', v1, stmts, top) <- exprToVar env expr
+        let fty = funTy $ fsLit "dynamic"
+            cast = case getVarType v1 of
+                ty | isPointer ty -> LM_Bitcast
+                ty | isInt ty     -> LM_Inttoptr
+
+                ty -> panic $ "genCall: Expr is of bad type for function"
+                              ++ " call! (" ++ show (ty) ++ ")"
+
+        (v2,s1) <- doExpr (pLift fty) $ Cast cast v1 (pLift fty)
+        return (env', v2, stmts `snocOL` s1, top)
+
+    CmmPrim mop -> litCase $ cmmPrimOpFunctions env mop
+
+    where
+        litCase name = do
+            case funLookup name env of
+                Just ty'@(LMFunction sig) -> do
+                    -- Function in module in right form
+                    let fun = LMGlobalVar name ty' (funcLinkage sig)
+                                    Nothing Nothing False
+                    return (env, fun, nilOL, [])
+
+                Just ty' -> do
+                    -- label in module but not function pointer, convert
+                    let fty@(LMFunction sig) = funTy name
+                        fun = LMGlobalVar name (pLift ty') (funcLinkage sig)
+                                    Nothing Nothing False
+                    (v1, s1) <- doExpr (pLift fty)
+                                    $ Cast LM_Bitcast fun (pLift fty)
+                    return  (env, v1, unitOL s1, [])
+
+                Nothing -> do
+                    -- label not in module, create external reference
+                    let fty@(LMFunction sig) = funTy name
+                        fun = LMGlobalVar name fty (funcLinkage sig)
+                                    Nothing Nothing False
+                        top = [CmmData Data [([],[fty])]]
+                        env' = funInsert name fty env
+                    return (env', fun, nilOL, top)
 
 
 -- | Conversion of call arguments.
@@ -370,9 +371,41 @@ arg_vars env (CmmHinted e _:rest) (vars, stmts, tops)
   = do (env', v1, stmts', top') <- exprToVar env e
        arg_vars env' rest (vars ++ [v1], stmts `appOL` stmts', tops ++ top')
 
+
+-- | Cast a collection of LLVM variables to specific types.
+castVars :: [(LlvmVar, LlvmType)]
+         -> UniqSM ([LlvmVar], LlvmStatements)
+castVars vars = do
+                done <- mapM (uncurry castVar) vars
+                let (vars', stmts) = unzip done
+                return (vars', toOL stmts)
+
+-- | Cast an LLVM variable to a specific type, panicing if it can't be done.
+castVar :: LlvmVar -> LlvmType -> UniqSM (LlvmVar, LlvmStatement)
+castVar v t | getVarType v == t
+            = return (v, Nop)
+
+            | otherwise
+            = let op = case (getVarType v, t) of
+                      (LMInt n, LMInt m)
+                          -> if n < m then LM_Sext else LM_Trunc
+                      (vt, _) | isFloat vt && isFloat t
+                          -> if llvmWidthInBits vt < llvmWidthInBits t
+                                then LM_Fpext else LM_Fptrunc
+                      (vt, _) | isInt vt && isFloat t       -> LM_Sitofp
+                      (vt, _) | isFloat vt && isInt t       -> LM_Fptosi
+                      (vt, _) | isInt vt && isPointer t     -> LM_Inttoptr
+                      (vt, _) | isPointer vt && isInt t     -> LM_Ptrtoint
+                      (vt, _) | isPointer vt && isPointer t -> LM_Bitcast
+
+                      (vt, _) -> panic $ "castVars: Can't cast this type ("
+                                  ++ show vt ++ ") to (" ++ show t ++ ")"
+              in doExpr t $ Cast op v t
+
+
 -- | Decide what C function to use to implement a CallishMachOp
-cmmPrimOpFunctions :: CallishMachOp -> FastString
-cmmPrimOpFunctions mop
+cmmPrimOpFunctions :: LlvmEnv -> CallishMachOp -> LMString
+cmmPrimOpFunctions env mop
  = case mop of
     MO_F32_Exp    -> fsLit "expf"
     MO_F32_Log    -> fsLit "logf"
@@ -408,8 +441,18 @@ cmmPrimOpFunctions mop
     MO_F64_Cosh   -> fsLit "cosh"
     MO_F64_Tanh   -> fsLit "tanh"
 
+    MO_Memcpy     -> fsLit $ "llvm.memcpy."  ++ intrinTy1
+    MO_Memmove    -> fsLit $ "llvm.memmove." ++ intrinTy1
+    MO_Memset     -> fsLit $ "llvm.memset."  ++ intrinTy2
+
     a -> panic $ "cmmPrimOpFunctions: Unknown callish op! (" ++ show a ++ ")"
 
+    where
+        intrinTy1 = (if getLlvmVer env >= 28
+                       then "p0i8.p0i8." else "") ++ show llvmWord
+        intrinTy2 = (if getLlvmVer env >= 28
+                       then "p0i8." else "") ++ show llvmWord
+    
 
 -- | Tail function calls
 genJump :: LlvmEnv -> CmmExpr -> UniqSM StmtData
@@ -594,7 +637,7 @@ genSwitch env cond maybe_ids = do
     (env', vc, stmts, top) <- exprToVar env cond
     let ty = getVarType vc
 
-    let pairs = [ (ix, id) | (ix,Just id) <- zip ([0..]::[Integer]) maybe_ids ]
+    let pairs = [ (ix, id) | (ix,Just id) <- zip [0..] maybe_ids ]
     let labels = map (\(ix, b) -> (mkIntLit ty ix, blockIdToLlvm b)) pairs
     -- out of range is undefied, so lets just branch to first label
     let (_, defLbl) = head labels
@@ -675,11 +718,11 @@ genMachOp :: LlvmEnv -> EOption -> MachOp -> [CmmExpr] -> UniqSM ExprData
 genMachOp env _ op [x] = case op of
 
     MO_Not w ->
-        let all1 = mkIntLit (widthToLlvmInt w) (-1::Int)
+        let all1 = mkIntLit (widthToLlvmInt w) (-1)
         in negate (widthToLlvmInt w) all1 LM_MO_Xor
 
     MO_S_Neg w ->
-        let all0 = mkIntLit (widthToLlvmInt w) (0::Int)
+        let all0 = mkIntLit (widthToLlvmInt w) 0
         in negate (widthToLlvmInt w) all0 LM_MO_Sub
 
     MO_F_Neg w ->
@@ -1105,6 +1148,28 @@ funEpilogue = do
     loads <- mapM loadExpr activeStgRegs
     let (vars, stmts) = unzip loads
     return (vars, concatOL stmts)
+
+
+-- | A serries of statements to trash all the STG registers.
+--
+-- In LLVM we pass the STG registers around everywhere in function calls.
+-- So this means LLVM considers them live across the entire function, when
+-- in reality they usually aren't. For Caller save registers across C calls
+-- the saving and restoring of them is done by the Cmm code generator,
+-- using Cmm local vars. So to stop LLVM saving them as well (and saving
+-- all of them since it thinks they're always live, we trash them just
+-- before the call by assigning the 'undef' value to them. The ones we
+-- need are restored from the Cmm local var and the ones we don't need
+-- are fine to be trashed.
+trashStmts :: LlvmStatements
+trashStmts = concatOL $ map trashReg activeStgRegs
+    where trashReg r =
+            let reg   = lmGlobalRegVar r
+                ty    = (pLower . getVarType) reg
+                trash = unitOL $ Store (LMLitVar $ LMUndefLit ty) reg
+            in case callerSaves r of
+                      True  -> trash
+                      False -> nilOL
 
 
 -- | Get a function pointer to the CLabel specified.

@@ -459,7 +459,15 @@ data CallishMachOp
   | MO_F32_Sqrt
   | MO_WriteBarrier
   | MO_Touch         -- Keep variables live (when using interior pointers)
+  
+  -- Note that these three MachOps all take 1 extra parameter than the
+  -- standard C lib versions. The extra (last) parameter contains
+  -- alignment of the pointers. Used for optimisation in backends.
+  | MO_Memcpy
+  | MO_Memset
+  | MO_Memmove
   deriving (Eq, Show)
 
 pprCallishMachOp :: CallishMachOp -> SDoc
 pprCallishMachOp mo = text (show mo)
+
