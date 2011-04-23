@@ -482,6 +482,12 @@ cvtl e = wrapL (cvt e)
     cvt (AppE x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ HsApp x' y' }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
 			    ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
+    cvt (LamCaseE ms)
+      | null ms        = failWith (ptext (sLit "Lambda-case expression with no alternatives"))
+      | otherwise      = do { ms' <- mapM cvtMatch ms
+                            ; return $ HsLamCase placeHolderType
+                                                 (mkMatchGroup ms')
+                            }
     cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
     	      	       	         -- Note [Dropping constructors]
                                  -- Singleton tuples treated like nothing (just parens)

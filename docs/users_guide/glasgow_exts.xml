@@ -1669,6 +1669,27 @@ continues to stand for the unboxed singleton tuple data constructor.
 
 </sect2>
 
+<sect2 id="lambda-case">
+<title>Lambda-case</title>
+<para>
+The <option>-XLambdaCase</option> flag enables expressions of the form
+<programlisting>
+  \case { p1 -> e1; ...; pN -> eN }
+</programlisting>
+which is equivalent to
+<programlisting>
+  \freshName -> case freshName of { p1 -> e1; ...; pN -> eN }
+</programlisting>
+Note that <literal>\case</literal> starts a layout, so you can write
+<programlisting>
+  \case
+    p1 -> e1
+    ...
+    pN -> eN
+</programlisting>
+</para>
+</sect2>
+
 <sect2 id="disambiguate-fields">
 <title>Record field disambiguation</title>
 <para>

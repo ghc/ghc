@@ -205,6 +205,15 @@ dsExpr (NegApp expr neg_expr)
 dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr a_Match
 
+dsExpr (HsLamCase arg matches@(MatchGroup _ rhs_ty))
+  | isEmptyMatchGroup matches	-- A Core 'case' is always non-empty
+  = 		      		-- So desugar empty HsLamCase to error call
+    mkErrorAppDs pAT_ERROR_ID (funResultTy rhs_ty) (ptext (sLit "\\case"))
+  | otherwise
+  = do { arg_var <- newSysLocalDs arg
+       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt matches
+       ; return $ Lam arg_var $ bindNonRec discrim_var (Var arg_var) matching_code }
+
 dsExpr (HsApp fun arg)
   = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
 \end{code}

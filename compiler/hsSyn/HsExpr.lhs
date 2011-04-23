@@ -113,6 +113,8 @@ data HsExpr id
 
   | HsLam     (MatchGroup id)           -- Currently always a single match
 
+  | HsLamCase PostTcType (MatchGroup id) -- Lambda-case
+
   | HsApp     (LHsExpr id) (LHsExpr id) -- Application
 
   -- Operator applications:
@@ -447,6 +449,10 @@ ppr_expr (ExplicitTuple exprs boxity)
 --avoid using PatternSignatures for stage1 code portability
 ppr_expr (HsLam matches)
   = pprMatches (LambdaExpr :: HsMatchContext id) matches
+
+ppr_expr (HsLamCase _ matches)
+  = sep [ sep [ptext (sLit "\\case {")],
+          nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches <+> char '}') ]
 
 ppr_expr (HsCase expr matches)
   = sep [ sep [ptext (sLit "case"), nest 4 (ppr expr), ptext (sLit "of {")],

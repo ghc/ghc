@@ -557,6 +557,11 @@ zonkExpr env (HsLam matches)
   = zonkMatchGroup env matches	`thenM` \ new_matches ->
     returnM (HsLam new_matches)
 
+zonkExpr env (HsLamCase arg matches)
+  = zonkTcTypeToType env arg	`thenM` \ new_arg ->
+    zonkMatchGroup env matches	`thenM` \ new_matches ->
+    returnM (HsLamCase new_arg new_matches)
+
 zonkExpr env (HsApp e1 e2)
   = zonkLExpr env e1	`thenM` \ new_e1 ->
     zonkLExpr env e2	`thenM` \ new_e2 ->

@@ -201,6 +201,14 @@ tcExpr (HsLam match) res_ty
   = do	{ (co_fn, match') <- tcMatchLambda match res_ty
 	; return (mkHsWrap co_fn (HsLam match')) }
 
+tcExpr e@(HsLamCase _ matches) res_ty
+  = do	{ (co_fn, [arg_ty], body_ty) <- matchExpectedFunTys msg 1 res_ty
+	; matches' <- tcMatchesCase match_ctxt arg_ty matches body_ty
+	; return $ mkHsWrapCo co_fn $ HsLamCase arg_ty matches' }
+  where msg = sep [ ptext (sLit "The function") <+> quotes (ppr e)
+                  , ptext (sLit "requires")]
+        match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
+
 tcExpr (ExprWithTySig expr sig_ty) res_ty
  = do { sig_tc_ty <- tcHsSigType ExprSigCtxt sig_ty
 

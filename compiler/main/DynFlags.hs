@@ -485,6 +485,7 @@ data ExtensionFlag
    | Opt_NondecreasingIndentation
    | Opt_RelaxedLayout
    | Opt_TraditionalRecordSyntax
+   | Opt_LambdaCase
    deriving (Eq, Enum, Show)
 
 -- | Contains not only a collection of 'DynFlag's but also a plethora of
@@ -2162,6 +2163,7 @@ xFlags = [
   ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
   ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
   ( "TraditionalRecordSyntax",          Opt_TraditionalRecordSyntax, nop ),
+  ( "LambdaCase",                       Opt_LambdaCase, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),
   ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec,
     \ turn_on -> if not turn_on

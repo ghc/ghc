@@ -224,6 +224,10 @@ rnExpr (HsLam matches)
   = rnMatchGroup LambdaExpr matches	`thenM` \ (matches', fvMatch) ->
     return (HsLam matches', fvMatch)
 
+rnExpr (HsLamCase arg matches)
+  = rnMatchGroup CaseAlt matches	`thenM` \ (matches', fvs_ms) ->
+    return (HsLamCase arg matches', fvs_ms)
+
 rnExpr (HsCase expr matches)
   = rnLExpr expr		 	`thenM` \ (new_expr, e_fvs) ->
     rnMatchGroup CaseAlt matches	`thenM` \ (new_matches, ms_fvs) ->
