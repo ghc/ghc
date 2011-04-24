@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+#endif
 
 #include "Typeable.h"
 

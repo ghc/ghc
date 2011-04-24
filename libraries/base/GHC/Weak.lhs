@@ -4,6 +4,8 @@
            , BangPatterns
            , MagicHash
            , UnboxedTuples
+           , DeriveDataTypeable
+           , StandaloneDeriving
   #-}
 {-# OPTIONS_HADDOCK hide #-}
 

@@ -4,6 +4,9 @@
            , GeneralizedNewtypeDeriving
   #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds #-}
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+#endif
 -- XXX -fno-warn-unused-binds stops us warning about unused constructors,
 -- but really we should just remove them if we don't want them
 
@@ -91,7 +94,7 @@ import Foreign.Storable
 import Data.Bits        ( Bits(..) )
 import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
 import Data.Word        ( Word8, Word16, Word32, Word64 )
-import {-# SOURCE #-} Data.Typeable (Typeable(typeOf), TyCon, mkTyCon, mkTyConApp)
+import {-# SOURCE #-} Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base

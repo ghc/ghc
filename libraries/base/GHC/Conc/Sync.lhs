@@ -7,6 +7,7 @@
            , UnliftedFFITypes
            , ForeignFunctionInterface
            , DeriveDataTypeable
+           , StandaloneDeriving
            , RankNTypes
   #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
