@@ -310,20 +310,14 @@ sub scmall {
             if (-d "$localpath/.git") {
                 die "Found both _darcs and .git in $localpath";
             }
-            else {
-                $scm = "darcs";
-            }
-        }
-        else {
-            if (-d "$localpath/.git") {
-                $scm = "git";
-            }
-            elsif ($tag eq "") {
-                die "Required repo $localpath is missing";
-            }
-            else {
-                message "== $localpath repo not present; skipping";
-            }
+            $scm = "darcs";
+        } elsif (-d "$localpath/.git") {
+            $scm = "git";
+        } elsif ($tag eq "") {
+            die "Required repo $localpath is missing";
+        } else {
+             message "== $localpath repo not present; skipping";
+             next;
         }
 
         # Work out the arguments we should give to the SCM
