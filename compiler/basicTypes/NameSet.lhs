@@ -48,7 +48,12 @@ import Data.Data
 \begin{code}
 type NameSet = UniqSet Name
 
-INSTANCE_TYPEABLE0(NameSet,nameSetTc,"NameSet")
+-- TODO: These Data/Typeable instances look very dubious. Surely either
+-- UniqFM should have the instances, or this should be a newtype?
+
+nameSetTc :: TyCon
+nameSetTc = mkTyCon "NameSet"
+instance Typeable NameSet where { typeOf _ = mkTyConApp nameSetTc [] }
 
 instance Data NameSet where
   gfoldl k z s = z mkNameSet `k` nameSetToList s -- traverse abstractly
