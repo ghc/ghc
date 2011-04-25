@@ -666,7 +666,9 @@ pprModIface iface
 	, vcat (map ppr (mi_fam_insts iface))
 	, vcat (map ppr (mi_rules iface))
         , pprVectInfo (mi_vect_info iface)
+        , pprVectInfo (mi_vect_info iface)
 	, ppr (mi_warns iface)
+	, pprTrustInfo (mi_trust iface)
  	]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
@@ -742,6 +744,9 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
   , ptext (sLit "scalar variables:") <+> hsep (map ppr scalarVars)
   , ptext (sLit "scalar tycons:") <+> hsep (map ppr scalarTyCons)
   ]
+
+pprTrustInfo :: IfaceTrustInfo -> SDoc
+pprTrustInfo trust = ptext (sLit "trusted:") <+> ppr trust
 
 instance Outputable Warnings where
     ppr = pprWarns

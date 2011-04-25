@@ -31,6 +31,7 @@ module DynFlags (
         fFlags, fLangFlags, xFlags,
         DPHBackend(..), dphPackageMaybe,
         wayNames,
+        SafeHaskellMode(..),
 
         Settings(..),
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
@@ -319,6 +320,24 @@ data DynFlag
 
 data Language = Haskell98 | Haskell2010
 
+-- | The various SafeHaskell modes
+data SafeHaskellMode
+   = Sf_None
+   | Sf_SafeImports
+   | Sf_SafeLanguage
+   | Sf_Trustworthy
+   | Sf_TrustworthyWithSafeLanguage
+   | Sf_Safe
+   deriving (Eq)
+
+instance Show SafeHaskellMode where
+    show Sf_None = "None"
+    show Sf_SafeImports = "SafeImports"
+    show Sf_SafeLanguage = "SafeLanguage"
+    show Sf_Trustworthy = "Trustworthy"
+    show Sf_TrustworthyWithSafeLanguage = "Trustworthy + SafeLanguage"
+    show Sf_Safe = "Safe"
+
 data ExtensionFlag
    = Opt_Cpp
    | Opt_OverlappingInstances
@@ -511,6 +530,8 @@ data DynFlags = DynFlags {
   flags                 :: [DynFlag],
   -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
+  -- | Safe Haskell mode
+  safeHaskell           :: SafeHaskellMode,
   -- Don't change this without updating extensionFlags:
   extensions            :: [OnOff ExtensionFlag],
   -- extensionFlags should always be equal to
@@ -831,6 +852,7 @@ defaultDynFlags mySettings =
         haddockOptions = Nothing,
         flags = defaultFlags,
         language = Nothing,
+        safeHaskell = Sf_None,
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
@@ -948,6 +970,47 @@ setLanguage l = upd f
                          language = mLang,
                          extensionFlags = flattenExtensionFlags mLang oneoffs
                      }
+
+-- | Set a 'SafeHaskell' flag
+setSafeHaskell :: SafeHaskellMode -> DynP ()
+setSafeHaskell s = upd f
+    where f dfs = let sf = safeHaskell dfs
+                  in dfs {
+                         safeHaskell = combineSafeFlags sf s
+                     }
+
+-- | Combine two SafeHaskell modes correctly. Used for dealing with multiple flags.
+-- This makes SafeHaskell very much a monoid but for now I prefer this as I don't
+-- want to export this functionality from the module but do want to export the
+-- type constructors.
+combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> SafeHaskellMode
+combineSafeFlags a b =
+    case (a,b) of
+        (Sf_None, sf) -> sf
+        (sf, Sf_None) -> sf
+
+        (Sf_SafeImports, sf) -> sf
+        (sf, Sf_SafeImports) -> sf
+
+        (Sf_SafeLanguage, Sf_Safe) -> err
+        (Sf_Safe, Sf_SafeLanguage) -> err
+
+        (Sf_SafeLanguage, Sf_Trustworthy) -> Sf_TrustworthyWithSafeLanguage
+        (Sf_Trustworthy, Sf_SafeLanguage) -> Sf_TrustworthyWithSafeLanguage
+
+        (Sf_TrustworthyWithSafeLanguage, Sf_Trustworthy)  -> Sf_TrustworthyWithSafeLanguage
+        (Sf_TrustworthyWithSafeLanguage, Sf_SafeLanguage) -> Sf_TrustworthyWithSafeLanguage
+        (Sf_Trustworthy, Sf_TrustworthyWithSafeLanguage)  -> Sf_TrustworthyWithSafeLanguage
+        (Sf_SafeLanguage, Sf_TrustworthyWithSafeLanguage) -> Sf_TrustworthyWithSafeLanguage
+
+        (Sf_Trustworthy, Sf_Safe) -> err
+        (Sf_Safe, Sf_Trustworthy) -> err
+
+        (a,b) | a == b -> a
+              | otherwise -> err
+
+    where err = ghcError (CmdLineError $ "Incompatible SafeHaskell flags! ("
+                                        ++ show a ++ "," ++ show b ++ ")")
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -1467,6 +1530,7 @@ dynamic_flags = [
  ++ map (mkFlag turnOn  "X"    setExtensionFlag  ) xFlags
  ++ map (mkFlag turnOff "XNo"  unSetExtensionFlag) xFlags
  ++ map (mkFlag turnOn  "X"    setLanguage) languageFlags
+ ++ map (mkFlag turnOn  "X"    setSafeHaskell) safeHaskellFlags
 
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
@@ -1645,11 +1709,15 @@ fLangFlags = [
 supportedLanguages :: [String]
 supportedLanguages = [ name | (name, _, _) <- languageFlags ]
 
+supportedLanguageOverlays :: [String]
+supportedLanguageOverlays = [ name | (name, _, _) <- safeHaskellFlags ]
+
 supportedExtensions :: [String]
 supportedExtensions = [ name' | (name, _, _) <- xFlags, name' <- [name, "No" ++ name] ]
 
 supportedLanguagesAndExtensions :: [String]
-supportedLanguagesAndExtensions = supportedLanguages ++ supportedExtensions
+supportedLanguagesAndExtensions =
+    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlags :: [FlagSpec Language]
@@ -1657,6 +1725,13 @@ languageFlags = [
   ( "Haskell98",                        Haskell98, nop ),
   ( "Haskell2010",                      Haskell2010, nop )
   ]
+
+-- | These -X<blah> flags cannot be reversed with -XNo<blah>
+-- They are used to place hard requirements on what GHC Haskell language
+-- features can be used.
+safeHaskellFlags :: [FlagSpec SafeHaskellMode]
+safeHaskellFlags = map mkF [Sf_SafeImports, Sf_SafeLanguage, Sf_Trustworthy, Sf_Safe]
+    where mkF flag = (show flag, flag, nop)
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]

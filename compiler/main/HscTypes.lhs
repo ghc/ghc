@@ -91,6 +91,10 @@ module HscTypes (
         VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo, 
         noIfaceVectInfo,
 
+        -- * Safe Haskell information
+        IfaceTrustInfo, getSafeMode, setSafeMode, noIfaceTrustInfo,
+        trustInfoToNum, numToTrustInfo,
+
         -- * Compilation errors and warnings
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
         throwOneError, handleSourceError,
@@ -127,7 +131,7 @@ import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
-                          DynFlag(..) )
+                          DynFlag(..), SafeHaskellMode(..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -154,6 +158,7 @@ import Data.IORef
 import Data.Array       ( Array, array )
 import Data.List
 import Data.Map (Map)
+import Data.Word
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
 
@@ -680,8 +685,10 @@ data ModIface
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt. the old interface.
                         -- The 'OccName' is the parent of the name, if it has one.
-	mi_hpc    :: !AnyHpcUsage
+	mi_hpc    :: !AnyHpcUsage,
 	        -- ^ True if this program uses Hpc at any point in the program.
+	mi_trust  :: !IfaceTrustInfo
+	        -- ^ Safe Haskell Trust information for this module.
      }
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
@@ -852,7 +859,8 @@ emptyModIface mod
 	       mi_warn_fn    = emptyIfaceWarnCache,
 	       mi_fix_fn    = emptyIfaceFixCache,
 	       mi_hash_fn   = emptyIfaceHashCache,
-	       mi_hpc       = False
+	       mi_hpc       = False,
+	       mi_trust     = noIfaceTrustInfo
     }		
 \end{code}
 
@@ -1790,6 +1798,58 @@ concatVectInfo = foldr plusVectInfo noVectInfo
 
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Safe Haskell Support}
+%*									*
+%************************************************************************
+
+This stuff here is related to supporting the Safe Haskell extension,
+primarily about storing under what trust type a module has been compiled.
+
+\begin{code}
+-- | Safe Haskell information for 'ModIface'
+-- Simply a wrapper around SafeHaskellMode to sepperate iface and flags
+newtype IfaceTrustInfo = TrustInfo SafeHaskellMode
+
+getSafeMode :: IfaceTrustInfo -> SafeHaskellMode
+getSafeMode (TrustInfo x) = x
+
+setSafeMode :: SafeHaskellMode -> IfaceTrustInfo
+setSafeMode = TrustInfo
+
+noIfaceTrustInfo :: IfaceTrustInfo
+noIfaceTrustInfo = setSafeMode Sf_None
+
+trustInfoToNum :: IfaceTrustInfo -> Word8
+trustInfoToNum it
+  = case getSafeMode it of
+            Sf_None -> 0
+            Sf_SafeImports -> 1
+            Sf_SafeLanguage -> 2
+            Sf_Trustworthy -> 3
+            Sf_TrustworthyWithSafeLanguage -> 4
+            Sf_Safe -> 5
+
+numToTrustInfo :: Word8 -> IfaceTrustInfo
+numToTrustInfo 0 = setSafeMode Sf_None
+numToTrustInfo 1 = setSafeMode Sf_SafeImports
+numToTrustInfo 2 = setSafeMode Sf_SafeLanguage
+numToTrustInfo 3 = setSafeMode Sf_Trustworthy
+numToTrustInfo 4 = setSafeMode Sf_TrustworthyWithSafeLanguage
+numToTrustInfo 5 = setSafeMode Sf_Safe
+numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
+
+instance Outputable IfaceTrustInfo where
+    ppr (TrustInfo Sf_None)         = ptext $ sLit "none"
+    ppr (TrustInfo Sf_SafeImports)  = ptext $ sLit "safe-imports"
+    ppr (TrustInfo Sf_SafeLanguage) = ptext $ sLit "safe-language"
+    ppr (TrustInfo Sf_Trustworthy)  = ptext $ sLit "trustworthy"
+    ppr (TrustInfo Sf_TrustworthyWithSafeLanguage)
+                                    = ptext $ sLit "trustworthy + safe-language"
+    ppr (TrustInfo Sf_Safe)         = ptext $ sLit "safe"
 \end{code}
 
 %************************************************************************

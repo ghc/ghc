@@ -390,7 +390,8 @@ instance Binary ModIface where
 		 mi_rules     = rules,
 		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
-		 mi_hpc       = hpc_info }) = do
+		 mi_hpc       = hpc_info,
+		 mi_trust     = trust }) = do
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh iface_hash
@@ -411,6 +412,7 @@ instance Binary ModIface where
 	put_ bh orphan_hash
         put_ bh vect_info
 	put_ bh hpc_info
+	put_ bh trust
 
    get bh = do
 	mod_name  <- get bh
@@ -433,6 +435,7 @@ instance Binary ModIface where
 	orphan_hash <- get bh
         vect_info <- get bh
         hpc_info  <- get bh
+        trust     <- get bh
 	return (ModIface {
 		 mi_module    = mod_name,
 		 mi_boot      = is_boot,
@@ -455,6 +458,7 @@ instance Binary ModIface where
 		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
 		 mi_hpc       = hpc_info,
+		 mi_trust     = trust,
 			-- And build the cached values
 		 mi_warn_fn   = mkIfaceWarnCache warns,
 		 mi_fix_fn    = mkIfaceFixCache fixities,
@@ -1522,4 +1526,7 @@ instance Binary IfaceVectInfo where
 	    a5 <- get bh
 	    return (IfaceVectInfo a1 a2 a3 a4 a5)
 
+instance Binary IfaceTrustInfo where
+    put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
+    get bh = getByte bh >>= (return . numToTrustInfo)
 
