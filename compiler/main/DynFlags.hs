@@ -1243,23 +1243,29 @@ parseDynamicFlags dflags0 args cmdline = do
   -- the easiest way to fix this is to just check that they aren't enabled now. The down
   -- side is that flags marked as NeverAllowed must also be checked here placing a sync
   -- burden on the ghc hacker.
-  let sh_warns = if (safeLanguageOn dflags2) 
-                    then shFlagsDisallowed dflags2
-                    else []
+  let (dflags2, sh_warns) = if (safeLanguageOn dflags1)
+                                then shFlagsDisallowed dflags1
+                                else (dflags1, [])
 
   return (dflags2, leftover, sh_warns ++ warns)
 
 -- | Extensions that can't be enabled at all when compiling in Safe mode
 -- checkSafeHaskellFlags :: MonadIO m => DynFlags -> m ()
-shFlagsDisallowed :: DynFlags -> [Located String]
-shFlagsDisallowed dflags = concat $ map check_method bad_flags 
+shFlagsDisallowed :: DynFlags -> (DynFlags, [Located String])
+shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
     where
-        check_method (flag,str) | (flag dflags) = safeFailure str
-                                | otherwise     = []
+        check_method (df, warns) (test,str,fix)
+            | test df   = (fix df, warns ++ safeFailure str)
+            | otherwise = (df, warns)
 
-        bad_flags = [(xopt Opt_GeneralizedNewtypeDeriving, "-XGeneralizedNewtypeDeriving")]
+        bad_flags = [(xopt Opt_GeneralizedNewtypeDeriving, "-XGeneralizedNewtypeDeriving",
+                     flip xopt_unset Opt_GeneralizedNewtypeDeriving),
+                     (dopt Opt_EnableRewriteRules, "-enable-rewrite-rules",
+                     flip dopt_unset Opt_EnableRewriteRules),
+                     (xopt Opt_TemplateHaskell, "-XTemplateHaskell",
+                     flip xopt_unset Opt_TemplateHaskell)]
 
-        safeFailure str = [L noSrcSpan $ "Warning: " ++ str ++ " is not allowed in"
+        safeFailure str = [L noSrcSpan $ "Warning2: " ++ str ++ " is not allowed in"
                                       ++ " SafeHaskell; ignoring " ++ str]
 
 {-
@@ -1772,8 +1778,8 @@ fFlags = [
   ( "print-bind-result",                AlwaysAllowed, Opt_PrintBindResult, nop ),
   ( "force-recomp",                     AlwaysAllowed, Opt_ForceRecomp, nop ),
   ( "hpc-no-auto",                      AlwaysAllowed, Opt_Hpc_No_Auto, nop ),
-  ( "rewrite-rules",                    AlwaysAllowed, Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
-  ( "enable-rewrite-rules",             AlwaysAllowed, Opt_EnableRewriteRules, nop ),
+  ( "rewrite-rules",                    NeverAllowed,  Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
+  ( "enable-rewrite-rules",             NeverAllowed,  Opt_EnableRewriteRules, nop ),
   ( "break-on-exception",               AlwaysAllowed, Opt_BreakOnException, nop ),
   ( "break-on-error",                   AlwaysAllowed, Opt_BreakOnError, nop ),
   ( "print-evld-with-show",             AlwaysAllowed, Opt_PrintEvldWithShow, nop ),
@@ -1798,7 +1804,7 @@ fFlags = [
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
 fLangFlags :: [FlagSpec ExtensionFlag]
 fLangFlags = [
-  ( "th",                               CmdLineOnly, Opt_TemplateHaskell,
+  ( "th",                               NeverAllowed, Opt_TemplateHaskell,
     deprecatedForExtension "TemplateHaskell" >> checkTemplateHaskellOk ),
   ( "fi",                               RestrictedFunction, Opt_ForeignFunctionInterface,
     deprecatedForExtension "ForeignFunctionInterface" ),

@@ -1098,8 +1098,8 @@ outOfDate = True	-- Recompile required
 
 -- | Check the safe haskell flags haven't changed
 --   (e.g different flag on command line now)
-checkSafeHaskell :: HscEnv -> ModIface -> Bool
-checkSafeHaskell hsc_env iface
+safeHsChanged :: HscEnv -> ModIface -> Bool
+safeHsChanged hsc_env iface
   = (getSafeMode $ mi_trust iface) /= (safeHaskell $ hsc_dflags hsc_env)
 
 checkVersions :: HscEnv
@@ -1109,36 +1109,37 @@ checkVersions :: HscEnv
 	      -> IfG (RecompileRequired, Maybe ModIface)
 checkVersions hsc_env source_unchanged mod_summary iface
   | not source_unchanged
-  = return (outOfDate, Just iface)
+  = let iface' = if safeHsChanged hsc_env iface then Nothing else Just iface
+    in return (outOfDate, iface')
+
   | otherwise
-  = do  { traceHiDiffs (text "Considering whether compilation is required for" <+> 
+  = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
-        ; recomp <- checkDependencies hsc_env mod_summary iface
-        ; if recomp then return (outOfDate, Just iface) else do {
-        ; if trust_dif then return (outOfDate, Nothing) else do {
+       ; recomp <- checkDependencies hsc_env mod_summary iface
+       ; if recomp then return (outOfDate, Just iface) else do {
+       ; if trust_dif then return (outOfDate, Nothing) else do {
 
-        -- Source code unchanged and no errors yet... carry on 
-        --
-        -- First put the dependent-module info, read from the old
-        -- interface, into the envt, so that when we look for
-        -- interfaces we look for the right one (.hi or .hi-boot)
-        -- 
-        -- It's just temporary because either the usage check will succeed 
-        -- (in which case we are done with this module) or it'll fail (in which
-        -- case we'll compile the module from scratch anyhow).
-        -- 
-        -- We do this regardless of compilation mode, although in --make mode
-        -- all the dependent modules should be in the HPT already, so it's
-        -- quite redundant
-  updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
-
-        ; let this_pkg = thisPackage (hsc_dflags hsc_env)
-        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
-        ; return (recomp, Just iface)
+       -- Source code unchanged and no errors yet... carry on
+       --
+       -- First put the dependent-module info, read from the old
+       -- interface, into the envt, so that when we look for
+       -- interfaces we look for the right one (.hi or .hi-boot)
+       --
+       -- It's just temporary because either the usage check will succeed
+       -- (in which case we are done with this module) or it'll fail (in which
+       -- case we'll compile the module from scratch anyhow).
+       --
+       -- We do this regardless of compilation mode, although in --make mode
+       -- all the dependent modules should be in the HPT already, so it's
+       -- quite redundant
+       ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
+       ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
+       ; return (recomp, Just iface)
     }}}
   where
-    trust_dif = checkSafeHaskell hsc_env iface
+    this_pkg  = thisPackage (hsc_dflags hsc_env)
+    trust_dif = safeHsChanged hsc_env iface
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
