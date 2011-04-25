@@ -219,8 +219,10 @@ rnImportDecl this_mod implicit_prelude
                         Just (is_hiding, ls) -> not is_hiding && null ls
                         _                    -> False
 
+        mod_safe' = mod_safe || safeImportsRequired dflags
+
         imports   = ImportAvails {
-                        imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe)],
+                        imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],
                         imp_orphs    = orphans,
                         imp_finsts   = finsts,
                         imp_dep_mods = mkModDeps dependent_mods,
@@ -234,7 +236,7 @@ rnImportDecl this_mod implicit_prelude
           _           -> return ()
      )
 
-    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot mod_safe
+    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot mod_safe'
                                          qual_only as_mod new_imp_details)
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)

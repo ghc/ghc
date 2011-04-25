@@ -31,8 +31,10 @@ module DynFlags (
         fFlags, fLangFlags, xFlags,
         DPHBackend(..), dphPackageMaybe,
         wayNames,
+
+        -- ** SafeHaskell
         SafeHaskellMode(..),
-        safeHaskellOn,
+        safeHaskellOn, safeImportsRequired,
 
         Settings(..),
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
@@ -984,6 +986,11 @@ setSafeHaskell s = upd f
                   in dfs {
                          safeHaskell = combineSafeFlags sf s
                      }
+
+-- | Are all imports required to be safe for this SafeHaskell mode?
+safeImportsRequired :: DynFlags -> Bool
+safeImportsRequired dflags = m == Sf_SafeLanguage || m == Sf_Safe
+                            where m = safeHaskell dflags
 
 -- | Combine two SafeHaskell modes correctly. Used for dealing with multiple flags.
 -- This makes SafeHaskell very much a monoid but for now I prefer this as I don't
