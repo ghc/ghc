@@ -198,6 +198,12 @@ usageHeader prog = substProg prog $
   "  $p hide {pkg-id}\n" ++
   "    Hide the specified package.\n" ++
   "\n" ++
+  "  $p trust {pkg-id}\n" ++
+  "    Trust the specified package.\n" ++
+  "\n" ++
+  "  $p distrust {pkg-id}\n" ++
+  "    Distrust the specified package.\n" ++
+  "\n" ++
   "  $p list [pkg]\n" ++
   "    List registered packages in the global database, and also the\n" ++
   "    user database if --user is given. If a package name is given\n" ++
@@ -344,6 +350,12 @@ runit verbosity cli nonopts = do
     ["hide",   pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         hidePackage pkgid verbosity cli force
+    ["trust",    pkgid_str] -> do
+        pkgid <- readGlobPkgId pkgid_str
+        trustPackage pkgid verbosity cli force
+    ["distrust", pkgid_str] -> do
+        pkgid <- readGlobPkgId pkgid_str
+        distrustPackage pkgid verbosity cli force
     ["list"] -> do
         listPackages verbosity cli Nothing Nothing
     ["list", pkgid_str] ->
@@ -413,7 +425,7 @@ globVersion = Version{ versionBranch=[], versionTags=["*"] }
 -- Package databases
 
 -- Some commands operate on a single database:
---      register, unregister, expose, hide
+--      register, unregister, expose, hide, trust, distrust
 -- however these commands also check the union of the available databases
 -- in order to check consistency.  For example, register will check that
 -- dependencies exist before registering a package.
@@ -859,13 +871,19 @@ updateDBCache verbosity db = do
       else ioError e
 
 -- -----------------------------------------------------------------------------
--- Exposing, Hiding, Unregistering are all similar
+-- Exposing, Hiding, Trusting, Distrusting, Unregistering are all similar
 
 exposePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
 exposePackage = modifyPackage (\p -> ModifyPackage p{exposed=True})
 
 hidePackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
 hidePackage = modifyPackage (\p -> ModifyPackage p{exposed=False})
+
+trustPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+trustPackage = modifyPackage (\p -> ModifyPackage p{trusted=True})
+
+distrustPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
+distrustPackage = modifyPackage (\p -> ModifyPackage p{trusted=False})
 
 unregisterPackage :: PackageIdentifier -> Verbosity -> [Flag] -> Force -> IO ()
 unregisterPackage = modifyPackage RemovePackage
