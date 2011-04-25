@@ -1556,10 +1556,10 @@ setCmd ""
           vcat (text "other dynamic, non-language, flag settings:" 
                :map (flagSetting dflags) others)
           ))
-  where flagSetting dflags (str, f, _)
+  where flagSetting dflags (str, _, f, _)
           | dopt f dflags = text "  " <> text "-f"    <> text str
           | otherwise     = text "  " <> text "-fno-" <> text str
-        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flags)
+        (ghciFlags,others)  = partition (\(_, _, f, _) -> f `elem` flags)
                                         DynFlags.fFlags
         flags = [Opt_PrintExplicitForalls
                 ,Opt_PrintBindResult
@@ -1804,7 +1804,7 @@ showLanguages = do
    dflags <- getDynFlags
    liftIO $ putStrLn $ showSDoc $ vcat $
       text "active language flags:" :
-      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, xopt f dflags]
+      [text ("  -X" ++ str) | (str, _, f, _) <- DynFlags.xFlags, xopt f dflags]
 
 -- -----------------------------------------------------------------------------
 -- Completion

@@ -86,7 +86,8 @@ import Panic
 #endif
 
 import Id		( Id )
-import Module		( emptyModuleEnv, ModLocation(..), Module )
+import Module
+import Packages
 import RdrName
 import HsSyn
 import CoreSyn
@@ -770,12 +771,109 @@ batchMsg hsc_env mb_mod_index recomp mod_summary
 --------------------------------------------------------------
 
 hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
-hscFileFrontEnd mod_summary =
-    do rdr_module <- hscParse' mod_summary
-       hsc_env <- getHscEnv
-       {-# SCC "Typecheck-Rename" #-}
-         ioMsgMaybe $ 
-             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+hscFileFrontEnd mod_summary = do
+    rdr_module <- hscParse' mod_summary
+    hsc_env <- getHscEnv
+    {-# SCC "Typecheck-Rename" #-}
+        tcg_env <- ioMsgMaybe $
+            tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+    dflags <- getDynFlags
+    tcg_env' <- checkSafeImports dflags hsc_env tcg_env
+    return tcg_env'
+
+--------------------------------------------------------------
+-- SafeHaskell
+--------------------------------------------------------------
+
+-- | Validate that safe imported modules are actually safe.
+-- For modules in the HomePackage (the package the module we
+-- are compiling in resides) this just involves checking its
+-- trust type is 'Safe' or 'Trustworthy'. For modules that
+-- reside in another package we also must check that the
+-- external pacakge is trusted.
+checkSafeImports :: DynFlags -> HscEnv -> TcGblEnv -> Hsc TcGblEnv
+checkSafeImports dflags hsc_env tcg_env
+    | not (safeHaskellOn dflags)
+    = return tcg_env
+
+    | otherwise
+    = do
+        imps <- mapM condense imports'
+        mapM_ checkSafe imps
+        return tcg_env
+    where
+        imp_info = tcg_imports tcg_env     -- ImportAvails
+        imports  = imp_mods imp_info       -- ImportedMods
+        imports' = moduleEnvToList imports -- (Module, [ImportedModsVal])
+
+        condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
+        condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
+        condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
+                                return (m, l, s)
+        
+        -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
+        cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
+        cond' v1@(m1,_,l1,s1) (_,_,_,s2)
+            | s1 /= s2
+            = liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l1
+                    (text "Module" <+> ppr m1 <+> (text $ "is imported"
+                        ++ " both as a safe and unsafe import!"))
+
+            | otherwise
+            = return v1
+
+        lookup' :: Module -> Hsc (Maybe ModIface)
+        lookup' m = do
+            hsc_eps <- liftIO $ hscEPS hsc_env
+            let pkgIfaceT = eps_PIT hsc_eps
+                homePkgT = hsc_HPT hsc_env
+                iface = lookupIfaceByModule dflags homePkgT pkgIfaceT m
+            return iface
+
+        -- | Check the package a module resides in is trusted.
+        -- Modules in the home package are trusted but otherwise
+        -- we check the packages trust flag.
+        packageTrusted :: Module -> Bool
+        packageTrusted m
+            | thisPackage dflags == modulePackageId m = True
+            | otherwise = trusted $ getPackageDetails (pkgState dflags)
+                                                      (modulePackageId m)
+
+        -- Is a module a Safe importable? Return Nothing if True, or a String
+        -- if it isn't containing the reason it isn't
+        isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc)
+        isModSafe m l = do
+            iface <- lookup' m
+            case iface of
+                -- can't load iface to check trust!
+                Nothing -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
+                            $ text "Can't load the interface file for" <+> ppr m <>
+                              text ", to check that it can be safely imported"
+
+                -- got iface, check trust
+                Just iface' -> do
+                    let trust = getSafeMode $ mi_trust iface'
+                        -- check module is trusted
+                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
+                                            Sf_TrustworthyWithSafeLanguage]
+                        -- check package is trusted
+                        safeP = packageTrusted m
+                    if safeM && safeP
+                        then return Nothing
+                        else return $ Just $ if safeM
+                            then text "The package (" <> ppr (modulePackageId m) <>
+                                 text ") the module resides in isn't trusted."
+                            else text "The module itself isn't safe."
+
+        checkSafe :: (Module, SrcSpan, IsSafeImport) -> Hsc ()
+        checkSafe (_, _, False) = return ()
+        checkSafe (m, l, True ) = do
+            module_safe <- isModSafe m l
+            case module_safe of
+                Nothing -> return ()
+                Just s  -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
+                            $ text "Safe import of" <+> ppr m <+> text "can't be met!"
+                                <+> s
 
 --------------------------------------------------------------
 -- Simplifiers

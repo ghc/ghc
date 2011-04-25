@@ -104,13 +104,13 @@ mkPrelImports this_mod implicit_prelude import_decls
       preludeImportDecl :: LImportDecl RdrName
       preludeImportDecl
         = L loc $
-	  ImportDecl (L loc pRELUDE_NAME)
-               Nothing {- no specific package -}
-	       False {- Not a boot interface -}
-	       False {- Not a safe interface -}
-	       False	{- Not qualified -}
-	       Nothing	{- No "as" -}
-	       Nothing	{- No import list -}
+          ImportDecl (L loc pRELUDE_NAME)
+               Nothing  {- No specific package -}
+               False    {- Not a boot interface -}
+               False    {- Not a safe import -}
+               False    {- Not qualified -}
+               Nothing  {- No "as" -}
+               Nothing  {- No import list -}
 
       loc = mkGeneralSrcSpan (fsLit "Implicit import declaration")
 

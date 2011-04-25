@@ -219,7 +219,10 @@ rnImportDecl this_mod implicit_prelude
                         Just (is_hiding, ls) -> not is_hiding && null ls
                         _                    -> False
 
-        mod_safe' = mod_safe || safeImportsRequired dflags
+        -- should the import be safe?
+        mod_safe' = mod_safe
+                    || (not implicit_prelude && safeDirectImpsReq dflags)
+                    || (implicit_prelude && safeImplicitImpsReq dflags)
 
         imports   = ImportAvails {
                         imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],

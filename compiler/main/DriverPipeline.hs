@@ -754,7 +754,7 @@ runPhase (Cpp sf) input_fn dflags0
   = do
        src_opts <- io $ getOptionsFromFile dflags0 input_fn
        (dflags1, unhandled_flags, warns)
-           <- io $ parseDynamicNoPackageFlags dflags0 src_opts
+           <- io $ parseDynamicFilePragma dflags0 src_opts
        setDynFlags dflags1
        io $ checkProcessArgsResult unhandled_flags
 
@@ -772,7 +772,7 @@ runPhase (Cpp sf) input_fn dflags0
             -- See #2464,#3457
             src_opts <- io $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
-                <- io $ parseDynamicNoPackageFlags dflags0 src_opts
+                <- io $ parseDynamicFilePragma dflags0 src_opts
             io $ checkProcessArgsResult unhandled_flags
             unless (dopt Opt_Pp dflags2) $ io $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
@@ -806,7 +806,7 @@ runPhase (HsPp sf) input_fn dflags
             -- re-read pragmas now that we've parsed the file (see #3674)
             src_opts <- io $ getOptionsFromFile dflags output_fn
             (dflags1, unhandled_flags, warns)
-                <- io $ parseDynamicNoPackageFlags dflags src_opts
+                <- io $ parseDynamicFilePragma dflags src_opts
             setDynFlags dflags1
             io $ checkProcessArgsResult unhandled_flags
             io $ handleFlagWarnings dflags1 warns

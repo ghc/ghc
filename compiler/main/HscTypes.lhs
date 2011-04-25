@@ -15,7 +15,7 @@ module HscTypes (
         -- * Information about modules
 	ModDetails(..),	emptyModDetails,
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
-        ImportedMods,
+        ImportedMods, ImportedModsVal,
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath,
@@ -718,7 +718,9 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
                              } 
 
 -- | Records the modules directly imported by a module for extracting e.g. usage information
-type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan, IsSafeImport)]
+type ImportedMods = ModuleEnv [ImportedModsVal]
+type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
+
 -- TODO: we are not actually using the codomain of this type at all, so it can be
 -- replaced with ModuleEnv ()
 

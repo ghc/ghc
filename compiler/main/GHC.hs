@@ -460,6 +460,11 @@ setSessionDynFlags dflags = do
   return preload
 
 
+parseDynamicFlags :: Monad m =>
+                     DynFlags -> [Located String]
+                  -> m (DynFlags, [Located String], [Located String])
+parseDynamicFlags = parseDynamicFlagsCmdLine
+
 
 -- %************************************************************************
 -- %*							                   *

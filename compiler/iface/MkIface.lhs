@@ -909,7 +909,7 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
             = case lookupModuleEnv direct_imports mod of
                 Just ((_,_,_,safe):_xs) -> (True, safe)
                 Just _                  -> pprPanic "mkUsage: empty direct import" empty
-                Nothing                 -> (False, safeImportsRequired dflags)
+                Nothing                 -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
                 -- is used in the source code. We require them to be safe in SafeHaskell
     
