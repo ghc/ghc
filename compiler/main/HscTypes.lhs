@@ -93,7 +93,7 @@ module HscTypes (
 
         -- * Safe Haskell information
         IfaceTrustInfo, getSafeMode, setSafeMode, noIfaceTrustInfo,
-        trustInfoToNum, numToTrustInfo,
+        trustInfoToNum, numToTrustInfo, IsSafeImport,
 
         -- * Compilation errors and warnings
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
@@ -718,7 +718,7 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
                              } 
 
 -- | Records the modules directly imported by a module for extracting e.g. usage information
-type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan)]
+type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan, IsSafeImport)]
 -- TODO: we are not actually using the codomain of this type at all, so it can be
 -- replaced with ModuleEnv ()
 
@@ -1456,7 +1456,10 @@ data Usage
   = UsagePackageModule {
         usg_mod      :: Module,
            -- ^ External package module depended on
-        usg_mod_hash :: Fingerprint
+        usg_mod_hash :: Fingerprint,
+	    -- ^ Cached module fingerprint
+        usg_safe :: IsSafeImport
+            -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from another package
   | UsageHomeModule {
         usg_mod_name :: ModuleName,
@@ -1467,9 +1470,11 @@ data Usage
             -- ^ Entities we depend on, sorted by occurrence name and fingerprinted.
             -- NB: usages are for parent names only, e.g. type constructors 
             -- but not the associated data constructors.
-	usg_exports  :: Maybe Fingerprint
+	usg_exports  :: Maybe Fingerprint,
             -- ^ Fingerprint for the export list we used to depend on this module,
             -- if we depend on the export list
+        usg_safe :: IsSafeImport
+            -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from the current package
     deriving( Eq )
 	-- The export list field is (Just v) if we depend on the export list:
@@ -1810,6 +1815,9 @@ This stuff here is related to supporting the Safe Haskell extension,
 primarily about storing under what trust type a module has been compiled.
 
 \begin{code}
+-- | Is an import a safe import?
+type IsSafeImport = Bool
+
 -- | Safe Haskell information for 'ModIface'
 -- Simply a wrapper around SafeHaskellMode to sepperate iface and flags
 newtype IfaceTrustInfo = TrustInfo SafeHaskellMode

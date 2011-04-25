@@ -65,7 +65,7 @@ rnImports imports
          implicit_prelude <- xoptM Opt_ImplicitPrelude
          let prel_imports       = mkPrelImports (moduleName this_mod) implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
-             is_source_import (L _ (ImportDecl _ _ is_boot _ _ _)) = is_boot
+             is_source_import (L _ (ImportDecl _ _ is_boot _ _ _ _)) = is_boot
 
          ifDOptM Opt_WarnImplicitPrelude (
             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
@@ -94,7 +94,8 @@ rnImportDecl  :: Module -> Bool
 
 rnImportDecl this_mod implicit_prelude
              (L loc (ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
-                                , ideclSource = want_boot, ideclQualified = qual_only
+                                , ideclSource = want_boot, ideclSafe = mod_safe
+                                , ideclQualified = qual_only
                                 , ideclAs = as_mod, ideclHiding = imp_details }))
   = setSrcSpan loc $ do
 
@@ -219,7 +220,7 @@ rnImportDecl this_mod implicit_prelude
                         _                    -> False
 
         imports   = ImportAvails {
-                        imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc)],
+                        imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe)],
                         imp_orphs    = orphans,
                         imp_finsts   = finsts,
                         imp_dep_mods = mkModDeps dependent_mods,
@@ -233,7 +234,7 @@ rnImportDecl this_mod implicit_prelude
           _           -> return ()
      )
 
-    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
+    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot mod_safe
                                          qual_only as_mod new_imp_details)
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
@@ -908,7 +909,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
     imported_modules = [ qual_name
                        | xs <- moduleEnvElts $ imp_mods imports,
-                         (qual_name, _, _) <- xs ]
+                         (qual_name, _, _, _) <- xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports)

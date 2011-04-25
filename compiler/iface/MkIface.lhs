@@ -873,7 +873,8 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
 
       | modulePackageId mod /= this_pkg
       = Just UsagePackageModule{ usg_mod      = mod,
-                                 usg_mod_hash = mod_hash }
+                                 usg_mod_hash = mod_hash,
+                                 usg_safe     = imp_safe }
         -- for package modules, we record the module hash only
 
       | (null used_occs
@@ -888,22 +889,27 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
       | otherwise	
       = Just UsageHomeModule { 
                       usg_mod_name = moduleName mod,
-    	  	      usg_mod_hash = mod_hash,
-    		      usg_exports  = export_hash,
-    		      usg_entities = Map.toList ent_hashs }
+                      usg_mod_hash = mod_hash,
+                      usg_exports  = export_hash,
+                      usg_entities = Map.toList ent_hashs,
+                      usg_safe     = imp_safe }
       where
-	maybe_iface  = lookupIfaceByModule dflags hpt pit mod
-		-- In one-shot mode, the interfaces for home-package 
-		-- modules accumulate in the PIT not HPT.  Sigh.
-
-        is_direct_import = mod `elemModuleEnv` direct_imports
+        maybe_iface  = lookupIfaceByModule dflags hpt pit mod
+                -- In one-shot mode, the interfaces for home-package
+                -- modules accumulate in the PIT not HPT.  Sigh.
 
         Just iface   = maybe_iface
 	finsts_mod   = mi_finsts    iface
         hash_env     = mi_hash_fn   iface
         mod_hash     = mi_mod_hash  iface
         export_hash | depend_on_exports = Just (mi_exp_hash iface)
-    		    | otherwise         = Nothing
+                    | otherwise         = Nothing
+
+        (is_direct_import, imp_safe)
+            = case lookupModuleEnv direct_imports mod of
+                Just ((_,_,_,safe):xs) -> (True, safe)
+                Just _                 -> pprPanic "mkUsage: empty direct import" empty
+                Nothing                -> (False, False)
     
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 
@@ -1158,7 +1164,7 @@ checkDependencies hsc_env summary iface
    orM = foldr f (return False)
     where f m rest = do b <- m; if b then return True else rest
 
-   dep_missing (L _ (ImportDecl (L _ mod) pkg _ _ _ _)) = do
+   dep_missing (L _ (ImportDecl (L _ mod) pkg _ _ _ _ _)) = do
      find_res <- liftIO $ findImportedModule hsc_env mod pkg
      case find_res of
         Found _ mod

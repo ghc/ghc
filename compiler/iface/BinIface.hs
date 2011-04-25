@@ -511,12 +511,14 @@ instance Binary Usage where
         putByte bh 0
 	put_ bh (usg_mod usg)
 	put_ bh (usg_mod_hash usg)
+	put_ bh (usg_safe     usg)
     put_ bh usg@UsageHomeModule{} = do 
         putByte bh 1
 	put_ bh (usg_mod_name usg)
 	put_ bh (usg_mod_hash usg)
 	put_ bh (usg_exports  usg)
 	put_ bh (usg_entities usg)
+	put_ bh (usg_safe     usg)
 
     get bh = do
         h <- getByte bh
@@ -524,14 +526,16 @@ instance Binary Usage where
           0 -> do
             nm    <- get bh
             mod   <- get bh
-            return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod }
+            safe  <- get bh
+            return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod, usg_safe = safe }
           _ -> do
             nm    <- get bh
             mod   <- get bh
             exps  <- get bh
             ents  <- get bh
+            safe  <- get bh
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
-                            usg_exports = exps, usg_entities = ents }
+                     usg_exports = exps, usg_entities = ents, usg_safe = safe }
 
 instance Binary Warnings where
     put_ bh NoWarnings     = putByte bh 0

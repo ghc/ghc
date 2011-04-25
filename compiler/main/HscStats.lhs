@@ -32,12 +32,13 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 	       [("ExportAll        ", export_all), -- 1 if no export list
 		("ExportDecls      ", export_ds),
 		("ExportModules    ", export_ms),
-		("Imports          ", import_no),
-		("  ImpQual        ", import_qual),
-		("  ImpAs          ", import_as),
-		("  ImpAll         ", import_all),
-		("  ImpPartial     ", import_partial),
-		("  ImpHiding      ", import_hiding),
+		("Imports          ", imp_no),
+		("  ImpSafe        ", imp_safe),
+		("  ImpQual        ", imp_qual),
+		("  ImpAs          ", imp_as),
+		("  ImpAll         ", imp_all),
+		("  ImpPartial     ", imp_partial),
+		("  ImpHiding      ", imp_hiding),
 		("FixityDecls      ", fixity_sigs),
 		("DefaultDecls     ", default_ds),
 	      	("TypeDecls        ", type_ds),
@@ -99,8 +100,8 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     (val_bind_ds, fn_bind_ds)
 	= foldr add2 (0,0) (map count_bind val_decls)
 
-    (import_no, import_qual, import_as, import_all, import_partial, import_hiding)
-	= foldr add6 (0,0,0,0,0,0) (map import_info imports)
+    (imp_no, imp_safe, imp_qual, imp_as, imp_all, imp_partial, imp_hiding)
+	= foldr add7 (0,0,0,0,0,0,0) (map import_info imports)
     (data_constrs, data_derivs)
 	= foldr add2 (0,0) (map data_info tycl_decls)
     (class_method_ds, default_method_ds)
@@ -122,15 +123,16 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     sig_info (GenericSig _ _)   = (0,0,0,0,1)
     sig_info _                  = (0,0,0,0,0)
 
-    import_info (L _ (ImportDecl _ _ _ qual as spec))
-	= add6 (1, qual_info qual, as_info as, 0,0,0) (spec_info spec)
+    import_info (L _ (ImportDecl _ _ _ safe qual as spec))
+	= add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
+    safe_info = qual_info
     qual_info False  = 0
     qual_info True   = 1
     as_info Nothing  = 0
     as_info (Just _) = 1
-    spec_info Nothing 	        = (0,0,0,1,0,0)
-    spec_info (Just (False, _)) = (0,0,0,0,1,0)
-    spec_info (Just (True, _))  = (0,0,0,0,0,1)
+    spec_info Nothing 	        = (0,0,0,0,1,0,0)
+    spec_info (Just (False, _)) = (0,0,0,0,0,1,0)
+    spec_info (Just (True, _))  = (0,0,0,0,0,0,1)
 
     data_info (TyData {tcdCons = cs, tcdDerivs = derivs})
 	= (length cs, case derivs of Nothing -> 0
@@ -160,12 +162,12 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     addpr :: (Int,Int) -> Int
     add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)
     add5  :: (Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int)
-    add6  :: (Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int)
+    add7  :: (Int,Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int, Int)
 
     addpr (x,y) = x+y
     add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
     add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
-    add6 (x1,x2,x3,x4,x5,x6) (y1,y2,y3,y4,y5,y6) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6)
+    add7 (x1,x2,x3,x4,x5,x6,x7) (y1,y2,y3,y4,y5,y6,y7) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6,x7+y7)
 \end{code}
 
 

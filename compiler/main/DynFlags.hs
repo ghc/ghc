@@ -32,6 +32,7 @@ module DynFlags (
         DPHBackend(..), dphPackageMaybe,
         wayNames,
         SafeHaskellMode(..),
+        safeHaskellOn,
 
         Settings(..),
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
@@ -962,6 +963,7 @@ xopt_unset dfs f
       in dfs { extensions = onoffs,
                extensionFlags = flattenExtensionFlags (language dfs) onoffs }
 
+-- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
 setLanguage l = upd f
     where f dfs = let mLang = Just l
@@ -970,6 +972,10 @@ setLanguage l = upd f
                          language = mLang,
                          extensionFlags = flattenExtensionFlags mLang oneoffs
                      }
+
+-- | Test if SafeHaskell is on in some form
+safeHaskellOn :: DynFlags -> Bool
+safeHaskellOn dflags = safeHaskell dflags /= Sf_None
 
 -- | Set a 'SafeHaskell' flag
 setSafeHaskell :: SafeHaskellMode -> DynP ()

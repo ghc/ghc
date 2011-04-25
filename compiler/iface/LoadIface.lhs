@@ -697,15 +697,21 @@ pprExport (mod, items)
 
 pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}
-  = hsep [ptext (sLit "import"), ppr (usg_mod usage), 
-	  ppr (usg_mod_hash usage)]
+  = pprUsageImport usage usg_mod
 pprUsage usage@UsageHomeModule{}
-  = hsep [ptext (sLit "import"), ppr (usg_mod_name usage), 
-	  ppr (usg_mod_hash usage)] $$
+  = pprUsageImport usage usg_mod_name $$
     nest 2 (
 	maybe empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
         vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
         )
+
+pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
+pprUsageImport usage usg_mod'
+  = hsep [ptext (sLit "import"), safe, ppr (usg_mod' usage),
+                       ppr (usg_mod_hash usage)]
+    where
+        safe | usg_safe usage = ptext $ sLit "safe"
+             | otherwise      = ptext $ sLit " -/ "
 
 pprDeps :: Dependencies -> SDoc
 pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
