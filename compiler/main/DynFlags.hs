@@ -1260,8 +1260,6 @@ shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
 
         bad_flags = [(xopt Opt_GeneralizedNewtypeDeriving, "-XGeneralizedNewtypeDeriving",
                      flip xopt_unset Opt_GeneralizedNewtypeDeriving),
-                     (dopt Opt_EnableRewriteRules, "-enable-rewrite-rules",
-                     flip dopt_unset Opt_EnableRewriteRules),
                      (xopt Opt_TemplateHaskell, "-XTemplateHaskell",
                      flip xopt_unset Opt_TemplateHaskell)]
 
@@ -1778,8 +1776,8 @@ fFlags = [
   ( "print-bind-result",                AlwaysAllowed, Opt_PrintBindResult, nop ),
   ( "force-recomp",                     AlwaysAllowed, Opt_ForceRecomp, nop ),
   ( "hpc-no-auto",                      AlwaysAllowed, Opt_Hpc_No_Auto, nop ),
-  ( "rewrite-rules",                    NeverAllowed,  Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
-  ( "enable-rewrite-rules",             NeverAllowed,  Opt_EnableRewriteRules, nop ),
+  ( "rewrite-rules",                    AlwaysAllowed, Opt_EnableRewriteRules, useInstead "enable-rewrite-rules" ),
+  ( "enable-rewrite-rules",             AlwaysAllowed, Opt_EnableRewriteRules, nop ),
   ( "break-on-exception",               AlwaysAllowed, Opt_BreakOnException, nop ),
   ( "break-on-error",                   AlwaysAllowed, Opt_BreakOnError, nop ),
   ( "print-evld-with-show",             AlwaysAllowed, Opt_PrintEvldWithShow, nop ),

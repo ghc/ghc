@@ -778,8 +778,27 @@ hscFileFrontEnd mod_summary = do
         tcg_env <- ioMsgMaybe $
             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
     dflags <- getDynFlags
-    tcg_env' <- checkSafeImports dflags hsc_env tcg_env
-    return tcg_env'
+    -- XXX: See Note [SafeHaskell API]
+    if safeHaskellOn dflags
+        then do
+            tcg_env1 <- checkSafeImports dflags hsc_env tcg_env
+            if safeLanguageOn dflags
+                then do
+                    -- we also nuke user written RULES.
+                    logWarnings $ warns (tcg_rules tcg_env1)
+                    return tcg_env1 { tcg_rules = [] }
+                else
+                    return tcg_env1
+
+        else
+            return tcg_env
+
+    where
+        warns rules = listToBag $ map warnRules rules
+        warnRules (L loc (HsRule n _ _ _ _ _ _)) =
+            mkPlainWarnMsg loc $
+                text "Rule \"" <> ftext n <> text "\" ignored" $+$
+                text "User defined rules are disabled under SafeHaskell"
 
 --------------------------------------------------------------
 -- SafeHaskell
@@ -791,12 +810,14 @@ hscFileFrontEnd mod_summary = do
 -- trust type is 'Safe' or 'Trustworthy'. For modules that
 -- reside in another package we also must check that the
 -- external pacakge is trusted.
+--
+-- Note [SafeHaskell API]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- XXX: We only call this in hscFileFrontend and don't expose
+-- it to the GHC API. External users of GHC can't properly use
+-- the GHC API and SafeHaskell.
 checkSafeImports :: DynFlags -> HscEnv -> TcGblEnv -> Hsc TcGblEnv
 checkSafeImports dflags hsc_env tcg_env
-    | not (safeHaskellOn dflags)
-    = return tcg_env
-
-    | otherwise
     = do
         imps <- mapM condense imports'
         mapM_ checkSafe imps
