@@ -17,9 +17,9 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 
 # Options for a Haskell compilation:
 #   - CONF_HC_OPTS                 source-tree-wide options, selected at
-#				   configure-time
+#                                  configure-time
 #   - SRC_HC_OPTS                  source-tree-wide options from build.mk
-#				   (optimisation, heap settings)
+#                                  (optimisation, heap settings)
 #   - libraries/base_HC_OPTS       options from Cabal for libraries/base
 #                                  for all ways
 #   - libraries/base_MORE_HC_OPTS  options from elsewhere in the build
@@ -27,7 +27,7 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #   - libraries/base_v_HC_OPTS     options from libraries/base for way v
 #   - WAY_v_HC_OPTS                options for this way
 #   - EXTRA_HC_OPTS                options from the command-line
-#   - -Idir1 -Idir2 ...		   include-dirs from this package
+#   - -Idir1 -Idir2 ...            include-dirs from this package
 #   - -odir/-hidir/-stubdir        put the output files under $3/build
 #   - -osuf/-hisuf/-hcsuf          suffixes for the output files in this way
 
