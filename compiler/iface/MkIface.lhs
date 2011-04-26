@@ -232,7 +232,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
                 ; iface_vect_info = flattenVectInfo vect_info
-                ; trust_info = (setSafeMode . safeHaskell . hsc_dflags) hsc_env
+                ; trust_info  = (setSafeMode . safeHaskell) dflags
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
