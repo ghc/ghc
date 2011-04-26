@@ -134,6 +134,8 @@ $1_$2_$3_ALL_HSC2HS_OPTS = \
  --cflag=-D__GLASGOW_HASKELL__=$$(ProjectVersionInt) \
  $$($1_$2_$3_HSC2HS_CC_OPTS) \
  $$($1_$2_$3_HSC2HS_LD_OPTS) \
+ --cflag=-I$1/$2/build/autogen \
+ $$(if $$($1_PACKAGE),--cflag=-include --cflag=$1/$2/build/autogen/cabal_macros.h) \
  $$($$(basename $$<)_HSC2HS_OPTS) \
  $$(EXTRA_HSC2HS_OPTS)
 
