@@ -789,6 +789,7 @@ findMemoryLeak (void)
 
     for (i = 0; i < n_capabilities; i++) {
         markBlocks(nurseries[i].blocks);
+        markBlocks(capabilities[i].pinned_object_block);
     }
 
 #ifdef PROFILING
@@ -880,6 +881,9 @@ memInventory (rtsBool show)
   for (i = 0; i < n_capabilities; i++) {
       ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
       nursery_blocks += nurseries[i].n_blocks;
+      if (capabilities[i].pinned_object_block != NULL) {
+          nursery_blocks += capabilities[i].pinned_object_block->blocks;
+      }
   }
 
   retainer_blocks = 0;

@@ -1373,6 +1373,20 @@ module M where
       </varlistentry>
 
       <varlistentry>
+	<term><option>-fwarn-missing-local-sigs</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-missing-local-sigs</option></primary></indexterm>
+	  <indexterm><primary>type signatures, missing</primary></indexterm>
+
+	  <para>If you use the
+          <option>-fwarn-missing-local-sigs</option> flag GHC will warn
+          you about any polymorphic local bindings. As part of
+	    the warning GHC also reports the inferred type. The
+          option is off by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-fwarn-name-shadowing</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-name-shadowing</option></primary></indexterm>

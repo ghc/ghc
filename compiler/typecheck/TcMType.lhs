@@ -34,8 +34,8 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  tcInstTyVar, tcInstTyVars, tcInstSigTyVars,
-  tcInstType, instMetaTyVar,
+  tcInstTyVars, tcInstSigTyVars,
+  tcInstType, 
   tcInstSkolTyVars, tcInstSuperSkolTyVars, tcInstSkolTyVar, tcInstSkolType,
   tcSkolDFunType, tcSuperSkolTyVars,
 
@@ -258,8 +258,17 @@ tcInstSkolType ty = tcInstType tcInstSkolTyVars ty
 tcInstSigTyVars :: [TyVar] -> TcM [TcTyVar]
 -- Make meta SigTv type variables for patten-bound scoped type varaibles
 -- We use SigTvs for them, so that they can't unify with arbitrary types
-tcInstSigTyVars = mapM (\tv -> instMetaTyVar (SigTv (tyVarName tv)) tv)
-		-- ToDo: the "function binding site is bogus
+tcInstSigTyVars = mapM tcInstSigTyVar
+
+tcInstSigTyVar :: TyVar -> TcM TcTyVar
+tcInstSigTyVar tyvar
+  = do	{ uniq <- newMetaUnique
+ 	; ref <- newMutVar Flexi
+        ; let name = setNameUnique (tyVarName tyvar) uniq
+   	        -- Use the same OccName so that the tidy-er 
+		-- doesn't rename 'a' to 'a0' etc
+	      kind = tyVarKind tyvar
+	; return (mkTcTyVar name kind (MetaTv SigTv ref)) }
 \end{code}
 
 
@@ -277,25 +286,15 @@ newMetaTyVar meta_info kind
  	; ref <- newMutVar Flexi
         ; let name = mkTcTyVarName uniq s
               s = case meta_info of
-                        TauTv   -> fsLit "t"
-                        TcsTv   -> fsLit "u"
-                        SigTv _ -> fsLit "a"
+                        TauTv -> fsLit "t"
+                        TcsTv -> fsLit "u"
+                        SigTv -> fsLit "a"
 	; return (mkTcTyVar name kind (MetaTv meta_info ref)) }
 
 mkTcTyVarName :: Unique -> FastString -> Name
 -- Make sure that fresh TcTyVar names finish with a digit
 -- leaving the un-cluttered names free for user names
 mkTcTyVarName uniq str = mkSysTvName uniq str
-
-instMetaTyVar :: MetaInfo -> TyVar -> TcM TcTyVar
--- Make a new meta tyvar whose Name and Kind 
--- come from an existing TyVar
-instMetaTyVar meta_info tyvar
-  = do	{ uniq <- newMetaUnique
- 	; ref <- newMutVar Flexi
-        ; let name = mkSystemName uniq (getOccName tyvar)
-	      kind = tyVarKind tyvar
-	; return (mkTcTyVar name kind (MetaTv meta_info ref)) }
 
 readMetaTyVar :: TyVar -> TcM MetaDetails
 readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
@@ -394,10 +393,6 @@ newFlexiTyVarTy kind = do
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
 newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
-tcInstTyVar :: TyVar -> TcM TcTyVar
--- Instantiate with a META type variable
-tcInstTyVar tyvar = instMetaTyVar TauTv tyvar
-
 tcInstTyVars :: [TyVar] -> TcM ([TcTyVar], [TcType], TvSubst)
 -- Instantiate with META type variables
 tcInstTyVars tyvars
@@ -407,6 +402,16 @@ tcInstTyVars tyvars
 		-- Since the tyvars are freshly made,
 		-- they cannot possibly be captured by
 		-- any existing for-alls.  Hence zipTopTvSubst
+
+tcInstTyVar :: TyVar -> TcM TcTyVar
+-- Make a new unification variable tyvar whose Name and Kind 
+-- come from an existing TyVar
+tcInstTyVar tyvar
+  = do	{ uniq <- newMetaUnique
+ 	; ref <- newMutVar Flexi
+        ; let name = mkSystemName uniq (getOccName tyvar)
+	      kind = tyVarKind tyvar
+	; return (mkTcTyVar name kind (MetaTv TauTv ref)) }
 \end{code}
 
 

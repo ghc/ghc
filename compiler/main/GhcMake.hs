@@ -1405,17 +1405,14 @@ preprocessFile hsc_env src_fn mb_phase Nothing
 preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
   = do
         let dflags = hsc_dflags hsc_env
-	-- case we bypass the preprocessing stage?
-	let 
-	    local_opts = getOptions dflags buf src_fn
-	--
+	let local_opts = getOptions dflags buf src_fn
+
 	(dflags', leftovers, warns)
             <- parseDynamicNoPackageFlags dflags local_opts
         checkProcessArgsResult leftovers
         handleFlagWarnings dflags' warns
 
-	let
-	    needs_preprocessing
+	let needs_preprocessing
 		| Just (Unlit _) <- mb_phase    = True
 	        | Nothing <- mb_phase, Unlit _ <- startPhase src_fn  = True
 		  -- note: local_opts is only required if there's no Unlit phase

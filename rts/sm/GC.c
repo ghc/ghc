@@ -597,11 +597,6 @@ GarbageCollect (rtsBool force_major_gc,
   // update the max size of older generations after a major GC
   resize_generations();
   
-  // Start a new pinned_object_block
-  for (n = 0; n < n_capabilities; n++) {
-      capabilities[n].pinned_object_block = NULL;
-  }
-
   // Free the mark stack.
   if (mark_stack_top_bd != NULL) {
       debugTrace(DEBUG_gc, "mark stack: %d blocks",

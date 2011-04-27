@@ -485,9 +485,7 @@ pprKind = pprType
 pprParendKind = pprParendType
 
 ppr_type :: Prec -> Type -> SDoc
-ppr_type _ (TyVarTy tv)		-- Note [Infix type variables]
-  | isSymOcc (getOccName tv)  = parens (ppr tv)
-  | otherwise		      = ppr tv
+ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 ppr_type p (PredTy pred)      = maybeParen p TyConPrec $
                                 ifPprDebug (ptext (sLit "<pred>")) <> (ppr pred)
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
@@ -570,14 +568,19 @@ ppr_tc tc
 					     else ptext (sLit "<nt>"))
 	       | otherwise     = empty
 
+ppr_tvar :: TyVar -> SDoc
+ppr_tvar tv  -- Note [Infix type variables]
+  | isSymOcc (getOccName tv)  = parens (ppr tv)
+  | otherwise		      = ppr tv
+
 -------------------
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
 pprForAll tvs = ptext (sLit "forall") <+> sep (map pprTvBndr tvs) <> dot
 
 pprTvBndr :: TyVar -> SDoc
-pprTvBndr tv | isLiftedTypeKind kind = ppr tv
-	     | otherwise	     = parens (ppr tv <+> dcolon <+> pprKind kind)
+pprTvBndr tv | isLiftedTypeKind kind = ppr_tvar tv
+	     | otherwise	     = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
 	     where
 	       kind = tyVarKind tv
 \end{code}

@@ -103,7 +103,9 @@ import HsBinds               -- for TcEvBinds stuff
 import Id 
 
 import TcRnTypes
-
+#ifdef DEBUG
+import Control.Monad( when )
+#endif
 import Data.IORef
 \end{code}
 
@@ -421,17 +423,16 @@ type TcsUntouchables = (Untouchables,TcTyVarSet)
 
 \begin{code}
 data SimplContext
-  = SimplInfer		-- Inferring type of a let-bound thing
-  | SimplRuleLhs	-- Inferring type of a RULE lhs
-  | SimplInteractive	-- Inferring type at GHCi prompt
-  | SimplCheck		-- Checking a type signature or RULE rhs
-  deriving Eq
+  = SimplInfer SDoc	   -- Inferring type of a let-bound thing
+  | SimplRuleLhs RuleName  -- Inferring type of a RULE lhs
+  | SimplInteractive	   -- Inferring type at GHCi prompt
+  | SimplCheck SDoc	   -- Checking a type signature or RULE rhs
 
 instance Outputable SimplContext where
-  ppr SimplInfer       = ptext (sLit "SimplInfer")
-  ppr SimplRuleLhs     = ptext (sLit "SimplRuleLhs")
+  ppr (SimplInfer d)   = ptext (sLit "SimplInfer") <+> d
+  ppr (SimplCheck d)   = ptext (sLit "SimplCheck") <+> d
+  ppr (SimplRuleLhs n) = ptext (sLit "SimplRuleLhs") <+> doubleQuotes (ftext n)
   ppr SimplInteractive = ptext (sLit "SimplInteractive")
-  ppr SimplCheck       = ptext (sLit "SimplCheck")
 
 isInteractive :: SimplContext -> Bool
 isInteractive SimplInteractive = True
@@ -441,14 +442,14 @@ simplEqsOnly :: SimplContext -> Bool
 -- Simplify equalities only, not dictionaries
 -- This is used for the LHS of rules; ee
 -- Note [Simplifying RULE lhs constraints] in TcSimplify
-simplEqsOnly SimplRuleLhs = True
-simplEqsOnly _            = False
+simplEqsOnly (SimplRuleLhs {}) = True
+simplEqsOnly _                 = False
 
 performDefaulting :: SimplContext -> Bool
-performDefaulting SimplInfer   	   = False
-performDefaulting SimplRuleLhs 	   = False
-performDefaulting SimplInteractive = True
-performDefaulting SimplCheck       = True
+performDefaulting (SimplInfer {})   = False
+performDefaulting (SimplRuleLhs {}) = False
+performDefaulting SimplInteractive  = True
+performDefaulting (SimplCheck {})   = True
 
 ---------------
 newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } 
@@ -526,7 +527,9 @@ runTcS context untouch tcs
 
 #ifdef DEBUG
        ; count <- TcM.readTcRef step_count
-       ; TcM.dumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count)
+       ; when (count > 0) $
+         TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") 
+                            <+> int count <+> ppr context)
 #endif
              -- And return
        ; ev_binds      <- TcM.readTcRef evb_ref
@@ -563,8 +566,9 @@ recoverTcS (TcS recovery_code) (TcS thing_inside)
 
 ctxtUnderImplic :: SimplContext -> SimplContext
 -- See Note [Simplifying RULE lhs constraints] in TcSimplify
-ctxtUnderImplic SimplRuleLhs = SimplCheck
-ctxtUnderImplic ctxt         = ctxt
+ctxtUnderImplic (SimplRuleLhs n) = SimplCheck (ptext (sLit "lhs of rule") 
+                                               <+> doubleQuotes (ftext n))
+ctxtUnderImplic ctxt              = ctxt
 
 tryTcS :: TcS a -> TcS a
 -- Like runTcS, but from within the TcS monad 
