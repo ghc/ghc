@@ -42,6 +42,9 @@ import GHC.Num
 import GHC.Real
 import GHC.Arr
 import GHC.Float.RealFracMethods
+import GHC.Float.ConversionUtils
+import GHC.Integer.Logarithms ( integerLogBase# )
+import GHC.Integer.Logarithms.Internals
 
 infixr 8  **
 \end{code}
@@ -190,13 +193,30 @@ instance  Num Float  where
     fromInteger i = F# (floatFromInteger i)
 
 instance  Real Float  where
-    toRational x        =  (m%1)*(b%1)^^n
-                           where (m,n) = decodeFloat x
-                                 b     = floatRadix  x
+    toRational (F# x#)  =
+        case decodeFloat_Int# x# of
+          (# m#, e# #)
+            | e# >=# 0#                                 ->
+                    (smallInteger m# `shiftLInteger` e#) :% 1
+            | (int2Word# m# `and#` 1##) `eqWord#` 0##   ->
+                    case elimZerosInt# m# (negateInt# e#) of
+                      (# n, d# #) -> n :% shiftLInteger 1 d#
+            | otherwise                                 ->
+                    smallInteger m# :% shiftLInteger 1 (negateInt# e#)
 
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
-    fromRational x      =  fromRat x
+    fromRational (n:%0)
+        | n == 0        = 0/0
+        | n < 0         = (-1)/0
+        | otherwise     = 1/0
+    fromRational (n:%d)
+        | n == 0        = encodeFloat 0 0
+        | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
+        | otherwise     = fromRat'' minEx mantDigs n d
+          where
+            minEx       = FLT_MIN_EXP
+            mantDigs    = FLT_MANT_DIG
     recip x             =  1.0 / x
 
 -- RULES for Integer and Int
@@ -330,13 +350,30 @@ instance  Num Double  where
 
 
 instance  Real Double  where
-    toRational x        =  (m%1)*(b%1)^^n
-                           where (m,n) = decodeFloat x
-                                 b     = floatRadix  x
+    toRational (D# x#)  =
+        case decodeDoubleInteger x# of
+          (# m, e# #)
+            | e# >=# 0#                                         ->
+                shiftLInteger m e# :% 1
+            | (int2Word# (toInt# m) `and#` 1##) `eqWord#` 0##   ->
+                case elimZerosInteger m (negateInt# e#) of
+                    (# n, d# #) ->  n :% shiftLInteger 1 d#
+            | otherwise                                         ->
+                m :% shiftLInteger 1 (negateInt# e#)
 
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
-    fromRational x      =  fromRat x
+    fromRational (n:%0)
+        | n == 0        = 0/0
+        | n < 0         = (-1)/0
+        | otherwise     = 1/0
+    fromRational (n:%d)
+        | n == 0        = encodeFloat 0 0
+        | n < 0         = -(fromRat'' minEx mantDigs (-n) d)
+        | otherwise     = fromRat'' minEx mantDigs n d
+          where
+            minEx       = DBL_MIN_EXP
+            mantDigs    = DBL_MANT_DIG
     recip x             =  1.0 / x
 
 instance  Floating Double  where
@@ -751,8 +788,10 @@ Now, here's Lennart's code (which works)
 
 \begin{code}
 -- | Converts a 'Rational' value into any type in class 'RealFloat'.
-{-# SPECIALISE fromRat :: Rational -> Double,
-                          Rational -> Float #-}
+{-# RULES
+"fromRat/Float"     fromRat = (fromRational :: Rational -> Float)
+"fromRat/Double"    fromRat = (fromRational :: Rational -> Double)
+  #-}
 fromRat :: (RealFloat a) => Rational -> a
 
 -- Deal with special cases first, delegating the real work to fromRat'
@@ -820,20 +859,90 @@ expts10 = array (minExpt,maxExpt10) [(n,10^n) | n <- [minExpt .. maxExpt10]]
 
 -- Compute the (floor of the) log of i in base b.
 -- Simplest way would be just divide i by b until it's smaller then b, but that would
--- be very slow!  We are just slightly more clever.
+-- be very slow!  We are just slightly more clever, except for base 2, where
+-- we take advantage of the representation of Integers.
+-- The general case could be improved by a lookup table for
+-- approximating the result by integerLog2 i / integerLog2 b.
 integerLogBase :: Integer -> Integer -> Int
 integerLogBase b i
    | i < b     = 0
-   | otherwise = doDiv (i `div` (b^l)) l
-       where
-        -- Try squaring the base first to cut down the number of divisions.
-         l = 2 * integerLogBase (b*b) i
+   | b == 2    = I# (integerLog2# i)
+   | otherwise = I# (integerLogBase# b i)
 
-         doDiv :: Integer -> Int -> Int
-         doDiv x y
-            | x < b     = y
-            | otherwise = doDiv (x `div` b) (y+1)
+\end{code}
 
+Unfortunately, the old conversion code was awfully slow due to
+a) a slow integer logarithm
+b) repeated calculation of gcd's
+
+For the case of Rational's coming from a Float or Double via toRational,
+we can exploit the fact that the denominator is a power of two, which for
+these brings a huge speedup since we need only shift and add instead
+of division.
+
+The below is an adaption of fromRat' for the conversion to
+Float or Double exploiting the know floatRadix and avoiding
+divisions as much as possible.
+
+\begin{code}
+{-# SPECIALISE fromRat'' :: Int -> Int -> Integer -> Integer -> Float,
+                            Int -> Int -> Integer -> Integer -> Double #-}
+fromRat'' :: RealFloat a => Int -> Int -> Integer -> Integer -> a
+fromRat'' minEx@(I# me#) mantDigs@(I# md#) n d =
+    case integerLog2IsPowerOf2# d of
+      (# ld#, pw# #)
+        | pw# ==# 0# ->
+          case integerLog2# n of
+            ln# | ln# ># (ld# +# me#) ->
+                  if ln# <# md#
+                    then encodeFloat (n `shiftL` (I# (md# -# 1# -# ln#)))
+                                        (I# (ln# +# 1# -# ld# -# md#))
+                    else let n'  = n `shiftR` (I# (ln# +# 1# -# md#))
+                             n'' = case roundingMode# n (ln# -# md#) of
+                                    0# -> n'
+                                    2# -> n' + 1
+                                    _  -> case fromInteger n' .&. (1 :: Int) of
+                                            0 -> n'
+                                            _ -> n' + 1
+                         in encodeFloat n'' (I# (ln# -# ld# +# 1# -# md#))
+                | otherwise ->
+                  case ld# +# (me# -# md#) of
+                    ld'# | ld'# ># (ln# +# 1#)  -> encodeFloat 0 0
+                         | ld'# ==# (ln# +# 1#) ->
+                           case integerLog2IsPowerOf2# n of
+                            (# _, 0# #) -> encodeFloat 0 0
+                            (# _, _ #)  -> encodeFloat 1 (minEx - mantDigs)
+                         | ld'# <=# 0#  ->
+                           encodeFloat n (I# ((me# -# md#) -# ld'#))
+                         | otherwise    ->
+                           let n' = n `shiftR` (I# ld'#)
+                           in case roundingMode# n (ld'# -# 1#) of
+                                0# -> encodeFloat n' (minEx - mantDigs)
+                                1# -> if fromInteger n' .&. (1 :: Int) == 0
+                                        then encodeFloat n' (minEx-mantDigs)
+                                        else encodeFloat (n' + 1) (minEx-mantDigs)
+                                _  -> encodeFloat (n' + 1) (minEx-mantDigs)
+        | otherwise ->
+          let ln = I# (integerLog2# n)
+              ld = I# ld#
+              p0 = max minEx (ln - ld)
+              (n', d')
+                | p0 < mantDigs = (n `shiftL` (mantDigs - p0), d)
+                | p0 == mantDigs = (n, d)
+                | otherwise     = (n, d `shiftL` (p0 - mantDigs))
+              scale p a b
+                | p <= minEx-mantDigs = (p,a,b)
+                | a < (b `shiftL` (mantDigs-1)) = (p-1, a `shiftL` 1, b)
+                | (b `shiftL` mantDigs) <= a = (p+1, a, b `shiftL` 1)
+                | otherwise = (p, a, b)
+              (p', n'', d'') = scale (p0-mantDigs) n' d'
+              rdq = case n'' `quotRem` d'' of
+                     (q,r) -> case compare (r `shiftL` 1) d'' of
+                                LT -> q
+                                EQ -> if fromInteger q .&. (1 :: Int) == 0
+                                        then q else q+1
+                                GT -> q+1
+          in  encodeFloat rdq p'
 \end{code}
 
 

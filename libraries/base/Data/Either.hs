@@ -1,4 +1,7 @@
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+#endif
 
 -----------------------------------------------------------------------------
 -- |

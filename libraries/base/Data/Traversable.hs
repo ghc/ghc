@@ -170,7 +170,10 @@ instance Applicative (StateR s) where
 mapAccumR :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
 
--- | This function may be used as a value for `fmap` in a `Functor` instance.
+-- | This function may be used as a value for `fmap` in a `Functor`
+--   instance, provided that 'traverse' is defined. (Using
+--   `fmapDefault` with a `Traversable` instance defined only by
+--   'sequenceA' will result in infinite recursion.)
 fmapDefault :: Traversable t => (a -> b) -> t a -> t b
 {-# INLINE fmapDefault #-}
 fmapDefault f = getId . traverse (Id . f)

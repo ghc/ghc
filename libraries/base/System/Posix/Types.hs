@@ -3,7 +3,9 @@
            , MagicHash
            , GeneralizedNewtypeDeriving
   #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-}
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+#endif
 
 -----------------------------------------------------------------------------
 -- |
