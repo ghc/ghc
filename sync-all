@@ -377,6 +377,10 @@ sub scmall {
             }
             scm ($localpath, $scm, @scm_args, @args);
         }
+        elsif ($command =~ /^checkout$/) {
+            scm ($localpath, $scm, "checkout", @args)
+                unless $scm eq "darcs";
+        }
         elsif ($command =~ /^grep$/) {
             # Hack around 'git grep' failing if there are no matches
             $ignore_failure = 1;
@@ -423,6 +427,7 @@ Supported commands:
  * remote add <branch-name>
  * remote rm <branch-name>
  * remote set-url [--push] <branch-name>
+ * checkout
  * grep
  * clean
  * reset
