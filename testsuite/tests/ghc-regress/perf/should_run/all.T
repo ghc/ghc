@@ -107,3 +107,11 @@ test('T149',
      run_command,
      ['$MAKE -s --no-print-directory T149'])
 
+test('T5113',
+     [stats_num_field('bytes allocated', 8000000,
+                                         9000000),
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O'])
+
