@@ -106,6 +106,7 @@ data Name = Name {
 --(note later when changing Int# -> FastInt: is that still true about UNPACK?)
 		n_loc  :: !SrcSpan	-- Definition site
 	    }
+    deriving Typeable
 
 -- NOTE: we make the n_loc field strict to eliminate some potential
 -- (and real!) space leaks, due to the fact that we don't look at
@@ -362,8 +363,6 @@ instance Uniquable Name where
 
 instance NamedThing Name where
     getName n = n
-
-INSTANCE_TYPEABLE0(Name,nameTc,"Name")
 
 instance Data Name where
   -- don't traverse?

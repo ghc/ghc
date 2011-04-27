@@ -476,42 +476,15 @@
           style.</para>
 	</listitem>
       </varlistentry>
+    </variablelist>
+  </sect2>
 
-      <varlistentry>
-	<term>
-          <option>-dsuppress-uniques</option>
-          <indexterm><primary><option>-dsuppress-uniques</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Suppress the printing of uniques in debugging output. This may make 
-	  the printout ambiguous (e.g. unclear where an occurrence of 'x' is bound), but
-	  it makes the output of two compiler runs have many fewer gratuitous differences,
-	    so you can realistically apply <command>diff</command>.  Once <command>diff</command>
-	  has shown you where to look, you can try again without <option>-dsuppress-uniques</option></para>
-	</listitem>
-      </varlistentry>
+  <sect2 id="formatting dumps">
+    <title>Formatting dumps</title>
 
-      <varlistentry>
-	<term>
-          <option>-dsuppress-coercions</option>
-          <indexterm><primary><option>-dsuppress-coercions</option></primary></indexterm>
-        </term>
-	<listitem>
-          <para>Suppress the printing of coercions in Core dumps to make them
-shorter.</para>
-	</listitem>
-      </varlistentry>
+    <indexterm><primary>formatting dumps</primary></indexterm>
 
-      <varlistentry>
-	<term>
-          <option>-dsuppress-module-prefixes</option>
-          <indexterm><primary><option>-dsuppress-module-prefixes</option></primary></indexterm>
-        </term>
-	<listitem>
-          <para>Suppress the printing of module qualification prefixes in Core dumps to make them easier to read.</para>
-	</listitem>
-      </varlistentry>
-
+     <variablelist>
       <varlistentry>
 	<term>
           <option>-dppr-user-length</option>
@@ -522,6 +495,28 @@ shorter.</para>
 	  certain &ldquo;depth&rdquo;, with subexpressions beyond the
 	  depth replaced by ellipses.  This flag sets the
 	  depth.  Its default value is 5.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dppr-colsNNN</option>
+          <indexterm><primary><option>-dppr-colsNNN</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Set the width of debugging output. Use this if your code is wrapping too much.
+		For example: <option>-dppr-cols200</option>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dppr-case-as-let</option>
+          <indexterm><primary><option>-dppr-case-as-let</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Print single alternative case expressions as though they were strict 
+		let expressions. This is helpful when your code does a lot of unboxing.</para>
 	</listitem>
       </varlistentry>
 
@@ -538,6 +533,97 @@ shorter.</para>
             cause bogus test failures, so this flag is provided to
             turn it off.</para>
         </listitem>
+      </varlistentry>
+     </variablelist>
+
+  </sect2>
+
+  <sect2 id="supression">
+    <title>Suppressing unwanted information</title>
+
+    <indexterm><primary>suppression</primary></indexterm>
+
+    Core dumps contain a large amount of information. Depending on what you are doing, not all of it will be useful.
+    Use these flags to suppress the parts that you are not interested in.
+
+    <variablelist>
+      <varlistentry>
+	<term>
+          <option>-dsuppress-all</option>
+          <indexterm><primary><option>-dsuppress-all</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Suppress everything that can be suppressed, except for unique ids as this often 
+		makes the printout ambiguous. If you just want to see the overall structure of
+		the code, then start here.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dsuppress-uniques</option>
+          <indexterm><primary><option>-dsuppress-uniques</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Suppress the printing of uniques. This may make 
+	  the printout ambiguous (e.g. unclear where an occurrence of 'x' is bound), but
+	  it makes the output of two compiler runs have many fewer gratuitous differences,
+	    so you can realistically apply <command>diff</command>.  Once <command>diff</command>
+	  has shown you where to look, you can try again without <option>-dsuppress-uniques</option></para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dsuppress-idinfo</option>
+          <indexterm><primary><option>-dsuppress-idinfo</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Suppress extended information about identifiers where they are bound. This includes
+		strictness information and inliner templates. Using this flag can cut the size 
+		of the core dump in half, due to the lack of inliner templates</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dsuppress-module-prefixes</option>
+          <indexterm><primary><option>-dsuppress-module-prefixes</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Suppress the printing of module qualification prefixes.
+	        This is the <constant>Data.List</constant> in <constant>Data.List.length</constant>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dsuppress-type-signatures</option>
+          <indexterm><primary><option>-dsuppress-type-signatures</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Suppress the printing of type signatures.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dsuppress-type-applications</option>
+          <indexterm><primary><option>-dsuppress-type-applications</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Suppress the printing of type applications.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <option>-dsuppress-coercions</option>
+          <indexterm><primary><option>-dsuppress-coercions</option></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Suppress the printing of type coercions.</para>
+	</listitem>
       </varlistentry>
     </variablelist>
   </sect2>

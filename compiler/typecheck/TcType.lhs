@@ -306,14 +306,12 @@ data MetaInfo
      		   -- A TauTv is always filled in with a tau-type, which
 		   -- never contains any ForAlls 
 
-   | SigTv Name	   -- A variant of TauTv, except that it should not be
+   | SigTv 	   -- A variant of TauTv, except that it should not be
 		   -- unified with a type, only with a type variable
 		   -- SigTvs are only distinguished to improve error messages
 		   --      see Note [Signature skolems]        
 		   --      The MetaDetails, if filled in, will 
 		   --      always be another SigTv or a SkolemTv
-		   -- The Name is the name of the function from whose
-		   -- type signature we got this skolem
 
    | TcsTv	   -- A MetaTv allocated by the constraint solver
      		   -- Its particular property is that it is always "touchable"
@@ -392,12 +390,12 @@ kind_var_occ = mkOccName tvName "k"
 \begin{code}
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
-pprTcTyVarDetails (SkolemTv {})        = ptext (sLit "sk")
-pprTcTyVarDetails (RuntimeUnk {})      = ptext (sLit "rt")
-pprTcTyVarDetails (FlatSkol {})        = ptext (sLit "fsk")
-pprTcTyVarDetails (MetaTv TauTv _)     = ptext (sLit "tau")
-pprTcTyVarDetails (MetaTv TcsTv _)     = ptext (sLit "tcs")
-pprTcTyVarDetails (MetaTv (SigTv _) _) = ptext (sLit "sig")
+pprTcTyVarDetails (SkolemTv {})    = ptext (sLit "sk")
+pprTcTyVarDetails (RuntimeUnk {})  = ptext (sLit "rt")
+pprTcTyVarDetails (FlatSkol {})    = ptext (sLit "fsk")
+pprTcTyVarDetails (MetaTv TauTv _) = ptext (sLit "tau")
+pprTcTyVarDetails (MetaTv TcsTv _) = ptext (sLit "tcs")
+pprTcTyVarDetails (MetaTv SigTv _) = ptext (sLit "sig")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
@@ -552,8 +550,8 @@ isTyConableTyVar tv
 	-- not a SigTv
   = ASSERT( isTcTyVar tv) 
     case tcTyVarDetails tv of
-	MetaTv (SigTv _) _ -> False
-	_                  -> True
+	MetaTv SigTv _ -> False
+	_              -> True
 	
 isSkolemTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
@@ -583,8 +581,8 @@ isSigTyVar :: Var -> Bool
 isSigTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	MetaTv (SigTv _) _ -> True
-	_                  -> False
+	MetaTv SigTv _ -> True
+	_              -> False
 
 metaTvRef :: TyVar -> IORef MetaDetails
 metaTvRef tv 

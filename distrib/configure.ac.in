@@ -55,7 +55,7 @@ export CC
 WhatGccIsCalled="$CC"
 AC_SUBST(WhatGccIsCalled)
 
-FP_HAVE_GCC
+FP_GCC_VERSION
 AC_PROG_CPP
 
 #
@@ -88,7 +88,7 @@ dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_NEEDS_RANLIB
 
 #
-AC_CONFIG_FILES(extra-gcc-opts mk/config.mk mk/install.mk)
+AC_CONFIG_FILES(settings mk/config.mk mk/install.mk)
 AC_OUTPUT
 
 # We get caught by

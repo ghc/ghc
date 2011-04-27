@@ -210,6 +210,7 @@ data OccName = OccName
     { occNameSpace  :: !NameSpace
     , occNameFS     :: !FastString
     }
+    deriving Typeable
 \end{code}
 
 
@@ -221,8 +222,6 @@ instance Ord OccName where
 	-- Compares lexicographically, *not* by Unique of the string
     compare (OccName sp1 s1) (OccName sp2 s2) 
 	= (s1  `compare` s2) `thenCmp` (sp1 `compare` sp2)
-
-INSTANCE_TYPEABLE0(OccName,occNameTc,"OccName")
 
 instance Data OccName where
   -- don't traverse?

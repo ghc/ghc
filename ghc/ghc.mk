@@ -108,15 +108,15 @@ all_ghc_stage1 : $(GHC_STAGE1)
 all_ghc_stage2 : $(GHC_STAGE2)
 all_ghc_stage3 : $(GHC_STAGE3)
 
-$(INPLACE_LIB)/extra-gcc-opts : extra-gcc-opts
+$(INPLACE_LIB)/settings : settings
 	"$(CP)" $< $@
 
 # The GHC programs need to depend on all the helper programs they might call,
 # and the settings files they use
 
-$(GHC_STAGE1) : | $(UNLIT) $(INPLACE_LIB)/extra-gcc-opts
-$(GHC_STAGE2) : | $(UNLIT) $(INPLACE_LIB)/extra-gcc-opts
-$(GHC_STAGE3) : | $(UNLIT) $(INPLACE_LIB)/extra-gcc-opts
+$(GHC_STAGE1) : | $(UNLIT) $(INPLACE_LIB)/settings
+$(GHC_STAGE2) : | $(UNLIT) $(INPLACE_LIB)/settings
+$(GHC_STAGE3) : | $(UNLIT) $(INPLACE_LIB)/settings
 
 ifeq "$(GhcUnregisterised)" "NO"
 $(GHC_STAGE1) : | $(SPLIT)
@@ -137,7 +137,7 @@ endif
 
 endif
 
-INSTALL_LIBS += extra-gcc-opts
+INSTALL_LIBS += settings
 
 ifeq "$(Windows)" "NO"
 install: install_ghc_link

@@ -1237,10 +1237,10 @@ completeCall env var cont
       | not (dopt Opt_D_dump_inlinings dflags) = stuff
       | not (dopt Opt_D_verbose_core2core dflags) 
       = if isExternalName (idName var) then 
-      	  pprTrace "Inlining done:" (ppr var) stuff
+      	  pprDefiniteTrace "Inlining done:" (ppr var) stuff
         else stuff
       | otherwise
-      = pprTrace ("Inlining done: " ++ showSDoc (ppr var))
+      = pprDefiniteTrace ("Inlining done: " ++ showSDoc (ppr var))
            (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                   text "Cont:  " <+> ppr cont])
            stuff
@@ -1393,10 +1393,10 @@ tryRules env rules fn args call_cont
       , not (dopt Opt_D_dump_rule_rewrites dflags) = stuff
 
       | not (dopt Opt_D_dump_rule_rewrites dflags)
-      = pprTrace "Rule fired:" (ftext (ru_name rule)) stuff
+      = pprDefiniteTrace "Rule fired:" (ftext (ru_name rule)) stuff
 
       | otherwise
-      = pprTrace "Rule fired"
+      = pprDefiniteTrace "Rule fired"
            (vcat [text "Rule:" <+> ftext (ru_name rule),
            	  text "Before:" <+> hang (ppr fn) 2 (sep (map pprParendExpr args)),
            	  text "After: " <+> pprCoreExpr rule_rhs,

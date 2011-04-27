@@ -155,6 +155,7 @@ addBootSuffixLocn locn
 \begin{code}
 -- | A ModuleName is essentially a simple string, e.g. @Data.List@.
 newtype ModuleName = ModuleName FastString
+    deriving Typeable
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
@@ -174,8 +175,6 @@ instance Outputable ModuleName where
 instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
-
-INSTANCE_TYPEABLE0(ModuleName,moduleNameTc,"ModuleName")
 
 instance Data ModuleName where
   -- don't traverse?
@@ -224,7 +223,7 @@ data Module = Module {
    modulePackageId :: !PackageId,  -- pkg-1.0
    moduleName      :: !ModuleName  -- A.B.C
   }
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Typeable)
 
 instance Uniquable Module where
   getUnique (Module p n) = getUnique (packageIdFS p `appendFS` moduleNameFS n)
@@ -235,8 +234,6 @@ instance Outputable Module where
 instance Binary Module where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
   get bh = do p <- get bh; n <- get bh; return (Module p n)
-
-INSTANCE_TYPEABLE0(Module,moduleTc,"Module")
 
 instance Data Module where
   -- don't traverse?
@@ -280,7 +277,7 @@ pprPackagePrefix p mod = getPprStyle doc
 
 \begin{code}
 -- | Essentially just a string identifying a package, including the version: e.g. parsec-1.0
-newtype PackageId = PId FastString deriving( Eq )
+newtype PackageId = PId FastString deriving( Eq, Typeable )
     -- here to avoid module loops with PackageConfig
 
 instance Uniquable PackageId where
@@ -290,8 +287,6 @@ instance Uniquable PackageId where
 -- ordering.
 instance Ord PackageId where
   nm1 `compare` nm2 = getUnique nm1 `compare` getUnique nm2
-
-INSTANCE_TYPEABLE0(PackageId,packageIdTc,"PackageId")
 
 instance Data PackageId where
   -- don't traverse?
