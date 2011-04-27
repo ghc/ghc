@@ -305,12 +305,15 @@ checkOS "$TargetOS"
 
 # Verify that the installed (bootstrap) GHC is capable of generating
 # code for the requested build platform.
-if test "$BuildPlatform" != "$bootstrap_target"
+if test "$BootingFromHc" = "NO"
 then
-    echo "This GHC (${WithGhc}) does not generate code for the build platform"
-    echo "   GHC target platform    : $bootstrap_target"
-    echo "   Desired build platform : $BuildPlatform"
-    exit 1
+    if test "$BuildPlatform" != "$bootstrap_target"
+    then
+        echo "This GHC (${WithGhc}) does not generate code for the build platform"
+        echo "   GHC target platform    : $bootstrap_target"
+        echo "   Desired build platform : $BuildPlatform"
+        exit 1
+    fi
 fi
 
 echo "GHC build  : $BuildPlatform"
