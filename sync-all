@@ -378,6 +378,8 @@ sub scmall {
             scm ($localpath, $scm, @scm_args, @args);
         }
         elsif ($command =~ /^checkout$/) {
+            # Not all repos are necessarily branched, so ignore failure
+            $ignore_failure = 1;
             scm ($localpath, $scm, "checkout", @args)
                 unless $scm eq "darcs";
         }
