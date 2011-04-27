@@ -87,7 +87,17 @@ pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
                       <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
                     else empty
 #endif
+   $$ pprSizeDecl (if null info then lbl else entryLblToInfoLbl lbl)
 
+-- | Output the ELF .size directive.
+pprSizeDecl :: CLabel -> Doc
+#if elf_OBJ_FORMAT
+pprSizeDecl lbl =
+    ptext (sLit "\t.size") <+> pprCLabel_asm lbl
+    <> ptext (sLit ", .-") <> pprCLabel_asm lbl
+#else
+pprSizeDecl _ = empty
+#endif
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
 pprBasicBlock (BasicBlock blockid instrs) =
