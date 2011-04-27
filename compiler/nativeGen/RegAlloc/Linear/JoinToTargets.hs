@@ -190,7 +190,7 @@ joinToTargets_again
 		 _	-> let	instr'	=  patchJumpInstr instr 
 		 				(\bid -> if bid == dest 
 								then mkBlockId fixup_block_id 
-								else dest)
+								else bid) -- no change!
 						
 		 	   in	joinToTargets' block_live (block : new_blocks) block_id instr' dests
 
