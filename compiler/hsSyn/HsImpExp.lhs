@@ -6,12 +6,6 @@
 HsImpExp: Abstract syntax: imports, exports, interfaces
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module HsImpExp where
@@ -103,6 +97,7 @@ ieName (IEVar n) 	 = n
 ieName (IEThingAbs  n)   = n
 ieName (IEThingWith n _) = n
 ieName (IEThingAll  n)   = n
+ieName _ = panic "ieName failed pattern match!"
 
 ieNames :: IE a -> [a]
 ieNames (IEVar            n   ) = [n]
@@ -122,8 +117,8 @@ instance (Outputable name) => Outputable (IE name) where
     ppr (IEThingAll	thing)	= hcat [ppr thing, text "(..)"]
     ppr (IEThingWith thing withs)
 	= ppr thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
-    ppr (IEModuleContents mod)
-	= ptext (sLit "module") <+> ppr mod
+    ppr (IEModuleContents mod')
+	= ptext (sLit "module") <+> ppr mod'
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
