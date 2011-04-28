@@ -25,12 +25,6 @@ Common commands:
 
      Shows the targets available in <dir>
 
-  make html
-  make pdf
-  make ps
-
-     Make documentation
-
   make install
 
      Installs GHC, libraries and tools under $(prefix)
