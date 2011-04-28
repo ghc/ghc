@@ -185,8 +185,6 @@ instance Outputable SrcLoc where
 
     ppr (UnhelpfulLoc s)  = ftext s
 
-INSTANCE_TYPEABLE0(SrcSpan,srcSpanTc,"SrcSpan")
-
 instance Data SrcSpan where
   -- don't traverse?
   toConstr _   = abstractConstr "SrcSpan"
@@ -237,10 +235,10 @@ data SrcSpan
 				-- also used to indicate an empty span
 
 #ifdef DEBUG
-  deriving (Eq, Show)	-- Show is used by Lexer.x, becuase we
-			-- derive Show for Token
+  deriving (Eq, Typeable, Show) -- Show is used by Lexer.x, becuase we
+                                -- derive Show for Token
 #else
-  deriving Eq
+  deriving (Eq, Typeable)
 #endif
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty

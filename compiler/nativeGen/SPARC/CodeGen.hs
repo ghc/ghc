@@ -8,6 +8,7 @@
 
 module SPARC.CodeGen ( 
 	cmmTopCodeGen, 
+	generateJumpTableForInstr,
 	InstrBlock 
 ) 
 
@@ -299,15 +300,11 @@ genSwitch expr ids
 		dst		<- getNewRegNat II32
 
 		label 		<- getNewLabelNat
-		let jumpTable	= map jumpTableEntry ids
 
 		return $ e_code `appOL`
 		 toOL	
-		 	-- the jump table
-			[ LDATA ReadOnlyData (CmmDataLabel label : jumpTable)
-
-			-- load base of jump table
-			, SETHI (HI (ImmCLbl label)) base_reg
+			[ -- load base of jump table
+			  SETHI (HI (ImmCLbl label)) base_reg
 			, OR    False base_reg (RIImm $ LO $ ImmCLbl label) base_reg
 			
 			-- the addrs in the table are 32 bits wide..
@@ -315,6 +312,11 @@ genSwitch expr ids
 
 			-- load and jump to the destination
 			, LD 	  II32 (AddrRegReg base_reg offset_reg) dst
-			, JMP_TBL (AddrRegImm dst (ImmInt 0)) [i | Just i <- ids]
+			, JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
 			, NOP ]
 
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr (JMP_TBL _ ids label) =
+	let jumpTable = map jumpTableEntry ids
+	in Just (CmmData ReadOnlyData (CmmDataLabel label : jumpTable))
+generateJumpTableForInstr _ = Nothing

@@ -1132,12 +1132,11 @@ hscTcExpr	-- Typecheck an expression (but don't run it)
 hscTcExpr hsc_env expr = runHsc hsc_env $ do
     maybe_stmt <- hscParseStmt expr
     case maybe_stmt of
-      Just (L _ (ExprStmt expr _ _ _)) ->
-          ioMsgMaybe $ tcRnExpr hsc_env (hsc_IC hsc_env) expr
-      _ -> 
-          liftIO $ throwIO $ mkSrcErr $ unitBag $ 
-              mkPlainErrMsg noSrcSpan
-                            (text "not an expression:" <+> quotes (text expr))
+        Just (L _ (ExprStmt expr _ _ _)) ->
+            ioMsgMaybe $ tcRnExpr hsc_env (hsc_IC hsc_env) expr
+        _ ->
+            liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg noSrcSpan
+                (text "not an expression:" <+> quotes (text expr))
 
 -- | Find the kind of a type
 hscKcType

@@ -104,7 +104,7 @@ data Instr
 	| JMP     CLabel          	-- same as branch,
                                         -- but with CLabel instead of block ID
 	| MTCTR	Reg
-	| BCTR    [BlockId]       	-- with list of local destinations
+	| BCTR [Maybe BlockId] (Maybe CLabel) -- with list of local destinations, and jump table location if necessary
 	| BL	CLabel [Reg]		-- with list of argument regs
 	| BCTRL	[Reg]
 	      
@@ -184,7 +184,7 @@ ppc_regUsageOfInstr instr
     BCC	   _ _		-> noUsage
     BCCFAR _ _		-> noUsage
     MTCTR reg		-> usage ([reg],[])
-    BCTR  _		-> noUsage
+    BCTR  _ _		-> noUsage
     BL    _ params	-> usage (params, callClobberedRegs)
     BCTRL params	-> usage (params, callClobberedRegs)
     ADD	  reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
@@ -257,7 +257,7 @@ ppc_patchRegsOfInstr instr env
     BCC	  cond lbl	-> BCC cond lbl
     BCCFAR cond lbl	-> BCCFAR cond lbl
     MTCTR reg		-> MTCTR (env reg)
-    BCTR  targets	-> BCTR targets
+    BCTR  targets lbl	-> BCTR targets lbl
     BL    imm argRegs	-> BL imm argRegs	-- argument regs
     BCTRL argRegs	-> BCTRL argRegs 	-- cannot be remapped
     ADD	  reg1 reg2 ri	-> ADD (env reg1) (env reg2) (fixRI ri)
@@ -326,7 +326,7 @@ ppc_jumpDestsOfInstr insn
   = case insn of
         BCC _ id        -> [id]
         BCCFAR _ id     -> [id]
-        BCTR targets    -> targets
+        BCTR targets _  -> [id | Just id <- targets]
 	_		-> []
 	
 	
@@ -338,7 +338,7 @@ ppc_patchJumpInstr insn patchF
   = case insn of
         BCC cc id 	-> BCC cc (patchF id)
         BCCFAR cc id 	-> BCCFAR cc (patchF id)
-        BCTR _	 	-> error "Cannot patch BCTR"
+        BCTR ids lbl	-> BCTR (map (fmap patchF) ids) lbl
 	_		-> insn
 
 

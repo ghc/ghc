@@ -36,7 +36,7 @@ where
 #include "HsVersions.h"
 
 import PackageConfig	
-import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..), DPHBackend(..) )
+import DynFlags
 import StaticFlags
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )

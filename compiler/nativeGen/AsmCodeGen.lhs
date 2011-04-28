@@ -378,10 +378,15 @@ cmmNativeGen dflags us cmm count
 			, Nothing
 			, mPprStats)
 
+	---- generate jump tables
+	let tabled	=
+		{-# SCC "generateJumpTables" #-}
+		alloced ++ generateJumpTables alloced
+
 	---- shortcut branches
 	let shorted	=
 	 	{-# SCC "shortcutBranches" #-}
-	 	shortcutBranches dflags alloced
+	 	shortcutBranches dflags tabled
 
 	---- sequence blocks
 	let sequenced	=
@@ -607,6 +612,18 @@ makeFarBranches blocks
 #else
 makeFarBranches = id
 #endif
+
+-- -----------------------------------------------------------------------------
+-- Generate jump tables
+
+-- Analyzes all native code and generates data sections for all jump
+-- table instructions.
+generateJumpTables
+	:: [NatCmmTop Instr] -> [NatCmmTop Instr]
+generateJumpTables xs = concatMap f xs
+    where f (CmmProc _ _ (ListGraph xs)) = concatMap g xs
+          f _ = []
+          g (BasicBlock _ xs) = catMaybes (map generateJumpTableForInstr xs)
 
 -- -----------------------------------------------------------------------------
 -- Shortcut branches

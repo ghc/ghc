@@ -310,20 +310,14 @@ sub scmall {
             if (-d "$localpath/.git") {
                 die "Found both _darcs and .git in $localpath";
             }
-            else {
-                $scm = "darcs";
-            }
-        }
-        else {
-            if (-d "$localpath/.git") {
-                $scm = "git";
-            }
-            elsif ($tag eq "") {
-                die "Required repo $localpath is missing";
-            }
-            else {
-                message "== $localpath repo not present; skipping";
-            }
+            $scm = "darcs";
+        } elsif (-d "$localpath/.git") {
+            $scm = "git";
+        } elsif ($tag eq "") {
+            die "Required repo $localpath is missing";
+        } else {
+             message "== $localpath repo not present; skipping";
+             next;
         }
 
         # Work out the arguments we should give to the SCM
@@ -383,6 +377,12 @@ sub scmall {
             }
             scm ($localpath, $scm, @scm_args, @args);
         }
+        elsif ($command =~ /^checkout$/) {
+            # Not all repos are necessarily branched, so ignore failure
+            $ignore_failure = 1;
+            scm ($localpath, $scm, "checkout", @args)
+                unless $scm eq "darcs";
+        }
         elsif ($command =~ /^grep$/) {
             # Hack around 'git grep' failing if there are no matches
             $ignore_failure = 1;
@@ -429,6 +429,7 @@ Supported commands:
  * remote add <branch-name>
  * remote rm <branch-name>
  * remote set-url [--push] <branch-name>
+ * checkout
  * grep
  * clean
  * reset

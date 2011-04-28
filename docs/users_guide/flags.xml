@@ -2474,24 +2474,6 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-dsuppress-uniques</option></entry>
-	      <entry>Suppress the printing of uniques in debug output (easier to use <command>diff</command>.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-dsuppress-coercions</option></entry>
-	      <entry>Suppress the printing of coercions in Core dumps to make them shorter.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-dsuppress-module-prefixes</option></entry>
-	      <entry>Suppress the printing of module qualification prefixes in Core dumps to make them easier to read.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-dppr-noprags</option></entry>
 	      <entry>Don't output pragma info in dumps</entry>
 	      <entry>static</entry>
@@ -2500,6 +2482,60 @@ phase <replaceable>n</replaceable></entry>
 	    <row>
 	      <entry><option>-dppr-user-length</option></entry>
 	      <entry>Set the depth for printing expressions in error msgs</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-colsNNN</option></entry>
+	      <entry>Set the width of debugging output. For example <option>-dppr-cols200</option></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-case-as-let</option></entry>
+	      <entry>Print single alternative case expressions as strict lets.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-all</option></entry>
+	      <entry>In core dumps, suppress everything that is suppressable.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-uniques</option></entry>
+	      <entry>Suppress the printing of uniques in debug output (easier to use <command>diff</command>)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-idinfo</option></entry>
+	      <entry>Suppress extended information about identifiers where they are bound</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-module-prefixes</option></entry>
+	      <entry>Suppress the printing of module qualification prefixes</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-type-signatures</option></entry>
+	      <entry>Suppress type signatures</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-type-applications</option></entry>
+	      <entry>Suppress type applications</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-coercions</option></entry>
+	      <entry>Suppress the printing of coercions in Core dumps to make them shorter</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

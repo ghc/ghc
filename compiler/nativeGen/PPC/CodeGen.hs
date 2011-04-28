@@ -15,6 +15,7 @@
 
 module PPC.CodeGen ( 
 	cmmTopCodeGen, 
+	generateJumpTableForInstr,
 	InstrBlock 
 ) 
 
@@ -798,7 +799,7 @@ genJump (CmmLit (CmmLabel lbl))
 genJump tree
   = do
         (target,code) <- getSomeReg tree
-        return (code `snocOL` MTCTR target `snocOL` BCTR [])
+        return (code `snocOL` MTCTR target `snocOL` BCTR [] Nothing)
 
 
 -- -----------------------------------------------------------------------------
@@ -1126,22 +1127,12 @@ genSwitch expr ids
         dflags <- getDynFlagsNat
         dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
-        let
-            jumpTable = map jumpTableEntryRel ids
-            
-            jumpTableEntryRel Nothing
-                = CmmStaticLit (CmmInt 0 wordWidth)
-            jumpTableEntryRel (Just blockid)
-                = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                where blockLabel = mkAsmTempLabel (getUnique blockid)
-
-            code = e_code `appOL` t_code `appOL` toOL [
-                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+        let code = e_code `appOL` t_code `appOL` toOL [
                             SLW tmp reg (RIImm (ImmInt 2)),
                             LD II32 tmp (AddrRegReg tableReg tmp),
                             ADD tmp tmp (RIReg tableReg),
                             MTCTR tmp,
-                            BCTR [ id | Just id <- ids ]
+                            BCTR ids (Just lbl)
                     ]
         return code
   | otherwise
@@ -1149,19 +1140,27 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat II32
         lbl <- getNewLabelNat
-        let
-            jumpTable = map jumpTableEntry ids
-        
-            code = e_code `appOL` toOL [
-                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+        let code = e_code `appOL` toOL [
                             SLW tmp reg (RIImm (ImmInt 2)),
                             ADDIS tmp tmp (HA (ImmCLbl lbl)),
                             LD II32 tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
                             MTCTR tmp,
-                            BCTR [ id | Just id <- ids ]
+                            BCTR ids (Just lbl)
                     ]
         return code
 
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr (BCTR ids (Just lbl)) =
+    let jumpTable
+            | opt_PIC   = map jumpTableEntryRel ids
+            | otherwise = map jumpTableEntry ids
+                where jumpTableEntryRel Nothing
+                        = CmmStaticLit (CmmInt 0 wordWidth)
+                      jumpTableEntryRel (Just blockid)
+                        = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
+                            where blockLabel = mkAsmTempLabel (getUnique blockid)
+    in Just (CmmData ReadOnlyData (CmmDataLabel lbl : jumpTable))
+generateJumpTableForInstr _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- 'condIntReg' and 'condFltReg': condition codes into registers

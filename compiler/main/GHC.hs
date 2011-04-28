@@ -431,8 +431,8 @@ initGhcMonad mb_top_dir = do
 
   liftIO $ StaticFlags.initStaticOpts
 
-  dflags0 <- liftIO $ initDynFlags defaultDynFlags
-  dflags <- liftIO $ initSysTools mb_top_dir dflags0
+  mySettings <- liftIO $ initSysTools mb_top_dir
+  dflags <- liftIO $ initDynFlags (defaultDynFlags mySettings)
   env <- liftIO $ newHscEnv dflags
   setSession env
 

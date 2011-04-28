@@ -16,7 +16,7 @@
     shared between several programs. In contrast, with static linking the
     code is copied into each program. Using shared libraries can thus save
     disk space. They also allow a single copy of code to be shared in memory
-    between several programs that use it. Shared libraires are often used as
+    between several programs that use it. Shared libraries are often used as
     a way of structuring large projects, especially where different parts are
     written in different programming languages. Shared libraries are also
     commonly used as a plugin mechanism by various applications. This is

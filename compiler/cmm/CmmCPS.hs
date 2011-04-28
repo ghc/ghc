@@ -112,12 +112,13 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        --------------- Stack layout ----------------
        slotEnv <- run $ liveSlotAnal g
+       let spEntryMap = getSpEntryMap entry_off g
        mbpprTrace "live slot analysis results: " (ppr slotEnv) $ return ()
-       let areaMap = layout procPoints slotEnv entry_off g
+       let areaMap = layout procPoints spEntryMap slotEnv entry_off g
        mbpprTrace "areaMap" (ppr areaMap) $ return ()
 
        ------------  Manifest the stack pointer --------
-       g  <- run $ manifestSP areaMap entry_off g
+       g  <- run $ manifestSP spEntryMap areaMap entry_off g
        dump Opt_D_dump_cmmz "after manifestSP" g
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...

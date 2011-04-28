@@ -370,13 +370,21 @@ getCoreToDo dflags
 
     simpl_phase phase names iter
       = CoreDoPasses
-          [ maybe_strictness_before phase
+      $   [ maybe_strictness_before phase
           , CoreDoSimplify iter
                 (base_mode { sm_phase = Phase phase
                            , sm_names = names })
 
-          , maybe_rule_check (Phase phase)
-          ]
+          , maybe_rule_check (Phase phase) ]
+
+          -- Vectorisation can introduce a fair few common sub expressions involving 
+          --  DPH primitives. For example, see the Reverse test from dph-examples.
+          --  We need to eliminate these common sub expressions before their definitions
+          --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings, 
+          --  so we also run simpl_gently to inline them.
+      ++  (if dopt Opt_Vectorise dflags && phase == 3
+	    then [CoreCSE, simpl_gently]
+	    else [])
 
     vectorisation
       = runWhen (dopt Opt_Vectorise dflags) $

@@ -48,7 +48,12 @@ import Data.Data
 \begin{code}
 type NameSet = UniqSet Name
 
-INSTANCE_TYPEABLE0(NameSet,nameSetTc,"NameSet")
+-- TODO: These Data/Typeable instances look very dubious. Surely either
+-- UniqFM should have the instances, or this should be a newtype?
+
+nameSetTc :: TyCon
+nameSetTc = mkTyCon "NameSet"
+instance Typeable NameSet where { typeOf _ = mkTyConApp nameSetTc [] }
 
 instance Data NameSet where
   gfoldl k z s = z mkNameSet `k` nameSetToList s -- traverse abstractly
@@ -176,7 +181,7 @@ duDefs dus = foldr get emptyNameSet dus
     get (Just d1, _u1) d2 = d1 `unionNameSets` d2
 
 allUses :: DefUses -> Uses
--- ^ Just like 'allUses', but 'Defs' are not eliminated from the 'Uses' returned
+-- ^ Just like 'duUses', but 'Defs' are not eliminated from the 'Uses' returned
 allUses dus = foldr get emptyNameSet dus
   where
     get (_d1, u1) u2 = u1 `unionNameSets` u2
@@ -184,8 +189,7 @@ allUses dus = foldr get emptyNameSet dus
 duUses :: DefUses -> Uses
 -- ^ Collect all 'Uses', regardless of whether the group is itself used,
 -- but remove 'Defs' on the way
-duUses dus
-  = foldr get emptyNameSet dus
+duUses dus = foldr get emptyNameSet dus
   where
     get (Nothing,   rhs_uses) uses = rhs_uses `unionNameSets` uses
     get (Just defs, rhs_uses) uses = (rhs_uses `unionNameSets` uses)

@@ -194,8 +194,8 @@ endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" \
-		$$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
+	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 endif
 
 endif
@@ -499,7 +499,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
 	"$(RM)" $(RM_OPTS) $@
-	"$(AR)" $(AR_OPTS) $(EXTRA_AR_ARGS) $@ $<
+	"$(AR_STAGE1)" $(AR_OPTS_STAGE1) $(EXTRA_AR_ARGS_STAGE1) $@ $<
 endif
 
 # -----------------------------------------------------------------------------

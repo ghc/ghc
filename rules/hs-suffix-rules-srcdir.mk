@@ -52,10 +52,10 @@ endif
 # .hs->.o rule, I don't know why --SDM
 
 $1/$2/build/%.$$($3_osuf) : $1/$4/%.hc includes/ghcautoconf.h includes/ghcplatform.h | $$$$(dir $$$$@)/.
-	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
+	"$$($1_$2_CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
 
 $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.hc includes/ghcautoconf.h includes/ghcplatform.h
-	"$$(CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
+	"$$($1_$2_CC)" $$($1_$2_$3_ALL_CC_OPTS) -Iincludes -x c -c $$< -o $$@
 
 # $1/$2/build/%.$$($3_osuf) : $1/$2/build/%.$$($3_way_)hc
 # 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
