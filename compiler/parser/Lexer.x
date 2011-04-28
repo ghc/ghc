@@ -335,11 +335,6 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
          { token ITcubxparen }
 }
 
-<0> {
-  "{|" / { ifExtension genericsEnabled } { token ITocurlybar }
-  "|}" / { ifExtension genericsEnabled } { token ITccurlybar }
-}
-
 <0,option_prags> {
   \(					{ special IToparen }
   \)					{ special ITcparen }
@@ -431,7 +426,6 @@ data Token
   | ITderiving
   | ITdo
   | ITelse
-  | ITgeneric
   | IThiding
   | ITif
   | ITimport
@@ -636,7 +630,6 @@ reservedWordsFM = listToUFM $
 	( "deriving",	ITderiving, 	0 ), 
 	( "do",		ITdo, 		0 ),       
 	( "else",	ITelse, 	0 ),     
-	( "generic",	ITgeneric, 	bit genericsBit ),     
 	( "hiding",	IThiding, 	0 ),
 	( "if",		ITif, 		0 ),       
 	( "import",	ITimport, 	0 ),   
@@ -1753,8 +1746,10 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 -- -fglasgow-exts or -XParallelArrays) are represented by a bitmap stored in an unboxed
 -- integer
 
-genericsBit :: Int
-genericsBit = 0 -- {|, |} and "generic"
+-- The "genericsBit" is now unused, available for others
+-- genericsBit :: Int
+-- genericsBit = 0 -- {|, |} and "generic"
+
 ffiBit :: Int
 ffiBit	   = 1
 parrBit :: Int
@@ -1805,8 +1800,6 @@ nondecreasingIndentationBit = 25
 
 always :: Int -> Bool
 always           _     = True
-genericsEnabled :: Int -> Bool
-genericsEnabled  flags = testBit flags genericsBit
 parrEnabled :: Int -> Bool
 parrEnabled      flags = testBit flags parrBit
 arrowsEnabled :: Int -> Bool
@@ -1875,8 +1868,7 @@ mkPState flags buf loc =
       alr_justClosedExplicitLetBlock = False
     }
     where
-      bitmap =     genericsBit       `setBitIf` xopt Opt_Generics flags
-               .|. ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
+      bitmap =     ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
                .|. parrBit           `setBitIf` xopt Opt_ParallelArrays  flags
                .|. arrowsBit         `setBitIf` xopt Opt_Arrows          flags
                .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
