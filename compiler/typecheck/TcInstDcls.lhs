@@ -206,7 +206,7 @@ Just <blah>.
 Instead, we simply rely on the fact that casts are cheap:
 
    $df :: forall a. C a => C [a]
-   {-# INLINE df #}  -- NB: INLINE this
+   {-# INLINE df #-}  -- NB: INLINE this
    $df = /\a. \d. MkC [a] ($cop_list a d)
        = $cop_list |> forall a. C a -> (sym (Co:C [a]))
 
@@ -379,26 +379,22 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                 --     tythings to the global environment
        ; tcExtendGlobalEnv (at_idx_tycons ++ implicit_things) $ do {
 
-                -- (3) Instances from generic class declarations
-       ; generic_inst_info <- getGenericInstances clas_decls
 
                 -- Next, construct the instance environment so far, consisting
                 -- of
                 --   (a) local instance decls
-                --   (b) generic instances
-                --   (c) local family instance decls
+                --   (b) local family instance decls
        ; addInsts local_info         $
-         addInsts generic_inst_info  $
          addFamInsts at_idx_tycons   $ do {
 
-                -- (4) Compute instances from "deriving" clauses;
+                -- (3) Compute instances from "deriving" clauses;
                 -- This stuff computes a context for the derived instance
                 -- decl, so it needs to know about all the instances possible
                 -- NB: class instance declarations can contain derivings as
                 --     part of associated data type declarations
-	 failIfErrsM		-- If the addInsts stuff gave any errors, don't
-				-- try the deriving stuff, because that may give
-				-- more errors still
+	 failIfErrsM	-- If the addInsts stuff gave any errors, don't
+			-- try the deriving stuff, because that may give
+			-- more errors still
        ; (deriv_inst_info, deriv_binds, deriv_dus, deriv_tys, deriv_ty_insts) 
               <- tcDeriving tycl_decls inst_decls deriv_decls
 
@@ -407,9 +403,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; gbl_env <- addFamInsts (map ATyCon deriv_ty_insts) $
                       tcExtendGlobalEnv (map ATyCon (deriv_tys ++ deriv_ty_insts)) $
                         addInsts deriv_inst_info getGblEnv
---       ; traceTc "Generic deriving" (vcat (map pprInstInfo deriv_inst_info))
-         ; return ( addTcgDUs gbl_env deriv_dus,
-                  generic_inst_info ++ deriv_inst_info ++ local_info,
+       ; return ( addTcgDUs gbl_env deriv_dus,
+                  deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
     }}}
 

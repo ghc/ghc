@@ -8,7 +8,7 @@ Typechecking class declarations
 \begin{code}
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
-		    mkGenericDefMethBind, getGenericInstances, 
+		    mkGenericDefMethBind,
 		    tcAddDeclCtxt, badMethodErr, badATErr, omittedATWarn
 		  ) where
 
@@ -385,142 +385,7 @@ mkGenericDefMethBind clas inst_tys sel_id dm_name
                                     [mkSimpleMatch [] rhs]) }
   where
     rhs = nlHsVar dm_name
-
----------------------------
-getGenericInstances :: [LTyClDecl Name] -> TcM [InstInfo Name] 
-getGenericInstances class_decls
-  = do	{ gen_inst_infos <- mapM (addLocM get_generics) class_decls
-	; let { gen_inst_info = concat gen_inst_infos }
-
-	-- Return right away if there is no generic stuff
-	; if null gen_inst_info then return []
-	  else do 
-
-	-- Otherwise print it out
-        { dumpDerivingInfo $ hang (ptext (sLit "Generic instances"))
-                                2 (vcat (map pprInstInfoDetails gen_inst_info))
-	; return gen_inst_info }}
-
-get_generics :: TyClDecl Name -> TcM [InstInfo Name]
-get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
-  | null generic_binds
-  = return [] -- The comon case: no generic default methods
-
-  | otherwise	-- A source class decl with generic default methods
-  = recoverM (return [])                                $
-    tcAddDeclCtxt decl                                  $ do
-    clas <- tcLookupLocatedClass class_name
-
-	-- Group by type, and
-	-- make an InstInfo out of each group
-    let
-	groups = groupWith listToBag generic_binds
-
-    inst_infos <- mapM (mkGenericInstance clas) groups
-
-	-- Check that there is only one InstInfo for each type constructor
-  	-- The main way this can fail is if you write
-	--	f {| a+b |} ... = ...
-	--	f {| x+y |} ... = ...
-	-- Then at this point we'll have an InstInfo for each
-	--
-	-- The class should be unary, which is why simpleInstInfoTyCon should be ok
-    let
-	tc_inst_infos :: [(TyCon, InstInfo Name)]
-	tc_inst_infos = [(simpleInstInfoTyCon i, i) | i <- inst_infos]
-
-	bad_groups = [group | group <- equivClassesByUniq get_uniq tc_inst_infos,
-			      group `lengthExceeds` 1]
-	get_uniq (tc,_) = getUnique tc
-
-    mapM_ (addErrTc . dupGenericInsts) bad_groups
-
-	-- Check that there is an InstInfo for each generic type constructor
-    let
-	missing = genericTyConNames `minusList` [tyConName tc | (tc,_) <- tc_inst_infos]
-
-    checkTc (null missing) (missingGenericInstances missing)
-
-    return inst_infos
-  where
-    generic_binds :: [(HsType Name, LHsBind Name)]
-    generic_binds = getGenericBinds def_methods
-get_generics decl = pprPanic "get_generics" (ppr decl)
-
-
----------------------------------
-getGenericBinds :: LHsBinds Name -> [(HsType Name, LHsBind Name)]
-  -- Takes a group of method bindings, finds the generic ones, and returns
-  -- them in finite map indexed by the type parameter in the definition.
-getGenericBinds binds = concat (map getGenericBind (bagToList binds))
-
-getGenericBind :: LHsBindLR Name Name -> [(HsType Name, LHsBindLR Name Name)]
-getGenericBind (L loc bind@(FunBind { fun_matches = MatchGroup matches ty }))
-  = groupWith wrap (mapCatMaybes maybeGenericMatch matches)
-  where
-    wrap ms = L loc (bind { fun_matches = MatchGroup ms ty })
-getGenericBind _
-  = []
-
-groupWith :: ([a] -> b) -> [(HsType Name, a)] -> [(HsType Name, b)]
-groupWith _  [] 	 = []
-groupWith op ((t,v):prs) = (t, op (v:vs)) : groupWith op rest
-    where
-      vs              = map snd this
-      (this,rest)     = partition same_t prs
-      same_t (t', _v) = t `eqPatType` t'
-
-eqPatLType :: LHsType Name -> LHsType Name -> Bool
-eqPatLType t1 t2 = unLoc t1 `eqPatType` unLoc t2
-
-eqPatType :: HsType Name -> HsType Name -> Bool
--- A very simple equality function, only for 
--- type patterns in generic function definitions.
-eqPatType (HsTyVar v1)       (HsTyVar v2)    	= v1==v2
-eqPatType (HsAppTy s1 t1)    (HsAppTy s2 t2) 	= s1 `eqPatLType` s2 && t1 `eqPatLType` t2
-eqPatType (HsOpTy s1 op1 t1) (HsOpTy s2 op2 t2) = s1 `eqPatLType` s2 && t1 `eqPatLType` t2 && unLoc op1 == unLoc op2
-eqPatType (HsNumTy n1)	     (HsNumTy n2)	= n1 == n2
-eqPatType (HsParTy t1)	     t2			= unLoc t1 `eqPatType` t2
-eqPatType t1		     (HsParTy t2)	= t1 `eqPatType` unLoc t2
-eqPatType _ _ = False
-
----------------------------------
-mkGenericInstance :: Class
-		  -> (HsType Name, LHsBinds Name)
-		  -> TcM (InstInfo Name)
-
-mkGenericInstance clas (hs_ty, binds) = do
-  -- Make a generic instance declaration
-  -- For example:	instance (C a, C b) => C (a+b) where { binds }
-
-	-- Extract the universally quantified type variables
-	-- and wrap them as forall'd tyvars, so that kind inference
-	-- works in the standard way
-    let
-	sig_tvs = userHsTyVarBndrs $ map noLoc $ nameSetToList $
-                  extractHsTyVars (noLoc hs_ty)
-	hs_forall_ty = noLoc $ mkExplicitHsForAllTy sig_tvs (noLoc []) (noLoc hs_ty)
-
-	-- Type-check the instance type, and check its form
-    forall_inst_ty <- tcHsSigType GenPatCtxt hs_forall_ty
-    let
-	(tyvars, inst_ty) = tcSplitForAllTys forall_inst_ty
-
-    checkTc (validGenericInstanceType inst_ty)
-            (badGenericInstanceType binds)
-
-	-- Make the dictionary function.
-    span <- getSrcSpanM
-    overlap_flag <- getOverlapFlag
-    dfun_name <- newDFunName clas [inst_ty] span
-    let
-	inst_theta = [mkClassPred clas [mkTyVarTy tv] | tv <- tyvars]
-	dfun_id    = mkDictFunId dfun_name tyvars inst_theta clas [inst_ty]
-        ispec      = mkLocalInstance dfun_id overlap_flag
-
-    return (InstInfo { iSpec = ispec, iBinds = VanillaInst binds [] False })
 \end{code}
-
 
 %************************************************************************
 %*									*
