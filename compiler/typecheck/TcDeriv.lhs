@@ -318,18 +318,20 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
-		 -- Generate the (old) generic to/from functions from each type declaration
+	-- We no longer generate the old generic to/from functions
+        -- from each type declaration, so this is emptyBag
 	; gen_binds <- return emptyBag -- mkGenericBinds is_boot tycl_decls
 	
-	 -- Generate the generic Representable0/1 instances from each type declaration
-  ; repInstsMeta <- genGenericRepBinds is_boot tycl_decls
+	 -- Generate the generic Representable0 instances
+        -- from each type declaration
+        ; repInstsMeta <- genGenericRepBinds is_boot tycl_decls
 	
 	; let repInsts   = concat (map (\(a,_,_) -> a) repInstsMeta)
 	      repMetaTys = map (\(_,b,_) -> b) repInstsMeta
 	      repTyCons  = map (\(_,_,c) -> c) repInstsMeta
-	-- Should we extendLocalInstEnv with repInsts?
 
-	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ repInsts)
+	; (inst_info, rn_binds, rn_dus)
+                <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ repInsts)
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
