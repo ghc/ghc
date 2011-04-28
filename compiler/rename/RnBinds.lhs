@@ -713,7 +713,9 @@ renameSig mb_names sig@(TypeSig v ty)
 	; return (TypeSig new_v new_ty) }
 
 renameSig mb_names sig@(GenericSig v ty)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
+  = do	{ generics_on <- xoptM Opt_Generics
+        ; unless generics_on (addErr (genericSigErr sig))
+        ; new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (GenericSig new_v new_ty) } -- JPM: ?
 
@@ -838,6 +840,11 @@ misplacedSigErr (L loc sig)
   = addErrAt loc $
     sep [ptext (sLit "Misplaced") <+> hsSigDoc sig <> colon, ppr sig]
 
+genericSigErr :: Sig RdrName -> SDoc
+genericSigErr sig = vcat [ hang (ptext (sLit "Unexpected generic default signature:"))
+                              2 (ppr sig)
+                         , ptext (sLit "Use -XGenerics to enable generic default signatures") ] 
+
 methodBindErr :: HsBindLR RdrName RdrName -> SDoc
 methodBindErr mbind
  =  hang (ptext (sLit "Pattern bindings (except simple variables) not allowed in instance declarations"))
@@ -852,4 +859,5 @@ nonStdGuardErr :: [LStmtLR Name Name] -> SDoc
 nonStdGuardErr guards
   = hang (ptext (sLit "accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
        4 (interpp'SP guards)
+
 \end{code}

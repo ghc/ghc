@@ -216,7 +216,6 @@ incorrect.
  'deriving' 	{ L _ ITderiving }
  'do' 		{ L _ ITdo }
  'else' 	{ L _ ITelse }
- 'generic' 	{ L _ ITgeneric }
  'hiding' 	{ L _ IThiding }
  'if' 		{ L _ ITif }
  'import' 	{ L _ ITimport }
@@ -721,6 +720,11 @@ stand_alone_deriving :: { LDerivDecl RdrName }
 decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
 decl_cls  : at_decl_cls		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
 	  | decl                        { $1 }
+
+	  -- A 'default' signature used with the generic-programming extension
+          | 'default' infixexp '::' sigtypedoc
+                    {% do { (TypeSig l ty) <- checkValSig $2 $4
+                          ; return (LL $ unitOL (LL $ SigD (GenericSig l ty))) } }
 
 decls_cls :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 	  : decls_cls ';' decl_cls	{ LL (unLoc $1 `appOL` unLoc $3) }
@@ -1233,11 +1237,9 @@ gdrh :: { LGRHS RdrName }
 	: '|' guardquals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
-        : 'generic' infixexp '::' sigtypedoc
-                        {% do (TypeSig l ty) <- checkValSig $2 $4
-                        ; return (LL $ unitOL (LL $ SigD (GenericSig l ty))) }
+        : 
 	-- See Note [Declaration/signature overlap] for why we need infixexp here
-	| infixexp '::' sigtypedoc
+	  infixexp '::' sigtypedoc
                         {% do s <- checkValSig $1 $3 
                         ; return (LL $ unitOL (LL $ SigD s)) }
 	| var ',' sig_vars '::' sigtypedoc
