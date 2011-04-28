@@ -555,7 +555,7 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   k1DataCon_RDR, m1DataCon_RDR, l1DataCon_RDR, r1DataCon_RDR,
   prodDataCon_RDR, comp1DataCon_RDR, from0_RDR, from1_RDR,
   to0_RDR, to1_RDR, datatypeName_RDR, moduleName_RDR, conName_RDR,
-  conFixity_RDR, conIsRecord_RDR, conIsTuple_RDR,
+  conFixity_RDR, conIsRecord_RDR,
   noArityDataCon_RDR, arityDataCon_RDR, selName_RDR,
   prefixDataCon_RDR, infixDataCon_RDR, leftAssocDataCon_RDR,
   rightAssocDataCon_RDR, notAssocDataCon_RDR :: RdrName
@@ -584,7 +584,6 @@ selName_RDR       = varQual_RDR gHC_GENERICS (fsLit "selName")
 conName_RDR       = varQual_RDR gHC_GENERICS (fsLit "conName")
 conFixity_RDR     = varQual_RDR gHC_GENERICS (fsLit "conFixity")
 conIsRecord_RDR   = varQual_RDR gHC_GENERICS (fsLit "conIsRecord")
-conIsTuple_RDR    = varQual_RDR gHC_GENERICS (fsLit "conIsTuple")
 
 noArityDataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "NoArity")
 arityDataCon_RDR      = dataQual_RDR gHC_GENERICS (fsLit "Arity")

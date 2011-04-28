@@ -15,9 +15,6 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 #include "HsVersions.h"
 
 import HsSyn
-import RnHsSyn
-import Inst
-import InstEnv
 import TcEnv
 import TcPat( addInlinePrags )
 import TcBinds
@@ -27,20 +24,13 @@ import TcMType
 import TcType
 import TcRnMonad
 import BuildTyCl( TcMethInfo )
-import Generics
 import Class
-import TyCon
-import MkId
 import Id
 import Name
 import Var
-import NameSet
 import Outputable
-import PrelNames
 import DynFlags
 import ErrUtils
-import Util
-import ListSetOps
 import SrcLoc
 import Maybes
 import BasicTypes
@@ -48,7 +38,6 @@ import Bag
 import FastString
 
 import Control.Monad
-import Data.List
 \end{code}
 
 
@@ -430,7 +419,7 @@ badATErr clas at
 omittedATWarn :: Name -> SDoc
 omittedATWarn at
   = ptext (sLit "No explicit AT declaration for") <+> quotes (ppr at)
-
+{-
 badGenericInstanceType :: LHsBinds Name -> SDoc
 badGenericInstanceType binds
   = vcat [ptext (sLit "Illegal type pattern in the generic bindings"),
@@ -448,7 +437,7 @@ dupGenericInsts tc_inst_infos
     ]
   where 
     ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
-
+-}
 badDmPrag :: Id -> Sig Name -> TcM ()
 badDmPrag sel_id prag
   = addErrTc (ptext (sLit "The") <+> hsSigDoc prag <+> ptext (sLit "for default method") 

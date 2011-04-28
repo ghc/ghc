@@ -370,7 +370,6 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; let { (local_info,
                 at_tycons_s)   = unzip local_info_tycons
              ; at_idx_tycons   = concat at_tycons_s ++ idx_tycons
-             ; clas_decls      = filter (isClassDecl . unLoc) tycl_decls
              ; implicit_things = concatMap implicitTyThings at_idx_tycons
 	     ; aux_binds       = mkRecSelBinds at_idx_tycons
              }
