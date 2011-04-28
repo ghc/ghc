@@ -1205,7 +1205,7 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 
 --------------------
 mkPlan :: LStmt Name -> TcM PlanResult
-mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt 
+mkPlan (L loc (ExprStmt expr _ _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
 	      the_bind  = L loc $ mkFunBind (L loc fresh_it) matches
@@ -1214,7 +1214,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
-			          	   (HsVar thenIOName) placeHolderType
+			          	   (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 	-- The plans are:
 	--	[it <- e; print it]	but not if it::()
@@ -1242,7 +1242,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 mkPlan stmt@(L loc (BindStmt {}))
   | [v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
   = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-			          	   (HsVar thenIOName) placeHolderType
+			          	  (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 	; print_bind_result <- doptM Opt_PrintBindResult
 	; let print_plan = do
@@ -1304,7 +1304,7 @@ tcGhciStmts stmts
 
 	traceTc "TcRnDriver.tcGhciStmts: done" empty ;
 	return (ids, mkHsDictLet (EvBinds const_binds) $
-		     noLoc (HsDo GhciStmt tc_stmts (mk_return ids) io_ret_ty))
+		     noLoc (HsDo GhciStmt tc_stmts (mk_return ids) noSyntaxExpr io_ret_ty))
     }
 \end{code}
 

@@ -301,10 +301,11 @@ addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsExprNeverOrAlways e)
-addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
+addTickHsExpr (HsDo cxt stmts last_exp return_exp srcloc) = do
         (stmts', last_exp') <- addTickLStmts' forQual stmts 
                                      (addTickLHsExpr last_exp)
-	return (HsDo cxt stmts' last_exp' srcloc)
+        return_exp' <- addTickSyntaxExpr hpcSrcSpan return_exp
+	return (HsDo cxt stmts' last_exp' return_exp' srcloc)
   where
 	forQual = case cxt of
 		    ListComp -> Just $ BinBox QualBinBox
@@ -438,31 +439,38 @@ addTickStmt _isGuard (BindStmt pat e bind fail) = do
 		(addTickLHsExprAlways e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
-addTickStmt isGuard (ExprStmt e bind' ty) = do
-	liftM3 ExprStmt
+addTickStmt isGuard (ExprStmt e bind' guard' ty) = do
+	liftM4 ExprStmt
 		(addTick isGuard e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
+		(addTickSyntaxExpr hpcSrcSpan guard')
 		(return ty)
 addTickStmt _isGuard (LetStmt binds) = do
 	liftM LetStmt
 		(addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt pairs) = do
-    liftM ParStmt 
+addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr returnExpr) = do
+    liftM4 ParStmt 
         (mapM (addTickStmtAndBinders isGuard) pairs)
+        (addTickSyntaxExpr hpcSrcSpan mzipExpr)
+        (addTickSyntaxExpr hpcSrcSpan bindExpr)
+        (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
-addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr) = do
-    liftM4 TransformStmt 
-        (addTickLStmts isGuard stmts)
-        (return ids)
-        (addTickLHsExprAlways usingExpr)
-        (addTickMaybeByLHsExpr maybeByExpr)
+addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr returnExpr bindExpr) = do
+    t_s <- (addTickLStmts isGuard stmts)
+    t_u <- (addTickLHsExprAlways usingExpr)
+    t_m <- (addTickMaybeByLHsExpr maybeByExpr)
+    t_r <- (addTickSyntaxExpr hpcSrcSpan returnExpr)
+    t_b <- (addTickSyntaxExpr hpcSrcSpan bindExpr)
+    return $ TransformStmt t_s ids t_u t_m t_r t_b
 
-addTickStmt isGuard (GroupStmt stmts binderMap by using) = do
-    liftM4 GroupStmt 
-        (addTickLStmts isGuard stmts)
-        (return binderMap)
-        (fmapMaybeM  addTickLHsExprAlways by)
-	(fmapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) using)
+addTickStmt isGuard (GroupStmt stmts binderMap by using returnExpr bindExpr liftMExpr) = do
+    t_s <- (addTickLStmts isGuard stmts)
+    t_y <- (fmapMaybeM  addTickLHsExprAlways by)
+    t_u <- (fmapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) using)
+    t_f <- (addTickSyntaxExpr hpcSrcSpan returnExpr)
+    t_b <- (addTickSyntaxExpr hpcSrcSpan bindExpr)
+    t_m <- (addTickSyntaxExpr hpcSrcSpan liftMExpr)
+    return $ GroupStmt t_s binderMap t_y t_u t_b t_f t_m
 
 addTickStmt isGuard stmt@(RecStmt {})
   = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
@@ -569,9 +577,10 @@ addTickHsCmd (HsLet binds c) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsCmd c)
-addTickHsCmd (HsDo cxt stmts last_exp srcloc) = do
+addTickHsCmd (HsDo cxt stmts last_exp return_exp srcloc) = do
         (stmts', last_exp') <- addTickLCmdStmts' stmts (addTickLHsCmd last_exp)
-	return (HsDo cxt stmts' last_exp' srcloc)
+        return_exp' <- addTickSyntaxExpr hpcSrcSpan return_exp
+	return (HsDo cxt stmts' last_exp' return_exp' srcloc)
 
 addTickHsCmd (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
         liftM5 HsArrApp
@@ -635,10 +644,11 @@ addTickCmdStmt (BindStmt pat c bind fail) = do
 		(addTickLHsCmd c)
 		(return bind)
 		(return fail)
-addTickCmdStmt (ExprStmt c bind' ty) = do
-	liftM3 ExprStmt
+addTickCmdStmt (ExprStmt c bind' guard' ty) = do
+	liftM4 ExprStmt
 		(addTickLHsCmd c)
-		(return bind')
+		(addTickSyntaxExpr hpcSrcSpan bind')
+                (addTickSyntaxExpr hpcSrcSpan guard')
 		(return ty)
 addTickCmdStmt (LetStmt binds) = do
 	liftM LetStmt

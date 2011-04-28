@@ -325,22 +325,25 @@ dsExpr (HsLet binds body) = do
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-dsExpr (HsDo ListComp stmts body result_ty)
+dsExpr (HsDo ListComp stmts body _ result_ty)
   =	-- Special case for list comprehensions
     dsListComp stmts body elt_ty
   where
     [elt_ty] = tcTyConAppArgs result_ty
 
-dsExpr (HsDo DoExpr stmts body result_ty)
+dsExpr (HsDo DoExpr stmts body _ result_ty)
   = dsDo stmts body result_ty
 
-dsExpr (HsDo GhciStmt stmts body result_ty)
+dsExpr (HsDo GhciStmt stmts body _ result_ty)
   = dsDo stmts body result_ty
 
-dsExpr (HsDo MDoExpr stmts body result_ty)
+dsExpr (HsDo MDoExpr stmts body _ result_ty)
   = dsDo stmts body result_ty
 
-dsExpr (HsDo PArrComp stmts body result_ty)
+dsExpr (HsDo MonadComp stmts body return_op result_ty)
+  = dsMonadComp stmts return_op body result_ty
+
+dsExpr (HsDo PArrComp stmts body _ result_ty)
   =	-- Special case for array comprehensions
     dsPArrComp (map unLoc stmts) body elt_ty
   where
@@ -722,7 +725,7 @@ dsDo stmts body result_ty
     goL [] = dsLExpr body
     goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
   
-    go _ (ExprStmt rhs then_expr _) stmts
+    go _ (ExprStmt rhs then_expr _ _) stmts
       = do { rhs2 <- dsLExpr rhs
            ; case tcSplitAppTy_maybe (exprType rhs2) of
                 Just (container_ty, returning_ty) -> warnDiscardedDoBindings rhs container_ty returning_ty
@@ -769,7 +772,7 @@ dsDo stmts body result_ty
         mfix_arg   = noLoc $ HsLam (MatchGroup [mkSimpleMatch [mfix_pat] body]
                                              (mkFunTy tup_ty body_ty))
         mfix_pat   = noLoc $ LazyPat $ mkLHsPatTup rec_tup_pats
-        body       = noLoc $ HsDo DoExpr rec_stmts return_app body_ty
+        body       = noLoc $ HsDo DoExpr rec_stmts return_app noSyntaxExpr body_ty
         return_app = nlHsApp (noLoc return_op) (mkLHsTupleExpr rets)
 	body_ty    = mkAppTy m_ty tup_ty
         tup_ty     = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
@@ -869,7 +872,7 @@ dsMDo ctxt tbl stmts body result_ty
 	rets         = map nlHsVar     later_ids' ++ map noLoc rec_rets
 
 	mfix_pat = noLoc $ LazyPat $ mk_tup_pat rec_tup_pats
-	body     = noLoc $ HsDo ctxt rec_stmts return_app body_ty
+	body     = noLoc $ HsDo ctxt rec_stmts return_app noSyntaxExpr body_ty
 	body_ty = mkAppTy m_ty tup_ty
 	tup_ty  = mkBoxedTupleTy (map idType (later_ids' ++ rec_ids))  -- Deals with singleton case
 
@@ -887,7 +890,6 @@ dsMDo ctxt tbl stmts body result_ty
 	mk_tup_pat ps  = noLoc $ mkVanillaTuplePat ps Boxed
 -}
 \end{code}
-
 
 %************************************************************************
 %*									*

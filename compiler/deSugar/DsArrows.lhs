@@ -541,7 +541,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsLet binds body) = do
                         core_body,
         exprFreeVars core_binds `intersectVarSet` local_vars)
 
-dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts body _)
+dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts body _ _)
   = dsCmdDo ids local_vars env_ids res_ty stmts body
 
 --	A |- e :: forall e. a1 (e*ts1) t1 -> ... an (e*tsn) tn -> a (e*ts) t
@@ -674,7 +674,7 @@ dsCmdStmt
 --		---> arr (\ (xs) -> ((xs1),(xs'))) >>> first c >>>
 --			arr snd >>> ss
 
-dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd _ c_ty) = do
+dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd _ _ c_ty) = do
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars [] c_ty cmd
     core_mux <- matchEnvStack env_ids []
         (mkCorePairExpr (mkBigCoreVarTup env_ids1) (mkBigCoreVarTup out_ids))

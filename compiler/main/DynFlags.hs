@@ -351,6 +351,7 @@ data ExtensionFlag
    | Opt_KindSignatures
    | Opt_ParallelListComp
    | Opt_TransformListComp
+   | Opt_MonadComprehensions
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
    | Opt_DoRec
@@ -1569,6 +1570,7 @@ xFlags = [
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
   ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
   ( "TransformListComp",                Opt_TransformListComp, nop ),
+  ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),

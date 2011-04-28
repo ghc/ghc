@@ -1465,7 +1465,8 @@ list :: { LHsExpr RdrName }
 	| texp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
 	| texp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp '|' flattenedpquals	{ sL (comb2 $1 $>) $ mkHsDo ListComp (unLoc $3) $1 }
+	| texp '|' flattenedpquals	{% checkMonadComp >>= \ ctxt ->
+					   return (sL (comb2 $1 $>) $ mkHsDo ctxt (unLoc $3) $1) }
 
 lexps :: { Located [LHsExpr RdrName] }
 	: lexps ',' texp 		{ LL (((:) $! $3) $! unLoc $1) }
@@ -1480,7 +1481,7 @@ flattenedpquals :: { Located [LStmt RdrName] }
                     -- We just had one thing in our "parallel" list so 
                     -- we simply return that thing directly
                     
-                    qss -> L1 [L1 $ ParStmt [(qs, undefined) | qs <- qss]]
+                    qss -> L1 [L1 $ ParStmt [(qs, undefined) | qs <- qss] noSyntaxExpr noSyntaxExpr noSyntaxExpr]
                     -- We actually found some actual parallel lists so
                     -- we wrap them into as a ParStmt
                 }

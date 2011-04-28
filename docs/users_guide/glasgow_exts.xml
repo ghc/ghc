@@ -1201,6 +1201,168 @@ output = [ x
 </para>
   </sect2>
 
+   <!-- ===================== MONAD COMPREHENSIONS ===================== -->
+
+<sect2 id="monad-comprehensions">
+    <title>Monad comprehensions</title>
+    <indexterm><primary>monad comprehensions</primary></indexterm>
+
+    <para>
+        Monad comprehesions generalise the list comprehension notation to work
+        for any monad.
+    </para>
+
+    <para>Monad comprehensions support:</para>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                Bindings:
+            </para>
+
+<programlisting>
+[ x + y | x &lt;- Just 1, y &lt;- Just 2 ]
+</programlisting>
+
+            <para>
+                Bindings are translated with the <literal>(&gt;&gt;=)</literal> and
+                <literal>return</literal> functions to the usual do-notation:
+            </para>
+
+<programlisting>
+do x &lt;- Just 1
+   y &lt;- Just 2
+   return (x+y)
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Guards:
+            </para>
+
+<programlisting>
+[ x | x &lt;- [1..10], x &lt;= 5 ]
+</programlisting>
+
+            <para>
+                Guards are translated with the <literal>guard</literal> function,
+                which requires a <literal>MonadPlus</literal> instance:
+            </para>
+
+<programlisting>
+do x &lt;- [1..10]
+   guard (x &lt;= 5)
+   return x
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Transform statements (as with <literal>-XTransformListComp</literal>):
+            </para>
+
+<programlisting>
+[ x+y | x &lt;- [1..10], y &lt;- [1..x], then take 2 ]
+</programlisting>
+
+            <para>
+                This translates to:
+            </para>
+
+<programlisting>
+do (x,y) &lt;- take 2 (do x &lt;- [1..10]
+                       y &lt;- [1..x]
+                       return (x,y))
+   return (x+y)
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Group statements (as with <literal>-XTransformListComp</literal>):
+            </para>
+
+<programlisting>
+[ x | x &lt;- [1,1,2,2,3], then group by x ]
+[ x | x &lt;- [1,1,2,2,3], then group by x using GHC.Exts.groupWith ]
+[ x | x &lt;- [1,1,2,2,3], then group using myGroup ]
+</programlisting>
+
+            <para>
+                The basic <literal>then group by e</literal> statement is
+                translated using the <literal>mgroupWith</literal> function, which
+                requires a <literal>MonadGroup</literal> instance, defined in
+                <ulink url="&libraryBaseLocation;/Control-Monad-Group.html"><literal>Control.Monad.Group</literal></ulink>:
+            </para>
+
+<programlisting>
+do x &lt;- mgroupWith (do x &lt;- [1,1,2,2,3]
+                       return x)
+   return x
+</programlisting>
+
+            <para>
+                Note that the type of <literal>x</literal> is changed by the
+                grouping statement.
+            </para>
+
+            <para>
+                The grouping function can also be defined with the
+                <literal>using</literal> keyword.
+            </para>
+
+        </listitem>
+        <listitem>
+            <para>
+                Parallel statements (as with <literal>-XParallelListComp</literal>):
+            </para>
+
+<programlisting>
+[ (x+y) | x &lt;- [1..10]
+        | y &lt;- [11..20]
+        ]
+</programlisting>
+
+            <para>
+                Parallel statements are translated using the
+                <literal>mzip</literal> function, which requires a
+                <literal>MonadZip</literal> instance defined in
+                <ulink url="&libraryBaseLocation;/Control-Monad-Zip.html"><literal>Control.Monad.Zip</literal></ulink>:
+            </para>
+
+<programlisting>
+do (x,y) &lt;- mzip (do x &lt;- [1..10]
+                     return x)
+                 (do y &lt;- [11..20]
+                     return y)
+   return (x+y)
+</programlisting>
+
+        </listitem>
+    </itemizedlist>
+
+    <para>
+        All these features are enabled by default if the
+        <literal>MonadComprehensions</literal> extension is enabled. The types
+        and more detailed examples on how to use comprehensions are explained
+        in the previous chapters <xref
+            linkend="generalised-list-comprehensions"/> and <xref
+            linkend="parallel-list-comprehensions"/>. In general you just have
+        to replace the type <literal>[a]</literal> with the type
+        <literal>Monad m => m a</literal> for monad comprehensions.
+    </para>
+
+    <para>
+        Note: Even though most of these examples are using the list monad,
+        monad comprehensions work for any monad.
+        The <literal>base</literal> package offers all necessary instances for
+        lists, which make <literal>MonadComprehensions</literal> backward
+        compatible to built-in, transform and parallel list comprehensions.
+    </para>
+
+</sect2>
+
    <!-- ===================== REBINDABLE SYNTAX ===================  -->
 
 <sect2 id="rebindable-syntax">

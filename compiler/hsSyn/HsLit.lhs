@@ -63,8 +63,7 @@ instance Eq HsLit where
 data HsOverLit id 	-- An overloaded literal
   = OverLit {
 	ol_val :: OverLitVal, 
-	ol_rebindable :: Bool,		-- True <=> rebindable syntax
-					-- False <=> standard syntax
+	ol_rebindable :: Bool,		-- 
 	ol_witness :: SyntaxExpr id,	-- Note [Overloaded literal witnesses]
 	ol_type :: PostTcType }
   deriving (Data, Typeable)
@@ -78,6 +77,19 @@ data OverLitVal
 overLitType :: HsOverLit a -> Type
 overLitType = ol_type
 \end{code}
+
+Note [ol_rebindable]
+~~~~~~~~~~~~~~~~~~~~
+The ol_rebindable field is True if this literal is actually 
+using rebindable syntax.  Specifically:
+
+  False iff ol_witness is the standard one
+  True  iff ol_witness is non-standard
+
+Equivalently it's True if
+  a) RebindableSyntax is on
+  b) the witness for fromInteger/fromRational/fromString
+     that happens to be in scope isn't the standard one
 
 Note [Overloaded literal witnesses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

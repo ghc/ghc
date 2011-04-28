@@ -1893,6 +1893,7 @@ mkPState flags buf loc =
 	       .|. unboxedTuplesBit  `setBitIf` xopt Opt_UnboxedTuples flags
                .|. datatypeContextsBit `setBitIf` xopt Opt_DatatypeContexts flags
                .|. transformComprehensionsBit `setBitIf` xopt Opt_TransformListComp flags
+               .|. transformComprehensionsBit `setBitIf` xopt Opt_MonadComprehensions flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
                .|. relaxedLayoutBit `setBitIf` xopt Opt_RelaxedLayout flags

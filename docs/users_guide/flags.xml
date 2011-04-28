@@ -898,6 +898,12 @@
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoTransformListComp</option></entry>
 	    </row>
+        <row>
+	      <entry><option>-XMonadComprehensions</option></entry>
+	      <entry>Enable <link linkend="monad-comprehensions">monad comprehensions</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoMonadComprehensions</option></entry>
+	    </row>
 	    <row>
 	      <entry><option>-XUnliftedFFITypes</option></entry>
 	      <entry>Enable unlifted FFI types.</entry>

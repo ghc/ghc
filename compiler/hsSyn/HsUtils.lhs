@@ -212,7 +212,7 @@ mkHsIsString   s       = OverLit (HsIsString   s)  noRebindableInfo noSyntaxExpr
 noRebindableInfo :: Bool
 noRebindableInfo = error "noRebindableInfo" 	-- Just another placeholder; 
 
-mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
+mkHsDo ctxt stmts body = HsDo ctxt stmts body noSyntaxExpr placeHolderType
 
 mkHsIf :: LHsExpr id -> LHsExpr id -> LHsExpr id -> HsExpr id
 mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
@@ -220,18 +220,18 @@ mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt   stmts usingExpr        = TransformStmt stmts [] usingExpr Nothing
-mkTransformByStmt stmts usingExpr byExpr = TransformStmt stmts [] usingExpr (Just byExpr)
+mkTransformStmt   stmts usingExpr        = TransformStmt stmts [] usingExpr Nothing       noSyntaxExpr noSyntaxExpr
+mkTransformByStmt stmts usingExpr byExpr = TransformStmt stmts [] usingExpr (Just byExpr) noSyntaxExpr noSyntaxExpr
 
 mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL idR
 mkGroupByStmt      :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
 mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 
-mkGroupUsingStmt   stmts usingExpr        = GroupStmt stmts [] Nothing       (Left usingExpr)    
-mkGroupByStmt      stmts byExpr           = GroupStmt stmts [] (Just byExpr) (Right noSyntaxExpr)
-mkGroupByUsingStmt stmts byExpr usingExpr = GroupStmt stmts [] (Just byExpr) (Left usingExpr)    
+mkGroupUsingStmt   stmts usingExpr        = GroupStmt stmts [] Nothing       (Left usingExpr)     noSyntaxExpr noSyntaxExpr noSyntaxExpr
+mkGroupByStmt      stmts byExpr           = GroupStmt stmts [] (Just byExpr) (Right noSyntaxExpr) noSyntaxExpr noSyntaxExpr noSyntaxExpr
+mkGroupByUsingStmt stmts byExpr usingExpr = GroupStmt stmts [] (Just byExpr) (Left usingExpr)     noSyntaxExpr noSyntaxExpr noSyntaxExpr
 
-mkExprStmt expr	    = ExprStmt expr noSyntaxExpr placeHolderType
+mkExprStmt expr	    = ExprStmt expr noSyntaxExpr noSyntaxExpr placeHolderType
 mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
 
 emptyRecStmt = RecStmt { recS_stmts = [], recS_later_ids = [], recS_rec_ids = []
@@ -496,12 +496,12 @@ collectStmtBinders :: StmtLR idL idR -> [idL]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt pat _ _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
-collectStmtBinders (ExprStmt _ _ _)     = []
-collectStmtBinders (ParStmt xs)         = collectLStmtsBinders
+collectStmtBinders (ExprStmt _ _ _ _)   = []
+collectStmtBinders (ParStmt xs _ _ _)   = collectLStmtsBinders
                                         $ concatMap fst xs
-collectStmtBinders (TransformStmt stmts _ _ _)   = collectLStmtsBinders stmts
-collectStmtBinders (GroupStmt     stmts _ _ _)   = collectLStmtsBinders stmts
-collectStmtBinders (RecStmt { recS_stmts = ss }) = collectLStmtsBinders ss
+collectStmtBinders (TransformStmt stmts _ _ _ _ _)   = collectLStmtsBinders stmts
+collectStmtBinders (GroupStmt     stmts _ _ _ _ _ _) = collectLStmtsBinders stmts
+collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
 
 
 ----------------- Patterns --------------------------
@@ -642,11 +642,11 @@ lStmtsImplicits = hs_lstmts
     
     hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
     hs_stmt (LetStmt binds)      = hs_local_binds binds
-    hs_stmt (ExprStmt _ _ _)     = emptyNameSet
-    hs_stmt (ParStmt xs)         = hs_lstmts $ concatMap fst xs
+    hs_stmt (ExprStmt _ _ _ _)   = emptyNameSet
+    hs_stmt (ParStmt xs _ _ _)   = hs_lstmts $ concatMap fst xs
     
-    hs_stmt (TransformStmt stmts _ _ _)   = hs_lstmts stmts
-    hs_stmt (GroupStmt     stmts _ _ _)   = hs_lstmts stmts
+    hs_stmt (TransformStmt stmts _ _ _ _ _)   = hs_lstmts stmts
+    hs_stmt (GroupStmt     stmts _ _ _ _ _ _) = hs_lstmts stmts
     hs_stmt (RecStmt { recS_stmts = ss }) = hs_lstmts ss
     
     hs_local_binds (HsValBinds val_binds) = hsValBindsImplicits val_binds

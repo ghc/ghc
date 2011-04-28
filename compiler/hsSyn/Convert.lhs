@@ -523,9 +523,9 @@ cvtHsDo do_or_lc stmts
   | otherwise
   = do	{ stmts' <- cvtStmts stmts
 	; body <- case last stmts' of
-		    L _ (ExprStmt body _ _) -> return body
+		    L _ (ExprStmt body _ _ _) -> return body
                     stmt' -> failWith (bad_last stmt')
-	; return $ HsDo do_or_lc (init stmts') body void }
+	; return $ HsDo do_or_lc (init stmts') body noSyntaxExpr void }
   where
     bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprStmtContext do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
@@ -539,7 +539,7 @@ cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnL $ mkExprStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkBindStmt p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (ptext (sLit "a let binding")) ds
                             ; returnL $ LetStmt ds' }
-cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' }
+cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' noSyntaxExpr noSyntaxExpr noSyntaxExpr }
 		       where
 			 cvt_one ds = do { ds' <- cvtStmts ds; return (ds', undefined) }
 

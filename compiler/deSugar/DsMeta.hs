@@ -721,7 +721,7 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; wrapGenSyms ss z }
 
 -- FIXME: I haven't got the types here right yet
-repE e@(HsDo ctxt sts body _) 
+repE e@(HsDo ctxt sts body _ _) 
  | case ctxt of { DoExpr -> True; GhciStmt -> True; _ -> False }
  = do { (ss,zs) <- repLSts sts; 
 	body'	<- addBinds ss $ repLE body;
@@ -737,7 +737,7 @@ repE e@(HsDo ctxt sts body _)
         wrapGenSyms ss e' }
 
   | otherwise
-  = notHandled "mdo and [: :]" (ppr e)
+  = notHandled "mdo, monad comprehension and [: :]" (ppr e)
 
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
@@ -817,7 +817,7 @@ repGuards other
      wrapGenSyms (concat xs) gd }
   where 
     process :: LGRHS Name -> DsM ([GenSymBind], (Core (TH.Q (TH.Guard, TH.Exp))))
-    process (L _ (GRHS [L _ (ExprStmt e1 _ _)] e2))
+    process (L _ (GRHS [L _ (ExprStmt e1 _ _ _)] e2))
            = do { x <- repLNormalGE e1 e2;
                   return ([], x) }
     process (L _ (GRHS ss rhs))
@@ -876,7 +876,7 @@ repSts (LetStmt bs : ss) =
       ; z <- repLetSt ds
       ; (ss2,zs) <- addBinds ss1 (repSts ss)
       ; return (ss1++ss2, z : zs) } 
-repSts (ExprStmt e _ _ : ss) =       
+repSts (ExprStmt e _ _ _ : ss) =       
    do { e2 <- repLE e
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss

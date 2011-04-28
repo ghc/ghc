@@ -221,6 +221,12 @@ basicKnownKeyNames
 	-- dotnet interop
 	, objectTyConName, marshalObjectName, unmarshalObjectName
 	, marshalStringName, unmarshalStringName, checkDotnetResName
+
+        -- Monad comprehensions
+        , guardMName
+        , liftMName
+        , groupMName
+        , mzipName
     ]
 
 genericTyConNames :: [Name]
@@ -262,8 +268,9 @@ gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
-    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW, cONTROL_APPLICATIVE,
-    gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION_BASE :: Module
+    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_GROUP, mONAD_ZIP,
+    aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
+    cONTROL_EXCEPTION_BASE :: Module
 
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -311,6 +318,8 @@ gHC_INT		= mkBaseModule (fsLit "GHC.Int")
 gHC_WORD	= mkBaseModule (fsLit "GHC.Word")
 mONAD		= mkBaseModule (fsLit "Control.Monad")
 mONAD_FIX	= mkBaseModule (fsLit "Control.Monad.Fix")
+mONAD_GROUP     = mkBaseModule (fsLit "Control.Monad.Group")
+mONAD_ZIP       = mkBaseModule (fsLit "Control.Monad.Zip")
 aRROW		= mkBaseModule (fsLit "Control.Arrow")
 cONTROL_APPLICATIVE = mkBaseModule (fsLit "Control.Applicative")
 gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
@@ -834,6 +843,14 @@ appAName	   = varQual aRROW (fsLit "app")	  appAIdKey
 choiceAName	   = varQual aRROW (fsLit "|||")	  choiceAIdKey
 loopAName	   = varQual aRROW (fsLit "loop")  loopAIdKey
 
+-- Monad comprehensions
+guardMName, liftMName, groupMName, mzipName :: Name
+guardMName         = varQual mONAD (fsLit "guard") guardMIdKey
+liftMName          = varQual mONAD (fsLit "liftM") liftMIdKey
+groupMName         = varQual mONAD_GROUP (fsLit "mgroupWith") groupMIdKey
+mzipName           = varQual mONAD_ZIP (fsLit "mzip") mzipIdKey
+
+
 -- Annotation type checking
 toAnnotationWrapperName :: Name
 toAnnotationWrapperName = varQual gHC_DESUGAR (fsLit "toAnnotationWrapper") toAnnotationWrapperIdKey
@@ -1324,6 +1341,14 @@ fromIntegralIdKey    = mkPreludeMiscIdUnique 127
 realToFracIdKey      = mkPreludeMiscIdUnique 128
 toIntegerClassOpKey  = mkPreludeMiscIdUnique 129
 toRationalClassOpKey = mkPreludeMiscIdUnique 130
+
+-- Monad comprehensions
+guardMIdKey, liftMIdKey, groupMIdKey, mzipIdKey :: Unique
+guardMIdKey     = mkPreludeMiscIdUnique 131
+liftMIdKey      = mkPreludeMiscIdUnique 132
+groupMIdKey     = mkPreludeMiscIdUnique 133
+mzipIdKey       = mkPreludeMiscIdUnique 134
+
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-499
