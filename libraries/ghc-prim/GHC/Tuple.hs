@@ -19,7 +19,7 @@ module GHC.Tuple where
 -- We need Inl etc behind the scenes for the tuple definitions
 import GHC.Generics ()
 
-default () -- Double and Inteegr aren't available yet
+default () -- Double and Integer aren't available yet
 
 data (,) a b = (,) a b
 data (,,) a b c = (,,) a b c

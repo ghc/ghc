@@ -1,19 +1,3 @@
-{-
-
-{-# OPTIONS_GHC -XNoImplicitPrelude -XTypeOperators #-}
-
-module GHC.Generics where
-
-default ()
-
-data Unit = Unit
-#ifndef __HADDOCK__
-data (:+:) a b = Inl a | Inr b
-data (:*:) a b = a :*: b
-#endif
-
--}
-
 {-# OPTIONS_GHC -XNoImplicitPrelude      #-}
 {-# OPTIONS_GHC -XEmptyDataDecls         #-}
 {-# OPTIONS_GHC -XMultiParamTypeClasses  #-}
@@ -42,12 +26,6 @@ module GHC.Generics  (
   -- * Representation type families
   , Rep0, Rep1
 
-{-
-  -- * Representations for base types
-  , Rep0Char, Rep0Int, Rep0Float
-  , Rep0Maybe, Rep1Maybe
-  , Rep0List, Rep1List
--}
   ) where
   
 import {-# SOURCE #-} GHC.Types -- ([](..), Int, Char, Bool(..))
@@ -145,11 +123,6 @@ class Constructor c where
   conIsRecord :: t c (f :: * -> *) a -> Bool
   conIsRecord _ = False
 
-  -- | Marks if this constructor is a tuple, 
-  -- returning arity >=0 if so, <0 if not
-  conIsTuple :: t c (f :: * -> *) a -> Arity
-  conIsTuple _ = NoArity
-
 
 -- | Datatype to represent the arity of a tuple.
 data Arity = NoArity | Arity Int
@@ -173,22 +146,6 @@ data Associativity =  LeftAssociative
                    |  NotAssociative
 --  deriving (Eq, Show, Ord, Read)
 -- TODO: Add these instances to the Prelude
-
-{-
--- | Representable types of kind *
-class Representable0 a rep | a -> rep where
-  -- | Convert from the datatype to its representation
-  from0  :: a -> rep x
-  -- | Convert from the representation to the datatype
-  to0    :: rep x -> a
-
--- | Representable types of kind * -> *
-class Representable1 f rep | f -> rep where
-  -- | Convert from the datatype to its representation
-  from1  :: f a -> rep a
-  -- | Convert from the representation to the datatype
-  to1    :: rep a -> f a
--}
 
 -- | Generic representation type
 type family Rep0 a :: * -> *
