@@ -2221,10 +2221,6 @@ machdepCCOpts'
         = ["-D_HPUX_SOURCE"]
 
 #elif i386_TARGET_ARCH
-      -- -fno-defer-pop : basically the same game as for m68k
-      --
-      -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
-      --   the fp (%ebp) for our register maps.
         =  if opt_Static then ["-DDONT_WANT_WIN32_DLL_SUPPORT"] else []
 
 #else
