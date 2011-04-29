@@ -182,6 +182,9 @@ initSysTools mbMinusB
         -- to make that possible, so for now you can't.
         ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
                                        else getSetting "C compiler command"
+        ; gcc_args_str <- if isWindowsHost then return []
+                                           else getSetting "C compiler flags"
+        ; let gcc_args = map Option (words gcc_args_str)
         ; perl_path <- if isWindowsHost
                        then return $ installed_perl_bin "perl"
                        else getSetting "perl command"
@@ -224,12 +227,16 @@ initSysTools mbMinusB
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
         -- Config.hs one day.
-        ; let cpp_path  = (gcc_prog,
-                           (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
+        ; let cpp_prog  = gcc_prog
+              cpp_args  = Option "-E"
+                        : map Option (words cRAWCPP_FLAGS)
+                       ++ gcc_args
 
         -- Other things being equal, as and ld are simply gcc
         ; let   as_prog  = gcc_prog
+                as_args  = gcc_args
                 ld_prog  = gcc_prog
+                ld_args  = gcc_args
 
         -- figure out llvm location. (TODO: Acutally implement).
         ; let lc_prog = "llc"
@@ -244,12 +251,12 @@ initSysTools mbMinusB
                         sExtraGccViaCFlags = words myExtraGccViaCFlags,
                         sSystemPackageConfig = pkgconfig_path,
                         sPgm_L   = unlit_path,
-                        sPgm_P   = cpp_path,
+                        sPgm_P   = (cpp_prog, cpp_args),
                         sPgm_F   = "",
-                        sPgm_c   = (gcc_prog,[]),
+                        sPgm_c   = (gcc_prog, gcc_args),
                         sPgm_s   = (split_prog,split_args),
-                        sPgm_a   = (as_prog,[]),
-                        sPgm_l   = (ld_prog,[]),
+                        sPgm_a   = (as_prog, as_args),
+                        sPgm_l   = (ld_prog, ld_args),
                         sPgm_dll = (mkdll_prog,mkdll_args),
                         sPgm_T   = touch_path,
                         sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",

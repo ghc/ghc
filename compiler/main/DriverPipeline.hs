@@ -1027,7 +1027,6 @@ runPhase cc_phase input_fn dflags
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
                               (cmdline_include_paths ++ pkg_include_dirs)
 
-        let md_c_flags = machdepCCOpts dflags
         let gcc_extra_viac_flags = extraGccViaCFlags dflags
         let pic_c_flags = picCCOpts dflags
 
@@ -1092,8 +1091,7 @@ runPhase cc_phase input_fn dflags
                         , SysTools.FileOption "" output_fn
                         ]
                        ++ map SysTools.Option (
-                          md_c_flags
-                       ++ pic_c_flags
+                          pic_c_flags
 
 #if    defined(mingw32_TARGET_OS)
                 -- Stub files generated for foreign exports references the runIO_closure
@@ -1178,7 +1176,6 @@ runPhase As input_fn dflags
         -- might be a hierarchical module.
         io $ createDirectoryHierarchy (takeDirectory output_fn)
 
-        let md_c_flags = machdepCCOpts dflags
         io $ SysTools.runAs dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
@@ -1196,8 +1193,7 @@ runPhase As input_fn dflags
                           , SysTools.FileOption "" input_fn
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" output_fn
-                          ]
-                       ++ map SysTools.Option md_c_flags)
+                          ])
 
         return (next_phase, output_fn)
 
@@ -1233,7 +1229,6 @@ runPhase SplitAs _input_fn dflags
             split_obj n = split_odir </>
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
-        let md_c_flags = machdepCCOpts dflags
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
@@ -1251,8 +1246,7 @@ runPhase SplitAs _input_fn dflags
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" (split_obj n)
                           , SysTools.FileOption "" (split_s n)
-                          ]
-                       ++ map SysTools.Option md_c_flags)
+                          ])
 
         io $ mapM_ assemble_file [1..n]
 
@@ -1419,14 +1413,12 @@ mkExtraCObj dflags xs
       oFile <- newTempName dflags "o"
       writeFile cFile xs
       let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
-          md_c_flags = machdepCCOpts dflags
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,
                        Option        "-o",
                        FileOption "" oFile] ++
-                      map (FileOption "-I") (includeDirs rtsDetails) ++
-                      map Option md_c_flags)
+                      map (FileOption "-I") (includeDirs rtsDetails))
       return oFile
 
 mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath
@@ -1654,14 +1646,13 @@ linkBinary dflags o_files dep_packages = do
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    let md_c_flags = machdepCCOpts dflags
     SysTools.runLink dflags (
                        map SysTools.Option verbFlags
                       ++ [ SysTools.Option "-o"
                          , SysTools.FileOption "" output_fn
                          ]
                       ++ map SysTools.Option (
-                         md_c_flags
+                         []
 
 #ifdef mingw32_TARGET_OS
                       -- Permit the linker to auto link _symbol to _imp_symbol.
@@ -1806,7 +1797,6 @@ linkDynLib dflags o_files dep_packages = do
         -- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
-    let md_c_flags = machdepCCOpts dflags
     let extra_ld_opts = getOpts dflags opt_l
 
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
@@ -1828,11 +1818,10 @@ linkDynLib dflags o_files dep_packages = do
             ]
          ++ map (SysTools.FileOption "") o_files
          ++ map SysTools.Option (
-            md_c_flags
 
          -- Permit the linker to auto link _symbol to _imp_symbol
          -- This lets us link against DLLs without needing an "import library"
-         ++ ["-Wl,--enable-auto-import"]
+            ["-Wl,--enable-auto-import"]
 
          ++ extra_ld_inputs
          ++ lib_path_opts
@@ -1884,8 +1873,7 @@ linkDynLib dflags o_files dep_packages = do
             , SysTools.FileOption "" output_fn
             ]
          ++ map SysTools.Option (
-            md_c_flags
-         ++ o_files
+            o_files
          ++ [ "-undefined", "dynamic_lookup", "-single_module",
 #if !defined(x86_64_TARGET_ARCH)
               "-Wl,-read_only_relocs,suppress",
@@ -1919,8 +1907,7 @@ linkDynLib dflags o_files dep_packages = do
             , SysTools.FileOption "" output_fn
             ]
          ++ map SysTools.Option (
-            md_c_flags
-         ++ o_files
+            o_files
          ++ [ "-shared" ]
          ++ bsymbolicFlag
             -- Set the library soname. We use -h rather than -soname as
@@ -1949,11 +1936,8 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
     let verbFlags = getVerbFlags dflags
 
     let cc_opts
-          | not include_cc_opts = []
-          | otherwise           = (optc ++ md_c_flags)
-                where
-                      optc = getOpts dflags opt_c
-                      md_c_flags = machdepCCOpts dflags
+          | include_cc_opts = getOpts dflags opt_c
+          | otherwise       = []
 
     let cpp_prog args | raw       = SysTools.runCpp dflags args
                       | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
@@ -2005,7 +1989,6 @@ joinObjectFiles dflags o_files output_fn = do
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
                             SysTools.FileOption "" output_fn ]
-                         ++ map SysTools.Option md_c_flags
                          ++ args)
 
       ld_x_flag | null cLD_X = ""
@@ -2017,8 +2000,6 @@ joinObjectFiles dflags o_files output_fn = do
       ld_build_id | cLdHasBuildId == "YES"  = "-Wl,--build-id=none"
                   | otherwise               = ""
 
-      md_c_flags = machdepCCOpts dflags
-  
   if cLdIsGNULd == "YES"
      then do
           script <- newTempName dflags "ldscript"

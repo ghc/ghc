@@ -60,7 +60,7 @@ module DynFlags (
         supportedLanguagesAndExtensions,
 
         -- ** DynFlag C compiler options
-        machdepCCOpts, picCCOpts,
+        picCCOpts,
 
         -- * Configuration of the stg-to-stg passes
         StgToDo(..),
@@ -2200,9 +2200,6 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -- The options below are not dependent on the version of gcc, only the
 -- platform.
 
-machdepCCOpts :: DynFlags -> [String] -- flags for all C compilations
-machdepCCOpts _ = cCcOpts
-
 picCCOpts :: DynFlags -> [String]
 picCCOpts _dflags
 #if darwin_TARGET_OS
@@ -2272,7 +2269,6 @@ compilerInfo dflags
        ("Debug on",                    show debugIsOn),
        ("LibDir",                      topDir dflags),
        ("Global Package DB",           systemPackageConfig dflags),
-       ("C compiler flags",            show cCcOpts),
        ("Gcc Linker flags",            show cGccLinkerOpts),
        ("Ld Linker flags",             show cLdLinkerOpts)
       ]

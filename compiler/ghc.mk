@@ -108,8 +108,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo 'cStage                :: String'                             >> $@
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
-	@echo 'cCcOpts               :: [String]'                           >> $@
-	@echo 'cCcOpts               = words "$(CONF_CC_OPTS_STAGE$*)"'     >> $@
 	@echo 'cGccLinkerOpts        :: [String]'                           >> $@
 	@echo 'cGccLinkerOpts        = words "$(CONF_GCC_LINKER_OPTS_STAGE$*)"' >> $@
 	@echo 'cLdLinkerOpts         :: [String]'                           >> $@
