@@ -834,7 +834,7 @@ instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats
 \begin{code}
 type LDerivDecl name = Located (DerivDecl name)
 
-data DerivDecl name = DerivDecl (LHsType name)
+data DerivDecl name = DerivDecl { deriv_type :: LHsType name }
   deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
