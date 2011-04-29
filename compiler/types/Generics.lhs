@@ -111,6 +111,7 @@ tc_mkRep0Ty tycon metaDts =
     c1 <- tcLookupTyCon c1TyConName
     s1 <- tcLookupTyCon s1TyConName
     rec0 <- tcLookupTyCon rec0TyConName
+    par0 <- tcLookupTyCon par0TyConName
     u1 <- tcLookupTyCon u1TyConName
     v1 <- tcLookupTyCon v1TyConName
     plus <- tcLookupTyCon sumTyConName
@@ -119,6 +120,7 @@ tc_mkRep0Ty tycon metaDts =
     let mkSum' a b = mkTyConApp plus  [a,b]
         mkProd a b = mkTyConApp times [a,b]
         mkRec0 a   = mkTyConApp rec0  [a]
+        mkPar0 a   = mkTyConApp par0  [a]
         mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
         mkC  i d a = mkTyConApp c1    [d, prod i (dataConOrigArgTys a)]
         mkS    d a = mkTyConApp s1    [d, a]
@@ -136,7 +138,11 @@ tc_mkRep0Ty tycon metaDts =
                         foldBal mkProd [ arg d a 
                                        | (d,a) <- zip (metaSTyCons !! i) l ]
         
-        arg d t = mkS d (mkRec0 t)
+        arg d t = trace (showPpr t) $ mkS d (recOrPar t (getTyVar_maybe t))
+        -- Argument is not a type variable, use Rec0
+        recOrPar t Nothing  = trace "Rec0" $ mkRec0 t
+        -- Argument is a type variable, use Par0
+        recOrPar t (Just _) = trace "Par0" $ mkPar0 t
         
         metaDTyCon  = mkTyConTy (metaD metaDts)
         metaCTyCons = map mkTyConTy (metaC metaDts)
@@ -318,9 +324,9 @@ genLR_E i n e
 --------------------------------------------------------------------------------
 
 -- Build a product expression
-mkProd_E :: US		          -- Base for unique names
-	       -> [RdrName]       -- List of variables matched on the lhs
-	       -> LHsExpr RdrName -- Resulting product expression
+mkProd_E :: US	            -- Base for unique names
+	 -> [RdrName]       -- List of variables matched on the lhs
+	 -> LHsExpr RdrName -- Resulting product expression
 mkProd_E _ []   = mkM1_E (nlHsVar u1DataCon_RDR)
 mkProd_E _ vars = mkM1_E (foldBal prod appVars)
                    -- These M1s are meta-information for the constructor
