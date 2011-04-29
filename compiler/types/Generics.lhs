@@ -26,7 +26,7 @@ import PrelNames
 import TcEnv (tcLookupTyCon)
 import TcRnMonad (TcM, newUnique)
 import HscTypes
-	
+
 import SrcLoc
 import Bag
 import Outputable 
@@ -138,11 +138,11 @@ tc_mkRep0Ty tycon metaDts =
                         foldBal mkProd [ arg d a 
                                        | (d,a) <- zip (metaSTyCons !! i) l ]
         
-        arg d t = trace (showPpr t) $ mkS d (recOrPar t (getTyVar_maybe t))
+        arg d t = mkS d (recOrPar t (getTyVar_maybe t))
         -- Argument is not a type variable, use Rec0
-        recOrPar t Nothing  = trace "Rec0" $ mkRec0 t
+        recOrPar t Nothing  = mkRec0 t
         -- Argument is a type variable, use Par0
-        recOrPar t (Just _) = trace "Par0" $ mkPar0 t
+        recOrPar t (Just _) = mkPar0 t
         
         metaDTyCon  = mkTyConTy (metaD metaDts)
         metaCTyCons = map mkTyConTy (metaC metaDts)
@@ -334,7 +334,6 @@ mkProd_E _ vars = mkM1_E (foldBal prod appVars)
     appVars = map wrapArg_E vars
     prod a b = prodDataCon_RDR `nlHsApps` [a,b]
 
--- TODO: Produce a P0 when v is a parameter
 wrapArg_E :: RdrName -> LHsExpr RdrName
 wrapArg_E v = mkM1_E (k1DataCon_RDR `nlHsVarApps` [v])
               -- This M1 is meta-information for the selector
@@ -350,7 +349,6 @@ mkProd_P _ vars = mkM1_P (foldBal prod appVars)
     appVars = map wrapArg_P vars
     prod a b = prodDataCon_RDR `nlConPat` [a,b]
     
--- TODO: Produce a P0 when v is a parameter
 wrapArg_P :: RdrName -> LPat RdrName
 wrapArg_P v = mkM1_P (k1DataCon_RDR `nlConVarPat` [v])
               -- This M1 is meta-information for the selector
