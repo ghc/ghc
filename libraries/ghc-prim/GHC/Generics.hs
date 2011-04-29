@@ -141,9 +141,9 @@ prec Prefix      = I# 10#
 prec (Infix _ n) = n
 
 -- | Datatype to represent the associativy of a constructor
-data Associativity =  LeftAssociative 
-                   |  RightAssociative
-                   |  NotAssociative
+data Associativity = LeftAssociative 
+                   | RightAssociative
+                   | NotAssociative
 --  deriving (Eq, Show, Ord, Read)
 -- TODO: Add these instances to the Prelude
 
