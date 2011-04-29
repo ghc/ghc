@@ -635,7 +635,7 @@ AC_SUBST([ArArgs], ["$fp_prog_ar_args"])
 # FP_PROG_AR_NEEDS_RANLIB
 # -----------------------
 # Sets the output variable RANLIB to "ranlib" if it is needed and found,
-# to ":" otherwise.
+# to "true" otherwise.
 AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],
 [AC_REQUIRE([FP_PROG_AR_IS_GNU])
 AC_REQUIRE([FP_PROG_AR_ARGS])
@@ -655,7 +655,7 @@ fi])
 if test $fp_cv_prog_ar_needs_ranlib = yes; then
    AC_PROG_RANLIB
 else
-  RANLIB=":"
+  RANLIB="true"
   AC_SUBST([RANLIB])
 fi
 ])# FP_PROG_AR_NEEDS_RANLIB
