@@ -126,14 +126,12 @@ class Constructor c where
 
 -- | Datatype to represent the arity of a tuple.
 data Arity = NoArity | Arity Int
---  deriving (Eq, Show, Ord, Read)
--- TODO: Add these instances to the Prelude
+-- Eq, Show, Ord, and Read instances are in GHC.Int
 
 -- | Datatype to represent the fixity of a constructor. An infix
 -- | declaration directly corresponds to an application of 'Infix'.
 data Fixity = Prefix | Infix Associativity Int
---  deriving (Eq, Show, Ord, Read)
--- TODO: Add these instances to the Prelude
+-- Eq, Show, Ord, and Read instances are in GHC.Int
 
 -- | Get the precedence of a fixity value.
 prec :: Fixity -> Int
@@ -144,8 +142,7 @@ prec (Infix _ n) = n
 data Associativity = LeftAssociative 
                    | RightAssociative
                    | NotAssociative
---  deriving (Eq, Show, Ord, Read)
--- TODO: Add these instances to the Prelude
+-- Eq, Show, Ord, and Read instances are in GHC.Int
 
 -- | Generic representation type
 type family Rep0 a :: * -> *
