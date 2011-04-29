@@ -415,8 +415,8 @@ tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
        -- and it maintains uniformity with other rebindable syntax
        ; return (HsIf (Just fun') pred' b1' b2') }
 
-tcExpr (HsDo do_or_lc stmts body return_op _) res_ty
-  = tcDoStmts do_or_lc stmts body return_op res_ty
+tcExpr (HsDo do_or_lc stmts _) res_ty
+  = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty

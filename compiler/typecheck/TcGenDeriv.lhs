@@ -779,7 +779,7 @@ gen_Ix_binds loc tycon
     single_con_range
       = mk_easy_FunBind loc range_RDR 
 	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
-	nlHsDo ListComp stmts con_expr
+	noLoc (mkHsComp ListComp stmts con_expr)
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 
@@ -893,7 +893,7 @@ gen_Read_binds get_fixity loc tycon
     read_nullary_cons 
       = case nullary_cons of
     	    []    -> []
-    	    [con] -> [nlHsDo DoExpr (match_con con) (result_expr con [])]
+    	    [con] -> [nlHsDo DoExpr (match_con con ++ [mkExprStmt (result_expr con [])])]
             _     -> [nlHsApp (nlHsVar choose_RDR) 
     		   	      (nlList (map mk_pair nullary_cons))]
         -- NB For operators the parens around (:=:) are matched by the
@@ -965,11 +965,12 @@ gen_Read_binds get_fixity loc tycon
     ------------------------------------------------------------------------
     --		Helpers
     ------------------------------------------------------------------------
-    mk_alt e1 e2       = genOpApp e1 alt_RDR e2					-- e1 +++ e2
-    mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p, nlHsDo DoExpr ss b]	-- prec p (do { ss ; b })
-    bindLex pat	       = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))		-- pat <- lexP
-    con_app con as     = nlHsVarApps (getRdrName con) as			-- con as
-    result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as)		-- return (con as)
+    mk_alt e1 e2       = genOpApp e1 alt_RDR e2				-- e1 +++ e2
+    mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p	        -- prec p (do { ss ; b })
+                                           , nlHsDo DoExpr (ss ++ [mkExprStmt b])]
+    bindLex pat	       = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))	-- pat <- lexP
+    con_app con as     = nlHsVarApps (getRdrName con) as		-- con as
+    result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as) -- return (con as)
     
     punc_pat s   = nlConPat punc_RDR   [nlLitPat (mkHsString s)]  -- Punc 'c'
 

@@ -578,12 +578,10 @@ zonkExpr env (HsLet binds expr)
     zonkLExpr new_env expr	`thenM` \ new_expr ->
     returnM (HsLet new_binds new_expr)
 
-zonkExpr env (HsDo do_or_lc stmts body return_op ty)
-  = zonkStmts env stmts 	`thenM` \ (new_env, new_stmts) ->
-    zonkLExpr new_env body	`thenM` \ new_body ->
-    zonkExpr new_env return_op  `thenM` \ new_return ->
+zonkExpr env (HsDo do_or_lc stmts ty)
+  = zonkStmts env stmts 	`thenM` \ (_, new_stmts) ->
     zonkTcTypeToType env ty	`thenM` \ new_ty   ->
-    returnM (HsDo do_or_lc new_stmts new_body new_return new_ty)
+    returnM (HsDo do_or_lc new_stmts new_ty)
 
 zonkExpr env (ExplicitList ty exprs)
   = zonkTcTypeToType env ty	`thenM` \ new_ty ->
@@ -745,9 +743,10 @@ zonkStmt env (ParStmt stmts_w_bndrs mzip_op bind_op return_op)
 
 zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                       , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id, recS_bind_fn = bind_id
-                      , recS_rec_rets = rets })
+                      , recS_rec_rets = rets, redS_ret_ty = ret_ty })
   = do { new_rvs <- zonkIdBndrs env rvs
        ; new_lvs <- zonkIdBndrs env lvs
+       ; new_ret_ty  <- zonkTcTypeToType env ret_ty
        ; new_ret_id  <- zonkExpr env ret_id
        ; new_mfix_id <- zonkExpr env mfix_id
        ; new_bind_id <- zonkExpr env bind_id
@@ -760,7 +759,7 @@ zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_id
                  RecStmt { recS_stmts = new_segStmts, recS_later_ids = new_lvs
                          , recS_rec_ids = new_rvs, recS_ret_fn = new_ret_id
                          , recS_mfix_fn = new_mfix_id, recS_bind_fn = new_bind_id
-                         , recS_rec_rets = new_rets }) }
+                         , recS_rec_rets = new_rets, recS_ret_ty = new_ret_ty }) }
 
 zonkStmt env (ExprStmt expr then_op guard_op ty)
   = zonkLExpr env expr		`thenM` \ new_expr ->
@@ -768,6 +767,11 @@ zonkStmt env (ExprStmt expr then_op guard_op ty)
     zonkExpr env guard_op	`thenM` \ new_guard ->
     zonkTcTypeToType env ty	`thenM` \ new_ty ->
     returnM (env, ExprStmt new_expr new_then new_guard new_ty)
+
+zonkStmt env (LastStmt expr ret_op)
+  = zonkLExpr env expr		`thenM` \ new_expr ->
+    zonkExpr env ret_op		`thenM` \ new_ret ->
+    returnM (env, LastStmt new_expr new_ret)
 
 zonkStmt env (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op)
   = do { (env', stmts') <- zonkStmts env stmts 

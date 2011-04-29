@@ -21,7 +21,7 @@ module HsUtils(
   mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCoI, mkLHsWrapCoI,
   coiToHsWrapper, mkHsLams, mkHsDictLet,
-  mkHsOpApp, mkHsDo, mkHsWrapPat, mkHsWrapPatCoI,
+  mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCoI, mkDoStmts,
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -42,7 +42,7 @@ module HsUtils(
   nlHsAppTy, nlHsTyVar, nlHsFunTy, nlHsTyConApp, 
 
   -- Stmts
-  mkTransformStmt, mkTransformByStmt, mkExprStmt, mkBindStmt,
+  mkTransformStmt, mkTransformByStmt, mkExprStmt, mkBindStmt, mkLastStmt,
   mkGroupUsingStmt, mkGroupByStmt, mkGroupByUsingStmt, 
   emptyRecStmt, mkRecStmt, 
 
@@ -190,7 +190,9 @@ mkSimpleHsAlt pat expr
 mkHsIntegral   :: Integer -> PostTcType -> HsOverLit id
 mkHsFractional :: Rational -> PostTcType -> HsOverLit id
 mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
-mkHsDo         :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
+mkHsDo         :: HsStmtContext Name -> [LStmt id] -> HsExpr id
+mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
+mkDoStmts      :: [LStmt id] -> [LStmt id] 
 
 mkNPat      :: HsOverLit id -> Maybe (SyntaxExpr id) -> Pat id
 mkNPlusKPat :: Located id -> HsOverLit id -> Pat id
@@ -198,6 +200,7 @@ mkNPlusKPat :: Located id -> HsOverLit id -> Pat id
 mkTransformStmt   :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
 mkTransformByStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 
+mkLastStmt :: LHsExpr idR -> StmtLR idL idR
 mkExprStmt :: LHsExpr idR -> StmtLR idL idR
 mkBindStmt :: LPat idL -> LHsExpr idR -> StmtLR idL idR
 
@@ -212,7 +215,15 @@ mkHsIsString   s       = OverLit (HsIsString   s)  noRebindableInfo noSyntaxExpr
 noRebindableInfo :: Bool
 noRebindableInfo = error "noRebindableInfo" 	-- Just another placeholder; 
 
-mkHsDo ctxt stmts body = HsDo ctxt stmts body noSyntaxExpr placeHolderType
+-- mkDoStmts turns a trailing ExprStmt into a LastStmt
+mkDoStmts [L loc (ExprStmt e _ _ _)] = [L loc (mkLastStmt e)]
+mkDoStmts (s:ss) 	      	     = s : mkDoStmts ss
+mkDoStmts []     	      	     = []
+
+mkHsDo ctxt stmts = HsDo ctxt stmts placeHolderType
+mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
+  where
+    last_stmt = L (getLoc expr) $ mkLastStmt expr
 
 mkHsIf :: LHsExpr id -> LHsExpr id -> LHsExpr id -> HsExpr id
 mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
@@ -231,13 +242,14 @@ mkGroupUsingStmt   stmts usingExpr        = GroupStmt stmts [] Nothing       (Le
 mkGroupByStmt      stmts byExpr           = GroupStmt stmts [] (Just byExpr) (Right noSyntaxExpr) noSyntaxExpr noSyntaxExpr noSyntaxExpr
 mkGroupByUsingStmt stmts byExpr usingExpr = GroupStmt stmts [] (Just byExpr) (Left usingExpr)     noSyntaxExpr noSyntaxExpr noSyntaxExpr
 
+mkLastStmt expr	    = LastStmt expr noSyntaxExpr
 mkExprStmt expr	    = ExprStmt expr noSyntaxExpr noSyntaxExpr placeHolderType
 mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
 
 emptyRecStmt = RecStmt { recS_stmts = [], recS_later_ids = [], recS_rec_ids = []
                        , recS_ret_fn = noSyntaxExpr, recS_mfix_fn = noSyntaxExpr
 		       , recS_bind_fn = noSyntaxExpr
-                       , recS_rec_rets = [] }
+                       , recS_rec_rets = [], recS_ret_ty = placeHolderType }
 
 mkRecStmt stmts = emptyRecStmt { recS_stmts = stmts }
 
@@ -327,8 +339,8 @@ nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
 nlWildPat :: LPat id
 nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
-nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> LHsExpr id
-nlHsDo ctxt stmts body = noLoc (mkHsDo ctxt stmts body)
+nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id
+nlHsDo ctxt stmts = noLoc (mkHsDo ctxt stmts)
 
 nlHsOpApp :: LHsExpr id -> id -> LHsExpr id -> LHsExpr id
 nlHsOpApp e1 op e2 = noLoc (mkHsOpApp e1 op e2)
@@ -496,7 +508,8 @@ collectStmtBinders :: StmtLR idL idR -> [idL]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt pat _ _ _) = collectPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
-collectStmtBinders (ExprStmt _ _ _ _)   = []
+collectStmtBinders (ExprStmt {})        = []
+collectStmtBinders (LastStmt {})        = []
 collectStmtBinders (ParStmt xs _ _ _)   = collectLStmtsBinders
                                         $ concatMap fst xs
 collectStmtBinders (TransformStmt stmts _ _ _ _ _)   = collectLStmtsBinders stmts
@@ -642,7 +655,8 @@ lStmtsImplicits = hs_lstmts
     
     hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
     hs_stmt (LetStmt binds)      = hs_local_binds binds
-    hs_stmt (ExprStmt _ _ _ _)   = emptyNameSet
+    hs_stmt (ExprStmt {})        = emptyNameSet
+    hs_stmt (LastStmt {})        = emptyNameSet
     hs_stmt (ParStmt xs _ _ _)   = hs_lstmts $ concatMap fst xs
     
     hs_stmt (TransformStmt stmts _ _ _ _ _)   = hs_lstmts stmts

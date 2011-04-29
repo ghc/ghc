@@ -23,6 +23,7 @@ import Name
 import BasicTypes
 import DataCon
 import SrcLoc
+import Util( dropTail )
 import Outputable
 import FastString
 
@@ -146,10 +147,6 @@ data HsExpr id
                                      -- because in this context we never use
                                      -- the PatGuard or ParStmt variant
                 [LStmt id]           -- "do":one or more stmts
-                (LHsExpr id)         -- The body; the last expression in the
-                                     -- 'do' of [ body | ... ] in a list comp
-                (SyntaxExpr id)      -- The 'return' function, see Note
-                                     -- [Monad Comprehensions]
                 PostTcType           -- Type of the whole expression
 
   | ExplicitList                -- syntactic list
@@ -441,7 +438,7 @@ ppr_expr (HsLet binds expr)
   = sep [hang (ptext (sLit "let")) 2 (pprBinds binds),
          hang (ptext (sLit "in"))  2 (ppr expr)]
 
-ppr_expr (HsDo do_or_list_comp stmts body _ _) = pprDo do_or_list_comp stmts body
+ppr_expr (HsDo do_or_list_comp stmts _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -577,7 +574,7 @@ pprParendExpr expr
       HsPar {}          -> pp_as_was
       HsBracket {}      -> pp_as_was
       HsBracketOut _ [] -> pp_as_was
-      HsDo sc _ _ _ _
+      HsDo sc _ _
        | isListCompExpr sc -> pp_as_was
       _                    -> parens pp_as_was
 
@@ -835,7 +832,12 @@ type Stmt id = StmtLR id id
 -- The SyntaxExprs in here are used *only* for do-notation and monad
 -- comprehensions, which have rebindable syntax. Otherwise they are unused.
 data StmtLR idL idR
-  = BindStmt (LPat idL)
+  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp, DoExpr, MDoExpr
+              -- Not used for GhciStmt, PatGuard, which scope over other stuff
+               (LHsExpr idR)
+               (SyntaxExpr idR)   -- The return operator, used only for MonadComp
+	       		   	  -- See Note [Monad Comprehensions]
+  | BindStmt (LPat idL)
              (LHsExpr idR)
              (SyntaxExpr idR) -- The (>>=) operator
              (SyntaxExpr idR) -- The fail operator
@@ -852,9 +854,10 @@ data StmtLR idL idR
 
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  [([LStmt idL], [idR])]
-             (SyntaxExpr idR)           -- polymorphic `mzip` for monad comprehensions
+             (SyntaxExpr idR)           -- Polymorphic `mzip` for monad comprehensions
              (SyntaxExpr idR)           -- The `>>=` operator
-             (SyntaxExpr idR)           -- polymorphic `return` operator
+             (SyntaxExpr idR)           -- Polymorphic `return` operator
+	     		 		-- with type (forall a. a -> m a)
                                         -- See notes [Monad Comprehensions]
 
   -- After renaming, the ids are the binders bound by the stmts and used
@@ -926,6 +929,10 @@ data StmtLR idL idR
                                      -- because the Id may be *polymorphic*, but
                                      -- the returned thing has to be *monomorphic*, 
 				     -- so they may be type applications
+
+      , recS_ret_ty :: PostTcType    -- The type of of do { stmts; return (a,b,c) }
+      		       		     -- With rebindable syntax the type might not
+				     -- be quite as simple as (m (tya, tyb, tyc)).
       }
   deriving (Data, Typeable)
 \end{code}
@@ -1022,10 +1029,10 @@ where v1..vn are the later_ids
 
 Note [Monad Comprehensions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Monad comprehensions require seperate functions like 'return' and '>>=' for
-desugaring. These functions are stored in the 'HsDo' expression and the
-statements used in monad comprehensions. For example, the 'return' of the
-'HsDo' expression is used to lift the body of the monad comprehension:
+Monad comprehensions require separate functions like 'return' and
+'>>=' for desugaring. These functions are stored in the statements
+used in monad comprehensions. For example, the 'return' of the 'LastStmt'
+expression is used to lift the body of the monad comprehension:
 
   [ body | stmts ]
    =>
@@ -1065,6 +1072,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (StmtLR idL idR)
     ppr stmt = pprStmt stmt
 
 pprStmt :: (OutputableBndr idL, OutputableBndr idR) => (StmtLR idL idR) -> SDoc
+pprStmt (LastStmt expr _)         = ppr expr
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, ptext (sLit "<-"), ppr expr]
 pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _ _)     = ppr expr
@@ -1103,28 +1111,32 @@ pprBy :: OutputableBndr id => Maybe (LHsExpr id) -> SDoc
 pprBy Nothing  = empty
 pprBy (Just e) = ptext (sLit "by") <+> ppr e
 
-pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
-pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
-pprDo GhciStmt    stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
-pprDo MDoExpr     stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
-pprDo ListComp    stmts body = brackets    $ pprComp stmts body
-pprDo PArrComp    stmts body = pa_brackets $ pprComp stmts body
-pprDo MonadComp   stmts body = brackets    $ pprComp stmts body
-pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
+pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> SDoc
+pprDo DoExpr      stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
+pprDo GhciStmt    stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
+pprDo MDoExpr     stmts = ptext (sLit "mdo") <+> ppr_do_stmts stmts
+pprDo ListComp    stmts = brackets    $ pprComp stmts
+pprDo PArrComp    stmts = pa_brackets $ pprComp stmts
+pprDo MonadComp   stmts = brackets    $ pprComp stmts
+pprDo _           _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
+ppr_do_stmts :: OutputableBndr id => [LStmt id] -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
-ppr_do_stmts stmts body
-  = lbrace <+> pprDeeperList vcat ([ppr s <> semi | s <- stmts] ++ [ppr body])
+ppr_do_stmts stmts 
+  = lbrace <+> pprDeeperList vcat ([ppr s <> semi | s <- stmts])
            <+> rbrace
 
 ppr_lc_stmts :: OutputableBndr id => [LStmt id] -> [SDoc]
 ppr_lc_stmts stmts = [ppr s <> comma | s <- stmts]
 
-pprComp :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
-pprComp quals body	  -- Prints:  body | qual1, ..., qualn 
-  = hang (ppr body <+> char '|') 2 (interpp'SP quals)
+pprComp :: OutputableBndr id => [LStmt id] -> SDoc
+pprComp quals	  -- Prints:  body | qual1, ..., qualn 
+  | not (null quals)
+  , L _ (LastStmt body _) <- last quals
+  = hang (ppr body <+> char '|') 2 (interpp'SP (dropTail 1 quals))
+  | otherwise
+  = pprPanic "pprComp" (interpp'SP quals)
 \end{code}
 
 %************************************************************************
@@ -1242,11 +1254,13 @@ data HsMatchContext id  -- Context of a Match
 
 data HsStmtContext id
   = ListComp
-  | DoExpr
-  | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
-  | MDoExpr                              -- Recursive do-expression
   | MonadComp
   | PArrComp                             -- Parallel array comprehension
+
+  | DoExpr				 -- do { ... }
+  | MDoExpr                              -- mdo { ... }  ie recursive do-expression 
+
+  | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
   | TransformStmtCtxt (HsStmtContext id) -- A branch of a transform stmt

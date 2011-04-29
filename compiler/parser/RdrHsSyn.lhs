@@ -40,8 +40,6 @@ module RdrHsSyn (
 	checkPattern,	      -- HsExp -> P HsPat
 	bang_RDR,
 	checkPatterns,	      -- SrcLoc -> [HsExp] -> P [HsPat]
-	checkDo,	      -- [Stmt] -> P [Stmt]
-	checkMDo,	      -- [Stmt] -> P [Stmt]
 	checkMonadComp,       -- P (HsStmtContext RdrName)
 	checkValDef,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	checkValSig,	      -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
@@ -612,34 +610,6 @@ checkPred (L spn ty)
     check _loc (HsParTy t)  	       args = checkl t args
     check loc _                        _    = parseErrorSDoc loc
                                 (text "malformed class assertion:" <+> ppr ty)
-
----------------------------------------------------------------------------
--- Checking statements in a do-expression
--- 	We parse   do { e1 ; e2 ; }
--- 	as [ExprStmt e1, ExprStmt e2]
--- checkDo (a) checks that the last thing is an ExprStmt
---	   (b) returns it separately
--- same comments apply for mdo as well
-
-checkDo, checkMDo :: SrcSpan -> [LStmt RdrName] -> P ([LStmt RdrName], LHsExpr RdrName)
-
-checkDo	 = checkDoMDo "a " "'do'"
-checkMDo = checkDoMDo "an " "'mdo'"
-
-checkDoMDo :: String -> String -> SrcSpan -> [LStmt RdrName] -> P ([LStmt RdrName], LHsExpr RdrName)
-checkDoMDo _   nm loc []   = parseErrorSDoc loc (text ("Empty " ++ nm ++ " construct"))
-checkDoMDo pre nm _   ss   = do
-  check ss
-  where 
-	check  []                       = panic "RdrHsSyn:checkDoMDo"
-	check  [L _ (ExprStmt e _ _ _)] = return ([], e)
-	check  [L l e] = parseErrorSDoc l
-                         (text ("The last statement in " ++ pre ++ nm ++
-					            " construct must be an expression:")
-                       $$ ppr e)
-	check (s:ss) = do
-	  (ss',e') <-  check ss
-	  return ((s:ss'),e')
 
 -- -------------------------------------------------------------------------
 -- Checking Patterns.

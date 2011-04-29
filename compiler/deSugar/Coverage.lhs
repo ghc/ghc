@@ -301,11 +301,9 @@ addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsExprNeverOrAlways e)
-addTickHsExpr (HsDo cxt stmts last_exp return_exp srcloc) = do
-        (stmts', last_exp') <- addTickLStmts' forQual stmts 
-                                     (addTickLHsExpr last_exp)
-        return_exp' <- addTickSyntaxExpr hpcSrcSpan return_exp
-	return (HsDo cxt stmts' last_exp' return_exp' srcloc)
+addTickHsExpr (HsDo cxt stmts srcloc) 
+  = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
+       ; return (HsDo cxt stmts' srcloc) }
   where
 	forQual = case cxt of
 		    ListComp -> Just $ BinBox QualBinBox
@@ -425,14 +423,16 @@ addTickLStmts isGuard stmts = do
 addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM a 
                -> TM ([LStmt Id], a)
 addTickLStmts' isGuard lstmts res
-  = bindLocals binders $ do
-        lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
-        a <- res
-        return (lstmts', a)
-  where
-        binders = collectLStmtsBinders lstmts
+  = bindLocals (collectLStmtsBinders lstmts) $ 
+    do { lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
+       ; a <- res
+       ; return (lstmts', a) }
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
+addTickStmt _isGuard (LastStmt e ret) = do
+	liftM2 LastStmt
+		(addTickLHsExprAlways e)
+		(addTickSyntaxExpr hpcSrcSpan ret)
 addTickStmt _isGuard (BindStmt pat e bind fail) = do
 	liftM4 BindStmt
 		(addTickLPat pat)
@@ -577,10 +577,9 @@ addTickHsCmd (HsLet binds c) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsCmd c)
-addTickHsCmd (HsDo cxt stmts last_exp return_exp srcloc) = do
-        (stmts', last_exp') <- addTickLCmdStmts' stmts (addTickLHsCmd last_exp)
-        return_exp' <- addTickSyntaxExpr hpcSrcSpan return_exp
-	return (HsDo cxt stmts' last_exp' return_exp' srcloc)
+addTickHsCmd (HsDo cxt stmts srcloc)
+  = do { (stmts', _) <- addTickLCmdStmts' stmts (return ())
+       ; return (HsDo cxt stmts' srcloc) }
 
 addTickHsCmd (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
         liftM5 HsArrApp

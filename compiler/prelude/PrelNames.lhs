@@ -160,6 +160,7 @@ basicKnownKeyNames
 	-- Monad stuff
 	thenIOName, bindIOName, returnIOName, failIOName,
 	failMName, bindMName, thenMName, returnMName,
+        fmapName,
 
 	-- MonadRec stuff
 	mfixName,
@@ -612,6 +613,7 @@ eqName		  = methName gHC_CLASSES (fsLit "==")      eqClassOpKey
 ordClassName	  = clsQual  gHC_CLASSES (fsLit "Ord")     ordClassKey
 geName		  = methName gHC_CLASSES (fsLit ">=")      geClassOpKey
 functorClassName  = clsQual  gHC_BASE (fsLit "Functor") functorClassKey
+fmapName          = methName gHC_BASE (fsLit "fmap")    fmapClassOpKey
 
 -- Class Monad
 monadClassName, thenMName, bindMName, returnMName, failMName :: Name
@@ -1312,6 +1314,7 @@ negateClassOpKey	      = mkPreludeMiscIdUnique 111
 failMClassOpKey		      = mkPreludeMiscIdUnique 112
 bindMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
 thenMClassOpKey		      = mkPreludeMiscIdUnique 114 -- (>>)
+fmapClassOpKey                = mkPreludeMiscIdUnique 115
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
 
 -- Recursive do notation

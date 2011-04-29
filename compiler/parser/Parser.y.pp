@@ -1283,14 +1283,9 @@ exp10 :: { LHsExpr RdrName }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
 	| '-' fexp				{ LL $ NegApp $2 noSyntaxExpr }
 
-  	| 'do' stmtlist			{% let loc = comb2 $1 $2 in
-					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
-					   return (L loc (mkHsDo DoExpr stmts body)) }
-  	| 'mdo' stmtlist		{% let loc = comb2 $1 $2 in
-					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
-                                           return (L loc (mkHsDo MDoExpr
-                                                                 [L loc (mkRecStmt stmts)]
-                                                                 body)) }
+  	| 'do' stmtlist			{ L (comb2 $1 $2) (mkHsDo DoExpr  (unLoc $2)) }
+  	| 'mdo' stmtlist		{ L (comb2 $1 $2) (mkHsDo MDoExpr (unLoc $2)) }
+
         | scc_annot exp		    		{ LL $ if opt_SccProfilingOn
 							then HsSCC (unLoc $1) $2
 							else HsPar $2 }
@@ -1465,8 +1460,10 @@ list :: { LHsExpr RdrName }
 	| texp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
 	| texp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp '|' flattenedpquals	{% checkMonadComp >>= \ ctxt ->
-					   return (sL (comb2 $1 $>) $ mkHsDo ctxt (unLoc $3) $1) }
+	| texp '|' flattenedpquals	
+             {% checkMonadComp >>= \ ctxt ->
+		return (sL (comb2 $1 $>) $ 
+                        mkHsComp ctxt (unLoc $3) $1) }
 
 lexps :: { Located [LHsExpr RdrName] }
 	: lexps ',' texp 		{ LL (((:) $! $3) $! unLoc $1) }
@@ -1538,7 +1535,7 @@ parr :: { LHsExpr RdrName }
 						       (reverse (unLoc $1)) }
 	| texp '..' exp	 		{ LL $ PArrSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp		{ LL $ PArrSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp '|' flattenedpquals	{ LL $ mkHsDo PArrComp (unLoc $3) $1 }
+	| texp '|' flattenedpquals	{ LL $ mkHsComp PArrComp (unLoc $3) $1 }
 
 -- We are reusing `lexps' and `flattenedpquals' from the list case.
 
@@ -1605,7 +1602,7 @@ apats  :: { [LPat RdrName] }
 -- Statement sequences
 
 stmtlist :: { Located [LStmt RdrName] }
-	: '{'         	stmts '}'	{ LL (unLoc $2) }
+	: '{'         	stmts '}'	{ LL (mkDoStmts (unLoc $2)) }
 	|     vocurly   stmts close	{ $2 }
 
 --	do { ;; s ; s ; ; s ;; }
