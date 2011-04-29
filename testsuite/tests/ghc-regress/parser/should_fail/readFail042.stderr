@@ -1,9 +1,9 @@
 
 readFail042.hs:10:9:
-    Illegal transform or grouping list comprehension: use -XTransformListComp
+    Illegal transform or grouping list comprehension: use -XTransformListComp or -XMonadComprehensions
 
 readFail042.hs:11:9:
-    Illegal transform or grouping list comprehension: use -XTransformListComp
+    Illegal transform or grouping list comprehension: use -XTransformListComp or -XMonadComprehensions
 
 readFail042.hs:11:23: Not in scope: `by'
 
