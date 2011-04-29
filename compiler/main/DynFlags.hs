@@ -2201,28 +2201,7 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -- platform.
 
 machdepCCOpts :: DynFlags -> [String] -- flags for all C compilations
-machdepCCOpts _ = cCcOpts ++ machdepCCOpts'
-
-machdepCCOpts' :: [String] -- flags for all C compilations
-machdepCCOpts'
-#if alpha_TARGET_ARCH
-        =       ["-w", "-mieee"
-#ifdef HAVE_THREADED_RTS_SUPPORT
-                    , "-D_REENTRANT"
-#endif
-                   ]
-        -- For now, to suppress the gcc warning "call-clobbered
-        -- register used for global register variable", we simply
-        -- disable all warnings altogether using the -w flag. Oh well.
-
-#elif hppa_TARGET_ARCH
-        -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
-        -- (very nice, but too bad the HP /usr/include files don't agree.)
-        = ["-D_HPUX_SOURCE"]
-
-#else
-        = []
-#endif
+machdepCCOpts _ = cCcOpts
 
 picCCOpts :: DynFlags -> [String]
 picCCOpts _dflags

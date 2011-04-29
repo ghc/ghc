@@ -105,6 +105,21 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -arch x86_64"
         $5="$$5 -m64"
         ;;
+    alpha-*)
+        # For now, to suppress the gcc warning "call-clobbered
+        # register used for global register variable", we simply
+        # disable all warnings altogether using the -w flag. Oh well.
+        $2="$$2 -w -mieee -D_REENTRANT"
+        $3="$$3 -w -mieee -D_REENTRANT"
+        $5="$$5 -w -mieee -D_REENTRANT"
+        ;;
+    hppa*)
+        # ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
+        # (very nice, but too bad the HP /usr/include files don't agree.)
+        $2="$$2 -D_HPUX_SOURCE"
+        $3="$$3 -D_HPUX_SOURCE"
+        $5="$$5 -D_HPUX_SOURCE"
+        ;;
     esac
 
     # If gcc knows about the stack protector, turn it off.
