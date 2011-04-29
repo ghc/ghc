@@ -2220,9 +2220,6 @@ machdepCCOpts'
         -- (very nice, but too bad the HP /usr/include files don't agree.)
         = ["-D_HPUX_SOURCE"]
 
-#elif i386_TARGET_ARCH
-        =  if opt_Static then ["-DDONT_WANT_WIN32_DLL_SUPPORT"] else []
-
 #else
         = []
 #endif
