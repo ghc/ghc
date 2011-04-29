@@ -548,6 +548,11 @@ CC_STAGE0       = @CC_STAGE0@
 CC_STAGE1       = $(CC)
 CC_STAGE2       = $(CC)
 CC_STAGE3       = $(CC)
+AS              = $(WhatGccIsCalled)
+AS_STAGE0       = @CC_STAGE0@
+AS_STAGE1       = $(AS)
+AS_STAGE2       = $(AS)
+AS_STAGE3       = $(AS)
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC
