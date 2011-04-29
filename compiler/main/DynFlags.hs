@@ -323,7 +323,7 @@ data ExtensionFlag
    | Opt_TemplateHaskell
    | Opt_QuasiQuotes
    | Opt_ImplicitParams
-   | Opt_Generics			-- "Derivable type classes"
+   | Opt_Generics			-- generic deriving mechanism
    | Opt_ImplicitPrelude
    | Opt_ScopedTypeVariables
    | Opt_UnboxedTuples
@@ -345,6 +345,7 @@ data ExtensionFlag
    | Opt_DeriveFunctor
    | Opt_DeriveTraversable
    | Opt_DeriveFoldable
+   | Opt_DeriveRepresentable
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -1672,6 +1673,7 @@ xFlags = [
   ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),
   ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
   ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
+  ( "DeriveRepresentable",              Opt_DeriveRepresentable, nop ),
   ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, nop ),
   ( "FlexibleContexts",                 Opt_FlexibleContexts, nop ),
   ( "FlexibleInstances",                Opt_FlexibleInstances, nop ),
@@ -1852,6 +1854,7 @@ glasgowExtsFlags = [
            , Opt_DeriveFunctor
            , Opt_DeriveFoldable
            , Opt_DeriveTraversable
+           , Opt_DeriveRepresentable
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances
            , Opt_ConstrainedClassMethods
