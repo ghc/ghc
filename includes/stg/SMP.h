@@ -306,6 +306,7 @@ load_load_barrier(void) {
 #define store_load_barrier() /* nothing */
 #define load_load_barrier()  /* nothing */
 
+#if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord
 xchg(StgPtr p, StgWord w)
 {
@@ -337,6 +338,7 @@ atomic_dec(StgVolatilePtr p)
 {
     return --(*p);
 }
+#endif
 
 #define VOLATILE_LOAD(p) ((StgWord)*((StgWord*)(p)))
 

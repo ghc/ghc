@@ -101,7 +101,7 @@ module CLabel (
         hasCAF,
 	infoLblToEntryLbl, entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
-        isMathFun, isCas,
+        isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
 
 	pprCLabel
@@ -588,14 +588,6 @@ isAsmTemp _ 	    	   		= False
 maybeAsmTemp :: CLabel -> Maybe Unique
 maybeAsmTemp (AsmTempLabel uq) 		= Just uq
 maybeAsmTemp _ 	    	       		= Nothing
-
-
--- | Check whether a label corresponds to our cas function.
---      We #include the prototype for this, so we need to avoid
---      generating out own C prototypes.
-isCas :: CLabel -> Bool
-isCas (CmmLabel pkgId fn _) = pkgId == rtsPackageId && fn == fsLit "cas"
-isCas _                     = False
 
 
 -- | Check whether a label corresponds to a C function that has 
