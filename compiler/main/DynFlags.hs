@@ -1346,10 +1346,11 @@ dynamic_flags = [
   , Flag "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
 
         ------ Optimisation flags ------------------------------------------
-  , Flag "O"      (noArg (setOptLevel 1))
-  , Flag "Onot"   (noArgDF (setOptLevel 0) "Use -O0 instead")
-  , Flag "Odph"   (noArg setDPHOpt)
-  , Flag "O"      (OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
+  , Flag "O"      (noArgM (setOptLevel 1))
+  , Flag "Onot"   (noArgM (\dflags -> do deprecate "Use -O0 instead"
+                                         setOptLevel 0 dflags))
+  , Flag "Odph"   (noArgM setDPHOpt)
+  , Flag "O"      (optIntSuffixM (\mb_n -> setOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
 
   , Flag "fsimplifier-phases"          (intSuffix (\n d -> d{ simplPhases = n }))
@@ -1905,12 +1906,20 @@ checkTemplateHaskellOk _ = return ()
 type DynP = EwM (CmdLineP DynFlags)
 
 upd :: (DynFlags -> DynFlags) -> DynP ()
-upd f = liftEwM (do { dfs <- getCmdLineState
-                    ; putCmdLineState $! (f dfs) })
+upd f = liftEwM (do dflags <- getCmdLineState
+                    putCmdLineState $! f dflags)
+
+updM :: (DynFlags -> DynP DynFlags) -> DynP ()
+updM f = do dflags <- liftEwM getCmdLineState
+            dflags' <- f dflags
+            liftEwM $ putCmdLineState $! dflags'
 
 --------------- Constructor functions for OptKind -----------------
 noArg :: (DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 noArg fn = NoArg (upd fn)
+
+noArgM :: (DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
+noArgM fn = NoArg (updM fn)
 
 noArgDF :: (DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
 noArgDF fn deprec = NoArg (upd fn >> deprecate deprec)
@@ -1924,6 +1933,10 @@ hasArgDF fn deprec = HasArg (\s -> do { upd (fn s)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
+
+optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
+              -> OptKind (CmdLineP DynFlags)
+optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
 
 setDumpFlag :: DynFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
@@ -2029,14 +2042,13 @@ setObjTarget l = upd set
      | isObjectTarget (hscTarget dfs) = dfs { hscTarget = l }
      | otherwise = dfs
 
-setOptLevel :: Int -> DynFlags -> DynFlags
+setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags
    | hscTarget dflags == HscInterpreted && n > 0
-        = dflags
-            -- not in IO any more, oh well:
-            -- putStr "warning: -O conflicts with --interactive; -O ignored.\n"
+        = do addWarn "-O conflicts with --interactive; -O ignored."
+             return dflags
    | otherwise
-        = updOptLevel n dflags
+        = return (updOptLevel n dflags)
 
 
 -- -Odph is equivalent to
@@ -2045,7 +2057,7 @@ setOptLevel n dflags
 --    -fmax-simplifier-iterations20     this is necessary sometimes
 --    -fsimplifier-phases=3             we use an additional simplifier phase for fusion
 --
-setDPHOpt :: DynFlags -> DynFlags
+setDPHOpt :: DynFlags -> DynP DynFlags
 setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , simplPhases         = 3
                                          })
