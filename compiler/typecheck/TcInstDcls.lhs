@@ -450,10 +450,11 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
         ; dfun_name <- newDFunName clas inst_tys (getLoc poly_ty)
 		-- Dfun location is that of instance *header*
         ; overlap_flag <- getOverlapFlag
+        ; safe <- getSafeHaskellFlag
         ; let (eq_theta,dict_theta) = partition isEqPred theta
               theta'         = eq_theta ++ dict_theta
               dfun           = mkDictFunId dfun_name tyvars theta' clas inst_tys
-              ispec          = mkLocalInstance dfun overlap_flag
+              ispec          = mkLocalInstance dfun overlap_flag safe
 
         ; return (InstInfo { iSpec  = ispec, iBinds = VanillaInst binds uprags False },
                   idx_tycons)

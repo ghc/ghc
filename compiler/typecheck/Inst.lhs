@@ -13,8 +13,8 @@ module Inst (
 
        newOverloadedLit, mkOverLit, 
      
-       tcGetInstEnvs, getOverlapFlag, tcExtendLocalInstEnv,
-       instCallConstraints, newMethodFromName,
+       tcGetInstEnvs, getOverlapFlag, getSafeHaskellFlag,
+       tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
        tcSyntaxName,
 
        -- Simple functions over evidence variables
@@ -377,6 +377,11 @@ getOverlapFlag
 			   
 	; return overlap_flag }
 
+getSafeHaskellFlag :: TcM SafeHaskellMode
+getSafeHaskellFlag
+  = do { dflags <- getDOpts
+       ; return $ safeHaskell dflags }
+
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
@@ -429,7 +434,7 @@ addLocalInst home_ie ispec
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
-	; let { (matches, _) = lookupInstEnv inst_envs cls tys'
+	; let { (matches, _, _) = lookupInstEnv inst_envs cls tys'
 	      ;	dup_ispecs = [ dup_ispec 
 			     | (dup_ispec, _) <- matches
 			     , let (_,_,_,dup_tys) = instanceHead dup_ispec

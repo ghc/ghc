@@ -21,6 +21,7 @@ module InstEnv (
 
 #include "HsVersions.h"
 
+import DynFlags
 import Class
 import Var
 import VarSet
@@ -46,21 +47,23 @@ import Data.Maybe	( isJust, isNothing )
 
 \begin{code}
 data Instance 
-  = Instance { is_cls  :: Name		-- Class name
-	
-		-- Used for "rough matching"; see Note [Rough-match field]
-		-- INVARIANT: is_tcs = roughMatchTcs is_tys
-	     , is_tcs  :: [Maybe Name]	-- Top of type args
+  = Instance { is_cls  :: Name  -- Class name
 
-		-- Used for "proper matching"; see Note [Proper-match fields]
-	     , is_tvs  :: TyVarSet	-- Template tyvars for full match
-	     , is_tys  :: [Type]	-- Full arg types
-		-- INVARIANT: is_dfun Id has type 
-		--	forall is_tvs. (...) => is_cls is_tys
+                -- Used for "rough matching"; see Note [Rough-match field]
+                -- INVARIANT: is_tcs = roughMatchTcs is_tys
+             , is_tcs  :: [Maybe Name]  -- Top of type args
 
-	     , is_dfun :: DFunId -- See Note [Haddock assumptions]
-	     , is_flag :: OverlapFlag	-- See detailed comments with
-					-- the decl of BasicTypes.OverlapFlag
+                -- Used for "proper matching"; see Note [Proper-match fields]
+             , is_tvs  :: TyVarSet      -- Template tyvars for full match
+             , is_tys  :: [Type]        -- Full arg types
+                -- INVARIANT: is_dfun Id has type 
+                --      forall is_tvs. (...) => is_cls is_tys
+
+             , is_dfun :: DFunId -- See Note [Haddock assumptions]
+             , is_flag :: OverlapFlag   -- See detailed comments with
+                                        -- the decl of BasicTypes.OverlapFlag
+             , is_safe :: SafeHaskellMode -- SafeHaskell mode of module the
+                                          -- instance came from
     }
 \end{code}
 
@@ -177,21 +180,22 @@ instanceHead ispec
 
 mkLocalInstance :: DFunId
                 -> OverlapFlag
+                -> SafeHaskellMode
                 -> Instance
 -- Used for local instances, where we can safely pull on the DFunId
-mkLocalInstance dfun oflag
-  = Instance {	is_flag = oflag, is_dfun = dfun,
+mkLocalInstance dfun oflag sflag
+  = Instance {	is_flag = oflag, is_safe = sflag, is_dfun = dfun,
 		is_tvs = mkVarSet tvs, is_tys = tys,
                 is_cls = className cls, is_tcs = roughMatchTcs tys }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
 
 mkImportedInstance :: Name -> [Maybe Name]
-		   -> DFunId -> OverlapFlag -> Instance
+		   -> DFunId -> OverlapFlag -> SafeHaskellMode -> Instance
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
-mkImportedInstance cls mb_tcs dfun oflag
-  = Instance {	is_flag = oflag, is_dfun = dfun,
+mkImportedInstance cls mb_tcs dfun oflag sflag
+  = Instance {	is_flag = oflag, is_safe = sflag, is_dfun = dfun,
 		is_tvs = mkVarSet tvs, is_tys = tys,
 		is_cls = cls, is_tcs = mb_tcs }
   where
@@ -437,7 +441,9 @@ where the Nothing indicates that 'b' can be freely instantiated.
 lookupInstEnv :: (InstEnv, InstEnv) 	-- External and home package inst-env
 	      -> Class -> [Type]	-- What we are looking for
 	      -> ([InstMatch], 		-- Successful matches
-		  [Instance])		-- These don't match but do unify
+		  [Instance],		-- These don't match but do unify
+                  Bool)                 -- True if error condition caused by
+                                        -- SafeHaskell condition.
 
 -- The second component of the result pair happens when we look up
 --	Foo [a]
@@ -450,7 +456,7 @@ lookupInstEnv :: (InstEnv, InstEnv) 	-- External and home package inst-env
 -- giving a suitable error messagen
 
 lookupInstEnv (pkg_ie, home_ie) cls tys
-  = (pruned_matches, all_unifs)
+  = (safe_matches, all_unifs, safe_fail)
   where
     rough_tcs  = roughMatchTcs tys
     all_tvs    = all isNothing rough_tcs
@@ -459,10 +465,42 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
     pruned_matches = foldr insert_overlapping [] all_matches
+    (safe_matches, safe_fail) = if length pruned_matches /= 1 
+                        then (pruned_matches, False)
+                        else check_safe (head pruned_matches) all_matches
 	-- Even if the unifs is non-empty (an error situation)
 	-- we still prune the matches, so that the error message isn't
 	-- misleading (complaining of multiple matches when some should be
 	-- overlapped away)
+
+    -- SafeHaskell: We restrict code compiled in 'Safe' mode from 
+    -- overriding code compiled in any other mode. The rational is
+    -- that code compiled in 'Safe' mode is code that is untrusted
+    -- by the ghc user. So we shouldn't let that code change the
+    -- behaviour of code the user didn't compile in 'Safe' mode
+    -- since thats the code they trust. So 'Safe' instances can only
+    -- overlap instances from the same module. A same instance origin
+    -- policy for safe compiled instances.
+    check_safe match@(inst,_) others
+        = case is_safe inst of
+                -- most specific isn't from a Safe module so OK
+                sf | sf /= Sf_Safe && sf /= Sf_SafeLanguage -> ([match], True)
+                -- otherwise we make sure it only overlaps instances from
+                -- the same module
+                _other -> (go [] others, True)
+        where
+            go bad [] = match:bad
+            go bad (i@(x,_):unchecked) =
+                if inSameMod x
+                    then go bad unchecked
+                    else go (i:bad) unchecked
+            
+            inSameMod b =
+                let na = getName $ getName inst
+                    la = isInternalName na
+                    nb = getName $ getName b
+                    lb = isInternalName nb
+                in (la && lb) || (nameModule na == nameModule nb)
 
     --------------
     lookup env = case lookupUFM env cls of
