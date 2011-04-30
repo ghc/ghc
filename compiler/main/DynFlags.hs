@@ -692,8 +692,9 @@ defaultHscTarget = defaultObjectTarget
 -- object files on the current platform.
 defaultObjectTarget :: HscTarget
 defaultObjectTarget
+  | cGhcUnregisterised    == "YES"      =  HscC
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
-  | otherwise                           =  HscC
+  | otherwise                           =  HscLlvm
 
 data DynLibLoader
   = Deployable
