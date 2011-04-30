@@ -503,10 +503,6 @@ Library
             RegClass
             PIC
             Platform
-            Alpha.Regs
-            Alpha.RegInfo
-            Alpha.Instr
-            Alpha.CodeGen
             X86.Regs
             X86.RegInfo
             X86.Instr

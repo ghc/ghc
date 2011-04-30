@@ -13,13 +13,7 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "nativeGen/NCG.h"
 
 
-#if   alpha_TARGET_ARCH
-import Alpha.CodeGen
-import Alpha.Regs
-import Alpha.RegInfo
-import Alpha.Instr
-
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import X86.CodeGen
 import X86.Regs
 import X86.Instr
