@@ -306,7 +306,10 @@ rnValBindsRHS trim mb_bound_names (ValBindsIn mbinds sigs)
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
               where
                 valbind' = ValBindsOut anal_binds sigs'
-                valbind'_dus = usesOnly (hsSigsFVs sigs') `plusDU` anal_dus
+                valbind'_dus = anal_dus `plusDU` usesOnly (hsSigsFVs sigs')
+			       -- Put the sig uses *after* the bindings
+			       -- so that the binders are removed from 
+			       -- the uses in the sigs
        }
 
 rnValBindsRHS _ _ b = pprPanic "rnValBindsRHS" (ppr b)
@@ -699,7 +702,7 @@ renameSig _ (SpecInstSig ty)
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
 -- we use lookupOccRn.  If there's both an imported and a local 'f'
--- then the SPECIALISE pragma is ambiguous, unlike alll other signatures
+-- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig mb_names sig@(SpecSig v ty inl)
   = do	{ new_v <- case mb_names of
                      Just {} -> lookupSigOccRn mb_names sig v

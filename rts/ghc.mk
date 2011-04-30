@@ -194,8 +194,8 @@ endif
 else
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" \
-		$$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
+	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 endif
 
 endif
@@ -456,8 +456,7 @@ rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
 
 endif
 
-$(eval $(call build-dependencies,rts,dist,1))
-$(eval $(call include-dependencies,rts,dist,1))
+$(eval $(call dependencies,rts,dist,1))
 
 $(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h $(DTRACEPROBES_H)
 
@@ -500,7 +499,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
 	"$(RM)" $(RM_OPTS) $@
-	"$(AR)" $(AR_OPTS) $(EXTRA_AR_ARGS) $@ $<
+	"$(AR_STAGE1)" $(AR_OPTS_STAGE1) $(EXTRA_AR_ARGS_STAGE1) $@ $<
 endif
 
 # -----------------------------------------------------------------------------

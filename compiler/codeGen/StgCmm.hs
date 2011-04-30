@@ -25,6 +25,7 @@ import StgCmmTicky
 
 import MkGraph
 import CmmExpr
+import CmmDecl
 import CLabel
 import PprCmm
 
@@ -181,7 +182,7 @@ mkModuleInit cost_centre_info this_mod hpc_info
         ; initCostCentres cost_centre_info
             -- For backwards compatibility: user code may refer to this
             -- label for calling hs_add_root().
-        ; emitSimpleProc (mkPlainModuleInitLabel this_mod) $ emptyAGraph
+        ; emitData Data $ [ CmmDataLabel (mkPlainModuleInitLabel this_mod) ]
         }
 
 ---------------------------------------------------------------

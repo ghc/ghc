@@ -54,7 +54,7 @@ Well, of course you'd need a lot of rules if you did it
 like that, so we use a BuiltinRule instead, so that we
 can match in any two literal values.  So the rule is really
 more like
-        (Lit 4) +# (Lit y) = Lit (x+#y)
+        (Lit x) +# (Lit y) = Lit (x+#y)
 where the (+#) on the rhs is done at compile time
 
 That is why these rules are built in here.  Other rules

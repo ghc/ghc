@@ -78,7 +78,8 @@ import Data.Maybe
 main :: IO ()
 main = do
    hSetBuffering stdout NoBuffering
-   GHC.defaultErrorHandler defaultDynFlags $ do
+   let defaultErrorHandlerDynFlags = defaultDynFlags (panic "No settings")
+   GHC.defaultErrorHandler defaultErrorHandlerDynFlags $ do
     -- 1. extract the -B flag from the args
     argv0 <- getArgs
 
@@ -358,9 +359,6 @@ showVersionMode             = mkPreStartupMode ShowVersion
 showNumVersionMode          = mkPreStartupMode ShowNumVersion
 showSupportedExtensionsMode = mkPreStartupMode ShowSupportedExtensions
 
-printMode :: String -> Mode
-printMode str              = mkPreStartupMode (Print str)
-
 mkPreStartupMode :: PreStartupMode -> Mode
 mkPreStartupMode = Left
 
@@ -383,8 +381,10 @@ showGhcUsageMode = mkPreLoadMode ShowGhcUsage
 showGhciUsageMode = mkPreLoadMode ShowGhciUsage
 showInfoMode = mkPreLoadMode ShowInfo
 
-printWithDynFlagsMode :: (DynFlags -> String) -> Mode
-printWithDynFlagsMode f = mkPreLoadMode (PrintWithDynFlags f)
+printSetting :: String -> Mode
+printSetting k = mkPreLoadMode (PrintWithDynFlags f)
+    where f dflags = fromMaybe (panic ("Setting not found: " ++ show k))
+                   $ lookup k (compilerInfo dflags)
 
 mkPreLoadMode :: PreLoadMode -> Mode
 mkPreLoadMode = Right . Left
@@ -504,14 +504,30 @@ mode_flags =
   , Flag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , Flag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
   ] ++
-  [ Flag k'                     (PassFlag (setMode mode))
-  | (k, v) <- compilerInfo,
+  [ Flag k'                     (PassFlag (setMode (printSetting k)))
+  | k <- ["Project version",
+          "Booter version",
+          "Stage",
+          "Build platform",
+          "Host platform",
+          "Target platform",
+          "Have interpreter",
+          "Object splitting supported",
+          "Have native code generator",
+          "Support SMP",
+          "Unregisterised",
+          "Tables next to code",
+          "RTS ways",
+          "Leading underscore",
+          "Debug on",
+          "LibDir",
+          "Global Package DB",
+          "C compiler flags",
+          "Gcc Linker flags",
+          "Ld Linker flags"],
     let k' = "-print-" ++ map (replaceSpace . toLower) k
         replaceSpace ' ' = '-'
         replaceSpace c   = c
-        mode = case v of
-               String str -> printMode str
-               FromDynFlags f -> printWithDynFlagsMode f
   ] ++
       ------- interfaces ----------------------------------------------------
   [ Flag "-show-iface"  (HasArg (\f -> setMode (showInterfaceMode f)
@@ -649,9 +665,7 @@ showBanner _postLoadMode dflags = do
 showInfo :: DynFlags -> IO ()
 showInfo dflags = do
         let sq x = " [" ++ x ++ "\n ]"
-        putStrLn $ sq $ concat $ intersperse "\n ," $ map (show . flatten) compilerInfo
-    where flatten (k, String v)       = (k, v)
-          flatten (k, FromDynFlags f) = (k, f dflags)
+        putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
 
 showSupportedExtensions :: IO ()
 showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions

@@ -10,6 +10,7 @@ import DriverPhases     ( isHaskellSrcFilename )
 import HscTypes         ( msHsFilePath )
 import Name             ( getOccString )
 --import ErrUtils         ( printBagOfErrors )
+import Panic            ( panic )
 import DynFlags         ( defaultDynFlags )
 import Bag
 import Exception
@@ -100,7 +101,7 @@ main = do
                      then Just `liftM` openFile "TAGS" openFileMode
                      else return Nothing
 
-  GHC.defaultErrorHandler defaultDynFlags $
+  GHC.defaultErrorHandler (defaultDynFlags (panic "No settings")) $
     runGhc (Just ghc_topdir) $ do
       --liftIO $ print "starting up session"
       dflags <- getSessionDynFlags

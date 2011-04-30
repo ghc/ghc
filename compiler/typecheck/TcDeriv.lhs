@@ -1282,7 +1282,7 @@ inferInstanceContexts oflag infer_specs
     gen_soln (DS { ds_loc = loc, ds_orig = orig, ds_tvs = tyvars 
 		 , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs })
       = setSrcSpan loc	$
-	addErrCtxt (derivInstCtxt clas inst_tys) $ 
+	addErrCtxt (derivInstCtxt the_pred) $ 
 	do {      -- Check for a bizarre corner case, when the derived instance decl should
 		  -- have form 	instance C a b => D (T a) where ...
 		  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
@@ -1297,7 +1297,7 @@ inferInstanceContexts oflag infer_specs
                                      , not (tyVarsOfPred pred `subVarSet` tv_set)]
 	   ; mapM_ (addErrTc . badDerivedPred) weird_preds	
 
-           ; theta <- simplifyDeriv orig tyvars deriv_rhs
+           ; theta <- simplifyDeriv orig the_pred tyvars deriv_rhs
 	   	-- checkValidInstance tyvars theta clas inst_tys
 		-- Not necessary; see Note [Exotic derived instance contexts]
 		-- 		  in TcSimplify
@@ -1307,6 +1307,8 @@ inferInstanceContexts oflag infer_specs
 		-- Hence no need to call:
 		--   checkValidInstance tyvars theta clas inst_tys
 	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the solution
+      where
+        the_pred = mkClassPred clas inst_tys
 
 ------------------------------------------------------------------
 mkInstance :: OverlapFlag -> ThetaType -> DerivSpec -> Instance
@@ -1509,9 +1511,9 @@ standaloneCtxt :: LHsType Name -> SDoc
 standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for")) 
 		       2 (quotes (ppr ty))
 
-derivInstCtxt :: Class -> [Type] -> Message
-derivInstCtxt clas inst_tys
-  = ptext (sLit "When deriving the instance for") <+> parens (pprClassPred clas inst_tys)
+derivInstCtxt :: PredType -> Message
+derivInstCtxt pred
+  = ptext (sLit "When deriving the instance for") <+> parens (ppr pred)
 
 badDerivedPred :: PredType -> Message
 badDerivedPred pred

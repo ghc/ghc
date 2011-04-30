@@ -717,7 +717,7 @@ type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan)]
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
 -- being compiled right now.  Once it is compiled, a 'ModIface' and 
--- 'ModDetails' are extracted and the ModGuts is dicarded.
+-- 'ModDetails' are extracted and the ModGuts is discarded.
 data ModGuts
   = ModGuts {
         mg_module    :: !Module,         -- ^ Module being compiled

@@ -145,6 +145,7 @@ data Var
 	idScope    :: IdScope,
 	id_details :: IdDetails,	-- Stable, doesn't change
 	id_info    :: IdInfo }		-- Unstable, updated by simplifier
+    deriving Typeable
 
 data IdScope	-- See Note [GlobalId/LocalId]
   = GlobalId 
@@ -204,8 +205,6 @@ instance Ord Var where
     a >= b = realUnique a >=# realUnique b
     a >	 b = realUnique a >#  realUnique b
     a `compare` b = varUnique a `compare` varUnique b
-
-INSTANCE_TYPEABLE0(Var,varTc,"Var")
 
 instance Data Var where
   -- don't traverse?

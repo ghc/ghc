@@ -888,8 +888,8 @@ uUnfilledVars origin swapped tv1 details1 tv2 details2
     ty1       = mkTyVarTy tv1
     ty2       = mkTyVarTy tv2
 
-    nicer_to_update_tv1 _         (SigTv _) = True
-    nicer_to_update_tv1 (SigTv _) _         = False
+    nicer_to_update_tv1 _     SigTv = True
+    nicer_to_update_tv1 SigTv _     = False
     nicer_to_update_tv1 _         _         = isSystemName (Var.varName tv1)
         -- Try not to update SigTvs; and try to update sys-y type
         -- variables in preference to ones gotten (say) by

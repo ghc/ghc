@@ -26,7 +26,6 @@ module SysTools (
         touch,                  -- String -> String -> IO ()
         copy,
         copyWithHeader,
-        getExtraViaCOpts,
 
         -- Temporary-file management
         setTmpDir,
@@ -47,6 +46,7 @@ import ErrUtils
 import Panic
 import Util
 import DynFlags
+import StaticFlags
 import Exception
 
 import Data.IORef
@@ -148,24 +148,46 @@ stuff.
 
 \begin{code}
 initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
-
-             -> DynFlags
-             -> IO DynFlags     -- Set all the mutable variables above, holding
+             -> IO Settings     -- Set all the mutable variables above, holding
                                 --      (a) the system programs
                                 --      (b) the package-config file
                                 --      (c) the GHC usage message
-
-
-initSysTools mbMinusB dflags0
+initSysTools mbMinusB
   = do  { top_dir <- findTopDir mbMinusB
                 -- see [Note topdir]
                 -- NB: top_dir is assumed to be in standard Unix
                 -- format, '/' separated
 
-        ; let installed :: FilePath -> FilePath
+        ; let settingsFile = top_dir </> "settings"
+              installed :: FilePath -> FilePath
               installed file = top_dir </> file
               installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
               installed_perl_bin file = top_dir </> ".." </> "perl" </> file
+
+        ; settingsStr <- readFile settingsFile
+        ; mySettings <- case maybeReadFuzzy settingsStr of
+                        Just s ->
+                            return s
+                        Nothing ->
+                            pgmError ("Can't parse " ++ show settingsFile)
+        ; let getSetting key = case lookup key mySettings of
+                               Just xs ->
+                                   return xs
+                               Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+        ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
+        -- On Windows, mingw is distributed with GHC,
+        -- so we look in TopDir/../mingw/bin
+        -- It would perhaps be nice to be able to override this
+        -- with the settings file, but it would be a little fiddly
+        -- to make that possible, so for now you can't.
+        ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
+                                       else getSetting "C compiler command"
+        ; gcc_args_str <- if isWindowsHost then return []
+                                           else getSetting "C compiler flags"
+        ; let gcc_args = map Option (words gcc_args_str)
+        ; perl_path <- if isWindowsHost
+                       then return $ installed_perl_bin "perl"
+                       else getSetting "perl command"
 
         ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -181,17 +203,8 @@ initSysTools mbMinusB dflags0
               windres_path  = installed_mingw_bin "windres"
 
         ; tmpdir <- getTemporaryDirectory
-        ; let dflags1 = setTmpDir tmpdir dflags0
 
-        -- On Windows, mingw is distributed with GHC,
-        --      so we look in TopDir/../mingw/bin
         ; let
-              gcc_prog
-                | isWindowsHost = installed_mingw_bin "gcc"
-                | otherwise     = cGCC
-              perl_path
-                | isWindowsHost = installed_perl_bin cGHC_PERL
-                | otherwise     = cGHC_PERL
               -- 'touch' is a GHC util for Windows
               touch_path
                 | isWindowsHost = installed cGHC_TOUCHY_PGM
@@ -214,37 +227,57 @@ initSysTools mbMinusB dflags0
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
         -- Config.hs one day.
-        ; let cpp_path  = (gcc_prog,
-                           (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
+        ; let cpp_prog  = gcc_prog
+              cpp_args  = Option "-E"
+                        : map Option (words cRAWCPP_FLAGS)
+                       ++ gcc_args
 
         -- Other things being equal, as and ld are simply gcc
         ; let   as_prog  = gcc_prog
+                as_args  = gcc_args
                 ld_prog  = gcc_prog
+                ld_args  = gcc_args
 
         -- figure out llvm location. (TODO: Acutally implement).
         ; let lc_prog = "llc"
               lo_prog = "opt"
 
-        ; return dflags1{
-                        ghcUsagePath = ghc_usage_msg_path,
-                        ghciUsagePath = ghci_usage_msg_path,
-                        topDir  = top_dir,
-                        systemPackageConfig = pkgconfig_path,
-                        pgm_L   = unlit_path,
-                        pgm_P   = cpp_path,
-                        pgm_F   = "",
-                        pgm_c   = (gcc_prog,[]),
-                        pgm_s   = (split_prog,split_args),
-                        pgm_a   = (as_prog,[]),
-                        pgm_l   = (ld_prog,[]),
-                        pgm_dll = (mkdll_prog,mkdll_args),
-                        pgm_T   = touch_path,
-                        pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
-                        pgm_windres = windres_path,
-                        pgm_lo  = (lo_prog,[]),
-                        pgm_lc  = (lc_prog,[])
+        ; return $ Settings {
+                        sTmpDir = normalise tmpdir,
+                        sGhcUsagePath = ghc_usage_msg_path,
+                        sGhciUsagePath = ghci_usage_msg_path,
+                        sTopDir  = top_dir,
+                        sRawSettings = mySettings,
+                        sExtraGccViaCFlags = words myExtraGccViaCFlags,
+                        sSystemPackageConfig = pkgconfig_path,
+                        sPgm_L   = unlit_path,
+                        sPgm_P   = (cpp_prog, cpp_args),
+                        sPgm_F   = "",
+                        sPgm_c   = (gcc_prog, gcc_args),
+                        sPgm_s   = (split_prog,split_args),
+                        sPgm_a   = (as_prog, as_args),
+                        sPgm_l   = (ld_prog, ld_args),
+                        sPgm_dll = (mkdll_prog,mkdll_args),
+                        sPgm_T   = touch_path,
+                        sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
+                        sPgm_windres = windres_path,
+                        sPgm_lo  = (lo_prog,[]),
+                        sPgm_lc  = (lc_prog,[]),
                         -- Hans: this isn't right in general, but you can
                         -- elaborate it in the same way as the others
+                        sOpt_L       = [],
+                        sOpt_P       = (if opt_PIC
+                                        then -- this list gets reversed
+                                             ["-D__PIC__", "-U __PIC__"]
+                                        else []),
+                        sOpt_F       = [],
+                        sOpt_c       = [],
+                        sOpt_a       = [],
+                        sOpt_m       = [],
+                        sOpt_l       = [],
+                        sOpt_windres = [],
+                        sOpt_lo      = [],
+                        sOpt_lc      = []
                 }
         }
 \end{code}
@@ -448,11 +481,6 @@ copyWithHeader dflags purpose maybe_header from to = do
   hClose hout
   hClose hin
 
-getExtraViaCOpts :: DynFlags -> IO [String]
-getExtraViaCOpts dflags = do
-  f <- readFile (topDir dflags </> "extra-gcc-opts")
-  return (words f)
-
 -- | read the contents of the named section in an ELF object as a
 -- String.
 readElfSection :: DynFlags -> String -> FilePath -> IO (Maybe String)
@@ -527,8 +555,9 @@ newTempName dflags extn
 -- return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet
 getTempDir :: DynFlags -> IO FilePath
-getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
+getTempDir dflags
   = do let ref = dirsToClean dflags
+           tmp_dir = tmpDir dflags
        mapping <- readIORef ref
        case Map.lookup tmp_dir mapping of
            Nothing ->
