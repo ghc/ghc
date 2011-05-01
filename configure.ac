@@ -265,6 +265,7 @@ checkVendor() {
     esac
 }
 
+# Sync this with cTargetOS in compiler/ghc.mk
 checkOS() {
     case $1 in
     linux|freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)

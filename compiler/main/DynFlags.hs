@@ -111,6 +111,7 @@ import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
 -- import Data.Maybe
+import Distribution.System
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -403,7 +404,7 @@ data DynFlags = DynFlags {
   			   	 	--   See CoreMonad.FloatOutSwitches
 
 #ifndef OMIT_NATIVE_CODEGEN
-  targetPlatform	:: Platform,	-- ^ The platform we're compiling for. Used by the NCG.
+  targetPlatform        :: Platform.Platform, -- ^ The platform we're compiling for. Used by the NCG.
 #endif
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
@@ -629,6 +630,14 @@ data HscTarget
   | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
   | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
+
+showHscTargetFlag :: HscTarget -> String
+showHscTargetFlag HscC           = "-fvia-c"
+showHscTargetFlag HscAsm         = "-fasm"
+showHscTargetFlag HscLlvm        = "-fllvm"
+showHscTargetFlag HscJava        = panic "No flag for HscJava"
+showHscTargetFlag HscInterpreted = "-fbyte-code"
+showHscTargetFlag HscNothing     = "-fno-code"
 
 -- | Will this target result in an object file on the disk?
 isObjectTarget :: HscTarget -> Bool
@@ -1100,12 +1109,13 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
   let (pic_warns, dflags2)
-#if !(x86_64_TARGET_ARCH && linux_TARGET_OS)
-        | (not opt_Static || opt_PIC) && hscTarget dflags1 == HscLlvm
+        | not (cTargetArch == X86_64 && cTargetOS == Linux) &&
+          (not opt_Static || opt_PIC) &&
+          hscTarget dflags1 == HscLlvm
         = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -"
-                ++ "dynamic on this platform;\n              ignoring -fllvm"],
-                dflags1{ hscTarget = HscAsm })
-#endif
+                       ++ "dynamic on this platform;\n"
+                       ++ "         using " ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
+                dflags1{ hscTarget = defaultObjectTarget })
         | otherwise = ([], dflags1)
 
   return (dflags2, leftover, pic_warns ++ warns)
