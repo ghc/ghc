@@ -423,12 +423,6 @@ endif
 
 endif
 
-ifeq "$(GhcWithNativeCodeGen)" "NO"
-# XXX This should logically be a CPP option, but there doesn't seem to
-# be a flag for that
-compiler_CONFIGURE_OPTS += --ghc-option=-DOMIT_NATIVE_CODEGEN
-endif
-
 ifeq "$(TargetOS_CPP)" "openbsd"
 compiler_CONFIGURE_OPTS += --ld-options=-E
 endif

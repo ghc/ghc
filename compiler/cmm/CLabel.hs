@@ -850,8 +850,8 @@ instance Outputable CLabel where
 
 pprCLabel :: CLabel -> SDoc
 
-#if ! OMIT_NATIVE_CODEGEN
 pprCLabel (AsmTempLabel u)
+ | cGhcWithNativeCodeGen == "YES"
   =  getPprStyle $ \ sty ->
      if asmStyle sty then 
 	ptext asmTempLabelPrefix <> pprUnique u
@@ -859,23 +859,22 @@ pprCLabel (AsmTempLabel u)
 	char '_' <> pprUnique u
 
 pprCLabel (DynamicLinkerLabel info lbl)
+ | cGhcWithNativeCodeGen == "YES"
    = pprDynamicLinkerAsmLabel info lbl
    
 pprCLabel PicBaseLabel
+ | cGhcWithNativeCodeGen == "YES"
    = ptext (sLit "1b")
    
 pprCLabel (DeadStripPreventer lbl)
+ | cGhcWithNativeCodeGen == "YES"
    = pprCLabel lbl <> ptext (sLit "_dsp")
-#endif
 
-pprCLabel lbl = 
-#if ! OMIT_NATIVE_CODEGEN
-    getPprStyle $ \ sty ->
-    if asmStyle sty then 
-	maybe_underscore (pprAsmCLbl lbl)
-    else
-#endif
-       pprCLbl lbl
+pprCLabel lbl
+   = getPprStyle $ \ sty ->
+     if cGhcWithNativeCodeGen == "YES" && asmStyle sty
+     then maybe_underscore (pprAsmCLbl lbl)
+     else pprCLbl lbl
 
 maybe_underscore doc
   | underscorePrefix = pp_cSEP <> doc

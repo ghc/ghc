@@ -77,9 +77,7 @@ module DynFlags (
 
 #include "HsVersions.h"
 
-#ifndef OMIT_NATIVE_CODEGEN
 import Platform
-#endif
 import Module
 import PackageConfig
 import PrelNames        ( mAIN )
@@ -402,9 +400,7 @@ data DynFlags = DynFlags {
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
   			   	 	--   See CoreMonad.FloatOutSwitches
 
-#ifndef OMIT_NATIVE_CODEGEN
   targetPlatform        :: Platform.Platform, -- ^ The platform we're compiling for. Used by the NCG.
-#endif
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
   mainModIs             :: Module,
@@ -749,9 +745,7 @@ defaultDynFlags mySettings =
         floatLamArgs            = Just 0,	-- Default: float only if no fvs
         strictnessBefore        = [],
 
-#ifndef OMIT_NATIVE_CODEGEN
         targetPlatform          = defaultTargetPlatform,
-#endif
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
         mainModIs               = mAIN,
