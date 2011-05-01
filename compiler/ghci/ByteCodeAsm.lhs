@@ -395,12 +395,11 @@ mkBits findLabel st proto_insns
           = do st_l1 <- addToSS st_l0 (BCONPtrItbl (getName dcon))
                return (sizeSS16 st_l0, (st_i0,st_l1,st_p0))
 
-#ifdef mingw32_TARGET_OS
        literal st (MachLabel fs (Just sz) _)
+        | cTargetOS == Windows
             = litlabel st (appendFS fs (mkFastString ('@':show sz)))
         -- On Windows, stdcall labels have a suffix indicating the no. of
         -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
-#endif
        literal st (MachLabel fs _ _) = litlabel st fs
        literal st (MachWord w)     = int st (fromIntegral w)
        literal st (MachInt j)      = int st (fromIntegral j)
