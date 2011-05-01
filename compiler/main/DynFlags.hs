@@ -2039,11 +2039,28 @@ setTarget l = upd set
 -- not from bytecode to object-code.  The idea is that -fasm/-fllvm
 -- can be safely used in an OPTIONS_GHC pragma.
 setObjTarget :: HscTarget -> DynP ()
-setObjTarget l = upd set
+setObjTarget l = updM set
   where
-   set dfs
-     | isObjectTarget (hscTarget dfs) = dfs { hscTarget = l }
-     | otherwise = dfs
+   set dflags
+     | isObjectTarget (hscTarget dflags)
+       = case l of
+         HscC
+          | cGhcUnregisterised /= "YES" ->
+             do addWarn ("Compiler not unregisterised, so ignoring " ++
+                         showHscTargetFlag l)
+                return dflags
+         HscAsm
+          | cGhcWithNativeCodeGen /= "YES" ->
+             do addWarn ("Compiler has no native codegen, so ignoring " ++
+                         showHscTargetFlag l)
+                return dflags
+         HscLlvm
+          | cGhcUnregisterised == "YES" ->
+             do addWarn ("Compiler unregisterised, so ignoring " ++
+                         showHscTargetFlag l)
+                return dflags
+         _ -> return $ dflags { hscTarget = l }
+     | otherwise = return dflags
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags

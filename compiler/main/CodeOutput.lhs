@@ -156,8 +156,7 @@ outputAsm dflags filenm flat_absC
                  nativeCodeGen dflags f ncg_uniqs flat_absC
 
  | otherwise
-  = pprPanic "This compiler was built without a native code generator"
-             (text "Use -fvia-C instead")
+  = panic "This compiler was built without a native code generator"
 \end{code}
 
 
