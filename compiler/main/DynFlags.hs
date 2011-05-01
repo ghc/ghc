@@ -110,7 +110,6 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
--- import Data.Maybe
 import Distribution.System
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
