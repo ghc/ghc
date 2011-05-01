@@ -52,11 +52,9 @@ import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
 
--- import Data.Either
 import Exception
 import Data.IORef       ( readIORef )
 import Distribution.System
--- import GHC.Exts              ( Int(..) )
 import System.Directory
 import System.FilePath
 import System.IO
