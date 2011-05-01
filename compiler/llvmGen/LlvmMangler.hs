@@ -12,6 +12,8 @@
 
 module LlvmMangler ( llvmFixupAsm ) where
 
+#include "HsVersions.h"
+
 import Control.Exception
 import qualified Data.ByteString.Char8 as B
 import Data.Char
@@ -23,13 +25,19 @@ infoSec, newInfoSec, newLine, spInst, jmpInst :: B.ByteString
 infoSec    = B.pack "\t.section\t__STRIP,__me"
 newInfoSec = B.pack "\n\t.text"
 newLine    = B.pack "\n"
-spInst     = B.pack ", %esp\n"
 jmpInst    = B.pack "\n\tjmp"
 
-infoLen, spFix, labelStart :: Int
-infoLen = B.length infoSec
-spFix   = 4
+infoLen, labelStart, spFix :: Int
+infoLen    = B.length infoSec
 labelStart = B.length jmpInst
+
+#if x86_64_TARGET_ARCH
+spInst     = B.pack ", %rsp\n"
+spFix      = 8
+#else
+spInst     = B.pack ", %esp\n"
+spFix      = 4
+#endif
 
 -- Search Predicates
 eolPred, dollarPred, commaPred :: Char -> Bool
