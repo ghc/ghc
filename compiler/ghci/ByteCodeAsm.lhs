@@ -31,6 +31,7 @@ import Constants
 import FastString
 import SMRep
 import Outputable
+import Config
 
 import Control.Monad    ( foldM )
 import Control.Monad.ST ( runST )
@@ -44,6 +45,7 @@ import Data.Char        ( ord )
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Distribution.System
 
 import GHC.Base         ( ByteArray#, MutableByteArray#, RealWorld )
 
