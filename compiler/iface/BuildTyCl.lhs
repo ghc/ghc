@@ -59,13 +59,12 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> ThetaType		-- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
-	      -> Bool			-- ^ True <=> want generics functions
 	      -> Bool			-- ^ True <=> was declared in GADT syntax
               -> TyConParent
 	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
+buildAlgTyCon tc_name tvs stupid_theta rhs is_rec gadt_syn
 	      parent mb_family
   | Just fam_inst_info <- mb_family
   = -- We need to tie a knot as the coercion of a data instance depends
@@ -74,11 +73,11 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
     fixM $ \ tycon_rec -> do 
     { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec
     ; return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
-		         fam_parent is_rec want_generics gadt_syn) }
+		         fam_parent is_rec gadt_syn) }
 
   | otherwise
   = return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
-	               parent is_rec want_generics gadt_syn)
+	               parent is_rec gadt_syn)
   where
     kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 

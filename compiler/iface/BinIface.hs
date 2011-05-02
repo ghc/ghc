@@ -1291,7 +1291,7 @@ instance Binary IfaceDecl where
 	    put_ bh idinfo
     put_ _ (IfaceForeign _ _) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7) = do
 	    putByte bh 2
 	    put_ bh (occNameFS a1)
 	    put_ bh a2
@@ -1300,7 +1300,6 @@ instance Binary IfaceDecl where
 	    put_ bh a5
 	    put_ bh a6
 	    put_ bh a7
-	    put_ bh a8
     put_ bh (IfaceSyn a1 a2 a3 a4 a5) = do
 	    putByte bh 3
 	    put_ bh (occNameFS a1)
@@ -1335,9 +1334,8 @@ instance Binary IfaceDecl where
 		    a5 <- get bh
 		    a6 <- get bh
 		    a7 <- get bh
-		    a8 <- get bh
                     occ <- return $! mkOccNameFS tcName a1
-		    return (IfaceData occ a2 a3 a4 a5 a6 a7 a8)
+		    return (IfaceData occ a2 a3 a4 a5 a6 a7)
 	      3 -> do
 		    a1 <- get bh
 		    a2 <- get bh

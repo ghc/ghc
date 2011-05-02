@@ -42,18 +42,24 @@ import FastString
 %************************************************************************
 
 \begin{code}
-canDoGenerics :: ThetaType -> [DataCon] -> Bool
+canDoGenerics :: TyCon -> Bool
 -- Called on source-code data types, to see if we should generate
--- generic functions for them.  (This info is recorded in the interface file for
--- imported data types.)
+-- generic functions for them.
 
-canDoGenerics stupid_theta data_cs
-  =  not (any bad_con data_cs) 	-- See comment below
-  
-  -- && not (null data_cs)	-- No values of the type
-  -- JPM: we now support empty datatypes
-  
-     && null stupid_theta -- We do not support datatypes with context (for now)
+canDoGenerics tycon
+  =  let result = not (any bad_con (tyConDataCons tycon)) 	-- See comment below
+                  -- We do not support datatypes with context (for now)
+                  && null (tyConStupidTheta tycon)
+{-
+                  -- Primitives are (probably) not representable either
+                  && not (isPrimTyCon tycon)
+                  -- Foreigns are (probably) not representable either
+                  && not (isForeignTyCon tycon)
+-}
+                  -- We don't like type families
+                  && not (isFamilyTyCon tycon)
+
+     in {- pprTrace "canDoGenerics" (ppr (tycon,result)) -} result
   where
     bad_con dc = any bad_arg_type (dataConOrigArgTys dc) || not (isVanillaDataCon dc)
   	-- If any of the constructor has an unboxed type as argument,
@@ -65,8 +71,6 @@ canDoGenerics stupid_theta data_cs
 
 	-- Nor if the args are polymorphic types (I don't think)
     bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
-  -- JPM: TODO: I'm not sure I know what isTauTy checks for, so I'm leaving it
-	-- like this for now...
 \end{code}
 
 %************************************************************************

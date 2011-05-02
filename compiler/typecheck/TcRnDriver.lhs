@@ -1587,7 +1587,6 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , vcat (map ppr rules)
          , vcat (map ppr vects)
-         , ppr_gen_tycons (typeEnvTyCons type_env)
          , ptext (sLit "Dependent modules:") <+> 
                 ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
 	 , ptext (sLit "Dependent packages:") <+> 
@@ -1667,9 +1666,4 @@ ppr_rules [] = empty
 ppr_rules rs = vcat [ptext (sLit "{-# RULES"),
 		      nest 2 (pprRules rs),
 		      ptext (sLit "#-}")]
-
-ppr_gen_tycons :: [TyCon] -> SDoc
-ppr_gen_tycons []  = empty
-ppr_gen_tycons tcs = vcat [ptext (sLit "Tycons with generics:"),
-			   nest 2 (fsep (map ppr (filter tyConHasGenerics tcs)))]
 \end{code}

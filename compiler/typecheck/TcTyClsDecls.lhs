@@ -25,7 +25,6 @@ import TcMType
 import TcType
 import TysWiredIn	( unitTy )
 import Type
-import Generics
 import Class
 import TyCon
 import DataCon
@@ -272,7 +271,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 		   NewType  -> ASSERT( not (null data_cons) )
 			       mkNewTyConRhs rep_tc_name rep_tycon (head data_cons)
 	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax NoParentTyCon (Just (fam_tycon, t_typats))
+			     h98_syntax NoParentTyCon (Just (fam_tycon, t_typats))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
@@ -640,7 +639,7 @@ tcTyClDecl1 parent _calc_isrec
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
-               DataFamilyTyCon Recursive False True 
+               DataFamilyTyCon Recursive True 
                parent Nothing
   ; return [ATyCon tycon]
   }
@@ -666,7 +665,6 @@ tcTyClDecl1 _parent calc_isrec
   { extra_tvs <- tcDataKindSig mb_ksig
   ; let final_tvs = tvs' ++ extra_tvs
   ; stupid_theta <- tcHsKindedContext ctxt
-  ; want_generic <- xoptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; empty_data_decls <- xoptM Opt_EmptyDataDecls
   ; kind_signatures <- xoptM Opt_KindSignatures
@@ -708,8 +706,7 @@ tcTyClDecl1 _parent calc_isrec
 		   NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-	    (want_generic && canDoGenerics stupid_theta data_cons) (not h98_syntax) 
-            NoParentTyCon Nothing
+	    (not h98_syntax) NoParentTyCon Nothing
 	})
   ; return [ATyCon tycon]
   }

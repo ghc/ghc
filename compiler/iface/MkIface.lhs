@@ -1357,7 +1357,6 @@ tyThingToIfaceDecl (ATyCon tycon)
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
-		ifGeneric = tyConHasGenerics tycon,
 		ifFamInst = famInstToIface (tyConFamInst_maybe tycon)}
 
   | isForeignTyCon tycon
