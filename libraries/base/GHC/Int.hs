@@ -43,7 +43,7 @@ import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
 import GHC.Float ()     -- for RealFrac methods
 -- For defining instances for the new generic deriving mechanism
-import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
+--import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 
 ------------------------------------------------------------------------
 -- type Int8
@@ -917,7 +917,7 @@ instance Ix Int64 where
 
 -- We need instances for some basic datatypes, but some of those use Int,
 -- so we have to put the instances here
-
+{-
 deriving instance Eq Arity
 deriving instance Eq Associativity
 deriving instance Eq Fixity
@@ -933,3 +933,4 @@ deriving instance Read Fixity
 deriving instance Show Arity
 deriving instance Show Associativity
 deriving instance Show Fixity
+-}
