@@ -57,8 +57,7 @@ end Rec }
 
 Roman.$wgo
   :: Data.Maybe.Maybe GHC.Types.Int
-     -> Data.Maybe.Maybe GHC.Types.Int
-     -> GHC.Prim.Int#
+     -> Data.Maybe.Maybe GHC.Types.Int -> GHC.Prim.Int#
 [GblId,
  Arity=2,
  Str=DmdType SS,
@@ -71,7 +70,7 @@ Roman.$wgo =
     case w1 of _ {
       Data.Maybe.Nothing ->
         Roman.foo3
-        `cast` (CoUnsafe GHC.Types.Int GHC.Prim.Int#
+        `cast` (UnsafeCo GHC.Types.Int GHC.Prim.Int#
                 :: GHC.Types.Int ~ GHC.Prim.Int#);
       Data.Maybe.Just x ->
         case x of _ { GHC.Types.I# ipv ->
@@ -109,8 +108,7 @@ Roman.$wgo =
 
 Roman.foo_go [InlPrag=INLINE[0]]
   :: Data.Maybe.Maybe GHC.Types.Int
-     -> Data.Maybe.Maybe GHC.Types.Int
-     -> GHC.Types.Int
+     -> Data.Maybe.Maybe GHC.Types.Int -> GHC.Types.Int
 [GblId,
  Arity=2,
  Str=DmdType SSm,
