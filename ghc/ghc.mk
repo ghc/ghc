@@ -111,21 +111,23 @@ all_ghc_stage3 : $(GHC_STAGE3)
 $(INPLACE_LIB)/extra-gcc-opts : extra-gcc-opts
 	"$(CP)" $< $@
 
-# The GHC programs need to depend on all the helper programs they might call
+# The GHC programs need to depend on all the helper programs they might call,
+# and the settings files they use
+
+$(GHC_STAGE1) : | $(UNLIT) $(INPLACE_LIB)/extra-gcc-opts
+$(GHC_STAGE2) : | $(UNLIT) $(INPLACE_LIB)/extra-gcc-opts
+$(GHC_STAGE3) : | $(UNLIT) $(INPLACE_LIB)/extra-gcc-opts
+
 ifeq "$(GhcUnregisterised)" "NO"
-$(GHC_STAGE1) : $(SPLIT)
-$(GHC_STAGE2) : $(SPLIT)
-$(GHC_STAGE3) : $(SPLIT)
+$(GHC_STAGE1) : | $(SPLIT)
+$(GHC_STAGE2) : | $(SPLIT)
+$(GHC_STAGE3) : | $(SPLIT)
 endif
 
-$(GHC_STAGE1) : $(INPLACE_LIB)/extra-gcc-opts
-$(GHC_STAGE2) : $(INPLACE_LIB)/extra-gcc-opts
-$(GHC_STAGE3) : $(INPLACE_LIB)/extra-gcc-opts
-
 ifeq "$(Windows)" "YES"
-$(GHC_STAGE1) : $(TOUCHY)
-$(GHC_STAGE2) : $(TOUCHY)
-$(GHC_STAGE3) : $(TOUCHY)
+$(GHC_STAGE1) : | $(TOUCHY)
+$(GHC_STAGE2) : | $(TOUCHY)
+$(GHC_STAGE3) : | $(TOUCHY)
 endif
 
 ifeq "$(BootingFromHc)" "YES"

@@ -556,9 +556,7 @@ instance Outputable name => OutputableBndr (IPName name) where
 	-- OK, here's the main printer
 
 ppr_type :: Prec -> Type -> SDoc
-ppr_type _ (TyVarTy tv)         -- Note [Infix type variables]
-  | isSymOcc (getOccName tv)  = parens (ppr tv)
-  | otherwise		      = ppr tv
+ppr_type _ (TyVarTy tv)	      = ppr_tvar tv
 ppr_type p (PredTy pred)      = maybeParen p TyConPrec $
                                 ifPprDebug (ptext (sLit "<pred>")) <> (pprPredTy pred)
 ppr_type p (TyConApp tc tys)  = pprTcApp p ppr_type tc tys
@@ -594,15 +592,19 @@ ppr_forall_type p ty
     split2 ps (PredTy p `FunTy` ty) = split2 (p:ps) ty
     split2 ps ty		    = (reverse ps, ty)
 
--------------------
+ppr_tvar :: TyVar -> SDoc
+ppr_tvar tv  -- Note [Infix type variables]
+  | isSymOcc (getOccName tv)  = parens (ppr tv)
+  | otherwise		      = ppr tv
+
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
 pprForAll tvs = ptext (sLit "forall") <+> sep (map pprTvBndr tvs) <> dot
 
 pprTvBndr :: TyVar -> SDoc
 pprTvBndr tv
-  | isLiftedTypeKind kind = ppr tv
-  | otherwise             = parens (ppr tv <+> dcolon <+> pprKind kind)
+  | isLiftedTypeKind kind = ppr_tvar tv
+  | otherwise             = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
   where
     kind = tyVarKind tv
 \end{code}

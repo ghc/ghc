@@ -100,10 +100,13 @@ opt_co env sym co
 
 opt_co' env _   (Refl ty)           = Refl (substTy env ty)
 opt_co' env sym (SymCo co)          = opt_co env (not sym) co
-opt_co' env sym (TyConAppCo tc cos) = TyConAppCo tc (map (opt_co env sym) cos)
+
+opt_co' env sym (TyConAppCo tc cos) = mkTyConAppCo tc (map (opt_co env sym) cos)
 opt_co' env sym (AppCo co1 co2)     = mkAppCo (opt_co env sym co1) (opt_co env sym co2)
 opt_co' env sym (ForAllCo tv co)    = case substTyVarBndr env tv of
-                                         (env', tv') -> ForAllCo tv' (opt_co env' sym co)
+                                         (env', tv') -> mkForAllCo tv' (opt_co env' sym co)
+     -- Use the "mk" functions to check for nested Refls
+
 opt_co' env sym (CoVarCo cv)
   | Just co <- lookupCoVar env cv
   = opt_co (zapCvSubstEnv env) sym co
