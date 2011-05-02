@@ -2,7 +2,7 @@
 --
 -- Test trying to use a function bound in the list comprehension as the transform function
 
-{-# OPTIONS_GHC -XRank2Types -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XRank2Types -XMonadComprehensions -XTransformListComp #-}
 
 module RnFail048 where
 

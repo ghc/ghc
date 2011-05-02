@@ -1,6 +1,6 @@
 -- Transformation stress test
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module Main where
 
@@ -17,7 +17,7 @@ main = putStrLn (show output)
   where
     output = [ (dept, salary) 
              | then sortWith by 1
-		     , (name, dept, salary) <- employees
+	     , (name, dept, salary) <- employees
              , then sortWith by salary
              , then filter by salary > 50
              , then take 1 ]

@@ -1,7 +1,7 @@
 
 -- Checks that the ordering constraint on the implicit groupWith is respected
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module ShouldFail where
 

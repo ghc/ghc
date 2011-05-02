@@ -1,6 +1,6 @@
 -- Test grouping with both a using and a by clause
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module Main where
 

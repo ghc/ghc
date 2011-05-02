@@ -1,6 +1,6 @@
 -- Transformation and grouping stress test
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module Main where
 

@@ -1,7 +1,7 @@
 -- Checks that the types of the old binder and the binder 
 -- implicitly introduced by grouping are linked
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module ShouldFail where
 

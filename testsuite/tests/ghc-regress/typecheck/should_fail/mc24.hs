@@ -1,6 +1,6 @@
 -- Checks that the correct type is used checking the using clause of the group when a by clause is present
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module ShouldFail where
 

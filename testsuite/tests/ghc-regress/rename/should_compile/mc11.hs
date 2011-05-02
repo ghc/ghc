@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, MonadComprehensions, NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards, MonadComprehensions, TransformListComp, NamedFieldPuns #-}
 
 module T3901 where
 

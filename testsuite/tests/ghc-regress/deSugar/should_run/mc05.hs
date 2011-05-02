@@ -1,6 +1,6 @@
 -- Test transform WITHOUT a by clause
 
-{-# OPTIONS_GHC -XMonadComprehensions #-}
+{-# OPTIONS_GHC -XMonadComprehensions -XTransformListComp #-}
 
 module Main where
 

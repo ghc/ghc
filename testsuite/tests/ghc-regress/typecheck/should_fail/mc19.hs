@@ -1,6 +1,6 @@
 -- Checks that the correct type is used checking the using clause of the transform
 
-{-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE MonadComprehensions, TransformListComp #-}
 
 module ShouldFail where
 
