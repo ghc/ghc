@@ -21,7 +21,7 @@ module HsUtils(
   mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCoI, mkLHsWrapCoI,
   coiToHsWrapper, mkHsLams, mkHsDictLet,
-  mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCoI, mkDoStmts,
+  mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCoI, 
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -192,7 +192,6 @@ mkHsFractional :: Rational -> PostTcType -> HsOverLit id
 mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
 mkHsDo         :: HsStmtContext Name -> [LStmt id] -> HsExpr id
 mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
-mkDoStmts      :: [LStmt id] -> [LStmt id] 
 
 mkNPat      :: HsOverLit id -> Maybe (SyntaxExpr id) -> Pat id
 mkNPlusKPat :: Located id -> HsOverLit id -> Pat id
@@ -214,11 +213,6 @@ mkHsIsString   s       = OverLit (HsIsString   s)  noRebindableInfo noSyntaxExpr
 
 noRebindableInfo :: Bool
 noRebindableInfo = error "noRebindableInfo" 	-- Just another placeholder; 
-
--- mkDoStmts turns a trailing ExprStmt into a LastStmt
-mkDoStmts [L loc (ExprStmt e _ _ _)] = [L loc (mkLastStmt e)]
-mkDoStmts (s:ss) 	      	     = s : mkDoStmts ss
-mkDoStmts []     	      	     = []
 
 mkHsDo ctxt stmts = HsDo ctxt stmts placeHolderType
 mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])

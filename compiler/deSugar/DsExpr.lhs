@@ -740,6 +740,7 @@ dsDo stmts
                                          noSyntaxExpr  -- Tuple cannot fail
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
+        tup_ty       = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
@@ -748,8 +749,11 @@ dsDo stmts
                                                  (mkFunTy tup_ty body_ty))
         mfix_pat     = noLoc $ LazyPat $ mkLHsPatTup rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
-        ret_stmt     = noLoc $ LastStmt (mkLHsTupleExpr rets) return_op
-        tup_ty       = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
+        ret_app      = nlHsApp (noLoc return_op) (mkLHsTupleExpr rets)
+        ret_stmt     = noLoc $ mkLastStmt ret_app
+		     -- This LastStmt will be desugared with dsDo, 
+		     -- which ignores the return_op in the LastStmt,
+		     -- so we must apply the return_op explicitly 
 
 handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls

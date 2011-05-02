@@ -1602,7 +1602,7 @@ apats  :: { [LPat RdrName] }
 -- Statement sequences
 
 stmtlist :: { Located [LStmt RdrName] }
-	: '{'         	stmts '}'	{ LL (mkDoStmts (unLoc $2)) }
+	: '{'         	stmts '}'	{ LL (unLoc $2) }
 	|     vocurly   stmts close	{ $2 }
 
 --	do { ;; s ; s ; ; s ;; }

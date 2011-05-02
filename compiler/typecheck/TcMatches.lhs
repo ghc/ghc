@@ -358,7 +358,7 @@ tcLcStmt :: TyCon	-- The list/Parray type constructor ([] or PArray)
 	 -> TcStmtChecker
 
 tcLcStmt _ _ (LastStmt body _) elt_ty thing_inside
-  = do { body' <- tcMonoExpr body elt_ty
+  = do { body' <- tcMonoExprNC body elt_ty
        ; thing <- thing_inside (panic "tcLcStmt: thing_inside")
        ; return (LastStmt body' noSyntaxExpr, thing) }
 
@@ -502,7 +502,7 @@ tcMcStmt _ (LastStmt body return_op) res_ty thing_inside
   = do  { a_ty       <- newFlexiTyVarTy liftedTypeKind
         ; return_op' <- tcSyntaxOp MCompOrigin return_op
                                    (a_ty `mkFunTy` res_ty)
-        ; body'      <- tcMonoExpr body a_ty
+        ; body'      <- tcMonoExprNC body a_ty
         ; thing      <- thing_inside (panic "tcMcStmt: thing_inside")
         ; return (LastStmt body' return_op', thing) } 
 
@@ -558,15 +558,20 @@ tcMcStmt _ (ExprStmt rhs then_op guard_op _) res_ty thing_inside
 --   [ body | stmts, then f by e ]  ->  f :: forall a. (a -> t) -> m a -> m a
 --
 tcMcStmt ctxt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op) res_ty thing_inside
-  = do  {
-        -- We don't know the types of binders yet, so we use this dummy and
-        -- later unify this type with the `m_bndr_ty`
-          ty_dummy <- newFlexiTyVarTy liftedTypeKind
+  = do { let star_star_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
+       ; m1_ty      <- newFlexiTyVarTy star_star_kind
+       ; m2_ty      <- newFlexiTyVarTy star_star_kind
+       ; n_ty       <- newFlexiTyVarTy star_star_kind
+       ; tup_ty_var <- newFlexiTyVarTy liftedTypeKind
+       ; new_res_ty <- newFlexiTyVarTy liftedTypeKind
+       ; let m1_tup_ty = m1_ty `mkAppTy` tup_ty_var
 
+	     -- 'stmts' returns a result of type (m1_ty tuple_ty),
+	     -- typically something like [(Int,Bool,Int)]
+	     -- We don't know what tuple_ty is yet, so we use a variable
         ; (stmts', (binders', usingExpr', maybeByExpr', return_op', bind_op', thing)) <- 
-              tcStmtsAndThen (TransformStmtCtxt ctxt) tcMcStmt stmts ty_dummy $ \res_ty' -> do
-                  { (_, (m_ty, _)) <- matchExpectedAppTy res_ty'
-                  ; (usingExpr', maybeByExpr') <- 
+              tcStmtsAndThen (TransformStmtCtxt ctxt) tcMcStmt stmts m1_tup_ty $ \res_ty' -> do
+                  { (usingExpr', maybeByExpr') <- 
                         case maybeByExpr of
                             Nothing -> do
                                 -- We must validate that usingExpr :: forall a. m a -> m a
@@ -671,8 +676,8 @@ tcMcStmt ctxt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = bindersMap
              using_res_ty = m2_ty `mkAppTy` n_tup_ty 	-- m2 (n (a,b,c))
 	     using_fun_ty = using_arg_ty `mkFunTy` using_arg_ty
               
-                -- (>>=) :: m2 (n (a,b,c)) -> ( n (a,b,c) -> new_res_ty ) -> res_ty
-                -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
+          -- (>>=) :: m2 (n (a,b,c)) -> ( n (a,b,c) -> new_res_ty ) -> res_ty
+          -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
 
        --------------- Typecheck the 'bind' function -------------
        ; bind_op' <- tcSyntaxOp MCompOrigin bind_op $

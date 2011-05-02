@@ -833,7 +833,8 @@ type Stmt id = StmtLR id id
 -- The SyntaxExprs in here are used *only* for do-notation and monad
 -- comprehensions, which have rebindable syntax. Otherwise they are unused.
 data StmtLR idL idR
-  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp, DoExpr, MDoExpr
+  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp, 
+    	      -- and (after the renamer) DoExpr, MDoExpr
               -- Not used for GhciStmt, PatGuard, which scope over other stuff
                (LHsExpr idR)
                (SyntaxExpr idR)   -- The return operator, used only for MonadComp
@@ -1090,7 +1091,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (StmtLR idL idR)
     ppr stmt = pprStmt stmt
 
 pprStmt :: (OutputableBndr idL, OutputableBndr idR) => (StmtLR idL idR) -> SDoc
-pprStmt (LastStmt expr _)         = ppr expr
+pprStmt (LastStmt expr _)         = ifPprDebug (ptext (sLit "[last]")) <+> ppr expr
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, ptext (sLit "<-"), ppr expr]
 pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _ _)     = ppr expr
@@ -1354,8 +1355,8 @@ pprAStmtContext ctxt = article <+> pprStmtContext ctxt
 
 -----------------
 pprStmtContext GhciStmt        = ptext (sLit "interactive GHCi command")
-pprStmtContext DoExpr          = ptext (sLit "'do' expression")
-pprStmtContext MDoExpr         = ptext (sLit "'mdo' expression")
+pprStmtContext DoExpr          = ptext (sLit "'do' block")
+pprStmtContext MDoExpr         = ptext (sLit "'mdo' block")
 pprStmtContext ListComp        = ptext (sLit "list comprehension")
 pprStmtContext MonadComp       = ptext (sLit "monad comprehension")
 pprStmtContext PArrComp        = ptext (sLit "array comprehension")
@@ -1402,8 +1403,13 @@ pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <>
 
 pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR)
    	       => HsStmtContext idL -> StmtLR idL idR -> SDoc
-pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprAStmtContext ctxt <> colon)
-		    	  4 (ppr_stmt stmt)
+pprStmtInCtxt ctxt (LastStmt e _)
+  | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
+  = hang (ptext (sLit "In the expression:")) 2 (ppr e)
+
+pprStmtInCtxt ctxt stmt 
+  = hang (ptext (sLit "In a stmt of") <+> pprAStmtContext ctxt <> colon)
+       2 (ppr_stmt stmt)
   where
     -- For Group and Transform Stmts, don't print the nested stmts!
     ppr_stmt (GroupStmt { grpS_by = by, grpS_using = using
