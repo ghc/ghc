@@ -1053,7 +1053,7 @@ doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_i
            Derived {} -> pprPanic "Unexpected derived IP" (ppr workItem)
            Wanted  {} ->
                do { setIPBind (cc_id workItem) $
-                    EvCast id1 (mkSymCoercion (mkCoVarCoercion co_var))
+                    EvCast id1 (mkSymCo (mkCoVarCo co_var))
                   ; mkIRStopK "IP/IP interaction (solved)" cans }
        }
 

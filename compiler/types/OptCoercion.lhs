@@ -3,26 +3,18 @@
 %
 
 \begin{code}
-{-# OPTIONS_GHC -w #-}
-module OptCoercion (
-	optCoercion
-   ) where 
+module OptCoercion ( optCoercion ) where 
 
 #include "HsVersions.h"
 
-import Unify	( tcMatchTy )
 import Coercion
 import Type hiding( substTyVarBndr, substTy, extendTvSubst )
-import TypeRep
 import TyCon
 import Var
 import VarSet
 import VarEnv
-import PrelNames
 import StaticFlags	( opt_NoOptCoercion )
-import Util
 import Outputable
-import Unify
 import Pair
 import Maybes( allMaybes )
 import FastString
@@ -100,7 +92,8 @@ opt_co env sym co
 
 opt_co' env _   (Refl ty)           = Refl (substTy env ty)
 opt_co' env sym (SymCo co)          = opt_co env (not sym) co
-opt_co' env sym (TyConAppCo tc cos) = TyConAppCo tc (map (opt_co env sym) cos)
+opt_co' env sym (TyConAppCo tc cos) = mkTyConAppCo tc (map (opt_co env sym) cos)
+opt_co' env sym (PredCo cos)        = mkPredCo (fmap (opt_co env sym) cos)
 opt_co' env sym (AppCo co1 co2)     = mkAppCo (opt_co env sym co1) (opt_co env sym co2)
 opt_co' env sym (ForAllCo tv co)    = case substTyVarBndr env tv of
                                          (env', tv') -> ForAllCo tv' (opt_co env' sym co)
@@ -338,8 +331,8 @@ opt_trans_pred (IParam n1 co1) (IParam n2 co2)
 opt_trans_pred _ _ = Nothing
 
 fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
-fireTransRule rule co1 co2 res
-  = -- pprTrace ("Trans rule fired: " ++ rule) (vcat [ppr co1, ppr co2, ppr res]) $
+fireTransRule _rule _co1 _co2 res
+  = -- pprTrace ("Trans rule fired: " ++ _rule) (vcat [ppr _co1, ppr _co2, ppr res]) $
     Just res
 
 -----------

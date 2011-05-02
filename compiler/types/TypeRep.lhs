@@ -603,46 +603,6 @@ ppr_forall_type p ty
     split2 ps (PredTy p `FunTy` ty) = split2 (p:ps) ty
     split2 ps ty		    = (reverse ps, ty)
 
-ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
-ppr_tc_app _ tc []
-  = ppr_tc tc
-ppr_tc_app _ tc [ty]
-  | tc `hasKey` listTyConKey = brackets (pprType ty)
-  | tc `hasKey` parrTyConKey = ptext (sLit "[:") <> pprType ty <> ptext (sLit ":]")
-  | tc `hasKey` liftedTypeKindTyConKey   = ptext (sLit "*")
-  | tc `hasKey` unliftedTypeKindTyConKey = ptext (sLit "#")
-  | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "(?)")
-  | tc `hasKey` ubxTupleKindTyConKey     = ptext (sLit "(#)")
-  | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "??")
-
-ppr_tc_app p tc tys
-  | isTupleTyCon tc && tyConArity tc == length tys
-  = tupleParens (tupleTyConBoxity tc) (sep (punctuate comma (map pprType tys)))
-  | otherwise
-  = ppr_type_app p (getName tc) tys
-
-ppr_type_app :: Prec -> Name -> [Type] -> SDoc
--- Used for classes as well as types; that's why it's separate from ppr_tc_app
-ppr_type_app p tc tys
-  | is_sym_occ		-- Print infix if possible
-  , [ty1,ty2] <- tys	-- We know nothing of precedence though
-  = maybeParen p FunPrec (sep [ppr_type FunPrec ty1, 
-			       pprInfixVar True (ppr tc) <+> ppr_type FunPrec ty2])
-  | otherwise
-  = maybeParen p TyConPrec (hang (pprPrefixVar is_sym_occ (ppr tc))
-    	       	 	       2 (sep (map pprParendType tys)))
-  where
-    is_sym_occ = isSymOcc (getOccName tc)
-
-ppr_tc :: TyCon -> SDoc	-- No brackets for SymOcc
-ppr_tc tc 
-  = pp_nt_debug <> ppr tc
-  where
-   pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 
-				             then ptext (sLit "<recnt>")
-					     else ptext (sLit "<nt>"))
-	       | otherwise     = empty
-
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
   | isSymOcc (getOccName tv)  = parens (ppr tv)

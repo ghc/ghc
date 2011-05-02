@@ -598,13 +598,13 @@ decomposeRuleLhs bndrs lhs
 
    bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
                       2 (ppr opt_lhs)
-   dead_msg bndr = hang (ptext (sLit "Forall'd") <+> pp_bndr bndr
-				 <+> ptext (sLit "is not bound in RULE lhs"))
+   dead_msg bndr = hang (sep [ ptext (sLit "Forall'd") <+> pp_bndr bndr
+			     , ptext (sLit "is not bound in RULE lhs")])
                       2 (ppr opt_lhs)
    pp_bndr bndr
-    | isTyVar bndr  = ptext (sLit "type variable") <+> ppr bndr
-    | isEvVar bndr  = ptext (sLit "constraint") <+> ppr bndr <+> dcolon <+> ppr (evVarPred bndr)
-    | otherwise     = ptext (sLit "variable") <+> ppr bndr
+    | isTyVar bndr  = ptext (sLit "type variable") <+> quotes (ppr bndr)
+    | isEvVar bndr  = ptext (sLit "constraint") <+> quotes (ppr (evVarPred bndr))
+    | otherwise     = ptext (sLit "variable") <+> quotes (ppr bndr)
 \end{code}
 
 Note [Simplifying the left-hand side of a RULE]
