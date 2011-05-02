@@ -13,13 +13,7 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "nativeGen/NCG.h"
 
 
-#if   alpha_TARGET_ARCH
-import Alpha.CodeGen
-import Alpha.Regs
-import Alpha.RegInfo
-import Alpha.Instr
-
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import X86.CodeGen
 import X86.Regs
 import X86.Instr
@@ -64,7 +58,7 @@ import NCGMonad
 import BlockId
 import CgUtils		( fixStgRegisters )
 import OldCmm
-import CmmOpt		( cmmMiniInline, cmmMachOpFold )
+import CmmOpt		( cmmEliminateDeadBlocks, cmmMiniInline, cmmMachOpFold )
 import OldPprCmm
 import CLabel
 
@@ -378,10 +372,15 @@ cmmNativeGen dflags us cmm count
 			, Nothing
 			, mPprStats)
 
+	---- generate jump tables
+	let tabled	=
+		{-# SCC "generateJumpTables" #-}
+		alloced ++ generateJumpTables alloced
+
 	---- shortcut branches
 	let shorted	=
 	 	{-# SCC "shortcutBranches" #-}
-	 	shortcutBranches dflags alloced
+	 	shortcutBranches dflags tabled
 
 	---- sequence blocks
 	let sequenced	=
@@ -609,6 +608,18 @@ makeFarBranches = id
 #endif
 
 -- -----------------------------------------------------------------------------
+-- Generate jump tables
+
+-- Analyzes all native code and generates data sections for all jump
+-- table instructions.
+generateJumpTables
+	:: [NatCmmTop Instr] -> [NatCmmTop Instr]
+generateJumpTables xs = concatMap f xs
+    where f (CmmProc _ _ (ListGraph xs)) = concatMap g xs
+          f _ = []
+          g (BasicBlock _ xs) = catMaybes (map generateJumpTableForInstr xs)
+
+-- -----------------------------------------------------------------------------
 -- Shortcut branches
 
 shortcutBranches 
@@ -718,10 +729,9 @@ Here we do:
              and position independent refs
         (ii) compile a list of imported symbols
 
-Ideas for other things we could do (ToDo):
+Ideas for other things we could do:
 
   - shortcut jumps-to-jumps
-  - eliminate dead code blocks
   - simple CSE: if an expr is assigned to a temp, then replace later occs of
     that expr with the temp, until the expr is no longer valid (can push through
     temp assignments, and certain assigns to mem...)
@@ -730,7 +740,7 @@ Ideas for other things we could do (ToDo):
 cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline (cmmEliminateDeadBlocks blocks))
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))

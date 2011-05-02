@@ -289,7 +289,11 @@ data Instr
 	| JMP	      Operand
 	| JXX	      Cond BlockId  -- includes unconditional branches
 	| JXX_GBL     Cond Imm      -- non-local version of JXX
-	| JMP_TBL     Operand [BlockId]  -- table jump
+	-- Table jump
+	| JMP_TBL     Operand   -- Address to jump to
+	              [Maybe BlockId] -- Blocks in the jump table
+	              Section   -- Data section jump table should be put in
+	              CLabel    -- Label of jump table
 	| CALL	      (Either Imm Reg) [Reg]
 
 	-- Other things.
@@ -350,7 +354,7 @@ x86_regUsageOfInstr instr
     JXX    _ _		-> mkRU [] []
     JXX_GBL _ _		-> mkRU [] []
     JMP     op		-> mkRUR (use_R op)
-    JMP_TBL op _        -> mkRUR (use_R op)
+    JMP_TBL op _ _ _    -> mkRUR (use_R op)
     CALL (Left _)  params   -> mkRU params callClobberedRegs
     CALL (Right reg) params -> mkRU (reg:params) callClobberedRegs
     CLTD   _		-> mkRU [eax] [edx]
@@ -482,7 +486,7 @@ x86_patchRegsOfInstr instr env
     POP  sz op		-> patch1 (POP  sz) op
     SETCC cond op	-> patch1 (SETCC cond) op
     JMP op		-> patch1 JMP op
-    JMP_TBL op ids      -> patch1 JMP_TBL op $ ids
+    JMP_TBL op ids s lbl-> JMP_TBL (patchOp op) ids s lbl
 
     GMOV src dst	-> GMOV (env src) (env dst)
     GLD  sz src dst	-> GLD sz (lookupAddr src) (env dst)
@@ -579,7 +583,7 @@ x86_jumpDestsOfInstr
 x86_jumpDestsOfInstr insn 
   = case insn of
 	JXX _ id	-> [id]
-	JMP_TBL _ ids	-> ids
+	JMP_TBL _ ids _ _ -> [id | Just id <- ids]
 	_		-> []
 
 
@@ -589,7 +593,8 @@ x86_patchJumpInstr
 x86_patchJumpInstr insn patchF
   = case insn of
 	JXX cc id 	-> JXX cc (patchF id)
-	JMP_TBL _ _     -> error "Cannot patch JMP_TBL"
+	JMP_TBL op ids section lbl
+	  -> JMP_TBL op (map (fmap patchF) ids) section lbl
 	_		-> insn
 
 

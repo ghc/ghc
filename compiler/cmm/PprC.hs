@@ -248,7 +248,7 @@ pprStmt stmt = case stmt of
                 | CmmNeverReturns <- ret ->
                     let myCall = pprCall (pprCLabel lbl) cconv results args safety
                     in (real_fun_proto lbl, myCall)
-                | not (isMathFun lbl || isCas lbl) ->
+                | not (isMathFun lbl) ->
                     let myCall = braces (
                                      pprCFunType (char '*' <> text "ghcFunPtr") cconv results args <> semi
                                   $$ text "ghcFunPtr" <+> equals <+> cast_fn <> semi

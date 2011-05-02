@@ -249,7 +249,6 @@ floatregnos = fakeregnos ++ xmmregnos;
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
 -- Sparc passes up to the first 6 args in regs.
--- Dunno about Alpha.
 argRegs :: RegNo -> [Reg]
 argRegs _	= panic "MachRegs.argRegs(x86): should not be used!"
 

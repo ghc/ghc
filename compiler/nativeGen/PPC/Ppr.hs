@@ -545,7 +545,7 @@ pprInstr (MTCTR reg) = hcat [
 	char '\t',
 	pprReg reg
     ]
-pprInstr (BCTR _) = hcat [
+pprInstr (BCTR _ _) = hcat [
 	char '\t',
 	ptext (sLit "bctr")
     ]
