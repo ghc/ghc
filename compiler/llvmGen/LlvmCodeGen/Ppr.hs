@@ -122,34 +122,25 @@ pprInfoTable env count lbl stat
           then Outputable.panic "LlvmCodeGen.Ppr: invalid info table!"
           else (pprLlvmData ([ldata'], ltypes), llvmUsed)
 
+
 -- | We generate labels for info tables by converting them to the same label
 -- as for the entry code but adding this string as a suffix.
 iTableSuf :: String
 iTableSuf = "_itable"
 
 
--- | Create an appropriate section declaration for subsection <n> of text
--- WARNING: This technique could fail as gas documentation says it only
--- supports up to 8192 subsections per section. Inspection of the source
--- code and some test programs seem to suggest it supports more than this
--- so we are hoping it does.
+-- | Create a specially crafted section declaration that encodes the order this
+-- section should be in the final object code.
+-- 
+-- The LlvmMangler.llvmFixupAsm pass over the assembly produced by LLVM uses
+-- this section declaration to do its processing.
 mkLayoutSection :: Int -> LMSection
 mkLayoutSection n
-  -- On OSX we can't use the GNU Assembler, we must use the OSX assembler, which
-  -- doesn't support subsections. So we post process the assembly code, this
-  -- section specifier will be replaced with '.text' by the mangler.
-  = Just (fsLit $ infoSection ++ show n
-#if darwin_TARGET_OS
-      )
-#else
-      ++ "#")
-#endif
+  = Just (fsLit $ infoSection ++ show n)
 
--- | The section we are putting info tables and their entry code into
+
+-- | The section we are putting info tables and their entry code into, should
+-- be unique since we process the assembly pattern matching this.
 infoSection :: String
-#if darwin_TARGET_OS
-infoSection = "__STRIP,__me"
-#else
-infoSection = ".text; .text "
-#endif
+infoSection = "X98A__STRIP,__me"
 
