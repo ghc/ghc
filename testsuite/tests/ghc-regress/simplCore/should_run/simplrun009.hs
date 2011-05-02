@@ -61,11 +61,8 @@ foo xss = Main.concatMap (\xs -> Main.map (+1) xs) xss
 instance StreamableSequence [] where
   stream = listToStream
   unstream = streamToList
-  -- These inline pragmas are useless (see #5084)
-{-
   {-# INLINE stream #-}
   {-# INLINE unstream #-}
--}
 
 listToStream :: [a] -> Stream a
 listToStream xs = Stream next xs
@@ -107,11 +104,8 @@ class StreamableSequence seq where
   unstream :: Stream a -> seq a
 
   -- axiom: stream . unstream = id
-  -- These inline pragmas are useless (see #5084)
-{-
   {-# INLINE stream #-}
   {-# INLINE unstream #-}
--}
 
 {-
 --version that does not require the sequence type
