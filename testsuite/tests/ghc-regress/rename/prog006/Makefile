@@ -19,6 +19,8 @@ LOCAL_PKGCONF=local.package.conf
 LOCAL_GHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF)
 
 rn.prog006:
+	rm -f A.hi A.o B/C.hi B/C.o Main.hi Main.o pkg.conf
+	rm -f pwd pwd.exe pwd.exe.manifest pwd.hi pwd.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make pwd -v0
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -package-name test-1.0 B.C -fforce-recomp -v0
 	rm -f pkg.conf
