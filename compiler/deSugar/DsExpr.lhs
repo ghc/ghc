@@ -327,10 +327,10 @@ dsExpr (HsLet binds body) = do
 --
 dsExpr (HsDo ListComp  stmts res_ty) = dsListComp stmts res_ty
 dsExpr (HsDo PArrComp  stmts _)      = dsPArrComp (map unLoc stmts)
-dsExpr (HsDo DoExpr    stmts res_ty) = dsDo stmts res_ty
-dsExpr (HsDo GhciStmt  stmts res_ty) = dsDo stmts res_ty
-dsExpr (HsDo MDoExpr   stmts res_ty) = dsDo stmts res_ty
-dsExpr (HsDo MonadComp stmts res_ty) = dsMonadComp stmts res_ty
+dsExpr (HsDo DoExpr    stmts _)      = dsDo stmts 
+dsExpr (HsDo GhciStmt  stmts _)      = dsDo stmts 
+dsExpr (HsDo MDoExpr   stmts _)      = dsDo stmts 
+dsExpr (HsDo MonadComp stmts _)      = dsMonadComp stmts
 
 dsExpr (HsIf mb_fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -694,21 +694,16 @@ handled in DsListComp).  Basically does the translation given in the
 Haskell 98 report:
 
 \begin{code}
-dsDo	:: [LStmt Id]
-	-> Type			-- Type of the whole expression
-	-> DsM CoreExpr
-
-dsDo stmts result_ty
+dsDo :: [LStmt Id] -> DsM CoreExpr
+dsDo stmts
   = goL stmts
   where
     goL [] = panic "dsDo"
     goL (L loc stmt:lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
   
-    go _ (LastStmt body ret_op) stmts
-      = ASSERT( null stmts ) 
-        do { body' <- dsLExpr body
-           ; ret_op' <- dsExpr ret_op
-           ; return (App ret_op' body') }
+    go _ (LastStmt body _) stmts
+      = ASSERT( null stmts ) dsLExpr body
+        -- The 'return' op isn't used for 'do' expressions
 
     go _ (ExprStmt rhs then_expr _ _) stmts
       = do { rhs2 <- dsLExpr rhs
@@ -753,7 +748,7 @@ dsDo stmts result_ty
                                                  (mkFunTy tup_ty body_ty))
         mfix_pat     = noLoc $ LazyPat $ mkLHsPatTup rec_tup_pats
         body         = noLoc $ HsDo DoExpr (rec_stmts ++ [ret_stmt]) body_ty
-        ret_stmt     = noLoc $ LastStmt return_op (mkLHsTupleExpr rets)
+        ret_stmt     = noLoc $ LastStmt (mkLHsTupleExpr rets) return_op
         tup_ty       = mkBoxedTupleTy (map idType tup_ids) -- Deals with singleton case
 
 handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr

@@ -63,7 +63,7 @@ instance Eq HsLit where
 data HsOverLit id 	-- An overloaded literal
   = OverLit {
 	ol_val :: OverLitVal, 
-	ol_rebindable :: Bool,		-- 
+	ol_rebindable :: Bool,		-- Note [ol_rebindable]
 	ol_witness :: SyntaxExpr id,	-- Note [Overloaded literal witnesses]
 	ol_type :: PostTcType }
   deriving (Data, Typeable)
@@ -101,7 +101,7 @@ This witness should replace the literal.
 
 This dual role is unusual, because we're replacing 'fromInteger' with 
 a call to fromInteger.  Reason: it allows commoning up of the fromInteger
-calls, which wouldn't be possible if the desguarar made the application
+calls, which wouldn't be possible if the desguarar made the application.
 
 The PostTcType in each branch records the type the overload literal is
 found to have.

@@ -607,7 +607,7 @@ inlineIdName :: Name
 inlineIdName	 	= varQual gHC_MAGIC (fsLit "inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
-eqClassName, eqName, ordClassName, geName, functorClassName :: Name
+fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
 eqClassName	  = clsQual  gHC_CLASSES (fsLit "Eq")      eqClassKey
 eqName		  = methName gHC_CLASSES (fsLit "==")      eqClassOpKey
 ordClassName	  = clsQual  gHC_CLASSES (fsLit "Ord")     ordClassKey
@@ -1299,7 +1299,8 @@ unboundKey		      = mkPreludeMiscIdUnique 101
 fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
     enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,
     enumFromThenToClassOpKey, eqClassOpKey, geClassOpKey, negateClassOpKey,
-    failMClassOpKey, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey
+    failMClassOpKey, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey,
+    fmapClassOpKey
     :: Unique
 fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
 minusClassOpKey		      = mkPreludeMiscIdUnique 103

@@ -743,7 +743,7 @@ zonkStmt env (ParStmt stmts_w_bndrs mzip_op bind_op return_op)
 
 zonkStmt env (RecStmt { recS_stmts = segStmts, recS_later_ids = lvs, recS_rec_ids = rvs
                       , recS_ret_fn = ret_id, recS_mfix_fn = mfix_id, recS_bind_fn = bind_id
-                      , recS_rec_rets = rets, redS_ret_ty = ret_ty })
+                      , recS_rec_rets = rets, recS_ret_ty = ret_ty })
   = do { new_rvs <- zonkIdBndrs env rvs
        ; new_lvs <- zonkIdBndrs env lvs
        ; new_ret_ty  <- zonkTcTypeToType env ret_ty
@@ -782,16 +782,20 @@ zonkStmt env (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_o
     ; bind_op' <- zonkExpr env' bind_op
     ; return (env', TransformStmt stmts' binders' usingExpr' maybeByExpr' return_op' bind_op') }
     
-zonkStmt env (GroupStmt stmts binderMap by using return_op bind_op liftM_op)
+zonkStmt env (GroupStmt { grpS_stmts = stmts, grpS_bndrs = binderMap
+                        , grpS_by = by, grpS_explicit = explicit, grpS_using = using
+                        , grpS_ret = return_op, grpS_bind = bind_op, grpS_fmap = liftM_op })
   = do { (env', stmts') <- zonkStmts env stmts 
     ; binderMap' <- mappM (zonkBinderMapEntry env') binderMap
     ; by' <- fmapMaybeM (zonkLExpr env') by
-    ; using' <- fmapEitherM (zonkLExpr env) (zonkExpr env) using
+    ; using' <- zonkLExpr env using
     ; return_op' <- zonkExpr env' return_op
     ; bind_op' <- zonkExpr env' bind_op
     ; liftM_op' <- zonkExpr env' liftM_op
     ; let env'' = extendZonkEnv env' (map snd binderMap')
-    ; return (env'', GroupStmt stmts' binderMap' by' using' return_op' bind_op' liftM_op') }
+    ; return (env'', GroupStmt { grpS_stmts = stmts', grpS_bndrs =  binderMap'
+                               , grpS_by = by', grpS_explicit = explicit, grpS_using = using'
+                               , grpS_ret = return_op', grpS_bind = bind_op', grpS_fmap = liftM_op' }) }
   where
     zonkBinderMapEntry env (oldBinder, newBinder) = do 
         let oldBinder' = zonkIdOcc env oldBinder

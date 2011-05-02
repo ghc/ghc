@@ -721,19 +721,15 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; wrapGenSyms ss z }
 
 -- FIXME: I haven't got the types here right yet
-repE e@(HsDo ctxt sts body _ _) 
+repE e@(HsDo ctxt sts _) 
  | case ctxt of { DoExpr -> True; GhciStmt -> True; _ -> False }
  = do { (ss,zs) <- repLSts sts; 
-	body'	<- addBinds ss $ repLE body;
-	ret	<- repNoBindSt body';	
-        e'      <- repDoE (nonEmptyCoreList (zs ++ [ret]));
+        e'      <- repDoE (nonEmptyCoreList zs);
         wrapGenSyms ss e' }
 
  | ListComp <- ctxt
  = do { (ss,zs) <- repLSts sts; 
-	body'	<- addBinds ss $ repLE body;
-	ret	<- repNoBindSt body';	
-        e'      <- repComp (nonEmptyCoreList (zs ++ [ret]));
+        e'      <- repComp (nonEmptyCoreList zs);
         wrapGenSyms ss e' }
 
   | otherwise

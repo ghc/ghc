@@ -54,7 +54,9 @@ dsListComp :: [LStmt Id]
 dsListComp lquals res_ty = do 
     dflags <- getDOptsDs
     let quals = map unLoc lquals
-        [elt_ty] = tcTyConAppArgs res_ty
+        elt_ty = case tcTyConAppArgs res_ty of
+                   [elt_ty] -> elt_ty
+                   _ -> pprPanic "dsListComp" (ppr res_ty $$ ppr lquals)
     
     if not (dopt Opt_EnableRewriteRules dflags) || dopt Opt_IgnoreInterfacePragmas dflags
        -- Either rules are switched off, or we are ignoring what there are;
@@ -82,9 +84,9 @@ dsListComp lquals res_ty = do
 -- of that comprehension that we need in the outer comprehension into such an expression
 -- and the type of the elements that it outputs (tuples of binders)
 dsInnerListComp :: ([LStmt Id], [Id]) -> DsM (CoreExpr, Type)
-dsInnerListComp (stmts, bndrs) = do
+dsInnerListComp (stmts, bndrs)
   = do { expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTup bndrs)]) 
-                           bndrs_tuple_type
+                            (mkListTy bndrs_tuple_type)
        ; return (expr, bndrs_tuple_type) }
   where
     bndrs_tuple_type = mkBigCoreVarTupTy bndrs
@@ -117,7 +119,8 @@ dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr _ _)
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
 dsGroupStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsGroupStmt (GroupStmt stmts binderMap by using _ _ _) = do
+dsGroupStmt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = binderMap
+                       , grpS_by = by, grpS_using = using }) = do
     let (fromBinders, toBinders) = unzip binderMap
         
         fromBindersTypes = map idType fromBinders
@@ -130,7 +133,7 @@ dsGroupStmt (GroupStmt stmts binderMap by using _ _ _) = do
     
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
     -- function required? If so, create that desugared function and add to arguments
-    usingExpr' <- dsLExpr (either id noLoc using)
+    usingExpr' <- dsLExpr using
     usingArgs <- case by of
                    Nothing   -> return [expr]
  		   Just by_e -> do { by_e' <- dsLExpr by_e
@@ -688,45 +691,15 @@ parrElemType e  =
 Translation for monad comprehensions
 
 \begin{code}
-
--- | Keep the "context" of a monad comprehension in a small data type to avoid
--- some boilerplate...
-data DsMonadComp = DsMonadComp
-    { mc_return :: Either (SyntaxExpr Id) (Expr CoreBndr)
-    , mc_body   :: LHsExpr Id
-    , mc_m_ty   :: Type
-    }
-
---
 -- Entry point for monad comprehension desugaring
---
-dsMonadComp :: [LStmt Id]       -- the statements
-            -> Type             -- the final type
-            -> DsM CoreExpr
-dsMonadComp stmts res_ty
-  = dsMcStmts stmts (DsMonadComp (Left return_op) body m_ty)
-  where
-    (m_ty, _) = tcSplitAppTy res_ty
+dsMonadComp :: [LStmt Id] -> DsM CoreExpr
+dsMonadComp stmts = dsMcStmts stmts
 
+dsMcStmts :: [LStmt Id] -> DsM CoreExpr
+dsMcStmts []                    = panic "dsMcStmts"
+dsMcStmts (L loc stmt : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
 
-dsMcStmts :: [LStmt Id]
-          -> DsMonadComp
-          -> DsM CoreExpr
-
--- No statements left for desugaring. Desugar the body after calling "return"
--- on it.
-dsMcStmts [] DsMonadComp { mc_return, mc_body }
-  = case mc_return of
-         Left ret   -> dsLExpr $ noLoc ret `nlHsApp` mc_body
-         Right ret' -> do
-             { body' <- dsLExpr mc_body
-             ; return $ mkApps ret' [body'] }
-
--- Otherwise desugar each statement step by step
-dsMcStmts ((L loc stmt) : lstmts) mc
-  = putSrcSpanDs loc (dsMcStmt stmt lstmts mc)
-
-
+---------------
 dsMcStmt :: Stmt Id -> [LStmt Id] -> DsM CoreExpr
 
 dsMcStmt (LastStmt body ret_op) stmts
@@ -785,7 +758,7 @@ dsMcStmt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op) s
 --
 --   [| (q, then group by e using f); rest |]
 --   --->  f {qt} (\qv -> e) [| q; return qv |] >>= \ n_tup -> 
---         case unzip n_tup of qv -> [| rest |]
+--         case unzip n_tup of qv' -> [| rest |]
 --
 -- where   variables (v1:t1, ..., vk:tk) are bound by q
 --         qv = (v1, ..., vk)
@@ -794,61 +767,42 @@ dsMcStmt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op) s
 --         f :: forall a. (a -> t) -> m1 a -> m2 (n a)
 --         n_tup :: n qt
 --         unzip :: n qt -> (n t1, ..., n tk)    (needs Functor n)
---
---   [| q, then group by e using f |]  ->  (f (\q_v -> e) [| q |]) >>= (return . (unzip q_v))
---
--- which is equal to
---
---   [| q, then group by e using f |]  ->  liftM (unzip q_v) (f (\q_v -> e) [| q |])
---
--- where unzip is of the form
---
---   unzip :: n (a,b,c,..) -> (n a,n b,n c,..)
---   unzip m_tuple = ( fmap selN1 m_tuple
---                   , fmap selN2 m_tuple
---                   , .. )
---     where selN1 (a,b,c,..) = a
---           selN2 (a,b,c,..) = b
---           ..
---
-dsMcStmt (GroupStmt stmts binderMap by using return_op bind_op fmap_op) stmts_rest
-  = do { let (fromBinders, toBinders) = unzip binderMap
-             fromBindersTypes         = map idType fromBinders		-- Types ty
-             fromBindersTupleTy       = mkBigCoreTupTy fromBindersTypes
-             toBindersTypes           = map idType toBinders		-- Types (n ty)
-             toBindersTupleTy         = mkBigCoreTupTy toBindersTypes
+
+dsMcStmt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = bndrs
+                    , grpS_by = by, grpS_using = using
+                    , grpS_ret = return_op, grpS_bind = bind_op
+                    , grpS_fmap = fmap_op }) stmts_rest
+  = do { let (from_bndrs, to_bndrs) = unzip bndrs
+             from_bndr_tys          = map idType from_bndrs	-- Types ty
 
        -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-       ; expr <- dsInnerMonadComp stmts fromBinders return_op
+       ; expr <- dsInnerMonadComp stmts from_bndrs return_op
 
        -- Work out what arguments should be supplied to that expression: i.e. is an extraction
        -- function required? If so, create that desugared function and add to arguments
-       ; usingExpr' <- dsLExpr (either id noLoc using)
+       ; usingExpr' <- dsLExpr using
        ; usingArgs <- case by of
                         Nothing   -> return [expr]
                         Just by_e -> do { by_e' <- dsLExpr by_e
-                                        ; lam <- matchTuple fromBinders by_e'
+                                        ; lam <- matchTuple from_bndrs by_e'
                                         ; return [lam, expr] }
-
-       -- Create an unzip function for the appropriate arity and element types
-       ; fmap_op' <- dsExpr fmap_op
-       ; (unzip_fn, unzip_rhs) <- mkMcUnzipM fmap_op' m_ty fromBindersTypes
 
        -- Generate the expressions to build the grouped list
        -- Build a pattern that ensures the consumer binds into the NEW binders, 
        -- which hold monads rather than single values
+       ; fmap_op' <- dsExpr fmap_op
        ; bind_op' <- dsExpr bind_op
        ; let bind_ty = exprType bind_op'    -- m2 (n (a,b,c)) -> (n (a,b,c) -> r1) -> r2
-             n_tup_ty = funArgTy $ funArgTy $ funResultTy bind_ty
+             n_tup_ty = funArgTy $ funArgTy $ funResultTy bind_ty   -- n (a,b,c)
+             tup_n_ty = mkBigCoreVarTupTy to_bndrs
 
-       ; body      <- dsMcStmts stmts_rest
-       ; n_tup_var <- newSysLocalDs n_tup_ty
-       ; tup_n_var <- newSysLocalDs (mkBigCoreVarTupTy toBinders)
-       ; us        <- newUniqueSupply
-       ; let unzip_n_tup = Let (Rec [(unzip_fn, unzip_rhs)]) $
-                           App (Var unzip_fn) (Var n_tup_var)
-	     -- unzip_n_tup :: (n a, n b, n c)
-             body' = mkTupleCase us toBinders body unzip_n_tup (Var tup_n_var)
+       ; body       <- dsMcStmts stmts_rest
+       ; n_tup_var  <- newSysLocalDs n_tup_ty
+       ; tup_n_var  <- newSysLocalDs tup_n_ty
+       ; tup_n_expr <- mkMcUnzipM fmap_op' n_tup_var from_bndr_tys
+       ; us         <- newUniqueSupply
+       ; let rhs'  = mkApps usingExpr' usingArgs
+             body' = mkTupleCase us to_bndrs body tup_n_var tup_n_expr
 		   
        ; return (mkApps bind_op' [rhs', Lam n_tup_var body']) }
 
@@ -864,23 +818,26 @@ dsMcStmt (GroupStmt stmts binderMap by using return_op bind_op fmap_op) stmts_re
 -- NB: we need a polymorphic mzip because we call it several times
 
 dsMcStmt (ParStmt pairs mzip_op bind_op return_op) stmts_rest
- = do  { exps <- mapM ds_inner pairs
-       ; let qual_tys = map (mkBigCoreVarTupTy . snd) pairs
-       ; mzip_op' <- dsExpr mzip_op
-       ; (zip_fn, zip_rhs) <- mkMcZipM mzip_op' (mc_m_ty mc) qual_tys
+ = do  { exps_w_tys  <- mapM ds_inner pairs   -- Pairs (exp :: m ty, ty)
+       ; mzip_op'    <- dsExpr mzip_op
 
        ; let -- The pattern variables
-             vars = map (mkBigLHsVarPatTup . snd) pairs
+             pats = map (mkBigLHsVarPatTup . snd) pairs
              -- Pattern with tuples of variables
              -- [v1,v2,v3]  =>  (v1, (v2, v3))
-             pat = foldr (\tn tm -> mkBigLHsPatTup [tn, tm]) (last vars) (init vars)
-             rhs = Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)
+             pat = foldr1 (\p1 p2 -> mkLHsPatTup [p1, p2]) pats
+	     (rhs, _) = foldr1 (\(e1,t1) (e2,t2) -> 
+                                 (mkApps mzip_op' [Type t1, Type t2, e1, e2],
+                                  mkBoxedTupleTy [t1,t2])) 
+                               exps_w_tys
 
        ; dsMcBindStmt pat rhs bind_op noSyntaxExpr stmts_rest }
   where
-    ds_inner (stmts, bndrs) = dsInnerMonadComp stmts bndrs mono_ret_op
+    ds_inner (stmts, bndrs) = do { exp <- dsInnerMonadComp stmts bndrs mono_ret_op
+                                 ; return (exp, tup_ty) }
        where 
-         mono_ret_op = HsWrap (WpTyApp (mkBigCoreVarTupTy bndrs)) return_op
+         mono_ret_op = HsWrap (WpTyApp tup_ty) return_op
+         tup_ty      = mkBigCoreVarTupTy bndrs
 
 dsMcStmt stmt _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
 
@@ -891,9 +848,8 @@ matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
 --  \x. case x of (a,b,c) -> body 
 matchTuple ids body
   = do { us <- newUniqueSupply
-       ; tup_id <- newSysLocalDs (mkBigLHsVarPatTup ids)
+       ; tup_id <- newSysLocalDs (mkBigCoreVarTupTy ids)
        ; return (Lam tup_id $ mkTupleCase us ids body tup_id (Var tup_id)) }
-
 
 -- general `rhs' >>= \pat -> stmts` desugaring where `rhs'` is already a
 -- desugared `CoreExpr`
@@ -936,10 +892,10 @@ dsMcBindStmt pat rhs' bind_op fail_op stmts
 
 dsInnerMonadComp :: [LStmt Id]
                  -> [Id]	-- Return a tuple of these variables
-                 -> LHsExpr Id	-- The monomorphic "return" operator
+                 -> HsExpr Id	-- The monomorphic "return" operator
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
-  = dsMcStmts (stmts ++ [noLoc (ReturnStmt (mkBigLHsVarTup bndrs) ret_op)])
+  = dsMcStmts (stmts ++ [noLoc (LastStmt (mkBigLHsVarTup bndrs) ret_op)])
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions
 --
@@ -948,85 +904,25 @@ dsInnerMonadComp stmts bndrs ret_op
 --                   , liftM selN2 m_tuple
 --                   , .. )
 --
---   mkMcUnzipM m [t1, t2]
---     = (unzip_fn, \ys :: m (t1, t2) ->
---         ( liftM (selN1 :: (t1, t2) -> t1) ys
---         , liftM (selN2 :: (t1, t2) -> t2) ys
---         ))
---
-mkMcUnzipM :: CoreExpr
-           -> Type                      -- m
-           -> [Type]                    -- [a,b,c,..]
-           -> DsM (Id, CoreExpr)
-mkMcUnzipM liftM_op m_ty elt_tys
-  = do  { ys    <- newSysLocalDs monad_tuple_ty
-        ; xs    <- mapM newSysLocalDs elt_tys
-        ; scrut <- newSysLocalDs tuple_tys
+--   mkMcUnzipM fmap ys [t1, t2]
+--     = ( fmap (selN1 :: (t1, t2) -> t1) ys
+--       , fmap (selN2 :: (t1, t2) -> t2) ys )
 
-        ; unzip_fn <- newSysLocalDs unzip_fn_ty
+mkMcUnzipM :: CoreExpr		-- fmap
+	   -> Id		-- Of type n (a,b,c)
+	   -> [Type]		-- [a,b,c]
+	   -> DsM CoreExpr	-- Of type (n a, n b, n c)
+mkMcUnzipM fmap_op ys elt_tys
+  = do { xs     <- mapM newSysLocalDs elt_tys
+       ; tup_xs <- newSysLocalDs (mkBigCoreTupTy elt_tys)
 
-        ; let -- Select one Id from our tuple
-              selectExpr n = mkLams [scrut] $ mkTupleSelector xs (xs !! n) scrut (Var scrut)
-              -- Apply 'selectVar' and 'ys' to 'liftM'
-              tupleElem n = mkApps liftM_op
-                                   -- Types (m is figured out by the type checker):
-                                   -- liftM :: forall a b. (a -> b) -> m a -> m b
-                                   [ Type tuple_tys, Type (elt_tys !! n)
-                                   -- Arguments:
-                                   , selectExpr n, Var ys ]
-              -- The final expression with the big tuple
-              unzip_body = mkBigCoreTup [ tupleElem n | n <- [0..length elt_tys - 1] ]
+       ; let arg_ty = idType ys
+             mk_elt i = mkApps fmap_op  -- fmap :: forall a b. (a -> b) -> n a -> n b
+                           [ Type arg_ty, Type (elt_tys !! i)
+                           , mk_sel i, Var ys]
 
-        ; return (unzip_fn, mkLams [ys] unzip_body) }
-  where monad_tys       = map (m_ty `mkAppTy`) elt_tys                  -- [m a,m b,m c,..]
-        tuple_monad_tys = mkBigCoreTupTy monad_tys                      -- (m a,m b,m c,..)
-        tuple_tys       = mkBigCoreTupTy elt_tys                        -- (a,b,c,..)
-        monad_tuple_ty  = m_ty `mkAppTy` tuple_tys                      -- m (a,b,c,..)
-        unzip_fn_ty     = monad_tuple_ty `mkFunTy` tuple_monad_tys      -- m (a,b,c,..) -> (m a,m b,m c,..)
+             mk_sel n = Lam tup_xs $ 
+                        mkTupleSelector xs (xs !! n) tup_xs (Var tup_xs)
 
--- Generate the `mzip` function for `ParStmt` in monad comprehensions, for
--- example:
---
---   mzip :: m t1
---        -> (m t2 -> m t3 -> m (t2, t3))
---        -> m (t1, (t2, t3))
---
---   mkMcZipM m [t1, t2, t3]
---     = (zip_fn, \(q1::t1) (q2::t2) (q3::t3) ->
---         mzip q1 (mzip q2 q3))
---
-mkMcZipM :: CoreExpr
-         -> Type
-         -> [Type]
-         -> DsM (Id, CoreExpr)
-
-mkMcZipM mzip_op m_ty tys@(_:_:_) -- min. 2 types
- = do  { (ids, t1, tuple_ty, zip_body) <- loop tys
-       ; zip_fn <- newSysLocalDs $
-                       (m_ty `mkAppTy` t1)
-                       `mkFunTy`
-                       (m_ty `mkAppTy` tuple_ty)
-                       `mkFunTy`
-                       (m_ty `mkAppTy` mkBigCoreTupTy [t1, tuple_ty])
-       ; return (zip_fn, mkLams ids zip_body) }
-
- where 
-       -- loop :: [Type] -> DsM ([Id], Type, [Type], CoreExpr)
-       loop [t1, t2] = do -- last run of the `loop`
-           { ids@[a,b] <- newSysLocalsDs (map (m_ty `mkAppTy`) [t1,t2])
-           ; let zip_body = mkApps mzip_op [ Type t1, Type t2 , Var a, Var b ]
-           ; return (ids, t1, t2, zip_body) }
-
-       loop (t1:tr) = do
-           { -- Get ty, ids etc from the "inner" zip
-             (ids', t1', t2', zip_body') <- loop tr
-
-           ; a <- newSysLocalDs $ m_ty `mkAppTy` t1
-           ; let tuple_ty' = mkBigCoreTupTy [t1', t2']
-                 zip_body = mkApps mzip_op [ Type t1, Type tuple_ty', Var a, zip_body' ]
-           ; return ((a:ids'), t1, tuple_ty', zip_body) }
-
--- This case should never happen:
-mkMcZipM _ _ tys = pprPanic "mkMcZipM: unexpected argument" (ppr tys)
-
+       ; return (mkBigCoreTup (map mk_elt [0..length elt_tys - 1])) }
 \end{code}

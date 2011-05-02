@@ -40,7 +40,7 @@ import RdrName
 import LoadIface	( loadInterfaceForName )
 import UniqSet
 import Data.List
-import Util		( isSingleton )
+import Util		( isSingleton, snocView )
 import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc
@@ -225,7 +225,7 @@ rnExpr (HsLet binds expr)
     return (HsLet binds' expr', fvExpr)
 
 rnExpr (HsDo do_or_lc stmts _)
-  = do 	{ ((stmts', _), fvs) <- rnStmts do_or_lc stmts (\ _ -> return ())
+  = do 	{ ((stmts', _), fvs) <- rnStmts do_or_lc stmts (\ _ -> return ((), emptyFVs))
 	; return ( HsDo do_or_lc stmts' placeHolderType, fvs ) }
 
 rnExpr (ExplicitList _ exps)
@@ -440,10 +440,8 @@ convertOpFormsCmd (HsIf f exp c1 c2)
 convertOpFormsCmd (HsLet binds cmd)
   = HsLet binds (convertOpFormsLCmd cmd)
 
-convertOpFormsCmd (HsDo ctxt stmts body return_op ty)
-  = HsDo ctxt (map (fmap convertOpFormsStmt) stmts)
-	      (convertOpFormsLCmd body)
-              (convertOpFormsCmd  return_op) ty
+convertOpFormsCmd (HsDo ctxt stmts ty)
+  = HsDo ctxt (map (fmap convertOpFormsStmt) stmts) ty
 
 -- Anything else is unchanged.  This includes HsArrForm (already done),
 -- things with no sub-commands, and illegal commands (which will be
@@ -495,14 +493,10 @@ methodNamesCmd (HsPar c) = methodNamesLCmd c
 methodNamesCmd (HsIf _ _ c1 c2)
   = methodNamesLCmd c1 `plusFV` methodNamesLCmd c2 `addOneFV` choiceAName
 
-methodNamesCmd (HsLet _ c) = methodNamesLCmd c
-
-methodNamesCmd (HsDo _ stmts body _ _) 
-  = methodNamesStmts stmts `plusFV` methodNamesLCmd body
-
-methodNamesCmd (HsApp c _) = methodNamesLCmd c
-
-methodNamesCmd (HsLam match) = methodNamesMatch match
+methodNamesCmd (HsLet _ c)      = methodNamesLCmd c
+methodNamesCmd (HsDo _ stmts _) = methodNamesStmts stmts 
+methodNamesCmd (HsApp c _)      = methodNamesLCmd c
+methodNamesCmd (HsLam match)    = methodNamesMatch match
 
 methodNamesCmd (HsCase _ matches)
   = methodNamesMatch matches `addOneFV` choiceAName
@@ -538,6 +532,7 @@ methodNamesLStmt :: Located (StmtLR Name Name) -> FreeVars
 methodNamesLStmt = methodNamesStmt . unLoc
 
 methodNamesStmt :: StmtLR Name Name -> FreeVars
+methodNamesStmt (LastStmt cmd _)                 = methodNamesLCmd cmd
 methodNamesStmt (ExprStmt cmd _ _ _)             = methodNamesLCmd cmd
 methodNamesStmt (BindStmt _ cmd _ _)             = methodNamesLCmd cmd
 methodNamesStmt (RecStmt { recS_stmts = stmts }) = methodNamesStmts stmts `addOneFV` loopAName
@@ -639,42 +634,48 @@ rnBracket (DecBrG _) = panic "rnBracket: unexpected DecBrG"
 
 \begin{code}
 rnStmts :: HsStmtContext Name -> [LStmt RdrName]
-	      -> ([Name] -> RnM (thing, FreeVars))
-	      -> RnM (([LStmt Name], thing), FreeVars)	
+	-> ([Name] -> RnM (thing, FreeVars))
+	-> RnM (([LStmt Name], thing), FreeVars)	
 -- Variables bound by the Stmts, and mentioned in thing_inside,
 -- do not appear in the result FreeVars
---
--- Renaming a single RecStmt can give a sequence of smaller Stmts
 
 rnStmts ctxt [] thing_inside
-  = do { addErr (ptext (sLit "Empty") <+> pprStmtContext ctxt)
+  = do { checkEmptyStmts ctxt
        ; (thing, fvs) <- thing_inside []
        ; return (([], thing), fvs) }
 
 rnStmts MDoExpr stmts thing_inside    -- Deal with mdo
   = -- Behave like do { rec { ...all but last... }; last }
     do { ((stmts1, (stmts2, thing)), fvs) 
-    	   <- rnStmt MDoExpr (mkRecStmt all_but_last) $ \ bndrs ->
+    	   <- rnStmt MDoExpr (noLoc $ mkRecStmt all_but_last) $ \ _ ->
     	      do { checkStmt MDoExpr True last_stmt
     	         ; rnStmt MDoExpr last_stmt thing_inside }
 	; return (((stmts1 ++ stmts2), thing), fvs) }
   where
     Just (all_but_last, last_stmt) = snocView stmts
 
-rnStmts ctxt (stmt@(L loc _) : stmts) thing_inside
-  | null stmts
+rnStmts ctxt (lstmt@(L loc stmt) : lstmts) thing_inside
+  | null lstmts
   = setSrcSpan loc $
-    do { let last_stmt = case stmt of 
-                           ExprStmt e _ _ _ -> LastStmt e noSyntaxExpr
-       ; checkStmt ctxt True {- last stmt -} stmt
-       ; rnStmt ctxt stmt thing_inside }
+    do { -- Turn a final ExprStmt into a LastStmt
+         -- This is the first place it's convenient to do this
+	 -- (In principle the parser could do it, but it's 
+	 --  just not very convenient to do so.)
+         let stmt' | okEmpty ctxt 
+                   = lstmt
+                   | otherwise    
+                   = case stmt of 
+                       ExprStmt e _ _ _ -> L loc (mkLastStmt e)
+		       _                -> lstmt
+       ; checkStmt ctxt True {- last stmt -} stmt'
+       ; rnStmt ctxt stmt' thing_inside }
 
   | otherwise
   = do { ((stmts1, (stmts2, thing)), fvs) 
             <- setSrcSpan loc                         $
-               do { checkStmt ctxt False {- Not last -} stmt
-                  ; rnStmt ctxt stmt    $ \ bndrs1 ->
-                    rnStmts ctxt stmts  $ \ bndrs2 ->
+               do { checkStmt ctxt False {- Not last -} lstmt
+                  ; rnStmt ctxt lstmt    $ \ bndrs1 ->
+                    rnStmts ctxt lstmts  $ \ bndrs2 ->
                     thing_inside (bndrs1 ++ bndrs2) }
 	; return (((stmts1 ++ stmts2), thing), fvs) }
 
@@ -686,7 +687,7 @@ rnStmt :: HsStmtContext Name
 -- Variables bound by the Stmt, and mentioned in thing_inside,
 -- do not appear in the result FreeVars
 
-rnStmt ctxt (L loc (LastStmt expr _)) thing_inside
+rnStmt _ (L loc (LastStmt expr _)) thing_inside
   = do	{ (expr', fv_expr) <- rnLExpr expr
 	; (ret_op, fvs1)   <- lookupSyntaxName returnMName
 	; (thing, fvs3)    <- thing_inside []
@@ -704,8 +705,7 @@ rnStmt ctxt (L loc (ExprStmt expr _ _ _)) thing_inside
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }
 
 rnStmt ctxt (L loc (BindStmt pat expr _ _)) thing_inside
-  = do	{ checkBindStmt ctxt is_last
-        ; (expr', fv_expr) <- rnLExpr expr
+  = do	{ (expr', fv_expr) <- rnLExpr expr
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
@@ -716,13 +716,12 @@ rnStmt ctxt (L loc (BindStmt pat expr _ _)) thing_inside
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
 	-- but it does not matter because the names are unique
 
-rnStmt ctxt (L loc (LetStmt binds)) thing_inside 
-  = do	{ checkLetStmt ctxt binds
-	; rnLocalBindsAndThen binds $ \binds' -> do
+rnStmt _ (L loc (LetStmt binds)) thing_inside 
+  = do	{ rnLocalBindsAndThen binds $ \binds' -> do
 	{ (thing, fvs) <- thing_inside (collectLocalBinders binds')
         ; return (([L loc (LetStmt binds')], thing), fvs) }  }
 
-rnStmt ctxt (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
+rnStmt _ (L _ (RecStmt { recS_stmts = rec_stmts })) thing_inside
   = do	{ 
 	-- Step1: Bring all the binders of the mdo into scope
 	-- (Remember that this also removes the binders from the
@@ -803,17 +802,15 @@ rnStmt ctxt (L loc (TransformStmt stmts _ using by _ _)) thing_inside
        ; return (([L loc (TransformStmt stmts' used_bndrs using' by' return_op bind_op)], thing), 
                  fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
         
-rnStmt ctxt (L loc (GroupStmt stmts _ by using _ _ _)) thing_inside
+rnStmt ctxt (L loc (GroupStmt { grpS_stmts = stmts, grpS_by = by, grpS_explicit = explicit
+                              , grpS_using = using })) thing_inside
   = do { -- Rename the 'using' expression in the context before the transform is begun
-       ; (using', fvs1) <- case using of
-                             Left e  -> do { (e', fvs) <- rnLExpr e; return (Left e', fvs) }
-			     Right _
-                                | isMonadCompExpr ctxt ->
-                                  do { (e', fvs) <- lookupSyntaxName groupMName
-                                     ; return (Right e', fvs) }
-                                | otherwise ->
-                                  do { (e', fvs) <- lookupSyntaxName groupWithName
-                                     ; return (Right e', fvs) }
+         let implicit_name | isMonadCompExpr ctxt = groupMName
+       	     		   | otherwise            = groupWithName
+       ; (using', fvs1) <- if explicit 
+                           then rnLExpr using
+                           else do { (e,fvs) <- lookupSyntaxName implicit_name
+                                   ; return (noLoc e, fvs) }
 
          -- Rename the stmts and the 'by' expression
 	 -- Keep track of the variables mentioned in the 'by' expression
@@ -841,7 +838,10 @@ rnStmt ctxt (L loc (GroupStmt stmts _ by using _ _ _)) thing_inside
 	     -- See Note [GroupStmt binder map] in HsExpr
 
        ; traceRn (text "rnStmt: implicitly rebound these used binders:" <+> ppr bndr_map)
-       ; return (([L loc (GroupStmt stmts' bndr_map by' using' return_op bind_op fmap_op)], thing), all_fvs) }
+       ; return (([L loc (GroupStmt { grpS_stmts = stmts', grpS_bndrs = bndr_map
+                                    , grpS_by = by', grpS_using = using', grpS_explicit = explicit
+                                    , grpS_ret = return_op, grpS_bind = bind_op
+                                    , grpS_fmap = fmap_op })], thing), all_fvs) }
 
 type ParSeg id = ([LStmt id], [id])	   -- The Names are bound by the Stmts
 
@@ -958,9 +958,11 @@ rn_rec_stmt_lhs :: MiniFixityEnv
                    -- so we don't bother to compute it accurately in the other cases
                 -> RnM [(LStmtLR Name RdrName, FreeVars)]
 
-rn_rec_stmt_lhs _ (L loc (ExprStmt expr a b c)) = return [(L loc (ExprStmt expr a b c), 
-                                                         -- this is actually correct
-                                                         emptyFVs)]
+rn_rec_stmt_lhs _ (L loc (ExprStmt expr a b c)) 
+  = return [(L loc (ExprStmt expr a b c), emptyFVs)]
+
+rn_rec_stmt_lhs _ (L loc (LastStmt expr a)) 
+  = return [(L loc (LastStmt expr a), emptyFVs)]
 
 rn_rec_stmt_lhs fix_env (L loc (BindStmt pat expr a b)) 
   = do 
@@ -1014,6 +1016,12 @@ rn_rec_stmt :: [Name] -> LStmtLR Name RdrName -> FreeVars -> RnM [Segment (LStmt
 	-- Rename a Stmt that is inside a RecStmt (or mdo)
 	-- Assumes all binders are already in scope
 	-- Turns each stmt into a singleton Stmt
+rn_rec_stmt _ (L loc (LastStmt expr _)) _
+  = do	{ (expr', fv_expr) <- rnLExpr expr
+	; (ret_op, fvs1)   <- lookupSyntaxName returnMName
+	; return [(emptyNameSet, fv_expr `plusFV` fvs1, emptyNameSet,
+                   L loc (LastStmt expr' ret_op))] }
+
 rn_rec_stmt _ (L loc (ExprStmt expr _ _ _)) _
   = rnLExpr expr `thenM` \ (expr', fvs) ->
     lookupSyntaxName thenMName	`thenM` \ (then_op, fvs1) ->
@@ -1198,6 +1206,20 @@ program.
 %************************************************************************
 
 \begin{code}
+checkEmptyStmts :: HsStmtContext Name -> RnM ()
+-- We've seen an empty sequence of Stmts... is that ok?
+checkEmptyStmts ctxt 
+  = unless (okEmpty ctxt) (addErr (emptyErr ctxt))
+
+okEmpty :: HsStmtContext Name -> Bool
+okEmpty (PatGuard {}) = True
+okEmpty _             = False
+
+emptyErr :: HsStmtContext Name -> SDoc
+emptyErr (ParStmtCtxt {})       = ptext (sLit "Empty statement group in parallel comprehension")
+emptyErr (TransformStmtCtxt {}) = ptext (sLit "Empty statement group preceding 'group' or 'then'")
+emptyErr ctxt                   = ptext (sLit "Empty") <+> pprStmtContext ctxt
+
 ---------------------- 
 -- Checking when a particular Stmt is ok
 checkStmt :: HsStmtContext Name
@@ -1207,11 +1229,11 @@ checkStmt :: HsStmtContext Name
 checkStmt ctxt is_last (L _ stmt)
   = do { dflags <- getDOpts
        ; case okStmt dflags ctxt is_last stmt of 
-           Nothing   -> return ()
-           Just extr -> addErr (msg $$ extra) }
+           Nothing    -> return ()
+           Just extra -> addErr (msg $$ extra) }
   where
-   msg = ptext (sLit "Unexpected") <+> pprStmtCat stmt 
-         <+> ptext (sLit "statement in") <+> pprStmtContext ctxt
+   msg = sep [ ptext (sLit "Unexpected") <+> pprStmtCat stmt <+> ptext (sLit "statement")
+             , ptext (sLit "in") <+> pprAStmtContext ctxt ]
 
 pprStmtCat :: Stmt a -> SDoc
 pprStmtCat (TransformStmt {}) = ptext (sLit "transform")
@@ -1232,49 +1254,42 @@ okStmt, okDoStmt, okCompStmt :: DynFlags -> HsStmtContext Name -> Bool
                              -> Stmt RdrName -> Maybe SDoc
 -- Return Nothing if OK, (Just extra) if not ok
 -- The "extra" is an SDoc that is appended to an generic error message
-okStmt dflags GhciStmt is_last stmt 
+okStmt _ (PatGuard {}) _ stmt
   = case stmt of
       ExprStmt {} -> isOK
       BindStmt {} -> isOK
       LetStmt {}  -> isOK
       _           -> notOK
 
-okStmt dflags (PatGuard {}) is_last stmt
-  = case stmt of
-      ExprStmt {} -> isOK
-      BindStmt {} -> isOK
-      LetStmt {}  -> isOK
-      _           -> notOK
-
-okStmt dflags (ParStmtCtxt ctxt) is_last stmt
+okStmt dflags (ParStmtCtxt ctxt) _ stmt
   = case stmt of
       LetStmt (HsIPBinds {}) -> notOK
-      _                      -> okStmt dflags ctxt is_last stmt
+      _                      -> okStmt dflags ctxt False stmt
+      			        -- NB: is_last=False in recursive
+				-- call; the branches of of a Par
+				-- not finish with a LastStmt
 
-okStmt dflags (TransformStmtCtxt ctxt) is_last stmt 
-  = okStmt dflags ctxt is_last stmt
+okStmt dflags (TransformStmtCtxt ctxt) _ stmt 
+  = okStmt dflags ctxt False stmt
 
-okStmt ctxt is_last stmt 
-  | isDoExpr   ctxt = okDoStmt   ctxt is_last stmt
-  | isCompExpr ctxt = okCompStmt ctxt is_last stmt
-  | otherwise       = pprPanic "okStmt" (pprStmtContext ctxt)
+okStmt dflags ctxt is_last stmt 
+  | isDoExpr       ctxt = okDoStmt   dflags ctxt is_last stmt
+  | isListCompExpr ctxt = okCompStmt dflags ctxt is_last stmt
+  | otherwise           = pprPanic "okStmt" (pprStmtContext ctxt)
 
 ----------------
 okDoStmt dflags ctxt is_last stmt
   | is_last
   = case stmt of 
       LastStmt {} -> isOK
-      _ -> Just (ptext (sLit "The last statement in") <+> what <+> 
-                 ptext (sLIt "construct must be an expression"))
-        where
-          what = case ctxt of 
-                   DoExpr  -> ptext (sLit "a 'do'")
-                   MDoExpr -> ptext (sLit "an 'mdo'")
-		   _       -> panic "checkStmt"
+      _ -> Just (ptext (sLit "The last statement in") <+> pprAStmtContext ctxt
+                 <+> ptext (sLit "must be an expression"))
 
   | otherwise
   = case stmt of
-       RecStmt {}  -> isOK	-- Shouldn't we test a flag?
+       RecStmt {} 
+         | Opt_DoRec `xopt` dflags -> isOK
+         | otherwise -> Just (ptext (sLit "Use -XDoRec"))
        BindStmt {} -> isOK
        LetStmt {}  -> isOK
        ExprStmt {} -> isOK
@@ -1282,68 +1297,28 @@ okDoStmt dflags ctxt is_last stmt
 
 
 ----------------
-okCompStmt dflags ctxt is_last stmt
+okCompStmt dflags _ is_last stmt
   | is_last
   = case stmt of
       LastStmt {} -> Nothing
-      -> pprPanic "Unexpected stmt" (ppr stmt)	-- Not a user error
+      _ -> pprPanic "Unexpected stmt" (ppr stmt)  -- Not a user error
 
   | otherwise
   = case stmt of
        BindStmt {} -> isOK
        LetStmt {}  -> isOK
        ExprStmt {} -> isOK
-       RecStmt {}  -> notOK
        ParStmt {} 
-         | dopt dflags Opt_ParallelListComp -> isOK
+         | Opt_ParallelListComp `xopt` dflags -> isOK
          | otherwise -> Just (ptext (sLit "Use -XParallelListComp"))
        TransformStmt {} 
-         | dopt dflags Opt_transformListComp -> isOK
+         | Opt_TransformListComp `xopt` dflags -> isOK
          | otherwise -> Just (ptext (sLit "Use -XTransformListComp"))
        GroupStmt {} 
-         | dopt dflags Opt_transformListComp -> isOK
+         | Opt_TransformListComp `xopt` dflags -> isOK
          | otherwise -> Just (ptext (sLit "Use -XTransformListComp"))
-      
-
-checkStmt :: HsStmtContext Name -> Stmt RdrName -> Maybe SDoc
--- Non-last stmt
-
-checkStmt (ParStmtCtxt _) (HsIPBinds binds) 
-  = Just (badIpBinds (ptext (sLit "a parallel list comprehension:")) binds)
-  	-- We do not allow implicit-parameter bindings in a parallel
-	-- list comprehension.  I'm not sure what it might mean.
-
-checkStmt ctxt (RecStmt {})
-  | not (isDoExpr ctxt) 
-  = addErr (ptext (sLit "Illegal 'rec' stmt in") <+> pprStmtContext ctxt)
-
----------
-checkParStmt :: HsStmtContext Name -> RnM ()
-checkParStmt _
-  = do	{ monad_comp <- xoptM Opt_MonadComprehensions
-        ; unless monad_comp $ do
-          { parallel_list_comp <- xoptM Opt_ParallelListComp
-	  ; checkErr parallel_list_comp msg }
-        }
-  where
-    msg = ptext (sLit "Illegal parallel list comprehension: use -XParallelListComp or -XMonadComprehensions")
-
----------
-checkTransformStmt :: HsStmtContext Name -> RnM ()
-checkTransformStmt ListComp  -- Ensure we are really within a list comprehension because otherwise the
-			     -- desugarer will break when we come to operate on a parallel array
-  = do	{ transform_list_comp <- xoptM Opt_TransformListComp
-	; checkErr transform_list_comp msg }
-  where
-    msg = ptext (sLit "Illegal transform or grouping list comprehension: use -XTransformListComp or -XMonadComprehensions")
-checkTransformStmt MonadComp  -- Monad comprehensions are always fine, since the
-                              -- MonadComprehensions flag will already be turned on
-  = do  { return () }
-checkTransformStmt (ParStmtCtxt       ctxt) = checkTransformStmt ctxt	-- Ok to nest inside a parallel comprehension
-checkTransformStmt (TransformStmtCtxt ctxt) = checkTransformStmt ctxt	-- Ok to nest inside a parallel comprehension
-checkTransformStmt ctxt = addErr msg
-  where
-    msg = ptext (sLit "Illegal transform or grouping in") <+> pprStmtContext ctxt
+       LastStmt {} -> notOK
+       RecStmt {}  -> notOK
 
 ---------
 checkTupleSection :: [HsTupArg RdrName] -> RnM ()

@@ -522,12 +522,15 @@ cvtHsDo do_or_lc stmts
   | null stmts = failWith (ptext (sLit "Empty stmt list in do-block"))
   | otherwise
   = do	{ stmts' <- cvtStmts stmts
-	; body <- case last stmts' of
-		    L _ (ExprStmt body _ _ _) -> return body
-                    stmt' -> failWith (bad_last stmt')
-	; return $ HsDo do_or_lc (init stmts') body noSyntaxExpr void }
+        ; let Just (stmts'', last') = snocView stmts'
+        
+	; last'' <- case last' of
+		      L loc (ExprStmt body _ _ _) -> return (L loc (mkLastStmt body))
+                      _ -> failWith (bad_last last')
+
+	; return $ HsDo do_or_lc (stmts'' ++ [last'']) void }
   where
-    bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprStmtContext do_or_lc <> colon
+    bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprAStmtContext do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
 			 , ptext (sLit "(It should be an expression.)") ]
 		

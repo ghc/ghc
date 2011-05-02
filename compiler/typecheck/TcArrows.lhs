@@ -206,18 +206,17 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 	     ; return (GRHSs grhss' binds') }
 
     tc_grhs res_ty (GRHS guards body)
-	= do { (guards', rhs') <- tcStmts pg_ctxt tcGuardStmt guards res_ty $
+	= do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
 				  tcGuardedCmd env body stk'
 	     ; return (GRHS guards' rhs') }
 
 -------------------------------------------
 -- 		Do notation
 
-tc_cmd env cmd@(HsDo do_or_lc stmts body _ _ty) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsDo do_or_lc stmts _) (cmd_stk, res_ty)
   = do 	{ checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
-	; (stmts', body') <- tcStmts do_or_lc (tcMDoStmt tc_rhs) stmts res_ty $
-			     tcGuardedCmd env body []
-	; return (HsDo do_or_lc stmts' body' noSyntaxExpr res_ty) }
+	; stmts' <- tcStmts do_or_lc (tcMDoStmt tc_rhs) stmts res_ty 
+	; return (HsDo do_or_lc stmts' res_ty) }
   where
     tc_rhs rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
 		    ; rhs' <- tcCmd env rhs ([], ty)

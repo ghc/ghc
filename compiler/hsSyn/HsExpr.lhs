@@ -24,6 +24,7 @@ import BasicTypes
 import DataCon
 import SrcLoc
 import Util( dropTail )
+import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
 
@@ -836,17 +837,19 @@ data StmtLR idL idR
               -- Not used for GhciStmt, PatGuard, which scope over other stuff
                (LHsExpr idR)
                (SyntaxExpr idR)   -- The return operator, used only for MonadComp
+	       		   	  -- For ListComp, PArrComp, we use the baked-in 'return'
+				  -- For DoExpr, MDoExpr, we don't appply a 'return' at all
 	       		   	  -- See Note [Monad Comprehensions]
   | BindStmt (LPat idL)
              (LHsExpr idR)
-             (SyntaxExpr idR) -- The (>>=) operator
+             (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
              (SyntaxExpr idR) -- The fail operator
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
 
   | ExprStmt (LHsExpr idR)     -- See Note [ExprStmt]
              (SyntaxExpr idR) -- The (>>) operator
-             (SyntaxExpr idR) -- The `guard` operator
+             (SyntaxExpr idR) -- The `guard` operator; used only in MonadComp
                               -- See notes [Monad Comprehensions]
              PostTcType       -- Element type of the RHS (used for arrows)
 
@@ -859,16 +862,15 @@ data StmtLR idL idR
              (SyntaxExpr idR)           -- Polymorphic `return` operator
 	     		 		-- with type (forall a. a -> m a)
                                         -- See notes [Monad Comprehensions]
-
-  -- After renaming, the ids are the binders bound by the stmts and used
-  -- after them
+  	    -- After renaming, the ids are the binders 
+  	    -- bound by the stmts and used after them
 
   -- "qs, then f by e" ==> TransformStmt qs binders f (Just e) (return) (>>=)
   -- "qs, then f"      ==> TransformStmt qs binders f Nothing  (return) (>>=)
   | TransformStmt 
          [LStmt idL]	-- Stmts are the ones to the left of the 'then'
 
-         [idR] 		-- After renaming, the IDs are the binders occurring 
+         [idR] 		-- After renaming, the Ids are the binders occurring 
 		        -- within this transform statement that are used after it
 
          (LHsExpr idR)		-- "then f"
@@ -880,25 +882,30 @@ data StmtLR idL idR
          (SyntaxExpr idR)       -- The '(>>=)' operator.
                                 -- See Note [Monad Comprehensions]
 
-  | GroupStmt 
-         [LStmt idL]      -- Stmts to the *left* of the 'group'
-	 	       	  -- which generates the tuples to be grouped
+  | GroupStmt {
+      grpS_stmts :: [LStmt idL],      -- Stmts to the *left* of the 'group'
+	            	              -- which generates the tuples to be grouped
 
-         [(idR, idR)]	  -- See Note [GroupStmt binder map]
+      grpS_bndrs :: [(idR, idR)],     -- See Note [GroupStmt binder map]
 				
-         (Maybe (LHsExpr idR)) 	-- "by e" (optional)
+      grpS_by :: Maybe (LHsExpr idR), 	-- "by e" (optional)
 
-         (Either		-- "using f"
-             (LHsExpr idR)	--   Left f  => explicit "using f"
-             (SyntaxExpr idR))	--   Right f => implicit; filled in with 'groupWith'
-                                --     (list comprehensions) or 'groupM' (monad
-                                --     comprehensions)
+      grpS_using :: LHsExpr idR,
+      grpS_explicit :: Bool,	-- True  <=> explicit "using f"
+      		       		-- False <=> implicit; grpS_using is filled in with 
+                                --     'groupWith' (list comprehensions) or 
+				--     'groupM' (monad comprehensions)
 
-         (SyntaxExpr idR)       -- The 'return' function for inner monad
-                                -- comprehensions
-         (SyntaxExpr idR)       -- The '(>>=)' operator
-         (SyntaxExpr idR)       -- The 'liftM' function from Control.Monad for desugaring
-                                -- See Note [Monad Comprehensions]
+	-- Invariant: if grpS_explicit = False, then grp_by = Just e
+	-- That is, we can have    group by e
+	-- 	       	   	   group using f
+	--			   group by e using f
+
+      grpS_ret :: SyntaxExpr idR,      -- The 'return' function for inner monad
+                                       -- comprehensions
+      grpS_bind :: SyntaxExpr idR,     -- The '(>>=)' operator
+      grpS_fmap :: SyntaxExpr idR      -- The polymorphic 'fmap' function for desugaring
+    }                                  -- See Note [Monad Comprehensions]
 
   -- Recursive statement (see Note [How RecStmt works] below)
   | RecStmt
@@ -937,6 +944,17 @@ data StmtLR idL idR
   deriving (Data, Typeable)
 \end{code}
 
+Note [The type of bind in Stmts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some Stmts, notably BindStmt, keep the (>>=) bind operator.  
+We do NOT assume that it has type  
+    (>>=) :: m a -> (a -> m b) -> m b
+In some cases (see Trac #303, #1537) it might have a more 
+exotic type, such as
+    (>>=) :: m i j a -> (a -> m j k b) -> m i k b
+So we must be careful not to make assumptions about the type.
+In particular, the monad may not be uniform throughout.
+
 Note [GroupStmt binder map]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The [(idR,idR)] in a GroupStmt behaves as follows:
@@ -946,7 +964,7 @@ The [(idR,idR)] in a GroupStmt behaves as follows:
   * After renaming: 
     	  [ (x27,x27), ..., (z35,z35) ]
     These are the variables 
-        bound by the stmts to the left of the 'group'
+       bound by the stmts to the left of the 'group'
        and used either in the 'by' clause, 
                 or     in the stmts following the 'group'
     Each item is a pair of identical variables.
@@ -986,7 +1004,7 @@ depends on the context.  Consider the following contexts:
                 E :: Bool
           Translation: guard E >> ...
 
-Array comprehensions are handled like list comprehensions -=chak
+Array comprehensions are handled like list comprehensions.
 
 Note [How RecStmt works]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1045,7 +1063,7 @@ In transform and grouping statements ('then ..' and 'then group ..') the
    =>
   f [ env | stmts ] >>= \bndrs -> [ body | rest ]
 
-Normal expressions require the 'Control.Monad.guard' function for boolean
+ExprStmts require the 'Control.Monad.guard' function for boolean
 expressions:
 
   [ body | exp, stmts ]
@@ -1082,8 +1100,8 @@ pprStmt (ParStmt stmtss _ _ _)    = hsep (map doStmts stmtss)
 pprStmt (TransformStmt stmts bndrs using by _ _)
   = sep (ppr_lc_stmts stmts ++ [pprTransformStmt bndrs using by])
 
-pprStmt (GroupStmt stmts _ by using _ _ _) 
-  = sep (ppr_lc_stmts stmts ++ [pprGroupStmt by using])
+pprStmt (GroupStmt { grpS_stmts = stmts, grpS_by = by, grpS_using = using, grpS_explicit = explicit })
+  = sep (ppr_lc_stmts stmts ++ [pprGroupStmt by using explicit])
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
@@ -1099,13 +1117,13 @@ pprTransformStmt bndrs using by
         , nest 2 (pprBy by)]
 
 pprGroupStmt :: OutputableBndr id => Maybe (LHsExpr id)
-                                  -> Either (LHsExpr id) (SyntaxExpr is)
+                                  -> LHsExpr id -> Bool
 				  -> SDoc
-pprGroupStmt by using 
-  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 (ppr_using using)]
+pprGroupStmt by using explicit
+  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 pp_using ]
   where
-    ppr_using (Right _) = empty
-    ppr_using (Left e)  = ptext (sLit "using") <+> ppr e
+    pp_using | explicit  = ptext (sLit "using") <+> ppr using
+             | otherwise = empty
 
 pprBy :: OutputableBndr id => Maybe (LHsExpr id) -> SDoc
 pprBy Nothing  = empty
@@ -1124,7 +1142,7 @@ ppr_do_stmts :: OutputableBndr id => [LStmt id] -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
 ppr_do_stmts stmts 
-  = lbrace <+> pprDeeperList vcat ([ppr s <> semi | s <- stmts])
+  = lbrace <+> pprDeeperList vcat (punctuate semi (map ppr stmts))
            <+> rbrace
 
 ppr_lc_stmts :: OutputableBndr id => [LStmt id] -> [SDoc]
@@ -1269,9 +1287,10 @@ data HsStmtContext id
 
 \begin{code}
 isDoExpr :: HsStmtContext id -> Bool
-isDoExpr DoExpr  = True
-isDoExpr MDoExpr = True
-isDoExpr _       = False
+isDoExpr DoExpr   = True
+isDoExpr MDoExpr  = True
+isDoExpr GhciStmt = True
+isDoExpr _        = False
 
 isListCompExpr :: HsStmtContext id -> Bool
 isListCompExpr ListComp  = True
@@ -1320,34 +1339,40 @@ pprMatchContextNoun ProcExpr        = ptext (sLit "arrow abstraction")
 pprMatchContextNoun (StmtCtxt ctxt) = ptext (sLit "pattern binding in")
                                       $$ pprStmtContext ctxt
 
-pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
+-----------------
+pprAStmtContext, pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
+pprAStmtContext ctxt = article <+> pprStmtContext ctxt
+  where
+    pp_an = ptext (sLit "an")
+    pp_a  = ptext (sLit "a")
+    article = case ctxt of
+                  MDoExpr  -> pp_an
+                  PArrComp -> pp_an
+		  GhciStmt -> pp_an
+                  _        -> pp_a
+
+
+-----------------
+pprStmtContext GhciStmt        = ptext (sLit "interactive GHCi command")
+pprStmtContext DoExpr          = ptext (sLit "'do' expression")
+pprStmtContext MDoExpr         = ptext (sLit "'mdo' expression")
+pprStmtContext ListComp        = ptext (sLit "list comprehension")
+pprStmtContext MonadComp       = ptext (sLit "monad comprehension")
+pprStmtContext PArrComp        = ptext (sLit "array comprehension")
+pprStmtContext (PatGuard ctxt) = ptext (sLit "pattern guard for") $$ pprMatchContext ctxt
+
+-- Drop the inner contexts when reporting errors, else we get
+--     Unexpected transform statement
+--     in a transformed branch of
+--          transformed branch of
+--          transformed branch of monad comprehension
 pprStmtContext (ParStmtCtxt c)
- = sep [ptext (sLit "a parallel branch of"), pprStmtContext c]
+ | opt_PprStyle_Debug = sep [ptext (sLit "parallel branch of"), pprAStmtContext c]
+ | otherwise          = pprStmtContext c
 pprStmtContext (TransformStmtCtxt c)
- = sep [ptext (sLit "a transformed branch of"), pprStmtContext c]
-pprStmtContext (PatGuard ctxt)
- = ptext (sLit "a pattern guard for") $$ pprMatchContext ctxt
-pprStmtContext GhciStmt        = ptext (sLit "an interactive GHCi command")
-pprStmtContext DoExpr          = ptext (sLit "a 'do' expression")
-pprStmtContext MDoExpr         = ptext (sLit "an 'mdo' expression")
-pprStmtContext ListComp        = ptext (sLit "a list comprehension")
-pprStmtContext MonadComp       = ptext (sLit "a monad comprehension")
-pprStmtContext PArrComp        = ptext (sLit "an array comprehension")
+ | opt_PprStyle_Debug = sep [ptext (sLit "transformed branch of"), pprAStmtContext c]
+ | otherwise          = pprStmtContext c
 
-{-
-pprMatchRhsContext (FunRhs fun) = ptext (sLit "a right-hand side of function") <+> quotes (ppr fun)
-pprMatchRhsContext CaseAlt      = ptext (sLit "the body of a case alternative")
-pprMatchRhsContext PatBindRhs   = ptext (sLit "the right-hand side of a pattern binding")
-pprMatchRhsContext LambdaExpr   = ptext (sLit "the body of a lambda")
-pprMatchRhsContext ProcExpr     = ptext (sLit "the body of a proc")
-pprMatchRhsContext other        = panic "pprMatchRhsContext"    -- RecUpd, StmtCtxt
-
--- Used for the result statement of comprehension
--- e.g. the 'e' in      [ e | ... ]
---      or the 'r' in   f x = r
-pprStmtResultContext (PatGuard ctxt) = pprMatchRhsContext ctxt
-pprStmtResultContext other           = ptext (sLit "the result of") <+> pprStmtContext other
--}
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: Outputable id => HsMatchContext id -> SDoc
@@ -1377,11 +1402,12 @@ pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <>
 
 pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR)
    	       => HsStmtContext idL -> StmtLR idL idR -> SDoc
-pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
+pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprAStmtContext ctxt <> colon)
 		    	  4 (ppr_stmt stmt)
   where
     -- For Group and Transform Stmts, don't print the nested stmts!
-    ppr_stmt (GroupStmt _ _ by using _ _ _)       = pprGroupStmt by using
+    ppr_stmt (GroupStmt { grpS_by = by, grpS_using = using
+                        , grpS_explicit = explicit }) = pprGroupStmt by using explicit
     ppr_stmt (TransformStmt _ bndrs using by _ _) = pprTransformStmt bndrs using by
     ppr_stmt stmt                                 = pprStmt stmt
 \end{code}

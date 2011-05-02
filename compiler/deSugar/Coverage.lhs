@@ -463,14 +463,18 @@ addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr returnExpr bi
     t_b <- (addTickSyntaxExpr hpcSrcSpan bindExpr)
     return $ TransformStmt t_s ids t_u t_m t_r t_b
 
-addTickStmt isGuard (GroupStmt stmts binderMap by using returnExpr bindExpr liftMExpr) = do
-    t_s <- (addTickLStmts isGuard stmts)
-    t_y <- (fmapMaybeM  addTickLHsExprAlways by)
-    t_u <- (fmapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) using)
-    t_f <- (addTickSyntaxExpr hpcSrcSpan returnExpr)
-    t_b <- (addTickSyntaxExpr hpcSrcSpan bindExpr)
-    t_m <- (addTickSyntaxExpr hpcSrcSpan liftMExpr)
-    return $ GroupStmt t_s binderMap t_y t_u t_b t_f t_m
+addTickStmt isGuard stmt@(GroupStmt { grpS_stmts = stmts
+                                    , grpS_by = by, grpS_using = using
+                                    , grpS_ret = returnExpr, grpS_bind = bindExpr
+                                    , grpS_fmap = liftMExpr }) = do
+    t_s <- addTickLStmts isGuard stmts
+    t_y <- fmapMaybeM  addTickLHsExprAlways by
+    t_u <- addTickLHsExprAlways using
+    t_f <- addTickSyntaxExpr hpcSrcSpan returnExpr
+    t_b <- addTickSyntaxExpr hpcSrcSpan bindExpr
+    t_m <- addTickSyntaxExpr hpcSrcSpan liftMExpr
+    return $ stmt { grpS_stmts = t_s, grpS_by = t_y, grpS_using = t_u
+                  , grpS_ret = t_f, grpS_bind = t_b, grpS_fmap = t_m }
 
 addTickStmt isGuard stmt@(RecStmt {})
   = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
