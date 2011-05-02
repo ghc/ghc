@@ -245,32 +245,38 @@ instance  Integral Int  where
 
     a `quot` b
      | b == 0                     = divZeroError
-     | a == minBound && b == (-1) = overflowError
+     | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
+                                                  -- in GHC.Int
      | otherwise                  =  a `quotInt` b
 
     a `rem` b
      | b == 0                     = divZeroError
-     | a == minBound && b == (-1) = overflowError
+     | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
+                                                  -- in GHC.Int
      | otherwise                  =  a `remInt` b
 
     a `div` b
      | b == 0                     = divZeroError
-     | a == minBound && b == (-1) = overflowError
+     | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
+                                                  -- in GHC.Int
      | otherwise                  =  a `divInt` b
 
     a `mod` b
      | b == 0                     = divZeroError
-     | a == minBound && b == (-1) = overflowError
+     | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
+                                                  -- in GHC.Int
      | otherwise                  =  a `modInt` b
 
     a `quotRem` b
      | b == 0                     = divZeroError
-     | a == minBound && b == (-1) = overflowError
+     | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
+                                                  -- in GHC.Int
      | otherwise                  =  a `quotRemInt` b
 
     a `divMod` b
      | b == 0                     = divZeroError
-     | a == minBound && b == (-1) = overflowError
+     | b == (-1) && a == minBound = overflowError -- Note [Order of tests]
+                                                  -- in GHC.Int
      | otherwise                  =  a `divModInt` b
 \end{code}
 

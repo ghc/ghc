@@ -8,6 +8,7 @@ module GHC.Event
 
       -- * Creation
     , new
+    , getSystemEventManager
 
       -- * Running
     , loop
@@ -37,3 +38,4 @@ module GHC.Event
     ) where
 
 import GHC.Event.Manager
+import GHC.Event.Thread (getSystemEventManager)
