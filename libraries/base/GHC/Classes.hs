@@ -27,6 +27,9 @@ import GHC.Prim
 import GHC.Tuple
 import GHC.Types
 import GHC.Unit
+-- For defining instances for the generic deriving mechanism
+import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
+
 
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
@@ -105,6 +108,16 @@ instance Eq Float where
 
 instance Eq Double where
     (D# x) == (D# y) = x ==## y
+
+instance Eq Int where
+    (==) = eqInt
+    (/=) = neInt
+
+{-# INLINE eqInt #-}
+{-# INLINE neInt #-}
+eqInt, neInt :: Int -> Int -> Bool
+(I# x) `eqInt` (I# y) = x ==# y
+(I# x) `neInt` (I# y) = x /=# y
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
@@ -223,6 +236,32 @@ instance Ord Double where
     (D# x) >= (D# y) = x >=## y
     (D# x) >  (D# y) = x >##  y
 
+instance Ord Int where
+    compare = compareInt
+    (<)     = ltInt
+    (<=)    = leInt
+    (>=)    = geInt
+    (>)     = gtInt
+
+{-# INLINE gtInt #-}
+{-# INLINE geInt #-}
+{-# INLINE ltInt #-}
+{-# INLINE leInt #-}
+gtInt, geInt, ltInt, leInt :: Int -> Int -> Bool
+(I# x) `gtInt` (I# y) = x >#  y
+(I# x) `geInt` (I# y) = x >=# y
+(I# x) `ltInt` (I# y) = x <#  y
+(I# x) `leInt` (I# y) = x <=# y
+
+compareInt :: Int -> Int -> Ordering
+(I# x#) `compareInt` (I# y#) = compareInt# x# y#
+
+compareInt# :: Int# -> Int# -> Ordering
+compareInt# x# y#
+    | x# <#  y# = LT
+    | x# ==# y# = EQ
+    | True      = GT
+
 -- OK, so they're technically not part of a class...:
 
 -- Boolean functions
@@ -242,3 +281,17 @@ not                     :: Bool -> Bool
 not True                =  False
 not False               =  True
 
+
+------------------------------------------------------------------------
+-- Generic deriving
+------------------------------------------------------------------------
+
+-- We need instances for some basic datatypes, but some of those use Int,
+-- so we have to put the instances here
+deriving instance Eq Arity
+deriving instance Eq Associativity
+deriving instance Eq Fixity
+
+deriving instance Ord Arity
+deriving instance Ord Associativity
+deriving instance Ord Fixity

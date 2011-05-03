@@ -42,8 +42,7 @@ import GHC.Err
 import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
 import GHC.Float ()     -- for RealFrac methods
--- For defining instances for the new generic deriving mechanism
---import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
+
 
 ------------------------------------------------------------------------
 -- type Int8
@@ -911,29 +910,6 @@ instance Ix Int64 where
     unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
     inRange (m,n) i     = m <= i && i <= n
 
-------------------------------------------------------------------------
--- Generic deriving
-------------------------------------------------------------------------
-
--- We need instances for some basic datatypes, but some of those use Int,
--- so we have to put the instances here
-{-
-deriving instance Eq Arity
-deriving instance Eq Associativity
-deriving instance Eq Fixity
-
-deriving instance Ord Arity
-deriving instance Ord Associativity
-deriving instance Ord Fixity
-
-deriving instance Read Arity
-deriving instance Read Associativity
-deriving instance Read Fixity
-
-deriving instance Show Arity
-deriving instance Show Associativity
-deriving instance Show Fixity
--}
 
 {-
 Note [Order of tests]

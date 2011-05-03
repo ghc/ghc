@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash, StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -38,6 +38,8 @@ module GHC.Show
 import GHC.Base
 import Data.Maybe
 import GHC.List ((!!), foldr1, break)
+-- For defining instances for the generic deriving mechanism
+import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 \end{code}
 
 
@@ -429,3 +431,10 @@ itos n# cs
                       itos' (x# `quotInt#` 10#) (C# c# : cs') }
 \end{code}
 
+Instances for types of the generic deriving mechanism.
+
+\begin{code}
+deriving instance Show Arity
+deriving instance Show Associativity
+deriving instance Show Fixity
+\end{code}

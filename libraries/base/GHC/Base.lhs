@@ -502,26 +502,6 @@ maxInt  = I# 0x7FFFFFFF#
 minInt  = I# (-0x8000000000000000#)
 maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 #endif
-
-instance Eq Int where
-    (==) = eqInt
-    (/=) = neInt
-
-instance Ord Int where
-    compare = compareInt
-    (<)     = ltInt
-    (<=)    = leInt
-    (>=)    = geInt
-    (>)     = gtInt
-
-compareInt :: Int -> Int -> Ordering
-(I# x#) `compareInt` (I# y#) = compareInt# x# y#
-
-compareInt# :: Int# -> Int# -> Ordering
-compareInt# x# y#
-    | x# <#  y# = LT
-    | x# ==# y# = EQ
-    | otherwise = GT
 \end{code}
 
 
@@ -703,12 +683,6 @@ Definitions of the boxed PrimOps; these will be
 used in the case of partial applications, etc.
 
 \begin{code}
-{-# INLINE eqInt #-}
-{-# INLINE neInt #-}
-{-# INLINE gtInt #-}
-{-# INLINE geInt #-}
-{-# INLINE ltInt #-}
-{-# INLINE leInt #-}
 {-# INLINE plusInt #-}
 {-# INLINE minusInt #-}
 {-# INLINE timesInt #-}
@@ -738,14 +712,6 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt :: Int -> Int -> In
 
 negateInt :: Int -> Int
 negateInt (I# x) = I# (negateInt# x)
-
-gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
-(I# x) `gtInt` (I# y) = x >#  y
-(I# x) `geInt` (I# y) = x >=# y
-(I# x) `eqInt` (I# y) = x ==# y
-(I# x) `neInt` (I# y) = x /=# y
-(I# x) `ltInt` (I# y) = x <#  y
-(I# x) `leInt` (I# y) = x <=# y
 
 {-# RULES
 "x# ># x#"  forall x#. x# >#  x# = False

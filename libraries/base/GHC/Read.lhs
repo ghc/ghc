@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -72,6 +72,8 @@ import GHC.Float ()
 import GHC.Show
 import GHC.Base
 import GHC.Arr
+-- For defining instances for the generic deriving mechanism
+import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 \end{code}
 
 
@@ -680,3 +682,10 @@ readp :: Read a => ReadP a
 readp = readPrec_to_P readPrec minPrec
 \end{code}
 
+Instances for types of the generic deriving mechanism.
+
+\begin{code}
+deriving instance Read Arity
+deriving instance Read Associativity
+deriving instance Read Fixity
+\end{code}
