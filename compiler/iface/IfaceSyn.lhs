@@ -604,11 +604,11 @@ pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
 
-pprIfaceExpr add_par e@(IfaceLam _ _)
+pprIfaceExpr add_par i@(IfaceLam _ _)
   = add_par (sep [char '\\' <+> sep (map ppr bndrs) <+> arrow,
                   pprIfaceExpr noParens body])
   where
-    (bndrs,body) = collect [] e
+    (bndrs,body) = collect [] i
     collect bs (IfaceLam b e) = collect (b:bs) e
     collect bs e              = (reverse bs, e)
 
@@ -855,10 +855,10 @@ freeNamesIfExpr (IfaceCase s _ ty alts)
 
     -- Depend on the data constructors.  Just one will do!
     -- Note [Tracking data constructors]
-    fn_cons []                              = emptyNameSet
-    fn_cons ((IfaceDefault    ,_,_) : alts) = fn_cons alts
-    fn_cons ((IfaceDataAlt con,_,_) : _   ) = unitNameSet con
-    fn_cons (_                      : _   ) = emptyNameSet
+    fn_cons []                            = emptyNameSet
+    fn_cons ((IfaceDefault    ,_,_) : xs) = fn_cons xs
+    fn_cons ((IfaceDataAlt con,_,_) : _ ) = unitNameSet con
+    fn_cons (_                      : _ ) = emptyNameSet
 
 freeNamesIfExpr (IfaceLet (IfaceNonRec bndr rhs) body)
   = freeNamesIfLetBndr bndr &&& freeNamesIfExpr rhs &&& freeNamesIfExpr body
