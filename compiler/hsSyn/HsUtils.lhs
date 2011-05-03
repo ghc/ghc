@@ -43,7 +43,7 @@ module HsUtils(
 
   -- Stmts
   mkTransformStmt, mkTransformByStmt, mkExprStmt, mkBindStmt, mkLastStmt,
-  emptyGroupStmt, mkGroupUsingStmt, mkGroupByStmt, mkGroupByUsingStmt, 
+  emptyTransStmt, mkGroupUsingStmt, mkGroupByStmt, mkGroupByUsingStmt, 
   emptyRecStmt, mkRecStmt, 
 
   -- Template Haskell
@@ -196,9 +196,6 @@ mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
 mkNPat      :: HsOverLit id -> Maybe (SyntaxExpr id) -> Pat id
 mkNPlusKPat :: Located id -> HsOverLit id -> Pat id
 
-mkTransformStmt   :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
-mkTransformByStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
-
 mkLastStmt :: LHsExpr idR -> StmtLR idL idR
 mkExprStmt :: LHsExpr idR -> StmtLR idL idR
 mkBindStmt :: LPat idL -> LHsExpr idR -> StmtLR idL idR
@@ -225,22 +222,23 @@ mkHsIf c a b = HsIf (Just noSyntaxExpr) c a b
 mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
-mkTransformStmt   stmts usingExpr        = TransformStmt stmts [] usingExpr Nothing       noSyntaxExpr noSyntaxExpr
-mkTransformByStmt stmts usingExpr byExpr = TransformStmt stmts [] usingExpr (Just byExpr) noSyntaxExpr noSyntaxExpr
-
+mkTransformStmt   :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
+mkTransformByStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL idR
 mkGroupByStmt      :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
 mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
 
-emptyGroupStmt :: StmtLR idL idR
-emptyGroupStmt = GroupStmt { grpS_stmts = [], grpS_bndrs = [], grpS_explicit = False
-                           , grpS_by = Nothing, grpS_using = noLoc noSyntaxExpr
-                           , grpS_ret = noSyntaxExpr, grpS_bind = noSyntaxExpr
-                           , grpS_fmap = noSyntaxExpr }
-mkGroupUsingStmt   ss u   = emptyGroupStmt { grpS_stmts = ss, grpS_explicit = True, grpS_using = u }
-mkGroupByStmt      ss b   = emptyGroupStmt { grpS_stmts = ss, grpS_by = Just b }
-mkGroupByUsingStmt ss b u = emptyGroupStmt { grpS_stmts = ss, grpS_by = Just b
-                                           , grpS_explicit = True, grpS_using = u }
+emptyTransStmt :: StmtLR idL idR
+emptyTransStmt = TransStmt { trS_form = undefined, trS_stmts = [], trS_bndrs = [] 
+                           , trS_by = Nothing, trS_using = noLoc noSyntaxExpr
+                           , trS_ret = noSyntaxExpr, trS_bind = noSyntaxExpr
+                           , trS_fmap = noSyntaxExpr }
+mkTransformStmt   ss u    = emptyTransStmt { trS_form = ThenForm, trS_stmts = ss, trS_using = u }
+mkTransformByStmt ss u b  = emptyTransStmt { trS_form = ThenForm, trS_stmts = ss, trS_using = u, trS_by = Just b }
+mkGroupByStmt      ss b   = emptyTransStmt { trS_form = GroupFormB, trS_stmts = ss, trS_by = Just b }
+mkGroupUsingStmt   ss u   = emptyTransStmt { trS_form = GroupFormU, trS_stmts = ss, trS_using = u }
+mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupFormU, trS_stmts = ss
+                                           , trS_by = Just b, trS_using = u }
 
 mkLastStmt expr	    = LastStmt expr noSyntaxExpr
 mkExprStmt expr	    = ExprStmt expr noSyntaxExpr noSyntaxExpr placeHolderType
@@ -512,9 +510,8 @@ collectStmtBinders (ExprStmt {})        = []
 collectStmtBinders (LastStmt {})        = []
 collectStmtBinders (ParStmt xs _ _ _)   = collectLStmtsBinders
                                         $ concatMap fst xs
-collectStmtBinders (TransformStmt stmts _ _ _ _ _)    = collectLStmtsBinders stmts
-collectStmtBinders (GroupStmt { grpS_stmts = stmts }) = collectLStmtsBinders stmts
-collectStmtBinders (RecStmt { recS_stmts = ss })      = collectLStmtsBinders ss
+collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
+collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
 
 
 ----------------- Patterns --------------------------
@@ -659,9 +656,8 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (LastStmt {})        = emptyNameSet
     hs_stmt (ParStmt xs _ _ _)   = hs_lstmts $ concatMap fst xs
     
-    hs_stmt (TransformStmt stmts _ _ _ _ _)    = hs_lstmts stmts
-    hs_stmt (GroupStmt { grpS_stmts = stmts }) = hs_lstmts stmts
-    hs_stmt (RecStmt { recS_stmts = ss })      = hs_lstmts ss
+    hs_stmt (TransStmt { trS_stmts = stmts }) = hs_lstmts stmts
+    hs_stmt (RecStmt { recS_stmts = ss })     = hs_lstmts ss
     
     hs_local_binds (HsValBinds val_binds) = hsValBindsImplicits val_binds
     hs_local_binds (HsIPBinds _)         = emptyNameSet

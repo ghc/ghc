@@ -864,48 +864,24 @@ data StmtLR idL idR
 	     		 		-- with type (forall a. a -> m a)
                                         -- See notes [Monad Comprehensions]
   	    -- After renaming, the ids are the binders 
-  	    -- bound by the stmts and used after them
+  	    -- bound by the stmts and used after themp
 
-  -- "qs, then f by e" ==> TransformStmt qs binders f (Just e) (return) (>>=)
-  -- "qs, then f"      ==> TransformStmt qs binders f Nothing  (return) (>>=)
-  | TransformStmt 
-         [LStmt idL]	-- Stmts are the ones to the left of the 'then'
-
-         [idR] 		-- After renaming, the Ids are the binders occurring 
-		        -- within this transform statement that are used after it
-
-         (LHsExpr idR)		-- "then f"
-
-         (Maybe (LHsExpr idR))	-- "by e" (optional)
-
-         (SyntaxExpr idR)       -- The 'return' function for inner monad
-                                -- comprehensions
-         (SyntaxExpr idR)       -- The '(>>=)' operator.
-                                -- See Note [Monad Comprehensions]
-
-  | GroupStmt {
-      grpS_stmts :: [LStmt idL],      -- Stmts to the *left* of the 'group'
+  | TransStmt {
+      trS_form  :: TransForm,
+      trS_stmts :: [LStmt idL],      -- Stmts to the *left* of the 'group'
 	            	              -- which generates the tuples to be grouped
 
-      grpS_bndrs :: [(idR, idR)],     -- See Note [GroupStmt binder map]
+      trS_bndrs :: [(idR, idR)],     -- See Note [TransStmt binder map]
 				
-      grpS_by :: Maybe (LHsExpr idR), 	-- "by e" (optional)
+      trS_using :: LHsExpr idR,
+      trS_by :: Maybe (LHsExpr idR), 	-- "by e" (optional)
+	-- Invariant: if trS_form = GroupBy, then grp_by = Just e
 
-      grpS_using :: LHsExpr idR,
-      grpS_explicit :: Bool,	-- True  <=> explicit "using f"
-      		       		-- False <=> implicit; grpS_using is filled in with 
-                                --     'groupWith' (list comprehensions) or 
-				--     'groupM' (monad comprehensions)
-
-	-- Invariant: if grpS_explicit = False, then grp_by = Just e
-	-- That is, we can have    group by e
-	-- 	       	   	   group using f
-	--			   group by e using f
-
-      grpS_ret :: SyntaxExpr idR,      -- The 'return' function for inner monad
-                                       -- comprehensions
-      grpS_bind :: SyntaxExpr idR,     -- The '(>>=)' operator
-      grpS_fmap :: SyntaxExpr idR      -- The polymorphic 'fmap' function for desugaring
+      trS_ret :: SyntaxExpr idR,      -- The monomorphic 'return' function for 
+                                       -- the inner monad comprehensions
+      trS_bind :: SyntaxExpr idR,     -- The '(>>=)' operator
+      trS_fmap :: SyntaxExpr idR      -- The polymorphic 'fmap' function for desugaring
+      		   	      	       -- Only for 'group' forms
     }                                  -- See Note [Monad Comprehensions]
 
   -- Recursive statement (see Note [How RecStmt works] below)
@@ -943,6 +919,15 @@ data StmtLR idL idR
 				     -- be quite as simple as (m (tya, tyb, tyc)).
       }
   deriving (Data, Typeable)
+
+data TransForm		-- The 'f' below is the 'using' function, 'e' is the by function
+  = ThenForm		-- then f          or    then f by e
+  | GroupFormU		-- group using f   or    group using f by e
+  | GroupFormB    	-- group by e  
+      -- In the GroupByFormB, trS_using is filled in with
+      --    'groupWith' (list comprehensions) or 
+      --    'groupM' (monad comprehensions)
+  deriving (Data, Typeable)
 \end{code}
 
 Note [The type of bind in Stmts]
@@ -956,9 +941,9 @@ exotic type, such as
 So we must be careful not to make assumptions about the type.
 In particular, the monad may not be uniform throughout.
 
-Note [GroupStmt binder map]
+Note [TransStmt binder map]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The [(idR,idR)] in a GroupStmt behaves as follows:
+The [(idR,idR)] in a TransStmt behaves as follows:
 
   * Before renaming: []
 
@@ -1098,11 +1083,8 @@ pprStmt (ExprStmt expr _ _ _)     = ppr expr
 pprStmt (ParStmt stmtss _ _ _)    = hsep (map doStmts stmtss)
   where doStmts stmts = ptext (sLit "| ") <> ppr stmts
 
-pprStmt (TransformStmt stmts bndrs using by _ _)
-  = sep (ppr_lc_stmts stmts ++ [pprTransformStmt bndrs using by])
-
-pprStmt (GroupStmt { grpS_stmts = stmts, grpS_by = by, grpS_using = using, grpS_explicit = explicit })
-  = sep (ppr_lc_stmts stmts ++ [pprGroupStmt by using explicit])
+pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form = form })
+  = sep (ppr_lc_stmts stmts ++ [pprTransStmt by using form])
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
@@ -1117,14 +1099,15 @@ pprTransformStmt bndrs using by
         , nest 2 (ppr using)
         , nest 2 (pprBy by)]
 
-pprGroupStmt :: OutputableBndr id => Maybe (LHsExpr id)
-                                  -> LHsExpr id -> Bool
+pprTransStmt :: OutputableBndr id => Maybe (LHsExpr id)
+                                  -> LHsExpr id -> TransForm
 				  -> SDoc
-pprGroupStmt by using explicit
-  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 pp_using ]
-  where
-    pp_using | explicit  = ptext (sLit "using") <+> ppr using
-             | otherwise = empty
+pprTransStmt by using ThenForm
+  = sep [ ptext (sLit "then"), nest 2 (ppr using), nest 2 (pprBy by)]
+pprTransStmt by _ GroupFormB
+  = sep [ ptext (sLit "then group"), nest 2 (pprBy by) ]
+pprTransStmt by using GroupFormU
+  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 (ptext (sLit "using") <+> ppr using)]
 
 pprBy :: OutputableBndr id => Maybe (LHsExpr id) -> SDoc
 pprBy Nothing  = empty
@@ -1412,8 +1395,7 @@ pprStmtInCtxt ctxt stmt
        2 (ppr_stmt stmt)
   where
     -- For Group and Transform Stmts, don't print the nested stmts!
-    ppr_stmt (GroupStmt { grpS_by = by, grpS_using = using
-                        , grpS_explicit = explicit }) = pprGroupStmt by using explicit
-    ppr_stmt (TransformStmt _ bndrs using by _ _) = pprTransformStmt bndrs using by
-    ppr_stmt stmt                                 = pprStmt stmt
+    ppr_stmt (TransStmt { trS_by = by, trS_using = using
+                        , trS_form = form }) = pprTransStmt by using form
+    ppr_stmt stmt = pprStmt stmt
 \end{code}

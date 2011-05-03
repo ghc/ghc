@@ -12,7 +12,7 @@ module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 		   tcDoStmt, tcMDoStmt, tcGuardStmt
        ) where
 
-import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRhoNC, tcCheckId,
+import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho, tcCheckId,
                                 tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 
 import HsSyn
@@ -413,81 +413,65 @@ tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
 		      ; return (ids, pairs', thing) }
 	   ; return ( (stmts', ids) : pairs', thing ) }
 
-tcLcStmt m_tc ctxt (TransformStmt stmts binders usingExpr maybeByExpr _ _) elt_ty thing_inside = do
-    (stmts', (binders', usingExpr', maybeByExpr', thing)) <- 
-        tcStmtsAndThen (TransformStmtCtxt ctxt) (tcLcStmt m_tc) stmts elt_ty $ \elt_ty' -> do
-            let alphaListTy = mkTyConApp m_tc [alphaTy]
-                    
-            (usingExpr', maybeByExpr') <- 
-                case maybeByExpr of
-                    Nothing -> do
-                        -- We must validate that usingExpr :: forall a. [a] -> [a]
-                        let using_ty = mkForAllTy alphaTyVar (alphaListTy `mkFunTy` alphaListTy)
-                        usingExpr' <- tcPolyExpr usingExpr using_ty
-                        return (usingExpr', Nothing)
-                    Just byExpr -> do
-                        -- We must infer a type such that e :: t and then check that 
-			-- usingExpr :: forall a. (a -> t) -> [a] -> [a]
-                        (byExpr', tTy) <- tcInferRhoNC byExpr
-                        let using_ty = mkForAllTy alphaTyVar $ 
-                                       (alphaTy `mkFunTy` tTy)
-                                       `mkFunTy` alphaListTy `mkFunTy` alphaListTy
-                        usingExpr' <- tcPolyExpr usingExpr using_ty
-                        return (usingExpr', Just byExpr')
-            
-            binders' <- tcLookupLocalIds binders
-            thing <- thing_inside elt_ty'
-            
-            return (binders', usingExpr', maybeByExpr', thing)
+tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
+                              , trS_bndrs =  bindersMap
+                              , trS_by = by, trS_using = using }) elt_ty thing_inside
+  = do { let (bndr_names, n_bndr_names) = unzip bindersMap
+             unused_ty = pprPanic "tcLcStmt: inner ty" (ppr bindersMap)
+       	     -- The inner 'stmts' lack a LastStmt, so the element type
+	     --  passed in to tcStmtsAndThen is never looked at
+       ; (stmts', (bndr_ids, by'))
+            <- tcStmtsAndThen (TransformStmtCtxt ctxt) (tcLcStmt m_tc) stmts unused_ty $ \_ -> do
+	       { by' <- case by of
+                           Nothing -> return Nothing
+                           Just e  -> do { e_ty <- tcInferRho e; return (Just e_ty) }
+               ; bndr_ids <- tcLookupLocalIds bndr_names
+               ; return (bndr_ids, by') }
 
-    return (TransformStmt stmts' binders' usingExpr' maybeByExpr' noSyntaxExpr noSyntaxExpr, thing)
+       ; let m_app ty = mkTyConApp m_tc [ty]
 
-tcLcStmt m_tc ctxt (GroupStmt { grpS_stmts = stmts, grpS_bndrs =  bindersMap
-                              , grpS_by = by, grpS_using = using
-                              , grpS_explicit = explicit }) elt_ty thing_inside
-  = do { let (bndr_names, list_bndr_names) = unzip bindersMap
+       --------------- Typecheck the 'using' function -------------
+       -- using :: ((a,b,c)->t) -> m (a,b,c) -> m (a,b,c)m      (ThenForm)
+       --       :: ((a,b,c)->t) -> m (a,b,c) -> m (m (a,b,c)))  (GroupForm)
 
-       ; (stmts', (bndr_ids, by', using_ty, elt_ty')) <-
-            tcStmtsAndThen (TransformStmtCtxt ctxt) (tcLcStmt m_tc) stmts elt_ty $ \elt_ty' -> do
-	        (by', using_ty) <- 
-                   case by of
-                     Nothing   -> -- check that using :: forall a. [a] -> [[a]]
-                                  return (Nothing, mkForAllTy alphaTyVar $
-                                                   alphaListTy `mkFunTy` alphaListListTy)
-		     			
-		     Just by_e -> -- check that using :: forall a. (a -> t) -> [a] -> [[a]]
-		     	          -- where by :: t
-                                  do { (by_e', t_ty) <- tcInferRhoNC by_e
-                                     ; return (Just by_e', mkForAllTy alphaTyVar $
-                                                           (alphaTy `mkFunTy` t_ty) 
-                                                           `mkFunTy` alphaListTy 
-                                                           `mkFunTy` alphaListListTy) }
-                -- Find the Ids (and hence types) of all old binders
-                bndr_ids <- tcLookupLocalIds bndr_names
-                
-                return (bndr_ids, by', using_ty, elt_ty')
-        
-                -- Ensure that every old binder of type b is linked up with
-		-- its new binder which should have type [b]
-       ; let list_bndr_ids = zipWith mk_list_bndr list_bndr_names bndr_ids
-             bindersMap' = bndr_ids `zip` list_bndr_ids
+         -- n_app :: Type -> Type   -- Wraps a 'ty' into '[ty]' for GroupForm
+       ; let n_app = case form of
+                       ThenForm -> (\ty -> ty)
+  		       _ 	-> m_app
+
+             by_arrow :: Type -> Type     -- Wraps 'ty' to '(a->t) -> ty' if the By is present
+             by_arrow = case by' of
+                          Nothing       -> \ty -> ty
+                          Just (_,e_ty) -> \ty -> e_ty `mkFunTy` ty
+
+             tup_ty        = mkBigCoreVarTupTy bndr_ids
+             poly_arg_ty   = m_app alphaTy
+	     poly_res_ty   = m_app (n_app alphaTy)
+	     using_poly_ty = mkForAllTy alphaTyVar $ by_arrow $ 
+                             poly_arg_ty `mkFunTy` poly_res_ty
+
+       ; using' <- tcPolyExpr using using_poly_ty
+       ; let final_using = fmap (HsWrap (WpTyApp tup_ty)) using' 
+
+	     -- 'stmts' returns a result of type (m1_ty tuple_ty),
+	     -- typically something like [(Int,Bool,Int)]
+	     -- We don't know what tuple_ty is yet, so we use a variable
+       ; let mk_n_bndr :: Name -> TcId -> TcId
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (n_app (idType bndr_id))
+
+             -- Ensure that every old binder of type `b` is linked up with its
+             -- new binder which should have type `n b`
 	     -- See Note [GroupStmt binder map] in HsExpr
-            
-       ; using' <- tcPolyExpr using using_ty
+             n_bndr_ids  = zipWith mk_n_bndr n_bndr_names bndr_ids
+             bindersMap' = bndr_ids `zip` n_bndr_ids
 
-             -- Type check the thing in the environment with 
-	     -- these new binders and return the result
-       ; thing <- tcExtendIdEnv list_bndr_ids (thing_inside elt_ty')
-       ; return (emptyGroupStmt { grpS_stmts = stmts', grpS_bndrs = bindersMap'
-                                , grpS_by = by', grpS_using = using'
-                                , grpS_explicit = explicit }, thing) }
-  where
-    alphaListTy = mkTyConApp m_tc [alphaTy]
-    alphaListListTy = mkTyConApp m_tc [alphaListTy]
-            
-    mk_list_bndr :: Name -> TcId -> TcId
-    mk_list_bndr list_bndr_name bndr_id 
-      = mkLocalId list_bndr_name (mkTyConApp m_tc [idType bndr_id])
+       -- Type check the thing in the environment with 
+       -- these new binders and return the result
+       ; thing <- tcExtendIdEnv n_bndr_ids (thing_inside elt_ty)
+
+       ; return (emptyTransStmt { trS_stmts = stmts', trS_bndrs = bindersMap' 
+                                , trS_by = fmap fst by', trS_using = final_using 
+                                , trS_form = form }, thing) }
     
 tcLcStmt _ _ stmt _ _
   = pprPanic "tcLcStmt: unexpected Stmt" (ppr stmt)
@@ -552,79 +536,6 @@ tcMcStmt _ (ExprStmt rhs then_op guard_op _) res_ty thing_inside
 	; thing      <- thing_inside new_res_ty
 	; return (ExprStmt rhs' then_op' guard_op' rhs_ty, thing) }
 
--- Transform statements.
---
---   [ body | stmts, then f ]       ->  f :: forall a. m a -> m a
---   [ body | stmts, then f by e ]  ->  f :: forall a. (a -> t) -> m a -> m a
---
-tcMcStmt ctxt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
-       ; m1_ty      <- newFlexiTyVarTy star_star_kind
-       ; m2_ty      <- newFlexiTyVarTy star_star_kind
-       ; n_ty       <- newFlexiTyVarTy star_star_kind
-       ; tup_ty_var <- newFlexiTyVarTy liftedTypeKind
-       ; new_res_ty <- newFlexiTyVarTy liftedTypeKind
-       ; let m1_tup_ty = m1_ty `mkAppTy` tup_ty_var
-
-	     -- 'stmts' returns a result of type (m1_ty tuple_ty),
-	     -- typically something like [(Int,Bool,Int)]
-	     -- We don't know what tuple_ty is yet, so we use a variable
-        ; (stmts', (binders', usingExpr', maybeByExpr', return_op', bind_op', thing)) <- 
-              tcStmtsAndThen (TransformStmtCtxt ctxt) tcMcStmt stmts m1_tup_ty $ \res_ty' -> do
-                  { (usingExpr', maybeByExpr') <- 
-                        case maybeByExpr of
-                            Nothing -> do
-                                -- We must validate that usingExpr :: forall a. m a -> m a
-                                let using_ty = mkForAllTy alphaTyVar $
-                                               (m_ty `mkAppTy` alphaTy)
-                                               `mkFunTy`
-                                               (m_ty `mkAppTy` alphaTy)
-                                usingExpr' <- tcPolyExpr usingExpr using_ty
-                                return (usingExpr', Nothing)
-                            Just byExpr -> do
-                                -- We must infer a type such that e :: t and then check that 
-                                -- usingExpr :: forall a. (a -> t) -> m a -> m a
-                                (byExpr', tTy) <- tcInferRhoNC byExpr
-                                let using_ty = mkForAllTy alphaTyVar $ 
-                                               (alphaTy `mkFunTy` tTy)
-                                               `mkFunTy`
-                                               (m_ty `mkAppTy` alphaTy)
-                                               `mkFunTy`
-                                               (m_ty `mkAppTy` alphaTy)
-                                usingExpr' <- tcPolyExpr usingExpr using_ty
-                                return (usingExpr', Just byExpr')
-                    
-                  ; bndr_ids <- tcLookupLocalIds binders
-
-                  -- `return` and `>>=` are used to pass around/modify our
-                  -- binders, so we know their types:
-                  --
-                  --   return :: (a,b,c,..) -> m (a,b,c,..)
-                  --   (>>=)  :: m (a,b,c,..)
-                  --          -> ( (a,b,c,..) -> m (a,b,c,..) )
-                  --          -> m (a,b,c,..)
-                  --
-                  ; let bndr_ty   = mkBigCoreVarTupTy bndr_ids
-                        m_bndr_ty = m_ty `mkAppTy` bndr_ty
-
-                  ; return_op' <- tcSyntaxOp MCompOrigin return_op
-                                      (bndr_ty `mkFunTy` m_bndr_ty)
-
-                  ; bind_op'   <- tcSyntaxOp MCompOrigin bind_op $
-                                      m_bndr_ty `mkFunTy` (bndr_ty `mkFunTy` res_ty)
-                                                `mkFunTy` res_ty
-
-                  -- Unify types of the inner comprehension and the binders type
-                  ; _ <- unifyType res_ty' m_bndr_ty
-
-                  -- Typecheck the `thing` with out old type (which is the type
-                  -- of the final result of our comprehension)
-                  ; thing <- thing_inside res_ty
-
-                  ; return (bndr_ids, usingExpr', maybeByExpr', return_op', bind_op', thing) }
-
-        ; return (TransformStmt stmts' binders' usingExpr' maybeByExpr' return_op' bind_op', thing) }
-
 -- Grouping statements
 --
 --   [ body | stmts, then group by e ]
@@ -634,85 +545,88 @@ tcMcStmt ctxt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_
 --         f :: forall a. (a -> t) -> m a -> m (m a)
 --   [ body | stmts, then group using f ]
 --     ->  f :: forall a. m a -> m (m a)
+
+-- We type [ body | (stmts, group by e using f), ... ]
+--     f <optional by> [ (a,b,c) | stmts ] >>= \(a,b,c) -> ...body....
 --
-tcMcStmt ctxt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = bindersMap
-                         , grpS_by = by, grpS_using = using, grpS_explicit = explicit
-                         , grpS_ret = return_op, grpS_bind = bind_op 
-                         , grpS_fmap = fmap_op }) res_ty thing_inside
+-- We type the functions as follows:
+--     f <optional by> :: m1 (a,b,c) -> m2 (a,b,c)		(ThenForm)
+--     	 	       :: m1 (a,b,c) -> m2 (n (a,b,c))		(GroupForm)
+--     (>>=) :: m2 (a,b,c)     -> ((a,b,c)   -> res) -> res	(ThenForm)
+--           :: m2 (n (a,b,c)) -> (n (a,b,c) -> res) -> res	(GroupForm)
+-- 
+tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
+                         , trS_by = by, trS_using = using, trS_form = form
+                         , trS_ret = return_op, trS_bind = bind_op 
+                         , trS_fmap = fmap_op }) res_ty thing_inside
   = do { let star_star_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
-       ; m1_ty      <- newFlexiTyVarTy star_star_kind
-       ; m2_ty      <- newFlexiTyVarTy star_star_kind
-       ; n_ty       <- newFlexiTyVarTy star_star_kind
-       ; tup_ty_var <- newFlexiTyVarTy liftedTypeKind
+       ; m1_ty   <- newFlexiTyVarTy star_star_kind
+       ; m2_ty   <- newFlexiTyVarTy star_star_kind
+       ; tup_ty  <- newFlexiTyVarTy liftedTypeKind
+       ; by_e_ty <- newFlexiTyVarTy liftedTypeKind	-- The type of the 'by' expression (if any)
+
+       --------------- Typecheck the 'using' function -------------
+       -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
+
+         -- n_app :: Type -> Type   -- Wraps a 'ty' into '(n ty)' for GroupForm
+       ; n_app <- case form of
+                    ThenForm -> return (\ty -> ty)
+		    _ 	     -> do { n_ty <- newFlexiTyVarTy star_star_kind
+                      	           ; return (n_ty `mkAppTy`) }
+       ; let by_arrow :: Type -> Type     -- Wraps 'ty' to '(a->t) -> ty' if the By is present
+             by_arrow = case by of
+                          Nothing -> \ty -> ty
+                          Just {} -> \ty -> by_e_ty `mkFunTy` ty
+
+             poly_arg_ty  = m1_ty `mkAppTy` alphaTy
+             using_arg_ty = m1_ty `mkAppTy` tup_ty
+	     poly_res_ty  = m2_ty `mkAppTy` n_app alphaTy
+	     using_res_ty = m2_ty `mkAppTy` n_app tup_ty
+	     using_poly_ty = mkForAllTy alphaTyVar $ by_arrow $ 
+                             poly_arg_ty `mkFunTy` poly_res_ty
+
+       ; using' <- tcPolyExpr using using_poly_ty
+       ; let final_using = fmap (HsWrap (WpTyApp tup_ty)) using' 
+
+       --------------- Typecheck the 'bind' function -------------
+       -- (>>=) :: m2 (n (a,b,c)) -> ( n (a,b,c) -> new_res_ty ) -> res_ty
        ; new_res_ty <- newFlexiTyVarTy liftedTypeKind
-       ; let (bndr_names, n_bndr_names) = unzip bindersMap
-             m1_tup_ty = m1_ty `mkAppTy` tup_ty_var
-       	            	     
+       ; let n_tup_ty = n_app tup_ty	-- n (a,b,c)
+       ; bind_op' <- tcSyntaxOp MCompOrigin bind_op $
+                                using_res_ty `mkFunTy` (n_tup_ty `mkFunTy` new_res_ty)
+                                             `mkFunTy` res_ty
+
+       --------------- Typecheck the 'fmap' function -------------
+       ; fmap_op' <- case form of
+                       ThenForm -> return noSyntaxExpr
+                       _ -> fmap unLoc . tcPolyExpr (noLoc fmap_op) $
+                            mkForAllTy alphaTyVar $ mkForAllTy betaTyVar $
+                            (alphaTy `mkFunTy` betaTy)
+                            `mkFunTy` (n_app alphaTy)
+                            `mkFunTy` (n_app betaTy)
+
 	     -- 'stmts' returns a result of type (m1_ty tuple_ty),
 	     -- typically something like [(Int,Bool,Int)]
 	     -- We don't know what tuple_ty is yet, so we use a variable
-       ; (stmts', (bndr_ids, by_e_ty, return_op')) <-
-            tcStmtsAndThen (TransformStmtCtxt ctxt) tcMcStmt stmts m1_tup_ty $ \res_ty' -> do
-	        { by_e_ty <- case by of
-                               Nothing -> return Nothing
-                               Just e  -> do { e_ty <- tcInferRhoNC e; return (Just e_ty) }
+       ; let (bndr_names, n_bndr_names) = unzip bindersMap
+       ; (stmts', (bndr_ids, by', return_op')) <-
+            tcStmtsAndThen (TransformStmtCtxt ctxt) tcMcStmt stmts using_arg_ty $ \res_ty' -> do
+	        { by' <- case by of
+                           Nothing -> return Nothing
+                           Just e  -> do { e' <- tcMonoExpr e by_e_ty; return (Just e') }
 
                 -- Find the Ids (and hence types) of all old binders
                 ; bndr_ids <- tcLookupLocalIds bndr_names
 
                 -- 'return' is only used for the binders, so we know its type.
-                --
                 --   return :: (a,b,c,..) -> m (a,b,c,..)
                 ; return_op' <- tcSyntaxOp MCompOrigin return_op $ 
                                 (mkBigCoreVarTupTy bndr_ids) `mkFunTy` res_ty'
 
-                ; return (bndr_ids, by_e_ty, return_op') }
-
-
-
-       ; let tup_ty       = mkBigCoreVarTupTy bndr_ids	-- (a,b,c)
-             using_arg_ty = m1_ty `mkAppTy` tup_ty	-- m1 (a,b,c)
-             n_tup_ty     = n_ty  `mkAppTy` tup_ty	-- n (a,b,c)
-             using_res_ty = m2_ty `mkAppTy` n_tup_ty 	-- m2 (n (a,b,c))
-	     using_fun_ty = using_arg_ty `mkFunTy` using_arg_ty
-              
-          -- (>>=) :: m2 (n (a,b,c)) -> ( n (a,b,c) -> new_res_ty ) -> res_ty
-          -- using :: ((a,b,c)->t) -> m1 (a,b,c) -> m2 (n (a,b,c))
-
-       --------------- Typecheck the 'bind' function -------------
-       ; bind_op' <- tcSyntaxOp MCompOrigin bind_op $
-                                using_res_ty `mkFunTy` (n_tup_ty `mkFunTy` new_res_ty)
-                                             `mkFunTy` res_ty
-
-       --------------- Typecheck the 'using' function -------------
-       ; let poly_fun_ty = (m1_ty `mkAppTy` alphaTy) `mkFunTy` 
-                                     (m2_ty `mkAppTy` (n_ty `mkAppTy` alphaTy))
-             using_poly_ty = case by_e_ty of
-               Nothing       -> mkForAllTy alphaTyVar poly_fun_ty
-                                -- using :: forall a. m1 a -> m2 (n a)
-
-	       Just (_,t_ty) -> mkForAllTy alphaTyVar $
-                                (alphaTy `mkFunTy` t_ty) `mkFunTy` poly_fun_ty
-                                -- using :: forall a. (a->t) -> m1 a -> m2 (n a)
-		       	        -- where by :: t
-
-       ; using' <- tcPolyExpr using using_poly_ty
-       ; coi <- unifyType (applyTy using_poly_ty tup_ty)
-                          (case by_e_ty of
-                             Nothing       -> using_fun_ty
-			     Just (_,t_ty) -> (tup_ty `mkFunTy` t_ty) `mkFunTy` using_fun_ty)
-       ; let final_using = fmap (mkHsWrapCoI coi . HsWrap (WpTyApp tup_ty)) using' 
-
-       --------------- Typecheck the 'fmap' function -------------
-       ; fmap_op' <- fmap unLoc . tcPolyExpr (noLoc fmap_op) $
-                         mkForAllTy alphaTyVar $ mkForAllTy betaTyVar $
-                         (alphaTy `mkFunTy` betaTy)
-                         `mkFunTy` (n_ty `mkAppTy` alphaTy)
-                         `mkFunTy` (n_ty `mkAppTy` betaTy)
+                ; return (bndr_ids, by', return_op') }
 
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id 
-                = mkLocalId n_bndr_name (n_ty `mkAppTy` idType bndr_id)
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -720,14 +634,14 @@ tcMcStmt ctxt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = bindersMap
              n_bndr_ids = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
-       -- Type check the thing in the environment with these new binders and
-       -- return the result
+       -- Type check the thing in the environment with 
+       -- these new binders and return the result
        ; thing <- tcExtendIdEnv n_bndr_ids (thing_inside res_ty)
 
-       ; return (GroupStmt { grpS_stmts = stmts', grpS_bndrs = bindersMap' 
-                           , grpS_by = fmap fst by_e_ty, grpS_using = final_using 
-                           , grpS_ret = return_op', grpS_bind = bind_op'
-                           , grpS_fmap = fmap_op', grpS_explicit = explicit }, thing) }
+       ; return (TransStmt { trS_stmts = stmts', trS_bndrs = bindersMap' 
+                           , trS_by = by', trS_using = final_using 
+                           , trS_ret = return_op', trS_bind = bind_op'
+                           , trS_fmap = fmap_op', trS_form = form }, thing) }
 
 -- Typecheck `ParStmt`. See `tcLcStmt` for more informations about typechecking
 -- of `ParStmt`s.

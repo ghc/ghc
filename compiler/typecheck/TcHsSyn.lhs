@@ -773,29 +773,20 @@ zonkStmt env (LastStmt expr ret_op)
     zonkExpr env ret_op		`thenM` \ new_ret ->
     returnM (env, LastStmt new_expr new_ret)
 
-zonkStmt env (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op)
-  = do { (env', stmts') <- zonkStmts env stmts 
-    ; let binders' = zonkIdOccs env' binders
-    ; usingExpr' <- zonkLExpr env' usingExpr
-    ; maybeByExpr' <- zonkMaybeLExpr env' maybeByExpr
-    ; return_op' <- zonkExpr env' return_op
-    ; bind_op' <- zonkExpr env' bind_op
-    ; return (env', TransformStmt stmts' binders' usingExpr' maybeByExpr' return_op' bind_op') }
-    
-zonkStmt env (GroupStmt { grpS_stmts = stmts, grpS_bndrs = binderMap
-                        , grpS_by = by, grpS_explicit = explicit, grpS_using = using
-                        , grpS_ret = return_op, grpS_bind = bind_op, grpS_fmap = liftM_op })
+zonkStmt env (TransStmt { trS_stmts = stmts, trS_bndrs = binderMap
+                        , trS_by = by, trS_form = form, trS_using = using
+                        , trS_ret = return_op, trS_bind = bind_op, trS_fmap = liftM_op })
   = do { (env', stmts') <- zonkStmts env stmts 
     ; binderMap' <- mappM (zonkBinderMapEntry env') binderMap
-    ; by' <- fmapMaybeM (zonkLExpr env') by
-    ; using' <- zonkLExpr env using
+    ; by'        <- fmapMaybeM (zonkLExpr env') by
+    ; using'     <- zonkLExpr env using
     ; return_op' <- zonkExpr env' return_op
-    ; bind_op' <- zonkExpr env' bind_op
-    ; liftM_op' <- zonkExpr env' liftM_op
+    ; bind_op'   <- zonkExpr env' bind_op
+    ; liftM_op'  <- zonkExpr env' liftM_op
     ; let env'' = extendZonkEnv env' (map snd binderMap')
-    ; return (env'', GroupStmt { grpS_stmts = stmts', grpS_bndrs =  binderMap'
-                               , grpS_by = by', grpS_explicit = explicit, grpS_using = using'
-                               , grpS_ret = return_op', grpS_bind = bind_op', grpS_fmap = liftM_op' }) }
+    ; return (env'', TransStmt { trS_stmts = stmts', trS_bndrs = binderMap'
+                               , trS_by = by', trS_form = form, trS_using = using'
+                               , trS_ret = return_op', trS_bind = bind_op', trS_fmap = liftM_op' }) }
   where
     zonkBinderMapEntry env (oldBinder, newBinder) = do 
         let oldBinder' = zonkIdOcc env oldBinder
@@ -812,11 +803,6 @@ zonkStmt env (BindStmt pat expr bind_op fail_op)
 	; new_bind <- zonkExpr env bind_op
 	; new_fail <- zonkExpr env fail_op
 	; return (env1, BindStmt new_pat new_expr new_bind new_fail) }
-
-zonkMaybeLExpr :: ZonkEnv -> Maybe (LHsExpr TcId) -> TcM (Maybe (LHsExpr Id))
-zonkMaybeLExpr _   Nothing  = return Nothing
-zonkMaybeLExpr env (Just e) = (zonkLExpr env e) >>= (return . Just)
-
 
 -------------------------------------------------------------------------
 zonkRecFields :: ZonkEnv -> HsRecordBinds TcId -> TcM (HsRecordBinds TcId)

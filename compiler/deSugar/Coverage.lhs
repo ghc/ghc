@@ -455,26 +455,18 @@ addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr returnExpr) = do
         (addTickSyntaxExpr hpcSrcSpan bindExpr)
         (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
-addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr returnExpr bindExpr) = do
-    t_s <- (addTickLStmts isGuard stmts)
-    t_u <- (addTickLHsExprAlways usingExpr)
-    t_m <- (addTickMaybeByLHsExpr maybeByExpr)
-    t_r <- (addTickSyntaxExpr hpcSrcSpan returnExpr)
-    t_b <- (addTickSyntaxExpr hpcSrcSpan bindExpr)
-    return $ TransformStmt t_s ids t_u t_m t_r t_b
-
-addTickStmt isGuard stmt@(GroupStmt { grpS_stmts = stmts
-                                    , grpS_by = by, grpS_using = using
-                                    , grpS_ret = returnExpr, grpS_bind = bindExpr
-                                    , grpS_fmap = liftMExpr }) = do
+addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
+                                    , trS_by = by, trS_using = using
+                                    , trS_ret = returnExpr, trS_bind = bindExpr
+                                    , trS_fmap = liftMExpr }) = do
     t_s <- addTickLStmts isGuard stmts
     t_y <- fmapMaybeM  addTickLHsExprAlways by
     t_u <- addTickLHsExprAlways using
     t_f <- addTickSyntaxExpr hpcSrcSpan returnExpr
     t_b <- addTickSyntaxExpr hpcSrcSpan bindExpr
     t_m <- addTickSyntaxExpr hpcSrcSpan liftMExpr
-    return $ stmt { grpS_stmts = t_s, grpS_by = t_y, grpS_using = t_u
-                  , grpS_ret = t_f, grpS_bind = t_b, grpS_fmap = t_m }
+    return $ stmt { trS_stmts = t_s, trS_by = t_y, trS_using = t_u
+                  , trS_ret = t_f, trS_bind = t_b, trS_fmap = t_m }
 
 addTickStmt isGuard stmt@(RecStmt {})
   = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
@@ -494,12 +486,6 @@ addTickStmtAndBinders isGuard (stmts, ids) =
     liftM2 (,) 
         (addTickLStmts isGuard stmts)
         (return ids)
-
-addTickMaybeByLHsExpr :: Maybe (LHsExpr Id) -> TM (Maybe (LHsExpr Id))
-addTickMaybeByLHsExpr maybeByExpr = 
-    case maybeByExpr of
-        Nothing -> return Nothing
-        Just byExpr -> addTickLHsExprAlways byExpr >>= (return . Just)
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 

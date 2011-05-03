@@ -91,45 +91,19 @@ dsInnerListComp (stmts, bndrs)
   where
     bndrs_tuple_type = mkBigCoreVarTupTy bndrs
         
--- This function factors out commonality between the desugaring strategies for TransformStmt.
--- Given such a statement it gives you back an expression representing how to compute the transformed
--- list and the tuple that you need to bind from that list in order to proceed with your desugaring
-dsTransformStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr _ _)
- = do { (expr, binders_tuple_type) <- dsInnerListComp (stmts, binders)
-      ; usingExpr' <- dsLExpr usingExpr
-    
-      ; using_args <-
-          case maybeByExpr of
-            Nothing -> return [expr]
-            Just byExpr -> do
-                byExpr' <- dsLExpr byExpr
-                
-                us <- newUniqueSupply
-                [tuple_binder] <- newSysLocalsDs [binders_tuple_type]
-                let byExprWrapper = mkTupleCase us binders byExpr' tuple_binder (Var tuple_binder)
-                
-                return [Lam tuple_binder byExprWrapper, expr]
-
-      ; let inner_list_expr = mkApps usingExpr' ((Type binders_tuple_type) : using_args)
-            pat = mkBigLHsVarPatTup binders
-      ; return (inner_list_expr, pat) }
-    
 -- This function factors out commonality between the desugaring strategies for GroupStmt.
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
-dsGroupStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsGroupStmt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = binderMap
-                       , grpS_by = by, grpS_using = using }) = do
-    let (fromBinders, toBinders) = unzip binderMap
-        
-        fromBindersTypes = map idType fromBinders
-        toBindersTypes = map idType toBinders
-        
-        toBindersTupleType = mkBigCoreTupTy toBindersTypes
+dsTransStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
+dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderMap
+                       , trS_by = by, trS_using = using }) = do
+    let (from_bndrs, to_bndrs) = unzip binderMap
+        from_bndrs_tys  = map idType from_bndrs
+        to_bndrs_tys    = map idType to_bndrs
+        to_bndrs_tup_ty = mkBigCoreTupTy to_bndrs_tys
     
     -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-    (expr, from_tup_ty) <- dsInnerListComp (stmts, fromBinders)
+    (expr, from_tup_ty) <- dsInnerListComp (stmts, from_bndrs)
     
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
     -- function required? If so, create that desugared function and add to arguments
@@ -137,31 +111,34 @@ dsGroupStmt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = binderMap
     usingArgs <- case by of
                    Nothing   -> return [expr]
  		   Just by_e -> do { by_e' <- dsLExpr by_e
-                                   ; us <- newUniqueSupply
-                                   ; [from_tup_id] <- newSysLocalsDs [from_tup_ty]
-                                   ; let by_wrap = mkTupleCase us fromBinders by_e' 
-                                                   from_tup_id (Var from_tup_id)
-                                   ; return [Lam from_tup_id by_wrap, expr] }
+                                   ; lam <- matchTuple from_bndrs by_e'
+                                   ; return [lam, expr] }
     
     -- Create an unzip function for the appropriate arity and element types and find "map"
-    (unzip_fn, unzip_rhs) <- mkUnzipBind fromBindersTypes
+    unzip_stuff <- mkUnzipBind form from_bndrs_tys
     map_id <- dsLookupGlobalId mapName
 
     -- Generate the expressions to build the grouped list
     let -- First we apply the grouping function to the inner list
-        inner_list_expr = mkApps usingExpr' ((Type from_tup_ty) : usingArgs)
+        inner_list_expr = mkApps usingExpr' (Type from_tup_ty : usingArgs)
         -- Then we map our "unzip" across it to turn the lists of tuples into tuples of lists
         -- We make sure we instantiate the type variable "a" to be a list of "from" tuples and
         -- the "b" to be a tuple of "to" lists!
-        unzipped_inner_list_expr = mkApps (Var map_id) 
-            [Type (mkListTy from_tup_ty), Type toBindersTupleType, Var unzip_fn, inner_list_expr]
         -- Then finally we bind the unzip function around that expression
-        bound_unzipped_inner_list_expr = Let (Rec [(unzip_fn, unzip_rhs)]) unzipped_inner_list_expr
-    
-    -- Build a pattern that ensures the consumer binds into the NEW binders, which hold lists rather than single values
-    let pat = mkBigLHsVarPatTup toBinders
+        bound_unzipped_inner_list_expr 
+          = case unzip_stuff of
+              Nothing -> inner_list_expr
+              Just (unzip_fn, unzip_rhs) -> Let (Rec [(unzip_fn, unzip_rhs)]) $
+                                            mkApps (Var map_id) $
+                                            [ Type (mkListTy from_tup_ty)
+                                            , Type to_bndrs_tup_ty
+                                            , Var unzip_fn
+                                            , inner_list_expr]
+
+    -- Build a pattern that ensures the consumer binds into the NEW binders, 
+    -- which hold lists rather than single values
+    let pat = mkBigLHsVarPatTup to_bndrs
     return (bound_unzipped_inner_list_expr, pat)
-    
 \end{code}
 
 %************************************************************************
@@ -251,12 +228,8 @@ deListComp (LetStmt binds : quals) list = do
     core_rest <- deListComp quals list
     dsLocalBinds binds core_rest
 
-deListComp (stmt@(TransformStmt {}) : quals) list = do
-    (inner_list_expr, pat) <- dsTransformStmt stmt
-    deBindComp pat inner_list_expr quals list
-
-deListComp (stmt@(GroupStmt {}) : quals) list = do
-    (inner_list_expr, pat) <- dsGroupStmt stmt
+deListComp (stmt@(TransStmt {}) : quals) list = do
+    (inner_list_expr, pat) <- dsTransStmt stmt
     deBindComp pat inner_list_expr quals list
 
 deListComp (BindStmt pat list1 _ _ : quals) core_list2 = do -- rule A' above
@@ -264,16 +237,14 @@ deListComp (BindStmt pat list1 _ _ : quals) core_list2 = do -- rule A' above
     deBindComp pat core_list1 quals core_list2
 
 deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
-  = do
-    exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
-    let (exps, qual_tys) = unzip exps_and_qual_tys
+  = do { exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
+       ; let (exps, qual_tys) = unzip exps_and_qual_tys
     
-    (zip_fn, zip_rhs) <- mkZipBind qual_tys
+       ; (zip_fn, zip_rhs) <- mkZipBind qual_tys
 
 	-- Deal with [e | pat <- zip l1 .. ln] in example above
-    deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)) 
-		   quals list
-
+       ; deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)) 
+		    quals list }
   where 
 	bndrs_s = map snd stmtss_w_bndrs
 
@@ -361,13 +332,8 @@ dfListComp c_id n_id (LetStmt binds : quals) = do
     core_rest <- dfListComp c_id n_id quals
     dsLocalBinds binds core_rest
 
-dfListComp c_id n_id (stmt@(TransformStmt {}) : quals) = do
-    (inner_list_expr, pat) <- dsTransformStmt stmt
-    -- Anyway, we bind the newly transformed list via the generic binding function
-    dfBindComp c_id n_id (pat, inner_list_expr) quals 
-
-dfListComp c_id n_id (stmt@(GroupStmt {}) : quals) = do
-    (inner_list_expr, pat) <- dsGroupStmt stmt
+dfListComp c_id n_id (stmt@(TransStmt {}) : quals) = do
+    (inner_list_expr, pat) <- dsTransStmt stmt
     -- Anyway, we bind the newly grouped list via the generic binding function
     dfBindComp c_id n_id (pat, inner_list_expr) quals 
     
@@ -445,7 +411,7 @@ mkZipBind elt_tys = do
 			-- Increasing order of tag
             
             
-mkUnzipBind :: [Type] -> DsM (Id, CoreExpr)
+mkUnzipBind :: TransForm -> [Type] -> DsM (Maybe (Id, CoreExpr))
 -- mkUnzipBind [t1, t2] 
 -- = (unzip, \ys :: [(t1, t2)] -> foldr (\ax :: (t1, t2) axs :: ([t1], [t2])
 --     -> case ax of
@@ -455,28 +421,29 @@ mkUnzipBind :: [Type] -> DsM (Id, CoreExpr)
 --      ys)
 -- 
 -- We use foldr here in all cases, even if rules are turned off, because we may as well!
-mkUnzipBind elt_tys = do
-    ax  <- newSysLocalDs elt_tuple_ty
-    axs <- newSysLocalDs elt_list_tuple_ty
-    ys  <- newSysLocalDs elt_tuple_list_ty
-    xs  <- mapM newSysLocalDs elt_tys
-    xss <- mapM newSysLocalDs elt_list_tys
+mkUnzipBind ThenForm _
+ = return Nothing    -- No unzipping for ThenForm
+mkUnzipBind _ elt_tys 
+  = do { ax  <- newSysLocalDs elt_tuple_ty
+       ; axs <- newSysLocalDs elt_list_tuple_ty
+       ; ys  <- newSysLocalDs elt_tuple_list_ty
+       ; xs  <- mapM newSysLocalDs elt_tys
+       ; xss <- mapM newSysLocalDs elt_list_tys
     
-    unzip_fn <- newSysLocalDs unzip_fn_ty
+       ; unzip_fn <- newSysLocalDs unzip_fn_ty
 
-    [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
+       ; [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
 
-    let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
-        
-        concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
-        tupled_concat_expression = mkBigCoreTup concat_expressions
-        
-        folder_body_inner_case = mkTupleCase us1 xss tupled_concat_expression axs (Var axs)
-        folder_body_outer_case = mkTupleCase us2 xs folder_body_inner_case ax (Var ax)
-        folder_body = mkLams [ax, axs] folder_body_outer_case
-        
-    unzip_body <- mkFoldrExpr elt_tuple_ty elt_list_tuple_ty folder_body nil_tuple (Var ys)
-    return (unzip_fn, mkLams [ys] unzip_body)
+       ; let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
+    	     concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
+    	     tupled_concat_expression = mkBigCoreTup concat_expressions
+    	    
+    	     folder_body_inner_case = mkTupleCase us1 xss tupled_concat_expression axs (Var axs)
+    	     folder_body_outer_case = mkTupleCase us2 xs folder_body_inner_case ax (Var ax)
+    	     folder_body = mkLams [ax, axs] folder_body_outer_case
+    	    
+       ; unzip_body <- mkFoldrExpr elt_tuple_ty elt_list_tuple_ty folder_body nil_tuple (Var ys)
+       ; return (Just (unzip_fn, mkLams [ys] unzip_body)) }
   where
     elt_tuple_ty       = mkBigCoreTupTy elt_tys
     elt_tuple_list_ty  = mkListTy elt_tuple_ty
@@ -730,30 +697,6 @@ dsMcStmt (ExprStmt exp then_exp guard_exp _) stmts
        ; return $ mkApps then_exp' [ mkApps guard_exp' [exp']
                                    , rest ] }
 
--- Transform statements desugar like this:
---
---   [ .. | qs, then f by e ]  ->  f (\q_v -> e) [| qs |]
---
--- where [| qs |] is the desugared inner monad comprehenion generated by the
--- statements `qs`.
-dsMcStmt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op) stmts_rest
-  = do { expr <- dsInnerMonadComp stmts binders return_op
-       ; let binders_tup_type = mkBigCoreTupTy $ map idType binders
-       ; usingExpr' <- dsLExpr usingExpr
-       ; using_args <- case maybeByExpr of
-            Nothing -> return [expr]
-            Just byExpr -> do
-                byExpr' <- dsLExpr byExpr
-                us <- newUniqueSupply
-                tup_binder <- newSysLocalDs binders_tup_type
-                let byExprWrapper = mkTupleCase us binders byExpr' tup_binder (Var tup_binder)
-                return [Lam tup_binder byExprWrapper, expr]
-
-       ; let pat = mkBigLHsVarPatTup binders
-             rhs = mkApps usingExpr' ((Type binders_tup_type) : using_args)
-
-       ; dsMcBindStmt pat rhs bind_op noSyntaxExpr stmts_rest }
-
 -- Group statements desugar like this:
 --
 --   [| (q, then group by e using f); rest |]
@@ -768,10 +711,10 @@ dsMcStmt (TransformStmt stmts binders usingExpr maybeByExpr return_op bind_op) s
 --         n_tup :: n qt
 --         unzip :: n qt -> (n t1, ..., n tk)    (needs Functor n)
 
-dsMcStmt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = bndrs
-                    , grpS_by = by, grpS_using = using
-                    , grpS_ret = return_op, grpS_bind = bind_op
-                    , grpS_fmap = fmap_op }) stmts_rest
+dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
+                    , trS_by = by, trS_using = using
+                    , trS_ret = return_op, trS_bind = bind_op
+                    , trS_fmap = fmap_op, trS_form = form }) stmts_rest
   = do { let (from_bndrs, to_bndrs) = unzip bndrs
              from_bndr_tys          = map idType from_bndrs	-- Types ty
 
@@ -790,16 +733,15 @@ dsMcStmt (GroupStmt { grpS_stmts = stmts, grpS_bndrs = bndrs
        -- Generate the expressions to build the grouped list
        -- Build a pattern that ensures the consumer binds into the NEW binders, 
        -- which hold monads rather than single values
-       ; fmap_op' <- dsExpr fmap_op
        ; bind_op' <- dsExpr bind_op
-       ; let bind_ty = exprType bind_op'    -- m2 (n (a,b,c)) -> (n (a,b,c) -> r1) -> r2
+       ; let bind_ty  = exprType bind_op'    -- m2 (n (a,b,c)) -> (n (a,b,c) -> r1) -> r2
              n_tup_ty = funArgTy $ funArgTy $ funResultTy bind_ty   -- n (a,b,c)
              tup_n_ty = mkBigCoreVarTupTy to_bndrs
 
        ; body       <- dsMcStmts stmts_rest
        ; n_tup_var  <- newSysLocalDs n_tup_ty
        ; tup_n_var  <- newSysLocalDs tup_n_ty
-       ; tup_n_expr <- mkMcUnzipM fmap_op' n_tup_var from_bndr_tys
+       ; tup_n_expr <- mkMcUnzipM form fmap_op n_tup_var from_bndr_tys
        ; us         <- newUniqueSupply
        ; let rhs'  = mkApps usingExpr' usingArgs
              body' = mkTupleCase us to_bndrs body tup_n_var tup_n_expr
@@ -908,16 +850,21 @@ dsInnerMonadComp stmts bndrs ret_op
 --     = ( fmap (selN1 :: (t1, t2) -> t1) ys
 --       , fmap (selN2 :: (t1, t2) -> t2) ys )
 
-mkMcUnzipM :: CoreExpr		-- fmap
+mkMcUnzipM :: TransForm
+           -> SyntaxExpr TcId	-- fmap
 	   -> Id		-- Of type n (a,b,c)
 	   -> [Type]		-- [a,b,c]
 	   -> DsM CoreExpr	-- Of type (n a, n b, n c)
-mkMcUnzipM fmap_op ys elt_tys
-  = do { xs     <- mapM newSysLocalDs elt_tys
-       ; tup_xs <- newSysLocalDs (mkBigCoreTupTy elt_tys)
+mkMcUnzipM ThenForm _ ys _ 	
+  = return (Var ys) -- No unzipping to do
+
+mkMcUnzipM _ fmap_op ys elt_tys
+  = do { fmap_op' <- dsExpr fmap_op
+       ; xs       <- mapM newSysLocalDs elt_tys
+       ; tup_xs   <- newSysLocalDs (mkBigCoreTupTy elt_tys)
 
        ; let arg_ty = idType ys
-             mk_elt i = mkApps fmap_op  -- fmap :: forall a b. (a -> b) -> n a -> n b
+             mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
                            [ Type arg_ty, Type (elt_tys !! i)
                            , mk_sel i, Var ys]
 

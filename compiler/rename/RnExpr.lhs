@@ -538,9 +538,8 @@ methodNamesStmt (BindStmt _ cmd _ _)             = methodNamesLCmd cmd
 methodNamesStmt (RecStmt { recS_stmts = stmts }) = methodNamesStmts stmts `addOneFV` loopAName
 methodNamesStmt (LetStmt _)                      = emptyFVs
 methodNamesStmt (ParStmt _ _ _ _)                = emptyFVs
-methodNamesStmt (TransformStmt {})               = emptyFVs
-methodNamesStmt (GroupStmt {})                   = emptyFVs
-   -- ParStmt, TransformStmt and GroupStmt can't occur in commands, but it's not convenient to error 
+methodNamesStmt (TransStmt {})                   = emptyFVs
+   -- ParStmt and TransStmt can't occur in commands, but it's not convenient to error 
    -- here so we just do what's convenient
 \end{code}
 
@@ -766,41 +765,15 @@ rnStmt ctxt (L loc (ParStmt segs _ _ _)) thing_inside
 	; return ( ([L loc (ParStmt segs' mzip_op bind_op return_op)], thing)
                  , fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
 
-rnStmt ctxt (L loc (TransformStmt stmts _ using by _ _)) thing_inside
-  = do { (using', fvs1) <- rnLExpr using
-
-       ; ((stmts', (by', used_bndrs, thing)), fvs2)
-             <- rnStmts (TransformStmtCtxt ctxt) stmts $ \ bndrs ->
-                do { (by', fvs_by) <- case by of
-                                        Nothing -> return (Nothing, emptyFVs)
-                                        Just e  -> do { (e', fvs) <- rnLExpr e; return (Just e', fvs) }
-                   ; (thing, fvs_thing) <- thing_inside bndrs
-                   ; let fvs        = fvs_by `plusFV` fvs_thing
-                         used_bndrs = filter (`elemNameSet` fvs) bndrs
-                         -- The paper (Fig 5) has a bug here; we must treat any free varaible of
-                         -- the "thing inside", **or of the by-expression**, as used
-                   ; return ((by', used_bndrs, thing), fvs) }
-
-       -- Lookup `(>>=)` and `fail` for monad comprehensions
-       ; ((return_op, fvs3), (bind_op, fvs4)) <-
-             if isMonadCompExpr ctxt
-                then (,) <$> lookupSyntaxName returnMName
-                         <*> lookupSyntaxName bindMName
-                else return ( (noSyntaxExpr, emptyFVs)
-                            , (noSyntaxExpr, emptyFVs) )
-
-       ; return (([L loc (TransformStmt stmts' used_bndrs using' by' return_op bind_op)], thing), 
-                 fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4) }
-        
-rnStmt ctxt (L loc (GroupStmt { grpS_stmts = stmts, grpS_by = by, grpS_explicit = explicit
-                              , grpS_using = using })) thing_inside
+rnStmt ctxt (L loc (TransStmt { trS_stmts = stmts, trS_by = by, trS_form = form
+                              , trS_using = using })) thing_inside
   = do { -- Rename the 'using' expression in the context before the transform is begun
          let implicit_name | isMonadCompExpr ctxt = groupMName
        	     		   | otherwise            = groupWithName
-       ; (using', fvs1) <- if explicit 
-                           then rnLExpr using
-                           else do { (e,fvs) <- lookupSyntaxName implicit_name
-                                   ; return (noLoc e, fvs) }
+       ; (using', fvs1) <- case form of
+                             GroupFormB -> do { (e,fvs) <- lookupSyntaxName implicit_name
+                                               ; return (noLoc e, fvs) }
+			     _          -> rnLExpr using
 
          -- Rename the stmts and the 'by' expression
 	 -- Keep track of the variables mentioned in the 'by' expression
@@ -810,28 +783,27 @@ rnStmt ctxt (L loc (GroupStmt { grpS_stmts = stmts, grpS_by = by, grpS_explicit 
                    ; (thing, fvs_thing) <- thing_inside bndrs
                    ; let fvs = fvs_by `plusFV` fvs_thing
                          used_bndrs = filter (`elemNameSet` fvs) bndrs
+                         -- The paper (Fig 5) has a bug here; we must treat any free varaible of
+                         -- the "thing inside", **or of the by-expression**, as used
                    ; return ((by', used_bndrs, thing), fvs) }
 
        -- Lookup `return`, `(>>=)` and `liftM` for monad comprehensions
-       ; ((return_op, fvs3), (bind_op, fvs4), (fmap_op, fvs5)) <-
-             if isMonadCompExpr ctxt
-                then (,,) <$> lookupSyntaxName returnMName
-                          <*> lookupSyntaxName bindMName
-                          <*> lookupSyntaxName fmapName
-                else return ( (noSyntaxExpr, emptyFVs)
-                            , (noSyntaxExpr, emptyFVs)
-                            , (noSyntaxExpr, emptyFVs) )
+       ; (return_op, fvs3) <- lookupSyntaxName returnMName
+       ; (bind_op,   fvs4) <- lookupSyntaxName bindMName
+       ; (fmap_op,   fvs5) <- case form of
+                                ThenForm -> return (noSyntaxExpr, emptyFVs)
+                                _        -> lookupSyntaxName fmapName
 
-       ; let all_fvs  = fvs1 `plusFV` fvs2 `plusFV` fvs3 `plusFV` fvs4
-                             `plusFV` fvs5
+       ; let all_fvs  = fvs1 `plusFV` fvs2 `plusFV` fvs3 
+                             `plusFV` fvs4 `plusFV` fvs5
              bndr_map = used_bndrs `zip` used_bndrs
-	     -- See Note [GroupStmt binder map] in HsExpr
+	     -- See Note [TransStmt binder map] in HsExpr
 
        ; traceRn (text "rnStmt: implicitly rebound these used binders:" <+> ppr bndr_map)
-       ; return (([L loc (GroupStmt { grpS_stmts = stmts', grpS_bndrs = bndr_map
-                                    , grpS_by = by', grpS_using = using', grpS_explicit = explicit
-                                    , grpS_ret = return_op, grpS_bind = bind_op
-                                    , grpS_fmap = fmap_op })], thing), all_fvs) }
+       ; return (([L loc (TransStmt { trS_stmts = stmts', trS_bndrs = bndr_map
+                                    , trS_by = by', trS_using = using', trS_form = form
+                                    , trS_ret = return_op, trS_bind = bind_op
+                                    , trS_fmap = fmap_op })], thing), all_fvs) }
 
 type ParSeg id = ([LStmt id], [id])	   -- The Names are bound by the Stmts
 
@@ -978,10 +950,7 @@ rn_rec_stmt_lhs fix_env (L _ (RecStmt { recS_stmts = stmts }))	-- Flatten Rec in
 rn_rec_stmt_lhs _ stmt@(L _ (ParStmt _ _ _ _))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
   
-rn_rec_stmt_lhs _ stmt@(L _ (TransformStmt {}))	-- Syntactically illegal in mdo
-  = pprPanic "rn_rec_stmt" (ppr stmt)
-  
-rn_rec_stmt_lhs _ stmt@(L _ (GroupStmt {}))	-- Syntactically illegal in mdo
+rn_rec_stmt_lhs _ stmt@(L _ (TransStmt {}))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
 
 rn_rec_stmt_lhs _ (L _ (LetStmt EmptyLocalBinds))
@@ -1046,11 +1015,8 @@ rn_rec_stmt _ stmt@(L _ (RecStmt {})) _
 rn_rec_stmt _ stmt@(L _ (ParStmt {})) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: ParStmt" (ppr stmt)
 
-rn_rec_stmt _ stmt@(L _ (TransformStmt {})) _	-- Syntactically illegal in mdo
-  = pprPanic "rn_rec_stmt: TransformStmt" (ppr stmt)
-
-rn_rec_stmt _ stmt@(L _ (GroupStmt {})) _	-- Syntactically illegal in mdo
-  = pprPanic "rn_rec_stmt: GroupStmt" (ppr stmt)
+rn_rec_stmt _ stmt@(L _ (TransStmt {})) _	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt: TransStmt" (ppr stmt)
 
 rn_rec_stmt _ (L _ (LetStmt EmptyLocalBinds)) _
   = panic "rn_rec_stmt: LetStmt EmptyLocalBinds"
@@ -1254,8 +1220,7 @@ checkStmt ctxt (L _ stmt)
              , ptext (sLit "in") <+> pprAStmtContext ctxt ]
 
 pprStmtCat :: Stmt a -> SDoc
-pprStmtCat (TransformStmt {}) = ptext (sLit "transform")
-pprStmtCat (GroupStmt {})     = ptext (sLit "group")
+pprStmtCat (TransStmt {})     = ptext (sLit "transform")
 pprStmtCat (LastStmt {})      = ptext (sLit "return expression")
 pprStmtCat (ExprStmt {})      = ptext (sLit "exprssion")
 pprStmtCat (BindStmt {})      = ptext (sLit "binding")
@@ -1313,10 +1278,7 @@ okCompStmt dflags _ stmt
        ParStmt {} 
          | Opt_ParallelListComp `xopt` dflags -> isOK
          | otherwise -> Just (ptext (sLit "Use -XParallelListComp"))
-       TransformStmt {} 
-         | Opt_TransformListComp `xopt` dflags -> isOK
-         | otherwise -> Just (ptext (sLit "Use -XTransformListComp"))
-       GroupStmt {} 
+       TransStmt {} 
          | Opt_TransformListComp `xopt` dflags -> isOK
          | otherwise -> Just (ptext (sLit "Use -XTransformListComp"))
        LastStmt {} -> notOK
