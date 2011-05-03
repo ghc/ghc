@@ -1,11 +1,12 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XNoGenerics        #-}
+{-# OPTIONS_GHC -XGenerics          #-}
 
 module GHC.Ordering where
 
--- We need Inl etc behind the scenes for the Ordering definition
+-- We need generics behind the scenes for the Ordering definition
 import GHC.Generics ()
+import GHC.CString ()
 
 default ()
 

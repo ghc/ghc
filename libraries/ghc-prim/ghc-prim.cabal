@@ -32,6 +32,7 @@ Library {
         GHC.Tuple
         GHC.Types
         GHC.Unit
+        GHC.CString
 
     if flag(include-ghc-prim) {
         exposed-modules: GHC.Prim

@@ -15,13 +15,17 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XNoGenerics        #-}
+{-# OPTIONS_GHC -XGenerics          #-}
 
-module GHC.Types (Bool(..), Char(..), Int(..), Float(..), Double(..), IO(..)) where
+module GHC.Types (
+    Bool(..), Char(..), Int(..)
+  , Float(..), Double(..), IO(..)
+  ) where
 
 import GHC.Prim
--- We need Inl etc behind the scenes for the type definitions
-import GHC.Generics () -- JPM: Do we really need this?
+-- We need generics behind the scenes for the type definitions
+import GHC.Generics ()
+import GHC.CString ()
 
 infixr 5 :
 
@@ -72,4 +76,3 @@ at some point, directly or indirectly, from @Main.main@.
 or the '>>' and '>>=' operations from the 'Monad' class.
 -}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
-

@@ -1,10 +1,11 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XNoGenerics        #-}
+{-# OPTIONS_GHC -XGenerics          #-}
 
 module GHC.Unit where
 
 import GHC.Generics ()
+import GHC.CString ()
 
 default ()
 

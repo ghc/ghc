@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XNoGenerics        #-}
+{-# OPTIONS_GHC -XGenerics          #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Tuple
@@ -16,8 +16,9 @@
 
 module GHC.Tuple where
 
--- We need Inl etc behind the scenes for the tuple definitions
+-- We need generics behind the scenes for the tuple definitions
 import GHC.Generics ()
+import GHC.CString ()
 
 default () -- Double and Integer aren't available yet
 
