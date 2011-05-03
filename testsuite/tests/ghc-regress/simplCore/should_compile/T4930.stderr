@@ -2,7 +2,7 @@
 ==================== Tidy Core ====================
 lvl :: [GHC.Types.Char]
 [GblId]
-lvl = GHC.Base.unpackCString# "Too small"
+lvl = GHC.CString.unpackCString# "Too small"
 
 T4930.foo1 :: GHC.Types.Int
 [GblId, Str=DmdType b]

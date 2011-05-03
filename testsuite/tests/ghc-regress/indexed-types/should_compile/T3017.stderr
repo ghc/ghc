@@ -6,13 +6,11 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
     data ListColl a
         RecFlag NonRecursive
-        Generics: no
         = L :: forall a. [a] -> ListColl a Stricts: _
         FamilyInstance: none
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11-27
 FAMILY INSTANCES
   type Elem (ListColl a) -- Defined at T3017.hs:13:9-12
-Tycons with generics:
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]

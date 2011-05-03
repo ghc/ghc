@@ -1,6 +1,5 @@
 TYPE SIGNATURES
     f :: forall a b a1. C a1 (a, b) => a1 -> a
 TYPE CONSTRUCTORS
-Tycons with generics:
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]

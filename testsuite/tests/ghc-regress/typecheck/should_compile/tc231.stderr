@@ -6,15 +6,12 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
     data Q s a chain
         RecFlag NonRecursive
-        Generics: no
         = Node :: forall s a chain. s -> a -> chain -> Q s a chain
               Stricts: _ _ _
         FamilyInstance: none
     data Z a
         RecFlag NonRecursive
-        Generics: no
         = Z :: forall a. a -> Z a Stricts: _
         FamilyInstance: none
-Tycons with generics:
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]
