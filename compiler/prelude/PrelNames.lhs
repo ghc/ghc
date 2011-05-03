@@ -271,7 +271,7 @@ pRELUDE		= mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_MAGIC,
-    gHC_CLASSES, gHC_BASE, gHC_ENUM,
+    gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
@@ -286,6 +286,7 @@ gHC_UNIT	= mkPrimModule (fsLit "GHC.Unit")
 gHC_ORDERING	= mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS	= mkPrimModule (fsLit "GHC.Generics")
 gHC_MAGIC	= mkPrimModule (fsLit "GHC.Magic")
+gHC_CSTRING	= mkPrimModule (fsLit "GHC.CString")
 
 gHC_CLASSES	= mkBaseModule (fsLit "GHC.Classes")
 gHC_BASE	= mkBaseModule (fsLit "GHC.Base")
@@ -683,10 +684,10 @@ rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
 -- Base strings Strings
 unpackCStringName, unpackCStringAppendName, unpackCStringFoldrName,
     unpackCStringUtf8Name, eqStringName, stringTyConName :: Name
-unpackCStringName       = varQual gHC_BASE (fsLit "unpackCString#") unpackCStringIdKey
-unpackCStringAppendName = varQual gHC_BASE (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
-unpackCStringFoldrName  = varQual gHC_BASE (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
-unpackCStringUtf8Name   = varQual gHC_BASE (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
+unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
+unpackCStringAppendName = varQual gHC_CSTRING (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
+unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
+unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName	 	= varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
 stringTyConName         = tcQual  gHC_BASE (fsLit "String") stringTyConKey
 
