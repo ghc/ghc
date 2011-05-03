@@ -1,0 +1,5 @@
+
+cannotDoRep0.hs:9:45:
+    Can't make a derived instance of `Representable0 Dynamic':
+      Cannot derive Representable for type Dynamic
+    In the data type declaration for `Dynamic'
