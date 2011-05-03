@@ -111,14 +111,15 @@ tc_mkRep0Ty :: -- The type to generate representation for
             -> TcM Type
 tc_mkRep0Ty tycon metaDts = 
   do
-    d1 <- tcLookupTyCon d1TyConName
-    c1 <- tcLookupTyCon c1TyConName
-    s1 <- tcLookupTyCon s1TyConName
-    rec0 <- tcLookupTyCon rec0TyConName
-    par0 <- tcLookupTyCon par0TyConName
-    u1 <- tcLookupTyCon u1TyConName
-    v1 <- tcLookupTyCon v1TyConName
-    plus <- tcLookupTyCon sumTyConName
+    d1    <- tcLookupTyCon d1TyConName
+    c1    <- tcLookupTyCon c1TyConName
+    s1    <- tcLookupTyCon s1TyConName
+    nS1   <- tcLookupTyCon noSelTyConName
+    rec0  <- tcLookupTyCon rec0TyConName
+    par0  <- tcLookupTyCon par0TyConName
+    u1    <- tcLookupTyCon u1TyConName
+    v1    <- tcLookupTyCon v1TyConName
+    plus  <- tcLookupTyCon sumTyConName
     times <- tcLookupTyCon prodTyConName
     
     let mkSum' a b = mkTyConApp plus  [a,b]
@@ -126,23 +127,29 @@ tc_mkRep0Ty tycon metaDts =
         mkRec0 a   = mkTyConApp rec0  [a]
         mkPar0 a   = mkTyConApp par0  [a]
         mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
-        mkC  i d a = mkTyConApp c1    [d, prod i (dataConOrigArgTys a)]
-        mkS    d a = mkTyConApp s1    [d, a]
+        mkC  i d a = mkTyConApp c1    [d, prod i (dataConOrigArgTys a) 
+                                                 (null (dataConFieldLabels a))]
+        -- This field has no label
+        mkS True  _ a = mkTyConApp s1 [mkTyConTy nS1, a]
+        -- This field has a  label
+        mkS False d a = mkTyConApp s1 [d, a]
         
         sumP [] = mkTyConTy v1
         sumP l  = ASSERT (length metaCTyCons == length l)
                     foldBal mkSum' [ mkC i d a
                                    | (d,(a,i)) <- zip metaCTyCons (zip l [0..])]
-        prod :: Int -> [Type] -> Type
-        prod i [] = ASSERT (length metaSTyCons > i)
-                      ASSERT (length (metaSTyCons !! i) == 0)
-                        mkTyConTy u1
-        prod i l  = ASSERT (length metaSTyCons > i)
-                      ASSERT (length l == length (metaSTyCons !! i))
-                        foldBal mkProd [ arg d a 
-                                       | (d,a) <- zip (metaSTyCons !! i) l ]
+        -- The Bool is True if this constructor has labelled fields
+        prod :: Int -> [Type] -> Bool -> Type
+        prod i [] _ = ASSERT (length metaSTyCons > i)
+                        ASSERT (length (metaSTyCons !! i) == 0)
+                          mkTyConTy u1
+        prod i l b  = ASSERT (length metaSTyCons > i)
+                        ASSERT (length l == length (metaSTyCons !! i))
+                          foldBal mkProd [ arg d t b
+                                         | (d,t) <- zip (metaSTyCons !! i) l ]
         
-        arg d t = mkS d (recOrPar t (getTyVar_maybe t))
+        arg :: Type -> Type -> Bool -> Type
+        arg d t b = mkS b d (recOrPar t (getTyVar_maybe t))
         -- Argument is not a type variable, use Rec0
         recOrPar t Nothing  = mkRec0 t
         -- Argument is a type variable, use Par0
