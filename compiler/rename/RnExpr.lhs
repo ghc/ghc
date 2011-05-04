@@ -841,9 +841,24 @@ rnParallelStmts ctxt segs thing_inside
 
 lookupStmtName :: HsStmtContext Name -> Name -> RnM (HsExpr Name, FreeVars)
 -- Like lookupSyntaxName, but ListComp/PArrComp are never rebindable
-lookupStmtName ListComp n = return (HsVar n, emptyFVs)
-lookupStmtName PArrComp n = return (HsVar n, emptyFVs)
-lookupStmtName _        n = lookupSyntaxName n
+-- Neither is ArrowExpr, which has its own desugarer in DsArrows
+lookupStmtName ctxt n 
+  = case ctxt of
+      ListComp        -> not_rebindable
+      PArrComp        -> not_rebindable
+      ArrowExpr       -> not_rebindable
+      PatGuard {}     -> not_rebindable
+
+      DoExpr          -> rebindable
+      MDoExpr         -> rebindable
+      MonadComp       -> rebindable
+      GhciStmt        -> rebindable   -- I suppose?
+
+      ParStmtCtxt   c -> lookupStmtName c n	-- Look inside to
+      TransStmtCtxt c -> lookupStmtName c n	-- the parent context
+  where
+    rebindable     = lookupSyntaxName n
+    not_rebindable = return (HsVar n, emptyFVs)
 \end{code}
 
 Note [Renaming parallel Stmts]
