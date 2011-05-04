@@ -83,3 +83,4 @@ test('T4870',
       extra_clean(['T4870a.hi', 'T4870a.o'])],
      multimod_compile,
      ['T4870', '-v0'])
+test('T5117', normal, compile, [''])
