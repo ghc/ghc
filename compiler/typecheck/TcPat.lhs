@@ -36,7 +36,6 @@ import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import DynFlags
 import SrcLoc
-import ErrUtils
 import Util
 import Outputable
 import FastString
@@ -348,9 +347,9 @@ tc_lpat :: LPat Name
 	-> TcM a
 	-> TcM (LPat TcId, a)
 tc_lpat (L span pat) pat_ty penv thing_inside
-  = setSrcSpan span		  $
-    maybeAddErrCtxt (patCtxt pat) $
-    do	{ (pat', res) <- tc_pat penv pat pat_ty thing_inside
+  = setSrcSpan span $
+    do	{ (pat', res) <- maybeWrapPatCtxt pat (tc_pat penv pat pat_ty)
+                                          thing_inside
 	; return (L span pat', res) }
 
 tc_lpats :: PatEnv
@@ -774,7 +773,6 @@ matchExpectedConTy data_tc pat_ty
        	     -- coi : T tys ~ pat_ty
 \end{code}
 
-Noate [
 Note [Matching constructor patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
@@ -1006,12 +1004,18 @@ sigPatCtxt pats bound_tvs pat_tys body_ty tidy_env
 -}
 
 \begin{code}
-patCtxt :: Pat Name -> Maybe Message	-- Not all patterns are worth pushing a context
-patCtxt (VarPat _)  = Nothing
-patCtxt (ParPat _)  = Nothing
-patCtxt (AsPat _ _) = Nothing
-patCtxt pat 	    = Just (hang (ptext (sLit "In the pattern:")) 
-                         2 (ppr pat))
+maybeWrapPatCtxt :: Pat Name -> (TcM a -> TcM b) -> TcM a -> TcM b
+-- Not all patterns are worth pushing a context
+maybeWrapPatCtxt pat tcm thing_inside 
+  | not (worth_wrapping pat) = tcm thing_inside
+  | otherwise                = addErrCtxt msg $ tcm $ popErrCtxt thing_inside
+    			       -- Remember to pop before doing thing_inside
+  where
+   worth_wrapping (VarPat {}) = False
+   worth_wrapping (ParPat {}) = False
+   worth_wrapping (AsPat {})  = False
+   worth_wrapping _  	      = True
+   msg = hang (ptext (sLit "In the pattern:")) 2 (ppr pat)
 
 -----------------------------------------------
 checkExistentials :: [TyVar] -> PatEnv -> TcM ()

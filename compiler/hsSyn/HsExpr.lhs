@@ -23,6 +23,8 @@ import Name
 import BasicTypes
 import DataCon
 import SrcLoc
+import Util( dropTail )
+import StaticFlags( opt_PprStyle_Debug )
 import Outputable
 import FastString
 
@@ -146,8 +148,6 @@ data HsExpr id
                                      -- because in this context we never use
                                      -- the PatGuard or ParStmt variant
                 [LStmt id]           -- "do":one or more stmts
-                (LHsExpr id)         -- The body; the last expression in the
-                                     -- 'do' of [ body | ... ] in a list comp
                 PostTcType           -- Type of the whole expression
 
   | ExplicitList                -- syntactic list
@@ -439,7 +439,7 @@ ppr_expr (HsLet binds expr)
   = sep [hang (ptext (sLit "let")) 2 (pprBinds binds),
          hang (ptext (sLit "in"))  2 (ppr expr)]
 
-ppr_expr (HsDo do_or_list_comp stmts body _) = pprDo do_or_list_comp stmts body
+ppr_expr (HsDo do_or_list_comp stmts _) = pprDo do_or_list_comp stmts
 
 ppr_expr (ExplicitList _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
@@ -575,7 +575,7 @@ pprParendExpr expr
       HsPar {}          -> pp_as_was
       HsBracket {}      -> pp_as_was
       HsBracketOut _ [] -> pp_as_was
-      HsDo sc _ _ _
+      HsDo sc _ _
        | isListCompExpr sc -> pp_as_was
       _                    -> parens pp_as_was
 
@@ -830,51 +830,59 @@ type LStmtLR idL idR = Located (StmtLR idL idR)
 
 type Stmt id = StmtLR id id
 
--- The SyntaxExprs in here are used *only* for do-notation, which
--- has rebindable syntax.  Otherwise they are unused.
+-- The SyntaxExprs in here are used *only* for do-notation and monad
+-- comprehensions, which have rebindable syntax. Otherwise they are unused.
 data StmtLR idL idR
-  = BindStmt (LPat idL)
+  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp, 
+    	      -- and (after the renamer) DoExpr, MDoExpr
+              -- Not used for GhciStmt, PatGuard, which scope over other stuff
+               (LHsExpr idR)
+               (SyntaxExpr idR)   -- The return operator, used only for MonadComp
+	       		   	  -- For ListComp, PArrComp, we use the baked-in 'return'
+				  -- For DoExpr, MDoExpr, we don't appply a 'return' at all
+	       		   	  -- See Note [Monad Comprehensions]
+  | BindStmt (LPat idL)
              (LHsExpr idR)
-             (SyntaxExpr idR) -- The (>>=) operator
+             (SyntaxExpr idR) -- The (>>=) operator; see Note [The type of bind]
              (SyntaxExpr idR) -- The fail operator
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
 
   | ExprStmt (LHsExpr idR)     -- See Note [ExprStmt]
              (SyntaxExpr idR) -- The (>>) operator
+             (SyntaxExpr idR) -- The `guard` operator; used only in MonadComp
+                              -- See notes [Monad Comprehensions]
              PostTcType       -- Element type of the RHS (used for arrows)
 
   | LetStmt  (HsLocalBindsLR idL idR)
 
-  -- ParStmts only occur in a list comprehension
+  -- ParStmts only occur in a list/monad comprehension
   | ParStmt  [([LStmt idL], [idR])]
-  -- After renaming, the ids are the binders bound by the stmts and used
-  -- after them
+             (SyntaxExpr idR)           -- Polymorphic `mzip` for monad comprehensions
+             (SyntaxExpr idR)           -- The `>>=` operator
+             (SyntaxExpr idR)           -- Polymorphic `return` operator
+	     		 		-- with type (forall a. a -> m a)
+                                        -- See notes [Monad Comprehensions]
+  	    -- After renaming, the ids are the binders 
+  	    -- bound by the stmts and used after themp
 
-  -- "qs, then f by e" ==> TransformStmt qs binders f (Just e)
-  -- "qs, then f"      ==> TransformStmt qs binders f Nothing
-  | TransformStmt 
-         [LStmt idL]	-- Stmts are the ones to the left of the 'then'
+  | TransStmt {
+      trS_form  :: TransForm,
+      trS_stmts :: [LStmt idL],      -- Stmts to the *left* of the 'group'
+	            	              -- which generates the tuples to be grouped
 
-         [idR] 		-- After renaming, the IDs are the binders occurring 
-		        -- within this transform statement that are used after it
-
-         (LHsExpr idR)		-- "then f"
-
-         (Maybe (LHsExpr idR))	-- "by e" (optional)
-
-  | GroupStmt 
-         [LStmt idL]      -- Stmts to the *left* of the 'group'
-	 	       	  -- which generates the tuples to be grouped
-
-         [(idR, idR)]	  -- See Note [GroupStmt binder map]
+      trS_bndrs :: [(idR, idR)],     -- See Note [TransStmt binder map]
 				
-         (Maybe (LHsExpr idR)) 	-- "by e" (optional)
+      trS_using :: LHsExpr idR,
+      trS_by :: Maybe (LHsExpr idR), 	-- "by e" (optional)
+	-- Invariant: if trS_form = GroupBy, then grp_by = Just e
 
-         (Either		-- "using f"
-             (LHsExpr idR)	--   Left f  => explicit "using f"
-             (SyntaxExpr idR))	--   Right f => implicit; filled in with 'groupWith'
-							
+      trS_ret :: SyntaxExpr idR,      -- The monomorphic 'return' function for 
+                                       -- the inner monad comprehensions
+      trS_bind :: SyntaxExpr idR,     -- The '(>>=)' operator
+      trS_fmap :: SyntaxExpr idR      -- The polymorphic 'fmap' function for desugaring
+      		   	      	       -- Only for 'group' forms
+    }                                  -- See Note [Monad Comprehensions]
 
   -- Recursive statement (see Note [How RecStmt works] below)
   | RecStmt
@@ -905,20 +913,44 @@ data StmtLR idL idR
                                      -- because the Id may be *polymorphic*, but
                                      -- the returned thing has to be *monomorphic*, 
 				     -- so they may be type applications
+
+      , recS_ret_ty :: PostTcType    -- The type of of do { stmts; return (a,b,c) }
+      		       		     -- With rebindable syntax the type might not
+				     -- be quite as simple as (m (tya, tyb, tyc)).
       }
+  deriving (Data, Typeable)
+
+data TransForm		-- The 'f' below is the 'using' function, 'e' is the by function
+  = ThenForm		-- then f          or    then f by e
+  | GroupFormU		-- group using f   or    group using f by e
+  | GroupFormB    	-- group by e  
+      -- In the GroupByFormB, trS_using is filled in with
+      --    'groupWith' (list comprehensions) or 
+      --    'groupM' (monad comprehensions)
   deriving (Data, Typeable)
 \end{code}
 
-Note [GroupStmt binder map]
+Note [The type of bind in Stmts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some Stmts, notably BindStmt, keep the (>>=) bind operator.  
+We do NOT assume that it has type  
+    (>>=) :: m a -> (a -> m b) -> m b
+In some cases (see Trac #303, #1537) it might have a more 
+exotic type, such as
+    (>>=) :: m i j a -> (a -> m j k b) -> m i k b
+So we must be careful not to make assumptions about the type.
+In particular, the monad may not be uniform throughout.
+
+Note [TransStmt binder map]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The [(idR,idR)] in a GroupStmt behaves as follows:
+The [(idR,idR)] in a TransStmt behaves as follows:
 
   * Before renaming: []
 
   * After renaming: 
     	  [ (x27,x27), ..., (z35,z35) ]
     These are the variables 
-        bound by the stmts to the left of the 'group'
+       bound by the stmts to the left of the 'group'
        and used either in the 'by' clause, 
                 or     in the stmts following the 'group'
     Each item is a pair of identical variables.
@@ -952,7 +984,13 @@ depends on the context.  Consider the following contexts:
                 E :: Bool
           Translation: if E then fail else ...
 
-Array comprehensions are handled like list comprehensions -=chak
+        A monad comprehension of type (m res_ty)
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        * ExprStmt E Bool:   [ .. | .... E ]
+                E :: Bool
+          Translation: guard E >> ...
+
+Array comprehensions are handled like list comprehensions.
 
 Note [How RecStmt works]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -993,23 +1031,60 @@ A (RecStmt stmts) types as if you had written
 where v1..vn are the later_ids
       r1..rm are the rec_ids
 
+Note [Monad Comprehensions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Monad comprehensions require separate functions like 'return' and
+'>>=' for desugaring. These functions are stored in the statements
+used in monad comprehensions. For example, the 'return' of the 'LastStmt'
+expression is used to lift the body of the monad comprehension:
+
+  [ body | stmts ]
+   =>
+  stmts >>= \bndrs -> return body
+
+In transform and grouping statements ('then ..' and 'then group ..') the
+'return' function is required for nested monad comprehensions, for example:
+
+  [ body | stmts, then f, rest ]
+   =>
+  f [ env | stmts ] >>= \bndrs -> [ body | rest ]
+
+ExprStmts require the 'Control.Monad.guard' function for boolean
+expressions:
+
+  [ body | exp, stmts ]
+   =>
+  guard exp >> [ body | stmts ]
+
+Grouping/parallel statements require the 'Control.Monad.Group.groupM' and
+'Control.Monad.Zip.mzip' functions:
+
+  [ body | stmts, then group by e, rest]
+   =>
+  groupM [ body | stmts ] >>= \bndrs -> [ body | rest ]
+
+  [ body | stmts1 | stmts2 | .. ]
+   =>
+  mzip stmts1 (mzip stmts2 (..)) >>= \(bndrs1, (bndrs2, ..)) -> return body
+
+In any other context than 'MonadComp', the fields for most of these
+'SyntaxExpr's stay bottom.
+
 
 \begin{code}
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (StmtLR idL idR) where
     ppr stmt = pprStmt stmt
 
 pprStmt :: (OutputableBndr idL, OutputableBndr idR) => (StmtLR idL idR) -> SDoc
+pprStmt (LastStmt expr _)         = ifPprDebug (ptext (sLit "[last]")) <+> ppr expr
 pprStmt (BindStmt pat expr _ _)   = hsep [ppr pat, ptext (sLit "<-"), ppr expr]
 pprStmt (LetStmt binds)           = hsep [ptext (sLit "let"), pprBinds binds]
-pprStmt (ExprStmt expr _ _)       = ppr expr
-pprStmt (ParStmt stmtss)          = hsep (map doStmts stmtss)
+pprStmt (ExprStmt expr _ _ _)     = ppr expr
+pprStmt (ParStmt stmtss _ _ _)    = hsep (map doStmts stmtss)
   where doStmts stmts = ptext (sLit "| ") <> ppr stmts
 
-pprStmt (TransformStmt stmts bndrs using by)
-  = sep (ppr_lc_stmts stmts ++ [pprTransformStmt bndrs using by])
-
-pprStmt (GroupStmt stmts _ by using) 
-  = sep (ppr_lc_stmts stmts ++ [pprGroupStmt by using])
+pprStmt (TransStmt { trS_stmts = stmts, trS_by = by, trS_using = using, trS_form = form })
+  = sep (ppr_lc_stmts stmts ++ [pprTransStmt by using form])
 
 pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
@@ -1024,40 +1099,47 @@ pprTransformStmt bndrs using by
         , nest 2 (ppr using)
         , nest 2 (pprBy by)]
 
-pprGroupStmt :: OutputableBndr id => Maybe (LHsExpr id)
-                                  -> Either (LHsExpr id) (SyntaxExpr is)
+pprTransStmt :: OutputableBndr id => Maybe (LHsExpr id)
+                                  -> LHsExpr id -> TransForm
 				  -> SDoc
-pprGroupStmt by using 
-  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 (ppr_using using)]
-  where
-    ppr_using (Right _) = empty
-    ppr_using (Left e)  = ptext (sLit "using") <+> ppr e
+pprTransStmt by using ThenForm
+  = sep [ ptext (sLit "then"), nest 2 (ppr using), nest 2 (pprBy by)]
+pprTransStmt by _ GroupFormB
+  = sep [ ptext (sLit "then group"), nest 2 (pprBy by) ]
+pprTransStmt by using GroupFormU
+  = sep [ ptext (sLit "then group"), nest 2 (pprBy by), nest 2 (ptext (sLit "using") <+> ppr using)]
 
 pprBy :: OutputableBndr id => Maybe (LHsExpr id) -> SDoc
 pprBy Nothing  = empty
 pprBy (Just e) = ptext (sLit "by") <+> ppr e
 
-pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
-pprDo DoExpr      stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
-pprDo GhciStmt    stmts body = ptext (sLit "do")  <+> ppr_do_stmts stmts body
-pprDo MDoExpr     stmts body = ptext (sLit "mdo") <+> ppr_do_stmts stmts body
-pprDo ListComp    stmts body = brackets    $ pprComp stmts body
-pprDo PArrComp    stmts body = pa_brackets $ pprComp stmts body
-pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
+pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> SDoc
+pprDo DoExpr      stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
+pprDo GhciStmt    stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
+pprDo ArrowExpr   stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
+pprDo MDoExpr     stmts = ptext (sLit "mdo") <+> ppr_do_stmts stmts
+pprDo ListComp    stmts = brackets    $ pprComp stmts
+pprDo PArrComp    stmts = pa_brackets $ pprComp stmts
+pprDo MonadComp   stmts = brackets    $ pprComp stmts
+pprDo _           _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
-ppr_do_stmts :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
+ppr_do_stmts :: OutputableBndr id => [LStmt id] -> SDoc
 -- Print a bunch of do stmts, with explicit braces and semicolons,
 -- so that we are not vulnerable to layout bugs
-ppr_do_stmts stmts body
-  = lbrace <+> pprDeeperList vcat ([ppr s <> semi | s <- stmts] ++ [ppr body])
+ppr_do_stmts stmts 
+  = lbrace <+> pprDeeperList vcat (punctuate semi (map ppr stmts))
            <+> rbrace
 
 ppr_lc_stmts :: OutputableBndr id => [LStmt id] -> [SDoc]
 ppr_lc_stmts stmts = [ppr s <> comma | s <- stmts]
 
-pprComp :: OutputableBndr id => [LStmt id] -> LHsExpr id -> SDoc
-pprComp quals body	  -- Prints:  body | qual1, ..., qualn 
-  = hang (ppr body <+> char '|') 2 (interpp'SP quals)
+pprComp :: OutputableBndr id => [LStmt id] -> SDoc
+pprComp quals	  -- Prints:  body | qual1, ..., qualn 
+  | not (null quals)
+  , L _ (LastStmt body _) <- last quals
+  = hang (ppr body <+> char '|') 2 (interpp'SP (dropTail 1 quals))
+  | otherwise
+  = pprPanic "pprComp" (interpp'SP quals)
 \end{code}
 
 %************************************************************************
@@ -1175,26 +1257,33 @@ data HsMatchContext id  -- Context of a Match
 
 data HsStmtContext id
   = ListComp
-  | DoExpr
-  | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
-  | MDoExpr                              -- Recursive do-expression
+  | MonadComp
   | PArrComp                             -- Parallel array comprehension
+
+  | DoExpr				 -- do { ... }
+  | MDoExpr                              -- mdo { ... }  ie recursive do-expression 
+  | ArrowExpr				 -- do-notation in an arrow-command context
+
+  | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
-  | TransformStmtCtxt (HsStmtContext id) -- A branch of a transform stmt
+  | TransStmtCtxt (HsStmtContext id)     -- A branch of a transform stmt
   deriving (Data, Typeable)
 \end{code}
 
 \begin{code}
-isDoExpr :: HsStmtContext id -> Bool
-isDoExpr DoExpr  = True
-isDoExpr MDoExpr = True
-isDoExpr _       = False
-
 isListCompExpr :: HsStmtContext id -> Bool
-isListCompExpr ListComp = True
-isListCompExpr PArrComp = True
-isListCompExpr _        = False
+-- Uses syntax [ e | quals ]
+isListCompExpr ListComp  = True
+isListCompExpr PArrComp  = True
+isListCompExpr MonadComp = True
+isListCompExpr _         = False
+
+isMonadCompExpr :: HsStmtContext id -> Bool
+isMonadCompExpr MonadComp            = True
+isMonadCompExpr (ParStmtCtxt ctxt)   = isMonadCompExpr ctxt
+isMonadCompExpr (TransStmtCtxt ctxt) = isMonadCompExpr ctxt
+isMonadCompExpr _                    = False
 \end{code}
 
 \begin{code}
@@ -1231,33 +1320,41 @@ pprMatchContextNoun ProcExpr        = ptext (sLit "arrow abstraction")
 pprMatchContextNoun (StmtCtxt ctxt) = ptext (sLit "pattern binding in")
                                       $$ pprStmtContext ctxt
 
-pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
+-----------------
+pprAStmtContext, pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
+pprAStmtContext ctxt = article <+> pprStmtContext ctxt
+  where
+    pp_an = ptext (sLit "an")
+    pp_a  = ptext (sLit "a")
+    article = case ctxt of
+                  MDoExpr  -> pp_an
+                  PArrComp -> pp_an
+		  GhciStmt -> pp_an
+                  _        -> pp_a
+
+
+-----------------
+pprStmtContext GhciStmt        = ptext (sLit "interactive GHCi command")
+pprStmtContext DoExpr          = ptext (sLit "'do' block")
+pprStmtContext MDoExpr         = ptext (sLit "'mdo' block")
+pprStmtContext ArrowExpr       = ptext (sLit "'do' block in an arrow command")
+pprStmtContext ListComp        = ptext (sLit "list comprehension")
+pprStmtContext MonadComp       = ptext (sLit "monad comprehension")
+pprStmtContext PArrComp        = ptext (sLit "array comprehension")
+pprStmtContext (PatGuard ctxt) = ptext (sLit "pattern guard for") $$ pprMatchContext ctxt
+
+-- Drop the inner contexts when reporting errors, else we get
+--     Unexpected transform statement
+--     in a transformed branch of
+--          transformed branch of
+--          transformed branch of monad comprehension
 pprStmtContext (ParStmtCtxt c)
- = sep [ptext (sLit "a parallel branch of"), pprStmtContext c]
-pprStmtContext (TransformStmtCtxt c)
- = sep [ptext (sLit "a transformed branch of"), pprStmtContext c]
-pprStmtContext (PatGuard ctxt)
- = ptext (sLit "a pattern guard for") $$ pprMatchContext ctxt
-pprStmtContext GhciStmt        = ptext (sLit "an interactive GHCi command")
-pprStmtContext DoExpr          = ptext (sLit "a 'do' expression")
-pprStmtContext MDoExpr         = ptext (sLit "an 'mdo' expression")
-pprStmtContext ListComp        = ptext (sLit "a list comprehension")
-pprStmtContext PArrComp        = ptext (sLit "an array comprehension")
+ | opt_PprStyle_Debug = sep [ptext (sLit "parallel branch of"), pprAStmtContext c]
+ | otherwise          = pprStmtContext c
+pprStmtContext (TransStmtCtxt c)
+ | opt_PprStyle_Debug = sep [ptext (sLit "transformed branch of"), pprAStmtContext c]
+ | otherwise          = pprStmtContext c
 
-{-
-pprMatchRhsContext (FunRhs fun) = ptext (sLit "a right-hand side of function") <+> quotes (ppr fun)
-pprMatchRhsContext CaseAlt      = ptext (sLit "the body of a case alternative")
-pprMatchRhsContext PatBindRhs   = ptext (sLit "the right-hand side of a pattern binding")
-pprMatchRhsContext LambdaExpr   = ptext (sLit "the body of a lambda")
-pprMatchRhsContext ProcExpr     = ptext (sLit "the body of a proc")
-pprMatchRhsContext other        = panic "pprMatchRhsContext"    -- RecUpd, StmtCtxt
-
--- Used for the result statement of comprehension
--- e.g. the 'e' in      [ e | ... ]
---      or the 'r' in   f x = r
-pprStmtResultContext (PatGuard ctxt) = pprMatchRhsContext ctxt
-pprStmtResultContext other           = ptext (sLit "the result of") <+> pprStmtContext other
--}
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: Outputable id => HsMatchContext id -> SDoc
@@ -1268,14 +1365,16 @@ matchContextErrString RecUpd                     = ptext (sLit "record update")
 matchContextErrString LambdaExpr                 = ptext (sLit "lambda")
 matchContextErrString ProcExpr                   = ptext (sLit "proc")
 matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (PatGuard _))    = ptext (sLit "pattern guard")
-matchContextErrString (StmtCtxt GhciStmt)        = ptext (sLit "interactive GHCi command")
-matchContextErrString (StmtCtxt DoExpr)          = ptext (sLit "'do' expression")
-matchContextErrString (StmtCtxt MDoExpr)         = ptext (sLit "'mdo' expression")
-matchContextErrString (StmtCtxt ListComp)        = ptext (sLit "list comprehension")
-matchContextErrString (StmtCtxt PArrComp)        = ptext (sLit "array comprehension")
+matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (PatGuard _))      = ptext (sLit "pattern guard")
+matchContextErrString (StmtCtxt GhciStmt)          = ptext (sLit "interactive GHCi command")
+matchContextErrString (StmtCtxt DoExpr)            = ptext (sLit "'do' block")
+matchContextErrString (StmtCtxt ArrowExpr)         = ptext (sLit "'do' block")
+matchContextErrString (StmtCtxt MDoExpr)           = ptext (sLit "'mdo' block")
+matchContextErrString (StmtCtxt ListComp)          = ptext (sLit "list comprehension")
+matchContextErrString (StmtCtxt MonadComp)         = ptext (sLit "monad comprehension")
+matchContextErrString (StmtCtxt PArrComp)          = ptext (sLit "array comprehension")
 \end{code}
 
 \begin{code}
@@ -1286,11 +1385,16 @@ pprMatchInCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <>
 
 pprStmtInCtxt :: (OutputableBndr idL, OutputableBndr idR)
    	       => HsStmtContext idL -> StmtLR idL idR -> SDoc
-pprStmtInCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
-		    	  4 (ppr_stmt stmt)
+pprStmtInCtxt ctxt (LastStmt e _)
+  | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
+  = hang (ptext (sLit "In the expression:")) 2 (ppr e)
+
+pprStmtInCtxt ctxt stmt 
+  = hang (ptext (sLit "In a stmt of") <+> pprAStmtContext ctxt <> colon)
+       2 (ppr_stmt stmt)
   where
     -- For Group and Transform Stmts, don't print the nested stmts!
-    ppr_stmt (GroupStmt _ _ by using)         = pprGroupStmt by using
-    ppr_stmt (TransformStmt _ bndrs using by) = pprTransformStmt bndrs using by
-    ppr_stmt stmt                             = pprStmt stmt
+    ppr_stmt (TransStmt { trS_by = by, trS_using = using
+                        , trS_form = form }) = pprTransStmt by using form
+    ppr_stmt stmt = pprStmt stmt
 \end{code}
