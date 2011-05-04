@@ -137,8 +137,7 @@ data Var
 					-- Identical to the Unique in the name,
 					-- cached here for speed
 	varType       :: Kind,          -- ^ The type or kind of the 'Var' in question
-        isCoercionVar :: Bool
- }
+        isCoercionVar :: Bool }
 
   | TcTyVar { 				-- Used only during type inference
 					-- Used for kind variables during 
