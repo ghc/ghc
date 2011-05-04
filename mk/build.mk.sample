@@ -136,15 +136,6 @@ endif
 # -----------------------------------------------------------------------------
 # Other settings that might be useful
 
-# profiled RTS
-#GhcRtsCcOpts =  -pg -g
-
-# Optimised/profiled RTS
-#GhcRtsCcOpts = -O2 -pg
-
-#GhcRtsWithFrontPanel = YES
-#SRC_HC_OPTS += `gtk-config --libs`
-
 # NoFib settings
 NoFibWays =
 STRIP_CMD = :
