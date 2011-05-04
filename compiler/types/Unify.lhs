@@ -316,9 +316,8 @@ anything, type functions (incl newtypes) match anything, and only
 distinct data types fail to match.  We can elaborate later.
 
 \begin{code}
-typesCantMatch :: [Type] -> [Type] -> Bool
-typesCantMatch tys1 tys2 = ASSERT( equalLength tys1 tys2 )
-		           or (zipWith cant_match tys1 tys2)
+typesCantMatch :: [(Type,Type)] -> Bool
+typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
   where
     cant_match :: Type -> Type -> Bool
     cant_match t1 t2
@@ -330,7 +329,7 @@ typesCantMatch tys1 tys2 = ASSERT( equalLength tys1 tys2 )
 
     cant_match (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 	| isDataTyCon tc1 && isDataTyCon tc2
-	= tc1 /= tc2 || typesCantMatch tys1 tys2
+	= tc1 /= tc2 || typesCantMatch (zipEqual "typesCantMatch" tys1 tys2)
 
     cant_match (FunTy {}) (TyConApp tc _) = isDataTyCon tc
     cant_match (TyConApp tc _) (FunTy {}) = isDataTyCon tc

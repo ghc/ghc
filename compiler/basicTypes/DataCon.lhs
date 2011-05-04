@@ -835,16 +835,17 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 -- Returns True iff the data con *definitely cannot* match a 
 --		    scrutinee of type (T tys)
 --		    where T is the type constructor for the data con
---
+-- NB: look at *all* equality constraints, not only those
+--     in dataConEqSpec; see Trac #5168
 dataConCannotMatch tys con
-  | null eq_spec      = False	-- Common
+  | null theta        = False	-- Common
   | all isTyVarTy tys = False	-- Also common
   | otherwise
-  = typesCantMatch (map (substTyVar subst . fst) eq_spec)
-	           (map snd eq_spec)
+  = typesCantMatch [(Type.substTy subst ty1, Type.substTy subst ty2)
+                   | EqPred ty1 ty2 <- theta ]
   where
     dc_tvs  = dataConUnivTyVars con
-    eq_spec = dataConEqSpec con
+    theta   = dataConTheta con
     subst   = zipTopTvSubst dc_tvs tys
 \end{code}
 
