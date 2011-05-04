@@ -110,8 +110,7 @@ type EqnSet = UniqSet EqnNo
 check :: [EquationInfo] -> ([ExhaustivePat], [EquationInfo])
   -- Second result is the shadowed equations
   -- if there are view patterns, just give up - don't know what the function is
-check qs = pprTrace "check" (ppr tidy_qs) $
-           (untidy_warns, shadowed_eqns)
+check qs = (untidy_warns, shadowed_eqns)
       where
         tidy_qs = map tidy_eqn qs
 	(warns, used_nos) = check' ([1..] `zip` tidy_qs)
