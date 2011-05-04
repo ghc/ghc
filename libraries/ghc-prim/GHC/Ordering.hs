@@ -4,11 +4,11 @@
 
 module GHC.Ordering where
 
--- We need generics behind the scenes for the Ordering definition
-import GHC.Generics ()
-import GHC.CString ()
+import GHC.Generics (Representable0)
+
 
 default ()
 
 data Ordering = LT | EQ | GT
+        deriving Representable0
 

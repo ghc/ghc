@@ -14,8 +14,9 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XGenerics          #-}
+{-# OPTIONS_GHC -XNoImplicitPrelude  #-}
+{-# OPTIONS_GHC -XTypeFamilies       #-}
+{-# OPTIONS_GHC -XGenerics           #-}
 
 module GHC.Types (
     Bool(..), Char(..), Int(..)
@@ -23,15 +24,16 @@ module GHC.Types (
   ) where
 
 import GHC.Prim
--- We need generics behind the scenes for the type definitions
-import GHC.Generics ()
-import GHC.CString ()
+import GHC.Generics
+
 
 infixr 5 :
 
 data [] a = [] | a : [a]
+        deriving Representable0
 
 data Bool = False | True
+        deriving Representable0
 
 {-| The character type 'Char' is an enumeration whose values represent
 Unicode (or equivalently ISO\/IEC 10646) characters
@@ -76,3 +78,75 @@ at some point, directly or indirectly, from @Main.main@.
 or the '>>' and '>>=' operations from the 'Monad' class.
 -}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
+
+
+--------------------------------------------------------------------------------
+-- Generic representations
+--------------------------------------------------------------------------------
+
+-- Int
+data D_Int
+data C_Int
+
+instance Datatype D_Int where
+  datatypeName _ = "Int"
+  moduleName   _ = "GHC.Int"
+
+instance Constructor C_Int where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+type instance Rep0 Int = D1 D_Int (C1 C_Int (S1 NoSelector (Rec0 Int)))
+instance Representable0 Int where
+  from0 x = M1 (M1 (M1 (K1 x)))
+  to0 (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Float
+data D_Float
+data C_Float
+
+instance Datatype D_Float where
+  datatypeName _ = "Float"
+  moduleName   _ = "GHC.Float"
+
+instance Constructor C_Float where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+type instance Rep0 Float = D1 D_Float (C1 C_Float (S1 NoSelector (Rec0 Float)))
+instance Representable0 Float where
+  from0 x = M1 (M1 (M1 (K1 x)))
+  to0 (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Double
+data D_Double
+data C_Double
+
+instance Datatype D_Double where
+  datatypeName _ = "Double"
+  moduleName   _ = "GHC.Float"
+
+instance Constructor C_Double where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+type instance Rep0 Double = D1 D_Double (C1 C_Double (S1 NoSelector (Rec0 Double)))
+instance Representable0 Double where
+  from0 x = M1 (M1 (M1 (K1 x)))
+  to0 (M1 (M1 (M1 (K1 x)))) = x
+
+
+-- Char
+data D_Char
+data C_Char
+
+instance Datatype D_Char where
+  datatypeName _ = "Char"
+  moduleName   _ = "GHC.Base"
+
+instance Constructor C_Char where
+  conName _ = "" -- JPM: I'm not sure this is the right implementation...
+
+type instance Rep0 Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
+instance Representable0 Char where
+  from0 x = M1 (M1 (M1 (K1 x)))
+  to0 (M1 (M1 (M1 (K1 x)))) = x
