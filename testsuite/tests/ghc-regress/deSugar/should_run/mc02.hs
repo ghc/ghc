@@ -16,8 +16,7 @@ employees = [ ("Simon", "MS", 80)
 main = putStrLn (show output)
   where
     output = [ (dept, salary) 
-             | then sortWith by 1
-	     , (name, dept, salary) <- employees
+             | (name, dept, salary) <- employees
              , then sortWith by salary
              , then filter by salary > 50
              , then take 1 ]

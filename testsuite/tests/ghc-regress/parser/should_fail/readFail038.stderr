@@ -1,3 +1,4 @@
 
 readFail038.hs:6:7:
-    Illegal parallel list comprehension: use -XParallelListComp or -XMonadComprehensions
+    Unexpected parallel statement in a list comprehension
+    Use -XParallelListComp

@@ -1,8 +1,8 @@
 
 tcfail190.hs:12:9:
     No instance for (Ord Unorderable)
-      arising from a use of `GHC.Exts.groupWith'
+      arising from a use of `Control.Monad.Group.mgroupWith'
     Possible fix: add an instance declaration for (Ord Unorderable)
-    In the expression: GHC.Exts.groupWith
+    In the expression: Control.Monad.Group.mgroupWith
     In a stmt of a list comprehension: then group by x
     In the expression: [() | x <- [Gnorf, Brain], then group by x]

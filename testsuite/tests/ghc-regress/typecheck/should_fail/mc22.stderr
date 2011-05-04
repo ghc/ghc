@@ -1,18 +1,9 @@
 
-mc22.hs:8:13:
-    No instance for (Num [[Char]])
-      arising from the literal `1'
-    Possible fix: add an instance declaration for (Num [[Char]])
-    In the second argument of `(+)', namely `1'
-    In the expression: x + 1
-    In the expression:
-      [x + 1 | x <- ["Hello", "World"], then group using take 5]
-
 mc22.hs:10:26:
-    Couldn't match type `a' with `[a]'
+    Couldn't match type `a' with `t0 a'
       `a' is a rigid type variable bound by
-          a type expected by the context: [a] -> [[a]] at mc22.hs:10:9
-    Expected type: [a] -> [[a]]
+          a type expected by the context: [a] -> [t0 a] at mc22.hs:10:9
+    Expected type: [a] -> [t0 a]
       Actual type: [a] -> [a]
     In the return type of a call of `take'
     In the expression: take 5

@@ -1,7 +1,8 @@
 
-tcfail189.hs:9:31:
+tcfail189.hs:10:31:
     Couldn't match expected type `a -> t0' with actual type `[a0]'
     Expected type: (a -> t0) -> [a] -> [[a]]
       Actual type: [a0] -> [a0]
     In the return type of a call of `take'
+    Probable cause: `take' is applied to too many arguments
     In the expression: take 2

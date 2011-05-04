@@ -1,4 +1,4 @@
-{-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE MonadComprehensions, ParallelListComp #-}
 
 -- !!! Parallel list comprehensions
 

@@ -3,7 +3,7 @@ simpl017.hs:44:12:
     Couldn't match expected type `forall v. [E m i] -> E' v m a'
                 with actual type `[E m i] -> E' v0 m a'
     In the first argument of `return', namely `f'
-    In the expression: return f
+    In a stmt of a 'do' block: return f
     In the first argument of `E', namely
       `(do { let ix :: [E m i] -> m i
                  ix [i] = runE i
@@ -17,4 +17,4 @@ simpl017.hs:63:5:
     The function `a' is applied to one argument,
     but its type `forall v. [E m0 Int] -> E' v m0 Int' has none
     In the first argument of `plus', namely `a [one]'
-    In the expression: a [one] `plus` a [one]
+    In a stmt of a 'do' block: a [one] `plus` a [one]
