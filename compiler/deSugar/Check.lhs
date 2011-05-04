@@ -110,9 +110,11 @@ type EqnSet = UniqSet EqnNo
 check :: [EquationInfo] -> ([ExhaustivePat], [EquationInfo])
   -- Second result is the shadowed equations
   -- if there are view patterns, just give up - don't know what the function is
-check qs = (untidy_warns, shadowed_eqns)
+check qs = pprTrace "check" (ppr tidy_qs) $
+           (untidy_warns, shadowed_eqns)
       where
-	(warns, used_nos) = check' ([1..] `zip` map tidy_eqn qs)
+        tidy_qs = map tidy_eqn qs
+	(warns, used_nos) = check' ([1..] `zip` tidy_qs)
 	untidy_warns = map untidy_exhaustive warns 
 	shadowed_eqns = [eqn | (eqn,i) <- qs `zip` [1..], 
 				not (i `elementOfUniqSet` used_nos)]
@@ -671,8 +673,6 @@ tidy_pat (CoPat _ pat _)  = tidy_pat pat
 tidy_pat (NPlusKPat id _ _ _) = WildPat (idType (unLoc id))
 tidy_pat (ViewPat _ _ ty)     = WildPat ty
 
-tidy_pat (NPat lit mb_neg eq) = tidyNPat lit mb_neg eq
-
 tidy_pat pat@(ConPatOut { pat_con = L _ id, pat_args = ps })
   = pat { pat_args = tidy_con id ps }
 
@@ -696,16 +696,18 @@ tidy_pat (TuplePat ps boxity ty)
   where
     arity = length ps
 
--- Unpack string patterns fully, so we can see when they overlap with
--- each other, or even explicit lists of Chars.
-tidy_pat (LitPat lit)
+tidy_pat (NPat lit mb_neg eq) = tidyNPat tidy_lit_pat lit mb_neg eq
+tidy_pat (LitPat lit)         = tidy_lit_pat lit
+
+tidy_lit_pat :: HsLit -> Pat Id
+-- Unpack string patterns fully, so we can see when they 
+-- overlap with each other, or even explicit lists of Chars.
+tidy_lit_pat lit
   | HsString s <- lit
-  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mk_char_lit c, pat] stringTy)
+  = unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c, pat] stringTy)
 		  (mkPrefixConPat nilDataCon [] stringTy) (unpackFS s)
   | otherwise
   = tidyLitPat lit 
-  where
-    mk_char_lit c = mkPrefixConPat charDataCon [nlLitPat (HsCharPrim c)] charTy
 
 -----------------
 tidy_con :: DataCon -> HsConPatDetails Id -> HsConPatDetails Id

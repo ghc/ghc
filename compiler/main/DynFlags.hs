@@ -360,6 +360,7 @@ data ExtensionFlag
    | Opt_KindSignatures
    | Opt_ParallelListComp
    | Opt_TransformListComp
+   | Opt_MonadComprehensions
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
    | Opt_DoRec
@@ -1622,6 +1623,7 @@ xFlags = [
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
   ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
   ( "TransformListComp",                Opt_TransformListComp, nop ),
+  ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
@@ -1630,9 +1632,9 @@ xFlags = [
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop), 
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
-  ( "RecursiveDo",                      Opt_RecursiveDo,
+  ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
     deprecatedForExtension "DoRec"),
-  ( "DoRec",                            Opt_DoRec, nop ),
+  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword 
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
