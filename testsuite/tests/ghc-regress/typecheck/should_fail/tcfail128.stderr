@@ -5,7 +5,7 @@ tcfail128.hs:18:16:
     Possible fix:
       add an instance declaration for
       (Data.Array.Base.MArray b0 FlatVector IO)
-    In a stmt of a 'do' expression: v <- thaw tmp
+    In a stmt of a 'do' block: v <- thaw tmp
     In the expression:
       do { let sL = ...
                dim = length sL

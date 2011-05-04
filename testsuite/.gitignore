@@ -8,9 +8,13 @@
 *.orig
 *.prof
 
+*.exe
 *.hi
 *.o
 *.pyc
+*.normalised
+*.eventlog
+*.comp.std*
 
 # -----------------------------------------------------------------------------
 # specific generated files
@@ -82,3 +86,4 @@ tests/ghc-regress/th/TH_import_loop/ModuleA.o-boot
 tests/ghc-regress/typecheck/should_fail/T3468.o-boot
 timeout/calibrate.out
 timeout/install-inplace/
+timeout/dist/

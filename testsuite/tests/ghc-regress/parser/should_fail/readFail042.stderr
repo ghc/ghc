@@ -1,9 +1,11 @@
 
 readFail042.hs:10:9:
-    Illegal transform or grouping list comprehension: use -XTransformListComp
+    Unexpected transform statement in a list comprehension
+    Use -XTransformListComp
 
 readFail042.hs:11:9:
-    Illegal transform or grouping list comprehension: use -XTransformListComp
+    Unexpected transform statement in a list comprehension
+    Use -XTransformListComp
 
 readFail042.hs:11:23: Not in scope: `by'
 
