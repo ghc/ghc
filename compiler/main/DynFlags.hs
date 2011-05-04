@@ -1103,12 +1103,13 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
   let (pic_warns, dflags2)
-        | not (cTargetArch == X86_64 && cTargetOS == Linux) &&
+        | not (cTargetArch == X86_64 && (cTargetOS == Linux || cTargetOS == OSX)) &&
           (not opt_Static || opt_PIC) &&
           hscTarget dflags1 == HscLlvm
-        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -"
-                       ++ "dynamic on this platform;\n"
-                       ++ "         using " ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
+        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and "
+                       ++ "-dynamic on this platform;\n"
+                       ++ "         using "
+                       ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
                 dflags1{ hscTarget = defaultObjectTarget })
         | otherwise = ([], dflags1)
 
