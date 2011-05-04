@@ -1,0 +1,46 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Control.Monad.Zip
+-- Copyright   :  (c) Nils Schweinsberg 2011,
+--                (c) University Tuebingen 2011
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
+-- Maintainer  :  libraries@haskell.org
+-- Stability   :  experimental
+-- Portability :  portable
+--
+-- Monadic zipping (used for monad comprehensions)
+--
+-----------------------------------------------------------------------------
+
+module Control.Monad.Zip where
+
+import Prelude
+import Control.Monad (liftM)
+
+-- | `MonadZip` type class. Minimal definition: `mzip` or `mzipWith`
+--
+-- Instances should satisfy the laws:
+--
+-- * Naturality :
+--
+--   > liftM (f *** g) (mzip ma mb) = mzip (liftM f ma) (liftM g mb)
+--
+-- * Information Preservation:
+--
+--   > liftM (const ()) ma = liftM (const ()) mb
+--   > ==>
+--   > munzip (mzip ma mb) = (ma, mb)
+--
+class Monad m => MonadZip m where
+
+    mzip :: m a -> m b -> m (a,b)
+    mzip = mzipWith (,)
+
+    mzipWith :: (a -> b -> c) -> m a -> m b -> m c
+    mzipWith f ma mb = liftM (uncurry f) (mzip ma mb)
+
+instance MonadZip [] where
+    mzip = zip
+
+munzip :: MonadZip m => m (a,b) -> (m a, m b)
+munzip mab = (liftM fst mab, liftM snd mab)

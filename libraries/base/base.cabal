@@ -121,6 +121,8 @@ Library {
         Control.Monad.ST
         Control.Monad.ST.Lazy
         Control.Monad.ST.Strict
+        Control.Monad.Group
+        Control.Monad.Zip
         Data.Bits,
         Data.Bool,
         Data.Char,
