@@ -1,0 +1,29 @@
+#include "Cmm.h"
+
+/* This code is carefully arranged to tickle the bug reported in #5149 */
+f5149
+{
+    D_ z;
+
+    z = D1;
+
+    W_ x,y;
+    x = R1;
+    y = R2;
+
+    if (x > y) {
+       goto a; /* this jump is shortcutted to g5149 */
+    }  else {
+       goto b;
+    }
+
+  a:
+    jump g5149;
+  b:
+    RET_N(TO_W_(%f2i32(z)));
+}
+
+g5149
+{
+    jump %ENTRY_CODE(Sp(0));
+}
