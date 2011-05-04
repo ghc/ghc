@@ -597,16 +597,17 @@ ppr_tvar tv  -- Note [Infix type variables]
   | isSymOcc (getOccName tv)  = parens (ppr tv)
   | otherwise		      = ppr tv
 
+-------------------
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
 pprForAll tvs = ptext (sLit "forall") <+> sep (map pprTvBndr tvs) <> dot
 
 pprTvBndr :: TyVar -> SDoc
-pprTvBndr tv
+pprTvBndr tv 
   | isLiftedTypeKind kind = ppr_tvar tv
-  | otherwise             = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
-  where
-    kind = tyVarKind tv
+  | otherwise	          = parens (ppr_tvar tv <+> dcolon <+> pprKind kind)
+	     where
+	       kind = tyVarKind tv
 \end{code}
 
 Note [Infix type variables]

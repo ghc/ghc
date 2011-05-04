@@ -1470,6 +1470,7 @@ atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
 atomPrimRep (AnnVar v)    	    = typePrimRep (idType v)
 atomPrimRep (AnnLit l)    	    = typePrimRep (literalType l)
+atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
 
 atomRep :: AnnExpr' Id ann -> CgRep

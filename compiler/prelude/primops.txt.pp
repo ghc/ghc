@@ -1738,9 +1738,19 @@ primtype Any a
 	    but never enters a function value.  
 
 	It's also used to instantiate un-constrained type variables after type
-	checking.  For example
+	checking.  For example, {\tt length} has type
 
-	{\tt length Any []}
+	{\tt length :: forall a. [a] -> Int}
+
+	and the list datacon for the empty list has type
+
+	{\tt [] :: forall a. [a]}
+
+	In order to compose these two terms as {\tt length []} a type
+	application is required, but there is no constraint on the
+	choice.  In this situation GHC uses {\tt Any}:
+
+	{\tt length Any ([] Any)}
 
 	Annoyingly, we sometimes need {\tt Any}s of other kinds, such as {\tt (* -> *)} etc.
 	This is a bit like tuples.   We define a couple of useful ones here,

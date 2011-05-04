@@ -66,6 +66,9 @@ module Util (
         -- * Floating point
         readRational,
 
+        -- * read helpers
+        maybeReadFuzzy,
+
         -- * IO-ish utilities
         createDirectoryHierarchy,
         doesDirNameExist,
@@ -964,6 +967,17 @@ readRational top_s
           []  -> error ("readRational: no parse:"        ++ top_s)
           _   -> error ("readRational: ambiguous parse:" ++ top_s)
 
+
+-----------------------------------------------------------------------------
+-- read helpers
+
+maybeReadFuzzy :: Read a => String -> Maybe a
+maybeReadFuzzy str = case reads str of
+                     [(x, s)]
+                      | all isSpace s ->
+                         Just x
+                     _ ->
+                         Nothing
 
 -----------------------------------------------------------------------------
 -- Create a hierarchy of directories

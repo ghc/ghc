@@ -378,6 +378,8 @@ add_CopyOuts protos procPoints g = foldGraphBlocks mb_copy_out (return mapEmpty)
 -- 4. build info tables for the procedures -- and update the info table for
 --    the SRTs in the entry procedure as well.
 -- Input invariant: A block should only be reachable from a single ProcPoint.
+-- ToDo: use the _ret naming convention that the old code generator
+-- used. -- EZY
 splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
                      CmmTop -> FuelUniqSM [CmmTop]
 splitAtProcPoints entry_label callPPs procPoints procMap

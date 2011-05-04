@@ -569,10 +569,10 @@ newVar = liftTcM . newFlexiTyVarTy
 type RttiInstantiation = [(TcTyVar, TyVar)]
    -- Associates the typechecker-world meta type variables 
    -- (which are mutable and may be refined), to their 
-   -- debugger-world RuntimeUnkSkol counterparts.
+   -- debugger-world RuntimeUnk counterparts.
    -- If the TcTyVar has not been refined by the runtime type
    -- elaboration, then we want to turn it back into the
-   -- original RuntimeUnkSkol
+   -- original RuntimeUnk
 
 -- | Returns the instantiated type scheme ty', and the 
 --   mapping from new (instantiated) -to- old (skolem) type variables
@@ -1130,9 +1130,9 @@ zonkRttiType = zonkType (mkZonkTcTyVar zonk_unbound_meta)
     zonk_unbound_meta tv 
       = ASSERT( isTcTyVar tv )
         do { tv' <- skolemiseUnboundMetaTyVar tv RuntimeUnk
-	     -- This is where RuntimeUnkSkols are born: 
+	     -- This is where RuntimeUnks are born: 
 	     -- otherwise-unconstrained unification variables are
-	     -- turned into RuntimeUnkSkols as they leave the
+	     -- turned into RuntimeUnks as they leave the
 	     -- typechecker's monad
            ; return (mkTyVarTy tv') }
 

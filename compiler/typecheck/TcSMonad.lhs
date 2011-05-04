@@ -530,7 +530,8 @@ runTcS context untouch tcs
 #ifdef DEBUG
        ; count <- TcM.readTcRef step_count
        ; when (count > 0) $
-         TcM.dumpTcRn (ptext (sLit "Constraint solver steps =") <+> int count <+> ppr context)
+         TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") 
+                            <+> int count <+> ppr context)
 #endif
              -- And return
        ; ev_binds      <- TcM.readTcRef evb_ref

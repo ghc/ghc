@@ -900,8 +900,8 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
 	finsts_mod   = mi_finsts    iface
         hash_env     = mi_hash_fn   iface
         mod_hash     = mi_mod_hash  iface
-        export_hash | depend_on_exports mod = Just (mi_exp_hash iface)
-    		    | otherwise 	    = Nothing
+        export_hash | depend_on_exports = Just (mi_exp_hash iface)
+    		    | otherwise         = Nothing
     
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 
@@ -918,21 +918,21 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
                 Nothing -> pprPanic "mkUsage" (ppr mod <+> ppr occ <+> ppr used_names)
                 Just r  -> r
 
-        depend_on_exports mod = 
-           case lookupModuleEnv direct_imports mod of
-    	        Just _ -> True
-                  -- Even if we used 'import M ()', we have to register a
-                  -- usage on the export list because we are sensitive to
-                  -- changes in orphan instances/rules.
-	    	Nothing -> False
-                  -- In GHC 6.8.x the above line read "True", and in
-                  -- fact it recorded a dependency on *all* the
-                  -- modules underneath in the dependency tree.  This
-                  -- happens to make orphans work right, but is too
-                  -- expensive: it'll read too many interface files.
-                  -- The 'isNothing maybe_iface' check above saved us
-                  -- from generating many of these usages (at least in
-                  -- one-shot mode), but that's even more bogus!
+        depend_on_exports = is_direct_import
+        {- True
+              Even if we used 'import M ()', we have to register a
+              usage on the export list because we are sensitive to
+              changes in orphan instances/rules.
+           False
+              In GHC 6.8.x we always returned true, and in
+              fact it recorded a dependency on *all* the
+              modules underneath in the dependency tree.  This
+              happens to make orphans work right, but is too
+              expensive: it'll read too many interface files.
+              The 'isNothing maybe_iface' check above saved us
+              from generating many of these usages (at least in
+              one-shot mode), but that's even more bogus!
+        -}
 \end{code}
 
 \begin{code}

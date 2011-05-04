@@ -41,6 +41,7 @@ data Bag a
   | UnitBag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
   | ListBag [a]             -- INVARIANT: the list is non-empty
+    deriving Typeable
 
 emptyBag :: Bag a
 emptyBag = EmptyBag
@@ -261,8 +262,6 @@ bagToList b = foldrBag (:) [] b
 \begin{code}
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))
-
-INSTANCE_TYPEABLE1(Bag,bagTc,"Bag")
 
 instance Data a => Data (Bag a) where
   gfoldl k z b = z listToBag `k` bagToList b -- traverse abstract type abstractly

@@ -87,7 +87,17 @@ pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
                       <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
                     else empty
 #endif
+   $$ pprSizeDecl (if null info then lbl else entryLblToInfoLbl lbl)
 
+-- | Output the ELF .size directive.
+pprSizeDecl :: CLabel -> Doc
+#if elf_OBJ_FORMAT
+pprSizeDecl lbl =
+    ptext (sLit "\t.size") <+> pprCLabel_asm lbl
+    <> ptext (sLit ", .-") <> pprCLabel_asm lbl
+#else
+pprSizeDecl _ = empty
+#endif
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
 pprBasicBlock (BasicBlock blockid instrs) =
@@ -626,7 +636,7 @@ pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
 pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand archWordSize op)
-pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
+pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op)
 pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
 pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg archWordSize reg)
 

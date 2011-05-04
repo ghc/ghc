@@ -1046,9 +1046,16 @@ doInteractWithInert (CIPCan { cc_id = id1, cc_flavor = ifl, cc_ip_nm = nm1, cc_i
   | nm1 == nm2
   =  	-- See Note [When improvement happens]
     do { co_var <- newCoVar ty2 ty1 -- See Note [Efficient Orientation]
-       ; let flav = Wanted (combineCtLoc ifl wfl) 
-       ; cans <- mkCanonical flav co_var 
-       ; mkIRContinue "IP/IP fundep" workItem KeepInert cans }
+       ; let flav = Wanted (combineCtLoc ifl wfl)
+       ; cans <- mkCanonical flav co_var
+       ; case wfl of
+           Given   {} -> pprPanic "Unexpected given IP" (ppr workItem)
+           Derived {} -> pprPanic "Unexpected derived IP" (ppr workItem)
+           Wanted  {} ->
+               do { setIPBind (cc_id workItem) $
+                    EvCast id1 (mkSymCo (mkCoVarCo co_var))
+                  ; mkIRStopK "IP/IP interaction (solved)" cans }
+       }
 
 -- Never rewrite a given with a wanted equality, and a type function
 -- equality can never rewrite an equality. We rewrite LHS *and* RHS 

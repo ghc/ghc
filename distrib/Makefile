@@ -34,7 +34,7 @@ install::
 	$(MAKE) -C gmp       install      DOING_BIN_DIST=YES
 	$(MAKE) -C docs      install-docs DOING_BIN_DIST=YES
 	$(MAKE) -C libraries/Cabal/doc install-docs DOING_BIN_DIST=YES
-	$(INSTALL_DATA) $(INSTALL_OPTS) extra-gcc-opts $(libdir)
+	$(INSTALL_DATA) $(INSTALL_OPTS) settings $(libdir)
 
 install :: postinstall denounce
 
