@@ -20,17 +20,17 @@ cabal03: clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' -v0 --make Setup
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d --disable-optimisation --ghc-pkg-option=--force
+	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --disable-optimisation --ghc-pkg-option=--force
 	cd p && $(SETUP) build
 	cd p && $(SETUP) register
-	cd q && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d --ghc-pkg-option=--force
+	cd q && $(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
 	cd q && $(SETUP) build
 	cd q && $(SETUP) register
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d --ghc-pkg-option=--force
+	cd p && $(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
 	cd p && $(SETUP) build
 	cd p && $(SETUP) register
-	cd r && ! ../Setup configure --with-ghc='$(TEST_HC)' --package-db=../tmp.d --ghc-pkg-option=--force
+	cd r && ! ../Setup configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
 ifneq "$(CLEANUP)" ""
 	$(MAKE) clean
 endif

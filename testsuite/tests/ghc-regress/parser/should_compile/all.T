@@ -86,3 +86,5 @@ test('T3303', extra_clean(['T3303A.hi', 'T3303A.o']),
 test('T3741', normal, compile, [''])
 test('DoAndIfThenElse', normal, compile, [''])
 test('NondecreasingIndentation', normal, compile, [''])
+test('mc15', normal, compile, [''])
+test('mc16', expect_broken_for(4370, ['ghci','hpc']), compile, [''])

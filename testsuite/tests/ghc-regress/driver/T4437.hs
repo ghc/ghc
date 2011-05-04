@@ -15,7 +15,8 @@ main = do let ghcExtensions = [ ext | (ext, _, _) <- xFlags ]
                   = ["ParallelArrays",
                      "RelaxedLayout",
                      "AlternativeLayoutRule",
-                     "AlternativeLayoutRuleTransitional"]
+                     "AlternativeLayoutRuleTransitional",
+                     "MonadComprehensions"]
               unexpectedGhcOnlyExtension = ghcOnlyExtensions
                                         \\ expectedGhcOnlyExtensions
           mapM_ putStrLn unexpectedGhcOnlyExtension

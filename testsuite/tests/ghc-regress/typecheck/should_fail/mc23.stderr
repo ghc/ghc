@@ -1,0 +1,8 @@
+
+mc23.hs:9:29:
+    Couldn't match expected type `a -> t0' with actual type `[a0]'
+    Expected type: (a -> t0) -> [a] -> t1 a
+      Actual type: [a0] -> [a0]
+    In the return type of a call of `take'
+    Probable cause: `take' is applied to too many arguments
+    In the expression: take 5

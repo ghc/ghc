@@ -166,3 +166,7 @@ test('T4489', normal, compile, [''])
 test('T4478', if_compiler_lt('ghc', '7.1', expect_fail), compile, [''])
 test('T4534', normal, compile, [''])
 
+test('mc09', normal, compile, [''])
+test('mc10', normal, compile, [''])
+test('mc11', expect_broken_for(4370, ['ghci','hpc']), compile, [''])
+test('mc12', normal, compile, [''])

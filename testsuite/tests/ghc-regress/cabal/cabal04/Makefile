@@ -11,7 +11,7 @@ cabal04:
 	$(MAKE) clean
 	'$(TEST_HC)' -v0 --make Setup
 	$(SETUP) clean
-	$(SETUP) configure --with-ghc='$(TEST_HC)' $(PROF) $(DYN)
+	$(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' $(PROF) $(DYN)
 	$(SETUP) build 2> err
 	! grep -v "Creating library file" err
 ifneq "$(CLEANUP)" ""
