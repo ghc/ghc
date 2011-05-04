@@ -986,11 +986,11 @@ cond_stdOK Nothing (_, rep_tc)
     check_con con 
       | isVanillaDataCon con
       , all isTauTy (dataConOrigArgTys con) = Nothing
-      | otherwise = Just (badCon con (ptext (sLit "does not have a Haskell-98 type")))
+      | otherwise = Just (badCon con (ptext (sLit "must have a Haskell-98 type")))
   
 no_cons_why :: TyCon -> SDoc
 no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+> 
-		     ptext (sLit "has no data constructors")
+		     ptext (sLit "must have at least one data constructor")
 
 -- JPM TODO: should give better error message
 cond_RepresentableOk :: Condition
@@ -1010,7 +1010,7 @@ cond_noUnliftedArgs (_, tc)
   where
     bad_cons = [ con | con <- tyConDataCons tc
 		     , any isUnLiftedType (dataConOrigArgTys con) ]
-    why = badCon (head bad_cons) (ptext (sLit "has arguments of unlifted type"))
+    why = badCon (head bad_cons) (ptext (sLit "must have only arguments of lifted type"))
 
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
@@ -1018,7 +1018,7 @@ cond_isEnumeration (_, rep_tc)
   | otherwise		        = Just why
   where
     why = sep [ quotes (pprSourceTyCon rep_tc) <+> 
-	          ptext (sLit "is not an enumeration type")
+	          ptext (sLit "must be an enumeration type")
               , ptext (sLit "(an enumeration consists of one or more nullary, non-GADT constructors)") ]
 		  -- See Note [Enumeration types] in TyCon
 
@@ -1028,7 +1028,7 @@ cond_isProduct (_, rep_tc)
   | otherwise	          = Just why
   where
     why = quotes (pprSourceTyCon rep_tc) <+> 
-	  ptext (sLit "does not have precisely one constructor")
+	  ptext (sLit "must have precisely one constructor")
 
 cond_typeableOK :: Condition
 -- OK for Typeable class
@@ -1041,9 +1041,9 @@ cond_typeableOK (_, tc)
   | otherwise	      = Nothing
   where
     too_many = quotes (pprSourceTyCon tc) <+> 
-	       ptext (sLit "has too many arguments")
+	       ptext (sLit "must have 7 or fewer arguments")
     bad_kind = quotes (pprSourceTyCon tc) <+> 
-	       ptext (sLit "has arguments of kind other than `*'")
+	       ptext (sLit "must only have arguments of kind `*'")
 
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
@@ -1058,11 +1058,11 @@ cond_functorOK :: Bool -> Condition
 cond_functorOK allowFunctions (_, rep_tc)
   | null tc_tvs
   = Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc) 
-          <+> ptext (sLit "has no parameters"))
+          <+> ptext (sLit "must have some type parameters"))
 
   | not (null bad_stupid_theta)
   = Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc) 
-          <+> ptext (sLit "has a class context") <+> pprTheta bad_stupid_theta)
+          <+> ptext (sLit "must not have a class context") <+> pprTheta bad_stupid_theta)
 
   | otherwise
   = msum (map check_con data_cons)	-- msum picks the first 'Just', if any
@@ -1089,10 +1089,10 @@ cond_functorOK allowFunctions (_, rep_tc)
                       , ft_bad_app = Just (badCon con wrong_arg)
                       , ft_forall = \_ x   -> x }
                     
-    existential = ptext (sLit "has existential arguments")
-    covariant 	= ptext (sLit "uses the type variable in a function argument")
-    functions 	= ptext (sLit "contains function types")
-    wrong_arg 	= ptext (sLit "uses the type variable in an argument other than the last")
+    existential = ptext (sLit "must not have existential arguments")
+    covariant 	= ptext (sLit "must not use the type variable in a function argument")
+    functions 	= ptext (sLit "must not contain function types")
+    wrong_arg 	= ptext (sLit "must not use the type variable in an argument other than the last")
 
 checkFlag :: ExtensionFlag -> Condition
 checkFlag flag (dflags, _)
