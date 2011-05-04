@@ -293,7 +293,6 @@ boundThings modname lbinding =
                LitPat _ -> tl
                NPat _ _ _ -> tl -- form of literal pattern?
                NPlusKPat id _ _ _ -> thing id : tl
-               TypePat _ -> tl -- XXX need help here
                SigPatIn p _ -> patThings p tl
                SigPatOut p _ -> patThings p tl
                _ -> error "boundThings"

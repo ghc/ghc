@@ -132,12 +132,6 @@ data Pat id
 		    (SyntaxExpr id)	-- (>=) function, of type t->t->Bool
 		    (SyntaxExpr id)	-- Name of '-' (see RnEnv.lookupSyntaxName)
 
-	------------ Generics ---------------
-  | TypePat	    (LHsType id)	-- Type pattern for generic definitions
-                                        -- e.g  f{| a+b |} = ...
-                                        -- These show up only in class declarations,
-                                        -- and should be a top-level pattern
-
 	------------ Pattern type signatures ---------------
   | SigPatIn	    (LPat id)		-- Pattern with a type signature
 		    (LHsType id)
@@ -281,7 +275,6 @@ pprPat (NPat l Nothing  _)  = ppr l
 pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (QuasiQuotePat qq)   = ppr qq
-pprPat (TypePat ty)	    = ptext (sLit "{|") <> ppr ty <> ptext (sLit "|}")
 pprPat (CoPat co pat _)	    = pprHsWrapper (ppr pat) co
 pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)   = ppr pat <+> dcolon <+> ppr ty
@@ -439,7 +432,6 @@ isIrrefutableHsPat pat
 
     go1 (QuasiQuotePat {}) = urk pat	-- Gotten rid of by renamer, before
 					-- isIrrefutablePat is called
-    go1 (TypePat {})       = urk pat
 
     urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
 
@@ -463,7 +455,6 @@ hsPatNeedsParens (LitPat {})   	     = False
 hsPatNeedsParens (NPat {})	     = False
 hsPatNeedsParens (NPlusKPat {})      = True
 hsPatNeedsParens (QuasiQuotePat {})  = True
-hsPatNeedsParens (TypePat {})        = False
 
 conPatNeedsParens :: HsConDetails a b -> Bool
 conPatNeedsParens (PrefixCon args) = not (null args)

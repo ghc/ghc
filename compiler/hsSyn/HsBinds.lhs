@@ -671,7 +671,7 @@ okBindSig _ = True
 
 okHsBootSig :: Sig a -> Bool
 okHsBootSig (TypeSig  _ _)    = True
-okHsBootSig (GenericSig  _ _) = True -- JPM: Is this true?
+okHsBootSig (GenericSig  _ _) = False
 okHsBootSig (FixSig _) 	      = True
 okHsBootSig _                 = False
 

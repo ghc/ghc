@@ -26,7 +26,6 @@ module RnBinds (
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn
-import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnTypes        ( rnHsSigType, rnLHsType, checkPrecMatch)
@@ -586,11 +585,10 @@ a binder.
 \begin{code}
 rnMethodBinds :: Name			-- Class name
 	      -> (Name -> [Name])	-- Signature tyvar function
-	      -> [Name]			-- Names for generic type variables
 	      -> LHsBinds RdrName
 	      -> RnM (LHsBinds Name, FreeVars)
 
-rnMethodBinds cls sig_fn gen_tyvars binds
+rnMethodBinds cls sig_fn binds
   = do { checkDupRdrNames meth_names
 	     -- Check that the same method is not given twice in the
 	     -- same instance decl	instance C T where
@@ -606,15 +604,14 @@ rnMethodBinds cls sig_fn gen_tyvars binds
   where 
     meth_names  = collectMethodBinders binds
     do_one (binds,fvs) bind 
-       = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn gen_tyvars bind
+       = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn bind
 	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
 
 rnMethodBind :: Name
 	      -> (Name -> [Name])
-	      -> [Name]
 	      -> LHsBindLR RdrName RdrName
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
-rnMethodBind cls sig_fn gen_tyvars 
+rnMethodBind cls sig_fn 
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
 				  , fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ do
@@ -623,7 +620,7 @@ rnMethodBind cls sig_fn gen_tyvars
         -- We use the selector name as the binder
 
     (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
-                          mapFvRn (rn_match (FunRhs plain_name is_infix)) matches
+                          mapFvRn (rnMatch (FunRhs plain_name is_infix)) matches
     let new_group = MatchGroup new_matches placeHolderType
 
     when is_infix $ checkPrecMatch plain_name new_group
@@ -632,24 +629,13 @@ rnMethodBind cls sig_fn gen_tyvars
                                  , bind_fvs    = fvs })),
              fvs `addOneFV` plain_name)
         -- The 'fvs' field isn't used for method binds
-  where
-	-- Truly gruesome; bring into scope the correct members of the generic 
-	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
-    rn_match info match@(L _ (Match (L _ (TypePat ty) : _) _ _))
-	= extendTyVarEnvFVRn gen_tvs 	$
-	  rnMatch info match
-	where
-	  tvs     = map (rdrNameOcc.unLoc) (extractHsTyRdrTyVars ty)
-	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
-
-    rn_match info match = rnMatch info match
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind _ _ _ (L loc bind@(PatBind {})) = do
+rnMethodBind _ _ (L loc bind@(PatBind {})) = do
     addErrAt loc (methodBindErr bind)
     return (emptyBag, emptyFVs)
 
-rnMethodBind _ _ _ b = pprPanic "rnMethodBind" (ppr b)
+rnMethodBind _ _ b = pprPanic "rnMethodBind" (ppr b)
 \end{code}
 
 
@@ -684,7 +670,7 @@ renameSigs mb_names ok_sig sigs
 		--     equal to an ordinary sig, so we allow, say
 		--     	     class C a where
 		--	       op :: a -> a
- 		--             generic op :: Eq a => a -> a
+ 		--             default op :: Eq a => a -> a
 		
 	; sigs' <- mapM (wrapLocM (renameSig mb_names)) sigs
 
@@ -717,7 +703,7 @@ renameSig mb_names sig@(GenericSig v ty)
         ; unless defaultSigs_on (addErr (defaultSigErr sig))
         ; new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
-	; return (GenericSig new_v new_ty) } -- JPM: ?
+	; return (GenericSig new_v new_ty) }
 
 renameSig _ (SpecInstSig ty)
   = do	{ new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty

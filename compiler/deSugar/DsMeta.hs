@@ -420,7 +420,10 @@ rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
 rep_sig (L loc (TypeSig nm ty))       = rep_proto nm ty loc
-rep_sig (L loc (GenericSig nm ty))    = rep_proto nm ty loc -- JPM: ?
+rep_sig (L _   (GenericSig nm _))     = failWithDs msg
+  where msg = vcat  [ ptext (sLit "Illegal default signature for") <+> quotes (ppr nm)
+                    , ptext (sLit "Default signatures are not supported by Template Haskell") ]
+
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig _                             = return []
@@ -632,7 +635,6 @@ repTy (HsKindSig t k)       = do
                                 k1 <- repKind k
                                 repTSig t1 k1
 repTy (HsSpliceTy splice _ _) = repSplice splice
-repTy ty@(HsNumTy _)          = notHandled "Number types (for generics)" (ppr ty)
 repTy ty		      = notHandled "Exotic form of type" (ppr ty)
 
 -- represent a kind
