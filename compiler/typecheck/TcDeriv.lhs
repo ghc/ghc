@@ -460,6 +460,7 @@ stored in NewTypeDerived.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 
 \begin{code}
+{-
 -- Make the EarlyDerivSpec for Representable0
 mkGenDerivSpec :: TyCon -> TcRn (EarlyDerivSpec)
 mkGenDerivSpec tc = do
@@ -470,8 +471,8 @@ mkGenDerivSpec tc = do
         ; let mtheta    = Just []
         ; ds <- mkEqnHelp StandAloneDerivOrigin tc_tvs cls cls_tys tc_app mtheta
         -- JPM TODO: StandAloneDerivOrigin?...
-        ; {- pprTrace "mkGenDerivSpec" (ppr (tc, ds)) $ -} return ds }
-
+        ; return ds }
+-}
 -- Make the "extras" for the generic representation
 mkGenDerivExtras :: TyCon 
                  -> TcRn (MetaTyCons, TyCon, [(InstInfo RdrName, DerivAuxBinds)])
@@ -494,9 +495,10 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
   = do	{ eqns1 <- mapAndRecoverM deriveTyData all_tydata
 	; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
         -- Generate EarlyDerivSpec's for Representable, if asked for
-	; (xGenerics, xDeriveRepresentable) <- genericsFlags
+	-- ; (xGenerics, xDerRep) <- genericsFlags
+	; xDerRep <- genericsFlag
 	; let allTyNames = [ tcdName d | L _ d <- tycl_decls, isDataDecl d ]
-        ; allTyDecls <- mapM tcLookupTyCon allTyNames
+        -- ; allTyDecls <- mapM tcLookupTyCon allTyNames
         -- Select only those types that derive Representable
         ; let sel_tydata = [ tcdName t | (L _ c, L _ t) <- all_tydata
                                        , getClassName c == Just rep0ClassName ]
@@ -504,7 +506,7 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
                                   | L _ (DerivDecl (L _ t)) <- deriv_decls
                                   , getClassName t == Just rep0ClassName ] 
         ; derTyDecls <- mapM tcLookupTyCon $ 
-                         filter (needsExtras xDeriveRepresentable
+                         filter (needsExtras xDerRep
                                   (sel_tydata ++ sel_deriv_decls)) allTyNames
         -- We need to generate the extras to add to what has
         -- already been derived
@@ -512,6 +514,7 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
         -- For the remaining types, if Generics is on, we need to
         -- generate both the instances and the extras, but only for the
         -- types we can represent.
+{-
         ; let repTyDecls = filter canDoGenerics allTyDecls
         ; let remTyDecls = filter (\x -> not (x `elem` derTyDecls)) repTyDecls
         ; generic_instances    <- if xGenerics
@@ -520,24 +523,14 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
         ; generic_extras_flag  <- if xGenerics
                                    then mapM mkGenDerivExtras remTyDecls
                                     else return []
-        -- Merge and return everything
-	; {- pprTrace "allTyDecls" (ppr allTyDecls) $ 
-	  pprTrace "derTyDecls" (ppr derTyDecls) $ 
-	  pprTrace "repTyDecls" (ppr repTyDecls) $ 
-	  pprTrace "remTyDecls" (ppr remTyDecls) $ 
-	  pprTrace "xGenerics"  (ppr xGenerics) $ 
-	  pprTrace "xDeriveRep" (ppr xDeriveRepresentable) $ 
-	  pprTrace "all_tydata" (ppr all_tydata) $ 
-	  pprTrace "eqns1" (ppr eqns1) $ 
-	  pprTrace "eqns2" (ppr eqns2) $ 
 -}
-          return ( eqns1 ++ eqns2 ++ generic_instances
-                 , generic_extras_deriv ++ generic_extras_flag) }
+        -- Merge and return everything
+	; return ( eqns1 ++ eqns2 -- ++ generic_instances
+                 , generic_extras_deriv {- ++ generic_extras_flag -}) }
   where
-    needsExtras xDeriveRepresentable tydata tc_name = 
-      -- We need extras if the flag DeriveGenerics is on and this type is 
+      -- We need extras if the flag DeriveRepresentable is on and this type is 
       -- deriving Representable
-      xDeriveRepresentable && tc_name `elem` tydata
+    needsExtras xDerRep tydata tc_name = xDerRep && tc_name `elem` tydata
 
     -- Extracts the name of the class in the deriving
     getClassName :: HsType Name -> Maybe Name
@@ -546,8 +539,10 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 
     -- Extracts the name of the type in the deriving
     getTypeName :: HsType Name -> Maybe Name
-    getTypeName (HsPredTy (HsClassP _ [L _ (HsTyVar n)])) = Just n
-    getTypeName _                                         = Nothing
+    getTypeName (HsTyVar n)                     = Just n
+    getTypeName (HsOpTy _ (L _ n) _)            = Just n
+    getTypeName (HsPredTy (HsClassP _ [L _ n])) = getTypeName n
+    getTypeName _                               = Nothing
 
     extractTyDataPreds decls
       = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
@@ -563,10 +558,10 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 			addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
 				   2 (ptext (sLit "Use an instance declaration instead")))
 
-genericsFlags :: TcM (Bool, Bool)
-genericsFlags = do dOpts <- getDOpts
-                   return ( xopt Opt_Generics            dOpts
-                          , xopt Opt_DeriveRepresentable dOpts)
+genericsFlag :: TcM Bool
+genericsFlag = do dOpts <- getDOpts
+                  return (  xopt Opt_Generics            dOpts
+                         || xopt Opt_DeriveRepresentable dOpts)
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM EarlyDerivSpec
@@ -965,7 +960,7 @@ orCond c1 c2 tc
 	Nothing -> Nothing	    -- c1 succeeds
 	Just x  -> case c2 tc of    -- c1 fails
 		     Nothing -> Nothing
-		     Just y  -> Just (x $$ ptext (sLit "  and") $$ y)
+		     Just y  -> Just (x $$ ptext (sLit "  or") $$ y)
 			            -- Both fail
 
 andCond :: Condition -> Condition -> Condition

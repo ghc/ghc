@@ -597,8 +597,8 @@ data Sig name	-- Signatures and pragmas
 	-- f :: Num a => a -> a
     TypeSig (Located name) (LHsType name)
 
-        -- A type signature for a generic function inside a class
-        -- generic eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
+        -- A type signature for a default method inside a class
+        -- default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
   | GenericSig (Located name) (LHsType name)
 
 	-- A type signature in generated code, notably the code
@@ -734,7 +734,7 @@ isInlineLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {}) 		= ptext (sLit "type signature")
-hsSigDoc (GenericSig {})	= ptext (sLit "generic default type signature")
+hsSigDoc (GenericSig {})	= ptext (sLit "default type signature")
 hsSigDoc (IdSig {}) 		= ptext (sLit "id signature")
 hsSigDoc (SpecSig {})	 	= ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
@@ -763,7 +763,7 @@ instance (OutputableBndr name) => Outputable (Sig name) where
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
 ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) (ppr ty)
-ppr_sig (GenericSig var ty)	  = ptext (sLit "generic") <+> pprVarSig (unLoc var) (ppr ty)
+ppr_sig (GenericSig var ty)	  = ptext (sLit "default") <+> pprVarSig (unLoc var) (ppr ty)
 ppr_sig (IdSig id)	          = pprVarSig id (ppr (varType id))
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
 ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var (ppr ty) inl)

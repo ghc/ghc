@@ -321,7 +321,6 @@ data ExtensionFlag
    | Opt_TemplateHaskell
    | Opt_QuasiQuotes
    | Opt_ImplicitParams
-   | Opt_Generics			-- generic deriving mechanism
    | Opt_ImplicitPrelude
    | Opt_ScopedTypeVariables
    | Opt_UnboxedTuples
@@ -343,7 +342,9 @@ data ExtensionFlag
    | Opt_DeriveFunctor
    | Opt_DeriveTraversable
    | Opt_DeriveFoldable
-   | Opt_DeriveRepresentable
+   | Opt_DeriveRepresentable            -- Allow deriving Representable0/1
+   | Opt_DefaultSignatures              -- Allow extra signatures for defmeths
+   | Opt_Generics                       -- Generic deriving mechanism
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -1679,6 +1680,7 @@ xFlags = [
   ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
   ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
   ( "DeriveRepresentable",              Opt_DeriveRepresentable, nop ),
+  ( "DefaultSignatures",                Opt_DefaultSignatures, nop ),
   ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, nop ),
   ( "FlexibleContexts",                 Opt_FlexibleContexts, nop ),
   ( "FlexibleInstances",                Opt_FlexibleInstances, nop ),
@@ -1744,6 +1746,9 @@ impliedFlags
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
     
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
+    -- The new behavior of the XGenerics flag is just to turn on these two flags
+    , (Opt_Generics, turnOn, Opt_DefaultSignatures)
+    , (Opt_Generics, turnOn, Opt_DeriveRepresentable)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]

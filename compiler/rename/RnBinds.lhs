@@ -713,8 +713,8 @@ renameSig mb_names sig@(TypeSig v ty)
 	; return (TypeSig new_v new_ty) }
 
 renameSig mb_names sig@(GenericSig v ty)
-  = do	{ generics_on <- xoptM Opt_Generics
-        ; unless generics_on (addErr (genericSigErr sig))
+  = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
+        ; unless defaultSigs_on (addErr (defaultSigErr sig))
         ; new_v <- lookupSigOccRn mb_names sig v
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (GenericSig new_v new_ty) } -- JPM: ?
@@ -840,10 +840,10 @@ misplacedSigErr (L loc sig)
   = addErrAt loc $
     sep [ptext (sLit "Misplaced") <+> hsSigDoc sig <> colon, ppr sig]
 
-genericSigErr :: Sig RdrName -> SDoc
-genericSigErr sig = vcat [ hang (ptext (sLit "Unexpected generic default signature:"))
+defaultSigErr :: Sig RdrName -> SDoc
+defaultSigErr sig = vcat [ hang (ptext (sLit "Unexpected default signature:"))
                               2 (ppr sig)
-                         , ptext (sLit "Use -XGenerics to enable generic default signatures") ] 
+                         , ptext (sLit "Use -XDefaultSignatures to enable default signatures") ] 
 
 methodBindErr :: HsBindLR RdrName RdrName -> SDoc
 methodBindErr mbind

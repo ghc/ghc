@@ -50,12 +50,6 @@ canDoGenerics tycon
   =  let result = not (any bad_con (tyConDataCons tycon)) 	-- See comment below
                   -- We do not support datatypes with context (for now)
                   && null (tyConStupidTheta tycon)
-{-
-                  -- Primitives are (probably) not representable either
-                  && not (isPrimTyCon tycon)
-                  -- Foreigns are (probably) not representable either
-                  && not (isForeignTyCon tycon)
--}
                   -- We don't like type families
                   && not (isFamilyTyCon tycon)
 

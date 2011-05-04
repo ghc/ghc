@@ -814,8 +814,8 @@ checkValSig lhs@(L l _) ty
   where
     hint = if foreign_RDR `looks_like` lhs
            then "Perhaps you meant to use -XForeignFunctionInterface?"
-           else if generic_RDR `looks_like` lhs
-                then "Perhaps you meant to use -XGenerics?"
+           else if default_RDR `looks_like` lhs
+                then "Perhaps you meant to use -XDefaultSignatures?"
                 else "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
@@ -825,7 +825,7 @@ checkValSig lhs@(L l _) ty
     looks_like _ _                   = False
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
-    generic_RDR = mkUnqual varName (fsLit "generic")
+    default_RDR = mkUnqual varName (fsLit "default")
 
 checkDoAndIfThenElse :: LHsExpr RdrName
                      -> Bool
