@@ -1946,7 +1946,7 @@ genSwitch expr ids
     
             code = e_code `appOL` t_code `appOL` toOL [
                             ADD (intSize wordWidth) op (OpReg tableReg),
-                            JMP_TBL (OpReg tableReg) ids Text lbl,
+                            JMP_TBL (OpReg tableReg) ids Text lbl
                     ]
 #else
     -- HACK: On x86_64 binutils<2.17 is only able to generate PC32

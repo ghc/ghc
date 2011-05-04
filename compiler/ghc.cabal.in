@@ -36,11 +36,6 @@ Flag ghci
     Default: False
     Manual: True
 
-Flag ncg
-    Description: Build the NCG.
-    Default: False
-    Manual: True
-
 Flag stage1
     Description: Is this stage 1?
     Default: False
@@ -87,9 +82,6 @@ Library
         Build-Depends: template-haskell
         CPP-Options: -DGHCI
         Include-Dirs: ../libffi/build/include
-
-    if !flag(ncg)
-        CPP-Options: -DOMIT_NATIVE_CODEGEN
 
     Build-Depends: bin-package-db
     Build-Depends: hoopl
@@ -490,10 +482,7 @@ Library
         Vectorise.Exp
         Vectorise
 
-    -- We only need to expose more modules as some of the ncg code is used
-    -- by the LLVM backend so its always included
-    if flag(ncg)
-        Exposed-Modules:
+    Exposed-Modules:
             AsmCodeGen
             TargetReg
             NCGMonad
@@ -503,10 +492,6 @@ Library
             RegClass
             PIC
             Platform
-            Alpha.Regs
-            Alpha.RegInfo
-            Alpha.Instr
-            Alpha.CodeGen
             X86.Regs
             X86.RegInfo
             X86.Instr

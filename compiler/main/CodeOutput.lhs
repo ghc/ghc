@@ -8,9 +8,7 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
 
-#ifndef OMIT_NATIVE_CODEGEN
-import AsmCodeGen	( nativeCodeGen )
-#endif
+import AsmCodeGen ( nativeCodeGen )
 import LlvmCodeGen ( llvmCodeGen )
 
 import UniqSupply	( mkSplitUniqSupply )
@@ -149,24 +147,16 @@ outputC dflags filenm flat_absC packages
 
 \begin{code}
 outputAsm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
-
-#ifndef OMIT_NATIVE_CODEGEN
-
 outputAsm dflags filenm flat_absC
+ | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        {-# SCC "OutputAsm" #-} doOutput filenm $
-	   \f -> {-# SCC "NativeCodeGen" #-}
-	         nativeCodeGen dflags f ncg_uniqs flat_absC
-  where
+           \f -> {-# SCC "NativeCodeGen" #-}
+                 nativeCodeGen dflags f ncg_uniqs flat_absC
 
-#else /* OMIT_NATIVE_CODEGEN */
-
-outputAsm _ _ _
-  = pprPanic "This compiler was built without a native code generator"
-	     (text "Use -fvia-C instead")
-
-#endif
+ | otherwise
+  = panic "This compiler was built without a native code generator"
 \end{code}
 
 

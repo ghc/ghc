@@ -134,6 +134,9 @@ if test "$WithGhc" != ""; then
   AC_SUBST(ghc_ge_613)dnl
 
   BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command],['$(CC)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command],['$(AR)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags],['$(AR_OPTS)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file],['$(ArSupportsAtFile)'])
 fi
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
@@ -262,6 +265,7 @@ checkVendor() {
     esac
 }
 
+# Sync this with cTargetOS in compiler/ghc.mk
 checkOS() {
     case $1 in
     linux|freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)

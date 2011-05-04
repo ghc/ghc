@@ -96,6 +96,58 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo '#error Unknown target arch'                                  >> $@
 	@echo '#endif'                                                      >> $@
 	@echo                                                               >> $@
+# Sync this with checkOS in configure.ac
+	@echo 'cTargetOS :: OS'                                             >> $@
+	@echo '#if linux_TARGET_OS'                                         >> $@
+	@echo 'cTargetOS = Linux'                                           >> $@
+	@echo '#elif freebsd_TARGET_OS'                                     >> $@
+	@echo 'cTargetOS = FreeBSD'                                         >> $@
+	@echo '#elif netbsd_TARGET_OS'                                      >> $@
+	@echo 'cTargetOS = NetBSD'                                          >> $@
+	@echo '#elif openbsd_TARGET_OS'                                     >> $@
+	@echo 'cTargetOS = OpenBSD'                                         >> $@
+	@echo '#elif dragonfly_TARGET_OS'                                   >> $@
+	@echo 'cTargetOS = OtherOS "dragonfly"'                             >> $@
+	@echo '#elif osf1_TARGET_OS'                                        >> $@
+	@echo 'cTargetOS = OtherOS "osf"'                                   >> $@
+	@echo '#elif osf3_TARGET_OS'                                        >> $@
+	@echo 'cTargetOS = OtherOS "osf"'                                   >> $@
+	@echo '#elif hpux_TARGET_OS'                                        >> $@
+	@echo 'cTargetOS = HPUX'                                            >> $@
+	@echo '#elif linuxaout_TARGET_OS'                                   >> $@
+	@echo 'cTargetOS = Linux'                                           >> $@
+	@echo '#elif kfreebsdgnu_TARGET_OS'                                 >> $@
+	@echo 'cTargetOS = OtherOS "kfreebsdgnu"'                           >> $@
+	@echo '#elif freebsd2_TARGET_OS'                                    >> $@
+	@echo 'cTargetOS = FreeBSD'                                         >> $@
+	@echo '#elif solaris2_TARGET_OS'                                    >> $@
+	@echo 'cTargetOS = Solaris'                                         >> $@
+	@echo '#elif cygwin32_TARGET_OS'                                    >> $@
+	@echo 'cTargetOS = Windows'                                         >> $@
+	@echo '#elif mingw32_TARGET_OS'                                     >> $@
+	@echo 'cTargetOS = Windows'                                         >> $@
+	@echo '#elif darwin_TARGET_OS'                                      >> $@
+	@echo 'cTargetOS = OSX'                                             >> $@
+	@echo '#elif gnu_TARGET_OS'                                         >> $@
+	@echo 'cTargetOS = OtherOS "gnu"'                                   >> $@
+	@echo '#elif nextstep2_TARGET_OS'                                   >> $@
+	@echo 'cTargetOS = OtherOS "nextstep"'                              >> $@
+	@echo '#elif nextstep3_TARGET_OS'                                   >> $@
+	@echo 'cTargetOS = OtherOS "nextstep"'                              >> $@
+	@echo '#elif sunos4_TARGET_OS'                                      >> $@
+	@echo 'cTargetOS = Solaris'                                         >> $@
+	@echo '#elif ultrix_TARGET_OS'                                      >> $@
+	@echo 'cTargetOS = OtherOS "ultrix"'                                >> $@
+	@echo '#elif irix_TARGET_OS'                                        >> $@
+	@echo 'cTargetOS = IRIX'                                            >> $@
+	@echo '#elif aix_TARGET_OS'                                         >> $@
+	@echo 'cTargetOS = AIX'                                             >> $@
+	@echo '#elif haiku_TARGET_OS'                                       >> $@
+	@echo 'cTargetOS = OtherOS "haiku"'                                 >> $@
+	@echo '#else'                                                       >> $@
+	@echo '#error Unknown target OS'                                    >> $@
+	@echo '#endif'                                                      >> $@
+	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
 	@echo 'cProjectVersion       :: String'                             >> $@
@@ -108,8 +160,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo 'cStage                :: String'                             >> $@
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
-	@echo 'cCcOpts               :: [String]'                           >> $@
-	@echo 'cCcOpts               = words "$(CONF_CC_OPTS_STAGE$*)"'     >> $@
 	@echo 'cGccLinkerOpts        :: [String]'                           >> $@
 	@echo 'cGccLinkerOpts        = words "$(CONF_GCC_LINKER_OPTS_STAGE$*)"' >> $@
 	@echo 'cLdLinkerOpts         :: [String]'                           >> $@
@@ -371,12 +421,6 @@ ifeq "$(GhciWithDebugger)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --ghc-option=-DDEBUGGER
 endif
 
-endif
-
-ifeq "$(GhcWithNativeCodeGen)" "NO"
-# XXX This should logically be a CPP option, but there doesn't seem to
-# be a flag for that
-compiler_CONFIGURE_OPTS += --ghc-option=-DOMIT_NATIVE_CODEGEN
 endif
 
 ifeq "$(TargetOS_CPP)" "openbsd"
