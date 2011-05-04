@@ -6,8 +6,8 @@ import GHC.Generics
 import Uniplate
 
 
-data Tree     = Leaf | Node Int Tree Tree deriving Show
-data Pair a b = Pair a b                  deriving Show
+data Tree     = Leaf | Node Int Tree Tree deriving (Show, Representable0)
+data Pair a b = Pair a b                  deriving (Show, Representable0)
 
 instance Uniplate Tree
 instance Uniplate (Pair a b)

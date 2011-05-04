@@ -1,5 +1,5 @@
 
-cannotDoRep1.hs:8:49:
+CannotDoRep1.hs:8:49:
     Can't make a derived instance of `Representable0 (Context a)':
       Cannot derive Representable for type Context
     In the data type declaration for `Context'

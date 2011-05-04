@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveRepresentable #-}
 
-module ShouldFail1 where
+module CannotDoRep1 where
 
 import GHC.Generics
 

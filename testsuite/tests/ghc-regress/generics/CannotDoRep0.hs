@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveRepresentable        #-}
 {-# LANGUAGE ExistentialQuantification  #-}
 
-module ShouldFail0 where
+module CannotDoRep0 where
 
 import GHC.Generics
 

@@ -10,10 +10,7 @@ class GEq' f where
 instance GEq' U1 where
   geq' _ _ = True
 
-instance GEq' (K1 P c) where
-  geq' (K1 a) (K1 b) = undefined
-
-instance (GEq c) => GEq' (K1 R c) where
+instance (GEq c) => GEq' (K1 i c) where
   geq' (K1 a) (K1 b) = geq a b
 
 -- No instances for P or Rec because geq is only applicable to types of kind *
