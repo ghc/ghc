@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 #ifdef __GLASGOW_HASKELL__
-{-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveRepresentable, StandaloneDeriving #-}
 #endif
 
 -----------------------------------------------------------------------------
@@ -34,6 +34,7 @@ import GHC.Read
 #endif
 
 import Data.Typeable
+import GHC.Generics (Representable0)
 
 #ifdef __GLASGOW_HASKELL__
 {-
@@ -51,7 +52,8 @@ either correct or an error; by convention, the 'Left' constructor is
 used to hold an error value and the 'Right' constructor is used to
 hold a correct value (mnemonic: \"right\" also means \"correct\").
 -}
-data  Either a b  =  Left a | Right b   deriving (Eq, Ord, Read, Show)
+data  Either a b  =  Left a | Right b
+  deriving (Eq, Ord, Read, Show, Representable0)
 
 -- | Case analysis for the 'Either' type.
 -- If the value is @'Left' a@, apply the first function to @a@;
