@@ -522,7 +522,7 @@ tidy1 _ (LitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 tidy1 _ (NPat lit mb_neg eq)
-  = return (idDsWrapper, tidyNPat lit mb_neg eq)
+  = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq)
 
 -- BangPatterns: Pattern matching is already strict in constructors,
 -- tuples etc, so the last case strips off the bang for thoses patterns.
