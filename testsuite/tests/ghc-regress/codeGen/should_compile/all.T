@@ -13,4 +13,5 @@ test('T3286', extra_clean(['T3286b.o','T3286b.hi']),
               multimod_compile, ['T3286', '-v0'])
 test('3579', normal, compile, [''])
 test('2578', normal, run_command, ['$MAKE -s --no-print-directory 2578'])
-test('jmp_tbl', normal, compile, ['-fPIC -O'])
+# skip llvm on i386 as we don't support fPIC
+test('jmp_tbl', if_arch('i386', omit_ways(['llvm', 'optllvm'])), compile, ['-fPIC -O'])
