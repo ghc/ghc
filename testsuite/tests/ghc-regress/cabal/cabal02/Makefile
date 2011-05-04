@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 CABAL_SETUP = $(FPTOOLS_TOP_ABS)/libraries/Cabal/cabal-setup/cabal-setup
 
-CONFIG_ARGS = --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG)
+CONFIG_ARGS = --with-compiler=$(TEST_HC) --ghc-options='$(TEST_HC_OPTS)' --with-hc-pkg=$(GHC_PKG)
 
 # We have 3 packages, P-1.0, P-2.0, and Q.  Q depends on P-1.0.
 # We have an executable R, that depends on P-2.0 and Q, so the resulting
