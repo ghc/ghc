@@ -1208,8 +1208,11 @@ output = [ x
     <indexterm><primary>monad comprehensions</primary></indexterm>
 
     <para>
-        Monad comprehesions generalise the list comprehension notation to work
-        for any monad.
+        Monad comprehesions generalise the list comprehension notation,
+        including parallel comprehensions 
+        (<xref linkend="parallel-list-comprehensions"/>) and 
+        transform comprenensions (<xref linkend="generalised-list-comprehensions"/>) 
+        to work for any monad.
     </para>
 
     <para>Monad comprehensions support:</para>
@@ -1360,7 +1363,70 @@ do (x,y) &lt;- mzip (do x &lt;- [1..10]
         lists, which make <literal>MonadComprehensions</literal> backward
         compatible to built-in, transform and parallel list comprehensions.
     </para>
+<para> More formally, the desugaring is as follows.  We write <literal>D[ e | Q]</literal>
+to mean the desugaring of the monad comprehension <literal>[ e | Q]</literal>: 
+<programlisting>
+Expressions: e
+Declarations: d
+Lists of qualifiers: Q,R,S  
 
+-- Basic forms
+D[ e | ]               = return e
+D[ e | p &lt;- e, Q ]     = e &gt;&gt;= \p -&gt; D[ e | Q ]
+D[ e | e, Q ]          = guard e &gt;&gt; \p -&gt; D[ e | Q ]
+D[ e | let d, Q ]      = let d in D[ e | Q ]
+
+-- Parallel comprehensions (iterate for multiple parallel branches)
+D[ e | (Q | R), S ]    = mzip D[ Qv | Q ] D[ Rv | R ] &gt;&gt;= \(Qv,Rv) -&gt; D[ e | S ]
+
+-- Transform comprehensions
+D[ e | Q then f, R ]                  = f D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+
+D[ e | Q then f by b, R ]             = f b D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+
+D[ e | Q then group using f, R ]      = f D[ Qv | Q ] &gt;&gt;= \ys -&gt; 
+                                        case (fmap selQv1 ys, ..., fmap selQvn ys) of
+                                 	     Qv -&gt; D[ e | R ]
+
+D[ e | Q then group by b using f, R ] = f b D[ Qv | Q ] &gt;&gt;= \ys -&gt; 
+                                        case (fmap selQv1 ys, ..., fmap selQvn ys) of
+                                           Qv -&gt; D[ e | R ]
+
+where  Qv is the tuple of variables bound by Q (and used subsequently)
+       selQvi is a selector mapping Qv to the ith component of Qv
+
+Operator     Standard binding       Expected type
+--------------------------------------------------------------------
+return       GHC.Base               t1 -&gt; m t2
+(&gt;&gt;=)        GHC.Base               m1 t1 -&gt; (t2 -&gt; m2 t3) -&gt; m3 t3
+(&gt;&gt;)         GHC.Base               m1 t1 -&gt; m2 t2         -&gt; m3 t3
+guard        Control.Monad          t1 -&gt; m t2
+fmap         GHC.Base               forall a b. (a-&gt;b) -&gt; n a -&gt; n b
+mgroupWith   Control.Monad.Group    forall a. (a -&gt; t) -&gt; m1 a -&gt; m2 (n a)
+mzip         Control.Monad.Zip      forall a b. m a -&gt; m b -&gt; m (a,b)
+</programlisting>                                          
+The comprehension should typecheck when its desugaring would typecheck. 
+</para>
+<para>
+Monad comprehensions support rebindable syntax (<xref linkend="rebindable-syntax"/>).  
+Without rebindable
+syntax, the operators from the "standard binding" module are used; with
+rebindable syntax, the operators are looked up in the current lexical scope.
+For example, parallel comprehensions will be typechecked and desugared
+using whatever "<literal>mzip</literal>" is in scope.
+</para>
+<para>
+The rebindable operators must have the "Expected type" given in the 
+table above.  These types are surprisingly general.  For example, you can
+use a bind operator with the type
+<programlisting>
+(>>=) :: T x y a -> (a -> T y z b) -> T x z b
+</programlisting>
+In the case of transform comprehensions, notice that the groups are
+parameterised over some arbitrary type <literal>n</literal> (provided it
+has an <literal>fmap</literal>, as well as
+the comprehension being over an arbitrary monad.
+</para>
 </sect2>
 
    <!-- ===================== REBINDABLE SYNTAX ===================  -->

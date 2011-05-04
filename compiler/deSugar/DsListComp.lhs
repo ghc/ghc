@@ -120,7 +120,7 @@ dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderM
 
     -- Generate the expressions to build the grouped list
     let -- First we apply the grouping function to the inner list
-        inner_list_expr = mkApps usingExpr' (Type from_tup_ty : usingArgs)
+        inner_list_expr = mkApps usingExpr' usingArgs
         -- Then we map our "unzip" across it to turn the lists of tuples into tuples of lists
         -- We make sure we instantiate the type variable "a" to be a list of "from" tuples and
         -- the "b" to be a tuple of "to" lists!
@@ -861,11 +861,11 @@ mkMcUnzipM ThenForm _ ys _
 mkMcUnzipM _ fmap_op ys elt_tys
   = do { fmap_op' <- dsExpr fmap_op
        ; xs       <- mapM newSysLocalDs elt_tys
-       ; tup_xs   <- newSysLocalDs (mkBigCoreTupTy elt_tys)
-
-       ; let arg_ty = idType ys
-             mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
-                           [ Type arg_ty, Type (elt_tys !! i)
+       ; let tup_ty = mkBigCoreTupTy elt_tys
+       ; tup_xs   <- newSysLocalDs tup_ty
+ 
+       ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
+                           [ Type tup_ty, Type (elt_tys !! i)
                            , mk_sel i, Var ys]
 
              mk_sel n = Lam tup_xs $ 

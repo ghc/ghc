@@ -1116,6 +1116,7 @@ pprBy (Just e) = ptext (sLit "by") <+> ppr e
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> SDoc
 pprDo DoExpr      stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
 pprDo GhciStmt    stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
+pprDo ArrowExpr   stmts = ptext (sLit "do")  <+> ppr_do_stmts stmts
 pprDo MDoExpr     stmts = ptext (sLit "mdo") <+> ppr_do_stmts stmts
 pprDo ListComp    stmts = brackets    $ pprComp stmts
 pprDo PArrComp    stmts = pa_brackets $ pprComp stmts
@@ -1261,32 +1262,28 @@ data HsStmtContext id
 
   | DoExpr				 -- do { ... }
   | MDoExpr                              -- mdo { ... }  ie recursive do-expression 
+  | ArrowExpr				 -- do-notation in an arrow-command context
 
   | GhciStmt				 -- A command-line Stmt in GHCi pat <- rhs
   | PatGuard (HsMatchContext id)         -- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)       -- A branch of a parallel stmt
-  | TransformStmtCtxt (HsStmtContext id) -- A branch of a transform stmt
+  | TransStmtCtxt (HsStmtContext id)     -- A branch of a transform stmt
   deriving (Data, Typeable)
 \end{code}
 
 \begin{code}
-isDoExpr :: HsStmtContext id -> Bool
-isDoExpr DoExpr   = True
-isDoExpr MDoExpr  = True
-isDoExpr GhciStmt = True
-isDoExpr _        = False
-
 isListCompExpr :: HsStmtContext id -> Bool
+-- Uses syntax [ e | quals ]
 isListCompExpr ListComp  = True
 isListCompExpr PArrComp  = True
 isListCompExpr MonadComp = True
 isListCompExpr _         = False
 
 isMonadCompExpr :: HsStmtContext id -> Bool
-isMonadCompExpr MonadComp                = True
-isMonadCompExpr (ParStmtCtxt ctxt)       = isMonadCompExpr ctxt
-isMonadCompExpr (TransformStmtCtxt ctxt) = isMonadCompExpr ctxt
-isMonadCompExpr _                        = False
+isMonadCompExpr MonadComp            = True
+isMonadCompExpr (ParStmtCtxt ctxt)   = isMonadCompExpr ctxt
+isMonadCompExpr (TransStmtCtxt ctxt) = isMonadCompExpr ctxt
+isMonadCompExpr _                    = False
 \end{code}
 
 \begin{code}
@@ -1340,6 +1337,7 @@ pprAStmtContext ctxt = article <+> pprStmtContext ctxt
 pprStmtContext GhciStmt        = ptext (sLit "interactive GHCi command")
 pprStmtContext DoExpr          = ptext (sLit "'do' block")
 pprStmtContext MDoExpr         = ptext (sLit "'mdo' block")
+pprStmtContext ArrowExpr       = ptext (sLit "'do' block in an arrow command")
 pprStmtContext ListComp        = ptext (sLit "list comprehension")
 pprStmtContext MonadComp       = ptext (sLit "monad comprehension")
 pprStmtContext PArrComp        = ptext (sLit "array comprehension")
@@ -1353,7 +1351,7 @@ pprStmtContext (PatGuard ctxt) = ptext (sLit "pattern guard for") $$ pprMatchCon
 pprStmtContext (ParStmtCtxt c)
  | opt_PprStyle_Debug = sep [ptext (sLit "parallel branch of"), pprAStmtContext c]
  | otherwise          = pprStmtContext c
-pprStmtContext (TransformStmtCtxt c)
+pprStmtContext (TransStmtCtxt c)
  | opt_PprStyle_Debug = sep [ptext (sLit "transformed branch of"), pprAStmtContext c]
  | otherwise          = pprStmtContext c
 
@@ -1367,15 +1365,16 @@ matchContextErrString RecUpd                     = ptext (sLit "record update")
 matchContextErrString LambdaExpr                 = ptext (sLit "lambda")
 matchContextErrString ProcExpr                   = ptext (sLit "proc")
 matchContextErrString ThPatQuote                 = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (StmtCtxt c)
-matchContextErrString (StmtCtxt (PatGuard _))    = ptext (sLit "pattern guard")
-matchContextErrString (StmtCtxt GhciStmt)        = ptext (sLit "interactive GHCi command")
-matchContextErrString (StmtCtxt DoExpr)          = ptext (sLit "'do' expression")
-matchContextErrString (StmtCtxt MDoExpr)         = ptext (sLit "'mdo' expression")
-matchContextErrString (StmtCtxt ListComp)        = ptext (sLit "list comprehension")
-matchContextErrString (StmtCtxt MonadComp)       = ptext (sLit "monad comprehension")
-matchContextErrString (StmtCtxt PArrComp)        = ptext (sLit "array comprehension")
+matchContextErrString (StmtCtxt (ParStmtCtxt c))   = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (TransStmtCtxt c)) = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (PatGuard _))      = ptext (sLit "pattern guard")
+matchContextErrString (StmtCtxt GhciStmt)          = ptext (sLit "interactive GHCi command")
+matchContextErrString (StmtCtxt DoExpr)            = ptext (sLit "'do' block")
+matchContextErrString (StmtCtxt ArrowExpr)         = ptext (sLit "'do' block")
+matchContextErrString (StmtCtxt MDoExpr)           = ptext (sLit "'mdo' block")
+matchContextErrString (StmtCtxt ListComp)          = ptext (sLit "list comprehension")
+matchContextErrString (StmtCtxt MonadComp)         = ptext (sLit "monad comprehension")
+matchContextErrString (StmtCtxt PArrComp)          = ptext (sLit "array comprehension")
 \end{code}
 
 \begin{code}

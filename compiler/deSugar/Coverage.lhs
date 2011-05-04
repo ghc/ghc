@@ -431,7 +431,7 @@ addTickLStmts' isGuard lstmts res
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
 addTickStmt _isGuard (LastStmt e ret) = do
 	liftM2 LastStmt
-		(addTickLHsExprAlways e)
+		(addTickLHsExpr e)
 		(addTickSyntaxExpr hpcSrcSpan ret)
 addTickStmt _isGuard (BindStmt pat e bind fail) = do
 	liftM4 BindStmt
@@ -633,6 +633,10 @@ addTickCmdStmt (BindStmt pat c bind fail) = do
 		(addTickLHsCmd c)
 		(return bind)
 		(return fail)
+addTickCmdStmt (LastStmt c ret) = do
+	liftM2 LastStmt
+		(addTickLHsCmd c)
+		(addTickSyntaxExpr hpcSrcSpan ret)
 addTickCmdStmt (ExprStmt c bind' guard' ty) = do
 	liftM4 ExprStmt
 		(addTickLHsCmd c)

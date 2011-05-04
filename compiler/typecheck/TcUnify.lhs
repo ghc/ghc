@@ -20,7 +20,7 @@ module TcUnify (
   matchExpectedListTy, matchExpectedPArrTy, 
   matchExpectedTyConApp, matchExpectedAppTy, 
   matchExpectedFunTys, matchExpectedFunKind,
-  wrapFunResCoercion
+  wrapFunResCoercion, failWithMisMatch
   ) where
 
 #include "HsVersions.h"
