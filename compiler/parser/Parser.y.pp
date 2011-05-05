@@ -1504,8 +1504,7 @@ squals :: { Located [LStmt RdrName] }	-- In reverse order, because the last
 
 -- It is possible to enable bracketing (associating) qualifier lists by uncommenting the lines with {| |}
 -- above. Due to a lack of consensus on the syntax, this feature is not being used until we get user
--- demand. Note that the {| |} symbols are reused from -XGenerics and hence if you want to compile
--- a program that makes use of this temporary syntax you must supply that flag to GHC
+-- demand.
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
 			-- Function is applied to a list of stmts *in order*
