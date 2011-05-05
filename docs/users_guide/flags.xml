@@ -682,7 +682,10 @@
 	    </row>
 	    <row>
 	      <entry><option>-XGenerics</option></entry>
-	      <entry>Enable <link linkend="generic-classes">generic classes</link></entry>
+	      <entry>Enables <option>-XDeriveRepresentable</option> and <option>-XDefaultSignatures</option>. 
+               No longer enables <link linkend="generic-classes">generic classes</link>.
+               See also GHC's support for
+               <link linkend="generic-programming">generic programming</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoGenerics</option></entry>
 	    </row>
@@ -977,6 +980,12 @@
 	      <entry><option>-XNoDeriveDataTypeable</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XDeriveRepresentable</option></entry>
+	      <entry>Enable <link linkend="deriving-typeable">deriving for the Representable0 class</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoDeriveRepresentable</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
 	      <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
 	      <entry>dynamic</entry>
@@ -1006,6 +1015,12 @@
 	      <entry>Enable <link linkend="class-method-types">constrained class methods</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoConstrainedClassMethods</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XDefaultSignatures</option></entry>
+	      <entry>Enable <link linkend="class-default-signatures">default signatures</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoDefaultSignatures</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XMultiParamTypeClasses</option></entry>
