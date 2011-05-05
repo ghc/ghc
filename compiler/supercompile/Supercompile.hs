@@ -5,6 +5,7 @@ import Supercompile.Core.Renaming
 import Supercompile.Core.Size
 import Supercompile.Core.Syntax
 
+import Supercompile.Evaluator.Evaluate
 import Supercompile.Evaluator.Syntax
 import Supercompile.Evaluator.FreeVars
 

@@ -48,7 +48,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
         Cast e _        -> term e
     
     value = rec value'
-    value' (_co, rv) = 1 + case rv of
+    value' v = 1 + case v of
         Indirect _   -> 0
         TyLambda _ e -> term e
         Lambda _ e   -> term e

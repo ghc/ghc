@@ -267,12 +267,31 @@ instance Ord a => Ord (Down a) where
     Down a `compare` Down b = b `compare` a
 
 
+fmapEither :: (a -> b) -> (c -> d) -> Either a c -> Either b d
+fmapEither f g = either (Left . f) (Right . g)
+
 orElse :: Maybe a -> a -> a
 orElse = flip fromMaybe
+
+plusMaybe :: (a -> a -> a) -> Maybe a -> Maybe a -> Maybe a
+plusMaybe f (Just x) (Just y) = Just (f x y)
+plusMaybe _ Nothing  mb_y     = mb_y
+plusMaybe _ mb_x     Nothing  = mb_x
 
 
 third3 :: (c -> d) -> (a, b, c) -> (a, b, d)
 third3 f (a, b, c) = (a, b, f c)
+
+
+uncons :: [a] -> Maybe (a, [a])
+uncons []     = Nothing
+uncons (x:xs) = Just (x, xs)
+
+listContexts :: [a] -> [([a], a, [a])]
+listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs))
+
+bagContexts :: [a] -> [(a, [a])]
+bagContexts xs = [(x, is ++ ts) | (is, x, ts) <- listContexts xs]
 
 
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.

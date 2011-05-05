@@ -73,8 +73,7 @@ type AltF ann = (AltCon, ann (TermF ann))
 
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-type ValueF ann = (Maybe Coercion, RawValueF ann)
-data RawValueF ann = Indirect Var | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Var] | Literal Literal
+data ValueF ann = Indirect Var | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Var] | Literal Literal
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
@@ -86,7 +85,7 @@ instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
     pprPrec prec e = case e of
         LetRec xes e      -> pPrintPrecLetRec prec (map (second asPrettyFunction1) xes) (asPrettyFunction1 e)
         Var x             -> pPrintPrec prec x
-        Value v           -> pPrintPrecValue prec v
+        Value v           -> pPrintPrec prec v
         TyApp e ty        -> pPrintPrecApp prec (asPrettyFunction1 e) ty
         App e x           -> pPrintPrecApp prec (asPrettyFunction1 e) x
         PrimOp pop es     -> pPrintPrecPrimOp prec pop (map asPrettyFunction1 es)
@@ -95,10 +94,6 @@ instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
 
 asPrettyFunction1 :: (Outputable1 f, Outputable a) => f a -> PrettyFunction
 asPrettyFunction1 = asPrettyFunction . Wrapper1
-
-pPrintPrecValue :: (Outputable a) => Rational -> (Maybe Coercion, a) -> SDoc
-pPrintPrecValue prec (Nothing, v) = pPrintPrec prec v
-pPrintPrecValue prec (Just co, v) = pPrintPrecCast prec v co
 
 pPrintPrecCast :: (Outputable a) => Rational -> a -> Coercion -> SDoc
 pPrintPrecCast prec e co = prettyParen (prec > noPrec) $ pPrintPrec opPrec e <+> text "|>" <+> pPrintPrec appPrec co
@@ -120,7 +115,7 @@ pPrintPrecLetRec prec xes e_body
   | [] <- xes = pPrintPrec prec e_body
   | otherwise = prettyParen (prec > noPrec) $ hang (text "letrec") 2 (vcat [pPrintPrec noPrec x <+> text "=" <+> pPrintPrec noPrec e | (x, e) <- xes]) $$ text "in" <+> pPrintPrec noPrec e_body
 
-instance (Functor ann, Outputable1 ann) => Outputable (RawValueF ann) where
+instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
     pprPrec prec v = case v of
         Indirect x    -> pPrintPrec prec x
         TyLambda x e  -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
@@ -165,9 +160,9 @@ isCheap _               = False
 
 termToVar :: Copointed ann => ann (TermF ann) -> Maybe (Coercion, Var)
 termToVar e = case extract e of
-    Value (mb_co, Indirect x) -> Just (mb_co `orElse` idType x , x)
-    Var x                     -> Just (idType x, x)
-    _                         -> Nothing
+    Value (Indirect x) -> Just (idType x, x)
+    Var x              -> Just (idType x, x)
+    _                  -> Nothing -- FIXME: cast things as well
 
 
 class Functor ann => Symantics ann where
@@ -206,12 +201,12 @@ reflect (I e) = case e of
     Cast e co        -> cast (reflect e) co
   where
     reflectValue :: Value -> (forall ann. Symantics ann => ValueF ann)
-    reflectValue (mb_co, rv) = (mb_co, case rv of
+    reflectValue v = case v of
         Indirect x   -> Indirect x
         TyLambda x e -> TyLambda x (reflect e)
         Lambda x e   -> Lambda x (reflect e)
         Data dc xs   -> Data dc xs
-        Literal l    -> Literal l)
+        Literal l    -> Literal l
 
 
 {-
@@ -232,11 +227,13 @@ apps = foldl app
 
 varApps :: Symantics ann => Var -> [Var] -> ann (TermF ann)
 varApps h xs = var h `apps` xs
+-}
 
 letRecSmart :: Symantics ann => [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
 letRecSmart []  = id
 letRecSmart xes = letRec xes
 
+{-
 strictLet :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
 strictLet x e1 e2 = case_ e1 [(DefaultAlt (Just x), e2)]
 

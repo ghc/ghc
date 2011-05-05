@@ -452,6 +452,7 @@ Library
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars
+        Supercompile.Evaluator.Residualise
         Supercompile.Evaluator.Syntax
         Supercompile.StaticFlags
         Supercompile.Utilities

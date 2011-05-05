@@ -3,7 +3,8 @@ module Supercompile.Evaluator.FreeVars (
     inFreeVars,
     heapBindingFreeVars,
     pureHeapBoundVars, stackBoundVars, stackFrameBoundVars, stackFrameFreeVars,
-    pureHeapVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars
+    pureHeapVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
+    module Supercompile.Core.FreeVars
   ) where
 
 import Supercompile.Evaluator.Syntax
@@ -12,8 +13,6 @@ import Supercompile.Core.FreeVars
 import Supercompile.Core.Renaming
 
 import Supercompile.Utilities
-
-import VarSet
 
 import qualified Data.Map as M
 
@@ -41,7 +40,7 @@ stackFrameOpenFreeVars kf = case kf of
     Apply x'                 -> (emptyVarSet, unitVarSet x')
     TyApply ty'              -> (emptyVarSet, tyVarsOfType ty')
     Scrutinise x' ty in_alts -> (emptyVarSet, (inFreeVars annedAltsFreeVars in_alts `delVarSet` x') `unionVarSet` tyVarsOfType ty)
-    PrimApply _ in_vs in_es  -> (emptyVarSet, unionVarSets (map (inFreeVars annedValueFreeVars) in_vs) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
+    PrimApply _ as in_es     -> (emptyVarSet, unionVarSets (map annedFreeVars as) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
     Update x'                -> (unitVarSet x', emptyVarSet)
     CastIt co'               -> (emptyVarSet, tyVarsOfType co')
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types, FlexibleInstances #-}
 module Supercompile.Core.FreeVars (
     module Supercompile.Core.FreeVars,
+    module VarSet,
     tyVarsOfType
   ) where
 
@@ -50,13 +51,11 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     term' (Cast e co)        = term e `unionVarSet` typ co
     
     value = rec value'
-    value' (mb_co, rv) = maybe id (unionVarSet . typ) mb_co (rawvalue' rv)
-    
-    rawvalue' (Indirect x)   = idFreeVars x
-    rawvalue' (TyLambda x e) = term e `delVarSet` x
-    rawvalue' (Lambda x e)   = term e `delVarSet` x
-    rawvalue' (Data _ xs)    = unionVarSets $ map idFreeVars xs
-    rawvalue' (Literal _)    = emptyVarSet
+    value' (Indirect x)   = idFreeVars x
+    value' (TyLambda x e) = term e `delVarSet` x
+    value' (Lambda x e)   = term e `delVarSet` x
+    value' (Data _ xs)    = unionVarSets $ map idFreeVars xs
+    value' (Literal _)    = emptyVarSet
     
     alternatives = unionVarSets . map alternative
     
@@ -107,10 +106,9 @@ type FVedAlt = AltF FVed
 type FVedValue = ValueF FVed
 
 
-{-
 instance Symantics FVed where
     var = fvedTerm . Var
-    value = fvedValue
+    value = fmap Value . fvedValue
     tyApp e = fvedTerm . TyApp e
     app e = fvedTerm . App e
     primOp pop = fvedTerm . PrimOp pop
@@ -126,4 +124,3 @@ fvedValue v = FVed (fvedValueFreeVars' v) v
 
 fvedTerm :: TermF FVed -> FVedTerm
 fvedTerm e = FVed (fvedTermFreeVars' e) e
--}

@@ -1,7 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Supercompile.Core.Renaming (
     module Supercompile.Core.Renaming,
-    InScopeSet, mkInScopeSet
+    InScopeSet, emptyInScopeSet, mkInScopeSet
   ) where
 
 import Supercompile.Core.FreeVars
@@ -14,7 +14,6 @@ import qualified CoreSyn as CoreSyn (Expr(Var))
 import Type (mkTyVarTy)
 import Var  (isTyCoVar)
 import VarEnv
-import VarSet (varSetElems, mapVarSet)
 
 
 -- We are going to use GHC's substitution type in a rather stylised way, and only
@@ -48,11 +47,14 @@ mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv
 insertRenaming :: Renaming -> Var -> Var -> Renaming
 insertRenaming (id_subst, tv_subst) x x' = (extendVarEnv id_subst x (CoreSyn.Var x'), tv_subst)
 
+insertRenamings :: Renaming -> [(Var, Var)] -> Renaming
+insertRenamings (id_subst, tv_subst) xxs = (extendVarEnvList id_subst $ map (second CoreSyn.Var) xxs, tv_subst)
+
 insertTypeSubst :: Renaming -> Var -> Type -> Renaming
 insertTypeSubst (id_subst, tv_subst) x ty' = (id_subst, extendVarEnv tv_subst x ty')
 
 rename :: Renaming -> Var -> Out Var
-rename rn x = case lookupIdSubst (text "rename") (trivialSubst rn) x of CoreSyn.Var x' -> x'
+rename rn x = case lookupIdSubst (text "rename") (trivialSubst rn) x of CoreSyn.Var x' -> x'; e -> pprPanic "rename" (ppr e)
 
 
 type In a = (Renaming, a)
@@ -115,9 +117,7 @@ mkRename rec = (term, alternatives, value, value')
       Cast e co -> Cast (term ids rn e) (renameType ids rn co)
     
     value ids rn = rec (value' ids) rn
-    value' ids rn (mb_co, v) = (fmap (renameType ids rn) mb_co, rvalue' ids rn v)
-    
-    rvalue' ids rn v = case v of
+    value' ids rn v = case v of
       Indirect x -> Indirect (rename rn x)
       TyLambda x e -> TyLambda x' (term ids' rn' e)
         where (ids', rn', [x']) = renameNonRecBinders ids rn [x]

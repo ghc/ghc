@@ -36,9 +36,7 @@ mkTagger rec = term
                 idss' = listSplitUniqSupply ids0'
         Cast e co        -> Cast (term ids e) co
 
-    value' ids (co, rv) = (co, rvalue' ids rv)
-
-    rvalue' ids rv = case rv of
+    value' ids v = case v of
         Indirect x   -> Indirect x
         TyLambda x e -> TyLambda x (term ids e)
         Lambda x e   -> Lambda x (term ids e)
@@ -50,19 +48,20 @@ mkTagger rec = term
     alternative ids (con, e) = (con, term ids e)
 
 
-(taggedTermToTerm,              taggedAltsToAlts,              taggedValueToValue,              taggedValue'ToValue')              = mkDetag (\f e -> I (f (tagee e)))
-(fVedTermToTerm,                fVedAltsToAlts,                fVedValueToValue,                fVedValue'ToValue')                = mkDetag (\f e -> I (f (fvee e)))
-(taggedSizedFVedTermToTerm,     taggedSizedFVedAltsToAlts,     taggedSizedFVedValueToValue,     taggedSizedFVedValue'ToValue')     = mkDetag (\f e -> I (f (fvee (sizee (unComp (tagee (unComp e)))))))
-(taggedSizedFVedTermToFVedTerm, taggedSizedFVedAltsToFVedAlts, taggedSizedFVedValueToFVedValue, taggedSizedFVedValue'ToFVedValue') = mkDetag (\f e -> FVed (freeVars (sizee (unComp (tagee (unComp e))))) (f (extract e)))
+(taggedTermToTerm,              taggedTermToTerm',              taggedAltsToAlts,              taggedValueToValue,              taggedValue'ToValue')              = mkDetag (\f e -> I (f (tagee e)))
+(fVedTermToTerm,                fVedTermToTerm',                fVedAltsToAlts,                fVedValueToValue,                fVedValue'ToValue')                = mkDetag (\f e -> I (f (fvee e)))
+(taggedSizedFVedTermToTerm,     taggedSizedFVedTermToTerm',     taggedSizedFVedAltsToAlts,     taggedSizedFVedValueToValue,     taggedSizedFVedValue'ToValue')     = mkDetag (\f e -> I (f (fvee (sizee (unComp (tagee (unComp e)))))))
+(taggedSizedFVedTermToFVedTerm, taggedSizedFVedTermToFVedTerm', taggedSizedFVedAltsToFVedAlts, taggedSizedFVedValueToFVedValue, taggedSizedFVedValue'ToFVedValue') = mkDetag (\f e -> FVed (freeVars (sizee (unComp (tagee (unComp e))))) (f (extract e)))
 
 
 {-# INLINE mkDetag #-}
 mkDetag :: (forall a b. (a -> b) -> ann a -> ann' b)
         -> (ann (TermF ann)  -> ann' (TermF ann'),
+            TermF ann        -> TermF ann',
             [AltF ann]       -> [AltF ann'],
             ann (ValueF ann) -> ann' (ValueF ann'),
             ValueF ann       -> ValueF ann')
-mkDetag rec = (term, alternatives, value, value')
+mkDetag rec = (term, term', alternatives, value, value')
   where
     term = rec term'
     term' e = case e of
@@ -76,12 +75,10 @@ mkDetag rec = (term, alternatives, value, value')
         Cast e co        -> Cast (term e) co
 
     value = rec value'
-    value' (mb_co, rv) = (mb_co, rvalue' rv)
-    
-    rvalue' (Indirect x)   = Indirect x
-    rvalue' (TyLambda x e) = TyLambda x (term e)
-    rvalue' (Lambda x e)   = Lambda x (term e)
-    rvalue' (Data dc xs)   = Data dc xs
-    rvalue' (Literal l)    = Literal l
+    value' (Indirect x)   = Indirect x
+    value' (TyLambda x e) = TyLambda x (term e)
+    value' (Lambda x e)   = Lambda x (term e)
+    value' (Data dc xs)   = Data dc xs
+    value' (Literal l)    = Literal l
 
     alternatives = map (second term)
