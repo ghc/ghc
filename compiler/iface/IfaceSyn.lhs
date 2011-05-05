@@ -341,7 +341,7 @@ and suppose we are compiling module X:
         data T = ...
         instance C S T where ...
 
-If we base the instance verion on T, I'm worried that changing S to S'
+If we base the instance version on T, I'm worried that changing S to S'
 would change T's version, but not S or S'.  But an importing module might
 not depend on T, and so might not be recompiled even though the new instance
 (C S' T) might be relevant.  I have not been able to make a concrete example,

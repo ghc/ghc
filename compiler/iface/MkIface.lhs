@@ -298,8 +298,6 @@ mkIface_ hsc_env maybe_old_fingerprint
             then return ( errs_and_warns, Nothing )
             else do {
 
--- XXX	; when (dopt Opt_D_dump_hi_diffs dflags) (printDump pp_diffs)
-   
 	   	-- Debug printing
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
@@ -520,9 +518,13 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                       (mi_exports iface0,
                        orphan_hash,
                        dep_orphan_hashes,
-                       dep_pkgs (mi_deps iface0))
+                       dep_pkgs (mi_deps iface0),
                         -- dep_pkgs: see "Package Version Changes" on
                         -- wiki/Commentary/Compiler/RecompilationAvoidance
+                       mi_trust iface0)
+                        -- TODO: Can probably make more fine grained. Only
+                        -- really need to have recompilation for overlapping
+                        -- instances.
 
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = Map.elems $ Map.fromList $
