@@ -40,20 +40,29 @@ initBuiltins
 initBuiltins pkg
  = do mapM_ load dph_Orphans
 
+      -- From dph-common:Data.Array.Parallel.PArray.PData
+      --   PData is a type family that maps an element type onto the type
+      --   we use to hold an array of those elements.
+      pdataTyCon	<- externalTyCon	dph_PData	(fsLit "PData")
+
+      --   PR is a type class that holds the primitive operators we can 
+      --   apply to array data. Its functions take arrays in terms of PData types.
+      prClass           <- externalClass        dph_PData      (fsLit "PR")
+      let prTyCon     = classTyCon prClass
+          [prDataCon] = tyConDataCons prTyCon
+
       -- From dph-common:Data.Array.Parallel.Lifted.PArray
+      --   A PArray (Parallel Array) holds the array length and some array elements
+      --   represented by the PData type family.
       parrayTyCon	<- externalTyCon	dph_PArray	(fsLit "PArray")
       let [parrayDataCon] = tyConDataCons parrayTyCon
 
-      pdataTyCon	<- externalTyCon	dph_PArray	(fsLit "PData")
       paClass           <- externalClass        dph_PArray      (fsLit "PA")
       let paTyCon     = classTyCon paClass
           [paDataCon] = tyConDataCons paTyCon
           paPRSel     = classSCSelId paClass 0
 
       preprTyCon	<- externalTyCon 	dph_PArray	(fsLit "PRepr")
-      prClass           <- externalClass        dph_PArray      (fsLit "PR")
-      let prTyCon     = classTyCon prClass
-          [prDataCon] = tyConDataCons prTyCon
 
       closureTyCon	<- externalTyCon dph_Closure		(fsLit ":->")
 
@@ -162,13 +171,17 @@ initBuiltins pkg
                , liftingContext   = liftingContext
                }
   where
-    mods@(Modules {
-               dph_PArray         = dph_PArray
-             , dph_Repr           = dph_Repr
-             , dph_Closure        = dph_Closure
-             , dph_Scalar         = dph_Scalar
-             , dph_Unboxed        = dph_Unboxed
-             })
+    -- Extract out all the modules we'll use.
+    -- These are the modules from the DPH base library that contain
+    --  the primitive array types and functions that vectorised code uses.
+    mods@(Modules 
+                { dph_PArray    = dph_PArray
+                , dph_PData     = dph_PData
+                , dph_Repr      = dph_Repr
+                , dph_Closure   = dph_Closure
+                , dph_Scalar    = dph_Scalar
+                , dph_Unboxed   = dph_Unboxed
+                })
       = dph_Modules pkg
 
     load get_mod = dsLoadModule doc mod
@@ -254,7 +267,7 @@ initBuiltinPAs (Builtins { dphModules = mods }) insts
 -- | Get the names of all builtin instance functions for the PR class.
 initBuiltinPRs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
 initBuiltinPRs (Builtins { dphModules = mods }) insts
-  = liftM (initBuiltinDicts insts) (externalClass (dph_PArray mods) (fsLit "PR"))
+  = liftM (initBuiltinDicts insts) (externalClass (dph_PData mods) (fsLit "PR"))
 
 
 -- | Get the names of all DPH instance functions for this class.

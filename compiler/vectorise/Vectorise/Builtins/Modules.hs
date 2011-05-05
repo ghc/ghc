@@ -18,6 +18,7 @@ data Modules
         , dph_Instances		:: Module
         , dph_Combinators	:: Module
         , dph_Scalar		:: Module
+        , dph_PData             :: Module
         , dph_Prelude_PArr	:: Module
         , dph_Prelude_Int	:: Module
         , dph_Prelude_Word8	:: Module
@@ -38,6 +39,8 @@ dph_Modules pkg
 	, dph_Instances      = mk (fsLit "Data.Array.Parallel.Lifted.Instances")
 	, dph_Combinators    = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
 	, dph_Scalar         = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
+
+        , dph_PData          = mk (fsLit "Data.Array.Parallel.PArray.PData")
 
 	, dph_Prelude_PArr   = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
 	, dph_Prelude_Int    = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
