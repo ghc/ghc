@@ -36,8 +36,7 @@ ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
 ifeq "$(ValidateSlow)" "YES"
-GhcStage2HcOpts += -XGenerics -DDEBUG
-GhcLibHcOpts    += -XGenerics
+GhcStage2HcOpts += -DDEBUG
 endif
 
 ######################################################################
