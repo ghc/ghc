@@ -238,7 +238,7 @@ initSysTools mbMinusB
                 ld_prog  = gcc_prog
                 ld_args  = gcc_args
 
-        -- figure out llvm location. (TODO: Acutally implement).
+        -- We just assume on command line
         ; let lc_prog = "llc"
               lo_prog = "opt"
 

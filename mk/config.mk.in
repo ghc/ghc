@@ -774,8 +774,6 @@ ALEX_VERSION		= @AlexVersion@
 #
 SRC_ALEX_OPTS		= -g
 
-HSTAGS = @HstagsCmd@
-
 # Should we build haddock docs?
 HADDOCK_DOCS = YES
 # And HsColour the sources?

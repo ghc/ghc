@@ -102,6 +102,7 @@ import FastString
 import HsBinds               -- for TcEvBinds stuff 
 import Id 
 
+import StaticFlags( opt_PprStyle_Debug )
 import TcRnTypes
 #ifdef DEBUG
 import Control.Monad( when )

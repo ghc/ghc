@@ -143,11 +143,7 @@ nextPhase (Hsc   _)     = HCc
 nextPhase SplitMangle   = As
 nextPhase As            = SplitAs
 nextPhase LlvmOpt       = LlvmLlc
-#if darwin_TARGET_OS
 nextPhase LlvmLlc       = LlvmMangle
-#else
-nextPhase LlvmLlc       = As
-#endif
 nextPhase LlvmMangle    = As
 nextPhase SplitAs       = MergeStub
 nextPhase Ccpp          = As

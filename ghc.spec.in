@@ -177,7 +177,6 @@ fi
 %{_prefix}/bin/ghci
 %{_prefix}/bin/ghci-%{version}
 %{_prefix}/bin/ghcprof
-%{_prefix}/bin/hasktags
 %{_prefix}/bin/hp2ps
 %{_prefix}/bin/hpc
 %{_prefix}/bin/hsc2hs-ghc
