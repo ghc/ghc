@@ -360,6 +360,7 @@ data ExtensionFlag
    | Opt_KindSignatures
    | Opt_ParallelListComp
    | Opt_TransformListComp
+   | Opt_MonadComprehensions
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
    | Opt_DoRec
@@ -1104,12 +1105,13 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
   let (pic_warns, dflags2)
-        | not (cTargetArch == X86_64 && cTargetOS == Linux) &&
+        | not (cTargetArch == X86_64 && (cTargetOS == Linux || cTargetOS == OSX)) &&
           (not opt_Static || opt_PIC) &&
           hscTarget dflags1 == HscLlvm
-        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -"
-                       ++ "dynamic on this platform;\n"
-                       ++ "         using " ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
+        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and "
+                       ++ "-dynamic on this platform;\n"
+                       ++ "         using "
+                       ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
                 dflags1{ hscTarget = defaultObjectTarget })
         | otherwise = ([], dflags1)
 
@@ -1622,6 +1624,7 @@ xFlags = [
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
   ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
   ( "TransformListComp",                Opt_TransformListComp, nop ),
+  ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
@@ -1630,9 +1633,9 @@ xFlags = [
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop), 
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
-  ( "RecursiveDo",                      Opt_RecursiveDo,
+  ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
     deprecatedForExtension "DoRec"),
-  ( "DoRec",                            Opt_DoRec, nop ),
+  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword 
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),

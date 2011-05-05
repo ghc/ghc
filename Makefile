@@ -45,7 +45,7 @@ endif
 include mk/custom-settings.mk
 
 # No need to update makefiles for these targets:
-REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help install-docs test fulltest,$(MAKECMDGOALS))
+REALGOALS=$(filter-out binary-dist binary-dist-prep bootstrapping-files framework-pkg clean clean_% distclean maintainer-clean show help test fulltest,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
 # can mean a lot of unnecessary recompilation after a re-configure, so
@@ -101,12 +101,6 @@ ifeq "$(darwin_TARGET_OS)" "1"
 framework-pkg:
 	$(MAKE) -C distrib/MacOS $@
 endif
-
-# install-docs is a historical target that isn't supported in GHC 6.12. See #3662.
-install-docs:
-	@echo "The install-docs target is not supported in GHC 6.12.1 and later."
-	@echo "'make install' now installs everything, including documentation."
-	@exit 1
 
 # If the user says 'make A B', then we don't want to invoke two
 # instances of the rule above in parallel:

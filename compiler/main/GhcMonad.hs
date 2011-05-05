@@ -15,11 +15,11 @@ module GhcMonad (
         reflectGhc, reifyGhc,
         getSessionDynFlags, 
         liftIO,
-	Session(..), withSession, modifySession, withTempSession,
+        Session(..), withSession, modifySession, withTempSession,
 
         -- ** Warnings
         logWarnings, printException, printExceptionAndWarnings,
-	WarnErrLogger, defaultWarnErrLogger
+        WarnErrLogger, defaultWarnErrLogger
   ) where
 
 import MonadUtils

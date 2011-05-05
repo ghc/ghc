@@ -1031,18 +1031,6 @@ AC_SUBST([FopCmd])
 ])# FP_PROG_FOP
 
 
-# FP_PROG_HSTAGS
-# ----------------
-# Sets the output variable HstagsCmd to the full Haskell tags program path.
-# HstagsCmd is empty if no such program could be found.
-AC_DEFUN([FP_PROG_HSTAGS],
-[AC_PATH_PROG([HstagsCmd], [hasktags])
-if test -z "$HstagsCmd"; then
-  AC_MSG_WARN([cannot find hasktags in your PATH, you will not be able to build the tags])
-fi
-])# FP_PROG_HSTAGS
-
-
 # FP_PROG_GHC_PKG
 # ----------------
 # Try to find a ghc-pkg matching the ghc mentioned in the environment variable

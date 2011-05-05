@@ -407,7 +407,7 @@ renameDeriv is_boot gen_binds insts
 		-- scope (yuk), and rename the method binds
 	   ASSERT( null sigs )
 	   bindLocalNames (map Var.varName tyvars) $
- 	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
+ 	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) binds
 	      ; let binds' = VanillaInst rn_binds [] standalone_deriv
               ; return (inst_info { iBinds = binds' }, fvs) }
 	where

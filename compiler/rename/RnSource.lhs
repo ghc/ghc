@@ -17,14 +17,14 @@ import {-# SOURCE #-} TcSplice ( runQuasiQuoteDecl )
 
 import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, rdrNameOcc )
-import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
+import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext, rnConDeclFields )
 import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSigTvFn,
                                 makeMiniFixityEnv)
 import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
 			  lookupTopBndrRn, lookupLocatedTopBndrRn,
-			  lookupOccRn, newLocalBndrsRn, bindLocalNamesFV,
+			  lookupOccRn, bindLocalNamesFV,
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, bindTyVarsFV, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupRdrNames, mapFvRn
@@ -449,7 +449,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
 	rnMethodBinds cls (\_ -> []) 	-- No scoped tyvars
-		      [] mbinds
+		      mbinds
     )						`thenM` \ (mbinds', meth_fvs) ->
 	-- Rename the associated types
 	-- The typechecker (not the renamer) checks that all 
@@ -815,15 +815,11 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	-- we want to name both "x" tyvars with the same unique, so that they are
 	-- easy to group together in the typechecker.  
 	; (mbinds', meth_fvs) 
-	    <- extendTyVarEnvForMethodBinds tyvars' $ do
-	    { name_env <- getLocalRdrEnv
-	    ; let gen_rdr_tyvars_w_locs = [ tv | tv <- extractGenericPatTyVars mbinds,
-	    		 		         not (unLoc tv `elemLocalRdrEnv` name_env) ]
+	    <- extendTyVarEnvForMethodBinds tyvars' $
 		-- No need to check for duplicate method signatures
 		-- since that is done by RnNames.extendGlobalRdrEnvRn
 		-- and the methods are already in scope
-	    ; gen_tyvars <- newLocalBndrsRn gen_rdr_tyvars_w_locs
-	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
+	         rnMethodBinds (unLoc cname') (mkSigTvFn sigs') mbinds
 
   -- Haddock docs 
 	; docs' <- mapM (wrapLocM rnDocDecl) docs

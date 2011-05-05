@@ -106,11 +106,11 @@ matchGuards [] _ rhs _
 	-- NB:	The success of this clause depends on the typechecker not
 	-- 	wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
 	--	If it does, you'll get bogus overlap warnings
-matchGuards (ExprStmt e _ _ : stmts) ctx rhs rhs_ty
+matchGuards (ExprStmt e _ _ _ : stmts) ctx rhs rhs_ty
   | Just addTicks <- isTrueLHsExpr e = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     return (adjustMatchResultDs addTicks match_result)
-matchGuards (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty = do
+matchGuards (ExprStmt expr _ _ _ : stmts) ctx rhs rhs_ty = do
     match_result <- matchGuards stmts ctx rhs rhs_ty
     pred_expr <- dsLExpr expr
     return (mkGuardedMatchResult pred_expr match_result)

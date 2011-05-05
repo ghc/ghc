@@ -152,8 +152,14 @@ tidyLitPat (HsString s)
 tidyLitPat lit = LitPat lit
 
 ----------------
-tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id -> Pat Id
-tidyNPat (OverLit val False _ ty) mb_neg _
+tidyNPat :: (HsLit -> Pat Id)	-- How to tidy a LitPat
+	    	 -- We need this argument because tidyNPat is called
+		 -- both by Match and by Check, but they tidy LitPats 
+		 -- slightly differently; and we must desugar 
+		 -- literals consistently (see Trac #5117)
+         -> HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id 
+         -> Pat Id
+tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
 	-- False: Take short cuts only if the literal is not using rebindable syntax
 	-- 
 	-- Once that is settled, look for cases where the type of the 
@@ -169,7 +175,7 @@ tidyNPat (OverLit val False _ ty) mb_neg _
   | isWordTy ty,   Just int_lit <- mb_int_lit = mk_con_pat wordDataCon   (HsWordPrim   int_lit)
   | isFloatTy ty,  Just rat_lit <- mb_rat_lit = mk_con_pat floatDataCon  (HsFloatPrim  rat_lit)
   | isDoubleTy ty, Just rat_lit <- mb_rat_lit = mk_con_pat doubleDataCon (HsDoublePrim rat_lit)
-  | isStringTy ty, Just str_lit <- mb_str_lit = tidyLitPat (HsString str_lit)
+  | isStringTy ty, Just str_lit <- mb_str_lit = tidy_lit_pat (HsString str_lit)
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
     mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] ty)
@@ -193,7 +199,7 @@ tidyNPat (OverLit val False _ ty) mb_neg _
 		   (Nothing, HsIsString s) -> Just s
 		   _ -> Nothing
 
-tidyNPat over_lit mb_neg eq 
+tidyNPat _ over_lit mb_neg eq 
   = NPat over_lit mb_neg eq
 \end{code}
 

@@ -101,12 +101,12 @@ import FastString
 
 import HsBinds               -- for TcEvBinds stuff 
 import Id 
-
 import TcRnTypes
+import Data.IORef
 #ifdef DEBUG
+import StaticFlags( opt_PprStyle_Debug )
 import Control.Monad( when )
 #endif
-import Data.IORef
 \end{code}
 
 
@@ -527,7 +527,7 @@ runTcS context untouch tcs
 
 #ifdef DEBUG
        ; count <- TcM.readTcRef step_count
-       ; when (count > 0) $
+       ; when (opt_PprStyle_Debug && count > 0) $
          TcM.debugDumpTcRn (ptext (sLit "Constraint solver steps =") 
                             <+> int count <+> ppr context)
 #endif

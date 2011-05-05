@@ -1157,13 +1157,6 @@ checkValidClass cls
 	; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
 	; checkTc (tyVarsOfType tau `intersectsVarSet` grown_tyvars)
 	          (noClassTyVarErr cls sel_id)
-
-		-- Check that for a generic method, the type of 
-		-- the method is sufficiently simple
-{- -- JPM TODO  (when reinstating, remove commenting-out of badGenericMethodType
-	; checkTc (dm /= GenDefMeth || validGenericMethodType tau)
-		  (badGenericMethodType op_name op_ty)
--}
 	}
 	where
 	  op_name = idName sel_id
@@ -1428,14 +1421,6 @@ genericMultiParamErr :: Class -> SDoc
 genericMultiParamErr clas
   = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
     ptext (sLit "cannot have generic methods")
-
-{-  Commented out until the call is reinstated
-badGenericMethodType :: Name -> Kind -> SDoc
-badGenericMethodType op op_ty
-  = hang (ptext (sLit "Generic method type is too complex"))
-       2 (vcat [ppr op <+> dcolon <+> ppr op_ty,
-		ptext (sLit "You can only use type variables, arrows, lists, and tuples")])
--}
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls

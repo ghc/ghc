@@ -1027,8 +1027,6 @@ atype :: { LHsType RdrName }
 	| '$(' exp ')'	      		{ LL $ mkHsSpliceTy $2 }
 	| TH_ID_SPLICE	      		{ LL $ mkHsSpliceTy $ L1 $ HsVar $ 
 					  mkUnqual varName (getTH_ID_SPLICE $1) }
--- Generics
-        | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
 
 -- An inst_type is what occurs in the head of an instance decl
 --	e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1290,14 +1288,9 @@ exp10 :: { LHsExpr RdrName }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
 	| '-' fexp				{ LL $ NegApp $2 noSyntaxExpr }
 
-  	| 'do' stmtlist			{% let loc = comb2 $1 $2 in
-					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
-					   return (L loc (mkHsDo DoExpr stmts body)) }
-  	| 'mdo' stmtlist		{% let loc = comb2 $1 $2 in
-					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->
-                                           return (L loc (mkHsDo MDoExpr
-                                                                 [L loc (mkRecStmt stmts)]
-                                                                 body)) }
+  	| 'do' stmtlist			{ L (comb2 $1 $2) (mkHsDo DoExpr  (unLoc $2)) }
+  	| 'mdo' stmtlist		{ L (comb2 $1 $2) (mkHsDo MDoExpr (unLoc $2)) }
+
         | scc_annot exp		    		{ LL $ if opt_SccProfilingOn
 							then HsSCC (unLoc $1) $2
 							else HsPar $2 }
@@ -1472,7 +1465,10 @@ list :: { LHsExpr RdrName }
 	| texp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
 	| texp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp '|' flattenedpquals	{ sL (comb2 $1 $>) $ mkHsDo ListComp (unLoc $3) $1 }
+	| texp '|' flattenedpquals	
+             {% checkMonadComp >>= \ ctxt ->
+		return (sL (comb2 $1 $>) $ 
+                        mkHsComp ctxt (unLoc $3) $1) }
 
 lexps :: { Located [LHsExpr RdrName] }
 	: lexps ',' texp 		{ LL (((:) $! $3) $! unLoc $1) }
@@ -1487,7 +1483,7 @@ flattenedpquals :: { Located [LStmt RdrName] }
                     -- We just had one thing in our "parallel" list so 
                     -- we simply return that thing directly
                     
-                    qss -> L1 [L1 $ ParStmt [(qs, undefined) | qs <- qss]]
+                    qss -> L1 [L1 $ ParStmt [(qs, undefined) | qs <- qss] noSyntaxExpr noSyntaxExpr noSyntaxExpr]
                     -- We actually found some actual parallel lists so
                     -- we wrap them into as a ParStmt
                 }
@@ -1544,7 +1540,7 @@ parr :: { LHsExpr RdrName }
 						       (reverse (unLoc $1)) }
 	| texp '..' exp	 		{ LL $ PArrSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp		{ LL $ PArrSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp '|' flattenedpquals	{ LL $ mkHsDo PArrComp (unLoc $3) $1 }
+	| texp '|' flattenedpquals	{ LL $ mkHsComp PArrComp (unLoc $3) $1 }
 
 -- We are reusing `lexps' and `flattenedpquals' from the list case.
 

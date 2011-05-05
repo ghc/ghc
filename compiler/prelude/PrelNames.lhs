@@ -160,6 +160,7 @@ basicKnownKeyNames
 	-- Monad stuff
 	thenIOName, bindIOName, returnIOName, failIOName,
 	failMName, bindMName, thenMName, returnMName,
+        fmapName,
 
 	-- MonadRec stuff
 	mfixName,
@@ -226,6 +227,11 @@ basicKnownKeyNames
 	, rep0ClassName, rep1ClassName
 	, datatypeClassName, constructorClassName, selectorClassName
 	
+        -- Monad comprehensions
+        , guardMName
+        , liftMName
+        , groupMName
+        , mzipName
     ]
 
 genericTyConNames :: [Name]
@@ -277,8 +283,9 @@ gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
-    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, aRROW, cONTROL_APPLICATIVE,
-    gHC_DESUGAR, rANDOM, gHC_EXTS, cONTROL_EXCEPTION_BASE :: Module
+    dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_GROUP, mONAD_ZIP,
+    aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
+    cONTROL_EXCEPTION_BASE :: Module
 
 gHC_PRIM	= mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
@@ -327,6 +334,8 @@ gHC_INT		= mkBaseModule (fsLit "GHC.Int")
 gHC_WORD	= mkBaseModule (fsLit "GHC.Word")
 mONAD		= mkBaseModule (fsLit "Control.Monad")
 mONAD_FIX	= mkBaseModule (fsLit "Control.Monad.Fix")
+mONAD_GROUP     = mkBaseModule (fsLit "Control.Monad.Group")
+mONAD_ZIP       = mkBaseModule (fsLit "Control.Monad.Zip")
 aRROW		= mkBaseModule (fsLit "Control.Arrow")
 cONTROL_APPLICATIVE = mkBaseModule (fsLit "Control.Applicative")
 gHC_DESUGAR = mkBaseModule (fsLit "GHC.Desugar")
@@ -696,12 +705,13 @@ inlineIdName :: Name
 inlineIdName	 	= varQual gHC_MAGIC (fsLit "inline") inlineIdKey
 
 -- Base classes (Eq, Ord, Functor)
-eqClassName, eqName, ordClassName, geName, functorClassName :: Name
+fmapName, eqClassName, eqName, ordClassName, geName, functorClassName :: Name
 eqClassName	  = clsQual  gHC_CLASSES (fsLit "Eq")      eqClassKey
 eqName		  = methName gHC_CLASSES (fsLit "==")      eqClassOpKey
 ordClassName	  = clsQual  gHC_CLASSES (fsLit "Ord")     ordClassKey
 geName		  = methName gHC_CLASSES (fsLit ">=")      geClassOpKey
 functorClassName  = clsQual  gHC_BASE (fsLit "Functor") functorClassKey
+fmapName          = methName gHC_BASE (fsLit "fmap")    fmapClassOpKey
 
 -- Class Monad
 monadClassName, thenMName, bindMName, returnMName, failMName :: Name
@@ -942,6 +952,14 @@ firstAName	   = varQual aRROW (fsLit "first") firstAIdKey
 appAName	   = varQual aRROW (fsLit "app")	  appAIdKey
 choiceAName	   = varQual aRROW (fsLit "|||")	  choiceAIdKey
 loopAName	   = varQual aRROW (fsLit "loop")  loopAIdKey
+
+-- Monad comprehensions
+guardMName, liftMName, groupMName, mzipName :: Name
+guardMName         = varQual mONAD (fsLit "guard") guardMIdKey
+liftMName          = varQual mONAD (fsLit "liftM") liftMIdKey
+groupMName         = varQual mONAD_GROUP (fsLit "mgroupWith") groupMIdKey
+mzipName           = varQual mONAD_ZIP (fsLit "mzip") mzipIdKey
+
 
 -- Annotation type checking
 toAnnotationWrapperName :: Name
@@ -1433,7 +1451,8 @@ unboundKey		      = mkPreludeMiscIdUnique 101
 fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
     enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,
     enumFromThenToClassOpKey, eqClassOpKey, geClassOpKey, negateClassOpKey,
-    failMClassOpKey, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey
+    failMClassOpKey, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey,
+    fmapClassOpKey
     :: Unique
 fromIntegerClassOpKey	      = mkPreludeMiscIdUnique 102
 minusClassOpKey		      = mkPreludeMiscIdUnique 103
@@ -1448,6 +1467,7 @@ negateClassOpKey	      = mkPreludeMiscIdUnique 111
 failMClassOpKey		      = mkPreludeMiscIdUnique 112
 bindMClassOpKey		      = mkPreludeMiscIdUnique 113 -- (>>=)
 thenMClassOpKey		      = mkPreludeMiscIdUnique 114 -- (>>)
+fmapClassOpKey                = mkPreludeMiscIdUnique 115
 returnMClassOpKey	      = mkPreludeMiscIdUnique 117
 
 -- Recursive do notation
@@ -1477,6 +1497,14 @@ fromIntegralIdKey    = mkPreludeMiscIdUnique 127
 realToFracIdKey      = mkPreludeMiscIdUnique 128
 toIntegerClassOpKey  = mkPreludeMiscIdUnique 129
 toRationalClassOpKey = mkPreludeMiscIdUnique 130
+
+-- Monad comprehensions
+guardMIdKey, liftMIdKey, groupMIdKey, mzipIdKey :: Unique
+guardMIdKey     = mkPreludeMiscIdUnique 131
+liftMIdKey      = mkPreludeMiscIdUnique 132
+groupMIdKey     = mkPreludeMiscIdUnique 133
+mzipIdKey       = mkPreludeMiscIdUnique 134
+
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-499

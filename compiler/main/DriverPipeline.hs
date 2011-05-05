@@ -1307,22 +1307,18 @@ runPhase LlvmOpt input_fn dflags
         -- fix up some pretty big deficiencies in the code we generate
         llvmOpts = ["-mem2reg", "-O1", "-O2"]
 
-
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
 
 runPhase LlvmLlc input_fn dflags
   = do
     let lc_opts = getOpts dflags opt_lc
-    let opt_lvl = max 0 (min 2 $ optLevel dflags)
-    let nphase = if cTargetOS == OSX
-                 then LlvmMangle
-                 else As
-    let rmodel | opt_PIC        = "pic"
+        opt_lvl = max 0 (min 2 $ optLevel dflags)
+        rmodel | opt_PIC        = "pic"
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
 
-    output_fn <- phaseOutputFilename nphase
+    output_fn <- phaseOutputFilename LlvmMangle
 
     io $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
@@ -1331,12 +1327,12 @@ runPhase LlvmLlc input_fn dflags
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts)
 
-    return (nphase, output_fn)
+    return (LlvmMangle, output_fn)
   where
+        -- Bug in LLVM at O3 on OSX.
         llvmOpts = if cTargetOS == OSX
                    then ["-O1", "-O2", "-O2"]
                    else ["-O1", "-O2", "-O3"]
-
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
