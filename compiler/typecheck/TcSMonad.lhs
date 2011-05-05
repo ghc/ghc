@@ -101,13 +101,12 @@ import FastString
 
 import HsBinds               -- for TcEvBinds stuff 
 import Id 
-
-import StaticFlags( opt_PprStyle_Debug )
 import TcRnTypes
+import Data.IORef
 #ifdef DEBUG
+import StaticFlags( opt_PprStyle_Debug )
 import Control.Monad( when )
 #endif
-import Data.IORef
 \end{code}
 
 
