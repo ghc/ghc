@@ -695,8 +695,7 @@ tcConPat penv (L con_span con_name) pat_ty arg_pats thing_inside
 
 	  else do   -- The general case, with existential, 
                     -- and local equality constraints
-	{ let eq_preds = [mkEqPred (mkTyVarTy tv, ty) | (tv, ty) <- eq_spec]
-	      theta'   = substTheta tenv (eq_preds ++ theta)
+	{ let theta'   = substTheta tenv (eqSpecPreds eq_spec ++ theta)
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
 	      no_equalities = not (any isEqPred theta')
