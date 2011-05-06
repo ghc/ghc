@@ -24,7 +24,7 @@ cabal01:
 	'$(TEST_HC)' --make -o setup Setup.lhs -v0
 
 	'$(GHC_PKG)' init local.db
-	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(PROF)
+	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(PROF)
 	./setup build -v0
 	./setup copy -v0
 	echo install1:

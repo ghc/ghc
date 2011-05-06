@@ -77,3 +77,5 @@ test('T3265', normal, compile_fail, [''])
 test('T3792', normal, compile_fail, [''])
 test('T4042', normal, compile_fail, [''])
 
+test('mc13', normal, compile_fail, [''])
+test('mc14', normal, compile_fail, [''])
