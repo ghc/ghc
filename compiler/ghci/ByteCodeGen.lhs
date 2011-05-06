@@ -1198,6 +1198,9 @@ pushAtom d p e
    | Just e' <- bcView e 
    = pushAtom d p e'
 
+pushAtom _ _ (AnnCoercion {})	-- Coercions are zero-width things, 
+   = return (nilOL, 0)	  	-- treated just like a variable VoidArg
+
 pushAtom d p (AnnVar v)
    | idCgRep v == VoidArg
    = return (nilOL, 0)
@@ -1270,9 +1273,6 @@ pushAtom _ _ (AnnLit lit)
                 addr <- getMallocvilleAddr
                 -- Get the addr on the stack, untaggedly
                 return (unitOL (PUSH_UBX (Right addr) 1), 1)
-
-pushAtom d p (AnnCast e _)
-   = pushAtom d p (snd e)
 
 pushAtom _ _ expr
    = pprPanic "ByteCodeGen.pushAtom" 
@@ -1464,6 +1464,7 @@ bcView _                             = Nothing
 isVoidArgAtom :: AnnExpr' Var ann -> Bool
 isVoidArgAtom e | Just e' <- bcView e = isVoidArgAtom e'
 isVoidArgAtom (AnnVar v)              = typePrimRep (idType v) == VoidRep
+isVoidArgAtom (AnnCoercion {})        = True
 isVoidArgAtom _ 	              = False
 
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
