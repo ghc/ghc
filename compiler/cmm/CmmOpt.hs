@@ -99,11 +99,13 @@ cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
 -- The mini-inliner
 
 {-
-This pass inlines assignments to temporaries that are used just
-once.  It works as follows:
+This pass inlines assignments to temporaries.  Temporaries that are
+only used once are unconditionally inlined.  Temporaries that are used
+two or more times are only inlined if they are assigned a literal.  It
+works as follows:
 
   - count uses of each temporary
-  - for each temporary that occurs just once:
+  - for each temporary:
 	- attempt to push it forward to the statement that uses it
         - only push forward past assignments to other temporaries
 	  (assumes that temporaries are single-assignment)
@@ -158,7 +160,24 @@ cmmMiniInline blocks = map do_inline blocks
 
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
-cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
+cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr@(CmmLit _)) : stmts)
+        -- not used: just discard this assignment
+  | Nothing <- lookupUFM uses u
+  = cmmMiniInlineStmts uses stmts
+
+        -- used: try to inline at all the use sites
+  | Just n <- lookupUFM uses u
+  =
+#ifdef NCG_DEBUG
+     trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
+#endif
+     case lookForInlineLit u expr stmts of
+         (m, stmts')
+             | n == m -> cmmMiniInlineStmts (delFromUFM uses u) stmts'
+             | otherwise ->
+                 stmt : cmmMiniInlineStmts (adjustUFM (\x -> x - m) uses u) stmts'
+
+cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr : stmts))
         -- not used at all: just discard this assignment
   | Nothing <- lookupUFM uses u
   = cmmMiniInlineStmts uses stmts
@@ -174,6 +193,31 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
 
 cmmMiniInlineStmts uses (stmt:stmts)
   = stmt : cmmMiniInlineStmts uses stmts
+
+-- | Takes a register, a 'CmmLit' expression assigned to that
+-- register, and a list of statements.  Inlines the expression at all
+-- use sites of the register.  Returns the number of substituations
+-- made and the, possibly modified, list of statements.
+lookForInlineLit :: Unique -> CmmExpr -> [CmmStmt] -> (Int, [CmmStmt])
+lookForInlineLit _ _ [] = (0, [])
+lookForInlineLit u expr stmts@(stmt : rest)
+  | Just n <- lookupUFM (countUses stmt) u
+  = case lookForInlineLit u expr rest of
+      (m, stmts) -> let z = n + m
+                    in z `seq` (z, inlineStmt u expr stmt : stmts)
+
+  | ok_to_skip
+  = case lookForInlineLit u expr rest of
+      (n, stmts) -> (n, stmt : stmts)
+
+  | otherwise
+  = (0, stmts)
+  where
+    -- We skip over assignments to registers, unless the register
+    -- being assigned to is the one we're inlining.
+    ok_to_skip = case stmt of
+        CmmAssign (CmmLocal r@(LocalReg u' _)) _ | u' == u -> False
+        _other -> True
 
 lookForInline u expr stmts = lookForInline' u expr regset stmts
     where regset = foldRegsUsed extendRegSet emptyRegSet expr
