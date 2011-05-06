@@ -45,6 +45,7 @@ import Type
 import Coercion
 import Var
 import VarSet
+import VarEnv
 import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
@@ -55,6 +56,7 @@ import SrcLoc
 import Util
 import ListSetOps
 import Maybes
+import ErrUtils
 import Outputable
 import FastString
 import Control.Monad
@@ -415,8 +417,8 @@ tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
        -- and it maintains uniformity with other rebindable syntax
        ; return (HsIf (Just fun') pred' b1' b2') }
 
-tcExpr (HsDo do_or_lc stmts body _) res_ty
-  = tcDoStmts do_or_lc stmts body res_ty
+tcExpr (HsDo do_or_lc stmts _) res_ty
+  = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty
@@ -820,7 +822,7 @@ tcApp fun args res_ty
 	-- Typecheck the result, thereby propagating 
         -- info (if any) from result into the argument types
         -- Both actual_res_ty and res_ty are deeply skolemised
-        ; co_res <- addErrCtxt (funResCtxt fun) $
+        ; co_res <- addErrCtxtM (funResCtxt fun actual_res_ty res_ty) $
                     unifyType actual_res_ty res_ty
 
 	-- Typecheck the arguments
@@ -1386,9 +1388,23 @@ funAppCtxt fun arg arg_no
 		    quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
 
-funResCtxt :: LHsExpr Name -> SDoc
-funResCtxt fun
-  = ptext (sLit "In the return type of a call of") <+> quotes (ppr fun)
+funResCtxt :: LHsExpr Name -> TcType -> TcType 
+           -> TidyEnv -> TcM (TidyEnv, Message)
+-- When we have a mis-match in the return type of a function
+-- try to give a helpful message about too many/few arguments
+funResCtxt fun fun_res_ty res_ty env0
+  = do { fun_res' <- zonkTcType fun_res_ty
+       ; res'     <- zonkTcType res_ty
+       ; let n_fun = length (fst (tcSplitFunTys fun_res'))
+             n_res = length (fst (tcSplitFunTys res'))
+             what  | n_fun > n_res = ptext (sLit "few")
+                   | otherwise     = ptext (sLit "many")
+             extra | n_fun == n_res = empty
+                   | otherwise = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
+                                 <+> ptext (sLit "is applied to too") <+> what 
+                                 <+> ptext (sLit "arguments") 
+             msg = ptext (sLit "In the return type of a call of") <+> quotes (ppr fun)
+       ; return (env0, msg $$ extra) }
 
 badFieldTypes :: [(Name,TcType)] -> SDoc
 badFieldTypes prs

@@ -55,6 +55,7 @@ import MonadUtils
 -- import Data.Either
 import Exception
 import Data.IORef       ( readIORef )
+import Distribution.System
 -- import GHC.Exts              ( Int(..) )
 import System.Directory
 import System.FilePath
@@ -269,11 +270,11 @@ link :: GhcLink                 -- interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-#ifdef GHCI
 link LinkInMemory _ _ _
-    = do -- Not Linking...(demand linker will do the job)
-         return Succeeded
-#endif
+    = if cGhcWithInterpreter == "YES"
+      then -- Not Linking...(demand linker will do the job)
+           return Succeeded
+      else panicBadLink LinkInMemory
 
 link NoLink _ _ _
    = return Succeeded
@@ -283,11 +284,6 @@ link LinkBinary dflags batch_attempt_linking hpt
 
 link LinkDynLib dflags batch_attempt_linking hpt
    = link' dflags batch_attempt_linking hpt
-
-#ifndef GHCI
--- warning suppression
-link other _ _ _ = panicBadLink other
-#endif
 
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
@@ -1061,15 +1057,14 @@ runPhase cc_phase input_fn dflags
 
         let
           more_hcc_opts =
-#if i386_TARGET_ARCH
                 -- on x86 the floating point regs have greater precision
                 -- than a double, which leads to unpredictable results.
                 -- By default, we turn this off with -ffloat-store unless
                 -- the user specified -fexcess-precision.
-                (if dopt Opt_ExcessPrecision dflags
-                        then []
-                        else [ "-ffloat-store" ]) ++
-#endif
+                (if cTargetArch == I386 &&
+                    not (dopt Opt_ExcessPrecision dflags)
+                        then [ "-ffloat-store" ]
+                        else []) ++
 
                 -- gcc's -fstrict-aliasing allows two accesses to memory
                 -- to be considered non-aliasing if they have different types.
@@ -1093,26 +1088,26 @@ runPhase cc_phase input_fn dflags
                        ++ map SysTools.Option (
                           pic_c_flags
 
-#if    defined(mingw32_TARGET_OS)
                 -- Stub files generated for foreign exports references the runIO_closure
                 -- and runNonIO_closure symbols, which are defined in the base package.
                 -- These symbols are imported into the stub.c file via RtsAPI.h, and the
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
-                       ++ (if thisPackage dflags == basePackageId
+                       ++ (if cTargetOS == Windows &&
+                              thisPackage dflags == basePackageId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
-#endif
 
-#ifdef sparc_TARGET_ARCH
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction. Note that the user can still override this
         -- (e.g., -mcpu=ultrasparc) as GCC picks the "best" -mcpu flag
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ ["-mcpu=v9"]
-#endif
+                       ++ (if cTargetArch == Sparc
+                           then ["-mcpu=v9"]
+                           else [])
+
                        ++ (if hcc
                              then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
@@ -1179,7 +1174,7 @@ runPhase As input_fn dflags
         io $ SysTools.runAs dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
-#ifdef sparc_TARGET_ARCH
+
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
         -- instruction set. Note that the user can still override this
@@ -1187,8 +1182,10 @@ runPhase As input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ [ SysTools.Option "-mcpu=v9" ]
-#endif
+                       ++ (if cTargetArch == Sparc
+                           then [SysTools.Option "-mcpu=v9"]
+                           else [])
+
                        ++ [ SysTools.Option "-c"
                           , SysTools.FileOption "" input_fn
                           , SysTools.Option "-o"
@@ -1232,7 +1229,7 @@ runPhase SplitAs _input_fn dflags
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
-#ifdef sparc_TARGET_ARCH
+
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
         -- instruction set. Note that the user can still override this
@@ -1240,8 +1237,10 @@ runPhase SplitAs _input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                          [ SysTools.Option "-mcpu=v9" ] ++
-#endif
+                          (if cTargetArch == Sparc
+                           then [SysTools.Option "-mcpu=v9"]
+                           else []) ++
+
                           [ SysTools.Option "-c"
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" (split_obj n)
@@ -1308,24 +1307,18 @@ runPhase LlvmOpt input_fn dflags
         -- fix up some pretty big deficiencies in the code we generate
         llvmOpts = ["-mem2reg", "-O1", "-O2"]
 
-
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
 
 runPhase LlvmLlc input_fn dflags
   = do
     let lc_opts = getOpts dflags opt_lc
-    let opt_lvl = max 0 (min 2 $ optLevel dflags)
-#if darwin_TARGET_OS
-    let nphase = LlvmMangle
-#else
-    let nphase = As
-#endif
-    let rmodel | opt_PIC        = "pic"
+        opt_lvl = max 0 (min 2 $ optLevel dflags)
+        rmodel | opt_PIC        = "pic"
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
 
-    output_fn <- phaseOutputFilename nphase
+    output_fn <- phaseOutputFilename LlvmMangle
 
     io $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
@@ -1334,14 +1327,12 @@ runPhase LlvmLlc input_fn dflags
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts)
 
-    return (nphase, output_fn)
+    return (LlvmMangle, output_fn)
   where
-#if darwin_TARGET_OS
-        llvmOpts = ["-O1", "-O2", "-O2"]
-#else
-        llvmOpts = ["-O1", "-O2", "-O3"]
-#endif
-
+        -- Bug in LLVM at O3 on OSX.
+        llvmOpts = if cTargetOS == OSX
+                   then ["-O1", "-O2", "-O2"]
+                   else ["-O1", "-O2", "-O3"]
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
@@ -1654,11 +1645,12 @@ linkBinary dflags o_files dep_packages = do
                       ++ map SysTools.Option (
                          []
 
-#ifdef mingw32_TARGET_OS
                       -- Permit the linker to auto link _symbol to _imp_symbol.
                       -- This lets us link against DLLs without needing an "import library".
-                      ++ ["-Wl,--enable-auto-import"]
-#endif
+                      ++ (if cTargetOS == Windows
+                          then ["-Wl,--enable-auto-import"]
+                          else [])
+
                       ++ o_files
                       ++ extra_ld_inputs
                       ++ lib_path_opts
@@ -1689,19 +1681,15 @@ linkBinary dflags o_files dep_packages = do
 exeFileName :: DynFlags -> FilePath
 exeFileName dflags
   | Just s <- outputFile dflags =
-#if defined(mingw32_HOST_OS)
-      if null (takeExtension s)
-        then s <.> "exe"
-        else s
-#else
-      s
-#endif
+      if cTargetOS == Windows
+      then if null (takeExtension s)
+           then s <.> "exe"
+           else s
+      else s
   | otherwise =
-#if defined(mingw32_HOST_OS)
-        "main.exe"
-#else
-        "a.out"
-#endif
+      if cTargetOS == Windows
+      then "main.exe"
+      else "a.out"
 
 maybeCreateManifest
    :: DynFlags

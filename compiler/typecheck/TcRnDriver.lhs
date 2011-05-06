@@ -1195,7 +1195,7 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 
 --------------------
 mkPlan :: LStmt Name -> TcM PlanResult
-mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt 
+mkPlan (L loc (ExprStmt expr _ _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
 	      the_bind  = L loc $ mkFunBind (L loc fresh_it) matches
@@ -1204,7 +1204,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
-			          	   (HsVar thenIOName) placeHolderType
+			          	   (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 	-- The plans are:
 	--	[it <- e; print it]	but not if it::()
@@ -1232,7 +1232,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 mkPlan stmt@(L loc (BindStmt {}))
   | [v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
   = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-			          	   (HsVar thenIOName) placeHolderType
+			          	  (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 	; print_bind_result <- doptM Opt_PrintBindResult
 	; let print_plan = do
@@ -1259,11 +1259,25 @@ tcGhciStmts stmts
 	let {
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-	    tc_io_stmts stmts = tcStmts GhciStmt tcDoStmt stmts io_ret_ty ;
-
+	    tc_io_stmts stmts = tcStmtsAndThen GhciStmt tcDoStmt stmts io_ret_ty ;
 	    names = collectLStmtsBinders stmts ;
+	 } ;
 
-		-- mk_return builds the expression
+	-- OK, we're ready to typecheck the stmts
+	traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
+	((tc_stmts, ids), lie) <- captureConstraints $ 
+                                  tc_io_stmts stmts  $ \ _ ->
+                           	  mapM tcLookupId names  ;
+			-- Look up the names right in the middle,
+			-- where they will all be in scope
+
+	-- Simplify the context
+	traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
+	const_binds <- checkNoErrs (simplifyInteractive lie) ;
+		-- checkNoErrs ensures that the plan fails if context redn fails
+
+	traceTc "TcRnDriver.tcGhciStmts: done" empty ;
+        let {   -- mk_return builds the expression
 		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
 		--
 		-- Despite the inconvenience of building the type applications etc,
@@ -1274,27 +1288,14 @@ tcGhciStmts stmts
 		-- then the type checker would instantiate x..z, and we wouldn't
 		-- get their *polymorphic* values.  (And we'd get ambiguity errs
 		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ids = nlHsApp (nlHsTyApp ret_id [ret_ty]) 
-			 	    (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
+	    ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) 
+		       (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
 	    mk_item id = nlHsApp (nlHsTyApp unsafeCoerceId [idType id, unitTy])
-		    	         (nlHsVar id) 
-	 } ;
-
-	-- OK, we're ready to typecheck the stmts
-	traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
-	((tc_stmts, ids), lie) <- captureConstraints $ tc_io_stmts stmts $ \ _ ->
-					   mapM tcLookupId names ;
-					-- Look up the names right in the middle,
-					-- where they will all be in scope
-
-	-- Simplify the context
-	traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
-	const_binds <- checkNoErrs (simplifyInteractive lie) ;
-		-- checkNoErrs ensures that the plan fails if context redn fails
-
-	traceTc "TcRnDriver.tcGhciStmts: done" empty ;
+		    	         (nlHsVar id) ;
+	    stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
+        } ;
 	return (ids, mkHsDictLet (EvBinds const_binds) $
-		     noLoc (HsDo GhciStmt tc_stmts (mk_return ids) io_ret_ty))
+		     noLoc (HsDo GhciStmt stmts io_ret_ty))
     }
 \end{code}
 

@@ -13,13 +13,7 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "nativeGen/NCG.h"
 
 
-#if   alpha_TARGET_ARCH
-import Alpha.CodeGen
-import Alpha.Regs
-import Alpha.RegInfo
-import Alpha.Instr
-
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import X86.CodeGen
 import X86.Regs
 import X86.Instr
@@ -64,7 +58,7 @@ import NCGMonad
 import BlockId
 import CgUtils		( fixStgRegisters )
 import OldCmm
-import CmmOpt		( cmmMiniInline, cmmMachOpFold )
+import CmmOpt		( cmmEliminateDeadBlocks, cmmMiniInline, cmmMachOpFold )
 import OldPprCmm
 import CLabel
 
@@ -378,10 +372,25 @@ cmmNativeGen dflags us cmm count
 			, Nothing
 			, mPprStats)
 
-	---- generate jump tables
+        ---- x86fp_kludge.  This pass inserts ffree instructions to clear
+        ---- the FPU stack on x86.  The x86 ABI requires that the FPU stack
+        ---- is clear, and library functions can return odd results if it
+        ---- isn't.
+        ----
+        ---- NB. must happen before shortcutBranches, because that
+        ---- generates JXX_GBLs which we can't fix up in x86fp_kludge.
+        let kludged =
+#if i386_TARGET_ARCH
+	 	{-# SCC "x86fp_kludge" #-}
+                map x86fp_kludge alloced
+#else
+                alloced
+#endif
+
+        ---- generate jump tables
 	let tabled	=
 		{-# SCC "generateJumpTables" #-}
-		alloced ++ generateJumpTables alloced
+                generateJumpTables kludged
 
 	---- shortcut branches
 	let shorted	=
@@ -393,27 +402,18 @@ cmmNativeGen dflags us cmm count
 	 	{-# SCC "sequenceBlocks" #-}
 	 	map sequenceTop shorted
 
-	---- x86fp_kludge
-	let kludged =
-#if i386_TARGET_ARCH
-	 	{-# SCC "x86fp_kludge" #-}
-	 	map x86fp_kludge sequenced
-#else
-		sequenced
-#endif
-
-	---- expansion of SPARC synthetic instrs
+        ---- expansion of SPARC synthetic instrs
 #if sparc_TARGET_ARCH
 	let expanded = 
 		{-# SCC "sparc_expand" #-}
-		map expandTop kludged
+                map expandTop sequenced
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
 		(vcat $ map (docToSDoc . pprNatCmmTop) expanded)
 #else
 	let expanded = 
-		kludged
+                sequenced
 #endif
 
 	return 	( usAlloc
@@ -621,8 +621,8 @@ makeFarBranches = id
 generateJumpTables
 	:: [NatCmmTop Instr] -> [NatCmmTop Instr]
 generateJumpTables xs = concatMap f xs
-    where f (CmmProc _ _ (ListGraph xs)) = concatMap g xs
-          f _ = []
+    where f p@(CmmProc _ _ (ListGraph xs)) = p : concatMap g xs
+          f p = [p]
           g (BasicBlock _ xs) = catMaybes (map generateJumpTableForInstr xs)
 
 -- -----------------------------------------------------------------------------
@@ -735,10 +735,9 @@ Here we do:
              and position independent refs
         (ii) compile a list of imported symbols
 
-Ideas for other things we could do (ToDo):
+Ideas for other things we could do:
 
   - shortcut jumps-to-jumps
-  - eliminate dead code blocks
   - simple CSE: if an expr is assigned to a temp, then replace later occs of
     that expr with the temp, until the expr is no longer valid (can push through
     temp assignments, and certain assigns to mem...)
@@ -747,7 +746,7 @@ Ideas for other things we could do (ToDo):
 cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline (cmmEliminateDeadBlocks blocks))
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))

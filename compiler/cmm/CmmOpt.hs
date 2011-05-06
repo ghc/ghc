@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 module CmmOpt (
+	cmmEliminateDeadBlocks,
 	cmmMiniInline,
 	cmmMachOpFold,
 	cmmLoopifyForC,
@@ -30,10 +31,69 @@ import UniqFM
 import Unique
 import FastTypes
 import Outputable
+import BlockId
 
 import Data.Bits
 import Data.Word
 import Data.Int
+import Data.Maybe
+import Data.List
+
+import Compiler.Hoopl hiding (Unique)
+
+-- -----------------------------------------------------------------------------
+-- Eliminates dead blocks
+
+{-
+We repeatedly expand the set of reachable blocks until we hit a
+fixpoint, and then prune any blocks that were not in this set.  This is
+actually a required optimization, as dead blocks can cause problems
+for invariants in the linear register allocator (and possibly other
+places.)
+-}
+
+-- Deep fold over statements could probably be abstracted out, but it
+-- might not be worth the effort since OldCmm is moribund
+cmmEliminateDeadBlocks :: [CmmBasicBlock] -> [CmmBasicBlock]
+cmmEliminateDeadBlocks [] = []
+cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
+    let -- Calculate what's reachable from what block
+        reachableMap = foldl' f emptyUFM blocks -- lazy in values
+            where f m (BasicBlock block_id stmts) = addToUFM m block_id (reachableFrom stmts)
+        reachableFrom stmts = foldl stmt [] stmts
+            where
+                stmt m CmmNop = m
+                stmt m (CmmComment _) = m
+                stmt m (CmmAssign _ e) = expr m e
+                stmt m (CmmStore e1 e2) = expr (expr m e1) e2
+                stmt m (CmmCall c _ as _ _) = f (actuals m as) c
+                    where f m (CmmCallee e _) = expr m e
+                          f m (CmmPrim _) = m
+                stmt m (CmmBranch b) = b:m
+                stmt m (CmmCondBranch e b) = b:(expr m e)
+                stmt m (CmmSwitch e bs) = catMaybes bs ++ expr m e
+                stmt m (CmmJump e as) = expr (actuals m as) e
+                stmt m (CmmReturn as) = actuals m as
+                actuals m as = foldl' (\m h -> expr m (hintlessCmm h)) m as
+                -- We have to do a deep fold into CmmExpr because
+                -- there may be a BlockId in the CmmBlock literal.
+                expr m (CmmLit l) = lit m l
+                expr m (CmmLoad e _) = expr m e
+                expr m (CmmReg _) = m
+                expr m (CmmMachOp _ es) = foldl' expr m es
+                expr m (CmmStackSlot _ _) = m
+                expr m (CmmRegOff _ _) = m
+                lit m (CmmBlock b) = b:m
+                lit m _ = m
+        -- go todo done
+        reachable = go [base_id] (setEmpty :: BlockSet)
+          where go []     m = m
+                go (x:xs) m
+                    | setMember x m = go xs m
+                    | otherwise     = go (add ++ xs) (setInsert x m)
+                        where add = fromMaybe (panic "cmmEliminateDeadBlocks: unknown block")
+                                              (lookupUFM reachableMap x)
+    in filter (\(BasicBlock block_id _) -> setMember block_id reachable) blocks
 
 -- -----------------------------------------------------------------------------
 -- The mini-inliner

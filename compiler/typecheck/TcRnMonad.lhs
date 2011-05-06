@@ -780,11 +780,6 @@ updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) -> 
 			   env { tcl_ctxt = upd ctxt })
 
--- Conditionally add an error context
-maybeAddErrCtxt :: Maybe Message -> TcM a -> TcM a
-maybeAddErrCtxt (Just msg) thing_inside = addErrCtxt msg thing_inside
-maybeAddErrCtxt Nothing    thing_inside = thing_inside
-
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 

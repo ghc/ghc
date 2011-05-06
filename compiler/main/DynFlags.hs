@@ -77,9 +77,7 @@ module DynFlags (
 
 #include "HsVersions.h"
 
-#ifndef OMIT_NATIVE_CODEGEN
 import Platform
-#endif
 import Module
 import PackageConfig
 import PrelNames        ( mAIN )
@@ -110,7 +108,7 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
--- import Data.Maybe
+import Distribution.System
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -360,6 +358,7 @@ data ExtensionFlag
    | Opt_KindSignatures
    | Opt_ParallelListComp
    | Opt_TransformListComp
+   | Opt_MonadComprehensions
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
    | Opt_DoRec
@@ -402,9 +401,7 @@ data DynFlags = DynFlags {
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
   			   	 	--   See CoreMonad.FloatOutSwitches
 
-#ifndef OMIT_NATIVE_CODEGEN
-  targetPlatform	:: Platform,	-- ^ The platform we're compiling for. Used by the NCG.
-#endif
+  targetPlatform        :: Platform.Platform, -- ^ The platform we're compiling for. Used by the NCG.
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
   mainModIs             :: Module,
@@ -630,6 +627,14 @@ data HscTarget
   | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
 
+showHscTargetFlag :: HscTarget -> String
+showHscTargetFlag HscC           = "-fvia-c"
+showHscTargetFlag HscAsm         = "-fasm"
+showHscTargetFlag HscLlvm        = "-fllvm"
+showHscTargetFlag HscJava        = panic "No flag for HscJava"
+showHscTargetFlag HscInterpreted = "-fbyte-code"
+showHscTargetFlag HscNothing     = "-fno-code"
+
 -- | Will this target result in an object file on the disk?
 isObjectTarget :: HscTarget -> Bool
 isObjectTarget HscC     = True
@@ -692,8 +697,9 @@ defaultHscTarget = defaultObjectTarget
 -- object files on the current platform.
 defaultObjectTarget :: HscTarget
 defaultObjectTarget
+  | cGhcUnregisterised    == "YES"      =  HscC
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
-  | otherwise                           =  HscC
+  | otherwise                           =  HscLlvm
 
 data DynLibLoader
   = Deployable
@@ -740,9 +746,7 @@ defaultDynFlags mySettings =
         floatLamArgs            = Just 0,	-- Default: float only if no fvs
         strictnessBefore        = [],
 
-#ifndef OMIT_NATIVE_CODEGEN
         targetPlatform          = defaultTargetPlatform,
-#endif
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
         mainModIs               = mAIN,
@@ -1099,12 +1103,14 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
   let (pic_warns, dflags2)
-#if !(x86_64_TARGET_ARCH && linux_TARGET_OS)
-        | (not opt_Static || opt_PIC) && hscTarget dflags1 == HscLlvm
-        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and -"
-                ++ "dynamic on this platform;\n              ignoring -fllvm"],
-                dflags1{ hscTarget = HscAsm })
-#endif
+        | not (cTargetArch == X86_64 && (cTargetOS == Linux || cTargetOS == OSX)) &&
+          (not opt_Static || opt_PIC) &&
+          hscTarget dflags1 == HscLlvm
+        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and "
+                       ++ "-dynamic on this platform;\n"
+                       ++ "         using "
+                       ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
+                dflags1{ hscTarget = defaultObjectTarget })
         | otherwise = ([], dflags1)
 
   return (dflags2, leftover, pic_warns ++ warns)
@@ -1345,10 +1351,11 @@ dynamic_flags = [
   , Flag "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
 
         ------ Optimisation flags ------------------------------------------
-  , Flag "O"      (noArg (setOptLevel 1))
-  , Flag "Onot"   (noArgDF (setOptLevel 0) "Use -O0 instead")
-  , Flag "Odph"   (noArg setDPHOpt)
-  , Flag "O"      (OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
+  , Flag "O"      (noArgM (setOptLevel 1))
+  , Flag "Onot"   (noArgM (\dflags -> do deprecate "Use -O0 instead"
+                                         setOptLevel 0 dflags))
+  , Flag "Odph"   (noArgM setDPHOpt)
+  , Flag "O"      (optIntSuffixM (\mb_n -> setOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
 
   , Flag "fsimplifier-phases"          (intSuffix (\n d -> d{ simplPhases = n }))
@@ -1615,6 +1622,7 @@ xFlags = [
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls, nop ),
   ( "ParallelListComp",                 Opt_ParallelListComp, nop ),
   ( "TransformListComp",                Opt_TransformListComp, nop ),
+  ( "MonadComprehensions",              Opt_MonadComprehensions, nop),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface, nop ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes, nop ),
   ( "GHCForeignImportPrim",             Opt_GHCForeignImportPrim, nop ),
@@ -1623,9 +1631,9 @@ xFlags = [
   ( "RankNTypes",                       Opt_RankNTypes, nop ),
   ( "ImpredicativeTypes",               Opt_ImpredicativeTypes, nop), 
   ( "TypeOperators",                    Opt_TypeOperators, nop ),
-  ( "RecursiveDo",                      Opt_RecursiveDo,
+  ( "RecursiveDo",                      Opt_RecursiveDo,     -- Enables 'mdo'
     deprecatedForExtension "DoRec"),
-  ( "DoRec",                            Opt_DoRec, nop ),
+  ( "DoRec",                            Opt_DoRec, nop ),    -- Enables 'rec' keyword 
   ( "Arrows",                           Opt_Arrows, nop ),
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
@@ -1904,12 +1912,20 @@ checkTemplateHaskellOk _ = return ()
 type DynP = EwM (CmdLineP DynFlags)
 
 upd :: (DynFlags -> DynFlags) -> DynP ()
-upd f = liftEwM (do { dfs <- getCmdLineState
-                    ; putCmdLineState $! (f dfs) })
+upd f = liftEwM (do dflags <- getCmdLineState
+                    putCmdLineState $! f dflags)
+
+updM :: (DynFlags -> DynP DynFlags) -> DynP ()
+updM f = do dflags <- liftEwM getCmdLineState
+            dflags' <- f dflags
+            liftEwM $ putCmdLineState $! dflags'
 
 --------------- Constructor functions for OptKind -----------------
 noArg :: (DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 noArg fn = NoArg (upd fn)
+
+noArgM :: (DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
+noArgM fn = NoArg (updM fn)
 
 noArgDF :: (DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
 noArgDF fn deprec = NoArg (upd fn >> deprecate deprec)
@@ -1923,6 +1939,10 @@ hasArgDF fn deprec = HasArg (\s -> do { upd (fn s)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
+
+optIntSuffixM :: (Maybe Int -> DynFlags -> DynP DynFlags)
+              -> OptKind (CmdLineP DynFlags)
+optIntSuffixM fn = OptIntSuffix (\mi -> updM (fn mi))
 
 setDumpFlag :: DynFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
@@ -2021,20 +2041,36 @@ setTarget l = upd set
 -- not from bytecode to object-code.  The idea is that -fasm/-fllvm
 -- can be safely used in an OPTIONS_GHC pragma.
 setObjTarget :: HscTarget -> DynP ()
-setObjTarget l = upd set
+setObjTarget l = updM set
   where
-   set dfs
-     | isObjectTarget (hscTarget dfs) = dfs { hscTarget = l }
-     | otherwise = dfs
+   set dflags
+     | isObjectTarget (hscTarget dflags)
+       = case l of
+         HscC
+          | cGhcUnregisterised /= "YES" ->
+             do addWarn ("Compiler not unregisterised, so ignoring " ++
+                         showHscTargetFlag l)
+                return dflags
+         HscAsm
+          | cGhcWithNativeCodeGen /= "YES" ->
+             do addWarn ("Compiler has no native codegen, so ignoring " ++
+                         showHscTargetFlag l)
+                return dflags
+         HscLlvm
+          | cGhcUnregisterised == "YES" ->
+             do addWarn ("Compiler unregisterised, so ignoring " ++
+                         showHscTargetFlag l)
+                return dflags
+         _ -> return $ dflags { hscTarget = l }
+     | otherwise = return dflags
 
-setOptLevel :: Int -> DynFlags -> DynFlags
+setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags
    | hscTarget dflags == HscInterpreted && n > 0
-        = dflags
-            -- not in IO any more, oh well:
-            -- putStr "warning: -O conflicts with --interactive; -O ignored.\n"
+        = do addWarn "-O conflicts with --interactive; -O ignored."
+             return dflags
    | otherwise
-        = updOptLevel n dflags
+        = return (updOptLevel n dflags)
 
 
 -- -Odph is equivalent to
@@ -2043,7 +2079,7 @@ setOptLevel n dflags
 --    -fmax-simplifier-iterations20     this is necessary sometimes
 --    -fsimplifier-phases=3             we use an additional simplifier phase for fusion
 --
-setDPHOpt :: DynFlags -> DynFlags
+setDPHOpt :: DynFlags -> DynP DynFlags
 setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
                                          , simplPhases         = 3
                                          })

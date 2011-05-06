@@ -31,8 +31,7 @@ data Platform
 --	about what instruction set extensions an architecture might support.
 --
 data Arch
-	= ArchAlpha
-	| ArchX86
+	= ArchX86
 	| ArchX86_64
 	| ArchPPC
 	| ArchPPC_64
@@ -70,9 +69,7 @@ defaultTargetPlatform
 
 -- | Move the evil TARGET_ARCH #ifdefs into Haskell land.
 defaultTargetArch :: Arch
-#if   alpha_TARGET_ARCH
-defaultTargetArch	= ArchAlpha
-#elif i386_TARGET_ARCH
+#if i386_TARGET_ARCH
 defaultTargetArch	= ArchX86
 #elif x86_64_TARGET_ARCH
 defaultTargetArch	= ArchX86_64

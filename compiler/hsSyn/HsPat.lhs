@@ -122,7 +122,9 @@ data Pat id
   | LitPat	    HsLit		-- Used for *non-overloaded* literal patterns:
 					-- Int#, Char#, Int, Char, String, etc.
 
-  | NPat	    (HsOverLit id)		-- ALWAYS positive
+  | NPat		-- Used for all overloaded literals, 
+    			-- including overloaded strings with -XOverloadedStrings
+                    (HsOverLit id)		-- ALWAYS positive
 		    (Maybe (SyntaxExpr id))	-- Just (Name of 'negate') for negative
 						-- patterns, Nothing otherwise
 		    (SyntaxExpr id)		-- Equality checker, of type t->t->Bool
