@@ -165,7 +165,7 @@ void traverseAllRetainerSet(void (*f)(RetainerSet *));
 
 #ifdef SECOND_APPROACH
 // Prints a single retainer set.
-void printRetainerSetShort(FILE *, RetainerSet *);
+void printRetainerSetShort(FILE *, RetainerSet *, nat);
 #endif
 
 // Print the statistics on all the retainer sets.
