@@ -4,4 +4,4 @@ Stopped at ../getargs.hs:4:12-18
 _result :: IO [String] = _
 Stopped at ../getargs.hs:5:3-11
 _result :: IO () = _
-arg :: String = ['4','2']
+arg :: String = "42"
