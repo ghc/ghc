@@ -254,7 +254,7 @@ coreView :: Type -> Maybe Type
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
 coreView (PredTy p)
-  | isEqPred p             = Nothing
+--  | isEqPred p             = Nothing
   | otherwise    	   = Just (predTypeRep p)
 coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys 
 			   = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
