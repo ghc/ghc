@@ -730,7 +730,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op return_op) res_ty thing_insi
 	-- so for now we just check that it's the identity
     check_same actual expected
       = do { coi <- unifyType actual expected
-	   ; unless (isIdentityCoI coi) $
+	   ; unless (isReflCo coi) $
              failWithMisMatch [UnifyOrigin { uo_expected = expected
                                            , uo_actual = actual }] }
 
