@@ -160,13 +160,13 @@ cmmMiniInline blocks = map do_inline blocks
 
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
-cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr@(CmmLit _)) : stmts)
+cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
         -- not used: just discard this assignment
   | Nothing <- lookupUFM uses u
   = cmmMiniInlineStmts uses stmts
 
-        -- used: try to inline at all the use sites
-  | Just n <- lookupUFM uses u
+        -- used (literal): try to inline at all the use sites
+  | Just n <- lookupUFM uses u, isLit expr
   =
 #ifdef NCG_DEBUG
      trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
@@ -177,12 +177,21 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr@(CmmLit 
              | otherwise ->
                  stmt : cmmMiniInlineStmts (adjustUFM (\x -> x - m) uses u) stmts'
 
-cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr : stmts))
-        -- not used at all: just discard this assignment
-  | Nothing <- lookupUFM uses u
-  = cmmMiniInlineStmts uses stmts
+        -- used (foldable to literal): try to inline at all the use sites
+  | Just n <- lookupUFM uses u,
+    CmmMachOp op es <- expr,
+    e@(CmmLit _) <- cmmMachOpFold op es
+  =
+#ifdef NCG_DEBUG
+     trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
+#endif
+     case lookForInlineLit u e stmts of
+         (m, stmts')
+             | n == m -> cmmMiniInlineStmts (delFromUFM uses u) stmts'
+             | otherwise ->
+                 stmt : cmmMiniInlineStmts (adjustUFM (\x -> x - m) uses u) stmts'
 
-        -- used once: try to inline at the use site
+        -- used once (non-literal): try to inline at the use site
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
