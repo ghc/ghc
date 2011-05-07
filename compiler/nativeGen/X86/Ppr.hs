@@ -33,7 +33,6 @@ import PprBase
 
 import OldCmm
 import CLabel
-import Config
 import Unique           ( pprUnique, Uniquable(..) )
 import Pretty
 import FastString
@@ -41,7 +40,6 @@ import qualified Outputable
 import Outputable       (panic, Outputable)
 
 import Data.Word
-import Distribution.System
 
 #if i386_TARGET_ARCH && darwin_TARGET_OS
 import Data.Bits

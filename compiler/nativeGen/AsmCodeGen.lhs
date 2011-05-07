@@ -86,7 +86,6 @@ import Data.List
 import Data.Maybe
 import Control.Monad
 import System.IO
-import Distribution.System
 
 {-
 The native-code generator has machine-independent and
@@ -823,8 +822,10 @@ cmmStmtConFold stmt
 
 
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
-cmmExprConFold referenceKind expr
-   = case expr of
+cmmExprConFold referenceKind expr = do
+     dflags <- getDynFlagsCmmOpt
+     let arch = platformArch (targetPlatform dflags)
+     case expr of
         CmmLoad addr rep
            -> do addr' <- cmmExprConFold DataReference addr
                  return $ CmmLoad addr' rep
@@ -837,11 +838,9 @@ cmmExprConFold referenceKind expr
 
         CmmLit (CmmLabel lbl)
            -> do
-		dflags <- getDynFlagsCmmOpt
 		cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
            -> do
-		 dflags <- getDynFlagsCmmOpt
 		 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
                  return $ cmmMachOpFold (MO_Add wordWidth) [
                      dynRef,
@@ -852,15 +851,15 @@ cmmExprConFold referenceKind expr
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | cTargetArch == PPC && not opt_PIC
+          | arch == ArchPPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | cTargetArch == PPC && not opt_PIC
+          | arch == ArchPPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
-          | cTargetArch == PPC && not opt_PIC
+          | arch == ArchPPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
 
