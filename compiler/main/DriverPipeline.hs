@@ -51,6 +51,7 @@ import SrcLoc
 import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
+import Platform
 
 import Exception
 import Data.IORef       ( readIORef )
@@ -1059,7 +1060,7 @@ runPhase cc_phase input_fn dflags
                 -- than a double, which leads to unpredictable results.
                 -- By default, we turn this off with -ffloat-store unless
                 -- the user specified -fexcess-precision.
-                (if cTargetArch == I386 &&
+                (if platformArch (targetPlatform dflags) == ArchX86 &&
                     not (dopt Opt_ExcessPrecision dflags)
                         then [ "-ffloat-store" ]
                         else []) ++
@@ -1102,7 +1103,7 @@ runPhase cc_phase input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ (if cTargetArch == Sparc
+                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then ["-mcpu=v9"]
                            else [])
 
@@ -1180,7 +1181,7 @@ runPhase As input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ (if cTargetArch == Sparc
+                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
 
@@ -1235,7 +1236,7 @@ runPhase SplitAs _input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                          (if cTargetArch == Sparc
+                          (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else []) ++
 
