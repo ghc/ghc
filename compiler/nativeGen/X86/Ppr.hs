@@ -12,7 +12,6 @@ module X86.Ppr (
         pprSectionHeader,
         pprData,
         pprInstr,
-        pprUserReg,
         pprSize,
         pprImm,
         pprDataItem,
@@ -171,12 +170,6 @@ pprAlign bytes
 instance Outputable Instr where
     ppr instr = Outputable.docToSDoc $ pprInstr instr
 
-
-pprUserReg :: Reg -> Doc
-pprUserReg
- | cTargetArch == I386   = pprReg II32
- | cTargetArch == X86_64 = pprReg II64
- | otherwise             = panic "X86.Ppr.pprUserReg: not defined"
 
 pprReg :: Size -> Reg -> Doc
 
