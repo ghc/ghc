@@ -85,7 +85,7 @@ byteCodeGen dflags binds tycs modBreaks
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
            "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
-        assembleBCOs proto_bcos tycs
+        assembleBCOs dflags proto_bcos tycs
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for an expression
@@ -114,7 +114,7 @@ coreExprToBCOs dflags expr
 
       dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" (ppr proto_bco)
 
-      assembleBCO proto_bco
+      assembleBCO dflags proto_bco
 
 
 -- -----------------------------------------------------------------------------
