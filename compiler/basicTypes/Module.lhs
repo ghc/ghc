@@ -73,7 +73,6 @@ module Module
 
 import Config
 import Outputable
-import qualified Pretty
 import Unique
 import UniqFM
 import FastString
@@ -253,9 +252,10 @@ mkModule :: PackageId -> ModuleName -> Module
 mkModule = Module
 
 pprModule :: Module -> SDoc
-pprModule mod@(Module p n)  = pprPackagePrefix p mod <> pprModuleName n
+pprModule mod@(Module p n)  =
+  pprPackagePrefix p mod <> pprModuleName n
 
-pprPackagePrefix :: PackageId -> Module -> PprStyle -> Pretty.Doc
+pprPackagePrefix :: PackageId -> Module -> SDoc
 pprPackagePrefix p mod = getPprStyle doc
  where
    doc sty

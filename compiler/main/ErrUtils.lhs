@@ -67,7 +67,8 @@ mkLocMessage locn msg
   -- would look strange.  Better to say explicitly "<no location info>".
 
 printError :: SrcSpan -> Message -> IO ()
-printError span msg = printErrs (mkLocMessage span msg $ defaultErrStyle)
+printError span msg =
+  printErrs (mkLocMessage span msg) defaultErrStyle
 
 
 -- -----------------------------------------------------------------------------
