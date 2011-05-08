@@ -49,8 +49,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo '{-# LANGUAGE CPP #-}'                                        >> $@
 	@echo 'module Config where'                                         >> $@
 	@echo                                                               >> $@
-	@echo 'import Distribution.System'                                  >> $@
-	@echo                                                               >> $@
 	@echo '#include "ghc_boot_platform.h"'                              >> $@
 	@echo                                                               >> $@
 	@echo 'cBuildPlatformString :: String'                              >> $@
@@ -59,94 +57,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cHostPlatformString = HostPlatform_NAME'                     >> $@
 	@echo 'cTargetPlatformString :: String'                             >> $@
 	@echo 'cTargetPlatformString = TargetPlatform_NAME'                 >> $@
-	@echo                                                               >> $@
-# Sync this with checkArch in configure.ac
-	@echo 'cTargetArch :: Arch'                                         >> $@
-	@echo '#if i386_TARGET_ARCH'                                        >> $@
-	@echo 'cTargetArch = I386'                                          >> $@
-	@echo '#elif x86_64_TARGET_ARCH'                                    >> $@
-	@echo 'cTargetArch = X86_64'                                        >> $@
-	@echo '#elif powerpc_TARGET_ARCH'                                   >> $@
-	@echo 'cTargetArch = PPC'                                           >> $@
-	@echo '#elif powerpc64_TARGET_ARCH'                                 >> $@
-	@echo 'cTargetArch = PPC64'                                         >> $@
-	@echo '#elif sparc_TARGET_ARCH || sparc64_TARGET_ARCH'              >> $@
-	@echo 'cTargetArch = Sparc'                                         >> $@
-	@echo '#elif arm_TARGET_ARCH'                                       >> $@
-	@echo 'cTargetArch = Arm'                                           >> $@
-	@echo '#elif mips_TARGET_ARCH || mipseb_TARGET_ARCH || mipsel_TARGET_ARCH' >> $@
-	@echo 'cTargetArch = Mips'                                          >> $@
-	@echo '#elif 0'                                                     >> $@
-	@echo 'cTargetArch = SH'                                            >> $@
-	@echo '#elif ia64_TARGET_ARCH'                                      >> $@
-	@echo 'cTargetArch = IA64'                                          >> $@
-	@echo '#elif s390_TARGET_ARCH'                                      >> $@
-	@echo 'cTargetArch = S390'                                          >> $@
-	@echo '#elif alpha_TARGET_ARCH'                                     >> $@
-	@echo 'cTargetArch = Alpha'                                         >> $@
-	@echo '#elif hppa_TARGET_ARCH || hppa1_1_TARGET_ARCH'               >> $@
-	@echo 'cTargetArch = Hppa'                                          >> $@
-	@echo '#elif rs6000_TARGET_ARCH'                                    >> $@
-	@echo 'cTargetArch = Rs6000'                                        >> $@
-	@echo '#elif m68k_TARGET_ARCH'                                      >> $@
-	@echo 'cTargetArch = M68k'                                          >> $@
-	@echo '#elif vax_TARGET_ARCH'                                       >> $@
-	@echo 'cTargetArch = Vax'                                           >> $@
-	@echo '#else'                                                       >> $@
-	@echo '#error Unknown target arch'                                  >> $@
-	@echo '#endif'                                                      >> $@
-	@echo                                                               >> $@
-# Sync this with checkOS in configure.ac
-	@echo 'cTargetOS :: OS'                                             >> $@
-	@echo '#if linux_TARGET_OS'                                         >> $@
-	@echo 'cTargetOS = Linux'                                           >> $@
-	@echo '#elif freebsd_TARGET_OS'                                     >> $@
-	@echo 'cTargetOS = FreeBSD'                                         >> $@
-	@echo '#elif netbsd_TARGET_OS'                                      >> $@
-	@echo 'cTargetOS = NetBSD'                                          >> $@
-	@echo '#elif openbsd_TARGET_OS'                                     >> $@
-	@echo 'cTargetOS = OpenBSD'                                         >> $@
-	@echo '#elif dragonfly_TARGET_OS'                                   >> $@
-	@echo 'cTargetOS = OtherOS "dragonfly"'                             >> $@
-	@echo '#elif osf1_TARGET_OS'                                        >> $@
-	@echo 'cTargetOS = OtherOS "osf"'                                   >> $@
-	@echo '#elif osf3_TARGET_OS'                                        >> $@
-	@echo 'cTargetOS = OtherOS "osf"'                                   >> $@
-	@echo '#elif hpux_TARGET_OS'                                        >> $@
-	@echo 'cTargetOS = HPUX'                                            >> $@
-	@echo '#elif linuxaout_TARGET_OS'                                   >> $@
-	@echo 'cTargetOS = Linux'                                           >> $@
-	@echo '#elif kfreebsdgnu_TARGET_OS'                                 >> $@
-	@echo 'cTargetOS = OtherOS "kfreebsdgnu"'                           >> $@
-	@echo '#elif freebsd2_TARGET_OS'                                    >> $@
-	@echo 'cTargetOS = FreeBSD'                                         >> $@
-	@echo '#elif solaris2_TARGET_OS'                                    >> $@
-	@echo 'cTargetOS = Solaris'                                         >> $@
-	@echo '#elif cygwin32_TARGET_OS'                                    >> $@
-	@echo 'cTargetOS = Windows'                                         >> $@
-	@echo '#elif mingw32_TARGET_OS'                                     >> $@
-	@echo 'cTargetOS = Windows'                                         >> $@
-	@echo '#elif darwin_TARGET_OS'                                      >> $@
-	@echo 'cTargetOS = OSX'                                             >> $@
-	@echo '#elif gnu_TARGET_OS'                                         >> $@
-	@echo 'cTargetOS = OtherOS "gnu"'                                   >> $@
-	@echo '#elif nextstep2_TARGET_OS'                                   >> $@
-	@echo 'cTargetOS = OtherOS "nextstep"'                              >> $@
-	@echo '#elif nextstep3_TARGET_OS'                                   >> $@
-	@echo 'cTargetOS = OtherOS "nextstep"'                              >> $@
-	@echo '#elif sunos4_TARGET_OS'                                      >> $@
-	@echo 'cTargetOS = Solaris'                                         >> $@
-	@echo '#elif ultrix_TARGET_OS'                                      >> $@
-	@echo 'cTargetOS = OtherOS "ultrix"'                                >> $@
-	@echo '#elif irix_TARGET_OS'                                        >> $@
-	@echo 'cTargetOS = IRIX'                                            >> $@
-	@echo '#elif aix_TARGET_OS'                                         >> $@
-	@echo 'cTargetOS = AIX'                                             >> $@
-	@echo '#elif haiku_TARGET_OS'                                       >> $@
-	@echo 'cTargetOS = OtherOS "haiku"'                                 >> $@
-	@echo '#else'                                                       >> $@
-	@echo '#error Unknown target OS'                                    >> $@
-	@echo '#endif'                                                      >> $@
 	@echo                                                               >> $@
 	@echo 'cProjectName          :: String'                             >> $@
 	@echo 'cProjectName          = "$(ProjectName)"'                    >> $@
