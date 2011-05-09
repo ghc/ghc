@@ -642,8 +642,8 @@ pprInstr (FDIV size op1 op2) = pprSizeOpOp (sLit "div") size op1 op2
 
 pprInstr (CVTSS2SD from to)      = pprRegReg (sLit "cvtss2sd") from to
 pprInstr (CVTSD2SS from to)      = pprRegReg (sLit "cvtsd2ss") from to
-pprInstr (CVTTSS2SIQ sz from to) = pprSizeOpReg (sLit "cvttss2si") sz from to
-pprInstr (CVTTSD2SIQ sz from to) = pprSizeOpReg (sLit "cvttsd2si") sz from to
+pprInstr (CVTTSS2SIQ sz from to) = pprSizeSizeOpReg (sLit "cvttss2si") FF32 sz from to
+pprInstr (CVTTSD2SIQ sz from to) = pprSizeSizeOpReg (sLit "cvttsd2si") FF64 sz from to
 pprInstr (CVTSI2SS sz from to)   = pprSizeOpReg (sLit "cvtsi2ss") sz from to
 pprInstr (CVTSI2SD sz from to)   = pprSizeOpReg (sLit "cvtsi2sd") sz from to
 
@@ -1094,7 +1094,6 @@ pprSizeOpReg name size op1 reg2
         pprReg archWordSize reg2
     ]
 
-
 pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> Doc
 pprCondRegReg name size cond reg1 reg2
   = hcat [
@@ -1116,11 +1115,18 @@ pprSizeSizeRegReg name size1 size2 reg1 reg2
         pprSize size2,
         space,
         pprReg size1 reg1,
-
         comma,
         pprReg size2 reg2
     ]
 
+pprSizeSizeOpReg :: LitString -> Size -> Size -> Operand -> Reg -> Doc
+pprSizeSizeOpReg name size1 size2 op1 reg2
+  = hcat [
+        pprMnemonic name size2,
+        pprOperand size1 op1,
+        comma,
+        pprReg size2 reg2
+    ]
 
 pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3
