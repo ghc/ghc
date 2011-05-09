@@ -108,8 +108,13 @@ test('T149',
      ['$MAKE -s --no-print-directory T149'])
 
 test('T5113',
-     [stats_num_field('bytes allocated', 8000000,
-                                         9000000),
+     [
+      if_wordsize(32,
+          stats_num_field('bytes allocated', 3000000,
+                                             5000000)),
+      if_wordsize(64,
+          stats_num_field('bytes allocated', 8000000,
+                                             9000000)),
       only_ways(['normal'])
       ],
      compile_and_run,
