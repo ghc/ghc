@@ -30,30 +30,50 @@ import Prelude hiding (succ)
 
 data CmmNode e x where
   CmmEntry :: Label -> CmmNode C O
+
   CmmComment :: FastString -> CmmNode O O
+
   CmmAssign :: CmmReg -> CmmExpr -> CmmNode O O  -- Assign to register
+
   CmmStore :: CmmExpr -> CmmExpr -> CmmNode O O  -- Assign to memory location.  Size is
                                                  -- given by cmmExprType of the rhs.
+
   CmmUnsafeForeignCall ::         -- An unsafe foreign call; see Note [Foreign calls]
+  		       		  -- Like a "fat machine instruction"; can occur
+				  -- in the middle of a block
       ForeignTarget ->            -- call target
       CmmFormals ->               -- zero or more results
       CmmActuals ->               -- zero or more arguments
       CmmNode O O
+      -- Semantics: kills only result regs; all other regs (both GlobalReg
+      --            and LocalReg) are preserved
+
   CmmBranch :: Label -> CmmNode O C  -- Goto another block in the same procedure
+
   CmmCondBranch :: {                 -- conditional branch
       cml_pred :: CmmExpr,
       cml_true, cml_false :: Label
   } -> CmmNode O C
+
   CmmSwitch :: CmmExpr -> [Maybe Label] -> CmmNode O C -- Table branch
       -- The scrutinee is zero-based;
       --      zero -> first block
       --      one  -> second block etc
       -- Undefined outside range, and when there's a Nothing
-  CmmCall :: {                -- A call (native or safe foreign)
+
+  CmmCall :: {                -- A native call or tail call
       cml_target :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
 
       cml_cont :: Maybe Label,
           -- Label of continuation (Nothing for return or tail call)
+
+-- ToDO: add this:
+--       cml_args_regs :: [GlobalReg],
+-- It says which GlobalRegs are live for the parameters at the
+-- moment of the call.  Later stages can use this to give liveness
+-- everywhere, which in turn guides register allocation.
+-- It is the companion of cml_args; cml_args says which stack words
+-- hold parameters, while cml_arg_regs says which global regs hold parameters
 
       cml_args :: ByteOff,
           -- Byte offset, from the *old* end of the Area associated with
@@ -78,7 +98,9 @@ data CmmNode e x where
         -- cml_ret_off are treated as live, even if the sequel of
         -- the call goes into a loop.
   } -> CmmNode O C
+
   CmmForeignCall :: {           -- A safe foreign call; see Note [Foreign calls]
+  		    		-- Always the last node of a block
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: CmmFormals,      -- zero or more results
       args  :: CmmActuals,      -- zero or more arguments
@@ -89,8 +111,8 @@ data CmmNode e x where
 
 {- Note [Foreign calls]
 ~~~~~~~~~~~~~~~~~~~~~~~
-A MidForeign call is used for *unsafe* foreign calls;
-a LastForeign call is used for *safe* foreign calls.
+A CmmUnsafeForeignCall is used for *unsafe* foreign calls;
+a CmmForeignCall call is used for *safe* foreign calls.
 Unsafe ones are easy: think of them as a "fat machine instruction".
 In particular, they do *not* kill all live registers (there was a bit
 of code in GHC that conservatively assumed otherwise.)
