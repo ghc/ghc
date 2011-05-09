@@ -13,7 +13,7 @@ module Vectorise.Builtins.Base (
 	indexBuiltin,
 	
 	-- * Projections
-	selTy,
+        selTy,
 	selReplicate,
 	selPick,
 	selTags,

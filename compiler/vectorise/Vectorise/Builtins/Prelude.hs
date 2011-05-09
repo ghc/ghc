@@ -25,7 +25,6 @@ preludeVars :: Modules
 	-> [( Module, FastString	--   Maps the original variable to the one in the DPH 
 	    , Module, FastString)]      --   packages that it should be rewritten to.
 preludeVars (Modules { dph_Combinators    = _dph_Combinators
-                     , dph_PArray         = _dph_PArray
                      , dph_Prelude_Int    = dph_Prelude_Int
                      , dph_Prelude_Word8  = dph_Prelude_Word8
                      , dph_Prelude_Double = dph_Prelude_Double

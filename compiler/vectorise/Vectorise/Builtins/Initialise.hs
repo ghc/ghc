@@ -79,15 +79,23 @@ initBuiltins pkg
       -- From dph-common:Data.Array.Parallel.Lifted.PArray
       --   A PArray (Parallel Array) holds the array length and some array elements
       --   represented by the PData type family.
-      parrayTyCon	<- externalTyCon	dph_PArray	(fsLit "PArray")
+      parrayTyCon	<- externalTyCon	dph_PArray_Base	  (fsLit "PArray")
       let [parrayDataCon] = tyConDataCons parrayTyCon
+
+      -- From dph-common:Data.Array.Parallel.PArray.Types
+      voidTyCon		<- externalTyCon        dph_PArray_Types  (fsLit "Void")
+      voidVar           <- externalVar          dph_PArray_Types  (fsLit "void")
+      fromVoidVar       <- externalVar          dph_PArray_Types  (fsLit "fromVoid")
+      wrapTyCon		<- externalTyCon        dph_PArray_Types  (fsLit "Wrap")
+      sum_tcs		<- mapM (externalTyCon  dph_PArray_Types) (numbered "Sum" 2 mAX_DPH_SUM)
+
+      -- from dph-common:Data.Array.Parallel.PArray.PDataInstances
+      pvoidVar          <- externalVar dph_PArray_PDataInstances  (fsLit "pvoid")
+      punitVar          <- externalVar dph_PArray_PDataInstances  (fsLit "punit")
 
 
       closureTyCon	<- externalTyCon dph_Closure		 (fsLit ":->")
 
-      -- From dph-common:Data.Array.Parallel.Lifted.Repr
-      voidTyCon		<- externalTyCon	dph_Repr	(fsLit "Void")
-      wrapTyCon		<- externalTyCon	dph_Repr	(fsLit "Wrap")
 
       -- From dph-common:Data.Array.Parallel.Lifted.Unboxed
       sel_tys		<- mapM (externalType dph_Unboxed)
@@ -105,8 +113,6 @@ initBuiltins pkg
       sel_els		<- mapM mk_elements
 				[(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
 
-      sum_tcs		<- mapM (externalTyCon dph_Repr)
-				(numbered "Sum" 2 mAX_DPH_SUM)
 
       let selTys        = listArray (2, mAX_DPH_SUM) sel_tys
           selReplicates = listArray (2, mAX_DPH_SUM) sel_replicates
@@ -116,17 +122,14 @@ initBuiltins pkg
           sumTyCons     = listArray (2, mAX_DPH_SUM) sum_tcs
 
 
-      voidVar          <- externalVar dph_Repr		(fsLit "void")
-      pvoidVar         <- externalVar dph_Repr		(fsLit "pvoid")
-      fromVoidVar      <- externalVar dph_Repr		(fsLit "fromVoid")
-      punitVar         <- externalVar dph_Repr		(fsLit "punit")
+
       closureVar       <- externalVar dph_Closure	(fsLit "closure")
       applyVar         <- externalVar dph_Closure	(fsLit "$:")
       liftedClosureVar <- externalVar dph_Closure	(fsLit "liftedClosure")
       liftedApplyVar   <- externalVar dph_Closure	(fsLit "liftedApply")
 
       scalar_map	<- externalVar	dph_Scalar	(fsLit "scalar_map")
-      scalar_zip2	<- externalVar	dph_Scalar	(fsLit "scalar_zipWith")
+      scalar_zip2   <- externalVar	dph_Scalar	(fsLit "scalar_zipWith")
       scalar_zips	<- mapM (externalVar dph_Scalar)
                           	(numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
 
@@ -185,14 +188,16 @@ initBuiltins pkg
     -- These are the modules from the DPH base library that contain
     --  the primitive array types and functions that vectorised code uses.
     mods@(Modules 
-                { dph_PArray            = dph_PArray
-                , dph_PArray_Scalar     = dph_PArray_Scalar
-                , dph_PArray_PRepr      = dph_PArray_PRepr
-                , dph_PArray_PData      = dph_PArray_PData
-                , dph_Repr              = dph_Repr
-                , dph_Closure           = dph_Closure
-                , dph_Scalar            = dph_Scalar
-                , dph_Unboxed           = dph_Unboxed
+                { dph_PArray_Base               = dph_PArray_Base
+                , dph_PArray_Scalar             = dph_PArray_Scalar
+                , dph_PArray_PRepr              = dph_PArray_PRepr
+                , dph_PArray_PData              = dph_PArray_PData
+                , dph_PArray_PDataInstances     = dph_PArray_PDataInstances
+                , dph_PArray_Types              = dph_PArray_Types
+                , dph_Repr                      = dph_Repr
+                , dph_Closure                   = dph_Closure
+                , dph_Scalar                    = dph_Scalar
+                , dph_Unboxed                   = dph_Unboxed
                 })
       = dph_Modules pkg
 
