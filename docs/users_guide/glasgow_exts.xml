@@ -3212,8 +3212,8 @@ then writing the data type instance by hand.
 </para>
 </listitem>
 
-<listitem><para> With <option>-XDeriveRepresentable</option>, you can derive
-instances of  the class <literal>Representable0</literal>, defined in
+<listitem><para> With <option>-XDeriveGeneric</option>, you can derive
+instances of  the class <literal>Generic</literal>, defined in
 <literal>GHC.Generics</literal>. You can use these to define generic functions,
 as described in <xref linkend="generic-programming"/>.
 </para></listitem>
@@ -3561,8 +3561,8 @@ you can specify a default method that uses that generic implementation:
 <programlisting>
   class Enum a where
     enum :: [a]
-    default enum :: (Representable0 a, GEnum (Rep0 a)) => [a]
-    enum = map to0 genum
+    default enum :: (Generic a, GEnum (Rep a)) => [a]
+    enum = map to genum
 </programlisting>
 We reuse the keyword <literal>default</literal> to signal that a signature
 applies to the default method only; when defining instances of the
@@ -3570,7 +3570,7 @@ applies to the default method only; when defining instances of the
 <literal>enum</literal> still applies. When giving an empty instance, however,
 the default implementation <literal>map to0 genum</literal> is filled-in,
 and type-checked with the type
-<literal>(Representable0 a, GEnum (Rep0 a)) => [a]</literal>.
+<literal>(Generic a, GEnum (Rep a)) => [a]</literal>.
 </para>
 
 <para>
@@ -9199,10 +9199,10 @@ general <link linkend="generic-programming">support for generic programming</lin
 <title>Generic programming</title>
 
 <para>
-Using a combination of <option>-XDeriveRepresentable</option>
+Using a combination of <option>-XDeriveGeneric</option>
 (<xref linkend="deriving-typeable"/>) and
 <option>-XDefaultSignatures</option> (<xref linkend="class-default-signatures"/>),
-or simply <option>-XGenerics</option>, you can easily do datatype-generic
+you can easily do datatype-generic
 programming using the <literal>GHC.Generics</literal> framework. This section
 gives a very brief overview of how to do it. For more detail please refer to the
 <ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
@@ -9223,8 +9223,8 @@ José Pedro Magalhães, Atze Dijkstra, Johan Jeuring, and Andres Löh.
 
 <emphasis>Note</emphasis>: the current support for generic programming in GHC
 is preliminary. In particular, we only allow deriving instances for the
-<literal>Representable0</literal> class. Support for deriving
-<literal>Representable1</literal> (and thus enabling generic functions of kind
+<literal>Generic</literal> class. Support for deriving
+<literal>Generic1</literal> (and thus enabling generic functions of kind
 <literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
 later stage.
 
@@ -9260,21 +9260,21 @@ For example, a user-defined datatype of trees <literal>data UserTree a = Node a
 (UserTree a) (UserTree a) | Leaf</literal> gets the following representation:
 
 <programlisting>
--- Representation type
-type instance Rep0 (UserTree a) = 
-  M1 D D1UserTree (
-        M1 C C1_0UserTree (
-              M1 S NoSelector (K1 P a)
-          :*: M1 S NoSelector (K1 R (UserTree a))
-          :*: M1 S NoSelector (K1 R (UserTree a)))
-    :+: M1 C C1_1UserTree U1)
+instance Generic (UserTree a) where
+  -- Representation type
+  type Rep (UserTree a) = 
+    M1 D D1UserTree (
+          M1 C C1_0UserTree (
+                M1 S NoSelector (K1 P a)
+            :*: M1 S NoSelector (K1 R (UserTree a))
+            :*: M1 S NoSelector (K1 R (UserTree a)))
+      :+: M1 C C1_1UserTree U1)
 
--- Representable0 instance
-instance Representable0 (UserTree a) where
-  from0 (Node x l r) = M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))
-  from0 Leaf         = M1 (R1 (M1 U1))
-  to0 (M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))) = Node x l r
-  to0 (M1 (R1 (M1 U1)))                                      = Leaf
+  -- Conversion functions
+  from (Node x l r) = M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))
+  from Leaf         = M1 (R1 (M1 U1))
+  to (M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))) = Node x l r
+  to (M1 (R1 (M1 U1)))                                      = Leaf
 
 -- Meta-information
 data D1UserTree
@@ -9293,7 +9293,7 @@ instance Constructor C1_1UserTree where
 </programlisting>
 
 This representation is generated automatically if a
-<literal>deriving Representable0</literal> clause is attached to the datatype.
+<literal>deriving Generic</literal> clause is attached to the datatype.
 <link linkend="stand-alone-deriving">Standalone deriving</link> can also be
 used.
 </para>
@@ -9344,12 +9344,12 @@ exposed to the user:
 class Serialize a where
   put :: a -> [Bin]
   
-  default put :: (Representable0 a, GSerialize (Rep0 a)) => a -> [Bit]
-  put a = gput (from0 a)
+  default put :: (Generic a, GSerialize (Rep a)) => a -> [Bit]
+  put = gput . from
 </programlisting>
 Here we use a <link linkend="class-default-signatures">default signature</link>
 to specify that the user does not have to provide an implementation for
-<literal>put</literal>, as long as there is a <literal>Representable0</literal>
+<literal>put</literal>, as long as there is a <literal>Generic</literal>
 instance for the type to instantiate. For the <literal>UserTree</literal> type,
 for instance, the user can just write:
 
