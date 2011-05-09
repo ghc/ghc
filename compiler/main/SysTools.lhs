@@ -21,6 +21,7 @@ module SysTools (
         runWindres,
         runLlvmOpt,
         runLlvmLlc,
+        figureLlvmVersion,
         readElfSection,
 
         touch,                  -- String -> String -> IO ()
@@ -58,6 +59,7 @@ import System.IO
 import System.IO.Error as IO
 import System.Directory
 import Data.Char
+import Data.Maybe ( isNothing )
 import Data.List
 import qualified Data.Map as Map
 import Text.ParserCombinators.ReadP hiding (char)
@@ -416,15 +418,53 @@ runAs dflags args = do
   mb_env <- getGccEnv args1
   runSomethingFiltered dflags id "Assembler" p args1 mb_env
 
+-- | Run the LLVM Optimiser
 runLlvmOpt :: DynFlags -> [Option] -> IO ()
 runLlvmOpt dflags args = do
   let (p,args0) = pgm_lo dflags
   runSomething dflags "LLVM Optimiser" p (args0++args)
 
+-- | Run the LLVM Compiler
 runLlvmLlc :: DynFlags -> [Option] -> IO ()
 runLlvmLlc dflags args = do
   let (p,args0) = pgm_lc dflags
   runSomething dflags "LLVM Compiler" p (args0++args)
+
+-- | Figure out which version of LLVM we are running this session
+figureLlvmVersion :: DynFlags -> IO (Maybe Int)
+figureLlvmVersion dflags = do
+  let (pgm,opts) = pgm_lc dflags
+      args = filter notNull (map showOpt opts)
+      -- we grab the args even though they should be useless just in
+      -- case the user is using a customised 'llc' that requires some
+      -- of the options they've specified. llc doesn't care what other
+      -- options are specified when '-version' is used.
+      args' = args ++ ["-version"]
+  ver <- catchIO (do
+             (pin, pout, perr, _) <- runInteractiveProcess pgm args'
+                                             Nothing Nothing
+             {- $ llc -version
+                  Low Level Virtual Machine (http://llvm.org/):
+                    llvm version 2.8 (Ubuntu 2.8-0Ubuntu1)
+                    ...
+             -}
+             hSetBinaryMode pout False
+             _     <- hGetLine pout
+             vline <- hGetLine pout
+             v     <- case filter isDigit vline of
+                            []      -> fail "no digits!"
+                            [x]     -> fail $ "only 1 digit! (" ++ show x ++ ")"
+                            (x:y:_) -> return ((read [x,y]) :: Int)
+             hClose pin
+             hClose pout
+             hClose perr
+             return $ Just v
+            )
+            (\err -> do
+                putMsg dflags $ text $ "Warning: " ++ show err
+                return Nothing)
+  return ver
+  
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do
