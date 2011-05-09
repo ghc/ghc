@@ -1,8 +1,8 @@
 
 mod56.hs:4:39:
     Can't make a derived instance of `Ix T':
-      `T' is not an enumeration type
+      `T' must be an enumeration type
       (an enumeration consists of one or more nullary, non-GADT constructors)
-        and
-      `T' does not have precisely one constructor
+        or
+      `T' must have precisely one constructor
     In the data type declaration for `T'

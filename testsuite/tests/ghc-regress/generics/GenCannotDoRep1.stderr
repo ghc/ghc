@@ -1,5 +1,5 @@
 
 GenCannotDoRep1.hs:8:49:
     Can't make a derived instance of `Generic (Context a)':
-      Context has a datatype context
+      Context must not have a datatype context
     In the data type declaration for `Context'

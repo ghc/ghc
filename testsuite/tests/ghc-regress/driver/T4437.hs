@@ -14,7 +14,7 @@ main = do let ghcExtensions = [ ext | (ext, _, _) <- xFlags ]
               expectedGhcOnlyExtensions
                   = ["ParallelArrays",
                      "RelaxedLayout",
-                     "DeriveRepresentable",
+                     "DeriveGeneric",
                      "DefaultSignatures",
                      "AlternativeLayoutRule",
                      "AlternativeLayoutRuleTransitional",

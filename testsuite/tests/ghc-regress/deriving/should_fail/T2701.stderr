@@ -1,5 +1,5 @@
 
 T2701.hs:10:32:
     Can't make a derived instance of `Data Foo':
-      Constructor `MkFoo' has arguments of unlifted type
+      Constructor `MkFoo' must have only arguments of lifted type
     In the data type declaration for `Foo'

@@ -2,10 +2,10 @@
 drvfail010.hs:6:42:
     Can't make a derived instance of
       `Typeable (A a b c d e f g h i j)':
-      `A' has too many arguments
+      `A' must have 7 or fewer arguments
     In the data type declaration for `A'
 
 drvfail010.hs:9:32:
     Can't make a derived instance of `Typeable (B a b)':
-      `B' has arguments of kind other than `*'
+      `B' must only have arguments of kind `*'
     In the data type declaration for `B'

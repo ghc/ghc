@@ -1,12 +1,12 @@
 
 drvfail-functor2.hs:7:14:
     Can't make a derived instance of `Functor InFunctionArgument':
-      Constructor `InFunctionArgument' uses the type variable in a function argument
+      Constructor `InFunctionArgument' must not use the type variable in a function argument
     In the newtype declaration for `InFunctionArgument'
 
 drvfail-functor2.hs:10:14:
     Can't make a derived instance of `Functor OnSecondArg':
-      Constructor `OnSecondArg' uses the type variable in an argument other than the last
+      Constructor `OnSecondArg' must not use the type variable in an argument other than the last
     In the newtype declaration for `OnSecondArg'
 
 drvfail-functor2.hs:15:14:
@@ -16,7 +16,7 @@ drvfail-functor2.hs:15:14:
 
 drvfail-functor2.hs:20:14:
     Can't make a derived instance of `Functor StupidConstraint':
-      Data type `StupidConstraint' has a class context (Eq a)
+      Data type `StupidConstraint' must not have a class context (Eq a)
     In the data type declaration for `StupidConstraint'
 
 drvfail-functor2.hs:26:14:

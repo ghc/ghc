@@ -1,5 +1,2 @@
 
-tcfail094.hs:7:10:
-    `Int' is applied to too many type arguments
-    In the type `Int 1'
-    In the type synonym declaration for `A'
+tcfail094.hs:7:14: parse error on input `1'
