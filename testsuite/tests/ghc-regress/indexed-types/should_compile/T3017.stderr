@@ -4,11 +4,14 @@ TYPE SIGNATURES
              (Num t, Num t1, Coll c, Elem c ~ (t, t1)) =>
              c -> c
 TYPE CONSTRUCTORS
-    data ListColl a
-        RecFlag NonRecursive
-        Generics: no
-        = L :: forall a. [a] -> ListColl a Stricts: _
-        FamilyInstance: none
+  data ListColl a
+      RecFlag NonRecursive
+      Generics: no
+      = L :: forall a. [a] -> ListColl a Stricts: _
+      FamilyInstance: none
+COERCION AXIOMS
+  coercion Foo.TFCo:R:ElemListColl [a]
+    :: Elem (ListColl a) ~ Foo.R:ElemListColl a
 INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11-27
 FAMILY INSTANCES

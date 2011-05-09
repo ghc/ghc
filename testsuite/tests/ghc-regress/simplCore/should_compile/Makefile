@@ -20,7 +20,7 @@ T4306:
 T4201:
 	$(RM) -f T4201.hi T4201.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4201.hs 
-	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4201.hi | grep 'Unfolding.*sym'
+	'$(TEST_HC)' $(TEST_HC_OPTS) --show-iface T4201.hi | grep 'Sym'
 
 # This one looped as a result of bogus specialisation
 T4903:
@@ -36,6 +36,9 @@ T4918:
 
 EvalTest:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O EvalTest.hs -ddump-simpl -dsuppress-uniques | grep 'rght.*Dmd'
+
+T5168:
+	-('$(TEST_HC)' $(TEST_HC_OPTS) -c -O T5168.hs -ddump-simpl -dsuppress-uniques | grep 'patError')
 
 # When SpecConstr works there are no STUArrays at all
 # The "-(...)" ignores the (expected) non-zero exit code from grep
