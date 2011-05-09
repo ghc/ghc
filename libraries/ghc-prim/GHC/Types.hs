@@ -16,7 +16,7 @@
 
 {-# OPTIONS_GHC -XNoImplicitPrelude  #-}
 {-# OPTIONS_GHC -XTypeFamilies       #-}
-{-# OPTIONS_GHC -XGenerics           #-}
+{-# OPTIONS_GHC -XDeriveGeneric      #-}
 
 module GHC.Types (
     Bool(..), Char(..), Int(..)
@@ -30,10 +30,10 @@ import GHC.Generics
 infixr 5 :
 
 data [] a = [] | a : [a]
-        deriving Representable0
+        deriving Generic
 
 data Bool = False | True
-        deriving Representable0
+        deriving Generic
 
 {-| The character type 'Char' is an enumeration whose values represent
 Unicode (or equivalently ISO\/IEC 10646) characters
@@ -95,10 +95,10 @@ instance Datatype D_Int where
 instance Constructor C_Int where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
-type instance Rep0 Int = D1 D_Int (C1 C_Int (S1 NoSelector (Rec0 Int)))
-instance Representable0 Int where
-  from0 x = M1 (M1 (M1 (K1 x)))
-  to0 (M1 (M1 (M1 (K1 x)))) = x
+instance Generic Int where
+  type Rep Int = D1 D_Int (C1 C_Int (S1 NoSelector (Rec0 Int)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Float
@@ -112,10 +112,10 @@ instance Datatype D_Float where
 instance Constructor C_Float where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
-type instance Rep0 Float = D1 D_Float (C1 C_Float (S1 NoSelector (Rec0 Float)))
-instance Representable0 Float where
-  from0 x = M1 (M1 (M1 (K1 x)))
-  to0 (M1 (M1 (M1 (K1 x)))) = x
+instance Generic Float where
+  type Rep Float = D1 D_Float (C1 C_Float (S1 NoSelector (Rec0 Float)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Double
@@ -129,10 +129,10 @@ instance Datatype D_Double where
 instance Constructor C_Double where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
-type instance Rep0 Double = D1 D_Double (C1 C_Double (S1 NoSelector (Rec0 Double)))
-instance Representable0 Double where
-  from0 x = M1 (M1 (M1 (K1 x)))
-  to0 (M1 (M1 (M1 (K1 x)))) = x
+instance Generic Double where
+  type Rep Double = D1 D_Double (C1 C_Double (S1 NoSelector (Rec0 Double)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x
 
 
 -- Char
@@ -146,7 +146,7 @@ instance Datatype D_Char where
 instance Constructor C_Char where
   conName _ = "" -- JPM: I'm not sure this is the right implementation...
 
-type instance Rep0 Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
-instance Representable0 Char where
-  from0 x = M1 (M1 (M1 (K1 x)))
-  to0 (M1 (M1 (M1 (K1 x)))) = x
+instance Generic Char where
+  type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
+  from x = M1 (M1 (M1 (K1 x)))
+  to (M1 (M1 (M1 (K1 x)))) = x

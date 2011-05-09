@@ -19,17 +19,14 @@ module GHC.Generics  (
   , Datatype(..), Constructor(..), Selector(..), NoSelector
   , Fixity(..), Associativity(..), Arity(..), prec
 
-  -- * Representable type classes
-  , Representable0(..), Representable1(..)
-
-  -- * Representation type families
-  , Rep0, Rep1
+  -- * Generic type classes
+  , Generic(..), Generic1(..)
 
   ) where
   
 -- We use some base types
 import {-# SOURCE #-} GHC.Types
--- We need this to give the Representable0 instances in ghc-prim
+-- We need this to give the Generic instances in ghc-prim
 import GHC.CString ()
 
 --------------------------------------------------------------------------------
@@ -146,23 +143,21 @@ data Associativity = LeftAssociative
                    | NotAssociative
 -- Eq, Show, Ord, and Read instances are in GHC.Int
 
--- | Generic representation type
-type family Rep0 a :: * -> *
-
 -- | Representable types of kind *.
 -- This class is derivable in GHC with the XDeriveRepresentable flag on.
-class Representable0 a where
+class Generic a where
+  -- | Generic representation type
+  type Rep a :: * -> *
   -- | Convert from the datatype to its representation
-  from0  :: a -> (Rep0 a) x
+  from  :: a -> (Rep a) x
   -- | Convert from the representation to the datatype
-  to0    :: (Rep0 a) x -> a
+  to    :: (Rep a) x -> a
 
-
--- | Generic representation type
-type family Rep1 f :: * -> *
 
 -- | Representable types of kind * -> * (not yet derivable)
-class Representable1 f where
+class Generic1 f where
+  -- | Generic representation type
+  type Rep1 f :: * -> *
   -- | Convert from the datatype to its representation
   from1  :: f a -> (Rep1 f) a
   -- | Convert from the representation to the datatype
