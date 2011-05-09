@@ -224,7 +224,7 @@ basicKnownKeyNames
 	, marshalStringName, unmarshalStringName, checkDotnetResName
 	
 	-- Generics
-	, rep0ClassName, rep1ClassName
+	, genClassName, gen1ClassName
 	, datatypeClassName, constructorClassName, selectorClassName
 	
         -- Monad comprehensions
@@ -236,15 +236,12 @@ basicKnownKeyNames
 
 genericTyConNames :: [Name]
 genericTyConNames = [
-    -- Old stuff
-    crossTyConName, plusTyConName, genUnitTyConName,
-    -- New stuff
     v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
     k1TyConName, m1TyConName, sumTyConName, prodTyConName,
     compTyConName, rTyConName, pTyConName, dTyConName,
     cTyConName, sTyConName, rec0TyConName, par0TyConName,
     d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
-    rep0TyConName, rep1TyConName
+    repTyConName, rep1TyConName
   ]
 
 -- Know names from the DPH package which vary depending on the selected DPH backend.
@@ -563,14 +560,13 @@ genUnitDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "Unit")
 -- Generics (constructors and functions)
 u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   k1DataCon_RDR, m1DataCon_RDR, l1DataCon_RDR, r1DataCon_RDR,
-  prodDataCon_RDR, comp1DataCon_RDR, from0_RDR, from1_RDR,
-  to0_RDR, to1_RDR, datatypeName_RDR, moduleName_RDR, conName_RDR,
+  prodDataCon_RDR, comp1DataCon_RDR, from_RDR, from1_RDR,
+  to_RDR, to1_RDR, datatypeName_RDR, moduleName_RDR, conName_RDR,
   conFixity_RDR, conIsRecord_RDR,
   noArityDataCon_RDR, arityDataCon_RDR, selName_RDR,
   prefixDataCon_RDR, infixDataCon_RDR, leftAssocDataCon_RDR,
   rightAssocDataCon_RDR, notAssocDataCon_RDR :: RdrName
 
---v1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "V1")
 u1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "U1")
 par1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Par1")
 rec1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Rec1")
@@ -583,9 +579,9 @@ r1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "R1")
 prodDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
 comp1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Comp1")
 
-from0_RDR = varQual_RDR gHC_GENERICS (fsLit "from0")
+from_RDR  = varQual_RDR gHC_GENERICS (fsLit "from")
 from1_RDR = varQual_RDR gHC_GENERICS (fsLit "from1")
-to0_RDR   = varQual_RDR gHC_GENERICS (fsLit "to0")
+to_RDR    = varQual_RDR gHC_GENERICS (fsLit "to")
 to1_RDR   = varQual_RDR gHC_GENERICS (fsLit "to1")
 
 datatypeName_RDR  = varQual_RDR gHC_GENERICS (fsLit "datatypeName")
@@ -649,19 +645,13 @@ eitherTyConName	  = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
 leftDataConName   = conName dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = conName dATA_EITHER (fsLit "Right")  rightDataConKey
 
--- Old Generics (types)
-crossTyConName, plusTyConName, genUnitTyConName :: Name
-crossTyConName     = tcQual   gHC_GENERICS (fsLit ":*:") crossTyConKey
-plusTyConName      = tcQual   gHC_GENERICS (fsLit ":+:") plusTyConKey
-genUnitTyConName   = tcQual   gHC_GENERICS (fsLit "Unit") genUnitTyConKey
-
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   k1TyConName, m1TyConName, sumTyConName, prodTyConName,
   compTyConName, rTyConName, pTyConName, dTyConName, 
   cTyConName, sTyConName, rec0TyConName, par0TyConName,
   d1TyConName, c1TyConName, s1TyConName, noSelTyConName,
-  rep0TyConName, rep1TyConName :: Name
+  repTyConName, rep1TyConName :: Name
 
 v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
 u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
@@ -687,7 +677,7 @@ c1TyConName  = tcQual gHC_GENERICS (fsLit "C1") c1TyConKey
 s1TyConName  = tcQual gHC_GENERICS (fsLit "S1") s1TyConKey
 noSelTyConName = tcQual gHC_GENERICS (fsLit "NoSelector") noSelTyConKey
 
-rep0TyConName = tcQual gHC_GENERICS (fsLit "Rep0") rep0TyConKey
+repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
 rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
 
 -- Base strings Strings
@@ -864,11 +854,11 @@ showClassName	  = clsQual gHC_SHOW (fsLit "Show")       showClassKey
 readClassName :: Name
 readClassName	   = clsQual gHC_READ (fsLit "Read") readClassKey
 
--- Classes Representable0 and Representable1, Datatype, Constructor and Selector
-rep0ClassName, rep1ClassName, datatypeClassName, constructorClassName,
+-- Classes Generic and Generic1, Datatype, Constructor and Selector
+genClassName, gen1ClassName, datatypeClassName, constructorClassName,
   selectorClassName :: Name
-rep0ClassName = clsQual gHC_GENERICS (fsLit "Representable0") rep0ClassKey
-rep1ClassName = clsQual gHC_GENERICS (fsLit "Representable1") rep1ClassKey
+genClassName  = clsQual gHC_GENERICS (fsLit "Generic")  genClassKey
+gen1ClassName = clsQual gHC_GENERICS (fsLit "Generic1") gen1ClassKey
 
 datatypeClassName = clsQual gHC_GENERICS (fsLit "Datatype") datatypeClassKey
 constructorClassName = clsQual gHC_GENERICS (fsLit "Constructor") constructorClassKey
@@ -1072,10 +1062,10 @@ applicativeClassKey	= mkPreludeClassUnique 34
 foldableClassKey	= mkPreludeClassUnique 35
 traversableClassKey	= mkPreludeClassUnique 36
 
-rep0ClassKey, rep1ClassKey, datatypeClassKey, constructorClassKey,
+genClassKey, gen1ClassKey, datatypeClassKey, constructorClassKey,
   selectorClassKey :: Unique
-rep0ClassKey  = mkPreludeClassUnique 37
-rep1ClassKey  = mkPreludeClassUnique 38
+genClassKey   = mkPreludeClassUnique 37
+gen1ClassKey  = mkPreludeClassUnique 38
 
 datatypeClassKey    = mkPreludeClassUnique 39
 constructorClassKey = mkPreludeClassUnique 40
@@ -1165,12 +1155,6 @@ ptrTyConKey				= mkPreludeTyConUnique 74
 funPtrTyConKey				= mkPreludeTyConUnique 75
 tVarPrimTyConKey		    	= mkPreludeTyConUnique 76
 
--- Old Generic Type Constructors
-crossTyConKey, plusTyConKey, genUnitTyConKey :: Unique
-crossTyConKey		      		= mkPreludeTyConUnique 79
-plusTyConKey		      		= mkPreludeTyConUnique 80
-genUnitTyConKey				= mkPreludeTyConUnique 81
-
 -- Parallel array type constructor
 parrTyConKey :: Unique
 parrTyConKey				= mkPreludeTyConUnique 82
@@ -1228,7 +1212,7 @@ v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   compTyConKey, rTyConKey, pTyConKey, dTyConKey,
   cTyConKey, sTyConKey, rec0TyConKey, par0TyConKey,
   d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
-  rep0TyConKey, rep1TyConKey :: Unique
+  repTyConKey, rep1TyConKey :: Unique
 
 v1TyConKey    = mkPreludeTyConUnique 135
 u1TyConKey    = mkPreludeTyConUnique 136
@@ -1254,7 +1238,7 @@ c1TyConKey    = mkPreludeTyConUnique 152
 s1TyConKey    = mkPreludeTyConUnique 153
 noSelTyConKey = mkPreludeTyConUnique 154
 
-rep0TyConKey = mkPreludeTyConUnique 155
+repTyConKey  = mkPreludeTyConUnique 155
 rep1TyConKey = mkPreludeTyConUnique 156
 
 ---------------- Template Haskell -------------------

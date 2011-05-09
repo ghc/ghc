@@ -342,7 +342,7 @@ data ExtensionFlag
    | Opt_DeriveFunctor
    | Opt_DeriveTraversable
    | Opt_DeriveFoldable
-   | Opt_DeriveRepresentable            -- Allow deriving Representable0/1
+   | Opt_DeriveGeneric            -- Allow deriving Generic/1
    | Opt_DefaultSignatures              -- Allow extra signatures for defmeths
    | Opt_Generics                       -- Generic deriving mechanism
 
@@ -1682,7 +1682,7 @@ xFlags = [
   ( "DeriveFunctor",                    Opt_DeriveFunctor, nop ),
   ( "DeriveTraversable",                Opt_DeriveTraversable, nop ),
   ( "DeriveFoldable",                   Opt_DeriveFoldable, nop ),
-  ( "DeriveRepresentable",              Opt_DeriveRepresentable, nop ),
+  ( "DeriveGeneric",                    Opt_DeriveGeneric, nop ),
   ( "DefaultSignatures",                Opt_DefaultSignatures, nop ),
   ( "TypeSynonymInstances",             Opt_TypeSynonymInstances, nop ),
   ( "FlexibleContexts",                 Opt_FlexibleContexts, nop ),
@@ -1751,7 +1751,7 @@ impliedFlags
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
     -- The new behavior of the XGenerics flag is just to turn on these two flags
     , (Opt_Generics, turnOn, Opt_DefaultSignatures)
-    , (Opt_Generics, turnOn, Opt_DeriveRepresentable)
+    , (Opt_Generics, turnOn, Opt_DeriveGeneric)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]
@@ -1867,7 +1867,7 @@ glasgowExtsFlags = [
            , Opt_DeriveFunctor
            , Opt_DeriveFoldable
            , Opt_DeriveTraversable
-           , Opt_DeriveRepresentable
+           , Opt_DeriveGeneric
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances
            , Opt_ConstrainedClassMethods

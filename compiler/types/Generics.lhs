@@ -5,7 +5,7 @@
 \begin{code}
 
 module Generics ( canDoGenerics,
-		  mkBindsRep0, tc_mkRep0TyCon, mkBindsMetaD,
+		  mkBindsRep, tc_mkRepTyCon, mkBindsMetaD,
 		  MetaTyCons(..), metaTyCons2TyCons
     ) where
 
@@ -77,33 +77,33 @@ canDoGenerics tycon
 type US = Int	-- Local unique supply, just a plain Int
 type Alt = (LPat RdrName, LHsExpr RdrName)
 
--- Bindings for the Representable0 instance
-mkBindsRep0 :: TyCon -> LHsBinds RdrName
-mkBindsRep0 tycon = 
-    unitBag (L loc (mkFunBind (L loc from0_RDR) from0_matches))
+-- Bindings for the Generic instance
+mkBindsRep :: TyCon -> LHsBinds RdrName
+mkBindsRep tycon = 
+    unitBag (L loc (mkFunBind (L loc from_RDR) from_matches))
   `unionBags`
-    unitBag (L loc (mkFunBind (L loc to0_RDR) to0_matches))
+    unitBag (L loc (mkFunBind (L loc to_RDR) to_matches))
       where
-        from0_matches = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from0_alts]
-        to0_matches   = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to0_alts  ]
+        from_matches = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
+        to_matches   = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
         loc           = srcLocSpan (getSrcLoc tycon)
         datacons      = tyConDataCons tycon
 
         -- Recurse over the sum first
-        from0_alts, to0_alts :: [Alt]
-        (from0_alts, to0_alts) = mkSum (1 :: US) tycon datacons
+        from_alts, to_alts :: [Alt]
+        (from_alts, to_alts) = mkSum (1 :: US) tycon datacons
         
 --------------------------------------------------------------------------------
 -- Type representation
 --------------------------------------------------------------------------------
 
-tc_mkRep0Ty :: -- The type to generate representation for
+tc_mkRepTy :: -- The type to generate representation for
                TyCon 
                -- Metadata datatypes to refer to
             -> MetaTyCons 
                -- Generated representation0 type
             -> TcM Type
-tc_mkRep0Ty tycon metaDts = 
+tc_mkRepTy tycon metaDts = 
   do
     d1    <- tcLookupTyCon d1TyConName
     c1    <- tcLookupTyCon c1TyConName
@@ -155,18 +155,18 @@ tc_mkRep0Ty tycon metaDts =
         
     return (mkD tycon)
 
-tc_mkRep0TyCon :: TyCon           -- The type to generate representation for
+tc_mkRepTyCon :: TyCon           -- The type to generate representation for
                -> MetaTyCons      -- Metadata datatypes to refer to
                -> TcM TyCon       -- Generated representation0 type
-tc_mkRep0TyCon tycon metaDts = 
+tc_mkRepTyCon tycon metaDts = 
 -- Consider the example input tycon `D`, where data D a b = D_ a
   do
     uniq1   <- newUnique
     uniq2   <- newUnique
     -- `rep0Ty` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-    rep0Ty  <- tc_mkRep0Ty tycon metaDts
-    -- `rep0` = GHC.Generics.Rep0 (type family)
-    rep0    <- tcLookupTyCon rep0TyConName
+    rep0Ty  <- tc_mkRepTy tycon metaDts
+    -- `rep0` = GHC.Generics.Rep (type family)
+    rep0    <- tcLookupTyCon repTyConName
     
     let modl    = nameModule  (tyConName tycon)
         loc     = nameSrcSpan (tyConName tycon)
@@ -185,7 +185,7 @@ tc_mkRep0TyCon tycon metaDts =
                  tyvars (SynonymTyCon rep0Ty)
                  (FamInstTyCon rep0 appT
                    (mkCoercionTyCon coName (tyConArity tycon)
-                     -- co : forall a b. Rep0 (D a b) ~ `rep0Ty` a b
+                     -- co : forall a b. Rep (D a b) ~ `rep0Ty` a b
                      (CoAxiom tyvars (mkTyConApp rep0 appT) rep0Ty)))
 
     return res
