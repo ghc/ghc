@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NoImplicitPrelude, DeriveRepresentable #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, DeriveGeneric #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -33,7 +33,7 @@ module Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Generics (Representable0)
+import GHC.Generics (Generic)
 #endif
 
 #ifdef __NHC__
@@ -66,7 +66,7 @@ import Maybe
 -- error monad can be built using the 'Data.Either.Either' type.
 
 data  Maybe a  =  Nothing | Just a
-  deriving (Eq, Ord, Representable0)
+  deriving (Eq, Ord, Generic)
 
 instance  Functor Maybe  where
     fmap _ Nothing       = Nothing
