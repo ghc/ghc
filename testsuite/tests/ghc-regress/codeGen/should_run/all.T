@@ -84,3 +84,6 @@ test('3561', normal, compile_and_run, [''])
 test('3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('4441', normal, compile_and_run, [''])
 
+test('5149', [ extra_clean(['5149.o', '5149.hi', '5149_cmm.o', '5149']) ],
+             run_command,
+             ['$MAKE -s --no-print-directory 5149'])
