@@ -20,7 +20,6 @@ import CoreSyn
 import CoreUtils
 import CoreUnfold
 import Type
-import Var
 import Id
 import BasicTypes( Arity )
 import FastString

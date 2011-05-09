@@ -33,7 +33,6 @@ import TysWiredIn
 import Type
 import TyCon
 import DataCon
-import Var
 import Outputable
 import Data.Array
 

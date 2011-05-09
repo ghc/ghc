@@ -243,6 +243,7 @@ If there were another lambda in @r@'s rhs, it would get level-2 as well.
 
 \begin{code}
 lvlExpr _ _ (  _, AnnType ty) = return (Type ty)
+lvlExpr _ _ ( _, AnnCoercion co) = return (Coercion co)
 lvlExpr _ env (_, AnnVar v)   = return (lookupVar env v)
 lvlExpr _ _   (_, AnnLit lit) = return (Lit lit)
 
@@ -423,7 +424,9 @@ lvlMFE True ctxt_lvl env e@(_, AnnCase {})
   = lvlExpr ctxt_lvl env e     -- Don't share cases
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
-  |  isUnLiftedType ty			-- Can't let-bind it; see Note [Unlifted MFEs]
+  |  isUnLiftedType ty		-- Can't let-bind it; see Note [Unlifted MFEs]
+     		    		-- This includes coercions, which we don't
+				-- want to float anyway
   || notWorthFloating ann_expr abs_vars
   || not good_destination
   = 	-- Don't float it out
@@ -491,6 +494,7 @@ notWorthFloating e abs_vars
     go (_, AnnCast e _)  n = go e n
     go (_, AnnApp e arg) n 
        | (_, AnnType {}) <- arg = go e n
+       | (_, AnnCoercion {}) <- arg = go e n
        | n==0                   = False
        | is_triv arg       	= go e (n-1)
        | otherwise         	= False
@@ -500,6 +504,7 @@ notWorthFloating e abs_vars
     is_triv (_, AnnVar {})   	       	  = True	-- (ie not worth floating)
     is_triv (_, AnnCast e _) 	       	  = is_triv e
     is_triv (_, AnnApp e (_, AnnType {})) = is_triv e
+    is_triv (_, AnnApp e (_, AnnCoercion {})) = is_triv e
     is_triv _                             = False     
 \end{code}
 
@@ -563,7 +568,7 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 	-> LvlM (LevelledBind, LevelEnv)
 
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
-  |  isTyCoVar bndr 		-- Don't do anything for TyVar binders
+  |  isTyVar bndr 		-- Don't do anything for TyVar binders
 				--   (simplifier gets rid of them pronto)
   = do rhs' <- lvlExpr ctxt_lvl env rhs
        return (NonRec (TB bndr ctxt_lvl) rhs', env)
@@ -883,7 +888,7 @@ abstractVars dest_lvl (LE { le_lvl_env = lvl_env, le_env = id_env }) fvs
 		   (False, True) -> False
 		   _    	 -> v1 <= v2	-- Same family
 
-    is_tv v = isTyCoVar v && not (isCoVar v)
+    is_tv v = isTyVar v 
 
     uniq :: [Var] -> [Var]
 	-- Remove adjacent duplicates; the sort will have brought them together
@@ -914,9 +919,7 @@ absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> [Var]
 absVarsOf id_env v 
   | isId v    = [av2 | av1 <- lookup_avs v
 		     , av2 <- add_tyvars av1]
-  | isCoVar v = add_tyvars v
-  | otherwise = [v]
-
+  | otherwise = ASSERT( isTyVar v ) [v]
   where
     lookup_avs v = case lookupVarEnv id_env v of
 			Just (abs_vars, _) -> abs_vars

@@ -53,7 +53,6 @@ import CoreUtils
 import MkCore
 import MkId
 import Id
-import Var
 import Name
 import Literal
 import TyCon
@@ -73,7 +72,6 @@ import ListSetOps
 import FastString
 import StaticFlags
 \end{code}
-
 
 
 %************************************************************************
@@ -256,10 +254,9 @@ wrapBinds [] e = e
 wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
 wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
-wrapBind new old body	-- Can deal with term variables *or* type variables
-  | new==old    = body
-  | isTyCoVar new = Let (mkTyBind new (mkTyVarTy old)) body
-  | otherwise   = Let (NonRec new (Var old))         body
+wrapBind new old body	-- NB: this function must deal with term
+  | new==old    = body	-- variables, type variables or coercion variables
+  | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
 seqVar var body = Case (Var var) var (exprType body)
@@ -605,7 +602,7 @@ mkSelectorBinds pat val_expr
         return (bndr_var, rhs_expr)
       where
         error_expr = mkCoerce co (Var err_var)
-        co         = mkUnsafeCoercion (exprType (Var err_var)) (idType bndr_var)
+        co         = mkUnsafeCo (exprType (Var err_var)) (idType bndr_var)
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 

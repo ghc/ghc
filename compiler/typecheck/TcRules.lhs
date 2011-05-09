@@ -17,7 +17,6 @@ import TcHsType
 import TcExpr
 import TcEnv
 import Id
-import Var	( Var )
 import Name
 import VarSet
 import SrcLoc

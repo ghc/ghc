@@ -234,7 +234,8 @@ vectScalarFun forceScalar recFns expr
         scalars' = scalars `extendVarSet` var
     is_scalar scalars  (Cast e _coe)   = is_scalar scalars e
     is_scalar scalars  (Note _ e   )   = is_scalar scalars e
-    is_scalar _scalars (Type _)        = True
+    is_scalar _scalars (Type {})       = True
+    is_scalar _scalars (Coercion {})   = True
 
     -- Result: (<is this binding group scalar>, scalars ++ variables bound in this group)
     is_scalar_bind scalars (NonRec var e) = (is_scalar scalars e, scalars `extendVarSet` var)

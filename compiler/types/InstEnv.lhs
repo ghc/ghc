@@ -119,7 +119,7 @@ instanceDFunId = is_dfun
 
 setInstanceDFunId :: Instance -> DFunId -> Instance
 setInstanceDFunId ispec dfun
-   = ASSERT( idType dfun `tcEqType` idType (is_dfun ispec) )
+   = ASSERT( idType dfun `eqType` idType (is_dfun ispec) )
 	-- We need to create the cached fields afresh from
 	-- the new dfun id.  In particular, the is_tvs in
 	-- the Instance must match those in the dfun!
@@ -156,7 +156,7 @@ pprInstanceHdr ispec@(Instance { is_flag = flag })
           | debugStyle sty = theta
           | otherwise = drop (dfunNSilent dfun) theta
     in ptext (sLit "instance") <+> ppr flag
-       <+> sep [pprThetaArrow theta_to_print, ppr res_ty]
+       <+> sep [pprThetaArrowTy theta_to_print, ppr res_ty]
   where
     dfun = is_dfun ispec
     (_, theta, res_ty) = tcSplitSigmaTy (idType dfun)

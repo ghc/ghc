@@ -18,7 +18,7 @@ module DataCon (
 	dataConName, dataConIdentity, dataConTag, dataConTyCon, 
         dataConOrigTyCon, dataConUserType,
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, 
-	dataConEqSpec, eqSpecPreds, dataConEqTheta, dataConDictTheta,
+	dataConEqSpec, eqSpecPreds, dataConTheta,
 	dataConStupidTheta,  
 	dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
 	dataConInstOrigArgTys, dataConRepArgTys, 
@@ -31,7 +31,7 @@ module DataCon (
 	
 	-- ** Predicates on DataCons
 	isNullarySrcDataCon, isNullaryRepDataCon, isTupleCon, isUnboxedTupleCon,
-	isVanillaDataCon, classDataCon, 
+	isVanillaDataCon, classDataCon, dataConCannotMatch,
 
         -- * Splitting product types
 	splitProductType_maybe, splitProductType, deepSplitProductType,
@@ -41,6 +41,7 @@ module DataCon (
 #include "HsVersions.h"
 
 import Type
+import Unify
 import Coercion
 import TyCon
 import Class
@@ -57,7 +58,6 @@ import Module
 import qualified Data.Data as Data
 import Data.Char
 import Data.Word
-import Data.List ( partition )
 \end{code}
 
 
@@ -256,8 +256,7 @@ data DataCon
 	--	dcUnivTyVars  = [a]
 	--	dcExTyVars    = [x,y]
 	--	dcEqSpec      = [a~(x,y)]
-	--	dcEqTheta     = [x~y]	
-	--	dcDictTheta   = [Ord x]
+	--	dcOtherTheta  = [x~y, Ord x]	
 	--	dcOrigArgTys  = [a,List b]
 	--	dcRepTyCon       = T
 
@@ -265,7 +264,7 @@ data DataCon
 				--	    Its type is of form
 				--	        forall a1..an . t1 -> ... tm -> T a1..an
 				-- 	    No existentials, no coercions, nothing.
-				-- That is: dcExTyVars = dcEqSpec = dcEqTheta = dcDictTheta = []
+				-- That is: dcExTyVars = dcEqSpec = dcOtherTheta = []
 		-- NB 1: newtypes always have a vanilla data con
 		-- NB 2: a vanilla constructor can still be declared in GADT-style 
 		--	 syntax, provided its type looks like the above.
@@ -300,8 +299,8 @@ data DataCon
 		-- In GADT form, this is *exactly* what the programmer writes, even if
 		-- the context constrains only universally quantified variables
 		--	MkT :: forall a b. (a ~ b, Ord b) => a -> T a b
-	dcEqTheta   :: ThetaType,  -- The *equational* constraints
-	dcDictTheta :: ThetaType,  -- The *type-class and implicit-param* constraints
+	dcOtherTheta :: ThetaType,  -- The other constraints in the data con's type
+		                    -- other than those in the dcEqSpec
 
 	dcStupidTheta :: ThetaType,	-- The context of the data type declaration 
 					--	data Eq a => T a = ...
@@ -338,9 +337,9 @@ data DataCon
 		-- length = 0 (if not a record) or dataConSourceArity.
 
 	-- Constructor representation
-	dcRepArgTys :: [Type],		-- Final, representation argument types, 
-					-- after unboxing and flattening,
-					-- and *including* existential dictionaries
+	dcRepArgTys :: [Type],	-- Final, representation argument types, 
+				-- after unboxing and flattening,
+				-- and *including* all existential evidence args
 
 	dcRepStrictness :: [StrictnessMark],
                 -- One for each *representation* *value* argument
@@ -519,8 +518,8 @@ mkDataCon name declared_infix
 		  dcVanilla = is_vanilla, dcInfix = declared_infix,
 	  	  dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
 		  dcEqSpec = eq_spec, 
+		  dcOtherTheta = theta,
 		  dcStupidTheta = stupid_theta, 
-		  dcEqTheta = eq_theta, dcDictTheta = dict_theta,
 		  dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
 		  dcRepTyCon = rep_tycon, 
 		  dcRepArgTys = rep_arg_tys,
@@ -536,10 +535,9 @@ mkDataCon name declared_infix
 	-- The 'arg_stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
-    (eq_theta,dict_theta)  = partition isEqPred theta
-    dict_tys     	   = mkPredTys dict_theta
-    real_arg_tys 	   = dict_tys ++ orig_arg_tys
-    real_stricts 	   = map mk_dict_strict_mark dict_theta ++ arg_stricts
+    full_theta   = eqSpecPreds eq_spec ++ theta
+    real_arg_tys = mkPredTys full_theta               ++ orig_arg_tys
+    real_stricts = map mk_dict_strict_mark full_theta ++ arg_stricts
 
 	-- Representation arguments and demands
 	-- To do: eliminate duplication with MkId
@@ -547,11 +545,6 @@ mkDataCon name declared_infix
 
     tag = assoc "mkDataCon" (tyConDataCons rep_tycon `zip` [fIRST_TAG..]) con
     ty  = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
-	  mkFunTys (mkPredTys (eqSpecPreds eq_spec)) $
-	  mkFunTys (mkPredTys eq_theta) $
-		-- NB:	the dict args are already in rep_arg_tys
-		--	because they might be flattened..
-		--	but the equality predicates are not
 	  mkFunTys rep_arg_tys $
 	  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
@@ -611,13 +604,10 @@ dataConAllTyVars (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs })
 dataConEqSpec :: DataCon -> [(TyVar,Type)]
 dataConEqSpec = dcEqSpec
 
--- | The equational constraints on the data constructor type
-dataConEqTheta :: DataCon -> ThetaType
-dataConEqTheta = dcEqTheta
-
--- | The type class and implicit parameter contsraints on the data constructor type
-dataConDictTheta :: DataCon -> ThetaType
-dataConDictTheta = dcDictTheta
+-- | The *full* constraints on the constructor type
+dataConTheta :: DataCon -> ThetaType
+dataConTheta (MkData { dcEqSpec = eq_spec, dcOtherTheta = theta }) 
+  = eqSpecPreds eq_spec ++ theta
 
 -- | Get the Id of the 'DataCon' worker: a function that is the "actual"
 -- constructor and has no top level binding in the program. The type may
@@ -666,10 +656,10 @@ dataConFieldType con label
 dataConStrictMarks :: DataCon -> [HsBang]
 dataConStrictMarks = dcStrictMarks
 
--- | Strictness of /existential/ arguments only
+-- | Strictness of evidence arguments to the wrapper function
 dataConExStricts :: DataCon -> [HsBang]
 -- Usually empty, so we don't bother to cache this
-dataConExStricts dc = map mk_dict_strict_mark $ dcDictTheta dc
+dataConExStricts dc = map mk_dict_strict_mark $ (dcOtherTheta dc)
 
 -- | Source-level arity of the data constructor
 dataConSourceArity :: DataCon -> Arity
@@ -705,10 +695,10 @@ dataConRepStrictness dc = dcRepStrictness dc
 --
 -- 4) The /original/ result type of the 'DataCon'
 dataConSig :: DataCon -> ([TyVar], ThetaType, [Type], Type)
-dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-		    dcEqTheta  = eq_theta, dcDictTheta = dict_theta, 
+dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
+		    dcEqSpec = eq_spec, dcOtherTheta  = theta, 
 		    dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ eq_theta ++ dict_theta, arg_tys, res_ty)
+  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ theta, arg_tys, res_ty)
 
 -- | The \"full signature\" of the 'DataCon' returns, in order:
 --
@@ -725,11 +715,11 @@ dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_
 --
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon 
-	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, ThetaType, [Type], Type)
-dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-			dcEqTheta = eq_theta, dcDictTheta = dict_theta, 
+	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, [Type], Type)
+dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
+			dcEqSpec = eq_spec, dcOtherTheta = theta,
 			dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, res_ty)
+  = (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty)
 
 dataConOrigResTy :: DataCon -> Type
 dataConOrigResTy dc = dcOrigResTy dc
@@ -754,11 +744,10 @@ dataConUserType :: DataCon -> Type
 -- mentions the family tycon, not the internal one.
 dataConUserType  (MkData { dcUnivTyVars = univ_tvs, 
 			   dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-			   dcEqTheta = eq_theta, dcDictTheta = dict_theta, dcOrigArgTys = arg_tys,
+			   dcOtherTheta = theta, dcOrigArgTys = arg_tys,
 			   dcOrigResTy = res_ty })
   = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
-    mkFunTys (mkPredTys eq_theta) $
-    mkFunTys (mkPredTys dict_theta) $
+    mkFunTys (mkPredTys theta) $
     mkFunTys arg_tys $
     res_ty
 
@@ -839,6 +828,25 @@ classDataCon :: Class -> DataCon
 classDataCon clas = case tyConDataCons (classTyCon clas) of
 		      (dict_constr:no_more) -> ASSERT( null no_more ) dict_constr 
 		      [] -> panic "classDataCon"
+\end{code}
+
+\begin{code}
+dataConCannotMatch :: [Type] -> DataCon -> Bool
+-- Returns True iff the data con *definitely cannot* match a 
+--		    scrutinee of type (T tys)
+--		    where T is the type constructor for the data con
+-- NB: look at *all* equality constraints, not only those
+--     in dataConEqSpec; see Trac #5168
+dataConCannotMatch tys con
+  | null theta        = False	-- Common
+  | all isTyVarTy tys = False	-- Also common
+  | otherwise
+  = typesCantMatch [(Type.substTy subst ty1, Type.substTy subst ty2)
+                   | EqPred ty1 ty2 <- theta ]
+  where
+    dc_tvs  = dataConUnivTyVars con
+    theta   = dataConTheta con
+    subst   = zipTopTvSubst dc_tvs tys
 \end{code}
 
 %************************************************************************

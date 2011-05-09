@@ -271,8 +271,8 @@ improveFromAnother pred1@(ClassP cls1 tys1, _) pred2@(ClassP cls2 tys2, _)
     , fd <- cls_fds
     , let (ltys1, rs1)  = instFD         fd cls_tvs tys1
           (ltys2, irs2) = instFD_WithPos fd cls_tvs tys2
-    , tcEqTypes ltys1 ltys2		-- The LHSs match
-    , let eqs = zipAndComputeFDEqs tcEqType rs1 irs2
+    , eqTypes ltys1 ltys2		-- The LHSs match
+    , let eqs = zipAndComputeFDEqs eqType rs1 irs2
     , not (null eqs) ]
 
 improveFromAnother _ _ = []

@@ -33,9 +33,9 @@ import CoreMonad
 import HscTypes         ( ModGuts(..) )
 import WwLib		( mkWorkerArgs )
 import DataCon
-import Coercion	
+import Coercion		hiding( substTy, substCo )
 import Rules
-import Type		hiding( substTy )
+import Type		hiding ( substTy )
 import Id
 import MkCore		( mkImpossibleExpr )
 import Var
@@ -50,6 +50,7 @@ import Demand
 import DmdAnal		( both )
 import Serialized       ( deserializeWithData )
 import Util
+import Pair
 import UniqSupply
 import Outputable
 import FastString
@@ -699,6 +700,9 @@ scSubstId env v = lookupIdSubst (text "scSubstId") (sc_subst env) v
 scSubstTy :: ScEnv -> Type -> Type
 scSubstTy env ty = substTy (sc_subst env) ty
 
+scSubstCo :: ScEnv -> Coercion -> Coercion
+scSubstCo env co = substCo (sc_subst env) co
+
 zapScSubst :: ScEnv -> ScEnv
 zapScSubst env = env { sc_subst = zapSubstEnv (sc_subst env) }
 
@@ -777,7 +781,7 @@ extendCaseBndrs env scrut case_bndr con alt_bndrs
 		       	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
 				       varsToCoreExprs alt_bndrs
 
-   zap v | isTyCoVar v = v		-- See NB2 above
+   zap v | isTyVar v = v		-- See NB2 above
          | otherwise = zapIdOccInfo v
 
 
@@ -997,11 +1001,12 @@ scExpr' env (Var v)     = case scSubstId env v of
 		            e'     -> scExpr (zapScSubst env) e'
 
 scExpr' env (Type t)    = return (nullUsage, Type (scSubstTy env t))
+scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
 scExpr' _   e@(Lit {})  = return (nullUsage, e)
 scExpr' env (Note n e)  = do (usg,e') <- scExpr env e
                              return (usg, Note n e')
 scExpr' env (Cast e co) = do (usg, e') <- scExpr env e
-                             return (usg, Cast e' (scSubstTy env co))
+                             return (usg, Cast e' (scSubstCo env co))
 scExpr' env e@(App _ _) = scApp env (collectArgs e)
 scExpr' env (Lam b e)   = do let (env', b') = extendBndr env b
                              (usg, e') <- scExpr env' e
@@ -1047,7 +1052,7 @@ scExpr' env (Case scrut b ty alts)
 	   ; return (usg', b_occ `combineOcc` scrut_occ, (con, bs2, rhs')) }
 
 scExpr' env (Let (NonRec bndr rhs) body)
-  | isTyCoVar bndr	-- Type-lets may be created by doBeta
+  | isTyVar bndr	-- Type-lets may be created by doBeta
   = scExpr' (extendScSubst env bndr rhs) body
 
   | otherwise	
@@ -1417,6 +1422,7 @@ calcSpecStrictness fn qvars pats
     dmd_env = go emptyVarEnv dmds pats
 
     go env ds (Type {} : pats) = go env ds pats
+    go env ds (Coercion {} : pats) = go env ds pats
     go env (d:ds) (pat : pats) = go (go_one env d pat) ds pats
     go env _      _            = env
 
@@ -1517,7 +1523,7 @@ callToPats env bndr_occs (con_env, args)
 		-- at the call site
 		-- See Note [Shadowing] at the top
 		
-	      (tvs, ids) = partition isTyCoVar qvars
+	      (tvs, ids) = partition isTyVar qvars
 	      qvars'     = tvs ++ ids
 		-- Put the type variables first; the type of a term
 		-- variable may mention a type variable
@@ -1552,6 +1558,9 @@ argToPat :: ScEnv
 
 argToPat _env _in_scope _val_env arg@(Type {}) _arg_occ
   = return (False, arg)
+    
+argToPat _env _in_scope _val_env arg@(Coercion {}) _arg_occ
+  = return (False, arg)
 
 argToPat env in_scope val_env (Note _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
@@ -1577,8 +1586,8 @@ argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
 -}
 
 argToPat env in_scope val_env (Cast arg co) arg_occ
-  | isIdentityCoercion co     -- Substitution in the SpecConstr itself
-                              -- can lead to identity coercions
+  | isReflCo co     -- Substitution in the SpecConstr itself
+                    -- can lead to identity coercions
   = argToPat env in_scope val_env arg arg_occ
   | not (ignoreType env ty2)
   = do	{ (interesting, arg') <- argToPat env in_scope val_env arg arg_occ
@@ -1588,10 +1597,10 @@ argToPat env in_scope val_env (Cast arg co) arg_occ
 	{ -- Make a wild-card pattern for the coercion
 	  uniq <- getUniqueUs
 	; let co_name = mkSysTvName uniq (fsLit "sg")
-	      co_var = mkCoVar co_name (mkCoKind ty1 ty2)
-	; return (interesting, Cast arg' (mkTyVarTy co_var)) } }
+	      co_var = mkCoVar co_name (mkCoType ty1 ty2)
+	; return (interesting, Cast arg' (mkCoVarCo co_var)) } }
   where
-    (ty1, ty2) = coercionKind co
+    Pair ty1 ty2 = coercionKind co
 
     
 
@@ -1699,7 +1708,7 @@ isValue env (Var v)
 	-- as well, for let-bound constructors!
 
 isValue env (Lam b e)
-  | isTyCoVar b = case isValue env e of
+  | isTyVar b = case isValue env e of
 		  Just _  -> Just LambdaVal
 		  Nothing -> Nothing
   | otherwise = Just LambdaVal
@@ -1734,6 +1743,7 @@ samePat (vs1, as1) (vs2, as2)
     same (App f1 a1) (App f2 a2) = same f1 f2 && same a1 a2
 
     same (Type {}) (Type {}) = True	-- Note [Ignore type differences]
+    same (Coercion {}) (Coercion {}) = True
     same (Note _ e1) e2	= same e1 e2	-- Ignore casts and notes
     same (Cast e1 _) e2	= same e1 e2
     same e1 (Note _ e2) = same e1 e2

@@ -24,7 +24,6 @@ import CoreSyn
 import Type
 import Name
 import Module
-import Var
 import Id
 import FastString
 import Outputable

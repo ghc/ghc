@@ -23,10 +23,9 @@ import MkId		( realWorldPrimId, voidArgId,
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type
-import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
+import Coercion         ( mkSymCo, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
 import Literal		( absentLiteralOf )
-import Var              ( Var )
 import UniqSupply
 import Unique
 import Util		( zipWithEqual )
@@ -244,7 +243,7 @@ mkWWargs subst fun_ty arg_info
   = do { (wrap_args, wrap_fn_args, work_fn_args, res_ty)
 	    <-  mkWWargs subst rep_ty arg_info
  	; return (wrap_args,
-	     	  \e -> Cast (wrap_fn_args e) (mkSymCoercion co),
+	     	  \e -> Cast (wrap_fn_args e) (mkSymCo co),
      		  \e -> work_fn_args (Cast e co),
      		  res_ty) } 
 
@@ -271,7 +270,7 @@ mkWWargs subst fun_ty arg_info
 	      <- mkWWargs subst fun_ty' arg_info'
 	; return (id : wrap_args,
 	          Lam id . wrap_fn_args,
-        	  work_fn_args . (`App` Var id),
+        	  work_fn_args . (`App` varToCoreExpr id),
         	  res_ty) }
 
   | otherwise
@@ -291,18 +290,12 @@ mk_wrap_arg uniq ty dmd one_shot
 
 Note [Freshen type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-mkWWargs may be given a type like  (a~b) => <blah>
-Which really means                 forall (co:a~b). <blah>
-Because the name of the coercion variable, 'co', isn't mentioned in <blah>,
-nested coercion foralls may all use the same variable; and sometimes do
-see Var.mkWildCoVar.
-
-However, when we do a worker/wrapper split, we must not use shadowed names,
+Wen we do a worker/wrapper split, we must not use shadowed names,
 else we'll get
-   f = /\ co /\co. fw co co
-which is obviously wrong.  Actually, the same is true of type variables, which
-can in principle shadow, within a type (e.g. forall a. a -> forall a. a->a).
-But type variables *are* mentioned in <blah>, so we must substitute.
+   f = /\ a /\a. fw a a
+which is obviously wrong.  Type variables can can in principle shadow,
+within a type (e.g. forall a. a -> forall a. a->a).  But type
+variables *are* mentioned in <blah>, so we must substitute.
 
 That's why we carry the TvSubst through mkWWargs
 	
@@ -339,7 +332,7 @@ mkWWstr (arg : args) = do
 --	  brings into scope wrap_arg (via lets)
 mkWWstr_one :: Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one arg
-  | isTyCoVar arg
+  | isTyVar arg
   = return ([arg],  nop_fn, nop_fn)
 
   | otherwise
@@ -525,7 +518,7 @@ mk_absent_let arg
   | Just (tc, _) <- splitTyConApp_maybe arg_ty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit)))
-  | arg_ty `coreEqType` realWorldStatePrimTy 
+  | arg_ty `eqType` realWorldStatePrimTy 
   = Just (Let (NonRec arg (Var realWorldPrimId)))
   | otherwise
   = WARN( True, ptext (sLit "No absent value for") <+> ppr arg_ty )

@@ -31,7 +31,6 @@ import Type
 import DataCon
 import TyCon
 import Util
-import Var
 import VarSet
 import TysPrim
 import DynFlags
@@ -249,7 +248,7 @@ schemeR fvs (nm, rhs)
 {-
    | trace (showSDoc (
               (char ' '
-               $$ (ppr.filter (not.isTyCoVar).varSetElems.fst) rhs
+               $$ (ppr.filter (not.isTyVar).varSetElems.fst) rhs
                $$ pprCoreExpr (deAnnotate rhs)
                $$ char ' '
               ))) False
@@ -833,8 +832,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
              MASSERT(isAlgCase)
              rhs_code <- schemeE (d_alts+size) s p' rhs
              return (my_discr alt, unitOL (UNPACK size) `appOL` rhs_code)
-           where
-             real_bndrs = filter (not.isTyCoVar) bndrs
+	   where
+	     real_bndrs = filterOut isTyVar bndrs
 
         my_discr (DEFAULT, _, _) = NoDiscr {-shouldn't really happen-}
         my_discr (DataAlt dc, _, _)
@@ -1197,6 +1196,9 @@ pushAtom d p e
    | Just e' <- bcView e
    = pushAtom d p e'
 
+pushAtom _ _ (AnnCoercion {})	-- Coercions are zero-width things, 
+   = return (nilOL, 0)	  	-- treated just like a variable VoidArg
+
 pushAtom d p (AnnVar v)
    | idCgRep v == VoidArg
    = return (nilOL, 0)
@@ -1269,9 +1271,6 @@ pushAtom _ _ (AnnLit lit)
                 addr <- getMallocvilleAddr
                 -- Get the addr on the stack, untaggedly
                 return (unitOL (PUSH_UBX (Right addr) 1), 1)
-
-pushAtom d p (AnnCast e _)
-   = pushAtom d p (snd e)
 
 pushAtom _ _ expr
    = pprPanic "ByteCodeGen.pushAtom"
@@ -1454,21 +1453,23 @@ bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
 --  d) notes
 -- Type lambdas *can* occur in random expressions,
 -- whereas value lambdas cannot; that is why they are nuked here
-bcView (AnnNote _ (_,e))               = Just e
-bcView (AnnCast (_,e) _)               = Just e
-bcView (AnnLam v (_,e)) | isTyCoVar v  = Just e
-bcView (AnnApp (_,e) (_, AnnType _))   = Just e
-bcView _                               = Nothing
+bcView (AnnNote _ (_,e)) 	     = Just e
+bcView (AnnCast (_,e) _) 	     = Just e
+bcView (AnnLam v (_,e)) | isTyVar v  = Just e
+bcView (AnnApp (_,e) (_, AnnType _)) = Just e
+bcView _                             = Nothing
 
 isVoidArgAtom :: AnnExpr' Var ann -> Bool
 isVoidArgAtom e | Just e' <- bcView e = isVoidArgAtom e'
 isVoidArgAtom (AnnVar v)              = typePrimRep (idType v) == VoidRep
-isVoidArgAtom _                       = False
+isVoidArgAtom (AnnCoercion {})        = True
+isVoidArgAtom _ 	              = False
 
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
-atomPrimRep (AnnVar v)              = typePrimRep (idType v)
-atomPrimRep (AnnLit l)              = typePrimRep (literalType l)
+atomPrimRep (AnnVar v)    	    = typePrimRep (idType v)
+atomPrimRep (AnnLit l)    	    = typePrimRep (literalType l)
+atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
 
 atomRep :: AnnExpr' Id ann -> CgRep

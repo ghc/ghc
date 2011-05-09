@@ -357,7 +357,7 @@ data IPBind id
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs) 
-			$$ ifPprDebug (ppr ds)
+                        $$ ifPprDebug (ppr ds)
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
   ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
@@ -457,7 +457,7 @@ data EvTerm
   deriving( Data, Typeable)
 
 evVarTerm :: EvVar -> EvTerm
-evVarTerm v | isCoVar v = EvCoercion (mkCoVarCoercion v)
+evVarTerm v | isCoVar v = EvCoercion (mkCoVarCo v)
             | otherwise = EvId v
 \end{code}
 
@@ -546,7 +546,7 @@ pprHsWrapper doc wrap
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>") 
-                                                 <+> pprParendType co)]
+                                              <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
     help it (WpTyApp ty)  = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
     help it (WpEvLam id)  = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
@@ -572,8 +572,8 @@ instance Outputable EvBind where
 
 instance Outputable EvTerm where
   ppr (EvId v)        	 = ppr v
-  ppr (EvCast v co)   	 = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendType co
-  ppr (EvCoercion co)    = ppr co
+  ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendCo co
+  ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
 \end{code}
