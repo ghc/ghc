@@ -42,29 +42,47 @@ import FastString
 %************************************************************************
 
 \begin{code}
-canDoGenerics :: TyCon -> Bool
+canDoGenerics :: TyCon -> Maybe SDoc
 -- Called on source-code data types, to see if we should generate
 -- generic functions for them.
+-- Nothing == yes
+-- Just s  == no, because of `s`
 
 canDoGenerics tycon
-  =  let result = not (any bad_con (tyConDataCons tycon)) 	-- See comment below
-                  -- We do not support datatypes with context (for now)
-                  && null (tyConStupidTheta tycon)
-                  -- We don't like type families
-                  && not (isFamilyTyCon tycon)
-
-     in {- pprTrace "canDoGenerics" (ppr (tycon,result)) -} result
+  =  mergeErrors (
+          -- We do not support datatypes with context
+              (if (not (null (tyConStupidTheta tycon)))
+                then (Just (ppr tycon <+> text "has a datatype context"))
+                else Nothing)
+          -- We don't like type families
+            : (if (isFamilyTyCon tycon)
+                then (Just (ppr tycon <+> text "is a family instance"))
+                else Nothing)
+          -- See comment below
+            : (map bad_con (tyConDataCons tycon)))
   where
-    bad_con dc = any bad_arg_type (dataConOrigArgTys dc) || not (isVanillaDataCon dc)
-  	-- If any of the constructor has an unboxed type as argument,
-	-- then we can't build the embedding-projection pair, because
-	-- it relies on instantiating *polymorphic* sum and product types
-	-- at the argument types of the constructors
+        -- If any of the constructor has an unboxed type as argument,
+        -- then we can't build the embedding-projection pair, because
+        -- it relies on instantiating *polymorphic* sum and product types
+        -- at the argument types of the constructors
+    bad_con dc = if (any bad_arg_type (dataConOrigArgTys dc))
+                  then (Just (ppr dc <+> text "has unlifted or polymorphic arguments"))
+                  else (if (not (isVanillaDataCon dc))
+                          then (Just (ppr dc <+> text "is not a vanilla data constructor"))
+                          else Nothing)
+
 
 	-- Nor can we do the job if it's an existential data constructor,
 
 	-- Nor if the args are polymorphic types (I don't think)
     bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
+    
+    mergeErrors :: [Maybe SDoc] -> Maybe SDoc
+    mergeErrors []           = Nothing
+    mergeErrors ((Just s):t) = case mergeErrors t of
+                                 Nothing -> Just s
+                                 Just s' -> Just (s $$ s')
+    mergeErrors (Nothing :t) = mergeErrors t
 \end{code}
 
 %************************************************************************

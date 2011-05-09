@@ -993,8 +993,11 @@ no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+>
 
 -- JPM TODO: should give better error message
 cond_RepresentableOk :: Condition
+{-
 cond_RepresentableOk (_,t) | canDoGenerics t = Nothing
                            | otherwise       = Just (ptext (sLit "Cannot derive Generic for type") <+> ppr t)
+-}
+cond_RepresentableOk (_,t) = canDoGenerics t
 
 cond_enumOrProduct :: Condition
 cond_enumOrProduct = cond_isEnumeration `orCond` 
