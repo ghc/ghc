@@ -3,7 +3,7 @@
 module Main where
 
 import GHC.Generics
-import Uniplate
+import GUniplate
 
 
 data Tree     = Leaf | Node Int Tree Tree deriving (Show, Generic)

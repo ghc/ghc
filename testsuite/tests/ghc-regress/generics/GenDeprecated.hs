@@ -1,3 +1,3 @@
 {-# LANGUAGE Generics #-}
 
-module GenericsDeprecated where
+module GenDeprecated where

@@ -6,7 +6,7 @@
 {-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE IncoherentInstances        #-} -- necessary, unfortunately
 
-module Uniplate where
+module GUniplate where
 
 import GHC.Generics
 

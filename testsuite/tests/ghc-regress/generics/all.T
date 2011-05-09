@@ -1,8 +1,9 @@
 setTestOpts(only_compiler_types(['ghc']))
 
-test('CanDoRep0', normal, compile, [''])
+test('GenCanDoRep0', normal, compile, [''])
 
-test('ShouldFail0',  normal, compile_fail, [''])
-test('CannotDoRep0', normal, compile_fail, [''])
-test('CannotDoRep1', normal, compile_fail, [''])
-test('CannotDoRep2', normal, compile_fail, [''])
+test('GenDeprecated',  normal, compile, [''])
+test('GenShouldFail0',  normal, compile_fail, [''])
+test('GenCannotDoRep0', normal, compile_fail, [''])
+test('GenCannotDoRep1', normal, compile_fail, [''])
+test('GenCannotDoRep2', normal, compile_fail, [''])
