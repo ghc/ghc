@@ -644,7 +644,6 @@ data HscTarget
   = HscC           -- ^ Generate C code.
   | HscAsm         -- ^ Generate assembly using the native code generator.
   | HscLlvm        -- ^ Generate assembly using the llvm code generator.
-  | HscJava        -- ^ Generate Java bytecode.
   | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
   | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
@@ -653,7 +652,6 @@ showHscTargetFlag :: HscTarget -> String
 showHscTargetFlag HscC           = "-fvia-c"
 showHscTargetFlag HscAsm         = "-fasm"
 showHscTargetFlag HscLlvm        = "-fllvm"
-showHscTargetFlag HscJava        = panic "No flag for HscJava"
 showHscTargetFlag HscInterpreted = "-fbyte-code"
 showHscTargetFlag HscNothing     = "-fno-code"
 

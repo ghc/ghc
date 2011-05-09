@@ -13,12 +13,6 @@ import LlvmCodeGen ( llvmCodeGen )
 
 import UniqSupply	( mkSplitUniqSupply )
 
-#ifdef JAVA
-import JavaGen		( javaGen )
-import qualified PrintJava
-import OccurAnal	( occurAnalyseBinds )
-#endif
-
 import Finder		( mkStubPaths )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
@@ -83,12 +77,6 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm flat_abstractC pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm flat_abstractC;
-             HscJava        -> 
-#ifdef JAVA
-			       outputJava dflags filenm mod_name tycons core_binds;
-#else
-                               panic "Java support not compiled into this ghc";
-#endif
              HscNothing     -> panic "codeOutput: HscNothing"
 	  }
 	; return stubs_exist
@@ -171,26 +159,6 @@ outputLlvm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
 outputLlvm dflags filenm flat_absC
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
        doOutput filenm $ \f -> llvmCodeGen dflags f ncg_uniqs flat_absC
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Java}
-%*									*
-%************************************************************************
-
-\begin{code}
-#ifdef JAVA
-outputJava dflags filenm mod tycons core_binds
-  = doOutput filenm (\ f -> printForUser f alwaysQualify pp_java)
-	-- User style printing for now to keep indentation
-  where
-    occ_anal_binds = occurAnalyseBinds core_binds
-	-- Make sure we have up to date dead-var information
-    java_code = javaGen mod [{- Should be imports-}] tycons occ_anal_binds
-    pp_java   = PrintJava.compilationUnit java_code
-#endif
 \end{code}
 
 
