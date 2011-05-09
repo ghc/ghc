@@ -50,9 +50,9 @@ else:
 
 test('T3294',
      [if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 14000000,
-                                                     19000000)),
-                                   # expected value: 17754884 (x86/Linux)
+          compiler_stats_num_field('max_bytes_used', 12000000,
+                                                     17000000)),
+                                   # expected value: 13049060 (x86/Linux)
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 27000000,
                                                      34000000)),
@@ -87,10 +87,10 @@ test('T4801',
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 600000000,
                                                       750000000)),
-      # expected value: 16277524 (x86/Windows)
+      # expected value: 14181360 (x86/Linux)
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 15000000,
-                                                     17000000)),
+          compiler_stats_num_field('max_bytes_used', 13000000,
+                                                     15000000)),
       # expected value: 7001696 (amd64/Linux, bindist)
       # expected value: 7189848 (amd64/Linux, intree):
       if_wordsize(64,

@@ -235,4 +235,5 @@ test('mc24', normal, compile_fail, [''])
 test('mc25', normal, compile_fail, [''])
 test('tcfail207', normal, compile_fail, [''])
 test('T5084', normal, compile_fail, [''])
+test('tcfail208', normal, compile_fail, [''])
 
