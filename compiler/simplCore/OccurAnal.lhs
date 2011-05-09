@@ -101,11 +101,6 @@ occAnalBind env _ (NonRec binder rhs) body_usage
   | isTyVar binder	-- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
-  | isCoVar binder	 -- A coercion let; again no usage info
-    	    		 -- We trust that it'll get inlined away
-			 -- as soon as it takes form (cv = Coercion co)
-  = (body_usage, [NonRec binder rhs])
-
   | not (binder `usedIn` body_usage)    -- It's not mentioned
   = (body_usage, [])
 
