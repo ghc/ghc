@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE TypeOperators              #-}
-{-# LANGUAGE Generics                   #-}
+{-# LANGUAGE DefaultSignatures          #-}
 {-# LANGUAGE IncoherentInstances        #-} -- necessary, unfortunately
 
 module Uniplate where
@@ -39,8 +39,8 @@ instance (Uniplate' f b, Uniplate' g b) => Uniplate' (f :*: g) b where
 
 class Uniplate a where 
   children :: a -> [a]
-  default children :: (Representable0 a, Uniplate' (Rep0 a) a) => a -> [a]
-  children = children' . from0
+  default children :: (Generic a, Uniplate' (Rep a) a) => a -> [a]
+  children = children' . from
 
 
 -- Base types instances

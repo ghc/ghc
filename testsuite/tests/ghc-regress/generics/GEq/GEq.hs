@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators, Generics, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE TypeOperators, DefaultSignatures, FlexibleContexts, FlexibleInstances #-}
 
 module GEq where
 
@@ -29,8 +29,8 @@ instance (GEq' a, GEq' b) => GEq' (a :*: b) where
 
 class GEq a where 
   geq :: a -> a -> Bool
-  default geq :: (Representable0 a, GEq' (Rep0 a)) => a -> a -> Bool
-  geq x y = geq' (from0 x) (from0 y)
+  default geq :: (Generic a, GEq' (Rep a)) => a -> a -> Bool
+  geq x y = geq' (from x) (from y)
 
 
 -- Base types instances (ad-hoc)

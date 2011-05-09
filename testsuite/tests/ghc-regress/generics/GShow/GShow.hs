@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE IncoherentInstances        #-} -- :-/
-{-# LANGUAGE Generics                   #-}
+{-# LANGUAGE DefaultSignatures          #-}
 
 module GShow (
   -- * Generic show class
@@ -92,8 +92,8 @@ instance (GShow' a, GShow' b) => GShow' (a :*: b) where
 
 class GShow a where 
   gshowsPrec :: Int -> a -> ShowS
-  default gshowsPrec :: (Representable0 a, GShow' (Rep0 a)) => Int -> a -> ShowS
-  gshowsPrec n = gshowsPrec' Pref n . from0
+  default gshowsPrec :: (Generic a, GShow' (Rep a)) => Int -> a -> ShowS
+  gshowsPrec n = gshowsPrec' Pref n . from
 
   gshows :: a -> ShowS
   gshows = gshowsPrec 0

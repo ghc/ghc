@@ -1,23 +1,23 @@
-{-# LANGUAGE Generics      #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TypeOperators #-}
 
 module CanDoRep0 where
 
-import GHC.Generics (Representable0)
+import GHC.Generics (Generic)
 
 
 -- We should be able to generate a generic representation for these types
 data A  
-  deriving Representable0
+  deriving Generic
 
 data B a
-  deriving Representable0
+  deriving Generic
 
 data C = C0 | C1
-  deriving Representable0
+  deriving Generic
 
 data D a = D0 | D1 { d11 :: a, d12 :: (D a) }
-  deriving Representable0
+  deriving Generic
 
 data (:*:) a b = a :*: b
-  deriving Representable0
+  deriving Generic

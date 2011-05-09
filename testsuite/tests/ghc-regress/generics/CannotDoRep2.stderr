@@ -1,5 +1,5 @@
 
 CannotDoRep2.hs:13:1:
-    Can't make a derived instance of `Representable0 (Term a)':
-      Cannot derive Representable for type Term
-    In the stand-alone deriving instance for `Representable0 (Term a)'
+    Can't make a derived instance of `Generic (Term a)':
+      Cannot derive Generic for type Term
+    In the stand-alone deriving instance for `Generic (Term a)'

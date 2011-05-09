@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveRepresentable #-}
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE GADTs               #-}
 
@@ -10,4 +10,4 @@ import GHC.Generics
 data Term a where
   Int :: Term Int
 
-deriving instance Representable0 (Term a)
+deriving instance Generic (Term a)

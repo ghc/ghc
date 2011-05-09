@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveRepresentable #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Main where
 
@@ -6,7 +6,7 @@ import GHC.Generics hiding (C, D)
 import GShow
 
 -- We should be able to generate a generic representation for these types
-data D a = D0 | D1 { d11 :: a, d12 :: (D a) } deriving Representable0
+data D a = D0 | D1 { d11 :: a, d12 :: (D a) } deriving Generic
 
 -- Example values
 d0 :: D Char

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveRepresentable        #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE ExistentialQuantification  #-}
 
 module CannotDoRep0 where
@@ -6,4 +6,4 @@ module CannotDoRep0 where
 import GHC.Generics
 
 -- We do not support existential quantification
-data Dynamic = forall a. Dynamic a deriving Representable0
+data Dynamic = forall a. Dynamic a deriving Generic

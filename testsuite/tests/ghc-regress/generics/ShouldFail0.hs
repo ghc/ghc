@@ -2,10 +2,10 @@
 
 module ShouldFail0 where
 
-import GHC.Generics (Representable0)
+import GHC.Generics (Generic)
 
 data X = X
 
-deriving instance Representable0 X
+deriving instance Generic X
 
--- Should fail (no XDeriveRepresentable)
+-- Should fail (no XDeriveGeneric)
