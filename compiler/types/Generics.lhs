@@ -52,11 +52,11 @@ canDoGenerics tycon
   =  mergeErrors (
           -- We do not support datatypes with context
               (if (not (null (tyConStupidTheta tycon)))
-                then (Just (ppr tycon <+> text "has a datatype context"))
+                then (Just (ppr tycon <+> text "must not have a datatype context"))
                 else Nothing)
           -- We don't like type families
             : (if (isFamilyTyCon tycon)
-                then (Just (ppr tycon <+> text "is a family instance"))
+                then (Just (ppr tycon <+> text "must not be a family instance"))
                 else Nothing)
           -- See comment below
             : (map bad_con (tyConDataCons tycon)))
@@ -66,9 +66,9 @@ canDoGenerics tycon
         -- it relies on instantiating *polymorphic* sum and product types
         -- at the argument types of the constructors
     bad_con dc = if (any bad_arg_type (dataConOrigArgTys dc))
-                  then (Just (ppr dc <+> text "has unlifted or polymorphic arguments"))
+                  then (Just (ppr dc <+> text "must not have unlifted or polymorphic arguments"))
                   else (if (not (isVanillaDataCon dc))
-                          then (Just (ppr dc <+> text "is not a vanilla data constructor"))
+                          then (Just (ppr dc <+> text "must be a vanilla data constructor"))
                           else Nothing)
 
 
@@ -81,7 +81,7 @@ canDoGenerics tycon
     mergeErrors []           = Nothing
     mergeErrors ((Just s):t) = case mergeErrors t of
                                  Nothing -> Just s
-                                 Just s' -> Just (s $$ s')
+                                 Just s' -> Just (s <> text ", and" $$ s')
     mergeErrors (Nothing :t) = mergeErrors t
 \end{code}
 
