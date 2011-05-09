@@ -343,8 +343,8 @@ data ExtensionFlag
    | Opt_DeriveTraversable
    | Opt_DeriveFoldable
    | Opt_DeriveGeneric            -- Allow deriving Generic/1
-   | Opt_DefaultSignatures              -- Allow extra signatures for defmeths
-   | Opt_Generics                       -- Generic deriving mechanism
+   | Opt_DefaultSignatures        -- Allow extra signatures for defmeths
+   | Opt_Generics                 -- Old generic classes, now deprecated
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -1640,7 +1640,8 @@ xFlags = [
   ( "ParallelArrays",                   Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell, checkTemplateHaskellOk ),
   ( "QuasiQuotes",                      Opt_QuasiQuotes, nop ),
-  ( "Generics",                         Opt_Generics, nop ),
+  ( "Generics",                         Opt_Generics,
+    \ _ -> deprecate "it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support." ),
   ( "ImplicitPrelude",                  Opt_ImplicitPrelude, nop ),
   ( "RecordWildCards",                  Opt_RecordWildCards, nop ),
   ( "NamedFieldPuns",                   Opt_RecordPuns, nop ),
@@ -1749,9 +1750,6 @@ impliedFlags
     , (Opt_RecordWildCards,     turnOn, Opt_DisambiguateRecordFields)
     
     , (Opt_ParallelArrays, turnOn, Opt_ParallelListComp)
-    -- The new behavior of the XGenerics flag is just to turn on these two flags
-    , (Opt_Generics, turnOn, Opt_DefaultSignatures)
-    , (Opt_Generics, turnOn, Opt_DeriveGeneric)
   ]
 
 optLevelFlags :: [([Int], DynFlag)]

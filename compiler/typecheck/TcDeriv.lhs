@@ -940,8 +940,7 @@ sideConditions mtheta cls
   | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
     	                                   cond_functorOK False)
   | cls_key == genClassKey         = Just (cond_RepresentableOk `andCond`
-                                           (checkFlag Opt_DeriveGeneric `orCond`
-                                            checkFlag Opt_Generics))
+                                           checkFlag Opt_DeriveGeneric)
   | otherwise = Nothing
   where
     cls_key = getUnique cls
