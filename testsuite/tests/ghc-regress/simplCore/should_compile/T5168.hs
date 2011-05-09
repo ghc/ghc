@@ -1,7 +1,7 @@
-# In this test we do -ddump-simpl, and grep for 'patError.
-# We expect *not* to see patError in the output
-# because the branch is inaccessible.  
-# In GHC 7.0 and earlier, we did get a patError in the output program.
+-- In this test we do -ddump-simpl, and grep for 'patError.
+-- We expect *not* to see patError in the output
+-- because the branch is inaccessible.  
+-- In GHC 7.0 and earlier, we did get a patError in the output program.
 
 {-# LANGUAGE TypeFamilies, GADTs #-}
 module NoMatch where
