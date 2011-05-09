@@ -19,7 +19,6 @@ data Modules
   , dph_PArray_PDataInstances   :: Module
   , dph_PArray_Types            :: Module
 	
-  , dph_Repr	                :: Module
   , dph_Closure	                :: Module
   , dph_Unboxed	                :: Module
   , dph_Combinators             :: Module
@@ -46,7 +45,6 @@ dph_Modules pkg
   , dph_PArray_PDataInstances   = mk (fsLit "Data.Array.Parallel.PArray.PDataInstances")
   , dph_PArray_Types            = mk (fsLit "Data.Array.Parallel.PArray.Types")
 	
-  , dph_Repr                    = mk (fsLit "Data.Array.Parallel.Lifted.Repr")
   , dph_Closure                 = mk (fsLit "Data.Array.Parallel.Lifted.Closure")
   , dph_Unboxed                 = mk (fsLit "Data.Array.Parallel.Lifted.Unboxed")
   , dph_Combinators             = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
@@ -65,6 +63,5 @@ dph_Modules pkg
 -- | Project out ids of modules that contain orphan instances that we need to load.
 dph_Orphans :: [Modules -> Module]
 dph_Orphans 
- =      [ dph_Repr
-        , dph_PArray_PReprInstances
+ =      [ dph_PArray_PReprInstances
         , dph_PArray_PDataInstances ]

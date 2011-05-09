@@ -194,7 +194,6 @@ initBuiltins pkg
                 , dph_PArray_PData              = dph_PArray_PData
                 , dph_PArray_PDataInstances     = dph_PArray_PDataInstances
                 , dph_PArray_Types              = dph_PArray_Types
-                , dph_Repr                      = dph_Repr
                 , dph_Closure                   = dph_Closure
                 , dph_Scalar                    = dph_Scalar
                 , dph_Unboxed                   = dph_Unboxed
