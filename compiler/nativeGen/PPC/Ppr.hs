@@ -12,7 +12,6 @@ module PPC.Ppr (
 	pprSectionHeader,
 	pprData,
 	pprInstr,
-	pprUserReg,
 	pprSize,
 	pprImm,
 	pprDataItem,
@@ -156,9 +155,6 @@ pprAlign bytes =
 instance Outputable Instr where
     ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
 
-
-pprUserReg :: Reg -> Doc
-pprUserReg = pprReg
 
 pprReg :: Reg -> Doc
 

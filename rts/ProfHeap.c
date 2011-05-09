@@ -812,7 +812,7 @@ dumpCensus( Census *census )
 		rs->id = -(rs->id);
 
 	    // report in the unit of bytes: * sizeof(StgWord)
-	    printRetainerSetShort(hp_file, rs);
+	    printRetainerSetShort(hp_file, rs, RtsFlags.ProfFlags.ccsLength);
 	    break;
 	}
 	default:

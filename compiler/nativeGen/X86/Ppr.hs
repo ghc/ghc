@@ -12,7 +12,6 @@ module X86.Ppr (
         pprSectionHeader,
         pprData,
         pprInstr,
-        pprUserReg,
         pprSize,
         pprImm,
         pprDataItem,
@@ -34,7 +33,6 @@ import PprBase
 
 import OldCmm
 import CLabel
-import Config
 import Unique           ( pprUnique, Uniquable(..) )
 import Pretty
 import FastString
@@ -42,7 +40,6 @@ import qualified Outputable
 import Outputable       (panic, Outputable)
 
 import Data.Word
-import Distribution.System
 
 #if i386_TARGET_ARCH && darwin_TARGET_OS
 import Data.Bits
@@ -171,12 +168,6 @@ pprAlign bytes
 instance Outputable Instr where
     ppr instr = Outputable.docToSDoc $ pprInstr instr
 
-
-pprUserReg :: Reg -> Doc
-pprUserReg
- | cTargetArch == I386   = pprReg II32
- | cTargetArch == X86_64 = pprReg II64
- | otherwise             = panic "X86.Ppr.pprUserReg: not defined"
 
 pprReg :: Size -> Reg -> Doc
 

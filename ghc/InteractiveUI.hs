@@ -38,7 +38,7 @@ import HscTypes ( handleFlagWarnings )
 import HsImpExp
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import RdrName (RdrName)
-import Outputable       hiding (printForUser, printForUserPartWay)
+import Outputable       hiding (printForUser, printForUserPartWay, bold)
 import Module           -- for ModuleEnv
 import Name
 import SrcLoc
