@@ -233,5 +233,5 @@ missingArgErr f = Left ("missing argument for flag: " ++ f)
 errorsToGhcException :: [Located String] -> GhcException
 errorsToGhcException errs =
    let errors = vcat [ ppr l <> text ": " <> text e | L l e <- errs ]
-   in UsageError (showSDoc $ withPprStyle cmdlineParserStyle errors)
+   in UsageError (renderWithStyle errors cmdlineParserStyle)
 

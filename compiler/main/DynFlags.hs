@@ -108,7 +108,6 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Distribution.System
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -805,12 +804,12 @@ defaultDynFlags mySettings =
 
         log_action = \severity srcSpan style msg ->
                         case severity of
-                          SevOutput -> printOutput (msg style)
-                          SevInfo   -> printErrs (msg style)
-                          SevFatal  -> printErrs (msg style)
+                          SevOutput -> printSDoc msg style
+                          SevInfo   -> printErrs msg style
+                          SevFatal  -> printErrs msg style
                           _         -> do 
                                 hPutChar stderr '\n'
-                                printErrs ((mkLocMessage srcSpan msg) style)
+                                printErrs (mkLocMessage srcSpan msg) style
                      -- careful (#2302): printErrs prints in UTF-8, whereas
                      -- converting to string first and using hPutStr would
                      -- just emit the low 8 bits of each unicode char.
@@ -1102,18 +1101,7 @@ parseDynamicFlags_ dflags0 args pkg_flags = do
           = runCmdLine (processArgs flag_spec args') dflags0
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
-  let (pic_warns, dflags2)
-        | not (cTargetArch == X86_64 && (cTargetOS == Linux || cTargetOS == OSX)) &&
-          (not opt_Static || opt_PIC) &&
-          hscTarget dflags1 == HscLlvm
-        = ([L noSrcSpan $ "Warning: -fllvm is incompatible with -fPIC and "
-                       ++ "-dynamic on this platform;\n"
-                       ++ "         using "
-                       ++ showHscTargetFlag defaultObjectTarget ++ " instead"],
-                dflags1{ hscTarget = defaultObjectTarget })
-        | otherwise = ([], dflags1)
-
-  return (dflags2, leftover, pic_warns ++ warns)
+  return (dflags1, leftover, warns)
 
 
 {- **********************************************************************
@@ -2049,21 +2037,28 @@ setObjTarget l = updM set
        = case l of
          HscC
           | cGhcUnregisterised /= "YES" ->
-             do addWarn ("Compiler not unregisterised, so ignoring " ++
-                         showHscTargetFlag l)
+             do addWarn ("Compiler not unregisterised, so ignoring " ++ flag)
                 return dflags
          HscAsm
           | cGhcWithNativeCodeGen /= "YES" ->
              do addWarn ("Compiler has no native codegen, so ignoring " ++
-                         showHscTargetFlag l)
+                         flag)
                 return dflags
          HscLlvm
           | cGhcUnregisterised == "YES" ->
-             do addWarn ("Compiler unregisterised, so ignoring " ++
-                         showHscTargetFlag l)
+             do addWarn ("Compiler unregisterised, so ignoring " ++ flag)
+                return dflags
+          | not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
+            (not opt_Static || opt_PIC)
+            ->
+             do addWarn ("Ignoring " ++ flag ++ " as it is incompatible with -fPIC and -dynamic on this platform")
                 return dflags
          _ -> return $ dflags { hscTarget = l }
      | otherwise = return dflags
+     where platform = targetPlatform dflags
+           arch = platformArch platform
+           os   = platformOS   platform
+           flag = showHscTargetFlag l
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
 setOptLevel n dflags

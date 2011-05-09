@@ -12,7 +12,6 @@ module SPARC.Ppr (
 	pprSectionHeader,
 	pprData,
 	pprInstr,
-	pprUserReg,
 	pprSize,
 	pprImm,
 	pprDataItem
@@ -138,12 +137,6 @@ pprAlign bytes =
 
 instance Outputable Instr where
     ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
-
-
--- | Pretty print a register.
---	This is an alias of pprReg for legacy reasons, should remove it.
-pprUserReg :: Reg -> Doc
-pprUserReg = pprReg
 
 
 -- | Pretty print a register.

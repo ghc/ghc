@@ -51,12 +51,10 @@ import SrcLoc
 import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
+import Platform
 
--- import Data.Either
 import Exception
 import Data.IORef       ( readIORef )
-import Distribution.System
--- import GHC.Exts              ( Int(..) )
 import System.Directory
 import System.FilePath
 import System.IO
@@ -1061,7 +1059,7 @@ runPhase cc_phase input_fn dflags
                 -- than a double, which leads to unpredictable results.
                 -- By default, we turn this off with -ffloat-store unless
                 -- the user specified -fexcess-precision.
-                (if cTargetArch == I386 &&
+                (if platformArch (targetPlatform dflags) == ArchX86 &&
                     not (dopt Opt_ExcessPrecision dflags)
                         then [ "-ffloat-store" ]
                         else []) ++
@@ -1093,7 +1091,7 @@ runPhase cc_phase input_fn dflags
                 -- These symbols are imported into the stub.c file via RtsAPI.h, and the
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
-                       ++ (if cTargetOS == Windows &&
+                       ++ (if platformOS (targetPlatform dflags) == OSMinGW32 &&
                               thisPackage dflags == basePackageId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
@@ -1104,7 +1102,7 @@ runPhase cc_phase input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ (if cTargetArch == Sparc
+                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then ["-mcpu=v9"]
                            else [])
 
@@ -1182,7 +1180,7 @@ runPhase As input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ (if cTargetArch == Sparc
+                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else [])
 
@@ -1237,7 +1235,7 @@ runPhase SplitAs _input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                          (if cTargetArch == Sparc
+                          (if platformArch (targetPlatform dflags) == ArchSPARC
                            then [SysTools.Option "-mcpu=v9"]
                            else []) ++
 
@@ -1330,7 +1328,7 @@ runPhase LlvmLlc input_fn dflags
     return (LlvmMangle, output_fn)
   where
         -- Bug in LLVM at O3 on OSX.
-        llvmOpts = if cTargetOS == OSX
+        llvmOpts = if platformOS (targetPlatform dflags) == OSDarwin
                    then ["-O1", "-O2", "-O2"]
                    else ["-O1", "-O2", "-O3"]
 
@@ -1647,7 +1645,7 @@ linkBinary dflags o_files dep_packages = do
 
                       -- Permit the linker to auto link _symbol to _imp_symbol.
                       -- This lets us link against DLLs without needing an "import library".
-                      ++ (if cTargetOS == Windows
+                      ++ (if platformOS (targetPlatform dflags) == OSMinGW32
                           then ["-Wl,--enable-auto-import"]
                           else [])
 
@@ -1681,13 +1679,13 @@ linkBinary dflags o_files dep_packages = do
 exeFileName :: DynFlags -> FilePath
 exeFileName dflags
   | Just s <- outputFile dflags =
-      if cTargetOS == Windows
+      if platformOS (targetPlatform dflags) == OSMinGW32
       then if null (takeExtension s)
            then s <.> "exe"
            else s
       else s
   | otherwise =
-      if cTargetOS == Windows
+      if platformOS (targetPlatform dflags) == OSMinGW32
       then "main.exe"
       else "a.out"
 

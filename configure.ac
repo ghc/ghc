@@ -242,7 +242,6 @@ case $host in
      ;;
 esac
 
-# Sync this with cTargetArch in compiler/ghc.mk
 checkArch() {
     case $1 in
     alpha|arm|hppa|hppa1_1|i386|ia64|m68k|mips|mipseb|mipsel|powerpc|powerpc64|rs6000|s390|sparc|sparc64|vax|x86_64)
@@ -265,7 +264,6 @@ checkVendor() {
     esac
 }
 
-# Sync this with cTargetOS in compiler/ghc.mk
 checkOS() {
     case $1 in
     linux|freebsd|netbsd|openbsd|dragonfly|osf1|osf3|hpux|linuxaout|kfreebsdgnu|freebsd2|solaris2|cygwin32|mingw32|darwin|gnu|nextstep2|nextstep3|sunos4|ultrix|irix|aix|haiku)
