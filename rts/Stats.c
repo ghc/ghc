@@ -547,6 +547,18 @@ stat_exit(int alloc)
             gc_elapsed += GC_coll_elapsed[i];
         }
 
+        init_cpu     = end_init_cpu - start_init_cpu;
+        init_elapsed = end_init_elapsed - start_init_elapsed;
+
+        exit_cpu     = end_exit_cpu - start_exit_cpu;
+        exit_elapsed = end_exit_elapsed - start_exit_elapsed;
+
+        mut_elapsed = start_exit_elapsed - end_init_elapsed - gc_elapsed;
+
+        mut_cpu = start_exit_cpu - end_init_cpu - gc_cpu
+            - PROF_VAL(RP_tot_time + HC_tot_time);
+        if (mut_cpu < 0) { mut_cpu = 0; }
+
 	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
 	    showStgWord64(GC_tot_alloc*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
@@ -635,20 +647,8 @@ stat_exit(int alloc)
             }
 #endif
 
-            init_cpu     = end_init_cpu - start_init_cpu;
-            init_elapsed = end_init_elapsed - start_init_elapsed;
-
-            exit_cpu     = end_exit_cpu - start_exit_cpu;
-            exit_elapsed = end_exit_elapsed - start_exit_elapsed;
-
 	    statsPrintf("  INIT    time  %6.2fs  (%6.2fs elapsed)\n",
                         TICK_TO_DBL(init_cpu), TICK_TO_DBL(init_elapsed));
-
-            mut_elapsed = start_exit_elapsed - end_init_elapsed - gc_elapsed;
-
-            mut_cpu = start_exit_cpu - end_init_cpu - gc_cpu
-                - PROF_VAL(RP_tot_time + HC_tot_time);
-            if (mut_cpu < 0) { mut_cpu = 0; }
 
             statsPrintf("  MUT     time  %6.2fs  (%6.2fs elapsed)\n",
                         TICK_TO_DBL(mut_cpu), TICK_TO_DBL(mut_elapsed));
