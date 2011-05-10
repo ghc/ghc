@@ -1274,10 +1274,12 @@ data HsStmtContext id
 \begin{code}
 isListCompExpr :: HsStmtContext id -> Bool
 -- Uses syntax [ e | quals ]
-isListCompExpr ListComp  = True
-isListCompExpr PArrComp  = True
-isListCompExpr MonadComp = True
-isListCompExpr _         = False
+isListCompExpr ListComp  	 = True
+isListCompExpr PArrComp  	 = True
+isListCompExpr MonadComp 	 = True  
+isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
+isListCompExpr (TransStmtCtxt c) = isListCompExpr c
+isListCompExpr _                 = False
 
 isMonadCompExpr :: HsStmtContext id -> Bool
 isMonadCompExpr MonadComp            = True

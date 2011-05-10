@@ -694,6 +694,8 @@ rnStmt ctxt (L loc (ExprStmt expr _ _ _)) thing_inside
                               then lookupStmtName ctxt guardMName
 			      else return (noSyntaxExpr, emptyFVs)
 			      -- Only list/parr/monad comprehensions use 'guard'
+			      -- Also for sub-stmts of same eg [ e | x<-xs, gd | blah ]
+			      -- Here "gd" is a guard
 	; (thing, fvs3)    <- thing_inside []
 	; return (([L loc (ExprStmt expr' then_op guard_op placeHolderType)], thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }
