@@ -1794,10 +1794,12 @@ showPackages = do
   liftIO $ putStrLn $ showSDoc $ vcat $
     text ("active package flags:"++if null pkg_flags then " none" else "")
     : map showFlag pkg_flags
-  where showFlag (ExposePackage p) = text $ "  -package " ++ p
-        showFlag (HidePackage p)   = text $ "  -hide-package " ++ p
-        showFlag (IgnorePackage p) = text $ "  -ignore-package " ++ p
+  where showFlag (ExposePackage   p) = text $ "  -package " ++ p
+        showFlag (HidePackage     p) = text $ "  -hide-package " ++ p
+        showFlag (IgnorePackage   p) = text $ "  -ignore-package " ++ p
         showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
+        showFlag (TrustPackage    p) = text $ "  -trust " ++ p
+        showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
 
 showLanguages :: GHCi ()
 showLanguages = do

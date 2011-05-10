@@ -631,10 +631,10 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 
     -- Overlap error because of SafeHaskell (first match should be the most
     -- specific match)
-    mk_overlap_msg (matches, unifiers, True)
+    mk_overlap_msg (matches, _unifiers, True)
       = ASSERT( length matches > 1 )
         vcat [ addArising orig (ptext (sLit "Unsafe overlapping instances for") 
-                        <+> pprPred pred)
+                        <+> pprPredTy pred)
              , sep [ptext (sLit "The matching instance is") <> colon,
                     nest 2 (pprInstance $ head ispecs)]
              , vcat [ ptext $ sLit "It is compiled in a Safe module and as such can only"
