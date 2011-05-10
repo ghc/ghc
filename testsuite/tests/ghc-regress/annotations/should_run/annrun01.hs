@@ -7,6 +7,7 @@ import MonadUtils  ( liftIO )
 import DynFlags    ( defaultDynFlags )
 import Annotations ( AnnTarget(..), CoreAnnTarget )
 import Serialized  ( deserializeWithData )
+import Panic
 
 import Config
 import Annrun01_Help
@@ -15,7 +16,8 @@ import qualified Language.Haskell.TH as TH
 import Data.List
 import Data.Function
 
-main = defaultErrorHandler defaultDynFlags $ runGhc (Just cTop) $ do
+main = defaultErrorHandler (defaultDynFlags (panic "No settings"))
+     $ runGhc (Just cTop) $ do
     liftIO $ putStrLn "Initializing Package Database"
     dflags <- getSessionDynFlags
     let dflags' = dflags
