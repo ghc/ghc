@@ -287,6 +287,7 @@ data DynFlag
    | Opt_SplitObjs
    | Opt_StgStats
    | Opt_HideAllPackages
+   | Opt_DistrustAllPackages
    | Opt_PrintBindResult
    | Opt_Haddock
    | Opt_HaddockOptions
@@ -734,10 +735,12 @@ doingTickyProfiling _ = opt_Ticky
   -- static.  If the way flags were made dynamic, we could fix this.
 
 data PackageFlag
-  = ExposePackage  String
+  = ExposePackage   String
   | ExposePackageId String
-  | HidePackage    String
-  | IgnorePackage  String
+  | HidePackage     String
+  | IgnorePackage   String
+  | TrustPackage    String
+  | DistrustPackage String
   deriving Eq
 
 defaultHscTarget :: HscTarget
@@ -1666,16 +1669,19 @@ dynamic_flags = [
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
         ------- Packages ----------------------------------------------------
-    flagC "package-conf"         (HasArg extraPkgConf_)
-  , flagC "no-user-package-conf" (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
-  , flagC "package-name"      	 (hasArg setPackageName)
-  , flagC "package-id"        	 (HasArg exposePackageId)
-  , flagC "package"           	 (HasArg exposePackage)
-  , flagC "hide-package"      	 (HasArg hidePackage)
-  , flagC "hide-all-packages" 	 (NoArg (setDynFlag Opt_HideAllPackages))
-  , flagC "ignore-package"    	 (HasArg ignorePackage)
-  , flagC "syslib"            	 (HasArg (\s -> do { exposePackage s
-                                                   ; deprecate "Use -package instead" }))
+    flagC "package-conf"          (HasArg extraPkgConf_)
+  , flagC "no-user-package-conf"  (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
+  , flagC "package-name"      	  (hasArg setPackageName)
+  , flagC "package-id"        	  (HasArg exposePackageId)
+  , flagC "package"           	  (HasArg exposePackage)
+  , flagC "hide-package"      	  (HasArg hidePackage)
+  , flagC "hide-all-packages" 	  (NoArg (setDynFlag Opt_HideAllPackages))
+  , flagC "ignore-package"    	  (HasArg ignorePackage)
+  , flagC "syslib"            	  (HasArg (\s -> do { exposePackage s
+                                                    ; deprecate "Use -package instead" }))
+  , flagC "trust"                 (HasArg trustPackage)
+  , flagC "distrust"              (HasArg distrustPackage)
+  , flagC "distrust-all-packages" (NoArg (setDynFlag Opt_DistrustAllPackages))
   ]
 
 type TurnOnFlag = Bool   -- True  <=> we are turning the flag on
@@ -2279,7 +2285,8 @@ addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes 
 extraPkgConf_ :: FilePath -> DynP ()
 extraPkgConf_  p = upd (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
 
-exposePackage, exposePackageId, hidePackage, ignorePackage :: String -> DynP ()
+exposePackage, exposePackageId, hidePackage, ignorePackage,
+        trustPackage, distrustPackage :: String -> DynP ()
 exposePackage p =
   upd (\s -> s{ packageFlags = ExposePackage p : packageFlags s })
 exposePackageId p =
@@ -2288,6 +2295,10 @@ hidePackage p =
   upd (\s -> s{ packageFlags = HidePackage p : packageFlags s })
 ignorePackage p =
   upd (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
+trustPackage p = exposePackage p >> -- both trust and distrust also expose a package
+  upd (\s -> s{ packageFlags = TrustPackage p : packageFlags s })
+distrustPackage p = exposePackage p >>
+  upd (\s -> s{ packageFlags = DistrustPackage p : packageFlags s })
 
 setPackageName :: String -> DynFlags -> DynFlags
 setPackageName p s =  s{ thisPackage = stringToPackageId p }
