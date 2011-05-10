@@ -1403,7 +1403,7 @@ dynamic_flags = [
   , flagC "optl"           (hasArg addOptl)
   , flagC "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
 
-  , flagC "split-objs"
+  , flagA "split-objs"
          (NoArg (if can_split 
                  then setDynFlag Opt_SplitObjs
                  else addWarn "ignoring -fsplit-objs"))
@@ -1424,7 +1424,7 @@ dynamic_flags = [
         -------- Linking ----------------------------------------------------
   , flagA "no-link"            (noArg (\d -> d{ ghcLink=NoLink }))
   , flagA "shared"             (noArg (\d -> d{ ghcLink=LinkDynLib }))
-  , flagC "dynload"            (hasArg parseDynLibLoaderMode)
+  , flagA "dynload"            (hasArg parseDynLibLoaderMode)
   , flagC "dylib-install-name" (hasArg setDylibInstallName)
 
         ------- Libraries ---------------------------------------------------
@@ -1447,7 +1447,7 @@ dynamic_flags = [
   , flagC "tmpdir"            (hasArg setTmpDir)
   , flagC "stubdir"           (hasArg setStubDir)
   , flagC "outputdir"         (hasArg setOutputDir)
-  , flagC "ddump-file-prefix" (hasArg (setDumpPrefixForce . Just))
+  , flagA "ddump-file-prefix" (hasArg (setDumpPrefixForce . Just))
 
         ------- Keeping temporary files -------------------------------------
      -- These can be singular (think ghc -c) or plural (think ghc --make)
