@@ -13,6 +13,7 @@ data Modules
   = Modules 
   { dph_PArray_Base             :: Module
   , dph_PArray_Scalar           :: Module
+  , dph_PArray_ScalarInstances  :: Module
   , dph_PArray_PRepr            :: Module
   , dph_PArray_PReprInstances   :: Module
   , dph_PArray_PData            :: Module
@@ -24,7 +25,6 @@ data Modules
   , dph_Combinators             :: Module
   , dph_Scalar	                :: Module
 
-  , dph_Prelude_PArr            :: Module
   , dph_Prelude_Int             :: Module
   , dph_Prelude_Word8           :: Module
   , dph_Prelude_Double          :: Module
@@ -39,6 +39,7 @@ dph_Modules pkg
   = Modules 
   { dph_PArray_Base             = mk (fsLit "Data.Array.Parallel.PArray.Base")
   , dph_PArray_Scalar           = mk (fsLit "Data.Array.Parallel.PArray.Scalar")
+  , dph_PArray_ScalarInstances  = mk (fsLit "Data.Array.Parallel.PArray.ScalarInstances")
   , dph_PArray_PRepr            = mk (fsLit "Data.Array.Parallel.PArray.PRepr")
   , dph_PArray_PReprInstances   = mk (fsLit "Data.Array.Parallel.PArray.PReprInstances")
   , dph_PArray_PData            = mk (fsLit "Data.Array.Parallel.PArray.PData")
@@ -50,7 +51,6 @@ dph_Modules pkg
   , dph_Combinators             = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
   , dph_Scalar                  = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
 
-  , dph_Prelude_PArr            = mk (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
   , dph_Prelude_Int             = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
   , dph_Prelude_Word8           = mk (fsLit "Data.Array.Parallel.Prelude.Base.Word8")
   , dph_Prelude_Double          = mk (fsLit "Data.Array.Parallel.Prelude.Base.Double")
@@ -60,8 +60,11 @@ dph_Modules pkg
   where	mk = mkModule pkg . mkModuleNameFS
 
 
--- | Project out ids of modules that contain orphan instances that we need to load.
 dph_Orphans :: [Modules -> Module]
-dph_Orphans 
- =      [ dph_PArray_PReprInstances
-        , dph_PArray_PDataInstances ]
+dph_Orphans
+ = [ dph_PArray_Scalar
+   , dph_PArray_ScalarInstances
+   , dph_PArray_PReprInstances
+   , dph_PArray_PDataInstances
+   , dph_Scalar
+   ]

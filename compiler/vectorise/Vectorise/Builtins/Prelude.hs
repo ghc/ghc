@@ -29,7 +29,6 @@ preludeVars (Modules { dph_Combinators    = _dph_Combinators
                      , dph_Prelude_Word8  = dph_Prelude_Word8
                      , dph_Prelude_Double = dph_Prelude_Double
                      , dph_Prelude_Bool   = dph_Prelude_Bool 
-                     , dph_Prelude_PArr   = _dph_Prelude_PArr
                      })
 
     -- Functions that work on whole PArrays, defined in GHC.PArr
