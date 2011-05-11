@@ -608,9 +608,12 @@ addTickCmdGRHSs (GRHSs guarded local_binds) = do
     binders = collectLocalBinders local_binds
 
 addTickCmdGRHS :: GRHS Id -> TM (GRHS Id)
-addTickCmdGRHS (GRHS stmts cmd) = do
-  (stmts',expr') <- addTickLCmdStmts' stmts (addTickLHsCmd cmd)
-  return $ GRHS stmts' expr'
+-- The *guards* are *not* Cmds, although the body is
+-- C.f. addTickGRHS for the BinBox stuff
+addTickCmdGRHS (GRHS stmts cmd)
+  = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) 
+                                   stmts (addTickLHsCmd cmd)
+       ; return $ GRHS stmts' expr' }
 
 addTickLCmdStmts :: [LStmt Id] -> TM [LStmt Id]
 addTickLCmdStmts stmts = do
