@@ -137,7 +137,7 @@ step' normalising state =
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
     unwind deeds h k tg_v in_v = uncons k >>= \(kf, k) -> case tagee kf of
         TyApply ty'               -> tyApply    (deeds + 1)          h k      in_v ty'
-        Apply x2'                 -> apply      (deeds + 1)          h k      in_v x2'
+        Apply x2'                 -> apply      deeds       (tag kf) h k      in_v x2'
         Scrutinise x' ty' in_alts -> scrutinise (deeds + 1)          h k tg_v in_v x' ty' in_alts
         PrimApply pop in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop in_vs in_v in_es
         CastIt co'                -> cast       deeds       (tag kf) h k      in_v co'
@@ -167,12 +167,21 @@ step' normalising state =
         tyApply :: Deeds -> Heap -> Stack -> Answer -> Out Type -> Maybe UnnormalisedState
         tyApply deeds h k in_v@(_, (_, v)) ty' = do
             (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h in_v
-            fmap (\deeds -> (deeds, h, k, (insertTypeSubst rn x ty', e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body) -- FIXME: deeds in mb_co?
+            fmap (\deeds -> (deeds, h, case mb_co of Nothing -> k; Just (co', tg_co) -> Tagged tg_co (Coerce (co' `mkInstCo` ty')) : k, (insertTypeSubst rn x ty', e_body))) $
+                 claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
 
-        apply :: Deeds -> Heap -> Stack -> Answer -> Out Var -> Maybe UnnormalisedState
-        apply deeds h k in_v@(_, (_, v)) x' = do
-            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h in_v
-            fmap (\deeds -> (deeds, h, k, (insertRenaming rn x x', e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body) -- FIXME: deeds in mb_co?
+        apply :: Deeds -> Tag -> Heap -> Stack -> Answer -> Out Var -> Maybe UnnormalisedState
+        apply deeds tg_v (Heap h ids) k in_v@(_, (_, v)) x' = do
+            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) in_v
+            case mb_co of
+              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertRenaming rn x x', e_body))) $
+                              claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
+              Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' e_arg h) ids', Tagged tg_co (Cast res_co') : k)) $
+                                        claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
+                where (ids', rn', [y']) = renameNonRecBinders ids rn [x `setVarType` arg_co_from_ty']) $
+                      (arg_co_from_ty', _arg_co_to_ty') = coercionKind arg_co'
+                      [arg_co', res_co'] = decomposeCo 2 co'
+                      e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` mkSymCo arg_co')
 
         scrutinise :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
         scrutinise deeds (Heap h ids) k tg_v (rn_v, v) x' ty' (rn_alts, alts)
@@ -190,7 +199,7 @@ step' normalising state =
                              -- NB: we add the *non-dereferenced* value to the heap in a default branch with variable, because anything else may duplicate allocation
           | otherwise
           = Nothing -- This can legitimately occur, e.g. when supercompiling (if x then (case x of False -> 1) else 2)
-          where (rn_v_deref, v_deref) = dereference (Heap h ids) (rn_v, v)
+          where (mb_co_deref, (rn_v_deref, v_deref)) = dereference (Heap h ids) (rn_v, v)
 
         primop :: Deeds -> Tag -> Heap -> Stack -> Tag -> PrimOp -> [Anned Answer] -> Answer -> [In AnnedTerm] -> Maybe UnnormalisedState
         primop deeds tg_kf h k tg_a pop anned_as a [] = do

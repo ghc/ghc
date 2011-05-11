@@ -17,10 +17,6 @@ import Var      (CoVar, TyVar, isTyVar)
 import VarEnv
 
 
-isTyCoVar :: Var -> Bool
-isTyCoVar x = isTyVar x || isCoVar x
-
-
 -- We are going to use GHC's substitution type in a rather stylised way, and only
 -- ever substitute variables for variables. The reasons for this are twofold:
 --
@@ -39,11 +35,12 @@ isTyCoVar x = isTyVar x || isCoVar x
 --
 --  gam = (F Int -> F Int ~ Bool -> Bool)
 --
--- We need to reduce to:
+-- We need to reduce to something like:
 --
 --  e[(y |> sym (nth 1 gam))/x] |> (nth 2 gam)
 --
--- We record this information as an optional Cast around the Vars in the IdSubstEnv.
+-- We deal with this problem in the evaluator by introducing an intermediate let binding for
+-- such redexes.
 
 type Renaming = (IdSubstEnv, TvSubstEnv, CvSubstEnv)
 
@@ -62,14 +59,12 @@ mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv
   where (tv_list, coid_list) = partition isTyVar (varSetElems fvs)
         (co_list, id_list)   = partition isCoVar coid_list
 
-coercedVarToCoreSyn :: Coerced (Out Var) -> CoreSyn.Expr
-coercedVarToCoreSyn (Nothing,  x') = CoreSyn.Var x'
-coercedVarToCoreSyn (Just co', x') = CoreSyn.Var x' `CoreSyn.Cast` co'
+coercedVarToCoreSyn :: Var -> CoreSyn.Expr
+coercedVarToCoreSyn x' = CoreSyn.Var x'
 
-coreSynToCoercedVar :: CoreSyn.Expr -> Coerced (Out Var)
-coreSynToCoercedVar (CoreSyn.Var x')                    = (Nothing,  x')
-coreSynToCoercedVar (CoreSyn.Cast (CoreSyn.Var x') co') = (Just co', x')
-coreSynToCoercedVar e                                   = panic "renome" (ppr e)
+coreSynToCoercedVar :: CoreSyn.Expr -> Var
+coreSynToCoercedVar (CoreSyn.Var x') = x'
+coreSynToCoercedVar e                = panic "renome" (ppr e)
 
 insertRenaming :: Renaming -> Var -> Var -> Renaming
 insertRenaming (id_subst, tv_subst, co_subst) x x' = (extendVarEnv id_subst x (coercedVarToCoreSyn x'), tv_subst, co_subst)

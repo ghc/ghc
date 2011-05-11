@@ -165,7 +165,7 @@ termToVar e = case extract e of
     _                  -> Nothing -- FIXME: cast things as well
 
 
-type Coerced a = (Maybe (Out Coercion), a)
+type Coerced a = (Maybe (Out Coercion, Tag), a)
 
 
 class Functor ann => Symantics ann where
