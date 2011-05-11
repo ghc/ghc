@@ -68,7 +68,6 @@ import UniqSupply
 import DynFlags
 import StaticFlags
 import Util
-import Config
 
 import Digraph
 import qualified Pretty
