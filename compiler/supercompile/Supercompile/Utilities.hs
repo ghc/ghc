@@ -71,6 +71,9 @@ instance (Ord1 f, Ord a) => Ord (Wrapper1 f a) where
 
 class Outputable1 f where
     pprPrec1 :: Outputable a => Rational -> f a -> SDoc
+    
+    ppr1 :: Outputable a => f a -> SDoc
+    ppr1 = pprPrec1 noPrec
 
 instance (Outputable1 f, Outputable a) => Outputable (Wrapper1 f a) where
     pprPrec prec = pprPrec1 prec . unWrapper1

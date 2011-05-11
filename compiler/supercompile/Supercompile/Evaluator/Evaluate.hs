@@ -78,7 +78,7 @@ step' normalising state =
   where
     go :: (Deeds, Heap, Stack, In AnnedTerm) -> (Bool, State)
     go (deeds, h@(Heap _ ids), k, (rn, e)) 
-     | Just anned_a <- termToAnswer iss (rn, e) = go_answer (deeds, h, k, anned_a)
+     | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, h, k, anned_a)
      | otherwise = case annee e of
         Var x             -> go_question (deeds, h, k, fmap (const (rename rn x)) e)
         TyApp e ty        -> go (deeds, h, Tagged tg (TyApply (renameType ids rn ty))                             : k, (rn, e))
@@ -87,7 +87,7 @@ step' normalising state =
         Case e x ty alts  -> go (deeds, h, Tagged tg (Scrutinise (rename rn x) (renameType ids rn ty) (rn, alts)) : k, (rn, e))
         Cast e co         -> go (deeds, h, Tagged tg (CastIt (renameType ids rn co))                              : k, (rn, e))
         LetRec xes e      -> go (allocate (deeds + 1) h k (rn, (xes, e)))
-        _                 -> panic "reduced" (text "Impossible expression" $ ppr e)
+        _                 -> panic "reduced" (text "Impossible expression" $$ ppr1 e)
       where tg = annedTag e
 
     go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) (\s -> (True, normalise s)) $ force  deeds h k (annedTag anned_x) (annee anned_x)
@@ -165,14 +165,14 @@ step' normalising state =
           | otherwise = Just (dereference h a)
     
         tyApply :: Deeds -> Heap -> Stack -> Answer -> Out Type -> Maybe UnnormalisedState
-        tyApply deeds h k in_v@(_, v) ty' = do
-            (rn, TyLambda x e_body) <- deferenceLambdaish h in_v
-            fmap (\deeds -> (deeds, h, k, (insertTypeSubst x ty' rn, e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
+        tyApply deeds h k in_v@(_, (_, v)) ty' = do
+            (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h in_v
+            fmap (\deeds -> (deeds, h, k, (insertTypeSubst rn x ty', e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body) -- FIXME: deeds in mb_co?
 
         apply :: Deeds -> Heap -> Stack -> Answer -> Out Var -> Maybe UnnormalisedState
-        apply deeds h k in_v@(_, v) x' = do
-            (rn, Lambda x e_body) <- deferenceLambdaish h in_v
-            fmap (\deeds -> (deeds, h, k, (insertRenaming x x' rn, e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
+        apply deeds h k in_v@(_, (_, v)) x' = do
+            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h in_v
+            fmap (\deeds -> (deeds, h, k, (insertRenaming rn x x', e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body) -- FIXME: deeds in mb_co?
 
         scrutinise :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
         scrutinise deeds (Heap h ids) k tg_v (rn_v, v) x' ty' (rn_alts, alts)
