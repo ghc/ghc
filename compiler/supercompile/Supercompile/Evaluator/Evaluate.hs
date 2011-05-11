@@ -40,7 +40,7 @@ evaluatePrim tg pop args = do
         _          -> Nothing
     
     fro :: CoreSyn.CoreExpr -> Maybe Answer
-    fro (CoreSyn.Cast e co) = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCoercion` co) mb_co', tg), in_v)) $ fro e
+    fro (CoreSyn.Cast e co) = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
     fro (CoreSyn.Lit l)     = Just (Nothing, (emptyRenaming, Literal l))
     fro e | CoreSyn.Var f <- e, Just dc <- isDataConId_maybe f = fmap (\xs -> (Nothing, (mkIdentityRenaming (mkVarSet xs), Data dc xs))) $ mapM toVar_maybe es
           | otherwise = Nothing
@@ -49,7 +49,7 @@ evaluatePrim tg pop args = do
             toVar_maybe _               = Nothing
 
 castAnswer :: Answer -> Maybe (Out Coercion, Tag) -> Answer
-castAnswer (mb_co, in_v) mb_co' = (plusMaybe (\(co, _tg) (co', tg') -> (co `mkTransCoercion` co', tg')) mb_co mb_co', in_v)
+castAnswer (mb_co, in_v) mb_co' = (plusMaybe (\(co, _tg) (co', tg') -> (co `mkTransCo` co', tg')) mb_co mb_co', in_v)
 
 
 -- | Non-expansive simplification we can do everywhere safely
@@ -85,7 +85,7 @@ step' normalising state =
         App e x           -> go (deeds, h, Tagged tg (Apply (rename rn x))                                        : k, (rn, e))
         PrimOp pop (e:es) -> go (deeds, h, Tagged tg (PrimApply pop [] (map ((,) rn) es))                         : k, (rn, e))
         Case e x ty alts  -> go (deeds, h, Tagged tg (Scrutinise (rename rn x) (renameType ids rn ty) (rn, alts)) : k, (rn, e))
-        Cast e co         -> go (deeds, h, Tagged tg (CastIt (renameType ids rn co))                              : k, (rn, e))
+        Cast e co         -> go (deeds, h, Tagged tg (CastIt (renameCoercion ids rn co))                          : k, (rn, e))
         LetRec xes e      -> go (allocate (deeds + 1) h k (rn, (xes, e)))
         _                 -> panic "reduced" (text "Impossible expression" $$ ppr1 e)
       where tg = annedTag e
@@ -206,8 +206,8 @@ step' normalising state =
         cast :: Deeds -> Tag -> Heap -> Stack -> Answer -> Coercion -> Maybe UnnormalisedState
         cast deeds tg_kf (Heap h ids) k (mb_co, in_v) co' = Just (deeds', Heap h ids, k, annedAnswerToAnnedTerm ids (annedAnswer tg_kf ans'))
           where (deeds', ans') = case mb_co of
-                    Nothing          -> (deeds,     (Just (co',                      tg_kf), in_v))
-                    Just (co, tg_co) -> (deeds + 1, (Just (co `mkTransCoercion` co', tg_kf), in_v))
+                    Nothing          -> (deeds,     (Just (co',                tg_kf), in_v))
+                    Just (co, tg_co) -> (deeds + 1, (Just (co `mkTransCo` co', tg_kf), in_v))
 
         update :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Answer -> Maybe UnnormalisedState
         update deeds (Heap h ids) k tg_a x' a = do

@@ -42,7 +42,7 @@ stackFrameOpenFreeVars kf = case kf of
     Scrutinise x' ty in_alts -> (emptyVarSet, (inFreeVars annedAltsFreeVars in_alts `delVarSet` x') `unionVarSet` tyVarsOfType ty)
     PrimApply _ as in_es     -> (emptyVarSet, unionVarSets (map annedFreeVars as) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
     Update x'                -> (unitVarSet x', emptyVarSet)
-    CastIt co'               -> (emptyVarSet, tyVarsOfType co')
+    CastIt co'               -> (emptyVarSet, tyCoVarsOfCo co')
 
 
 -- | Computes the variables bound and free in a state

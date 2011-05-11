@@ -12,7 +12,7 @@ import Var      (Var)
 import Id       (idType)
 import Literal  (Literal)
 import Type     (Type)
-import Coercion (Coercion)
+import Coercion (Coercion, mkReflCo)
 import PrimOp   (PrimOp)
 
 
@@ -160,9 +160,12 @@ isCheap _               = False
 
 termToVar :: Copointed ann => ann (TermF ann) -> Maybe (Coercion, Var)
 termToVar e = case extract e of
-    Value (Indirect x) -> Just (idType x, x)
-    Var x              -> Just (idType x, x)
+    Value (Indirect x) -> Just (mkReflCo (idType x), x)
+    Var x              -> Just (mkReflCo (idType x), x)
     _                  -> Nothing -- FIXME: cast things as well
+
+
+type Coerced a = (Maybe (Out Coercion), a)
 
 
 class Functor ann => Symantics ann where

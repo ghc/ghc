@@ -75,7 +75,7 @@ toAnnedTerm :: UniqSupply -> Term -> AnnedTerm
 toAnnedTerm tag_ids = tagFVedTerm tag_ids . reflect
 
 
-type Answer = (Maybe (Out Coercion, Tag), In (ValueF Anned))
+type Answer = Coerced (In (ValueF Anned))
 
 answerSize' :: Answer -> Size
 answerSize' = annedTermSize' . answerToAnnedTerm' emptyInScopeSet
@@ -87,7 +87,7 @@ termToAnswer :: InScopeSet -> In AnnedTerm -> Maybe (Anned Answer)
 termToAnswer iss (rn, anned_e) = flip traverse anned_e $ \e -> case e of
     Value v          -> Just (Nothing, (rn, v))
     Cast anned_e' co -> case extract anned_e' of
-        Value v -> Just (Just (renameType iss rn co, annedTag anned_e'), (rn, v))
+        Value v -> Just (Just (renameCoercion iss rn co, annedTag anned_e'), (rn, v))
         _       -> Nothing
     _ -> Nothing
 

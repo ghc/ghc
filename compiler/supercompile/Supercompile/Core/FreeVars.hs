@@ -2,7 +2,7 @@
 module Supercompile.Core.FreeVars (
     module Supercompile.Core.FreeVars,
     module VarSet,
-    tyVarsOfType
+    tyVarsOfType, tyCoVarsOfCo
   ) where
 
 import Supercompile.Core.Syntax
@@ -13,6 +13,7 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 
 import CoreFVs
+import Coercion (tyCoVarsOfCo)
 import VarSet
 import Type (tyVarsOfType)
 
@@ -48,7 +49,7 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` (alternatives alts `delVarSet` x)
     term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e) `delVarSetList` xs
       where (xs, es) = unzip xes
-    term' (Cast e co)        = term e `unionVarSet` typ co
+    term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
     
     value = rec value'
     value' (Indirect x)   = idFreeVars x
@@ -72,6 +73,11 @@ altConFreeVars :: AltCon -> FreeVars -> FreeVars
 altConFreeVars (DataAlt _ xs) = (`delVarSetList` xs)
 altConFreeVars (LiteralAlt _) = id
 altConFreeVars DefaultAlt     = id
+
+
+coercedFreeVars :: (a -> FreeVars) -> Coerced a -> FreeVars
+coercedFreeVars f (Nothing, x) = f x
+coercedFreeVars f (Just co, x) = f x `unionVarSet` tyCoVarsOfCo co
 
 
 data FVed a = FVed { freeVars :: !FreeVars, fvee :: !a }
