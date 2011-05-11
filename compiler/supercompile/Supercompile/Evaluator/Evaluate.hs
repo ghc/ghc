@@ -76,17 +76,22 @@ step' normalising state =
                                        res) $
     go state
   where
-    go (deeds, h@(Heap _ ids), k, (rn, e)) = case annee e of
-        Var x             -> maybe (False, (deeds, h, k, fmap (const (Question (rename rn x))) e))      (\s -> (True, normalise s)) $ force  deeds h k tg (rename rn x);
-        Value v           -> maybe (False, (deeds, h, k, fmap (const (Answer (Nothing, (rn, v)))) e))   (\s -> (True, normalise s)) $ unwind deeds h k tg (rn, v)
+    go :: (Deeds, Heap, Stack, In AnnedTerm) -> (Bool, State)
+    go (deeds, h@(Heap _ ids), k, (rn, e)) 
+     | Just anned_a <- termToAnswer iss (rn, e) = go_answer (deeds, h, k, anned_a)
+     | otherwise = case annee e of
+        Var x             -> go_question (deeds, h, k, fmap (const (rename rn x)) e)
         TyApp e ty        -> go (deeds, h, Tagged tg (TyApply (renameType ids rn ty))                             : k, (rn, e))
         App e x           -> go (deeds, h, Tagged tg (Apply (rename rn x))                                        : k, (rn, e))
-        PrimOp pop []     -> panic "reduced" (text "Nullary primop" <+> pPrint pop <+> text "in input")
         PrimOp pop (e:es) -> go (deeds, h, Tagged tg (PrimApply pop [] (map ((,) rn) es))                         : k, (rn, e))
         Case e x ty alts  -> go (deeds, h, Tagged tg (Scrutinise (rename rn x) (renameType ids rn ty) (rn, alts)) : k, (rn, e))
         Cast e co         -> go (deeds, h, Tagged tg (CastIt (renameType ids rn co))                              : k, (rn, e))
         LetRec xes e      -> go (allocate (deeds + 1) h k (rn, (xes, e)))
+        _                 -> panic "reduced" (text "Impossible expression" $ ppr e)
       where tg = annedTag e
+
+    go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) (\s -> (True, normalise s)) $ force  deeds h k (annedTag anned_x) (annee anned_x)
+    go_answer   (deeds, h, k, anned_a) = maybe (False, (deeds, h, k, fmap Answer anned_a))   (\s -> (True, normalise s)) $ unwind deeds h k (annedTag anned_a) (annee anned_a)
 
     allocate :: Deeds -> Heap -> Stack -> In ([(Var, AnnedTerm)], AnnedTerm) -> UnnormalisedState
     allocate deeds (Heap h ids) k (rn, (xes, e)) = (deeds, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
@@ -112,6 +117,7 @@ step' normalising state =
     
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
+    force :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Maybe UnnormalisedState
     force deeds (Heap h ids) k tg x'
       -- NB: inlining values is non-normalising if dUPLICATE_VALUES_EVALUATOR is on (since doing things the long way would involve executing an update frame)
       | not (dUPLICATE_VALUES_EVALUATOR && normalising)
@@ -124,11 +130,11 @@ step' normalising state =
         in_e <- heapBindingTerm hb
         return $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
-            kf : _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming [y'], annedTerm (tag kf) (Var y'))) h) ids,                         k, in_e)
+            kf : _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                         k, in_e)
             _                              -> (deeds, Heap (M.delete x' h)                                                                          ids, Tagged tg (Update x') : k, in_e)
 
     -- Deal with a value at the top of the stack
-    unwind :: Deeds -> Heap -> Stack -> Tag -> In AnnedValue -> Maybe UnnormalisedState
+    unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
     unwind deeds h k tg_v in_v = uncons k >>= \(kf, k) -> case tagee kf of
         TyApply ty'               -> tyApply    (deeds + 1)          h k      in_v ty'
         Apply x2'                 -> apply      (deeds + 1)          h k      in_v x2'
@@ -158,17 +164,17 @@ step' normalising state =
           | normalising, not dUPLICATE_VALUES_EVALUATOR, Indirect _ <- v = Nothing -- If not duplicating values, we ensure normalisation by not executing applications to non-explicit-lambdas
           | otherwise = Just (dereference h a)
     
-        tyApply :: Deeds -> Heap -> Stack -> In AnnedValue -> Out Type -> Maybe UnnormalisedState
+        tyApply :: Deeds -> Heap -> Stack -> Answer -> Out Type -> Maybe UnnormalisedState
         tyApply deeds h k in_v@(_, v) ty' = do
             (rn, TyLambda x e_body) <- deferenceLambdaish h in_v
             fmap (\deeds -> (deeds, h, k, (insertTypeSubst x ty' rn, e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
 
-        apply :: Deeds -> Heap -> Stack -> In AnnedValue -> Out Var -> Maybe UnnormalisedState
+        apply :: Deeds -> Heap -> Stack -> Answer -> Out Var -> Maybe UnnormalisedState
         apply deeds h k in_v@(_, v) x' = do
             (rn, Lambda x e_body) <- deferenceLambdaish h in_v
             fmap (\deeds -> (deeds, h, k, (insertRenaming x x' rn, e_body))) $ claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
 
-        scrutinise :: Deeds -> Heap -> Stack -> Tag -> In AnnedValue -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
+        scrutinise :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
         scrutinise deeds (Heap h ids) k tg_v (rn_v, v) x' ty' (rn_alts, alts)
           | Literal l <- v_deref
           , (alt_e, rest):_ <- [((rn_alts, alt_e), rest) | ((LiteralAlt alt_l, alt_e), rest) <- bagContexts alts, alt_l == l]
@@ -197,8 +203,8 @@ step' normalising state =
             return (denormalise (deeds, h, k, fmap Answer a'))
         primop deeds tg_kf h k tg_a pop anned_as a (in_e:in_es) = Just (deeds, h, Tagged tg_kf (PrimApply pop (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
 
-        cast :: Deeds -> Heap -> Stack -> Answer -> Coercion -> Maybe UnnormalisedState
-        cast deeds tg_kf h k (mb_co, in_v) co' = Just (deeds', h, k, ans')
+        cast :: Deeds -> Tag -> Heap -> Stack -> Answer -> Coercion -> Maybe UnnormalisedState
+        cast deeds tg_kf (Heap h ids) k (mb_co, in_v) co' = Just (deeds', Heap h ids, k, annedAnswerToAnnedTerm ids (annedAnswer tg_kf ans'))
           where (deeds', ans') = case mb_co of
                     Nothing          -> (deeds,     (Just (co',                      tg_kf), in_v))
                     Just (co, tg_co) -> (deeds + 1, (Just (co `mkTransCoercion` co', tg_kf), in_v))
@@ -206,6 +212,6 @@ step' normalising state =
         update :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Answer -> Maybe UnnormalisedState
         update deeds (Heap h ids) k tg_a x' a = do
             (deeds', prepared_in_v) <- case prepareAnswer deeds x' a of
-                Nothing                      -> pprTrace (text "update-deeds:" <+> pPrint x') Nothing
+                Nothing                      -> pprTrace "update-deeds:" (pPrint x') Nothing
                 Just (deeds', prepared_in_v) -> Just (deeds', prepared_in_v)
-            return (deeds', Heap (M.insert x' (internallyBound annedAnswer tg_a a) h) ids, k, second (annedAnswer tg_a . Answer) prepared_in_v)
+            return (deeds', Heap (M.insert x' (internallyBound (annedAnswerToAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, annedAnswerToAnnedTerm ids (annedAnswer tg_a prepared_in_v))

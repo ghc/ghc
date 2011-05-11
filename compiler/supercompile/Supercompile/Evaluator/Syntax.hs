@@ -97,6 +97,11 @@ data QA = Question (Out Var)
 instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
 
+annedAnswerToAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
+annedAnswerToAnnedTerm iss anned_a = (mkIdentityRenaming (annedFreeVars anned_e), anned_e)
+  where e' = answerToAnnedTerm' iss (annee anned_a)
+        anned_e = annedTerm (annedTag anned_a) e'
+
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
 answerToAnnedTerm' iss (mb_co, (rn, v)) = case mb_co of
     Nothing       -> Value v'
