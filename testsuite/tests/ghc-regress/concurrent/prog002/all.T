@@ -4,8 +4,10 @@
 # hence -O0:
 
 test('concprog002',
-     [only_ways(['threaded2','threaded2_qw']),
-      exit_code(1), 
+        # Add 'threaded2_hT' so that we have at least one test for bug #5127
+     [only_ways(['threaded2','threaded2_hT']),
+      extra_ways(['threaded2_hT']),
+      exit_code(1),
       skip_if_fast,
       extra_clean(['Event.hi',     'Event.o',
                    'Scheduler.hi', 'Scheduler.o',
