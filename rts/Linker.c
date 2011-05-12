@@ -2335,6 +2335,7 @@ unloadObj( char *path )
             //  stgFree(oc->image);
             // #endif
             stgFree(oc->fileName);
+            stgFree(oc->archiveMemberName);
             stgFree(oc->symbols);
             stgFree(oc->sections);
             stgFree(oc);
@@ -3680,31 +3681,6 @@ PLTSize(void)
  * Generic ELF functions
  */
 
-static char *
-findElfSection ( void* objImage, Elf_Word sh_type )
-{
-   char* ehdrC = (char*)objImage;
-   Elf_Ehdr* ehdr = (Elf_Ehdr*)ehdrC;
-   Elf_Shdr* shdr = (Elf_Shdr*)(ehdrC + ehdr->e_shoff);
-   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
-   char* ptr = NULL;
-   int i;
-
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == sh_type
-          /* Ignore the section header's string table. */
-          && i != ehdr->e_shstrndx
-          /* Ignore string tables named .stabstr, as they contain
-             debugging info. */
-          && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
-         ) {
-         ptr = ehdrC + shdr[i].sh_offset;
-         break;
-      }
-   }
-   return ptr;
-}
-
 static int
 ocVerifyImage_ELF ( ObjectCode* oc )
 {
@@ -3712,7 +3688,6 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    Elf_Sym*  stab;
    int i, j, nent, nstrtab, nsymtabs;
    char* sh_strtab;
-   char* strtab;
 
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*)ehdrC;
@@ -3794,20 +3769,64 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                ehdrC + shdr[i].sh_offset,
                       ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
 
-      if (shdr[i].sh_type == SHT_REL) {
-          IF_DEBUG(linker,debugBelch("Rel  " ));
-      } else if (shdr[i].sh_type == SHT_RELA) {
-          IF_DEBUG(linker,debugBelch("RelA " ));
-      } else {
-          IF_DEBUG(linker,debugBelch("     "));
+#define SECTION_INDEX_VALID(ndx) (ndx > SHN_UNDEF && ndx < ehdr->e_shnum)
+
+      switch (shdr[i].sh_type) {
+
+        case SHT_REL:
+        case SHT_RELA:
+          IF_DEBUG(linker,debugBelch( shdr[i].sh_type == SHT_REL ? "Rel  " : "RelA "));
+
+          if (!SECTION_INDEX_VALID(shdr[i].sh_link)) {
+            if (shdr[i].sh_link == SHN_UNDEF)
+              errorBelch("\n%s: relocation section #%d has no symbol table\n"
+                         "This object file has probably been fully striped. "
+                         "Such files cannot be linked.\n",
+                         oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
+            else
+              errorBelch("\n%s: relocation section #%d has an invalid link field (%d)\n",
+                         oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+                         i, shdr[i].sh_link);
+            return 0;
+          }
+          if (shdr[shdr[i].sh_link].sh_type != SHT_SYMTAB) {
+            errorBelch("\n%s: relocation section #%d does not link to a symbol table\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
+            return 0;
+          }
+          if (!SECTION_INDEX_VALID(shdr[i].sh_info)) {
+            errorBelch("\n%s: relocation section #%d has an invalid info field (%d)\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+                       i, shdr[i].sh_info);
+            return 0;
+          }
+
+          break;
+        case SHT_SYMTAB:
+          IF_DEBUG(linker,debugBelch("Sym  "));
+
+          if (!SECTION_INDEX_VALID(shdr[i].sh_link)) {
+            errorBelch("\n%s: symbol table section #%d has an invalid link field (%d)\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+                       i, shdr[i].sh_link);
+            return 0;
+          }
+          if (shdr[shdr[i].sh_link].sh_type != SHT_STRTAB) {
+            errorBelch("\n%s: symbol table section #%d does not link to a string table\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
+
+            return 0;
+          }
+          break;
+        case SHT_STRTAB: IF_DEBUG(linker,debugBelch("Str  ")); break;
+        default:         IF_DEBUG(linker,debugBelch("     ")); break;
       }
       if (sh_strtab) {
           IF_DEBUG(linker,debugBelch("sname=%s\n", sh_strtab + shdr[i].sh_name ));
       }
    }
 
-   IF_DEBUG(linker,debugBelch( "\nString tables" ));
-   strtab = NULL;
+   IF_DEBUG(linker,debugBelch( "\nString tables\n" ));
    nstrtab = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type == SHT_STRTAB
@@ -3817,18 +3836,16 @@ ocVerifyImage_ELF ( ObjectCode* oc )
              debugging info. */
           && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
-         IF_DEBUG(linker,debugBelch("   section %d is a normal string table", i ));
-         strtab = ehdrC + shdr[i].sh_offset;
+         IF_DEBUG(linker,debugBelch("   section %d is a normal string table\n", i ));
          nstrtab++;
       }
    }
-   if (nstrtab != 1) {
-      errorBelch("%s: no string tables, or too many", oc->fileName);
-      return 0;
+   if (nstrtab == 0) {
+      IF_DEBUG(linker,debugBelch("   no normal string tables (potentially, but not necessarily a problem)\n"));
    }
 
    nsymtabs = 0;
-   IF_DEBUG(linker,debugBelch( "\nSymbol tables" ));
+   IF_DEBUG(linker,debugBelch( "Symbol tables\n" ));
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
       IF_DEBUG(linker,debugBelch( "section %d is a symbol table\n", i ));
@@ -3870,13 +3887,17 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          }
          IF_DEBUG(linker,debugBelch("  " ));
 
-         IF_DEBUG(linker,debugBelch("name=%s\n", strtab + stab[j].st_name ));
+         IF_DEBUG(linker,debugBelch("name=%s\n",
+                        ehdrC + shdr[shdr[i].sh_link].sh_offset
+                              + stab[j].st_name ));
       }
    }
 
    if (nsymtabs == 0) {
-      errorBelch("%s: didn't find any symbol tables", oc->fileName);
-      return 0;
+     // Not having a symbol table is not in principle a problem.
+     // When an object file has no symbols then the 'strip' program
+     // typically will remove the symbol table entirely.
+     IF_DEBUG(linker,debugBelch("   no symbol tables (potentially, but not necessarily a problem)\n"));
    }
 
    return 1;
@@ -3923,15 +3944,10 @@ ocGetNames_ELF ( ObjectCode* oc )
 
    char*     ehdrC    = (char*)(oc->image);
    Elf_Ehdr* ehdr     = (Elf_Ehdr*)ehdrC;
-   char*     strtab   = findElfSection ( ehdrC, SHT_STRTAB );
+   char*     strtab;
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
    ASSERT(symhash != NULL);
-
-   if (!strtab) {
-      errorBelch("%s: no strtab", oc->fileName);
-      return 0;
-   }
 
    k = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
@@ -3965,12 +3981,16 @@ ocGetNames_ELF ( ObjectCode* oc )
 
       /* copy stuff into this module's object symbol table */
       stab = (Elf_Sym*) (ehdrC + shdr[i].sh_offset);
+      strtab = ehdrC + shdr[shdr[i].sh_link].sh_offset;
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
 
       oc->n_symbols = nent;
       oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
                                    "ocGetNames_ELF(oc->symbols)");
 
+      //TODO: we ignore local symbols anyway right? So we can use the
+      //      shdr[i].sh_info to get the index of the first non-local symbol
+      // ie we should use j = shdr[i].sh_info
       for (j = 0; j < nent; j++) {
 
          char  isLocal = FALSE; /* avoids uninit-var warning */
@@ -4068,21 +4088,24 @@ ocGetNames_ELF ( ObjectCode* oc )
    relocations appear to be of this form. */
 static int
 do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
-                         Elf_Shdr* shdr, int shnum,
-                         Elf_Sym*  stab, char* strtab )
+                         Elf_Shdr* shdr, int shnum )
 {
    int j;
    char *symbol;
    Elf_Word* targ;
    Elf_Rel*  rtab = (Elf_Rel*) (ehdrC + shdr[shnum].sh_offset);
+   Elf_Sym*  stab;
+   char*     strtab;
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rel);
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
+   int strtab_shndx = shdr[symtab_shndx].sh_link;
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
+   strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
    targ  = (Elf_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d\n",
-                          target_shndx, symtab_shndx ));
+   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d and strtab %d\n",
+                          target_shndx, symtab_shndx, strtab_shndx ));
 
    /* Skip sections that we're not interested in. */
    {
@@ -4168,18 +4191,21 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    sparc-solaris relocations appear to be of this form. */
 static int
 do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
-                          Elf_Shdr* shdr, int shnum,
-                          Elf_Sym*  stab, char* strtab )
+                          Elf_Shdr* shdr, int shnum )
 {
    int j;
    char *symbol = NULL;
    Elf_Addr targ;
    Elf_Rela* rtab = (Elf_Rela*) (ehdrC + shdr[shnum].sh_offset);
+   Elf_Sym*  stab;
+   char*     strtab;
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rela);
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
+   int strtab_shndx = shdr[symtab_shndx].sh_link;
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
+   strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
    targ  = (Elf_Addr) (ehdrC + shdr[ target_shndx ].sh_offset);
    IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d\n",
                           target_shndx, symtab_shndx ));
@@ -4448,35 +4474,20 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 static int
 ocResolve_ELF ( ObjectCode* oc )
 {
-   char *strtab;
    int   shnum, ok;
-   Elf_Sym*  stab  = NULL;
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
-   /* first find "the" symbol table */
-   stab = (Elf_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
-
-   /* also go find the string table */
-   strtab = findElfSection ( ehdrC, SHT_STRTAB );
-
-   if (stab == NULL || strtab == NULL) {
-      errorBelch("%s: can't find string or symbol table", oc->fileName);
-      return 0;
-   }
-
    /* Process the relocation sections. */
    for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
       if (shdr[shnum].sh_type == SHT_REL) {
-         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr,
-                                       shnum, stab, strtab );
+         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, shnum );
          if (!ok) return ok;
       }
       else
       if (shdr[shnum].sh_type == SHT_RELA) {
-         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr,
-                                        shnum, stab, strtab );
+         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr, shnum );
          if (!ok) return ok;
       }
    }
@@ -4509,8 +4520,12 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 
   if( i == ehdr->e_shnum )
   {
-    errorBelch( "This ELF file contains no symtab" );
-    return 0;
+    // Not having a symbol table is not in principle a problem.
+    // When an object file has no symbols then the 'strip' program
+    // typically will remove the symbol table entirely.
+    IF_DEBUG(linker, debugBelch( "The ELF file %s contains no symtab\n",
+             oc->archiveMemberName ? oc->archiveMemberName : oc->fileName ));
+    return 1;
   }
 
   if( shdr[i].sh_entsize != sizeof( Elf_Sym ) )
