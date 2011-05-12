@@ -202,10 +202,12 @@ tc_mkRepTyCon tycon metaDts =
                  (tyConKind tycon `mkArrowKind` liftedTypeKind)
                  tyvars (SynonymTyCon rep0Ty)
                  (FamInstTyCon rep0 appT
+{-
                    (mkCoercionTyCon coName (tyConArity tycon)
-                     -- co : forall a b. Rep (D a b) ~ `rep0Ty` a b
                      (CoAxiom tyvars (mkTyConApp rep0 appT) rep0Ty)))
-
+-}
+                   -- co : forall a b. Rep (D a b) ~ `rep0Ty` a b
+                   (CoAxiom uniq2 coName tyvars (mkTyConApp rep0 appT) rep0Ty))
     return res
 
 --------------------------------------------------------------------------------
