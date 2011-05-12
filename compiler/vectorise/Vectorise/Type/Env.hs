@@ -27,7 +27,6 @@ import FamInstEnv
 import OccName
 import Id
 import MkId
-import Var
 import NameEnv
 
 import Unique

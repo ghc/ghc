@@ -37,10 +37,10 @@ import CoreUtils        ( exprType, eqExpr )
 import PprCore		( pprRules )
 import Type             ( Type )
 import TcType		( tcSplitTyConApp_maybe )
+import Coercion
 import CoreTidy		( tidyRules )
 import Id
 import IdInfo		( SpecInfo( SpecInfo ) )
-import Var		( Var )
 import VarEnv
 import VarSet
 import Name		( Name, NamedThing(..) )
@@ -55,7 +55,6 @@ import Bag
 import Util
 import Data.List
 \end{code}
-
 
 Note [Overall plumbing for rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -184,8 +183,9 @@ roughTopNames args = map roughTopName args
 
 roughTopName :: CoreExpr -> Maybe Name
 roughTopName (Type ty) = case tcSplitTyConApp_maybe ty of
-			  Just (tc,_) -> Just (getName tc)
-			  Nothing     -> Nothing
+                               Just (tc,_) -> Just (getName tc)
+                               Nothing     -> Nothing
+roughTopName (Coercion _) = Nothing 
 roughTopName (App f _) = roughTopName f
 roughTopName (Var f)   | isGlobalId f	-- Note [Care with roughTopName]
                        , isDataConWorkId f || idArity f > 0
@@ -625,10 +625,7 @@ match :: RuleEnv
 -- succeed in matching what looks like the template variable 'a' against 3.
 
 -- The Var case follows closely what happens in Unify.match
-match renv subst (Var v1) e2
-  | Just subst <- match_var renv subst v1 e2
-  = Just subst
-
+match renv subst (Var v1)    e2 = match_var renv subst v1 e2
 match renv subst (Note _ e1) e2 = match renv subst e1 e2
 match renv subst e1 (Note _ e2) = match renv subst e1 e2
       -- Ignore notes in both template and thing to be matched
@@ -714,15 +711,29 @@ match renv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
 
 match renv subst (Type ty1) (Type ty2)
   = match_ty renv subst ty1 ty2
+match renv subst (Coercion co1) (Coercion co2)
+  = match_co renv subst co1 co2
 
 match renv subst (Cast e1 co1) (Cast e2 co2)
-  = do	{ subst1 <- match_ty renv subst co1 co2
+  = do	{ subst1 <- match_co renv subst co1 co2
 	; match renv subst1 e1 e2 }
 
 -- Everything else fails
 match _ _ _e1 _e2 = -- pprTrace "Failing at" ((text "e1:" <+> ppr _e1) $$ (text "e2:" <+> ppr _e2)) $
                     Nothing
 
+-------------
+match_co :: RuleEnv
+      	 -> RuleSubst
+      	 -> Coercion
+      	 -> Coercion
+      	 -> Maybe RuleSubst
+match_co renv subst (CoVarCo cv) co
+  = match_var renv subst cv (Coercion co)
+match_co _ _ co1 _ 
+  = pprTrace "match_co baling out" (ppr co1) Nothing
+
+-------------
 rnMatchBndr2 :: RuleEnv -> RuleSubst -> Var -> Var -> RuleEnv
 rnMatchBndr2 renv subst x1 x2
   = renv { rv_lcl  = rnBndr2 rn_env x1 x2
@@ -1038,6 +1049,7 @@ ruleCheck :: RuleCheckEnv -> CoreExpr -> Bag SDoc
 ruleCheck _   (Var _) 	    = emptyBag
 ruleCheck _   (Lit _) 	    = emptyBag
 ruleCheck _   (Type _)      = emptyBag
+ruleCheck _   (Coercion _)  = emptyBag
 ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
 ruleCheck env (Note _ e)    = ruleCheck env e
 ruleCheck env (Cast e _)    = ruleCheck env e

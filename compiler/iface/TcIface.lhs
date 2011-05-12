@@ -21,6 +21,7 @@ import BuildTyCl
 import TcRnMonad
 import TcType
 import Type
+import Coercion
 import TypeRep
 import HscTypes
 import Annotations
@@ -39,7 +40,6 @@ import TyCon
 import DataCon
 import TysWiredIn
 import TysPrim		( anyTyConOfKind )
-import Var              ( Var, TyVar )
 import BasicTypes	( Arity, nonRuleLoopBreaker )
 import qualified Var
 import VarEnv
@@ -790,20 +790,56 @@ tcIfaceType (IfaceAppTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceTy
 tcIfaceType (IfaceFunTy t1 t2)    = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (FunTy t1' t2') }
 tcIfaceType (IfaceTyConApp tc ts) = do { tc' <- tcIfaceTyCon tc; ts' <- tcIfaceTypes ts; return (mkTyConApp tc' ts') }
 tcIfaceType (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' -> do { t' <- tcIfaceType t; return (ForAllTy tv' t') }
-tcIfaceType (IfacePredTy st)      = do { st' <- tcIfacePredType st; return (PredTy st') }
+tcIfaceType (IfacePredTy st)      = do { st' <- tcIfacePred tcIfaceType st; return (PredTy st') }
+tcIfaceType t@(IfaceCoConApp {})  = pprPanic "tcIfaceType" (ppr t)
 
 tcIfaceTypes :: [IfaceType] -> IfL [Type]
 tcIfaceTypes tys = mapM tcIfaceType tys
 
 -----------------------------------------
-tcIfacePredType :: IfacePredType -> IfL PredType
-tcIfacePredType (IfaceClassP cls ts) = do { cls' <- tcIfaceClass cls; ts' <- tcIfaceTypes ts; return (ClassP cls' ts') }
-tcIfacePredType (IfaceIParam ip t)   = do { ip' <- newIPName ip; t' <- tcIfaceType t; return (IParam ip' t') }
-tcIfacePredType (IfaceEqPred t1 t2)  = do { t1' <- tcIfaceType t1; t2' <- tcIfaceType t2; return (EqPred t1' t2') }
+tcIfacePred :: (IfaceType -> IfL a) -> IfacePredType -> IfL (Pred a)
+tcIfacePred tc (IfaceClassP cls ts)
+  = do { cls' <- tcIfaceClass cls; ts' <- mapM tc ts; return (ClassP cls' ts') }
+tcIfacePred tc (IfaceIParam ip t)
+  = do { ip' <- newIPName ip; t' <- tc t; return (IParam ip' t') }
+tcIfacePred tc (IfaceEqPred t1 t2)
+  = do { t1' <- tc t1; t2' <- tc t2; return (EqPred t1' t2') }
 
 -----------------------------------------
 tcIfaceCtxt :: IfaceContext -> IfL ThetaType
-tcIfaceCtxt sts = mapM tcIfacePredType sts
+tcIfaceCtxt sts = mapM (tcIfacePred tcIfaceType) sts
+\end{code}
+
+%************************************************************************
+%*									*
+			Coercions
+%*									*
+%************************************************************************
+
+\begin{code}
+tcIfaceCo :: IfaceType -> IfL Coercion
+tcIfaceCo (IfaceTyVar n)        = mkCoVarCo <$> tcIfaceCoVar n
+tcIfaceCo (IfaceAppTy t1 t2)    = mkAppCo <$> tcIfaceCo t1 <*> tcIfaceCo t2
+tcIfaceCo (IfaceFunTy t1 t2)    = mkFunCo <$> tcIfaceCo t1 <*> tcIfaceCo t2
+tcIfaceCo (IfaceTyConApp tc ts) = mkTyConAppCo <$> tcIfaceTyCon tc <*> mapM tcIfaceCo ts
+tcIfaceCo (IfaceCoConApp tc ts) = tcIfaceCoApp tc ts
+tcIfaceCo (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' ->
+                                  mkForAllCo tv' <$> tcIfaceCo t
+-- tcIfaceCo (IfacePredTy co)      = mkPredCo <$> tcIfacePred tcIfaceCo co
+tcIfaceCo (IfacePredTy _)      = panic "tcIfaceCo"
+
+tcIfaceCoApp :: IfaceCoCon -> [IfaceType] -> IfL Coercion
+tcIfaceCoApp IfaceReflCo    [t]     = Refl         <$> tcIfaceType t
+tcIfaceCoApp (IfaceCoAx n)  ts      = AxiomInstCo  <$> tcIfaceCoAxiom n <*> mapM tcIfaceCo ts
+tcIfaceCoApp IfaceUnsafeCo  [t1,t2] = UnsafeCo     <$> tcIfaceType t1 <*> tcIfaceType t2
+tcIfaceCoApp IfaceSymCo     [t]     = SymCo        <$> tcIfaceCo t
+tcIfaceCoApp IfaceTransCo   [t1,t2] = TransCo      <$> tcIfaceCo t1 <*> tcIfaceCo t2
+tcIfaceCoApp IfaceInstCo    [t1,t2] = InstCo       <$> tcIfaceCo t1 <*> tcIfaceType t2
+tcIfaceCoApp (IfaceNthCo d) [t]     = NthCo d      <$> tcIfaceCo t
+tcIfaceCoApp cc ts = pprPanic "toIfaceCoApp" (ppr cc <+> ppr ts)
+
+tcIfaceCoVar :: FastString -> IfL CoVar
+tcIfaceCoVar = tcIfaceLclId
 \end{code}
 
 
@@ -817,6 +853,12 @@ tcIfaceCtxt sts = mapM tcIfacePredType sts
 tcIfaceExpr :: IfaceExpr -> IfL CoreExpr
 tcIfaceExpr (IfaceType ty)
   = Type <$> tcIfaceType ty
+
+tcIfaceExpr (IfaceCo co)
+  = Coercion <$> tcIfaceCo co
+
+tcIfaceExpr (IfaceCast expr co)
+  = Cast <$> tcIfaceExpr expr <*> tcIfaceCo co
 
 tcIfaceExpr (IfaceLcl name)
   = Var <$> tcIfaceLclId name
@@ -852,7 +894,7 @@ tcIfaceExpr (IfaceLam bndr body)
 tcIfaceExpr (IfaceApp fun arg)
   = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
-tcIfaceExpr (IfaceCase scrut case_bndr ty alts)  = do
+tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     scrut' <- tcIfaceExpr scrut
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
@@ -867,8 +909,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr ty alts)  = do
 
     extendIfaceIdEnv [case_bndr'] $ do
      alts' <- mapM (tcIfaceAlt scrut' tc_app) alts
-     ty' <- tcIfaceType ty
-     return (Case scrut' case_bndr' ty' alts')
+     return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info) rhs) body)
   = do	{ name 	  <- newIfaceName (mkVarOccFS fs)
@@ -896,11 +937,6 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                                 (idName id) (idType id) info
           ; return (setIdInfo id id_info, rhs') }
-
-tcIfaceExpr (IfaceCast expr co) = do
-    expr' <- tcIfaceExpr expr
-    co' <- tcIfaceType co
-    return (Cast expr' co')
 
 tcIfaceExpr (IfaceNote note expr) = do
     expr' <- tcIfaceExpr expr
@@ -941,14 +977,13 @@ tcIfaceDataAlt :: DataCon -> [Type] -> [FastString] -> IfaceExpr
 tcIfaceDataAlt con inst_tys arg_strs rhs
   = do	{ us <- newUniqueSupply
 	; let uniqs = uniqsFromSupply us
-	; let (ex_tvs, co_tvs, arg_ids)
+	; let (ex_tvs, arg_ids)
 	              = dataConRepFSInstPat arg_strs uniqs con inst_tys
-              all_tvs = ex_tvs ++ co_tvs
 
-	; rhs' <- extendIfaceTyVarEnv all_tvs	$
+	; rhs' <- extendIfaceTyVarEnv ex_tvs	$
 		  extendIfaceIdEnv arg_ids	$
 		  tcIfaceExpr rhs
-	; return (DataAlt con, all_tvs ++ arg_ids, rhs') }
+	; return (DataAlt con, ex_tvs ++ arg_ids, rhs') }
 \end{code}
 
 
@@ -1215,6 +1250,10 @@ tcWiredInTyCon tc = do { ifCheckWiredInThing (ATyCon tc)
 tcIfaceClass :: Name -> IfL Class
 tcIfaceClass name = do { thing <- tcIfaceGlobal name
 		       ; return (tyThingClass thing) }
+
+tcIfaceCoAxiom :: Name -> IfL CoAxiom
+tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name
+		         ; return (tyThingCoAxiom thing) }
 
 tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name

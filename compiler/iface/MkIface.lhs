@@ -59,10 +59,10 @@ import Annotations
 import CoreSyn
 import CoreFVs
 import Class
+import Kind
 import TyCon
 import DataCon
 import Type
-import Coercion
 import TcType
 import InstEnv
 import FamInstEnv
@@ -1386,20 +1386,24 @@ tyThingToIfaceDecl (ATyCon tycon)
 	= IfCon   { ifConOcc   	 = getOccName (dataConName data_con),
 		    ifConInfix 	 = dataConIsInfix data_con,
 		    ifConWrapper = isJust (dataConWrapId_maybe data_con),
-		    ifConUnivTvs = toIfaceTvBndrs (dataConUnivTyVars data_con),
-		    ifConExTvs   = toIfaceTvBndrs (dataConExTyVars data_con),
-		    ifConEqSpec  = to_eq_spec (dataConEqSpec data_con),
-		    ifConCtxt    = toIfaceContext (dataConEqTheta data_con ++ dataConDictTheta data_con),
-		    ifConArgTys  = map toIfaceType (dataConOrigArgTys data_con),
+		    ifConUnivTvs = toIfaceTvBndrs univ_tvs,
+		    ifConExTvs   = toIfaceTvBndrs ex_tvs,
+		    ifConEqSpec  = to_eq_spec eq_spec,
+		    ifConCtxt    = toIfaceContext theta,
+		    ifConArgTys  = map toIfaceType arg_tys,
 		    ifConFields  = map getOccName 
 				       (dataConFieldLabels data_con),
 		    ifConStricts = dataConStrictMarks data_con }
+        where
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ty) | (tv,ty) <- spec]
 
     famInstToIface Nothing                    = Nothing
     famInstToIface (Just (famTyCon, instTys)) = 
       Just (toIfaceTyCon famTyCon, map toIfaceType instTys)
+
+tyThingToIfaceDecl c@(ACoAxiom _) = pprPanic "tyThingToIfaceDecl (ACoCon _)" (ppr c)
 
 tyThingToIfaceDecl (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
@@ -1565,6 +1569,8 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
 	-- construct the same ru_rough field as we have right now;
 	-- see tcIfaceRule
     do_arg (Type ty) = IfaceType (toIfaceType (deNoteType ty))
+    do_arg (Coercion co) = IfaceType (coToIfaceType co)
+                           
     do_arg arg       = toIfaceExpr arg
 
 	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
@@ -1584,15 +1590,16 @@ bogusIfaceRule id_name
 
 ---------------------
 toIfaceExpr :: CoreExpr -> IfaceExpr
-toIfaceExpr (Var v)       = toIfaceVar v
-toIfaceExpr (Lit l)       = IfaceLit l
-toIfaceExpr (Type ty)     = IfaceType (toIfaceType ty)
-toIfaceExpr (Lam x b)     = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
-toIfaceExpr (App f a)     = toIfaceApp f [a]
-toIfaceExpr (Case s x ty as) = IfaceCase (toIfaceExpr s) (getFS x) (toIfaceType ty) (map toIfaceAlt as)
-toIfaceExpr (Let b e)     = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)   = IfaceCast (toIfaceExpr e) (toIfaceType co)
-toIfaceExpr (Note n e)    = IfaceNote (toIfaceNote n) (toIfaceExpr e)
+toIfaceExpr (Var v)         = toIfaceVar v
+toIfaceExpr (Lit l)         = IfaceLit l
+toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
+toIfaceExpr (Coercion co)   = IfaceCo   (coToIfaceType co)
+toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
+toIfaceExpr (App f a)       = toIfaceApp f [a]
+toIfaceExpr (Case s x _ as) = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
+toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
+toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (coToIfaceType co)
+toIfaceExpr (Note n e)      = IfaceNote (toIfaceNote n) (toIfaceExpr e)
 
 ---------------------
 toIfaceNote :: Note -> IfaceNote

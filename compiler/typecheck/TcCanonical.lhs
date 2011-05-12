@@ -8,12 +8,13 @@ module TcCanonical(
 #include "HsVersions.h"
 
 import BasicTypes
-import Type
+import Id	( evVarPred )
+import TcErrors
 import TcRnTypes
 import FunDeps
 import qualified TcMType as TcM
 import TcType
-import TcErrors
+import Type
 import Coercion
 import Class
 import TyCon
@@ -112,29 +113,29 @@ flatten ctxt ty
 	-- We can tell if ty' is function-free by
 	-- whether there are any floated constraints
        ; if isEmptyCCan ccs then
-             return (ty, ty, emptyCCan)  
+             return (ty, mkReflCo ty, emptyCCan)
          else
              return (xi, co, ccs) }
 
 flatten _ v@(TyVarTy _)
-  = return (v, v, emptyCCan)
+  = return (v, mkReflCo v, emptyCCan)
 
 flatten ctxt (AppTy ty1 ty2)
   = do { (xi1,co1,c1) <- flatten ctxt ty1
        ; (xi2,co2,c2) <- flatten ctxt ty2
-       ; return (mkAppTy xi1 xi2, mkAppCoercion co1 co2, c1 `andCCan` c2) }
+       ; return (mkAppTy xi1 xi2, mkAppCo co1 co2, c1 `andCCan` c2) }
 
 flatten ctxt (FunTy ty1 ty2)
   = do { (xi1,co1,c1) <- flatten ctxt ty1
        ; (xi2,co2,c2) <- flatten ctxt ty2
-       ; return (mkFunTy xi1 xi2, mkFunCoercion co1 co2, c1 `andCCan` c2) }
+       ; return (mkFunTy xi1 xi2, mkFunCo co1 co2, c1 `andCCan` c2) }
 
 flatten fl (TyConApp tc tys)
   -- For a normal type constructor or data family application, we just
   -- recursively flatten the arguments.
   | not (isSynFamilyTyCon tc)
     = do { (xis,cos,ccs) <- flattenMany fl tys
-         ; return (mkTyConApp tc xis, mkTyConCoercion tc cos, ccs) }
+         ; return (mkTyConApp tc xis, mkTyConAppCo tc cos, ccs) }
 
   -- Otherwise, it's a type function application, and we have to
   -- flatten it away as well, and generate a new given equality constraint
@@ -148,7 +149,7 @@ flatten fl (TyConApp tc tys)
 		 -- in which case the remaining arguments should
 		 -- be dealt with by AppTys
                fam_ty = mkTyConApp tc xi_args 
-               fam_co = fam_ty -- identity 
+               fam_co = mkReflCo fam_ty -- identity
 
          ; (ret_co, rhs_var, ct) <- 
              if isGiven fl then
@@ -159,7 +160,7 @@ flatten fl (TyConApp tc tys)
                                        , cc_fun    = tc 
                                        , cc_tyargs = xi_args 
                                        , cc_rhs    = rhs_var }
-                  ; return $ (mkCoVarCoercion cv, rhs_var, ct) }
+                  ; return $ (mkCoVarCo cv, rhs_var, ct) }
              else -- Derived or Wanted: make a new *unification* flatten variable
                do { rhs_var <- newFlexiTcSTy (typeKind fam_ty)
                   ; cv <- newCoVar fam_ty rhs_var
@@ -169,11 +170,13 @@ flatten fl (TyConApp tc tys)
                                        , cc_fun = tc
                                        , cc_tyargs = xi_args
                                        , cc_rhs    = rhs_var }
-                  ; return $ (mkCoVarCoercion cv, rhs_var, ct) }
+                  ; return $ (mkCoVarCo cv, rhs_var, ct) }
 
          ; return ( foldl AppTy rhs_var xi_rest
-                  , foldl AppTy (mkSymCoercion ret_co 
-                                    `mkTransCoercion` mkTyConCoercion tc cos_args) cos_rest
+                  , foldl mkAppCo
+                          (mkSymCo ret_co
+                            `mkTransCo` mkTyConAppCo tc cos_args)
+                          cos_rest
                   , ccs `extendCCans` ct) }
 
 
@@ -193,22 +196,20 @@ flatten ctxt ty@(ForAllTy {})
              tv_set   = mkVarSet tvs
        ; unless (isEmptyBag bad_eqs)
                 (flattenForAllErrorTcS ctxt ty bad_eqs)
-       ; return (mkForAllTys tvs rho', mkForAllTys tvs co, ccs)  }
+       ; return (mkForAllTys tvs rho', foldr mkForAllCo co tvs, ccs)  }
 
 ---------------
 flattenPred :: CtFlavor -> TcPredType -> TcS (TcPredType, Coercion, CanonicalCts)
 flattenPred ctxt (ClassP cls tys)
   = do { (tys', cos, ccs) <- flattenMany ctxt tys
-       ; return (ClassP cls tys', mkClassPPredCo cls cos, ccs) }
+       ; return (ClassP cls tys', mkPredCo $ ClassP cls cos, ccs) }
 flattenPred ctxt (IParam nm ty)
   = do { (ty', co, ccs) <- flatten ctxt ty
-       ; return (IParam nm ty', mkIParamPredCo nm co, ccs) }
--- TODO: Handling of coercions between EqPreds must be revisited once the New Coercion API is ready!
+       ; return (IParam nm ty', mkPredCo $ IParam nm co, ccs) }
 flattenPred ctxt (EqPred ty1 ty2)
   = do { (ty1', co1, ccs1) <- flatten ctxt ty1
        ; (ty2', co2, ccs2) <- flatten ctxt ty2
-       ; return (EqPred ty1' ty2', mkEqPredCo co1 co2, ccs1 `andCCan` ccs2) }
-
+       ; return (EqPred ty1' ty2', mkPredCo $ EqPred co1 co2, ccs1 `andCCan` ccs2) }
 \end{code}
 
 %************************************************************************
@@ -249,14 +250,14 @@ canClassToWorkList :: CtFlavor -> EvVar -> Class -> [TcType] -> TcS WorkList
 canClassToWorkList fl v cn tys 
   = do { (xis,cos,ccs) <- flattenMany fl tys  -- cos :: xis ~ tys
        ; let no_flattening_happened = isEmptyCCan ccs
-             dict_co = mkTyConCoercion (classTyCon cn) cos
+             dict_co = mkTyConAppCo (classTyCon cn) cos
        ; v_new <- if no_flattening_happened then return v
                   else if isGiven fl        then return v
                          -- The cos are all identities if fl=Given,
                          -- hence nothing to do
                   else do { v' <- newDictVar cn xis  -- D xis
                           ; when (isWanted fl) $ setDictBind v  (EvCast v' dict_co)
-                          ; when (isGiven fl)  $ setDictBind v' (EvCast v (mkSymCoercion dict_co))
+                          ; when (isGiven fl)  $ setDictBind v' (EvCast v (mkSymCo dict_co))
                                  -- NB: No more setting evidence for derived now 
                           ; return v' }
 
@@ -391,9 +392,9 @@ canEqToWorkList fl cv ty1 ty2 = do { cts <- canEq fl cv ty1 ty2
 
 canEq :: CtFlavor -> EvVar -> Type -> Type -> TcS CanonicalCts 
 canEq fl cv ty1 ty2 
-  | tcEqType ty1 ty2	-- Dealing with equality here avoids
+  | eqType ty1 ty2	-- Dealing with equality here avoids
     	     	 	-- later spurious occurs checks for a~a
-  = do { when (isWanted fl) (setCoBind cv ty1)
+  = do { when (isWanted fl) (setCoBind cv (mkReflCo ty1))
        ; return emptyCCan }
 
 -- If one side is a variable, orient and flatten, 
@@ -407,47 +408,6 @@ canEq fl cv ty1 ty2@(TyVarTy {})
        ; canEqLeaf untch fl cv (classify ty1) (classify ty2) }
       -- NB: don't use VarCls directly because tv1 or tv2 may be scolems!
 
-canEq fl cv (TyConApp fn tys) ty2 
-  | isSynFamilyTyCon fn, length tys == tyConArity fn
-  = do { untch <- getUntouchables 
-       ; canEqLeaf untch fl cv (FunCls fn tys) (classify ty2) }
-canEq fl cv ty1 (TyConApp fn tys)
-  | isSynFamilyTyCon fn, length tys == tyConArity fn
-  = do { untch <- getUntouchables 
-       ; canEqLeaf untch fl cv (classify ty1) (FunCls fn tys) }
-
-canEq fl cv s1 s2
-  | Just (t1a,t1b,t1c) <- splitCoPredTy_maybe s1, 
-    Just (t2a,t2b,t2c) <- splitCoPredTy_maybe s2
-  = do { (v1,v2,v3) 
-             <- if isWanted fl then                   -- Wanted
-                    do { v1 <- newCoVar t1a t2a
-                       ; v2 <- newCoVar t1b t2b 
-                       ; v3 <- newCoVar t1c t2c 
-                       ; let res_co = mkCoPredCo (mkCoVarCoercion v1) 
-                                        (mkCoVarCoercion v2) (mkCoVarCoercion v3)
-                       ; setCoBind cv res_co
-                       ; return (v1,v2,v3) }
-                else if isGiven fl then               -- Given 
-                         let co_orig = mkCoVarCoercion cv 
-                             coa = mkCsel1Coercion co_orig
-                             cob = mkCsel2Coercion co_orig
-                             coc = mkCselRCoercion co_orig
-                         in do { v1 <- newGivenCoVar t1a t2a coa
-                               ; v2 <- newGivenCoVar t1b t2b cob
-                               ; v3 <- newGivenCoVar t1c t2c coc 
-                               ; return (v1,v2,v3) }
-                else                                  -- Derived 
-                    do { v1 <- newDerivedId (EqPred t1a t2a)
-                       ; v2 <- newDerivedId (EqPred t1b t2b)
-                       ; v3 <- newDerivedId (EqPred t1c t2c)
-                       ; return (v1,v2,v3) }
-       ; cc1 <- canEq fl v1 t1a t2a 
-       ; cc2 <- canEq fl v2 t1b t2b 
-       ; cc3 <- canEq fl v3 t1c t2c 
-       ; return (cc1 `andCCan` cc2 `andCCan` cc3) }
-
-
 -- Split up an equality between function types into two equalities.
 canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
   = do { (argv, resv) <- 
@@ -455,11 +415,11 @@ canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
                  do { argv <- newCoVar s1 s2 
                     ; resv <- newCoVar t1 t2 
                     ; setCoBind cv $ 
-                      mkFunCoercion (mkCoVarCoercion argv) (mkCoVarCoercion resv) 
+                      mkFunCo (mkCoVarCo argv) (mkCoVarCo resv) 
                     ; return (argv,resv) } 
 
              else if isGiven fl then 
-                      let [arg,res] = decomposeCo 2 (mkCoVarCoercion cv) 
+                      let [arg,res] = decomposeCo 2 (mkCoVarCo cv) 
                       in do { argv <- newGivenCoVar s1 s2 arg 
                             ; resv <- newGivenCoVar t1 t2 res
                             ; return (argv,resv) } 
@@ -473,33 +433,17 @@ canEq fl cv (FunTy s1 t1) (FunTy s2 t2)
        ; cc2 <- canEq fl resv t1 t2
        ; return (cc1 `andCCan` cc2) }
 
-canEq fl cv (PredTy (IParam n1 t1)) (PredTy (IParam n2 t2))
-  | n1 == n2
-  = if isWanted fl then 
-        do { v <- newCoVar t1 t2 
-           ; setCoBind cv $ mkIParamPredCo n1 (mkCoVarCoercion cv)
-           ; canEq fl v t1 t2 } 
-    else return emptyCCan -- DV: How to decompose given IP coercions? 
-
-canEq fl cv (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2))
-  | c1 == c2
-  = if isWanted fl then 
-       do { vs <- zipWithM newCoVar tys1 tys2 
-          ; setCoBind cv $ mkClassPPredCo c1 (map mkCoVarCoercion vs) 
-          ; andCCans <$> zipWith3M (canEq fl) vs tys1 tys2
-          }
-    else return emptyCCan 
-  -- How to decompose given dictionary (and implicit parameter) coercions? 
-  -- You may think that the following is right: 
-  --    let cos = decomposeCo (length tys1) (mkCoVarCoercion cv) 
-  --    in  zipWith3M newGivOrDerCoVar tys1 tys2 cos
-  -- But this assumes that the coercion is a type constructor-based 
-  -- coercion, and not a PredTy (ClassP cn cos) coercion. So we chose
-  -- to not decompose these coercions. We have to get back to this 
-  -- when we clean up the Coercion API.
+canEq fl cv (TyConApp fn tys) ty2 
+  | isSynFamilyTyCon fn, length tys == tyConArity fn
+  = do { untch <- getUntouchables 
+       ; canEqLeaf untch fl cv (FunCls fn tys) (classify ty2) }
+canEq fl cv ty1 (TyConApp fn tys)
+  | isSynFamilyTyCon fn, length tys == tyConArity fn
+  = do { untch <- getUntouchables 
+       ; canEqLeaf untch fl cv (classify ty1) (FunCls fn tys) }
 
 canEq fl cv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-  | isAlgTyCon tc1 && isAlgTyCon tc2
+  | isDecomposableTyCon tc1 && isDecomposableTyCon tc2
   , tc1 == tc2
   , length tys1 == length tys2
   = -- Generate equalities for each of the corresponding arguments
@@ -507,11 +451,11 @@ canEq fl cv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
              <- if isWanted fl then
                     do { argsv <- zipWithM newCoVar tys1 tys2
                        ; setCoBind cv $ 
-                         mkTyConCoercion tc1 (map mkCoVarCoercion argsv)
+                         mkTyConAppCo tc1 (map mkCoVarCo argsv)
                        ; return argsv } 
 
                 else if isGiven fl then 
-                    let cos = decomposeCo (length tys1) (mkCoVarCoercion cv) 
+                    let cos = decomposeCo (length tys1) (mkCoVarCo cv) 
                     in zipWith3M newGivenCoVar tys1 tys2 cos
 
                 else -- Derived 
@@ -524,28 +468,24 @@ canEq fl cv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 canEq fl cv ty1 ty2
   | Just (s1,t1) <- tcSplitAppTy_maybe ty1
   , Just (s2,t2) <- tcSplitAppTy_maybe ty2
-    = do { (cv1,cv2) <- 
-             if isWanted fl 
-             then do { cv1 <- newCoVar s1 s2 
-                     ; cv2 <- newCoVar t1 t2 
-                     ; setCoBind cv $ 
-                       mkAppCoercion (mkCoVarCoercion cv1) (mkCoVarCoercion cv2) 
-                     ; return (cv1,cv2) } 
+    = if isWanted fl 
+      then do { cv1 <- newCoVar s1 s2 
+              ; cv2 <- newCoVar t1 t2 
+              ; setCoBind cv $ 
+                mkAppCo (mkCoVarCo cv1) (mkCoVarCo cv2) 
+              ; cc1 <- canEq fl cv1 s1 s2 
+              ; cc2 <- canEq fl cv2 t1 t2 
+              ; return (cc1 `andCCan` cc2) } 
 
-             else if isGiven fl then 
-                    let co1 = mkLeftCoercion  $ mkCoVarCoercion cv 
-                        co2 = mkRightCoercion $ mkCoVarCoercion cv
-                    in do { cv1 <- newGivenCoVar s1 s2 co1 
-                          ; cv2 <- newGivenCoVar t1 t2 co2 
-                          ; return (cv1,cv2) } 
-             else -- Derived
-                 do { cv1 <- newDerivedId (EqPred s1 s2)
-                    ; cv2 <- newDerivedId (EqPred t1 t2)
-                    ; return (cv1,cv2) }
-
-         ; cc1 <- canEq fl cv1 s1 s2 
-         ; cc2 <- canEq fl cv2 t1 t2 
-         ; return (cc1 `andCCan` cc2) } 
+      else if isDerived fl 
+      then do { cv1 <- newDerivedId (EqPred s1 s2)
+              ; cv2 <- newDerivedId (EqPred t1 t2)
+              ; cc1 <- canEq fl cv1 s1 s2 
+              ; cc2 <- canEq fl cv2 t1 t2 
+              ; return (cc1 `andCCan` cc2) } 
+      
+      else return emptyCCan    -- We cannot decompose given applications
+      	   	  	       -- because we no longer have 'left' and 'right'
 
 canEq fl cv s1@(ForAllTy {}) s2@(ForAllTy {})
  | tcIsForAllTy s1, tcIsForAllTy s2, 
@@ -749,10 +689,10 @@ canEqLeaf _untch fl cv cls1 cls2
   | cls1 `re_orient` cls2
   = do { cv' <- if isWanted fl 
                 then do { cv' <- newCoVar s2 s1 
-                        ; setCoBind cv $ mkSymCoercion (mkCoVarCoercion cv') 
+                        ; setCoBind cv $ mkSymCo (mkCoVarCo cv') 
                         ; return cv' } 
                 else if isGiven fl then 
-                         newGivenCoVar s2 s1 (mkSymCoercion (mkCoVarCoercion cv))
+                         newGivenCoVar s2 s1 (mkSymCo (mkCoVarCo cv))
                 else -- Derived
                     newDerivedId (EqPred s2 s1)
        ; canEqLeafOriented fl cv' cls2 s1 }
@@ -790,11 +730,11 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys1) s2         -- cv : F tys1
                          do { cv' <- newCoVar (unClassify (FunCls fn xis1)) xi2
                                  -- cv' : F xis ~ xi2
                             ; let -- fun_co :: F xis1 ~ F tys1
-                                 fun_co = mkTyConCoercion fn cos1
+                                 fun_co = mkTyConAppCo fn cos1
                                  -- want_co :: F tys1 ~ s2
-                                 want_co = mkSymCoercion fun_co
-                                           `mkTransCoercion` mkCoVarCoercion cv'
-                                           `mkTransCoercion` co2
+                                 want_co = mkSymCo fun_co
+                                           `mkTransCo` mkCoVarCo cv'
+                                           `mkTransCo` co2
                             ; setCoBind cv  want_co
                             ; return cv' }
                    else -- Derived 
@@ -834,7 +774,7 @@ canEqLeafTyVarLeft fl cv tv s2       -- cv : tv ~ s2
                    else if isGiven fl        then return cv
                    else if isWanted fl then 
                          do { cv' <- newCoVar (mkTyVarTy tv) xi2'  -- cv' : tv ~ xi2
-                            ; setCoBind cv  (mkCoVarCoercion cv' `mkTransCoercion` co)
+                            ; setCoBind cv  (mkCoVarCo cv' `mkTransCo` co)
                             ; return cv' }
                    else -- Derived
                        newDerivedId (EqPred (mkTyVarTy tv) xi2')
@@ -898,7 +838,7 @@ expandAway tv (FunTy ty1 ty2)
 expandAway tv ty@(ForAllTy {}) 
   = let (tvs,rho) = splitForAllTys ty
         tvs_knds  = map tyVarKind tvs 
-    in if tv `elemVarSet` tyVarsOfTypes tvs_knds then 
+    in if tv `elemVarSet` tyVarsOfTypes tvs_knds then
        -- Can't expand away the kinds unless we create 
        -- fresh variables which we don't want to do at this point.
            Nothing 
@@ -1064,8 +1004,8 @@ instFunDepEqn fl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
     push_ctx loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
 
     do_one subst (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
-       = do { let sty1 = substTy subst ty1
-                  sty2 = substTy subst ty2
+       = do { let sty1 = Type.substTy subst ty1
+                  sty2 = Type.substTy subst ty2
             ; ev <- newCoVar sty1 sty2
             ; return (i, mkEvVarX ev fl') }
 
@@ -1077,8 +1017,8 @@ rewriteDictParams param_eqs tys
   where
     do_one :: Type -> Int -> (Type,Coercion)
     do_one ty n = case lookup n param_eqs of
-                    Just wev -> (get_fst_ty wev, mkCoVarCoercion (evVarOf wev))
-                    Nothing  -> (ty,ty)		-- Identity
+                    Just wev -> (get_fst_ty wev, mkCoVarCo (evVarOf wev))
+                    Nothing  -> (ty,             mkReflCo ty)	-- Identity
 
     get_fst_ty wev = case evVarOfPred wev of
                           EqPred ty1 _ -> ty1

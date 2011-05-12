@@ -100,6 +100,7 @@ matching by looking for strict arguments of the correct type.
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
 wwExpr e@(Type {}) = return e
+wwExpr e@(Coercion {}) = return e
 wwExpr e@(Lit  {}) = return e
 wwExpr e@(Var  {}) = return e
 

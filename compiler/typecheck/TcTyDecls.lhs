@@ -356,8 +356,8 @@ tcTyConsOfType ty
      go (FunTy a b)                = go a `plusNameEnv` go b
      go (PredTy (IParam _ ty))     = go ty
      go (PredTy (ClassP cls tys))  = go_tc (classTyCon cls) tys
+     go (PredTy (EqPred ty1 ty2))  = go ty1 `plusNameEnv` go ty2
      go (ForAllTy _ ty)            = go ty
-     go _                          = panic "tcTyConsOfType"
 
      go_tc tc tys = extendNameEnv (go_s tys) (tyConName tc) tc
      go_s tys = foldr (plusNameEnv . go) emptyNameEnv tys

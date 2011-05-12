@@ -7,7 +7,8 @@ TcTyClsDecls: Typecheck type and class declarations
 
 \begin{code}
 module TcTyClsDecls (
-	tcTyAndClassDecls, tcFamInstDecl, mkRecSelBinds
+	tcTyAndClassDecls, kcDataDecl, tcConDecls, mkRecSelBinds,
+        checkValidTyCon, dataDeclChecks, badFamInstDecl
     ) where
 
 #include "HsVersions.h"
@@ -135,188 +136,6 @@ zipRecTyClss decls_s rec_things
       where
         name = tcdName decl
         Just (ATyCon tc) = lookupTypeEnv rec_type_env name
-\end{code}
-
-
-%************************************************************************
-%*									*
-               Type checking family instances
-%*									*
-%************************************************************************
-
-Family instances are somewhat of a hybrid.  They are processed together with
-class instance heads, but can contain data constructors and hence they share a
-lot of kinding and type checking code with ordinary algebraic data types (and
-GADTs).
-
-\begin{code}
-tcFamInstDecl :: TopLevelFlag -> LTyClDecl Name -> TcM TyThing
-tcFamInstDecl top_lvl (L loc decl)
-  =	-- Prime error recovery, set source location
-    setSrcSpan loc				$
-    tcAddDeclCtxt decl				$
-    do { -- type family instances require -XTypeFamilies
-	 -- and can't (currently) be in an hs-boot file
-       ; type_families <- xoptM Opt_TypeFamilies
-       ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
-       ; checkTc type_families $ badFamInstDecl (tcdLName decl)
-       ; checkTc (not is_boot) $ badBootFamInstDeclErr
-
-	 -- Perform kind and type checking
-       ; tc <- tcFamInstDecl1 decl
-       ; checkValidTyCon tc	-- Remember to check validity;
-				-- no recursion to worry about here
-
-       -- Check that toplevel type instances are not for associated types.
-       ; when (isTopLevel top_lvl && isAssocFamily tc)
-              (addErr $ assocInClassErr (tcdName decl))
-
-       ; return (ATyCon tc) }
-
-isAssocFamily :: TyCon -> Bool	-- Is an assocaited type
-isAssocFamily tycon
-  = case tyConFamInst_maybe tycon of
-          Nothing       -> panic "isAssocFamily: no family?!?"
-          Just (fam, _) -> isTyConAssoc fam
-
-assocInClassErr :: Name -> SDoc
-assocInClassErr name
- = ptext (sLit "Associated type") <+> quotes (ppr name) <+>
-   ptext (sLit "must be inside a class instance")
-
-
-
-tcFamInstDecl1 :: TyClDecl Name -> TcM TyCon
-
-  -- "type instance"
-tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
-  = kcIdxTyPats decl $ \k_tvs k_typats resKind family ->
-    do { -- check that the family declaration is for a synonym
-         checkTc (isFamilyTyCon family) (notFamily family)
-       ; checkTc (isSynTyCon family) (wrongKindOfFamily family)
-
-       ; -- (1) kind check the right-hand side of the type equation
-       ; k_rhs <- kcCheckLHsType (tcdSynRhs decl) (EK resKind EkUnk)
-       	       	  -- ToDo: the ExpKind could be better
-
-         -- we need the exact same number of type parameters as the family
-         -- declaration 
-       ; let famArity = tyConArity family
-       ; checkTc (length k_typats == famArity) $ 
-           wrongNumberOfParmsErr famArity
-
-         -- (2) type check type equation
-       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
-       ; t_typats <- mapM tcHsKindedType k_typats
-       ; t_rhs    <- tcHsKindedType k_rhs
-
-         -- (3) check the well-formedness of the instance
-       ; checkValidTypeInst t_typats t_rhs
-
-         -- (4) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName tc_name t_typats loc
-       ; buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
-                       (typeKind t_rhs) 
-                       NoParentTyCon (Just (family, t_typats))
-       }}
-
-  -- "newtype instance" and "data instance"
-tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
-			     tcdCons = cons})
-  = kcIdxTyPats decl $ \k_tvs k_typats resKind fam_tycon ->
-    do { -- check that the family declaration is for the right kind
-         checkTc (isFamilyTyCon fam_tycon) (notFamily fam_tycon)
-       ; checkTc (isAlgTyCon fam_tycon) (wrongKindOfFamily fam_tycon)
-
-       ; -- (1) kind check the data declaration as usual
-       ; k_decl <- kcDataDecl decl k_tvs
-       ; let k_ctxt = tcdCtxt k_decl
-	     k_cons = tcdCons k_decl
-
-         -- result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr (tyConArity fam_tycon)
-
-         -- (2) type check indexed data type declaration
-       ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
-       ; unbox_strict <- doptM Opt_UnboxStrictFields
-
-         -- kind check the type indexes and the context
-       ; t_typats     <- mapM tcHsKindedType k_typats
-       ; stupid_theta <- tcHsKindedContext k_ctxt
-
-         -- (3) Check that
-         --     (a) left-hand side contains no type family applications
-         --         (vanilla synonyms are fine, though, and we checked for
-         --         foralls earlier)
-       ; mapM_ checkTyFamFreeness t_typats
-
-	 -- Check that we don't use GADT syntax in H98 world
-       ; gadt_ok <- xoptM Opt_GADTs
-       ; checkTc (gadt_ok || consUseH98Syntax cons) (badGadtDecl tc_name)
-
-	 --     (b) a newtype has exactly one constructor
-       ; checkTc (new_or_data == DataType || isSingleton k_cons) $
-	         newtypeConError tc_name (length k_cons)
-
-         -- (4) construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName tc_name t_typats loc
-       ; let ex_ok = True	-- Existentials ok for type families!
-       ; fixM (\ rep_tycon -> do 
-	     { let orig_res_ty = mkTyConApp fam_tycon t_typats
-	     ; data_cons <- tcConDecls unbox_strict ex_ok rep_tycon
-				       (t_tvs, orig_res_ty) k_cons
-	     ; tc_rhs <-
-		 case new_or_data of
-		   DataType -> return (mkDataTyConRhs data_cons)
-		   NewType  -> ASSERT( not (null data_cons) )
-			       mkNewTyConRhs rep_tc_name rep_tycon (head data_cons)
-	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
-			     h98_syntax NoParentTyCon (Just (fam_tycon, t_typats))
-                 -- We always assume that indexed types are recursive.  Why?
-                 -- (1) Due to their open nature, we can never be sure that a
-                 -- further instance might not introduce a new recursive
-                 -- dependency.  (2) They are always valid loop breakers as
-                 -- they involve a coercion.
-	     })
-       }}
-       where
-	 h98_syntax = case cons of 	-- All constructors have same shape
-			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
-			_ -> True
-
-tcFamInstDecl1 d = pprPanic "tcFamInstDecl1" (ppr d)
-
--- Kind checking of indexed types
--- -
-
--- Kind check type patterns and kind annotate the embedded type variables.
---
--- * Here we check that a type instance matches its kind signature, but we do
---   not check whether there is a pattern for each type index; the latter
---   check is only required for type synonym instances.
-
-kcIdxTyPats :: TyClDecl Name
-	    -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TyCon -> TcM a)
-	       -- ^^kinded tvs         ^^kinded ty pats  ^^res kind
-	    -> TcM a
-kcIdxTyPats decl thing_inside
-  = kcHsTyVars (tcdTyVars decl) $ \tvs -> 
-    do { let tc_name = tcdLName decl
-       ; fam_tycon <- tcLookupLocatedTyCon tc_name
-       ; let { (kinds, resKind) = splitKindFunTys (tyConKind fam_tycon)
-	     ; hs_typats	= fromJust $ tcdTyPats decl }
-
-         -- we may not have more parameters than the kind indicates
-       ; checkTc (length kinds >= length hs_typats) $
-	   tooManyParmsErr (tcdLName decl)
-
-         -- type functions can have a higher-kinded result
-       ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
-       ; typats <- zipWithM kcCheckLHsType hs_typats 
-       	 	   	    [ EK kind (EkArg (ppr tc_name) n) 
-                            | (kind,n) <- kinds `zip` [1..]]
-       ; thing_inside tvs typats resultKind fam_tycon
-       }
 \end{code}
 
 
@@ -666,34 +485,17 @@ tcTyClDecl1 _parent calc_isrec
   ; let final_tvs = tvs' ++ extra_tvs
   ; stupid_theta <- tcHsKindedContext ctxt
   ; unbox_strict <- doptM Opt_UnboxStrictFields
-  ; empty_data_decls <- xoptM Opt_EmptyDataDecls
   ; kind_signatures <- xoptM Opt_KindSignatures
   ; existential_ok <- xoptM Opt_ExistentialQuantification
   ; gadt_ok      <- xoptM Opt_GADTs
-  ; gadtSyntax_ok <- xoptM Opt_GADTSyntax
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
   ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
-
-	-- Check that we don't use GADT syntax in H98 world
-  ; checkTc (gadtSyntax_ok || h98_syntax) (badGadtDecl tc_name)
 
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc (kind_signatures || isNothing mb_ksig) (badSigTyDecl tc_name)
 
-	-- Check that the stupid theta is empty for a GADT-style declaration
-  ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
+  ; dataDeclChecks tc_name new_or_data stupid_theta cons
 
-	-- Check that a newtype has exactly one constructor
-	-- Do this before checking for empty data decls, so that
-	-- we don't suggest -XEmptyDataDecls for newtypes
-  ; checkTc (new_or_data == DataType || isSingleton cons) 
-	    (newtypeConError tc_name (length cons))
-
-	-- Check that there's at least one condecl,
-	-- or else we're reading an hs-boot file, or -XEmptyDataDecls
-  ; checkTc (not (null cons) || empty_data_decls || is_boot)
-	    (emptyConDeclsErr tc_name)
-    
   ; tycon <- fixM (\ tycon -> do 
 	{ let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
 	; data_cons <- tcConDecls unbox_strict ex_ok 
@@ -750,6 +552,29 @@ tcTyClDecl1 _ _
 
 tcTyClDecl1 _ _ d = pprPanic "tcTyClDecl1" (ppr d)
 
+dataDeclChecks :: Name -> NewOrData -> ThetaType -> [LConDecl Name] -> TcM ()
+dataDeclChecks tc_name new_or_data stupid_theta cons
+  = do {   -- Check that we don't use GADT syntax in H98 world
+         gadtSyntax_ok <- xoptM Opt_GADTSyntax
+       ; let h98_syntax = consUseH98Syntax cons
+       ; checkTc (gadtSyntax_ok || h98_syntax) (badGadtDecl tc_name)
+
+	   -- Check that the stupid theta is empty for a GADT-style declaration
+       ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
+
+	-- Check that a newtype has exactly one constructor
+	-- Do this before checking for empty data decls, so that
+	-- we don't suggest -XEmptyDataDecls for newtypes
+      ; checkTc (new_or_data == DataType || isSingleton cons) 
+	        (newtypeConError tc_name (length cons))
+
+ 	-- Check that there's at least one condecl,
+	-- or else we're reading an hs-boot file, or -XEmptyDataDecls
+      ; empty_data_decls <- xoptM Opt_EmptyDataDecls
+      ; is_boot <- tcIsHsBoot	-- Are we compiling an hs-boot file?
+      ; checkTc (not (null cons) || empty_data_decls || is_boot)
+                (emptyConDeclsErr tc_name) }
+    
 -----------------------------------
 tcConDecls :: Bool -> Bool -> TyCon -> ([TyVar], Type)
 	   -> [LConDecl Name] -> TcM [DataCon]
@@ -1102,14 +927,14 @@ checkNewDataCon con
 		-- One argument
 	; checkTc (null eq_spec) (newtypePredError con)
 		-- Return type is (T a b c)
-	; checkTc (null ex_tvs && null eq_theta && null dict_theta) (newtypeExError con)
+	; checkTc (null ex_tvs && null theta) (newtypeExError con)
 		-- No existentials
 	; checkTc (not (any isBanged (dataConStrictMarks con))) 
 		  (newtypeStrictError con)
 		-- No strictness
     }
   where
-    (_univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _res_ty) = dataConFullSig con
+    (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig con
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -1502,39 +1327,6 @@ badFamInstDecl tc_name
   = vcat [ ptext (sLit "Illegal family instance for") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
-
-tooManyParmsErr :: Located Name -> SDoc
-tooManyParmsErr tc_name
-  = ptext (sLit "Family instance has too many parameters:") <+> 
-    quotes (ppr tc_name)
-
-tooFewParmsErr :: Arity -> SDoc
-tooFewParmsErr arity
-  = ptext (sLit "Family instance has too few parameters; expected") <+> 
-    ppr arity
-
-wrongNumberOfParmsErr :: Arity -> SDoc
-wrongNumberOfParmsErr exp_arity
-  = ptext (sLit "Number of parameters must match family declaration; expected")
-    <+> ppr exp_arity
-
-badBootFamInstDeclErr :: SDoc
-badBootFamInstDeclErr
-  = ptext (sLit "Illegal family instance in hs-boot file")
-
-notFamily :: TyCon -> SDoc
-notFamily tycon
-  = vcat [ ptext (sLit "Illegal family instance for") <+> quotes (ppr tycon)
-         , nest 2 $ parens (ppr tycon <+> ptext (sLit "is not an indexed type family"))]
-  
-wrongKindOfFamily :: TyCon -> SDoc
-wrongKindOfFamily family
-  = ptext (sLit "Wrong category of family instance; declaration was for a")
-    <+> kindOfFamily
-  where
-    kindOfFamily | isSynTyCon family = ptext (sLit "type synonym")
-		 | isAlgTyCon family = ptext (sLit "data type")
-		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
 emptyConDeclsErr :: Name -> SDoc
 emptyConDeclsErr tycon

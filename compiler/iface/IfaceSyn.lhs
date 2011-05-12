@@ -227,12 +227,13 @@ data IfaceExpr
   = IfaceLcl    IfLclName
   | IfaceExt    IfExtName
   | IfaceType   IfaceType
-  | IfaceTuple  Boxity [IfaceExpr]              -- Saturated; type arguments omitted
-  | IfaceLam    IfaceBndr IfaceExpr
-  | IfaceApp    IfaceExpr IfaceExpr
-  | IfaceCase   IfaceExpr IfLclName IfaceType [IfaceAlt]
-  | IfaceLet    IfaceBinding  IfaceExpr
-  | IfaceNote   IfaceNote IfaceExpr
+  | IfaceCo     IfaceType		-- We re-use IfaceType for coercions
+  | IfaceTuple 	Boxity [IfaceExpr]	-- Saturated; type arguments omitted
+  | IfaceLam 	IfaceBndr IfaceExpr
+  | IfaceApp 	IfaceExpr IfaceExpr
+  | IfaceCase	IfaceExpr IfLclName [IfaceAlt]
+  | IfaceLet	IfaceBinding  IfaceExpr
+  | IfaceNote	IfaceNote IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit    Literal
   | IfaceFCall  ForeignCall IfaceType
@@ -588,6 +589,7 @@ pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
 pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
+pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceType co
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (interpp'SP as)
@@ -600,17 +602,17 @@ pprIfaceExpr add_par i@(IfaceLam _ _)
     collect bs (IfaceLam b e) = collect (b:bs) e
     collect bs e              = (reverse bs, e)
 
-pprIfaceExpr add_par (IfaceCase scrut bndr ty [(con, bs, rhs)])
-  = add_par (sep [ptext (sLit "case") <+> char '@' <+> pprParendIfaceType ty
-                        <+> pprIfaceExpr noParens scrut <+> ptext (sLit "of")
-                        <+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
-                  pprIfaceExpr noParens rhs <+> char '}'])
+pprIfaceExpr add_par (IfaceCase scrut bndr [(con, bs, rhs)])
+  = add_par (sep [ptext (sLit "case") 
+			<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
+			<+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
+  		  pprIfaceExpr noParens rhs <+> char '}'])
 
-pprIfaceExpr add_par (IfaceCase scrut bndr ty alts)
-  = add_par (sep [ptext (sLit "case") <+> char '@' <+> pprParendIfaceType ty
-                        <+> pprIfaceExpr noParens scrut <+> ptext (sLit "of")
-                        <+> ppr bndr <+> char '{',
-                  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
+pprIfaceExpr add_par (IfaceCase scrut bndr alts)
+  = add_par (sep [ptext (sLit "case") 
+		 	<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
+			<+> ppr bndr <+> char '{',
+  		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
 pprIfaceExpr _       (IfaceCast expr co)
   = sep [pprParendIfaceExpr expr,
@@ -786,6 +788,8 @@ freeNamesIfType (IfaceTyConApp tc ts) =
 freeNamesIfType (IfaceForAllTy tv t)  =
    freeNamesIfTvBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
+freeNamesIfType (IfaceCoConApp tc ts) = 
+   freeNamesIfCo tc &&& fnList freeNamesIfType ts
 
 freeNamesIfTvBndrs :: [IfaceTvBndr] -> NameSet
 freeNamesIfTvBndrs = fnList freeNamesIfTvBndr
@@ -828,16 +832,16 @@ freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)      = unitNameSet v
 freeNamesIfExpr (IfaceFCall _ ty) = freeNamesIfType ty
 freeNamesIfExpr (IfaceType ty)    = freeNamesIfType ty
+freeNamesIfExpr (IfaceCo co)      = freeNamesIfType co
 freeNamesIfExpr (IfaceTuple _ as) = fnList freeNamesIfExpr as
 freeNamesIfExpr (IfaceLam b body) = freeNamesIfBndr b &&& freeNamesIfExpr body
 freeNamesIfExpr (IfaceApp f a)    = freeNamesIfExpr f &&& freeNamesIfExpr a
 freeNamesIfExpr (IfaceCast e co)  = freeNamesIfExpr e &&& freeNamesIfType co
 freeNamesIfExpr (IfaceNote _n r)  = freeNamesIfExpr r
 
-freeNamesIfExpr (IfaceCase s _ ty alts)
-  = freeNamesIfExpr s
+freeNamesIfExpr (IfaceCase s _ alts)
+  = freeNamesIfExpr s 
     &&& fnList fn_alt alts &&& fn_cons alts
-    &&& freeNamesIfType ty
   where
     fn_alt (_con,_bs,r) = freeNamesIfExpr r
 
@@ -862,6 +866,10 @@ freeNamesIfTc :: IfaceTyCon -> NameSet
 freeNamesIfTc (IfaceTc tc) = unitNameSet tc
 -- ToDo: shouldn't we include IfaceIntTc & co.?
 freeNamesIfTc _ = emptyNameSet
+
+freeNamesIfCo :: IfaceCoCon -> NameSet
+freeNamesIfCo (IfaceCoAx tc) = unitNameSet tc
+freeNamesIfCo _ = emptyNameSet
 
 freeNamesIfRule :: IfaceRule -> NameSet
 freeNamesIfRule (IfaceRule { ifRuleBndrs = bs, ifRuleHead = f

@@ -33,7 +33,6 @@ import Vectorise.Builtins
 import CoreSyn
 import CoreUtils
 import Type
-import Var
 import Control.Monad
 
 
@@ -47,7 +46,7 @@ collectAnnTypeArgs expr = go expr []
 collectAnnTypeBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
 collectAnnTypeBinders expr = go [] expr
   where
-    go bs (_, AnnLam b e) | isTyCoVar b = go (b:bs) e
+    go bs (_, AnnLam b e) | isTyVar b = go (b:bs) e
     go bs e                           = (reverse bs, e)
 
 collectAnnValBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)

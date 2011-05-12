@@ -271,8 +271,8 @@ improveFromAnother pred1@(ClassP cls1 tys1, _) pred2@(ClassP cls2 tys2, _)
     , fd <- cls_fds
     , let (ltys1, rs1)  = instFD         fd cls_tvs tys1
           (ltys2, irs2) = instFD_WithPos fd cls_tvs tys2
-    , tcEqTypes ltys1 ltys2		-- The LHSs match
-    , let eqs = zipAndComputeFDEqs tcEqType rs1 irs2
+    , eqTypes ltys1 ltys2		-- The LHSs match
+    , let eqs = zipAndComputeFDEqs eqType rs1 irs2
     , not (null eqs) ]
 
 improveFromAnother _ _ = []
@@ -386,7 +386,7 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
                     fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' irs2'
                         -- Don't discard anything! 
                         -- We could discard equal types but it's an overkill to call 
-                        -- tcEqType again, since we know for sure that /at least one/ 
+                        -- eqType again, since we know for sure that /at least one/ 
                         -- equation in there is useful)
 
 		    qtvs' = filterVarSet (`notElemTvSubst` subst) qtvs

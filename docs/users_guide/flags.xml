@@ -2247,6 +2247,12 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-to-file</option></entry>
+	      <entry>Dump to files instead of stdout</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-asm</option></entry>
 	      <entry>Dump assembly</entry>
 	      <entry>dynamic</entry>

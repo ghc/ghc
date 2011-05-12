@@ -64,23 +64,14 @@ import TysPrim
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
+import DataCon          ( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
+import Var
+import TyCon
+import TypeRep
 import RdrName
 import Name
-import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
-import Var
-import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
-			  mkTupleTyCon, mkAlgTyCon, tyConName,
-			  TyConParent(NoParentTyCon) )
-
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, HsBang(..) )
-
-import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys,
-			  TyThing(..) )
-import Coercion         ( unsafeCoercionTyCon, symCoercionTyCon,
-                          transCoercionTyCon, leftCoercionTyCon, 
-                          rightCoercionTyCon, instCoercionTyCon )
-import TypeRep          ( mkArrowKinds, liftedTypeKind, ubxTupleKind )
-import Unique		( incrUnique, mkTupleTyConUnique,
+import BasicTypes       ( Arity, RecFlag(..), Boxity(..), isBoxed, HsBang(..) )
+import Unique           ( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
 import Data.Array
 import FastString
@@ -124,12 +115,6 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
     	      , intTyCon
     	      , listTyCon
 	      , parrTyCon
-              , unsafeCoercionTyCon
-              , symCoercionTyCon
-              , transCoercionTyCon
-              , leftCoercionTyCon
-              , rightCoercionTyCon
-              , instCoercionTyCon
     	      ]
 \end{code}
 
@@ -607,5 +592,3 @@ mkPArrFakeCon arity  = data_con
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
-
-

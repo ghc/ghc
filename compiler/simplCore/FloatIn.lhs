@@ -126,14 +126,15 @@ fiExpr :: FloatingBinds		-- Binds we're trying to drop
        -> CoreExprWithFVs	-- Input expr
        -> CoreExpr		-- Result
 
-fiExpr to_drop (_, AnnVar v) = mkCoLets' to_drop (Var v)
-
-fiExpr to_drop (_, AnnType ty) = ASSERT( null to_drop )
-				 Type ty
-fiExpr to_drop (_, AnnCast expr co)
-  = Cast (fiExpr to_drop expr) co	-- Just float in past coercion
-
-fiExpr _ (_, AnnLit lit) = Lit lit
+fiExpr to_drop (_, AnnLit lit)     = ASSERT( null to_drop ) Lit lit
+fiExpr to_drop (_, AnnType ty)     = ASSERT( null to_drop ) Type ty
+fiExpr to_drop (_, AnnVar v)       = mkCoLets' to_drop (Var v)
+fiExpr to_drop (_, AnnCoercion co) = mkCoLets' to_drop (Coercion co)
+fiExpr to_drop (_, AnnCast expr (fvs_co, co))
+  = mkCoLets' (drop_here ++ co_drop) $
+    Cast (fiExpr e_drop expr) co
+  where
+    [drop_here, e_drop, co_drop] = sepBindsByDropPoint False [freeVarsOf expr, fvs_co] to_drop
 \end{code}
 
 Applications: we do float inside applications, mainly because we
@@ -198,7 +199,7 @@ fiExpr to_drop lam@(_, AnnLam _ _)
 
     go seen_one_shot_id [] = seen_one_shot_id
     go seen_one_shot_id (b:bs)
-      | isTyCoVar       b = go seen_one_shot_id bs
+      | isTyVar       b = go seen_one_shot_id bs
       | isOneShotBndr b = go True bs
       | otherwise       = False	 -- Give up at a non-one-shot Id
 \end{code}

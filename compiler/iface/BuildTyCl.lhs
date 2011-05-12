@@ -99,8 +99,8 @@ mkFamInstParentInfo :: Name -> [TyVar]
 mkFamInstParentInfo tc_name tvs (family, instTys) rep_tycon
   = do { -- Create the coercion
        ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
-       ; let co_tycon = mkFamInstCoercion co_tycon_name tvs
-                                        family instTys rep_tycon
+       ; let co_tycon = mkFamInstCo co_tycon_name tvs
+                                    family instTys rep_tycon
        ; return $ FamInstTyCon family instTys co_tycon }
     
 ------------------------------------------------------
@@ -126,23 +126,15 @@ mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 --   because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con 
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
-	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon etad_tvs etad_rhs
-              cocon_maybe | all_coercions || isRecursiveTyCon tycon 
-		          = Just co_tycon
-                	  | otherwise              
-                	  = Nothing
-	; traceIf (text "mkNewTyConRhs" <+> ppr cocon_maybe)
+	; let co_tycon = mkNewTypeCo co_tycon_name tycon etad_tvs etad_rhs
+	; traceIf (text "mkNewTyConRhs" <+> ppr co_tycon)
 	; return (NewTyCon { data_con    = con, 
 		       	     nt_rhs      = rhs_ty,
 		       	     nt_etad_rhs = (etad_tvs, etad_rhs),
- 		       	     nt_co 	 = cocon_maybe } ) }
+ 		       	     nt_co 	 = co_tycon } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
   where
-        -- If all_coercions is True then we use coercions for all newtypes
-        -- otherwise we use coercions for recursive newtypes and look through
-        -- non-recursive newtypes
-    all_coercions = True
     tvs    = tyConTyVars tycon
     inst_con_ty = applyTys (dataConUserType con) (mkTyVarTys tvs)
     rhs_ty = ASSERT( isFunTy inst_con_ty ) funArgTy inst_con_ty
@@ -155,7 +147,7 @@ mkNewTyConRhs tycon_name tycon con
   	-- has a single argument (Foo a) that is a *type class*, so
 	-- dataConInstOrigArgTys returns [].
 
-    etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCoercion can
+    etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCo can
     etad_rhs :: Type	-- return a TyCon without pulling on rhs_ty
 			-- See Note [Tricky iface loop] in LoadIface
     (etad_tvs, etad_rhs) = eta_reduce (reverse tvs) rhs_ty

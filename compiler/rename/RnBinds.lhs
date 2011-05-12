@@ -457,7 +457,7 @@ rnBind :: (Name -> [Name])		-- Signature tyvar function
 rnBind _ trim (L loc bind@(PatBind { pat_lhs = pat
                                    , pat_rhs = grhss 
                                       -- pat fvs were stored in bind_fvs
-                                      -- after processing the LHS          
+                                      -- after processing the LHS
                                    , bind_fvs = pat_fvs }))
   = setSrcSpan loc $ 
     do	{ let bndrs = collectPatBinders pat
@@ -477,7 +477,7 @@ rnBind sig_fn trim
                             , fun_infix = is_infix 
                             , fun_matches = matches })) 
        -- invariant: no free vars here when it's a FunBind
-  = setSrcSpan loc $ 
+  = setSrcSpan loc $
     do	{ let plain_name = unLoc name
 
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
