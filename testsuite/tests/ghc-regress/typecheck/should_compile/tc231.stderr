@@ -16,7 +16,7 @@ TYPE CONSTRUCTORS
       = Z :: forall a. a -> Z a Stricts: _
       FamilyInstance: none
 COERCION AXIOMS
-  coercion ShouldCompile.NTCo:T:Zork [s, a, b]
+  axiom ShouldCompile.NTCo:T:Zork [s, a, b]
     :: ShouldCompile.T:Zork s a b
          ~
        (forall chain. Q s a chain -> ST s ())
