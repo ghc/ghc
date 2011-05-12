@@ -16,13 +16,8 @@ _result :: a
 Stopped at <exception thrown>
 _exception :: e
 already at the beginning of the history
-_exception = SomeException (GHC.Exception.D:Exception _
-                                                      (GHC.Show.D:Show _ _ _) _ _)
-                           (ErrorCall ['f','o','o'])
-_exception ::
-  SomeException = SomeException (GHC.Exception.D:Exception _
-                                                           (GHC.Show.D:Show ...) ....)
-                                (ErrorCall ['f',....])
+_exception = SomeException (ErrorCall "foo")
+_exception :: SomeException = SomeException (ErrorCall "foo")
 _result :: a = _
 *** Exception: foo
 *** Exception: foo

@@ -2,5 +2,5 @@ test :: Integer = _
 test = 0
 test :: Integer = 0
 test :: [Char] = _
-test = ['t','e','s','t']
-test :: [Char] = ['t','e','s','t']
+test = "test"
+test :: [Char] = "test"

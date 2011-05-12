@@ -4,14 +4,19 @@ TYPE SIGNATURES
            Q s (Z [Char]) chain -> ST s ()
     s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
 TYPE CONSTRUCTORS
-    data Q s a chain
-        RecFlag NonRecursive
-        = Node :: forall s a chain. s -> a -> chain -> Q s a chain
-              Stricts: _ _ _
-        FamilyInstance: none
-    data Z a
-        RecFlag NonRecursive
-        = Z :: forall a. a -> Z a Stricts: _
-        FamilyInstance: none
+  data Q s a chain
+      RecFlag NonRecursive
+      = Node :: forall s a chain. s -> a -> chain -> Q s a chain
+            Stricts: _ _ _
+      FamilyInstance: none
+  data Z a
+      RecFlag NonRecursive
+      = Z :: forall a. a -> Z a Stricts: _
+      FamilyInstance: none
+COERCION AXIOMS
+  axiom ShouldCompile.NTCo:T:Zork [s, a, b]
+    :: ShouldCompile.T:Zork s a b
+         ~
+       (forall chain. Q s a chain -> ST s ())
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]

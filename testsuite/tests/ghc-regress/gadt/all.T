@@ -70,7 +70,7 @@ test('karl2', normal, compile, [''])
 test('data1', normal, compile, [''])
 test('data2', normal, compile, [''])
 
-test('termination', normal, compile, [''])
+test('termination', expect_broken(1999), compile, [''])
 test('set', normal, compile, [''])
 test('scoped', normal, compile, [''])
 test('gadt-escape1', normal, compile, [''])
@@ -91,7 +91,7 @@ test('Session', normal, compile_and_run, [''])
 test('CasePrune', normal, compile_and_run, [''])
 
 test('T1999', normal, compile, [''])
-test('T1999a', normal, compile, [''])
+test('T1999a', expect_broken(1999), compile, [''])
 
 test('T2587', normal, compile, [''])
 test('T2040', normal, compile, [''])
