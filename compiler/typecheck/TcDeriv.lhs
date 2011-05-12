@@ -327,17 +327,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
         -- from each type declaration, so this is emptyBag
 	; gen_binds <- return emptyBag -- mkGenericBinds is_boot tycl_decls
 	
-{-
-	 -- Generate the Generic instances
-         -- from each type declaration
-        ; repInstsMeta <- genGenericAlls is_boot tycl_decls
-	
-	; let repInsts   = concat (map (\(a,_,_) -> a) repInstsMeta)
-	      repMetaTys = map (\(_,b,_) -> b) repInstsMeta
-	      repTyCons  = map (\(_,_,c) -> c) repInstsMeta
--}
 	; (inst_info, rn_binds, rn_dus)
-                <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ concat metaInsts {- ++ repInsts -})
+                <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ concat metaInsts)
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
@@ -413,22 +404,6 @@ renameDeriv is_boot gen_binds insts
 	where
 	  (tyvars,_, clas,_) = instanceHead inst
 	  clas_nm            = className clas
-
------------------------------------------
-{- Now unused 
-mkGenericBinds :: Bool -> [LTyClDecl Name] -> TcM (LHsBinds RdrName)
-mkGenericBinds is_boot tycl_decls
-  | is_boot 
-  = return emptyBag
-  | otherwise
-  = do	{ tcs <- mapM tcLookupTyCon [ tcdName d 
-    	      	      		    | L _ d <- tycl_decls, isDataDecl d ]
-	; return (unionManyBags [ mkTyConGenericBinds tc
-				| tc <- tcs, tyConHasGenerics tc ]) }
-		-- We are only interested in the data type declarations,
-		-- and then only in the ones whose 'has-generics' flag is on
-		-- The predicate tyConHasGenerics finds both of these
--}
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -460,19 +435,6 @@ stored in NewTypeDerived.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 
 \begin{code}
-{-
--- Make the EarlyDerivSpec for Generic
-mkGenDerivSpec :: TyCon -> TcRn (EarlyDerivSpec)
-mkGenDerivSpec tc = do
-        { cls           <- tcLookupClass genClassName
-        ; let tc_tvs    = tyConTyVars tc
-        ; let tc_app    = mkTyConApp tc (mkTyVarTys tc_tvs)
-        ; let cls_tys   = []
-        ; let mtheta    = Just []
-        ; ds <- mkEqnHelp StandAloneDerivOrigin tc_tvs cls cls_tys tc_app mtheta
-        -- JPM TODO: StandAloneDerivOrigin?...
-        ; return ds }
--}
 -- Make the "extras" for the generic representation
 mkGenDerivExtras :: TyCon 
                  -> TcRn (MetaTyCons, TyCon, [(InstInfo RdrName, DerivAuxBinds)])
@@ -488,17 +450,21 @@ makeDerivSpecs :: Bool
 	       -> TcM ( [EarlyDerivSpec]
                       , [(MetaTyCons, TyCon, [(InstInfo RdrName, DerivAuxBinds)])])
 makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
-  | is_boot 	-- No 'deriving' at all in hs-boot files
-  = do	{ mapM_ add_deriv_err deriv_locs 
-	; return ([],[]) }
+  | is_boot     -- No 'deriving' at all in hs-boot files
+  = do  { mapM_ add_deriv_err deriv_locs 
+        ; return ([],[]) }
   | otherwise
-  = do	{ eqns1 <- mapAndRecoverM deriveTyData all_tydata
-	; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
-        -- Generate EarlyDerivSpec's for Generic, if asked for
-	-- ; (xGenerics, xDerRep) <- genericsFlags
-	; xDerRep <- genericsFlag
-	; let allTyNames = [ tcdName d | L _ d <- tycl_decls, isDataDecl d ]
-        -- ; allTyDecls <- mapM tcLookupTyCon allTyNames
+  = do  { eqns1 <- mapAndRecoverM deriveTyData all_tydata
+        ; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
+
+        -- Generic representation stuff: we might need to add some "extras"
+        -- to the instances
+        ; xDerRep <- getDOpts >>= return . xopt Opt_DeriveGeneric
+        ; generic_extras_deriv <- if not xDerRep
+                                   -- No extras if the flag is off
+                                   then (return [])
+                                    else do {
+          let allTyNames = [ tcdName d | L _ d <- tycl_decls, isDataDecl d ]
         -- Select only those types that derive Generic
         ; let sel_tydata = [ tcdName t | (L _ c, L _ t) <- all_tydata
                                        , getClassName c == Just genClassName ]
@@ -510,23 +476,10 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
                                   (sel_tydata ++ sel_deriv_decls)) allTyNames
         -- We need to generate the extras to add to what has
         -- already been derived
-        ; generic_extras_deriv <- mapM mkGenDerivExtras derTyDecls
-        -- For the remaining types, if Generics is on, we need to
-        -- generate both the instances and the extras, but only for the
-        -- types we can represent.
-{-
-        ; let repTyDecls = filter canDoGenerics allTyDecls
-        ; let remTyDecls = filter (\x -> not (x `elem` derTyDecls)) repTyDecls
-        ; generic_instances    <- if xGenerics
-                                   then mapM mkGenDerivSpec   remTyDecls
-                                    else return []
-        ; generic_extras_flag  <- if xGenerics
-                                   then mapM mkGenDerivExtras remTyDecls
-                                    else return []
--}
-        -- Merge and return everything
-	; return ( eqns1 ++ eqns2 -- ++ generic_instances
-                 , generic_extras_deriv {- ++ generic_extras_flag -}) }
+        ; mapM mkGenDerivExtras derTyDecls }
+
+        -- Merge and return
+        ; return ( eqns1 ++ eqns2, generic_extras_deriv) }
   where
       -- We need extras if the flag DeriveGeneric is on and this type is 
       -- deriving Generic
@@ -548,20 +501,15 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
       = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
 
     all_tydata :: [(LHsType Name, LTyClDecl Name)]
-	-- Derived predicate paired with its data type declaration
+        -- Derived predicate paired with its data type declaration
     all_tydata = extractTyDataPreds (instDeclATs inst_decls ++ tycl_decls)
 
     deriv_locs = map (getLoc . snd) all_tydata
-		 ++ map getLoc deriv_decls
+                 ++ map getLoc deriv_decls
 
     add_deriv_err loc = setSrcSpan loc $
-			addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
-				   2 (ptext (sLit "Use an instance declaration instead")))
-
-genericsFlag :: TcM Bool
-genericsFlag = do dOpts <- getDOpts
-                  return (  xopt Opt_Generics            dOpts
-                         || xopt Opt_DeriveGeneric dOpts)
+                        addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
+                                   2 (ptext (sLit "Use an instance declaration instead")))
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM EarlyDerivSpec
@@ -991,12 +939,7 @@ no_cons_why :: TyCon -> SDoc
 no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+> 
 		     ptext (sLit "must have at least one data constructor")
 
--- JPM TODO: should give better error message
 cond_RepresentableOk :: Condition
-{-
-cond_RepresentableOk (_,t) | canDoGenerics t = Nothing
-                           | otherwise       = Just (ptext (sLit "Cannot derive Generic for type") <+> ppr t)
--}
 cond_RepresentableOk (_,t) = canDoGenerics t
 
 cond_enumOrProduct :: Condition
