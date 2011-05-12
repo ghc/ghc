@@ -11,7 +11,7 @@ import Supercompile.Utilities
 
 import CoreSubst
 import Coercion (CvSubstEnv, isCoVar, mkCoVarCo)
-import qualified CoreSyn as CoreSyn (Expr(Var))
+import qualified CoreSyn as CoreSyn (CoreExpr, Expr(Var, Cast))
 import Type     (mkTyVarTy)
 import Var      (CoVar, TyVar, isTyVar)
 import VarEnv
@@ -59,27 +59,30 @@ mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv
   where (tv_list, coid_list) = partition isTyVar (varSetElems fvs)
         (co_list, id_list)   = partition isCoVar coid_list
 
-coercedVarToCoreSyn :: Var -> CoreSyn.Expr
-coercedVarToCoreSyn x' = CoreSyn.Var x'
+varToCoreSyn :: Var -> CoreSyn.CoreExpr
+varToCoreSyn x' = CoreSyn.Var x'
 
-coreSynToCoercedVar :: CoreSyn.Expr -> Var
-coreSynToCoercedVar (CoreSyn.Var x') = x'
-coreSynToCoercedVar e                = panic "renome" (ppr e)
+coreSynToVar :: CoreSyn.CoreExpr -> Var
+coreSynToVar (CoreSyn.Var x') = x'
+coreSynToVar e                = panic "renome" (ppr e)
 
 insertRenaming :: Renaming -> Var -> Var -> Renaming
-insertRenaming (id_subst, tv_subst, co_subst) x x' = (extendVarEnv id_subst x (coercedVarToCoreSyn x'), tv_subst, co_subst)
+insertRenaming (id_subst, tv_subst, co_subst) x x' = (extendVarEnv id_subst x (varToCoreSyn x'), tv_subst, co_subst)
 
 insertRenamings :: Renaming -> [(Var, Var)] -> Renaming
-insertRenamings (id_subst, tv_subst, co_subst) xxs = (extendVarEnvList id_subst $ map (second coercedVarToCoreSyn) xxs, tv_subst, co_subst)
+insertRenamings (id_subst, tv_subst, co_subst) xxs = (extendVarEnvList id_subst $ map (second varToCoreSyn) xxs, tv_subst, co_subst)
 
 insertTypeSubst :: Renaming -> TyVar -> Type -> Renaming
 insertTypeSubst (id_subst, tv_subst, co_subst) x ty' = (id_subst, extendVarEnv tv_subst x ty', co_subst)
 
+insertTypeSubsts :: Renaming -> [(TyVar, Type)] -> Renaming
+insertTypeSubsts (id_subst, tv_subst, co_subst) xtys = (id_subst, extendVarEnvList tv_subst xtys, co_subst)
+
 insertCoercionSubst :: Renaming -> CoVar -> Coercion -> Renaming
 insertCoercionSubst (id_subst, tv_subst, co_subst) x co' = (id_subst, tv_subst, extendVarEnv co_subst x co')
 
-rename :: Renaming -> Var -> Coerced (Out Var)
-rename rn = coreSynToCoercedVar . lookupIdSubst (text "rename") (joinSubst emptyInScopeSet rn)
+rename :: Renaming -> Var -> Out Var
+rename rn = coreSynToVar . lookupIdSubst (text "rename") (joinSubst emptyInScopeSet rn)
 
 
 type In a = (Renaming, a)
@@ -90,7 +93,7 @@ inFreeVars :: (a -> FreeVars) -> In a -> FreeVars
 inFreeVars thing_fvs (rn, thing) = renameFreeVars rn (thing_fvs thing)
 
 renameFreeVars :: Renaming -> FreeVars -> FreeVars
-renameFreeVars rn = concatMapVarSet (coercedFreeVars unitVarSet . rename rn)
+renameFreeVars rn = mapVarSet (rename rn)
 
 renameType :: InScopeSet -> Renaming -> Type -> Type
 renameType iss rn = substTy (joinSubst iss rn)
@@ -151,7 +154,7 @@ mkRename rec = (term, alternatives, value, value')
         where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
       Lambda x e -> Lambda x' (term ids' rn' e)
         where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
-      Data dc xs -> Data dc (map (rename rn) xs)
+      Data dc tys xs -> Data dc (map (renameType ids rn) tys) (map (rename rn) xs)
       Literal l -> Literal l
     
     alternatives ids rn = map (alternative ids rn)

@@ -296,6 +296,14 @@ listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs
 bagContexts :: [a] -> [(a, [a])]
 bagContexts xs = [(x, is ++ ts) | (is, x, ts) <- listContexts xs]
 
+takeWhileJust :: (a -> Maybe b) -> [a] -> ([b], [a])
+takeWhileJust f = go
+  where
+    go [] = ([], [])
+    go (x:xs) = case f x of
+        Nothing -> ([], x:xs)
+        Just y  -> first (y:) $ go xs
+
 
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.
 --

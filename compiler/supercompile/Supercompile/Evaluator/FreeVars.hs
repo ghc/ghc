@@ -3,7 +3,7 @@ module Supercompile.Evaluator.FreeVars (
     inFreeVars,
     heapBindingFreeVars,
     pureHeapBoundVars, stackBoundVars, stackFrameBoundVars, stackFrameFreeVars,
-    pureHeapVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
+    pureHeapVars, unnormalisedStateFreeVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
     module Supercompile.Core.FreeVars
   ) where
 
@@ -46,10 +46,13 @@ stackFrameOpenFreeVars kf = case kf of
 
 
 -- | Computes the variables bound and free in a state
-stateVars :: (Heap, Stack, In (Anned a)) -> (HowBound -> BoundVars, FreeVars)
+unnormalisedStateVars :: UnnormalisedState -> (HowBound -> BoundVars, FreeVars)
+stateVars :: State -> (HowBound -> BoundVars, FreeVars)
 pureHeapVars :: PureHeap -> (HowBound -> BoundVars, FreeVars)
-(stateVars, pureHeapVars) = (\(Heap h _, k, in_e) -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars k (inFreeVars annedFreeVars in_e)),
-                             \h -> finish $ pureHeapOpenFreeVars h (emptyVarSet, emptyVarSet))
+(unnormalisedStateVars, stateVars, pureHeapVars)
+  = (\(_, Heap h _, k, in_e) -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars k (inFreeVars annedFreeVars in_e)),
+     \(_, Heap h _, k, a)    -> finish $ pureHeapOpenFreeVars h (stackOpenFreeVars k (annedFreeVars a)),
+     \h -> finish $ pureHeapOpenFreeVars h (emptyVarSet, emptyVarSet))
   where
     finish ((bvs_internal, bvs_lambda, bvs_let), fvs) = (\how -> case how of InternallyBound -> bvs_internal; LambdaBound -> bvs_lambda; LetBound -> bvs_let, fvs)
     
@@ -65,22 +68,26 @@ pureHeapVars :: PureHeap -> (HowBound -> BoundVars, FreeVars)
 
 
 -- | Returns (an overapproximation of) the free variables that the state would have if it were residualised right now (i.e. variables bound by phantom bindings *are* in the free vars set)
-stateFreeVars :: (Heap, Stack, In (Anned a)) -> FreeVars
+stateFreeVars :: State -> FreeVars
 stateFreeVars s = fvs `minusVarSet` bvs InternallyBound
   where (bvs, fvs) = stateVars s
 
-stateAllFreeVars :: (Heap, Stack, In (Anned a)) -> FreeVars
+unnormalisedStateFreeVars :: UnnormalisedState -> FreeVars
+unnormalisedStateFreeVars s = fvs `minusVarSet` bvs InternallyBound
+  where (bvs, fvs) = unnormalisedStateVars s
+
+stateAllFreeVars :: State -> FreeVars
 stateAllFreeVars = snd . stateVars
 
-stateLetBounders :: (Heap, Stack, In (Anned a)) -> BoundVars
+stateLetBounders :: State -> BoundVars
 stateLetBounders = ($ LetBound) . fst . stateVars
 
-stateLambdaBounders :: (Heap, Stack, In (Anned a)) -> BoundVars
+stateLambdaBounders :: State -> BoundVars
 stateLambdaBounders = ($ LambdaBound) . fst . stateVars
 
-stateInternalBounders :: (Heap, Stack, In (Anned a)) -> BoundVars
+stateInternalBounders :: State -> BoundVars
 stateInternalBounders = ($ InternallyBound) . fst . stateVars
 
-stateUncoveredVars :: (Heap, Stack, In (Anned a)) -> FreeVars
+stateUncoveredVars :: State -> FreeVars
 stateUncoveredVars s = fvs `minusVarSet` bvs InternallyBound `minusVarSet` bvs LetBound `minusVarSet` bvs LambdaBound
   where (bvs, fvs) = stateVars s

@@ -31,7 +31,6 @@ module UniqSet (
         intersectUniqSets,
         foldUniqSet,
         mapUniqSet,
-        concatMapUniqSet,
         elementOfUniqSet,
         elemUniqSet_Directly,
         filterUniqSet,
@@ -72,7 +71,6 @@ intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 
 foldUniqSet :: (a -> b -> b) -> b -> UniqSet a -> b
 mapUniqSet :: (a -> b) -> UniqSet a -> UniqSet b
-concatMapUniqSet :: (a -> UniqSet b) -> UniqSet a -> UniqSet b
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
 elemUniqSet_Directly :: Unique -> UniqSet a -> Bool
 filterUniqSet :: (a -> Bool) -> UniqSet a -> UniqSet a
@@ -112,7 +110,6 @@ intersectUniqSets = intersectUFM
 
 foldUniqSet = foldUFM
 mapUniqSet = mapUFM
-concatMapUniqSet = concatMapUFM
 elementOfUniqSet = elemUFM
 elemUniqSet_Directly = elemUFM_Directly
 filterUniqSet = filterUFM

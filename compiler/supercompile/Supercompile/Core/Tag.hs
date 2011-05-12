@@ -37,11 +37,11 @@ mkTagger rec = term
         Cast e co        -> Cast (term ids e) co
 
     value' ids v = case v of
-        Indirect x   -> Indirect x
-        TyLambda x e -> TyLambda x (term ids e)
-        Lambda x e   -> Lambda x (term ids e)
-        Data dc xs   -> Data dc xs
-        Literal l    -> Literal l
+        Indirect x     -> Indirect x
+        TyLambda x e   -> TyLambda x (term ids e)
+        Lambda x e     -> Lambda x (term ids e)
+        Data dc tys xs -> Data dc tys xs
+        Literal l      -> Literal l
 
     alternatives = zipWith alternative . listSplitUniqSupply
     
@@ -75,10 +75,10 @@ mkDetag rec = (term, term', alternatives, value, value')
         Cast e co        -> Cast (term e) co
 
     value = rec value'
-    value' (Indirect x)   = Indirect x
-    value' (TyLambda x e) = TyLambda x (term e)
-    value' (Lambda x e)   = Lambda x (term e)
-    value' (Data dc xs)   = Data dc xs
-    value' (Literal l)    = Literal l
+    value' (Indirect x)     = Indirect x
+    value' (TyLambda x e)   = TyLambda x (term e)
+    value' (Lambda x e)     = Lambda x (term e)
+    value' (Data dc tys xs) = Data dc tys xs
+    value' (Literal l)      = Literal l
 
     alternatives = map (second term)

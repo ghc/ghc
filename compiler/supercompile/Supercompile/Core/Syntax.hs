@@ -73,7 +73,7 @@ type AltF ann = (AltCon, ann (TermF ann))
 
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-data ValueF ann = Indirect Var | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Var] | Literal Literal
+data ValueF ann = Indirect Var | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Type] [Var] | Literal Literal
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
@@ -117,14 +117,14 @@ pPrintPrecLetRec prec xes e_body
 
 instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
     pprPrec prec v = case v of
-        Indirect x    -> pPrintPrec prec x
-        TyLambda x e  -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
+        Indirect x     -> pPrintPrec prec x
+        TyLambda x e   -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
         -- Unfortunately, this nicer pretty-printing doesn't work for general (TermF ann):
-        --Lambda x e    -> pPrintPrecLam prec (x:xs) e'
+        --Lambda x e     -> pPrintPrecLam prec (x:xs) e'
         --  where (xs, e') = collectLambdas e
-        Lambda x e    -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
-        Data dc xs    -> pPrintPrecApps prec (PrettyFunction $ \prec -> pPrintPrec prec dc) xs
-        Literal l     -> pPrintPrec prec l
+        Lambda x e     -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
+        Data dc tys xs -> pPrintPrecApps prec (PrettyFunction (flip pPrintPrec dc)) ([PrettyFunction (flip pPrintPrec ty) | ty <- tys] ++ [PrettyFunction (flip pPrintPrec x) | x <- xs])
+        Literal l      -> pPrintPrec prec l
 
 pPrintPrecLam :: Outputable a => Rational -> [Var] -> a -> SDoc
 pPrintPrecLam prec xs e = prettyParen (prec > noPrec) $ text "\\" <> hsep [pPrintPrec appPrec y | y <- xs] <+> text "->" <+> pPrintPrec noPrec e
@@ -165,7 +165,7 @@ termToVar e = case extract e of
     _                  -> Nothing -- FIXME: cast things as well
 
 
-type Coerced a = (Maybe (Out Coercion, Tag), a)
+type Coerced a = (Maybe (Coercion, Tag), a)
 
 
 class Functor ann => Symantics ann where
@@ -205,11 +205,11 @@ reflect (I e) = case e of
   where
     reflectValue :: Value -> (forall ann. Symantics ann => ValueF ann)
     reflectValue v = case v of
-        Indirect x   -> Indirect x
-        TyLambda x e -> TyLambda x (reflect e)
-        Lambda x e   -> Lambda x (reflect e)
-        Data dc xs   -> Data dc xs
-        Literal l    -> Literal l
+        Indirect x     -> Indirect x
+        TyLambda x e   -> TyLambda x (reflect e)
+        Lambda x e     -> Lambda x (reflect e)
+        Data dc tys xs -> Data dc tys xs
+        Literal l      -> Literal l
 
 
 {-

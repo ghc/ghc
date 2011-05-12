@@ -52,7 +52,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
         Indirect _   -> 0
         TyLambda _ e -> term e
         Lambda _ e   -> term e
-        Data _ _     -> 0
+        Data _ _ _   -> 0
         Literal _    -> 0
     
     alternatives = sum . map alternative

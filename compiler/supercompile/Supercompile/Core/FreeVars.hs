@@ -52,11 +52,11 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
     
     value = rec value'
-    value' (Indirect x)   = idFreeVars x
-    value' (TyLambda x e) = term e `delVarSet` x
-    value' (Lambda x e)   = term e `delVarSet` x
-    value' (Data _ xs)    = unionVarSets $ map idFreeVars xs
-    value' (Literal _)    = emptyVarSet
+    value' (Indirect x)    = idFreeVars x
+    value' (TyLambda x e)  = term e `delVarSet` x
+    value' (Lambda x e)    = term e `delVarSet` x
+    value' (Data _ tys xs) = unionVarSets $ map typ tys ++ map idFreeVars xs
+    value' (Literal _)     = emptyVarSet
     
     alternatives = unionVarSets . map alternative
     

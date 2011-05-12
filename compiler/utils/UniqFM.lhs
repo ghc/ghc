@@ -57,7 +57,6 @@ module UniqFM (
 	intersectUFM_C,
 	foldUFM, foldUFM_Directly,
 	mapUFM, mapUFM_Directly,
-	concatMapUFM,
 	elemUFM, elemUFM_Directly,
 	filterUFM, filterUFM_Directly,
 	sizeUFM,
@@ -152,7 +151,6 @@ foldUFM		:: (elt -> a -> a) -> a -> UniqFM elt -> a
 foldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
 mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
-concatMapUFM    :: (elt1 -> UniqFM elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
 
@@ -239,7 +237,6 @@ foldUFM k z (UFM m) = M.fold k z m
 foldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m
 mapUFM f (UFM m) = UFM (M.map f m)
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
-concatMapUFM f (UFM m) = UFM (M.fold (\x rest -> f x `M.union` rest) M.empty m)
 filterUFM p (UFM m) = UFM (M.filter p m)
 filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . getUnique) m)
 
