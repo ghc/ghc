@@ -513,9 +513,8 @@ freeVars (Let (Rec binds) body)
     body2     = freeVars body
     body_fvs  = freeVarsOf body2
 
-
 freeVars (Cast expr co)
-  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 co)
+  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 (cfvs, co))
   where
     expr2 = freeVars expr
     cfvs  = tyCoVarsOfCo co

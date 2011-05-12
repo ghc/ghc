@@ -169,8 +169,6 @@ import ListSetOps
 import Outputable
 import FastString
 
-import qualified Data.Foldable as Foldable
-import Data.Functor( (<$>) )
 import Data.List( mapAccumL )
 import Data.IORef
 \end{code}
@@ -545,7 +543,6 @@ tidyCo env@(_, subst) co
     go (ForAllCo tv co)      = ForAllCo tvp $! (tidyCo envp co)
                                where
                                  (envp, tvp) = tidyTyVarBndr env tv
-    go (PredCo pco)          = PredCo $! (go <$> pco)
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
@@ -1079,8 +1076,6 @@ orphNamesOfCo (Refl ty)             = orphNamesOfType ty
 orphNamesOfCo (TyConAppCo tc cos)   = unitNameSet (getName tc) `unionNameSets` orphNamesOfCos cos
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSets` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ co)       = orphNamesOfCo co
-orphNamesOfCo (PredCo p)            = Foldable.foldr (unionNameSets . orphNamesOfCo)
-                                                      emptyNameSet p
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
 orphNamesOfCo (AxiomInstCo con cos) = orphNamesOfCoCon con `unionNameSets` orphNamesOfCos cos
 orphNamesOfCo (UnsafeCo ty1 ty2)    = orphNamesOfType ty1 `unionNameSets` orphNamesOfType ty2

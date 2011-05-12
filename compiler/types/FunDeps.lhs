@@ -386,7 +386,7 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
                     fdeqs = zipAndComputeFDEqs (\_ _ -> False) rtys1' irs2'
                         -- Don't discard anything! 
                         -- We could discard equal types but it's an overkill to call 
-                        -- tcEqType again, since we know for sure that /at least one/ 
+                        -- eqType again, since we know for sure that /at least one/ 
                         -- equation in there is useful)
 
 		    qtvs' = filterVarSet (`notElemTvSubst` subst) qtvs

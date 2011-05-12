@@ -826,7 +826,8 @@ tcIfaceCo (IfaceTyConApp tc ts) = mkTyConAppCo <$> tcIfaceTyCon tc <*> mapM tcIf
 tcIfaceCo (IfaceCoConApp tc ts) = tcIfaceCoApp tc ts
 tcIfaceCo (IfaceForAllTy tv t)  = bindIfaceTyVar tv $ \ tv' ->
                                   mkForAllCo tv' <$> tcIfaceCo t
-tcIfaceCo (IfacePredTy co)      = mkPredCo <$> tcIfacePred tcIfaceCo co
+-- tcIfaceCo (IfacePredTy co)      = mkPredCo <$> tcIfacePred tcIfaceCo co
+tcIfaceCo (IfacePredTy _)      = panic "tcIfaceCo"
 
 tcIfaceCoApp :: IfaceCoCon -> [IfaceType] -> IfL Coercion
 tcIfaceCoApp IfaceReflCo    [t]     = Refl         <$> tcIfaceType t

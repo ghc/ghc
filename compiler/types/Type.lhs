@@ -231,38 +231,15 @@ coreView :: Type -> Maybe Type
 -- its underlying representation type. 
 -- Returns Nothing if there is nothing to look through.
 --
--- In the case of @newtype@s, it returns one of:
---
--- 1) A vanilla 'TyConApp' (recursive newtype, or non-saturated)
--- 
--- 2) The newtype representation (otherwise), meaning the
---    type written in the RHS of the newtype declaration,
---    which may itself be a newtype
---
--- For example, with:
---
--- > newtype R = MkR S
--- > newtype S = MkS T
--- > newtype T = MkT (T -> T)
---
--- 'expandNewTcApp' on:
---
---  * @R@ gives @Just S@
---  * @S@ gives @Just T@
---  * @T@ gives @Nothing@ (no expansion)
-
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
-coreView (PredTy p)
---  | isEqPred p             = Nothing
-  | otherwise    	   = Just (predTypeRep p)
+coreView (PredTy p)        = Just (predTypeRep p)
 coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys 
 			   = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 				-- Its important to use mkAppTys, rather than (foldl AppTy),
 				-- because the function part might well return a 
 				-- partially-applied type constructor; indeed, usually will!
 coreView _                 = Nothing
-
 
 
 -----------------------------------------------
@@ -382,10 +359,9 @@ repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 repSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
 repSplitAppTy_maybe (TyConApp tc tys) 
-  | isDecomposableTyCon tc || length tys > tyConArity tc 
-  = case snocView tys of       -- never create unsaturated type family apps
-      Just (tys', ty') -> Just (TyConApp tc tys', ty')
-      Nothing	       -> Nothing
+  | isDecomposableTyCon tc || tys `lengthExceeds` tyConArity tc 
+  , Just (tys', ty') <- snocView tys
+  = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
 repSplitAppTy_maybe _other = Nothing
 -------------
 splitAppTy :: Type -> (Type, Type)

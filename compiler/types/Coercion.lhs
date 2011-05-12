@@ -71,7 +71,7 @@ module Coercion (
         seqCo,
         
         -- * Pretty-printing
-        pprCo, pprParendCo,
+        pprCo, pprParendCo, pprCoAxiom,
 
         -- * Other
         applyCo, coVarPred
@@ -85,6 +85,7 @@ import TypeRep
 import qualified Type
 import Type hiding( substTy, substTyVarBndr, extendTvSubst )
 import Kind
+import Class	( classTyCon )
 import TyCon
 import Var
 import VarEnv
@@ -98,7 +99,8 @@ import BasicTypes
 import Outputable
 import Unique
 import Pair
-import PrelNames( funTyConKey )
+import TysPrim		( eqPredPrimTyCon )
+import PrelNames	( funTyConKey )
 import Control.Applicative
 import Data.Traversable (traverse, sequenceA)
 import Control.Arrow (second)
@@ -116,6 +118,7 @@ import qualified Data.Data as Data hiding ( TyCon )
 \begin{code}
 -- | A 'Coercion' is concrete evidence of the equality/convertibility
 -- of two types.
+
 data Coercion 
   -- These ones mirror the shape of types
   = Refl Type  -- See Note [Refl invariant]
@@ -139,7 +142,6 @@ data Coercion
 
   -- See Note [Forall coercions]
   | ForAllCo TyVar Coercion       -- forall a. g
-  | PredCo (Pred Coercion)        -- (g1~g2) etc
 
   -- These are special
   | CoVarCo CoVar
@@ -229,35 +231,34 @@ Note that it's only necessary to coerce between polymorphic types
 where the type variables have identical kinds, because equality on
 kinds is trivial.
 
-  ForAllCoCo Coercion Coercion Coercion
+Note [Predicate coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   g :: a~b
+How can we coerce between types
+   ([c]~a) => [a] -> c
+and
+   ([c]~b) => [b] -> c
+where the equality predicate *itself* differs?
 
-represents a coercion between types abstracted over equality proofs,
-which we might more suggestively write as
+Answer: we simply treat (~) as an ordinary type constructor, so these
+types really look like
 
-  ForAllCoCo (_:Coercion~Coercion) Coercion
+   ((~) [c] a) -> [a] -> c
+   ((~) [c] b) -> [b] -> c
 
-The rule is
+So the coercion between the two is obviously
 
-          g1 : t1 ~ t1'    g2 : t2 ~ t2'     g3 : t3 ~ t3'
-  ------------------------------------------------------------------
-  ForAllCoCo g1 g2 g3 : ( (t1 ~ t2) => t3 ) ~ ( (t1' ~ t2') => t3' )
+   ((~) [c] g) -> [g] -> c
 
-There are several things to note.  First, we don't need to bind a
-variable, since coercion variables do not appear in types.  Second,
-note that here we DO need to convert between "kinds" (the types of the
-required coercions).
+Another way to see this to say that we simply collapse predicates to
+their representation type (see Type.coreView and Type.predTypeRep).
 
-In the future, if we collapse the type and kind levels and add a bit
-more dependency, we will need something like
-
-  | ForAllCo   TyVar Coercion Coercion
-  | ForAllCoCo CoVar Coercion Coercion Coercion
-
-The addition of the extra coercion in the first case handles
-converting between possibly different kinds; the addition of a CoVar
-in the second case is needed since now types may mention coercion
-variables (in casts).
-
+This collapse is done by mkPredCo; there is no PredCo constructor
+in Coercion.  This is important because we need Nth to work on 
+predicates too:
+    Nth 1 ((~) [c] g) = g
+See Simplify.simplCoercionF, which generates such selections.
 
 %************************************************************************
 %*									*
@@ -290,7 +291,6 @@ tyCoVarsOfCo (Refl ty)           = tyVarsOfType ty
 tyCoVarsOfCo (TyConAppCo _ cos)  = tyCoVarsOfCos cos
 tyCoVarsOfCo (AppCo co1 co2)     = tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2
 tyCoVarsOfCo (ForAllCo tv co)    = tyCoVarsOfCo co `delVarSet` tv
-tyCoVarsOfCo (PredCo pred)       = varsOfPred tyCoVarsOfCo pred
 tyCoVarsOfCo (CoVarCo v)         = unitVarSet v
 tyCoVarsOfCo (AxiomInstCo _ cos) = tyCoVarsOfCos cos
 tyCoVarsOfCo (UnsafeCo ty1 ty2)  = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
@@ -308,7 +308,6 @@ coVarsOfCo (Refl _)            = emptyVarSet
 coVarsOfCo (TyConAppCo _ cos)  = coVarsOfCos cos
 coVarsOfCo (AppCo co1 co2)     = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (ForAllCo _ co)     = coVarsOfCo co
-coVarsOfCo (PredCo pred)       = varsOfPred coVarsOfCo pred
 coVarsOfCo (CoVarCo v)         = unitVarSet v
 coVarsOfCo (AxiomInstCo _ cos) = coVarsOfCos cos
 coVarsOfCo (UnsafeCo _ _)      = emptyVarSet
@@ -325,7 +324,6 @@ coercionSize (Refl ty)           = typeSize ty
 coercionSize (TyConAppCo _ cos)  = 1 + sum (map coercionSize cos)
 coercionSize (AppCo co1 co2)     = coercionSize co1 + coercionSize co2
 coercionSize (ForAllCo _ co)     = 1 + coercionSize co
-coercionSize (PredCo pred)       = predSize coercionSize pred
 coercionSize (CoVarCo _)         = 1
 coercionSize (AxiomInstCo _ cos) = 1 + sum (map coercionSize cos)
 coercionSize (UnsafeCo ty1 ty2)  = typeSize ty1 + typeSize ty2
@@ -360,14 +358,12 @@ ppr_co _ (Refl ty) = angles (ppr ty)
 
 ppr_co p co@(TyConAppCo tc cos)
   | tc `hasKey` funTyConKey = ppr_fun_co p co
-  | otherwise               = maybeParen p TyConPrec $
-                              pprTcApp   p ppr_co tc cos
+  | otherwise               = pprTcApp   p ppr_co tc cos
 
 ppr_co p (AppCo co1 co2)    = maybeParen p TyConPrec $
                               pprCo co1 <+> ppr_co TyConPrec co2
 
 ppr_co p co@(ForAllCo {}) = ppr_forall_co p co
-ppr_co _ (PredCo pred)    = pprPred ppr_co pred
 
 ppr_co _ (CoVarCo cv)
   | isSymOcc (getOccName cv) = parens (ppr cv)
@@ -402,23 +398,19 @@ ppr_fun_co p co = pprArrowChain p (split co)
 ppr_forall_co :: Prec -> Coercion -> SDoc
 ppr_forall_co p ty
   = maybeParen p FunPrec $
-    sep [pprForAll tvs, pprThetaArrow ppr_co ctxt, ppr_co TopPrec tau]
+    sep [pprForAll tvs, ppr_co TopPrec rho]
   where
     (tvs,  rho) = split1 [] ty
-    (ctxt, tau) = split2 [] rho
-
-    -- We need to be extra careful here as equality constraints will occur as
-    -- type variables with an equality kind.  So, while collecting quantified
-    -- variables, we separate the coercion variables out and turn them into
-    -- equality predicates.
     split1 tvs (ForAllCo tv ty) = split1 (tv:tvs) ty
     split1 tvs ty               = (reverse tvs, ty)
- 
-    split2 ps (TyConAppCo tc [PredCo p, co])
-      | tc `hasKey` funTyConKey = split2 (p:ps) co
-    split2 ps co                = (reverse ps, co)
 \end{code}
 
+\begin{code}
+pprCoAxiom :: CoAxiom -> SDoc
+pprCoAxiom ax
+  = sep [ ptext (sLit "axiom") <+> ppr ax <+> ppr (co_ax_tvs ax)
+        , nest 2 (dcolon <+> pprEqPred (Pair (co_ax_lhs ax) (co_ax_rhs ax))) ]
+\end{code}
 
 %************************************************************************
 %*									*
@@ -450,12 +442,14 @@ splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
 -- ^ Attempt to take a coercion application apart.
 splitAppCo_maybe (AppCo co1 co2) = Just (co1, co2)
 splitAppCo_maybe (TyConAppCo tc cos)
-  | not (null cos) = Just (mkTyConAppCo tc (init cos), last cos)
+  | isDecomposableTyCon tc || cos `lengthExceeds` tyConArity tc 
+  , Just (cos', co') <- snocView cos
+  = Just (mkTyConAppCo tc cos', co')    -- Never create unsaturated type family apps!
        -- Use mkTyConAppCo to preserve the invariant
        --  that identity coercions are always represented by Refl
 splitAppCo_maybe (Refl ty) 
-  | Just (ty1, ty2) <- splitAppTy_maybe ty = Just (Refl ty1, Refl ty2)
-  | otherwise = Nothing
+  | Just (ty1, ty2) <- splitAppTy_maybe ty 
+  = Just (Refl ty1, Refl ty2)
 splitAppCo_maybe _ = Nothing
 
 splitForAllCo_maybe :: Coercion -> Maybe (TyVar, Coercion)
@@ -570,10 +564,10 @@ mkForAllCo tv (Refl ty) = ASSERT( isTyVar tv ) Refl (mkForAllTy tv ty)
 mkForAllCo tv  co       = ASSERT ( isTyVar tv ) ForAllCo tv co
 
 mkPredCo :: Pred Coercion -> Coercion
-mkPredCo pred_co
-  = case traverse isReflCo_maybe pred_co of
-      Just pred_ty -> Refl (PredTy pred_ty)
-      Nothing      -> PredCo pred_co
+-- See Note [Predicate coercions]
+mkPredCo (EqPred co1 co2) = mkTyConAppCo eqPredPrimTyCon [co1,co2]
+mkPredCo (ClassP cls cos) = mkTyConAppCo (classTyCon cls) cos
+mkPredCo (IParam _ co)    = co
 
 -------------------------------
 
@@ -860,13 +854,10 @@ subst_co subst co
     go (Refl ty)             = Refl $! go_ty ty
     go (TyConAppCo tc cos)   = let args = map go cos
                                in  args `seqList` TyConAppCo tc args
-
     go (AppCo co1 co2)       = mkAppCo (go co1) $! go co2
     go (ForAllCo tv co)      = case substTyVarBndr subst tv of
                                  (subst', tv') ->
                                    ForAllCo tv' $! subst_co subst' co
-
-    go (PredCo p)            = mkPredCo (go <$> p)
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con cos) = AxiomInstCo con $! map go cos
     go (UnsafeCo ty1 ty2)    = (UnsafeCo $! go_ty ty1) $! go_ty ty2
@@ -1018,7 +1009,8 @@ ty_co_match menv subst@(tenv, cenv) (TyVarTy tv1) co
     rn_env = me_env menv
     tv1' = rnOccL rn_env tv1
 
-ty_co_match menv subst (AppTy ty1 ty2) (AppCo co1 co2)   -- BAY: do we need to work harder to decompose the AppCo?
+ty_co_match menv subst (AppTy ty1 ty2) co
+  | Just (co1, co2) <- splitAppCo_maybe co	-- c.f. Unify.match on AppTy
   = do { subst' <- ty_co_match menv subst ty1 co1 
        ; ty_co_match menv subst' ty2 co2 }
 
@@ -1051,7 +1043,6 @@ seqCo (Refl ty)             = seqType ty
 seqCo (TyConAppCo tc cos)   = tc `seq` seqCos cos
 seqCo (AppCo co1 co2)       = seqCo co1 `seq` seqCo co2
 seqCo (ForAllCo tv co)      = tv `seq` seqCo co
-seqCo (PredCo p)            = seqPred seqCo p
 seqCo (CoVarCo cv)          = cv `seq` ()
 seqCo (AxiomInstCo con cos) = con `seq` seqCos cos
 seqCo (UnsafeCo ty1 ty2)    = seqType ty1 `seq` seqType ty2
@@ -1084,21 +1075,10 @@ coercionType co = case coercionKind co of
 --
 -- i.e. the kind of @c@ relates @t1@ and @t2@, then @coercionKind c = Pair t1 t2@.
 coercionKind :: Coercion -> Pair Type
-coercionKind (Refl ty)               = Pair ty ty
-coercionKind (TyConAppCo tc cos)     = mkTyConApp tc <$> (sequenceA $ map coercionKind cos)
-coercionKind (AppCo co1 co2)         = mkAppTy <$> coercionKind co1 <*> coercionKind co2
-coercionKind (ForAllCo tv co)        = mkForAllTy tv <$> coercionKind co
-         -- BAY*: is the above still correct for equality
-         --  abstractions?  the System FC paper seems to imply we can
-         --  only ever construct coercions between foralls whose
-         --  variables have *equal* kinds.  But there was this comment
-         --  below suggesting otherwise:
-                                                                                 
---     c1 :: s1~s2  c2 :: t1~t2   c3 :: r1~r2
---    ----------------------------------------------
---    c1~c2 => c3  ::  (s1~t1) => r1 ~ (s2~t2) => r2
---      or
---    forall (_:c1~c2)
+coercionKind (Refl ty)            = Pair ty ty
+coercionKind (TyConAppCo tc cos)  = mkTyConApp tc <$> (sequenceA $ map coercionKind cos)
+coercionKind (AppCo co1 co2)      = mkAppTy <$> coercionKind co1 <*> coercionKind co2
+coercionKind (ForAllCo tv co)     = mkForAllTy tv <$> coercionKind co
 coercionKind (CoVarCo cv)         = ASSERT( isCoVar cv ) toPair $ coVarKind cv
 coercionKind (AxiomInstCo ax cos) = let Pair tys1 tys2 = coercionKinds cos
                                     in  Pair (substTyWith (co_ax_tvs ax) tys1 (co_ax_lhs ax)) 
@@ -1107,10 +1087,9 @@ coercionKind (UnsafeCo ty1 ty2)   = Pair ty1 ty2
 coercionKind (SymCo co)           = swap $ coercionKind co
 coercionKind (TransCo co1 co2)    = Pair (pFst $ coercionKind co1) (pSnd $ coercionKind co2)
 coercionKind (NthCo d co)         = getNth d <$> coercionKind co
-coercionKind (InstCo co ty)       | Just ks <- splitForAllTy_maybe `traverse` coercionKind co
+coercionKind co@(InstCo aco ty)    | Just ks <- splitForAllTy_maybe `traverse` coercionKind aco
                                   = (\(tv, body) -> substTyWith [tv] [ty] body) <$> ks
-    -- fall-through error case.
-coercionKind co = pprPanic "coercionKind" (ppr co)
+				  | otherwise = pprPanic "coercionKind" (ppr co)
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
 coercionKinds :: [Coercion] -> Pair [Type]

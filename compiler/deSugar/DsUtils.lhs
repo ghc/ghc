@@ -296,10 +296,11 @@ mkCoPrimCaseMatchResult var ty match_alts
                                                   return (LitAlt lit, [], body)
 
 
-mkCoAlgCaseMatchResult :: Id					-- Scrutinee
-                    -> Type                                     -- Type of exp
-		    -> [(DataCon, [CoreBndr], MatchResult)]	-- Alternatives
-		    -> MatchResult
+mkCoAlgCaseMatchResult 
+  :: Id					   -- Scrutinee
+  -> Type                                  -- Type of exp
+  -> [(DataCon, [CoreBndr], MatchResult)]  -- Alternatives (bndrs *include* tyvars, dicts)
+  -> MatchResult
 mkCoAlgCaseMatchResult var ty match_alts 
   | isNewTyCon tycon		-- Newtype case; use a let
   = ASSERT( null (tail match_alts) && null (tail arg_ids1) )

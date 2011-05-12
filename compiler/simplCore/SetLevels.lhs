@@ -288,7 +288,7 @@ lvlExpr ctxt_lvl env (_, AnnNote note expr) = do
     expr' <- lvlExpr ctxt_lvl env expr
     return (Note note expr')
 
-lvlExpr ctxt_lvl env (_, AnnCast expr co) = do
+lvlExpr ctxt_lvl env (_, AnnCast expr (_, co)) = do
     expr' <- lvlExpr ctxt_lvl env expr
     return (Cast expr' co)
 
@@ -415,7 +415,7 @@ lvlMFE strict_ctxt ctxt_lvl env (_, AnnNote n e)
   = do { e' <- lvlMFE strict_ctxt ctxt_lvl env e
        ; return (Note n e') }
 
-lvlMFE strict_ctxt ctxt_lvl env (_, AnnCast e co)
+lvlMFE strict_ctxt ctxt_lvl env (_, AnnCast e (_, co))
   = do	{ e' <- lvlMFE strict_ctxt ctxt_lvl env e
 	; return (Cast e' co) }
 

@@ -369,9 +369,10 @@ simplNonRecX :: SimplEnv
              -> SimplM SimplEnv
 
 simplNonRecX env bndr new_rhs
-  | isDeadBinder bndr	-- Not uncommon; e.g. case (a,b) of b { (p,q) -> p }
-  = return env		-- 		 Here b is dead, and we avoid creating
-  | Coercion co <- new_rhs
+  | isDeadBinder bndr	-- Not uncommon; e.g. case (a,b) of c { (p,q) -> p }
+  = return env		-- 		 Here c is dead, and we avoid creating
+    	   		--               the binding c = (a,b)
+  | Coercion co <- new_rhs    
   = return (extendCvSubst env bndr co)
   | otherwise		--		 the binding b = (a,b)
   = do  { (env', bndr') <- simplBinder env bndr
@@ -628,6 +629,12 @@ completeBind :: SimplEnv
 --      * or by adding to the floats in the envt
 
 completeBind env top_lvl old_bndr new_bndr new_rhs
+ | isCoVar old_bndr
+ = case new_rhs of
+     Coercion co -> return (extendCvSubst env old_bndr co)
+     _           -> return (addNonRec env new_bndr new_rhs)
+
+ | otherwise
  = ASSERT( isId new_bndr )
    do { let old_info = idInfo old_bndr
 	    old_unf  = unfoldingInfo old_info
@@ -643,9 +650,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
       ; if postInlineUnconditionally env top_lvl new_bndr occ_info final_rhs new_unfolding
 	                -- Inline and discard the binding
 	then do  { tick (PostInlineUnconditionally old_bndr)
-	         ; -- pprTrace "postInlineUnconditionally" 
-                   --         (ppr old_bndr <+> equals <+> ppr final_rhs $$ ppr occ_info) $
-                   return (extendIdSubst env old_bndr (DoneEx final_rhs)) }
+	         ; return (extendIdSubst env old_bndr (DoneEx final_rhs)) }
 	        -- Use the substitution to make quite, quite sure that the
 	        -- substitution will happen, since we are going to discard the binding
 	else
@@ -872,18 +877,21 @@ simplExprF :: SimplEnv -> InExpr -> SimplCont
 
 simplExprF env e cont
   = -- pprTrace "simplExprF" (ppr e $$ ppr cont $$ ppr (seTvSubst env) $$ ppr (seIdSubst env) {- $$ ppr (seFloats env) -} ) $
-    simplExprF' env e cont
+    simplExprF1 env e cont
 
-simplExprF' :: SimplEnv -> InExpr -> SimplCont
+simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplEnv, OutExpr)
-simplExprF' env (Var v)        cont = simplIdF env v cont
-simplExprF' env (Lit lit)      cont = rebuild env (Lit lit) cont
-simplExprF' env (Note n expr)  cont = simplNote env n expr cont
-simplExprF' env (Cast body co) cont = simplCast env body co cont
-simplExprF' env (App fun arg)  cont = simplExprF env fun $
+simplExprF1 env (Var v)        cont = simplIdF env v cont
+simplExprF1 env (Lit lit)      cont = rebuild env (Lit lit) cont
+simplExprF1 env (Note n expr)  cont = simplNote env n expr cont
+simplExprF1 env (Cast body co) cont = simplCast env body co cont
+simplExprF1 env (Coercion co)  cont = simplCoercionF env co cont
+simplExprF1 env (Type ty)      cont = ASSERT( contIsRhsOrArg cont )
+                                      rebuild env (Type (substTy env ty)) cont
+simplExprF1 env (App fun arg)  cont = simplExprF env fun $
                                       ApplyTo NoDup arg env cont
 
-simplExprF' env expr@(Lam {}) cont
+simplExprF1 env expr@(Lam {}) cont
   = simplLam env zapped_bndrs body cont
         -- The main issue here is under-saturated lambdas
         --   (\x1. \x2. e) arg1
@@ -905,16 +913,7 @@ simplExprF' env expr@(Lam {}) cont
     zap b | isTyVar b = b
           | otherwise = zapLamIdInfo b
 
-simplExprF' env (Type ty) cont
-  = ASSERT( contIsRhsOrArg cont )
-    rebuild env (Type (substTy env ty)) cont
-
-simplExprF' env (Coercion co) cont
-  = ASSERT( contIsRhsOrArg cont )
-    do  { co' <- simplCoercion env co
-        ; rebuild env (Coercion co') cont }
-
-simplExprF' env (Case scrut bndr _ alts) cont
+simplExprF1 env (Case scrut bndr _ alts) cont
   | sm_case_case (getMode env)
   =     -- Simplify the scrutinee with a Select continuation
     simplExprF env scrut (Select NoDup bndr alts env cont)
@@ -926,7 +925,7 @@ simplExprF' env (Case scrut bndr _ alts) cont
                              (Select NoDup bndr alts env mkBoringStop)
         ; rebuild env case_expr' cont }
 
-simplExprF' env (Let (Rec pairs) body) cont
+simplExprF1 env (Let (Rec pairs) body) cont
   = do  { env' <- simplRecBndrs env (map fst pairs)
                 -- NB: bndrs' don't have unfoldings or rules
                 -- We add them as we go down
@@ -934,7 +933,7 @@ simplExprF' env (Let (Rec pairs) body) cont
         ; env'' <- simplRecBind env' NotTopLevel pairs
         ; simplExprF env'' body cont }
 
-simplExprF' env (Let (NonRec bndr rhs) body) cont
+simplExprF1 env (Let (NonRec bndr rhs) body) cont
   = simplNonRecE env bndr (rhs, env) ([], body) cont
 
 ---------------------------------
@@ -947,12 +946,30 @@ simplType env ty
     new_ty = substTy env ty
 
 ---------------------------------
+simplCoercionF :: SimplEnv -> InCoercion -> SimplCont
+               -> SimplM (SimplEnv, OutExpr)
+-- We are simplifying a term of form (Coercion co)
+-- Simplify the InCoercion, and then try to combine with the 
+-- context, to implememt the rule
+--     (Coercion co) |> g
+--  =  Coercion (syn (nth 0 g) ; co ; nth 1 g) 
+simplCoercionF env co cont 
+  = do { co' <- simplCoercion env co
+       ; simpl_co co' cont }
+  where
+    simpl_co co (CoerceIt g cont)
+       = simpl_co new_co cont
+     where
+       new_co = mkSymCo g0 `mkTransCo` co `mkTransCo` g1
+       [g0, g1] = decomposeCo 2 g
+
+    simpl_co co cont
+       = seqCo co `seq` rebuild env (Coercion co) cont
+
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = -- pprTrace "simplCoercion" (ppr co $$ ppr (getCvSubst env)) $
-    seqCo new_co `seq` return new_co
-  where 
-    new_co = optCoercion (getCvSubst env) co
+  = let opt_co = optCoercion (getCvSubst env) co
+    in opt_co `seq` return opt_co
 \end{code}
 
 
@@ -969,7 +986,7 @@ rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplEnv, OutExpr)
 rebuild env expr cont
   = case cont of
       Stop {}                      -> return (env, expr)
-      CoerceIt co cont             -> rebuild env (mkCoerce co expr) cont
+      CoerceIt co cont             -> rebuild env (Cast expr co) cont
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont
       StrictArg info _ cont        -> rebuildCall env (info `addArgTo` expr) cont
       StrictBind b bs body se cont -> do { env' <- simplNonRecX (se `setFloats` env) b expr
@@ -1011,7 +1028,7 @@ simplCast env body co0 cont0
                 -- and we'd like it to simplify to e[y/x] in one round
                 -- of simplification
          , s1 `eqType` t1  = cont            -- The coerces cancel out
-         | otherwise           = CoerceIt (mkTransCo co1 co2) cont
+         | otherwise       = CoerceIt (mkTransCo co1 co2) cont
 
        add_coerce co (Pair s1s2 _t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
                 -- (f |> g) ty  --->   (f ty) |> (g @ ty)
@@ -1141,18 +1158,13 @@ simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
     do	{ ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
 	; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
 
-simplNonRecE env bndr (Coercion co_arg, rhs_se) (bndrs, body) cont
-  = ASSERT( isCoVar bndr )
-    do  { co_arg' <- simplCoercion (rhs_se `setInScope` env) co_arg
-        ; simplLam (extendCvSubst env bndr co_arg') bndrs body cont }
-
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
   | preInlineUnconditionally env NotTopLevel bndr rhs
   = do  { tick (PreInlineUnconditionally bndr)
         ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
           simplLam (extendIdSubst env bndr (mkContEx rhs_se rhs)) bndrs body cont }
 
-  | isStrictId bndr
+  | isStrictId bndr		  -- Includes coercions
   = do  { simplExprF (rhs_se `setFloats` env) rhs
                      (StrictBind bndr bndrs body env cont) }
 
@@ -1296,11 +1308,6 @@ rebuildCall env info (ApplyTo dup_flag (Type arg_ty) se cont)
   = do { arg_ty' <- if isSimplified dup_flag then return arg_ty
                     else simplType (se `setInScope` env) arg_ty
        ; rebuildCall env (info `addArgTo` Type arg_ty') cont }
-
-rebuildCall env info (ApplyTo dup_flag (Coercion arg_co) se cont)
-  = do { arg_co' <- if isSimplified dup_flag then return arg_co
-                    else simplCoercion (se `setInScope` env) arg_co
-       ; rebuildCall env (info `addArgTo` Coercion arg_co') cont }
 
 rebuildCall env info@(ArgInfo { ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })

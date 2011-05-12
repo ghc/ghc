@@ -99,6 +99,7 @@ data SimplCont
 
   | CoerceIt 		-- C `cast` co
 	OutCoercion		-- The coercion simplified
+				-- Invariant: never an identity coercion
 	SimplCont
 
   | ApplyTo  		-- C arg
@@ -788,6 +789,11 @@ Don't inline top-level Ids that are bottoming, even if they are used just
 once, because FloatOut has gone to some trouble to extract them out.
 Inlining them won't make the program run faster!
 
+Note [Do not inline CoVars unconditionally]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Coercion variables appear inside coercions, and have a separate
+substitution, so don't inline them via the IdSubst!
+
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
 preInlineUnconditionally env top_lvl bndr rhs
@@ -795,6 +801,7 @@ preInlineUnconditionally env top_lvl bndr rhs
   | isStableUnfolding (idUnfolding bndr)     = False    -- Note [InlineRule and preInlineUnconditionally]
   | isTopLevel top_lvl && isBottomingId bndr = False	-- Note [Top-level bottoming Ids]
   | opt_SimplNoPreInlining                   = False
+  | isCoVar bndr                             = False -- Note [Do not inline CoVars unconditionally]
   | otherwise = case idOccInfo bndr of
 		  IAmDead	     	     -> True	-- Happens in ((\x.1) v)
 	  	  OneOcc in_lam True int_cxt -> try_once in_lam int_cxt
@@ -892,6 +899,7 @@ story for now.
 postInlineUnconditionally 
     :: SimplEnv -> TopLevelFlag
     -> OutId		-- The binder (an InId would be fine too)
+       			--            (*not* a CoVar)
     -> OccInfo 		-- From the InId
     -> OutExpr
     -> Unfolding

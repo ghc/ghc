@@ -72,7 +72,6 @@ import Outputable
 import DataCon
 import Type
 import Class
-import Pair
 import TcType   ( orphNamesOfDFunHead )
 import Inst	( tcGetInstEnvs )
 import Data.List ( sortBy )
@@ -1612,7 +1611,7 @@ ppr_tycons fam_insts type_env
   = vcat [ text "TYPE CONSTRUCTORS"
          ,   nest 2 (ppr_tydecls tycons)
          , text "COERCION AXIOMS" 
-         ,   nest 2 (ppr_axioms (typeEnvCoAxioms type_env)) ]
+         ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
   where
     fi_tycons = map famInstTyCon fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
@@ -1646,14 +1645,6 @@ ppr_tydecls tycons
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
     ppr_tycon tycon = ppr (tyThingToIfaceDecl (ATyCon tycon))
       where
-
-ppr_axioms :: [CoAxiom] -> SDoc
-ppr_axioms axs
-  = vcat (map ppr_ax axs)
-  where
-    ppr_ax ax = sep [ ptext (sLit "coercion") <+> ppr ax <+> ppr (co_ax_tvs ax)
-                    , nest 2 (dcolon <+> pprEqPred 
-                                           (Pair (co_ax_lhs ax) (co_ax_rhs ax))) ]
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty

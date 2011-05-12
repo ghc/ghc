@@ -23,6 +23,7 @@ import DataCon
 import Id
 import IdInfo
 import TyCon
+import Coercion( pprCoAxiom )
 import TcType
 import Name
 import Outputable
@@ -56,7 +57,7 @@ ppr_ty_thing :: PrintExplicitForalls -> ShowMe -> TyThing -> SDoc
 ppr_ty_thing pefas _ 	 (AnId id)          = pprId         pefas id
 ppr_ty_thing pefas _ 	 (ADataCon dataCon) = pprDataConSig pefas dataCon
 ppr_ty_thing pefas show_me (ATyCon tyCon)   = pprTyCon      pefas show_me tyCon
-ppr_ty_thing _     _       (ACoAxiom _  )   = error "ppr_ty_thing (ACoCon)"  -- BAY
+ppr_ty_thing _     _       (ACoAxiom ax)    = pprCoAxiom    ax
 ppr_ty_thing pefas show_me (AClass cls)     = pprClass      pefas show_me cls
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
@@ -94,7 +95,7 @@ pprTyThingHdr :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingHdr pefas (AnId id)          = pprId         pefas id
 pprTyThingHdr pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
 pprTyThingHdr pefas (ATyCon tyCon)     = pprTyConHdr   pefas tyCon
-pprTyThingHdr _     (ACoAxiom _)       = error "pprTyThingHdr (ACoCon)" -- BAY
+pprTyThingHdr _     (ACoAxiom ax)      = pprCoAxiom ax
 pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc

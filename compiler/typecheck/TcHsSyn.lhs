@@ -52,7 +52,7 @@ import SrcLoc
 import Bag
 import FastString
 import Outputable
-import Data.Traversable( traverse )
+-- import Data.Traversable( traverse )
 \end{code}
 
 \begin{code}
@@ -1129,7 +1129,6 @@ zonkTcCoToCo env co
     go (AxiomInstCo ax cos) = do { cos' <- mapM go cos; return (AxiomInstCo ax cos') }
     go (AppCo co1 co2)      = do { co1' <- go co1; co2' <- go co2
                                  ; return (mkAppCo co1' co2') }
-    go (PredCo pco)         = do { pco' <- go `traverse` pco; return (mkPredCo pco') }
     go (UnsafeCo t1 t2)     = do { t1' <- zonkTcTypeToType env t1
                                  ; t2' <- zonkTcTypeToType env t2
                                  ; return (mkUnsafeCo t1' t2') }

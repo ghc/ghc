@@ -13,8 +13,8 @@ import Module
 import CoreSyn
 import HscTypes	
 import TyCon
-import Class
-import TysPrim( eqPredPrimTyCon )
+-- import Class
+-- import TysPrim( eqPredPrimTyCon )
 import TypeRep
 import Type
 import PprExternalCore () -- Instances
@@ -289,9 +289,6 @@ make_co (Refl ty)             = make_ty ty
 make_co (TyConAppCo tc cos)   = make_conAppCo (qtc tc) cos
 make_co (AppCo c1 c2)         = C.Tapp (make_co c1) (make_co c2)
 make_co (ForAllCo tv co)      = C.Tforall (make_tbind tv) (make_co co)
-make_co (PredCo (ClassP cls cos)) = make_conAppCo (qtc (classTyCon cls)) cos
-make_co (PredCo (IParam _ co))    = make_co co
-make_co (PredCo (EqPred co1 co2)) = make_conAppCo (qtc eqPredPrimTyCon) [co1,co2]
 make_co (CoVarCo cv)          = C.Tvar (make_var_id (coVarName cv))
 make_co (AxiomInstCo cc cos)  = make_conAppCo (qcc cc) cos
 make_co (UnsafeCo t1 t2)      = C.UnsafeCoercion (make_ty t1) (make_ty t2)

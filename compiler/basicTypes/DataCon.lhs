@@ -659,7 +659,7 @@ dataConStrictMarks = dcStrictMarks
 -- | Strictness of evidence arguments to the wrapper function
 dataConExStricts :: DataCon -> [HsBang]
 -- Usually empty, so we don't bother to cache this
-dataConExStricts dc = map mk_dict_strict_mark $ (dcOtherTheta dc)
+dataConExStricts dc = map mk_dict_strict_mark $ (dataConTheta dc)
 
 -- | Source-level arity of the data constructor
 dataConSourceArity :: DataCon -> Arity

@@ -312,8 +312,9 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
-coreToStgExpr (Lit l) = return (StgLit l, emptyFVInfo, emptyVarSet)
-coreToStgExpr (Var v) = coreToStgApp Nothing v []
+coreToStgExpr (Lit l)      = return (StgLit l, emptyFVInfo, emptyVarSet)
+coreToStgExpr (Var v)      = coreToStgApp Nothing v               []
+coreToStgExpr (Coercion _) = coreToStgApp Nothing coercionTokenId []
 
 coreToStgExpr expr@(App _ _)
   = coreToStgApp Nothing f args

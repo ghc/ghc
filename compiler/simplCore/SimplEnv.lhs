@@ -279,7 +279,8 @@ setEnclosingCC env cc = env {seCC = cc}
 ---------------------
 extendIdSubst :: SimplEnv -> Id -> SimplSR -> SimplEnv
 extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
-  = env {seIdSubst = extendVarEnv subst var res}
+  = ASSERT2( isId var && not (isCoVar var), ppr var )
+    env {seIdSubst = extendVarEnv subst var res}
 
 extendTvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
 extendTvSubst env@(SimplEnv {seTvSubst = subst}) var res
@@ -560,8 +561,6 @@ simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 simplBinder env bndr
   | isTyVar bndr  = do	{ let (env', tv) = substTyVarBndr env bndr
 			; seqTyVar tv `seq` return (env', tv) }
-  | isCoVar bndr  = do  { let (env', tv) = substCoVarBndr env bndr
-			; seqId tv `seq` return (env', tv) }
   | otherwise     = do	{ let (env', id) = substIdBndr env bndr
 			; seqId id `seq` return (env', id) }
 
@@ -597,9 +596,17 @@ simplRecBndrs env@(SimplEnv {}) ids
 	; seqIds ids1 `seq` return env1 }
 
 ---------------
-substIdBndr :: SimplEnv 	
-	    -> InBndr 	-- Env and binder to transform
-	    -> (SimplEnv, OutBndr)
+substIdBndr :: SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+-- Might be a coercion variable
+substIdBndr env bndr
+  | isCoVar bndr  = substCoVarBndr env bndr
+  | otherwise     = substNonCoVarIdBndr env bndr
+
+---------------
+substNonCoVarIdBndr 
+   :: SimplEnv 	
+   -> InBndr 	-- Env and binder to transform
+   -> (SimplEnv, OutBndr)
 -- Clone Id if necessary, substitute its type
 -- Return an Id with its 
 --	* Type substituted
@@ -617,10 +624,10 @@ substIdBndr :: SimplEnv
 -- Similar to CoreSubst.substIdBndr, except that 
 --	the type of id_subst differs
 --	all fragile info is zapped
-
-substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) 
-	       old_id
-  = (env { seInScope = in_scope `extendInScopeSet` new_id, 
+substNonCoVarIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst })
+                    old_id
+  = ASSERT2( not (isCoVar old_id), ppr old_id )
+    (env { seInScope = in_scope `extendInScopeSet` new_id, 
 	   seIdSubst = new_subst }, new_id)
   where
     id1	   = uniqAway in_scope old_id

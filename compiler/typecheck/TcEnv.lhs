@@ -626,7 +626,6 @@ data InstBindings a
 			-- witness dictionary is identical to the argument 
 			-- dictionary.  Hence no bindings, no pragmas.
 
-          -- BAY* : should this be a CoAxiom?
 	Coercion	-- The coercion maps from newtype to the representation type
 			-- (mentioning type variables bound by the forall'd iSpec variables)
 			-- E.g.   newtype instance N [a] = N1 (Tree a)

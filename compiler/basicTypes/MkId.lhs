@@ -230,7 +230,7 @@ mkDataConIds wrap_name wkr_name data_con
   = DCIds Nothing wrk_id
   where
     (univ_tvs, ex_tvs, eq_spec, 
-     theta, orig_arg_tys, res_ty) = dataConFullSig data_con
+     other_theta, orig_arg_tys, res_ty) = dataConFullSig data_con
     tycon = dataConTyCon data_con       -- The representation TyCon (not family)
 
         ----------- Worker (algebraic data types only) --------------
@@ -293,7 +293,7 @@ mkDataConIds wrap_name wkr_name data_con
         -- extra constraints where necessary.
     wrap_tvs    = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
     res_ty_args = substTyVars (mkTopTvSubst eq_spec) univ_tvs
-    ev_tys      = mkPredTys theta
+    ev_tys      = mkPredTys other_theta
     wrap_ty     = mkForAllTys wrap_tvs $ 
                   mkFunTys ev_tys $
                   mkFunTys orig_arg_tys $ res_ty
@@ -309,8 +309,9 @@ mkDataConIds wrap_name wkr_name data_con
                     `setStrictnessInfo` Just wrap_sig
 
     all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
-    wrap_sig = mkStrictSig (mkTopDmdType arg_dmds cpr_info)
-    arg_dmds = map mk_dmd all_strict_marks
+    wrap_sig = mkStrictSig (mkTopDmdType wrap_arg_dmds cpr_info)
+    wrap_stricts = dropList eq_spec all_strict_marks
+    wrap_arg_dmds = map mk_dmd wrap_stricts
     mk_dmd str | isBanged str = evalDmd
                | otherwise    = lazyDmd
         -- The Cpr info can be important inside INLINE rhss, where the
@@ -327,8 +328,11 @@ mkDataConIds wrap_name wkr_name data_con
                mkLams ev_args $
                mkLams id_args $
                foldr mk_case con_app 
-                     (zip (ev_args ++ id_args) all_strict_marks)
+                     (zip (ev_args ++ id_args) wrap_stricts)
                      i3 []
+	     -- The ev_args is the evidence arguments *other than* the eq_spec
+	     -- Because we are going to apply the eq_spec args manually in the
+	     -- wrapper
 
     con_app _ rep_ids = wrapFamInstBody tycon res_ty_args $
                           Var wrk_id `mkTyApps`  res_ty_args
@@ -598,7 +602,7 @@ mkProductBox arg_ids ty
 mkReboxingAlt
   :: [Unique] -- Uniques for the new Ids
   -> DataCon
-  -> [Var]    -- Source-level args, including existential dicts
+  -> [Var]    -- Source-level args, *including* all evidence vars 
   -> CoreExpr -- RHS
   -> CoreAlt
 
@@ -626,8 +630,7 @@ mkReboxingAlt us con args rhs
         -- Term variable case
     go (arg:args) (str:stricts) us
       | isMarkedUnboxed str
-      = 
-        let (binds, unpacked_args')        = go args stricts us'
+      = let (binds, unpacked_args')        = go args stricts us'
             (us', bind_rhs, unpacked_args) = reboxProduct us (idType arg)
         in
             (NonRec arg bind_rhs : binds, unpacked_args ++ unpacked_args')

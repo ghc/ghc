@@ -93,7 +93,6 @@ opt_co env sym co
 opt_co' env _   (Refl ty)           = Refl (substTy env ty)
 opt_co' env sym (SymCo co)          = opt_co env (not sym) co
 opt_co' env sym (TyConAppCo tc cos) = mkTyConAppCo tc (map (opt_co env sym) cos)
-opt_co' env sym (PredCo cos)        = mkPredCo (fmap (opt_co env sym) cos)
 opt_co' env sym (AppCo co1 co2)     = mkAppCo (opt_co env sym co1) (opt_co env sym co2)
 opt_co' env sym (ForAllCo tv co)    = case substTyVarBndr env tv of
                                          (env', tv') -> mkForAllCo tv' (opt_co env' sym co)
@@ -222,12 +221,6 @@ opt_trans_rule in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   = fireTransRule "TrPushApp" in_co1 in_co2 $
     mkAppCo (opt_trans co1a co2a) (opt_trans co1b co2b)
 
--- Push transitivity inside PredCos
-opt_trans_rule in_co1@(PredCo pco1) in_co2@(PredCo pco2)
-  | Just pco' <- opt_trans_pred pco1 pco2
-  = fireTransRule "TrPushPrd" in_co1 in_co2 $
-    mkPredCo pco'
-
 opt_trans_rule co1@(TyConAppCo tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
   = ASSERT( length cos1 == length cos2 )
@@ -239,27 +232,6 @@ opt_trans_rule co1 co2@(TyConAppCo tc cos2)
   = ASSERT( length cos1 == length cos2 )
     fireTransRule "EtaCompR" co1 co2 $
     TyConAppCo tc (zipWith opt_trans cos1 cos2)
-
-
-{- BAY: think harder about this.  do we still need it?
--- Push transitivity inside (s~t)=>r
--- We re-use the CoVar rather than using mkCoPredTy
--- See Note [Subtle shadowing in coercions]
-opt_trans_rule co1 co2
-  | Just (cv1,r1) <- splitForAllTy_maybe co1
-  , isCoVar cv1
-  , Just (s1,t1) <- coVarKind_maybe cv1
-  , Just (s2,t2,r2) <- etaCoPred_maybe co2
-  = Just (ForAllTy (mkCoVar (coVarName cv1) (mkCoType (opt_trans s1 s2) (opt_trans t1 t2)))
-                   (opt_trans r1 r2))
-
-  | Just (cv2,r2) <- splitForAllTy_maybe co2
-  , isCoVar cv2
-  , Just (s2,t2) <- coVarKind_maybe cv2
-  , Just (s1,t1,r1) <- etaCoPred_maybe co1
-  = Just (ForAllTy (mkCoVar (coVarName cv2) (mkCoType (opt_trans s1 s2) (opt_trans t1 t2)))
-                   (opt_trans r1 r2))
--}
 
 -- Push transitivity inside forall
 opt_trans_rule co1 co2
@@ -320,17 +292,6 @@ opt_trans_rule co1 co2	-- Identity rule
     Refl ty2
 
 opt_trans_rule _ _ = Nothing
-
-opt_trans_pred :: Pred Coercion -> Pred Coercion -> Maybe (Pred Coercion)
-opt_trans_pred (EqPred co1a co1b) (EqPred co2a co2b)
-  = Just (EqPred (opt_trans co1a co2a) (opt_trans co1b co2b))
-opt_trans_pred (ClassP cls1 cos1) (ClassP cls2 cos2)
-  | cls1 == cls2
-  = Just (ClassP cls1 (opt_transList cos1 cos2))
-opt_trans_pred (IParam n1 co1) (IParam n2 co2)
-  | n1 == n2
-  = Just (IParam n1 (opt_trans co1 co2))
-opt_trans_pred _ _ = Nothing
 
 fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
 fireTransRule _rule _co1 _co2 res
