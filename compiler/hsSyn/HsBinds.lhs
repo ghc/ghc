@@ -69,23 +69,23 @@ data HsLocalBindsLR idL idR	-- Bindings in a 'let' expression
 type HsValBinds id = HsValBindsLR id id
 
 data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
-  = ValBindsIn             -- Before renaming
+  = ValBindsIn             -- Before renaming RHS; idR is always RdrName
 	(LHsBindsLR idL idR) [LSig idR]	-- Not dependency analysed
 					-- Recursive by default
 
-  | ValBindsOut		   -- After renaming
+  | ValBindsOut		   -- After renaming RHS; idR can be Name or Id
 	[(RecFlag, LHsBinds idL)]	-- Dependency analysed, later bindings 
                                         -- in the list may depend on earlier
                                         -- ones.
 	[LSig Name]
   deriving (Data, Typeable)
 
-type LHsBinds id = Bag (LHsBind id)
-type LHsBind  id = Located (HsBind id)
-type HsBind id   = HsBindLR id id
+type LHsBind  id = LHsBindLR  id id
+type LHsBinds id = LHsBindsLR id id
+type HsBind   id = HsBindLR   id id
 
-type LHsBindLR idL idR = Located (HsBindLR idL idR)
 type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
+type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
 data HsBindLR idL idR
   = -- | FunBind is used for both functions   @f x = e@
