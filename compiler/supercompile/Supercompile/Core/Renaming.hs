@@ -59,6 +59,11 @@ mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv
   where (tv_list, coid_list) = partition isTyVar (varSetElems fvs)
         (co_list, id_list)   = partition isCoVar coid_list
 
+mkRenaming :: [(Var, Var)] -> Renaming
+mkRenaming xxs' = (mkVarEnv [(x, CoreSyn.Var x') | (x, x') <- idids'], mkVarEnv [(x, mkTyVarTy x') | (x, x') <- tvtvs'], mkVarEnv [(x, mkCoVarCo x') | (x, x') <- cocos'])
+  where (tvtvs', yys')   = partition (isTyVar . fst) xxs'
+        (cocos', idids') = partition (isCoVar . fst) yys'
+
 varToCoreSyn :: Var -> CoreSyn.CoreExpr
 varToCoreSyn x' = CoreSyn.Var x'
 

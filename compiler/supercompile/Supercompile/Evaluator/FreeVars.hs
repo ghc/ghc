@@ -3,7 +3,7 @@ module Supercompile.Evaluator.FreeVars (
     inFreeVars,
     heapBindingFreeVars,
     pureHeapBoundVars, stackBoundVars, stackFrameBoundVars, stackFrameFreeVars,
-    pureHeapVars, unnormalisedStateFreeVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
+    qaFreeVars, pureHeapVars, unnormalisedStateFreeVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
     module Supercompile.Core.FreeVars
   ) where
 
@@ -65,6 +65,11 @@ pureHeapVars :: PureHeap -> (HowBound -> BoundVars, FreeVars)
     
     stackOpenFreeVars :: Stack -> FreeVars -> (BoundVars, FreeVars)
     stackOpenFreeVars k fvs = (unionVarSets *** (unionVarSet fvs . unionVarSets)) . unzip . map (stackFrameOpenFreeVars . tagee) $ k
+
+
+qaFreeVars :: QA -> FreeVars
+qaFreeVars (Question x') = unitVarSet x'
+qaFreeVars (Answer a)    = answerFreeVars' a
 
 
 -- | Returns (an overapproximation of) the free variables that the state would have if it were residualised right now (i.e. variables bound by phantom bindings *are* in the free vars set)

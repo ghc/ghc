@@ -305,6 +305,12 @@ takeWhileJust f = go
         Just y  -> first (y:) $ go xs
 
 
+zipWithEqualM :: Monad m => (a -> b -> m c) -> [a] -> [b] -> m [c]
+zipWithEqualM _ []     []     = return []
+zipWithEqualM f (x:xs) (y:ys) = liftM2 (:) (f x y) (zipWithEqualM f xs ys)
+zipWithEqualM _ _ _ = fail "zipWithEqualM"
+
+
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.
 --
 -- > sum (apportion n weights) == n

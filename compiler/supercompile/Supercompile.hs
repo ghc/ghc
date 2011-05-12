@@ -9,6 +9,8 @@ import Supercompile.Evaluator.Evaluate
 import Supercompile.Evaluator.Syntax
 import Supercompile.Evaluator.FreeVars
 
+import Supercompile.Drive.Match
+
 -- import CoreSyn
 -- 
 -- supercompile :: CoreExpr -> CoreExpr
