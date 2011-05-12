@@ -68,7 +68,8 @@ import FastString
 
 #if mingw32_TARGET_OS
 import Packages		( isDllName )
-
+import Type		( typePrimRep )
+import TyCon		( PrimRep(..) )
 #endif
 \end{code}
 
@@ -118,8 +119,27 @@ isDllConApp this_pkg con args
   = isDllName this_pkg (dataConName con) || any is_dll_arg args
   where
     is_dll_arg ::StgArg -> Bool
-    is_dll_arg (StgVarArg v) = isDllName this_pkg (idName v)
+    is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep (idType v))
+                             && isDllName this_pkg (idName v)
     is_dll_arg _             = False
+
+isAddrRep :: PrimRep -> Bool
+-- True of machine adddresses; these are the things that don't
+-- work across DLLs.
+-- The key point here is that VoidRep comes out False, so that
+-- a top level nullary GADT construtor is False for isDllConApp
+--    data T a where
+--      T1 :: T Int
+-- gives
+--    T1 :: forall a. (a~Int) -> T a
+-- and hence the top-level binding
+--    $WT1 :: T Int
+--    $WT1 = T1 Int (Coercion (Refl Int))
+-- The coercion argument here gets VoidRep
+isAddrRep AddrRep = True
+isAddrRep PtrRep  = True
+isAddrRep _       = False
+
 #else
 isDllConApp _ _ _ = False
 #endif

@@ -29,6 +29,7 @@ import BasicTypes
 import Unique
 import Outputable
 import FastString
+import Pair
 \end{code}
 
 %************************************************************************
@@ -79,11 +80,13 @@ exprArity e = go e
     go (Lam x e) | isId x    	   = go e + 1
     		 | otherwise 	   = go e
     go (Note n e) | notSccNote n   = go e
-    go (Cast e co)                 = go e `min` length (typeArity (snd (coercionKind co)))
-       	       			     	-- Note [exprArity invariant]
+    go (Cast e co)                 = go e `min` length (typeArity (pSnd (coercionKind co)))
+                                        -- Note [exprArity invariant]
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
         -- See Note [exprArity for applications]
+	-- NB: coercions count as a value argument
+
     go _		       	   = 0
 
 
@@ -549,7 +552,7 @@ arityType cheap_fn (Lam x e)
   | isId x    = arityLam x (arityType cheap_fn e)
   | otherwise = arityType cheap_fn e
 
-	-- Applications; decrease arity
+	-- Applications; decrease arity, except for types
 arityType cheap_fn (App fun (Type _))
    = arityType cheap_fn fun
 arityType cheap_fn (App fun arg )
@@ -663,14 +666,14 @@ etaExpand n orig_expr
       -- Strip off existing lambdas and casts
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
-    go n (Lam v body) | isTyCoVar v = Lam v (go n     body)
-       	              | otherwise   = Lam v (go (n-1) body)
+    go n (Lam v body) | isTyVar v = Lam v (go n     body)
+       	              | otherwise = Lam v (go (n-1) body)
     go n (Cast expr co) = Cast (go n expr) co
     go n expr           = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
        	 		  etaInfoAbs etas (etaInfoApp subst' expr etas)
     	  		where
 			    in_scope = mkInScopeSet (exprFreeVars expr)
-			    (in_scope', etas) = mkEtaWW n in_scope (exprType expr)
+			    (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
 			    subst' = mkEmptySubst in_scope'
 
       	      	       	        -- Wrapper    Unwrapper
@@ -685,10 +688,10 @@ instance Outputable EtaInfo where
 
 pushCoercion :: Coercion -> [EtaInfo] -> [EtaInfo]
 pushCoercion co1 (EtaCo co2 : eis)
-  | isIdentityCoercion co = eis
-  | otherwise	       	  = EtaCo co : eis
+  | isReflCo co = eis
+  | otherwise	= EtaCo co : eis
   where
-    co = co1 `mkTransCoercion` co2
+    co = co1 `mkTransCo` co2
 
 pushCoercion co eis = EtaCo co : eis
 
@@ -696,7 +699,7 @@ pushCoercion co eis = EtaCo co : eis
 etaInfoAbs :: [EtaInfo] -> CoreExpr -> CoreExpr
 etaInfoAbs []               expr = expr
 etaInfoAbs (EtaVar v : eis) expr = Lam v (etaInfoAbs eis expr)
-etaInfoAbs (EtaCo co : eis) expr = Cast (etaInfoAbs eis expr) (mkSymCoercion co)
+etaInfoAbs (EtaCo co : eis) expr = Cast (etaInfoAbs eis expr) (mkSymCo co)
 
 --------------
 etaInfoApp :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
@@ -704,15 +707,12 @@ etaInfoApp :: Subst -> CoreExpr -> [EtaInfo] -> CoreExpr
 -- 	       ((substExpr s e) `appliedto` eis)
 
 etaInfoApp subst (Lam v1 e) (EtaVar v2 : eis) 
-  = etaInfoApp subst' e eis
-  where
-    subst' | isTyCoVar v1 = CoreSubst.extendTvSubst subst v1 (mkTyVarTy v2) 
-    	   | otherwise  = CoreSubst.extendIdSubst subst v1 (Var v2)
+  = etaInfoApp (CoreSubst.extendSubstWithVar subst v1 v2) e eis
 
 etaInfoApp subst (Cast e co1) eis
   = etaInfoApp subst e (pushCoercion co' eis)
   where
-    co' = CoreSubst.substTy subst co1
+    co' = CoreSubst.substCo subst co1
 
 etaInfoApp subst (Case e b _ alts) eis 
   = Case (subst_expr subst e) b1 (coreAltsType alts') alts'
@@ -739,24 +739,24 @@ etaInfoApp subst e eis
     go e (EtaCo co    : eis) = go (Cast e co) eis
 
 --------------
-mkEtaWW :: Arity -> InScopeSet -> Type
+mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
 	-> (InScopeSet, [EtaInfo])
 	-- EtaInfo contains fresh variables,
 	--   not free in the incoming CoreExpr
 	-- Outgoing InScopeSet includes the EtaInfo vars
 	--   and the original free vars
 
-mkEtaWW orig_n in_scope orig_ty
+mkEtaWW orig_n orig_expr in_scope orig_ty
   = go orig_n empty_subst orig_ty []
   where
-    empty_subst = mkTvSubst in_scope emptyTvSubstEnv
+    empty_subst = TvSubst in_scope emptyTvSubstEnv
 
     go n subst ty eis	    -- See Note [exprArity invariant]
        | n == 0
        = (getTvInScope subst, reverse eis)
 
        | Just (tv,ty') <- splitForAllTy_maybe ty
-       , let (subst', tv') = substTyVarBndr subst tv
+       , let (subst', tv') = Type.substTyVarBndr subst tv
            -- Avoid free vars of the original expression
        = go n subst' ty' (EtaVar tv' : eis)
 
@@ -772,11 +772,11 @@ mkEtaWW orig_n in_scope orig_ty
        		--  	eta_expand 1 e T
        		-- We want to get
        		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
-         go n subst ty' (EtaCo (Type.substTy subst co) : eis)
+         go n subst ty' (EtaCo co : eis)
 
        | otherwise	 -- We have an expression of arity > 0, 
        	 		 -- but its type isn't a function. 		   
-       = WARN( True, ppr orig_n <+> ppr orig_ty )
+       = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
          (getTvInScope subst, reverse eis)
     	-- This *can* legitmately happen:
     	-- e.g.  coerce Int (\x. x) Essentially the programmer is

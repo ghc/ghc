@@ -2,10 +2,10 @@
 module TcUnify where
 import TcType	( TcTauType )
 import TcRnTypes( TcM )
-import Coercion (CoercionI)
+import Coercion (Coercion)
 
 -- This boot file exists only to tie the knot between
 --		TcUnify and TcSimplify
 
-unifyType :: TcTauType -> TcTauType -> TcM CoercionI
+unifyType :: TcTauType -> TcTauType -> TcM Coercion
 \end{code}

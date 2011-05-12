@@ -15,6 +15,7 @@ import CoreUtils
 import MkCore		 ( mkWildCase )
 import TyCon
 import Type
+import Kind
 import BuildTyCl
 import OccName
 import Coercion
@@ -180,9 +181,9 @@ buildToArrPRepr vect_tc prepr_tc pdata_tc r
 
       pdata_co <- mkBuiltinCo pdataTyCon
       let Just repr_co = tyConFamilyCoercion_maybe prepr_tc
-          co           = mkAppCoercion pdata_co
-                       . mkSymCoercion
-                       $ mkTyConApp repr_co ty_args
+          co           = mkAppCo pdata_co
+                       . mkSymCo
+                       $ mkAxInstCo repr_co ty_args
 
           scrut   = unwrapFamInstScrut pdata_tc ty_args (Var arg)
 
@@ -262,8 +263,8 @@ buildFromArrPRepr vect_tc prepr_tc pdata_tc r
 
       pdata_co <- mkBuiltinCo pdataTyCon
       let Just repr_co = tyConFamilyCoercion_maybe prepr_tc
-          co           = mkAppCoercion pdata_co
-                       $ mkTyConApp repr_co var_tys
+          co           = mkAppCo pdata_co
+                       $ mkAxInstCo repr_co var_tys
 
           scrut  = mkCoerce co (Var arg)
 

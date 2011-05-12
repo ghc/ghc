@@ -106,7 +106,9 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
 	-- The function adds parens in context that need
 	-- an atomic value (e.g. function args)
 
-ppr_expr add_par (Type ty)  = add_par (ptext (sLit "TYPE") <+> ppr ty)	-- Wierd
+ppr_expr add_par (Type ty) = add_par (ptext (sLit "TYPE") <+> ppr ty)	-- Wierd
+
+ppr_expr add_par (Coercion co) = add_par (ptext (sLit "CO") <+> ppr co)
 	           
 ppr_expr _       (Var name) = ppr name
 ppr_expr _       (Lit lit)  = ppr lit
@@ -255,8 +257,8 @@ pprArg :: OutputableBndr a => Expr a -> SDoc
 pprArg (Type ty) 
  | opt_SuppressTypeApplications	= empty
  | otherwise			= ptext (sLit "@") <+> pprParendType ty
-
-pprArg expr      = pprParendExpr expr
+pprArg (Coercion co) = ptext (sLit "@~") <+> pprParendCo co
+pprArg expr          = pprParendExpr expr
 \end{code}
 
 Other printing bits-and-bobs used with the general @pprCoreBinding@
@@ -268,7 +270,7 @@ instance OutputableBndr Var where
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
-  | isTyCoVar binder = pprKindedTyVarBndr binder
+  | isTyVar binder = pprKindedTyVarBndr binder
   | otherwise      = pprTypedBinder binder $$ 
 		     ppIdInfo binder (idInfo binder)
 
@@ -279,7 +281,7 @@ pprCoreBinder bind_site bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
-  | isTyCoVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
+  | isTyVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedLCBinder :: BindingSite -> Bool -> Var -> SDoc
@@ -287,7 +289,7 @@ pprTypedLCBinder :: BindingSite -> Bool -> Var -> SDoc
 pprTypedLCBinder bind_site debug_on var
   | not debug_on && isDeadBinder var    = char '_'
   | not debug_on, CaseBind <- bind_site = pprUntypedBinder var  -- No parens, no kind info
-  | isTyCoVar var                         = parens (pprKindedTyVarBndr var)
+  | isTyVar var                         = parens (pprKindedTyVarBndr var)
   | otherwise = parens (hang (pprIdBndr var) 
                            2 (vcat [ dcolon <+> pprType (idType var), pp_unf]))
               where
@@ -298,7 +300,7 @@ pprTypedLCBinder bind_site debug_on var
 pprTypedBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
 pprTypedBinder binder
-  | isTyCoVar binder		= pprKindedTyVarBndr binder
+  | isTyVar binder		= pprKindedTyVarBndr binder
   | opt_SuppressTypeSignatures	= empty
   | otherwise			= hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 

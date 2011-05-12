@@ -23,8 +23,8 @@ import DataCon
 import Id
 import IdInfo
 import TyCon
+import Coercion( pprCoAxiom )
 import TcType
-import Var
 import Name
 import Outputable
 import FastString
@@ -45,7 +45,7 @@ type ShowMe = Name -> Bool
 ----------------------------
 -- | Pretty-prints a 'TyThing' with its defining location.
 pprTyThingLoc :: PrintExplicitForalls -> TyThing -> SDoc
-pprTyThingLoc pefas tyThing 
+pprTyThingLoc pefas tyThing
   = showWithLoc loc (pprTyThing pefas tyThing)
   where loc = pprNameLoc (GHC.getName tyThing)
 
@@ -57,10 +57,11 @@ ppr_ty_thing :: PrintExplicitForalls -> ShowMe -> TyThing -> SDoc
 ppr_ty_thing pefas _ 	 (AnId id)          = pprId         pefas id
 ppr_ty_thing pefas _ 	 (ADataCon dataCon) = pprDataConSig pefas dataCon
 ppr_ty_thing pefas show_me (ATyCon tyCon)   = pprTyCon      pefas show_me tyCon
+ppr_ty_thing _     _       (ACoAxiom ax)    = pprCoAxiom    ax
 ppr_ty_thing pefas show_me (AClass cls)     = pprClass      pefas show_me cls
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
--- is a data constructor, record selector, or class method, then 
+-- is a data constructor, record selector, or class method, then
 -- the entity's parent declaration is pretty-printed with irrelevant
 -- parts omitted.
 pprTyThingInContext :: PrintExplicitForalls -> TyThing -> SDoc
@@ -77,7 +78,7 @@ pprTyThingInContextLoc pefas tyThing
                 (pprTyThingInContext pefas tyThing)
 
 pprTyThingParent_maybe :: TyThing -> Maybe TyThing
--- (pprTyThingParent_maybe x) returns (Just p) 
+-- (pprTyThingParent_maybe x) returns (Just p)
 -- when pprTyThingInContext sould print a declaration for p
 -- (albeit with some "..." in it) when asked to show x
 pprTyThingParent_maybe (ADataCon dc) = Just (ATyCon (dataConTyCon dc))
@@ -94,6 +95,7 @@ pprTyThingHdr :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingHdr pefas (AnId id)          = pprId         pefas id
 pprTyThingHdr pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
 pprTyThingHdr pefas (ATyCon tyCon)     = pprTyConHdr   pefas tyCon
+pprTyThingHdr _     (ACoAxiom ax)      = pprCoAxiom ax
 pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
@@ -103,7 +105,7 @@ pprTyConHdr _ tyCon
   | otherwise
   = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
-    vars | GHC.isPrimTyCon tyCon || 
+    vars | GHC.isPrimTyCon tyCon ||
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
 	 | otherwise = GHC.tyConTyVars tyCon
 
@@ -116,7 +118,7 @@ pprTyConHdr _ tyCon
       | otherwise             = empty
 
     opt_stupid 	-- The "stupid theta" part of the declaration
-	| isAlgTyCon tyCon = GHC.pprThetaArrow (tyConStupidTheta tyCon)
+	| isAlgTyCon tyCon = GHC.pprThetaArrowTy (tyConStupidTheta tyCon)
 	| otherwise	   = empty	-- Returns 'empty' if null theta
 
 pprDataConSig :: PrintExplicitForalls -> GHC.DataCon -> SDoc
@@ -125,14 +127,14 @@ pprDataConSig pefas dataCon
 
 pprClassHdr :: PrintExplicitForalls -> GHC.Class -> SDoc
 pprClassHdr _ cls
-  = ptext (sLit "class") <+> 
-    GHC.pprThetaArrow (GHC.classSCTheta cls) <+>
+  = ptext (sLit "class") <+>
+    GHC.pprThetaArrowTy (GHC.classSCTheta cls) <+>
     ppr_bndr cls <+>
     hsep (map ppr tyVars) <+>
     GHC.pprFundeps funDeps
   where
      (tyVars, funDeps) = GHC.classTvsFds cls
-     
+
 pprId :: PrintExplicitForalls -> Var -> SDoc
 pprId pefas ident
   = hang (ppr_bndr ident <+> dcolon)
@@ -147,7 +149,7 @@ pprTypeForUser :: PrintExplicitForalls -> GHC.Type -> SDoc
 --	forall a. C a => forall b. Ord b => stuff
 -- Then we want to display
 --	(C a, Ord b) => stuff
-pprTypeForUser print_foralls ty 
+pprTypeForUser print_foralls ty
   | print_foralls = ppr tidy_ty
   | otherwise     = ppr (mkPhiTy ctxt ty')
   where
@@ -160,7 +162,7 @@ pprTyCon pefas show_me tyCon
   = if GHC.isFamilyTyCon tyCon
     then pprTyConHdr pefas tyCon <+> dcolon <+> 
 	 pprTypeForUser pefas (GHC.synTyConResKind tyCon)
-    else 
+    else
       let rhs_type = GHC.synTyConType tyCon
       in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprTypeForUser pefas rhs_type)
   | otherwise
@@ -168,7 +170,7 @@ pprTyCon pefas show_me tyCon
 
 pprAlgTyCon :: PrintExplicitForalls -> ShowMe -> TyCon -> SDoc
 pprAlgTyCon pefas show_me tyCon
-  | gadt      = pprTyConHdr pefas tyCon <+> ptext (sLit "where") $$ 
+  | gadt      = pprTyConHdr pefas tyCon <+> ptext (sLit "where") $$
 		   nest 2 (vcat (ppr_trim show_con datacons))
   | otherwise = hang (pprTyConHdr pefas tyCon)
     		   2 (add_bars (ppr_trim show_con datacons))
@@ -184,8 +186,8 @@ pprAlgTyCon pefas show_me tyCon
 pprDataConDecl :: PrintExplicitForalls -> ShowMe -> Bool -> GHC.DataCon -> SDoc
 pprDataConDecl pefas show_me gadt_style dataCon
   | not gadt_style = ppr_fields tys_w_strs
-  | otherwise      = ppr_bndr dataCon <+> dcolon <+> 
-			sep [ pp_foralls, GHC.pprThetaArrow theta, pp_tau ]
+  | otherwise      = ppr_bndr dataCon <+> dcolon <+>
+			sep [ pp_foralls, GHC.pprThetaArrowTy theta, pp_tau ]
 	-- Printing out the dataCon as a type signature, in GADT style
   where
     (forall_tvs, theta, tau) = tcSplitSigmaTy (GHC.dataConUserType dataCon)
@@ -214,15 +216,15 @@ pprDataConDecl pefas show_me gadt_style dataCon
 	| null labels
 	= ppr_bndr dataCon <+> sep (map pprParendBangTy fields)
 	| otherwise
-	= ppr_bndr dataCon <+> 
-		braces (sep (punctuate comma (ppr_trim maybe_show_label 
+	= ppr_bndr dataCon <+>
+		braces (sep (punctuate comma (ppr_trim maybe_show_label
 					(zip labels fields))))
 
 pprClass :: PrintExplicitForalls -> ShowMe -> GHC.Class -> SDoc
 pprClass pefas show_me cls
   | null methods
   = pprClassHdr pefas cls
-  | otherwise 
+  | otherwise
   = hang (pprClassHdr pefas cls <+> ptext (sLit "where"))
        2 (vcat (ppr_trim show_meth methods))
   where
@@ -237,7 +239,7 @@ pprClassMethod pefas id
   -- Here's the magic incantation to strip off the dictionary
   -- from the class op type.  Stolen from IfaceSyn.tyThingToIfaceDecl.
   --
-  -- It's important to tidy it *before* splitting it up, so that if 
+  -- It's important to tidy it *before* splitting it up, so that if
   -- we have	class C a b where
   --	          op :: forall a. a -> b
   -- then the inner forall on op gets renamed to a1, and we print
@@ -268,7 +270,7 @@ ppr_bndr :: GHC.NamedThing a => a -> SDoc
 ppr_bndr a = GHC.pprParenSymName a
 
 showWithLoc :: SDoc -> SDoc -> SDoc
-showWithLoc loc doc 
+showWithLoc loc doc
     = hang doc 2 (char '\t' <> comment <+> loc)
 		-- The tab tries to make them line up a bit
   where

@@ -207,6 +207,7 @@ do_one env (id, rhs)
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
 tryForCSE _   (Type t) = Type t
+tryForCSE _   (Coercion c) = Coercion c
 tryForCSE env expr     = case lookupCSEnv env expr' of
 			    Just smaller_expr -> smaller_expr
  			    Nothing  	      -> expr'
@@ -215,6 +216,7 @@ tryForCSE env expr     = case lookupCSEnv env expr' of
 
 cseExpr :: CSEnv -> CoreExpr -> CoreExpr
 cseExpr _   (Type t)               = Type t
+cseExpr _   (Coercion co)          = Coercion co
 cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)

@@ -1022,11 +1022,12 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     word32PrimTyConKey, word32TyConKey, word64PrimTyConKey, word64TyConKey,
     liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
-    funPtrTyConKey, tVarPrimTyConKey :: Unique
+    funPtrTyConKey, tVarPrimTyConKey, eqPredPrimTyConKey :: Unique
 statePrimTyConKey			= mkPreludeTyConUnique 50
 stableNamePrimTyConKey			= mkPreludeTyConUnique 51
-stableNameTyConKey		        = mkPreludeTyConUnique 52
-mutVarPrimTyConKey			= mkPreludeTyConUnique 55
+stableNameTyConKey                      = mkPreludeTyConUnique 52
+eqPredPrimTyConKey                      = mkPreludeTyConUnique 53
+mutVarPrimTyConKey                      = mkPreludeTyConUnique 55
 ioTyConKey				= mkPreludeTyConUnique 56
 wordPrimTyConKey			= mkPreludeTyConUnique 58
 wordTyConKey				= mkPreludeTyConUnique 59
@@ -1066,9 +1067,8 @@ eitherTyConKey :: Unique
 eitherTyConKey				= mkPreludeTyConUnique 84
 
 -- Super Kinds constructors
-tySuperKindTyConKey, coSuperKindTyConKey :: Unique
+tySuperKindTyConKey :: Unique
 tySuperKindTyConKey                    = mkPreludeTyConUnique 85
-coSuperKindTyConKey                    = mkPreludeTyConUnique 86
 
 -- Kind constructors
 liftedTypeKindTyConKey, openTypeKindTyConKey, unliftedTypeKindTyConKey,
@@ -1256,6 +1256,9 @@ mapIdKey, groupWithIdKey, dollarIdKey :: Unique
 mapIdKey	      = mkPreludeMiscIdUnique 69
 groupWithIdKey        = mkPreludeMiscIdUnique 70
 dollarIdKey           = mkPreludeMiscIdUnique 71
+
+coercionTokenIdKey :: Unique
+coercionTokenIdKey    = mkPreludeMiscIdUnique 72
 
 -- Parallel array functions
 singletonPIdKey, nullPIdKey, lengthPIdKey, replicatePIdKey, mapPIdKey,

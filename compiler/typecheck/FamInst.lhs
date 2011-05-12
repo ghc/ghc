@@ -196,17 +196,11 @@ addFamInstLoc famInst thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
     loc = getSrcLoc famInst
-\end{code} 
-
-\begin{code} 
 
 tcGetFamInstEnvs :: TcM (FamInstEnv, FamInstEnv)
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
 tcGetFamInstEnvs 
   = do { eps <- getEps; env <- getGblEnv
-       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) 
-       }
-
-
+       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
 \end{code}

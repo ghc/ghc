@@ -45,22 +45,19 @@ import TyCon
 import Name
 import VarEnv
 import Util
-import ListSetOps
 import VarSet
 import TysPrim
 import PrelNames
 import TysWiredIn
 import DynFlags
-import Outputable
+import Outputable as Ppr
 import FastString
--- import Panic
-
 import Constants        ( wORD_SIZE )
-
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO ( IO(..) )
 
+import StaticFlags( opt_PprStyle_Debug )
 import Control.Monad
 import Data.Maybe
 import Data.Array.Base
@@ -186,7 +183,7 @@ getClosureData a =
                elems = fromIntegral (BCI.ptrs itbl)
                ptrsList = Array 0 (elems - 1) elems ptrs
                nptrs_data = [W# (indexWordArray# nptrs i)
-                              | I# i <- [0.. fromIntegral (BCI.nptrs itbl)] ]
+                              | I# i <- [0.. fromIntegral (BCI.nptrs itbl)-1] ]
            ASSERT(elems >= 0) return ()
            ptrsList `seq` 
             return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
@@ -346,10 +343,17 @@ ppr_termM y p Term{dc=Right dc, subTerms=tt}
   = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2) 
     <+> hsep (map (ppr_term1 True) tt) 
 -} -- TODO Printing infix constructors properly
-  | null tt   = return$ ppr dc
-  | otherwise = do
-         tt_docs <- mapM (y app_prec) tt
-         return$ cparen (p >= app_prec) (ppr dc <+> pprDeeperList fsep tt_docs)
+  | null sub_terms_to_show
+  = return (ppr dc)
+  | otherwise 
+  = do { tt_docs <- mapM (y app_prec) sub_terms_to_show
+       ; return $ cparen (p >= app_prec) $
+         sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)] }
+  where
+    sub_terms_to_show	-- Don't show the dictionary arguments to 
+    			-- constructors unless -dppr-debug is on
+      | opt_PprStyle_Debug = tt
+      | otherwise = dropList (dataConTheta dc) tt
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 ppr_termM y p RefWrap{wrapped_term=t}  = do
@@ -414,55 +418,70 @@ cPprTerm printers_ = go 0 where
   firstJustM [] = return Nothing
 
 -- Default set of custom printers. Note that the recursion knot is explicit
-cPprTermBase :: Monad m => CustomTermPrinter m
+cPprTermBase :: forall m. Monad m => CustomTermPrinter m
 cPprTermBase y =
   [ ifTerm (isTupleTy.ty) (\_p -> liftM (parens . hcat . punctuate comma) 
                                       . mapM (y (-1))
                                       . subTerms)
   , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
-           (\ p t -> doList p t)
-  , ifTerm (isTyCon intTyCon    . ty) (coerceShow$ \(a::Int)->a)
-  , ifTerm (isTyCon charTyCon   . ty) (coerceShow$ \(a::Char)->a)
-  , ifTerm (isTyCon floatTyCon  . ty) (coerceShow$ \(a::Float)->a)
-  , ifTerm (isTyCon doubleTyCon . ty) (coerceShow$ \(a::Double)->a)
-  , ifTerm (isIntegerTy         . ty) (coerceShow$ \(a::Integer)->a)
+           ppr_list
+  , ifTerm (isTyCon intTyCon    . ty) ppr_int
+  , ifTerm (isTyCon charTyCon   . ty) ppr_char
+  , ifTerm (isTyCon floatTyCon  . ty) ppr_float
+  , ifTerm (isTyCon doubleTyCon . ty) ppr_double
+  , ifTerm (isIntegerTy         . ty) ppr_integer
   ]
-     where ifTerm pred f prec t@Term{}
-               | pred t    = Just `liftM` f prec t
-           ifTerm _ _ _ _  = return Nothing
+ where 
+   ifTerm :: (Term -> Bool)
+          -> (Precedence -> Term -> m SDoc)
+          -> Precedence -> Term -> m (Maybe SDoc)
+   ifTerm pred f prec t@Term{}
+       | pred t    = Just `liftM` f prec t
+   ifTerm _ _ _ _  = return Nothing
 
-           isTupleTy ty    = fromMaybe False $ do 
-             (tc,_) <- tcSplitTyConApp_maybe ty 
-             return (isBoxedTupleTyCon tc)
+   isTupleTy ty    = fromMaybe False $ do 
+     (tc,_) <- tcSplitTyConApp_maybe ty 
+     return (isBoxedTupleTyCon tc)
 
-           isTyCon a_tc ty = fromMaybe False $ do 
-             (tc,_) <- tcSplitTyConApp_maybe ty
-             return (a_tc == tc)
+   isTyCon a_tc ty = fromMaybe False $ do 
+     (tc,_) <- tcSplitTyConApp_maybe ty
+     return (a_tc == tc)
 
-           isIntegerTy ty = fromMaybe False $ do
-             (tc,_) <- tcSplitTyConApp_maybe ty
-             return (tyConName tc == integerTyConName)
+   isIntegerTy ty = fromMaybe False $ do
+     (tc,_) <- tcSplitTyConApp_maybe ty
+     return (tyConName tc == integerTyConName)
 
-           coerceShow f _p = return . text . show . f . unsafeCoerce# . val
+   ppr_int, ppr_char, ppr_float, ppr_double, ppr_integer 
+      :: Precedence -> Term -> m SDoc
+   ppr_int     _ v = return (Ppr.int     (unsafeCoerce# (val v)))
+   ppr_char    _ v = return (Ppr.char '\'' <> Ppr.char (unsafeCoerce# (val v)) <> Ppr.char '\'')
+   ppr_float   _ v = return (Ppr.float   (unsafeCoerce# (val v)))
+   ppr_double  _ v = return (Ppr.double  (unsafeCoerce# (val v)))
+   ppr_integer _ v = return (Ppr.integer (unsafeCoerce# (val v)))
 
-           --Note pprinting of list terms is not lazy
-           doList p (Term{subTerms=[h,t]}) = do
-               let elems      = h : getListTerms t
-                   isConsLast = not(termType(last elems) `coreEqType` termType h)
-               print_elems <- mapM (y cons_prec) elems
-               return$ if isConsLast
-                     then cparen (p >= cons_prec) 
-                        . pprDeeperList fsep 
-                        . punctuate (space<>colon)
-                        $ print_elems
-                     else brackets (pprDeeperList fcat$
-                                         punctuate comma print_elems)
+   --Note pprinting of list terms is not lazy
+   ppr_list :: Precedence -> Term -> m SDoc
+   ppr_list p (Term{subTerms=[h,t]}) = do
+       let elems      = h : getListTerms t
+           isConsLast = not(termType(last elems) `eqType` termType h)
+   	   is_string  = all (isCharTy . ty) elems
 
-                where getListTerms Term{subTerms=[h,t]} = h : getListTerms t
-                      getListTerms Term{subTerms=[]}    = []
-                      getListTerms t@Suspension{}       = [t]
-                      getListTerms t = pprPanic "getListTerms" (ppr t)
-           doList _ _ = panic "doList"
+       print_elems <- mapM (y cons_prec) elems
+       if is_string
+        then return (Ppr.doubleQuotes (Ppr.text (unsafeCoerce# (map val elems))))
+        else if isConsLast
+        then return $ cparen (p >= cons_prec) 
+                    $ pprDeeperList fsep 
+                    $ punctuate (space<>colon) print_elems
+        else return $ brackets 
+                    $ pprDeeperList fcat
+                    $ punctuate comma print_elems
+
+        where getListTerms Term{subTerms=[h,t]} = h : getListTerms t
+              getListTerms Term{subTerms=[]}    = []
+              getListTerms t@Suspension{}       = [t]
+              getListTerms t = pprPanic "getListTerms" (ppr t)
+   ppr_list _ _ = panic "doList"
 
 
 repPrim :: TyCon -> [Word] -> String
@@ -566,6 +585,11 @@ liftTcM = id
 newVar :: Kind -> TR TcType
 newVar = liftTcM . newFlexiTyVarTy
 
+instTyVars :: [TyVar] -> TR ([TcTyVar], [TcType], TvSubst)
+-- Instantiate fresh mutable type variables from some TyVars
+-- This function preserves the print-name, which helps error messages
+instTyVars = liftTcM . tcInstTyVars
+
 type RttiInstantiation = [(TcTyVar, TyVar)]
    -- Associates the typechecker-world meta type variables 
    -- (which are mutable and may be refined), to their 
@@ -658,7 +682,10 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             text "Type obtained: " <> ppr (termType term))
    return term
     where 
+
   go :: Int -> Type -> Type -> HValue -> TcM Term
+   -- [SPJ May 11] I don't understand the difference between my_ty and old_ty
+
   go max_depth _ _ _ | seq max_depth False = undefined
   go 0 my_ty _old_ty a = do
     traceTR (text "Gave up reconstructing a term after" <>
@@ -704,7 +731,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
         traceTR (text "entering a constructor " <>
                       if monomorphic
                         then parens (text "already monomorphic: " <> ppr my_ty)
-                        else Outputable.empty)
+                        else Ppr.empty)
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
         case mb_dc of
@@ -713,59 +740,34 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         -- In such case, we return a best approximation:
                         --  ignore the unpointed args, and recover the pointeds
                         -- This preserves laziness, and should be safe.
+		       traceTR (text "Nothing" <+> ppr dcname)
                        let tag = showSDoc (ppr dcname)
                        vars     <- replicateM (length$ elems$ ptrs clos) 
-                                              (newVar (liftedTypeKind))
+                                              (newVar liftedTypeKind)
                        subTerms <- sequence [appArr (go (pred max_depth) tv tv) (ptrs clos) i 
                                               | (i, tv) <- zip [0..] vars]
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
-            let subTtypes  = matchSubTypes dc old_ty
-            subTermTvs    <- mapMif (not . isMonomorphic)
-                                    (\t -> newVar (typeKind t))
-                                    subTtypes
-            let (subTermsP, subTermsNP) = partition (\(ty,_) -> isLifted ty
-                                                             || isRefType ty)
-                                                    (zip subTtypes subTermTvs)
-                (subTtypesP,   subTermTvsP ) = unzip subTermsP
-                (subTtypesNP, _subTermTvsNP) = unzip subTermsNP
-
-            -- When we already have all the information, avoid solving
-            -- unnecessary constraints. Propagation of type information
-            -- to subterms is already being done via matching.
-            when (not monomorphic) $ do
-               let myType = mkFunTys subTermTvs my_ty
-               (signatureType,_) <- instScheme (mydataConType dc)
-            -- It is vital for newtype reconstruction that the unification step
-            -- is done right here, _before_ the subterms are RTTI reconstructed
-               addConstraint myType signatureType
+            traceTR (text "Just" <+> ppr dc)
+            subTtypes <- getDataConArgTys dc my_ty
+            let (subTtypesP, subTtypesNP) = partition isPtrType subTtypes
             subTermsP <- sequence
-                  [ appArr (go (pred max_depth) tv t) (ptrs clos) i
-                   | (i,tv,t) <- zip3 [0..] subTermTvsP subTtypesP]
+                  [ appArr (go (pred max_depth) ty ty) (ptrs clos) i
+                  | (i,ty) <- zip [0..] subTtypesP]
             let unboxeds   = extractUnboxed subTtypesNP clos
-                subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)
+                subTermsNP = zipWith Prim subTtypesNP unboxeds
                 subTerms   = reOrderTerms subTermsP subTermsNP subTtypes
             return (Term my_ty (Right dc) a subTerms)
+
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       tipe_clos ->
          return (Suspension tipe_clos my_ty a Nothing)
-
-  matchSubTypes dc ty
-    | ty' <- repType ty     -- look through newtypes
-    , Just (tc,ty_args) <- tcSplitTyConApp_maybe ty'
-    , dc `elem` tyConDataCons tc
-      -- It is necessary to check that dc is actually a constructor for tycon tc,
-      -- because it may be the case that tc is a recursive newtype and tcSplitTyConApp
-      -- has not removed it. In that case, we happily give up and don't match
-    = myDataConInstArgTys dc ty_args
-    | otherwise = dataConRepArgTys dc
 
   -- put together pointed and nonpointed subterms in the
   --  correct order.
   reOrderTerms _ _ [] = []
   reOrderTerms pointed unpointed (ty:tys) 
-   | isLifted ty || isRefType ty
-                  = ASSERT2(not(null pointed)
+   | isPtrType ty = ASSERT2(not(null pointed)
                             , ptext (sLit "reOrderTerms") $$ 
                                         (ppr pointed $$ ppr unpointed))
                     let (t:tt) = pointed in t : reOrderTerms tt unpointed tys
@@ -835,6 +837,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
    -- returns unification tasks,since we are going to want a breadth-first search
   go :: Type -> HValue -> TR [(Type, HValue)]
   go my_ty a = do
+    traceTR (text "go" <+> ppr my_ty)
     clos <- trIO $ getClosureData a
     case tipe clos of
       Blackhole -> appArr (go my_ty) (ptrs clos) 0 -- carefully, don't eval the TSO
@@ -847,6 +850,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
          return [(tv', contents)]
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
+        traceTR (text "Constr1" <+> ppr dcname)
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
         case mb_dc of
           Nothing-> do
@@ -856,17 +860,10 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
                         return$ appArr (\e->(tv,e)) (ptrs clos) i
 
           Just dc -> do
-            subTtypes <- mapMif (not . isMonomorphic)
-                                (\t -> newVar (typeKind t))
-                                (dataConRepArgTys dc)
-
-            -- It is vital for newtype reconstruction that the unification step
-            -- is done right here, _before_ the subterms are RTTI reconstructed
-            let myType         = mkFunTys subTtypes my_ty
-            (signatureType,_) <- instScheme (mydataConType dc)
-            addConstraint myType signatureType
-            return $ [ appArr (\e->(t,e)) (ptrs clos) i
-                       | (i,t) <- zip [0..] (filter (isLifted |.| isRefType) subTtypes)]
+            arg_tys <- getDataConArgTys dc my_ty
+	    traceTR (text "Constr2" <+> ppr dcname <+> ppr arg_tys)
+            return $ [ appArr (\e-> (ty,e)) (ptrs clos) i
+                     | (i,ty) <- zip [0..] (filter isPtrType arg_tys)]
       _ -> return []
 
 -- Compute the difference between a base type and the type found by RTTI
@@ -877,36 +874,36 @@ improveRTTIType :: HscEnv -> RttiType -> RttiType -> Maybe TvSubst
 improveRTTIType _ base_ty new_ty
   = U.tcUnifyTys (const U.BindMe) [base_ty] [new_ty]
 
-myDataConInstArgTys :: DataCon -> [Type] -> [Type]
-myDataConInstArgTys dc args
-    | null (dataConExTyVars dc) && null (dataConEqTheta dc) = dataConInstArgTys dc args
-    | otherwise = dataConRepArgTys dc
+getDataConArgTys :: DataCon -> Type -> TR [Type]
+-- Given the result type ty of a constructor application (D a b c :: ty) 
+-- return the types of the arguments.  This is RTTI-land, so 'ty' might
+-- not be fully known.  Moreover, the arg types might involve existentials;
+-- if so, make up fresh RTTI type variables for them
+getDataConArgTys dc con_app_ty
+  = do { (_, ex_tys, _) <- instTyVars ex_tvs
+       ; let rep_con_app_ty = repType con_app_ty
+       ; ty_args <- case tcSplitTyConApp_maybe rep_con_app_ty of
+                       Just (tc, ty_args) | dataConTyCon dc == tc
+		       	   -> ASSERT( univ_tvs `equalLength` ty_args) 
+                              return ty_args
+ 		       _   -> do { (_, ty_args, subst) <- instTyVars univ_tvs
+		       	         ; let res_ty = substTy subst (dataConOrigResTy dc)
+                                 ; addConstraint rep_con_app_ty res_ty
+                                 ; return ty_args }
+		-- It is necessary to check dataConTyCon dc == tc
+      		-- because it may be the case that tc is a recursive
+      		-- newtype and tcSplitTyConApp has not removed it. In
+      		-- that case, we happily give up and don't match
+       ; let subst = zipTopTvSubst (univ_tvs ++ ex_tvs) (ty_args ++ ex_tys)
+       ; return (substTys subst (dataConRepArgTys dc)) }
+  where
+    univ_tvs = dataConUnivTyVars dc
+    ex_tvs   = dataConExTyVars dc
 
-mydataConType :: DataCon -> QuantifiedType
--- ^ Custom version of DataCon.dataConUserType where we
---    - remove the equality constraints
---    - use the representation types for arguments, including dictionaries
---    - keep the original result type
-mydataConType  dc
-  = ( (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
-    , mkFunTys arg_tys res_ty )
-  where univ_tvs   = dataConUnivTyVars dc
-        ex_tvs     = dataConExTyVars dc
-        eq_spec    = dataConEqSpec dc
-        arg_tys    = [case a of
-                        PredTy p -> predTypeRep p
-                        _        -> a
-                     | a <- dataConRepArgTys dc]
-        res_ty     = dataConOrigResTy dc
-
-isRefType :: Type -> Bool
-isRefType ty
-   | Just (tc, _) <- tcSplitTyConApp_maybe ty' = isRefTyCon tc
-   | otherwise = False
-  where ty'= repType ty
-
-isRefTyCon :: TyCon -> Bool
-isRefTyCon tc = tc `elem` [mutVarPrimTyCon, mVarPrimTyCon, tVarPrimTyCon]
+isPtrType :: Type -> Bool
+isPtrType ty = case typePrimRep ty of
+                 PtrRep -> True
+                 _      -> False
 
 -- Soundness checks
 --------------------
@@ -1103,7 +1100,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
             | otherwise = do
                traceTR (text "(Upgrade) upgraded " <> ppr ty <>
                         text " in presence of newtype evidence " <> ppr new_tycon)
-               vars <- mapM (newVar . tyVarKind) (tyConTyVars new_tycon)
+               (_, vars, _) <- instTyVars (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon vars
                _ <- liftTcM (unifyType ty (repType ty'))
         -- assumes that reptype doesn't ^^^^ touch tyconApp args 
@@ -1183,12 +1180,6 @@ quantifyType :: Type -> QuantifiedType
 -- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
 quantifyType ty = (varSetElems (tyVarsOfType ty), ty)
 
-mapMif :: Monad m => (a -> Bool) -> (a -> m a) -> [a] -> m [a]
-mapMif pred f xx = sequence $ mapMif_ pred f xx
-  where
-   mapMif_ _ _ []     = []
-   mapMif_ pred f (x:xx) = (if pred x then f x else return x) : mapMif_ pred f xx
-
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = condM >>= \c -> unless c acc
 
@@ -1205,24 +1196,10 @@ amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
     where g (I# i#) = case indexArray# arr# i# of
                           (# e #) -> f e
 
-
-isLifted :: Type -> Bool
-isLifted =  not . isUnLiftedType
-
 extractUnboxed  :: [Type] -> Closure -> [[Word]]
 extractUnboxed tt clos = go tt (nonPtrs clos)
-   where sizeofType t
-           | Just (tycon,_) <- tcSplitTyConApp_maybe t
-           = ASSERT (isPrimTyCon tycon) sizeofTyCon tycon
-           | otherwise = pprPanic "Expected a TcTyCon" (ppr t)
+   where sizeofType t = primRepSizeW (typePrimRep t)
          go [] _ = []
          go (t:tt) xx 
            | (x, rest) <- splitAt (sizeofType t) xx
            = x : go tt rest
-
-sizeofTyCon :: TyCon -> Int -- in *words*
-sizeofTyCon = primRepSizeW . tyConPrimRep
-
-
-(|.|) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
-(f |.| g) x = f x || g x

@@ -17,7 +17,6 @@ import Vectorise.Vect
 import Vectorise.Type.Type
 import CoreSyn
 import Type
-import Var
 import VarEnv
 import Literal
 import Id

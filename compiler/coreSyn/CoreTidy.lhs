@@ -17,7 +17,7 @@ import CoreSyn
 import CoreArity
 import Id
 import IdInfo
-import TcType( tidyType, tidyTyVarBndr )
+import TcType( tidyType, tidyCo, tidyTyVarBndr )
 import Var
 import VarEnv
 import UniqFM
@@ -55,11 +55,12 @@ tidyBind env (Rec prs)
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
 tidyExpr env (Var v)   	 =  Var (tidyVarOcc env v)
-tidyExpr env (Type ty) 	 =  Type (tidyType env ty)
+tidyExpr env (Type ty)  =  Type (tidyType env ty)
+tidyExpr env (Coercion co) = Coercion (tidyCo env co)
 tidyExpr _   (Lit lit)   =  Lit lit
 tidyExpr env (App f a) 	 =  App (tidyExpr env f) (tidyExpr env a)
 tidyExpr env (Note n e)  =  Note (tidyNote env n) (tidyExpr env e)
-tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyType env co)
+tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyCo env co)
 
 tidyExpr env (Let b e) 
   = tidyBind env b 	=: \ (env', b') ->
@@ -125,7 +126,7 @@ tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 -- tidyBndr is used for lambda and case binders
 tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
-  | isTyCoVar var = tidyTyVarBndr env var
+  | isTyVar var = tidyTyVarBndr env var
   | otherwise   = tidyIdBndr env var
 
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
