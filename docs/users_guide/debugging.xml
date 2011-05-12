@@ -24,8 +24,9 @@
         a short form&hellip;).  You can get all of these at once
         (<emphasis>lots</emphasis> of output) by using
         <option>-v5</option>, or most of them with
-        <option>-v4</option>.  Some of the most useful ones
-        are:</para>
+        <option>-v4</option>.  You can prevent them from clogging up
+        your standard output by passing <option>-ddump-to-file</option>.
+        Some of the most useful ones are:</para>
 
 	  <variablelist>
 	    <varlistentry>
