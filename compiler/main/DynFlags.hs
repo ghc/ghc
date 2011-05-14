@@ -122,6 +122,21 @@ data DynFlag
    | Opt_D_dump_raw_cmm
    | Opt_D_dump_cmmz
    | Opt_D_dump_cmmz_pretty
+   -- All of the cmmz subflags (there are a lot!)  Automatically
+   -- enabled if you run -ddump-cmmz
+   | Opt_D_dump_cmmz_cbe
+   | Opt_D_dump_cmmz_proc
+   | Opt_D_dump_cmmz_spills
+   | Opt_D_dump_cmmz_rewrite
+   | Opt_D_dump_cmmz_dead
+   | Opt_D_dump_cmmz_stub
+   | Opt_D_dump_cmmz_sp
+   | Opt_D_dump_cmmz_procmap
+   | Opt_D_dump_cmmz_split
+   | Opt_D_dump_cmmz_lower
+   | Opt_D_dump_cmmz_info
+   | Opt_D_dump_cmmz_cafs
+   -- end cmmz subflags
    | Opt_D_dump_cps_cmm
    | Opt_D_dump_cvt_cmm
    | Opt_D_dump_asm
@@ -1254,6 +1269,18 @@ dynamic_flags = [
   , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
   , Flag "ddump-cmmz-pretty"       (setDumpFlag Opt_D_dump_cmmz_pretty)
+  , Flag "ddump-cmmz-cbe"          (setDumpFlag Opt_D_dump_cmmz_cbe)
+  , Flag "ddump-cmmz-spills"       (setDumpFlag Opt_D_dump_cmmz_spills)
+  , Flag "ddump-cmmz-proc"         (setDumpFlag Opt_D_dump_cmmz_proc)
+  , Flag "ddump-cmmz-rewrite"      (setDumpFlag Opt_D_dump_cmmz_rewrite)
+  , Flag "ddump-cmmz-dead"         (setDumpFlag Opt_D_dump_cmmz_dead)
+  , Flag "ddump-cmmz-stub"         (setDumpFlag Opt_D_dump_cmmz_stub)
+  , Flag "ddump-cmmz-sp"           (setDumpFlag Opt_D_dump_cmmz_sp)
+  , Flag "ddump-cmmz-procmap"      (setDumpFlag Opt_D_dump_cmmz_procmap)
+  , Flag "ddump-cmmz-split"        (setDumpFlag Opt_D_dump_cmmz_split)
+  , Flag "ddump-cmmz-lower"        (setDumpFlag Opt_D_dump_cmmz_lower)
+  , Flag "ddump-cmmz-info"         (setDumpFlag Opt_D_dump_cmmz_info)
+  , Flag "ddump-cmmz-cafs"         (setDumpFlag Opt_D_dump_cmmz_cafs)
   , Flag "ddump-core-stats"        (setDumpFlag Opt_D_dump_core_stats)
   , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
   , Flag "ddump-cvt-cmm"           (setDumpFlag Opt_D_dump_cvt_cmm)
