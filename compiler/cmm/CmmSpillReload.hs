@@ -195,6 +195,7 @@ removeDeadAssignmentsAndReloads procPoints g =
          middle :: CmmNode O O -> Fact O DualLive -> CmmReplGraph O O
          middle (CmmAssign (CmmLocal reg') _) live | not (reg' `elemRegSet` in_regs live) = return $ Just emptyGraph
          -- XXX maybe this should be somewhere else...
+         middle (CmmAssign lhs (CmmReg rhs))   _ | lhs == rhs = return $ Just emptyGraph
          middle (CmmStore lhs (CmmLoad rhs _)) _ | lhs == rhs = return $ Just emptyGraph
          middle _ _ = return Nothing
 
@@ -457,7 +458,10 @@ middleAssignment n@(AssignLocal r e usage) assign
             decide CmmLoad{}      = AlwaysSink e
             decide CmmStackSlot{} = AlwaysSink e
             decide CmmMachOp{}    = AlwaysSink e
-            decide CmmRegOff{}    = AlwaysSink e
+            -- We'll always inline simple operations on the global
+            -- registers, to reduce register pressure: Sp - 4 or Hp - 8
+            -- EZY: Justify this optimization more carefully.
+            decide CmmRegOff{}    = AlwaysInline e
 
 -- Algorithm for unannotated assignments of global registers:
 -- 1. Delete any sinking assignments that were used by this instruction
@@ -553,8 +557,9 @@ assignmentRewrite :: FwdRewrite FuelUniqSM (WithRegUsage CmmNode) AssignmentMap
 assignmentRewrite = mkFRewrite3 first middle last
     where
         first _ _ = return Nothing
+        middle :: WithRegUsage CmmNode O O -> AssignmentMap -> GenCmmReplGraph (WithRegUsage CmmNode) O O
         middle (Plain m) assign = return $ rewrite assign (precompute assign m) mkMiddle m
-        middle _ _ = return Nothing
+        middle (AssignLocal l e u) assign = return $ rewriteLocal assign (precompute assign (CmmAssign (CmmLocal l) e)) mkMiddle l e u
         last (Plain l) assign = return $ rewrite assign (precompute assign l) mkLast l
         -- Tuple is (inline?, reloads)
         precompute assign n = foldRegsUsed f (False, []) n -- duplicates are harmless
@@ -580,20 +585,31 @@ assignmentRewrite = mkFRewrite3 first middle last
         rewrite _ (True, []) _ n | not (inlinable n) = Nothing -- see [CmmCall Inline Hack]
         rewrite assign (i, xs) mk n = Just $ mkMiddles xs <*> mk (Plain (inline i assign n))
 
+        rewriteLocal _ (False, []) _ _ _ _ = Nothing
+        rewriteLocal assign (i, xs) mk l e u = Just $ mkMiddles xs <*> mk n'
+            where n' = AssignLocal l e' u
+                  e' = if i then wrapRecExp (inlineExp assign) e else e
+            -- inlinable check omitted, since we can always inline into
+            -- assignments.
+
         inline :: Bool -> AssignmentMap -> CmmNode e x -> CmmNode e x
         inline False _ n = n
         inline True  _ n | not (inlinable n) = n -- see [CmmCall Inline Hack]
-        inline True assign n = mapExpDeep inlineExp n
-            where inlineExp old@(CmmReg (CmmLocal r))
-                    = case lookupUFM assign r of
-                        Just (AlwaysInline x) -> x
-                        _ -> old
-                  inlineExp old@(CmmRegOff (CmmLocal r) i)
-                    = case lookupUFM assign r of
-                        Just (AlwaysInline x) -> CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
-                            where rep = typeWidth (localRegType r)
-                        _ -> old
-                  inlineExp old = old
+        inline True assign n = mapExpDeep (inlineExp assign) n
+
+        inlineExp assign old@(CmmReg (CmmLocal r))
+          = case lookupUFM assign r of
+              Just (AlwaysInline x) -> x
+              _ -> old
+        inlineExp assign old@(CmmRegOff (CmmLocal r) i)
+          = case lookupUFM assign r of
+              Just (AlwaysInline x) ->
+                case x of
+                    (CmmRegOff r' i') -> CmmRegOff r' (i + i')
+                    _ -> CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
+                          where rep = typeWidth (localRegType r)
+              _ -> old
+        inlineExp _ old = old
 
         inlinable :: CmmNode e x -> Bool
         inlinable (CmmCall{}) = False

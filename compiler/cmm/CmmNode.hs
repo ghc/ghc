@@ -10,7 +10,7 @@
 module CmmNode
   ( CmmNode(..)
   , UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..)
-  , mapExp, mapExpDeep, foldExp, foldExpDeep
+  , mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf
   )
 where
 
