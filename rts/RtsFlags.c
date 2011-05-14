@@ -34,6 +34,14 @@ char  **full_prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
 char   *rts_argv[MAX_RTS_ARGS];
+#if defined(mingw32_HOST_OS)
+// On Windows, we want to use GetCommandLineW rather than argc/argv,
+// but we need to mutate the command line arguments for withProgName and
+// friends. The System.Environment module achieves that using this bit of
+// shared state:
+int       win32_prog_argc = 0;
+wchar_t **win32_prog_argv = NULL;
+#endif
 
 /*
  * constants, used later 
@@ -1536,3 +1544,53 @@ freeFullProgArgv (void)
     full_prog_argc = 0;
     full_prog_argv = NULL;
 }
+
+#if defined(mingw32_HOST_OS)
+void freeWin32ProgArgv (void);
+
+void
+freeWin32ProgArgv (void)
+{
+    int i;
+
+    if (win32_prog_argv != NULL) {
+        for (i = 0; i < win32_prog_argc; i++) {
+            stgFree(win32_prog_argv[i]);
+        }
+        stgFree(win32_prog_argv);
+    }
+
+    win32_prog_argc = 0;
+    win32_prog_argv = NULL;
+}
+
+void
+getWin32ProgArgv(int *argc, wchar_t **argv[])
+{
+    *argc = win32_prog_argc;
+    *argv = win32_prog_argv;
+}
+
+void
+setWin32ProgArgv(int argc, wchar_t *argv[])
+{
+	int i;
+    
+	freeWin32ProgArgv();
+
+    win32_prog_argc = argc;
+	if (argv == NULL) {
+		win32_prog_argv = NULL;
+		return;
+	}
+	
+    win32_prog_argv = stgCallocBytes(argc + 1, sizeof (wchar_t *),
+                                    "setWin32ProgArgv 1");
+    for (i = 0; i < argc; i++) {
+        win32_prog_argv[i] = stgMallocBytes((wcslen(argv[i]) + 1) * sizeof(wchar_t),
+                                           "setWin32ProgArgv 2");
+        wcscpy(win32_prog_argv[i], argv[i]);
+    }
+    win32_prog_argv[argc] = NULL;
+}
+#endif

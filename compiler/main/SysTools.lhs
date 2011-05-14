@@ -822,14 +822,15 @@ getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 -- Assuming we are running ghc, accessed by path  $(stuff)/bin/ghc.exe,
 -- return the path $(stuff)/lib.
-getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
-                buf <- mallocArray len
-                ret <- getModuleFileName nullPtr buf len
-                if ret == 0 then free buf >> return Nothing
-                            else do s <- peekCString buf
-                                    free buf
-                                    return (Just (rootDir s))
+getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
   where
+    try_size size = allocaArray (fromIntegral size) $ \buf -> do
+        ret <- c_GetModuleFileName nullPtr buf size
+        case ret of
+          0 -> return Nothing
+          _ | ret < size -> fmap (Just . rootDir) $ peekCWString buf
+            | otherwise  -> try_size (size * 2)
+    
     rootDir s = case splitFileName $ normalise s of
                 (d, ghc_exe)
                  | lower ghc_exe `elem` ["ghc.exe",
@@ -844,8 +845,8 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
         where fail = panic ("can't decompose ghc.exe path: " ++ show s)
               lower = map toLower
 
-foreign import stdcall unsafe "GetModuleFileNameA"
-  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+  c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getBaseDir = return Nothing
 #endif

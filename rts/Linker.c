@@ -387,6 +387,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
+      SymI_HasProto(getWin32ProgArgv)                    \
+      SymI_HasProto(setWin32ProgArgv)                    \
       SymI_HasProto(memset)                              \
       SymI_HasProto(inet_ntoa)                           \
       SymI_HasProto(inet_addr)                           \
