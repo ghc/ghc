@@ -502,13 +502,26 @@ middleAssignment (Plain (CmmComment {})) assign
     = assign
 
 -- Assumptions:
+--  * Writes using Hp do not overlap with any other memory locations
+--    (An important invariant being relied on here is that we only ever
+--    use Hp to allocate values on the heap, which appears to be the
+--    case given hpReg usage, and that our heap writing code doesn't
+--    do anything stupid like overlapping writes.)
 --  * Stack slots do not overlap with any other memory locations
---  * Non stack-slot stores always conflict with each other.  (This is
---    not always the case; we could probably do something special for Hp)
 --  * Stack slots for different areas do not overlap
 --  * Stack slots within the same area and different offsets may
 --    overlap; we need to do a size check (see 'overlaps').
-clobbers :: (CmmExpr, CmmExpr) -> (Unique, CmmExpr) -> Bool
+--  * Register slots only overlap with themselves.  (But this shouldn't
+--    happen in practice, because we'll fail to inline a reload across
+--    the next spill.)
+--  * Non stack-slot stores always conflict with each other.  (This is
+--    not always the case; we could probably do something special for Hp)
+clobbers :: (CmmExpr, CmmExpr) -- (lhs, rhs) of clobbering CmmStore
+         -> (Unique,  CmmExpr) -- (register, expression) that may be clobbered
+         -> Bool
+clobbers (CmmRegOff (CmmGlobal Hp) _, _) (_, _) = False
+clobbers (CmmReg (CmmGlobal Hp), _) (_, _) = False
+-- ToDo: Also catch MachOp case
 clobbers (ss@CmmStackSlot{}, CmmReg (CmmLocal r)) (u, CmmLoad (ss'@CmmStackSlot{}) _)
     | getUnique r == u, ss == ss' = False -- No-op on the stack slot (XXX: Do we need this special case?)
 clobbers (CmmStackSlot (CallArea a) o, rhs) (_, expr) = f expr
@@ -523,6 +536,9 @@ clobbers (CmmStackSlot (CallArea a) o, rhs) (_, expr) = f expr
           containsStackSlot (CmmMachOp _ es) = or (map containsStackSlot es)
           containsStackSlot (CmmStackSlot{}) = True
           containsStackSlot _ = False
+clobbers (CmmStackSlot (RegSlot l) _, _) (_, expr) = f expr
+    where f (CmmLoad (CmmStackSlot (RegSlot l') _) _) = l == l'
+          f _ = False
 clobbers _ (_, e) = f e
     where f (CmmLoad (CmmStackSlot _ _) _) = False
           f (CmmLoad{}) = True -- conservative
