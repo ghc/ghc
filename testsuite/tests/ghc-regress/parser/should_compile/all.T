@@ -81,6 +81,7 @@ test('read067', normal, compile, [''])
 test('read068', normal, compile, [''])
 test('read069', normal, compile, [''])
 test('read_1821', normal, compile, [''])
+test('T2245', normal, compile, ['-fwarn-type-defaults'])
 test('T3303', extra_clean(['T3303A.hi', 'T3303A.o']),
      multimod_compile, ['T3303', '-v0'])
 test('T3741', normal, compile, [''])
