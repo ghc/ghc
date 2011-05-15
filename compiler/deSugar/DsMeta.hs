@@ -1580,7 +1580,7 @@ repLiteral lit
 mk_integer :: Integer -> DsM HsLit
 mk_integer  i = do integer_ty <- lookupType integerTyConName
                    return $ HsInteger i integer_ty
-mk_rational :: Rational -> DsM HsLit
+mk_rational :: FractionalLit -> DsM HsLit
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit
@@ -1595,7 +1595,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
 
 mk_lit :: OverLitVal -> DsM HsLit
 mk_lit (HsIntegral i)   = mk_integer  i
-mk_lit (HsFractional f) = mk_rational (fl_value f)
+mk_lit (HsFractional f) = mk_rational f
 mk_lit (HsIsString s)   = mk_string   s
               
 --------------- Miscellaneous -------------------

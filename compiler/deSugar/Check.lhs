@@ -437,14 +437,14 @@ get_lit :: Pat id -> Maybe HsLit
 -- It doesn't matter which one, because they will only be compared
 -- with other HsLits gotten in the same way
 get_lit (LitPat lit)				          = Just lit
-get_lit (NPat (OverLit { ol_val = HsIntegral i})    mb _) = Just (HsIntPrim   (mb_neg mb i))
-get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg mb (fl_value f)))
+get_lit (NPat (OverLit { ol_val = HsIntegral i})    mb _) = Just (HsIntPrim   (mb_neg negate              mb i))
+get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg negateFractionalLit mb f))
 get_lit (NPat (OverLit { ol_val = HsIsString s })   _  _) = Just (HsStringPrim s)
 get_lit _                                	          = Nothing
 
-mb_neg :: Num a => Maybe b -> a -> a
-mb_neg Nothing  v = v
-mb_neg (Just _) v = -v
+mb_neg :: (a -> a) -> Maybe b -> a -> a
+mb_neg _      Nothing  v = v
+mb_neg negate (Just _) v = negate v
 
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = ASSERT( not (null used_cons) ) unused_cons

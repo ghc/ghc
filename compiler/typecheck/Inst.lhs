@@ -56,7 +56,6 @@ import PrelNames
 import SrcLoc
 import DynFlags
 import Bag
-import BasicTypes
 import Maybes
 import Util
 import Outputable
@@ -277,7 +276,7 @@ mkOverLit (HsIntegral i)
 
 mkOverLit (HsFractional r)
   = do	{ rat_ty <- tcMetaTy rationalTyConName
-	; return (HsRat (fl_value r) rat_ty) }
+	; return (HsRat r rat_ty) }
 
 mkOverLit (HsIsString s) = return (HsString s)
 \end{code}

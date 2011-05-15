@@ -568,7 +568,7 @@ cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
 cvtOverLit (IntegerL i)  
   = do { force i; return $ mkHsIntegral i placeHolderType}
 cvtOverLit (RationalL r) 
-  = do { force r; return $ mkHsFractional (FL { fl_text = show (fromRational r :: Double), fl_value = r }) placeHolderType}
+  = do { force r; return $ mkHsFractional (cvtFractionalLit r) placeHolderType}
 cvtOverLit (StringL s)   
   = do { let { s' = mkFastString s }
        ; force s'
@@ -602,8 +602,8 @@ allCharLs xs
 cvtLit :: Lit -> CvtM HsLit
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim i }
 cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim w }
-cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim f }
-cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim f }
+cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
+cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
        		       	    ; force s'      
@@ -767,6 +767,9 @@ overloadedLit _             = False
 
 void :: Type.Type
 void = placeHolderType
+
+cvtFractionalLit :: Rational -> FractionalLit
+cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = r }
 
 --------------------------------------------------------------------
 --	Turning Name back into RdrName

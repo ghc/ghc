@@ -547,8 +547,8 @@ data Token
   | ITprimstring FastString
   | ITprimint    Integer
   | ITprimword   Integer
-  | ITprimfloat  Rational
-  | ITprimdouble Rational
+  | ITprimfloat  FractionalLit
+  | ITprimdouble FractionalLit
 
   -- Template Haskell extension tokens
   | ITopenExpQuote  		--  [| or [e|
@@ -1061,9 +1061,12 @@ hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
-tok_float        str = ITrational   $! FL { fl_text = str, fl_value = readRational str }
-tok_primfloat    str = ITprimfloat  $! readRational str
-tok_primdouble   str = ITprimdouble $! readRational str
+tok_float        str = ITrational   $! readFractionalLit str
+tok_primfloat    str = ITprimfloat  $! readFractionalLit str
+tok_primdouble   str = ITprimdouble $! readFractionalLit str
+
+readFractionalLit :: String -> FractionalLit
+readFractionalLit str = (FL $! str) $! readRational str
 
 -- -----------------------------------------------------------------------------
 -- Layout processing
