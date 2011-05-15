@@ -1185,8 +1185,8 @@ dynamic_flags = [
   , Flag "dylib-install-name" (hasArg setDylibInstallName)
 
         ------- Libraries ---------------------------------------------------
-  , Flag "L"   (Prefix    addLibraryPath)
-  , Flag "l"   (AnySuffix (upd . addOptl))
+  , Flag "L"   (Prefix addLibraryPath)
+  , Flag "l"   (hasArg (addOptl . ("-l" ++)))
 
         ------- Frameworks --------------------------------------------------
         -- -framework-path should really be -F ...
