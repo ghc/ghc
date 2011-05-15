@@ -340,6 +340,22 @@ emitRtsCall' res pkg fun args _vols safe
 --  * Regs.h claims that BaseReg should be saved last and loaded first
 --    * This might not have been tickled before since BaseReg is callee save
 --  * Regs.h saves SparkHd, ParkT1, SparkBase and SparkLim
+-- EZY: This code is very dodgy, because callerSaves only ever
+-- returns true in the current universe for registers NOT in
+-- system_regs (just do a grep for CALLER_SAVES in
+-- includes/stg/MachRegs.h).  Thus, this is all one giant no-op.  What we are
+-- actually interested in is saving are the non-system registers, which
+-- we is what the old code generator actually does at this point.
+-- Unfortunately, we can't do that here either, because we don't
+-- liveness information, and thus there's not an easy way to tell which
+-- specific global registers need to be saved (the 'vols' argument in
+-- the old code generator.)  One possible hack is to save all of them
+-- unconditionally, but unless we have very clever dead /memory/
+-- elimination (unlikely), this will still leave a dead, unnecessary
+-- memory assignment.  And really, we shouldn't be doing the workaround
+-- at this point in the pipeline, see Note [Register parameter passing].
+-- Right now the workaround is to avoid inlining across unsafe foreign
+-- calls in rewriteAssignments.
 callerSaveVolatileRegs :: (CmmAGraph, CmmAGraph)
 callerSaveVolatileRegs = (caller_save, caller_load)
   where
@@ -395,6 +411,51 @@ callerSaves :: GlobalReg -> Bool
 
 #ifdef CALLER_SAVES_Base
 callerSaves BaseReg		= True
+#endif
+#ifdef CALLER_SAVES_R1
+callerSaves (VanillaReg 1 _)	= True
+#endif
+#ifdef CALLER_SAVES_R2
+callerSaves (VanillaReg 2 _)	= True
+#endif
+#ifdef CALLER_SAVES_R3
+callerSaves (VanillaReg 3 _)	= True
+#endif
+#ifdef CALLER_SAVES_R4
+callerSaves (VanillaReg 4 _)	= True
+#endif
+#ifdef CALLER_SAVES_R5
+callerSaves (VanillaReg 5 _)	= True
+#endif
+#ifdef CALLER_SAVES_R6
+callerSaves (VanillaReg 6 _)	= True
+#endif
+#ifdef CALLER_SAVES_R7
+callerSaves (VanillaReg 7 _)	= True
+#endif
+#ifdef CALLER_SAVES_R8
+callerSaves (VanillaReg 8 _)	= True
+#endif
+#ifdef CALLER_SAVES_F1
+callerSaves (FloatReg 1)	= True
+#endif
+#ifdef CALLER_SAVES_F2
+callerSaves (FloatReg 2)	= True
+#endif
+#ifdef CALLER_SAVES_F3
+callerSaves (FloatReg 3)	= True
+#endif
+#ifdef CALLER_SAVES_F4
+callerSaves (FloatReg 4)	= True
+#endif
+#ifdef CALLER_SAVES_D1
+callerSaves (DoubleReg 1)	= True
+#endif
+#ifdef CALLER_SAVES_D2
+callerSaves (DoubleReg 2)	= True
+#endif
+#ifdef CALLER_SAVES_L1
+callerSaves (LongReg 1)		= True
 #endif
 #ifdef CALLER_SAVES_Sp
 callerSaves Sp			= True

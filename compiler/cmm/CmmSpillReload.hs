@@ -25,6 +25,7 @@ import Cmm
 import CmmExpr
 import CmmLive
 import OptimizationFuel
+import StgCmmUtils
 
 import Control.Monad
 import Outputable hiding (empty)
@@ -495,8 +496,19 @@ middleAssignment (Plain n@(CmmStore lhs rhs)) assign
 -}
 
 -- Assumption: Unsafe foreign calls don't clobber memory
+-- Since foreign calls clobber caller saved registers, we need
+-- invalidate any assignments that reference those global registers.
+-- This is kind of expensive. (One way to optimize this might be to
+-- store extra information about expressions that allow this and other
+-- checks to be done cheaply.)
 middleAssignment (Plain n@(CmmUnsafeForeignCall{})) assign
-    = foldRegsDefd (\m r -> addToUFM m r NeverOptimize) (deleteSinks n assign) n
+    = deleteCallerSaves (foldRegsDefd (\m r -> addToUFM m r NeverOptimize) (deleteSinks n assign) n)
+    where deleteCallerSaves m = foldUFM_Directly f m m
+          f u (xassign -> Just x) m | wrapRecExpf g x False = addToUFM_Directly m u NeverOptimize
+          f _ _ m = m
+          g (CmmReg (CmmGlobal r)) _      | callerSaves r = True
+          g (CmmRegOff (CmmGlobal r) _) _ | callerSaves r = True
+          g _ b = b
 
 middleAssignment (Plain (CmmComment {})) assign
     = assign
@@ -588,16 +600,18 @@ assignmentRewrite = mkFRewrite3 first middle last
                                 Nothing -> (i, l)
         rewrite _ (False, []) _ _ = Nothing
         -- Note [CmmCall Inline Hack]
-        -- ToDo: Conservative hack: don't do any inlining on CmmCalls, since
-        -- the code produced here tends to be unproblematic and I need
-        -- to write lint passes to ensure that we don't put anything in
-        -- the arguments that could be construed as a global register by
+        -- Conservative hack: don't do any inlining on what will
+        -- be translated into an OldCmm CmmCalls, since the code
+        -- produced here tends to be unproblematic and I need to write
+        -- lint passes to ensure that we don't put anything in the
+        -- arguments that could be construed as a global register by
         -- some later translation pass.  (For example, slots will turn
-        -- into dereferences of Sp).  This is the same hack in spirit as
-        -- was in cmm/CmmOpt.hs.  Fix this up to only bug out if certain
-        -- CmmExprs are involved.
-        -- ToDo: We miss an opportunity here, where all possible
-        -- inlinings should instead be sunk.
+        -- into dereferences of Sp).  See [Register parameter passing].
+        -- ToDo: Fix this up to only bug out if all inlines were for
+        -- CmmExprs with global registers (we can't use the
+        -- straightforward mapExpDeep call, in this case.) ToDo: We miss
+        -- an opportunity here, where all possible inlinings should
+        -- instead be sunk.
         rewrite _ (True, []) _ n | not (inlinable n) = Nothing -- see [CmmCall Inline Hack]
         rewrite assign (i, xs) mk n = Just $ mkMiddles xs <*> mk (Plain (inline i assign n))
 
@@ -630,6 +644,7 @@ assignmentRewrite = mkFRewrite3 first middle last
         inlinable :: CmmNode e x -> Bool
         inlinable (CmmCall{}) = False
         inlinable (CmmForeignCall{}) = False
+        inlinable (CmmUnsafeForeignCall{}) = False
         inlinable _ = True
 
 rewriteAssignments :: CmmGraph -> FuelUniqSM CmmGraph
