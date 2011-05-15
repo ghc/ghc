@@ -876,7 +876,8 @@ data FractionalLit
   = FL { fl_text :: String         -- How the value was written in the source
        , fl_value :: Rational      -- Numeric value of the literal
        }
-  deriving (Data, Typeable)
+  deriving (Data, Typeable, Show)
+  -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
 
 negateFractionalLit :: FractionalLit -> FractionalLit
 negateFractionalLit (FL { fl_text = '-':text, fl_value = value }) = FL { fl_text = text, fl_value = negate value }
