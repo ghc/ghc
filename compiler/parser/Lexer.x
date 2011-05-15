@@ -68,7 +68,7 @@ import UniqFM
 import DynFlags
 import Module
 import Ctype
-import BasicTypes	( InlineSpec(..), RuleMatchInfo(..) )
+import BasicTypes	( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
 import Util		( readRational )
 
 import Control.Monad
@@ -541,7 +541,7 @@ data Token
   | ITchar       Char
   | ITstring     FastString
   | ITinteger    Integer
-  | ITrational   Rational
+  | ITrational   FractionalLit
 
   | ITprimchar   Char
   | ITprimstring FastString
@@ -1061,7 +1061,7 @@ hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
-tok_float        str = ITrational   $! readRational str
+tok_float        str = ITrational   $! FL { fl_text = str, fl_value = readRational str }
 tok_primfloat    str = ITprimfloat  $! readRational str
 tok_primdouble   str = ITprimdouble $! readRational str
 

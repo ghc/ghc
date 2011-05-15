@@ -568,7 +568,7 @@ cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
 cvtOverLit (IntegerL i)  
   = do { force i; return $ mkHsIntegral i placeHolderType}
 cvtOverLit (RationalL r) 
-  = do { force r; return $ mkHsFractional r placeHolderType}
+  = do { force r; return $ mkHsFractional (FL { fl_text = show (fromRational r :: Double), fl_value = r }) placeHolderType}
 cvtOverLit (StringL s)   
   = do { let { s' = mkFastString s }
        ; force s'

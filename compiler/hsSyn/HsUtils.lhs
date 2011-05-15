@@ -187,7 +187,7 @@ mkSimpleHsAlt pat expr
 -- See RnEnv.lookupSyntaxName
 
 mkHsIntegral   :: Integer -> PostTcType -> HsOverLit id
-mkHsFractional :: Rational -> PostTcType -> HsOverLit id
+mkHsFractional :: FractionalLit -> PostTcType -> HsOverLit id
 mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
 mkHsDo         :: HsStmtContext Name -> [LStmt id] -> HsExpr id
 mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id

@@ -30,6 +30,7 @@ import Type
 import SrcLoc
 import UniqSet
 import Util
+import BasicTypes
 import Outputable
 import FastString
 \end{code}
@@ -437,7 +438,7 @@ get_lit :: Pat id -> Maybe HsLit
 -- with other HsLits gotten in the same way
 get_lit (LitPat lit)				          = Just lit
 get_lit (NPat (OverLit { ol_val = HsIntegral i})    mb _) = Just (HsIntPrim   (mb_neg mb i))
-get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg mb f))
+get_lit (NPat (OverLit { ol_val = HsFractional f }) mb _) = Just (HsFloatPrim (mb_neg mb (fl_value f)))
 get_lit (NPat (OverLit { ol_val = HsIsString s })   _  _) = Just (HsStringPrim s)
 get_lit _                                	          = Nothing
 

@@ -1595,7 +1595,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
 
 mk_lit :: OverLitVal -> DsM HsLit
 mk_lit (HsIntegral i)   = mk_integer  i
-mk_lit (HsFractional f) = mk_rational f
+mk_lit (HsFractional f) = mk_rational (fl_value f)
 mk_lit (HsIsString s)   = mk_string   s
               
 --------------- Miscellaneous -------------------

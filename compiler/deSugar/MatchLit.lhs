@@ -33,6 +33,7 @@ import Literal
 import SrcLoc
 import Data.Ratio
 import Outputable
+import BasicTypes
 import Util
 import FastString
 \end{code}
@@ -124,8 +125,8 @@ hsOverLitKey (OverLit { ol_val = l }) neg = litValKey l neg
 litValKey :: OverLitVal -> Bool -> Literal
 litValKey (HsIntegral i)   False = MachInt i
 litValKey (HsIntegral i)   True  = MachInt (-i)
-litValKey (HsFractional r) False = MachFloat r
-litValKey (HsFractional r) True  = MachFloat (-r)
+litValKey (HsFractional r) False = MachFloat (fl_value r)
+litValKey (HsFractional r) True  = MachFloat (negate (fl_value r))
 litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr s
 \end{code}
 
@@ -190,8 +191,8 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
     mb_rat_lit = case (mb_neg, val) of
 		   (Nothing, HsIntegral   i) -> Just (fromInteger i)
 		   (Just _,  HsIntegral   i) -> Just (fromInteger (-i))
-		   (Nothing, HsFractional f) -> Just f
-		   (Just _, HsFractional f)  -> Just (-f)
+		   (Nothing, HsFractional f) -> Just (fl_value f)
+		   (Just _, HsFractional f)  -> Just (negate (fl_value f))
 		   _ -> Nothing
 	
     mb_str_lit :: Maybe FastString

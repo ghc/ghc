@@ -12,7 +12,8 @@ module HsLit where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr( SyntaxExpr, pprExpr )
-import HsTypes (PostTcType)
+import BasicTypes ( FractionalLit(..) )
+import HsTypes  ( PostTcType )
 import Type	( Type )
 import Outputable
 import FastString
@@ -70,7 +71,7 @@ data HsOverLit id 	-- An overloaded literal
 
 data OverLitVal
   = HsIntegral   !Integer   	-- Integer-looking literals;
-  | HsFractional !Rational   	-- Frac-looking literals
+  | HsFractional !FractionalLit	-- Frac-looking literals
   | HsIsString   !FastString 	-- String-looking literals
   deriving (Data, Typeable)
 
@@ -155,6 +156,6 @@ instance OutputableBndr id => Outputable (HsOverLit id) where
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)   = integer i 
-  ppr (HsFractional f) = rational f
+  ppr (HsFractional f) = text (fl_text f)
   ppr (HsIsString s)   = pprHsString s
 \end{code}
