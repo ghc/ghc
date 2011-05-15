@@ -16,6 +16,8 @@
 *.eventlog
 *.comp.std*
 
+.hpc
+
 # -----------------------------------------------------------------------------
 # specific generated files
 
@@ -37,6 +39,7 @@ tests/ghc-regress/driver/A012.ooo
 tests/ghc-regress/driver/A013.xhi
 tests/ghc-regress/driver/B022/C.ooo
 tests/ghc-regress/driver/B023/C.xhi
+tests/ghc-regress/driver/B024a/
 tests/ghc-regress/driver/F018a.obj.018
 tests/ghc-regress/driver/F018a_stub.obj.018
 tests/ghc-regress/driver/Test.081b
@@ -54,7 +57,9 @@ tests/ghc-regress/driver/stub017/
 tests/ghc-regress/driver/stub028/
 tests/ghc-regress/driver/stub035/
 tests/ghc-regress/driver/stub045/
+tests/ghc-regress/driver/T706.hs
 tests/ghc-regress/ffi/should_run/.hpc/
+tests/ghc-regress/ghci/prog001/D.hs
 tests/ghc-regress/ghci/should_run/3171.err
 tests/ghc-regress/lib/IO/encoding001.utf16.utf8_bom
 tests/ghc-regress/lib/IO/encoding001.utf16be.utf8_bom
@@ -71,6 +76,7 @@ tests/ghc-regress/lib/IO/encoding001.utf8_bom.utf32
 tests/ghc-regress/lib/IO/encoding001.utf8_bom.utf32be
 tests/ghc-regress/lib/IO/encoding001.utf8_bom.utf32le
 tests/ghc-regress/lib/IO/encoding001.utf8_bom.utf8
+tests/ghc-regress/lib/should_run/array001.data
 tests/ghc-regress/perf/compiler/T1969.comp.stats
 tests/ghc-regress/perf/compiler/T3064.comp.stats
 tests/ghc-regress/perf/compiler/T3294.comp.stats
