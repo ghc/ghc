@@ -108,6 +108,8 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -494,6 +496,11 @@ data DynFlags = DynFlags {
   filesToClean          :: IORef [FilePath],
   dirsToClean           :: IORef (Map FilePath FilePath),
 
+  -- Names of files which were generated from -ddump-to-file; used to
+  -- track which ones we need to truncate because it's our first run
+  -- through
+  generatedDumps        :: IORef (Set FilePath),
+
   -- hsc dynamic flags
   flags                 :: [DynFlag],
   -- Don't change this without updating extensionFlags:
@@ -730,12 +737,14 @@ initDynFlags dflags = do
  ways <- readIORef v_Ways
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
+ refGeneratedDumps <- newIORef Set.empty
  return dflags{
         ways            = ways,
         buildTag        = mkBuildTag (filter (not . wayRTSOnly) ways),
         rtsBuildTag     = mkBuildTag ways,
         filesToClean    = refFilesToClean,
-        dirsToClean     = refDirsToClean
+        dirsToClean     = refDirsToClean,
+        generatedDumps   = refGeneratedDumps
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
@@ -811,6 +820,7 @@ defaultDynFlags mySettings =
         -- end of ghc -M values
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
+        generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
         flags = defaultFlags,
         language = Nothing,
