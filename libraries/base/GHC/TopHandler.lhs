@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , ForeignFunctionInterface
@@ -26,10 +27,10 @@
 
 -- #hide
 module GHC.TopHandler (
-   runMainIO, runIO, runIOFastExit, runNonIO,
-   topHandler, topHandlerFastExit,
-   reportStackOverflow, reportError,
-  ) where
+        runMainIO, runIO, runIOFastExit, runNonIO,
+        topHandler, topHandlerFastExit,
+        reportStackOverflow, reportError,
+    ) where
 
 #include "HsBaseConfig.h"
 

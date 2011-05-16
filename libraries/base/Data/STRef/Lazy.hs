@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.STRef.Lazy
@@ -20,7 +21,7 @@ module Data.STRef.Lazy (
         modifySTRef     -- :: STRef s a -> (a -> a) -> ST s ()
  ) where
 
-import Control.Monad.ST.Lazy
+import Control.Monad.ST.Lazy.Safe
 import qualified Data.STRef as ST
 import Prelude
 

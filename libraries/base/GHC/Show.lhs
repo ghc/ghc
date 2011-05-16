@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash, StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 

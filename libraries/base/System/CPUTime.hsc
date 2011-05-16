@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NondecreasingIndentation, ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
@@ -33,7 +34,7 @@ import CPUTime ( getCPUTime, cpuTimePrecision )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import Foreign hiding (unsafePerformIO)
+import Foreign.Safe
 import Foreign.C
 #if !defined(CLK_TCK)
 import System.IO.Unsafe (unsafePerformIO)

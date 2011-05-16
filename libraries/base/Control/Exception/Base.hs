@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, StandaloneDeriving #-}
@@ -400,7 +401,7 @@ catch   :: Exception e
         -> (e -> IO a)  -- ^ Handler to invoke if an exception is raised
         -> IO a
 #if __GLASGOW_HASKELL__
-catch = GHC.IO.catchException
+catch = catchException
 #elif __HUGS__
 catch m h = Hugs.Exception.catchException m h'
   where h' e = case fromException e of

@@ -98,7 +98,7 @@ module GHC.Base
         module GHC.Base,
         module GHC.Classes,
         module GHC.CString,
-        --module GHC.Generics,        -- JPM: We no longer export GHC.Generics
+        -- module GHC.Generics,        -- JPM: We no longer export GHC.Generics
                                       -- by default to avoid name clashes
         module GHC.Ordering,
         module GHC.Types,
@@ -111,7 +111,7 @@ import GHC.Types
 import GHC.Classes
 import GHC.CString
 -- JPM: Since we don't export it, we don't need to import GHC.Generics
---import GHC.Generics
+-- import GHC.Generics
 import GHC.Ordering
 import GHC.Prim
 import {-# SOURCE #-} GHC.Show
@@ -613,7 +613,7 @@ instance  Monad IO  where
     m >> k    = m >>= \ _ -> k
     return    = returnIO
     (>>=)     = bindIO
-    fail s    = GHC.IO.failIO s
+    fail s    = failIO s
 
 returnIO :: a -> IO a
 returnIO x = IO $ \ s -> (# s, x #)
@@ -833,3 +833,4 @@ a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
 data RealWorld
 \end{code}
 #endif
+

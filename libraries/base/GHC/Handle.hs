@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -53,3 +54,4 @@ import GHC.IO.IOMode
 import GHC.IO.Handle
 import GHC.IO.Handle.Internals
 import GHC.IO.Handle.FD
+

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude
            , RecordWildCards
            , BangPatterns
@@ -75,8 +76,7 @@ import GHC.MVar
 import Data.Typeable
 import Control.Monad
 import Data.Maybe
-import Foreign hiding (unsafePerformIO)
--- import System.IO.Error
+import Foreign.Safe
 import System.Posix.Internals hiding (FD)
 
 import Foreign.C

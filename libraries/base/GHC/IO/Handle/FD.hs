@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards, ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
@@ -24,19 +25,16 @@ module GHC.IO.Handle.FD (
 import GHC.Base
 import GHC.Show
 import Data.Maybe
--- import Control.Monad
 import Foreign.C.Types
 import GHC.MVar
 import GHC.IO
 import GHC.IO.Encoding
--- import GHC.IO.Exception
 import GHC.IO.Device as IODevice
 import GHC.IO.Exception
 import GHC.IO.IOMode
 import GHC.IO.Handle
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
-import GHC.IO.FD (FD(..))
 import qualified GHC.IO.FD as FD
 import qualified System.Posix.Internals as Posix
 
@@ -90,7 +88,7 @@ stdHandleFinalizer fp m = do
 
 -- We have to put the FDs into binary mode on Windows to avoid the newline
 -- translation that the CRT IO library does.
-setBinaryMode :: FD -> IO ()
+setBinaryMode :: FD.FD -> IO ()
 #ifdef mingw32_HOST_OS
 setBinaryMode fd = do _ <- setmode (fdFD fd) True
                       return ()
@@ -199,7 +197,7 @@ openFile' filepath iomode binary non_blocking = do
 -- Converting file descriptors to Handles
 
 mkHandleFromFD
-   :: FD
+   :: FD.FD
    -> IODeviceType
    -> FilePath  -- a string describing this file descriptor (e.g. the filename)
    -> IOMode

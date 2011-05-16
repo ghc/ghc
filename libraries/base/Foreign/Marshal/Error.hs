@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -38,7 +39,6 @@ import System.IO.Error
 #endif
 import GHC.Base
 import GHC.Num
--- import GHC.IO
 import GHC.IO.Exception
 #endif
 

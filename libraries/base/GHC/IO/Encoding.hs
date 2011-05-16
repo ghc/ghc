@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, PatternGuards #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -16,18 +17,17 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.Encoding (
-  BufferCodec(..), TextEncoding(..), TextEncoder, TextDecoder, CodingProgress(..),
-  latin1, latin1_encode, latin1_decode,
-  utf8, utf8_bom,
-  utf16, utf16le, utf16be,
-  utf32, utf32le, utf32be, 
-  localeEncoding, fileSystemEncoding, foreignEncoding,
-  char8,
-  mkTextEncoding,
-  ) where
+        BufferCodec(..), TextEncoding(..), TextEncoder, TextDecoder, CodingProgress(..),
+        latin1, latin1_encode, latin1_decode,
+        utf8, utf8_bom,
+        utf16, utf16le, utf16be,
+        utf32, utf32le, utf32be, 
+        localeEncoding, fileSystemEncoding, foreignEncoding,
+        char8,
+        mkTextEncoding,
+    ) where
 
 import GHC.Base
---import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Failure

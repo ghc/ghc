@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -29,13 +30,11 @@ module Foreign.Concurrent
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IO           ( IO )
-import GHC.Ptr          ( Ptr )
-import GHC.ForeignPtr   ( ForeignPtr )
+import GHC.IO         ( IO )
+import GHC.Ptr        ( Ptr )
+import GHC.ForeignPtr ( ForeignPtr )
 import qualified GHC.ForeignPtr
-#endif
 
-#ifdef __GLASGOW_HASKELL__
 newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign object by associating
 -- a finalizer - given by the monadic operation - with the reference.
@@ -52,3 +51,4 @@ addForeignPtrFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- same object.
 addForeignPtrFinalizer = GHC.ForeignPtr.addForeignPtrConcFinalizer
 #endif
+

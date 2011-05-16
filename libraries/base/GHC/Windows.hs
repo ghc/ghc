@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, ForeignFunctionInterface #-}
 -----------------------------------------------------------------------------
 -- |
@@ -17,7 +18,10 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Windows where
+module GHC.Windows (
+        HANDLE, DWORD, LPTSTR, iNFINITE,
+        throwGetLastError, maperrno
+    ) where
 
 import GHC.Base
 import GHC.Ptr

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , ForeignFunctionInterface
@@ -31,7 +32,7 @@ module GHC.IO.Encoding.Iconv (
 
 #if !defined(mingw32_HOST_OS)
 
-import Foreign hiding (unsafePerformIO)
+import Foreign.Safe
 import Foreign.C
 import Data.Maybe
 import GHC.Base

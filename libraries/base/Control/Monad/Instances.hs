@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 {-# OPTIONS_NHC98 --prelude #-}
 -- This module deliberately declares orphan instances:
 {-# OPTIONS_GHC -fno-warn-orphans #-}

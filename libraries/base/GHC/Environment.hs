@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 module GHC.Environment (getFullArgs) where

@@ -6,7 +6,7 @@
 -- Module      :  GHC.IOArray
 -- Copyright   :  (c) The University of Glasgow 2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -16,25 +16,25 @@
 -----------------------------------------------------------------------------
 
 module GHC.IOArray (
-    IOArray(..),
-    newIOArray, unsafeReadIOArray, unsafeWriteIOArray,
-    readIOArray, writeIOArray,
-    boundsIOArray
-  ) where
+        IOArray(..),
+        newIOArray, unsafeReadIOArray, unsafeWriteIOArray,
+        readIOArray, writeIOArray,
+        boundsIOArray
+    ) where
 
 import GHC.Base
 import GHC.IO
 import GHC.Arr
 
 -- ---------------------------------------------------------------------------
--- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.  
+-- | An 'IOArray' is a mutable, boxed, non-strict array in the 'IO' monad.
 -- The type arguments are as follows:
 --
 --  * @i@: the index type of the array (should be an instance of 'Ix')
 --
 --  * @e@: the element type of the array.
 --
--- 
+--
 
 newtype IOArray i e = IOArray (STArray RealWorld i e)
 
@@ -66,5 +66,6 @@ writeIOArray :: Ix i => IOArray i e -> i -> e -> IO ()
 writeIOArray (IOArray marr) i e = stToIO (writeSTArray marr i e)
 
 {-# INLINE boundsIOArray #-}
-boundsIOArray :: IOArray i e -> (i,i)  
+boundsIOArray :: IOArray i e -> (i,i)
 boundsIOArray (IOArray marr) = boundsSTArray marr
+

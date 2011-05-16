@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , ForeignFunctionInterface
            , MagicHash

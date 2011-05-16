@@ -7,7 +7,7 @@
 -- Module      :  GHC.IORef
 -- Copyright   :  (c) The University of Glasgow 2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -16,9 +16,9 @@
 --
 -----------------------------------------------------------------------------
 module GHC.IORef (
-    IORef(..),
-    newIORef, readIORef, writeIORef, atomicModifyIORef
-  ) where
+        IORef(..),
+        newIORef, readIORef, writeIORef, atomicModifyIORef
+    ) where
 
 import GHC.Base
 import GHC.STRef

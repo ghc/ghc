@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
@@ -40,7 +41,6 @@ import Hugs.IORef
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.STRef
--- import GHC.IO
 import GHC.IORef hiding (atomicModifyIORef)
 import qualified GHC.IORef
 #if !defined(__PARALLEL_HASKELL__)

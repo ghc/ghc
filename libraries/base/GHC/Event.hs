@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 -- | This module provides scalable event notification for file
 -- descriptors and timeouts.
 --

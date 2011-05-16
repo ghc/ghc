@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns #-}
 
 -----------------------------------------------------------------------------
@@ -15,11 +16,11 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.Device (
-    RawIO(..),
-    IODevice(..),
-    IODeviceType(..),
-    SeekMode(..)
-  ) where  
+        RawIO(..),
+        IODevice(..),
+        IODeviceType(..),
+        SeekMode(..)
+    ) where  
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base

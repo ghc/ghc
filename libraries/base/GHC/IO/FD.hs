@@ -13,7 +13,7 @@
 -- Module      :  GHC.IO.FD
 -- Copyright   :  (c) The University of Glasgow, 1994-2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable
@@ -23,12 +23,12 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.FD (
-  FD(..),
-  openFile, mkFD, release,
-  setNonBlockingMode,
-  readRawBufferPtr, readRawBufferPtrNoBlock, writeRawBufferPtr,
-  stdin, stdout, stderr
-  ) where
+        FD(..),
+        openFile, mkFD, release,
+        setNonBlockingMode,
+        readRawBufferPtr, readRawBufferPtrNoBlock, writeRawBufferPtr,
+        stdin, stdout, stderr
+    ) where
 
 import GHC.Base
 import GHC.Num
@@ -56,7 +56,6 @@ import Foreign.C
 import qualified System.Posix.Internals
 import System.Posix.Internals hiding (FD, setEcho, getEcho)
 import System.Posix.Types
--- import GHC.Ptr
 
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
