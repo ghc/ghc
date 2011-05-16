@@ -18,6 +18,12 @@
 
 .hpc
 
+*.genscript
+*.interp.stdout
+*.interp.stderr
+*.run.stdout
+*.run.stderr
+
 # -----------------------------------------------------------------------------
 # specific generated files
 
