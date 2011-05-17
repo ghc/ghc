@@ -621,6 +621,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
     addErrCtxt (instDeclCtxt2 (idType dfun_id)) $ 
     do {  -- Instantiate the instance decl with skolem constants
        ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType (idType dfun_id)
+                     -- We instantiate the dfun_id with superSkolems.
+                     -- See Note [Subtle interaction of recursion and overlap]
+                     -- and Note [Binding when looking up instances]
        ; let (clas, inst_tys) = tcSplitDFunHead inst_head
              (class_tyvars, sc_theta, _, op_items) = classBigSig clas
              sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys) sc_theta
@@ -699,7 +702,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                  listToBag meth_binds)
        }
  where
-   skol_info = InstSkol         -- See Note [Subtle interaction of recursion and overlap]
+   skol_info = InstSkol         
    dfun_ty   = idType dfun_id
    dfun_id   = instanceDFunId ispec
    loc       = getSrcSpan dfun_id

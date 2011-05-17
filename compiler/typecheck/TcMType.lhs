@@ -627,8 +627,8 @@ zonkWantedEvVar :: WantedEvVar -> TcM WantedEvVar
 zonkWantedEvVar (EvVarX v l) = do { v' <- zonkEvVar v; return (EvVarX v' l) }
 
 zonkFlavor :: CtFlavor -> TcM CtFlavor
-zonkFlavor (Given loc) = do { loc' <- zonkGivenLoc loc; return (Given loc') }
-zonkFlavor fl          = return fl
+zonkFlavor (Given loc gk) = do { loc' <- zonkGivenLoc loc; return (Given loc' gk) }
+zonkFlavor fl             = return fl
 
 zonkGivenLoc :: GivenLoc -> TcM GivenLoc
 -- GivenLocs may have unification variables inside them!

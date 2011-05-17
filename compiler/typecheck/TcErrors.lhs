@@ -16,6 +16,7 @@ import TcSMonad
 import TcType
 import TypeRep
 import Type( isTyVarTy )
+import Unify ( tcMatchTys )
 
 import Inst
 import InstEnv
@@ -106,7 +107,7 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
                        -- because they are unconditionally wrong
                        -- Moreover, if any of the insolubles are givens, stop right there
                        -- ignoring nested errors, because the code is inaccessible
-  = do { let (given, other) = partitionBag (isGiven . evVarX) insols
+  = do { let (given, other) = partitionBag (isGivenOrSolved . evVarX) insols
              insol_implics  = filterBag ic_insol implics
        ; if isEmptyBag given
          then do { mapBagM_ (reportInsoluble ctxt) other
@@ -154,7 +155,8 @@ reportInsoluble ctxt (EvVarX ev flav)
   | otherwise
   = pprPanic "reportInsoluble" (pprEvVarWithType ev)
   where
-    inaccessible_msg | Given loc <- flav
+    inaccessible_msg | Given loc GivenOrig <- flav
+                       -- If a GivenSolved then we should not report inaccessible code
                      = hang (ptext (sLit "Inaccessible code in"))
                           2 (ppr (ctLocOrigin loc))
                      | otherwise = empty
@@ -420,18 +422,18 @@ couldNotDeduce :: [([EvVar], GivenLoc)] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
   = vcat [ hang (ptext (sLit "Could not deduce") <+> pprTheta wanteds)
               2 (pprArising orig)
-         , vcat pp_givens ]
-  where
-    pp_givens
-      = case givens of
+         , vcat (pp_givens givens)]
+
+pp_givens :: [([EvVar], GivenLoc)] -> [SDoc]
+pp_givens givens 
+   = case givens of
          []     -> []
          (g:gs) ->      ppr_given (ptext (sLit "from the context")) g
                  : map (ppr_given (ptext (sLit "or from"))) gs
-
-    ppr_given herald (gs,loc)
-      = hang (herald <+> pprEvVarTheta gs)
-           2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin loc)
-                  , ptext (sLit "at") <+> ppr (ctLocSpan loc)])
+    where ppr_given herald (gs,loc)
+           = hang (herald <+> pprEvVarTheta gs)
+                2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin loc)
+                       , ptext (sLit "at") <+> ppr (ctLocSpan loc)])
 
 addExtraInfo :: ReportErrCtxt -> TcType -> TcType -> ReportErrCtxt
 -- Add on extra info about the types themselves
@@ -577,6 +579,18 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 				<+> pprPred pred)
     	     ,	sep [ptext (sLit "Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
+
+             ,  if not (null overlapping_givens) then 
+                  sep [ptext (sLit "Matching givens (or their superclasses)") <> colon, nest 2 (vcat overlapping_givens)]
+                else empty
+
+             ,  if null overlapping_givens && isSingleton matches && null unifiers then
+                -- Intuitively, some given matched the wanted in their flattened or rewritten (from given equalities) 
+                -- form but the matcher can't figure that out because the constraints are non-flat and non-rewritten
+                -- so we simply report back the whole given context. Accelerate Smart.hs showed this problem.
+                  sep [ptext (sLit "There exists a (perhaps superclass) match") <> colon, nest 2 (vcat (pp_givens givens))]
+                else empty 
+
 	     ,	if not (isSingleton matches)
     		then 	-- Two or more matches
 		     empty
@@ -584,10 +598,38 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 		ASSERT( not (null unifiers) )
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
-			      ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
-			      ptext (sLit "when compiling the other instance declarations")])]
+			      if null (overlapping_givens) then
+                                   vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
+			                  ptext (sLit "when compiling the other instance declarations")]
+                              else empty])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
+
+        givens = getUserGivens ctxt
+        overlapping_givens = unifiable_givens givens
+
+        unifiable_givens [] = [] 
+        unifiable_givens (gg:ggs) 
+          | Just ggdoc <- matchable gg 
+          = ggdoc : unifiable_givens ggs 
+          | otherwise 
+          = unifiable_givens ggs 
+
+        matchable (evvars,gloc) 
+          = case ev_vars_matching of
+                 [] -> Nothing
+                 _  -> Just $ hang (pprTheta ev_vars_matching)
+                                2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin gloc)
+                                       , ptext (sLit "at") <+> ppr (ctLocSpan gloc)])
+            where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
+                  ev_var_matches (ClassP clas' tys')
+                    | clas' == clas
+                    , Just _ <- tcMatchTys (tyVarsOfTypes tys) tys tys'
+                    = True 
+                  ev_var_matches (ClassP clas' tys') =
+                    any ev_var_matches (immSuperClasses clas' tys')
+                  ev_var_matches _ = False
+
 
 reportOverlap _ _ _ _ = panic "reportOverlap"    -- Not a ClassP
 
@@ -834,9 +876,9 @@ flattenForAllErrorTcS fl ty _bad_eqs
 
 \begin{code}
 setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  loc) thing = setCtLoc loc thing
-setCtFlavorLoc (Derived loc) thing = setCtLoc loc thing
-setCtFlavorLoc (Given   loc) thing = setCtLoc loc thing
+setCtFlavorLoc (Wanted  loc)   thing = setCtLoc loc thing
+setCtFlavorLoc (Derived loc)   thing = setCtLoc loc thing
+setCtFlavorLoc (Given loc _gk) thing = setCtLoc loc thing
 \end{code}
 
 %************************************************************************
