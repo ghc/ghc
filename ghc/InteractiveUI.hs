@@ -34,7 +34,7 @@ import Packages
 -- import PackageConfig
 import UniqFM
 
-import HscTypes ( handleFlagWarnings )
+import HscTypes ( handleFlagWarnings, getSafeMode )
 import HsImpExp
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import RdrName (RdrName)
@@ -134,6 +134,7 @@ builtin_commands = [
   ("help",      keepGoing help,                 noCompletion),
   ("history",   keepGoing historyCmd,           noCompletion),
   ("info",      keepGoing' info,                completeIdentifier),
+  ("issafe",    keepGoing' isSafeCmd,           completeModule),
   ("kind",      keepGoing' kindOfType,          completeIdentifier),
   ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
   ("list",      keepGoing' listCmd,             noCompletion),
@@ -211,6 +212,7 @@ helpText =
  "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
+ "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :load [*]<module> ...       load module(s) and their dependents\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
@@ -1316,6 +1318,51 @@ runScript filename = do
             Just succ -> if succ 
               then scriptLoop script
               else return ()
+
+-----------------------------------------------------------------------------
+-- Displaying SafeHaskell properties of a module
+
+isSafeCmd :: String -> InputT GHCi ()
+isSafeCmd m = 
+  case words m of
+    [s] | looksLikeModuleName s -> do
+        m <- lift $ lookupModule s
+        isSafeModule m
+    [] -> do
+        (as,bs) <- GHC.getContext
+                -- Guess which module the user wants to browse.  Pick
+                -- modules that are interpreted first.  The most
+                -- recently-added module occurs last, it seems.
+        case (as,bs) of
+          (as@(_:_), _)   -> isSafeModule $ last as
+          ([],  bs@(_:_)) -> isSafeModule $ fst (last bs)
+          ([], [])  -> ghcError (CmdLineError ":issafe: no current module")
+    _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
+
+isSafeModule :: Module -> InputT GHCi ()
+isSafeModule m = do
+  mb_mod_info <- GHC.getModuleInfo m
+  case mb_mod_info of
+    Nothing -> ghcError $ CmdLineError ("unknown module: " ++
+                                GHC.moduleNameString (GHC.moduleName m))
+    Just mi -> do
+        dflags <- getDynFlags
+        let iface = GHC.modInfoIface mi
+        case iface of
+             Just iface' -> do
+                 let trust = show $ getSafeMode $ GHC.mi_trust iface'
+                     pkg   = if packageTrusted dflags m then "trusted" else "untrusted"
+                 liftIO $ putStrLn $ "Trust type is (Module: " ++ trust
+                                               ++ ", Package: " ++ pkg ++ ")"
+             Nothing -> ghcError $ CmdLineError ("can't load interface file for module: " ++
+                                            GHC.moduleNameString (GHC.moduleName m))
+  where
+    packageTrusted :: DynFlags -> Module -> Bool
+    packageTrusted dflags m
+        | thisPackage dflags == modulePackageId m = True
+        | otherwise = trusted $ getPackageDetails (pkgState dflags)
+                                                  (modulePackageId m)
+
 
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
