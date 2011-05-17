@@ -50,6 +50,7 @@ import qualified RegAlloc.Graph.TrivColorable	as Color
 
 import TargetReg
 import Platform
+import Config
 import Instruction
 import PIC
 import Reg
@@ -68,7 +69,6 @@ import UniqSupply
 import DynFlags
 import StaticFlags
 import Util
-import Config
 
 import Digraph
 import qualified Pretty
@@ -451,14 +451,12 @@ makeImportsDoc dflags imports
                 -- stack so add the note in:
             Pretty.$$ Pretty.text ".section .note.GNU-stack,\"\",@progbits"
 #endif
-#if !defined(darwin_TARGET_OS)
                 -- And just because every other compiler does, lets stick in
 		-- an identifier directive: .ident "GHC x.y.z"
-	    Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
+            Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
 	                                  Pretty.text cProjectVersion
                        in Pretty.text ".ident" Pretty.<+>
                           Pretty.doubleQuotes compilerIdent
-#endif
 
  where
 	-- Generate "symbol stubs" for all external symbols that might

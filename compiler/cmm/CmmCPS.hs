@@ -67,49 +67,47 @@ mutable reference cells in an 'HscEnv' and are
 global to one compiler session.
 -}
 
+-- EZY: It might be helpful to have an easy way of dumping the "pre"
+-- input for any given phase, besides just turning it all on with
+-- -ddump-cmmz
+
 cpsTop :: HscEnv -> CmmTop -> IO ([(CLabel, CAFSet)], [(CAFSet, CmmTop)])
 cpsTop _ p@(CmmData {}) = return ([], [(Map.empty, p)])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
-       -- Why bother doing it this early?
-       -- g <- dual_rewrite run Opt_D_dump_cmmz "spills and reloads"
-       --                       (dualLivenessWithInsertion callPPs) g
-       -- g <- run $ insertLateReloads g -- Duplicate reloads just before uses
-       -- g <- dual_rewrite runOptimization Opt_D_dump_cmmz "Dead Assignment Elimination"
-       --                   (removeDeadAssignmentsAndReloads callPPs) g
-       dump Opt_D_dump_cmmz "Pre common block elimination" g
-       g <- return $ elimCommonBlocks g
-       dump Opt_D_dump_cmmz "Post common block elimination" g
+       -- Why bother doing these early: dualLivenessWithInsertion,
+       -- insertLateReloads, rewriteAssignments?
 
+       ----------- Eliminate common blocks -------------------
+       g <- return $ elimCommonBlocks g
+       dump Opt_D_dump_cmmz_cbe "Post common block elimination" g
        -- Any work storing block Labels must be performed _after_ elimCommonBlocks
 
        ----------- Proc points -------------------
        let callPPs = callProcPoints g
        procPoints <- run $ minimalProcPointSet callPPs g
        g <- run $ addProcPointProtocols callPPs procPoints g
-       dump Opt_D_dump_cmmz "Post Proc Points Added" g
+       dump Opt_D_dump_cmmz_proc "Post Proc Points Added" g
 
        ----------- Spills and reloads -------------------
-       g     <- 
-              -- pprTrace "pre Spills" (ppr g) $
-                dual_rewrite run Opt_D_dump_cmmz "spills and reloads"
-                             (dualLivenessWithInsertion procPoints) g
-                    -- Insert spills at defns; reloads at return points
-       g     <-
-              -- pprTrace "pre insertLateReloads" (ppr g) $
-                runOptimization $ insertLateReloads g -- Duplicate reloads just before uses
-       dump Opt_D_dump_cmmz "Post late reloads" g
-       g     <-
-               -- pprTrace "post insertLateReloads" (ppr g) $
-                dual_rewrite runOptimization Opt_D_dump_cmmz "Dead Assignment Elimination"
-                                        (removeDeadAssignmentsAndReloads procPoints) g
-                    -- Remove redundant reloads (and any other redundant asst)
+       g <- run $ dualLivenessWithInsertion procPoints g
+       dump Opt_D_dump_cmmz_spills "Post spills and reloads" g
 
-       ----------- Debug only: add code to put zero in dead stack slots----
+       ----------- Sink and inline assignments -------------------
+       g <- runOptimization $ rewriteAssignments g
+       dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
+
+       ----------- Eliminate dead assignments -------------------
+       -- Remove redundant reloads (and any other redundant asst)
+       g <- runOptimization $ removeDeadAssignmentsAndReloads procPoints g
+       dump Opt_D_dump_cmmz_dead "Post Dead Assignment Elimination" g
+
+       ----------- Zero dead stack slots (Debug only) ---------------
        -- Debugging: stubbing slots on death can cause crashes early
-       g <- -- trace "post dead-assign elim" $
-            if opt_StubDeadValues then run $ stubSlotsOnDeath g else return g
-
+       g <- if opt_StubDeadValues
+                then run $ stubSlotsOnDeath g
+                else return g
+       dump Opt_D_dump_cmmz_stub "Post stub dead stack slots" g
 
        --------------- Stack layout ----------------
        slotEnv <- run $ liveSlotAnal g
@@ -120,16 +118,16 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ------------  Manifest the stack pointer --------
        g  <- run $ manifestSP spEntryMap areaMap entry_off g
-       dump Opt_D_dump_cmmz "after manifestSP" g
+       dump Opt_D_dump_cmmz_sp "Post manifestSP" g
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...
 
        ------------- Split into separate procedures ------------
        procPointMap  <- run $ procPointAnalysis procPoints g
-       dump Opt_D_dump_cmmz "procpoint map" procPointMap
+       dump Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
        gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap
                                        (CmmProc h l g)
-       mapM_ (dump Opt_D_dump_cmmz "after splitting") gs
+       mapM_ (dump Opt_D_dump_cmmz_split "Post splitting") gs
 
        ------------- More CAFs and foreign calls ------------
        cafEnv <- run $ cafAnal g
@@ -137,29 +135,28 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
 
        gs <- run $ mapM (lowerSafeForeignCalls areaMap) gs
-       mapM_ (dump Opt_D_dump_cmmz "after lowerSafeForeignCalls") gs
+       mapM_ (dump Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls") gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
-       let gs' = map (setInfoTableStackMap slotEnv areaMap) gs
-       mapM_ (dump Opt_D_dump_cmmz "after setInfoTableStackMap") gs'
-       let gs'' = map (bundleCAFs cafEnv) gs'
-       mapM_ (dump Opt_D_dump_cmmz "after bundleCAFs") gs''
-       return (localCAFs, gs'')
+       gs <- return $ map (setInfoTableStackMap slotEnv areaMap) gs
+       mapM_ (dump Opt_D_dump_cmmz_info "after setInfoTableStackMap") gs
+       gs <- return $ map (bundleCAFs cafEnv) gs
+       mapM_ (dump Opt_D_dump_cmmz_cafs "after bundleCAFs") gs
+       return (localCAFs, gs)
   where dflags = hsc_dflags hsc_env
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
-        dump f txt g = dumpIfSet_dyn dflags f txt (ppr g)
+        dump f txt g = do
+            -- ToDo: No easy way of say "dump all the cmmz, *and* split
+            -- them into files."  Also, -ddump-cmmz doesn't play nicely
+            -- with -ddump-to-file, since the headers get omitted.
+            dumpIfSet_dyn dflags f txt (ppr g)
+            when (not (dopt f dflags)) $
+                dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (ppr g)
         -- Runs a required transformation/analysis
         run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
         -- Runs an optional transformation/analysis (and should
         -- thus be subject to optimization fuel)
         runOptimization = runFuelIO (hsc_OptFuel hsc_env)
-
-        -- pass 'run' or 'runOptimization' for 'r'
-        dual_rewrite r flag txt pass g =
-          do dump flag ("Pre " ++ txt)  g
-             g <- r $ pass g
-             dump flag ("Post " ++ txt) $ g
-             return g
 
 -- This probably belongs in CmmBuildInfoTables?
 -- We're just finishing the job here: once we know what CAFs are defined

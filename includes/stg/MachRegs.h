@@ -67,6 +67,11 @@
    Caller-saves regs have to be saved around C-calls made from STG
    land, so this file defines CALLER_SAVES_<reg> for each <reg> that
    is designated caller-saves in that machine's C calling convention.
+
+   As it stands, the only registers that are ever marked caller saves
+   are the RX, FX, DX and USER registers; as a result, if you
+   decide to caller save a system register (e.g. SP, HP, etc), note that
+   this code path is completely untested! -- EZY
    -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------

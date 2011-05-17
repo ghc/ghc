@@ -1487,16 +1487,17 @@ getExecDir cmd =
           removeCmdSuffix = return . Just . initN (length cmd) . unDosifyPath
 
 getExecPath :: IO (Maybe String)
-getExecPath =
-     allocaArray len $ \buf -> do
-         ret <- getModuleFileName nullPtr buf len
-         if ret == 0 then return Nothing
-	             else liftM Just $ peekCString buf
-    where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
+getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
+  where
+    try_size size = allocaArray (fromIntegral size) $ \buf -> do
+        ret <- c_GetModuleFileName nullPtr buf size
+        case ret of
+          0 -> return Nothing
+          _ | ret < size -> fmap Just $ peekCWString buf
+            | otherwise  -> try_size (size * 2)
 
-foreign import stdcall unsafe "GetModuleFileNameA"
-    getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
-
+foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+  c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getLibDir :: IO (Maybe String)
 getLibDir = return Nothing

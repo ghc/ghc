@@ -121,7 +121,7 @@ shortCutLit (HsIntegral i) ty
   | isIntTy ty && inIntRange i   = Just (HsLit (HsInt i))
   | isWordTy ty && inWordRange i = Just (mkLit wordDataCon (HsWordPrim i))
   | isIntegerTy ty 	       	 = Just (HsLit (HsInteger i ty))
-  | otherwise		       	 = shortCutLit (HsFractional (fromInteger i)) ty
+  | otherwise		       	 = shortCutLit (HsFractional (integralFractionalLit i)) ty
 	-- The 'otherwise' case is important
 	-- Consider (3 :: Float).  Syntactically it looks like an IntLit,
 	-- so we'll call shortCutIntLit, but of course it's a float

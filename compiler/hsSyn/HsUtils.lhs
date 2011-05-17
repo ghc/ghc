@@ -84,7 +84,6 @@ import NameSet
 import BasicTypes
 import SrcLoc
 import FastString
-import Outputable
 import Util
 import Bag
 
@@ -188,7 +187,7 @@ mkSimpleHsAlt pat expr
 -- See RnEnv.lookupSyntaxName
 
 mkHsIntegral   :: Integer -> PostTcType -> HsOverLit id
-mkHsFractional :: Rational -> PostTcType -> HsOverLit id
+mkHsFractional :: FractionalLit -> PostTcType -> HsOverLit id
 mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
 mkHsDo         :: HsStmtContext Name -> [LStmt id] -> HsExpr id
 mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
@@ -664,11 +663,15 @@ lStmtsImplicits = hs_lstmts
 
 hsValBindsImplicits :: HsValBindsLR Name idR -> NameSet
 hsValBindsImplicits (ValBindsOut binds _)
-  = unionManyNameSets [foldBag unionNameSets (hs_bind . unLoc) emptyNameSet hs_binds | (_rec, hs_binds) <- binds]
+  = foldr (unionNameSets . lhsBindsImplicits . snd) emptyNameSet binds
+hsValBindsImplicits (ValBindsIn binds _) 
+  = lhsBindsImplicits binds
+
+lhsBindsImplicits :: LHsBindsLR Name idR -> NameSet
+lhsBindsImplicits = foldBag unionNameSets lhs_bind emptyNameSet
   where
-    hs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
-    hs_bind _ = emptyNameSet
-hsValBindsImplicits (ValBindsIn {}) = pprPanic "hsValBindsImplicits: ValBindsIn" empty
+    lhs_bind (L _ (PatBind { pat_lhs = lpat })) = lPatImplicits lpat
+    lhs_bind _ = emptyNameSet
 
 lPatImplicits :: LPat Name -> NameSet
 lPatImplicits = hs_lpat

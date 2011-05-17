@@ -12,7 +12,8 @@ module HsLit where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr( SyntaxExpr, pprExpr )
-import HsTypes (PostTcType)
+import BasicTypes ( FractionalLit(..) )
+import HsTypes  ( PostTcType )
 import Type	( Type )
 import Outputable
 import FastString
@@ -40,10 +41,10 @@ data HsLit
   | HsWordPrim	    Integer		-- Unboxed Word
   | HsInteger	    Integer  Type	-- Genuinely an integer; arises only from TRANSLATION
 					-- 	(overloaded literals are done with HsOverLit)
-  | HsRat	    Rational Type	-- Genuinely a rational; arises only from TRANSLATION
+  | HsRat	    FractionalLit Type	-- Genuinely a rational; arises only from TRANSLATION
 					-- 	(overloaded literals are done with HsOverLit)
-  | HsFloatPrim	    Rational		-- Unboxed Float
-  | HsDoublePrim    Rational		-- Unboxed Double
+  | HsFloatPrim	    FractionalLit	-- Unboxed Float
+  | HsDoublePrim    FractionalLit	-- Unboxed Double
   deriving (Data, Typeable)
 
 instance Eq HsLit where
@@ -70,7 +71,7 @@ data HsOverLit id 	-- An overloaded literal
 
 data OverLitVal
   = HsIntegral   !Integer   	-- Integer-looking literals;
-  | HsFractional !Rational   	-- Frac-looking literals
+  | HsFractional !FractionalLit	-- Frac-looking literals
   | HsIsString   !FastString 	-- String-looking literals
   deriving (Data, Typeable)
 
@@ -142,9 +143,9 @@ instance Outputable HsLit where
     ppr (HsStringPrim s) = pprHsString s <> char '#'
     ppr (HsInt i)	 = integer i
     ppr (HsInteger i _)	 = integer i
-    ppr (HsRat f _)	 = rational f
-    ppr (HsFloatPrim f)	 = rational f <> char '#'
-    ppr (HsDoublePrim d) = rational d <> text "##"
+    ppr (HsRat f _)	 = ppr f
+    ppr (HsFloatPrim f)	 = ppr f <> char '#'
+    ppr (HsDoublePrim d) = ppr d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
     ppr (HsWordPrim w)	 = integer w  <> text "##"
 
@@ -155,6 +156,6 @@ instance OutputableBndr id => Outputable (HsOverLit id) where
 
 instance Outputable OverLitVal where
   ppr (HsIntegral i)   = integer i 
-  ppr (HsFractional f) = rational f
+  ppr (HsFractional f) = ppr f
   ppr (HsIsString s)   = pprHsString s
 \end{code}
