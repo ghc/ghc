@@ -12,25 +12,37 @@ test.concio001.thr:
 
 # NB. utf8-test should *not* have a final newline.  The last char should be 'X'.
 utf16-test: utf8-test
-	iconv -f UTF8 -t UTF16 <utf8-test >utf16-test
+	iconv -f UTF-8 -t UTF-16 <utf8-test >utf16-test
 
 utf16le-test: utf8-test
-	iconv -f UTF8 -t UTF16LE <utf8-test >utf16le-test
+	iconv -f UTF-8 -t UTF-16LE <utf8-test >utf16le-test
 
 utf16be-test: utf8-test
-	iconv -f UTF8 -t UTF16BE <utf8-test >utf16be-test
+	iconv -f UTF-8 -t UTF-16BE <utf8-test >utf16be-test
 
 utf32-test: utf8-test
-	iconv -f UTF8 -t UTF32 <utf8-test >utf32-test
+	iconv -f UTF-8 -t UTF-32 <utf8-test >utf32-test
 
 utf32le-test: utf8-test
-	iconv -f UTF8 -t UTF32LE <utf8-test >utf32le-test
+	iconv -f UTF-8 -t UTF-32LE <utf8-test >utf32le-test
 
 utf32be-test: utf8-test
-	iconv -f UTF8 -t UTF32BE <utf8-test >utf32be-test
+	iconv -f UTF-8 -t UTF-32BE <utf8-test >utf32be-test
 
 utf8-bom-test: utf16-test
-	iconv -f UTF16LE -t UTF8 <utf16-test >utf8-bom-test
+	iconv -f UTF-16LE -t UTF-8 <utf16-test >utf8-bom-test
 
 hSetEncoding001.in : latin1 utf8-test utf16le-test utf16be-test utf16-test utf32le-test utf32be-test utf32-test utf8-bom-test
 	cat >$@ latin1 utf8-test utf16le-test utf16be-test utf16-test utf32-test utf32le-test utf32be-test utf8-bom-test
+
+environment001-test:
+	@"$(TEST_HC)" --make -fforce-recomp -v0 environment001.hs -o environment001 
+	@(sleep 1; echo x) | GHC_TEST=马克斯 ./environment001 说
+
+3307-test:
+	@"$(TEST_HC)" --make -fforce-recomp -v0 3307.hs -o 3307
+	echo Ni hao > chinese-file-小说
+	echo chinese-file-小说 > chinese-name
+	# Try a UTF-8 locale. I would test another one (like Big5) but GHC
+	# developers probably won't have it on their machines:
+	@(sleep 1; echo x) | LC_ALL=en_US.UTF-8 ./3307 chinese-file-小说

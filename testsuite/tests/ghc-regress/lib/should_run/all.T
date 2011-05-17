@@ -3,6 +3,8 @@ test('array001', 	normal, compile_and_run, [''])
 test('char001', 	normal, compile_and_run, [''])
 test('char002', 	normal, compile_and_run, [''])
 
+test('cstring001', 	normal, compile_and_run, [''])
+
 test('length001',
      # This fails without -O, as it relies on a RULE being applied
      expect_fail_for(['normal', 'threaded1', 'llvm']),
@@ -54,3 +56,5 @@ test('stableptr004', extra_run_opts('+RTS -K4m -RTS'), compile_and_run, [''])
 test('stableptr005', normal, compile_and_run, [''])
 
 test('weak001', normal, compile_and_run, [''])
+
+test('4006',		normal, compile_and_run, [''])
