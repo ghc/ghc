@@ -23,7 +23,6 @@
 -----------------------------------------------------------------------------
 
 module Foreign.C.String (   -- representation of strings in C
-
   -- * C strings
 
   CString,           -- = Ptr CChar
@@ -31,8 +30,14 @@ module Foreign.C.String (   -- representation of strings in C
 
   -- ** Using a locale-dependent encoding
 
+#ifndef __GLASGOW_HASKELL__
   -- | Currently these functions are identical to their @CAString@ counterparts;
   -- eventually they will use an encoding determined by the current locale.
+#else
+  -- | These functions are different from their @CAString@ counterparts
+  -- in that they will use an encoding determined by the current locale,
+  -- rather than always assuming ASCII.
+#endif
 
   -- conversion of C strings into Haskell strings
   --
@@ -102,10 +107,15 @@ import Foreign.Storable
 import Data.Word
 
 #ifdef __GLASGOW_HASKELL__
+import Control.Monad
+
 import GHC.List
 import GHC.Real
 import GHC.Num
 import GHC.Base
+
+import {-# SOURCE #-} GHC.IO.Encoding
+import qualified GHC.Foreign as GHC
 #else
 import Data.Char ( chr, ord )
 #define unsafeChr chr
@@ -133,12 +143,20 @@ type CStringLen = (Ptr CChar, Int)
 -- | Marshal a NUL terminated C string into a Haskell string.
 --
 peekCString    :: CString -> IO String
+#ifndef __GLASGOW_HASKELL__
 peekCString = peekCAString
+#else
+peekCString = GHC.peekCString foreignEncoding
+#endif
 
 -- | Marshal a C string with explicit length into a Haskell string.
 --
 peekCStringLen           :: CStringLen -> IO String
+#ifndef __GLASGOW_HASKELL__
 peekCStringLen = peekCAStringLen
+#else
+peekCStringLen = GHC.peekCStringLen foreignEncoding
+#endif
 
 -- | Marshal a Haskell string into a NUL terminated C string.
 --
@@ -149,7 +167,11 @@ peekCStringLen = peekCAStringLen
 --   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCString :: String -> IO CString
+#ifndef __GLASGOW_HASKELL__
 newCString = newCAString
+#else
+newCString = GHC.newCString foreignEncoding
+#endif
 
 -- | Marshal a Haskell string into a C string (ie, character array) with
 -- explicit length information.
@@ -159,7 +181,11 @@ newCString = newCAString
 --   'Foreign.Marshal.Alloc.finalizerFree'.
 --
 newCStringLen     :: String -> IO CStringLen
+#ifndef __GLASGOW_HASKELL__
 newCStringLen = newCAStringLen
+#else
+newCStringLen = GHC.newCStringLen foreignEncoding
+#endif
 
 -- | Marshal a Haskell string into a NUL terminated C string using temporary
 -- storage.
@@ -171,7 +197,11 @@ newCStringLen = newCAStringLen
 --   storage must /not/ be used after this.
 --
 withCString :: String -> (CString -> IO a) -> IO a
+#ifndef __GLASGOW_HASKELL__
 withCString = withCAString
+#else
+withCString = GHC.withCString foreignEncoding
+#endif
 
 -- | Marshal a Haskell string into a C string (ie, character array)
 -- in temporary storage, with explicit length information.
@@ -181,14 +211,26 @@ withCString = withCAString
 --   storage must /not/ be used after this.
 --
 withCStringLen         :: String -> (CStringLen -> IO a) -> IO a
+#ifndef __GLASGOW_HASKELL__
 withCStringLen = withCAStringLen
+#else
+withCStringLen = GHC.withCStringLen foreignEncoding
+#endif
 
+
+#ifndef __GLASGOW_HASKELL__
 -- | Determines whether a character can be accurately encoded in a 'CString'.
 -- Unrepresentable characters are converted to @\'?\'@.
 --
 -- Currently only Latin-1 characters are representable.
 charIsRepresentable :: Char -> IO Bool
 charIsRepresentable c = return (ord c < 256)
+#else
+-- -- | Determines whether a character can be accurately encoded in a 'CString'.
+-- -- Unrepresentable characters are converted to '?' or their nearest visual equivalent.
+charIsRepresentable :: Char -> IO Bool
+charIsRepresentable = GHC.charIsRepresentable foreignEncoding
+#endif
 
 -- single byte characters
 -- ----------------------

@@ -355,6 +355,38 @@ ioe_bufsiz n = ioException
         ("illegal buffer size " ++ showsPrec 9 n []) Nothing Nothing)
                                 -- 9 => should be parens'ified.
 
+-- ---------------------------------------------------------------------------
+-- Wrapper for Handle encoding/decoding.
+
+-- The interface for TextEncoding changed so that a TextEncoding doesn't raise
+-- an exception if it encounters an invalid sequnce. Furthermore, encoding
+-- returns a reason as to why encoding stopped, letting us know if it was due
+-- to input/output underflow or an invalid sequence.
+--
+-- This code adapts this elaborated interface back to the original TextEncoding
+-- interface.
+--
+-- FIXME: it is possible that Handle code using the haDecoder/haEncoder fields
+-- could be made clearer by using the 'encode' interface directly. I have not
+-- looked into this.
+--
+-- FIXME: we should use recover to deal with EOF, rather than always throwing an
+-- IOException (ioe_invalidCharacter).
+
+streamEncode :: BufferCodec from to state
+             -> Buffer from -> Buffer to
+             -> IO (Buffer from, Buffer to)
+streamEncode codec from to = go (from, to)
+  where 
+    go (from, to) = do
+      (why, from', to') <- encode codec from to
+      -- When we are dealing with Handles, we don't care about input/output
+      -- underflow particularly, and we want to delay errors about invalid
+      -- sequences as far as possible.
+      case why of
+        Encoding.InvalidSequence | bufL from == bufL from' -> recover codec from' to' >>= go
+        _ -> return (from', to')
+
 -- -----------------------------------------------------------------------------
 -- Handle Finalizers
 
@@ -476,7 +508,7 @@ writeCharBuffer h_@Handle__{..} !cbuf = do
 
   (cbuf',bbuf') <- case haEncoder of
     Nothing      -> latin1_encode cbuf bbuf
-    Just encoder -> (encode encoder) cbuf bbuf
+    Just encoder -> (streamEncode encoder) cbuf bbuf
 
   debugIO ("writeCharBuffer after encoding: cbuf=" ++ summaryBuffer cbuf' ++
         " bbuf=" ++ summaryBuffer bbuf')
@@ -537,7 +569,7 @@ flushCharReadBuffer Handle__{..} = do
       -- restore the codec state
       setState decoder codec_state
     
-      (bbuf1,cbuf1) <- (encode decoder) bbuf0
+      (bbuf1,cbuf1) <- (streamEncode decoder) bbuf0
                                cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
     
       debugIO ("finished, bbuf=" ++ summaryBuffer bbuf1 ++
@@ -801,7 +833,7 @@ readTextDevice h_@Handle__{..} cbuf = do
           Just decoder -> do
                state <- getState decoder
                writeIORef haLastDecode (state, bbuf1)
-               (encode decoder) bbuf1 cbuf
+               (streamEncode decoder) bbuf1 cbuf
 
   debugIO ("readTextDevice after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
         " bbuf=" ++ summaryBuffer bbuf2)
@@ -835,7 +867,7 @@ readTextDevice' h_@Handle__{..} bbuf0 cbuf = do
           Just decoder -> do
                state <- getState decoder
                writeIORef haLastDecode (state, bbuf2)
-               (encode decoder) bbuf2 cbuf
+               (streamEncode decoder) bbuf2 cbuf
 
   debugIO ("readTextDevice' after decoding: cbuf=" ++ summaryBuffer cbuf' ++ 
         " bbuf=" ++ summaryBuffer bbuf3)
@@ -872,7 +904,7 @@ decodeByteBuf h_@Handle__{..} cbuf = do
           Just decoder -> do
                state <- getState decoder
                writeIORef haLastDecode (state, bbuf0)
-               (encode decoder) bbuf0 cbuf
+               (streamEncode decoder) bbuf0 cbuf
 
   writeIORef haByteBuffer bbuf2
   return cbuf'

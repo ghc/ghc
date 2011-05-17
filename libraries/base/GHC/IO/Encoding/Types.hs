@@ -20,6 +20,7 @@ module GHC.IO.Encoding.Types (
     TextEncoding(..),
     TextEncoder, TextDecoder,
     EncodeBuffer, DecodeBuffer,
+    CodingProgress(..)
   ) where
 
 import GHC.Base
@@ -32,22 +33,30 @@ import GHC.IO.Buffer
 -- Text encoders/decoders
 
 data BufferCodec from to state = BufferCodec {
-  encode :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
+  encode :: Buffer from -> Buffer to -> IO (CodingProgress, Buffer from, Buffer to),
    -- ^ The @encode@ function translates elements of the buffer @from@
    -- to the buffer @to@.  It should translate as many elements as possible
    -- given the sizes of the buffers, including translating zero elements
    -- if there is either not enough room in @to@, or @from@ does not
    -- contain a complete multibyte sequence.
-   -- 
-   -- @encode@ should raise an exception if, and only if, @from@
-   -- begins with an illegal sequence, or the first element of @from@
-   -- is not representable in the encoding of @to@.  That is, if any
-   -- elements can be successfully translated before an error is
-   -- encountered, then @encode@ should translate as much as it can
-   -- and not throw an exception.  This behaviour is used by the IO
+   --
+   -- The fact that as many elements as possible are translated is used by the IO
    -- library in order to report translation errors at the point they
    -- actually occur, rather than when the buffer is translated.
+  
+  recover :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
+   -- ^ The @recover@ function is used to continue decoding
+   -- in the presence of invalid or unrepresentable sequences. This includes
+   -- both those detected by @encode@ returning @InvalidSequence@ and those
+   -- that occur because the input byte sequence appears to be truncated.
    --
+   -- Progress will usually be made by skipping the first element of the @from@
+   -- buffer. This function should only be called if you are certain that you
+   -- wish to do this skipping, and if the @to@ buffer has at least one element
+   -- of free space.
+   --
+   -- @recover@ may raise an exception rather than skipping anything.
+  
   close  :: IO (),
    -- ^ Resources associated with the encoding may now be released.
    -- The @encode@ function may not be called again after calling
@@ -66,16 +75,16 @@ data BufferCodec from to state = BufferCodec {
    -- beginning), and if not, whether to use the big or little-endian
    -- encoding.
 
-  setState :: state -> IO()
+  setState :: state -> IO ()
    -- restore the state of the codec using the state from a previous
    -- call to 'getState'.
  }
 
 type DecodeBuffer = Buffer Word8 -> Buffer Char
-                  -> IO (Buffer Word8, Buffer Char)
+                  -> IO (CodingProgress, Buffer Word8, Buffer Char)
 
 type EncodeBuffer = Buffer Char -> Buffer Word8
-                  -> IO (Buffer Char, Buffer Word8)
+                  -> IO (CodingProgress, Buffer Char, Buffer Word8)
 
 type TextDecoder state = BufferCodec Word8 CharBufElem state
 type TextEncoder state = BufferCodec CharBufElem Word8 state
@@ -101,3 +110,11 @@ data TextEncoding
 instance Show TextEncoding where
   -- | Returns the value of 'textEncodingName'
   show te = textEncodingName te
+
+data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains insufficient available elements,
+                                      -- or all of the input sequence has been sucessfully translated.
+                    | OutputUnderflow -- ^ Stopped because the output contains insufficient free elements
+                    | InvalidSequence -- ^ Stopped because there are sufficient free elements in the output
+                                      -- to output at least one encoded ASCII character, but the input contains
+                                      -- an invalid or unrepresentable sequence
+                    deriving (Eq, Show)

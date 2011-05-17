@@ -53,6 +53,7 @@ Library {
             GHC.Exts,
             GHC.Float,
             GHC.Float.RealFracMethods,
+            GHC.Foreign,
             GHC.Float.ConversionUtils,
             GHC.ForeignPtr,
             GHC.MVar,
@@ -71,6 +72,7 @@ Library {
             GHC.IO.Encoding.Types,
             GHC.IO.Encoding.Iconv,
             GHC.IO.Encoding.CodePage,
+            GHC.IO.Encoding.Failure,
             GHC.IO.Handle,
             GHC.IO.Handle.Types,
             GHC.IO.Handle.Internals,
@@ -101,6 +103,7 @@ Library {
         if os(windows)
             exposed-modules: GHC.IO.Encoding.CodePage.Table
                              GHC.Conc.Windows
+                             GHC.Windows
     }
     exposed-modules:
         Control.Applicative,

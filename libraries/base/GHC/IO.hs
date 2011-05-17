@@ -36,7 +36,7 @@ module GHC.IO (
     mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
     MaskingState(..), getMaskingState,
     block, unblock, blocked, unsafeUnmask,
-    onException, finally, evaluate
+    onException, bracket, finally, evaluate
   ) where
 
 import GHC.Base
@@ -431,6 +431,18 @@ uninterruptibleMask io = do
     Unmasked              -> blockUninterruptible $ io unblock
     MaskedInterruptible   -> blockUninterruptible $ io block
     MaskedUninterruptible -> io id
+
+bracket
+        :: IO a         -- ^ computation to run first (\"acquire resource\")
+        -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
+        -> (a -> IO c)  -- ^ computation to run in-between
+        -> IO c         -- returns the value from the in-between computation
+bracket before after thing =
+  mask $ \restore -> do
+    a <- before
+    r <- restore (thing a) `onException` after a
+    _ <- after a
+    return r
 
 finally :: IO a         -- ^ computation to run first
         -> IO b         -- ^ computation to run afterward (even if an exception
