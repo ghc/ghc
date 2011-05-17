@@ -71,6 +71,7 @@ test('cgrun060',
 test('cgrun061', normal, compile_and_run, [''])
 test('cgrun062', normal, compile_and_run, [''])
 test('cgrun063', normal, compile_and_run, [''])
+test('cgrun064', normal, compile_and_run, [''])
 test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', extra_clean(['Cgrun067A.hi', 'Cgrun067A.o']),
