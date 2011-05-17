@@ -520,11 +520,10 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
                   in if even e then (nn :% dd) else (negate nn :% dd)
 
 -------------------------------------------------------
--- | @'gcd' x y@ is the greatest (positive) integer that divides both @x@
+-- | @'gcd' x y@ is the greatest (nonnegative) integer that divides both @x@
 -- and @y@; for example @'gcd' (-3) 6@ = @3@, @'gcd' (-3) (-6)@ = @3@,
--- @'gcd' 0 4@ = @4@.  @'gcd' 0 0@ raises a runtime error.
+-- @'gcd' 0 4@ = @4@.  @'gcd' 0 0@ = @0@.
 gcd             :: (Integral a) => a -> a -> a
-gcd 0 0         =  error "Prelude.gcd: gcd 0 0 is undefined"
 gcd x y         =  gcd' (abs x) (abs y)
                    where gcd' a 0  =  a
                          gcd' a b  =  gcd' b (a `rem` b)
@@ -539,16 +538,11 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 #ifdef OPTIMISE_INTEGER_GCD_LCM
 {-# RULES
 "gcd/Int->Int->Int"             gcd = gcdInt
-"gcd/Integer->Integer->Integer" gcd = gcdInteger'
+"gcd/Integer->Integer->Integer" gcd = gcdInteger
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
 
-gcdInteger' :: Integer -> Integer -> Integer
-gcdInteger' 0 0 = error "GHC.Real.gcdInteger': gcd 0 0 is undefined"
-gcdInteger' a b = gcdInteger a b
-
 gcdInt :: Int -> Int -> Int
-gcdInt 0 0 = error "GHC.Real.gcdInt: gcd 0 0 is undefined"
 gcdInt a b = fromIntegral (gcdInteger (fromIntegral a) (fromIntegral b))
 #endif
 
