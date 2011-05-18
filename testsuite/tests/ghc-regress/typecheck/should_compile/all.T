@@ -346,3 +346,6 @@ test('T4969', normal, compile, [''])
 test('T5120', normal, compile, [''])
 test('mc18', expect_broken_for(4370, ['hpc']), compile, [''])
 test('tc249', normal, compile, [''])
+
+test('GivenOverlapping', normal, compile, [''])
+test('SilentParametersOverlapping', normal, compile, [''])
