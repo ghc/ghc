@@ -29,7 +29,14 @@ main = do
           chr (fromIntegral (x `shiftR` 8)  .&. 0xff),
           chr (fromIntegral x .&. 0xff) ]
   hPutStr h (concatMap expand32 [ 0, 32 .. 0xD7ff ])
-  hPutStr h (concatMap expand32 [ 0xE000, 0xE000+32 .. 0x10FFFF ])
+  -- We avoid the private-use characters at 0xF1E00..0xF1EFF
+  -- that reserved for GHC's PEP383 roundtripping implementation.
+  --
+  -- The reason is that currently normal text containing those
+  -- characters will be mangled, even if we aren't using an encoding
+  -- created using //ROUNDTRIP.
+  hPutStr h (concatMap expand32 [ 0xE000, 0xE000+32 .. 0xF1DFF ])
+  hPutStr h (concatMap expand32 [ 0xF1F00, 0xF1F00+32 .. 0x10FFFF ])
   hClose h
 
   -- convert the UTF-32BE file into each other encoding

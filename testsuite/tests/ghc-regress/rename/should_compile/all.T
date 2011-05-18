@@ -168,5 +168,5 @@ test('T4534', normal, compile, [''])
 
 test('mc09', normal, compile, [''])
 test('mc10', normal, compile, [''])
-test('mc11', expect_broken_for(4370, ['ghci','hpc']), compile, [''])
+test('mc11', normal, compile, [''])
 test('mc12', normal, compile, [''])

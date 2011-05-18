@@ -107,15 +107,15 @@ test('T3064',
           compiler_stats_num_field('peak_megabytes_allocated', 8, 11)),
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 14, 18)),
+          compiler_stats_num_field('peak_megabytes_allocated', 12, 16)),
       # expected value: 68181508 (x86/Windows)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 65000000,
                                                       75000000)),
       # expected value: 145038576 (amd64/Linux):
       if_wordsize(64,
-          compiler_stats_num_field('bytes allocated', 120000000,
-                                                      140000000)),
+          compiler_stats_num_field('bytes allocated', 110000000,
+                                                      130000000)),
       # expected value: 3404504 (x86/OSX):
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 3000000,

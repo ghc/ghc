@@ -19,6 +19,21 @@ inf = 1 / 0
 neginf :: Double
 neginf = -1 / 0
 
+fzero :: Float
+fzero = 0
+
+fone :: Float
+fone = 1
+
+fnan :: Float
+fnan = 0 / 0
+
+finf :: Float
+finf = 1 / 0
+
+fneginf :: Float
+fneginf = -1 / 0
+
 main :: IO ()
 main = do putStrLn "=== Subtraction ==="
           print (zero - zero)
@@ -106,4 +121,91 @@ main = do putStrLn "=== Subtraction ==="
           print (neginf / nan)
           print (neginf / inf)
           print (neginf / neginf)
+
+          putStrLn "=== Subtraction ==="
+          print (fzero - fzero)
+          print (fzero - fnan)
+          print (fzero - finf)
+          print (fzero - fneginf)
+          print (fnan - fzero)
+          print (fnan - fnan)
+          print (fnan - finf)
+          print (fnan - fneginf)
+          print (finf - fzero)
+          print (finf - fnan)
+          print (finf - finf)
+          print (finf - fneginf)
+          print (fneginf - fzero)
+          print (fneginf - fnan)
+          print (fneginf - finf)
+          print (fneginf - fneginf)
+          putStrLn "=== Addition ==="
+          print (fzero + fzero)
+          print (fzero + fnan)
+          print (fzero + finf)
+          print (fzero + fneginf)
+          print (fnan + fzero)
+          print (fnan + fnan)
+          print (fnan + finf)
+          print (fnan + fneginf)
+          print (finf + fzero)
+          print (finf + fnan)
+          print (finf + finf)
+          print (finf + fneginf)
+          print (fneginf + fzero)
+          print (fneginf + fnan)
+          print (fneginf + finf)
+          print (fneginf + fneginf)
+          putStrLn "=== Mutiplication ==="
+          print (fzero * fzero)
+          print (fzero * fone)
+          print (fzero * fnan)
+          print (fzero * finf)
+          print (fzero * fneginf)
+          print (fone * fzero)
+          print (fone * fone)
+          print (fone * fnan)
+          print (fone * finf)
+          print (fone * fneginf)
+          print (fnan * fzero)
+          print (fnan * fone)
+          print (fnan * fnan)
+          print (fnan * finf)
+          print (fnan * fneginf)
+          print (finf * fzero)
+          print (finf * fone)
+          print (finf * fnan)
+          print (finf * finf)
+          print (finf * fneginf)
+          print (fneginf * fzero)
+          print (fneginf * fone)
+          print (fneginf * fnan)
+          print (fneginf * finf)
+          print (fneginf * fneginf)
+          putStrLn "=== Division ==="
+          print (fzero / fzero)
+          print (fzero / fone)
+          print (fzero / fnan)
+          print (fzero / finf)
+          print (fzero / fneginf)
+          print (fone / fzero)
+          print (fone / fone)
+          print (fone / fnan)
+          print (fone / finf)
+          print (fone / fneginf)
+          print (fnan / fzero)
+          print (fnan / fone)
+          print (fnan / fnan)
+          print (fnan / finf)
+          print (fnan / fneginf)
+          print (finf / fzero)
+          print (finf / fone)
+          print (finf / fnan)
+          print (finf / finf)
+          print (finf / fneginf)
+          print (fneginf / fzero)
+          print (fneginf / fone)
+          print (fneginf / fnan)
+          print (fneginf / finf)
+          print (fneginf / fneginf)
 

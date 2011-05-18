@@ -6,9 +6,11 @@
 module Main where
 
 data T a where
-  T1 { w :: !(Int, Int), x :: a, y :: b } :: T (a,b)
-  T2 { w :: !(Int, Int), x :: a } :: T (a,b)
-  T3 { z :: Int } :: T Bool
+  T1 :: { w :: !(Int, Int), x :: a, y :: b } -> T (a,b)
+  T2 :: { w :: !(Int, Int), x :: a } -> T (a,b)
+  T3 :: { z :: Int } -> T Bool
+ 
+-- T1 :: forall c a b. (c~(a,b)) => (Int,Int) -> a -> b -> T c
 
 f xv yv = T1 { w = (0,0), x = xv, y = yv }
 
