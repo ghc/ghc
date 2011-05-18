@@ -15,7 +15,9 @@
 
 module GHC.IO.Encoding.Failure (
     CodingFailureMode(..), codingFailureModeSuffix,
-    isSurrogate, recoverDecode, recoverEncode
+    isSurrogate,
+    surrogatifyRoundtripCharacter, desurrogatifyRoundtripCharacter,
+    recoverDecode, recoverEncode
   ) where
 
 import GHC.IO
@@ -37,16 +39,34 @@ import Data.Maybe
 data CodingFailureMode = ErrorOnCodingFailure         -- ^ Throw an error when an illegal sequence is encountered
                        | IgnoreCodingFailure          -- ^ Attempt to ignore and recover if an illegal sequence is encountered
                        | TransliterateCodingFailure   -- ^ Replace with the closest visual match upon an illegal sequence
-                       | SurrogateEscapeFailure       -- ^ Use the surrogate escape mechanism to attempt to allow illegal sequences to be roundtripped.
+                       | RoundtripFailure             -- ^ Use the private-use escape mechanism to attempt to allow illegal sequences to be roundtripped.
                        deriving (Show)                -- This will only work properly for those encodings which are strict supersets of ASCII in the sense
                                                       -- that valid ASCII data is also valid in that encoding. This is not true for e.g. UTF-16, because
                                                       -- ASCII characters must be padded to two bytes to retain their meaning.
+
+-- Note [Roundtripping]
+-- ~~~~~~~~~~~~~~~~~~~~
+--
+-- Roundtripping is based on the ideas of PEP383. However, unlike PEP383 we do not wish to use lone surrogate codepoints
+-- to escape undecodable bytes, because that may confuse Unicode processing software written in Haskell. Instead, we use
+-- the range of private-use characters from 0xF1E00 to 0xF1EFF.
+--
+-- This introduces a technical problem when it comes to encoding back to bytes using iconv. The iconv code will not fail when
+-- it tries to encode a private-use character (as it would if trying to encode a surrogate), which means that we won't get a
+-- chance to replace it with the byte we originally escaped.
+--
+-- To work around this, when filling the buffer to be encoded (in writeBlocks/withEncodedCString/newEncodedCString), we replace
+-- the private-use characters with lone surrogates again! Likewise, when reading from a buffer (unpack/unpack_nl/peekEncodedCString)
+-- we have to do the inverse process.
+--
+-- The user of String should never see these lone surrogates, but it ensures that iconv will throw an error when encountering them.
+-- We use lone surrogates in the range 0xDC00 to 0xDCFF for this purpose.
 
 codingFailureModeSuffix :: CodingFailureMode -> String
 codingFailureModeSuffix ErrorOnCodingFailure       = ""
 codingFailureModeSuffix IgnoreCodingFailure        = "//IGNORE"
 codingFailureModeSuffix TransliterateCodingFailure = "//TRANSLIT"
-codingFailureModeSuffix SurrogateEscapeFailure     = "//SURROGATE"
+codingFailureModeSuffix RoundtripFailure           = "//ROUNDTRIP"
 
 -- | In transliterate mode, we use this character when decoding unknown bytes.
 --
@@ -55,20 +75,44 @@ unrepresentableChar :: Char
 unrepresentableChar = '\xFFFD'
 
 -- | Some characters are actually "surrogate" codepoints defined for use in UTF-16. We need to signal an
--- invalid character if we detect them when encoding a sequence of 'Char's into 'Word8's because the
--- 'SurrogateEscapeFailure' mode creates unpaired surrogates to round-trip bytes through our internal
--- UTF-16 encoding.
+-- invalid character if we detect them when encoding a sequence of 'Char's into 'Word8's because they won't
+-- give valid Unicode.
+--
+-- We may also need to signal an invalid character if we detect them when encoding a sequence of 'Char's into 'Word8's
+-- because the 'RoundtripFailure' mode creates these to round-trip bytes through our internal UTF-16 encoding.
 isSurrogate :: Char -> Bool
 isSurrogate c = (0xD800 <= x && x <= 0xDBFF) || (0xDC00 <= x && x <= 0xDFFF)
   where x = ord c
 
-escapeToSurrogateCharacter :: Word8 -> Char
-escapeToSurrogateCharacter b
+-- | We use some private-use characters for roundtripping unknown bytes through a String
+isRoundtripEscapeChar :: Char -> Bool
+isRoundtripEscapeChar c = 0xF1E00 <= x && x < 0xF1F00
+  where x = ord c
+
+-- | We use some surrogate characters for roundtripping unknown bytes through a String
+isRoundtripEscapeSurrogateChar :: Char -> Bool
+isRoundtripEscapeSurrogateChar c = 0xDC00 <= x && x < 0xDD00
+  where x = ord c
+
+-- Private use characters (in Strings) --> lone surrogates (in Buffer CharBufElem)
+surrogatifyRoundtripCharacter :: Char -> Char
+surrogatifyRoundtripCharacter c | isRoundtripEscapeChar c = chr (ord c - 0xF1E00 + 0xDC00)
+                                | otherwise               = c
+
+-- Lone surrogates (in Buffer CharBufElem) --> private use characters (in Strings)
+desurrogatifyRoundtripCharacter :: Char -> Char
+desurrogatifyRoundtripCharacter c | isRoundtripEscapeSurrogateChar c = chr (ord c - 0xDC00 + 0xF1E00)
+                                  | otherwise                        = c
+
+-- Bytes (in Buffer Word8) --> lone surrogates (in Buffer CharBufElem)
+escapeToRoundtripCharacterSurrogate :: Word8 -> Char
+escapeToRoundtripCharacterSurrogate b
   | b < 128   = chr (fromIntegral b) -- Disallow 'smuggling' of ASCII bytes. For roundtripping to work, this assumes encoding is ASCII-superset.
   | otherwise = chr (0xDC00 + fromIntegral b)
 
-unescapeSurrogateCharacter :: Char -> Maybe Word8
-unescapeSurrogateCharacter c
+-- Lone surrogates (in Buffer CharBufElem) --> bytes (in Buffer Word8)
+unescapeRoundtripCharacterSurrogate :: Char -> Maybe Word8
+unescapeRoundtripCharacterSurrogate c
     | 0xDC80 <= x && x < 0xDD00 = Just (fromIntegral x) -- Discard high byte
     | otherwise                 = Nothing
   where x = ord c
@@ -83,9 +127,9 @@ recoverDecode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
   TransliterateCodingFailure -> do
       ow' <- writeCharBuf oraw ow unrepresentableChar
       return (input { bufL=ir+1 }, output { bufR=ow' })
-  SurrogateEscapeFailure     -> do
+  RoundtripFailure           -> do
       b <- readWord8Buf iraw ir
-      ow' <- writeCharBuf oraw ow (escapeToSurrogateCharacter b)
+      ow' <- writeCharBuf oraw ow (escapeToRoundtripCharacterSurrogate b)
       return (input { bufL=ir+1 }, output { bufR=ow' })
 
 recoverEncode :: CodingFailureMode -> Buffer Char -> Buffer Word8 -> IO (Buffer Char, Buffer Word8)
@@ -113,7 +157,7 @@ recoverEncode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
         -- encode a simple ASCII value
         --writeWord8Buf oraw ow unrepresentableByte
         --return (input { bufL=ir' }, output { bufR=ow+1 })
-    SurrogateEscapeFailure | Just x <- unescapeSurrogateCharacter c -> do
+    RoundtripFailure | Just x <- unescapeRoundtripCharacterSurrogate c -> do
         writeWord8Buf oraw ow x
         return (input { bufL=ir' }, output { bufR=ow+1 })
     _                          -> ioe_encodingError

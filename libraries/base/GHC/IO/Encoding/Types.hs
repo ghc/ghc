@@ -43,6 +43,14 @@ data BufferCodec from to state = BufferCodec {
    -- The fact that as many elements as possible are translated is used by the IO
    -- library in order to report translation errors at the point they
    -- actually occur, rather than when the buffer is translated.
+   --
+   -- To allow us to use iconv as a BufferCode efficiently, character buffers are
+   -- defined to contain lone surrogates instead of those private use characters that
+   -- are used for roundtripping. Thus, Chars poked and peeked from a character buffer
+   -- must undergo surrogatifyRoundtripCharacter and desurrogatifyRoundtripCharacter
+   -- respectively.
+   --
+   -- For more information on this, see Note [Roundtripping] in GHC.IO.Encoding.Failure.
   
   recover :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
    -- ^ The @recover@ function is used to continue decoding
@@ -56,6 +64,9 @@ data BufferCodec from to state = BufferCodec {
    -- of free space.
    --
    -- @recover@ may raise an exception rather than skipping anything.
+   --
+   -- Currently, some implementations of @recover@ may mutate the input buffer.
+   -- In particular, this feature is used to implement transliteration.
   
   close  :: IO (),
    -- ^ Resources associated with the encoding may now be released.
