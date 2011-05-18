@@ -595,7 +595,9 @@ nestImplicTcS ref (inner_range, inner_tcs) (TcS thing_inside)
 		   -- outer ones!
 
        ; orig_flat_cache <- TcM.readTcRef orig_flat_cache_var
-       ; flat_cache_var  <- TcM.newTcRef orig_flat_cache -- emptyFlatCache
+       ; flat_cache_var  <- TcM.newTcRef orig_flat_cache
+       -- One could be more conservative as well: 
+       -- ; flat_cache_var  <- TcM.newTcRef emptyFlatCache 
 
                             -- Consider copying the results the tcs_flat_map of the 
                             -- incomping constraint, but we must make sure that we

@@ -94,6 +94,7 @@ multiple times.
 
 
 \begin{code}
+
 -- Flatten a bunch of types all at once.
 flattenMany :: CtFlavor -> [Type] -> TcS ([Xi], [Coercion], CanonicalCts)
 -- Coercions :: Xi ~ Type 
@@ -112,8 +113,8 @@ flatten ctxt ty
 	-- Preserve type synonyms if possible
 	-- We can tell if ty' is function-free by
 	-- whether there are any floated constraints
-       ; if isEmptyCCan ccs then
-             return (ty, ty, emptyCCan)  
+        ; if isIdentityCoercion co then
+             return (ty, ty, emptyCCan)
          else
              return (xi, co, ccs) }
 
@@ -257,7 +258,7 @@ mkCanonical fl ev = case evVarPred ev of
 canClassToWorkList :: CtFlavor -> EvVar -> Class -> [TcType] -> TcS WorkList
 canClassToWorkList fl v cn tys 
   = do { (xis,cos,ccs) <- flattenMany fl tys  -- cos :: xis ~ tys
-       ; let no_flattening_happened = isEmptyCCan ccs
+       ; let no_flattening_happened = all isIdentityCoercion cos
              dict_co = mkTyConCoercion (classTyCon cn) cos
        ; v_new <- if no_flattening_happened  then return v
                   else if isGivenOrSolved fl then return v
@@ -796,7 +797,7 @@ canEqLeafOriented fl cv cls1@(FunCls fn tys1) s2         -- cv : F tys1
        ; (xi2, co2, ccs2) <- flatten fl s2       -- Flatten entire RHS
                                                  -- co2  :: xi2 ~ s2
        ; let ccs = ccs1 `andCCan` ccs2
-             no_flattening_happened = isEmptyCCan ccs
+             no_flattening_happened = all isIdentityCoercion (co2:cos1)
        ; cv_new <- if no_flattening_happened  then return cv
                    else if isGivenOrSolved fl then return cv
                    else if isWanted fl then 
@@ -842,7 +843,7 @@ canEqLeafTyVarLeft fl cv tv s2       -- cv : tv ~ s2
        ; case mxi2' of {
            Nothing   -> canEqFailure fl cv ;
            Just xi2' ->
-    do { let no_flattening_happened = isEmptyCCan ccs2
+    do { let no_flattening_happened = isIdentityCoercion co
        ; cv_new <- if no_flattening_happened  then return cv
                    else if isGivenOrSolved fl then return cv
                    else if isWanted fl then 
