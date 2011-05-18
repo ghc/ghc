@@ -49,7 +49,7 @@ data CodingFailureMode = ErrorOnCodingFailure         -- ^ Throw an error when a
 --
 -- Roundtripping is based on the ideas of PEP383. However, unlike PEP383 we do not wish to use lone surrogate codepoints
 -- to escape undecodable bytes, because that may confuse Unicode processing software written in Haskell. Instead, we use
--- the range of private-use characters from 0xF1E00 to 0xF1EFF.
+-- the range of private-use characters from 0xEF80 to 0xEFFF designated for "encoding hacks" by the ConScript Unicode Registery.
 --
 -- This introduces a technical problem when it comes to encoding back to bytes using iconv. The iconv code will not fail when
 -- it tries to encode a private-use character (as it would if trying to encode a surrogate), which means that we won't get a
@@ -86,7 +86,7 @@ isSurrogate c = (0xD800 <= x && x <= 0xDBFF) || (0xDC00 <= x && x <= 0xDFFF)
 
 -- | We use some private-use characters for roundtripping unknown bytes through a String
 isRoundtripEscapeChar :: Char -> Bool
-isRoundtripEscapeChar c = 0xF1E00 <= x && x < 0xF1F00
+isRoundtripEscapeChar c = 0xEF00 <= x && x < 0xF000
   where x = ord c
 
 -- | We use some surrogate characters for roundtripping unknown bytes through a String
@@ -96,12 +96,12 @@ isRoundtripEscapeSurrogateChar c = 0xDC00 <= x && x < 0xDD00
 
 -- Private use characters (in Strings) --> lone surrogates (in Buffer CharBufElem)
 surrogatifyRoundtripCharacter :: Char -> Char
-surrogatifyRoundtripCharacter c | isRoundtripEscapeChar c = chr (ord c - 0xF1E00 + 0xDC00)
+surrogatifyRoundtripCharacter c | isRoundtripEscapeChar c = chr (ord c - 0xEF00 + 0xDC00)
                                 | otherwise               = c
 
 -- Lone surrogates (in Buffer CharBufElem) --> private use characters (in Strings)
 desurrogatifyRoundtripCharacter :: Char -> Char
-desurrogatifyRoundtripCharacter c | isRoundtripEscapeSurrogateChar c = chr (ord c - 0xDC00 + 0xF1E00)
+desurrogatifyRoundtripCharacter c | isRoundtripEscapeSurrogateChar c = chr (ord c - 0xDC00 + 0xEF00)
                                   | otherwise                        = c
 
 -- Bytes (in Buffer Word8) --> lone surrogates (in Buffer CharBufElem)
