@@ -366,6 +366,9 @@ sub scmall {
             my @scm_args = ("log", "$branch_name..");
             scm ($localpath, $scm, @scm_args, @args);
         }
+        elsif ($command =~ /^log$/) {
+            scm ($localpath, $scm, "log", @args);
+        }
         elsif ($command =~ /^remote$/) {
             my @scm_args;
             if ($subcommand eq 'add') {
@@ -434,6 +437,7 @@ Supported commands:
  * clean
  * reset
  * config
+ * log
 
 Available package-tags are:
 END
