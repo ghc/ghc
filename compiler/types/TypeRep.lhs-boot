@@ -2,9 +2,10 @@
 module TypeRep where
 
 data Type
-data PredType
+data Pred a
 data TyThing
 
+type PredType = Pred Type
 type Kind = Type
 
 isCoercionKind :: Kind -> Bool

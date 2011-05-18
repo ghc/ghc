@@ -1580,7 +1580,7 @@ repLiteral lit
 mk_integer :: Integer -> DsM HsLit
 mk_integer  i = do integer_ty <- lookupType integerTyConName
                    return $ HsInteger i integer_ty
-mk_rational :: Rational -> DsM HsLit
+mk_rational :: FractionalLit -> DsM HsLit
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit

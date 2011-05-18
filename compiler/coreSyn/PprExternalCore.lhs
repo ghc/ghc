@@ -106,10 +106,8 @@ pty (SymCoercion t) =
   sep [text "%sym", paty t]
 pty (UnsafeCoercion t1 t2) =
   sep [text "%unsafe", paty t1, paty t2]
-pty (LeftCoercion t) =
-  sep [text "%left", paty t]
-pty (RightCoercion t) =
-  sep [text "%right", paty t]
+pty (NthCoercion n t) =
+  sep [text "%nth", int n, paty t]
 pty (InstCoercion t1 t2) =
   sep [text "%inst", paty t1, paty t2]
 pty t = pbty t

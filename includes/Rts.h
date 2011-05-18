@@ -219,6 +219,12 @@ DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell *
 DLL_IMPORT_RTS extern int    prog_argc;
 DLL_IMPORT_RTS extern char  *prog_name;
 
+#ifdef mingw32_HOST_OS
+// We need these two from Haskell too
+void getWin32ProgArgv(int *argc, wchar_t **argv[]);
+void setWin32ProgArgv(int argc, wchar_t *argv[]);
+#endif
+
 void stackOverflow(void);
 
 void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);

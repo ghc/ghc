@@ -24,12 +24,10 @@
   </para>
 
   <para>
-    In GHC version 6.12 building shared libraries is supported for Linux on
-    x86 and x86-64 architectures and there is partial support on Windows (see
-    <xref linkend="win32-dlls"/>). The crucial difference in support on
-    Windows is that it is not currently possible to build each Haskell
-    package as a separate DLL, it is only possible to link an entire Haskell
-    program as one massive DLL.
+    In GHC version 6.12 building shared libraries is supported for Linux (on
+    x86 and x86-64 architectures). GHC version 7.0 adds support on Windows
+    (see <xref linkend="win32-dlls"/>), FreeBSD and OpenBSD (x86 and x86-64),
+    Solaris (x86) and Mac OS X (x86 and PowerPC).
   </para>
 
   <para>
@@ -59,7 +57,7 @@ ghc --make -dynamic Main.hs
       that it can be linked against shared library versions of Haskell
       packages (such as base). The second is when linking, to link against
       the shared versions of the packages' libraries rather than the static
-      versions. Obviously this requires that the packages were build with
+      versions. Obviously this requires that the packages were built with
       shared libraries. On supported platforms GHC comes with shared
       libraries for all the core packages, but if you install extra packages
       (e.g. with Cabal) then they would also have to be built with shared
@@ -87,10 +85,7 @@ ghc --make -dynamic Main.hs
       In particular Haskell shared libraries <emphasis>must</emphasis> be
       made into packages. You cannot freely assign which modules go in which
       shared libraries. The Haskell shared libraries must match the package
-      boundaries. Most of the conventions GHC expects when using packages are
-      described in <xref linkend="building-packages"/>.
-    </para>
-    <para>
+      boundaries. The reason for this is that
       GHC handles references to symbols <emphasis>within</emphasis> the same
       shared library (or main executable binary) differently from references
       to symbols <emphasis>between</emphasis> different shared libraries. GHC
@@ -153,8 +148,6 @@ ghc -dynamic -shared Foo.o -o libfoo.so
       <literal>-dynamic</literal> in the link step. That means to
       statically link the rts all the base libraries into your new shared
       library. This would make a very big, but standalone shared library.
-      Indeed this is exactly what we must currently do on Windows where
-      -dynamic is not yet supported (see <xref linkend="win32-dlls"/>).
       On most platforms however that would require all the static libraries
       to have been built with <literal>-fPIC</literal> so that the code is
       suitable to include into a shared library and we do not do that at the
@@ -176,6 +169,8 @@ ghc -dynamic -shared Foo.o -o libfoo.so
       The details of how this works varies between platforms, in particular
       the three major systems: Unix ELF platforms, Windows and Mac OS X.
     </para>
+    <sect3 id="finding-shared-libs-unix">
+    <title>Unix</title>
     <para>
       On Unix there are two mechanisms. Shared libraries can be installed
       into standard locations that the dynamic linker knows about. For
@@ -190,20 +185,21 @@ ghc -dynamic -shared Foo.o -o libfoo.so
     <para>
       GHC has a <literal>-dynload</literal> linking flag to select the method
       that is used to find shared libraries at runtime. There are currently
-      three modes:
+      two modes:
       <variablelist>
 	<varlistentry>
 	  <term>sysdep</term>
 	  <listitem>
 	    <para>
 	      A system-dependent mode. This is also the default mode. On Unix
-	      ELF systems this embeds rpaths into the shared library or
-	      executable. In particular it uses absolute paths to where the
-	      shared libraries for the rts and each package can be found.
-	      This means the program can immediately be run and it will be
-	      able to find the libraries it needs. However it may not be
-	      suitable for deployment if the libraries are installed in a
-	      different location on another machine.
+	      ELF systems this embeds
+        <literal>RPATH</literal>/<literal>RUNPATH</literal> entries into the
+        shared library or executable. In particular it uses absolute paths to
+        where the shared libraries for the rts and each package can be found.
+	      This means the program can immediately be run and it will be able to
+        find the libraries it needs. However it may not be suitable for
+        deployment if the libraries are installed in a different location on
+        another machine.
 	    </para>
 	  </listitem>
 	</varlistentry>
@@ -220,8 +216,7 @@ ghc -dynamic -shared Foo.o -o libfoo.so
 	</varlistentry>
       </variablelist>
       To use relative paths for dependent libraries on Linux and Solaris you
-      can use the <literal>deploy</literal> mode and pass suitable a -rpath
-      flag to the linker:
+      can pass a suitable <literal>-rpath</literal> flag to the linker:
 <programlisting>
 ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
 </programlisting>
@@ -232,7 +227,24 @@ ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
       executable e.g. <literal>-optl-Wl,-rpath,'$ORIGIN/lib'</literal>.
     </para>
     <para>
-      The standard assumption on Darwin/MacOS X is that dynamic libraries will
+      This relative path technique can be used with either of the two
+      <literal>-dynload</literal> modes, though it makes most sense with the
+      <literal>deploy</literal> mode. The difference is that with the
+      <literal>deploy</literal> mode, the above example will end up with an ELF
+      <literal>RUNPATH</literal> of just <literal>$ORIGIN</literal> while with
+      the <literal>sysdep</literal> mode the <literal>RUNPATH</literal> will be
+      <literal>$ORIGIN</literal> followed by all the library directories of all
+      the packages that the program depends on (e.g. <literal>base</literal>
+      and <literal>rts</literal> packages etc.) which are typically absolute
+      paths. The unix tool <literal>readelf --dynamic</literal> is handy for
+      inspecting the <literal>RPATH</literal>/<literal>RUNPATH</literal>
+      entries in ELF shared libraries and executables.
+    </para>
+    </sect3>
+    <sect3 id="finding-shared-libs-mac">
+    <title>Mac OS X</title>
+    <para>
+      The standard assumption on Darwin/Mac OS X is that dynamic libraries will
       be stamped at build time with an "install name", which is the full
       ultimate install path of the library file. Any libraries or executables
       that subsequently link against it (even if it hasn't been installed yet)
@@ -244,6 +256,7 @@ ghc -dynamic Main.hs -o main -lfoo -L. -optl-Wl,-rpath,'$ORIGIN'
       for you. It automatically sets the install name for dynamic libraries to
       the absolute path of the ultimate install location.
     </para>
+    </sect3>
   </sect2>
 
 </sect1>

@@ -46,11 +46,10 @@ import TcMType
 import TcType
 import Class
 import Unify
-import Coercion
 import HscTypes
 import Id
 import Name
-import Var
+import Var      ( Var, TyVar, EvVar, varType, setVarType )
 import VarEnv
 import VarSet
 import PrelNames
@@ -212,11 +211,8 @@ instCallConstraints _ [] = return idHsWrapper
 
 instCallConstraints origin (EqPred ty1 ty2 : preds)	-- Try short-cut
   = do  { traceTc "instCallConstraints" $ ppr (EqPred ty1 ty2)
-	; coi   <- unifyType ty1 ty2
+        ; co    <- unifyType ty1 ty2
 	; co_fn <- instCallConstraints origin preds
-	; let co = case coi of
-                       IdCo ty -> ty
-                       ACo  co -> co
         ; return (co_fn <.> WpEvApp (EvCoercion co)) }
 
 instCallConstraints origin (pred : preds)

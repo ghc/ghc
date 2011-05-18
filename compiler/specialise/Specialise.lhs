@@ -709,11 +709,12 @@ specExpr :: Subst -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 
 ---------------- First the easy cases --------------------
 specExpr subst (Type ty) = return (Type (CoreSubst.substTy subst ty), emptyUDs)
+specExpr subst (Coercion co) = return (Coercion (CoreSubst.substCo subst co), emptyUDs)
 specExpr subst (Var v)   = return (specVar subst v,         emptyUDs)
 specExpr _     (Lit lit) = return (Lit lit,                 emptyUDs)
 specExpr subst (Cast e co) = do
     (e', uds) <- specExpr subst e
-    return ((Cast e' (CoreSubst.substTy subst co)), uds)
+    return ((Cast e' (CoreSubst.substCo subst co)), uds)
 specExpr subst (Note note body) = do
     (body', uds) <- specExpr subst body
     return (Note (specNote subst note) body', uds)
@@ -1518,7 +1519,7 @@ instance Ord CallKey where
 		  cmp Nothing   Nothing   = EQ
 		  cmp Nothing   (Just _)  = LT
 		  cmp (Just _)  Nothing   = GT
-		  cmp (Just t1) (Just t2) = tcCmpType t1 t2
+		  cmp (Just t1) (Just t2) = cmpType t1 t2
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusVarEnv_C unionCallInfoSet c1 c2
@@ -1603,7 +1604,9 @@ interestingDict :: CoreExpr -> Bool
 interestingDict (Var v) =  hasSomeUnfolding (idUnfolding v)
 			|| isDataConWorkId v
 interestingDict (Type _)	  = False
+interestingDict (Coercion _)      = False
 interestingDict (App fn (Type _)) = interestingDict fn
+interestingDict (App fn (Coercion _)) = interestingDict fn
 interestingDict (Note _ a)	  = interestingDict a
 interestingDict (Cast e _)	  = interestingDict e
 interestingDict _                 = True

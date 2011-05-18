@@ -25,13 +25,18 @@ module MkId (
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
         unsafeCoerceName, unsafeCoerceId, realWorldPrimId, 
-        voidArgId, nullAddrId, seqId, lazyId, lazyIdKey
+        voidArgId, nullAddrId, seqId, lazyId, lazyIdKey,
+        coercionTokenId,
+
+	-- Re-export error Ids
+	module PrelRules
     ) where
 
 #include "HsVersions.h"
 
 import Rules
 import TysPrim
+import TysWiredIn	( unitTy )
 import PrelRules
 import Type
 import Coercion
@@ -48,7 +53,7 @@ import PrimOp
 import ForeignCall
 import DataCon
 import Id
-import Var              ( Var, TyVar, mkCoVar, mkExportedLocalVar )
+import Var              ( mkExportedLocalVar )
 import IdInfo
 import Demand
 import CoreSyn
@@ -56,6 +61,7 @@ import Unique
 import PrelNames
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util
+import Pair
 import Outputable
 import FastString
 import ListSetOps
@@ -224,7 +230,7 @@ mkDataConIds wrap_name wkr_name data_con
   = DCIds Nothing wrk_id
   where
     (univ_tvs, ex_tvs, eq_spec, 
-     eq_theta, dict_theta, orig_arg_tys, res_ty) = dataConFullSig data_con
+     other_theta, orig_arg_tys, res_ty) = dataConFullSig data_con
     tycon = dataConTyCon data_con       -- The representation TyCon (not family)
 
         ----------- Worker (algebraic data types only) --------------
@@ -287,12 +293,10 @@ mkDataConIds wrap_name wkr_name data_con
         -- extra constraints where necessary.
     wrap_tvs    = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
     res_ty_args = substTyVars (mkTopTvSubst eq_spec) univ_tvs
-    eq_tys   = mkPredTys eq_theta
-    dict_tys = mkPredTys dict_theta
-    wrap_ty  = mkForAllTys wrap_tvs $ mkFunTys eq_tys $ mkFunTys dict_tys $
-               mkFunTys orig_arg_tys $ res_ty
-        -- NB: watch out here if you allow user-written equality 
-        --     constraints in data constructor signatures
+    ev_tys      = mkPredTys other_theta
+    wrap_ty     = mkForAllTys wrap_tvs $ 
+                  mkFunTys ev_tys $
+                  mkFunTys orig_arg_tys $ res_ty
 
         ----------- Wrappers for algebraic data types -------------- 
     alg_wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty alg_wrap_info
@@ -305,8 +309,9 @@ mkDataConIds wrap_name wkr_name data_con
                     `setStrictnessInfo` Just wrap_sig
 
     all_strict_marks = dataConExStricts data_con ++ dataConStrictMarks data_con
-    wrap_sig = mkStrictSig (mkTopDmdType arg_dmds cpr_info)
-    arg_dmds = map mk_dmd all_strict_marks
+    wrap_sig = mkStrictSig (mkTopDmdType wrap_arg_dmds cpr_info)
+    wrap_stricts = dropList eq_spec all_strict_marks
+    wrap_arg_dmds = map mk_dmd wrap_stricts
     mk_dmd str | isBanged str = evalDmd
                | otherwise    = lazyDmd
         -- The Cpr info can be important inside INLINE rhss, where the
@@ -318,32 +323,26 @@ mkDataConIds wrap_name wkr_name data_con
         --      ...(let w = C x in ...(w p q)...)...
         -- we want to see that w is strict in its two arguments
 
-    wrap_unf = mkInlineUnfolding (Just (length dict_args + length id_args)) wrap_rhs
+    wrap_unf = mkInlineUnfolding (Just (length ev_args + length id_args)) wrap_rhs
     wrap_rhs = mkLams wrap_tvs $ 
-               mkLams eq_args $
-               mkLams dict_args $ mkLams id_args $
+               mkLams ev_args $
+               mkLams id_args $
                foldr mk_case con_app 
-                     (zip (dict_args ++ id_args) all_strict_marks)
+                     (zip (ev_args ++ id_args) wrap_stricts)
                      i3 []
+	     -- The ev_args is the evidence arguments *other than* the eq_spec
+	     -- Because we are going to apply the eq_spec args manually in the
+	     -- wrapper
 
     con_app _ rep_ids = wrapFamInstBody tycon res_ty_args $
                           Var wrk_id `mkTyApps`  res_ty_args
                                      `mkVarApps` ex_tvs                 
-                                     -- Equality evidence:
-                                     `mkTyApps`  map snd eq_spec
-                                     `mkVarApps` eq_args
+                                     `mkCoApps`  map (mkReflCo . snd) eq_spec
                                      `mkVarApps` reverse rep_ids
 
-    (dict_args,i2) = mkLocals 1  dict_tys
-    (id_args,i3)   = mkLocals i2 orig_arg_tys
-    wrap_arity     = i3-1
-    (eq_args,_)    = mkCoVarLocals i3 eq_tys
-
-    mkCoVarLocals i []     = ([],i)
-    mkCoVarLocals i (x:xs) = let (ys,j) = mkCoVarLocals (i+1) xs
-                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) 
-                                                  (fsLit "dc_co")) x
-                             in (y:ys,j)
+    (ev_args,i2) = mkLocals 1  ev_tys
+    (id_args,i3) = mkLocals i2 orig_arg_tys
+    wrap_arity   = i3-1
 
     mk_case 
            :: (Id, HsBang)      -- Arg, strictness
@@ -458,7 +457,7 @@ mkDictSelId no_unf name clas
     	   	       	 	     occNameFS (getOccName name)
                        , ru_fn    = name
     	               , ru_nargs = n_ty_args + 1
-                       , ru_try   = dictSelRule val_index n_ty_args n_eq_args }
+                       , ru_try   = dictSelRule val_index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
         -- where the V depends on which item we are selecting
@@ -474,8 +473,6 @@ mkDictSelId no_unf name clas
     [data_con] 	   = tyConDataCons tycon
     tyvars     	   = dataConUnivTyVars data_con
     arg_tys    	   = dataConRepArgTys data_con	-- Includes the dictionary superclasses
-    eq_theta   	   = dataConEqTheta data_con
-    n_eq_args      = length eq_theta
 
     -- 'index' is a 0-index into the *value* arguments of the dictionary
     val_index      = assoc "MkId.mkDictSelId" sel_index_prs name
@@ -485,25 +482,23 @@ mkDictSelId no_unf name clas
     pred       	   = mkClassPred clas (mkTyVarTys tyvars)
     dict_id    	   = mkTemplateLocal 1 $ mkPredTy pred
     arg_ids    	   = mkTemplateLocalsNum 2 arg_tys
-    eq_ids     	   = map mkWildEvBinder eq_theta
 
     rhs = mkLams tyvars  (Lam dict_id   rhs_body)
     rhs_body | new_tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
              | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
-                                [(DataAlt data_con, eq_ids ++ arg_ids, Var the_arg_id)]
+                                [(DataAlt data_con, arg_ids, Var the_arg_id)]
 
-dictSelRule :: Int -> Arity -> Arity 
+dictSelRule :: Int -> Arity 
             -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
 -- Tries to persuade the argument to look like a constructor
 -- application, using exprIsConApp_maybe, and then selects
 -- from it
 --       sel_i t1..tk (D t1..tk op1 ... opm) = opi
 --
-dictSelRule val_index n_ty_args n_eq_args id_unf args
+dictSelRule val_index n_ty_args id_unf args
   | (dict_arg : _) <- drop n_ty_args args
   , Just (_, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
-  , let val_args = drop n_eq_args con_args
-  = Just (val_args !! val_index)
+  = Just (con_args !! val_index)
   | otherwise
   = Nothing
 \end{code}
@@ -607,7 +602,7 @@ mkProductBox arg_ids ty
 mkReboxingAlt
   :: [Unique] -- Uniques for the new Ids
   -> DataCon
-  -> [Var]    -- Source-level args, including existential dicts
+  -> [Var]    -- Source-level args, *including* all evidence vars 
   -> CoreExpr -- RHS
   -> CoreAlt
 
@@ -628,15 +623,14 @@ mkReboxingAlt us con args rhs
 
     -- Type variable case
     go (arg:args) stricts us 
-      | isTyCoVar arg
+      | isTyVar arg
       = let (binds, args') = go args stricts us
         in  (binds, arg:args')
 
         -- Term variable case
     go (arg:args) (str:stricts) us
       | isMarkedUnboxed str
-      = 
-        let (binds, unpacked_args')        = go args stricts us'
+      = let (binds, unpacked_args')        = go args stricts us'
             (us', bind_rhs, unpacked_args) = reboxProduct us (idType arg)
         in
             (NonRec arg bind_rhs : binds, unpacked_args ++ unpacked_args')
@@ -674,13 +668,11 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 -- coercion constructor of the newtype or applied by itself).
 
 wrapNewTypeBody tycon args result_expr
-  = wrapFamInstBody tycon args inner
+  = ASSERT( isNewTyCon tycon )
+    wrapFamInstBody tycon args $
+    mkCoerce (mkSymCo co) result_expr
   where
-    inner
-      | Just co_con <- newTyConCo_maybe tycon
-      = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) result_expr
-      | otherwise
-      = result_expr
+    co = mkAxInstCo (newTyConCo tycon) args
 
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
@@ -689,10 +681,8 @@ wrapNewTypeBody tycon args result_expr
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
-  | Just co_con <- newTyConCo_maybe tycon
-  = mkCoerce (mkTyConApp co_con args) result_expr
-  | otherwise
-  = result_expr
+  = ASSERT( isNewTyCon tycon )
+    mkCoerce (mkAxInstCo (newTyConCo tycon) args) result_expr
 
 -- If the type constructor is a representation type of a data instance, wrap
 -- the expression into a cast adjusting the expression type, which is an
@@ -702,14 +692,14 @@ unwrapNewTypeBody tycon args result_expr
 wrapFamInstBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 wrapFamInstBody tycon args body
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCoerce (mkSymCoercion (mkTyConApp co_con args)) body
+  = mkCoerce (mkSymCo (mkAxInstCo co_con args)) body
   | otherwise
   = body
 
 unwrapFamInstScrut :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapFamInstScrut tycon args scrut
   | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCoerce (mkTyConApp co_con args) scrut
+  = mkCoerce (mkAxInstCo co_con args) scrut
   | otherwise
   = scrut
 \end{code}
@@ -858,7 +848,7 @@ mkDictFunTy tvs theta clas tys
                               (classSCTheta clas)
                    -- See Note [Silent Superclass Arguments]
     discard pred = isEmptyVarSet (tyVarsOfPred pred)
-                 || any (`tcEqPred` pred) theta
+                 || any (`eqPred` pred) theta
                  -- See the DFun Superclass Invariant in TcInstDcls
 \end{code}
 
@@ -885,12 +875,13 @@ they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 
 \begin{code}
-lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName :: Name
-unsafeCoerceName = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
-nullAddrName     = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
-seqName          = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
-realWorldName    = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPrimIdKey realWorldPrimId
-lazyIdName       = mkWiredInIdName gHC_BASE (fsLit "lazy")         lazyIdKey           lazyId
+lazyIdName, unsafeCoerceName, nullAddrName, seqName, realWorldName, coercionTokenName :: Name
+unsafeCoerceName  = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
+nullAddrName      = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
+seqName           = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
+realWorldName     = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPrimIdKey realWorldPrimId
+lazyIdName        = mkWiredInIdName gHC_BASE (fsLit "lazy")         lazyIdKey           lazyId
+coercionTokenName = mkWiredInIdName gHC_PRIM (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
 \end{code}
 
 \begin{code}
@@ -908,7 +899,7 @@ unsafeCoerceId
                       (mkFunTy argAlphaTy openBetaTy)
     [x] = mkTemplateLocals [argAlphaTy]
     rhs = mkLams [argAlphaTyVar,openBetaTyVar,x] $
-          Cast (Var x) (mkUnsafeCoercion argAlphaTy openBetaTy)
+          Cast (Var x) (mkUnsafeCo argAlphaTy openBetaTy)
 
 ------------------------------------------------
 nullAddrId :: Id
@@ -944,7 +935,7 @@ seqId = pcMiscPrelId seqName ty info
 match_seq_of_cast :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
     -- See Note [Built-in RULES for seq]
 match_seq_of_cast _ [Type _, Type res_ty, Cast scrut co, expr]
-  = Just (Var seqId `mkApps` [Type (fst (coercionKind co)), Type res_ty,
+  = Just (Var seqId `mkApps` [Type (pFst (coercionKind co)), Type res_ty,
                               scrut, expr])
 match_seq_of_cast _ _ = Nothing
 
@@ -1054,6 +1045,12 @@ realWorldPrimId -- :: State# RealWorld
 voidArgId :: Id
 voidArgId       -- :: State# RealWorld
   = mkSysLocal (fsLit "void") voidArgIdKey realWorldStatePrimTy
+
+coercionTokenId :: Id 	      -- :: () ~ ()
+coercionTokenId -- Used to replace Coercion terms when we go to STG
+  = pcMiscPrelId coercionTokenName 
+                 (mkTyConApp eqPredPrimTyCon [unitTy, unitTy])
+                 noCafIdInfo
 \end{code}
 
 

@@ -108,6 +108,8 @@ import Data.Char
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import System.FilePath
 import System.IO        ( stderr, hPutChar )
 
@@ -122,6 +124,21 @@ data DynFlag
    | Opt_D_dump_raw_cmm
    | Opt_D_dump_cmmz
    | Opt_D_dump_cmmz_pretty
+   -- All of the cmmz subflags (there are a lot!)  Automatically
+   -- enabled if you run -ddump-cmmz
+   | Opt_D_dump_cmmz_cbe
+   | Opt_D_dump_cmmz_proc
+   | Opt_D_dump_cmmz_spills
+   | Opt_D_dump_cmmz_rewrite
+   | Opt_D_dump_cmmz_dead
+   | Opt_D_dump_cmmz_stub
+   | Opt_D_dump_cmmz_sp
+   | Opt_D_dump_cmmz_procmap
+   | Opt_D_dump_cmmz_split
+   | Opt_D_dump_cmmz_lower
+   | Opt_D_dump_cmmz_info
+   | Opt_D_dump_cmmz_cafs
+   -- end cmmz subflags
    | Opt_D_dump_cps_cmm
    | Opt_D_dump_cvt_cmm
    | Opt_D_dump_asm
@@ -479,6 +496,11 @@ data DynFlags = DynFlags {
   filesToClean          :: IORef [FilePath],
   dirsToClean           :: IORef (Map FilePath FilePath),
 
+  -- Names of files which were generated from -ddump-to-file; used to
+  -- track which ones we need to truncate because it's our first run
+  -- through
+  generatedDumps        :: IORef (Set FilePath),
+
   -- hsc dynamic flags
   flags                 :: [DynFlag],
   -- Don't change this without updating extensionFlags:
@@ -715,12 +737,14 @@ initDynFlags dflags = do
  ways <- readIORef v_Ways
  refFilesToClean <- newIORef []
  refDirsToClean <- newIORef Map.empty
+ refGeneratedDumps <- newIORef Set.empty
  return dflags{
         ways            = ways,
         buildTag        = mkBuildTag (filter (not . wayRTSOnly) ways),
         rtsBuildTag     = mkBuildTag ways,
         filesToClean    = refFilesToClean,
-        dirsToClean     = refDirsToClean
+        dirsToClean     = refDirsToClean,
+        generatedDumps   = refGeneratedDumps
         }
 
 -- | The normal 'DynFlags'. Note that they is not suitable for use in this form
@@ -796,6 +820,7 @@ defaultDynFlags mySettings =
         -- end of ghc -M values
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
+        generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
         flags = defaultFlags,
         language = Nothing,
@@ -1185,8 +1210,8 @@ dynamic_flags = [
   , Flag "dylib-install-name" (hasArg setDylibInstallName)
 
         ------- Libraries ---------------------------------------------------
-  , Flag "L"   (Prefix    addLibraryPath)
-  , Flag "l"   (AnySuffix (upd . addOptl))
+  , Flag "L"   (Prefix addLibraryPath)
+  , Flag "l"   (hasArg (addOptl . ("-l" ++)))
 
         ------- Frameworks --------------------------------------------------
         -- -framework-path should really be -F ...
@@ -1254,6 +1279,18 @@ dynamic_flags = [
   , Flag "ddump-raw-cmm"           (setDumpFlag Opt_D_dump_raw_cmm)
   , Flag "ddump-cmmz"              (setDumpFlag Opt_D_dump_cmmz)
   , Flag "ddump-cmmz-pretty"       (setDumpFlag Opt_D_dump_cmmz_pretty)
+  , Flag "ddump-cmmz-cbe"          (setDumpFlag Opt_D_dump_cmmz_cbe)
+  , Flag "ddump-cmmz-spills"       (setDumpFlag Opt_D_dump_cmmz_spills)
+  , Flag "ddump-cmmz-proc"         (setDumpFlag Opt_D_dump_cmmz_proc)
+  , Flag "ddump-cmmz-rewrite"      (setDumpFlag Opt_D_dump_cmmz_rewrite)
+  , Flag "ddump-cmmz-dead"         (setDumpFlag Opt_D_dump_cmmz_dead)
+  , Flag "ddump-cmmz-stub"         (setDumpFlag Opt_D_dump_cmmz_stub)
+  , Flag "ddump-cmmz-sp"           (setDumpFlag Opt_D_dump_cmmz_sp)
+  , Flag "ddump-cmmz-procmap"      (setDumpFlag Opt_D_dump_cmmz_procmap)
+  , Flag "ddump-cmmz-split"        (setDumpFlag Opt_D_dump_cmmz_split)
+  , Flag "ddump-cmmz-lower"        (setDumpFlag Opt_D_dump_cmmz_lower)
+  , Flag "ddump-cmmz-info"         (setDumpFlag Opt_D_dump_cmmz_info)
+  , Flag "ddump-cmmz-cafs"         (setDumpFlag Opt_D_dump_cmmz_cafs)
   , Flag "ddump-core-stats"        (setDumpFlag Opt_D_dump_core_stats)
   , Flag "ddump-cps-cmm"           (setDumpFlag Opt_D_dump_cps_cmm)
   , Flag "ddump-cvt-cmm"           (setDumpFlag Opt_D_dump_cvt_cmm)
@@ -1979,14 +2016,13 @@ forceRecompile :: DynP ()
 -- recompiled which probably isn't what you want
 forceRecompile = do { dfs <- liftEwM getCmdLineState
 	       	    ; when (force_recomp dfs) (setDynFlag Opt_ForceRecomp) }
-	where
+        where
 	  force_recomp dfs = isOneShot (ghcMode dfs)
 
 setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do forceRecompile
                          setDynFlag Opt_D_verbose_core2core 
                          upd (\dfs -> dfs { shouldDumpSimplPhase = Nothing })
-		         
 
 setDumpSimplPhases :: String -> DynP ()
 setDumpSimplPhases s = do forceRecompile
@@ -2126,7 +2162,6 @@ addImportPath, addLibraryPath, addIncludePath, addFrameworkPath :: FilePath -> D
 -- -i on its own deletes the import paths
 addImportPath "" = upd (\s -> s{importPaths = []})
 addImportPath p  = upd (\s -> s{importPaths = importPaths s ++ splitPathList p})
-
 
 addLibraryPath p =
   upd (\s -> s{libraryPaths = libraryPaths s ++ splitPathList p})

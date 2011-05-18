@@ -19,9 +19,9 @@ module HsUtils(
   mkHsPar, mkHsApp, mkHsConApp, mkSimpleHsAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS, 
   mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
-  mkHsWrap, mkLHsWrap, mkHsWrapCoI, mkLHsWrapCoI,
-  coiToHsWrapper, mkHsLams, mkHsDictLet,
-  mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCoI, 
+  mkHsWrap, mkLHsWrap, mkHsWrapCo, mkLHsWrapCo,
+  coToHsWrapper, mkHsDictLet, mkHsLams,
+  mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
 
   nlHsTyApp, nlHsVar, nlHsLit, nlHsApp, nlHsApps, nlHsIntLit, nlHsVarApps, 
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -77,14 +77,13 @@ import HsLit
 import RdrName
 import Var
 import Coercion
-import Type
+import TypeRep
 import DataCon
 import Name
 import NameSet
 import BasicTypes
 import SrcLoc
 import FastString
-import Outputable
 import Util
 import Bag
 
@@ -137,25 +136,25 @@ mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 		 | otherwise	       = HsWrap co_fn e
 
-mkHsWrapCoI :: CoercionI -> HsExpr id -> HsExpr id
-mkHsWrapCoI (IdCo _) e = e
-mkHsWrapCoI (ACo co) e = mkHsWrap (WpCast co) e
+mkHsWrapCo :: Coercion -> HsExpr id -> HsExpr id
+mkHsWrapCo (Refl _) e = e
+mkHsWrapCo co       e = mkHsWrap (WpCast co) e
 
-mkLHsWrapCoI :: CoercionI -> LHsExpr id -> LHsExpr id
-mkLHsWrapCoI (IdCo _) e         = e
-mkLHsWrapCoI (ACo co) (L loc e) = L loc (mkHsWrap (WpCast co) e)
+mkLHsWrapCo :: Coercion -> LHsExpr id -> LHsExpr id
+mkLHsWrapCo (Refl _) e         = e
+mkLHsWrapCo co       (L loc e) = L loc (mkHsWrap (WpCast co) e)
 
-coiToHsWrapper :: CoercionI -> HsWrapper
-coiToHsWrapper (IdCo _) = idHsWrapper
-coiToHsWrapper (ACo co) = WpCast co
+coToHsWrapper :: Coercion -> HsWrapper
+coToHsWrapper (Refl _) = idHsWrapper
+coToHsWrapper co       = WpCast co
 
 mkHsWrapPat :: HsWrapper -> Pat id -> Type -> Pat id
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
 		       | otherwise	     = CoPat co_fn p ty
 
-mkHsWrapPatCoI :: CoercionI -> Pat id -> Type -> Pat id
-mkHsWrapPatCoI (IdCo _) pat _  = pat
-mkHsWrapPatCoI (ACo co) pat ty = CoPat (WpCast co) pat ty
+mkHsWrapPatCo :: Coercion -> Pat id -> Type -> Pat id
+mkHsWrapPatCo (Refl _) pat _  = pat
+mkHsWrapPatCo co       pat ty = CoPat (WpCast co) pat ty
 
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
@@ -188,7 +187,7 @@ mkSimpleHsAlt pat expr
 -- See RnEnv.lookupSyntaxName
 
 mkHsIntegral   :: Integer -> PostTcType -> HsOverLit id
-mkHsFractional :: Rational -> PostTcType -> HsOverLit id
+mkHsFractional :: FractionalLit -> PostTcType -> HsOverLit id
 mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
 mkHsDo         :: HsStmtContext Name -> [LStmt id] -> HsExpr id
 mkHsComp       :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
@@ -665,11 +664,15 @@ lStmtsImplicits = hs_lstmts
 
 hsValBindsImplicits :: HsValBindsLR Name idR -> NameSet
 hsValBindsImplicits (ValBindsOut binds _)
-  = unionManyNameSets [foldBag unionNameSets (hs_bind . unLoc) emptyNameSet hs_binds | (_rec, hs_binds) <- binds]
+  = foldr (unionNameSets . lhsBindsImplicits . snd) emptyNameSet binds
+hsValBindsImplicits (ValBindsIn binds _) 
+  = lhsBindsImplicits binds
+
+lhsBindsImplicits :: LHsBindsLR Name idR -> NameSet
+lhsBindsImplicits = foldBag unionNameSets lhs_bind emptyNameSet
   where
-    hs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
-    hs_bind _ = emptyNameSet
-hsValBindsImplicits (ValBindsIn {}) = pprPanic "hsValBindsImplicits: ValBindsIn" empty
+    lhs_bind (L _ (PatBind { pat_lhs = lpat })) = lPatImplicits lpat
+    lhs_bind _ = emptyNameSet
 
 lPatImplicits :: LPat Name -> NameSet
 lPatImplicits = hs_lpat

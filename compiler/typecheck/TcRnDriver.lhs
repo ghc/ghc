@@ -65,7 +65,6 @@ import Name
 import NameEnv
 import NameSet
 import TyCon
-import TysPrim
 import SrcLoc
 import HscTypes
 import ListSetOps
@@ -645,7 +644,7 @@ checkHiBootIface
     check_inst boot_inst
 	= case [dfun | inst <- local_insts, 
 		       let dfun = instanceDFunId inst,
-		       idType dfun `tcEqType` boot_inst_ty ] of
+		       idType dfun `eqType` boot_inst_ty ] of
 	    [] -> do { traceTc "check_inst" (vcat [ text "local_insts" <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
                                                   , text "boot_inst"   <+> ppr boot_inst
                                                   , text "boot_inst_ty" <+> ppr boot_inst_ty
@@ -669,7 +668,7 @@ checkBootDecl :: TyThing -> TyThing -> Bool
 
 checkBootDecl (AnId id1) (AnId id2)
   = ASSERT(id1 == id2) 
-    (idType id1 `tcEqType` idType id2)
+    (idType id1 `eqType` idType id2)
 
 checkBootDecl (ATyCon tc1) (ATyCon tc2)
   = checkBootTyCon tc1 tc2
@@ -686,7 +685,7 @@ checkBootDecl (AClass c1)  (AClass c2)
 
        eqSig (id1, def_meth1) (id2, def_meth2)
          = idName id1 == idName id2 &&
-           tcEqTypeX env op_ty1 op_ty2 &&
+           eqTypeX env op_ty1 op_ty2 &&
            def_meth1 == def_meth2
          where
 	  (_, rho_ty1) = splitForAllTys (idType id1)
@@ -695,8 +694,8 @@ checkBootDecl (AClass c1)  (AClass c2)
           op_ty2 = funResultTy rho_ty2
 
        eqFD (as1,bs1) (as2,bs2) = 
-         eqListBy (tcEqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
-         eqListBy (tcEqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
+         eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
+         eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
 
        same_kind tv1 tv2 = eqKind (tyVarKind tv1) (tyVarKind tv2)
     in
@@ -705,7 +704,7 @@ checkBootDecl (AClass c1)  (AClass c2)
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
         ||   -- Above tests for an "abstract" class
-        eqListBy (tcEqPredX env) sc_theta1 sc_theta2 &&
+        eqListBy (eqPredX env) sc_theta1 sc_theta2 &&
         eqListBy eqSig op_stuff1 op_stuff2 &&
         eqListBy checkBootTyCon ats1 ats2)
 
@@ -728,7 +727,7 @@ checkBootTyCon tc1 tc2
         eqSynRhs SynFamilyTyCon SynFamilyTyCon
             = True
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
-            = tcEqTypeX env t1 t2
+            = eqTypeX env t1 t2
         eqSynRhs _ _ = False
     in
     equalLength tvs1 tvs2 &&
@@ -737,7 +736,7 @@ checkBootTyCon tc1 tc2
   | isAlgTyCon tc1 && isAlgTyCon tc2
   = ASSERT(tc1 == tc2)
     eqKind (tyConKind tc1) (tyConKind tc2) &&
-    eqListBy tcEqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
+    eqListBy eqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
   | isForeignTyCon tc1 && isForeignTyCon tc2
@@ -761,17 +760,7 @@ checkBootTyCon tc1 tc2
           && dataConIsInfix c1 == dataConIsInfix c2
           && dataConStrictMarks c1 == dataConStrictMarks c2
           && dataConFieldLabels c1 == dataConFieldLabels c2
-          && let tvs1 = dataConUnivTyVars c1 ++ dataConExTyVars c1
-                 tvs2 = dataConUnivTyVars c2 ++ dataConExTyVars c2
-                 env = rnBndrs2 env0 tvs1 tvs2
-             in
-              equalLength tvs1 tvs2 &&              
-              eqListBy (tcEqPredX env)
-                        (dataConEqTheta c1 ++ dataConDictTheta c1)
-                        (dataConEqTheta c2 ++ dataConDictTheta c2) &&
-              eqListBy (tcEqTypeX env)
-                        (dataConOrigArgTys c1)
-                        (dataConOrigArgTys c2)
+          && eqType (dataConUserType c1) (dataConUserType c2)
 
 ----------------
 missingBootThing :: Name -> String -> SDoc
@@ -1326,16 +1315,13 @@ tcRnExpr hsc_env ictxt rdr_expr
 
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
-
     uniq <- newUnique ;
     let { fresh_it  = itName uniq } ;
-    ((_tc_expr, res_ty), lie)   <- captureConstraints (tcInferRho rn_expr) ;
-    ((qtvs, dicts, _), lie_top) <- captureConstraints $
-                                   simplifyInfer TopLevel
-                                                 False {- No MR for now -}
+    ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
+    ((qtvs, dicts, _), lie_top) <- captureConstraints $ 
+                                   simplifyInfer TopLevel False {- No MR for now -}
                                                  [(fresh_it, res_ty)]
                                                  lie  ;
-
     _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
@@ -1622,7 +1608,10 @@ ppr_types insts type_env
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env
-  = text "TYPE CONSTRUCTORS" $$ nest 4 (ppr_tydecls tycons)
+  = vcat [ text "TYPE CONSTRUCTORS"
+         ,   nest 2 (ppr_tydecls tycons)
+         , text "COERCION AXIOMS" 
+         ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
   where
     fi_tycons = map famInstTyCon fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
@@ -1654,13 +1643,8 @@ ppr_tydecls tycons
   = vcat (map ppr_tycon (sortLe le_sig tycons))
   where
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
-    ppr_tycon tycon 
-      | isCoercionTyCon tycon 
-      = sep [ptext (sLit "coercion") <+> ppr tycon <+> ppr tvs
-            , nest 2 (dcolon <+> pprEqPred (coercionKind (mkTyConApp tycon (mkTyVarTys tvs))))]
-      | otherwise             = ppr (tyThingToIfaceDecl (ATyCon tycon))
+    ppr_tycon tycon = ppr (tyThingToIfaceDecl (ATyCon tycon))
       where
-        tvs = take (tyConArity tycon) alphaTyVars
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty

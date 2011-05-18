@@ -86,6 +86,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM 
        ( checkWellStaged, topIdLvl, tcLookupFamInst, tcGetDefaultTys )
+import Kind
 import TcType
 import DynFlags
 
@@ -101,6 +102,7 @@ import Outputable
 import Bag
 import MonadUtils
 import VarSet
+import Pair
 import FastString
 
 import HsBinds               -- for TcEvBinds stuff 
@@ -213,9 +215,9 @@ instance Outputable CanonicalCt where
   ppr (CIPCan ip fl ip_nm ty)     
       = ppr fl <+> ppr ip <+> dcolon <+> parens (ppr ip_nm <> dcolon <> ppr ty)
   ppr (CTyEqCan co fl tv ty)      
-      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (mkTyVarTy tv, ty)
+      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (Pair (mkTyVarTy tv) ty)
   ppr (CFunEqCan co fl tc tys ty) 
-      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (mkTyConApp tc tys, ty)
+      = ppr fl <+> ppr co <+> dcolon <+> pprEqPred (Pair (mkTyConApp tc tys) ty)
   ppr (CFrozenErr co fl)
       = ppr fl <+> pprEvVarWithType co
 \end{code}
@@ -447,12 +449,12 @@ emptyFlatCache
 newtype FunEqHead = FunEqHead (TyCon,[Xi])
 
 instance Eq FunEqHead where
-  FunEqHead (tc1,xis1) == FunEqHead (tc2,xis2) = tc1 == tc2 && tcEqTypes xis1 xis2
+  FunEqHead (tc1,xis1) == FunEqHead (tc2,xis2) = tc1 == tc2 && eqTypes xis1 xis2
 
 instance Ord FunEqHead where
   FunEqHead (tc1,xis1) `compare` FunEqHead (tc2,xis2) 
     = case compare tc1 tc2 of 
-        EQ    -> tcCmpTypes xis1 xis2
+        EQ    -> cmpTypes xis1 xis2
         other -> other
 
 type TcsUntouchables = (Untouchables,TcTyVarSet)
@@ -769,7 +771,7 @@ checkWellStagedDFun pred dfun_id loc
     bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
-pprEq ty1 ty2 = pprPred $ mkEqPred (ty1,ty2)
+pprEq ty1 ty2 = pprPredTy $ mkEqPred (ty1,ty2)
 
 isTouchableMetaTyVar :: TcTyVar -> TcS Bool
 isTouchableMetaTyVar tv 

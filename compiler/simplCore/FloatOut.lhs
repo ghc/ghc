@@ -225,6 +225,7 @@ floatRhs lvl arg	-- Used for nested non-rec rhss, and fn args
 -----------------
 floatExpr _ (Var v)   = (zeroStats, emptyFloats, Var v)
 floatExpr _ (Type ty) = (zeroStats, emptyFloats, Type ty)
+floatExpr _ (Coercion co) = (zeroStats, emptyFloats, Coercion co)
 floatExpr _ (Lit lit) = (zeroStats, emptyFloats, Lit lit)
 	  
 floatExpr lvl (App e a)

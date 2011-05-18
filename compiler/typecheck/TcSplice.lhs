@@ -71,6 +71,7 @@ import SrcLoc
 import Outputable
 import Util		( dropList )
 import Data.List	( mapAccumL )
+import Pair
 import Unique
 import Data.Maybe
 import BasicTypes
@@ -1066,8 +1067,9 @@ reifyThing (AGlobal (AnId id))
 	    _             -> return (TH.VarI     v ty Nothing fix)
     }
 
-reifyThing (AGlobal (ATyCon tc))  = reifyTyCon tc
-reifyThing (AGlobal (AClass cls)) = reifyClass cls
+reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
+reifyThing (AGlobal (ACoAxiom ax)) = reifyAxiom ax
+reifyThing (AGlobal (AClass cls))  = reifyClass cls
 reifyThing (AGlobal (ADataCon dc))
   = do	{ let name = dataConName dc
 	; ty <- reifyType (idType (dataConWrapId dc))
@@ -1091,12 +1093,24 @@ reifyThing (ATyVar tv ty)
 reifyThing (AThing {}) = panic "reifyThing AThing"
 
 ------------------------------
+reifyAxiom :: CoAxiom -> TcM TH.Info
+reifyAxiom ax@(CoAxiom { co_ax_lhs = lhs, co_ax_rhs = rhs })
+  | Just (tc, args) <- tcSplitTyConApp_maybe lhs
+  = do { args' <- mapM reifyType args
+       ; rhs'  <- reifyType rhs
+       ; return (TH.TyConI $ TH.TySynInstD (reifyName tc) args' rhs') }
+  | otherwise
+  = failWith (ptext (sLit "Can't reify the axiom") <+> ppr ax 
+              <+> dcolon <+> pprEqPred (Pair lhs rhs))
+
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
   | isFunTyCon tc  
   = return (TH.PrimTyConI (reifyName tc) 2 		  False)
+
   | isPrimTyCon tc 
   = return (TH.PrimTyConI (reifyName tc) (tyConArity tc) (isUnLiftedTyCon tc))
+
   | isFamilyTyCon tc
   = let flavour = reifyFamFlavour tc
         tvs     = tyConTyVars tc
@@ -1107,6 +1121,7 @@ reifyTyCon tc
     in
     return (TH.TyConI $
               TH.FamilyD flavour (reifyName tc) (reifyTyVars tvs) kind')
+
   | isSynTyCon tc
   = do { let (tvs, rhs) = synTyConDefn tc 
        ; rhs' <- reifyType rhs
@@ -1114,7 +1129,7 @@ reifyTyCon tc
 		   TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') 
        }
 
-reifyTyCon tc
+  | otherwise
   = do 	{ cxt <- reifyCxt (tyConStupidTheta tc)
 	; let tvs = tyConTyVars tc
 	; cons <- mapM (reifyDataCon (mkTyVarTys tvs)) (tyConDataCons tc)
@@ -1189,7 +1204,7 @@ reifyClassInstance i
 reifyType :: TypeRep.Type -> TcM TH.Type
 -- Monadic only because of failure
 reifyType ty@(ForAllTy _ _)        = reify_for_all ty
-reifyType ty@(PredTy {} `FunTy` _) = reify_for_all ty	        -- Types like ((?x::Int) => Char -> Char)
+reifyType ty@(PredTy {} `FunTy` _) = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
 reifyType (TyVarTy tv)	    = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
 reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }

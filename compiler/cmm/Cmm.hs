@@ -11,7 +11,7 @@
 module Cmm
   ( CmmGraph, GenCmmGraph(..), CmmBlock
   , CmmStackInfo(..), CmmTopInfo(..), Cmm, CmmTop
-  , CmmReplGraph, CmmFwdRewrite, CmmBwdRewrite
+  , CmmReplGraph, GenCmmReplGraph, CmmFwdRewrite, CmmBwdRewrite
 
   , modifyGraph
   , lastNode, replaceLastNode, insertBetween
@@ -46,7 +46,8 @@ type CmmGraph = GenCmmGraph CmmNode
 data GenCmmGraph n = CmmGraph { g_entry :: BlockId, g_graph :: Graph n C C }
 type CmmBlock = Block CmmNode C C
 
-type CmmReplGraph e x = FuelUniqSM (Maybe (Graph CmmNode e x))
+type CmmReplGraph e x = GenCmmReplGraph CmmNode e x
+type GenCmmReplGraph n e x = FuelUniqSM (Maybe (Graph n e x))
 type CmmFwdRewrite f = FwdRewrite FuelUniqSM CmmNode f
 type CmmBwdRewrite f = BwdRewrite FuelUniqSM CmmNode f
 

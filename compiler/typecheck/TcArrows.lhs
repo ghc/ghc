@@ -43,17 +43,17 @@ import Control.Monad
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
        -> TcRhoType				-- Expected type of whole proc expression
-       -> TcM (OutPat TcId, LHsCmdTop TcId, CoercionI)
+       -> TcM (OutPat TcId, LHsCmdTop TcId, Coercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
     do	{ (coi, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty 
 	; (coi1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
+        ; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
 			  tcCmdTop cmd_env cmd [] res_ty
-        ; let res_coi = mkTransCoI coi (mkAppTyCoI coi1 (IdCo res_ty))
-	; return (pat', cmd', res_coi) }
+        ; let res_coi = mkTransCo coi (mkAppCo coi1 (mkReflCo res_ty))
+        ; return (pat', cmd', res_coi) }
 \end{code}
 
 
@@ -181,8 +181,8 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 
 		-- Check the patterns, and the GRHSs inside
 	; (pats', grhss') <- setSrcSpan mtch_loc		$
-			     tcPats LambdaExpr pats cmd_stk	$
-			     tc_grhss grhss res_ty
+                             tcPats LambdaExpr pats cmd_stk     $
+                             tc_grhss grhss res_ty
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')
 	; return (HsLam (MatchGroup [match'] res_ty))
@@ -239,7 +239,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 			      e_res_ty
 
 		-- Check expr
-	; (inst_binds, expr') <- checkConstraints ArrowSkol [w_tv] [] $
+        ; (inst_binds, expr') <- checkConstraints ArrowSkol [w_tv] [] $
                                  escapeArrowScope (tcMonoExpr expr e_ty)
 
 		-- OK, now we are in a position to unscramble 
@@ -269,7 +269,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- Check that it has the right shape:
 		-- 	((w,s1) .. sn)
 		-- where the si do not mention w
-	   ; checkTc (corner_ty `tcEqType` mkTyVarTy w_tv && 
+	   ; checkTc (corner_ty `eqType` mkTyVarTy w_tv && 
 		      not (w_tv `elemVarSet` tyVarsOfTypes arg_tys))
 		     (badFormFun i tup_ty')
 

@@ -10,7 +10,7 @@
 module CmmNode
   ( CmmNode(..)
   , UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..)
-  , mapExp, mapExpDeep, foldExp, foldExpDeep
+  , mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf
   )
 where
 
@@ -46,7 +46,9 @@ data CmmNode e x where
       CmmActuals ->               -- zero or more arguments
       CmmNode O O
       -- Semantics: kills only result regs; all other regs (both GlobalReg
-      --            and LocalReg) are preserved
+      --            and LocalReg) are preserved.  But there is a current
+      --            bug for what can be put in arguments, see
+      --            Note [Register Parameter Passing]
 
   CmmBranch :: Label -> CmmNode O C  -- Goto another block in the same procedure
 
@@ -73,7 +75,8 @@ data CmmNode e x where
 -- moment of the call.  Later stages can use this to give liveness
 -- everywhere, which in turn guides register allocation.
 -- It is the companion of cml_args; cml_args says which stack words
--- hold parameters, while cml_arg_regs says which global regs hold parameters
+-- hold parameters, while cml_arg_regs says which global regs hold parameters.
+-- But do note [Register parameter passing]
 
       cml_args :: ByteOff,
           -- Byte offset, from the *old* end of the Area associated with
@@ -103,7 +106,7 @@ data CmmNode e x where
   		    		-- Always the last node of a block
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: CmmFormals,      -- zero or more results
-      args  :: CmmActuals,      -- zero or more arguments
+      args  :: CmmActuals,      -- zero or more arguments; see Note [Register parameter passing]
       succ  :: Label,           -- Label of continuation
       updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
       intrbl:: Bool             -- whether or not the call is interruptible
@@ -113,9 +116,11 @@ data CmmNode e x where
 ~~~~~~~~~~~~~~~~~~~~~~~
 A CmmUnsafeForeignCall is used for *unsafe* foreign calls;
 a CmmForeignCall call is used for *safe* foreign calls.
-Unsafe ones are easy: think of them as a "fat machine instruction".
-In particular, they do *not* kill all live registers (there was a bit
-of code in GHC that conservatively assumed otherwise.)
+
+Unsafe ones are mostly easy: think of them as a "fat machine
+instruction".  In particular, they do *not* kill all live registers,
+just the registers they return to (there was a bit of code in GHC that
+conservatively assumed otherwise.)  However, see [Register parameter passing].
 
 Safe ones are trickier.  A safe foreign call 
      r = f(x)
@@ -136,6 +141,21 @@ so that a LastCall passes no parameters or results.  But the smart
 constructors do *not* (currently) know the foreign call conventions.
 
 Note that a safe foreign call needs an info table.
+-}
+
+{- Note [Register parameter passing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On certain architectures, some registers are utilized for parameter
+passing in the C calling convention.  For example, in x86-64 Linux
+convention, rdi, rsi, rdx and rcx (as well as r8 and r9) may be used for
+argument passing.  These are registers R3-R6, which our generated
+code may also be using; as a result, it's necessary to save these
+values before doing a foreign call.  This is done during initial
+code generation in callerSaveVolatileRegs in StgCmmUtils.hs.  However,
+one result of doing this is that the contents of these registers
+may mysteriously change if referenced inside the arguments.  This
+is dangerous, so you'll need to disable inlining much in the same
+way is done in cmm/CmmOpt.hs currently.  We should fix this!
 -}
 
 ---------------------------------------------

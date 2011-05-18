@@ -416,6 +416,7 @@ Library
         Generics
         InstEnv
         TyCon
+        Kind
         Type
         TypeRep
         Unify
@@ -442,6 +443,7 @@ Library
         MonadUtils
         OrdList
         Outputable
+        Pair
         Panic
         Pretty
         Serialized

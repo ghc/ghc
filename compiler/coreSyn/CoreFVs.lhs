@@ -49,6 +49,7 @@ import Name
 import VarSet
 import Var
 import TcType
+import Coercion
 import Util
 import BasicTypes( Activation )
 import Outputable
@@ -179,12 +180,13 @@ addBndrs bndrs fv = foldr addBndr fv bndrs
 expr_fvs :: CoreExpr -> FV
 
 expr_fvs (Type ty) 	 = someVars (tyVarsOfType ty)
+expr_fvs (Coercion co)   = someVars (tyCoVarsOfCo co)
 expr_fvs (Var var) 	 = oneVar var
 expr_fvs (Lit _)         = noVars
 expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
-expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyVarsOfType co)
+expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyCoVarsOfCo co)
 
 expr_fvs (Case scrut bndr ty alts)
   = expr_fvs scrut `union` someVars (tyVarsOfType ty) `union` addBndr bndr  
@@ -248,10 +250,11 @@ exprOrphNames e
       where n = idName v
     go (Lit _) 	   	    = emptyNameSet
     go (Type ty)   	    = orphNamesOfType ty	-- Don't need free tyvars
+    go (Coercion co)        = orphNamesOfCo co
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
     go (Lam v e)   	    = go e `delFromNameSet` idName v
     go (Note _ e)           = go e
-    go (Cast e co)          = go e `unionNameSets` orphNamesOfType co
+    go (Cast e co)          = go e `unionNameSets` orphNamesOfCo co
     go (Let (NonRec _ r) e) = go e `unionNameSets` go r
     go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSets` go e
     go (Case e _ ty as)     = go e `unionNameSets` orphNamesOfType ty
@@ -392,15 +395,15 @@ varTypeTyVars :: Var -> TyVarSet
 -- Find the type variables free in the type of the variable
 -- Remember, coercion variables can mention type variables...
 varTypeTyVars var
-  | isLocalId var || isCoVar var = tyVarsOfType (idType var)
-  | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
+  | isLocalId var = tyVarsOfType (idType var)
+  | otherwise     = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 varTypeTcTyVars :: Var -> TyVarSet
 -- Find the type variables free in the type of the variable
 -- Remember, coercion variables can mention type variables...
 varTypeTcTyVars var
-  | isLocalId var || isCoVar var = tcTyVarsOfType (idType var)
-  | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
+  | isLocalId var = tcTyVarsOfType (idType var)
+  | otherwise     = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 idFreeVars :: Id -> VarSet
 -- Type variables, rule variables, and inline variables
@@ -411,7 +414,7 @@ idFreeVars id = ASSERT( isId id)
 bndrRuleAndUnfoldingVars ::Var -> VarSet
 -- A 'let' can bind a type variable, and idRuleVars assumes 
 -- it's seeing an Id. This function tests first.
-bndrRuleAndUnfoldingVars v | isTyCoVar v = emptyVarSet
+bndrRuleAndUnfoldingVars v | isTyVar v = emptyVarSet
 	                   | otherwise = idRuleAndUnfoldingVars v
 
 idRuleAndUnfoldingVars :: Id -> VarSet
@@ -510,12 +513,11 @@ freeVars (Let (Rec binds) body)
     body2     = freeVars body
     body_fvs  = freeVarsOf body2
 
-
 freeVars (Cast expr co)
-  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 co)
+  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 (cfvs, co))
   where
     expr2 = freeVars expr
-    cfvs  = tyVarsOfType co
+    cfvs  = tyCoVarsOfCo co
 
 freeVars (Note other_note expr)
   = (freeVarsOf expr2, AnnNote other_note expr2)
@@ -523,5 +525,7 @@ freeVars (Note other_note expr)
     expr2 = freeVars expr
 
 freeVars (Type ty) = (tyVarsOfType ty, AnnType ty)
+
+freeVars (Coercion co) = (tyCoVarsOfCo co, AnnCoercion co)
 \end{code}
 
