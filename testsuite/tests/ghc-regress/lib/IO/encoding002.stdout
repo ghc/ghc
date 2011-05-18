@@ -1,6 +1,6 @@
 == UTF-8: roundtripping
 [72,105,237,178,128,33]
-"Hi\56557\56498\56448!"
+"Hi\990957\990898\990848!"
 [72,105,237,178,128,33]
 True
 
@@ -8,7 +8,7 @@ True
 "recoverDecode: invalid argument (invalid byte sequence)"
 "Hi!"
 "Hi\65533\65533\65533!"
-"Hi\56557\56498\56448!"
+"Hi\990957\990898\990848!"
 == UTF-8: encoding
 []
 [72,105,33]
@@ -19,7 +19,7 @@ True
 "recoverDecode: invalid argument (invalid byte sequence)"
 "Hi\65503\8671"
 "Hi\65533\65503\8671\65533"
-"Hi\56575\65503\8671\NUL"
+"Hi\990975\65503\8671\NUL"
 == UTF-16LE: encoding
 []
 [72,0,105,0,33,0]
@@ -30,7 +30,7 @@ True
 "recoverDecode: invalid argument (invalid byte sequence)"
 "Hi\65503\65280"
 "Hi\65533\65503\65280\65533"
-"Hi\56543\65503\65280!"
+"Hi\990943\65503\65280!"
 == UTF-16BE: encoding
 []
 [0,72,0,105,0,33]
@@ -41,7 +41,7 @@ True
 "recoverDecode: invalid argument (invalid byte sequence)"
 "Hi\8448"
 "Hi\65533\65533\65533\8448\65533"
-"Hi\56557\56498\56448\8448\NUL"
+"Hi\990957\990898\990848\8448\NUL"
 == UTF-32LE: encoding
 []
 [72,0,0,0,105,0,0,0,33,0,0,0]
@@ -52,7 +52,7 @@ True
 "recoverDecode: invalid argument (invalid byte sequence)"
 "Hi!"
 "Hi\65533\65533\65533\65533!"
-"Hi\NUL\56448\56498\56557!"
+"Hi\NUL\990848\990898\990957!"
 == UTF-32BE: encoding
 []
 [0,0,0,72,0,0,0,105,0,0,0,33]
