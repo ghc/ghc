@@ -601,13 +601,17 @@ assignTemp e
 			    ; stmtC (CmmAssign (CmmLocal reg) e)
 			    ; return (CmmReg (CmmLocal reg)) }
 
--- | Assign the expression to a temporary register and return an
--- expression referring to this register.
+-- | If the expression is trivial and doesn't refer to a global
+-- register, return it.  Otherwise, assign the expression to a
+-- temporary register and return an expression referring to this
+-- register.
 assignTemp_ :: CmmExpr -> FCode CmmExpr
-assignTemp_ e = do
-    reg <- newTemp (cmmExprType e)
-    stmtC (CmmAssign (CmmLocal reg) e)
-    return (CmmReg (CmmLocal reg))
+assignTemp_ e
+    | isTrivialCmmExpr e && hasNoGlobalRegs e = return e
+    | otherwise = do
+        reg <- newTemp (cmmExprType e)
+        stmtC (CmmAssign (CmmLocal reg) e)
+        return (CmmReg (CmmLocal reg))
 
 newTemp :: CmmType -> FCode LocalReg
 newTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep) }
