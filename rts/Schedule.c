@@ -2030,16 +2030,16 @@ exitScheduler (rtsBool wait_foreign USED_IF_THREADS)
     }
     sched_state = SCHED_SHUTTING_DOWN;
 
+    nat i;
+
+    for (i = 0; i < n_capabilities; i++) {
 #if defined(THREADED_RTS)
-    { 
-	nat i;
-	
-	for (i = 0; i < n_capabilities; i++) {
-            ASSERT(task->incall->tso == NULL);
-	    shutdownCapability(&capabilities[i], task, wait_foreign);
-	}
-    }
+        ASSERT(task->incall->tso == NULL);
+        shutdownCapability(&capabilities[i], task, wait_foreign);
 #endif
+        traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, i);
+    }
+    traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
 
     boundTaskExiting(task);
 }
