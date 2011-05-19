@@ -174,4 +174,4 @@ test('T4981-V3', normal, compile, [''])
 
 test('T5002', normal, compile, [''])
 test('PushedInAsGivens', normal, compile, [''])
-test('SlowComp', normal, compile, ['-fcontext-stack=300'])
+test('SlowComp', reqlib('mtl'), compile, ['-fcontext-stack=300'])
