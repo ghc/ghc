@@ -3,6 +3,10 @@
 
 -- !!! stress tests of copying/cloning primitive arrays
 
+-- Note: You can run this test manually with an argument
+-- (i.e. ./cgrun068 10000) if you want to run the stress test for
+-- longer.
+
 {-
 Test strategy
 =============
@@ -32,12 +36,19 @@ import GHC.Exts
 import GHC.ST hiding (liftST)
 import Prelude hiding (length, read)
 import qualified Prelude as P
+import qualified Prelude as P
+import System.Environment
 import System.Random
 
 main :: IO ()
 main = do
-    putStr (test_copyMutableArray ++ "\n" ++
-            test_cloneMutableArray ++ "\n"
+    args <- getArgs
+    -- Number of copies to perform
+    let numMods = case args of
+            [] -> 100
+            [n] -> P.read n :: Int
+    putStr (test_copyMutableArray numMods ++ "\n" ++
+            test_cloneMutableArray numMods ++ "\n"
            )
 
 -- Number of arrays
@@ -47,10 +58,6 @@ numArrays = 100
 -- Maxmimum length of a sub-array
 maxLen :: Int
 maxLen = 1024
-
--- Number of copies to perform
-numMods :: Int
-numMods = 10000
 
 -- Create an array of arrays, with each sub-array having random length
 -- and content.
@@ -120,8 +127,8 @@ clone marr f = do
 
 -- Copy a slice of the source array into a destination array and check
 -- that the copy succeeded.
-test_copyMutableArray :: String
-test_copyMutableArray = runST $ run $ do
+test_copyMutableArray :: Int -> String
+test_copyMutableArray numMods = runST $ run $ do
     marr <- local setup
     marrRef <- setup
     let go i
@@ -165,8 +172,8 @@ unlinesShow =  concatMap (\ x -> show x ++ "\n")
 
 -- Copy a slice of the source array into a destination array and check
 -- that the copy succeeded.
-test_cloneMutableArray :: String
-test_cloneMutableArray = runST $ run $ do
+test_cloneMutableArray :: Int -> String
+test_cloneMutableArray numMods = runST $ run $ do
     marr <- local setup
     marrRef <- setup
     let go i
