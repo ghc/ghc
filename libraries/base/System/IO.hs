@@ -245,7 +245,7 @@ import System.Posix.Types
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IO hiding ( onException )
+import GHC.IO hiding ( bracket, onException )
 import GHC.IO.IOMode
 import GHC.IO.Handle.FD
 import qualified GHC.IO.FD as FD

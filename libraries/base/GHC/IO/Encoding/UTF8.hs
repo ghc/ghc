@@ -24,8 +24,8 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.Encoding.UTF8 (
-  utf8,
-  utf8_bom,
+  utf8, mkUTF8,
+  utf8_bom, mkUTF8_bom
   ) where
 
 import GHC.Base
@@ -33,56 +33,66 @@ import GHC.Real
 import GHC.Num
 import GHC.IORef
 -- import GHC.IO
-import GHC.IO.Exception
 import GHC.IO.Buffer
+import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.Word
 import Data.Bits
-import Data.Maybe
 
 utf8 :: TextEncoding
-utf8 = TextEncoding { textEncodingName = "UTF-8",
-                      mkTextDecoder = utf8_DF,
- 	              mkTextEncoder = utf8_EF }
+utf8 = mkUTF8 ErrorOnCodingFailure
 
-utf8_DF :: IO (TextDecoder ())
-utf8_DF =
+mkUTF8 :: CodingFailureMode -> TextEncoding
+mkUTF8 cfm = TextEncoding { textEncodingName = "UTF-8",
+                            mkTextDecoder = utf8_DF cfm,
+                            mkTextEncoder = utf8_EF cfm }
+
+
+utf8_DF :: CodingFailureMode -> IO (TextDecoder ())
+utf8_DF cfm =
   return (BufferCodec {
              encode   = utf8_decode,
+             recover  = recoverDecode cfm,
              close    = return (),
              getState = return (),
              setState = const $ return ()
           })
 
-utf8_EF :: IO (TextEncoder ())
-utf8_EF =
+utf8_EF :: CodingFailureMode -> IO (TextEncoder ())
+utf8_EF cfm =
   return (BufferCodec {
              encode   = utf8_encode,
+             recover  = recoverEncode cfm,
              close    = return (),
              getState = return (),
              setState = const $ return ()
           })
 
 utf8_bom :: TextEncoding
-utf8_bom = TextEncoding { textEncodingName = "UTF-8BOM",
-                          mkTextDecoder = utf8_bom_DF,
-                          mkTextEncoder = utf8_bom_EF }
+utf8_bom = mkUTF8_bom ErrorOnCodingFailure
 
-utf8_bom_DF :: IO (TextDecoder Bool)
-utf8_bom_DF = do
+mkUTF8_bom :: CodingFailureMode -> TextEncoding
+mkUTF8_bom cfm = TextEncoding { textEncodingName = "UTF-8BOM",
+                                mkTextDecoder = utf8_bom_DF cfm,
+                                mkTextEncoder = utf8_bom_EF cfm }
+
+utf8_bom_DF :: CodingFailureMode -> IO (TextDecoder Bool)
+utf8_bom_DF cfm = do
    ref <- newIORef True
    return (BufferCodec {
              encode   = utf8_bom_decode ref,
+             recover  = recoverDecode cfm,
              close    = return (),
              getState = readIORef ref,
              setState = writeIORef ref
           })
 
-utf8_bom_EF :: IO (TextEncoder Bool)
-utf8_bom_EF = do
+utf8_bom_EF :: CodingFailureMode -> IO (TextEncoder Bool)
+utf8_bom_EF cfm = do
    ref <- newIORef True
    return (BufferCodec {
              encode   = utf8_bom_encode ref,
+             recover  = recoverEncode cfm,
              close    = return (),
              getState = readIORef ref,
              setState = writeIORef ref
@@ -98,13 +108,13 @@ utf8_bom_decode ref
       then utf8_decode input output
       else do
        let no_bom = do writeIORef ref False; utf8_decode input output
-       if iw - ir < 1 then return (input,output) else do
+       if iw - ir < 1 then return (InputUnderflow,input,output) else do
        c0 <- readWord8Buf iraw ir
        if (c0 /= bom0) then no_bom else do
-       if iw - ir < 2 then return (input,output) else do
+       if iw - ir < 2 then return (InputUnderflow,input,output) else do
        c1 <- readWord8Buf iraw (ir+1)
        if (c1 /= bom1) then no_bom else do
-       if iw - ir < 3 then return (input,output) else do
+       if iw - ir < 3 then return (InputUnderflow,input,output) else do
        c2 <- readWord8Buf iraw (ir+2)
        if (c2 /= bom2) then no_bom else do
        -- found a BOM, ignore it and carry on
@@ -118,7 +128,7 @@ utf8_bom_encode ref input
   b <- readIORef ref
   if not b then utf8_encode input output
            else if os - ow < 3
-                  then return (input,output)
+                  then return (OutputUnderflow,input,output)
                   else do
                     writeIORef ref False
                     writeWord8Buf oraw ow     bom0
@@ -137,7 +147,8 @@ utf8_decode
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
  = let 
        loop !ir !ow
-         | ow >= os || ir >= iw = done ir ow
+         | ow >= os = done OutputUnderflow ir ow
+         | ir >= iw = done InputUnderflow ir ow
          | otherwise = do
               c0 <- readWord8Buf iraw ir
               case c0 of
@@ -145,19 +156,19 @@ utf8_decode
                            ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
                            loop (ir+1) ow'
                   | c0 >= 0xc0 && c0 <= 0xdf ->
-                           if iw - ir < 2 then done ir ow else do
+                           if iw - ir < 2 then done InputUnderflow ir ow else do
                            c1 <- readWord8Buf iraw (ir+1)
                            if (c1 < 0x80 || c1 >= 0xc0) then invalid else do
                            ow' <- writeCharBuf oraw ow (chr2 c0 c1)
                            loop (ir+2) ow'
                   | c0 >= 0xe0 && c0 <= 0xef ->
                       case iw - ir of
-                        1 -> done ir ow
+                        1 -> done InputUnderflow ir ow
                         2 -> do -- check for an error even when we don't have
                                 -- the full sequence yet (#3341)
                            c1 <- readWord8Buf iraw (ir+1)
                            if not (validate3 c0 c1 0x80) 
-                              then invalid else done ir ow
+                              then invalid else done InputUnderflow ir ow
                         _ -> do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
@@ -166,17 +177,17 @@ utf8_decode
                            loop (ir+3) ow'
                   | c0 >= 0xf0 ->
                       case iw - ir of
-                        1 -> done ir ow
+                        1 -> done InputUnderflow ir ow
                         2 -> do -- check for an error even when we don't have
                                 -- the full sequence yet (#3341)
                            c1 <- readWord8Buf iraw (ir+1)
                            if not (validate4 c0 c1 0x80 0x80)
-                              then invalid else done ir ow
+                              then invalid else done InputUnderflow ir ow
                         3 -> do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
                            if not (validate4 c0 c1 c2 0x80)
-                              then invalid else done ir ow
+                              then invalid else done InputUnderflow ir ow
                         _ -> do
                            c1 <- readWord8Buf iraw (ir+1)
                            c2 <- readWord8Buf iraw (ir+2)
@@ -187,30 +198,28 @@ utf8_decode
                   | otherwise ->
                            invalid
          where
-           invalid = if ir > ir0 then done ir ow else ioe_decodingError
+           invalid = done InvalidSequence ir ow
 
        -- lambda-lifted, to avoid thunks being built in the inner-loop:
-       done !ir !ow = return (if ir == iw then input{ bufL=0, bufR=0 }
-                                          else input{ bufL=ir },
-                         output{ bufR=ow })
+       done why !ir !ow = return (why,
+                                  if ir == iw then input{ bufL=0, bufR=0 }
+                                              else input{ bufL=ir },
+                                  output{ bufR=ow })
    in
    loop ir0 ow0
-
-ioe_decodingError :: IO a
-ioe_decodingError = ioException
-     (IOError Nothing InvalidArgument "utf8_decode"
-          "invalid UTF-8 byte sequence" Nothing Nothing)
 
 utf8_encode :: EncodeBuffer
 utf8_encode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
  = let 
-      done !ir !ow = return (if ir == iw then input{ bufL=0, bufR=0 }
-                                         else input{ bufL=ir },
-                             output{ bufR=ow })
+      done why !ir !ow = return (why,
+                                 if ir == iw then input{ bufL=0, bufR=0 }
+                                             else input{ bufL=ir },
+                                 output{ bufR=ow })
       loop !ir !ow
-        | ow >= os || ir >= iw = done ir ow
+        | ow >= os = done OutputUnderflow ir ow
+        | ir >= iw = done InputUnderflow ir ow
         | otherwise = do
            (c,ir') <- readCharBuf iraw ir
            case ord c of
@@ -218,20 +227,20 @@ utf8_encode
                     writeWord8Buf oraw ow (fromIntegral x)
                     loop ir' (ow+1)
                | x <= 0x07FF ->
-                    if os - ow < 2 then done ir ow else do
+                    if os - ow < 2 then done OutputUnderflow ir ow else do
                     let (c1,c2) = ord2 c
                     writeWord8Buf oraw ow     c1
                     writeWord8Buf oraw (ow+1) c2
                     loop ir' (ow+2)
-               | x <= 0xFFFF -> do
-                    if os - ow < 3 then done ir ow else do
+               | x <= 0xFFFF -> if isSurrogate c then done InvalidSequence ir ow else do
+                    if os - ow < 3 then done OutputUnderflow ir ow else do
                     let (c1,c2,c3) = ord3 c
                     writeWord8Buf oraw ow     c1
                     writeWord8Buf oraw (ow+1) c2
                     writeWord8Buf oraw (ow+2) c3
                     loop ir' (ow+3)
                | otherwise -> do
-                    if os - ow < 4 then done ir ow else do
+                    if os - ow < 4 then done OutputUnderflow ir ow else do
                     let (c1,c2,c3,c4) = ord4 c
                     writeWord8Buf oraw ow     c1
                     writeWord8Buf oraw (ow+1) c2

@@ -47,6 +47,9 @@ import qualified GHC.IO.Device
 import GHC.IO.Device (SeekMode(..), IODeviceType(..))
 import GHC.Conc.IO
 import GHC.IO.Exception
+#ifdef mingw32_HOST_OS
+import GHC.Windows
+#endif
 
 import Foreign
 import Foreign.C
@@ -619,9 +622,6 @@ blockingWriteRawBufferPtr loc fd buf off len
       -- for this case.  We need to detect EPIPE correctly, because it
       -- shouldn't be reported as an error when it happens on stdout.
 
-foreign import ccall unsafe "maperrno"             -- in Win32Utils.c
-   c_maperrno :: IO ()
-
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.
 
@@ -664,8 +664,3 @@ foreign import ccall unsafe "lockFile"
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
 #endif
-
-puts :: String -> IO ()
-puts s = do _ <- withCStringLen s $ \(p,len) ->
-                     c_write 1 (castPtr p) (fromIntegral len)
-            return ()

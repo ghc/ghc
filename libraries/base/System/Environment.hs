@@ -31,13 +31,20 @@ module System.Environment
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import Data.List
 import Foreign
 import Foreign.C
 import Control.Exception.Base   ( bracket )
-import Control.Monad
 -- import GHC.IO
 import GHC.IO.Exception
+import GHC.IO.Encoding (fileSystemEncoding)
+import qualified GHC.Foreign as GHC
+import Data.List
+#ifdef mingw32_HOST_OS
+import GHC.Environment
+import GHC.Windows
+#else
+import Control.Monad
+#endif
 #endif
 
 #ifdef __HUGS__
@@ -52,25 +59,78 @@ import System
   )
 #endif
 
+#ifdef __GLASGOW_HASKELL__
 -- ---------------------------------------------------------------------------
 -- getArgs, getProgName, getEnv
 
+#ifdef mingw32_HOST_OS
+
+-- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
+
+getWin32ProgArgv_certainly :: IO [String]
+getWin32ProgArgv_certainly = do
+	mb_argv <- getWin32ProgArgv
+	case mb_argv of
+	  Nothing   -> fmap dropRTSArgs getFullArgs
+	  Just argv -> return argv
+
+withWin32ProgArgv :: [String] -> IO a -> IO a
+withWin32ProgArgv argv act = bracket begin setWin32ProgArgv (\_ -> act)
+  where
+    begin = do
+	  mb_old_argv <- getWin32ProgArgv
+	  setWin32ProgArgv (Just argv)
+	  return mb_old_argv
+
+getWin32ProgArgv :: IO (Maybe [String])
+getWin32ProgArgv = alloca $ \p_argc -> alloca $ \p_argv -> do
+	c_getWin32ProgArgv p_argc p_argv
+	argc <- peek p_argc
+	argv_p <- peek p_argv
+	if argv_p == nullPtr
+	 then return Nothing
+	 else do
+	  argv_ps <- peekArray (fromIntegral argc) argv_p
+	  fmap Just $ mapM peekCWString argv_ps
+
+setWin32ProgArgv :: Maybe [String] -> IO ()
+setWin32ProgArgv Nothing = c_setWin32ProgArgv 0 nullPtr
+setWin32ProgArgv (Just argv) = withMany withCWString argv $ \argv_ps -> withArrayLen argv_ps $ \argc argv_p -> do
+	c_setWin32ProgArgv (fromIntegral argc) argv_p
+
+foreign import ccall unsafe "getWin32ProgArgv"
+  c_getWin32ProgArgv :: Ptr CInt -> Ptr (Ptr CWString) -> IO ()
+
+foreign import ccall unsafe "setWin32ProgArgv"
+  c_setWin32ProgArgv :: CInt -> Ptr CWString -> IO ()
+
+dropRTSArgs :: [String] -> [String]
+dropRTSArgs []             = []
+dropRTSArgs ("+RTS":rest)  = dropRTSArgs (dropWhile (/= "-RTS") rest)
+dropRTSArgs ("--RTS":rest) = rest
+dropRTSArgs ("-RTS":rest)  = dropRTSArgs rest
+dropRTSArgs (arg:rest)     = arg : dropRTSArgs rest
+
+#endif
+
 -- | Computation 'getArgs' returns a list of the program's command
 -- line arguments (not including the program name).
-
-#ifdef __GLASGOW_HASKELL__
 getArgs :: IO [String]
+
+#ifdef mingw32_HOST_OS
+getArgs =  fmap tail getWin32ProgArgv_certainly
+#else
 getArgs =
   alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
    getProgArgv p_argc p_argv
    p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
-   peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
-
+   peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString fileSystemEncoding)
 
 foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
+#endif
 
 {-|
 Computation 'getProgName' returns the name of the program as it was
@@ -83,6 +143,10 @@ between platforms: on Windows, for example, a program invoked as foo
 is probably really @FOO.EXE@, and that is what 'getProgName' will return.
 -}
 getProgName :: IO String
+#ifdef mingw32_HOST_OS
+-- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
+getProgName = fmap (basename . head) getWin32ProgArgv_certainly
+#else
 getProgName =
   alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
@@ -92,23 +156,24 @@ getProgName =
 
 unpackProgName  :: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do
-  s <- peekElemOff argv 0 >>= peekCString
+  s <- peekElemOff argv 0 >>= GHC.peekCString fileSystemEncoding
   return (basename s)
-  where
-   basename :: String -> String
-   basename f = go f f
-    where
-      go acc [] = acc
-      go acc (x:xs)
-        | isPathSeparator x = go xs xs
-        | otherwise         = go acc xs
-
-   isPathSeparator :: Char -> Bool
-   isPathSeparator '/'  = True
-#ifdef mingw32_HOST_OS 
-   isPathSeparator '\\' = True
 #endif
-   isPathSeparator _    = False
+
+basename :: FilePath -> FilePath
+basename f = go f f
+ where
+  go acc [] = acc
+  go acc (x:xs)
+    | isPathSeparator x = go xs xs
+    | otherwise         = go acc xs
+
+  isPathSeparator :: Char -> Bool
+  isPathSeparator '/'  = True
+#ifdef mingw32_HOST_OS
+  isPathSeparator '\\' = True
+#endif
+  isPathSeparator _    = False
 
 
 -- | Computation 'getEnv' @var@ returns the value
@@ -120,16 +185,43 @@ unpackProgName argv = do
 --    does not exist.
 
 getEnv :: String -> IO String
+#ifdef mingw32_HOST_OS
+getEnv name = withCWString name $ \s -> try_size s 256
+  where
+    try_size s size = allocaArray (fromIntegral size) $ \p_value -> do
+      res <- c_GetEnvironmentVariable s p_value size
+      case res of
+        0 -> do
+		  err <- c_GetLastError
+		  if err == eRROR_ENVVAR_NOT_FOUND
+		   then ioe_missingEnvVar name
+		   else throwGetLastError "getEnv"
+        _ | res > size -> try_size s res -- Rare: size increased between calls to GetEnvironmentVariable
+          | otherwise  -> peekCWString p_value
+
+eRROR_ENVVAR_NOT_FOUND :: DWORD
+eRROR_ENVVAR_NOT_FOUND = 203
+
+foreign import stdcall unsafe "windows.h GetLastError"
+  c_GetLastError:: IO DWORD
+
+foreign import stdcall unsafe "windows.h GetEnvironmentVariableW"
+  c_GetEnvironmentVariable :: LPTSTR -> LPTSTR -> DWORD -> IO DWORD
+#else
 getEnv name =
     withCString name $ \s -> do
       litstring <- c_getenv s
       if litstring /= nullPtr
-        then peekCString litstring
-        else ioException (IOError Nothing NoSuchThing "getEnv"
-                          "no environment variable" Nothing (Just name))
+        then GHC.peekCString fileSystemEncoding litstring
+        else ioe_missingEnvVar name
 
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
+#endif
+
+ioe_missingEnvVar :: String -> IO a
+ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
+											  "no environment variable" Nothing (Just name))
 
 {-|
 'withArgs' @args act@ - while executing action @act@, have 'getArgs'
@@ -153,48 +245,93 @@ withProgName nm act = do
 -- the duration of an action.
 
 withArgv :: [String] -> IO a -> IO a
-withArgv new_args act = do
+
+#ifdef mingw32_HOST_OS
+-- We have to reflect the updated arguments in the RTS-side variables as
+-- well, because the RTS still consults them for error messages and the like.
+-- If we don't do this then ghc-e005 fails.
+withArgv new_args act = withWin32ProgArgv new_args $ withProgArgv new_args act
+#else
+withArgv = withProgArgv
+#endif
+
+withProgArgv :: [String] -> IO a -> IO a
+withProgArgv new_args act = do
   pName <- System.Environment.getProgName
   existing_args <- System.Environment.getArgs
-  bracket (setArgs new_args)
-          (\argv -> do _ <- setArgs (pName:existing_args)
-                       freeArgv argv)
+  bracket (setProgArgv new_args)
+          (\argv -> do _ <- setProgArgv (pName:existing_args)
+                       freeProgArgv argv)
           (const act)
 
-freeArgv :: Ptr CString -> IO ()
-freeArgv argv = do
+freeProgArgv :: Ptr CString -> IO ()
+freeProgArgv argv = do
   size <- lengthArray0 nullPtr argv
   sequence_ [peek (argv `advancePtr` i) >>= free | i <- [size, size-1 .. 0]]
   free argv
 
-setArgs :: [String] -> IO (Ptr CString)
-setArgs argv = do
-  vs <- mapM newCString argv >>= newArray0 nullPtr
-  setArgsPrim (genericLength argv) vs
+setProgArgv :: [String] -> IO (Ptr CString)
+setProgArgv argv = do
+  vs <- mapM (GHC.newCString fileSystemEncoding) argv >>= newArray0 nullPtr
+  c_setProgArgv (genericLength argv) vs
   return vs
 
 foreign import ccall unsafe "setProgArgv" 
-  setArgsPrim  :: CInt -> Ptr CString -> IO ()
+  c_setProgArgv  :: CInt -> Ptr CString -> IO ()
 
 -- |'getEnvironment' retrieves the entire environment as a
 -- list of @(key,value)@ pairs.
 --
 -- If an environment entry does not contain an @\'=\'@ character,
 -- the @key@ is the whole entry and the @value@ is the empty string.
-
 getEnvironment :: IO [(String, String)]
+
+#ifdef mingw32_HOST_OS
+getEnvironment = bracket c_GetEnvironmentStrings c_FreeEnvironmentStrings $ \pBlock ->
+    if pBlock == nullPtr then return []
+     else go pBlock
+  where
+    go pBlock = do
+        -- The block is terminated by a null byte where there
+        -- should be an environment variable of the form X=Y
+        c <- peek pBlock
+        if c == 0 then return []
+         else do
+          -- Seek the next pair (or terminating null):
+          pBlock' <- seekNull pBlock False
+          -- We now know the length in bytes, but ignore it when
+          -- getting the actual String:
+          str <- peekCWString pBlock
+          fmap (divvy str :) $ go pBlock'
+    
+    -- Returns pointer to the byte *after* the next null
+    seekNull pBlock done = do
+        let pBlock' = pBlock `plusPtr` sizeOf (undefined :: CWchar)
+        if done then return pBlock'
+         else do
+           c <- peek pBlock'
+           seekNull pBlock' (c == (0 :: Word8 ))
+
+foreign import stdcall unsafe "windows.h GetEnvironmentStringsW"
+  c_GetEnvironmentStrings :: IO (Ptr CWchar)
+
+foreign import stdcall unsafe "windows.h FreeEnvironmentStringsW"
+  c_FreeEnvironmentStrings :: Ptr CWchar -> IO Bool
+#else
 getEnvironment = do
    pBlock <- getEnvBlock
    if pBlock == nullPtr then return []
     else do
-      stuff <- peekArray0 nullPtr pBlock >>= mapM peekCString
+      stuff <- peekArray0 nullPtr pBlock >>= mapM (GHC.peekCString fileSystemEncoding)
       return (map divvy stuff)
-  where
-   divvy str =
-      case break (=='=') str of
-        (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
-        (name,_:value) -> (name,value)
 
 foreign import ccall unsafe "__hscore_environ" 
   getEnvBlock :: IO (Ptr CString)
+#endif
+
+divvy :: String -> (String, String)
+divvy str =
+  case break (=='=') str of
+    (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
+    (name,_:value) -> (name,value)
 #endif  /* __GLASGOW_HASKELL__ */

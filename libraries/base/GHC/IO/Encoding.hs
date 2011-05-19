@@ -16,18 +16,20 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.Encoding (
-  BufferCodec(..), TextEncoding(..), TextEncoder, TextDecoder,
+  BufferCodec(..), TextEncoding(..), TextEncoder, TextDecoder, CodingProgress(..),
   latin1, latin1_encode, latin1_decode,
   utf8, utf8_bom,
   utf16, utf16le, utf16be,
   utf32, utf32le, utf32be, 
-  localeEncoding,
+  localeEncoding, fileSystemEncoding, foreignEncoding,
   mkTextEncoding,
   ) where
 
 import GHC.Base
 --import GHC.IO
+import GHC.IO.Exception
 import GHC.IO.Buffer
+import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.Word
 #if !defined(mingw32_HOST_OS)
@@ -41,10 +43,8 @@ import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
 
-#if defined(mingw32_HOST_OS)
+import Data.List
 import Data.Maybe
-import GHC.IO.Exception
-#endif
 
 -- -----------------------------------------------------------------------------
 
@@ -97,11 +97,32 @@ utf32be  :: TextEncoding
 utf32be = UTF32.utf32be
 
 -- | The Unicode encoding of the current locale
-localeEncoding  :: TextEncoding
+localeEncoding :: TextEncoding
+
+-- | The Unicode encoding of the current locale, but allowing arbitrary
+-- undecodable bytes to be round-tripped through it.
+--
+-- This 'TextEncoding' is used to decode and encode command line arguments
+-- and environment variables on non-Windows platforms.
+--
+-- On Windows, this encoding *should not* be used if possible because
+-- the use of code pages is deprecated: Strings should be retrieved
+-- via the "wide" W-family of UTF-16 APIs instead
+fileSystemEncoding :: TextEncoding
+
+-- | The Unicode encoding of the current locale, but where undecodable
+-- bytes are replaced with their closest visual match. Used for
+-- the 'CString' marshalling functions in "Foreign.C.String"
+foreignEncoding :: TextEncoding
+
 #if !defined(mingw32_HOST_OS)
 localeEncoding = Iconv.localeEncoding
+fileSystemEncoding = Iconv.mkLocaleEncoding RoundtripFailure
+foreignEncoding = Iconv.mkLocaleEncoding IgnoreCodingFailure
 #else
 localeEncoding = CodePage.localeEncoding
+fileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
+foreignEncoding = CodePage.mkLocaleEncoding IgnoreCodingFailure
 #endif
 
 -- | Look up the named Unicode encoding.  May fail with 
@@ -131,27 +152,40 @@ localeEncoding = CodePage.localeEncoding
 -- @CP@; for example, @\"CP1250\"@.
 --
 mkTextEncoding :: String -> IO TextEncoding
-#if !defined(mingw32_HOST_OS)
-mkTextEncoding = Iconv.mkTextEncoding
+mkTextEncoding e = case mb_coding_failure_mode of
+  Nothing -> unknown_encoding
+  Just cfm -> case enc of
+    "UTF-8"    -> return $ UTF8.mkUTF8 cfm
+    "UTF-16"   -> return $ UTF16.mkUTF16 cfm
+    "UTF-16LE" -> return $ UTF16.mkUTF16le cfm
+    "UTF-16BE" -> return $ UTF16.mkUTF16be cfm
+    "UTF-32"   -> return $ UTF32.mkUTF32 cfm
+    "UTF-32LE" -> return $ UTF32.mkUTF32le cfm
+    "UTF-32BE" -> return $ UTF32.mkUTF32be cfm
+#if defined(mingw32_HOST_OS)
+    'C':'P':n | [(cp,"")] <- reads n -> return $ CodePage.mkCodePageEncoding cfm cp
+    _ -> unknown_encoding
 #else
-mkTextEncoding "UTF-8"    = return utf8
-mkTextEncoding "UTF-16"   = return utf16
-mkTextEncoding "UTF-16LE" = return utf16le
-mkTextEncoding "UTF-16BE" = return utf16be
-mkTextEncoding "UTF-32"   = return utf32
-mkTextEncoding "UTF-32LE" = return utf32le
-mkTextEncoding "UTF-32BE" = return utf32be
-mkTextEncoding ('C':'P':n)
-    | [(cp,"")] <- reads n = return $ CodePage.codePageEncoding cp
-mkTextEncoding e = ioException
-     (IOError Nothing NoSuchThing "mkTextEncoding"
-          ("unknown encoding:" ++ e)  Nothing Nothing)
+    _ -> Iconv.mkIconvEncoding cfm enc
 #endif
+  where
+    -- The only problem with actually documenting //IGNORE and //TRANSLIT as
+    -- supported suffixes is that they are not necessarily supported with non-GNU iconv
+    (enc, suffix) = span (/= '/') e
+    mb_coding_failure_mode = case suffix of
+        ""            -> Just ErrorOnCodingFailure
+        "//IGNORE"    -> Just IgnoreCodingFailure
+        "//TRANSLIT"  -> Just TransliterateCodingFailure
+        "//ROUNDTRIP" -> Just RoundtripFailure
+        _             -> Nothing
+    
+    unknown_encoding = ioException (IOError Nothing NoSuchThing "mkTextEncoding"
+                                            ("unknown encoding:" ++ e)  Nothing Nothing)
 
 latin1_encode :: CharBuffer -> Buffer Word8 -> IO (CharBuffer, Buffer Word8)
-latin1_encode = Latin1.latin1_encode -- unchecked, used for binary
+latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_encode input output -- unchecked, used for binary
 --latin1_encode = unsafePerformIO $ do mkTextEncoder Iconv.latin1 >>= return.encode
 
 latin1_decode :: Buffer Word8 -> CharBuffer -> IO (Buffer Word8, CharBuffer)
-latin1_decode = Latin1.latin1_decode
+latin1_decode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_decode input output
 --latin1_decode = unsafePerformIO $ do mkTextDecoder Iconv.latin1 >>= return.encode

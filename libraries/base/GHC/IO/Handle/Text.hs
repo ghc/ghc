@@ -38,6 +38,7 @@ import GHC.IO.FD
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
 import GHC.IO.Exception
+import GHC.IO.Encoding.Failure (surrogatifyRoundtripCharacter, desurrogatifyRoundtripCharacter)
 import GHC.Exception
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
@@ -279,10 +280,10 @@ unpack !buf !r !w acc0
                  else do c1 <- peekElemOff pbuf (i-1)
                          let c = (fromIntegral c1 - 0xd800) * 0x400 +
                                  (fromIntegral c2 - 0xdc00) + 0x10000
-                         unpackRB (unsafeChr c : acc) (i-2)
+                         unpackRB (desurrogatifyRoundtripCharacter (unsafeChr c) : acc) (i-2)
 #else
               c <- peekElemOff pbuf i
-              unpackRB (c:acc) (i-1)
+              unpackRB (desurrogatifyRoundtripCharacter c:acc) (i-1)
 #endif
      in
      unpackRB acc0 (w-1)
@@ -305,7 +306,7 @@ unpack_nl !buf !r !w acc0
                             then unpackRB ('\n':acc) (i-2)
                             else unpackRB ('\n':acc) (i-1)
                  else do
-                         unpackRB (c:acc) (i-1)
+                         unpackRB (desurrogatifyRoundtripCharacter c:acc) (i-1)
      in do
      c <- peekElemOff pbuf (w-1)
      if (c == '\r')
@@ -585,7 +586,7 @@ writeBlocks hdl line_buffered add_nl nl
            else do
                shoveString n' cs rest
      | otherwise = do
-        n' <- writeCharBuf raw n c
+        n' <- writeCharBuf raw n (surrogatifyRoundtripCharacter c)
         shoveString n' cs rest
   in
   shoveString 0 s (if add_nl then "\n" else "")
