@@ -81,7 +81,8 @@ import System.IO.Error          ( mkIOError, eofErrorType )
 import GHC.Real                 ( Ratio(..) )
 import GHC.Exts
 import GHC.Word                 ( Word8(..) )
-import GHC.IO ( IO(..) )
+
+import GhcIO ( IO(..) )
 
 type BinArray = ForeignPtr Word8
 

@@ -22,8 +22,9 @@ import System.IO.Unsafe
 
 import GHC.Exts
 import GHC.Word
-import GHC.IO (IO(..), unsafeDupableInterleaveIO)
 import GHC.Base (unsafeChr)
+
+import GhcIO        (IO(..), unsafeDupableInterleaveIO)
 
 -- Just like unsafePerformIO, but we inline it.
 {-# INLINE inlinePerformIO #-}

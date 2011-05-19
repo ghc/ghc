@@ -26,7 +26,7 @@ module BreakArray
   ) where
 #ifdef GHCI
 import GHC.Exts
-import GHC.IO ( IO(..) )
+import GhcIO ( IO(..) )
 import Constants
 
 data BreakArray = BA (MutableByteArray# RealWorld)

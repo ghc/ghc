@@ -53,9 +53,9 @@ import DynFlags
 import Outputable as Ppr
 import FastString
 import Constants        ( wORD_SIZE )
-import GHC.Arr          ( Array(..) )
+import GHC.Arr.Unsafe   ( Array(..) )
 import GHC.Exts
-import GHC.IO ( IO(..) )
+import GhcIO ( IO(..) )
 
 import StaticFlags( opt_PprStyle_Debug )
 import Control.Monad

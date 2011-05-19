@@ -106,7 +106,7 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
 
-import GHC.IO ( IO(..) )
+import GhcIO ( IO(..) )
 
 import GHC.Ptr          ( Ptr(..) )
 #if defined(__GLASGOW_HASKELL__)
