@@ -117,11 +117,11 @@ foreignEncoding :: TextEncoding
 
 #if !defined(mingw32_HOST_OS)
 localeEncoding = Iconv.localeEncoding
-fileSystemEncoding = Iconv.mkLocaleEncoding SurrogateEscapeFailure
+fileSystemEncoding = Iconv.mkLocaleEncoding RoundtripFailure
 foreignEncoding = Iconv.mkLocaleEncoding IgnoreCodingFailure
 #else
 localeEncoding = CodePage.localeEncoding
-fileSystemEncoding = CodePage.mkLocaleEncoding SurrogateEscapeFailure
+fileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
 foreignEncoding = CodePage.mkLocaleEncoding IgnoreCodingFailure
 #endif
 
@@ -176,7 +176,7 @@ mkTextEncoding e = case mb_coding_failure_mode of
         ""            -> Just ErrorOnCodingFailure
         "//IGNORE"    -> Just IgnoreCodingFailure
         "//TRANSLIT"  -> Just TransliterateCodingFailure
-        "//SURROGATE" -> Just SurrogateEscapeFailure
+        "//ROUNDTRIP" -> Just RoundtripFailure
         _             -> Nothing
     
     unknown_encoding = ioException (IOError Nothing NoSuchThing "mkTextEncoding"

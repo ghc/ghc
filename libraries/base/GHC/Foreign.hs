@@ -62,6 +62,7 @@ import GHC.Base
 import GHC.IO
 import GHC.IO.Exception
 import GHC.IO.Buffer
+import GHC.IO.Encoding.Failure (surrogatifyRoundtripCharacter, desurrogatifyRoundtripCharacter)
 import GHC.IO.Encoding.Types
 
 
@@ -171,7 +172,7 @@ peekEncodedCString (TextEncoding { mkTextDecoder = mk_decoder }) (p, sz_bytes)
             if isEmptyBuffer from'
              then
               -- No input remaining: @why@ will be InputUnderflow, but we don't care
-              withBuffer to' $ peekArray (bufferElems to')
+              fmap (map desurrogatifyRoundtripCharacter) $ withBuffer to' $ peekArray (bufferElems to')
              else do
               -- Input remaining: what went wrong?
               putDebugMsg ("peekEncodedCString: " ++ show iteration ++ " " ++ show why)
@@ -181,7 +182,7 @@ peekEncodedCString (TextEncoding { mkTextDecoder = mk_decoder }) (p, sz_bytes)
               putDebugMsg ("peekEncodedCString: from " ++ summaryBuffer from ++ " " ++ summaryBuffer from' ++ " " ++ summaryBuffer from'')
               putDebugMsg ("peekEncodedCString: to " ++ summaryBuffer to ++ " " ++ summaryBuffer to' ++ " " ++ summaryBuffer to'')
               to_chars <- withBuffer to'' $ peekArray (bufferElems to'')
-              fmap (to_chars++) $ go (iteration + 1) from''
+              fmap (map desurrogatifyRoundtripCharacter to_chars++) $ go (iteration + 1) from''
 
       go (0 :: Int) from0
 
@@ -192,7 +193,7 @@ withEncodedCString :: TextEncoding         -- ^ Encoding of CString to create
                    -> (CStringLen -> IO a) -- ^ Worker that can safely use the allocated memory
                    -> IO a
 withEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate s act
-  = bracket mk_encoder close $ \encoder -> withArrayLen s $ \sz p -> do
+  = bracket mk_encoder close $ \encoder -> withArrayLen (map surrogatifyRoundtripCharacter s) $ \sz p -> do
       from <- fmap (\fp -> bufferAdd sz (emptyBuffer fp sz ReadBuffer)) $ newForeignPtr_ p
 
       let go iteration to_sz_bytes = do
@@ -212,7 +213,7 @@ newEncodedCString :: TextEncoding  -- ^ Encoding of CString to create
                   -> String        -- ^ String to encode
                   -> IO CStringLen
 newEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate s
-  = bracket mk_encoder close $ \encoder -> withArrayLen s $ \sz p -> do
+  = bracket mk_encoder close $ \encoder -> withArrayLen (map surrogatifyRoundtripCharacter s) $ \sz p -> do
       from <- fmap (\fp -> bufferAdd sz (emptyBuffer fp sz ReadBuffer)) $ newForeignPtr_ p
 
       let go iteration to_p to_sz_bytes = do
