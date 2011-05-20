@@ -167,3 +167,11 @@ test('T4497', normal, compile, [''])
 test('T3484', normal, compile, [''])
 test('T3460', normal, compile, [''])
 test('T4935', normal, compile, [''])
+
+test('T4981-V1', normal, compile, [''])
+test('T4981-V2', normal, compile, [''])
+test('T4981-V3', normal, compile, [''])
+
+test('T5002', normal, compile, [''])
+test('PushedInAsGivens', normal, compile, [''])
+test('SlowComp', reqlib('mtl'), compile, ['-fcontext-stack=300'])

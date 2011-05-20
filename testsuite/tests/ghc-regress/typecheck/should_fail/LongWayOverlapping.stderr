@@ -1,0 +1,9 @@
+
+LongWayOverlapping.hs:23:11:
+    No instance for (EmbAsChild [Char] Char)
+      arising from a use of `emb'
+    Possible fix:
+      add an instance declaration for (EmbAsChild [Char] Char)
+    In the expression: emb 'c'
+    In an equation for `emb': emb _ = emb 'c'
+    In the instance declaration for `EmbAsChild [Char] Bool'
