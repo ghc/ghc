@@ -106,7 +106,7 @@ tcTyAndClassDecls boot_details decls_s
 	--     second time here.  This doesn't matter as the definitions are
 	--     the same.
 	; let {	implicit_things = concatMap implicitTyThings tyclss
-	      ; rec_sel_binds   = mkRecSelBinds tyclss
+	      ; rec_sel_binds   = mkRecSelBinds [tc | ATyCon tc <- tyclss]
               ; dm_ids          = mkDefaultMethodIds tyclss }
 
   	; env <- tcExtendGlobalEnv implicit_things getGblEnv
@@ -1031,16 +1031,16 @@ must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 
 \begin{code}
-mkRecSelBinds :: [TyThing] -> HsValBinds Name
+mkRecSelBinds :: [TyCon] -> HsValBinds Name
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
-mkRecSelBinds ty_things
+mkRecSelBinds tycons
   = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
   where
     (sigs, binds) = unzip rec_sels
     rec_sels = map mkRecSelBind [ (tc,fld) 
-       	 	     	        | ATyCon tc <- ty_things 
+       	 	     	        | tc <- tycons
 				, fld <- tyConFields tc ]
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)

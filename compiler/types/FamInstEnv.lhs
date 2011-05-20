@@ -84,7 +84,12 @@ instance Outputable FamInst where
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
   = hang (pprFamInstHdr famInst)
-	2 (ptext (sLit "--") <+> pprNameLoc (getName famInst))
+       2 (vcat [ ifPprDebug (ptext (sLit "Coercion axiom:") <+> pp_ax)
+               , ptext (sLit "--") <+> pprNameLoc (getName famInst)])
+  where
+    pp_ax = case tyConFamilyCoercion_maybe (fi_tycon famInst) of
+              Just ax -> ppr ax
+              Nothing -> ptext (sLit "<not there!>")
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr (FamInst {fi_tycon = rep_tc})

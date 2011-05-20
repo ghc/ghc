@@ -10,7 +10,8 @@ module BuildTyCl (
         buildDataCon,
 	TcMethInfo, buildClass,
 	mkAbstractTyConRhs, 
-	mkNewTyConRhs, mkDataTyConRhs
+	mkNewTyConRhs, mkDataTyConRhs, 
+        newImplicitBinder
     ) where
 
 #include "HsVersions.h"
