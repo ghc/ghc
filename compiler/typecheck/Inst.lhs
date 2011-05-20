@@ -547,7 +547,7 @@ tidyFlavoredEvVar env (EvVarX v fl)
   = EvVarX (tidyEvVar env v) (tidyFlavor env fl)
 
 tidyFlavor :: TidyEnv -> CtFlavor -> CtFlavor
-tidyFlavor env (Given loc) = Given (tidyGivenLoc env loc)
+tidyFlavor env (Given loc gk) = Given (tidyGivenLoc env loc) gk
 tidyFlavor _   fl          = fl
 
 tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
@@ -591,8 +591,8 @@ substFlavoredEvVar subst (EvVarX v fl)
   = EvVarX (substEvVar subst v) (substFlavor subst fl)
 
 substFlavor :: TvSubst -> CtFlavor -> CtFlavor
-substFlavor subst (Given loc) = Given (substGivenLoc subst loc)
-substFlavor _     fl          = fl
+substFlavor subst (Given loc gk) = Given (substGivenLoc subst loc) gk
+substFlavor _     fl             = fl
 
 substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
 substGivenLoc subst (CtLoc skol span ctxt) = CtLoc (substSkolemInfo subst skol) span ctxt

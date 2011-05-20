@@ -4,7 +4,7 @@ module CmmExpr
     , CmmReg(..), cmmRegType
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
-    , GlobalReg(..), globalRegType, spReg, hpReg, spLimReg, nodeReg, node
+    , GlobalReg(..), globalRegType, spReg, hpReg, spLimReg, nodeReg, node, baseReg
     , VGcPtr(..), vgcFlag 	-- Temporary!
     , DefinerOfLocalRegs, UserOfLocalRegs, foldRegsDefd, foldRegsUsed, filterRegsUsed
     , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
@@ -425,7 +425,8 @@ instance Ord GlobalReg where
    compare _ EagerBlackholeInfo = GT
 
 -- convenient aliases
-spReg, hpReg, spLimReg, nodeReg :: CmmReg
+baseReg, spReg, hpReg, spLimReg, nodeReg :: CmmReg
+baseReg = CmmGlobal BaseReg
 spReg = CmmGlobal Sp
 hpReg = CmmGlobal Hp
 spLimReg = CmmGlobal SpLim

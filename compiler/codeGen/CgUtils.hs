@@ -20,7 +20,7 @@ module CgUtils (
         emitRODataLits, mkRODataLits,
         emitIf, emitIfThenElse,
 	emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult,
-	assignTemp, newTemp,
+	assignTemp, assignTemp_, newTemp,
 	emitSimultaneously,
 	emitSwitch, emitLitSwitch,
 	tagToClosure,
@@ -29,7 +29,7 @@ module CgUtils (
 	activeStgRegs, fixStgRegisters,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
-        cmmUGtWord,
+        cmmUGtWord, cmmSubWord, cmmMulWord, cmmAddWord, cmmUShrWord,
 	cmmOffsetExprW, cmmOffsetExprB,
 	cmmRegOffW, cmmRegOffB,
 	cmmLabelOffW, cmmLabelOffB,
@@ -180,8 +180,10 @@ cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
 cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
 cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
 --cmmShlWord e1 e2 = CmmMachOp mo_wordShl [e1, e2]
---cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
+cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
+cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
 cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
+cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
@@ -587,6 +589,9 @@ mkByteStringCLit bytes
 --
 -------------------------------------------------------------------------
 
+-- | If the expression is trivial, return it.  Otherwise, assign the
+-- expression to a temporary register and return an expression
+-- referring to this register.
 assignTemp :: CmmExpr -> FCode CmmExpr
 -- For a non-trivial expression, e, create a local
 -- variable and assign the expression to it
@@ -595,6 +600,14 @@ assignTemp e
   | otherwise 	       = do { reg <- newTemp (cmmExprType e) 
 			    ; stmtC (CmmAssign (CmmLocal reg) e)
 			    ; return (CmmReg (CmmLocal reg)) }
+
+-- | Assign the expression to a temporary register and return an
+-- expression referring to this register.
+assignTemp_ :: CmmExpr -> FCode CmmExpr
+assignTemp_ e = do
+    reg <- newTemp (cmmExprType e)
+    stmtC (CmmAssign (CmmLocal reg) e)
+    return (CmmReg (CmmLocal reg))
 
 newTemp :: CmmType -> FCode LocalReg
 newTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep) }

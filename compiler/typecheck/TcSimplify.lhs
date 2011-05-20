@@ -749,22 +749,26 @@ solve_wanteds inert wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = 
                                   unsolved_implics
            }
 
-givensFromWanteds :: CanonicalCts -> Bag FlavoredEvVar
--- Extract the *wanted* ones from CanonicalCts
--- and make them into *givens*
-givensFromWanteds = foldrBag getWanted emptyBag
+givensFromWanteds :: SimplContext -> CanonicalCts -> Bag FlavoredEvVar
+-- Extract the Wanted ones from CanonicalCts and conver to
+-- Givens; not Given/Solved, see Note [Preparing inert set for implications]
+givensFromWanteds _ctxt = foldrBag getWanted emptyBag
   where
     getWanted :: CanonicalCt -> Bag FlavoredEvVar -> Bag FlavoredEvVar
     getWanted cc givens
-      | not (isCFrozenErr cc)
-      , Wanted loc <- cc_flavor cc 
-      , let given = mkEvVarX (cc_id cc) (Given (setCtLocOrigin loc UnkSkol))
-      = given `consBag` givens
-      | otherwise 
-      = givens   -- We are not helping anyone by pushing a Derived in!
-                 -- Because if we could not solve it to start with 
-                 -- we are not going to do either inside the impl constraint
-  
+      | pushable_wanted cc
+      = let given = mkEvVarX (cc_id cc) (mkGivenFlavor (cc_flavor cc) UnkSkol)
+        in given `consBag` givens     -- and not mkSolvedFlavor,
+                                      -- see Note [Preparing inert set for implications]
+      | otherwise = givens
+
+    pushable_wanted :: CanonicalCt -> Bool 
+    pushable_wanted cc 
+      | not (isCFrozenErr cc) 
+      , isWantedCt cc 
+      = isEqPred (evVarPred (cc_id cc)) -- see Note [Preparing inert set for implications]
+      | otherwise = False 
+ 
 solveNestedImplications :: InertSet -> CanonicalCts
                         -> Bag Implication
                         -> TcS (Bag FlavoredEvVar, Bag Implication)
@@ -774,15 +778,18 @@ solveNestedImplications just_given_inert unsolved_cans implics
   | otherwise 
   = do {  -- See Note [Preparing inert set for implications]
 	  -- Push the unsolved wanteds inwards, but as givens
-         let pushed_givens    = givensFromWanteds unsolved_cans
+             
+       ; simpl_ctx <- getTcSContext 
+
+       ; let pushed_givens    = givensFromWanteds simpl_ctx unsolved_cans
              tcs_untouchables = filterVarSet isFlexiTcsTv $
                                 tyVarsOfEvVarXs pushed_givens
              -- See Note [Extra TcsTv untouchables]
 
        ; traceTcS "solveWanteds: preparing inerts for implications {"  
                   (vcat [ppr tcs_untouchables, ppr pushed_givens])
-     
-       ; (_, inert_for_implics) <- solveInteract just_given_inert pushed_givens
+
+       ; (_, inert_for_implics) <- solveInteract just_given_inert pushed_givens 
 
        ; traceTcS "solveWanteds: } now doing nested implications {" $
          vcat [ text "inerts_for_implics =" <+> ppr inert_for_implics
@@ -933,6 +940,42 @@ We were not able to solve (a ~w [beta]) but we can't just assume it as
 given because the resulting set is not inert. Hence we have to do a
 'solveInteract' step first. 
 
+Finally, note that we convert them to [Given] and NOT [Given/Solved].
+The reason is that Given/Solved are weaker than Givens and may be discarded.
+As an example consider the inference case, where we may have, the following 
+original constraints: 
+     [Wanted] F Int ~ Int
+             (F Int ~ a => F Int ~ a)
+If we convert F Int ~ Int to [Given/Solved] instead of Given, then the next 
+given (F Int ~ a) is going to cause the Given/Solved to be ignored, casting 
+the (F Int ~ a) insoluble. Hence we should really convert the residual 
+wanteds to plain old Given. 
+
+We need only push in unsolved equalities both in checking mode and inference mode: 
+
+  (1) In checking mode we should not push given dictionaries in because of
+example LongWayOverlapping.hs, where we might get strange overlap
+errors between far-away constraints in the program.  But even in
+checking mode, we must still push type family equations. Consider:
+
+   type instance F True a b = a 
+   type instance F False a b = b
+
+   [w] F c a b ~ gamma 
+   (c ~ True) => a ~ gamma 
+   (c ~ False) => b ~ gamma
+
+Since solveCTyFunEqs happens at the very end of solving, the only way to solve
+the two implications is temporarily consider (F c a b ~ gamma) as Given (NB: not 
+merely Given/Solved because it has to interact with the top-level instance 
+environment) and push it inside the implications. Now, when we come out again at
+the end, having solved the implications solveCTyFunEqs will solve this equality.
+
+  (2) In inference mode, we recheck the final constraint in checking mode and
+hence we will be able to solve inner implications from top-level quantified
+constraints nonetheless.
+
+
 Note [Extra TcsTv untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Furthemore, we record the inert set simplifier-generated unification
@@ -1032,7 +1075,7 @@ getSolvableCTyFunEqs untch cts
 
       , not (tv `elemVarSet` niSubstTvSet tv_subst (tyVarsOfTypes xis))
            -- Occurs check: see Note [Solving Family Equations], Point 2
-      = ASSERT ( not (isGiven fl) )
+      = ASSERT ( not (isGivenOrSolved fl) )
         (cts_in, extendFunEqBinds feb cv tv (mkTyConApp tc xis))
 
     dflt_funeq (cts_in, fun_eq_binds) ct

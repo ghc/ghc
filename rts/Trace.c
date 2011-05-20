@@ -20,6 +20,10 @@
 #include "Threads.h"
 #include "Printer.h"
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 #ifdef DEBUG
 // debugging flags, set with +RTS -D<something>
 int DEBUG_sched;
@@ -248,6 +252,69 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
 #endif
     {
         postSchedEvent(cap,tag,tso ? tso->id : 0, info1, info2);
+    }
+}
+
+void traceCapsetModify_ (EventTypeNum tag,
+                         CapsetID capset,
+                         StgWord32 other,
+                         StgWord32 other2)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        switch (tag) {
+        case EVENT_CAPSET_CREATE:   // (capset, capset_type)
+            debugBelch("created capset %d of type %d\n", capset, other);
+            break;
+        case EVENT_CAPSET_DELETE:   // (capset)
+            debugBelch("deleted capset %d\n", capset);
+            break;
+        case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
+            debugBelch("assigned cap %d to capset %d\n", other, capset);
+            break;
+        case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
+            debugBelch("removed cap %d from capset %d\n", other, capset);
+            break;
+        }
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if(eventlog_enabled) postCapsetModifyEvent(tag, capset, other, other2);
+    }
+}
+
+extern char **environ;
+
+void traceCapsetDetails_(int *argc, char **argv[]){
+    if(eventlog_enabled){
+        postCapsetModifyEvent(EVENT_OSPROCESS_PID,
+                              CAPSET_OSPROCESS_DEFAULT,
+                              getpid(),
+                              getppid());
+
+        char buf[256];
+        snprintf(buf, sizeof(buf), "GHC-%s %s", ProjectVersion, RtsWay);
+        postCapsetStrEvent(EVENT_RTS_IDENTIFIER,
+                           CAPSET_OSPROCESS_DEFAULT,
+                           buf);
+
+        if(argc != NULL && argv != NULL){
+            postCapsetVecEvent(EVENT_PROGRAM_ARGS,
+                               CAPSET_OSPROCESS_DEFAULT,
+                               *argc,
+                               *argv);
+        }
+
+        int env_len;
+        for( env_len = 0; environ[env_len] != NULL; env_len++);
+        postCapsetVecEvent(EVENT_PROGRAM_ENV,
+                           CAPSET_OSPROCESS_DEFAULT,
+                           env_len,
+                           environ);
     }
 }
 

@@ -40,11 +40,13 @@ module TcRnTypes(
         Implication(..),
         CtLoc(..), ctLocSpan, ctLocOrigin, setCtLocOrigin,
 	CtOrigin(..), EqOrigin(..), 
-        WantedLoc, GivenLoc, pushErrCtxt,
+        WantedLoc, GivenLoc, GivenKind(..), pushErrCtxt,
 
 	SkolemInfo(..),
 
-        CtFlavor(..), pprFlavorArising, isWanted, isGiven, isDerived,
+        CtFlavor(..), pprFlavorArising, isWanted, 
+        isGivenOrSolved, isGiven_maybe,
+        isDerived,
         FlavoredEvVar,
 
 	-- Pretty printing
@@ -924,35 +926,37 @@ pprWantedEvVar        (EvVarX v _)   = pprEvVarWithType v
 
 \begin{code}
 data CtFlavor
-  = Given   GivenLoc  -- We have evidence for this constraint in TcEvBinds
-  | Derived WantedLoc 
-                      -- We have evidence for this constraint in TcEvBinds;
-                      --   *however* this evidence can contain wanteds, so 
-                      --   it's valid only provisionally to the solution of
-                      --   these wanteds 
-  | Wanted WantedLoc  -- We have no evidence bindings for this constraint. 
+  = Given GivenLoc GivenKind -- We have evidence for this constraint in TcEvBinds
+  | Derived WantedLoc        -- Derived's are just hints for unifications 
+  | Wanted WantedLoc         -- We have no evidence bindings for this constraint. 
 
--- data DerivedOrig = DerSC | DerInst | DerSelf
--- Deriveds are either superclasses of other wanteds or deriveds, or partially
--- solved wanteds from instances, or 'self' dictionaries containing yet wanted
--- superclasses. 
+data GivenKind
+  = GivenOrig   -- Originates in some given, such as signature or pattern match
+  | GivenSolved -- Is given as result of being solved, maybe provisionally on
+                -- some other wanted constraints. 
 
 instance Outputable CtFlavor where
-  ppr (Given {})   = ptext (sLit "[G]")
-  ppr (Wanted {})  = ptext (sLit "[W]")
-  ppr (Derived {}) = ptext (sLit "[D]") 
+  ppr (Given _ GivenOrig)   = ptext (sLit "[G]")
+  ppr (Given _ GivenSolved) = ptext (sLit "[S]") -- Print [S] for Given/Solved's
+  ppr (Wanted {})           = ptext (sLit "[W]")
+  ppr (Derived {})          = ptext (sLit "[D]") 
+
 pprFlavorArising :: CtFlavor -> SDoc
-pprFlavorArising (Derived wl )  = pprArisingAt wl
+pprFlavorArising (Derived wl)   = pprArisingAt wl
 pprFlavorArising (Wanted  wl)   = pprArisingAt wl
-pprFlavorArising (Given gl)     = pprArisingAt gl
+pprFlavorArising (Given gl _)   = pprArisingAt gl
 
 isWanted :: CtFlavor -> Bool
 isWanted (Wanted {}) = True
 isWanted _           = False
 
-isGiven :: CtFlavor -> Bool 
-isGiven (Given {}) = True 
-isGiven _          = False 
+isGivenOrSolved :: CtFlavor -> Bool
+isGivenOrSolved (Given {}) = True
+isGivenOrSolved _ = False
+
+isGiven_maybe :: CtFlavor -> Maybe GivenKind 
+isGiven_maybe (Given _ gk) = Just gk
+isGiven_maybe _            = Nothing
 
 isDerived :: CtFlavor -> Bool 
 isDerived (Derived {}) = True
