@@ -22,10 +22,12 @@ import RdrName
 import BasicTypes
 import TysWiredIn
 import PrelNames
+
 -- For generation of representation types
 import TcEnv (tcLookupTyCon)
-import TcRnMonad (TcM, newUnique)
+import TcRnMonad
 import HscTypes
+import BuildTyCl
 
 import SrcLoc
 import Bag
@@ -112,6 +114,41 @@ mkBindsRep tycon =
         (from_alts, to_alts) = mkSum (1 :: US) tycon datacons
         
 --------------------------------------------------------------------------------
+-- The type instance synonym and synonym
+--       type instance Rep (D a b) = Rep_D a b
+--       type Rep_D a b = ...representation type for D ...
+--------------------------------------------------------------------------------
+
+tc_mkRepTyCon :: TyCon           -- The type to generate representation for
+               -> MetaTyCons      -- Metadata datatypes to refer to
+               -> TcM TyCon       -- Generated representation0 type
+tc_mkRepTyCon tycon metaDts = 
+-- Consider the example input tycon `D`, where data D a b = D_ a
+  do { -- `rep0` = GHC.Generics.Rep (type family)
+       rep0 <- tcLookupTyCon repTyConName
+
+       -- `rep0Ty` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
+     ; rep0Ty <- tc_mkRepTy tycon metaDts
+    
+       -- `rep_name` is a name we generate for the synonym
+     ; rep_name <- newImplicitBinder (tyConName tycon) mkGenR
+     ; let -- `tyvars` = [a,b]
+           tyvars  = tyConTyVars tycon
+
+           -- rep0Ty has kind `kind of D` -> *
+           --      rep_kind = tyConKind tycon `mkArrowKind` liftedTypeKind
+	   --      SLPJ The above type looks quite wrong to me! 
+	   --           The kind sig in the comment for rep0Ty looks right
+	   --	   
+           rep_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
+
+           -- `appT` = D a b
+           appT = [mkTyConApp tycon (mkTyVarTys tyvars)]
+
+     ; buildSynTyCon rep_name tyvars (SynonymTyCon rep0Ty) rep_kind
+                     NoParentTyCon (Just (rep0, appT)) }
+
+--------------------------------------------------------------------------------
 -- Type representation
 --------------------------------------------------------------------------------
 
@@ -172,43 +209,6 @@ tc_mkRepTy tycon metaDts =
         metaSTyCons = map (map mkTyConTy) (metaS metaDts)
         
     return (mkD tycon)
-
-tc_mkRepTyCon :: TyCon           -- The type to generate representation for
-               -> MetaTyCons      -- Metadata datatypes to refer to
-               -> TcM TyCon       -- Generated representation0 type
-tc_mkRepTyCon tycon metaDts = 
--- Consider the example input tycon `D`, where data D a b = D_ a
-  do
-    uniq1   <- newUnique
-    uniq2   <- newUnique
-    -- `rep0Ty` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
-    rep0Ty  <- tc_mkRepTy tycon metaDts
-    -- `rep0` = GHC.Generics.Rep (type family)
-    rep0    <- tcLookupTyCon repTyConName
-    
-    let modl    = nameModule  (tyConName tycon)
-        loc     = nameSrcSpan (tyConName tycon)
-        -- `repName` is a name we generate for the synonym
-        repName = mkExternalName uniq1 modl (mkGenR0 (nameOccName (tyConName tycon))) loc
-        -- `coName` is a name for the coercion
-        coName  = mkExternalName uniq2 modl (mkGenR0 (nameOccName (tyConName tycon))) loc
-        -- `tyvars` = [a,b]
-        tyvars  = tyConTyVars tycon
-        -- `appT` = D a b
-        appT    = [mkTyConApp tycon (mkTyVarTys tyvars)]
-        -- Result
-        res = mkSynTyCon repName
-                 -- rep0Ty has kind `kind of D` -> *
-                 (tyConKind tycon `mkArrowKind` liftedTypeKind)
-                 tyvars (SynonymTyCon rep0Ty)
-                 (FamInstTyCon rep0 appT
-{-
-                   (mkCoercionTyCon coName (tyConArity tycon)
-                     (CoAxiom tyvars (mkTyConApp rep0 appT) rep0Ty)))
--}
-                   -- co : forall a b. Rep (D a b) ~ `rep0Ty` a b
-                   (CoAxiom uniq2 coName tyvars (mkTyConApp rep0 appT) rep0Ty))
-    return res
 
 --------------------------------------------------------------------------------
 -- Meta-information

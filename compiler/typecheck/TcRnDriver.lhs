@@ -1644,7 +1644,6 @@ ppr_tydecls tycons
   where
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
     ppr_tycon tycon = ppr (tyThingToIfaceDecl (ATyCon tycon))
-      where
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty

@@ -55,7 +55,7 @@ module HscTypes (
         -- * TyThings and type environments
 	TyThing(..),
 	tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId, tyThingCoAxiom,
-	implicitTyThings, isImplicitTyThing,
+	implicitTyThings, implicitTyConThings, implicitClassThings, isImplicitTyThing,
 	
 	TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
@@ -1027,21 +1027,15 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 -- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
-
--- For data and newtype declarations:
-implicitTyThings (ATyCon tc)
-  =   -- fields (names of selectors)
-      -- (possibly) implicit coercion and family coercion
-      --   depending on whether it's a newtype or a family instance or both
-    implicitCoTyCon tc ++
-      -- for each data constructor in order,
-      --   the contructor, worker, and (possibly) wrapper
-    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
-
-implicitTyThings (ACoAxiom _cc)
-  = []
-	     
-implicitTyThings (AClass cl) 
+implicitTyThings (AnId _)       = []
+implicitTyThings (ACoAxiom _cc) = []
+implicitTyThings (ATyCon tc)    = implicitTyConThings tc
+implicitTyThings (AClass cl)    = implicitClassThings cl
+implicitTyThings (ADataCon dc)  = map AnId (dataConImplicitIds dc)
+    -- For data cons add the worker and (possibly) wrapper
+    
+implicitClassThings :: Class -> [TyThing]
+implicitClassThings cl 
   = -- dictionary datatype:
     --    [extras_plus:]
     --      type constructor 
@@ -1058,11 +1052,16 @@ implicitTyThings (AClass cl)
     -- superclass and operation selectors
     map AnId (classAllSelIds cl)
 
-implicitTyThings (ADataCon dc) = 
-    -- For data cons add the worker and (possibly) wrapper
-    map AnId (dataConImplicitIds dc)
+implicitTyConThings :: TyCon -> [TyThing]
+implicitTyConThings tc 
+  =   -- fields (names of selectors)
+      -- (possibly) implicit coercion and family coercion
+      --   depending on whether it's a newtype or a family instance or both
+    implicitCoTyCon tc ++
+      -- for each data constructor in order,
+      --   the contructor, worker, and (possibly) wrapper
+    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
 
-implicitTyThings (AnId _)   = []
 
 -- add a thing and recursive call
 extras_plus :: TyThing -> [TyThing]
