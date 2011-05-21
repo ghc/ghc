@@ -26,10 +26,9 @@ module FastMutInt(
 #endif
 
 import GHC.Base
+import GHC.Ptr
 #if __GLASGOW_HASKELL__ >= 701
-import GHC.Ptr.Unsafe   ( Ptr(..) )
-#else
-import GHC.Ptr          ( Ptr(..) )
+import GHC.Ptr.Unsafe
 #endif
 
 #else /* ! __GLASGOW_HASKELL__ */
