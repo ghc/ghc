@@ -35,9 +35,9 @@ import Bag
 import RdrName (GlobalRdrEnv)
 
 
--- | Process the data in a GhcModule to produce an interface.
+-- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
--- sort. That's what's in the interface map.
+-- sort. That's what's in the 'IfaceMap'.
 createInterface :: TypecheckedModule -> [Flag] -> IfaceMap -> InstIfaceMap
                 -> ErrMsgGhc Interface
 createInterface tm flags modMap instIfaceMap = do
