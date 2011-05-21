@@ -277,8 +277,8 @@ gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
-    gHC_PACK, gHC_CONC, gHC_IO, gHC_IO_Exception,
-    gHC_ST, gHC_ARR, gHC_STABLE, gHC_ADDR, gHC_PTR, gHC_ERR, gHC_REAL,
+    gHC_CONC, gHC_IO, gHC_IO_Exception,
+    gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_GROUP, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
@@ -307,14 +307,12 @@ dATA_EITHER	= mkBaseModule (fsLit "Data.Either")
 dATA_STRING	= mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE	= mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")
-gHC_PACK	= mkBaseModule (fsLit "GHC.Pack")
 gHC_CONC	= mkBaseModule (fsLit "GHC.Conc")
 gHC_IO    	= mkBaseModule (fsLit "GHC.IO")
 gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
 gHC_ST		= mkBaseModule (fsLit "GHC.ST")
 gHC_ARR		= mkBaseModule (fsLit "GHC.Arr")
 gHC_STABLE	= mkBaseModule (fsLit "GHC.Stable")
-gHC_ADDR	= mkBaseModule (fsLit "GHC.Addr")
 gHC_PTR		= mkBaseModule (fsLit "GHC.Ptr")
 gHC_ERR		= mkBaseModule (fsLit "GHC.Err")
 gHC_REAL	= mkBaseModule (fsLit "GHC.Real")
