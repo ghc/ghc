@@ -666,20 +666,20 @@ moduleExports :: Module           -- ^ Module A
 moduleExports thisMod expMod dflags gre exports decls ifaceMap instIfaceMap
   | m == thisMod = liftErrMsg $ fullContentsOfThisModule dflags gre decls
   | otherwise =
-      case Map.lookup m ifaceMap of
-        Just iface
-          | OptHide `elem` ifaceOptions iface -> return (ifaceExportItems iface)
-          | otherwise -> return [ ExportModule m ]
+    case Map.lookup m ifaceMap of
+      Just iface
+        | OptHide `elem` ifaceOptions iface -> return (ifaceExportItems iface)
+        | otherwise -> return [ ExportModule m ]
 
-        Nothing -> -- we have to try to find it in the installed interfaces
-                   -- (external packages)
-          case Map.lookup expMod (Map.mapKeys moduleName instIfaceMap) of
-            Just iface -> return [ ExportModule (instMod iface) ]
-            Nothing -> do
-              liftErrMsg $
-                tell ["Warning: " ++ pretty thisMod ++ ": Could not find " ++
-                      "documentation for exported module: " ++ pretty expMod]
-              return []
+      Nothing -> -- we have to try to find it in the installed interfaces
+                 -- (external packages)
+        case Map.lookup expMod (Map.mapKeys moduleName instIfaceMap) of
+          Just iface -> return [ ExportModule (instMod iface) ]
+          Nothing -> do
+            liftErrMsg $
+              tell ["Warning: " ++ pretty thisMod ++ ": Could not find " ++
+                    "documentation for exported module: " ++ pretty expMod]
+            return []
   where
     m = mkModule packageId expMod
     packageId = modulePackageId thisMod
