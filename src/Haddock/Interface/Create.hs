@@ -72,7 +72,7 @@ createInterface tm flags modMap instIfaceMap = do
       exports0      = fmap (reverse . map unLoc) optExports
       exports
         | OptIgnoreExports `elem` opts = Nothing
-        | otherwise = exports
+        | otherwise = exports0
 
   liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
@@ -453,8 +453,8 @@ mkExportItems
 mkExportItems modMap this_mod gre exported_names decls declMap
               optExports _ instIfaceMap dflags =
   case optExports of
-    Just exports -> everything_local_exported
-    Nothing -> liftM concat $ mapM lookupExport exports
+    Nothing      -> everything_local_exported
+    Just exports -> liftM concat $ mapM lookupExport exports
   where
 
 
