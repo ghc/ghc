@@ -449,32 +449,25 @@ mkExportItems
   -> InstIfaceMap
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
-
-mkExportItems modMap this_mod gre exported_names decls declMap
+mkExportItems modMap thisMod gre exportedNames decls declMap
               optExports _ instIfaceMap dflags =
   case optExports of
-    Nothing      -> everything_local_exported
+    Nothing      -> liftErrMsg $ fullContentsOfThisModule dflags gre decls
     Just exports -> liftM concat $ mapM lookupExport exports
   where
-
-
-    everything_local_exported =  -- everything exported
-      liftErrMsg $ fullContentsOfThisModule dflags gre decls
-
-
-    lookupExport (IEVar x) = declWith x
-    lookupExport (IEThingAbs t) = declWith t
+    lookupExport (IEVar x)             = declWith x
+    lookupExport (IEThingAbs t)        = declWith t
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t _)     = declWith t
     lookupExport (IEModuleContents m)  =
-      moduleExports this_mod m dflags gre exported_names decls modMap instIfaceMap
+      moduleExports thisMod m dflags gre exportedNames decls modMap instIfaceMap
     lookupExport (IEGroup lev docStr)  = liftErrMsg $
       ifDoc (lexParseRnHaddockComment dflags DocSectionComment gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
     lookupExport (IEDoc docStr)        = liftErrMsg $
       ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
             (\doc -> return [ ExportDoc doc ])
-    lookupExport (IEDocNamed str) = liftErrMsg $
+    lookupExport (IEDocNamed str)      = liftErrMsg $
       ifDoc (findNamedDoc str [ unL d | (d,_,_) <- decls ])
             (\docStr ->
             ifDoc (lexParseRnHaddockComment dflags NormalHaddockComment gre docStr)
@@ -507,7 +500,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
               | t /= declName_,
                 Just p <- find isExported (parents t $ unL decl) ->
                 do liftErrMsg $ tell [
-                     "Warning: " ++ moduleString this_mod ++ ": " ++
+                     "Warning: " ++ moduleString thisMod ++ ": " ++
                      pretty (nameOccName t) ++ " is exported separately but " ++
                      "will be documented under " ++ pretty (nameOccName p) ++
                      ". Consider exporting it together with its parent(s)" ++
@@ -525,7 +518,7 @@ mkExportItems modMap this_mod gre exported_names decls declMap
           -- looked for the .hi/.haddock).  It's to help people
           -- debugging after all, so good to show more info.
           let exportInfoString =
-                         moduleString this_mod ++ "." ++ getOccString t
+                         moduleString thisMod ++ "." ++ getOccString t
                       ++ ": "
                       ++ pretty (nameModule t) ++ "." ++ getOccString t
 
@@ -631,17 +624,16 @@ mkExportItems modMap this_mod gre exported_names decls declMap
       where
         decl' = ExportDecl (restrictTo sub_names (extractDecl n mdl decl)) doc subs' []
         mdl = nameModule n
-        subs' = filter ((`elem` exported_names) . fst) subs
+        subs' = filter (isExported . fst) subs
         sub_names = map fst subs'
 
 
-    isExported = (`elem` exported_names)
-
+    isExported = (`elem` exportedNames)
 
 
     findDecl :: Name -> Maybe DeclInfo
     findDecl n
-      | m == this_mod = Map.lookup n declMap
+      | m == thisMod = Map.lookup n declMap
       | otherwise = case Map.lookup m modMap of
                       Just iface -> Map.lookup n (ifaceDeclMap iface)
                       Nothing -> Nothing
