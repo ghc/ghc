@@ -23,8 +23,6 @@
  * typedef uint16_t EventCapNo;
  * typedef uint16_t EventPayloadSize; // variable-size events
  * typedef uint16_t EventThreadStatus;
- * typedef uint32_t EventCapsetID;
- * typedef uint16_t EventCapsetType;  // types for EVENT_CAPSET_CREATE
  */
 
 /* -----------------------------------------------------------------------------
@@ -62,9 +60,5 @@ provider HaskellEvent {
   probe gc__idle (EventCapNo);
   probe gc__work (EventCapNo);
   probe gc__done (EventCapNo);
-  probe capset__create(EventCapsetID, EventCapsetType);
-  probe capset__delete(EventCapsetID);
-  probe capset__assign__cap(EventCapsetID, EventCapNo);
-  probe capset__remove__cap(EventCapsetID, EventCapNo);
 
 };

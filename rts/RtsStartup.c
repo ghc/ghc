@@ -148,10 +148,6 @@ hs_init(int *argc, char **argv[])
      */
     dtraceEventStartup();
 
-    /* Trace some basic information about the process
-     */
-    traceCapsetDetails(argc, argv);
-
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
