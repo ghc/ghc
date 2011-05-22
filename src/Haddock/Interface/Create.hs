@@ -466,7 +466,8 @@ mkExportItems modMap this_mod gre exported_names decls declMap
     lookupExport (IEThingAbs t) = declWith t
     lookupExport (IEThingAll t)        = declWith t
     lookupExport (IEThingWith t _)     = declWith t
-    lookupExport (IEModuleContents m)  = fullContentsOf m
+    lookupExport (IEModuleContents m)  =
+      moduleExports this_mod m dflags gre exported_names decls modMap instIfaceMap
     lookupExport (IEGroup lev docStr)  = liftErrMsg $
       ifDoc (lexParseRnHaddockComment dflags DocSectionComment gre docStr)
             (\doc -> return [ ExportGroup lev "" doc ])
@@ -637,27 +638,6 @@ mkExportItems modMap this_mod gre exported_names decls declMap
     isExported = (`elem` exported_names)
 
 
-    fullContentsOf modname
-      | m == this_mod = liftErrMsg $ fullContentsOfThisModule dflags gre decls
-      | otherwise =
-          case Map.lookup m modMap of
-            Just iface
-              | OptHide `elem` ifaceOptions iface -> return (ifaceExportItems iface)
-              | otherwise -> return [ ExportModule m ]
-
-            Nothing -> -- we have to try to find it in the installed interfaces
-                       -- (external packages)
-              case Map.lookup modname (Map.mapKeys moduleName instIfaceMap) of
-                Just iface -> return [ ExportModule (instMod iface) ]
-                Nothing -> do
-                  liftErrMsg $
-                    tell ["Warning: " ++ pretty this_mod ++ ": Could not find " ++
-                          "documentation for exported module: " ++ pretty modname]
-                  return []
-      where
-        m = mkModule packageId modname
-        packageId = modulePackageId this_mod
-
 
     findDecl :: Name -> Maybe DeclInfo
     findDecl n
@@ -667,6 +647,50 @@ mkExportItems modMap this_mod gre exported_names decls declMap
                       Nothing -> Nothing
       where
         m = nameModule n
+
+
+-- | Return all export items produced by an exported module. That is, we're
+-- interested in the exports produced by \"module B\" in such a scenario:
+--
+-- > module A (module B) where
+-- > import B (...) hiding (...)
+--
+-- There are three different cases to consider:
+--
+-- 1) B is hidden, in which case we return all its exports that are in scope in A.
+-- 2) B is visible, but not all its exports are in scope in A, in which case we
+--    only return those that are.
+-- 3) B is visible and all its exports are in scope, in which case we return
+--    a single 'ExportModule' item. 
+moduleExports :: Module           -- ^ Module A
+              -> ModuleName       -- ^ The real name of B, the exported module
+              -> DynFlags         -- ^ The flag used when typechecking A
+              -> GlobalRdrEnv     -- ^ The renaming environment used for A
+              -> [Name]           -- ^ All the exports of A
+              -> [DeclInfo]       -- ^ All the declarations in A
+              -> IfaceMap         -- ^ Already created interfaces
+              -> InstIfaceMap     -- ^ Interfaces in other packages
+              -> ErrMsgGhc [ExportItem Name] -- ^ Resulting export items
+moduleExports thisMod expMod dflags gre exports decls ifaceMap instIfaceMap
+  | m == thisMod = liftErrMsg $ fullContentsOfThisModule dflags gre decls
+  | otherwise =
+      case Map.lookup m ifaceMap of
+        Just iface
+          | OptHide `elem` ifaceOptions iface -> return (ifaceExportItems iface)
+          | otherwise -> return [ ExportModule m ]
+
+        Nothing -> -- we have to try to find it in the installed interfaces
+                   -- (external packages)
+          case Map.lookup expMod (Map.mapKeys moduleName instIfaceMap) of
+            Just iface -> return [ ExportModule (instMod iface) ]
+            Nothing -> do
+              liftErrMsg $
+                tell ["Warning: " ++ pretty thisMod ++ ": Could not find " ++
+                      "documentation for exported module: " ++ pretty expMod]
+              return []
+  where
+    m = mkModule packageId expMod
+    packageId = modulePackageId thisMod
 
 
 -- Note [1]:
