@@ -69,13 +69,15 @@ createInterface tm flags modMap instIfaceMap = do
 
       decls         = filterOutInstances decls0
       declMap       = mkDeclMap decls
-      exports       = fmap (reverse . map unLoc) optExports
-      ignoreExps    = Flag_IgnoreAllExports `elem` flags
+      exports0      = fmap (reverse . map unLoc) optExports
+      exports
+        | OptIgnoreExports `elem` opts = Nothing
+        | otherwise = exports
 
   liftErrMsg $ warnAboutFilteredDecls mdl decls0
 
   exportItems <- mkExportItems modMap mdl gre exportedNames decls declMap
-                               opts exports ignoreExps instances instIfaceMap dflags
+                               exports instances instIfaceMap dflags
 
   let visibleNames = mkVisibleNames exportItems opts
 
@@ -442,19 +444,17 @@ mkExportItems
   -> [Name]             -- exported names (orig)
   -> [DeclInfo]
   -> Map Name DeclInfo  -- maps local names to declarations
-  -> [DocOption]
   -> Maybe [IE Name]
-  -> Bool               -- --ignore-all-exports flag
   -> [Instance]
   -> InstIfaceMap
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
 
 mkExportItems modMap this_mod gre exported_names decls declMap
-              opts maybe_exps ignore_all_exports _ instIfaceMap dflags
-  | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
-    = everything_local_exported
-  | otherwise = liftM concat $ mapM lookupExport (fromJust maybe_exps)
+              optExports _ instIfaceMap dflags =
+  case optExports of
+    Just exports -> everything_local_exported
+    Nothing -> liftM concat $ mapM lookupExport exports
   where
 
 
