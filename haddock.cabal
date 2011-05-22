@@ -198,3 +198,11 @@ library
   
   if flag(in-ghc-tree)
     buildable: False
+
+test-suite html-tests
+  type:             exitcode-stdio-1.0
+  default-language: Haskell2010
+  main-is:          runtests.hs
+  hs-source-dirs:   tests/html-tests
+  build-depends:    base, directory, process, filepath, Cabal, regex-compat
+

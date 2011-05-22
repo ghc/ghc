@@ -1,4 +1,3 @@
-
 This is a testsuite for Haddock that uses the concept of "golden files". That
 is, it compares output files against a set of reference files.
 
@@ -6,7 +5,7 @@ To add a new test:
 
  1) Create a module in the "tests" directory.
 
- 2) Run runtests.hs. You should now have output/<modulename>.html. The test
+ 2) Run "cabal test". You should now have output/<modulename>.html. The test
     passes since there is no reference file to compare with.
 
  3) To make a reference file from the output file, do
@@ -14,15 +13,12 @@ To add a new test:
 
 Tips and tricks:
 
-You can
+To copy all output files into reference files, run
   runhaskell copy.hs
 
-to copy all output files into reference files.
-
-You can
-  runhaskell runtests.hs all
-
-to continue despite a failing test.
+You can run all tests despite failing tests, like so
+  cabal test --test-option=all
 
 You can pass extra options to haddock like so
-  runhaskell runtests.hs --title="All Tests" all
+  cabal test --test-options='all --title="All Tests"'
+
