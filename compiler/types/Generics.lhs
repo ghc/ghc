@@ -135,11 +135,7 @@ tc_mkRepTyCon tycon metaDts =
      ; let -- `tyvars` = [a,b]
            tyvars  = tyConTyVars tycon
 
-           -- rep0Ty has kind `kind of D` -> *
-           --      rep_kind = tyConKind tycon `mkArrowKind` liftedTypeKind
-	   --      SLPJ The above type looks quite wrong to me! 
-	   --           The kind sig in the comment for rep0Ty looks right
-	   --	   
+           -- rep0Ty has kind * -> *
            rep_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
 
            -- `appT` = D a b
