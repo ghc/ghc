@@ -347,6 +347,13 @@ emitPrimOp res WriteByteArrayOp_Word16    args _ = doWriteByteArrayOp (Just mo_W
 emitPrimOp res WriteByteArrayOp_Word32    args _ = doWriteByteArrayOp (Just mo_WordTo32) b32  res args
 emitPrimOp res WriteByteArrayOp_Word64    args _ = doWriteByteArrayOp Nothing b64  res args
 
+-- Copying byte arrays
+
+emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] live =
+    doCopyByteArrayOp src src_off dst dst_off n live
+emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] live =
+    doCopyMutableByteArrayOp src src_off dst dst_off n live
+
 
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg] _
@@ -634,6 +641,58 @@ cmmLoadIndexOffExpr off rep base idx
 
 setInfo :: CmmExpr -> CmmExpr -> CmmStmt
 setInfo closure_ptr info_ptr = CmmStore closure_ptr info_ptr
+
+-- ----------------------------------------------------------------------------
+-- Copying byte arrays
+
+-- | Takes a source 'ByteArray#', an offset in the source array, a
+-- destination 'MutableByteArray#', an offset into the destination
+-- array, and the number of bytes to copy.  Copies the given number of
+-- bytes from the source array to the destination array.
+doCopyByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                  -> StgLiveVars -> Code
+doCopyByteArrayOp = emitCopyByteArray copy
+  where
+    -- Copy data (we assume the arrays aren't overlapping since
+    -- they're of different types)
+    copy _src _dst dst_p src_p bytes live =
+        emitMemcpyCall dst_p src_p bytes (CmmLit (mkIntCLit 1)) live
+
+-- | Takes a source 'MutableByteArray#', an offset in the source
+-- array, a destination 'MutableByteArray#', an offset into the
+-- destination array, and the number of bytes to copy.  Copies the
+-- given number of bytes from the source array to the destination
+-- array.
+doCopyMutableByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                         -> StgLiveVars -> Code
+doCopyMutableByteArrayOp = emitCopyByteArray copy
+  where
+    -- The only time the memory might overlap is when the two arrays
+    -- we were provided are the same array!
+    -- TODO: Optimize branch for common case of no aliasing.
+    copy src dst dst_p src_p bytes live =
+        emitIfThenElse (cmmEqWord src dst)
+        (emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit 1)) live)
+        (emitMemcpyCall dst_p src_p bytes (CmmLit (mkIntCLit 1)) live)
+
+emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                  -> StgLiveVars -> Code)
+                  -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                  -> StgLiveVars
+                  -> Code
+emitCopyByteArray copy src0 src_off0 dst0 dst_off0 n0 live = do
+    -- Assign the arguments to temporaries so the code generator can
+    -- calculate liveness for us.
+    src <- assignTemp_ src0
+    src_off <- assignTemp_ src_off0
+    dst <- assignTemp_ dst0
+    dst_off <- assignTemp_ dst_off0
+    n <- assignTemp_ n0
+
+    dst_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
+    src_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
+
+    copy src dst dst_p src_p n live
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
