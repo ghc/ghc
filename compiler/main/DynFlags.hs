@@ -1392,16 +1392,16 @@ dynamic_flags = [
   , flagC "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
-  , flagC "optlo"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
-  , flagC "optlc"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
-  , flagC "optL"           (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
-  , flagC "optP"           (hasArg addOptP)
-  , flagC "optF"           (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
-  , flagC "optc"           (hasArg (\f -> alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})))
-  , flagC "optm"           (hasArg (\f -> alterSettings (\s -> s { sOpt_m   = f : sOpt_m s})))
-  , flagC "opta"           (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
-  , flagC "optl"           (hasArg addOptl)
-  , flagC "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
+  , flagA "optlo"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
+  , flagA "optlc"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lc  = f : sOpt_lc s})))
+  , flagA "optL"           (hasArg (\f -> alterSettings (\s -> s { sOpt_L   = f : sOpt_L s})))
+  , flagA "optP"           (hasArg addOptP)
+  , flagA "optF"           (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
+  , flagA "optc"           (hasArg (\f -> alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})))
+  , flagA "optm"           (hasArg (\f -> alterSettings (\s -> s { sOpt_m   = f : sOpt_m s})))
+  , flagA "opta"           (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
+  , flagA "optl"           (hasArg addOptl)
+  , flagA "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
 
   , flagA "split-objs"
          (NoArg (if can_split 
@@ -1425,28 +1425,28 @@ dynamic_flags = [
   , flagA "no-link"            (noArg (\d -> d{ ghcLink=NoLink }))
   , flagA "shared"             (noArg (\d -> d{ ghcLink=LinkDynLib }))
   , flagA "dynload"            (hasArg parseDynLibLoaderMode)
-  , flagC "dylib-install-name" (hasArg setDylibInstallName)
+  , flagA "dylib-install-name" (hasArg setDylibInstallName)
 
         ------- Libraries ---------------------------------------------------
-  , flagC "L"   (Prefix addLibraryPath)
-  , flagC "l"   (hasArg (addOptl . ("-l" ++)))
+  , flagA "L"   (Prefix addLibraryPath)
+  , flagA "l"   (hasArg (addOptl . ("-l" ++)))
 
         ------- Frameworks --------------------------------------------------
         -- -framework-path should really be -F ...
-  , flagC "framework-path" (HasArg addFrameworkPath)
-  , flagC "framework"      (hasArg addCmdlineFramework)
+  , flagA "framework-path" (HasArg addFrameworkPath)
+  , flagA "framework"      (hasArg addCmdlineFramework)
 
         ------- Output Redirection ------------------------------------------
-  , flagC "odir"              (hasArg setObjectDir)
-  , flagC "o"                 (SepArg (upd . setOutputFile . Just))
-  , flagC "ohi"               (hasArg (setOutputHi . Just ))
-  , flagC "osuf"              (hasArg setObjectSuf)
-  , flagC "hcsuf"             (hasArg setHcSuf)
-  , flagC "hisuf"             (hasArg setHiSuf)
-  , flagC "hidir"             (hasArg setHiDir)
-  , flagC "tmpdir"            (hasArg setTmpDir)
-  , flagC "stubdir"           (hasArg setStubDir)
-  , flagC "outputdir"         (hasArg setOutputDir)
+  , flagA "odir"              (hasArg setObjectDir)
+  , flagA "o"                 (SepArg (upd . setOutputFile . Just))
+  , flagA "ohi"               (hasArg (setOutputHi . Just ))
+  , flagA "osuf"              (hasArg setObjectSuf)
+  , flagA "hcsuf"             (hasArg setHcSuf)
+  , flagA "hisuf"             (hasArg setHiSuf)
+  , flagA "hidir"             (hasArg setHiDir)
+  , flagA "tmpdir"            (hasArg setTmpDir)
+  , flagA "stubdir"           (hasArg setStubDir)
+  , flagA "outputdir"         (hasArg setOutputDir)
   , flagA "ddump-file-prefix" (hasArg (setDumpPrefixForce . Just))
 
         ------- Keeping temporary files -------------------------------------
@@ -1483,12 +1483,12 @@ dynamic_flags = [
                                      ; deprecate "Use -fforce-recomp instead" }))
 
         ------ HsCpp opts ---------------------------------------------------
-  , flagC "D"              (AnySuffix (upd . addOptP))
-  , flagC "U"              (AnySuffix (upd . addOptP))
+  , flagA "D"              (AnySuffix (upd . addOptP))
+  , flagA "U"              (AnySuffix (upd . addOptP))
 
         ------- Include/Import Paths ----------------------------------------
-  , flagC "I"              (Prefix    addIncludePath)
-  , flagC "i"              (OptPrefix addImportPath)
+  , flagA "I"              (Prefix    addIncludePath)
+  , flagA "i"              (OptPrefix addImportPath)
 
         ------ Debugging ----------------------------------------------------
   , flagA "dstg-stats"     (NoArg (setDynFlag Opt_StgStats))
@@ -1669,6 +1669,8 @@ dynamic_flags = [
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
         ------- Packages ----------------------------------------------------
+    -- specifying these to be flagC is redundant since they are actually
+    -- static flags, but best to do this anyway.
     flagC "package-conf"          (HasArg extraPkgConf_)
   , flagC "no-user-package-conf"  (NoArg (unSetDynFlag Opt_ReadUserPackageConf))
   , flagC "package-name"      	  (hasArg setPackageName)
@@ -1876,7 +1878,7 @@ safeHaskellFlags = [mkF Sf_SafeImports, mkF' Sf_SafeLanguage,
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]
 xFlags = [
-  ( "CPP",                              CmdLineOnly,  Opt_Cpp, nop ),
+  ( "CPP",                              AlwaysAllowed,  Opt_Cpp, nop ),
   ( "PostfixOperators",                 AlwaysAllowed, Opt_PostfixOperators, nop ),
   ( "TupleSections",                    AlwaysAllowed, Opt_TupleSections, nop ),
   ( "PatternGuards",                    AlwaysAllowed, Opt_PatternGuards, nop ),
