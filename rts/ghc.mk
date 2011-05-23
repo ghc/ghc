@@ -295,7 +295,6 @@ rts/RtsMain_HC_OPTS += -optc-O0
 
 rts/RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 rts/RtsUtils_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
-rts/Trace_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 #
 rts/RtsUtils_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
 rts/RtsUtils_CC_OPTS += -DHostArch=\"$(HostArch_CPP)\"
