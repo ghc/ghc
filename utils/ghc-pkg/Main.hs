@@ -101,6 +101,7 @@ data Flag
   | FlagForce
   | FlagForceFiles
   | FlagAutoGHCiLibs
+  | FlagExpandEnvVars
   | FlagSimpleOutput
   | FlagNamesOnly
   | FlagIgnoreCase
@@ -126,6 +127,8 @@ flags = [
          "ignore missing directories and libraries only",
   Option ['g'] ["auto-ghci-libs"] (NoArg FlagAutoGHCiLibs)
         "automatically build libs for GHCi (with register)",
+  Option [] ["expand-env-vars"] (NoArg FlagExpandEnvVars)
+        "expand environment variables (${name}-style) in input package descriptions",
   Option ['?'] ["help"] (NoArg FlagHelp)
         "display this help and exit",
   Option ['V'] ["version"] (NoArg FlagVersion)
@@ -274,6 +277,7 @@ runit verbosity cli nonopts = do
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
         auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
+        expand_env_vars= FlagExpandEnvVars `elem` cli
         splitFields fields = unfoldr splitComma (',':fields)
           where splitComma "" = Nothing
                 splitComma fs = Just $ break (==',') (tail fs)
@@ -313,9 +317,11 @@ runit verbosity cli nonopts = do
     ["init", filename] ->
         initPackageDB filename verbosity cli
     ["register", filename] ->
-        registerPackage filename verbosity cli auto_ghci_libs False force
+        registerPackage filename verbosity cli
+                        auto_ghci_libs expand_env_vars False force
     ["update", filename] ->
-        registerPackage filename verbosity cli auto_ghci_libs True force
+        registerPackage filename verbosity cli
+                        auto_ghci_libs expand_env_vars True force
     ["unregister", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         unregisterPackage pkgid verbosity cli force
@@ -624,10 +630,11 @@ registerPackage :: FilePath
                 -> Verbosity
                 -> [Flag]
                 -> Bool              -- auto_ghci_libs
+                -> Bool              -- expand_env_vars
                 -> Bool              -- update
                 -> Force
                 -> IO ()
-registerPackage input verbosity my_flags auto_ghci_libs update force = do
+registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update force = do
   (db_stack, Just to_modify, _flag_dbs) <- 
       getPkgDatabases verbosity True True my_flags
 
@@ -648,7 +655,8 @@ registerPackage input verbosity my_flags auto_ghci_libs update force = do
             putStr ("Reading package info from " ++ show f ++ " ... ")
         readUTF8File f
 
-  expanded <- expandEnvVars s force
+  expanded <- if expand_env_vars then expandEnvVars s force
+                                 else return s
 
   pkg <- parsePackageInfo expanded
   when (verbosity >= Normal) $
