@@ -476,7 +476,11 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
                                   (sel_tydata ++ sel_deriv_decls)) allTyNames
         -- We need to generate the extras to add to what has
         -- already been derived
-        ; mapM mkGenDerivExtras derTyDecls }
+        ; {- pprTrace "sel_tydata" (ppr sel_tydata) $
+          pprTrace "sel_deriv_decls" (ppr sel_deriv_decls) $
+          pprTrace "derTyDecls" (ppr derTyDecls) $
+          pprTrace "deriv_decls" (ppr deriv_decls) $ -}
+          mapM mkGenDerivExtras derTyDecls }
 
         -- Merge and return
         ; return ( eqns1 ++ eqns2, generic_extras_deriv) }
@@ -487,14 +491,22 @@ makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
 
     -- Extracts the name of the class in the deriving
     getClassName :: HsType Name -> Maybe Name
-    getClassName (HsPredTy (HsClassP n _)) = Just n
-    getClassName _                         = Nothing
+    getClassName (HsForAllTy _ _ _ (L _ n)) = getClassName n
+    getClassName (HsPredTy (HsClassP n _))  = Just n
+    getClassName _                          = Nothing
 
     -- Extracts the name of the type in the deriving
+    -- This function (and also getClassName above) is not really nice, and I
+    -- might not have covered all possible cases. I wonder if there is no easier
+    -- way to extract class and type name from a LDerivDecl...
     getTypeName :: HsType Name -> Maybe Name
+    getTypeName (HsForAllTy _ _ _ (L _ n))      = getTypeName n
     getTypeName (HsTyVar n)                     = Just n
     getTypeName (HsOpTy _ (L _ n) _)            = Just n
     getTypeName (HsPredTy (HsClassP _ [L _ n])) = getTypeName n
+    getTypeName (HsAppTy (L _ n) _)             = getTypeName n
+    getTypeName (HsParTy (L _ n))               = getTypeName n
+    getTypeName (HsKindSig (L _ n) _)           = getTypeName n
     getTypeName _                               = Nothing
 
     extractTyDataPreds decls
@@ -1590,7 +1602,8 @@ genGenericRepExtras tc =
       let metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
   
       rep0_tycon <- tc_mkRepTyCon tc metaDts
-
+      
+      -- pprTrace "rep0" (ppr rep0_tycon) $
       return (metaDts, rep0_tycon)
 {-
 genGenericAll :: TyCon
