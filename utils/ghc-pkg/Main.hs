@@ -642,6 +642,9 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
         db_to_operate_on = my_head "register" $
                            filter ((== to_modify).location) db_stack
   --
+  when (auto_ghci_libs && verbosity >= Silent) $
+    warn "Warning: --auto-ghci-libs is deprecated and will be removed in GHC 7.4"
+  --
   s <-
     case input of
       "-" -> do
