@@ -19,7 +19,8 @@ import Distribution.ParseUtils
 import Distribution.Package hiding (depends)
 import Distribution.Text
 import Distribution.Version
-import System.FilePath
+import System.FilePath as FilePath
+import qualified System.FilePath.Posix as FilePath.Posix
 import System.Cmd       ( rawSystem )
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
@@ -34,7 +35,8 @@ import Data.Maybe
 import Data.Char ( isSpace, toLower )
 import Control.Monad
 import System.Directory ( doesDirectoryExist, getDirectoryContents,
-                          doesFileExist, renameFile, removeFile )
+                          doesFileExist, renameFile, removeFile,
+                          getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
@@ -421,6 +423,7 @@ allPackagesInStack = concatMap packages
 getPkgDatabases :: Verbosity
                 -> Bool    -- we are modifying, not reading
                 -> Bool    -- read caches, if available
+                -> Bool    -- expand vars, like ${pkgroot} and $topdir
                 -> [Flag]
                 -> IO (PackageDBStack, 
                           -- the real package DB stack: [global,user] ++ 
@@ -433,7 +436,7 @@ getPkgDatabases :: Verbosity
                           -- is used as the list of package DBs for
                           -- commands that just read the DB, such as 'list'.
 
-getPkgDatabases verbosity modify use_cache my_flags = do
+getPkgDatabases verbosity modify use_cache expand_vars my_flags = do
   -- first we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-config flag by the
@@ -450,6 +453,12 @@ getPkgDatabases verbosity modify use_cache my_flags = do
                        Nothing -> die ("Can't find package database in " ++ dir)
                        Just path -> return path
         fs -> return (last fs)
+
+  -- The value of the $topdir variable used in some package descriptions
+  -- Note that the way we calculate this is slightly different to how it
+  -- is done in ghc itself. We rely on the convention that the global
+  -- package db lives in ghc's libdir.
+  top_dir <- absolutePath (takeDirectory global_conf)
 
   let no_user_db = FlagNoUserDb `elem` my_flags
 
@@ -519,7 +528,10 @@ getPkgDatabases verbosity modify use_cache my_flags = do
         | null db_flags = Just virt_global_conf
         | otherwise     = Just (last db_flags)
 
-  db_stack <- mapM (readParseDatabase verbosity mb_user_conf use_cache) final_stack
+  db_stack  <- sequence
+    [ do db <- readParseDatabase verbosity mb_user_conf use_cache db_path
+         if expand_vars then mungePackageDBPaths top_dir db else return db
+    | db_path <- final_stack ]
 
   let flag_db_stack = [ db | db_name <- flag_db_names,
                         db <- db_stack, location db == db_name ]
@@ -611,6 +623,63 @@ parseSingletonPackageConf verbosity file = do
 cachefilename :: FilePath
 cachefilename = "package.cache"
 
+mungePackageDBPaths :: FilePath -> PackageDB -> IO PackageDB
+mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } = do
+    -- It so happens that for both styles of package db ("package.conf"
+    -- files and "package.conf.d" dirs) the pkgroot is the parent directory
+    -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
+    pkgroot <- absolutePath (takeDirectory (location db))
+    return db { packages = map (mungePackagePaths top_dir pkgroot) pkgs }
+
+mungePackagePaths :: FilePath -> FilePath
+                  -> InstalledPackageInfo -> InstalledPackageInfo
+-- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
+-- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
+-- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
+-- The "pkgroot" is the directory containing the package database.
+--
+-- Also perform a similar substitution for the older GHC-specific
+-- "$topdir" variable. The "topdir" is the location of the ghc
+-- installation (obtained from the -B option).
+mungePackagePaths top_dir pkgroot pkg =
+    pkg {
+      importDirs  = munge_paths (importDirs pkg),
+      includeDirs = munge_paths (includeDirs pkg),
+      libraryDirs = munge_paths (libraryDirs pkg),
+      frameworkDirs = munge_paths (frameworkDirs pkg),
+      haddockInterfaces = munge_paths (haddockInterfaces pkg),
+      haddockHTMLs = munge_urls (haddockHTMLs pkg)
+    }
+  where
+    munge_paths = map munge_path
+    munge_urls  = map munge_url
+
+    munge_path p
+      | Just p' <- stripVarPrefix "${pkgroot}" sp = pkgroot </> p'
+      | Just p' <- stripVarPrefix "$topdir"    sp = top_dir </> p'
+      | otherwise                                 = p
+      where
+        sp = splitPath p
+
+    munge_url p
+      | Just p' <- stripVarPrefix "${pkgrooturl}" sp = toUrlPath pkgroot p'
+      | Just p' <- stripVarPrefix "$httptopdir"   sp = toUrlPath top_dir p'
+      | otherwise                                    = p
+      where
+        sp = splitPath p
+
+    toUrlPath r p = "file:///"
+                 -- URLs always use posix style '/' separators:
+                 ++ FilePath.Posix.joinPath (r : FilePath.splitDirectories p)
+
+    stripVarPrefix var (root:path')
+      | Just [sep] <- stripPrefix var root
+      , isPathSeparator sep
+      = Just (joinPath path')
+
+    stripVarPrefix _ _ = Nothing
+
+
 -- -----------------------------------------------------------------------------
 -- Creating a new package DB
 
@@ -636,7 +705,7 @@ registerPackage :: FilePath
                 -> IO ()
 registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update force = do
   (db_stack, Just to_modify, _flag_dbs) <- 
-      getPkgDatabases verbosity True True my_flags
+      getPkgDatabases verbosity True True False{-expand vars-} my_flags
 
   let
         db_to_operate_on = my_head "register" $
@@ -665,10 +734,15 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
   when (verbosity >= Normal) $
       putStrLn "done."
 
+  -- validate the expanded pkg, but register the unexpanded
+  pkgroot <- absolutePath (takeDirectory to_modify)
+  let top_dir = takeDirectory (location (last db_stack))
+      pkg_expanded = mungePackagePaths top_dir pkgroot pkg
+
   let truncated_stack = dropWhile ((/= to_modify).location) db_stack
   -- truncate the stack for validation, because we don't allow
   -- packages lower in the stack to refer to those higher up.
-  validatePackageConfig pkg truncated_stack auto_ghci_libs update force
+  validatePackageConfig pkg_expanded truncated_stack auto_ghci_libs update force
   let 
      removes = [ RemovePackage p
                | p <- packages db_to_operate_on,
@@ -761,7 +835,7 @@ modifyPackage
   -> IO ()
 modifyPackage fn pkgid verbosity my_flags force = do
   (db_stack, Just _to_modify, _flag_dbs) <- 
-      getPkgDatabases verbosity True{-modify-} True{-use cache-} my_flags
+      getPkgDatabases verbosity True{-modify-} True{-use cache-} False{-expand vars-} my_flags
 
   (db, ps) <- fmap head $ findPackagesByDB db_stack (Id pkgid)
   let 
@@ -789,7 +863,7 @@ modifyPackage fn pkgid verbosity my_flags force = do
 recache :: Verbosity -> [Flag] -> IO ()
 recache verbosity my_flags = do
   (db_stack, Just to_modify, _flag_dbs) <- 
-     getPkgDatabases verbosity True{-modify-} False{-no cache-} my_flags
+     getPkgDatabases verbosity True{-modify-} False{-no cache-} False{-expand vars-} my_flags
   let
         db_to_operate_on = my_head "recache" $
                            filter ((== to_modify).location) db_stack
@@ -805,7 +879,7 @@ listPackages ::  Verbosity -> [Flag] -> Maybe PackageArg
 listPackages verbosity my_flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` my_flags
   (db_stack, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False True{-use cache-} my_flags
+     getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} my_flags
 
   let db_stack_filtered -- if a package is given, filter out all other packages
         | Just this <- mPackageName =
@@ -898,7 +972,7 @@ simplePackageList my_flags pkgs = do
 showPackageDot :: Verbosity -> [Flag] -> IO ()
 showPackageDot verbosity myflags = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False True{-use cache-} myflags
+      getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} myflags
 
   let all_pkgs = allPackagesInStack flag_db_stack
       ipix  = PackageIndex.fromList all_pkgs
@@ -920,7 +994,7 @@ showPackageDot verbosity myflags = do
 latestPackage ::  Verbosity -> [Flag] -> PackageIdentifier -> IO ()
 latestPackage verbosity my_flags pkgid = do
   (_, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False True{-use cache-} my_flags
+     getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} my_flags
 
   ps <- findPackages flag_db_stack (Id pkgid)
   show_pkg (sortBy compPkgIdVer (map sourcePackageId ps))
@@ -934,14 +1008,14 @@ latestPackage verbosity my_flags pkgid = do
 describePackage :: Verbosity -> [Flag] -> PackageArg -> IO ()
 describePackage verbosity my_flags pkgarg = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False True{-use cache-} my_flags
+      getPkgDatabases verbosity False True{-use cache-} True{-expand vars-} my_flags
   ps <- findPackages flag_db_stack pkgarg
   doDump ps
 
 dumpPackages :: Verbosity -> [Flag] -> IO ()
 dumpPackages verbosity my_flags = do
   (_, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False True{-use cache-} my_flags
+     getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} my_flags
   doDump (allPackagesInStack flag_db_stack)
 
 doDump :: [InstalledPackageInfo] -> IO ()
@@ -990,46 +1064,16 @@ compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> IO ()
 describeField verbosity my_flags pkgarg fields = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False True{-use cache-} my_flags
+      getPkgDatabases verbosity False True{-use cache-} True{-expand vars-} my_flags
   fns <- toFields fields
   ps <- findPackages flag_db_stack pkgarg
-  let top_dir = takeDirectory (location (last flag_db_stack))
-  mapM_ (selectFields fns) (mungePackagePaths top_dir ps)
+  mapM_ (selectFields fns) ps
   where toFields [] = return []
         toFields (f:fs) = case toField f of
             Nothing -> die ("unknown field: " ++ f)
             Just fn -> do fns <- toFields fs
                           return (fn:fns)
         selectFields fns info = mapM_ (\fn->putStrLn (fn info)) fns
-
-mungePackagePaths :: String -> [InstalledPackageInfo] -> [InstalledPackageInfo]
--- Replace the strings "$topdir" and "$httptopdir" at the beginning of a path
--- with the current topdir (obtained from the -B option).
-mungePackagePaths top_dir ps = map munge_pkg ps
-  where
-  munge_pkg p = p{ importDirs        = munge_paths (importDirs p),
-                   includeDirs       = munge_paths (includeDirs p),
-                   libraryDirs       = munge_paths (libraryDirs p),
-                   frameworkDirs     = munge_paths (frameworkDirs p),
-                   haddockInterfaces = munge_paths (haddockInterfaces p),
-                   haddockHTMLs      = munge_paths (haddockHTMLs p)
-                 }
-
-  munge_paths = map munge_path
-
-  munge_path p
-   | Just p' <- maybePrefixMatch "$topdir"     p =            top_dir ++ p'
-   | Just p' <- maybePrefixMatch "$httptopdir" p = toHttpPath top_dir ++ p'
-   | otherwise                               = p
-
-  toHttpPath p = "file:///" ++ p
-
-maybePrefixMatch :: String -> String -> Maybe String
-maybePrefixMatch []    rest = Just rest
-maybePrefixMatch (_:_) []   = Nothing
-maybePrefixMatch (p:pat) (r:rest)
-  | p == r    = maybePrefixMatch pat rest
-  | otherwise = Nothing
 
 toField :: String -> Maybe (InstalledPackageInfo -> String)
 -- backwards compatibility:
@@ -1056,7 +1100,8 @@ strList = show
 
 checkConsistency :: Verbosity -> [Flag] -> IO ()
 checkConsistency verbosity my_flags = do
-  (db_stack, _, _) <- getPkgDatabases verbosity True True{-use cache-} my_flags
+  (db_stack, _, _) <- 
+         getPkgDatabases verbosity True True{-use cache-} True{-expand vars-} my_flags
          -- check behaves like modify for the purposes of deciding which
          -- databases to use, because ordering is important.
 
@@ -1280,12 +1325,11 @@ checkDuplicates db_stack pkg update = do
         "Package " ++ display pkgid ++
         " overlaps with: " ++ unwords (map display dups)
 
-
-checkDir :: Bool -> String -> String -> Validate ()
+checkDir :: Bool -> String -> FilePath -> Validate ()
 checkDir warn_only thisfield d
- | "$topdir"     `isPrefixOf` d = return ()
- | "$httptopdir" `isPrefixOf` d = return ()
-        -- can't check these, because we don't know what $(http)topdir is
+   -- Note: we don't check for $topdir/${pkgroot} here. We relies on these
+   -- variables having been expanded already, see mungePackagePaths.
+
  | isRelative d = verror ForceFiles $
                      thisfield ++ ": " ++ d ++ " is a relative path"
         -- relative paths don't make any sense; #4134
@@ -1427,6 +1471,8 @@ expandEnvVars str0 force = go str0 ""
         = go str (c:acc)
 
    lookupEnvVar :: String -> IO String
+   lookupEnvVar "pkgroot"    = return "${pkgroot}"    -- these two are special,
+   lookupEnvVar "pkgrooturl" = return "${pkgrooturl}" -- we don't expand them
    lookupEnvVar nm =
         catchIO (System.Environment.getEnv nm)
            (\ _ -> do dieOrForceAll force ("Unable to expand variable " ++
@@ -1640,3 +1686,6 @@ removeFileSafe :: FilePath -> IO ()
 removeFileSafe fn =
   removeFile fn `catchIO` \ e ->
     when (not $ isDoesNotExistError e) $ ioError e
+
+absolutePath :: FilePath -> IO FilePath
+absolutePath path = return . normalise . (</> path) =<< getCurrentDirectory
