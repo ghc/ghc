@@ -80,4 +80,3 @@ main = do
     _ <- evaluate (I# (testMemcpy4_8 1#))
     putStrLn "Test Passed!"
     return ()
-
