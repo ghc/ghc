@@ -355,13 +355,13 @@ type IPr = (Int, Int)
 
 -- | The type of immutable non-strict (boxed) arrays
 -- with indices in @i@ and elements in @e@.
-data Ix i => Array i e
-                 = Array !i         -- the lower bound, l
-                         !i         -- the upper bound, u
-                         !Int       -- a cache of (rangeSize (l,u))
-                                    -- used to make sure an index is
-                                    -- really in range
-                         (Array# e) -- The actual elements
+data Array i e
+         = Array !i         -- the lower bound, l
+                 !i         -- the upper bound, u
+                 !Int       -- a cache of (rangeSize (l,u))
+                            -- used to make sure an index is
+                            -- really in range
+                 (Array# e) -- The actual elements
 
 -- | Mutable, boxed, non-strict arrays in the 'ST' monad.  The type
 -- arguments are as follows:
