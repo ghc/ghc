@@ -1274,6 +1274,8 @@ checkPackageConfig pkg db_stack auto_ghci_libs update = do
   mapM_ (checkDir False "import-dirs")  (importDirs pkg)
   mapM_ (checkDir True  "library-dirs") (libraryDirs pkg)
   mapM_ (checkDir True  "include-dirs") (includeDirs pkg)
+  mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
+  mapM_ (checkDirURL True "haddock-html")       (haddockHTMLs pkg)
   checkModules pkg
   mapM_ (checkHSLib (libraryDirs pkg) auto_ghci_libs) (hsLibraries pkg)
   -- ToDo: check these somehow?
@@ -1325,18 +1327,34 @@ checkDuplicates db_stack pkg update = do
         "Package " ++ display pkgid ++
         " overlaps with: " ++ unwords (map display dups)
 
-checkDir :: Bool -> String -> FilePath -> Validate ()
-checkDir warn_only thisfield d
-   -- Note: we don't check for $topdir/${pkgroot} here. We relies on these
+checkDir, checkFile, checkDirURL :: Bool -> String -> FilePath -> Validate ()
+checkDir  = checkPath False True
+checkFile = checkPath False False
+checkDirURL = checkPath True True
+
+checkPath :: Bool -> Bool -> Bool -> String -> FilePath -> Validate ()
+checkPath url_ok is_dir warn_only thisfield d
+ | url_ok && ("http://"  `isPrefixOf` d
+           || "https://" `isPrefixOf` d) = return ()
+
+ | url_ok
+ , Just d' <- stripPrefix "file://" d
+ = checkPath False is_dir warn_only thisfield d'
+
+   -- Note: we don't check for $topdir/${pkgroot} here. We rely on these
    -- variables having been expanded already, see mungePackagePaths.
 
  | isRelative d = verror ForceFiles $
-                     thisfield ++ ": " ++ d ++ " is a relative path"
+                     thisfield ++ ": " ++ d ++ " is a relative path which "
+                  ++ "makes no sense (as there is nothing for it to be "
+                  ++ "relative to). You can make paths relative to the "
+                  ++ "package database itself by using ${pkgroot}."
         -- relative paths don't make any sense; #4134
  | otherwise = do
-   there <- liftIO $ doesDirectoryExist d
+   there <- liftIO $ if is_dir then doesDirectoryExist d else doesFileExist d
    when (not there) $
-       let msg = thisfield ++ ": " ++ d ++ " doesn't exist or isn't a directory"
+       let msg = thisfield ++ ": " ++ d ++ " doesn't exist or isn't a "
+                                        ++ if is_dir then "directory" else "file"
        in
        if warn_only 
           then vwarn msg
@@ -1375,10 +1393,7 @@ doesFileExistOnPath file path = go path
                        if b then return (Just p) else go ps
 
 doesFileExistIn :: String -> String -> IO Bool
-doesFileExistIn lib d
- | "$topdir"     `isPrefixOf` d = return True
- | "$httptopdir" `isPrefixOf` d = return True
- | otherwise                = doesFileExist (d </> lib)
+doesFileExistIn lib d = doesFileExist (d </> lib)
 
 checkModules :: InstalledPackageInfo -> Validate ()
 checkModules pkg = do

@@ -296,7 +296,7 @@ generate config_args distdir directory
                                          pd lib lbi clbi
                   final_ipi = installedPkgInfo {
                                   Installed.installedPackageId = ipid,
-                                  Installed.haddockHTMLs = ["../" ++ display (packageId pd)]
+                                  Installed.haddockHTMLs = []
                               }
                   content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
               writeFileAtomic (distdir </> "inplace-pkg-config") (toUTF8 content)
