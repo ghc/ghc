@@ -400,7 +400,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 	  alts_size tot_size _ = tot_size
 
-    size_up (Case e b _ alts) = size_up e  `addSizeNSD`
+    size_up (Case e _ _ alts) = size_up e  `addSizeNSD`
                                 foldr (addAltSize . size_up_alt) case_size alts
       where
           case_size
