@@ -1,10 +1,10 @@
 
-tcfail102.hs:8:7:
+tcfail102.hs:9:7:
     Could not deduce (Integral (Ratio a)) arising from a record update
     from the context (Integral a)
       bound by the type signature for
                  f :: Integral a => P (Ratio a) -> P (Ratio a)
-      at tcfail102.hs:8:1-19
+      at tcfail102.hs:9:1-19
     Possible fix:
       add (Integral (Ratio a)) to the context of
         the type signature for
