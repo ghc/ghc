@@ -27,6 +27,10 @@ module Data.IORef
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
         mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
 #endif
+        -- ** Memory Model
+
+        -- $memmodel
+
         ) where
 
 #ifdef __HUGS__
@@ -94,3 +98,43 @@ atomicModifyIORef r f =
     writeIORef r a'
     return b
 #endif
+
+{- $memmodel
+
+  In a concurrent program, 'IORef' operations may appear out-of-order
+  to another thread, depending on the memory model of the underlying
+  processor architecture.  For example, on x86, loads can move ahead
+  of stores, so in the following example:
+
+>  maybePrint :: IORef Bool -> IORef Bool -> IO ()
+>  maybePrint myRef yourRef = do
+>    writeIORef myRef True
+>    yourVal <- readIORef yourRef
+>    unless yourVal $ putStrLn "critical section"
+>
+>  main :: IO ()
+>  main = do
+>    r1 <- newIORef False
+>    r2 <- newIORef False
+>    forkIO $ maybePrint r1 r2
+>    forkIO $ maybePrint r2 r1
+>    threadDelay 1000000
+
+  it is possible that the string @"critical section"@ is printed
+  twice, even though there is no interleaving of the operations of the
+  two threads that allows that outcome.  The memory model of x86
+  allows 'readIORef' to happen before the earlier 'writeIORef'.
+
+  The implementation is required to ensure that reordering of memory
+  operations cannot cause type-correct code to go wrong.  In
+  particular, when inspecting the value read from an 'IORef', the
+  memory writes that created that value must have occurred from the
+  point of view of the current therad.
+
+  'atomicModifyIORef' acts as a barrier to reordering.  Multiple
+  'atomicModifyIORef' operations occur in strict program order.  An
+  'atomicModifyIORef' is never observed to take place ahead of any
+  earlier (in program order) 'IORef' operations, or after any later
+  'IORef' operations.
+
+-}
