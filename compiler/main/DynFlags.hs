@@ -874,7 +874,11 @@ languageExtensions Nothing
       -- But NB it's implied by GADTs etc
       -- SLPJ September 2010
     : Opt_NondecreasingIndentation -- This has been on by default for some time
-    : languageExtensions (Just Haskell2010)
+    : delete Opt_DatatypeContexts  -- The Haskell' committee decided to
+                                   -- remove datatype contexts from the
+                                   -- language:
+   -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
+      (languageExtensions (Just Haskell2010))
 
 languageExtensions (Just Haskell98)
     = [Opt_ImplicitPrelude,
