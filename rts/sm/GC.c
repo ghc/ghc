@@ -1247,7 +1247,7 @@ prepare_collected_gen (generation *gen)
 
     // for a compacted generation, we need to allocate the bitmap
     if (gen->mark) {
-        nat bitmap_size; // in bytes
+        lnat bitmap_size; // in bytes
         bdescr *bitmap_bdescr;
         StgWord *bitmap;
 	
