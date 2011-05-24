@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses,RankNTypes,ExistentialQuantification #-}
+{-# LANGUAGE MultiParamTypeClasses,RankNTypes,ExistentialQuantification,DatatypeContexts #-}
 module RnFail055 where
 
 import RnFail055_aux
