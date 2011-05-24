@@ -240,7 +240,7 @@ loadInterface doc_str mod from
 
 	; ignore_prags      <- doptM Opt_IgnoreInterfacePragmas
 	; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
-	; new_eps_insts     <- mapM (tcIfaceInst $ mi_trust iface) (mi_insts iface)
+	; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
 	; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
 	; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 	; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)

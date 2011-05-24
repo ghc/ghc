@@ -14,7 +14,7 @@ import Annotations ( Annotation )
 tcIfaceDecl        :: Bool -> IfaceDecl -> IfL TyThing
 tcIfaceRules       :: Bool -> [IfaceRule] -> IfL [CoreRule]
 tcIfaceVectInfo    :: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
-tcIfaceInst        :: IfaceTrustInfo -> IfaceInst -> IfL Instance
+tcIfaceInst        :: IfaceInst -> IfL Instance
 tcIfaceFamInst     :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations :: [IfaceAnnotation] -> IfL [Annotation]
 \end{code}

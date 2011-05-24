@@ -265,7 +265,7 @@ typecheckIface iface
 	; writeMutVar tc_env_var type_env
 
 		-- Now do those rules, instances and annotations
-	; insts     <- mapM (tcIfaceInst $ mi_trust iface) (mi_insts iface)
+	; insts     <- mapM tcIfaceInst (mi_insts iface)
 	; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
 	; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
 	; anns      <- tcIfaceAnnotations (mi_anns iface)
@@ -588,14 +588,13 @@ look at it.
 %************************************************************************
 
 \begin{code}
-tcIfaceInst :: IfaceTrustInfo -> IfaceInst -> IfL Instance
-tcIfaceInst safe (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
+tcIfaceInst :: IfaceInst -> IfL Instance
+tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
                               ifInstCls = cls, ifInstTys = mb_tcs })
   = do { dfun    <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
                      tcIfaceExtId dfun_occ
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-       ; let safe' = getSafeMode safe
-       ; return (mkImportedInstance cls mb_tcs' dfun oflag safe') }
+       ; return (mkImportedInstance cls mb_tcs' dfun oflag) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 

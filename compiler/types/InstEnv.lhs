@@ -62,8 +62,6 @@ data Instance
              , is_dfun :: DFunId -- See Note [Haddock assumptions]
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
-             , is_safe :: SafeHaskellMode -- SafeHaskell mode of module the
-                                          -- instance came from
     }
 \end{code}
 
@@ -180,22 +178,21 @@ instanceHead ispec
 
 mkLocalInstance :: DFunId
                 -> OverlapFlag
-                -> SafeHaskellMode
                 -> Instance
 -- Used for local instances, where we can safely pull on the DFunId
-mkLocalInstance dfun oflag sflag
-  = Instance {	is_flag = oflag, is_safe = sflag, is_dfun = dfun,
+mkLocalInstance dfun oflag
+  = Instance {	is_flag = oflag, is_dfun = dfun,
 		is_tvs = mkVarSet tvs, is_tys = tys,
                 is_cls = className cls, is_tcs = roughMatchTcs tys }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
 
 mkImportedInstance :: Name -> [Maybe Name]
-		   -> DFunId -> OverlapFlag -> SafeHaskellMode -> Instance
+		   -> DFunId -> OverlapFlag -> Instance
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
-mkImportedInstance cls mb_tcs dfun oflag sflag
-  = Instance {	is_flag = oflag, is_safe = sflag, is_dfun = dfun,
+mkImportedInstance cls mb_tcs dfun oflag
+  = Instance {	is_flag = oflag, is_dfun = dfun,
 		is_tvs = mkVarSet tvs, is_tys = tys,
 		is_cls = cls, is_tcs = mb_tcs }
   where
@@ -482,12 +479,12 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     -- overlap instances from the same module. A same instance origin
     -- policy for safe compiled instances.
     check_safe match@(inst,_) others
-        = case is_safe inst of
+        = case isSafeOverlap (is_flag inst) of
                 -- most specific isn't from a Safe module so OK
-                sf | sf /= Sf_Safe && sf /= Sf_SafeLanguage -> ([match], True)
+                False -> ([match], True)
                 -- otherwise we make sure it only overlaps instances from
                 -- the same module
-                _other -> (go [] others, True)
+                True -> (go [] others, True)
         where
             go bad [] = match:bad
             go bad (i@(x,_):unchecked) =
@@ -538,7 +535,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
 
 	-- Does not match, so next check whether the things unify
 	-- See Note [Overlapping instances] above
-      | Incoherent <- oflag
+      | Incoherent _ <- oflag
       = find ms us rest
 
       | otherwise
@@ -581,8 +578,8 @@ insert_overlapping new_item (item:items)
             -- This is a change (Trac #3877, Dec 10). It used to
             -- require that instB (the less specific one) permitted overlap.
             overlap_ok = case (is_flag instA, is_flag instB) of
-                              (NoOverlap, NoOverlap) -> False
-                              _                      -> True
+                              (NoOverlap _, NoOverlap _) -> False
+                              _                          -> True
 \end{code}
 
 

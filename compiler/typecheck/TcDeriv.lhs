@@ -315,14 +315,13 @@ tcDeriving tycl_decls inst_decls deriv_decls
         ; let (repMetaTys, repTyCons, metaInsts) = unzip3 genericsExtras
 
 	; overlap_flag <- getOverlapFlag
-	; safe <- getSafeHaskellFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
-	; insts1 <- mapM (genInst True safe overlap_flag) given_specs
+	; insts1 <- mapM (genInst True overlap_flag) given_specs
 
 	; final_specs <- extendLocalInstEnv (map (iSpec . fst) insts1) $
-			 inferInstanceContexts safe overlap_flag infer_specs
+			 inferInstanceContexts overlap_flag infer_specs
 
-	; insts2 <- mapM (genInst False safe overlap_flag) final_specs
+	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
 	-- We no longer generate the old generic to/from functions
         -- from each type declaration, so this is emptyBag
@@ -1325,11 +1324,11 @@ ordered by sorting on type varible, tv, (major key) and then class, k,
 \end{itemize}
 
 \begin{code}
-inferInstanceContexts :: SafeHaskellMode -> OverlapFlag -> [DerivSpec] -> TcM [DerivSpec]
+inferInstanceContexts :: OverlapFlag -> [DerivSpec] -> TcM [DerivSpec]
 
-inferInstanceContexts _ _ [] = return []
+inferInstanceContexts _ [] = return []
 
-inferInstanceContexts safe oflag infer_specs
+inferInstanceContexts oflag infer_specs
   = do	{ traceTc "inferInstanceContexts" $ vcat (map pprDerivSpec infer_specs)
 	; iterate_deriv 1 initial_solutions }
   where
@@ -1355,7 +1354,7 @@ inferInstanceContexts safe oflag infer_specs
       | otherwise
       =	do { 	  -- Extend the inst info from the explicit instance decls
 		  -- with the current set of solutions, and simplify each RHS
-	     let inst_specs = zipWithEqual "add_solns" (mkInstance safe oflag)
+	     let inst_specs = zipWithEqual "add_solns" (mkInstance oflag)
 					   current_solns infer_specs
 	   ; new_solns <- checkNoErrs $
 	     		  extendLocalInstEnv inst_specs $
@@ -1401,11 +1400,11 @@ inferInstanceContexts safe oflag infer_specs
         the_pred = mkClassPred clas inst_tys
 
 ------------------------------------------------------------------
-mkInstance :: SafeHaskellMode -> OverlapFlag -> ThetaType -> DerivSpec -> Instance
-mkInstance safe overlap_flag theta
+mkInstance :: OverlapFlag -> ThetaType -> DerivSpec -> Instance
+mkInstance overlap_flag theta
 	    (DS { ds_name = dfun_name
 		, ds_tvs = tyvars, ds_cls = clas, ds_tys = tys })
-  = mkLocalInstance dfun overlap_flag safe
+  = mkLocalInstance dfun overlap_flag
   where
     dfun = mkDictFunId dfun_name tyvars theta clas tys
 
@@ -1492,10 +1491,9 @@ the renamer.  What a great hack!
 -- case of instances for indexed families.
 --
 genInst :: Bool             -- True <=> standalone deriving
-        -> SafeHaskellMode
         -> OverlapFlag
         -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
-genInst standalone_deriv safe oflag
+genInst standalone_deriv oflag
         spec@(DS { ds_tc = rep_tycon, ds_tc_args = rep_tc_args
                  , ds_theta = theta, ds_newtype = is_newtype
                  , ds_name = name, ds_cls = clas })
@@ -1514,7 +1512,7 @@ genInst standalone_deriv safe oflag
                            , iBinds  = VanillaInst meth_binds [] standalone_deriv }
                  , aux_binds) }
   where
-    inst_spec = mkInstance safe oflag theta spec
+    inst_spec = mkInstance oflag theta spec
     co1 = case tyConFamilyCoercion_maybe rep_tycon of
               Just co_con -> mkAxInstCo co_con rep_tc_args
     	      Nothing     -> id_co

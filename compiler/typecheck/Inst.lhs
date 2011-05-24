@@ -13,7 +13,7 @@ module Inst (
 
        newOverloadedLit, mkOverLit, 
      
-       tcGetInstEnvs, getOverlapFlag, getSafeHaskellFlag,
+       tcGetInstEnvs, getOverlapFlag,
        tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
        tcSyntaxName,
 
@@ -368,19 +368,15 @@ syntaxNameCtxt name orig ty tidy_env = do
 \begin{code}
 getOverlapFlag :: TcM OverlapFlag
 getOverlapFlag 
-  = do 	{ dflags <- getDOpts
-	; let overlap_ok    = xopt Opt_OverlappingInstances dflags
-	      incoherent_ok = xopt Opt_IncoherentInstances  dflags
-	      overlap_flag | incoherent_ok = Incoherent
-			   | overlap_ok    = OverlapOk
-			   | otherwise     = NoOverlap
-			   
-	; return overlap_flag }
+  = do  { dflags <- getDOpts
+        ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
+              incoherent_ok = xopt Opt_IncoherentInstances  dflags
+              safeOverlap   = safeLanguageOn dflags
+              overlap_flag | incoherent_ok = Incoherent safeOverlap
+                           | overlap_ok    = OverlapOk safeOverlap
+                           | otherwise     = NoOverlap safeOverlap
 
-getSafeHaskellFlag :: TcM SafeHaskellMode
-getSafeHaskellFlag
-  = do { dflags <- getDOpts
-       ; return $ safeHaskell dflags }
+        ; return overlap_flag }
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env
