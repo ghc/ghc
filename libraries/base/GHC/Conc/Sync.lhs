@@ -373,9 +373,17 @@ thread reaches a /safe point/, where a safe point is where memory
 allocation occurs.  Some loops do not perform any memory allocation
 inside the loop and therefore cannot be interrupted by a 'throwTo'.
 
-Blocked 'throwTo' is fair: if multiple threads are trying to throw an
-exception to the same target thread, they will succeed in FIFO order.
+If the target of 'throwTo' is the calling thread, then the behaviour
+is the same as 'Control.Exception.throwIO', except that the exception
+is thrown as an asynchronous exception.  This means that if there is
+an enclosing pure computation, which would be the case if the current
+IO operation is inside 'unsafePerformIO' or 'unsafeInterleaveIO', that
+computation is not permanently replaced by the exception, but is
+suspended as if it had received an asynchronous exception.
 
+Note that if 'throwTo' is called with the current thread as the
+target, the exception will be thrown even if the thread is currently
+inside 'mask' or 'uninterruptibleMask'.
   -}
 throwTo :: Exception e => ThreadId -> e -> IO ()
 throwTo (ThreadId tid) ex = IO $ \ s ->
