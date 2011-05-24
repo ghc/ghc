@@ -7,7 +7,7 @@ module OneOfEverything (
 	FooData,
 	FooDataB(..),
 	FooDataC( .. ),
-	EqTree(EqLeaf, EqBranch),
+	Tree(Leaf, Branch),
 	EqClass(..),
 	OrdClass(orda, ordb),
 	module OneC ,
@@ -35,7 +35,7 @@ data FooData = FooCon Int
 
 data FooDataB = FooConB Double
 
-data (Eq a) => EqTree a = EqLeaf a | EqBranch (EqLeaf a) (EqLeaf a)
+data Tree a = Leaf a | Branch (Leaf a) (Leaf a)
 
 class (Eq a) => EqClass a where
     eqc :: a -> Char
@@ -46,7 +46,7 @@ class (Ord a) => OrdClass a where
     ordb :: a -> Char
     ordc :: a -> Char
 
-instance (Eq a) => EqClass (EqTree a) where
+instance (Eq a) => EqClass (Tree a) where
     eqc x = 'a'
 
 default (Integer, Rational)

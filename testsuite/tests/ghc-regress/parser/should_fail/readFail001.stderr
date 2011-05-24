@@ -2,11 +2,11 @@
 readFail001.hs:25:11:
     The fixity signature for `+#' lacks an accompanying binding
 
-readFail001.hs:38:48:
-    Not in scope: type constructor or class `EqLeaf'
+readFail001.hs:38:32:
+    Not in scope: type constructor or class `Leaf'
 
-readFail001.hs:38:59:
-    Not in scope: type constructor or class `EqLeaf'
+readFail001.hs:38:41:
+    Not in scope: type constructor or class `Leaf'
 
 readFail001.hs:87:11: Not in scope: `x'
 
