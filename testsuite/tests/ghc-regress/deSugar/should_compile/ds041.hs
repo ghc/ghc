@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 {- In 2.05 this one crashed with
 
 	Fail: "basicTypes/Id.lhs", line 990: incomplete pattern(s) 

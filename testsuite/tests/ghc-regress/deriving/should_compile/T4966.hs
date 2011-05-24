@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}

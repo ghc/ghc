@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 
 module T4325 where
 

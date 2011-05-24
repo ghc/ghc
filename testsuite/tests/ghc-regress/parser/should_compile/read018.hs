@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 -- !!! Checking that empty contexts are permitted.
 module ShouldCompile where
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 -- Trac #2138
 -- If we :i D, we should see the Eq constraint
 

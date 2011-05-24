@@ -1,5 +1,5 @@
 
-ds041.hs:15:7:
+ds041.hs:16:7:
     Warning: Fields of `Foo' not initialised: x
     In the expression: Foo {}
     In an equation for `foo': foo = Foo {}
