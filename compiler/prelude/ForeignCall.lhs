@@ -13,7 +13,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module ForeignCall (
-	ForeignCall(..),
+        ForeignCall(..), isSafeForeignCall,
 	Safety(..), playSafe, playInterruptible,
 
 	CExportSpec(..), CLabelString, isCLabelString, pprCLabelString,
@@ -42,6 +42,9 @@ import Data.Data
 newtype ForeignCall = CCall CCallSpec
   deriving Eq
   {-! derive: Binary !-}
+
+isSafeForeignCall :: ForeignCall -> Bool
+isSafeForeignCall (CCall (CCallSpec _ _ safe)) = playSafe safe
 
 -- We may need more clues to distinguish foreign calls
 -- but this simple printer will do for now

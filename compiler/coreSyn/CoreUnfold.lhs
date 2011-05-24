@@ -64,6 +64,8 @@ import Pair
 import FastTypes
 import FastString
 import Outputable
+import ForeignCall
+
 import Data.Maybe
 \end{code}
 
@@ -398,15 +400,41 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 	  alts_size tot_size _ = tot_size
 
-    size_up (Case e _ _ alts) = size_up e  `addSizeNSD` 
-                                foldr (addAltSize . size_up_alt) sizeZero alts
-	  	-- We don't charge for the case itself
-		-- It's a strict thing, and the price of the call
-		-- is paid by scrut.  Also consider
-		--	case f x of DEFAULT -> e
-		-- This is just ';'!  Don't charge for it.
-		--
-		-- Moreover, we charge one per alternative.
+    size_up (Case e b _ alts) = size_up e  `addSizeNSD`
+                                foldr (addAltSize . size_up_alt) case_size alts
+      where
+          case_size
+           | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-1)
+           | otherwise = sizeZero
+                -- Normally we don't charge for the case itself, but
+                -- we charge one per alternative (see size_up_alt,
+                -- below) to account for the cost of the info table
+                -- and comparisons.
+                --
+                -- However, in certain cases (see is_inline_scrut
+                -- below), no code is generated for the case unless
+                -- there are multiple alts.  In these cases we
+                -- subtract one, making the first alt free.
+                -- e.g. case x# +# y# of _ -> ...   should cost 1
+                --      case touch# x# of _ -> ...  should cost 0
+                -- (see #4978)
+                --
+                -- I would like to not have the "not (lengthExceeds alts 1)"
+                -- condition above, but without that some programs got worse
+                -- (spectral/hartel/event and spectral/para).  I don't fully
+                -- understand why. (SDM 24/5/11)
+
+                -- unboxed variables, inline primops and unsafe foreign calls
+                -- are all "inline" things:
+          is_inline_scrut (Var v) = isUnLiftedType (idType v)
+          is_inline_scrut scrut
+              | (Var f, _) <- collectArgs scrut
+                = case idDetails f of
+                    FCallId fc  -> not (isSafeForeignCall fc)
+                    PrimOpId op -> not (primOpOutOfLine op)
+                    _other      -> False
+              | otherwise
+                = False
 
     ------------ 
     -- size_up_app is used when there's ONE OR MORE value args
