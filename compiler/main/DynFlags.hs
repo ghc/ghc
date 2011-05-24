@@ -274,7 +274,6 @@ data DynFlag
    -- misc opts
    | Opt_Pp
    | Opt_ForceRecomp
-   | Opt_DryRun
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
    | Opt_ReadUserPackageConf
@@ -1154,7 +1153,7 @@ allFlags = map ('-':) $
 --------------- The main flags themselves ------------------
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
-    Flag "n"        (NoArg (setDynFlag Opt_DryRun))
+    Flag "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
   , Flag "cpp"      (NoArg (setExtensionFlag Opt_Cpp)) 
   , Flag "F"        (NoArg (setDynFlag Opt_Pp)) 
   , Flag "#include" 

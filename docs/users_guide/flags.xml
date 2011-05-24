@@ -35,13 +35,7 @@
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
-	    <row>
-	      <entry><option>-n</option></entry>
-	      <entry>do a dry run</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
+            <row>
 	      <entry><option>-v</option></entry>
 	      <entry>verbose mode (equivalent to <option>-v3</option>)</entry>
 	      <entry>dynamic</entry>
