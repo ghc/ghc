@@ -585,19 +585,11 @@ didn't adopt the idea.
 \begin{code}
 primOpSize :: PrimOp -> Int -> ExprSize
 primOpSize op n_val_args
- | not (primOpIsDupable op) = sizeN opt_UF_DearOp
- | not (primOpOutOfLine op) = sizeN 1
-	-- Be very keen to inline simple primops.
-	-- We give a discount of 1 for each arg so that (op# x y z) costs 2.
-	-- We can't make it cost 1, else we'll inline let v = (op# x y z) 
-	-- at every use of v, which is excessive.
-	--
-	-- A good example is:
-	--	let x = +# p q in C {x}
-	-- Even though x get's an occurrence of 'many', its RHS looks cheap,
-	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
-
- | otherwise = sizeN n_val_args
+ = if primOpOutOfLine op
+      then sizeN (op_size + n_val_args)
+      else sizeN op_size
+ where
+   op_size = primOpCodeSize op
 
 
 buildSize :: ExprSize

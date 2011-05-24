@@ -81,6 +81,7 @@ data Token = TEOF
            | TUpperName String
            | TString String
            | TNoBraces String
+           | TInteger Int
     deriving Show
 
 -- Actions

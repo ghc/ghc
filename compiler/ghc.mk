@@ -252,7 +252,7 @@ PRIMOP_BITS = compiler/primop-data-decl.hs-incl        \
               compiler/primop-has-side-effects.hs-incl \
               compiler/primop-out-of-line.hs-incl      \
               compiler/primop-commutable.hs-incl       \
-              compiler/primop-needs-wrapper.hs-incl    \
+              compiler/primop-code-size.hs-incl        \
               compiler/primop-can-fail.hs-incl         \
               compiler/primop-strictness.hs-incl       \
               compiler/primop-primop-info.hs-incl
@@ -278,8 +278,8 @@ compiler/primop-out-of-line.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 	"$(GENPRIMOP_INPLACE)" --out-of-line        < $< > $@
 compiler/primop-commutable.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 	"$(GENPRIMOP_INPLACE)" --commutable         < $< > $@
-compiler/primop-needs-wrapper.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
-	"$(GENPRIMOP_INPLACE)" --needs-wrapper      < $< > $@
+compiler/primop-code-size.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
+	"$(GENPRIMOP_INPLACE)" --code-size          < $< > $@
 compiler/primop-can-fail.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)
 	"$(GENPRIMOP_INPLACE)" --can-fail           < $< > $@
 compiler/primop-strictness.hs-incl: $(PRIMOPS_TXT) $(GENPRIMOP_INPLACE)

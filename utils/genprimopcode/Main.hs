@@ -46,13 +46,13 @@ main = getArgs >>= \args ->
                                        "commutable" 
                                        "commutableOp" p_o_specs)
 
-                      "--needs-wrapper" 
+                      "--code-size"
                          -> putStr (gen_switch_from_attribs 
-                                       "needs_wrapper" 
-                                       "primOpNeedsWrapper" p_o_specs)
+                                       "code_size"
+                                       "primOpCodeSize" p_o_specs)
 
-                      "--can-fail" 
-                         -> putStr (gen_switch_from_attribs 
+                      "--can-fail"
+                         -> putStr (gen_switch_from_attribs
                                        "can_fail" 
                                        "primOpCanFail" p_o_specs)
 
@@ -91,7 +91,7 @@ known_args
        "--has-side-effects",
        "--out-of-line",
        "--commutable",
-       "--needs-wrapper",
+       "--code-size",
        "--can-fail",
        "--strictness",
        "--primop-primop-info",
@@ -550,6 +550,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
 
          getAltRhs (OptionFalse _)    = "False"
          getAltRhs (OptionTrue _)     = "True"
+         getAltRhs (OptionInteger _ i) = show i
          getAltRhs (OptionString _ s) = s
 
          mkAlt po
