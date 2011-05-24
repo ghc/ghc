@@ -141,6 +141,7 @@ gen_hs_source (Info defaults entries) =
      where opt (OptionFalse n)	  = n ++ " = False"
            opt (OptionTrue n)	  = n ++ " = True"
 	   opt (OptionString n v) = n ++ " = { " ++ v ++ "}"
+           opt (OptionInteger n v) = n ++ " = " ++ show v
 
 	   hdr s@(Section {})			 = sec s
 	   hdr (PrimOpSpec { name = n })	 = wrapOp n ++ ","
@@ -409,7 +410,8 @@ gen_latex_doc (Info defaults entries)
 	       Just (OptionTrue _) -> if_true
 	       Just (OptionFalse _) -> if_false
 	       Just (OptionString _ _) -> error "String value for boolean option"
-	       Nothing -> ""
+               Just (OptionInteger _ _) -> error "Integer value for boolean option"
+               Nothing -> ""
 	   
 	   mk_strictness o = 
 	     case lookup_attrib "strictness" o of
