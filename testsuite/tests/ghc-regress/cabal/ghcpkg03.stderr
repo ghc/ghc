@@ -1,9 +1,9 @@
 testpkg-1.2.3.4: Warning: library-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory
 testpkg-1.2.3.4: Warning: include-dirs: /usr/local/include/testpkg doesn't exist or isn't a directory
 testpkg-1.2.3.4: import-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory (ignoring)
-testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg is a relative path (ignoring)
-testpkg-1.2.3.4: library-dirs: c:/Program Files/testpkg is a relative path (ignoring)
-testpkg-1.2.3.4: include-dirs: c:/Program Files/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: library-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: include-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
 testpkg-1.2.3.4: file A.hi is missing (ignoring)
 testpkg-1.2.3.4: file B.hi is missing (ignoring)
 testpkg-1.2.3.4: file C/D.hi is missing (ignoring)
@@ -11,9 +11,9 @@ testpkg-1.2.3.4: cannot find libtestpkg-1.2.3.4.a on library path (ignoring)
 testpkg-2.0: Warning: library-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory
 testpkg-2.0: Warning: include-dirs: /usr/local/include/testpkg doesn't exist or isn't a directory
 testpkg-2.0: import-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory (ignoring)
-testpkg-2.0: import-dirs: c:/Program Files/testpkg is a relative path (ignoring)
-testpkg-2.0: library-dirs: c:/Program Files/testpkg is a relative path (ignoring)
-testpkg-2.0: include-dirs: c:/Program Files/testpkg is a relative path (ignoring)
+testpkg-2.0: import-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-2.0: library-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-2.0: include-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
 testpkg-2.0: file A.hi is missing (ignoring)
 testpkg-2.0: file B.hi is missing (ignoring)
 testpkg-2.0: file C/D.hi is missing (ignoring)
@@ -22,9 +22,9 @@ testpkg-2.0: cannot find libtestpkg-2.0.a on library path (ignoring)
 testpkg-1.2.3.4: Warning: library-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory
 testpkg-1.2.3.4: Warning: include-dirs: /usr/local/include/testpkg doesn't exist or isn't a directory
 testpkg-1.2.3.4: import-dirs: /usr/local/lib/testpkg doesn't exist or isn't a directory (ignoring)
-testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg is a relative path (ignoring)
-testpkg-1.2.3.4: library-dirs: c:/Program Files/testpkg is a relative path (ignoring)
-testpkg-1.2.3.4: include-dirs: c:/Program Files/testpkg is a relative path (ignoring)
+testpkg-1.2.3.4: import-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: library-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
+testpkg-1.2.3.4: include-dirs: c:/Program Files/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}. (ignoring)
 testpkg-1.2.3.4: file A.hi is missing (ignoring)
 testpkg-1.2.3.4: file B.hi is missing (ignoring)
 testpkg-1.2.3.4: file C/D.hi is missing (ignoring)
