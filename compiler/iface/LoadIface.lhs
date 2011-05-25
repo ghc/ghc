@@ -638,7 +638,7 @@ showIface hsc_env filename = do
    -- non-profiled interfaces, for example.
    iface <- initTcRnIf 's' hsc_env () () $
        readBinIface IgnoreHiWay TraceBinIFaceReading filename
-   printDump (pprModIface iface)
+   printDump (hsc_dflags hsc_env) (pprModIface iface)
 \end{code}
 
 \begin{code}

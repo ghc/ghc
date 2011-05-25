@@ -346,9 +346,10 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 
    	; endPass dflags CoreTidy all_tidy_binds tidy_rules
 
-	  -- If the endPass didn't print the rules, but ddump-rules is on, print now
-	; dumpIfSet (dopt Opt_D_dump_rules dflags 
-                     && (not (dopt Opt_D_dump_simpl dflags))) 
+          -- If the endPass didn't print the rules, but ddump-rules is
+          -- on, print now
+        ; dumpIfSet dflags (dopt Opt_D_dump_rules dflags
+                            && (not (dopt Opt_D_dump_simpl dflags)))
 		    CoreTidy
                     (ptext (sLit "rules"))
                     (pprRulesForUser tidy_rules)
@@ -356,11 +357,11 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
           -- Print one-line size info
         ; let cs = coreBindsStats tidy_binds
         ; when (dopt Opt_D_dump_core_stats dflags)
-	       (printDump (ptext (sLit "Tidy size (terms,types,coercions)") 
-                           <+> ppr (moduleName mod) <> colon 
-                           <+> int (cs_tm cs) 
-                           <+> int (cs_ty cs) 
-                           <+> int (cs_co cs) ))
+               (printDump dflags (ptext (sLit "Tidy size (terms,types,coercions)")
+                                  <+> ppr (moduleName mod) <> colon
+                                  <+> int (cs_tm cs)
+                                  <+> int (cs_ty cs)
+                                  <+> int (cs_co cs) ))
 
         ; return (CgGuts { cg_module   = mod,
                            cg_tycons   = alg_tycons,

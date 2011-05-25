@@ -37,7 +37,7 @@ stg2stg dflags module_name binds
 	; us <- mkSplitUniqSupply 'g'
 
 	; doIfSet_dyn dflags Opt_D_verbose_stg2stg 
-		      (printDump (text "VERBOSE STG-TO-STG:"))
+		      (printDump dflags (text "VERBOSE STG-TO-STG:"))
 
 	; (binds', us', ccs) <- end_pass us "Stg2Stg" ([],[],[]) binds
 

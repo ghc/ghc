@@ -128,7 +128,7 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds =
                   } 
 
   doIfSet_dyn dflags  Opt_D_dump_hpc $ do
-	  printDump (pprLHsBinds binds1)
+	  printDump dflags (pprLHsBinds binds1)
 
   return (binds1, HpcInfo (tickBoxCount st) hashNo, modBreaks)
 \end{code}

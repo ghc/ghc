@@ -1708,7 +1708,8 @@ showCmd str = do
         ["stop"]     -> liftIO $ putStrLn (show (stop st))
 	["modules" ] -> showModules
 	["bindings"] -> showBindings
-	["linker"]   -> liftIO showLinkerState
+        ["linker"]   -> do dflags <- getDynFlags
+                           liftIO $ showLinkerState dflags
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
         ["packages"]  -> showPackages

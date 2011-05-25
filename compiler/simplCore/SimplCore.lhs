@@ -141,15 +141,15 @@ doCorePass pass = pprPanic "doCorePass" (ppr pass)
 %************************************************************************
 
 \begin{code}
-printCore :: a -> [CoreBind] -> IO ()
-printCore _ binds = Err.dumpIfSet True "Print Core" (pprCoreBindings binds)
+printCore :: DynFlags -> [CoreBind] -> IO ()
+printCore dflags binds = Err.dumpIfSet dflags True "Print Core" (pprCoreBindings binds)
 
 ruleCheck :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheck current_phase pat guts = do
     rb <- getRuleBase
     dflags <- getDynFlags
     liftIO $ Err.showPass dflags "RuleCheck"
-    liftIO $ printDump (ruleCheckProgram current_phase pat rb (mg_binds guts))
+    liftIO $ printDump dflags (ruleCheckProgram current_phase pat rb (mg_binds guts))
     return guts
 
 
@@ -314,7 +314,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
   = do { (termination_msg, it_count, counts_out, guts') 
 	   <- do_iteration us 1 [] binds rules 
 
-	; Err.dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
+	; Err.dumpIfSet dflags (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
 		  "Simplifier statistics for following pass"
 		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
 			 blankLine,
@@ -431,7 +431,7 @@ end_iteration :: DynFlags -> CoreToDo -> Int
              -> SimplCount -> [CoreBind] -> [CoreRule] -> IO ()
 -- Same as endIteration but with simplifier counts
 end_iteration dflags pass iteration_no counts binds rules
-  = do { dumpIfSet (dopt Opt_D_dump_simpl_iterations dflags)
+  = do { dumpIfSet dflags (dopt Opt_D_dump_simpl_iterations dflags)
                    pass (ptext (sLit "Simplifier counts"))
 		   (pprSimplCount counts)
 

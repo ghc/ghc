@@ -336,13 +336,13 @@ printErrs dflags doc sty = do
 printOutput :: Doc -> IO ()
 printOutput doc = Pretty.printDoc PageMode stdout doc
 
-printDump :: SDoc -> IO ()
-printDump doc = hPrintDump stdout doc
+printDump :: DynFlags -> SDoc -> IO ()
+printDump dflags doc = hPrintDump dflags stdout doc
 
-hPrintDump :: Handle -> SDoc -> IO ()
-hPrintDump h doc = do
+hPrintDump :: DynFlags -> Handle -> SDoc -> IO ()
+hPrintDump dflags h doc = do
    Pretty.printDoc PageMode h
-     (runSDoc better_doc (initSDocContext defaultDumpStyle))
+     (runSDoc better_doc (initSDocContext' dflags defaultDumpStyle))
    hFlush h
  where
    better_doc = doc $$ blankLine

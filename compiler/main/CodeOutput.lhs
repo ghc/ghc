@@ -69,7 +69,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 		{ showPass dflags "CmmLint"
 		; let lints = map cmmLint flat_abstractC
 		; case firstJusts lints of
-			Just err -> do { printDump err
+			Just err -> do { printDump dflags err
 				       ; ghcExit dflags 1
 				       }
 			Nothing  -> return ()

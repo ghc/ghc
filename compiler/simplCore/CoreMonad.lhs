@@ -120,9 +120,9 @@ endIteration dflags pass n
   = dumpAndLint dflags False pass (ptext (sLit "iteration=") <> int n)
                 (Just Opt_D_dump_simpl_iterations)
 
-dumpIfSet :: Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
-dumpIfSet dump_me pass extra_info doc
-  = Err.dumpIfSet dump_me (showSDoc (ppr pass <+> extra_info)) doc
+dumpIfSet :: DynFlags -> Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
+dumpIfSet dflags dump_me pass extra_info doc
+  = Err.dumpIfSet dflags dump_me (showSDoc (ppr pass <+> extra_info)) doc
 
 dumpAndLint :: DynFlags -> Bool -> CoreToDo -> SDoc -> Maybe DynFlag
             -> [CoreBind] -> [CoreRule] -> IO ()
@@ -160,10 +160,10 @@ displayLintResults :: DynFlags -> CoreToDo
                    -> IO ()
 displayLintResults dflags pass warns errs binds
   | not (isEmptyBag errs)
-  = do { printDump (vcat [ banner "errors", Err.pprMessageBag errs
-			 , ptext (sLit "*** Offending Program ***")
-			 , pprCoreBindings binds
-			 , ptext (sLit "*** End of Offense ***") ])
+  = do { printDump dflags (vcat [ banner "errors", Err.pprMessageBag errs
+                                , ptext (sLit "*** Offending Program ***")
+                                , pprCoreBindings binds
+                                , ptext (sLit "*** End of Offense ***") ])
        ; Err.ghcExit dflags 1 }
 
   | not (isEmptyBag warns)
@@ -174,7 +174,7 @@ displayLintResults dflags pass warns errs binds
 	-- group.  Only afer a round of simplification are they unravelled.
   , not opt_NoDebugOutput
   , showLintWarnings pass
-  = printDump (banner "warnings" $$ Err.pprMessageBag warns)
+  = printDump dflags (banner "warnings" $$ Err.pprMessageBag warns)
 
   | otherwise = return ()
   where

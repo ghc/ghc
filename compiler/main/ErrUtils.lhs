@@ -177,10 +177,12 @@ doIfSet_dyn dflags flag action | dopt flag dflags = action
 -- -----------------------------------------------------------------------------
 -- Dumping
 
-dumpIfSet :: Bool -> String -> SDoc -> IO ()
-dumpIfSet flag hdr doc
+-- TODO: Now that this function has access to DynFlags, should we
+-- check verbosity dflags >= 4?
+dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
+dumpIfSet dflags flag hdr doc
   | not flag   = return ()
-  | otherwise  = printDump (mkDumpDoc hdr doc)
+  | otherwise  = printDump dflags (mkDumpDoc hdr doc)
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
@@ -193,7 +195,7 @@ dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
 dumpIfSet_dyn_or dflags flags hdr doc
   | or [dopt flag dflags | flag <- flags]
   || verbosity dflags >= 4 
-  = printDump (mkDumpDoc hdr doc)
+  = printDump dflags (mkDumpDoc hdr doc)
   | otherwise = return ()
 
 mkDumpDoc :: String -> SDoc -> SDoc
@@ -225,12 +227,12 @@ dumpSDoc dflags dflag hdr doc
                         when (not append) $
                             writeIORef gdref (Set.insert fileName gd)
                         handle <- openFile fileName mode
-                        hPrintDump handle doc
+                        hPrintDump dflags handle doc
                         hClose handle
 
             -- write the dump to stdout
             Nothing
-                 -> printDump (mkDumpDoc hdr doc)
+                 -> printDump dflags (mkDumpDoc hdr doc)
 
 
 -- | Choose where to put a dump file based on DynFlags
