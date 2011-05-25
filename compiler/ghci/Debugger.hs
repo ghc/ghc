@@ -58,7 +58,8 @@ pprintClosureCommand bindThings force str = do
   -- Finally, print the Terms
   unqual  <- GHC.getPrintUnqual
   docterms <- mapM showTerm terms
-  liftIO $ (printForUser stdout unqual . vcat)
+  dflags <- getSessionDynFlags
+  liftIO $ (printForUser dflags stdout unqual . vcat)
            (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
                     ids
                     docterms)
@@ -225,4 +226,4 @@ pprTypeAndContents ids = do
 traceOptIf :: GhcMonad m => DynFlag -> SDoc -> m ()
 traceOptIf flag doc = do
   dflags <- GHC.getSessionDynFlags
-  when (dopt flag dflags) $ liftIO $ printForUser stderr alwaysQualify doc
+  when (dopt flag dflags) $ liftIO $ printForUser dflags stderr alwaysQualify doc

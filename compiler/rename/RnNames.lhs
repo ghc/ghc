@@ -1377,9 +1377,10 @@ printMinimalImports :: [ImportDeclUsage] -> RnM ()
 printMinimalImports imports_w_usage
   = do { imports' <- mapM mk_minimal imports_w_usage
        ; this_mod <- getModule
+       ; dflags <- getDOpts
        ; liftIO $
          do { h <- openFile (mkFilename this_mod) WriteMode
-            ; printForUser h neverQualify (vcat (map ppr imports')) }
+            ; printForUser dflags h neverQualify (vcat (map ppr imports')) }
               -- The neverQualify is important.  We are printing Names
               -- but they are in the context of an 'import' decl, and
               -- we never qualify things inside there

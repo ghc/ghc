@@ -122,7 +122,8 @@ dumpOptVt flag header doc
 dumpVt :: String -> SDoc -> VM ()
 dumpVt header doc 
   = do { unqual <- liftDs mkPrintUnqualifiedDs
-       ; liftIO $ printForUser stderr unqual (mkDumpDoc header doc)
+       ; dflags <- liftDs getDOptsDs
+       ; liftIO $ printForUser dflags stderr unqual (mkDumpDoc header doc)
        }
 
 -- Control --------------------------------------------------------------------

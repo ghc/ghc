@@ -239,7 +239,8 @@ unsetOption opt
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
   unqual <- GHC.getPrintUnqual
-  MonadUtils.liftIO $ Outputable.printForUser stdout unqual doc
+  dflags <- getSessionDynFlags
+  MonadUtils.liftIO $ Outputable.printForUser dflags stdout unqual doc
 
 printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do

@@ -347,10 +347,10 @@ hPrintDump dflags h doc = do
  where
    better_doc = doc $$ blankLine
 
-printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
-printForUser handle unqual doc 
+printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
+printForUser dflags handle unqual doc
   = Pretty.printDoc PageMode handle
-      (runSDoc doc (initSDocContext (mkUserStyle unqual AllTheWay)))
+      (runSDoc doc (initSDocContext' dflags (mkUserStyle unqual AllTheWay)))
 
 printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
 printForUserPartWay handle d unqual doc

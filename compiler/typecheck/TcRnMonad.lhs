@@ -413,7 +413,8 @@ traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
 traceOptIf flag doc = ifDOptM flag $
-		      liftIO (printForUser stderr alwaysQualify doc)
+                      do dflags <- getDOpts
+                         liftIO (printForUser dflags stderr alwaysQualify doc)
 
 traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
 -- Output the message, with current location if opt_PprStyle_Debug
@@ -428,7 +429,7 @@ traceOptTcRn flag doc = ifDOptM flag $ do
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv 
                   ; dflags <- getDOpts 
-                  ; liftIO (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
+                  ; liftIO (printForUser dflags stderr (mkPrintUnqualified dflags rdr_env) doc) }
 
 debugDumpTcRn :: SDoc -> TcRn ()
 debugDumpTcRn doc | opt_NoDebugOutput = return ()
