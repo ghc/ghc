@@ -552,7 +552,6 @@ Library
             TcSplice
             Convert
             ByteCodeAsm
-            ByteCodeFFI
             ByteCodeGen
             ByteCodeInstr
             ByteCodeItbls
