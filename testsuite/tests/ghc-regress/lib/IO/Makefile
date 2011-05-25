@@ -37,7 +37,7 @@ hSetEncoding001.in : latin1 utf8-test utf16le-test utf16be-test utf16-test utf32
 
 environment001-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 environment001.hs -o environment001 
-	(sleep 1; echo x) | GHC_TEST=马克斯 ./environment001 说
+	GHC_TEST=马克斯 ./environment001 说
 
 3307-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 3307.hs -o 3307
@@ -45,4 +45,4 @@ environment001-test:
 	echo chinese-file-小说 > chinese-name
 	# The tests are run in a UTF-8 locale. We would test another one
 	# (like Big5) but GHC developers probably won't have it on their machines.
-	(sleep 1; echo x) | ./3307 chinese-file-小说
+	./3307 chinese-file-小说
