@@ -43,6 +43,6 @@ environment001-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 3307.hs -o 3307
 	echo Ni hao > chinese-file-小说
 	echo chinese-file-小说 > chinese-name
-	# Try a UTF-8 locale. I would test another one (like Big5) but GHC
-	# developers probably won't have it on their machines:
-	(sleep 1; echo x) | LC_ALL=en_US.UTF-8 ./3307 chinese-file-小说
+	# The tests are run in a UTF-8 locale. We would test another one
+	# (like Big5) but GHC developers probably won't have it on their machines.
+	(sleep 1; echo x) | ./3307 chinese-file-小说
