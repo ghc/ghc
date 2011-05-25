@@ -647,7 +647,7 @@ parseMultiPackageConf verbosity file = do
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
   when (verbosity > Normal) $ putStrLn ("reading package config: " ++ file)
-  readUTF8File file >>= parsePackageInfo
+  readUTF8File file >>= fmap fst . parsePackageInfo
 
 cachefilename :: FilePath
 cachefilename = "package.cache"
@@ -764,9 +764,13 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
   expanded <- if expand_env_vars then expandEnvVars s force
                                  else return s
 
-  pkg <- parsePackageInfo expanded
+  (pkg, ws) <- parsePackageInfo expanded
   when (verbosity >= Normal) $
       putStrLn "done."
+
+  -- report any warnings from the parse phase
+  _ <- reportValidateErrors [] ws
+         (display (sourcePackageId pkg) ++ ": Warning: ") Nothing
 
   -- validate the expanded pkg, but register the unexpanded
   pkgroot <- absolutePath (takeDirectory to_modify)
@@ -786,10 +790,13 @@ registerPackage input verbosity my_flags auto_ghci_libs expand_env_vars update f
 
 parsePackageInfo
         :: String
-        -> IO InstalledPackageInfo
+        -> IO (InstalledPackageInfo, [ValidateWarning])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
-    ParseOk _warns ok -> return ok
+    ParseOk warnings ok -> return (ok, ws)
+      where
+        ws = [ msg | PWarning msg <- warnings
+                   , not ("Unrecognized field pkgroot" `isPrefixOf` msg) ]
     ParseFailed err -> case locatedErrorMsg err of
                            (Nothing, s) -> die s
                            (Just l, s) -> die (show l ++ ": " ++ s)
