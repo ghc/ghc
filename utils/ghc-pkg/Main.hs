@@ -104,6 +104,8 @@ data Flag
   | FlagForceFiles
   | FlagAutoGHCiLibs
   | FlagExpandEnvVars
+  | FlagExpandPkgroot
+  | FlagNoExpandPkgroot
   | FlagSimpleOutput
   | FlagNamesOnly
   | FlagIgnoreCase
@@ -131,6 +133,10 @@ flags = [
         "automatically build libs for GHCi (with register)",
   Option [] ["expand-env-vars"] (NoArg FlagExpandEnvVars)
         "expand environment variables (${name}-style) in input package descriptions",
+  Option [] ["expand-pkgroot"] (NoArg FlagExpandPkgroot)
+        "expand ${pkgroot}-relative paths to absolute in output package descriptions",
+  Option [] ["no-expand-pkgroot"] (NoArg FlagNoExpandPkgroot)
+        "preserve ${pkgroot}-relative paths in output package descriptions",
   Option ['?'] ["help"] (NoArg FlagHelp)
         "display this help and exit",
   Option ['V'] ["version"] (NoArg FlagVersion)
@@ -280,6 +286,11 @@ runit verbosity cli nonopts = do
           | otherwise                   = NoForce
         auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
         expand_env_vars= FlagExpandEnvVars `elem` cli
+        mexpand_pkgroot= foldl' accumExpandPkgroot Nothing cli
+          where accumExpandPkgroot _ FlagExpandPkgroot   = Just True
+                accumExpandPkgroot _ FlagNoExpandPkgroot = Just False
+                accumExpandPkgroot x _                   = x
+                
         splitFields fields = unfoldr splitComma (',':fields)
           where splitComma "" = Nothing
                 splitComma fs = Just $ break (==',') (tail fs)
@@ -348,23 +359,24 @@ runit verbosity cli nonopts = do
     ["latest", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         latestPackage verbosity cli pkgid
-    ["describe", pkgid_str] ->
-        case substringCheck pkgid_str of
-          Nothing -> do pkgid <- readGlobPkgId pkgid_str
-                        describePackage verbosity cli (Id pkgid)
-          Just m -> describePackage verbosity cli (Substring pkgid_str m)
-    ["field", pkgid_str, fields] ->
-        case substringCheck pkgid_str of
-          Nothing -> do pkgid <- readGlobPkgId pkgid_str
-                        describeField verbosity cli (Id pkgid) 
-                                      (splitFields fields)
-          Just m -> describeField verbosity cli (Substring pkgid_str m)
-                                      (splitFields fields)
+    ["describe", pkgid_str] -> do
+        pkgarg <- case substringCheck pkgid_str of
+          Nothing -> liftM Id (readGlobPkgId pkgid_str)
+          Just m  -> return (Substring pkgid_str m)
+        describePackage verbosity cli pkgarg (fromMaybe False mexpand_pkgroot)
+        
+    ["field", pkgid_str, fields] -> do
+        pkgarg <- case substringCheck pkgid_str of
+          Nothing -> liftM Id (readGlobPkgId pkgid_str)
+          Just m  -> return (Substring pkgid_str m)
+        describeField verbosity cli pkgarg
+                      (splitFields fields) (fromMaybe True mexpand_pkgroot)
+
     ["check"] -> do
         checkConsistency verbosity cli
 
     ["dump"] -> do
-        dumpPackages verbosity cli
+        dumpPackages verbosity cli (fromMaybe False mexpand_pkgroot)
 
     ["recache"] -> do
         recache verbosity cli
@@ -410,8 +422,16 @@ globVersion = Version{ versionBranch=[], versionTags=["*"] }
 --      list, describe, field
 
 data PackageDB 
-  = PackageDB { location :: FilePath,
-                packages :: [InstalledPackageInfo] }
+  = PackageDB {
+      location, locationAbsolute :: !FilePath,
+      -- We need both possibly-relative and definately-absolute package
+      -- db locations. This is because the relative location is used as
+      -- an identifier for the db, so it is important we do not modify it.
+      -- On the other hand we need the absolute path in a few places
+      -- particularly in relation to the ${pkgroot} stuff.
+      
+      packages :: [InstalledPackageInfo]
+    }
 
 type PackageDBStack = [PackageDB]
         -- A stack of package databases.  Convention: head is the topmost
@@ -530,7 +550,8 @@ getPkgDatabases verbosity modify use_cache expand_vars my_flags = do
 
   db_stack  <- sequence
     [ do db <- readParseDatabase verbosity mb_user_conf use_cache db_path
-         if expand_vars then mungePackageDBPaths top_dir db else return db
+         if expand_vars then return (mungePackageDBPaths top_dir db)
+                        else return db
     | db_path <- final_stack ]
 
   let flag_db_stack = [ db | db_name <- flag_db_names,
@@ -557,13 +578,13 @@ readParseDatabase :: Verbosity
 readParseDatabase verbosity mb_user_conf use_cache path
   -- the user database (only) is allowed to be non-existent
   | Just (user_conf,False) <- mb_user_conf, path == user_conf
-  = return PackageDB { location = path, packages = [] }
+  = mkPackageDB []
   | otherwise
   = do e <- tryIO $ getDirectoryContents path
        case e of
          Left _   -> do
               pkgs <- parseMultiPackageConf verbosity path
-              return PackageDB{ location = path, packages = pkgs }              
+              mkPackageDB pkgs
          Right fs
            | not use_cache -> ignore_cache
            | otherwise -> do
@@ -581,7 +602,7 @@ readParseDatabase verbosity mb_user_conf use_cache path
                         putStrLn ("using cache: " ++ cache)
                      pkgs <- myReadBinPackageDB cache
                      let pkgs' = map convertPackageInfoIn pkgs
-                     return PackageDB { location = path, packages = pkgs' }
+                     mkPackageDB pkgs'
                   | otherwise -> do
                      when (verbosity >= Normal) $ do
                         warn ("WARNING: cache is out of date: " ++ cache)
@@ -592,7 +613,15 @@ readParseDatabase verbosity mb_user_conf use_cache path
                      let confs = filter (".conf" `isSuffixOf`) fs
                      pkgs <- mapM (parseSingletonPackageConf verbosity) $
                                    map (path </>) confs
-                     return PackageDB { location = path, packages = pkgs }
+                     mkPackageDB pkgs
+  where
+    mkPackageDB pkgs = do
+      path_abs <- absolutePath path
+      return PackageDB {
+        location = path,
+        locationAbsolute = path_abs,
+        packages = pkgs
+      }
 
 -- read the package.cache file strictly, to work around a problem with
 -- bytestring 0.9.0.x (fixed in 0.9.1.x) where the file wasn't closed
@@ -623,13 +652,14 @@ parseSingletonPackageConf verbosity file = do
 cachefilename :: FilePath
 cachefilename = "package.cache"
 
-mungePackageDBPaths :: FilePath -> PackageDB -> IO PackageDB
-mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } = do
+mungePackageDBPaths :: FilePath -> PackageDB -> PackageDB
+mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
+    db { packages = map (mungePackagePaths top_dir pkgroot) pkgs }
+  where
+    pkgroot = takeDirectory (locationAbsolute db)    
     -- It so happens that for both styles of package db ("package.conf"
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
-    pkgroot <- absolutePath (takeDirectory (location db))
-    return db { packages = map (mungePackagePaths top_dir pkgroot) pkgs }
 
 mungePackagePaths :: FilePath -> FilePath
                   -> InstalledPackageInfo -> InstalledPackageInfo
@@ -690,7 +720,11 @@ initPackageDB filename verbosity _flags = do
   when b1 eexist
   b2 <- doesDirectoryExist filename
   when b2 eexist
-  changeDB verbosity [] PackageDB{ location = filename, packages = [] }
+  filename_abs <- absolutePath filename
+  changeDB verbosity [] PackageDB {
+                          location = filename, locationAbsolute = filename_abs,
+                          packages = []
+                        }
 
 -- -----------------------------------------------------------------------------
 -- Registering
@@ -1005,24 +1039,33 @@ latestPackage verbosity my_flags pkgid = do
 -- -----------------------------------------------------------------------------
 -- Describe
 
-describePackage :: Verbosity -> [Flag] -> PackageArg -> IO ()
-describePackage verbosity my_flags pkgarg = do
+describePackage :: Verbosity -> [Flag] -> PackageArg -> Bool -> IO ()
+describePackage verbosity my_flags pkgarg expand_pkgroot = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False True{-use cache-} True{-expand vars-} my_flags
-  ps <- findPackages flag_db_stack pkgarg
-  doDump ps
+      getPkgDatabases verbosity False True{-use cache-} expand_pkgroot my_flags
+  dbs <- findPackagesByDB flag_db_stack pkgarg
+  doDump expand_pkgroot [ (pkg, locationAbsolute db)
+                        | (db, pkgs) <- dbs, pkg <- pkgs ]
 
-dumpPackages :: Verbosity -> [Flag] -> IO ()
-dumpPackages verbosity my_flags = do
+dumpPackages :: Verbosity -> [Flag] -> Bool -> IO ()
+dumpPackages verbosity my_flags expand_pkgroot = do
   (_, _, flag_db_stack) <- 
-     getPkgDatabases verbosity False True{-use cache-} False{-expand vars-} my_flags
-  doDump (allPackagesInStack flag_db_stack)
+     getPkgDatabases verbosity False True{-use cache-} expand_pkgroot my_flags
+  doDump expand_pkgroot [ (pkg, locationAbsolute db)
+                        | db <- flag_db_stack, pkg <- packages db ]
 
-doDump :: [InstalledPackageInfo] -> IO ()
-doDump pkgs = do
+doDump :: Bool -> [(InstalledPackageInfo, FilePath)] -> IO ()
+doDump expand_pkgroot pkgs = do
   -- fix the encoding to UTF-8, since this is an interchange format
   hSetEncoding stdout utf8
-  mapM_ putStrLn . intersperse "---" . map showInstalledPackageInfo $ pkgs
+  putStrLn $
+    intercalate "---\n"
+    [ if expand_pkgroot
+        then showInstalledPackageInfo pkg
+        else showInstalledPackageInfo pkg ++ pkgrootField
+    | (pkg, pkgloc) <- pkgs
+    , let pkgroot      = takeDirectory pkgloc
+          pkgrootField = "pkgroot: " ++ pkgroot ++ "\n" ]
 
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
@@ -1061,10 +1104,10 @@ compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 -- -----------------------------------------------------------------------------
 -- Field
 
-describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> IO ()
-describeField verbosity my_flags pkgarg fields = do
+describeField :: Verbosity -> [Flag] -> PackageArg -> [String] -> Bool -> IO ()
+describeField verbosity my_flags pkgarg fields expand_pkgroot = do
   (_, _, flag_db_stack) <- 
-      getPkgDatabases verbosity False True{-use cache-} True{-expand vars-} my_flags
+      getPkgDatabases verbosity False True{-use cache-} expand_pkgroot my_flags
   fns <- toFields fields
   ps <- findPackages flag_db_stack pkgarg
   mapM_ (selectFields fns) ps
@@ -1274,6 +1317,7 @@ checkPackageConfig pkg db_stack auto_ghci_libs update = do
   mapM_ (checkDir False "import-dirs")  (importDirs pkg)
   mapM_ (checkDir True  "library-dirs") (libraryDirs pkg)
   mapM_ (checkDir True  "include-dirs") (includeDirs pkg)
+  mapM_ (checkDir True  "framework-dirs") (frameworkDirs pkg)
   mapM_ (checkFile   True "haddock-interfaces") (haddockInterfaces pkg)
   mapM_ (checkDirURL True "haddock-html")       (haddockHTMLs pkg)
   checkModules pkg
