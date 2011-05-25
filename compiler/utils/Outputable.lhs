@@ -363,10 +363,10 @@ printForC dflags handle doc =
   Pretty.printDoc LeftMode handle
     (runSDoc doc (initSDocContext' dflags (PprCode CStyle)))
 
-printForAsm :: Handle -> SDoc -> IO ()
-printForAsm handle doc =
+printForAsm :: DynFlags -> Handle -> SDoc -> IO ()
+printForAsm dflags handle doc =
   Pretty.printDoc LeftMode handle
-    (runSDoc doc (initSDocContext (PprCode AsmStyle)))
+    (runSDoc doc (initSDocContext' dflags (PprCode AsmStyle)))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
