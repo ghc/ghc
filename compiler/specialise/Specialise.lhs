@@ -649,7 +649,7 @@ specImport done rb fn calls_for_fn
        ; return (rules2 ++ rules1, spec_binds2 ++ spec_binds1) }
 
   | otherwise
-  = WARN( True, ptext (sLit "specImport discard") <+> ppr fn <+> ppr calls_for_fn )
+  = WARN( dflags, True, ptext (sLit "specImport discard") <+> ppr fn <+> ppr calls_for_fn )
     return ([], [])    
 \end{code}
 
@@ -1024,7 +1024,7 @@ specCalls subst rules_for_me calls_for_me fn rhs
        ; return (spec_rules, spec_defns, plusUDList spec_uds) }
 
   | otherwise	-- No calls or RHS doesn't fit our preconceptions
-  = WARN( notNull calls_for_me, ptext (sLit "Missed specialisation opportunity for") 
+  = WARN( dflags, notNull calls_for_me, ptext (sLit "Missed specialisation opportunity for") 
                                  <+> ppr fn $$ _trace_doc )
 	  -- Note [Specialisation shape]
     -- pprTrace "specDefn: none" (ppr fn $$ ppr calls_for_me) $

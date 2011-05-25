@@ -70,9 +70,10 @@ opt_co env sym co
  = pprTrace "opt_co {" (ppr sym <+> ppr co $$ ppr env) $
    co1 `seq`
    pprTrace "opt_co done }" (ppr co1) $
-   (WARN( not same_co_kind, ppr co  <+> dcolon <+> pprEqPred (Pair s1 t1)
+   (WARN( dflags,
+          not same_co_kind, ppr co  <+> dcolon <+> pprEqPred (Pair s1 t1)
                          $$ ppr co1 <+> dcolon <+> pprEqPred (Pair s2 t2) )
-    WARN( not (coreEqCoercion co1 simple_result),
+    WARN( dflags, not (coreEqCoercion co1 simple_result),
            (text "env=" <+> ppr env) $$
            (text "input=" <+> ppr co) $$
            (text "simple=" <+> ppr simple_result) $$
@@ -106,7 +107,7 @@ opt_co' env sym (CoVarCo cv)
   = ASSERT( isCoVar cv1 ) wrapSym sym (CoVarCo cv1)
                 -- cv1 might have a substituted kind!
 
-  | otherwise = WARN( True, ptext (sLit "opt_co: not in scope:") <+> ppr cv $$ ppr env)
+  | otherwise = WARN( dflags, True, ptext (sLit "opt_co: not in scope:") <+> ppr cv $$ ppr env)
                 ASSERT( isCoVar cv )
                 wrapSym sym (CoVarCo cv)
 

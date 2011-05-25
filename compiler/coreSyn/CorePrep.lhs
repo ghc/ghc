@@ -363,7 +363,7 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
        ; (floats3, rhs')
             <- if manifestArity rhs1 <= arity 
 	       then return (floats2, cpeEtaExpand arity rhs2)
-	       else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
+	       else WARN(dflags, True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
 	       	    	       -- Note [Silly extra arguments]
 	       	    (do { v <- newVar (idType bndr)
 		        ; let float = mkFloat False False v rhs2

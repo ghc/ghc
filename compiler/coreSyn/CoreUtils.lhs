@@ -210,7 +210,7 @@ mkCoerce co expr
 --    if to_ty `eqType` from_ty
 --    then expr
 --    else 
-        WARN(not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ pprEqPred (coercionKind co))
+        WARN(dflags, not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ pprEqPred (coercionKind co))
          (Cast expr co)
 \end{code}
 
@@ -1223,10 +1223,10 @@ hash_expr env (Let (NonRec b r) e)    = hash_expr (extend_env env b) e * fast_ha
 hash_expr env (Let (Rec ((b,_):_)) e) = hash_expr (extend_env env b) e
 hash_expr env (Case e _ _ _)	      = hash_expr env e
 hash_expr env (Lam b e)	              = hash_expr (extend_env env b) e
-hash_expr _   (Type _)                = WARN(True, text "hash_expr: type") 1
+hash_expr _   (Type _)                = WARN(dflags, True, text "hash_expr: type") 1
 -- Shouldn't happen.  Better to use WARN than trace, because trace
 -- prevents the CPR optimisation kicking in for hash_expr.
-hash_expr _   (Coercion _)            = WARN(True, text "hash_expr: coercion") 1
+hash_expr _   (Coercion _)            = WARN(dflags, True, text "hash_expr: coercion") 1
 
 fast_hash_expr :: HashEnv -> CoreExpr -> Word32
 fast_hash_expr env (Var v)     	 = hashVar env v

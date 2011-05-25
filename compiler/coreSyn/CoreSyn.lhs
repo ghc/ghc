@@ -821,7 +821,7 @@ cmpAltCon (DataAlt _)  DEFAULT      = GT
 cmpAltCon (LitAlt  l1) (LitAlt  l2) = l1 `compare` l2
 cmpAltCon (LitAlt _)   DEFAULT      = GT
 
-cmpAltCon con1 con2 = WARN( True, text "Comparing incomparable AltCons" <+> 
+cmpAltCon con1 con2 = WARN( dflags, True, text "Comparing incomparable AltCons" <+> 
 			 	  ppr con1 <+> ppr con2 )
 		      LT
 \end{code}

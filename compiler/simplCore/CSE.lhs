@@ -329,7 +329,7 @@ extendCSEnv (CS cs in_scope sub) expr expr'
   where
     hash = hashExpr expr
     combine old new 
-	= WARN( result `lengthExceeds` 4, short_msg $$ nest 2 long_msg ) result
+	= WARN( dflags, result `lengthExceeds` 4, short_msg $$ nest 2 long_msg ) result
 	where
 	  result = new ++ old
 	  short_msg = ptext (sLit "extendCSEnv: long list, length") <+> int (length result)
@@ -348,7 +348,7 @@ addBinder :: CSEnv -> Id -> (CSEnv, Id)
 addBinder (CS cs in_scope sub) v
   | not (v `elemInScopeSet` in_scope) = (CS cs (extendInScopeSet in_scope v)  sub,		       v)
   | isId v			      = (CS cs (extendInScopeSet in_scope v') (extendVarEnv sub v v'), v')
-  | otherwise			      = WARN( True, ppr v )
+  | otherwise			      = WARN( dflags, True, ppr v )
 				        (CS emptyUFM in_scope		      sub,		       v)
 	-- This last case is the unusual situation where we have shadowing of
 	-- a type variable; we have to discard the CSE mapping

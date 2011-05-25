@@ -870,7 +870,7 @@ substCoVar :: CvSubst -> CoVar -> Coercion
 substCoVar (CvSubst in_scope _ cenv) cv
   | Just co  <- lookupVarEnv cenv cv      = co
   | Just cv1 <- lookupInScope in_scope cv = ASSERT( isCoVar cv1 ) CoVarCo cv1
-  | otherwise = WARN( True, ptext (sLit "substCoVar not in scope") <+> ppr cv )
+  | otherwise = WARN( dflags, True, ptext (sLit "substCoVar not in scope") <+> ppr cv )
                 ASSERT( isCoVar cv ) CoVarCo cv
 
 substCoVars :: CvSubst -> [CoVar] -> [Coercion]

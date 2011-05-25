@@ -678,7 +678,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
 		-- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
                          Just id -> id
-                         Nothing -> WARN( True, ppr idocc ) idocc
+                         Nothing -> WARN( dflags, True, ppr idocc ) idocc
 
           unfold_env' = extendVarEnv unfold_env idocc (name',show_unfold)
           referrer' | isExportedId refined_id = refined_id
@@ -1058,7 +1058,7 @@ tidyTopIdInfo rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
 
     --------- Strictness ------------
     final_sig | Just sig <- strictnessInfo idinfo
-              = WARN( _bottom_hidden sig, ppr name ) Just sig
+              = WARN( dflags, _bottom_hidden sig, ppr name ) Just sig
               | Just (_, sig) <- mb_bot_str = Just sig
               | otherwise                   = Nothing
 

@@ -74,6 +74,7 @@ module SrcLoc (
 import Util
 import Outputable
 import FastString
+import {-# SOURCE #-} DynFlags (DynFlags)
 
 import Data.Bits
 import Data.Data
@@ -127,14 +128,14 @@ srcLocFile (SrcLoc fname _ _) = fname
 srcLocFile _other	      = (fsLit "<unknown file")
 
 -- | Raises an error when used on a "bad" 'SrcLoc'
-srcLocLine :: SrcLoc -> Int
-srcLocLine (SrcLoc _ l _) = l
-srcLocLine (UnhelpfulLoc s) = pprPanic "srcLocLine" (ftext s)
+srcLocLine :: DynFlags -> SrcLoc -> Int
+srcLocLine _      (SrcLoc _ l _) = l
+srcLocLine dflags (UnhelpfulLoc s) = pprPanic dflags "srcLocLine" (ftext s)
 
 -- | Raises an error when used on a "bad" 'SrcLoc'
-srcLocCol :: SrcLoc -> Int
-srcLocCol (SrcLoc _ _ c) = c
-srcLocCol (UnhelpfulLoc s) = pprPanic "srcLocCol" (ftext s)
+srcLocCol :: DynFlags -> SrcLoc -> Int
+srcLocCol _      (SrcLoc _ _ c) = c
+srcLocCol dflags (UnhelpfulLoc s) = pprPanic dflags "srcLocCol" (ftext s)
 
 -- | Move the 'SrcLoc' down by one line if the character is a newline,
 -- to the next 8-char tabstop if it is a tab, and across by one
@@ -256,19 +257,19 @@ srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
 srcLocSpan (SrcLoc file line col) = SrcSpanPoint file line col
 
 -- | Create a 'SrcSpan' between two points in a file
-mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
-mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
-mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
-mkSrcSpan loc1 loc2
+mkSrcSpan :: DynFlags -> SrcLoc -> SrcLoc -> SrcSpan
+mkSrcSpan _ (UnhelpfulLoc str) _ = UnhelpfulSpan str
+mkSrcSpan _ _ (UnhelpfulLoc str) = UnhelpfulSpan str
+mkSrcSpan dflags loc1 loc2
   | line1 == line2 = if col1 == col2
 			then SrcSpanPoint file line1 col1
 			else SrcSpanOneLine file line1 col1 col2
   | otherwise      = SrcSpanMultiLine file line1 col1 line2 col2
   where
-	line1 = srcLocLine loc1
-	line2 = srcLocLine loc2
-	col1 = srcLocCol loc1
-	col2 = srcLocCol loc2
+	line1 = srcLocLine dflags loc1
+	line2 = srcLocLine dflags loc2
+	col1 = srcLocCol dflags loc1
+	col2 = srcLocCol dflags loc2
 	file = srcLocFile loc1
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters

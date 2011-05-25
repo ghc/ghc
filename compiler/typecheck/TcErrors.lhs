@@ -737,7 +737,7 @@ monomorphism_fix dflags
 
 getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
 getSkolemInfo [] tv
-  = WARN( True, ptext (sLit "No skolem info:") <+> ppr tv )
+  = WARN( dflags, True, ptext (sLit "No skolem info:") <+> ppr tv )
     UnkSkol
 getSkolemInfo (implic:implics) tv
   | tv `elemVarSet` ic_skols implic = ctLocOrigin (ic_loc implic)

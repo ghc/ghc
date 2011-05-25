@@ -547,7 +547,7 @@ dmdAnalRhs top_lvl rec_flag env (id, rhs)
   arity		     = idArity id   -- The idArity should be up to date
 				    -- The simplifier was run just beforehand
   (rhs_dmd_ty, rhs') = dmdAnal env (vanillaCall arity) rhs
-  (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty && not (exprIsTrivial rhs), ppr id )
+  (lazy_fv, sig_ty)  = WARN( dflags, arity /= dmdTypeDepth rhs_dmd_ty && not (exprIsTrivial rhs), ppr id )
 				-- The RHS can be eta-reduced to just a variable, 
 				-- in which case we should not complain. 
 		       mkSigTy top_lvl rec_flag id rhs rhs_dmd_ty

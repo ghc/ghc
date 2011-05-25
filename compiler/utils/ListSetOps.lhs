@@ -25,6 +25,7 @@ import Outputable
 import Unique
 import UniqFM
 import Util
+import DynFlags
 
 import Data.List
 \end{code}
@@ -43,10 +44,10 @@ insertList :: Eq a => a -> [a] -> [a]
 insertList x xs | isIn "insert" x xs = xs
                 | otherwise          = x : xs
 
-unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
+unionLists :: (Outputable a, Eq a) => DynFlags -> [a] -> [a] -> [a]
 -- Assumes that the arguments contain no duplicates
-unionLists xs ys 
-  = WARN(length xs > 100 || length ys > 100, ppr xs $$ ppr ys)
+unionLists dflags xs ys
+  = WARN(dflags, length xs > 100 || length ys > 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
 minusList :: (Eq a) => [a] -> [a] -> [a]

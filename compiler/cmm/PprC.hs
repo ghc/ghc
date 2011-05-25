@@ -775,10 +775,10 @@ pprReg r = case r of
         CmmLocal  local  -> pprLocalReg local
         CmmGlobal global -> pprGlobalReg global
 		
-pprAsPtrReg :: CmmReg -> SDoc
-pprAsPtrReg (CmmGlobal (VanillaReg n gcp)) 
-  = WARN( gcp /= VGcPtr, ppr n ) char 'R' <> int n <> ptext (sLit ".p")
-pprAsPtrReg other_reg = pprReg other_reg
+pprAsPtrReg :: DynFlags -> CmmReg -> SDoc
+pprAsPtrReg dflags (CmmGlobal (VanillaReg n gcp)) 
+  = WARN( dflags, gcp /= VGcPtr, ppr n ) char 'R' <> int n <> ptext (sLit ".p")
+pprAsPtrReg _ other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr = case gr of

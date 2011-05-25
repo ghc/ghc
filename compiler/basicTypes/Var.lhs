@@ -76,6 +76,7 @@ import Util
 import FastTypes
 import FastString
 import Outputable
+import DynFlags
 
 import Data.Data
 \end{code}
@@ -272,9 +273,9 @@ mkTcTyVar name kind details
 		tc_tv_details = details
 	}
 
-tcTyVarDetails :: TyVar -> TcTyVarDetails
-tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
-tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var)
+tcTyVarDetails :: DynFlags -> TyVar -> TcTyVarDetails
+tcTyVarDetails _ (TcTyVar { tc_tv_details = details }) = details
+tcTyVarDetails dflags var = pprPanic dflags "tcTyVarDetails" (ppr var)
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }

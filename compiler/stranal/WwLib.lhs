@@ -274,7 +274,7 @@ mkWWargs subst fun_ty arg_info
         	  res_ty) }
 
   | otherwise
-  = WARN( True, ppr fun_ty )			-- Should not happen: if there is a demand
+  = WARN( dflags, True, ppr fun_ty )			-- Should not happen: if there is a demand
     return ([], id, id, substTy subst fun_ty) 	-- then there should be a function arrow
 
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
@@ -424,7 +424,7 @@ mkWWcpr :: Type                              -- function body type
 
 mkWWcpr body_ty RetCPR
     | not (isClosedAlgType body_ty)
-    = WARN( True, 
+    = WARN( dflags, True, 
             text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
       return (id, id, body_ty)
 
@@ -521,7 +521,7 @@ mk_absent_let arg
   | arg_ty `eqType` realWorldStatePrimTy 
   = Just (Let (NonRec arg (Var realWorldPrimId)))
   | otherwise
-  = WARN( True, ptext (sLit "No absent value for") <+> ppr arg_ty )
+  = WARN( dflags, True, ptext (sLit "No absent value for") <+> ppr arg_ty )
     Nothing
   where
     arg_ty  = idType arg

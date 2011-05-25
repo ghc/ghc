@@ -636,7 +636,7 @@ getCallMethod _ _ _ (LFUnknown True) _
 
 getCallMethod _ name _ (LFUnknown False) n_args
   | n_args > 0 
-  = WARN( True, ppr name <+> ppr n_args ) 
+  = WARN( dflags, True, ppr name <+> ppr n_args ) 
     SlowCall	-- Note [Unsafe coerce complications]
 
   | otherwise

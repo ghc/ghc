@@ -635,7 +635,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
 
     from_exposed_pkg m = case lookupPackage pkg_map (modulePackageId m) of
                             Just pkg_config -> exposed pkg_config
-                            Nothing         -> WARN( True, ppr m ) -- Should not happen
+                            Nothing         -> WARN( dflags, True, ppr m ) -- Should not happen
                                                False
 
     pp_exp mod = ppr (moduleName mod)

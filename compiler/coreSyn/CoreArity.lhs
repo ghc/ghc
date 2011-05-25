@@ -776,7 +776,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
 
        | otherwise	 -- We have an expression of arity > 0, 
        	 		 -- but its type isn't a function. 		   
-       = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
+       = WARN( dflags, True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
          (getTvInScope subst, reverse eis)
     	-- This *can* legitmately happen:
     	-- e.g.  coerce Int (\x. x) Essentially the programmer is

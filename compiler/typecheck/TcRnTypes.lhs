@@ -650,7 +650,7 @@ plusImportAvails
 		   imp_finsts   = finsts1 `unionLists` finsts2 }
   where
     plus_mod_dep (m1, boot1) (m2, boot2) 
-	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
+	= WARN( dflags, not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
 		-- Check mod-names match
 	  (m1, boot1 && boot2)	-- If either side can "see" a non-hi-boot interface, use that
 \end{code}
@@ -1077,7 +1077,7 @@ pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.  
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
+pprSkolInfo UnkSkol = WARN( dflags, True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
 \end{code}
 
 

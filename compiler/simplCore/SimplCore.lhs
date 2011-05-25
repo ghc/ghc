@@ -339,7 +339,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
 	-- iteration_no is the number of the iteration we are
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
-      = WARN( debugIsOn && (max_iterations > 2)
+      = WARN( dflags, debugIsOn && (max_iterations > 2)
             , ptext (sLit "Simplifier baling out after") <+> int max_iterations
               <+> ptext (sLit "iterations") 
               <+> (brackets $ hsep $ punctuate comma $ 
@@ -618,7 +618,7 @@ shortMeOut ind_env exported_id local_id
     then
 	if hasShortableIdInfo exported_id
 	then True	-- See Note [Messing up the exported Id's IdInfo]
-	else WARN( True, ptext (sLit "Not shorting out:") <+> ppr exported_id )
+	else WARN( dflags, True, ptext (sLit "Not shorting out:") <+> ppr exported_id )
              False
     else
         False

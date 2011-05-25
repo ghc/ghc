@@ -67,6 +67,7 @@ import SrcLoc
 import FastString
 import Outputable
 import Util
+import {-# SOURCE #-} DynFlags (DynFlags)
 
 import Data.Data
 \end{code}
@@ -129,7 +130,7 @@ rdrNameOcc (Exact name) = nameOccName name
 rdrNameSpace :: RdrName -> NameSpace
 rdrNameSpace = occNameSpace . rdrNameOcc
 
-setRdrNameSpace :: RdrName -> NameSpace -> RdrName
+setRdrNameSpace :: DynFlags -> RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
 -- When parsing:
 --
@@ -143,12 +144,12 @@ setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- > data [] a = [] | a : [a]
 --
 -- For the exact-name case we return an original name.
-setRdrNameSpace (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
-setRdrNameSpace (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
-setRdrNameSpace (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
-setRdrNameSpace (Exact n)    ns = ASSERT( isExternalName n ) 
-		       	          Orig (nameModule n)
-				       (setOccNameSpace ns (nameOccName n))
+setRdrNameSpace _      (Unqual occ) ns = Unqual (setOccNameSpace ns occ)
+setRdrNameSpace _      (Qual m occ) ns = Qual m (setOccNameSpace ns occ)
+setRdrNameSpace _      (Orig m occ) ns = Orig m (setOccNameSpace ns occ)
+setRdrNameSpace dflags (Exact n)    ns = ASSERT( isExternalName n )
+                                         Orig (nameModule dflags n)
+                                              (setOccNameSpace ns (nameOccName n))
 \end{code}
 
 \begin{code}
@@ -185,9 +186,9 @@ nameRdrName name = Exact name
 -- unique is still there for debug printing, particularly
 -- of Types (which are converted to IfaceTypes before printing)
 
-nukeExact :: Name -> RdrName
-nukeExact n 
-  | isExternalName n = Orig (nameModule n) (nameOccName n)
+nukeExact :: DynFlags -> Name -> RdrName
+nukeExact dflags n
+  | isExternalName n = Orig (nameModule dflags n) (nameOccName n)
   | otherwise	     = Unqual (nameOccName n)
 \end{code}
 
@@ -504,17 +505,17 @@ mkGlobalRdrEnv gres
 				   (nameOccName (gre_name gre)) 
 				   gre
 
-findLocalDupsRdrEnv :: GlobalRdrEnv -> [OccName] -> (GlobalRdrEnv, [[Name]])
+findLocalDupsRdrEnv :: DynFlags -> GlobalRdrEnv -> [OccName] -> (GlobalRdrEnv, [[Name]])
 -- ^ For each 'OccName', see if there are multiple local definitions
 -- for it.  If so, remove all but one (to suppress subsequent error messages)
 -- and return a list of the duplicate bindings
-findLocalDupsRdrEnv rdr_env occs 
+findLocalDupsRdrEnv dflags rdr_env occs 
   = go rdr_env [] occs
   where
     go rdr_env dups [] = (rdr_env, dups)
     go rdr_env dups (occ:occs)
       = case filter isLocalGRE gres of
-	  []       -> WARN( True, ppr occ <+> ppr rdr_env ) 
+	  []       -> WARN( dflags, True, ppr occ <+> ppr rdr_env ) 
 		      go rdr_env dups occs	-- Weird!  No binding for occ
 	  [_]      -> go rdr_env dups occs	-- The common case
 	  dup_gres -> go (extendOccEnv rdr_env occ (head dup_gres : nonlocal_gres))

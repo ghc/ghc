@@ -211,7 +211,7 @@ mkStackLayout = do
                     [(offset - frame_sp - retAddrSizeW, b)
                     | (offset, b) <- binds]
 
-  WARN( not (all (\bind -> fst bind >= 0) rel_binds),
+  WARN( dflags, not (all (\bind -> fst bind >= 0) rel_binds),
 	ppr binds $$ ppr rel_binds $$
         ppr frame_size $$ ppr real_sp $$ ppr frame_sp )
     return $ stack_layout rel_binds frame_size

@@ -325,14 +325,14 @@ writeMetaTyVar tyvar ty
 
 -- Everything from here on only happens if DEBUG is on
   | not (isTcTyVar tyvar)
-  = WARN( True, text "Writing to non-tc tyvar" <+> ppr tyvar )
+  = WARN( dflags, True, text "Writing to non-tc tyvar" <+> ppr tyvar )
     return ()
 
   | MetaTv _ ref <- tcTyVarDetails tyvar
   = writeMetaTyVarRef tyvar ref ty
 
   | otherwise
-  = WARN( True, text "Writing to non-meta tyvar" <+> ppr tyvar )
+  = WARN( dflags, True, text "Writing to non-meta tyvar" <+> ppr tyvar )
     return ()
 
 --------------------
@@ -347,7 +347,7 @@ writeMetaTyVarRef tyvar ref ty
 -- Everything from here on only happens if DEBUG is on
   | not (isPredTy tv_kind)   -- Don't check kinds for updates to coercion variables
   , not (ty_kind `isSubKind` tv_kind)
-  = WARN( True, hang (text "Ill-kinded update to meta tyvar")
+  = WARN( dflags, True, hang (text "Ill-kinded update to meta tyvar")
                    2 (ppr tyvar $$ ppr tv_kind $$ ppr ty $$ ppr ty_kind) )
     return ()
 
@@ -543,7 +543,7 @@ zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 zonkQuantifiedTyVar tv
   = ASSERT2( isTcTyVar tv, ppr tv ) 
     case tcTyVarDetails tv of
-      SkolemTv {} -> WARN( True, ppr tv )  -- Dec10: Can this really happen?
+      SkolemTv {} -> WARN( dflags, True, ppr tv )  -- Dec10: Can this really happen?
                      do { kind <- zonkTcType (tyVarKind tv)
                         ; return $ setTyVarKind tv kind }
 	-- It might be a skolem type variable, 
@@ -556,7 +556,7 @@ zonkQuantifiedTyVar tv
                       (readMutVar _ref >>= \cts -> 
                        case cts of 
                              Flexi -> return ()
-                             Indirect ty -> WARN( True, ppr tv $$ ppr ty )
+                             Indirect ty -> WARN( dflags, True, ppr tv $$ ppr ty )
                                             return ()) >>
 #endif
                       skolemiseUnboundMetaTyVar tv vanillaSkolemTv

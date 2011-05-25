@@ -508,7 +508,7 @@ tagToEnumRule _ [Type ty, Lit (MachInt i)]
         (dc:rest) -> ASSERT( null rest )
                      Just (mkTyApps (Var (dataConWorkId dc)) tc_args)
   | otherwise  -- See Note [tagToEnum#]
-  = WARN( True, ptext (sLit "tagToEnum# on non-enumeration type") <+> ppr ty )
+  = WARN( dflags, True, ptext (sLit "tagToEnum# on non-enumeration type") <+> ppr ty )
     Just (mkRuntimeErrorApp rUNTIME_ERROR_ID ty "tagToEnum# on non-enumeration type")
   where
     correct_tag dc = (dataConTag dc - fIRST_TAG) == tag

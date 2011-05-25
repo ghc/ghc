@@ -308,7 +308,7 @@ checkSize fn_id rhs thing_inside
 splitFun :: Id -> IdInfo -> [Demand] -> DmdResult -> Expr Var
          -> UniqSM [(Id, CoreExpr)]
 splitFun fn_id fn_info wrap_dmds res_info rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
+  = WARN( dflags, not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
     (do {
 	-- The arity should match the signature
       (work_demands, wrap_fn, work_fn) <- mkWwBodies fun_ty wrap_dmds res_info one_shots

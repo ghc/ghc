@@ -218,7 +218,7 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 -- floated out a binding, in which case it will be approximate.
 consistentCafInfo :: Id -> GenStgBinding Var Id -> Bool
 consistentCafInfo id bind
-  = WARN( not (exact || is_sat_thing) , ppr id <+> ppr id_marked_caffy <+> ppr binding_is_caffy )
+  = WARN( dflags, not (exact || is_sat_thing) , ppr id <+> ppr id_marked_caffy <+> ppr binding_is_caffy )
     safe
   where
     safe  = id_marked_caffy || not binding_is_caffy
@@ -608,7 +608,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- we complain.
         -- We also want to check if a pointer is cast to a non-ptr etc
 
-    WARN( bad_args, ptext (sLit "Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
+    WARN( dflags, bad_args, ptext (sLit "Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
      return (stg_arg : stg_args, fvs)
 
 

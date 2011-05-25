@@ -393,7 +393,7 @@ mkArgInfo fun rules n_val_args call_cont
 		   else
 			map isStrictDmd demands ++ vanilla_stricts
 	       | otherwise
-	       -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun) 
+	       -> WARN( dflags, True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun) 
 				<+> ppr n_val_args <+> ppr demands ) 
 		   vanilla_stricts	-- Not enough args, or no strictness
 
@@ -1110,7 +1110,7 @@ tryEtaExpand env bndr rhs
   = do { dflags <- getDOptsSmpl
        ; (new_arity, new_rhs) <- try_expand dflags
 
-       ; WARN( new_arity < old_arity || new_arity < _dmd_arity, 
+       ; WARN( dflags, new_arity < old_arity || new_arity < _dmd_arity, 
                (ptext (sLit "Arity decrease:") <+> (ppr bndr <+> ppr old_arity
 		<+> ppr new_arity <+> ppr _dmd_arity) $$ ppr new_rhs) )
 			-- Note [Arity decrease]

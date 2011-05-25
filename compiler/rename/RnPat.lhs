@@ -513,7 +513,7 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
       = do { env <- getGlobalRdrEnv
            ; return (case lookupGRE_Name env con of
 	       	       [gre] -> gre_par gre
-               	       gres  -> WARN( True, ppr con <+> ppr gres ) NoParent) }
+               	       gres  -> WARN( dflags, True, ppr con <+> ppr gres ) NoParent) }
       | otherwise = return NoParent
  
     dup_flds :: [[RdrName]]

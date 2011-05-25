@@ -522,7 +522,7 @@ refine :: InScopeSet -> Var -> Var
 refine in_scope v 
   | isLocalId v = case lookupInScope in_scope v of
 			 Just v' -> v'
-			 Nothing -> WARN( True, ppr v ) v	-- This is an error!
+			 Nothing -> WARN( dflags, True, ppr v ) v	-- This is an error!
   | otherwise = v
 
 lookupRecBndr :: SimplEnv -> InId -> OutId

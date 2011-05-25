@@ -2012,7 +2012,7 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExp
 		-- it "sees" that the entire branch of an outer case is 
 		-- inaccessible.  So we simply put an error case here instead.
 missingAlt env case_bndr alts cont
-  = WARN( True, ptext (sLit "missingAlt") <+> ppr case_bndr )
+  = WARN( dflags, True, ptext (sLit "missingAlt") <+> ppr case_bndr )
     return (env, mkImpossibleExpr res_ty)
   where
     res_ty = contResultType env (substTy env (coreAltsType alts)) cont
@@ -2176,7 +2176,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
 		      	     rhs = mkConApp dc (map Type (tyConAppArgs scrut_ty)
 			     	   	        ++ varsToCoreExprs bndrs')
 
-		      LitAlt {} -> WARN( True, ptext (sLit "mkDupableAlt")
+		      LitAlt {} -> WARN( dflags, True, ptext (sLit "mkDupableAlt")
 		      	     	   	        <+> ppr case_bndr <+> ppr con )
 			           case_bndr
 		      	   -- The case binder is alive but trivial, so why has 

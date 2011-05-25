@@ -122,7 +122,7 @@ rnImportDecl this_mod implicit_prelude
 
         -- Compiler sanity check: if the import didn't say
         -- {-# SOURCE #-} we should not get a hi-boot file
-    WARN( not want_boot && mi_boot iface, ppr imp_mod_name ) (do
+    WARN( dflags, not want_boot && mi_boot iface, ppr imp_mod_name ) (do
 
         -- Issue a user warning for a redundant {- SOURCE -} import
         -- NB that we arrange to read all the ordinary imports before

@@ -251,7 +251,7 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope $$ doc) 
+  | otherwise = WARN( dflags, True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope $$ doc) 
 		Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
@@ -645,13 +645,13 @@ substUnfoldingSource (Subst in_scope ids _ _) (InlineWrapper wkr)
   | Just wkr_expr <- lookupVarEnv ids wkr 
   = case wkr_expr of
       Var w1 -> InlineWrapper w1
-      _other -> -- WARN( True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
+      _other -> -- WARN( dflags, True, text "Interesting! CoreSubst.substWorker1:" <+> ppr wkr 
                 --             <+> ifPprDebug (equals <+> ppr wkr_expr) )   
 			      -- Note [Worker inlining]
                 InlineStable  -- It's not a wrapper any more, but still inline it!
 
   | Just w1  <- lookupInScope in_scope wkr = InlineWrapper w1
-  | otherwise = -- WARN( True, text "Interesting! CoreSubst.substWorker2:" <+> ppr wkr )
+  | otherwise = -- WARN( dflags, True, text "Interesting! CoreSubst.substWorker2:" <+> ppr wkr )
     	      	-- This can legitimately happen.  The worker has been inlined and
 		-- dropped as dead code, because we don't treat the UnfoldingSource
 		-- as an "occurrence".

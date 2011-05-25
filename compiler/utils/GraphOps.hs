@@ -21,6 +21,7 @@ where
 
 import GraphBase
 
+import DynFlags
 import Outputable
 import Unique
 import UniqSet
@@ -510,12 +511,13 @@ scanGraph match graph
 --
 validateGraph
 	:: (Uniquable k, Outputable k, Eq color)
-	=> SDoc				-- ^ extra debugging info to display on error
+	=> DynFlags
+	-> SDoc				-- ^ extra debugging info to display on error
 	-> Bool				-- ^ whether this graph is supposed to be colored.
 	-> Graph k cls color		-- ^ graph to validate
 	-> Graph k cls color		-- ^ validated graph
 
-validateGraph doc isColored graph
+validateGraph dflags doc isColored graph
 
 	-- Check that all edges point to valid nodes.
   	| edges		<- unionManyUniqSets
@@ -525,7 +527,7 @@ validateGraph doc isColored graph
 	, nodes		<- mkUniqSet $ map nodeId $ eltsUFM $ graphMap graph
 	, badEdges 	<- minusUniqSet edges nodes
 	, not $ isEmptyUniqSet badEdges
-	= pprPanic "GraphOps.validateGraph"
+	= pprPanic dflags "GraphOps.validateGraph"
 		(  text "Graph has edges that point to non-existant nodes"
 		$$ text "  bad edges: " <> vcat (map ppr $ uniqSetToList badEdges)
 		$$ doc )

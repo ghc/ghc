@@ -72,6 +72,7 @@ module Name (
 #include "Typeable.h"
 
 import {-# SOURCE #-} TypeRep( TyThing )
+import {-# SOURCE #-} DynFlags (DynFlags)
 
 import OccName
 import Module
@@ -164,7 +165,7 @@ All built-in syntax is for wired-in things.
 \begin{code}
 nameUnique		:: Name -> Unique
 nameOccName		:: Name -> OccName 
-nameModule		:: Name -> Module
+nameModule		:: DynFlags -> Name -> Module
 nameSrcLoc		:: Name -> SrcLoc
 nameSrcSpan		:: Name -> SrcSpan
 
@@ -181,7 +182,7 @@ nameSrcSpan name = n_loc  name
 %************************************************************************
 
 \begin{code}
-nameIsLocalOrFrom :: Module -> Name -> Bool
+nameIsLocalOrFrom :: DynFlags -> Module -> Name -> Bool
 isInternalName	  :: Name -> Bool
 isExternalName	  :: Name -> Bool
 isSystemName	  :: Name -> Bool
@@ -204,14 +205,14 @@ isExternalName _                               = False
 
 isInternalName name = not (isExternalName name)
 
-nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
+nameModule dflags name = nameModule_maybe name `orElse` pprPanic dflags "nameModule" (ppr name)
 nameModule_maybe :: Name -> Maybe Module
 nameModule_maybe (Name { n_sort = External mod})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
 nameModule_maybe _                                  = Nothing
 
-nameIsLocalOrFrom from name
-  | isExternalName name = from == nameModule name
+nameIsLocalOrFrom dflags from name
+  | isExternalName name = from == nameModule dflags name
   | otherwise		= True
 
 isTyVarName :: Name -> Bool
@@ -220,8 +221,8 @@ isTyVarName name = isTvOcc (nameOccName name)
 isTyConName :: Name -> Bool
 isTyConName name = isTcOcc (nameOccName name)
 
-isDataConName :: Name -> Bool
-isDataConName name = isDataOcc (nameOccName name)
+isDataConName :: DynFlags -> Name -> Bool
+isDataConName dflags name = isDataOcc dflags (nameOccName name)
 
 isValName :: Name -> Bool
 isValName name = isValOcc (nameOccName name)
@@ -484,7 +485,9 @@ pprNameLoc name
   | isGoodSrcSpan loc = pprDefnLoc loc
   | isInternalName name || isSystemName name 
                       = ptext (sLit "<no location info>")
-  | otherwise         = ptext (sLit "Defined in ") <> ppr (nameModule name)
+  | otherwise         = sdocWithDynFlags $ \dflags ->
+                        (ptext (sLit "Defined in ") <>
+                         ppr (nameModule dflags name))
   where loc = nameSrcSpan name
 \end{code}
 

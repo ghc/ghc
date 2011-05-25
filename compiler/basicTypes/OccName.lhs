@@ -101,6 +101,7 @@ import UniqFM
 import UniqSet
 import FastString
 import Outputable
+import {-# SOURCE #-} DynFlags (DynFlags)
 import Binary
 import StaticFlags( opt_SuppressUniques )
 import Data.Char
@@ -427,7 +428,8 @@ occNameString (OccName _ s) = unpackFS s
 setOccNameSpace :: NameSpace -> OccName -> OccName
 setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
-isVarOcc, isTvOcc, isTcOcc, isDataOcc :: OccName -> Bool
+isVarOcc, isTvOcc, isTcOcc :: OccName -> Bool
+isDataOcc :: DynFlags -> OccName -> Bool
 
 isVarOcc (OccName VarName _) = True
 isVarOcc _                   = False
@@ -445,20 +447,20 @@ isValOcc (OccName VarName  _) = True
 isValOcc (OccName DataName _) = True
 isValOcc _                    = False
 
-isDataOcc (OccName DataName _) = True
-isDataOcc (OccName VarName s)  
-  | isLexCon s = pprPanic "isDataOcc: check me" (ppr s)
+isDataOcc _      (OccName DataName _) = True
+isDataOcc dflags (OccName VarName s)  
+  | isLexCon s = pprPanic dflags "isDataOcc: check me" (ppr s)
 		-- Jan06: I don't think this should happen
-isDataOcc _                    = False
+isDataOcc _      _                    = False
 
 -- | Test if the 'OccName' is a data constructor that starts with
 -- a symbol (e.g. @:@, or @[]@)
-isDataSymOcc :: OccName -> Bool
-isDataSymOcc (OccName DataName s) = isLexConSym s
-isDataSymOcc (OccName VarName s)  
-  | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
+isDataSymOcc :: DynFlags -> OccName -> Bool
+isDataSymOcc _      (OccName DataName s) = isLexConSym s
+isDataSymOcc dflags (OccName VarName s)
+  | isLexConSym s = pprPanic dflags "isDataSymOcc: check me" (ppr s)
 		-- Jan06: I don't think this should happen
-isDataSymOcc _                    = False
+isDataSymOcc _      _                    = False
 -- Pretty inefficient!
 
 -- | Test if the 'OccName' is that for any operator (whether 

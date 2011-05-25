@@ -19,6 +19,7 @@ where
 import Constants
 import FastString
 import Outputable
+import DynFlags
 
 import Data.Word
 import Data.Int
@@ -197,14 +198,14 @@ widthInBytes W64  = 8
 widthInBytes W128 = 16
 widthInBytes W80  = 10
 
-widthFromBytes :: Int -> Width
-widthFromBytes 1  = W8
-widthFromBytes 2  = W16
-widthFromBytes 4  = W32
-widthFromBytes 8  = W64
-widthFromBytes 16 = W128
-widthFromBytes 10 = W80
-widthFromBytes n  = pprPanic "no width for given number of bytes" (ppr n)
+widthFromBytes :: DynFlags -> Int -> Width
+widthFromBytes _      1  = W8
+widthFromBytes _      2  = W16
+widthFromBytes _      4  = W32
+widthFromBytes _      8  = W64
+widthFromBytes _      16 = W128
+widthFromBytes _      10 = W80
+widthFromBytes dflags n  = pprPanic dflags "no width for given number of bytes" (ppr n)
 
 -- log_2 of the width in bytes, useful for generating shifts.
 widthInLog :: Width -> Int

@@ -16,6 +16,7 @@ module Outputable (
 
         -- * Pretty printing combinators
 	SDoc, runSDoc, initSDocContext,
+	sdocWithDynFlags,
 	docToSDoc,
 	interppSP, interpp'SP, pprQuotedList, pprWithCommas, quotedListWithOr,
 	empty, nest,
@@ -245,6 +246,11 @@ initSDocContext' dflags sty = SDC
   , sdocLastColour = colReset
   , sdocDynFlags = dflags
   }
+
+sdocWithDynFlags :: (DynFlags -> SDoc) -> SDoc
+sdocWithDynFlags f = SDoc (\sdc -> case f (sdocDynFlags sdc) of
+                                   SDoc mkDoc ->
+                                       mkDoc sdc)
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
@@ -873,9 +879,9 @@ plural _   = char 's'
 
 \begin{code}
 
-pprPanic :: String -> SDoc -> a
+pprPanic :: DynFlags -> String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"
-pprPanic    = pprAndThen panic
+pprPanic _ = pprAndThen panic
 
 pprSorry :: String -> SDoc -> a
 -- ^ Throw an exceptio saying "this isn't finished yet"
