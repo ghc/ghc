@@ -897,10 +897,10 @@ pprDefiniteTrace :: String -> SDoc -> a -> a
 -- ^ Same as pprTrace, but show even if -dno-debug-output is on
 pprDefiniteTrace str doc x = pprAndThen trace str doc x
 
-pprPanicFastInt :: String -> SDoc -> FastInt
+pprPanicFastInt :: DynFlags -> String -> SDoc -> FastInt
 -- ^ Specialization of pprPanic that can be safely used with 'FastInt'
-pprPanicFastInt heading pretty_msg =
-    panicFastInt (show (runSDoc doc (initSDocContext PprDebug)))
+pprPanicFastInt dflags heading pretty_msg =
+    panicFastInt (show (runSDoc doc (initSDocContext' dflags PprDebug)))
   where
     doc = text heading <+> pretty_msg
 
