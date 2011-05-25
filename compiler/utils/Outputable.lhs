@@ -352,10 +352,10 @@ printForUser dflags handle unqual doc
   = Pretty.printDoc PageMode handle
       (runSDoc doc (initSDocContext' dflags (mkUserStyle unqual AllTheWay)))
 
-printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
-printForUserPartWay handle d unqual doc
+printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
+printForUserPartWay dflags handle d unqual doc
   = Pretty.printDoc PageMode handle
-      (runSDoc doc (initSDocContext (mkUserStyle unqual (PartWay d))))
+      (runSDoc doc (initSDocContext' dflags (mkUserStyle unqual (PartWay d))))
 
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()

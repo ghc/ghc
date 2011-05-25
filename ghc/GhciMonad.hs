@@ -245,7 +245,8 @@ printForUser doc = do
 printForUserPartWay :: SDoc -> GHCi ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
-  liftIO $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
+  dflags <- getSessionDynFlags
+  liftIO $ Outputable.printForUserPartWay dflags stdout opt_PprUserLength unqual doc
 
 runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
 runStmt expr step = do
