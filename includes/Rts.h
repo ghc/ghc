@@ -248,9 +248,6 @@ int stg_sig_install (int, int, void *);
    Miscellaneous garbage
    -------------------------------------------------------------------------- */
 
-/* declarations for runtime flags/values */
-#define MAX_RTS_ARGS 32
-
 #ifdef DEBUG
 #define TICK_VAR(arity) \
   extern StgInt SLOW_CALLS_##arity; \
