@@ -275,6 +275,9 @@ Notice that 'x' counts 0, while (f x) counts 2.  That's deliberate: there's
 a function call to account for.  Notice also that constructor applications 
 are very cheap, because exposing them to a caller is so valuable.
 
+[25/5/11] All sizes are now multiplied by 10, except for primops.
+This makes primops look cheap, and seems to be almost unversally
+beneficial.  Done partly as a result of #4978.
 
 Note [Do not inline top-level bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -332,7 +335,7 @@ uncondInline :: Arity -> Int -> Bool
 -- See Note [INLINE for small functions]
 uncondInline arity size 
   | arity == 0 = size == 0
-  | otherwise  = size <= arity + 1
+  | otherwise  = size <= 10 * (arity + 1)
 \end{code}
 
 
@@ -361,19 +364,19 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (App fun arg)      = size_up arg  `addSizeNSD`
                                  size_up_app fun [arg]
 
-    size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
+    size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 10)
 		      | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
       = size_up rhs		`addSizeNSD`
 	size_up body		`addSizeN`
-	(if isUnLiftedType (idType binder) then 0 else 1)
+        (if isUnLiftedType (idType binder) then 0 else 10)
 		-- For the allocation
 		-- If the binder has an unlifted type there is no allocation
 
     size_up (Let (Rec pairs) body)
       = foldr (addSizeNSD . size_up . snd) 
-              (size_up body `addSizeN` length pairs)	-- (length pairs) for the allocation
+              (size_up body `addSizeN` (10 * length pairs))     -- (length pairs) for the allocation
               pairs
 
     size_up (Case (Var v) _ _ alts) 
@@ -390,7 +393,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 		-- the case when we are scrutinising an argument variable
 	  alts_size (SizeIs tot tot_disc tot_scrut)  -- Size of all alternatives
 		    (SizeIs max _        _)          -- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, iBox (_ILIT(2) +# tot -# max)) `unionBags` tot_disc) tot_scrut
+                = SizeIs tot (unitBag (v, iBox (_ILIT(20) +# tot -# max)) `unionBags` tot_disc) tot_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of the largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
@@ -404,7 +407,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
                                 foldr (addAltSize . size_up_alt) case_size alts
       where
           case_size
-           | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-1)
+           | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-10)
            | otherwise = sizeZero
                 -- Normally we don't charge for the case itself, but
                 -- we charge one per alternative (see size_up_alt,
@@ -449,14 +452,14 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up_call :: Id -> [CoreExpr] -> ExprSize
     size_up_call fun val_args
        = case idDetails fun of
-           FCallId _        -> sizeN opt_UF_DearOp
+           FCallId _        -> sizeN (10 * (1 + length val_args))
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op      -> primOpSize op (length val_args)
 	   ClassOpId _ 	    -> classOpSize top_args val_args
 	   _     	    -> funSize top_args fun (length val_args)
 
     ------------ 
-    size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 1
+    size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 10
  	-- Don't charge for args, so that wrappers look cheap
 	-- (See comments about wrappers with Case)
 	--
@@ -492,7 +495,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
-litSize (MachStr str) = 1 + ((lengthFS str + 3) `div` 4)
+litSize (MachStr str) = 10 + 10 * ((lengthFS str + 3) `div` 4)
 	-- If size could be 0 then @f "x"@ might be too small
 	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
 	--  duplication of little strings]
@@ -507,7 +510,7 @@ classOpSize _ []
 classOpSize top_args (arg1 : other_args)
   = SizeIs (iUnbox size) arg_discount (_ILIT(0))
   where
-    size = 2 + length other_args
+    size = 20 + (10 * length other_args)
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
     -- The actual discount is rather arbitrarily chosen
@@ -535,8 +538,7 @@ funSize top_args fun n_val_args
     res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
     		 | otherwise   	 	    = 0
         -- If the function is partially applied, show a result discount
-
-    size | some_val_args = 1 + n_val_args
+    size | some_val_args = 10 * (1 + n_val_args)
          | otherwise     = 0
 	-- The 1+ is for the function itself
 	-- Add 1 for each non-trivial arg;
@@ -545,16 +547,17 @@ funSize top_args fun n_val_args
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))	-- Like variables
-
--- See Note [Constructor size]
-  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+  | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(10))    -- Like variables
 
 -- See Note [Unboxed tuple result discount]
---  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (_ILIT(0))
+  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox (10 * (1 + n_val_args)))
 
 -- See Note [Constructor size]
-  | otherwise = SizeIs (_ILIT(1)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+  | otherwise = SizeIs (_ILIT(10)) emptyBag (iUnbox (10 * (10 + n_val_args)))
+     -- discont was (10 * (1 + n_val_args)), but it turns out that
+     -- adding a bigger constant here is an unambiguous win.  We
+     -- REALLY like unfolding constructors that get scrutinised.
+     -- [SDM, 25/5/11]
 \end{code}
 
 Note [Constructor size]
@@ -593,7 +596,7 @@ primOpSize op n_val_args
 
 
 buildSize :: ExprSize
-buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
+buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
 	-- We really want to inline applications of build
 	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
 	-- Indeed, we should add a result_discount becuause build is 
@@ -602,7 +605,7 @@ buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
 	-- The "4" is rather arbitrary.
 
 augmentSize :: ExprSize
-augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
+augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
 	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
 	-- e plus ys. The -2 accounts for the \cn 
 
@@ -734,7 +737,7 @@ certainlyWillInline (CoreUnfolding { uf_is_cheap = is_cheap, uf_arity = n_vals, 
       UnfNever      -> False
       UnfWhen {}    -> True
       UnfIfGoodArgs { ug_size = size} 
-                    -> is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
+                    -> is_cheap && size - (10 * (n_vals +1)) <= opt_UF_UseThreshold
 
 certainlyWillInline _
   = False
@@ -1082,10 +1085,10 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
 	--  *efficiency* to be gained (e.g. beta reductions, case reductions) 
 	-- by inlining.
 
-  = 1 		-- Discount of 1 because the result replaces the call
+  = 10          -- Discount of 1 because the result replaces the call
 		-- so we count 1 for the function itself
 
-    + length (take n_vals_wanted arg_infos)
+    + 10 * length (take n_vals_wanted arg_infos)
       	       -- Discount of (un-scaled) 1 for each arg supplied, 
    	       -- because the result replaces the call
 
@@ -1095,13 +1098,13 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
     arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)
 
     mk_arg_discount _ 	     TrivArg    = 0 
-    mk_arg_discount _ 	     NonTrivArg = 1   
+    mk_arg_discount _        NonTrivArg = 10
     mk_arg_discount discount ValueArg   = discount 
 
     res_discount' = case cont_info of
 			BoringCtxt  -> 0
 			CaseCtxt    -> res_discount
-			_other      -> 4 `min` res_discount
+                        _other      -> 40 `min` res_discount
 		-- res_discount can be very large when a function returns
 		-- constructors; but we only want to invoke that large discount
 		-- when there's a case continuation.
