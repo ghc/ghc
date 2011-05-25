@@ -511,7 +511,7 @@ data DynFlags = DynFlags {
   extensionFlags        :: [ExtensionFlag],
 
   -- | Message output action: use "ErrUtils" instead of this if you can
-  log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
+  log_action            :: DynFlags -> Severity -> SrcSpan -> PprStyle -> Message -> IO (),
 
   haddockOptions :: Maybe String
  }
@@ -826,9 +826,9 @@ defaultDynFlags mySettings =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
-        log_action = \severity srcSpan style msg ->
+        log_action = \dflags severity srcSpan style msg ->
                         case severity of
-                          SevOutput -> printSDoc msg style
+                          SevOutput -> printSDoc dflags msg style
                           SevInfo   -> printErrs msg style
                           SevFatal  -> printErrs msg style
                           _         -> do 

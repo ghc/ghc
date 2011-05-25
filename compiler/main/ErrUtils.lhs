@@ -145,7 +145,7 @@ printBagOfWarnings dflags bag_of_warns =
 printMsgBag :: DynFlags -> Bag ErrMsg -> Severity -> IO ()
 printMsgBag dflags bag sev
   = sequence_   [ let style = mkErrStyle unqual
-		  in log_action dflags sev s style (d $$ e)
+		  in log_action dflags dflags sev s style (d $$ e)
 		| ErrMsg { errMsgSpans = s:_,
 			   errMsgShortDoc = d,
 			   errMsgExtraInfo = e,
@@ -284,30 +284,30 @@ ifVerbose dflags val act
   | otherwise               = return ()
 
 putMsg :: DynFlags -> Message -> IO ()
-putMsg dflags msg = log_action dflags SevInfo noSrcSpan defaultUserStyle msg
+putMsg dflags msg = log_action dflags dflags SevInfo noSrcSpan defaultUserStyle msg
 
 putMsgWith :: DynFlags -> PrintUnqualified -> Message -> IO ()
 putMsgWith dflags print_unqual msg
-  = log_action dflags SevInfo noSrcSpan sty msg
+  = log_action dflags dflags SevInfo noSrcSpan sty msg
   where
     sty = mkUserStyle print_unqual AllTheWay
 
 errorMsg :: DynFlags -> Message -> IO ()
-errorMsg dflags msg = log_action dflags SevError noSrcSpan defaultErrStyle msg
+errorMsg dflags msg = log_action dflags dflags SevError noSrcSpan defaultErrStyle msg
 
 fatalErrorMsg :: DynFlags -> Message -> IO ()
-fatalErrorMsg dflags msg = log_action dflags SevFatal noSrcSpan defaultErrStyle msg
+fatalErrorMsg dflags msg = log_action dflags dflags SevFatal noSrcSpan defaultErrStyle msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
-  = ifVerbose dflags 1 (log_action dflags SevOutput noSrcSpan defaultUserStyle (text msg))
+  = ifVerbose dflags 1 (log_action dflags dflags SevOutput noSrcSpan defaultUserStyle (text msg))
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what 
-  = ifVerbose dflags 2 (log_action dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
+  = ifVerbose dflags 2 (log_action dflags dflags SevInfo noSrcSpan defaultUserStyle (text "***" <+> text what <> colon))
 
 debugTraceMsg :: DynFlags -> Int -> Message -> IO ()
 debugTraceMsg dflags val msg
-  = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
+  = ifVerbose dflags val (log_action dflags dflags SevInfo noSrcSpan defaultDumpStyle msg)
 
 \end{code}

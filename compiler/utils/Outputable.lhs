@@ -70,6 +70,7 @@ module Outputable (
 
 import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
+import {-# SOURCE #-} DynFlags (DynFlags)
 
 import StaticFlags
 import FastString 
@@ -228,12 +229,21 @@ data SDocContext = SDC
   { sdocStyle      :: !PprStyle
   , sdocLastColour :: !PprColour
     -- ^ The most recently used colour.  This allows nesting colours.
+  , sdocDynFlags   :: DynFlags -- XXX Strictness?
   }
 
 initSDocContext :: PprStyle -> SDocContext
 initSDocContext sty = SDC
   { sdocStyle = sty
   , sdocLastColour = colReset
+  , sdocDynFlags = error "XXX"
+  }
+
+initSDocContext' :: DynFlags -> PprStyle -> SDocContext
+initSDocContext' dflags sty = SDC
+  { sdocStyle = sty
+  , sdocLastColour = colReset
+  , sdocDynFlags = dflags
   }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
@@ -311,9 +321,9 @@ ifPprDebug d = SDoc $ \ctx -> case ctx of
 
 \begin{code}
 -- Unused [7/02 sof]
-printSDoc :: SDoc -> PprStyle -> IO ()
-printSDoc d sty = do
-  Pretty.printDoc PageMode stdout (runSDoc d (initSDocContext sty))
+printSDoc :: DynFlags -> SDoc -> PprStyle -> IO ()
+printSDoc dflags d sty = do
+  Pretty.printDoc PageMode stdout (runSDoc d (initSDocContext' dflags sty))
   hFlush stdout
 
 -- I'm not sure whether the direct-IO approach of Pretty.printDoc
