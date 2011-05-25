@@ -44,6 +44,7 @@ import PprCmmExpr
 
 import Outputable
 import FastString
+import DynFlags
 
 import Data.List
 import System.IO
@@ -59,8 +60,8 @@ pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ ptext (sLit "-------------------") $$ space
 
-writeCmms :: (Outputable info, Outputable g) => Handle -> [GenCmm CmmStatic info g] -> IO ()
-writeCmms handle cmms = printForC handle (pprCmms cmms)
+writeCmms :: (Outputable info, Outputable g) => DynFlags -> Handle -> [GenCmm CmmStatic info g] -> IO ()
+writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
