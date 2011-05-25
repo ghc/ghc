@@ -69,9 +69,9 @@ mkLocMessage locn msg
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
 
-printError :: SrcSpan -> Message -> IO ()
-printError span msg =
-  printErrs (mkLocMessage span msg) defaultErrStyle
+printError :: DynFlags -> SrcSpan -> Message -> IO ()
+printError dflags span msg =
+  printErrs dflags (mkLocMessage span msg) defaultErrStyle
 
 
 -- -----------------------------------------------------------------------------

@@ -829,11 +829,11 @@ defaultDynFlags mySettings =
         log_action = \dflags severity srcSpan style msg ->
                         case severity of
                           SevOutput -> printSDoc dflags msg style
-                          SevInfo   -> printErrs msg style
-                          SevFatal  -> printErrs msg style
+                          SevInfo   -> printErrs dflags msg style
+                          SevFatal  -> printErrs dflags msg style
                           _         -> do 
                                 hPutChar stderr '\n'
-                                printErrs (mkLocMessage srcSpan msg) style
+                                printErrs dflags (mkLocMessage srcSpan msg) style
                      -- careful (#2302): printErrs prints in UTF-8, whereas
                      -- converting to string first and using hPutStr would
                      -- just emit the low 8 bits of each unicode char.

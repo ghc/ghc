@@ -1149,7 +1149,8 @@ failIfM :: Message -> IfL a
 failIfM msg
   = do 	{ env <- getLclEnv
 	; let full_msg = (if_loc env <> colon) $$ nest 2 msg
-	; liftIO (printErrs full_msg defaultErrStyle)
+    ; dflags <- getDOpts
+	; liftIO (printErrs dflags full_msg defaultErrStyle)
 	; failM }
 
 --------------------
@@ -1184,7 +1185,8 @@ forkM_maybe doc thing_inside
 	  	    ; return Nothing }
 	}}
   where
-    print_errs sdoc = liftIO (printErrs sdoc defaultErrStyle)
+    print_errs sdoc = do dflags <- getDOpts
+                         liftIO (printErrs dflags sdoc defaultErrStyle)
 
 forkM :: SDoc -> IfL a -> IfL a
 forkM doc thing_inside
