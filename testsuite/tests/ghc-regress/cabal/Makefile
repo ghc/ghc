@@ -5,21 +5,23 @@ include $(TOP)/mk/test.mk
 PKGCONF01=local01.package.conf
 LOCAL_GHC_PKG01 = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF01)
 
+STRIP_PKGROOT=sed 's/^pkgroot: .*$$/pkgroot: /'
+
 # a bunch of tests for ghc-pkg
 ghcpkg01 :
 	@rm -rf $(PKGCONF01)
 	$(LOCAL_GHC_PKG01) init $(PKGCONF01)
 	$(LOCAL_GHC_PKG01) list
 	$(LOCAL_GHC_PKG01) register --force test.pkg 2>/dev/null
-	$(LOCAL_GHC_PKG01) describe testpkg
-	$(LOCAL_GHC_PKG01) describe testpkg-1.2.3.4
+	$(LOCAL_GHC_PKG01) describe testpkg         | $(STRIP_PKGROOT)
+	$(LOCAL_GHC_PKG01) describe testpkg-1.2.3.4 | $(STRIP_PKGROOT)
 	$(LOCAL_GHC_PKG01) field testpkg-1.2.3.4 import-dirs
 
 	@: # test2.pkg is a later version of testpkg-1.2.3.4
 	$(LOCAL_GHC_PKG01) register --force test2.pkg 2>/dev/null
 	$(LOCAL_GHC_PKG01) list
-	$(LOCAL_GHC_PKG01) describe testpkg-2.0
-	$(LOCAL_GHC_PKG01) describe testpkg-*
+	$(LOCAL_GHC_PKG01) describe testpkg-2.0 | $(STRIP_PKGROOT)
+	$(LOCAL_GHC_PKG01) describe testpkg-*   | $(STRIP_PKGROOT)
 	$(LOCAL_GHC_PKG01) field testpkg-* version
 
 	@: # test hiding/exposing
@@ -39,7 +41,7 @@ ghcpkg01 :
 	$(LOCAL_GHC_PKG01) unregister testpkg-3.0
 
 	$(LOCAL_GHC_PKG01) unregister testpkg-2.0
-	$(LOCAL_GHC_PKG01) describe testpkg
+	$(LOCAL_GHC_PKG01) describe testpkg | $(STRIP_PKGROOT)
 	$(LOCAL_GHC_PKG01) unregister testpkg-*
 	$(LOCAL_GHC_PKG01) list
 
