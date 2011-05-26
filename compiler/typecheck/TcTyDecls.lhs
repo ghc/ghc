@@ -30,7 +30,7 @@ import NameSet
 import Digraph
 import BasicTypes
 import SrcLoc
-import Outputable
+import Maybes( mapCatMaybes )
 import Util ( isSingleton )
 import Data.List
 \end{code}
@@ -253,11 +253,10 @@ calcRecFlags boot_details tyclss
                 nt_loop_breakers  `unionNameSets`
                 prod_loop_breakers
 
-    all_tycons = [ tc | tycls <- tyclss,
+    all_tycons = [ tc | tc <- mapCatMaybes getTyCon tyclss
                            -- Recursion of newtypes/data types can happen via
                            -- the class TyCon, so tyclss includes the class tycons
-                        let tc = getTyCon tycls,
-                        not (tyConName tc `elemNameSet` boot_name_set) ]
+                      , not (tyConName tc `elemNameSet` boot_name_set) ]
                            -- Remove the boot_name_set because they are going
                            -- to be loop breakers regardless.
 
@@ -321,10 +320,10 @@ calcRecFlags boot_details tyclss
 new_tc_rhs :: TyCon -> Type
 new_tc_rhs tc = snd (newTyConRhs tc)    -- Ignore the type variables
 
-getTyCon :: TyThing -> TyCon
-getTyCon (ATyCon tc) = tc
-getTyCon (AClass cl) = classTyCon cl
-getTyCon _           = panic "getTyCon"
+getTyCon :: TyThing -> Maybe TyCon
+getTyCon (ATyCon tc) = Just tc
+getTyCon (AClass cl) = Just (classTyCon cl)
+getTyCon _           = Nothing
 
 findLoopBreakers :: [(TyCon, [TyCon])] -> [Name]
 -- Finds a set of tycons that cut all loops

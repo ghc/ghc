@@ -127,7 +127,6 @@ extract_lty (L loc ty) acc
       HsPredTy p		-> extract_pred p acc
       HsOpTy ty1 (L loc tv) ty2 -> extract_tv loc tv (extract_lty ty1 (extract_lty ty2 acc))
       HsParTy ty               	-> extract_lty ty acc
-      HsNumTy {}                -> acc
       HsCoreTy {}               -> acc  -- The type is closed
       HsQuasiQuoteTy {}	        -> acc  -- Quasi quotes mention no type variables
       HsSpliceTy {}           	-> acc	-- Type splices mention no type variables
@@ -152,8 +151,7 @@ extractGenericPatTyVars binds
     get (L _ (FunBind { fun_matches = MatchGroup ms _ })) acc = foldr (get_m.unLoc) acc ms
     get _                                                 acc = acc
 
-    get_m (Match (L _ (TypePat ty) : _) _ _) acc = extract_lty ty acc
-    get_m _                                        acc = acc
+    get_m _ acc = acc
 \end{code}
 
 
@@ -704,8 +702,6 @@ checkAPat dynflags loc e0 = case e0 of
                       -> do fs <- mapM checkPatField fs
                             return (ConPatIn c (RecCon (HsRecFields fs dd)))
    HsQuasiQuoteE q    -> return (QuasiQuotePat q)
--- Generics 
-   HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc e0
 
 placeHolderPunRhs :: LHsExpr RdrName
@@ -784,17 +780,20 @@ checkValSig lhs@(L l _) ty
                        ppr lhs <+> text "::" <+> ppr ty)
                    $$ text hint)
   where
-    hint = if looks_like_foreign lhs
+    hint = if foreign_RDR `looks_like` lhs
            then "Perhaps you meant to use -XForeignFunctionInterface?"
-           else "Should be of form <variable> :: <type>"
+           else if default_RDR `looks_like` lhs
+                then "Perhaps you meant to use -XDefaultSignatures?"
+                else "Should be of form <variable> :: <type>"
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
-    looks_like_foreign (L _ (HsVar v))     = v == foreign_RDR
-    looks_like_foreign (L _ (HsApp lhs _)) = looks_like_foreign lhs
-    looks_like_foreign _                   = False
+    looks_like s (L _ (HsVar v))     = v == s
+    looks_like s (L _ (HsApp lhs _)) = looks_like s lhs
+    looks_like _ _                   = False
 
     foreign_RDR = mkUnqual varName (fsLit "foreign")
+    default_RDR = mkUnqual varName (fsLit "default")
 
 checkDoAndIfThenElse :: LHsExpr RdrName
                      -> Bool

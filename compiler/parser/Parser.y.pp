@@ -721,6 +721,11 @@ decl_cls  :: { Located (OrdList (LHsDecl RdrName)) }
 decl_cls  : at_decl_cls		        { LL (unitOL (L1 (TyClD (unLoc $1)))) }
 	  | decl                        { $1 }
 
+	  -- A 'default' signature used with the generic-programming extension
+          | 'default' infixexp '::' sigtypedoc
+                    {% do { (TypeSig l ty) <- checkValSig $2 $4
+                          ; return (LL $ unitOL (LL $ SigD (GenericSig l ty))) } }
+
 decls_cls :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 	  : decls_cls ';' decl_cls	{ LL (unLoc $1 `appOL` unLoc $3) }
 	  | decls_cls ';'		{ LL (unLoc $1) }
@@ -1022,8 +1027,6 @@ atype :: { LHsType RdrName }
 	| '$(' exp ')'	      		{ LL $ mkHsSpliceTy $2 }
 	| TH_ID_SPLICE	      		{ LL $ mkHsSpliceTy $ L1 $ HsVar $ 
 					  mkUnqual varName (getTH_ID_SPLICE $1) }
--- Generics
-        | INTEGER                       { L1 (HsNumTy (getINTEGER $1)) }
 
 -- An inst_type is what occurs in the head of an instance decl
 --	e.g.  (Foo a, Gaz b) => Wibble a b
@@ -1232,9 +1235,11 @@ gdrh :: { LGRHS RdrName }
 	: '|' guardquals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
-	: infixexp '::' sigtypedoc	{% do s <- checkValSig $1 $3 
-				         ; return (LL $ unitOL (LL $ SigD s)) }
-		-- See Note [Declaration/signature overlap] for why we need infixexp here
+        : 
+	-- See Note [Declaration/signature overlap] for why we need infixexp here
+	  infixexp '::' sigtypedoc
+                        {% do s <- checkValSig $1 $3 
+                        ; return (LL $ unitOL (LL $ SigD s)) }
 	| var ',' sig_vars '::' sigtypedoc
 				{ LL $ toOL [ LL $ SigD (TypeSig n $5) | n <- $1 : unLoc $3 ] }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
@@ -1499,8 +1504,7 @@ squals :: { Located [LStmt RdrName] }	-- In reverse order, because the last
 
 -- It is possible to enable bracketing (associating) qualifier lists by uncommenting the lines with {| |}
 -- above. Due to a lack of consensus on the syntax, this feature is not being used until we get user
--- demand. Note that the {| |} symbols are reused from -XGenerics and hence if you want to compile
--- a program that makes use of this temporary syntax you must supply that flag to GHC
+-- demand.
 
 transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
 			-- Function is applied to a list of stmts *in order*

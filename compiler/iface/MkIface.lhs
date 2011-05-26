@@ -1335,9 +1335,9 @@ tyThingToIfaceDecl (AClass clas)
 	  (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
 	  op_ty		       = funResultTy rho_ty
 
-    toDmSpec NoDefMeth   = NoDM
-    toDmSpec GenDefMeth  = GenericDM
-    toDmSpec (DefMeth _) = VanillaDM
+    toDmSpec NoDefMeth      = NoDM
+    toDmSpec (GenDefMeth _) = GenericDM
+    toDmSpec (DefMeth _)    = VanillaDM
 
     toIfaceFD (tvs1, tvs2) = (map getFS tvs1, map getFS tvs2)
 
@@ -1357,7 +1357,6 @@ tyThingToIfaceDecl (ATyCon tycon)
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
-		ifGeneric = tyConHasGenerics tycon,
 		ifFamInst = famInstToIface (tyConFamInst_maybe tycon)}
 
   | isForeignTyCon tycon

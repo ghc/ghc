@@ -979,9 +979,9 @@ isAlgType ty
 isClosedAlgType :: Type -> Bool
 isClosedAlgType ty
   = case splitTyConApp_maybe ty of
-      Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
-			    isAlgTyCon tc && not (isFamilyTyCon tc)
-      _other	         -> False
+      Just (tc, ty_args) | isAlgTyCon tc && not (isFamilyTyCon tc)
+             -> ASSERT2( ty_args `lengthIs` tyConArity tc, ppr ty ) True
+      _other -> False
 \end{code}
 
 \begin{code}

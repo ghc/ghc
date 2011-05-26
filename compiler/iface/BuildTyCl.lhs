@@ -10,7 +10,8 @@ module BuildTyCl (
         buildDataCon,
 	TcMethInfo, buildClass,
 	mkAbstractTyConRhs, 
-	mkNewTyConRhs, mkDataTyConRhs
+	mkNewTyConRhs, mkDataTyConRhs, 
+        newImplicitBinder
     ) where
 
 #include "HsVersions.h"
@@ -59,13 +60,12 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> ThetaType		-- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
-	      -> Bool			-- ^ True <=> want generics functions
 	      -> Bool			-- ^ True <=> was declared in GADT syntax
               -> TyConParent
 	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
+buildAlgTyCon tc_name tvs stupid_theta rhs is_rec gadt_syn
 	      parent mb_family
   | Just fam_inst_info <- mb_family
   = -- We need to tie a knot as the coercion of a data instance depends
@@ -74,11 +74,11 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
     fixM $ \ tycon_rec -> do 
     { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec
     ; return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
-		         fam_parent is_rec want_generics gadt_syn) }
+		         fam_parent is_rec gadt_syn) }
 
   | otherwise
   = return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
-	               parent is_rec want_generics gadt_syn)
+	               parent is_rec gadt_syn)
   where
     kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
@@ -221,8 +221,9 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 \begin{code}
-type TcMethInfo = (Name, DefMethSpec, Type)  -- A temporary intermediate, to communicate 
-					     -- between tcClassSigs and buildClass
+type TcMethInfo = (Name, DefMethSpec, Type)  
+        -- A temporary intermediate, to communicate between 
+        -- tcClassSigs and buildClass.
 
 buildClass :: Bool		-- True <=> do not include unfoldings 
 				--	    on dict selectors
@@ -324,7 +325,8 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
     mk_op_item rec_clas (op_name, dm_spec, _) 
       = do { dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
-                          GenericDM -> return GenDefMeth
+                          GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
+			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
            ; return (mkDictSelId no_unf op_name rec_clas, dm_info) }

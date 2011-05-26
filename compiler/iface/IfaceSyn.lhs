@@ -67,14 +67,6 @@ data IfaceDecl
                 ifRec        :: RecFlag,        -- Recursive or not?
                 ifGadtSyntax :: Bool,           -- True <=> declared using
                                                 -- GADT syntax
-                ifGeneric    :: Bool,           -- True <=> generic converter
-                                                --          functions available
-                                                -- We need this for imported
-                                                -- data decls, since the
-                                                -- imported modules may have
-                                                -- been compiled with
-                                                -- different flags to the
-                                                -- current compilation unit
                 ifFamInst    :: Maybe (IfaceTyCon, [IfaceType])
                                                 -- Just <=> instance of family
                                                 -- Invariant:
@@ -473,11 +465,11 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars,
   = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (dcolon <+> ppr kind)
 
-pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
+pprIfaceDecl (IfaceData {ifName = tycon, ifCtxt = context,
                          ifTyVars = tyvars, ifCons = condecls,
                          ifRec = isrec, ifFamInst = mbFamInst})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
-       4 (vcat [pprRec isrec, pprGen gen, pp_condecls tycon condecls,
+       4 (vcat [pprRec isrec, pp_condecls tycon condecls,
                 pprFamily mbFamInst])
   where
     pp_nd = case condecls of
@@ -496,10 +488,6 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 
 pprRec :: RecFlag -> SDoc
 pprRec isrec = ptext (sLit "RecFlag") <+> ppr isrec
-
-pprGen :: Bool -> SDoc
-pprGen True  = ptext (sLit "Generics: yes")
-pprGen False = ptext (sLit "Generics: no")
 
 pprFamily :: Maybe (IfaceTyCon, [IfaceType]) -> SDoc
 pprFamily Nothing        = ptext (sLit "FamilyInstance: none")

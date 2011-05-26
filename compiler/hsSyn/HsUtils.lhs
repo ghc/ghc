@@ -27,7 +27,7 @@ module HsUtils(
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
 
-  -- Bindigns
+  -- Bindings
   mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, 
 
   -- Literals
@@ -547,7 +547,6 @@ collect_lpat (L _ pat) bndrs
     go (SigPatIn pat _)	 	  = collect_lpat pat bndrs
     go (SigPatOut pat _)	  = collect_lpat pat bndrs
     go (QuasiQuotePat _)          = bndrs
-    go (TypePat _)                = bndrs
     go (CoPat _ pat _)            = go pat
 \end{code}
 
@@ -727,7 +726,6 @@ collect_sig_lpat pat acc = collect_sig_pat (unLoc pat) acc
 
 collect_sig_pat :: Pat name -> [LHsType name] -> [LHsType name]
 collect_sig_pat (SigPatIn pat ty)  	acc = collect_sig_lpat pat (ty:acc)
-collect_sig_pat (TypePat ty)       	acc = ty:acc
 
 collect_sig_pat (LazyPat pat)       acc = collect_sig_lpat pat acc
 collect_sig_pat (BangPat pat)       acc = collect_sig_lpat pat acc

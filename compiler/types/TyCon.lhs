@@ -49,7 +49,7 @@ module TyCon(
 	isTyConAssoc,
 	isRecursiveTyCon,
 	isHiBootTyCon,
-        isImplicitTyCon, tyConHasGenerics,
+        isImplicitTyCon, 
 
         -- ** Extracting information out of TyCons
 	tyConName,
@@ -67,7 +67,7 @@ module TyCon(
         tyConExtName,           -- External name for foreign types
 	algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe, 
-        tupleTyConBoxity,
+        tupleTyConBoxity, tupleTyConArity,
 
         -- ** Manipulating TyCons
 	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
@@ -333,11 +333,7 @@ data TyCon
 
 	algTcRec :: RecFlag,	  -- ^ Tells us whether the data type is part 
                                   -- of a mutually-recursive group or not
-
-	hasGenerics :: Bool,	  -- ^ Whether generic (in the -XGenerics sense) 
-                                  -- to\/from functions are available in the exports 
-                                  -- of the data type's source module.
-
+	
 	algTcParent :: TyConParent	-- ^ Gives the class or family declaration 'TyCon' 
                                         -- for derived 'TyCon's representing class 
                                         -- or family instances, respectively. 
@@ -353,8 +349,7 @@ data TyCon
 	tyConArity  :: Arity,
 	tyConBoxed  :: Boxity,
 	tyConTyVars :: [TyVar],
-	dataCon     :: DataCon, -- ^ Corresponding tuple data constructor
-	hasGenerics :: Bool
+	dataCon     :: DataCon -- ^ Corresponding tuple data constructor
     }
 
   -- | Represents type synonyms
@@ -788,10 +783,9 @@ mkAlgTyCon :: Name
            -> AlgTyConRhs       -- ^ Information about dat aconstructors
            -> TyConParent
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
-           -> Bool              -- ^ Does it have generic functions? See 'hasGenerics'
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
+mkAlgTyCon name kind tyvars stupid rhs parent is_rec gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
@@ -802,14 +796,13 @@ mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
 	algTcRhs         = rhs,
 	algTcParent	 = ASSERT( okParent name parent ) parent,
 	algTcRec	 = is_rec,
-	algTcGadtSyntax  = gadt_syn,
-	hasGenerics      = gen_info
+	algTcGadtSyntax  = gadt_syn
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> Kind -> [TyVar] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars rhs clas is_rec =
-  mkAlgTyCon name kind tyvars [] rhs (ClassTyCon clas) is_rec False False
+  mkAlgTyCon name kind tyvars [] rhs (ClassTyCon clas) is_rec False
 
 mkTupleTyCon :: Name 
              -> Kind    -- ^ Kind of the resulting 'TyCon'
@@ -817,9 +810,8 @@ mkTupleTyCon :: Name
              -> [TyVar] -- ^ 'TyVar's scoped over: see 'tyConTyVars'
              -> DataCon 
              -> Boxity  -- ^ Whether the tuple is boxed or unboxed
-             -> Bool    -- ^ Does it have generic functions? See 'hasGenerics'
              -> TyCon
-mkTupleTyCon name kind arity tyvars con boxed gen_info
+mkTupleTyCon name kind arity tyvars con boxed 
   = TupleTyCon {
 	tyConUnique = nameUnique name,
 	tyConName = name,
@@ -827,8 +819,7 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 	tyConArity = arity,
 	tyConBoxed = boxed,
 	tyConTyVars = tyvars,
-	dataCon = con,
-	hasGenerics = gen_info
+	dataCon = con
     }
 
 -- ^ Foreign-imported (.NET) type constructors are represented
@@ -1087,6 +1078,11 @@ isBoxedTupleTyCon _                                  = False
 tupleTyConBoxity :: TyCon -> Boxity
 tupleTyConBoxity tc = tyConBoxed tc
 
+-- | Extract the arity of the given 'TyCon', if it is a 'TupleTyCon'.
+-- Panics otherwise
+tupleTyConArity :: TyCon -> Arity
+tupleTyConArity tc = tyConArity tc
+
 -- | Is this a recursive 'TyCon'?
 isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
@@ -1178,11 +1174,6 @@ expand tvs rhs tys
 \end{code}
 
 \begin{code}
--- | Does this 'TyCon' have any generic to\/from functions available? See also 'hasGenerics'
-tyConHasGenerics :: TyCon -> Bool
-tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
-tyConHasGenerics (TupleTyCon {hasGenerics = hg}) = hg
-tyConHasGenerics _                               = False        -- Synonyms
 
 tyConKind :: TyCon -> Kind
 tyConKind (FunTyCon   { tc_kind = k }) = k

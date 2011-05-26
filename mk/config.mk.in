@@ -282,13 +282,8 @@ GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 #
 # 	-O(2) is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
-#
-#	-XGenerics switches on generation of support code for 
-#		derivable type classes.  This is now off by default,
-#		but we switch it on for the libraries so that we generate
-#		the code in case someone importing wants it
 
-GhcLibHcOpts=-O2 -XGenerics
+GhcLibHcOpts=-O2
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.

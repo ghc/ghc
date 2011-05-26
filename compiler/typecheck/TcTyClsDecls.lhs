@@ -26,17 +26,16 @@ import TcMType
 import TcType
 import TysWiredIn	( unitTy )
 import Type
-import Generics
 import Class
 import TyCon
 import DataCon
 import Id
-import MkId		( mkDefaultMethodId )
 import MkCore		( rEC_SEL_ERROR_ID )
 import IdInfo
 import Var
 import VarSet
 import Name
+import NameEnv
 import Outputable
 import Maybes
 import Unify
@@ -62,12 +61,12 @@ import Data.List
 %************************************************************************
 
 \begin{code}
+
 tcTyAndClassDecls :: ModDetails 
                    -> [[LTyClDecl Name]]     -- Mutually-recursive groups in dependency order
    	           -> TcM (TcGblEnv,   	     -- Input env extended by types and classes 
 					     -- and their implicit Ids,DataCons
-		           HsValBinds Name,  -- Renamed bindings for record selectors
-			   [Id])      	     -- Default method ids
+		           HsValBinds Name)  -- Renamed bindings for record selectors
 -- Fails if there are any errors
 
 tcTyAndClassDecls boot_details decls_s
@@ -90,7 +89,7 @@ tcTyAndClassDecls boot_details decls_s
 
                       -- And now build the TyCons/Classes
                 ; let rec_flags = calcRecFlags boot_details rec_tyclss
-                 ; concatMapM (tcTyClDecl rec_flags) kc_decls }
+                ; concatMapM (tcTyClDecl rec_flags) kc_decls }
 
        ; tcExtendGlobalEnv tyclss $ do
        {  -- Perform the validity check
@@ -106,11 +105,13 @@ tcTyAndClassDecls boot_details decls_s
 	--     second time here.  This doesn't matter as the definitions are
 	--     the same.
 	; let {	implicit_things = concatMap implicitTyThings tyclss
-	      ; rec_sel_binds   = mkRecSelBinds tyclss
+	      ; rec_sel_binds   = mkRecSelBinds [tc | ATyCon tc <- tyclss]
               ; dm_ids          = mkDefaultMethodIds tyclss }
 
-  	; env <- tcExtendGlobalEnv implicit_things getGblEnv
-	; return (env, rec_sel_binds, dm_ids) } }
+  	; env <- tcExtendGlobalEnv implicit_things $
+                 tcExtendGlobalValEnv dm_ids $
+                 getGblEnv
+        ; return (env, rec_sel_binds) } }
                     
 zipRecTyClss :: [[LTyClDecl Name]]
              -> [TyThing]           -- Knot-tied
@@ -307,6 +308,8 @@ kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   where
     kc_sig (TypeSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
 				   ; return (TypeSig nm op_ty') }
+    kc_sig (GenericSig nm op_ty) = do { op_ty' <- kcHsLiftedSigType op_ty
+				      ; return (GenericSig nm op_ty') }
     kc_sig other_sig	      = return other_sig
 
 kcTyClDecl decl@(ForeignType {})
@@ -453,7 +456,7 @@ tcTyClDecl1 parent _calc_isrec
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
-               DataFamilyTyCon Recursive False True 
+               DataFamilyTyCon Recursive True 
                parent Nothing
   ; return [ATyCon tycon]
   }
@@ -479,7 +482,6 @@ tcTyClDecl1 _parent calc_isrec
   { extra_tvs <- tcDataKindSig mb_ksig
   ; let final_tvs = tvs' ++ extra_tvs
   ; stupid_theta <- tcHsKindedContext ctxt
-  ; want_generic <- xoptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; kind_signatures <- xoptM Opt_KindSignatures
   ; existential_ok <- xoptM Opt_ExistentialQuantification
@@ -504,8 +506,7 @@ tcTyClDecl1 _parent calc_isrec
 		   NewType  -> ASSERT( not (null data_cons) )
                                mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
-	    (want_generic && canDoGenerics data_cons) (not h98_syntax) 
-            NoParentTyCon Nothing
+	    (not h98_syntax) NoParentTyCon Nothing
 	})
   ; return [ATyCon tycon]
   }
@@ -521,7 +522,7 @@ tcTyClDecl1 _parent calc_isrec
     tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mapM (addLocM tc_fundep) fundeps
-  ; sig_stuff <- tcClassSigs class_name sigs meths
+  ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
   ; clas <- fixM $ \ clas -> do
 	    { let 	-- This little knot is just so we can get
 			-- hold of the name of the class TyCon, which we
@@ -534,7 +535,18 @@ tcTyClDecl1 _parent calc_isrec
             ; buildClass False {- Must include unfoldings for selectors -}
 			 class_name tvs' ctxt' fds' (concat atss')
 			 sig_stuff tc_isrec }
-  ; return (AClass clas : map ATyCon (classATs clas))
+
+  ; let gen_dm_ids = [ AnId (mkExportedLocalId gen_dm_name gen_dm_ty)
+                     | (sel_id, GenDefMeth gen_dm_name) <- classOpItems clas
+                     , let gen_dm_tau = expectJust "tcTyClDecl1" $
+                                        lookupNameEnv gen_dm_env (idName sel_id)
+		     , let gen_dm_ty = mkSigmaTy tvs' 
+                                                 [mkClassPred clas (mkTyVarTys tvs')] 
+                                                 gen_dm_tau
+                     ]
+        class_ats = map ATyCon (classATs clas)
+
+  ; return (AClass clas : gen_dm_ids ++ class_ats )
       -- NB: Order is important due to the call to `mkGlobalThings' when
       --     tying the the type and class declaration type checking knot.
   }
@@ -799,6 +811,8 @@ checkValidTyCl decl
 	    ATyCon tc -> checkValidTyCon tc
 	    AClass cl -> do { checkValidClass cl 
                             ; mapM_ (addLocM checkValidTyCl) (tcdATs decl) }
+            AnId _    -> return ()  -- Generic default methods are checked
+	    	      	 	    -- with their parent class
             _         -> panic "checkValidTyCl"
 	; traceTc "Done validity of" (ppr thing)	
 	}
@@ -959,7 +973,7 @@ checkValidClass cls
   where
     (tyvars, fundeps, theta, _, _, op_stuff) = classExtraBigSig cls
     unary 	= isSingleton tyvars
-    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
+    no_generics = null [() | (_, (GenDefMeth _)) <- op_stuff]
 
     check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
@@ -980,10 +994,10 @@ checkValidClass cls
 	; checkTc (tyVarsOfType tau `intersectsVarSet` grown_tyvars)
 	          (noClassTyVarErr cls sel_id)
 
-		-- Check that for a generic method, the type of 
-		-- the method is sufficiently simple
-	; checkTc (dm /= GenDefMeth || validGenericMethodType tau)
-		  (badGenericMethodType op_name op_ty)
+        ; case dm of
+            GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
+                                     ; checkValidType (FunSigCtxt op_name) (idType dm_id) }
+            _                  -> return ()
 	}
 	where
 	  op_name = idName sel_id
@@ -1011,7 +1025,7 @@ checkValidClass cls
 mkDefaultMethodIds :: [TyThing] -> [Id]
 -- See Note [Default method Ids and Template Haskell]
 mkDefaultMethodIds things
-  = [ mkDefaultMethodId sel_id dm_name
+  = [ mkExportedLocalId dm_name (idType sel_id)
     | AClass cls <- things
     , (sel_id, DefMeth dm_name) <- classOpItems cls ]
 \end{code}
@@ -1033,16 +1047,16 @@ must bring the default method Ids into scope first (so they can be seen
 when typechecking the [d| .. |] quote, and typecheck them later.
 
 \begin{code}
-mkRecSelBinds :: [TyThing] -> HsValBinds Name
+mkRecSelBinds :: [TyCon] -> HsValBinds Name
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
-mkRecSelBinds ty_things
+mkRecSelBinds tycons
   = ValBindsOut [(NonRecursive, b) | b <- binds] sigs
   where
     (sigs, binds) = unzip rec_sels
     rec_sels = map mkRecSelBind [ (tc,fld) 
-       	 	     	        | ATyCon tc <- ty_things 
+       	 	     	        | tc <- tycons
 				, fld <- tyConFields tc ]
 
 mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, LHsBinds Name)
@@ -1248,12 +1262,6 @@ genericMultiParamErr :: Class -> SDoc
 genericMultiParamErr clas
   = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
     ptext (sLit "cannot have generic methods")
-
-badGenericMethodType :: Name -> Kind -> SDoc
-badGenericMethodType op op_ty
-  = hang (ptext (sLit "Generic method type is too complex"))
-       2 (vcat [ppr op <+> dcolon <+> ppr op_ty,
-		ptext (sLit "You can only use type variables, arrows, lists, and tuples")])
 
 recSynErr :: [LTyClDecl Name] -> TcRn ()
 recSynErr syn_decls

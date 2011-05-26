@@ -458,9 +458,6 @@ tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
 
         ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }
 
-tc_pat _ pat@(TypePat _) _ _
-  = failWithTc (badTypePat pat)
-
 ------------------------
 -- Lists, tuples, arrays
 tc_pat penv (ListPat pats _) pat_ty thing_inside
@@ -1048,9 +1045,6 @@ polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
   = hang (ptext (sLit "Illegal polymorphic type signature in pattern:"))
        2 (ppr sig_ty)
-
-badTypePat :: Pat Name -> SDoc
-badTypePat pat = ptext (sLit "Illegal type pattern") <+> ppr pat
 
 lazyUnliftedPatErr :: OutputableBndr name => Pat name -> TcM ()
 lazyUnliftedPatErr pat

@@ -433,7 +433,6 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
 			  ifCtxt = ctxt, ifGadtSyntax = gadt_syn,
 			  ifCons = rdr_cons, 
 			  ifRec = is_rec, 
-			  ifGeneric = want_generic,
 			  ifFamInst = mb_family })
   = bindIfaceTyVars_AT tv_bndrs $ \ tyvars -> do
     { tc_name <- lookupIfaceTop occ_name
@@ -442,7 +441,7 @@ tc_iface_decl parent _ (IfaceData {ifName = occ_name,
 	    ; cons <- tcIfaceDataCons tc_name tycon tyvars rdr_cons
 	    ; mb_fam_inst  <- tcFamInst mb_family
 	    ; buildAlgTyCon tc_name tyvars stupid_theta cons is_rec
-			    want_generic gadt_syn parent mb_fam_inst
+			    gadt_syn parent mb_fam_inst
 	    })
     ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
     ; return (ATyCon tycon) }

@@ -1,18 +1,12 @@
 %
-% (c) The University of Glasgow 2006
+% (c) The University of Glasgow 2011
 %
 
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
-module Generics ( canDoGenerics, mkTyConGenericBinds,
-		  mkGenericRhs, 
-		  validGenericInstanceType, validGenericMethodType
+module Generics ( canDoGenerics,
+		  mkBindsRep, tc_mkRepTyCon, mkBindsMetaD,
+		  MetaTyCons(..), metaTyCons2TyCons
     ) where
 
 
@@ -22,202 +16,26 @@ import TcType
 import DataCon
 
 import TyCon
-import Name
+import Name hiding (varName)
+import Module (moduleName, moduleNameString)
 import RdrName
 import BasicTypes
-import Var
-import VarSet
-import Id
 import TysWiredIn
 import PrelNames
-	
+
+-- For generation of representation types
+import TcEnv (tcLookupTyCon)
+import TcRnMonad
+import HscTypes
+import BuildTyCl
+
 import SrcLoc
-import Util
 import Bag
 import Outputable 
 import FastString
 
 #include "HsVersions.h"
 \end{code}
-
-Roadmap of what's where in the Generics work.
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Parser
-No real checks.
-
-RnSource.rnHsType
-  Checks that HsNumTy has a "1" in it.
-
-TcInstDcls.mkGenericInstance:
-  Checks for invalid type patterns, such as f {| Int |}
-
-TcClassDcl.tcClassSig
-  Checks for a method type that is too complicated;
-	e.g. has for-alls or lists in it
-  We could lift this restriction
-
-TcClassDecl.mkDefMethRhs
-  Checks that the instance type is simple, in an instance decl 
-  where we let the compiler fill in a generic method.
-	e.g.  instance C (T Int)
-  	is not valid if C has generic methods.
-
-TcClassDecl.checkGenericClassIsUnary
-  Checks that we don't have generic methods in a multi-parameter class
-
-TcClassDecl.checkDefaultBinds
-  Checks that all the equations for a method in a class decl
-  are generic, or all are non-generic
-
-
-			
-Checking that the type constructors which are present in Generic
-patterns (not Unit, this is done differently) is done in mk_inst_info
-(TcInstDecls) in a call to tcHsType (TcMonoBinds). This means that
-HsOpTy is tied to Generic definitions which is not a very good design
-feature, indeed a bug. However, the check is easy to move from
-tcHsType back to mk_inst_info and everything will be fine. Also see
-bug #5. [I don't think that this is the case anymore after SPJ's latest
-changes in that regard.  Delete this comment?  -=chak/7Jun2]
-
-Generics.lhs
-
-Making generic information to put into a tycon. Constructs the
-representation type, which, I think, are not used later. Perhaps it is
-worth removing them from the GI datatype. Although it does get used in
-the construction of conversion functions (internally).
-
-TyCon.lhs
-
-Just stores generic information, accessible by tyConGenInfo or tyConGenIds.
-
-TysWiredIn.lhs
-
-Defines generic and other type and data constructors.
-
-This is sadly incomplete, but will be added to.
-
-
-Bugs & shortcomings of existing implementation:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-2. Another pretty big bug I dscovered at the last minute when I was
-testing the code is that at the moment the type variable of the class
-is scoped over the entire declaration, including the patterns. For
-instance, if I have the following code,
-
-class Er a where
- ...
-  er {| Plus a b |} (Inl x) (Inl y) = er x y 
-  er {| Plus a b |} (Inr x) (Inr y) = er x y 
-  er {| Plus a b |} _ _ = False
- 
-and I print out the types of the generic patterns, I get the
-following.  Note that all the variable names for "a" are the same,
-while for "b" they are all different.
-
-check_ty
-    [std.Generics.Plus{-33u,i-} a{-r6Z-} b{-r7g-},
-     std.Generics.Plus{-33u,i-} a{-r6Z-} b{-r7m-},
-     std.Generics.Plus{-33u,i-} a{-r6Z-} b{-r7p-}]
-
-This is a bug as if I change the code to
-
- er {| Plus c b |} (Inl x)  (Inl y) = er x y 
-
-all the names come out to be different.
-
-Thus, all the types (Plus a b) come out to be different, so I cannot
-compare them and test whether they are all the same and thus cannot
-return an error if the type variables are different.
-
-Temporary fix/hack. I am not checking for this, I just assume they are
-the same, see line "check_ty = True" in TcInstDecls. When we resolve
-the issue with variables, though - I assume that we will make them to
-be the same in all the type patterns, jus uncomment the check and
-everything should work smoothly.
-
-Hence, I have also left the rather silly construction of:
-* extracting all the type variables from all the types
-* putting them *all* into the environment
-* typechecking all the types
-* selecting one of them and using it as the instance_ty.
-
-(the alternative is to make sure that all the types are the same,
-taking one, extracting its variables, putting them into the environment,
-type checking it, using it as the instance_ty)
- 
-6. What happens if we do not supply all of the generic patterns? At
-the moment, the compiler crashes with an error message "Non-exhaustive
-patterns in a generic declaration" 
-
-
-What has not been addressed:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Contexts. In the generated instance declarations for the 3 primitive
-type constructors, we need contexts. It is unclear what those should
-be. At the moment, we always say eg. (Eq a, Eq b) => Eq (Plus a b)
-
-Type application. We have type application in expressions
-(essentially) on the lhs of an equation. Do we want to allow it on the
-RHS?
-
-Scoping of type variables in a generic definition. At the moment, (see
-TcInstDecls) we extract the type variables inside the type patterns
-and add them to the environment. See my bug #2 above. This seems pretty
-important.
-
-
-
-%************************************************************************
-%*									*
-\subsection{Getting the representation type out}
-%*									*
-%************************************************************************
-
-\begin{code}
-validGenericInstanceType :: Type -> Bool
-  -- Checks for validity of the type pattern in a generic
-  -- declaration.  It's ok to have  
-  --	f {| a + b |} ...
-  -- but it's not OK to have
-  --	f {| a + Int |}
-
-validGenericInstanceType inst_ty
-  = case tcSplitTyConApp_maybe inst_ty of
-	Just (tycon, tys) ->  all isTyVarTy tys && tyConName tycon `elem` genericTyConNames
-	Nothing		  ->  False
-
-validGenericMethodType :: Type -> Bool
-  -- At the moment we only allow method types built from
-  -- 	* type variables
-  --	* function arrow
-  --	* boxed tuples
-  --    * lists
-  --	* an arbitrary type not involving the class type variables
-  --		e.g. this is ok: 	forall b. Ord b => [b] -> a
-  --	             where a is the class variable
-validGenericMethodType ty 
-  = valid tau
-  where
-    (local_tvs, _, tau) = tcSplitSigmaTy ty
-
-    valid ty
-      | not (isTauTy ty) = False 	-- Note [Higher ramk methods]
-      | isTyVarTy ty     = True
-      | no_tyvars_in_ty	 = True
-      | otherwise	 = case tcSplitTyConApp_maybe ty of
-				Just (tc,tys) -> valid_tycon tc && all valid tys
-				Nothing	      -> False
-      where
-	no_tyvars_in_ty = all (`elem` local_tvs) (varSetElems (tyVarsOfType ty))
-
-    valid_tycon tc = tc == funTyCon || tc == listTyCon || isBoxedTupleTyCon tc 
-	-- Compare bimapApp, below
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -226,25 +44,47 @@ validGenericMethodType ty
 %************************************************************************
 
 \begin{code}
-canDoGenerics :: [DataCon] -> Bool
+canDoGenerics :: TyCon -> Maybe SDoc
 -- Called on source-code data types, to see if we should generate
--- generic functions for them.  (This info is recorded in the interface file for
--- imported data types.)
+-- generic functions for them.
+-- Nothing == yes
+-- Just s  == no, because of `s`
 
-canDoGenerics data_cons
-  =  not (any bad_con data_cons) 	-- See comment below
-  && not (null data_cons)		-- No values of the type
+canDoGenerics tycon
+  =  mergeErrors (
+          -- We do not support datatypes with context
+              (if (not (null (tyConStupidTheta tycon)))
+                then (Just (ppr tycon <+> text "must not have a datatype context"))
+                else Nothing)
+          -- We don't like type families
+            : (if (isFamilyTyCon tycon)
+                then (Just (ppr tycon <+> text "must not be a family instance"))
+                else Nothing)
+          -- See comment below
+            : (map bad_con (tyConDataCons tycon)))
   where
-    bad_con dc = any bad_arg_type (dataConOrigArgTys dc) || not (isVanillaDataCon dc)
-  	-- If any of the constructor has an unboxed type as argument,
-	-- then we can't build the embedding-projection pair, because
-	-- it relies on instantiating *polymorphic* sum and product types
-	-- at the argument types of the constructors
+        -- If any of the constructor has an unboxed type as argument,
+        -- then we can't build the embedding-projection pair, because
+        -- it relies on instantiating *polymorphic* sum and product types
+        -- at the argument types of the constructors
+    bad_con dc = if (any bad_arg_type (dataConOrigArgTys dc))
+                  then (Just (ppr dc <+> text "must not have unlifted or polymorphic arguments"))
+                  else (if (not (isVanillaDataCon dc))
+                          then (Just (ppr dc <+> text "must be a vanilla data constructor"))
+                          else Nothing)
+
 
 	-- Nor can we do the job if it's an existential data constructor,
 
 	-- Nor if the args are polymorphic types (I don't think)
     bad_arg_type ty = isUnLiftedType ty || not (isTauTy ty)
+    
+    mergeErrors :: [Maybe SDoc] -> Maybe SDoc
+    mergeErrors []           = Nothing
+    mergeErrors ((Just s):t) = case mergeErrors t of
+                                 Nothing -> Just s
+                                 Just s' -> Just (s <> text ", and" $$ s')
+    mergeErrors (Nothing :t) = mergeErrors t
 \end{code}
 
 %************************************************************************
@@ -255,320 +95,302 @@ canDoGenerics data_cons
 
 \begin{code}
 type US = Int	-- Local unique supply, just a plain Int
-type FromAlt = (LPat RdrName, LHsExpr RdrName)
+type Alt = (LPat RdrName, LHsExpr RdrName)
 
-mkTyConGenericBinds :: TyCon -> LHsBinds RdrName
-mkTyConGenericBinds tycon
-  = unitBag (L loc (mkFunBind (L loc from_RDR) from_matches))
-	`unionBags`
+-- Bindings for the Generic instance
+mkBindsRep :: TyCon -> LHsBinds RdrName
+mkBindsRep tycon = 
+    unitBag (L loc (mkFunBind (L loc from_RDR) from_matches))
+  `unionBags`
     unitBag (L loc (mkFunBind (L loc to_RDR) to_matches))
+      where
+        from_matches = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
+        to_matches   = [mkSimpleHsAlt pat rhs | (pat,rhs) <- to_alts  ]
+        loc           = srcLocSpan (getSrcLoc tycon)
+        datacons      = tyConDataCons tycon
+
+        -- Recurse over the sum first
+        from_alts, to_alts :: [Alt]
+        (from_alts, to_alts) = mkSum (1 :: US) tycon datacons
+        
+--------------------------------------------------------------------------------
+-- The type instance synonym and synonym
+--       type instance Rep (D a b) = Rep_D a b
+--       type Rep_D a b = ...representation type for D ...
+--------------------------------------------------------------------------------
+
+tc_mkRepTyCon :: TyCon           -- The type to generate representation for
+               -> MetaTyCons      -- Metadata datatypes to refer to
+               -> TcM TyCon       -- Generated representation0 type
+tc_mkRepTyCon tycon metaDts = 
+-- Consider the example input tycon `D`, where data D a b = D_ a
+  do { -- `rep0` = GHC.Generics.Rep (type family)
+       rep0 <- tcLookupTyCon repTyConName
+
+       -- `rep0Ty` = D1 ... (C1 ... (S1 ... (Rec0 a))) :: * -> *
+     ; rep0Ty <- tc_mkRepTy tycon metaDts
+    
+       -- `rep_name` is a name we generate for the synonym
+     ; rep_name <- newImplicitBinder (tyConName tycon) mkGenR
+     ; let -- `tyvars` = [a,b]
+           tyvars  = tyConTyVars tycon
+
+           -- rep0Ty has kind * -> *
+           rep_kind = liftedTypeKind `mkArrowKind` liftedTypeKind
+
+           -- `appT` = D a b
+           appT = [mkTyConApp tycon (mkTyVarTys tyvars)]
+
+     ; buildSynTyCon rep_name tyvars (SynonymTyCon rep0Ty) rep_kind
+                     NoParentTyCon (Just (rep0, appT)) }
+
+--------------------------------------------------------------------------------
+-- Type representation
+--------------------------------------------------------------------------------
+
+tc_mkRepTy :: -- The type to generate representation for
+               TyCon 
+               -- Metadata datatypes to refer to
+            -> MetaTyCons 
+               -- Generated representation0 type
+            -> TcM Type
+tc_mkRepTy tycon metaDts = 
+  do
+    d1    <- tcLookupTyCon d1TyConName
+    c1    <- tcLookupTyCon c1TyConName
+    s1    <- tcLookupTyCon s1TyConName
+    nS1   <- tcLookupTyCon noSelTyConName
+    rec0  <- tcLookupTyCon rec0TyConName
+    par0  <- tcLookupTyCon par0TyConName
+    u1    <- tcLookupTyCon u1TyConName
+    v1    <- tcLookupTyCon v1TyConName
+    plus  <- tcLookupTyCon sumTyConName
+    times <- tcLookupTyCon prodTyConName
+    
+    let mkSum' a b = mkTyConApp plus  [a,b]
+        mkProd a b = mkTyConApp times [a,b]
+        mkRec0 a   = mkTyConApp rec0  [a]
+        mkPar0 a   = mkTyConApp par0  [a]
+        mkD    a   = mkTyConApp d1    [metaDTyCon, sumP (tyConDataCons a)]
+        mkC  i d a = mkTyConApp c1    [d, prod i (dataConOrigArgTys a) 
+                                                 (null (dataConFieldLabels a))]
+        -- This field has no label
+        mkS True  _ a = mkTyConApp s1 [mkTyConTy nS1, a]
+        -- This field has a  label
+        mkS False d a = mkTyConApp s1 [d, a]
+        
+        sumP [] = mkTyConTy v1
+        sumP l  = ASSERT (length metaCTyCons == length l)
+                    foldBal mkSum' [ mkC i d a
+                                   | (d,(a,i)) <- zip metaCTyCons (zip l [0..])]
+        -- The Bool is True if this constructor has labelled fields
+        prod :: Int -> [Type] -> Bool -> Type
+        prod i [] _ = ASSERT (length metaSTyCons > i)
+                        ASSERT (length (metaSTyCons !! i) == 0)
+                          mkTyConTy u1
+        prod i l b  = ASSERT (length metaSTyCons > i)
+                        ASSERT (length l == length (metaSTyCons !! i))
+                          foldBal mkProd [ arg d t b
+                                         | (d,t) <- zip (metaSTyCons !! i) l ]
+        
+        arg :: Type -> Type -> Bool -> Type
+        arg d t b = mkS b d (recOrPar t (getTyVar_maybe t))
+        -- Argument is not a type variable, use Rec0
+        recOrPar t Nothing  = mkRec0 t
+        -- Argument is a type variable, use Par0
+        recOrPar t (Just _) = mkPar0 t
+        
+        metaDTyCon  = mkTyConTy (metaD metaDts)
+        metaCTyCons = map mkTyConTy (metaC metaDts)
+        metaSTyCons = map (map mkTyConTy) (metaS metaDts)
+        
+    return (mkD tycon)
+
+--------------------------------------------------------------------------------
+-- Meta-information
+--------------------------------------------------------------------------------
+
+data MetaTyCons = MetaTyCons { -- One meta datatype per dataype
+                               metaD :: TyCon
+                               -- One meta datatype per constructor
+                             , metaC :: [TyCon]
+                               -- One meta datatype per selector per constructor
+                             , metaS :: [[TyCon]] }
+                             
+instance Outputable MetaTyCons where
+  ppr (MetaTyCons d c s) = ppr d <+> ppr c <+> ppr s
+                                   
+metaTyCons2TyCons :: MetaTyCons -> [TyCon]
+metaTyCons2TyCons (MetaTyCons d c s) = d : c ++ concat s
+
+
+-- Bindings for Datatype, Constructor, and Selector instances
+mkBindsMetaD :: FixityEnv -> TyCon 
+             -> ( LHsBinds RdrName      -- Datatype instance
+                , [LHsBinds RdrName]    -- Constructor instances
+                , [[LHsBinds RdrName]]) -- Selector instances
+mkBindsMetaD fix_env tycon = (dtBinds, allConBinds, allSelBinds)
+      where
+        mkBag l = foldr1 unionBags 
+                    [ unitBag (L loc (mkFunBind (L loc name) matches)) 
+                        | (name, matches) <- l ]
+        dtBinds       = mkBag [ (datatypeName_RDR, dtName_matches)
+                              , (moduleName_RDR, moduleName_matches)]
+
+        allConBinds   = map conBinds datacons
+        conBinds c    = mkBag ( [ (conName_RDR, conName_matches c)]
+                              ++ ifElseEmpty (dataConIsInfix c)
+                                   [ (conFixity_RDR, conFixity_matches c) ]
+                              ++ ifElseEmpty (length (dataConFieldLabels c) > 0)
+                                   [ (conIsRecord_RDR, conIsRecord_matches c) ]
+                              )
+
+        ifElseEmpty p x = if p then x else []
+        fixity c      = case lookupFixity fix_env (dataConName c) of
+                          Fixity n InfixL -> buildFix n leftAssocDataCon_RDR
+                          Fixity n InfixR -> buildFix n rightAssocDataCon_RDR
+                          Fixity n InfixN -> buildFix n notAssocDataCon_RDR
+        buildFix n assoc = nlHsApps infixDataCon_RDR [nlHsVar assoc
+                                                     , nlHsIntLit (toInteger n)]
+
+        allSelBinds   = map (map selBinds) datasels
+        selBinds s    = mkBag [(selName_RDR, selName_matches s)]
+
+        loc           = srcLocSpan (getSrcLoc tycon)
+        mkStringLHS s = [mkSimpleHsAlt nlWildPat (nlHsLit (mkHsString s))]
+        datacons      = tyConDataCons tycon
+        datasels      = map dataConFieldLabels datacons
+
+        dtName_matches     = mkStringLHS . showPpr . nameOccName . tyConName 
+                           $ tycon
+        moduleName_matches = mkStringLHS . moduleNameString . moduleName 
+                           . nameModule . tyConName $ tycon
+
+        conName_matches     c = mkStringLHS . showPpr . nameOccName
+                              . dataConName $ c
+        conFixity_matches   c = [mkSimpleHsAlt nlWildPat (fixity c)]
+        conIsRecord_matches _ = [mkSimpleHsAlt nlWildPat (nlHsVar true_RDR)]
+
+        selName_matches     s = mkStringLHS (showPpr (nameOccName s))
+
+
+--------------------------------------------------------------------------------
+-- Dealing with sums
+--------------------------------------------------------------------------------
+
+mkSum :: US          -- Base for generating unique names
+      -> TyCon       -- The type constructor
+      -> [DataCon]   -- The data constructors
+      -> ([Alt],     -- Alternatives for the T->Trep "from" function
+          [Alt])     -- Alternatives for the Trep->T "to" function
+
+-- Datatype without any constructors
+mkSum _us tycon [] = ([from_alt], [to_alt])
   where
-    from_matches = [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]
-    to_matches   = [mkSimpleHsAlt to_pat to_body]
-    loc	     = srcLocSpan (getSrcLoc tycon)
-    datacons = tyConDataCons tycon
-    (from_RDR, to_RDR) = mkGenericNames tycon
+    from_alt = (nlWildPat, mkM1_E (makeError errMsgFrom))
+    to_alt   = (mkM1_P nlWildPat, makeError errMsgTo)
+               -- These M1s are meta-information for the datatype
+    makeError s = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString s))
+    errMsgFrom = "No generic representation for empty datatype " ++ showPpr tycon
+    errMsgTo = "No values for empty datatype " ++ showPpr tycon
 
-    -- Recurse over the sum first
-    from_alts :: [FromAlt]
-    (from_alts, to_pat, to_body) = mk_sum_stuff init_us datacons
-    init_us = 1::Int		-- Unique supply
+-- Datatype with at least one constructor
+mkSum us _tycon datacons =
+  unzip [ mk1Sum us i (length datacons) d | (d,i) <- zip datacons [1..] ]
 
-----------------------------------------------------
---	Dealing with sums
-----------------------------------------------------
-
-mk_sum_stuff :: US 			-- Base for generating unique names
-	     -> [DataCon]	 	-- The data constructors
-	     -> ([FromAlt],				-- Alternatives for the T->Trep "from" function
-		 InPat RdrName, LHsExpr RdrName)	-- Arg and body of the Trep->T "to" function
-
--- For example, given
---	data T = C | D Int Int Int
--- 
--- mk_sum_stuff v [C,D] = ([C -> Inl Unit, D a b c -> Inr (a :*: (b :*: c))],
---			   case cd of { Inl u -> C; 
---  					Inr abc -> case abc of { a :*: bc ->
---						   case bc  of { b :*: c ->
---						   D a b c }} },
---			   cd)
-
-mk_sum_stuff us [datacon]
-   = ([from_alt], to_pat, to_body_fn app_exp)
-   where
-     n_args = dataConSourceArity datacon	-- Existentials already excluded
-
-     datacon_vars = map mkGenericLocal [us .. us+n_args-1]
-     us'          = us + n_args
-
-     datacon_rdr  = getRdrName datacon
-     app_exp      = nlHsVarApps datacon_rdr datacon_vars
-     from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
-
-     (_, from_alt_rhs, to_pat, to_body_fn) = mk_prod_stuff us' datacon_vars
-
-mk_sum_stuff us datacons
-  = (wrap inlDataCon_RDR l_from_alts ++ wrap inrDataCon_RDR r_from_alts,
-     nlVarPat to_arg,
-     noLoc (HsCase (nlHsVar to_arg) 
-	    (mkMatchGroup [mkSimpleHsAlt (nlConPat inlDataCon_RDR [l_to_pat]) l_to_body,
-			   mkSimpleHsAlt (nlConPat inrDataCon_RDR [r_to_pat]) r_to_body])))
+-- Build the sum for a particular constructor
+mk1Sum :: US        -- Base for generating unique names
+       -> Int       -- The index of this constructor
+       -> Int       -- Total number of constructors
+       -> DataCon   -- The data constructor
+       -> (Alt,     -- Alternative for the T->Trep "from" function
+           Alt)     -- Alternative for the Trep->T "to" function
+mk1Sum us i n datacon = (from_alt, to_alt)
   where
-    (l_datacons, r_datacons)		= splitInHalf datacons
-    (l_from_alts, l_to_pat, l_to_body)	= mk_sum_stuff us' l_datacons
-    (r_from_alts, r_to_pat, r_to_body)	= mk_sum_stuff us' r_datacons
+    n_args = dataConSourceArity datacon	-- Existentials already excluded
 
-    to_arg = mkGenericLocal us
-    us'	   = us+1
+    datacon_vars = map mkGenericLocal [us .. us+n_args-1]
+    us'          = us + n_args
 
-    wrap :: RdrName -> [FromAlt] -> [FromAlt]
-	-- Wrap an application of the Inl or Inr constructor round each alternative
-    wrap dc alts = [(pat, noLoc (HsApp (nlHsVar dc) rhs)) | (pat,rhs) <- alts]
+    datacon_rdr  = getRdrName datacon
+    app_exp      = nlHsVarApps datacon_rdr datacon_vars
+    
+    from_alt     = (nlConVarPat datacon_rdr datacon_vars, from_alt_rhs)
+    from_alt_rhs = mkM1_E (genLR_E i n (mkProd_E us' datacon_vars))
+    
+    to_alt     = (mkM1_P (genLR_P i n (mkProd_P us' datacon_vars)), to_alt_rhs)
+                 -- These M1s are meta-information for the datatype
+    to_alt_rhs = app_exp
 
+-- Generates the L1/R1 sum pattern
+genLR_P :: Int -> Int -> LPat RdrName -> LPat RdrName
+genLR_P i n p
+  | n == 0       = error "impossible"
+  | n == 1       = p
+  | i <= div n 2 = nlConPat l1DataCon_RDR [genLR_P i     (div n 2) p]
+  | otherwise    = nlConPat r1DataCon_RDR [genLR_P (i-m) (n-m)     p]
+                     where m = div n 2
 
-----------------------------------------------------
---	Dealing with products
-----------------------------------------------------
-mk_prod_stuff :: US			-- Base for unique names
-	      -> [RdrName]		-- arg-ids; args of the original user-defined constructor
-					-- 	They are bound enclosing from_rhs
-					-- 	Please bind these in the to_body_fn 
-	      -> (US,			-- Depleted unique-name supply
-		  LHsExpr RdrName, 			-- from-rhs: puts together the representation from the arg_ids
-		  InPat RdrName,			-- to_pat: 
-		  LHsExpr RdrName -> LHsExpr RdrName)	-- to_body_fn: takes apart the representation
+-- Generates the L1/R1 sum expression
+genLR_E :: Int -> Int -> LHsExpr RdrName -> LHsExpr RdrName
+genLR_E i n e
+  | n == 0       = error "impossible"
+  | n == 1       = e
+  | i <= div n 2 = nlHsVar l1DataCon_RDR `nlHsApp` genLR_E i     (div n 2) e
+  | otherwise    = nlHsVar r1DataCon_RDR `nlHsApp` genLR_E (i-m) (n-m)     e
+                     where m = div n 2
 
--- For example:
--- mk_prod_stuff abc [a,b,c] = ( a :*: (b :*: c),
---				 abc,
---			         \<body-code> -> case abc of { a :*: bc ->
---				 	         case bc  of { b :*: c  -> 
---					         <body-code> )
+--------------------------------------------------------------------------------
+-- Dealing with products
+--------------------------------------------------------------------------------
 
--- We need to use different uniques in the branches 
--- because the returned to_body_fns are nested.  
--- Hence the returned unqique-name supply
-
-mk_prod_stuff us []		-- Unit case
-  = (us+1,
-     nlHsVar genUnitDataCon_RDR,
-     noLoc (SigPatIn (nlVarPat (mkGenericLocal us)) 
-	    	     (noLoc (HsTyVar (getRdrName genUnitTyConName)))),
-	-- Give a signature to the pattern so we get 
-	--	data S a = Nil | S a
-	--	toS = \x -> case x of { Inl (g :: Unit) -> Nil
-	--				Inr x -> S x }
-	-- The (:: Unit) signature ensures that we'll infer the right
-	-- type for toS. If we leave it out, the type is too polymorphic
-
-     \x -> x)
-
-mk_prod_stuff us [arg_var]	-- Singleton case
-  = (us, nlHsVar arg_var, nlVarPat arg_var, \x -> x)
-
-mk_prod_stuff us arg_vars	-- Two or more
-  = (us'', 
-     nlHsApps crossDataCon_RDR [l_alt_rhs, r_alt_rhs],
-     nlVarPat to_arg, 
--- gaw 2004 FIX?
-     \x -> noLoc (HsCase (nlHsVar to_arg) 
-		  (mkMatchGroup [mkSimpleHsAlt pat (l_to_body_fn (r_to_body_fn x))])))
+-- Build a product expression
+mkProd_E :: US	            -- Base for unique names
+	 -> [RdrName]       -- List of variables matched on the lhs
+	 -> LHsExpr RdrName -- Resulting product expression
+mkProd_E _ []   = mkM1_E (nlHsVar u1DataCon_RDR)
+mkProd_E _ vars = mkM1_E (foldBal prod appVars)
+                   -- These M1s are meta-information for the constructor
   where
-    to_arg = mkGenericLocal us
-    (l_arg_vars, r_arg_vars) 		      = splitInHalf arg_vars
-    (us',  l_alt_rhs, l_to_pat, l_to_body_fn) = mk_prod_stuff (us+1)  l_arg_vars
-    (us'', r_alt_rhs, r_to_pat, r_to_body_fn) = mk_prod_stuff us' r_arg_vars
-    pat = nlConPat crossDataCon_RDR [l_to_pat, r_to_pat]
+    appVars = map wrapArg_E vars
+    prod a b = prodDataCon_RDR `nlHsApps` [a,b]
 
-splitInHalf :: [a] -> ([a],[a])
-splitInHalf list = (left, right)
-		 where
-		   half  = length list `div` 2
-		   left  = take half list
-		   right = drop half list
+wrapArg_E :: RdrName -> LHsExpr RdrName
+wrapArg_E v = mkM1_E (k1DataCon_RDR `nlHsVarApps` [v])
+              -- This M1 is meta-information for the selector
+
+-- Build a product pattern
+mkProd_P :: US		        -- Base for unique names
+	       -> [RdrName]     -- List of variables to match
+	       -> LPat RdrName  -- Resulting product pattern
+mkProd_P _ []   = mkM1_P (nlNullaryConPat u1DataCon_RDR)
+mkProd_P _ vars = mkM1_P (foldBal prod appVars)
+                   -- These M1s are meta-information for the constructor
+  where
+    appVars = map wrapArg_P vars
+    prod a b = prodDataCon_RDR `nlConPat` [a,b]
+    
+wrapArg_P :: RdrName -> LPat RdrName
+wrapArg_P v = mkM1_P (k1DataCon_RDR `nlConVarPat` [v])
+              -- This M1 is meta-information for the selector
 
 mkGenericLocal :: US -> RdrName
 mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
 
-mkGenericNames :: TyCon -> (RdrName, RdrName)
-mkGenericNames tycon
-  = (from_RDR, to_RDR)
-  where
-    tc_name  = tyConName tycon
-    tc_occ   = nameOccName tc_name
-    tc_mod   = ASSERT( isExternalName tc_name ) nameModule tc_name
-    from_RDR = mkOrig tc_mod (mkGenOcc1 tc_occ)
-    to_RDR   = mkOrig tc_mod (mkGenOcc2 tc_occ)
-\end{code}
+mkM1_E :: LHsExpr RdrName -> LHsExpr RdrName
+mkM1_E e = nlHsVar m1DataCon_RDR `nlHsApp` e
 
-%************************************************************************
-%*									*
-\subsection{Generating the RHS of a generic default method}
-%*									*
-%************************************************************************
+mkM1_P :: LPat RdrName -> LPat RdrName
+mkM1_P p = m1DataCon_RDR `nlConPat` [p]
 
-Generating the Generic default method.  Uses the bimaps to generate the
-actual method. All of this is rather incomplete, but it would be nice
-to make even this work.  Example
+-- | Variant of foldr1 for producing balanced lists
+foldBal :: (a -> a -> a) -> [a] -> a
+foldBal op = foldBal' op (error "foldBal: empty list")
 
- 	class Foo a where
-	  op :: Op a
+foldBal' :: (a -> a -> a) -> a -> [a] -> a
+foldBal' _  x []  = x
+foldBal' _  _ [y] = y
+foldBal' op x l   = let (a,b) = splitAt (length l `div` 2) l
+                    in foldBal' op x a `op` foldBal' op x b
 
-	instance Foo T
-
-Then we fill in the RHS for op, RenamedHsExpr, by calling mkGenericRhs:
-
-	instance Foo T where
-	   op = <mkGenericRhs op a T>
-
-To do this, we generate a pair of RenamedHsExprs (EP toOp fromOp), where
-
-	toOp   :: Op Trep -> Op T
-	fromOp :: Op T    -> Op Trep
-
-(the bimap) and then fill in the RHS with
-
-	instance Foo T where
-	   op = toOp op
-
-Remember, we're generating a RenamedHsExpr, so the result of all this
-will be fed to the type checker.  So the 'op' on the RHS will be 
-at the representation type for T, Trep.
-
-
-Note [Polymorphic methods]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose the class op is polymorphic:
-
-	class Baz a where
-	  op :: forall b. Ord b => a -> b -> b
-
-Then we can still generate a bimap with
-
-	toOP :: forall b. (Trep -> b -> b) -> (T -> b -> b)
-
-and fill in the instance decl thus
-
-	instance Foo T where
-	   op = toOp op
-
-By the time the type checker has done its stuff we'll get
-
-	instance Foo T where
-	   op = \b. \dict::Ord b. toOp b (op Trep b dict)
-
-Note [Higher rank methods]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Higher-rank method types don't work, because we'd generate a bimap that
-needs impredicative polymorphism.  In principle that should be possible
-(with boxy types and all) but it would take a bit of working out.   Here's
-an example:
-  class ChurchEncode k where 
-    match :: k -> z 
-       	  -> (forall a b z. a -> b -> z)  {- product -} 
-       	  -> (forall a   z. a -> z)       {- left -} 
-       	  -> (forall a   z. a -> z)       {- right -} 
-       	  -> z 
-  
-    match {| Unit    |} Unit      unit prod left right = unit 
-    match {| a :*: b |} (x :*: y) unit prod left right = prod x y 
-    match {| a :+: b |} (Inl l)   unit prod left right = left l 
-    match {| a :+: b |} (Inr r)   unit prod left right = right r 
-
-\begin{code}
-mkGenericRhs :: Id -> TyVar -> TyCon -> LHsExpr RdrName
-mkGenericRhs sel_id tyvar tycon
-  = ASSERT( isSingleton ctxt ) 	-- Checks shape of selector-id context
---    pprTrace "mkGenericRhs" (vcat [ppr sel_id, ppr (idType sel_id), ppr tyvar, ppr tycon, ppr local_tvs, ppr final_ty]) $
-    mkHsApp (toEP bimap) (nlHsVar (getRdrName sel_id))
-  where 
-	-- Initialising the "Environment" with the from/to functions
-	-- on the datatype (actually tycon) in question
-	(from_RDR, to_RDR) = mkGenericNames tycon 
-
-        -- Instantiate the selector type, and strip off its class context
-	(ctxt, op_ty) = tcSplitPhiTy (applyTy (idType sel_id) (mkTyVarTy tyvar))
-
-        -- Do it again!  This deals with the case where the method type 
-	-- is polymorphic -- see Note [Polymorphic methods] above
-	(local_tvs,_,final_ty) = tcSplitSigmaTy op_ty
-
-	-- Now we probably have a tycon in front
-        -- of us, quite probably a FunTyCon.
-        ep    = EP (nlHsVar from_RDR) (nlHsVar to_RDR) 
-        bimap = generate_bimap (tyvar, ep, local_tvs) final_ty
-
-type EPEnv = (TyVar,			-- The class type variable
-	      EP (LHsExpr RdrName),	-- The EP it maps to
-	      [TyVar]			-- Other in-scope tyvars; they have an identity EP
-	     )
-
--------------------
-generate_bimap :: EPEnv
-	       -> Type
-	       -> EP (LHsExpr RdrName)
--- Top level case - splitting the TyCon.
-generate_bimap env@(tv,ep,local_tvs) ty 
-  | all (`elem` local_tvs) (varSetElems (tyVarsOfType ty))
-  = idEP	-- A constant type
-
-  | Just tv1 <- getTyVar_maybe ty
-  = ASSERT( tv == tv1 ) ep					-- The class tyvar
-
-  | Just (tycon, ty_args) <- tcSplitTyConApp_maybe ty
-  = bimapTyCon tycon (map (generate_bimap env) ty_args)
-
-  | otherwise
-  = pprPanic "generate_bimap" (ppr ty)
-
--------------------
-bimapTyCon :: TyCon -> [EP  (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
-bimapTyCon tycon arg_eps 
-  | tycon == funTyCon       = bimapArrow arg_eps
-  | tycon == listTyCon      = bimapList arg_eps
-  | isBoxedTupleTyCon tycon = bimapTuple arg_eps
-  | otherwise		    = pprPanic "bimapTyCon" (ppr tycon)
-
--------------------
--- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
-bimapArrow :: [EP (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
-bimapArrow [ep1, ep2]
-  = EP { fromEP = mkHsLam [nlVarPat a_RDR, nlVarPat b_RDR] from_body, 
-	 toEP   = mkHsLam [nlVarPat a_RDR, nlVarPat b_RDR] to_body }
-  where
-    from_body = fromEP ep2 `mkHsApp` (mkHsPar $ nlHsVar a_RDR `mkHsApp` (mkHsPar $ toEP   ep1 `mkHsApp` nlHsVar b_RDR))
-    to_body   = toEP   ep2 `mkHsApp` (mkHsPar $ nlHsVar a_RDR `mkHsApp` (mkHsPar $ fromEP ep1 `mkHsApp` nlHsVar b_RDR))
-
--------------------
--- bimapTuple :: [EP a1 b1, ... EP an bn] -> EP (a1,...an) (b1,..bn)
-bimapTuple :: [EP (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
-bimapTuple eps 
-  = EP { fromEP = mkHsLam [noLoc tuple_pat] from_body,
-	 toEP   = mkHsLam [noLoc tuple_pat] to_body }
-  where
-    names	= takeList eps gs_RDR
-    tuple_pat	= TuplePat (map nlVarPat names) Boxed placeHolderType
-    eps_w_names = eps `zip` names
-    to_body     = mkLHsTupleExpr [toEP   ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names]
-    from_body   = mkLHsTupleExpr [fromEP ep `mkHsApp` nlHsVar g | (ep,g) <- eps_w_names]
-
--------------------
--- bimapList :: EP a b -> EP [a] [b]
-bimapList :: [EP (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
-bimapList [ep]
-  = EP { fromEP = nlHsApp (nlHsVar map_RDR) (fromEP ep),
-	 toEP   = nlHsApp (nlHsVar map_RDR) (toEP ep) }
-
--------------------
-a_RDR, b_RDR :: RdrName
-a_RDR	= mkVarUnqual (fsLit "a")
-b_RDR	= mkVarUnqual (fsLit "b")
-
-gs_RDR :: [RdrName]
-gs_RDR	= [ mkVarUnqual (mkFastString ("g"++show i)) | i <- [(1::Int) .. ] ]
-
-idEP :: EP (LHsExpr RdrName)
-idEP = EP idexpr idexpr
-     where
-       idexpr = mkHsLam [nlVarPat a_RDR] (nlHsVar a_RDR)
 \end{code}

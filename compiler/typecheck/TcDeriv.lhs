@@ -40,10 +40,13 @@ import Name
 import NameSet
 import TyCon
 import TcType
+import BuildTyCl
+import BasicTypes
 import Var
 import VarSet
 import PrelNames
 import SrcLoc
+import UniqSupply
 import Util
 import ListSetOps
 import Outputable
@@ -125,6 +128,9 @@ pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs,
 		   ds_cls = c, ds_tys = tys, ds_theta = rhs })
   = parens (hsep [ppr l, ppr n, ppr tvs, ppr c, ppr tys]
 	    <+> equals <+> ppr rhs)
+
+instance Outputable DerivSpec where
+  ppr = pprDerivSpec
 \end{code}
 
 
@@ -292,17 +298,21 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 tcDeriving  :: [LTyClDecl Name]  -- All type constructors
             -> [LInstDecl Name]  -- All instance declarations
             -> [LDerivDecl Name] -- All stand-alone deriving declarations
-	    -> TcM ([InstInfo Name],	-- The generated "instance decls"
-		    HsValBinds Name,	-- Extra generated top-level bindings
-                    DefUses)
+            -> TcM ([InstInfo Name] -- The generated "instance decls"
+                   ,HsValBinds Name -- Extra generated top-level bindings
+                   ,DefUses
+                   ,[TyCon]         -- Extra generated top-level types
+                   ,[TyCon])        -- Extra generated type family instances
 
 tcDeriving tycl_decls inst_decls deriv_decls
-  = recoverM (return ([], emptyValBindsOut, emptyDUs)) $
+  = recoverM (return ([], emptyValBindsOut, emptyDUs, [], [])) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- And make the necessary "equations".
 	  is_boot <- tcIsHsBoot
 	; traceTc "tcDeriving" (ppr is_boot)
-	; early_specs <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
+	; (early_specs, genericsExtras) 
+                <- makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
+        ; let (repMetaTys, repTyCons, metaInsts) = unzip3 genericsExtras
 
 	; overlap_flag <- getOverlapFlag
 	; let (infer_specs, given_specs) = splitEithers early_specs
@@ -313,20 +323,29 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; insts2 <- mapM (genInst False overlap_flag) final_specs
 
-		 -- Generate the generic to/from functions from each type declaration
-	; gen_binds <- mkGenericBinds is_boot tycl_decls
-	; (inst_info, rn_binds, rn_dus) <- renameDeriv is_boot gen_binds (insts1 ++ insts2)
+	-- We no longer generate the old generic to/from functions
+        -- from each type declaration, so this is emptyBag
+	; gen_binds <- return emptyBag -- mkGenericBinds is_boot tycl_decls
+	
+	; (inst_info, rn_binds, rn_dus)
+                <- renameDeriv is_boot gen_binds (insts1 ++ insts2 ++ concat metaInsts)
 
+	; dflags <- getDOpts
+	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+	         (ddump_deriving inst_info rn_binds))
+{-
         ; when (not (null inst_info)) $
           dumpDerivingInfo (ddump_deriving inst_info rn_binds)
-
-	; return (inst_info, rn_binds, rn_dus) }
+-}
+	; return ( inst_info, rn_binds, rn_dus
+                 , concat (map metaTyCons2TyCons repMetaTys), repTyCons) }
   where
     ddump_deriving :: [InstInfo Name] -> HsValBinds Name -> SDoc
     ddump_deriving inst_infos extra_binds
       = hang (ptext (sLit "Derived instances"))
            2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos)
               $$ ppr extra_binds)
+
 
 renameDeriv :: Bool -> LHsBinds RdrName
 	    -> [(InstInfo RdrName, DerivAuxBinds)]
@@ -379,26 +398,12 @@ renameDeriv is_boot gen_binds insts
 		-- scope (yuk), and rename the method binds
 	   ASSERT( null sigs )
 	   bindLocalNames (map Var.varName tyvars) $
- 	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) [] binds
+ 	   do { (rn_binds, fvs) <- rnMethodBinds clas_nm (\_ -> []) binds
 	      ; let binds' = VanillaInst rn_binds [] standalone_deriv
               ; return (inst_info { iBinds = binds' }, fvs) }
 	where
 	  (tyvars,_, clas,_) = instanceHead inst
 	  clas_nm            = className clas
-
------------------------------------------
-mkGenericBinds :: Bool -> [LTyClDecl Name] -> TcM (LHsBinds RdrName)
-mkGenericBinds is_boot tycl_decls
-  | is_boot 
-  = return emptyBag
-  | otherwise
-  = do	{ tcs <- mapM tcLookupTyCon [ tcdName d 
-    	      	      		    | L _ d <- tycl_decls, isDataDecl d ]
-	; return (unionManyBags [ mkTyConGenericBinds tc
-				| tc <- tcs, tyConHasGenerics tc ]) }
-		-- We are only interested in the data type declarations,
-		-- and then only in the ones whose 'has-generics' flag is on
-		-- The predicate tyConHasGenerics finds both of these
 \end{code}
 
 Note [Newtype deriving and unused constructors]
@@ -430,34 +435,93 @@ stored in NewTypeDerived.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 
 \begin{code}
+-- Make the "extras" for the generic representation
+mkGenDerivExtras :: TyCon 
+                 -> TcRn (MetaTyCons, TyCon, [(InstInfo RdrName, DerivAuxBinds)])
+mkGenDerivExtras tc = do
+        { (metaTyCons, rep0TyInst) <- genGenericRepExtras tc
+        ; metaInsts                <- genDtMeta (tc, metaTyCons)
+        ; return (metaTyCons, rep0TyInst, metaInsts) }
+
 makeDerivSpecs :: Bool 
 	       -> [LTyClDecl Name] 
-               -> [LInstDecl Name]
+	       -> [LInstDecl Name]
 	       -> [LDerivDecl Name] 
-	       -> TcM [EarlyDerivSpec]
-
+	       -> TcM ( [EarlyDerivSpec]
+                      , [(MetaTyCons, TyCon, [(InstInfo RdrName, DerivAuxBinds)])])
 makeDerivSpecs is_boot tycl_decls inst_decls deriv_decls
-  | is_boot 	-- No 'deriving' at all in hs-boot files
-  = do	{ mapM_ add_deriv_err deriv_locs 
-	; return [] }
+  | is_boot     -- No 'deriving' at all in hs-boot files
+  = do  { mapM_ add_deriv_err deriv_locs 
+        ; return ([],[]) }
   | otherwise
-  = do	{ eqns1 <- mapAndRecoverM deriveTyData all_tydata
-	; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
-	; return (eqns1 ++ eqns2) }
+  = do  { eqns1 <- mapAndRecoverM deriveTyData all_tydata
+        ; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
+
+        -- Generic representation stuff: we might need to add some "extras"
+        -- to the instances
+        ; xDerRep <- getDOpts >>= return . xopt Opt_DeriveGeneric
+        ; generic_extras_deriv <- if not xDerRep
+                                   -- No extras if the flag is off
+                                   then (return [])
+                                    else do {
+          let allTyNames = [ tcdName d | L _ d <- tycl_decls, isDataDecl d ]
+        -- Select only those types that derive Generic
+        ; let sel_tydata = [ tcdName t | (L _ c, L _ t) <- all_tydata
+                                       , getClassName c == Just genClassName ]
+        ; let sel_deriv_decls = catMaybes [ getTypeName t
+                                  | L _ (DerivDecl (L _ t)) <- deriv_decls
+                                  , getClassName t == Just genClassName ] 
+        ; derTyDecls <- mapM tcLookupTyCon $ 
+                         filter (needsExtras xDerRep
+                                  (sel_tydata ++ sel_deriv_decls)) allTyNames
+        -- We need to generate the extras to add to what has
+        -- already been derived
+        ; {- pprTrace "sel_tydata" (ppr sel_tydata) $
+          pprTrace "sel_deriv_decls" (ppr sel_deriv_decls) $
+          pprTrace "derTyDecls" (ppr derTyDecls) $
+          pprTrace "deriv_decls" (ppr deriv_decls) $ -}
+          mapM mkGenDerivExtras derTyDecls }
+
+        -- Merge and return
+        ; return ( eqns1 ++ eqns2, generic_extras_deriv) }
   where
+      -- We need extras if the flag DeriveGeneric is on and this type is 
+      -- deriving Generic
+    needsExtras xDerRep tydata tc_name = xDerRep && tc_name `elem` tydata
+
+    -- Extracts the name of the class in the deriving
+    getClassName :: HsType Name -> Maybe Name
+    getClassName (HsForAllTy _ _ _ (L _ n)) = getClassName n
+    getClassName (HsPredTy (HsClassP n _))  = Just n
+    getClassName _                          = Nothing
+
+    -- Extracts the name of the type in the deriving
+    -- This function (and also getClassName above) is not really nice, and I
+    -- might not have covered all possible cases. I wonder if there is no easier
+    -- way to extract class and type name from a LDerivDecl...
+    getTypeName :: HsType Name -> Maybe Name
+    getTypeName (HsForAllTy _ _ _ (L _ n))      = getTypeName n
+    getTypeName (HsTyVar n)                     = Just n
+    getTypeName (HsOpTy _ (L _ n) _)            = Just n
+    getTypeName (HsPredTy (HsClassP _ [L _ n])) = getTypeName n
+    getTypeName (HsAppTy (L _ n) _)             = getTypeName n
+    getTypeName (HsParTy (L _ n))               = getTypeName n
+    getTypeName (HsKindSig (L _ n) _)           = getTypeName n
+    getTypeName _                               = Nothing
+
     extractTyDataPreds decls
       = [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
 
     all_tydata :: [(LHsType Name, LTyClDecl Name)]
-	-- Derived predicate paired with its data type declaration
+        -- Derived predicate paired with its data type declaration
     all_tydata = extractTyDataPreds (instDeclATs inst_decls ++ tycl_decls)
 
     deriv_locs = map (getLoc . snd) all_tydata
-		 ++ map getLoc deriv_decls
+                 ++ map getLoc deriv_decls
 
     add_deriv_err loc = setSrcSpan loc $
-			addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
-				   2 (ptext (sLit "Use an instance declaration instead")))
+                        addErr (hang (ptext (sLit "Deriving not permitted in hs-boot file"))
+                                   2 (ptext (sLit "Use an instance declaration instead")))
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM EarlyDerivSpec
@@ -727,6 +791,11 @@ inferConstraints :: [TyVar] -> Class -> [TcType] -> TyCon -> [TcType] -> ThetaTy
 -- generated method definitions should succeed.   This set will be simplified
 -- before being used in the instance declaration
 inferConstraints _ cls inst_tys rep_tc rep_tc_args
+  -- Generic constraints are easy
+  | cls `hasKey` genClassKey
+  = []
+  -- The others are a bit more complicated
+  | otherwise
   = ASSERT2( equalLength rep_tc_tvs all_rep_tc_args, ppr cls <+> ppr rep_tc )
     stupid_constraints ++ extra_constraints
     ++ sc_constraints ++ con_arg_constraints
@@ -830,6 +899,8 @@ sideConditions mtheta cls
     	                                   cond_functorOK False) -- Functor/Fold/Trav works ok for rank-n types
   | cls_key == traversableClassKey = Just (checkFlag Opt_DeriveTraversable `andCond`
     	                                   cond_functorOK False)
+  | cls_key == genClassKey         = Just (cond_RepresentableOk `andCond`
+                                           checkFlag Opt_DeriveGeneric)
   | otherwise = Nothing
   where
     cls_key = getUnique cls
@@ -848,7 +919,7 @@ orCond c1 c2 tc
 	Nothing -> Nothing	    -- c1 succeeds
 	Just x  -> case c2 tc of    -- c1 fails
 		     Nothing -> Nothing
-		     Just y  -> Just (x $$ ptext (sLit "  and") $$ y)
+		     Just y  -> Just (x $$ ptext (sLit "  or") $$ y)
 			            -- Both fail
 
 andCond :: Condition -> Condition -> Condition
@@ -874,11 +945,14 @@ cond_stdOK Nothing (_, rep_tc)
     check_con con 
       | isVanillaDataCon con
       , all isTauTy (dataConOrigArgTys con) = Nothing
-      | otherwise = Just (badCon con (ptext (sLit "does not have a Haskell-98 type")))
+      | otherwise = Just (badCon con (ptext (sLit "must have a Haskell-98 type")))
   
 no_cons_why :: TyCon -> SDoc
 no_cons_why rep_tc = quotes (pprSourceTyCon rep_tc) <+> 
-		     ptext (sLit "has no data constructors")
+		     ptext (sLit "must have at least one data constructor")
+
+cond_RepresentableOk :: Condition
+cond_RepresentableOk (_,t) = canDoGenerics t
 
 cond_enumOrProduct :: Condition
 cond_enumOrProduct = cond_isEnumeration `orCond` 
@@ -893,7 +967,7 @@ cond_noUnliftedArgs (_, tc)
   where
     bad_cons = [ con | con <- tyConDataCons tc
 		     , any isUnLiftedType (dataConOrigArgTys con) ]
-    why = badCon (head bad_cons) (ptext (sLit "has arguments of unlifted type"))
+    why = badCon (head bad_cons) (ptext (sLit "must have only arguments of lifted type"))
 
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
@@ -901,7 +975,7 @@ cond_isEnumeration (_, rep_tc)
   | otherwise		        = Just why
   where
     why = sep [ quotes (pprSourceTyCon rep_tc) <+> 
-	          ptext (sLit "is not an enumeration type")
+	          ptext (sLit "must be an enumeration type")
               , ptext (sLit "(an enumeration consists of one or more nullary, non-GADT constructors)") ]
 		  -- See Note [Enumeration types] in TyCon
 
@@ -911,7 +985,7 @@ cond_isProduct (_, rep_tc)
   | otherwise	          = Just why
   where
     why = quotes (pprSourceTyCon rep_tc) <+> 
-	  ptext (sLit "does not have precisely one constructor")
+	  ptext (sLit "must have precisely one constructor")
 
 cond_typeableOK :: Condition
 -- OK for Typeable class
@@ -924,9 +998,9 @@ cond_typeableOK (_, tc)
   | otherwise	      = Nothing
   where
     too_many = quotes (pprSourceTyCon tc) <+> 
-	       ptext (sLit "has too many arguments")
+	       ptext (sLit "must have 7 or fewer arguments")
     bad_kind = quotes (pprSourceTyCon tc) <+> 
-	       ptext (sLit "has arguments of kind other than `*'")
+	       ptext (sLit "must only have arguments of kind `*'")
 
 functorLikeClassKeys :: [Unique]
 functorLikeClassKeys = [functorClassKey, foldableClassKey, traversableClassKey]
@@ -941,11 +1015,11 @@ cond_functorOK :: Bool -> Condition
 cond_functorOK allowFunctions (_, rep_tc)
   | null tc_tvs
   = Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc) 
-          <+> ptext (sLit "has no parameters"))
+          <+> ptext (sLit "must have some type parameters"))
 
   | not (null bad_stupid_theta)
   = Just (ptext (sLit "Data type") <+> quotes (ppr rep_tc) 
-          <+> ptext (sLit "has a class context") <+> pprTheta bad_stupid_theta)
+          <+> ptext (sLit "must not have a class context") <+> pprTheta bad_stupid_theta)
 
   | otherwise
   = msum (map check_con data_cons)	-- msum picks the first 'Just', if any
@@ -972,10 +1046,10 @@ cond_functorOK allowFunctions (_, rep_tc)
                       , ft_bad_app = Just (badCon con wrong_arg)
                       , ft_forall = \_ x   -> x }
                     
-    existential = ptext (sLit "has existential arguments")
-    covariant 	= ptext (sLit "uses the type variable in a function argument")
-    functions 	= ptext (sLit "contains function types")
-    wrong_arg 	= ptext (sLit "uses the type variable in an argument other than the last")
+    existential = ptext (sLit "must not have existential arguments")
+    covariant 	= ptext (sLit "must not use the type variable in a function argument")
+    functions 	= ptext (sLit "must not contain function types")
+    wrong_arg 	= ptext (sLit "must not use the type variable in an argument other than the last")
 
 checkFlag :: ExtensionFlag -> Condition
 checkFlag flag (dflags, _)
@@ -999,11 +1073,11 @@ std_class_via_iso clas
 
 
 non_iso_class :: Class -> Bool
--- *Never* derive Read,Show,Typeable,Data by isomorphism,
+-- *Never* derive Read, Show, Typeable, Data, Generic by isomorphism,
 -- even with -XGeneralizedNewtypeDeriving
 non_iso_class cls 
-  = classKey cls `elem` ([readClassKey, showClassKey, dataClassKey] ++
-			 typeableClassKeys)
+  = classKey cls `elem` ([ readClassKey, showClassKey, dataClassKey
+                         , genClassKey] ++ typeableClassKeys)
 
 typeableClassKeys :: [Unique]
 typeableClassKeys = map getUnique typeableClassNames
@@ -1451,18 +1525,157 @@ genDerivBinds loc fix_env clas tycon
 	Nothing	    -> pprPanic "genDerivBinds: bad derived class" (ppr clas)
   where
     gen_list :: [(Unique, SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds))]
-    gen_list = [(eqClassKey,       gen_Eq_binds)
- 	       ,(ordClassKey,      gen_Ord_binds)
- 	       ,(enumClassKey,     gen_Enum_binds)
- 	       ,(boundedClassKey,  gen_Bounded_binds)
- 	       ,(ixClassKey,       gen_Ix_binds)
- 	       ,(showClassKey,     gen_Show_binds fix_env)
- 	       ,(readClassKey,     gen_Read_binds fix_env)
-	       ,(dataClassKey,     gen_Data_binds)
-	       ,(functorClassKey,  gen_Functor_binds)
-	       ,(foldableClassKey, gen_Foldable_binds)
-	       ,(traversableClassKey, gen_Traversable_binds)
+    gen_list = [(eqClassKey,            gen_Eq_binds)
+ 	       ,(ordClassKey,           gen_Ord_binds)
+ 	       ,(enumClassKey,          gen_Enum_binds)
+ 	       ,(boundedClassKey,       gen_Bounded_binds)
+ 	       ,(ixClassKey,            gen_Ix_binds)
+ 	       ,(showClassKey,          gen_Show_binds fix_env)
+ 	       ,(readClassKey,          gen_Read_binds fix_env)
+	       ,(dataClassKey,          gen_Data_binds)
+	       ,(functorClassKey,       gen_Functor_binds)
+	       ,(foldableClassKey,      gen_Foldable_binds)
+	       ,(traversableClassKey,   gen_Traversable_binds)
+	       ,(genClassKey,           genGenericBinds)
  	       ]
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[TcDeriv-generic-binds]{Bindings for the new generic deriving mechanism}
+%*									*
+%************************************************************************
+
+For the generic representation we need to generate:
+\begin{itemize}
+\item A Generic instance
+\item A Rep type instance 
+\item Many auxiliary datatypes and instances for them (for the meta-information)
+\end{itemize}
+
+@genGenericBinds@ does (1)
+@genGenericRepExtras@ does (2) and (3)
+@genGenericAll@ does all of them
+
+\begin{code}
+genGenericBinds :: SrcSpan -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
+genGenericBinds _ tc = (mkBindsRep tc, [ {- No DerivAuxBinds -} ])
+
+genGenericRepExtras :: TyCon -> TcM (MetaTyCons, TyCon)
+genGenericRepExtras tc =
+  do  uniqS <- newUniqueSupply
+      let
+        -- Uniques for everyone
+        (uniqD:uniqs) = uniqsFromSupply uniqS
+        (uniqsC,us) = splitAt (length tc_cons) uniqs
+        uniqsS :: [[Unique]] -- Unique supply for the S datatypes
+        uniqsS = mkUniqsS tc_arits us
+        mkUniqsS []    _  = []
+        mkUniqsS (n:t) us = case splitAt n us of
+                              (us1,us2) -> us1 : mkUniqsS t us2
+
+        tc_name   = tyConName tc
+        tc_cons   = tyConDataCons tc
+        tc_arits  = map dataConSourceArity tc_cons
+        
+        tc_occ    = nameOccName tc_name
+        d_occ     = mkGenD tc_occ
+        c_occ m   = mkGenC tc_occ m
+        s_occ m n = mkGenS tc_occ m n
+        mod_name  = nameModule (tyConName tc)
+        d_name    = mkExternalName uniqD mod_name d_occ wiredInSrcSpan
+        c_names   = [ mkExternalName u mod_name (c_occ m) wiredInSrcSpan
+                      | (u,m) <- zip uniqsC [0..] ]
+        s_names   = [ [ mkExternalName u mod_name (s_occ m n) wiredInSrcSpan 
+                        | (u,n) <- zip us [0..] ] | (us,m) <- zip uniqsS [0..] ]
+        
+        mkTyCon name = ASSERT( isExternalName name )
+                         buildAlgTyCon name [] [] mkAbstractTyConRhs
+                           NonRecursive False NoParentTyCon Nothing
+
+      metaDTyCon  <- mkTyCon d_name
+      metaCTyCons <- sequence [ mkTyCon c_name | c_name <- c_names ]
+      metaSTyCons <- mapM sequence 
+                       [ [ mkTyCon s_name 
+                         | s_name <- s_namesC ] | s_namesC <- s_names ]
+
+      let metaDts = MetaTyCons metaDTyCon metaCTyCons metaSTyCons
+  
+      rep0_tycon <- tc_mkRepTyCon tc metaDts
+      
+      -- pprTrace "rep0" (ppr rep0_tycon) $
+      return (metaDts, rep0_tycon)
+{-
+genGenericAll :: TyCon
+                  -> TcM ((InstInfo RdrName, DerivAuxBinds), MetaTyCons, TyCon)
+genGenericAll tc =
+  do  (metaDts, rep0_tycon)     <- genGenericRepExtras tc
+      clas                      <- tcLookupClass genClassName
+      dfun_name                 <- new_dfun_name clas tc
+      let
+        mkInstRep = (InstInfo { iSpec = inst, iBinds = binds }
+                               , [ {- No DerivAuxBinds -} ])
+        inst  = mkLocalInstance dfun NoOverlap
+        binds = VanillaInst (mkBindsRep tc) [] False
+
+        tvs   = tyConTyVars tc
+        tc_ty = mkTyConApp tc (mkTyVarTys tvs)
+        
+        dfun  = mkDictFunId dfun_name (tyConTyVars tc) [] clas [tc_ty]
+      return (mkInstRep, metaDts, rep0_tycon)
+-}
+genDtMeta :: (TyCon, MetaTyCons) -> TcM [(InstInfo RdrName, DerivAuxBinds)]
+genDtMeta (tc,metaDts) =
+  do  dClas <- tcLookupClass datatypeClassName
+      d_dfun_name <- new_dfun_name dClas tc
+      cClas <- tcLookupClass constructorClassName
+      c_dfun_names <- sequence [ new_dfun_name cClas tc | _ <- metaC metaDts ]
+      sClas <- tcLookupClass selectorClassName
+      s_dfun_names <- sequence (map sequence [ [ new_dfun_name sClas tc 
+                                               | _ <- x ] 
+                                             | x <- metaS metaDts ])
+      fix_env <- getFixityEnv
+
+      let
+        (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
+        
+        -- Datatype
+        d_metaTycon = metaD metaDts
+        d_inst = mkLocalInstance d_dfun NoOverlap
+        d_binds = VanillaInst dBinds [] False
+        d_dfun  = mkDictFunId d_dfun_name (tyConTyVars tc) [] dClas 
+                    [ mkTyConTy d_metaTycon ]
+        d_mkInst = (InstInfo { iSpec = d_inst, iBinds = d_binds }, [])
+        
+        -- Constructor
+        c_metaTycons = metaC metaDts
+        c_insts = [ mkLocalInstance (c_dfun c ds) NoOverlap 
+                  | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
+        c_binds = [ VanillaInst c [] False | c <- cBinds ]
+        c_dfun c dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] cClas 
+                               [ mkTyConTy c ]
+        c_mkInst = [ (InstInfo { iSpec = is, iBinds = bs }, []) 
+                   | (is,bs) <- myZip1 c_insts c_binds ]
+        
+        -- Selector
+        s_metaTycons = metaS metaDts
+        s_insts = map (map (\(s,ds) -> mkLocalInstance (s_dfun s ds) NoOverlap))
+                    (myZip2 s_metaTycons s_dfun_names)
+        s_binds = [ [ VanillaInst s [] False | s <- ss ] | ss <- sBinds ]
+        s_dfun s dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] sClas
+                               [ mkTyConTy s ]
+        s_mkInst = map (map (\(is,bs) -> (InstInfo {iSpec=is, iBinds=bs}, [])))
+                     (myZip2 s_insts s_binds)
+       
+        myZip1 :: [a] -> [b] -> [(a,b)]
+        myZip1 l1 l2 = ASSERT (length l1 == length l2) zip l1 l2
+        
+        myZip2 :: [[a]] -> [[b]] -> [[(a,b)]]
+        myZip2 l1 l2 =
+          ASSERT (and (zipWith (>=) (map length l1) (map length l2)))
+            [ zip x1 x2 | (x1,x2) <- zip l1 l2 ]
+        
+      return (d_mkInst : c_mkInst ++ concat s_mkInst)
 \end{code}
 
 

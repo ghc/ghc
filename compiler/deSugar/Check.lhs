@@ -644,7 +644,7 @@ might_fail_pat (ConPatOut { pat_args = ps }) = any might_fail_lpat (hsConPatArgs
 
 -- Finally the ones that are sure to succeed, or which are covered by the checking algorithm
 might_fail_pat (LazyPat _)                   = False -- Always succeeds
-might_fail_pat _                             = False -- VarPat, WildPat, LitPat, NPat, TypePat
+might_fail_pat _                             = False -- VarPat, WildPat, LitPat, NPat
 
 --------------
 might_fail_lpat :: LPat Id -> Bool

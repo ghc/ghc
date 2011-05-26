@@ -208,7 +208,7 @@ Just <blah>.
 Instead, we simply rely on the fact that casts are cheap:
 
    $df :: forall a. C a => C [a]
-   {-# INLINE df #}  -- NB: INLINE this
+   {-# INLINE df #-}  -- NB: INLINE this
    $df = /\a. \d. MkC [a] ($cop_list a d)
        = $cop_list |> forall a. C a -> (sym (Co:C [a]))
 
@@ -372,40 +372,41 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; let { (local_info,
                 at_tycons_s)   = unzip local_info_tycons
              ; at_idx_tycons   = concat at_tycons_s ++ idx_tycons
-             ; clas_decls      = filter (isClassDecl . unLoc) tycl_decls
-             ; implicit_things = concatMap implicitTyThings at_idx_tycons
-	     ; aux_binds       = mkRecSelBinds at_idx_tycons
-             }
+             ; implicit_things = concatMap implicitTyConThings at_idx_tycons
+	     ; aux_binds       = mkRecSelBinds at_idx_tycons  }
 
                 -- (2) Add the tycons of indexed types and their implicit
                 --     tythings to the global environment
-       ; tcExtendGlobalEnv (at_idx_tycons ++ implicit_things) $ do {
+       ; tcExtendGlobalEnv (map ATyCon at_idx_tycons ++ implicit_things) $ do {
 
-                -- (3) Instances from generic class declarations
-       ; generic_inst_info <- getGenericInstances clas_decls
 
                 -- Next, construct the instance environment so far, consisting
                 -- of
                 --   (a) local instance decls
-                --   (b) generic instances
-                --   (c) local family instance decls
+                --   (b) local family instance decls
        ; addInsts local_info         $
-         addInsts generic_inst_info  $
          addFamInsts at_idx_tycons   $ do {
 
-                -- (4) Compute instances from "deriving" clauses;
+                -- (3) Compute instances from "deriving" clauses;
                 -- This stuff computes a context for the derived instance
                 -- decl, so it needs to know about all the instances possible
                 -- NB: class instance declarations can contain derivings as
                 --     part of associated data type declarations
-	 failIfErrsM		-- If the addInsts stuff gave any errors, don't
-				-- try the deriving stuff, becuase that may give
-				-- more errors still
-       ; (deriv_inst_info, deriv_binds, deriv_dus) 
+	 failIfErrsM	-- If the addInsts stuff gave any errors, don't
+			-- try the deriving stuff, because that may give
+			-- more errors still
+       ; (deriv_inst_info, deriv_binds, deriv_dus, deriv_tys, deriv_ty_insts) 
               <- tcDeriving tycl_decls inst_decls deriv_decls
-       ; gbl_env <- addInsts deriv_inst_info getGblEnv
+
+       -- Extend the global environment also with the generated datatypes for
+       -- the generic representation
+       ; let all_tycons = map ATyCon (deriv_tys ++ deriv_ty_insts)
+       ; gbl_env <- tcExtendGlobalEnv all_tycons $
+                    tcExtendGlobalEnv (concatMap implicitTyThings all_tycons) $
+                    addFamInsts deriv_ty_insts $
+                    addInsts deriv_inst_info getGblEnv
        ; return ( addTcgDUs gbl_env deriv_dus,
-                  generic_inst_info ++ deriv_inst_info ++ local_info,
+                  deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
     }}}
 
@@ -413,18 +414,14 @@ addInsts :: [InstInfo Name] -> TcM a -> TcM a
 addInsts infos thing_inside
   = tcExtendLocalInstEnv (map iSpec infos) thing_inside
 
-addFamInsts :: [TyThing] -> TcM a -> TcM a
+addFamInsts :: [TyCon] -> TcM a -> TcM a
 addFamInsts tycons thing_inside
-  = tcExtendLocalFamInstEnv (map mkLocalFamInstTyThing tycons) thing_inside
-  where
-    mkLocalFamInstTyThing (ATyCon tycon) = mkLocalFamInst tycon
-    mkLocalFamInstTyThing tything        = pprPanic "TcInstDcls.addFamInsts"
-                                                    (ppr tything)
+  = tcExtendLocalFamInstEnv (map mkLocalFamInst tycons) thing_inside
 \end{code}
 
 \begin{code}
 tcLocalInstDecl1 :: LInstDecl Name
-                 -> TcM (InstInfo Name, [TyThing])
+                 -> TcM (InstInfo Name, [TyCon])
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
@@ -468,7 +465,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
     checkValidAndMissingATs :: Class
                             -> ([TyVar], [TcType])     -- instance types
                             -> [(LTyClDecl Name,       -- source form of AT
-                                 TyThing)]    	       -- Core form of AT
+                                 TyCon)]    	       -- Core form of AT
                             -> TcM ()
     checkValidAndMissingATs clas inst_tys ats
       = do { -- Issue a warning for each class AT that is not defined in this
@@ -486,12 +483,11 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
            ; mapM_ (checkIndexes clas inst_tys) ats
            }
 
-    checkIndexes clas inst_tys (hsAT, ATyCon tycon)
+    checkIndexes clas inst_tys (hsAT, tycon)
 -- !!!TODO: check that this does the Right Thing for indexed synonyms, too!
       = checkIndexes' clas inst_tys hsAT
                       (tyConTyVars tycon,
                        snd . fromJust . tyConFamInst_maybe $ tycon)
-    checkIndexes _ _ _ = panic "checkIndexes"
 
     checkIndexes' clas (instTvs, instTys) hsAT (atTvs, atTys)
       = let atName = tcdName . unLoc $ hsAT
@@ -581,7 +577,7 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 
 \begin{code}
-tcFamInstDecl :: TopLevelFlag -> LTyClDecl Name -> TcM TyThing
+tcFamInstDecl :: TopLevelFlag -> LTyClDecl Name -> TcM TyCon
 tcFamInstDecl top_lvl (L loc decl)
   =	-- Prime error recovery, set source location
     setSrcSpan loc				$
@@ -602,7 +598,7 @@ tcFamInstDecl top_lvl (L loc decl)
        ; when (isTopLevel top_lvl && isAssocFamily tc)
               (addErr $ assocInClassErr (tcdName decl))
 
-       ; return (ATyCon tc) }
+       ; return tc }
 
 isAssocFamily :: TyCon -> Bool	-- Is an assocaited type
 isAssocFamily tycon
@@ -696,7 +692,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 		   NewType  -> ASSERT( not (null data_cons) )
 			       mkNewTyConRhs rep_tc_name rep_tycon (head data_cons)
 	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
-			     False h98_syntax NoParentTyCon (Just (fam_tycon, t_typats))
+			     h98_syntax NoParentTyCon (Just (fam_tycon, t_typats))
                  -- We always assume that indexed types are recursive.  Why?
                  -- (1) Due to their open nature, we can never be sure that a
                  -- further instance might not introduce a new recursive
@@ -1098,10 +1094,15 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
     ----------------------
     tc_default :: Id -> DefMeth -> TcM (TcId, LHsBind Id)
+
+    tc_default sel_id (GenDefMeth dm_name)
+      = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
+           ; tc_body sel_id False {- Not generated code? -} meth_bind }
+{-
     tc_default sel_id GenDefMeth    -- Derivable type classes stuff
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id
            ; tc_body sel_id False {- Not generated code? -} meth_bind }
-    	  
+-}
     tc_default sel_id NoDefMeth	    -- No default method at all
       = do { warnMissingMethod sel_id
     	   ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars 
