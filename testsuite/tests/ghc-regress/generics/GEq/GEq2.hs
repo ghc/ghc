@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeOperators, DefaultSignatures, FlexibleInstances, DeriveGeneric #-}
--- {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Main where
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, DatatypeContexts #-}
 
 module CannotDoRep1 where
 
