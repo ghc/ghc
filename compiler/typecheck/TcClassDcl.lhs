@@ -27,6 +27,8 @@ import BuildTyCl( TcMethInfo )
 import Class
 import Id
 import Name
+import NameEnv
+import NameSet
 import Var
 import Outputable
 import DynFlags
@@ -81,39 +83,43 @@ Death to "ExpandingDicts".
 %************************************************************************
 
 \begin{code}
-tcClassSigs :: Name	    		-- Name of the class
+tcClassSigs :: Name	             -- Name of the class
 	    -> [LSig Name]
 	    -> LHsBinds Name
-	    -> TcM [TcMethInfo]    -- One for each method
-
+	    -> TcM ([TcMethInfo],    -- Exactly one for each method
+                    NameEnv Type)    -- Types of the generic-default methods
 tcClassSigs clas sigs def_methods
-  = do { -- Check that all def_methods are in the class
-       ; op_info <- mapM (addLocM tc_sig) [sig | sig@(L _ (TypeSig _ _)) <- sigs]
-       ; let op_names = [ n | (n,_,_) <- op_info ]
+  = do { gen_dm_prs <- mapM (addLocM tc_gen_sig) gen_sigs
+       ; let gen_dm_env = mkNameEnv gen_dm_prs
 
+       ; op_info <- mapM (addLocM (tc_sig gen_dm_env)) vanilla_sigs
+
+       ; let op_names = mkNameSet [ n | (n,_,_) <- op_info ]
        ; sequence_ [ failWithTc (badMethodErr clas n)
-                   | n <- dm_bind_names, not (n `elem` op_names) ]
+                   | n <- dm_bind_names, not (n `elemNameSet` op_names) ]
 		   -- Value binding for non class-method (ie no TypeSig)
 
        ; sequence_ [ failWithTc (badGenericMethod clas n)
-                   | n <- genop_names, not (n `elem` dm_bind_names) ]
+                   | (n,_) <- gen_dm_prs, not (n `elem` dm_bind_names) ]
 		   -- Generic signature without value binding
 
-       ; return op_info }
+       ; return (op_info, gen_dm_env) }
   where
+    vanilla_sigs = [L loc (nm,ty) | L loc (TypeSig    nm ty) <- sigs]
+    gen_sigs     = [L loc (nm,ty) | L loc (GenericSig nm ty) <- sigs]
     dm_bind_names :: [Name]	-- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
-    genop_names :: [Name]   -- These ones have a generic signature
-    genop_names = [n | L _ (GenericSig (L _ n) _) <- sigs]
-
-    tc_sig (TypeSig (L _ op_name) op_hs_ty)
+    tc_sig genop_env (L _ op_name, op_hs_ty)
       = do { op_ty <- tcHsKindedType op_hs_ty	-- Class tyvars already in scope
-           ; let dm | op_name `elem` genop_names   = GenericDM
-                    | op_name `elem` dm_bind_names = VanillaDM
-                    | otherwise                    = NoDM
+           ; let dm | op_name `elemNameEnv` genop_env = GenericDM
+                    | op_name `elem` dm_bind_names    = VanillaDM
+                    | otherwise                       = NoDM
            ; return (op_name, dm, op_ty) }
-    tc_sig sig = pprPanic "tc_cls_sig" (ppr sig)
+
+    tc_gen_sig (L _ op_name, gen_hs_ty)
+      = do { gen_op_ty <- tcHsKindedType gen_hs_ty
+           ; return (op_name, gen_op_ty) }
 \end{code}
 
 
@@ -151,7 +157,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
 	; traceTc "TIM2" (ppr sigs)
 	; let tc_dm = tcDefMeth clas clas_tyvars
-				this_dict default_binds sigs
+				this_dict default_binds 
 	      			sig_fn prag_fn
 
 	; dm_binds <- tcExtendTyVarEnv clas_tyvars $
@@ -161,7 +167,7 @@ tcClassDecl2 (L loc (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
     
-tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name -> [LSig Name]
+tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name
           -> SigFun -> PragFun -> ClassOpItem
           -> TcM (LHsBinds TcId)
 -- Generate code for polymorphic default methods only (hence DefMeth)
@@ -170,15 +176,12 @@ tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds Name -> [LSig Name]
 -- default method for every class op, regardless of whether or not 
 -- the programmer supplied an explicit default decl for the class.  
 -- (If necessary we can fix that, but we don't have a convenient Id to hand.)
-tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
+tcDefMeth clas tyvars this_dict binds_in sig_fn prag_fn (sel_id, dm_info)
   = case dm_info of
       NoDefMeth          -> do { mapM_ (addLocM (badDmPrag sel_id)) prags
                                ; return emptyBag }
-      DefMeth dm_name    -> tc_dm dm_name (instantiateMethod clas sel_id (mkTyVarTys tyvars))
-      GenDefMeth dm_name -> do { tau <- tc_genop_ty (findGenericSig sigs sel_name)
-                               ; tc_dm dm_name tau } 
-           -- In the case of a generic default, we have to get the type from the signature
-           -- Otherwise we can get it by instantiating the method selector
+      DefMeth dm_name    -> tc_dm dm_name 
+      GenDefMeth dm_name -> tc_dm dm_name 
   where
     sel_name      = idName sel_id
     prags         = prag_fn sel_name
@@ -193,13 +196,13 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
     -- The "local_dm_ty" is precisely the type in the above
     -- type signatures, ie with no "forall a. C a =>" prefix
 
-    tc_dm dm_name local_dm_ty
-      = do { local_dm_name <- newLocalName sel_name
+    tc_dm dm_name 
+      = do { dm_id <- tcLookupId dm_name
+	   ; local_dm_name <- newLocalName sel_name
  	     -- Base the local_dm_name on the selector name, because
  	     -- type errors from tcInstanceMethodBody come from here
 
-	   ; let dm_ty = mkSigmaTy tyvars [mkClassPred clas (mkTyVarTys tyvars)] local_dm_ty
-	         dm_id = mkExportedLocalId dm_name dm_ty
+           ; let local_dm_ty = instantiateMethod clas dm_id (mkTyVarTys tyvars)
 	         local_dm_id = mkLocalId local_dm_name local_dm_ty
 
            ; dm_id_w_inline <- addInlinePrags dm_id prags
@@ -214,23 +217,6 @@ tcDefMeth clas tyvars this_dict binds_in sigs sig_fn prag_fn (sel_id, dm_info)
                                              IsDefaultMethod dm_bind
 
            ; return (unitBag tc_bind) }
-
-    tc_genop_ty :: LHsType Name -> TcM Type
-    tc_genop_ty hs_ty 
-       = setSrcSpan (getLoc hs_ty) $
-         do { tau <- tcHsKindedType hs_ty
-            ; checkValidType (FunSigCtxt sel_name) tau	
-            ; return tau }
-
-findGenericSig :: [LSig Name] -> Name -> LHsType Name
--- Find the 'generic op :: ty' signature among the sigs
--- If dm_info is GenDefMeth, the corresponding signature
--- should jolly well exist!  Hence the panic
-findGenericSig sigs sel_name 
-  = case [lty | L _ (GenericSig (L _ n) lty) <- sigs
-         , n == sel_name ] of
-      [lty] -> lty
-      _     -> pprPanic "tcDefMeth" (ppr sel_name $$ ppr sigs)
 
 ---------------
 tcInstanceMethodBody :: SkolemInfo -> [TcTyVar] -> [EvVar]

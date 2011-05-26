@@ -35,6 +35,7 @@ import IdInfo
 import Var
 import VarSet
 import Name
+import NameEnv
 import Outputable
 import Maybes
 import Unify
@@ -65,9 +66,7 @@ tcTyAndClassDecls :: ModDetails
                    -> [[LTyClDecl Name]]     -- Mutually-recursive groups in dependency order
    	           -> TcM (TcGblEnv,   	     -- Input env extended by types and classes 
 					     -- and their implicit Ids,DataCons
-		           HsValBinds Name,  -- Renamed bindings for record selectors
-			   [Id],      	     -- Default method ids
-                           [LTyClDecl Name]) -- Kind-checked declarations
+		           HsValBinds Name)  -- Renamed bindings for record selectors
 -- Fails if there are any errors
 
 tcTyAndClassDecls boot_details decls_s
@@ -109,11 +108,10 @@ tcTyAndClassDecls boot_details decls_s
 	      ; rec_sel_binds   = mkRecSelBinds [tc | ATyCon tc <- tyclss]
               ; dm_ids          = mkDefaultMethodIds tyclss }
 
-  	; env <- tcExtendGlobalEnv implicit_things getGblEnv
-          -- We need the kind-checked declarations later, so we return them
-          -- from here
-        ; kc_decls <- kcTyClDecls tyclds_s
-        ; return (env, rec_sel_binds, dm_ids, kc_decls) } }
+  	; env <- tcExtendGlobalEnv implicit_things $
+                 tcExtendGlobalValEnv dm_ids $
+                 getGblEnv
+        ; return (env, rec_sel_binds) } }
                     
 zipRecTyClss :: [[LTyClDecl Name]]
              -> [TyThing]           -- Knot-tied
@@ -524,7 +522,7 @@ tcTyClDecl1 _parent calc_isrec
     tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mapM (addLocM tc_fundep) fundeps
-  ; sig_stuff <- tcClassSigs class_name sigs meths
+  ; (sig_stuff, gen_dm_env) <- tcClassSigs class_name sigs meths
   ; clas <- fixM $ \ clas -> do
 	    { let 	-- This little knot is just so we can get
 			-- hold of the name of the class TyCon, which we
@@ -537,7 +535,18 @@ tcTyClDecl1 _parent calc_isrec
             ; buildClass False {- Must include unfoldings for selectors -}
 			 class_name tvs' ctxt' fds' (concat atss')
 			 sig_stuff tc_isrec }
-  ; return (AClass clas : map ATyCon (classATs clas))
+
+  ; let gen_dm_ids = [ AnId (mkExportedLocalId gen_dm_name gen_dm_ty)
+                     | (sel_id, GenDefMeth gen_dm_name) <- classOpItems clas
+                     , let gen_dm_tau = expectJust "tcTyClDecl1" $
+                                        lookupNameEnv gen_dm_env (idName sel_id)
+		     , let gen_dm_ty = mkSigmaTy tvs' 
+                                                 [mkClassPred clas (mkTyVarTys tvs')] 
+                                                 gen_dm_tau
+                     ]
+        class_ats = map ATyCon (classATs clas)
+
+  ; return (AClass clas : gen_dm_ids ++ class_ats )
       -- NB: Order is important due to the call to `mkGlobalThings' when
       --     tying the the type and class declaration type checking knot.
   }
@@ -802,6 +811,8 @@ checkValidTyCl decl
 	    ATyCon tc -> checkValidTyCon tc
 	    AClass cl -> do { checkValidClass cl 
                             ; mapM_ (addLocM checkValidTyCl) (tcdATs decl) }
+            AnId _    -> return ()  -- Generic default methods are checked
+	    	      	 	    -- with their parent class
             _         -> panic "checkValidTyCl"
 	; traceTc "Done validity of" (ppr thing)	
 	}
@@ -964,7 +975,7 @@ checkValidClass cls
     unary 	= isSingleton tyvars
     no_generics = null [() | (_, (GenDefMeth _)) <- op_stuff]
 
-    check_op constrained_class_methods (sel_id, _) 
+    check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
 	{ checkValidTheta SigmaCtxt (tail theta)
 		-- The 'tail' removes the initial (C a) from the
@@ -982,6 +993,11 @@ checkValidClass cls
 	; let grown_tyvars = growThetaTyVars theta (mkVarSet tyvars)
 	; checkTc (tyVarsOfType tau `intersectsVarSet` grown_tyvars)
 	          (noClassTyVarErr cls sel_id)
+
+        ; case dm of
+            GenDefMeth dm_name -> do { dm_id <- tcLookupId dm_name
+                                     ; checkValidType (FunSigCtxt op_name) (idType dm_id) }
+            _                  -> return ()
 	}
 	where
 	  op_name = idName sel_id

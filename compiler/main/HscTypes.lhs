@@ -1036,7 +1036,9 @@ implicitTyThings (ADataCon dc)  = map AnId (dataConImplicitIds dc)
     
 implicitClassThings :: Class -> [TyThing]
 implicitClassThings cl 
-  = -- dictionary datatype:
+  = -- Does not include default methods, because those Ids may have
+    --    their own pragmas, unfoldings etc, not derived from the Class object
+    -- Dictionary datatype:
     --    [extras_plus:]
     --      type constructor 
     --    [recursive call:]

@@ -245,7 +245,6 @@ tcRnImports hsc_env this_mod import_decls
 		-- interfaces, so that their rules and instance decls will be
 		-- found.
 	; loadOrphanModules (imp_orphs  imports) False
-	; loadOrphanModules (imp_finsts imports) True 
 
 		-- Check type-familily consistency
 	; traceRn (text "rn1: checking family instance consistency")
@@ -299,7 +298,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- any mutually recursive types are done right
 	-- Just discard the auxiliary bindings; they are generated 
 	-- only for Haskell source code, and should already be in Core
-   (tcg_env, _aux_binds, _dm_ids, _) <- tcTyAndClassDecls emptyModDetails rn_decls ;
+   (tcg_env, _aux_binds) <- tcTyAndClassDecls emptyModDetails rn_decls ;
 
    setGblEnv tcg_env $ do {
 	-- Make the new type env available to stuff slurped from interface files
@@ -500,10 +499,9 @@ tcRnHsBootDecls decls
 
 		-- Typecheck type/class decls
 	; traceTc "Tc2" empty
-	; (tcg_env, aux_binds, dm_ids, _) 
+	; (tcg_env, aux_binds) 
                <- tcTyAndClassDecls emptyModDetails tycl_decls
-	; setGblEnv tcg_env    $ 
-          tcExtendIdEnv dm_ids $ do {
+	; setGblEnv tcg_env    $ do {
 
 		-- Typecheck instance decls
 		-- Family instance declarations are rejected here
@@ -837,11 +835,10 @@ tcTopSrcDecls boot_details
 		-- The latter come in via tycl_decls
         traceTc "Tc2" empty ;
 
-	(tcg_env, aux_binds, dm_ids, kc_decls) <- tcTyAndClassDecls boot_details tycl_decls ;
+	(tcg_env, aux_binds) <- tcTyAndClassDecls boot_details tycl_decls ;
 		-- If there are any errors, tcTyAndClassDecls fails here
 	
-	setGblEnv tcg_env	$
-        tcExtendIdEnv dm_ids    $ do {
+	setGblEnv tcg_env	$ do {
 
 		-- Source-language instances, including derivings,
 		-- and import the supporting declarations
@@ -877,7 +874,7 @@ tcTopSrcDecls boot_details
                 -- Second pass over class and instance declarations, 
                 -- now using the kind-checked decls
         traceTc "Tc6" empty ;
-        inst_binds <- tcInstDecls2 kc_decls inst_infos ;
+        inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
 
                 -- Foreign exports
         traceTc "Tc7" empty ;
@@ -1387,7 +1384,6 @@ tcGetModuleExports mod directlyImpMods
   		-- Load any orphan-module and family instance-module
   		-- interfaces, so their instances are visible.
        ; loadOrphanModules (dep_orphs (mi_deps iface)) False 
-       ; loadOrphanModules (dep_finsts (mi_deps iface)) True
 
                 -- Check that the family instances of all directly loaded
                 -- modules are consistent.

@@ -222,8 +222,8 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 ------------------------------------------------------
 \begin{code}
 type TcMethInfo = (Name, DefMethSpec, Type)  
-        -- A temporary intermediate, to communicate between tcClassSigs and
-        -- buildClass.
+        -- A temporary intermediate, to communicate between 
+        -- tcClassSigs and buildClass.
 
 buildClass :: Bool		-- True <=> do not include unfoldings 
 				--	    on dict selectors
