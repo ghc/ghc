@@ -45,6 +45,8 @@ void postUserMsg(Capability *cap, char *msg, va_list ap);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
+void postEventStartup(EventCapNo n_caps);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,

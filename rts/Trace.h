@@ -160,6 +160,8 @@ void traceUserMsg(Capability *cap, char *msg);
 
 void traceThreadStatus_ (StgTSO *tso);
 
+void traceEventStartup_ (int n_caps);
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -170,6 +172,7 @@ void traceThreadStatus_ (StgTSO *tso);
 #define debugTrace(class, str, ...) /* nothing */
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
+#define traceEventStartup_(n_caps) /* nothing */
 
 #endif /* TRACING */
 
@@ -374,17 +377,18 @@ INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED,
     dtraceCreateSparkThread((EventCapNo)cap->no, (EventThreadID)spark_tid);
 }
 
-// This applies only to dtrace as EVENT_STARTUP in the logging framework is
-// handled specially in 'EventLog.c'.
-//
-INLINE_HEADER void dtraceEventStartup(void)
+INLINE_HEADER void traceEventStartup(void)
 {
+    int n_caps;
 #ifdef THREADED_RTS
     // XXX n_capabilities hasn't been initislised yet
-    dtraceStartup(RtsFlags.ParFlags.nNodes);
+    n_caps = RtsFlags.ParFlags.nNodes;
 #else
-    dtraceStartup(1);
+    n_caps = 1;
 #endif
+
+    traceEventStartup_(n_caps);
+    dtraceStartup(n_caps);
 }
 
 INLINE_HEADER void traceEventGcIdle(Capability *cap STG_UNUSED)

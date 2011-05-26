@@ -296,10 +296,6 @@ initEventLogging(void)
     
     // Prepare event buffer for events (data).
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
-    
-    // Post a STARTUP event with the number of capabilities
-    postEventHeader(&eventBuf, EVENT_STARTUP);
-    postCapNo(&eventBuf, n_caps);
 
     // Flush capEventBuf with header.
     /*
@@ -497,6 +493,22 @@ void postUserMsg(Capability *cap, char *msg, va_list ap)
 {
     postLogMsg(&capEventBuf[cap->no], EVENT_USER_MSG, msg, ap);
 }    
+
+void postEventStartup(EventCapNo n_caps)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForEvent(&eventBuf, EVENT_STARTUP)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+
+    // Post a STARTUP event with the number of capabilities
+    postEventHeader(&eventBuf, EVENT_STARTUP);
+    postCapNo(&eventBuf, n_caps);
+
+    RELEASE_LOCK(&eventBufMutex);
+}
 
 void closeBlockMarker (EventsBuf *ebuf)
 {

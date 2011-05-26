@@ -359,6 +359,12 @@ void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
     }
 }
 
+void traceEventStartup_(int nocaps)
+{
+    if (eventlog_enabled) {
+        postEventStartup(nocaps);
+    }
+}
 
 #ifdef DEBUG
 void traceBegin (const char *str, ...)

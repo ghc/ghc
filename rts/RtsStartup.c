@@ -144,9 +144,9 @@ hs_init(int *argc, char **argv[])
 #ifdef TRACING
     initTracing();
 #endif
-    /* Dtrace events are always enabled
+    /* Trace the startup event
      */
-    dtraceEventStartup();
+    traceEventStartup();
 
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
