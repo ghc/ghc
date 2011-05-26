@@ -9174,7 +9174,7 @@ allows control over inlining on a per-call-site basis.
 restrains the strictness analyser.
 </para></listitem>
 <listitem><para>
-<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>lazy</literal></ulink> 
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>unsafeCoerce#</literal></ulink> 
 allows you to fool the type checker.
 </para></listitem>
 </itemizedlist>

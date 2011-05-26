@@ -40,6 +40,7 @@ data Option
    = OptionFalse  String          -- name = False
    | OptionTrue   String          -- name = True
    | OptionString String String   -- name = { ... unparsed stuff ... }
+   | OptionInteger String Int     -- name = <int>
      deriving Show
 
 -- categorises primops
@@ -120,6 +121,7 @@ get_attrib_name :: Option -> String
 get_attrib_name (OptionFalse nm) = nm
 get_attrib_name (OptionTrue nm)  = nm
 get_attrib_name (OptionString nm _) = nm
+get_attrib_name (OptionInteger nm _) = nm
 
 lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib _ [] = Nothing

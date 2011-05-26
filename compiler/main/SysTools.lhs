@@ -788,20 +788,16 @@ data BuildMessage
   | EOF
 
 traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
--- a) trace the command (at two levels of verbosity)
--- b) don't do it at all if dry-run is set
+-- trace the command (at two levels of verbosity)
 traceCmd dflags phase_name cmd_line action
  = do   { let verb = verbosity dflags
         ; showPass dflags phase_name
         ; debugTraceMsg dflags 3 (text cmd_line)
         ; hFlush stderr
 
-           -- Test for -n flag
-        ; unless (dopt Opt_DryRun dflags) $ do {
-
            -- And run it!
         ; action `catchIO` handle_exn verb
-        }}
+        }
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))

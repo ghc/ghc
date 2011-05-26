@@ -35,29 +35,6 @@ void postSchedEvent(Capability *cap, EventTypeNum tag,
                     StgThreadID id, StgWord info1, StgWord info2);
 
 /*
- * Post a capability set modification event
- */
-void postCapsetModifyEvent (EventTypeNum tag,
-                            EventCapsetID capset,
-                            StgWord32 other,
-                            StgWord32 other2);
-
-/*
- * Post a capability set event with a string payload
- */
-void postCapsetStrEvent (EventTypeNum tag,
-                         EventCapsetID capset,
-                         char *msg);
-
-/*
- * Post a capability set event with several strings payload
- */
-void postCapsetVecEvent (EventTypeNum tag,
-                         EventCapsetID capset,
-                         int argc,
-                         char *msg[]);
-
-/*
  * Post a nullary event.
  */
 void postEvent(Capability *cap, EventTypeNum tag);
@@ -75,12 +52,6 @@ INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
                                    StgThreadID id   STG_UNUSED,
                                    StgWord info1    STG_UNUSED,
                                    StgWord info2    STG_UNUSED)
-{ /* nothing */ }
-
-INLINE_HEADER void postCapsetModifyEvent (EventTypeNum tag     STG_UNUSED,
-                                          EventCapsetID capset STG_UNUSED,
-                                          StgWord32 other      STG_UNUSED,
-                                          StgWord32 other2     STG_UNUSED)
 { /* nothing */ }
 
 INLINE_HEADER void postEvent (Capability *cap  STG_UNUSED,

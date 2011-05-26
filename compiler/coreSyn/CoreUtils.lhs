@@ -589,12 +589,10 @@ exprIsCheap' good_app other_expr 	-- Applications and variables
     go _ _ = False
  
     --------------
-    go_pap args = all exprIsTrivial args
- 	-- For constructor applications and primops, check that all
- 	-- the args are trivial.  We don't want to treat as cheap, say,
- 	-- 	(1:2:3:4:5:[])
- 	-- We'll put up with one constructor application, but not dozens
- 	
+    go_pap args = all (exprIsCheap' good_app) args
+        -- Used to be "all exprIsTrivial args" due to concerns about
+        -- duplicating nested constructor applications, but see #4978.
+
     --------------
     go_primop op args = primOpIsCheap op && all (exprIsCheap' good_app) args
  	-- In principle we should worry about primops

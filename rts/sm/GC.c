@@ -408,16 +408,6 @@ GarbageCollect (rtsBool force_major_gc,
 
   // NO MORE EVACUATION AFTER THIS POINT!
 
-  // Two-space collector: free the old to-space.
-  // g0->old_blocks is the old nursery
-  // g0->blocks is to-space from the previous GC
-  if (RtsFlags.GcFlags.generations == 1) {
-      if (g0->blocks != NULL) {
-	  freeChain(g0->blocks);
-	  g0->blocks = NULL;
-      }
-  }
-
   // Finally: compact or sweep the oldest generation.
   if (major_gc && oldest_gen->mark) {
       if (oldest_gen->compact) 
@@ -1257,7 +1247,7 @@ prepare_collected_gen (generation *gen)
 
     // for a compacted generation, we need to allocate the bitmap
     if (gen->mark) {
-        nat bitmap_size; // in bytes
+        lnat bitmap_size; // in bytes
         bdescr *bitmap_bdescr;
         StgWord *bitmap;
 	

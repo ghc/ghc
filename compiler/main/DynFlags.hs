@@ -274,7 +274,6 @@ data DynFlag
    -- misc opts
    | Opt_Pp
    | Opt_ForceRecomp
-   | Opt_DryRun
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
    | Opt_ReadUserPackageConf
@@ -765,9 +764,9 @@ defaultDynFlags mySettings =
         maxSimplIterations      = 4,
         shouldDumpSimplPhase    = Nothing,
         ruleCheck               = Nothing,
-        specConstrThreshold     = Just 200,
+        specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
-        liberateCaseThreshold   = Just 200,
+        liberateCaseThreshold   = Just 2000,
         floatLamArgs            = Just 0,	-- Default: float only if no fvs
         strictnessBefore        = [],
 
@@ -876,7 +875,11 @@ languageExtensions Nothing
       -- But NB it's implied by GADTs etc
       -- SLPJ September 2010
     : Opt_NondecreasingIndentation -- This has been on by default for some time
-    : languageExtensions (Just Haskell2010)
+    : delete Opt_DatatypeContexts  -- The Haskell' committee decided to
+                                   -- remove datatype contexts from the
+                                   -- language:
+   -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
+      (languageExtensions (Just Haskell2010))
 
 languageExtensions (Just Haskell98)
     = [Opt_ImplicitPrelude,
@@ -1152,7 +1155,7 @@ allFlags = map ('-':) $
 --------------- The main flags themselves ------------------
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
-    Flag "n"        (NoArg (setDynFlag Opt_DryRun))
+    Flag "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
   , Flag "cpp"      (NoArg (setExtensionFlag Opt_Cpp)) 
   , Flag "F"        (NoArg (setDynFlag Opt_Pp)) 
   , Flag "#include" 

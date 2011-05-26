@@ -817,7 +817,7 @@ statDescribeGens(void)
           gen_blocks += gcThreadLiveBlocks(i,g);
       }
 
-      debugBelch("%5d %7d %9d", g, gen->max_blocks, mut);
+      debugBelch("%5d %7ld %9d", g, (lnat)gen->max_blocks, mut);
 
       gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
 

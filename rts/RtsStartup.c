@@ -148,10 +148,6 @@ hs_init(int *argc, char **argv[])
      */
     dtraceEventStartup();
 
-    /* Trace some basic information about the process
-     */
-    traceCapsetDetails(argc, argv);
-
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */
@@ -301,9 +297,6 @@ hs_exit_(rtsBool wait_foreign)
     checkFPUStack();
 #endif
 
-    // Free the full argv storage
-    freeFullProgArgv();
-
 #if defined(THREADED_RTS)
     ioManagerDie();
 #endif
@@ -406,6 +399,8 @@ hs_exit_(rtsBool wait_foreign)
     // heap memory (e.g. by being passed a ByteArray#).
     freeStorage(wait_foreign);
 
+    // Free the various argvs
+    freeRtsArgs();
 }
 
 // The real hs_exit():

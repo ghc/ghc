@@ -17,6 +17,7 @@
 void initRtsFlagsDefaults (void);
 void setupRtsFlags        (int *argc, char *argv[]);
 void setProgName          (char *argv[]);
+void freeRtsArgs          (void);
 
 #include "EndPrivate.h"
 

@@ -253,8 +253,6 @@ initCapability( Capability *cap, nat i )
     cap->transaction_tokens = 0;
     cap->context_switch = 0;
     cap->pinned_object_block = NULL;
-
-    traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
 }
 
 /* ---------------------------------------------------------------------------
@@ -268,7 +266,6 @@ initCapability( Capability *cap, nat i )
 void
 initCapabilities( void )
 {
-
 #if defined(THREADED_RTS)
     nat i;
 
@@ -836,7 +833,6 @@ freeCapabilities (void)
 #else
     freeCapability(&MainCapability);
 #endif
-    traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
 }
 
 /* ---------------------------------------------------------------------------
