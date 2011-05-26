@@ -903,7 +903,7 @@ genCCall' _ (CmmPrim MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
 genCCall' gcp target dest_regs argsAndHints
-  = ASSERT (not $ any (`elem` [II8,II16]) $ map cmmTypeSize argReps)
+  = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
@@ -1058,23 +1058,23 @@ genCCall' gcp target dest_regs argsAndHints
                     = case gcp of
                       GCPDarwin ->
                           case cmmTypeSize rep of
+                          II8  -> (1, 0, 4, gprs)
                           II32 -> (1, 0, 4, gprs)
                           -- The Darwin ABI requires that we skip a
                           -- corresponding number of GPRs when we use
                           -- the FPRs.
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
-                          II8  -> panic "genCCall' passArguments II8"
                           II16 -> panic "genCCall' passArguments II16"
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
                       GCPLinux ->
                           case cmmTypeSize rep of
+                          II8  -> (1, 0, 4, gprs)
                           II32 -> (1, 0, 4, gprs)
                           -- ... the SysV ABI doesn't.
                           FF32 -> (0, 1, 4, fprs)
                           FF64 -> (0, 1, 8, fprs)
-                          II8  -> panic "genCCall' passArguments II8"
                           II16 -> panic "genCCall' passArguments II16"
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
