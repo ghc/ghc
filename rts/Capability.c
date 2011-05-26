@@ -677,6 +677,31 @@ prodCapability (Capability *cap, Task *task)
 }
 
 /* ----------------------------------------------------------------------------
+ * tryGrabCapability
+ *
+ * Attempt to gain control of a Capability if it is free.
+ *
+ * ------------------------------------------------------------------------- */
+
+rtsBool
+tryGrabCapability (Capability *cap, Task *task)
+{
+    if (cap->running_task != NULL) return rtsFalse;
+    ACQUIRE_LOCK(&cap->lock);
+    if (cap->running_task != NULL) {
+	RELEASE_LOCK(&cap->lock);
+	return rtsFalse;
+    }
+    task->cap = cap;
+    cap->running_task = task;
+    RELEASE_LOCK(&cap->lock);
+    return rtsTrue;
+}
+
+
+#endif /* THREADED_RTS */
+
+/* ----------------------------------------------------------------------------
  * shutdownCapability
  *
  * At shutdown time, we want to let everything exit as cleanly as
@@ -692,8 +717,9 @@ prodCapability (Capability *cap, Task *task)
  * ------------------------------------------------------------------------- */
 
 void
-shutdownCapability (Capability *cap, Task *task, rtsBool safe)
+shutdownCapability (Capability *cap USED_IF_THREADS, Task *task USED_IF_THREADS, rtsBool safe USED_IF_THREADS)
 {
+#if defined(THREADED_RTS)
     nat i;
 
     task->cap = cap;
@@ -785,32 +811,19 @@ shutdownCapability (Capability *cap, Task *task, rtsBool safe)
     // threads performing foreign calls that will eventually try to 
     // return via resumeThread() and attempt to grab cap->lock.
     // closeMutex(&cap->lock);
-}
-
-/* ----------------------------------------------------------------------------
- * tryGrabCapability
- *
- * Attempt to gain control of a Capability if it is free.
- *
- * ------------------------------------------------------------------------- */
-
-rtsBool
-tryGrabCapability (Capability *cap, Task *task)
-{
-    if (cap->running_task != NULL) return rtsFalse;
-    ACQUIRE_LOCK(&cap->lock);
-    if (cap->running_task != NULL) {
-	RELEASE_LOCK(&cap->lock);
-	return rtsFalse;
-    }
-    task->cap = cap;
-    cap->running_task = task;
-    RELEASE_LOCK(&cap->lock);
-    return rtsTrue;
-}
-
-
+    
 #endif /* THREADED_RTS */
+}
+
+void
+shutdownCapabilities(Task *task, rtsBool safe)
+{
+    nat i;
+    for (i=0; i < n_capabilities; i++) {
+        ASSERT(task->incall->tso == NULL);
+        shutdownCapability(&capabilities[i], task, safe);
+    }
+}
 
 static void
 freeCapability (Capability *cap)

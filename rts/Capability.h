@@ -240,11 +240,6 @@ void prodCapability (Capability *cap, Task *task);
 //
 void prodAllCapabilities (void);
 
-// Waits for a capability to drain of runnable threads and workers,
-// and then acquires it.  Used at shutdown time.
-//
-void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
-
 // Attempt to gain control of a Capability if it is free.
 //
 rtsBool tryGrabCapability (Capability *cap, Task *task);
@@ -269,6 +264,15 @@ INLINE_HEADER void    discardSparksCap  (Capability *cap);
 extern void grabCapability (Capability **pCap);
 
 #endif /* !THREADED_RTS */
+
+// Waits for a capability to drain of runnable threads and workers,
+// and then acquires it.  Used at shutdown time.
+//
+void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
+
+// Shut down all capabilities.
+//
+void shutdownCapabilities(Task *task, rtsBool wait_foreign);
 
 // cause all capabilities to context switch as soon as possible.
 void setContextSwitches(void);
