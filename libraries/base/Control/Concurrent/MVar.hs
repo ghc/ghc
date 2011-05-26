@@ -61,6 +61,13 @@
 -- in an 'MVar' to the appropriate normal form, or utilize a strict
 -- MVar provided by the strict-concurrency package.
 --
+-- * Ordering
+--
+-- 'MVar' operations are always observed to take place in the order
+-- they are written in the program, regardless of the memory model of
+-- the underlying machine.  This is in contrast to 'IORef' operations
+-- which may appear out-of-order to another thread in some cases.
+--
 -- * Example
 --
 -- Consider the following concurrent data structure, a skip channel.

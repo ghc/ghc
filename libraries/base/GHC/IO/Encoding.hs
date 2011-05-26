@@ -22,6 +22,7 @@ module GHC.IO.Encoding (
   utf16, utf16le, utf16be,
   utf32, utf32le, utf32be, 
   localeEncoding, fileSystemEncoding, foreignEncoding,
+  char8,
   mkTextEncoding,
   ) where
 
@@ -125,6 +126,16 @@ fileSystemEncoding = CodePage.mkLocaleEncoding RoundtripFailure
 foreignEncoding = CodePage.mkLocaleEncoding IgnoreCodingFailure
 #endif
 
+-- | An encoding in which Unicode code points are translated to bytes
+-- by taking the code point modulo 256.  When decoding, bytes are
+-- translated directly into the equivalent code point.
+--
+-- This encoding never fails in either direction.  However, encoding
+-- discards informaiton, so encode followed by decode is not the
+-- identity.
+char8 :: TextEncoding
+char8 = Latin1.latin1
+
 -- | Look up the named Unicode encoding.  May fail with 
 --
 --  * 'isDoesNotExistError' if the encoding is unknown
@@ -183,7 +194,7 @@ mkTextEncoding e = case mb_coding_failure_mode of
                                             ("unknown encoding:" ++ e)  Nothing Nothing)
 
 latin1_encode :: CharBuffer -> Buffer Word8 -> IO (CharBuffer, Buffer Word8)
-latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_encode input output -- unchecked, used for binary
+latin1_encode input output = fmap (\(_why,input',output') -> (input',output')) $ Latin1.latin1_encode input output -- unchecked, used for char8
 --latin1_encode = unsafePerformIO $ do mkTextEncoder Iconv.latin1 >>= return.encode
 
 latin1_decode :: Buffer Word8 -> CharBuffer -> IO (Buffer Word8, CharBuffer)

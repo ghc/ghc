@@ -201,6 +201,7 @@ module System.IO (
     utf16, utf16le, utf16be,
     utf32, utf32le, utf32be, 
     localeEncoding,
+    char8,
     mkTextEncoding,
 #endif
 
