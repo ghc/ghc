@@ -144,8 +144,10 @@ test('CoTest3', normal, compile, [''])
 test('Roman1', normal, compile, [''])
 test('T4160', normal, compile, [''])
 test('IndTypesPerf',
-     extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
-                  'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi']),
+     [ expect_broken(5224)
+     , extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
+                    'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi'])
+     ] ,
      run_command,
      ['$MAKE -s --no-print-directory IndTypesPerf'])
 
