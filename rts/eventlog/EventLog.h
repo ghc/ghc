@@ -47,6 +47,13 @@ void postCapMsg(Capability *cap, char *msg, va_list ap);
 
 void postEventStartup(EventCapNo n_caps);
 
+/*
+ * Post a capability set modification event
+ */
+void postCapsetModifyEvent (EventTypeNum tag,
+                            EventCapsetID capset,
+                            StgWord32 other);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,

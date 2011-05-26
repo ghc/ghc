@@ -75,7 +75,11 @@ char *EventDesc[] = {
   [EVENT_GC_IDLE]             = "GC idle",
   [EVENT_GC_WORK]             = "GC working",
   [EVENT_GC_DONE]             = "GC done",
-  [EVENT_BLOCK_MARKER]        = "Block marker"
+  [EVENT_BLOCK_MARKER]        = "Block marker",
+  [EVENT_CAPSET_CREATE]       = "Create capability set",
+  [EVENT_CAPSET_DELETE]       = "Delete capability set",
+  [EVENT_CAPSET_ASSIGN_CAP]   = "Add capability to capability set",
+  [EVENT_CAPSET_REMOVE_CAP]   = "Remove capability from capability set"
 };
 
 // Event type. 
@@ -145,6 +149,12 @@ static inline void postThreadID(EventsBuf *eb, EventThreadID id)
 
 static inline void postCapNo(EventsBuf *eb, EventCapNo no)
 { postWord16(eb,no); }
+
+static inline void postCapsetID(EventsBuf *eb, EventCapsetID id)
+{ postWord32(eb,id); }
+
+static inline void postCapsetType(EventsBuf *eb, EventCapsetType type)
+{ postWord16(eb,type); }
 
 static inline void postPayloadSize(EventsBuf *eb, EventPayloadSize size)
 { postWord16(eb,size); }
@@ -257,6 +267,21 @@ initEventLogging(void)
 
         case EVENT_STARTUP:         // (cap count)
             eventTypes[t].size = sizeof(EventCapNo);
+            break;
+
+        case EVENT_CAPSET_CREATE:   // (capset, capset_type)
+            eventTypes[t].size =
+                sizeof(EventCapsetID) + sizeof(EventCapsetType);
+            break;
+
+        case EVENT_CAPSET_DELETE:   // (capset)
+            eventTypes[t].size = sizeof(EventCapsetID);
+            break;
+
+        case EVENT_CAPSET_ASSIGN_CAP:  // (capset, cap)
+        case EVENT_CAPSET_REMOVE_CAP:
+            eventTypes[t].size =
+                sizeof(EventCapsetID) + sizeof(EventCapNo);
             break;
 
         case EVENT_SHUTDOWN:        // (cap)
@@ -437,6 +462,45 @@ postSchedEvent (Capability *cap,
     default:
         barf("postEvent: unknown event tag %d", tag);
     }
+}
+
+void postCapsetModifyEvent (EventTypeNum tag,
+                            EventCapsetID capset,
+                            StgWord32 other)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForEvent(&eventBuf, tag)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(&eventBuf);
+    }
+
+    postEventHeader(&eventBuf, tag);
+    postCapsetID(&eventBuf, capset);
+
+    switch (tag) {
+    case EVENT_CAPSET_CREATE:   // (capset, capset_type)
+    {
+        postCapsetType(&eventBuf, other /* capset_type */);
+        break;
+    }
+
+    case EVENT_CAPSET_DELETE:   // (capset)
+    {
+        break;
+    }
+
+    case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
+    case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
+    {
+        postCapNo(&eventBuf, other /* capno */);
+        break;
+    }
+    default:
+        barf("postCapsetModifyEvent: unknown event tag %d", tag);
+    }
+
+    RELEASE_LOCK(&eventBufMutex);
 }
 
 void

@@ -253,6 +253,8 @@ initCapability( Capability *cap, nat i )
     cap->transaction_tokens = 0;
     cap->context_switch = 0;
     cap->pinned_object_block = NULL;
+
+    traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
 }
 
 /* ---------------------------------------------------------------------------
@@ -266,6 +268,10 @@ initCapability( Capability *cap, nat i )
 void
 initCapabilities( void )
 {
+    /* Declare a single capability set representing the process. 
+       Each capability will get added to this capset. */ 
+    traceCapsetCreate(CAPSET_OSPROCESS_DEFAULT, CapsetTypeOsProcess);
+
 #if defined(THREADED_RTS)
     nat i;
 
@@ -717,7 +723,9 @@ tryGrabCapability (Capability *cap, Task *task)
  * ------------------------------------------------------------------------- */
 
 void
-shutdownCapability (Capability *cap USED_IF_THREADS, Task *task USED_IF_THREADS, rtsBool safe USED_IF_THREADS)
+shutdownCapability (Capability *cap,
+                    Task *task USED_IF_THREADS,
+                    rtsBool safe USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
     nat i;
@@ -813,6 +821,8 @@ shutdownCapability (Capability *cap USED_IF_THREADS, Task *task USED_IF_THREADS,
     // closeMutex(&cap->lock);
     
 #endif /* THREADED_RTS */
+
+    traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
 }
 
 void
@@ -823,6 +833,7 @@ shutdownCapabilities(Task *task, rtsBool safe)
         ASSERT(task->incall->tso == NULL);
         shutdownCapability(&capabilities[i], task, safe);
     }
+    traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
 }
 
 static void

@@ -251,6 +251,39 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
     }
 }
 
+void traceCapsetModify_ (EventTypeNum tag,
+                         CapsetID capset,
+                         StgWord32 other)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        switch (tag) {
+        case EVENT_CAPSET_CREATE:   // (capset, capset_type)
+            debugBelch("created capset %d of type %d\n", capset, other);
+            break;
+        case EVENT_CAPSET_DELETE:   // (capset)
+            debugBelch("deleted capset %d\n", capset);
+            break;
+        case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
+            debugBelch("assigned cap %d to capset %d\n", other, capset);
+            break;
+        case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
+            debugBelch("removed cap %d from capset %d\n", other, capset);
+            break;
+        }
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if (eventlog_enabled) {
+            postCapsetModifyEvent(tag, capset, other);
+        }
+    }
+}
+
 void traceEvent_ (Capability *cap, EventTypeNum tag)
 {
 #ifdef DEBUG
