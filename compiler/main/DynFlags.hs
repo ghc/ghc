@@ -762,9 +762,9 @@ defaultDynFlags mySettings =
         maxSimplIterations      = 4,
         shouldDumpSimplPhase    = Nothing,
         ruleCheck               = Nothing,
-        specConstrThreshold     = Just 200,
+        specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
-        liberateCaseThreshold   = Just 200,
+        liberateCaseThreshold   = Just 2000,
         floatLamArgs            = Just 0,	-- Default: float only if no fvs
         strictnessBefore        = [],
 
