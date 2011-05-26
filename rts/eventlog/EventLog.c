@@ -79,7 +79,12 @@ char *EventDesc[] = {
   [EVENT_CAPSET_CREATE]       = "Create capability set",
   [EVENT_CAPSET_DELETE]       = "Delete capability set",
   [EVENT_CAPSET_ASSIGN_CAP]   = "Add capability to capability set",
-  [EVENT_CAPSET_REMOVE_CAP]   = "Remove capability from capability set"
+  [EVENT_CAPSET_REMOVE_CAP]   = "Remove capability from capability set",
+  [EVENT_RTS_IDENTIFIER]      = "RTS name and version",
+  [EVENT_PROGRAM_ARGS]        = "Program arguments",
+  [EVENT_PROGRAM_ENV]         = "Program environment variables",
+  [EVENT_OSPROCESS_PID]       = "Process ID",
+  [EVENT_OSPROCESS_PPID]      = "Parent process ID"
 };
 
 // Event type. 
@@ -284,6 +289,12 @@ initEventLogging(void)
                 sizeof(EventCapsetID) + sizeof(EventCapNo);
             break;
 
+        case EVENT_OSPROCESS_PID:   // (cap, pid)
+        case EVENT_OSPROCESS_PPID:
+            eventTypes[t].size =
+                sizeof(EventCapsetID) + sizeof(StgWord32);
+            break;
+
         case EVENT_SHUTDOWN:        // (cap)
         case EVENT_REQUEST_SEQ_GC:  // (cap)
         case EVENT_REQUEST_PAR_GC:  // (cap)
@@ -297,6 +308,9 @@ initEventLogging(void)
 
         case EVENT_LOG_MSG:          // (msg)
         case EVENT_USER_MSG:         // (msg)
+        case EVENT_RTS_IDENTIFIER:   // (capset, str)
+        case EVENT_PROGRAM_ARGS:     // (capset, strvec)
+        case EVENT_PROGRAM_ENV:      // (capset, strvec)
             eventTypes[t].size = 0xffff;
             break;
 
@@ -496,8 +510,78 @@ void postCapsetModifyEvent (EventTypeNum tag,
         postCapNo(&eventBuf, other /* capno */);
         break;
     }
+    case EVENT_OSPROCESS_PID:   // (capset, pid)
+    case EVENT_OSPROCESS_PPID:  // (capset, parent_pid)
+    {
+        postWord32(&eventBuf, other);
+        break;
+    }
     default:
         barf("postCapsetModifyEvent: unknown event tag %d", tag);
+    }
+
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postCapsetStrEvent (EventTypeNum tag,
+                         EventCapsetID capset,
+                         char *msg)
+{
+    int strsize = strlen(msg);
+    int size = strsize + sizeof(EventCapsetID)
+
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForVariableEvent(&eventBuf, size)){
+        printAndClearEventBuf(&eventBuf);
+
+        if (!hasRoomForVariableEvent(&eventBuf, size)){
+            // Event size exceeds buffer size, bail out:
+            RELEASE_LOCK(&eventBufMutex);
+            return;
+        }
+    }
+
+    postEventHeader(&eventBuf, tag);
+    postPayloadSize(&eventBuf, size);
+    postCapsetID(&eventBuf, capset);
+
+    postBuf(&eventBuf, (StgWord8*) msg, strsize);
+
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postCapsetVecEvent (EventTypeNum tag,
+                         EventCapsetID capset,
+                         int argc,
+                         char *argv[])
+{
+    int i, size = sizeof(EventCapsetID);
+
+    for (i = 0; i < argc; i++) {
+        // 1 + strlen to account for the trailing \0, used as separator
+        size += 1 + strlen(argv[i]);
+    }
+
+    ACQUIRE_LOCK(&eventBufMutex);
+
+    if (!hasRoomForVariableEvent(&eventBuf, size)){
+        printAndClearEventBuf(&eventBuf);
+
+        if(!hasRoomForVariableEvent(&eventBuf, size)){
+            // Event size exceeds buffer size, bail out:
+            RELEASE_LOCK(&eventBufMutex);
+            return;
+        }
+    }
+
+    postEventHeader(&eventBuf, tag);
+    postPayloadSize(&eventBuf, size);
+    postCapsetID(&eventBuf, capset);
+
+    for( i = 0; i < argc; i++ ) {
+        // again, 1 + to account for \0
+        postBuf(&eventBuf, (StgWord8*) argv[i], 1 + strlen(argv[i]));
     }
 
     RELEASE_LOCK(&eventBufMutex);

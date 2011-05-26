@@ -182,6 +182,8 @@ void traceCapsetModify_ (EventTypeNum tag,
                          CapsetID capset,
                          StgWord32 other);
 
+void traceOSProcessInfo_ (void);
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -194,6 +196,7 @@ void traceCapsetModify_ (EventTypeNum tag,
 #define traceThreadStatus(class, tso) /* nothing */
 #define traceEventStartup_(n_caps) /* nothing */
 #define traceCapsetModify_(tag, capset, other) /* nothing */
+#define traceOSProcessInfo_() /* nothing */
 
 #endif /* TRACING */
 
@@ -467,6 +470,13 @@ INLINE_HEADER void traceCapsetRemoveCap(CapsetID capset STG_UNUSED,
 {
     traceCapsetModify_(EVENT_CAPSET_REMOVE_CAP, capset, capno);
     dtraceCapsetRemoveCap(capset, capno);
+}
+
+INLINE_HEADER void traceOSProcessInfo(void)
+{
+    traceOSProcessInfo_();
+    /* Note: no DTrace equivalent because all this OS process info
+     * is available to DTrace directly */
 }
 
 #include "EndPrivate.h"

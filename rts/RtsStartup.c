@@ -153,6 +153,9 @@ hs_init(int *argc, char **argv[])
      */
     initScheduler();
 
+    /* Trace some basic information about the process */
+    traceOSProcessInfo();
+
     /* initialize the storage manager */
     initStorage();
 
