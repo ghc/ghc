@@ -12,12 +12,13 @@
 --		properly. eg SPARC doesn't care about FF80.
 --
 module Size (
-	Size(..),
-	intSize,
-	floatSize,
-	isFloatSize,
-	cmmTypeSize,
-	sizeToWidth
+    Size(..),
+    intSize,
+    floatSize,
+    isFloatSize,
+    cmmTypeSize,
+    sizeToWidth,
+    sizeInBytes
 )
 
 where
@@ -99,5 +100,6 @@ sizeToWidth size
 	FF32		-> W32
 	FF64		-> W64
 	FF80		-> W80
-	
 
+sizeInBytes :: Size -> Int
+sizeInBytes = widthInBytes . sizeToWidth
