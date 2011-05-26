@@ -379,6 +379,22 @@ doublePrimTyCon	= pcPrimTyCon0 doublePrimTyConName DoubleRep
 %*									*
 %************************************************************************
 
+Note [The (~) TyCon)
+~~~~~~~~~~~~~~~~~~~~
+There is a perfectly ordinary type constructor (~) that represents the type
+of coercions (which, remember, are values).  For example
+   Refl Int :: Int ~ Int
+
+Atcually it is not quite "perfectly ordinary" because it is kind-polymorphic:
+   Refl Maybe :: Maybe ~ Maybe
+
+So the true kind of (~) :: forall k. k -> k -> #.  But we don't have
+polymorphic kinds (yet). However, (~) really only appears saturated in
+which case there is no problem in finding the kind of (ty1 ~ ty2). So
+we check that in CoreLint (and, in an assertion, in Kind.typeKind).
+
+Note [The State# TyCon]
+~~~~~~~~~~~~~~~~~~~~~~~
 State# is the primitive, unlifted type of states.  It has one type parameter,
 thus
 	State# RealWorld
@@ -392,10 +408,11 @@ keep different state threads separate.  It is represented by nothing at all.
 mkStatePrimTy :: Type -> Type
 mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
 
-statePrimTyCon :: TyCon
+statePrimTyCon :: TyCon   -- See Note [The State# TyCon]
 statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 VoidRep
 
 eqPredPrimTyCon :: TyCon  -- The representation type for equality predicates
+		   	  -- See Note [The (~) TyCon]
 eqPredPrimTyCon  = pcPrimTyCon eqPredPrimTyConName 2 VoidRep
 \end{code}
 
@@ -414,7 +431,6 @@ realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 
 Note: the ``state-pairing'' types are not truly primitive, so they are
 defined in \tr{TysWiredIn.lhs}, not here.
-
 
 %************************************************************************
 %*									*

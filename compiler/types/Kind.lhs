@@ -72,8 +72,11 @@ isLiftedTypeKindCon tc    = tc `hasKey` liftedTypeKindTyConKey
 
 \begin{code}
 typeKind :: Type -> Kind
-typeKind (TyConApp tc tys) 
-  = kindAppResult (tyConKind tc) tys
+typeKind _ty@(TyConApp tc tys) 
+  = ASSERT2( not (tc `hasKey` eqPredPrimTyConKey) || length tys == 2, ppr _ty )
+    	     -- Assertion checks for unsaturated application of (~)
+	     -- See Note [The (~) TyCon] in TysPrim
+    kindAppResult (tyConKind tc) tys
 
 typeKind (PredTy pred)	      = predKind pred
 typeKind (AppTy fun _)        = kindFunResult (typeKind fun)
