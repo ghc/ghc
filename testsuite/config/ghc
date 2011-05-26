@@ -63,7 +63,8 @@ config.in_tree_compiler = in_tree_compiler
 
 config.way_flags = {
 	'normal'     : [],
-	'optasm'     : ['-O -fasm'],
+        'g1'         : [],
+        'optasm'     : ['-O -fasm'],
 	'llvm'       : ['-fllvm'],
 	'optllvm'    : ['-O -fllvm'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
@@ -85,8 +86,9 @@ config.way_flags = {
 	}
 
 config.way_rts_flags = { 
-	'normal'     : [],
-	'optasm'     : [],
+        'normal'     : [],
+        'g1'         : ['-G1'],
+        'optasm'     : [],
 	'llvm'       : [],
 	'optllvm'    : [],
 	'profasm'    : ['-hc'], # test heap profiling too

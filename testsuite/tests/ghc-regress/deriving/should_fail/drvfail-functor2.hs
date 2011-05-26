@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor, DatatypeContexts #-}
 module ShouldFail where
 
 -- Derive Functor on a type that uses 'a' in the wrong places

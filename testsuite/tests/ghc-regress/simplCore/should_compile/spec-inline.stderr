@@ -6,7 +6,7 @@ Roman.foo2 :: GHC.Types.Int
  Str=DmdType m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, Cheap=True, Expandable=True,
-         Guidance=IF_ARGS [] 1 2}]
+         Guidance=IF_ARGS [] 10 110}]
 Roman.foo2 = GHC.Types.I# 6
 
 Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
@@ -15,7 +15,7 @@ Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
  Str=DmdType,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
          ConLike=True, Cheap=True, Expandable=True,
-         Guidance=IF_ARGS [] 1 2}]
+         Guidance=IF_ARGS [] 10 110}]
 Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
 
 Roman.foo3 :: GHC.Types.Int
@@ -63,7 +63,7 @@ Roman.$wgo
  Str=DmdType SS,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=2, Value=True,
          ConLike=True, Cheap=True, Expandable=True,
-         Guidance=IF_ARGS [6 3] 37 0}]
+         Guidance=IF_ARGS [60 30] 253 0}]
 Roman.$wgo =
   \ (w :: Data.Maybe.Maybe GHC.Types.Int)
     (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->

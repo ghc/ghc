@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 module ShouldFail where
 
 import Data.Ratio

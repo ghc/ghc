@@ -120,3 +120,16 @@ test('T5113',
      compile_and_run,
      ['-O'])
 
+
+test('T4978',
+     [if_wordsize(32,
+          stats_num_field('bytes allocated', 4500000,
+                                             5500000)),
+      if_wordsize(64,
+          stats_num_field('bytes allocated',  9000000,
+                                             11000000)),
+                                     # expected value: 10137680 (amd64/Linux)
+      only_ways(['normal'])
+      ],
+     compile_and_run,
+     ['-O2'])

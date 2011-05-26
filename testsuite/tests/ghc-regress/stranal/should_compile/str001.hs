@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 module ShouldSucceed where
 
 {-# OPTIONS -O #-}

@@ -1,5 +1,5 @@
 {-# LANGUAGE UndecidableInstances, FlexibleInstances, TypeOperators,
-             MultiParamTypeClasses, FunctionalDependencies #-}
+             MultiParamTypeClasses, FunctionalDependencies, DatatypeContexts #-}
 
 -- This one crashed GHC 6.3 due to an error in TcSimplify.add_ors
 
