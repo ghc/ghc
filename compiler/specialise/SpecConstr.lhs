@@ -1313,8 +1313,10 @@ specialise env bind_calls (RI fn _ arg_bndrs body arg_occs)
               spec_count' = n_pats + spec_count
 	; case sc_count env of
 	    Just max | not (sc_force env) && spec_count' > max
-		-> pprTrace "SpecConstr" msg $  
-                   return (nullUsage, spec_info)
+		-> if (debugIsOn || opt_PprStyle_Debug)	 -- Suppress this scary message for
+                   then pprTrace "SpecConstr" msg $  	 -- ordinary users!  Trac #5125
+                        return (nullUsage, spec_info)
+                   else return (nullUsage, spec_info)
 		where
 		   msg = vcat [ sep [ ptext (sLit "Function") <+> quotes (ppr fn)
 		       	            , nest 2 (ptext (sLit "has") <+> 
