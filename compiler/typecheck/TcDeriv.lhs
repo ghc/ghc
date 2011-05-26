@@ -332,7 +332,7 @@ tcDeriving tycl_decls inst_decls deriv_decls
 
 	; dflags <- getDOpts
 	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
-	         (ddump_deriving inst_info rn_binds))
+	         (ddump_deriving inst_info rn_binds repMetaTys repTyCons metaInsts))
 {-
         ; when (not (null inst_info)) $
           dumpDerivingInfo (ddump_deriving inst_info rn_binds)
@@ -340,11 +340,26 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	; return ( inst_info, rn_binds, rn_dus
                  , concat (map metaTyCons2TyCons repMetaTys), repTyCons) }
   where
-    ddump_deriving :: [InstInfo Name] -> HsValBinds Name -> SDoc
-    ddump_deriving inst_infos extra_binds
-      = hang (ptext (sLit "Derived instances"))
-           2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos)
-              $$ ppr extra_binds)
+    ddump_deriving :: [InstInfo Name] -> HsValBinds Name 
+                   -> [MetaTyCons] -- ^ Empty data constructors
+                   -> [TyCon]      -- ^ Rep type family instances
+                   -> [[(InstInfo RdrName, DerivAuxBinds)]] 
+                      -- ^ Instances for the repMetaTys
+                   -> SDoc
+    ddump_deriving inst_infos extra_binds repMetaTys repTyCons metaInsts
+      =    hang (ptext (sLit "Derived instances"))
+              2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos)
+                 $$ ppr extra_binds)
+        $$ hangP "Generic representation" (
+              hangP "Generated datatypes for meta-information"
+               (vcat (map ppr repMetaTys))
+           -- The Outputable instance for TyCon unfortunately only prints the name...
+           $$ hangP "Representation types" 
+                (vcat (map ppr  repTyCons))
+           $$ hangP "Meta-information instances"
+                (vcat (map (pprInstInfoDetails . fst) (concat metaInsts))))
+    
+    hangP s x = text "" $$ hang (ptext (sLit s)) 2 x
 
 
 renameDeriv :: Bool -> LHsBinds RdrName

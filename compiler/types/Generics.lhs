@@ -218,7 +218,7 @@ data MetaTyCons = MetaTyCons { -- One meta datatype per dataype
                              , metaS :: [[TyCon]] }
                              
 instance Outputable MetaTyCons where
-  ppr (MetaTyCons d c s) = ppr d <+> ppr c <+> ppr s
+  ppr (MetaTyCons d c s) = ppr d $$ vcat (map ppr c) $$ vcat (map ppr (concat s))
                                    
 metaTyCons2TyCons :: MetaTyCons -> [TyCon]
 metaTyCons2TyCons (MetaTyCons d c s) = d : c ++ concat s
