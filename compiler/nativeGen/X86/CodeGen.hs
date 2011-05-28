@@ -54,11 +54,15 @@ import FastBool		( isFastTrue )
 import Constants	( wORD_SIZE )
 import DynFlags
 
-import Control.Monad	( mapAndUnzipM )
-import Data.Maybe	( fromJust, catMaybes )
-import Data.Bits
-import Data.Word
+import Control.Monad    ( mapAndUnzipM )
+import Data.Maybe       ( catMaybes )
 import Data.Int
+
+#if WORD_SIZE_IN_BITS==32
+import Data.Maybe       ( fromJust )
+import Data.Word
+import Data.Bits
+#endif
 
 sse2Enabled :: NatM Bool
 #if x86_64_TARGET_ARCH
@@ -176,6 +180,7 @@ data CondCode
 	= CondCode Bool Cond InstrBlock
 
 
+#if WORD_SIZE_IN_BITS==32
 -- | a.k.a "Register64"
 --	Reg is the lower 32-bit temporary which contains the result. 
 --	Use getHiVRegFromLo to find the other VRegUnique.  
@@ -187,6 +192,7 @@ data ChildCode64
    = ChildCode64 
         InstrBlock
         Reg	 	
+#endif
 
 
 -- | Register's passed up the tree.  If the stix code forces the register
@@ -286,9 +292,7 @@ getSomeReg expr = do
 	return (reg, code)
 
 
-
-
-
+#if WORD_SIZE_IN_BITS==32
 assignMem_I64Code :: CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_I64Code addrTree valueTree = do
   Amode addr addr_code <- getAmode addrTree
@@ -319,8 +323,6 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
 
 assignReg_I64Code _ _
    = panic "assignReg_I64Code(i386): invalid lvalue"
-
-
 
 
 iselExpr64        :: CmmExpr -> NatM ChildCode64
@@ -396,7 +398,7 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
 
 iselExpr64 expr
    = pprPanic "iselExpr64(i386)" (ppr expr)
-
+#endif
 
 
 --------------------------------------------------------------------------------
@@ -1798,7 +1800,7 @@ genCCall target dest_regs args = do
 	  where 
 		rep = localRegType dest
 		r_dest = getRegisterReg True (CmmLocal dest)
-	assign_code many = panic "genCCall.assign_code many"
+	assign_code _many = panic "genCCall.assign_code many"
 
     return (load_args_code 	`appOL` 
 	    adjust_rsp 		`appOL`
@@ -1840,7 +1842,7 @@ genCCall target dest_regs args = do
 	    return ((CmmHinted arg hint):args', ars, frs, code')
 
     push_args [] code = return code
-    push_args ((CmmHinted arg hint):rest) code
+    push_args ((CmmHinted arg _):rest) code
        | isFloatType arg_rep = do
 	 (arg_reg, arg_code) <- getSomeReg arg
          delta <- getDeltaNat
@@ -1969,10 +1971,7 @@ genSwitch expr ids
     -- conjunction with the hack in PprMach.hs/pprDataItem once
     -- binutils 2.17 is standard.
             code = e_code `appOL` t_code `appOL` toOL [
-			    MOVSxL II32
-				   (OpAddr (AddrBaseIndex (EABaseReg tableReg)
-							  (EAIndex reg wORD_SIZE) (ImmInt 0)))
-				   (OpReg reg),
+			    MOVSxL II32 op (OpReg reg),
 			    ADD (intSize wordWidth) (OpReg reg) (OpReg tableReg),
 			    JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
 		   ]
@@ -1988,8 +1987,7 @@ genSwitch expr ids
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
-        let
-            op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
+        let op = OpAddr (AddrBaseIndex EABaseNone (EAIndex reg wORD_SIZE) (ImmCLbl lbl))
             code = e_code `appOL` toOL [
                     JMP_TBL op ids ReadOnlyData lbl
                  ]

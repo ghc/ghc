@@ -59,7 +59,6 @@ import System.IO
 import System.IO.Error as IO
 import System.Directory
 import Data.Char
-import Data.Maybe ( isNothing )
 import Data.List
 import qualified Data.Map as Map
 import Text.ParserCombinators.ReadP hiding (char)
@@ -443,7 +442,7 @@ figureLlvmVersion dflags = do
   ver <- catchIO (do
              (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                              Nothing Nothing
-             {- $ llc -version
+             {- > llc -version
                   Low Level Virtual Machine (http://llvm.org/):
                     llvm version 2.8 (Ubuntu 2.8-0Ubuntu1)
                     ...

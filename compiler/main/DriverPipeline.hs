@@ -2007,5 +2007,4 @@ hscNextPhase dflags _ hsc_lang =
         HscLlvm        -> LlvmOpt
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
-        _other         -> StopLn
 

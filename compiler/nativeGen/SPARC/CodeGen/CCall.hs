@@ -85,10 +85,10 @@ genCCall target dest_regs argsAndHints
                             (mop == MO_Memcpy ||
                              mop == MO_Memset ||
                              mop == MO_Memmove)
-                          -> init argsAndHints
+                          = init argsAndHints
 
                           | otherwise
-                          -> argsAndHints
+                          = argsAndHints
                 
 	-- strip hints from the arg regs
 	let args :: [CmmExpr]

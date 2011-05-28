@@ -942,10 +942,10 @@ genCCall target dest_regs argsAndHints
                         (mop == MO_Memcpy ||
                          mop == MO_Memset ||
                          mop == MO_Memmove)
-                      -> init argsAndHints
+                      = init argsAndHints
 
                       | otherwise
-                      -> argsAndHints
+                      = argsAndHints
 
 	args = map hintlessCmm argsAndHints'
 	argReps = map cmmExprType args
