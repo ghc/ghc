@@ -528,7 +528,7 @@ void postCapsetStrEvent (EventTypeNum tag,
                          char *msg)
 {
     int strsize = strlen(msg);
-    int size = strsize + sizeof(EventCapsetID)
+    int size = strsize + sizeof(EventCapsetID);
 
     ACQUIRE_LOCK(&eventBufMutex);
 
