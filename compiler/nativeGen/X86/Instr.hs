@@ -781,6 +781,9 @@ is_G_instr instr
 
 data JumpDest = DestBlockId BlockId | DestImm Imm
 
+getJumpDestBlockId :: JumpDest -> Maybe BlockId
+getJumpDestBlockId (DestBlockId bid) = Just bid
+getJumpDestBlockId _                 = Nothing
 
 canShortcut :: Instr -> Maybe JumpDest
 canShortcut (JXX ALWAYS id)    = Just (DestBlockId id)

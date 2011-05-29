@@ -1,6 +1,6 @@
 
 module SPARC.ShortcutJump (
-	JumpDest(..),
+	JumpDest(..), getJumpDestBlockId,
 	canShortcut,
 	shortcutJump,
 	shortcutStatic,
@@ -24,6 +24,10 @@ import Unique
 data JumpDest 
 	= DestBlockId BlockId 
 	| DestImm Imm
+
+getJumpDestBlockId :: JumpDest -> Maybe BlockId
+getJumpDestBlockId (DestBlockId bid) = Just bid
+getJumpDestBlockId _                 = Nothing
 
 
 canShortcut :: Instr -> Maybe JumpDest
