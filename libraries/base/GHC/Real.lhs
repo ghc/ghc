@@ -520,9 +520,15 @@ x ^^ n          =  if n >= 0 then x^n else recip (x^(negate n))
                   in if even e then (nn :% dd) else (negate nn :% dd)
 
 -------------------------------------------------------
--- | @'gcd' x y@ is the greatest (nonnegative) integer that divides both @x@
--- and @y@; for example @'gcd' (-3) 6@ = @3@, @'gcd' (-3) (-6)@ = @3@,
--- @'gcd' 0 4@ = @4@.  @'gcd' 0 0@ = @0@.
+-- | @'gcd' x y@ is the non-negative factor of both @x@ and @y@ of which
+-- every common factor of @x@ and @y@ is also a factor; for example
+-- @'gcd' 4 2 = 2@, @'gcd' (-4) 6 = 2@, @'gcd' 0 4@ = @4@. @'gcd' 0 0@ = @0@.
+-- (That is, the common divisor that is \"greatest\" in the divisibility
+-- preordering.)
+--
+-- Note: Since for signed fixed-width integer types, @'abs' 'minBound' < 0@,
+-- the result may be negative if one of the arguments is @'minBound'@ (and
+-- necessarily is if the other is @0@ or @'minBound'@) for such types.
 gcd             :: (Integral a) => a -> a -> a
 gcd x y         =  gcd' (abs x) (abs y)
                    where gcd' a 0  =  a
