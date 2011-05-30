@@ -114,9 +114,9 @@
 	  has been specified, then the object filename is
 	  <replaceable>dir</replaceable>/<replaceable>mod</replaceable>.<replaceable>osuf</replaceable>,
 	  where <replaceable>mod</replaceable> is the module name with
-	  dots replaced by slashes.  GHC will silently create the necessary directory 
+	  dots replaced by slashes.  GHC will silently create the necessary directory
           structure underneath <replaceable>dir</replaceable>, if it does not
-          already exist.</para> 
+          already exist.</para>
 	</listitem>
       </itemizedlist>
 
@@ -273,7 +273,7 @@
           <para>If you use <command>ghc --make</command> and you don't
           use the <option>-o</option>, the name GHC will choose
           for the executable will be based on the name of the file
-          containing the module <literal>Main</literal>. 
+          containing the module <literal>Main</literal>.
           Note that with GHC the <literal>Main</literal> module doesn't
           have to be put in file <filename>Main.hs</filename>.
           Thus both
@@ -433,7 +433,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 	</varlistentry>
       </variablelist>
     </sect2>
-  
+
     <sect2 id="keeping-intermediates">
       <title>Keeping Intermediate Files</title>
       <indexterm><primary>intermediate files, saving</primary>
@@ -693,22 +693,22 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
       This section explains how.</para>
 
       <para>Every cycle in the module import graph must be broken by a <filename>hs-boot</filename> file.
-      Suppose that modules <filename>A.hs</filename> and <filename>B.hs</filename> are Haskell source files, 
+      Suppose that modules <filename>A.hs</filename> and <filename>B.hs</filename> are Haskell source files,
       thus:
 <programlisting>
 module A where
     import B( TB(..) )
-    
+
     newtype TA = MkTA Int
-    
+
     f :: TB -&#62; TA
     f (MkTB x) = MkTA x
 
 module B where
     import {-# SOURCE #-} A( TA(..) )
-    
+
     data TB = MkTB !Int
-    
+
     g :: TA -&#62; TB
     g (MkTA x) = MkTB x
 </programlisting>
@@ -750,12 +750,12 @@ module A where
 <programlisting>
   ghc -c A.hs-boot
 </programlisting>
-When a hs-boot file <filename>A.hs-boot</filename> 
+When a hs-boot file <filename>A.hs-boot</filename>
    is compiled, it is checked for scope and type errors.
    When its parent module <filename>A.hs</filename> is compiled, the two are compared, and
    an error is reported if the two are inconsistent.
    </para></listitem>
-   
+
 	<listitem>
 	  <para> Just as compiling <filename>A.hs</filename> produces an
 	    interface file <filename>A.hi</filename>, and an object file
@@ -793,7 +793,7 @@ When a hs-boot file <filename>A.hs-boot</filename>
    <command>ghc -M</command> will report an error if a cycle is found.
    </para></listitem>
 
-   <listitem><para> A module <literal>M</literal> that is 
+   <listitem><para> A module <literal>M</literal> that is
    <literal>{-# SOURCE #-}</literal>-imported in a program will usually also be
    ordinarily imported elsewhere.  If not, <command>ghc --make</command>
    automatically adds <literal>M</literal> to the set of modules it tries to
@@ -812,9 +812,9 @@ A hs-boot file need only contain the bare
 <para>A hs-boot file is written in a subset of Haskell:
 <itemizedlist>
 <listitem><para> The module header (including the export list), and import statements, are exactly as in
-Haskell, and so are the scoping rules.  
+Haskell, and so are the scoping rules.
    Hence, to mention a non-Prelude type or class, you must import it.</para></listitem>
-   
+
 <listitem><para> There must be no value declarations, but there can be type signatures for
 values.  For example:
 <programlisting>
@@ -823,7 +823,7 @@ values.  For example:
 </para></listitem>
 <listitem><para> Fixity declarations are exactly as in Haskell.</para></listitem>
 <listitem><para> Type synonym declarations are exactly as in Haskell.</para></listitem>
-<listitem><para> A data type declaration can either be given in full, exactly as in Haskell, or it 
+<listitem><para> A data type declaration can either be given in full, exactly as in Haskell, or it
 can be given abstractly, by omitting the '=' sign and everything that follows.  For example:
 <programlisting>
   data T a b
@@ -835,7 +835,7 @@ can be given abstractly, by omitting the '=' sign and everything that follows.  
 	  You <emphasis>can</emphasis> also write out the constructors but, if you do so, you must write
 	  it out precisely as in its real definition.</para>
 	  <para>
-	    If you do not write out the constructors, you may need to give a kind 
+	    If you do not write out the constructors, you may need to give a kind
 	    annotation (<xref linkend="kinding"/>), to tell
 	    GHC the kind of the type variable, if it is not "*".  (In source files, this is worked out
 	    from the way the type variable is used in the constructors.)  For example:
@@ -938,7 +938,7 @@ Foo.o Foo.hc Foo.s    : Baz.hi          # Foo imports Baz
       brought up to date.  To bring it up to date,
       <literal>make</literal> looks for a rule to do so; one of the
       preceding suffix rules does the job nicely.  These dependencies
-      can be generated automatically by <command>ghc</command>; see 
+      can be generated automatically by <command>ghc</command>; see
       <xref linkend="makefile-dependencies"/></para>
 
  </sect2>
@@ -967,7 +967,7 @@ depend :
         <filename>Makefile</filename>.</para>
 
 	<para>In general, <command>ghc -M Foo</command> does the following.
-	For each module <literal>M</literal> in the set 
+	For each module <literal>M</literal> in the set
 	<literal>Foo</literal> plus all its imports (transitively),
 	it adds to the Makefile:
 	<itemizedlist>
@@ -990,7 +990,7 @@ M.o : X.hi-boot
        (See <xref linkend="mutual-recursion"/> for details of
        <literal>hi-boot</literal> style interface files.)
       </para></listitem>
-        </itemizedlist> 
+        </itemizedlist>
 	If <literal>M</literal> imports multiple modules, then there will
        be multiple lines with <filename>M.o</filename> as the
        target.</para>
@@ -1127,7 +1127,7 @@ just in case they contain an instance declaration that matters to M.  This would
 be a disaster in practice, so GHC tries to be clever. </para>
 
 <para>In particular, if an instance declaration is in the same module as the definition
-of any type or class mentioned in the <emphasis>head</emphasis> of the instance declaration 
+of any type or class mentioned in the <emphasis>head</emphasis> of the instance declaration
 (the part after the &ldquo;<literal>=&gt;</literal>&rdquo;; see <xref linkend="instance-rules"/>), then
 GHC has to visit that interface file anyway.  Example:</para>
 <programlisting>
@@ -1178,8 +1178,8 @@ These considerations lead to the following definition of an orphan module:
   least one <emphasis>orphan rule</emphasis>.</para> </listitem>
 
   <listitem><para> An instance declaration in a module M is an <emphasis>orphan instance</emphasis> if
-  <indexterm><primary>orphan instance</primary></indexterm> 
-<itemizedlist> 
+  <indexterm><primary>orphan instance</primary></indexterm>
+<itemizedlist>
 <listitem><para>
   The class of the instance declaration is not declared in M, and
 </para></listitem>
@@ -1191,7 +1191,7 @@ These considerations lead to the following definition of an orphan module:
 	</para></listitem>
   </itemizedlist>
   </para>
-  <para> Only the instance head 
+  <para> Only the instance head
   counts.  In the example above, it is not good enough for C's declaration
   to be in module A; it must be the declaration of D or T.</para>
   </listitem>
@@ -1205,9 +1205,9 @@ These considerations lead to the following definition of an orphan module:
 
 
 
-<para>If you use the flag <option>-fwarn-orphans</option>, GHC will warn you 
+<para>If you use the flag <option>-fwarn-orphans</option>, GHC will warn you
 if you are creating an orphan module.
-Like any warning, you can switch the warning off with <option>-fno-warn-orphans</option>, 
+Like any warning, you can switch the warning off with <option>-fno-warn-orphans</option>,
 and <option>-Werror</option>
 will make the compilation fail if the warning is issued.
 </para>
