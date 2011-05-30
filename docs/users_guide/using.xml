@@ -1547,7 +1547,7 @@ f "2"    = 2
 	  <indexterm><primary>unused do binding, warning</primary></indexterm>
 	  <indexterm><primary>do binding, unused</primary></indexterm>
 
-	  <para>Report expressions occuring in <literal>do</literal> and <literal>mdo</literal> blocks
+	  <para>Report expressions occurring in <literal>do</literal> and <literal>mdo</literal> blocks
 	  that appear to silently throw information away.
           For instance <literal>do { mapM popInt xs ; return 10 }</literal> would report
           the first statement in the <literal>do</literal> block as suspicious,
@@ -1572,7 +1572,7 @@ f "2"    = 2
 	  <indexterm><primary>apparently erroneous do binding, warning</primary></indexterm>
 	  <indexterm><primary>do binding, apparently erroneous</primary></indexterm>
 
-	  <para>Report expressions occuring in <literal>do</literal> and <literal>mdo</literal> blocks
+	  <para>Report expressions occurring in <literal>do</literal> and <literal>mdo</literal> blocks
 	  that appear to lack a binding.
           For instance <literal>do { return (popInt 10) ; return 10 }</literal> would report
           the first statement in the <literal>do</literal> block as suspicious,
