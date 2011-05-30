@@ -5,7 +5,7 @@
   <sect2 id="replacing-phases">
     <title>Replacing the program for one or more phases</title>
     <indexterm><primary>phases, changing</primary></indexterm>
-    
+
     <para>You may specify that a different program be used for one
     of the phases of the compilation system, in place of whatever
     the <command>ghc</command> has wired into it.  For example, you
@@ -409,7 +409,7 @@ $ cat foo.hspp</screen>
           for Windows, <literal>solaris</literal>, etc.).</para>
         </listitem>
       </varlistentry>
-        
+
       <varlistentry>
         <term>
           <constant><replaceable>arch</replaceable>_HOST_ARCH=1</constant>
@@ -437,7 +437,7 @@ $ cat foo.hspp</screen>
 <programlisting>strmod = "\
 \ p \
 \ "</programlisting>
-      
+
       <para>don't work with <option>-cpp</option>;
       <filename>/usr/bin/cpp</filename> elides the backslash-newline
       pairs.</para>
@@ -452,7 +452,7 @@ $ cat foo.hspp</screen>
 
   <sect2 id="pre-processor">
     <title>Options affecting a Haskell pre-processor</title>
-    
+
     <indexterm><primary>pre-processing: custom</primary></indexterm>
     <indexterm><primary>Pre-processor options</primary></indexterm>
 
@@ -855,11 +855,11 @@ $ cat foo.hspp</screen>
             However, if all the modules are otherwise up to date, you may need to force
             recompilation both of the module where the new "main" is, and of the
             module where the "main" function used to be;
-            <literal>ghc</literal> is not clever 
+            <literal>ghc</literal> is not clever
             enough to figure out that they both need recompiling.  You can
             force recompilation by removing the object file, or by using the
             <option>-fforce-recomp</option> flag.
-            </para> 
+            </para>
         </listitem>
       </varlistentry>
 
@@ -928,7 +928,7 @@ $ cat foo.hspp</screen>
           <para>The threaded runtime system provides the following
           benefits:</para>
 
-          <itemizedlist> 
+          <itemizedlist>
             <listitem>
               <para>Parallelism<indexterm><primary>parallelism</primary></indexterm> on a multiprocessor<indexterm><primary>multiprocessor</primary></indexterm><indexterm><primary>SMP</primary></indexterm> or multicore<indexterm><primary>multicore</primary></indexterm>
               machine.  See <xref linkend="using-smp" />.</para>
@@ -1038,7 +1038,7 @@ $ cat foo.hspp</screen>
             <option>-with-rtsopts="-H128m"</option> sets the default heap size to 128MB.
             This will always be the default heap size for this program, unless the user overrides it.
             (Depending on the setting of the <option>-rtsopts</option> option, the user might
-            not have the ability to change RTS options at run-time, in which case 
+            not have the ability to change RTS options at run-time, in which case
             <option>-with-rtsopts</option> would be the <emphasis>only</emphasis> way to set
             them.)
           </para>
@@ -1074,7 +1074,7 @@ $ cat foo.hspp</screen>
             system using the security control panel, but GHC by default
             generates binaries that don't depend on the user having disabled
             installer detection.</para>
-          
+
           <para>The <option>-fno-gen-manifest</option> disables generation of
             the manifest file.  One reason to do this would be if you had
             a manifest file of your own, for example.</para>
@@ -1086,7 +1086,7 @@ $ cat foo.hspp</screen>
             <option>-fno-embed-manifest</option>, see below.</para>
         </listitem>
       </varlistentry>
-          
+
       <varlistentry>
         <term>
           <option>-fno-embed-manifest</option>
@@ -1102,15 +1102,15 @@ $ cat foo.hspp</screen>
             </indexterm>; to see exactly what GHC does to embed the manifest,
             use the <option>-v</option> flag.  A GHC installation comes with
             its own copy of <literal>windres</literal> for this reason.</para>
-          
+
           <para>See also <option>-pgmwindres</option> (<xref
-              linkend="replacing-phases" />) and 
+              linkend="replacing-phases" />) and
             <option>-optwindres</option> (<xref
                                             linkend="forcing-options-through"
               />).</para>
         </listitem>
       </varlistentry>
-          
+
       <varlistentry>
         <term>
           <option>-fno-shared-implib</option>
@@ -1125,7 +1125,7 @@ $ cat foo.hspp</screen>
             disk-space cost of creating this import library, which can be substantial - it
             might require as much space as the code itself, as Haskell DLLs tend to export
             lots of symbols.</para>
-            
+
           <para>As long as you are happy to only be able to link to the DLL using
             <literal>GetProcAddress</literal> and friends, you can supply the
             <option>-fno-shared-implib</option> flag to disable the creation of the import
