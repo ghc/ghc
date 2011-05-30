@@ -1177,7 +1177,7 @@ hp2ps [flags] [&lt;file&gt;[.hp]]
     <sect2 id="manipulating-hp">
       <title>Manipulating the hp file</title>
 
-<para>(Notes kindly offered by Jan-Willhem Maessen.)</para>
+<para>(Notes kindly offered by Jan-Willem Maessen.)</para>
 
 <para>
 The <filename>FOO.hp</filename> file produced when you ask for the
@@ -1660,7 +1660,7 @@ Options:
             for <option>-debug</option> at link-time).  This links in
             the debug version of the RTS, which includes the code for
             aggregating and reporting the results of ticky-ticky
-            profilng.
+            profiling.
           </para>
         </listitem>
         <listitem>
