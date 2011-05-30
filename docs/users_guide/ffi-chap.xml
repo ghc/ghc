@@ -110,7 +110,7 @@ foreign import ccall interruptible
    "sleep" :: CUint -> IO CUint
 </programlisting>
 
-          <literal>interruptble</literal> behaves exactly as
+          <literal>interruptible</literal> behaves exactly as
           <literal>safe</literal>, except that when
           a <literal>throwTo</literal> is directed at a thread in an
           interruptible foreign call, an OS-specific mechanism will be
