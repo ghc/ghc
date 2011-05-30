@@ -357,7 +357,7 @@
         </term>
 	<listitem>
 	  <para>Make the interface loader be *real* chatty about what it is
-	upto.</para>
+	up to.</para>
 	</listitem>
       </varlistentry>
 
@@ -368,7 +368,7 @@
         </term>
   <listitem>
     <para>Make the type checker be *real* chatty about what it is
-  upto.</para>
+  up to.</para>
   </listitem>
       </varlistentry>
 
@@ -379,7 +379,7 @@
         </term>
   <listitem>
     <para>Make the vectoriser be *real* chatty about what it is
-  upto.</para>
+  up to.</para>
   </listitem>
       </varlistentry>
 
@@ -390,7 +390,7 @@
         </term>
 	<listitem>
 	  <para>Make the renamer be *real* chatty about what it is
-	upto.</para>
+	up to.</para>
 	</listitem>
       </varlistentry>
 
