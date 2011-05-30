@@ -78,7 +78,7 @@ Hello World!</screen>
 
   <sect1>
     <title>Options overview</title>
-    
+
     <para>GHC's behaviour is controlled by
     <firstterm>options</firstterm>, which for historical reasons are
     also sometimes referred to as command-line flags or arguments.
@@ -86,11 +86,11 @@ Hello World!</screen>
 
     <sect2>
       <title>Command-line arguments</title>
-      
+
       <indexterm><primary>structure, command-line</primary></indexterm>
       <indexterm><primary>command-line</primary><secondary>arguments</secondary></indexterm>
       <indexterm><primary>arguments</primary><secondary>command-line</secondary></indexterm>
-      
+
       <para>An invocation of GHC takes the following form:</para>
 
 <screen>
@@ -112,7 +112,7 @@ ghc [argument...]
 
     <sect2 id="source-file-options">
       <title>Command line options in source files</title>
-    
+
       <indexterm><primary>source-file options</primary></indexterm>
 
       <para>Sometimes it is useful to make the connection between a
@@ -130,7 +130,7 @@ ghc [argument...]
 module X where
 ...
 </programlisting>
-      
+
       <para><literal>OPTIONS_GHC</literal> is a <emphasis>file-header pragma</emphasis>
       (see <xref linkend="pragmas"/>).</para>
 
@@ -163,7 +163,7 @@ module X where
       for more details.</para>
     </sect2>
   </sect1>
-    
+
   <sect1 id="static-dynamic-flags">
     <title>Static, Dynamic, and Mode options</title>
     <indexterm><primary>static</primary><secondary>options</secondary>
@@ -204,14 +204,14 @@ module X where
 	</listitem>
       </varlistentry>
     </variablelist>
-    
+
     <para>The flag reference tables (<xref
     linkend="flag-reference"/>) lists the status of each flag.</para>
 
     <para>There are a few flags that are static except that they can
     also be used with GHCi's <literal>:set</literal> command; these
     are listed as &ldquo;static/<literal>:set</literal>&rdquo; in the
-    table.</para> 
+    table.</para>
   </sect1>
 
   <sect1 id="file-suffixes">
@@ -266,7 +266,7 @@ module X where
 	  compiler.</para>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term><filename>.ll</filename></term>
 	<listitem>
@@ -336,7 +336,7 @@ module X where
 	  more detail in <xref linkend="ghci"/>.</para>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term>
 	  <cmdsynopsis><command>ghc &ndash;&ndash;make</command>
@@ -375,7 +375,7 @@ module X where
 	  more details.</para>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term>
           <cmdsynopsis>
@@ -531,7 +531,7 @@ module X where
       <title>Using <command>ghc</command> <option>&ndash;&ndash;make</option></title>
       <indexterm><primary><option>&ndash;&ndash;make</option></primary></indexterm>
       <indexterm><primary>separate compilation</primary></indexterm>
-      
+
       <para>In this mode, GHC will build a multi-module Haskell program by following
       dependencies from one or more root modules (usually just
       <literal>Main</literal>).  For example, if your
@@ -583,7 +583,7 @@ ghc Main.hs
 	  source.</para>
 	</listitem>
       </itemizedlist>
-      
+
       <para>Any of the command-line options described in the rest of
       this chapter can be used with
       <option>&ndash;&ndash;make</option>, but note that any options
@@ -596,7 +596,7 @@ ghc Main.hs
       (say, some auxiliary C code), then the object files can be
       given on the command line and GHC will include them when linking
       the executable.</para>
-      
+
       <para>Note that GHC can only follow dependencies if it has the
       source file available, so if your program includes a module for
       which there is no source file, even if you have an object and an
@@ -609,7 +609,7 @@ ghc Main.hs
       to add directories to the search path (see <xref
       linkend="search-path"/>).</para>
     </sect2>
-  
+
     <sect2 id="eval-mode">
       <title>Expression evaluation mode</title>
 
@@ -633,7 +633,7 @@ ghc -e <replaceable>expr</replaceable>
 <screen>
 ghc -e Main.main Main.hs
 </screen>
-      
+
       <para>or we can just use this mode to evaluate expressions in
       the context of the <literal>Prelude</literal>:</para>
 
@@ -646,22 +646,22 @@ olleh
 
     <sect2 id="options-order">
       <title>Batch compiler mode</title>
-      
+
       <para>In <emphasis>batch mode</emphasis>, GHC will compile one or more source files
       given on the command line.</para>
-      
+
       <para>The first phase to run is determined by each input-file
       suffix, and the last phase is determined by a flag.  If no
       relevant flag is present, then go all the way through to linking.
       This table summarises:</para>
-      
+
       <informaltable>
 	<tgroup cols="4">
 	  <colspec align="left"/>
 	  <colspec align="left"/>
 	  <colspec align="left"/>
 	  <colspec align="left"/>
-	  
+
 	  <thead>
 	    <row>
 	      <entry>Phase of the compilation system</entry>
@@ -677,7 +677,7 @@ olleh
 	      <entry>-</entry>
 	      <entry><literal>.hs</literal></entry>
 	    </row>
-	    
+
 	    <row>
 	      <entry>C pre-processor (opt.) </entry>
 	      <entry><literal>.hs</literal> (with
@@ -685,28 +685,28 @@ olleh
 	      <entry><option>-E</option></entry>
 	      <entry><literal>.hspp</literal></entry>
 	    </row>
-	    
+
 	    <row>
 	      <entry>Haskell compiler</entry>
 	      <entry><literal>.hs</literal></entry>
 	      <entry><option>-C</option>, <option>-S</option></entry>
 	      <entry><literal>.hc</literal>, <literal>.s</literal></entry>
 	    </row>
-	    
+
 	    <row>
 	      <entry>C compiler (opt.)</entry>
 	      <entry><literal>.hc</literal> or <literal>.c</literal></entry>
 	      <entry><option>-S</option></entry>
 	      <entry><literal>.s</literal></entry>
 	    </row>
-	    
+
 	    <row>
 	      <entry>assembler</entry>
 	      <entry><literal>.s</literal></entry>
 	      <entry><option>-c</option></entry>
 	      <entry><literal>.o</literal></entry>
 	    </row>
-	    
+
 	    <row>
 	      <entry>linker</entry>
 	      <entry><replaceable>other</replaceable></entry>
@@ -716,17 +716,17 @@ olleh
 	  </tbody>
 	</tgroup>
       </informaltable>
-      
+
       <indexterm><primary><option>-C</option></primary></indexterm>
       <indexterm><primary><option>-E</option></primary></indexterm>
       <indexterm><primary><option>-S</option></primary></indexterm>
       <indexterm><primary><option>-c</option></primary></indexterm>
-      
+
       <para>Thus, a common invocation would be: </para>
 
 <screen>
 ghc -c Foo.hs</screen>
-      
+
       <para>to compile the Haskell source file
       <filename>Foo.hs</filename> to an object file
       <filename>Foo.o</filename>.</para>
@@ -741,7 +741,7 @@ ghc -c Foo.hs</screen>
       <option>-cpp</option><indexterm><primary><option>-cpp</option></primary></indexterm>
       flag turns it on.  See <xref linkend="c-pre-processor"/> for more
       details.</para>
-      
+
       <para>Note: The option <option>-E</option><indexterm><primary>-E
       option</primary></indexterm> runs just the pre-processing passes
       of the compiler, dumping the result in a file.</para>
@@ -800,7 +800,7 @@ ghc -c Foo.hs</screen>
           verify.</para>
 	</listitem>
       </varlistentry>
-	
+
       <varlistentry>
 	<term>
           <option>-v</option><replaceable>n</replaceable>
@@ -812,7 +812,7 @@ ghc -c Foo.hs</screen>
 	  argument.  Specifying <option>-v</option> on its own is
 	  equivalent to <option>-v3</option>, and the other levels
 	  have the following meanings:</para>
-	  
+
 	  <variablelist>
 	    <varlistentry>
 	      <term><option>-v0</option></term>
@@ -862,7 +862,7 @@ ghc -c Foo.hs</screen>
 	  </variablelist>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term><option>-ferror-spans</option>
           <indexterm><primary><option>-ferror-spans</option></primary>
@@ -1000,7 +1000,7 @@ ghc -c Foo.hs</screen>
 	<term><option>-Werror</option>:</term>
 	<listitem>
 	  <indexterm><primary><option>-Werror</option></primary></indexterm>
-	  <para>Makes any warning into a fatal error. Useful so that you don't 
+	  <para>Makes any warning into a fatal error. Useful so that you don't
 	    miss warnings when doing batch compilation. </para>
 	</listitem>
       </varlistentry>
@@ -1205,18 +1205,18 @@ foreign import "&amp;f" f :: FunPtr t
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fwarn-incomplete-patterns</option>, 
+	<term><option>-fwarn-incomplete-patterns</option>,
               <option>-fwarn-incomplete-uni-patterns</option>:
-        </term> 
+        </term>
 	<listitem>
 	  <indexterm><primary><option>-fwarn-incomplete-patterns</option></primary></indexterm>
 	  <indexterm><primary><option>-fwarn-incomplete-uni-patterns</option></primary></indexterm>
 	  <indexterm><primary>incomplete patterns, warning</primary></indexterm>
 	  <indexterm><primary>patterns, incomplete</primary></indexterm>
 
-          <para>The option <option>-fwarn-incomplete-patterns</option> warns 
+          <para>The option <option>-fwarn-incomplete-patterns</option> warns
             about places where
-	    a pattern-match might fail at runtime.  
+	    a pattern-match might fail at runtime.
           The function
           <function>g</function> below will fail when applied to
           non-empty lists, so the compiler will emit a warning about
@@ -1228,7 +1228,7 @@ g [] = 2
 	  This option isn't enabled by default because it can be
           a bit noisy, and it doesn't always indicate a bug in the
           program.  However, it's generally considered good practice
-          to cover all the cases in your functions, and it is switched 
+          to cover all the cases in your functions, and it is switched
           on by <option>-W</option>.</para>
 
           <para>The flag <option>-fwarn-incomplete-uni-patterns</option> is
@@ -1296,9 +1296,9 @@ f foo = foo { x = 6 }
         </term>
 	<listitem>
 
-	  <para>This flag warns if you use an unqualified 
+	  <para>This flag warns if you use an unqualified
             <literal>import</literal> declaration
-	    that does not explicitly list the entities brought into scope. For 
+	    that does not explicitly list the entities brought into scope. For
 	    example
       </para>
 <programlisting>
@@ -1339,7 +1339,7 @@ module M where
 	        complexFn :: a -> a -> String
 	        complexFn x y = ... _simpleFn ...
 	      </programlisting>
-	    The idea is that: (a) users of the class will only call <literal>complexFn</literal>; 
+	    The idea is that: (a) users of the class will only call <literal>complexFn</literal>;
 	    never <literal>_simpleFn</literal>; and (b)
 	    instance declarations can define either <literal>complexFn</literal> or <literal>_simpleFn</literal>.
 	    </para>
@@ -1379,7 +1379,7 @@ module M where
 	<listitem>
 	  <indexterm><primary><option>-fwarn-name-shadowing</option></primary></indexterm>
 	  <indexterm><primary>shadowing, warning</primary></indexterm>
-	  
+
 	  <para>This option causes a warning to be emitted whenever an
           inner-scope value has the same name as an outer-scope value,
           i.e. the inner value shadows the outer one.  This can catch
@@ -1400,8 +1400,8 @@ module M where
 	  <indexterm><primary><option>-fwarn-orphans</option></primary></indexterm>
 	  <indexterm><primary>orphan instances, warning</primary></indexterm>
 	  <indexterm><primary>orphan rules, warning</primary></indexterm>
-	  
-	  <para>This option causes a warning to be emitted whenever the 
+
+	  <para>This option causes a warning to be emitted whenever the
 	    module contains an "orphan" instance declaration or rewrite rule.
 	    An instance declaration is an orphan if it appears in a module in
 	    which neither the class nor the type being instanced are declared
@@ -1410,7 +1410,7 @@ module M where
 	  orphans is called an orphan module.</para>
 	  <para>The trouble with orphans is that GHC must pro-actively read the interface
 	    files for all orphan modules, just in case their instances or rules
-	    play a role, whether or not the module's interface would otherwise 
+	    play a role, whether or not the module's interface would otherwise
 	    be of any use.  See <xref linkend="orphan-modules"/> for details.
             </para>
 	</listitem>
@@ -1498,8 +1498,8 @@ f "2"    = 2
           which are unused.  For top-level functions, the warning is
           only given if the binding is not exported.</para>
 	  <para>A definition is regarded as "used" if (a) it is exported, or (b) it is
-	    mentioned in the right hand side of another definition that is used, or (c) the 
-	    function it defines begins with an underscore.  The last case provides a 
+	    mentioned in the right hand side of another definition that is used, or (c) the
+	    function it defines begins with an underscore.  The last case provides a
 	    way to suppress unused-binding warnings selectively.  </para>
 	  <para> Notice that a variable
 	    is reported as unused even if it appears in the right-hand side of another
@@ -1858,7 +1858,7 @@ f "2"    = 2
 	      <literal>State#</literal> token as argument is considered to be
 	      single-entry, hence it is considered OK to inline things inside
 	      it.  This can improve performance of IO and ST monad code, but it
-	    runs the risk of reducing sharing.</para> 
+	    runs the risk of reducing sharing.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1922,7 +1922,7 @@ f "2"    = 2
 	    <indexterm><primary>unfolding, controlling</primary></indexterm>
           </term>
 	  <listitem>
-	    <para>(Default: 45) Governs the maximum size that GHC will 
+	    <para>(Default: 45) Governs the maximum size that GHC will
             allow a function unfolding to be.   (An unfolding has a
             &ldquo;size&rdquo; that reflects the cost in terms of
             &ldquo;code bloat&rdquo; of expanding that unfolding at
@@ -1959,10 +1959,10 @@ f "2"    = 2
       </variablelist>
 
     </sect2>
-    
+
   </sect1>
-  
-  &phases;  
+
+  &phases;
 
   &shared_libs;
 
@@ -2022,7 +2022,7 @@ f "2"    = 2
       use GHC to compile and run parallel programs, in <xref
 	linkend="lang-parallel" /> we describe the language features that affect
     parallelism.</para>
-    
+
     <sect2 id="parallel-compile-options">
       <title>Compile-time options for SMP parallelism</title>
 
@@ -2030,7 +2030,7 @@ f "2"    = 2
 	linked with the <option>-threaded</option> option (see <xref
 	  linkend="options-linker" />).  Additionally, the following
 	compiler options affect parallelism:</para>
-      
+
       <variablelist>
         <varlistentry>
           <term><option>-feager-blackholing</option></term>
@@ -2087,7 +2087,7 @@ f "2"    = 2
 	          results you find.</para></footnote>.  For example,
 	      on a dual-core machine we would probably use
 	      <literal>+RTS -N2 -RTS</literal>.</para>
-	    
+
             <para>Omitting <replaceable>x</replaceable>,
               i.e. <literal>+RTS -N -RTS</literal>, lets the runtime
               choose the value of <replaceable>x</replaceable> itself
@@ -2149,7 +2149,7 @@ f "2"    = 2
         </varlistentry>
        </variablelist>
     </sect2>
-      
+
     <sect2>
       <title>Hints for using SMP parallelism</title>
 
@@ -2216,14 +2216,14 @@ f "2"    = 2
 
   <indexterm><primary>intermediate code generation</primary></indexterm>
 
-  <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format) 
+  <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format)
   to a file as a side-effect of compilation. Non-GHC back-end tools can read and process Core files; these files have the suffix
   <filename>.hcr</filename>. The Core format is described in <ulink url="../../core.pdf">
-  <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>, 
+  <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>,
   and sample tools
   for manipulating Core files (in Haskell) are available in the
   <ulink url="http://hackage.haskell.org/package/extcore">extcore package on Hackage</ulink>.  Note that the format of <literal>.hcr</literal>
-  files is <emphasis>different</emphasis> from the Core output format that GHC generates 
+  files is <emphasis>different</emphasis> from the Core output format that GHC generates
   for debugging purposes (<xref linkend="options-debugging"/>), though the two formats appear somewhat similar.</para>
 
   <para>The Core format natively supports notes which you can add to
