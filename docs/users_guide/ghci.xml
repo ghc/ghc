@@ -2812,7 +2812,7 @@ Prelude> :set -fno-glasgow-exts
     defining useful macros.  Placing a <filename>.ghci</filename> file
     in a directory with a Haskell project is a useful way to set
     certain project-wide options so you don't have to type them
-    everytime you start GHCi: eg. if your project uses GHC extensions
+    every time you start GHCi: eg. if your project uses GHC extensions
     and CPP, and has source files in three subdirectories A, B and C,
     you might put the following lines in
     <filename>.ghci</filename>:</para>
