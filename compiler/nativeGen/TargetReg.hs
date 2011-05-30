@@ -31,60 +31,67 @@ import CmmType	(wordWidth)
 import Outputable
 import Unique
 import FastTypes
+import Platform
 
+import qualified X86.Regs       as X86
+import qualified X86.RegInfo    as X86
 
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-import qualified X86.Regs	as X86
-import qualified X86.RegInfo	as X86
+import qualified PPC.Regs       as PPC
 
-#elif powerpc_TARGET_ARCH
-import qualified PPC.Regs	as PPC
+import qualified SPARC.Regs     as SPARC
 
-#elif sparc_TARGET_ARCH	
-import qualified SPARC.Regs	as SPARC
-
-#else
-#error "RegAlloc.Graph.TargetReg: not defined"
-#endif
+-- TODO: We shouldn't be using defaultTargetPlatform here.
+--       We should be passing DynFlags in instead, and looking at
+--       its targetPlatform.
 
 targetVirtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
-targetRealRegSqueeze 	:: RegClass -> RealReg -> FastInt
-targetClassOfRealReg 	:: RealReg -> RegClass
-targetWordSize 		:: Size
-targetMkVirtualReg 	:: Unique -> Size -> VirtualReg
-targetRegDotColor 	:: RealReg -> SDoc
+targetVirtualRegSqueeze
+    = case platformArch defaultTargetPlatform of
+      ArchX86    -> X86.virtualRegSqueeze
+      ArchX86_64 -> X86.virtualRegSqueeze
+      ArchPPC    -> PPC.virtualRegSqueeze
+      ArchSPARC  -> SPARC.virtualRegSqueeze
+      ArchPPC_64 -> panic "targetVirtualRegSqueeze ArchPPC_64"
 
--- x86 -------------------------------------------------------------------------
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-targetVirtualRegSqueeze = X86.virtualRegSqueeze
-targetRealRegSqueeze 	= X86.realRegSqueeze
-targetClassOfRealReg 	= X86.classOfRealReg
-targetWordSize 		= intSize wordWidth
-targetMkVirtualReg 	= X86.mkVirtualReg
-targetRegDotColor 	= X86.regDotColor
+targetRealRegSqueeze :: RegClass -> RealReg -> FastInt
+targetRealRegSqueeze
+    = case platformArch defaultTargetPlatform of
+      ArchX86    -> X86.realRegSqueeze
+      ArchX86_64 -> X86.realRegSqueeze
+      ArchPPC    -> PPC.realRegSqueeze
+      ArchSPARC  -> SPARC.realRegSqueeze
+      ArchPPC_64 -> panic "targetRealRegSqueeze ArchPPC_64"
 
--- ppc -------------------------------------------------------------------------
-#elif powerpc_TARGET_ARCH
-targetVirtualRegSqueeze = PPC.virtualRegSqueeze
-targetRealRegSqueeze 	= PPC.realRegSqueeze
-targetClassOfRealReg 	= PPC.classOfRealReg
-targetWordSize 		= intSize wordWidth
-targetMkVirtualReg 	= PPC.mkVirtualReg
-targetRegDotColor 	= PPC.regDotColor
+targetClassOfRealReg :: RealReg -> RegClass
+targetClassOfRealReg
+    = case platformArch defaultTargetPlatform of
+      ArchX86    -> X86.classOfRealReg
+      ArchX86_64 -> X86.classOfRealReg
+      ArchPPC    -> PPC.classOfRealReg
+      ArchSPARC  -> SPARC.classOfRealReg
+      ArchPPC_64 -> panic "targetClassOfRealReg ArchPPC_64"
 
--- sparc -----------------------------------------------------------------------
-#elif sparc_TARGET_ARCH
-targetVirtualRegSqueeze = SPARC.virtualRegSqueeze
-targetRealRegSqueeze 	= SPARC.realRegSqueeze
-targetClassOfRealReg 	= SPARC.classOfRealReg
-targetWordSize 		= intSize wordWidth
-targetMkVirtualReg 	= SPARC.mkVirtualReg
-targetRegDotColor 	= SPARC.regDotColor
+-- TODO: This should look at targetPlatform too
+targetWordSize :: Size
+targetWordSize = intSize wordWidth
 
---------------------------------------------------------------------------------
-#else
-#error "RegAlloc.Graph.TargetReg: not defined"
-#endif
+targetMkVirtualReg :: Unique -> Size -> VirtualReg
+targetMkVirtualReg
+    = case platformArch defaultTargetPlatform of
+      ArchX86    -> X86.mkVirtualReg
+      ArchX86_64 -> X86.mkVirtualReg
+      ArchPPC    -> PPC.mkVirtualReg
+      ArchSPARC  -> SPARC.mkVirtualReg
+      ArchPPC_64 -> panic "targetMkVirtualReg ArchPPC_64"
+
+targetRegDotColor :: RealReg -> SDoc
+targetRegDotColor
+    = case platformArch defaultTargetPlatform of
+      ArchX86    -> X86.regDotColor
+      ArchX86_64 -> X86.regDotColor
+      ArchPPC    -> PPC.regDotColor
+      ArchSPARC  -> SPARC.regDotColor
+      ArchPPC_64 -> panic "targetRegDotColor ArchPPC_64"
 
 
 targetClassOfReg :: Reg -> RegClass
