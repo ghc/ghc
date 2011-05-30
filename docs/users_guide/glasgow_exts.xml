@@ -427,7 +427,7 @@ Indeed, the bindings can even be recursive.
 
       <para>The hash sign does not change semantics at all.  We tend to use variable
 	names ending in "&num;" for unboxed values or types (e.g. <literal>Int&num;</literal>),
-	but there is no requirement to do so; they are just plain ordinary variables.
+        but there is no requirement to do so; they are just plain ordinary variables.
 	Nor does the <option>-XMagicHash</option> extension bring anything into scope.
 	For example, to bring <literal>Int&num;</literal> into scope you must
 	import <literal>GHC.Prim</literal> (see <xref linkend="primitives"/>);
