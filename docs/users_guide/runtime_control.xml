@@ -1012,12 +1012,12 @@ char *ghc_rts_opts = "-H128m -K1m";
       </listitem>
       <listitem>
         <para>
-          How many page faults occured this garbage collection.
+          How many page faults occurred this garbage collection.
         </para>
       </listitem>
       <listitem>
         <para>
-          How many page faults occured since the end of the last garbage
+          How many page faults occurred since the end of the last garbage
           collection.
         </para>
       </listitem>
@@ -1209,7 +1209,7 @@ char *ghc_rts_opts = "-H128m -K1m";
         </term>
 	<listitem>
 	  <para>
-            An RTS debugging flag; only availble if the program was
+            An RTS debugging flag; only available if the program was
 	    linked with the <option>-debug</option> option.  Various
 	    values of <replaceable>x</replaceable> are provided to
 	    enable debug messages and additional runtime sanity checks
