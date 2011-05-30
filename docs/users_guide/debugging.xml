@@ -8,10 +8,10 @@
 
   <sect2 id="dumping-output">
     <title>Dumping out compiler intermediate structures</title>
-    
+
     <indexterm><primary>dumping GHC intermediates</primary></indexterm>
     <indexterm><primary>intermediate passes, output</primary></indexterm>
-    
+
     <variablelist>
       <varlistentry>
 	<term>
@@ -121,7 +121,7 @@
                 <indexterm><primary><option>-ddump-rules</option></primary></indexterm>
 	      </term>
 	      <listitem>
-		<para>dumps all rewrite rules specified in this module; 
+		<para>dumps all rewrite rules specified in this module;
                       see <xref linkend="controlling-rules"/>.
                 </para>
 	      </listitem>
@@ -312,7 +312,7 @@
 	  </variablelist>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term>
           <option>-ddump-simpl-phases</option>:
@@ -425,7 +425,7 @@
 
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term>
           <option>-dshow-passes</option>
@@ -516,7 +516,7 @@
           <indexterm><primary><option>-dppr-case-as-let</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Print single alternative case expressions as though they were strict 
+	  <para>Print single alternative case expressions as though they were strict
 		let expressions. This is helpful when your code does a lot of unboxing.</para>
 	</listitem>
       </varlistentry>
@@ -554,7 +554,7 @@
           <indexterm><primary><option>-dsuppress-all</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Suppress everything that can be suppressed, except for unique ids as this often 
+	  <para>Suppress everything that can be suppressed, except for unique ids as this often
 		makes the printout ambiguous. If you just want to see the overall structure of
 		the code, then start here.</para>
 	</listitem>
@@ -566,7 +566,7 @@
           <indexterm><primary><option>-dsuppress-uniques</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Suppress the printing of uniques. This may make 
+	  <para>Suppress the printing of uniques. This may make
 	  the printout ambiguous (e.g. unclear where an occurrence of 'x' is bound), but
 	  it makes the output of two compiler runs have many fewer gratuitous differences,
 	    so you can realistically apply <command>diff</command>.  Once <command>diff</command>
@@ -581,7 +581,7 @@
         </term>
 	<listitem>
 	  <para>Suppress extended information about identifiers where they are bound. This includes
-		strictness information and inliner templates. Using this flag can cut the size 
+		strictness information and inliner templates. Using this flag can cut the size
 		of the core dump in half, due to the lack of inliner templates</para>
 	</listitem>
       </varlistentry>
