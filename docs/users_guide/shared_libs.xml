@@ -113,8 +113,8 @@ ghc --make -dynamic Main.hs
       Building Haskell code into a shared library is a good way to include
       Haskell code in a larger mixed-language project. While with static
       linking it is recommended to use GHC to perform the final link step,
-      with shared libaries a Haskell library can be treated just like any
-      other shared libary. The linking can be done using the normal system C
+      with shared libraries a Haskell library can be treated just like any
+      other shared library. The linking can be done using the normal system C
       compiler or linker.
     </para>
     <para>
@@ -138,7 +138,7 @@ ghc --make -dynamic -shared -fPIC Foo.hs -o libfoo.so
       package. The <literal>-fPIC</literal> flag is required for all code
       that will end up in a shared library. The <literal>-shared</literal>
       flag specifies to make a shared library rather than a program. To make
-      this clearer we can break this down into separate compliation and link
+      this clearer we can break this down into separate compilation and link
       steps:
 <programlisting>
 ghc -dynamic -fPIC -c Foo.hs
@@ -179,7 +179,7 @@ ghc -dynamic -shared Foo.o -o libfoo.so
       is to use a "runtime path" or "rpath" embedded into programs and
       libraries themselves. These paths can either be absolute paths or on at
       least Linux and Solaris they can be paths relative to the program or
-      libary itself. In principle this makes it possible to construct fully
+      library itself. In principle this makes it possible to construct fully
       relocatable sets of programs and libraries.
     </para>
     <para>
