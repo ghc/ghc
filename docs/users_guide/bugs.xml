@@ -251,7 +251,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	  the <literal>Int</literal> type.</para>
 
 	  <para>The <literal>fromInteger</literal><indexterm><primary><literal>fromInteger</literal></primary>
-	    </indexterm>function (and hence
+	    </indexterm> function (and hence
 	  also <literal>fromIntegral</literal><indexterm><primary><literal>fromIntegral</literal></primary>
 	    </indexterm>) is a special case when
 	  converting to <literal>Int</literal>.  The value of
