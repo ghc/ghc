@@ -1,0 +1,99 @@
+#include "Cmm.h"
+
+// Test that the Memcpy, Memmove, Memset GHC intrinsic functions
+// are working correctly.
+
+section "rodata" { memsetErr : bits8[] "Memset Error Occured\n"; }
+section "rodata" { memcpyErr : bits8[] "Memcpy Error Occured\n"; }
+section "rodata" { memmoveErr : bits8[] "Memmove Error Occured\n"; }
+
+memintrinTest
+{
+	W_ size, src, dst, off, alignV, set;
+	bits8 set8;
+
+   // Need two versions as memset takes a word for historical reasons
+	// but really its a bits8. We check that setting has ben done correctly
+	// at the bits8 level, so need bits8 version for checking.
+	set = 4;
+	set8 = 4::bits8;
+
+	size = 1024;
+	alignV = 4;
+
+	("ptr" src) = foreign "C" malloc(size);
+	("ptr" dst) = foreign "C" malloc(size);
+
+   // Test memset
+	prim %memset(src "ptr", set, size, alignV) [];
+
+   // Check memset worked
+	off = 0;
+while1:
+		if (off == size) {
+			goto while1_end;
+		}
+
+		if (bits8[src + off] != set8) {
+			foreign "C" printf(memsetErr "ptr") [];
+			goto while1_end;
+		}
+
+		off = off + 1;
+		goto while1;
+
+while1_end: 
+
+   // Test memcpy
+	prim %memcpy(dst "ptr", src "ptr", size, alignV) [];
+
+   // Check memcpy worked
+	off = 0;
+while2:
+		if (off == size) {
+			goto while2_end;
+		}
+
+		if (bits8[dst + off] != set8) {
+			foreign "C" printf(memcpyErr "ptr") [];
+			goto while2_end;
+		}
+
+		off = off + 1;
+		goto while2;
+
+while2_end: 
+
+   // Test memove
+	set = 8;
+	set8 = 8::bits8;
+	size = 100;
+	W_ src2;
+	src2 = src + 50;
+
+	prim %memset(src "ptr", set, size, alignV) [];
+	prim %memmove(src2 "ptr", src "ptr", size, alignV) [];
+
+   // Check memmove worked
+	off = 0;
+while3:
+ 		if (off == size) {
+ 			goto while3_end;
+ 		}
+
+ 		if (bits8[src2 + off] != set8) {
+ 			foreign "C" printf(memmoveErr "ptr") [];
+ 			goto while3_end;
+ 		}
+
+ 		off = off + 1;
+ 		goto while3;
+
+while3_end: 
+
+	foreign "C" free(src);
+	foreign "C" free(dst);
+
+	jump %ENTRY_CODE(Sp(0));
+}
+

@@ -513,7 +513,7 @@ def test_common_work (name, opts, func, args):
     # All the ways we might run this test
     if func == compile or func == multimod_compile:
         all_ways = config.compile_ways
-    elif func == compile_and_run or func == multimod_compile_and_run:
+    elif func == compile_and_run or func == multimod_compile_and_run or func == multisrc_compile_and_run:
         all_ways = config.run_ways
     elif func == ghci_script:
         if 'ghci' in config.run_ways:
@@ -738,7 +738,7 @@ def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
 def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     # print 'Compile only, extra args = ', extra_hc_opts
     pretest_cleanup(name)
-    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0 )
+    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1)
     
     if result == 'fail':
         return result
@@ -765,16 +765,20 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run__( name, way, extra_hc_opts, top_mod ):
+def compile_and_run__( name, way, extra_hc_opts, top_mod, extra_mods ):
     # print 'Compile and run, extra args = ', extra_hc_opts
     pretest_cleanup(name)
+
+    for mod in extra_mods:	
+        simple_build( mod, way, extra_hc_opts, 0, '', 0, 0 )
+        extra_hc_opts += " " + replace_suffix(mod, 'o')
 
     if way == 'ghci': # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
     elif way == 'extcore' or way == 'optextcore' :
         return extcore_run( name, way, extra_hc_opts, 0, top_mod )
     else: # compiled...
-        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
+        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1, 1 )
         if result == 'fail':
             return result
 
@@ -786,10 +790,13 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod ):
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 def compile_and_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, '')
+    return compile_and_run__( name, way, extra_hc_opts, '', [])
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, top_mod)
+    return compile_and_run__( name, way, extra_hc_opts, top_mod, [])
+
+def multisrc_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return compile_and_run__( name, way, extra_hc_opts, '', extra_mods)
 
 # -----------------------------------------------------------------------------
 # Check -t stats info
@@ -823,16 +830,20 @@ def checkStats(stats_file, num_fields):
 # -----------------------------------------------------------------------------
 # Build a single-module program
 
-def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link ):
+def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf ):
     opts = getTestOpts()
     errname = add_suffix(name, 'comp.stderr')
     rm_no_fail( errname )
-    rm_no_fail( name )
     
     if top_mod != '':
         srcname = top_mod
-    else:
+        rm_no_fail( name )
+    elif addsuf:
         srcname = add_hs_lhs_suffix(name)
+        rm_no_fail( name )
+    else:
+        srcname = name
+        rm_no_fail( name + '.o' )
 
     to_do = ''
     if top_mod != '':
@@ -1460,6 +1471,10 @@ def add_hs_lhs_suffix(name):
         return add_suffix(name, 'lhs')
     else:
         return add_suffix(name, 'hs')
+
+def replace_suffix( name, suffix ):
+    base, suf = os.path.splitext(name)
+    return base + '.' + suffix
 
 def in_testdir( name ):
     return (getTestOpts().testdir + '/' + name)

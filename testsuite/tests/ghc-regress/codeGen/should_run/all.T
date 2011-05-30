@@ -24,10 +24,8 @@ test('cgrun020', normal, compile_and_run, [''])
 test('cgrun021', normal, compile_and_run, [''])
 test('cgrun022', normal, compile_and_run, [''])
 test('cgrun024', normal, compile_and_run, [''])
-
 test('cgrun025', compose(reqlib('regex-compat'), compose(extra_run_opts('cg025.hs'),exit_code(1))),
                       compile_and_run, ['-package regex-compat'])
-
 test('cgrun026', only_compiler_types(['ghc']), compile_and_run, [''])
 test('cgrun027', normal, compile_and_run, [''])
 test('cgrun028', normal, compile_and_run, [''])
@@ -56,18 +54,12 @@ test('cgrun053', normal, compile_and_run, [''])
 test('cgrun054', normal, compile_and_run, [''])
 test('cgrun055', normal, compile_and_run, [''])
 test('cgrun056', normal, compile_and_run, [''])
-
 test('cgrun057', composes([expect_broken(948),
                         only_ways(['prof','profasm']),
                         extra_run_opts('+RTS -xc')]),
      compile_and_run, [''])
-
 test('cgrun058', normal, compile_and_run, [''])
 test('cgrun059', exit_code(1), compile_and_run, [''])
-
-test('1852', normal, compile_and_run, [''])
-test('2080', normal, compile_and_run, [''])
-
 test('cgrun060',
      extra_run_opts('+RTS -K64k -RTS'),
      compile_and_run, [''])
@@ -80,15 +72,16 @@ test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', extra_clean(['Cgrun067A.hi', 'Cgrun067A.o']),
      compile_and_run, [''])
 test('cgrun068', normal, compile_and_run, [''])
+test('cgrun069', omit_ways(['ghci']), multisrc_compile_and_run,
+                 ['cgrun069', ['cgrun069_cmm.cmm'], ''])
 
+test('1852', normal, compile_and_run, [''])
 test('1861', extra_run_opts('0'), compile_and_run, [''])
-
+test('2080', normal, compile_and_run, [''])
 test('2838', normal, compile_and_run, [''])
 test('3207', normal, compile_and_run, [''])
 test('3561', normal, compile_and_run, [''])
 test('3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('4441', normal, compile_and_run, [''])
-
-test('5149', [ extra_clean(['5149.o', '5149.hi', '5149_cmm.o', '5149']) ],
-             run_command,
-             ['$MAKE -s --no-print-directory 5149'])
+test('5149', omit_ways(['ghci']), multisrc_compile_and_run,
+                 ['5149', ['5149_cmm.cmm'], ''])
