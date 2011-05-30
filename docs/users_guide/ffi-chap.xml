@@ -51,7 +51,7 @@ Foreign function interface (FFI)
 	calling arbitrary IO procedures in some part of the program.)
 </para>
 <para>The Haskell FFI already specifies that arguments and results of
-foreign imports and exports will be automatically unwrapped if they are 
+foreign imports and exports will be automatically unwrapped if they are
 newtypes (Section 3.2 of the FFI addendum).  GHC extends the FFI by automatically unwrapping any newtypes that
 wrap the IO monad itself.
 More precisely, wherever the FFI specification requires an IO type, GHC will
@@ -96,7 +96,7 @@ OK:
           the time, then the program will not respond to the user
           interrupt.
         </para>
-        
+
         <para>
           The problem is that it is not possible in general to
           interrupt a foreign call safely.  However, GHC does provide
@@ -106,7 +106,7 @@ OK:
           of <literal>safe</literal> or <literal>unsafe</literal>:
 
 <programlisting>
-foreign import ccall interruptible 
+foreign import ccall interruptible
    "sleep" :: CUint -> IO CUint
 </programlisting>
 
@@ -174,7 +174,7 @@ foreign import ccall interruptible
       </indexterm>
 
       <para>When GHC compiles a module (say <filename>M.hs</filename>)
-      which uses <literal>foreign export</literal> or 
+      which uses <literal>foreign export</literal> or
       <literal>foreign import "wrapper"</literal>, it generates two
       additional files, <filename>M_stub.c</filename> and
       <filename>M_stub.h</filename>.  GHC will automatically compile
@@ -223,7 +223,7 @@ extern HsInt foo(HsInt a0);</programlisting>
         &ndash;&ndash;make</literal>, as GHC will automatically link in the
         correct bits).</para>
 
-      <sect3 id="using-own-main"> 
+      <sect3 id="using-own-main">
 	<title>Using your own <literal>main()</literal></title>
 
 	<para>Normally, GHC's runtime system provides a
@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
       </sect3>
 
     </sect2>
-    
+
     <sect2 id="glasgow-foreign-headers">
       <title>Using header files</title>
 
@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
         available when compiling an inlined version of a foreign call,
         so the compiler is free to inline foreign calls in any
         context.</para>
-        
+
       <para>The <literal>-&num;include</literal> option is now
         deprecated, and the <literal>include-files</literal> field
         in a Cabal package specification is ignored.</para>
@@ -481,17 +481,17 @@ int main(int argc, char *argv[])
 	</varlistentry>
       </variablelist>
     </sect2>
-    
+
     <sect2 id="ffi-threads">
       <title>Multi-threading and the FFI</title>
-      
+
       <para>In order to use the FFI in a multi-threaded setting, you must
         use the <option>-threaded</option> option
         (see <xref linkend="options-linker" />).</para>
-        
+
       <sect3>
         <title>Foreign imports and multi-threading</title>
-        
+
         <para>When you call a <literal>foreign import</literal>ed
           function that is annotated as <literal>safe</literal> (the
           default), and the program was linked
@@ -500,7 +500,7 @@ int main(int argc, char *argv[])
           program was linked without <option>-threaded</option>,
           then the other Haskell threads will be blocked until the
           call returns.</para>
-        
+
         <para>This means that if you need to make a foreign call to
           a function that takes a long time or blocks indefinitely,
           then you should mark it <literal>safe</literal> and
@@ -540,7 +540,7 @@ int main(int argc, char *argv[])
       <sect3 id="haskell-threads-and-os-threads">
         <title>The relationship between Haskell threads and OS
           threads</title>
-        
+
         <para>Normally there is no fixed relationship between Haskell
           threads and OS threads.  This means that when you make a
           foreign call, that call may take place in an unspecified OS
@@ -560,10 +560,10 @@ int main(int argc, char *argv[])
           for the <ulink url="&libraryBaseLocation;/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink>
           module.</para>
       </sect3>
-      
+
       <sect3>
         <title>Foreign exports and multi-threading</title>
-        
+
         <para>When the program is linked
           with <option>-threaded</option>, then you may
           invoke <literal>foreign export</literal>ed functions from
@@ -612,7 +612,7 @@ int main(int argc, char *argv[])
           isn't necessary to ensure that the threads have exited first.
           (Unofficially, if you want to use this fast and loose version of
           <literal>hs_exit()</literal>, then call
-          <literal>shutdownHaskellAndExit()</literal> instead).</para> 
+          <literal>shutdownHaskellAndExit()</literal> instead).</para>
       </sect3>
     </sect2>
 
