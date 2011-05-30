@@ -300,7 +300,7 @@ import SpecConstr
         <para>
           The RTS now exports a function <literal>setKeepCAFs</literal>
           which is important when loading Haskell DLLs dynamically, as
-          a DLL may refer to CAFs that hae already been GCed.
+          a DLL may refer to CAFs that have already been GCed.
         </para>
       </listitem>
 
