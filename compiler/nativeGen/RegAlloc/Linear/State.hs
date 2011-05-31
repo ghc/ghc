@@ -32,7 +32,6 @@ where
 import RegAlloc.Linear.Stats
 import RegAlloc.Linear.StackMap
 import RegAlloc.Linear.Base
-import RegAlloc.Linear.FreeRegs
 import RegAlloc.Liveness
 import Instruction
 import Reg
@@ -48,13 +47,13 @@ instance Monad (RegM freeRegs) where
 
 
 -- | Run a computation in the RegM register allocator monad.
-runR 	:: BlockAssignment 
-	-> FreeRegs 
+runR 	:: BlockAssignment freeRegs
+	-> freeRegs 
 	-> RegMap Loc
 	-> StackMap 
 	-> UniqSupply
-  	-> RegM FreeRegs a 
-	-> (BlockAssignment, StackMap, RegAllocStats, a)
+  	-> RegM freeRegs a 
+	-> (BlockAssignment freeRegs, StackMap, RegAllocStats, a)
 
 runR block_assig freeregs assig stack us thing =
   case unReg thing 
@@ -76,14 +75,14 @@ runR block_assig freeregs assig stack us thing =
 
 
 -- | Make register allocator stats from its final state.
-makeRAStats :: RA_State FreeRegs -> RegAllocStats
+makeRAStats :: RA_State freeRegs -> RegAllocStats
 makeRAStats state
 	= RegAllocStats
 	{ ra_spillInstrs	= binSpillReasons (ra_spills state) }
 
 
 spillR 	:: Instruction instr
-	=> Reg -> Unique -> RegM FreeRegs (instr, Int)
+	=> Reg -> Unique -> RegM freeRegs (instr, Int)
 
 spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
   let (stack',slot) = getStackSlotFor stack temp
@@ -93,49 +92,49 @@ spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
 
 
 loadR 	:: Instruction instr
-	=> Reg -> Int -> RegM FreeRegs instr
+	=> Reg -> Int -> RegM freeRegs instr
 
 loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
   (# s, mkLoadInstr reg delta slot #)
 
-getFreeRegsR :: RegM FreeRegs FreeRegs
+getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->
   (# s, freeregs #)
 
-setFreeRegsR :: FreeRegs -> RegM FreeRegs ()
+setFreeRegsR :: freeRegs -> RegM freeRegs ()
 setFreeRegsR regs = RegM $ \ s ->
   (# s{ra_freeregs = regs}, () #)
 
-getAssigR :: RegM FreeRegs (RegMap Loc)
+getAssigR :: RegM freeRegs (RegMap Loc)
 getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
   (# s, assig #)
 
-setAssigR :: RegMap Loc -> RegM FreeRegs ()
+setAssigR :: RegMap Loc -> RegM freeRegs ()
 setAssigR assig = RegM $ \ s ->
   (# s{ra_assig=assig}, () #)
 
-getBlockAssigR :: RegM FreeRegs BlockAssignment
+getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
 getBlockAssigR = RegM $ \ s@RA_State{ra_blockassig = assig} ->
   (# s, assig #)
 
-setBlockAssigR :: BlockAssignment -> RegM FreeRegs ()
+setBlockAssigR :: BlockAssignment freeRegs -> RegM freeRegs ()
 setBlockAssigR assig = RegM $ \ s ->
   (# s{ra_blockassig = assig}, () #)
 
-setDeltaR :: Int -> RegM FreeRegs ()
+setDeltaR :: Int -> RegM freeRegs ()
 setDeltaR n = RegM $ \ s ->
   (# s{ra_delta = n}, () #)
 
-getDeltaR :: RegM FreeRegs Int
+getDeltaR :: RegM freeRegs Int
 getDeltaR = RegM $ \s -> (# s, ra_delta s #)
 
-getUniqueR :: RegM FreeRegs Unique
+getUniqueR :: RegM freeRegs Unique
 getUniqueR = RegM $ \s ->
   case takeUniqFromSupply (ra_us s) of
     (uniq, us) -> (# s{ra_us = us}, uniq #)
 
 
 -- | Record that a spill instruction was inserted, for profiling.
-recordSpill :: SpillReason -> RegM FreeRegs ()
+recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
  	= RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)

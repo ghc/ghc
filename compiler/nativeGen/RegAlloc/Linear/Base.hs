@@ -18,7 +18,6 @@ module RegAlloc.Linear.Base (
 
 where
 
-import RegAlloc.Linear.FreeRegs
 import RegAlloc.Linear.StackMap
 import RegAlloc.Liveness
 import Reg
@@ -34,8 +33,8 @@ import UniqSupply
 --      target a particular label. We have to insert fixup code to make
 --      the register assignments from the different sources match up.
 --
-type BlockAssignment
-        = BlockMap (FreeRegs, RegMap Loc)
+type BlockAssignment freeRegs
+        = BlockMap (freeRegs, RegMap Loc)
 
 
 -- | Where a vreg is currently stored
@@ -107,7 +106,7 @@ data RA_State freeRegs
         {
         -- | the current mapping from basic blocks to
         --      the register assignments at the beginning of that block.
-          ra_blockassig :: BlockAssignment
+          ra_blockassig :: BlockAssignment freeRegs
 
         -- | free machine registers
         , ra_freeregs   :: !freeRegs

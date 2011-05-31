@@ -424,7 +424,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 			= {-# SCC "RegAlloc" #-}
   			  initUs usLive
  			  $ liftM unzip
-			  $ mapUs Linear.regAlloc withLiveness
+			  $ mapUs (Linear.regAlloc dflags) withLiveness
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"

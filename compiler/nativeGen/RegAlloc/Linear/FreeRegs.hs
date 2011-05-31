@@ -1,17 +1,18 @@
 
 module RegAlloc.Linear.FreeRegs (
-	FreeRegs(),
-	noFreeRegs,
-	releaseReg,
-	initFreeRegs,
-	getFreeRegs,
-	allocateReg,
-	maxSpillSlots
+    FR(..),
+    maxSpillSlots
 )
 
 #include "HsVersions.h"
 
 where
+
+import Reg
+import RegClass
+
+import Panic
+import Platform
 
 -- -----------------------------------------------------------------------------
 -- The free register set
@@ -25,21 +26,48 @@ where
 --	getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
 --	allocateReg f r = filter (/= r) f
 
+import qualified RegAlloc.Linear.PPC.FreeRegs   as PPC
+import qualified RegAlloc.Linear.SPARC.FreeRegs as SPARC
+import qualified RegAlloc.Linear.X86.FreeRegs   as X86
 
-#if   defined(powerpc_TARGET_ARCH) 
-import RegAlloc.Linear.PPC.FreeRegs
-import PPC.Instr	(maxSpillSlots)
+import qualified PPC.Instr
+import qualified SPARC.Instr
+import qualified X86.Instr
 
-#elif defined(sparc_TARGET_ARCH)
-import RegAlloc.Linear.SPARC.FreeRegs
-import SPARC.Instr	(maxSpillSlots)
+class Show freeRegs => FR freeRegs where
+    frAllocateReg :: RealReg -> freeRegs -> freeRegs
+    frGetFreeRegs :: RegClass -> freeRegs -> [RealReg]
+    frInitFreeRegs :: freeRegs
+    frReleaseReg :: RealReg -> freeRegs -> freeRegs
 
-#elif defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
-import RegAlloc.Linear.X86.FreeRegs
-import X86.Instr	(maxSpillSlots)
+instance FR X86.FreeRegs where
+    frAllocateReg  = X86.allocateReg
+    frGetFreeRegs  = X86.getFreeRegs
+    frInitFreeRegs = X86.initFreeRegs
+    frReleaseReg   = X86.releaseReg
 
-#else
-#error "RegAlloc.Linear.FreeRegs not defined for this architecture."
+instance FR PPC.FreeRegs where
+    frAllocateReg  = PPC.allocateReg
+    frGetFreeRegs  = PPC.getFreeRegs
+    frInitFreeRegs = PPC.initFreeRegs
+    frReleaseReg   = PPC.releaseReg
 
-#endif
+instance FR SPARC.FreeRegs where
+    frAllocateReg  = SPARC.allocateReg
+    frGetFreeRegs  = SPARC.getFreeRegs
+    frInitFreeRegs = SPARC.initFreeRegs
+    frReleaseReg   = SPARC.releaseReg
+
+-- TODO: We shouldn't be using defaultTargetPlatform here.
+--       We should be passing DynFlags in instead, and looking at
+--       its targetPlatform.
+
+maxSpillSlots :: Int
+maxSpillSlots = case platformArch defaultTargetPlatform of
+                ArchX86     -> X86.Instr.maxSpillSlots
+                ArchX86_64  -> X86.Instr.maxSpillSlots
+                ArchPPC     -> PPC.Instr.maxSpillSlots
+                ArchSPARC   -> SPARC.Instr.maxSpillSlots
+                ArchPPC_64  -> panic "maxSpillSlots ArchPPC_64"
+                ArchUnknown -> panic "maxSpillSlots ArchUnknown"
 
