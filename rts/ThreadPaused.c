@@ -245,13 +245,15 @@ threadPaused(Capability *cap, StgTSO *tso)
             //    --------------------------------------------------------
             //                                  c->indirectee = other_tso;
             //                                  c->header.info = EAGER_BH
-            //                                  threadPaused()
-            //    c->indirectee = other_tso;
+            //                                  threadPaused():
+            //                                    c->header.info = WHITEHOLE
+            //                                    c->indirectee = other_tso
+            //    c->indirectee = this_tso;
             //    c->header.info = EAGER_BH
-            //                                  c->header.info = BLACKHOLE
+            //                                    c->header.info = BLACKHOLE
             //    threadPaused()
             //    *** c->header.info is now BLACKHOLE,
-            //        c->indirectee  points to this TSO
+            //        c->indirectee  points to this_tso
             //
             // So in this case do *not* suspend the work of the
             // current thread, because the current thread will become
