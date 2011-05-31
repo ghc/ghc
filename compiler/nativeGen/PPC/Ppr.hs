@@ -352,14 +352,9 @@ pprInstr :: Instr -> Doc
 pprInstr (COMMENT _) = empty -- nuke 'em
 {-
 pprInstr (COMMENT s)
-   =  IF_ARCH_alpha( ((<>) (ptext (sLit "\t# ")) (ftext s))
-     ,IF_ARCH_sparc( ((<>) (ptext (sLit "# "))   (ftext s))
-     ,IF_ARCH_i386( ((<>) (ptext (sLit "# "))   (ftext s))
-     ,IF_ARCH_x86_64( ((<>) (ptext (sLit "# "))   (ftext s))
-     ,IF_ARCH_powerpc( IF_OS_linux(
+     IF_OS_linux(
         ((<>) (ptext (sLit "# ")) (ftext s)),
         ((<>) (ptext (sLit "; ")) (ftext s)))
-     ,)))))
 -}
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
