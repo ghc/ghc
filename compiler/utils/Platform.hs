@@ -31,7 +31,8 @@ data Platform
 --	about what instruction set extensions an architecture might support.
 --
 data Arch
-	= ArchX86
+	= ArchUnknown
+	| ArchX86
 	| ArchX86_64
 	| ArchPPC
 	| ArchPPC_64
@@ -80,7 +81,7 @@ defaultTargetArch	= ArchPPC_64
 #elif sparc_TARGET_ARCH
 defaultTargetArch	= ArchSPARC
 #else
-#error	"Platform.buildArch: undefined"
+defaultTargetArch	= ArchUnknown
 #endif
 
 

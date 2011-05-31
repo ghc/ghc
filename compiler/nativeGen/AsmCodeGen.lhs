@@ -199,6 +199,8 @@ nativeCodeGen dflags h us cmms
                      }
                  ArchPPC_64 ->
                      panic "nativeCodeGen: No NCG for PPC 64"
+                 ArchUnknown ->
+                     panic "nativeCodeGen: No NCG for unknown arch"
 
 nativeCodeGen' :: (Instruction instr, Outputable instr)
                => DynFlags
