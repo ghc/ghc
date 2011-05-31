@@ -66,7 +66,7 @@ import Data.List
 import qualified Data.Sequence as Seq
 import Data.Monoid
 import Data.Sequence (viewl, ViewL(..))
-import Foreign hiding (unsafePerformIO)
+import Foreign
 import System.IO.Unsafe
 
 ---------------------------------------------

@@ -96,7 +96,7 @@ import FastFunctions
 import Panic
 import Util
 
-import Foreign hiding   ( unsafePerformIO )
+import Foreign
 import Foreign.C
 import GHC.Exts
 import System.IO

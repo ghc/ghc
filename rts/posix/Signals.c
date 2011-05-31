@@ -149,7 +149,7 @@ Capability *
 ioManagerStartCap (Capability *cap)
 {
     return rts_evalIO(
-        cap,&base_GHCziConcziIO_ensureIOManagerIsRunning_closure,NULL);
+        cap,&base_GHCziConcziIOziImp_ensureIOManagerIsRunning_closure,NULL);
 }
 
 void

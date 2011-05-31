@@ -75,13 +75,12 @@ import System.Directory
 import Data.Dynamic
 import Data.List (find)
 import Control.Monad
-import Foreign hiding (unsafePerformIO)
+import Foreign
 import Foreign.C
 import GHC.Exts
 import Data.Array
 import Exception
 import Control.Concurrent
--- import Foreign.StablePtr
 import System.IO
 import System.IO.Unsafe
 

@@ -82,6 +82,7 @@ import System.Environment
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
+import System.IO.Unsafe ( unsafePerformIO )
 import System.IO.Error
 import Data.Char
 import Data.Array

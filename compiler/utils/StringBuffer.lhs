@@ -51,6 +51,7 @@ import FastFunctions
 import Foreign
 import System.IO                ( hGetBuf, hFileSize,IOMode(ReadMode), hClose
                                 , Handle, hTell )
+import System.IO.Unsafe         ( unsafePerformIO )
 
 import GHC.Exts
 
