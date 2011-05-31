@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-unused-binds #-}
 
 module RegAlloc.Graph.TrivColorable (
-	trivColorable,
+        trivColorable,
 )
 
 where
@@ -21,25 +21,25 @@ import FastTypes
 
 -- trivColorable function for the graph coloring allocator
 --
---	This gets hammered by scanGraph during register allocation,
---	so needs to be fairly efficient.
+--      This gets hammered by scanGraph during register allocation,
+--      so needs to be fairly efficient.
 --
---	NOTE: 	This only works for arcitectures with just RcInteger and RcDouble
---		(which are disjoint) ie. x86, x86_64 and ppc
+--      NOTE:   This only works for arcitectures with just RcInteger and RcDouble
+--              (which are disjoint) ie. x86, x86_64 and ppc
 --
--- 	The number of allocatable regs is hard coded here so we can do a fast
--- 		comparision in trivColorable. 
+--      The number of allocatable regs is hard coded here so we can do a fast
+--              comparision in trivColorable.
 --
--- 	It's ok if these numbers are _less_ than the actual number of free regs, 
---		but they can't be more or the register conflict graph won't color.
+--      It's ok if these numbers are _less_ than the actual number of free regs,
+--              but they can't be more or the register conflict graph won't color.
 --
--- 	If the graph doesn't color then the allocator will panic, but it won't 
---		generate bad object code or anything nasty like that.
+--      If the graph doesn't color then the allocator will panic, but it won't
+--              generate bad object code or anything nasty like that.
 --
--- 	There is an allocatableRegsInClass :: RegClass -> Int, but doing the unboxing
--- 	is too slow for us here.
+--      There is an allocatableRegsInClass :: RegClass -> Int, but doing the unboxing
+--      is too slow for us here.
 --
--- 	Look at includes/stg/MachRegs.h to get these numbers.
+--      Look at includes/stg/MachRegs.h to get these numbers.
 --
 
 #if i386_TARGET_ARCH
@@ -76,17 +76,17 @@ import FastTypes
 
 
 -- Disjoint registers ----------------------------------------------------------
---	
---	The definition has been unfolded into individual cases for speed.
--- 	Each architecture has a different register setup, so we use a
---	different regSqueeze function for each.
 --
-accSqueeze 
-	:: FastInt 
-	-> FastInt
-	-> (reg -> FastInt) 
-	-> UniqFM reg
-	-> FastInt
+--      The definition has been unfolded into individual cases for speed.
+--      Each architecture has a different register setup, so we use a
+--      different regSqueeze function for each.
+--
+accSqueeze
+        :: FastInt
+        -> FastInt
+        -> (reg -> FastInt)
+        -> UniqFM reg
+        -> FastInt
 
 accSqueeze count maxCount squeeze ufm = acc count (eltsUFM ufm)
   where acc count [] = count
@@ -126,59 +126,59 @@ the most efficient variant tried. Benchmark compiling 10-times SHA1.lhs follows.
 -}
 
 trivColorable
-	:: (RegClass -> VirtualReg -> FastInt)
-	-> (RegClass -> RealReg    -> FastInt)
-	-> Triv VirtualReg RegClass RealReg
+        :: (RegClass -> VirtualReg -> FastInt)
+        -> (RegClass -> RealReg    -> FastInt)
+        -> Triv VirtualReg RegClass RealReg
 
 trivColorable virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
-	| count2	<- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_INTEGER 
-				(virtualRegSqueeze RcInteger)
-				conflicts
-				
-	, count3	<- accSqueeze  count2    ALLOCATABLE_REGS_INTEGER
-				(realRegSqueeze   RcInteger)
-				exclusions
+        | count2        <- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_INTEGER
+                                (virtualRegSqueeze RcInteger)
+                                conflicts
 
-	= count3 <# ALLOCATABLE_REGS_INTEGER
+        , count3        <- accSqueeze  count2    ALLOCATABLE_REGS_INTEGER
+                                (realRegSqueeze   RcInteger)
+                                exclusions
+
+        = count3 <# ALLOCATABLE_REGS_INTEGER
 
 trivColorable virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
-	| count2	<- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_FLOAT
-				(virtualRegSqueeze RcFloat)
-				conflicts
-				
-	, count3	<- accSqueeze  count2    ALLOCATABLE_REGS_FLOAT
-				(realRegSqueeze   RcFloat)
-				exclusions
+        | count2        <- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_FLOAT
+                                (virtualRegSqueeze RcFloat)
+                                conflicts
 
-	= count3 <# ALLOCATABLE_REGS_FLOAT
+        , count3        <- accSqueeze  count2    ALLOCATABLE_REGS_FLOAT
+                                (realRegSqueeze   RcFloat)
+                                exclusions
+
+        = count3 <# ALLOCATABLE_REGS_FLOAT
 
 trivColorable virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
-	| count2	<- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_DOUBLE
-				(virtualRegSqueeze RcDouble)
-				conflicts
-				
-	, count3	<- accSqueeze  count2    ALLOCATABLE_REGS_DOUBLE
-				(realRegSqueeze   RcDouble)
-				exclusions
+        | count2        <- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_DOUBLE
+                                (virtualRegSqueeze RcDouble)
+                                conflicts
 
-	= count3 <# ALLOCATABLE_REGS_DOUBLE
+        , count3        <- accSqueeze  count2    ALLOCATABLE_REGS_DOUBLE
+                                (realRegSqueeze   RcDouble)
+                                exclusions
+
+        = count3 <# ALLOCATABLE_REGS_DOUBLE
 
 trivColorable virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
-	| count2	<- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_SSE
-				(virtualRegSqueeze RcDoubleSSE)
-				conflicts
-				
-	, count3	<- accSqueeze  count2    ALLOCATABLE_REGS_SSE
-				(realRegSqueeze   RcDoubleSSE)
-				exclusions
+        | count2        <- accSqueeze (_ILIT(0)) ALLOCATABLE_REGS_SSE
+                                (virtualRegSqueeze RcDoubleSSE)
+                                conflicts
 
-	= count3 <# ALLOCATABLE_REGS_SSE
+        , count3        <- accSqueeze  count2    ALLOCATABLE_REGS_SSE
+                                (realRegSqueeze   RcDoubleSSE)
+                                exclusions
+
+        = count3 <# ALLOCATABLE_REGS_SSE
 
 
 -- Specification Code ----------------------------------------------------------
 --
---	The trivColorable function for each particular architecture should
---	implement the following function, but faster.
+--      The trivColorable function for each particular architecture should
+--      implement the following function, but faster.
 --
 
 {-
@@ -186,39 +186,39 @@ trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
 trivColorable classN conflicts exclusions
  = let
 
-	acc :: Reg -> (Int, Int) -> (Int, Int)
-	acc r (cd, cf)	
-	 = case regClass r of
-		RcInteger	-> (cd+1, cf)
-		RcFloat		-> (cd,   cf+1)
-		_		-> panic "Regs.trivColorable: reg class not handled"
+        acc :: Reg -> (Int, Int) -> (Int, Int)
+        acc r (cd, cf)
+         = case regClass r of
+                RcInteger       -> (cd+1, cf)
+                RcFloat         -> (cd,   cf+1)
+                _               -> panic "Regs.trivColorable: reg class not handled"
 
-	tmp			= foldUniqSet acc (0, 0) conflicts
-	(countInt,  countFloat)	= foldUniqSet acc tmp    exclusions
+        tmp                     = foldUniqSet acc (0, 0) conflicts
+        (countInt,  countFloat) = foldUniqSet acc tmp    exclusions
 
-	squeese		= worst countInt   classN RcInteger
-			+ worst countFloat classN RcFloat
+        squeese         = worst countInt   classN RcInteger
+                        + worst countFloat classN RcFloat
 
-   in	squeese < allocatableRegsInClass classN
+   in   squeese < allocatableRegsInClass classN
 
 -- | Worst case displacement
---	node N of classN has n neighbors of class C.
+--      node N of classN has n neighbors of class C.
 --
---	We currently only have RcInteger and RcDouble, which don't conflict at all.
---	This is a bit boring compared to what's in RegArchX86.
+--      We currently only have RcInteger and RcDouble, which don't conflict at all.
+--      This is a bit boring compared to what's in RegArchX86.
 --
 worst :: Int -> RegClass -> RegClass -> Int
 worst n classN classC
  = case classN of
- 	RcInteger
-	 -> case classC of
-	 	RcInteger	-> min n (allocatableRegsInClass RcInteger)
-		RcFloat		-> 0
-		
-	RcDouble
-	 -> case classC of
-	 	RcFloat		-> min n (allocatableRegsInClass RcFloat)
-		RcInteger	-> 0
+        RcInteger
+         -> case classC of
+                RcInteger       -> min n (allocatableRegsInClass RcInteger)
+                RcFloat         -> 0
+
+        RcDouble
+         -> case classC of
+                RcFloat         -> min n (allocatableRegsInClass RcFloat)
+                RcInteger       -> 0
 
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
@@ -230,21 +230,21 @@ allocatableRegs
 
 
 -- | The number of regs in each class.
---	We go via top level CAFs to ensure that we're not recomputing
---	the length of these lists each time the fn is called.
+--      We go via top level CAFs to ensure that we're not recomputing
+--      the length of these lists each time the fn is called.
 allocatableRegsInClass :: RegClass -> Int
 allocatableRegsInClass cls
  = case cls of
- 	RcInteger	-> allocatableRegsInteger
-	RcFloat		-> allocatableRegsDouble
+        RcInteger       -> allocatableRegsInteger
+        RcFloat         -> allocatableRegsDouble
 
 allocatableRegsInteger :: Int
-allocatableRegsInteger	
-	= length $ filter (\r -> regClass r == RcInteger) 
-		 $ map RealReg allocatableRegs
+allocatableRegsInteger
+        = length $ filter (\r -> regClass r == RcInteger)
+                 $ map RealReg allocatableRegs
 
 allocatableRegsFloat :: Int
 allocatableRegsFloat
-	= length $ filter (\r -> regClass r == RcFloat 
-		 $ map RealReg allocatableRegs
+        = length $ filter (\r -> regClass r == RcFloat
+                 $ map RealReg allocatableRegs
 -}
