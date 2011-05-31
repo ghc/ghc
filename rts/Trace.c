@@ -267,16 +267,18 @@ void traceCapsetModify_ (EventTypeNum tag,
         tracePreface();
         switch (tag) {
         case EVENT_CAPSET_CREATE:   // (capset, capset_type)
-            debugBelch("created capset %d of type %d\n", capset, other);
+            debugBelch("created capset %lu of type %d\n", (lnat)capset, other);
             break;
         case EVENT_CAPSET_DELETE:   // (capset)
-            debugBelch("deleted capset %d\n", capset);
+            debugBelch("deleted capset %lu\n", (lnat)capset);
             break;
         case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
-            debugBelch("assigned cap %d to capset %d\n", other, capset);
+            debugBelch("assigned cap %lu to capset %lu\n",
+                       (lnat)other, (lnat)capset);
             break;
         case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
-            debugBelch("removed cap %d from capset %d\n", other, capset);
+            debugBelch("removed cap %lu from capset %lu\n",
+                       (lnat)other, (lnat)capset);
             break;
         }
         RELEASE_LOCK(&trace_utx);
