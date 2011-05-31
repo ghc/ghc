@@ -144,8 +144,9 @@ test('CoTest3', normal, compile, [''])
 test('Roman1', normal, compile, [''])
 test('T4160', normal, compile, [''])
 test('IndTypesPerf',
-     [ expect_broken(5224)
-     , extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
+     [ # expect_broken(5224),
+       # unbroken temporarily: #5227
+       extra_clean(['IndTypesPerf.o', 'IndTypesPerf.hi',
                     'IndTypesPerfMerge.o', 'IndTypesPerfMerge.hi'])
      ] ,
      run_command,

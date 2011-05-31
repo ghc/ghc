@@ -73,7 +73,8 @@ test('T3294',
      [''])
 
 test('T4801',
-     [expect_broken(5224),
+     [ # expect_broken(5224),
+       # temporarily unbroken (#5227)
       # expected value: 11 (x86/OSX):
       if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 35, 45)),
