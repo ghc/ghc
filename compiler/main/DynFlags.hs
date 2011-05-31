@@ -1003,7 +1003,7 @@ safeDirectImpsReq = safeLanguageOn
 -- | Are all implicit imports required to be safe for this SafeHaskell mode?
 -- Implicit imports are things in the prelude. e.g System.IO when print is used.
 safeImplicitImpsReq :: DynFlags -> Bool
-safeImplicitImpsReq _ = False
+safeImplicitImpsReq = safeLanguageOn
 
 -- | Combine two SafeHaskell modes correctly. Used for dealing with multiple flags.
 -- This makes SafeHaskell very much a monoid but for now I prefer this as I don't
