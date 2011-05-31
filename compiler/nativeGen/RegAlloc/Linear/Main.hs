@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
 -----------------------------------------------------------------------------
 --
 -- The register allocator
@@ -179,6 +178,13 @@ linearRegAlloc first_id block_live sccs
 
         return  (blocks, stats)
 
+linearRA_SCCs :: (Instruction instr, Outputable instr)
+              => BlockId
+              -> BlockMap RegSet
+              -> [NatBasicBlock instr]
+              -> [SCC (LiveBasicBlock instr)]
+              -> RegM [NatBasicBlock instr]
+
 linearRA_SCCs _ _ blocksAcc []
         = return $ reverse blocksAcc
 
@@ -206,6 +212,15 @@ linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
    some reason then this function will loop. We should probably do some
    more sanity checking to guard against this eventuality.
 -}
+
+process :: (Instruction instr, Outputable instr)
+        => BlockId
+        -> BlockMap RegSet
+        -> [GenBasicBlock (LiveInstr instr)]
+        -> [GenBasicBlock (LiveInstr instr)]
+        -> [[NatBasicBlock instr]]
+        -> Bool
+        -> RegM [[NatBasicBlock instr]]
 
 process _ _ [] []         accum _
         = return $ reverse accum
@@ -366,7 +381,14 @@ raInsn _ _ _ instr
         = pprPanic "raInsn" (text "no match for:" <> ppr instr)
 
 
-
+genRaInsn :: (Instruction instr, Outputable instr)
+          => BlockMap RegSet
+          -> [instr]
+          -> BlockId
+          -> instr
+          -> [Reg]
+          -> [Reg]
+          -> RegM ([instr], [NatBasicBlock instr])
 
 genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     case regUsageOfInstr instr              of { RU read written ->
@@ -463,6 +485,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
+releaseRegs :: [Reg] -> RegM ()
 releaseRegs regs = do
   assig <- getAssigR
   free <- getFreeRegsR
@@ -634,6 +657,16 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
+allocRegsAndSpill_spill :: (Instruction instr, Outputable instr)
+                        => Bool
+                        -> [VirtualReg]
+                        -> [instr]
+                        -> [RealReg]
+                        -> VirtualReg
+                        -> [VirtualReg]
+                        -> UniqFM Loc
+                        -> SpillLoc
+                        -> RegM ([instr], [RealReg])
 allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
  = do
         freeRegs                <- getFreeRegsR
