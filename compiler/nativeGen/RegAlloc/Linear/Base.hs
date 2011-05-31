@@ -101,7 +101,7 @@ data RegAllocStats
 
 
 -- | The register alloctor state
-data RA_State
+data RA_State freeRegs
         = RA_State
 
         {
@@ -110,7 +110,7 @@ data RA_State
           ra_blockassig :: BlockAssignment
 
         -- | free machine registers
-        , ra_freeregs   :: {-#UNPACK#-}!FreeRegs
+        , ra_freeregs   :: !freeRegs
 
         -- | assignment of temps to locations
         , ra_assig      :: RegMap Loc
@@ -131,7 +131,7 @@ data RA_State
 
 
 -- | The register allocator monad type.
-newtype RegM a
-        = RegM { unReg :: RA_State -> (# RA_State, a #) }
+newtype RegM freeRegs a
+        = RegM { unReg :: RA_State freeRegs -> (# RA_State freeRegs, a #) }
 
 

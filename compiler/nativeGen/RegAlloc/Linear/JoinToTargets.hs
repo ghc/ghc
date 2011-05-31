@@ -42,7 +42,7 @@ joinToTargets
 	-> BlockId			-- ^ id of the current block
 	-> instr			-- ^ branch instr on the end of the source block.
 
-	-> RegM ([NatBasicBlock instr]	--   fresh blocks of fixup code.
+	-> RegM FreeRegs ([NatBasicBlock instr]	--   fresh blocks of fixup code.
 		, instr)		--   the original branch instruction, but maybe patched to jump
 					--	to a fixup block first.
 
@@ -68,7 +68,7 @@ joinToTargets'
 
 	-> [BlockId]			-- ^ branch destinations still to consider.
 
-	-> RegM ( [NatBasicBlock instr]
+	-> RegM FreeRegs ( [NatBasicBlock instr]
 		, instr)
 
 -- no more targets to consider. all done.
@@ -262,7 +262,7 @@ expandNode vreg src dst
 --
 handleComponent 
 	:: Instruction instr
-	=> Int -> instr -> SCC (Unique, Loc, [Loc]) -> RegM [instr]
+	=> Int -> instr -> SCC (Unique, Loc, [Loc]) -> RegM FreeRegs [instr]
 
 -- If the graph is acyclic then we won't get the swapping problem below.
 --	In this case we can just do the moves directly, and avoid having to
@@ -317,7 +317,7 @@ makeMove
 	-> Unique 	-- ^ unique of the vreg that we're moving.
 	-> Loc 		-- ^ source location.
 	-> Loc 		-- ^ destination location.
-	-> RegM instr	-- ^ move instruction.
+	-> RegM FreeRegs instr	-- ^ move instruction.
 
 makeMove _     vreg (InReg src) (InReg dst)
  = do	recordSpill (SpillJoinRR vreg)

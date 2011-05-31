@@ -183,7 +183,7 @@ linearRA_SCCs :: (Instruction instr, Outputable instr)
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
-              -> RegM [NatBasicBlock instr]
+              -> RegM FreeRegs [NatBasicBlock instr]
 
 linearRA_SCCs _ _ blocksAcc []
         = return $ reverse blocksAcc
@@ -220,7 +220,7 @@ process :: (Instruction instr, Outputable instr)
         -> [GenBasicBlock (LiveInstr instr)]
         -> [[NatBasicBlock instr]]
         -> Bool
-        -> RegM [[NatBasicBlock instr]]
+        -> RegM FreeRegs [[NatBasicBlock instr]]
 
 process _ _ [] []         accum _
         = return $ reverse accum
@@ -260,7 +260,7 @@ processBlock
         :: (Outputable instr, Instruction instr)
         => BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
-        -> RegM [NatBasicBlock instr]   -- ^ block with registers allocated
+        -> RegM FreeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
 processBlock block_live (BasicBlock id instrs)
  = do   initBlock id
@@ -271,7 +271,7 @@ processBlock block_live (BasicBlock id instrs)
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
-initBlock :: BlockId -> RegM ()
+initBlock :: BlockId -> RegM FreeRegs ()
 initBlock id
  = do   block_assig     <- getBlockAssigR
         case mapLookup id block_assig of
@@ -298,7 +298,8 @@ linearRA
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
 
-        -> RegM ( [instr]                       --   instructions after register allocation
+        -> RegM FreeRegs
+                ( [instr]                       --   instructions after register allocation
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
 
 
@@ -323,7 +324,7 @@ raInsn
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
-        -> RegM
+        -> RegM FreeRegs
                 ( [instr]                       -- new instructions
                 , [NatBasicBlock instr])        -- extra fixup blocks
 
@@ -388,7 +389,7 @@ genRaInsn :: (Instruction instr, Outputable instr)
           -> instr
           -> [Reg]
           -> [Reg]
-          -> RegM ([instr], [NatBasicBlock instr])
+          -> RegM FreeRegs ([instr], [NatBasicBlock instr])
 
 genRaInsn block_live new_instrs block_id instr r_dying w_dying =
     case regUsageOfInstr instr              of { RU read written ->
@@ -485,7 +486,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying =
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
-releaseRegs :: [Reg] -> RegM ()
+releaseRegs :: [Reg] -> RegM FreeRegs ()
 releaseRegs regs = do
   assig <- getAssigR
   free <- getFreeRegsR
@@ -523,7 +524,7 @@ saveClobberedTemps
         :: (Outputable instr, Instruction instr)
         => [RealReg]            -- real registers clobbered by this instruction
         -> [Reg]                -- registers which are no longer live after this insn
-        -> RegM [instr]         -- return: instructions to spill any temps that will
+        -> RegM FreeRegs [instr]         -- return: instructions to spill any temps that will
                                 -- be clobbered.
 
 saveClobberedTemps [] _
@@ -562,7 +563,7 @@ saveClobberedTemps clobbered dying
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
 --
-clobberRegs :: [RealReg] -> RegM ()
+clobberRegs :: [RealReg] -> RegM FreeRegs ()
 clobberRegs []
         = return ()
 
@@ -618,8 +619,7 @@ allocateRegsAndSpill
         -> [instr]              -- spill insns
         -> [RealReg]            -- real registers allocated (accum.)
         -> [VirtualReg]         -- temps to allocate
-        -> RegM ( [instr]
-                , [RealReg])
+        -> RegM FreeRegs ( [instr] , [RealReg])
 
 allocateRegsAndSpill _       _    spills alloc []
         = return (spills, reverse alloc)
@@ -666,7 +666,7 @@ allocRegsAndSpill_spill :: (Instruction instr, Outputable instr)
                         -> [VirtualReg]
                         -> UniqFM Loc
                         -> SpillLoc
-                        -> RegM ([instr], [RealReg])
+                        -> RegM FreeRegs ([instr], [RealReg])
 allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
  = do
         freeRegs                <- getFreeRegsR
@@ -767,7 +767,7 @@ loadTemp
         -> SpillLoc     -- the current location of this temp
         -> RealReg      -- the hreg to load the temp into
         -> [instr]
-        -> RegM [instr]
+        -> RegM FreeRegs [instr]
 
 loadTemp vreg (ReadMem slot) hreg spills
  = do
