@@ -329,6 +329,12 @@ def if_arch( arch, f ):
     else:
         return normal
 
+def unless_arch( arch, f ):
+    if config.arch == arch:
+        return normal
+    else:
+        return f
+
 def if_wordsize( ws, f ):
     if config.wordsize == str(ws):
         return f
@@ -937,6 +943,33 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
                            two_normalisers(two_normalisers(getTestOpts().extra_errmsg_normaliser, normalise_errmsg), normalise_whitespace), \
                            expected_stderr_file, actual_stderr_file):
         return failBecause('stderr mismatch')
+
+    # no problems found, this test passed
+    return passed()
+
+def compile_cmp_asm( name, way, extra_hc_opts ):
+    print 'Compile only, extra args = ', extra_hc_opts
+    pretest_cleanup(name)
+    result = simple_build( name + '.cmm', way, '-keep-s-files -O ' + extra_hc_opts, 0, '', 0, 0, 0)
+
+    if badResult(result):
+        return result
+
+    # the actual stderr should always match the expected, regardless
+    # of whether we expected the compilation to fail or not (successful
+    # compilations may generate warnings).
+
+    if getTestOpts().with_namebase == None:
+        namebase = name
+    else:
+        namebase = getTestOpts().with_namebase
+
+    (platform_specific, expected_asm_file) = platform_wordsize_qualify(namebase, 'asm')
+    actual_asm_file = qualify(name, 's')
+
+    if not compare_outputs('asm', two_normalisers(normalise_errmsg, normalise_asm), \
+                           expected_asm_file, actual_asm_file):
+        return failBecause('asm mismatch')
 
     # no problems found, this test passed
     return passed()
@@ -1674,6 +1707,26 @@ def normalise_output( str ):
     str = re.sub('([^\\s])\\.exe', '\\1', str)
     return str
 
+def normalise_asm( str ):
+    lines = str.split('\n')
+    # Only keep instructions and labels not starting with a dot.
+    metadata = re.compile('^[ \t]*\\..*$')
+    out = []
+    for line in lines:
+      # Drop metadata directives (e.g. ".type")
+      if not metadata.match(line):
+        instr = line.lstrip().split()
+        # Drop empty lines.
+        if not instr:
+          continue
+        # Drop operands, except for call instructions.
+        elif instr[0] == 'call':
+          out.append(instr[0] + ' ' + instr[1])
+        else:
+          out.append(instr[0])
+    out = '\n'.join(out)
+    return out
+
 def if_verbose( n, str ):
     if config.verbose >= n:
         print str
@@ -2118,4 +2171,3 @@ def getStdout(cmd):
         return stdout
     else:
         raise Exception("Need subprocess to get stdout, but don't have it")
-
