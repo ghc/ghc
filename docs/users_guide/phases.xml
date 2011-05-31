@@ -1054,7 +1054,7 @@ $ cat foo.hspp</screen>
         <listitem>
           <para>On Windows, GHC normally generates a
             <firstterm>manifest</firstterm><indexterm><primary>manifest</primary>
-            </indexterm>file when linking a binary.  The
+            </indexterm> file when linking a binary.  The
             manifest is placed in the file
             <literal><replaceable>prog</replaceable>.exe.manifest</literal>
             where <replaceable>prog.exe</replaceable> is the name of the

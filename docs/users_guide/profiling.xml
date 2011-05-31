@@ -1383,7 +1383,7 @@ main = do
 <screen>
 $ ghc -fhpc Recip.hs --make
 </screen>
-    <para>HPC index (.mix) files are placed placed in .hpc subdirectory. These can be considered like
+    <para>HPC index (.mix) files are placed in .hpc subdirectory. These can be considered like
     the .hi files for HPC.
    </para>
 <screen>

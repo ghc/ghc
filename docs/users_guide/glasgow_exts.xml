@@ -2799,7 +2799,7 @@ different constructors.  For example, this is fine:
     T1 :: Eq b => b -> b -> T b
     T2 :: (Show c, Ix c) => c -> [c] -> T c
 </programlisting>
-When patten matching, these constraints are made available to discharge constraints
+When pattern matching, these constraints are made available to discharge constraints
 in the body of the match. For example:
 <programlisting>
   f :: T a -> String
@@ -4031,7 +4031,7 @@ But these are not:
 <programlisting>
       -- Context assertion no smaller than head
   instance C a => C a where ...
-      -- (C b b) has more more occurrences of b than the head
+      -- (C b b) has more occurrences of b than the head
   instance C b b => Foo [b] where ...
 </programlisting>
 </para>
@@ -6464,7 +6464,7 @@ Wiki page</ulink>.
                     must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
             Note that pattern splices are not supported.
-	    Inside a splice you can can only call functions defined in imported modules,
+            Inside a splice you can only call functions defined in imported modules,
 	    not functions defined elsewhere in the same module.</para></listitem>
 
 	      <listitem><para>
@@ -7518,7 +7518,7 @@ That leaves let expressions, whose translation is given in
 of the Haskell Report.
 In the translation box, first apply
 the following transformation:  for each pattern <literal>pi</literal> that is of
-form <literal>!qi = ei</literal>, transform it to <literal>(xi,!qi) = ((),ei)</literal>, and and replace <literal>e0</literal>
+form <literal>!qi = ei</literal>, transform it to <literal>(xi,!qi) = ((),ei)</literal>, and replace <literal>e0</literal>
 by <literal>(xi `seq` e0)</literal>.  Then, when none of the left-hand-side patterns
 have a bang at the top, apply the rules in the existing box.
 </para>
