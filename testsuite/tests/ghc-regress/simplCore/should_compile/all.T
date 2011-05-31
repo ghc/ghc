@@ -98,7 +98,7 @@ test('T4345', normal, compile, [''])
 test('T4398', normal, compile, [''])
 
 test('T4903',
-     normal,
+     extra_clean(['T4903a.hi']),
      run_command,
      ['$MAKE -s --no-print-directory T4903'])
 

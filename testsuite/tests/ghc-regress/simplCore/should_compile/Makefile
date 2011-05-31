@@ -24,7 +24,7 @@ T4201:
 
 # This one looped as a result of bogus specialisation
 T4903:
-	$(RM) -f T4903a.o T4903.o
+	$(RM) -f T4903.hi T4903a.hi T4903a.o T4903.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4903a.hs -dcore-lint
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T4903.hs -dcore-lint
 
