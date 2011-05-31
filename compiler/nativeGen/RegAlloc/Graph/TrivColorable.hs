@@ -109,13 +109,13 @@ trivColorable
 
 trivColorable virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
         | let !cALLOCATABLE_REGS_INTEGER
-                  = iUnbox $ case platformArch defaultTargetPlatform of
-                             ArchX86     -> 3
-                             ArchX86_64  -> 5
-                             ArchPPC     -> 16
-                             ArchSPARC   -> 14
-                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                             ArchUnknown -> panic "trivColorable ArchUnknown"
+                  = iUnbox (case platformArch defaultTargetPlatform of
+                            ArchX86     -> 3
+                            ArchX86_64  -> 5
+                            ArchPPC     -> 16
+                            ArchSPARC   -> 14
+                            ArchPPC_64  -> panic "trivColorable ArchPPC_64"
+                            ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_INTEGER
                                 (virtualRegSqueeze RcInteger)
                                 conflicts
@@ -128,13 +128,13 @@ trivColorable virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
 
 trivColorable virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
         | let !cALLOCATABLE_REGS_FLOAT
-                  = iUnbox $ case platformArch defaultTargetPlatform of
-                             ArchX86     -> 0
-                             ArchX86_64  -> 0
-                             ArchPPC     -> 0
-                             ArchSPARC   -> 22
-                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                             ArchUnknown -> panic "trivColorable ArchUnknown"
+                  = iUnbox (case platformArch defaultTargetPlatform of
+                            ArchX86     -> 0
+                            ArchX86_64  -> 0
+                            ArchPPC     -> 0
+                            ArchSPARC   -> 22
+                            ArchPPC_64  -> panic "trivColorable ArchPPC_64"
+                            ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_FLOAT
                                 (virtualRegSqueeze RcFloat)
                                 conflicts
@@ -147,13 +147,13 @@ trivColorable virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
 
 trivColorable virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
         | let !cALLOCATABLE_REGS_DOUBLE
-                  = iUnbox $ case platformArch defaultTargetPlatform of
-                             ArchX86     -> 6
-                             ArchX86_64  -> 0
-                             ArchPPC     -> 26
-                             ArchSPARC   -> 11
-                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                             ArchUnknown -> panic "trivColorable ArchUnknown"
+                  = iUnbox (case platformArch defaultTargetPlatform of
+                            ArchX86     -> 6
+                            ArchX86_64  -> 0
+                            ArchPPC     -> 26
+                            ArchSPARC   -> 11
+                            ArchPPC_64  -> panic "trivColorable ArchPPC_64"
+                            ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_DOUBLE
                                 (virtualRegSqueeze RcDouble)
                                 conflicts
@@ -166,13 +166,13 @@ trivColorable virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
 
 trivColorable virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
         | let !cALLOCATABLE_REGS_SSE
-                  = iUnbox $ case platformArch defaultTargetPlatform of
-                             ArchX86     -> 8
-                             ArchX86_64  -> 10
-                             ArchPPC     -> 0
-                             ArchSPARC   -> 0
-                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                             ArchUnknown -> panic "trivColorable ArchUnknown"
+                  = iUnbox (case platformArch defaultTargetPlatform of
+                            ArchX86     -> 8
+                            ArchX86_64  -> 10
+                            ArchPPC     -> 0
+                            ArchSPARC   -> 0
+                            ArchPPC_64  -> panic "trivColorable ArchPPC_64"
+                            ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_SSE
                                 (virtualRegSqueeze RcDoubleSSE)
                                 conflicts
