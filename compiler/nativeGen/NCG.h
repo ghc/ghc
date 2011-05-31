@@ -26,12 +26,6 @@
 # define IF_OS_linux(x,y) y
 #endif
 -- - - - - - - - - - - - - - - - - - - - - - 
-#if sparc_TARGET_ARCH
-# define IF_ARCH_sparc(x,y) x
-#else
-# define IF_ARCH_sparc(x,y) y
-#endif
--- - - - - - - - - - - - - - - - - - - - - - 
 #if darwin_TARGET_OS
 # define IF_OS_darwin(x,y) x
 #else

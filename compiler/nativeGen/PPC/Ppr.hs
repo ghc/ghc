@@ -109,9 +109,7 @@ pprData (CmmStaticLit lit)       = pprDataItem lit
 pprGloblDecl :: CLabel -> Doc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext IF_ARCH_sparc((sLit ".global "), 
-				    (sLit ".globl ")) <>
-		pprCLabel_asm lbl
+  | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm lbl
 
 pprTypeAndSizeDecl :: CLabel -> Doc
 #if linux_TARGET_OS
