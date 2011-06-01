@@ -782,7 +782,7 @@ fi
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
 dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
-AC_CHECK_LIB(bfd,    bfd_init)
+AC_CHECK_LIB(bfd,    bfd_uncompress_section_contents)
 
 dnl ################################################################
 dnl Check for libraries
