@@ -22,7 +22,7 @@ import TysWiredIn       ( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name             ( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes       ( Boxity )
-import SrcLoc           ( Located(..), unLoc )
+import SrcLoc
 \end{code}
 
 %************************************************************************

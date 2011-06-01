@@ -18,6 +18,7 @@ import GHC
 import GhciMonad
 import Outputable
 import Util
+import SrcLoc
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
@@ -91,13 +92,13 @@ listModuleTags m = do
        let names = fromMaybe [] $GHC.modInfoTopLevelScope mInfo
        let localNames = filter ((m==) . nameModule) names
        mbTyThings <- mapM GHC.lookupName localNames
-       return $! [ tagInfo unqual exported kind name loc
+       return $! [ tagInfo unqual exported kind name realLoc
                      | tyThing <- catMaybes mbTyThings
                      , let name = getName tyThing
                      , let exported = GHC.modInfoIsExportedName mInfo name
                      , let kind = tyThing2TagKind tyThing
                      , let loc = srcSpanStart (nameSrcSpan name)
-                     , isGoodSrcLoc loc
+                     , RealSrcLoc realLoc <- [loc]
                      ]
 
   where
@@ -120,7 +121,7 @@ data TagInfo = TagInfo
 
 
 -- get tag info, for later translation into Vim or Emacs style
-tagInfo :: PrintUnqualified -> Bool -> Char -> Name -> SrcLoc -> TagInfo
+tagInfo :: PrintUnqualified -> Bool -> Char -> Name -> RealSrcLoc -> TagInfo
 tagInfo unqual exported kind name loc
     = TagInfo exported kind
         (showSDocForUser unqual $ pprOccName (nameOccName name))

@@ -494,9 +494,10 @@ getSrcSpanM :: TcRn SrcSpan
 getSrcSpanM = do { env <- getLclEnv; return (tcl_loc env) }
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan loc thing_inside
-  | isGoodSrcSpan loc = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
-  | otherwise	      = thing_inside	-- Don't overwrite useful info with useless
+setSrcSpan loc@(RealSrcSpan _) thing_inside
+    = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
+-- Don't overwrite useful info with useless:
+setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a

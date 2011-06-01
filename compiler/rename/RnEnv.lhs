@@ -1053,7 +1053,11 @@ unknownNameSuggestErr where_look tried_rdr_name
   where
     pp_item :: (RdrName, HowInScope) -> SDoc
     pp_item (rdr, Left loc) = quotes (ppr rdr) <+>   -- Locally defined
-                              parens (ptext (sLit "line") <+> int (srcSpanStartLine loc))
+                              parens (ptext (sLit "line") <+> int (srcSpanStartLine loc'))
+        where loc' = case loc of
+                     UnhelpfulSpan _ ->
+                         panic "unknownNameSuggestErr UnhelpfulSpan"
+                     RealSrcSpan l -> l
     pp_item (rdr, Right is) = quotes (ppr rdr) <+>   -- Imported
                               parens (ptext (sLit "imported from") <+> ppr (is_mod is))
 

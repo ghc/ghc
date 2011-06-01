@@ -687,7 +687,7 @@ checkInputForLayout stmt getStmt = do
    let dflags = xopt_set dflags' Opt_AlternativeLayoutRule
    st <- lift $ getGHCiState
    let buf =  stringToStringBuffer stmt
-       loc  = mkSrcLoc (fsLit (progname st)) (line_number st) 1
+       loc  = mkRealSrcLoc (fsLit (progname st)) (line_number st) 1
        pstate = Lexer.mkPState dflags buf loc
    case Lexer.unP goToEnd pstate of
      (Lexer.POk _ False) -> return $ Just stmt
@@ -2061,12 +2061,15 @@ stepModuleCmd expression = stepCmd expression
 
 -- | Returns the span of the largest tick containing the srcspan given
 enclosingTickSpan :: Module -> SrcSpan -> GHCi SrcSpan
-enclosingTickSpan mod src = do
+enclosingTickSpan _ (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
+enclosingTickSpan mod (RealSrcSpan src) = do
   ticks <- getTickArray mod
   let line = srcSpanStartLine src
   ASSERT (inRange (bounds ticks) line) do
-  let enclosing_spans = [ span | (_,span) <- ticks ! line
-                               , srcSpanEnd span >= srcSpanEnd src]
+  let toRealSrcSpan (UnhelpfulSpan _) = panic "enclosingTickSpan UnhelpfulSpan"
+      toRealSrcSpan (RealSrcSpan s) = s
+      enclosing_spans = [ span | (_,span) <- ticks ! line
+                               , realSrcSpanEnd (toRealSrcSpan span) >= realSrcSpanEnd src]
   return . head . sortBy leftmost_largest $ enclosing_spans
 
 traceCmd :: String -> GHCi ()
@@ -2178,13 +2181,15 @@ breakSwitch (arg1:rest)
    | otherwise = do -- try parsing it as an identifier
         wantNameFromInterpretedModule noCanDo arg1 $ \name -> do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
-        if GHC.isGoodSrcLoc loc
-               then ASSERT( isExternalName name ) 
+        case loc of
+            RealSrcLoc l ->
+               ASSERT( isExternalName name ) 
 	       	    findBreakAndSet (GHC.nameModule name) $ 
-                         findBreakByCoord (Just (GHC.srcLocFile loc))
-                                          (GHC.srcLocLine loc, 
-                                           GHC.srcLocCol loc)
-               else noCanDo name $ text "can't find its location: " <> ppr loc
+                         findBreakByCoord (Just (GHC.srcLocFile l))
+                                          (GHC.srcLocLine l, 
+                                           GHC.srcLocCol l)
+            UnhelpfulLoc _ ->
+                noCanDo name $ text "can't find its location: " <> ppr loc
        where
           noCanDo n why = printForUser $
                 text "cannot set breakpoint on " <> ppr n <> text ": " <> why
@@ -2249,10 +2254,12 @@ findBreakByLine line arr
         ticks = arr ! line
 
         starts_here = [ tick | tick@(_,span) <- ticks,
-                               GHC.srcSpanStartLine span == line ]
+                               GHC.srcSpanStartLine (toRealSpan span) == line ]
 
         (complete,incomplete) = partition ends_here starts_here
-            where ends_here (_,span) = GHC.srcSpanEndLine span == line
+            where ends_here (_,span) = GHC.srcSpanEndLine (toRealSpan span) == line
+        toRealSpan (RealSrcSpan span) = span
+        toRealSpan (UnhelpfulSpan _) = panic "findBreakByLine UnhelpfulSpan"
 
 findBreakByCoord :: Maybe FastString -> (Int,Int) -> TickArray
                  -> Maybe (BreakIndex,SrcSpan)
@@ -2269,12 +2276,16 @@ findBreakByCoord mb_file (line, col) arr
                             is_correct_file span ]
 
         is_correct_file span
-                 | Just f <- mb_file = GHC.srcSpanFile span == f
+                 | Just f <- mb_file = GHC.srcSpanFile (toRealSpan span) == f
                  | otherwise         = True
 
         after_here = [ tick | tick@(_,span) <- ticks,
-                              GHC.srcSpanStartLine span == line,
-                              GHC.srcSpanStartCol span >= col ]
+                              let span' = toRealSpan span,
+                              GHC.srcSpanStartLine span' == line,
+                              GHC.srcSpanStartCol span' >= col ]
+
+        toRealSpan (RealSrcSpan span) = span
+        toRealSpan (UnhelpfulSpan _) = panic "findBreakByCoord UnhelpfulSpan"
 
 -- For now, use ANSI bold on terminals that we know support it.
 -- Otherwise, we add a line of carets under the active expression instead.
@@ -2300,9 +2311,9 @@ listCmd' "" = do
    case mb_span of
       Nothing ->
           printForUser $ text "Not stopped at a breakpoint; nothing to list"
-      Just span
-       | GHC.isGoodSrcSpan span -> listAround span True
-       | otherwise ->
+      Just (RealSrcSpan span) ->
+          listAround span True
+      Just span@(UnhelpfulSpan _) ->
           do resumes <- GHC.getResumeContext
              case resumes of
                  [] -> panic "No resumes"
@@ -2328,17 +2339,18 @@ list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do
 list2 [arg] = do
         wantNameFromInterpretedModule noCanDo arg $ \name -> do
         let loc = GHC.srcSpanStart (GHC.nameSrcSpan name)
-        if GHC.isGoodSrcLoc loc
-               then do
-                  tickArray <- ASSERT( isExternalName name )
+        case loc of
+            RealSrcLoc l ->
+               do tickArray <- ASSERT( isExternalName name )
 		  	       lift $ getTickArray (GHC.nameModule name)
-                  let mb_span = findBreakByCoord (Just (GHC.srcLocFile loc))
-                                        (GHC.srcLocLine loc, GHC.srcLocCol loc)
+                  let mb_span = findBreakByCoord (Just (GHC.srcLocFile l))
+                                        (GHC.srcLocLine l, GHC.srcLocCol l)
                                         tickArray
                   case mb_span of
-                    Nothing       -> listAround (GHC.srcLocSpan loc) False
-                    Just (_,span) -> listAround span False
-               else
+                    Nothing       -> listAround (realSrcLocSpan l) False
+                    Just (_, UnhelpfulSpan _) -> panic "list2 UnhelpfulSpan"
+                    Just (_, RealSrcSpan span) -> listAround span False
+            UnhelpfulLoc _ ->
                   noCanDo name $ text "can't find its location: " <>
                                  ppr loc
     where
@@ -2355,8 +2367,8 @@ listModuleLine modl line = do
      [] -> panic "listModuleLine"
      summ:_ -> do
            let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
-               loc = GHC.mkSrcLoc (mkFastString (filename)) line 0
-           listAround (GHC.srcLocSpan loc) False
+               loc = mkRealSrcLoc (mkFastString (filename)) line 0
+           listAround (realSrcLocSpan loc) False
 
 -- | list a section of a source file around a particular SrcSpan.
 -- If the highlight flag is True, also highlight the span using
@@ -2367,7 +2379,7 @@ listModuleLine modl line = do
 -- 2) convert the BS to String using utf-string, and write it out.
 -- It would be better if we could convert directly between UTF-8 and the
 -- console encoding, of course.
-listAround :: MonadIO m => SrcSpan -> Bool -> InputT m ()
+listAround :: MonadIO m => RealSrcSpan -> Bool -> InputT m ()
 listAround span do_highlight = do
       contents <- liftIO $ BS.readFile (unpackFS file)
       let 
@@ -2454,11 +2466,14 @@ mkTickArray :: [(BreakIndex,SrcSpan)] -> TickArray
 mkTickArray ticks
   = accumArray (flip (:)) [] (1, max_line) 
         [ (line, (nm,span)) | (nm,span) <- ticks,
-                              line <- srcSpanLines span ]
+                              let span' = toRealSpan span,
+                              line <- srcSpanLines span' ]
     where
-        max_line = foldr max 0 (map GHC.srcSpanEndLine (map snd ticks))
+        max_line = foldr max 0 (map (GHC.srcSpanEndLine . toRealSpan . snd) ticks)
         srcSpanLines span = [ GHC.srcSpanStartLine span .. 
                               GHC.srcSpanEndLine span ]
+        toRealSpan (RealSrcSpan span) = span
+        toRealSpan (UnhelpfulSpan _) = panic "mkTickArray UnhelpfulSpan"
 
 lookupModule :: GHC.GhcMonad m => String -> m Module
 lookupModule modName
@@ -2500,3 +2515,4 @@ setBreakFlag :: Bool -> GHC.BreakArray -> Int -> IO Bool
 setBreakFlag toggle array index
    | toggle    = GHC.setBreakOn array index 
    | otherwise = GHC.setBreakOff array index
+
