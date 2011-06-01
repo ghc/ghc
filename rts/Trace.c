@@ -267,7 +267,7 @@ void traceCapsetModify_ (EventTypeNum tag,
         tracePreface();
         switch (tag) {
         case EVENT_CAPSET_CREATE:   // (capset, capset_type)
-            debugBelch("created capset %lu of type %d\n", (lnat)capset, other);
+            debugBelch("created capset %lu of type %d\n", (lnat)capset, (int)other);
             break;
         case EVENT_CAPSET_DELETE:   // (capset)
             debugBelch("deleted capset %lu\n", (lnat)capset);
