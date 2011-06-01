@@ -73,32 +73,6 @@ newSpark (StgRegTable *reg, StgClosure *p)
     return 1;
 }
 
-/* -----------------------------------------------------------------------------
- * 
- * tryStealSpark: try to steal a spark from a Capability.
- *
- * Returns a valid spark, or NULL if the pool was empty, and can
- * occasionally return NULL if there was a race with another thread
- * stealing from the same pool.  In this case, try again later.
- *
- -------------------------------------------------------------------------- */
-
-StgClosure *
-tryStealSpark (Capability *cap)
-{
-  SparkPool *pool = cap->sparks;
-  StgClosure *stolen;
-
-  do { 
-      stolen = stealWSDeque_(pool); 
-      // use the no-loopy version, stealWSDeque_(), since if we get a
-      // spurious NULL here the caller may want to try stealing from
-      // other pools before trying again.
-  } while (stolen != NULL && !closure_SHOULD_SPARK(stolen));
-
-  return stolen;
-}
-
 /* --------------------------------------------------------------------------
  * Remove all sparks from the spark queues which should not spark any
  * more.  Called after GC. We assume exclusive access to the structure

@@ -92,7 +92,11 @@ findSpark (Capability *cap)
       //   spark = reclaimSpark(cap->sparks);
       // However, measurements show that this makes at least one benchmark
       // slower (prsa) and doesn't affect the others.
-      spark = tryStealSpark(cap);
+      spark = tryStealSpark(cap->sparks);
+      while (spark != NULL && fizzledSpark(spark)) {
+          cap->sparks_fizzled++;
+          spark = tryStealSpark(cap->sparks);
+      }
       if (spark != NULL) {
           cap->sparks_converted++;
 
@@ -121,7 +125,11 @@ findSpark (Capability *cap)
           if (emptySparkPoolCap(robbed)) // nothing to steal here
               continue;
 
-          spark = tryStealSpark(robbed);
+          spark = tryStealSpark(robbed->sparks);
+          while (spark != NULL && fizzledSpark(spark)) {
+              cap->sparks_fizzled++;
+              spark = tryStealSpark(robbed->sparks);
+          }
           if (spark == NULL && !emptySparkPoolCap(robbed)) {
               // we conflicted with another thread while trying to steal;
               // try again later.

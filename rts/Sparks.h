@@ -30,7 +30,7 @@ INLINE_HEADER StgClosure* reclaimSpark(SparkPool *pool);
 // if the pool is almost empty).
 INLINE_HEADER rtsBool looksEmpty(SparkPool* deque);
 
-StgClosure * tryStealSpark     (Capability *cap);
+INLINE_HEADER StgClosure * tryStealSpark (SparkPool *cap);
 INLINE_HEADER rtsBool      fizzledSpark  (StgClosure *);
 
 void         freeSparkPool     (SparkPool *pool);
@@ -63,6 +63,27 @@ INLINE_HEADER long sparkPoolSize (SparkPool *pool)
 INLINE_HEADER void discardSparks (SparkPool *pool)
 {
     discardElements(pool);
+}
+
+/* ----------------------------------------------------------------------------
+ * 
+ * tryStealSpark: try to steal a spark from a Capability.
+ *
+ * Returns either:
+ *  (a) a useful spark;
+ *  (b) a fizzled spark (use fizzledSpark to check);
+ *  (c) or NULL if the pool was empty, and can occasionally return NULL
+ *      if there was a race with another thread stealing from the same
+ *      pool.  In this case, try again later.
+ *
+ -------------------------------------------------------------------------- */
+
+INLINE_HEADER StgClosure * tryStealSpark (SparkPool *pool)
+{
+    return stealWSDeque_(pool);
+    // use the no-loopy version, stealWSDeque_(), since if we get a
+    // spurious NULL here the caller may want to try stealing from
+    // other pools before trying again.
 }
 
 INLINE_HEADER rtsBool fizzledSpark (StgClosure *spark)

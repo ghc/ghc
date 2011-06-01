@@ -783,6 +783,10 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		if (emptySparkPoolCap(free_caps[i])) {
 		    spark = tryStealSpark(cap->sparks);
 		    if (spark != NULL) {
+                        /* TODO: if anyone wants to re-enable this code then
+                         * they must consider the fizzledSpark(spark) case
+                         * and update the per-cap spark statistics.
+                         */
 			debugTrace(DEBUG_sched, "pushing spark %p to capability %d", spark, free_caps[i]->no);
 
             traceEventStealSpark(free_caps[i], t, cap->no);
