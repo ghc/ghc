@@ -65,9 +65,9 @@ newSpark (StgRegTable *reg, StgClosure *p)
 
     if (!fizzledSpark(p)) {
         pushWSDeque(pool,p);
-        cap->sparks_created++;
+        cap->spark_stats.created++;
     } else {
-        cap->sparks_dud++;
+        cap->spark_stats.dud++;
     }
 
     return 1;
@@ -173,7 +173,7 @@ pruneSparkQueue (Capability *cap)
           // evaluated, but it doesn't hurt to have this check for
           // robustness.
           pruned_sparks++;
-          cap->sparks_fizzled++;
+          cap->spark_stats.fizzled++;
       } else {
           info = spark->header.info;
           if (IS_FORWARDING_PTR(info)) {
@@ -185,7 +185,7 @@ pruneSparkQueue (Capability *cap)
                   n++;
               } else {
                   pruned_sparks++; // discard spark
-                  cap->sparks_fizzled++;
+                  cap->spark_stats.fizzled++;
               }
           } else if (HEAP_ALLOCED(spark)) {
               if ((Bdescr((P_)spark)->flags & BF_EVACUATED)) {
@@ -195,11 +195,11 @@ pruneSparkQueue (Capability *cap)
                       n++;
                   } else {
                       pruned_sparks++; // discard spark
-                      cap->sparks_fizzled++;
+                      cap->spark_stats.fizzled++;
                   }
               } else {
                   pruned_sparks++; // discard spark
-                  cap->sparks_gcd++;
+                  cap->spark_stats.gcd++;
               }
           } else {
               if (INFO_PTR_TO_STRUCT(info)->type == THUNK_STATIC) {
@@ -209,11 +209,11 @@ pruneSparkQueue (Capability *cap)
                       n++;
                   } else {
                       pruned_sparks++; // discard spark
-                      cap->sparks_gcd++;
+                      cap->spark_stats.gcd++;
                   }
               } else {
                   pruned_sparks++; // discard spark
-                  cap->sparks_fizzled++;
+                  cap->spark_stats.fizzled++;
               }
           }
       }

@@ -98,11 +98,7 @@ struct Capability_ {
     SparkPool *sparks;
 
     // Stats on spark creation/conversion
-    nat sparks_created;
-    nat sparks_dud;
-    nat sparks_converted;
-    nat sparks_gcd;
-    nat sparks_fizzled;
+    SparkCounters spark_stats;
 #endif
 
     // Per-capability STM-related data

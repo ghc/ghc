@@ -94,11 +94,11 @@ findSpark (Capability *cap)
       // slower (prsa) and doesn't affect the others.
       spark = tryStealSpark(cap->sparks);
       while (spark != NULL && fizzledSpark(spark)) {
-          cap->sparks_fizzled++;
+          cap->spark_stats.fizzled++;
           spark = tryStealSpark(cap->sparks);
       }
       if (spark != NULL) {
-          cap->sparks_converted++;
+          cap->spark_stats.converted++;
 
           // Post event for running a spark from capability's own pool.
           traceEventRunSpark(cap, cap->r.rCurrentTSO);
@@ -127,7 +127,7 @@ findSpark (Capability *cap)
 
           spark = tryStealSpark(robbed->sparks);
           while (spark != NULL && fizzledSpark(spark)) {
-              cap->sparks_fizzled++;
+              cap->spark_stats.fizzled++;
               spark = tryStealSpark(robbed->sparks);
           }
           if (spark == NULL && !emptySparkPoolCap(robbed)) {
@@ -137,7 +137,7 @@ findSpark (Capability *cap)
           }
 
           if (spark != NULL) {
-              cap->sparks_converted++;
+              cap->spark_stats.converted++;
 
               traceEventStealSpark(cap, cap->r.rCurrentTSO, robbed->no);
               
@@ -232,11 +232,11 @@ initCapability( Capability *cap, nat i )
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
     cap->inbox              = (Message*)END_TSO_QUEUE;
-    cap->sparks_created     = 0;
-    cap->sparks_dud         = 0;
-    cap->sparks_converted   = 0;
-    cap->sparks_gcd         = 0;
-    cap->sparks_fizzled     = 0;
+    cap->spark_stats.created    = 0;
+    cap->spark_stats.dud        = 0;
+    cap->spark_stats.converted  = 0;
+    cap->spark_stats.gcd        = 0;
+    cap->spark_stats.fizzled    = 0;
 #endif
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
