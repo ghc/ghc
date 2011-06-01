@@ -63,13 +63,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
     Capability *cap = regTableToCapability(reg);
     SparkPool *pool = cap->sparks;
 
-    /* I am not sure whether this is the right thing to do.
-     * Maybe it is better to exploit the tag information
-     * instead of throwing it away?
-     */
-    p = UNTAG_CLOSURE(p);
-
-    if (closure_SHOULD_SPARK(p)) {
+    if (!fizzledSpark(p)) {
         pushWSDeque(pool,p);
         cap->sparks_created++;
     } else {

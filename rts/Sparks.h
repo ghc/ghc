@@ -31,6 +31,8 @@ INLINE_HEADER StgClosure* reclaimSpark(SparkPool *pool);
 INLINE_HEADER rtsBool looksEmpty(SparkPool* deque);
 
 StgClosure * tryStealSpark     (Capability *cap);
+INLINE_HEADER rtsBool      fizzledSpark  (StgClosure *);
+
 void         freeSparkPool     (SparkPool *pool);
 void         createSparkThread (Capability *cap);
 void         traverseSparkQueue(evac_fn evac, void *user, Capability *cap);
@@ -61,6 +63,11 @@ INLINE_HEADER long sparkPoolSize (SparkPool *pool)
 INLINE_HEADER void discardSparks (SparkPool *pool)
 {
     discardElements(pool);
+}
+
+INLINE_HEADER rtsBool fizzledSpark (StgClosure *spark)
+{
+    return (GET_CLOSURE_TAG(spark) != 0 || !closure_SHOULD_SPARK(spark));
 }
 
 #endif // THREADED_RTS
