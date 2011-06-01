@@ -64,8 +64,12 @@ newSpark (StgRegTable *reg, StgClosure *p)
     SparkPool *pool = cap->sparks;
 
     if (!fizzledSpark(p)) {
-        pushWSDeque(pool,p);
-        cap->spark_stats.created++;
+        if (pushWSDeque(pool,p)) {
+           cap->spark_stats.created++;
+        } else {
+            /* overflowing the spark pool */
+            cap->spark_stats.overflowed++;
+	}
     } else {
         cap->spark_stats.dud++;
     }

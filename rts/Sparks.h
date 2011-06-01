@@ -19,6 +19,7 @@
 typedef struct {
     StgWord created;
     StgWord dud;
+    StgWord overflowed;
     StgWord converted;
     StgWord gcd;
     StgWord fizzled;

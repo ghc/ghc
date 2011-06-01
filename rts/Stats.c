@@ -629,18 +629,19 @@ stat_exit(int alloc)
 
             {
                 nat i;
-                SparkCounters sparks = { 0, 0, 0, 0, 0};
+                SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
                 for (i = 0; i < n_capabilities; i++) {
                     sparks.created   += capabilities[i].spark_stats.created;
                     sparks.dud       += capabilities[i].spark_stats.dud;
+                    sparks.overflowed+= capabilities[i].spark_stats.overflowed;
                     sparks.converted += capabilities[i].spark_stats.converted;
                     sparks.gcd       += capabilities[i].spark_stats.gcd;
                     sparks.fizzled   += capabilities[i].spark_stats.fizzled;
                 }
 
-                statsPrintf("  SPARKS: %ld (%ld converted, %ld dud, %ld GC'd, %ld fizzled)\n\n",
-                            sparks.created + sparks.dud,
-                            sparks.converted, sparks.dud,
+                statsPrintf("  SPARKS: %ld (%ld converted, %ld overflowed, %ld dud, %ld GC'd, %ld fizzled)\n\n",
+                            sparks.created + sparks.dud + sparks.overflowed,
+                            sparks.converted, sparks.overflowed, sparks.dud,
                             sparks.gcd, sparks.fizzled);
             }
 #endif

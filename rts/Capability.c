@@ -234,6 +234,7 @@ initCapability( Capability *cap, nat i )
     cap->inbox              = (Message*)END_TSO_QUEUE;
     cap->spark_stats.created    = 0;
     cap->spark_stats.dud        = 0;
+    cap->spark_stats.overflowed = 0;
     cap->spark_stats.converted  = 0;
     cap->spark_stats.gcd        = 0;
     cap->spark_stats.fizzled    = 0;
