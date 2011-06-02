@@ -40,7 +40,7 @@ INLINE_HEADER StgClosure* reclaimSpark(SparkPool *pool);
 // if the pool is almost empty).
 INLINE_HEADER rtsBool looksEmpty(SparkPool* deque);
 
-INLINE_HEADER StgClosure * tryStealSpark (SparkPool *cap);
+INLINE_HEADER StgClosure * tryStealSpark (SparkPool *pool);
 INLINE_HEADER rtsBool      fizzledSpark  (StgClosure *);
 
 void         freeSparkPool     (SparkPool *pool);
