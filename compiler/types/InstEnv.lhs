@@ -21,7 +21,6 @@ module InstEnv (
 
 #include "HsVersions.h"
 
-import DynFlags
 import Class
 import Var
 import VarSet
@@ -462,9 +461,9 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
     pruned_matches = foldr insert_overlapping [] all_matches
-    (safe_matches, safe_fail) = if length pruned_matches /= 1 
-                        then (pruned_matches, False)
-                        else check_safe (head pruned_matches) all_matches
+    (safe_matches, safe_fail) = if length pruned_matches == 1 
+                        then check_safe (head pruned_matches) all_matches
+                        else (pruned_matches, False)
 	-- Even if the unifs is non-empty (an error situation)
 	-- we still prune the matches, so that the error message isn't
 	-- misleading (complaining of multiple matches when some should be
@@ -481,7 +480,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     check_safe match@(inst,_) others
         = case isSafeOverlap (is_flag inst) of
                 -- most specific isn't from a Safe module so OK
-                False -> ([match], True)
+                False -> ([match], False)
                 -- otherwise we make sure it only overlaps instances from
                 -- the same module
                 True -> (go [] others, True)
