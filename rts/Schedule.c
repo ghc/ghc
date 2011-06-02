@@ -1414,6 +1414,11 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
         waitForGcThreads(cap);
+        
+#if defined(THREADED_RTS)
+        // Stable point where we can do a global check on our spark counters
+        ASSERT(checkSparkCountInvariant());
+#endif
     }
 
 #endif
@@ -1460,6 +1465,11 @@ delete_threads_and_gc:
         // necessarily deadlocked:
         recent_activity = ACTIVITY_YES;
     }
+
+#if defined(THREADED_RTS)
+    // Stable point where we can do a global check on our spark counters
+    ASSERT(checkSparkCountInvariant());
+#endif
 
     if (heap_census) {
         debugTrace(DEBUG_sched, "performing heap census");

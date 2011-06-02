@@ -139,6 +139,10 @@ struct Capability_ {
   ASSERT(myTask() == task);				\
   ASSERT_TASK_ID(task);
 
+#if defined(THREADED_RTS)
+rtsBool checkSparkCountInvariant (void);
+#endif
+
 // Converts a *StgRegTable into a *Capability.
 //
 INLINE_HEADER Capability *
