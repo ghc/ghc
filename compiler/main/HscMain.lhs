@@ -774,8 +774,9 @@ hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
 hscFileFrontEnd mod_summary = do
     rdr_module <- hscParse' mod_summary
     hsc_env <- getHscEnv
-    {-# SCC "Typecheck-Rename" #-}
-        tcg_env <- ioMsgMaybe $
+    tcg_env <-
+        {-# SCC "Typecheck-Rename" #-}
+        ioMsgMaybe $
             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
     dflags <- getDynFlags
     -- XXX: See Note [SafeHaskell API]
