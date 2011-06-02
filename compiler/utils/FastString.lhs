@@ -108,7 +108,12 @@ import Data.Char        ( ord )
 
 import GhcIO ( IO(..) )
 
+#if __GLASGOW_HASKELL__ >= 701
+import GHC.Ptr.Unsafe   ( Ptr(..) )
+#else
 import GHC.Ptr          ( Ptr(..) )
+#endif
+
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )
 #endif

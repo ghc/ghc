@@ -48,14 +48,17 @@ import FastString hiding ( buf )
 import FastTypes
 import FastFunctions
 
-import Foreign
 import System.IO                ( hGetBuf, hFileSize,IOMode(ReadMode), hClose
-                                , Handle, hTell )
+                                , Handle, hTell, openBinaryFile )
 import System.IO.Unsafe         ( unsafePerformIO )
 
 import GHC.Exts
 
-import System.IO                ( openBinaryFile )
+#if __GLASGOW_HASKELL__ >= 701
+import Foreign
+#else
+import Foreign hiding           ( unsafePerformIO )
+#endif
 
 -- -----------------------------------------------------------------------------
 -- The StringBuffer type
