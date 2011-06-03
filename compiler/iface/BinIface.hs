@@ -1508,14 +1508,18 @@ instance Binary name => Binary (AnnTarget name) where
                   return (ModuleTarget a)
 
 instance Binary IfaceVectInfo where
-    put_ bh (IfaceVectInfo a1 a2 a3) = do
+    put_ bh (IfaceVectInfo a1 a2 a3 a4 a5) = do
 	    put_ bh a1
 	    put_ bh a2
 	    put_ bh a3
+	    put_ bh a4
+	    put_ bh a5
     get bh = do
 	    a1 <- get bh
 	    a2 <- get bh
 	    a3 <- get bh
-	    return (IfaceVectInfo a1 a2 a3)
+	    a4 <- get bh
+	    a5 <- get bh
+	    return (IfaceVectInfo a1 a2 a3 a4 a5)
 
 

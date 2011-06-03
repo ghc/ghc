@@ -100,7 +100,7 @@ module HscTypes (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import ByteCodeAsm	( CompiledByteCode )
+import ByteCodeAsm      ( CompiledByteCode )
 import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
@@ -108,16 +108,17 @@ import HsSyn
 import RdrName
 import Name
 import NameEnv
-import NameSet	
+import NameSet  
 import Module
-import InstEnv		( InstEnv, Instance )
-import FamInstEnv	( FamInstEnv, FamInst )
-import Rules		( RuleBase )
-import CoreSyn		( CoreBind )
+import InstEnv          ( InstEnv, Instance )
+import FamInstEnv       ( FamInstEnv, FamInst )
+import Rules            ( RuleBase )
+import CoreSyn          ( CoreBind )
 import VarEnv
+import VarSet
 import Var
 import Id
-import Type		
+import Type             
 
 import Annotations
 import Class		( Class, classAllSelIds, classATs, classTyCon )
@@ -1712,9 +1713,9 @@ isHpcUsed (NoHpcInfo { hpcUsed = used }) = used
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Vectorisation Support}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 The following information is generated and consumed by the vectorisation
@@ -1727,49 +1728,58 @@ vectorisation, we need to know `f_v', whose `Var' we cannot lookup based
 on just the OccName easily in a Core pass.
 
 \begin{code}
--- | Vectorisation information for 'ModGuts', 'ModDetails' and 'ExternalPackageState'.
+-- |Vectorisation information for 'ModGuts', 'ModDetails' and 'ExternalPackageState'; see also
+-- documentation at 'Vectorise.Env.GlobalEnv'.
 data VectInfo      
-  = VectInfo {
-      vectInfoVar     :: VarEnv  (Var    , Var  ),   -- ^ @(f, f_v)@ keyed on @f@
-      vectInfoTyCon   :: NameEnv (TyCon  , TyCon),   -- ^ @(T, T_v)@ keyed on @T@
-      vectInfoDataCon :: NameEnv (DataCon, DataCon), -- ^ @(C, C_v)@ keyed on @C@
-      vectInfoPADFun  :: NameEnv (TyCon  , Var),     -- ^ @(T_v, paT)@ keyed on @T_v@
-      vectInfoIso     :: NameEnv (TyCon  , Var)      -- ^ @(T, isoT)@ keyed on @T@
+  = VectInfo
+    { vectInfoVar          :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
+    , vectInfoTyCon        :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
+    , vectInfoDataCon      :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
+    , vectInfoPADFun       :: NameEnv (TyCon  , Var)      -- ^ @(T_v, paT)@ keyed on @T_v@
+    , vectInfoIso          :: NameEnv (TyCon  , Var)      -- ^ @(T, isoT)@ keyed on @T@
+    , vectInfoScalarVars   :: VarSet                      -- ^ set of purely scalar variables
+    , vectInfoScalarTyCons :: NameSet                     -- ^ set of scalar type constructors
     }
 
--- | Vectorisation information for 'ModIface': a slightly less low-level view
+-- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated 
+-- across module boundaries.
+--
 data IfaceVectInfo 
-  = IfaceVectInfo {
-      ifaceVectInfoVar        :: [Name],
-        -- ^ All variables in here have a vectorised variant
-      ifaceVectInfoTyCon      :: [Name],
-        -- ^ All 'TyCon's in here have a vectorised variant;
-        -- the name of the vectorised variant and those of its
-        -- data constructors are determined by 'OccName.mkVectTyConOcc'
-        -- and 'OccName.mkVectDataConOcc'; the names of
-        -- the isomorphisms are determined by 'OccName.mkVectIsoOcc'
-      ifaceVectInfoTyConReuse :: [Name]              
-        -- ^ The vectorised form of all the 'TyCon's in here coincides with
-        -- the unconverted form; the name of the isomorphisms is determined
-        -- by 'OccName.mkVectIsoOcc'
+  = IfaceVectInfo 
+    { ifaceVectInfoVar          :: [Name]  -- ^ All variables in here have a vectorised variant
+    , ifaceVectInfoTyCon        :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
+                                           -- the name of the vectorised variant and those of its
+                                           -- data constructors are determined by
+                                           -- 'OccName.mkVectTyConOcc' and 
+                                           -- 'OccName.mkVectDataConOcc'; the names of the
+                                           -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
+    , ifaceVectInfoTyConReuse   :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
+                                           -- coincides with the unconverted form; the name of the
+                                           -- isomorphisms is determined by 'OccName.mkVectIsoOcc'
+    , ifaceVectInfoScalarVars   :: [Name]  -- iface version of 'vectInfoScalarVar'
+    , ifaceVectInfoScalarTyCons :: [Name]  -- iface version of 'vectInfoScalarTyCon'
     }
 
 noVectInfo :: VectInfo
-noVectInfo = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyNameEnv
+noVectInfo 
+  = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyVarSet
+             emptyNameSet
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 = 
-  VectInfo (vectInfoVar     vi1 `plusVarEnv`  vectInfoVar     vi2)
-           (vectInfoTyCon   vi1 `plusNameEnv` vectInfoTyCon   vi2)
-           (vectInfoDataCon vi1 `plusNameEnv` vectInfoDataCon vi2)
-           (vectInfoPADFun  vi1 `plusNameEnv` vectInfoPADFun  vi2)
-           (vectInfoIso     vi1 `plusNameEnv` vectInfoIso     vi2)
+  VectInfo (vectInfoVar          vi1 `plusVarEnv`    vectInfoVar          vi2)
+           (vectInfoTyCon        vi1 `plusNameEnv`   vectInfoTyCon        vi2)
+           (vectInfoDataCon      vi1 `plusNameEnv`   vectInfoDataCon      vi2)
+           (vectInfoPADFun       vi1 `plusNameEnv`   vectInfoPADFun       vi2)
+           (vectInfoIso          vi1 `plusNameEnv`   vectInfoIso          vi2)
+           (vectInfoScalarVars   vi1 `unionVarSet`   vectInfoScalarVars   vi2)
+           (vectInfoScalarTyCons vi1 `unionNameSets` vectInfoScalarTyCons vi2)
 
 concatVectInfo :: [VectInfo] -> VectInfo
 concatVectInfo = foldr plusVectInfo noVectInfo
 
 noIfaceVectInfo :: IfaceVectInfo
-noIfaceVectInfo = IfaceVectInfo [] [] []
+noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
 \end{code}
 
 %************************************************************************

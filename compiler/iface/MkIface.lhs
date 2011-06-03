@@ -7,23 +7,23 @@
 module MkIface ( 
         mkUsedNames,
         mkDependencies,
-	mkIface, 	-- Build a ModIface from a ModGuts, 
-			-- including computing version information
+        mkIface,        -- Build a ModIface from a ModGuts, 
+                        -- including computing version information
 
         mkIfaceTc,
 
-	writeIfaceFile,	-- Write the interface file
+        writeIfaceFile, -- Write the interface file
 
-	checkOldIface,	-- See if recompilation is required, by
-			-- comparing version information
+        checkOldIface,  -- See if recompilation is required, by
+                        -- comparing version information
 
         tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
 \end{code}
 
-	-----------------------------------------------
-        	Recompilation checking
-	-----------------------------------------------
+  -----------------------------------------------
+          Recompilation checking
+  -----------------------------------------------
 
 A complete description of how recompilation checking works can be
 found in the wiki commentary:
@@ -72,6 +72,7 @@ import HscTypes
 import Finder
 import DynFlags
 import VarEnv
+import VarSet
 import Var
 import Name
 import RdrName
@@ -325,18 +326,17 @@ mkIface_ hsc_env maybe_old_fingerprint
 
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
-     flattenVectInfo (VectInfo { vectInfoVar   = vVar
-                               , vectInfoTyCon = vTyCon
+     flattenVectInfo (VectInfo { vectInfoVar          = vVar
+                               , vectInfoTyCon        = vTyCon
+                               , vectInfoScalarVars   = vScalarVars
+                               , vectInfoScalarTyCons = vScalarTyCons
                                }) = 
-       IfaceVectInfo { 
-         ifaceVectInfoVar        = [ Var.varName v 
-                                   | (v, _) <- varEnvElts vVar],
-         ifaceVectInfoTyCon      = [ tyConName t 
-                                   | (t, t_v) <- nameEnvElts vTyCon
-                                   , t /= t_v],
-         ifaceVectInfoTyConReuse = [ tyConName t
-                                   | (t, t_v) <- nameEnvElts vTyCon
-                                   , t == t_v]
+       IfaceVectInfo
+       { ifaceVectInfoVar          = [Var.varName v | (v, _  ) <- varEnvElts  vVar]
+       , ifaceVectInfoTyCon        = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
+       , ifaceVectInfoTyConReuse   = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
+       , ifaceVectInfoScalarVars   = [Var.varName v | v <- varSetElems vScalarVars]
+       , ifaceVectInfoScalarTyCons = nameSetToList vScalarTyCons
        } 
 
 -----------------------------

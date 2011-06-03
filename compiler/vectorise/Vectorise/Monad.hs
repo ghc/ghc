@@ -1,27 +1,26 @@
 
 module Vectorise.Monad (
-	module Vectorise.Monad.Base,
-	module Vectorise.Monad.Naming,
-	module Vectorise.Monad.Local,
-	module Vectorise.Monad.Global,
-	module Vectorise.Monad.InstEnv,
-	initV,
+  module Vectorise.Monad.Base,
+  module Vectorise.Monad.Naming,
+  module Vectorise.Monad.Local,
+  module Vectorise.Monad.Global,
+  module Vectorise.Monad.InstEnv,
+  initV,
 
-	-- * Builtins
-	liftBuiltinDs,
-	builtin,
-	builtins,
-	
-	-- * Variables
-	lookupVar,
-	maybeCantVectoriseVarM,
-	dumpVar,
-	addGlobalScalar, 
-    deleteGlobalScalar,
+  -- * Builtins
+  liftBuiltinDs,
+  builtin,
+  builtins,
+  
+  -- * Variables
+  lookupVar,
+  maybeCantVectoriseVarM,
+  dumpVar,
+  addGlobalScalar, 
     
-	-- * Primitives
-	lookupPrimPArray,
-	lookupPrimMethod
+  -- * Primitives
+  lookupPrimPArray,
+  lookupPrimMethod
 ) where
 
 import Vectorise.Monad.Base
@@ -98,7 +97,7 @@ initV hsc_env guts info thing_inside
                No           -> return Nothing
            } }
 
-    new_info genv = updVectInfo genv (mg_types guts) info
+    new_info genv = modVectInfo genv (mg_types guts) info
 
     selectBackendErr = sLit "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
 
@@ -120,7 +119,7 @@ builtins f = VM $ \bi genv lenv -> return (Yes genv lenv (`f` bi))
 
 -- Var ------------------------------------------------------------------------
 -- | Lookup the vectorised and\/or lifted versions of this variable.
---	If it's in the global environment we get the vectorised version.
+--  If it's in the global environment we get the vectorised version.
 --      If it's in the local environment we get both the vectorised and lifted version.
 lookupVar :: Var -> VM (Scope Var (Var, Var))
 lookupVar v
@@ -140,29 +139,24 @@ maybeCantVectoriseVarM v p
 
 dumpVar :: Var -> a
 dumpVar var
-	| Just _		<- isClassOpId_maybe var
-	= cantVectorise "ClassOpId not vectorised:" (ppr var)
+  | Just _    <- isClassOpId_maybe var
+  = cantVectorise "ClassOpId not vectorised:" (ppr var)
 
-	| otherwise
-	= cantVectorise "Variable not vectorised:" (ppr var)
+  | otherwise
+  = cantVectorise "Variable not vectorised:" (ppr var)
 
 
--- local scalars --------------------------------------------------------------
+-- Global scalars --------------------------------------------------------------
 
 addGlobalScalar :: Var -> VM ()
 addGlobalScalar var 
   = do { traceVt "addGlobalScalar" (ppr var)
-       ; updGEnv $ \env -> env{global_scalars = extendVarSet (global_scalars env) var}
-     }
-     
-deleteGlobalScalar :: Var -> VM ()
-deleteGlobalScalar var 
-  = do { traceVt "deleteGlobalScalar" (ppr var)
-       ; updGEnv $ \env -> env{global_scalars = delVarSet (global_scalars env) var}
-     }
+       ; updGEnv $ \env -> env{global_scalar_vars = extendVarSet (global_scalar_vars env) var}
+       }
      
      
 -- Primitives -----------------------------------------------------------------
+
 lookupPrimPArray :: TyCon -> VM (Maybe TyCon)
 lookupPrimPArray = liftBuiltinDs . primPArray
 

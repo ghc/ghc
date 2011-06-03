@@ -39,14 +39,16 @@ import Class
 import TyCon
 import DataCon
 import TysWiredIn
-import TysPrim		( anyTyConOfKind )
-import BasicTypes	( Arity, nonRuleLoopBreaker )
+import TysPrim          ( anyTyConOfKind )
+import BasicTypes       ( Arity, nonRuleLoopBreaker )
 import qualified Var
 import VarEnv
+import VarSet
 import Name
 import NameEnv
-import OccurAnal	( occurAnalyseExpr )
-import Demand		( isBottomingSig )
+import NameSet
+import OccurAnal        ( occurAnalyseExpr )
+import Demand           ( isBottomingSig )
 import Module
 import UniqFM
 import UniqSupply
@@ -689,28 +691,32 @@ tcIfaceAnnTarget (ModuleTarget mod) = do
 
 
 %************************************************************************
-%*									*
-		Vectorisation information
-%*									*
+%*                                                                      *
+                Vectorisation information
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 tcIfaceVectInfo :: Module -> TypeEnv  -> IfaceVectInfo -> IfL VectInfo
 tcIfaceVectInfo mod typeEnv (IfaceVectInfo 
-                             { ifaceVectInfoVar        = vars
-                             , ifaceVectInfoTyCon      = tycons
-                             , ifaceVectInfoTyConReuse = tyconsReuse
+                             { ifaceVectInfoVar          = vars
+                             , ifaceVectInfoTyCon        = tycons
+                             , ifaceVectInfoTyConReuse   = tyconsReuse
+                             , ifaceVectInfoScalarVars   = scalarVars
+                             , ifaceVectInfoScalarTyCons = scalarTyCons
                              })
   = do { vVars     <- mapM vectVarMapping vars
        ; tyConRes1 <- mapM vectTyConMapping      tycons
        ; tyConRes2 <- mapM vectTyConReuseMapping tyconsReuse
        ; let (vTyCons, vDataCons, vPAs, vIsos) = unzip4 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
-                  { vectInfoVar     = mkVarEnv  vVars
-                  , vectInfoTyCon   = mkNameEnv vTyCons
-                  , vectInfoDataCon = mkNameEnv (concat vDataCons)
-                  , vectInfoPADFun  = mkNameEnv vPAs
-                  , vectInfoIso     = mkNameEnv vIsos
+                  { vectInfoVar          = mkVarEnv     vVars
+                  , vectInfoTyCon        = mkNameEnv    vTyCons
+                  , vectInfoDataCon      = mkNameEnv    (concat vDataCons)
+                  , vectInfoPADFun       = mkNameEnv    vPAs
+                  , vectInfoIso          = mkNameEnv    vIsos
+                  , vectInfoScalarVars   = mkVarSet  (map lookupVar scalarVars)
+                  , vectInfoScalarTyCons = mkNameSet scalarTyCons
                   }
        }
   where
@@ -778,9 +784,9 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
 \end{code}
 
 %************************************************************************
-%*									*
-			Types
-%*									*
+%*                                                                      *
+                        Types
+%*                                                                      *
 %************************************************************************
 
 \begin{code}

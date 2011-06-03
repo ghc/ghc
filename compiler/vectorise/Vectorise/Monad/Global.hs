@@ -73,19 +73,24 @@ defGlobalVar v v' = updGEnv $ \env ->
 
 
 -- Vectorisation declarations -------------------------------------------------
--- | Check whether a variable has a (non-scalar) vectorisation declaration.
+
+-- |Check whether a variable has a (non-scalar) vectorisation declaration.
+--
 lookupVectDecl :: Var -> VM (Maybe (Type, CoreExpr))
 lookupVectDecl var = readGEnv $ \env -> lookupVarEnv (global_vect_decls env) var
 
 
 -- Scalars --------------------------------------------------------------------
--- | Get the set of global scalar variables.
-globalScalars :: VM VarSet
-globalScalars = readGEnv global_scalars
 
--- | Check whether a given variable is in the set of global scalar variables.
+-- |Get the set of global scalar variables.
+--
+globalScalars :: VM VarSet
+globalScalars = readGEnv global_scalar_vars
+
+-- |Check whether a given variable is in the set of global scalar variables.
+--
 isGlobalScalar :: Var -> VM Bool
-isGlobalScalar var = readGEnv $ \env -> elemVarSet var (global_scalars env)
+isGlobalScalar var = readGEnv $ \env -> elemVarSet var (global_scalar_vars env)
 
 
 -- TyCons ---------------------------------------------------------------------
