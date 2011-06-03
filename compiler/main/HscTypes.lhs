@@ -863,37 +863,47 @@ emptyModIface mod
 %************************************************************************
 
 \begin{code}
--- | Interactive context, recording information relevant to GHCi
+-- | Interactive context, recording information about the state of the
+-- context in which statements are executed in a GHC session.
+--
 data InteractiveContext 
   = InteractiveContext { 
-          ic_toplev_scope :: [Module]   -- ^ The context includes the "top-level" scope of
-					-- these modules
+         -- These two fields are only stored here so that the client
+         -- can retrieve them with GHC.getContext.  GHC itself doesn't
+         -- use them, but it does reset them to empty sometimes (such
+         -- as before a GHC.load).  The context is set with GHC.setContext.
+         ic_toplev_scope :: [Module],
+             -- ^ The context includes the "top-level" scope of
+             -- these modules
+         ic_imports :: [ImportDecl RdrName],
+             -- ^ The context is extended with these import declarations
 
-        , ic_exports :: [(Module, Maybe (ImportDecl RdrName))]    -- ^ The context includes just the exported parts of these
-					-- modules
+         ic_rn_gbl_env :: GlobalRdrEnv,
+             -- ^ The contexts' cached 'GlobalRdrEnv', built by
+             -- 'InteractiveEval.setContext'
 
-        , ic_rn_gbl_env :: GlobalRdrEnv -- ^ The contexts' cached 'GlobalRdrEnv', built from
-					-- 'ic_toplev_scope' and 'ic_exports'
-
-        , ic_tmp_ids :: [Id]   -- ^ Names bound during interaction with the user.
-                               -- Later Ids shadow earlier ones with the same OccName
-                               -- Expressions are typed with these Ids in the envt
-                               -- For runtime-debugging, these Ids may have free
-                               -- TcTyVars of RuntimUnkSkol flavour, but no free TyVars
-                               -- (because the typechecker doesn't expect that)
+         ic_tmp_ids :: [Id],
+             -- ^ Names bound during interaction with the user.  Later
+             -- Ids shadow earlier ones with the same OccName
+             -- Expressions are typed with these Ids in the envt For
+             -- runtime-debugging, these Ids may have free TcTyVars of
+             -- RuntimUnkSkol flavour, but no free TyVars (because the
+             -- typechecker doesn't expect that)
 
 #ifdef GHCI
-        , ic_resume :: [Resume]         -- ^ The stack of breakpoint contexts
+         ic_resume :: [Resume],
+             -- ^ The stack of breakpoint contexts
 #endif
 
-        , ic_cwd :: Maybe FilePath      -- virtual CWD of the program
+         ic_cwd :: Maybe FilePath
+             -- virtual CWD of the program
     }
 
 
 emptyInteractiveContext :: InteractiveContext
 emptyInteractiveContext
   = InteractiveContext { ic_toplev_scope = [],
-			 ic_exports = [],
+                         ic_imports = [],
 			 ic_rn_gbl_env = emptyGlobalRdrEnv,
 			 ic_tmp_ids = []
 #ifdef GHCI
