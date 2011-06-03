@@ -232,3 +232,5 @@ _darcs/
 /utils/runstdtest/runstdtest
 /utils/unlit/unlit
 
+
+/extra-gcc-opts
