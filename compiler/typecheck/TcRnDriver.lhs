@@ -246,7 +246,7 @@ tcRnImports hsc_env this_mod import_decls
 		-- found.
 	; loadOrphanModules (imp_orphs  imports) False
 
-		-- Check type-familily consistency
+                -- Check type-family consistency
 	; traceRn (text "rn1: checking family instance consistency")
 	; let { dir_imp_mods = moduleEnvKeys
 			     . imp_mods 
