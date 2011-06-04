@@ -933,6 +933,10 @@ getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 #ifdef GHCI
 getPackageModuleInfo hsc_env mdl = do
   mb_avails <- hscGetModuleExports hsc_env mdl
+     -- This is the only use of hscGetModuleExports.  Perhaps we could use
+     -- hscRnImportDecls instead, but that does a lot more than we need
+     -- (building instance environment, checking family instance consistency
+     -- etc.).
   case mb_avails of
     Nothing -> return Nothing
     Just avails -> do
