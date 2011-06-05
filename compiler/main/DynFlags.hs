@@ -252,7 +252,6 @@ data DynFlag
    | Opt_Pp
    | Opt_ForceRecomp
    | Opt_DryRun
-   | Opt_DoAsmMangling
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
    | Opt_ReadUserPackageConf
@@ -289,7 +288,6 @@ data DynFlag
    | Opt_KeepHiDiffs
    | Opt_KeepHcFiles
    | Opt_KeepSFiles
-   | Opt_KeepRawSFiles
    | Opt_KeepTmpFiles
    | Opt_KeepRawTokenStream
    | Opt_KeepLlvmFiles
@@ -398,7 +396,6 @@ data DynFlags = DynFlags {
 #ifndef OMIT_NATIVE_CODEGEN
   targetPlatform	:: Platform,	-- ^ The platform we're compiling for. Used by the NCG.
 #endif
-  stolen_x86_regs       :: Int,
   cmdlineHcIncludes     :: [String],    -- ^ @\-\#includes@
   importPaths           :: [FilePath],
   mainModIs             :: Module,
@@ -469,7 +466,6 @@ data DynFlags = DynFlags {
   pgm_P                 :: (String,[Option]),
   pgm_F                 :: String,
   pgm_c                 :: (String,[Option]),
-  pgm_m                 :: (String,[Option]),
   pgm_s                 :: (String,[Option]),
   pgm_a                 :: (String,[Option]),
   pgm_l                 :: (String,[Option]),
@@ -627,6 +623,7 @@ data DynLibLoader
   deriving Eq
 
 data RtsOptsEnabled = RtsOptsNone | RtsOptsSafeOnly | RtsOptsAll
+  deriving (Show)
 
 -- | Used by 'GHC.newSession' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
@@ -668,7 +665,6 @@ defaultDynFlags =
 #ifndef OMIT_NATIVE_CODEGEN
         targetPlatform          = defaultTargetPlatform,
 #endif
-        stolen_x86_regs         = 4,
         cmdlineHcIncludes       = [],
         importPaths             = ["."],
         mainModIs               = mAIN,
@@ -733,7 +729,6 @@ defaultDynFlags =
         pgm_P                   = panic "defaultDynFlags: No pgm_P",
         pgm_F                   = panic "defaultDynFlags: No pgm_F",
         pgm_c                   = panic "defaultDynFlags: No pgm_c",
-        pgm_m                   = panic "defaultDynFlags: No pgm_m",
         pgm_s                   = panic "defaultDynFlags: No pgm_s",
         pgm_a                   = panic "defaultDynFlags: No pgm_a",
         pgm_l                   = panic "defaultDynFlags: No pgm_l",
@@ -1106,7 +1101,7 @@ dynamic_flags = [
   , Flag "pgmP"           (hasArg setPgmP)
   , Flag "pgmF"           (hasArg (\f d -> d{ pgm_F   = f}))
   , Flag "pgmc"           (hasArg (\f d -> d{ pgm_c   = (f,[])}))
-  , Flag "pgmm"           (hasArg (\f d -> d{ pgm_m   = (f,[])}))
+  , Flag "pgmm"           (HasArg (\_ -> addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
   , Flag "pgms"           (hasArg (\f d -> d{ pgm_s   = (f,[])}))
   , Flag "pgma"           (hasArg (\f d -> d{ pgm_a   = (f,[])}))
   , Flag "pgml"           (hasArg (\f d -> d{ pgm_l   = (f,[])}))
@@ -1177,8 +1172,8 @@ dynamic_flags = [
   , Flag "keep-hc-files"    (NoArg (setDynFlag Opt_KeepHcFiles))
   , Flag "keep-s-file"      (NoArg (setDynFlag Opt_KeepSFiles))
   , Flag "keep-s-files"     (NoArg (setDynFlag Opt_KeepSFiles))
-  , Flag "keep-raw-s-file"  (NoArg (setDynFlag Opt_KeepRawSFiles))
-  , Flag "keep-raw-s-files" (NoArg (setDynFlag Opt_KeepRawSFiles))
+  , Flag "keep-raw-s-file"  (NoArg (addWarn "The -keep-raw-s-file flag does nothing; it will be removed in a future GHC release"))
+  , Flag "keep-raw-s-files" (NoArg (addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
   , Flag "keep-llvm-file"   (NoArg (setDynFlag Opt_KeepLlvmFiles))
   , Flag "keep-llvm-files"  (NoArg (setDynFlag Opt_KeepLlvmFiles))
      -- This only makes sense as plural
@@ -1289,9 +1284,9 @@ dynamic_flags = [
 
         ------ Machine dependant (-m<blah>) stuff ---------------------------
 
-  , Flag "monly-2-regs" (noArg (\s -> s{stolen_x86_regs = 2}))
-  , Flag "monly-3-regs" (noArg (\s -> s{stolen_x86_regs = 3}))
-  , Flag "monly-4-regs" (noArg (\s -> s{stolen_x86_regs = 4}))
+  , Flag "monly-2-regs" (NoArg (addWarn "The -monly-2-regs flag does nothing; it will be removed in a future GHC release"))
+  , Flag "monly-3-regs" (NoArg (addWarn "The -monly-3-regs flag does nothing; it will be removed in a future GHC release"))
+  , Flag "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
   , Flag "msse2"        (NoArg (setDynFlag Opt_SSE2))
 
      ------ Warning opts -------------------------------------------------
@@ -1478,7 +1473,6 @@ fFlags = [
   ( "dicts-cheap",                      Opt_DictsCheap, nop ),
   ( "excess-precision",                 Opt_ExcessPrecision, nop ),
   ( "eager-blackholing",                Opt_EagerBlackHoling, nop ),
-  ( "asm-mangling",                     Opt_DoAsmMangling, nop ),
   ( "print-bind-result",                Opt_PrintBindResult, nop ),
   ( "force-recomp",                     Opt_ForceRecomp, nop ),
   ( "hpc-no-auto",                      Opt_Hpc_No_Auto, nop ),
@@ -1649,8 +1643,6 @@ defaultFlags :: [DynFlag]
 defaultFlags 
   = [ Opt_AutoLinkPackages,
       Opt_ReadUserPackageConf,
-
-      Opt_DoAsmMangling,
 
       Opt_SharedImplib,
 
@@ -2153,20 +2145,17 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -- The options below are not dependent on the version of gcc, only the
 -- platform.
 
-machdepCCOpts :: DynFlags -> ([String], -- flags for all C compilations
-                              [String]) -- for registerised HC compilations
-machdepCCOpts dflags = let (flagsAll, flagsRegHc) = machdepCCOpts' dflags
-                       in (cCcOpts ++ flagsAll, flagsRegHc)
+machdepCCOpts :: DynFlags -> [String] -- flags for all C compilations
+machdepCCOpts dflags = cCcOpts ++ machdepCCOpts'
 
-machdepCCOpts' :: DynFlags -> ([String], -- flags for all C compilations
-                               [String]) -- for registerised HC compilations
-machdepCCOpts' _dflags
+machdepCCOpts' :: [String] -- flags for all C compilations
+machdepCCOpts'
 #if alpha_TARGET_ARCH
-        =       ( ["-w", "-mieee"
+        =       ["-w", "-mieee"
 #ifdef HAVE_THREADED_RTS_SUPPORT
                     , "-D_REENTRANT"
 #endif
-                   ], [] )
+                   ]
         -- For now, to suppress the gcc warning "call-clobbered
         -- register used for global register variable", we simply
         -- disable all warnings altogether using the -w flag. Oh well.
@@ -2174,71 +2163,17 @@ machdepCCOpts' _dflags
 #elif hppa_TARGET_ARCH
         -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
         -- (very nice, but too bad the HP /usr/include files don't agree.)
-        = ( ["-D_HPUX_SOURCE"], [] )
-
-#elif m68k_TARGET_ARCH
-      -- -fno-defer-pop : for the .hc files, we want all the pushing/
-      --    popping of args to routines to be explicit; if we let things
-      --    be deferred 'til after an STGJUMP, imminent death is certain!
-      --
-      -- -fomit-frame-pointer : *don't*
-      --     It's better to have a6 completely tied up being a frame pointer
-      --     rather than let GCC pick random things to do with it.
-      --     (If we want to steal a6, then we would try to do things
-      --     as on iX86, where we *do* steal the frame pointer [%ebp].)
-        = ( [], ["-fno-defer-pop", "-fno-omit-frame-pointer"] )
+        = ["-D_HPUX_SOURCE"]
 
 #elif i386_TARGET_ARCH
       -- -fno-defer-pop : basically the same game as for m68k
       --
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
       --   the fp (%ebp) for our register maps.
-        =  let n_regs = stolen_x86_regs _dflags
-           in
-                    (
-                      [ if opt_Static then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
-                      ],
-                      [ "-fno-defer-pop",
-                        "-fomit-frame-pointer",
-                        -- we want -fno-builtin, because when gcc inlines
-                        -- built-in functions like memcpy() it tends to
-                        -- run out of registers, requiring -monly-n-regs
-                        "-fno-builtin",
-                        "-DSTOLEN_X86_REGS="++show n_regs ]
-                    )
+        =  if opt_Static then ["-DDONT_WANT_WIN32_DLL_SUPPORT"] else []
 
-#elif ia64_TARGET_ARCH
-        = ( [], ["-fomit-frame-pointer", "-G0"] )
-
-#elif x86_64_TARGET_ARCH
-        = (
-                [],
-                ["-fomit-frame-pointer",
-                 "-fno-asynchronous-unwind-tables",
-                        -- the unwind tables are unnecessary for HC code,
-                        -- and get in the way of -split-objs.  Another option
-                        -- would be to throw them away in the mangler, but this
-                        -- is easier.
-                 "-fno-builtin"
-                        -- calling builtins like strlen() using the FFI can
-                        -- cause gcc to run out of regs, so use the external
-                        -- version.
-                ] )
-
-#elif sparc_TARGET_ARCH
-        = ( [], ["-w"] )
-        -- For now, to suppress the gcc warning "call-clobbered
-        -- register used for global register variable", we simply
-        -- disable all warnings altogether using the -w flag. Oh well.
-
-#elif powerpc_apple_darwin_TARGET
-      -- -no-cpp-precomp:
-      --     Disable Apple's precompiling preprocessor. It's a great thing
-      --     for "normal" programs, but it doesn't support register variable
-      --     declarations.
-        = ( [], ["-no-cpp-precomp"] )
 #else
-        = ( [], [] )
+        = []
 #endif
 
 picCCOpts :: DynFlags -> [String]

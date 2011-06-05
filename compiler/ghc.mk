@@ -152,10 +152,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cGHC_UNLIT_PGM        = "$(GHC_UNLIT_PGM)"'                  >> $@
 	@echo 'cGHC_UNLIT_DIR        :: String'                             >> $@
 	@echo 'cGHC_UNLIT_DIR        = "$(GHC_UNLIT_DIR)"'                  >> $@
-	@echo 'cGHC_MANGLER_PGM      :: String'                             >> $@
-	@echo 'cGHC_MANGLER_PGM      = "$(GHC_MANGLER_PGM)"'                >> $@
-	@echo 'cGHC_MANGLER_DIR      :: String'                             >> $@
-	@echo 'cGHC_MANGLER_DIR      = "$(GHC_MANGLER_DIR)"'                >> $@
 	@echo 'cGHC_SPLIT_PGM        :: String'                             >> $@
 	@echo 'cGHC_SPLIT_PGM        = "$(GHC_SPLIT_PGM)"'                  >> $@
 	@echo 'cGHC_SPLIT_DIR        :: String'                             >> $@

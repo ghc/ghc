@@ -544,7 +544,6 @@ BUILD_DIRS += \
 
 ifneq "$(GhcUnregisterised)" "YES"
 BUILD_DIRS += \
-   $(GHC_MANGLER_DIR) \
    $(GHC_SPLIT_DIR)
 endif
 

@@ -496,22 +496,6 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `uname -m`
 
 	<varlistentry>
 	  <term>
-            <option>-keep-raw-s-file</option>,
-            <option>-keep-raw-s-files</option>
-            <indexterm><primary><option>-keep-raw-s-file</option></primary></indexterm>
-            <indexterm><primary><option>-keep-raw-s-files</option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Keep intermediate <literal>.raw-s</literal> files.
-	    These are the direct output from the C compiler, before
-	    GHC does &ldquo;assembly mangling&rdquo; to produce the
-	    <literal>.s</literal> file.  Again, these are not produced
-	    when using the native code generator.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
             <option>-keep-tmp-files</option>
             <indexterm><primary><option>-keep-tmp-files</option></primary></indexterm>
             <indexterm><primary>temporary files</primary><secondary>keeping</secondary></indexterm>

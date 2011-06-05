@@ -498,7 +498,7 @@ mkStubPaths
   :: DynFlags
   -> ModuleName
   -> ModLocation
-  -> (FilePath,FilePath,FilePath)
+  -> FilePath
 
 mkStubPaths dflags mod location
   = let
@@ -513,15 +513,8 @@ mkStubPaths dflags mod location
             | otherwise           = src_basename
 
         stub_basename = stub_basename0 ++ "_stub"
-
-        obj  = ml_obj_file location
-        osuf = objectSuf dflags
-        stub_obj_base = dropTail (length osuf + 1) obj ++ "_stub"
-                        -- NB. not takeFileName, see #3093
      in
-        (stub_basename <.> "c",
-         stub_basename <.> "h",
-         stub_obj_base <.> objectSuf dflags)
+        stub_basename <.> "h"
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
@@ -538,12 +531,9 @@ findObjectLinkableMaybe mod locn
 -- Make an object linkable when we know the object file exists, and we know
 -- its modification time.
 findObjectLinkable :: Module -> FilePath -> ClockTime -> IO Linkable
-findObjectLinkable mod obj_fn obj_time = do
-  let stub_fn = (dropExtension obj_fn ++ "_stub") <.> "o"
-  stub_exist <- doesFileExist stub_fn
-  if stub_exist
-	then return (LM obj_time mod [DotO obj_fn, DotO stub_fn])
-	else return (LM obj_time mod [DotO obj_fn])
+findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
+  -- We used to look for _stub.o files here, but that was a bug (#706)
+  -- Now GHC merges the stub.o into the main .o (#3687)
 
 -- -----------------------------------------------------------------------------
 -- Error messages

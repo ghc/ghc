@@ -20,7 +20,7 @@ The GHC Developer's Wiki
   
   Quick Start for developers
 
-     http://hackage.haskell.org/trac/ghc/wiki/Building/Hacking 
+     http://hackage.haskell.org/trac/ghc/wiki/Building/Hacking
    
      This section on the wiki will get you up and running with a
      serviceable build tree in no time:

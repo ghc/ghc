@@ -1,8 +1,10 @@
 -- -----------------------------------------------------------------------------
 --
--- (c) The University of Glasgow, 2005
+-- (c) The University of Glasgow, 2011
 --
---       This module deals with --make
+--       This module implements multi-module compilation, and is used
+--       by --make and GHCi.
+--
 -- -----------------------------------------------------------------------------
 
 module GhcMake( 
@@ -248,8 +250,9 @@ load2 how_much mod_graph = do
 	    mg = stable_mg ++ partial_mg
 
 	-- clean up between compilations
-	let cleanup = cleanTempFilesExcept dflags
-			  (ppFilesFromSummaries (flattenSCCs mg2_with_srcimps))
+        let cleanup hsc_env = intermediateCleanTempFiles dflags
+                                  (flattenSCCs mg2_with_srcimps)
+                                  hsc_env
 
 	liftIO $ debugTraceMsg dflags 2 (hang (text "Ready for upsweep")
 				   2 (ppr mg))
@@ -274,9 +277,10 @@ load2 how_much mod_graph = do
            do liftIO $ debugTraceMsg dflags 2 (text "Upsweep completely successful.")
 
 	      -- Clean up after ourselves
-	      liftIO $ cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
+              hsc_env1 <- getSession
+              liftIO $ intermediateCleanTempFiles dflags modsDone hsc_env1
 
-	      -- Issue a warning for the confusing case where the user
+              -- Issue a warning for the confusing case where the user
 	      -- said '-o foo' but we're not going to do any linking.
 	      -- We attempt linking if either (a) one of the modules is
 	      -- called Main, or (b) the user said -no-hs-main, indicating
@@ -298,7 +302,6 @@ load2 how_much mod_graph = do
                           moduleNameString (moduleName main_mod) ++ " module.")
 
 	      -- link everything together
-              hsc_env1 <- getSession
               linkresult <- liftIO $ link (ghcLink dflags) dflags do_linking (hsc_HPT hsc_env1)
 
 	      loadFinish Succeeded linkresult
@@ -323,7 +326,7 @@ load2 how_much mod_graph = do
 					      (hsc_HPT hsc_env1)
 
 	      -- Clean up after ourselves
-	      liftIO $ cleanTempFilesExcept dflags (ppFilesFromSummaries mods_to_keep)
+              liftIO $ intermediateCleanTempFiles dflags mods_to_keep hsc_env1
 
 	      -- there should be no Nothings where linkables should be, now
 	      ASSERT(all (isJust.hm_linkable) 
@@ -361,11 +364,21 @@ discardProg hsc_env
 	      hsc_IC = emptyInteractiveContext,
 	      hsc_HPT = emptyHomePackageTable }
 
--- used to fish out the preprocess output files for the purposes of
--- cleaning up.  The preprocessed file *might* be the same as the
--- source file, but that doesn't do any harm.
-ppFilesFromSummaries :: [ModSummary] -> [FilePath]
-ppFilesFromSummaries summaries = map ms_hspp_file summaries
+intermediateCleanTempFiles :: DynFlags -> [ModSummary] -> HscEnv -> IO ()
+intermediateCleanTempFiles dflags summaries hsc_env
+ = cleanTempFilesExcept dflags except
+  where
+    except =
+          -- Save preprocessed files. The preprocessed file *might* be
+          -- the same as the source file, but that doesn't do any
+          -- harm.
+          map ms_hspp_file summaries ++
+          -- Save object files for loaded modules.  The point of this
+          -- is that we might have generated and compiled a stub C
+          -- file, and in the case of GHCi the object file will be a
+          -- temporary file which we must not remove because we need
+          -- to load/link it later.
+          hptObjs (hsc_HPT hsc_env)
 
 -- | If there is no -o option, guess the name of target executable
 -- by using top-level source file name as a base.
@@ -589,7 +602,7 @@ upsweep
     :: GhcMonad m
     => HomePackageTable		-- ^ HPT from last time round (pruned)
     -> ([ModuleName],[ModuleName]) -- ^ stable modules (see checkStability)
-    -> IO ()			-- ^ How to clean up unwanted tmp files
+    -> (HscEnv -> IO ())           -- ^ How to clean up unwanted tmp files
     -> [SCC ModSummary]		-- ^ Mods to do (the worklist)
     -> m (SuccessFlag,
           [ModSummary])
@@ -622,6 +635,10 @@ upsweep old_hpt stable_mods cleanup sccs = do
         let logger _mod = defaultWarnErrLogger
 
         hsc_env <- getSession
+
+        -- Remove unwanted tmp files between compilations
+        liftIO (cleanup hsc_env)
+
         mb_mod_info
             <- handleSourceError
                    (\err -> do logger mod (Just err); return Nothing) $ do
@@ -629,8 +646,6 @@ upsweep old_hpt stable_mods cleanup sccs = do
                                                   mod mod_index nmods
                  logger mod Nothing -- log warnings
                  return (Just mod_info)
-
-        liftIO cleanup -- Remove unwanted tmp files between compilations
 
         case mb_mod_info of
           Nothing -> return (Failed, done)

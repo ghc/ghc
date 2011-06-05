@@ -36,7 +36,6 @@ GHC_PKG_DIR             = $(GHC_UTILS_DIR)/ghc-pkg
 GHC_GENPRIMOP_DIR       = $(GHC_UTILS_DIR)/genprimopcode
 GHC_GENAPPLY_DIR        = $(GHC_UTILS_DIR)/genapply
 GHC_CABAL_DIR           = $(GHC_UTILS_DIR)/ghc-cabal
-GHC_MANGLER_DIR         = $(GHC_DRIVER_DIR)/mangler
 GHC_SPLIT_DIR           = $(GHC_DRIVER_DIR)/split
 GHC_SYSMAN_DIR          = $(GHC_RTS_DIR)/parallel
 

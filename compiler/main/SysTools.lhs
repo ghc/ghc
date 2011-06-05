@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
+{-# OPTIONS -fno-warn-unused-do-bind #-}
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -14,12 +15,13 @@ module SysTools (
         -- Interface to system tools
         runUnlit, runCpp, runCc, -- [Option] -> IO ()
         runPp,                   -- [Option] -> IO ()
-        runMangle, runSplit,     -- [Option] -> IO ()
+        runSplit,                -- [Option] -> IO ()
         runAs, runLink,          -- [Option] -> IO ()
         runMkDLL,
         runWindres,
         runLlvmOpt,
         runLlvmLlc,
+        readElfSection,
 
         touch,                  -- String -> String -> IO ()
         copy,
@@ -58,6 +60,8 @@ import System.Directory
 import Data.Char
 import Data.List
 import qualified Data.Map as Map
+import Text.ParserCombinators.ReadP hiding (char)
+import qualified Text.ParserCombinators.ReadP as R
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -171,9 +175,8 @@ initSysTools mbMinusB dflags0
                 -- architecture-specific stuff is done when building Config.hs
               unlit_path = installed cGHC_UNLIT_PGM
 
-                -- split and mangle are Perl scripts
+                -- split is a Perl script
               split_script  = installed cGHC_SPLIT_PGM
-              mangle_script = installed cGHC_MANGLER_PGM
 
               windres_path  = installed_mingw_bin "windres"
 
@@ -194,7 +197,7 @@ initSysTools mbMinusB dflags0
                 | isWindowsHost = installed cGHC_TOUCHY_PGM
                 | otherwise     = "touch"
               -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-              -- a call to Perl to get the invocation of split and mangle.
+              -- a call to Perl to get the invocation of split.
               -- On Unix, scripts are invoked using the '#!' method.  Binary
               -- installations of GHC on Unix place the correct line on the
               -- front of the script at installation time, so we don't want
@@ -202,9 +205,6 @@ initSysTools mbMinusB dflags0
               (split_prog,  split_args)
                 | isWindowsHost = (perl_path,    [Option split_script])
                 | otherwise     = (split_script, [])
-              (mangle_prog, mangle_args)
-                | isWindowsHost = (perl_path,   [Option mangle_script])
-                | otherwise     = (mangle_script, [])
               (mkdll_prog, mkdll_args)
                 | not isWindowsHost
                     = panic "Can't build DLLs on a non-Win32 system"
@@ -234,7 +234,6 @@ initSysTools mbMinusB dflags0
                         pgm_P   = cpp_path,
                         pgm_F   = "",
                         pgm_c   = (gcc_prog,[]),
-                        pgm_m   = (mangle_prog,mangle_args),
                         pgm_s   = (split_prog,split_args),
                         pgm_a   = (as_prog,[]),
                         pgm_l   = (ld_prog,[]),
@@ -372,11 +371,6 @@ getGccEnv opts =
         = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
 
-runMangle :: DynFlags -> [Option] -> IO ()
-runMangle dflags args = do
-  let (p,args0) = pgm_m dflags
-  runSomething dflags "Mangler" p (args0++args)
-
 runSplit :: DynFlags -> [Option] -> IO ()
 runSplit dflags args = do
   let (p,args0) = pgm_s dflags
@@ -458,6 +452,27 @@ getExtraViaCOpts :: DynFlags -> IO [String]
 getExtraViaCOpts dflags = do
   f <- readFile (topDir dflags </> "extra-gcc-opts")
   return (words f)
+
+-- | read the contents of the named section in an ELF object as a
+-- String.
+readElfSection :: DynFlags -> String -> FilePath -> IO (Maybe String)
+readElfSection _dflags section exe = do
+  let
+     prog = "readelf"
+     args = [Option "-p", Option section, FileOption "" exe]
+  --
+  r <- readProcessWithExitCode prog (filter notNull (map showOpt args)) ""
+  case r of
+    (ExitSuccess, out, _err) -> return (doFilter (lines out))
+    _ -> return Nothing
+ where
+  doFilter [] = Nothing
+  doFilter (s:r) = case readP_to_S parse s of
+                    [(p,"")] -> Just p
+                    _r       -> doFilter r
+   where parse = do
+           skipSpaces; R.char '['; skipSpaces; string "0]"; skipSpaces;
+           munch (const True)
 \end{code}
 
 %************************************************************************

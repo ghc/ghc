@@ -71,17 +71,6 @@
 
       <varlistentry>
         <term>
-          <option>-pgmm</option> <replaceable>cmd</replaceable>
-          <indexterm><primary><option>-pgmm</option></primary></indexterm>
-        </term>
-        <listitem>
-          <para>Use <replaceable>cmd</replaceable> as the
-          mangler.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
           <option>-pgms</option> <replaceable>cmd</replaceable>
           <indexterm><primary><option>-pgms</option></primary></indexterm>
         </term>

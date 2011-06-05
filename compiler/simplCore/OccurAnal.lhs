@@ -1146,7 +1146,7 @@ wrapProxy (bndr, rhs_var, co) (body_usg, body)
   where
     (body_usg', tagged_bndr) = tagBinder body_usg bndr
     rhs_usg = unitVarEnv rhs_var NoOccInfo	-- We don't need exact info
-    rhs = mkCoerceI co (Var rhs_var)
+    rhs = mkCoerceI co (Var (zapIdOccInfo rhs_var)) -- See Note [Zap case binders in proxy bindings]
 \end{code}
 
 
@@ -1582,8 +1582,7 @@ extendProxyEnv pe scrut co case_bndr
   | otherwise          = PE env2 fvs2	--   don't extend
   where
     PE env1 fvs1 = trimProxyEnv pe [case_bndr]
-    zapped_case_bndr = zapIdOccInfo case_bndr  -- See Note [Zap case binders in proxy bindings]
-    env2 = extendVarEnv_Acc add single env1 scrut1 (zapped_case_bndr,co)
+    env2 = extendVarEnv_Acc add single env1 scrut1 (case_bndr,co)
     single cb_co = (scrut1, [cb_co]) 
     add cb_co (x, cb_cos) = (x, cb_co:cb_cos)
     fvs2 = fvs1 `unionVarSet`  freeVarsCoI co

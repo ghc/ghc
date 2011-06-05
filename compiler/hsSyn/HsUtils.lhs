@@ -61,7 +61,10 @@ module HsUtils(
   collectSigTysFromPats, collectSigTysFromPat,
 
   hsTyClDeclBinders, hsTyClDeclsBinders, 
-  hsForeignDeclsBinders, hsGroupBinders
+  hsForeignDeclsBinders, hsGroupBinders,
+  
+  -- Collecting implicit binders
+  lStmtsImplicits, hsValBindsImplicits, lPatImplicits
   ) where
 
 import HsDecls
@@ -81,8 +84,11 @@ import NameSet
 import BasicTypes
 import SrcLoc
 import FastString
+import Outputable
 import Util
 import Bag
+
+import Data.Either
 \end{code}
 
 
@@ -612,6 +618,81 @@ hsConDeclsBinders cons
 
     do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname }))
 	= (flds_seen, lname:acc)
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Collecting binders the user did not write
+%*									*
+%************************************************************************
+
+The job of this family of functions is to run through binding sites and find the set of all Names
+that were defined "implicitly", without being explicitly written by the user.
+
+The main purpose is to find names introduced by record wildcards so that we can avoid
+warning the user when they don't use those names (#4404)
+
+\begin{code}
+lStmtsImplicits :: [LStmtLR Name idR] -> NameSet
+lStmtsImplicits = hs_lstmts
+  where
+    hs_lstmts :: [LStmtLR Name idR] -> NameSet
+    hs_lstmts = foldr (\stmt rest -> unionNameSets (hs_stmt (unLoc stmt)) rest) emptyNameSet
+    
+    hs_stmt (BindStmt pat _ _ _) = lPatImplicits pat
+    hs_stmt (LetStmt binds)      = hs_local_binds binds
+    hs_stmt (ExprStmt _ _ _)     = emptyNameSet
+    hs_stmt (ParStmt xs)         = hs_lstmts $ concatMap fst xs
+    
+    hs_stmt (TransformStmt stmts _ _ _)   = hs_lstmts stmts
+    hs_stmt (GroupStmt     stmts _ _ _)   = hs_lstmts stmts
+    hs_stmt (RecStmt { recS_stmts = ss }) = hs_lstmts ss
+    
+    hs_local_binds (HsValBinds val_binds) = hsValBindsImplicits val_binds
+    hs_local_binds (HsIPBinds _)         = emptyNameSet
+    hs_local_binds EmptyLocalBinds       = emptyNameSet
+
+hsValBindsImplicits :: HsValBindsLR Name idR -> NameSet
+hsValBindsImplicits (ValBindsOut binds _)
+  = unionManyNameSets [foldBag unionNameSets (hs_bind . unLoc) emptyNameSet hs_binds | (_rec, hs_binds) <- binds]
+  where
+    hs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
+    hs_bind _ = emptyNameSet
+hsValBindsImplicits (ValBindsIn {}) = pprPanic "hsValBindsImplicits: ValBindsIn" empty
+
+lPatImplicits :: LPat Name -> NameSet
+lPatImplicits = hs_lpat
+  where
+    hs_lpat (L _ pat) = hs_pat pat
+    
+    hs_lpats = foldr (\pat rest -> hs_lpat pat `unionNameSets` rest) emptyNameSet
+    
+    hs_pat (LazyPat pat)       = hs_lpat pat
+    hs_pat (BangPat pat)       = hs_lpat pat
+    hs_pat (AsPat _ pat)       = hs_lpat pat
+    hs_pat (ViewPat _ pat _)   = hs_lpat pat
+    hs_pat (ParPat  pat)       = hs_lpat pat
+    hs_pat (ListPat pats _)    = hs_lpats pats
+    hs_pat (PArrPat pats _)    = hs_lpats pats
+    hs_pat (TuplePat pats _ _) = hs_lpats pats
+
+    hs_pat (SigPatIn pat _)  = hs_lpat pat
+    hs_pat (SigPatOut pat _) = hs_lpat pat
+    hs_pat (CoPat _ pat _)   = hs_pat pat
+    
+    hs_pat (ConPatIn _ ps)           = details ps
+    hs_pat (ConPatOut {pat_args=ps}) = details ps
+    
+    hs_pat _ = emptyNameSet
+    
+    details (PrefixCon ps)   = hs_lpats ps
+    details (RecCon fs)      = hs_lpats explicit `unionNameSets` mkNameSet (collectPatsBinders implicit)
+      where (explicit, implicit) = partitionEithers [if pat_explicit then Left pat else Right pat
+                                                    | (i, fld) <- [0..] `zip` rec_flds fs
+                                                    , let pat = hsRecFieldArg fld
+                                                          pat_explicit = maybe True (i<) (rec_dotdot fs)]
+    details (InfixCon p1 p2) = hs_lpat p1 `unionNameSets` hs_lpat p2
 \end{code}
 
 
