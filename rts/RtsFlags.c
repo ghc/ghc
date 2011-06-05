@@ -1585,8 +1585,6 @@ void freeWin32ProgArgv (void);
 void
 freeWin32ProgArgv (void)
 {
-    freeArgv(win32_prog_argc, win32_prog_argv);
-
     int i;
 
     if (win32_prog_argv != NULL) {
