@@ -950,7 +950,7 @@ calcAllocatedCap (Capability *cap, rtsBool include_nursery)
   nat allocated = 0;
 
   if (include_nursery) {
-      allocated += countOccupied(nurseries[i].blocks);
+      allocated += countOccupied(nurseries[cap->no].blocks);
   }
 
   allocated += cap->r.rG0->n_new_large_words;

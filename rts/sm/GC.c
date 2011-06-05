@@ -647,8 +647,6 @@ GarbageCollect (nat N, // generation to collect
 
   // update the max size of older generations after a major GC
   resize_generations();
-  
-  }
 
   // Free the mark stack, leaving one block.
   freeMarkStack();

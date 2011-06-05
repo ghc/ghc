@@ -589,19 +589,8 @@ stat_exit(int alloc)
         exit_cpu     = end_exit_cpu - start_exit_cpu;
         exit_elapsed = end_exit_elapsed - start_exit_elapsed;
 
-        if (RtsFlags.ParFlags.nNodes == 1)
-        {
-            // In single-threaded mode, we can separate out the
-            // local GC time from the MUT time, and report the
-            // total GC time separately.
-
-            mut_elapsed = start_exit_elapsed - end_init_elapsed - gc_elapsed;
-
-            mut_cpu = start_exit_cpu - end_init_cpu
-                - gc_local_cpu - gc_global_cpu
-                - PROF_VAL(RP_tot_time + HC_tot_time);
-        }
-        else
+#if defined(THREADED_RTS)
+        if (RtsFlags.ParFlags.nNodes != 1)
         {
             // In multi-threaded mode, we have to include the
             // local GC time in the MUT time, because each thread
@@ -613,6 +602,19 @@ stat_exit(int alloc)
 
             mut_cpu = start_exit_cpu - end_init_cpu
                 - gc_global_cpu
+                - PROF_VAL(RP_tot_time + HC_tot_time);
+        }
+        else
+#endif
+        {
+            // In single-threaded mode, we can separate out the
+            // local GC time from the MUT time, and report the
+            // total GC time separately.
+
+            mut_elapsed = start_exit_elapsed - end_init_elapsed - gc_elapsed;
+
+            mut_cpu = start_exit_cpu - end_init_cpu
+                - gc_local_cpu - gc_global_cpu
                 - PROF_VAL(RP_tot_time + HC_tot_time);
         }
 
@@ -691,7 +693,7 @@ stat_exit(int alloc)
                 statsPrintf("                        MUT time (elapsed)       GC time  (elapsed)\n");
 		for (i = 0, task = all_tasks; 
 		     task != NULL; 
-1                    i++, task = task->all_link) {
+                     i++, task = task->all_link) {
 		    statsPrintf("  Task %2d %-8s :  %6.2fs    (%6.2fs)     %6.2fs    (%6.2fs)\n",
 				i,
 				(task->worker) ? "(worker)" : "(bound)",
@@ -870,10 +872,10 @@ void
 statDescribeGens(void)
 {
   nat g, n, i, lge;
-  nat cap_blocks, gen_blocks;
-  nat cap_mut, gen_mut;
-  lnat cap_live, gen_live;
-  lnat slop, tot_live, tot_slop;
+  memcount cap_blocks, gen_blocks;
+  memcount cap_mut, gen_mut;
+  memcount cap_live, gen_live;
+  memcount slop, tot_live, tot_slop;
   bdescr *bd;
   generation *gen;
   
@@ -898,7 +900,7 @@ statDescribeGens(void)
 
       slop = gen_blocks * BLOCK_SIZE_W - gen_live;
 
-      debugBelch("%5d %7d %8d %8d %4s %8s %8d %8ld %8ld\n", 
+      debugBelch("%5d %7ld %8d %8ld %4s %8s %8ld %8ld %8ld\n",
                  g, gen->max_blocks, lge, gen->n_prim_blocks, "", "", gen_blocks, 
                  gen_live*sizeof(W_), slop*sizeof(W_));
 

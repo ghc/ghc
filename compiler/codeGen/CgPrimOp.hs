@@ -32,6 +32,8 @@ import Constants
 import Outputable
 import FastString
 
+#include "HsVersions.h"
+
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
 
@@ -235,11 +237,11 @@ emitPrimOp [] CopyMutableArrayOp [src,src_off,dst,dst_off,n] live =
 emitPrimOp [res] CloneArrayOp [src,src_off,n] live =
     emitCloneArray mkMAP_FROZEN_infoLabel res src src_off n live
 emitPrimOp [res] CloneMutableArrayOp [src,src_off,n] live =
-    emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n live
+    emitCloneArray mkMAP_GLOBAL_infoLabel res src src_off n live
 emitPrimOp [res] FreezeArrayOp [src,src_off,n] live =
     emitCloneArray mkMAP_FROZEN_infoLabel res src src_off n live
 emitPrimOp [res] ThawArrayOp [src,src_off,n] live =
-    emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n live
+    emitCloneArray mkMAP_GLOBAL_infoLabel res src src_off n live
 
 -- Reading/writing pointer arrays
 
@@ -720,6 +722,9 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
               -> StgLiveVars
               -> Code
 emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
+    -- XXX need to fix for local GC
+    WARN(True, text "emitCopyArray: needs fixing for local GC") return ()
+
     -- Assign the arguments to temporaries so the code generator can
     -- calculate liveness for us.
     src <- assignTemp_ src0
@@ -729,7 +734,7 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
     n <- assignTemp_ n0
 
     -- Set the dirty bit in the header.
-    stmtC (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+    stmtC (setInfo dst (CmmLit (CmmLabel mkMAP_GLOBAL_infoLabel)))
 
     dst_elems_p <- assignTemp $ cmmOffsetB dst arrPtrsHdrSize
     dst_p <- assignTemp $ cmmOffsetExprW dst_elems_p dst_off
@@ -750,6 +755,9 @@ emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 live = do
 emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> CmmExpr
                -> StgLiveVars -> Code
 emitCloneArray info_p res_r src0 src_off0 n0 live = do
+    -- XXX need to fix for local GC
+    WARN(True, text "emitCloneArray: needs fixing for local GC") return ()
+
     -- Assign the arguments to temporaries so the code generator can
     -- calculate liveness for us.
     src <- assignTemp_ src0

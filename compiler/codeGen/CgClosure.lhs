@@ -584,12 +584,6 @@ link_caf cl_info _is_upd = do
   where
     bh_cl_info :: ClosureInfo
     bh_cl_info = cafBlackHoleClosureInfo cl_info
-
-    ind_static_info :: CmmExpr
-    ind_static_info = mkLblExpr mkIndStaticInfoLabel
-
-    off_indirectee :: WordOff
-    off_indirectee = fixedHdrSize + oFFSET_StgInd_indirectee*wORD_SIZE
 \end{code}
 
 
