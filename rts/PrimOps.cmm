@@ -230,6 +230,25 @@ stg_newMutVarzh
     RET_P(mv);
 }
 
+stg_casMutVarzh
+ /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, a #) */
+{
+    W_ mv, old, new, h;
+
+    mv  = R1;
+    old = R2;
+    new = R3;
+
+    (h) = foreign "C" cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var,
+                          old, new) [];
+    if (h != old) {
+        RET_NP(1,h);
+    } else {
+        RET_NP(0,h);
+    }
+}
+
+
 stg_atomicModifyMutVarzh
 {
     W_ mv, f, z, x, y, r, h;

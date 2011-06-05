@@ -458,6 +458,7 @@ RTS_FUN_DECL(stg_newArrayzh);
 
 RTS_FUN_DECL(stg_newMutVarzh);
 RTS_FUN_DECL(stg_atomicModifyMutVarzh);
+RTS_FUN_DECL(stg_casMutVarzh);
 
 RTS_FUN_DECL(stg_isEmptyMVarzh);
 RTS_FUN_DECL(stg_newMVarzh);
