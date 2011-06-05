@@ -765,18 +765,33 @@ allocatePinned (Capability *cap, lnat n)
     // If we don't have a block of pinned objects yet, or the current
     // one isn't large enough to hold the new object, allocate a new one.
     if (bd == NULL || (bd->free + n) > (bd->start + BLOCK_SIZE_W)) {
+        // The pinned_object_block remains attached to the capability
+        // until it is full, even if a GC occurs.  We want this
+        // behaviour because otherwise the unallocated portion of the
+        // block would be forever slop, and under certain workloads
+        // (allocating a few ByteStrings per GC) we accumulate a lot
+        // of slop.
+        //
+        // So, the pinned_object_block is initially marked
+        // BF_EVACUATED so the GC won't touch it.  When it is full,
+        // we place it on the large_objects list, and at the start of
+        // the next GC the BF_EVACUATED flag will be cleared, and the
+        // block will be promoted as usual (if anything in it is
+        // live).
         ACQUIRE_SM_LOCK;
-	cap->pinned_object_block = bd = allocBlock();
         gen = cap->r.rG0; // use our local G0
-	dbl_link_onto(bd, &gen->large_objects);
-	gen->n_large_blocks++;
+        if (bd != NULL) {
+            dbl_link_onto(bd, &gen->large_objects);
+            gen->n_large_blocks++;
+            g0->n_new_large_words += bd->free - bd->start;
+        }
+        cap->pinned_object_block = bd = allocBlock();
         RELEASE_SM_LOCK;
         initBdescr(bd, gen, gen);
-	bd->flags  = BF_PINNED | BF_LARGE;
-	bd->free   = bd->start;
+        bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
+        bd->free   = bd->start;
     }
 
-    cap->r.rG0->n_new_large_words += n;
     p = bd->free;
     bd->free += n;
     return p;

@@ -905,6 +905,13 @@ statDescribeGens(void)
                      "", "", "", "", i, cap_mut*sizeof(W_), cap_blocks,
                      cap_live*sizeof(W_), slop*sizeof(W_));
 
+          // Add the pinned object block.
+          bd = capabilities[i].pinned_object_block;
+          if (bd != NULL) {
+              gen_live   += bd->free - bd->start;
+              gen_blocks += bd->blocks;
+          }
+
           gen_mut    += cap_mut;
           gen_live   += cap_live;
           gen_blocks += cap_blocks;

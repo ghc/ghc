@@ -21,10 +21,15 @@ The GHC Developer's Wiki
   Quick Start for developers
 
      http://hackage.haskell.org/trac/ghc/wiki/Building/Hacking
-   
+
      This section on the wiki will get you up and running with a
-     serviceable build tree in no time:
-  
+     serviceable build tree in no time.
+
+     Don't skip this!  By default, GHC builds with all optimizations
+     and profiling; most hackers will want a quicker build, so creating
+     a mk/build.mk file and knowing how to rebuild only parts of GHC is
+     very important.
+
      This is part of the "Building GHC" section of the wiki, which
      has more detailed information on GHC's build system should you
      need it.

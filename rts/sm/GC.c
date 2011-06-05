@@ -658,13 +658,6 @@ GarbageCollect (nat N, // generation to collect
   // update the max size of older generations after a major GC
   resize_generations();
   
-  // Start a new pinned_object_block
-  if (gc_type == GC_LOCAL) {
-      cap->pinned_object_block = NULL;
-  } else {
-      for (n = 0; n < n_capabilities; n++) {
-          capabilities[n].pinned_object_block = NULL;
-      }
   }
 
   // Free the mark stack, leaving one block.
