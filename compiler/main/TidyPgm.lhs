@@ -292,8 +292,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 				mg_binds = binds, 
 				mg_rules = imp_rules,
                                 mg_vect_info = vect_info,
-				mg_dir_imps = dir_imps, 
-				mg_anns = anns,
+                                mg_anns = anns,
                                 mg_deps = deps, 
 				mg_foreign = foreign_stubs,
 			        mg_hpc_info = hpc_info,
@@ -363,13 +362,10 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
                            <+> int (cs_ty cs) 
                            <+> int (cs_co cs) ))
 
-        ; let dir_imp_mods = moduleEnvKeys dir_imps
-
-	; return (CgGuts { cg_module   = mod, 
-			   cg_tycons   = alg_tycons,
-			   cg_binds    = all_tidy_binds,
-			   cg_dir_imps = dir_imp_mods,
-			   cg_foreign  = foreign_stubs,
+        ; return (CgGuts { cg_module   = mod,
+                           cg_tycons   = alg_tycons,
+                           cg_binds    = all_tidy_binds,
+                           cg_foreign  = foreign_stubs,
 			   cg_dep_pkgs = dep_pkgs deps,
 			   cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks }, 

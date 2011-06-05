@@ -279,7 +279,6 @@ exposed-modules: Network.BSD,
 <programlisting>
 /usr/bin/ld: Undefined symbols:
 _ZCMain_main_closure
-___stginit_ZCMain
 </programlisting>
 </para>
 

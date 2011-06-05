@@ -6,6 +6,8 @@
 #include "Rts.h"
 
 #include "Trace.h"
+#include "Hash.h"
+#include "RtsUtils.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -36,11 +38,11 @@ static pid_t hpc_pid = 0;		// pid of this process at hpc-boot time.
 static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
 
-HpcModuleInfo *modules = 0;
-HpcModuleInfo *nextModule = 0;
-int totalTixes = 0;		// total number of tix boxes.
+static HashTable * moduleHash = NULL;   // module name -> HpcModuleInfo
 
-static char *tixFilename;
+HpcModuleInfo *modules = 0;
+
+static char *tixFilename = NULL;
 
 static void GNU_ATTRIBUTE(__noreturn__)
 failure(char *msg) {
@@ -78,7 +80,7 @@ static void ws(void) {
 }
 
 static char *expectString(void) {
-  char tmp[256], *res;
+  char tmp[256], *res; // XXX
   int tmp_ix = 0;
   expect('"');
   while (tix_ch != '"') {
@@ -87,7 +89,7 @@ static char *expectString(void) {
   }
   tmp[tmp_ix++] = 0;
   expect('"');
-  res = malloc(tmp_ix);
+  res = stgMallocBytes(tmp_ix,"Hpc.expectString");
   strcpy(res,tmp);
   return res;
 }
@@ -104,10 +106,8 @@ static StgWord64 expectWord64(void) {
 static void
 readTix(void) {
   unsigned int i;
-  HpcModuleInfo *tmpModule;
+  HpcModuleInfo *tmpModule, *lookup;
 
-  totalTixes = 0;
-    
   ws();
   expect('T');
   expect('i');
@@ -117,7 +117,9 @@ readTix(void) {
   ws();
   
   while(tix_ch != ']') {
-    tmpModule = (HpcModuleInfo *)calloc(1,sizeof(HpcModuleInfo));
+    tmpModule = (HpcModuleInfo *)stgMallocBytes(sizeof(HpcModuleInfo),
+                                                "Hpc.readTix");
+    tmpModule->from_file = rtsTrue;
     expect('T');
     expect('i');
     expect('x');
@@ -134,8 +136,6 @@ readTix(void) {
     ws();
     tmpModule -> tickCount = (int)expectWord64();
     tmpModule -> tixArr = (StgWord64 *)calloc(tmpModule->tickCount,sizeof(StgWord64));
-    tmpModule -> tickOffset = totalTixes;
-    totalTixes += tmpModule -> tickCount;
     ws();
     expect('[');
     ws();
@@ -150,13 +150,32 @@ readTix(void) {
     expect(']');
     ws();
     
-    if (!modules) {
-      modules = tmpModule;
+    lookup = lookupHashTable(moduleHash, (StgWord)tmpModule->modName);
+    if (tmpModule == NULL) {
+        debugTrace(DEBUG_hpc,"readTix: new HpcModuleInfo for %s",
+                   tmpModule->modName);
+        insertHashTable(moduleHash, (StgWord)tmpModule->modName, tmpModule);
     } else {
-      nextModule->next=tmpModule;
+        ASSERT(lookup->tixArr != 0);
+        ASSERT(!strcmp(tmpModule->modName, lookup->modName));
+        debugTrace(DEBUG_hpc,"readTix: existing HpcModuleInfo for %s",
+                   tmpModule->modName);
+        if (tmpModule->hashNo != lookup->hashNo) {
+            fprintf(stderr,"in module '%s'\n",tmpModule->modName);
+            failure("module mismatch with .tix/.mix file hash number");
+            if (tixFilename != NULL) {
+                fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
+            }
+            stg_exit(EXIT_FAILURE);
+        }
+        for (i=0; i < tmpModule->tickCount; i++) {
+            lookup->tixArr[i] = tmpModule->tixArr[i];
+        }
+        stgFree(tmpModule->tixArr);
+        stgFree(tmpModule->modName);
+        stgFree(tmpModule);
     }
-    nextModule=tmpModule;
-    
+
     if (tix_ch == ',') {
       expect(',');
       ws();
@@ -166,9 +185,18 @@ readTix(void) {
   fclose(tixFile);
 }
 
-static void hpc_init(void) {
+void
+startupHpc(void)
+{
   char *hpc_tixdir;
   char *hpc_tixfile;
+
+  if (moduleHash == NULL) {
+      // no modules were registered with hs_hpc_module, so don't bother
+      // creating the .tix file.
+      return;
+  }
+
   if (hpc_inited != 0) {
     return;
   }
@@ -176,6 +204,8 @@ static void hpc_init(void) {
   hpc_pid    = getpid();
   hpc_tixdir = getenv("HPCTIXDIR");
   hpc_tixfile = getenv("HPCTIXFILE");
+
+  debugTrace(DEBUG_hpc,"startupHpc");
 
   /* XXX Check results of mallocs/strdups, and check we are requesting
          enough bytes */
@@ -192,10 +222,13 @@ static void hpc_init(void) {
 #endif
     /* Then, try open the file
      */
-    tixFilename = (char *) malloc(strlen(hpc_tixdir) + strlen(prog_name) + 12);
+    tixFilename = (char *) stgMallocBytes(strlen(hpc_tixdir) +
+                                          strlen(prog_name) + 12,
+                                          "Hpc.startupHpc");
     sprintf(tixFilename,"%s/%s-%d.tix",hpc_tixdir,prog_name,(int)hpc_pid);
   } else {
-    tixFilename = (char *) malloc(strlen(prog_name) + 6);
+    tixFilename = (char *) stgMallocBytes(strlen(prog_name) + 6,
+                                          "Hpc.startupHpc");
     sprintf(tixFilename, "%s.tix", prog_name);
   }
 
@@ -204,89 +237,79 @@ static void hpc_init(void) {
   }
 }
 
-/* Called on a per-module basis, at startup time, declaring where the tix boxes are stored in memory.
- * This memory can be uninitized, because we will initialize it with either the contents
- * of the tix file, or all zeros.
- */
-
-int
-hs_hpc_module(char *modName,
-	      StgWord32 modCount,
-	      StgWord32 modHashNo,
-	      StgWord64 *tixArr) {
-  HpcModuleInfo *tmpModule, *lastModule;
-  unsigned int i;
-  int offset = 0;
-  
-  debugTrace(DEBUG_hpc,"hs_hpc_module(%s,%d)",modName,(nat)modCount);
-
-  hpc_init();
-
-  tmpModule = modules;
-  lastModule = 0;
-  
-  for(;tmpModule != 0;tmpModule = tmpModule->next) {
-    if (!strcmp(tmpModule->modName,modName)) {
-      if (tmpModule->tickCount != modCount) {
-	failure("inconsistent number of tick boxes");
-      }
-      assert(tmpModule->tixArr != 0);	
-      if (tmpModule->hashNo != modHashNo) {
-	fprintf(stderr,"in module '%s'\n",tmpModule->modName);
-	failure("module mismatch with .tix/.mix file hash number");
-	fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
-	stg_exit(1);
-
-      }
-      for(i=0;i < modCount;i++) {
-	tixArr[i] = tmpModule->tixArr[i];
-      }
-      tmpModule->tixArr = tixArr;
-      return tmpModule->tickOffset;
-    }
-    lastModule = tmpModule;
-  }
-  // Did not find entry so add one on.
-  tmpModule = (HpcModuleInfo *)calloc(1,sizeof(HpcModuleInfo));
-  tmpModule->modName = modName;
-  tmpModule->tickCount = modCount;
-  tmpModule->hashNo = modHashNo;
-  if (lastModule) {
-    tmpModule->tickOffset = lastModule->tickOffset + lastModule->tickCount;
-  } else {
-    tmpModule->tickOffset = 0;
-  }
-  tmpModule->tixArr = tixArr;
-  for(i=0;i < modCount;i++) {
-    tixArr[i] = 0;
-  }
-  tmpModule->next = 0;
-
-  if (!modules) {
-    modules = tmpModule;
-  } else {
-    lastModule->next=tmpModule;
-  }
-
-  debugTrace(DEBUG_hpc,"end: hs_hpc_module");
-
-  return offset;
-}
-
-
-/* This is called after all the modules have registered their local tixboxes,
- * and does a sanity check: are we good to go?
+/*
+ * Called on a per-module basis, by a constructor function compiled
+ * with each module (see Coverage.hpcInitCode), declaring where the
+ * tix boxes are stored in memory.  This memory can be uninitized,
+ * because we will initialize it with either the contents of the tix
+ * file, or all zeros.
+ *
+ * Note that we might call this before reading the .tix file, or after
+ * in the case where we loaded some Haskell code from a .so with
+ * dlopen().  So we must handle the case where we already have an
+ * HpcModuleInfo for the module which was read from the .tix file.
  */
 
 void
-startupHpc(void) {
-  debugTrace(DEBUG_hpc,"startupHpc");
- 
- if (hpc_inited == 0) {
-    return;
+hs_hpc_module(char *modName,
+	      StgWord32 modCount,
+	      StgWord32 modHashNo,
+              StgWord64 *tixArr)
+{
+  HpcModuleInfo *tmpModule;
+  nat i;
+
+  if (moduleHash == NULL) {
+      moduleHash = allocStrHashTable();
+  }
+
+  tmpModule = lookupHashTable(moduleHash, (StgWord)modName);
+  if (tmpModule == NULL)
+  {
+      // Did not find entry so add one on.
+      tmpModule = (HpcModuleInfo *)stgMallocBytes(sizeof(HpcModuleInfo),
+                                                  "Hpc.hs_hpc_module");
+      tmpModule->modName = modName;
+      tmpModule->tickCount = modCount;
+      tmpModule->hashNo = modHashNo;
+
+      tmpModule->tixArr = tixArr;
+      for(i=0;i < modCount;i++) {
+          tixArr[i] = 0;
+      }
+      tmpModule->next = modules;
+      tmpModule->from_file = rtsFalse;
+      modules = tmpModule;
+      insertHashTable(moduleHash, (StgWord)modName, tmpModule);
+  }
+  else
+  {
+      if (tmpModule->tickCount != modCount) {
+          failure("inconsistent number of tick boxes");
+      }
+      ASSERT(tmpModule->tixArr != 0);
+      if (tmpModule->hashNo != modHashNo) {
+          fprintf(stderr,"in module '%s'\n",tmpModule->modName);
+          failure("module mismatch with .tix/.mix file hash number");
+          if (tixFilename != NULL) {
+              fprintf(stderr,"(perhaps remove %s ?)\n",tixFilename);
+          }
+          stg_exit(EXIT_FAILURE);
+      }
+      // The existing tixArr was made up when we read the .tix file,
+      // whereas this is the real tixArr, so copy the data from the
+      // .tix into the real tixArr.
+      for(i=0;i < modCount;i++) {
+          tixArr[i] = tmpModule->tixArr[i];
+      }
+
+      if (tmpModule->from_file) {
+          stgFree(tmpModule->modName);
+          stgFree(tmpModule->tixArr);
+      }
+      tmpModule->from_file = rtsFalse;
   }
 }
-
 
 static void
 writeTix(FILE *f) {
@@ -311,11 +334,10 @@ writeTix(FILE *f) {
 	   tmpModule->modName,
 	    (nat)tmpModule->hashNo,
 	    (nat)tmpModule->tickCount);
-    debugTrace(DEBUG_hpc,"%s: %u (offset=%u) (hash=%u)\n",
+    debugTrace(DEBUG_hpc,"%s: %u (hash=%u)\n",
 	       tmpModule->modName,
 	       (nat)tmpModule->tickCount,
-	       (nat)tmpModule->hashNo,
-	       (nat)tmpModule->tickOffset);
+               (nat)tmpModule->hashNo);
 
     inner_comma = 0;
     for(i = 0;i < tmpModule->tickCount;i++) {
@@ -338,7 +360,17 @@ writeTix(FILE *f) {
   fclose(f);
 }
 
-/* Called at the end of execution, to write out the Hpc *.tix file  
+static void
+freeHpcModuleInfo (HpcModuleInfo *mod)
+{
+    if (mod->from_file) {
+        stgFree(mod->modName);
+        stgFree(mod->tixArr);
+    }
+    stgFree(mod);
+}
+
+/* Called at the end of execution, to write out the Hpc *.tix file
  * for this exection. Safe to call, even if coverage is not used.
  */
 void
@@ -357,6 +389,12 @@ exitHpc(void) {
     FILE *f = fopen(tixFilename,"w");
     writeTix(f);
   }
+
+  freeHashTable(moduleHash, (void (*)(void *))freeHpcModuleInfo);
+  moduleHash = NULL;
+
+  stgFree(tixFilename);
+  tixFilename = NULL;
 }
 
 //////////////////////////////////////////////////////////////////////////////

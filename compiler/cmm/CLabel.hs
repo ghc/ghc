@@ -51,9 +51,7 @@ module CLabel (
 
 	mkAsmTempLabel,
 
-	mkModuleInitLabel,
-	mkPlainModuleInitLabel,
-	mkModuleInitTableLabel,
+        mkPlainModuleInitLabel,
 
 	mkSplitMarkerLabel,
 	mkDirty_MUT_VAR_Label,
@@ -72,10 +70,7 @@ module CLabel (
 	mkRtsPrimOpLabel,
 	mkRtsSlowTickyCtrLabel,
 
-	moduleRegdLabel,
-	moduleRegTableLabel,
-
-	mkSelectorInfoLabel,
+        mkSelectorInfoLabel,
 	mkSelectorEntryLabel,
 
 	mkCmmInfoLabel,
@@ -104,7 +99,6 @@ module CLabel (
         mkDeadStripPreventer,
 
         mkHpcTicksLabel,
-        mkHpcModuleNameLabel,
 
         hasCAF,
 	infoLblToEntryLbl, entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
@@ -204,22 +198,8 @@ data CLabel
   | StringLitLabel
 	{-# UNPACK #-} !Unique
 
-  | ModuleInitLabel 
-	Module			-- the module name
-	String			-- its "way"
-	-- at some point we might want some kind of version number in
-	-- the module init label, to guard against compiling modules in
-	-- the wrong order.  We can't use the interface file version however,
-	-- because we don't always recompile modules which depend on a module
-	-- whose version has changed.
-
-  | PlainModuleInitLabel	-- without the version & way info
+  | PlainModuleInitLabel        -- without the version & way info
 	Module
-
-  | ModuleInitTableLabel	-- table of imported modules to init
-	Module
-
-  | ModuleRegdLabel
 
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
@@ -243,9 +223,6 @@ data CLabel
 
   -- | Per-module table of tick locations
   | HpcTicksLabel Module
-
-  -- | Per-module name of the module for Hpc
-  | HpcModuleNameLabel
 
   -- | Label of an StgLargeSRT
   | LargeSRTLabel
@@ -494,7 +471,6 @@ mkRtsSlowTickyCtrLabel pat = RtsLabel (RtsSlowTickyCtr pat)
 
 -- Constructing Code Coverage Labels
 mkHpcTicksLabel                = HpcTicksLabel
-mkHpcModuleNameLabel           = HpcModuleNameLabel
 
 
 -- Constructing labels used for dynamic linking
@@ -519,18 +495,8 @@ mkStringLitLabel		= StringLitLabel
 mkAsmTempLabel :: Uniquable a => a -> CLabel
 mkAsmTempLabel a		= AsmTempLabel (getUnique a)
 
-mkModuleInitLabel :: Module -> String -> CLabel
-mkModuleInitLabel mod way	= ModuleInitLabel mod way
-
 mkPlainModuleInitLabel :: Module -> CLabel
 mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
-
-mkModuleInitTableLabel :: Module -> CLabel
-mkModuleInitTableLabel mod	= ModuleInitTableLabel mod
-
-moduleRegdLabel			= ModuleRegdLabel
-moduleRegTableLabel		= ModuleInitTableLabel	
-
 
 -- -----------------------------------------------------------------------------
 -- Converting between info labels and entry/ret labels.
@@ -595,10 +561,7 @@ needsCDecl (LargeSRTLabel _)		= False
 needsCDecl (LargeBitmapLabel _)		= False
 needsCDecl (IdLabel _ _ _)		= True
 needsCDecl (CaseLabel _ _)	        = True
-needsCDecl (ModuleInitLabel _ _)	= True
-needsCDecl (PlainModuleInitLabel _)	= True
-needsCDecl (ModuleInitTableLabel _)	= True
-needsCDecl ModuleRegdLabel		= False
+needsCDecl (PlainModuleInitLabel _)     = True
 
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
@@ -616,7 +579,6 @@ needsCDecl l@(ForeignLabel{})		= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
 needsCDecl (HpcTicksLabel _)            = True
-needsCDecl HpcModuleNameLabel           = False
 
 
 -- | Check whether a label is a local temporary for native code generation
@@ -729,11 +691,8 @@ externallyVisibleCLabel :: CLabel -> Bool -- not C "static"
 externallyVisibleCLabel (CaseLabel _ _)		= False
 externallyVisibleCLabel (StringLitLabel _)	= False
 externallyVisibleCLabel (AsmTempLabel _)	= False
-externallyVisibleCLabel (ModuleInitLabel _ _)	= True
 externallyVisibleCLabel (PlainModuleInitLabel _)= True
-externallyVisibleCLabel (ModuleInitTableLabel _)= False
-externallyVisibleCLabel ModuleRegdLabel		= False
-externallyVisibleCLabel (RtsLabel _)		= True
+externallyVisibleCLabel (RtsLabel _)            = True
 externallyVisibleCLabel (CmmLabel _ _ _)	= True
 externallyVisibleCLabel (ForeignLabel{})	= True
 externallyVisibleCLabel (IdLabel name _ _)	= isExternalName name
@@ -741,8 +700,7 @@ externallyVisibleCLabel (CC_Label _)		= True
 externallyVisibleCLabel (CCS_Label _)		= True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)	= True
-externallyVisibleCLabel HpcModuleNameLabel	= False
-externallyVisibleCLabel (LargeBitmapLabel _)	= False
+externallyVisibleCLabel (LargeBitmapLabel _)    = False
 externallyVisibleCLabel (LargeSRTLabel _)	= False
 
 -- -----------------------------------------------------------------------------
@@ -781,9 +739,7 @@ labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsApFast _))              = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)          = DataLabel
 labelType (CaseLabel _ _)	                = CodeLabel
-labelType (ModuleInitLabel _ _)                 = CodeLabel
 labelType (PlainModuleInitLabel _)              = CodeLabel
-labelType (ModuleInitTableLabel _)              = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
 labelType (ForeignLabel _ _ _ IsFunction)	= CodeLabel
@@ -841,10 +797,8 @@ labelDynamic this_pkg lbl =
    CmmLabel pkg _ _     -> True 
 
 #endif
-   ModuleInitLabel m _    -> not opt_Static && this_pkg /= (modulePackageId m)
    PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
-   ModuleInitTableLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
-   
+
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _ 		     -> False
 
@@ -1012,9 +966,6 @@ pprCLbl (RtsLabel (RtsPrimOp primop))
 pprCLbl (RtsLabel (RtsSlowTickyCtr pat)) 
   = ptext (sLit "SLOW_CALL_") <> text pat <> ptext (sLit "_ctr")
 
-pprCLbl ModuleRegdLabel
-  = ptext (sLit "_module_registered")
-
 pprCLbl (ForeignLabel str _ _ _)
   = ftext str
 
@@ -1023,21 +974,11 @@ pprCLbl (IdLabel name cafs flavor) = ppr name <> ppIdFlavor flavor
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
-pprCLbl (ModuleInitLabel mod way)
-   = ptext (sLit "__stginit_") <> ppr mod
-	<> char '_' <> text way
-
 pprCLbl (PlainModuleInitLabel mod)
    = ptext (sLit "__stginit_") <> ppr mod
 
-pprCLbl (ModuleInitTableLabel mod)
-   = ptext (sLit "__stginittable_") <> ppr mod
-
 pprCLbl (HpcTicksLabel mod)
   = ptext (sLit "_hpc_tickboxes_")  <> ppr mod <> ptext (sLit "_hpc")
-
-pprCLbl HpcModuleNameLabel
-  = ptext (sLit "_hpc_module_name_str")
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <>

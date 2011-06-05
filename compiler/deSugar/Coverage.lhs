@@ -5,7 +5,7 @@
 \section[Coverage]{@coverage@: the main function}
 
 \begin{code}
-module Coverage (addCoverageTicksToBinds) where
+module Coverage (addCoverageTicksToBinds, hpcInitCode) where
 
 import HsSyn
 import Module
@@ -25,6 +25,8 @@ import StaticFlags
 import TyCon
 import MonadUtils
 import Maybes
+import CLabel
+import Util
 
 import Data.Array
 import System.Directory ( createDirectoryIfMissing )
@@ -870,4 +872,57 @@ type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 mixHash :: FilePath -> Integer -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
 	(show $ Mix file tm 0 tabstop entries)
+\end{code}
+
+%************************************************************************
+%*									*
+%*              initialisation
+%*									*
+%************************************************************************
+
+Each module compiled with -fhpc declares an initialisation function of
+the form `hpc_init_<module>()`, which is emitted into the _stub.c file
+and annotated with __attribute__((constructor)) so that it gets
+executed at startup time.
+
+The function's purpose is to call hs_hpc_module to register this
+module with the RTS, and it looks something like this:
+
+static void hpc_init_Main(void) __attribute__((constructor));
+static void hpc_init_Main(void)
+{extern StgWord64 _hpc_tickboxes_Main_hpc[];
+ hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
+
+\begin{code}
+hpcInitCode :: Module -> HpcInfo -> SDoc
+hpcInitCode _ (NoHpcInfo {}) = empty
+hpcInitCode this_mod (HpcInfo tickCount hashNo)
+ = vcat
+    [ text "static void hpc_init_" <> ppr this_mod
+         <> text "(void) __attribute__((constructor));"
+    , text "static void hpc_init_" <> ppr this_mod <> text "(void)"
+    , braces (vcat [
+        ptext (sLit "extern StgWord64 ") <> tickboxes <>
+               ptext (sLit "[]") <> semi,
+        ptext (sLit "hs_hpc_module") <>
+          parens (hcat (punctuate comma [
+              doubleQuotes full_name_str,
+              int tickCount, -- really StgWord32
+              int hashNo,    -- really StgWord32
+              tickboxes
+            ])) <> semi
+       ])
+    ]
+  where
+    tickboxes = pprCLabel (mkHpcTicksLabel $ this_mod)
+
+    module_name  = hcat (map (text.charToC) $
+                         bytesFS (moduleNameFS (Module.moduleName this_mod)))
+    package_name = hcat (map (text.charToC) $
+                         bytesFS (packageIdFS  (modulePackageId this_mod)))
+    full_name_str
+       | modulePackageId this_mod == mainPackageId
+       = module_name
+       | otherwise
+       = package_name <> char '/' <> module_name
 \end{code}

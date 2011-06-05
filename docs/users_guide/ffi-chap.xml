@@ -245,18 +245,11 @@ extern HsInt foo(HsInt a0);</programlisting>
 #include "foo_stub.h"
 #endif
 
-#ifdef __GLASGOW_HASKELL__
-extern void __stginit_Foo ( void );
-#endif
-
 int main(int argc, char *argv[])
 {
   int i;
 
   hs_init(&amp;argc, &amp;argv);
-#ifdef __GLASGOW_HASKELL__
-  hs_add_root(__stginit_Foo);
-#endif
 
   for (i = 0; i &lt; 5; i++) {
     printf("%d\n", foo(2500));
@@ -282,26 +275,6 @@ int main(int argc, char *argv[])
 	so that it can separate out any arguments for the RTS
 	(i.e. those arguments between
 	<literal>+RTS...-RTS</literal>).</para>
-
-	<para>Next, we call
-	<function>hs_add_root</function><indexterm><primary><function>hs_add_root</function></primary>
-	</indexterm>, a GHC-specific interface which is required to
-	initialise the Haskell modules in the program.  The argument
-	to <function>hs_add_root</function> should be the name of the
-	initialization function for the "root" module in your program
-	- in other words, the module which directly or indirectly
-	imports all the other Haskell modules in the program.  In a
-	standalone Haskell program the root module is normally
-	<literal>Main</literal>, but when you are using Haskell code
-	from a library it may not be.  If your program has multiple
-	root modules, then you can call
-	<function>hs_add_root</function> multiple times, one for each
-	root.  The name of the initialization function for module
-	<replaceable>M</replaceable> is
-	<literal>__stginit_<replaceable>M</replaceable></literal>, and
-	it may be declared as an external function symbol as in the
-	code above.  Note that the symbol name should be transformed
-	according to the Z-encoding:</para>
 
       <informaltable>
 	<tgroup cols="2" align="left" colsep="1" rowsep="1">
@@ -380,9 +353,6 @@ int main(int argc, char *argv[])
    // Initialize Haskell runtime
    hs_init(&amp;argc, &amp;argv);
 
-   // Tell Haskell about all root modules
-   hs_add_root(__stginit_Foo);
-
    // do any other initialization here and
    // return false if there was a problem
    return HS_BOOL_TRUE;
@@ -394,7 +364,7 @@ int main(int argc, char *argv[])
 </programlisting>
 
         <para>The initialisation routine, <literal>mylib_init</literal>, calls
-          <literal>hs_init()</literal> and <literal>hs_add_root()</literal> as
+          <literal>hs_init()</literal> as
           normal to initialise the Haskell runtime, and the corresponding
           deinitialisation function <literal>mylib_end()</literal> calls
           <literal>hs_exit()</literal> to shut down the runtime.</para>
@@ -599,8 +569,7 @@ int main(int argc, char *argv[])
           invoke <literal>foreign export</literal>ed functions from
           multiple OS threads concurrently.  The runtime system must
           be initialised as usual by
-          calling <literal>hs_init()</literal>
-          and <literal>hs_add_root</literal>, and these calls must
+          calling <literal>hs_init()</literal>, and this call must
           complete before invoking any <literal>foreign
           export</literal>ed functions.</para>
       </sect3>

@@ -1227,6 +1227,8 @@ runPhase SplitAs _input_fn dflags
                                   Just x -> x
 
         let split_s   n = split_s_prefix ++ "__" ++ show n <.> "s"
+
+            split_obj :: Int -> FilePath
             split_obj n = split_odir </>
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
@@ -1253,15 +1255,31 @@ runPhase SplitAs _input_fn dflags
 
         io $ mapM_ assemble_file [1..n]
 
-        -- If there's a stub_o file, then we make it the n+1th split object.
+        -- Note [pipeline-split-init]
+        -- If we have a stub file, it may contain constructor
+        -- functions for initialisation of this module.  We can't
+        -- simply leave the stub as a separate object file, because it
+        -- will never be linked in: nothing refers to it.  We need to
+        -- ensure that if we ever refer to the data in this module
+        -- that needs initialisation, then we also pull in the
+        -- initialisation routine.
+        --
+        -- To that end, we make a DANGEROUS ASSUMPTION here: the data
+        -- that needs to be initialised is all in the FIRST split
+        -- object.  See Note [codegen-split-init].
+
         PipeState{maybe_stub_o} <- getPipeState
-        n' <- case maybe_stub_o of
-                  Nothing     -> return n
-                  Just stub_o -> do io $ copyFile stub_o (split_obj (n+1))
-                                    return (n+1)
+        case maybe_stub_o of
+            Nothing     -> return ()
+            Just stub_o -> io $ do
+                     tmp_split_1 <- newTempName dflags osuf
+                     let split_1 = split_obj 1
+                     copyFile split_1 tmp_split_1
+                     removeFile split_1
+                     joinObjectFiles dflags [tmp_split_1, stub_o] split_1
 
         -- join them into a single .o file
-        io $ joinObjectFiles dflags (map split_obj [1..n']) output_fn
+        io $ joinObjectFiles dflags (map split_obj [1..n]) output_fn
 
         return (next_phase, output_fn)
 
@@ -1979,13 +1997,21 @@ joinObjectFiles dflags o_files output_fn = do
                             SysTools.Option "-nostdlib",
                             SysTools.Option "-nodefaultlibs",
                             SysTools.Option "-Wl,-r",
+                            SysTools.Option ld_build_id,
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
                             SysTools.FileOption "" output_fn ]
                          ++ map SysTools.Option md_c_flags
                          ++ args)
+
       ld_x_flag | null cLD_X = ""
                 | otherwise  = "-Wl,-x"
+
+      -- suppress the generation of the .note.gnu.build-id section,
+      -- which we don't need and sometimes causes ld to emit a
+      -- warning:
+      ld_build_id | cLdHasBuildId == "YES"  = "-Wl,--build-id=none"
+                  | otherwise               = ""
 
       md_c_flags = machdepCCOpts dflags
   

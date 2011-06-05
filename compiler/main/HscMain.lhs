@@ -109,7 +109,8 @@ import CoreToStg	( coreToStg )
 import qualified StgCmm	( codeGen )
 import StgSyn
 import CostCentre
-import TyCon		( TyCon, isDataTyCon )
+import ProfInit
+import TyCon            ( TyCon, isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -863,8 +864,7 @@ hscGenHardCode cgguts mod_summary
                      cg_module   = this_mod,
                      cg_binds    = core_binds,
                      cg_tycons   = tycons,
-                     cg_dir_imps = dir_imps,
-                     cg_foreign  = foreign_stubs,
+                     cg_foreign  = foreign_stubs0,
                      cg_dep_pkgs = dependencies,
                      cg_hpc_info = hpc_info } = cgguts
              dflags = hsc_dflags hsc_env
@@ -883,16 +883,19 @@ hscGenHardCode cgguts mod_summary
              <- {-# SCC "CoreToStg" #-}
                 myCoreToStg dflags this_mod prepd_binds	
 
+         let prof_init = profilingInitCode this_mod cost_centre_info
+             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
+
          ------------------  Code generation ------------------
          
          cmms <- if dopt Opt_TryNewCodeGen dflags
                  then do cmms <- tryNewCodeGen hsc_env this_mod data_tycons
-                                 dir_imps cost_centre_info
+                                 cost_centre_info
                                  stg_binds hpc_info
                          return cmms
                  else {-# SCC "CodeGen" #-}
                        codeGen dflags this_mod data_tycons
-                               dir_imps cost_centre_info
+                               cost_centre_info
                                stg_binds hpc_info
 
          --- Optionally run experimental Cmm transformations ---
@@ -963,15 +966,15 @@ hscCompileCmmFile hsc_env filename
 
 -------------------- Stuff for new code gen ---------------------
 
-tryNewCodeGen	:: HscEnv -> Module -> [TyCon] -> [Module]
+tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
 		-> CollectedCCs
 		-> [(StgBinding,[(Id,[Id])])]
 		-> HpcInfo
 		-> IO [Cmm]
-tryNewCodeGen hsc_env this_mod data_tycons imported_mods 
+tryNewCodeGen hsc_env this_mod data_tycons
 	      cost_centre_info stg_binds hpc_info =
   do	{ let dflags = hsc_dflags hsc_env
-        ; prog <- StgCmm.codeGen dflags this_mod data_tycons imported_mods 
+        ; prog <- StgCmm.codeGen dflags this_mod data_tycons
 		 	 cost_centre_info stg_binds hpc_info
 	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
 		(pprCmms prog)

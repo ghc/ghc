@@ -14,7 +14,7 @@ module HscTypes (
 
         -- * Information about modules
 	ModDetails(..),	emptyModDetails,
-	ModGuts(..), CgGuts(..), ForeignStubs(..),
+        ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods,
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
@@ -799,11 +799,7 @@ data CgGuts
 		-- data constructor workers; reason: we we regard them
 		-- as part of the code-gen of tycons
 
-	cg_dir_imps :: ![Module],
-		-- ^ Directly-imported modules; used to generate
-		-- initialisation code
-
-	cg_foreign  :: !ForeignStubs,	-- ^ Foreign export stubs
+        cg_foreign  :: !ForeignStubs,   -- ^ Foreign export stubs
 	cg_dep_pkgs :: ![PackageId],	-- ^ Dependent packages, used to 
 	                                -- generate #includes for C code gen
         cg_hpc_info :: !HpcInfo,        -- ^ Program coverage tick box information
@@ -823,6 +819,10 @@ data ForeignStubs = NoStubs             -- ^ We don't have any stubs
                    --
                    --  2) C stubs to use when calling
                    --     "foreign exported" functions
+
+appendStubC :: ForeignStubs -> SDoc -> ForeignStubs
+appendStubC NoStubs            c_code = ForeignStubs empty c_code
+appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
 \end{code}
 
 \begin{code}

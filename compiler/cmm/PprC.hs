@@ -105,18 +105,19 @@ pprTop (CmmProc info clbl (ListGraph blocks)) =
         then pprDataExterns info $$
              pprWordArray (entryLblToInfoLbl clbl) info
         else empty) $$
-    (case blocks of
-        [] -> empty
-         -- the first block doesn't get a label:
-        (BasicBlock _ stmts : rest) -> vcat [
+    (vcat [
 	   blankLine,
 	   extern_decls,
            (if (externallyVisibleCLabel clbl)
                     then mkFN_ else mkIF_) (pprCLabel clbl) <+> lbrace,
            nest 8 temp_decls,
            nest 8 mkFB_,
-           nest 8 (vcat (map pprStmt stmts)) $$
-              vcat (map pprBBlock rest),
+           case blocks of
+               [] -> empty
+               -- the first block doesn't get a label:
+               (BasicBlock _ stmts : rest) ->
+                    nest 8 (vcat (map pprStmt stmts)) $$
+                       vcat (map pprBBlock rest),
            nest 8 mkFE_,
            rbrace ]
     )
