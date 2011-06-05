@@ -91,6 +91,8 @@
 #include "STM.h"
 #include "Trace.h"
 #include "Threads.h"
+#include "sm/Globalise.h"
+#include "WritePolicy.h"
 
 #include <stdio.h>
 
@@ -411,48 +413,33 @@ static void unpark_waiters_on(Capability *cap, StgTVar *s) {
 static StgInvariantCheckQueue *new_stg_invariant_check_queue(Capability *cap,
 							     StgAtomicInvariant *invariant) {
   StgInvariantCheckQueue *result;
-  result = (StgInvariantCheckQueue *)allocate(cap, sizeofW(StgInvariantCheckQueue));
+  result = (StgInvariantCheckQueue *)allocatePrim(cap, sizeofW(StgInvariantCheckQueue));
   SET_HDR (result, &stg_INVARIANT_CHECK_QUEUE_info, CCS_SYSTEM);
   result -> invariant = invariant;
   result -> my_execution = NO_TREC;
   return result;
 }
 
-static StgTVarWatchQueue *new_stg_tvar_watch_queue(Capability *cap,
-						   StgClosure *closure) {
-  StgTVarWatchQueue *result;
-  result = (StgTVarWatchQueue *)allocate(cap, sizeofW(StgTVarWatchQueue));
-  SET_HDR (result, &stg_TVAR_WATCH_QUEUE_info, CCS_SYSTEM);
-  result -> closure = closure;
-  return result;
-}
-
 static StgTRecChunk *new_stg_trec_chunk(Capability *cap) {
   StgTRecChunk *result;
-  result = (StgTRecChunk *)allocate(cap, sizeofW(StgTRecChunk));
+  result = (StgTRecChunk *)allocatePrim(cap, sizeofW(StgTRecChunk));
   SET_HDR (result, &stg_TREC_CHUNK_info, CCS_SYSTEM);
   result -> prev_chunk = END_STM_CHUNK_LIST;
   result -> next_entry_idx = 0;
+  result -> cap_no = cap -> no;
   return result;
 }
 
-static StgTRecHeader *new_stg_trec_header(Capability *cap,
-                                          StgTRecHeader *enclosing_trec) {
+static StgTRecHeader *new_stg_trec_header(Capability *cap) {
   StgTRecHeader *result;
-  result = (StgTRecHeader *) allocate(cap, sizeofW(StgTRecHeader));
+
+  result = (StgTRecHeader *) allocatePrim(cap, sizeofW(StgTRecHeader));
+  setGlobal((StgClosure*)result);
+
   SET_HDR (result, &stg_TREC_HEADER_info, CCS_SYSTEM);
-
-  result -> enclosing_trec = enclosing_trec;
   result -> current_chunk = new_stg_trec_chunk(cap);
-  result -> invariants_to_check = END_INVARIANT_CHECK_QUEUE;
 
-  if (enclosing_trec == NO_TREC) {
-    result -> state = TREC_ACTIVE;
-  } else {
-    ASSERT(enclosing_trec -> state == TREC_ACTIVE ||
-           enclosing_trec -> state == TREC_CONDEMNED);
-    result -> state = enclosing_trec -> state;
-  }
+  recordMutableCap (cap, (StgClosure*)result, global_gen_no);
 
   return result;  
 }
@@ -477,15 +464,15 @@ static StgInvariantCheckQueue *alloc_stg_invariant_check_queue(Capability *cap,
 }
 
 static StgTVarWatchQueue *alloc_stg_tvar_watch_queue(Capability *cap,
-						     StgClosure *closure) {
+						     StgClosure *closure,
+                                                     rtsBool is_local) {
   StgTVarWatchQueue *result = NULL;
-  if (cap -> free_tvar_watch_queues == END_STM_WATCH_QUEUE) {
-    result = new_stg_tvar_watch_queue(cap, closure);
-  } else {
-    result = cap -> free_tvar_watch_queues;
-    result -> closure = closure;
-    cap -> free_tvar_watch_queues = result -> next_queue_entry;
+  result = (StgTVarWatchQueue *)allocatePrim(cap, sizeofW(StgTVarWatchQueue));
+  if (!is_local) {
+      setGlobal((StgClosure*)result);
   }
+  SET_HDR (result, &stg_TVAR_WATCH_QUEUE_info, CCS_SYSTEM);
+  result -> closure = closure;
   return result;
 }
 
@@ -506,6 +493,7 @@ static StgTRecChunk *alloc_stg_trec_chunk(Capability *cap) {
     cap -> free_trec_chunks = result -> prev_chunk;
     result -> prev_chunk = END_STM_CHUNK_LIST;
     result -> next_entry_idx = 0;
+    ASSERT(result -> cap_no == cap -> no);
   }
   return result;
 }
@@ -522,20 +510,23 @@ static StgTRecHeader *alloc_stg_trec_header(Capability *cap,
                                             StgTRecHeader *enclosing_trec) {
   StgTRecHeader *result = NULL;
   if (cap -> free_trec_headers == NO_TREC) {
-    result = new_stg_trec_header(cap, enclosing_trec);
+    result = new_stg_trec_header(cap);
   } else {
     result = cap -> free_trec_headers;
     cap -> free_trec_headers = result -> enclosing_trec;
-    result -> enclosing_trec = enclosing_trec;
     result -> current_chunk -> next_entry_idx = 0;
-    result -> invariants_to_check = END_INVARIANT_CHECK_QUEUE;
-    if (enclosing_trec == NO_TREC) {
+  }
+
+  result -> enclosing_trec = enclosing_trec;
+  result -> invariants_to_check = END_INVARIANT_CHECK_QUEUE;
+  result -> cap_no = cap -> no;
+
+  if (enclosing_trec == NO_TREC) {
       result -> state = TREC_ACTIVE;
-    } else {
+  } else {
       ASSERT(enclosing_trec -> state == TREC_ACTIVE ||
              enclosing_trec -> state == TREC_CONDEMNED);
       result -> state = enclosing_trec -> state;
-    }
   }
   return result;
 }
@@ -577,7 +568,8 @@ static void build_watch_queue_entries_for_trec(Capability *cap,
     ACQ_ASSERT(s -> current_value == (StgClosure *)trec);
     NACQ_ASSERT(s -> current_value == e -> expected_value);
     fq = s -> first_watch_queue_entry;
-    q = alloc_stg_tvar_watch_queue(cap, (StgClosure*) tso);
+    q = alloc_stg_tvar_watch_queue(cap, (StgClosure*) tso, 
+                                   isLocal((StgClosure*)s));
     q -> next_queue_entry = fq;
     q -> prev_queue_entry = END_STM_WATCH_QUEUE;
     if (fq != END_STM_WATCH_QUEUE) {
@@ -879,17 +871,12 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
 
 /************************************************************************/
 
-void stmPreGCHook() {
-  nat i;
-
+void stmPreGCHook (Capability *cap) {
   lock_stm(NO_TREC);
   TRACE("stmPreGCHook");
-  for (i = 0; i < n_capabilities; i ++) {
-    Capability *cap = &capabilities[i];
-    cap -> free_tvar_watch_queues = END_STM_WATCH_QUEUE;
-    cap -> free_trec_chunks = END_STM_CHUNK_LIST;
-    cap -> free_trec_headers = NO_TREC;
-  }
+  cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
+  cap->free_trec_chunks = END_STM_CHUNK_LIST;
+  cap->free_trec_headers = NO_TREC;
   unlock_stm(NO_TREC);
 }
 
@@ -1133,7 +1120,8 @@ static void connect_invariant_to_trec(Capability *cap,
 
   FOR_EACH_ENTRY(my_execution, e, {
     StgTVar *s = e -> tvar;
-    StgTVarWatchQueue *q = alloc_stg_tvar_watch_queue(cap, (StgClosure*)inv);
+    StgTVarWatchQueue *q = alloc_stg_tvar_watch_queue(cap, (StgClosure*)inv,
+                                                      isLocal((StgClosure*)s));
     StgTVarWatchQueue *fq = s -> first_watch_queue_entry;
 
     // We leave "last_execution" holding the values that will be
@@ -1174,7 +1162,7 @@ void stmAddInvariantToCheck(Capability *cap,
   // 1. Allocate an StgAtomicInvariant, set last_execution to NO_TREC
   //    to signal that this is a new invariant in the current atomic block
 
-  invariant = (StgAtomicInvariant *) allocate(cap, sizeofW(StgAtomicInvariant));
+  invariant = (StgAtomicInvariant *) allocatePrim(cap, sizeofW(StgAtomicInvariant));
   TRACE("%p : stmAddInvariantToCheck allocated invariant=%p", trec, invariant);
   SET_HDR (invariant, &stg_ATOMIC_INVARIANT_info, CCS_SYSTEM);
   invariant -> code = code;
@@ -1402,6 +1390,11 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
           IF_STM_FG_LOCKS({
             s -> num_updates ++;
           });
+          // we're about to write e->new_value into s, better ensure
+          // the global heap invariant is maintained:
+          if (isGlobal((StgClosure*)s)) {
+              e->new_value = TVAR_GLOBALISE(cap, e->new_value);
+          }
           unlock_tvar(trec, s, e -> new_value, TRUE);
         } 
         ACQ_ASSERT(!tvar_is_locked(s, trec));
@@ -1488,6 +1481,11 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
     // The transaction is valid so far so we can actually start waiting.
     // (Otherwise the transaction was not valid and the thread will have to
     // retry it).
+
+    // Better globalise the TSO.  We don't know for sure that this is
+    // necessary, but checking would be tedious: if any TVar is global
+    // then the TSO needs to be.
+    globalise(cap, (StgClosure**)&tso);
 
     // Put ourselves to sleep.  We retain locks on all the TVars involved
     // until we are sound asleep : (a) on the wait queues, (b) BlockedOnSTM
@@ -1657,7 +1655,7 @@ void stmWriteTVar(Capability *cap,
 StgTVar *stmNewTVar(Capability *cap,
                     StgClosure *new_value) {
   StgTVar *result;
-  result = (StgTVar *)allocate(cap, sizeofW(StgTVar));
+  result = (StgTVar *)allocatePrim(cap, sizeofW(StgTVar));
   SET_HDR (result, &stg_TVAR_info, CCS_SYSTEM);
   result -> current_value = new_value;
   result -> first_watch_queue_entry = END_STM_WATCH_QUEUE;

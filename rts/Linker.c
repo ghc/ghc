@@ -778,6 +778,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_deRefWeakzh)                    \
       SymI_HasProto(stg_deRefStablePtrzh)               \
       SymI_HasProto(dirty_MUT_VAR)                      \
+      SymI_HasProto(dirty_MUT_ARR)                      \
       SymI_HasProto(stg_forkzh)                         \
       SymI_HasProto(stg_forkOnzh)                       \
       SymI_HasProto(forkProcess)                        \
@@ -909,9 +910,10 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_MVAR_DIRTY_info)                \
       SymI_HasProto(stg_IND_STATIC_info)                \
       SymI_HasProto(stg_ARR_WORDS_info)                 \
-      SymI_HasProto(stg_MUT_ARR_PTRS_DIRTY_info)        \
-      SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_info)       \
-      SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN0_info)      \
+      SymI_HasProto(stg_MUT_ARR_PTRS_LOCAL_info)        \
+      SymI_HasProto(stg_MUT_ARR_PTRS_GLOBAL_info)	\
+      SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN_info)	\
+      SymI_HasProto(stg_MUT_ARR_PTRS_FROZEN0_info)	\
       SymI_HasProto(stg_WEAK_info)                      \
       SymI_HasProto(stg_ap_v_info)                      \
       SymI_HasProto(stg_ap_f_info)                      \
@@ -983,7 +985,6 @@ typedef struct _RtsSymbolVal {
       SymI_NeedsProto(stg_interp_constr_entry)          \
       SymI_HasProto(stg_arg_bitmaps)                    \
       SymI_HasProto(large_alloc_lim)                    \
-      SymI_HasProto(g0)                                 \
       SymI_HasProto(allocate)                           \
       SymI_HasProto(allocateExec)                       \
       SymI_HasProto(freeExec)                           \

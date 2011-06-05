@@ -182,7 +182,6 @@ performTailCall fun_info arg_amodes pending_assts
     fun_name  = idName fun_id
     lf_info   = cgIdInfoLF fun_info
     fun_has_cafs = idCafInfo fun_id
-    untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
     -- Test if closure is a constructor
     maybeSwitchOnCons enterClosure eob
               | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob,
@@ -195,7 +194,7 @@ performTailCall fun_info arg_amodes pending_assts
                    ; stmtC (CmmCondBranch (cmmIsTagged (CmmReg nodeReg)) 
                                 is_constr)
                    -- No, enter the closure.
-                   ; enterClosure
+                   ; _ <- enterClosure
                    ; labelC is_constr
                    ; stmtC (CmmJump (entryCode $ CmmLit (CmmLabel lbl)) [])
                    }
@@ -220,8 +219,15 @@ performTailCall fun_info arg_amodes pending_assts
 -}
               -- No case expression involved, enter the closure.
               | otherwise
-              = do { stmtC untag_node
-                   ; enterClosure
+              = do { is_constr <- newLabelC
+                   -- Is the pointer tagged?
+                   -- Yes, jump to switch statement
+                   ; stmtC (CmmCondBranch (cmmIsTagged (CmmReg nodeReg)) 
+                                is_constr)
+                   -- No, enter the closure.
+                   ; _ <- enterClosure
+                   ; labelC is_constr
+                   ; emitReturnInstr
                    }
         where
           --cond1 tag  = cmmULtWord tag lowCons

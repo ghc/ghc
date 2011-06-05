@@ -16,6 +16,8 @@
 #include "GetTime.h"
 #include "sm/Storage.h"
 #include "sm/GC.h" // gc_alloc_block_sync, whitehole_spin
+#include "sm/GCThread.h"
+#include "sm/BlockAlloc.h"
 
 #if USE_PAPI
 #include "Papi.h"
@@ -26,31 +28,23 @@
 
 #define TICK_TO_DBL(t) ((double)(t) / TICKS_PER_SECOND)
 
-static Ticks ElapsedTimeStart = 0;
+static Ticks
+    start_init_cpu, start_init_elapsed,
+    end_init_cpu,   end_init_elapsed,
+    start_exit_cpu, start_exit_elapsed,
+    end_exit_cpu,   end_exit_elapsed;
 
-static Ticks InitUserTime     = 0;
-static Ticks InitElapsedTime  = 0;
-static Ticks InitElapsedStamp = 0;
+static Ticks GC_tot_cpu  = 0;
 
-static Ticks MutUserTime      = 0;
-static Ticks MutElapsedTime   = 0;
-static Ticks MutElapsedStamp  = 0;
-
-static Ticks ExitUserTime     = 0;
-static Ticks ExitElapsedTime  = 0;
-
-static StgWord64 GC_tot_alloc        = 0;
-static StgWord64 GC_tot_copied       = 0;
+static StgWord64 GC_tot_alloc      = 0;
+static StgWord64 GC_tot_copied     = 0;
 
 static StgWord64 GC_par_max_copied = 0;
 static StgWord64 GC_par_avg_copied = 0;
 
-static Ticks GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
-static Ticks GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
-
 #ifdef PROFILING
-static Ticks RP_start_time  = 0, RP_tot_time  = 0;  /* retainer prof user time */
-static Ticks RPe_start_time = 0, RPe_tot_time = 0;  /* retainer prof elap time */
+static Ticks RP_start_time  = 0, RP_tot_time  = 0;  // retainer prof user time
+static Ticks RPe_start_time = 0, RPe_tot_time = 0;  // retainer prof elap time
 
 static Ticks HC_start_time, HC_tot_time = 0;     // heap census prof user time
 static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
@@ -62,99 +56,81 @@ static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #define PROF_VAL(x)   0
 #endif
 
-static lnat MaxResidency = 0;     // in words; for stats only
-static lnat AvgResidency = 0;
-static lnat ResidencySamples = 0; // for stats only
-static lnat MaxSlop = 0;
+static lnat max_residency     = 0; // in words; for stats only
+static lnat avg_residency     = 0;
+static lnat residency_samples = 0; // for stats only
+static lnat max_slop          = 0;
 
-static lnat GC_start_faults = 0, GC_end_faults = 0;
+static lnat GC_end_faults = 0;
 
-static Ticks *GC_coll_times = NULL;
-static Ticks *GC_coll_etimes = NULL;
+static Ticks *GC_coll_cpu = NULL;
+static Ticks *GC_coll_elapsed = NULL;
+static Ticks *GC_coll_max_pause = NULL;
 
 static void statsFlush( void );
 static void statsClose( void );
 
-Ticks stat_getElapsedGCTime(void)
-{
-    return GCe_tot_time;
-}
+/* -----------------------------------------------------------------------------
+   Current elapsed time
+   ------------------------------------------------------------------------- */
 
 Ticks stat_getElapsedTime(void)
 {
-    return getProcessElapsedTime() - ElapsedTimeStart;
+    return getProcessElapsedTime() - start_init_elapsed;
 }
 
-/* mut_user_time_during_GC() and mut_user_time()
- *
- * The former function can be used to get the current mutator time
- * *during* a GC, i.e. between stat_startGC and stat_endGC.  This is
- * used in the heap profiler for accurately time stamping the heap
- * sample.  
- *
- * ATTENTION: mut_user_time_during_GC() relies on GC_start_time being 
- *	      defined in stat_startGC() - to minimise system calls, 
- *	      GC_start_time is, however, only defined when really needed (check
- *	      stat_startGC() for details)
- */
-double
-mut_user_time_during_GC( void )
-{
-  return TICK_TO_DBL(GC_start_time - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time));
-}
+/* ---------------------------------------------------------------------------
+   Measure the current MUT time, for profiling
+   ------------------------------------------------------------------------ */
 
 double
 mut_user_time( void )
 {
-    Ticks user;
-    user = getProcessCPUTime();
-    return TICK_TO_DBL(user - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time));
+    Ticks cpu;
+    cpu = getProcessCPUTime();
+    return TICK_TO_DBL(cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
 }
 
 #ifdef PROFILING
 /*
-  mut_user_time_during_RP() is similar to mut_user_time_during_GC();
-  it returns the MUT time during retainer profiling.
+  mut_user_time_during_RP() returns the MUT time during retainer profiling.
   The same is for mut_user_time_during_HC();
  */
 double
 mut_user_time_during_RP( void )
 {
-  return TICK_TO_DBL(RP_start_time - GC_tot_time - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
 }
 
 double
 mut_user_time_during_heap_census( void )
 {
-  return TICK_TO_DBL(HC_start_time - GC_tot_time - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
 }
 #endif /* PROFILING */
 
-// initStats0() has no dependencies, it can be called right at the beginning
+/* ---------------------------------------------------------------------------
+   initStats0() has no dependencies, it can be called right at the beginning
+   ------------------------------------------------------------------------ */
+
 void
 initStats0(void)
 {
-    ElapsedTimeStart = 0;
+    start_init_cpu    = 0;
+    start_init_elapsed = 0;
+    end_init_cpu     = 0;
+    end_init_elapsed  = 0;
 
-    InitUserTime     = 0;
-    InitElapsedTime  = 0;
-    InitElapsedStamp = 0;
-
-    MutUserTime      = 0;
-    MutElapsedTime   = 0;
-    MutElapsedStamp  = 0;
-
-    ExitUserTime     = 0;
-    ExitElapsedTime  = 0;
+    start_exit_cpu    = 0;
+    start_exit_elapsed = 0;
+    end_exit_cpu     = 0;
+    end_exit_elapsed  = 0;
 
     GC_tot_alloc     = 0;
     GC_tot_copied    = 0;
     GC_par_max_copied = 0;
     GC_par_avg_copied = 0;
-    GC_start_time = 0;
-    GC_tot_time  = 0;
-    GCe_start_time = 0;
-    GCe_tot_time = 0;
+    GC_tot_cpu  = 0;
 
 #ifdef PROFILING
     RP_start_time  = 0;
@@ -168,16 +144,18 @@ initStats0(void)
     HCe_tot_time = 0;
 #endif
 
-    MaxResidency = 0;
-    AvgResidency = 0;
-    ResidencySamples = 0;
-    MaxSlop = 0;
+    max_residency = 0;
+    avg_residency = 0;
+    residency_samples = 0;
+    max_slop = 0;
 
-    GC_start_faults = 0;
     GC_end_faults = 0;
 }    
 
-// initStats1() can be called after setupRtsFlags()
+/* ---------------------------------------------------------------------------
+   initStats1() can be called after setupRtsFlags()
+   ------------------------------------------------------------------------ */
+
 void
 initStats1 (void)
 {
@@ -187,17 +165,22 @@ initStats1 (void)
 	statsPrintf("    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts\n");
 	statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
     }
-    GC_coll_times = 
+    GC_coll_cpu = 
 	(Ticks *)stgMallocBytes(
-	    sizeof(Ticks)*RtsFlags.GcFlags.generations,
+	    sizeof(Ticks)*total_generations,
 	    "initStats");
-    GC_coll_etimes = 
+    GC_coll_elapsed = 
 	(Ticks *)stgMallocBytes(
-	    sizeof(Ticks)*RtsFlags.GcFlags.generations,
+	    sizeof(Ticks)*total_generations,
 	    "initStats");
-    for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
-	GC_coll_times[i] = 0;
-	GC_coll_etimes[i] = 0;
+    GC_coll_max_pause =
+	(Ticks *)stgMallocBytes(
+	    sizeof(Ticks)*total_generations,
+	    "initStats");
+    for (i = 0; i < total_generations; i++) {
+	GC_coll_cpu[i] = 0;
+        GC_coll_elapsed[i] = 0;
+        GC_coll_max_pause[i] = 0;
     }
 }
 
@@ -208,26 +191,14 @@ initStats1 (void)
 void
 stat_startInit(void)
 {
-    Ticks elapsed;
-
-    elapsed = getProcessElapsedTime();
-    ElapsedTimeStart = elapsed;
+    getProcessTimes(&start_init_cpu, &start_init_elapsed);
 }
 
 void 
 stat_endInit(void)
 {
-    Ticks user, elapsed;
+    getProcessTimes(&end_init_cpu, &end_init_elapsed);
 
-    getProcessTimes(&user, &elapsed);
-
-    InitUserTime = user;
-    InitElapsedStamp = elapsed; 
-    if (ElapsedTimeStart > elapsed) {
-	InitElapsedTime = 0;
-    } else {
-	InitElapsedTime = elapsed - ElapsedTimeStart;
-    }
 #if USE_PAPI
     /* We start counting events for the mutator
      * when garbage collection starts
@@ -249,18 +220,7 @@ stat_endInit(void)
 void
 stat_startExit(void)
 {
-    Ticks user, elapsed;
-
-    getProcessTimes(&user, &elapsed);
-
-    MutElapsedStamp = elapsed;
-    MutElapsedTime = elapsed - GCe_tot_time -
-	PROF_VAL(RPe_tot_time + HCe_tot_time) - InitElapsedStamp;
-    if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
-
-    MutUserTime = user - GC_tot_time - 
-        PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
-    if (MutUserTime < 0) { MutUserTime = 0; }
+    getProcessTimes(&start_exit_cpu, &start_exit_elapsed);
 
 #if USE_PAPI
     /* We stop counting mutator events
@@ -269,25 +229,13 @@ stat_startExit(void)
 
     /* This flag is needed, because GC is run once more after this function */
     papi_is_reporting = 0;
-
 #endif
 }
 
 void
 stat_endExit(void)
 {
-    Ticks user, elapsed;
-
-    getProcessTimes(&user, &elapsed);
-
-    ExitUserTime = user - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
-    ExitElapsedTime = elapsed - MutElapsedStamp;
-    if (ExitUserTime < 0) {
-	ExitUserTime = 0;
-    }
-    if (ExitElapsedTime < 0) {
-	ExitElapsedTime = 0;
-    }
+    getProcessTimes(&end_exit_cpu, &end_exit_elapsed);
 }
 
 /* -----------------------------------------------------------------------------
@@ -296,13 +244,8 @@ stat_endExit(void)
 
 static nat rub_bell = 0;
 
-/*  initialise global variables needed during GC
- *
- *  * GC_start_time is read in mut_user_time_during_GC(), which in turn is 
- *    needed if either PROFILING or DEBUGing is enabled
- */
 void
-stat_startGC(void)
+stat_startGC (gc_thread *gct)
 {
     nat bell = RtsFlags.GcFlags.ringBell;
 
@@ -315,16 +258,6 @@ stat_startGC(void)
 	}
     }
 
-    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS
-        || RtsFlags.ProfFlags.doHeapProfile)
-        // heap profiling needs GC_tot_time
-    {
-        getProcessTimes(&GC_start_time, &GCe_start_time);
-	if (RtsFlags.GcFlags.giveStats) {
-	    GC_start_faults = getPageFaults();
-	}
-    }
-
 #if USE_PAPI
     if(papi_is_reporting) {
       /* Switch to counting GC events */
@@ -333,6 +266,40 @@ stat_startGC(void)
     }
 #endif
 
+    getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
+    gct->gc_start_thread_cpu  = getThreadCPUTime();
+
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
+    {
+        gct->gc_start_faults = getPageFaults();
+    }
+}
+
+void
+stat_gcWorkerThreadStart (gc_thread *gct)
+{
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
+    {
+        getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
+        gct->gc_start_thread_cpu  = getThreadCPUTime();
+    }
+}
+
+void
+stat_gcWorkerThreadDone (gc_thread *gct)
+{
+    Ticks thread_cpu, elapsed, gc_cpu, gc_elapsed;
+
+    if (RtsFlags.GcFlags.giveStats != NO_GC_STATS)
+    {
+        elapsed    = getProcessElapsedTime();
+        thread_cpu = getThreadCPUTime();
+
+        gc_cpu     = thread_cpu - gct->gc_start_thread_cpu;
+        gc_elapsed = elapsed    - gct->gc_start_elapsed;
+    
+        taskDoneGC(gct->cap->running_task, gc_cpu, gc_elapsed);
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -340,67 +307,88 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen,
+stat_endGC (gc_thread *gct,
+            lnat alloc, lnat live, lnat copied, nat gen,
             lnat max_copied, lnat avg_copied, lnat slop)
 {
+    nat gen_ix;
+
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
         RtsFlags.ProfFlags.doHeapProfile)
         // heap profiling needs GC_tot_time
     {
-	Ticks time, etime, gc_time, gc_etime;
+        Ticks cpu, elapsed, thread_gc_cpu, gc_cpu, gc_elapsed;
 	
-	getProcessTimes(&time, &etime);
-	gc_time  = time - GC_start_time;
-	gc_etime = etime - GCe_start_time;
-	
+        getProcessTimes(&cpu, &elapsed);
+        gc_elapsed    = elapsed - gct->gc_start_elapsed;
+
+        thread_gc_cpu = getThreadCPUTime() - gct->gc_start_thread_cpu;
+
+        if (gct->gc_type == GC_LOCAL) {
+            gc_cpu = thread_gc_cpu;
+        } else {
+            gc_cpu = cpu - gct->gc_start_cpu;
+        }
+
+        taskDoneGC(gct->cap->running_task, thread_gc_cpu, gc_elapsed);
+
+        if (gct->gc_type == GC_LOCAL) {
+            gen_ix = gct->index;
+        } else {
+            gen_ix = old_generations[gct->collect_gen].ix;
+        }
+
 	if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
 	    nat faults = getPageFaults();
 	    
 	    statsPrintf("%9ld %9ld %9ld",
 		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
-	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
-		    TICK_TO_DBL(gc_time),
-		    TICK_TO_DBL(gc_etime),
-		    TICK_TO_DBL(time),
-		    TICK_TO_DBL(etime - ElapsedTimeStart),
-		    faults - GC_start_faults,
-		    GC_start_faults - GC_end_faults,
-		    gen);
+	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  ", 
+		    TICK_TO_DBL(gc_cpu),
+		    TICK_TO_DBL(gc_elapsed),
+		    TICK_TO_DBL(cpu),
+		    TICK_TO_DBL(elapsed - start_init_elapsed),
+		    faults - gct->gc_start_faults,
+                        gct->gc_start_faults - GC_end_faults);
 
+            switch (gct->gc_type) {
+            case GC_LOCAL:
+                statsPrintf("(G0.%d, loc)", gct->index);
+                break;
+            case GC_PAR:
+                statsPrintf("(G%d, par)", gct->collect_gen);
+                break;
+            case GC_SEQ:
+                statsPrintf("(G%d)", gct->collect_gen);
+                break;
+            }
+            statsPrintf("\n");
 	    GC_end_faults = faults;
 	    statsFlush();
 	}
 
-	GC_coll_times[gen] += gc_time;
-	GC_coll_etimes[gen] += gc_etime;
+	GC_coll_cpu[gen_ix] += gc_cpu;
+	GC_coll_elapsed[gen_ix] += gc_elapsed;
+        if (GC_coll_max_pause[gen_ix] < gc_elapsed) {
+            GC_coll_max_pause[gen_ix] = gc_elapsed;
+        }
 
 	GC_tot_copied += (StgWord64) copied;
 	GC_tot_alloc  += (StgWord64) alloc;
         GC_par_max_copied += (StgWord64) max_copied;
         GC_par_avg_copied += (StgWord64) avg_copied;
-	GC_tot_time   += gc_time;
-	GCe_tot_time  += gc_etime;
-	
-#if defined(THREADED_RTS)
-	{
-	    Task *task;
-	    if ((task = myTask()) != NULL) {
-		task->gc_time += gc_time;
-		task->gc_etime += gc_etime;
-	    }
-	}
-#endif
+	GC_tot_cpu   += gc_cpu;
 
 	if (gen == RtsFlags.GcFlags.generations-1) { /* major GC? */
-	    if (live > MaxResidency) {
-		MaxResidency = live;
+	    if (live > max_residency) {
+		max_residency = live;
 	    }
-	    ResidencySamples++;
-	    AvgResidency += live;
+	    residency_samples++;
+	    avg_residency += live;
 	}
 
-        if (slop > MaxSlop) MaxSlop = slop;
+        if (slop > max_slop) max_slop = slop;
     }
 
     if (rub_bell) {
@@ -539,35 +527,58 @@ StgInt TOTAL_CALLS=1;
   statsPrintf("  (SLOW_CALLS_" #arity ") %% of (TOTAL_CALLS) : %.1f%%\n", \
 	      SLOW_CALLS_##arity * 100.0/TOTAL_CALLS)
 
-extern lnat hw_alloc_blocks;
-
 void
 stat_exit(int alloc)
 {
+    generation *gen;
+    Ticks gc_global_cpu = 0;
+    Ticks gc_global_elapsed = 0;
+    Ticks gc_local_cpu = 0;
+    Ticks gc_local_elapsed = 0;
+    Ticks init_cpu = 0;
+    Ticks init_elapsed = 0;
+    Ticks mut_cpu = 0;
+    Ticks mut_elapsed = 0;
+    Ticks gc_cpu = 0;
+    Ticks gc_elapsed = 0;
+    Ticks exit_cpu = 0;
+    Ticks exit_elapsed = 0;
+    StgWord64 globalised = 0;
+        
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 
 	char temp[BIG_STRING_LEN];
-	Ticks time;
-	Ticks etime;
-	nat g, total_collections = 0;
+	Ticks tot_cpu;
+	Ticks tot_elapsed;
+	nat i, g, total_collections = 0;
 
-	getProcessTimes( &time, &etime );
-	etime -= ElapsedTimeStart;
+	getProcessTimes( &tot_cpu, &tot_elapsed );
+	tot_elapsed -= start_init_elapsed;
 
 	GC_tot_alloc += alloc;
 
 	/* Count total garbage collections */
-	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
-	    total_collections += generations[g].collections;
+	for (g = 0; g < total_generations; g++)
+	    total_collections += all_generations[g].collections;
 
-	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
-	if (time  == 0.0)  time = 1;
-	if (etime == 0.0) etime = 1;
+	/* avoid divide by zero if tot_cpu is measured as 0.00 seconds -- SDM */
+	if (tot_cpu  == 0.0)  tot_cpu = 1;
+	if (tot_elapsed == 0.0) tot_elapsed = 1;
 	
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
 	    statsPrintf("%9ld %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
 	    statsPrintf(" %5.2f %5.2f\n\n", 0.0, 0.0);
 	}
+
+        for (i = 0; i < total_generations; i++) {
+            if (all_generations[i].is_local) {
+                gc_local_cpu     += GC_coll_cpu[i];
+                gc_local_elapsed += GC_coll_elapsed[i];
+            } else {
+                gc_global_cpu     += GC_coll_cpu[i];
+                gc_global_elapsed += GC_coll_elapsed[i];
+            }
+        }
 
 	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
 	    showStgWord64(GC_tot_alloc*sizeof(W_), 
@@ -578,14 +589,22 @@ stat_exit(int alloc)
 				 temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes copied during GC\n", temp);
 
-	    if ( ResidencySamples > 0 ) {
-		showStgWord64(MaxResidency*sizeof(W_), 
+            for (i = 0; i < n_capabilities; i++) {
+                globalised += gc_threads[i]->globalised;
+            }
+
+	    showStgWord64(globalised * sizeof(W_), 
+				 temp, rtsTrue/*commas*/);
+	    statsPrintf("%16s bytes globalised\n", temp);
+
+	    if ( residency_samples > 0 ) {
+		showStgWord64(max_residency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
 		statsPrintf("%16s bytes maximum residency (%ld sample(s))\n",
-			temp, ResidencySamples);
+			temp, residency_samples);
 	    }
 
-	    showStgWord64(MaxSlop*sizeof(W_), temp, rtsTrue/*commas*/);
+	    showStgWord64(max_slop*sizeof(W_), temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes maximum slop\n", temp);
 
 	    statsPrintf("%16ld MB total memory in use (%ld MB lost due to fragmentation)\n\n", 
@@ -593,12 +612,27 @@ stat_exit(int alloc)
                         (peak_mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W - hw_alloc_blocks * BLOCK_SIZE_W) / (1024 * 1024 / sizeof(W_)));
 
 	    /* Print garbage collections in each gen */
-	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-		statsPrintf("  Generation %d: %5d collections, %5d parallel, %5.2fs, %5.2fs elapsed\n", 
-                            g, generations[g].collections, 
-                            generations[g].par_collections,
-                        TICK_TO_DBL(GC_coll_times[g]),
-                        TICK_TO_DBL(GC_coll_etimes[g]));
+            statsPrintf("                                    Tot time (elapsed)  Avg pause  Max pause\n");
+            for (g = 0; g < total_generations; g++) {
+                gen = &all_generations[g];
+                if (gen->is_local) {
+                    statsPrintf("  Gen %2d.%-2d  %5d colls,     local   %5.2fs   %5.2fs     %3.4fs    %3.4fs\n",
+                                gen->no, gen->cap,
+                                gen->collections,
+                                TICK_TO_DBL(GC_coll_cpu[g]),
+                                TICK_TO_DBL(GC_coll_elapsed[g]),
+                                TICK_TO_DBL(GC_coll_elapsed[g] / gen->collections),
+                                TICK_TO_DBL(GC_coll_max_pause[g]));
+                } else {
+                    statsPrintf("  Gen %2d     %5d colls, %5d par   %5.2fs   %5.2fs     %3.4fs    %3.4fs\n",
+                                gen->no,
+                                gen->collections, 
+                                gen->par_collections,
+                                TICK_TO_DBL(GC_coll_cpu[g]),
+                                TICK_TO_DBL(GC_coll_elapsed[g]),
+                                TICK_TO_DBL(GC_coll_elapsed[g] / gen->collections),
+                                TICK_TO_DBL(GC_coll_max_pause[g]));
+                }
 	    }
 
 #if defined(THREADED_RTS)
@@ -610,8 +644,7 @@ stat_exit(int alloc)
                     );
             }
 #endif
-
-	    statsPrintf("\n");
+            statsPrintf("\n");
 
 #if defined(THREADED_RTS)
 	    {
@@ -653,44 +686,100 @@ stat_exit(int alloc)
             }
 #endif
 
-	    statsPrintf("  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
-		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime));
-	    statsPrintf("  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
-		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime));
-	    statsPrintf("  GC    time  %6.2fs  (%6.2fs elapsed)\n",
-		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
+            gc_elapsed = gc_local_elapsed + gc_global_elapsed;
+
+            init_cpu     = end_init_cpu - start_init_cpu;
+            init_elapsed = end_init_elapsed - start_init_elapsed;
+
+            exit_cpu     = end_exit_cpu - start_exit_cpu;
+            exit_elapsed = end_exit_elapsed - start_exit_elapsed;
+
+            gc_cpu = gc_local_cpu + gc_global_cpu;
+
+	    statsPrintf("  INIT    time  %6.2fs  (%6.2fs elapsed)\n",
+                        TICK_TO_DBL(init_cpu), TICK_TO_DBL(init_elapsed));
+
+#ifdef THREADED_RTS
+            if (RtsFlags.ParFlags.nNodes == 1)
+#endif
+            {
+                // In single-threaded mode, we can separate out the
+                // local GC time from the MUT time, and report the
+                // total GC time separately.
+
+                mut_elapsed = start_exit_elapsed - end_init_elapsed
+                    - gc_elapsed;
+
+                mut_cpu = start_exit_cpu - end_init_cpu
+                    - gc_local_cpu - gc_global_cpu
+                    - PROF_VAL(RP_tot_time + HC_tot_time);
+                if (mut_cpu < 0) { mut_cpu = 0; }
+
+                statsPrintf("  MUT     time  %6.2fs  (%6.2fs elapsed)\n",
+                            TICK_TO_DBL(mut_cpu), TICK_TO_DBL(mut_elapsed));
+                statsPrintf("  GC      time  %6.2fs  (%6.2fs elapsed)\n",
+                            TICK_TO_DBL(gc_cpu), TICK_TO_DBL(gc_elapsed));
+            } 
+#ifdef THREADED_RTS
+            else
+            {
+                // In multi-threaded mode, we have to include the
+                // local GC time in the MUT time, because each thread
+                // has its own independent interleaving of MUT and
+                // local GC.
+
+                mut_elapsed = start_exit_elapsed - end_init_elapsed
+                    - gc_global_elapsed;
+
+                mut_cpu = start_exit_cpu - end_init_cpu
+                    - gc_global_cpu
+                    - PROF_VAL(RP_tot_time + HC_tot_time);
+                if (mut_cpu < 0) { mut_cpu = 0; }
+
+                statsPrintf("  MUT+GC0 time  %6.2fs  (%6.2fs elapsed) (%.2fs MUT + %.2fs GC0)\n",
+                            TICK_TO_DBL(mut_cpu),
+                            TICK_TO_DBL(mut_elapsed),
+                            TICK_TO_DBL(mut_cpu - gc_local_cpu),
+                            TICK_TO_DBL(gc_local_cpu));
+                statsPrintf("  GC1     time  %6.2fs  (%6.2fs elapsed)\n",
+                            TICK_TO_DBL(gc_global_cpu), TICK_TO_DBL(gc_global_elapsed));
+            }
+#endif
+
 #ifdef PROFILING
-	    statsPrintf("  RP    time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  RP      time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(RP_tot_time), TICK_TO_DBL(RPe_tot_time));
-	    statsPrintf("  PROF  time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  PROF    time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(HC_tot_time), TICK_TO_DBL(HCe_tot_time));
 #endif 
-	    statsPrintf("  EXIT  time  %6.2fs  (%6.2fs elapsed)\n",
-		    TICK_TO_DBL(ExitUserTime), TICK_TO_DBL(ExitElapsedTime));
-	    statsPrintf("  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
-		    TICK_TO_DBL(time), TICK_TO_DBL(etime));
-	    statsPrintf("  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
-		    TICK_TO_DBL(GC_tot_time)*100/TICK_TO_DBL(time),
-		    TICK_TO_DBL(GCe_tot_time)*100/TICK_TO_DBL(etime));
+	    statsPrintf("  EXIT    time  %6.2fs  (%6.2fs elapsed)\n",
+		    TICK_TO_DBL(exit_cpu), TICK_TO_DBL(exit_elapsed));
+	    statsPrintf("  Total   time  %6.2fs  (%6.2fs elapsed)\n\n",
+		    TICK_TO_DBL(tot_cpu), TICK_TO_DBL(tot_elapsed));
+#ifndef THREADED_RTS
+	    statsPrintf("  %%GC     time     %5.1f%%  (%.1f%% elapsed)\n\n",
+		    TICK_TO_DBL(gc_cpu)*100/TICK_TO_DBL(tot_cpu),
+		    TICK_TO_DBL(gc_elapsed)*100/TICK_TO_DBL(tot_elapsed));
+#endif
 
-	    if (time - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) == 0)
+	    if (tot_cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time) == 0)
 		showStgWord64(0, temp, rtsTrue/*commas*/);
 	    else
 		showStgWord64(
 		    (StgWord64)((GC_tot_alloc*sizeof(W_))/
-			     TICK_TO_DBL(time - GC_tot_time - 
+			     TICK_TO_DBL(tot_cpu - GC_tot_cpu - 
 					 PROF_VAL(RP_tot_time + HC_tot_time))),
 		    temp, rtsTrue/*commas*/);
 	    
 	    statsPrintf("  Alloc rate    %s bytes per MUT second\n\n", temp);
 	
 	    statsPrintf("  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
-		    TICK_TO_DBL(time - GC_tot_time - 
-				PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime) * 100 
-		    / TICK_TO_DBL(time), 
-		    TICK_TO_DBL(time - GC_tot_time - 
-				PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime) * 100 
-		    / TICK_TO_DBL(etime));
+		    TICK_TO_DBL(tot_cpu - GC_tot_cpu - 
+				PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100 
+		    / TICK_TO_DBL(tot_cpu), 
+		    TICK_TO_DBL(tot_cpu - GC_tot_cpu - 
+				PROF_VAL(RP_tot_time + HC_tot_time) - init_cpu) * 100 
+		    / TICK_TO_DBL(tot_elapsed));
 
             /*
             TICK_PRINT(1);
@@ -709,8 +798,8 @@ stat_exit(int alloc)
                 
                 statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
                 statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
-                for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-                    statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, generations[g].sync.spin);
+                for (g = 0; g < total_generations; g++) {
+                    statsPrintf("gen[%d].sync: %"FMT_Word64"\n", g, all_generations[g].sync.spin);
                 }
             }
 #endif
@@ -741,26 +830,26 @@ stat_exit(int alloc)
 	  statsPrintf(fmt1, GC_tot_alloc*(StgWord64)sizeof(W_));
 	  statsPrintf(fmt2,
 		    total_collections,
-		    ResidencySamples == 0 ? 0 : 
-		        AvgResidency*sizeof(W_)/ResidencySamples, 
-		    MaxResidency*sizeof(W_), 
-		    ResidencySamples,
+		    residency_samples == 0 ? 0 : 
+		        avg_residency*sizeof(W_)/residency_samples, 
+		    max_residency*sizeof(W_), 
+		    residency_samples,
 		    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
-		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime),
-		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime),
-		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
+		    TICK_TO_DBL(init_cpu), TICK_TO_DBL(init_elapsed),
+		    TICK_TO_DBL(mut_cpu), TICK_TO_DBL(mut_elapsed),
+		    TICK_TO_DBL(gc_cpu), TICK_TO_DBL(gc_elapsed));
 	}
 
 	statsFlush();
 	statsClose();
     }
 
-    if (GC_coll_times)
-      stgFree(GC_coll_times);
-    GC_coll_times = NULL;
-    if (GC_coll_etimes)
-      stgFree(GC_coll_etimes);
-    GC_coll_etimes = NULL;
+    if (GC_coll_cpu)
+      stgFree(GC_coll_cpu);
+    GC_coll_cpu = NULL;
+    if (GC_coll_elapsed)
+      stgFree(GC_coll_elapsed);
+    GC_coll_elapsed = NULL;
 }
 
 /* -----------------------------------------------------------------------------
@@ -771,24 +860,25 @@ stat_exit(int alloc)
 void
 statDescribeGens(void)
 {
-  nat g, mut, lge, i;
-  lnat gen_slop;
-  lnat tot_live, tot_slop;
-  lnat gen_live, gen_blocks;
+  nat g, n, i, lge;
+  nat cap_blocks, gen_blocks;
+  nat cap_mut, gen_mut;
+  lnat cap_live, gen_live;
+  lnat slop, tot_live, tot_slop;
   bdescr *bd;
   generation *gen;
   
   debugBelch(
-"----------------------------------------------------------\n"
-"  Gen     Max  Mut-list  Blocks    Large     Live     Slop\n"
-"       Blocks     Bytes          Objects                  \n"
-"----------------------------------------------------------\n");
+"------------------------------------------------------------------------\n"
+"  Gen     Max    Large    Prim   Cap  Mut-list   Total     Live     Slop\n"
+"       Blocks  Objects  Blocks           Bytes  Blocks                  \n"
+"------------------------------------------------------------------------\n");
 
   tot_live = 0;
   tot_slop = 0;
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      gen = &generations[g];
+  for (n = 0; n < total_generations; n++) {
+      gen = &all_generations[n];
+      g = gen->no;
 
       for (bd = gen->large_objects, lge = 0; bd; bd = bd->link) {
           lge++;
@@ -797,25 +887,42 @@ statDescribeGens(void)
       gen_live   = genLiveWords(gen);
       gen_blocks = genLiveBlocks(gen);
 
-      mut = 0;
+      slop = gen_blocks * BLOCK_SIZE_W - gen_live;
+
+      debugBelch("%5d %7d %8d %8d %4s %8s %8d %8ld %8ld\n", 
+                 g, gen->max_blocks, lge, gen->n_prim_blocks, "", "", gen_blocks, 
+                 gen_live*sizeof(W_), slop*sizeof(W_));
+
       for (i = 0; i < n_capabilities; i++) {
-          mut += countOccupied(capabilities[i].mut_lists[g]);
-          gen_live   += gcThreadLiveWords(i,g);
-          gen_blocks += gcThreadLiveBlocks(i,g);
-      }
+          cap_mut    = countOccupied(capabilities[i].mut_lists[g]);
 
-      debugBelch("%5d %7d %9d", g, gen->max_blocks, mut);
+          cap_live   = gcThreadLiveWords(i,n);
+          cap_blocks = gcThreadLiveBlocks(i,n);
 
-      gen_slop = gen_blocks * BLOCK_SIZE_W - gen_live;
+          slop = cap_blocks * BLOCK_SIZE_W - cap_live;
 
-      debugBelch("%8ld %8d %8ld %8ld\n", gen_blocks, lge,
-                 gen_live*sizeof(W_), gen_slop*sizeof(W_));
+          debugBelch("%5s %7s %8s %8s %4d %8ld %8d %8ld %8ld\n", 
+                     "", "", "", "", i, cap_mut*sizeof(W_), cap_blocks,
+                     cap_live*sizeof(W_), slop*sizeof(W_));
+
+          gen_mut    += cap_mut;
+          gen_live   += cap_live;
+          gen_blocks += cap_blocks;
+      }	  
+
+      debugBelch("%55s-----------------\n","");
+      debugBelch("%5s %7s %8s %4s %8s %8s %8s %8ld %8ld\n\n",
+                 "", "", "", "", "", "", "", 
+                 gen_live*sizeof(W_), slop*sizeof(W_));
+
+      slop = gen_blocks * BLOCK_SIZE_W - gen_live;
+
       tot_live += gen_live;
-      tot_slop += gen_slop;
+      tot_slop += slop;
   }
-  debugBelch("----------------------------------------------------------\n");
-  debugBelch("%41s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));
-  debugBelch("----------------------------------------------------------\n");
+  debugBelch("------------------------------------------------------------------------\n");
+  debugBelch("%55s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));
+  debugBelch("------------------------------------------------------------------------\n");
   debugBelch("\n");
 }
 

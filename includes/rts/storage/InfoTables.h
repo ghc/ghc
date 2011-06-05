@@ -236,6 +236,8 @@ typedef struct StgInfoTable_ {
             - the constructor tag
           In a FUN/THUNK
             - a bitmap of SRT entries
+          In an IND_LOCAL
+            - the owning Capability
        */
 
 #ifdef TABLES_NEXT_TO_CODE

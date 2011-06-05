@@ -93,12 +93,16 @@ typedef StgInt64           StgInt;
 typedef StgWord64          StgWord;
 typedef StgInt32           StgHalfInt;
 typedef StgWord32          StgHalfWord;
+typedef StgInt16           StgQtrInt;
+typedef StgWord16          StgQtrWord;
 #else
 #if SIZEOF_VOID_P == 4
 typedef StgInt32           StgInt; 
 typedef StgWord32          StgWord;
 typedef StgInt16           StgHalfInt;
 typedef StgWord16          StgHalfWord;
+typedef StgInt8            StgQtrInt;
+typedef StgWord8           StgQtrWord;
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif

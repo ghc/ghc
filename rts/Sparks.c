@@ -10,10 +10,12 @@
 #include "Rts.h"
 
 #include "Schedule.h"
+#include "sm/Globalise.h"
 #include "RtsUtils.h"
 #include "Trace.h"
 #include "Prelude.h"
 #include "Sparks.h"
+#include "WritePolicy.h"
 
 #if defined(THREADED_RTS)
 
@@ -70,7 +72,7 @@ newSpark (StgRegTable *reg, StgClosure *p)
     p = UNTAG_CLOSURE(p);
 
     if (closure_SHOULD_SPARK(p)) {
-        pushWSDeque(pool,p);
+        pushWSDeque(pool, SPARK_GLOBALISE(cap,p));
         cap->sparks_created++;
     } else {
         cap->sparks_dud++;

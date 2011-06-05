@@ -410,6 +410,7 @@ run_thread:
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT(t->cap == cap);
     ASSERT(t->bound ? t->bound->task->cap == cap : 1);
+    ASSERT(isGlobal((StgClosure*)t) || Bdescr((P_)t)->gen_ix == cap->no);
 
     prev_what_next = t->what_next;
 
@@ -643,6 +644,26 @@ scheduleYield (Capability **pcap, Task *task)
          sched_state >= SCHED_INTERRUPTING))
         return;
 
+#if 0
+    if (cap->await_reply)
+    {
+        nat i;
+
+        cap->await_reply = rtsFalse;
+
+        for (;;) {
+            if (shouldYieldCapability(cap,task)) {
+                break;
+            }
+            if (!emptyRunQueue(cap) ||
+                !emptyInbox(cap) ||
+                sched_state >= SCHED_INTERRUPTING) {
+                return;
+            }
+        }
+    }
+#endif
+
     // otherwise yield (sleep), and keep yielding if necessary.
     do {
         yieldCapability(&cap,task);
@@ -747,6 +768,8 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                     setTSOPrev(cap, t, prev);
 		    prev = t;
 		} else {
+                    t = globalise_TSO(cap,t);
+
 		    appendToRunQueue(free_caps[i],t);
 
                     traceEventMigrateThread (cap, t, free_caps[i]->no);
@@ -956,7 +979,7 @@ scheduleProcessInbox (Capability *cap USED_IF_THREADS)
 
     while (!emptyInbox(cap)) {
         if (cap->r.rCurrentNursery->link == NULL ||
-            g0->n_new_large_words >= large_alloc_lim) {
+            cap->r.rG0->n_new_large_words >= large_alloc_lim) {
             scheduleDoGC(cap, cap->running_task, rtsFalse);
         }
 
@@ -975,6 +998,7 @@ scheduleProcessInbox (Capability *cap USED_IF_THREADS)
 
         m = cap->inbox;
         cap->inbox = (Message*)END_TSO_QUEUE;
+        cap->n_inbox = 0;
 
         RELEASE_LOCK(&cap->lock);
 
@@ -1068,7 +1092,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    
             bd = allocGroup_lock(blocks);
             cap->r.rNursery->n_blocks += blocks;
-	    
+
 	    // link the new group into the list
 	    bd->link = cap->r.rCurrentNursery;
 	    bd->u.back = cap->r.rCurrentNursery->u.back;
@@ -1097,7 +1121,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	    
 	    // This assert can be a killer if the app is doing lots
 	    // of large block allocations.
-	    IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
+	    IF_DEBUG(sanity, checkNurserySanity(cap->no));
 	    
 	    // now update the nursery to point to the new block
 	    cap->r.rCurrentNursery = bd;
@@ -1241,7 +1265,7 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 #endif
 	  }
 
-	  ASSERT(task->incall->tso == t);
+          ASSERT(task->incall->tso == t);
 
 	  if (t->what_next == ThreadComplete) {
 	      if (task->incall->ret) {
@@ -1309,10 +1333,11 @@ static Capability *
 scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 {
     rtsBool heap_census;
+    nat gc_type, N;
 #ifdef THREADED_RTS
     /* extern static volatile StgWord waiting_for_gc; 
        lives inside capability.c */
-    rtsBool gc_type, prev_pending_gc;
+    rtsBool prev_pending_gc;
     nat i;
 #endif
 
@@ -1323,15 +1348,30 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         return cap;
     }
 
-#ifdef THREADED_RTS
-    if (sched_state < SCHED_INTERRUPTING
-        && RtsFlags.ParFlags.parGcEnabled
-        && N >= RtsFlags.ParFlags.parGcGen
-        && ! oldest_gen->mark)
-    {
-        gc_type = PENDING_GC_PAR;
+    // The final shutdown GC is always single-threaded, because it's
+    // possible that some of the Capabilities have no worker threads.
+    
+    heap_census = scheduleNeedHeapProfile(rtsTrue);
+
+    if (heap_census || force_major) {
+        N = RtsFlags.GcFlags.generations - 1;
     } else {
-        gc_type = PENDING_GC_SEQ;
+        N = next_gc_gen;
+    }
+
+    if (heap_census || sched_state >= SCHED_INTERRUPTING) {
+        gc_type = GC_SEQ;
+#ifdef THREADED_RTS
+    } else if (next_gc_gen == 0 && !force_major) {
+        gc_type = GC_LOCAL;
+    } else if (RtsFlags.ParFlags.parGcEnabled
+               && n_capabilities > 1
+               && next_gc_gen >= RtsFlags.ParFlags.parGcGen
+               && ! oldest_gen->mark) {
+        gc_type = GC_PAR;
+#endif
+    } else {
+        gc_type = GC_SEQ;
     }
 
     // In order to GC, there must be no threads running Haskell code.
@@ -1349,37 +1389,38 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
 	threads if waiting_for_gc is set. Tested inside
 	yieldCapability() and releaseCapability() in Capability.c */
 
-    prev_pending_gc = cas(&waiting_for_gc, 0, gc_type);
-    if (prev_pending_gc) {
-	do {
-	    debugTrace(DEBUG_sched, "someone else is trying to GC (%d)...", 
-                       prev_pending_gc);
-            ASSERT(cap);
-            yieldCapability(&cap,task);
-	} while (waiting_for_gc);
-	return cap;  // NOTE: task->cap might have changed here
+#ifdef THREADED_RTS
+    if (gc_type != GC_LOCAL) {
+        prev_pending_gc = cas(&waiting_for_gc, 0, gc_type);
+        if (prev_pending_gc) {
+            do {
+                debugTrace(DEBUG_sched, "someone else is trying to GC (%d)...", 
+                           prev_pending_gc);
+                ASSERT(cap);
+                yieldCapability(&cap,task);
+            } while (waiting_for_gc);
+            return cap;  // NOTE: task->cap might have changed here
+        }
     }
+#endif
 
-    setContextSwitches();
-
-    // The final shutdown GC is always single-threaded, because it's
-    // possible that some of the Capabilities have no worker threads.
-    
-    if (gc_type == PENDING_GC_SEQ)
-    {
-        traceEventRequestSeqGc(cap);
-    }
-    else
-    {
+    switch (gc_type) {
+    case GC_PAR:
+        setContextSwitches();
         traceEventRequestParGc(cap);
-        debugTrace(DEBUG_sched, "ready_to_gc, grabbing GC threads");
+        break;
+    case GC_SEQ:
+        setContextSwitches();
+        traceEventRequestSeqGc(cap);
+        break;
     }
 
-    if (gc_type == PENDING_GC_SEQ)
+#ifdef THREADED_RTS
+    if (gc_type == GC_SEQ)
     {
         // single-threaded GC: grab all the capabilities
         for (i=0; i < n_capabilities; i++) {
-            debugTrace(DEBUG_sched, "ready_to_gc, grabbing all the capabilies (%d/%d)", i, n_capabilities);
+            debugTrace(DEBUG_sched, "scheduleDoGC: grabbing all the capabilies (%d/%d)", i, n_capabilities);
             if (cap != &capabilities[i]) {
                 Capability *pcap = &capabilities[i];
                 // we better hope this task doesn't get migrated to
@@ -1395,13 +1436,13 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
             }
         }
     }
-    else
+    else if (gc_type == GC_PAR)
     {
+        debugTrace(DEBUG_sched, "scheduleDoGC: grabbing GC threads");
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
         waitForGcThreads(cap);
     }
-
 #endif
 
     IF_DEBUG(scheduler, printAllThreads());
@@ -1417,17 +1458,14 @@ delete_threads_and_gc:
 	sched_state = SCHED_SHUTTING_DOWN;
     }
     
-    heap_census = scheduleNeedHeapProfile(rtsTrue);
-
-    traceEventGcStart(cap);
 #if defined(THREADED_RTS)
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     waiting_for_gc = 0;
-    GarbageCollect(force_major || heap_census, gc_type, cap);
-#else
-    GarbageCollect(force_major || heap_census, 0, cap);
 #endif
+
+    traceEventGcStart(cap);
+    GarbageCollect(N, gc_type, cap);
     traceEventGcEnd(cap);
 
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
@@ -1448,7 +1486,7 @@ delete_threads_and_gc:
     }
 
 #if defined(THREADED_RTS)
-    if (gc_type == PENDING_GC_PAR)
+    if (gc_type == GC_PAR)
     {
         releaseGCThreads(cap);
     }
@@ -1486,7 +1524,7 @@ delete_threads_and_gc:
 #endif
 
 #if defined(THREADED_RTS)
-    if (gc_type == PENDING_GC_SEQ) {
+    if (gc_type == GC_SEQ) {
         // release our stash of capabilities.
         for (i = 0; i < n_capabilities; i++) {
             if (cap != &capabilities[i]) {
@@ -1550,6 +1588,7 @@ forkProcess(HsStablePtr *entry
 
     pid = fork();
     
+
     if (pid) { // parent
 	
         startTimer(); // #4074
@@ -1581,9 +1620,9 @@ forkProcess(HsStablePtr *entry
 	// now gone.
 
         for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-          for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
+          for (t = all_generations[g].threads; t != END_TSO_QUEUE; t = next) {
                 next = t->global_link;
-		// don't allow threads to catch the ThreadKilled
+                // don't allow threads to catch the ThreadKilled
 		// exception, but we do want to raiseAsync() because these
 		// threads may be evaluating thunks that we need later.
 		deleteThread_(cap,t);
@@ -1610,8 +1649,8 @@ forkProcess(HsStablePtr *entry
 
 	// Empty the threads lists.  Otherwise, the garbage
 	// collector may attempt to resurrect some of these threads.
-        for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-            generations[g].threads = END_TSO_QUEUE;
+        for (g = 0; g < total_generations; g++) {
+            all_generations[g].threads = END_TSO_QUEUE;
         }
 
         discardTasksExcept(cap->running_task);
@@ -1644,6 +1683,7 @@ forkProcess(HsStablePtr *entry
 #else /* !FORKPROCESS_PRIMOP_SUPPORTED */
     barf("forkProcess#: primop not supported on this platform, sorry!\n");
 #endif
+
 }
 
 /* ---------------------------------------------------------------------------
@@ -1660,7 +1700,7 @@ deleteAllThreads ( Capability *cap )
 
     debugTrace(DEBUG_sched,"deleting all threads");
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
+        for (t = all_generations[g].threads; t != END_TSO_QUEUE; t = next) {
                 next = t->global_link;
                 deleteThread(cap,t);
         }
@@ -1823,6 +1863,7 @@ resumeThread (void *task_)
     tso = incall->suspended_tso;
     incall->suspended_tso = NULL;
     incall->suspended_cap = NULL;
+
     tso->_link = END_TSO_QUEUE; // no write barrier reqd
 
     traceEventRunThread(cap, tso);
@@ -1991,7 +2032,11 @@ initScheduler(void)
 #endif
 
   RELEASE_LOCK(&sched_mutex);
+}
 
+void 
+startWorkers(void)
+{
 #if defined(THREADED_RTS)
   /*
    * Eagerly start one worker to run each Capability, except for
@@ -2067,6 +2112,16 @@ freeScheduler( void )
 #if defined(THREADED_RTS)
     closeMutex(&sched_mutex);
 #endif
+}
+
+void markScheduler (evac_fn evac USED_IF_NOT_THREADS, 
+                    void *user USED_IF_NOT_THREADS)
+{
+#if !defined(THREADED_RTS)
+    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
+    evac(user, (StgClosure **)(void *)&sleeping_queue);
+#endif 
 }
 
 /* -----------------------------------------------------------------------------

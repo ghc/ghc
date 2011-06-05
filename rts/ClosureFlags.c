@@ -52,6 +52,7 @@ StgWord16 closure_flags[] = {
  [IND]		   	=  (          _NS|			  _IND ),
  [IND_PERM]		=  (          _NS|			  _IND ),
  [IND_STATIC]	   	=  (          _NS|_STA|                   _IND ),
+ [IND_LOCAL]	   	=  (          _NS|                        _IND ),
  [RET_BCO]		=  (     _BTM                                  ),
  [RET_SMALL]		=  (     _BTM|                       _SRT      ),
  [RET_BIG]		=  (                                 _SRT      ),
@@ -66,12 +67,12 @@ StgWord16 closure_flags[] = {
  [MVAR_CLEAN]	   	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MVAR_DIRTY]	   	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [ARR_WORDS]		=  (_HNF|     _NS|              _UPT           ),
- [MUT_ARR_PTRS_CLEAN]  	=  (_HNF|     _NS|         _MUT|_UPT           ),
- [MUT_ARR_PTRS_DIRTY]  	=  (_HNF|     _NS|         _MUT|_UPT           ),
+ [MUT_ARR_PTRS_LOCAL]  	=  (_HNF|     _NS|         _MUT|_UPT           ),
+ [MUT_ARR_PTRS_GLOBAL] 	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MUT_ARR_PTRS_FROZEN0]	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [MUT_ARR_PTRS_FROZEN] 	=  (_HNF|     _NS|              _UPT           ),
- [MUT_VAR_CLEAN]	=  (_HNF|     _NS|         _MUT|_UPT           ),
- [MUT_VAR_DIRTY]	=  (_HNF|     _NS|         _MUT|_UPT           ),
+ [MUT_VAR_LOCAL]	=  (_HNF|     _NS|         _MUT|_UPT           ),
+ [MUT_VAR_GLOBAL]	=  (_HNF|     _NS|         _MUT|_UPT           ),
  [WEAK]		   	=  (_HNF|     _NS|              _UPT           ),
  [PRIM]  	   	=  (_HNF|     _NS|              _UPT           ),
  [MUT_PRIM]  	   	=  (_HNF|     _NS|         _MUT|_UPT           ),
@@ -84,6 +85,6 @@ StgWord16 closure_flags[] = {
  [WHITEHOLE]		=  ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 61
+#if N_CLOSURE_TYPES != 62
 #error Closure types changed: update ClosureFlags.c!
 #endif

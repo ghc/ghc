@@ -640,7 +640,7 @@ doWriteByteArrayOp _ _ _
 doWritePtrArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doWritePtrArrayOp addr idx val
   = do mkBasicIndexedWrite arrPtrsHdrSize Nothing addr idx val
-       emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+       emit (setInfo addr (CmmLit (CmmLabel undefined {-TODO: mkMAP_DIRTY_infoLabel-})))
   -- the write barrier.  We must write a byte into the mark table:
   -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
        emit $ mkStore (

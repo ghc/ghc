@@ -209,7 +209,7 @@ mkRhsClosure	bndr cc bi
 		body@(StgCase (StgApp scrutinee [{-no args-}])
 		      _ _ _ _   -- ignore uniq, etc.
 		      (AlgAlt _)
-		      [(DataAlt con, params, _use_mask,
+		      [(DataAlt _, params, _use_mask,
 			    (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee		-- Scrutinee is the only free variable
   && maybeToBool maybe_offset		-- Selectee is a component of the tuple
@@ -226,8 +226,8 @@ mkRhsClosure	bndr cc bi
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
-			-- Just want the layout
+    (_, _, params_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} 
+                                                 (addIdReps params)
     maybe_offset	  = assocMaybe params_w_offsets (NonVoid selectee)
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize
@@ -277,11 +277,12 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 	; c_srt <- getSRTInfo srt
 	; let	name  = idName bndr
 		descr = closureDescription mod_name name
+                fv_infos = addIdReps (map stripNV reduced_fvs)
 		fv_details :: [(NonVoid Id, VirtualHpOffset)]
-		(tot_wds, ptr_wds, fv_details)
-		   = mkVirtHeapOffsets (isLFThunk lf_info)
+                (tot_wds, ptr_wds, fv_details)
+		   = mkVirtHeapOffsets (isLFThunk lf_info) 
 				       (addIdReps (map stripNV reduced_fvs))
-		closure_info = mkClosureInfo False	-- Not static
+                closure_info = mkClosureInfo False      -- Not static
 					     bndr lf_info tot_wds ptr_wds
 					     c_srt descr
 

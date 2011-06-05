@@ -155,7 +155,16 @@ throwTo (Capability *cap,	// the Capability we hold
 {
     MessageThrowTo *msg;
 
-    msg = (MessageThrowTo *) allocate(cap, sizeofW(MessageThrowTo));
+    // globalise everything up front.  The alternative, to globalise
+    // later (in throwToSendMsg() and blockedThrowTo()) doesn't work
+    // because we would be globalising a WHITEHOLE closure.
+    globalise(cap, (StgClosure**)&source);
+    globalise(cap, (StgClosure**)&target);
+    globalise(cap, (StgClosure**)&exception);
+
+    msg = (MessageThrowTo *) allocatePrim(cap, sizeofW(MessageThrowTo));
+    setGlobal((StgClosure*)msg);
+
     // message starts locked; the caller has to unlock it when it is
     // ready.
     SET_HDR(msg, &stg_WHITEHOLE_info, CCS_SYSTEM);
@@ -166,6 +175,10 @@ throwTo (Capability *cap,	// the Capability we hold
     switch (throwToMsg(cap, msg))
     {
     case THROWTO_SUCCESS:
+#ifdef DEBUG
+        // so that sanity checking can understand this closure.
+        SET_INFO(msg, &stg_MSG_THROWTO_info);
+#endif
         return NULL;
     case THROWTO_BLOCKED:
     default:
@@ -349,12 +362,29 @@ check_target:
             blockedThrowTo(cap,target,msg);
 	    return THROWTO_BLOCKED;
 	} else {
-            // Revoke the message by replacing it with IND. We're not
-            // locking anything here, so we might still get a TRY_WAKEUP
-            // message from the owner of the blackhole some time in the
-            // future, but that doesn't matter.
+            // Revoke the message by replacing it with
+            // STUB_MSG_BLACKHOLE. We're not locking anything here, so we
+            // might still get a TRY_WAKEUP message from the owner of the
+            // blackhole some time in the future, but that doesn't matter.
             ASSERT(target->block_info.bh->header.info == &stg_MSG_BLACKHOLE_info);
-            OVERWRITE_INFO(target->block_info.bh, &stg_IND_info);
+            OVERWRITE_PRIM_CLOSURE((StgClosure*)target->block_info.bh,
+                                   &stg_STUB_MSG_BLACKHOLE_info,
+                                   sizeofW(MessageBlackHole),
+                                   sizeofW(StgInd));
+            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            return THROWTO_SUCCESS;
+        }
+    }
+
+    case BlockedOnMsgGlobalise:
+    {
+	if (target->flags & TSO_BLOCKEX) {
+            // BlockedOnMsgGlobalise is not interruptible.
+            blockedThrowTo(cap,target,msg);
+	    return THROWTO_BLOCKED;
+	} else {
+            // We could revoke the message, but it won't do any harm
+            // if we just leave it in flight.
             raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
             return THROWTO_SUCCESS;
         }
@@ -592,7 +622,8 @@ removeFromMVarBlockedQueue (StgTSO *tso)
 
     if (mvar->head == q) {
         mvar->head = q->link;
-        OVERWRITE_INFO(q, &stg_IND_info);
+        OVERWRITE_PRIM_CLOSURE((StgClosure*)q, &stg_IND_info,
+                               sizeofW(StgMVarTSOQueue), sizeofW(StgInd));
         if (mvar->tail == q) {
             mvar->tail = (StgMVarTSOQueue*)END_TSO_QUEUE;
         }
@@ -602,10 +633,12 @@ removeFromMVarBlockedQueue (StgTSO *tso)
         // we lose the tail pointer when the GC shorts out the IND.
         // So we use MSG_NULL as a kind of non-dupable indirection;
         // these are ignored by takeMVar/putMVar.
-        OVERWRITE_INFO(q, &stg_MSG_NULL_info);
+        OVERWRITE_PRIM_CLOSURE((StgClosure*)q, &stg_MSG_NULL_info,
+                               sizeofW(StgMVarTSOQueue), sizeofW(Message));
     }
     else {
-        OVERWRITE_INFO(q, &stg_IND_info);
+        OVERWRITE_PRIM_CLOSURE((StgClosure*)q, &stg_IND_info,
+                               sizeofW(StgMVarTSOQueue), sizeofW(StgInd));
     }
 
     // revoke the MVar operation
@@ -650,6 +683,10 @@ removeFromQueues(Capability *cap, StgTSO *tso)
       doneWithMsgThrowTo(m);
       break;
   }
+
+  case BlockedOnMsgGlobalise:
+      // nothing to do
+      goto done;
 
 #if !defined(THREADED_RTS)
   case BlockedOnRead:

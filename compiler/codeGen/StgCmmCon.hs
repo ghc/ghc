@@ -217,7 +217,8 @@ bindConArgs (DataAlt con) base args
   = ASSERT(not (isUnboxedTupleCon con))
     mapM bind_arg args_w_offsets
   where
-    (_, args_w_offsets) = layOutDynConstr con (addIdReps args)
+    (_, _, args_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} 
+                                                    (addIdReps args)
 
     tag = tagForCon con
 

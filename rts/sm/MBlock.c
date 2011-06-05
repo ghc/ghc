@@ -259,6 +259,11 @@ freeMBlocks(void *addr, nat n)
         markHeapUnalloced( (StgWord8*)addr + i * MBLOCK_SIZE );
     }
 
+#ifdef DEBUG
+    if (RtsFlags.DebugFlags.sanity) {
+        memset(addr, 0xdd, n * MBLOCK_SIZE);
+    } else
+#endif
     osFreeMBlocks(addr, n);
 }
 

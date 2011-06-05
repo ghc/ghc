@@ -18,6 +18,7 @@
 #include "Storage.h"
 #include "GC.h"
 #include "GCThread.h"
+#include "GCTDecl.h"
 #include "GCUtils.h"
 #include "Printer.h"
 #include "Trace.h"
@@ -32,54 +33,101 @@ SpinLock gc_alloc_block_sync;
 bdescr *
 allocBlock_sync(void)
 {
-    bdescr *bd;
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocBlock();
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-    return bd;
+    // GC_LOCAL uses the ordinary locking protocol for the block
+    // allocator because it runs concurrently with the mutator.
+    if (gct->gc_type == GC_LOCAL) {
+        return allocBlock_lock();
+    } else {
+        bdescr *bd;
+        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        bd = allocBlock();
+        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+        return bd;
+    }
 }
 
-static bdescr *
+bdescr *
 allocGroup_sync(nat n)
 {
-    bdescr *bd;
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    bd = allocGroup(n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
-    return bd;
+    // GC_LOCAL uses the ordinary locking protocol for the block
+    // allocator because it runs concurrently with the mutator.
+    if (gct->gc_type == GC_LOCAL) {
+        return allocGroup_lock(n);
+    } else {
+        bdescr *bd;
+        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        bd = allocGroup(n);
+        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+        return bd;
+    }
 }
 
 
-#if 0
+#define ALLOCBLOCKS 4
+#if ALLOCBLOCKS
 static void
-allocBlocks_sync(nat n, bdescr **hd, bdescr **tl, 
-                 nat gen_no, step *stp,
-                 StgWord32 flags)
+allocChain_sync(nat n, bdescr **hd, bdescr **tl,
+                 generation *gen, StgWord32 flags)
 {
     bdescr *bd;
     nat i;
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+
+    if (gct->gc_type == GC_LOCAL) {
+        ACQUIRE_SM_LOCK;
+    } else {
+        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    }
+
     bd = allocGroup(n);
+
+    // NB. hold the lock while we fiddle with the block group,
+    // otherwise we can invalidate invariants of the block allocator.
+    // e.g. the block allocator assumes that bd->blocks doesn't change
+    // for allocated blocks, so that it can do free list coalescing.
     for (i = 0; i < n; i++) {
         bd[i].blocks = 1;
-        bd[i].gen_no = gen_no;
-        bd[i].step = stp;
+        initBdescr(&bd[i], gen, gen->to);
         bd[i].flags = flags;
         bd[i].link = &bd[i+1];
         bd[i].u.scan = bd[i].free = bd[i].start;
     }
     *hd = bd;
     *tl = &bd[n-1];
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+
+    if (gct->gc_type == GC_LOCAL) {
+        RELEASE_SM_LOCK;
+    } else {
+        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    }
 }
 #endif
 
 void
 freeChain_sync(bdescr *bd)
 {
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-    freeChain(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    // GC_LOCAL uses the ordinary locking protocol for the block
+    // allocator because it runs concurrently with the mutator.
+    if (gct->gc_type == GC_LOCAL) {
+        return freeChain_lock(bd);
+    } else {
+        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        freeChain(bd);
+        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    }
+}
+
+void
+freeGroup_sync(bdescr *bd)
+{
+    // GC_LOCAL uses the ordinary locking protocol for the block
+    // allocator because it runs concurrently with the mutator.
+    if (gct->gc_type == GC_LOCAL) {
+        return freeGroup_lock(bd);
+    } else {
+        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+        freeGroup(bd);
+        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -122,7 +170,7 @@ steal_todo_block (nat g)
 
     // look for work to steal
     for (n = 0; n < n_gc_threads; n++) {
-        if (n == gct->thread_index) continue;
+        if (n == gct->index) continue;
         bd = stealWSDeque(gc_threads[n]->gens[g].todo_q);
         if (bd) {
             return bd;
@@ -192,7 +240,6 @@ todo_block_full (nat size, gen_workspace *ws)
         }
     }
     
-    gct->copied += ws->todo_free - bd->free;
     bd->free = ws->todo_free;
 
     ASSERT(bd->u.scan >= bd->start && bd->u.scan <= bd->free);
@@ -241,7 +288,7 @@ todo_block_full (nat size, gen_workspace *ws)
 StgPtr
 alloc_todo_block (gen_workspace *ws, nat size)
 {
-    bdescr *bd/*, *hd, *tl */;
+    bdescr *bd;
 
     // Grab a part block if we have one, and it has enough room
     bd = ws->part_list;
@@ -255,20 +302,23 @@ alloc_todo_block (gen_workspace *ws, nat size)
     {
         // blocks in to-space get the BF_EVACUATED flag.
 
-//        allocBlocks_sync(16, &hd, &tl, 
-//                         ws->step->gen_no, ws->step, BF_EVACUATED);
-//
-//        tl->link = ws->part_list;
-//        ws->part_list = hd->link;
-//        ws->n_part_blocks += 15;
-//
-//        bd = hd;
-
         if (size > BLOCK_SIZE_W) {
             bd = allocGroup_sync((lnat)BLOCK_ROUND_UP(size*sizeof(W_))
                                  / BLOCK_SIZE);
         } else {
+
+#if ALLOCBLOCKS
+            bdescr *hd, *tl;
+
+            allocChain_sync(ALLOCBLOCKS, &hd, &tl, ws->gen, BF_EVACUATED);
+            tl->link = ws->part_list;
+            ws->part_list = hd->link;
+            ws->n_part_blocks += ALLOCBLOCKS-1;
+
+            bd = hd;
+#else
             bd = allocBlock_sync();
+#endif
         }
         initBdescr(bd, ws->gen, ws->gen->to);
         bd->flags = BF_EVACUATED;
@@ -279,8 +329,15 @@ alloc_todo_block (gen_workspace *ws, nat size)
 
     ws->todo_bd = bd;
     ws->todo_free = bd->free;
-    ws->todo_lim  = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
-                            bd->free + stg_max(WORK_UNIT_WORDS,size));
+
+    if (gct->gc_type == GC_PAR && work_stealing) {
+        // use a smaller limit if we're doing load-balancing, so we
+        // can share available work more quickly.
+        ws->todo_lim  = stg_min(bd->start + bd->blocks * BLOCK_SIZE_W,
+                                bd->free + stg_max(WORK_UNIT_WORDS,size));
+    } else {
+        ws->todo_lim = bd->start + bd->blocks * BLOCK_SIZE_W;
+    }
 
     debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d", 
                bd->free, ws->gen->no);
@@ -301,7 +358,7 @@ printMutableList(bdescr *bd)
     debugBelch("mutable list %p: ", bd);
 
     for (; bd != NULL; bd = bd->link) {
-	for (p = bd->start; p < bd->free; p++) {
+        for (p = bd->start; p < bd->free; p++) {
 	    debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
 	}
     }

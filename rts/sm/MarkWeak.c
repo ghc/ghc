@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team 1998-2008
+ * (c) The GHC Team 1998-2010
  *
  * Weak pointers and weak-like things in the GC
  *
@@ -17,6 +17,8 @@
 #include "MarkWeak.h"
 #include "GC.h"
 #include "GCThread.h"
+#include "GCTDecl.h"
+#include "GCUtils.h"
 #include "Evac.h"
 #include "Trace.h"
 #include "Schedule.h"
@@ -68,149 +70,162 @@
 
    -------------------------------------------------------------------------- */
 
-/* Which stage of processing various kinds of weak pointer are we at?
- * (see traverse_weak_ptr_list() below for discussion).
- */
-typedef enum { WeakPtrs, WeakThreads, WeakDone } WeakStage;
-static WeakStage weak_stage;
-
-/* Weak pointers
- */
-StgWeak *old_weak_ptr_list; // also pending finaliser list
-
-// List of threads found to be unreachable
-StgTSO *resurrected_threads;
-
 static void resurrectUnreachableThreads (generation *gen);
 static rtsBool tidyThreadList (generation *gen);
 
 void
 initWeakForGC(void)
 {
-    old_weak_ptr_list = weak_ptr_list;
-    weak_ptr_list = NULL;
-    weak_stage = WeakPtrs;
-    resurrected_threads = END_TSO_QUEUE;
+    gct->old_weak_ptrs = NULL;
+    gct->weak_stage = WeakPtrs;
+    gct->resurrected_threads = END_TSO_QUEUE;
 }
 
 rtsBool 
 traverseWeakPtrList(void)
 {
   StgWeak *w, **last_w, *next_w;
-  StgClosure *new;
   rtsBool flag = rtsFalse;
+  generation *gen;
+  bdescr *bd;
   const StgInfoTable *info;
+  StgClosure *new;
+  nat g;
 
-  switch (weak_stage) {
+  switch (gct->weak_stage) {
 
   case WeakDone:
       return rtsFalse;
 
   case WeakPtrs:
-      /* doesn't matter where we evacuate values/finalizers to, since
-       * these pointers are treated as roots (iff the keys are alive).
-       */
-      gct->evac_gen_no = 0;
-      
-      last_w = &old_weak_ptr_list;
-      for (w = old_weak_ptr_list; w != NULL; w = next_w) {
-	  
-	  /* There might be a DEAD_WEAK on the list if finalizeWeak# was
-	   * called on a live weak pointer object.  Just remove it.
-	   */
-	  if (w->header.info == &stg_DEAD_WEAK_info) {
-	      next_w = ((StgDeadWeak *)w)->link;
-	      *last_w = next_w;
-	      continue;
-	  }
-	  
+
+      last_w = &gct->old_weak_ptrs;
+      for (w = gct->old_weak_ptrs; w != NULL; w = next_w) {
+          
+          /* There might be a DEAD_WEAK on the list if finalizeWeak# was
+           * called on a live weak pointer object.  Just remove it.
+           */
+          if (w->header.info == &stg_DEAD_WEAK_info) {
+              next_w = ((StgDeadWeak *)w)->link;
+              *last_w = next_w;
+              continue;
+          }
+          
           info = get_itbl(w);
-	  switch (info->type) {
+          switch (info->type) {
+              
+          case WEAK:
+              /* Now, check whether the key is reachable.
+               */
+              new = isAlive(w->key);
+              if (new != NULL) {
+                  w->key = new;
 
-	  case WEAK:
-	      /* Now, check whether the key is reachable.
-	       */
-	      new = isAlive(w->key);
-	      if (new != NULL) {
-		  w->key = new;
-		  // evacuate the value and finalizer 
-		  evacuate(&w->value);
-		  evacuate(&w->finalizer);
-		  // remove this weak ptr from the old_weak_ptr list 
-		  *last_w = w->link;
-		  // and put it on the new weak ptr list 
-		  next_w  = w->link;
-		  w->link = weak_ptr_list;
-		  weak_ptr_list = w;
-		  flag = rtsTrue;
-
-		  debugTrace(DEBUG_weak, 
-			     "weak pointer still alive at %p -> %p",
-			     w, w->key);
-		  continue;
-	      }
-	      else {
-		  last_w = &(w->link);
-		  next_w = w->link;
-		  continue;
-	      }
-
-	  default:
-	      barf("traverseWeakPtrList: not WEAK");
-	  }
+                  bd = Bdescr((P_)w);
+                  gct->evac_gen_ix = bd->gen_ix;
+              
+                  // evacuate the value and finalizer 
+                  evacuate(&w->value);
+                  evacuate(&w->finalizer);
+                  // remove this weak ptr from the old_weak_ptrs list 
+                  *last_w = w->link;
+                  // and put it on the new weak ptr list
+                  next_w  = w->link;
+                  w->link = bd->gen->weak_ptrs;
+                  bd->gen->weak_ptrs = w;
+                  flag = rtsTrue;
+                  
+                  debugTrace(DEBUG_weak, 
+                             "weak pointer still alive at %p -> %p",
+                             w, w->key);
+                  
+                  if (gct->failed_to_evac || 
+                      Bdescr((P_)w->key)->gen_ix < bd->gen_ix) {
+                      gct->failed_to_evac = rtsFalse;
+                      recordMutableGen_GC((StgClosure *)w,bd->gen_no);
+                  }
+                  
+                  continue;
+              }
+              else {
+                  last_w = &(w->link);
+                  next_w = w->link;
+                  continue;
+              }
+              
+          default:
+              barf("traverseWeakPtrListGen: not WEAK");
+          }
       }
-      
+        
       /* If we didn't make any changes, then we can go round and kill all
        * the dead weak pointers.  The old_weak_ptr list is used as a list
        * of pending finalizers later on.
        */
       if (flag == rtsFalse) {
-	  for (w = old_weak_ptr_list; w; w = w->link) {
-	      evacuate(&w->finalizer);
-	  }
+          for (w = gct->old_weak_ptrs; w; w = w->link) {
+              bd = Bdescr((P_)w);
+              gct->evac_gen_ix = bd->gen_ix;
+              evacuate(&w->finalizer);
+              if (gct->failed_to_evac) {
+                  gct->failed_to_evac = rtsFalse;
+                  recordMutableGen_GC((StgClosure *)w,Bdescr((P_)w)->gen_no);
+              }
 
-	  // Next, move to the WeakThreads stage after fully
-	  // scavenging the finalizers we've just evacuated.
-	  weak_stage = WeakThreads;
+#ifdef PROFILING
+              // A weak pointer is inherently used, so we do not need to call
+              // LDV_recordDead().
+              //
+              // Furthermore, when PROFILING is turned on, dead weak
+              // pointers are exactly as large as weak pointers, so there is
+              // no need to fill the slop, either.  See stg_DEAD_WEAK_info
+              // in StgMiscClosures.hc.
+#endif
+              SET_INFO(w, &stg_DEAD_WEAK_info);
+          }
+                
+          // Next, move to the WeakThreads stage after fully
+          // scavenging the finalizers we've just evacuated.
+          gct->weak_stage = WeakThreads;
       }
 
       return rtsTrue;
 
   case WeakThreads:
-      /* Now deal with the step->threads lists, which behave somewhat like
+      /* Now deal with the gen->threads lists, which behave somewhat like
        * the weak ptr list.  If we discover any threads that are about to
        * become garbage, we wake them up and administer an exception.
+       *
+       * We can't do in the same phase as WeakPtrs, because we want
+       * the property that a reachable finalizer can keep a thread
+       * alive (see test conc031).
        */
   {
-      nat g;
 	  
       // Traverse thread lists for generations we collected...
-//      ToDo when we have one gen per capability:
-//      for (n = 0; n < n_capabilities; n++) {
-//          if (tidyThreadList(&nurseries[n])) {
-//              flag = rtsTrue;
-//          }
-//      }              
-      for (g = 0; g <= N; g++) {
-          if (tidyThreadList(&generations[g])) {
+      for (g = 0; g < total_generations; g++) {
+          gen = &all_generations[g];
+          if (gen->no > gct->collect_gen) break;
+          if (gct->gc_type == GC_LOCAL && isNonLocalGen(gen)) continue;
+          if (tidyThreadList(gen)) {
               flag = rtsTrue;
           }
       }
-
+        
       /* If we evacuated any threads, we need to go back to the scavenger.
        */
       if (flag) return rtsTrue;
 
       /* And resurrect any threads which were about to become garbage.
        */
-      {
-          nat g;
-          for (g = 0; g <= N; g++) {
-              resurrectUnreachableThreads(&generations[g]);
-          }
+      for (g = 0; g < total_generations; g++) {
+          gen = &all_generations[g];
+          if (gen->no > gct->collect_gen) break;
+          if (gct->gc_type == GC_LOCAL && isNonLocalGen(gen)) continue;
+          resurrectUnreachableThreads(gen);
       }
-        
-      weak_stage = WeakDone;  // *now* we're done,
+
+      gct->weak_stage = WeakDone;  // *now* we're done,
       return rtsTrue;         // but one more round of scavenging, please
   }
       
@@ -220,7 +235,7 @@ traverseWeakPtrList(void)
   }
 }
   
-  static void resurrectUnreachableThreads (generation *gen)
+static void resurrectUnreachableThreads (generation *gen)
 {
     StgTSO *t, *tmp, *next;
 
@@ -232,17 +247,31 @@ traverseWeakPtrList(void)
         // become garbage, because they might get
         // pending exceptions.
         switch (t->what_next) {
+
         case ThreadKilled:
         case ThreadComplete:
             continue;
+
         default:
             tmp = t;
             evacuate((StgClosure **)&tmp);
-            tmp->global_link = resurrected_threads;
-            resurrected_threads = tmp;
+
+            if (gct->gc_type == GC_LOCAL) {
+                // We don't currently resurrect threads with
+                // exceptions in GC_LOCAL.  It's hard to get right,
+                // becuase we would have to do real throwTo rather
+                // than throwToSingleThhreaded.
+                generation *gen = Bdescr((P_)tmp)->gen;
+                tmp->global_link = gen->threads;
+                gen->threads = tmp;
+            } else {
+                tmp->global_link = gct->resurrected_threads;
+                gct->resurrected_threads = tmp;
+            }
         }
     }
 }
+
 
 static rtsBool tidyThreadList (generation *gen)
 {
@@ -253,15 +282,21 @@ static rtsBool tidyThreadList (generation *gen)
 
     for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
 	      
-        tmp = (StgTSO *)isAlive((StgClosure *)t);
-	
+        if (gct->gc_type == GC_LOCAL) {
+            tmp = t;
+            evacuate((StgClosure **)&tmp);
+        } else {
+            tmp = (StgTSO *)isAlive((StgClosure *)t);
+        }
+        
         if (tmp != NULL) {
             t = tmp;
         }
-        
-        ASSERT(get_itbl(t)->type == TSO);
+
         next = t->global_link;
         
+        ASSERT(get_itbl(t)->type == TSO);
+
         // if the thread is not masking exceptions but there are
         // pending exceptions on its queue, then something has gone
         // wrong.  However, pending exceptions are OK if there is an
@@ -292,40 +327,63 @@ static rtsBool tidyThreadList (generation *gen)
 }
 
 /* -----------------------------------------------------------------------------
-   Evacuate every weak pointer object on the weak_ptr_list, and update
-   the link fields.
+   Every weak pointer object (WEAK) is treated as implicitly alive to
+   begin with.  Only when w->key is found to be unreachable does the
+   WEAK turn into a DEAD_WEAK which may be subsequently GC'd.
 
-   ToDo: with a lot of weak pointers, this will be expensive.  We
-   should have a per-GC weak pointer list, just like threads.
-   -------------------------------------------------------------------------- */
+   All WEAK objects are chained together by their w->link fields.
+   Since we're doing generational GC, it makes sense to divide this
+   list per-generation, so that we don't have to traverse the weak
+   pointers of old generations when collecting young generations, so
+   each generation has its own gen->weak_ptrs list.
+
+   In markWeakPtr list we traverse the gen->weak_ptrs lists of
+   generations we are collecting, and evacuate each one.  The
+   resulting weak pointer objects are chained together on a temporary
+   list gct->old_weak_ptrs, which we will traverse again (possibly
+   multiple times) in traverseWeakPtrList().  Eventually WEAK objects
+   will be placed on the appropriate gen->weak_ptrs list of the
+   generation that they now belong to.
+  -------------------------------------------------------------------------- */
 
 void
 markWeakPtrList ( void )
 {
-  StgWeak *w, **last_w;
+    StgWeak *w, *next;
+    generation *gen;
+    nat g;
 
-  last_w = &weak_ptr_list;
-  for (w = weak_ptr_list; w; w = w->link) {
-      // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
-
+    for (g = 0; g < total_generations; g++) {
+        gen = &all_generations[g];
+        if (gen->no > gct->collect_gen) break;
+        if (gct->gc_type == GC_LOCAL && isNonLocalGen(gen)) continue;
+        
+        for (w = gen->weak_ptrs; w; w = next) {
+            // w might be WEAK, a forwarding ptr, or DEAD_WEAK (actually
+            // CONSTR_STATIC) here
+            
 #ifdef DEBUG
-      {   // careful to do this assertion only reading the info ptr
-          // once, because during parallel GC it might change under our feet.
-          const StgInfoTable *info;
-          info = w->header.info;
-          ASSERT(IS_FORWARDING_PTR(info)
-                 || info == &stg_DEAD_WEAK_info 
-                 || INFO_PTR_TO_STRUCT(info)->type == WEAK);
-      }
+            {   // careful to do this assertion only reading the info ptr
+                // once, because during parallel GC it might change under our feet.
+                const StgInfoTable *info;
+                info = w->header.info;
+                ASSERT(IS_FORWARDING_PTR(info)
+                       || info == &stg_DEAD_WEAK_info 
+                       || INFO_PTR_TO_STRUCT(info)->type == WEAK);
+            }
 #endif
+            
+            evacuate((StgClosure**)&w);
 
-      evacuate((StgClosure **)last_w);
-      w = *last_w;
-      if (w->header.info == &stg_DEAD_WEAK_info) {
-          last_w = &(((StgDeadWeak*)w)->link);
-      } else {
-          last_w = &(w->link);
-      }
-  }
+            next = w->link;
+            // We drop DEAD_WEAK objects from the list here.
+            if (w->header.info != &stg_DEAD_WEAK_info) {
+                w->link = gct->old_weak_ptrs;
+                gct->old_weak_ptrs = w;
+            }
+        }
+
+        gen->weak_ptrs = NULL;
+        // we'll re-populate these lists later in traverseWeakPtrList()
+    }
 }
-

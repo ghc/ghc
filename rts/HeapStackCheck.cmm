@@ -331,6 +331,10 @@ __stg_gc_fun
     W_ info;
     W_ type;
 
+    info = %INFO_PTR(UNTAG(R1));
+    if (IS_FORWARDING_PTR(info)) {
+        R1 = UN_FORWARDING_PTR(info) | GETTAG(R1);
+    }
     info = %GET_FUN_INFO(UNTAG(R1));
 
     // cache the size
@@ -389,15 +393,23 @@ INFO_TABLE_RET( stg_gc_fun, RET_FUN )
 {
     R1 = Sp(2);
     Sp_adj(3);
+
+    W_ info;
+    info = %INFO_PTR(UNTAG(R1));
+    if (IS_FORWARDING_PTR(info)) {
+       R1 = UN_FORWARDING_PTR(info) + GETTAG(R1);
+       info = %INFO_PTR(UNTAG(R1));
+    }
+
 #ifdef NO_ARG_REGS
     // Minor optimisation: there are no argument registers to load up,
     // so we can just jump straight to the function's entry point.
-    jump %GET_ENTRY(UNTAG(R1));
+    jump %ENTRY_CODE(info);
 #else
     W_ info;
     W_ type;
     
-    info = %GET_FUN_INFO(UNTAG(R1));
+    info = %FUN_INFO(info);
     type = TO_W_(StgFunInfoExtra_fun_type(info));
     if (type == ARG_GEN || type == ARG_GEN_BIG) {
 	jump StgFunInfoExtra_slow_apply(info);
@@ -625,7 +637,7 @@ stg_block_putmvar
     BLOCK_BUT_FIRST(stg_block_putmvar_finally);
 }
 
-stg_block_blackhole
+stg_block_enter
 {
     Sp_adj(-2);
     Sp(1) = R1;

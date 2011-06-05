@@ -175,7 +175,7 @@ stackSqueeze(Capability *cap, StgTSO *tso, StgPtr bottom)
  * here.  We also take the opportunity to do stack squeezing if it's
  * turned on.
  * -------------------------------------------------------------------------- */
-void
+StgTSO * // returns the new TSO, since it might have moved
 threadPaused(Capability *cap, StgTSO *tso)
 {
     StgClosure *frame;
@@ -188,6 +188,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     nat weight           = 0;
     nat weight_pending   = 0;
     rtsBool prev_was_update_frame = rtsFalse;
+    rtsBool tso_global;
     
     // Check to see whether we have threads waiting to raise
     // exceptions, and we're not blocking exceptions, or are blocked
@@ -195,7 +196,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     // TSO_BLOCKEX and becomes blocked interruptibly, this is the only
     // place we ensure that the blocked_exceptions get a chance.
     maybePerformBlockedException (cap, tso);
-    if (tso->what_next == ThreadKilled) { return; }
+    if (tso->what_next == ThreadKilled) { return tso; }
 
     // NB. Blackholing is *compulsory*, we must either do lazy
     // blackholing, or eager blackholing consistently.  See Note
@@ -205,9 +206,12 @@ threadPaused(Capability *cap, StgTSO *tso)
     
     frame = (StgClosure *)tso->stackobj->sp;
 
+    // used to decide whether we need to globalise the TSO
+    tso_global = isGlobal((StgClosure*)tso);
+
     while ((P_)frame < stack_end) {
         info = get_ret_itbl(frame);
-	
+
 	switch (info->i.type) {
 
 	case UPDATE_FRAME:
@@ -278,13 +282,17 @@ threadPaused(Capability *cap, StgTSO *tso)
             }
 #endif
 
+            // .. we're about to write a TSO pointer into the BLACKHOLE,
+            // so we better not violate the global heap invariant:
+            if (Bdescr((P_)bh)->gen_no > 0 && !tso_global) {
+                globalise(cap,(StgClosure**)&tso);
+                tso_global = rtsTrue;
+            }
+
             // The payload of the BLACKHOLE points to the TSO
             ((StgInd *)bh)->indirectee = (StgClosure *)tso;
             write_barrier();
             SET_INFO(bh,&stg_BLACKHOLE_info);
-
-            // .. and we need a write barrier, since we just mutated the closure:
-            recordClosureMutated(cap,bh);
 
             // We pretend that bh has just been created.
             LDV_RECORD_CREATE(bh);
@@ -332,4 +340,6 @@ end:
     } else {
         tso->flags &= ~TSO_SQUEEZED;
     }
+
+    return tso;
 }

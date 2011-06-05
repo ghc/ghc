@@ -60,6 +60,11 @@ typedef struct nursery_ {
 
 typedef struct generation_ {
     unsigned int   no;			// generation number
+    unsigned int   ix;                  // generation "index", i.e the
+                                        // offset in the all_generations array
+
+    unsigned int   is_local;            // true if a local generation
+    unsigned int   cap;                 // capability this gen is local to
 
     bdescr *       blocks;	        // blocks in this gen
     unsigned int   n_blocks;	        // number of blocks
@@ -70,10 +75,18 @@ typedef struct generation_ {
     unsigned long  n_new_large_words;   // words of new large objects
                                         // (for allocation stats)
 
+    bdescr *       prim_blocks;         // blocks of primitive objects
+    unsigned int   n_prim_blocks;       // these blocks are marked/swept,
+    unsigned int   n_prim_words;        // not copied.
+
     unsigned int   max_blocks;		// max blocks
 
     StgTSO *       threads;             // threads in this gen
                                         // linked via global_link
+
+    StgWeak *      weak_ptrs;           // WEAK objects in this gen
+                                        // linked via w->link
+
     struct generation_ *to;		// destination gen for live objects
 
     // stats information
@@ -85,10 +98,11 @@ typedef struct generation_ {
     // Fields below are used during GC only
 
 #if defined(THREADED_RTS)
-    char pad[128];                      // make sure the following is
+    StgWord8 pad[128];                  // make sure the following is
                                         // on a separate cache line.
-    SpinLock     sync;                  // lock for large_objects
-                                        //    and scavenged_large_objects
+    SpinLock     sync;                  // lock for large_objects,
+                                        //    blocks, n_blocks, n_words,
+                                        //    scavenged_large_objects
 #endif
 
     int          mark;			// mark (not copy)? (old gen only)
@@ -109,9 +123,14 @@ typedef struct generation_ {
     StgTSO *     old_threads;
 } generation;
 
-extern generation * generations;
-extern generation * g0;
-extern generation * oldest_gen;
+extern nat total_generations;        // size of all_generations
+extern generation * all_generations; // indexed by gen->ix
+extern generation * old_generations; // indexed by gen->no
+extern generation * g0;              // == &old_generations[0]
+extern generation * oldest_gen;      // == &old_generations[G-1]
+extern generation * global_gen;      // == &all_generations[global_gen_ix]
+extern nat global_gen_ix;            // ix of first non-local gen
+extern nat global_gen_no;            // no of first non-local gen
 
 /* -----------------------------------------------------------------------------
    Generic allocation
@@ -143,6 +162,7 @@ extern generation * oldest_gen;
 
 StgPtr  allocate        ( Capability *cap, lnat n );
 StgPtr  allocatePinned  ( Capability *cap, lnat n );
+StgPtr  allocatePrim    ( Capability *cap, lnat n );
 
 /* memory allocator for executable memory */
 void * allocateExec(unsigned int len, void **exec_addr);
@@ -162,8 +182,8 @@ void performMajorGC(void);
    The CAF table - used to let us revert CAFs in GHCi
    -------------------------------------------------------------------------- */
 
-void newCAF     (StgRegTable *reg, StgClosure *);
-void newDynCAF  (StgRegTable *reg, StgClosure *);
+void newCAF     (StgRegTable *reg, StgClosure *, StgClosure *);
+void newDynCAF  (StgRegTable *reg, StgClosure *, StgClosure *);
 void revertCAFs (void);
 
 // Request that all CAFs are retained indefinitely.
@@ -183,7 +203,27 @@ HsInt64 getAllocations (void);
    and is put on the mutable list.
    -------------------------------------------------------------------------- */
 
-void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
+StgClosure *dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
+
+// similarly, the barrier for arrays:
+StgClosure *dirty_MUT_ARR (StgRegTable *reg, StgClosure *p);
+
+// and for MVars:
+void dirty_MVAR(StgRegTable *reg, StgClosure *p);
+
+/* ---------------------------------------------------------------------------
+   Globalisation 
+   ------------------------------------------------------------------------- */
+
+INLINE_HEADER rtsBool
+isLocal (StgClosure *p)
+{
+    return Bdescr((P_)p)->gen->is_local;
+}
+
+/* ---------------------------------------------------------------------------
+   Misc 
+   ------------------------------------------------------------------------- */
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
@@ -191,9 +231,36 @@ extern rtsBool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->gen     = gen;
-    bd->gen_no  = gen->no;
-    bd->dest_no = dest->no;
+    bd->gen      = gen;
+    bd->gen_no   = gen->no;
+    bd->gen_ix   = gen->ix;
+    bd->dest_ix  = dest->ix;
+}
+
+/* -----------------------------------------------------------------------------
+   Primitive heap area
+
+   For now, just use a word before the primitive object to indicate
+   global/private.  Later try using a bitmap.
+   -------------------------------------------------------------------------- */
+
+EXTERN_INLINE rtsBool isGlobalPrim (StgClosure *p);
+EXTERN_INLINE rtsBool isGlobalPrim (StgClosure *p)
+{
+    return (rtsBool) *((P_)p - 1);
+}
+
+EXTERN_INLINE rtsBool isGlobal (StgClosure *p);
+EXTERN_INLINE rtsBool isGlobal (StgClosure *p)
+{
+    bdescr *bd;
+    bd = Bdescr((P_)p);
+    return bd->gen_no != 0 || ((bd->flags & BF_PRIM) && isGlobalPrim(p));
+}
+
+INLINE_HEADER void setGlobal (StgClosure *p)
+{
+    *((P_)p - 1) = 1;
 }
 
 #endif /* RTS_STORAGE_GC_H */

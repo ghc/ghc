@@ -44,7 +44,6 @@ import IdInfo
 import Type
 import PrelInfo
 import Outputable
-import ListSetOps
 import Util
 import Module
 import FastString
@@ -242,7 +241,8 @@ bindConArgs con args
           -- The binding below forces the masking out of the tag bits
           -- when accessing the constructor field.
 	  bind_arg (arg, offset) = bindNewToUntagNode arg offset (mkLFArgument arg) (tagForCon con)
-	  (_, args_w_offsets)    = layOutDynConstr con (addIdReps args)
+          (_, _, args_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} 
+                                                       (addIdReps args)
 	--
        ASSERT(not (isUnboxedTupleCon con)) return ()
        mapCs bind_arg args_w_offsets
@@ -316,31 +316,7 @@ cgReturnDataCon con amodes
   | opt_SccProfilingOn    = build_it_then enter_it
   | otherwise
   = ASSERT( amodes `lengthIs` dataConRepArity con )
-    do	{ EndOfBlockInfo _ sequel <- getEndOfBlockInfo
-	; case sequel of
-	    CaseAlts _ (Just (alts, deflt_lbl)) bndr
-	      ->    -- Ho! We know the constructor so we can
-		    -- go straight to the right alternative
-		 case assocMaybe alts (dataConTagZ con) of {
-		    Just join_lbl -> build_it_then (jump_to join_lbl);
-		    Nothing
-			-- Special case!  We're returning a constructor to the default case
-			-- of an enclosing case.  For example:
-			--
-			--	case (case e of (a,b) -> C a b) of
-			--	  D x -> ...
-			--	  y   -> ...<returning here!>...
-			--
-			-- In this case,
-			--	if the default is a non-bind-default (ie does not use y),
-			--  	then we should simply jump to the default join point;
-    
-			| isDeadBinder bndr -> performReturn (jump_to deflt_lbl)
-			| otherwise	    -> build_it_then (jump_to deflt_lbl) }
-    
-	    _otherwise	-- The usual case
-              -> build_it_then emitReturnInstr
-	}
+    build_it_then emitReturnInstr
   where
     enter_it    = stmtsC [ CmmAssign nodeReg (cmmUntag (CmmReg nodeReg)),
                            CmmJump (entryCode (closureInfoPtr (CmmReg nodeReg))) [] ]

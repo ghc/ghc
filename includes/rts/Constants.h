@@ -215,22 +215,20 @@
 /* Win32 only: */
 #define BlockedOnDoProc     7
 
-/* Only relevant for PAR: */
-  /* blocked on a remote closure represented by a Global Address: */
-#define BlockedOnGA         8
-  /* same as above but without sending a Fetch message */
-#define BlockedOnGA_NoSend  9
 /* Only relevant for THREADED_RTS: */
-#define BlockedOnCCall      10
-#define BlockedOnCCall_Interruptible 11
-   /* same as above but permit killing the worker thread */
+#define BlockedOnCCall      8
+#define BlockedOnCCall_Interruptible 9
+   /* same as above but permit interrupting the call */
 
 /* Involved in a message sent to tso->msg_cap */
-#define BlockedOnMsgThrowTo 12
+#define BlockedOnMsgThrowTo 10
 
 /* The thread is not on any run queues, but can be woken up 
    by tryWakeupThread() */
-#define ThreadMigrating     13
+#define ThreadMigrating     11
+
+/* Involved in a message sent to tso->msg_cap */
+#define BlockedOnMsgGlobalise 12
 
 /*
  * These constants are returned to the scheduler by a thread that has

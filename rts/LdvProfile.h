@@ -23,11 +23,9 @@ RTS_PRIVATE void LdvCensusKillAll ( void );
 // Invoked when: 
 //   1) Hp is incremented and exceeds HpLim (in Updates.hc).
 //   2) copypart() is called (in GC.c).
-#define LDV_FILL_SLOP(from, howMany)	\
+#define LDV_FILL_SLOP(from, howMany)            \
   if (era > 0) {				\
-    int i;					\
-    for (i = 0;i < (howMany); i++)	\
-      ((StgWord *)(from))[i] = 0;		\
+    ZERO_SLOP(from, i);                         \
   }
 
 // Informs the LDV profiler that closure c has just been evacuated.

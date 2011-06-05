@@ -380,7 +380,9 @@ enterFastPathHelper tag regstatus no_load_regs args_in_regs args =
 	reg_doc,
         text "  Sp_adj(" <> int sp' <> text ");",
         -- enter, but adjust offset with tag
-	text "  jump " <> text "%GET_ENTRY(R1-" <> int tag <> text ");",
+        text "  info = %INFO_PTR(R1-" <> int tag <> text ");",
+        text "  if (IS_FORWARDING_PTR(info)) { R1 = UN_FORWARDING_PTR(info) + " <> int tag <> text "; info = %INFO_PTR(R1-" <> int tag <> text "); }",
+	text "  jump " <> text "%ENTRY_CODE(info);",
         text "}"
        ]
   -- I don't totally understand this code, I copied it from
@@ -502,6 +504,8 @@ genApply regstatus args =
        -- Functions can be tagged, so we untag them!
        text  "R1 = UNTAG(R1);",
        text  "info = %INFO_PTR(R1);",
+        -- check for forwarding pointers
+        text  "if (IS_FORWARDING_PTR(info)) { R1 = UN_FORWARDING_PTR(info); info = %INFO_PTR(R1); }",
 
 --    if fast == 1:
 --        print "    goto *lbls[info->type];";
@@ -563,6 +567,7 @@ genApply regstatus args =
 	text "case AP,",
 	text "     AP_STACK,",
 	text "     BLACKHOLE,",
+	text "     IND_LOCAL,",
 	text "     WHITEHOLE,",
         text "     THUNK,",
         text "     THUNK_1_0,",
@@ -636,7 +641,10 @@ genApplyFast regstatus args =
 
         -- Functions can be tagged, so we untag them!
         text  "R1 = UNTAG(R1);",
-        text  "info = %GET_STD_INFO(R1);",
+        text  "info = %INFO_PTR(R1);",
+        -- check for forwarding pointers
+        text  "if (IS_FORWARDING_PTR(info)) { R1 = UN_FORWARDING_PTR(info); info = %INFO_PTR(R1); }",
+        text "info = %STD_INFO(info);",
         text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (TO_W_(%INFO_TYPE(info))) {",
 	nest 4 (vcat [
           text "case FUN,",

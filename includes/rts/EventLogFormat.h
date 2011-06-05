@@ -151,6 +151,22 @@
  * #define BlockedOnMsgThrowTo          16
  */
 #define THREAD_SUSPENDED_FOREIGN_CALL 6
+/*
+ * 7-20 are the tso->why_blocked values (+6)
+ *
+ * #define BlockedOnMVar       7
+ * #define BlockedOnBlackHole  8
+ * #define BlockedOnRead       9
+ * #define BlockedOnWrite      10
+ * #define BlockedOnDelay      11
+ * #define BlockedOnSTM        12
+ * #define BlockedOnDoProc     13
+ * #define BlockedOnCCall      14
+ * #define BlockedOnCCall_NoUnblockExc 15
+ * #define BlockedOnMsgThrowTo 16
+ * #define ThreadMigrating     17
+ * #define BlockedOnMsgGlobalise 18
+ */
 
 #ifndef EVENTLOG_CONSTANTS_ONLY
 

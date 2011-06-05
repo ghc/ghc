@@ -31,26 +31,32 @@ runCFinalizer(void *fn, void *ptr, void *env, StgWord flag)
 }
 
 void
-runAllCFinalizers(StgWeak *list)
+runAllCFinalizers(void)
 {
     StgWeak *w;
     Task *task;
+    nat g;
+    generation *gen;
 
     task = myTask();
     if (task != NULL) {
         task->running_finalizers = rtsTrue;
     }
 
-    for (w = list; w; w = w->link) {
-	StgArrWords *farr;
-
-	farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
-
-	if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
-	    runCFinalizer((void *)farr->payload[0],
-	                  (void *)farr->payload[1],
-	                  (void *)farr->payload[2],
-	                  farr->payload[3]);
+    for (g = 0; g < total_generations; g++) {
+        gen = &all_generations[g];
+        
+        for (w = gen->weak_ptrs; w; w = w->link) {
+            StgArrWords *farr;
+            
+            farr = (StgArrWords *)UNTAG_CLOSURE(w->cfinalizer);
+            
+            if ((StgClosure *)farr != &stg_NO_FINALIZER_closure)
+                runCFinalizer((void *)farr->payload[0],
+                              (void *)farr->payload[1],
+                              (void *)farr->payload[2],
+                              farr->payload[3]);
+        }
     }
 
     if (task != NULL) {
@@ -93,9 +99,8 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     for (w = list; w; w = w->link) { 
 	StgArrWords *farr;
 
-	// Better not be a DEAD_WEAK at this stage; the garbage
-	// collector removes DEAD_WEAKs from the weak pointer list.
-	ASSERT(w->header.info != &stg_DEAD_WEAK_info);
+	// Better be a DEAD_WEAK
+	ASSERT(w->header.info == &stg_DEAD_WEAK_info);
 
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    n++;
@@ -109,16 +114,6 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 	                  (void *)farr->payload[2],
 	                  farr->payload[3]);
 
-#ifdef PROFILING
-        // A weak pointer is inherently used, so we do not need to call
-        // LDV_recordDead().
-	//
-        // Furthermore, when PROFILING is turned on, dead weak
-        // pointers are exactly as large as weak pointers, so there is
-        // no need to fill the slop, either.  See stg_DEAD_WEAK_info
-        // in StgMiscClosures.hc.
-#endif
-	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 	
     if (task != NULL) {
@@ -131,7 +126,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     debugTrace(DEBUG_weak, "weak: batching %d finalizers", n);
 
     size = n + mutArrPtrsCardTableSize(n);
-    arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
+    arr = (StgMutArrPtrs *)allocatePrim(cap, sizeofW(StgMutArrPtrs) + size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
     arr->ptrs = n;

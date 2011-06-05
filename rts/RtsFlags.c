@@ -76,6 +76,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize	= 0;    /* off by default */
     RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
+    RtsFlags.GcFlags.fixedAllocHeapSizeSuggestion = 0; /* none */
     RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsFalse;
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
@@ -117,6 +118,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.squeeze		= rtsFalse;
     RtsFlags.DebugFlags.hpc		= rtsFalse;
     RtsFlags.DebugFlags.sparks		= rtsFalse;
+    RtsFlags.DebugFlags.mallocleaks	= rtsFalse;
 #endif
 
 #if defined(PROFILING)
@@ -308,6 +310,7 @@ usage_text[] = {
 "  -Dz  DEBUG: stack squeezing",
 "  -Dc  DEBUG: program coverage",
 "  -Dr  DEBUG: sparks",
+"  -Dk  DEBUG: malloc leaks",
 "",
 "     NOTE: DEBUG events are sent to stderr by default; add -l to create a",
 "     binary event log file instead.",
@@ -694,6 +697,9 @@ error = rtsTrue;
 		      case 'r':
 			  RtsFlags.DebugFlags.sparks = rtsTrue;
 			  break;
+		      case 'k':
+			  RtsFlags.DebugFlags.mallocleaks = rtsTrue;
+			  break;
 		      default:
 			  bad_option( rts_argv[arg] );
 		      }
@@ -752,6 +758,9 @@ error = rtsTrue;
 	      case 'H':
                   if (rts_argv[arg][2] == '\0') {
                       RtsFlags.GcFlags.heapSizeSuggestionAuto = rtsTrue;
+                  } else if (rts_argv[arg][2] == 'A') {
+                      RtsFlags.GcFlags.fixedAllocHeapSizeSuggestion =
+                          (nat)(decodeSize(rts_argv[arg], 3, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
                   } else {
                       RtsFlags.GcFlags.heapSizeSuggestion =
                           (nat)(decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX) / BLOCK_SIZE);
@@ -1129,10 +1138,16 @@ error = rtsTrue;
 		    error = rtsTrue;
 		    break;
 
-                case 'b': /* heapBase in hex; undocumented */
+                case 'b': /* undocumented: heapBase in hex; 0x prefix optional */
                     if (rts_argv[arg][3] != '\0') {
-                        RtsFlags.GcFlags.heapBase
-                            = strtol(rts_argv[arg]+3, (char **) NULL, 16);
+                        if (rts_argv[arg][4] == '0' && 
+                            rts_argv[arg][5] == 'x') {
+                            RtsFlags.GcFlags.heapBase
+                                = strtol(rts_argv[arg]+6, (char **) NULL, 16);
+                        } else {
+                            RtsFlags.GcFlags.heapBase
+                                = strtol(rts_argv[arg]+3, (char **) NULL, 16);
+                        }
                     } else {
                         errorBelch("-xb: requires argument");
                         error = rtsTrue;

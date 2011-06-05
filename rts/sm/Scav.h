@@ -17,13 +17,21 @@
 #include "BeginPrivate.h"
 
 void    scavenge_loop (void);
-void    scavenge_mutable_list (bdescr *bd, generation *gen);
 void    scavenge_capability_mut_lists (Capability *cap);
 
 #ifdef THREADED_RTS
-void    scavenge_loop1 (void);
-void    scavenge_mutable_list1 (bdescr *bd, generation *gen);
-void    scavenge_capability_mut_Lists1 (Capability *cap);
+
+void    scavenge_loop_par (void);
+void    scavenge_capability_mut_lists_par (Capability *cap);
+
+void    scavenge_loop_local (void);
+void    scavenge_capability_mut_lists_local (Capability *cap);
+
+#else
+
+#define scavenge_loop1 scavenge_loop
+#define scavenge_capability_mut_lists1 scavenge_capability_mut_lists
+
 #endif
 
 #include "EndPrivate.h"

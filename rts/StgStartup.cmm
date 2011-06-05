@@ -96,8 +96,10 @@ stg_returnToStackTop
 
 stg_returnToSched
 {
+  W_ new_tso;
   SAVE_THREAD_STATE();
-  foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
+  ("ptr" new_tso) = foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
+  CurrentTSO = new_tso;
   jump StgReturn;
 }
 
@@ -117,8 +119,10 @@ stg_returnToSchedNotPaused
 // the MVar on which we are about to block in SMP mode.
 stg_returnToSchedButFirst
 {
+  W_ new_tso;
   SAVE_THREAD_STATE();
-  foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
+  ("ptr" new_tso) = foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
+  CurrentTSO = new_tso;
   jump R2;
 }
 

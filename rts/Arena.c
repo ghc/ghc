@@ -85,9 +85,10 @@ arenaAlloc( Arena *arena, size_t size )
 	arena_blocks += req_blocks;
 
 	bd->gen_no  = 0;
+	bd->gen_ix  = 0;
 	bd->gen     = NULL;
-        bd->dest_no = 0;
-	bd->flags   = 0;
+        bd->dest_ix = 0;
+        bd->flags   = 0;
 	bd->free    = bd->start;
 	bd->link    = arena->current;
 	arena->current = bd;

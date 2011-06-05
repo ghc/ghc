@@ -190,9 +190,9 @@ INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
 INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 {
     TICK_ENT_DYN_IND();	/* tick */
-    R1 = UNTAG(StgInd_indirectee(R1));
+    R1 = StgInd_indirectee(R1);
     TICK_ENT_VIA_NODE();
-    jump %GET_ENTRY(R1);
+    ENTER();
 }
 
 INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
@@ -206,9 +206,9 @@ INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
 INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
 {
     TICK_ENT_STATIC_IND();	/* tick */
-    R1 = UNTAG(StgInd_indirectee(R1));
+    R1 = StgInd_indirectee(R1);
     TICK_ENT_VIA_NODE();
-    jump %GET_ENTRY(R1);
+    ENTER();
 }
 
 INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
@@ -252,6 +252,159 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
     jump %GET_ENTRY(R1);
 }  
 
+STRING(ind_local_msg,"IND_LOCAL: not mine")
+
+#define DEF_IND_LOCAL(n)                                                \
+  INFO_TABLE_CONSTR(stg_IND_LOCAL##n,1,0,n,IND_LOCAL,"IND_LOCAL","IND_LOCAL") \
+  {                                                                     \
+      W_ r;                                                             \
+      if (TO_W_(Capability_no(MyCapability())) != n) {                  \
+          MAYBE_GC(R1_PTR, stg_IND_LOCAL##n##_info);                    \
+          (r) = foreign "C" messageGlobalise(MyCapability(), CurrentTSO, R1, n) [R1]; \
+          if (r != 0) {                                                 \
+              jump stg_block_enter;                                     \
+          }                                                             \
+      }                                                                 \
+                                                                        \
+      R1 = StgInd_indirectee(R1);                                       \
+      ENTER();                                                          \
+  }
+
+DEF_IND_LOCAL(0)
+DEF_IND_LOCAL(1)
+DEF_IND_LOCAL(2)
+DEF_IND_LOCAL(3)
+DEF_IND_LOCAL(4)
+DEF_IND_LOCAL(5)
+DEF_IND_LOCAL(6)
+DEF_IND_LOCAL(7)
+DEF_IND_LOCAL(8)
+DEF_IND_LOCAL(9)
+DEF_IND_LOCAL(10)
+DEF_IND_LOCAL(11)
+DEF_IND_LOCAL(12)
+DEF_IND_LOCAL(13)
+DEF_IND_LOCAL(14)
+DEF_IND_LOCAL(15)
+DEF_IND_LOCAL(16)
+DEF_IND_LOCAL(17)
+DEF_IND_LOCAL(18)
+DEF_IND_LOCAL(19)
+DEF_IND_LOCAL(20)
+DEF_IND_LOCAL(21)
+DEF_IND_LOCAL(22)
+DEF_IND_LOCAL(23)
+DEF_IND_LOCAL(24)
+DEF_IND_LOCAL(25)
+DEF_IND_LOCAL(26)
+DEF_IND_LOCAL(27)
+DEF_IND_LOCAL(28)
+DEF_IND_LOCAL(29)
+DEF_IND_LOCAL(30)
+DEF_IND_LOCAL(31)
+DEF_IND_LOCAL(32)
+DEF_IND_LOCAL(33)
+DEF_IND_LOCAL(34)
+DEF_IND_LOCAL(35)
+DEF_IND_LOCAL(36)
+DEF_IND_LOCAL(37)
+DEF_IND_LOCAL(38)
+DEF_IND_LOCAL(39)
+DEF_IND_LOCAL(40)
+DEF_IND_LOCAL(41)
+DEF_IND_LOCAL(42)
+DEF_IND_LOCAL(43)
+DEF_IND_LOCAL(44)
+DEF_IND_LOCAL(45)
+DEF_IND_LOCAL(46)
+DEF_IND_LOCAL(47)
+DEF_IND_LOCAL(48)
+DEF_IND_LOCAL(49)
+DEF_IND_LOCAL(50)
+DEF_IND_LOCAL(51)
+DEF_IND_LOCAL(52)
+DEF_IND_LOCAL(53)
+DEF_IND_LOCAL(54)
+DEF_IND_LOCAL(55)
+DEF_IND_LOCAL(56)
+DEF_IND_LOCAL(57)
+DEF_IND_LOCAL(58)
+DEF_IND_LOCAL(59)
+DEF_IND_LOCAL(60)
+DEF_IND_LOCAL(61)
+DEF_IND_LOCAL(62)
+DEF_IND_LOCAL(63)
+DEF_IND_LOCAL(64)
+
+section "rodata" {
+ stg_IND_LOCAL_tbl:
+    W_ stg_IND_LOCAL0_info;
+    W_ stg_IND_LOCAL1_info;
+    W_ stg_IND_LOCAL2_info;
+    W_ stg_IND_LOCAL3_info;
+    W_ stg_IND_LOCAL4_info;
+    W_ stg_IND_LOCAL5_info;
+    W_ stg_IND_LOCAL6_info;
+    W_ stg_IND_LOCAL7_info;
+    W_ stg_IND_LOCAL8_info;
+    W_ stg_IND_LOCAL9_info;
+    W_ stg_IND_LOCAL10_info;
+    W_ stg_IND_LOCAL11_info;
+    W_ stg_IND_LOCAL12_info;
+    W_ stg_IND_LOCAL13_info;
+    W_ stg_IND_LOCAL14_info;
+    W_ stg_IND_LOCAL15_info;
+    W_ stg_IND_LOCAL16_info;
+    W_ stg_IND_LOCAL17_info;
+    W_ stg_IND_LOCAL18_info;
+    W_ stg_IND_LOCAL19_info;
+    W_ stg_IND_LOCAL20_info;
+    W_ stg_IND_LOCAL21_info;
+    W_ stg_IND_LOCAL22_info;
+    W_ stg_IND_LOCAL23_info;
+    W_ stg_IND_LOCAL24_info;
+    W_ stg_IND_LOCAL25_info;
+    W_ stg_IND_LOCAL26_info;
+    W_ stg_IND_LOCAL27_info;
+    W_ stg_IND_LOCAL28_info;
+    W_ stg_IND_LOCAL29_info;
+    W_ stg_IND_LOCAL30_info;
+    W_ stg_IND_LOCAL31_info;
+    W_ stg_IND_LOCAL32_info;
+    W_ stg_IND_LOCAL33_info;
+    W_ stg_IND_LOCAL34_info;
+    W_ stg_IND_LOCAL35_info;
+    W_ stg_IND_LOCAL36_info;
+    W_ stg_IND_LOCAL37_info;
+    W_ stg_IND_LOCAL38_info;
+    W_ stg_IND_LOCAL39_info;
+    W_ stg_IND_LOCAL40_info;
+    W_ stg_IND_LOCAL41_info;
+    W_ stg_IND_LOCAL42_info;
+    W_ stg_IND_LOCAL43_info;
+    W_ stg_IND_LOCAL44_info;
+    W_ stg_IND_LOCAL45_info;
+    W_ stg_IND_LOCAL46_info;
+    W_ stg_IND_LOCAL47_info;
+    W_ stg_IND_LOCAL48_info;
+    W_ stg_IND_LOCAL49_info;
+    W_ stg_IND_LOCAL50_info;
+    W_ stg_IND_LOCAL51_info;
+    W_ stg_IND_LOCAL52_info;
+    W_ stg_IND_LOCAL53_info;
+    W_ stg_IND_LOCAL54_info;
+    W_ stg_IND_LOCAL55_info;
+    W_ stg_IND_LOCAL56_info;
+    W_ stg_IND_LOCAL57_info;
+    W_ stg_IND_LOCAL58_info;
+    W_ stg_IND_LOCAL59_info;
+    W_ stg_IND_LOCAL60_info;
+    W_ stg_IND_LOCAL61_info;
+    W_ stg_IND_LOCAL62_info;
+    W_ stg_IND_LOCAL63_info;
+    W_ stg_IND_LOCAL64_info;
+}
+
 /* ----------------------------------------------------------------------------
    Black holes.
 
@@ -263,7 +416,7 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
 
 INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 {
-    W_ r, p, info, bq, msg, owner, bd;
+    W_ r, p, info, bq, msg, owner, bd, new_tso;
 
     TICK_ENT_DYN_IND();	/* tick */
 
@@ -275,7 +428,7 @@ retry:
     }
 
     info = StgHeader_info(p);
-    if (info == stg_IND_info) {
+    if (info == stg_STUB_BLOCKING_QUEUE_info) {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
         // wakeBlockingQueue().
@@ -286,9 +439,8 @@ retry:
         info == stg_BLOCKING_QUEUE_CLEAN_info ||
         info == stg_BLOCKING_QUEUE_DIRTY_info)
     {
-        ("ptr" msg) = foreign "C" allocate(MyCapability() "ptr", 
-                                           BYTES_TO_WDS(SIZEOF_MessageBlackHole)) [R1];
-        
+        ("ptr" msg) = foreign "C" allocatePrim(MyCapability() "ptr", 
+                                               BYTES_TO_WDS(SIZEOF_MessageBlackHole)) [R1];
         SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = R1;
@@ -300,7 +452,7 @@ retry:
         } else {
             StgTSO_why_blocked(CurrentTSO) = BlockedOnBlackHole::I16;
             StgTSO_block_info(CurrentTSO) = msg;
-            jump stg_block_blackhole;
+            jump stg_block_enter;
         }
     }
     else
@@ -333,6 +485,12 @@ INFO_TABLE(stg_BLOCKING_QUEUE_CLEAN,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKIN
 INFO_TABLE(stg_BLOCKING_QUEUE_DIRTY,4,0,BLOCKING_QUEUE,"BLOCKING_QUEUE","BLOCKING_QUEUE")
 { foreign "C" barf("BLOCKING_QUEUE_DIRTY object entered!") never returns; }
     
+/*
+ * A kind of indirection that is never intended to be entered.  This
+ * is used for stubbing out BLOCKING_QUEUEs in wakeBlockingQueue().
+ */
+INFO_TABLE(stg_STUB_BLOCKING_QUEUE,1,0,IND,"STUB_BLOCKING_QUEUE","STUB_BLOCKING_QUEUE")
+{ foreign "C" barf("STUB_BLOCKING_QUEUE object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Whiteholes are used for the "locked" state of a closure (see lockClosure())
@@ -482,9 +640,17 @@ INFO_TABLE_CONSTR(stg_MSG_THROWTO,4,0,0,PRIM,"MSG_THROWTO","MSG_THROWTO")
 INFO_TABLE_CONSTR(stg_MSG_BLACKHOLE,3,0,0,PRIM,"MSG_BLACKHOLE","MSG_BLACKHOLE")
 { foreign "C" barf("MSG_BLACKHOLE object entered!") never returns; }
 
+// used to overwrite a MSG_BLACKHOLE when the message has been used/revoked
+// Closure type is IND so these get automatically eliminated by the GC.
+INFO_TABLE(stg_STUB_MSG_BLACKHOLE,1,0,IND,"STUB_MSG_BLACKHOLE","STUB_MSG_BLACKHOLE")
+{ foreign "C" barf("STUB_MSG_BLACKHOLE object entered!") never returns; }
+
 // used to overwrite a MSG_THROWTO when the message has been used/revoked
 INFO_TABLE_CONSTR(stg_MSG_NULL,1,0,0,PRIM,"MSG_NULL","MSG_NULL")
 { foreign "C" barf("MSG_NULL object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_MSG_GLOBALISE,3,0,0,PRIM,"MSG_GLOBALISE","MSG_GLOBALISE")
+{ foreign "C" barf("MSG_GLOBALISE object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    END_TSO_QUEUE
@@ -516,11 +682,11 @@ CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
 { foreign "C" barf("ARR_WORDS object entered!") never returns; }
 
-INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
-{ foreign "C" barf("MUT_ARR_PTRS_CLEAN object entered!") never returns; }
+INFO_TABLE(stg_MUT_ARR_PTRS_LOCAL, 0, 0, MUT_ARR_PTRS_LOCAL, "MUT_ARR_PTRS_LOCAL", "MUT_ARR_PTRS_LOCAL")
+{ foreign "C" barf("MUT_ARR_PTRS_LOCAL object entered!") never returns; }
 
-INFO_TABLE(stg_MUT_ARR_PTRS_DIRTY, 0, 0, MUT_ARR_PTRS_DIRTY, "MUT_ARR_PTRS_DIRTY", "MUT_ARR_PTRS_DIRTY")
-{ foreign "C" barf("MUT_ARR_PTRS_DIRTY object entered!") never returns; }
+INFO_TABLE(stg_MUT_ARR_PTRS_GLOBAL, 0, 0, MUT_ARR_PTRS_GLOBAL, "MUT_ARR_PTRS_GLOBAL", "MUT_ARR_PTRS_GLOBAL")
+{ foreign "C" barf("MUT_ARR_PTRS_GLOBAL object entered!") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN, 0, 0, MUT_ARR_PTRS_FROZEN, "MUT_ARR_PTRS_FROZEN", "MUT_ARR_PTRS_FROZEN")
 { foreign "C" barf("MUT_ARR_PTRS_FROZEN object entered!") never returns; }
@@ -532,10 +698,10 @@ INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN0, 0, 0, MUT_ARR_PTRS_FROZEN0, "MUT_ARR_PTRS_F
    Mutable Variables
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN")
-{ foreign "C" barf("MUT_VAR_CLEAN object entered!") never returns; }
-INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY")
-{ foreign "C" barf("MUT_VAR_DIRTY object entered!") never returns; }
+INFO_TABLE(stg_MUT_VAR_LOCAL, 1, 0, MUT_VAR_LOCAL, "MUT_VAR_LOCAL", "MUT_VAR_LOCAL")
+{ foreign "C" barf("MUT_VAR_LOCAL object entered!") never returns; }
+INFO_TABLE(stg_MUT_VAR_GLOBAL, 1, 0, MUT_VAR_GLOBAL, "MUT_VAR_GLOBAL", "MUT_VAR_GLOBAL")
+{ foreign "C" barf("MUT_VAR_GLOBAL object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Dummy return closure

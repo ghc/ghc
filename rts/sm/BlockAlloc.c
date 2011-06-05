@@ -357,6 +357,7 @@ allocGroup (nat n)
         bd = alloc_mega_group(1);
         bd->blocks = n;
         initGroup(bd);		         // we know the group will fit
+        IF_DEBUG(sanity,memset(bd->start, 0xaa, bd->blocks * BLOCK_SIZE));
         rem = bd + n;
         rem->blocks = BLOCKS_PER_MBLOCK-n;
         initGroup(rem); // init the slop
@@ -478,6 +479,8 @@ freeGroup(bdescr *p)
 
   // Todo: not true in multithreaded GC
   // ASSERT_SM_LOCK();
+
+  IF_DEBUG(sanity, checkFreeListSanity());
 
   ASSERT(p->free != (P_)-1);
 

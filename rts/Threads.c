@@ -70,6 +70,10 @@ createThread(Capability *cap, nat size)
         size = MIN_STACK_WORDS + sizeofW(StgStack);
     }
 
+    tso = (StgTSO *)allocatePrim(cap, sizeofW(StgTSO));
+    TICK_ALLOC_TSO();
+    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
+
     /* The size argument we are given includes all the per-thread
      * overheads:
      *
@@ -82,16 +86,13 @@ createThread(Capability *cap, nat size)
      * of a benchmark hack, but it doesn't do any harm.
      */
     stack_size = round_to_mblocks(size - sizeofW(StgTSO));
-    stack = (StgStack *)allocate(cap, stack_size);
+    stack = (StgStack *)allocatePrim(cap, stack_size);
     TICK_ALLOC_STACK(stack_size);
     SET_HDR(stack, &stg_STACK_info, CCS_SYSTEM);
+    stack->tso          = tso;
     stack->stack_size   = stack_size - sizeofW(StgStack);
     stack->sp           = stack->stack + stack->stack_size;
     stack->dirty        = 1;
-
-    tso = (StgTSO *)allocate(cap, sizeofW(StgTSO));
-    TICK_ALLOC_TSO();
-    SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 
     // Always start with the compiled code evaluator
     tso->what_next = ThreadRunGHC;
@@ -123,11 +124,9 @@ createThread(Capability *cap, nat size)
 
     /* Link the new thread on the global thread list.
      */
-    ACQUIRE_LOCK(&sched_mutex);
-    tso->id = next_thread_id++;  // while we have the mutex
-    tso->global_link = g0->threads;
-    g0->threads = tso;
-    RELEASE_LOCK(&sched_mutex);
+    tso->id = atomic_inc((StgVolatilePtr)&next_thread_id) - 1;
+    tso->global_link = cap->r.rG0->threads;
+    cap->r.rG0->threads = tso;
     
     // ToDo: report the stack size in the event?
     traceEventCreateThread(cap, tso);
@@ -176,7 +175,7 @@ removeThreadFromQueue (Capability *cap, StgTSO **queue, StgTSO *tso)
 
     prev = NULL;
     for (t = *queue; t != END_TSO_QUEUE; prev = t, t = t->_link) {
-	if (t == tso) {
+        if (t == tso) {
 	    if (prev) {
 		setTSOLink(cap,prev,t->_link);
                 t->_link = END_TSO_QUEUE;
@@ -242,12 +241,11 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     if (tso->cap != cap)
     {
         MessageWakeup *msg;
-        msg = (MessageWakeup *)allocate(cap,sizeofW(MessageWakeup));
+        msg = (MessageWakeup *)allocateInGen(cap,global_gen_ix,
+                                             sizeofW(MessageWakeup));
         SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
         msg->tso = tso;
         sendMessage(cap, tso->cap, (Message*)msg);
-        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld on cap %d",
-                      (lnat)tso->id, tso->cap->no);
         return;
     }
 #endif
@@ -285,6 +283,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     case BlockedOnBlackHole:
     case BlockedOnSTM:
     case ThreadMigrating:
+    case BlockedOnMsgGlobalise:
         goto unblock;
 
     default:
@@ -323,6 +322,7 @@ migrateThread (Capability *from, StgTSO *tso, Capability *to)
     // ThreadMigrating tells the target cap that it needs to be added to
     // the run queue when it receives the MSG_TRY_WAKEUP.
     tso->why_blocked = ThreadMigrating;
+    tso = globalise_TSO(from, tso); // after setting tso->cap
     tso->cap = to;
     tryWakeupThread(from, tso);
 }
@@ -345,10 +345,15 @@ wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
     for (msg = bq->queue; msg != (MessageBlackHole*)END_TSO_QUEUE; 
          msg = msg->link) {
         i = msg->header.info;
-        if (i != &stg_IND_info) {
-            ASSERT(i == &stg_MSG_BLACKHOLE_info);
-            tryWakeupThread(cap,msg->tso);
-        }
+#ifdef THREADED_RTS
+        if (i == &stg_MSG_GLOBALISE_info) {
+            executeMessage(cap,(Message *)msg);
+        } else
+#endif
+            if (i != &stg_STUB_MSG_BLACKHOLE_info) {
+                ASSERT(i == &stg_MSG_BLACKHOLE_info);
+                tryWakeupThread(cap,msg->tso);
+            }
     }
 
     // overwrite the BQ with an indirection so it will be
@@ -359,7 +364,8 @@ wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
     // checking the owner field at the same time.
     bq->bh = 0; bq->queue = 0; bq->owner = 0;
 #endif
-    OVERWRITE_INFO(bq, &stg_IND_info);
+    OVERWRITE_PRIM_CLOSURE((StgClosure*)bq, &stg_STUB_BLOCKING_QUEUE_info,
+                           sizeofW(StgBlockingQueue), sizeofW(StgInd));
 }
 
 // If we update a closure that we know we BLACKHOLE'd, and the closure
@@ -380,9 +386,9 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
     for (bq = tso->bq; bq != (StgBlockingQueue*)END_TSO_QUEUE; bq = next) {
         next = bq->link;
 
-        if (bq->header.info == &stg_IND_info) {
+        if (bq->header.info == &stg_STUB_BLOCKING_QUEUE_info) {
             // ToDo: could short it out right here, to avoid
-            // traversing this IND multiple times.
+            // traversing this STUB_BLOCKING_QUEUE multiple times.
             continue;
         }
         
@@ -569,10 +575,14 @@ threadStackOverflow (Capability *cap, StgTSO *tso)
                   "allocating new stack chunk of size %d bytes",
                   chunk_size * sizeof(W_));
 
-    new_stack = (StgStack*) allocate(cap, chunk_size);
+    new_stack = (StgStack*) allocatePrim(cap, chunk_size);
     SET_HDR(new_stack, &stg_STACK_info, CCS_SYSTEM);
     TICK_ALLOC_STACK(chunk_size);
 
+    // we don't have to globalise the STACK, because it is only
+    // pointed to by TSO and STACK objects which are both private.
+
+    new_stack->tso = tso;
     new_stack->dirty = 0; // begin clean, we'll mark it dirty below
     new_stack->stack_size = chunk_size - sizeofW(StgStack);
     new_stack->sp = new_stack->stack + new_stack->stack_size;
@@ -740,6 +750,10 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnSTM:
     debugBelch("is blocked on an STM operation");
     break;
+  case BlockedOnMsgGlobalise:
+    debugBelch("is blocked on globalisation of %p", 
+               ((MessageGlobalise*)tso->block_info.closure)->req);
+    break;
   default:
     barf("printThreadBlockage: strange tso->why_blocked: %d for TSO %d (%d)",
 	 tso->why_blocked, tso->id, tso);
@@ -774,7 +788,7 @@ printThreadStatus(StgTSO *t)
 void
 printAllThreads(void)
 {
-  StgTSO *t, *next;
+  StgTSO *t;
   nat i, g;
   Capability *cap;
 
@@ -789,12 +803,11 @@ printAllThreads(void)
   }
 
   debugBelch("other threads:\n");
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
+  for (g = 0; g < total_generations; g++) {
+    for (t = all_generations[g].threads; t != END_TSO_QUEUE; t = t->global_link) {
       if (t->why_blocked != NotBlocked) {
 	  printThreadStatus(t);
       }
-      next = t->global_link;
     }
   }
 }

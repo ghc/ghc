@@ -14,6 +14,9 @@
 #include "Threads.h"
 #include "RaiseAsync.h"
 #include "sm/Storage.h"
+#include "sm/Globalise.h"
+#include "sm/GCThread.h"
+#include "WritePolicy.h"
 
 /* ----------------------------------------------------------------------------
    Send a message to another Capability
@@ -21,7 +24,9 @@
 
 #ifdef THREADED_RTS
 
-void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
+#define INBOX_THRESHOLD 0
+
+void sendMessage(Capability *from_cap STG_UNUSED, Capability *to_cap, Message *msg)
 {
     ACQUIRE_LOCK(&to_cap->lock);
 
@@ -31,24 +36,41 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
         if (i != &stg_MSG_THROWTO_info &&
             i != &stg_MSG_BLACKHOLE_info &&
             i != &stg_MSG_TRY_WAKEUP_info &&
-            i != &stg_IND_info && // can happen if a MSG_BLACKHOLE is revoked
+            i != &stg_STUB_MSG_BLACKHOLE_info && // can happen if a MSG_BLACKHOLE is revoked
+            i != &stg_MSG_GLOBALISE_info &&
             i != &stg_WHITEHOLE_info) {
             barf("sendMessage: %p", i);
         }
     }
+
 #endif
-
-    msg->link = to_cap->inbox;
-    to_cap->inbox = msg;
-
-    recordClosureMutated(from_cap,(StgClosure*)msg);
+    // not necessary, since all messages are in the global heap:
+    // recordClosureMutated(from_cap,(StgClosure*)msg);
+    ASSERT(isGlobal((StgClosure*)msg));
 
     if (to_cap->running_task == NULL) {
-	to_cap->running_task = myTask(); 
+#if 0
+        Task *task = myTask();
+        to_cap->running_task = task;
             // precond for releaseCapability_()
+        task->cap = to_cap;
+        executeMessage(to_cap, msg);
 	releaseCapability_(to_cap,rtsFalse);
+        task->cap = from_cap;
+#else
+        msg->link = to_cap->inbox;
+        to_cap->inbox = msg;
+        to_cap->n_inbox++;
+        to_cap->running_task = myTask();
+        releaseCapability_(to_cap,rtsFalse);
+#endif
     } else {
-        contextSwitchCapability(to_cap);
+        if (to_cap->n_inbox > INBOX_THRESHOLD) {
+            contextSwitchCapability(to_cap);
+        }
+        msg->link = to_cap->inbox;
+        to_cap->inbox = msg;
+        to_cap->n_inbox++;
     }
 
     RELEASE_LOCK(&to_cap->lock);
@@ -73,7 +95,7 @@ loop:
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
-        debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %ld", 
+        debugTraceCap(DEBUG_sched, cap, "exec message: try wakeup thread %ld", 
                       (lnat)tso->id);
         tryWakeupThread(cap, tso);
     }
@@ -89,7 +111,7 @@ loop:
             goto loop;
         }
 
-        debugTraceCap(DEBUG_sched, cap, "message: throwTo %ld -> %ld", 
+        debugTraceCap(DEBUG_sched, cap, "exec message: throwTo %ld -> %ld", 
                       (lnat)t->source->id, (lnat)t->target->id);
 
         ASSERT(t->source->why_blocked == BlockedOnMsgThrowTo);
@@ -122,7 +144,40 @@ loop:
         }
         return;
     }
-    else if (i == &stg_IND_info || i == &stg_MSG_NULL_info)
+    else if (i == &stg_MSG_GLOBALISE_info)
+    {
+        MessageGlobalise *g = (MessageGlobalise*)m;
+        StgClosure *p;
+        const StgInfoTable *info;
+        
+        debugTraceCap(DEBUG_sched, cap, "exec message: globalise %p for thread %lu",
+                      g->req, (lnat)g->tso->id);
+
+        p = UNTAG_CLOSURE(g->req);
+        ASSERT(!HEAP_ALLOCED(p) || isGlobal((StgClosure*)p));
+        info = get_itbl(p);
+
+        // paranoia
+        if (info->type == IND_LOCAL && info->srt_bitmap == cap->no) {
+            info = get_itbl(UNTAG_CLOSURE(((StgInd*)p)->indirectee));
+            if (info->type == BLACKHOLE) {
+                nat r;
+                r = messageBlackHole(cap,(MessageBlackHole*)m);
+                if (r != 0) return;
+            }
+            ((StgInd*)p)->indirectee =
+                MSG_GLOB_GLOBALISE(cap, ((StgInd*)p)->indirectee);
+            SET_INFO(p, &stg_IND_info);
+        }
+
+        // even if we didn't globalise: wake up the thread.  If the
+        // message came to the wrong place, then the source thread
+        // will try again and emit a message to the right place.
+        tryWakeupThread(cap, g->tso);
+        return;
+
+    }
+    else if (i == &stg_STUB_MSG_BLACKHOLE_info || i == &stg_MSG_NULL_info)
     {
         // message was revoked
         return;
@@ -166,7 +221,7 @@ nat messageBlackHole(Capability *cap, MessageBlackHole *msg)
     StgClosure *bh = UNTAG_CLOSURE(msg->bh);
     StgTSO *owner;
 
-    debugTraceCap(DEBUG_sched, cap, "message: thread %d blocking on blackhole %p", 
+    debugTraceCap(DEBUG_sched, cap, "exec message: thread %d blocking on blackhole %p", 
                   (lnat)msg->tso->id, msg->bh);
 
     info = bh->header.info;
@@ -194,7 +249,7 @@ loop:
     p = UNTAG_CLOSURE((StgClosure*)VOLATILE_LOAD(&((StgInd*)bh)->indirectee));
     info = p->header.info;
 
-    if (info == &stg_IND_info)
+    if (info == &stg_STUB_BLOCKING_QUEUE_info)
     {
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
@@ -209,6 +264,8 @@ loop:
 
 #ifdef THREADED_RTS
         if (owner->cap != cap) {
+            msg->link = (MessageBlackHole*)END_TSO_QUEUE; // just make it valid
+            msg = (MessageBlackHole*)globalise_(cap, (StgClosure*)msg);
             sendMessage(cap, owner->cap, (Message*)msg);
             debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d", owner->cap->no);
             return 1;
@@ -218,8 +275,8 @@ loop:
         // Capability.  msg->tso is the first thread to block on this
         // BLACKHOLE, so we first create a BLOCKING_QUEUE object.
 
-        bq = (StgBlockingQueue*)allocate(cap, sizeofW(StgBlockingQueue));
-            
+        bq = (StgBlockingQueue*)allocatePrim(cap, sizeofW(StgBlockingQueue));
+
         // initialise the BLOCKING_QUEUE object
         SET_HDR(bq, &stg_BLOCKING_QUEUE_DIRTY_info, CCS_SYSTEM);
         bq->bh = bh;
@@ -250,10 +307,15 @@ loop:
             pushOnRunQueue(cap,owner);
         }
 
+        // if the BLACKHOLE is global, the BLOCKING_QUEUE and the TSO
+        // must also be visible globally.
+        globaliseWRT(cap, bh, (StgClosure**)&bq);
+
         // point to the BLOCKING_QUEUE from the BLACKHOLE
         write_barrier(); // make the BQ visible
         ((StgInd*)bh)->indirectee = (StgClosure *)bq;
-        recordClosureMutated(cap,bh); // bh was mutated
+        // not necessary: if the bh was global, we allocated the BQ globally
+        // recordClosureMutated(cap,bh);
 
         debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d", 
                       (lnat)msg->tso->id, (lnat)owner->id);
@@ -273,6 +335,8 @@ loop:
 
 #ifdef THREADED_RTS
         if (owner->cap != cap) {
+            msg->link = (MessageBlackHole*)END_TSO_QUEUE; // just make it valid
+            msg = (MessageBlackHole*)globalise_(cap, (StgClosure*)msg);
             sendMessage(cap, owner->cap, (Message*)msg);
             debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d", owner->cap->no);
             return 1;
@@ -281,11 +345,13 @@ loop:
 
         msg->link = bq->queue;
         bq->queue = msg;
-        recordClosureMutated(cap,(StgClosure*)msg);
+        // no need to do this, the msg will be global if the bq is
+        // recordClosureMutated(cap,(StgClosure*)msg);
 
         if (info == &stg_BLOCKING_QUEUE_CLEAN_info) {
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
-            recordClosureMutated(cap,(StgClosure*)bq);
+            // no need to do this, the bq will be global if the msg is
+            // recordClosureMutated(cap,(StgClosure*)bq);
         }
 
         debugTraceCap(DEBUG_sched, cap, "thread %d blocked on thread %d", 
@@ -301,6 +367,133 @@ loop:
     }
     
     return 0; // not blocked
+}
+
+
+/* ----------------------------------------------------------------------------
+   Requesting globalisation of a closure
+   -------------------------------------------------------------------------- */
+
+
+nat
+#ifndef THREADED_RTS
+  GNUC3_ATTRIBUTE(__noreturn__)
+#endif
+messageGlobalise (Capability *cap USED_IF_THREADS, 
+                  StgTSO *tso     USED_IF_THREADS,
+                  StgClosure *p   USED_IF_THREADS,
+                  nat owner       USED_IF_THREADS)
+{
+#ifndef THREADED_RTS
+
+    barf("messageGlobalise in non-THREADED_RTS");
+
+#else
+
+#if ASYNC_GLOBALISE
+    int r;
+    r = pthread_mutex_trylock(&gc_threads[owner]->local_gc_lock);
+    if (r == 0)
+    {
+        StgClosure *res;
+        res = globaliseFull_(cap, ((StgInd*)p)->indirectee);
+
+        // If we didn't manage to globalise it (maybe a BLACKHOLE),
+        // then continue below and send a MSG_GLOBALISE.
+        if (get_itbl(UNTAG_CLOSURE(res))->type != IND_LOCAL) {
+            ((StgInd*)p)->indirectee = res;
+            SET_INFO(p, &stg_IND_info);
+            RELEASE_LOCK(&gc_threads[owner]->local_gc_lock);
+            return 0;
+        }
+
+        RELEASE_LOCK(&gc_threads[owner]->local_gc_lock);
+    } 
+#endif
+    
+    {
+        Capability *dest;
+        MessageGlobalise *msg;
+        
+        // No: The owner might be turning it into an IND.  Don't look at
+        // the info table.
+        // ASSERT(get_itbl(p)->type == IND_LOCAL);
+        
+        ASSERT(Bdescr((P_)p)->gen_ix == global_gen_ix);
+        
+        dest = &capabilities[owner];
+        
+        debugTraceCap(DEBUG_sched, cap,
+                      "thread %lu requesting globalisation of closure at %p from cap %u",
+                      (lnat)tso->id, p, (nat)dest->no);
+        
+        ACQUIRE_LOCK(&dest->lock);
+
+        if (dest->running_task == NULL) 
+        {
+            Task *task = cap->running_task;
+            const StgInfoTable *info;
+            
+            info = get_itbl(UNTAG_CLOSURE(p));
+
+            if (info->type == IND_LOCAL && info->srt_bitmap == dest->no) {
+
+                // if the closure is a BLACKHOLE, it cannot be
+                // globalised, and we have to block anyway.  So
+                // we fall back to sending a message.
+                info = get_itbl(UNTAG_CLOSURE(((StgInd*)p)->indirectee));
+                if (info->type == BLACKHOLE) {
+                    goto message;
+                }
+
+                // release the lock on the cap, because we're about to
+                // do a (possibly lengthy) globalise operation.  Make
+                // sure we mark the cap as owned by the current Task
+                // first, however.
+                dest->running_task = task;
+                RELEASE_LOCK(&dest->lock);
+
+                ((StgInd*)p)->indirectee =
+                    globaliseFull_(dest, ((StgInd*)p)->indirectee);
+                SET_INFO(p, &stg_IND_info);
+
+                releaseCapability(dest);
+            }
+            else
+            {
+                releaseCapability_(dest,rtsFalse);
+                RELEASE_LOCK(&dest->lock);
+            }
+
+            return 0;
+        }
+
+    message:
+        msg = (MessageGlobalise*)allocatePrim(cap, sizeofW(MessageGlobalise));
+        setGlobal((StgClosure*)msg);
+        
+        SET_HDR(msg, &stg_MSG_GLOBALISE_info, CCS_SYSTEM);
+        msg->tso = tso;
+        msg->req = p;
+        
+        msg->link = dest->inbox;
+        dest->inbox = (Message*)msg;
+        dest->n_inbox++;
+
+        if (dest->running_task == NULL) {
+            releaseCapability_(dest,rtsFalse);
+        } else {
+            if (dest->n_inbox > INBOX_THRESHOLD) {
+                contextSwitchCapability(dest);
+            }
+        }
+        RELEASE_LOCK(&dest->lock);
+
+        tso->block_info.closure = (StgClosure*)msg;
+        tso->why_blocked = BlockedOnMsgGlobalise;
+        return 1;
+    }
+#endif
 }
 
 // A shorter version of messageBlackHole(), that just returns the
@@ -344,5 +537,3 @@ loop:
     
     return NULL; // not blocked
 }
-
-

@@ -129,12 +129,6 @@
    SET_HDR(c,info,costCentreStack);			\
    (c)->bytes = n_bytes;
 
-// Use when changing a closure from one kind to another
-#define OVERWRITE_INFO(c, new_info)                             \
-    OVERWRITING_CLOSURE((StgClosure *)(c));                     \
-    SET_INFO((c), (new_info));                                  \
-    LDV_RECORD_CREATE(c);
-
 /* -----------------------------------------------------------------------------
    How to get hold of the static link field for a static closure.
    -------------------------------------------------------------------------- */
@@ -347,11 +341,12 @@ closure_sizeW_ (StgClosure *p, StgInfoTable *info)
 	return pap_sizeW((StgPAP *)p);
     case IND:
     case IND_PERM:
+    case IND_LOCAL:
 	return sizeofW(StgInd);
     case ARR_WORDS:
 	return arr_words_sizeW((StgArrWords *)p);
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	return mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
@@ -465,28 +460,74 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, lnat n)
 #define OVERWRITING_CLOSURE(c) /* nothing */
 #endif
 
-#ifdef PROFILING
-void LDV_recordDead (StgClosure *c, nat size);
-#endif
+#define OVERWRITE_PRIM_CLOSURE(c,new_info,old_size,new_size)    \
+    overwritingPrimClosure((c),old_size,new_size);      \
+    SET_INFO((c), (new_info));                          \
+    LDV_RECORD_CREATE(c);
 
 EXTERN_INLINE void overwritingClosure (StgClosure *p);
 EXTERN_INLINE void overwritingClosure (StgClosure *p)
 {
     nat size, i;
 
-#if defined(PROFILING)
+#if defined(PROFILING) && !defined(DEBUG)
     if (era <= 0) return;
 #endif
 
     size = closure_sizeW(p);
 
     // For LDV profiling, we need to record the closure as dead
-#if defined(PROFILING)
-    LDV_recordDead((StgClosure *)(p), size);
-#endif
+    LDV_RECORD_DEAD(p,size);
 
     for (i = 0; i < size - sizeofW(StgThunkHeader); i++) {
         ((StgThunk *)(p))->payload[i] = 0;
+    }
+}
+
+// slop in the prim area is marked with '-size'
+EXTERN_INLINE void fillPrimSlop (StgClosure *p,
+                                 StgWord old_size, StgWord new_size);
+EXTERN_INLINE void fillPrimSlop (StgClosure *p,
+                                 StgWord old_size, StgWord new_size)
+{
+    nat i, slop;
+    slop = old_size - new_size;
+    // this might be an object in the prim heap, or it might be in the
+    // global heap.  For the prim heap we write a word that says how
+    // many words of slop to skip over; for the global heap we fill
+    // the remaining words with zero.
+    if (slop > 0) {
+        *((P_)p + new_size) = slop + 2;
+        for (i = 1; i < slop; i++) {
+            *((P_)p+ new_size + i) = 0;
+        }
+    }
+}
+
+
+EXTERN_INLINE void overwritingPrimClosure (StgClosure *p,
+                                           nat old_size, nat new_size);
+EXTERN_INLINE void overwritingPrimClosure (StgClosure *p,
+                                           nat old_size, nat new_size)
+{
+#if defined(PROFILING) && !defined(DEBUG)
+    if (era <= 0) return;
+#endif
+
+    // For LDV profiling, we need to record the closure as dead
+    LDV_RECORD_DEAD(p,old_size);
+
+    fillPrimSlop(p, old_size, new_size);
+
+}
+
+// used occasionally to fill slop when other methods won't do
+INLINE_HEADER void
+zeroSlop (StgPtr p, nat words)
+{
+    nat i;
+    for (i = 0; i < words; i++) {
+        *(p + i) = 0;
     }
 }
 

@@ -458,14 +458,15 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	return;
 
 	// one child (fixed), no SRT
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
+    case MUT_VAR_LOCAL:
+    case MUT_VAR_GLOBAL:
 	*first_child = ((StgMutVar *)c)->var;
 	return;
     case THUNK_SELECTOR:
 	*first_child = ((StgSelector *)c)->selectee;
 	return;
     case IND_PERM:
+    case IND_LOCAL:
     case BLACKHOLE:
 	*first_child = ((StgInd *)c)->indirectee;
 	return;
@@ -518,8 +519,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 	break;
 
 	// StgMutArrPtr.ptrs, no SRT
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	init_ptrs(&se.info, ((StgMutArrPtrs *)c)->ptrs,
@@ -851,8 +852,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case BCO:
 	case CONSTR_STATIC:
 	    // StgMutArrPtr.ptrs, no SRT
-	case MUT_ARR_PTRS_CLEAN:
-	case MUT_ARR_PTRS_DIRTY:
+	case MUT_ARR_PTRS_LOCAL:
+	case MUT_ARR_PTRS_GLOBAL:
 	case MUT_ARR_PTRS_FROZEN:
 	case MUT_ARR_PTRS_FROZEN0:
 	    *c = find_ptrs(&se->info);
@@ -917,8 +918,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	case CONSTR_0_2:
 	case ARR_WORDS:
 	    // one child (fixed), no SRT
-	case MUT_VAR_CLEAN:
-	case MUT_VAR_DIRTY:
+	case MUT_VAR_LOCAL:
+	case MUT_VAR_GLOBAL:
 	case THUNK_SELECTOR:
 	case IND_PERM:
 	case CONSTR_1_1:
@@ -1011,10 +1012,10 @@ isRetainer( StgClosure *c )
     case MUT_PRIM:
     case MVAR_CLEAN:
     case MVAR_DIRTY:
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_VAR_LOCAL:
+    case MUT_VAR_GLOBAL:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 
@@ -1063,6 +1064,7 @@ isRetainer( StgClosure *c )
     // as isAlive doesn't look through IND_STATIC as it ignores static
     // closures. See trac #3956 for a program that hit this error.
     case IND_STATIC:
+    case IND_LOCAL:
     case BLACKHOLE:
 	// static objects
     case CONSTR_STATIC:
@@ -1787,9 +1789,13 @@ computeRetainerSet( void )
     //
     // The following code assumes that WEAK objects are considered to be roots
     // for retainer profilng.
-    for (weak = weak_ptr_list; weak != NULL; weak = weak->link)
-	// retainRoot((StgClosure *)weak);
-	retainRoot(NULL, (StgClosure **)&weak);
+    for (g = 0; g < total_generations; g++) {
+        for (weak = &all_generations[g].weak_ptrs; weak != NULL; 
+             weak = weak->link) {
+            // retainRoot((StgClosure *)weak);
+            retainRoot(NULL, (StgClosure **)&weak);
+        }
+    }
 
     // Consider roots from the stable ptr table.
     markStablePtrTable(retainRoot, NULL);
@@ -1797,16 +1803,19 @@ computeRetainerSet( void )
     // The following code resets the rs field of each unvisited mutable
     // object (computing sumOfNewCostExtra and updating costArray[] when
     // debugging retainer profiler).
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    for (g = 0; g < total_generations; g++) {
 	// NOT TRUE: even G0 has a block on its mutable list
         // ASSERT(g != 0 || (generations[g].mut_list == NULL));
 
 	// Traversing through mut_list is necessary
 	// because we can find MUT_VAR objects which have not been
 	// visited during retainer profiling.
-        for (n = 0; n < n_capabilities; n++) {
-          for (bd = capabilities[n].mut_lists[g]; bd != NULL; bd = bd->link) {
-	    for (ml = bd->start; ml < bd->free; ml++) {
+#ifdef THREADED_RTS
+        if (RtsFlags.ParFlags.nNodes != 0) 
+            barf("RetainerProfile.c: this code needs fixing for -N > 0");
+#endif
+	for (bd = capabilities[0].mut_lists[g]; bd != NULL; bd = bd->link) {
+            for (ml = bd->start; ml < bd->free; ml++) {
 
 		maybeInitRetainerSet((StgClosure *)*ml);
 		rtl = retainerSetOf((StgClosure *)*ml);

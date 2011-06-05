@@ -148,7 +148,8 @@ static char *thread_stop_reasons[] = {
     [6 + BlockedOnCCall]        = "blocked on a foreign call",
     [6 + BlockedOnCCall_Interruptible] = "blocked on a foreign call (interruptible)",
     [6 + BlockedOnMsgThrowTo]   =  "blocked on throwTo",
-    [6 + ThreadMigrating]       =  "migrating"
+    [6 + ThreadMigrating]       =  "migrating",
+    [6 + BlockedOnMsgGlobalise] =  "blocked waiting for data to be globalised"
 };
 #endif
 

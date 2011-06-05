@@ -26,6 +26,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Cmm.h"
+#include "WritePolicy.h"
 
 #ifdef __PIC__
 import pthread_mutex_lock;
@@ -61,7 +62,7 @@ stg_newByteArrayzh
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    ("ptr" p) = foreign "C" allocate(MyCapability() "ptr",words) [];
+    ("ptr" p) = foreign "C" allocatePrim(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_bytes(p) = n;
@@ -154,10 +155,10 @@ stg_newArrayzh
     // number of words.
     size = n + mutArrPtrsCardWords(n);
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + size;
-    ("ptr" arr) = foreign "C" allocate(MyCapability() "ptr",words) [R2];
+    ("ptr" arr) = foreign "C" allocatePrim(MyCapability() "ptr",words) [R2];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
-    SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
+    SET_HDR(arr, stg_MUT_ARR_PTRS_LOCAL_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(arr) = n;
     StgMutArrPtrs_size(arr) = size;
 
@@ -201,15 +202,13 @@ stg_unsafeThawArrayzh
   // we put it on the mutable list more than once, but it would get scavenged
   // multiple times during GC, which would be unnecessarily slow.
   //
-  if (StgHeader_info(R1) != stg_MUT_ARR_PTRS_FROZEN0_info) {
-	SET_INFO(R1,stg_MUT_ARR_PTRS_DIRTY_info);
-	recordMutable(R1, R1);
-	// must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
-	RET_P(R1);
-  } else {
-	SET_INFO(R1,stg_MUT_ARR_PTRS_DIRTY_info);
-	RET_P(R1);
-  }
+    W_ bd;
+    bd = Bdescr(R1);
+    if (isGlobalPrim(bd,R1)) {
+        SET_INFO(R1,stg_MUT_ARR_PTRS_GLOBAL_info);
+    } else {
+        SET_INFO(R1,stg_MUT_ARR_PTRS_LOCAL_info);
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -221,10 +220,11 @@ stg_newMutVarzh
     W_ mv;
     /* Args: R1 = initialisation value */
 
-    ALLOC_PRIM( SIZEOF_StgMutVar, R1_PTR, stg_newMutVarzh);
-
-    mv = Hp - SIZEOF_StgMutVar + WDS(1);
-    SET_HDR(mv,stg_MUT_VAR_DIRTY_info,W_[CCCS]);
+    MAYBE_GC(R1_PTR, stg_newMutVarzh);
+    ("ptr" mv) = foreign "C" allocatePrim(MyCapability() "ptr", 
+                                          BYTES_TO_WDS(SIZEOF_StgMutVar)) [R1];
+    
+    SET_HDR(mv,stg_MUT_VAR_LOCAL_info,W_[CCCS]);
     StgMutVar_var(mv) = R1;
     
     RET_P(mv);
@@ -295,19 +295,35 @@ stg_atomicModifyMutVarzh
    LDV_RECORD_CREATE(r);
    StgThunk_payload(r,0) = z;
 
- retry:
    x = StgMutVar_var(mv);
    StgThunk_payload(z,1) = x;
-#ifdef THREADED_RTS
-   (h) = foreign "C" cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y) [];
-   if (h != x) { goto retry; }
-#else
-   StgMutVar_var(mv) = y;
-#endif
 
-   if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-     foreign "C" dirty_MUT_VAR(BaseReg "ptr", mv "ptr") [];
+   // globalise the value we're going to store in the MUT_VAR, if
+   // necessary.  If the MUT_VAR is not global, it must be in our
+   // local heap, and hence it can't be globalised during the
+   // operation, so we only need to check once:
+   //
+   W_ y_gbl;
+   if (GET_INFO(mv) == stg_MUT_VAR_GLOBAL_info) {
+      ("ptr" y_gbl) = foreign "C" dirty_MUT_VAR(BaseReg "ptr", y) [];
+      // don't forget, z may have moved now:
+      z = StgThunk_payload(y_gbl,0);
+   } else {
+       y_gbl = y;
    }
+
+ retry:
+
+#ifdef THREADED_RTS
+   (h) = foreign "C" cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y_gbl) [];
+   if (h != x) {
+       x = StgMutVar_var(mv);
+       StgThunk_payload(z,1) = x;
+       goto retry;
+   }
+#else
+   StgMutVar_var(mv) = y_gbl;
+#endif
 
    RET_P(r);
 }
@@ -330,9 +346,11 @@ stg_mkWeakzh
     R3 = stg_NO_FINALIZER_closure;
   }
 
-  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR & R3_PTR, stg_mkWeakzh );
+  MAYBE_GC(R1_PTR & R2_PTR & R3_PTR, stg_mkWeakzh);
 
-  w = Hp - SIZEOF_StgWeak + WDS(1);
+  ("ptr" w) = foreign "C" allocatePrim(MyCapability() "ptr",
+                                       BYTES_TO_WDS(SIZEOF_StgWeak)) [R1,R2,R3];
+
   SET_HDR(w, stg_WEAK_info, W_[CCCS]);
 
   // We don't care about cfinalizer here.
@@ -345,8 +363,8 @@ stg_mkWeakzh
   StgWeak_cfinalizer(w) = stg_NO_FINALIZER_closure;
 
   ACQUIRE_LOCK(sm_mutex);
-  StgWeak_link(w)	= W_[weak_ptr_list];
-  W_[weak_ptr_list] 	= w;
+  StgWeak_link(w) = generation_weak_ptrs(StgRegTable_rG0(BaseReg));
+  generation_weak_ptrs(StgRegTable_rG0(BaseReg)) = w;
   RELEASE_LOCK(sm_mutex);
 
   IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
@@ -374,14 +392,15 @@ stg_mkWeakForeignEnvzh
   flag = R5;
   eptr = R6;
 
-  ALLOC_PRIM( SIZEOF_StgWeak, R1_PTR & R2_PTR, stg_mkWeakForeignEnvzh );
+  MAYBE_GC(R1_PTR & R2_PTR, stg_mkWeakForeignEnvzh);
+  ("ptr" w) = foreign "C" allocatePrim(MyCapability() "ptr", 
+                                       BYTES_TO_WDS(SIZEOF_StgWeak)) [R1,R2];
 
-  w = Hp - SIZEOF_StgWeak + WDS(1);
   SET_HDR(w, stg_WEAK_info, W_[CCCS]);
 
   payload_words = 4;
   words         = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-  ("ptr" p)     = foreign "C" allocate(MyCapability() "ptr", words) [];
+  ("ptr" p)     = foreign "C" allocatePrim(MyCapability() "ptr", words) [];
 
   TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
   SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
@@ -401,8 +420,8 @@ stg_mkWeakForeignEnvzh
   StgWeak_cfinalizer(w) = p;
 
   ACQUIRE_LOCK(sm_mutex);
-  StgWeak_link(w)   = W_[weak_ptr_list];
-  W_[weak_ptr_list] = w;
+  StgWeak_link(w) = W_[generation_weak_ptrs(StgRegTable_rG0(BaseReg))];
+  W_[generation_weak_ptrs(StgRegTable_rG0(BaseReg))] = w;
   RELEASE_LOCK(sm_mutex);
 
   IF_DEBUG(weak, foreign "C" debugBelch(stg_weak_msg,w) []);
@@ -1130,9 +1149,10 @@ stg_newMVarzh
     /* args: none */
     W_ mvar;
 
-    ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, stg_newMVarzh );
+    MAYBE_GC(NO_PTRS, stg_newMVarzh);
+    ("ptr" mvar) = foreign "C" allocatePrim(MyCapability(),
+                                            BYTES_TO_WDS(SIZEOF_StgMVar)) [];
   
-    mvar = Hp - SIZEOF_StgMVar + WDS(1);
     SET_HDR(mvar,stg_MVAR_DIRTY_info,W_[CCCS]);
         // MVARs start dirty: generation 0 has no mutable list
     StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
@@ -1147,6 +1167,8 @@ stg_newMVarzh
     sp = StgStack_sp(stack);                    \
     W_[sp + WDS(1)] = value;                    \
     W_[sp + WDS(0)] = stg_gc_unpt_r1_info;
+// no need to globalise_wrt: the if the mvar is global, then the value and tso
+// will be too.
 
 #define PerformPut(stack,lval)                  \
     W_ sp;                                      \
@@ -1156,7 +1178,7 @@ stg_newMVarzh
 
 stg_takeMVarzh
 {
-    W_ mvar, val, info, tso, q;
+    W_ mvar, val, info, tso, q, bd, new_tso;
 
     /* args: R1 = MVar closure */
     mvar = R1;
@@ -1167,36 +1189,35 @@ stg_takeMVarzh
     info = GET_INFO(mvar);
 #endif
         
-    if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
-    }
+    // Not necessary until we have multiple local generations:
+    // if (info == stg_MVAR_CLEAN_info) {
+    //     foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
+    // }
 
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
      */
     if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
         
-        // Note [mvar-heap-check] We want to do the heap check in the
-        // branch here, to avoid the conditional in the common case.
-        // However, we've already locked the MVar above, so we better
-        // be careful to unlock it again if the the heap check fails.
-        // Unfortunately we don't have an easy way to inject any code
-        // into the heap check generated by the code generator, so we
-        // have to do it in stg_gc_gen (see HeapStackCheck.cmm).
-        HP_CHK_GEN_TICKY(SIZEOF_StgMVarTSOQueue, R1_PTR, stg_takeMVarzh);
-
-        q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
-
+        ("ptr" q) = foreign "C" allocatePrim(MyCapability(), 
+                                             BYTES_TO_WDS(SIZEOF_StgMVarTSOQueue));
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
+
+        bd = Bdescr(mvar);
+        if (isGlobalPrim(bd,mvar)) {
+            ("ptr" new_tso) = foreign "C" globalise_(MyCapability(), q);
+        }
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = q;
 	} else {
             StgMVarTSOQueue_link(StgMVar_tail(mvar)) = q;
-            foreign "C" recordClosureMutated(MyCapability() "ptr",
-                                             StgMVar_tail(mvar)) [];
+            // No need to do this, at least until we have multiple
+            // local generations:
+            // foreign "C" recordClosureMutated(MyCapability() "ptr",
+            //                                  StgMVar_tail(mvar)) [];
 	}
 	StgTSO__link(CurrentTSO)       = q;
 	StgTSO_block_info(CurrentTSO)  = mvar;
@@ -1278,9 +1299,10 @@ stg_tryTakeMVarzh
 	RET_NP(0, stg_NO_FINALIZER_closure);
     }
     
-    if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
-    }
+    // Not necessary until we have multiple local generations:
+    // if (info == stg_MVAR_CLEAN_info) {
+    //     foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
+    // }
 
     /* we got the value... */
     val = StgMVar_value(mvar);
@@ -1329,7 +1351,7 @@ loop:
 
 stg_putMVarzh
 {
-    W_ mvar, val, info, tso, q;
+    W_ mvar, val, info, tso, q, bd, new_tso;
 
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
@@ -1341,27 +1363,32 @@ stg_putMVarzh
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
+    // Not necessary until we have multiple local generations:
+    // if (info == stg_MVAR_CLEAN_info) {
+    //     foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
+    // }
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 
-        // see Note [mvar-heap-check] above
-        HP_CHK_GEN_TICKY(SIZEOF_StgMVarTSOQueue, R1_PTR & R2_PTR, stg_putMVarzh);
-
-        q = Hp - SIZEOF_StgMVarTSOQueue + WDS(1);
-
+        ("ptr" q) = foreign "C" allocatePrim(MyCapability(), 
+                                             BYTES_TO_WDS(SIZEOF_StgMVarTSOQueue));
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
         StgMVarTSOQueue_link(q) = END_TSO_QUEUE;
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
+
+        bd = Bdescr(mvar);
+        if (isGlobalPrim(bd,mvar)) {
+            ("ptr" new_tso) = foreign "C" globalise_(MyCapability(), q);
+        }
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = q;
 	} else {
             StgMVarTSOQueue_link(StgMVar_tail(mvar)) = q;
-            foreign "C" recordClosureMutated(MyCapability() "ptr",
-                                             StgMVar_tail(mvar)) [];
+            // No need to do this, at least until we have multiple
+            // local generations:
+            // foreign "C" recordClosureMutated(MyCapability() "ptr",
+            //                                  StgMVar_tail(mvar)) [];
 	}
 	StgTSO__link(CurrentTSO)       = q;
 	StgTSO_block_info(CurrentTSO)  = mvar;
@@ -1373,12 +1400,17 @@ stg_putMVarzh
 	jump stg_block_putmvar;
     }
   
+    bd = Bdescr(mvar);
+    if (isGlobalPrim(bd,mvar)) {
+        ("ptr" val) = foreign "C" MVAR_GLOBALISE(MyCapability(), val);
+    }
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = val;
-    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        unlockClosure(mvar, stg_MVAR_DIRTY_info);
 	jump %ENTRY_CODE(Sp(0));
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1406,10 +1438,18 @@ loop:
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
 
-    if (TO_W_(StgStack_dirty(stack)) == 0) {
-        foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
-    }
-    
+    // if the TSO we're waking up belongs to another cap, then the
+    // MVAR must be global, because otherwise it couldn't have blocked
+    // on this MVAR.  Hence, the value we're writing must be global
+    // too, so we don't need a write barrier to update this TSO.
+    // Indeed, we can't use a write barrier if the TSO belongs to
+    // another cap, because we would be putting it on the wrong
+    // mutable list.
+    //
+    // if (TO_W_(StgStack_dirty(stack)) == 0) {
+    //    foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
+    // }
+
     foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
@@ -1419,7 +1459,7 @@ loop:
 
 stg_tryPutMVarzh
 {
-    W_ mvar, val, info, tso, q;
+    W_ mvar, val, info, tso, bd, q;
 
     /* args: R1 = MVar, R2 = value */
     mvar = R1;
@@ -1431,9 +1471,10 @@ stg_tryPutMVarzh
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
+    // Not necessary until we have multiple local generations:
+    // if (info == stg_MVAR_CLEAN_info) {
+    //     foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr") [];
+    // }
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
@@ -1442,12 +1483,17 @@ stg_tryPutMVarzh
 	RET_N(0);
     }
   
+    bd = Bdescr(mvar);
+    if (isGlobalPrim(bd,mvar)) {
+        ("ptr" val) = foreign "C" MVAR_GLOBALISE(MyCapability(), val);
+    }
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
 	/* No further takes, the MVar is now full. */
 	StgMVar_value(mvar) = val;
-    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
+        unlockClosure(mvar, stg_MVAR_DIRTY_info);
         RET_N(1);
     }
     if (StgHeader_info(q) == stg_IND_info ||
@@ -1475,10 +1521,18 @@ loop:
     // indicate that the MVar operation has now completed.
     StgTSO__link(tso) = stg_END_TSO_QUEUE_closure;
     
-    if (TO_W_(StgStack_dirty(stack)) == 0) {
-        foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
-    }
-    
+    // if the TSO we're waking up belongs to another cap, then the
+    // MVAR must be global, because otherwise it couldn't have blocked
+    // on this MVAR.  Hence, the value we're writing must be global
+    // too, so we don't need a write barrier to update this TSO.
+    // Indeed, we can't use a write barrier if the TSO belongs to
+    // another cap, because we would be putting it on the wrong
+    // mutable list.
+    //
+    // if (TO_W_(StgStack_dirty(stack)) == 0) {
+    //     foreign "C" dirty_STACK(MyCapability() "ptr", stack "ptr") [];
+    // }
+
     foreign "C" tryWakeupThread(MyCapability() "ptr", tso) [];
 
     unlockClosure(mvar, stg_MVAR_DIRTY_info);
@@ -1494,15 +1548,16 @@ stg_makeStableNamezh
 {
     W_ index, sn_obj;
 
-    ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, stg_makeStableNamezh );
-  
+    MAYBE_GC(R1_PTR, stg_makeStableNamezh);
+    
     (index) = foreign "C" lookupStableName(R1 "ptr") [];
 
     /* Is there already a StableName for this heap object?
      *  stable_ptr_table is a pointer to an array of snEntry structs.
      */
     if ( snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) == NULL ) {
-	sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
+        ("ptr" sn_obj) = foreign "C" allocatePrim(MyCapability() "ptr",
+                                                  BYTES_TO_WDS(SIZEOF_StgStableName)) [R1];
 	SET_HDR(sn_obj, stg_STABLE_NAME_info, W_[CCCS]);
 	StgStableName_sn(sn_obj) = index;
 	snEntry_sn_obj(W_[stable_ptr_table] + index*SIZEOF_snEntry) = sn_obj;
@@ -1551,9 +1606,10 @@ stg_newBCOzh
     words = BYTES_TO_WDS(SIZEOF_StgBCO) + BYTE_ARR_WDS(bitmap_arr);
     bytes = WDS(words);
 
-    ALLOC_PRIM( bytes, R1_PTR&R2_PTR&R3_PTR&R5_PTR, stg_newBCOzh );
+    MAYBE_GC(R1_PTR & R2_PTR & R3_PTR & R5_PTR, stg_newBCOzh);
+    ("ptr" bco) = foreign "C" allocatePrim(MyCapability() "ptr", words) 
+        [R1,R2,R3,R5];
 
-    bco = Hp - bytes + WDS(1);
     SET_HDR(bco, stg_BCO_info, W_[CCCS]);
     
     StgBCO_instrs(bco)     = R1;
@@ -1585,8 +1641,8 @@ stg_mkApUpd0zh
     // This function is *only* used to wrap zero-arity BCOs in an
     // updatable wrapper (see ByteCodeLink.lhs).  An AP thunk is always
     // saturated and always points directly to a FUN or BCO.
-    ASSERT(%INFO_TYPE(%GET_STD_INFO(R1)) == HALF_W_(BCO) &&
-	   StgBCO_arity(R1) == HALF_W_(0));
+    ASSERT(TO_W_(%INFO_TYPE(%GET_STD_INFO(R1))) == BCO &&
+	   TO_W_(StgBCO_arity(R1)) == 0);
 
     HP_CHK_GEN_TICKY(SIZEOF_StgAP, R1_PTR, stg_mkApUpd0zh);
     TICK_ALLOC_UP_THK(0, 0);
@@ -1608,6 +1664,8 @@ stg_unpackClosurezh
 
     W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
     info  = %GET_STD_INFO(UNTAG(R1));
+
+    MAYBE_GC(R1_PTR, stg_unpackClosurezh);
 
     // Some closures have non-standard layout, so we omit those here.
     W_ type;
@@ -1636,13 +1694,11 @@ out:
     ptrs_arr_cards = mutArrPtrsCardWords(ptrs);
     ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs) + WDS(ptrs_arr_cards);
 
-    ALLOC_PRIM (ptrs_arr_sz + nptrs_arr_sz, R1_PTR, stg_unpackClosurezh);
-
     W_ clos;
     clos = UNTAG(R1);
 
-    ptrs_arr  = Hp - nptrs_arr_sz - ptrs_arr_sz + WDS(1);
-    nptrs_arr = Hp - nptrs_arr_sz + WDS(1);
+    ("ptr" ptrs_arr ) = foreign "C" allocatePrim(MyCapability(), ptrs_arr_sz) [];
+    ("ptr" nptrs_arr) = foreign "C" allocatePrim(MyCapability(), nptrs_arr_sz) [];
 
     SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, W_[CCCS]);
     StgMutArrPtrs_ptrs(ptrs_arr) = ptrs;
@@ -1940,6 +1996,7 @@ INFO_TABLE_RET(stg_noDuplicate, RET_SMALL)
 
 stg_noDuplicatezh
 {
+    W_ new_tso;
     STK_CHK_GEN( WDS(1), NO_PTRS, stg_noDuplicatezh );
     // leave noDuplicate frame in case the current
     // computation is suspended and restarted (see above).
@@ -1948,7 +2005,8 @@ stg_noDuplicatezh
 
     SAVE_THREAD_STATE();
     ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
-    foreign "C" threadPaused (MyCapability() "ptr", CurrentTSO "ptr") [];
+    ("ptr" new_tso) = foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO) [];
+    CurrentTSO = new_tso;
     
     if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
         jump stg_threadFinished;

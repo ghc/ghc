@@ -17,53 +17,52 @@
 #include "BeginPrivate.h"
 
 INLINE_HEADER void
-push_mark_stack(StgPtr p)
+push_mark_stack(StgClosure *p)
 {
     bdescr *bd;
 
-    *mark_sp++ = (StgWord)p;
+    *gct->mark_sp++ = (StgWord)p;
 
-    if (((W_)mark_sp & BLOCK_MASK) == 0)
+    if (((W_)gct->mark_sp & BLOCK_MASK) == 0)
     {
-        if (mark_stack_bd->u.back != NULL)
+        if (gct->mark_stack_bd->link != NULL)
         {
-            mark_stack_bd = mark_stack_bd->u.back;
+            gct->mark_stack_bd = gct->mark_stack_bd->link;
         }
         else
         {
             bd = allocBlock_sync();
-            bd->link = mark_stack_bd;
-            bd->u.back = NULL;
-            mark_stack_bd->u.back = bd; // double-link the new block on
-            mark_stack_top_bd = bd;
-            mark_stack_bd = bd;
+            bd->u.back = gct->mark_stack_bd;
+            bd->link = NULL;
+            gct->mark_stack_bd->link = bd; // double-link the new block on
+            gct->mark_stack_bd = bd;
         }
-        mark_sp     = mark_stack_bd->start;
+        gct->mark_sp = gct->mark_stack_bd->start;
     }
 }
 
 INLINE_HEADER StgPtr
 pop_mark_stack(void)
 {
-    if (((W_)mark_sp & BLOCK_MASK) == 0)
+    if (((W_)gct->mark_sp & BLOCK_MASK) == 0)
     {
-        if (mark_stack_bd->link == NULL)
+        if (gct->mark_stack_bd->u.back == NULL)
         {
             return NULL;
         } 
         else
         {
-            mark_stack_bd = mark_stack_bd->link;
-            mark_sp       = mark_stack_bd->start + BLOCK_SIZE_W;
+            gct->mark_stack_bd = gct->mark_stack_bd->u.back;
+            gct->mark_sp       = gct->mark_stack_bd->start + BLOCK_SIZE_W;
         }
     }
-    return (StgPtr)*--mark_sp;
+    return (StgPtr)*--gct->mark_sp;
 }
 
 INLINE_HEADER rtsBool
 mark_stack_empty(void)
 {
-    return (((W_)mark_sp & BLOCK_MASK) == 0 && mark_stack_bd->link == NULL);
+    return (((W_)gct->mark_sp & BLOCK_MASK) == 0 && gct->mark_stack_bd->u.back == NULL);
 }
 
 #include "EndPrivate.h"

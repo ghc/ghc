@@ -224,6 +224,7 @@ initCapability( Capability *cap, nat i )
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
     cap->inbox              = (Message*)END_TSO_QUEUE;
+    cap->n_inbox            = 0;
     cap->sparks_created     = 0;
     cap->sparks_dud         = 0;
     cap->sparks_converted   = 0;
@@ -246,7 +247,6 @@ initCapability( Capability *cap, nat i )
 	cap->mut_lists[g] = NULL;
     }
 
-    cap->free_tvar_watch_queues = END_STM_WATCH_QUEUE;
     cap->free_invariant_check_queues = END_INVARIANT_CHECK_QUEUE;
     cap->free_trec_chunks = END_STM_CHUNK_LIST;
     cap->free_trec_headers = NO_TREC;
@@ -384,7 +384,7 @@ releaseCapability_ (Capability* cap,
 	return;
     }
 
-    if (waiting_for_gc == PENDING_GC_SEQ) {
+    if (waiting_for_gc == GC_SEQ) {
       last_free_capability = cap; // needed?
       debugTrace(DEBUG_sched, "GC pending, set capability %d free", cap->no);
       return;
@@ -598,7 +598,7 @@ yieldCapability (Capability** pCap, Task *task)
 {
     Capability *cap = *pCap;
 
-    if (waiting_for_gc == PENDING_GC_PAR) {
+    if (waiting_for_gc == GC_PAR) {
         traceEventGcStart(cap);
         gcWorkerThread(cap);
         traceEventGcEnd(cap);
@@ -842,11 +842,9 @@ freeCapabilities (void)
    ------------------------------------------------------------------------ */
 
 void
-markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
-                      rtsBool no_mark_sparks USED_IF_THREADS)
+markCapability (evac_fn evac, void *user, Capability *cap,
+                rtsBool no_mark_sparks USED_IF_THREADS)
 {
-    nat i;
-    Capability *cap;
     InCall *incall;
 
     // Each GC thread is responsible for following roots from the
@@ -854,39 +852,32 @@ markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta,
     // or fewer Capabilities as GC threads, but just in case there
     // are more, we mark every Capability whose number is the GC
     // thread's index plus a multiple of the number of GC threads.
-    for (i = i0; i < n_capabilities; i += delta) {
-	cap = &capabilities[i];
-	evac(user, (StgClosure **)(void *)&cap->run_queue_hd);
-	evac(user, (StgClosure **)(void *)&cap->run_queue_tl);
+    evac(user, (StgClosure **)(void *)&cap->run_queue_hd);
+    evac(user, (StgClosure **)(void *)&cap->run_queue_tl);
 #if defined(THREADED_RTS)
-        evac(user, (StgClosure **)(void *)&cap->inbox);
+    evac(user, (StgClosure **)(void *)&cap->inbox);
 #endif
-	for (incall = cap->suspended_ccalls; incall != NULL; 
-	     incall=incall->next) {
-	    evac(user, (StgClosure **)(void *)&incall->suspended_tso);
-	}
 
-#if defined(THREADED_RTS)
-        if (!no_mark_sparks) {
-            traverseSparkQueue (evac, user, cap);
-        }
-#endif
+    for (incall = cap->suspended_ccalls; incall != NULL; 
+         incall = incall->next) {
+        evac(user, (StgClosure **)(void *)&incall->suspended_tso);
     }
 
-#if !defined(THREADED_RTS)
-    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
-    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
-    evac(user, (StgClosure **)(void *)&sleeping_queue);
-#endif 
+#if defined(THREADED_RTS)
+    if (!no_mark_sparks) {
+        traverseSparkQueue (evac, user, cap);
+    }
+#endif
+
+    // Free STM structures for this Capability
+    stmPreGCHook(cap);
 }
 
 void
 markCapabilities (evac_fn evac, void *user)
 {
-    markSomeCapabilities(evac, user, 0, 1, rtsFalse);
+    nat n;
+    for (n = 0; n < n_capabilities; n++) {
+        markCapability(evac, user, &capabilities[n], rtsFalse);
+    }
 }
-
-/* -----------------------------------------------------------------------------
-   Messages
-   -------------------------------------------------------------------------- */
-

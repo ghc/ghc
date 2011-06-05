@@ -4,7 +4,7 @@
  *
  * Sanity checking code for the heap and stack.
  *
- * Used when debugging: check that everything reasonable.
+ * Used when debugging: check that everything satisfies the invariants.
  *
  *    - All things that are supposed to be pointers look like pointers.
  *
@@ -18,10 +18,11 @@
 
 #ifdef DEBUG                                                   /* whole file */
 
-#include "RtsUtils.h"
-#include "sm/Storage.h"
-#include "sm/BlockAlloc.h"
+#include "Storage.h"
+#include "BlockAlloc.h"
 #include "GCThread.h"
+
+#include "RtsUtils.h"
 #include "Sanity.h"
 #include "Schedule.h"
 #include "Apply.h"
@@ -84,8 +85,16 @@ static void
 checkClosureShallow( StgClosure* p )
 {
     StgClosure *q;
+    const StgInfoTable *info;
 
     q = UNTAG_CLOSURE(p);
+
+    // forwarding pointers are allowed in the local heap
+    info = q->header.info;
+    if (IS_FORWARDING_PTR(info)) {
+        q = (StgClosure*)UN_FORWARDING_PTR(info);
+    }        
+
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 
     /* Is it a static closure? */
@@ -167,9 +176,14 @@ checkStackFrame( StgPtr c )
     {
 	StgFunInfoTable *fun_info;
 	StgRetFun *ret_fun;
+        StgClosure *fun;
 
 	ret_fun = (StgRetFun *)c;
-	fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
+        fun = UNTAG_CLOSURE(ret_fun->fun);
+        if (IS_FORWARDING_PTR(fun->header.info)) {
+            fun = (StgClosure*)UN_FORWARDING_PTR(fun->header.info);
+        }
+	fun_info = get_fun_itbl(UNTAG_CLOSURE(fun));
 	size = ret_fun->size;
 	switch (fun_info->f.fun_type) {
 	case ARG_GEN:
@@ -213,10 +227,17 @@ checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
     StgClosure *fun;
     StgClosure *p;
     StgFunInfoTable *fun_info;
+    const StgInfoTable *info;
     
     fun = UNTAG_CLOSURE(tagged_fun);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
-    fun_info = get_fun_itbl(fun);
+
+    info = fun->header.info;
+    if (IS_FORWARDING_PTR(info)) {
+        fun = (StgClosure*)UN_FORWARDING_PTR(info);
+        info = fun->header.info;
+    }
+    fun_info = FUN_INFO_PTR_TO_STRUCT(info);
     
     p = (StgClosure *)payload;
     switch (fun_info->f.fun_type) {
@@ -251,22 +272,17 @@ checkClosure( StgClosure* p )
 {
     const StgInfoTable *info;
 
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-
     p = UNTAG_CLOSURE(p);
     /* Is it a static closure (i.e. in the data segment)? */
-    if (!HEAP_ALLOCED(p)) {
-	ASSERT(closure_STATIC(p));
-    } else {
-	ASSERT(!closure_STATIC(p));
-    }
-
     info = p->header.info;
 
     if (IS_FORWARDING_PTR(info)) {
-        barf("checkClosure: found EVACUATED closure %d", info->type);
+        return checkClosure((StgClosure *)UN_FORWARDING_PTR(info));
     }
     info = INFO_PTR_TO_STRUCT(info);
+
+    ASSERT(HEAP_ALLOCED(p) || closure_STATIC(p));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
 
     switch (info->type) {
 
@@ -307,11 +323,11 @@ checkClosure( StgClosure* p )
     case CONSTR_0_2:
     case CONSTR_2_0:
     case IND_PERM:
+    case IND_LOCAL:
     case BLACKHOLE:
     case PRIM:
     case MUT_PRIM:
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
+    case MUT_VAR_LOCAL:
     case CONSTR_STATIC:
     case CONSTR_NOCAF_STATIC:
     case THUNK_STATIC:
@@ -335,7 +351,7 @@ checkClosure( StgClosure* p )
         ASSERT(get_itbl(bq->owner)->type == TSO);
         ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE 
                || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
-        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
+        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE ||
                get_itbl(bq->link)->type == IND ||
                get_itbl(bq->link)->type == BLOCKING_QUEUE);
 
@@ -369,8 +385,8 @@ checkClosure( StgClosure* p )
       }
 
     case THUNK_SELECTOR:
-	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
-	    return THUNK_SELECTOR_sizeW();
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgSelector *)p)->selectee));
+        return THUNK_SELECTOR_sizeW();
 
     case IND:
 	{ 
@@ -381,19 +397,6 @@ checkClosure( StgClosure* p )
 	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(ind->indirectee));
 	    return sizeofW(StgInd);
 	}
-
-    case RET_BCO:
-    case RET_SMALL:
-    case RET_BIG:
-    case RET_DYN:
-    case UPDATE_FRAME:
-    case UNDERFLOW_FRAME:
-    case STOP_FRAME:
-    case CATCH_FRAME:
-    case ATOMICALLY_FRAME:
-    case CATCH_RETRY_FRAME:
-    case CATCH_STM_FRAME:
-	    barf("checkClosure: stack frame");
 
     case AP:
     {
@@ -418,10 +421,10 @@ checkClosure( StgClosure* p )
     }
 
     case ARR_WORDS:
-	    return arr_words_sizeW((StgArrWords *)p);
+        return arr_words_sizeW((StgArrWords *)p);
 
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	{
@@ -455,10 +458,233 @@ checkClosure( StgClosure* p )
       }
       
     default:
-	    barf("checkClosure (closure type %d)", info->type);
+        barf("checkClosure (closure type %d)", info->type);
     }
 }
 
+static void
+checkGlobalPtr (StgClosure *p)
+{
+    if (HEAP_ALLOCED(p)) {
+        ASSERT(isGlobal(p));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+    }
+}
+
+// Check that an object only points to global heap, unless it is
+// IND_LOCAL or TSO.  We use this to test that the global heap
+// invariant is satisfied.
+StgOffset
+checkGlobalClosure (StgClosure* p)
+{
+    const StgInfoTable *info;
+
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+
+    p = UNTAG_CLOSURE(p);
+
+    info = p->header.info;
+
+    if (IS_FORWARDING_PTR(info)) {
+        barf("checkGlobalClosure: found EVACUATED closure %d", info->type);
+    }
+    info = INFO_PTR_TO_STRUCT(info);
+
+    switch (info->type) {
+
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+      { 
+	StgMVar *mvar = (StgMVar *)p;
+	checkGlobalPtr((StgClosure *)mvar->head);
+        checkGlobalPtr((StgClosure *)mvar->tail);
+        checkGlobalPtr((StgClosure *)mvar->value);
+	return sizeofW(StgMVar);
+      }
+
+    case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_2_0:
+      {
+	nat i;
+	for (i = 0; i < info->layout.payload.ptrs; i++) {
+            checkGlobalPtr(((StgThunk *)p)->payload[i]);
+	}
+	return thunk_sizeW_fromITBL(info);
+      }
+
+    case MUT_PRIM:
+        if (p->header.info == &stg_TREC_HEADER_info) {
+            // TREC_HEADERs are private and are allowed to point to
+            // the local heap.
+            return checkClosure(p);
+        } // else fall through...
+    case FUN:
+    case FUN_1_0:
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_2_0:
+    case IND_PERM:
+    case IND_STATIC:
+    case BLACKHOLE:
+    case MUT_VAR_GLOBAL:
+    case CONSTR_STATIC:
+    case CONSTR_NOCAF_STATIC:
+    case THUNK_STATIC:
+    case FUN_STATIC:
+    case PRIM:
+	{
+	    nat i;
+	    for (i = 0; i < info->layout.payload.ptrs; i++) {
+		checkGlobalPtr(p->payload[i]);
+	    }
+	    return sizeW_fromITBL(info);
+	}
+
+    case IND_LOCAL:
+    {
+        StgClosure *q = ((StgInd*)p)->indirectee;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+        // the indirectee should live in the correct local heap
+        ASSERT(Bdescr((P_)q)->gen_ix == get_itbl(p)->srt_bitmap);
+        return sizeofW(StgInd);
+    }
+
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)p;
+
+        // NO: the BH might have been updated now
+        // ASSERT(get_itbl(bq->bh)->type == BLACKHOLE);
+
+        // NO: we allow global->local BH pointers
+        // checkGlobalPtr((StgClosure*)bq->bh);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure*)bq->bh)));
+
+        ASSERT(get_itbl(bq->owner)->type == TSO);
+        ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE 
+               || bq->queue->header.info == &stg_MSG_BLACKHOLE_info
+               || bq->queue->header.info == &stg_MSG_GLOBALISE_info);
+        ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE || 
+               get_itbl(bq->link)->type == IND ||
+               get_itbl(bq->link)->type == BLOCKING_QUEUE);
+
+        return sizeofW(StgBlockingQueue);
+    }
+
+    case BCO: {
+	StgBCO *bco = (StgBCO *)p;
+	checkGlobalPtr((StgClosure *)bco->instrs);
+	checkGlobalPtr((StgClosure *)bco->literals);
+        checkGlobalPtr((StgClosure *)bco->ptrs);
+	return bco_sizeW(bco);
+    }
+
+    case WEAK:
+      /* deal with these specially - the info table isn't
+       * representative of the actual layout.
+       */
+      { StgWeak *w = (StgWeak *)p;
+          checkGlobalPtr(w->key);
+          checkGlobalPtr(w->value);
+          checkGlobalPtr(w->finalizer);
+	if (w->link) {
+            checkGlobalPtr((StgClosure *)w->link);
+	}
+	return sizeW_fromITBL(info);
+      }
+
+    case THUNK_SELECTOR:
+        checkGlobalPtr(((StgSelector *)p)->selectee);
+        return THUNK_SELECTOR_sizeW();
+
+    case IND:
+	{ 
+  	    /* we don't expect to see any of these after GC
+	     * but they might appear during execution
+	     */
+	    StgInd *ind = (StgInd *)p;
+	    checkGlobalPtr(ind->indirectee);
+	    return sizeofW(StgInd);
+	}
+
+    case AP:
+    {
+	StgAP* ap = (StgAP *)p;
+	checkPAP (ap->fun, ap->payload, ap->n_args);
+	return ap_sizeW(ap);
+    }
+
+    case PAP:
+    {
+	StgPAP* pap = (StgPAP *)p;
+	checkPAP (pap->fun, pap->payload, pap->n_args);
+	return pap_sizeW(pap);
+    }
+
+    case AP_STACK:
+    { 
+	StgAP_STACK *ap = (StgAP_STACK *)p;
+	checkGlobalPtr(ap->fun);
+	checkStackChunk((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
+	return ap_stack_sizeW(ap);
+    }
+
+    case ARR_WORDS:
+        return arr_words_sizeW((StgArrWords *)p);
+
+    case MUT_ARR_PTRS_GLOBAL:
+    case MUT_ARR_PTRS_FROZEN:
+    case MUT_ARR_PTRS_FROZEN0:
+	{
+	    StgMutArrPtrs* a = (StgMutArrPtrs *)p;
+	    nat i;
+	    for (i = 0; i < a->ptrs; i++) {
+		// checkGlobalPtr(a->payload[i]);
+                // XXX: mutable arrays can have local ptrs at the
+                // moment, see globalise_scavenge_large().
+		ASSERT(LOOKS_LIKE_CLOSURE_PTR(a->payload[i]));
+	    }
+	    return mut_arr_ptrs_sizeW(a);
+	}
+
+    case TSO:
+        checkTSO((StgTSO *)p);
+        return sizeofW(StgTSO);
+
+    case STACK:
+        checkSTACK((StgStack*)p);
+        return stack_sizeW((StgStack*)p);
+
+    case TREC_CHUNK:
+        // these are allowed to point to the local heap, so we don't
+        // use checkGlobalPtr().
+      {
+        nat i;
+        StgTRecChunk *tc = (StgTRecChunk *)p;
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR((StgClosure *)tc->prev_chunk));
+        for (i = 0; i < tc -> next_entry_idx; i ++) {
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR((StgClosure *)tc->entries[i].tvar));
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(tc->entries[i].expected_value));
+            ASSERT(LOOKS_LIKE_CLOSURE_PTR(tc->entries[i].new_value));
+        }
+        return sizeofW(StgTRecChunk);
+      }
+
+    default:
+        barf("checkGlobalClosure (closure type %d)", info->type);
+    }
+}
 
 /* -----------------------------------------------------------------------------
    Check Heap Sanity
@@ -490,7 +716,51 @@ void checkHeapChain (bdescr *bd)
     }
 }
 
-void
+void checkGlobalHeapChain (bdescr *bd)
+{
+    StgPtr p;
+
+    for (; bd != NULL; bd = bd->link) {
+	p = bd->start;
+	while (p < bd->free) {
+            nat size = checkGlobalClosure((StgClosure *)p);
+	    /* This is the smallest size of closure that can live in the heap */
+	    ASSERT( size >= MIN_PAYLOAD_SIZE + sizeofW(StgHeader) );
+	    p += size;
+	    
+	    /* skip over slop */
+	    while (p < bd->free &&
+		   (*p < 0x1000 || !LOOKS_LIKE_INFO_PTR(*p))) { p++; } 
+	}
+    }
+}
+
+void checkPrimHeapChain (bdescr *bd)
+{
+    StgPtr p;
+    StgWord flag;
+
+    for (; bd != NULL; bd = bd->link) {
+        p = bd->start;
+        while (p < bd->free) {
+            flag = *p;
+            p += 1;
+            switch (flag) {
+            case 0: // not global
+                p += checkClosure((StgClosure*)p);
+                break;
+            case 1: // global
+                p += checkGlobalClosure((StgClosure*)p);
+                break;
+            default: // reclaimed free space of size 'flag - 2'
+                p += flag - 2;
+                break;
+            }
+        }
+    }
+}
+
+void 
 checkHeapChunk(StgPtr start, StgPtr end)
 {
   StgPtr p;
@@ -531,21 +801,23 @@ void
 checkTSO(StgTSO *tso)
 {
     if (tso->what_next == ThreadKilled) {
-      /* The garbage collector doesn't bother following any pointers
-       * from dead threads, so don't check sanity here.  
-       */
-      return;
+        /* The garbage collector doesn't bother following any pointers
+         * from dead threads, so don't check sanity here.  
+         */
+        return;
     }
 
     ASSERT(tso->_link == END_TSO_QUEUE || 
            tso->_link->header.info == &stg_MVAR_TSO_QUEUE_info ||
            tso->_link->header.info == &stg_TSO_info);
 
-    if (   tso->why_blocked == BlockedOnMVar
-	|| tso->why_blocked == BlockedOnBlackHole
-	|| tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == NotBlocked
-	) {
+    switch (tso->why_blocked) {
+    case NotBlocked:
+    case BlockedOnDelay:
+    case BlockedOnWrite:
+    case BlockedOnRead:
+        break;
+    default:
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
     }
 
@@ -567,8 +839,8 @@ checkGlobalTSOList (rtsBool checkTSOs)
   StgTSO *tso;
   nat g;
 
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      for (tso=generations[g].threads; tso != END_TSO_QUEUE; 
+  for (g = 0; g < total_generations; g++) {
+      for (tso = all_generations[g].threads; tso != END_TSO_QUEUE; 
            tso = tso->global_link) {
           ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso));
           ASSERT(get_itbl(tso)->type == TSO);
@@ -608,23 +880,28 @@ checkGlobalTSOList (rtsBool checkTSOs)
    -------------------------------------------------------------------------- */
 
 static void
-checkMutableList( bdescr *mut_bd, nat gen )
+checkMutableList (bdescr *mut_bd, nat gen, nat cap_no)
 {
-    bdescr *bd;
+    bdescr *bd, *pbd;
     StgPtr q;
     StgClosure *p;
 
     for (bd = mut_bd; bd != NULL; bd = bd->link) {
 	for (q = bd->start; q < bd->free; q++) {
 	    p = (StgClosure *)*q;
-            ASSERT(!HEAP_ALLOCED(p) || Bdescr((P_)p)->gen_no == gen);
-            checkClosure(p);
+            pbd = Bdescr((P_)p);
+	    ASSERT(!HEAP_ALLOCED(p) || pbd->gen_no == gen || 
+                   ((pbd->flags & BF_PRIM) && isGlobalPrim(p)));
+            checkGlobalClosure(p);
 
             switch (get_itbl(p)->type) {
             case TSO:
+                // TSOs on the mutable list must belong to this capability
+                ASSERT(((StgTSO*)p)->cap->no == cap_no);
                 ((StgTSO *)p)->flags |= TSO_MARKED;
                 break;
             case STACK:
+                ASSERT(((StgStack*)p)->tso->cap->no == cap_no);
                 ((StgStack *)p)->dirty |= TSO_MARKED;
                 break;
             }
@@ -637,7 +914,7 @@ checkLocalMutableLists (nat cap_no)
 {
     nat g;
     for (g = 1; g < RtsFlags.GcFlags.generations; g++) {
-        checkMutableList(capabilities[cap_no].mut_lists[g], g);
+        checkMutableList(capabilities[cap_no].mut_lists[g], g, cap_no);
     }
 }
 
@@ -694,29 +971,34 @@ checkStaticObjects ( StgClosure* static_objects )
 
 /* Nursery sanity check */
 void
-checkNurserySanity (nursery *nursery)
+checkNurserySanity (nat cap_no)
 {
     bdescr *bd, *prev;
     nat blocks = 0;
+    nursery *nursery;
+
+    nursery = &nurseries[cap_no];
 
     prev = NULL;
     for (bd = nursery->blocks; bd != NULL; bd = bd->link) {
-        ASSERT(bd->gen == g0);
-        ASSERT(bd->u.back == prev);
-	prev = bd;
+        ASSERT(bd->gen == &all_generations[cap_no]);
+        ASSERT(bd->gen_ix == cap_no);
+	ASSERT(bd->u.back == prev);
+        prev = bd;
 	blocks += bd->blocks;
     }
 
     ASSERT(blocks == nursery->n_blocks);
 }
 
-static void checkGeneration (generation *gen, 
+static void checkGeneration (generation *gen,
                              rtsBool after_major_gc USED_IF_THREADS)
 {
     nat n;
     gen_workspace *ws;
 
     ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    ASSERT(countBlocks(gen->prim_blocks) == gen->n_prim_blocks);
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
 
 #if defined(THREADED_RTS)
@@ -726,16 +1008,43 @@ static void checkGeneration (generation *gen,
     if (!after_major_gc) return;
 #endif
 
-    checkHeapChain(gen->blocks);
+    if (gen->is_local) {
+        checkHeapChain(gen->blocks);
+        checkPrimHeapChain(gen->prim_blocks);
+    } else {
+        checkGlobalHeapChain(gen->blocks);
+        ASSERT(gen->prim_blocks == NULL);
+    }
 
     for (n = 0; n < n_capabilities; n++) {
-        ws = &gc_threads[n]->gens[gen->no];
-        checkHeapChain(ws->todo_bd);
-        checkHeapChain(ws->part_list);
-        checkHeapChain(ws->scavd_list);
+        ws = &gc_threads[n]->gens[gen->ix];
+        if (gen->is_local) {
+            checkHeapChain(ws->todo_bd);
+            checkHeapChain(ws->part_list);
+            checkHeapChain(ws->scavd_list);
+        } else {
+            checkGlobalHeapChain(ws->todo_bd);
+            checkGlobalHeapChain(ws->part_list);
+            checkGlobalHeapChain(ws->scavd_list);
+        }
     }
 
     checkLargeObjects(gen->large_objects);
+}
+
+/* Local heap sanity check. */
+static void checkLocalHeap (nat cap_no)
+{
+    nat g;
+    generation *gen;
+
+    for (g = 0; g < total_generations; g++) {
+        gen = &all_generations[g];
+        if (gen->is_local && gen->cap == cap_no) {
+            checkGeneration(gen, rtsFalse);
+        }
+    }
+    checkNurserySanity(cap_no);
 }
 
 /* Full heap sanity check. */
@@ -743,25 +1052,34 @@ static void checkFullHeap (rtsBool after_major_gc)
 {
     nat g, n;
 
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        checkGeneration(&generations[g], after_major_gc);
+    for (g = 0; g < total_generations; g++) {
+        checkGeneration(&all_generations[g], after_major_gc);
     }
     for (n = 0; n < n_capabilities; n++) {
-        checkNurserySanity(&nurseries[n]);
+        checkNurserySanity(n);
     }
 }
 
-void checkSanity (rtsBool after_gc, rtsBool major_gc)
+void checkSanity(rtsBool local_only, rtsBool after_gc, rtsBool major_gc,
+                 nat cap_no)
 {
-    checkFullHeap(after_gc && major_gc);
+    if (local_only) {
+        checkLocalHeap(cap_no);
+    } else {
+        checkFullHeap(after_gc && major_gc);
+    }
 
-    checkFreeListSanity();
+    if (!local_only) checkFreeListSanity();
 
     // always check the stacks in threaded mode, because checkHeap()
     // does nothing in this case.
     if (after_gc) {
-        checkMutableLists();
-        checkGlobalTSOList(rtsTrue);
+        if (local_only) {
+            checkLocalMutableLists(cap_no);
+        } else {
+            checkMutableLists();
+            checkGlobalTSOList(rtsTrue);
+        }
     }
 }
 
@@ -775,20 +1093,23 @@ void checkSanity (rtsBool after_gc, rtsBool major_gc)
 static void
 findMemoryLeak (void)
 {
-    nat g, i;
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+    nat g, i, n;
+    for (n = 0; n < total_generations; n++) {
+        g = all_generations[n].no;
         for (i = 0; i < n_capabilities; i++) {
-            markBlocks(capabilities[i].mut_lists[g]);
-            markBlocks(gc_threads[i]->gens[g].part_list);
-            markBlocks(gc_threads[i]->gens[g].scavd_list);
-            markBlocks(gc_threads[i]->gens[g].todo_bd);
+            if (g > 0) { markBlocks(capabilities[i].mut_lists[g]); }
+            markBlocks(gc_threads[i]->gens[n].part_list);
+            markBlocks(gc_threads[i]->gens[n].scavd_list);
+            markBlocks(gc_threads[i]->gens[n].todo_bd);
         }
-        markBlocks(generations[g].blocks);
-        markBlocks(generations[g].large_objects);
-    }
+        markBlocks(all_generations[n].blocks);
+        markBlocks(all_generations[n].prim_blocks);
+        markBlocks(all_generations[n].large_objects);
+  }
 
     for (i = 0; i < n_capabilities; i++) {
         markBlocks(nurseries[i].blocks);
+        markBlocks(gc_threads[i]->mark_stack_top_bd);
     }
 
 #ifdef PROFILING
@@ -848,38 +1169,47 @@ static lnat
 genBlocks (generation *gen)
 {
     ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
+    ASSERT(countBlocks(gen->prim_blocks) == gen->n_prim_blocks);
     ASSERT(countBlocks(gen->large_objects) == gen->n_large_blocks);
-    return gen->n_blocks + gen->n_old_blocks + 
-	    countAllocdBlocks(gen->large_objects);
+    return gen->n_blocks + gen->n_prim_blocks + gen->n_old_blocks + 
+        countAllocdBlocks(gen->large_objects);
 }
 
 void
 memInventory (rtsBool show)
 {
-  nat g, i;
-  lnat gen_blocks[RtsFlags.GcFlags.generations];
+  nat g, i, n;
+  lnat gen_blocks[total_generations];
   lnat nursery_blocks, retainer_blocks,
-       arena_blocks, exec_blocks;
+      arena_blocks, exec_blocks, mark_stack_blocks;
   lnat live_blocks = 0, free_blocks = 0;
   rtsBool leak;
 
-  // count the blocks we current have
+  // count the blocks we currently have
 
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      gen_blocks[g] = 0;
+  for (n = 0; n < total_generations; n++) {
+      g = all_generations[n].no;
+      gen_blocks[n] = 0;
       for (i = 0; i < n_capabilities; i++) {
-	  gen_blocks[g] += countBlocks(capabilities[i].mut_lists[g]);
-          gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].part_list);
-          gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].scavd_list);
-          gen_blocks[g] += countBlocks(gc_threads[i]->gens[g].todo_bd);
-      }	  
-      gen_blocks[g] += genBlocks(&generations[g]);
+          if (g > 0) {
+              gen_blocks[n] += countBlocks(capabilities[i].mut_lists[g]);
+          }
+          gen_blocks[n] += countBlocks(gc_threads[i]->gens[n].part_list);
+          gen_blocks[n] += countBlocks(gc_threads[i]->gens[n].scavd_list);
+          gen_blocks[n] += countBlocks(gc_threads[i]->gens[n].todo_bd);
+      }
+      gen_blocks[n] += genBlocks(&all_generations[n]);
   }
 
   nursery_blocks = 0;
   for (i = 0; i < n_capabilities; i++) {
       ASSERT(countBlocks(nurseries[i].blocks) == nurseries[i].n_blocks);
       nursery_blocks += nurseries[i].n_blocks;
+  }
+
+  mark_stack_blocks = 0;
+  for (i = 0; i < n_capabilities; i++) {
+      mark_stack_blocks += countBlocks(gc_threads[i]->mark_stack_top_bd);
   }
 
   retainer_blocks = 0;
@@ -899,10 +1229,10 @@ memInventory (rtsBool show)
   free_blocks = countFreeList();
 
   live_blocks = 0;
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+  for (g = 0; g < total_generations; g++) {
       live_blocks += gen_blocks[g];
   }
-  live_blocks += nursery_blocks + 
+  live_blocks += nursery_blocks + mark_stack_blocks
                + retainer_blocks + arena_blocks + exec_blocks;
 
 #define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
@@ -916,12 +1246,14 @@ memInventory (rtsBool show)
       } else {
           debugBelch("Memory inventory:\n");
       }
-      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      for (g = 0; g < total_generations; g++) {
 	  debugBelch("  gen %d blocks : %5lu blocks (%lu MB)\n", g, 
                      gen_blocks[g], MB(gen_blocks[g]));
       }
       debugBelch("  nursery      : %5lu blocks (%lu MB)\n", 
                  nursery_blocks, MB(nursery_blocks));
+      debugBelch("  mark stacks  : %5lu blocks (%lu MB)\n", 
+                 mark_stack_blocks, MB(mark_stack_blocks));
       debugBelch("  retainer     : %5lu blocks (%lu MB)\n", 
                  retainer_blocks, MB(retainer_blocks));
       debugBelch("  arena blocks : %5lu blocks (%lu MB)\n", 
@@ -946,5 +1278,153 @@ memInventory (rtsBool show)
   ASSERT(!leak);
 }
 
+
+/* -----------------------------------------------------------------------------
+ * 
+ * Tools for use in gdb.
+ * 
+ * ---------------------------------------------------------------------------*/
+
+void
+findBlockInList(bdescr *bd, bdescr *list)
+{
+    bdescr *p;
+
+    for (p = list; p != NULL; p = p->link) {
+        ASSERT(bd != p);
+    }
+}
+
+// useful for locating a block from within gdb.
+void
+findBlock (bdescr *bd)
+{
+    nat n, g, i;
+    generation *gen;
+
+    for (n = 0; n < total_generations; n++) {
+        g = all_generations[n].no;
+        for (i = 0; i < n_capabilities; i++) {
+            if (g > 0) {
+                findBlockInList(bd, capabilities[i].mut_lists[g]);
+            }
+            findBlockInList(bd, gc_threads[i]->gens[n].part_list);
+            findBlockInList(bd, gc_threads[i]->gens[n].scavd_list);
+            findBlockInList(bd, gc_threads[i]->gens[n].todo_bd);
+        }	  
+
+        gen = &all_generations[n];
+        findBlockInList(bd, gen->blocks);
+        findBlockInList(bd, gen->old_blocks);
+        findBlockInList(bd, gen->prim_blocks);
+        findBlockInList(bd, gen->large_objects);
+        findBlockInList(bd, gen->scavenged_large_objects);
+    }
+    
+    for (i = 0; i < n_capabilities; i++) {
+        findBlockInList(bd, nurseries[i].blocks);
+        findBlockInList(bd, gc_threads[i]->mark_stack_top_bd);
+    }
+}
+
+int searched = 0;
+
+static int
+findPtrBlocks (char *msg, StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
+{
+    StgPtr q, r, end;
+    nat block_no = 0;
+
+    for (; bd; bd = bd->link, block_no++) {
+        searched++;
+        for (q = bd->start; q < bd->free; q++) {
+            if (UNTAG_CLOSURE((StgClosure*)*q) == (StgClosure *)p) {
+                debugBelch("found at %p in block %d of %s\n",
+                           q, block_no, msg);
+                if (i < arr_size) {
+                    for (r = bd->start; r < bd->free; r = end) {
+                        // skip over zeroed-out slop
+                        while (*r == 0) r++;
+                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
+                            debugBelch("no closure at %p\n", r);
+                            break;
+                        }
+                        end = r + closure_sizeW((StgClosure*)r);
+                        if (q < end) {
+                            debugBelch("%p = ", r);
+                            printClosure((StgClosure *)r);
+                            arr[i++] = r;
+                            break;
+                        }
+                    }
+                    if (r >= bd->free) {
+                        debugBelch("closure?\n");
+                    }
+                } else {
+                    return i;
+                }
+            }
+        }
+    }
+    return i;
+}
+
+void
+findPtr(P_ p, int follow)
+{
+  nat g;
+  bdescr *bd;
+  const int arr_size = 1024;
+  StgPtr arr[arr_size];
+  int i = 0;
+  nat j;
+  searched = 0;
+  char msg[512];
+
+  for (g = 0; g < total_generations; g++) {
+      bd = all_generations[g].blocks;
+      snprintf(msg, 512, "all_generations[%d].blocks", g);
+      i = findPtrBlocks(msg, p,bd,arr,arr_size,i);
+
+      bd = all_generations[g].prim_blocks;
+      snprintf(msg, 512, "all_generations[%d].prim_blocks", g);
+      i = findPtrBlocks(msg, p,bd,arr,arr_size,i);
+
+      bd = all_generations[g].large_objects;
+      snprintf(msg, 512, "all_generations[%d].large_objects", g);
+      i = findPtrBlocks(msg, p,bd,arr,arr_size,i);
+
+      for (j = 0; j < n_capabilities; j++) {
+          bd = gc_threads[j]->gens[g].part_list;
+          snprintf(msg, 512, "gc_threads[%d]->gens[%d].part_list", j,g);
+          i = findPtrBlocks(msg, p,bd,arr,arr_size,i);
+
+          bd = gc_threads[j]->gens[g].todo_bd;
+          snprintf(msg, 512, "gc_threads[%d]->gens[%d].todo_bd", j,g);
+          i = findPtrBlocks(msg, p,bd,arr,arr_size,i);
+      }
+      if (i >= arr_size) return;
+  }
+  if (follow && i == 1) {
+      debugBelch("-->\n");
+      findPtr(arr[0], 1);
+  }
+}
+
+void
+findPtrAnywhere (StgPtr p)
+{
+    StgPtr mblock, q;
+
+    mblock = getFirstMBlock();
+    do {
+        for (q = mblock; q < mblock + MBLOCK_SIZE_W; q++) {
+            if (UNTAG_CLOSURE((StgClosure*)*q) == 
+                UNTAG_CLOSURE((StgClosure*)p)) {
+                debugBelch("found at %p\n", q);
+            }
+        }
+    } while ((mblock = getNextMBlock(mblock)));
+}
 
 #endif /* DEBUG */

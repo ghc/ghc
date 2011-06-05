@@ -63,14 +63,14 @@ processHeapClosureForDead( StgClosure *c )
     case STACK:
     case MVAR_CLEAN:
     case MVAR_DIRTY:
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
     case ARR_WORDS:
     case WEAK:
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
+    case MUT_VAR_LOCAL:
+    case MUT_VAR_GLOBAL:
     case BCO:
     case PRIM:
     case MUT_PRIM:
@@ -115,6 +115,7 @@ processHeapClosureForDead( StgClosure *c )
 	// because they will perish before the next census at any
 	// rate.
     case IND:
+    case IND_LOCAL:
 	// Found a dead closure: record its size
 	LDV_recordDead(c, size);
 	return size;
@@ -231,8 +232,8 @@ LdvCensusForDead( nat N )
     } else {
         processNurseryForDead();
 	for (g = 0; g <= N; g++) {
-            processHeapForDead(generations[g].old_blocks);
-            processChainForDead(generations[g].large_objects);
+            processHeapForDead(old_generations[g].old_blocks);
+            processChainForDead(old_generations[g].large_objects);
         }
     }
 }

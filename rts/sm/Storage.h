@@ -43,8 +43,6 @@ bdescr * splitLargeBlock (bdescr *bd, nat blocks);
 				 normally called for objects in an old
 				 generation (>0) when they are updated.
 
-   updateWithPermIndirection(p1,p2)  As above but uses a permanent indir.
-
    -------------------------------------------------------------------------- */
 
 /*
@@ -65,21 +63,21 @@ extern Mutex sm_mutex;
 #endif
 
 /* -----------------------------------------------------------------------------
-   The write barrier for MVARs
-   -------------------------------------------------------------------------- */
-
-void dirty_MVAR(StgRegTable *reg, StgClosure *p);
-
-/* -----------------------------------------------------------------------------
    Nursery manipulation
    -------------------------------------------------------------------------- */
 
 extern nursery *nurseries;
 
+void     resetNursery         ( nat n );
 void     resetNurseries       ( void );
+
+lnat     clearNursery         ( nat n );
 lnat     clearNurseries       ( void );
+
+void     resizeNursery        ( Capability *cap, nat blocks );
 void     resizeNurseries      ( nat blocks );
 void     resizeNurseriesFixed ( nat blocks );
+
 lnat     countNurseryBlocks   ( void );
 
 /* -----------------------------------------------------------------------------
@@ -87,6 +85,7 @@ lnat     countNurseryBlocks   ( void );
    -------------------------------------------------------------------------- */
 
 lnat    calcAllocated  (rtsBool count_nurseries);
+lnat    calcAllocatedCap (Capability *cap, rtsBool count_nursery);
 lnat    countOccupied  (bdescr *bd);
 lnat    calcNeeded     (void);
 

@@ -19,6 +19,7 @@
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
 #include "GC.h"
+#include "GCThread.h"
 #include "Compact.h"
 #include "Schedule.h"
 #include "Apply.h"
@@ -508,8 +509,8 @@ update_fwd_large( bdescr *bd )
       // nothing to follow 
       continue;
 
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
       // follow everything 
@@ -526,6 +527,7 @@ update_fwd_large( bdescr *bd )
     case STACK:
     {
         StgStack *stack = (StgStack*)p;
+        thread_(&stack->tso);
         thread_stack(stack->sp, stack->stack + stack->stack_size);
         continue;
     }
@@ -630,8 +632,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case CONSTR:
     case PRIM:
     case MUT_PRIM:
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
+    case MUT_VAR_LOCAL:
+    case MUT_VAR_GLOBAL:
     case BLACKHOLE:
     case BLOCKING_QUEUE:
     {
@@ -670,6 +672,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     
     case IND:
     case IND_PERM:
+    case IND_LOCAL:
 	thread(&((StgInd *)p)->indirectee);
 	return p + sizeofW(StgInd);
 
@@ -692,8 +695,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case ARR_WORDS:
 	return p + arr_words_sizeW((StgArrWords *)p);
 	
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_LOCAL:
+    case MUT_ARR_PTRS_GLOBAL:
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
 	// follow everything 
@@ -714,6 +717,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     case STACK:
     {
         StgStack *stack = (StgStack*)p;
+        thread_(&stack->tso);
         thread_stack(stack->sp, stack->stack + stack->stack_size);
         return p + stack_sizeW(stack);
     }
@@ -934,7 +938,7 @@ update_bkwd_compact( generation *gen )
 }
 
 void
-compact(StgClosure *static_objects)
+compact(gc_thread *gct)
 {
     nat n, g, blocks;
     generation *gen;
@@ -942,12 +946,17 @@ compact(StgClosure *static_objects)
     // 1. thread the roots
     markCapabilities((evac_fn)thread_root, NULL);
 
+    markScheduler((evac_fn)thread_root, NULL);
+
     // the weak pointer lists...
-    if (weak_ptr_list != NULL) {
-	thread((void *)&weak_ptr_list);
+    for (g = 0; g < total_generations; g++) {
+        gen = &all_generations[g];
+	if (gen->weak_ptrs != NULL) {
+            thread((void *)&gen->weak_ptrs);
+        }
     }
-    if (old_weak_ptr_list != NULL) {
-	thread((void *)&old_weak_ptr_list); // tmp
+    if (gct->old_weak_ptrs != NULL) {
+        thread((void *)&gct->old_weak_ptrs);
     }
 
     // mutable lists
@@ -965,12 +974,15 @@ compact(StgClosure *static_objects)
     }
 
     // the global thread list
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        thread((void *)&generations[g].threads);
+    for (g = 0; g < total_generations; g++) {
+        thread((void *)&all_generations[g].threads);
     }
 
     // any threads resurrected during this GC
-    thread((void *)&resurrected_threads);
+    thread((void *)&gct->resurrected_threads);
+
+    // any threads resurrected during this GC
+    thread((void *)&gct->exception_threads);
 
     // the task list
     {
@@ -987,7 +999,7 @@ compact(StgClosure *static_objects)
     }
 
     // the static objects
-    thread_static(static_objects /* ToDo: ok? */);
+    thread_static(gct->scavenged_static_objects);
 
     // the stable pointer table
     threadStablePtrTable((evac_fn)thread_root, NULL);
@@ -996,8 +1008,8 @@ compact(StgClosure *static_objects)
     markCAFs((evac_fn)thread_root, NULL);
 
     // 2. update forward ptrs
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        gen = &generations[g];
+    for (g = 0; g < total_generations; g++) {
+        gen = &all_generations[g];
         debugTrace(DEBUG_gc, "update_fwd:  %d", g);
 
         update_fwd(gen->blocks);
@@ -1006,7 +1018,7 @@ compact(StgClosure *static_objects)
             update_fwd(gc_threads[n]->gens[g].part_list);
         }
         update_fwd_large(gen->scavenged_large_objects);
-        if (g == RtsFlags.GcFlags.generations-1 && gen->old_blocks != NULL) {
+        if (g == total_generations-1 && gen->old_blocks != NULL) {
             debugTrace(DEBUG_gc, "update_fwd:  %d (compact)", g);
             update_fwd_compact(gen->old_blocks);
 	}

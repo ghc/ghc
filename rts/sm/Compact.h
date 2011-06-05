@@ -15,21 +15,23 @@
 #define SM_COMPACT_H
 
 #include "BeginPrivate.h"
+#include "GCThread.h"
 
 INLINE_HEADER void 
 mark(StgPtr p, bdescr *bd)
 {
-    nat offset_within_block = p - bd->start; // in words
+    StgWord offset_within_block = ((W_)p & BLOCK_MASK) / sizeof(W_); // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap + 
 	(offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
     StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
+    ASSERT(((W_)bitmap_word & MBLOCK_MASK) >= FIRST_BLOCK_OFF);
     *bitmap_word |= bit_mask;
 }
 
 INLINE_HEADER void 
 unmark(StgPtr p, bdescr *bd)
 {
-    nat offset_within_block = p - bd->start; // in words
+    StgWord offset_within_block = ((W_)p & BLOCK_MASK) / sizeof(W_); // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap + 
 	(offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
     StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
@@ -39,14 +41,14 @@ unmark(StgPtr p, bdescr *bd)
 INLINE_HEADER StgWord
 is_marked(StgPtr p, bdescr *bd)
 {
-    nat offset_within_block = p - bd->start; // in words
+    StgWord offset_within_block = ((W_)p & BLOCK_MASK) / sizeof(W_); // in words
     StgPtr bitmap_word = (StgPtr)bd->u.bitmap + 
 	(offset_within_block / (sizeof(W_)*BITS_PER_BYTE));
     StgWord bit_mask = (StgWord)1 << (offset_within_block & (sizeof(W_)*BITS_PER_BYTE - 1));
     return (*bitmap_word & bit_mask);
 }
 
-void compact (StgClosure *static_objects);
+void compact (gc_thread *);
 
 #include "EndPrivate.h"
 

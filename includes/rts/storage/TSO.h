@@ -166,6 +166,7 @@ typedef struct StgTSO_ {
 
 typedef struct StgStack_ {
     StgHeader  header;
+    StgTSO    *tso;            // owner
     StgWord32  stack_size;     // stack size in *words*
     StgWord32  dirty;          // non-zero => dirty
     StgPtr     sp;             // current stack pointer

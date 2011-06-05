@@ -261,26 +261,45 @@ emitAlgReturnTarget
 	-> [(ConTagZ, CgStmts)]		-- Tagged branches
 	-> Maybe CgStmts		-- Default branch (if any)
 	-> Int                          -- family size
-	-> FCode (CLabel, SemiTaggingStuff)
+	-> FCode CLabel
 
 emitAlgReturnTarget name branches mb_deflt fam_sz
-  = do  { blks <- getCgStmts $
-                    -- is the constructor tag in the node reg?
-                    if isSmallFamily fam_sz
-                        then do -- yes, node has constr. tag
-                          let tag_expr = cmmConstrTag1 (CmmReg nodeReg)
-                              branches' = [(tag+1,branch)|(tag,branch)<-branches]
-                          emitSwitch tag_expr branches' mb_deflt 1 fam_sz
-                        else do -- no, get tag from info table
-                          let -- Note that ptr _always_ has tag 1
-                              -- when the family size is big enough
-                              untagged_ptr = cmmRegOffB nodeReg (-1)
-                              tag_expr = getConstrTag (untagged_ptr)
-                          emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
-	; lbl <- emitReturnTarget name blks
-	; return (lbl, Nothing) }
-		-- Nothing: the internal branches in the switch don't have
-		-- global labels, so we can't use them at the 'call site'
+ = do
+   blks <- getCgStmts $
+     -- is the constructor tag in the node reg?
+     if isSmallFamily fam_sz
+         then do -- yes, node has constr. tag
+           let tag_expr = cmmConstrTag1 (CmmReg nodeReg)
+               branches' = [(tag+1,branch)|(tag,branch)<-branches]
+           emitSwitch tag_expr branches' mb_deflt 1 fam_sz
+         else do -- no, get tag from info table
+           redo <- newLabelC
+           is_fwd <- newLabelC
+           labelC redo
+           ip <- newTemp bWord
+           tag <- newTemp bWord
+           let iptr = CmmReg (CmmLocal ip)
+           let untagged_ptr = cmmRegOffB nodeReg (-1)
+           let one = CmmLit (mkIntCLit 1)
+           stmtC $ CmmAssign (CmmLocal ip) (closureInfoPtr untagged_ptr)
+           -- check for a forwarding pointer; if it is, we have to
+           -- follow it to the real closure
+           let
+               cond = CmmMachOp mo_wordNe [
+                         CmmMachOp mo_wordAnd [iptr, one],
+                         CmmLit zeroCLit
+                      ]
+               tag_expr = CmmMachOp (MO_UU_Conv halfWordWidth wordWidth) [
+                             infoTableConstrTag (infoTable iptr)
+                           ]
+           stmtC $ CmmCondBranch cond is_fwd
+           emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
+           labelC is_fwd
+           -- iptr is already tagged with 1, no need to do any arithmetic
+           stmtC $ CmmAssign nodeReg iptr
+           stmtC $ CmmBranch redo
+   --
+   emitReturnTarget name blks
 
 --------------------------------
 emitReturnInstr :: Code

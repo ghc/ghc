@@ -227,6 +227,7 @@ main(int argc, char *argv[])
     field_offset(StgRegTable, rHpAlloc);
     struct_field(StgRegTable, rRet);
     struct_field(StgRegTable, rNursery);
+    struct_field(StgRegTable, rG0);
 
     def_offset("stgEagerBlackholeInfo", FUN_OFFSET(stgEagerBlackholeInfo));
     def_offset("stgGCEnter1", FUN_OFFSET(stgGCEnter1));
@@ -243,10 +244,12 @@ main(int argc, char *argv[])
     struct_field(bdescr, free);
     struct_field(bdescr, blocks);
     struct_field(bdescr, gen_no);
+    struct_field(bdescr, gen_ix);
     struct_field(bdescr, link);
 
     struct_size(generation);
     struct_field(generation, n_new_large_words);
+    struct_field(generation, weak_ptrs);
 
     struct_size(CostCentreStack);
     struct_field(CostCentreStack, ccsID);

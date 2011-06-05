@@ -13,31 +13,39 @@
 
 #include "BeginPrivate.h"
 
-# if defined(PAR)
-# define PVM_PE_MASK    0xfffc0000
-# define MAX_PVM_PES    MAX_PES
-# define MAX_PVM_TIDS   MAX_PES
-# define MAX_SLOTS      100000
-# endif
-
 /* debugging routines */
-void checkSanity        ( rtsBool after_gc, rtsBool major_gc );
-void checkNurserySanity ( nursery *nursery );
-void checkHeapChain     ( bdescr *bd );
+void checkSanity (rtsBool local_only, rtsBool after_gc, rtsBool major_gc,
+                  nat cap_no);
+void checkNurserySanity (nat cap_no);
+
+void checkHeapChain       (bdescr *bd);
+void checkGlobalHeapChain (bdescr *bd);
+void checkPrimHeapChain   (bdescr *bd);
+
 void checkHeapChunk     ( StgPtr start, StgPtr end );
 void checkLargeObjects  ( bdescr *bd );
 void checkTSO           ( StgTSO* tso );
 void checkGlobalTSOList ( rtsBool checkTSOs );
 void checkStaticObjects ( StgClosure* static_objects );
 void checkStackChunk    ( StgPtr sp, StgPtr stack_end );
-StgOffset checkStackFrame ( StgPtr sp );
-StgOffset checkClosure  ( StgClosure* p );
+StgOffset checkStackFrame    (StgPtr sp);
+
+StgOffset checkClosure       (StgClosure* p);
+StgOffset checkGlobalClosure (StgClosure* p);
 
 void checkRunQueue      (Capability *cap);
 
 void memInventory (rtsBool show);
 
 void checkBQ (StgTSO *bqe, StgClosure *closure);
+
+/* tools for use in gdb */
+
+void findPtr         (StgPtr p, int follow);
+void findPtrAnywhere (StgPtr p);
+
+void findBlock       (bdescr *bd);
+void findBlockInList (bdescr *bd, bdescr *list);
 
 #include "EndPrivate.h"
 

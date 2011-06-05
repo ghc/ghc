@@ -228,6 +228,12 @@ printClosure( StgClosure *obj )
             debugBelch(")\n"); 
             break;
 
+    case IND_LOCAL:
+            debugBelch("IND_LOCAL("); 
+            printPtr((StgPtr)((StgInd*)obj)->indirectee);
+            debugBelch(")\n"); 
+            break;
+
     case IND_PERM:
             debugBelch("IND("); 
             printPtr((StgPtr)((StgInd*)obj)->indirectee);
@@ -304,12 +310,12 @@ printClosure( StgClosure *obj )
             break;
         }
 
-    case MUT_ARR_PTRS_CLEAN:
-	debugBelch("MUT_ARR_PTRS_CLEAN(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+    case MUT_ARR_PTRS_LOCAL:
+	debugBelch("MUT_ARR_PTRS_LOCAL(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
-    case MUT_ARR_PTRS_DIRTY:
-	debugBelch("MUT_ARR_PTRS_DIRTY(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
+    case MUT_ARR_PTRS_GLOBAL:
+	debugBelch("MUT_ARR_PTRS_GLOBAL(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:
@@ -324,17 +330,17 @@ printClosure( StgClosure *obj )
           break;
         }
 
-    case MUT_VAR_CLEAN:
+    case MUT_VAR_LOCAL:
         {
 	  StgMutVar* mv = (StgMutVar*)obj;
-	  debugBelch("MUT_VAR_CLEAN(var=%p)\n", mv->var);
+	  debugBelch("MUT_VAR_LOCAL(var=%p)\n", mv->var);
           break;
         }
 
-    case MUT_VAR_DIRTY:
+    case MUT_VAR_GLOBAL:
         {
 	  StgMutVar* mv = (StgMutVar*)obj;
-	  debugBelch("MUT_VAR_DIRTY(var=%p)\n", mv->var);
+	  debugBelch("MUT_VAR_GLOBAL(var=%p)\n", mv->var);
           break;
         }
 
@@ -898,69 +904,6 @@ extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 
 #endif /* HAVE_BFD_H */
 
-void findPtr(P_ p, int);		/* keep gcc -Wall happy */
-
-int searched = 0;
-
-static int
-findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
-{
-    StgPtr q, r, end;
-    for (; bd; bd = bd->link) {
-        searched++;
-        for (q = bd->start; q < bd->free; q++) {
-            if (UNTAG_CLOSURE((StgClosure*)*q) == (StgClosure *)p) {
-                if (i < arr_size) {
-                    for (r = bd->start; r < bd->free; r = end) {
-                        // skip over zeroed-out slop
-                        while (*r == 0) r++;
-                        if (!LOOKS_LIKE_CLOSURE_PTR(r)) {
-                            debugBelch("%p found at %p, no closure at %p\n",
-                                       p, q, r);
-                            break;
-                        }
-                        end = r + closure_sizeW((StgClosure*)r);
-                        if (q < end) {
-                            debugBelch("%p = ", r);
-                            printClosure((StgClosure *)r);
-                            arr[i++] = r;
-                            break;
-                        }
-                    }
-                    if (r >= bd->free) {
-                        debugBelch("%p found at %p, closure?", p, q);
-                    }
-                } else {
-                    return i;
-                }
-            }
-        }
-    }
-    return i;
-}
-
-void
-findPtr(P_ p, int follow)
-{
-  nat g;
-  bdescr *bd;
-  const int arr_size = 1024;
-  StgPtr arr[arr_size];
-  int i = 0;
-  searched = 0;
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      bd = generations[g].blocks;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
-      bd = generations[g].large_objects;
-      i = findPtrBlocks(p,bd,arr,arr_size,i);
-      if (i >= arr_size) return;
-  }
-  if (follow && i == 1) {
-      debugBelch("-->\n");
-      findPtr(arr[0], 1);
-  }
-}
 
 /* prettyPrintClosure() is for printing out a closure using the data constructor
    names found in the info tables. Closures are printed in a fashion that resembles
@@ -989,6 +932,7 @@ void prettyPrintClosure_ (StgClosure *obj)
            
     while (type == IND ||
            type == IND_STATIC ||
+           type == IND_LOCAL ||
            type == IND_PERM)
     {
       obj = ((StgInd *)obj)->indirectee;
@@ -1101,6 +1045,7 @@ char *closure_type_names[] = {
  [AP_STACK]              = "AP_STACK",
  [IND]                   = "IND",
  [IND_PERM]              = "IND_PERM",
+ [IND_LOCAL]             = "IND_LOCAL",
  [IND_STATIC]            = "IND_STATIC",
  [RET_BCO]               = "RET_BCO",
  [RET_SMALL]             = "RET_SMALL",
@@ -1116,12 +1061,12 @@ char *closure_type_names[] = {
  [MVAR_CLEAN]            = "MVAR_CLEAN",
  [MVAR_DIRTY]            = "MVAR_DIRTY",
  [ARR_WORDS]             = "ARR_WORDS",
- [MUT_ARR_PTRS_CLEAN]    = "MUT_ARR_PTRS_CLEAN",
- [MUT_ARR_PTRS_DIRTY]    = "MUT_ARR_PTRS_DIRTY",
+ [MUT_ARR_PTRS_LOCAL]    = "MUT_ARR_PTRS_LOCAL",
+ [MUT_ARR_PTRS_GLOBAL]   = "MUT_ARR_PTRS_GLOBAL",
  [MUT_ARR_PTRS_FROZEN0]  = "MUT_ARR_PTRS_FROZEN0",
  [MUT_ARR_PTRS_FROZEN]   = "MUT_ARR_PTRS_FROZEN",
- [MUT_VAR_CLEAN]         = "MUT_VAR_CLEAN",
- [MUT_VAR_DIRTY]         = "MUT_VAR_DIRTY",
+ [MUT_VAR_LOCAL]         = "MUT_VAR_LOCAL",
+ [MUT_VAR_GLOBAL]        = "MUT_VAR_GLOBAL",
  [WEAK]                  = "WEAK",
  [PRIM]	                 = "PRIM",
  [MUT_PRIM]              = "MUT_PRIM",

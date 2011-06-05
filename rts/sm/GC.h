@@ -23,16 +23,11 @@ typedef void (*evac_fn)(void *user, StgClosure **root);
 StgClosure * isAlive      ( StgClosure *p );
 void         markCAFs     ( evac_fn evac, void *user );
 
-extern nat N;
-extern rtsBool major_gc;
+StgPtr allocateInGen (Capability *cap, nat gen_ix, nat size);
 
-extern bdescr *mark_stack_bd;
-extern bdescr *mark_stack_top_bd;
-extern StgPtr mark_sp;
-
-extern long copied;
-
-extern rtsBool work_stealing;
+extern rtsBool major_gc;       // collecting the oldest gen?
+extern rtsBool work_stealing;  // work stealing is enabled?
+extern nat     next_gc_gen;    // generation to collect next time
 
 #ifdef DEBUG
 extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
@@ -50,6 +45,9 @@ void freeGcThreads (void);
 void waitForGcThreads (Capability *cap);
 void releaseGCThreads (Capability *cap);
 #endif
+
+// used in globalise()
+void prepare_gen_workspace (nat g);
 
 #define WORK_UNIT_WORDS 128
 

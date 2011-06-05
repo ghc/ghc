@@ -341,7 +341,10 @@ mkRhsClosure	bndr cc bi
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
+
+    (_, _, params_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} 
+                                                 (addIdReps params)
+
 			-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset

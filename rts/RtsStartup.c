@@ -133,9 +133,6 @@ hs_init(int *argc, char **argv[])
 	setProgArgv(*argc,*argv);
     }
 
-    /* Initialise the stats department, phase 1 */
-    initStats1();
-
 #ifdef USE_PAPI
     papi_init();
 #endif
@@ -155,6 +152,12 @@ hs_init(int *argc, char **argv[])
 
     /* initialize the storage manager */
     initStorage();
+
+    /* Initialise the stats department, phase 1 */
+    initStats1();
+
+    /* after the storage manager has been initialised */
+    startWorkers();
 
     /* initialise the stable pointer table */
     initStablePtrTable();
@@ -361,7 +364,7 @@ hs_exit_(rtsBool wait_foreign)
     exitScheduler(wait_foreign);
 
     /* run C finalizers for all active weak pointers */
-    runAllCFinalizers(weak_ptr_list);
+    runAllCFinalizers();
     
 #if defined(RTS_USER_SIGNALS)
     if (RtsFlags.MiscFlags.install_signal_handlers) {

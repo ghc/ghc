@@ -109,6 +109,9 @@
 #define UNTAG(p) (p & ~TAG_MASK)
 #define GETTAG(p) (p & TAG_MASK)
 
+#define IS_FORWARDING_PTR(p) (((p) & 1) != 0)
+#define UN_FORWARDING_PTR(p) ((p) - 1)
+
 #if SIZEOF_INT == 4
 #define CInt bits32
 #elif SIZEOF_INT == 8
@@ -296,7 +299,7 @@
   case							\
     IND,						\
     IND_PERM,						\
-    IND_STATIC:						\
+    IND_STATIC:                                         \
    {							\
       P1 = StgInd_indirectee(P1);			\
       goto again;					\
@@ -383,8 +386,8 @@
 // allocate() - this includes many of the primops.
 #define MAYBE_GC(liveness,reentry)			\
     if (bdescr_link(CurrentNursery) == NULL || \
-        generation_n_new_large_words(W_[g0]) >= CLong[large_alloc_lim]) {   \
-	R9  = liveness;					\
+        generation_n_new_large_words(StgRegTable_rG0(BaseReg)) >= CLong[large_alloc_lim]) {   \
+        R9  = liveness;                                 \
         R10 = reentry;					\
         HpAlloc = 0;					\
         jump stg_gc_gen_hp;				\
@@ -431,7 +434,8 @@
 /* Debugging macros */
 #define LOOKS_LIKE_INFO_PTR(p)                                  \
    ((p) != NULL &&                                              \
-    LOOKS_LIKE_INFO_PTR_NOT_NULL(p))
+   (IS_FORWARDING_PTR(p) ||                                     \
+   LOOKS_LIKE_INFO_PTR_NOT_NULL(p)))
 
 #define LOOKS_LIKE_INFO_PTR_NOT_NULL(p)                         \
    ( (TO_W_(%INFO_TYPE(%STD_INFO(p))) != INVALID_OBJECT) &&     \
@@ -466,6 +470,9 @@
 
 #define mutArrPtrsCardWords(n) \
     ROUNDUP_BYTES_TO_WDS(((n) + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) >> MUT_ARR_PTRS_CARD_BITS)
+
+#define isGlobalPrim(bd,p) \
+    (TO_W_(bdescr_gen_ix(bd)) >= TO_W_(CInt[global_gen_ix]) || (W_[(p) - WDS(1)] != 0))
 
 #if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")

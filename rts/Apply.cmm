@@ -120,10 +120,15 @@ for:
   // Off we go! 
   TICK_ENT_VIA_NODE();
 
+  W_ info;
+  info = %INFO_PTR(UNTAG(R1));
+  if (IS_FORWARDING_PTR(info)) {
+      R1 = UN_FORWARDING_PTR(info) | GETTAG(R1);
+  }
+
 #ifdef NO_ARG_REGS
   jump %GET_ENTRY(UNTAG(R1));
 #else
-      W_ info;
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
@@ -197,10 +202,15 @@ for:
   // Off we go! 
   TICK_ENT_VIA_NODE();
 
+  W_ info;
+  info = %INFO_PTR(UNTAG(R1));
+  if (IS_FORWARDING_PTR(info)) {
+      R1 = UN_FORWARDING_PTR(info) | GETTAG(R1);
+  }
+
 #ifdef NO_ARG_REGS
   jump %GET_ENTRY(UNTAG(R1));
 #else
-      W_ info;
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
@@ -267,10 +277,15 @@ for:
   // Off we go! 
   TICK_ENT_VIA_NODE();
 
+  W_ info;
+  info = %INFO_PTR(UNTAG(R1));
+  if (IS_FORWARDING_PTR(info)) {
+      R1 = UN_FORWARDING_PTR(info) | GETTAG(R1);
+  }
+
 #ifdef NO_ARG_REGS
   jump %GET_ENTRY(UNTAG(R1));
 #else
-      W_ info;
       info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));

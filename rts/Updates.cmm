@@ -48,9 +48,9 @@ INFO_TABLE_RET( stg_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
     /* ToDo: it might be a PAP, so we should check... */
     TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));
     
-    updateWithIndirection(updatee,
-                          R1,
-                          jump %ENTRY_CODE(Sp(0)));
+    updateWithIndirectionToValue(updatee,
+                                 R1,
+                                 jump %ENTRY_CODE(Sp(0)));
 }
 
 
@@ -77,9 +77,9 @@ INFO_TABLE_RET( stg_marked_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 
     // common case: it is still our BLACKHOLE
     if (v == CurrentTSO) {
-        updateWithIndirection(updatee,
-                              R1,
-                              jump %ENTRY_CODE(Sp(0)));
+        updateWithIndirectionToValue(updatee,
+                                     R1,
+                                     jump %ENTRY_CODE(Sp(0)));
     }
 
     // The other cases are all handled by the generic code

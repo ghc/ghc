@@ -27,7 +27,7 @@ module CgMonad (
 	forkLabelledCode,
 	forkClosureBody, forkStatics, forkAlts, forkEval,
 	forkEvalHelp, forkProc, codeOnly,
-	SemiTaggingStuff, ConTagZ,
+	ConTagZ,
 
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
@@ -169,15 +169,9 @@ data Sequel
   = OnStack 		-- Continuation is on the stack
 
   | CaseAlts
-	  CLabel     -- Jump to this; if the continuation is for a vectored
-		     -- case this might be the label of a return vector
-	  SemiTaggingStuff
+	  CLabel     -- Jump to this
 	  Id	      -- The case binder, only used to see if it's dead
-
-type SemiTaggingStuff
-  = Maybe			-- Maybe[1] we don't have any semi-tagging stuff...
-     ([(ConTagZ, CmmLit)],	-- Alternatives
-      CmmLit)			-- Default (will be a can't happen RTS label if can't happen)
+          Int         -- family size
 
 type ConTagZ = Int	-- A *zero-indexed* contructor tag
 

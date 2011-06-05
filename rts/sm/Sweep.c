@@ -16,7 +16,9 @@
 
 #include "BlockAlloc.h"
 #include "Sweep.h"
+#include "Compact.h"
 #include "Trace.h"
+#include "GCUtils.h"
 
 void
 sweep(generation *gen)
@@ -83,4 +85,94 @@ sweep(generation *gen)
           (unsigned long)((blocks - freed) == 0 ? 0 : ((live / BLOCK_SIZE_W) * 100) / (blocks - freed)));
 
     ASSERT(countBlocks(gen->old_blocks) == gen->n_old_blocks);
+}
+
+
+typedef enum { Empty, LiveLocal, LiveGlobal } IsEmpty;
+
+static IsEmpty
+empty (bdescr *bd)
+{
+    StgPtr p;
+    StgWord flag, size;
+    IsEmpty is_empty;
+    
+    is_empty = Empty;
+    p = bd->start;
+    while (p < bd->free) {
+        flag = *p;
+        p += 1;
+        switch (flag) {
+        case 0: // not global
+            size = closure_sizeW((StgClosure*)p);
+            if (!is_marked(p,bd)) {
+                *(p-1) = size+2;
+            } else {
+                is_empty = LiveLocal;
+            }
+            p += size;
+            break;
+        case 1: // global
+#ifndef DEBUG
+            // in DEBUG, we need to sweep the whole lot, for sanity checking
+            return LiveGlobal;
+#else
+            is_empty = LiveGlobal;
+            p += closure_sizeW((StgClosure*)p);
+#endif
+            break;
+        default: // reclaimed free space of size 'flag-2'
+            p += flag-2;
+            break;
+        }
+    }
+
+    return is_empty;
+}
+
+void
+sweepPrimArea (generation *gen)
+{
+    bdescr *bd, *prev, *next;
+
+    prev = NULL;
+    for (bd = gen->prim_blocks; bd != NULL; bd = next)
+    {
+        next = bd->link;
+
+        // The BF_GLOBAL flag indicates that this block contains one
+        // or more global objects.  There's no point in sweeping it,
+        // because we can't free the block.
+#ifndef DEBUG
+        // Not in DEBUG mode: we might need to sanity-check the prim
+        // heap, so we need to sweep the free areas.
+        if (bd->flags & BF_GLOBAL) {
+            prev = bd;
+            continue;
+        }
+#endif
+
+        switch (empty(bd)) {
+        case Empty:
+            if (prev == NULL) {
+                gen->prim_blocks = next;
+            } else {
+                prev->link = next;
+            }
+            debugTrace(DEBUG_gc, "sweepPrimArea: free block at %p", bd->start);
+            gen->n_prim_blocks -= bd->blocks;
+            freeGroup_sync(bd);
+            break;
+
+        case LiveGlobal:
+            bd->flags |= BF_GLOBAL;
+            // fall through
+        case LiveLocal:
+            prev = bd;
+            break;
+        }
+    }
+
+    IF_DEBUG(sanity, ASSERT(countBlocks(gen->prim_blocks) == gen->n_prim_blocks));
+    
 }

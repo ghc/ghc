@@ -876,6 +876,7 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case CONSTR:
 	    case FUN:
 	    case IND_PERM:
+	    case IND_LOCAL:
 	    case BLACKHOLE:
 	    case BLOCKING_QUEUE:
 	    case FUN_1_0:
@@ -912,8 +913,8 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case WEAK:
 	    case PRIM:
 	    case MUT_PRIM:
-	    case MUT_VAR_CLEAN:
-	    case MUT_VAR_DIRTY:
+	    case MUT_VAR_LOCAL:
+	    case MUT_VAR_GLOBAL:
 		prim = rtsTrue;
 		size = sizeW_fromITBL(info);
 		break;
@@ -935,8 +936,8 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = arr_words_sizeW((StgArrWords*)p);
 		break;
 		
-	    case MUT_ARR_PTRS_CLEAN:
-	    case MUT_ARR_PTRS_DIRTY:
+	    case MUT_ARR_PTRS_LOCAL:
+	    case MUT_ARR_PTRS_GLOBAL:
 	    case MUT_ARR_PTRS_FROZEN:
 	    case MUT_ARR_PTRS_FROZEN0:
 		prim = rtsTrue;
@@ -1075,11 +1076,11 @@ heapCensus( void )
 #endif
 
   // Traverse the heap, collecting the census info
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      heapCensusChain( census, generations[g].blocks );
+  for (g = 0; g < total_generations; g++) {
+      heapCensusChain( census, all_generations[g].blocks );
       // Are we interested in large objects?  might be
       // confusing to include the stack in a heap profile.
-      heapCensusChain( census, generations[g].large_objects );
+      heapCensusChain( census, all_generations[g].large_objects );
   }
 
   // dump out the census info

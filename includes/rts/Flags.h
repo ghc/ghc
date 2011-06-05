@@ -36,6 +36,7 @@ struct GC_FLAGS {
     nat     minAllocAreaSize;   /* in *blocks* */
     nat     minOldGenSize;      /* in *blocks* */
     nat     heapSizeSuggestion; /* in *blocks* */
+    nat     fixedAllocHeapSizeSuggestion; /* in *blocks* */
     rtsBool heapSizeSuggestionAuto;
     double  oldGenFactor;
     double  pcFreeHeap;
@@ -74,6 +75,7 @@ struct DEBUG_FLAGS {
     rtsBool squeeze;        /* 'z'  stack squeezing & lazy blackholing */
     rtsBool hpc; 	    /* 'c' coverage */
     rtsBool sparks; 	    /* 'r' */
+    rtsBool mallocleaks;    /* 'k' */
 };
 
 struct COST_CENTRE_FLAGS {

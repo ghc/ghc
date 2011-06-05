@@ -399,7 +399,7 @@ cgEvalAlts cc_slot bndr alt_type@(PrimAlt tycon) alts
 		; cgPrimAlts GCMayHappen alt_type reg alts }
 
 	; lbl <- emitReturnTarget (idName bndr) abs_c
-	; returnFC (CaseAlts lbl Nothing bndr) }
+	; returnFC (CaseAlts lbl bndr 0) }
 
 cgEvalAlts cc_slot bndr (UbxTupAlt _) [(con,args,_,rhs)]
   =	-- Unboxed tuple case
@@ -421,7 +421,7 @@ cgEvalAlts cc_slot bndr (UbxTupAlt _) [(con,args,_,rhs)]
 		; unbxTupleHeapCheck live_regs ptrs nptrs noStmts
 				     (cgExpr rhs) }
 	; lbl <- emitReturnTarget (idName bndr) abs_c
-	; returnFC (CaseAlts lbl Nothing bndr) }
+	; returnFC (CaseAlts lbl bndr 0) }
 
 cgEvalAlts cc_slot bndr alt_type alts
   = 	-- Algebraic and polymorphic case
@@ -439,10 +439,9 @@ cgEvalAlts cc_slot bndr alt_type alts
 
 	; (alts, mb_deflt) <- cgAlgAlts GCMayHappen cc_slot alt_type alts
 
-	; (lbl, branches) <- emitAlgReturnTarget (idName bndr) 
-				alts mb_deflt fam_sz
+	; lbl <- emitAlgReturnTarget (idName bndr) alts mb_deflt fam_sz
 
-	; returnFC (CaseAlts lbl branches bndr) }
+	; returnFC (CaseAlts lbl bndr fam_sz) }
   where
     fam_sz = case alt_type of
     		AlgAlt tc -> tyConFamilySize tc

@@ -308,10 +308,15 @@ stg_killThreadzh
 	W_ msg;
 	out = Sp - WDS(1); /* ok to re-use stack space here */
 
+        SAVE_THREAD_STATE();
 	(msg) = foreign "C" throwTo(MyCapability() "ptr",
                                     CurrentTSO "ptr",
                                     target "ptr",
                                     exception "ptr") [R1,R2];
+
+        // throwTo may have to globalise the current TSO and the
+        // target, so make sure we get the new ones:
+        LOAD_THREAD_STATE();
 	
         if (msg == NULL) {
 	    jump %ENTRY_CODE(Sp(0));

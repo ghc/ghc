@@ -15,5 +15,6 @@
 #define SM_SWEEP_H
 
 RTS_PRIVATE void sweep(generation *gen);
+RTS_PRIVATE void sweepPrimArea (generation *gen);
 
 #endif /* SM_SWEEP_H */

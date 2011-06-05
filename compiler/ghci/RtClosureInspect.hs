@@ -202,7 +202,7 @@ readCType i
  | i' == aP_CODE                           = AP
  | i == AP_STACK                           = AP
  | i' == pAP_CODE                          = PAP
- | i == MUT_VAR_CLEAN || i == MUT_VAR_DIRTY= MutVar i'
+ | i == MUT_VAR_LOCAL || i == MUT_VAR_GLOBAL= MutVar i'
  | i == MVAR_CLEAN    || i == MVAR_DIRTY   = MVar i'
  | otherwise                               = Other  i'
   where i' = fromIntegral i

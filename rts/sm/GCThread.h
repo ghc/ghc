@@ -15,6 +15,7 @@
 #define SM_GCTHREAD_H
 
 #include "WSDeque.h"
+#include "GetTime.h" // for Ticks
 
 #include "BeginPrivate.h"
 
@@ -115,13 +116,19 @@ typedef struct gen_workspace_ {
    ------------------------------------------------------------------------- */
 
 typedef struct gc_thread_ {
+    Capability *cap;
+
 #ifdef THREADED_RTS
-    OSThreadId id;                 // The OS thread that this struct belongs to
     SpinLock   gc_spin;
     SpinLock   mut_spin;
     volatile rtsBool wakeup;
+
+    Mutex local_gc_lock;
 #endif
-    nat thread_index;              // a zero based index identifying the thread
+    nat index;                     // a zero based index identifying the thread
+                                   // equal to cap->no
+
+    generation *localg0;           // The local G0 for this Capability
 
     bdescr * free_blocks;          // a buffer of free blocks for this thread
                                    //  during GC without accessing the block
@@ -146,7 +153,7 @@ typedef struct gc_thread_ {
     // --------------------
     // evacuate flags
 
-    nat evac_gen_no;               // Youngest generation that objects
+    nat evac_gen_ix;               // Youngest generation that objects
                                    // should be evacuated to in
                                    // evacuate().  (Logically an
                                    // argument to evacuate, but it's
@@ -162,7 +169,35 @@ typedef struct gc_thread_ {
                                    // instead of the to-space
                                    // corresponding to the object
 
-    lnat thunk_selector_depth;     // ummm.... not used as of now
+    lnat thunk_selector_depth;     // used to avoid unbounded recursion in 
+                                   // evacuate() for THUNK_SELECTOR
+
+    nat collect_gen;               // maximum generation (no) to collect
+
+    nat gc_type;                   // The gc type (GC_SEQ, GC_PAR, GC_LOCAL)
+
+    rtsBool globalise_thunks;      // whether to globalise THUNK objects
+
+    StgTSO *resurrected_threads;   // threads found to be unreachable,
+                                   // linked by ->global_link field.
+
+    StgTSO *exception_threads;     // List of blocked threads found to
+                                   // have pending throwTos
+
+    /* Which stage of processing various kinds of weak pointer are we at?
+     * (see traverse_weak_ptr_list() below for discussion).
+     */
+    enum { WeakPtrs, WeakThreads, WeakDone } weak_stage;
+
+    StgWeak *old_weak_ptrs;
+
+    // --------------------
+    // The mark stack
+
+    bdescr *mark_stack_top_bd; // topmost block in the mark stack
+    bdescr *mark_stack_bd;     // current block in the mark stack
+    StgPtr mark_sp;            // pointer to the next unallocated mark
+                               // stack entry
 
 #ifdef USE_PAPI
     int papi_events;
@@ -173,14 +208,20 @@ typedef struct gc_thread_ {
 
     lnat copied;
     lnat scanned;
+    lnat globalised;
     lnat any_work;
     lnat no_work;
     lnat scav_find_work;
 
+    Ticks gc_start_cpu;   // process CPU time
+    Ticks gc_start_elapsed;  // process elapsed time
+    Ticks gc_start_thread_cpu; // thread CPU time
+    lnat gc_start_faults;
+
     // -------------------
     // workspaces
 
-    // array of workspaces, indexed by stp->abs_no.  This is placed
+    // array of workspaces, indexed by gen->abs_no.  This is placed
     // directly at the end of the gc_thread structure so that we can get from
     // the gc_thread pointer to a workspace using only pointer
     // arithmetic, no memory access.  This happens in the inner loop
@@ -191,90 +232,7 @@ typedef struct gc_thread_ {
 
 extern nat n_gc_threads;
 
-/* -----------------------------------------------------------------------------
-   The gct variable is thread-local and points to the current thread's
-   gc_thread structure.  It is heavily accessed, so we try to put gct
-   into a global register variable if possible; if we don't have a
-   register then use gcc's __thread extension to create a thread-local
-   variable.
-
-   Even on x86 where registers are scarce, it is worthwhile using a
-   register variable here: I measured about a 2-5% slowdown with the
-   __thread version.
-   -------------------------------------------------------------------------- */
-
 extern gc_thread **gc_threads;
-
-#if defined(THREADED_RTS)
-
-#define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
-
-#define SET_GCT(to) gct = (to)
-
-
-
-#if (defined(i386_HOST_ARCH) && defined(linux_HOST_OS))
-// Using __thread is better than stealing a register on x86/Linux, because
-// we have too few registers available.  In my tests it was worth
-// about 5% in GC performance, but of course that might change as gcc
-// improves. -- SDM 2009/04/03
-//
-// We ought to do the same on MacOS X, but __thread is not
-// supported there yet (gcc 4.0.1).
-
-extern __thread gc_thread* gct;
-#define DECLARE_GCT __thread gc_thread* gct;
-
-
-#elif defined(sparc_HOST_ARCH)
-// On SPARC we can't pin gct to a register. Names like %l1 are just offsets
-//	into the register window, which change on each function call.
-//	
-//	There are eight global (non-window) registers, but they're used for other purposes.
-//	%g0     -- always zero
-//	%g1     -- volatile over function calls, used by the linker
-//	%g2-%g3 -- used as scratch regs by the C compiler (caller saves)
-//	%g4	-- volatile over function calls, used by the linker
-//	%g5-%g7	-- reserved by the OS
-
-extern __thread gc_thread* gct;
-#define DECLARE_GCT __thread gc_thread* gct;
-
-
-#elif defined(REG_Base) && !defined(i386_HOST_ARCH)
-// on i386, REG_Base is %ebx which is also used for PIC, so we don't
-// want to steal it
-
-GLOBAL_REG_DECL(gc_thread*, gct, REG_Base)
-#define DECLARE_GCT /* nothing */
-
-
-#elif defined(REG_R1)
-
-GLOBAL_REG_DECL(gc_thread*, gct, REG_R1)
-#define DECLARE_GCT /* nothing */
-
-
-#elif defined(__GNUC__)
-
-extern __thread gc_thread* gct;
-#define DECLARE_GCT __thread gc_thread* gct;
-
-#else
-
-#error Cannot find a way to declare the thread-local gct
-
-#endif
-
-#else  // not the threaded RTS
-
-extern StgWord8 the_gc_thread[];
-
-#define gct ((gc_thread*)&the_gc_thread)
-#define SET_GCT(to) /*nothing*/
-#define DECLARE_GCT /*nothing*/
-
-#endif
 
 #include "EndPrivate.h"
 

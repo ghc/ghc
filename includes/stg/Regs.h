@@ -81,7 +81,8 @@ typedef struct StgRegTable_ {
   StgPtr 	  rHp;
   StgPtr 	  rHpLim;
   struct StgTSO_ *     rCurrentTSO;
-  struct nursery_ *    rNursery;
+  struct nursery_ *    rNursery;        /* nursery struct */
+  struct generation_ * rG0;             /* the local generation 0 */
   struct bdescr_ *     rCurrentNursery; /* Hp/HpLim point into this block */
   struct bdescr_ *     rCurrentAlloc;   /* for allocation using allocate() */
   StgWord         rHpAlloc;	/* number of *bytes* being allocated in heap */

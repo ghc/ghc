@@ -240,6 +240,7 @@ typedef struct {
 #define BCO_BITMAP_SIZEW(bco) ((BCO_BITMAP_SIZE(bco) + BITS_IN(StgWord) - 1) \
 			        / BITS_IN(StgWord))
 
+
 /* -----------------------------------------------------------------------------
    Dynamic stack frames for generic heap checks.
 
@@ -388,7 +389,8 @@ typedef struct {
 typedef struct StgTRecChunk_ {
   StgHeader                  header;
   struct StgTRecChunk_      *prev_chunk;
-  StgWord                    next_entry_idx;
+  StgHalfWord                next_entry_idx;
+  StgHalfWord                cap_no; // which Capability this TRec belongs to
   TRecEntry                  entries[TREC_CHUNK_NUM_ENTRIES];
 } StgTRecChunk;
 
@@ -412,7 +414,8 @@ struct StgTRecHeader_ {
   struct StgTRecHeader_     *enclosing_trec;
   StgTRecChunk              *current_chunk;
   StgInvariantCheckQueue    *invariants_to_check;
-  TRecState                  state;
+  StgHalfWord                state;
+  StgHalfWord                cap_no; // which Capability this TRec belongs to
 };
 
 typedef struct {
@@ -464,5 +467,12 @@ typedef struct MessageBlackHole_ {
     StgTSO     *tso;
     StgClosure *bh;
 } MessageBlackHole;
+
+typedef struct MessageGlobalise_ {
+    StgHeader        header;
+    struct Message_ *link;
+    StgTSO          *tso;
+    StgClosure      *req; // closure to globalise
+} MessageGlobalise;
 
 #endif /* RTS_STORAGE_CLOSURES_H */

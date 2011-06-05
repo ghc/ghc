@@ -17,7 +17,7 @@
 #include "Capability.h"
 #include "Trace.h"
 #include "Schedule.h"
-// DO NOT include "GCThread.h", we don't want the register variable
+// DO NOT include "GCTDecl.h", we don't want the register variable
 
 /* -----------------------------------------------------------------------------
    isAlive determines whether the given closure is still alive (after
@@ -63,6 +63,17 @@ isAlive(StgClosure *p)
     // if it's a pointer into to-space, then we're done
     if (bd->flags & BF_EVACUATED) {
 	return p;
+    }
+
+    // BF_PRIM things can be either copied or marked, depending on
+    // kind of GC we're doing, so we check for both here.
+    if (bd->flags & BF_PRIM) {
+        info = q->header.info;
+        if (is_marked((P_)q,bd) || isGlobalPrim(q)) {
+            return p;
+        } else {
+            return NULL;
+        }
     }
 
     // large objects use the evacuated flag
@@ -138,3 +149,4 @@ markCAFs (evac_fn evac, void *user)
 	evac(user, &c->indirectee);
     }
 }
+

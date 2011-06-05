@@ -568,20 +568,18 @@ link_caf cl_info _is_upd = do
   ; hp_offset <- allocDynClosure bh_cl_info use_cc blame_cc [(tso,fixedHdrSize)]
   ; hp_rel    <- getHpRelOffset hp_offset
 
-	-- Call the RTS function newCAF to add the CAF to the CafList
-	-- so that the garbage collector can find them
+	-- Call the RTS function newCAF.  This:
+        --   - creates an IND_LOCAL to point to the local BH
+        --   - updates the CAF with an IND_STATIC pointing to the IND_LOCAL
+        --   - adds the CAF to the CAF list if necessary
 	-- This must be done *before* the info table pointer is overwritten, 
 	-- because the old info table ptr is needed for reversion
   ; emitRtsCallWithVols rtsPackageId (fsLit "newCAF")
       [ CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint,
-        CmmHinted (CmmReg nodeReg) AddrHint ]
+        CmmHinted (CmmReg nodeReg) AddrHint,
+        CmmHinted hp_rel AddrHint ]
       [node] False
 	-- node is live, so save it.
-
-	-- Overwrite the closure with a (static) indirection 
-	-- to the newly-allocated black hole
-  ; stmtsC [ CmmStore (cmmRegOffW nodeReg off_indirectee) hp_rel
-	   , CmmStore (CmmReg nodeReg) ind_static_info ]
 
   ; returnFC hp_rel }
   where

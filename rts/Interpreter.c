@@ -277,6 +277,7 @@ eval_obj:
 
     case IND:
     case IND_PERM:
+    case IND_LOCAL:
     case IND_STATIC:
     { 
 	tagged_obj = ((StgInd*)obj)->indirectee;

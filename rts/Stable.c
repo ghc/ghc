@@ -14,6 +14,7 @@
 #include "RtsUtils.h"
 #include "Trace.h"
 #include "Stable.h"
+#include "sm/Globalise.h"
 
 /* Comment from ADR's implementation in old RTS:
 
@@ -188,6 +189,7 @@ removeIndirections(StgClosure* p)
 
   while (get_itbl(q)->type == IND ||
          get_itbl(q)->type == IND_STATIC ||
+         get_itbl(q)->type == IND_LOCAL ||
          get_itbl(q)->type == IND_PERM) {
       q = ((StgInd *)q)->indirectee;
       tag = GET_CLOSURE_TAG(q);
@@ -202,6 +204,7 @@ lookupStableName_(StgPtr p)
 {
   StgWord sn;
   void* sn_tmp;
+  Task *task;
 
   if (stable_ptr_free == NULL) {
     enlargeStablePtrTable();
@@ -211,6 +214,13 @@ lookupStableName_(StgPtr p)
    * of finding a match in the stable name hash table.
    */
   p = (StgPtr)removeIndirections((StgClosure*)p);
+
+  // Globalise the pointer, since the stable pointer table is a global
+  // set of roots.
+  task = myTask(); // sometimes called for static closures without a Task
+  if (task != NULL) {
+      globalise(task->cap, (StgClosure**)&p);
+  }
 
   // register the untagged pointer.  This just makes things simpler.
   p = (StgPtr)UNTAG_CLOSURE((StgClosure*)p);

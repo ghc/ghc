@@ -94,6 +94,10 @@ struct Capability_ {
 
     // Messages, or END_TSO_QUEUE.
     Message *inbox;
+    nat n_inbox;
+#if 0
+    rtsBool await_reply;
+#endif
 
     SparkPool *sparks;
 
@@ -140,8 +144,10 @@ struct Capability_ {
 #define ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)	\
   ASSERT(cap->run_queue_hd == END_TSO_QUEUE ?		\
 	    cap->run_queue_tl == END_TSO_QUEUE : 1);	\
-  ASSERT(myTask() == task);				\
-  ASSERT_TASK_ID(task);
+  if (task != NULL) {                                   \
+     ASSERT(myTask() == task);                          \
+     ASSERT_TASK_ID(task);                              \
+  }
 
 // Converts a *StgRegTable into a *Capability.
 //
@@ -190,8 +196,9 @@ extern Capability *capabilities;
 extern Capability *last_free_capability;
 
 // GC indicator, in scope for the scheduler
-#define PENDING_GC_SEQ 1
-#define PENDING_GC_PAR 2
+#define GC_SEQ   1
+#define GC_PAR   2
+#define GC_LOCAL 3
 extern volatile StgWord waiting_for_gc;
 
 // Acquires a capability at a return point.  If *cap is non-NULL, then
@@ -205,9 +212,10 @@ extern volatile StgWord waiting_for_gc;
 //
 void waitForReturnCapability (Capability **cap/*in/out*/, Task *task);
 
-EXTERN_INLINE void recordMutableCap (StgClosure *p, Capability *cap, nat gen);
+EXTERN_INLINE void recordMutableCap (Capability *cap, StgClosure *p, nat gen);
 
 EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
+EXTERN_INLINE void recordClosureMutated_ (Capability *cap, StgClosure *p);
 
 #if defined(THREADED_RTS)
 
@@ -278,9 +286,11 @@ INLINE_HEADER void contextSwitchCapability(Capability *cap);
 void freeCapabilities (void);
 
 // For the GC:
-void markSomeCapabilities (evac_fn evac, void *user, nat i0, nat delta, 
-                           rtsBool no_mark_sparks);
+void markCapability (evac_fn evac, void *user, Capability *cap,
+                     rtsBool no_mark_sparks USED_IF_THREADS);
+
 void markCapabilities (evac_fn evac, void *user);
+
 void traverseSparkQueues (evac_fn evac, void *user);
 
 /* -----------------------------------------------------------------------------
@@ -298,32 +308,46 @@ INLINE_HEADER rtsBool emptyInbox(Capability *cap);;
  * -------------------------------------------------------------------------- */
 
 EXTERN_INLINE void
-recordMutableCap (StgClosure *p, Capability *cap, nat gen)
+recordMutableCap (Capability *cap, StgClosure *p, nat gen_no)
 {
     bdescr *bd;
 
     // We must own this Capability in order to modify its mutable list.
     //    ASSERT(cap->running_task == myTask());
     // NO: assertion is violated by performPendingThrowTos()
-    bd = cap->mut_lists[gen];
+    bd = cap->mut_lists[gen_no];
     if (bd->free >= bd->start + BLOCK_SIZE_W) {
 	bdescr *new_bd;
 	new_bd = allocBlock_lock();
 	new_bd->link = bd;
 	bd = new_bd;
-	cap->mut_lists[gen] = bd;
+	cap->mut_lists[gen_no] = bd;
     }
     *bd->free++ = (StgWord)p;
 }
 
-EXTERN_INLINE void
-recordClosureMutated (Capability *cap, StgClosure *p)
-{
-    bdescr *bd;
-    bd = Bdescr((StgPtr)p);
-    if (bd->gen_no != 0) recordMutableCap(p,cap,bd->gen_no);
-}
+/*
+ * Not currently called, but might be required in the future if we
+ * have multiple local generations.
+ */
+// EXTERN_INLINE void
+// recordClosureMutated (Capability *cap, StgClosure *p)
+// {
+//     bdescr *bd;
+//     bd = Bdescr((StgPtr)p);
+//     if (bd->gen_no != 0) {
+//         barf("recordClosureMutated", cap); // recordMutableCap(cap,p,bd->gen_no);
+//     } 
+// }
 
+// For TSO and IND_LOCALs:
+EXTERN_INLINE void
+recordClosureMutated_ (Capability *cap, StgClosure *p)
+{
+    if (isGlobal(p)) {
+        recordMutableCap(cap,p,global_gen_no); // XXX gen wrong
+    } 
+}
 
 #if defined(THREADED_RTS)
 INLINE_HEADER rtsBool

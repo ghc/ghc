@@ -8,7 +8,8 @@
 
 #include "BeginPrivate.h"
 
-nat messageBlackHole(Capability *cap, MessageBlackHole *msg);
+nat  messageBlackHole (Capability *cap, MessageBlackHole *msg);
+nat  messageGlobalise (Capability *cap, StgTSO *tso, StgClosure *p, nat owner);
 StgTSO * blackHoleOwner (StgClosure *bh);
 
 #ifdef THREADED_RTS
@@ -22,7 +23,8 @@ void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 INLINE_HEADER void
 doneWithMsgThrowTo (MessageThrowTo *m)
 {
-    OVERWRITING_CLOSURE((StgClosure*)m);
+    overwritingPrimClosure((StgClosure*)m,
+                           sizeofW(MessageThrowTo), sizeofW(Message));
     unlockClosure((StgClosure*)m, &stg_MSG_NULL_info);
     LDV_RECORD_CREATE(m);
 }

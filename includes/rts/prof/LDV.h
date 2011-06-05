@@ -16,6 +16,8 @@
 
 #ifdef PROFILING
 
+void LDV_recordDead (StgClosure *c, nat size);
+
 /* retrieves the LDV word from closure c */
 #define LDVW(c)                 (((StgClosure *)(c))->header.prof.hp.ldvw)
 
@@ -33,6 +35,9 @@
 
 #else
 
+#define LDV_RECORD_DEAD(c,size) \
+    LDV_recordDead((StgClosure *)(p), size);
+
 #define LDV_RECORD_CREATE(c)   \
   LDVW((c)) = ((StgWord)RTS_DEREF(era) << LDV_SHIFT) | LDV_STATE_CREATE
 
@@ -40,7 +45,8 @@
 
 #else  /* !PROFILING */
 
-#define LDV_RECORD_CREATE(c)   /* nothing */
+#define LDV_RECORD_CREATE(c)    /* nothing */
+#define LDV_RECORD_DEAD(c,size) /* nothing */
 
 #endif /* PROFILING */
 

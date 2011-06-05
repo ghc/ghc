@@ -75,8 +75,8 @@ typedef struct bdescr_ {
     struct generation_ *gen;   // generation
 
     StgWord16 gen_no;          // gen->no, cached
-    StgWord16 dest_no;         // number of destination generation
-    StgWord16 _pad1;
+    StgWord16 gen_ix;          // gen->ix, cached
+    StgWord16 dest_ix;         // ix of destination generation
 
     StgWord16 flags;           // block flags, see below
 
@@ -119,6 +119,10 @@ typedef struct bdescr_ {
 #define BF_KNOWN     128
 /* Block was swept in the last generation */
 #define BF_SWEPT     256
+/* contains primitive objects */
+#define BF_PRIM      512
+/* contains global objects */
+#define BF_GLOBAL    1024
 
 /* Finding the block descriptor for a given block -------------------------- */
 

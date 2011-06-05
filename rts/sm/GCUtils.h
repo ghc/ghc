@@ -16,8 +16,12 @@
 
 #include "BeginPrivate.h"
 
-bdescr *allocBlock_sync(void);
-void    freeChain_sync(bdescr *bd);
+#include "GCTDecl.h"
+
+bdescr *allocBlock_sync (void);
+bdescr *allocGroup_sync (nat n);
+void    freeChain_sync  (bdescr *bd);
+void    freeGroup_sync  (bdescr *bd);
 
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);
 StgPtr  todo_block_full      (nat size, gen_workspace *ws);
@@ -42,6 +46,18 @@ isPartiallyFull(bdescr *bd)
 void printMutableList (bdescr *bd);
 #endif
 
+// returns True if the given generation index belongs to
+// another GC thread.
+INLINE_HEADER rtsBool isNonLocalGen (generation *gen)
+{
+    return (gen->is_local && gen->cap != gct->index);
+}
+
+INLINE_HEADER rtsBool isNonLocalGenIx (nat ix)
+{
+    return isNonLocalGen(&all_generations[ix]);
+}
+
 // Version of recordMutableGen for use during GC.  This uses the
 // mutable lists attached to the current gc_thread structure, which
 // are the same as the mutable lists on the Capability.
@@ -53,7 +69,7 @@ recordMutableGen_GC (StgClosure *p, nat gen_no)
     bd = gct->mut_lists[gen_no];
     if (bd->free >= bd->start + BLOCK_SIZE_W) {
 	bdescr *new_bd;
-	new_bd = allocBlock_sync();
+        new_bd = allocBlock_sync();
 	new_bd->link = bd;
 	bd = new_bd;
 	gct->mut_lists[gen_no] = bd;

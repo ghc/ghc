@@ -1,0 +1,726 @@
+-----------------------------------------------------------------------------
+-- Plan
+
+  - fix hangs in ray with localgc N=16/20
+
+  - nbody slower with -N1? Something recent in HEAD?
+
+  - measure CnC properly
+
+  - test a multicore HTTP server
+
+  - try to improve the message-queue locking.  Multiple writers should
+    be non-blocking.
+
+  - BLOCKING_QUEUE can point to IND_LOCAL instead of the BLACKHOLE,
+    assertion at Message.c:300 fails
+
+  - LinSolv has been broken by WEAK sparks
+  - transclos only seems to parallelise when not optimised :-(
+
+  - Don't steal another spark if we're waiting for a reply to
+    MSG_GLOBALISE on the first one (or maybe limit the number of
+    outstanding MSG_GLOBALISE messages before we stop stealing).
+
+  - running messageGlobalise eagerly is bad if the target is a BLACKHOLE
+
+  - check the perf of stage2 (need to compile it optimised)
+
+  - sort out where we allocate prim memory from.  Using the nursery is
+    a bit of a hack, and the nursery has to be resized after each
+    collection.
+
+  - calcAllocated: take into account allocations from allocatePrim().
+
+  - threadStackOverflow: hacky -1s to account for global flags
+
+  - PROFILING???
+    - selector thunks: must check for forwarding ptr before entering
+
+ - is HEAP_ALLOCED_GC() safe to call during local GC?
+
+ - no need to maintain the global heap invariant for non-THREADED_RTS
+   and when -N1.
+
+ - sparks: we should look through the IND_LOCAL when deciding whether
+   to fizzle a spark during GC.
+
+ - STM invariants
+
+ - Now can we do pinning of arbitrary objects?
+   - a BF_PINNED page gets mark-swept
+   - we want to support unpinning too: how can we tell when to unpin
+     the page again?
+
+-----------------------------------------------------------------------------
+Tuning
+
+  - Push down local_gc_lock further?  Do we have contention problems?
+    Measure.
+
+  - ray: using parBuffer 1000 much better than parBuffer 200 for -N8,
+    and we beat HEAD now.
+
+  - instead of setting failed_to_evac, just globalise_evac
+    immediately
+.
+  - sparks: can we do better than just globalising all sparks?
+    e.g. separate the spark pool into local and global pools
+
+  - if a Cap is idle, it should probably do a local GC, otherwise it
+    will keep receiving messages requesting globalisation.
+
+  - options for global mark bits:
+    - word before each object
+    - bitmap at the beginning of the block
+    - low bit in the info pointer
+
+  - GC'ing IND_LOCAL:
+    - can't squash it to IND when scavenging, because although the IND
+      may point to the global gen, it might refer transitively to
+      something in the local gen, so this is not safe until after
+      globalise_mut_list.
+    - in globalise_mut_list, we want to squash IND_LOCALs on the mut
+      list; might this need two passes?
+
+  - checking whether a closure pointer is global is too complex:
+
+       EXTERN_INLINE rtsBool isGlobal (StgClosure *p)
+       {
+           bdescr *bd;
+           bd = Bdescr((P_)p);
+           return bd->gen_no != 0 || ((bd->flags & BF_PRIM) && isGlobalPrim(p));
+       }
+
+        (used in globalise_wrt, checkMutableList, 
+         dirty_MUT_VAR, dirty_MUT_ARR, recordClosureMutated_)
+
+    how can we make this easier?
+
+    1. use MUT_VAR_GLOBAL iff the MUT_VAR is in the global gen,
+    otherwise use MUT_VAR_LOCAL.  Only MUT_VAR_GLOBAL writes need to
+    publish.  Inline dirty_MUT_VAR.
+
+    2. similarly for TSO: !tso->dirty means global and clean.
+
+    3. can omit the BF_PRIM check for objects we know to be prim.
+
+  - scavenge_mark_stack should probably set evac_gen_ix to the old gen
+    if the marked closure is global.
+
+  - the first time we sweep a prim block that has a global object in it,
+    mark the block BF_GLOBAL so we don't sweep it again?
+
+  - we could inline part of allocatePrim if newMVar, newMutVar
+    performance is important.
+
+  - An alternative: allocate prim objects in the nursery as normal,
+    but pin the whole block if they become global.  Other private
+    objects would be copied out of the block as normal.  The pinned
+    block then becomes part of the global heap (if we did Immix
+    marking then we could reclaim the free parts of the block).
+
+    We still have to mark individual objects as global/local, and we
+    can't use word-before-object.
+
+  - fix gc_bench: 38% slower
+
+-----------------------------------------------------------------------------
+Things to measure
+
+ - sendMessage to an idle processor: do the message eagerly or not?
+
+ - INBOX_THRESHOLD setting
+
+ - not eagerly promoting THUNKS: 
+     - on average 3% slower over nofib/gc, constraints +13%, power +11%.
+     - also slower with -A1m (similar results)
+     - power is the biggest culprit, because it does a lot of updates
+       where the value is a constructor with 2 thunk fields, so we make
+       2 IND_LOCALs rather than 1.
+
+ - single-threaded GC perf: most things got faster, gc_bench??
+
+ - publish vs. globalise vs. globalise-to-depth vs. globalise-but-not-thunks
+    - for updates
+    - for MUT_VAR / MUT_ARR / TVAR / MVAR
+    - IND_LOCAL on the mut list during GC
+    - sparks
+
+  - right now we're not promoting anything from the local prim heap
+    unless it is referred to by the global heap.  Is this the best
+    option?  Alternative: mark closures global in evacuate().
+
+  - different choices of where to store mark bits.
+
+  - sparks:
+    - keep a local spark pool and steal by messages, compared to
+      a global spark pool with a work-stealing queue.
+    - separate the spark pool into local and global pools
+
+  - allocating MSG_BLACKHOLE globally immediately, or globalise on
+    demand.
+
+  - code size impact of extra tag & fwd ptr checking   
+  - mutator impact (just the codeGen changes, no GC changes)
+
+-----------------------------------------------------------------------------
+-- Truly asynchronous globalisation
+
+ * Add a new per-CPU lock in the gc_thread: local_gc_lock.  This protects
+   the local heap during a GC: we allow concurrent globalise(), but a
+   local GC gets exclusive access to the heap.
+   - take it when doing a GC_LOCAL
+   - take it when globalising from another CPU.
+   - take it in globalise_TSO: in here we set the TSO_GLOBALISE flag
+     on the TSO, we don't want concurrent globalises to find this flag
+     set.
+
+ * we need a separate set of mut_lists to use when globalising data
+   from another processor's local heap.  These mut_lists are locked by
+   local_gc_lock.
+   - add cap->ext_mut_lists
+   - add recordMutableExt() in Capability.h
+
+ * add appropriate write_barrier()s in Globalise.c:copy_tag() etc.
+
+ * in globalise_maybe_record_mutable(), check whether we're recording
+   a mutable object that points to another cap's local heap, and use
+   ext_mut_lists if so.
+
+ * in atomicModifyIORef, writeIORef, we cannot be sure that the IORef
+   is not being globalised while we are modifying it, so we don't know
+   for sure whether we should globalise the value or not.  How to
+   solve this race condition?
+
+-----------------------------------------------------------------------------
+-- Plan, later
+
+* strange behaviour: iograph 30000 +RTS -H300m
+    612 MB total memory in use (190 MB lost due to fragmentation) ???
+
+* MUT_VAR_CLEAN and MUT_VAR_DIRTY aren't being used.  Decide what to
+  do about them.  (similarly for other clean/dirty pairs?)
+
+* Can we do globalise_capability_mut_lists() in the worker threads for
+  GC_PAR, rather than having the main thread do all of them?  The
+  problem is that mut_list entries might be on the wrong mut_list.
+
+* Clean up mutable arrays:
+  - card marking is unnecessary for an array in the global heap, because
+    we publish/globalise every pointer written into it
+
+* leaving an IND_LOCAL every time we write to a mutable object in the
+   global gen is bad, because we'll accumulate floating garbage from
+   all the old values.  Can we do anything at all here?
+   - for objects that already have a read barrier (e.g. MVar), we
+     could do better.
+
+* maybe we should have MUT_VAR_PUBLIC / MUT_VAR_PRIVATE?
+
+* Push down SM lock in GC.c
+  * GLOBALS that need locking in GC:
+    * threads lists attached to old generations (modified in tidyThreadList)
+    * gen->weak_ptrs lists
+    * gen->large_objects lists
+    * resurrectUnreachableThreads() can be pulled outside the lock, it only
+      touches the threads lists of generations collected.
+
+* XXX we broke LDV profiling in CgTailCall
+* XXX we probably don't need to duplicate the whole of Scav.c/Evac.c
+* XXX major_gc is global, we rely on it always being rtsFalse for local GC
+* XXX what to do about heapSizeSuggestion and resize_nursery: should
+  we resize the current nursery accoring to the amount of stuff that
+  was retained?
+* XXX -G1 is not compatible with -N2 and greater, becauser there would
+  be no global heap.
+* XXX should make publish() faster by inlining the allocation
+
+  * ToDo: check whether the interpreter looks at the info table of a
+    tagged closure
+
+- do more sanity checking:
+  - check for proper BF_EVACUATED flags on blocks
+
+-----------------------------------------------------------------------------
+-- STM
+
+  TRecHeader (MUT_PRIM) -> { TRecHeader enclosing, 
+                             TRecChunk, 
+                             InvariantCheckQueue }
+
+  * TRecHeaders must be visible to all Capabilities, because a TVar is
+    locked by writing a pointer to the current TRecHeader into the
+    tvar->current_value field.  Other Capabilities need to examine
+    this closure to check whether the TVar is locked.
+
+    Hence, we allocate all TRecHeaders in the global heap.  Their
+    contents are PRIVATE, they may contain global->local pointers, and
+    they must be on the mutable list.
+
+  TRecChunk (TREC_CHUNK) -> 
+   { TRecChunk prev_chunk,
+     TRecEntry  -> { TVar, expected, new }
+   }
+
+  * We consider the TRecChunk to be PRIVATE.  They can contain
+    global->local pointers, and must be on the correct mutable list,
+    but they do not have to be allocated in the global heap.
+
+  TVar (MUT_PRIM) -> { value, TVarWatchQueue }
+
+  * When we write to a TVar, we must globalise as usual.  Both TVars
+    and TVarWatchQueues are MUT_PRIM, so they both get eagerly promoted.
+
+  TVarWatchQueue (MUT_PRIM) -> { closure, prev, next }
+
+  * When creating a TVarWatchQueue we first need to check whether to
+    allocate it globally or locally, depending on the TVar.
+
+  AtomicInvariant (MUT_PRIM) -> { code, TrecHeader }
+
+  * TODO
+
+  InvariantCheckQueue (MUT_PRIM) -> { AtomicInvariant, TrecHeader, next }
+
+  * TODO
+
+-----------------------------------------------------------------------------
+-- BLOCKING_QUEUE structures
+
+typedef struct StgBlockingQueue_ {
+    StgHeader   header;
+    struct StgBlockingQueue_ *link; // here so it looks like an IND
+    StgClosure *bh;  // the BLACKHOLE
+    StgTSO     *owner;
+    struct MessageBlackHole_ *queue;
+} StgBlockingQueue;
+
+ - BLOCKING_QUEUE and MSG_BLACKHOLE always get eagerly promoted, so we
+   never end up with global->local pointers in the link and queue
+   fields.
+
+ - BLOCKING_QUEUE may be promoted ahead of BLACKHOLE, so the BH field
+   may be global->local.  But: a BLOCKING_QUEUE object is only pointed
+   to by the BH and the TSO that owns it, and the TSO must belong to
+   the owner of the BH, so this should be safe.
+
+-----------------------------------------------------------------------------
+-- Remembered set overhaul
+
+If we're going to support more than one local generation, we may want
+to simplify the remembered set handling.  Here are some thoughts on
+that:
+
+ - All remembered sets contain only TSO / IND_LOCAL objects
+ - every update of an old-gen thunk promotes the transitive closure
+ - no more recordMutable
+ - every GC must do globalise_mut_list for all mut lists
+ - write barriers:
+   - MUT_VAR/MUT_ARR: publish the written pointer
+   - TSO: as before, TSO can be in the remembered set
+   - MVAR
+   - blocking on a BLACKHOLE (modifies the BH, or the BQ)
+   - sending a message (modifies its link)
+
+-----------------------------------------------------------------------------
+-- Allocate MSG_BLACKHOLE locally or globally? (also MSG_THROWTO)
+
+           We have a choice here;
+           1. allocate the MSG_BLACKHOLE in global memory,
+              and globalise CurrentTSO immediately.
+
+           2. allocate the MSG_BLACKHOLE in local memory, leaving it
+              to messageBlackHole to globalise it (and CurrentTSO) if
+              necessary.
+
+           We need the MSG_BLACKHOLE to be global if:
+             - the BLACKHOLE is already in global memory, or
+             - the MSG_BLACKHOLE will be sent to another CPU
+           
+           For now we do (2), ToDo: try (1) and measure
+
+-----------------------------------------------------------------------------
+-- Invariants
+
+1. Pointers from the global heap to the local heap are allowed only in
+   two places: IND_LOCAL, or the stack of a TSO
+
+   1a. TSO stacks point to at most one local heap.
+
+
+2. every global object that points into a Capability's local heap must
+   be in that Capability's remembered set (cap->mut_lists[g]).
+
+   This means that
+    * GC_LOCAL need only consult the local mut lists.
+    * MAINTAINING THE INVARIANT:
+      * GC_LCCAL needs to do nothing special: the invariant is
+        automatically maintained.
+      * GC_SEQ needs to add entries to the appropriate mut list
+      * GC_PAR may need to save up entries for adding to the appropriate
+        list.
+
+3. Objects in a Capability's remembered set may only point to the
+   local heap of that Capability or the global heap.
+
+   So when doing a local GC, we only visit objects in the global heap
+   or our local heap.
+
+-----------------------------------------------------------------------------
+-- Why this design?
+
+1. Why have IND_LOCAL rather than always promoting the transitive
+   closure to maintain the global heap invariant?
+
+   - we can have some closures that we do not globalise
+     - closures with identity, e.g. primitive arrays and suchlike
+     - mutable objects can still be allocated in the local heap
+     - we probably want to try to keep mutable closures in the private
+       heap, otherwise we have to do globalisation/publish on every
+       write.  For this we might want to have two generations in the
+       local heap.
+
+   - might be able to reduce the latency of globalisation requests
+     from another CPU, by not promoting the whole transitive closure.
+
+   - we can use a shared public spark pool and work-stealing without
+     globalising the entire transitive closure of its contents.
+
+-----------------------------------------------------------------------------
+-- How to globalise different closure types [GLOBALISE]
+
+Two operations:
+
+  StgClosure * publish (StgClosure *p)
+    // make an object representing P in the global heap
+
+  void globalise (StgClosure **p)
+    // move P from local to global storage
+
+Every time we write a pointer P into an object in the old generation,
+if P points to the local heap, we must write publish(P) instead.  This
+includes updates.  (we cannot overwrite with an IND_LOCAL, because a
+race condition between two processors updating the same thunk could
+leave an IND_LOCAL pointing to the wrong local heap).
+
+If we receive a message requesting that we globalise a pointer P, then
+we try to copy the transitive closure of the pointer into the global
+heap, this is globalise(P).
+
+class B: BLACKHOLE
+class T: THUNK/PAP/AP, untagged
+class C: CONSTR, tagged
+class F: FUN, tagged or untagged
+class L: large or pinned unpointed
+class T: TSOs
+class U: small unpointed (MVar#, MutVar#, Array#, Weak#, BCO#,
+         StableName#, TVar#, PRIM, MUT_PRIM)
+
+publish:
+   B: IND_LOCAL
+   T: globalise, or IND_LOCAL
+   C: globalise, or IND_LOCAL
+   F: globalise, or IND_LOCAL
+   L: globalise, or IND_LOCAL
+   T: globalise, or IND_LOCAL
+   U: NO
+
+globalise:
+
+   B: NO (pointed to by stack, will be updated)
+   T: copy and replace with IND, publish children
+   C: copy and replace with forwarding ptr, publish children
+   F: copy and replace with forwarding ptr, publish children
+   L: re-link the block, publish children
+   T: copy, replacing with ThreadRelocated, publish children
+   U: NO
+
+Note that we can neither publish nor globalise U, hence objects that
+point to U can only be published, not globalised.
+
+Since we cannot globalise U, what happens to the closures that point to U?
+
+   WE NEVER GLOBALISE A CLOSURE THAT POINTS TO U
+
+   Thunks, functions and constructors that point to U are flagged in
+   their info tables (info->flags & HAS_UNLIFTED_FIELDS), and if
+   globalise() sees one of these it refuses to globalise the closure.
+
+
+What about during GC?
+
+   U CLOSURES ARE EAGERLY PROMOTED DURING GC
+
+   This is to avoid the situation where we have promoted a closure
+   that points to U, but not the U itself.  There is no way to fix
+   this up post-GC to reestablish the local heap invariant, so instead
+   we avoid it happening by automatically promoting U closures.
+
+ L->U: we can promote L without moving it, so everything's fine.
+
+Alternative:
+
+     do *not* eagerly promote C->U, F->U or T->U.  We can guarantee
+     that the C->U, F->U, T->U pointers are not back-pointers, so as long
+     as we do not eagerly promote the C or F or T closure, we can be sure
+     that they stay forward-pointers, and hence we never get into a
+     state where C/F/T has been promoted but not U.
+
+Should we change ENTER() to check for forwarding pointers?  why has
+this not gone wrong so far? - because forwarded closures are always
+tagged, so ENTER just returns.
+
+-----------------------------------------------------------------------------
+How to globalise large-family constructors?
+
+Problem is that to get the constructor tag we have to read the info
+table, but we want to globalise constructors by replacing the info
+pointer with a forwarding pointer.
+
+   1. don't tag large-family constructors at all,
+      case code checks closure type before entering
+        - extra 2 memory refs on entry :-(
+   1a. like 1, but code to check closure type is at the return pt,
+       so can share loading of info ptr.
+        - 1 extra memory ref
+        - extra test/branch in common case for returns
+        - need to distinguish tagged from untagged CONSTR in globalise() :-(
+   2. tag large-family constructors as before
+      info table identifies large-family somehow
+      globalise code replaces with an IND
+      case return code checks for a special tag value (eg. 0) for IND,
+      and re-enters
+        - extra code for re-entry, extra tag in info table :-(
+   3. tag large-family constructors as before
+      case join point checks for forwarding ptr
+        - extra test/branch at return pt for large-family constrs
+   4. globalising a large-family constructor requires building a new
+      info table instance in the heap.  The new itbl has type
+      CON_GLOBALISED, and contains the address of the relocated
+      closure.
+        - complicated, but no runtime overhead
+
+we currently do (3).
+
+-----------------------------------------------------------------------------
+Globalising the mutable list after GC
+
+An object may contain back-pointers after scavenging it; in this case
+the GC puts a reference to the object on the appropriate mutable list.
+
+In order to respect the global heap invariant, we must ensure that the
+mutable lists of the global generation(s) only contain TSO or
+IND_LOCAL objects.
+
+GC always promotes U objects (see [GLOBALISE]), so that directly after
+GC globalising a pointer is always possible.  So after GC we can
+always globalise all the objects on the mutable list, except for TSO
+and IND_LOCAL.
+
+The remaining problem is whether we might have TSO or IND_LOCAL
+objects on the *wrong* mutable list, i.e. pointing into the wrong
+local heap.
+
+   TSO: this can certainly happen, we must move the TSO to the correct
+   mutable list.
+
+   IND_LOCAL: this cannot happen, since local GC begins with all
+   IND_LOCALs pointing to the right local heap, and global GC always
+   shorts out the IND_LOCALs.
+
+-----------------------------------------------------------------------------
+More generations
+
+We would like to be able to expand the heap structure to allow more
+generations both local and global.  Here I collect notes about the
+ramifications of doing so:
+
+1. More local generations
+
+   - write barriers are more complicated: if the object is local but
+     in a non-zero generation, then we use the ordinary write barrier
+     (add it to the mutable list), otherwise globalise.
+
+   - we probably want to keep data in the local old-generation unless
+     it is required to be global, so the local old-gen's dest points
+     to itself.  Might even want to mark-sweep or compact these.
+
+2. More global generations
+
+   - mutable lists may contain not only TSO and IND_LOCAL, but also
+     objects that point to younger global generations.
+
+
+  - recordClosureMutated_: gen is wrong if we have >2 gens
+
+-----------------------------------------------------------------------------
+* TSO fields
+
+  The only TSO fields that may be read by another Capability are
+
+  tso->cap
+    - to determine whether the TSO belongs to the current cap or not
+
+  A TSO is special in that it may hold global->local pointers either
+  in its metadata (e.g. tso->bq) or on its stack.  The TSO itself must
+  still reside in the global heap if it is referenced from there, but
+  clients other than the owning capability can read only the tso->cap
+  field.
+
+  TSO fields are subject to the write barrier as usual.  A TSO is
+  marked dirty (tso->dirty) if any of its fields may contain
+  global->local pointers.  If only the tso->_link and
+  tso->block_info.prev fields are dirty, then instead of setting
+  tso->dirty, the TSO_LINK_DIRTY bit may be set in tso->flags.  When
+  marking a TSO dirty it is placed on the mutable list of the owning
+  Capability.
+
+* ThreadRelocated
+
+  When a TSO is moved, the old tso has tso->what_next set to
+  ThreadRelocated, and tso->_link points to the new instance.
+  tso->cap in a ThreadRelocated may still be read, but it might be
+  incorrect (the TSO may have migrated to another Capability).  This
+  may lead to a message being sent to the wrong Capability, which
+  shouldn't cause any problems other than a message having to be
+  redirected.
+
+* XXX
+
+  The MVar operations still modify a TSO directly, but I think
+  harmlessly.  They modify
+
+  ** tso->_link
+     To set it to END_TSO_QUEUE, which is fine
+
+  ** the stack
+     To pass the value back for takeMVar, but if the MVar is global
+     then the TSO and the value will be global too.
+
+-----------------------------------------------------------------------------
+-- Weak pointers.
+
+   - per-generation weak pointer lists: (WE DO THIS ONE)
+
+     - old-gen weak pointers would need to be on the mut list if they
+       pointed into a younger gen
+     - would need to globalise_scavenge them on the mut list
+     - key/value/finalizer could end up being IND_LOCALs
+     - link could never be an IND_LOCAL, because the link should
+       always point only to WEAKs in the same gen.
+     - in global GC, the leader thread calls traverseWeakPtrList
+     - in local GC, the thread traverses the weak ptr list for its
+       local gen(s)
+
+   - alternative: all WEAK objects are in the global heap
+
+     - no need to traverse WEAK objects during local GC
+     - finalizers do not start until a global GC happens
+     - must globalise the fields of a WEAK when creating one
+     - probably terrible for memo tables etc.
+     - probably terrible for ForeignPtrs
+
+-----------------------------------------------------------------------------
+Shorting out IND_LOCAL
+
+ - better not short out IND_LOCAL during global GC, as then a TSO
+   might end up pointing to more than one local heap.  Instead, the
+   best we can do is turn them into IND during scavenge if we find
+   they no longer point to the local heap.
+
+-----------------------------------------------------------------------------
+ALTERNATIVE IDEA
+
+Primitive and/or mutable objects are allocated in a special area of
+the global heap (one per HEC), and marked as private or global. e.g.
+
+  MUT_VAR_PRIVATE, MUT_VAR_GLOBAL
+
+Thus we can globalise one of these objects by marking it global and
+globalising its children.  All objects can therefore be globalised
+(with the possible exception of BLACKHOLEs).
+
+During a local GC, we must use mark/sweep for this area of the global
+heap.  Global objects are treated as marked, and we can free any
+unreachable private objects (as in Domani et. al. ISMM'00).  In GHC we
+would either free complete blocks only, or implement Immix-style
+region marking.
+
+Compared to the other scheme:
+
+  - no need for eager promotion of primitive objects! (well actually,
+    primitive objects do get eagerly promoted, but without moving
+    them).
+
+  - we can globalise everything, globalise is simpler.
+
+  - write barriers are a bit simpler and cheaper: check info pointer,
+    maybe globalise (well actually, currently the check is worse
+    because it is a bdescr->gen check plus isGlobal).
+
+  - we need to duplicate all info tables for primitive objects, but
+    private/global can be a bit in the flags field of the info table,
+    so don't need to duplicate all the closure types too.
+
+  - we need to set up the per-Capability primitive areas of the global
+    generation, and arrange that they get marked/swept.  Sweeping has
+    to traverse the primitive heap linearly looking for global objects.
+
+  - TSOs don't need to be globalised, they can be implicitly global,
+    similarly for BLOCKING_QUEUE and other private objects.
+
+  - Evac: 
+      - in local GC:
+          if the closure is global, we're done
+          if the closure is private, mark it and push it on the mark stack.
+      - in global GC:
+          copy the closure as normal.
+
+      Even though the prim areas are local heap, we don't have to
+      record pointers from the global heap to the prim heap in the
+      remembered set.  Instead we transitively mark all the global
+      objects in the prim area, so that they don't get discarded by
+      local GC.
+
+
+What about clean/dirty?
+
+  - for TSO: still need clean/dirty
+
+  - for MUT_VAR and others: no need to do this, as the write barrier
+    globalises.  Though we could also have muliple local generations,
+    and then we would need
+
+    MUT_VAR_CLEAN, MUT_VAR_DIRTY, MUT_VAR_GLOBAL
+
+    and a 3-way write barrier.
+
+
+-----------------------------------------------------------------------------
+Sources of overhead
+
+ - checking for forwarding pointers in apply code, PAP code, large
+   family constructor cases.
+
+ - slower allocation of primitive objects
+
+ - not promoting prim objects in the local heap, so they get
+   repeatedly scanned during local GC.
+
+ - thread migration is more expensive
+
+-----------------------------------------------------------------------------
+Related work
+
+- DLG
+- "Thread-local heaps for Java" (Domani et. al.)
+  (source of idea for mark-sweep with a bit to represent local/global)
+- "Thread-specific heaps for Multi-threaded programs" (Steensgaard)
+- "Optimisations in a private-nursery based collector"
+  (forces local GC to avoid violating local heap invariant; mutables
+  are allowed in the young gen)
+
+To look at:
+
+- "Pillar: A parallel implementation language"

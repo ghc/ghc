@@ -128,19 +128,38 @@ emitPrimOp [res] ParOp [arg] live
 emitPrimOp [res] ReadMutVarOp [mutv] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
 
-emitPrimOp [] WriteMutVarOp [mutv,var] live
+emitPrimOp [] WriteMutVarOp [mutv,val] live
    = do
-	stmtC (CmmStore (cmmOffsetW mutv fixedHdrSize) var)
 	vols <- getVolatileRegs live
+        join <- newLabelC
+
+        -- store the value in a register, in case it is a non-trivial expression
+        tmpl <- newTemp gcWord
+        let tmp = CmmReg (CmmLocal tmpl)
+        stmtC (CmmAssign (CmmLocal tmpl) val)
+
+        -- save the address of the mut var in a temporary, becuase it may not
+        -- be present in 'live' and hence won't be automatically saved across
+        -- the foreign call below (live only contains live-in-alts, not
+        -- live-in-whole-case, when the primop is the scrutinee of a case).
+        mutl <- newTemp gcWord
+        let mut = CmmReg (CmmLocal mutl)
+        stmtC (CmmAssign (CmmLocal mutl) mutv)
+
+        stmtC (CmmCondBranch (CmmMachOp mo_wordNe [
+                                 closureInfoPtr mut,
+                                 CmmLit (CmmLabel mkMUT_VAR_GLOBAL_infoLabel) ])
+                            join)
 	emitForeignCall' PlayRisky
-		[{-no results-}]
-		(CmmCallee (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-			 CCallConv)
+		[CmmHinted tmpl AddrHint]
+		(CmmCallee (CmmLit (CmmLabel mkDirty_MUT_VAR_Label)) CCallConv)
 		[   (CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint)
-                  , (CmmHinted mutv AddrHint)  ]
+                  , (CmmHinted tmp AddrHint)  ]
 		(Just vols)
                 NoC_SRT -- No SRT b/c we do PlayRisky
                 CmmMayReturn
+        labelC join
+	stmtC (CmmStore (cmmOffsetW mut fixedHdrSize) tmp)
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrWords *)(a))->bytes
@@ -209,7 +228,7 @@ emitPrimOp [res] UnsafeFreezeByteArrayOp [arg] _
 
 emitPrimOp [r] ReadArrayOp  [obj,ix]   _  = doReadPtrArrayOp r obj ix
 emitPrimOp [r] IndexArrayOp [obj,ix]   _  = doReadPtrArrayOp r obj ix
-emitPrimOp []  WriteArrayOp [obj,ix,v] _  = doWritePtrArrayOp obj ix v
+emitPrimOp []  WriteArrayOp [obj,ix,v] live  = doWritePtrArrayOp obj ix v live
 
 emitPrimOp [res] SizeofArrayOp [arg] _
    = stmtC $ CmmAssign (CmmLocal res) (cmmLoadIndexW arg (fixedHdrSize + oFFSET_StgMutArrPtrs_ptrs) bWord)
@@ -571,19 +590,48 @@ doWriteByteArrayOp maybe_pre_write_cast rep [] [addr,idx,val]
 doWriteByteArrayOp _ _ _ _ 
    = panic "CgPrimOp: doWriteByteArrayOp"
 
-doWritePtrArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> Code
-doWritePtrArrayOp addr idx val
-   = do mkBasicIndexedWrite arrPtrsHdrSize Nothing bWord addr idx val
-        stmtC (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
-   -- the write barrier.  We must write a byte into the mark table:
-   -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
-        stmtC $ CmmStore (
-          cmmOffsetExpr
-           (cmmOffsetExprW (cmmOffsetB addr arrPtrsHdrSize)
-                          (loadArrPtrsSize addr))
-           (CmmMachOp mo_wordUShr [idx,
-                                   CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)])
-          ) (CmmLit (CmmInt 1 W8))
+doWritePtrArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> StgLiveVars -> Code
+doWritePtrArrayOp addr idx val live
+   = do vols <- getVolatileRegs live
+        join <- newLabelC
+
+        -- store the value in a register, in case it is a non-trivial expression
+        tmpl <- newTemp gcWord
+        let tmp = CmmReg (CmmLocal tmpl)
+        stmtC (CmmAssign (CmmLocal tmpl) val)
+
+        -- save the address of the array in a temporary, becuase it may not
+        -- be present in 'live' and hence won't be automatically saved across
+        -- the foreign call below (live only contains live-in-alts, not
+        -- live-in-whole-case, when the primop is the scrutinee of a case).
+        arrl <- newTemp gcWord
+        let arr = CmmReg (CmmLocal arrl)
+        stmtC (CmmAssign (CmmLocal arrl) addr)
+        stmtC (CmmCondBranch (CmmMachOp mo_wordNe [
+                                 closureInfoPtr arr,
+                                 CmmLit (CmmLabel mkMAP_GLOBAL_infoLabel) ])
+                            join)
+	emitForeignCall' PlayRisky
+		[CmmHinted tmpl AddrHint]
+		(CmmCallee (CmmLit (CmmLabel mkDirty_MUT_ARR_Label)) CCallConv)
+		[   (CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint)
+                  , (CmmHinted tmp AddrHint) ]
+		(Just vols)
+                NoC_SRT -- No SRT b/c we do PlayRisky
+                CmmMayReturn
+        labelC join
+        mkBasicIndexedWrite arrPtrsHdrSize Nothing bWord arr idx tmp
+
+--   -- the write barrier.  We must write a byte into the mark table:
+--   -- bits8[a + header_size + StgMutArrPtrs_size(a) + x >> N]
+--        stmtC (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+--        stmtC $ CmmStore (
+--          cmmOffsetExpr
+--           (cmmOffsetExprW (cmmOffsetB addr arrPtrsHdrSize)
+--                          (loadArrPtrsSize addr))
+--           (CmmMachOp mo_wordUShr [idx,
+--                                   CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)])
+--          ) (CmmLit (CmmInt 1 W8))
 
 loadArrPtrsSize :: CmmExpr -> CmmExpr
 loadArrPtrsSize addr = CmmLoad (cmmOffsetB addr off) bWord

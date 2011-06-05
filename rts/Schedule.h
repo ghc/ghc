@@ -21,8 +21,10 @@
  * Locks assumed   :  none
  */
 void initScheduler (void);
+void startWorkers  (void);
 void exitScheduler (rtsBool wait_foreign);
 void freeScheduler (void);
+void markScheduler (evac_fn evac, void *user);
 
 // Place a new thread on the run queue of the current Capability
 void scheduleThread (Capability *cap, StgTSO *tso);
@@ -120,6 +122,7 @@ appendToRunQueue (Capability *cap, StgTSO *tso)
 	cap->run_queue_hd = tso;
         tso->block_info.prev = END_TSO_QUEUE;
     } else {
+        cap->run_queue_tl = cap->run_queue_tl;
 	setTSOLink(cap, cap->run_queue_tl, tso);
         setTSOPrev(cap, tso, cap->run_queue_tl);
     }
@@ -139,6 +142,7 @@ pushOnRunQueue (Capability *cap, StgTSO *tso)
     setTSOLink(cap, tso, cap->run_queue_hd);
     tso->block_info.prev = END_TSO_QUEUE;
     if (cap->run_queue_hd != END_TSO_QUEUE) {
+        cap->run_queue_hd = cap->run_queue_hd;
         setTSOPrev(cap, cap->run_queue_hd, tso);
     }
     cap->run_queue_hd = tso;
@@ -153,6 +157,7 @@ INLINE_HEADER StgTSO *
 popRunQueue (Capability *cap)
 { 
     StgTSO *t = cap->run_queue_hd;
+
     ASSERT(t != END_TSO_QUEUE);
     cap->run_queue_hd = t->_link;
     if (t->_link != END_TSO_QUEUE) {
