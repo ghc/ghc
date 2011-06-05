@@ -190,11 +190,11 @@ dumpIfSet_dyn dflags flag hdr doc
   = return ()
 
 dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
-dumpIfSet_dyn_or dflags flags hdr doc
-  | or [dopt flag dflags | flag <- flags]
-  || verbosity dflags >= 4 
-  = printDump (mkDumpDoc hdr doc)
-  | otherwise = return ()
+dumpIfSet_dyn_or _ [] _ _ = return ()
+dumpIfSet_dyn_or dflags (flag : flags) hdr doc
+    = if dopt flag dflags || verbosity dflags >= 4
+      then dumpSDoc dflags flag hdr doc
+      else dumpIfSet_dyn_or dflags flags hdr doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc 
