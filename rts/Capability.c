@@ -857,9 +857,8 @@ markCapability (evac_fn evac, void *user, Capability *cap,
 #if defined(THREADED_RTS)
     evac(user, (StgClosure **)(void *)&cap->inbox);
 #endif
-
-    for (incall = cap->suspended_ccalls; incall != NULL; 
-         incall = incall->next) {
+    for (incall = cap->suspended_ccalls; incall != NULL;
+         incall=incall->next) {
         evac(user, (StgClosure **)(void *)&incall->suspended_tso);
     }
 

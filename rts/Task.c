@@ -323,10 +323,10 @@ taskTimeStamp (Task *task USED_IF_THREADS)
     currentUserTime = getThreadCPUTime();
     currentElapsedTime = getProcessElapsedTime();
 
-    task->mut_time = 
-	currentUserTime - task->muttimestart - task->gc_time;
+    task->mut_time =
+        currentUserTime - task->muttimestart - task->gc_time;
     task->mut_etime = 
-	currentElapsedTime - task->elapsedtimestart - task->gc_etime;
+        currentElapsedTime - task->elapsedtimestart - task->gc_etime;
 
     if (task->gc_time   < 0) { task->gc_time   = 0; }
     if (task->gc_etime  < 0) { task->gc_etime  = 0; }

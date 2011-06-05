@@ -504,8 +504,8 @@ cleanTempFilesExcept dflags dont_delete
    $ do let ref = filesToClean dflags
         files <- readIORef ref
         let (to_keep, to_delete) = partition (`elem` dont_delete) files
-        removeTmpFiles dflags to_delete
         writeIORef ref to_keep
+        removeTmpFiles dflags to_delete
 
 
 -- find a temporary name that doesn't already exist.

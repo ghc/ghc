@@ -165,12 +165,12 @@ initStats1 (void)
 	statsPrintf("    Alloc    Copied     Live    GC    GC     TOT     TOT  Page Flts\n");
 	statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
     }
-    GC_coll_cpu = 
-	(Ticks *)stgMallocBytes(
+    GC_coll_cpu =
+        (Ticks *)stgMallocBytes(
 	    sizeof(Ticks)*total_generations,
 	    "initStats");
-    GC_coll_elapsed = 
-	(Ticks *)stgMallocBytes(
+    GC_coll_elapsed =
+        (Ticks *)stgMallocBytes(
 	    sizeof(Ticks)*total_generations,
 	    "initStats");
     GC_coll_max_pause =
@@ -339,12 +339,12 @@ stat_endGC (gc_thread *gct,
         }
 
 	if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
-	    nat faults = getPageFaults();
+            nat faults = getPageFaults();
 	    
 	    statsPrintf("%9ld %9ld %9ld",
 		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
-	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  ", 
+            statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  ",
 		    TICK_TO_DBL(gc_cpu),
 		    TICK_TO_DBL(gc_elapsed),
 		    TICK_TO_DBL(cpu),
@@ -365,10 +365,10 @@ stat_endGC (gc_thread *gct,
             }
             statsPrintf("\n");
 	    GC_end_faults = faults;
-	    statsFlush();
+            statsFlush();
 	}
 
-	GC_coll_cpu[gen_ix] += gc_cpu;
+        GC_coll_cpu[gen_ix] += gc_cpu;
 	GC_coll_elapsed[gen_ix] += gc_elapsed;
         if (GC_coll_max_pause[gen_ix] < gc_elapsed) {
             GC_coll_max_pause[gen_ix] = gc_elapsed;
@@ -580,7 +580,7 @@ stat_exit(int alloc)
             }
         }
 
-	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
+        if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
 	    showStgWord64(GC_tot_alloc*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes allocated in the heap\n", temp);
@@ -599,7 +599,7 @@ stat_exit(int alloc)
 
 	    if ( residency_samples > 0 ) {
 		showStgWord64(max_residency*sizeof(W_), 
-				     temp, rtsTrue/*commas*/);
+                                     temp, rtsTrue/*commas*/);
 		statsPrintf("%16s bytes maximum residency (%ld sample(s))\n",
 			temp, residency_samples);
 	    }

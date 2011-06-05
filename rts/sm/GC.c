@@ -200,6 +200,7 @@ GarbageCollect (nat N, // generation to collect
   ASSERT(sizeof(gen_workspace) == 16 * sizeof(StgWord));
   // otherwise adjust the padding in gen_workspace.
 
+  // this is the main thread
   SET_GCT(gc_threads[cap->no]);
 
   gct->gc_type = gc_type;

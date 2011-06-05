@@ -169,7 +169,7 @@ typedef struct gc_thread_ {
                                    // instead of the to-space
                                    // corresponding to the object
 
-    lnat thunk_selector_depth;     // used to avoid unbounded recursion in 
+    lnat thunk_selector_depth;     // used to avoid unbounded recursion in
                                    // evacuate() for THUNK_SELECTOR
 
     nat collect_gen;               // maximum generation (no) to collect
