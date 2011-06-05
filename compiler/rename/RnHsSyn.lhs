@@ -11,9 +11,7 @@ module RnHsSyn(
         extractFunDepNames, extractHsCtxtTyNames, extractHsPredTyNames,
 
         -- Free variables
-        hsSigsFVs, hsSigFVs, conDeclFVs, bangTyFVs,
-
-        maybeGenericMatch
+        hsSigsFVs, hsSigFVs, conDeclFVs, bangTyFVs
   ) where
 
 #include "HsVersions.h"
@@ -66,7 +64,6 @@ extractHsTyNames ty
     get (HsParTy ty)           = getl ty
     get (HsBangTy _ ty)        = getl ty
     get (HsRecTy flds)         = extractHsTyNames_s (map cd_fld_type flds)
-    get (HsNumTy _)            = emptyNameSet
     get (HsTyVar tv)           = unitNameSet tv
     get (HsSpliceTy _ fvs _)   = fvs
     get (HsQuasiQuoteTy {})    = emptyNameSet
@@ -120,10 +117,11 @@ hsSigsFVs :: [LSig Name] -> FreeVars
 hsSigsFVs sigs = plusFVs (map (hsSigFVs.unLoc) sigs)
 
 hsSigFVs :: Sig Name -> FreeVars
-hsSigFVs (TypeSig _ ty)   = extractHsTyNames ty
-hsSigFVs (SpecInstSig ty) = extractHsTyNames ty
-hsSigFVs (SpecSig _ ty _) = extractHsTyNames ty
-hsSigFVs _                = emptyFVs
+hsSigFVs (TypeSig _ ty)    = extractHsTyNames ty
+hsSigFVs (GenericSig _ ty) = extractHsTyNames ty
+hsSigFVs (SpecInstSig ty)  = extractHsTyNames ty
+hsSigFVs (SpecSig _ ty _)  = extractHsTyNames ty
+hsSigFVs _                 = emptyFVs
 
 ----------------
 conDeclFVs :: LConDecl Name -> FreeVars
@@ -143,25 +141,4 @@ conDetailsFVs details = plusFVs (map bangTyFVs (hsConDeclArgTys details))
 
 bangTyFVs :: LHsType Name -> FreeVars
 bangTyFVs bty = extractHsTyNames (getBangType bty)
-\end{code}
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{A few functions on generic defintions
-%*                                                                      *
-%************************************************************************
-
-These functions on generics are defined over Matches Name, which is
-why they are here and not in HsMatches.
-
-\begin{code}
-maybeGenericMatch :: LMatch Name -> Maybe (HsType Name, LMatch Name)
-  -- Tells whether a Match is for a generic definition
-  -- and extract the type from a generic match and put it at the front
-
-maybeGenericMatch (L loc (Match (L _ (TypePat (L _ ty)) : pats) sig_ty grhss))
-  = Just (ty, L loc (Match pats sig_ty grhss))
-
-maybeGenericMatch _ = Nothing
 \end{code}

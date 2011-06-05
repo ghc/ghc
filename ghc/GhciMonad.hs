@@ -56,7 +56,7 @@ data GHCiState = GHCiState
 	editor         :: String,
         stop           :: String,
 	options        :: [GHCiOption],
-        prelude        :: GHC.Module,
+        prelude        :: GHC.ModuleName,
         line_number    :: !Int,         -- input line
         break_ctr      :: !Int,
         breaks         :: ![(Int, BreakLocation)],
@@ -78,7 +78,7 @@ data GHCiState = GHCiState
         ghc_e :: Bool -- True if this is 'ghc -e' (or runghc)
      }
 
-data CtxtCmd	-- In each case, the first [String] are the starred modules
+data CtxtCmd    -- In each case, the first [String] are the starred modules
      		-- and the second are the unstarred ones
   = SetContext [String] [String]
   | AddModules [String] [String]
@@ -210,7 +210,7 @@ instance ExceptionMonad (InputT GHCi) where
   gunblock = Haskeline.unblock
 
 -- for convenience...
-getPrelude :: GHCi Module
+getPrelude :: GHCi ModuleName
 getPrelude = getGHCiState >>= return . prelude
 
 getDynFlags :: GhcMonad m => m DynFlags

@@ -273,7 +273,7 @@ boxResult result_ty
 	; let io_data_con = head (tyConDataCons io_tycon)
 	      toIOCon     = dataConWrapId io_data_con
 
-	      wrap the_call = mkCoerceI (mkSymCoI co) $
+	      wrap the_call = mkCoerce (mkSymCo co) $
 			      mkApps (Var toIOCon)
 			    	     [ Type io_res_ty, 
 			    	       Lam state_id $
@@ -372,7 +372,7 @@ resultWrapper result_ty
   -- Recursive newtypes
   | Just (rep_ty, co) <- splitNewTypeRepCo_maybe result_ty
   = do (maybe_ty, wrapper) <- resultWrapper rep_ty
-       return (maybe_ty, \e -> mkCoerce (mkSymCoercion co) (wrapper e))
+       return (maybe_ty, \e -> mkCoerce (mkSymCo co) (wrapper e))
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).

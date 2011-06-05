@@ -367,10 +367,6 @@ rnPatAndThen mk (TuplePat pats boxed _)
        ; pats' <- rnLPatsAndThen mk pats
        ; return (TuplePat pats' boxed placeHolderType) }
 
-rnPatAndThen _ (TypePat ty)
-  = do { ty' <- liftCpsFV $ rnHsTypeFVs (text "In a type pattern") ty
-       ; return (TypePat ty') }
-
 #ifndef GHCI
 rnPatAndThen _ p@(QuasiQuotePat {}) 
   = pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)

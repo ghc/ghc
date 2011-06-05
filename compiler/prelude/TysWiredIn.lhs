@@ -64,23 +64,14 @@ import TysPrim
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
+import DataCon          ( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
+import Var
+import TyCon
+import TypeRep
 import RdrName
 import Name
-import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
-import Var
-import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
-			  mkTupleTyCon, mkAlgTyCon, tyConName,
-			  TyConParent(NoParentTyCon) )
-
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, HsBang(..) )
-
-import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys,
-			  TyThing(..) )
-import Coercion         ( unsafeCoercionTyCon, symCoercionTyCon,
-                          transCoercionTyCon, leftCoercionTyCon, 
-                          rightCoercionTyCon, instCoercionTyCon )
-import TypeRep          ( mkArrowKinds, liftedTypeKind, ubxTupleKind )
-import Unique		( incrUnique, mkTupleTyConUnique,
+import BasicTypes       ( Arity, RecFlag(..), Boxity(..), isBoxed, HsBang(..) )
+import Unique           ( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
 import Data.Array
 import FastString
@@ -124,12 +115,6 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
     	      , intTyCon
     	      , listTyCon
 	      , parrTyCon
-              , unsafeCoercionTyCon
-              , symCoercionTyCon
-              , transCoercionTyCon
-              , leftCoercionTyCon
-              , rightCoercionTyCon
-              , instCoercionTyCon
     	      ]
 \end{code}
 
@@ -211,7 +196,6 @@ pcTyCon is_enum is_rec name tyvars cons
 		(DataTyCon cons is_enum)
 		NoParentTyCon
                 is_rec
-		True		-- All the wired-in tycons have generics
 		False		-- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
@@ -276,7 +260,7 @@ unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mA
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple boxity arity = (tycon, tuple_con)
   where
-	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity gen_info 
+	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity 
 	modu	= mkTupleModule boxity arity
 	tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
 				(ATyCon tycon) BuiltInSyntax
@@ -293,8 +277,6 @@ mk_tuple boxity arity = (tycon, tuple_con)
 				  (ADataCon tuple_con) BuiltInSyntax
  	tc_uniq   = mkTupleTyConUnique   boxity arity
 	dc_uniq   = mkTupleDataConUnique boxity arity
-	gen_info  = True		-- Tuples all have generics..
-					-- hmm: that's a *lot* of code
 
 unitTyCon :: TyCon
 unitTyCon     = tupleTyCon Boxed 0
@@ -610,5 +592,3 @@ mkPArrFakeCon arity  = data_con
 isPArrFakeCon      :: DataCon -> Bool
 isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 \end{code}
-
-

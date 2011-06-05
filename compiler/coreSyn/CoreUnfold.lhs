@@ -60,9 +60,12 @@ import PrelNames
 import VarEnv           ( mkInScopeSet )
 import Bag
 import Util
+import Pair
 import FastTypes
 import FastString
 import Outputable
+import ForeignCall
+
 import Data.Maybe
 \end{code}
 
@@ -107,7 +110,7 @@ mkWwInlineRule id expr arity
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	   -- Used for things that absolutely must be unfolded
   = mkCoreUnfolding InlineCompulsory True
-                    expr 0    -- Arity of unfolding doesn't matter
+                    (simpleOptExpr expr) 0    -- Arity of unfolding doesn't matter
                     (UnfWhen unSaturatedOk boringCxtOk)
 
 mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
@@ -272,6 +275,9 @@ Notice that 'x' counts 0, while (f x) counts 2.  That's deliberate: there's
 a function call to account for.  Notice also that constructor applications 
 are very cheap, because exposing them to a caller is so valuable.
 
+[25/5/11] All sizes are now multiplied by 10, except for primops.
+This makes primops look cheap, and seems to be almost unversally
+beneficial.  Done partly as a result of #4978.
 
 Note [Do not inline top-level bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -329,7 +335,7 @@ uncondInline :: Arity -> Int -> Bool
 -- See Note [INLINE for small functions]
 uncondInline arity size 
   | arity == 0 = size == 0
-  | otherwise  = size <= arity + 1
+  | otherwise  = size <= 10 * (arity + 1)
 \end{code}
 
 
@@ -348,27 +354,29 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up (Cast e _) = size_up e
     size_up (Note _ e) = size_up e
     size_up (Type _)   = sizeZero           -- Types cost nothing
+    size_up (Coercion _) = sizeZero
     size_up (Lit lit)  = sizeN (litSize lit)
     size_up (Var f)    = size_up_call f []  -- Make sure we get constructor
     	    	       	 	      	    -- discounts even on nullary constructors
 
     size_up (App fun (Type _)) = size_up fun
+    size_up (App fun (Coercion _)) = size_up fun
     size_up (App fun arg)      = size_up arg  `addSizeNSD`
                                  size_up_app fun [arg]
 
-    size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
+    size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 10)
 		      | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
       = size_up rhs		`addSizeNSD`
 	size_up body		`addSizeN`
-	(if isUnLiftedType (idType binder) then 0 else 1)
+        (if isUnLiftedType (idType binder) then 0 else 10)
 		-- For the allocation
 		-- If the binder has an unlifted type there is no allocation
 
     size_up (Let (Rec pairs) body)
       = foldr (addSizeNSD . size_up . snd) 
-              (size_up body `addSizeN` length pairs)	-- (length pairs) for the allocation
+              (size_up body `addSizeN` (10 * length pairs))     -- (length pairs) for the allocation
               pairs
 
     size_up (Case (Var v) _ _ alts) 
@@ -385,7 +393,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 		-- the case when we are scrutinising an argument variable
 	  alts_size (SizeIs tot tot_disc tot_scrut)  -- Size of all alternatives
 		    (SizeIs max _        _)          -- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, iBox (_ILIT(2) +# tot -# max)) `unionBags` tot_disc) tot_scrut
+                = SizeIs tot (unitBag (v, iBox (_ILIT(20) +# tot -# max)) `unionBags` tot_disc) tot_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of the largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
@@ -395,20 +403,46 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 	  alts_size tot_size _ = tot_size
 
-    size_up (Case e _ _ alts) = size_up e  `addSizeNSD` 
-                                foldr (addAltSize . size_up_alt) sizeZero alts
-	  	-- We don't charge for the case itself
-		-- It's a strict thing, and the price of the call
-		-- is paid by scrut.  Also consider
-		--	case f x of DEFAULT -> e
-		-- This is just ';'!  Don't charge for it.
-		--
-		-- Moreover, we charge one per alternative.
+    size_up (Case e _ _ alts) = size_up e  `addSizeNSD`
+                                foldr (addAltSize . size_up_alt) case_size alts
+      where
+          case_size
+           | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-10)
+           | otherwise = sizeZero
+                -- Normally we don't charge for the case itself, but
+                -- we charge one per alternative (see size_up_alt,
+                -- below) to account for the cost of the info table
+                -- and comparisons.
+                --
+                -- However, in certain cases (see is_inline_scrut
+                -- below), no code is generated for the case unless
+                -- there are multiple alts.  In these cases we
+                -- subtract one, making the first alt free.
+                -- e.g. case x# +# y# of _ -> ...   should cost 1
+                --      case touch# x# of _ -> ...  should cost 0
+                -- (see #4978)
+                --
+                -- I would like to not have the "not (lengthExceeds alts 1)"
+                -- condition above, but without that some programs got worse
+                -- (spectral/hartel/event and spectral/para).  I don't fully
+                -- understand why. (SDM 24/5/11)
+
+                -- unboxed variables, inline primops and unsafe foreign calls
+                -- are all "inline" things:
+          is_inline_scrut (Var v) = isUnLiftedType (idType v)
+          is_inline_scrut scrut
+              | (Var f, _) <- collectArgs scrut
+                = case idDetails f of
+                    FCallId fc  -> not (isSafeForeignCall fc)
+                    PrimOpId op -> not (primOpOutOfLine op)
+                    _other      -> False
+              | otherwise
+                = False
 
     ------------ 
     -- size_up_app is used when there's ONE OR MORE value args
     size_up_app (App fun arg) args 
-	| isTypeArg arg		   = size_up_app fun args
+	| isTyCoArg arg		   = size_up_app fun args
 	| otherwise		   = size_up arg  `addSizeNSD`
                                      size_up_app fun (arg:args)
     size_up_app (Var fun)     args = size_up_call fun args
@@ -418,14 +452,14 @@ sizeExpr bOMB_OUT_SIZE top_args expr
     size_up_call :: Id -> [CoreExpr] -> ExprSize
     size_up_call fun val_args
        = case idDetails fun of
-           FCallId _        -> sizeN opt_UF_DearOp
+           FCallId _        -> sizeN (10 * (1 + length val_args))
            DataConWorkId dc -> conSize    dc (length val_args)
            PrimOpId op      -> primOpSize op (length val_args)
 	   ClassOpId _ 	    -> classOpSize top_args val_args
 	   _     	    -> funSize top_args fun (length val_args)
 
     ------------ 
-    size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 1
+    size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 10
  	-- Don't charge for args, so that wrappers look cheap
 	-- (See comments about wrappers with Case)
 	--
@@ -461,7 +495,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr
-litSize (MachStr str) = 1 + ((lengthFS str + 3) `div` 4)
+litSize (MachStr str) = 10 + 10 * ((lengthFS str + 3) `div` 4)
 	-- If size could be 0 then @f "x"@ might be too small
 	-- [Sept03: make literal strings a bit bigger to avoid fruitless 
 	--  duplication of little strings]
@@ -476,7 +510,7 @@ classOpSize _ []
 classOpSize top_args (arg1 : other_args)
   = SizeIs (iUnbox size) arg_discount (_ILIT(0))
   where
-    size = 2 + length other_args
+    size = 20 + (10 * length other_args)
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
     -- The actual discount is rather arbitrarily chosen
@@ -504,8 +538,7 @@ funSize top_args fun n_val_args
     res_discount | idArity fun > n_val_args = opt_UF_FunAppDiscount
     		 | otherwise   	 	    = 0
         -- If the function is partially applied, show a result discount
-
-    size | some_val_args = 1 + n_val_args
+    size | some_val_args = 10 * (1 + n_val_args)
          | otherwise     = 0
 	-- The 1+ is for the function itself
 	-- Add 1 for each non-trivial arg;
@@ -514,16 +547,17 @@ funSize top_args fun n_val_args
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
-  | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(1))	-- Like variables
-
--- See Note [Constructor size]
-  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+  | n_val_args == 0 = SizeIs (_ILIT(0)) emptyBag (_ILIT(10))    -- Like variables
 
 -- See Note [Unboxed tuple result discount]
---  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (_ILIT(0))
+  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox (10 * (1 + n_val_args)))
 
 -- See Note [Constructor size]
-  | otherwise = SizeIs (_ILIT(1)) emptyBag (iUnbox n_val_args +# _ILIT(1))
+  | otherwise = SizeIs (_ILIT(10)) emptyBag (iUnbox (10 * (10 + n_val_args)))
+     -- discont was (10 * (1 + n_val_args)), but it turns out that
+     -- adding a bigger constant here is an unambiguous win.  We
+     -- REALLY like unfolding constructors that get scrutinised.
+     -- [SDM, 25/5/11]
 \end{code}
 
 Note [Constructor size]
@@ -554,23 +588,15 @@ didn't adopt the idea.
 \begin{code}
 primOpSize :: PrimOp -> Int -> ExprSize
 primOpSize op n_val_args
- | not (primOpIsDupable op) = sizeN opt_UF_DearOp
- | not (primOpOutOfLine op) = sizeN 1
-	-- Be very keen to inline simple primops.
-	-- We give a discount of 1 for each arg so that (op# x y z) costs 2.
-	-- We can't make it cost 1, else we'll inline let v = (op# x y z) 
-	-- at every use of v, which is excessive.
-	--
-	-- A good example is:
-	--	let x = +# p q in C {x}
-	-- Even though x get's an occurrence of 'many', its RHS looks cheap,
-	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
-
- | otherwise = sizeN n_val_args
+ = if primOpOutOfLine op
+      then sizeN (op_size + n_val_args)
+      else sizeN op_size
+ where
+   op_size = primOpCodeSize op
 
 
 buildSize :: ExprSize
-buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
+buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
 	-- We really want to inline applications of build
 	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
 	-- Indeed, we should add a result_discount becuause build is 
@@ -579,7 +605,7 @@ buildSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
 	-- The "4" is rather arbitrary.
 
 augmentSize :: ExprSize
-augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(4))
+augmentSize = SizeIs (_ILIT(0)) emptyBag (_ILIT(40))
 	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
 	-- e plus ys. The -2 accounts for the \cn 
 
@@ -711,7 +737,7 @@ certainlyWillInline (CoreUnfolding { uf_is_cheap = is_cheap, uf_arity = n_vals, 
       UnfNever      -> False
       UnfWhen {}    -> True
       UnfIfGoodArgs { ug_size = size} 
-                    -> is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
+                    -> is_cheap && size - (10 * (n_vals +1)) <= opt_UF_UseThreshold
 
 certainlyWillInline _
   = False
@@ -1059,10 +1085,10 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
 	--  *efficiency* to be gained (e.g. beta reductions, case reductions) 
 	-- by inlining.
 
-  = 1 		-- Discount of 1 because the result replaces the call
+  = 10          -- Discount of 1 because the result replaces the call
 		-- so we count 1 for the function itself
 
-    + length (take n_vals_wanted arg_infos)
+    + 10 * length (take n_vals_wanted arg_infos)
       	       -- Discount of (un-scaled) 1 for each arg supplied, 
    	       -- because the result replaces the call
 
@@ -1072,13 +1098,13 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos cont_info
     arg_discount = sum (zipWith mk_arg_discount arg_discounts arg_infos)
 
     mk_arg_discount _ 	     TrivArg    = 0 
-    mk_arg_discount _ 	     NonTrivArg = 1   
+    mk_arg_discount _        NonTrivArg = 10
     mk_arg_discount discount ValueArg   = discount 
 
     res_discount' = case cont_info of
 			BoringCtxt  -> 0
 			CaseCtxt    -> res_discount
-			_other      -> 4 `min` res_discount
+                        _other      -> 40 `min` res_discount
 		-- res_discount can be very large when a function returns
 		-- constructors; but we only want to invoke that large discount
 		-- when there's a case continuation.
@@ -1147,12 +1173,14 @@ interestingArg e = go e 0
          conlike_unfolding = isConLikeUnfolding (idUnfolding v)
 
     go (Type _)          _ = TrivArg
-    go (App fn (Type _)) n = go fn n    
+    go (Coercion _)      _ = TrivArg
+    go (App fn (Type _)) n = go fn n
+    go (App fn (Coercion _)) n = go fn n
     go (App fn _)        n = go fn (n+1)
     go (Note _ a) 	 n = go a n
     go (Cast e _) 	 n = go e n
     go (Lam v e)  	 n 
-       | isTyCoVar v	   = go e n
+       | isTyVar v	   = go e n
        | n>0	 	   = go e (n-1)
        | otherwise	   = ValueArg
     go (Let _ e)  	 n = case go e n of { ValueArg -> ValueArg; _ -> NonTrivArg }
@@ -1208,7 +1236,7 @@ exprIsConApp_maybe id_unf (Cast expr co)
 	Nothing 	                 -> Nothing ;
 	Just (dc, _dc_univ_args, dc_args) -> 
 
-    let (_from_ty, to_ty) = coercionKind co
+    let Pair _from_ty to_ty = coercionKind co
 	dc_tc = dataConTyCon dc
     in
     case splitTyConApp_maybe to_ty of {
@@ -1228,41 +1256,28 @@ exprIsConApp_maybe id_unf (Cast expr co)
         dc_ex_tyvars   = dataConExTyVars dc
         arg_tys        = dataConRepArgTys dc
 
-        dc_eqs :: [(Type,Type)]	  -- All equalities from the DataCon
-        dc_eqs = [(mkTyVarTy tv, ty)   | (tv,ty) <- dataConEqSpec dc] ++
-                 [getEqPredTys eq_pred | eq_pred <- dataConEqTheta dc]
-
-        (ex_args, rest1)    = splitAtList dc_ex_tyvars dc_args
-	(co_args, val_args) = splitAtList dc_eqs rest1
+        (ex_args, val_args) = splitAtList dc_ex_tyvars dc_args
 
 	-- Make the "theta" from Fig 3 of the paper
         gammas = decomposeCo tc_arity co
-        theta  = zipOpenTvSubst (dc_univ_tyvars ++ dc_ex_tyvars)
-                                (gammas         ++ stripTypeArgs ex_args)
+        theta  = zipOpenCvSubst (dc_univ_tyvars ++ dc_ex_tyvars)
+                                (gammas         ++ map mkReflCo (stripTypeArgs ex_args))
 
-          -- Cast the existential coercion arguments
-        cast_co (ty1, ty2) (Type co) 
-          = Type $ mkSymCoercion (substTy theta ty1)
-		   `mkTransCoercion` co
-		   `mkTransCoercion` (substTy theta ty2)
-        cast_co _ other_arg = pprPanic "cast_co" (ppr other_arg)
-        new_co_args = zipWith cast_co dc_eqs co_args
-  
           -- Cast the value arguments (which include dictionaries)
 	new_val_args = zipWith cast_arg arg_tys val_args
-	cast_arg arg_ty arg = mkCoerce (substTy theta arg_ty) arg
+	cast_arg arg_ty arg = mkCoerce (liftCoSubst theta arg_ty) arg
     in
 #ifdef DEBUG
     let dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
                          ppr ex_args, ppr val_args]
     in
-    ASSERT2( coreEqType _from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
-    ASSERT2( all isTypeArg (ex_args ++ co_args), dump_doc )
+    ASSERT2( eqType _from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
+    ASSERT2( all isTypeArg ex_args, dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
 #endif
 
-    Just (dc, to_tc_arg_tys, ex_args ++ new_co_args ++ new_val_args)
+    Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
     }}
 
 exprIsConApp_maybe id_unf expr 
@@ -1301,7 +1316,7 @@ exprIsConApp_maybe id_unf expr
 
     -----------
     beta (Lam v body) pairs (arg : args) 
-        | isTypeArg arg
+        | isTyCoArg arg
         = beta body ((v,arg):pairs) args 
 
     beta (Lam {}) _ _    -- Un-saturated, or not a type lambda
@@ -1313,10 +1328,10 @@ exprIsConApp_maybe id_unf expr
           subst = mkOpenSubst (mkInScopeSet (exprFreeVars fun)) pairs
 	  -- doc = vcat [ppr fun, ppr expr, ppr pairs, ppr args]
 
-
 stripTypeArgs :: [CoreExpr] -> [Type]
 stripTypeArgs args = ASSERT2( all isTypeArg args, ppr args )
                      [ty | Type ty <- args]
+  -- We really do want isTypeArg here, not isTyCoArg!
 \end{code}
 
 Note [Unfolding DFuns]

@@ -51,11 +51,10 @@ import SrcLoc
 import FastString
 import LlvmCodeGen      ( llvmFixupAsm )
 import MonadUtils
+import Platform
 
--- import Data.Either
 import Exception
 import Data.IORef       ( readIORef )
--- import GHC.Exts              ( Int(..) )
 import System.Directory
 import System.FilePath
 import System.IO
@@ -269,11 +268,11 @@ link :: GhcLink                 -- interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-#ifdef GHCI
 link LinkInMemory _ _ _
-    = do -- Not Linking...(demand linker will do the job)
-         return Succeeded
-#endif
+    = if cGhcWithInterpreter == "YES"
+      then -- Not Linking...(demand linker will do the job)
+           return Succeeded
+      else panicBadLink LinkInMemory
 
 link NoLink _ _ _
    = return Succeeded
@@ -283,11 +282,6 @@ link LinkBinary dflags batch_attempt_linking hpt
 
 link LinkDynLib dflags batch_attempt_linking hpt
    = link' dflags batch_attempt_linking hpt
-
-#ifndef GHCI
--- warning suppression
-link other _ _ _ = panicBadLink other
-#endif
 
 panicBadLink :: GhcLink -> a
 panicBadLink other = panic ("link: GHC not built to link this way: " ++
@@ -779,9 +773,9 @@ runPhase (Cpp sf) input_fn dflags0
             src_opts <- io $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
                 <- io $ parseDynamicNoPackageFlags dflags0 src_opts
+            io $ checkProcessArgsResult unhandled_flags
             unless (dopt Opt_Pp dflags2) $ io $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
-            io $ checkProcessArgsResult unhandled_flags
 
             setDynFlags dflags2
 
@@ -814,8 +808,8 @@ runPhase (HsPp sf) input_fn dflags
             (dflags1, unhandled_flags, warns)
                 <- io $ parseDynamicNoPackageFlags dflags src_opts
             setDynFlags dflags1
-            io $ handleFlagWarnings dflags1 warns
             io $ checkProcessArgsResult unhandled_flags
+            io $ handleFlagWarnings dflags1 warns
 
             return (Hsc sf, output_fn)
 
@@ -1027,11 +1021,10 @@ runPhase cc_phase input_fn dflags
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
                               (cmdline_include_paths ++ pkg_include_dirs)
 
-        let md_c_flags = machdepCCOpts dflags
-        gcc_extra_viac_flags <- io $ getExtraViaCOpts dflags
+        let gcc_extra_viac_flags = extraGccViaCFlags dflags
         let pic_c_flags = picCCOpts dflags
 
-        let verb = getVerbFlag dflags
+        let verbFlags = getVerbFlags dflags
 
         -- cc-options are not passed when compiling .hc files.  Our
         -- hc code doesn't not #include any header files anyway, so these
@@ -1062,15 +1055,14 @@ runPhase cc_phase input_fn dflags
 
         let
           more_hcc_opts =
-#if i386_TARGET_ARCH
                 -- on x86 the floating point regs have greater precision
                 -- than a double, which leads to unpredictable results.
                 -- By default, we turn this off with -ffloat-store unless
                 -- the user specified -fexcess-precision.
-                (if dopt Opt_ExcessPrecision dflags
-                        then []
-                        else [ "-ffloat-store" ]) ++
-#endif
+                (if platformArch (targetPlatform dflags) == ArchX86 &&
+                    not (dopt Opt_ExcessPrecision dflags)
+                        then [ "-ffloat-store" ]
+                        else []) ++
 
                 -- gcc's -fstrict-aliasing allows two accesses to memory
                 -- to be considered non-aliasing if they have different types.
@@ -1092,33 +1084,33 @@ runPhase cc_phase input_fn dflags
                         , SysTools.FileOption "" output_fn
                         ]
                        ++ map SysTools.Option (
-                          md_c_flags
-                       ++ pic_c_flags
+                          pic_c_flags
 
-#if    defined(mingw32_TARGET_OS)
                 -- Stub files generated for foreign exports references the runIO_closure
                 -- and runNonIO_closure symbols, which are defined in the base package.
                 -- These symbols are imported into the stub.c file via RtsAPI.h, and the
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
-                       ++ (if thisPackage dflags == basePackageId
+                       ++ (if platformOS (targetPlatform dflags) == OSMinGW32 &&
+                              thisPackage dflags == basePackageId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
-#endif
 
-#ifdef sparc_TARGET_ARCH
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction. Note that the user can still override this
         -- (e.g., -mcpu=ultrasparc) as GCC picks the "best" -mcpu flag
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ ["-mcpu=v9"]
-#endif
+                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                           then ["-mcpu=v9"]
+                           else [])
+
                        ++ (if hcc
                              then gcc_extra_viac_flags ++ more_hcc_opts
                              else [])
-                       ++ [ verb, "-S", "-Wimplicit", cc_opt ]
+                       ++ verbFlags
+                       ++ [ "-S", "-Wimplicit", cc_opt ]
                        ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
 #ifdef darwin_TARGET_OS
                        ++ framework_paths
@@ -1177,11 +1169,10 @@ runPhase As input_fn dflags
         -- might be a hierarchical module.
         io $ createDirectoryHierarchy (takeDirectory output_fn)
 
-        let md_c_flags = machdepCCOpts dflags
         io $ SysTools.runAs dflags
                        (map SysTools.Option as_opts
                        ++ [ SysTools.Option ("-I" ++ p) | p <- cmdline_include_paths ]
-#ifdef sparc_TARGET_ARCH
+
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
         -- instruction set. Note that the user can still override this
@@ -1189,14 +1180,15 @@ runPhase As input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                       ++ [ SysTools.Option "-mcpu=v9" ]
-#endif
+                       ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                           then [SysTools.Option "-mcpu=v9"]
+                           else [])
+
                        ++ [ SysTools.Option "-c"
                           , SysTools.FileOption "" input_fn
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" output_fn
-                          ]
-                       ++ map SysTools.Option md_c_flags)
+                          ])
 
         return (next_phase, output_fn)
 
@@ -1232,11 +1224,10 @@ runPhase SplitAs _input_fn dflags
             split_obj n = split_odir </>
                           takeFileName base_o ++ "__" ++ show n <.> osuf
 
-        let md_c_flags = machdepCCOpts dflags
         let assemble_file n
               = SysTools.runAs dflags
                          (map SysTools.Option as_opts ++
-#ifdef sparc_TARGET_ARCH
+
         -- We only support SparcV9 and better because V8 lacks an atomic CAS
         -- instruction so we have to make sure that the assembler accepts the
         -- instruction set. Note that the user can still override this
@@ -1244,14 +1235,15 @@ runPhase SplitAs _input_fn dflags
         -- regardless of the ordering.
         --
         -- This is a temporary hack.
-                          [ SysTools.Option "-mcpu=v9" ] ++
-#endif
+                          (if platformArch (targetPlatform dflags) == ArchSPARC
+                           then [SysTools.Option "-mcpu=v9"]
+                           else []) ++
+
                           [ SysTools.Option "-c"
                           , SysTools.Option "-o"
                           , SysTools.FileOption "" (split_obj n)
                           , SysTools.FileOption "" (split_s n)
-                          ]
-                       ++ map SysTools.Option md_c_flags)
+                          ])
 
         io $ mapM_ assemble_file [1..n]
 
@@ -1313,24 +1305,18 @@ runPhase LlvmOpt input_fn dflags
         -- fix up some pretty big deficiencies in the code we generate
         llvmOpts = ["-mem2reg", "-O1", "-O2"]
 
-
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
 
 runPhase LlvmLlc input_fn dflags
   = do
     let lc_opts = getOpts dflags opt_lc
-    let opt_lvl = max 0 (min 2 $ optLevel dflags)
-#if darwin_TARGET_OS
-    let nphase = LlvmMangle
-#else
-    let nphase = As
-#endif
-    let rmodel | opt_PIC        = "pic"
+        opt_lvl = max 0 (min 2 $ optLevel dflags)
+        rmodel | opt_PIC        = "pic"
                | not opt_Static = "dynamic-no-pic"
                | otherwise      = "static"
 
-    output_fn <- phaseOutputFilename nphase
+    output_fn <- phaseOutputFilename LlvmMangle
 
     io $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
@@ -1339,14 +1325,12 @@ runPhase LlvmLlc input_fn dflags
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
                 ++ map SysTools.Option lc_opts)
 
-    return (nphase, output_fn)
+    return (LlvmMangle, output_fn)
   where
-#if darwin_TARGET_OS
-        llvmOpts = ["-O1", "-O2", "-O2"]
-#else
-        llvmOpts = ["-O1", "-O2", "-O3"]
-#endif
-
+        -- Bug in LLVM at O3 on OSX.
+        llvmOpts = if platformOS (targetPlatform dflags) == OSDarwin
+                   then ["-O1", "-O2", "-O2"]
+                   else ["-O1", "-O2", "-O3"]
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase
@@ -1418,14 +1402,12 @@ mkExtraCObj dflags xs
       oFile <- newTempName dflags "o"
       writeFile cFile xs
       let rtsDetails = getPackageDetails (pkgState dflags) rtsPackageId
-          md_c_flags = machdepCCOpts dflags
       SysTools.runCc dflags
                      ([Option        "-c",
                        FileOption "" cFile,
                        Option        "-o",
                        FileOption "" oFile] ++
-                      map (FileOption "-I") (includeDirs rtsDetails) ++
-                      map Option md_c_flags)
+                      map (FileOption "-I") (includeDirs rtsDetails))
       return oFile
 
 mkExtraObjToLinkIntoBinary :: DynFlags -> [PackageId] -> IO FilePath
@@ -1433,7 +1415,10 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
    link_info <- getLinkInfo dflags dep_packages
    mkExtraCObj dflags (showSDoc (vcat [rts_opts_enabled,
                                        extra_rts_opts,
-                                       link_opts link_info]))
+                                       link_opts link_info]
+                                   <> char '\n')) -- final newline, to
+                                                  -- keep gcc happy
+
   where
     mk_rts_opts_enabled val
          = vcat [text "#include \"Rts.h\"",
@@ -1574,7 +1559,7 @@ getHCFilePackages filename =
 
 linkBinary :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
 linkBinary dflags o_files dep_packages = do
-    let verb = getVerbFlag dflags
+    let verbFlags = getVerbFlags dflags
         output_fn = exeFileName dflags
 
     -- get the full list of packages to link with, by combining the
@@ -1650,20 +1635,20 @@ linkBinary dflags o_files dep_packages = do
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    let md_c_flags = machdepCCOpts dflags
     SysTools.runLink dflags (
-                       [ SysTools.Option verb
-                       , SysTools.Option "-o"
-                       , SysTools.FileOption "" output_fn
-                       ]
+                       map SysTools.Option verbFlags
+                      ++ [ SysTools.Option "-o"
+                         , SysTools.FileOption "" output_fn
+                         ]
                       ++ map SysTools.Option (
-                         md_c_flags
+                         []
 
-#ifdef mingw32_TARGET_OS
                       -- Permit the linker to auto link _symbol to _imp_symbol.
                       -- This lets us link against DLLs without needing an "import library".
-                      ++ ["-Wl,--enable-auto-import"]
-#endif
+                      ++ (if platformOS (targetPlatform dflags) == OSMinGW32
+                          then ["-Wl,--enable-auto-import"]
+                          else [])
+
                       ++ o_files
                       ++ extra_ld_inputs
                       ++ lib_path_opts
@@ -1694,19 +1679,15 @@ linkBinary dflags o_files dep_packages = do
 exeFileName :: DynFlags -> FilePath
 exeFileName dflags
   | Just s <- outputFile dflags =
-#if defined(mingw32_HOST_OS)
-      if null (takeExtension s)
-        then s <.> "exe"
-        else s
-#else
-      s
-#endif
+      if platformOS (targetPlatform dflags) == OSMinGW32
+      then if null (takeExtension s)
+           then s <.> "exe"
+           else s
+      else s
   | otherwise =
-#if defined(mingw32_HOST_OS)
-        "main.exe"
-#else
-        "a.out"
-#endif
+      if platformOS (targetPlatform dflags) == OSMinGW32
+      then "main.exe"
+      else "a.out"
 
 maybeCreateManifest
    :: DynFlags
@@ -1768,7 +1749,7 @@ maybeCreateManifest dflags exe_filename = do
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
 linkDynLib dflags o_files dep_packages = do
-    let verb = getVerbFlag dflags
+    let verbFlags = getVerbFlags dflags
     let o_file = outputFile dflags
 
     pkgs <- getPreloadPackagesAnd dflags dep_packages
@@ -1802,7 +1783,6 @@ linkDynLib dflags o_files dep_packages = do
         -- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
-    let md_c_flags = machdepCCOpts dflags
     let extra_ld_opts = getOpts dflags opt_l
 
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags dep_packages
@@ -1813,22 +1793,21 @@ linkDynLib dflags o_files dep_packages = do
     -----------------------------------------------------------------------------
     let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
 
-    SysTools.runLink dflags
-         ([ SysTools.Option verb
-          , SysTools.Option "-o"
-          , SysTools.FileOption "" output_fn
-          , SysTools.Option "-shared"
-          ] ++
-          [ SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
-          | dopt Opt_SharedImplib dflags
-          ]
+    SysTools.runLink dflags (
+            map SysTools.Option verbFlags
+         ++ [ SysTools.Option "-o"
+            , SysTools.FileOption "" output_fn
+            , SysTools.Option "-shared"
+            ] ++
+            [ SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
+            | dopt Opt_SharedImplib dflags
+            ]
          ++ map (SysTools.FileOption "") o_files
          ++ map SysTools.Option (
-            md_c_flags
 
          -- Permit the linker to auto link _symbol to _imp_symbol
          -- This lets us link against DLLs without needing an "import library"
-         ++ ["-Wl,--enable-auto-import"]
+            ["-Wl,--enable-auto-import"]
 
          ++ extra_ld_inputs
          ++ lib_path_opts
@@ -1873,15 +1852,14 @@ linkDynLib dflags o_files dep_packages = do
         Nothing -> do
             pwd <- getCurrentDirectory
             return $ pwd `combine` output_fn
-    SysTools.runLink dflags
-         ([ SysTools.Option verb
-          , SysTools.Option "-dynamiclib"
-          , SysTools.Option "-o"
-          , SysTools.FileOption "" output_fn
-          ]
+    SysTools.runLink dflags (
+            map SysTools.Option verbFlags
+         ++ [ SysTools.Option "-dynamiclib"
+            , SysTools.Option "-o"
+            , SysTools.FileOption "" output_fn
+            ]
          ++ map SysTools.Option (
-            md_c_flags
-         ++ o_files
+            o_files
          ++ [ "-undefined", "dynamic_lookup", "-single_module",
 #if !defined(x86_64_TARGET_ARCH)
               "-Wl,-read_only_relocs,suppress",
@@ -1909,14 +1887,13 @@ linkDynLib dflags o_files dep_packages = do
                              -- non-PIC intra-package-relocations
                              ["-Wl,-Bsymbolic"]
 
-    SysTools.runLink dflags
-         ([ SysTools.Option verb
-          , SysTools.Option "-o"
-          , SysTools.FileOption "" output_fn
-          ]
+    SysTools.runLink dflags (
+            map SysTools.Option verbFlags
+         ++ [ SysTools.Option "-o"
+            , SysTools.FileOption "" output_fn
+            ]
          ++ map SysTools.Option (
-            md_c_flags
-         ++ o_files
+            o_files
          ++ [ "-shared" ]
          ++ bsymbolicFlag
             -- Set the library soname. We use -h rather than -soname as
@@ -1942,14 +1919,11 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
     let include_paths = foldr (\ x xs -> "-I" : x : xs) []
                           (cmdline_include_paths ++ pkg_include_dirs)
 
-    let verb = getVerbFlag dflags
+    let verbFlags = getVerbFlags dflags
 
     let cc_opts
-          | not include_cc_opts = []
-          | otherwise           = (optc ++ md_c_flags)
-                where
-                      optc = getOpts dflags opt_c
-                      md_c_flags = machdepCCOpts dflags
+          | include_cc_opts = getOpts dflags opt_c
+          | otherwise       = []
 
     let cpp_prog args | raw       = SysTools.runCpp dflags args
                       | otherwise = SysTools.runCc dflags (SysTools.Option "-E" : args)
@@ -1962,7 +1936,7 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
 
-    cpp_prog       ([SysTools.Option verb]
+    cpp_prog       (   map SysTools.Option verbFlags
                     ++ map SysTools.Option include_paths
                     ++ map SysTools.Option hsSourceCppOpts
                     ++ map SysTools.Option target_defs
@@ -2001,7 +1975,6 @@ joinObjectFiles dflags o_files output_fn = do
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
                             SysTools.FileOption "" output_fn ]
-                         ++ map SysTools.Option md_c_flags
                          ++ args)
 
       ld_x_flag | null cLD_X = ""
@@ -2013,8 +1986,6 @@ joinObjectFiles dflags o_files output_fn = do
       ld_build_id | cLdHasBuildId == "YES"  = "-Wl,--build-id=none"
                   | otherwise               = ""
 
-      md_c_flags = machdepCCOpts dflags
-  
   if cLdIsGNULd == "YES"
      then do
           script <- newTempName dflags "ldscript"

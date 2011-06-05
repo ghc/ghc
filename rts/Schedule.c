@@ -1485,18 +1485,18 @@ delete_threads_and_gc:
         recent_activity = ACTIVITY_YES;
     }
 
+    if (heap_census) {
+        debugTrace(DEBUG_sched, "performing heap census");
+        heapCensus();
+	performHeapProfile = rtsFalse;
+    }
+
 #if defined(THREADED_RTS)
     if (gc_type == GC_PAR)
     {
         releaseGCThreads(cap);
     }
 #endif
-
-    if (heap_census) {
-        debugTrace(DEBUG_sched, "performing heap census");
-        heapCensus();
-	performHeapProfile = rtsFalse;
-    }
 
     if (heap_overflow && sched_state < SCHED_INTERRUPTING) {
         // GC set the heap_overflow flag, so we should proceed with
@@ -2075,16 +2075,7 @@ exitScheduler (rtsBool wait_foreign USED_IF_THREADS)
     }
     sched_state = SCHED_SHUTTING_DOWN;
 
-#if defined(THREADED_RTS)
-    { 
-	nat i;
-	
-	for (i = 0; i < n_capabilities; i++) {
-            ASSERT(task->incall->tso == NULL);
-	    shutdownCapability(&capabilities[i], task, wait_foreign);
-	}
-    }
-#endif
+    shutdownCapabilities(task, wait_foreign);
 
     boundTaskExiting(task);
 }

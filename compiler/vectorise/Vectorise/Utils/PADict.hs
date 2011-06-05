@@ -31,7 +31,6 @@ import Control.Monad
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
   where
-    go ty k | Just k' <- kindView k = go ty k'
     go ty (FunTy k1 k2)
       = do
           tv   <- newTyVar (fsLit "a") k1
@@ -136,9 +135,9 @@ prDictOfPReprInstTyCon ty prepr_tc prepr_args
       dict <- prDictOfReprType' rhs
       pr_co <- mkBuiltinCo prTyCon
       let Just arg_co = tyConFamilyCoercion_maybe prepr_tc
-      let co = mkAppCoercion pr_co
-             $ mkSymCoercion
-             $ mkTyConApp arg_co prepr_args
+      let co = mkAppCo pr_co
+             $ mkSymCo
+             $ mkAxInstCo arg_co prepr_args
       return $ mkCoerce co dict
 
   | otherwise = cantVectorise "Invalid PRepr type instance" (ppr ty)

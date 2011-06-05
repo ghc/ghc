@@ -54,6 +54,7 @@ words :-
     <0>         "thats_all_folks"   { mkT TThatsAllFolks }
     <0>         [a-z][a-zA-Z0-9\#_]* { mkTv TLowerName }
     <0>         [A-Z][a-zA-Z0-9\#_]* { mkTv TUpperName }
+    <0>         [0-9][0-9]*         { mkTv (TInteger . read) }
     <0>         \" [^\"]* \"        { mkTv (TString . tail . init) }
     <in_braces> [^\{\}]+            { mkTv TNoBraces }
     <in_braces> \n                  { mkTv TNoBraces }

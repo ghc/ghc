@@ -301,10 +301,9 @@ addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsExprNeverOrAlways e)
-addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
-        (stmts', last_exp') <- addTickLStmts' forQual stmts 
-                                     (addTickLHsExpr last_exp)
-	return (HsDo cxt stmts' last_exp' srcloc)
+addTickHsExpr (HsDo cxt stmts srcloc) 
+  = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
+       ; return (HsDo cxt stmts' srcloc) }
   where
 	forQual = case cxt of
 		    ListComp -> Just $ BinBox QualBinBox
@@ -365,6 +364,20 @@ addTickHsExpr (HsWrap w e) =
 		(return w)
 		(addTickHsExpr e)	-- explicitly no tick on inside
 
+addTickHsExpr (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
+        liftM5 HsArrApp
+	       (addTickLHsExpr e1)
+	       (addTickLHsExpr e2)
+	       (return ty1)
+	       (return arr_ty)
+	       (return lr)
+
+addTickHsExpr (HsArrForm e fix cmdtop) = 
+        liftM3 HsArrForm
+	       (addTickLHsExpr e)
+	       (return fix)
+	       (mapM (liftL (addTickHsCmdTop)) cmdtop)
+
 addTickHsExpr e@(HsType _) = return e
 
 -- Others dhould never happen in expression content.
@@ -410,45 +423,50 @@ addTickLStmts isGuard stmts = do
 addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM a 
                -> TM ([LStmt Id], a)
 addTickLStmts' isGuard lstmts res
-  = bindLocals binders $ do
-        lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
-        a <- res
-        return (lstmts', a)
-  where
-        binders = collectLStmtsBinders lstmts
+  = bindLocals (collectLStmtsBinders lstmts) $ 
+    do { lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
+       ; a <- res
+       ; return (lstmts', a) }
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
+addTickStmt _isGuard (LastStmt e ret) = do
+	liftM2 LastStmt
+		(addTickLHsExpr e)
+		(addTickSyntaxExpr hpcSrcSpan ret)
 addTickStmt _isGuard (BindStmt pat e bind fail) = do
 	liftM4 BindStmt
 		(addTickLPat pat)
 		(addTickLHsExprAlways e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
-addTickStmt isGuard (ExprStmt e bind' ty) = do
-	liftM3 ExprStmt
+addTickStmt isGuard (ExprStmt e bind' guard' ty) = do
+	liftM4 ExprStmt
 		(addTick isGuard e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
+		(addTickSyntaxExpr hpcSrcSpan guard')
 		(return ty)
 addTickStmt _isGuard (LetStmt binds) = do
 	liftM LetStmt
 		(addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt pairs) = do
-    liftM ParStmt 
+addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr returnExpr) = do
+    liftM4 ParStmt 
         (mapM (addTickStmtAndBinders isGuard) pairs)
+        (addTickSyntaxExpr hpcSrcSpan mzipExpr)
+        (addTickSyntaxExpr hpcSrcSpan bindExpr)
+        (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
-addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr) = do
-    liftM4 TransformStmt 
-        (addTickLStmts isGuard stmts)
-        (return ids)
-        (addTickLHsExprAlways usingExpr)
-        (addTickMaybeByLHsExpr maybeByExpr)
-
-addTickStmt isGuard (GroupStmt stmts binderMap by using) = do
-    liftM4 GroupStmt 
-        (addTickLStmts isGuard stmts)
-        (return binderMap)
-        (fmapMaybeM  addTickLHsExprAlways by)
-	(fmapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) using)
+addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
+                                    , trS_by = by, trS_using = using
+                                    , trS_ret = returnExpr, trS_bind = bindExpr
+                                    , trS_fmap = liftMExpr }) = do
+    t_s <- addTickLStmts isGuard stmts
+    t_y <- fmapMaybeM  addTickLHsExprAlways by
+    t_u <- addTickLHsExprAlways using
+    t_f <- addTickSyntaxExpr hpcSrcSpan returnExpr
+    t_b <- addTickSyntaxExpr hpcSrcSpan bindExpr
+    t_m <- addTickSyntaxExpr hpcSrcSpan liftMExpr
+    return $ stmt { trS_stmts = t_s, trS_by = t_y, trS_using = t_u
+                  , trS_ret = t_f, trS_bind = t_b, trS_fmap = t_m }
 
 addTickStmt isGuard stmt@(RecStmt {})
   = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
@@ -468,12 +486,6 @@ addTickStmtAndBinders isGuard (stmts, ids) =
     liftM2 (,) 
         (addTickLStmts isGuard stmts)
         (return ids)
-
-addTickMaybeByLHsExpr :: Maybe (LHsExpr Id) -> TM (Maybe (LHsExpr Id))
-addTickMaybeByLHsExpr maybeByExpr = 
-    case maybeByExpr of
-        Nothing -> return Nothing
-        Just byExpr -> addTickLHsExprAlways byExpr >>= (return . Just)
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 
@@ -555,10 +567,10 @@ addTickHsCmd (HsLet binds c) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsCmd c)
-addTickHsCmd (HsDo cxt stmts last_exp srcloc) = do
-        (stmts', last_exp') <- addTickLCmdStmts' stmts (addTickLHsCmd last_exp)
-	return (HsDo cxt stmts' last_exp' srcloc)
-  where
+addTickHsCmd (HsDo cxt stmts srcloc)
+  = do { (stmts', _) <- addTickLCmdStmts' stmts (return ())
+       ; return (HsDo cxt stmts' srcloc) }
+
 addTickHsCmd (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
         liftM5 HsArrApp
 	       (addTickLHsExpr e1)
@@ -596,9 +608,12 @@ addTickCmdGRHSs (GRHSs guarded local_binds) = do
     binders = collectLocalBinders local_binds
 
 addTickCmdGRHS :: GRHS Id -> TM (GRHS Id)
-addTickCmdGRHS (GRHS stmts cmd) = do
-  (stmts',expr') <- addTickLCmdStmts' stmts (addTickLHsCmd cmd)
-  return $ GRHS stmts' expr'
+-- The *guards* are *not* Cmds, although the body is
+-- C.f. addTickGRHS for the BinBox stuff
+addTickCmdGRHS (GRHS stmts cmd)
+  = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) 
+                                   stmts (addTickLHsCmd cmd)
+       ; return $ GRHS stmts' expr' }
 
 addTickLCmdStmts :: [LStmt Id] -> TM [LStmt Id]
 addTickLCmdStmts stmts = do
@@ -621,10 +636,15 @@ addTickCmdStmt (BindStmt pat c bind fail) = do
 		(addTickLHsCmd c)
 		(return bind)
 		(return fail)
-addTickCmdStmt (ExprStmt c bind' ty) = do
-	liftM3 ExprStmt
+addTickCmdStmt (LastStmt c ret) = do
+	liftM2 LastStmt
 		(addTickLHsCmd c)
-		(return bind')
+		(addTickSyntaxExpr hpcSrcSpan ret)
+addTickCmdStmt (ExprStmt c bind' guard' ty) = do
+	liftM4 ExprStmt
+		(addTickLHsCmd c)
+		(addTickSyntaxExpr hpcSrcSpan bind')
+                (addTickSyntaxExpr hpcSrcSpan guard')
 		(return ty)
 addTickCmdStmt (LetStmt binds) = do
 	liftM LetStmt

@@ -25,7 +25,6 @@ import TcHsType
 import TcPat
 import TcMType
 import TcType
-import RnBinds( misplacedSigErr )
 import Coercion
 import TysPrim
 import Id
@@ -44,7 +43,6 @@ import BasicTypes
 import Outputable
 import FastString
 
-import Data.List( partition )
 import Control.Monad
 
 #include "HsVersions.h"
@@ -559,24 +557,16 @@ tcSpec _ prag = pprPanic "tcSpec" (ppr prag)
 tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
 tcImpPrags prags
   = do { this_mod <- getModule
-       ; let is_imp prag 
-               = case sigName prag of
-                   Nothing   -> False
-                   Just name -> not (nameIsLocalOrFrom this_mod name)
-             (spec_prags, others) = partition isSpecLSig $
-	     		  	    filter is_imp prags
-       ; mapM_ misplacedSigErr others 
-       -- Messy that this misplaced-sig error comes here
-       -- but the others come from the renamer
-       ; mapAndRecoverM (wrapLocM tcImpSpec) spec_prags }
+       ; mapAndRecoverM (wrapLocM tcImpSpec) 
+         [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
+                            , not (nameIsLocalOrFrom this_mod name) ] }
 
-tcImpSpec :: Sig Name -> TcM TcSpecPrag
-tcImpSpec prag@(SpecSig (L _ name) _ _)
+tcImpSpec :: (Name, Sig Name) -> TcM TcSpecPrag
+tcImpSpec (name, prag)
  = do { id <- tcLookupId name
       ; checkTc (isAnyInlinePragma (idInlinePragma id))
                 (impSpecErr name)
       ; tcSpec id prag }
-tcImpSpec p = pprPanic "tcImpSpec" (ppr p)
 
 impSpecErr :: Name -> SDoc
 impSpecErr name
@@ -854,7 +844,7 @@ unifyCtxts (sig1 : sigs)
                -- where F is a type function and (F a ~ [a])
                -- Then unification might succeed with a coercion.  But it's much
                -- much simpler to require that such signatures have identical contexts
-               checkTc (all isIdentityCoI cois)
+               checkTc (all isReflCo cois)
                        (ptext (sLit "Mutually dependent functions have syntactically distinct contexts"))
              }
 \end{code}

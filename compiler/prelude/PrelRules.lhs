@@ -54,7 +54,7 @@ Well, of course you'd need a lot of rules if you did it
 like that, so we use a BuiltinRule instead, so that we
 can match in any two literal values.  So the rule is really
 more like
-        (Lit 4) +# (Lit y) = Lit (x+#y)
+        (Lit x) +# (Lit y) = Lit (x+#y)
 where the (+#) on the rhs is done at compile time
 
 That is why these rules are built in here.  Other rules
@@ -527,7 +527,7 @@ For dataToTag#, we can reduce if either
 dataToTagRule :: IdUnfoldingFun -> [Expr CoreBndr] -> Maybe (Arg CoreBndr)
 dataToTagRule _ [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
   | tag_to_enum `hasKey` tagToEnumKey
-  , ty1 `coreEqType` ty2
+  , ty1 `eqType` ty2
   = Just tag  -- dataToTag (tagToEnum x)   ==>   x
 
 dataToTagRule id_unf [_, val_arg]
@@ -600,7 +600,7 @@ match_append_lit _ [Type ty1,
                    ]
   | unpk `hasKey` unpackCStringFoldrIdKey &&
     c1 `cheapEqExpr` c2
-  = ASSERT( ty1 `coreEqType` ty2 )
+  = ASSERT( ty1 `eqType` ty2 )
     Just (Var unpk `App` Type ty1
                    `App` Lit (MachStr (s1 `appendFS` s2))
                    `App` c1

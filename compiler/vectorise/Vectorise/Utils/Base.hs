@@ -133,7 +133,7 @@ mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
 mkBuiltinCo get_tc
   = do
       tc <- builtin get_tc
-      return $ mkTyConApp tc []
+      return $ mkTyConAppCo tc []
 
 
 mkVScrut :: VExpr -> VM (CoreExpr, CoreExpr, TyCon, [Type])

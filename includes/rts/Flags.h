@@ -246,7 +246,7 @@ extern RTS_FLAGS RtsFlags;
 extern int     prog_argc;
 extern char  **prog_argv;
 */
-extern int     rts_argc;  /* ditto */
-extern char   *rts_argv[];
+extern int      rts_argc;  /* ditto */
+extern char   **rts_argv;
 
 #endif	/* RTS_FLAGS_H */

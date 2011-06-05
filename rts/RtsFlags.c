@@ -33,7 +33,15 @@ int     full_prog_argc = 0;    /* an "int" so as to match normal "argc" */
 char  **full_prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
-char   *rts_argv[MAX_RTS_ARGS];
+char  **rts_argv = NULL;
+#if defined(mingw32_HOST_OS)
+// On Windows, we want to use GetCommandLineW rather than argc/argv,
+// but we need to mutate the command line arguments for withProgName and
+// friends. The System.Environment module achieves that using this bit of
+// shared state:
+int       win32_prog_argc = 0;
+wchar_t **win32_prog_argv = NULL;
+#endif
 
 /*
  * constants, used later 
@@ -64,6 +72,10 @@ static void read_trace_flags(char *arg);
 #endif
 
 static void errorUsage      (void) GNU_ATTRIBUTE(__noreturn__);
+
+static char *  copyArg  (char *arg);
+static char ** copyArgv (int argc, char *argv[]);
+static void    freeArgv (int argc, char *argv[]);
 
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
@@ -382,15 +394,11 @@ static void splitRtsFlags(char *s)
 	
 	if (c1 == c2) { break; }
 	
-        if (rts_argc < MAX_RTS_ARGS-1) {
-	    s = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
-	    strncpy(s, c1, c2-c1);
-	    s[c2-c1] = '\0';
-            rts_argv[rts_argc++] = s;
-	} else {
-	    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
-	}
-	
+        s = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
+        strncpy(s, c1, c2-c1);
+        s[c2-c1] = '\0';
+        rts_argv[rts_argc++] = s;
+
 	c1 = c2;
     } while (*c1 != '\0');
 }
@@ -402,13 +410,13 @@ static void splitRtsFlags(char *s)
      - argv[] is *modified*, any RTS options have been stripped out
      - *argc  contains the new count of arguments in argv[]
 
-     - rts_argv[]  (global) contains the collected RTS args
+     - rts_argv[]  (global) contains a copy of the collected RTS args
      - rts_argc    (global) contains the count of args in rts_argv
 
-     - prog_argv[] (global) contains the non-RTS args (== argv)
+     - prog_argv[] (global) contains a copy of the non-RTS args (== argv)
      - prog_argc   (global) contains the count of args in prog_argv
 
-     - prog_name   (global) contains the basename of argv[0]
+     - prog_name   (global) contains the basename of prog_argv[0]
 
   -------------------------------------------------------------------------- */
 
@@ -424,6 +432,8 @@ void setupRtsFlags (int *argc, char *argv[])
 
     *argc = 1;
     rts_argc = 0;
+
+    rts_argv = stgCallocBytes(total_arg + 1, sizeof (char *), "setupRtsFlags");
 
     rts_argc0 = rts_argc;
 
@@ -476,14 +486,11 @@ void setupRtsFlags (int *argc, char *argv[])
 	else if (strequal("-RTS", argv[arg])) {
 	    mode = PGM;
 	}
-        else if (mode == RTS && rts_argc < MAX_RTS_ARGS-1) {
-            rts_argv[rts_argc++] = argv[arg];
+        else if (mode == RTS) {
+            rts_argv[rts_argc++] = copyArg(argv[arg]);
         }
-        else if (mode == PGM) {
-	    argv[(*argc)++] = argv[arg];
-	}
-	else {
-	  barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
+        else {
+            argv[(*argc)++] = argv[arg];
 	}
     }
     // process remaining program arguments
@@ -1466,6 +1473,41 @@ bad_option(const char *s)
   stg_exit(EXIT_FAILURE);
 }
 
+/* ----------------------------------------------------------------------------
+   Copying and freeing argc/argv
+   ------------------------------------------------------------------------- */
+
+static char * copyArg(char *arg)
+{
+    char *new_arg = stgMallocBytes(strlen(arg) + 1, "copyArg");
+    strcpy(new_arg, arg);
+    return new_arg;
+}
+
+static char ** copyArgv(int argc, char *argv[])
+{
+    int i;
+    char **new_argv;
+
+    new_argv = stgCallocBytes(argc + 1, sizeof (char *), "copyArgv 1");
+    for (i = 0; i < argc; i++) {
+        new_argv[i] = copyArg(argv[i]);
+    }
+    new_argv[argc] = NULL;
+    return new_argv;
+}
+
+static void freeArgv(int argc, char *argv[])
+{
+    int i;
+    if (argv != NULL) {
+        for (i = 0; i < argc; i++) {
+            stgFree(argv[i]);
+        }
+        stgFree(argv);
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Getting/Setting the program's arguments.
 
@@ -1507,8 +1549,27 @@ void
 setProgArgv(int argc, char *argv[])
 {
     prog_argc = argc;
-    prog_argv = argv;
+    prog_argv = copyArgv(argc,argv);
     setProgName(prog_argv);
+}
+
+static void
+freeProgArgv(void)
+{
+    freeArgv(prog_argc,prog_argv);
+    prog_argc = 0;
+    prog_argv = NULL;
+}
+
+/* ----------------------------------------------------------------------------
+   The full argv - a copy of the original program's argc/argv
+   ------------------------------------------------------------------------- */
+
+void
+setFullProgArgv(int argc, char *argv[])
+{
+    full_prog_argc = argc;
+    full_prog_argv = copyArgv(argc,argv);
 }
 
 /* These functions record and recall the full arguments, including the
@@ -1522,32 +1583,91 @@ getFullProgArgv(int *argc, char **argv[])
 }
 
 void
-setFullProgArgv(int argc, char *argv[])
+freeFullProgArgv (void)
 {
+    freeArgv(full_prog_argc, full_prog_argv);
+    full_prog_argc = 0;
+    full_prog_argv = NULL;
+}
+
+/* ----------------------------------------------------------------------------
+   The Win32 argv
+   ------------------------------------------------------------------------- */
+
+#if defined(mingw32_HOST_OS)
+void freeWin32ProgArgv (void);
+
+void
+freeWin32ProgArgv (void)
+{
+    freeArgv(win32_prog_argc, win32_prog_argv);
+
     int i;
-    full_prog_argc = argc;
-    full_prog_argv = stgCallocBytes(argc + 1, sizeof (char *),
-                                    "setFullProgArgv 1");
-    for (i = 0; i < argc; i++) {
-        full_prog_argv[i] = stgMallocBytes(strlen(argv[i]) + 1,
-                                           "setFullProgArgv 2");
-        strcpy(full_prog_argv[i], argv[i]);
+
+    if (win32_prog_argv != NULL) {
+        for (i = 0; i < win32_prog_argc; i++) {
+            stgFree(win32_prog_argv[i]);
+        }
+        stgFree(win32_prog_argv);
     }
-    full_prog_argv[argc] = NULL;
+
+    win32_prog_argc = 0;
+    win32_prog_argv = NULL;
 }
 
 void
-freeFullProgArgv (void)
+getWin32ProgArgv(int *argc, wchar_t **argv[])
 {
-    int i;
+    *argc = win32_prog_argc;
+    *argv = win32_prog_argv;
+}
 
-    if (full_prog_argv != NULL) {
-        for (i = 0; i < full_prog_argc; i++) {
-            stgFree(full_prog_argv[i]);
-        }
-        stgFree(full_prog_argv);
+void
+setWin32ProgArgv(int argc, wchar_t *argv[])
+{
+	int i;
+    
+	freeWin32ProgArgv();
+
+    win32_prog_argc = argc;
+	if (argv == NULL) {
+		win32_prog_argv = NULL;
+		return;
+	}
+	
+    win32_prog_argv = stgCallocBytes(argc + 1, sizeof (wchar_t *),
+                                    "setWin32ProgArgv 1");
+    for (i = 0; i < argc; i++) {
+        win32_prog_argv[i] = stgMallocBytes((wcslen(argv[i]) + 1) * sizeof(wchar_t),
+                                           "setWin32ProgArgv 2");
+        wcscpy(win32_prog_argv[i], argv[i]);
     }
+    win32_prog_argv[argc] = NULL;
+}
+#endif
 
-    full_prog_argc = 0;
-    full_prog_argv = NULL;
+/* ----------------------------------------------------------------------------
+   The RTS argv
+   ------------------------------------------------------------------------- */
+
+static void
+freeRtsArgv(void)
+{
+    freeArgv(rts_argc,rts_argv);
+    rts_argc = 0;
+    rts_argv = NULL;
+}
+
+/* ----------------------------------------------------------------------------
+   All argvs
+   ------------------------------------------------------------------------- */
+
+void freeRtsArgs(void)
+{
+#if defined(mingw32_HOST_OS)
+    freeWin32ProgArgv();
+#endif
+    freeFullProgArgv();
+    freeProgArgv();
+    freeRtsArgv();
 }

@@ -40,11 +40,13 @@ module TcRnTypes(
         Implication(..),
         CtLoc(..), ctLocSpan, ctLocOrigin, setCtLocOrigin,
 	CtOrigin(..), EqOrigin(..), 
-        WantedLoc, GivenLoc, pushErrCtxt,
+        WantedLoc, GivenLoc, GivenKind(..), pushErrCtxt,
 
-        SkolemInfo(..),
+	SkolemInfo(..),
 
-        CtFlavor(..), pprFlavorArising, isWanted, isGiven, isDerived,
+        CtFlavor(..), pprFlavorArising, isWanted, 
+        isGivenOrSolved, isGiven_maybe,
+        isDerived,
         FlavoredEvVar,
 
 	-- Pretty printing
@@ -62,6 +64,7 @@ module TcRnTypes(
 import HsSyn
 import HscTypes
 import Type
+import Id	( evVarPred )
 import Class    ( Class )
 import DataCon  ( DataCon, dataConUserType )
 import TcType
@@ -324,6 +327,7 @@ data IfLclEnv
 		-- plus which bit is currently being examined
 
 	if_tv_env  :: UniqFM TyVar,	-- Nested tyvar bindings
+		      	     		-- (and coercions)
 	if_id_env  :: UniqFM Id		-- Nested id binding
     }
 \end{code}
@@ -639,7 +643,7 @@ plusImportAvails
   (ImportAvails { imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
-  = ImportAvails { imp_mods     = plusModuleEnv_C (++) mods1 mods2,	
+  = ImportAvails { imp_mods     = plusModuleEnv_C (++) mods1 mods2,
 		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
 		   imp_orphs    = orphs1 `unionLists` orphs2,
@@ -674,7 +678,6 @@ instance Outputable WhereFrom where
 %************************************************************************
 %*									*
 		Wanted constraints
-
      These are forced to be in TcRnTypes because
      	   TcLclEnv mentions WantedConstraints
 	   WantedConstraint mentions CtLoc
@@ -901,7 +904,7 @@ pprEvVarTheta :: [EvVar] -> SDoc
 pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
                               
 pprEvVarWithType :: EvVar -> SDoc
-pprEvVarWithType v = ppr v <+> dcolon <+> pprPred (evVarPred v)
+pprEvVarWithType v = ppr v <+> dcolon <+> pprPredTy (evVarPred v)
 
 pprWantedsWithLocs :: WantedConstraints -> SDoc
 pprWantedsWithLocs wcs
@@ -923,35 +926,37 @@ pprWantedEvVar        (EvVarX v _)   = pprEvVarWithType v
 
 \begin{code}
 data CtFlavor
-  = Given   GivenLoc  -- We have evidence for this constraint in TcEvBinds
-  | Derived WantedLoc 
-                      -- We have evidence for this constraint in TcEvBinds;
-                      --   *however* this evidence can contain wanteds, so 
-                      --   it's valid only provisionally to the solution of
-                      --   these wanteds 
-  | Wanted WantedLoc  -- We have no evidence bindings for this constraint. 
+  = Given GivenLoc GivenKind -- We have evidence for this constraint in TcEvBinds
+  | Derived WantedLoc        -- Derived's are just hints for unifications 
+  | Wanted WantedLoc         -- We have no evidence bindings for this constraint. 
 
--- data DerivedOrig = DerSC | DerInst | DerSelf
--- Deriveds are either superclasses of other wanteds or deriveds, or partially
--- solved wanteds from instances, or 'self' dictionaries containing yet wanted
--- superclasses. 
+data GivenKind
+  = GivenOrig   -- Originates in some given, such as signature or pattern match
+  | GivenSolved -- Is given as result of being solved, maybe provisionally on
+                -- some other wanted constraints. 
 
 instance Outputable CtFlavor where
-  ppr (Given {})   = ptext (sLit "[G]")
-  ppr (Wanted {})  = ptext (sLit "[W]")
-  ppr (Derived {}) = ptext (sLit "[D]") 
+  ppr (Given _ GivenOrig)   = ptext (sLit "[G]")
+  ppr (Given _ GivenSolved) = ptext (sLit "[S]") -- Print [S] for Given/Solved's
+  ppr (Wanted {})           = ptext (sLit "[W]")
+  ppr (Derived {})          = ptext (sLit "[D]") 
+
 pprFlavorArising :: CtFlavor -> SDoc
-pprFlavorArising (Derived wl )  = pprArisingAt wl
+pprFlavorArising (Derived wl)   = pprArisingAt wl
 pprFlavorArising (Wanted  wl)   = pprArisingAt wl
-pprFlavorArising (Given gl)     = pprArisingAt gl
+pprFlavorArising (Given gl _)   = pprArisingAt gl
 
 isWanted :: CtFlavor -> Bool
 isWanted (Wanted {}) = True
 isWanted _           = False
 
-isGiven :: CtFlavor -> Bool 
-isGiven (Given {}) = True 
-isGiven _          = False 
+isGivenOrSolved :: CtFlavor -> Bool
+isGivenOrSolved (Given {}) = True
+isGivenOrSolved _ = False
+
+isGiven_maybe :: CtFlavor -> Maybe GivenKind 
+isGiven_maybe (Given _ gk) = Just gk
+isGiven_maybe _            = Nothing
 
 isDerived :: CtFlavor -> Bool 
 isDerived (Derived {}) = True
@@ -1038,9 +1043,6 @@ data SkolemInfo
                         -- polymorphic Ids, and are now checking that their RHS
                         -- constraints are satisfied.
 
-  | RuntimeUnkSkol      -- a type variable used to represent an unknown
-                        -- runtime type (used in the GHCi debugger)
-
   | BracketSkol         -- Template Haskell bracket
 
   | UnkSkol             -- Unhelpful info (until I improve it)
@@ -1075,8 +1077,7 @@ pprSkolInfo (InferSkol ids) = sep [ ptext (sLit "the inferred type of")
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.  
 -- For Insts, these cases should not happen
-pprSkolInfo UnkSkol        = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
-pprSkolInfo RuntimeUnkSkol = WARN( True, text "pprSkolInfo: RuntimeUnkSkol" ) ptext (sLit "RuntimeUnkSkol")
+pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) ptext (sLit "UnkSkol")
 \end{code}
 
 
@@ -1116,6 +1117,7 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin	-- Typechecking a default decl
   | DoOrigin		-- Arising from a do expression
+  | MCompOrigin         -- Arising from a monad comprehension
   | IfOrigin            -- Arising from an if statement
   | ProcOrigin		-- Arising from a proc expression
   | AnnOrigin           -- An annotation
@@ -1151,6 +1153,7 @@ pprO DerivOrigin	   = ptext (sLit "the 'deriving' clause of a data type declarat
 pprO StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
 pprO DefaultOrigin	   = ptext (sLit "a 'default' declaration")
 pprO DoOrigin	           = ptext (sLit "a do statement")
+pprO MCompOrigin           = ptext (sLit "a statement in a monad comprehension")
 pprO ProcOrigin	           = ptext (sLit "a proc expression")
 pprO (TypeEqOrigin eq)     = ptext (sLit "an equality") <+> ppr eq
 pprO AnnOrigin             = ptext (sLit "an annotation")

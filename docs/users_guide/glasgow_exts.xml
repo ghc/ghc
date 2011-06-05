@@ -1201,6 +1201,234 @@ output = [ x
 </para>
   </sect2>
 
+   <!-- ===================== MONAD COMPREHENSIONS ===================== -->
+
+<sect2 id="monad-comprehensions">
+    <title>Monad comprehensions</title>
+    <indexterm><primary>monad comprehensions</primary></indexterm>
+
+    <para>
+        Monad comprehesions generalise the list comprehension notation,
+        including parallel comprehensions 
+        (<xref linkend="parallel-list-comprehensions"/>) and 
+        transform comprenensions (<xref linkend="generalised-list-comprehensions"/>) 
+        to work for any monad.
+    </para>
+
+    <para>Monad comprehensions support:</para>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                Bindings:
+            </para>
+
+<programlisting>
+[ x + y | x &lt;- Just 1, y &lt;- Just 2 ]
+</programlisting>
+
+            <para>
+                Bindings are translated with the <literal>(&gt;&gt;=)</literal> and
+                <literal>return</literal> functions to the usual do-notation:
+            </para>
+
+<programlisting>
+do x &lt;- Just 1
+   y &lt;- Just 2
+   return (x+y)
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Guards:
+            </para>
+
+<programlisting>
+[ x | x &lt;- [1..10], x &lt;= 5 ]
+</programlisting>
+
+            <para>
+                Guards are translated with the <literal>guard</literal> function,
+                which requires a <literal>MonadPlus</literal> instance:
+            </para>
+
+<programlisting>
+do x &lt;- [1..10]
+   guard (x &lt;= 5)
+   return x
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Transform statements (as with <literal>-XTransformListComp</literal>):
+            </para>
+
+<programlisting>
+[ x+y | x &lt;- [1..10], y &lt;- [1..x], then take 2 ]
+</programlisting>
+
+            <para>
+                This translates to:
+            </para>
+
+<programlisting>
+do (x,y) &lt;- take 2 (do x &lt;- [1..10]
+                       y &lt;- [1..x]
+                       return (x,y))
+   return (x+y)
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Group statements (as with <literal>-XTransformListComp</literal>):
+            </para>
+
+<programlisting>
+[ x | x &lt;- [1,1,2,2,3], then group by x ]
+[ x | x &lt;- [1,1,2,2,3], then group by x using GHC.Exts.groupWith ]
+[ x | x &lt;- [1,1,2,2,3], then group using myGroup ]
+</programlisting>
+
+            <para>
+                The basic <literal>then group by e</literal> statement is
+                translated using the <literal>mgroupWith</literal> function, which
+                requires a <literal>MonadGroup</literal> instance, defined in
+                <ulink url="&libraryBaseLocation;/Control-Monad-Group.html"><literal>Control.Monad.Group</literal></ulink>:
+            </para>
+
+<programlisting>
+do x &lt;- mgroupWith (do x &lt;- [1,1,2,2,3]
+                       return x)
+   return x
+</programlisting>
+
+            <para>
+                Note that the type of <literal>x</literal> is changed by the
+                grouping statement.
+            </para>
+
+            <para>
+                The grouping function can also be defined with the
+                <literal>using</literal> keyword.
+            </para>
+
+        </listitem>
+        <listitem>
+            <para>
+                Parallel statements (as with <literal>-XParallelListComp</literal>):
+            </para>
+
+<programlisting>
+[ (x+y) | x &lt;- [1..10]
+        | y &lt;- [11..20]
+        ]
+</programlisting>
+
+            <para>
+                Parallel statements are translated using the
+                <literal>mzip</literal> function, which requires a
+                <literal>MonadZip</literal> instance defined in
+                <ulink url="&libraryBaseLocation;/Control-Monad-Zip.html"><literal>Control.Monad.Zip</literal></ulink>:
+            </para>
+
+<programlisting>
+do (x,y) &lt;- mzip (do x &lt;- [1..10]
+                     return x)
+                 (do y &lt;- [11..20]
+                     return y)
+   return (x+y)
+</programlisting>
+
+        </listitem>
+    </itemizedlist>
+
+    <para>
+        All these features are enabled by default if the
+        <literal>MonadComprehensions</literal> extension is enabled. The types
+        and more detailed examples on how to use comprehensions are explained
+        in the previous chapters <xref
+            linkend="generalised-list-comprehensions"/> and <xref
+            linkend="parallel-list-comprehensions"/>. In general you just have
+        to replace the type <literal>[a]</literal> with the type
+        <literal>Monad m => m a</literal> for monad comprehensions.
+    </para>
+
+    <para>
+        Note: Even though most of these examples are using the list monad,
+        monad comprehensions work for any monad.
+        The <literal>base</literal> package offers all necessary instances for
+        lists, which make <literal>MonadComprehensions</literal> backward
+        compatible to built-in, transform and parallel list comprehensions.
+    </para>
+<para> More formally, the desugaring is as follows.  We write <literal>D[ e | Q]</literal>
+to mean the desugaring of the monad comprehension <literal>[ e | Q]</literal>: 
+<programlisting>
+Expressions: e
+Declarations: d
+Lists of qualifiers: Q,R,S  
+
+-- Basic forms
+D[ e | ]               = return e
+D[ e | p &lt;- e, Q ]     = e &gt;&gt;= \p -&gt; D[ e | Q ]
+D[ e | e, Q ]          = guard e &gt;&gt; \p -&gt; D[ e | Q ]
+D[ e | let d, Q ]      = let d in D[ e | Q ]
+
+-- Parallel comprehensions (iterate for multiple parallel branches)
+D[ e | (Q | R), S ]    = mzip D[ Qv | Q ] D[ Rv | R ] &gt;&gt;= \(Qv,Rv) -&gt; D[ e | S ]
+
+-- Transform comprehensions
+D[ e | Q then f, R ]                  = f D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+
+D[ e | Q then f by b, R ]             = f b D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+
+D[ e | Q then group using f, R ]      = f D[ Qv | Q ] &gt;&gt;= \ys -&gt; 
+                                        case (fmap selQv1 ys, ..., fmap selQvn ys) of
+                                 	     Qv -&gt; D[ e | R ]
+
+D[ e | Q then group by b using f, R ] = f b D[ Qv | Q ] &gt;&gt;= \ys -&gt; 
+                                        case (fmap selQv1 ys, ..., fmap selQvn ys) of
+                                           Qv -&gt; D[ e | R ]
+
+where  Qv is the tuple of variables bound by Q (and used subsequently)
+       selQvi is a selector mapping Qv to the ith component of Qv
+
+Operator     Standard binding       Expected type
+--------------------------------------------------------------------
+return       GHC.Base               t1 -&gt; m t2
+(&gt;&gt;=)        GHC.Base               m1 t1 -&gt; (t2 -&gt; m2 t3) -&gt; m3 t3
+(&gt;&gt;)         GHC.Base               m1 t1 -&gt; m2 t2         -&gt; m3 t3
+guard        Control.Monad          t1 -&gt; m t2
+fmap         GHC.Base               forall a b. (a-&gt;b) -&gt; n a -&gt; n b
+mgroupWith   Control.Monad.Group    forall a. (a -&gt; t) -&gt; m1 a -&gt; m2 (n a)
+mzip         Control.Monad.Zip      forall a b. m a -&gt; m b -&gt; m (a,b)
+</programlisting>                                          
+The comprehension should typecheck when its desugaring would typecheck. 
+</para>
+<para>
+Monad comprehensions support rebindable syntax (<xref linkend="rebindable-syntax"/>).  
+Without rebindable
+syntax, the operators from the "standard binding" module are used; with
+rebindable syntax, the operators are looked up in the current lexical scope.
+For example, parallel comprehensions will be typechecked and desugared
+using whatever "<literal>mzip</literal>" is in scope.
+</para>
+<para>
+The rebindable operators must have the "Expected type" given in the 
+table above.  These types are surprisingly general.  For example, you can
+use a bind operator with the type
+<programlisting>
+(>>=) :: T x y a -> (a -> T y z b) -> T x z b
+</programlisting>
+In the case of transform comprehensions, notice that the groups are
+parameterised over some arbitrary type <literal>n</literal> (provided it
+has an <literal>fmap</literal>, as well as
+the comprehension being over an arbitrary monad.
+</para>
+</sect2>
+
    <!-- ===================== REBINDABLE SYNTAX ===================  -->
 
 <sect2 id="rebindable-syntax">
@@ -2984,6 +3212,12 @@ then writing the data type instance by hand.
 </para>
 </listitem>
 
+<listitem><para> With <option>-XDeriveGeneric</option>, you can derive
+instances of  the class <literal>Generic</literal>, defined in
+<literal>GHC.Generics</literal>. You can use these to define generic functions,
+as described in <xref linkend="generic-programming"/>.
+</para></listitem>
+
 <listitem><para> With <option>-XDeriveFunctor</option>, you can derive instances of 
 the class <literal>Functor</literal>,
 defined in <literal>GHC.Base</literal>.
@@ -3301,6 +3535,47 @@ The type of <literal>elem</literal> is illegal in Haskell 98, because it
 contains the constraint <literal>Eq a</literal>, constrains only the 
 class type variable (in this case <literal>a</literal>).
 GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
+</para>
+
+
+</sect3>
+
+
+<sect3 id="class-default-signatures">
+<title>Default signatures</title>
+
+<para>
+Haskell 98 allows you to define a default implementation when declaring a class:
+<programlisting>
+  class Enum a where
+    enum :: [a]
+    enum = []
+</programlisting>
+The type of the <literal>enum</literal> method is <literal>[a]</literal>, and
+this is also the type of the default method. You can lift this restriction
+and give another type to the default method using the flag
+<option>-XDefaultSignatures</option>. For instance, if you have written a
+generic implementation of enumeration in a class <literal>GEnum</literal> 
+with method <literal>genum</literal> in terms of <literal>GHC.Generics</literal>,
+you can specify a default method that uses that generic implementation:
+<programlisting>
+  class Enum a where
+    enum :: [a]
+    default enum :: (Generic a, GEnum (Rep a)) => [a]
+    enum = map to genum
+</programlisting>
+We reuse the keyword <literal>default</literal> to signal that a signature
+applies to the default method only; when defining instances of the
+<literal>Enum</literal> class, the original type <literal>[a]</literal> of
+<literal>enum</literal> still applies. When giving an empty instance, however,
+the default implementation <literal>map to0 genum</literal> is filled-in,
+and type-checked with the type
+<literal>(Generic a, GEnum (Rep a)) => [a]</literal>.
+</para>
+
+<para>
+We use default signatures to simplify generic programming in GHC 
+(<xref linkend="generic-programming"/>).
 </para>
 
 
@@ -5884,7 +6159,7 @@ type variables, in the annotated expression.  For example:
 <programlisting>
   f = runST ( (op >>= \(x :: STRef s Int) -> g x) :: forall s. ST s Bool )
 </programlisting>
-Here, the type signature <literal>forall a. ST s Bool</literal> brings the 
+Here, the type signature <literal>forall s. ST s Bool</literal> brings the 
 type variable <literal>s</literal> into scope, in the annotated expression 
 <literal>(op >>= \(x :: STRef s Int) -> g x)</literal>.
 </para>
@@ -8899,7 +9174,7 @@ allows control over inlining on a per-call-site basis.
 restrains the strictness analyser.
 </para></listitem>
 <listitem><para>
-<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>lazy</literal></ulink> 
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>unsafeCoerce#</literal></ulink> 
 allows you to fool the type checker.
 </para></listitem>
 </itemizedlist>
@@ -8911,256 +9186,184 @@ allows you to fool the type checker.
 <title>Generic classes</title>
 
 <para>
-The ideas behind this extension are described in detail in "Derivable type classes",
-Ralf Hinze and Simon Peyton Jones, Haskell Workshop, Montreal Sept 2000, pp94-105.
-An example will give the idea:
+GHC used to have an implementation of generic classes as defined in the paper
+"Derivable type classes", Ralf Hinze and Simon Peyton Jones, Haskell Workshop,
+Montreal Sept 2000, pp94-105. These have been removed and replaced by the more
+general <link linkend="generic-programming">support for generic programming</link>.
 </para>
 
-<programlisting>
-  import Data.Generics
+</sect1>
 
-  class Bin a where
-    toBin   :: a -> [Int]
-    fromBin :: [Int] -> (a, [Int])
-  
-    toBin {| Unit |}    Unit	  = []
-    toBin {| a :+: b |} (Inl x)   = 0 : toBin x
-    toBin {| a :+: b |} (Inr y)   = 1 : toBin y
-    toBin {| a :*: b |} (x :*: y) = toBin x ++ toBin y
-  
-    fromBin {| Unit |}    bs      = (Unit, bs)
-    fromBin {| a :+: b |} (0:bs)  = (Inl x, bs')    where (x,bs') = fromBin bs
-    fromBin {| a :+: b |} (1:bs)  = (Inr y, bs')    where (y,bs') = fromBin bs
-    fromBin {| a :*: b |} bs	  = (x :*: y, bs'') where (x,bs' ) = fromBin bs
-							  (y,bs'') = fromBin bs'
-</programlisting>
+
+<sect1 id="generic-programming">
+<title>Generic programming</title>
+
 <para>
-This class declaration explains how <literal>toBin</literal> and <literal>fromBin</literal>
-work for arbitrary data types.  They do so by giving cases for unit, product, and sum,
-which are defined thus in the library module <literal>Data.Generics</literal>:
-</para>
-<programlisting>
-  data Unit    = Unit
-  data a :+: b = Inl a | Inr b
-  data a :*: b = a :*: b
-</programlisting>
-<para>
-Now you can make a data type into an instance of Bin like this:
-<programlisting>
-  instance (Bin a, Bin b) => Bin (a,b)
-  instance Bin a => Bin [a]
-</programlisting>
-That is, just leave off the "where" clause.  Of course, you can put in the
-where clause and over-ride whichever methods you please.
+Using a combination of <option>-XDeriveGeneric</option>
+(<xref linkend="deriving-typeable"/>) and
+<option>-XDefaultSignatures</option> (<xref linkend="class-default-signatures"/>),
+you can easily do datatype-generic
+programming using the <literal>GHC.Generics</literal> framework. This section
+gives a very brief overview of how to do it. For more detail please refer to the
+<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
+or the original paper:
 </para>
 
-    <sect2>
-      <title> Using generics </title>
-      <para>To use generics you need to</para>
-      <itemizedlist>
-	<listitem>
-	  <para>
-            Use the flags <option>-XGenerics</option> (to enable the
-            extra syntax and generate extra per-data-type code),
-            and <option>-package syb</option> (to make the
-            <literal>Data.Generics</literal> module available.
-          </para>
-	</listitem>
-	<listitem>
-	  <para>Import the module <literal>Data.Generics</literal> from the
-          <literal>syb</literal> package.  This import brings into
-          scope the data types <literal>Unit</literal>,
-          <literal>:*:</literal>, and <literal>:+:</literal>.  (You
-          don't need this import if you don't mention these types
-          explicitly; for example, if you are simply giving instance
-          declarations.)</para>
-	</listitem>
-      </itemizedlist>
-    </sect2>
-
-<sect2> <title> Changes wrt the paper </title>
-<para>
-Note that the type constructors <literal>:+:</literal> and <literal>:*:</literal> 
-can be written infix (indeed, you can now use
-any operator starting in a colon as an infix type constructor).  Also note that
-the type constructors are not exactly as in the paper (Unit instead of 1, etc).
-Finally, note that the syntax of the type patterns in the class declaration
-uses "<literal>{|</literal>" and "<literal>|}</literal>" brackets; curly braces
-alone would ambiguous when they appear on right hand sides (an extension we 
-anticipate wanting).
-</para>
-</sect2>
-
-<sect2> <title>Terminology and restrictions</title>
-<para>
-Terminology.  A "generic default method" in a class declaration
-is one that is defined using type patterns as above.
-A "polymorphic default method" is a default method defined as in Haskell 98.
-A "generic class declaration" is a class declaration with at least one
-generic default method.
-</para>
-
-<para>
-Restrictions:
 <itemizedlist>
 <listitem>
 <para>
-Alas, we do not yet implement the stuff about constructor names and 
-field labels.
+José Pedro Magalhães, Atze Dijkstra, Johan Jeuring, and Andres Löh.
+<ulink url="http://dreixel.net/research/pdf/gdmh.pdf">
+  A generic deriving mechanism for Haskell</ulink>.
+<citetitle>Proceedings of the third ACM Haskell symposium on Haskell</citetitle>
+(Haskell'2010), pp. 37-48, ACM, 2010.
 </para>
 </listitem>
-
-<listitem>
-<para>
-A generic class can have only one parameter; you can't have a generic
-multi-parameter class.
-</para>
-</listitem>
-
-<listitem>
-<para>
-A default method must be defined entirely using type patterns, or entirely
-without.  So this is illegal:
-<programlisting>
-  class Foo a where
-    op :: a -> (a, Bool)
-    op {| Unit |} Unit = (Unit, True)
-    op x               = (x,    False)
-</programlisting>
-However it is perfectly OK for some methods of a generic class to have 
-generic default methods and others to have polymorphic default methods.
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type variable(s) in the type pattern for a generic method declaration
-scope over the right hand side.  So this is legal (note the use of the type variable ``p'' in a type signature on the right hand side:
-<programlisting>
-  class Foo a where
-    op :: a -> Bool
-    op {| p :*: q |} (x :*: y) = op (x :: p)
-    ...
-</programlisting>
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type patterns in a generic default method must take one of the forms:
-<programlisting>
-       a :+: b
-       a :*: b
-       Unit
-</programlisting>
-where "a" and "b" are type variables.  Furthermore, all the type patterns for
-a single type constructor (<literal>:*:</literal>, say) must be identical; they
-must use the same type variables.  So this is illegal:
-<programlisting>
-  class Foo a where
-    op :: a -> Bool
-    op {| a :+: b |} (Inl x) = True
-    op {| p :+: q |} (Inr y) = False
-</programlisting>
-The type patterns must be identical, even in equations for different methods of the class.
-So this too is illegal:
-<programlisting>
-  class Foo a where
-    op1 :: a -> Bool
-    op1 {| a :*: b |} (x :*: y) = True
-
-    op2 :: a -> Bool
-    op2 {| p :*: q |} (x :*: y) = False
-</programlisting>
-(The reason for this restriction is that we gather all the equations for a particular type constructor
-into a single generic instance declaration.)
-</para>
-</listitem>
-
-<listitem>
-<para>
-A generic method declaration must give a case for each of the three type constructors.
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type for a generic method can be built only from:
-  <itemizedlist>
-  <listitem> <para> Function arrows </para> </listitem>
-  <listitem> <para> Type variables </para> </listitem>
-  <listitem> <para> Tuples </para> </listitem>
-  <listitem> <para> Arbitrary types not involving type variables </para> </listitem>
-  </itemizedlist>
-Here are some example type signatures for generic methods:
-<programlisting>
-    op1 :: a -> Bool
-    op2 :: Bool -> (a,Bool)
-    op3 :: [Int] -> a -> a
-    op4 :: [a] -> Bool
-</programlisting>
-Here, op1, op2, op3 are OK, but op4 is rejected, because it has a type variable
-inside a list.  
-</para>
-<para>
-This restriction is an implementation restriction: we just haven't got around to
-implementing the necessary bidirectional maps over arbitrary type constructors.
-It would be relatively easy to add specific type constructors, such as Maybe and list,
-to the ones that are allowed.</para>
-</listitem>
-
-<listitem>
-<para>
-In an instance declaration for a generic class, the idea is that the compiler
-will fill in the methods for you, based on the generic templates.  However it can only
-do so if
-  <itemizedlist>
-  <listitem>
-  <para>
-  The instance type is simple (a type constructor applied to type variables, as in Haskell 98).
-  </para>
-  </listitem>
-  <listitem>
-  <para>
-  No constructor of the instance type has unboxed fields.
-  </para>
-  </listitem>
-  </itemizedlist>
-(Of course, these things can only arise if you are already using GHC extensions.)
-However, you can still give an instance declarations for types which break these rules,
-provided you give explicit code to override any generic default methods.
-</para>
-</listitem>
-
 </itemizedlist>
-</para>
+
+<emphasis>Note</emphasis>: the current support for generic programming in GHC
+is preliminary. In particular, we only allow deriving instances for the
+<literal>Generic</literal> class. Support for deriving
+<literal>Generic1</literal> (and thus enabling generic functions of kind
+<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
+later stage.
+
+
+<sect2>
+<title>Deriving representations</title>
 
 <para>
-The option <option>-ddump-deriv</option> dumps incomprehensible stuff giving details of 
-what the compiler does with generic declarations.
-</para>
+The first thing we need is generic representations. The
+<literal>GHC.Generics</literal> module defines a couple of primitive types
+that can be used to represent most Haskell datatypes:
 
-</sect2>
-
-<sect2> <title> Another example </title>
-<para>
-Just to finish with, here's another example I rather like:
 <programlisting>
-  class Tag a where
-    nCons :: a -> Int
-    nCons {| Unit |}    _ = 1
-    nCons {| a :*: b |} _ = 1
-    nCons {| a :+: b |} _ = nCons (bot::a) + nCons (bot::b)
-  
-    tag :: a -> Int
-    tag {| Unit |}    _       = 1
-    tag {| a :*: b |} _       = 1   
-    tag {| a :+: b |} (Inl x) = tag x
-    tag {| a :+: b |} (Inr y) = nCons (bot::a) + tag y
+-- | Unit: used for constructors without arguments
+data U1 p = U1
+ 
+-- | Constants, additional parameters and recursion of kind *
+newtype K1 i c p = K1 { unK1 :: c }
+ 
+-- | Meta-information (constructor names, etc.)
+newtype M1 i c f p = M1 { unM1 :: f p }
+ 
+-- | Sums: encode choice between constructors
+infixr 5 :+:
+data (:+:) f g p = L1 (f p) | R1 (g p)
+ 
+-- | Products: encode multiple arguments to constructors
+infixr 6 :*:
+data (:*:) f g p = f p :*: g p
 </programlisting>
+
+For example, a user-defined datatype of trees <literal>data UserTree a = Node a
+(UserTree a) (UserTree a) | Leaf</literal> gets the following representation:
+
+<programlisting>
+instance Generic (UserTree a) where
+  -- Representation type
+  type Rep (UserTree a) = 
+    M1 D D1UserTree (
+          M1 C C1_0UserTree (
+                M1 S NoSelector (K1 P a)
+            :*: M1 S NoSelector (K1 R (UserTree a))
+            :*: M1 S NoSelector (K1 R (UserTree a)))
+      :+: M1 C C1_1UserTree U1)
+
+  -- Conversion functions
+  from (Node x l r) = M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))
+  from Leaf         = M1 (R1 (M1 U1))
+  to (M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))) = Node x l r
+  to (M1 (R1 (M1 U1)))                                      = Leaf
+
+-- Meta-information
+data D1UserTree
+data C1_0UserTree
+data C1_1UserTree
+
+instance Datatype D1UserTree where
+  datatypeName _ = "UserTree"
+  moduleName _   = "Main"
+  
+instance Constructor C1_0UserTree where
+  conName _ = "Node"
+  
+instance Constructor C1_1UserTree where
+  conName _ = "Leaf"
+</programlisting>
+
+This representation is generated automatically if a
+<literal>deriving Generic</literal> clause is attached to the datatype.
+<link linkend="stand-alone-deriving">Standalone deriving</link> can also be
+used.
 </para>
 </sect2>
+
+<sect2>
+<title>Writing generic functions</title>
+
+<para>
+A generic function is defined by creating a class and giving instances for
+each of the representation types of <literal>GHC.Generics</literal>. As an
+example we show generic serialization:
+<programlisting>
+data Bin = O | I
+
+class GSerialize f where
+  gput :: f a -> [Bin]
+
+instance GSerialize U1 where
+  gput U1 = []
+
+instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
+  gput (a :*: b) = gput a ++ gput b
+
+instance (GSerialize a, GSerialize b) => GSerialize (a :+: b) where
+  gput (L1 x) = O : gput x
+  gput (R1 x) = I : gput x
+
+instance (GSerialize a) => GSerialize (M1 i c a) where
+  gput (M1 x) = gput x
+
+instance (Serialize a) => GSerialize (K1 i c a) where
+  gput (K1 x) = put x
+</programlisting>
+
+Typically this class will not be exported, as it only makes sense to have
+instances for the representation types.
+</para>
+</sect2>
+
+<sect2>
+<title>Generic defaults</title>
+
+<para>
+The only thing left to do now is to define a "front-end" class, which is
+exposed to the user:
+<programlisting>
+class Serialize a where
+  put :: a -> [Bin]
+  
+  default put :: (Generic a, GSerialize (Rep a)) => a -> [Bit]
+  put = gput . from
+</programlisting>
+Here we use a <link linkend="class-default-signatures">default signature</link>
+to specify that the user does not have to provide an implementation for
+<literal>put</literal>, as long as there is a <literal>Generic</literal>
+instance for the type to instantiate. For the <literal>UserTree</literal> type,
+for instance, the user can just write:
+
+<programlisting>
+instance (Serialize a) => Serialize (UserTree a)
+</programlisting>
+
+The default method for <literal>put</literal> is then used, corresponding to the
+generic implementation of serialization.
+</para>
+</sect2>
+
 </sect1>
+
 
 <sect1 id="monomorphism">
 <title>Control over monomorphism</title>

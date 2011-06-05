@@ -69,23 +69,23 @@ data HsLocalBindsLR idL idR	-- Bindings in a 'let' expression
 type HsValBinds id = HsValBindsLR id id
 
 data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
-  = ValBindsIn             -- Before renaming
+  = ValBindsIn             -- Before renaming RHS; idR is always RdrName
 	(LHsBindsLR idL idR) [LSig idR]	-- Not dependency analysed
 					-- Recursive by default
 
-  | ValBindsOut		   -- After renaming
+  | ValBindsOut		   -- After renaming RHS; idR can be Name or Id
 	[(RecFlag, LHsBinds idL)]	-- Dependency analysed, later bindings 
                                         -- in the list may depend on earlier
                                         -- ones.
 	[LSig Name]
   deriving (Data, Typeable)
 
-type LHsBinds id = Bag (LHsBind id)
-type LHsBind  id = Located (HsBind id)
-type HsBind id   = HsBindLR id id
+type LHsBind  id = LHsBindLR  id id
+type LHsBinds id = LHsBindsLR id id
+type HsBind   id = HsBindLR   id id
 
-type LHsBindLR idL idR = Located (HsBindLR idL idR)
 type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
+type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
 data HsBindLR idL idR
   = -- | FunBind is used for both functions   @f x = e@
@@ -357,7 +357,7 @@ data IPBind id
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs) 
-			$$ ifPprDebug (ppr ds)
+                        $$ ifPprDebug (ppr ds)
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
   ppr (IPBind id rhs) = pprBndr LetBind id <+> equals <+> pprExpr (unLoc rhs)
@@ -457,7 +457,7 @@ data EvTerm
   deriving( Data, Typeable)
 
 evVarTerm :: EvVar -> EvTerm
-evVarTerm v | isCoVar v = EvCoercion (mkCoVarCoercion v)
+evVarTerm v | isCoVar v = EvCoercion (mkCoVarCo v)
             | otherwise = EvId v
 \end{code}
 
@@ -546,7 +546,7 @@ pprHsWrapper doc wrap
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (ptext (sLit "|>") 
-                                                 <+> pprParendType co)]
+                                              <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
     help it (WpTyApp ty)  = no_parens  $ sep [it True, ptext (sLit "@") <+> pprParendType ty]
     help it (WpEvLam id)  = add_parens $ sep [ ptext (sLit "\\") <> pp_bndr id, it False]
@@ -572,8 +572,8 @@ instance Outputable EvBind where
 
 instance Outputable EvTerm where
   ppr (EvId v)        	 = ppr v
-  ppr (EvCast v co)   	 = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendType co
-  ppr (EvCoercion co)    = ppr co
+  ppr (EvCast v co)      = ppr v <+> (ptext (sLit "`cast`")) <+> pprParendCo co
+  ppr (EvCoercion co)    = ptext (sLit "CO") <+> ppr co
   ppr (EvSuperClass d n) = ptext (sLit "sc") <> parens (ppr (d,n))
   ppr (EvDFunApp df tys ts) = ppr df <+> sep [ char '@' <> ppr tys, ppr ts ]
 \end{code}
@@ -596,6 +596,10 @@ data Sig name	-- Signatures and pragmas
   = 	-- An ordinary type signature
 	-- f :: Num a => a -> a
     TypeSig (Located name) (LHsType name)
+
+        -- A type signature for a default method inside a class
+        -- default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
+  | GenericSig (Located name) (LHsType name)
 
 	-- A type signature in generated code, notably the code
 	-- generated for record selectors.  We simply record
@@ -666,29 +670,27 @@ okBindSig :: Sig a -> Bool
 okBindSig _ = True
 
 okHsBootSig :: Sig a -> Bool
-okHsBootSig (TypeSig  _ _) = True
-okHsBootSig (FixSig _) 	   = True
-okHsBootSig _              = False
+okHsBootSig (TypeSig  _ _)    = True
+okHsBootSig (GenericSig  _ _) = False
+okHsBootSig (FixSig _) 	      = True
+okHsBootSig _                 = False
 
 okClsDclSig :: Sig a -> Bool
 okClsDclSig (SpecInstSig _) = False
 okClsDclSig _               = True        -- All others OK
 
 okInstDclSig :: Sig a -> Bool
-okInstDclSig (TypeSig _ _)   = False
-okInstDclSig (FixSig _)      = False
-okInstDclSig _ 	             = True
-
-sigForThisGroup :: NameSet -> LSig Name -> Bool
-sigForThisGroup ns sig
-  = case sigName sig of
-	Nothing -> False
-	Just n  -> n `elemNameSet` ns
+okInstDclSig (TypeSig _ _)    = False
+okInstDclSig (GenericSig _ _) = False
+okInstDclSig (FixSig _)       = False
+okInstDclSig _ 	              = True
 
 sigName :: LSig name -> Maybe name
+-- Used only in Haddock
 sigName (L _ sig) = sigNameNoLoc sig
 
 sigNameNoLoc :: Sig name -> Maybe name    
+-- Used only in Haddock
 sigNameNoLoc (TypeSig   n _)          = Just (unLoc n)
 sigNameNoLoc (SpecSig   n _ _)        = Just (unLoc n)
 sigNameNoLoc (InlineSig n _)          = Just (unLoc n)
@@ -706,9 +708,10 @@ isVanillaLSig (L _(TypeSig {})) = True
 isVanillaLSig _                 = False
 
 isTypeLSig :: LSig name -> Bool	 -- Type signatures
-isTypeLSig (L _(TypeSig {})) = True
-isTypeLSig (L _(IdSig {}))   = True
-isTypeLSig _                 = False
+isTypeLSig (L _(TypeSig {}))    = True
+isTypeLSig (L _(GenericSig {})) = True
+isTypeLSig (L _(IdSig {}))      = True
+isTypeLSig _                    = False
 
 isSpecLSig :: LSig name -> Bool
 isSpecLSig (L _(SpecSig {})) = True
@@ -731,6 +734,7 @@ isInlineLSig _                    = False
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {}) 		= ptext (sLit "type signature")
+hsSigDoc (GenericSig {})	= ptext (sLit "default type signature")
 hsSigDoc (IdSig {}) 		= ptext (sLit "id signature")
 hsSigDoc (SpecSig {})	 	= ptext (sLit "SPECIALISE pragma")
 hsSigDoc (InlineSig {})         = ptext (sLit "INLINE pragma")
@@ -745,6 +749,7 @@ eqHsSig :: Eq a => LSig a -> LSig a -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
 eqHsSig (L _ (IdSig n1))         	(L _ (IdSig n2))                = n1 == n2
 eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
+eqHsSig (L _ (GenericSig n1 _))        	(L _ (GenericSig n2 _))         = unLoc n1 == unLoc n2
 eqHsSig (L _ (InlineSig n1 _))          (L _ (InlineSig n2 _))          = unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
@@ -758,6 +763,7 @@ instance (OutputableBndr name) => Outputable (Sig name) where
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
 ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) (ppr ty)
+ppr_sig (GenericSig var ty)	  = ptext (sLit "default") <+> pprVarSig (unLoc var) (ppr ty)
 ppr_sig (IdSig id)	          = pprVarSig id (ppr (varType id))
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
 ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var (ppr ty) inl)

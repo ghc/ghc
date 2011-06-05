@@ -580,8 +580,46 @@ stat_exit(int alloc)
             }
         }
 
-        if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
-	    showStgWord64(GC_tot_alloc*sizeof(W_), 
+        gc_cpu     = gc_local_cpu + gc_global_cpu;
+        gc_elapsed = gc_local_elapsed + gc_global_elapsed;
+
+        init_cpu     = end_init_cpu - start_init_cpu;
+        init_elapsed = end_init_elapsed - start_init_elapsed;
+
+        exit_cpu     = end_exit_cpu - start_exit_cpu;
+        exit_elapsed = end_exit_elapsed - start_exit_elapsed;
+
+        if (RtsFlags.ParFlags.nNodes == 1)
+        {
+            // In single-threaded mode, we can separate out the
+            // local GC time from the MUT time, and report the
+            // total GC time separately.
+
+            mut_elapsed = start_exit_elapsed - end_init_elapsed - gc_elapsed;
+
+            mut_cpu = start_exit_cpu - end_init_cpu
+                - gc_local_cpu - gc_global_cpu
+                - PROF_VAL(RP_tot_time + HC_tot_time);
+        }
+        else
+        {
+            // In multi-threaded mode, we have to include the
+            // local GC time in the MUT time, because each thread
+            // has its own independent interleaving of MUT and
+            // local GC.
+
+            mut_elapsed = start_exit_elapsed - end_init_elapsed
+                - gc_global_elapsed;
+
+            mut_cpu = start_exit_cpu - end_init_cpu
+                - gc_global_cpu
+                - PROF_VAL(RP_tot_time + HC_tot_time);
+        }
+
+        if (mut_cpu < 0) { mut_cpu = 0; }
+
+	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
+            showStgWord64(GC_tot_alloc*sizeof(W_),
 				 temp, rtsTrue/*commas*/);
 	    statsPrintf("%16s bytes allocated in the heap\n", temp);
 
@@ -653,7 +691,7 @@ stat_exit(int alloc)
                 statsPrintf("                        MUT time (elapsed)       GC time  (elapsed)\n");
 		for (i = 0, task = all_tasks; 
 		     task != NULL; 
-		     i++, task = task->all_link) {
+1                    i++, task = task->all_link) {
 		    statsPrintf("  Task %2d %-8s :  %6.2fs    (%6.2fs)     %6.2fs    (%6.2fs)\n",
 				i,
 				(task->worker) ? "(worker)" : "(bound)",
@@ -686,35 +724,13 @@ stat_exit(int alloc)
             }
 #endif
 
-            gc_elapsed = gc_local_elapsed + gc_global_elapsed;
-
-            init_cpu     = end_init_cpu - start_init_cpu;
-            init_elapsed = end_init_elapsed - start_init_elapsed;
-
-            exit_cpu     = end_exit_cpu - start_exit_cpu;
-            exit_elapsed = end_exit_elapsed - start_exit_elapsed;
-
-            gc_cpu = gc_local_cpu + gc_global_cpu;
-
-	    statsPrintf("  INIT    time  %6.2fs  (%6.2fs elapsed)\n",
+            statsPrintf("  INIT    time  %6.2fs  (%6.2fs elapsed)\n",
                         TICK_TO_DBL(init_cpu), TICK_TO_DBL(init_elapsed));
 
 #ifdef THREADED_RTS
             if (RtsFlags.ParFlags.nNodes == 1)
 #endif
             {
-                // In single-threaded mode, we can separate out the
-                // local GC time from the MUT time, and report the
-                // total GC time separately.
-
-                mut_elapsed = start_exit_elapsed - end_init_elapsed
-                    - gc_elapsed;
-
-                mut_cpu = start_exit_cpu - end_init_cpu
-                    - gc_local_cpu - gc_global_cpu
-                    - PROF_VAL(RP_tot_time + HC_tot_time);
-                if (mut_cpu < 0) { mut_cpu = 0; }
-
                 statsPrintf("  MUT     time  %6.2fs  (%6.2fs elapsed)\n",
                             TICK_TO_DBL(mut_cpu), TICK_TO_DBL(mut_elapsed));
                 statsPrintf("  GC      time  %6.2fs  (%6.2fs elapsed)\n",
@@ -723,19 +739,6 @@ stat_exit(int alloc)
 #ifdef THREADED_RTS
             else
             {
-                // In multi-threaded mode, we have to include the
-                // local GC time in the MUT time, because each thread
-                // has its own independent interleaving of MUT and
-                // local GC.
-
-                mut_elapsed = start_exit_elapsed - end_init_elapsed
-                    - gc_global_elapsed;
-
-                mut_cpu = start_exit_cpu - end_init_cpu
-                    - gc_global_cpu
-                    - PROF_VAL(RP_tot_time + HC_tot_time);
-                if (mut_cpu < 0) { mut_cpu = 0; }
-
                 statsPrintf("  MUT+GC0 time  %6.2fs  (%6.2fs elapsed) (%.2fs MUT + %.2fs GC0)\n",
                             TICK_TO_DBL(mut_cpu),
                             TICK_TO_DBL(mut_elapsed),
@@ -844,12 +847,18 @@ stat_exit(int alloc)
 	statsClose();
     }
 
-    if (GC_coll_cpu)
+    if (GC_coll_cpu) {
       stgFree(GC_coll_cpu);
-    GC_coll_cpu = NULL;
-    if (GC_coll_elapsed)
+      GC_coll_cpu = NULL;
+    }
+    if (GC_coll_elapsed) {
       stgFree(GC_coll_elapsed);
-    GC_coll_elapsed = NULL;
+      GC_coll_elapsed = NULL;
+    }
+    if (GC_coll_max_pause) {
+      stgFree(GC_coll_max_pause);
+      GC_coll_max_pause = NULL;
+    }
 }
 
 /* -----------------------------------------------------------------------------

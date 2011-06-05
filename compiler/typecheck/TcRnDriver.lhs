@@ -65,7 +65,6 @@ import Name
 import NameEnv
 import NameSet
 import TyCon
-import TysPrim
 import SrcLoc
 import HscTypes
 import ListSetOps
@@ -246,9 +245,8 @@ tcRnImports hsc_env this_mod import_decls
 		-- interfaces, so that their rules and instance decls will be
 		-- found.
 	; loadOrphanModules (imp_orphs  imports) False
-	; loadOrphanModules (imp_finsts imports) True 
 
-		-- Check type-familily consistency
+                -- Check type-family consistency
 	; traceRn (text "rn1: checking family instance consistency")
 	; let { dir_imp_mods = moduleEnvKeys
 			     . imp_mods 
@@ -300,7 +298,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	-- any mutually recursive types are done right
 	-- Just discard the auxiliary bindings; they are generated 
 	-- only for Haskell source code, and should already be in Core
-   (tcg_env, _aux_binds, _dm_ids) <- tcTyAndClassDecls emptyModDetails rn_decls ;
+   (tcg_env, _aux_binds) <- tcTyAndClassDecls emptyModDetails rn_decls ;
 
    setGblEnv tcg_env $ do {
 	-- Make the new type env available to stuff slurped from interface files
@@ -501,10 +499,9 @@ tcRnHsBootDecls decls
 
 		-- Typecheck type/class decls
 	; traceTc "Tc2" empty
-	; (tcg_env, aux_binds, dm_ids) 
+	; (tcg_env, aux_binds) 
                <- tcTyAndClassDecls emptyModDetails tycl_decls
-	; setGblEnv tcg_env    $ 
-          tcExtendIdEnv dm_ids $ do {
+	; setGblEnv tcg_env    $ do {
 
 		-- Typecheck instance decls
 		-- Family instance declarations are rejected here
@@ -645,7 +642,7 @@ checkHiBootIface
     check_inst boot_inst
 	= case [dfun | inst <- local_insts, 
 		       let dfun = instanceDFunId inst,
-		       idType dfun `tcEqType` boot_inst_ty ] of
+		       idType dfun `eqType` boot_inst_ty ] of
 	    [] -> do { traceTc "check_inst" (vcat [ text "local_insts" <+> vcat (map (ppr . idType . instanceDFunId) local_insts)
                                                   , text "boot_inst"   <+> ppr boot_inst
                                                   , text "boot_inst_ty" <+> ppr boot_inst_ty
@@ -669,7 +666,7 @@ checkBootDecl :: TyThing -> TyThing -> Bool
 
 checkBootDecl (AnId id1) (AnId id2)
   = ASSERT(id1 == id2) 
-    (idType id1 `tcEqType` idType id2)
+    (idType id1 `eqType` idType id2)
 
 checkBootDecl (ATyCon tc1) (ATyCon tc2)
   = checkBootTyCon tc1 tc2
@@ -686,7 +683,7 @@ checkBootDecl (AClass c1)  (AClass c2)
 
        eqSig (id1, def_meth1) (id2, def_meth2)
          = idName id1 == idName id2 &&
-           tcEqTypeX env op_ty1 op_ty2 &&
+           eqTypeX env op_ty1 op_ty2 &&
            def_meth1 == def_meth2
          where
 	  (_, rho_ty1) = splitForAllTys (idType id1)
@@ -695,8 +692,8 @@ checkBootDecl (AClass c1)  (AClass c2)
           op_ty2 = funResultTy rho_ty2
 
        eqFD (as1,bs1) (as2,bs2) = 
-         eqListBy (tcEqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
-         eqListBy (tcEqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
+         eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
+         eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
 
        same_kind tv1 tv2 = eqKind (tyVarKind tv1) (tyVarKind tv2)
     in
@@ -705,7 +702,7 @@ checkBootDecl (AClass c1)  (AClass c2)
        eqListBy eqFD clas_fds1 clas_fds2 &&
        (null sc_theta1 && null op_stuff1 && null ats1
         ||   -- Above tests for an "abstract" class
-        eqListBy (tcEqPredX env) sc_theta1 sc_theta2 &&
+        eqListBy (eqPredX env) sc_theta1 sc_theta2 &&
         eqListBy eqSig op_stuff1 op_stuff2 &&
         eqListBy checkBootTyCon ats1 ats2)
 
@@ -728,7 +725,7 @@ checkBootTyCon tc1 tc2
         eqSynRhs SynFamilyTyCon SynFamilyTyCon
             = True
         eqSynRhs (SynonymTyCon t1) (SynonymTyCon t2)
-            = tcEqTypeX env t1 t2
+            = eqTypeX env t1 t2
         eqSynRhs _ _ = False
     in
     equalLength tvs1 tvs2 &&
@@ -737,7 +734,7 @@ checkBootTyCon tc1 tc2
   | isAlgTyCon tc1 && isAlgTyCon tc2
   = ASSERT(tc1 == tc2)
     eqKind (tyConKind tc1) (tyConKind tc2) &&
-    eqListBy tcEqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
+    eqListBy eqPred (tyConStupidTheta tc1) (tyConStupidTheta tc2) &&
     eqAlgRhs (algTyConRhs tc1) (algTyConRhs tc2)
 
   | isForeignTyCon tc1 && isForeignTyCon tc2
@@ -761,17 +758,7 @@ checkBootTyCon tc1 tc2
           && dataConIsInfix c1 == dataConIsInfix c2
           && dataConStrictMarks c1 == dataConStrictMarks c2
           && dataConFieldLabels c1 == dataConFieldLabels c2
-          && let tvs1 = dataConUnivTyVars c1 ++ dataConExTyVars c1
-                 tvs2 = dataConUnivTyVars c2 ++ dataConExTyVars c2
-                 env = rnBndrs2 env0 tvs1 tvs2
-             in
-              equalLength tvs1 tvs2 &&              
-              eqListBy (tcEqPredX env)
-                        (dataConEqTheta c1 ++ dataConDictTheta c1)
-                        (dataConEqTheta c2 ++ dataConDictTheta c2) &&
-              eqListBy (tcEqTypeX env)
-                        (dataConOrigArgTys c1)
-                        (dataConOrigArgTys c2)
+          && eqType (dataConUserType c1) (dataConUserType c2)
 
 ----------------
 missingBootThing :: Name -> String -> SDoc
@@ -848,11 +835,10 @@ tcTopSrcDecls boot_details
 		-- The latter come in via tycl_decls
         traceTc "Tc2" empty ;
 
-	(tcg_env, aux_binds, dm_ids) <- tcTyAndClassDecls boot_details tycl_decls ;
+	(tcg_env, aux_binds) <- tcTyAndClassDecls boot_details tycl_decls ;
 		-- If there are any errors, tcTyAndClassDecls fails here
 	
-	setGblEnv tcg_env	$
-        tcExtendIdEnv dm_ids    $ do {
+	setGblEnv tcg_env	$ do {
 
 		-- Source-language instances, including derivings,
 		-- and import the supporting declarations
@@ -886,6 +872,7 @@ tcTopSrcDecls boot_details
         setLclTypeEnv tcl_env $ do {	-- Environment doesn't change now
 
                 -- Second pass over class and instance declarations, 
+                -- now using the kind-checked decls
         traceTc "Tc6" empty ;
         inst_binds <- tcInstDecls2 (concat tycl_decls) inst_infos ;
 
@@ -1205,7 +1192,7 @@ runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
 
 --------------------
 mkPlan :: LStmt Name -> TcM PlanResult
-mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt 
+mkPlan (L loc (ExprStmt expr _ _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
 	      the_bind  = L loc $ mkFunBind (L loc fresh_it) matches
@@ -1214,7 +1201,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
-			          	   (HsVar thenIOName) placeHolderType
+			          	   (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 	-- The plans are:
 	--	[it <- e; print it]	but not if it::()
@@ -1242,7 +1229,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 mkPlan stmt@(L loc (BindStmt {}))
   | [v] <- collectLStmtBinders stmt		-- One binder, for a bind stmt 
   = do	{ let print_v  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
-			          	   (HsVar thenIOName) placeHolderType
+			          	  (HsVar thenIOName) noSyntaxExpr placeHolderType
 
 	; print_bind_result <- doptM Opt_PrintBindResult
 	; let print_plan = do
@@ -1269,11 +1256,25 @@ tcGhciStmts stmts
 	let {
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-	    tc_io_stmts stmts = tcStmts GhciStmt tcDoStmt stmts io_ret_ty ;
-
+	    tc_io_stmts stmts = tcStmtsAndThen GhciStmt tcDoStmt stmts io_ret_ty ;
 	    names = collectLStmtsBinders stmts ;
+	 } ;
 
-		-- mk_return builds the expression
+	-- OK, we're ready to typecheck the stmts
+	traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
+	((tc_stmts, ids), lie) <- captureConstraints $ 
+                                  tc_io_stmts stmts  $ \ _ ->
+                           	  mapM tcLookupId names  ;
+			-- Look up the names right in the middle,
+			-- where they will all be in scope
+
+	-- Simplify the context
+	traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
+	const_binds <- checkNoErrs (simplifyInteractive lie) ;
+		-- checkNoErrs ensures that the plan fails if context redn fails
+
+	traceTc "TcRnDriver.tcGhciStmts: done" empty ;
+        let {   -- mk_return builds the expression
 		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
 		--
 		-- Despite the inconvenience of building the type applications etc,
@@ -1284,27 +1285,14 @@ tcGhciStmts stmts
 		-- then the type checker would instantiate x..z, and we wouldn't
 		-- get their *polymorphic* values.  (And we'd get ambiguity errs
 		-- if they were overloaded, since they aren't applied to anything.)
-	    mk_return ids = nlHsApp (nlHsTyApp ret_id [ret_ty]) 
-			 	    (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
+	    ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) 
+		       (noLoc $ ExplicitList unitTy (map mk_item ids)) ;
 	    mk_item id = nlHsApp (nlHsTyApp unsafeCoerceId [idType id, unitTy])
-		    	         (nlHsVar id) 
-	 } ;
-
-	-- OK, we're ready to typecheck the stmts
-	traceTc "TcRnDriver.tcGhciStmts: tc stmts" empty ;
-	((tc_stmts, ids), lie) <- captureConstraints $ tc_io_stmts stmts $ \ _ ->
-					   mapM tcLookupId names ;
-					-- Look up the names right in the middle,
-					-- where they will all be in scope
-
-	-- Simplify the context
-	traceTc "TcRnDriver.tcGhciStmts: simplify ctxt" empty ;
-	const_binds <- checkNoErrs (simplifyInteractive lie) ;
-		-- checkNoErrs ensures that the plan fails if context redn fails
-
-	traceTc "TcRnDriver.tcGhciStmts: done" empty ;
+		    	         (nlHsVar id) ;
+	    stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
+        } ;
 	return (ids, mkHsDictLet (EvBinds const_binds) $
-		     noLoc (HsDo GhciStmt tc_stmts (mk_return ids) io_ret_ty))
+		     noLoc (HsDo GhciStmt stmts io_ret_ty))
     }
 \end{code}
 
@@ -1325,16 +1313,13 @@ tcRnExpr hsc_env ictxt rdr_expr
 
 	-- Now typecheck the expression; 
 	-- it might have a rank-2 type (e.g. :t runST)
-
     uniq <- newUnique ;
     let { fresh_it  = itName uniq } ;
-    ((_tc_expr, res_ty), lie)   <- captureConstraints (tcInferRho rn_expr) ;
-    ((qtvs, dicts, _), lie_top) <- captureConstraints $
-                                   simplifyInfer TopLevel
-                                                 False {- No MR for now -}
+    ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
+    ((qtvs, dicts, _), lie_top) <- captureConstraints $ 
+                                   simplifyInfer TopLevel False {- No MR for now -}
                                                  [(fresh_it, res_ty)]
                                                  lie  ;
-
     _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;
@@ -1381,29 +1366,20 @@ tcRnType hsc_env ictxt rdr_type
 -- could not be found.
 getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe [AvailInfo])
 getModuleExports hsc_env mod
-  = let
-      ic        = hsc_IC hsc_env
-      checkMods = ic_toplev_scope ic ++ map fst (ic_exports ic)
-    in
-    initTc hsc_env HsSrcFile False iNTERACTIVE (tcGetModuleExports mod checkMods)
+  = initTc hsc_env HsSrcFile False iNTERACTIVE (tcGetModuleExports mod)
 
 -- Get the export avail info and also load all orphan and family-instance
 -- modules.  Finally, check that the family instances of all modules in the
 -- interactive context are consistent (these modules are in the second
 -- argument).
-tcGetModuleExports :: Module -> [Module] -> TcM [AvailInfo]
-tcGetModuleExports mod directlyImpMods
+tcGetModuleExports :: Module -> TcM [AvailInfo]
+tcGetModuleExports mod
   = do { let doc = ptext (sLit "context for compiling statements")
        ; iface <- initIfaceTcRn $ loadSysInterface doc mod
 
   		-- Load any orphan-module and family instance-module
   		-- interfaces, so their instances are visible.
        ; loadOrphanModules (dep_orphs (mi_deps iface)) False 
-       ; loadOrphanModules (dep_finsts (mi_deps iface)) True
-
-                -- Check that the family instances of all directly loaded
-                -- modules are consistent.
-       ; checkFamInstConsistency (dep_finsts (mi_deps iface)) directlyImpMods
 
        ; ifaceExportNames (mi_exports iface)
        }
@@ -1586,7 +1562,6 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
          , ppr_fam_insts fam_insts
          , vcat (map ppr rules)
          , vcat (map ppr vects)
-         , ppr_gen_tycons (typeEnvTyCons type_env)
          , ptext (sLit "Dependent modules:") <+> 
                 ppr (sortBy cmp_mp $ eltsUFM (imp_dep_mods imports))
 	 , ptext (sLit "Dependent packages:") <+> 
@@ -1621,7 +1596,10 @@ ppr_types insts type_env
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env
-  = text "TYPE CONSTRUCTORS" $$ nest 4 (ppr_tydecls tycons)
+  = vcat [ text "TYPE CONSTRUCTORS"
+         ,   nest 2 (ppr_tydecls tycons)
+         , text "COERCION AXIOMS" 
+         ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
   where
     fi_tycons = map famInstTyCon fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
@@ -1653,22 +1631,11 @@ ppr_tydecls tycons
   = vcat (map ppr_tycon (sortLe le_sig tycons))
   where
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
-    ppr_tycon tycon 
-      | isCoercionTyCon tycon 
-      = sep [ptext (sLit "coercion") <+> ppr tycon <+> ppr tvs
-            , nest 2 (dcolon <+> pprEqPred (coercionKind (mkTyConApp tycon (mkTyVarTys tvs))))]
-      | otherwise             = ppr (tyThingToIfaceDecl (ATyCon tycon))
-      where
-        tvs = take (tyConArity tycon) alphaTyVars
+    ppr_tycon tycon = ppr (tyThingToIfaceDecl (ATyCon tycon))
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
 ppr_rules rs = vcat [ptext (sLit "{-# RULES"),
 		      nest 2 (pprRules rs),
 		      ptext (sLit "#-}")]
-
-ppr_gen_tycons :: [TyCon] -> SDoc
-ppr_gen_tycons []  = empty
-ppr_gen_tycons tcs = vcat [ptext (sLit "Tycons with generics:"),
-			   nest 2 (fsep (map ppr (filter tyConHasGenerics tcs)))]
 \end{code}

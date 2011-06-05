@@ -12,7 +12,6 @@ module SPARC.Ppr (
 	pprSectionHeader,
 	pprData,
 	pprInstr,
-	pprUserReg,
 	pprSize,
 	pprImm,
 	pprDataItem
@@ -138,12 +137,6 @@ pprAlign bytes =
 
 instance Outputable Instr where
     ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
-
-
--- | Pretty print a register.
---	This is an alias of pprReg for legacy reasons, should remove it.
-pprUserReg :: Reg -> Doc
-pprUserReg = pprReg
 
 
 -- | Pretty print a register.
@@ -543,7 +536,7 @@ pprInstr (BF cond b blockid)
     ]
 
 pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
-pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
+pprInstr (JMP_TBL op _ _)  = pprInstr (JMP op)
 
 pprInstr (CALL (Left imm) n _)
   = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]

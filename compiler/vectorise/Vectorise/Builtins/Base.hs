@@ -13,7 +13,7 @@ module Vectorise.Builtins.Base (
 	indexBuiltin,
 	
 	-- * Projections
-	selTy,
+        selTy,
 	selReplicate,
 	selPick,
 	selTags,
@@ -33,7 +33,6 @@ import TysWiredIn
 import Type
 import TyCon
 import DataCon
-import Var
 import Outputable
 import Data.Array
 

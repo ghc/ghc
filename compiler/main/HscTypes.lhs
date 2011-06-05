@@ -54,13 +54,13 @@ module HscTypes (
 
         -- * TyThings and type environments
 	TyThing(..),
-	tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId,
-	implicitTyThings, isImplicitTyThing,
+	tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId, tyThingCoAxiom,
+	implicitTyThings, implicitTyConThings, implicitClassThings, isImplicitTyThing,
 	
 	TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
 	extendTypeEnv, extendTypeEnvList, extendTypeEnvWithIds, lookupTypeEnv,
 	typeEnvElts, typeEnvClasses, typeEnvTyCons, typeEnvIds,
-	typeEnvDataCons,
+	typeEnvDataCons, typeEnvCoAxioms,
 
         -- * MonadThings
         MonadThings(..),
@@ -717,7 +717,7 @@ type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan)]
 -- | A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
 -- being compiled right now.  Once it is compiled, a 'ModIface' and 
--- 'ModDetails' are extracted and the ModGuts is dicarded.
+-- 'ModDetails' are extracted and the ModGuts is discarded.
 data ModGuts
   = ModGuts {
         mg_module    :: !Module,         -- ^ Module being compiled
@@ -863,37 +863,47 @@ emptyModIface mod
 %************************************************************************
 
 \begin{code}
--- | Interactive context, recording information relevant to GHCi
+-- | Interactive context, recording information about the state of the
+-- context in which statements are executed in a GHC session.
+--
 data InteractiveContext 
   = InteractiveContext { 
-          ic_toplev_scope :: [Module]   -- ^ The context includes the "top-level" scope of
-					-- these modules
+         -- These two fields are only stored here so that the client
+         -- can retrieve them with GHC.getContext.  GHC itself doesn't
+         -- use them, but it does reset them to empty sometimes (such
+         -- as before a GHC.load).  The context is set with GHC.setContext.
+         ic_toplev_scope :: [Module],
+             -- ^ The context includes the "top-level" scope of
+             -- these modules
+         ic_imports :: [ImportDecl RdrName],
+             -- ^ The context is extended with these import declarations
 
-        , ic_exports :: [(Module, Maybe (ImportDecl RdrName))]    -- ^ The context includes just the exported parts of these
-					-- modules
+         ic_rn_gbl_env :: GlobalRdrEnv,
+             -- ^ The contexts' cached 'GlobalRdrEnv', built by
+             -- 'InteractiveEval.setContext'
 
-        , ic_rn_gbl_env :: GlobalRdrEnv -- ^ The contexts' cached 'GlobalRdrEnv', built from
-					-- 'ic_toplev_scope' and 'ic_exports'
-
-        , ic_tmp_ids :: [Id]   -- ^ Names bound during interaction with the user.
-                               -- Later Ids shadow earlier ones with the same OccName
-                               -- Expressions are typed with these Ids in the envt
-                               -- For runtime-debugging, these Ids may have free
-                               -- TcTyVars of RuntimUnkSkol flavour, but no free TyVars
-                               -- (because the typechecker doesn't expect that)
+         ic_tmp_ids :: [Id],
+             -- ^ Names bound during interaction with the user.  Later
+             -- Ids shadow earlier ones with the same OccName
+             -- Expressions are typed with these Ids in the envt For
+             -- runtime-debugging, these Ids may have free TcTyVars of
+             -- RuntimUnkSkol flavour, but no free TyVars (because the
+             -- typechecker doesn't expect that)
 
 #ifdef GHCI
-        , ic_resume :: [Resume]         -- ^ The stack of breakpoint contexts
+         ic_resume :: [Resume],
+             -- ^ The stack of breakpoint contexts
 #endif
 
-        , ic_cwd :: Maybe FilePath      -- virtual CWD of the program
+         ic_cwd :: Maybe FilePath
+             -- virtual CWD of the program
     }
 
 
 emptyInteractiveContext :: InteractiveContext
 emptyInteractiveContext
   = InteractiveContext { ic_toplev_scope = [],
-			 ic_exports = [],
+                         ic_imports = [],
 			 ic_rn_gbl_env = emptyGlobalRdrEnv,
 			 ic_tmp_ids = []
 #ifdef GHCI
@@ -1027,19 +1037,18 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 -- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
-
--- For data and newtype declarations:
-implicitTyThings (ATyCon tc)
-  =   -- fields (names of selectors)
-      -- (possibly) implicit coercion and family coercion
-      --   depending on whether it's a newtype or a family instance or both
-    implicitCoTyCon tc ++
-      -- for each data constructor in order,
-      --   the contructor, worker, and (possibly) wrapper
-    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
-		     
-implicitTyThings (AClass cl) 
-  = -- dictionary datatype:
+implicitTyThings (AnId _)       = []
+implicitTyThings (ACoAxiom _cc) = []
+implicitTyThings (ATyCon tc)    = implicitTyConThings tc
+implicitTyThings (AClass cl)    = implicitClassThings cl
+implicitTyThings (ADataCon dc)  = map AnId (dataConImplicitIds dc)
+    -- For data cons add the worker and (possibly) wrapper
+    
+implicitClassThings :: Class -> [TyThing]
+implicitClassThings cl 
+  = -- Does not include default methods, because those Ids may have
+    --    their own pragmas, unfoldings etc, not derived from the Class object
+    -- Dictionary datatype:
     --    [extras_plus:]
     --      type constructor 
     --    [recursive call:]
@@ -1055,11 +1064,16 @@ implicitTyThings (AClass cl)
     -- superclass and operation selectors
     map AnId (classAllSelIds cl)
 
-implicitTyThings (ADataCon dc) = 
-    -- For data cons add the worker and (possibly) wrapper
-    map AnId (dataConImplicitIds dc)
+implicitTyConThings :: TyCon -> [TyThing]
+implicitTyConThings tc 
+  =   -- fields (names of selectors)
+      -- (possibly) implicit coercion and family coercion
+      --   depending on whether it's a newtype or a family instance or both
+    implicitCoTyCon tc ++
+      -- for each data constructor in order,
+      --   the contructor, worker, and (possibly) wrapper
+    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
 
-implicitTyThings (AnId _)   = []
 
 -- add a thing and recursive call
 extras_plus :: TyThing -> [TyThing]
@@ -1069,10 +1083,10 @@ extras_plus thing = thing : implicitTyThings thing
 -- add the implicit coercion tycon
 implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc 
-  = map ATyCon . catMaybes $ [-- Just if newtype, Nothing if not
-                              newTyConCo_maybe tc, 
+  = map ACoAxiom . catMaybes $ [-- Just if newtype, Nothing if not
+                              newTyConCo_maybe tc,
                               -- Just if family instance, Nothing if not
-			        tyConFamilyCoercion_maybe tc] 
+			      tyConFamilyCoercion_maybe tc] 
 
 -- sortByOcc = sortBy (\ x -> \ y -> getOccName x < getOccName y)
 
@@ -1082,10 +1096,11 @@ implicitCoTyCon tc
 -- of some other declaration, or it is generated implicitly by some
 -- other declaration.
 isImplicitTyThing :: TyThing -> Bool
-isImplicitTyThing (ADataCon _)  = True
-isImplicitTyThing (AnId     id) = isImplicitId id
-isImplicitTyThing (AClass   _)  = False
-isImplicitTyThing (ATyCon   tc) = isImplicitTyCon tc
+isImplicitTyThing (ADataCon {}) = True
+isImplicitTyThing (AnId id)     = isImplicitId id
+isImplicitTyThing (AClass {})   = False
+isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
+isImplicitTyThing (ACoAxiom {}) = True
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids
@@ -1107,6 +1122,7 @@ emptyTypeEnv    :: TypeEnv
 typeEnvElts     :: TypeEnv -> [TyThing]
 typeEnvClasses  :: TypeEnv -> [Class]
 typeEnvTyCons   :: TypeEnv -> [TyCon]
+typeEnvCoAxioms :: TypeEnv -> [CoAxiom]
 typeEnvIds      :: TypeEnv -> [Id]
 typeEnvDataCons :: TypeEnv -> [DataCon]
 lookupTypeEnv   :: TypeEnv -> Name -> Maybe TyThing
@@ -1115,6 +1131,7 @@ emptyTypeEnv 	    = emptyNameEnv
 typeEnvElts     env = nameEnvElts env
 typeEnvClasses  env = [cl | AClass cl   <- typeEnvElts env]
 typeEnvTyCons   env = [tc | ATyCon tc   <- typeEnvElts env] 
+typeEnvCoAxioms env = [ax | ACoAxiom ax <- typeEnvElts env] 
 typeEnvIds      env = [id | AnId id     <- typeEnvElts env] 
 typeEnvDataCons env = [dc | ADataCon dc <- typeEnvElts env] 
 
@@ -1169,6 +1186,11 @@ lookupTypeHscEnv hsc_env name = do
 tyThingTyCon :: TyThing -> TyCon
 tyThingTyCon (ATyCon tc) = tc
 tyThingTyCon other	 = pprPanic "tyThingTyCon" (pprTyThing other)
+
+-- | Get the 'CoAxiom' from a 'TyThing' if it is a coercion axiom thing. Panics otherwise
+tyThingCoAxiom :: TyThing -> CoAxiom
+tyThingCoAxiom (ACoAxiom ax) = ax
+tyThingCoAxiom other	     = pprPanic "tyThingCoAxiom" (pprTyThing other)
 
 -- | Get the 'Class' from a 'TyThing' if it is a class thing. Panics otherwise
 tyThingClass :: TyThing -> Class

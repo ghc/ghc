@@ -420,6 +420,10 @@ rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
 rep_sig (L loc (TypeSig nm ty))       = rep_proto nm ty loc
+rep_sig (L _   (GenericSig nm _))     = failWithDs msg
+  where msg = vcat  [ ptext (sLit "Illegal default signature for") <+> quotes (ppr nm)
+                    , ptext (sLit "Default signatures are not supported by Template Haskell") ]
+
 rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig _                             = return []
@@ -631,7 +635,6 @@ repTy (HsKindSig t k)       = do
                                 k1 <- repKind k
                                 repTSig t1 k1
 repTy (HsSpliceTy splice _ _) = repSplice splice
-repTy ty@(HsNumTy _)          = notHandled "Number types (for generics)" (ppr ty)
 repTy ty		      = notHandled "Exotic form of type" (ppr ty)
 
 -- represent a kind
@@ -721,23 +724,19 @@ repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; wrapGenSyms ss z }
 
 -- FIXME: I haven't got the types here right yet
-repE e@(HsDo ctxt sts body _) 
+repE e@(HsDo ctxt sts _) 
  | case ctxt of { DoExpr -> True; GhciStmt -> True; _ -> False }
  = do { (ss,zs) <- repLSts sts; 
-	body'	<- addBinds ss $ repLE body;
-	ret	<- repNoBindSt body';	
-        e'      <- repDoE (nonEmptyCoreList (zs ++ [ret]));
+        e'      <- repDoE (nonEmptyCoreList zs);
         wrapGenSyms ss e' }
 
  | ListComp <- ctxt
  = do { (ss,zs) <- repLSts sts; 
-	body'	<- addBinds ss $ repLE body;
-	ret	<- repNoBindSt body';	
-        e'      <- repComp (nonEmptyCoreList (zs ++ [ret]));
+        e'      <- repComp (nonEmptyCoreList zs);
         wrapGenSyms ss e' }
 
   | otherwise
-  = notHandled "mdo and [: :]" (ppr e)
+  = notHandled "mdo, monad comprehension and [: :]" (ppr e)
 
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
@@ -817,7 +816,7 @@ repGuards other
      wrapGenSyms (concat xs) gd }
   where 
     process :: LGRHS Name -> DsM ([GenSymBind], (Core (TH.Q (TH.Guard, TH.Exp))))
-    process (L _ (GRHS [L _ (ExprStmt e1 _ _)] e2))
+    process (L _ (GRHS [L _ (ExprStmt e1 _ _ _)] e2))
            = do { x <- repLNormalGE e1 e2;
                   return ([], x) }
     process (L _ (GRHS ss rhs))
@@ -876,7 +875,7 @@ repSts (LetStmt bs : ss) =
       ; z <- repLetSt ds
       ; (ss2,zs) <- addBinds ss1 (repSts ss)
       ; return (ss1++ss2, z : zs) } 
-repSts (ExprStmt e _ _ : ss) =       
+repSts (ExprStmt e _ _ _ : ss) =       
    do { e2 <- repLE e
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss
@@ -1584,7 +1583,7 @@ repLiteral lit
 mk_integer :: Integer -> DsM HsLit
 mk_integer  i = do integer_ty <- lookupType integerTyConName
                    return $ HsInteger i integer_ty
-mk_rational :: Rational -> DsM HsLit
+mk_rational :: FractionalLit -> DsM HsLit
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
 mk_string :: FastString -> DsM HsLit

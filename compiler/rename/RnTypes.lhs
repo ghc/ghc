@@ -31,7 +31,7 @@ import RnEnv
 import TcRnMonad
 import RdrName
 import PrelNames
-import TypeRep		( funTyConName )
+import TysPrim          ( funTyConName )
 import Name
 import SrcLoc
 import NameSet
@@ -138,13 +138,6 @@ rnHsType doc (HsBangTy b ty)
 rnHsType doc (HsRecTy flds)
   = do { flds' <- rnConDeclFields doc flds
        ; return (HsRecTy flds') }
-
-rnHsType _ (HsNumTy i)
-  | i == 1    = return (HsNumTy i)
-  | otherwise = addErr err_msg >> return (HsNumTy i)
-  where
-    err_msg = ptext (sLit "Only unit numeric type pattern is valid")
-			   
 
 rnHsType doc (HsFunTy ty1 ty2) = do
     ty1' <- rnLHsType doc ty1

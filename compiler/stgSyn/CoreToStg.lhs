@@ -18,8 +18,8 @@ import StgSyn
 
 import Type
 import TyCon
+import MkId		( coercionTokenId )
 import Id
-import Var              ( Var )
 import IdInfo
 import DataCon
 import CostCentre       ( noCCS )
@@ -218,7 +218,7 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 -- floated out a binding, in which case it will be approximate.
 consistentCafInfo :: Id -> GenStgBinding Var Id -> Bool
 consistentCafInfo id bind
-  = WARN( not (exact || is_sat_thing) , ppr id )
+  = WARN( not (exact || is_sat_thing) , ppr id <+> ppr id_marked_caffy <+> ppr binding_is_caffy )
     safe
   where
     safe  = id_marked_caffy || not binding_is_caffy
@@ -312,8 +312,9 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
-coreToStgExpr (Lit l) = return (StgLit l, emptyFVInfo, emptyVarSet)
-coreToStgExpr (Var v) = coreToStgApp Nothing v []
+coreToStgExpr (Lit l)      = return (StgLit l, emptyFVInfo, emptyVarSet)
+coreToStgExpr (Var v)      = coreToStgApp Nothing v               []
+coreToStgExpr (Coercion _) = coreToStgApp Nothing coercionTokenId []
 
 coreToStgExpr expr@(App _ _)
   = coreToStgApp Nothing f args
@@ -571,6 +572,10 @@ coreToStgArgs []
 coreToStgArgs (Type _ : args) = do     -- Type argument
     (args', fvs) <- coreToStgArgs args
     return (args', fvs)
+
+coreToStgArgs (Coercion _ : args)  -- Coercion argument; replace with place holder
+  = do { (args', fvs) <- coreToStgArgs args
+       ; return (StgVarArg coercionTokenId : args', fvs) }
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, args_fvs) <- coreToStgArgs args
@@ -1124,7 +1129,7 @@ myCollectArgs expr
     go (Cast e _)       as = go e as
     go (Note _ e)       as = go e as
     go (Lam b e)        as
-       | isTyCoVar b         = go e as  -- Note [Collect args]
+       | isTyVar b         = go e as  -- Note [Collect args]
     go _                _  = pprPanic "CoreToStg.myCollectArgs" (ppr expr)
 \end{code}
 

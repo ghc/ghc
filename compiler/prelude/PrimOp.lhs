@@ -18,8 +18,8 @@ module PrimOp (
 
 	tagToEnumKey,
 
-	primOpOutOfLine, primOpNeedsWrapper, 
-	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
+        primOpOutOfLine, primOpCodeSize,
+        primOpOkForSpeculation, primOpIsCheap,
 
 	getPrimOpResultInfo,  PrimOpResultInfo(..),
 
@@ -363,18 +363,23 @@ primOpIsCheap op = primOpOkForSpeculation op
 -- even if primOpIsCheap sometimes says 'True'.
 \end{code}
 
-primOpIsDupable
-~~~~~~~~~~~~~~~
-primOpIsDupable means that the use of the primop is small enough to
-duplicate into different case branches.  See CoreUtils.exprIsDupable.
+primOpCodeSize
+~~~~~~~~~~~~~~
+Gives an indication of the code size of a primop, for the purposes of
+calculating unfolding sizes; see CoreUnfold.sizeExpr.
 
 \begin{code}
-primOpIsDupable :: PrimOp -> Bool
-	-- See comments with CoreUtils.exprIsDupable
-	-- We say it's dupable it isn't implemented by a C call with a wrapper
-primOpIsDupable op = not (primOpNeedsWrapper op)
-\end{code}
+primOpCodeSize :: PrimOp -> Int
+#include "primop-code-size.hs-incl"
 
+primOpCodeSizeDefault :: Int
+primOpCodeSizeDefault = 1
+  -- CoreUnfold.primOpSize already takes into account primOpOutOfLine
+  -- and adds some further costs for the args in that case.
+
+primOpCodeSizeForeignCall :: Int
+primOpCodeSizeForeignCall = 4
+\end{code}
 
 \begin{code}
 primOpCanFail :: PrimOp -> Bool
@@ -419,14 +424,6 @@ duplicated.
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
 #include "primop-has-side-effects.hs-incl"
-\end{code}
-
-Inline primitive operations that perform calls need wrappers to save
-any live variables that are stored in caller-saves registers.
-
-\begin{code}
-primOpNeedsWrapper :: PrimOp -> Bool
-#include "primop-needs-wrapper.hs-incl"
 \end{code}
 
 \begin{code}

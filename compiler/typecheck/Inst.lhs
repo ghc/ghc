@@ -46,11 +46,10 @@ import TcMType
 import TcType
 import Class
 import Unify
-import Coercion
 import HscTypes
 import Id
 import Name
-import Var
+import Var      ( Var, TyVar, EvVar, varType, setVarType )
 import VarEnv
 import VarSet
 import PrelNames
@@ -212,11 +211,8 @@ instCallConstraints _ [] = return idHsWrapper
 
 instCallConstraints origin (EqPred ty1 ty2 : preds)	-- Try short-cut
   = do  { traceTc "instCallConstraints" $ ppr (EqPred ty1 ty2)
-	; coi   <- unifyType ty1 ty2
+        ; co    <- unifyType ty1 ty2
 	; co_fn <- instCallConstraints origin preds
-	; let co = case coi of
-                       IdCo ty -> ty
-                       ACo  co -> co
         ; return (co_fn <.> WpEvApp (EvCoercion co)) }
 
 instCallConstraints origin (pred : preds)
@@ -551,7 +547,7 @@ tidyFlavoredEvVar env (EvVarX v fl)
   = EvVarX (tidyEvVar env v) (tidyFlavor env fl)
 
 tidyFlavor :: TidyEnv -> CtFlavor -> CtFlavor
-tidyFlavor env (Given loc) = Given (tidyGivenLoc env loc)
+tidyFlavor env (Given loc gk) = Given (tidyGivenLoc env loc) gk
 tidyFlavor _   fl          = fl
 
 tidyGivenLoc :: TidyEnv -> GivenLoc -> GivenLoc
@@ -595,8 +591,8 @@ substFlavoredEvVar subst (EvVarX v fl)
   = EvVarX (substEvVar subst v) (substFlavor subst fl)
 
 substFlavor :: TvSubst -> CtFlavor -> CtFlavor
-substFlavor subst (Given loc) = Given (substGivenLoc subst loc)
-substFlavor _     fl          = fl
+substFlavor subst (Given loc gk) = Given (substGivenLoc subst loc) gk
+substFlavor _     fl             = fl
 
 substGivenLoc :: TvSubst -> GivenLoc -> GivenLoc
 substGivenLoc subst (CtLoc skol span ctxt) = CtLoc (substSkolemInfo subst skol) span ctxt

@@ -10,7 +10,7 @@ Haskell. [WDP 94/11])
 \begin{code}
 module IdInfo (
         -- * The IdDetails type
-	IdDetails(..), pprIdDetails,
+	IdDetails(..), pprIdDetails, coVarDetails,
 
         -- * The IdInfo type
 	IdInfo,		-- Abstract
@@ -140,6 +140,9 @@ data IdDetails
        -- Bool = True <=> the class has only one method, so may be
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
+
+coVarDetails :: IdDetails
+coVarDetails = VanillaId
 
 instance Outputable IdDetails where
     ppr = pprIdDetails

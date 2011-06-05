@@ -35,13 +35,7 @@
 	      <entry>mode</entry>
 	      <entry>-</entry>
 	    </row>
-	    <row>
-	      <entry><option>-n</option></entry>
-	      <entry>do a dry run</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
+            <row>
 	      <entry><option>-v</option></entry>
 	      <entry>verbose mode (equivalent to <option>-v3</option>)</entry>
 	      <entry>dynamic</entry>
@@ -682,7 +676,9 @@
 	    </row>
 	    <row>
 	      <entry><option>-XGenerics</option></entry>
-	      <entry>Enable <link linkend="generic-classes">generic classes</link></entry>
+	      <entry>Deprecated, does nothing. No longer enables <link linkend="generic-classes">generic classes</link>.
+               See also GHC's support for
+               <link linkend="generic-programming">generic programming</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoGenerics</option></entry>
 	    </row>
@@ -898,6 +894,12 @@
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoTransformListComp</option></entry>
 	    </row>
+        <row>
+	      <entry><option>-XMonadComprehensions</option></entry>
+	      <entry>Enable <link linkend="monad-comprehensions">monad comprehensions</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoMonadComprehensions</option></entry>
+	    </row>
 	    <row>
 	      <entry><option>-XUnliftedFFITypes</option></entry>
 	      <entry>Enable unlifted FFI types.</entry>
@@ -971,6 +973,12 @@
 	      <entry><option>-XNoDeriveDataTypeable</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XDeriveGeneric</option></entry>
+	      <entry>Enable <link linkend="deriving-typeable">deriving for the Generic class</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoDeriveGeneric</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
 	      <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
 	      <entry>dynamic</entry>
@@ -1000,6 +1008,12 @@
 	      <entry>Enable <link linkend="class-method-types">constrained class methods</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoConstrainedClassMethods</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XDefaultSignatures</option></entry>
+	      <entry>Enable <link linkend="class-default-signatures">default signatures</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoDefaultSignatures</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XMultiParamTypeClasses</option></entry>
@@ -1177,6 +1191,13 @@
 	    <entry>warn about top-level functions without signatures</entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-missing-signatures</option></entry>
+	  </row>
+
+	  <row>
+	    <entry><option>-fwarn-missing-local-sigs</option></entry>
+	    <entry>warn about polymorphic local bindings without signatures</entry>
+	    <entry>dynamic</entry>
+	    <entry><option>-fno-warn-missing-local-sigs</option></entry>
 	  </row>
 
 	  <row>
@@ -2220,6 +2241,12 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ddump-to-file</option></entry>
+	      <entry>Dump to files instead of stdout</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ddump-asm</option></entry>
 	      <entry>Dump assembly</entry>
 	      <entry>dynamic</entry>
@@ -2461,24 +2488,6 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-dsuppress-uniques</option></entry>
-	      <entry>Suppress the printing of uniques in debug output (easier to use <command>diff</command>.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-dsuppress-coercions</option></entry>
-	      <entry>Suppress the printing of coercions in Core dumps to make them shorter.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-dsuppress-module-prefixes</option></entry>
-	      <entry>Suppress the printing of module qualification prefixes in Core dumps to make them easier to read.</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-dppr-noprags</option></entry>
 	      <entry>Don't output pragma info in dumps</entry>
 	      <entry>static</entry>
@@ -2487,6 +2496,60 @@ phase <replaceable>n</replaceable></entry>
 	    <row>
 	      <entry><option>-dppr-user-length</option></entry>
 	      <entry>Set the depth for printing expressions in error msgs</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-colsNNN</option></entry>
+	      <entry>Set the width of debugging output. For example <option>-dppr-cols200</option></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dppr-case-as-let</option></entry>
+	      <entry>Print single alternative case expressions as strict lets.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-all</option></entry>
+	      <entry>In core dumps, suppress everything that is suppressable.</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-uniques</option></entry>
+	      <entry>Suppress the printing of uniques in debug output (easier to use <command>diff</command>)</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-idinfo</option></entry>
+	      <entry>Suppress extended information about identifiers where they are bound</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-module-prefixes</option></entry>
+	      <entry>Suppress the printing of module qualification prefixes</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-type-signatures</option></entry>
+	      <entry>Suppress type signatures</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-type-applications</option></entry>
+	      <entry>Suppress type applications</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-dsuppress-coercions</option></entry>
+	      <entry>Suppress the printing of coercions in Core dumps to make them shorter</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>

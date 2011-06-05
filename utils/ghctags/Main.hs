@@ -10,6 +10,7 @@ import DriverPhases     ( isHaskellSrcFilename )
 import HscTypes         ( msHsFilePath )
 import Name             ( getOccString )
 --import ErrUtils         ( printBagOfErrors )
+import Panic            ( panic )
 import DynFlags         ( defaultDynFlags )
 import Bag
 import Exception
@@ -100,7 +101,7 @@ main = do
                      then Just `liftM` openFile "TAGS" openFileMode
                      else return Nothing
 
-  GHC.defaultErrorHandler defaultDynFlags $
+  GHC.defaultErrorHandler (defaultDynFlags (panic "No settings")) $
     runGhc (Just ghc_topdir) $ do
       --liftIO $ print "starting up session"
       dflags <- getSessionDynFlags
@@ -292,7 +293,6 @@ boundThings modname lbinding =
                LitPat _ -> tl
                NPat _ _ _ -> tl -- form of literal pattern?
                NPlusKPat id _ _ _ -> thing id : tl
-               TypePat _ -> tl -- XXX need help here
                SigPatIn p _ -> patThings p tl
                SigPatOut p _ -> patThings p tl
                _ -> error "boundThings"

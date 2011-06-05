@@ -1156,6 +1156,7 @@ cafRefs p (Case e _bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts 
 cafRefs p (Note _n e) 	       = cafRefs p e
 cafRefs p (Cast e _co)         = cafRefs p e
 cafRefs _ (Type _) 	       = fastBool False
+cafRefs _ (Coercion _)         = fastBool False
 
 cafRefss :: VarEnv Id -> [Expr a] -> FastBool
 cafRefss _ [] 	  = fastBool False

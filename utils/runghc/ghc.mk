@@ -11,19 +11,19 @@
 # -----------------------------------------------------------------------------
 
 utils/runghc_PACKAGE = runghc
-utils/runghc_dist_USES_CABAL = YES
-utils/runghc_dist_PROG    = runghc$(exeext)
-utils/runghc_dist_SHELL_WRAPPER = YES
-utils/runghc_dist_INSTALL_SHELL_WRAPPER = YES
-utils/runghc_dist_EXTRA_HC_OPTS = -cpp -DVERSION="\"$(ProjectVersion)\""
+utils/runghc_dist-install_USES_CABAL = YES
+utils/runghc_dist-install_PROG    = runghc$(exeext)
+utils/runghc_dist-install_SHELL_WRAPPER = YES
+utils/runghc_dist-install_INSTALL_SHELL_WRAPPER = YES
+utils/runghc_dist-install_EXTRA_HC_OPTS = -cpp -DVERSION="\"$(ProjectVersion)\""
 
 ifneq "$(BINDIST)" "YES"
 # hack: the build system has trouble with Main modules not called Main.hs
-utils/runghc/dist/build/Main.hs : utils/runghc/runghc.hs | $$(dir $$@)/.
+utils/runghc/dist-install/build/Main.hs : utils/runghc/runghc.hs | $$(dir $$@)/.
 	"$(CP)" $< $@
 endif
 
-$(eval $(call build-prog,utils/runghc,dist,1))
+$(eval $(call build-prog,utils/runghc,dist-install,1))
 
 install: install_runhaskell
 

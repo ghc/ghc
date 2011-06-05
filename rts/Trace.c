@@ -15,10 +15,15 @@
 #ifdef TRACING
 
 #include "GetTime.h"
+#include "GetEnv.h"
 #include "Stats.h"
 #include "eventlog/EventLog.h"
 #include "Threads.h"
 #include "Printer.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #ifdef DEBUG
 // debugging flags, set with +RTS -D<something>
@@ -252,6 +257,83 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
     }
 }
 
+void traceCapsetModify_ (EventTypeNum tag,
+                         CapsetID capset,
+                         StgWord32 other)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        ACQUIRE_LOCK(&trace_utx);
+
+        tracePreface();
+        switch (tag) {
+        case EVENT_CAPSET_CREATE:   // (capset, capset_type)
+            debugBelch("created capset %d of type %d\n", capset, other);
+            break;
+        case EVENT_CAPSET_DELETE:   // (capset)
+            debugBelch("deleted capset %d\n", capset);
+            break;
+        case EVENT_CAPSET_ASSIGN_CAP:  // (capset, capno)
+            debugBelch("assigned cap %d to capset %d\n", other, capset);
+            break;
+        case EVENT_CAPSET_REMOVE_CAP:  // (capset, capno)
+            debugBelch("removed cap %d from capset %d\n", other, capset);
+            break;
+        }
+        RELEASE_LOCK(&trace_utx);
+    } else
+#endif
+    {
+        if (eventlog_enabled) {
+            postCapsetModifyEvent(tag, capset, other);
+        }
+    }
+}
+
+void traceOSProcessInfo_(void) {
+    if (eventlog_enabled) {
+        postCapsetModifyEvent(EVENT_OSPROCESS_PID,
+                              CAPSET_OSPROCESS_DEFAULT,
+                              getpid());
+
+#if !defined(cygwin32_HOST_OS) && !defined (mingw32_HOST_OS)
+/* Windows has no strong concept of process heirarchy, so no getppid().
+ * In any case, this trace event is mainly useful for tracing programs
+ * that use 'forkProcess' which Windows doesn't support anyway.
+ */
+        postCapsetModifyEvent(EVENT_OSPROCESS_PPID,
+                              CAPSET_OSPROCESS_DEFAULT,
+                              getppid());
+#endif
+        {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "GHC-%s %s", ProjectVersion, RtsWay);
+            postCapsetStrEvent(EVENT_RTS_IDENTIFIER,
+                               CAPSET_OSPROCESS_DEFAULT,
+                               buf);
+        }
+        {
+            int argc = 0; char **argv;
+            getFullProgArgv(&argc, &argv);
+            if (argc != 0) {
+                postCapsetVecEvent(EVENT_PROGRAM_ARGS,
+                                   CAPSET_OSPROCESS_DEFAULT,
+                                   argc, argv);
+            }
+        }
+        {
+            int envc = 0; char **envv;
+            getProgEnvv(&envc, &envv);
+            if (envc != 0) {
+                postCapsetVecEvent(EVENT_PROGRAM_ENV,
+                                   CAPSET_OSPROCESS_DEFAULT,
+                                   envc, envv);
+            }
+            freeProgEnvv(envc, envv);
+        }
+    }
+}
+
 void traceEvent_ (Capability *cap, EventTypeNum tag)
 {
 #ifdef DEBUG
@@ -360,6 +442,12 @@ void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)
     }
 }
 
+void traceEventStartup_(int nocaps)
+{
+    if (eventlog_enabled) {
+        postEventStartup(nocaps);
+    }
+}
 
 #ifdef DEBUG
 void traceBegin (const char *str, ...)

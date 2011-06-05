@@ -105,6 +105,21 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -arch x86_64"
         $5="$$5 -m64"
         ;;
+    alpha-*)
+        # For now, to suppress the gcc warning "call-clobbered
+        # register used for global register variable", we simply
+        # disable all warnings altogether using the -w flag. Oh well.
+        $2="$$2 -w -mieee -D_REENTRANT"
+        $3="$$3 -w -mieee -D_REENTRANT"
+        $5="$$5 -w -mieee -D_REENTRANT"
+        ;;
+    hppa*)
+        # ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
+        # (very nice, but too bad the HP /usr/include files don't agree.)
+        $2="$$2 -D_HPUX_SOURCE"
+        $3="$$3 -D_HPUX_SOURCE"
+        $5="$$5 -D_HPUX_SOURCE"
+        ;;
     esac
 
     # If gcc knows about the stack protector, turn it off.
@@ -181,8 +196,8 @@ AC_DEFUN([FP_EVAL_STDERR],
 # --------------------
 # XXX
 #
-# $1 = the command to look for
-# $2 = the variable to set
+# $1 = the variable to set
+# $2 = the command to look for
 #
 AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
 [
@@ -620,7 +635,7 @@ AC_SUBST([ArArgs], ["$fp_prog_ar_args"])
 # FP_PROG_AR_NEEDS_RANLIB
 # -----------------------
 # Sets the output variable RANLIB to "ranlib" if it is needed and found,
-# to ":" otherwise.
+# to "true" otherwise.
 AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],
 [AC_REQUIRE([FP_PROG_AR_IS_GNU])
 AC_REQUIRE([FP_PROG_AR_ARGS])
@@ -640,36 +655,10 @@ fi])
 if test $fp_cv_prog_ar_needs_ranlib = yes; then
    AC_PROG_RANLIB
 else
-  RANLIB=":"
+  RANLIB="true"
   AC_SUBST([RANLIB])
 fi
 ])# FP_PROG_AR_NEEDS_RANLIB
-
-
-# FP_PROG_AR_SUPPORTS_INPUT
-# -------------------------
-# Sets the output variable ArSupportsInput to "-input" or "", depending on
-# whether ar supports -input flag is supported or not.
-AC_DEFUN([FP_PROG_AR_SUPPORTS_INPUT],
-[AC_REQUIRE([FP_PROG_AR_IS_GNU])
-AC_REQUIRE([FP_PROG_AR_ARGS])
-AC_CACHE_CHECK([whether $fp_prog_ar_raw supports -input], [fp_cv_prog_ar_supports_input],
-[fp_cv_prog_ar_supports_input=no
-if test $fp_prog_ar_is_gnu = no; then
-  rm -f conftest*
-  touch conftest.lst
-  if FP_EVAL_STDERR(["$fp_prog_ar_raw" $fp_prog_ar_args conftest.a -input conftest.lst]) >/dev/null; then
-    test -s conftest.err || fp_cv_prog_ar_supports_input=yes
-  fi
-  rm -f conftest*
-fi])
-if test $fp_cv_prog_ar_supports_input = yes; then
-    ArSupportsInput="-input"
-else
-    ArSupportsInput=""
-fi
-AC_SUBST([ArSupportsInput])
-])# FP_PROG_AR_SUPPORTS_INPUT
 
 
 dnl
@@ -691,38 +680,30 @@ rm -f conftest
 ])])
 
 
-# FP_HAVE_GCC
+# FP_GCC_VERSION
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
-# output variables HaveGcc and GccVersion.
-AC_DEFUN([FP_HAVE_GCC],
+# output variable GccVersion.
+AC_DEFUN([FP_GCC_VERSION],
 [AC_REQUIRE([AC_PROG_CC])
-if test -z "$GCC"; then
-   fp_have_gcc=NO
-else
-   fp_have_gcc=YES
-fi
-if test "$fp_have_gcc" = "NO" -a -d $srcdir/ghc; then
+if test -z "$GCC"
+then
   AC_MSG_ERROR([gcc is required])
 fi
 GccLT34=
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
-[if test "$fp_have_gcc" = "YES"; then
-   fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
-   FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
-     [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
-   # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
-   # isn't a very good reason for that, but for now just make configure
-   # fail.
-   FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
- else
-   fp_cv_gcc_version="not-installed"
- fi
+[
+    fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.0],
+                        [AC_MSG_ERROR([Need at least gcc version 3.0 (3.4+ recommended)])])
+    # See #2770: gcc 2.95 doesn't work any more, apparently.  There probably
+    # isn't a very good reason for that, but for now just make configure
+    # fail.
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
 ])
-AC_SUBST([HaveGcc], [$fp_have_gcc])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
-])# FP_HAVE_GCC
+])# FP_GCC_VERSION
 
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary.
@@ -1050,18 +1031,6 @@ AC_SUBST([FopCmd])
 ])# FP_PROG_FOP
 
 
-# FP_PROG_HSTAGS
-# ----------------
-# Sets the output variable HstagsCmd to the full Haskell tags program path.
-# HstagsCmd is empty if no such program could be found.
-AC_DEFUN([FP_PROG_HSTAGS],
-[AC_PATH_PROG([HstagsCmd], [hasktags])
-if test -z "$HstagsCmd"; then
-  AC_MSG_WARN([cannot find hasktags in your PATH, you will not be able to build the tags])
-fi
-])# FP_PROG_HSTAGS
-
-
 # FP_PROG_GHC_PKG
 # ----------------
 # Try to find a ghc-pkg matching the ghc mentioned in the environment variable
@@ -1094,7 +1063,7 @@ AC_SUBST([GhcPkgCmd])
 # integer wrap around. (Trac #952)
 #
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
-[AC_REQUIRE([FP_HAVE_GCC])
+[AC_REQUIRE([FP_GCC_VERSION])
 AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
 [fp_cv_gcc_extra_opts=
  FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
@@ -1116,7 +1085,7 @@ if test "$RELEASE" = "NO"; then
         AC_MSG_RESULT(given $PACKAGE_VERSION)
     elif test -d .git; then
         changequote(, )dnl
-        ver_date=`git log -n 1 --date=short --pretty=format:%ci | sed "s/^.*\([0-9][0-9][0-9][0-9]\)-\([0-9][0-9]\)-\([0-9][0-9]\).*$/\1\2\3/"`
+        ver_date=`git log -n 1 --date=short --pretty=format:%ci | cut -d ' ' -f 1 | tr -d -`
         if echo $ver_date | grep '^[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]$' 2>&1 >/dev/null; then true; else
         changequote([, ])dnl
                 AC_MSG_ERROR([failed to detect version date: check that git is in your path])
@@ -1526,6 +1495,21 @@ case "$1" in
     exit 1
     ;;
   esac
+])
+
+# BOOTSTRAPPING_GHC_INFO_FIELD
+# --------------------------------
+# If the bootstrapping compiler is >= 7.1, then set the variable
+# $1 to the value of the ghc --info field $2. Otherwise, set it to
+# $3.
+AC_DEFUN([BOOTSTRAPPING_GHC_INFO_FIELD],[
+if test $GhcCanonVersion -ge 701
+then
+    $1=`"$WithGhc" --info | grep "^ ,(\"$2\"," | sed -e 's/.*","//' -e 's/")$//'`
+else
+    $1=$3
+fi
+AC_SUBST($1)
 ])
 
 # LIBRARY_VERSION(lib)

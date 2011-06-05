@@ -12,7 +12,6 @@ module X86.Ppr (
         pprSectionHeader,
         pprData,
         pprInstr,
-        pprUserReg,
         pprSize,
         pprImm,
         pprDataItem,
@@ -34,7 +33,6 @@ import PprBase
 
 import OldCmm
 import CLabel
-import Config
 import Unique           ( pprUnique, Uniquable(..) )
 import Pretty
 import FastString
@@ -42,7 +40,6 @@ import qualified Outputable
 import Outputable       (panic, Outputable)
 
 import Data.Word
-import Distribution.System
 
 #if i386_TARGET_ARCH && darwin_TARGET_OS
 import Data.Bits
@@ -87,7 +84,17 @@ pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
                       <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
                     else empty
 #endif
+   $$ pprSizeDecl (if null info then lbl else entryLblToInfoLbl lbl)
 
+-- | Output the ELF .size directive.
+pprSizeDecl :: CLabel -> Doc
+#if elf_OBJ_FORMAT
+pprSizeDecl lbl =
+    ptext (sLit "\t.size") <+> pprCLabel_asm lbl
+    <> ptext (sLit ", .-") <> pprCLabel_asm lbl
+#else
+pprSizeDecl _ = empty
+#endif
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
 pprBasicBlock (BasicBlock blockid instrs) =
@@ -161,12 +168,6 @@ pprAlign bytes
 instance Outputable Instr where
     ppr instr = Outputable.docToSDoc $ pprInstr instr
 
-
-pprUserReg :: Reg -> Doc
-pprUserReg
- | cTargetArch == I386   = pprReg II32
- | cTargetArch == X86_64 = pprReg II64
- | otherwise             = panic "X86.Ppr.pprUserReg: not defined"
 
 pprReg :: Size -> Reg -> Doc
 
@@ -626,7 +627,7 @@ pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
 pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
 pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand archWordSize op)
-pprInstr (JMP_TBL op _)  = pprInstr (JMP op)
+pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op)
 pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
 pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg archWordSize reg)
 
@@ -641,8 +642,8 @@ pprInstr (FDIV size op1 op2) = pprSizeOpOp (sLit "div") size op1 op2
 
 pprInstr (CVTSS2SD from to)      = pprRegReg (sLit "cvtss2sd") from to
 pprInstr (CVTSD2SS from to)      = pprRegReg (sLit "cvtsd2ss") from to
-pprInstr (CVTTSS2SIQ sz from to) = pprSizeOpReg (sLit "cvttss2si") sz from to
-pprInstr (CVTTSD2SIQ sz from to) = pprSizeOpReg (sLit "cvttsd2si") sz from to
+pprInstr (CVTTSS2SIQ sz from to) = pprSizeSizeOpReg (sLit "cvttss2si") FF32 sz from to
+pprInstr (CVTTSD2SIQ sz from to) = pprSizeSizeOpReg (sLit "cvttsd2si") FF64 sz from to
 pprInstr (CVTSI2SS sz from to)   = pprSizeOpReg (sLit "cvtsi2ss") sz from to
 pprInstr (CVTSI2SD sz from to)   = pprSizeOpReg (sLit "cvtsi2sd") sz from to
 
@@ -1093,7 +1094,6 @@ pprSizeOpReg name size op1 reg2
         pprReg archWordSize reg2
     ]
 
-
 pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> Doc
 pprCondRegReg name size cond reg1 reg2
   = hcat [
@@ -1115,11 +1115,18 @@ pprSizeSizeRegReg name size1 size2 reg1 reg2
         pprSize size2,
         space,
         pprReg size1 reg1,
-
         comma,
         pprReg size2 reg2
     ]
 
+pprSizeSizeOpReg :: LitString -> Size -> Size -> Operand -> Reg -> Doc
+pprSizeSizeOpReg name size1 size2 op1 reg2
+  = hcat [
+        pprMnemonic name size2,
+        pprOperand size1 op1,
+        comma,
+        pprReg size2 reg2
+    ]
 
 pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
 pprSizeRegRegReg name size reg1 reg2 reg3

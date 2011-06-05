@@ -45,6 +45,7 @@ import Type
 import Coercion
 import Var
 import VarSet
+import VarEnv
 import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
@@ -55,6 +56,7 @@ import SrcLoc
 import Util
 import ListSetOps
 import Maybes
+import ErrUtils
 import Outputable
 import FastString
 import Control.Monad
@@ -286,8 +288,8 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; co_res <- unifyType op_res_ty res_ty
        ; op_id <- tcLookupId op_name
        ; let op' = L loc (HsWrap (mkWpTyApps [arg2_ty, op_res_ty]) (HsVar op_id))
-       ; return $ mkHsWrapCoI co_res $
-         OpApp (mkLHsWrapCoI co_arg1 arg1') op' fix arg2' }
+       ; return $ mkHsWrapCo co_res $
+         OpApp (mkLHsWrapCo co_arg1 arg1') op' fix arg2' }
 
   | otherwise
   = do { traceTc "Non Application rule" (ppr op)
@@ -295,8 +297,8 @@ tcExpr (OpApp arg1 op fix arg2) res_ty
        ; (co_fn, arg_tys, op_res_ty) <- unifyOpFunTys op 2 op_ty
        ; co_res <- unifyType op_res_ty res_ty
        ; [arg1', arg2'] <- tcArgs op [arg1, arg2] arg_tys
-       ; return $ mkHsWrapCoI co_res $
-         OpApp arg1' (mkLHsWrapCoI co_fn op') fix arg2' }
+       ; return $ mkHsWrapCo co_res $
+         OpApp arg1' (mkLHsWrapCo co_fn op') fix arg2' }
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --	\ x -> op x expr
@@ -306,8 +308,8 @@ tcExpr (SectionR op arg2) res_ty
        ; (co_fn, [arg1_ty, arg2_ty], op_res_ty) <- unifyOpFunTys op 2 op_ty
        ; co_res <- unifyType (mkFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op (arg2, arg2_ty, 2)
-       ; return $ mkHsWrapCoI co_res $
-         SectionR (mkLHsWrapCoI co_fn op') arg2' } 
+       ; return $ mkHsWrapCo co_res $
+         SectionR (mkLHsWrapCo co_fn op') arg2' } 
 
 tcExpr (SectionL arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
@@ -318,15 +320,15 @@ tcExpr (SectionL arg1 op) res_ty
        ; (co_fn, (arg1_ty:arg_tys), op_res_ty) <- unifyOpFunTys op n_reqd_args op_ty
        ; co_res <- unifyType (mkFunTys arg_tys op_res_ty) res_ty
        ; arg1' <- tcArg op (arg1, arg1_ty, 1)
-       ; return $ mkHsWrapCoI co_res $
-         SectionL arg1' (mkLHsWrapCoI co_fn op') }
+       ; return $ mkHsWrapCo co_res $
+         SectionL arg1' (mkLHsWrapCo co_fn op') }
 
 tcExpr (ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
   = do { let tup_tc = tupleTyCon boxity (length tup_args)
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
        ; tup_args1 <- tcTupArgs tup_args arg_tys
-       ; return $ mkHsWrapCoI coi (ExplicitTuple tup_args1 boxity) }
+       ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
     
   | otherwise
   = -- The tup_args are a mixture of Present and Missing (for tuple sections)
@@ -345,19 +347,19 @@ tcExpr (ExplicitTuple tup_args boxity) res_ty
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
        
-       ; return $ mkHsWrapCoI coi (ExplicitTuple tup_args1 boxity) }
+       ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
 
 tcExpr (ExplicitList _ exprs) res_ty
   = do 	{ (coi, elt_ty) <- matchExpectedListTy res_ty
 	; exprs' <- mapM (tc_elt elt_ty) exprs
-	; return $ mkHsWrapCoI coi (ExplicitList elt_ty exprs') }
+	; return $ mkHsWrapCo coi (ExplicitList elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
 tcExpr (ExplicitPArr _ exprs) res_ty	-- maybe empty
   = do	{ (coi, elt_ty) <- matchExpectedPArrTy res_ty
     	; exprs' <- mapM (tc_elt elt_ty) exprs	
-	; return $ mkHsWrapCoI coi (ExplicitPArr elt_ty exprs') }
+	; return $ mkHsWrapCo coi (ExplicitPArr elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 \end{code}
@@ -415,12 +417,12 @@ tcExpr (HsIf (Just fun) pred b1 b2) res_ty   -- Note [Rebindable syntax for if]
        -- and it maintains uniformity with other rebindable syntax
        ; return (HsIf (Just fun') pred' b1' b2') }
 
-tcExpr (HsDo do_or_lc stmts body _) res_ty
-  = tcDoStmts do_or_lc stmts body res_ty
+tcExpr (HsDo do_or_lc stmts _) res_ty
+  = tcDoStmts do_or_lc stmts res_ty
 
 tcExpr (HsProc pat cmd) res_ty
   = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty
-	; return $ mkHsWrapCoI coi (HsProc pat' cmd') }
+	; return $ mkHsWrapCo coi (HsProc pat' cmd') }
 
 tcExpr e@(HsArrApp _ _ _ _ _) _
   = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
@@ -467,7 +469,7 @@ tcExpr (RecordCon (L loc con_name) _ rbinds) res_ty
 
         ; co_res <- unifyType actual_res_ty res_ty
         ; rbinds' <- tcRecordBinds data_con arg_tys rbinds
-	; return $ mkHsWrapCoI co_res $ 
+	; return $ mkHsWrapCo co_res $ 
           RecordCon (L loc con_id) con_expr rbinds' } 
 \end{code}
 
@@ -603,7 +605,7 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
 		-- Take apart a representative constructor
 	      con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-	      (con1_tvs, _, _, _, _, con1_arg_tys, _) = dataConFullSig con1
+	      (con1_tvs, _, _, _, con1_arg_tys, _) = dataConFullSig con1
 	      con1_flds = dataConFieldLabels con1
 	      con1_res_ty = mkFamilyTyConApp tycon (mkTyVarTys con1_tvs)
    	      
@@ -641,10 +643,10 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 	; (_, result_inst_tys, result_inst_env) <- tcInstTyVars con1_tvs
 	; scrut_inst_tys <- zipWithM mk_inst_ty con1_tvs result_inst_tys
 
-	; let rec_res_ty    = substTy result_inst_env con1_res_ty
-	      con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
+	; let rec_res_ty    = TcType.substTy result_inst_env con1_res_ty
+	      con1_arg_tys' = map (TcType.substTy result_inst_env) con1_arg_tys
 	      scrut_subst   = zipTopTvSubst con1_tvs scrut_inst_tys
-	      scrut_ty      = substTy scrut_subst con1_res_ty
+	      scrut_ty      = TcType.substTy scrut_subst con1_res_ty
 
         ; co_res <- unifyType rec_res_ty res_ty
 
@@ -659,11 +661,11 @@ tcExpr (RecordUpd record_expr rbinds _ _ _) res_ty
 
 	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
 	; let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
-		       = WpCast $ mkTyConApp co_con scrut_inst_tys
+		       = WpCast $ mkAxInstCo co_con scrut_inst_tys
 		       | otherwise
 		       = idHsWrapper
 	-- Phew!
-        ; return $ mkHsWrapCoI co_res $
+        ; return $ mkHsWrapCo co_res $
           RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
 			           relevant_cons scrut_inst_tys result_inst_tys  }
   where
@@ -703,7 +705,7 @@ tcExpr (ArithSeq _ seq@(From expr)) res_ty
 	; expr' <- tcPolyExpr expr elt_ty
 	; enum_from <- newMethodFromName (ArithSeqOrigin seq) 
 			      enumFromName elt_ty 
-	; return $ mkHsWrapCoI coi (ArithSeq enum_from (From expr')) }
+	; return $ mkHsWrapCo coi (ArithSeq enum_from (From expr')) }
 
 tcExpr (ArithSeq _ seq@(FromThen expr1 expr2)) res_ty
   = do	{ (coi, elt_ty) <- matchExpectedListTy res_ty
@@ -711,7 +713,7 @@ tcExpr (ArithSeq _ seq@(FromThen expr1 expr2)) res_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_then <- newMethodFromName (ArithSeqOrigin seq) 
 			      enumFromThenName elt_ty 
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                     (ArithSeq enum_from_then (FromThen expr1' expr2')) }
 
 tcExpr (ArithSeq _ seq@(FromTo expr1 expr2)) res_ty
@@ -720,7 +722,7 @@ tcExpr (ArithSeq _ seq@(FromTo expr1 expr2)) res_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_to <- newMethodFromName (ArithSeqOrigin seq) 
 		  	      enumFromToName elt_ty 
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                      (ArithSeq enum_from_to (FromTo expr1' expr2')) }
 
 tcExpr (ArithSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
@@ -730,7 +732,7 @@ tcExpr (ArithSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
 	; expr3' <- tcPolyExpr expr3 elt_ty
 	; eft <- newMethodFromName (ArithSeqOrigin seq) 
 		      enumFromThenToName elt_ty 
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                      (ArithSeq eft (FromThenTo expr1' expr2' expr3')) }
 
 tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
@@ -739,7 +741,7 @@ tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_to <- newMethodFromName (PArrSeqOrigin seq) 
 				 (enumFromToPName basePackageId) elt_ty    -- !!!FIXME: chak
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                      (PArrSeq enum_from_to (FromTo expr1' expr2')) }
 
 tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
@@ -749,7 +751,7 @@ tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
 	; expr3' <- tcPolyExpr expr3 elt_ty
 	; eft <- newMethodFromName (PArrSeqOrigin seq)
 		      (enumFromThenToPName basePackageId) elt_ty        -- !!!FIXME: chak
-	; return $ mkHsWrapCoI coi 
+	; return $ mkHsWrapCo coi 
                      (PArrSeq eft (FromThenTo expr1' expr2' expr3')) }
 
 tcExpr (PArrSeq _ _) _ 
@@ -820,15 +822,15 @@ tcApp fun args res_ty
 	-- Typecheck the result, thereby propagating 
         -- info (if any) from result into the argument types
         -- Both actual_res_ty and res_ty are deeply skolemised
-        ; co_res <- addErrCtxt (funResCtxt fun) $
+        ; co_res <- addErrCtxtM (funResCtxt fun actual_res_ty res_ty) $
                     unifyType actual_res_ty res_ty
 
 	-- Typecheck the arguments
 	; args1 <- tcArgs fun args expected_arg_tys
 
         -- Assemble the result
-	; let fun2 = mkLHsWrapCoI co_fun fun1
-              app  = mkLHsWrapCoI co_res (foldl mkHsApp fun2 args1)
+	; let fun2 = mkLHsWrapCo co_fun fun1
+              app  = mkLHsWrapCo co_res (foldl mkHsApp fun2 args1)
 
         ; return (unLoc app) }
 
@@ -850,7 +852,7 @@ tcInferApp fun args
 	; (co_fun, expected_arg_tys, actual_res_ty)
 	      <- matchExpectedFunTys (mk_app_msg fun) (length args) fun_tau
 	; args1 <- tcArgs fun args expected_arg_tys
-	; let fun2 = mkLHsWrapCoI co_fun fun1
+	; let fun2 = mkLHsWrapCo co_fun fun1
               app  = foldl mkHsApp fun2 args1
         ; return (unLoc app, actual_res_ty) }
 
@@ -899,7 +901,7 @@ tcTupArgs args tys
 
 ----------------
 unifyOpFunTys :: LHsExpr Name -> Arity -> TcRhoType
-              -> TcM (CoercionI, [TcSigmaType], TcRhoType)	 		
+              -> TcM (Coercion, [TcSigmaType], TcRhoType)	 		
 -- A wrapper for matchExpectedFunTys
 unifyOpFunTys op arity ty = matchExpectedFunTys herald arity ty
   where
@@ -1010,7 +1012,7 @@ instantiateOuter orig id
        ; let theta' = substTheta subst theta
        ; traceTc "Instantiating" (ppr id <+> text "with" <+> (ppr tys $$ ppr theta'))
        ; wrap <- instCall orig tys theta'
-       ; return (mkHsWrap wrap (HsVar id), substTy subst tau) }
+       ; return (mkHsWrap wrap (HsVar id), TcType.substTy subst tau) }
   where
     (tvs, theta, tau) = tcSplitSigmaTy (idType id)
 \end{code}
@@ -1134,7 +1136,7 @@ tcTagToEnum loc fun_name arg res_ty
         ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar fun))
               rep_ty = mkTyConApp rep_tc rep_args
 
-	; return (mkHsWrapCoI coi $ HsApp fun' arg') }
+	; return (mkHsWrapCo coi $ HsApp fun' arg') }
   where
     doc1 = vcat [ ptext (sLit "Specify the type by giving a type signature")
 		, ptext (sLit "e.g. (tagToEnum# x) :: Bool") ]
@@ -1142,18 +1144,18 @@ tcTagToEnum loc fun_name arg res_ty
     doc3 = ptext (sLit "No family instance for this type")
 
     get_rep_ty :: TcType -> TyCon -> [TcType]
-               -> TcM (CoercionI, TyCon, [TcType])
+               -> TcM (Coercion, TyCon, [TcType])
     	-- Converts a family type (eg F [a]) to its rep type (eg FList a)
 	-- and returns a coercion between the two
     get_rep_ty ty tc tc_args
       | not (isFamilyTyCon tc) 
-      = return (IdCo ty, tc, tc_args)
+      = return (mkReflCo ty, tc, tc_args)
       | otherwise 
       = do { mb_fam <- tcLookupFamInst tc tc_args
            ; case mb_fam of 
 	       Nothing -> failWithTc (tagToEnumError ty doc3)
                Just (rep_tc, rep_args) 
-                   -> return ( ACo (mkSymCoercion (mkTyConApp co_tc rep_args))
+                   -> return ( mkSymCo (mkAxInstCo co_tc rep_args)
                              , rep_tc, rep_args )
                  where
                    co_tc = expectJust "tcTagToEnum" $
@@ -1386,9 +1388,23 @@ funAppCtxt fun arg arg_no
 		    quotes (ppr fun) <> text ", namely"])
        2 (quotes (ppr arg))
 
-funResCtxt :: LHsExpr Name -> SDoc
-funResCtxt fun
-  = ptext (sLit "In the return type of a call of") <+> quotes (ppr fun)
+funResCtxt :: LHsExpr Name -> TcType -> TcType 
+           -> TidyEnv -> TcM (TidyEnv, Message)
+-- When we have a mis-match in the return type of a function
+-- try to give a helpful message about too many/few arguments
+funResCtxt fun fun_res_ty res_ty env0
+  = do { fun_res' <- zonkTcType fun_res_ty
+       ; res'     <- zonkTcType res_ty
+       ; let n_fun = length (fst (tcSplitFunTys fun_res'))
+             n_res = length (fst (tcSplitFunTys res'))
+             what  | n_fun > n_res = ptext (sLit "few")
+                   | otherwise     = ptext (sLit "many")
+             extra | n_fun == n_res = empty
+                   | otherwise = ptext (sLit "Probable cause:") <+> quotes (ppr fun)
+                                 <+> ptext (sLit "is applied to too") <+> what 
+                                 <+> ptext (sLit "arguments") 
+             msg = ptext (sLit "In the return type of a call of") <+> quotes (ppr fun)
+       ; return (env0, msg $$ extra) }
 
 badFieldTypes :: [(Name,TcType)] -> SDoc
 badFieldTypes prs

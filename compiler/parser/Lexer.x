@@ -68,7 +68,7 @@ import UniqFM
 import DynFlags
 import Module
 import Ctype
-import BasicTypes	( InlineSpec(..), RuleMatchInfo(..) )
+import BasicTypes	( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
 import Util		( readRational )
 
 import Control.Monad
@@ -335,11 +335,6 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
          { token ITcubxparen }
 }
 
-<0> {
-  "{|" / { ifExtension genericsEnabled } { token ITocurlybar }
-  "|}" / { ifExtension genericsEnabled } { token ITccurlybar }
-}
-
 <0,option_prags> {
   \(					{ special IToparen }
   \)					{ special ITcparen }
@@ -541,14 +536,14 @@ data Token
   | ITchar       Char
   | ITstring     FastString
   | ITinteger    Integer
-  | ITrational   Rational
+  | ITrational   FractionalLit
 
   | ITprimchar   Char
   | ITprimstring FastString
   | ITprimint    Integer
   | ITprimword   Integer
-  | ITprimfloat  Rational
-  | ITprimdouble Rational
+  | ITprimfloat  FractionalLit
+  | ITprimdouble FractionalLit
 
   -- Template Haskell extension tokens
   | ITopenExpQuote  		--  [| or [e|
@@ -1061,9 +1056,12 @@ hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
-tok_float        str = ITrational   $! readRational str
-tok_primfloat    str = ITprimfloat  $! readRational str
-tok_primdouble   str = ITprimdouble $! readRational str
+tok_float        str = ITrational   $! readFractionalLit str
+tok_primfloat    str = ITprimfloat  $! readFractionalLit str
+tok_primdouble   str = ITprimdouble $! readFractionalLit str
+
+readFractionalLit :: String -> FractionalLit
+readFractionalLit str = (FL $! str) $! readRational str
 
 -- -----------------------------------------------------------------------------
 -- Layout processing
@@ -1751,8 +1749,10 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 -- -fglasgow-exts or -XParallelArrays) are represented by a bitmap stored in an unboxed
 -- integer
 
-genericsBit :: Int
-genericsBit = 0 -- {| and |}
+-- The "genericsBit" is now unused, available for others
+-- genericsBit :: Int
+-- genericsBit = 0 -- {|, |} and "generic"
+
 ffiBit :: Int
 ffiBit	   = 1
 parrBit :: Int
@@ -1803,8 +1803,6 @@ nondecreasingIndentationBit = 25
 
 always :: Int -> Bool
 always           _     = True
-genericsEnabled :: Int -> Bool
-genericsEnabled  flags = testBit flags genericsBit
 parrEnabled :: Int -> Bool
 parrEnabled      flags = testBit flags parrBit
 arrowsEnabled :: Int -> Bool
@@ -1856,7 +1854,7 @@ pragState dynflags buf loc = (mkPState dynflags buf loc) {
 mkPState :: DynFlags -> StringBuffer -> SrcLoc -> PState
 mkPState flags buf loc =
   PState {
-      buffer	      = buf,
+      buffer        = buf,
       dflags        = flags,
       messages      = emptyMessages,
       last_loc      = mkSrcSpan loc loc,
@@ -1873,34 +1871,34 @@ mkPState flags buf loc =
       alr_justClosedExplicitLetBlock = False
     }
     where
-      bitmap = genericsBit `setBitIf` xopt Opt_Generics flags
-	       .|. ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
-	       .|. parrBit           `setBitIf` xopt Opt_ParallelArrays  flags
-	       .|. arrowsBit         `setBitIf` xopt Opt_Arrows          flags
-	       .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
-	       .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes	 flags
-	       .|. ipBit             `setBitIf` xopt Opt_ImplicitParams	 flags
-	       .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll  flags
-	       .|. bangPatBit        `setBitIf` xopt Opt_BangPatterns flags
-	       .|. tyFamBit          `setBitIf` xopt Opt_TypeFamilies flags
-	       .|. haddockBit        `setBitIf` dopt Opt_Haddock      flags
-	       .|. magicHashBit      `setBitIf` xopt Opt_MagicHash    flags
-	       .|. kindSigsBit       `setBitIf` xopt Opt_KindSignatures flags
-	       .|. recursiveDoBit    `setBitIf` xopt Opt_RecursiveDo flags
-	       .|. recBit 	     `setBitIf` xopt Opt_DoRec  flags
-	       .|. recBit 	     `setBitIf` xopt Opt_Arrows flags
-	       .|. unicodeSyntaxBit  `setBitIf` xopt Opt_UnicodeSyntax flags
-	       .|. unboxedTuplesBit  `setBitIf` xopt Opt_UnboxedTuples flags
+      bitmap =     ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
+               .|. parrBit           `setBitIf` xopt Opt_ParallelArrays  flags
+               .|. arrowsBit         `setBitIf` xopt Opt_Arrows          flags
+               .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
+               .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes     flags
+               .|. ipBit             `setBitIf` xopt Opt_ImplicitParams  flags
+               .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll  flags
+               .|. bangPatBit        `setBitIf` xopt Opt_BangPatterns    flags
+               .|. tyFamBit          `setBitIf` xopt Opt_TypeFamilies    flags
+               .|. haddockBit        `setBitIf` dopt Opt_Haddock         flags
+               .|. magicHashBit      `setBitIf` xopt Opt_MagicHash       flags
+               .|. kindSigsBit       `setBitIf` xopt Opt_KindSignatures  flags
+               .|. recursiveDoBit    `setBitIf` xopt Opt_RecursiveDo     flags
+               .|. recBit            `setBitIf` xopt Opt_DoRec           flags
+               .|. recBit            `setBitIf` xopt Opt_Arrows          flags
+               .|. unicodeSyntaxBit  `setBitIf` xopt Opt_UnicodeSyntax   flags
+               .|. unboxedTuplesBit  `setBitIf` xopt Opt_UnboxedTuples   flags
                .|. datatypeContextsBit `setBitIf` xopt Opt_DatatypeContexts flags
                .|. transformComprehensionsBit `setBitIf` xopt Opt_TransformListComp flags
+               .|. transformComprehensionsBit `setBitIf` xopt Opt_MonadComprehensions flags
                .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
-               .|. relaxedLayoutBit `setBitIf` xopt Opt_RelaxedLayout flags
+               .|. relaxedLayoutBit  `setBitIf` xopt Opt_RelaxedLayout flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
-			| otherwise = 0
+                        | otherwise = 0
 
 addWarning :: DynFlag -> SrcSpan -> SDoc -> P ()
 addWarning option srcspan warning

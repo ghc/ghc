@@ -3,15 +3,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
-
-
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 {-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Abstract syntax of global declarations.
@@ -630,15 +622,15 @@ instance OutputableBndr name
                   (ppr new_or_data <+> 
 		   (if isJust typats then ptext (sLit "instance") else empty) <+>
 		   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
-		   ppr_sig mb_sig)
+		   ppr_sigx mb_sig)
 		  (pp_condecls condecls)
 		  derivings
       where
-	ppr_sig Nothing = empty
-	ppr_sig (Just kind) = dcolon <+> pprKind kind
+	ppr_sigx Nothing     = empty
+	ppr_sigx (Just kind) = dcolon <+> pprKind kind
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, 
-		    tcdFDs = fds, 
+		    tcdFDs  = fds, 
 		    tcdSigs = sigs, tcdMeths = methods, tcdATs = ats})
       | null sigs && null ats  -- No "where" part
       = top_matter
@@ -773,14 +765,14 @@ instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
 pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
-pprConDecl (ConDecl { con_name =con, con_explicit = expl, con_qvars = tvs
+pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = details
                     , con_res = ResTyH98, con_doc = doc })
-  = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details con details]
+  = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details details]
   where
-    ppr_details con (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
-    ppr_details con (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
-    ppr_details con (RecCon fields)  = ppr con <+> pprConDeclFields fields
+    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
+    ppr_details (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
+    ppr_details (RecCon fields)  = ppr con <+> pprConDeclFields fields
 
 pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = PrefixCon arg_tys
@@ -802,7 +794,7 @@ pprConDecl (ConDecl {con_name = con, con_details = InfixCon {}, con_res = ResTyG
 
 %************************************************************************
 %*									*
-\subsection[InstDecl]{An instance declaration
+\subsection[InstDecl]{An instance declaration}
 %*									*
 %************************************************************************
 
@@ -835,14 +827,14 @@ instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats
 
 %************************************************************************
 %*									*
-\subsection[DerivDecl]{A stand-alone instance deriving declaration
+\subsection[DerivDecl]{A stand-alone instance deriving declaration}
 %*									*
 %************************************************************************
 
 \begin{code}
 type LDerivDecl name = Located (DerivDecl name)
 
-data DerivDecl name = DerivDecl (LHsType name)
+data DerivDecl name = DerivDecl { deriv_type :: LHsType name }
   deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where

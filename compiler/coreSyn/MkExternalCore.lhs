@@ -13,6 +13,8 @@ import Module
 import CoreSyn
 import HscTypes	
 import TyCon
+-- import Class
+-- import TysPrim( eqPredPrimTyCon )
 import TypeRep
 import Type
 import PprExternalCore () -- Instances
@@ -78,10 +80,7 @@ collect_tdefs tcon tdefs
   where
     tdef | isNewTyCon tcon = 
                 C.Newtype (qtc tcon) 
-                  (case newTyConCo_maybe tcon of
-                     Just co -> qtc co
-                     Nothing       -> pprPanic ("MkExternalCore: newtype tcon\
-                                       should have a coercion: ") (ppr tcon))
+                  (qcc (newTyConCo tcon))
                   (map make_tbind tyvars) 
                   (make_ty (snd (newTyConRhs tcon)))
          | otherwise = 
@@ -94,6 +93,8 @@ collect_tdefs _ tdefs = tdefs
 qtc :: TyCon -> C.Qual C.Tcon
 qtc = make_con_qid . tyConName
 
+qcc :: CoAxiom -> C.Qual C.Tcon
+qcc = make_con_qid . co_ax_name
 
 make_cdef :: DataCon -> C.Cdef
 make_cdef dcon =  C.Constr dcon_name existentials tys
@@ -142,15 +143,16 @@ make_exp (Var v) = do
 make_exp (Lit (MachLabel s _ _)) = return $ C.Label (unpackFS s)
 make_exp (Lit l) = return $ C.Lit (make_lit l)
 make_exp (App e (Type t)) = make_exp e >>= (\ b -> return $ C.Appt b (make_ty t))
+make_exp (App _e (Coercion _co)) = error "make_exp (App _ (Coercion _))"    -- TODO
 make_exp (App e1 e2) = do
    rator <- make_exp e1
    rand <- make_exp e2
    return $ C.App rator rand
-make_exp (Lam v e) | isTyCoVar v = make_exp e >>= (\ b -> 
+make_exp (Lam v e) | isTyVar v = make_exp e >>= (\ b -> 
                                     return $ C.Lam (C.Tb (make_tbind v)) b)
 make_exp (Lam v e) | otherwise = make_exp e >>= (\ b -> 
                                     return $ C.Lam (C.Vb (make_vbind v)) b)
-make_exp (Cast e co) = make_exp e >>= (\ b -> return $ C.Cast b (make_ty co))
+make_exp (Cast e co) = make_exp e >>= (\ b -> return $ C.Cast b (make_co co))
 make_exp (Let b e) = do
   vd   <- make_vdef False b
   body <- make_exp e
@@ -170,7 +172,7 @@ make_alt (DataAlt dcon, vs, e) = do
            (map make_tbind tbs)
            (map make_vbind vbs)
 	   newE
-	where (tbs,vbs) = span isTyCoVar vs
+	where (tbs,vbs) = span isTyVar vs
 make_alt (LitAlt l,_,e)   = make_exp e >>= (return . (C.Alit (make_lit l)))
 make_alt (DEFAULT,[],e)   = make_exp e >>= (return . C.Adefault)
 -- This should never happen, as the DEFAULT alternative binds no variables,
@@ -229,29 +231,12 @@ make_ty' (TyConApp tc ts) 	 = make_tyConApp tc ts
 make_ty' (PredTy p)	= make_ty (predTypeRep p)
 
 make_tyConApp :: TyCon -> [Type] -> C.Ty
-make_tyConApp tc [t1, t2] | tc == transCoercionTyCon =
-  C.TransCoercion (make_ty t1) (make_ty t2)
-make_tyConApp tc [t]      | tc == symCoercionTyCon =
-  C.SymCoercion (make_ty t)
-make_tyConApp tc [t1, t2] | tc == unsafeCoercionTyCon =
-  C.UnsafeCoercion (make_ty t1) (make_ty t2)
-make_tyConApp tc [t]      | tc == leftCoercionTyCon =
-  C.LeftCoercion (make_ty t)
-make_tyConApp tc [t]      | tc == rightCoercionTyCon =
-  C.RightCoercion (make_ty t)
-make_tyConApp tc [t1, t2] | tc == instCoercionTyCon =
-  C.InstCoercion (make_ty t1) (make_ty t2)
--- this fails silently if we have an application
--- of a wired-in coercion tycon to the wrong number of args.
--- Not great...
 make_tyConApp tc ts =
   foldl C.Tapp (C.Tcon (qtc tc)) 
 	    (map make_ty ts)
 
-
 make_kind :: Kind -> C.Kind
-make_kind (PredTy p) | isEqPred p = C.Keq (make_ty t1) (make_ty t2)
-    where (t1, t2) = getEqPredTys p
+make_kind (PredTy (EqPred t1 t2)) = C.Keq (make_ty t1) (make_ty t2)
 make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind k
   | isLiftedTypeKind k   = C.Klifted
@@ -298,6 +283,25 @@ make_var_qid force_unqual = make_qid force_unqual True
 
 make_con_qid :: Name -> C.Qual C.Id
 make_con_qid = make_qid False False
+
+make_co :: Coercion -> C.Ty
+make_co (Refl ty)             = make_ty ty
+make_co (TyConAppCo tc cos)   = make_conAppCo (qtc tc) cos
+make_co (AppCo c1 c2)         = C.Tapp (make_co c1) (make_co c2)
+make_co (ForAllCo tv co)      = C.Tforall (make_tbind tv) (make_co co)
+make_co (CoVarCo cv)          = C.Tvar (make_var_id (coVarName cv))
+make_co (AxiomInstCo cc cos)  = make_conAppCo (qcc cc) cos
+make_co (UnsafeCo t1 t2)      = C.UnsafeCoercion (make_ty t1) (make_ty t2)
+make_co (SymCo co)            = C.SymCoercion (make_co co)
+make_co (TransCo c1 c2)       = C.TransCoercion (make_co c1) (make_co c2)
+make_co (NthCo d co)          = C.NthCoercion d (make_co co)
+make_co (InstCo co ty)        = C.InstCoercion (make_co co) (make_ty ty)
+
+-- Used for both tycon app coercions and axiom instantiations.
+make_conAppCo :: C.Qual C.Tcon -> [Coercion] -> C.Ty
+make_conAppCo con cos =
+  foldl C.Tapp (C.Tcon con) 
+	    (map make_co cos)
 
 -------
 isALocal :: Name -> CoreM Bool

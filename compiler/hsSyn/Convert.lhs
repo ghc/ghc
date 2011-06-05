@@ -522,12 +522,15 @@ cvtHsDo do_or_lc stmts
   | null stmts = failWith (ptext (sLit "Empty stmt list in do-block"))
   | otherwise
   = do	{ stmts' <- cvtStmts stmts
-	; body <- case last stmts' of
-		    L _ (ExprStmt body _ _) -> return body
-                    stmt' -> failWith (bad_last stmt')
-	; return $ HsDo do_or_lc (init stmts') body void }
+        ; let Just (stmts'', last') = snocView stmts'
+        
+	; last'' <- case last' of
+		      L loc (ExprStmt body _ _ _) -> return (L loc (mkLastStmt body))
+                      _ -> failWith (bad_last last')
+
+	; return $ HsDo do_or_lc (stmts'' ++ [last'']) void }
   where
-    bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprStmtContext do_or_lc <> colon
+    bad_last stmt = vcat [ ptext (sLit "Illegal last statement of") <+> pprAStmtContext do_or_lc <> colon
                          , nest 2 $ Outputable.ppr stmt
 			 , ptext (sLit "(It should be an expression.)") ]
 		
@@ -539,7 +542,7 @@ cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnL $ mkExprStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkBindStmt p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (ptext (sLit "a let binding")) ds
                             ; returnL $ LetStmt ds' }
-cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' }
+cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss; returnL $ ParStmt dss' noSyntaxExpr noSyntaxExpr noSyntaxExpr }
 		       where
 			 cvt_one ds = do { ds' <- cvtStmts ds; return (ds', undefined) }
 
@@ -565,7 +568,7 @@ cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
 cvtOverLit (IntegerL i)  
   = do { force i; return $ mkHsIntegral i placeHolderType}
 cvtOverLit (RationalL r) 
-  = do { force r; return $ mkHsFractional r placeHolderType}
+  = do { force r; return $ mkHsFractional (cvtFractionalLit r) placeHolderType}
 cvtOverLit (StringL s)   
   = do { let { s' = mkFastString s }
        ; force s'
@@ -599,8 +602,8 @@ allCharLs xs
 cvtLit :: Lit -> CvtM HsLit
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim i }
 cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim w }
-cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim f }
-cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim f }
+cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
+cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
        		       	    ; force s'      
@@ -764,6 +767,9 @@ overloadedLit _             = False
 
 void :: Type.Type
 void = placeHolderType
+
+cvtFractionalLit :: Rational -> FractionalLit
+cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = r }
 
 --------------------------------------------------------------------
 --	Turning Name back into RdrName

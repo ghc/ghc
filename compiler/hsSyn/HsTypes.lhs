@@ -168,8 +168,6 @@ data HsType name
 	-- interface files smaller), so when printing a HsType we may need to
 	-- add parens.  
 
-  | HsNumTy             Integer		-- Generics only
-
   | HsPredTy		(HsPred name)	-- Only used in the type of an instance
 					-- declaration, eg.  Eq [a] -> Eq a
 					--			       ^^^^
@@ -440,7 +438,6 @@ ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcol
 ppr_mono_ty _    (HsListTy ty)	     = brackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPredTy pred)     = ppr pred
-ppr_mono_ty _    (HsNumTy n)         = integer n  -- generics only
 ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 

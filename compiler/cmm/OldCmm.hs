@@ -144,12 +144,14 @@ data CmmStmt	-- Old-style
   | CmmStore CmmExpr CmmExpr     -- Assign to memory location.  Size is
                                  -- given by cmmExprType of the rhs.
 
-  | CmmCall	 		 -- A call (forign, native or primitive), with 
+  | CmmCall	 		 -- A call (foreign, native or primitive), with 
      CmmCallTarget
      HintedCmmFormals		 -- zero or more results
      HintedCmmActuals		 -- zero or more arguments
      CmmSafety			 -- whether to build a continuation
      CmmReturnInfo
+  -- Some care is necessary when handling the arguments of these, see
+  -- [Register parameter passing] and the hack in cmm/CmmOpt.hs
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 

@@ -18,7 +18,7 @@ import HsSyn
 import TcEnv            ( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
-import IfaceEnv         ( ifaceExportNames )
+import IfaceEnv		( ifaceExportNames )
 import LoadIface        ( loadSrcInterface )
 import TcRnMonad
 

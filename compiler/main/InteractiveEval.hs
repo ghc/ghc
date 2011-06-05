@@ -40,10 +40,9 @@ module InteractiveEval (
 
 import GhcMonad
 import HscMain
-import HsSyn (ImportDecl)
+import HsSyn
 import HscTypes
-import TcRnDriver
-import RnNames		(gresFromAvails)
+import RnNames          (gresFromAvails)
 import InstEnv
 import Type
 import TcType		hiding( typeKind )
@@ -68,14 +67,13 @@ import ErrUtils
 import SrcLoc
 import BreakArray
 import RtClosureInspect
-import BasicTypes
 import Outputable
 import FastString
 import MonadUtils
 
 import System.Directory
 import Data.Dynamic
-import Data.List (find, partition)
+import Data.List (find)
 import Control.Monad
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
@@ -779,37 +777,27 @@ fromListBL bound l = BL (length l) bound l []
 -- module.  They always shadow anything in scope in the current context.
 setContext :: GhcMonad m =>
         [Module]	-- ^ entire top level scope of these modules
-        -> [(Module, Maybe (ImportDecl RdrName))]	-- ^ exports of these modules
+        -> [ImportDecl RdrName]       -- ^ these import declarations
         -> m ()
-setContext toplev_mods other_mods = do
+setContext toplev_mods import_decls = do
     hsc_env <- getSession
     let old_ic  = hsc_IC     hsc_env
         hpt     = hsc_HPT    hsc_env
-        (decls,mods)   = partition (isJust . snd) other_mods -- time for tracing
-        export_mods = map fst mods
-        imprt_decls = map noLoc (catMaybes (map snd decls))
+        imprt_decls = map noLoc import_decls
     --
-    export_env  <- liftIO $ mkExportEnv hsc_env export_mods
     import_env  <-
         if null imprt_decls then return emptyGlobalRdrEnv else do
             let this_mod | null toplev_mods = pRELUDE
                          | otherwise        = head toplev_mods
             liftIO $ hscRnImportDecls hsc_env this_mod imprt_decls
+
     toplev_envs <- liftIO $ mapM (mkTopLevEnv hpt) toplev_mods
-    let all_env = foldr plusGlobalRdrEnv (plusGlobalRdrEnv export_env import_env) toplev_envs
+
+    let all_env = foldr plusGlobalRdrEnv import_env toplev_envs
     modifySession $ \_ ->
         hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
-      			 ic_exports      = other_mods,
-      			 ic_rn_gbl_env   = all_env }}
-
--- Make a GlobalRdrEnv based on the exports of the modules only.
-mkExportEnv :: HscEnv -> [Module] -> IO GlobalRdrEnv
-mkExportEnv hsc_env mods
-  = do { stuff <- mapM (getModuleExports hsc_env) mods
-       ; let (_msgs, mb_name_sets) = unzip stuff
-	     envs = [ availsToGlobalRdrEnv (moduleName mod) avails
-                    | (Just avails, mod) <- zip mb_name_sets mods ]
-       ; return $! foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs }
+                                   ic_imports      = import_decls,
+                                   ic_rn_gbl_env   = all_env }}
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
 availsToGlobalRdrEnv mod_name avails
@@ -837,9 +825,9 @@ mkTopLevEnv hpt modl
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
 -- of modules from which we take just the exports respectively.
-getContext :: GhcMonad m => m ([Module],[(Module, Maybe (ImportDecl RdrName))])
+getContext :: GhcMonad m => m ([Module],[ImportDecl RdrName])
 getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
-	       return (ic_toplev_scope ic, ic_exports ic)
+               return (ic_toplev_scope ic, ic_imports ic)
 
 -- | Returns @True@ if the specified module is interpreted, and hence has
 -- its full top-level scope available.
@@ -949,15 +937,9 @@ compileExpr expr = withSession $ \hsc_env -> do
 
 dynCompileExpr :: GhcMonad m => String -> m Dynamic
 dynCompileExpr expr = do
-    (full,exports) <- getContext
-    setContext full $
-        (mkModule
-            (stringToPackageId "base") (mkModuleName "Data.Dynamic")
-        ,Nothing):exports
     let stmt = "let __dynCompileExpr = Data.Dynamic.toDyn (" ++ expr ++ ")"
     Just (ids, hvals) <- withSession $ \hsc_env -> 
                            liftIO $ hscStmt hsc_env stmt
-    setContext full exports
     vals <- liftIO (unsafeCoerce# hvals :: IO [Dynamic])
     case (ids,vals) of
         (_:[], v:[])    -> return v

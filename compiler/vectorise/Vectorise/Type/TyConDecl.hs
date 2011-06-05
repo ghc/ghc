@@ -82,7 +82,6 @@ vectTyConDecl tycon
                             []                  -- no stupid theta.
                             rhs'                -- new constructor defs.
                             rec_flag            -- FIXME: is this ok?
-                            False               -- FIXME: no generics
                             False               -- not GADT syntax
                             NoParentTyCon
                             Nothing             -- not a family instance

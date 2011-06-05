@@ -28,7 +28,8 @@ import System.Exit
 import System.FilePath
 
 main :: IO ()
-main = do args <- getArgs
+main = do hSetBuffering stdout LineBuffering
+          args <- getArgs
           case args of
               "hscolour" : distDir : dir : args' ->
                   runHsColour distDir dir args'
@@ -295,7 +296,7 @@ generate config_args distdir directory
                                          pd lib lbi clbi
                   final_ipi = installedPkgInfo {
                                   Installed.installedPackageId = ipid,
-                                  Installed.haddockHTMLs = ["../" ++ display (packageId pd)]
+                                  Installed.haddockHTMLs = []
                               }
                   content = Installed.showInstalledPackageInfo final_ipi ++ "\n"
               writeFileAtomic (distdir </> "inplace-pkg-config") (toUTF8 content)

@@ -13,13 +13,7 @@ module AsmCodeGen ( nativeCodeGen ) where
 #include "nativeGen/NCG.h"
 
 
-#if   alpha_TARGET_ARCH
-import Alpha.CodeGen
-import Alpha.Regs
-import Alpha.RegInfo
-import Alpha.Instr
-
-#elif i386_TARGET_ARCH || x86_64_TARGET_ARCH
+#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 import X86.CodeGen
 import X86.Regs
 import X86.Instr
@@ -56,6 +50,7 @@ import qualified RegAlloc.Graph.TrivColorable	as Color
 
 import TargetReg
 import Platform
+import Config
 import Instruction
 import PIC
 import Reg
@@ -64,7 +59,7 @@ import NCGMonad
 import BlockId
 import CgUtils		( fixStgRegisters )
 import OldCmm
-import CmmOpt		( cmmMiniInline, cmmMachOpFold )
+import CmmOpt		( cmmEliminateDeadBlocks, cmmMiniInline, cmmMachOpFold )
 import OldPprCmm
 import CLabel
 
@@ -74,7 +69,6 @@ import UniqSupply
 import DynFlags
 import StaticFlags
 import Util
-import Config
 
 import Digraph
 import qualified Pretty
@@ -92,7 +86,6 @@ import Data.List
 import Data.Maybe
 import Control.Monad
 import System.IO
-import Distribution.System
 
 {-
 The native-code generator has machine-independent and
@@ -378,37 +371,48 @@ cmmNativeGen dflags us cmm count
 			, Nothing
 			, mPprStats)
 
+        ---- x86fp_kludge.  This pass inserts ffree instructions to clear
+        ---- the FPU stack on x86.  The x86 ABI requires that the FPU stack
+        ---- is clear, and library functions can return odd results if it
+        ---- isn't.
+        ----
+        ---- NB. must happen before shortcutBranches, because that
+        ---- generates JXX_GBLs which we can't fix up in x86fp_kludge.
+        let kludged =
+#if i386_TARGET_ARCH
+	 	{-# SCC "x86fp_kludge" #-}
+                map x86fp_kludge alloced
+#else
+                alloced
+#endif
+
+        ---- generate jump tables
+	let tabled	=
+		{-# SCC "generateJumpTables" #-}
+                generateJumpTables kludged
+
 	---- shortcut branches
 	let shorted	=
 	 	{-# SCC "shortcutBranches" #-}
-	 	shortcutBranches dflags alloced
+	 	shortcutBranches dflags tabled
 
 	---- sequence blocks
 	let sequenced	=
 	 	{-# SCC "sequenceBlocks" #-}
 	 	map sequenceTop shorted
 
-	---- x86fp_kludge
-	let kludged =
-#if i386_TARGET_ARCH
-	 	{-# SCC "x86fp_kludge" #-}
-	 	map x86fp_kludge sequenced
-#else
-		sequenced
-#endif
-
-	---- expansion of SPARC synthetic instrs
+        ---- expansion of SPARC synthetic instrs
 #if sparc_TARGET_ARCH
 	let expanded = 
 		{-# SCC "sparc_expand" #-}
-		map expandTop kludged
+                map expandTop sequenced
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
 		(vcat $ map (docToSDoc . pprNatCmmTop) expanded)
 #else
 	let expanded = 
-		kludged
+                sequenced
 #endif
 
 	return 	( usAlloc
@@ -447,14 +451,12 @@ makeImportsDoc dflags imports
                 -- stack so add the note in:
             Pretty.$$ Pretty.text ".section .note.GNU-stack,\"\",@progbits"
 #endif
-#if !defined(darwin_TARGET_OS)
                 -- And just because every other compiler does, lets stick in
 		-- an identifier directive: .ident "GHC x.y.z"
-	    Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
+            Pretty.$$ let compilerIdent = Pretty.text "GHC" Pretty.<+>
 	                                  Pretty.text cProjectVersion
                        in Pretty.text ".ident" Pretty.<+>
                           Pretty.doubleQuotes compilerIdent
-#endif
 
  where
 	-- Generate "symbol stubs" for all external symbols that might
@@ -480,7 +482,7 @@ makeImportsDoc dflags imports
 		| otherwise
 		= Pretty.empty
 
-	doPpr lbl = (lbl, Pretty.render $ pprCLabel lbl astyle)
+	doPpr lbl = (lbl, renderWithStyle (pprCLabel lbl) astyle)
 	astyle = mkCodeStyle AsmStyle
 
 
@@ -609,6 +611,18 @@ makeFarBranches = id
 #endif
 
 -- -----------------------------------------------------------------------------
+-- Generate jump tables
+
+-- Analyzes all native code and generates data sections for all jump
+-- table instructions.
+generateJumpTables
+	:: [NatCmmTop Instr] -> [NatCmmTop Instr]
+generateJumpTables xs = concatMap f xs
+    where f p@(CmmProc _ _ (ListGraph xs)) = p : concatMap g xs
+          f p = [p]
+          g (BasicBlock _ xs) = catMaybes (map generateJumpTableForInstr xs)
+
+-- -----------------------------------------------------------------------------
 -- Shortcut branches
 
 shortcutBranches 
@@ -718,10 +732,9 @@ Here we do:
              and position independent refs
         (ii) compile a list of imported symbols
 
-Ideas for other things we could do (ToDo):
+Ideas for other things we could do:
 
   - shortcut jumps-to-jumps
-  - eliminate dead code blocks
   - simple CSE: if an expr is assigned to a temp, then replace later occs of
     that expr with the temp, until the expr is no longer valid (can push through
     temp assignments, and certain assigns to mem...)
@@ -730,7 +743,7 @@ Ideas for other things we could do (ToDo):
 cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
-  blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)
+  blocks' <- mapM cmmBlockConFold (cmmMiniInline (cmmEliminateDeadBlocks blocks))
   return $ CmmProc info lbl (ListGraph blocks')
 
 newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
@@ -807,8 +820,10 @@ cmmStmtConFold stmt
 
 
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
-cmmExprConFold referenceKind expr
-   = case expr of
+cmmExprConFold referenceKind expr = do
+     dflags <- getDynFlagsCmmOpt
+     let arch = platformArch (targetPlatform dflags)
+     case expr of
         CmmLoad addr rep
            -> do addr' <- cmmExprConFold DataReference addr
                  return $ CmmLoad addr' rep
@@ -821,11 +836,9 @@ cmmExprConFold referenceKind expr
 
         CmmLit (CmmLabel lbl)
            -> do
-		dflags <- getDynFlagsCmmOpt
 		cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
            -> do
-		 dflags <- getDynFlagsCmmOpt
 		 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
                  return $ cmmMachOpFold (MO_Add wordWidth) [
                      dynRef,
@@ -836,15 +849,15 @@ cmmExprConFold referenceKind expr
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | cTargetArch == PPC && not opt_PIC
+          | arch == ArchPPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | cTargetArch == PPC && not opt_PIC
+          | arch == ArchPPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
-          | cTargetArch == PPC && not opt_PIC
+          | arch == ArchPPC && not opt_PIC
           -> cmmExprConFold referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
 

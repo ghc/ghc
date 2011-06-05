@@ -19,7 +19,6 @@ import PprCore
 import CoreSyn
 import CoreMonad            ( CoreM, getHscEnv )
 import Type
-import Var
 import Id
 import OccName
 import DynFlags
@@ -190,7 +189,7 @@ vectTopBinder var inline expr
       ; case vectDecl of
           Nothing                 -> return ()
           Just (vdty, _) 
-            | coreEqType vty vdty -> return ()
+            | eqType vty vdty -> return ()
             | otherwise           -> 
               cantVectorise ("Type mismatch in vectorisation pragma for " ++ show var) $
                 (text "Expected type" <+> ppr vty)

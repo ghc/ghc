@@ -783,18 +783,6 @@ ghc -c Foo.hs</screen>
     <variablelist>
       <varlistentry>
 	<term>
-          <option>-n</option>
-          <indexterm><primary><option>-n</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Does a dry-run, i.e. GHC goes through all the motions
-          of compiling as normal, but does not actually run any
-          external commands.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
           <option>-v</option>
           <indexterm><primary><option>-v</option></primary></indexterm>
         </term>
@@ -1368,6 +1356,20 @@ module M where
           function/value has a type signature, use the
           <option>-fwarn-missing-signatures</option> option.  As part of
 	    the warning GHC also reports the inferred type.  The
+          option is off by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-missing-local-sigs</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-missing-local-sigs</option></primary></indexterm>
+	  <indexterm><primary>type signatures, missing</primary></indexterm>
+
+	  <para>If you use the
+          <option>-fwarn-missing-local-sigs</option> flag GHC will warn
+          you about any polymorphic local bindings. As part of
+	    the warning GHC also reports the inferred type. The
           option is off by default.</para>
 	</listitem>
       </varlistentry>

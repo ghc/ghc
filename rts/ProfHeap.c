@@ -18,6 +18,7 @@
 #include "LdvProfile.h"
 #include "Arena.h"
 #include "Printer.h"
+#include "sm/GCThread.h"
 
 #include <string.h>
 
@@ -812,7 +813,7 @@ dumpCensus( Census *census )
 		rs->id = -(rs->id);
 
 	    // report in the unit of bytes: * sizeof(StgWord)
-	    printRetainerSetShort(hp_file, rs);
+	    printRetainerSetShort(hp_file, rs, RtsFlags.ProfFlags.ccsLength);
 	    break;
 	}
 	default:
@@ -1058,8 +1059,9 @@ heapCensusChain( Census *census, bdescr *bd )
 void
 heapCensus( void )
 {
-  nat g;
+  nat g, n;
   Census *census;
+  gen_workspace *ws;
 
   census = &censuses[era];
   census->time  = mut_user_time();
@@ -1081,6 +1083,13 @@ heapCensus( void )
       // Are we interested in large objects?  might be
       // confusing to include the stack in a heap profile.
       heapCensusChain( census, all_generations[g].large_objects );
+
+      for (n = 0; n < n_capabilities; n++) {
+          ws = &gc_threads[n]->gens[g];
+          heapCensusChain(census, ws->todo_bd);
+          heapCensusChain(census, ws->part_list);
+          heapCensusChain(census, ws->scavd_list);
+      }
   }
 
   // dump out the census info

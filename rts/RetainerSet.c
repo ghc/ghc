@@ -265,35 +265,34 @@ printRetainer(FILE *f, retainer cc)
 #if defined(RETAINER_SCHEME_INFO)
 // Retainer scheme 1: retainer = info table
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs)
+printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
 {
-#define MAX_RETAINER_SET_SPACE  24
-    char tmp[MAX_RETAINER_SET_SPACE + 1];
+    char tmp[max_length + 1];
     int size;
     nat j;
 
     ASSERT(rs->id < 0);
 
-    tmp[MAX_RETAINER_SET_SPACE] = '\0';
+    tmp[max_length] = '\0';
 
     // No blank characters are allowed.
     sprintf(tmp + 0, "(%d)", -(rs->id));
     size = strlen(tmp);
-    ASSERT(size < MAX_RETAINER_SET_SPACE);
+    ASSERT(size < max_length);
 
     for (j = 0; j < rs->num; j++) {
 	if (j < rs->num - 1) {
-	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), max_length - size);
 	    size = strlen(tmp);
-	    if (size == MAX_RETAINER_SET_SPACE)
+	    if (size == max_length)
 		break;
-	    strncpy(tmp + size, ",", MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, ",", max_length - size);
 	    size = strlen(tmp);
-	    if (size == MAX_RETAINER_SET_SPACE)
+	    if (size == max_length)
 		break;
 	}
 	else {
-	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), max_length - size);
 	    // size = strlen(tmp);
 	}
     }
@@ -302,10 +301,9 @@ printRetainerSetShort(FILE *f, RetainerSet *rs)
 #elif defined(RETAINER_SCHEME_CC)
 // Retainer scheme 3: retainer = cost centre
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs)
+printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
 {
-#define MAX_RETAINER_SET_SPACE  24
-    char tmp[MAX_RETAINER_SET_SPACE + 1];
+    char tmp[max_length + 1];
     int size;
     nat j;
 
@@ -313,35 +311,34 @@ printRetainerSetShort(FILE *f, RetainerSet *rs)
 #elif defined(RETAINER_SCHEME_CCS)
 // Retainer scheme 2: retainer = cost centre stack
 void
-printRetainerSetShort(FILE *f, RetainerSet *rs)
+printRetainerSetShort(FILE *f, RetainerSet *rs, nat max_length)
 {
-#define MAX_RETAINER_SET_SPACE  24
-    char tmp[MAX_RETAINER_SET_SPACE + 1];
-    int size;
+    char tmp[max_length + 1];
+    nat size;
     nat j;
 
     ASSERT(rs->id < 0);
 
-    tmp[MAX_RETAINER_SET_SPACE] = '\0';
+    tmp[max_length] = '\0';
 
     // No blank characters are allowed.
     sprintf(tmp + 0, "(%d)", -(rs->id));
     size = strlen(tmp);
-    ASSERT(size < MAX_RETAINER_SET_SPACE);
+    ASSERT(size < max_length);
 
     for (j = 0; j < rs->num; j++) {
 	if (j < rs->num - 1) {
-	    strncpy(tmp + size, rs->element[j]->cc->label, MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, rs->element[j]->cc->label, max_length - size);
 	    size = strlen(tmp);
-	    if (size == MAX_RETAINER_SET_SPACE)
+	    if (size == max_length)
 		break;
-	    strncpy(tmp + size, ",", MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, ",", max_length - size);
 	    size = strlen(tmp);
-	    if (size == MAX_RETAINER_SET_SPACE)
+	    if (size == max_length)
 		break;
 	}
 	else {
-	    strncpy(tmp + size, rs->element[j]->cc->label, MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, rs->element[j]->cc->label, max_length - size);
 	    // size = strlen(tmp);
 	}
     }
@@ -350,46 +347,44 @@ printRetainerSetShort(FILE *f, RetainerSet *rs)
 #elif defined(RETAINER_SCHEME_CC)
 // Retainer scheme 3: retainer = cost centre
 static void
-printRetainerSetShort(FILE *f, retainerSet *rs)
+printRetainerSetShort(FILE *f, retainerSet *rs, nat max_length)
 {
-#define MAX_RETAINER_SET_SPACE  24
-    char tmp[MAX_RETAINER_SET_SPACE + 1];
+    char tmp[max_length + 1];
     int size;
     nat j;
 
     ASSERT(rs->id < 0);
 
-    tmp[MAX_RETAINER_SET_SPACE] = '\0';
+    tmp[max_length] = '\0';
 
     // No blank characters are allowed.
     sprintf(tmp + 0, "(%d)", -(rs->id));
     size = strlen(tmp);
-    ASSERT(size < MAX_RETAINER_SET_SPACE);
+    ASSERT(size < max_length);
 
     for (j = 0; j < rs->num; j++) {
 	if (j < rs->num - 1) {
 	    strncpy(tmp + size, rs->element[j]->label,
-		    MAX_RETAINER_SET_SPACE - size);
+		    max_length - size);
 	    size = strlen(tmp);
-	    if (size == MAX_RETAINER_SET_SPACE)
+	    if (size == max_length)
 		break;
-	    strncpy(tmp + size, ",", MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, ",", max_length - size);
 	    size = strlen(tmp);
-	    if (size == MAX_RETAINER_SET_SPACE)
+	    if (size == max_length)
 		break;
 	}
 	else {
 	    strncpy(tmp + size, rs->element[j]->label,
-		    MAX_RETAINER_SET_SPACE - size);
+		    max_length - size);
 	    // size = strlen(tmp);
 	}
     }
     fprintf(f, tmp);
 /*
-  #define MAX_RETAINER_SET_SPACE  24
   #define DOT_NUMBER              3
-  // 1. 32 > MAX_RETAINER_SET_SPACE + 1 (1 for '\0')
-  // 2. (MAX_RETAINER_SET_SPACE - DOT_NUMBER ) characters should be enough for
+  // 1. 32 > max_length + 1 (1 for '\0')
+  // 2. (max_length - DOT_NUMBER ) characters should be enough for
   //    printing one natural number (plus '(' and ')').
   char tmp[32];
   int size, ts;
@@ -400,12 +395,12 @@ printRetainerSetShort(FILE *f, retainerSet *rs)
   // No blank characters are allowed.
   sprintf(tmp + 0, "(%d)", -(rs->id));
   size = strlen(tmp);
-  ASSERT(size < MAX_RETAINER_SET_SPACE - DOT_NUMBER);
+  ASSERT(size < max_length - DOT_NUMBER);
 
   for (j = 0; j < rs->num; j++) {
     ts = strlen(rs->element[j]->label);
     if (j < rs->num - 1) {
-      if (size + ts + 1 > MAX_RETAINER_SET_SPACE - DOT_NUMBER) {
+      if (size + ts + 1 > max_length - DOT_NUMBER) {
         sprintf(tmp + size, "...");
         break;
       }
@@ -413,7 +408,7 @@ printRetainerSetShort(FILE *f, retainerSet *rs)
       size += ts + 1;
     }
     else {
-      if (size + ts > MAX_RETAINER_SET_SPACE - DOT_NUMBER) {
+      if (size + ts > max_length - DOT_NUMBER) {
         sprintf(tmp + size, "...");
         break;
       }

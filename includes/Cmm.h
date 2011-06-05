@@ -468,8 +468,10 @@
 #define StgFunInfoExtra_bitmap(i)     StgFunInfoExtraFwd_bitmap(i)
 #endif
 
-#define mutArrPtrsCardWords(n) \
-    ROUNDUP_BYTES_TO_WDS(((n) + (1 << MUT_ARR_PTRS_CARD_BITS) - 1) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrCardMask ((1 << MUT_ARR_PTRS_CARD_BITS) - 1)
+#define mutArrPtrCardDown(i) ((i) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrPtrCardUp(i)   (((i) + mutArrCardMask) >> MUT_ARR_PTRS_CARD_BITS)
+#define mutArrPtrsCardWords(n) ROUNDUP_BYTES_TO_WDS(mutArrPtrCardUp(n))
 
 #define isGlobalPrim(bd,p) \
     (TO_W_(bdescr_gen_ix(bd)) >= TO_W_(CInt[global_gen_ix]) || (W_[(p) - WDS(1)] != 0))

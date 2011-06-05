@@ -6,7 +6,7 @@
 \begin{code}
 module VarEnv (
         -- * Var, Id and TyVar environments (maps)
-	VarEnv, IdEnv, TyVarEnv,
+	VarEnv, IdEnv, TyVarEnv, CoVarEnv,
 	
 	-- ** Manipulating these environments
 	emptyVarEnv, unitVarEnv, mkVarEnv,
@@ -29,7 +29,7 @@ module VarEnv (
 	emptyInScopeSet, mkInScopeSet, delInScopeSet,
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
 	getInScopeVars, lookupInScope, lookupInScope_Directly, 
-        unionInScope, elemInScopeSet, uniqAway, 
+        unionInScope, elemInScopeSet, uniqAway,
 
 	-- * The RnEnv2 type
 	RnEnv2, 
@@ -343,6 +343,7 @@ emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
 type VarEnv elt   = UniqFM elt
 type IdEnv elt    = VarEnv elt
 type TyVarEnv elt = VarEnv elt
+type CoVarEnv elt = VarEnv elt
 
 emptyVarEnv	  :: VarEnv a
 mkVarEnv	  :: [(Var, a)] -> VarEnv a
