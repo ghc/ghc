@@ -7,6 +7,7 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "GetEnv.h"
 
 #include <windows.h>
@@ -40,10 +41,10 @@ void getProgEnvv(int *out_envc, char **out_envv[]) {
         envc++;
     }
 
-    envv = stgMallocBytes(sizeof(char*) * (envc+1));
+    envv = stgMallocBytes(sizeof(char*) * (envc+1), "getProgEnvv");
 
     i = 0;
-    for (envp = env; *envp != NULL; envp += strlen(envp) + 1) {
+    for (envp = env; *envp != 0; envp += strlen(envp) + 1) {
         envv[i] = envp;
         i++;
     }
