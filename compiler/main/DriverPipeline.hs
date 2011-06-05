@@ -1420,13 +1420,13 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
     mk_rts_opts_enabled val
          = vcat [text "#include \"Rts.h\"",
                  text "#include \"RtsOpts.h\"",
-                 text "const rtsOptsEnabledEnum rtsOptsEnabled = " <>
+                 text "const RtsOptsEnabledEnum rtsOptsEnabled = " <>
                        text val <> semi ]
 
     rts_opts_enabled = case rtsOptsEnabled dflags of
-          RtsOptsNone     -> mk_rts_opts_enabled "rtsOptsNone"
+          RtsOptsNone     -> mk_rts_opts_enabled "RtsOptsNone"
           RtsOptsSafeOnly -> empty -- The default
-          RtsOptsAll      -> mk_rts_opts_enabled "rtsOptsAll"
+          RtsOptsAll      -> mk_rts_opts_enabled "RtsOptsAll"
 
     extra_rts_opts = case rtsOpts dflags of
           Nothing   -> empty
