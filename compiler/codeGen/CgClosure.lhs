@@ -250,7 +250,6 @@ closureCodeBody _binder_info cl_info cc [{- No args i.e. thunk -}] body = do
 		-- in update frame CAF/DICT functions will be
 		-- subsumed by this enclosing cc
 	    { enterCostCentre cl_info cc body
-            ; stmtsC [CmmComment $ mkFastString $ showSDoc $ ppr body]
 	    ; cgExpr body }
 	}
     

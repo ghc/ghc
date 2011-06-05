@@ -1646,6 +1646,10 @@ defaultFlags
 
       Opt_SharedImplib,
 
+#if GHC_DEFAULT_NEW_CODEGEN
+      Opt_TryNewCodeGen,
+#endif
+
       Opt_GenManifest,
       Opt_EmbedManifest,
       Opt_PrintBindContents,

@@ -97,6 +97,16 @@ GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
 
+# These options modify whether or not a built compiler for a bootstrap
+# stage defaults to using the new code generation path.  The new
+# code generation path is a bit slower, so for development just
+# GhcStage2DefaultNewCodegen=YES, but it's also a good idea to try
+# building all libraries and the stage2 compiler with the
+# new code generator, which involves GhcStage1DefaultNewCodegen=YES.
+GhcStage1DefaultNewCodegen=NO
+GhcStage2DefaultNewCodegen=NO
+GhcStage3DefaultNewCodegen=NO
+
 GhcDebugged=NO
 GhcDynamic=NO
 

@@ -491,6 +491,18 @@ compiler_stage1_HC_OPTS += $(GhcStage1HcOpts)
 compiler_stage2_HC_OPTS += $(GhcStage2HcOpts)
 compiler_stage3_HC_OPTS += $(GhcStage3HcOpts)
 
+ifeq "$(GhcStage1DefaultNewCodegen)" "YES"
+compiler_stage1_HC_OPTS += -DGHC_DEFAULT_NEW_CODEGEN
+endif
+
+ifeq "$(GhcStage2DefaultNewCodegen)" "YES"
+compiler_stage2_HC_OPTS += -DGHC_DEFAULT_NEW_CODEGEN
+endif
+
+ifeq "$(GhcStage3DefaultNewCodegen)" "YES"
+compiler_stage3_HC_OPTS += -DGHC_DEFAULT_NEW_CODEGEN
+endif
+
 ifneq "$(BINDIST)" "YES"
 
 compiler_stage2_TAGS_HC_OPTS = -package ghc
