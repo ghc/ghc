@@ -178,6 +178,14 @@ void traceEventStartup_ (int n_caps);
  * the capset info events so for simplicity, rather than working out if
  * they're necessary we always emit them. They should be very low volume.
  */
+/* 
+ * Emit a message/event describing the state of a thread
+ */
+#define traceCapsetModify(tag, capset, other)   \
+    if (RTS_UNLIKELY(TRACE_sched)) {            \
+        traceCapsetModify_(tag,capset,other);   \
+    }
+
 void traceCapsetModify_ (EventTypeNum tag,
                          CapsetID capset,
                          StgWord32 other);
@@ -195,7 +203,7 @@ void traceOSProcessInfo_ (void);
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
 #define traceEventStartup_(n_caps) /* nothing */
-#define traceCapsetModify_(tag, capset, other) /* nothing */
+#define traceCapsetModify(tag, capset, other) /* nothing */
 #define traceOSProcessInfo_() /* nothing */
 
 #endif /* TRACING */
@@ -448,27 +456,27 @@ INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
 INLINE_HEADER void traceCapsetCreate(CapsetID   capset      STG_UNUSED,
                                      CapsetType capset_type STG_UNUSED)
 {
-    traceCapsetModify_(EVENT_CAPSET_CREATE, capset, capset_type);
+    traceCapsetModify(EVENT_CAPSET_CREATE, capset, capset_type);
     dtraceCapsetCreate(capset, capset_type);
 }
 
 INLINE_HEADER void traceCapsetDelete(CapsetID capset STG_UNUSED)
 {
-    traceCapsetModify_(EVENT_CAPSET_DELETE, capset, 0);
+    traceCapsetModify(EVENT_CAPSET_DELETE, capset, 0);
     dtraceCapsetDelete(capset);
 }
 
 INLINE_HEADER void traceCapsetAssignCap(CapsetID capset STG_UNUSED,
                                         nat      capno  STG_UNUSED)
 {
-    traceCapsetModify_(EVENT_CAPSET_ASSIGN_CAP, capset, capno);
+    traceCapsetModify(EVENT_CAPSET_ASSIGN_CAP, capset, capno);
     dtraceCapsetAssignCap(capset, capno);
 }
 
 INLINE_HEADER void traceCapsetRemoveCap(CapsetID capset STG_UNUSED,
                                         nat      capno  STG_UNUSED)
 {
-    traceCapsetModify_(EVENT_CAPSET_REMOVE_CAP, capset, capno);
+    traceCapsetModify(EVENT_CAPSET_REMOVE_CAP, capset, capno);
     dtraceCapsetRemoveCap(capset, capno);
 }
 
