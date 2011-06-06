@@ -813,7 +813,6 @@ statDescribeGens(void)
           }
 
           gen_live   += gcThreadLiveWords(i,g);
-          gen_live   += gcThreadLiveWords(i,g);
           gen_blocks += gcThreadLiveBlocks(i,g);
       }
 
