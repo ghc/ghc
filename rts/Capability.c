@@ -265,6 +265,9 @@ initCapability( Capability *cap, nat i )
     cap->pinned_object_block = NULL;
 
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
+#if defined(THREADED_RTS)
+    traceSparkCounters(cap);
+#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -829,7 +832,9 @@ shutdownCapability (Capability *cap,
     // threads performing foreign calls that will eventually try to 
     // return via resumeThread() and attempt to grab cap->lock.
     // closeMutex(&cap->lock);
-    
+
+    traceSparkCounters(cap);
+
 #endif /* THREADED_RTS */
 
     traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);

@@ -1449,6 +1449,8 @@ delete_threads_and_gc:
 #endif
     traceEventGcEnd(cap);
 
+    traceSparkCounters(cap);
+
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
     {
         // We are doing a GC because the system has been idle for a

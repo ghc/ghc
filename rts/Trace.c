@@ -335,6 +335,22 @@ void traceOSProcessInfo_(void) {
     }
 }
 
+void traceSparkCounters_ (Capability *cap,
+                          SparkCounters counters,
+                          StgWord remaining)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* we currently don't do debug tracing of spark stats but we must
+           test for TRACE_STDERR because of the !eventlog_enabled case. */
+    } else
+#endif
+    {
+        postSparkCountersEvent(cap, counters, remaining);
+    }
+}
+
+
 void traceEvent_ (Capability *cap, EventTypeNum tag)
 {
 #ifdef DEBUG

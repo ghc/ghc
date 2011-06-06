@@ -84,7 +84,8 @@ char *EventDesc[] = {
   [EVENT_PROGRAM_ARGS]        = "Program arguments",
   [EVENT_PROGRAM_ENV]         = "Program environment variables",
   [EVENT_OSPROCESS_PID]       = "Process ID",
-  [EVENT_OSPROCESS_PPID]      = "Parent process ID"
+  [EVENT_OSPROCESS_PPID]      = "Parent process ID",
+  [EVENT_SPARK_COUNTERS]      = "Spark counters"
 };
 
 // Event type. 
@@ -314,6 +315,10 @@ initEventLogging(void)
             eventTypes[t].size = 0xffff;
             break;
 
+        case EVENT_SPARK_COUNTERS:   // (cap, 7*counter)
+            eventTypes[t].size = 7 * sizeof(StgWord64);
+            break;
+
         case EVENT_BLOCK_MARKER:
             eventTypes[t].size = sizeof(StgWord32) + sizeof(EventTimestamp) + 
                 sizeof(EventCapNo);
@@ -476,6 +481,30 @@ postSchedEvent (Capability *cap,
     default:
         barf("postEvent: unknown event tag %d", tag);
     }
+}
+
+void
+postSparkCountersEvent (Capability *cap, 
+                        SparkCounters counters,
+                        StgWord remaining)
+{
+    EventsBuf *eb;
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForEvent(eb, EVENT_SPARK_COUNTERS)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(eb);
+    }
+    
+    postEventHeader(eb, EVENT_SPARK_COUNTERS);
+    postWord64(eb,counters.created);
+    postWord64(eb,counters.dud);
+    postWord64(eb,counters.overflowed);
+    postWord64(eb,counters.converted);
+    postWord64(eb,counters.gcd);
+    postWord64(eb,counters.fizzled);
+    postWord64(eb,remaining);
 }
 
 void postCapsetModifyEvent (EventTypeNum tag,

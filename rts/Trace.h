@@ -184,6 +184,10 @@ void traceCapsetModify_ (EventTypeNum tag,
 
 void traceOSProcessInfo_ (void);
 
+void traceSparkCounters_ (Capability *cap,
+                          SparkCounters counters,
+                          StgWord remaining);
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -197,6 +201,7 @@ void traceOSProcessInfo_ (void);
 INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceCapsetModify_(tag, capset, other) /* nothing */
 #define traceOSProcessInfo_() /* nothing */
+#define traceSparkCounters_(cap, counters, remaining) /* nothing */
 
 #endif /* TRACING */
 
@@ -262,6 +267,8 @@ INLINE_HEADER void dtraceStartup (int num_caps) {
     HASKELLEVENT_CAPSET_ASSIGN_CAP(capset, capno)
 #define dtraceCapsetRemoveCap(capset, capno)            \
     HASKELLEVENT_CAPSET_REMOVE_CAP(capset, capno)
+#define dtraceSparkCounters(cap, a, b, c, d, e, f, g) \
+    HASKELLEVENT_SPARK_COUNTERS(cap, a, b, c, d, e, f, g)
 
 #else /* !defined(DTRACE) */
 
@@ -288,6 +295,7 @@ INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceCapsetDelete(capset)                      /* nothing */
 #define dtraceCapsetAssignCap(capset, capno)            /* nothing */
 #define dtraceCapsetRemoveCap(capset, capno)            /* nothing */
+#define dtraceSparkCounters(cap, a, b, c, d, e, f, g)   /* nothing */
 
 #endif
 
@@ -352,22 +360,6 @@ INLINE_HEADER void traceEventMigrateThread(Capability *cap     STG_UNUSED,
                         (EventCapNo)new_cap);
 }
 
-INLINE_HEADER void traceEventRunSpark(Capability *cap STG_UNUSED, 
-                                      StgTSO     *tso STG_UNUSED)
-{
-    traceSchedEvent(cap, EVENT_RUN_SPARK, tso, 0);
-    dtraceRunSpark((EventCapNo)cap->no, (EventThreadID)tso->id);
-}
-
-INLINE_HEADER void traceEventStealSpark(Capability *cap        STG_UNUSED, 
-                                        StgTSO     *tso        STG_UNUSED,
-                                        nat         victim_cap STG_UNUSED)
-{
-    traceSchedEvent(cap, EVENT_STEAL_SPARK, tso, victim_cap);
-    dtraceStealSpark((EventCapNo)cap->no, (EventThreadID)tso->id,
-                     (EventCapNo)victim_cap);
-}
-
 INLINE_HEADER void traceEventShutdown(Capability *cap STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_SHUTDOWN, 0, 0);
@@ -405,6 +397,22 @@ INLINE_HEADER void traceEventRequestParGc(Capability *cap STG_UNUSED)
 {
     traceSchedEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
     dtraceRequestParGc((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceEventRunSpark(Capability *cap STG_UNUSED, 
+                                      StgTSO     *tso STG_UNUSED)
+{
+    traceSchedEvent(cap, EVENT_RUN_SPARK, tso, 0);
+    dtraceRunSpark((EventCapNo)cap->no, (EventThreadID)tso->id);
+}
+
+INLINE_HEADER void traceEventStealSpark(Capability *cap        STG_UNUSED, 
+                                        StgTSO     *tso        STG_UNUSED,
+                                        nat         victim_cap STG_UNUSED)
+{
+    traceSchedEvent(cap, EVENT_STEAL_SPARK, tso, victim_cap);
+    dtraceStealSpark((EventCapNo)cap->no, (EventThreadID)tso->id,
+                     (EventCapNo)victim_cap);
 }
 
 INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED, 
@@ -479,6 +487,24 @@ INLINE_HEADER void traceOSProcessInfo(void)
     /* Note: no DTrace equivalent because all this OS process info
      * is available to DTrace directly */
 }
+
+INLINE_HEADER void traceSparkCounters(Capability *cap STG_UNUSED)
+{
+#ifdef THREADED_RTS
+    if (RTS_UNLIKELY(TRACE_sched)) {
+        traceSparkCounters_(cap, cap->spark_stats, sparkPoolSize(cap->sparks));
+    }
+#endif
+    dtraceSparkCounters((EventCapNo)cap->no,
+                        cap->spark_stats.created,
+                        cap->spark_stats.dud,
+                        cap->spark_stats.overflowed,
+                        cap->spark_stats.converted,
+                        cap->spark_stats.gcd,
+                        cap->spark_stats.fizzled,
+                        sparkPoolSize(cap->sparks));
+}
+
 
 #include "EndPrivate.h"
 

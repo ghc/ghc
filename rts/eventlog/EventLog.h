@@ -69,6 +69,13 @@ void postCapsetVecEvent (EventTypeNum tag,
                          int argc,
                          char *msg[]);
 
+/*
+ * Post an event with several counters relating to `par` sparks.
+ */
+void postSparkCountersEvent (Capability *cap, 
+                             SparkCounters counters,
+                             StgWord remaining);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,

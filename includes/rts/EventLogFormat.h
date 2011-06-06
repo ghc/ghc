@@ -133,6 +133,7 @@
 #define EVENT_PROGRAM_ENV         31 /* (capset, environment_vector)  */
 #define EVENT_OSPROCESS_PID       32 /* (capset, pid)          */
 #define EVENT_OSPROCESS_PPID      33 /* (capset, parent_pid)   */
+#define EVENT_SPARK_COUNTERS      34 /* (crt,dud,ovf,cnv,fiz,gcd,rem) */
 
 
 /* Range 34 - 59 is available for new events */
@@ -146,7 +147,7 @@
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_EVENT_TAGS            34
+#define NUM_EVENT_TAGS            35
 
 #if 0  /* DEPRECATED EVENTS: */
 /* ghc changed how it handles sparks so these are no longer applicable */
