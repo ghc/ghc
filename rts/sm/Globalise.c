@@ -217,7 +217,20 @@ globalise_large (StgPtr p)
 
     ACQUIRE_SPIN_LOCK(&gen->sync);
 
-    // remove from large_object list 
+    // the object we need to globalise might be in the
+    // pinned_object_block, which is still being allocated into.  In
+    // that case, we just mark the pinned_object_block with the global
+    // generation, and allocatePinned() will attach the block to the
+    // correct gen->large_objects list when it is full.
+    if (bd == gct->cap->pinned_object_block) {
+        new_gen = &all_generations[global_gen_ix];
+        initBdescr(bd, new_gen, new_gen->to);
+
+        RELEASE_SPIN_LOCK(&gen->sync);
+        return;
+    }
+
+    // remove from large_object list
     if (bd->u.back) {
         bd->u.back->link = bd->link;
     } else { // first object in the list 

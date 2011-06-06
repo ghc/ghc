@@ -778,16 +778,20 @@ allocatePinned (Capability *cap, lnat n)
         // the next GC the BF_EVACUATED flag will be cleared, and the
         // block will be promoted as usual (if anything in it is
         // live).
-        ACQUIRE_SM_LOCK;
-        gen = cap->r.rG0; // use our local G0
         if (bd != NULL) {
+            gen = bd->gen;
+            // attach it to the correct generation - the block might
+            // have been globalised by now (see globalise_large()).
+            if (gen->no != 0) { ACQUIRE_SPIN_LOCK(&gen->sync); }
             dbl_link_onto(bd, &gen->large_objects);
             gen->n_large_blocks++;
-            g0->n_new_large_words += bd->free - bd->start;
+            gen->n_new_large_words += bd->free - bd->start;
+            if (gen->no != 0) { RELEASE_SPIN_LOCK(&gen->sync); }
         }
+        ACQUIRE_SM_LOCK;
         cap->pinned_object_block = bd = allocBlock();
         RELEASE_SM_LOCK;
-        initBdescr(bd, gen, gen);
+        initBdescr(bd, cap->r.rG0, cap->r.rG0);  // use our local G0
         bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
         bd->free   = bd->start;
     }
