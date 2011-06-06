@@ -439,13 +439,13 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # package-data.mk is sufficient, as that in turn depends on all the
 # libraries
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/ghc-pwd/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/compare_sizes/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/runghc/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/runghc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final two package.conf dependencies: ghc-prim depends on RTS,
 # and RTS depends on libffi.
@@ -910,7 +910,7 @@ $(eval $(call bindist,.,\
     mk/config.mk.in \
     $(INPLACE_BIN)/mkdirhier \
     utils/ghc-cabal/dist-install/build/tmp/ghc-cabal \
-    utils/ghc-pwd/dist/build/tmp/ghc-pwd \
+    utils/ghc-pwd/dist-install/build/tmp/ghc-pwd \
     $(BINDIST_WRAPPERS) \
     $(BINDIST_PERL_SOURCES) \
     $(BINDIST_LIBS) \

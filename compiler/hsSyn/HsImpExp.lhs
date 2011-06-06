@@ -15,7 +15,7 @@ import HsDoc		( HsDocString )
 
 import Outputable
 import FastString
-import SrcLoc		( Located(..) )
+import SrcLoc           ( Located(..), noLoc )
 
 import Data.Data
 \end{code}
@@ -40,6 +40,16 @@ data ImportDecl name
       ideclAs        :: Maybe ModuleName,   -- ^ as Module
       ideclHiding    :: Maybe (Bool, [LIE name]) -- ^ (True => hiding, names)
     } deriving (Data, Typeable)
+
+simpleImportDecl :: ModuleName -> ImportDecl name
+simpleImportDecl mn = ImportDecl {
+      ideclName      = noLoc mn,
+      ideclPkgQual   = Nothing,
+      ideclSource    = False,
+      ideclQualified = False,
+      ideclAs        = Nothing,
+      ideclHiding    = Nothing
+    }
 \end{code}
 
 \begin{code}
