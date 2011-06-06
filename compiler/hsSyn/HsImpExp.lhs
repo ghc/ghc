@@ -47,6 +47,7 @@ simpleImportDecl mn = ImportDecl {
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
       ideclSource    = False,
+      ideclSafe      = True,
       ideclQualified = False,
       ideclAs        = Nothing,
       ideclHiding    = Nothing

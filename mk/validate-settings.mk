@@ -7,6 +7,9 @@ HADDOCK_DOCS    = YES
 SRC_CC_OPTS     += -Wall $(WERROR)
 SRC_HC_OPTS     += -Wall $(WERROR) -H64m -O0
 
+# Safe by default
+#SRC_HC_OPTS += -Dsh_SAFE_DEFAULT
+
 GhcStage1HcOpts += -O
 
 GhcStage2HcOpts += -O

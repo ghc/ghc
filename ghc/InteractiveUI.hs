@@ -88,7 +88,7 @@ import Data.Char
 import Data.Array
 import Control.Monad as Monad
 import Text.Printf
-import Foreign
+import Foreign.Safe
 import GHC.Exts		( unsafeCoerce# )
 
 import GHC.IO.Exception	( IOErrorType(InvalidArgument) )
@@ -1336,7 +1336,10 @@ isSafeCmd m =
                 -- recently-added module occurs last, it seems.
         case (as,bs) of
           (as@(_:_), _)   -> isSafeModule $ last as
-          ([],  bs@(_:_)) -> isSafeModule $ fst (last bs)
+          ([],  bs@(_:_)) -> do
+             let i = last bs
+             m <- GHC.findModule (unLoc (ideclName i)) (ideclPkgQual i)
+             isSafeModule m
           ([], [])  -> ghcError (CmdLineError ":issafe: no current module")
     _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
 

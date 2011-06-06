@@ -55,7 +55,7 @@ import System.IO.Unsafe         ( unsafePerformIO )
 import GHC.Exts
 
 #if __GLASGOW_HASKELL__ >= 701
-import Foreign
+import Foreign.Safe
 #else
 import Foreign hiding           ( unsafePerformIO )
 #endif
