@@ -77,7 +77,7 @@ test('T4801',
        # temporarily unbroken (#5227)
       # expected value: 11 (x86/OSX):
       if_wordsize(32,
-          compiler_stats_num_field('peak_megabytes_allocated', 35, 45)),
+          compiler_stats_num_field('peak_megabytes_allocated', 30, 40)),
       # expected value: 66 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 60, 70)),
@@ -91,8 +91,8 @@ test('T4801',
                                                       750000000)),
       # expected value: 14181360 (x86/Linux)
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 13000000,
-                                                     15000000)),
+          compiler_stats_num_field('max_bytes_used', 11000000,
+                                                     14000000)),
       # expected value: 7001696 (amd64/Linux, bindist)
       # expected value: 7189848 (amd64/Linux, intree):
       if_wordsize(64,
