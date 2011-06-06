@@ -17,14 +17,10 @@
 
 #if defined(THREADED_RTS)
 
-void
-initSparkPools( void )
+SparkPool *
+allocSparkPool( void )
 {
-    /* walk over the capabilities, allocating a spark pool for each one */
-    nat i;
-    for (i = 0; i < n_capabilities; i++) {
-      capabilities[i].sparks = newWSDeque(RtsFlags.ParFlags.maxLocalSparks);
-    }
+    return newWSDeque(RtsFlags.ParFlags.maxLocalSparks);
 }
 
 void

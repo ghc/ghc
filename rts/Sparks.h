@@ -30,7 +30,7 @@ typedef struct {
 typedef WSDeque SparkPool;
 
 // Initialisation
-void initSparkPools (void);
+SparkPool *allocSparkPool (void);
 
 // Take a spark from the "write" end of the pool.  Can be called
 // by the pool owner only.

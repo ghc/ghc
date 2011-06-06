@@ -232,6 +232,7 @@ initCapability( Capability *cap, nat i )
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
     cap->inbox              = (Message*)END_TSO_QUEUE;
+    cap->sparks             = allocSparkPool();
     cap->spark_stats.created    = 0;
     cap->spark_stats.dud        = 0;
     cap->spark_stats.overflowed = 0;

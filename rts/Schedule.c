@@ -2010,10 +2010,6 @@ initScheduler(void)
 
   initTaskManager();
 
-#if defined(THREADED_RTS)
-  initSparkPools();
-#endif
-
   RELEASE_LOCK(&sched_mutex);
 
 #if defined(THREADED_RTS)
