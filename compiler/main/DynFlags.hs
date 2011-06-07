@@ -989,11 +989,11 @@ safeHaskellOn dflags = safeHaskell dflags /= Sf_None
 
 -- | Set a 'SafeHaskell' flag
 setSafeHaskell :: SafeHaskellMode -> DynP ()
-setSafeHaskell s = upd f
-    where f dfs = let sf = safeHaskell dfs
-                  in dfs {
-                         safeHaskell = combineSafeFlags sf s
-                     }
+setSafeHaskell s = updM f
+    where f dfs = do
+              let sf = safeHaskell dfs
+              safeM <- combineSafeFlags sf s
+              return $ dfs { safeHaskell = safeM }
 
 -- | Are all direct imports required to be safe for this SafeHaskell mode?
 -- Direct imports are when the code explicitly imports a module
@@ -1009,34 +1009,36 @@ safeImplicitImpsReq = safeLanguageOn
 -- This makes SafeHaskell very much a monoid but for now I prefer this as I don't
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
-combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> SafeHaskellMode
+combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
 combineSafeFlags a b =
     case (a,b) of
-        (Sf_None, sf) -> sf
-        (sf, Sf_None) -> sf
+        (Sf_None, sf) -> return sf
+        (sf, Sf_None) -> return sf
 
-        (Sf_SafeImports, sf) -> sf
-        (sf, Sf_SafeImports) -> sf
+        (Sf_SafeImports, sf) -> return sf
+        (sf, Sf_SafeImports) -> return sf
 
         (Sf_SafeLanguage, Sf_Safe) -> err
         (Sf_Safe, Sf_SafeLanguage) -> err
 
-        (Sf_SafeLanguage, Sf_Trustworthy) -> Sf_TrustworthyWithSafeLanguage
-        (Sf_Trustworthy, Sf_SafeLanguage) -> Sf_TrustworthyWithSafeLanguage
+        (Sf_SafeLanguage, Sf_Trustworthy) -> return Sf_TrustworthyWithSafeLanguage
+        (Sf_Trustworthy, Sf_SafeLanguage) -> return Sf_TrustworthyWithSafeLanguage
 
-        (Sf_TrustworthyWithSafeLanguage, Sf_Trustworthy)  -> Sf_TrustworthyWithSafeLanguage
-        (Sf_TrustworthyWithSafeLanguage, Sf_SafeLanguage) -> Sf_TrustworthyWithSafeLanguage
-        (Sf_Trustworthy, Sf_TrustworthyWithSafeLanguage)  -> Sf_TrustworthyWithSafeLanguage
-        (Sf_SafeLanguage, Sf_TrustworthyWithSafeLanguage) -> Sf_TrustworthyWithSafeLanguage
+        (Sf_TrustworthyWithSafeLanguage, Sf_Trustworthy)  -> return Sf_TrustworthyWithSafeLanguage
+        (Sf_TrustworthyWithSafeLanguage, Sf_SafeLanguage) -> return Sf_TrustworthyWithSafeLanguage
+        (Sf_Trustworthy, Sf_TrustworthyWithSafeLanguage)  -> return Sf_TrustworthyWithSafeLanguage
+        (Sf_SafeLanguage, Sf_TrustworthyWithSafeLanguage) -> return Sf_TrustworthyWithSafeLanguage
 
         (Sf_Trustworthy, Sf_Safe) -> err
         (Sf_Safe, Sf_Trustworthy) -> err
 
-        (a,b) | a == b -> a
+        (a,b) | a == b -> return a
               | otherwise -> err
 
-    where err = ghcError (CmdLineError $ "Incompatible SafeHaskell flags! ("
-                                        ++ showPpr a ++ "," ++ showPpr b ++ ")")
+    where err = do
+              let s = "Incompatible SafeHaskell flags! (" ++ showPpr a ++ ", " ++ showPpr b ++ ")"
+              addErr s
+              return $ panic s -- Just for saftey instead of returning say, a
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
