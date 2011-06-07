@@ -733,7 +733,7 @@ emitCloneArray info_p res_r src0 src_off0 n0 live = do
     emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize) live
 
     emitMemsetCall (cmmOffsetExprW dst_p n)
-        (CmmLit (CmmInt (toInteger (1 :: Int)) W8))
+        (CmmLit (mkIntCLit 1))
         (card_words `cmmMulWord` wordSize)
         live
     stmtC $ CmmAssign (CmmLocal res_r) arr
@@ -751,7 +751,7 @@ emitSetCards :: CmmExpr -> CmmExpr -> CmmExpr -> StgLiveVars -> Code
 emitSetCards dst_start dst_cards_start n live = do
     start_card <- assignTemp $ card dst_start
     emitMemsetCall (dst_cards_start `cmmAddWord` start_card)
-        (CmmLit (CmmInt (toInteger (1 :: Int)) W8))
+        (CmmLit (mkIntCLit 1))
         ((card (dst_start `cmmAddWord` n) `cmmSubWord` start_card)
          `cmmAddWord` CmmLit (mkIntCLit 1))
         live
@@ -795,8 +795,8 @@ emitMemmoveCall dst src n live = do
     memmove = CmmLit (CmmLabel (mkForeignLabel (fsLit "memmove") Nothing
                                ForeignLabelInExternalPackage IsFunction))
 
--- | Emit a call to @memset@.  The second argument must be of type
--- 'W8'.
+-- | Emit a call to @memset@.  The second argument must fit inside an
+-- unsigned char.
 emitMemsetCall :: CmmExpr -> CmmExpr -> CmmExpr -> StgLiveVars -> Code
 emitMemsetCall dst c n live = do
     vols <- getVolatileRegs live
