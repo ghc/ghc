@@ -1266,7 +1266,7 @@ shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
                      (xopt Opt_TemplateHaskell, "-XTemplateHaskell",
                      flip xopt_unset Opt_TemplateHaskell)]
 
-        safeFailure str = [L noSrcSpan $ "Warning2: " ++ str ++ " is not allowed in"
+        safeFailure str = [L noSrcSpan $ "Warning: " ++ str ++ " is not allowed in"
                                       ++ " SafeHaskell; ignoring " ++ str]
 
 
