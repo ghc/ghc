@@ -1354,7 +1354,7 @@ isSafeModule m = do
         let iface = GHC.modInfoIface mi
         case iface of
              Just iface' -> do
-                 let trust = show $ getSafeMode $ GHC.mi_trust iface'
+                 let trust = showPpr $ getSafeMode $ GHC.mi_trust iface'
                      pkg   = if packageTrusted dflags m then "trusted" else "untrusted"
                  liftIO $ putStrLn $ "Trust type is (Module: " ++ trust
                                                ++ ", Package: " ++ pkg ++ ")"

@@ -335,13 +335,13 @@ data SafeHaskellMode
    | Sf_Safe
    deriving (Eq)
 
-instance Show SafeHaskellMode where
-    show Sf_None = "None"
-    show Sf_SafeImports = "SafeImports"
-    show Sf_SafeLanguage = "SafeLanguage"
-    show Sf_Trustworthy = "Trustworthy"
-    show Sf_TrustworthyWithSafeLanguage = "Trustworthy + SafeLanguage"
-    show Sf_Safe = "Safe"
+instance Outputable SafeHaskellMode where
+    ppr Sf_None = ptext $ sLit "None"
+    ppr Sf_SafeImports = ptext $ sLit "SafeImports"
+    ppr Sf_SafeLanguage = ptext $ sLit "SafeLanguage"
+    ppr Sf_Trustworthy = ptext $ sLit "Trustworthy"
+    ppr Sf_TrustworthyWithSafeLanguage = ptext $ sLit "Trustworthy + SafeLanguage"
+    ppr Sf_Safe = ptext $ sLit "Safe"
 
 data ExtensionFlag
    = Opt_Cpp
@@ -1036,7 +1036,7 @@ combineSafeFlags a b =
               | otherwise -> err
 
     where err = ghcError (CmdLineError $ "Incompatible SafeHaskell flags! ("
-                                        ++ show a ++ "," ++ show b ++ ")")
+                                        ++ showPpr a ++ "," ++ showPpr b ++ ")")
 
 -- | Retrieve the options corresponding to a particular @opt_*@ field in the correct order
 getOpts :: DynFlags             -- ^ 'DynFlags' to retrieve the options from
@@ -1795,8 +1795,8 @@ languageFlags = [
 safeHaskellFlags :: [FlagSpec SafeHaskellMode]
 safeHaskellFlags = [mkF Sf_SafeImports, mkF' Sf_SafeLanguage,
                     mkF Sf_Trustworthy, mkF' Sf_Safe]
-    where mkF  flag = (show flag, AlwaysAllowed, flag, nop)
-          mkF' flag = (show flag, EnablesSafe,   flag, nop)
+    where mkF  flag = (showPpr flag, AlwaysAllowed, flag, nop)
+          mkF' flag = (showPpr flag, EnablesSafe,   flag, nop)
 
 -- | These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [FlagSpec ExtensionFlag]
