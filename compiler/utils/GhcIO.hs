@@ -7,14 +7,18 @@
 --
 module GhcIO (
 #if __GLASGOW_HASKELL__ >= 701
-        module GHC.IO.Unsafe,
-#endif
+        module GHC.IO.Safe,
+        module GHC.IO.Unsafe
+#else
         module GHC.IO
+#endif
     ) where
 
 #if __GLASGOW_HASKELL__ >= 701
+import GHC.IO.Safe
 import GHC.IO.Unsafe
+#else
+import GHC.IO
 #endif
 
-import GHC.IO
 
