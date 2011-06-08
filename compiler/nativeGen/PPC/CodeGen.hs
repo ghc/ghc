@@ -58,10 +58,8 @@ import Data.Bits
 import Data.Int
 import Data.Word
 
-#if darwin_TARGET_OS || linux_TARGET_OS
 import BasicTypes
 import FastString
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
@@ -118,24 +116,24 @@ stmtsToInstrs stmts
         return (concatOL instrss)
 
 stmtToInstrs :: CmmStmt -> NatM InstrBlock
-stmtToInstrs stmt = case stmt of
+stmtToInstrs stmt = do
+  dflags <- getDynFlagsNat
+  case stmt of
     CmmNop         -> return nilOL
     CmmComment s   -> return (unitOL (COMMENT s))
 
     CmmAssign reg src
       | isFloatType ty -> assignReg_FltCode size reg src
-#if WORD_SIZE_IN_BITS==32
-      | isWord64 ty    -> assignReg_I64Code      reg src
-#endif
+      | target32Bit (targetPlatform dflags) &&
+        isWord64 ty    -> assignReg_I64Code      reg src
       | otherwise        -> assignReg_IntCode size reg src
         where ty = cmmRegType reg
               size = cmmTypeSize ty
 
     CmmStore addr src
       | isFloatType ty -> assignMem_FltCode size addr src
-#if WORD_SIZE_IN_BITS==32
-      | isWord64 ty      -> assignMem_I64Code      addr src
-#endif
+      | target32Bit (targetPlatform dflags) &&
+        isWord64 ty      -> assignMem_I64Code      addr src
       | otherwise        -> assignMem_IntCode size addr src
         where ty = cmmExprType src
               size = cmmTypeSize ty
@@ -378,46 +376,49 @@ iselExpr64 expr
 
 
 getRegister :: CmmExpr -> NatM Register
+getRegister e = do dflags <- getDynFlagsNat
+                   getRegister' dflags e
 
-getRegister (CmmReg (CmmGlobal PicBaseReg))
+getRegister' :: DynFlags -> CmmExpr -> NatM Register
+
+getRegister' _ (CmmReg (CmmGlobal PicBaseReg))
   = do
       reg <- getPicBaseNat archWordSize
       return (Fixed archWordSize reg nilOL)
 
-getRegister (CmmReg reg)
+getRegister' _ (CmmReg reg)
   = return (Fixed (cmmTypeSize (cmmRegType reg))
                   (getRegisterReg reg) nilOL)
 
-getRegister tree@(CmmRegOff _ _)
-  = getRegister (mangleIndexTree tree)
+getRegister' dflags tree@(CmmRegOff _ _)
+  = getRegister' dflags (mangleIndexTree tree)
 
-
-#if WORD_SIZE_IN_BITS==32
     -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
 
-getRegister (CmmMachOp (MO_UU_Conv W64 W32)
-             [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
+getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32)
+                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister (CmmMachOp (MO_SS_Conv W64 W32)
-             [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
+getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32)
+                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister (CmmMachOp (MO_UU_Conv W64 W32) [x]) = do
+getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32) [x])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister (CmmMachOp (MO_SS_Conv W64 W32) [x]) = do
+getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32) [x])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-#endif
-
-
-getRegister (CmmLoad mem pk)
+getRegister' _ (CmmLoad mem pk)
   | not (isWord64 pk)
   = do
         Amode addr addr_code <- getAmode mem
@@ -427,21 +428,21 @@ getRegister (CmmLoad mem pk)
           where size = cmmTypeSize pk
 
 -- catch simple cases of zero- or sign-extended load
-getRegister (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
+getRegister' _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
 -- Note: there is no Load Byte Arithmetic instruction, so no signed case here
 
-getRegister (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _]) = do
+getRegister' _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
-getRegister (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _]) = do
+getRegister' _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode mem
     return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister (CmmMachOp mop [x]) -- unary MachOps
+getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_Not rep   -> triv_ucode_int rep NOT
 
@@ -477,10 +478,10 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
         triv_ucode_float width instr = trivialUCode (floatSize width) instr x
 
         conversionNop new_size expr
-            = do e_code <- getRegister expr
+            = do e_code <- getRegister' dflags expr
                  return (swizzleRegisterRep e_code new_size)
 
-getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
+getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
       MO_F_Eq w -> condFltReg EQQ x y
       MO_F_Ne w -> condFltReg NE  x y
@@ -557,14 +558,14 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
     triv_float :: Width -> (Size -> Reg -> Reg -> Reg -> Instr) -> NatM Register
     triv_float width instr = trivialCodeNoImm (floatSize width) instr x y
 
-getRegister (CmmLit (CmmInt i rep))
+getRegister' _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
   = let
         code dst = unitOL (LI dst imm)
     in
         return (Any (intSize rep) code)
 
-getRegister (CmmLit (CmmFloat f frep)) = do
+getRegister' _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
     dflags <- getDynFlagsNat
     dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
@@ -576,7 +577,7 @@ getRegister (CmmLit (CmmFloat f frep)) = do
             `consOL` (addr_code `snocOL` LD size dst addr)
     return (Any size code)
 
-getRegister (CmmLit lit)
+getRegister' _ (CmmLit lit)
   = let rep = cmmLitType lit
         imm = litToImm lit
         code dst = toOL [
@@ -585,7 +586,7 @@ getRegister (CmmLit lit)
           ]
     in return (Any (cmmTypeSize rep) code)
 
-getRegister other = pprPanic "getRegister(ppc)" (pprExpr other)
+getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
 
     -- extend?Rep: wrap integer expression of type rep
     -- in a conversion to II32
@@ -848,14 +849,30 @@ genCondJump id bool = do
 -- (If applicable) Do not fill the delay slots here; you will confuse the
 -- register allocator.
 
-genCCall
-    :: CmmCallTarget            -- function to call
+genCCall :: CmmCallTarget            -- function to call
+         -> HintedCmmFormals         -- where to put the result
+         -> HintedCmmActuals         -- arguments (of mixed type)
+         -> NatM InstrBlock
+genCCall target dest_regs argsAndHints
+ = do dflags <- getDynFlagsNat
+      case platformOS (targetPlatform dflags) of
+          OSLinux    -> genCCall' GCPLinux  target dest_regs argsAndHints
+          OSDarwin   -> genCCall' GCPDarwin target dest_regs argsAndHints
+          OSSolaris2 -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSMinGW32  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSFreeBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSOpenBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSUnknown  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+
+data GenCCallPlatform = GCPLinux | GCPDarwin
+
+genCCall'
+    :: GenCCallPlatform
+    -> CmmCallTarget            -- function to call
     -> HintedCmmFormals         -- where to put the result
     -> HintedCmmActuals         -- arguments (of mixed type)
     -> NatM InstrBlock
 
-
-#if darwin_TARGET_OS || linux_TARGET_OS
 {-
     The PowerPC calling convention for Darwin/Mac OS X
     is described in Apple's document
@@ -894,10 +911,10 @@ genCCall
 -}
 
 
-genCCall (CmmPrim MO_WriteBarrier) _ _
+genCCall' _ (CmmPrim MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
-genCCall target dest_regs argsAndHints
+genCCall' gcp target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [II8,II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
@@ -928,15 +945,16 @@ genCCall target dest_regs argsAndHints
                         `snocOL` BCTRL usedRegs
                         `appOL`  codeAfter)
     where
-#if darwin_TARGET_OS
-        initialStackOffset = 24
+        initialStackOffset = case gcp of
+                             GCPDarwin -> 24
+                             GCPLinux  -> 8
             -- size of linkage area + size of arguments, in bytes
-        stackDelta _finalStack = roundTo 16 $ (24 +) $ max 32 $ sum $
-                                 map (widthInBytes . typeWidth) argReps
-#elif linux_TARGET_OS
-        initialStackOffset = 8
-        stackDelta finalStack = roundTo 16 finalStack
-#endif
+        stackDelta finalStack = case gcp of
+                                GCPDarwin ->
+                                    roundTo 16 $ (24 +) $ max 32 $ sum $
+                                    map (widthInBytes . typeWidth) argReps
+                                GCPLinux -> roundTo 16 finalStack
+
         -- need to remove alignment information
         argsAndHints' | (CmmPrim mop) <- target,
                         (mop == MO_Memcpy ||
@@ -974,40 +992,39 @@ genCCall target dest_regs argsAndHints
                 ChildCode64 code vr_lo <- iselExpr64 arg
                 let vr_hi = getHiVRegFromLo vr_lo
 
-#if darwin_TARGET_OS
-                passArguments args
-                              (drop 2 gprs)
-                              fprs
-                              (stackOffset+8)
-                              (accumCode `appOL` code
-                                    `snocOL` storeWord vr_hi gprs stackOffset
-                                    `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
-                              ((take 2 gprs) ++ accumUsed)
-            where
-                storeWord vr (gpr:_) offset = MR gpr vr
-                storeWord vr [] offset = ST II32 vr (AddrRegImm sp (ImmInt offset))
+                case gcp of
+                    GCPDarwin ->
+                        do let storeWord vr (gpr:_) offset = MR gpr vr
+                               storeWord vr [] offset
+                                   = ST II32 vr (AddrRegImm sp (ImmInt offset))
+                           passArguments args
+                                         (drop 2 gprs)
+                                         fprs
+                                         (stackOffset+8)
+                                         (accumCode `appOL` code
+                                               `snocOL` storeWord vr_hi gprs stackOffset
+                                               `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
+                                         ((take 2 gprs) ++ accumUsed)
+                    GCPLinux ->
+                        do let stackOffset' = roundTo 8 stackOffset
+                               stackCode = accumCode `appOL` code
+                                   `snocOL` ST II32 vr_hi (AddrRegImm sp (ImmInt stackOffset'))
+                                   `snocOL` ST II32 vr_lo (AddrRegImm sp (ImmInt (stackOffset'+4)))
+                               regCode hireg loreg =
+                                   accumCode `appOL` code
+                                       `snocOL` MR hireg vr_hi
+                                       `snocOL` MR loreg vr_lo
 
-#elif linux_TARGET_OS
-                let stackOffset' = roundTo 8 stackOffset
-                    stackCode = accumCode `appOL` code
-                        `snocOL` ST II32 vr_hi (AddrRegImm sp (ImmInt stackOffset'))
-                        `snocOL` ST II32 vr_lo (AddrRegImm sp (ImmInt (stackOffset'+4)))
-                    regCode hireg loreg =
-                        accumCode `appOL` code
-                            `snocOL` MR hireg vr_hi
-                            `snocOL` MR loreg vr_lo
-
-                case gprs of
-                    hireg : loreg : regs | even (length gprs) ->
-                        passArguments args regs fprs stackOffset
-                                      (regCode hireg loreg) (hireg : loreg : accumUsed)
-                    _skipped : hireg : loreg : regs ->
-                        passArguments args regs fprs stackOffset
-                                      (regCode hireg loreg) (hireg : loreg : accumUsed)
-                    _ -> -- only one or no regs left
-                        passArguments args [] fprs (stackOffset'+8)
-                                      stackCode accumUsed
-#endif
+                           case gprs of
+                               hireg : loreg : regs | even (length gprs) ->
+                                   passArguments args regs fprs stackOffset
+                                                 (regCode hireg loreg) (hireg : loreg : accumUsed)
+                               _skipped : hireg : loreg : regs ->
+                                   passArguments args regs fprs stackOffset
+                                                 (regCode hireg loreg) (hireg : loreg : accumUsed)
+                               _ -> -- only one or no regs left
+                                   passArguments args [] fprs (stackOffset'+8)
+                                                 stackCode accumUsed
 
         passArguments ((arg,rep):args) gprs fprs stackOffset accumCode accumUsed
             | reg : _ <- regs = do
@@ -1015,16 +1032,16 @@ genCCall target dest_regs argsAndHints
                 let code = case register of
                             Fixed _ freg fcode -> fcode `snocOL` MR reg freg
                             Any _ acode -> acode reg
+                    stackOffsetRes = case gcp of
+                                     -- The Darwin ABI requires that we reserve
+                                     -- stack slots for register parameters
+                                     GCPDarwin -> stackOffset + stackBytes
+                                     -- ... the SysV ABI doesn't.
+                                     GCPLinux -> stackOffset
                 passArguments args
                               (drop nGprs gprs)
                               (drop nFprs fprs)
-#if darwin_TARGET_OS
-        -- The Darwin ABI requires that we reserve stack slots for register parameters
-                              (stackOffset + stackBytes)
-#elif linux_TARGET_OS
-        -- ... the SysV ABI doesn't.
-                              stackOffset
-#endif
+                              stackOffsetRes
                               (accumCode `appOL` code)
                               (reg : accumUsed)
             | otherwise = do
@@ -1036,29 +1053,35 @@ genCCall target dest_regs argsAndHints
                               (accumCode `appOL` code `snocOL` ST (cmmTypeSize rep) vr stackSlot)
                               accumUsed
             where
-#if darwin_TARGET_OS
-        -- stackOffset is at least 4-byte aligned
-        -- The Darwin ABI is happy with that.
-                stackOffset' = stackOffset
-#else
-        -- ... the SysV ABI requires 8-byte alignment for doubles.
-                stackOffset' | isFloatType rep && typeWidth rep == W64 =
-                                 roundTo 8 stackOffset
-                             | otherwise  =           stackOffset
-#endif
+                stackOffset' = case gcp of
+                               GCPDarwin ->
+                                   -- stackOffset is at least 4-byte aligned
+                                   -- The Darwin ABI is happy with that.
+                                   stackOffset
+                               GCPLinux
+                                   -- ... the SysV ABI requires 8-byte
+                                   -- alignment for doubles.
+                                | isFloatType rep && typeWidth rep == W64 ->
+                                   roundTo 8 stackOffset
+                                | otherwise ->
+                                   stackOffset
                 stackSlot = AddrRegImm sp (ImmInt stackOffset')
-                (nGprs, nFprs, stackBytes, regs) = case cmmTypeSize rep of
-                    II32 -> (1, 0, 4, gprs)
-#if darwin_TARGET_OS
-        -- The Darwin ABI requires that we skip a corresponding number of GPRs when
-        -- we use the FPRs.
-                    FF32 -> (1, 1, 4, fprs)
-                    FF64 -> (2, 1, 8, fprs)
-#elif linux_TARGET_OS
-        -- ... the SysV ABI doesn't.
-                    FF32 -> (0, 1, 4, fprs)
-                    FF64 -> (0, 1, 8, fprs)
-#endif
+                (nGprs, nFprs, stackBytes, regs)
+                    = case gcp of
+                      GCPDarwin ->
+                          case cmmTypeSize rep of
+                          II32 -> (1, 0, 4, gprs)
+                          -- The Darwin ABI requires that we skip a
+                          -- corresponding number of GPRs when we use
+                          -- the FPRs.
+                          FF32 -> (1, 1, 4, fprs)
+                          FF64 -> (2, 1, 8, fprs)
+                      GCPLinux ->
+                          case cmmTypeSize rep of
+                          II32 -> (1, 0, 4, gprs)
+                          -- ... the SysV ABI doesn't.
+                          FF32 -> (0, 1, 4, fprs)
+                          FF64 -> (0, 1, 8, fprs)
 
         moveResult reduceToFF32 =
             case dest_regs of
@@ -1123,10 +1146,6 @@ genCCall target dest_regs argsAndHints
 
                     other -> pprPanic "genCCall(ppc): unknown callish op"
                                     (pprCallishMachOp other)
-
-#else /* darwin_TARGET_OS || linux_TARGET_OS */
-genCCall = panic "PPC.CodeGen.genCCall: not defined for this os"
-#endif
 
 
 -- -----------------------------------------------------------------------------
