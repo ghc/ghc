@@ -86,6 +86,10 @@ libraries/dph/dph-prim-par_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-seq_dist-install_EXTRA_HC_OPTS += -Wwarn
 libraries/dph/dph-par_dist-install_EXTRA_HC_OPTS += -Wwarn
 
+# We need to turn of deprecated warnings for SafeHaskell transition
+libraries/array_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
+libraries/binary_dist-install_EXTRA_HC_OPTS += -fno-warn-warnings-deprecations
+
 # We need -fno-warn-deprecated-flags to avoid failure with -Werror
 GhcLibHcOpts += -fno-warn-deprecated-flags
 GhcBootLibHcOpts += -fno-warn-deprecated-flags
