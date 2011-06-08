@@ -1,4 +1,3 @@
-{-# OPTIONS -w #-}
 
 -----------------------------------------------------------------------------
 --
@@ -29,7 +28,6 @@ where
 import PPC.Instr
 import PPC.Cond
 import PPC.Regs
-import PPC.RegInfo
 import NCGMonad
 import Instruction
 import PIC
@@ -48,14 +46,12 @@ import CLabel
 -- The rest:
 import StaticFlags      ( opt_PIC )
 import OrdList
-import qualified Outputable as O
 import Outputable
 import Unique
 import DynFlags
 
 import Control.Monad    ( mapAndUnzipM )
 import Data.Bits
-import Data.Int
 import Data.Word
 
 import BasicTypes
@@ -144,8 +140,8 @@ stmtToInstrs stmt = do
     CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
-    CmmJump arg params    -> genJump arg
-    CmmReturn params      ->
+    CmmJump arg _         -> genJump arg
+    CmmReturn _           ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
@@ -205,17 +201,6 @@ temporary, then do the other computation, and then use the temporary:
     ... other computation ...
     ... (tmp) ...
 -}
-
-
--- | Check whether an integer will fit in 32 bits.
---      A CmmInt is intended to be truncated to the appropriate
---      number of bits, so here we truncate it to Int64.  This is
---      important because e.g. -1 as a CmmInt might be either
---      -1 or 18446744073709551615.
---
-is32BitInteger :: Integer -> Bool
-is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
-  where i64 = fromIntegral i :: Int64
 
 
 -- | Convert a BlockId to some CmmStatic data
@@ -303,7 +288,7 @@ assignMem_I64Code addrTree valueTree = do
 
 
 assignReg_I64Code :: CmmReg  -> CmmExpr -> NatM InstrBlock
-assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
+assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
    ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
    let
          r_dst_lo = RegVirtual $ mkVirtualReg u_dst II32
@@ -316,7 +301,7 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
         vcode `snocOL` mov_lo `snocOL` mov_hi
      )
 
-assignReg_I64Code lvalue valueTree
+assignReg_I64Code _ _
    = panic "assignReg_I64Code(powerpc): invalid lvalue"
 
 
@@ -483,12 +468,12 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
 
 getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
-      MO_F_Eq w -> condFltReg EQQ x y
-      MO_F_Ne w -> condFltReg NE  x y
-      MO_F_Gt w -> condFltReg GTT x y
-      MO_F_Ge w -> condFltReg GE  x y
-      MO_F_Lt w -> condFltReg LTT x y
-      MO_F_Le w -> condFltReg LE  x y
+      MO_F_Eq _ -> condFltReg EQQ x y
+      MO_F_Ne _ -> condFltReg NE  x y
+      MO_F_Gt _ -> condFltReg GTT x y
+      MO_F_Ge _ -> condFltReg GE  x y
+      MO_F_Lt _ -> condFltReg LTT x y
+      MO_F_Le _ -> condFltReg LE  x y
 
       MO_Eq rep -> condIntReg EQQ  (extendUExpr rep x) (extendUExpr rep y)
       MO_Ne rep -> condIntReg NE   (extendUExpr rep x) (extendUExpr rep y)
@@ -536,8 +521,8 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
 
       MO_S_MulMayOflo W32 -> trivialCodeNoImm' II32 MULLW_MayOflo x y
 
-      MO_S_MulMayOflo rep -> panic "S_MulMayOflo (rep /= II32): not implemented"
-      MO_U_MulMayOflo rep -> panic "U_MulMayOflo: not implemented"
+      MO_S_MulMayOflo _ -> panic "S_MulMayOflo (rep /= II32): not implemented"
+      MO_U_MulMayOflo _ -> panic "U_MulMayOflo: not implemented"
 
       MO_S_Quot rep -> trivialCodeNoImm' (intSize rep) DIVW (extendSExpr rep x) (extendSExpr rep y)
       MO_U_Quot rep -> trivialCodeNoImm' (intSize rep) DIVWU (extendUExpr rep x) (extendUExpr rep y)
@@ -590,8 +575,11 @@ getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
 
     -- extend?Rep: wrap integer expression of type rep
     -- in a conversion to II32
+extendSExpr :: Width -> CmmExpr -> CmmExpr
 extendSExpr W32 x = x
 extendSExpr rep x = CmmMachOp (MO_SS_Conv rep W32) [x]
+
+extendUExpr :: Width -> CmmExpr -> CmmExpr
 extendUExpr W32 x = x
 extendUExpr rep x = CmmMachOp (MO_UU_Conv rep W32) [x]
 
@@ -707,9 +695,9 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt rep -> condIntCode LU   (extendUExpr rep x) (extendUExpr rep y)
       MO_U_Le rep -> condIntCode LEU  (extendUExpr rep x) (extendUExpr rep y)
 
-      other -> pprPanic "getCondCode(powerpc)" (pprMachOp mop)
+      _ -> pprPanic "getCondCode(powerpc)" (pprMachOp mop)
 
-getCondCode other =  panic "getCondCode(2)(powerpc)"
+getCondCode _ = panic "getCondCode(2)(powerpc)"
 
 
 
@@ -925,8 +913,8 @@ genCCall' gcp target dest_regs argsAndHints
                                                         (toOL []) []
 
         (labelOrExpr, reduceToFF32) <- case target of
-            CmmCallee (CmmLit (CmmLabel lbl)) conv -> return (Left lbl, False)
-            CmmCallee expr conv -> return  (Right expr, False)
+            CmmCallee (CmmLit (CmmLabel lbl)) _ -> return (Left lbl, False)
+            CmmCallee expr _ -> return  (Right expr, False)
             CmmPrim mop -> outOfLineMachOp mop
 
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode
@@ -994,7 +982,7 @@ genCCall' gcp target dest_regs argsAndHints
 
                 case gcp of
                     GCPDarwin ->
-                        do let storeWord vr (gpr:_) offset = MR gpr vr
+                        do let storeWord vr (gpr:_) _ = MR gpr vr
                                storeWord vr [] offset
                                    = ST II32 vr (AddrRegImm sp (ImmInt offset))
                            passArguments args
@@ -1076,12 +1064,20 @@ genCCall' gcp target dest_regs argsAndHints
                           -- the FPRs.
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
+                          II8  -> panic "genCCall' passArguments II8"
+                          II16 -> panic "genCCall' passArguments II16"
+                          II64 -> panic "genCCall' passArguments II64"
+                          FF80 -> panic "genCCall' passArguments FF80"
                       GCPLinux ->
                           case cmmTypeSize rep of
                           II32 -> (1, 0, 4, gprs)
                           -- ... the SysV ABI doesn't.
                           FF32 -> (0, 1, 4, fprs)
                           FF64 -> (0, 1, 8, fprs)
+                          II8  -> panic "genCCall' passArguments II8"
+                          II16 -> panic "genCCall' passArguments II16"
+                          II64 -> panic "genCCall' passArguments II64"
+                          FF80 -> panic "genCCall' passArguments FF80"
 
         moveResult reduceToFF32 =
             case dest_regs of
@@ -1094,6 +1090,7 @@ genCCall' gcp target dest_regs argsAndHints
                     | otherwise -> unitOL (MR r_dest r3)
                     where rep = cmmRegType (CmmLocal dest)
                           r_dest = getRegisterReg (CmmLocal dest)
+                _ -> panic "genCCall' moveResult: Bad dest_regs"
 
         outOfLineMachOp mop =
             do
