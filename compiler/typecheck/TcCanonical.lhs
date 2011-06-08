@@ -2,7 +2,7 @@
 module TcCanonical(
     mkCanonical, mkCanonicals, mkCanonicalFEV, mkCanonicalFEVs, canWanteds, canGivens,
     canOccursCheck, canEqToWorkList,
-    rewriteWithFunDeps
+    rewriteWithFunDeps, mkCanonicalFDAsDerived, mkCanonicalFDAsWanted
  ) where
 
 #include "HsVersions.h"
@@ -23,7 +23,7 @@ import Name
 import Var
 import VarEnv		( TidyEnv )
 import Outputable
-import Control.Monad    ( unless, when, zipWithM, zipWithM_ )
+import Control.Monad    ( unless, when, zipWithM, zipWithM_, foldM )
 import MonadUtils
 import Control.Applicative ( (<|>) )
 
@@ -981,60 +981,44 @@ now!).
 
 \begin{code}
 rewriteWithFunDeps :: [Equation]
-                   -> [Xi] -> CtFlavor
-                   -> TcS (Maybe ([Xi], [Coercion], WorkList))
-rewriteWithFunDeps eqn_pred_locs xis fl
- = do { fd_ev_poss <- mapM (instFunDepEqn fl) eqn_pred_locs
-      ; let fd_ev_pos :: [(Int,FlavoredEvVar)]
+                   -> [Xi] 
+                   -> WantedLoc 
+                   -> TcS (Maybe ([Xi], [Coercion], [(EvVar,WantedLoc)])) 
+                                           -- Not quite a WantedEvVar unfortunately
+                                           -- Because our intention could be to make 
+                                           -- it derived at the end of the day
+-- NB: The flavor of the returned EvVars will be decided by the caller
+-- Post: returns no trivial equalities (identities)
+rewriteWithFunDeps eqn_pred_locs xis wloc
+ = do { fd_ev_poss <- mapM (instFunDepEqn wloc) eqn_pred_locs
+      ; let fd_ev_pos :: [(Int,(EvVar,WantedLoc))]
             fd_ev_pos = concat fd_ev_poss
             (rewritten_xis, cos) = unzip (rewriteDictParams fd_ev_pos xis)
-      ; fds <- mapM (\(_,fev) -> mkCanonicalFEV fev) fd_ev_pos
-      ; let fd_work = unionWorkLists fds
-      ; if isEmptyWorkList fd_work 
-        then return Nothing
-        else return (Just (rewritten_xis, cos, fd_work)) }
+      ; if null fd_ev_pos then return Nothing
+        else return (Just (rewritten_xis, cos, map snd fd_ev_pos)) }
 
-instFunDepEqn :: CtFlavor -- Precondition: Only Wanted or Derived
-              -> Equation
-              -> TcS [(Int, FlavoredEvVar)]
+instFunDepEqn :: WantedLoc -> Equation -> TcS [(Int,(EvVar,WantedLoc))]
 -- Post: Returns the position index as well as the corresponding FunDep equality
-instFunDepEqn fl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
+instFunDepEqn wl (FDEqn { fd_qtvs = qtvs, fd_eqs = eqs
                         , fd_pred1 = d1, fd_pred2 = d2 })
   = do { let tvs = varSetElems qtvs
        ; tvs' <- mapM instFlexiTcS tvs
        ; let subst = zipTopTvSubst tvs (mkTyVarTys tvs')
-       ; mapM (do_one subst) eqs }
+       ; foldM (do_one subst) [] eqs }
   where 
-    fl' = case fl of 
-             Given {}    -> panic "mkFunDepEqns"
-             Wanted  loc -> Wanted  (push_ctx loc)
-             Derived loc -> Derived (push_ctx loc)
+    do_one subst ievs (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
+       = let sty1 = Type.substTy subst ty1 
+             sty2 = Type.substTy subst ty2 
+         in if eqType sty1 sty2 then return ievs -- Return no trivial equalities
+            else do { ev <- newCoVar sty1 sty2
+                    ; let wl' = push_ctx wl 
+                    ; return $ (i,(ev,wl')):ievs }
 
+    push_ctx :: WantedLoc -> WantedLoc 
     push_ctx loc = pushErrCtxt FunDepOrigin (False, mkEqnMsg d1 d2) loc
 
-    do_one subst (FDEq { fd_pos = i, fd_ty_left = ty1, fd_ty_right = ty2 })
-       = do { let sty1 = Type.substTy subst ty1
-                  sty2 = Type.substTy subst ty2
-            ; ev <- newCoVar sty1 sty2
-            ; return (i, mkEvVarX ev fl') }
-
-rewriteDictParams :: [(Int,FlavoredEvVar)] -- A set of coercions : (pos, ty' ~ ty)
-                  -> [Type]                -- A sequence of types: tys
-                  -> [(Type,Coercion)]     -- Returns            : [(ty', co : ty' ~ ty)]
-rewriteDictParams param_eqs tys
-  = zipWith do_one tys [0..]
-  where
-    do_one :: Type -> Int -> (Type,Coercion)
-    do_one ty n = case lookup n param_eqs of
-                    Just wev -> (get_fst_ty wev, mkCoVarCo (evVarOf wev))
-                    Nothing  -> (ty,             mkReflCo ty)	-- Identity
-
-    get_fst_ty wev = case evVarOfPred wev of
-                          EqPred ty1 _ -> ty1
-                          _ -> panic "rewriteDictParams: non equality fundep"
-
-mkEqnMsg :: (TcPredType, SDoc) -> (TcPredType, SDoc) -> TidyEnv
-         -> TcM (TidyEnv, SDoc)
+mkEqnMsg :: (TcPredType, SDoc) 
+         -> (TcPredType, SDoc) -> TidyEnv -> TcM (TidyEnv, SDoc)
 mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
   = do  { zpred1 <- TcM.zonkTcPredType pred1
         ; zpred2 <- TcM.zonkTcPredType pred2
@@ -1044,4 +1028,36 @@ mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
 			  nest 2 (sep [ppr tpred1 <> comma, nest 2 from1]), 
 			  nest 2 (sep [ppr tpred2 <> comma, nest 2 from2])]
 	; return (tidy_env, msg) }
+
+rewriteDictParams :: [(Int,(EvVar,WantedLoc))] -- A set of coercions : (pos, ty' ~ ty)
+                  -> [Type]                    -- A sequence of types: tys
+                  -> [(Type,Coercion)]         -- Returns: [(ty', co : ty' ~ ty)]
+rewriteDictParams param_eqs tys
+  = zipWith do_one tys [0..]
+  where
+    do_one :: Type -> Int -> (Type,Coercion)
+    do_one ty n = case lookup n param_eqs of
+                    Just wev -> (get_fst_ty wev, mkCoVarCo (fst wev))
+                    Nothing  -> (ty,             mkReflCo ty)	-- Identity
+
+    get_fst_ty (wev,_wloc) 
+      | EqPred ty1 _ <- evVarPred wev 
+      = ty1 
+      | otherwise 
+      = panic "rewriteDictParams: non equality fundep!?"
+
+mkCanonicalFDAsWanted :: [(EvVar,WantedLoc)] -> TcS WorkList
+mkCanonicalFDAsWanted evlocs
+  = do { ws <- mapM can_as_wanted evlocs
+       ; return (unionWorkLists ws) }
+  where can_as_wanted (ev,loc) = mkCanonicalFEV (EvVarX ev (Wanted loc))
+
+
+mkCanonicalFDAsDerived :: [(EvVar,WantedLoc)] -> TcS WorkList
+mkCanonicalFDAsDerived evlocs
+  = do { ws <- mapM can_as_derived evlocs
+       ; return (unionWorkLists ws) }
+  where can_as_derived (ev,loc) = mkCanonicalFEV (EvVarX ev (Derived loc)) 
+
+
 \end{code}
