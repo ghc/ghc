@@ -1,6 +1,5 @@
 
 -- | A description of the platform we're compiling for.
---      Used by the native code generator.
 --      In the future, this module should be the only one that references
 --      the evil #defines for each TARGET_ARCH and TARGET_OS
 --
