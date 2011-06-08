@@ -67,11 +67,14 @@ target32Bit p = case platformArch p of
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
 osElfTarget :: OS -> Bool
-osElfTarget OSLinux   = True
-osElfTarget OSFreeBSD = True
-osElfTarget OSOpenBSD = True
+osElfTarget OSLinux    = True
+osElfTarget OSFreeBSD  = True
+osElfTarget OSOpenBSD  = True
 osElfTarget OSSolaris2 = True
-osElfTarget _         = False
+osElfTarget OSDarwin   = False
+osElfTarget OSMinGW32  = False
+osElfTarget OSUnknown  = panic "Don't know if OSUnknown is elf"
+
 
 -- | This is the target platform as far as the #ifdefs are concerned.
 --      These are set in includes/ghcplatform.h by the autoconf scripts
