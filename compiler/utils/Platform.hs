@@ -9,10 +9,13 @@ module Platform (
         OS(..),
 
         defaultTargetPlatform,
+        target32Bit,
         osElfTarget
 )
 
 where
+
+import Panic
 
 #include "HsVersions.h"
 
@@ -50,6 +53,16 @@ data OS
         | OSFreeBSD
         | OSOpenBSD
         deriving (Show, Eq)
+
+
+target32Bit :: Platform -> Bool
+target32Bit p = case platformArch p of
+                ArchUnknown -> panic "Don't know if ArchUnknown is 32bit"
+                ArchX86     -> True
+                ArchX86_64  -> False
+                ArchPPC     -> True
+                ArchPPC_64  -> False
+                ArchSPARC   -> True
 
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
