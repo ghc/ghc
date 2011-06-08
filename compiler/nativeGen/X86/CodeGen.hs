@@ -82,22 +82,22 @@ if_sse2 sse2 x87 = do
   if b then sse2 else x87
 
 cmmTopCodeGen 
-	:: DynFlags
-	-> RawCmmTop
+	:: RawCmmTop
 	-> NatM [NatCmmTop Instr]
 
-cmmTopCodeGen dynflags (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
+  dflags <- getDynFlagsNat
   let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
-      os   = platformOS $ targetPlatform dynflags
+      os   = platformOS $ targetPlatform dflags
 
   case picBaseMb of
       Just picBase -> initializePicBase_x86 ArchX86 os picBase tops
       Nothing -> return tops
   
-cmmTopCodeGen _ (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 

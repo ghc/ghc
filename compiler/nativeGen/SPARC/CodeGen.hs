@@ -47,15 +47,13 @@ import Outputable
 import Unique
 
 import Control.Monad	( mapAndUnzipM )
-import DynFlags
 
 -- | Top level code generation
 cmmTopCodeGen 
-	:: DynFlags
-	-> RawCmmTop 
+	:: RawCmmTop 
 	-> NatM [NatCmmTop Instr]
 
-cmmTopCodeGen _
+cmmTopCodeGen
 	(CmmProc info lab (ListGraph blocks)) 
  = do	
  	(nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -65,7 +63,7 @@ cmmTopCodeGen _
 
   	return tops
   
-cmmTopCodeGen _ (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 
