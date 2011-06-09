@@ -132,7 +132,7 @@ The machine-dependent bits break down as follows:
 -- Top-level of the native codegen
 
 data NcgImpl instr jumpDest = NcgImpl {
-    cmmTopCodeGen             :: DynFlags -> RawCmmTop -> NatM [NatCmmTop instr],
+    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmTop instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
@@ -759,7 +759,7 @@ apply_mapping ncgImpl ufm (CmmProc info lbl (ListGraph blocks))
 
 genMachCode 
 	:: DynFlags 
-        -> (DynFlags -> RawCmmTop -> NatM [NatCmmTop instr])
+        -> (RawCmmTop -> NatM [NatCmmTop instr])
 	-> RawCmmTop 
 	-> UniqSM 
 		( [NatCmmTop instr]
@@ -768,7 +768,7 @@ genMachCode
 genMachCode dflags cmmTopCodeGen cmm_top
   = do	{ initial_us <- getUs
 	; let initial_st           = mkNatM_State initial_us 0 dflags
-	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen dflags cmm_top)
+	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
 	      final_delta          = natm_delta final_st
 	      final_imports        = natm_imports final_st
 	; if   final_delta == 0
