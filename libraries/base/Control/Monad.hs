@@ -189,7 +189,25 @@ f >=> g     = \x -> f x >>= g
 
 -- | @'forever' act@ repeats the action infinitely.
 forever     :: (Monad m) => m a -> m b
+{-# INLINABLE forever #-}  -- See Note [Make forever INLINABLE]
 forever a   = a >> forever a
+
+{- Note [Make forever INLINABLE]
+
+If you say   x = forever a
+you'll get   x = a >> a >> a >> a >> ... etc ...
+and that can make a massive space leak (see Trac #5205)
+
+In some monads, where (>>) is expensive, this might be the right
+thing, but not in the IO monad.  We want to specialise 'forever' for
+the IO monad, so that eta expansion happens and there's no space leak.
+To achieve this we must make forever INLINABLE, so that it'll get
+specialised at call sites.
+
+Still delicate, though, because it depends on optimisation.  But there
+really is a space/time tradeoff here, and only optimisation reveals
+the "right" answer.
+-}
 
 -- | @'void' value@ discards or ignores the result of evaluation, such as the return value of an 'IO' action.
 void :: Functor f => f a -> f ()

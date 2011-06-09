@@ -20,6 +20,7 @@ module GHC.ST where
 
 import GHC.Base
 import GHC.Show
+import Control.Monad( forever )
 
 default ()
 \end{code}
@@ -73,6 +74,9 @@ instance Monad (ST s) where
         (k2 new_s) }})
 
 data STret s a = STret (State# s) a
+
+{-# SPECIALISE forever :: ST s a -> ST s b #-}
+-- See Note [Make forever INLINABLE] in Control.Monad
 
 -- liftST is useful when we want a lifted result from an ST computation.  See
 -- fixST below.
