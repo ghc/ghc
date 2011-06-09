@@ -186,10 +186,10 @@ module GHC (
 	compareFixity,
 
 	-- ** Source locations
-	SrcLoc, pprDefnLoc,
+	SrcLoc(..), RealSrcLoc, pprDefnLoc,
         mkSrcLoc, noSrcLoc,
 	srcLocFile, srcLocLine, srcLocCol,
-        SrcSpan,
+        SrcSpan(..), RealSrcSpan,
         mkSrcSpan, srcLocSpan, isGoodSrcSpan, noSrcSpan,
         srcSpanStart, srcSpanEnd,
 	srcSpanFile, 

@@ -18,7 +18,6 @@ import GHC
 import GhciMonad
 import Outputable
 import Util
-import SrcLoc
 
 -- ToDo: figure out whether we need these, and put something appropriate
 -- into the GHC API instead
