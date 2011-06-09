@@ -1,0 +1,6 @@
+
+T5246.hs:11:10:
+    Couldn't match type `Int' with `[Char]'
+    In the expression: foo
+    In the expression: let ?x = "hello" in foo
+    In an equation for `bar': bar = let ?x = "hello" in foo
