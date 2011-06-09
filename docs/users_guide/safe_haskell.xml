@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<sect1 id="safe-haskell">
+  <title>Safe Haskell</title>
+  
+  Safe Haskell is an extension to the Haskell language supported by GHC, that
+  provides certain safety guarantees about Haskell code compiled using this
+  extension. It allows people to build more advance security mechanisms on top
+  of Haskell and for the safe execution of untrusted Haskell code. Its purpose
+  isn't to provide a complete secure execution environment for Haskell code but
+  to give users enough guarantees about the Haskell language to be able to
+  build such systems. Its design is similar to the safe and unsafe module
+  system supported by the Modula-3 language.
+  
+  The design of Safe Haskell covers the following aspects:
+  <itemizedlist>
+    <listitem>A <link linkend="safe-language">safe language</link>dialect of
+      Haskell that provides guarantees about the code. Mainly it allows the
+      types and module boundaries to be trusted.
+    </listitem>
+    <listitem>A new <emphasis>safe import</emphasis> extension that specifies
+      the module being imported must be trusted.
+    </listitem>
+    <listitem>A definition of <emphasis>trust</emphasis> (or safety) and how it
+      operates, along with ways of defining and changing the trust of modules
+      and packages.
+    </listitem>
+  </itemizedlist>
+  
+  <sect2 id="safe-language">
+    <title>Safe Language</title>
+
+    The Safe Haskell <emphasis>Safe language</emphasis> guarantees the
+    following properties:
+    <itemizedlist>
+      <listitem><emphasis>Referential transparency.</emphasis> Functions
+        in the Safe language are deterministic, evaluating them will not
+        cause any side effects. Functions in the <emphasis>IO</emphasis>
+        monad are still allowed and behave as usual but any pure function
+        as according to the functions type is guaranteed to indeed be
+        pure. This property allows a user of the Safe language to trust
+        the types of functions.
+      </listitem>
+      <listitem><emphasis>Module boundary control.</emphasis> Haskell code
+        compiled using the Safe language is guaranteed to only access
+        symbols that are publicly available to it through other modules
+        export lists. An import part of this is that safe compiled code
+        is not able to examine or create data values using data constructors
+        that the module cannot import. If a module M establishes some
+        invariants through careful use of its export list then code
+        compiled using the Safe language that imports M is guaranteed to
+        respect those invariants.
+      </listitem>
+      <listitem><emphasis>Semantic consistency.</emphasis> The Safe language
+        is strictly a subset of Haskell as implemented by GHC. Any expression
+        that compiles in the safe language has the same meaning as it does
+        when compiled in normal Haskell. In addtion, in any module that imports
+        a Safe language module, expressions that compile both with and without
+        the safe import have the same meaning in both cases. That is, importing
+        a module using the Safe language cannot change the meaning of existing
+        code that isn't dependent on that module.
+      </listitem>
+    </itemizedlist>
+    
+    Put simply, these three properties guarantee that you can trust the types
+    in the Safe language, can trust module export lists are respected
+    in the Safe language and that code which succesfully compiles in the Safe
+    language has the same meaning as it normally would.
+  </sect2>
+
+  <sect2 id="safe-imports">
+    <title>Safe Imports</title>
+
+    Safe Haskell enables a small extension to the usual import syntax of
+    Haskell, adding a <emphasis>safe</emphasis> keyword:
+
+    <programlisting>
+      impdecl -> import [safe] [qualified] modid [as modid] [impspec]
+    </programlisting>
+
+    When used, the module being imported with the safe keyword must be a trusted
+    module, otherwise a compilation error will occur. The safe import extension
+    is enabled by either of the <emphasis>-XSafe</emphasis>,
+    <emphasis>-XTrustworthy</emphasis>, <emphasis>-XSafeLanguage</emphasis> or
+    <emphasis>-XSafeImports</emphasis> flags and corresponding PRAGMA's. When
+    either the <empahsis>-XSafe</empahsis> or
+    <emphasis>-XSafeLanguage</emphasis> flag is used, all imports are assumed to
+    be safe imports.
+  </sect2>
+
+  <sect2 id="safe-trust">
+    <title>Trust</title>
+
+    The Safe Haskell extension introduces the following two new language flags:
+    <itemizedlist>
+      <listitem><emphasis>-XSafe:</emphasis> Enables the Safe language dialect,
+      asking GHC to guarantee trust. The safe language dialect requires that
+      all imports be trusted or a compile error will occur.</listitem>
+      <listitem><emphasis>-XTrustworthy:</emphasis> Means that while this module
+      may invoke unsafe functions internally, the module's author claims that
+      it exports an API that can't be used in an unsafe way. This doesn't enable
+      the Safe language or place any restrictions on the allowed Haskell code.
+      The trust guarantee is provided by the module author, not GHC. Modules
+      imported with the <emphasis>safe</emphasis> import feature are required
+      to be trusted but otherwise unsafe modules can be imported as usual.
+      </listitem>
+    </itemizedlist>
+
+    The definition of trust for a module <emphasis>M</emphasis>, residing in
+    a package <emphasis>P</emphasis> for a user of GHC, a client
+    <emphasis>C</emphasis> (someone who is compiling a source module with GHC,
+    aka you!), is defined as follows:
+
+    A <emphasis>package P is trusted by client C</emphasis> if and only if one of
+    these conditions hold:
+    <itemizedlist>
+      <listitem>C's package database records that P is trusted (and no
+        command line arguments override this).</listitem>
+      <listitem>C's command-line flags say to trust it regardless of the
+        what is recorded in the package database.</listitem>
+    </itemizedlist>
+
+    It is important to note that C is the only authority on package trust. It is
+    up to the client to decide which packages they trust.
+
+    A <emphasis>module M is trusted by a client C</emphasis> if and only if:
+    <itemizedlist>
+      <listitem>Both of these hold:
+        <itemizedlist>
+          <listitem> The module was compiled with <emphasis>-XSafe</emphasis></listitem>
+          <listitem> All of M's direct imports are trusted by C</listitem>
+        </itemizedlist>
+      </listitem>
+      <listitem><emphasis>OR</emphasis> all of these hold:
+        <itemizedlist>
+          <listitem>The module was compiled with <emphasis>-XTrustworthy</emphasis></listitem>
+          <listitem>All of M's direct safe imports are trusted by C</listitem>
+          <listitem>Package P is trusted by C</listitem>
+        </itemizedlist>
+      </listitem>
+    </itemizedlist>
+
+    For the first trust definition the trust guarantee is provided by GHC
+    through the restrictions imposed by the Safe language. For the second
+    definition of trust, the guarantee is provided initially by the
+    module author. The client C then establishes that they trust the
+    module author by indicating they trust the package the module resides
+    in. This trust chain is required as GHC provides no guarantee for
+    <emphasis>-XTrustworthy</emphasis> compiled modules.
+  </sect2>
+
+</sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->

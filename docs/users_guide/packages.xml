@@ -101,6 +101,13 @@ $ ghc-pkg list
       directly.
     </para>
 
+    <para>Similar to a package's hidden status is a package's trusted
+      status. A package can be either trusted or not trusted (distrusted).
+      By default packages are distrusted. This property of a package only
+      plays a role when compiling code using GHC's Safe Haskell feature
+      (see <xref linkend="safe-haskell"/>).
+    </para>
+
     <para>To see which modules are provided by a package use the
       <literal>ghc-pkg</literal> command (see <xref linkend="package-management"/>):</para>
 
@@ -263,6 +270,53 @@ exposed-modules: Network.BSD,
               package <literal>name-version</literal> for the package.
               For example:
             <literal>-package mypkg-1.2</literal>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-trust</option> <replaceable>P</replaceable>
+        <indexterm><primary><option>-trust</option></primary>
+          </indexterm></term>
+        <listitem>
+          <para>This option causes the install package <replaceable>P
+            </replaceable> to be both exposed and trusted by GHC. This
+            command functions in the in a very similar way to the <option>
+            -package</option> command but in addition sets the selected
+            packaged to be trusted by GHC, regardless of the contents of
+            the package database. (see <xref linkend="safe-haskell"/>).
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-distrust</option> <replaceable>P</replaceable>
+        <indexterm><primary><option>-distrust</option></primary>
+          </indexterm></term>
+        <listitem>
+          <para>This option causes the install package <replaceable>P
+            </replaceable> to be both exposed and distrusted by GHC. This
+            command functions in the in a very similar way to the <option>
+            -package</option> command but in addition sets the selected
+            packaged to be distrusted by GHC, regardless of the contents of
+            the package database. (see <xref linkend="safe-haskell"/>).
+          </para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><option>-distrust-all</option>
+        <indexterm><primary><option>-distrust-all</option></primary>
+          </indexterm></term>
+        <listitem>
+          <para>Ignore the trusted flag on installed packages, and distrust
+            them by default. If you use this flag and Safe Haskell then any
+            packages you require to be trusted (including <literal>base
+            </literal>) need to be explicitly trusted using <option>-trust
+            </option> options. This option does not change the exposed/hidden
+            status of a package, so it isn't equivalent to applying <option>
+            -distrust</option> to all packages on the system. (see
+            <xref linkend="safe-haskell"/>).
+          </para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -624,14 +678,6 @@ haskell98-1.0.1.0
       </varlistentry>
 
       <varlistentry>
-        <term><literal>ghc-pkg expose <replaceable>P</replaceable></literal></term>
-        <listitem>
-          <para>Sets the <literal>exposed</literal> flag for package
-            <replaceable>P</replaceable> to <literal>True</literal>.</para>
-        </listitem>
-      </varlistentry>
-
-      <varlistentry>
         <term><literal>ghc-pkg check</literal></term>
         <listitem>
           <para>Check consistency of dependencies in the package
@@ -641,9 +687,33 @@ haskell98-1.0.1.0
       </varlistentry>
 
       <varlistentry>
+        <term><literal>ghc-pkg expose <replaceable>P</replaceable></literal></term>
+        <listitem>
+          <para>Sets the <literal>exposed</literal> flag for package
+            <replaceable>P</replaceable> to <literal>True</literal>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
         <term><literal>ghc-pkg hide <replaceable>P</replaceable></literal></term>
         <listitem>
           <para>Sets the <literal>exposed</literal> flag for package
+            <replaceable>P</replaceable> to <literal>False</literal>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>ghc-pkg trust <replaceable>P</replaceable></literal></term>
+        <listitem>
+          <para>Sets the <literal>trusted</literal> flag for package
+            <replaceable>P</replaceable> to <literal>True</literal>.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term><literal>ghc-pkg distrust <replaceable>P</replaceable></literal></term>
+        <listitem>
+          <para>Sets the <literal>trusted</literal> flag for package
             <replaceable>P</replaceable> to <literal>False</literal>.</para>
         </listitem>
       </varlistentry>
@@ -1093,6 +1163,7 @@ exposed-modules: System.Posix System.Posix.DynamicLinker.Module
                  System.Posix.Signals.Exts System.Posix.Semaphore
                  System.Posix.SharedMem
 hidden-modules:
+trusted: False
 import-dirs: /usr/lib/ghc-6.12.1/unix-2.3.1.0
 library-dirs: /usr/lib/ghc-6.12.1/unix-2.3.1.0
 hs-libraries: HSunix-2.3.1.0
@@ -1321,6 +1392,16 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
             no other package in the same program may provide a module of the
             same name.</para>
         </listitem>
+        </varlistentry>
+
+        <varlistentry>
+          <term>
+            <literal>trusted</literal>
+            <indexterm><primary><literal>trusted</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
+          <listitem>
+            <para>(bool) Whether the package is trusted or not.</para>
+          </listitem>
         </varlistentry>
 
         <varlistentry>
