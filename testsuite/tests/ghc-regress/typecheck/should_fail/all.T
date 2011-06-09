@@ -239,3 +239,4 @@ test('tcfail208', normal, compile_fail, [''])
 
 test('FailDueToGivenOverlapping', normal, compile_fail, [''])
 test('LongWayOverlapping', normal, compile_fail, [''])
+test('T5236',normal,compile_fail,[''])
