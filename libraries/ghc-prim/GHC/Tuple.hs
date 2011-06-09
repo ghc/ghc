@@ -17,23 +17,23 @@
 
 module GHC.Tuple where
 
--- import GHC.Generics (Generic)
+import GHC.Generics (Generic)
 
 
 default () -- Double and Integer aren't available yet
 
 data (,) a b = (,) a b
-    -- deriving Generic
+    deriving Generic
 data (,,) a b c = (,,) a b c
-    -- deriving Generic
+    deriving Generic
 data (,,,) a b c d = (,,,) a b c d
-    -- deriving Generic
+    deriving Generic
 data (,,,,) a b c d e = (,,,,) a b c d e
-    -- deriving Generic
+    deriving Generic
 data (,,,,,) a b c d e f = (,,,,,) a b c d e f
-    -- deriving Generic
+    deriving Generic
 data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g
-    -- deriving Generic
+    deriving Generic
 data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h
     -- deriving Generic
 data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i
