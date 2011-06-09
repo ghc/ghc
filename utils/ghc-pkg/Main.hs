@@ -678,7 +678,8 @@ mungePackagePaths top_dir pkgroot pkg =
       libraryDirs = munge_paths (libraryDirs pkg),
       frameworkDirs = munge_paths (frameworkDirs pkg),
       haddockInterfaces = munge_paths (haddockInterfaces pkg),
-      haddockHTMLs = munge_urls (haddockHTMLs pkg)
+                     -- haddock-html is allowed to be either a URL or a file
+      haddockHTMLs = munge_path (munge_urls (haddockHTMLs pkg))
     }
   where
     munge_paths = map munge_path
