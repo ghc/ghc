@@ -989,10 +989,10 @@ captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
 captureConstraints thing_inside
   = do { lie_var <- newTcRef emptyWC ;
-	 res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) 
-			  thing_inside ;
-	 lie <- readTcRef lie_var ;
-	 return (res, lie) }
+         res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) 
+                          thing_inside ;
+         lie <- readTcRef lie_var ;
+         return (res, lie) }
 
 captureUntouchables :: TcM a -> TcM (a, Untouchables)
 captureUntouchables thing_inside
@@ -1017,14 +1017,21 @@ setLclTypeEnv lcl_env thing_inside
   = updLclEnv upd thing_inside
   where
     upd env = env { tcl_env = tcl_env lcl_env,
-		    tcl_tyvars = tcl_tyvars lcl_env }
+                    tcl_tyvars = tcl_tyvars lcl_env }
+
+traceTcConstraints :: String -> TcM ()
+traceTcConstraints msg
+  = do { lie_var <- getConstraintVar
+       ; lie     <- readTcRef lie_var
+       ; traceTc (msg ++ "LIE:") (ppr lie)
+       }
 \end{code}
 
 
 %************************************************************************
-%*									*
-	     Template Haskell context
-%*									*
+%*                                                                      *
+             Template Haskell context
+%*                                                                      *
 %************************************************************************
 
 \begin{code}

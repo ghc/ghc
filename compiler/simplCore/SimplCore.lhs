@@ -358,7 +358,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       = do {
 		-- Occurrence analysis
 	   let { tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm active_rule rules binds } ;
+                     occurAnalysePgm active_rule rules [] binds } ;
 	   Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
