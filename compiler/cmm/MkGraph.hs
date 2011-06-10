@@ -290,8 +290,6 @@ stackStubExpr w = CmmLit (CmmInt 0 w)
 -- functions to pass the arguments in an overflow area and to pass them in spill slots.
 copyInOflow  :: Convention -> Area -> CmmFormals -> (Int, CmmAGraph)
 copyInSlot   :: Convention -> CmmFormals -> [CmmNode O O]
-copyOutOflow :: Convention -> Transfer -> Area -> CmmActuals -> UpdFrameOffset ->
-                              (Int, CmmAGraph)
 copyOutSlot  :: Convention -> [LocalReg] -> [CmmNode O O]
 
 copyInOflow conv area formals = (offset, catAGraphs $ map mkMiddle nodes)
@@ -333,26 +331,37 @@ oneCopySlotI _ (reg, _) (n, ms) =
 -- Factoring out the common parts of the copyout functions yielded something
 -- more complicated:
 
+copyOutOflow :: Convention -> Transfer -> Area -> CmmActuals -> UpdFrameOffset ->
+                              (Int, CmmAGraph)
+-- Generate code to move the actual parameters into the locations
+-- required by the calling convention.  This includes a store for the return address.
+--
 -- The argument layout function ignores the pointer to the info table, so we slot that
 -- in here. When copying-out to a young area, we set the info table for return
 -- and adjust the offsets of the other parameters.
 -- If this is a call instruction, we adjust the offsets of the other parameters.
-copyOutOflow conv transfer area@(CallArea a) actuals updfr_off =
-  foldr co (init_offset, emptyAGraph) args'
-  where co (v, RegisterParam r) (n, ms) = (n, mkAssign (CmmGlobal r) v <*> ms)
-        co (v, StackParam off)  (n, ms) =
-          (max n off, mkStore (CmmStackSlot area off) v <*> ms)
-        (setRA, init_offset) =
-          case a of Young id -> id `seq` -- set RA if making a call
-                      if transfer == Call then
-                        ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                         widthInBytes wordWidth)
-                      else ([], 0)
-                    Old -> ([], updfr_off)
-        args = assignArgumentsPos conv cmmExprType actuals
-        args' = foldl adjust setRA args
-          where adjust rst (v, StackParam off) = (v, StackParam (off + init_offset)) : rst
-                adjust rst x@(_, RegisterParam _) = x : rst
+copyOutOflow conv transfer area@(CallArea a) actuals updfr_off
+  = foldr co (init_offset, emptyAGraph) args'
+  where 
+    co (v, RegisterParam r) (n, ms) = (n, mkAssign (CmmGlobal r) v <*> ms)
+    co (v, StackParam off)  (n, ms) = (max n off, mkStore (CmmStackSlot area off) v <*> ms)
+
+    (setRA, init_offset) =
+      case a of Young id -> id `seq` -- Generate a store instruction for
+           	    	     	     -- the return address if making a call
+                  if transfer == Call then
+                    ([(CmmLit (CmmBlock id), StackParam init_offset)],
+                     widthInBytes wordWidth)
+                  else ([], 0)
+                Old -> ([], updfr_off)
+
+    args :: [(CmmExpr, ParamLocation ByteOff)]   -- The argument and where to put it
+    args = assignArgumentsPos conv cmmExprType actuals
+
+    args' = foldl adjust setRA args
+      where adjust rst   (v, StackParam off)  = (v, StackParam (off + init_offset)) : rst
+            adjust rst x@(_, RegisterParam _) = x : rst
+
 copyOutOflow _ _ (RegSlot _) _ _ = panic "cannot copy arguments into a register slot"
 
 -- Args passed only in registers and stack slots; no overflow space.
