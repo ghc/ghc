@@ -1294,8 +1294,8 @@ allFlags = map ('-':) $
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
 dynamic_flags = [
     flagA "n"        (NoArg (addWarn "The -n flag is deprecated and no longer has any effect"))
-  , flagC "cpp"      (NoArg (setExtensionFlag Opt_Cpp)) 
-  , flagC "F"        (NoArg (setDynFlag Opt_Pp)) 
+  , flagA "cpp"      (NoArg (setExtensionFlag Opt_Cpp)) 
+  , flagA "F"        (NoArg (setDynFlag Opt_Pp)) 
   , flagA "#include" 
          (HasArg (\s -> do { addCmdlineHCInclude s
                            ; addWarn "-#include and INCLUDE pragmas are deprecated: They no longer have any effect" }))
@@ -1303,18 +1303,18 @@ dynamic_flags = [
 
         ------- Specific phases  --------------------------------------------
     -- need to appear before -pgmL to be parsed as LLVM flags.
-  , flagC "pgmlo"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
-  , flagC "pgmlc"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
-  , flagC "pgmL"           (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
-  , flagC "pgmP"           (hasArg setPgmP)
-  , flagC "pgmF"           (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
-  , flagC "pgmc"           (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
-  , flagC "pgmm"           (HasArg (\_ -> addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
-  , flagC "pgms"           (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
-  , flagC "pgma"           (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
-  , flagC "pgml"           (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
-  , flagC "pgmdll"         (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
-  , flagC "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
+  , flagA "pgmlo"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lo  = (f,[])})))
+  , flagA "pgmlc"          (hasArg (\f -> alterSettings (\s -> s { sPgm_lc  = (f,[])})))
+  , flagA "pgmL"           (hasArg (\f -> alterSettings (\s -> s { sPgm_L   = f})))
+  , flagA "pgmP"           (hasArg setPgmP)
+  , flagA "pgmF"           (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
+  , flagA "pgmc"           (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
+  , flagA "pgmm"           (HasArg (\_ -> addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
+  , flagA "pgms"           (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
+  , flagA "pgma"           (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
+  , flagA "pgml"           (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
+  , flagA "pgmdll"         (hasArg (\f -> alterSettings (\s -> s { sPgm_dll = (f,[])})))
+  , flagA "pgmwindres"     (hasArg (\f -> alterSettings (\s -> s { sPgm_windres = f})))
 
     -- need to appear before -optl/-opta to be parsed as LLVM flags.
   , flagA "optlo"          (hasArg (\f -> alterSettings (\s -> s { sOpt_lo  = f : sOpt_lo s})))
@@ -1390,13 +1390,13 @@ dynamic_flags = [
         ------- Miscellaneous ----------------------------------------------
   , flagA "no-auto-link-packages" (NoArg (unSetDynFlag Opt_AutoLinkPackages))
   , flagA "no-hs-main"     (NoArg (setDynFlag Opt_NoHsMain))
-  , flagC "with-rtsopts"   (HasArg setRtsOpts)
-  , flagC "rtsopts"        (NoArg (setRtsOptsEnabled RtsOptsAll))
-  , flagC "rtsopts=all"    (NoArg (setRtsOptsEnabled RtsOptsAll))
-  , flagC "rtsopts=some"   (NoArg (setRtsOptsEnabled RtsOptsSafeOnly))
-  , flagC "rtsopts=none"   (NoArg (setRtsOptsEnabled RtsOptsNone))
+  , flagA "with-rtsopts"   (HasArg setRtsOpts)
+  , flagA "rtsopts"        (NoArg (setRtsOptsEnabled RtsOptsAll))
+  , flagA "rtsopts=all"    (NoArg (setRtsOptsEnabled RtsOptsAll))
+  , flagA "rtsopts=some"   (NoArg (setRtsOptsEnabled RtsOptsSafeOnly))
+  , flagA "rtsopts=none"   (NoArg (setRtsOptsEnabled RtsOptsNone))
   , flagA "no-rtsopts"     (NoArg (setRtsOptsEnabled RtsOptsNone))
-  , flagC "main-is"        (SepArg setMainIs)
+  , flagA "main-is"        (SepArg setMainIs)
   , flagA "haddock"        (NoArg (setDynFlag Opt_Haddock))
   , flagA "haddock-opts"   (hasArg addHaddockOpts)
   , flagA "hpcdir"         (SepArg setOptHpcDir)
