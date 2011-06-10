@@ -880,6 +880,10 @@ repSts (ExprStmt e _ _ _ : ss) =
       ; z <- repNoBindSt e2 
       ; (ss2,zs) <- repSts ss
       ; return (ss2, z : zs) }
+repSts [LastStmt e _] 
+  = do { e2 <- repLE e
+       ; z <- repNoBindSt e2
+       ; return ([], [z]) }
 repSts []    = return ([],[])
 repSts other = notHandled "Exotic statement" (ppr other)
 
