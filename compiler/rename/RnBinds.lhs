@@ -560,8 +560,9 @@ mkSigTvFn sigs
   where
     env :: NameEnv [Name]
     env = mkNameEnv [ (name, map hsLTyVarName ltvs)
-		    | L _ (TypeSig (L _ name) 
-			           (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs]
+		    | L _ (TypeSig names
+			           (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs
+                    , (L _ name) <- names]
 	-- Note the pattern-match on "Explicit"; we only bind
 	-- type variables from signatures with an explicit top-level for-all
 \end{code}
@@ -693,16 +694,16 @@ renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
 -- FixitySig is renamed elsewhere.
 renameSig _ (IdSig x)
   = return (IdSig x)	  -- Actually this never occurs
-renameSig mb_names sig@(TypeSig v ty)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
-	; new_ty <- rnHsSigType (quotes (ppr v)) ty
-	; return (TypeSig new_v new_ty) }
+renameSig mb_names sig@(TypeSig vs ty)
+  = do	{ new_vs <- mapM (lookupSigOccRn mb_names sig) vs
+	; new_ty <- rnHsSigType (quotes (ppr vs)) ty
+	; return (TypeSig new_vs new_ty) }
 
-renameSig mb_names sig@(GenericSig v ty)
+renameSig mb_names sig@(GenericSig vs ty)
   = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
         ; unless defaultSigs_on (addErr (defaultSigErr sig))
-        ; new_v <- lookupSigOccRn mb_names sig v
-	; new_ty <- rnHsSigType (quotes (ppr v)) ty
+        ; new_v <- mapM (lookupSigOccRn mb_names sig) vs
+	; new_ty <- rnHsSigType (quotes (ppr vs)) ty
 	; return (GenericSig new_v new_ty) }
 
 renameSig _ (SpecInstSig ty)

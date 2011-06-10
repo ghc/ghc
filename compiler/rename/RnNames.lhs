@@ -472,7 +472,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     val_bndrs :: [Located RdrName]
-    val_bndrs | is_hs_boot = [nm | L _ (TypeSig nm _) <- val_sigs]
+    val_bndrs | is_hs_boot = [n | L _ (TypeSig ns _) <- val_sigs, n <- ns]
               | otherwise  = for_hs_bndrs
 
     new_simple :: Located RdrName -> RnM (GenAvailInfo Name)

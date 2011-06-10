@@ -143,7 +143,7 @@ cvtDec (TH.FunD nm cls)
 cvtDec (TH.SigD nm typ)  
   = do  { nm' <- vNameL nm
 	; ty' <- cvtType typ
-	; returnL $ Hs.SigD (TypeSig nm' ty') }
+	; returnL $ Hs.SigD (TypeSig [nm'] ty') }
 
 cvtDec (PragmaD prag)
   = do { prag' <- cvtPragmaD prag
