@@ -575,12 +575,13 @@ impSpecErr name
                , ptext (sLit "(or you compiled its defining module without -O)")])
 
 --------------
-tcVectDecls :: [LVectDecl Name] -> TcM [LVectDecl TcId]
+tcVectDecls :: [LVectDecl Name] -> TcM ([LVectDecl TcId])
 tcVectDecls decls 
   = do { decls' <- mapM (wrapLocM tcVect) decls
        ; let ids  = [unLoc id | L _ (HsVect id _) <- decls']
              dups = findDupsEq (==) ids
        ; mapM_ reportVectDups dups
+       ; traceTcConstraints "End of tcVectDecls"
        ; return decls'
        }
   where
@@ -598,7 +599,7 @@ tcVect :: VectDecl Name -> TcM (VectDecl TcId)
 tcVect (HsVect name Nothing)
   = addErrCtxt (vectCtxt name) $
     do { id <- wrapLocM tcLookupId name
-       ; return (HsVect id Nothing)
+       ; return $ HsVect id Nothing
        }
 tcVect (HsVect name@(L loc _) (Just rhs))
   = addErrCtxt (vectCtxt name) $
@@ -613,9 +614,10 @@ tcVect (HsVect name@(L loc _) (Just rhs))
        ; (binds, [id']) <- tcPolyInfer TopLevel False sigFun pragFun NonRecursive [bind]
 
        ; traceTc "tcVect inferred type" $ ppr (varType id')
+       ; traceTc "tcVect bindings"      $ ppr binds
        
-         -- add the type variable and dictionary bindings produced by type generalisation to the
-         -- right-hand side of the vectorisation declaration
+         -- add all bindings, including the type variable and dictionary bindings produced by type
+         -- generalisation to the right-hand side of the vectorisation declaration
        ; let [AbsBinds tvs evs _ evBinds actualBinds] = (map unLoc . bagToList) binds
        ; let [bind']                                  = bagToList actualBinds
              MatchGroup 

@@ -116,35 +116,36 @@ deSugar hsc_env
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
-           Just (ds_ev_binds, all_prs, all_rules, ds_vects, ds_fords,ds_hpc_info, modBreaks) -> do
+           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords, ds_hpc_info, modBreaks) -> do
 
-	{ 	-- Add export flags to bindings
-	  keep_alive <- readIORef keep_var
-	; let (rules_for_locals, rules_for_imps) 
+        {       -- Add export flags to bindings
+          keep_alive <- readIORef keep_var
+        ; let (rules_for_locals, rules_for_imps) 
                    = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target
-	      		      export_set keep_alive rules_for_locals (fromOL all_prs)
+                              export_set keep_alive rules_for_locals (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
-	-- Notice that we put the whole lot in a big Rec, even the foreign binds
-	-- When compiling PrelFloat, which defines data Float = F# Float#
-	-- we want F# to be in scope in the foreign marshalling code!
-	-- You might think it doesn't matter, but the simplifier brings all top-level
-	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
+        -- Notice that we put the whole lot in a big Rec, even the foreign binds
+        -- When compiling PrelFloat, which defines data Float = F# Float#
+        -- we want F# to be in scope in the foreign marshalling code!
+        -- You might think it doesn't matter, but the simplifier brings all top-level
+        -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-	-- Lint result if necessary, and print
+        -- Lint result if necessary, and print
         ; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared, before opt" $
                (vcat [ pprCoreBindings final_pgm
                      , pprRules rules_for_imps ])
 
-	; (ds_binds, ds_rules_for_imps) <- simpleOptPgm dflags final_pgm rules_for_imps
-	      		 -- The simpleOptPgm gets rid of type 
-			 -- bindings plus any stupid dead code
+        ; (ds_binds, ds_rules_for_imps, ds_vects) 
+            <- simpleOptPgm dflags final_pgm rules_for_imps vects0
+                         -- The simpleOptPgm gets rid of type 
+                         -- bindings plus any stupid dead code
 
-	; endPass dflags CoreDesugar ds_binds ds_rules_for_imps
+        ; endPass dflags CoreDesugar ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
-	; deps <- mkDependencies tcg_env
+        ; deps <- mkDependencies tcg_env
 
         ; let mod_guts = ModGuts {	
 		mg_module    	= mod,
