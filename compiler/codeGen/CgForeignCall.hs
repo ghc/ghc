@@ -109,6 +109,9 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 
 
 -- alternative entry point, used by CmmParse
+-- the new code generator has utility function emitCCall and emitPrimCall
+-- which should be used instead of this (the equivalent emitForeignCall
+-- is not presently exported.)
 emitForeignCall'
 	:: Safety
 	-> HintedCmmFormals	-- where to put the results
