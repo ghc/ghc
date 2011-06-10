@@ -828,14 +828,14 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 type ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ([LIE Name],             -- Export items with Names
-        ExportOccMap,                -- Tracks exported occurrence names
+        ExportOccMap,           -- Tracks exported occurrence names
         [AvailInfo])            -- The accumulated exported stuff
                                 --   Not nub'd!
 
 emptyExportAccum :: ExportAccum
 emptyExportAccum = ([], emptyOccEnv, [])
 
-type ExportOccMap = OccEnv (Name, IE RdrName)
+type ExportOccMap = OccEnv (Name, IE Name)
         -- Tracks what a particular exported OccName
         --   in an export list refers to, and which item
         --   it came from.  It's illegal to export two distinct things
@@ -912,7 +912,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports)
-                      (L loc ie@(IEModuleContents mod))
+                      (L loc (IEModuleContents mod))
         | let earlier_mods = [ mod | (L _ (IEModuleContents mod)) <- ie_names ]
         , mod `elem` earlier_mods    -- Duplicate export of M
         = do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
@@ -937,7 +937,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                         -- The qualified and unqualified version of all of
                         -- these names are, in effect, used by this export
 
-             ; occs' <- check_occs ie occs names
+             ; occs' <- check_occs (IEModuleContents mod) occs names
                       -- This check_occs not only finds conflicts
                       -- between this item and others, but also
                       -- internally within this item.  That is, if
@@ -958,7 +958,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                   then return acc    -- Avoid error cascade
                   else do
 
-             occs' <- check_occs ie occs (availNames avail)
+             occs' <- check_occs new_ie occs (availNames avail)
 
              return (L loc new_ie : lie_names, occs', avail : exports)
 
@@ -1054,8 +1054,8 @@ isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
         Imported is -> any unQualSpecOK is && any (qualSpecOK mod) is
 
 -------------------------------
-check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
-check_occs ie occs names
+check_occs :: IE Name -> ExportOccMap -> [Name] -> RnM ExportOccMap
+check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
   = foldlM check occs names
   where
     check occs name
@@ -1066,7 +1066,7 @@ check_occs ie occs names
             | name == name'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do unless (diffModules ie ie') $ do
+            -> do unless (dupExport_ok name ie ie') $ do
                       warn_dup_exports <- doptM Opt_WarnDuplicateExports
                       warnIf warn_dup_exports (dupExportWarn name_occ ie ie')
                   return occs
@@ -1077,9 +1077,38 @@ check_occs ie occs names
                      return occs }
       where
         name_occ = nameOccName name
-        -- True if the two IE RdrName are different module exports.
-        diffModules (IEModuleContents n1) (IEModuleContents n2) = n1 /= n2
-        diffModules _                     _                     = False
+
+
+dupExport_ok :: Name -> IE Name -> IE Name -> Bool
+-- The Name is exported by both IEs. Is that ok?
+-- "No"  iff the name is mentioned explicitly in both IEs
+-- "Yes" otherwise
+-- 
+-- Example of "no":  module M( f, f )
+--
+-- Example of "yes"
+--    module M( module A, module B ) where
+--        import A( f )
+--        import B( f )
+--
+-- Example of "yes" (Trac #2436)
+--    module M( C(..), T(..) ) where
+--         class C a where { data T a }
+--         instace C Int where { data T Int = TInt }
+-- 
+-- Example of "yes" (Trac #2436)
+--    module Foo ( T ) where
+--      data family T a
+--    module Bar ( T(..), module Foo ) where
+--        import Foo
+--        data instance T Int = TInt
+
+dupExport_ok n ie1 ie2 
+  = not (explicit_in ie1 && explicit_in ie2)
+  where
+    explicit_in (IEModuleContents _) = False
+    explicit_in (IEThingAll n')      = n == n'
+    explicit_in _                    = True
 \end{code}
 
 %*********************************************************
@@ -1528,7 +1557,7 @@ typeItemErr name wherestr
   = sep [ ptext (sLit "Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
           ptext (sLit "Use -XTypeFamilies to enable this extension") ]
 
-exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
+exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE Name -> IE Name
                -> Message
 exportClashErr global_env name1 name2 ie1 ie2
   = vcat [ ptext (sLit "Conflicting exports for") <+> quotes (ppr occ) <> colon
@@ -1572,7 +1601,7 @@ addDupDeclErr names@(name : _)
   where
     sorted_names = sortWith nameSrcLoc names
 
-dupExportWarn :: OccName -> IE RdrName -> IE RdrName -> SDoc
+dupExportWarn :: OccName -> IE Name -> IE Name -> SDoc
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name),
           ptext (sLit "is exported by"), quotes (ppr ie1),
