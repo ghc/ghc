@@ -928,7 +928,14 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
   let mg = hsc_mod_graph hsc_env
   if mdl `elem` map ms_mod mg
 	then liftIO $ getHomeModuleInfo hsc_env mdl
-	else liftIO $ getPackageModuleInfo hsc_env mdl
+	else do
+  {- if isHomeModule (hsc_dflags hsc_env) mdl
+	then return Nothing
+	else -} liftIO $ getPackageModuleInfo hsc_env mdl
+   -- getPackageModuleInfo will attempt to find the interface, so
+   -- we don't want to call it for a home module, just in case there
+   -- was a problem loading the module and the interface doesn't
+   -- exist... hence the isHomeModule test here.  (ToDo: reinstate)
 
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 #ifdef GHCI
