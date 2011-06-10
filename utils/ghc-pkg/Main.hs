@@ -661,6 +661,7 @@ mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
 
+-- TODO: This code is duplicated in compiler/main/Packages.lhs
 mungePackagePaths :: FilePath -> FilePath
                   -> InstalledPackageInfo -> InstalledPackageInfo
 -- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
@@ -686,29 +687,30 @@ mungePackagePaths top_dir pkgroot pkg =
     munge_urls  = map munge_url
 
     munge_path p
-      | Just p' <- stripVarPrefix "${pkgroot}" sp = pkgroot </> p'
-      | Just p' <- stripVarPrefix "$topdir"    sp = top_dir </> p'
-      | otherwise                                 = p
-      where
-        sp = splitPath p
+      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
+      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
+      | otherwise                                = p
 
     munge_url p
-      | Just p' <- stripVarPrefix "${pkgrooturl}" sp = toUrlPath pkgroot p'
-      | Just p' <- stripVarPrefix "$httptopdir"   sp = toUrlPath top_dir p'
-      | otherwise                                    = p
-      where
-        sp = splitPath p
+      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
+      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
+      | otherwise                                   = p
 
     toUrlPath r p = "file:///"
                  -- URLs always use posix style '/' separators:
-                 ++ FilePath.Posix.joinPath (r : FilePath.splitDirectories p)
+                 ++ FilePath.Posix.joinPath
+                        (r : -- We need to drop a leading "/" or "\\"
+                             -- if there is one:
+                             dropWhile (all isPathSeparator)
+                                       (FilePath.splitDirectories p))
 
-    stripVarPrefix var (root:path')
-      | Just [sep] <- stripPrefix var root
-      , isPathSeparator sep
-      = Just (joinPath path')
-
-    stripVarPrefix _ _ = Nothing
+    -- We could drop the separator here, and then use </> above. However,
+    -- by leaving it in and using ++ we keep the same path separator
+    -- rather than letting FilePath change it to use \ as the separator
+    stripVarPrefix var path = case stripPrefix var path of
+                              Just [] -> Just []
+                              Just cs@(c : _) | isPathSeparator c -> Just cs
+                              _ -> Nothing
 
 
 -- -----------------------------------------------------------------------------
