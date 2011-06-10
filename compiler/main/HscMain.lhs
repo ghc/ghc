@@ -340,7 +340,7 @@ hscParse' mod_summary
             Just b  -> return b
             Nothing -> liftIO $ hGetStringBuffer src_filename
 
-   let loc  = mkSrcLoc (mkFastString src_filename) 1 1
+   let loc  = mkRealSrcLoc (mkFastString src_filename) 1 1
 
    case unP parseModule (mkPState dflags buf loc) of
      PFailed span err ->
@@ -1186,7 +1186,7 @@ hscParseThingWithLocation source linenumber parser str
       liftIO $ showPass dflags "Parser"
 
       let buf = stringToStringBuffer str
-          loc  = mkSrcLoc (fsLit source) linenumber 1
+          loc  = mkRealSrcLoc (fsLit source) linenumber 1
 
       case unP parser (mkPState dflags buf loc) of
 

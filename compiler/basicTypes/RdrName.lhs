@@ -677,14 +677,16 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
 ppr_defn :: SrcLoc -> SDoc
-ppr_defn loc | isGoodSrcLoc loc = parens (ptext (sLit "defined at") <+> ppr loc)
-	     | otherwise	= empty
+ppr_defn (RealSrcLoc loc) = parens (ptext (sLit "defined at") <+> ppr loc)
+ppr_defn (UnhelpfulLoc _) = empty
 
 instance Outputable ImportSpec where
    ppr imp_spec
      = ptext (sLit "imported from") <+> ppr (importSpecModule imp_spec) 
-	<+> if isGoodSrcSpan loc then ptext (sLit "at") <+> ppr loc
-				 else empty
+	<+> pprLoc
      where
        loc = importSpecLoc imp_spec
+       pprLoc = case loc of
+                RealSrcSpan s -> ptext (sLit "at") <+> ppr s
+                UnhelpfulSpan _ -> empty
 \end{code}

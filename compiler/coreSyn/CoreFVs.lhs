@@ -15,27 +15,28 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -- | A module concerned with finding the free variables of an expression.
 module CoreFVs (
         -- * Free variables of expressions and binding groups
-	exprFreeVars,	-- CoreExpr   -> VarSet	-- Find all locally-defined free Ids or tyvars
-	exprFreeIds,	-- CoreExpr   -> IdSet	-- Find all locally-defined free Ids
-	exprsFreeVars,	-- [CoreExpr] -> VarSet
-	bindFreeVars, 	-- CoreBind   -> VarSet
+        exprFreeVars,   -- CoreExpr   -> VarSet -- Find all locally-defined free Ids or tyvars
+        exprFreeIds,    -- CoreExpr   -> IdSet  -- Find all locally-defined free Ids
+        exprsFreeVars,  -- [CoreExpr] -> VarSet
+        bindFreeVars,   -- CoreBind   -> VarSet
 
         -- * Selective free variables of expressions
         InterestingVarFun,
-	exprSomeFreeVars, exprsSomeFreeVars,
+        exprSomeFreeVars, exprsSomeFreeVars,
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyVars, varTypeTcTyVars, 
-	idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
+        idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
-	ruleRhsFreeVars, rulesFreeVars,
-	ruleLhsOrphNames, ruleLhsFreeIds, 
+        ruleRhsFreeVars, rulesFreeVars,
+        ruleLhsOrphNames, ruleLhsFreeIds, 
+        vectsFreeVars,
 
         -- * Core syntax tree annotation with free variables
-	CoreExprWithFVs,	-- = AnnExpr Id VarSet
-	CoreBindWithFVs,	-- = AnnBind Id VarSet
-	freeVars,		-- CoreExpr -> CoreExprWithFVs
-	freeVarsOf		-- CoreExprWithFVs -> IdSet
+        CoreExprWithFVs,        -- = AnnExpr Id VarSet
+        CoreBindWithFVs,        -- = AnnBind Id VarSet
+        freeVars,               -- CoreExpr -> CoreExprWithFVs
+        freeVarsOf              -- CoreExprWithFVs -> IdSet
     ) where
 
 #include "HsVersions.h"
@@ -268,9 +269,9 @@ exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \section[freevars-everywhere]{Attaching free variables to every sub-expression}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -278,7 +279,7 @@ exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
 ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
-  = delFromUFM fvs fn	 -- Note [Rule free var hack]
+  = delFromUFM fvs fn    -- Note [Rule free var hack]
   where
     fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
 
@@ -286,7 +287,7 @@ ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
 ruleFreeVars :: CoreRule -> VarSet
 ruleFreeVars (BuiltinRule {}) = noFVs
 ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
-  = delFromUFM fvs fn	-- Note [Rule free var hack]
+  = delFromUFM fvs fn   -- Note [Rule free var hack]
   where
     fvs = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
 
@@ -298,8 +299,8 @@ idRuleRhsVars is_active id
     get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
                   , ru_rhs = rhs, ru_act = act })
       | is_active act
-      	    -- See Note [Finding rule RHS free vars] in OccAnal.lhs
-      = delFromUFM fvs fn	 -- Note [Rule free var hack]
+            -- See Note [Finding rule RHS free vars] in OccAnal.lhs
+      = delFromUFM fvs fn        -- Note [Rule free var hack]
       where
         fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
     get_fvs _ = noFVs
@@ -315,19 +316,31 @@ ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
 \end{code}
 
+
 Note [Rule free var hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't include the Id in its own rhs free-var set.
 Otherwise the occurrence analyser makes bindings recursive
 that shoudn't be.  E.g.
-	RULE:  f (f x y) z  ==>  f x (f y z)
+        RULE:  f (f x y) z  ==>  f x (f y z)
 
 Also since rule_fn is a Name, not a Var, we have to use the grungy delUFM.
 
+
+\begin{code}
+-- |Free variables of a vectorisation declaration
+vectsFreeVars :: [CoreVect] -> VarSet
+vectsFreeVars = foldr (unionVarSet . vectFreeVars) emptyVarSet
+  where
+    vectFreeVars (Vect _ Nothing)    = noFVs
+    vectFreeVars (Vect _ (Just rhs)) = expr_fvs rhs isLocalId emptyVarSet
+\end{code}
+
+
 %************************************************************************
-%*									*
+%*                                                                      *
 \section[freevars-everywhere]{Attaching free variables to every sub-expression}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 The free variable pass annotates every node in the expression with its

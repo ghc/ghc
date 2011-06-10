@@ -136,7 +136,7 @@ import CoreSyn		( CoreRule, CoreVect )
 import Maybes		( orElse, expectJust, catMaybes )
 import Outputable
 import BreakArray
-import SrcLoc		( SrcSpan, Located(..) )
+import SrcLoc
 import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString

@@ -3,7 +3,7 @@ module RnHsDoc ( rnHsDoc, rnLHsDoc, rnMbLHsDoc ) where
 
 import TcRnTypes
 import HsSyn
-import SrcLoc      ( Located(..) )
+import SrcLoc
 
 
 rnMbLHsDoc :: Maybe LHsDocString -> RnM (Maybe LHsDocString)

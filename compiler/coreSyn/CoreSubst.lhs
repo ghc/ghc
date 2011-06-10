@@ -692,16 +692,16 @@ substRule :: Subst -> (Name -> Name) -> CoreRule -> CoreRule
 --    - Rules for *imported* Ids never change ru_fn
 --    - Rules for *local* Ids are in the IdInfo for that Id,
 --      and the ru_fn field is simply replaced by the new name 
---	of the Id
+--      of the Id
 substRule _ _ rule@(BuiltinRule {}) = rule
 substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
                                        , ru_fn = fn_name, ru_rhs = rhs
                                        , ru_local = is_local })
   = rule { ru_bndrs = bndrs', 
-	   ru_fn    = if is_local 
-                      	then subst_ru_fn fn_name 
-                      	else fn_name,
-	   ru_args  = map (substExpr (text "subst-rule" <+> ppr fn_name) subst') args,
+           ru_fn    = if is_local 
+                        then subst_ru_fn fn_name 
+                        else fn_name,
+           ru_args  = map (substExpr (text "subst-rule" <+> ppr fn_name) subst') args,
            ru_rhs   = simpleOptExprWith subst' rhs }
            -- Do simple optimisation on RHS, in case substitution lets
            -- you improve it.  The real simplifier never gets to look at it.
@@ -709,13 +709,22 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
+substVects :: Subst -> [CoreVect] -> [CoreVect]
+substVects subst = map (substVect subst)
+
+------------------
+substVect :: Subst -> CoreVect -> CoreVect
+substVect _subst (Vect v Nothing)    = Vect v Nothing
+substVect subst  (Vect v (Just rhs)) = Vect v (Just (simpleOptExprWith subst rhs))
+
+------------------
 substVarSet :: Subst -> VarSet -> VarSet
 substVarSet subst fvs
   = foldVarSet (unionVarSet . subst_fv subst) emptyVarSet fvs
   where
     subst_fv subst fv 
-	| isId fv   = exprFreeVars (lookupIdSubst (text "substVarSet") subst fv)
-	| otherwise = Type.tyVarsOfType (lookupTvSubst subst fv)
+        | isId fv   = exprFreeVars (lookupIdSubst (text "substVarSet") subst fv)
+        | otherwise = Type.tyVarsOfType (lookupTvSubst subst fv)
 \end{code}
 
 Note [Worker inlining]
@@ -766,15 +775,16 @@ simpleOptExprWith :: Subst -> InExpr -> OutExpr
 simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
 
 ----------------------
-simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> IO ([CoreBind], [CoreRule])
-simpleOptPgm dflags binds rules
+simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> [CoreVect] 
+             -> IO ([CoreBind], [CoreRule], [CoreVect])
+simpleOptPgm dflags binds rules vects
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-		       (pprCoreBindings occ_anald_binds);
+                       (pprCoreBindings occ_anald_binds);
 
-       ; return (reverse binds', substRulesForImportedIds subst' rules) }
+       ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
     occ_anald_binds  = occurAnalysePgm Nothing {- No rules active -}
-                                       rules binds
+                                       rules vects binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
                        
     do_one (subst, binds') bind 
