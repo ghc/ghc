@@ -861,8 +861,8 @@ checkSafeImports dflags hsc_env tcg_env
             | otherwise = trusted $ getPackageDetails (pkgState dflags)
                                                       (modulePackageId m)
 
-        -- Is a module a Safe importable? Return Nothing if True, or a String
-        -- if it isn't containing the reason it isn't
+        -- Is a module trusted? Return Nothing if True, or a String
+        -- if it isn't, containing the reason it isn't
         isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc)
         isModSafe m l = do
             iface <- lookup' m
@@ -894,7 +894,7 @@ checkSafeImports dflags hsc_env tcg_env
             case module_safe of
                 Nothing -> return ()
                 Just s  -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
-                            $ text "Safe import of" <+> ppr m <+> text "can't be met!"
+                            $ text ppr m <+> text "can't be safely imported!"
                                 <+> s
 
 --------------------------------------------------------------
