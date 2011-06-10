@@ -30,9 +30,10 @@ import GhcMonad (withSession)
 #else
 import HscTypes (withSession)
 #endif
+import TysPrim( funTyCon )
 import MonadUtils (liftIO)
 import TcRnDriver (tcRnGetInfo)
-import TypeRep hiding (funTyConName)
+import TypeRep
 import Var hiding (varName)
 import TyCon
 import PrelNames

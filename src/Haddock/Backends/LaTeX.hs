@@ -874,7 +874,6 @@ ppr_mono_ty _         (HsKindSig ty kind) u = parens (ppr_mono_lty pREC_TOP ty u
 ppr_mono_ty _         (HsListTy ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPArrTy ty)       u = pabrackets (ppr_mono_lty pREC_TOP ty u)
 ppr_mono_ty _         (HsPredTy p)        u = parens (ppPred u p)
-ppr_mono_ty _         (HsNumTy n)         _ = text (show n) -- generics only
 ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ = error "ppr_mono_ty HsQuasiQuoteTy"
 ppr_mono_ty _         (HsRecTy {})        _ = error "ppr_mono_ty HsRecTy"

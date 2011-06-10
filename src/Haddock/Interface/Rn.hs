@@ -6,7 +6,7 @@ import RnEnv       ( dataTcOccs )
 
 import RdrName     ( RdrName, gre_name, GlobalRdrEnv, lookupGRE_RdrName )
 import Name        ( Name )
-import Outputable  ( ppr, defaultUserStyle )
+import Outputable  ( ppr, showSDoc )
 
 rnHaddockModInfo :: GlobalRdrEnv -> HaddockModInfo RdrName -> HaddockModInfo Name
 rnHaddockModInfo gre (HaddockModInfo desc port stab maint) =
@@ -14,7 +14,7 @@ rnHaddockModInfo gre (HaddockModInfo desc port stab maint) =
 
 ids2string :: [RdrName] -> String
 ids2string []    = []
-ids2string (x:_) = show $ ppr x defaultUserStyle
+ids2string (x:_) = showSDoc $ ppr x
 
 data Id x = Id {unId::x}
 instance Monad Id where (Id v)>>=f = f v; return = Id

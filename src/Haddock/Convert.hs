@@ -18,7 +18,7 @@ module Haddock.Convert where
 
 
 import HsSyn
-import TcType ( tcSplitSigmaTy )
+import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
 import Coercion ( splitKindFunTys, synTyConResKind )
 import Name
@@ -44,9 +44,15 @@ tyThingToLHsDecl t = noLoc $ case t of
   -- into a ForD instead of a SigD if we wanted.  Haddock doesn't
   -- need to care.
   AnId i -> SigD (synifyIdSig ImplicitizeForAll i)
+
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
   ATyCon tc -> TyClD (synifyTyCon tc)
+
+  -- type-constructors (e.g. Maybe) are complicated, put the definition
+  -- later in the file (also it's used for class associated-types too.)
+  ACoAxiom ax -> TyClD (synifyAxiom ax)
+
   -- a data-constructor alone just gets rendered as a function:
   ADataCon dc -> SigD (TypeSig (synifyName dc)
     (synifyType ImplicitizeForAll (dataConUserType dc)))
@@ -71,6 +77,16 @@ tyThingToLHsDecl t = noLoc $ case t of
 synifyClassAT :: TyCon -> LTyClDecl Name
 synifyClassAT = noLoc . synifyTyCon
 
+synifyAxiom :: CoAxiom -> TyClDecl Name
+synifyAxiom (CoAxiom { co_ax_tvs = tvs, co_ax_lhs = lhs, co_ax_rhs = rhs })
+  | Just (tc, args) <- tcSplitTyConApp_maybe lhs
+  = let name      = synifyName tc
+        tyvars    = synifyTyVars tvs
+        typats    = map (synifyType WithinType) args
+        hs_rhs_ty = synifyType WithinType rhs
+    in TySynonym name tyvars (Just typats) hs_rhs_ty
+  | otherwise
+  = error "synifyAxiom" 
 
 synifyTyCon :: TyCon -> TyClDecl Name
 synifyTyCon tc
@@ -162,11 +178,15 @@ synifyDataCon use_gadt_syntax dc = noLoc $
   use_named_field_syntax = not (null field_tys)
   name = synifyName dc
   -- con_qvars means a different thing depending on gadt-syntax
+  (univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
+
   qvars = if use_gadt_syntax
-    then synifyTyVars (dataConAllTyVars dc)
-    else synifyTyVars (dataConExTyVars dc)
+          then synifyTyVars (univ_tvs ++ ex_tvs)
+          else synifyTyVars ex_tvs
+
   -- skip any EqTheta, use 'orig'inal syntax
-  ctx = synifyCtx (dataConDictTheta dc)
+  ctx = synifyCtx theta
+
   linear_tys = zipWith (\ty bang ->
             let tySyn = synifyType WithinType ty
             in case bang of
@@ -175,23 +195,23 @@ synifyDataCon use_gadt_syntax dc = noLoc $
                       -- HsNoBang never appears, it's implied instead.
                  _              -> noLoc $ HsBangTy bang tySyn
           )
-          (dataConOrigArgTys dc) (dataConStrictMarks dc)
+          arg_tys (dataConStrictMarks dc)
   field_tys = zipWith (\field synTy -> ConDeclField
                                            (synifyName field) synTy Nothing)
                 (dataConFieldLabels dc) linear_tys
-  tys = case (use_named_field_syntax, use_infix_syntax) of
+  hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
           (True,True) -> error "synifyDataCon: contradiction!"
           (True,False) -> RecCon field_tys
           (False,False) -> PrefixCon linear_tys
           (False,True) -> case linear_tys of
                            [a,b] -> InfixCon a b
                            _ -> error "synifyDataCon: infix with non-2 args?"
-  res_ty = if use_gadt_syntax
-    then ResTyGADT (synifyType WithinType (dataConOrigResTy dc))
-    else ResTyH98
+  hs_res_ty = if use_gadt_syntax
+              then ResTyGADT (synifyType WithinType res_ty)
+              else ResTyH98
  -- finally we get synifyDataCon's result!
  in ConDecl name Implicit{-we don't know nor care-}
-      qvars ctx tys res_ty Nothing
+      qvars ctx hs_arg_tys hs_res_ty Nothing
       False --we don't want any "deprecated GADT syntax" warnings!
 
 

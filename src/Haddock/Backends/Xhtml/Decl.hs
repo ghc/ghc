@@ -711,11 +711,14 @@ ppr_mono_ty _         (HsKindSig ty kind) u q =
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPredTy p)        u q = parens (ppPred u q p)
-ppr_mono_ty _         (HsNumTy n)         _ _ = toHtml (show n) -- generics only
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
+#if __GLASGOW_HASKELL__ == 612
+ppr_mono_ty _         (HsSpliceTyOut {})  _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
+#else
 ppr_mono_ty _         (HsQuasiQuoteTy {}) _ _ = error "ppr_mono_ty HsQuasiQuoteTy"
-ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
+#endif
 ppr_mono_ty _         (HsRecTy {})        _ _ = error "ppr_mono_ty HsRecTy"
+ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty) unicode qual
   = maybeParen ctxt_prec pREC_CON $

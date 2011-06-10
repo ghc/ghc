@@ -57,7 +57,7 @@ import Paths_haddock
 import GHC hiding (flags, verbosity)
 import Config
 import DynFlags hiding (flags, verbosity)
-import Panic (handleGhcException)
+import Panic (panic, handleGhcException)
 import Module
 
 
@@ -393,7 +393,7 @@ getPrologue flags =
     [] -> return Nothing
     [filename] -> do
       str <- readFile filename
-      case parseParas (tokenise defaultDynFlags str
+      case parseParas (tokenise (defaultDynFlags (panic "No settings")) str
                       (1,0) {- TODO: real position -}) of
         Nothing -> throwE $ "failed to parse haddock prologue from file: " ++ filename
         Just doc -> return (Just doc)
@@ -416,18 +416,17 @@ getInTreeLibDir = do
 
 getExecDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
-getExecDir = allocaArray len $ \buf -> do
-  ret <- getModuleFileName nullPtr buf len
-  if ret == 0 then
-    return Nothing
-  else do
-    s <- peekCString buf
-    return (Just (dropFileName s))
-  where len = 2048 -- Plenty, PATH_MAX is 512 under Win32.
+getExecDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
+  where
+    try_size size = allocaArray (fromIntegral size) $ \buf -> do
+        ret <- c_GetModuleFileName nullPtr buf size
+        case ret of
+          0 -> return Nothing
+          _ | ret < size -> fmap (Just . dropFileName) $ peekCWString buf
+            | otherwise  -> try_size (size * 2)
 
-
-foreign import stdcall unsafe "GetModuleFileNameA"
-  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+  c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getExecDir = return Nothing
 #endif

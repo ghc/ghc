@@ -265,8 +265,6 @@ renameType t = case t of
 
   HsParTy ty -> return . HsParTy =<< renameLType ty
 
-  HsNumTy n -> return (HsNumTy n)
-
   HsPredTy p -> return . HsPredTy =<< renamePred p
 
   HsKindSig ty k -> do
