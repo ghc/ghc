@@ -1285,7 +1285,9 @@ warnUnusedImportDecls gbl_env
        ; ifDOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
-    explicit_import (L loc _) = isGoodSrcSpan loc
+    explicit_import (L loc _) = case loc of
+                                UnhelpfulSpan _ -> False
+                                RealSrcSpan _ -> True
         -- Filter out the implicit Prelude import
         -- which we do not want to bleat about
 \end{code}

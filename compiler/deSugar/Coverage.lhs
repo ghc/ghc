@@ -846,26 +846,16 @@ allocBinTickBox boxLabel pos m
 allocBinTickBox _boxLabel pos m = do e <- m; return (L pos e)
 
 isGoodSrcSpan' :: SrcSpan -> Bool
-isGoodSrcSpan' pos
-   | not (isGoodSrcSpan pos) = False
-   | start == end            = False
-   | otherwise		     = True
-  where
-   start = srcSpanStart pos
-   end   = srcSpanEnd pos
+isGoodSrcSpan' pos@(RealSrcSpan _) = srcSpanStart pos /= srcSpanEnd pos
+isGoodSrcSpan' (UnhelpfulSpan _) = False
 
 mkHpcPos :: SrcSpan -> HpcPos
-mkHpcPos pos 
-   | not (isGoodSrcSpan' pos) = panic "bad source span; expected such spans to be filtered out"
-   | otherwise		      = hpcPos
-  where
-   start = srcSpanStart pos
-   end   = srcSpanEnd pos
-   hpcPos = toHpcPos ( srcLocLine start
-		     , srcLocCol start
-		     , srcLocLine end
-		     , srcLocCol end - 1
-		     )
+mkHpcPos pos@(RealSrcSpan s)
+   | isGoodSrcSpan' pos = toHpcPos (srcSpanStartLine s,
+                                    srcSpanStartCol s,
+                                    srcSpanEndLine s,
+                                    srcSpanEndCol s)
+mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")

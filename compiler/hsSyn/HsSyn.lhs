@@ -41,7 +41,7 @@ import HsDoc
 -- others:
 import IfaceSyn		( IfaceBinding )
 import Outputable
-import SrcLoc		( Located(..) )
+import SrcLoc
 import Module		( Module, ModuleName )
 import FastString
 

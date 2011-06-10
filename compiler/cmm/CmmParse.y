@@ -1062,7 +1062,7 @@ parseCmmFile dflags filename = do
   showPass dflags "ParseCmm"
   buf <- hGetStringBuffer filename
   let
-	init_loc = mkSrcLoc (mkFastString filename) 1 1
+	init_loc = mkRealSrcLoc (mkFastString filename) 1 1
 	init_state = (mkPState dflags buf init_loc) { lex_state = [0] }
 		-- reset the lex_state: the Lexer monad leaves some stuff
 		-- in there we don't want.

@@ -16,6 +16,7 @@ import Bag
 import Exception
 import FastString
 import MonadUtils       ( liftIO )
+import SrcLoc
 
 -- Every GHC comes with Cabal anyways, so this is not a bad new dependency
 import Distribution.Simple.GHC ( ghcOptions )
@@ -49,7 +50,7 @@ type FileName = String
 type ThingName = String -- name of a defined entity in a Haskell program
 
 -- A definition we have found (we know its containing module, name, and location)
-data FoundThing = FoundThing ModuleName ThingName SrcLoc
+data FoundThing = FoundThing ModuleName ThingName RealSrcLoc
 
 -- Data we have obtained from a file (list of things we found)
 data FileData = FileData FileName [FoundThing] (Map Int String)
@@ -261,8 +262,10 @@ boundValues mod group =
   in vals ++ tys ++ fors
   where found = foundOfLName mod
 
-startOfLocated :: Located a -> SrcLoc
-startOfLocated lHs = srcSpanStart $ getLoc lHs
+startOfLocated :: Located a -> RealSrcLoc
+startOfLocated lHs = case getLoc lHs of
+                     RealSrcSpan l -> realSrcSpanStart l
+                     UnhelpfulSpan _ -> panic "startOfLocated UnhelpfulSpan"
 
 foundOfLName :: ModuleName -> Located Name -> FoundThing
 foundOfLName mod id = FoundThing mod (getOccString $ unLoc id) (startOfLocated id)
