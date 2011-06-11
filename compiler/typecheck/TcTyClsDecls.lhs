@@ -482,7 +482,6 @@ tcTyClDecl1 _parent calc_isrec
   { extra_tvs <- tcDataKindSig mb_ksig
   ; let final_tvs = tvs' ++ extra_tvs
   ; stupid_theta <- tcHsKindedContext ctxt
-  ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; kind_signatures <- xoptM Opt_KindSignatures
   ; existential_ok <- xoptM Opt_ExistentialQuantification
   ; gadt_ok      <- xoptM Opt_GADTs
@@ -496,8 +495,7 @@ tcTyClDecl1 _parent calc_isrec
 
   ; tycon <- fixM (\ tycon -> do 
 	{ let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
-	; data_cons <- tcConDecls unbox_strict ex_ok 
-				  tycon (final_tvs, res_ty) cons
+	; data_cons <- tcConDecls ex_ok tycon (final_tvs, res_ty) cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
 	    then return AbstractTyCon	-- "don't know"; hence Abstract
@@ -585,19 +583,18 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
                 (emptyConDeclsErr tc_name) }
     
 -----------------------------------
-tcConDecls :: Bool -> Bool -> TyCon -> ([TyVar], Type)
+tcConDecls :: Bool -> TyCon -> ([TyVar], Type)
 	   -> [LConDecl Name] -> TcM [DataCon]
-tcConDecls unbox ex_ok rep_tycon res_tmpl cons
-  = mapM (addLocM (tcConDecl unbox ex_ok rep_tycon res_tmpl)) cons
+tcConDecls ex_ok rep_tycon res_tmpl cons
+  = mapM (addLocM (tcConDecl ex_ok rep_tycon res_tmpl)) cons
 
-tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
-	  -> Bool		-- True <=> -XExistentialQuantificaton or -XGADTs
+tcConDecl :: Bool		-- True <=> -XExistentialQuantificaton or -XGADTs
 	  -> TyCon 		-- Representation tycon
 	  -> ([TyVar], Type)	-- Return type template (with its template tyvars)
 	  -> ConDecl Name 
 	  -> TcM DataCon
 
-tcConDecl unbox_strict existential_ok rep_tycon res_tmpl 	-- Data types
+tcConDecl existential_ok rep_tycon res_tmpl 	-- Data types
 	  con@(ConDecl {con_name = name, con_qvars = tvs, con_cxt = ctxt
                    , con_details = details, con_res = res_ty })
   = addErrCtxt (dataConCtxt name)	$ 
@@ -608,7 +605,7 @@ tcConDecl unbox_strict existential_ok rep_tycon res_tmpl 	-- Data types
     ; (univ_tvs, ex_tvs, eq_preds, res_ty') <- tcResultType res_tmpl tvs' res_ty
     ; let 
 	tc_datacon is_infix field_lbls btys
-	  = do { (arg_tys, stricts) <- mapAndUnzipM (tcConArg unbox_strict) btys
+	  = do { (arg_tys, stricts) <- mapAndUnzipM tcConArg btys
     	       ; buildDataCon (unLoc name) is_infix
     		    stricts field_lbls
     		    univ_tvs ex_tvs eq_preds ctxt' arg_tys
@@ -714,13 +711,10 @@ conRepresentibleWithH98Syntax
           f _ _ = False
 
 -------------------
-tcConArg :: Bool		-- True <=> -funbox-strict_fields
-	   -> LHsType Name
-	   -> TcM (TcType, HsBang)
-tcConArg unbox_strict bty
+tcConArg :: LHsType Name -> TcM (TcType, HsBang)
+tcConArg bty
   = do  { arg_ty <- tcHsBangType bty
-	; let bang = getBangStrictness bty
-        ; let strict_mark = chooseBoxingStrategy unbox_strict arg_ty bang
+        ; strict_mark <- chooseBoxingStrategy arg_ty (getBangStrictness bty)
 	; return (arg_ty, strict_mark) }
 
 -- We attempt to unbox/unpack a strict field when either:
@@ -729,13 +723,19 @@ tcConArg unbox_strict bty
 --
 -- We have turned off unboxing of newtypes because coercions make unboxing 
 -- and reboxing more complicated
-chooseBoxingStrategy :: Bool -> TcType -> HsBang -> HsBang
-chooseBoxingStrategy unbox_strict_fields arg_ty bang
+chooseBoxingStrategy :: TcType -> HsBang -> TcM HsBang
+chooseBoxingStrategy arg_ty bang
   = case bang of
-	HsNoBang			-> HsNoBang
-	HsUnpack                        -> can_unbox HsUnpackFailed arg_ty
-	HsStrict | unbox_strict_fields  -> can_unbox HsStrict       arg_ty
-		 | otherwise            -> HsStrict
+	HsNoBang -> return HsNoBang
+	HsStrict -> do { unbox_strict <- doptM Opt_UnboxStrictFields
+                       ; if unbox_strict then return (can_unbox HsStrict arg_ty)
+                                         else return HsStrict }
+	HsUnpack -> do { omit_prags <- doptM Opt_OmitInterfacePragmas
+            -- Do not respect UNPACK pragmas if OmitInterfacePragmas is on
+	    -- See Trac #5252: unpacking means we must not conceal the
+	    --                 representation of the argument type
+                       ; if omit_prags then return HsStrict
+                                       else return (can_unbox HsUnpackFailed arg_ty) }
 	HsUnpackFailed -> pprPanic "chooseBoxingStrategy" (ppr arg_ty)
 		       	  -- Source code never has shtes
   where

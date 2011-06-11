@@ -556,11 +556,20 @@ tcSpec _ prag = pprPanic "tcSpec" (ppr prag)
 
 --------------
 tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
+-- SPECIALISE pragamas for imported things
 tcImpPrags prags
   = do { this_mod <- getModule
-       ; mapAndRecoverM (wrapLocM tcImpSpec) 
-         [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
-                            , not (nameIsLocalOrFrom this_mod name) ] }
+       ; dflags <- getDOpts
+       ; if not (dopt Opt_Specialise dflags) then
+            return []    -- Ignore SPECIALISE pragmas for imported things
+	    	   	 -- when -O is not on; otherwise we get bogus 
+			 -- complaints about lack of INLINABLE pragmas 
+			 -- in the imported module (also compiled without -O)
+			 -- Notably, when Haddocking the base library
+         else
+            mapAndRecoverM (wrapLocM tcImpSpec) 
+            [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
+                               , not (nameIsLocalOrFrom this_mod name) ] }
 
 tcImpSpec :: (Name, Sig Name) -> TcM TcSpecPrag
 tcImpSpec (name, prag)
@@ -573,7 +582,11 @@ impSpecErr :: Name -> SDoc
 impSpecErr name
   = hang (ptext (sLit "You cannot SPECIALISE") <+> quotes (ppr name))
        2 (vcat [ ptext (sLit "because its definition has no INLINE/INLINABLE pragma")
-               , ptext (sLit "(or you compiled its defining module without -O)")])
+               , parens $ sep 
+                   [ ptext (sLit "or its defining module") <+> quotes (ppr mod)
+                   , ptext (sLit "was compiled without -O")]])
+  where
+    mod = nameModule name
 
 --------------
 tcVectDecls :: [LVectDecl Name] -> TcM ([LVectDecl TcId])

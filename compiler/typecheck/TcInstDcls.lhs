@@ -665,7 +665,6 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 
          -- (2) type check indexed data type declaration
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
-       ; unbox_strict <- doptM Opt_UnboxStrictFields
 
          -- kind check the type indexes and the context
        ; t_typats     <- mapM tcHsKindedType k_typats
@@ -684,7 +683,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; let ex_ok = True	-- Existentials ok for type families!
        ; fixM (\ rep_tycon -> do 
 	     { let orig_res_ty = mkTyConApp fam_tycon t_typats
-	     ; data_cons <- tcConDecls unbox_strict ex_ok rep_tycon
+	     ; data_cons <- tcConDecls ex_ok rep_tycon
 				       (t_tvs, orig_res_ty) k_cons
 	     ; tc_rhs <-
 		 case new_or_data of

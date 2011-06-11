@@ -24,7 +24,6 @@ import VarSet
 import UniqSupply
 import TcType
 import GHC
-import InteractiveEval
 import Outputable
 import PprTyThing
 import MonadUtils

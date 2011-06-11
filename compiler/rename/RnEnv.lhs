@@ -288,7 +288,7 @@ lookupSubBndr parent doc rdr_name
 		-- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
 		--     The latter does pickGREs, but we want to allow 'x'
 		--     even if only 'M.x' is in scope
-	    [gre] -> do { addUsedRdrNames (used_rdr_names gre)
+	    [gre] -> do { addUsedRdrName gre (used_rdr_name gre)
                         ; return (gre_name gre) }
 	    []    -> do { addErr (unknownSubordinateErr doc rdr_name)
 			; traceRn (text "RnEnv.lookup_sub_bndr" <+> (ppr rdr_name $$ ppr gres))
@@ -296,6 +296,8 @@ lookupSubBndr parent doc rdr_name
 	    gres  -> do { addNameClashErrRn rdr_name gres
 			; return (gre_name (head gres)) } }
   where
+    rdr_occ = rdrNameOcc rdr_name    
+
     pick NoParent gres		-- Normal lookup 
       = pickGREs rdr_name gres
     pick (ParentIs p) gres	-- Disambiguating lookup
@@ -306,13 +308,20 @@ lookupSubBndr parent doc rdr_name
     right_parent _ _                               = False
 
     -- Note [Usage for sub-bndrs]
-    used_rdr_names gre
-      | isQual rdr_name = [rdr_name]
+    used_rdr_name gre
+      | isQual rdr_name = rdr_name
       | otherwise       = case gre_prov gre of
-                            LocalDef -> [rdr_name]
-			    Imported is -> map mk_qual_rdr is
-    mk_qual_rdr imp_spec = mkRdrQual (is_as (is_decl imp_spec)) rdr_occ
-    rdr_occ = rdrNameOcc rdr_name    
+                            LocalDef    -> rdr_name
+			    Imported is -> used_rdr_name_from_is is
+
+    used_rdr_name_from_is imp_specs	-- rdr_name is unqualified
+      | not (all (is_qual . is_decl) imp_specs) 
+      = rdr_name    -- An unqualified import is available
+      | otherwise
+      = 	    -- Only qualified imports available, so make up 
+		    -- a suitable qualifed name from the first imp_spec
+        ASSERT( not (null imp_specs) )
+        mkRdrQual (is_as (is_decl (head imp_specs))) rdr_occ
 
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
@@ -334,13 +343,21 @@ Note [Usage for sub-bndrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you have this
    import qualified M( C( f ) ) 
-   intance M.C T where
+   instance M.C T where
      f x = x
 then is the qualified import M.f used?  Obviously yes.
 But the RdrName used in the instance decl is unqualified.  In effect,
 we fill in the qualification by looking for f's whose class is M.C
 But when adding to the UsedRdrNames we must make that qualification
-explicit, otherwise we get "Redundant import of M.C".
+explicit (saying "used  M.f"), otherwise we get "Redundant import of M.f".
+
+So we make up a suitable (fake) RdrName.  But be careful
+   import qualifed M
+   import M( C(f) )
+   instance C T where
+     f x = x
+Here we want to record a use of 'f', not of 'M.f', otherwise
+we'll miss the fact that the qualified import is redundant.
 
 --------------------------------------------------
 --		Occurrences
