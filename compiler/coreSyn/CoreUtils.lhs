@@ -592,6 +592,12 @@ exprIsCheap' good_app other_expr 	-- Applications and variables
     go_pap args = all (exprIsCheap' good_app) args
         -- Used to be "all exprIsTrivial args" due to concerns about
         -- duplicating nested constructor applications, but see #4978.
+	-- The principle here is that 
+	--    let x = a +# b in c *# x
+        -- should behave equivalently to
+        --    c *# (a +# b)
+        -- Since lets with cheap RHSs are accepted, 
+        -- so should paps with cheap arguments
 
     --------------
     go_primop op args = primOpIsCheap op && all (exprIsCheap' good_app) args
