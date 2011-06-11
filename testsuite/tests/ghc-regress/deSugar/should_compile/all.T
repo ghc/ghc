@@ -84,3 +84,7 @@ test('T4870',
      multimod_compile,
      ['T4870', '-v0'])
 test('T5117', normal, compile, [''])
+test('T5252',
+     extra_clean(['T5252a.hi', 'T5252a.o']),
+     run_command, 
+     ['$MAKE -s --no-print-directory T5252'])
