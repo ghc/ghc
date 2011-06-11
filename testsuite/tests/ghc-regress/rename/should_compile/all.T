@@ -170,3 +170,8 @@ test('mc09', normal, compile, [''])
 test('mc10', normal, compile, [''])
 test('mc11', normal, compile, [''])
 test('mc12', normal, compile, [''])
+test('T2436',
+     [ only_compiler_types(['ghc']),
+       extra_clean(['T2436a.hi', 'T2436a.o']) ],
+     multimod_compile,
+     ['T2436', '-v0'])
