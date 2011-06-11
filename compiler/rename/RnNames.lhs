@@ -835,7 +835,7 @@ type ExportAccum        -- The type of the accumulating parameter of
 emptyExportAccum :: ExportAccum
 emptyExportAccum = ([], emptyOccEnv, [])
 
-type ExportOccMap = OccEnv (Name, IE Name)
+type ExportOccMap = OccEnv (Name, IE RdrName)
         -- Tracks what a particular exported OccName
         --   in an export list refers to, and which item
         --   it came from.  It's illegal to export two distinct things
@@ -958,7 +958,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                   then return acc    -- Avoid error cascade
                   else do
 
-             occs' <- check_occs new_ie occs (availNames avail)
+             occs' <- check_occs ie occs (availNames avail)
 
              return (L loc new_ie : lie_names, occs', avail : exports)
 
@@ -1054,7 +1054,7 @@ isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
         Imported is -> any unQualSpecOK is && any (qualSpecOK mod) is
 
 -------------------------------
-check_occs :: IE Name -> ExportOccMap -> [Name] -> RnM ExportOccMap
+check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
 check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
   = foldlM check occs names
   where
@@ -1079,12 +1079,15 @@ check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
         name_occ = nameOccName name
 
 
-dupExport_ok :: Name -> IE Name -> IE Name -> Bool
+dupExport_ok :: Name -> IE RdrName -> IE RdrName -> Bool
 -- The Name is exported by both IEs. Is that ok?
 -- "No"  iff the name is mentioned explicitly in both IEs
+--        or one of the IEs mentions the name *alone*
 -- "Yes" otherwise
 -- 
--- Example of "no":  module M( f, f )
+-- Examples of "no":  module M( f, f )
+--                    module M( fmap, Functor(..) )
+--                    module M( module Data.List, head )
 --
 -- Example of "yes"
 --    module M( module A, module B ) where
@@ -1104,11 +1107,16 @@ dupExport_ok :: Name -> IE Name -> IE Name -> Bool
 --        data instance T Int = TInt
 
 dupExport_ok n ie1 ie2 
-  = not (explicit_in ie1 && explicit_in ie2)
+  = not (  single ie1 || single ie2
+        || (explicit_in ie1 && explicit_in ie2) )
   where
-    explicit_in (IEModuleContents _) = False
-    explicit_in (IEThingAll n')      = n == n'
-    explicit_in _                    = True
+    explicit_in (IEModuleContents _) = False                -- module M
+    explicit_in (IEThingAll r) = nameOccName n == rdrNameOcc r  -- T(..)
+    explicit_in _              = True
+  
+    single (IEVar {})      = True
+    single (IEThingAbs {}) = True
+    single _               = False
 \end{code}
 
 %*********************************************************
@@ -1279,6 +1287,7 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage imports rdr_env (Set.elems uses)
 
+       ; traceRn (ptext (sLit "Import usage") <+> ppr usage)
        ; ifDOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
@@ -1559,7 +1568,7 @@ typeItemErr name wherestr
   = sep [ ptext (sLit "Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
           ptext (sLit "Use -XTypeFamilies to enable this extension") ]
 
-exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE Name -> IE Name
+exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
                -> Message
 exportClashErr global_env name1 name2 ie1 ie2
   = vcat [ ptext (sLit "Conflicting exports for") <+> quotes (ppr occ) <> colon
@@ -1603,7 +1612,7 @@ addDupDeclErr names@(name : _)
   where
     sorted_names = sortWith nameSrcLoc names
 
-dupExportWarn :: OccName -> IE Name -> IE Name -> SDoc
+dupExportWarn :: OccName -> IE RdrName -> IE RdrName -> SDoc
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name),
           ptext (sLit "is exported by"), quotes (ppr ie1),
