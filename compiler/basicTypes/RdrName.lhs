@@ -570,7 +570,7 @@ data Provenance
 	                -- INVARIANT: the list of 'ImportSpec' is non-empty
 
 data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
-			    is_item ::  ImpItemSpec }
+			    is_item :: ImpItemSpec }
 		deriving( Eq, Ord )
 
 -- | Describes a particular import declaration and is
