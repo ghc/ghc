@@ -6,5 +6,5 @@ _result :: t = _
 Stopped at print022.hs:11:7
 _result :: t = _
 x :: t = _
-x = C2 1 32 'a' 3
+x = C2 1 (W# 32) (TwoFields 'a' 3)
 x :: T2
