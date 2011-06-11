@@ -177,7 +177,7 @@ string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
 
 exportListItem :: ExportItem DocName -> LaTeX
 exportListItem (ExportDecl decl _doc subdocs _insts)
-  = ppDocBinder (declName decl) <>
+  = sep (punctuate comma . map ppDocBinder $ declNames decl) <>
      case subdocs of
        [] -> empty
        _  -> parens (sep (punctuate comma (map (ppDocBinder . fst) subdocs)))
@@ -197,8 +197,8 @@ processExports :: [ExportItem DocName] -> LaTeX
 processExports [] = empty
 processExports (decl : es)
   | Just sig <- isSimpleSig decl
-  = multiDecl [ ppTypeSig (getName name) typ False
-              | (name,typ) <- sig:sigs ] $$
+  = multiDecl [ ppTypeSig (map getName names) typ False
+              | (names,typ) <- sig:sigs ] $$
     processExports es'
   where (sigs, es') = spanWith isSimpleSig es
 processExports (ExportModule mdl : es)
@@ -209,10 +209,10 @@ processExports (e : es) =
   processExport e $$ processExports es
 
 
-isSimpleSig :: ExportItem DocName -> Maybe (DocName, HsType DocName)
-isSimpleSig (ExportDecl (L _ (SigD (TypeSig (L _ n) (L _ t))))
+isSimpleSig :: ExportItem DocName -> Maybe ([DocName], HsType DocName)
+isSimpleSig (ExportDecl (L _ (SigD (TypeSig lnames (L _ t))))
                         (Nothing, argDocs) _ _)
-  | Map.null argDocs = Just (n, t)
+  | Map.null argDocs = Just (map unLoc lnames, t)
 isSimpleSig _ = Nothing
 
 
@@ -244,11 +244,11 @@ ppDocGroup lev doc = sec lev <> braces doc
         sec _ = text "\\paragraph"
 
 
-declName :: LHsDecl DocName -> DocName
-declName (L _ decl) = case decl of
-  TyClD d  -> unLoc $ tcdLName d
-  SigD (TypeSig (L _ n) _) -> n
-  _ -> error "declaration not supported by declName"
+declNames :: LHsDecl DocName -> [DocName]
+declNames (L _ decl) = case decl of
+  TyClD d  -> [unLoc $ tcdLName d]
+  SigD (TypeSig lnames _) -> map unLoc lnames
+  _ -> error "declaration not supported by declNames"
 
 
 forSummary :: (ExportItem DocName) -> Bool
@@ -286,7 +286,7 @@ ppDecl (L loc decl) (mbDoc, fnArgsDoc) instances subdocs = case decl of
     | Nothing <- tcdTyPats d     -> ppTySyn loc (mbDoc, fnArgsDoc) d unicode
     | Just _  <- tcdTyPats d     -> ppTyInst False loc mbDoc d unicode
   TyClD d@(ClassDecl {})         -> ppClassDecl instances loc mbDoc subdocs d unicode
-  SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig loc (mbDoc, fnArgsDoc) n t unicode
+  SigD (TypeSig lnames (L _ t))  -> ppFunSig loc (mbDoc, fnArgsDoc) (map unLoc lnames) t unicode
   ForD d                         -> ppFor loc (mbDoc, fnArgsDoc) d unicode
   InstD _                        -> empty
   _                              -> error "declaration not supported by ppDecl"
@@ -325,7 +325,7 @@ ppFor _ _ _ _ =
 ppTySyn :: SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool -> LaTeX
 
 ppTySyn loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode
-  = ppTypeOrFunSig loc name (unLoc ltype) doc (full, hdr, char '=') unicode
+  = ppTypeOrFunSig loc [name] (unLoc ltype) doc (full, hdr, char '=') unicode
   where
     hdr  = hsep (keyword "type" : ppDocBinder name : ppTyVars ltyvars)
     full = hdr <+> char '=' <+> ppLType unicode ltype
@@ -338,20 +338,22 @@ ppTySyn _ _ _ _ = error "declaration not supported by ppTySyn"
 -------------------------------------------------------------------------------
 
 
-ppFunSig :: SrcSpan -> DocForDecl DocName -> DocName -> HsType DocName
+ppFunSig :: SrcSpan -> DocForDecl DocName -> [DocName] -> HsType DocName
          -> Bool -> LaTeX
-ppFunSig loc doc docname typ unicode =
-  ppTypeOrFunSig loc docname typ doc
-    (ppTypeSig name typ False, ppSymName name, dcolon unicode)
+ppFunSig loc doc docnames typ unicode =
+  ppTypeOrFunSig loc docnames typ doc
+    ( ppTypeSig names typ False
+    , hsep . punctuate comma $ map ppSymName names
+    , dcolon unicode)
     unicode
  where
-   name = getName docname
+   names = map getName docnames
 
 
-ppTypeOrFunSig :: SrcSpan -> DocName -> HsType DocName ->
-                  DocForDecl DocName -> (LaTeX, LaTeX, LaTeX)
+ppTypeOrFunSig :: SrcSpan -> [DocName] -> HsType DocName
+               -> DocForDecl DocName -> (LaTeX, LaTeX, LaTeX)
                -> Bool -> LaTeX
-ppTypeOrFunSig _loc _docname typ (doc, argDocs) (pref1, pref2, sep0)
+ppTypeOrFunSig _ _ typ (doc, argDocs) (pref1, pref2, sep0)
                unicode
   | Map.null argDocs =
       declWithDoc pref1 (fmap docToLaTeX doc)
@@ -388,9 +390,11 @@ ppTypeOrFunSig _loc _docname typ (doc, argDocs) (pref1, pref2, sep0)
        = decltt leader <-> decltt (ppType unicode t) <-> arg_doc n <+> nl
 
 
-ppTypeSig :: Name -> HsType DocName  -> Bool -> LaTeX
-ppTypeSig nm ty unicode =
-  ppSymName nm <+> dcolon unicode <+> ppType unicode ty
+ppTypeSig :: [Name] -> HsType DocName  -> Bool -> LaTeX
+ppTypeSig nms ty unicode =
+  hsep (punctuate comma $ map ppSymName nms)
+    <+> dcolon unicode
+    <+> ppType unicode ty
 
 
 ppTyVars :: [LHsTyVarBndr DocName] -> [LaTeX]
@@ -489,12 +493,13 @@ ppClassDecl instances loc mbDoc subdocs
 
     methodTable =
       text "\\haddockpremethods{}\\textbf{Methods}" $$
-      vcat  [ ppFunSig loc doc n typ unicode
-            | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
-            , let doc = lookupAnySubdoc n subdocs ]
-
---    atTable = abovesSep s8 $ [ ppAssocType summary links doc at unicode | at <- ats
---                             , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]
+      vcat  [ ppFunSig loc doc names typ unicode
+            | L _ (TypeSig lnames (L _ typ)) <- lsigs
+            , let doc = lookupAnySubdoc (head names) subdocs
+                  names = map unLoc lnames ]
+              -- FIXME: is taking just the first name ok? Is it possible that
+              -- there are different subdocs for different names in a single
+              -- type signature?
 
     instancesBit = ppDocInstances unicode instances
 

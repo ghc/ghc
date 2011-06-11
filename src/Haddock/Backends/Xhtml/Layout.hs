@@ -176,8 +176,8 @@ declElem = paragraph ! [theclass "src"]
 
 -- a box for top level documented names
 -- it adds a source and wiki link at the right hand side of the box
-topDeclElem :: LinksInfo -> SrcSpan -> DocName -> Html -> Html
-topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc name html =
+topDeclElem :: LinksInfo -> SrcSpan -> [DocName] -> Html -> Html
+topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc names html =
     declElem << (html +++ srcLink +++ wikiLink)
   where srcLink =
           case Map.lookup origPkg sourceMap of
@@ -201,7 +201,8 @@ topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc name html =
         origPkg = modulePackageId origMod
 
         -- Name must be documented, otherwise we wouldn't get here
-        Documented n mdl = name
+        Documented n mdl = head names
+        -- FIXME: is it ok to simply take the first name?
 
         fname = unpackFS (srcSpanFile loc)
 

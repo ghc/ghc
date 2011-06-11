@@ -17,6 +17,7 @@ module Haddock.GhcUtils where
 
 
 import Data.Version
+import Control.Applicative  ( (<$>) )
 import Control.Arrow
 import Data.Foldable hiding (concatMap)
 import Data.Traversable
@@ -81,18 +82,54 @@ isVarSym :: OccName -> Bool
 isVarSym = isLexVarSym . occNameFS
 
 
-getMainDeclBinder :: HsDecl name -> Maybe name
-getMainDeclBinder (TyClD d) = Just (tcdName d)
+getMainDeclBinder :: HsDecl name -> [name]
+getMainDeclBinder (TyClD d) = [tcdName d]
 getMainDeclBinder (ValD d) =
+#if __GLASGOW_HASKELL__ == 612
+  case collectAcc d [] of
+    []       -> []
+    (name:_) -> [unLoc name]
+#else
   case collectHsBindBinders d of
-    []       -> Nothing
-    (name:_) -> Just name
-
+    []       -> []
+    (name:_) -> [name]
+#endif
 
 getMainDeclBinder (SigD d) = sigNameNoLoc d
-getMainDeclBinder (ForD (ForeignImport name _ _)) = Just (unLoc name)
-getMainDeclBinder (ForD (ForeignExport _ _ _)) = Nothing
-getMainDeclBinder _ = Nothing
+getMainDeclBinder (ForD (ForeignImport name _ _)) = [unLoc name]
+getMainDeclBinder (ForD (ForeignExport _ _ _)) = []
+getMainDeclBinder _ = []
+
+-- Useful when there is a signature with multiple names, e.g.
+--   foo, bar :: Types..
+-- but only one of the names is exported and we have to change the
+-- type signature to only include the exported names.
+filterLSigNames :: (name -> Bool) -> LSig name -> Maybe (LSig name)
+filterLSigNames p (L loc sig) = L loc <$> (filterSigNames p sig)
+
+filterSigNames :: (name -> Bool) -> Sig name -> Maybe (Sig name)
+filterSigNames p orig@(SpecSig n _ _)          = ifTrueJust (p $ unLoc n) orig
+filterSigNames p orig@(InlineSig n _)          = ifTrueJust (p $ unLoc n) orig
+filterSigNames p orig@(FixSig (FixitySig n _)) = ifTrueJust (p $ unLoc n) orig
+filterSigNames p (TypeSig ns ty)               =
+  case filter (p . unLoc) ns of
+    []       -> Nothing
+    filtered -> Just (TypeSig filtered ty)
+filterSigNames _ _                           = Nothing
+
+ifTrueJust :: Bool -> name -> Maybe name
+ifTrueJust True  = Just
+ifTrueJust False = const Nothing
+
+sigName :: LSig name -> [name]
+sigName (L _ sig) = sigNameNoLoc sig
+
+sigNameNoLoc :: Sig name -> [name]
+sigNameNoLoc (TypeSig   ns _)         = map unLoc ns
+sigNameNoLoc (SpecSig   n _ _)        = [unLoc n]
+sigNameNoLoc (InlineSig n _)          = [unLoc n]
+sigNameNoLoc (FixSig (FixitySig n _)) = [unLoc n]
+sigNameNoLoc _                        = []
 
 
 isTyClD :: HsDecl a -> Bool
@@ -184,7 +221,7 @@ instance Parent (TyClDecl Name) where
     | isDataDecl  d = map (unL . con_name . unL) . tcdCons $ d
     | isClassDecl d =
         map (tcdName . unL) (tcdATs d) ++
-        [ unL n | L _ (TypeSig n _) <- tcdSigs d ]
+        [ unL n | L _ (TypeSig ns _) <- tcdSigs d, n <- ns ]
     | otherwise = []
 
 

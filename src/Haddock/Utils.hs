@@ -68,7 +68,7 @@ import Data.Map ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( isSuffixOf )
-import Data.Maybe ( fromJust )
+import Data.Maybe ( mapMaybe )
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
@@ -160,9 +160,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
 
 
 restrictDecls :: [Name] -> [LSig Name] -> [LSig Name]
-restrictDecls names decls = filter keep decls
-  where keep d = fromJust (sigName d) `elem` names
-        -- has to have a name, since it's a class method type signature
+restrictDecls names decls = mapMaybe (filterLSigNames (`elem` names)) decls
 
 
 restrictATs :: [Name] -> [LTyClDecl Name] -> [LTyClDecl Name]

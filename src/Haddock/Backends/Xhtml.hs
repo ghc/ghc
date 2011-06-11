@@ -547,31 +547,31 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
 
 miniSynopsis :: Module -> Interface -> Bool -> Qualification -> Html
 miniSynopsis mdl iface unicode qual =
-    divInterface << mapMaybe (processForMiniSynopsis mdl unicode qual) exports
+    divInterface << concatMap (processForMiniSynopsis mdl unicode qual) exports
   where
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
 
 processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
-                       -> Maybe Html
+                       -> [Html]
 processForMiniSynopsis mdl unicode _ (ExportDecl (L _loc decl0) _doc _ _insts) =
   ((divTopDecl <<).(declElem <<)) `fmap` case decl0 of
     TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
-        (TyFamily{}) -> Just $ ppTyFamHeader True False d unicode
+        (TyFamily{}) -> [ppTyFamHeader True False d unicode]
         (TyData{tcdTyPats = ps})
-          | Nothing <- ps -> Just $ keyword "data" <+> b
-          | Just _ <- ps  -> Just $ keyword "data" <+> keyword "instance" <+> b
+          | Nothing <- ps -> [keyword "data" <+> b]
+          | Just _ <- ps  -> [keyword "data" <+> keyword "instance" <+> b]
         (TySynonym{tcdTyPats = ps})
-          | Nothing <- ps -> Just $ keyword "type" <+> b
-          | Just _ <- ps  -> Just $ keyword "type" <+> keyword "instance" <+> b
-        (ClassDecl {})    -> Just $ keyword "class" <+> b
-        _ -> Nothing
-    SigD (TypeSig (L _ n) (L _ _)) ->
-         Just $ ppNameMini mdl (nameOccName . getName $ n)
-    _ -> Nothing
+          | Nothing <- ps -> [keyword "type" <+> b]
+          | Just _ <- ps  -> [keyword "type" <+> keyword "instance" <+> b]
+        (ClassDecl {})    -> [keyword "class" <+> b]
+        _ -> []
+    SigD (TypeSig lnames (L _ _)) ->
+      map (ppNameMini mdl . nameOccName . getName . unLoc) lnames
+    _ -> []
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
-  Just $ groupTag lvl << docToHtml qual txt
-processForMiniSynopsis _ _ _ _ = Nothing
+  [groupTag lvl << docToHtml qual txt]
+processForMiniSynopsis _ _ _ = []
 
 
 ppNameMini :: Module -> OccName -> Html

@@ -114,16 +114,17 @@ ppExport (ExportDecl decl dc subdocs _) = doc (fst dc) ++ f (unL decl)
         f (TyClD d@TyData{}) = ppData d subdocs
         f (TyClD d@ClassDecl{}) = ppClass d
         f (TyClD d@TySynonym{}) = ppSynonym d
-        f (ForD (ForeignImport name typ _)) = ppSig $ TypeSig name typ
-        f (ForD (ForeignExport name typ _)) = ppSig $ TypeSig name typ
+        f (ForD (ForeignImport name typ _)) = ppSig $ TypeSig [name] typ
+        f (ForD (ForeignExport name typ _)) = ppSig $ TypeSig [name] typ
         f (SigD sig) = ppSig sig
         f _ = []
 ppExport _ = []
 
 
 ppSig :: Sig Name -> [String]
-ppSig (TypeSig name sig) = [operator (out name) ++ " :: " ++ outHsType typ]
+ppSig (TypeSig names sig) = [operator prettyNames ++ " :: " ++ outHsType typ]
     where
+        prettyNames = concat . intersperse ", " $ map out names
         typ = case unL sig of
                    HsForAllTy Explicit a b c -> HsForAllTy Implicit a b c
                    x -> x

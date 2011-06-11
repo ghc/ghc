@@ -176,9 +176,10 @@ mkSubMap declMap exports =
 -- subordinate names, but map them to their parent declarations.
 mkDeclMap :: [DeclInfo] -> Map Name DeclInfo
 mkDeclMap decls = Map.fromList . concat $
-  [ (declName d, (parent, doc, subs)) : subDecls
+  [ decls_ ++ subDecls
   | (parent@(L _ d), doc, subs) <- decls
-  , let subDecls = [ (n, (parent, doc', [])) | (n, doc') <- subs ]
+  , let decls_ = [ (name, (parent, doc, subs)) | name <- declNames d ]
+        subDecls = [ (n, (parent, doc', [])) | (n, doc') <- subs ]
   , not (isDocD d), not (isInstD d) ]
 
 
@@ -227,8 +228,9 @@ classDataSubs decl
   | isDataDecl  decl = dataSubs
   | otherwise        = []
   where
-    classSubs = [ (declName d, doc, fnArgsDoc)
+    classSubs = [ (name, doc, fnArgsDoc)
                 | (L _ d, doc) <- classDecls decl
+                , name <- declNames d
                 , let fnArgsDoc = getDeclFnArgDocs d ]
     dataSubs  = constrs ++ fields
       where
@@ -259,12 +261,12 @@ declsFromClass class_ = docs ++ defs ++ sigs ++ ats
     ats  = mkDecls tcdATs TyClD class_
 
 
-declName :: HsDecl a -> a
-declName (TyClD d) = tcdName d
-declName (ForD (ForeignImport n _ _)) = unLoc n
+declNames :: HsDecl a -> [a]
+declNames (TyClD d) = [tcdName d]
+declNames (ForD (ForeignImport n _ _)) = [unLoc n]
 -- we have normal sigs only (since they are taken from ValBindsOut)
-declName (SigD sig) = fromJust $ sigNameNoLoc sig
-declName _ = error "unexpected argument to declName"
+declNames (SigD sig) = sigNameNoLoc sig
+declNames _ = error "unexpected argument to declNames"
 
 
 -- | The top-level declarations of a module that we care about,
@@ -453,8 +455,17 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
               optExports _ instIfaceMap dflags =
   case optExports of
     Nothing      -> liftErrMsg $ fullContentsOfThisModule dflags gre decls
-    Just exports -> liftM concat $ mapM lookupExport exports
+    Just exports -> liftM (nubBy commaDeclared . concat) $ mapM lookupExport exports
   where
+    -- A type signature can have multiple names, like:
+    --   foo, bar :: Types..
+    -- When going throug the exported names we have to take care to detect such
+    -- situations and remove the duplicates.
+    commaDeclared (ExportDecl (L _ sig1) _ _ _) (ExportDecl (L _ sig2) _ _ _) =
+      getMainDeclBinder sig1 == getMainDeclBinder sig2
+    commaDeclared _ _ = False
+
+
     lookupExport (IEVar x)             = declWith x
     lookupExport (IEThingAbs t)        = declWith t
     lookupExport (IEThingAll t)        = declWith t
@@ -483,11 +494,8 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
     declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
     declWith t =
       case findDecl t of
-        Just x@(decl,_,_) ->
-          let declName_ =
-                case getMainDeclBinder (unL decl) of
-                  Just n -> n
-                  Nothing -> error "declWith: should not happen"
+        Just (decl, doc, subs) ->
+          let declNames_ = getMainDeclBinder (unL decl)
           in case () of
             _
               -- temp hack: we filter out separately exported ATs, since we haven't decided how
@@ -497,7 +505,7 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
 
               -- We should not show a subordinate by itself if any of its
               -- parents is also exported. See note [1].
-              | t /= declName_,
+              | not $ t `elem` declNames_,
                 Just p <- find isExported (parents t $ unL decl) ->
                 do liftErrMsg $ tell [
                      "Warning: " ++ moduleString thisMod ++ ": " ++
@@ -508,7 +516,18 @@ mkExportItems modMap thisMod gre exportedNames decls declMap
                    return []
 
               -- normal case
-              | otherwise                          -> return [ mkExportDecl t x ]
+              | otherwise -> return [ mkExportDecl t (newDecl, doc, subs) ]
+                  where
+                    -- Since a single signature might refer to many names, we
+                    -- need to filter the ones that are actually exported. This
+                    -- requires modifying the type signatures to "hide" the
+                    -- names that are not exported.
+                    newDecl = case decl of
+                      (L loc (SigD sig)) ->
+                        L loc . SigD . fromJust $ filterSigNames isExported sig
+                        -- fromJust is safe since we already checked in guards
+                        -- that 't' is a name declared in this declaration.
+                      _                  -> decl
         Nothing -> do
           -- If we can't find the declaration, it must belong to
           -- another package
@@ -720,11 +739,11 @@ fullContentsOfThisModule dflags gre decls = liftM catMaybes $ mapM mkExportItem 
 -- together a type signature for it...)
 extractDecl :: Name -> Module -> Decl -> Decl
 extractDecl name mdl decl
-  | Just n <- getMainDeclBinder (unLoc decl), n == name = decl
+  | name `elem` getMainDeclBinder (unLoc decl) = decl
   | otherwise  =
     case unLoc decl of
       TyClD d | isClassDecl d ->
-        let matches = [ sig | sig <- tcdSigs d, sigName sig == Just name,
+        let matches = [ sig | sig <- tcdSigs d, name `elem` sigName sig,
                         isVanillaLSig sig ] -- TODO: document fixity
         in case matches of
           [s0] -> let (n, tyvar_names) = name_and_tyvars d
@@ -762,7 +781,7 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
     RecCon fields | (ConDeclField n ty _ : _) <- matching_fields fields ->
-      L (getLoc n) (TypeSig (noLoc nm) (noLoc (HsFunTy data_ty (getBangType ty))))
+      L (getLoc n) (TypeSig [noLoc nm] (noLoc (HsFunTy data_ty (getBangType ty))))
     _ -> extractRecSel nm mdl t tvs rest
  where
   matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, unLoc n == nm ]
@@ -782,10 +801,7 @@ mkVisibleNames exports opts
   | OptHide `elem` opts = []
   | otherwise = concatMap exportName exports
   where
-    exportName e@ExportDecl {} =
-      case getMainDeclBinder $ unL $ expItemDecl e of
-        Just n -> n : subs
-        Nothing -> subs
+    exportName e@ExportDecl {} = getMainDeclBinder (unL $ expItemDecl e) ++ subs
       where subs = map fst (expItemSubDocs e)
     exportName ExportNoDecl {} = [] -- we don't count these as visible, since
                                     -- we don't want links to go to them.

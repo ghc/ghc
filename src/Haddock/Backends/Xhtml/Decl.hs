@@ -27,6 +27,7 @@ import Haddock.GhcUtils
 import Haddock.Types
 
 import           Control.Monad         ( join )
+import           Data.List             ( intersperse )
 import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
@@ -50,28 +51,31 @@ ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances subdocs unicode qual
     | Nothing <- tcdTyPats d     -> ppTySyn summ links loc (mbDoc, fnArgsDoc) d unicode qual
     | Just _  <- tcdTyPats d     -> ppTyInst summ False links loc mbDoc d unicode qual
   TyClD d@(ClassDecl {})         -> ppClassDecl summ links instances loc mbDoc subdocs d unicode qual
-  SigD (TypeSig (L _ n) (L _ t)) -> ppFunSig summ links loc (mbDoc, fnArgsDoc) n t unicode qual
+  SigD (TypeSig lnames (L _ t))  -> ppFunSig summ links loc (mbDoc, fnArgsDoc) (map unLoc lnames) t unicode qual
   ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d unicode qual
   InstD _                        -> noHtml
   _                              -> error "declaration not supported by ppDecl"
 
 
 ppFunSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
-            DocName -> HsType DocName -> Bool -> Qualification -> Html
-ppFunSig summary links loc doc docname typ unicode qual =
-  ppTypeOrFunSig summary links loc docname typ doc
-    (ppTypeSig summary occname typ unicode qual, ppBinder False occname, dcolon unicode)
+            [DocName] -> HsType DocName -> Bool Qualification -> Html
+ppFunSig summary links loc doc docnames typ unicode qual =
+  ppTypeOrFunSig summary links loc docnames typ doc
+    ( ppTypeSig summary occnames typ unicode qual
+    , concatHtml . punctuate comma $ map (ppBinder False) occnames
+    , dcolon unicode
+    )
     unicode qual
   where
-    occname = nameOccName . getName $ docname
+    occnames = map (nameOccName . getName) docnames
 
 
-ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> DocName -> HsType DocName ->
-                  DocForDecl DocName -> (Html, Html, Html) -> Bool -> Qualification-> Html
-ppTypeOrFunSig summary links loc docname typ (doc, argDocs) (pref1, pref2, sep) unicode qual
+ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> [DocName] -> HsType DocName
+               -> DocForDecl DocName -> (Html, Html, Html) -> Bool -> Qualification -> Html
+ppTypeOrFunSig summary links loc docnames typ (doc, argDocs) (pref1, pref2, sep) unicode qual
   | summary = pref1
-  | Map.null argDocs = topDeclElem links loc docname pref1 +++ maybeDocSection qual doc
-  | otherwise = topDeclElem links loc docname pref2 +++
+  | Map.null argDocs = topDeclElem links loc docnames pref1 +++ maybeDocSection qual doc
+  | otherwise = topDeclElem links loc docnames pref2 +++
       subArguments qual (do_args 0 sep typ) +++ maybeDocSection qual doc
   where
     argDoc n = Map.lookup n argDocs
@@ -108,10 +112,10 @@ tyvarNames :: [LHsTyVarBndr DocName] -> [Name]
 tyvarNames = map (getName . hsTyVarName . unLoc)
 
 
-ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName -> ForeignDecl DocName -> Bool 
-      -> Qualification -> Html
+ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName
+      -> ForeignDecl DocName -> Bool -> Qualification -> Html
 ppFor summary links loc doc (ForeignImport (L _ name) (L _ typ) _) unicode qual
-  = ppFunSig summary links loc doc name typ unicode qual
+  = ppFunSig summary links loc doc [name] typ unicode qual
 ppFor _ _ _ _ _ _ _ = error "ppFor"
 
 
@@ -119,7 +123,7 @@ ppFor _ _ _ _ _ _ _ = error "ppFor"
 ppTySyn :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName -> TyClDecl DocName -> Bool
         -> Qualification -> Html
 ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode qual
-  = ppTypeOrFunSig summary links loc name (unLoc ltype) doc
+  = ppTypeOrFunSig summary links loc [name] (unLoc ltype) doc
                    (full, hdr, spaceHtml +++ equals) unicode qual
   where
     hdr  = hsep ([keyword "type", ppBinder summary occ] ++ ppTyVars ltyvars)
@@ -128,9 +132,11 @@ ppTySyn summary links loc doc (TySynonym (L _ name) ltyvars _ ltype) unicode qua
 ppTySyn _ _ _ _ _ _ _ = error "declaration not supported by ppTySyn"
 
 
-ppTypeSig :: Bool -> OccName -> HsType DocName  -> Bool -> Qualification -> Html
-ppTypeSig summary nm ty unicode qual =
-    ppBinder summary nm <+> dcolon unicode <+> ppType unicode qual ty
+ppTypeSig :: Bool -> [OccName] -> HsType DocName  -> Bool -> Qualification -> Html
+ppTypeSig summary nms ty unicode qual =
+  concatHtml htmlNames <+> dcolon unicode <+> ppType unicode qual ty
+  where
+    htmlNames = intersperse (stringToHtml ", ") $ map (ppBinder summary) nms
 
 
 ppTyName :: Name -> Html
@@ -173,7 +179,7 @@ ppTyFam summary associated links loc mbDoc decl unicode qual
   where
     docname = tcdName decl
 
-    header_ = topDeclElem links loc docname (ppTyFamHeader summary associated decl unicode)
+    header_ = topDeclElem links loc [docname] (ppTyFamHeader summary associated decl unicode)
 
     instancesBit = ppInstances instances docname unicode qual
 
@@ -213,8 +219,8 @@ ppTyInst summary associated links loc mbDoc decl unicode qual
   where
     docname = tcdName decl
 
-    header_ = topDeclElem links loc docname
-        (ppTyInstHeader summary associated decl unicode qual)
+    header_ = topDeclElem links loc [docname]
+                (ppTyInstHeader summary associated decl unicode qual)
 
 
 ppTyInstHeader :: Bool -> Bool -> TyClDecl DocName -> Bool -> Qualification -> Html
@@ -349,16 +355,20 @@ ppShortClassDecl :: Bool -> LinksInfo -> TyClDecl DocName -> SrcSpan
 ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc
     subdocs unicode qual = 
   if null sigs && null ats
-    then (if summary then id else topDeclElem links loc nm) hdr
-    else (if summary then id else topDeclElem links loc nm) (hdr <+> keyword "where")
+    then (if summary then id else topDeclElem links loc [nm]) hdr
+    else (if summary then id else topDeclElem links loc [nm]) (hdr <+> keyword "where")
       +++ shortSubDecls
           (
             [ ppAssocType summary links doc at unicode qual | at <- ats
               , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]  ++
 
-            [ ppFunSig summary links loc doc n typ unicode qual
-              | L _ (TypeSig (L _ n) (L _ typ)) <- sigs
-              , let doc = lookupAnySubdoc n subdocs ]
+            [ ppFunSig summary links loc doc names typ unicode qual
+              | L _ (TypeSig lnames (L _ typ)) <- sigs
+              , let doc = lookupAnySubdoc (head names) subdocs
+                    names = map unLoc lnames ]
+              -- FIXME: is taking just the first name ok? Is it possible that
+              -- there are different subdocs for different names in a single
+              -- type signature?
           )
   where
     hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds unicode qual
@@ -377,8 +387,8 @@ ppClassDecl summary links instances loc mbDoc subdocs
                   +++ atBit +++ methodBit  +++ instancesBit
   where
     classheader
-      | null lsigs = topDeclElem links loc nm (hdr unicode qual)
-      | otherwise  = topDeclElem links loc nm (hdr unicode qual <+> keyword "where")
+      | null lsigs = topDeclElem links loc [nm] (hdr unicode qual)
+      | otherwise  = topDeclElem links loc [nm] (hdr unicode qual <+> keyword "where")
 
     nm   = unLoc $ tcdLName decl
 
@@ -388,9 +398,13 @@ ppClassDecl summary links instances loc mbDoc subdocs
                       | at <- ats
                       , let doc = lookupAnySubdoc (tcdName $ unL at) subdocs ]
 
-    methodBit = subMethods [ ppFunSig summary links loc doc n typ unicode qual
-                      | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
-                      , let doc = lookupAnySubdoc n subdocs ]
+    methodBit = subMethods [ ppFunSig summary links loc doc names typ unicode qual
+                           | L _ (TypeSig lnames (L _ typ)) <- lsigs
+                           , let doc = lookupAnySubdoc (head names) subdocs
+                                 names = map unLoc lnames ]
+                           -- FIXME: is taking just the first name ok? Is it possible that
+                           -- there are different subdocs for different names in a single
+                           -- type signature?
 
     instancesBit = ppInstances instances nm unicode qual 
 
@@ -461,7 +475,7 @@ ppDataDecl summary links instances subdocs loc mbDoc dataDecl unicode qual
     cons      = tcdCons dataDecl
     resTy     = (con_res . unLoc . head) cons
 
-    header_ = topDeclElem links loc docname (ppDataHeader summary dataDecl unicode qual
+    header_ = topDeclElem links loc [docname] (ppDataHeader summary dataDecl unicode qual
              <+> whereBit)
 
     whereBit
