@@ -10,6 +10,13 @@ AC_ARG_WITH([cc],
             [CC=$withval])
 AC_PROG_CC()
 
+case `uname -s` in
+    MINGW*|CYGWIN*)
+        WINDOWS=YES;;
+    *)
+        WINDOWS=NO;;
+esac
+
 # do we have long longs?
 AC_CHECK_TYPES([long long])
 
@@ -138,11 +145,10 @@ FP_SEARCH_LIBS_PROTO(iconv,
                       iconv_close(cd);],
                      iconv,
                      [EXTRA_LIBS="$EXTRA_LIBS $ac_lib"],
-                     [case `uname -s` in
-                        MINGW*|CYGWIN*) ;;
-                        *)
-                             AC_MSG_ERROR([iconv is required on non-Windows platforms]);;
-                      esac])
+                     [if test "$WINDOWS" = "NO"
+                      then
+                          AC_MSG_ERROR([iconv is required on non-Windows platforms])
+                      fi])
 
 # If possible, we use libcharset instead of nl_langinfo(CODESET) to
 # determine the current locale's character encoding.
