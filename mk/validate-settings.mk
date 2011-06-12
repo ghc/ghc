@@ -23,7 +23,7 @@ STRIP_CMD       = :
 CHECK_PACKAGES = YES
 
 # We want to install DPH when validating, so that we can test it
-InstallExtraPackages = YES    
+InstallExtraPackages = YES
 
 # dblatex with miktex under msys/mingw can't build the PS and PDF docs,
 # and just building the HTML docs is sufficient to check that the
