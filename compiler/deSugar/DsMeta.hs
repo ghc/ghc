@@ -614,9 +614,13 @@ repTy (HsPArrTy t)          = do
 			        t1   <- repLTy t
 			        tcon <- repTy (HsTyVar (tyConName parrTyCon))
 			        repTapp tcon t1
-repTy (HsTupleTy _ tys)	    = do
+repTy (HsTupleTy Boxed tys)	    = do
 			        tys1 <- repLTys tys 
 			        tcon <- repTupleTyCon (length tys)
+			        repTapps tcon tys1
+repTy (HsTupleTy Unboxed tys)	    = do
+			        tys1 <- repLTys tys
+			        tcon <- repUnboxedTupleTyCon (length tys)
 			        repTapps tcon tys1
 repTy (HsOpTy ty1 n ty2)    = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1) 
 			    	   `nlHsAppTy` ty2)
@@ -738,9 +742,9 @@ repE e@(HsDo ctxt sts body _)
 repE (ExplicitList _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple es boxed) 
-  | not (isBoxed boxed)        = notHandled "Unboxed tuples" (ppr e)
   | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
-  | otherwise                  = do { xs <- repLEs [e | Present e <- es]; repTup xs }
+  | isBoxed boxed              = do { xs <- repLEs [e | Present e <- es]; repTup xs }
+  | otherwise                  = do { xs <- repLEs [e | Present e <- es]; repUnboxedTup xs }
 
 repE (RecordCon c _ flds)
  = do { x <- lookupLOcc c;
@@ -1020,9 +1024,9 @@ repP (BangPat p)       = do { p1 <- repLP p; repPbang p1 }
 repP (AsPat x p)       = do { x' <- lookupLBinder x; p1 <- repLP p; repPaspat x' p1 }
 repP (ParPat p)        = repLP p 
 repP (ListPat ps _)    = do { qs <- repLPs ps; repPlist qs }
-repP p@(TuplePat ps boxed _) 
-  | not (isBoxed boxed) = notHandled "Unboxed tuples" (ppr p)
-  | otherwise           = do { qs <- repLPs ps; repPtup qs }
+repP (TuplePat ps boxed _)
+  | isBoxed boxed       = do { qs <- repLPs ps; repPtup qs }
+  | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
@@ -1247,6 +1251,9 @@ repPvar (MkC s) = rep2 varPName [s]
 repPtup :: Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPtup (MkC ps) = rep2 tupPName [ps]
 
+repPunboxedTup :: Core [TH.PatQ] -> DsM (Core TH.PatQ)
+repPunboxedTup (MkC ps) = rep2 unboxedTupPName [ps]
+
 repPcon   :: Core TH.Name -> Core [TH.PatQ] -> DsM (Core TH.PatQ)
 repPcon (MkC s) (MkC ps) = rep2 conPName [s, ps]
 
@@ -1296,6 +1303,9 @@ repLam (MkC ps) (MkC e) = rep2 lamEName [ps, e]
 
 repTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
 repTup (MkC es) = rep2 tupEName [es]
+
+repUnboxedTup :: Core [TH.ExpQ] -> DsM (Core TH.ExpQ)
+repUnboxedTup (MkC es) = rep2 unboxedTupEName [es]
 
 repCond :: Core TH.ExpQ -> Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repCond (MkC x) (MkC y) (MkC z) = rep2 condEName [x,y,z] 
@@ -1518,6 +1528,10 @@ repTupleTyCon :: Int -> DsM (Core TH.TypeQ)
 -- Note: not Core Int; it's easier to be direct here
 repTupleTyCon i = rep2 tupleTName [mkIntExprInt i]
 
+repUnboxedTupleTyCon :: Int -> DsM (Core TH.TypeQ)
+-- Note: not Core Int; it's easier to be direct here
+repUnboxedTupleTyCon i = rep2 unboxedTupleTName [mkIntExprInt i]
+
 repArrowTyCon :: DsM (Core TH.TypeQ)
 repArrowTyCon = rep2 arrowTName []
 
@@ -1668,7 +1682,8 @@ templateHaskellNames = [
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
     floatPrimLName, doublePrimLName, rationalLName, 
     -- Pat
-    litPName, varPName, tupPName, conPName, tildePName, bangPName, infixPName,
+    litPName, varPName, tupPName, unboxedTupPName,
+    conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName, viewPName,
     -- FieldPat
     fieldPatName,
@@ -1678,7 +1693,8 @@ templateHaskellNames = [
     clauseName,
     -- Exp
     varEName, conEName, litEName, appEName, infixEName,
-    infixAppName, sectionLName, sectionRName, lamEName, tupEName,
+    infixAppName, sectionLName, sectionRName, lamEName,
+    tupEName, unboxedTupEName,
     condEName, letEName, caseEName, doEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
     listEName, sigEName, recConEName, recUpdEName,
@@ -1805,11 +1821,12 @@ doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
 rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
 
 -- data Pat = ...
-litPName, varPName, tupPName, conPName, infixPName, tildePName, bangPName,
+litPName, varPName, tupPName, unboxedTupPName, conPName, infixPName, tildePName, bangPName,
     asPName, wildPName, recPName, listPName, sigPName, viewPName :: Name
 litPName   = libFun (fsLit "litP")   litPIdKey
 varPName   = libFun (fsLit "varP")   varPIdKey
 tupPName   = libFun (fsLit "tupP")   tupPIdKey
+unboxedTupPName = libFun (fsLit "unboxedTupP") unboxedTupPIdKey
 conPName   = libFun (fsLit "conP")   conPIdKey
 infixPName = libFun (fsLit "infixP") infixPIdKey
 tildePName = libFun (fsLit "tildeP") tildePIdKey
@@ -1835,7 +1852,7 @@ clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
 varEName, conEName, litEName, appEName, infixEName, infixAppName,
-    sectionLName, sectionRName, lamEName, tupEName, condEName,
+    sectionLName, sectionRName, lamEName, tupEName, unboxedTupEName, condEName,
     letEName, caseEName, doEName, compEName :: Name
 varEName        = libFun (fsLit "varE")        varEIdKey
 conEName        = libFun (fsLit "conE")        conEIdKey
@@ -1847,6 +1864,7 @@ sectionLName    = libFun (fsLit "sectionL")    sectionLIdKey
 sectionRName    = libFun (fsLit "sectionR")    sectionRIdKey
 lamEName        = libFun (fsLit "lamE")        lamEIdKey
 tupEName        = libFun (fsLit "tupE")        tupEIdKey
+unboxedTupEName = libFun (fsLit "unboxedTupE") unboxedTupEIdKey
 condEName       = libFun (fsLit "condE")       condEIdKey
 letEName        = libFun (fsLit "letE")        letEIdKey
 caseEName       = libFun (fsLit "caseE")       caseEIdKey
@@ -1939,12 +1957,13 @@ varStrictTypeName :: Name
 varStrictTypeName = libFun  (fsLit "varStrictType") varStrictTKey
 
 -- data Type = ...
-forallTName, varTName, conTName, tupleTName, arrowTName,
+forallTName, varTName, conTName, tupleTName, unboxedTupleTName, arrowTName,
     listTName, appTName, sigTName :: Name
 forallTName = libFun (fsLit "forallT") forallTIdKey
 varTName    = libFun (fsLit "varT")    varTIdKey
 conTName    = libFun (fsLit "conT")    conTIdKey
 tupleTName  = libFun (fsLit "tupleT")  tupleTIdKey
+unboxedTupleTName = libFun (fsLit "unboxedTupleT")  unboxedTupleTIdKey
 arrowTName  = libFun (fsLit "arrowT")  arrowTIdKey
 listTName   = libFun (fsLit "listT")   listTIdKey
 appTName    = libFun (fsLit "appT")    appTIdKey
@@ -2084,11 +2103,12 @@ liftStringIdKey :: Unique
 liftStringIdKey     = mkPreludeMiscIdUnique 218
 
 -- data Pat = ...
-litPIdKey, varPIdKey, tupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
+litPIdKey, varPIdKey, tupPIdKey, unboxedTupPIdKey, conPIdKey, infixPIdKey, tildePIdKey, bangPIdKey,
     asPIdKey, wildPIdKey, recPIdKey, listPIdKey, sigPIdKey, viewPIdKey :: Unique
 litPIdKey         = mkPreludeMiscIdUnique 220
 varPIdKey         = mkPreludeMiscIdUnique 221
 tupPIdKey         = mkPreludeMiscIdUnique 222
+unboxedTupPIdKey  = mkPreludeMiscIdUnique 362
 conPIdKey         = mkPreludeMiscIdUnique 223
 infixPIdKey       = mkPreludeMiscIdUnique 312
 tildePIdKey       = mkPreludeMiscIdUnique 224
@@ -2115,7 +2135,8 @@ clauseIdKey         = mkPreludeMiscIdUnique 232
 
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, infixEIdKey, infixAppIdKey,
-    sectionLIdKey, sectionRIdKey, lamEIdKey, tupEIdKey, condEIdKey,
+    sectionLIdKey, sectionRIdKey, lamEIdKey, tupEIdKey, unboxedTupEIdKey,
+    condEIdKey,
     letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
     listEIdKey, sigEIdKey, recConEIdKey, recUpdEIdKey :: Unique
@@ -2129,6 +2150,7 @@ sectionLIdKey     = mkPreludeMiscIdUnique 246
 sectionRIdKey     = mkPreludeMiscIdUnique 247
 lamEIdKey         = mkPreludeMiscIdUnique 248
 tupEIdKey         = mkPreludeMiscIdUnique 249
+unboxedTupEIdKey  = mkPreludeMiscIdUnique 263
 condEIdKey        = mkPreludeMiscIdUnique 250
 letEIdKey         = mkPreludeMiscIdUnique 251
 caseEIdKey        = mkPreludeMiscIdUnique 252
@@ -2217,12 +2239,13 @@ varStrictTKey :: Unique
 varStrictTKey     = mkPreludeMiscIdUnique 287
 
 -- data Type = ...
-forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, arrowTIdKey,
+forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey, arrowTIdKey,
     listTIdKey, appTIdKey, sigTIdKey :: Unique
 forallTIdKey      = mkPreludeMiscIdUnique 290
 varTIdKey         = mkPreludeMiscIdUnique 291
 conTIdKey         = mkPreludeMiscIdUnique 292
 tupleTIdKey       = mkPreludeMiscIdUnique 294
+unboxedTupleTIdKey = mkPreludeMiscIdUnique 361
 arrowTIdKey       = mkPreludeMiscIdUnique 295
 listTIdKey        = mkPreludeMiscIdUnique 296
 appTIdKey         = mkPreludeMiscIdUnique 293
