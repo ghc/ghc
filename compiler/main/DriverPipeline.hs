@@ -299,7 +299,7 @@ link' dflags batch_attempt_linking hpt
             home_mod_infos = eltsUFM hpt
 
             -- the packages we depend on
-            pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
+            pkg_deps  = concatMap (map fst . dep_pkgs . mi_deps . hm_iface) home_mod_infos
 
             -- the linkables to link
             linkables = map (expectJust "link".hm_linkable) home_mod_infos

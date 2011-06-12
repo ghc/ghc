@@ -144,10 +144,9 @@ import UniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag
 import Exception
--- import MonadUtils
 
 import Control.Monad
--- import System.IO
+import Data.Maybe       ( catMaybes )
 import Data.IORef
 \end{code}
 #include "HsVersions.h"
@@ -821,12 +820,18 @@ checkSafeImports :: DynFlags -> HscEnv -> TcGblEnv -> Hsc TcGblEnv
 checkSafeImports dflags hsc_env tcg_env
     = do
         imps <- mapM condense imports'
-        mapM_ checkSafe imps
-        return tcg_env
+        pkgs <- mapM checkSafe imps
+        pkgTransitiveOK pkg_reqs
+
+        -- add in trusted package requirements for this module
+        let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
+        return tcg_env { tcg_imports = imp_info `plusImportAvails` new_trust }
+
     where
         imp_info = tcg_imports tcg_env     -- ImportAvails
         imports  = imp_mods imp_info       -- ImportedMods
         imports' = moduleEnvToList imports -- (Module, [ImportedModsVal])
+        pkg_reqs = imp_trust_pkgs imp_info -- [PackageId]
 
         condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
         condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
@@ -840,7 +845,6 @@ checkSafeImports dflags hsc_env tcg_env
             = liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l1
                     (text "Module" <+> ppr m1 <+> (text $ "is imported"
                         ++ " both as a safe and unsafe import!"))
-
             | otherwise
             = return v1
 
@@ -852,15 +856,19 @@ checkSafeImports dflags hsc_env tcg_env
                 iface = lookupIfaceByModule dflags homePkgT pkgIfaceT m
             return iface
 
+        isHomePkg :: Module -> Bool
+        isHomePkg m
+            | thisPackage dflags == modulePackageId m = True
+            | otherwise                               = False
+
         -- | Check the package a module resides in is trusted.
         -- Modules in the home package are trusted but otherwise
         -- we check the packages trust flag.
         packageTrusted :: Module -> Bool
         packageTrusted m
-            | thisPackage dflags == modulePackageId m = True
-            | otherwise = trusted $ getPackageDetails (pkgState dflags)
-                                                      (modulePackageId m)
-
+            | isHomePkg m = True
+            | otherwise   = trusted $ getPackageDetails (pkgState dflags)
+                                                        (modulePackageId m)
         -- Is a module trusted? Return Nothing if True, or a String
         -- if it isn't, containing the reason it isn't
         isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc)
@@ -887,16 +895,34 @@ checkSafeImports dflags hsc_env tcg_env
                                  text ") the module resides in isn't trusted."
                             else text "The module itself isn't safe."
 
-        checkSafe :: (Module, SrcSpan, IsSafeImport) -> Hsc ()
-        checkSafe (_, _, False) = return ()
+        -- Here we check the transitive package trust requirements are OK still.
+        pkgTransitiveOK :: [PackageId] -> Hsc ()
+        pkgTransitiveOK pkgs = do
+            case errors of
+                [] -> return ()
+                _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
+            where
+                errors = catMaybes $ map go pkgs
+                go pkg
+                    | trusted $ getPackageDetails (pkgState dflags) pkg
+                    = Nothing
+                    | otherwise
+                    = Just $ mkPlainErrMsg noSrcSpan
+                           $ text "The package (" <> ppr pkg <> text ") is required"
+                          <> text " to be trusted but it isn't!"
+
+        checkSafe :: (Module, SrcSpan, IsSafeImport) -> Hsc (Maybe PackageId)
+        checkSafe (_, _, False) = return Nothing
         checkSafe (m, l, True ) = do
             module_safe <- isModSafe m l
             case module_safe of
-                Nothing -> return ()
+                Nothing -> return pkg
                 Just s  -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
-                            $ text ppr m <+> text "can't be safely imported!"
+                            $ ppr m <+> text "can't be safely imported!"
                                 <+> s
-
+            where pkg | isHomePkg m = Nothing
+                      | otherwise   = Just (modulePackageId m)
+                            
 --------------------------------------------------------------
 -- Simplifiers
 --------------------------------------------------------------

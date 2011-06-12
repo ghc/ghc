@@ -613,6 +613,16 @@ data ImportAvails
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
+        
+        imp_trust_pkgs :: [PackageId],
+          -- ^ This is strictly a subset of imp_dep_pkgs and records the
+          -- packages the current module needs to trust for Safe Haskell
+          -- compilation to succeed. A package is required to be trusted if
+          -- we are dependent on a trustworthy module in that package.
+          -- While perhaps making imp_dep_pkgs a tuple of (PackageId, Bool)
+          -- where True for the bool indicates the package is required to be
+          -- trusted is the more logical  design, doing so complicates a lot
+          -- of code not concerned with Safe Haskell.
 
  	imp_orphs :: [Module],
           -- ^ Orphan modules below us in the import tree (and maybe including
@@ -630,25 +640,29 @@ mkModDeps deps = foldl add emptyUFM deps
 		 add env elt@(m,_) = addToUFM env m elt
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_mods   	= emptyModuleEnv,
-				   imp_dep_mods = emptyUFM,
-				   imp_dep_pkgs = [],
-				   imp_orphs    = [],
-				   imp_finsts   = [] }
+emptyImportAvails = ImportAvails { imp_mods       = emptyModuleEnv,
+				   imp_dep_mods   = emptyUFM,
+				   imp_dep_pkgs   = [],
+                                   imp_trust_pkgs = [],
+				   imp_orphs      = [],
+				   imp_finsts     = [] }
 
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_mods = mods1,
-		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1, 
+		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1,
+                  imp_trust_pkgs = tpkgs1,
                   imp_orphs = orphs1, imp_finsts = finsts1 })
   (ImportAvails { imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
+                  imp_trust_pkgs = tpkgs2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
-  = ImportAvails { imp_mods     = plusModuleEnv_C (++) mods1 mods2,
-		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
-		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
-		   imp_orphs    = orphs1 `unionLists` orphs2,
-		   imp_finsts   = finsts1 `unionLists` finsts2 }
+  = ImportAvails { imp_mods       = plusModuleEnv_C (++) mods1 mods2,
+		   imp_dep_mods   = plusUFM_C plus_mod_dep dmods1 dmods2,	
+		   imp_dep_pkgs   = dpkgs1 `unionLists` dpkgs2,
+		   imp_trust_pkgs = tpkgs1 `unionLists` tpkgs2,
+		   imp_orphs      = orphs1 `unionLists` orphs2,
+		   imp_finsts     = finsts1 `unionLists` finsts2 }
   where
     plus_mod_dep (m1, boot1) (m2, boot2) 
 	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )

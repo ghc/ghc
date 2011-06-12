@@ -717,12 +717,14 @@ pprDeps :: Dependencies -> SDoc
 pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
 		dep_finsts = finsts })
   = vcat [ptext (sLit "module dependencies:") <+> fsep (map ppr_mod mods),
-	  ptext (sLit "package dependencies:") <+> fsep (map ppr pkgs), 
+	  ptext (sLit "package dependencies:") <+> fsep (map ppr_pkg pkgs),
 	  ptext (sLit "orphans:") <+> fsep (map ppr orphs),
 	  ptext (sLit "family instance modules:") <+> fsep (map ppr finsts)
 	]
   where
     ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
+    ppr_pkg (pkg,trust_req)  = ppr pkg <>
+                               (if trust_req then text "*" else empty)
     ppr_boot True  = text "[boot]"
     ppr_boot False = empty
 

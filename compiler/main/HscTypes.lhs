@@ -1435,7 +1435,7 @@ type IsBootInterface = Bool
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ Home-package module dependencies
-	 , dep_pkgs   :: [PackageId]
+	 , dep_pkgs   :: [(PackageId, Bool)]
 	                -- ^ External package dependencies
 	 , dep_orphs  :: [Module]	    
 	                -- ^ Orphan modules (whether home or external pkg),

@@ -53,6 +53,34 @@ import qualified Data.Map as Map
 %*                                                                      *
 %************************************************************************
 
+Note [Trust Transitive Property]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+So there is an interesting design question in regards to transitive trust
+checking. Say I have a module B compiled with -XSafe. B is dependent on a bunch
+of modules and packages, some packages it requires to be trusted as its using
+-XTrustworthy modules from them. Now if I have a module A that doesn't use safe
+haskell at all and simply imports B, should A inherit all the the trust
+requirements from B? Should A now also require that a package p is trusted since
+B required it?
+
+We currently say no but I saying yes also makes sense. The difference is, if a
+module M that doesn't use SafeHaskell imports a module N that does, should all
+the trusted package requirements be dropped since M didn't declare that it cares
+about Safe Haskell (so -XSafe is more strongly associated with the module doing
+the importing) or should it be done still since the author of the module N that
+uses Safe Haskell said they cared (so -XSafe is more strongly associated with
+the module that was compiled that used it).
+
+Going with yes is a simpler semantics we think and harder for the user to stuff
+up but it does mean that SafeHaskell will affect users who don't care about
+SafeHaskell as they might grab a package from Cabal which uses safe haskell (say
+network) and that packages imports -XTrustworthy modules from another package
+(say bytestring), so requires that package is trusted. The user may now get
+compilation errors in code that doesn't do anything with Safe Haskell simply
+because they are using the network package. They will have to call 'ghc-pkg
+trust network' to get everything working. Due to this invasive nature of going
+with yes we have gone with no for now.
+
 \begin{code}
 rnImports :: [LImportDecl RdrName]
            -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
@@ -211,8 +239,8 @@ rnImportDecl this_mod implicit_prelude
                 -- Imported module is from another package
                 -- Dump the dependent modules
                 -- Add the package imp_mod comes from to the dependent packages
-                ASSERT2( not (pkg `elem` dep_pkgs deps), ppr pkg <+> ppr (dep_pkgs deps) )
-                ([], pkg : dep_pkgs deps)
+                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps)), ppr pkg <+> ppr (dep_pkgs deps) )
+                ([], (pkg, False) : dep_pkgs deps)
 
         -- True <=> import M ()
         import_all = case imp_details of
@@ -225,11 +253,18 @@ rnImportDecl this_mod implicit_prelude
                     || (implicit_prelude && safeImplicitImpsReq dflags)
 
         imports   = ImportAvails {
-                        imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],
-                        imp_orphs    = orphans,
-                        imp_finsts   = finsts,
-                        imp_dep_mods = mkModDeps dependent_mods,
-                        imp_dep_pkgs = dependent_pkgs
+                        imp_mods       = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],
+                        imp_orphs      = orphans,
+                        imp_finsts     = finsts,
+                        imp_dep_mods   = mkModDeps dependent_mods,
+                        imp_dep_pkgs   = map fst $ dependent_pkgs,
+                        -- Add in the imported modules trusted package
+                        -- requirements. ONLY do this though if we import the
+                        -- module as a safe import.
+                        -- see Note [Trust Transitive Property]
+                        imp_trust_pkgs = if mod_safe' 
+                                            then map fst $ filter snd dependent_pkgs
+                                            else []
                    }
 
     -- Complain if we import a deprecated module

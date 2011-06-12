@@ -185,8 +185,13 @@ mkDependencies
         pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
              | otherwise = imp_dep_pkgs imports
 
+        -- add in safe haskell 'package needs to be safe' bool
+        sorted_pkgs = sortBy stablePackageIdCmp pkgs
+        trust_pkgs  = imp_trust_pkgs imports
+        dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
+
       return Deps { dep_mods   = sortBy (stableModuleNameCmp `on` fst) dep_mods,
-                    dep_pkgs   = sortBy stablePackageIdCmp pkgs,
+                    dep_pkgs   = dep_pkgs',
                     dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
                 -- sort to get into canonical order
@@ -598,7 +603,7 @@ getOrphanHashes hsc_env mods = do
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
  = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
-          dep_pkgs   = sortBy stablePackageIdCmp (dep_pkgs d),
+          dep_pkgs   = sortBy (stablePackageIdCmp `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
 \end{code}
@@ -1182,7 +1187,7 @@ checkDependencies hsc_env summary iface
                  else
                          return upToDate
           | otherwise
-           -> if pkg `notElem` prev_dep_pkgs
+           -> if pkg `notElem` (map fst prev_dep_pkgs)
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " is from package " <> quotes (ppr pkg) <>
