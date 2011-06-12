@@ -112,8 +112,8 @@ AC_DEFUN([FPTOOLS_HTYPE_INCLUDES],
 dnl ** Map an arithmetic C type to a Haskell type.
 dnl    Based on autconf's AC_CHECK_SIZEOF.
 
-dnl FPTOOLS_CHECK_HTYPE(TYPE)
-AC_DEFUN([FPTOOLS_CHECK_HTYPE],[
+dnl FPTOOLS_CHECK_HTYPE_ELSE(TYPE, WHAT_TO_DO_IF_TYPE_DOES_NOT_EXIST)
+AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
     changequote(<<, >>)
     dnl The name to #define.
     define(<<AC_TYPE_NAME>>, translit(htype_$1, [a-z *], [A-Z_P]))
@@ -174,12 +174,19 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE],[
         AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME,
                            [Define to Haskell type for $1])
     else
-        AC_CV_NAME=NotReallyAType
-        AC_MSG_RESULT([not supported])
+        $2
     fi
     undefine([AC_TYPE_NAME])dnl
     undefine([AC_CV_NAME])dnl
     undefine([AC_CV_NAME_supported])dnl
+])
+
+dnl FPTOOLS_CHECK_HTYPE(TYPE)
+AC_DEFUN([FPTOOLS_CHECK_HTYPE],[
+    FPTOOLS_CHECK_HTYPE_ELSE([$1],[
+        AC_CV_NAME=NotReallyAType
+        AC_MSG_RESULT([not supported])
+    ])
 ])
 
 
