@@ -102,7 +102,6 @@ FPTOOLS_CHECK_HTYPE_ELSE(suseconds_t,
                           then
                               AC_CV_NAME=Int32
                               AC_CV_NAME_supported=yes
-                              AC_MSG_RESULT([not found...on Windows, so using Int32])
                           else
                               AC_MSG_ERROR([type not found])
                           fi])

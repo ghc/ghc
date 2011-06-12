@@ -169,12 +169,17 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
             fi
         fi
         ])
+    if test "$AC_CV_NAME_supported" = no
+    then
+        $2
+    fi
+
+    dnl Note: evaluating dollar-2 can change the value of
+    dnl $AC_CV_NAME_supported, so we might now get a different answer
     if test "$AC_CV_NAME_supported" = yes; then
         AC_MSG_RESULT($AC_CV_NAME)
         AC_DEFINE_UNQUOTED(AC_TYPE_NAME, $AC_CV_NAME,
                            [Define to Haskell type for $1])
-    else
-        $2
     fi
     undefine([AC_TYPE_NAME])dnl
     undefine([AC_CV_NAME])dnl
