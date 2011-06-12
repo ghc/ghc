@@ -97,7 +97,15 @@ FPTOOLS_CHECK_HTYPE(sig_atomic_t)
 FPTOOLS_CHECK_HTYPE(clock_t)
 FPTOOLS_CHECK_HTYPE(time_t)
 FPTOOLS_CHECK_HTYPE(useconds_t)
-FPTOOLS_CHECK_HTYPE(suseconds_t)
+FPTOOLS_CHECK_HTYPE_ELSE(suseconds_t,
+                         [if test "$WINDOWS" = "YES"
+                          then
+                              AC_CV_NAME=Int32
+                              AC_CV_NAME_supported=yes
+                              AC_MSG_RESULT([not found...on Windows, so using Int32])
+                          else
+                              AC_MSG_ERROR([type not found])
+                          fi])
 FPTOOLS_CHECK_HTYPE(dev_t)
 FPTOOLS_CHECK_HTYPE(ino_t)
 FPTOOLS_CHECK_HTYPE(mode_t)
