@@ -1,5 +1,8 @@
 # Despite the name "package", this file contains the master list of 
-# the *repositories* that make up GHC. It is parsed by boot and sync-all.
+# the *repositories* that make up GHC. It is parsed by
+# * boot
+# * sync-all
+# * rules/extra-packages.mk
 #
 # Some of this information is duplicated elsewhere in the build system:
 #    See Trac #3896
