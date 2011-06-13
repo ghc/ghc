@@ -142,13 +142,12 @@ sub parsePackages {
     foreach (@repos) {
         chomp;
         $lineNum++;
-        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
+        if (/^([^# ]+) +([^ ]+) +([^ ]+) +([^ ]+)$/) {
             my %line;
             $line{"localpath"}  = $1;
             $line{"tag"}        = $2;
             $line{"remotepath"} = $3;
             $line{"vcs"}        = $4;
-            $line{"upstream"}   = $5;
             push @packages, \%line;
         }
         elsif (! /^(#.*)?$/) {
@@ -198,7 +197,6 @@ sub scmall {
     my $tag;
     my $remotepath;
     my $scm;
-    my $upstream;
     my $line;
     my $branch_name;
     my $subcommand;
@@ -252,7 +250,6 @@ sub scmall {
         $tag        = $$line{"tag"};
         $remotepath = $$line{"remotepath"};
         $scm        = $$line{"vcs"};
-        $upstream   = $$line{"upstream"};
 
         # Check the SCM is OK as early as possible
         die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));

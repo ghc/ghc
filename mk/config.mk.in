@@ -120,8 +120,8 @@ SharedLibsPlatformList = i386-unknown-linux x86_64-unknown-linux \
 	i386-unknown-mingw32 \
 	i386-apple-darwin powerpc-apple-darwin
 
-ifeq ($(SOLARIS_BROKEN_SHLD), NO)
-SharedLibsPlatformList := $(SharedLibsPlatformList) i386-unknown-solaris2
+ifeq "$(SOLARIS_BROKEN_SHLD)" "NO"
+SharedLibsPlatformList += i386-unknown-solaris2
 endif
 
 PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\

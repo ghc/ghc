@@ -1027,6 +1027,10 @@ zonkVect env (HsVect v (Just e))
        ; e' <- zonkLExpr env e
        ; return $ HsVect v' (Just e')
        }
+zonkVect env (HsNoVect v)
+  = do { v' <- wrapLocM (zonkIdBndr env) v
+       ; return $ HsNoVect v'
+       }
 \end{code}
 
 %************************************************************************

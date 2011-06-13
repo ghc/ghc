@@ -252,21 +252,22 @@ incorrect.
  'by'       { L _ ITby }        -- for list transform extension
  'using'    { L _ ITusing }     -- for list transform extension
 
- '{-# INLINE'      	  { L _ (ITinline_prag _ _) }
- '{-# SPECIALISE'  	  { L _ ITspec_prag }
+ '{-# INLINE'             { L _ (ITinline_prag _ _) }
+ '{-# SPECIALISE'         { L _ ITspec_prag }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _) }
- '{-# SOURCE'	   { L _ ITsource_prag }
- '{-# RULES'	   { L _ ITrules_prag }
- '{-# CORE'        { L _ ITcore_prag }              -- hdaume: annotated core
- '{-# SCC'	   { L _ ITscc_prag }
- '{-# GENERATED'   { L _ ITgenerated_prag }
- '{-# DEPRECATED'  { L _ ITdeprecated_prag }
- '{-# WARNING'     { L _ ITwarning_prag }
- '{-# UNPACK'      { L _ ITunpack_prag }
- '{-# ANN'         { L _ ITann_prag }
+ '{-# SOURCE'      				{ L _ ITsource_prag }
+ '{-# RULES'       				{ L _ ITrules_prag }
+ '{-# CORE'        				{ L _ ITcore_prag }              -- hdaume: annotated core
+ '{-# SCC'                { L _ ITscc_prag }
+ '{-# GENERATED'          { L _ ITgenerated_prag }
+ '{-# DEPRECATED'         { L _ ITdeprecated_prag }
+ '{-# WARNING'            { L _ ITwarning_prag }
+ '{-# UNPACK'             { L _ ITunpack_prag }
+ '{-# ANN'                { L _ ITann_prag }
  '{-# VECTORISE'          { L _ ITvect_prag }
  '{-# VECTORISE_SCALAR'   { L _ ITvect_scalar_prag }
- '#-}'		   { L _ ITclose_prag }
+ '{-# NOVECTORISE'        { L _ ITnovect_prag }
+ '#-}'             				{ L _ ITclose_prag }
 
  '..'		{ L _ ITdotdot }  			-- reserved symbols
  ':'		{ L _ ITcolon }
@@ -546,33 +547,34 @@ ops   	:: { Located [Located RdrName] }
 -- Top-Level Declarations
 
 topdecls :: { OrdList (LHsDecl RdrName) }
-        : topdecls ';' topdecl		        { $1 `appOL` $3 }
-        | topdecls ';'			        { $1 }
-	| topdecl			        { $1 }
+        : topdecls ';' topdecl                  { $1 `appOL` $3 }
+        | topdecls ';'                          { $1 }
+        | topdecl                               { $1 }
 
 topdecl :: { OrdList (LHsDecl RdrName) }
-  	: cl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
-  	| ty_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
-	| 'instance' inst_type where_inst
-	    { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
-	      in 
-	      unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs ats)))}
+        : cl_decl                       { unitOL (L1 (TyClD (unLoc $1))) }
+        | ty_decl                       { unitOL (L1 (TyClD (unLoc $1))) }
+        | 'instance' inst_type where_inst
+            { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
+              in 
+              unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs ats)))}
         | stand_alone_deriving                  { unitOL (LL (DerivD (unLoc $1))) }
-	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
-	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
+        | 'default' '(' comma_types0 ')'        { unitOL (LL $ DefD (DefaultDecl $3)) }
+        | 'foreign' fdecl                       { unitOL (LL (unLoc $2)) }
         | '{-# DEPRECATED' deprecations '#-}'   { $2 }
         | '{-# WARNING' warnings '#-}'          { $2 }
-	| '{-# RULES' rules '#-}'		{ $2 }
-	| '{-# VECTORISE_SCALAR' qvar '#-}'	{ unitOL $ LL $ VectD (HsVect $2 Nothing) }
-	| '{-# VECTORISE' qvar '=' exp '#-}'	{ unitOL $ LL $ VectD (HsVect $2 (Just $4)) }
-	| annotation { unitOL $1 }
-      	| decl					{ unLoc $1 }
+        | '{-# RULES' rules '#-}'               { $2 }
+        | '{-# VECTORISE_SCALAR' qvar '#-}'     { unitOL $ LL $ VectD (HsVect   $2 Nothing) }
+        | '{-# VECTORISE' qvar '=' exp '#-}'    { unitOL $ LL $ VectD (HsVect   $2 (Just $4)) }
+        | '{-# NOVECTORISE' qvar '#-}'     			{ unitOL $ LL $ VectD (HsNoVect $2) }
+        | annotation { unitOL $1 }
+        | decl                                  { unLoc $1 }
 
-	-- Template Haskell Extension
-	-- The $(..) form is one possible form of infixexp
-	-- but we treat an arbitrary expression just as if 
-	-- it had a $(..) wrapped around it
-	| infixexp 				{ unitOL (LL $ mkTopSpliceDecl $1) } 
+        -- Template Haskell Extension
+        -- The $(..) form is one possible form of infixexp
+        -- but we treat an arbitrary expression just as if 
+        -- it had a $(..) wrapped around it
+        | infixexp                              { unitOL (LL $ mkTopSpliceDecl $1) } 
 
 -- Type classes
 --

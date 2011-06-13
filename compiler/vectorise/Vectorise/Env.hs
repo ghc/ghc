@@ -95,6 +95,10 @@ data GlobalEnv
         , global_scalar_tycons  :: NameSet
           -- ^Type constructors whose values can only contain scalar data.  Scalar code may only
           -- operate on such data.
+        
+        , global_novect_vars    :: VarSet
+          -- ^Variables that are not vectorised.  (They may be referenced in the right-hand sides
+          -- of vectorisation declarations, though.)
 
         , global_exported_vars  :: VarEnv (Var, Var)
           -- ^Exported variables which have a vectorised version.
@@ -134,6 +138,7 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   , global_vect_decls    = mkVarEnv vects
   , global_scalar_vars   = vectInfoScalarVars   info `extendVarSetList` scalars
   , global_scalar_tycons = vectInfoScalarTyCons info
+  , global_novect_vars   = mkVarSet novects
   , global_exported_vars = emptyVarEnv
   , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
   , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
@@ -147,6 +152,7 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   where
     vects   = [(var, (varType var, exp)) | Vect var (Just exp) <- vectDecls]
     scalars = [var                       | Vect var Nothing    <- vectDecls]
+    novects = [var                       | NoVect var          <- vectDecls]
 
 
 -- Operators on Global Environments -------------------------------------------

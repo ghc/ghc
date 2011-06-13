@@ -29,7 +29,7 @@ import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
 import Id
-import BasicTypes       ( CompilerPhase, isDefaultInlinePragma )
+import BasicTypes
 import VarSet
 import VarEnv
 import LiberateCase	( liberateCase )
@@ -356,11 +356,18 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       -- space usage, especially with -O.  JRS, 000620.
       | let sz = coreBindsSize binds in sz == sz
       = do {
-		-- Occurrence analysis
-	   let { tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm active_rule rules [] binds } ;
-	   Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-		     (pprCoreBindings tagged_binds);
+                -- Occurrence analysis
+           let {   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
+                   -- that the right-hand sides of vectorisation declarations are taken into 
+                   -- account during occurence analysis.
+                 maybeVects   = case sm_phase mode of
+                                  InitialPhase -> mg_vect_decls guts
+                                  _            -> []
+               ; tagged_binds = {-# SCC "OccAnal" #-} 
+                     occurAnalysePgm active_rule rules maybeVects binds 
+               } ;
+           Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+                     (pprCoreBindings tagged_binds);
 
 	   	-- Get any new rules, and extend the rule base
 		-- See Note [Overall plumbing for rules] in Rules.lhs
