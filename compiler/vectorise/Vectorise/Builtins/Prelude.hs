@@ -27,7 +27,7 @@ preludeVars :: Modules
 preludeVars (Modules { dph_Combinators    = _dph_Combinators
                      , dph_Prelude_Int    = dph_Prelude_Int
                      , dph_Prelude_Word8  = dph_Prelude_Word8
-                     , dph_Prelude_Double = dph_Prelude_Double
+                     -- , dph_Prelude_Double = dph_Prelude_Double
                      , dph_Prelude_Bool   = dph_Prelude_Bool 
                      })
 
@@ -92,40 +92,40 @@ preludeVars (Modules { dph_Combinators    = _dph_Combinators
        , mk' mod "productP" "productPA"
        ]
 
-    vars_Fractional mod 
-     = [ mk' mod "/"     "divideV"
-       , mk' mod "recip" "recipV"
-       ]
-
-    vars_Floating mod 
-     = [ mk' mod "pi"      "pi"
-       , mk' mod "exp"     "expV"
-       , mk' mod "sqrt"    "sqrtV"
-       , mk' mod "log"     "logV"
-       , mk' mod "sin"     "sinV"
-       , mk' mod "tan"     "tanV"
-       , mk' mod "cos"     "cosV"
-       , mk' mod "asin"    "asinV"
-       , mk' mod "atan"    "atanV"
-       , mk' mod "acos"    "acosV"
-       , mk' mod "sinh"    "sinhV"
-       , mk' mod "tanh"    "tanhV"
-       , mk' mod "cosh"    "coshV"
-       , mk' mod "asinh"   "asinhV"
-       , mk' mod "atanh"   "atanhV"
-       , mk' mod "acosh"   "acoshV"
-       , mk' mod "**"      "powV"
-       , mk' mod "logBase" "logBaseV"
-       ]
-
-    vars_RealFrac mod
-     = [ mk' mod "fromInt"  "fromIntV"
-       , mk' mod "truncate" "truncateV"
-       , mk' mod "round"    "roundV"
-       , mk' mod "ceiling"  "ceilingV"
-       , mk' mod "floor"    "floorV"
-       ]
-
+    -- vars_Fractional mod 
+    --  = [ mk' mod "/"     "divideV"
+    --    , mk' mod "recip" "recipV"
+    --    ]
+    -- 
+    -- vars_Floating mod 
+    --  = [ mk' mod "pi"      "pi"
+    --    , mk' mod "exp"     "expV"
+    --    , mk' mod "sqrt"    "sqrtV"
+    --    , mk' mod "log"     "logV"
+    --    , mk' mod "sin"     "sinV"
+    --    , mk' mod "tan"     "tanV"
+    --    , mk' mod "cos"     "cosV"
+    --    , mk' mod "asin"    "asinV"
+    --    , mk' mod "atan"    "atanV"
+    --    , mk' mod "acos"    "acosV"
+    --    , mk' mod "sinh"    "sinhV"
+    --    , mk' mod "tanh"    "tanhV"
+    --    , mk' mod "cosh"    "coshV"
+    --    , mk' mod "asinh"   "asinhV"
+    --    , mk' mod "atanh"   "atanhV"
+    --    , mk' mod "acosh"   "acoshV"
+    --    , mk' mod "**"      "powV"
+    --    , mk' mod "logBase" "logBaseV"
+    --    ]
+    -- 
+    -- vars_RealFrac mod
+    --  = [ mk' mod "fromInt"  "fromIntV"
+    --    , mk' mod "truncate" "truncateV"
+    --    , mk' mod "round"    "roundV"
+    --    , mk' mod "ceiling"  "ceilingV"
+    --    , mk' mod "floor"    "floorV"
+    --    ]
+    -- 
 preludeScalars :: Modules -> [(Module, FastString)]
 preludeScalars (Modules { dph_Prelude_Int    = dph_Prelude_Int
                         , dph_Prelude_Word8  = dph_Prelude_Word8

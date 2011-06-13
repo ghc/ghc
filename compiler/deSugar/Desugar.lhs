@@ -399,6 +399,6 @@ dsVect (L loc (HsVect (L _ v) rhs))
     do { rhs' <- fmapMaybeM dsLExpr rhs
        ; return $ Vect v rhs'
   	   }
-dsVect (L loc (HsNoVect (L _ v)))
+dsVect (L _loc (HsNoVect (L _ v)))
   = return $ NoVect v
 \end{code}
