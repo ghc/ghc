@@ -17,7 +17,11 @@ import StgCmmForeign
 import StgCmmEnv
 import StgCmmMonad
 import StgCmmUtils
+import StgCmmTicky
+import StgCmmHeap
+import StgCmmProf
 
+import BasicTypes
 import MkGraph
 import StgSyn
 import CmmDecl
@@ -280,6 +284,21 @@ emitPrimOp [res] UnsafeFreezeArrayOp [arg]
 --  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
 emitPrimOp [res] UnsafeFreezeByteArrayOp [arg]
    = emit (mkAssign (CmmLocal res) arg)
+
+-- Copying pointer arrays
+
+emitPrimOp [] CopyArrayOp [src,src_off,dst,dst_off,n] =
+    doCopyArrayOp src src_off dst dst_off n
+emitPrimOp [] CopyMutableArrayOp [src,src_off,dst,dst_off,n] =
+    doCopyMutableArrayOp src src_off dst dst_off n
+emitPrimOp [res] CloneArrayOp [src,src_off,n] =
+    emitCloneArray mkMAP_FROZEN_infoLabel res src src_off n
+emitPrimOp [res] CloneMutableArrayOp [src,src_off,n] =
+    emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n
+emitPrimOp [res] FreezeArrayOp [src,src_off,n] =
+    emitCloneArray mkMAP_FROZEN_infoLabel res src src_off n
+emitPrimOp [res] ThawArrayOp [src,src_off,n] =
+    emitCloneArray mkMAP_DIRTY_infoLabel res src src_off n
 
 -- Reading/writing pointer arrays
 
@@ -684,3 +703,193 @@ cmmLoadIndexOffExpr off ty base idx
 setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
 
+-- ----------------------------------------------------------------------------
+-- Copying pointer arrays
+
+-- EZY: This code has an unusually high amount of assignTemp calls, seen
+-- nowhere else in the code generator.  This is mostly because these
+-- "primitive" ops result in a surprisingly large amount of code.  It
+-- will likely be worthwhile to optimize what is emitted here, so that
+-- our optimization passes don't waste time repeatedly optimizing the
+-- same bits of code.
+
+-- More closely imitates 'assignTemp' from the old code generator, which
+-- returns a CmmExpr rather than a LocalReg.
+assignTempE :: CmmExpr -> FCode CmmExpr
+assignTempE e = do
+    t <- assignTemp e
+    return (CmmReg (CmmLocal t))
+
+-- | Takes a source 'Array#', an offset in the source array, a
+-- destination 'MutableArray#', an offset into the destination array,
+-- and the number of elements to copy.  Copies the given number of
+-- elements from the source array to the destination array.
+doCopyArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+              -> FCode ()
+doCopyArrayOp = emitCopyArray copy
+  where
+    -- Copy data (we assume the arrays aren't overlapping since
+    -- they're of different types)
+    copy _src _dst = emitMemcpyCall
+
+-- | Takes a source 'MutableArray#', an offset in the source array, a
+-- destination 'MutableArray#', an offset into the destination array,
+-- and the number of elements to copy.  Copies the given number of
+-- elements from the source array to the destination array.
+doCopyMutableArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                     -> FCode ()
+doCopyMutableArrayOp = emitCopyArray copy
+  where
+    -- The only time the memory might overlap is when the two arrays
+    -- we were provided are the same array!
+    -- TODO: Optimize branch for common case of no aliasing.
+    copy src dst dst_p src_p bytes = do
+        [moveCall, cpyCall] <- forkAlts [
+            getCode $ emitMemmoveCall dst_p src_p bytes,
+            getCode $ emitMemcpyCall  dst_p src_p bytes
+            ]
+        emit $ mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
+
+emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                  -> FCode ())
+              -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+              -> FCode ()
+emitCopyArray copy src0 src_off0 dst0 dst_off0 n0 = do
+    -- Passed as arguments (be careful)
+    src     <- assignTempE src0
+    src_off <- assignTempE src_off0
+    dst     <- assignTempE dst0
+    dst_off <- assignTempE dst_off0
+    n       <- assignTempE n0
+
+    -- Set the dirty bit in the header.
+    emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
+
+    dst_elems_p <- assignTempE $ cmmOffsetB dst arrPtrsHdrSize
+    dst_p <- assignTempE $ cmmOffsetExprW dst_elems_p dst_off
+    src_p <- assignTempE $ cmmOffsetExprW (cmmOffsetB src arrPtrsHdrSize) src_off
+    bytes <- assignTempE $ cmmMulWord n (CmmLit (mkIntCLit wORD_SIZE))
+
+    copy src dst dst_p src_p bytes
+
+    -- The base address of the destination card table
+    dst_cards_p <- assignTempE $ cmmOffsetExprW dst_elems_p (loadArrPtrsSize dst)
+
+    emitSetCards dst_off dst_cards_p n
+
+-- | Takes an info table label, a register to return the newly
+-- allocated array in, a source array, an offset in the source array,
+-- and the number of elements to copy.  Allocates a new array and
+-- initializes it form the source array.
+emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> CmmExpr
+               -> FCode ()
+emitCloneArray info_p res_r src0 src_off0 n0 = do
+    -- Passed as arguments (be careful)
+    src     <- assignTempE src0
+    src_off <- assignTempE src_off0
+    n       <- assignTempE n0
+
+    card_words <- assignTempE $ (n `cmmUShrWord`
+                                (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS)))
+                  `cmmAddWord` CmmLit (mkIntCLit 1)
+    size <- assignTempE $ n `cmmAddWord` card_words
+    words <- assignTempE $ arrPtrsHdrSizeW `cmmAddWord` size
+
+    arr_r <- newTemp bWord
+    emitAllocateCall arr_r myCapability words
+    tickyAllocPrim (CmmLit (mkIntCLit arrPtrsHdrSize)) (n `cmmMulWord` wordSize)
+        (CmmLit $ mkIntCLit 0)
+
+    let arr = CmmReg (CmmLocal arr_r)
+    emitSetDynHdr arr (CmmLit (CmmLabel info_p)) curCCSAddr
+    emit $ mkStore (cmmOffsetB arr (fixedHdrSize * wORD_SIZE +
+                                    oFFSET_StgMutArrPtrs_ptrs)) n
+    emit $ mkStore (cmmOffsetB arr (fixedHdrSize * wORD_SIZE +
+                                    oFFSET_StgMutArrPtrs_size)) size
+
+    dst_p <- assignTempE $ cmmOffsetB arr arrPtrsHdrSize
+    src_p <- assignTempE $ cmmOffsetExprW (cmmOffsetB src arrPtrsHdrSize)
+             src_off
+
+    emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize)
+
+    emitMemsetCall (cmmOffsetExprW dst_p n)
+        (CmmLit (mkIntCLit 1))
+        (card_words `cmmMulWord` wordSize)
+    emit $ mkAssign (CmmLocal res_r) arr
+  where
+    arrPtrsHdrSizeW = CmmLit $ mkIntCLit $ fixedHdrSize +
+                      (sIZEOF_StgMutArrPtrs_NoHdr `div` wORD_SIZE)
+    wordSize = CmmLit (mkIntCLit wORD_SIZE)
+    myCapability = CmmReg baseReg `cmmSubWord`
+                   CmmLit (mkIntCLit oFFSET_Capability_r)
+
+-- | Takes and offset in the destination array, the base address of
+-- the card table, and the number of elements affected (*not* the
+-- number of cards).  Marks the relevant cards as dirty.
+emitSetCards :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitSetCards dst_start dst_cards_start n = do
+    start_card <- assignTempE $ card dst_start
+    emitMemsetCall (dst_cards_start `cmmAddWord` start_card)
+        (CmmLit (mkIntCLit 1))
+        ((card (dst_start `cmmAddWord` n) `cmmSubWord` start_card)
+         `cmmAddWord` CmmLit (mkIntCLit 1))
+  where
+    -- Convert an element index to a card index
+    card i = i `cmmUShrWord` (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS))
+
+-- | Emit a call to @memcpy@.
+emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitMemcpyCall dst src n = do
+    emitCCall
+        [ {-no results-} ]
+        memcpy
+        [ (dst, AddrHint)
+        , (src, AddrHint)
+        , (n, NoHint)
+        ]
+  where
+    memcpy = CmmLit (CmmLabel (mkForeignLabel (fsLit "memcpy") Nothing
+                               ForeignLabelInExternalPackage IsFunction))
+
+-- | Emit a call to @memmove@.
+emitMemmoveCall :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitMemmoveCall dst src n = do
+    emitCCall
+        [ {- no results -} ]
+        memmove
+        [ (dst, AddrHint)
+        , (src, AddrHint)
+        , (n, NoHint)
+        ]
+  where
+    memmove = CmmLit (CmmLabel (mkForeignLabel (fsLit "memmove") Nothing
+                               ForeignLabelInExternalPackage IsFunction))
+
+-- | Emit a call to @memset@.  The second argument must fit inside an
+-- unsigned char.
+emitMemsetCall :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitMemsetCall dst c n = do
+    emitCCall
+        [ {- no results -} ]
+        memset
+        [ (dst, AddrHint)
+        , (c, NoHint)
+        , (n, NoHint)
+        ]
+  where
+    memset = CmmLit (CmmLabel (mkForeignLabel (fsLit "memset") Nothing
+                               ForeignLabelInExternalPackage IsFunction))
+
+-- | Emit a call to @allocate@.
+emitAllocateCall :: LocalReg -> CmmExpr -> CmmExpr -> FCode ()
+emitAllocateCall res cap n = do
+    emitCCall
+        [ (res, AddrHint) ]
+        allocate
+        [ (cap, AddrHint)
+        , (n, NoHint)
+        ]
+  where
+    allocate = CmmLit (CmmLabel (mkForeignLabel (fsLit "allocate") Nothing
+                                 ForeignLabelInExternalPackage IsFunction))

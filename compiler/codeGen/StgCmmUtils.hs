@@ -23,7 +23,7 @@ module StgCmmUtils (
         callerSaves, callerSaveVolatileRegs, get_GlobalReg_addr,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
-        cmmUGtWord,
+        cmmUGtWord, cmmSubWord, cmmMulWord, cmmAddWord, cmmUShrWord,
 	cmmOffsetExprW, cmmOffsetExprB,
 	cmmRegOffW, cmmRegOffB,
 	cmmLabelOffW, cmmLabelOffB,
@@ -160,7 +160,8 @@ cmmLoadIndexW base off ty = CmmLoad (cmmOffsetW base off) ty
 
 -----------------------
 cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
-  cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord 
+  cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
+  cmmUShrWord, cmmAddWord, cmmMulWord
   :: CmmExpr -> CmmExpr -> CmmExpr
 cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
 cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
@@ -170,8 +171,10 @@ cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
 cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
 cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
 --cmmShlWord e1 e2 = CmmMachOp mo_wordShl [e1, e2]
---cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
+cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
+cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
 cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
+cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
@@ -550,7 +553,13 @@ mkByteStringCLit bytes
 -------------------------------------------------------------------------
 
 assignTemp :: CmmExpr -> FCode LocalReg
--- Make sure the argument is in a local register
+-- Make sure the argument is in a local register.
+-- We don't bother being particularly aggressive with avoiding
+-- unnecessary local registers, since we can rely on a later
+-- optimization pass to inline as necessary (and skipping out
+-- on things like global registers can be a little dangerous
+-- due to them being trashed on foreign calls--though it means
+-- the optimization pass doesn't have to do as much work)
 assignTemp (CmmReg (CmmLocal reg)) = return reg
 assignTemp e = do { uniq <- newUnique
 		  ; let reg = LocalReg uniq (cmmExprType e)
