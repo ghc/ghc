@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures -fno-warn-unused-do-bind #-}
 
 module Vectorise ( vectorise )
 where
@@ -82,98 +81,124 @@ vectModule guts@(ModGuts { mg_types     = types
                       }
       }
 
--- | Try to vectorise a top-level binding.
---   If it doesn't vectorise then return it unharmed.
+-- |Try to vectorise a top-level binding.  If it doesn't vectorise then return it unharmed.
 --
---   For example, for the binding 
+-- For example, for the binding 
 --
---   @  
---      foo :: Int -> Int
---      foo = \x -> x + x
---   @
---  
---   we get
---   @
---      foo  :: Int -> Int
---      foo  = \x -> vfoo $: x                  
--- 
---      v_foo :: Closure void vfoo lfoo
---      v_foo = closure vfoo lfoo void        
--- 
---      vfoo :: Void -> Int -> Int
---      vfoo = ...
+-- @  
+--    foo :: Int -> Int
+--    foo = \x -> x + x
+-- @
 --
---      lfoo :: PData Void -> PData Int -> PData Int
---      lfoo = ...
---   @ 
+-- we get
+-- @
+--    foo  :: Int -> Int
+--    foo  = \x -> vfoo $: x                  
 --
---   @vfoo@ is the "vectorised", or scalar, version that does the same as the original
---   function foo, but takes an explicit environment.
--- 
---   @lfoo@ is the "lifted" version that works on arrays.
+--    v_foo :: Closure void vfoo lfoo
+--    v_foo = closure vfoo lfoo void        
 --
---   @v_foo@ combines both of these into a `Closure` that also contains the
---   environment.
+--    vfoo :: Void -> Int -> Int
+--    vfoo = ...
 --
---   The original binding @foo@ is rewritten to call the vectorised version
---   present in the closure.
+--    lfoo :: PData Void -> PData Int -> PData Int
+--    lfoo = ...
+-- @ 
+--
+-- @vfoo@ is the "vectorised", or scalar, version that does the same as the original
+-- function foo, but takes an explicit environment.
+--
+-- @lfoo@ is the "lifted" version that works on arrays.
+--
+-- @v_foo@ combines both of these into a `Closure` that also contains the
+-- environment.
+--
+-- The original binding @foo@ is rewritten to call the vectorised version
+-- present in the closure.
+--
+-- Vectorisation may be surpressed by annotating a binding with a 'NOVECTORISE' pragma.  If this
+-- pragma is used in a group of mutually recursive bindings, either all or no binding must have
+-- the pragma.  If only some bindings are annotated, a fatal error is being raised.
+-- FIXME: Once we support partial vectorisation, we may be able to vectorise parts of a group, or
+--   we may emit a warning and refrain from vectorising the entire group.
 --
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
- = do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it to
-          -- the vectorisation map.
-      ; (inline, isScalar, expr') <- vectTopRhs [] var expr
-      ; var' <- vectTopBinder var inline expr'
-      ; when isScalar $ 
-          addGlobalScalar var
-
-          -- We replace the original top-level binding by a value projected from the vectorised
-          -- closure and add any newly created hoisted top-level bindings.
-      ; cexpr <- tryConvert var var' expr
-      ; hs <- takeHoisted
-      ; return . Rec $ (var, cexpr) : (var', expr') : hs
-      }
-  `orElseV`
-    return b
+  = unlessNoVectDecl $
+      do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it
+             -- to the vectorisation map.
+         ; (inline, isScalar, expr') <- vectTopRhs [] var expr
+         ; var' <- vectTopBinder var inline expr'
+         ; when isScalar $ 
+             addGlobalScalar var
+ 
+             -- We replace the original top-level binding by a value projected from the vectorised
+             -- closure and add any newly created hoisted top-level bindings.
+         ; cexpr <- tryConvert var var' expr
+         ; hs <- takeHoisted
+         ; return . Rec $ (var, cexpr) : (var', expr') : hs
+         }
+     `orElseV`
+       return b
+  where
+    unlessNoVectDecl vectorise
+      = do { hasNoVectDecl <- noVectDecl var
+           ; when hasNoVectDecl $
+               traceVt "NOVECTORISE" $ ppr var
+           ; if hasNoVectDecl then return b else vectorise
+           }
 vectTopBind b@(Rec bs)
- = let (vars, exprs) = unzip bs
-   in
-   do { (vars', _, exprs', hs) <- fixV $ 
-          \ ~(_, inlines, rhss, _) ->
-            do {   -- Vectorise the right-hand sides, create an appropriate top-level bindings and
-                   --  add them to the vectorisation map.
-               ; vars' <- sequence [vectTopBinder var inline rhs
-                                   | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
-               ; (inlines, areScalars, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
-               ; hs <- takeHoisted
-               ; if and areScalars
-                 then      -- (1) Entire recursive group is scalar
-                           --      => add all variables to the global set of scalars
-                      do { mapM addGlobalScalar vars
-                         ; return (vars', inlines, exprs', hs)
-                         }
-                 else      -- (2) At least one binding is not scalar
-                           --     => vectorise again with empty set of local scalars
-                      do { (inlines, _, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
-                         ; hs <- takeHoisted
-                         ; return (vars', inlines, exprs', hs)
-                         }
-               }
-                      
-          -- Replace the original top-level bindings by a values projected from the vectorised
-          -- closures and add any newly created hoisted top-level bindings to the group.
-      ; cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
-      ; return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
-      }
-  `orElseV`
-    return b    
-    
+  = unlessSomeNoVectDecl $
+      do { (vars', _, exprs', hs) <- fixV $ 
+             \ ~(_, inlines, rhss, _) ->
+               do {   -- Vectorise the right-hand sides, create an appropriate top-level bindings
+                      -- and add them to the vectorisation map.
+                  ; vars' <- sequence [vectTopBinder var inline rhs
+                                      | (var, ~(inline, rhs)) <- zipLazy vars (zip inlines rhss)]
+                  ; (inlines, areScalars, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs vars) bs
+                  ; hs <- takeHoisted
+                  ; if and areScalars
+                    then      -- (1) Entire recursive group is scalar
+                              --      => add all variables to the global set of scalars
+                         do { mapM_ addGlobalScalar vars
+                            ; return (vars', inlines, exprs', hs)
+                            }
+                    else      -- (2) At least one binding is not scalar
+                              --     => vectorise again with empty set of local scalars
+                         do { (inlines, _, exprs') <- mapAndUnzip3M (uncurry $ vectTopRhs []) bs
+                            ; hs <- takeHoisted
+                            ; return (vars', inlines, exprs', hs)
+                            }
+                  }
+                       
+             -- Replace the original top-level bindings by a values projected from the vectorised
+             -- closures and add any newly created hoisted top-level bindings to the group.
+         ; cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
+         ; return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
+         }
+     `orElseV`
+       return b    
+  where
+    (vars, exprs) = unzip bs
+
+    unlessSomeNoVectDecl vectorise
+      = do { hasNoVectDecls <- mapM noVectDecl vars
+           ; when (and hasNoVectDecls) $
+               traceVt "NOVECTORISE" $ ppr vars
+           ; if and hasNoVectDecls 
+             then return b                              -- all bindings have 'NOVECTORISE'
+             else if or hasNoVectDecls 
+             then cantVectorise noVectoriseErr (ppr b)  -- some (but not all) have 'NOVECTORISE'
+             else vectorise                             -- no binding has a 'NOVECTORISE' decl
+           }
+    noVectoriseErr = "NOVECTORISE must be used on all or no bindings of a recursive group"
+     
 -- | Make the vectorised version of this top level binder, and add the mapping
 --   between it and the original to the state. For some binder @foo@ the vectorised
 --   version is @$v_foo@
 --
---   NOTE: vectTopBinder *MUST* be lazy in inline and expr because of how it is
---   used inside of fixV in vectTopBind
+--   NOTE: 'vectTopBinder' *MUST* be lazy in inline and expr because of how it is
+--   used inside of 'fixV' in 'vectTopBind'.
 --
 vectTopBinder :: Var      -- ^ Name of the binding.
               -> Inline   -- ^ Whether it should be inlined, used to annotate it.

@@ -417,14 +417,16 @@ Representation of desugared vectorisation declarations that are fed to the vecto
 'ModGuts').
 
 \begin{code}
-data CoreVect = Vect Id (Maybe CoreExpr)
+data CoreVect = Vect   Id (Maybe CoreExpr)
+              | NoVect Id
+
 \end{code}
 
 
 %************************************************************************
-%*									*
-		Unfoldings
-%*									*
+%*                                                                      *
+                Unfoldings
+%*                                                                      *
 %************************************************************************
 
 The @Unfolding@ type is declared here to avoid numerous loops
