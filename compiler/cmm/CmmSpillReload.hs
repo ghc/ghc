@@ -289,6 +289,10 @@ boundedOrdLattice n = DataflowLattice n minBound f
 -- Custom node type we'll rewrite to.  CmmAssign nodes to local
 -- registers are replaced with AssignLocal nodes.
 data WithRegUsage n e x where
+    -- Plain will not contain CmmAssign nodes immediately after
+    -- transformation, but as we rewrite assignments, we may have
+    -- assignments here: these are assignments that should not be
+    -- rewritten!
     Plain       :: n e x -> WithRegUsage n e x
     AssignLocal :: LocalReg -> CmmExpr -> RegUsage -> WithRegUsage n O O
 

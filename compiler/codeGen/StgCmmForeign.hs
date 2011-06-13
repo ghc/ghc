@@ -104,20 +104,20 @@ emitCCall hinted_results fn hinted_args
     fc = ForeignConvention CCallConv arg_hints result_hints
     
 
-emitPrimCall :: CmmFormals -> CallishMachOp -> CmmActuals -> FCode ()
+emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
   = emitForeignCall PlayRisky res (PrimTarget op) args NoC_SRT CmmMayReturn
 
 -- alternative entry point, used by CmmParse
 emitForeignCall
-	:: Safety
-	-> CmmFormals		-- where to put the results
-	-> ForeignTarget	-- the op
-	-> CmmActuals		-- arguments
+        :: Safety
+        -> [CmmFormal]          -- where to put the results
+        -> ForeignTarget        -- the op
+        -> [CmmActual]          -- arguments
         -> C_SRT                -- the SRT of the calls continuation
-        -> CmmReturnInfo	-- This can say "never returns"
-				--   only RTS procedures do this
-	-> FCode ()
+        -> CmmReturnInfo        -- This can say "never returns"
+                                --   only RTS procedures do this
+        -> FCode ()
 emitForeignCall safety results target args _srt _ret
   | not (playSafe safety) = do
     let (caller_save, caller_load) = callerSaveVolatileRegs

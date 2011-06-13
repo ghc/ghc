@@ -14,7 +14,7 @@ module OldCmm (
         cmmMapGraphM, cmmTopMapGraphM,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmStmt(..), CmmReturnInfo(..), CmmHinted(..),
-        HintedCmmFormal, HintedCmmFormals, HintedCmmActual, HintedCmmActuals,
+        HintedCmmFormal, HintedCmmActual,
         CmmSafety(..), CmmCallTarget(..),
         module CmmDecl,
         module CmmExpr,
@@ -146,8 +146,8 @@ data CmmStmt	-- Old-style
 
   | CmmCall	 		 -- A call (foreign, native or primitive), with 
      CmmCallTarget
-     HintedCmmFormals		 -- zero or more results
-     HintedCmmActuals		 -- zero or more arguments
+     [HintedCmmFormal]		 -- zero or more results
+     [HintedCmmActual]		 -- zero or more arguments
      CmmSafety			 -- whether to build a continuation
      CmmReturnInfo
   -- Some care is necessary when handling the arguments of these, see
@@ -164,22 +164,20 @@ data CmmStmt	-- Old-style
 	-- Undefined outside range, and when there's a Nothing
 
   | CmmJump CmmExpr      -- Jump to another C-- function,
-      HintedCmmActuals         -- with these parameters.  (parameters never used)
+      [HintedCmmActual]        -- with these parameters.  (parameters never used)
 
   | CmmReturn            -- Return from a native C-- function,
-      HintedCmmActuals         -- with these return values. (parameters never used)
+      [HintedCmmActual]        -- with these return values. (parameters never used)
 
 data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: ForeignHint }
 	   	 deriving( Eq )
 
-type HintedCmmActuals = [HintedCmmActual]
-type HintedCmmFormals = [HintedCmmFormal]
 type HintedCmmFormal  = CmmHinted CmmFormal
 type HintedCmmActual  = CmmHinted CmmActual
 
 data CmmSafety      = CmmUnsafe | CmmSafe C_SRT | CmmInterruptible
 
--- | enable us to fold used registers over 'CmmActuals' and 'CmmFormals'
+-- | enable us to fold used registers over '[CmmActual]' and '[CmmFormal]'
 instance UserOfLocalRegs CmmStmt where
   foldRegsUsed f (set::b) s = stmt s set
     where 

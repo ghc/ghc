@@ -35,7 +35,7 @@ import FastString
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
 
-cgPrimOp   :: CmmFormals	-- where to put the results
+cgPrimOp   :: [CmmFormal]	-- where to put the results
 	   -> PrimOp		-- the op
 	   -> [StgArg]		-- arguments
 	   -> StgLiveVars	-- live vars, in case we need to save them
@@ -47,7 +47,7 @@ cgPrimOp results op args live
        emitPrimOp results op non_void_args live
 
 
-emitPrimOp :: CmmFormals	-- where to put the results
+emitPrimOp :: [CmmFormal]	-- where to put the results
 	   -> PrimOp		-- the op
 	   -> [CmmExpr]		-- arguments
 	   -> StgLiveVars	-- live vars, in case we need to save them
@@ -637,6 +637,13 @@ setInfo closure_ptr info_ptr = CmmStore closure_ptr info_ptr
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
+
+-- EZY: This code has an unusually high amount of assignTemp calls, seen
+-- nowhere else in the code generator.  This is mostly because these
+-- "primitive" ops result in a surprisingly large amount of code.  It
+-- will likely be worthwhile to optimize what is emitted here, so that
+-- our optimization passes don't waste time repeatedly optimizing the
+-- same bits of code.
 
 -- | Takes a source 'Array#', an offset in the source array, a
 -- destination 'MutableArray#', an offset into the destination array,
