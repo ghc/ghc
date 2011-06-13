@@ -666,6 +666,10 @@ rnHsVectDecl (HsVect var (Just rhs))
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
        }
+rnHsVectDecl (HsNoVect var)
+  = do { var' <- wrapLocM lookupTopBndrRn var
+       ; return (HsNoVect var', unitFV (unLoc var'))
+       }
 \end{code}
 
 %*********************************************************

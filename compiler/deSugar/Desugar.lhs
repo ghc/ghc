@@ -394,16 +394,11 @@ the rule is precisly to optimise them:
 
 \begin{code}
 dsVect :: LVectDecl Id -> DsM CoreVect
-dsVect (L loc (HsVect v rhs))
+dsVect (L loc (HsVect (L _ v) rhs))
   = putSrcSpanDs loc $ 
     do { rhs' <- fmapMaybeM dsLExpr rhs
-       ; return $ Vect (unLoc v) rhs'
+       ; return $ Vect v rhs'
   	   }
--- dsVect (L loc (HsVect v Nothing))
---   = return $ Vect v Nothing
--- dsVect (L loc (HsVect v (Just rhs)))
---   = putSrcSpanDs loc $ 
---     do { rhs' <- dsLExpr rhs
---        ; return $ Vect v (Just rhs')
---       }
+dsVect (L _loc (HsNoVect (L _ v)))
+  = return $ NoVect v
 \end{code}

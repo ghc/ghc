@@ -1,34 +1,34 @@
 
 module Vectorise.Monad.Global (
-	readGEnv,
-	setGEnv,
-	updGEnv,
-	
+  readGEnv,
+  setGEnv,
+  updGEnv,
+  
   -- * Vars
   defGlobalVar,
   
   -- * Vectorisation declarations
-  lookupVectDecl,
+  lookupVectDecl, noVectDecl, 
   
   -- * Scalars
   globalScalars, isGlobalScalar,
-	
-	-- * TyCons
-	lookupTyCon,
-	lookupBoxedTyCon,
-	defTyCon,
-	
-	-- * Datacons
-	lookupDataCon,
-	defDataCon,
-	
-	-- * PA Dictionaries
-	lookupTyConPA,
-	defTyConPA,
-	defTyConPAs,
-	
-	-- * PR Dictionaries
-	lookupTyConPR
+  
+  -- * TyCons
+  lookupTyCon,
+  lookupBoxedTyCon,
+  defTyCon,
+  
+  -- * Datacons
+  lookupDataCon,
+  defDataCon,
+  
+  -- * PA Dictionaries
+  lookupTyConPA,
+  defTyConPA,
+  defTyConPAs,
+  
+  -- * PR Dictionaries
+  lookupTyConPR
 ) where
 
 import Vectorise.Monad.Base
@@ -45,23 +45,27 @@ import VarSet
 
 
 -- Global Environment ---------------------------------------------------------
--- | Project something from the global environment.
+
+-- |Project something from the global environment.
+--
 readGEnv :: (GlobalEnv -> a) -> VM a
 readGEnv f	= VM $ \_ genv lenv -> return (Yes genv lenv (f genv))
 
-
--- | Set the value of the global environment.
+-- |Set the value of the global environment.
+--
 setGEnv :: GlobalEnv -> VM ()
 setGEnv genv	= VM $ \_ _ lenv -> return (Yes genv lenv ())
 
-
--- | Update the global environment using the provided function.
+-- |Update the global environment using the provided function.
+--
 updGEnv :: (GlobalEnv -> GlobalEnv) -> VM ()
 updGEnv f	= VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
 
 
 -- Vars -----------------------------------------------------------------------
--- | Add a mapping between a global var and its vectorised version to the state.
+
+-- |Add a mapping between a global var and its vectorised version to the state.
+--
 defGlobalVar :: Var -> Var -> VM ()
 defGlobalVar v v' = updGEnv $ \env ->
   env { global_vars = extendVarEnv (global_vars env) v v'
@@ -79,6 +83,11 @@ defGlobalVar v v' = updGEnv $ \env ->
 lookupVectDecl :: Var -> VM (Maybe (Type, CoreExpr))
 lookupVectDecl var = readGEnv $ \env -> lookupVarEnv (global_vect_decls env) var
 
+-- |Check whether a variable has a 'NOVECTORISE' declaration.
+--
+noVectDecl :: Var -> VM Bool
+noVectDecl var = readGEnv $ \env -> elemVarSet var (global_novect_vars env)
+
 
 -- Scalars --------------------------------------------------------------------
 
@@ -94,7 +103,9 @@ isGlobalScalar var = readGEnv $ \env -> elemVarSet var (global_scalar_vars env)
 
 
 -- TyCons ---------------------------------------------------------------------
--- | Lookup the vectorised version of a `TyCon` from the global environment.
+
+-- |Lookup the vectorised version of a `TyCon` from the global environment.
+--
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc
   | isUnLiftedTyCon tc || isTupleTyCon tc
@@ -103,13 +114,11 @@ lookupTyCon tc
   | otherwise 
   = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
 
-
 -- | Lookup the vectorised version of a boxed `TyCon` from the global environment.
 lookupBoxedTyCon :: TyCon -> VM (Maybe TyCon)
 lookupBoxedTyCon tc 
 	= readGEnv $ \env -> lookupNameEnv (global_boxed_tycons env)
                                            (tyConName tc)
-
 
 -- | Add a mapping between plain and vectorised `TyCon`s to the global environment.
 defTyCon :: TyCon -> TyCon -> VM ()
@@ -118,6 +127,7 @@ defTyCon tc tc' = updGEnv $ \env ->
 
 
 -- DataCons -------------------------------------------------------------------
+
 -- | Lookup the vectorised version of a `DataCon` from the global environment.
 lookupDataCon :: DataCon -> VM (Maybe DataCon)
 lookupDataCon dc
