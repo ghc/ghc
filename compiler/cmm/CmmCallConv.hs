@@ -1,9 +1,7 @@
 module CmmCallConv (
   ParamLocation(..),
   ArgumentFormat,
-  assignArguments,
-  assignArgumentsPos,
-  argumentsSize,
+  assignArgumentsPos
 ) where
 
 #include "HsVersions.h"
@@ -30,10 +28,6 @@ instance (Outputable a) => Outputable (ParamLocation a) where
   ppr (StackParam p)    = ppr p
 
 type ArgumentFormat a b = [(a, ParamLocation b)]
-
-assignArguments :: (a -> CmmType) -> [a] -> ArgumentFormat a WordOff
--- Stack parameters are returned as word offsets.
-assignArguments _ _ = panic "assignArguments only used in dead codegen" -- assignments
 
 -- | JD: For the new stack story, I want arguments passed on the stack to manifest as
 -- positive offsets in a CallArea, not negative offsets from the stack pointer.
@@ -96,14 +90,6 @@ assignArgumentsPos conv arg_ty reps = assignments
         where w    = typeWidth (arg_ty r)
               size = (((widthInBytes w - 1) `div` wORD_SIZE) + 1) * wORD_SIZE
               off' = offset + size
-       
-     
-argumentsSize :: (a -> CmmType) -> [a] -> WordOff
-argumentsSize f reps = maximum (0 : map arg_top args)
-    where
-      args = assignArguments f reps
-      arg_top (_, StackParam offset) = -offset
-      arg_top (_, RegisterParam _) = 0
 
 -----------------------------------------------------------------------------
 -- Local information about the registers available

@@ -1,7 +1,6 @@
 More notes (June 11)
 ~~~~~~~~~~~~~~~~~~~~
-* Kill dead code assignArguments, argumentsSize in CmmCallConv.
-  Bake in ByteOff to ParamLocation and ArgumentFormat
+* Bake in ByteOff to ParamLocation and ArgumentFormat
   CmmActuals -> [CmmActual]  similary CmmFormals
 
 * Possible refactoring: Nuke AGraph in favour of 
