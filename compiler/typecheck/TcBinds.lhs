@@ -591,7 +591,7 @@ impSpecErr name
 tcVectDecls :: [LVectDecl Name] -> TcM ([LVectDecl TcId])
 tcVectDecls decls 
   = do { decls' <- mapM (wrapLocM tcVect) decls
-       ; let ids  = [unLoc id | L _ (HsVect id _) <- decls']
+       ; let ids  = map lvectDeclName decls'
              dups = findDupsEq (==) ids
        ; mapM_ reportVectDups dups
        ; traceTcConstraints "End of tcVectDecls"
@@ -641,6 +641,11 @@ tcVect (HsVect name@(L loc _) (Just rhs))
         -- We return the type-checked 'Id', to propagate the inferred signature
         -- to the vectoriser - see "Note [Typechecked vectorisation pragmas]" in HsDecls
        ; return $ HsVect (L loc id') (Just rhsWrapped)
+       }
+tcVect (HsNoVect name)
+  = addErrCtxt (vectCtxt name) $
+    do { id <- wrapLocM tcLookupId name
+       ; return $ HsNoVect id
        }
 
 vectCtxt :: Located Name -> SDoc

@@ -332,8 +332,9 @@ Also since rule_fn is a Name, not a Var, we have to use the grungy delUFM.
 vectsFreeVars :: [CoreVect] -> VarSet
 vectsFreeVars = foldr (unionVarSet . vectFreeVars) emptyVarSet
   where
-    vectFreeVars (Vect _ Nothing)    = noFVs
-    vectFreeVars (Vect _ (Just rhs)) = expr_fvs rhs isLocalId emptyVarSet
+    vectFreeVars (Vect   _ Nothing)    = noFVs
+    vectFreeVars (Vect   _ (Just rhs)) = expr_fvs rhs isLocalId emptyVarSet
+    vectFreeVars (NoVect _)            = noFVs
 \end{code}
 
 

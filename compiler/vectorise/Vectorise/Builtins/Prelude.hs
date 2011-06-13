@@ -50,11 +50,11 @@ preludeVars (Modules { dph_Combinators    = _dph_Combinators
     , mk' dph_Prelude_Word8 "toInt"   "toIntV"
     ]
 
-    ++ vars_Ord        dph_Prelude_Double
-    ++ vars_Num        dph_Prelude_Double
-    ++ vars_Fractional dph_Prelude_Double
-    ++ vars_Floating   dph_Prelude_Double
-    ++ vars_RealFrac   dph_Prelude_Double
+    -- ++ vars_Ord        dph_Prelude_Double
+    -- ++ vars_Num        dph_Prelude_Double
+    -- ++ vars_Fractional dph_Prelude_Double
+    -- ++ vars_Floating   dph_Prelude_Double
+    -- ++ vars_RealFrac   dph_Prelude_Double
     ++
     [ mk dph_Prelude_Bool  (fsLit "andP")  dph_Prelude_Bool (fsLit "andPA")
     , mk dph_Prelude_Bool  (fsLit "orP")   dph_Prelude_Bool (fsLit "orPA")

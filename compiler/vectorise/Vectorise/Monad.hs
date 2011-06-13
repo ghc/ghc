@@ -81,6 +81,7 @@ initV hsc_env guts info thing_inside
            ; builtin_pas <- initBuiltinPAs builtins instEnvs
 
                -- construct the initial global environment
+           ; let thing_inside' = traceVt "VectDecls" (ppr (mg_vect_decls guts)) >> thing_inside
            ; let genv = extendImportedVarsEnv builtin_vars
                         . extendScalars       builtin_scalars
                         . extendTyConsEnv     builtin_tycons
@@ -91,7 +92,7 @@ initV hsc_env guts info thing_inside
                         $ initGlobalEnv info (mg_vect_decls guts) instEnvs famInstEnvs
  
                -- perform vectorisation
-           ; r <- runVM thing_inside builtins genv emptyLocalEnv
+           ; r <- runVM thing_inside' builtins genv emptyLocalEnv
            ; case r of
                Yes genv _ x -> return $ Just (new_info genv, x)
                No           -> return Nothing

@@ -446,7 +446,7 @@ instance Outputable e => Outputable (DFunArg e) where
 \end{code}
 
 -----------------------------------------------------
---	Rules
+--      Rules
 -----------------------------------------------------
 
 \begin{code}
@@ -461,11 +461,23 @@ pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
   = ptext (sLit "Built in rule for") <+> ppr fn <> colon <+> doubleQuotes (ftext name)
 
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
-		ru_bndrs = tpl_vars, ru_args = tpl_args,
-		ru_rhs = rhs })
+                ru_bndrs = tpl_vars, ru_args = tpl_args,
+                ru_rhs = rhs })
   = hang (doubleQuotes (ftext name) <+> ppr act)
        4 (sep [ptext (sLit "forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
-	       nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
-	       nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
-	    ])
+               nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
+               nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
+            ])
+\end{code}
+
+-----------------------------------------------------
+--      Vectorisation declarations
+-----------------------------------------------------
+
+\begin{code}
+instance Outputable CoreVect where
+  ppr (Vect   var Nothing)  = ptext (sLit "VECTORISE SCALAR") <+> ppr var
+  ppr (Vect   var (Just e)) = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
+                                4 (pprCoreExpr e)
+  ppr (NoVect var)          = ptext (sLit "NOVECTORISE") <+> ppr var
 \end{code}
