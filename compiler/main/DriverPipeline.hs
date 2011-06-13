@@ -1440,7 +1440,10 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
       | isWindowsTarget = empty
       | otherwise = hcat [
           text "__asm__(\"\\t.section ", text ghcLinkInfoSectionName,
-                                    text ",\\\"\\\",@note\\n",
+                                    text ",\\\"\\\",",
+                                    text elfSectionNote,
+                                    text "\\n",
+
                     text "\\t.ascii \\\"", info', text "\\\"\\n\");" ]
           where
             -- we need to escape twice: once because we're inside a C string,
@@ -1449,6 +1452,16 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
 
             escape :: String -> String
             escape = concatMap (charToC.fromIntegral.ord)
+
+            elfSectionNote :: String
+            elfSectionNote = case platformArch defaultTargetPlatform of
+                               ArchX86    -> "@note"
+                               ArchX86_64 -> "@note"
+                               ArchPPC    -> "@note"
+                               ArchPPC_64 -> "@note"
+                               ArchSPARC  -> "@note"
+                               ArchARM    -> "%note"
+                               ArchUnknown -> panic "elfSectionNote ArchUnknown"
 
 -- The "link info" is a string representing the parameters of the
 -- link.  We save this information in the binary, and the next time we
