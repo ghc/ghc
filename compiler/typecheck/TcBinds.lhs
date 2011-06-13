@@ -559,22 +559,29 @@ tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
 tcImpPrags prags
   = do { this_mod <- getModule
        ; dflags <- getDOpts
-       ; if not (dopt Opt_Specialise dflags) then
-            return []    -- Ignore SPECIALISE pragmas for imported things
-	    	   	 -- when -O is not on; otherwise we get bogus 
-			 -- complaints about lack of INLINABLE pragmas 
-			 -- in the imported module (also compiled without -O)
-			 -- Notably, when Haddocking the base library
+       ; if (not_specialising dflags) then
+            return []
          else
             mapAndRecoverM (wrapLocM tcImpSpec) 
             [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
                                , not (nameIsLocalOrFrom this_mod name) ] }
+  where
+    -- Ignore SPECIALISE pragmas for imported things
+    -- when we aren't specialising, or when we aren't generating
+    -- code.  The latter happens when Haddocking the base library;
+    -- we don't wnat complaints about lack of INLINABLE pragmas 
+    not_specialising dflags
+      | not (dopt Opt_Specialise dflags) = True
+      | otherwise = case hscTarget dflags of
+                      HscNothing -> True
+                      HscInterpreted -> True
+                      _other         -> False
 
 tcImpSpec :: (Name, Sig Name) -> TcM TcSpecPrag
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
-      ; checkTc (isAnyInlinePragma (idInlinePragma id))
-                (impSpecErr name)
+      ; unless (isAnyInlinePragma (idInlinePragma id))
+               (addWarnTc (impSpecErr name))
       ; tcSpec id prag }
 
 impSpecErr :: Name -> SDoc
