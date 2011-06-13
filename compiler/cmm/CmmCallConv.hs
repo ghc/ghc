@@ -1,6 +1,5 @@
 module CmmCallConv (
   ParamLocation(..),
-  ArgumentFormat,
   assignArgumentsPos
 ) where
 
@@ -19,21 +18,19 @@ import Outputable
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.
 
-data ParamLocation a
+data ParamLocation
   = RegisterParam GlobalReg
-  | StackParam a
+  | StackParam ByteOff
 
-instance (Outputable a) => Outputable (ParamLocation a) where
+instance Outputable ParamLocation where
   ppr (RegisterParam g) = ppr g
   ppr (StackParam p)    = ppr p
-
-type ArgumentFormat a b = [(a, ParamLocation b)]
 
 -- | JD: For the new stack story, I want arguments passed on the stack to manifest as
 -- positive offsets in a CallArea, not negative offsets from the stack pointer.
 -- Also, I want byte offsets, not word offsets.
-assignArgumentsPos :: (Outputable a) => Convention -> (a -> CmmType) -> [a] ->
-                      ArgumentFormat a ByteOff
+assignArgumentsPos :: Convention -> (a -> CmmType) -> [a] ->
+                      [(a, ParamLocation)]
 -- Given a list of arguments, and a function that tells their types,
 -- return a list showing where each argument is passed
 assignArgumentsPos conv arg_ty reps = assignments

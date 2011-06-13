@@ -1,7 +1,6 @@
 More notes (June 11)
 ~~~~~~~~~~~~~~~~~~~~
-* Bake in ByteOff to ParamLocation and ArgumentFormat
-  CmmActuals -> [CmmActual]  similary CmmFormals
+* CmmActuals -> [CmmActual]  similary CmmFormals
 
 * Possible refactoring: Nuke AGraph in favour of 
       mkIfThenElse :: Expr -> Graph -> Graph -> FCode Graph

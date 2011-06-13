@@ -355,7 +355,7 @@ copyOutOflow conv transfer area@(CallArea a) actuals updfr_off
                   else ([], 0)
                 Old -> ([], updfr_off)
 
-    args :: [(CmmExpr, ParamLocation ByteOff)]   -- The argument and where to put it
+    args :: [(CmmExpr, ParamLocation)]   -- The argument and where to put it
     args = assignArgumentsPos conv cmmExprType actuals
 
     args' = foldl adjust setRA args
