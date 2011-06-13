@@ -743,7 +743,7 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProc :: CmmInfo -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
+emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
 emitProc info lbl [] blocks
   = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
 	; state <- getState

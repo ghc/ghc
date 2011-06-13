@@ -1497,9 +1497,9 @@ genCondJump id bool = do
 -- register allocator.
 
 genCCall
-    :: CmmCallTarget		-- function to call
-    -> HintedCmmFormals		-- where to put the result
-    -> HintedCmmActuals		-- arguments (of mixed type)
+    :: CmmCallTarget            -- function to call
+    -> [HintedCmmFormal]        -- where to put the result
+    -> [HintedCmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1875,7 +1875,7 @@ genCCall	= panic "X86.genCCAll: not defined"
 #endif /* x86_64_TARGET_ARCH */
 
 
-outOfLineCmmOp :: CallishMachOp -> Maybe HintedCmmFormal -> HintedCmmActuals -> NatM InstrBlock
+outOfLineCmmOp :: CallishMachOp -> Maybe HintedCmmFormal -> [HintedCmmActual] -> NatM InstrBlock
 outOfLineCmmOp mop res args
   = do
       dflags <- getDynFlagsNat

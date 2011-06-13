@@ -42,8 +42,8 @@ data CmmNode e x where
   		       		  -- Like a "fat machine instruction"; can occur
 				  -- in the middle of a block
       ForeignTarget ->            -- call target
-      CmmFormals ->               -- zero or more results
-      CmmActuals ->               -- zero or more arguments
+      [CmmFormal] ->               -- zero or more results
+      [CmmActual] ->               -- zero or more arguments
       CmmNode O O
       -- Semantics: kills only result regs; all other regs (both GlobalReg
       --            and LocalReg) are preserved.  But there is a current
@@ -105,8 +105,8 @@ data CmmNode e x where
   CmmForeignCall :: {           -- A safe foreign call; see Note [Foreign calls]
   		    		-- Always the last node of a block
       tgt   :: ForeignTarget,   -- call target and convention
-      res   :: CmmFormals,      -- zero or more results
-      args  :: CmmActuals,      -- zero or more arguments; see Note [Register parameter passing]
+      res   :: [CmmFormal],     -- zero or more results
+      args  :: [CmmActual],     -- zero or more arguments; see Note [Register parameter passing]
       succ  :: Label,           -- Label of continuation
       updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
       intrbl:: Bool             -- whether or not the call is interruptible

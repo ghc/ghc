@@ -62,9 +62,9 @@ import Outputable
 -}
 
 genCCall
-    :: CmmCallTarget		-- function to call
-    -> HintedCmmFormals		-- where to put the result
-    -> HintedCmmActuals		-- arguments (of mixed type)
+    :: CmmCallTarget            -- function to call
+    -> [HintedCmmFormal]        -- where to put the result
+    -> [HintedCmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
 
