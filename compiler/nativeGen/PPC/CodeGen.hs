@@ -838,8 +838,8 @@ genCondJump id bool = do
 -- register allocator.
 
 genCCall :: CmmCallTarget            -- function to call
-         -> HintedCmmFormals         -- where to put the result
-         -> HintedCmmActuals         -- arguments (of mixed type)
+         -> [HintedCmmFormal]        -- where to put the result
+         -> [HintedCmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
 genCCall target dest_regs argsAndHints
  = do dflags <- getDynFlagsNat
@@ -857,8 +857,8 @@ data GenCCallPlatform = GCPLinux | GCPDarwin
 genCCall'
     :: GenCCallPlatform
     -> CmmCallTarget            -- function to call
-    -> HintedCmmFormals         -- where to put the result
-    -> HintedCmmActuals         -- arguments (of mixed type)
+    -> [HintedCmmFormal]        -- where to put the result
+    -> [HintedCmmActual]        -- arguments (of mixed type)
     -> NatM InstrBlock
 
 {-

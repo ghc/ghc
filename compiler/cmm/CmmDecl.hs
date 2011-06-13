@@ -10,7 +10,7 @@ module CmmDecl (
         GenCmm(..), GenCmmTop(..),
         CmmInfoTable(..), HasStaticClosure, ClosureTypeInfo(..), ConstrDescription,
         ProfilingInfo(..), ClosureTypeTag,
-        CmmActual, CmmActuals, CmmFormal, CmmFormals, ForeignHint(..),
+        CmmActual, CmmFormal, ForeignHint(..),
         CmmStatic(..), Section(..),
   ) where
 
@@ -114,8 +114,6 @@ type SelectorOffset = StgWord
 
 type CmmActual = CmmExpr
 type CmmFormal = LocalReg
-type CmmActuals = [CmmActual]
-type CmmFormals = [CmmFormal]
 
 data ForeignHint
   = NoHint | AddrHint | SignedHint
