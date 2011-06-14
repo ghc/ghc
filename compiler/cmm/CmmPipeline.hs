@@ -16,6 +16,7 @@ import CmmBuildInfoTables
 import CmmCommonBlockElim
 import CmmProcPoint
 import CmmSpillReload
+import CmmRewriteAssignments
 import CmmStackLayout
 import CmmContFlowOpt
 import OptimizationFuel

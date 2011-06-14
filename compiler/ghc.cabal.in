@@ -199,6 +199,7 @@ Library
         CmmParse
         CmmProcPoint
         CmmSpillReload
+        CmmRewriteAssignments
         CmmStackLayout
         CmmType
         CmmUtils
