@@ -343,3 +343,4 @@ test('tc249', normal, compile, [''])
 
 test('GivenOverlapping', normal, compile, [''])
 test('SilentParametersOverlapping', normal, compile, [''])
+test('GivenTypeSynonym', normal, compile, [''])
