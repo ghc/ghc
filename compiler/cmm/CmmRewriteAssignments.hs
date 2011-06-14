@@ -3,6 +3,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+#if __GLASGOW_HASKELL__ < 701
+-- GHC 7.0.1 improved incomplete pattern warnings with GADTs
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#endif
 
 -- This module implements generalized code motion for assignments to
 -- local registers, inlining and sinking when possible.  It also does

@@ -3,9 +3,9 @@
 -- If this module lives on I'd like to get rid of this flag in due course
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-#if __GLASGOW_HASKELL__ >= 701
+#if __GLASGOW_HASKELL__ < 701
 -- GHC 7.0.1 improved incomplete pattern warnings with GADTs
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
+{-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 #endif
 
 module CmmSpillReload
