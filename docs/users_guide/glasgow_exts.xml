@@ -4343,7 +4343,8 @@ literals enabled (with <literal>-XOverloadedStrings</literal>)
  a string literal has type <literal>(IsString a) => a</literal>.
 </para>
 <para>
-This means that the usual string syntax can be used, e.g., for packed strings
+  This means that the usual string syntax can be used, e.g.,
+  for <literal>ByteString</literal>, <literal>Text</literal>,
 and other variations of string like types.  String literals behave very much
 like integer literals, i.e., they can be used in both expressions and patterns.
 If used in a pattern the literal with be replaced by an equality test, in the same
