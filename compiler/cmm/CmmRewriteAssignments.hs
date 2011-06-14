@@ -24,6 +24,7 @@ import StgCmmUtils
 import Control.Monad
 import UniqFM
 import Unique
+import BlockId
 
 import Compiler.Hoopl hiding (Unique)
 import Data.Maybe
@@ -449,6 +450,7 @@ lastAssignment l assign = map (\id -> (id, deleteSinks l assign)) $ successors l
 -- Note: mapUFM could be expensive, but hopefully block boundaries
 -- aren't too common.  If it is a problem, replace with something more
 -- clever.
+invalidateVolatile :: BlockId -> AssignmentMap -> AssignmentMap
 invalidateVolatile k m = mapUFM p m
   where p (AlwaysInline e) = if exp e then AlwaysInline e else NeverOptimize
             where exp CmmLit{} = True
