@@ -450,7 +450,7 @@ Library
         Supercompile.Core.Tag
         Supercompile.Core.FreeVars
         Supercompile.Drive.Match
-		Supercompile.Evaluator.Deeds
+        Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars
         Supercompile.Evaluator.Residualise
