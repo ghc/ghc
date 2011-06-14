@@ -26,6 +26,7 @@ module HsTypes (
 	hsTyVarKind, hsTyVarNameKind,
 	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
 	splitHsInstDeclTy, splitHsFunType,
+	splitHsAppTys, mkHsAppTys,
 	
 	-- Type place holder
 	PostTcType, placeHolderType, PostTcKind, placeHolderKind,
@@ -292,6 +293,19 @@ replaceTyVarName (KindedTyVar _ k) n' = KindedTyVar n' k
 
 
 \begin{code}
+splitHsAppTys :: LHsType n -> [LHsType n] -> (LHsType n, [LHsType n])
+splitHsAppTys (L _ (HsAppTy f a)) as = splitHsAppTys f (a:as)
+splitHsAppTys f          	  as = (f,as)
+
+mkHsAppTys :: OutputableBndr n => LHsType n -> [LHsType n] -> HsType n
+mkHsAppTys fun_ty [] = pprPanic "mkHsAppTys" (ppr fun_ty)
+mkHsAppTys fun_ty (arg_ty:arg_tys)
+  = foldl mk_app (HsAppTy fun_ty arg_ty) arg_tys
+  where
+    mk_app fun arg = HsAppTy (noLoc fun) arg	
+       -- Add noLocs for inner nodes of the application; 
+       -- they are never used 
+
 splitHsInstDeclTy 
     :: OutputableBndr name
     => HsType name 
