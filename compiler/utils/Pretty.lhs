@@ -193,11 +193,7 @@ import System.IO
 --for a RULES
 import GHC.Base ( unpackCString# )
 import GHC.Exts ( Int# )
-#if __GLASGOW_HASKELL__ >= 701
-import GHC.Ptr.Unsafe ( Ptr(..) )
-#else
-import GHC.Ptr        ( Ptr(..) )
-#endif
+import GHC.Ptr  ( Ptr(..) )
 #endif
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure

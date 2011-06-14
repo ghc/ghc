@@ -82,7 +82,7 @@ import GHC.Real                 ( Ratio(..) )
 import GHC.Exts
 import GHC.Word                 ( Word8(..) )
 
-import GhcIO ( IO(..) )
+import GHC.IO ( IO(..) )
 
 type BinArray = ForeignPtr Word8
 

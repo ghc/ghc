@@ -32,11 +32,7 @@ module Encoding (
 import Foreign
 import Data.Char
 import Numeric
-#if __GLASGOW_HASKELL__ >= 701
-import GHC.Ptr.Unsafe   ( Ptr(..) )
-#else
-import GHC.Ptr          ( Ptr(..) )
-#endif
+import GHC.Ptr ( Ptr(..) )
 import GHC.Base
 
 -- -----------------------------------------------------------------------------

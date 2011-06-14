@@ -105,14 +105,13 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
 
-import GhcIO ( IO(..) )
+import GHC.IO           ( IO(..) )
+import GHC.Ptr          ( Ptr(..) )
 
 #if __GLASGOW_HASKELL__ >= 701
 import Foreign.Safe
-import GHC.Ptr.Unsafe   ( Ptr(..) )
 #else
 import Foreign hiding ( unsafePerformIO )
-import GHC.Ptr          ( Ptr(..) )
 #endif
 
 #if defined(__GLASGOW_HASKELL__)

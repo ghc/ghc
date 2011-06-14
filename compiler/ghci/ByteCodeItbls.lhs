@@ -36,7 +36,7 @@ import Foreign.C.String
 import Data.Bits	( Bits(..), shiftR )
 
 import GHC.Exts		( Int(I#), addr2Int# )
-import GHC.Ptr.Unsafe   ( Ptr(..) )
+import GHC.Ptr          ( Ptr(..) )
 
 import Debug.Trace
 import Text.Printf

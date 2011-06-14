@@ -24,7 +24,7 @@ import GHC.Exts
 import GHC.Word
 import GHC.Base (unsafeChr)
 
-import GhcIO        (IO(..), unsafeDupableInterleaveIO)
+import GHC.IO   (IO(..), unsafeDupableInterleaveIO)
 
 -- Just like unsafePerformIO, but we inline it.
 {-# INLINE inlinePerformIO #-}

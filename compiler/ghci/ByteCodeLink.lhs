@@ -44,7 +44,7 @@ import Data.Array.Base
 import Control.Monad	( zipWithM )
 import Control.Monad.ST ( stToIO )
 
-import GHC.Arr.Unsafe   ( Array(..), STArray(..) )
+import GHC.Arr          ( Array(..), STArray(..) )
 import GHC.Base		( writeArray#, RealWorld, Int(..), Word# )  
 import GHC.IOBase	( IO(..) )
 import GHC.Exts

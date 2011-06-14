@@ -435,7 +435,6 @@ Library
         FastTypes
         Fingerprint
         FiniteMap
-        GhcIO
         GraphBase
         GraphColor
         GraphOps
