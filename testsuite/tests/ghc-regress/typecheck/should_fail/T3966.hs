@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -Werror #-}
+{-# OPTIONS_GHC -Werror -O #-}
+-- Add -O so the UNPACK has some effect
 
 module T3966 where
 

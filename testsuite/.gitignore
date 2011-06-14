@@ -4,6 +4,8 @@
 *~
 #*#
 *.bak
+*.tix
+*.stackdump
 *.BAK
 *.orig
 *.prof

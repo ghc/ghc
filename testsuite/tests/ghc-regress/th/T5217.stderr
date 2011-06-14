@@ -1,0 +1,14 @@
+T5217.hs:1:1: Splicing declarations
+    [d| data T a b
+            where
+              T1 :: Int -> T Int Char
+              T2 :: a -> T a a
+              T3 :: a -> T [a] a
+              T4 :: a -> b -> T b [a] |]
+  ======>
+    T5217.hs:(6,3)-(9,53)
+    data T a b
+        = (b ~ Char, a ~ Int) => T1 Int |
+          b ~ a => T2 a |
+          a ~ [b] => T3 b |
+          forall a. b ~ [a] => T4 a a
