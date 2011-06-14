@@ -2,7 +2,7 @@
 -- Norman likes local bindings
 -- If this module lives on I'd like to get rid of this flag in due course
 
-module CmmCPS (
+module CmmPipeline (
   -- | Converts C-- with an implicit stack and native C-- calls into
   -- optimized, CPS converted and native-call-less C--.  The latter
   -- C-- can be used to generate assembly.

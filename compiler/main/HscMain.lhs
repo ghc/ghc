@@ -118,7 +118,7 @@ import OldCmm           ( Cmm )
 import PprCmm		( pprCmms )
 import CmmParse		( parseCmmFile )
 import CmmBuildInfoTables
-import CmmCPS
+import CmmPipeline
 import CmmInfo
 import OptimizationFuel ( initOptFuelState )
 import CmmCvt

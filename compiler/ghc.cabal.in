@@ -182,7 +182,7 @@ Library
         CLabel
         Cmm
         CmmBuildInfoTables
-        CmmCPS
+        CmmPipeline
         CmmCallConv
         CmmCommonBlockElim
         CmmContFlowOpt
