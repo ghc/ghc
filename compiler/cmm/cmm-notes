@@ -8,8 +8,7 @@ More notes (June 11)
 
   or parameterise FCode over its envt; the CgState part seem useful for both
 
-* Move top and tail calls to runCmmContFlowOpts from HscMain to CmmCps.cpsTop
-  (and rename the latter!)
+* Rename CmmCPS
 
 * "Remove redundant reloads" in CmmSpillReload should be redundant; since
   insertLateReloads is now gone, every reload is reloading a live variable.
