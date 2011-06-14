@@ -47,8 +47,15 @@ A variable can be expected to be live in a register, live on the
 stack, or both.  This analysis ensures that spills and reloads are
 inserted as needed to make sure that every live variable needed
 after a call is available on the stack.  Spills are pushed back to
-their reaching definitions, but reloads are dropped wherever needed
-and will have to be sunk by a later forward transformation.
+their reaching definitions, but reloads are dropped immediately after
+we return from a call and will have to be sunk by a later forward
+transformation.
+
+Note that we offer no guarantees about the consistency of the value
+in memory and the value in the register, except that they are
+equal across calls/procpoints.  If the variable is changed, this
+mapping breaks: but as the original value of the register may still
+be useful in a different context, the memory location is not updated.
 -}
 
 data DualLive = DualLive { on_stack :: RegSet, in_regs :: RegSet }
@@ -172,9 +179,6 @@ insertSpillAndReloadRewrites graph procPoints = deepBwdRw3 first middle nothing
           middle _ _ = return Nothing
 
           nothing _ _ = return Nothing
-
-regSlot :: LocalReg -> CmmExpr
-regSlot r = CmmStackSlot (RegSlot r) (widthInBytes $ typeWidth $ localRegType r)
 
 spill, reload :: LocalReg -> CmmNode O O
 spill  r = CmmStore  (regSlot r) (CmmReg $ CmmLocal r)

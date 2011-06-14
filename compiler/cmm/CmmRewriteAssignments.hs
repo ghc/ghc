@@ -4,6 +4,10 @@
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
+-- This module implements generalized code motion for assignments to
+-- local registers, inlining and sinking when possible.  It also does
+-- some amount of rewriting for stores to register slots, which are
+-- effectively equivalent to local registers.
 module CmmRewriteAssignments
   ( rewriteAssignments
   ) where
@@ -22,12 +26,34 @@ import Data.Maybe
 import Prelude hiding (succ, zip)
 
 ----------------------------------------------------------------
+--- Main function
+
+rewriteAssignments :: CmmGraph -> FuelUniqSM CmmGraph
+rewriteAssignments g = do
+  -- Because we need to act on forwards and backwards information, we
+  -- first perform usage analysis and bake this information into the
+  -- graph (backwards transform), and then do a forwards transform
+  -- to actually perform inlining and sinking.
+  g'  <- annotateUsage g
+  g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
+                                     analRewFwd assignmentLattice assignmentTransfer assignmentRewrite
+  return (modifyGraph eraseRegUsage g'')
+
+----------------------------------------------------------------
 --- Usage information
 
--- We decorate all register assignments with usage information,
--- that is, the maximum number of times the register is referenced
--- while it is live along all outgoing control paths.  There are a few
--- subtleties here:
+-- We decorate all register assignments with approximate usage
+-- information, that is, the maximum number of times the register is
+-- referenced while it is live along all outgoing control paths.
+-- This analysis provides a precise upper bound for usage, so if a
+-- register is never referenced, we can remove it, as that assignment is
+-- dead.
+--
+-- This analysis is very similar to liveness analysis; we just keep a
+-- little extra info. (Maybe we should move it to CmmLive, and subsume
+-- the old liveness analysis.)
+--
+-- There are a few subtleties here:
 --
 --  - If a register goes dead, and then becomes live again, the usages
 --    of the disjoint live range don't count towards the original range.
@@ -84,9 +110,17 @@ import Prelude hiding (succ, zip)
 --              3 -> ... a ...
 --              ...
 --
---  This analysis is very similar to liveness analysis; we just keep a
---  little extra info. (Maybe we should move it to CmmLive, and subsume
---  the old liveness analysis.)
+--  - Memory stores to local register slots (CmmStore (CmmStackSlot
+--    (LocalReg _) 0) _) have similar behavior to local registers,
+--    in that these locations are all disjoint from each other.  Thus,
+--    we attempt to inline them too. Note that because these are only
+--    generated as part of the spilling process, most of the time this
+--    will refer to a local register and the assignment will immediately
+--    die on the subsequent call.  However, if we manage to replace that
+--    local register with a memory location, it means that we've managed
+--    to preserve a value on the stack without having to move it to
+--    another memory location again!  We collect usage information just
+--    to be safe in case extra computation is involved.
 
 data RegUsage = SingleUse | ManyUse
     deriving (Ord, Eq, Show)
@@ -206,7 +240,7 @@ data Assignment =
 -- This assignment should be sunk down to its first use.  (This will
 -- increase code size if the register is used in multiple control flow
 -- paths, but won't increase execution time, and the reduction of
--- register pressure is worth it.)
+-- register pressure is worth it, I think.)
                 | AlwaysSink CmmExpr
 -- We cannot safely optimize occurrences of this local register. (This
 -- corresponds to top in the lattice structure.)
@@ -399,13 +433,90 @@ overlaps (_, o, w) (_, o', w') =
     in (s' < o) && (s < o) -- Not LTE, because [ I32  ][ I32  ] is OK
 
 lastAssignment :: WithRegUsage CmmNode O C -> AssignmentMap -> [(Label, AssignmentMap)]
--- Variables are dead across calls, so invalidating all mappings is justified
-lastAssignment (Plain (CmmCall _ (Just k) _ _ _)) assign = [(k, mapUFM (const NeverOptimize) assign)]
-lastAssignment (Plain (CmmForeignCall {succ=k}))  assign = [(k, mapUFM (const NeverOptimize) assign)]
+lastAssignment (Plain (CmmCall _ (Just k) _ _ _)) assign = [(k, invalidateVolatile k assign)]
+lastAssignment (Plain (CmmForeignCall {succ=k}))  assign = [(k, invalidateVolatile k assign)]
 lastAssignment l assign = map (\id -> (id, deleteSinks l assign)) $ successors l
+
+-- Invalidates any expressions that have volatile contents: essentially,
+-- all terminals volatile except for literals and loads of stack slots
+-- that do not correspond to the call area for 'k' (the current call
+-- area is volatile because overflow return parameters may be written
+-- there.)
+-- Note: mapUFM could be expensive, but hopefully block boundaries
+-- aren't too common.  If it is a problem, replace with something more
+-- clever.
+invalidateVolatile k m = mapUFM p m
+  where p (AlwaysInline e) = if exp e then AlwaysInline e else NeverOptimize
+            where exp CmmLit{} = True
+                  exp (CmmLoad (CmmStackSlot (CallArea (Young k')) _) _)
+                    | k' == k = False
+                  exp (CmmLoad (CmmStackSlot _ _) _) = True
+                  exp (CmmMachOp _ es) = and (map exp es)
+                  exp _ = False
+        p _ = NeverOptimize -- probably shouldn't happen with AlwaysSink
 
 assignmentTransfer :: FwdTransfer (WithRegUsage CmmNode) AssignmentMap
 assignmentTransfer = mkFTransfer3 (flip const) middleAssignment ((mkFactBase assignmentLattice .) . lastAssignment)
+
+-- Note [Soundness of inlining]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In the Hoopl paper, the soundness condition on rewrite functions is
+-- described as follows:
+--
+--      "If it replaces a node n by a replacement graph g, then g must
+--      be observationally equivalent to n under the assumptions
+--      expressed by the incoming dataflow fact f.  Moreover, analysis of
+--      g must produce output fact(s) that are at least as informative
+--      as the fact(s) produced by applying the transfer function to n."
+--
+-- We consider the second condition in more detail here.  It says given
+-- the rewrite R(n, f) = g, then for any incoming fact f' consistent
+-- with f (f' >= f), then running the transfer function T(f', n) <= T(f', g).
+-- For inlining this is not necessarily the case:
+--
+--  n = "x = a + 2"
+--  f = f' = {a = y}
+--  g = "x = y + 2"
+--  T(f', n) = {x = a + 2, a = y}
+--  T(f', g) = {x = y + 2, a = y}
+--
+-- y + 2 and a + 2 are not obviously comparable, and a naive
+-- implementation of the lattice would say they are incomparable.
+-- At best, this means we may be over-conservative, at worst, it means
+-- we may not terminate.
+--
+-- However, in the original Lerner-Grove-Chambers paper, soundness and
+-- termination are separated, and only equivalence of facts is required
+-- for soundness.  Monotonicity of the transfer function is not required
+-- for termination (as the calculation of least-upper-bound prevents
+-- this from being a problem), but it means we won't necessarily find
+-- the least-fixed point.
+
+-- Note [Coherency of annotations]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Is it possible for our usage annotations to become invalid after we
+-- start performing transformations?  As the usage info only provides
+-- an upper bound, we only need to consider cases where the usages of
+-- a register may increase due to transformations--e.g. any reference
+-- to a local register in an AlwaysInline or AlwaysSink instruction, whose
+-- originating assignment was single use (we don't care about the
+-- many use case, because it is the top of the lattice).  But such a
+-- case is not possible, because we always inline any single use
+-- register.  QED.
+--
+-- TODO: A useful lint option would be to check this invariant that
+-- there is never a local register in the assignment map that is
+-- single-use.
+
+-- Note [Soundness of store rewriting]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Its soundness depends on the invariant that no assignment is made to
+-- the local register before its store is accessed.  This is clearly
+-- true with unoptimized spill-reload code, and as the store will always
+-- be rewritten first (if possible), there is no chance of it being
+-- propagated down before getting written (possibly with incorrect
+-- values from the assignment map, due to reassignment of the local
+-- register.)  This is probably not locally sound.
 
 assignmentRewrite :: FwdRewrite FuelUniqSM (WithRegUsage CmmNode) AssignmentMap
 assignmentRewrite = mkFRewrite3 first middle last
@@ -415,7 +526,7 @@ assignmentRewrite = mkFRewrite3 first middle last
         middle (Plain m) assign = return $ rewrite assign (precompute assign m) mkMiddle m
         middle (AssignLocal l e u) assign = return $ rewriteLocal assign (precompute assign (CmmAssign (CmmLocal l) e)) l e u
         last (Plain l) assign = return $ rewrite assign (precompute assign l) mkLast l
-        -- Tuple is (inline?, reloads)
+        -- Tuple is (inline?, reloads for sinks)
         precompute :: AssignmentMap -> CmmNode O x -> (Bool, [WithRegUsage CmmNode O O])
         precompute assign n = foldRegsUsed f (False, []) n -- duplicates are harmless
             where f (i, l) r = case lookupUFM assign r of
@@ -475,6 +586,11 @@ assignmentRewrite = mkFRewrite3 first middle last
                     _ -> CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
                           where rep = typeWidth (localRegType r)
               _ -> old
+        -- See Note [Soundness of store rewriting]
+        inlineExp assign old@(CmmLoad (CmmStackSlot (RegSlot r) _) _)
+          = case lookupUFM assign r of
+              Just (AlwaysInline x) -> x
+              _ -> old
         inlineExp _ old = old
 
         inlinable :: CmmNode e x -> Bool
@@ -482,12 +598,5 @@ assignmentRewrite = mkFRewrite3 first middle last
         inlinable (CmmForeignCall{}) = False
         inlinable (CmmUnsafeForeignCall{}) = False
         inlinable _ = True
-
-rewriteAssignments :: CmmGraph -> FuelUniqSM CmmGraph
-rewriteAssignments g = do
-  g'  <- annotateUsage g
-  g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
-                                     analRewFwd assignmentLattice assignmentTransfer assignmentRewrite
-  return (modifyGraph eraseRegUsage g'')
 
 -- ToDo: Outputable instance for UsageMap and AssignmentMap
