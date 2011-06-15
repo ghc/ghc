@@ -770,8 +770,10 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod, extra_mods ):
     pretest_cleanup(name)
 
     for mod in extra_mods:	
-        simple_build( mod, way, extra_hc_opts, 0, '', 0, 0 )
+        result = simple_build( mod, way, extra_hc_opts, 0, '', 0, 0 )
         extra_hc_opts += " " + replace_suffix(mod, 'o')
+        if result == 'fail':
+            return result
 
     if way == 'ghci': # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
