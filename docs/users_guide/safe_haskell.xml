@@ -62,9 +62,9 @@
     </itemizedlist>
     
     Put simply, these three properties guarantee that you can trust the types
-    in the Safe language, can trust module export lists are respected
-    in the Safe language and that code which successfully compiles in the Safe
-    language has the same meaning as it normally would. Please see
+    in the Safe language, can trust that module export lists are respected
+    in the Safe language and can trust that code which successfully compiles
+    in the Safe language has the same meaning as it normally would. Please see
     <xref linkend="safe-language"/> for a more detailed view of the safe
     language.
   </sect2>
@@ -85,8 +85,8 @@
     <emphasis>-XTrustworthy</emphasis>, <emphasis>-XSafeLanguage</emphasis> or
     <emphasis>-XSafeImports</emphasis> flags and corresponding PRAGMA's. When
     either the <emphasis>-XSafe</emphasis> or
-    <emphasis>-XSafeLanguage</emphasis> flag is used, all imports are assumed to
-    be safe imports.
+    <emphasis>-XSafeLanguage</emphasis> flag is used, the safe keyword is
+    allowed but meaningless -- all imports are safe regardless.
   </sect2>
 
   <sect2 id="safe-trust">
@@ -101,30 +101,24 @@
       may invoke unsafe functions internally, the module's author claims that
       it exports an API that can't be used in an unsafe way. This doesn't enable
       the Safe language or place any restrictions on the allowed Haskell code.
-      The trust guarantee is provided by the module author, not GHC. Modules
-      imported with the <emphasis>safe</emphasis> import feature are required
-      to be trusted but otherwise unsafe modules can be imported as usual.
-      </listitem>
+      The trust guarantee is provided by the module author, not GHC. An import
+      statement with the safe keyword results in a compilation error if the
+      imported module is not trussted. An import statement without the keyword
+      behaves as usual and can import any module whether trusted or
+      not.</listitem>
     </itemizedlist>
 
-    The definition of trust for a module <emphasis>M</emphasis>, residing in
-    a package <emphasis>P</emphasis> for a user of GHC, a client
-    <emphasis>C</emphasis> (someone who is compiling a source module with GHC,
-    aka you!), is defined as follows:
+    Whether or not a module is trusted depends on a notion of trust for
+    packages, which is determined by the client C invoking GHC (i.e., you). A
+    package <emphasis>P</emphasis> is trusted when either C's package database
+    records that <emphasis>P</emphasis> is trusted (and no command-line
+    arguments override this), or C's command-line flags say to trust it
+    regardless of what is recorded in the package database. In either case, C
+    is the only authority on package trust. It is up to the client to decide
+    which packages they trust.
 
-    A <emphasis>package P is trusted by client C</emphasis> if and only if one of
-    these conditions hold:
-    <itemizedlist>
-      <listitem>C's package database records that P is trusted (and no
-        command-line arguments override this).</listitem>
-      <listitem>C's command-line flags say to trust it regardless of the
-        what is recorded in the package database.</listitem>
-    </itemizedlist>
-
-    It is important to note that C is the only authority on package trust. It is
-    up to the client to decide which packages they trust.
-
-    A <emphasis>module M is trusted by a client C</emphasis> if and only if:
+    Now a <emphasis>module M in a package P is trusted by a client C</emphasis>
+    if and only if:
     <itemizedlist>
       <listitem>Both of these hold:
         <itemizedlist>
@@ -169,13 +163,17 @@
        Suppose a client C decides to trust package P. Then does C trust module M?
        To decide, GHC must check M's imports: M imports System.IO.Unsafe. M was
        compiled with -XTrustworthy, so P's author takes responsibility for that
-       import. C trusts P's author, so C trusts M.  M has a safe import of
-       Buggle, so P's author takes no responsibility for the safety or otherwise
-       of Buggle. So C must check whether Buggle is trusted by C. Is it? Well,
-       it is compiled with -XSafe, so the code in Buggle itself is
-       machine-checked to be OK, but again under the assumption that Buggle's
-       imports are trusted by C. Prelude comes from base, which C
-       trusts, and is compiled with -XTrustworthy. 
+       import. C trusts P's author, so C trusts M to only use its unsafe
+       imports (System.IO.Unsafe in this example)in a safe and consistent
+       manner with respect the API M exposes.  M also has a safe import of
+       Buggle, so for this import P's author takes no responsibility for the
+       safety or otherwise.  So GHC must check whether Buggle is trusted by C.
+       Is it? Well, it is compiled with -XSafe, so the code in Buggle itself is
+       machine-checked to be OK, but again under the assumption that all of
+       Buggle's imports are trusted by C. Prelude comes from base, which C
+       trusts, and is compiled with -XTrustworthy (While Prelude is typically
+       imported implicitly, it still obeys the same rules outlined here).  So
+       Buggle is considered trusted.
 
        Notice that C didn't need to trust package Wuggle; the machine checking
        is enough. C only needs to trust packages that have -XTrustworthy
@@ -253,7 +251,8 @@
                module then specifies that they trust the module author by
                specifying they trust the package containing the module.
                '-XTrustworthy' has no effect on the accepted range of Haskell
-               programs or their semantics.</listitem>
+               programs or their semantics, except that they allow the safe
+               import keyword.</listitem>
                <listitem><emphasis>Module Trusted:</emphasis> Yes but only if
                  Package the module resides in is also trusted.</listitem>
                <listitem><emphasis>Haskell Language:</emphasis> Unrestricted
@@ -303,15 +302,15 @@
       at the GHC command-line to specify the trust property of packages:
 
       <itemizedlist>
-        <listitem><emphasis>-trust P:</emphasis> Exposes package P if it was
+        <listitem><emphasis>-trust P</emphasis>: Exposes package P if it was
           hidden and considers it a trusted package regardless of the package
           database.</listitem>
-        <listitem><emphasis>-distrust P: Exposes package P if it was hidden and
-            considers it a untrusted package regardless of the package
-            database.</emphasis></listitem>
-        <listitem><emphasis>-distrust-all-packages: Considers all packages
-            distrusted unless they are explicitly set to be trusted by subsequent
-            command-line options.</emphasis></listitem>
+       <listitem><emphasis>-distrust P</emphasis>: Exposes package P if it was
+          hidden and considers it an untrusted package regardless of the
+          package database.</listitem>
+       <listitem><emphasis>-distrust-all-packages</emphasis>: Considers all
+          packages distrusted unless they are explicitly set to be trusted by
+          subsequent command-line options.</listitem>
       </itemizedlist>
 
       To set a package's trust property in the package database please refer to <xref linkend="packages"/>.
@@ -353,13 +352,14 @@
         instance definition) in a way that changes the behaviour of code
         importing the untrusted module. The extension is not disabled for a
         module M compiled with -XSafe or -XSafeLanguage but restricted.
-        While M can defined overlapping instance declarations, they can
-        only be used in M. If in a module N that imports M, at a call site
-        that uses a type-class function there is a choice of which instance
-        to use (i.e overlapping) and the most specific choice is from M (or
-        any other Safe compiled module), then compilation will fail. It is
-        irrelevant if module N is considered Safe, or Trustworthy or
-        neither.</listitem>
+        While M can define overlapping instance declarations, they can
+        only overlap other instance declaration defined in M. If in a module N
+        that imports M, at a call site that uses  type-class function there is
+        a choice of which instance to use (i.e. overlapping) and the most
+        specific instances is from M, then all the other choices must also be
+        from M. If not, a compilation error will occur. A simple way to think
+        of this is a <emphasis>same origin policy</emphasis> for overlapping
+        instances defined in Safe compiled modules.</listitem>
     </itemizedlist>
   </sect2>
 
@@ -372,7 +372,7 @@
       <title>Enforcing Good Programming Style</title>
 
       Over-reliance on magic functions such as unsafePerformIO or magic symbols
-      such as #realWorld can lead to less elegant Haskell code. The Safe dialect
+      such as realWorld# can lead to less elegant Haskell code. The Safe dialect
       formalizes this notion of magic and prohibits its use. Thus, people may
       encourage their collaborators to use the Safe dialect, except when truly
       necessary, so as to promote better programming style. It can be thought
@@ -424,12 +424,12 @@
 
         rioReadFile :: FilePath -> RIO String
         rioReadFile file = UnsafeRIO $ do
-          ok &lt; pathOK file
+          ok &lt;- pathOK file
           if ok then readFile file else return ""
 
         rioWriteFile :: FilePath -> String -> RIO ()
         rioWriteFile file contents = UnsafeRIO $ do
-          ok &lt; pathOK file
+          ok &lt;- pathOK file
           if ok then writeFile file contents else return () 
       </programlisting>
 
