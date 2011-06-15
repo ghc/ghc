@@ -159,6 +159,9 @@ instance (Functor f, Ord1 f, Ord1 g) => Ord1 (O f g) where
 instance (Functor f, Outputable1 f, Outputable1 g) => Outputable1 (O f g) where
     pprPrec1 prec (Comp x) = pprPrec1 prec (fmap Wrapper1 x)
 
+instance (Functor f, Outputable1 f, Outputable1 g, Outputable a) => Outputable (O f g a) where
+    pprPrec = pprPrec1
+
 instance (Functor f, Functor g) => Functor (O f g) where
     fmap f (Comp x) = Comp (fmap (fmap f) x)
 
