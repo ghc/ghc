@@ -125,6 +125,7 @@ step' normalising state =
     
     -- Deal with a variable at the top of the stack
     -- Might have to claim deeds if inlining a non-value non-internally-bound thing here
+    -- FIXME: look inside unfoldings
     force :: Deeds -> Heap -> Stack -> Tag -> Out Var -> Maybe UnnormalisedState
     force deeds (Heap h ids) k tg x'
       -- NB: inlining values is non-normalising if dUPLICATE_VALUES_EVALUATOR is on (since doing things the long way would involve executing an update frame)
