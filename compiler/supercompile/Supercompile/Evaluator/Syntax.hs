@@ -226,7 +226,7 @@ stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
   where heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
         stackSize = sum . map (stackFrameSize . tagee)
 
-addStateDeeds :: Deeds -> (Deeds, Heap, Stack, In (Anned a)) -> (Deeds, Heap, Stack, In (Anned a))
+addStateDeeds :: Deeds -> (Deeds, a, b, c) -> (Deeds, a, b, c)
 addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds + deeds, h, k, in_e)
 
 releaseHeapBindingDeeds :: Deeds -> HeapBinding -> Deeds

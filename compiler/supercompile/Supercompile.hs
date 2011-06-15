@@ -9,7 +9,10 @@ import Supercompile.Evaluator.Evaluate
 import Supercompile.Evaluator.Syntax
 import Supercompile.Evaluator.FreeVars
 
+import Supercompile.Termination.Generaliser
+
 import Supercompile.Drive.Match
+import Supercompile.Drive.Split
 
 -- import CoreSyn
 -- 

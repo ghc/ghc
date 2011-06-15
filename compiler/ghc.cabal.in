@@ -450,12 +450,14 @@ Library
         Supercompile.Core.Tag
         Supercompile.Core.FreeVars
         Supercompile.Drive.Match
+        Supercompile.Drive.Split
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars
         Supercompile.Evaluator.Residualise
         Supercompile.Evaluator.Syntax
         Supercompile.StaticFlags
+        Supercompile.Termination.Generaliser
         Supercompile.Utilities
         Supercompile
         Vectorise.Builtins.Base

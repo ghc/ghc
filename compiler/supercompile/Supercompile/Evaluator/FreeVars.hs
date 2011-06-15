@@ -1,9 +1,10 @@
-{-# LANGUAGE PatternGuards #-}
 module Supercompile.Evaluator.FreeVars (
     inFreeVars,
     heapBindingFreeVars,
     pureHeapBoundVars, stackBoundVars, stackFrameBoundVars, stackFrameFreeVars,
-    qaFreeVars, pureHeapVars, unnormalisedStateFreeVars, stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
+    qaFreeVars, pureHeapVars,
+    unnormalisedStateFreeVars, unnormalisedStateUncoveredVars,
+    stateFreeVars, stateAllFreeVars, stateLetBounders, stateLambdaBounders, stateInternalBounders, stateUncoveredVars,
     module Supercompile.Core.FreeVars
   ) where
 
@@ -80,6 +81,11 @@ stateFreeVars s = fvs `minusVarSet` bvs InternallyBound
 unnormalisedStateFreeVars :: UnnormalisedState -> FreeVars
 unnormalisedStateFreeVars s = fvs `minusVarSet` bvs InternallyBound
   where (bvs, fvs) = unnormalisedStateVars s
+
+unnormalisedStateUncoveredVars :: UnnormalisedState -> FreeVars
+unnormalisedStateUncoveredVars s = fvs `minusVarSet` bvs InternallyBound `minusVarSet` bvs LetBound `minusVarSet` bvs LambdaBound
+  where (bvs, fvs) = unnormalisedStateVars s
+
 
 stateAllFreeVars :: State -> FreeVars
 stateAllFreeVars = snd . stateVars

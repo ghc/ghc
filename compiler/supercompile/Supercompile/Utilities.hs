@@ -25,10 +25,12 @@ import Control.Monad hiding (join)
 
 import Data.Function (on)
 import Data.Maybe
+import Data.Monoid (Monoid(..))
 import Data.Ord
 import Data.List
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.Set as S
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 
@@ -101,6 +103,13 @@ instance Outputable PrettyFunction where
 
 asPrettyFunction :: Outputable a => a -> PrettyFunction
 asPrettyFunction x = PrettyFunction (\prec -> pprPrec prec x)
+
+
+instance Outputable IS.IntSet where
+    ppr xs = braces $ hsep (punctuate comma (map ppr $ IS.toList xs))
+
+instance Outputable a => Outputable (S.Set a) where
+    ppr xs = braces $ hsep (punctuate comma (map ppr $ S.toList xs))
 
 
 newtype PrettyDoc = PrettyDoc SDoc
@@ -285,13 +294,39 @@ plusMaybe _ Nothing  mb_y     = mb_y
 plusMaybe _ mb_x     Nothing  = mb_x
 
 
+first3 :: (a -> d) -> (a, b, c) -> (d, b, c)
+first3 f (a, b, c) = (f a, b, c)
+
+second3 :: (b -> d) -> (a, b, c) -> (a, d, c)
+second3 f (a, b, c) = (a, f b, c)
+
 third3 :: (c -> d) -> (a, b, c) -> (a, b, d)
 third3 f (a, b, c) = (a, b, f c)
+
+first4 :: (a -> e) -> (a, b, c, d) -> (e, b, c, d)
+first4 f (a, b, c, d) = (f a, b, c, d)
+
+second4 :: (b -> e) -> (a, b, c, d) -> (a, e, c, d)
+second4 f (a, b, c, d) = (a, f b, c, d)
+
+third4 :: (c -> e) -> (a, b, c, d) -> (a, b, e, d)
+third4 f (a, b, c, d) = (a, b, f c, d)
+
+fourth4 :: (d -> e) -> (a, b, c, d) -> (a, b, c, e)
+fourth4 f (a, b, c, d) = (a, b, c, f d)
 
 
 uncons :: [a] -> Maybe (a, [a])
 uncons []     = Nothing
 uncons (x:xs) = Just (x, xs)
+
+splitBy :: [b] -> [a] -> ([a], [a])
+splitBy []     xs     = ([], xs)
+splitBy (_:ys) (x:xs) = first (x:) $ splitBy ys xs
+
+splitManyBy :: [[b]] -> [a] -> [[a]]
+splitManyBy []       xs = [xs]
+splitManyBy (ys:yss) xs = case splitBy ys xs of (xs1, xs2) -> xs1 : splitManyBy yss xs2
 
 listContexts :: [a] -> [([a], a, [a])]
 listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs))
@@ -306,6 +341,40 @@ takeWhileJust f = go
     go (x:xs) = case f x of
         Nothing -> ([], x:xs)
         Just y  -> first (y:) $ go xs
+
+accumLN :: (acc -> (acc, a)) -> acc -> Int -> (acc, [a])
+accumLN f = go
+  where
+    go acc n | n <= 0            = (acc, []) 
+             | (acc, x) <- f acc = second (x:) (go acc (n - 1))
+
+sumMap :: (Foldable.Foldable f, Num b) => (a -> b) -> f a -> b
+sumMap f = Foldable.foldr (\x n -> f x + n) 0
+
+
+class (Functor t, Foldable.Foldable t) => Accumulatable t where
+    mapAccumT  ::            (acc -> x ->   (acc, y)) -> acc -> t x ->   (acc, t y)
+    mapAccumTM :: Monad m => (acc -> x -> m (acc, y)) -> acc -> t x -> m (acc, t y)
+    
+    mapAccumT f acc x = unI (mapAccumTM (\acc' x' -> I (f acc' x')) acc x)
+
+fmapDefault :: (Accumulatable t) => (a -> b) -> t a -> t b
+fmapDefault f = snd . mapAccumT (\() x -> ((), f x)) ()
+
+foldMapDefault :: (Accumulatable t, Monoid m) => (a -> m) -> t a -> m
+foldMapDefault f = fst . mapAccumT (\acc x -> (f x `mappend` acc, ())) mempty
+
+instance Accumulatable [] where
+    mapAccumT  = mapAccumL
+    mapAccumTM = mapAccumLM
+
+mapAccumLM :: Monad m => (acc -> x -> m (acc, y)) -> acc -> [x] -> m (acc, [y])
+mapAccumLM f = go []
+  where
+    go ys acc []     = return (acc, reverse ys)
+    go ys acc (x:xs) = do
+      (acc, y) <- f acc x
+      go (y:ys) acc xs
 
 
 zipWithEqualM :: Monad m => (a -> b -> m c) -> [a] -> [b] -> m [c]
@@ -348,6 +417,6 @@ apportion orig_n weighting
 
 
 {-# NOINLINE prettyUniqSupply #-}
-supercompileUniqSupply, parseUniqSupply, expandUniqSupply, reduceUniqSupply, tagUniqSupply, prettyUniqSupply, matchUniqSupply :: UniqSupply
+supercompileUniqSupply, parseUniqSupply, expandUniqSupply, reduceUniqSupply, tagUniqSupply, prettyUniqSupply, matchUniqSupply, splitterUniqSupply :: UniqSupply
 supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
-(parseUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply
+(parseUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:splitterUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply

@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 module Supercompile.Evaluator.Evaluate (normalise, step) where
 
 #include "HsVersions.h"

@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternGuards, TypeSynonymInstances, FlexibleInstances, Rank2Types #-}
+{-# LANGUAGE Rank2Types #-}
 module Supercompile.Core.Syntax (
     module Supercompile.Core.Syntax,
     DataCon, Var, Literal, Type, Coercion, PrimOp

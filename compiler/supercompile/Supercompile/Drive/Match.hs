@@ -1,4 +1,3 @@
-{-# LANGUAGE PatternGuards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module Supercompile.Drive.Match (match) where
 

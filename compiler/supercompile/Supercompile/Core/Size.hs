@@ -1,4 +1,4 @@
-{-# LANGUAGE Rank2Types, FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
 module Supercompile.Core.Size where
 
 import Supercompile.Core.FreeVars
