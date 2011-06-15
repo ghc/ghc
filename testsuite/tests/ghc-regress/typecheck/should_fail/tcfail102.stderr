@@ -1,4 +1,7 @@
 
+tcfail102.hs:1:14:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
 tcfail102.hs:9:7:
     Could not deduce (Integral (Ratio a)) arising from a record update
     from the context (Integral a)

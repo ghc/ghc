@@ -1,4 +1,7 @@
 
+tcfail151.hs:1:14:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
 tcfail151.hs:8:6:
     `Name a' is not applied to enough type arguments
     Expected kind `?', but `Name a' has kind `* -> *'

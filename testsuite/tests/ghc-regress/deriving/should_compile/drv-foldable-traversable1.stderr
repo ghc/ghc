@@ -1,4 +1,3 @@
 
-str001.hs:1:14:
+drv-foldable-traversable1.hs:3:32:
     Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
-
