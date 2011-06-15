@@ -456,7 +456,6 @@ Library
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins.Modules
-        Vectorise.Builtins.Prelude
         Vectorise.Builtins
         Vectorise.Monad.Base
         Vectorise.Monad.Naming
