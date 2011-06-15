@@ -1507,9 +1507,9 @@ genCCall
 -- Unroll memcpy calls if the source and destination pointers are at
 -- least DWORD aligned and the number of bytes to copy isn't too
 -- large.  Otherwise, call C's memcpy.
-genCCall (CmmPrim MO_Memcpy) _ args@[CmmHinted dst _, CmmHinted src _,
-                                     CmmHinted (CmmLit (CmmInt n _)) _,
-                                     CmmHinted (CmmLit (CmmInt align _)) _]
+genCCall (CmmPrim MO_Memcpy) _ [CmmHinted dst _, CmmHinted src _,
+                                CmmHinted (CmmLit (CmmInt n _)) _,
+                                CmmHinted (CmmLit (CmmInt align _)) _]
     | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
@@ -1549,10 +1549,10 @@ genCCall (CmmPrim MO_Memcpy) _ args@[CmmHinted dst _, CmmHinted src _,
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-genCCall (CmmPrim MO_Memset) _ args@[CmmHinted dst _,
-                                     CmmHinted (CmmLit (CmmInt c _)) _,
-                                     CmmHinted (CmmLit (CmmInt n _)) _,
-                                     CmmHinted (CmmLit (CmmInt align _)) _]
+genCCall (CmmPrim MO_Memset) _ [CmmHinted dst _,
+                                CmmHinted (CmmLit (CmmInt c _)) _,
+                                CmmHinted (CmmLit (CmmInt n _)) _,
+                                CmmHinted (CmmLit (CmmInt align _)) _]
     | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
         code_dst <- getAnyReg dst
         dst_r <- getNewRegNat size
@@ -1960,6 +1960,7 @@ genCCall	= panic "X86.genCCAll: not defined"
 -- | We're willing to inline and unroll memcpy/memset calls that touch
 -- at most these many bytes.  This threshold is the same as the one
 -- used by GCC and LLVM.
+maxInlineSizeThreshold :: Integer
 maxInlineSizeThreshold = 128
 
 outOfLineCmmOp :: CallishMachOp -> Maybe HintedCmmFormal -> [HintedCmmActual] -> NatM InstrBlock
