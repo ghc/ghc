@@ -827,165 +827,19 @@ dumpCensus( Census *census )
     printSample(rtsFalse, census->time);
 }
 
-/* -----------------------------------------------------------------------------
- * Code to perform a heap census.
- * -------------------------------------------------------------------------- */
-static void
-heapCensusChain( Census *census, bdescr *bd )
+
+static void heapProfObject(Census *census, StgClosure *p, nat size,
+                           rtsBool prim
+#ifndef PROFILING
+                           STG_UNUSED
+#endif
+                           )
 {
-    StgPtr p;
-    StgInfoTable *info;
     void *identity;
-    nat size;
-    counter *ctr;
     nat real_size;
-    PROFILING_ONLY( rtsBool prim );
+    counter *ctr;
 
-    for (; bd != NULL; bd = bd->link) {
-
-	// HACK: ignore pinned blocks, because they contain gaps.
-	// It's not clear exactly what we'd like to do here, since we
-	// can't tell which objects in the block are actually alive.
-	// Perhaps the whole block should be counted as SYSTEM memory.
-	if (bd->flags & BF_PINNED) {
-	    continue;
-	}
-
-	p = bd->start;
-	while (p < bd->free) {
-	    info = get_itbl((StgClosure *)p);
-	    PROFILING_ONLY( prim = rtsFalse );
-	    
-	    switch (info->type) {
-
-	    case THUNK:
-		size = thunk_sizeW_fromITBL(info);
-		break;
-
-	    case THUNK_1_1:
-	    case THUNK_0_2:
-	    case THUNK_2_0:
-		size = sizeofW(StgThunkHeader) + 2;
-		break;
-
-	    case THUNK_1_0:
-	    case THUNK_0_1:
-	    case THUNK_SELECTOR:
-		size = sizeofW(StgThunkHeader) + 1;
-		break;
-
-	    case CONSTR:
-	    case FUN:
-	    case IND_PERM:
-	    case BLACKHOLE:
-	    case BLOCKING_QUEUE:
-	    case FUN_1_0:
-	    case FUN_0_1:
-	    case FUN_1_1:
-	    case FUN_0_2:
-	    case FUN_2_0:
-	    case CONSTR_1_0:
-	    case CONSTR_0_1:
-	    case CONSTR_1_1:
-	    case CONSTR_0_2:
-	    case CONSTR_2_0:
-		size = sizeW_fromITBL(info);
-		break;
-
-	    case IND:
-		// Special case/Delicate Hack: INDs don't normally
-		// appear, since we're doing this heap census right
-		// after GC.  However, GarbageCollect() also does
-		// resurrectThreads(), which can update some
-		// blackholes when it calls raiseAsync() on the
-		// resurrected threads.  So we know that any IND will
-		// be the size of a BLACKHOLE.
-		size = BLACKHOLE_sizeW();
-		break;
-
-	    case BCO:
-		PROFILING_ONLY ( prim = rtsTrue );
-		size = bco_sizeW((StgBCO *)p);
-		break;
-
-            case MVAR_CLEAN:
-            case MVAR_DIRTY:
-	    case WEAK:
-	    case PRIM:
-	    case MUT_PRIM:
-	    case MUT_VAR_CLEAN:
-	    case MUT_VAR_DIRTY:
-		PROFILING_ONLY ( prim = rtsTrue );
-		size = sizeW_fromITBL(info);
-		break;
-
-	    case AP:
-		size = ap_sizeW((StgAP *)p);
-		break;
-
-	    case PAP:
-		size = pap_sizeW((StgPAP *)p);
-		break;
-
-	    case AP_STACK:
-		size = ap_stack_sizeW((StgAP_STACK *)p);
-		break;
-		
-	    case ARR_WORDS:
-		PROFILING_ONLY ( prim = rtsTrue );
-		size = arr_words_sizeW((StgArrWords*)p);
-		break;
-		
-	    case MUT_ARR_PTRS_CLEAN:
-	    case MUT_ARR_PTRS_DIRTY:
-	    case MUT_ARR_PTRS_FROZEN:
-	    case MUT_ARR_PTRS_FROZEN0:
-		PROFILING_ONLY ( prim = rtsTrue );
-		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
-		break;
-		
-	    case TSO:
-		PROFILING_ONLY ( prim = rtsTrue );
-#ifdef PROFILING
-		if (RtsFlags.ProfFlags.includeTSOs) {
-                    size = sizeofW(StgTSO);
-		    break;
-		} else {
-		    // Skip this TSO and move on to the next object
-                    p += sizeofW(StgTSO);
-		    continue;
-		}
-#else
-                size = sizeofW(StgTSO);
-		break;
-#endif
-
-            case STACK:
-		PROFILING_ONLY ( prim = rtsTrue );
-#ifdef PROFILING
-		if (RtsFlags.ProfFlags.includeTSOs) {
-                    size = stack_sizeW((StgStack*)p);
-                    break;
-		} else {
-		    // Skip this TSO and move on to the next object
-                    p += stack_sizeW((StgStack*)p);
-		    continue;
-		}
-#else
-                size = stack_sizeW((StgStack*)p);
-		break;
-#endif
-
-            case TREC_CHUNK:
-		PROFILING_ONLY ( prim = rtsTrue );
-		size = sizeofW(StgTRecChunk);
-		break;
-
-	    default:
-		barf("heapCensus, unknown object: %d", info->type);
-	    }
-	    
-	    identity = NULL;
+            identity = NULL;
 
 #ifdef PROFILING
 	    // subtract the profiling overhead
@@ -1049,6 +903,167 @@ heapCensusChain( Census *census, bdescr *bd )
 		    }
 		}
 	    }
+}
+
+/* -----------------------------------------------------------------------------
+ * Code to perform a heap census.
+ * -------------------------------------------------------------------------- */
+static void
+heapCensusChain( Census *census, bdescr *bd )
+{
+    StgPtr p;
+    StgInfoTable *info;
+    nat size;
+    rtsBool prim;
+
+    for (; bd != NULL; bd = bd->link) {
+
+        // HACK: pretend a pinned block is just one big ARR_WORDS
+        // owned by CCS_SYSTEM.  These blocks can be full of holes due
+        // to alignment constraints so we can't traverse the memory
+        // and do a proper census.
+        if (bd->flags & BF_PINNED) {
+            StgClosure arr;
+            SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_SYSTEM);
+            heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, rtsTrue);
+            continue;
+        }
+
+	p = bd->start;
+	while (p < bd->free) {
+	    info = get_itbl((StgClosure *)p);
+            prim = rtsFalse;
+	    
+	    switch (info->type) {
+
+	    case THUNK:
+		size = thunk_sizeW_fromITBL(info);
+		break;
+
+	    case THUNK_1_1:
+	    case THUNK_0_2:
+	    case THUNK_2_0:
+		size = sizeofW(StgThunkHeader) + 2;
+		break;
+
+	    case THUNK_1_0:
+	    case THUNK_0_1:
+	    case THUNK_SELECTOR:
+		size = sizeofW(StgThunkHeader) + 1;
+		break;
+
+	    case CONSTR:
+	    case FUN:
+	    case IND_PERM:
+	    case BLACKHOLE:
+	    case BLOCKING_QUEUE:
+	    case FUN_1_0:
+	    case FUN_0_1:
+	    case FUN_1_1:
+	    case FUN_0_2:
+	    case FUN_2_0:
+	    case CONSTR_1_0:
+	    case CONSTR_0_1:
+	    case CONSTR_1_1:
+	    case CONSTR_0_2:
+	    case CONSTR_2_0:
+		size = sizeW_fromITBL(info);
+		break;
+
+	    case IND:
+		// Special case/Delicate Hack: INDs don't normally
+		// appear, since we're doing this heap census right
+		// after GC.  However, GarbageCollect() also does
+		// resurrectThreads(), which can update some
+		// blackholes when it calls raiseAsync() on the
+		// resurrected threads.  So we know that any IND will
+		// be the size of a BLACKHOLE.
+		size = BLACKHOLE_sizeW();
+		break;
+
+	    case BCO:
+                prim = rtsTrue;
+		size = bco_sizeW((StgBCO *)p);
+		break;
+
+            case MVAR_CLEAN:
+            case MVAR_DIRTY:
+	    case WEAK:
+	    case PRIM:
+	    case MUT_PRIM:
+	    case MUT_VAR_CLEAN:
+	    case MUT_VAR_DIRTY:
+		prim = rtsTrue;
+		size = sizeW_fromITBL(info);
+		break;
+
+	    case AP:
+		size = ap_sizeW((StgAP *)p);
+		break;
+
+	    case PAP:
+		size = pap_sizeW((StgPAP *)p);
+		break;
+
+	    case AP_STACK:
+		size = ap_stack_sizeW((StgAP_STACK *)p);
+		break;
+		
+	    case ARR_WORDS:
+		prim = rtsTrue;
+		size = arr_words_sizeW((StgArrWords*)p);
+		break;
+		
+	    case MUT_ARR_PTRS_CLEAN:
+	    case MUT_ARR_PTRS_DIRTY:
+	    case MUT_ARR_PTRS_FROZEN:
+	    case MUT_ARR_PTRS_FROZEN0:
+		prim = rtsTrue;
+		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
+		break;
+		
+	    case TSO:
+		prim = rtsTrue;
+#ifdef PROFILING
+		if (RtsFlags.ProfFlags.includeTSOs) {
+                    size = sizeofW(StgTSO);
+		    break;
+		} else {
+		    // Skip this TSO and move on to the next object
+                    p += sizeofW(StgTSO);
+		    continue;
+		}
+#else
+                size = sizeofW(StgTSO);
+		break;
+#endif
+
+            case STACK:
+		prim = rtsTrue;
+#ifdef PROFILING
+		if (RtsFlags.ProfFlags.includeTSOs) {
+                    size = stack_sizeW((StgStack*)p);
+                    break;
+		} else {
+		    // Skip this TSO and move on to the next object
+                    p += stack_sizeW((StgStack*)p);
+		    continue;
+		}
+#else
+                size = stack_sizeW((StgStack*)p);
+		break;
+#endif
+
+            case TREC_CHUNK:
+		prim = rtsTrue;
+		size = sizeofW(StgTRecChunk);
+		break;
+
+	    default:
+		barf("heapCensus, unknown object: %d", info->type);
+	    }
+	    
+            heapProfObject(census,(StgClosure*)p,size,prim);
 
 	    p += size;
 	}
