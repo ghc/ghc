@@ -55,13 +55,13 @@ import Constants	( wORD_SIZE )
 import DynFlags
 
 import Control.Monad    ( mapAndUnzipM )
+import Data.Bits
 import Data.Maybe       ( catMaybes )
 import Data.Int
 
 #if WORD_SIZE_IN_BITS==32
 import Data.Maybe       ( fromJust )
 import Data.Word
-import Data.Bits
 #endif
 
 sse2Enabled :: NatM Bool
@@ -1504,6 +1504,89 @@ genCCall
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+-- Unroll memcpy calls if the source and destination pointers are at
+-- least DWORD aligned and the number of bytes to copy isn't too
+-- large.  Otherwise, call C's memcpy.
+genCCall (CmmPrim MO_Memcpy) _ [CmmHinted dst _, CmmHinted src _,
+                                CmmHinted (CmmLit (CmmInt n _)) _,
+                                CmmHinted (CmmLit (CmmInt align _)) _]
+    | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
+        code_dst <- getAnyReg dst
+        dst_r <- getNewRegNat size
+        code_src <- getAnyReg src
+        src_r <- getNewRegNat size
+        tmp_r <- getNewRegNat size
+        return $ code_dst dst_r `appOL` code_src src_r `appOL`
+            go dst_r src_r tmp_r n
+  where
+    size = if align .&. 4 /= 0 then II32 else archWordSize
+
+    sizeBytes = fromIntegral (sizeInBytes size)
+
+    go :: Reg -> Reg -> Reg -> Integer -> OrdList Instr
+    go dst src tmp i
+        | i >= sizeBytes =
+            unitOL (MOV size (OpAddr src_addr) (OpReg tmp)) `appOL`
+            unitOL (MOV size (OpReg tmp) (OpAddr dst_addr)) `appOL`
+            go dst src tmp (i - sizeBytes)
+        -- Deal with remaining bytes.
+        | i >= 4 =  -- Will never happen on 32-bit
+            unitOL (MOV II32 (OpAddr src_addr) (OpReg tmp)) `appOL`
+            unitOL (MOV II32 (OpReg tmp) (OpAddr dst_addr)) `appOL`
+            go dst src tmp (i - 4)
+        | i >= 2 =
+            unitOL (MOVZxL II16 (OpAddr src_addr) (OpReg tmp)) `appOL`
+            unitOL (MOV II16 (OpReg tmp) (OpAddr dst_addr)) `appOL`
+            go dst src tmp (i - 2)
+        | i >= 1 =
+            unitOL (MOVZxL II8 (OpAddr src_addr) (OpReg tmp)) `appOL`
+            unitOL (MOV II8 (OpReg tmp) (OpAddr dst_addr)) `appOL`
+            go dst src tmp (i - 1)
+        | otherwise = nilOL
+      where
+        src_addr = AddrBaseIndex (EABaseReg src) EAIndexNone
+                   (ImmInteger (n - i))
+        dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
+                   (ImmInteger (n - i))
+
+genCCall (CmmPrim MO_Memset) _ [CmmHinted dst _,
+                                CmmHinted (CmmLit (CmmInt c _)) _,
+                                CmmHinted (CmmLit (CmmInt n _)) _,
+                                CmmHinted (CmmLit (CmmInt align _)) _]
+    | n <= maxInlineSizeThreshold && align .&. 3 == 0 = do
+        code_dst <- getAnyReg dst
+        dst_r <- getNewRegNat size
+        return $ code_dst dst_r `appOL` go dst_r n
+  where
+    (size, val) = case align .&. 3 of
+        2 -> (II16, c2)
+        0 -> (II32, c4)
+        _ -> (II8, c)
+    c2 = c `shiftL` 8 .|. c
+    c4 = c2 `shiftL` 16 .|. c2
+
+    sizeBytes = fromIntegral (sizeInBytes size)
+
+    go :: Reg -> Integer -> OrdList Instr
+    go dst i
+        -- TODO: Add movabs instruction and support 64-bit sets.
+        | i >= sizeBytes =  -- This might be smaller than the below sizes
+            unitOL (MOV size (OpImm (ImmInteger val)) (OpAddr dst_addr)) `appOL`
+            go dst (i - sizeBytes)
+        | i >= 4 =  -- Will never happen on 32-bit
+            unitOL (MOV II32 (OpImm (ImmInteger c4)) (OpAddr dst_addr)) `appOL`
+            go dst (i - 4)
+        | i >= 2 =
+            unitOL (MOV II16 (OpImm (ImmInteger c2)) (OpAddr dst_addr)) `appOL`
+            go dst (i - 2)
+        | i >= 1 =
+            unitOL (MOV II8 (OpImm (ImmInteger c)) (OpAddr dst_addr)) `appOL`
+            go dst (i - 1)
+        | otherwise = nilOL
+      where
+        dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
+                   (ImmInteger (n - i))
+
 #if i386_TARGET_ARCH
 
 genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
@@ -1874,6 +1957,11 @@ genCCall	= panic "X86.genCCAll: not defined"
 
 #endif /* x86_64_TARGET_ARCH */
 
+-- | We're willing to inline and unroll memcpy/memset calls that touch
+-- at most these many bytes.  This threshold is the same as the one
+-- used by GCC and LLVM.
+maxInlineSizeThreshold :: Integer
+maxInlineSizeThreshold = 128
 
 outOfLineCmmOp :: CallishMachOp -> Maybe HintedCmmFormal -> [HintedCmmActual] -> NatM InstrBlock
 outOfLineCmmOp mop res args
