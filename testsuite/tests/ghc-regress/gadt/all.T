@@ -70,7 +70,7 @@ test('karl2', normal, compile, [''])
 test('data1', normal, compile, [''])
 test('data2', normal, compile, [''])
 
-test('termination', expect_broken(1999), compile, [''])
+test('termination', normal, compile, [''])
 test('set', normal, compile, [''])
 test('scoped', normal, compile, [''])
 test('gadt-escape1', normal, compile, [''])
