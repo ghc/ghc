@@ -650,13 +650,14 @@ def do_test(name, way, func, args):
             else:
                 print '*** unexpected pass for', full_name
                 t.n_unexpected_passes = t.n_unexpected_passes + 1
-                addTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
+                addPassingTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
         elif passFail == 'fail':
             if getTestOpts().expect == 'pass' \
                and way not in getTestOpts().expect_fail_for:
                 print '*** unexpected failure for', full_name
                 t.n_unexpected_failures = t.n_unexpected_failures + 1
-                addTestInfo(t.unexpected_failures, getTestOpts().testdir, name, way)
+                reason = result['reason']
+                addFailingTestInfo(t.unexpected_failures, getTestOpts().testdir, name, reason, way)
             else:
                 t.n_expected_failures = t.n_expected_failures + 1
                 if name in t.expected_failures:
@@ -669,7 +670,7 @@ def do_test(name, way, func, args):
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
 
-def addTestInfo (testInfos, directory, name, way):
+def addPassingTestInfo (testInfos, directory, name, way):
     directory = re.sub('^\\.[/\\\\]', '', directory)
 
     if not directory in testInfos:
@@ -679,6 +680,20 @@ def addTestInfo (testInfos, directory, name, way):
         testInfos[directory][name] = []
 
     testInfos[directory][name].append(way)
+
+def addFailingTestInfo (testInfos, directory, name, reason, way):
+    directory = re.sub('^\\.[/\\\\]', '', directory)
+
+    if not directory in testInfos:
+        testInfos[directory] = {}
+
+    if not name in testInfos[directory]:
+        testInfos[directory][name] = {}
+
+    if not reason in testInfos[directory][name]:
+        testInfos[directory][name][reason] = []
+
+    testInfos[directory][name][reason].append(way)
 
 def skiptest (name, way):
     # print 'Skipping test \"', name, '\"'
@@ -1596,13 +1611,13 @@ def summary(t, file):
 
     if t.n_unexpected_passes > 0:
         file.write('Unexpected passes:\n')
-        printTestInfosSummary(file, t.unexpected_passes)
+        printPassingTestInfosSummary(file, t.unexpected_passes)
 
     if t.n_unexpected_failures > 0:
         file.write('Unexpected failures:\n')
-        printTestInfosSummary(file, t.unexpected_failures)
+        printFailingTestInfosSummary(file, t.unexpected_failures)
 
-def printTestInfosSummary(file, testInfos):
+def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()
     directories.sort()
     maxDirLen = max(map ((lambda x : len(x)), directories))
@@ -1612,6 +1627,21 @@ def printTestInfosSummary(file, testInfos):
         for test in tests:
            file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
                       ' (' + join(testInfos[directory][test],',') + ')\n')
+    file.write('\n')
+
+def printFailingTestInfosSummary(file, testInfos):
+    directories = testInfos.keys()
+    directories.sort()
+    maxDirLen = max(map ((lambda x : len(x)), directories))
+    for directory in directories:
+        tests = testInfos[directory].keys()
+        tests.sort()
+        for test in tests:
+           reasons = testInfos[directory][test].keys()
+           for reason in reasons:
+               file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
+                          ' [' + reason + ']' + \
+                          ' (' + join(testInfos[directory][test][reason],',') + ')\n')
     file.write('\n')
 
 def getStdout(cmd):
