@@ -244,7 +244,10 @@ isSystemName _                        = False
 -- | Create a name which is (for now at least) local to the current module and hence
 -- does not need a 'Module' to disambiguate it from other 'Name's
 mkInternalName :: Unique -> OccName -> SrcSpan -> Name
-mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq, n_sort = Internal, n_occ = occ, n_loc = loc }
+mkInternalName uniq occ loc = Name { n_uniq = getKeyFastInt uniq
+                                   , n_sort = Internal
+                                   , n_occ = occ
+                                   , n_loc = loc }
 	-- NB: You might worry that after lots of huffing and
 	-- puffing we might end up with two local names with distinct
 	-- uniques, but the same OccName.  Indeed we can, but that's ok
