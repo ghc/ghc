@@ -425,6 +425,11 @@ emitPrimOp res WriteByteArrayOp_Word16    args = doWriteByteArrayOp (Just mo_Wor
 emitPrimOp res WriteByteArrayOp_Word32    args = doWriteByteArrayOp (Just mo_WordTo32) res args
 emitPrimOp res WriteByteArrayOp_Word64    args = doWriteByteArrayOp Nothing res args
 
+-- Copying byte arrays
+emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
+    doCopyByteArrayOp src src_off dst dst_off n
+emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
+    doCopyMutableByteArrayOp src src_off dst dst_off n
 
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg]
@@ -702,6 +707,58 @@ cmmLoadIndexOffExpr off ty base idx
 
 setInfo :: CmmExpr -> CmmExpr -> CmmAGraph
 setInfo closure_ptr info_ptr = mkStore closure_ptr info_ptr
+
+-- ----------------------------------------------------------------------------
+-- Copying byte arrays
+
+-- | Takes a source 'ByteArray#', an offset in the source array, a
+-- destination 'MutableByteArray#', an offset into the destination
+-- array, and the number of bytes to copy.  Copies the given number of
+-- bytes from the source array to the destination array.
+doCopyByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                  -> FCode ()
+doCopyByteArrayOp = emitCopyByteArray copy
+  where
+    -- Copy data (we assume the arrays aren't overlapping since
+    -- they're of different types)
+    copy _src _dst dst_p src_p bytes =
+        emitMemcpyCall dst_p src_p bytes (CmmLit (mkIntCLit 1))
+
+-- | Takes a source 'MutableByteArray#', an offset in the source
+-- array, a destination 'MutableByteArray#', an offset into the
+-- destination array, and the number of bytes to copy.  Copies the
+-- given number of bytes from the source array to the destination
+-- array.
+doCopyMutableByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                         -> FCode ()
+doCopyMutableByteArrayOp = emitCopyByteArray copy
+  where
+    -- The only time the memory might overlap is when the two arrays
+    -- we were provided are the same array!
+    -- TODO: Optimize branch for common case of no aliasing.
+    copy src dst dst_p src_p bytes = do
+        [moveCall, cpyCall] <- forkAlts [
+            getCode $ emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit 1)),
+            getCode $ emitMemcpyCall  dst_p src_p bytes (CmmLit (mkIntCLit 1))
+            ]
+        emit $ mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
+
+emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                      -> FCode ())
+                  -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+                  -> FCode ()
+emitCopyByteArray copy src0 src_off0 dst0 dst_off0 n0 = do
+    -- Passed as arguments (be careful)
+    src     <- assignTempE src0
+    src_off <- assignTempE src_off0
+    dst     <- assignTempE dst0
+    dst_off <- assignTempE dst_off0
+    n       <- assignTempE n0
+
+    dst_p <- assignTempE $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
+    src_p <- assignTempE $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
+
+    copy src dst dst_p src_p n
 
 -- ----------------------------------------------------------------------------
 -- Copying pointer arrays
