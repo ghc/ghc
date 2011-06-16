@@ -9,11 +9,7 @@
 #endif
 
 module CmmSpillReload
-  ( DualLive(..)
-  , dualLiveLattice, dualLiveTransfers, dualLiveness
-  --, insertSpillsAndReloads  --- XXX todo check live-in at entry against formals
-  , dualLivenessWithInsertion
-
+  ( dualLivenessWithInsertion
   , removeDeadAssignmentsAndReloads
   )
 where
@@ -35,21 +31,22 @@ import Prelude hiding (succ, zip)
 
 {- Note [Overview of spill/reload]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The point of this module is to insert spills and reloads to
-establish the invariant that at a call (or at any proc point with
-an established protocol) all live variables not expected in
-registers are sitting on the stack.  We use a backward analysis to
-insert spills and reloads.  It should be followed by a
-forward transformation to sink reloads as deeply as possible, so as
-to reduce register pressure.
+The point of this module is to insert spills and reloads to establish
+the invariant that at a call or any proc point with an established
+protocol all live variables not expected in registers are sitting on the
+stack.  We use a backward dual liveness analysis (both traditional
+register liveness as well as register slot liveness on the stack) to
+insert spills and reloads.  It should be followed by a forward
+transformation to sink reloads as deeply as possible, so as to reduce
+register pressure: this transformation is performed by
+CmmRewriteAssignments.
 
 A variable can be expected to be live in a register, live on the
 stack, or both.  This analysis ensures that spills and reloads are
 inserted as needed to make sure that every live variable needed
-after a call is available on the stack.  Spills are pushed back to
-their reaching definitions, but reloads are dropped immediately after
-we return from a call and will have to be sunk by a later forward
-transformation.
+after a call is available on the stack.  Spills are placed immediately
+after their reaching definitions, but reloads are placed immediately
+after a return from a call (the entry point.)
 
 Note that we offer no guarantees about the consistency of the value
 in memory and the value in the register, except that they are
@@ -89,19 +86,26 @@ dualLivenessWithInsertion procPoints g =
                                                 (dualLiveTransfers (g_entry g) procPoints)
                                                 (insertSpillAndReloadRewrites g procPoints)
 
-dualLiveness :: BlockSet -> CmmGraph -> FuelUniqSM (BlockEnv DualLive)
-dualLiveness procPoints g =
+_dualLiveness :: BlockSet -> CmmGraph -> FuelUniqSM (BlockEnv DualLive)
+_dualLiveness procPoints g =
   liftM snd $ dataflowPassBwd g [] $ analBwd dualLiveLattice $ dualLiveTransfers (g_entry g) procPoints
+
+-- Note [Live registers on entry to procpoints]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Remember that the transfer function is only ever run on the rewritten
+-- version of a graph, and the rewrite function for spills and reloads
+-- enforces the invariant that no local registers are live on entry to
+-- a procpoint.  Accordingly, we check for this invariant here.  An old
+-- version of this code incorrectly claimed that any live registers were
+-- live on the stack before entering the function: this is wrong, but
+-- didn't cause bugs because it never actually was invoked.
 
 dualLiveTransfers :: BlockId -> BlockSet -> (BwdTransfer CmmNode DualLive)
 dualLiveTransfers entry procPoints = mkBTransfer3 first middle last
     where first :: CmmNode C O -> DualLive -> DualLive
-          first (CmmEntry id) live = check live id $  -- live at procPoint => spill
-            if id /= entry && setMember id procPoints
-               then DualLive { on_stack = on_stack live `plusRegSet` in_regs live
-                             , in_regs  = emptyRegSet }
-               else live
-            where check live id x = if id == entry then noLiveOnEntry id (in_regs live) x else x
+          first (CmmEntry id) live -- See Note [Live registers on entry to procpoints]
+            | id == entry || setMember id procPoints = noLiveOnEntry id (in_regs live) live
+            | otherwise                              = live
 
           middle :: CmmNode O O -> DualLive -> DualLive
           middle m = changeStack updSlots
@@ -114,9 +118,13 @@ dualLiveTransfers entry procPoints = mkBTransfer3 first middle last
                   spill  live _ = live
                   reload live s@(RegSlot r, _, _) = check s $ extendRegSet live r
                   reload live _ = live
+                  -- Ensure the assignment refers to the entirety of the
+                  -- register slot (and not just a slice).
                   check (RegSlot (LocalReg _ ty), o, w) x
                      | o == w && w == widthInBytes (typeWidth ty) = x
                   check _ _ = panic "middleDualLiveness unsupported: slices"
+
+          -- Differences from vanilla liveness analysis
           last :: CmmNode O C -> FactBase DualLive -> DualLive
           last l fb = case l of
             CmmBranch id                   -> lkp id
@@ -184,6 +192,8 @@ spill, reload :: LocalReg -> CmmNode O O
 spill  r = CmmStore  (regSlot r) (CmmReg $ CmmLocal r)
 reload r = CmmAssign (CmmLocal r) (CmmLoad (regSlot r) $ localRegType r)
 
+-- XXX: This should be done with generic liveness analysis and moved to
+-- its own module
 removeDeadAssignmentsAndReloads :: BlockSet -> CmmGraph -> FuelUniqSM CmmGraph
 removeDeadAssignmentsAndReloads procPoints g =
    liftM fst $ dataflowPassBwd g [] $ analRewBwd dualLiveLattice
