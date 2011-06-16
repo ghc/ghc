@@ -314,6 +314,8 @@ Library
         Finder
         GHC
         GhcMake
+        GhcPlugins
+        DynamicLoading
         HeaderInfo
         HscMain
         HscStats

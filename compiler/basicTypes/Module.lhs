@@ -39,7 +39,8 @@ module Module
         dphSeqPackageId,
         dphParPackageId,
 	mainPackageId,
-
+        thisGhcPackageId,
+        
 	-- * The Module type
 	Module,
 	modulePackageId, moduleName,
@@ -342,7 +343,7 @@ packageIdString = unpackFS . packageIdFS
 integerPackageId, primPackageId,
   basePackageId, rtsPackageId,
   thPackageId, dphSeqPackageId, dphParPackageId,
-  mainPackageId  :: PackageId
+  mainPackageId, thisGhcPackageId  :: PackageId
 primPackageId      = fsToPackageId (fsLit "ghc-prim")
 integerPackageId   = fsToPackageId (fsLit cIntegerLibrary)
 basePackageId      = fsToPackageId (fsLit "base")
@@ -350,6 +351,7 @@ rtsPackageId       = fsToPackageId (fsLit "rts")
 thPackageId        = fsToPackageId (fsLit "template-haskell")
 dphSeqPackageId    = fsToPackageId (fsLit "dph-seq")
 dphParPackageId    = fsToPackageId (fsLit "dph-par")
+thisGhcPackageId   = fsToPackageId (fsLit ("ghc-" ++ cProjectVersion))
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
