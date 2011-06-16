@@ -35,11 +35,11 @@ module RnEnv (
 #include "HsVersions.h"
 
 import LoadIface	( loadInterfaceForName, loadSrcInterface )
-import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
+import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName, updNameCache, extendNameCache )
 import HsSyn
 import RdrHsSyn		( extractHsTyRdrTyVars )
 import RdrName
-import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
+import HscTypes		( NameCache(..), availNames, ModIface(..), FixItem(..), lookupFixity)
 import TcEnv		( tcLookupDataCon, tcLookupField, isBrackStage )
 import TcRnMonad
 import Id		( isRecordSelector )
@@ -90,12 +90,19 @@ newTopSrcBinder (L loc rdr_name)
 	-- very confused indeed. This test rejects code like
 	--	data T = (,) Int Int
 	-- unless we are in GHC.Tup
-    ASSERT2( isExternalName name,  ppr name )
-    do	{ this_mod <- getModule
-        ; unless (this_mod == nameModule name)
-	         (addErrAt loc (badOrigBinding rdr_name))
-	; return name }
-
+    if isExternalName name then
+      do { this_mod <- getModule
+         ; unless (this_mod == nameModule name)
+      	          (addErrAt loc (badOrigBinding rdr_name))
+         ; return name }
+    else   -- See Note [Binders in Template Haskell] in Convert.hs
+      do { let occ = nameOccName name
+         ; occ `seq` return ()	-- c.f. seq in newGlobalBinder
+         ; this_mod <- getModule
+         ; updNameCache $ \ ns ->
+           let name' = mkExternalName (nameUnique name) this_mod occ loc
+               ns'   = ns { nsNames = extendNameCache (nsNames ns) this_mod occ name' }
+           in (ns', name') }
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do	{ this_mod <- getModule
@@ -939,18 +946,20 @@ extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
 checkDupRdrNames :: [Located RdrName] -> RnM ()
+-- Check for duplicated names in a binding group
 checkDupRdrNames rdr_names_w_loc
-  = 	-- Check for duplicated names in a binding group
-    mapM_ (dupNamesErr getLoc) dups
+  = mapM_ (dupNamesErr getLoc) dups
   where
     (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
 checkDupNames :: [Name] -> RnM ()
+-- Check for duplicated names in a binding group
 checkDupNames names
-  = 	-- Check for duplicated names in a binding group
-    mapM_ (dupNamesErr nameSrcSpan) dups
+  = mapM_ (dupNamesErr nameSrcSpan) dups
   where
-    (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) names
+    (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) $
+                filterOut isSystemName names
+		-- See Note [Binders in Template Haskell] in Convert
 
 ---------------------
 checkDupAndShadowedRdrNames :: [Located RdrName] -> RnM ()

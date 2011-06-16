@@ -831,13 +831,17 @@ thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- 	 which will give confusing error messages later
 -- 
 -- The strict applications ensure that any buried exceptions get forced
-thRdrName _       occ (TH.NameG th_ns pkg mod) = thOrigRdrName occ th_ns pkg mod
-thRdrName ctxt_ns occ (TH.NameL uniq)      = nameRdrName $! (((Name.mkInternalName $! (mk_uniq uniq)) $! (mk_occ ctxt_ns occ)) noSrcSpan)
-thRdrName ctxt_ns occ (TH.NameQ mod)       = (mkRdrQual  $! (mk_mod mod)) $! (mk_occ ctxt_ns occ)
-thRdrName ctxt_ns occ (TH.NameU uniq)      = mkRdrUnqual $! (mk_uniq_occ ctxt_ns occ uniq)
-thRdrName ctxt_ns occ TH.NameS
-  | Just name <- isBuiltInOcc ctxt_ns occ  = nameRdrName $! name
-  | otherwise			           = mkRdrUnqual $! (mk_occ ctxt_ns occ)
+thRdrName ctxt_ns th_occ th_name
+  = case th_name of
+     TH.NameG th_ns pkg mod -> thOrigRdrName th_occ th_ns pkg mod
+     TH.NameQ mod  -> (mkRdrQual  $! mk_mod mod) $! occ
+     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq uniq) $! occ) noSrcSpan)
+     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemName $! mk_uniq uniq) $! occ))
+     TH.NameS | Just name <- isBuiltInOcc ctxt_ns th_occ -> nameRdrName $! name
+              | otherwise			         -> mkRdrUnqual $! occ
+  where
+    occ :: OccName.OccName
+    occ = mk_occ ctxt_ns th_occ
 
 thOrigRdrName :: String -> TH.NameSpace -> PkgName -> ModName -> RdrName
 thOrigRdrName occ th_ns pkg mod = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
@@ -873,14 +877,9 @@ isBuiltInOcc ctxt_ns occ
 	| OccName.isTcClsNameSpace ctxt_ns = Name.getName (tupleTyCon Boxed n)
 	| otherwise 		           = Name.getName (tupleCon Boxed n)
 
-mk_uniq_occ :: OccName.NameSpace -> String -> Int# -> OccName.OccName
-mk_uniq_occ ns occ uniq 
-  = OccName.mkOccName ns (occ ++ '[' : shows (mk_uniq uniq) "]")
-        -- See Note [Unique OccNames from Template Haskell]
-
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> String -> OccName.OccName
-mk_occ ns occ = OccName.mkOccNameFS ns (mkFastString occ)
+mk_occ ns occ = OccName.mkOccName ns occ
 
 mk_ghc_ns :: TH.NameSpace -> OccName.NameSpace
 mk_ghc_ns TH.DataName  = OccName.dataName
@@ -897,17 +896,64 @@ mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)
 \end{code}
 
-Note [Unique OccNames from Template Haskell]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The idea here is to make a name that 
-  a) the user could not possibly write (it has a "[" 
-     and letters or digits from the unique)
-  b) cannot clash with another NameU
-Previously I generated an Exact RdrName with mkInternalName.  This
-works fine for local binders, but does not work at all for top-level
-binders, which must have External Names, since they are rapidly baked
-into data constructors and the like.  Baling out and generating an
-unqualified RdrName here is the simple solution
+Note [Binders in Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this TH term construction:
+  do { x1 <- TH.newName "x"   -- newName :: String -> Q TH.Name
+     ; x2 <- TH.newName "x"   -- Builds a NameU
+     ; x3 <- TH.newName "x"
 
-See also Note [Suppressing uniques in OccNames] in OccName, which
-suppresses the unique when opt_SuppressUniques is on.
+     ; let x = mkName "x"     -- mkName :: String -> TH.Name
+       	       	      	      -- Builds a NameL
+
+     ; return (LamE (..pattern [x1,x2]..) $
+               LamE (VarPat x3) $
+               ..tuple (x1,x2,x3,x)) }
+
+It represents the term   \[x1,x2]. \x3. (x1,x2,x3,x)
+
+a) We don't want to complain about "x" being bound twice in 
+   the pattern [x1,x2]
+b) We don't want x3 to shadow the x1,x2
+c) We *do* want 'x' (dynamically bound with mkName) to bind 
+   to the innermost binding of "x", namely x3.. (In this
+d) When pretty printing, we want to print a unique with x1,x2 
+   etc, else they'll all print as "x" which isn't very helpful
+
+When we convert all this to HsSyn, the TH.Names are converted with
+thRdrName.  To achieve (b) we want the binders to be Exact RdrNames.
+Achieving (a) is a bit awkward, because
+   - We must check for duplicate and shadowed names on Names, 
+     not RdrNames, *after* renaming.   
+     See Note [Collect binders only after renaming] in HsUtils
+
+   - But to achieve (a) we must distinguish between the Exact
+     RdrNames arising from TH and the Unqual RdrNames that would
+     come from a user writing \[x,x] -> blah
+
+So in Convert (here) we translate
+   TH Name		            RdrName
+   --------------------------------------------------------
+   NameU (arising from newName) --> Exact (Name{ System })
+   NameS (arising from mkName)  --> Unqual
+
+Notice that the NameUs generate *System* Names.  Then, when
+figuring out shadowing and duplicates, we can filter out
+System Names.
+
+This use of System Names fits with other uses of System Names, eg for
+temporary variables "a". Since there are lots of things called "a" we
+usually want to print the name with the unique, and that is indeed
+the way System Names are printed.
+
+There's a small complication of course.  For data types and
+classes we'll now have system Names in the binding positions
+for constructors, TyCons etc.  For example
+    [d| data T = MkT Int |]
+when we splice in and Convert to HsSyn RdrName, we'll get
+    data (Exact (system Name "T")) = (Exact (system Name "MkT")) ...
+So RnEnv.newGlobalBinder we spot Exact RdrNames that wrap a
+non-External Name, and make an External name for.  (Remember, 
+constructors and the like need External Names.)  Oddly, the 
+*occurrences* will continue to be that (non-External) System Name, 
+but that will come out in the wash.

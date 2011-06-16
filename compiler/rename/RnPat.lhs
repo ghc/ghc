@@ -229,12 +229,15 @@ rnPats ctxt pats thing_inside
 	; bindPatSigTyVarsFV (collectSigTysFromPats pats)     $ 
 	  unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
         { -- Check for duplicated and shadowed names 
-	         -- Because we don't bind the vars all at once, we can't
-	         -- 	check incrementally for duplicates; 
-	         -- Nor can we check incrementally for shadowing, else we'll
-	         -- 	complain *twice* about duplicates e.g. f (x,x) = ...
-        ; let names = collectPatsBinders pats'
-        ; addErrCtxt doc_pat $ checkDupAndShadowedNames envs_before names
+	  -- Must do this *after* renaming the patterns
+	  -- See Note [Collect binders only after renaming] in HsUtils
+          -- Because we don't bind the vars all at once, we can't
+	  -- 	check incrementally for duplicates; 
+	  -- Nor can we check incrementally for shadowing, else we'll
+	  -- 	complain *twice* about duplicates e.g. f (x,x) = ...
+        ; addErrCtxt doc_pat $ 
+          checkDupAndShadowedNames envs_before $
+          collectPatsBinders pats'
         ; thing_inside pats' } }
   where
     doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt
