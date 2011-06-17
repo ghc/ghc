@@ -521,9 +521,9 @@ unitTy = mkTupleTy Boxed []
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[TysWiredIn-PArr]{The @[::]@ type}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Special syntax for parallel arrays needs some wired in definitions.
@@ -546,13 +546,13 @@ parrTyCon  = pcNonRecDataTyCon parrTyConName alpha_tyvar [parrDataCon]
 
 parrDataCon :: DataCon
 parrDataCon  = pcDataCon 
-	         parrDataConName 
-		 alpha_tyvar		-- forall'ed type variables
-		 [intPrimTy,		-- 1st argument: Int#
-		  mkTyConApp		-- 2nd argument: Array# a
-		    arrayPrimTyCon 
-		    alpha_ty] 
-		 parrTyCon
+                 parrDataConName 
+                 alpha_tyvar            -- forall'ed type variables
+                 [intTy,                -- 1st argument: Int
+                  mkTyConApp            -- 2nd argument: Array# a
+                    arrayPrimTyCon 
+                    alpha_ty] 
+                 parrTyCon
 
 -- | Check whether a type constructor is the constructor for parallel arrays
 isPArrTyCon    :: TyCon -> Bool
@@ -566,27 +566,27 @@ isPArrTyCon tc  = tyConName tc == parrTyConName
 --   yet another constructor pattern
 --
 parrFakeCon                        :: Arity -> DataCon
-parrFakeCon i | i > mAX_TUPLE_SIZE  = mkPArrFakeCon  i	-- build one specially
+parrFakeCon i | i > mAX_TUPLE_SIZE  = mkPArrFakeCon  i  -- build one specially
 parrFakeCon i                       = parrFakeConArr!i
 
 -- pre-defined set of constructors
 --
 parrFakeConArr :: Array Int DataCon
 parrFakeConArr  = array (0, mAX_TUPLE_SIZE) [(i, mkPArrFakeCon i)   
-					    | i <- [0..mAX_TUPLE_SIZE]]
+                                            | i <- [0..mAX_TUPLE_SIZE]]
 
 -- build a fake parallel array constructor for the given arity
 --
 mkPArrFakeCon       :: Int -> DataCon
 mkPArrFakeCon arity  = data_con
   where
-	data_con  = pcDataCon name [tyvar] tyvarTys parrTyCon
-	tyvar     = head alphaTyVars
-	tyvarTys  = replicate arity $ mkTyVarTy tyvar
+        data_con  = pcDataCon name [tyvar] tyvarTys parrTyCon
+        tyvar     = head alphaTyVars
+        tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName gHC_PARR' (mkDataOccFS nameStr) unique
-				  (ADataCon data_con) UserSyntax
-	unique      = mkPArrDataConUnique arity
+        name      = mkWiredInName gHC_PARR' (mkDataOccFS nameStr) unique
+                                  (ADataCon data_con) UserSyntax
+        unique      = mkPArrDataConUnique arity
 
 -- | Checks whether a data constructor is a fake constructor for parallel arrays
 isPArrFakeCon      :: DataCon -> Bool

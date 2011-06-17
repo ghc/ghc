@@ -45,7 +45,7 @@ dph_Modules pkg
   , dph_Unboxed                 = mk (fsLit "Data.Array.Parallel.Lifted.Unboxed")
   , dph_Scalar                  = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
 
-  , dph_Prelude_Tuple           = mk (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
+  , dph_Prelude_Tuple           = mk (fsLit "Data.Array.Parallel.Prelude.Tuple")
   }
   where	mk = mkModule pkg . mkModuleNameFS
 
