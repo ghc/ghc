@@ -54,27 +54,24 @@ import FastBool         ( isFastTrue )
 import Constants        ( wORD_SIZE )
 import DynFlags
 
-import Control.Monad    ( mapAndUnzipM )
+import Control.Monad
 import Data.Bits
-import Data.Maybe       ( catMaybes )
 import Data.Int
-
-#if WORD_SIZE_IN_BITS==32
-import Data.Maybe       ( fromJust )
+import Data.Maybe
 import Data.Word
-#endif
 
 sse2Enabled :: NatM Bool
-#if x86_64_TARGET_ARCH
--- SSE2 is fixed on for x86_64.  It would be possible to make it optional,
--- but we'd need to fix at least the foreign call code where the calling
--- convention specifies the use of xmm regs, and possibly other places.
-sse2Enabled = return True
-#else
 sse2Enabled = do
   dflags <- getDynFlagsNat
-  return (dopt Opt_SSE2 dflags)
-#endif
+  case platformArch (targetPlatform dflags) of
+      ArchX86_64 -> -- SSE2 is fixed on for x86_64.  It would be
+                    -- possible to make it optional, but we'd need to
+                    -- fix at least the foreign call code where the
+                    -- calling convention specifies the use of xmm regs,
+                    -- and possibly other places.
+                    return True
+      ArchX86    -> return (dopt Opt_SSE2 dflags)
+      _          -> panic "sse2Enabled: Not an X86* arch"
 
 if_sse2 :: NatM a -> NatM a -> NatM a
 if_sse2 sse2 x87 = do
@@ -132,25 +129,24 @@ stmtsToInstrs stmts
 
 
 stmtToInstrs :: CmmStmt -> NatM InstrBlock
-stmtToInstrs stmt = case stmt of
+stmtToInstrs stmt = do
+  dflags <- getDynFlagsNat
+  let is32Bit = target32Bit (targetPlatform dflags)
+  case stmt of
     CmmNop         -> return nilOL
     CmmComment s   -> return (unitOL (COMMENT s))
 
     CmmAssign reg src
-      | isFloatType ty -> assignReg_FltCode size reg src
-#if WORD_SIZE_IN_BITS==32
-      | isWord64 ty    -> assignReg_I64Code      reg src
-#endif
-      | otherwise        -> assignReg_IntCode size reg src
+      | isFloatType ty         -> assignReg_FltCode size reg src
+      | is32Bit && isWord64 ty -> assignReg_I64Code      reg src
+      | otherwise              -> assignReg_IntCode size reg src
         where ty = cmmRegType reg
               size = cmmTypeSize ty
 
     CmmStore addr src
-      | isFloatType ty -> assignMem_FltCode size addr src
-#if WORD_SIZE_IN_BITS==32
-      | isWord64 ty      -> assignMem_I64Code      addr src
-#endif
-      | otherwise        -> assignMem_IntCode size addr src
+      | isFloatType ty         -> assignMem_FltCode size addr src
+      | is32Bit && isWord64 ty -> assignMem_I64Code      addr src
+      | otherwise              -> assignMem_IntCode size addr src
         where ty = cmmExprType src
               size = cmmTypeSize ty
 
@@ -180,7 +176,6 @@ data CondCode
         = CondCode Bool Cond InstrBlock
 
 
-#if WORD_SIZE_IN_BITS==32
 -- | a.k.a "Register64"
 --      Reg is the lower 32-bit temporary which contains the result.
 --      Use getHiVRegFromLo to find the other VRegUnique.
@@ -192,7 +187,6 @@ data ChildCode64
    = ChildCode64
         InstrBlock
         Reg
-#endif
 
 
 -- | Register's passed up the tree.  If the stix code forces the register
@@ -292,7 +286,6 @@ getSomeReg expr = do
         return (reg, code)
 
 
-#if WORD_SIZE_IN_BITS==32
 assignMem_I64Code :: CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_I64Code addrTree valueTree = do
   Amode addr addr_code <- getAmode addrTree
@@ -398,61 +391,63 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
 
 iselExpr64 expr
    = pprPanic "iselExpr64(i386)" (ppr expr)
-#endif
 
 
 --------------------------------------------------------------------------------
 getRegister :: CmmExpr -> NatM Register
+getRegister e = do dflags <- getDynFlagsNat
+                   getRegister' (target32Bit (targetPlatform dflags)) e
 
-#if !x86_64_TARGET_ARCH
-    -- on x86_64, we have %rip for PicBaseReg, but it's not a full-featured
-    -- register, it can only be used for rip-relative addressing.
-getRegister (CmmReg (CmmGlobal PicBaseReg))
-  = do
-      reg <- getPicBaseNat archWordSize
-      return (Fixed archWordSize reg nilOL)
-#endif
+getRegister' :: Bool -> CmmExpr -> NatM Register
 
-getRegister (CmmReg reg)
-  = do use_sse2 <- sse2Enabled
-       let
-         sz = cmmTypeSize (cmmRegType reg)
-         size | not use_sse2 && isFloatSize sz = FF80
-              | otherwise                      = sz
-       --
-       return (Fixed size (getRegisterReg use_sse2 reg) nilOL)
-
-
-getRegister (CmmRegOff r n)
-  = getRegister $ mangleIndexTree r n
+getRegister' is32Bit (CmmReg reg)
+  = case reg of
+        CmmGlobal PicBaseReg
+         | is32Bit ->
+            -- on x86_64, we have %rip for PicBaseReg, but it's not
+            -- a full-featured register, it can only be used for
+            -- rip-relative addressing.
+            do reg' <- getPicBaseNat archWordSize
+               return (Fixed archWordSize reg' nilOL)
+        _ ->
+            do use_sse2 <- sse2Enabled
+               let
+                 sz = cmmTypeSize (cmmRegType reg)
+                 size | not use_sse2 && isFloatSize sz = FF80
+                      | otherwise                      = sz
+               --
+               return (Fixed size (getRegisterReg use_sse2 reg) nilOL)
 
 
-#if WORD_SIZE_IN_BITS==32
-    -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
-    -- TO_W_(x), TO_W_(x >> 32)
+getRegister' is32Bit (CmmRegOff r n)
+  = getRegister' is32Bit $ mangleIndexTree r n
 
-getRegister (CmmMachOp (MO_UU_Conv W64 W32)
-             [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
+-- for 32-bit architectuers, support some 64 -> 32 bit conversions:
+-- TO_W_(x), TO_W_(x >> 32)
+
+getRegister' is32Bit (CmmMachOp (MO_UU_Conv W64 W32)
+                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+ | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister (CmmMachOp (MO_SS_Conv W64 W32)
-             [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
+getRegister' is32Bit (CmmMachOp (MO_SS_Conv W64 W32)
+                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+ | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister (CmmMachOp (MO_UU_Conv W64 W32) [x]) = do
+getRegister' is32Bit (CmmMachOp (MO_UU_Conv W64 W32) [x])
+ | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister (CmmMachOp (MO_SS_Conv W64 W32) [x]) = do
+getRegister' is32Bit (CmmMachOp (MO_SS_Conv W64 W32) [x])
+ | is32Bit = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-#endif
-
-
-getRegister (CmmLit lit@(CmmFloat f w)) =
+getRegister' _ (CmmLit lit@(CmmFloat f w)) =
   if_sse2 float_const_sse2 float_const_x87
  where
   float_const_sse2
@@ -483,62 +478,60 @@ getRegister (CmmLit lit@(CmmFloat f w)) =
       loadFloatAmode False w addr code
 
 -- catch simple cases of zero- or sign-extended load
-getRegister (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _]) = do
+getRegister' _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad addr _]) = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II32 code)
 
-getRegister (CmmMachOp (MO_SS_Conv W8 W32) [CmmLoad addr _]) = do
+getRegister' _ (CmmMachOp (MO_SS_Conv W8 W32) [CmmLoad addr _]) = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II32 code)
 
-getRegister (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad addr _]) = do
+getRegister' _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad addr _]) = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II32 code)
 
-getRegister (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad addr _]) = do
+getRegister' _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad addr _]) = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II32 code)
-
-
-#if x86_64_TARGET_ARCH
 
 -- catch simple cases of zero- or sign-extended load
-getRegister (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _]) = do
+getRegister' is32Bit (CmmMachOp (MO_UU_Conv W8 W64) [CmmLoad addr _])
+ | not is32Bit = do
   code <- intLoadCode (MOVZxL II8) addr
   return (Any II64 code)
 
-getRegister (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _]) = do
+getRegister' is32Bit (CmmMachOp (MO_SS_Conv W8 W64) [CmmLoad addr _])
+ | not is32Bit = do
   code <- intLoadCode (MOVSxL II8) addr
   return (Any II64 code)
 
-getRegister (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _]) = do
+getRegister' is32Bit (CmmMachOp (MO_UU_Conv W16 W64) [CmmLoad addr _])
+ | not is32Bit = do
   code <- intLoadCode (MOVZxL II16) addr
   return (Any II64 code)
 
-getRegister (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _]) = do
+getRegister' is32Bit (CmmMachOp (MO_SS_Conv W16 W64) [CmmLoad addr _])
+ | not is32Bit = do
   code <- intLoadCode (MOVSxL II16) addr
   return (Any II64 code)
 
-getRegister (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _]) = do
+getRegister' is32Bit (CmmMachOp (MO_UU_Conv W32 W64) [CmmLoad addr _])
+ | not is32Bit = do
   code <- intLoadCode (MOV II32) addr -- 32-bit loads zero-extend
   return (Any II64 code)
 
-getRegister (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _]) = do
+getRegister' is32Bit (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad addr _])
+ | not is32Bit = do
   code <- intLoadCode (MOVSxL II32) addr
   return (Any II64 code)
 
-getRegister (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
+getRegister' is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
                                      CmmLit displacement])
-    = return $ Any II64 (\dst -> unitOL $
+ | not is32Bit = do
+      return $ Any II64 (\dst -> unitOL $
         LEA II64 (OpAddr (ripRel (litToImm displacement))) (OpReg dst))
 
-#endif /* x86_64_TARGET_ARCH */
-
-
-
-
-
-getRegister (CmmMachOp mop [x]) = do -- unary MachOps
+getRegister' is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
     sse2 <- sse2Enabled
     case mop of
       MO_F_Neg w
@@ -556,14 +549,12 @@ getRegister (CmmMachOp mop [x]) = do -- unary MachOps
       MO_UU_Conv W32 W16 -> toI16Reg W32 x
       MO_SS_Conv W32 W16 -> toI16Reg W32 x
 
-#if x86_64_TARGET_ARCH
-      MO_UU_Conv W64 W32 -> conversionNop II64 x
-      MO_SS_Conv W64 W32 -> conversionNop II64 x
-      MO_UU_Conv W64 W16 -> toI16Reg W64 x
-      MO_SS_Conv W64 W16 -> toI16Reg W64 x
-      MO_UU_Conv W64 W8  -> toI8Reg  W64 x
-      MO_SS_Conv W64 W8  -> toI8Reg  W64 x
-#endif
+      MO_UU_Conv W64 W32 | not is32Bit -> conversionNop II64 x
+      MO_SS_Conv W64 W32 | not is32Bit -> conversionNop II64 x
+      MO_UU_Conv W64 W16 | not is32Bit -> toI16Reg W64 x
+      MO_SS_Conv W64 W16 | not is32Bit -> toI16Reg W64 x
+      MO_UU_Conv W64 W8  | not is32Bit -> toI8Reg  W64 x
+      MO_SS_Conv W64 W8  | not is32Bit -> toI8Reg  W64 x
 
       MO_UU_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intSize rep1) x
       MO_SS_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intSize rep1) x
@@ -577,18 +568,16 @@ getRegister (CmmMachOp mop [x]) = do -- unary MachOps
       MO_SS_Conv W16 W32 -> integerExtend W16 W32 MOVSxL x
       MO_SS_Conv W8  W16 -> integerExtend W8  W16 MOVSxL x
 
-#if x86_64_TARGET_ARCH
-      MO_UU_Conv W8  W64 -> integerExtend W8  W64 MOVZxL x
-      MO_UU_Conv W16 W64 -> integerExtend W16 W64 MOVZxL x
-      MO_UU_Conv W32 W64 -> integerExtend W32 W64 MOVZxL x
-      MO_SS_Conv W8  W64 -> integerExtend W8  W64 MOVSxL x
-      MO_SS_Conv W16 W64 -> integerExtend W16 W64 MOVSxL x
-      MO_SS_Conv W32 W64 -> integerExtend W32 W64 MOVSxL x
+      MO_UU_Conv W8  W64 | not is32Bit -> integerExtend W8  W64 MOVZxL x
+      MO_UU_Conv W16 W64 | not is32Bit -> integerExtend W16 W64 MOVZxL x
+      MO_UU_Conv W32 W64 | not is32Bit -> integerExtend W32 W64 MOVZxL x
+      MO_SS_Conv W8  W64 | not is32Bit -> integerExtend W8  W64 MOVSxL x
+      MO_SS_Conv W16 W64 | not is32Bit -> integerExtend W16 W64 MOVSxL x
+      MO_SS_Conv W32 W64 | not is32Bit -> integerExtend W32 W64 MOVSxL x
         -- for 32-to-64 bit zero extension, amd64 uses an ordinary movl.
         -- However, we don't want the register allocator to throw it
         -- away as an unnecessary reg-to-reg move, so we keep it in
         -- the form of a movzl and print it as a movl later.
-#endif
 
       MO_FF_Conv W32 W64
         | sse2      -> coerceFP2FP W64 x
@@ -632,11 +621,11 @@ getRegister (CmmMachOp mop [x]) = do -- unary MachOps
 
         conversionNop :: Size -> CmmExpr -> NatM Register
         conversionNop new_size expr
-            = do e_code <- getRegister expr
+            = do e_code <- getRegister' is32Bit expr
                  return (swizzleRegisterRep e_code new_size)
 
 
-getRegister (CmmMachOp mop [x, y]) = do -- dyadic MachOps
+getRegister' _ (CmmMachOp mop [x, y]) = do -- dyadic MachOps
   sse2 <- sse2Enabled
   case mop of
       MO_F_Eq _ -> condFltReg EQQ x y
@@ -814,16 +803,15 @@ getRegister (CmmMachOp mop [x, y]) = do -- dyadic MachOps
            return (Fixed size result code)
 
 
-getRegister (CmmLoad mem pk)
+getRegister' _ (CmmLoad mem pk)
   | isFloatType pk
   = do
     Amode addr mem_code <- getAmode mem
     use_sse2 <- sse2Enabled
     loadFloatAmode use_sse2 (typeWidth pk) addr mem_code
 
-#if i386_TARGET_ARCH
-getRegister (CmmLoad mem pk)
-  | not (isWord64 pk)
+getRegister' is32Bit (CmmLoad mem pk)
+  | is32Bit && not (isWord64 pk)
   = do
     code <- intLoadCode instr mem
     return (Any size code)
@@ -838,18 +826,16 @@ getRegister (CmmLoad mem pk)
         -- we can't guarantee access to an 8-bit variant of every register
         -- (esi and edi don't have 8-bit variants), so to make things
         -- simpler we do our 8-bit arithmetic with full 32-bit registers.
-#endif
 
-#if x86_64_TARGET_ARCH
 -- Simpler memory load code on x86_64
-getRegister (CmmLoad mem pk)
+getRegister' is32Bit (CmmLoad mem pk)
+ | not is32Bit
   = do
     code <- intLoadCode (MOV size) mem
     return (Any size code)
   where size = intSize $ typeWidth pk
-#endif
 
-getRegister (CmmLit (CmmInt 0 width))
+getRegister' _ (CmmLit (CmmInt 0 width))
   = let
         size = intSize width
 
@@ -860,12 +846,11 @@ getRegister (CmmLit (CmmInt 0 width))
     in
         return (Any size code)
 
-#if x86_64_TARGET_ARCH
   -- optimisation for loading small literals on x86_64: take advantage
   -- of the automatic zero-extension from 32 to 64 bits, because the 32-bit
   -- instruction forms are shorter.
-getRegister (CmmLit lit)
-  | isWord64 (cmmLitType lit), not (isBigLit lit)
+getRegister' is32Bit (CmmLit lit)
+  | not is32Bit, isWord64 (cmmLitType lit), not (isBigLit lit)
   = let
         imm = litToImm lit
         code dst = unitOL (MOV II32 (OpImm imm) (OpReg dst))
@@ -879,9 +864,8 @@ getRegister (CmmLit lit)
         -- literals here.
         -- note2: all labels are small, because we're assuming the
         -- small memory model (see gcc docs, -mcmodel=small).
-#endif
 
-getRegister (CmmLit lit)
+getRegister' _ (CmmLit lit)
   = let
         size = cmmTypeSize (cmmLitType lit)
         imm = litToImm lit
@@ -889,7 +873,7 @@ getRegister (CmmLit lit)
     in
         return (Any size code)
 
-getRegister other = pprPanic "getRegister(x86)" (ppr other)
+getRegister' _ other = pprPanic "getRegister(x86)" (ppr other)
 
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
@@ -913,23 +897,23 @@ anyReg (Fixed rep reg fcode) = return (\dst -> fcode `snocOL` reg2reg rep reg ds
 -- Fixed registers might not be byte-addressable, so we make sure we've
 -- got a temporary, inserting an extra reg copy if necessary.
 getByteReg :: CmmExpr -> NatM (Reg, InstrBlock)
-#if x86_64_TARGET_ARCH
-getByteReg = getSomeReg -- all regs are byte-addressable on x86_64
-#else
 getByteReg expr = do
-  r <- getRegister expr
-  case r of
-    Any rep code -> do
-        tmp <- getNewRegNat rep
-        return (tmp, code tmp)
-    Fixed rep reg code
-        | isVirtualReg reg -> return (reg,code)
-        | otherwise -> do
-            tmp <- getNewRegNat rep
-            return (tmp, code `snocOL` reg2reg rep reg tmp)
-        -- ToDo: could optimise slightly by checking for byte-addressable
-        -- real registers, but that will happen very rarely if at all.
-#endif
+  dflags <- getDynFlagsNat
+  if target32Bit (targetPlatform dflags)
+      then do r <- getRegister expr
+              case r of
+                Any rep code -> do
+                    tmp <- getNewRegNat rep
+                    return (tmp, code tmp)
+                Fixed rep reg code
+                    | isVirtualReg reg -> return (reg,code)
+                    | otherwise -> do
+                        tmp <- getNewRegNat rep
+                        return (tmp, code `snocOL` reg2reg rep reg tmp)
+                    -- ToDo: could optimise slightly by checking for
+                    -- byte-addressable real registers, but that will
+                    -- happen very rarely if at all.
+      else getSomeReg expr -- all regs are byte-addressable on x86_64
 
 -- Another variant: this time we want the result in a register that cannot
 -- be modified by code to evaluate an arbitrary expression.
@@ -958,27 +942,28 @@ reg2reg size src dst
 
 --------------------------------------------------------------------------------
 getAmode :: CmmExpr -> NatM Amode
-getAmode (CmmRegOff r n) = getAmode $ mangleIndexTree r n
+getAmode e = do dflags <- getDynFlagsNat
+                getAmode' (target32Bit (targetPlatform dflags)) e
 
-#if x86_64_TARGET_ARCH
+getAmode' :: Bool -> CmmExpr -> NatM Amode
+getAmode' _ (CmmRegOff r n) = getAmode $ mangleIndexTree r n
 
-getAmode (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
-                                     CmmLit displacement])
+getAmode' is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
+                                                  CmmLit displacement])
+ | not is32Bit
     = return $ Amode (ripRel (litToImm displacement)) nilOL
-
-#endif
 
 
 -- This is all just ridiculous, since it carefully undoes
 -- what mangleIndexTree has just done.
-getAmode (CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)])
+getAmode' _ (CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)])
   | is32BitLit lit
   -- ASSERT(rep == II32)???
   = do (x_reg, x_code) <- getSomeReg x
        let off = ImmInt (-(fromInteger i))
        return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
 
-getAmode (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
+getAmode' _ (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
   | is32BitLit lit
   -- ASSERT(rep == II32)???
   = do (x_reg, x_code) <- getSomeReg x
@@ -987,16 +972,16 @@ getAmode (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
 
 -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
 -- recognised by the next rule.
-getAmode (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
+getAmode' is32Bit (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
                                   b@(CmmLit _)])
-  = getAmode (CmmMachOp (MO_Add rep) [b,a])
+  = getAmode' is32Bit (CmmMachOp (MO_Add rep) [b,a])
 
-getAmode (CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _)
+getAmode' _ (CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _)
                                         [y, CmmLit (CmmInt shift _)]])
   | shift == 0 || shift == 1 || shift == 2 || shift == 3
   = x86_complex_amode x y shift 0
 
-getAmode (CmmMachOp (MO_Add _)
+getAmode' _ (CmmMachOp (MO_Add _)
                 [x, CmmMachOp (MO_Add _)
                         [CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)],
                          CmmLit (CmmInt offset _)]])
@@ -1004,13 +989,13 @@ getAmode (CmmMachOp (MO_Add _)
   && is32BitInteger offset
   = x86_complex_amode x y shift offset
 
-getAmode (CmmMachOp (MO_Add _) [x,y])
+getAmode' _ (CmmMachOp (MO_Add _) [x,y])
   = x86_complex_amode x y 0 0
 
-getAmode (CmmLit lit) | is32BitLit lit
+getAmode' _ (CmmLit lit) | is32BitLit lit
   = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
 
-getAmode expr = do
+getAmode' _ expr = do
   (reg,code) <- getSomeReg expr
   return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
 
@@ -1126,16 +1111,17 @@ isOperand _             = False
 
 memConstant :: Int -> CmmLit -> NatM Amode
 memConstant align lit = do
-#ifdef x86_64_TARGET_ARCH
-  lbl <- getNewLabelNat
-  let addr = ripRel (ImmCLbl lbl)
-      addr_code = nilOL
-#else
   lbl <- getNewLabelNat
   dflags <- getDynFlagsNat
-  dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
-  Amode addr addr_code <- getAmode dynRef
-#endif
+  (addr, addr_code) <- if target32Bit (targetPlatform dflags)
+                       then do dynRef <- cmmMakeDynamicReference
+                                             dflags
+                                             addImportNat
+                                             DataReference
+                                             lbl
+                               Amode addr addr_code <- getAmode dynRef
+                               return (addr, addr_code)
+                       else return (ripRel (ImmCLbl lbl), nilOL)
   let code =
         LDATA ReadOnlyData
                 [CmmAlign align,
@@ -1587,375 +1573,353 @@ genCCall (CmmPrim MO_Memset) _ [CmmHinted dst _,
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone
                    (ImmInteger (n - i))
 
-#if i386_TARGET_ARCH
-
 genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
--- void return type prim op
-genCCall (CmmPrim op) [] args =
-    outOfLineCmmOp op Nothing args
+genCCall target dest_regs args =
+    do dflags <- getDynFlagsNat
+       if target32Bit (targetPlatform dflags)
+           then case (target, dest_regs) of
+                -- void return type prim op
+                (CmmPrim op, []) ->
+                    outOfLineCmmOp op Nothing args
+                -- we only cope with a single result for foreign calls
+                (CmmPrim op, [r_hinted@(CmmHinted r _)]) -> do
+                    l1 <- getNewLabelNat
+                    l2 <- getNewLabelNat
+                    sse2 <- sse2Enabled
+                    if sse2
+                      then
+                        outOfLineCmmOp op (Just r_hinted) args
+                      else case op of
+                          MO_F32_Sqrt -> actuallyInlineFloatOp GSQRT FF32 args
+                          MO_F64_Sqrt -> actuallyInlineFloatOp GSQRT FF64 args
 
--- we only cope with a single result for foreign calls
-genCCall (CmmPrim op) [r_hinted@(CmmHinted r _)] args = do
-  l1 <- getNewLabelNat
-  l2 <- getNewLabelNat
-  sse2 <- sse2Enabled
-  if sse2
-    then
-      outOfLineCmmOp op (Just r_hinted) args
-    else case op of
-        MO_F32_Sqrt -> actuallyInlineFloatOp GSQRT FF32 args
-        MO_F64_Sqrt -> actuallyInlineFloatOp GSQRT FF64 args
+                          MO_F32_Sin  -> actuallyInlineFloatOp (\s -> GSIN s l1 l2) FF32 args
+                          MO_F64_Sin  -> actuallyInlineFloatOp (\s -> GSIN s l1 l2) FF64 args
 
-        MO_F32_Sin  -> actuallyInlineFloatOp (\s -> GSIN s l1 l2) FF32 args
-        MO_F64_Sin  -> actuallyInlineFloatOp (\s -> GSIN s l1 l2) FF64 args
+                          MO_F32_Cos  -> actuallyInlineFloatOp (\s -> GCOS s l1 l2) FF32 args
+                          MO_F64_Cos  -> actuallyInlineFloatOp (\s -> GCOS s l1 l2) FF64 args
 
-        MO_F32_Cos  -> actuallyInlineFloatOp (\s -> GCOS s l1 l2) FF32 args
-        MO_F64_Cos  -> actuallyInlineFloatOp (\s -> GCOS s l1 l2) FF64 args
+                          MO_F32_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF32 args
+                          MO_F64_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF64 args
 
-        MO_F32_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF32 args
-        MO_F64_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF64 args
+                          _other_op   -> outOfLineCmmOp op (Just r_hinted) args
 
-        _other_op   -> outOfLineCmmOp op (Just r_hinted) args
+                   where
+                    actuallyInlineFloatOp instr size [CmmHinted x _]
+                          = do res <- trivialUFCode size (instr size) x
+                               any <- anyReg res
+                               return (any (getRegisterReg False (CmmLocal r)))
 
- where
-  actuallyInlineFloatOp instr size [CmmHinted x _]
-        = do res <- trivialUFCode size (instr size) x
-             any <- anyReg res
-             return (any (getRegisterReg False (CmmLocal r)))
+                    actuallyInlineFloatOp _ _ args
+                          = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
+                                  ++ show (length args) ++ ")"
+                _ -> do
+                    let
+                        sizes               = map (arg_size . cmmExprType . hintlessCmm) (reverse args)
+                        raw_arg_size        = sum sizes
+                        tot_arg_size        = if isDarwin then roundTo 16 raw_arg_size else raw_arg_size
+                        arg_pad_size        = tot_arg_size - raw_arg_size
+                    delta0 <- getDeltaNat
+                    when isDarwin $ setDeltaNat (delta0 - arg_pad_size)
 
-  actuallyInlineFloatOp _ _ args
-        = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
-                ++ show (length args) ++ ")"
+                    use_sse2 <- sse2Enabled
+                    push_codes <- mapM (push_arg use_sse2) (reverse args)
+                    delta <- getDeltaNat
 
-genCCall target dest_regs args = do
-    let
-        sizes               = map (arg_size . cmmExprType . hintlessCmm) (reverse args)
-#if !darwin_TARGET_OS
-        tot_arg_size        = sum sizes
-#else
-        raw_arg_size        = sum sizes
-        tot_arg_size        = roundTo 16 raw_arg_size
-        arg_pad_size        = tot_arg_size - raw_arg_size
-    delta0 <- getDeltaNat
-    setDeltaNat (delta0 - arg_pad_size)
-#endif
+                    -- in
+                    -- deal with static vs dynamic call targets
+                    (callinsns,cconv) <-
+                      case target of
+                        CmmCallee (CmmLit (CmmLabel lbl)) conv
+                           -> -- ToDo: stdcall arg sizes
+                              return (unitOL (CALL (Left fn_imm) []), conv)
+                           where fn_imm = ImmCLbl lbl
+                        CmmCallee expr conv
+                           -> do { (dyn_r, dyn_c) <- getSomeReg expr
+                                 ; ASSERT( isWord32 (cmmExprType expr) )
+                                   return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
+                        CmmPrim _
+                            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
+                                        ++ "probably because too many return values."
 
-    use_sse2 <- sse2Enabled
-    push_codes <- mapM (push_arg use_sse2) (reverse args)
-    delta <- getDeltaNat
+                    let push_code
+                            | isDarwin && (arg_pad_size /= 0)
+                            = toOL [SUB II32 (OpImm (ImmInt arg_pad_size)) (OpReg esp),
+                                    DELTA (delta0 - arg_pad_size)]
+                              `appOL` concatOL push_codes
+                            | otherwise
+                            = concatOL push_codes
 
-    -- in
-    -- deal with static vs dynamic call targets
-    (callinsns,cconv) <-
-      case target of
-        CmmCallee (CmmLit (CmmLabel lbl)) conv
-           -> -- ToDo: stdcall arg sizes
-              return (unitOL (CALL (Left fn_imm) []), conv)
-           where fn_imm = ImmCLbl lbl
-        CmmCallee expr conv
-           -> do { (dyn_r, dyn_c) <- getSomeReg expr
-                 ; ASSERT( isWord32 (cmmExprType expr) )
-                   return (dyn_c `snocOL` CALL (Right dyn_r) [], conv) }
-        CmmPrim _
-            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
-                        ++ "probably because too many return values."
+                          -- Deallocate parameters after call for ccall;
+                          -- but not for stdcall (callee does it)
+                          --
+                          -- We have to pop any stack padding we added
+                          -- on Darwin even if we are doing stdcall, though (#5052)
+                        pop_size | cconv /= StdCallConv = tot_arg_size
+                                 | isDarwin = arg_pad_size
+                                 | otherwise = 0
 
-    let push_code
-#if darwin_TARGET_OS
-            | arg_pad_size /= 0
-            = toOL [SUB II32 (OpImm (ImmInt arg_pad_size)) (OpReg esp),
-                    DELTA (delta0 - arg_pad_size)]
-              `appOL` concatOL push_codes
-            | otherwise
-#endif
-            = concatOL push_codes
+                        call = callinsns `appOL`
+                               toOL (
+                                  (if pop_size==0 then [] else
+                                   [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
+                                  ++
+                                  [DELTA (delta + tot_arg_size)]
+                               )
+                    -- in
+                    setDeltaNat (delta + tot_arg_size)
 
-          -- Deallocate parameters after call for ccall;
-          -- but not for stdcall (callee does it)
-          --
-          -- We have to pop any stack padding we added
-          -- on Darwin even if we are doing stdcall, though (#5052)
-        pop_size | cconv /= StdCallConv = tot_arg_size
-                 | otherwise
-#if darwin_TARGET_OS
-                 = arg_pad_size
-#else
-                 = 0
-#endif
+                    let
+                        -- assign the results, if necessary
+                        assign_code []     = nilOL
+                        assign_code [CmmHinted dest _hint]
+                          | isFloatType ty =
+                             if use_sse2
+                                then let tmp_amode = AddrBaseIndex (EABaseReg esp)
+                                                                   EAIndexNone
+                                                                   (ImmInt 0)
+                                         sz = floatSize w
+                                     in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
+                                               GST sz fake0 tmp_amode,
+                                               MOV sz (OpAddr tmp_amode) (OpReg r_dest),
+                                               ADD II32 (OpImm (ImmInt b)) (OpReg esp)]
+                                else unitOL (GMOV fake0 r_dest)
+                          | isWord64 ty    = toOL [MOV II32 (OpReg eax) (OpReg r_dest),
+                                                    MOV II32 (OpReg edx) (OpReg r_dest_hi)]
+                          | otherwise      = unitOL (MOV (intSize w) (OpReg eax) (OpReg r_dest))
+                          where
+                                ty = localRegType dest
+                                w  = typeWidth ty
+                                b  = widthInBytes w
+                                r_dest_hi = getHiVRegFromLo r_dest
+                                r_dest    = getRegisterReg use_sse2 (CmmLocal dest)
+                        assign_code many = pprPanic "genCCall.assign_code - too many return values:" (ppr many)
 
-        call = callinsns `appOL`
-               toOL (
-                  (if pop_size==0 then [] else
-                   [ADD II32 (OpImm (ImmInt pop_size)) (OpReg esp)])
-                  ++
-                  [DELTA (delta + tot_arg_size)]
-               )
-    -- in
-    setDeltaNat (delta + tot_arg_size)
+                    return (push_code `appOL`
+                            call `appOL`
+                            assign_code dest_regs)
 
-    let
-        -- assign the results, if necessary
-        assign_code []     = nilOL
-        assign_code [CmmHinted dest _hint]
-          | isFloatType ty =
-             if use_sse2
-                then let tmp_amode = AddrBaseIndex (EABaseReg esp)
-                                                   EAIndexNone
-                                                   (ImmInt 0)
-                         sz = floatSize w
-                     in toOL [ SUB II32 (OpImm (ImmInt b)) (OpReg esp),
-                               GST sz fake0 tmp_amode,
-                               MOV sz (OpAddr tmp_amode) (OpReg r_dest),
-                               ADD II32 (OpImm (ImmInt b)) (OpReg esp)]
-                else unitOL (GMOV fake0 r_dest)
-          | isWord64 ty    = toOL [MOV II32 (OpReg eax) (OpReg r_dest),
-                                    MOV II32 (OpReg edx) (OpReg r_dest_hi)]
-          | otherwise      = unitOL (MOV (intSize w) (OpReg eax) (OpReg r_dest))
-          where
-                ty = localRegType dest
-                w  = typeWidth ty
-                b  = widthInBytes w
-                r_dest_hi = getHiVRegFromLo r_dest
-                r_dest    = getRegisterReg use_sse2 (CmmLocal dest)
-        assign_code many = pprPanic "genCCall.assign_code - too many return values:" (ppr many)
+                  where
+                    isDarwin = case platformOS (targetPlatform dflags) of
+                               OSDarwin -> True
+                               _        -> False
 
-    return (push_code `appOL`
-            call `appOL`
-            assign_code dest_regs)
+                    arg_size :: CmmType -> Int  -- Width in bytes
+                    arg_size ty = widthInBytes (typeWidth ty)
 
-  where
-    arg_size :: CmmType -> Int  -- Width in bytes
-    arg_size ty = widthInBytes (typeWidth ty)
+                    roundTo a x | x `mod` a == 0 = x
+                                | otherwise = x + a - (x `mod` a)
 
-#if darwin_TARGET_OS
-    roundTo a x | x `mod` a == 0 = x
-                | otherwise = x + a - (x `mod` a)
-#endif
+                    push_arg :: Bool -> HintedCmmActual {-current argument-}
+                                    -> NatM InstrBlock  -- code
 
-    push_arg :: Bool -> HintedCmmActual {-current argument-}
-                    -> NatM InstrBlock  -- code
+                    push_arg use_sse2 (CmmHinted arg _hint) -- we don't need the hints on x86
+                      | isWord64 arg_ty = do
+                        ChildCode64 code r_lo <- iselExpr64 arg
+                        delta <- getDeltaNat
+                        setDeltaNat (delta - 8)
+                        let
+                            r_hi = getHiVRegFromLo r_lo
+                        -- in
+                        return (       code `appOL`
+                                       toOL [PUSH II32 (OpReg r_hi), DELTA (delta - 4),
+                                             PUSH II32 (OpReg r_lo), DELTA (delta - 8),
+                                             DELTA (delta-8)]
+                            )
 
-    push_arg use_sse2 (CmmHinted arg _hint) -- we don't need the hints on x86
-      | isWord64 arg_ty = do
-        ChildCode64 code r_lo <- iselExpr64 arg
-        delta <- getDeltaNat
-        setDeltaNat (delta - 8)
-        let
-            r_hi = getHiVRegFromLo r_lo
-        -- in
-        return (       code `appOL`
-                       toOL [PUSH II32 (OpReg r_hi), DELTA (delta - 4),
-                             PUSH II32 (OpReg r_lo), DELTA (delta - 8),
-                             DELTA (delta-8)]
-            )
+                      | isFloatType arg_ty = do
+                        (reg, code) <- getSomeReg arg
+                        delta <- getDeltaNat
+                        setDeltaNat (delta-size)
+                        return (code `appOL`
+                                        toOL [SUB II32 (OpImm (ImmInt size)) (OpReg esp),
+                                              DELTA (delta-size),
+                                              let addr = AddrBaseIndex (EABaseReg esp)
+                                                                        EAIndexNone
+                                                                        (ImmInt 0)
+                                                  size = floatSize (typeWidth arg_ty)
+                                              in
+                                              if use_sse2
+                                                 then MOV size (OpReg reg) (OpAddr addr)
+                                                 else GST size reg addr
+                                             ]
+                                       )
 
-      | isFloatType arg_ty = do
-        (reg, code) <- getSomeReg arg
-        delta <- getDeltaNat
-        setDeltaNat (delta-size)
-        return (code `appOL`
-                        toOL [SUB II32 (OpImm (ImmInt size)) (OpReg esp),
-                              DELTA (delta-size),
-                              let addr = AddrBaseIndex (EABaseReg esp)
-                                                        EAIndexNone
-                                                        (ImmInt 0)
-                                  size = floatSize (typeWidth arg_ty)
-                              in
-                              if use_sse2
-                                 then MOV size (OpReg reg) (OpAddr addr)
-                                 else GST size reg addr
-                             ]
-                       )
+                      | otherwise = do
+                        (operand, code) <- getOperand arg
+                        delta <- getDeltaNat
+                        setDeltaNat (delta-size)
+                        return (code `snocOL`
+                                PUSH II32 operand `snocOL`
+                                DELTA (delta-size))
 
-      | otherwise = do
-        (operand, code) <- getOperand arg
-        delta <- getDeltaNat
-        setDeltaNat (delta-size)
-        return (code `snocOL`
-                PUSH II32 operand `snocOL`
-                DELTA (delta-size))
+                      where
+                         arg_ty = cmmExprType arg
+                         size = arg_size arg_ty -- Byte size
+           else case (target, dest_regs) of
+                (CmmPrim op, []) ->
+                    -- void return type prim op
+                    outOfLineCmmOp op Nothing args
+                (CmmPrim op, [res]) ->
+                    -- we only cope with a single result for foreign calls
+                    outOfLineCmmOp op (Just res) args
+                _ -> do
+                        -- load up the register arguments
+                    (stack_args, aregs, fregs, load_args_code)
+                         <- load_args args allArgRegs allFPArgRegs nilOL
 
-      where
-         arg_ty = cmmExprType arg
-         size = arg_size arg_ty -- Byte size
+                    let
+                        fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
+                        int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
+                        arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
+                                -- for annotating the call instruction with
 
-#elif x86_64_TARGET_ARCH
+                        sse_regs = length fp_regs_used
 
-genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
-        -- write barrier compiles to no code on x86/x86-64;
-        -- we keep it this long in order to prevent earlier optimisations.
+                        tot_arg_size = arg_size * length stack_args
 
--- void return type prim op
-genCCall (CmmPrim op) [] args =
-  outOfLineCmmOp op Nothing args
+                        -- On entry to the called function, %rsp should be aligned
+                        -- on a 16-byte boundary +8 (i.e. the first stack arg after
+                        -- the return address is 16-byte aligned).  In STG land
+                        -- %rsp is kept 16-byte aligned (see StgCRun.c), so we just
+                        -- need to make sure we push a multiple of 16-bytes of args,
+                        -- plus the return address, to get the correct alignment.
+                        -- Urg, this is hard.  We need to feed the delta back into
+                        -- the arg pushing code.
+                    (real_size, adjust_rsp) <-
+                        if tot_arg_size `rem` 16 == 0
+                            then return (tot_arg_size, nilOL)
+                            else do -- we need to adjust...
+                                delta <- getDeltaNat
+                                setDeltaNat (delta-8)
+                                return (tot_arg_size+8, toOL [
+                                                SUB II64 (OpImm (ImmInt 8)) (OpReg rsp),
+                                                DELTA (delta-8)
+                                        ])
 
--- we only cope with a single result for foreign calls
-genCCall (CmmPrim op) [res] args =
-  outOfLineCmmOp op (Just res) args
+                        -- push the stack args, right to left
+                    push_code <- push_args (reverse stack_args) nilOL
+                    delta <- getDeltaNat
 
-genCCall target dest_regs args = do
+                    -- deal with static vs dynamic call targets
+                    (callinsns,cconv) <-
+                      case target of
+                        CmmCallee (CmmLit (CmmLabel lbl)) conv
+                           -> -- ToDo: stdcall arg sizes
+                              return (unitOL (CALL (Left fn_imm) arg_regs), conv)
+                           where fn_imm = ImmCLbl lbl
+                        CmmCallee expr conv
+                           -> do (dyn_r, dyn_c) <- getSomeReg expr
+                                 return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
+                        CmmPrim _
+                            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
+                                        ++ "probably because too many return values."
 
-        -- load up the register arguments
-    (stack_args, aregs, fregs, load_args_code)
-         <- load_args args allArgRegs allFPArgRegs nilOL
+                    let
+                        -- The x86_64 ABI requires us to set %al to the number of SSE2
+                        -- registers that contain arguments, if the called routine
+                        -- is a varargs function.  We don't know whether it's a
+                        -- varargs function or not, so we have to assume it is.
+                        --
+                        -- It's not safe to omit this assignment, even if the number
+                        -- of SSE2 regs in use is zero.  If %al is larger than 8
+                        -- on entry to a varargs function, seg faults ensue.
+                        assign_eax n = unitOL (MOV II32 (OpImm (ImmInt n)) (OpReg eax))
 
-    let
-        fp_regs_used  = reverse (drop (length fregs) (reverse allFPArgRegs))
-        int_regs_used = reverse (drop (length aregs) (reverse allArgRegs))
-        arg_regs = [eax] ++ int_regs_used ++ fp_regs_used
-                -- for annotating the call instruction with
+                    let call = callinsns `appOL`
+                               toOL (
+                                        -- Deallocate parameters after call for ccall;
+                                        -- but not for stdcall (callee does it)
+                                  (if cconv == StdCallConv || real_size==0 then [] else
+                                   [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
+                                  ++
+                                  [DELTA (delta + real_size)]
+                               )
+                    -- in
+                    setDeltaNat (delta + real_size)
 
-        sse_regs = length fp_regs_used
+                    let
+                        -- assign the results, if necessary
+                        assign_code []     = nilOL
+                        assign_code [CmmHinted dest _hint] =
+                          case typeWidth rep of
+                                W32 | isFloatType rep -> unitOL (MOV (floatSize W32) (OpReg xmm0) (OpReg r_dest))
+                                W64 | isFloatType rep -> unitOL (MOV (floatSize W64) (OpReg xmm0) (OpReg r_dest))
+                                _ -> unitOL (MOV (cmmTypeSize rep) (OpReg rax) (OpReg r_dest))
+                          where
+                                rep = localRegType dest
+                                r_dest = getRegisterReg True (CmmLocal dest)
+                        assign_code _many = panic "genCCall.assign_code many"
 
-        tot_arg_size = arg_size * length stack_args
+                    return (load_args_code      `appOL`
+                            adjust_rsp          `appOL`
+                            push_code           `appOL`
+                            assign_eax sse_regs `appOL`
+                            call                `appOL`
+                            assign_code dest_regs)
 
-        -- On entry to the called function, %rsp should be aligned
-        -- on a 16-byte boundary +8 (i.e. the first stack arg after
-        -- the return address is 16-byte aligned).  In STG land
-        -- %rsp is kept 16-byte aligned (see StgCRun.c), so we just
-        -- need to make sure we push a multiple of 16-bytes of args,
-        -- plus the return address, to get the correct alignment.
-        -- Urg, this is hard.  We need to feed the delta back into
-        -- the arg pushing code.
-    (real_size, adjust_rsp) <-
-        if tot_arg_size `rem` 16 == 0
-            then return (tot_arg_size, nilOL)
-            else do -- we need to adjust...
-                delta <- getDeltaNat
-                setDeltaNat (delta-8)
-                return (tot_arg_size+8, toOL [
-                                SUB II64 (OpImm (ImmInt 8)) (OpReg rsp),
-                                DELTA (delta-8)
-                        ])
+                  where
+                    arg_size = 8 -- always, at the mo
 
-        -- push the stack args, right to left
-    push_code <- push_args (reverse stack_args) nilOL
-    delta <- getDeltaNat
+                    load_args :: [CmmHinted CmmExpr]
+                              -> [Reg]                  -- int regs avail for args
+                              -> [Reg]                  -- FP regs avail for args
+                              -> InstrBlock
+                              -> NatM ([CmmHinted CmmExpr],[Reg],[Reg],InstrBlock)
+                    load_args args [] [] code     =  return (args, [], [], code)
+                        -- no more regs to use
+                    load_args [] aregs fregs code =  return ([], aregs, fregs, code)
+                        -- no more args to push
+                    load_args ((CmmHinted arg hint) : rest) aregs fregs code
+                        | isFloatType arg_rep =
+                        case fregs of
+                          [] -> push_this_arg
+                          (r:rs) -> do
+                             arg_code <- getAnyReg arg
+                             load_args rest aregs rs (code `appOL` arg_code r)
+                        | otherwise =
+                        case aregs of
+                          [] -> push_this_arg
+                          (r:rs) -> do
+                             arg_code <- getAnyReg arg
+                             load_args rest rs fregs (code `appOL` arg_code r)
+                        where
+                          arg_rep = cmmExprType arg
 
-    -- deal with static vs dynamic call targets
-    (callinsns,cconv) <-
-      case target of
-        CmmCallee (CmmLit (CmmLabel lbl)) conv
-           -> -- ToDo: stdcall arg sizes
-              return (unitOL (CALL (Left fn_imm) arg_regs), conv)
-           where fn_imm = ImmCLbl lbl
-        CmmCallee expr conv
-           -> do (dyn_r, dyn_c) <- getSomeReg expr
-                 return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
-        CmmPrim _
-            -> panic $ "genCCall: Can't handle CmmPrim call type here, error "
-                        ++ "probably because too many return values."
+                          push_this_arg = do
+                            (args',ars,frs,code') <- load_args rest aregs fregs code
+                            return ((CmmHinted arg hint):args', ars, frs, code')
 
-    let
-        -- The x86_64 ABI requires us to set %al to the number of SSE2
-        -- registers that contain arguments, if the called routine
-        -- is a varargs function.  We don't know whether it's a
-        -- varargs function or not, so we have to assume it is.
-        --
-        -- It's not safe to omit this assignment, even if the number
-        -- of SSE2 regs in use is zero.  If %al is larger than 8
-        -- on entry to a varargs function, seg faults ensue.
-        assign_eax n = unitOL (MOV II32 (OpImm (ImmInt n)) (OpReg eax))
+                    push_args [] code = return code
+                    push_args ((CmmHinted arg _):rest) code
+                       | isFloatType arg_rep = do
+                         (arg_reg, arg_code) <- getSomeReg arg
+                         delta <- getDeltaNat
+                         setDeltaNat (delta-arg_size)
+                         let code' = code `appOL` arg_code `appOL` toOL [
+                                        SUB (intSize wordWidth) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
+                                        DELTA (delta-arg_size),
+                                        MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel 0))]
+                         push_args rest code'
 
-    let call = callinsns `appOL`
-               toOL (
-                        -- Deallocate parameters after call for ccall;
-                        -- but not for stdcall (callee does it)
-                  (if cconv == StdCallConv || real_size==0 then [] else
-                   [ADD (intSize wordWidth) (OpImm (ImmInt real_size)) (OpReg esp)])
-                  ++
-                  [DELTA (delta + real_size)]
-               )
-    -- in
-    setDeltaNat (delta + real_size)
-
-    let
-        -- assign the results, if necessary
-        assign_code []     = nilOL
-        assign_code [CmmHinted dest _hint] =
-          case typeWidth rep of
-                W32 | isFloatType rep -> unitOL (MOV (floatSize W32) (OpReg xmm0) (OpReg r_dest))
-                W64 | isFloatType rep -> unitOL (MOV (floatSize W64) (OpReg xmm0) (OpReg r_dest))
-                _ -> unitOL (MOV (cmmTypeSize rep) (OpReg rax) (OpReg r_dest))
-          where
-                rep = localRegType dest
-                r_dest = getRegisterReg True (CmmLocal dest)
-        assign_code _many = panic "genCCall.assign_code many"
-
-    return (load_args_code      `appOL`
-            adjust_rsp          `appOL`
-            push_code           `appOL`
-            assign_eax sse_regs `appOL`
-            call                `appOL`
-            assign_code dest_regs)
-
-  where
-    arg_size = 8 -- always, at the mo
-
-    load_args :: [CmmHinted CmmExpr]
-              -> [Reg]                  -- int regs avail for args
-              -> [Reg]                  -- FP regs avail for args
-              -> InstrBlock
-              -> NatM ([CmmHinted CmmExpr],[Reg],[Reg],InstrBlock)
-    load_args args [] [] code     =  return (args, [], [], code)
-        -- no more regs to use
-    load_args [] aregs fregs code =  return ([], aregs, fregs, code)
-        -- no more args to push
-    load_args ((CmmHinted arg hint) : rest) aregs fregs code
-        | isFloatType arg_rep =
-        case fregs of
-          [] -> push_this_arg
-          (r:rs) -> do
-             arg_code <- getAnyReg arg
-             load_args rest aregs rs (code `appOL` arg_code r)
-        | otherwise =
-        case aregs of
-          [] -> push_this_arg
-          (r:rs) -> do
-             arg_code <- getAnyReg arg
-             load_args rest rs fregs (code `appOL` arg_code r)
-        where
-          arg_rep = cmmExprType arg
-
-          push_this_arg = do
-            (args',ars,frs,code') <- load_args rest aregs fregs code
-            return ((CmmHinted arg hint):args', ars, frs, code')
-
-    push_args [] code = return code
-    push_args ((CmmHinted arg _):rest) code
-       | isFloatType arg_rep = do
-         (arg_reg, arg_code) <- getSomeReg arg
-         delta <- getDeltaNat
-         setDeltaNat (delta-arg_size)
-         let code' = code `appOL` arg_code `appOL` toOL [
-                        SUB (intSize wordWidth) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
-                        DELTA (delta-arg_size),
-                        MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel 0))]
-         push_args rest code'
-
-       | otherwise = do
-       -- we only ever generate word-sized function arguments.  Promotion
-       -- has already happened: our Int8# type is kept sign-extended
-       -- in an Int#, for example.
-         ASSERT(width == W64) return ()
-         (arg_op, arg_code) <- getOperand arg
-         delta <- getDeltaNat
-         setDeltaNat (delta-arg_size)
-         let code' = code `appOL` arg_code `appOL` toOL [
-                                PUSH II64 arg_op,
-                                DELTA (delta-arg_size)]
-         push_args rest code'
-        where
-          arg_rep = cmmExprType arg
-          width = typeWidth arg_rep
-
-#else
-genCCall _ _ _ = panic "X86.genCCAll: not defined for this architecture"
-
-#endif /* x86_64_TARGET_ARCH */
+                       | otherwise = do
+                       -- we only ever generate word-sized function arguments.  Promotion
+                       -- has already happened: our Int8# type is kept sign-extended
+                       -- in an Int#, for example.
+                         ASSERT(width == W64) return ()
+                         (arg_op, arg_code) <- getOperand arg
+                         delta <- getDeltaNat
+                         setDeltaNat (delta-arg_size)
+                         let code' = code `appOL` arg_code `appOL` toOL [
+                                                PUSH II64 arg_op,
+                                                DELTA (delta-arg_size)]
+                         push_args rest code'
+                        where
+                          arg_rep = cmmExprType arg
+                          width = typeWidth arg_rep
 
 -- | We're willing to inline and unroll memcpy/memset calls that touch
 -- at most these many bytes.  This threshold is the same as the one
@@ -2039,38 +2003,38 @@ genSwitch expr ids
         let op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg wORD_SIZE) (ImmInt 0))
 
-#if x86_64_TARGET_ARCH
-#if darwin_TARGET_OS
-    -- on Mac OS X/x86_64, put the jump table in the text section
-    -- to work around a limitation of the linker.
-    -- ld64 is unable to handle the relocations for
-    --     .quad L1 - L0
-    -- if L0 is not preceded by a non-anonymous label in its section.
-
-            code = e_code `appOL` t_code `appOL` toOL [
-                            ADD (intSize wordWidth) op (OpReg tableReg),
-                            JMP_TBL (OpReg tableReg) ids Text lbl
-                    ]
-#else
-    -- HACK: On x86_64 binutils<2.17 is only able to generate PC32
-    -- relocations, hence we only get 32-bit offsets in the jump
-    -- table. As these offsets are always negative we need to properly
-    -- sign extend them to 64-bit. This hack should be removed in
-    -- conjunction with the hack in PprMach.hs/pprDataItem once
-    -- binutils 2.17 is standard.
-            code = e_code `appOL` t_code `appOL` toOL [
-                            MOVSxL II32 op (OpReg reg),
-                            ADD (intSize wordWidth) (OpReg reg) (OpReg tableReg),
-                            JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
-                   ]
-#endif
-#else
-            code = e_code `appOL` t_code `appOL` toOL [
-                            ADD (intSize wordWidth) op (OpReg tableReg),
-                            JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
-                    ]
-#endif
-        return code
+        return $ if target32Bit (targetPlatform dflags)
+                 then e_code `appOL` t_code `appOL` toOL [
+                                ADD (intSize wordWidth) op (OpReg tableReg),
+                                JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
+                       ]
+                 else case platformOS (targetPlatform dflags) of
+                      OSDarwin ->
+                          -- on Mac OS X/x86_64, put the jump table
+                          -- in the text section to work around a
+                          -- limitation of the linker.
+                          -- ld64 is unable to handle the relocations for
+                          --     .quad L1 - L0
+                          -- if L0 is not preceded by a non-anonymous
+                          -- label in its section.
+                          e_code `appOL` t_code `appOL` toOL [
+                                   ADD (intSize wordWidth) op (OpReg tableReg),
+                                   JMP_TBL (OpReg tableReg) ids Text lbl
+                           ]
+                      _ ->
+                          -- HACK: On x86_64 binutils<2.17 is only able
+                          -- to generate PC32 relocations, hence we only
+                          -- get 32-bit offsets in the jump table. As
+                          -- these offsets are always negative we need
+                          -- to properly sign extend them to 64-bit.
+                          -- This hack should be removed in conjunction
+                          -- with the hack in PprMach.hs/pprDataItem
+                          -- once binutils 2.17 is standard.
+                          e_code `appOL` t_code `appOL` toOL [
+                                   MOVSxL II32 op (OpReg reg),
+                                   ADD (intSize wordWidth) (OpReg reg) (OpReg tableReg),
+                                   JMP_TBL (OpReg tableReg) ids ReadOnlyData lbl
+                           ]
   | otherwise
   = do
         (reg,e_code) <- getSomeReg expr
