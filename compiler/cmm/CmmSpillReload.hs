@@ -4,14 +4,8 @@
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
 
--- GHC 7.0.1 improved incomplete pattern warnings with GADTs, but for
--- older compilers we need to turn warn-incomplete-patterns off.
--- However, older compilers don't support OPTIONS_GHC inside CPP, so
--- we instead always turn it off, and then conditionally turn it back on.
+-- TODO: Get rid of this flag:
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
-#if __GLASGOW_HASKELL__ >= 700
-{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
-#endif
 
 module CmmSpillReload
   ( dualLivenessWithInsertion
