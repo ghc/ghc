@@ -1,4 +1,7 @@
 
+drvfail-functor2.hs:1:29:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
 drvfail-functor2.hs:7:14:
     Can't make a derived instance of `Functor InFunctionArgument':
       Constructor `InFunctionArgument' must not use the type variable in a function argument

@@ -646,19 +646,13 @@ def do_test(name, way, func, args):
             else:
                 print '*** unexpected pass for', full_name
                 t.n_unexpected_passes = t.n_unexpected_passes + 1
-                if name in t.unexpected_passes:
-                    t.unexpected_passes[name].append(way)
-                else:
-                    t.unexpected_passes[name] = [way]
+                addTestInfo(t.unexpected_passes, getTestOpts().testdir, name, way)
         else:
             if getTestOpts().expect == 'pass' \
                and way not in getTestOpts().expect_fail_for:
                 print '*** unexpected failure for', full_name
                 t.n_unexpected_failures = t.n_unexpected_failures + 1
-                if name in t.unexpected_failures:
-                    t.unexpected_failures[name].append(way)
-                else:
-                    t.unexpected_failures[name] = [way]
+                addTestInfo(t.unexpected_failures, getTestOpts().testdir, name, way)
             else:
                 t.n_expected_failures = t.n_expected_failures + 1
                 if name in t.expected_failures:
@@ -668,6 +662,17 @@ def do_test(name, way, func, args):
     except:
         framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
+
+def addTestInfo (testInfos, directory, name, way):
+    directory = re.sub('^\\.[/\\\\]', '', directory)
+
+    if not directory in testInfos:
+        testInfos[directory] = {}
+
+    if not name in testInfos[directory]:
+        testInfos[directory][name] = []
+
+    testInfos[directory][name].append(way)
 
 def skiptest (name, way):
     # print 'Skipping test \"', name, '\"'
@@ -770,8 +775,10 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod, extra_mods ):
     pretest_cleanup(name)
 
     for mod in extra_mods:	
-        simple_build( mod, way, extra_hc_opts, 0, '', 0, 0 )
+        result = simple_build( mod, way, extra_hc_opts, 0, '', 0, 0 )
         extra_hc_opts += " " + replace_suffix(mod, 'o')
+        if result == 'fail':
+            return result
 
     if way == 'ghci': # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
@@ -1575,21 +1582,23 @@ def summary(t, file):
 
     if t.n_unexpected_passes > 0:
         file.write('Unexpected passes:\n')
-        keys = t.unexpected_passes.keys()
-        keys.sort()
-        for test in keys:
-            file.write('   ' + test + '(' + \
-                       join(t.unexpected_passes[test],',') + ')\n')
-        file.write('\n')
-            
+        printTestInfosSummary(file, t.unexpected_passes)
+
     if t.n_unexpected_failures > 0:
         file.write('Unexpected failures:\n')
-        keys = t.unexpected_failures.keys()
-        keys.sort()
-        for test in keys:
-            file.write('   ' + test + '(' + \
-                       join(t.unexpected_failures[test],',') + ')\n')
-        file.write('\n')
+        printTestInfosSummary(file, t.unexpected_failures)
+
+def printTestInfosSummary(file, testInfos):
+    directories = testInfos.keys()
+    directories.sort()
+    maxDirLen = max(map ((lambda x : len(x)), directories))
+    for directory in directories:
+        tests = testInfos[directory].keys()
+        tests.sort()
+        for test in tests:
+           file.write('   ' + directory.ljust(maxDirLen + 2) + test + \
+                      ' (' + join(testInfos[directory][test],',') + ')\n')
+    file.write('\n')
 
 def getStdout(cmd):
     if have_subprocess:

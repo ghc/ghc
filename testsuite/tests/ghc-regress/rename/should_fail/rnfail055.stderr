@@ -1,4 +1,10 @@
 
+RnFail055.hs:1:73:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
+RnFail055.hs-boot:1:73:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
 RnFail055.hs-boot:4:1:
     Identifier `f1' has conflicting definitions in the module and its hs-boot file
     Main module: f1 :: Int -> Float

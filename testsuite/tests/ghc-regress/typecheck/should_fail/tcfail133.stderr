@@ -1,4 +1,7 @@
 
+tcfail133.hs:2:61:
+    Warning: -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
+
 tcfail133.hs:68:14:
     No instance for (AddDigit (Zero :@ (One :@ One)) One a0)
       arising from a use of `add'
