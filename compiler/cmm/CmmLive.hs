@@ -6,7 +6,8 @@ module CmmLive
     ( CmmLive
     , cmmLiveness
     , liveLattice
-    , noLiveOnEntry, xferLive
+    , noLiveOnEntry, xferLive, gen, kill, gen_kill
+    , removeDeadAssignments
     )
 where
 
@@ -65,13 +66,37 @@ gen_kill :: (DefinerOfLocalRegs a, UserOfLocalRegs a) => a -> CmmLive -> CmmLive
 gen_kill a = gen a . kill a
 
 -- | The transfer function
+-- EZY: Bits of this analysis are duplicated in CmmSpillReload, though
+-- it's not really easy to efficiently reuse all of this.  Keep in mind
+-- if you need to update this analysis.
 xferLive :: BwdTransfer CmmNode CmmLive
 xferLive = mkBTransfer3 fst mid lst
   where fst _ f = f
         mid :: CmmNode O O -> CmmLive -> CmmLive
         mid n f = gen_kill n f
         lst :: CmmNode O C -> FactBase CmmLive -> CmmLive
+        -- slightly inefficient: kill is unnecessary for emptyRegSet
         lst n f = gen_kill n
                 $ case n of CmmCall{}        -> emptyRegSet
                             CmmForeignCall{} -> emptyRegSet
                             _                -> joinOutFacts liveLattice n f
+
+-----------------------------------------------------------------------------
+-- Removing assignments to dead variables
+-----------------------------------------------------------------------------
+
+removeDeadAssignments :: CmmGraph -> FuelUniqSM CmmGraph
+removeDeadAssignments g =
+   liftM fst $ dataflowPassBwd g [] $ analRewBwd liveLattice xferLive rewrites
+   where rewrites = deepBwdRw3 nothing middle nothing
+         -- Beware: deepBwdRw with one polymorphic function seems more reasonable here,
+         -- but GHC panics while compiling, see bug #4045.
+         middle :: CmmNode O O -> Fact O CmmLive -> CmmReplGraph O O
+         middle (CmmAssign (CmmLocal reg') _) live | not (reg' `elemRegSet` live) = return $ Just emptyGraph
+         -- XXX maybe this should be somewhere else...
+         middle (CmmAssign lhs (CmmReg rhs))   _ | lhs == rhs = return $ Just emptyGraph
+         middle (CmmStore lhs (CmmLoad rhs _)) _ | lhs == rhs = return $ Just emptyGraph
+         middle _ _ = return Nothing
+
+         nothing :: CmmNode e x -> Fact x CmmLive -> CmmReplGraph e x
+         nothing _ _ = return Nothing

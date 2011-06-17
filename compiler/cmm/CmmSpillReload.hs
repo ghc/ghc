@@ -10,7 +10,6 @@
 
 module CmmSpillReload
   ( dualLivenessWithInsertion
-  , removeDeadAssignmentsAndReloads
   )
 where
 
@@ -57,19 +56,9 @@ be useful in a different context, the memory location is not updated.
 
 data DualLive = DualLive { on_stack :: RegSet, in_regs :: RegSet }
 
-dualUnion :: DualLive -> DualLive -> DualLive
-dualUnion (DualLive s r) (DualLive s' r') =
-    DualLive (s `unionUniqSets` s') (r `unionUniqSets` r') 
-
-dualUnionList :: [DualLive] -> DualLive
-dualUnionList ls = DualLive ss rs
-    where ss = unionManyUniqSets $ map on_stack ls
-          rs = unionManyUniqSets $ map in_regs  ls
-
 changeStack, changeRegs :: (RegSet -> RegSet) -> DualLive -> DualLive
 changeStack f live = live { on_stack = f (on_stack live) }
 changeRegs  f live = live { in_regs  = f (in_regs  live) }
-
 
 dualLiveLattice :: DataflowLattice DualLive
 dualLiveLattice = DataflowLattice "variables live in registers and on stack" empty add
@@ -84,11 +73,7 @@ dualLivenessWithInsertion :: BlockSet -> CmmGraph -> FuelUniqSM CmmGraph
 dualLivenessWithInsertion procPoints g =
   liftM fst $ dataflowPassBwd g [] $ analRewBwd dualLiveLattice
                                                 (dualLiveTransfers (g_entry g) procPoints)
-                                                (insertSpillAndReloadRewrites g procPoints)
-
-_dualLiveness :: BlockSet -> CmmGraph -> FuelUniqSM (BlockEnv DualLive)
-_dualLiveness procPoints g =
-  liftM snd $ dataflowPassBwd g [] $ analBwd dualLiveLattice $ dualLiveTransfers (g_entry g) procPoints
+                                                (insertSpillsAndReloads g procPoints)
 
 -- Note [Live registers on entry to procpoints]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -122,68 +107,40 @@ dualLiveTransfers entry procPoints = mkBTransfer3 first middle last
                   -- register slot (and not just a slice).
                   check (RegSlot (LocalReg _ ty), o, w) x
                      | o == w && w == widthInBytes (typeWidth ty) = x
-                  check _ _ = panic "middleDualLiveness unsupported: slices"
+                  check _ _ = panic "dualLiveTransfers: slices unsupported"
 
-          -- Differences from vanilla liveness analysis
+          -- Register analysis is identical to liveness analysis from CmmLive.
           last :: CmmNode O C -> FactBase DualLive -> DualLive
-          last l fb = case l of
-            CmmBranch id                   -> lkp id
-            l@(CmmCall {cml_cont=Nothing}) -> changeRegs (gen l . kill l) empty
-            l@(CmmCall {cml_cont=Just k})  -> call l k
-            l@(CmmForeignCall {succ=k})    -> call l k
-            l@(CmmCondBranch _ t f)        -> changeRegs (gen l . kill l) $ dualUnion (lkp t) (lkp f)
-            l@(CmmSwitch _ tbl)            -> changeRegs (gen l . kill l) $ dualUnionList $ map lkp (catMaybes tbl)
+          last l fb = changeRegs (gen_kill l) $ case l of
+            CmmCall {cml_cont=Nothing} -> empty
+            CmmCall {cml_cont=Just k}  -> keep_stack_only k
+            CmmForeignCall {succ=k}    -> keep_stack_only k
+            _                          -> joinOutFacts dualLiveLattice l fb
             where empty = fact_bot dualLiveLattice
-                  lkp id = empty `fromMaybe` lookupFact id fb
-                  call l k = DualLive (on_stack (lkp k)) (gen l emptyRegSet)
+                  lkp k = fromMaybe empty (lookupFact k fb)
+                  keep_stack_only k = DualLive (on_stack (lkp k)) emptyRegSet
 
-gen  :: UserOfLocalRegs    a => a -> RegSet -> RegSet
-gen  a live = foldRegsUsed extendRegSet     live a
-kill :: DefinerOfLocalRegs a => a -> RegSet -> RegSet
-kill a live = foldRegsDefd deleteFromRegSet live a
-
-insertSpillAndReloadRewrites :: CmmGraph -> BlockSet -> CmmBwdRewrite DualLive
-insertSpillAndReloadRewrites graph procPoints = deepBwdRw3 first middle nothing
+insertSpillsAndReloads :: CmmGraph -> BlockSet -> CmmBwdRewrite DualLive
+insertSpillsAndReloads graph procPoints = deepBwdRw3 first middle nothing
   -- Beware: deepBwdRw with one polymorphic function seems more reasonable here,
   -- but GHC miscompiles it, see bug #4044.
     where first :: CmmNode C O -> Fact O DualLive -> CmmReplGraph C O
           first e@(CmmEntry id) live = return $
             if id /= (g_entry graph) && setMember id procPoints then
-              case map reload (uniqSetToList spill_regs) of
+              case map reload (uniqSetToList (in_regs live)) of
                 [] -> Nothing
                 is -> Just $ mkFirst e <*> mkMiddles is
             else Nothing
-              where
-                -- If we are splitting procedures, we need the LastForeignCall
-                -- to spill its results to the stack because they will only
-                -- be used by a separate procedure (so they can't stay in LocalRegs).
-                splitting = True
-                spill_regs = if splitting then in_regs live
-                             else in_regs live `minusRegSet` defs
-                defs = case mapLookup id firstDefs of
-                           Just defs -> defs
-                           Nothing   -> emptyRegSet
-                -- A LastForeignCall may contain some definitions, which take place
-                -- on return from the function call. Therefore, we build a map (firstDefs)
-                -- from BlockId to the set of variables defined on return to the BlockId.
-                firstDefs = mapFold addLive emptyBlockMap (toBlockMap graph)
-                addLive :: CmmBlock -> BlockEnv RegSet -> BlockEnv RegSet
-                addLive b env = case lastNode b of
-                                  CmmForeignCall {succ=k, res=defs} -> add k (mkRegSet defs) env
-                                  _                                 -> env
-                add bid defs env = mapInsert bid defs'' env
-                  where defs'' = case mapLookup bid env of
-                                   Just defs' -> timesRegSet defs defs'
-                                   Nothing    -> defs
+          -- EZY: There was some dead code for handling the case where
+          -- we were not splitting procedures.  Check Git history if
+          -- you're interested (circa e26ea0f41).
 
           middle :: CmmNode O O -> Fact O DualLive -> CmmReplGraph O O
+          -- Don't add spills next to reloads.
           middle (CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot (RegSlot reg') _) _)) _ | reg == reg' = return Nothing
-          middle m@(CmmAssign (CmmLocal reg) _) live = return $
-              if reg `elemRegSet` on_stack live then -- must spill
-                   my_trace "Spilling" (f4sep [text "spill" <+> ppr reg,
-                                               text "after"{-, ppr m-}]) $
-                   Just $ mkMiddles $ [m, spill reg]
-              else Nothing
+          -- Spill if register is live on stack.
+          middle m@(CmmAssign (CmmLocal reg) _) live
+            | reg `elemRegSet` on_stack live = return (Just (mkMiddles [m, spill reg]))
           middle _ _ = return Nothing
 
           nothing _ _ = return Nothing
@@ -191,25 +148,6 @@ insertSpillAndReloadRewrites graph procPoints = deepBwdRw3 first middle nothing
 spill, reload :: LocalReg -> CmmNode O O
 spill  r = CmmStore  (regSlot r) (CmmReg $ CmmLocal r)
 reload r = CmmAssign (CmmLocal r) (CmmLoad (regSlot r) $ localRegType r)
-
--- XXX: This should be done with generic liveness analysis and moved to
--- its own module
-removeDeadAssignmentsAndReloads :: BlockSet -> CmmGraph -> FuelUniqSM CmmGraph
-removeDeadAssignmentsAndReloads procPoints g =
-   liftM fst $ dataflowPassBwd g [] $ analRewBwd dualLiveLattice
-                                                 (dualLiveTransfers (g_entry g) procPoints)
-                                                 rewrites
-   where rewrites = deepBwdRw3 nothing middle nothing
-         -- Beware: deepBwdRw with one polymorphic function seems more reasonable here,
-         -- but GHC panics while compiling, see bug #4045.
-         middle :: CmmNode O O -> Fact O DualLive -> CmmReplGraph O O
-         middle (CmmAssign (CmmLocal reg') _) live | not (reg' `elemRegSet` in_regs live) = return $ Just emptyGraph
-         -- XXX maybe this should be somewhere else...
-         middle (CmmAssign lhs (CmmReg rhs))   _ | lhs == rhs = return $ Just emptyGraph
-         middle (CmmStore lhs (CmmLoad rhs _)) _ | lhs == rhs = return $ Just emptyGraph
-         middle _ _ = return Nothing
-
-         nothing _ _ = return Nothing
 
 ---------------------
 -- prettyprinting
@@ -227,10 +165,3 @@ instance Outputable DualLive where
                          else (ppr_regs "live in regs =" regs),
                          if isEmptyUniqSet stack then PP.empty
                          else (ppr_regs "live on stack =" stack)]
-
-my_trace :: String -> SDoc -> a -> a
-my_trace = if False then pprTrace else \_ _ a -> a
-
-f4sep :: [SDoc] -> SDoc
-f4sep [] = fsep []
-f4sep (d:ds) = fsep (d : map (nest 4) ds)

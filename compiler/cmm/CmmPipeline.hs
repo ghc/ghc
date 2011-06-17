@@ -12,6 +12,7 @@ module CmmPipeline (
 import CLabel
 import Cmm
 import CmmDecl
+import CmmLive
 import CmmBuildInfoTables
 import CmmCommonBlockElim
 import CmmProcPoint
@@ -107,10 +108,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
 
        ----------- Eliminate dead assignments -------------------
-       -- Remove redundant reloads (and any other redundant asst)
-       --   in CmmSpillReloads
-       g <- runOptimization $ removeDeadAssignmentsAndReloads procPoints g
-       dump Opt_D_dump_cmmz_dead "Post Dead Assignment Elimination" g
+       g <- runOptimization $ removeDeadAssignments g
+       dump Opt_D_dump_cmmz_dead "Post remove dead assignments" g
 
        ----------- Zero dead stack slots (Debug only) ---------------
        -- Debugging: stubbing slots on death can cause crashes early
