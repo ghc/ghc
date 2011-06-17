@@ -1953,7 +1953,7 @@ genCCall target dest_regs args = do
 	  width = typeWidth arg_rep
 
 #else
-genCCall _ _ _ = panic "X86.genCCAll: not defined"
+genCCall _ _ _ = panic "X86.genCCAll: not defined for this architecture"
 
 #endif /* x86_64_TARGET_ARCH */
 
