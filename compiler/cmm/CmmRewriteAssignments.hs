@@ -18,6 +18,7 @@ module CmmRewriteAssignments
 
 import Cmm
 import CmmExpr
+import CmmOpt
 import OptimizationFuel
 import StgCmmUtils
 
@@ -41,7 +42,9 @@ rewriteAssignments g = do
   -- to actually perform inlining and sinking.
   g'  <- annotateUsage g
   g'' <- liftM fst $ dataflowPassFwd g' [(g_entry g, fact_bot assignmentLattice)] $
-                                     analRewFwd assignmentLattice assignmentTransfer assignmentRewrite
+                                     analRewFwd assignmentLattice
+                                                assignmentTransfer
+                                                (assignmentRewrite `thenFwdRw` machOpFoldRewrite)
   return (modifyGraph eraseRegUsage g'')
 
 ----------------------------------------------------------------
@@ -604,5 +607,23 @@ assignmentRewrite = mkFRewrite3 first middle last
         inlinable (CmmForeignCall{}) = False
         inlinable (CmmUnsafeForeignCall{}) = False
         inlinable _ = True
+
+-- Need to interleave this with inlining, because machop folding results
+-- in literals, which we can inline more aggressively, and inlining
+-- gives us opportunities for more folding.  However, we don't need any
+-- facts to do MachOp folding.
+machOpFoldRewrite :: FwdRewrite FuelUniqSM (WithRegUsage CmmNode) a
+machOpFoldRewrite = mkFRewrite3 first middle last
+  where first _ _ = return Nothing
+        middle :: WithRegUsage CmmNode O O -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O O
+        middle (Plain m) _ = return (fmap (mkMiddle . Plain) (foldNode m))
+        middle (AssignLocal l e r) _ = return (fmap f (wrapRecExpM foldExp e))
+            where f e' = mkMiddle (AssignLocal l e' r)
+        last   :: WithRegUsage CmmNode O C -> a -> GenCmmReplGraph (WithRegUsage CmmNode) O C
+        last (Plain l) _ = return (fmap (mkLast . Plain) (foldNode l))
+        foldNode :: CmmNode e x -> Maybe (CmmNode e x)
+        foldNode n = mapExpDeepM foldExp n
+        foldExp (CmmMachOp op args) = cmmMachOpFoldM op args
+        foldExp _ = Nothing
 
 -- ToDo: Outputable instance for UsageMap and AssignmentMap

@@ -789,8 +789,13 @@ Here we do:
         (i)  introduce the appropriate indirections
              and position independent refs
         (ii) compile a list of imported symbols
+  (d) Some arch-specific optimizations
 
-Ideas for other things we could do:
+(a) and (b) will be moving to the new Hoopl pipeline, however, (c) and
+(d) are only needed by the native backend and will continue to live
+here.
+
+Ideas for other things we could do (put these in Hoopl please!):
 
   - shortcut jumps-to-jumps
   - simple CSE: if an expr is assigned to a temp, then replace later occs of
@@ -830,6 +835,15 @@ cmmBlockConFold (BasicBlock id stmts) = do
   stmts' <- mapM cmmStmtConFold stmts
   return $ BasicBlock id stmts'
 
+-- This does three optimizations, but they're very quick to check, so we don't
+-- bother turning them off even when the Hoopl code is active.  Since
+-- this is on the old Cmm representation, we can't reuse the code either:
+--  * reg = reg      --> nop
+--  * if 0 then jump --> nop
+--  * if 1 then jump --> jump
+-- We might be tempted to skip this step entirely of not opt_PIC, but
+-- there is some PowerPC code for the non-PIC case, which would also
+-- have to be separated.
 cmmStmtConFold :: CmmStmt -> CmmOptM CmmStmt
 cmmStmtConFold stmt
    = case stmt of
@@ -876,28 +890,37 @@ cmmStmtConFold stmt
         other
            -> return other
 
-
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
-cmmExprConFold referenceKind expr = do
+-- ToDo: Allow for a flag to turn off invocation of cmmExprCon -- EZY
+cmmExprConFold referenceKind expr = cmmExprNative referenceKind (cmmExprCon expr)
+
+cmmExprCon :: CmmExpr -> CmmExpr
+cmmExprCon (CmmLoad addr rep) = CmmLoad (cmmExprCon addr) rep
+cmmExprCon (CmmMachOp mop args) = cmmMachOpFold mop (map cmmExprCon args)
+cmmExprCon other = other
+
+-- handles both PIC and non-PIC cases... a very strange mixture
+-- of things to do.
+cmmExprNative :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
+cmmExprNative referenceKind expr = do
      dflags <- getDynFlagsCmmOpt
      let arch = platformArch (targetPlatform dflags)
      case expr of
         CmmLoad addr rep
-           -> do addr' <- cmmExprConFold DataReference addr
+           -> do addr' <- cmmExprNative DataReference addr
                  return $ CmmLoad addr' rep
 
         CmmMachOp mop args
-           -- For MachOps, we first optimize the children, and then we try 
-           -- our hand at some constant-folding.
-           -> do args' <- mapM (cmmExprConFold DataReference) args
-                 return $ cmmMachOpFold mop args'
+           -> do args' <- mapM (cmmExprNative DataReference) args
+                 return $ CmmMachOp mop args'
 
         CmmLit (CmmLabel lbl)
            -> do
-		cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
+                cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
            -> do
-		 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
+                 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
+                 -- need to optimize here, since it's late
                  return $ cmmMachOpFold (MO_Add wordWidth) [
                      dynRef,
                      (CmmLit $ CmmInt (fromIntegral off) wordWidth)
@@ -908,15 +931,15 @@ cmmExprConFold referenceKind expr = do
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
           | arch == ArchPPC && not opt_PIC
-          -> cmmExprConFold referenceKind $
+          -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
           | arch == ArchPPC && not opt_PIC
-          -> cmmExprConFold referenceKind $
+          -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_enter_1"))) 
         CmmReg (CmmGlobal GCFun)
           | arch == ArchPPC && not opt_PIC
-          -> cmmExprConFold referenceKind $
+          -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "__stg_gc_fun")))
 
         other
