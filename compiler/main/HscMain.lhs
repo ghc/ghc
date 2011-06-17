@@ -821,7 +821,7 @@ checkSafeImports dflags hsc_env tcg_env
     = do
         imps <- mapM condense imports'
         pkgs <- mapM checkSafe imps
-        pkgTransitiveOK pkg_reqs
+        checkPkgTrust pkg_reqs
 
         -- add in trusted package requirements for this module
         let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
@@ -896,8 +896,8 @@ checkSafeImports dflags hsc_env tcg_env
                             else text "The module itself isn't safe."
 
         -- Here we check the transitive package trust requirements are OK still.
-        pkgTransitiveOK :: [PackageId] -> Hsc ()
-        pkgTransitiveOK pkgs = do
+        checkPkgTrust :: [PackageId] -> Hsc ()
+        checkPkgTrust pkgs = do
             case errors of
                 [] -> return ()
                 _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
