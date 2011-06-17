@@ -891,8 +891,14 @@ cmmStmtConFold stmt
            -> return other
 
 cmmExprConFold :: ReferenceKind -> CmmExpr -> CmmOptM CmmExpr
--- ToDo: Allow for a flag to turn off invocation of cmmExprCon -- EZY
-cmmExprConFold referenceKind expr = cmmExprNative referenceKind (cmmExprCon expr)
+cmmExprConFold referenceKind expr = do
+    dflags <- getDynFlagsCmmOpt
+    -- Skip constant folding if new code generator is running
+    -- (this optimization is done in Hoopl)
+    let expr' = if dopt Opt_TryNewCodeGen dflags
+                    then expr
+                    else cmmExprCon expr
+    cmmExprNative referenceKind expr'
 
 cmmExprCon :: CmmExpr -> CmmExpr
 cmmExprCon (CmmLoad addr rep) = CmmLoad (cmmExprCon addr) rep
