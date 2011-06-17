@@ -747,17 +747,9 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                       -> FCode ())
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
-emitCopyByteArray copy src0 src_off0 dst0 dst_off0 n0 = do
-    -- Passed as arguments (be careful)
-    src     <- assignTempE src0
-    src_off <- assignTempE src_off0
-    dst     <- assignTempE dst0
-    dst_off <- assignTempE dst_off0
-    n       <- assignTempE n0
-
+emitCopyByteArray copy src src_off dst dst_off n = do
     dst_p <- assignTempE $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
     src_p <- assignTempE $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
-
     copy src dst dst_p src_p n
 
 -- ----------------------------------------------------------------------------

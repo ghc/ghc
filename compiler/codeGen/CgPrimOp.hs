@@ -680,18 +680,9 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> StgLiveVars
                   -> Code
-emitCopyByteArray copy src0 src_off0 dst0 dst_off0 n0 live = do
-    -- Assign the arguments to temporaries so the code generator can
-    -- calculate liveness for us.
-    src <- assignTemp_ src0
-    src_off <- assignTemp_ src_off0
-    dst <- assignTemp_ dst0
-    dst_off <- assignTemp_ dst_off0
-    n <- assignTemp_ n0
-
+emitCopyByteArray copy src src_off dst dst_off n live = do
     dst_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB dst arrWordsHdrSize) dst_off
     src_p <- assignTemp $ cmmOffsetExpr (cmmOffsetB src arrWordsHdrSize) src_off
-
     copy src dst dst_p src_p n live
 
 -- ----------------------------------------------------------------------------
