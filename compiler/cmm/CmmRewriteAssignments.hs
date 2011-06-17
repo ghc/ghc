@@ -3,9 +3,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-#if __GLASGOW_HASKELL__ < 701
--- GHC 7.0.1 improved incomplete pattern warnings with GADTs
+
+-- GHC 7.0.1 improved incomplete pattern warnings with GADTs, but for
+-- older compilers we need to turn warn-incomplete-patterns off.
+-- However, older compilers don't support OPTIONS_GHC inside CPP, so
+-- we instead always turn it off, and then conditionally turn it back on.
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+#if __GLASGOW_HASKELL__ >= 700
+{-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 #endif
 
 -- This module implements generalized code motion for assignments to
