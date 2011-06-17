@@ -26,7 +26,6 @@ import Data.Typeable
 import Data.Map (Map)
 import qualified Data.Map as Map
 import GHC hiding (NoLink)
-import Name
 
 
 -----------------------------------------------------------------------------

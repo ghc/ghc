@@ -204,5 +204,7 @@ topDeclElem ((_,_,sourceMap), (_,_,maybe_wiki_url)) loc names html =
         Documented n mdl = head names
         -- FIXME: is it ok to simply take the first name?
 
-        fname = unpackFS (srcSpanFile loc)
+        fname = case loc of
+                RealSrcSpan l -> unpackFS (srcSpanFile l)
+                UnhelpfulSpan _ -> error "topDeclElem UnhelpfulSpan"
 

@@ -179,11 +179,11 @@ reL :: a -> Located a
 reL = L undefined
 
 
-instance Foldable Located where
+instance Foldable (GenLocated l) where
   foldMap f (L _ x) = f x
 
 
-instance Traversable Located where
+instance Traversable (GenLocated l) where
   mapM f (L l x) = (return . L l) =<< f x
 
 

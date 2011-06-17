@@ -58,7 +58,7 @@ ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances subdocs unicode qual
 
 
 ppFunSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
-            [DocName] -> HsType DocName -> Bool Qualification -> Html
+            [DocName] -> HsType DocName -> Bool -> Qualification -> Html
 ppFunSig summary links loc doc docnames typ unicode qual =
   ppTypeOrFunSig summary links loc docnames typ doc
     ( ppTypeSig summary occnames typ unicode qual

@@ -37,7 +37,7 @@ import Data.Maybe
 import Text.XHtml hiding ( name, title, p, quote )
 import qualified Text.XHtml as XHtml
 
-import GHC      ( SrcSpan, srcSpanStartLine, Name )
+import GHC      ( SrcSpan(..), srcSpanStartLine, Name )
 import Module   ( Module )
 import Name     ( getOccString, nameOccName, isValOcc )
 
@@ -59,7 +59,12 @@ spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
 
   line = case maybe_loc of
     Nothing -> ""
-    Just span_ -> show $ srcSpanStartLine span_
+    Just span_ ->
+      case span_ of
+      RealSrcSpan span__ ->
+        show $ srcSpanStartLine span__
+      UnhelpfulSpan _ ->
+        error "spliceURL UnhelpfulSpan"
 
   run "" = ""
   run ('%':'M':rest) = mdl  ++ run rest

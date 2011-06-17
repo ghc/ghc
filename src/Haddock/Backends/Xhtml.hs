@@ -571,7 +571,7 @@ processForMiniSynopsis mdl unicode _ (ExportDecl (L _loc decl0) _doc _ _insts) =
     _ -> []
 processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
   [groupTag lvl << docToHtml qual txt]
-processForMiniSynopsis _ _ _ = []
+processForMiniSynopsis _ _ _ _ = []
 
 
 ppNameMini :: Module -> OccName -> Html

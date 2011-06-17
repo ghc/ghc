@@ -28,6 +28,7 @@ import StringBuffer
 import RdrName
 import SrcLoc
 import DynFlags
+import FastString
 
 import Data.Char
 import Numeric
@@ -178,19 +179,25 @@ begin sc = \_ _ _ cont _ -> cont sc
 
 ident :: Action
 ident pos str sc cont dflags = 
-  case strToHsQNames dflags id of
+  case strToHsQNames dflags loc id of
 	Just names -> (TokIdent names, pos) : cont sc
 	Nothing -> (TokString str, pos) : cont sc
  where id = init (tail str)
+       -- TODO: Get the real filename here. Maybe we should just be
+       --       using GHC SrcLoc's ourself?
+       filename = mkFastString "<unknown file>"
+       loc = case pos of
+             AlexPn _ line col ->
+                 mkRealSrcLoc filename line col
 
-strToHsQNames :: DynFlags -> String -> Maybe [RdrName]
-strToHsQNames dflags str0 = 
+strToHsQNames :: DynFlags -> RealSrcLoc -> String -> Maybe [RdrName]
+strToHsQNames dflags loc str0 = 
 #if MIN_VERSION_ghc(7,1,0)
   let buffer = stringToStringBuffer str0
 #else
   let buffer = unsafePerformIO (stringToStringBuffer str0)
 #endif
-      pstate = mkPState dflags buffer noSrcLoc
+      pstate = mkPState dflags buffer loc
       result = unP parseIdentifier pstate 
   in case result of 
        POk _ name -> Just [unLoc name] 

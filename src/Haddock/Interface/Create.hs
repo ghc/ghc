@@ -682,7 +682,7 @@ moduleExports :: Module           -- ^ Module A
               -> IfaceMap         -- ^ Already created interfaces
               -> InstIfaceMap     -- ^ Interfaces in other packages
               -> ErrMsgGhc [ExportItem Name] -- ^ Resulting export items
-moduleExports thisMod expMod dflags gre exports decls ifaceMap instIfaceMap
+moduleExports thisMod expMod dflags gre _exports decls ifaceMap instIfaceMap
   | m == thisMod = liftErrMsg $ fullContentsOfThisModule dflags gre decls
   | otherwise =
     case Map.lookup m ifaceMap of
