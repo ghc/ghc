@@ -118,7 +118,7 @@ import OldCmm           ( Cmm )
 import PprCmm		( pprCmms )
 import CmmParse		( parseCmmFile )
 import CmmBuildInfoTables
-import CmmCPS
+import CmmPipeline
 import CmmInfo
 import OptimizationFuel ( initOptFuelState )
 import CmmCvt
@@ -967,34 +967,27 @@ hscCompileCmmFile hsc_env filename
 -------------------- Stuff for new code gen ---------------------
 
 tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
-		-> CollectedCCs
-		-> [(StgBinding,[(Id,[Id])])]
-		-> HpcInfo
-		-> IO [Cmm]
+                -> CollectedCCs
+                -> [(StgBinding,[(Id,[Id])])]
+                -> HpcInfo
+                -> IO [Cmm]
 tryNewCodeGen hsc_env this_mod data_tycons
-	      cost_centre_info stg_binds hpc_info =
-  do	{ let dflags = hsc_dflags hsc_env
+              cost_centre_info stg_binds hpc_info =
+  do    { let dflags = hsc_dflags hsc_env
         ; prog <- StgCmm.codeGen dflags this_mod data_tycons
-		 	 cost_centre_info stg_binds hpc_info
-	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
-		(pprCmms prog)
-
-	; prog <- return $ map runCmmContFlowOpts prog
-		-- Control flow optimisation
+                         cost_centre_info stg_binds hpc_info
+        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
+                (pprCmms prog)
 
         -- We are building a single SRT for the entire module, so
         -- we must thread it through all the procedures as we cps-convert them.
         ; us <- mkSplitUniqSupply 'S'
-        ; let topSRT = initUs_ us emptySRT
-	; (topSRT, prog) <- foldM (protoCmmCPS hsc_env) (topSRT, []) prog
-		-- The main CPS conversion
+        ; let initTopSRT = initUs_ us emptySRT
+        ; (topSRT, prog) <- foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
-	; prog <- return $ map runCmmContFlowOpts (srtToData topSRT : prog)
-		-- Control flow optimisation, again
-
-	; let prog' = map cmmOfZgraph prog
-	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (ppr prog')
-	; return prog' }
+        ; let prog' = map cmmOfZgraph (srtToData topSRT : prog)
+        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (ppr prog')
+        ; return prog' }
 
 
 optionallyConvertAndOrCPS :: HscEnv -> [Cmm] -> IO [Cmm]
@@ -1014,15 +1007,17 @@ testCmmConversion hsc_env cmm =
        dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (ppr cmm)
        --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
        us <- mkSplitUniqSupply 'C'
-       let cvtm = runCmmContFlowOpts `liftM` cmmToZgraph cmm
-       let zgraph = initUs_ us cvtm
-       us <- mkSplitUniqSupply 'S'
-       let topSRT = initUs_ us emptySRT
-       (_, [cps_zgraph]) <- protoCmmCPS hsc_env (topSRT, []) zgraph
-       let chosen_graph = if dopt Opt_RunCPSZ dflags then cps_zgraph else zgraph
+       let zgraph = initUs_ us (cmmToZgraph cmm)
+       chosen_graph <-
+        if dopt Opt_RunCPSZ dflags
+            then do us <- mkSplitUniqSupply 'S'
+                    let topSRT = initUs_ us emptySRT
+                    (_, [zgraph]) <- cmmPipeline hsc_env (topSRT, []) zgraph
+                    return zgraph
+            else return (runCmmContFlowOpts zgraph)
        dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
        showPass dflags "Convert from Z back to Cmm"
-       let cvt = cmmOfZgraph $ runCmmContFlowOpts $ chosen_graph
+       let cvt = cmmOfZgraph chosen_graph
        dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (ppr cvt)
        return cvt
 

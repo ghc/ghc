@@ -251,7 +251,13 @@ rnLocalValBindsLHS :: MiniFixityEnv
                    -> HsValBinds RdrName
                    -> RnM ([Name], HsValBindsLR Name RdrName)
 rnLocalValBindsLHS fix_env binds 
-  = do { -- Do error checking: we need to check for dups here because we
+  = do { binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds 
+
+         -- Check for duplicates and shadowing
+	 -- Must do this *after* renaming the patterns
+	 -- See Note [Collect binders only after renaming] in HsUtils
+
+         -- We need to check for dups here because we
      	 -- don't don't bind all of the variables from the ValBinds at once
      	 -- with bindLocatedLocals any more.
          -- 
@@ -265,10 +271,10 @@ rnLocalValBindsLHS fix_env binds
      	 --   import A(f)
      	 --   g = let f = ... in f
      	 -- should.
-       ; binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds 
        ; let bound_names = collectHsValBinders binds'
        ; envs <- getRdrEnvs
        ; checkDupAndShadowedNames envs bound_names
+
        ; return (bound_names, binds') }
 
 -- renames the left-hand sides

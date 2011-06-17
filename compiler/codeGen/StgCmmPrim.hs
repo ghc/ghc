@@ -730,7 +730,9 @@ doCopyArrayOp = emitCopyArray copy
   where
     -- Copy data (we assume the arrays aren't overlapping since
     -- they're of different types)
-    copy _src _dst = emitMemcpyCall
+    copy _src _dst dst_p src_p bytes =
+        emitMemcpyCall dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE))
+
 
 -- | Takes a source 'MutableArray#', an offset in the source array, a
 -- destination 'MutableArray#', an offset into the destination array,
@@ -745,8 +747,8 @@ doCopyMutableArrayOp = emitCopyArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p bytes,
-            getCode $ emitMemcpyCall  dst_p src_p bytes
+            getCode $ emitMemmoveCall dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE)),
+            getCode $ emitMemcpyCall  dst_p src_p bytes (CmmLit (mkIntCLit wORD_SIZE))
             ]
         emit $ mkCmmIfThenElse (cmmEqWord src dst) moveCall cpyCall
 
@@ -811,11 +813,12 @@ emitCloneArray info_p res_r src0 src_off0 n0 = do
     src_p <- assignTempE $ cmmOffsetExprW (cmmOffsetB src arrPtrsHdrSize)
              src_off
 
-    emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize)
+    emitMemcpyCall dst_p src_p (n `cmmMulWord` wordSize) (CmmLit (mkIntCLit wORD_SIZE))
 
     emitMemsetCall (cmmOffsetExprW dst_p n)
         (CmmLit (mkIntCLit 1))
         (card_words `cmmMulWord` wordSize)
+        (CmmLit (mkIntCLit wORD_SIZE))
     emit $ mkAssign (CmmLocal res_r) arr
   where
     arrPtrsHdrSizeW = CmmLit $ mkIntCLit $ fixedHdrSize +
@@ -834,52 +837,35 @@ emitSetCards dst_start dst_cards_start n = do
         (CmmLit (mkIntCLit 1))
         ((card (dst_start `cmmAddWord` n) `cmmSubWord` start_card)
          `cmmAddWord` CmmLit (mkIntCLit 1))
+         (CmmLit (mkIntCLit wORD_SIZE))
   where
     -- Convert an element index to a card index
     card i = i `cmmUShrWord` (CmmLit (mkIntCLit mUT_ARR_PTRS_CARD_BITS))
 
 -- | Emit a call to @memcpy@.
-emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-emitMemcpyCall dst src n = do
-    emitCCall
+emitMemcpyCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitMemcpyCall dst src n align = do
+    emitPrimCall
         [ {-no results-} ]
-        memcpy
-        [ (dst, AddrHint)
-        , (src, AddrHint)
-        , (n, NoHint)
-        ]
-  where
-    memcpy = CmmLit (CmmLabel (mkForeignLabel (fsLit "memcpy") Nothing
-                               ForeignLabelInExternalPackage IsFunction))
+        MO_Memcpy
+        [ dst, src, n, align ]
 
 -- | Emit a call to @memmove@.
-emitMemmoveCall :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-emitMemmoveCall dst src n = do
-    emitCCall
+emitMemmoveCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitMemmoveCall dst src n align = do
+    emitPrimCall
         [ {- no results -} ]
-        memmove
-        [ (dst, AddrHint)
-        , (src, AddrHint)
-        , (n, NoHint)
-        ]
-  where
-    memmove = CmmLit (CmmLabel (mkForeignLabel (fsLit "memmove") Nothing
-                               ForeignLabelInExternalPackage IsFunction))
+        MO_Memmove
+        [ dst, src, n, align ]
 
 -- | Emit a call to @memset@.  The second argument must fit inside an
 -- unsigned char.
-emitMemsetCall :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
-emitMemsetCall dst c n = do
-    emitCCall
+emitMemsetCall :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
+emitMemsetCall dst c n align = do
+    emitPrimCall
         [ {- no results -} ]
-        memset
-        [ (dst, AddrHint)
-        , (c, NoHint)
-        , (n, NoHint)
-        ]
-  where
-    memset = CmmLit (CmmLabel (mkForeignLabel (fsLit "memset") Nothing
-                               ForeignLabelInExternalPackage IsFunction))
+        MO_Memset
+        [ dst, c, n, align ]
 
 -- | Emit a call to @allocate@.
 emitAllocateCall :: LocalReg -> CmmExpr -> CmmExpr -> FCode ()
