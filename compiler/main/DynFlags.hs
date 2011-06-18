@@ -980,7 +980,9 @@ setLanguage l = upd f
                      }
 
 safeLanguageOn :: DynFlags -> Bool
-safeLanguageOn dflags = s == Sf_SafeLanguage || s == Sf_Safe
+safeLanguageOn dflags = s == Sf_SafeLanguage
+                     || s == Sf_TrustworthyWithSafeLanguage
+                     || s == Sf_Safe
                           where s = safeHaskell dflags
 
 -- | Test if SafeHaskell is on in some form

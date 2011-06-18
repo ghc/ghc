@@ -787,8 +787,15 @@ hscFileFrontEnd mod_summary = do
                     -- we also nuke user written RULES.
                     logWarnings $ warns (tcg_rules tcg_env1)
                     return tcg_env1 { tcg_rules = [] }
-                else
-                    return tcg_env1
+                else do
+                    -- Wipe out trust required packages if the module isn't
+                    -- trusted. Not doing this doesn't cause any problems
+                    -- but means the hi file will say some pkgs should be
+                    -- trusted when they don't need to be (since its an
+                    -- untrusted module) and we don't force them to be.
+                    let imps  = tcg_imports tcg_env1
+                        imps' = imps { imp_trust_pkgs = [] }
+                    return tcg_env1 { tcg_imports = imps' }
 
         else
             return tcg_env
@@ -862,13 +869,17 @@ checkSafeImports dflags hsc_env tcg_env
             | otherwise                               = False
 
         -- | Check the package a module resides in is trusted.
-        -- Modules in the home package are trusted but otherwise
-        -- we check the packages trust flag.
-        packageTrusted :: Module -> Bool
-        packageTrusted m
+        -- Safe compiled modules are trusted without requiring
+        -- that their package is trusted. For trustworthy modules,
+        -- modules in the home package are trusted but otherwise
+        -- we check the package trust flag.
+        packageTrusted :: SafeHaskellMode -> Module -> Bool
+        packageTrusted Sf_Safe _ = True
+        packageTrusted _ m
             | isHomePkg m = True
             | otherwise   = trusted $ getPackageDetails (pkgState dflags)
                                                         (modulePackageId m)
+
         -- Is a module trusted? Return Nothing if True, or a String
         -- if it isn't, containing the reason it isn't
         isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc)
@@ -887,7 +898,7 @@ checkSafeImports dflags hsc_env tcg_env
                         safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
                                             Sf_TrustworthyWithSafeLanguage]
                         -- check package is trusted
-                        safeP = packageTrusted m
+                        safeP = packageTrusted trust m
                     if safeM && safeP
                         then return Nothing
                         else return $ Just $ if safeM
