@@ -95,6 +95,7 @@ Library {
             GHC.Show,
             GHC.Stable,
             GHC.Storable,
+            GHC.TypeNats,
             GHC.TopHandler,
             GHC.Unicode,
             GHC.Weak,
