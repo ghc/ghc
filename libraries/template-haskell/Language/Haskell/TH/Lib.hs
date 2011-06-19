@@ -22,6 +22,7 @@ type DecQ           = Q Dec
 type DecsQ          = Q [Dec]
 type ConQ           = Q Con
 type TypeQ          = Q Type
+type TyLitQ         = Q TyLit
 type CxtQ           = Q Cxt
 type PredQ          = Q Pred
 type MatchQ         = Q Match
@@ -445,6 +446,9 @@ arrowT = return ArrowT
 listT :: TypeQ
 listT = return ListT
 
+literalT :: TyLit -> TypeQ
+literalT l = return (LiteralT l)
+
 tupleT :: Int -> TypeQ
 tupleT i = return (TupleT i)
 
@@ -468,6 +472,13 @@ varStrictType :: Name -> StrictTypeQ -> VarStrictTypeQ
 varStrictType v st = do (s, t) <- st
                         return (v, s, t)
 
+-- * Type Literals
+
+numberTL :: Integer -> TyLitQ
+numberTL n = if n >= 0 then return (NumberTL n)
+                       else fail ("Negative type-level number: " ++ show n)
+
+
 -------------------------------------------------------------------------------
 -- *   Kind
 
@@ -479,6 +490,9 @@ kindedTV = KindedTV
 
 starK :: Kind
 starK = StarK
+
+natK :: Kind
+natK = NatK
 
 arrowK :: Kind -> Kind -> Kind
 arrowK = ArrowK
