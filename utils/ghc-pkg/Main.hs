@@ -1093,7 +1093,7 @@ doDump expand_pkgroot pkgs = do
         else showInstalledPackageInfo pkg ++ pkgrootField
     | (pkg, pkgloc) <- pkgs
     , let pkgroot      = takeDirectory pkgloc
-          pkgrootField = "pkgroot: " ++ pkgroot ++ "\n" ]
+          pkgrootField = "pkgroot: " ++ show pkgroot ++ "\n" ]
 
 -- PackageId is can have globVersion for the version
 findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
