@@ -83,7 +83,7 @@ toZgraph fun_name g@(Old.ListGraph (Old.BasicBlock id ss : other_blocks)) =
 strip_hints :: [Old.CmmHinted a] -> [a]
 strip_hints = map Old.hintlessCmm
 
-convert_target :: Old.CmmCallTarget -> Old.HintedCmmFormals -> Old.HintedCmmActuals -> ForeignTarget
+convert_target :: Old.CmmCallTarget -> [Old.HintedCmmFormal] -> [Old.HintedCmmActual] -> ForeignTarget
 convert_target (Old.CmmCallee e cc) ress  args  = ForeignTarget e (ForeignConvention cc (map Old.cmmHint args) (map Old.cmmHint ress))
 convert_target (Old.CmmPrim op)	   _ress _args = PrimTarget op
 

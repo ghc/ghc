@@ -714,8 +714,9 @@ substVects subst = map (substVect subst)
 
 ------------------
 substVect :: Subst -> CoreVect -> CoreVect
-substVect _subst (Vect v Nothing)    = Vect v Nothing
-substVect subst  (Vect v (Just rhs)) = Vect v (Just (simpleOptExprWith subst rhs))
+substVect _subst (Vect   v Nothing)    = Vect   v Nothing
+substVect subst  (Vect   v (Just rhs)) = Vect   v (Just (simpleOptExprWith subst rhs))
+substVect _subst (NoVect v)            = NoVect v
 
 ------------------
 substVarSet :: Subst -> VarSet -> VarSet

@@ -477,7 +477,9 @@ canEq fl cv (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 -- See Note [Equality between type applications]
 --     Note [Care with type applications] in TcUnify
 canEq fl cv ty1 ty2
-  | Just (s1,t1) <- tcSplitAppTy_maybe ty1
+  | Nothing <- tcView ty1  -- Naked applications ONLY
+  , Nothing <- tcView ty2  -- See Note [Naked given applications]
+  , Just (s1,t1) <- tcSplitAppTy_maybe ty1
   , Just (s2,t2) <- tcSplitAppTy_maybe ty2
     = if isWanted fl 
       then do { cv1 <- newCoVar s1 s2 
@@ -495,8 +497,12 @@ canEq fl cv ty1 ty2
               ; cc2 <- canEq fl cv2 t1 t2 
               ; return (cc1 `andCCan` cc2) } 
       
-      else return emptyCCan    -- We cannot decompose given applications
-      	   	  	       -- because we no longer have 'left' and 'right'
+      else do { traceTcS "canEq/(app case)" $
+                text "Ommitting decomposition of given equality between: " 
+                          <+> ppr ty1 <+> text "and" <+> ppr ty2
+              ; return emptyCCan    -- We cannot decompose given applications
+      	   	  	            -- because we no longer have 'left' and 'right'
+              }
 
 canEq fl cv s1@(ForAllTy {}) s2@(ForAllTy {})
  | tcIsForAllTy s1, tcIsForAllTy s2, 
@@ -514,6 +520,25 @@ canEq fl cv _ _                               = canEqFailure fl cv
 canEqFailure :: CtFlavor -> EvVar -> TcS CanonicalCts
 canEqFailure fl cv = return (singleCCan (mkFrozenError fl cv))
 \end{code}
+
+Note [Naked given applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider: 
+   data A a 
+   type T a = A a 
+and the given equality:  
+   [G] A a ~ T Int 
+We will reach the case canEq where we do a tcSplitAppTy_maybe, but if
+we dont have the guards (Nothing <- tcView ty1) (Nothing <- tcView
+ty2) then the given equation is going to fall through and get
+completely forgotten!
+
+What we want instead is this clause to apply only when there is no
+immediate top-level synonym; if there is one it will be later on
+unfolded by the later stages of canEq.
+
+Test-case is in typecheck/should_compile/GivenTypeSynonym.hs
+
 
 Note [Equality between type applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

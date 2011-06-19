@@ -10,7 +10,7 @@ module CmmExpr
     , DefinerOfSlots, UserOfSlots, foldSlotsDefd, foldSlotsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet
-    , regUsedIn
+    , regUsedIn, regSlot
     , Area(..), AreaId(..), SubArea, SubAreaSet, AreaMap, isStackSlotOf
     , module CmmMachOp
     , module CmmType
@@ -266,6 +266,9 @@ _   `regUsedIn` CmmStackSlot _ _ = False
 isStackSlotOf :: CmmExpr -> LocalReg -> Bool
 isStackSlotOf (CmmStackSlot (RegSlot r) _) r' = r == r'
 isStackSlotOf _ _ = False
+
+regSlot :: LocalReg -> CmmExpr
+regSlot r = CmmStackSlot (RegSlot r) (widthInBytes $ typeWidth $ localRegType r)
 
 -----------------------------------------------------------------------------
 --    Stack slot use information for expressions and other types [_$_]

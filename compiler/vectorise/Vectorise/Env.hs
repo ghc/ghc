@@ -10,7 +10,6 @@ module Vectorise.Env (
   GlobalEnv(..),
   initGlobalEnv,
   extendImportedVarsEnv,
-  extendScalars,
   setFamEnv,
   extendFamEnv,
   extendTyConsEnv,
@@ -46,18 +45,18 @@ data Scope a b
 -- LocalEnv -------------------------------------------------------------------
 -- | The local environment.
 data LocalEnv
-	= LocalEnv {
+  = LocalEnv {
         -- Mapping from local variables to their vectorised and lifted versions.
-            local_vars		:: VarEnv (Var, Var)
+            local_vars    :: VarEnv (Var, Var)
 
         -- In-scope type variables.
-        , local_tyvars		:: [TyVar]
+        , local_tyvars    :: [TyVar]
 
         -- Mapping from tyvars to their PA dictionaries.
-        , local_tyvar_pa	:: VarEnv CoreExpr
+        , local_tyvar_pa  :: VarEnv CoreExpr
 
         -- Local binding name.
-        , local_bind_name	:: FastString
+        , local_bind_name :: FastString
         }
 
 
@@ -95,6 +94,10 @@ data GlobalEnv
         , global_scalar_tycons  :: NameSet
           -- ^Type constructors whose values can only contain scalar data.  Scalar code may only
           -- operate on such data.
+        
+        , global_novect_vars    :: VarSet
+          -- ^Variables that are not vectorised.  (They may be referenced in the right-hand sides
+          -- of vectorisation declarations, though.)
 
         , global_exported_vars  :: VarEnv (Var, Var)
           -- ^Exported variables which have a vectorised version.
@@ -134,6 +137,7 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   , global_vect_decls    = mkVarEnv vects
   , global_scalar_vars   = vectInfoScalarVars   info `extendVarSetList` scalars
   , global_scalar_tycons = vectInfoScalarTyCons info
+  , global_novect_vars   = mkVarSet novects
   , global_exported_vars = emptyVarEnv
   , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
   , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
@@ -147,6 +151,7 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   where
     vects   = [(var, (varType var, exp)) | Vect var (Just exp) <- vectDecls]
     scalars = [var                       | Vect var Nothing    <- vectDecls]
+    novects = [var                       | NoVect var          <- vectDecls]
 
 
 -- Operators on Global Environments -------------------------------------------
@@ -156,12 +161,6 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
 extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
 extendImportedVarsEnv ps genv
   = genv { global_vars = extendVarEnvList (global_vars genv) ps }
-
--- |Extend the set of scalar variables in an environment.
---
-extendScalars :: [Var] -> GlobalEnv -> GlobalEnv
-extendScalars vs genv
-  = genv { global_scalar_vars = extendVarSetList (global_scalar_vars genv) vs }
 
 -- |Set the list of type family instances in an environment.
 --

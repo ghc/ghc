@@ -442,7 +442,8 @@ mkDictSelId no_unf name clas
 		   -- for the ClassOp
 
     info | new_tycon = base_info `setInlinePragInfo` alwaysInlinePragma
-    	   	   -- See Note [Single-method classes] for why alwaysInlinePragma
+    	   	   -- See Note [Single-method classes] in TcInstDcls
+		   -- for why alwaysInlinePragma
          | otherwise = base_info  `setSpecInfo`       mkSpecInfo [rule]
 		       		  `setInlinePragInfo` neverInlinePragma
 		   -- Add a magic BuiltinRule, and never inline it

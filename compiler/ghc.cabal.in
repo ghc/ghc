@@ -182,7 +182,7 @@ Library
         CLabel
         Cmm
         CmmBuildInfoTables
-        CmmCPS
+        CmmPipeline
         CmmCallConv
         CmmCommonBlockElim
         CmmContFlowOpt
@@ -199,6 +199,7 @@ Library
         CmmParse
         CmmProcPoint
         CmmSpillReload
+        CmmRewriteAssignments
         CmmStackLayout
         CmmType
         CmmUtils
@@ -313,6 +314,8 @@ Library
         Finder
         GHC
         GhcMake
+        GhcPlugins
+        DynamicLoading
         HeaderInfo
         HscMain
         HscStats
@@ -456,7 +459,6 @@ Library
         Vectorise.Builtins.Base
         Vectorise.Builtins.Initialise
         Vectorise.Builtins.Modules
-        Vectorise.Builtins.Prelude
         Vectorise.Builtins
         Vectorise.Monad.Base
         Vectorise.Monad.Naming

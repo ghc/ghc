@@ -163,6 +163,7 @@ data DynFlag
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
    | Opt_D_dump_rn
+   | Opt_D_dump_core_pipeline -- TODO FIXME: dump after simplifier stats
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_simpl_phases
@@ -469,6 +470,10 @@ data DynFlags = DynFlags {
   rtsOptsEnabled        :: RtsOptsEnabled,
 
   hpcDir                :: String,      -- ^ Path to store the .mix files
+
+  -- Plugins
+  pluginModNames        :: [ModuleName],
+  pluginModNameOpts     :: [(ModuleName,String)],
 
   settings              :: Settings,
 
@@ -789,6 +794,9 @@ defaultDynFlags mySettings =
         hcSuf                   = phaseInputExt HCc,
         hiSuf                   = "hi",
 
+        pluginModNames          = [],
+        pluginModNameOpts       = [],
+
         outputFile              = Nothing,
         outputHi                = Nothing,
         dynLibLoader            = SystemDependent,
@@ -979,6 +987,16 @@ setHcSuf      f d = d{ hcSuf      = f}
 
 setOutputFile f d = d{ outputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
+
+addPluginModuleName :: String -> DynFlags -> DynFlags
+addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
+
+addPluginModuleNameOption :: String -> DynFlags -> DynFlags
+addPluginModuleNameOption optflag d = d { pluginModNameOpts = (mkModuleName m, option) : (pluginModNameOpts d) }
+  where (m, rest) = break (== ':') optflag
+        option = case rest of
+          [] -> "" -- should probably signal an error
+          (_:plug_opt) -> plug_opt -- ignore the ':' from break
 
 parseDynLibLoaderMode f d =
  case splitAt 8 f of
@@ -1320,6 +1338,7 @@ dynamic_flags = [
   , Flag "ddump-occur-anal"        (setDumpFlag Opt_D_dump_occur_anal)
   , Flag "ddump-parsed"            (setDumpFlag Opt_D_dump_parsed)
   , Flag "ddump-rn"                (setDumpFlag Opt_D_dump_rn)
+  , Flag "ddump-core-pipeline"     (setDumpFlag Opt_D_dump_core_pipeline)
   , Flag "ddump-simpl"             (setDumpFlag Opt_D_dump_simpl)
   , Flag "ddump-simpl-iterations"  (setDumpFlag Opt_D_dump_simpl_iterations)
   , Flag "ddump-simpl-phases"      (OptPrefix setDumpSimplPhases)
@@ -1378,7 +1397,11 @@ dynamic_flags = [
   , Flag "Wnot"   (NoArg (do { mapM_ unSetDynFlag minusWallOpts
                              ; deprecate "Use -w instead" }))
   , Flag "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
-
+        
+        ------ Plugin flags ------------------------------------------------
+  , Flag "fplugin"     (hasArg addPluginModuleName)
+  , Flag "fplugin-opt" (hasArg addPluginModuleNameOption)
+    
         ------ Optimisation flags ------------------------------------------
   , Flag "O"      (noArgM (setOptLevel 1))
   , Flag "Onot"   (noArgM (\dflags -> do deprecate "Use -O0 instead"
@@ -1689,7 +1712,8 @@ xFlags = [
   ( "ExplicitForAll",                   Opt_ExplicitForAll, nop ),
   ( "AlternativeLayoutRule",            Opt_AlternativeLayoutRule, nop ),
   ( "AlternativeLayoutRuleTransitional",Opt_AlternativeLayoutRuleTransitional, nop ),
-  ( "DatatypeContexts",                 Opt_DatatypeContexts, nop ),
+  ( "DatatypeContexts",                 Opt_DatatypeContexts,
+    \ turn_on -> when turn_on $ deprecate "It was widely considered a misfeature, and has been removed from the Haskell language." ),
   ( "NondecreasingIndentation",         Opt_NondecreasingIndentation, nop ),
   ( "RelaxedLayout",                    Opt_RelaxedLayout, nop ),
   ( "MonoLocalBinds",                   Opt_MonoLocalBinds, nop ),

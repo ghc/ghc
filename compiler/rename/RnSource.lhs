@@ -666,6 +666,10 @@ rnHsVectDecl (HsVect var (Just rhs))
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
        }
+rnHsVectDecl (HsNoVect var)
+  = do { var' <- wrapLocM lookupTopBndrRn var
+       ; return (HsNoVect var', unitFV (unLoc var'))
+       }
 \end{code}
 
 %*********************************************************
@@ -799,7 +803,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
-	; let sig_rdr_names_w_locs = [op | L _ (TypeSig op _) <- sigs]
+	; let sig_rdr_names_w_locs = [op | L _ (TypeSig ops _) <- sigs, op <- ops]
 	; checkDupRdrNames sig_rdr_names_w_locs
 		-- Typechecker is responsible for checking that we only
 		-- give default-method bindings for things in this class.

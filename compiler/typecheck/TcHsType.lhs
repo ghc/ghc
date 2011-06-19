@@ -299,7 +299,7 @@ kc_check_hs_type (HsParTy ty) exp_kind
   = do { ty' <- kc_check_lhs_type ty exp_kind; return (HsParTy ty') }
 
 kc_check_hs_type ty@(HsAppTy ty1 ty2) exp_kind
-  = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 ty2
+  = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
        ; (fun_ty', fun_kind) <- kc_lhs_type fun_ty
        ; arg_tys' <- kcCheckApps fun_ty fun_kind arg_tys ty exp_kind
        ; return (mkHsAppTys fun_ty' arg_tys') }
@@ -389,11 +389,10 @@ kc_hs_type (HsOpTy ty1 op ty2) = do
     return (HsOpTy ty1' op ty2', res_kind)
 
 kc_hs_type (HsAppTy ty1 ty2) = do
+    let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
     (fun_ty', fun_kind) <- kc_lhs_type fun_ty
     (arg_tys', res_kind) <- kcApps fun_ty fun_kind arg_tys
     return (mkHsAppTys fun_ty' arg_tys', res_kind)
-  where
-    (fun_ty, arg_tys) = splitHsAppTys ty1 ty2
 
 kc_hs_type (HsPredTy pred)
   = wrongPredErr pred
@@ -460,20 +459,6 @@ kcCheckApps the_fun fun_kind args ty exp_kind
 	     -- This improves error message; Trac #2994
        ; kc_check_lhs_types args_w_kinds }
 
-splitHsAppTys :: LHsType Name -> LHsType Name -> (LHsType Name, [LHsType Name])
-splitHsAppTys fun_ty arg_ty = split fun_ty [arg_ty]
-  where
-    split (L _ (HsAppTy f a)) as = split f (a:as)
-    split f       	      as = (f,as)
-
-mkHsAppTys :: LHsType Name -> [LHsType Name] -> HsType Name
-mkHsAppTys fun_ty [] = pprPanic "mkHsAppTys" (ppr fun_ty)
-mkHsAppTys fun_ty (arg_ty:arg_tys)
-  = foldl mk_app (HsAppTy fun_ty arg_ty) arg_tys
-  where
-    mk_app fun arg = HsAppTy (noLoc fun) arg	-- Add noLocs for inner nodes of
-					 	-- the application; they are
-						-- never used 
 
 ---------------------------
 splitFunKind :: SDoc -> Int -> TcKind -> [b] -> TcM ([(b,ExpKind)], TcKind)

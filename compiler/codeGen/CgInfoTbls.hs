@@ -53,7 +53,7 @@ import Outputable
 -- representation as a list of 'CmmAddr' is handled later
 -- in the pipeline by 'cmmToRawCmm'.
 
-emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormals -> CgStmts -> Code
+emitClosureCodeAndInfoTable :: ClosureInfo -> [CmmFormal] -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
  = do	{ blks <- cgStmtsToBlocks body
         ; info <- mkCmmInfo cl_info
@@ -412,7 +412,7 @@ funInfoTable info_ptr
 emitInfoTableAndCode 
 	:: CLabel 		-- Label of entry or ret
 	-> CmmInfo 		-- ...the info table
-	-> CmmFormals	-- ...args
+	-> [CmmFormal]	-- ...args
 	-> [CmmBasicBlock]	-- ...and body
 	-> Code
 

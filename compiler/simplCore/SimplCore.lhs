@@ -8,7 +8,7 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlags, DynFlag(..), dopt )
+import DynFlags
 import CoreSyn
 import CoreSubst
 import HscTypes
@@ -29,7 +29,7 @@ import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
 import Id
-import BasicTypes       ( CompilerPhase, isDefaultInlinePragma )
+import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma )
 import VarSet
 import VarEnv
 import LiberateCase	( liberateCase )
@@ -45,6 +45,16 @@ import Util
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import Outputable
 import Control.Monad
+
+#ifdef GHCI
+import Type		( mkTyConTy )
+import RdrName		( mkRdrQual )
+import OccName		( mkVarOcc )
+import PrelNames	( pluginTyConName )
+import DynamicLoading   ( forceLoadTyCon, lookupRdrNameInModule, getValueSafely )
+import Module		( ModuleName )
+import Panic
+#endif
 \end{code}
 
 %************************************************************************
@@ -57,9 +67,18 @@ import Control.Monad
 core2core :: HscEnv -> ModGuts -> IO ModGuts
 core2core hsc_env guts 
   = do { us <- mkSplitUniqSupply 's'
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod $ 
-                           doCorePasses (getCoreToDo dflags) guts
+       -- make sure all plugins are loaded 
 
+       ; let builtin_passes = getCoreToDo dflags
+       ; 
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod $
+                        do { all_passes <- addPluginPasses dflags builtin_passes
+                           ; runCorePasses all_passes guts }
+
+{--                           
+       ; Err.dumpIfSet_dyn dflags Opt_D_dump_core_pipeline
+             "Plugin information" "" -- TODO FIXME: dump plugin info
+--}
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
              (pprSimplCount stats)
@@ -75,16 +94,262 @@ core2core hsc_env guts
     -- consume the ModGuts to find the module) but somewhat ugly because mg_module may
     -- _theoretically_ be changed during the Core pipeline (it's part of ModGuts), which
     -- would mean our cached value would go out of date.
+\end{code}
 
 
-type CorePass = CoreToDo
+%************************************************************************
+%*									*
+           Generating the main optimisation pipeline
+%*									*
+%************************************************************************
 
-doCorePasses :: [CorePass] -> ModGuts -> CoreM ModGuts
-doCorePasses passes guts 
+\begin{code}
+getCoreToDo :: DynFlags -> [CoreToDo]
+getCoreToDo dflags
+  = core_todo
+  where
+    opt_level     = optLevel           dflags
+    phases        = simplPhases        dflags
+    max_iter      = maxSimplIterations dflags
+    rule_check    = ruleCheck          dflags
+    strictness    = dopt Opt_Strictness   		  dflags
+    full_laziness = dopt Opt_FullLaziness 		  dflags
+    do_specialise = dopt Opt_Specialise   		  dflags
+    do_float_in   = dopt Opt_FloatIn      		  dflags          
+    cse           = dopt Opt_CSE                          dflags
+    spec_constr   = dopt Opt_SpecConstr                   dflags
+    liberate_case = dopt Opt_LiberateCase                 dflags
+    static_args   = dopt Opt_StaticArgumentTransformation dflags
+    rules_on      = dopt Opt_EnableRewriteRules           dflags
+    eta_expand_on = dopt Opt_DoLambdaEtaExpansion         dflags
+
+    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
+
+    maybe_strictness_before phase
+      = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
+
+    base_mode = SimplMode { sm_phase      = panic "base_mode"
+                          , sm_names      = []
+                          , sm_rules      = rules_on
+                          , sm_eta_expand = eta_expand_on
+                          , sm_inline     = True
+                          , sm_case_case  = True }
+
+    simpl_phase phase names iter
+      = CoreDoPasses
+      $   [ maybe_strictness_before phase
+          , CoreDoSimplify iter
+                (base_mode { sm_phase = Phase phase
+                           , sm_names = names })
+
+          , maybe_rule_check (Phase phase) ]
+
+          -- Vectorisation can introduce a fair few common sub expressions involving 
+          --  DPH primitives. For example, see the Reverse test from dph-examples.
+          --  We need to eliminate these common sub expressions before their definitions
+          --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings, 
+          --  so we also run simpl_gently to inline them.
+      ++  (if dopt Opt_Vectorise dflags && phase == 3
+	    then [CoreCSE, simpl_gently]
+	    else [])
+
+    vectorisation
+      = runWhen (dopt Opt_Vectorise dflags) $
+          CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
+
+                -- By default, we have 2 phases before phase 0.
+
+                -- Want to run with inline phase 2 after the specialiser to give
+                -- maximum chance for fusion to work before we inline build/augment
+                -- in phase 1.  This made a difference in 'ansi' where an
+                -- overloaded function wasn't inlined till too late.
+
+                -- Need phase 1 so that build/augment get
+                -- inlined.  I found that spectral/hartel/genfft lost some useful
+                -- strictness in the function sumcode' if augment is not inlined
+                -- before strictness analysis runs
+    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
+                                | phase <- [phases, phases-1 .. 1] ]
+
+
+        -- initial simplify: mk specialiser happy: minimum effort please
+    simpl_gently = CoreDoSimplify max_iter
+                       (base_mode { sm_phase = InitialPhase
+                                  , sm_names = ["Gentle"]
+                                  , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
+                                  , sm_inline = False
+                                  , sm_case_case = False })
+                          -- Don't do case-of-case transformations.
+                          -- This makes full laziness work better
+
+    core_todo =
+     if opt_level == 0 then
+       [vectorisation,
+        simpl_phase 0 ["final"] max_iter]
+     else {- opt_level >= 1 -} [
+
+    -- We want to do the static argument transform before full laziness as it
+    -- may expose extra opportunities to float things outwards. However, to fix
+    -- up the output of the transformation we need at do at least one simplify
+    -- after this before anything else
+        runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
+
+        -- We run vectorisation here for now, but we might also try to run
+        -- it later
+        vectorisation,
+
+        -- initial simplify: mk specialiser happy: minimum effort please
+        simpl_gently,
+
+        -- Specialisation is best done before full laziness
+        -- so that overloaded functions have all their dictionary lambdas manifest
+        runWhen do_specialise CoreDoSpecialising,
+
+        runWhen full_laziness $
+           CoreDoFloatOutwards FloatOutSwitches {
+                                 floatOutLambdas   = Just 0,
+                                 floatOutConstants = True,
+                                 floatOutPartialApplications = False },
+      		-- Was: gentleFloatOutSwitches	
+                --
+		-- I have no idea why, but not floating constants to
+		-- top level is very bad in some cases.
+                --
+		-- Notably: p_ident in spectral/rewrite
+		-- 	    Changing from "gentle" to "constantsOnly"
+		-- 	    improved rewrite's allocation by 19%, and
+		-- 	    made 0.0% difference to any other nofib
+		-- 	    benchmark
+                --
+                -- Not doing floatOutPartialApplications yet, we'll do
+                -- that later on when we've had a chance to get more
+                -- accurate arity information.  In fact it makes no
+                -- difference at all to performance if we do it here,
+                -- but maybe we save some unnecessary to-and-fro in
+                -- the simplifier.
+
+        runWhen do_float_in CoreDoFloatInwards,
+
+        simpl_phases,
+
+                -- Phase 0: allow all Ids to be inlined now
+                -- This gets foldr inlined before strictness analysis
+
+                -- At least 3 iterations because otherwise we land up with
+                -- huge dead expressions because of an infelicity in the
+                -- simpifier.
+                --      let k = BIG in foldr k z xs
+                -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
+                -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
+                -- Don't stop now!
+        simpl_phase 0 ["main"] (max max_iter 3),
+
+        runWhen strictness (CoreDoPasses [
+                CoreDoStrictness,
+                CoreDoWorkerWrapper,
+                CoreDoGlomBinds,
+                simpl_phase 0 ["post-worker-wrapper"] max_iter
+                ]),
+
+        runWhen full_laziness $
+           CoreDoFloatOutwards FloatOutSwitches {
+                                 floatOutLambdas   = floatLamArgs dflags,
+                                 floatOutConstants = True,
+                                 floatOutPartialApplications = True },
+                -- nofib/spectral/hartel/wang doubles in speed if you
+                -- do full laziness late in the day.  It only happens
+                -- after fusion and other stuff, so the early pass doesn't
+                -- catch it.  For the record, the redex is
+                --        f_el22 (f_el21 r_midblock)
+
+
+        runWhen cse CoreCSE,
+                -- We want CSE to follow the final full-laziness pass, because it may
+                -- succeed in commoning up things floated out by full laziness.
+                -- CSE used to rely on the no-shadowing invariant, but it doesn't any more
+
+        runWhen do_float_in CoreDoFloatInwards,
+
+        maybe_rule_check (Phase 0),
+
+                -- Case-liberation for -O2.  This should be after
+                -- strictness analysis and the simplification which follows it.
+        runWhen liberate_case (CoreDoPasses [
+            CoreLiberateCase,
+            simpl_phase 0 ["post-liberate-case"] max_iter
+            ]),         -- Run the simplifier after LiberateCase to vastly
+                        -- reduce the possiblility of shadowing
+                        -- Reason: see Note [Shadowing] in SpecConstr.lhs
+
+        runWhen spec_constr CoreDoSpecConstr,
+
+        maybe_rule_check (Phase 0),
+
+        -- Final clean-up simplification:
+        simpl_phase 0 ["final"] max_iter
+     ]
+\end{code}
+
+
+Loading plugins
+
+\begin{code}
+addPluginPasses :: DynFlags -> [CoreToDo] -> CoreM [CoreToDo]
+#ifndef GHCI
+addPluginPasses _ builtin_passes = return builtin_passes
+#else
+addPluginPasses dflags builtin_passes
+  = do { hsc_env <- getHscEnv 
+       ; named_plugins <- liftIO (loadPlugins hsc_env)
+       ; foldM query_plug builtin_passes named_plugins }
+  where
+    query_plug todos (mod_nm, plug) 
+       = installCoreToDos plug options todos
+       where 
+         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
+                            , opt_mod_nm == mod_nm ]
+
+loadPlugins :: HscEnv -> IO [(ModuleName, Plugin)]
+loadPlugins hsc_env
+  = do { let to_load = pluginModNames (hsc_dflags hsc_env)
+       ; plugins <- mapM (loadPlugin hsc_env) to_load
+       ; return $ to_load `zip` plugins }
+
+loadPlugin :: HscEnv -> ModuleName -> IO Plugin
+loadPlugin hsc_env mod_name
+  = do { let plugin_rdr_name = mkRdrQual mod_name (mkVarOcc "plugin")
+       ; mb_name <- lookupRdrNameInModule hsc_env mod_name plugin_rdr_name
+       ; case mb_name of {
+            Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep 
+                          [ ptext (sLit "The module"), ppr mod_name
+                          , ptext (sLit "did not export the plugin name")
+                          , ppr plugin_rdr_name ]) ;
+            Just name -> 
+
+     do { plugin_tycon <- forceLoadTyCon hsc_env pluginTyConName
+        ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
+        ; case mb_plugin of
+            Nothing -> throwGhcException (CmdLineError $ showSDoc $ hsep
+                          [ ptext (sLit "The value"), ppr name 
+                          , ptext (sLit "did not have the type")
+                          , ppr pluginTyConName, ptext (sLit "as required")])
+            Just plugin -> return plugin } } }
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+                  The CoreToDo interpreter
+%*									*
+%************************************************************************
+
+\begin{code}
+runCorePasses :: [CoreToDo] -> ModGuts -> CoreM ModGuts
+runCorePasses passes guts 
   = foldM do_pass guts passes
   where
     do_pass guts CoreDoNothing = return guts
-    do_pass guts (CoreDoPasses ps) = doCorePasses ps guts
+    do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
     do_pass guts pass 
        = do { dflags <- getDynFlags
        	    ; liftIO $ showPass dflags pass
@@ -92,7 +357,7 @@ doCorePasses passes guts
        	    ; liftIO $ endPass dflags pass (mg_binds guts') (mg_rules guts')
        	    ; return guts' }
 
-doCorePass :: CorePass -> ModGuts -> CoreM ModGuts
+doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePass pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
                                        simplifyPgm pass
 
@@ -128,9 +393,14 @@ doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
 
 doCorePass CoreDoGlomBinds              = doPassDM  glomBinds
 doCorePass CoreDoPrintCore              = observe   printCore
-doCorePass (CoreDoRuleCheck phase pat)  = ruleCheck phase pat
+doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
-doCorePass (CoreDoPasses passes)        = doCorePasses passes
+doCorePass (CoreDoPasses passes)        = runCorePasses passes
+
+#ifdef GHCI
+doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+#endif
+
 doCorePass pass = pprPanic "doCorePass" (ppr pass)
 \end{code}
 
@@ -144,8 +414,8 @@ doCorePass pass = pprPanic "doCorePass" (ppr pass)
 printCore :: a -> [CoreBind] -> IO ()
 printCore _ binds = Err.dumpIfSet True "Print Core" (pprCoreBindings binds)
 
-ruleCheck :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
-ruleCheck current_phase pat guts = do
+ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
+ruleCheckPass current_phase pat guts = do
     rb <- getRuleBase
     dflags <- getDynFlags
     liftIO $ Err.showPass dflags "RuleCheck"
@@ -356,11 +626,18 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       -- space usage, especially with -O.  JRS, 000620.
       | let sz = coreBindsSize binds in sz == sz
       = do {
-		-- Occurrence analysis
-	   let { tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm active_rule rules [] binds } ;
-	   Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-		     (pprCoreBindings tagged_binds);
+                -- Occurrence analysis
+           let {   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
+                   -- that the right-hand sides of vectorisation declarations are taken into 
+                   -- account during occurence analysis.
+                 maybeVects   = case sm_phase mode of
+                                  InitialPhase -> mg_vect_decls guts
+                                  _            -> []
+               ; tagged_binds = {-# SCC "OccAnal" #-} 
+                     occurAnalysePgm active_rule rules maybeVects binds 
+               } ;
+           Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+                     (pprCoreBindings tagged_binds);
 
 	   	-- Get any new rules, and extend the rule base
 		-- See Note [Overall plumbing for rules] in Rules.lhs

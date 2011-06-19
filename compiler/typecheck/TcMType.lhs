@@ -1168,7 +1168,8 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
 check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
-       ; checkTc (xopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
+       ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags) 
+                 (eqPredTyErr pred)
        ; checkTc (case ctxt of ClassSCCtxt {} -> False; _ -> True)
                  (eqSuperClassErr pred)
 
@@ -1336,7 +1337,7 @@ badPredTyErr, eqPredTyErr, predTyVarErr :: PredType -> SDoc
 badPredTyErr pred = ptext (sLit "Illegal constraint") <+> pprPredTy pred
 eqPredTyErr  pred = ptext (sLit "Illegal equational constraint") <+> pprPredTy pred
 		    $$
-		    parens (ptext (sLit "Use -XTypeFamilies to permit this"))
+		    parens (ptext (sLit "Use -XGADTs or -XTypeFamilies to permit this"))
 predTyVarErr pred  = sep [ptext (sLit "Non type-variable argument"),
 			  nest 2 (ptext (sLit "in the constraint:") <+> pprPredTy pred)]
 dupPredWarn :: [[PredType]] -> SDoc

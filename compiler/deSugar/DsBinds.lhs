@@ -501,6 +501,15 @@ dsSpec :: Maybe CoreExpr  	-- Just rhs => RULE is for a local binding
        -> Located TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
+  | isJust (isClassOpId_maybe poly_id)
+  = putSrcSpanDs loc $ 
+    do { warnDs (ptext (sLit "Ignoring useless SPECIALISE pragma for class method selector") 
+                 <+> quotes (ppr poly_id))
+       ; return Nothing  }  -- There is no point in trying to specialise a class op
+       	 		    -- Moreover, classops don't (currently) have an inl_sat arity set
+			    -- (it would be Just 0) and that in turn makes makeCorePair bleat
+
+  | otherwise
   = putSrcSpanDs loc $ 
     do { let poly_name = idName poly_id
        ; spec_name <- newLocalName poly_name

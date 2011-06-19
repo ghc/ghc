@@ -57,6 +57,7 @@ import Bag
 import FastString
 import ForeignCall
 import MonadUtils
+import Util( equalLength )
 
 import Data.Maybe
 import Control.Monad
@@ -173,7 +174,7 @@ repTyClD (L loc (TyData { tcdND = DataType, tcdCtxt = cxt,
            do { cxt1     <- repLContext cxt
               ; opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
-              ; cons1    <- mapM repC cons
+              ; cons1    <- mapM (repC (hsLTyVarNames tvs)) cons
       	      ; cons2    <- coreList conQTyConName cons1
       	      ; derivs1  <- repDerivs mb_derivs
 	      ; bndrs1   <- coreList tyVarBndrTyConName bndrs
@@ -190,7 +191,7 @@ repTyClD (L loc (TyData { tcdND = NewType, tcdCtxt = cxt,
            do { cxt1     <- repLContext cxt
               ; opt_tys1 <- maybeMapM repLTys opt_tys   -- only for family insts
               ; opt_tys2 <- maybeMapM (coreList typeQTyConName) opt_tys1
-              ; con1     <- repC con
+              ; con1     <- repC (hsLTyVarNames tvs) con
       	      ; derivs1  <- repDerivs mb_derivs
 	      ; bndrs1   <- coreList tyVarBndrTyConName bndrs
       	      ; repNewtype cxt1 tc1 bndrs1 opt_tys2 con1 derivs1
@@ -360,23 +361,73 @@ ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 -- 			Constructors
 -------------------------------------------------------
 
-repC :: LConDecl Name -> DsM (Core TH.ConQ)
-repC (L _ (ConDecl { con_name = con, con_qvars = [], con_cxt = L _ []
-     	           , con_details = details, con_res = ResTyH98 }))
+repC :: [Name] -> LConDecl Name -> DsM (Core TH.ConQ)
+repC _ (L _ (ConDecl { con_name = con, con_qvars = [], con_cxt = L _ []
+                       , con_details = details, con_res = ResTyH98 }))
   = do { con1 <- lookupLOcc con 	-- See note [Binders and occurrences] 
-       ; repConstr con1 details 
-       }
-repC (L loc con_decl@(ConDecl { con_qvars = tvs, con_cxt = L cloc ctxt, con_res = ResTyH98 }))
-  = addTyVarBinds tvs $ \bndrs -> 
-      do { c' <- repC (L loc (con_decl { con_qvars = [], con_cxt = L cloc [] }))
-         ; ctxt' <- repContext ctxt
-         ; bndrs' <- coreList tyVarBndrTyConName bndrs
-         ; rep2 forallCName [unC bndrs', unC ctxt', unC c']
-         }
-repC (L loc con_decl)		-- GADTs
-  = putSrcSpanDs loc $
-    notHandled "GADT declaration" (ppr con_decl) 
+       ; repConstr con1 details  }
+repC tvs (L _ (ConDecl { con_name = con
+                       , con_qvars = con_tvs, con_cxt = L _ ctxt
+                       , con_details = details
+                       , con_res = res_ty }))
+  = do { (eq_ctxt, con_tv_subst) <- mkGadtCtxt tvs res_ty
+       ; let ex_tvs = [ tv | tv <- con_tvs, not (hsLTyVarName tv `in_subst` con_tv_subst)]
+       ; binds <- mapM dupBinder con_tv_subst 
+       ; dsExtendMetaEnv (mkNameEnv binds) $     -- Binds some of the con_tvs
+         addTyVarBinds ex_tvs $ \ ex_bndrs ->   -- Binds the remaining con_tvs
+    do { con1      <- lookupLOcc con 	-- See note [Binders and occurrences] 
+       ; c'        <- repConstr con1 details
+       ; ctxt'     <- repContext (eq_ctxt ++ ctxt)
+       ; ex_bndrs' <- coreList tyVarBndrTyConName ex_bndrs
+       ; rep2 forallCName [unC ex_bndrs', unC ctxt', unC c'] } }
 
+in_subst :: Name -> [(Name,Name)] -> Bool
+in_subst _ []          = False
+in_subst n ((n',_):ns) = n==n' || in_subst n ns
+
+mkGadtCtxt :: [Name]		-- Tyvars of the data type
+           -> ResType Name
+	   -> DsM (HsContext Name, [(Name,Name)])
+-- Given a data type in GADT syntax, figure out the equality 
+-- context, so that we can represent it with an explicit 
+-- equality context, because that is the only way to express
+-- the GADT in TH syntax
+--
+-- Example:   
+-- data T a b c where { MkT :: forall d e. d -> e -> T d [e] e
+--     mkGadtCtxt [a,b,c] [d,e] (T d [e] e)
+--   returns 
+--     (b~[e], c~e), [d->a] 
+-- 
+-- This function is fiddly, but not really hard
+mkGadtCtxt _ ResTyH98
+  = return ([], [])
+mkGadtCtxt data_tvs (ResTyGADT res_ty)
+  | let (head_ty, tys) = splitHsAppTys res_ty []
+  , Just _ <- is_hs_tyvar head_ty
+  , data_tvs `equalLength` tys
+  = return (go [] [] (data_tvs `zip` tys))
+
+  | otherwise 
+  = failWithDs (ptext (sLit "Malformed constructor result type") <+> ppr res_ty)
+  where
+    go cxt subst [] = (cxt, subst)
+    go cxt subst ((data_tv, ty) : rest)
+       | Just con_tv <- is_hs_tyvar ty
+       , isTyVarName con_tv
+       , not (in_subst con_tv subst)
+       = go cxt ((con_tv, data_tv) : subst) rest
+       | otherwise
+       = go (eq_pred : cxt) subst rest
+       where
+         loc = getLoc ty
+         eq_pred = L loc (HsEqualP (L loc (HsTyVar data_tv)) ty)
+
+    is_hs_tyvar (L _ (HsTyVar n))  = Just n   -- Type variables *and* tycons
+    is_hs_tyvar (L _ (HsParTy ty)) = is_hs_tyvar ty
+    is_hs_tyvar _                  = Nothing
+
+    
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
 repBangTy ty= do 
   MkC s <- rep2 str []
@@ -419,7 +470,7 @@ rep_sigs' sigs = do { sigs1 <- mapM rep_sig sigs ;
 rep_sig :: LSig Name -> DsM [(SrcSpan, Core TH.DecQ)]
 	-- Singleton => Ok
 	-- Empty     => Too hard, signature ignored
-rep_sig (L loc (TypeSig nm ty))       = rep_proto nm ty loc
+rep_sig (L loc (TypeSig nms ty))      = rep_proto nms ty loc
 rep_sig (L _   (GenericSig nm _))     = failWithDs msg
   where msg = vcat  [ ptext (sLit "Illegal default signature for") <+> quotes (ppr nm)
                     , ptext (sLit "Default signatures are not supported by Template Haskell") ]
@@ -428,14 +479,16 @@ rep_sig (L loc (InlineSig nm ispec))  = rep_inline nm ispec loc
 rep_sig (L loc (SpecSig nm ty ispec)) = rep_specialise nm ty ispec loc
 rep_sig _                             = return []
 
-rep_proto :: Located Name -> LHsType Name -> SrcSpan 
+rep_proto :: [Located Name] -> LHsType Name -> SrcSpan
           -> DsM [(SrcSpan, Core TH.DecQ)]
-rep_proto nm ty loc 
-  = do { nm1 <- lookupLOcc nm
-       ; ty1 <- repLTy ty
-       ; sig <- repProto nm1 ty1
-       ; return [(loc, sig)]
-       }
+rep_proto nms ty loc
+  = mapM f nms
+  where
+    f nm = do { nm1 <- lookupLOcc nm
+              ; ty1 <- repLTy ty
+              ; sig <- repProto nm1 ty1
+              ; return (loc, sig)
+              }
 
 rep_inline :: Located Name 
            -> InlinePragma	-- Never defaultInlinePragma
@@ -506,16 +559,14 @@ type ProcessTyVarBinds a =
 -- meta environment and gets the *new* names on Core-level as an argument
 --
 addTyVarBinds :: ProcessTyVarBinds a
-addTyVarBinds tvs m =
-  do
-    let names       = hsLTyVarNames tvs
-        mkWithKinds = map repTyVarBndrWithKind tvs
-    freshNames <- mkGenSyms names
-    term       <- addBinds freshNames $ do
-		    bndrs       <- mapM lookupBinder names 
-                    kindedBndrs <- zipWithM ($) mkWithKinds bndrs
-		    m kindedBndrs
-    wrapGenSyms freshNames term
+addTyVarBinds tvs m
+  = do { freshNames <- mkGenSyms (hsLTyVarNames tvs)
+       ; term <- addBinds freshNames $ 
+	    	 do { kindedBndrs <- mapM mk_tv_bndr (tvs `zip` freshNames)
+	    	    ; m kindedBndrs }
+       ; wrapGenSyms freshNames term }
+  where
+    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
 -- Look up a list of type variables; the computations passed as the second 
 -- argument gets the *new* names on Core-level as an argument
@@ -1111,6 +1162,13 @@ lookupBinder n
 	    _              -> failWithDs msg }
   where
     msg = ptext (sLit "DsMeta: failed binder lookup when desugaring a TH bracket:") <+> ppr n
+
+dupBinder :: (Name, Name) -> DsM (Name, DsMetaVal)
+dupBinder (new, old) 
+  = do { mb_val <- dsLookupMetaEnv old
+       ; case mb_val of
+           Just val -> return (new, val)
+           Nothing  -> pprPanic "dupBinder" (ppr old) }
 
 -- Look up a name that is either locally bound or a global name
 --

@@ -252,7 +252,7 @@ getTypeSigNames :: HsValBinds a -> NameSet
 getTypeSigNames (ValBindsIn {}) 
   = panic "getTypeSigNames"
 getTypeSigNames (ValBindsOut _ sigs) 
-  = mkNameSet [unLoc n | L _ (TypeSig n _) <- sigs]
+  = mkNameSet [unLoc n | L _ (TypeSig names _) <- sigs, n <- names]
 \end{code}
 
 What AbsBinds means
@@ -625,11 +625,11 @@ type LSig name = Located (Sig name)
 data Sig name	-- Signatures and pragmas
   = 	-- An ordinary type signature
 	-- f :: Num a => a -> a
-    TypeSig (Located name) (LHsType name)
+    TypeSig [Located name] (LHsType name)
 
         -- A type signature for a default method inside a class
         -- default eq :: (Representable0 a, GEq (Rep0 a)) => a -> a -> Bool
-  | GenericSig (Located name) (LHsType name)
+  | GenericSig [Located name] (LHsType name)
 
 	-- A type signature in generated code, notably the code
 	-- generated for record selectors.  We simply record
@@ -715,18 +715,6 @@ okInstDclSig (GenericSig _ _) = False
 okInstDclSig (FixSig _)       = False
 okInstDclSig _ 	              = True
 
-sigName :: LSig name -> Maybe name
--- Used only in Haddock
-sigName (L _ sig) = sigNameNoLoc sig
-
-sigNameNoLoc :: Sig name -> Maybe name    
--- Used only in Haddock
-sigNameNoLoc (TypeSig   n _)          = Just (unLoc n)
-sigNameNoLoc (SpecSig   n _ _)        = Just (unLoc n)
-sigNameNoLoc (InlineSig n _)          = Just (unLoc n)
-sigNameNoLoc (FixSig (FixitySig n _)) = Just (unLoc n)
-sigNameNoLoc _                        = Nothing
-
 isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True
 isFixityLSig _	               = False
@@ -778,8 +766,8 @@ Signature equality is used when checking for duplicate signatures
 eqHsSig :: Eq a => LSig a -> LSig a -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
 eqHsSig (L _ (IdSig n1))         	(L _ (IdSig n2))                = n1 == n2
-eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
-eqHsSig (L _ (GenericSig n1 _))        	(L _ (GenericSig n2 _))         = unLoc n1 == unLoc n2
+eqHsSig (L _ (TypeSig ns1 _))         	(L _ (TypeSig ns2 _))           = map unLoc ns1 == map unLoc ns2
+eqHsSig (L _ (GenericSig ns1 _))        (L _ (GenericSig ns2 _))        = map unLoc ns1 == map unLoc ns2
 eqHsSig (L _ (InlineSig n1 _))          (L _ (InlineSig n2 _))          = unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
@@ -792,9 +780,9 @@ instance (OutputableBndr name) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: OutputableBndr name => Sig name -> SDoc
-ppr_sig (TypeSig var ty)	  = pprVarSig (unLoc var) (ppr ty)
-ppr_sig (GenericSig var ty)	  = ptext (sLit "default") <+> pprVarSig (unLoc var) (ppr ty)
-ppr_sig (IdSig id)	          = pprVarSig id (ppr (varType id))
+ppr_sig (TypeSig vars ty)	  = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (GenericSig vars ty)	  = ptext (sLit "default") <+> pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (IdSig id)	          = pprVarSig [id] (ppr (varType id))
 ppr_sig (FixSig fix_sig) 	  = ppr fix_sig
 ppr_sig (SpecSig var ty inl) 	  = pragBrackets (pprSpec var (ppr ty) inl)
 ppr_sig (InlineSig var inl)       = pragBrackets (ppr inl <+> ppr var)
@@ -806,11 +794,13 @@ instance Outputable name => Outputable (FixitySig name) where
 pragBrackets :: SDoc -> SDoc
 pragBrackets doc = ptext (sLit "{-#") <+> doc <+> ptext (sLit "#-}") 
 
-pprVarSig :: (Outputable id) => id -> SDoc -> SDoc
-pprVarSig var pp_ty = sep [ppr var <+> dcolon, nest 2 pp_ty]
+pprVarSig :: (Outputable id) => [id] -> SDoc -> SDoc
+pprVarSig vars pp_ty = sep [pprvars <+> dcolon, nest 2 pp_ty]
+  where
+    pprvars = hsep $ punctuate comma (map ppr vars)
 
 pprSpec :: (Outputable id) => id -> SDoc -> InlinePragma -> SDoc
-pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig var pp_ty
+pprSpec var pp_ty inl = ptext (sLit "SPECIALIZE") <+> pp_inl <+> pprVarSig [var] pp_ty
   where
     pp_inl | isDefaultInlinePragma inl = empty
            | otherwise = ppr inl

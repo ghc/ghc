@@ -89,10 +89,10 @@ tcClassSigs :: Name	             -- Name of the class
 	    -> TcM ([TcMethInfo],    -- Exactly one for each method
                     NameEnv Type)    -- Types of the generic-default methods
 tcClassSigs clas sigs def_methods
-  = do { gen_dm_prs <- mapM (addLocM tc_gen_sig) gen_sigs
+  = do { gen_dm_prs <- concat <$> mapM (addLocM tc_gen_sig) gen_sigs
        ; let gen_dm_env = mkNameEnv gen_dm_prs
 
-       ; op_info <- mapM (addLocM (tc_sig gen_dm_env)) vanilla_sigs
+       ; op_info <- concat <$> mapM (addLocM (tc_sig gen_dm_env)) vanilla_sigs
 
        ; let op_names = mkNameSet [ n | (n,_,_) <- op_info ]
        ; sequence_ [ failWithTc (badMethodErr clas n)
@@ -110,16 +110,17 @@ tcClassSigs clas sigs def_methods
     dm_bind_names :: [Name]	-- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
-    tc_sig genop_env (L _ op_name, op_hs_ty)
+    tc_sig genop_env (op_names, op_hs_ty)
       = do { op_ty <- tcHsKindedType op_hs_ty	-- Class tyvars already in scope
-           ; let dm | op_name `elemNameEnv` genop_env = GenericDM
-                    | op_name `elem` dm_bind_names    = VanillaDM
-                    | otherwise                       = NoDM
-           ; return (op_name, dm, op_ty) }
+           ; return [ (op_name, f op_name, op_ty) | L _ op_name <- op_names ] }
+           where
+             f nm | nm `elemNameEnv` genop_env = GenericDM
+                  | nm `elem` dm_bind_names    = VanillaDM
+                  | otherwise                  = NoDM
 
-    tc_gen_sig (L _ op_name, gen_hs_ty)
+    tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcHsKindedType gen_hs_ty
-           ; return (op_name, gen_op_ty) }
+           ; return [ (op_name, gen_op_ty) | L _ op_name <- op_names ] }
 \end{code}
 
 

@@ -78,8 +78,8 @@ cheapEqReg _ _                = False
 ---------------------------------------------------
 
 loadArgsIntoTemps :: [Unique]
-                  -> HintedCmmActuals
-                  -> ([Unique], [CmmStmt], HintedCmmActuals)
+                  -> [HintedCmmActual]
+                  -> ([Unique], [CmmStmt], [HintedCmmActual])
 loadArgsIntoTemps uniques [] = (uniques, [], [])
 loadArgsIntoTemps uniques ((CmmHinted e hint):args) =
     (uniques'',

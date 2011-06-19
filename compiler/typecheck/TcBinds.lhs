@@ -102,11 +102,12 @@ tcHsBootSigs :: HsValBinds Name -> TcM [Id]
 -- signatures in it.  The renamer checked all this
 tcHsBootSigs (ValBindsOut binds sigs)
   = do  { checkTc (null binds) badBootDeclErr
-        ; mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
+        ; concat <$> mapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
-    tc_boot_sig (TypeSig (L _ name) ty)
-      = do { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-           ; return (mkVanillaGlobal name sigma_ty) }
+    tc_boot_sig (TypeSig lnames ty) = mapM f lnames
+      where
+        f (L _ name) = do  { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
+                           ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
@@ -177,7 +178,7 @@ tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
               ; ty_sigs = filter isTypeLSig sigs
               ; sig_fn  = mkSigFun ty_sigs }
 
-        ; poly_ids <- checkNoErrs (mapAndRecoverM tcTySig ty_sigs)
+        ; poly_ids <- concat <$> checkNoErrs (mapAndRecoverM tcTySig ty_sigs)
                 -- No recovery from bad signatures, because the type sigs
                 -- may bind type variables, so proceeding without them
                 -- can lead to a cascade of errors
@@ -559,22 +560,29 @@ tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
 tcImpPrags prags
   = do { this_mod <- getModule
        ; dflags <- getDOpts
-       ; if not (dopt Opt_Specialise dflags) then
-            return []    -- Ignore SPECIALISE pragmas for imported things
-	    	   	 -- when -O is not on; otherwise we get bogus 
-			 -- complaints about lack of INLINABLE pragmas 
-			 -- in the imported module (also compiled without -O)
-			 -- Notably, when Haddocking the base library
+       ; if (not_specialising dflags) then
+            return []
          else
             mapAndRecoverM (wrapLocM tcImpSpec) 
             [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
                                , not (nameIsLocalOrFrom this_mod name) ] }
+  where
+    -- Ignore SPECIALISE pragmas for imported things
+    -- when we aren't specialising, or when we aren't generating
+    -- code.  The latter happens when Haddocking the base library;
+    -- we don't wnat complaints about lack of INLINABLE pragmas 
+    not_specialising dflags
+      | not (dopt Opt_Specialise dflags) = True
+      | otherwise = case hscTarget dflags of
+                      HscNothing -> True
+                      HscInterpreted -> True
+                      _other         -> False
 
 tcImpSpec :: (Name, Sig Name) -> TcM TcSpecPrag
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
-      ; checkTc (isAnyInlinePragma (idInlinePragma id))
-                (impSpecErr name)
+      ; unless (isAnyInlinePragma (idInlinePragma id))
+               (addWarnTc (impSpecErr name))
       ; tcSpec id prag }
 
 impSpecErr :: Name -> SDoc
@@ -591,7 +599,7 @@ impSpecErr name
 tcVectDecls :: [LVectDecl Name] -> TcM ([LVectDecl TcId])
 tcVectDecls decls 
   = do { decls' <- mapM (wrapLocM tcVect) decls
-       ; let ids  = [unLoc id | L _ (HsVect id _) <- decls']
+       ; let ids  = map lvectDeclName decls'
              dups = findDupsEq (==) ids
        ; mapM_ reportVectDups dups
        ; traceTcConstraints "End of tcVectDecls"
@@ -641,6 +649,11 @@ tcVect (HsVect name@(L loc _) (Just rhs))
         -- We return the type-checked 'Id', to propagate the inferred signature
         -- to the vectoriser - see "Note [Typechecked vectorisation pragmas]" in HsDecls
        ; return $ HsVect (L loc id') (Just rhsWrapped)
+       }
+tcVect (HsNoVect name)
+  = addErrCtxt (vectCtxt name) $
+    do { id <- wrapLocM tcLookupId name
+       ; return $ HsNoVect id
        }
 
 vectCtxt :: Located Name -> SDoc
@@ -1068,10 +1081,12 @@ mkSigFun :: [LSig Name] -> SigFun
 -- Precondition: no duplicates
 mkSigFun sigs = lookupNameEnv env
   where
-    env = mkNameEnv (mapCatMaybes mk_pair sigs)
-    mk_pair (L loc (TypeSig (L _ name) lhs_ty)) = Just (name, (hsExplicitTvs lhs_ty, loc))
-    mk_pair (L loc (IdSig id))                  = Just (idName id, ([], loc))
-    mk_pair _                                   = Nothing    
+    env = mkNameEnv (concatMap mk_pair sigs)
+    mk_pair (L loc (IdSig id))              = [(idName id, ([], loc))]
+    mk_pair (L loc (TypeSig lnames lhs_ty)) = map f lnames
+      where
+        f (L _ name) = (name, (hsExplicitTvs lhs_ty, loc))
+    mk_pair _                               = []
         -- The scoped names are the ones explicitly mentioned
         -- in the HsForAll.  (There may be more in sigma_ty, because
         -- of nested type synonyms.  See Note [More instantiated than scoped].)
@@ -1079,13 +1094,14 @@ mkSigFun sigs = lookupNameEnv env
 \end{code}
 
 \begin{code}
-tcTySig :: LSig Name -> TcM TcId
-tcTySig (L span (TypeSig (L _ name) ty))
-  = setSrcSpan span             $
-    do  { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-        ; return (mkLocalId name sigma_ty) }
+tcTySig :: LSig Name -> TcM [TcId]
+tcTySig (L span (TypeSig names ty))
+  = setSrcSpan span $ mapM f names
+  where
+    f (L _ name) = do  { sigma_ty <- tcHsSigType (FunSigCtxt name) ty
+                       ; return (mkLocalId name sigma_ty) }
 tcTySig (L _ (IdSig id))
-  = return id
+  = return [id]
 tcTySig s = pprPanic "tcTySig" (ppr s)
 
 -------------------

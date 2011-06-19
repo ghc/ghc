@@ -15,8 +15,8 @@ module Linker ( HValue, getHValue, showLinkerState,
 		linkExpr, unload, withExtendedLinkEnv,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs, 
-		linkPackages,initDynLinker,
-                dataConInfoPtrToName
+		linkPackages,initDynLinker,linkModule,
+                dataConInfoPtrToName, lessUnsafeCoerce
 	) where
 
 #include "HsVersions.h"
@@ -54,6 +54,8 @@ import UniqSet
 import Constants
 import FastString
 import Config
+
+import GHC.Exts (unsafeCoerce#)
 
 -- Standard libraries
 import Control.Monad
@@ -264,6 +266,7 @@ dataConInfoPtrToName x = do
 -- Throws a 'ProgramError' if loading fails or the name cannot be found.
 getHValue :: HscEnv -> Name -> IO HValue
 getHValue hsc_env name = do
+  initDynLinker (hsc_dflags hsc_env)
   pls <- modifyMVar v_PersistentLinkerState $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [nameModule name]
@@ -277,6 +280,7 @@ linkDependencies :: HscEnv -> PersistentLinkerState
                  -> SrcSpan -> [Module]
                  -> IO (PersistentLinkerState, SuccessFlag)
 linkDependencies hsc_env pls span needed_mods = do
+--   initDynLinker (hsc_dflags hsc_env)
    let hpt = hsc_HPT hsc_env
        dflags = hsc_dflags hsc_env
 	-- The interpreter and dynamic linker can only handle object code built
@@ -696,6 +700,38 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 	    adjust_ul _ _ = panic "adjust_ul"
 \end{code}
 
+%************************************************************************
+%*									*
+              Loading a single module
+%*									*
+%************************************************************************
+\begin{code}
+
+-- | Link a single module
+linkModule :: HscEnv -> Module -> IO ()
+linkModule hsc_env mod = do
+  initDynLinker (hsc_dflags hsc_env)
+  modifyMVar v_PersistentLinkerState $ \pls -> do
+    (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
+    if (failed ok) then ghcError (ProgramError "could not link module")
+      else return (pls',())
+
+-- | Coerce a value as usual, but:
+--
+-- 1) Evaluate it immediately to get a segfault early if the coercion was wrong
+--
+-- 2) Wrap it in some debug messages at verbosity 3 or higher so we can see what happened
+--    if it /does/ segfault
+lessUnsafeCoerce :: DynFlags -> String -> a -> IO b
+lessUnsafeCoerce dflags context what = do
+    debugTraceMsg dflags 3 $ (ptext $ sLit "Coercing a value in") <+> (text context) <> (ptext $ sLit "...")
+    output <- evaluate (unsafeCoerce# what)
+    debugTraceMsg dflags 3 $ ptext $ sLit "Successfully evaluated coercion"
+    return output
+
+
+
+\end{code}
 
 %************************************************************************
 %*									*
@@ -997,6 +1033,7 @@ linkPackages :: DynFlags -> [PackageId] -> IO ()
 linkPackages dflags new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
+  initDynLinker dflags
   modifyMVar_ v_PersistentLinkerState $ \pls -> do
     linkPackages' dflags new_pkgs pls
 

@@ -10,6 +10,8 @@ import TcSMonad   ( TcS, Xi
                   , mkFrozenError
                   , traceTcS
                   , WorkList, unionWorkList, emptyWorkList
+                  , workListFromEqs, workListFromNonEqs
+                  , isCFunEqCan_Maybe, isCTyEqCan
                   )
 import TcRnTypes  ( CtFlavor(..) )
 import TcCanonical (mkCanonicals)
@@ -26,8 +28,8 @@ import Outputable
 import PrelNames  ( lessThanEqualClassName
                   , addTyFamName, mulTyFamName, expTyFamName
                   )
-import Bag        (bagToList, emptyBag, unionManyBags, unionBags)
-import Data.Maybe (fromMaybe, listToMaybe, maybeToList)
+import Bag        (bagToList, unionManyBags, unionBags, partitionBag)
+import Data.Maybe (fromMaybe, listToMaybe, maybeToList, isJust)
 import Data.List  (nub, partition, sort)
 import Control.Monad (msum, mplus, zipWithM, (<=<), guard)
 
@@ -109,21 +111,22 @@ toProp p = panic $
 -- XXX: Not doing anything, just trying to get things to compile.
 canonicalNum :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
                 TcS NumericsResult
-canonicalNum _given _derived _wanted prop =
-  return NumericsResult { numInert    = Nothing
-                        , numNewWork  = emptyWorkList
-                        , numNext     = Just prop
-                        }
-
-{-
+canonicalNum given derived wanted prop =
   case cc_flavor prop of
     Wanted {}   -> solveNumWanted given derived wanted prop
     Derived {}  -> addNumDerived  given derived wanted prop
     Given {}    -> addNumGiven    given derived wanted prop
+
+{- Disables the solver.
+  return NumericsResult { numInert    = Nothing
+                        , numNewWork  = emptyWorkList
+                        , numNext     = Just prop
+                        }
 -}
 
 
-{-
+
+
 solveNumWanted :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
                 TcS NumericsResult
 solveNumWanted given derived wanted prop =
@@ -181,13 +184,13 @@ addNumDerived given derived wanted prop =
             goals <- mkCanonicals (Derived (getWantedLoc prop)) evs
             return NumericsResult
               { numNext = Just prop, numInert = Just (unionBags given derived)
-              , numNewWork = unionWorkList wanted goals }
+              , numNewWork = unionWorkList (reconsider wanted) goals }
 
        Impossible -> impossible prop
 
 
-addNumGiven :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
-              TcS NumericsResult
+addNumGiven :: CanonicalCts -> CanonicalCts -> CanonicalCts
+            -> CanonicalCt -> TcS NumericsResult
 addNumGiven given derived wanted prop =
   do let asmps = map toProp (bagToList given)
          goal  = toProp prop
@@ -208,10 +211,16 @@ addNumGiven given derived wanted prop =
             facts <- mkCanonicals (cc_flavor prop) evs
             return NumericsResult
               { numNext = Just prop, numInert = Just (unionBags given derived)
-              , numNewWork = unionWorkList wanted facts }
+              , numNewWork = unionWorkList (reconsider wanted) facts }
 
        Impossible -> impossible prop
--}
+
+
+reconsider :: CanonicalCts -> WorkList
+reconsider cs = let (eqs,non) = partitionBag isEq cs
+                in unionWorkList (workListFromEqs eqs) (workListFromNonEqs non)
+  where isEq c = isCTyEqCan c || isJust (isCFunEqCan_Maybe c)
+
 
 impossible :: CanonicalCt -> TcS NumericsResult
 impossible c =

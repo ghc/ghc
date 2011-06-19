@@ -701,6 +701,8 @@ whenC :: Bool -> Code -> Code
 whenC True  code = code
 whenC False _    = nopC
 
+-- Corresponds to 'emit' in new code generator with a smart constructor
+-- from cmm/MkGraph.hs
 stmtC :: CmmStmt -> Code
 stmtC stmt = emitCgStmt (CgStmt stmt)
 
@@ -741,7 +743,7 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProc :: CmmInfo -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
+emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
 emitProc info lbl [] blocks
   = do  { let proc_block = CmmProc info lbl (ListGraph blocks)
 	; state <- getState

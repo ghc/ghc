@@ -147,7 +147,7 @@ stmtToInstrs env stmt = case stmt of
 
 
 -- | Foreign Calls
-genCall :: LlvmEnv -> CmmCallTarget -> HintedCmmFormals -> HintedCmmActuals
+genCall :: LlvmEnv -> CmmCallTarget -> [HintedCmmFormal] -> [HintedCmmActual]
               -> CmmReturnInfo -> UniqSM StmtData
 
 -- Write barrier needs to be handled specially as it is implemented as an LLVM
@@ -347,7 +347,7 @@ getFunPtr env funTy targ = case targ of
 
 -- | Conversion of call arguments.
 arg_vars :: LlvmEnv
-         -> HintedCmmActuals
+         -> [HintedCmmActual]
          -> ([LlvmVar], LlvmStatements, [LlvmCmmTop])
          -> UniqSM (LlvmEnv, [LlvmVar], LlvmStatements, [LlvmCmmTop])
 
