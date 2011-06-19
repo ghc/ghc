@@ -34,8 +34,6 @@
 #
 # We use libffi's own configuration stuff.
 
-PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
-
 # 2007-07-05
 # Passing
 #     as_ln_s='cp -p'
@@ -107,6 +105,8 @@ $(libffi_STAMP_CONFIGURE):
 	cat ghc-tarballs/libffi/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
 	mv libffi/libffi-* libffi/build
 	chmod +x libffi/ln
+	# don't report nonselinux systems as selinux
+	cd libffi/build && "$(PATCH_CMD)" -p0 < ../libffi.selinux-detection-3.0.8.patch
 
 # Because -Werror may be in SRC_CC_OPTS/SRC_LD_OPTS, we need to turn
 # warnings off or the compilation of libffi might fail due to warnings
@@ -114,16 +114,16 @@ $(libffi_STAMP_CONFIGURE):
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
 	    cd build && \
-	    CC=$(WhatGccIsCalled) \
+	    CC=$(CC_STAGE1) \
 	    LD=$(LD) \
-	    AR=$(AR) \
+	    AR=$(AR_STAGE1) \
 	    NM=$(NM) \
         CFLAGS="$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -w" \
         LDFLAGS="$(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE1) -w" \
         "$(SHELL)" configure \
 	          --enable-static=yes \
 	          --enable-shared=$(libffi_EnableShared) \
-	          --host=$(PLATFORM) --build=$(PLATFORM)
+	          --host=$(HOSTPLATFORM) --build=$(BUILDPLATFORM)
 
 	# libffi.so needs to be built with the correct soname.
 	# NOTE: this builds libffi_convience.so with the incorrect
@@ -177,7 +177,7 @@ $(eval $(call all-target,libffi,$(INSTALL_HEADERS) $(INSTALL_LIBS)))
 libffi/dist-install/build/HSffi.o: libffi/dist-install/build/libHSffi.a
 	cd libffi/dist-install/build && \
 	  touch empty.c && \
-	  "$(CC)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -c empty.c -o HSffi.o
+	  "$(CC_STAGE1)" $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE1) -c empty.c -o HSffi.o
 
 $(eval $(call all-target,libffi,libffi/dist-install/build/HSffi.o))
 
@@ -225,4 +225,3 @@ $(eval $(call manual-package-config,libffi))
 # binary-dist
 
 BINDIST_EXTRAS += libffi/package.conf.in
-

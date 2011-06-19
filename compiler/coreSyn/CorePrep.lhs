@@ -18,6 +18,7 @@ import CoreFVs
 import CoreMonad	( endPass, CoreToDo(..) )
 import CoreSyn
 import CoreSubst
+import OccurAnal        ( occurAnalyseExpr )
 import Type
 import Coercion
 import TyCon
@@ -36,6 +37,7 @@ import OrdList
 import ErrUtils
 import DynFlags
 import Util
+import Pair
 import Outputable
 import MonadUtils
 import FastString
@@ -77,9 +79,9 @@ The goal of this pass is to prepare for code generation.
     weaker guarantee of no clashes which the simplifier provides.
     And that is what the code generator needs.
 
-    We don't clone TyVars. The code gen doesn't need that, 
+    We don't clone TyVars or CoVars. The code gen doesn't need that, 
     and doing so would be tiresome because then we'd need
-    to substitute in types.
+    to substitute in types and coercions.
 
 
 7.  Give each dynamic CCall occurrence a fresh unique; this is
@@ -103,19 +105,21 @@ Invariants
 Here is the syntax of the Core produced by CorePrep:
 
     Trivial expressions 
-       triv ::= lit |  var  | triv ty  |  /\a. triv  |  triv |> co
+       triv ::= lit |  var  
+              | triv ty  |  /\a. triv 
+              | truv co  |  /\c. triv  |  triv |> co
 
     Applications
-       app ::= lit  |  var  |  app triv  |  app ty  |  app |> co
+       app ::= lit  |  var  |  app triv  |  app ty  | app co | app |> co
 
     Expressions
        body ::= app  
               | let(rec) x = rhs in body     -- Boxed only
               | case body of pat -> body
-	      | /\a. body
+	      | /\a. body | /\c. body 
               | body |> co
 
-    Right hand sides (only place where lambdas can occur)
+    Right hand sides (only place where value lambdas can occur)
        rhs ::= /\a.rhs  |  \x.rhs  |  body
 
 We define a synonym for each of these non-terminals.  Functions
@@ -246,6 +250,61 @@ give a loop).  As Lennart says: the ice is thin here, but it works.
 Hmm.  Should we create bindings for dictionary constructors?  They are
 always fully applied, and the bindings are just there to support
 partial applications. But it's easier to let them through.
+
+
+Note [Dead code in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Imagine that we got an input program like this:
+
+  f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
+  f x = (g True (Just x) + g () (Just x), g)
+    where
+      g :: Show a => a -> Maybe Int -> Int
+      g _ Nothing = x
+      g y (Just z) = if z > 100 then g y (Just (z + length (show y))) else g y unknown
+
+After specialisation and SpecConstr, we would get something like this:
+
+  f :: Show b => Int -> (Int, b -> Maybe Int -> Int)
+  f x = (g$Bool_True_Just x + g$Unit_Unit_Just x, g)
+    where
+      {-# RULES g $dBool = g$Bool 
+                g $dUnit = g$Unit #-}
+      g = ...
+      {-# RULES forall x. g$Bool True (Just x) = g$Bool_True_Just x #-}
+      g$Bool = ...
+      {-# RULES forall x. g$Unit () (Just x) = g$Unit_Unit_Just x #-}
+      g$Unit = ...
+      g$Bool_True_Just = ...
+      g$Unit_Unit_Just = ...
+
+Note that the g$Bool and g$Unit functions are actually dead code: they are only kept
+alive by the occurrence analyser because they are referred to by the rules of g,
+which is being kept alive by the fact that it is used (unspecialised) in the returned pair.
+
+However, at the CorePrep stage there is no way that the rules for g will ever fire,
+and it really seems like a shame to produce an output program that goes to the trouble
+of allocating a closure for the unreachable g$Bool and g$Unit functions.
+
+The way we fix this is to:
+ * In cloneBndr, drop all unfoldings/rules
+ * In deFloatTop, run the occurrence analyser on each top-level RHS to drop
+   the dead local bindings
+
+The reason we don't just OccAnal the whole output of CorePrep is that the tidier
+ensures that all top-level binders are GlobalIds, so they don't show up in the free
+variables any longer. So if you run the occurrence analyser on the output of CoreTidy
+(or later) you e.g. turn this program:
+
+  Rec {
+  f = ... f ...
+  }
+
+Into this one:
+
+  f = ... f ...
+
+(Since f is not considered to be free in its own RHS.)
 
 
 %************************************************************************
@@ -384,9 +443,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --	f (g x)	  ===>   ([v = g x], f v)
 
-cpeRhsE _env expr@(Type _) = return (emptyFloats, expr)
-cpeRhsE _env expr@(Lit _)  = return (emptyFloats, expr)
-cpeRhsE env expr@(Var {})  = cpeApp env expr
+cpeRhsE _env expr@(Type {})     = return (emptyFloats, expr)
+cpeRhsE _env expr@(Coercion {}) = return (emptyFloats, expr)
+cpeRhsE _env expr@(Lit {})      = return (emptyFloats, expr)
+cpeRhsE env expr@(Var {})       = cpeApp env expr
 
 cpeRhsE env (Var f `App` _ `App` arg)
   | f `hasKey` lazyIdKey  	  -- Replace (lazy a) by a
@@ -472,7 +532,7 @@ rhsToBody (Cast e co)
 rhsToBody expr@(Lam {})
   | Just no_lam_result <- tryEtaReducePrep bndrs body
   = return (emptyFloats, no_lam_result)
-  | all isTyCoVar bndrs		-- Type lambdas are ok
+  | all isTyVar bndrs		-- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise			-- Some value lambdas
   = do { fn <- newVar (exprType expr)
@@ -523,6 +583,10 @@ cpeApp env expr
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun depth
            ; return (App fun' arg, hd, applyTy fun_ty arg_ty, floats, ss) }
 
+    collect_args (App fun arg@(Coercion arg_co)) depth
+      = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun depth
+           ; return (App fun' arg, hd, applyCo fun_ty arg_co, floats, ss) }
+
     collect_args (App fun arg) depth
       = do { (fun',hd,fun_ty,floats,ss) <- collect_args fun (depth+1)
       	   ; let
@@ -552,7 +616,7 @@ cpeApp env expr
 		-- partial application might be seq'd
 
     collect_args (Cast fun co) depth
-      = do { let (_ty1,ty2) = coercionKind co
+      = do { let Pair _ty1 ty2 = coercionKind co
            ; (fun', hd, _, floats, ss) <- collect_args fun depth
            ; return (Cast fun' co, hd, ty2, floats, ss) }
           
@@ -695,11 +759,12 @@ cpe_ExprIsTrivial :: CoreExpr -> Bool
 -- Version that doesn't consider an scc annotation to be trivial.
 cpe_ExprIsTrivial (Var _)                  = True
 cpe_ExprIsTrivial (Type _)                 = True
+cpe_ExprIsTrivial (Coercion _)             = True
 cpe_ExprIsTrivial (Lit _)                  = True
 cpe_ExprIsTrivial (App e arg)              = isTypeArg arg && cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Note n e)               = notSccNote n  && cpe_ExprIsTrivial e
 cpe_ExprIsTrivial (Cast e _)               = cpe_ExprIsTrivial e
-cpe_ExprIsTrivial (Lam b body) | isTyCoVar b = cpe_ExprIsTrivial body
+cpe_ExprIsTrivial (Lam b body) | isTyVar b = cpe_ExprIsTrivial body
 cpe_ExprIsTrivial _                        = False
 \end{code}
 
@@ -901,8 +966,12 @@ deFloatTop :: Floats -> [CoreBind]
 deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
-    get (FloatLet b) bs = b:bs
+    get (FloatLet b) bs = occurAnalyseRHSs b : bs
     get b            _  = pprPanic "corePrepPgm" (ppr b)
+    
+    -- See Note [Dead code in CorePrep]
+    occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr e)
+    occurAnalyseRHSs (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
 
 -------------------------------------------
 canFloatFromNoCaf ::  Floats -> CpeRhs -> Maybe (Floats, CpeRhs)
@@ -1010,13 +1079,19 @@ cloneBndrs env bs = mapAccumLM cloneBndr env bs
 
 cloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
 cloneBndr env bndr
-  | isLocalId bndr
+  | isLocalId bndr, not (isCoVar bndr)
   = do bndr' <- setVarUnique bndr <$> getUniqueM
-       return (extendCorePrepEnv env bndr bndr', bndr')
+       
+       -- We are going to OccAnal soon, so drop (now-useless) rules/unfoldings
+       -- so that we can drop more stuff as dead code.
+       -- See also Note [Dead code in CorePrep]
+       let bndr'' = bndr' `setIdUnfolding` noUnfolding
+                          `setIdSpecialisation` emptySpecInfo
+       return (extendCorePrepEnv env bndr bndr'', bndr'')
 
   | otherwise	-- Top level things, which we don't want
 		-- to clone, have become GlobalIds by now
-		-- And we don't clone tyvars
+		-- And we don't clone tyvars, or coercion variables
   = return (env, bndr)
   
 

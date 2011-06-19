@@ -53,24 +53,32 @@
  *
  * ------------------------------------------------------------------------- */
 
+// A count of blocks needs to store anything up to the size of memory
+// divided by the block size.  The safest thing is therefore to use a
+// type that can store the full range of memory addresses,
+// ie. StgWord.  Note that we have had some tricky int overflows in a
+// couple of cases caused by using ints rather than longs (e.g. #5086)
+
+typedef StgWord memcount;
+
 typedef struct nursery_ {
     bdescr *       blocks;
-    unsigned int   n_blocks;
+    memcount       n_blocks;
 } nursery;
 
 typedef struct generation_ {
     unsigned int   no;			// generation number
 
     bdescr *       blocks;	        // blocks in this gen
-    unsigned int   n_blocks;	        // number of blocks
-    unsigned int   n_words;             // number of used words
+    memcount       n_blocks;            // number of blocks
+    memcount       n_words;             // number of used words
 
     bdescr *       large_objects;	// large objects (doubly linked)
-    unsigned int   n_large_blocks;      // no. of blocks used by large objs
-    unsigned long  n_new_large_words;   // words of new large objects
+    memcount       n_large_blocks;      // no. of blocks used by large objs
+    memcount       n_new_large_words;   // words of new large objects
                                         // (for allocation stats)
 
-    unsigned int   max_blocks;		// max blocks
+    memcount       max_blocks;          // max blocks
 
     StgTSO *       threads;             // threads in this gen
                                         // linked via global_link
@@ -98,11 +106,11 @@ typedef struct generation_ {
     // are copied into the following two fields.  After GC, these blocks
     // are freed.
     bdescr *     old_blocks;	        // bdescr of first from-space block
-    unsigned int n_old_blocks;		// number of blocks in from-space
-    unsigned int live_estimate;         // for sweeping: estimate of live data
+    memcount     n_old_blocks;         // number of blocks in from-space
+    memcount     live_estimate;         // for sweeping: estimate of live data
     
     bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
-    unsigned int n_scavenged_large_blocks; // size (not count) of above
+    memcount     n_scavenged_large_blocks; // size (not count) of above
 
     bdescr *     bitmap;  		// bitmap for compacting collection
 

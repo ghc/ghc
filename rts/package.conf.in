@@ -146,7 +146,7 @@ ld-options:
 	 , "-Wl,-search_paths_first"
 #endif
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS) && !defined(x86_64_HOST_ARCH)
          , "-read_only_relocs", "warning"
 #endif
 

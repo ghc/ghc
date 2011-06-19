@@ -132,10 +132,15 @@ if test "$WithGhc" != ""; then
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
   if test $GhcCanonVersion -ge 613; then ghc_ge_613=YES; else ghc_ge_613=NO; fi
   AC_SUBST(ghc_ge_613)dnl
+
+  BOOTSTRAPPING_GHC_INFO_FIELD([CC_STAGE0],[C compiler command],['$(CC)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command],['$(AR)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags],['$(AR_OPTS)'])
+  BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file],['$(ArSupportsAtFile)'])
 fi
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
+if test "$BootingFromHc" = "NO"; then
   if test "$WithGhc" = ""; then
      AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
   fi
@@ -200,72 +205,7 @@ AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
-# If no argument was given for a configuration variable, then discard
-# the guessed canonical system and use the configuration of the
-# bootstrapping ghc. If an argument was given, map it from gnu format
-# to ghc format.
-#
-# For why we do it this way, see: #3637, #1717, #2951
-
-if test "$build_alias" = ""
-then
-    if test "${WithGhc}" != ""
-    then
-        build=$bootstrap_target
-        echo "Build platform inferred as: $build"
-    else
-        echo "Can't work out build platform"
-        exit 1
-    fi
-
-    BuildArch=`echo "$build" | sed 's/-.*//'`
-    BuildVendor=`echo "$build" | sed -e 's/.*-\(.*\)-.*/\1/'`
-    BuildOS=`echo "$build" | sed 's/.*-//'`
-else
-    GHC_CONVERT_CPU([$build_cpu], [BuildArch])
-    GHC_CONVERT_VENDOR([$build_vendor], [BuildVendor])
-    GHC_CONVERT_OS([$build_os], [BuildOS])
-fi
-
-if test "$host_alias" = ""
-then
-    if test "${WithGhc}" != ""
-    then
-        host=$bootstrap_target
-        echo "Host platform inferred as: $host"
-    else
-        echo "Can't work out host platform"
-        exit 1
-    fi
-
-    HostArch=`echo "$host" | sed 's/-.*//'`
-    HostVendor=`echo "$host" | sed -e 's/.*-\(.*\)-.*/\1/'`
-    HostOS=`echo "$host" | sed 's/.*-//'`
-else
-    GHC_CONVERT_CPU([$host_cpu], [HostArch])
-    GHC_CONVERT_VENDOR([$host_vendor], [HostVendor])
-    GHC_CONVERT_OS([$host_os], [HostOS])
-fi
-
-if test "$target_alias" = ""
-then
-    if test "${WithGhc}" != ""
-    then
-        target=$bootstrap_target
-        echo "Target platform inferred as: $target"
-    else
-        echo "Can't work out target platform"
-        exit 1
-    fi
-
-    TargetArch=`echo "$target" | sed 's/-.*//'`
-    TargetVendor=`echo "$target" | sed -e 's/.*-\(.*\)-.*/\1/'`
-    TargetOS=`echo "$target" | sed 's/.*-//'`
-else
-    GHC_CONVERT_CPU([$target_cpu], [TargetArch])
-    GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
-    GHC_CONVERT_OS([$target_os], [TargetOS])
-fi
+FPTOOLS_SET_PLATFORM_VARS
 
 exeext=''
 soext='.so'
@@ -287,7 +227,21 @@ x86_64-apple-darwin)
     ;;
 esac
 
-# Sync this with cTargetArch in compiler/ghc.mk
+# Testing if we shall enable shared libs support on Solaris.
+# Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
+
+SOLARIS_BROKEN_SHLD=NO
+
+case $host in
+     i386-*-solaris2)
+     # here we go with the test
+     MINOR=`uname -r|cut -d '.' -f 2-`
+     if test "$MINOR" -lt "11"; then
+     	SOLARIS_BROKEN_SHLD=YES
+     fi
+     ;;
+esac
+
 checkArch() {
     case $1 in
     alpha|arm|hppa|hppa1_1|i386|ia64|m68k|mips|mipseb|mipsel|powerpc|powerpc64|rs6000|s390|sparc|sparc64|vax|x86_64)
@@ -353,13 +307,20 @@ checkOS "$TargetOS"
 
 # Verify that the installed (bootstrap) GHC is capable of generating
 # code for the requested build platform.
-if test "$build" != "$bootstrap_target"
+if test "$BootingFromHc" = "NO"
 then
-    echo "This GHC (${WithGhc}) does not generate code for the build platform"
-    echo "   GHC target platform    : $bootstrap_target"
-    echo "   Desired build platform : $BuildPlatform"
-    exit 1
+    if test "$BuildPlatform" != "$bootstrap_target"
+    then
+        echo "This GHC (${WithGhc}) does not generate code for the build platform"
+        echo "   GHC target platform    : $bootstrap_target"
+        echo "   Desired build platform : $BuildPlatform"
+        exit 1
+    fi
 fi
+
+echo "GHC build  : $BuildPlatform"
+echo "GHC host   : $HostPlatform"
+echo "GHC target : $TargetPlatform"
 
 AC_SUBST(BuildPlatform)
 AC_SUBST(HostPlatform)
@@ -382,6 +343,8 @@ AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 AC_SUBST(soext)
+
+AC_SUBST(SOLARIS_BROKEN_SHLD)
 
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
@@ -479,6 +442,41 @@ FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
 NmCmd="$NM"
 AC_SUBST([NmCmd])
 
+SplitObjsBroken=NO
+if test "$TargetOS_CPP" = "darwin"
+then
+    AC_MSG_CHECKING(XCode version)
+    XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`
+    # Old XCode versions don't actually give the XCode version
+    if test "$XCodeVersion" = ""
+    then
+        AC_MSG_RESULT(not found (too old?))
+        SplitObjsBroken=YES
+    else
+        AC_MSG_RESULT($XCodeVersion)
+        XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+changequote(, )dnl
+        XCodeVersion2=`echo "$XCodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
+changequote([, ])dnl
+        AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
+        AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
+        # Split objects is broken (#4013) with XCode < 3.2
+        if test "$XCodeVersion1" -lt 3
+        then
+            SplitObjsBroken=YES
+        else
+            if test "$XCodeVersion1" -eq 3
+            then
+                if test "$XCodeVersion2" -lt 2
+                then
+                    SplitObjsBroken=YES
+                fi
+            fi
+        fi
+    fi
+fi
+AC_SUBST([SplitObjsBroken])
+
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
 AC_ARG_WITH([macosx-deployment-target],
@@ -546,7 +544,7 @@ dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
 dnl     If gcc, make sure it's at least 2.1
 dnl
-FP_HAVE_GCC
+FP_GCC_VERSION
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -587,7 +585,6 @@ AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
 dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_NEEDS_RANLIB
-FP_PROG_AR_SUPPORTS_INPUT
 
 dnl ** Check to see whether ln -s works
 AC_PROG_LN_S
@@ -612,7 +609,7 @@ dnl ** check for dtrace (currently only implemented for Mac OS X)
 HaveDtrace=NO
 AC_PATH_PROG(DtraceCmd,dtrace)
 if test -n "$DtraceCmd"; then
-  if test "x$TargetOS_CPP-$TargetVendor_CPP" == "xdarwin-apple"; then
+  if test "x$TargetOS_CPP-$TargetVendor_CPP" == "xdarwin-apple" -o "x$TargetOS_CPP-$TargetVendor_CPP" == "xsolaris2-unknown"; then
     HaveDtrace=YES
   fi
 fi
@@ -632,8 +629,6 @@ dnl ** check for DocBook toolchain
 FP_CHECK_DOCBOOK_DTD
 FP_DOCBOOK_XSL
 FP_PROG_DBLATEX
-
-FP_PROG_HSTAGS
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -787,7 +782,7 @@ fi
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
 dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
-AC_CHECK_LIB(bfd,    bfd_init)
+AC_CHECK_LIB(bfd,    bfd_uncompress_section_contents)
 
 dnl ################################################################
 dnl Check for libraries
@@ -825,6 +820,7 @@ FP_LEADING_UNDERSCORE
 dnl ** check for ld, whether it has an -x option, and if it is GNU ld
 FP_PROG_LD_X
 FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
 
 dnl ** check for Apple-style dead-stripping support
 dnl    (.subsections-via-symbols assembler directive)
@@ -939,7 +935,7 @@ if grep '	' compiler/ghc.cabal.in 2>&1 >/dev/null; then
    AC_MSG_ERROR([compiler/ghc.cabal.in contains tab characters; please remove them])
 fi
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/ghc.iss distrib/configure.ac distrib/MacOS/installer-scripts/create-links distrib/MacOS/installer-scripts/Uninstaller distrib/MacOS/GHC-system.pmdoc/index.xml])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal ghc.spec settings docs/users_guide/ug-book.xml docs/users_guide/ug-ent.xml docs/index.html libraries/prologue.txt distrib/ghc.iss distrib/configure.ac])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
 

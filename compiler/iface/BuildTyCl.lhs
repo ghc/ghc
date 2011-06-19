@@ -10,7 +10,8 @@ module BuildTyCl (
         buildDataCon,
 	TcMethInfo, buildClass,
 	mkAbstractTyConRhs, 
-	mkNewTyConRhs, mkDataTyConRhs
+	mkNewTyConRhs, mkDataTyConRhs, 
+        newImplicitBinder
     ) where
 
 #include "HsVersions.h"
@@ -59,13 +60,12 @@ buildAlgTyCon :: Name -> [TyVar]
 	      -> ThetaType		-- ^ Stupid theta
 	      -> AlgTyConRhs
 	      -> RecFlag
-	      -> Bool			-- ^ True <=> want generics functions
 	      -> Bool			-- ^ True <=> was declared in GADT syntax
               -> TyConParent
 	      -> Maybe (TyCon, [Type])  -- ^ family instance if applicable
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
+buildAlgTyCon tc_name tvs stupid_theta rhs is_rec gadt_syn
 	      parent mb_family
   | Just fam_inst_info <- mb_family
   = -- We need to tie a knot as the coercion of a data instance depends
@@ -74,11 +74,11 @@ buildAlgTyCon tc_name tvs stupid_theta rhs is_rec want_generics gadt_syn
     fixM $ \ tycon_rec -> do 
     { fam_parent <- mkFamInstParentInfo tc_name tvs fam_inst_info tycon_rec
     ; return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
-		         fam_parent is_rec want_generics gadt_syn) }
+		         fam_parent is_rec gadt_syn) }
 
   | otherwise
   = return (mkAlgTyCon tc_name kind tvs stupid_theta rhs
-	               parent is_rec want_generics gadt_syn)
+	               parent is_rec gadt_syn)
   where
     kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
@@ -100,8 +100,8 @@ mkFamInstParentInfo :: Name -> [TyVar]
 mkFamInstParentInfo tc_name tvs (family, instTys) rep_tycon
   = do { -- Create the coercion
        ; co_tycon_name <- newImplicitBinder tc_name mkInstTyCoOcc
-       ; let co_tycon = mkFamInstCoercion co_tycon_name tvs
-                                        family instTys rep_tycon
+       ; let co_tycon = mkFamInstCo co_tycon_name tvs
+                                    family instTys rep_tycon
        ; return $ FamInstTyCon family instTys co_tycon }
     
 ------------------------------------------------------
@@ -127,23 +127,15 @@ mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs
 --   because the latter is part of a knot, whereas the former is not.
 mkNewTyConRhs tycon_name tycon con 
   = do	{ co_tycon_name <- newImplicitBinder tycon_name mkNewTyCoOcc
-	; let co_tycon = mkNewTypeCoercion co_tycon_name tycon etad_tvs etad_rhs
-              cocon_maybe | all_coercions || isRecursiveTyCon tycon 
-		          = Just co_tycon
-                	  | otherwise              
-                	  = Nothing
-	; traceIf (text "mkNewTyConRhs" <+> ppr cocon_maybe)
+	; let co_tycon = mkNewTypeCo co_tycon_name tycon etad_tvs etad_rhs
+	; traceIf (text "mkNewTyConRhs" <+> ppr co_tycon)
 	; return (NewTyCon { data_con    = con, 
 		       	     nt_rhs      = rhs_ty,
 		       	     nt_etad_rhs = (etad_tvs, etad_rhs),
- 		       	     nt_co 	 = cocon_maybe } ) }
+ 		       	     nt_co 	 = co_tycon } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
   where
-        -- If all_coercions is True then we use coercions for all newtypes
-        -- otherwise we use coercions for recursive newtypes and look through
-        -- non-recursive newtypes
-    all_coercions = True
     tvs    = tyConTyVars tycon
     inst_con_ty = applyTys (dataConUserType con) (mkTyVarTys tvs)
     rhs_ty = ASSERT( isFunTy inst_con_ty ) funArgTy inst_con_ty
@@ -156,7 +148,7 @@ mkNewTyConRhs tycon_name tycon con
   	-- has a single argument (Foo a) that is a *type class*, so
 	-- dataConInstOrigArgTys returns [].
 
-    etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCoercion can
+    etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCo can
     etad_rhs :: Type	-- return a TyCon without pulling on rhs_ty
 			-- See Note [Tricky iface loop] in LoadIface
     (etad_tvs, etad_rhs) = eta_reduce (reverse tvs) rhs_ty
@@ -229,8 +221,9 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
 ------------------------------------------------------
 \begin{code}
-type TcMethInfo = (Name, DefMethSpec, Type)  -- A temporary intermediate, to communicate 
-					     -- between tcClassSigs and buildClass
+type TcMethInfo = (Name, DefMethSpec, Type)  
+        -- A temporary intermediate, to communicate between 
+        -- tcClassSigs and buildClass.
 
 buildClass :: Bool		-- True <=> do not include unfoldings 
 				--	    on dict selectors
@@ -332,7 +325,8 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
     mk_op_item rec_clas (op_name, dm_spec, _) 
       = do { dm_info <- case dm_spec of
                           NoDM      -> return NoDefMeth
-                          GenericDM -> return GenDefMeth
+                          GenericDM -> do { dm_name <- newImplicitBinder op_name mkGenDefMethodOcc
+			  	          ; return (GenDefMeth dm_name) }
                           VanillaDM -> do { dm_name <- newImplicitBinder op_name mkDefaultMethodOcc
 			  	          ; return (DefMeth dm_name) }
            ; return (mkDictSelId no_unf op_name rec_clas, dm_info) }

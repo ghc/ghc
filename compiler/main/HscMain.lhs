@@ -58,11 +58,12 @@ module HscMain
     , hscParseIdentifier
     , hscTcRcLookupName
     , hscTcRnGetInfo
-    , hscRnImportDecls
 #ifdef GHCI
+    , hscRnImportDecls
     , hscGetModuleExports
     , hscTcRnLookupRdrName
-    , hscStmt, hscTcExpr, hscImport, hscKcType
+    , hscStmt, hscStmtWithLocation
+    , hscTcExpr, hscImport, hscKcType
     , hscCompileCoreExpr
 #endif
 
@@ -96,7 +97,6 @@ import SrcLoc
 import TcRnDriver
 import TcIface		( typecheckIface )
 import TcRnMonad
-import RnNames          ( rnImports )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
@@ -109,7 +109,8 @@ import CoreToStg	( coreToStg )
 import qualified StgCmm	( codeGen )
 import StgSyn
 import CostCentre
-import TyCon		( TyCon, isDataTyCon )
+import ProfInit
+import TyCon            ( TyCon, isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -161,9 +162,9 @@ import Data.IORef
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags
   = do 	{ eps_var <- newIORef initExternalPackageState
-	; us      <- mkSplitUniqSupply 'r'
-	; nc_var  <- newIORef (initNameCache us knownKeyNames)
-	; fc_var  <- newIORef emptyUFM
+        ; us      <- mkSplitUniqSupply 'r'
+        ; nc_var  <- newIORef (initNameCache us knownKeyNames)
+        ; fc_var  <- newIORef emptyUFM
 	; mlc_var <- newIORef emptyModuleEnv
         ; optFuel <- initOptFuelState
 	; return (HscEnv { hsc_dflags = dflags,
@@ -179,12 +180,13 @@ newHscEnv dflags
                            hsc_type_env_var = Nothing } ) }
 
 
-knownKeyNames :: [Name]	-- Put here to avoid loops involving DsMeta,
-			-- where templateHaskellNames are defined
-knownKeyNames = map getName wiredInThings 
-	      ++ basicKnownKeyNames
+knownKeyNames :: [Name]      -- Put here to avoid loops involving DsMeta,
+                             -- where templateHaskellNames are defined
+knownKeyNames
+  = map getName wiredInThings 
+    ++ basicKnownKeyNames
 #ifdef GHCI
-	      ++ templateHaskellNames
+    ++ templateHaskellNames
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -293,7 +295,6 @@ hscTcRnGetInfo hsc_env name =
 hscGetModuleExports :: HscEnv -> Module -> IO (Maybe [AvailInfo])
 hscGetModuleExports hsc_env mdl =
   runHsc hsc_env $ ioMsgMaybe' $ getModuleExports hsc_env mdl
-#endif
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
@@ -304,11 +305,14 @@ hscRnImportDecls
         -> [LImportDecl RdrName]
         -> IO GlobalRdrEnv
 
-hscRnImportDecls hsc_env this_mod import_decls = runHsc hsc_env $ do
-  (_, r, _, _) <- 
-       ioMsgMaybe $ initTc hsc_env HsSrcFile False this_mod $
-          rnImports import_decls
-  return r
+-- It is important that we use tcRnImports instead of calling rnImports directly
+-- because tcRnImports will force-load any orphan modules necessary, making extra
+-- instances/family instances visible (GHC #4832)
+hscRnImportDecls hsc_env this_mod import_decls
+  = runHsc hsc_env $ ioMsgMaybe $ initTc hsc_env HsSrcFile False this_mod $
+          fmap tcg_rdr_env $ tcRnImports hsc_env this_mod import_decls
+
+#endif
 
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
@@ -336,7 +340,7 @@ hscParse' mod_summary
             Just b  -> return b
             Nothing -> liftIO $ hGetStringBuffer src_filename
 
-   let loc  = mkSrcLoc (mkFastString src_filename) 1 1
+   let loc  = mkRealSrcLoc (mkFastString src_filename) 1 1
 
    case unP parseModule (mkPState dflags buf loc) of
      PFailed span err ->
@@ -426,7 +430,7 @@ makeSimpleDetails hsc_env tc_result = mkBootModDetailsTc hsc_env tc_result
 
 
 It's the task of the compilation proper to compile Haskell, hs-boot and
-core files to either byte-code, hard-code (C, asm, Java, ect) or to
+core files to either byte-code, hard-code (C, asm, LLVM, ect) or to
 nothing at all (the module is still parsed and type-checked. This
 feature is mostly used by IDE's and the likes).
 Compilation can happen in either 'one-shot', 'batch', 'nothing',
@@ -457,7 +461,8 @@ error. This is the only thing that isn't caught by the type-system.
 data HscStatus' a
     = HscNoRecomp
     | HscRecomp
-       Bool -- Has stub files.  This is a hack. We can't compile C files here
+       (Maybe FilePath)
+            -- Has stub files.  This is a hack. We can't compile C files here
             -- since it's done in DriverPipeline. For now we just return True
             -- if we want the caller to compile them for us.
        a
@@ -593,14 +598,14 @@ hscOneShotCompiler =
   , hscBackend = \ tc_result mod_summary mb_old_hash -> do
        dflags <- getDynFlags
        case hscTarget dflags of
-         HscNothing -> return (HscRecomp False ())
+         HscNothing -> return (HscRecomp Nothing ())
          _otherw    -> genericHscBackend hscOneShotCompiler
                                          tc_result mod_summary mb_old_hash
 
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, _) <- hscSimpleIface tc_result mb_old_iface
        hscWriteIface iface changed mod_summary
-       return (HscRecomp False ())
+       return (HscRecomp Nothing ())
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify' guts0
@@ -646,7 +651,7 @@ hscBatchCompiler =
   , hscGenBootOutput = \tc_result mod_summary mb_old_iface -> do
        (iface, changed, details) <- hscSimpleIface tc_result mb_old_iface
        hscWriteIface iface changed mod_summary
-       return (HscRecomp False (), iface, details)
+       return (HscRecomp Nothing (), iface, details)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify' guts0
@@ -678,7 +683,7 @@ hscInteractiveCompiler =
 
   , hscGenBootOutput = \tc_result _mod_summary mb_old_iface -> do
        (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
-       return (HscRecomp False Nothing, iface, details)
+       return (HscRecomp Nothing Nothing, iface, details)
 
   , hscGenOutput = \guts0 mod_summary mb_old_iface -> do
        guts <- hscSimplify' guts0
@@ -707,7 +712,7 @@ hscNothingCompiler =
   , hscBackend = \tc_result _mod_summary mb_old_iface -> do
        handleWarnings
        (iface, _changed, details) <- hscSimpleIface tc_result mb_old_iface
-       return (HscRecomp False (), iface, details)
+       return (HscRecomp Nothing (), iface, details)
 
   , hscGenBootOutput = \_ _ _ ->
         panic "hscCompileNothing: hscGenBootOutput should not be called"
@@ -849,7 +854,7 @@ hscWriteIface iface no_change mod_summary
 
 -- | Compile to hard-code.
 hscGenHardCode :: CgGuts -> ModSummary
-               -> Hsc Bool -- ^ @True@ <=> stub.c exists
+               -> Hsc (Maybe FilePath) -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode cgguts mod_summary
   = do
     hsc_env <- getHscEnv
@@ -859,8 +864,7 @@ hscGenHardCode cgguts mod_summary
                      cg_module   = this_mod,
                      cg_binds    = core_binds,
                      cg_tycons   = tycons,
-                     cg_dir_imps = dir_imps,
-                     cg_foreign  = foreign_stubs,
+                     cg_foreign  = foreign_stubs0,
                      cg_dep_pkgs = dependencies,
                      cg_hpc_info = hpc_info } = cgguts
              dflags = hsc_dflags hsc_env
@@ -879,16 +883,19 @@ hscGenHardCode cgguts mod_summary
              <- {-# SCC "CoreToStg" #-}
                 myCoreToStg dflags this_mod prepd_binds	
 
+         let prof_init = profilingInitCode this_mod cost_centre_info
+             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
+
          ------------------  Code generation ------------------
          
          cmms <- if dopt Opt_TryNewCodeGen dflags
                  then do cmms <- tryNewCodeGen hsc_env this_mod data_tycons
-                                 dir_imps cost_centre_info
+                                 cost_centre_info
                                  stg_binds hpc_info
                          return cmms
                  else {-# SCC "CodeGen" #-}
                        codeGen dflags this_mod data_tycons
-                               dir_imps cost_centre_info
+                               cost_centre_info
                                stg_binds hpc_info
 
          --- Optionally run experimental Cmm transformations ---
@@ -896,7 +903,7 @@ hscGenHardCode cgguts mod_summary
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
-         dumpIfSet_dyn dflags Opt_D_dump_cmmz "Raw Cmm" (ppr rawcmms)
+         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (ppr rawcmms)
          (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
                 dependencies rawcmms
@@ -959,15 +966,15 @@ hscCompileCmmFile hsc_env filename
 
 -------------------- Stuff for new code gen ---------------------
 
-tryNewCodeGen	:: HscEnv -> Module -> [TyCon] -> [Module]
+tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
 		-> CollectedCCs
 		-> [(StgBinding,[(Id,[Id])])]
 		-> HpcInfo
 		-> IO [Cmm]
-tryNewCodeGen hsc_env this_mod data_tycons imported_mods 
+tryNewCodeGen hsc_env this_mod data_tycons
 	      cost_centre_info stg_binds hpc_info =
   do	{ let dflags = hsc_dflags hsc_env
-        ; prog <- StgCmm.codeGen dflags this_mod data_tycons imported_mods 
+        ; prog <- StgCmm.codeGen dflags this_mod data_tycons
 		 	 cost_centre_info stg_binds hpc_info
 	; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
 		(pprCmms prog)
@@ -1074,8 +1081,17 @@ hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
   -> String			-- The statement
   -> IO (Maybe ([Id], HValue))
      -- ^ 'Nothing' <==> empty statement (or comment only), but no parse error
-hscStmt hsc_env stmt = runHsc hsc_env $ do
-    maybe_stmt <- hscParseStmt stmt
+hscStmt hsc_env stmt = hscStmtWithLocation hsc_env stmt "<interactive>" 1
+
+hscStmtWithLocation	-- Compile a stmt all the way to an HValue, but don't run it
+  :: HscEnv
+  -> String			-- The statement
+  -> String                     -- the source
+  -> Int                        -- ^ starting line
+  -> IO (Maybe ([Id], HValue))
+     -- ^ 'Nothing' <==> empty statement (or comment only), but no parse error
+hscStmtWithLocation hsc_env stmt source linenumber = runHsc hsc_env $ do
+    maybe_stmt <- hscParseStmtWithLocation source linenumber stmt
     case maybe_stmt of
       Nothing -> return Nothing
       Just parsed_stmt -> do  -- The real stuff
@@ -1116,12 +1132,11 @@ hscTcExpr	-- Typecheck an expression (but don't run it)
 hscTcExpr hsc_env expr = runHsc hsc_env $ do
     maybe_stmt <- hscParseStmt expr
     case maybe_stmt of
-      Just (L _ (ExprStmt expr _ _)) ->
-          ioMsgMaybe $ tcRnExpr hsc_env (hsc_IC hsc_env) expr
-      _ -> 
-          liftIO $ throwIO $ mkSrcErr $ unitBag $ 
-              mkPlainErrMsg noSrcSpan
-                            (text "not an expression:" <+> quotes (text expr))
+        Just (L _ (ExprStmt expr _ _ _)) ->
+            ioMsgMaybe $ tcRnExpr hsc_env (hsc_IC hsc_env) expr
+        _ ->
+            liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg noSrcSpan
+                (text "not an expression:" <+> quotes (text expr))
 
 -- | Find the kind of a type
 hscKcType
@@ -1141,6 +1156,11 @@ hscKcType hsc_env str = runHsc hsc_env $ do
 hscParseStmt :: String -> Hsc (Maybe (LStmt RdrName))
 hscParseStmt = hscParseThing parseStmt
 
+hscParseStmtWithLocation :: String -> Int 
+                         -> String -> Hsc (Maybe (LStmt RdrName))
+hscParseStmtWithLocation source linenumber stmt = 
+  hscParseThingWithLocation source linenumber parseStmt stmt
+
 hscParseType :: String -> Hsc (LHsType RdrName)
 hscParseType = hscParseThing parseType
 #endif
@@ -1149,19 +1169,24 @@ hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
 hscParseIdentifier hsc_env str = runHsc hsc_env $ 
                                    hscParseThing parseIdentifier str
 
-
 hscParseThing :: (Outputable thing)
 	      => Lexer.P thing
 	      -> String
 	      -> Hsc thing
+hscParseThing = hscParseThingWithLocation "<interactive>" 1
 
-hscParseThing parser str
+hscParseThingWithLocation :: (Outputable thing)
+	      => String -> Int 
+              -> Lexer.P thing
+	      -> String
+	      -> Hsc thing
+hscParseThingWithLocation source linenumber parser str
  = {-# SCC "Parser" #-} do
       dflags <- getDynFlags
       liftIO $ showPass dflags "Parser"
-  
+
       let buf = stringToStringBuffer str
-          loc = mkSrcLoc (fsLit "<interactive>") 1 1
+          loc  = mkRealSrcLoc (fsLit source) linenumber 1
 
       case unP parser (mkPState dflags buf loc) of
 
@@ -1207,6 +1232,7 @@ mkModGuts mod binds = ModGuts {
   mg_insts = [],
   mg_fam_insts = [],
   mg_rules = [],
+  mg_vect_decls = [],
   mg_binds = binds,
   mg_foreign = NoStubs,
   mg_warns = NoWarnings,

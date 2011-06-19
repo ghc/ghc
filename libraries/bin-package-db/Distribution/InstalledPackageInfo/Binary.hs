@@ -59,6 +59,7 @@ putInstalledPackageInfo ipi = do
   put (stability ipi)
   put (homepage ipi)
   put (pkgUrl ipi)
+  put (synopsis ipi)
   put (description ipi)
   put (category ipi)
   put (exposed ipi)
@@ -91,6 +92,7 @@ getInstalledPackageInfo = do
   stability <- get
   homepage <- get
   pkgUrl <- get
+  synopsis <- get
   description <- get
   category <- get
   exposed <- get

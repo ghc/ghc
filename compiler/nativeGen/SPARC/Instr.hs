@@ -37,6 +37,7 @@ import RegClass
 import Reg
 import Size
 
+import CLabel
 import BlockId
 import OldCmm
 import FastString
@@ -194,7 +195,7 @@ data Instr
 	-- With a tabled jump we know all the possible destinations.
 	-- We also need this info so we can work out what regs are live across the jump.
 	-- 
-	| JMP_TBL	AddrMode [BlockId]
+	| JMP_TBL	AddrMode [Maybe BlockId] CLabel
 
 	| CALL		(Either Imm Reg) Int Bool 	-- target, args, terminal
 
@@ -247,7 +248,7 @@ sparc_regUsageOfInstr instr
     FxTOy   _ _  r1 r2 		-> usage ([r1], 		[r2])
 
     JMP     addr 		-> usage (regAddr addr, [])
-    JMP_TBL addr _      	-> usage (regAddr addr, [])
+    JMP_TBL addr _ _    	-> usage (regAddr addr, [])
 
     CALL  (Left _  )  _ True  	-> noUsage
     CALL  (Left _  )  n False 	-> usage (argRegs n, callClobberedRegs)
@@ -315,7 +316,7 @@ sparc_patchRegsOfInstr instr env = case instr of
     FxTOy s1 s2 r1 r2   	-> FxTOy s1 s2 (env r1) (env r2)
 
     JMP     addr        	-> JMP     (fixAddr addr)
-    JMP_TBL addr ids    	-> JMP_TBL (fixAddr addr) ids
+    JMP_TBL addr ids l  	-> JMP_TBL (fixAddr addr) ids l
 
     CALL  (Left i) n t  	-> CALL (Left i) n t
     CALL  (Right r) n t 	-> CALL (Right (env r)) n t
@@ -345,7 +346,7 @@ sparc_jumpDestsOfInstr insn
   = case insn of
 	BI   _ _ id	-> [id]
 	BF   _ _ id	-> [id]
-	JMP_TBL _ ids	-> ids
+	JMP_TBL _ ids _	-> [id | Just id <- ids]
 	_		-> []
 
 
@@ -354,6 +355,7 @@ sparc_patchJumpInstr insn patchF
   = case insn of
 	BI cc annul id	-> BI cc annul (patchF id)
 	BF cc annul id	-> BF cc annul (patchF id)
+	JMP_TBL n ids l	-> JMP_TBL n (map (fmap patchF) ids) l
 	_		-> insn
 
 

@@ -19,17 +19,18 @@ module OccurAnal (
 
 import CoreSyn
 import CoreFVs
-import Type		( tyVarsOfType )
-import CoreUtils        ( exprIsTrivial, isDefaultAlt, mkCoerceI, isExpandableApp )
-import Coercion		( CoercionI(..), mkSymCoI )
+import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp, mkCoerce )
 import Id
 import NameEnv
 import NameSet
 import Name		( Name, localiseName )
 import BasicTypes
+import Coercion
+
 import VarSet
 import VarEnv
-import Var              ( varUnique )
+import Var
+
 import Maybes           ( orElse )
 import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesR )
 import PrelNames        ( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
@@ -52,13 +53,14 @@ import Data.List
 Here's the externally-callable interface:
 
 \begin{code}
-occurAnalysePgm :: Maybe (Activation -> Bool) -> [CoreRule]
+occurAnalysePgm :: Maybe (Activation -> Bool) -> [CoreRule] -> [CoreVect]
                 -> [CoreBind] -> [CoreBind]
-occurAnalysePgm active_rule imp_rules binds
+occurAnalysePgm active_rule imp_rules vects binds
   = snd (go (initOccEnv active_rule imp_rules) binds)
   where
-    initial_uds = addIdOccs emptyDetails (rulesFreeVars imp_rules)
-    -- The RULES keep things alive!
+    initial_uds = addIdOccs emptyDetails 
+                            (rulesFreeVars imp_rules `unionVarSet` vectsFreeVars vects)
+    -- The RULES and VECTORISE declarations keep things alive!
 
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go _ []
@@ -97,7 +99,7 @@ occAnalBind :: OccEnv 		-- The incoming OccEnv
                 [CoreBind])
 
 occAnalBind env _ (NonRec binder rhs) body_usage
-  | isTyCoVar binder			-- A type let; we don't gather usage info
+  | isTyVar binder	-- A type let; we don't gather usage info
   = (body_usage, [NonRec binder rhs])
 
   | not (binder `usedIn` body_usage)    -- It's not mentioned
@@ -381,7 +383,7 @@ occAnalBind _ env (Rec pairs) body_usage
     
     make_node (bndr, rhs)
         = (details, varUnique bndr, keysUFM out_edges)
-	where
+        where
           details = ND { nd_bndr = bndr, nd_rhs = rhs'
                        , nd_uds = rhs_usage3, nd_inl = inl_fvs}
 
@@ -872,33 +874,27 @@ occAnal :: OccEnv
         -> (UsageDetails,       -- Gives info only about the "interesting" Ids
             CoreExpr)
 
-occAnal _   (Type t)  = (emptyDetails, Type t)
-occAnal env (Var v)   = (mkOneOcc env v False, Var v)
+occAnal _   expr@(Type _) = (emptyDetails, 	   expr)
+occAnal _   expr@(Lit _)  = (emptyDetails, 	   expr)   
+occAnal env expr@(Var v)  = (mkOneOcc env v False, expr)
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.
     -- But that went wrong right after specialisation, when
     -- the *occurrences* of the overloaded function didn't have any
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
+
+occAnal _ (Coercion co) 
+  = (addIdOccs emptyDetails (coVarsOfCo co), Coercion co)
+	-- See Note [Gather occurrences of coercion veriables]
 \end{code}
 
-We regard variables that occur as constructor arguments as "dangerousToDup":
-
-\begin{verbatim}
-module A where
-f x = let y = expensive x in
-      let z = (True,y) in
-      (case z of {(p,q)->q}, case z of {(p,q)->q})
-\end{verbatim}
-
-We feel free to duplicate the WHNF (True,y), but that means
-that y may be duplicated thereby.
-
-If we aren't careful we duplicate the (expensive x) call!
-Constructors are rather like lambdas in this way.
+Note [Gather occurrences of coercion veriables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to gather info about what coercion variables appear, so that
+we can sort them into the right place when doing dependency analysis.
 
 \begin{code}
-occAnal _   expr@(Lit _) = (emptyDetails, expr)
 \end{code}
 
 \begin{code}
@@ -914,7 +910,10 @@ occAnal env (Note note body)
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
-      (markManyIf (isRhsEnv env) usage, Cast expr' co)
+    let usage1 = markManyIf (isRhsEnv env) usage
+        usage2 = addIdOccs usage1 (coVarsOfCo co)
+          -- See Note [Gather occurrences of coercion veriables]
+    in (usage2, Cast expr' co)
         -- If we see let x = y `cast` co
         -- then mark y as 'Many' so that we don't
         -- immediately inline y again.
@@ -929,7 +928,7 @@ occAnal env app@(App _ _)
 --   (a) occurrences inside type lambdas only not marked as InsideLam
 --   (b) type variables not in environment
 
-occAnal env (Lam x body) | isTyCoVar x
+occAnal env (Lam x body) | isTyVar x
   = case occAnal env body of { (body_usage, body') ->
     (body_usage, Lam x body')
     }
@@ -1021,6 +1020,18 @@ occAnalArgs env args
 Applications are dealt with specially because we want
 the "build hack" to work.
 
+Note [Arguments of let-bound constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+    f x = let y = expensive x in
+          let z = (True,y) in
+          (case z of {(p,q)->q}, case z of {(p,q)->q})
+We feel free to duplicate the WHNF (True,y), but that means
+that y may be duplicated thereby.
+
+If we aren't careful we duplicate the (expensive x) call!
+Constructors are rather like lambdas in this way.
+
 \begin{code}
 occAnalApp :: OccEnv
            -> (Expr CoreBndr, [Arg CoreBndr])
@@ -1036,6 +1047,7 @@ occAnalApp env (Var fun, args)
 	  -- arguments are just variables, or trivial expressions.
 	  --
 	  -- This is the *whole point* of the isRhsEnv predicate
+	  -- See Note [Arguments of let-bound constructors]
     in
     (fun_uds +++ final_args_uds, mkApps (Var fun) args') }
   where
@@ -1146,7 +1158,7 @@ wrapProxy (bndr, rhs_var, co) (body_usg, body)
   where
     (body_usg', tagged_bndr) = tagBinder body_usg bndr
     rhs_usg = unitVarEnv rhs_var NoOccInfo	-- We don't need exact info
-    rhs = mkCoerceI co (Var rhs_var)
+    rhs = mkCoerce co (Var (zapIdOccInfo rhs_var)) -- See Note [Zap case binders in proxy bindings]
 \end{code}
 
 
@@ -1352,9 +1364,11 @@ extendFvs env s
 %************************************************************************
 
 \begin{code}
-data ProxyEnv 
-   = PE (IdEnv (Id, [(Id,CoercionI)])) VarSet
-     	-- Main env, and its free variables (of both range and domain)
+data ProxyEnv	-- See Note [ProxyEnv]
+   = PE (IdEnv	-- Domain = scrutinee variables
+           (Id,                  -- The scrutinee variable again
+            [(Id,Coercion)])) 	 -- The case binders that it maps to
+        VarSet	-- Free variables of both range and domain
 \end{code}
 
 Note [ProxyEnv]
@@ -1497,6 +1511,17 @@ From this we want to extract the bindings
 Notice that later bindings may mention earlier ones, and that
 we need to go "both ways".
 
+Note [Zap case binders in proxy bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+From the original
+     case x of cb(dead) { p -> ...x... }
+we will get
+     case x of cb(live) { p -> let x = cb in ...x... }
+
+Core Lint never expects to find an *occurence* of an Id marked
+as Dead, so we must zap the OccInfo on cb before making the 
+binding x = cb.  See Trac #5028.
+
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We *used* to suppress the binder-swap in case expressions when 
@@ -1559,7 +1584,7 @@ binder-swap unconditionally and still get occurrence analysis
 information right.
 
 \begin{code}
-extendProxyEnv :: ProxyEnv -> Id -> CoercionI -> Id -> ProxyEnv
+extendProxyEnv :: ProxyEnv -> Id -> Coercion -> Id -> ProxyEnv
 -- (extendPE x co y) typically arises from 
 --		  case (x |> co) of y { ... }
 -- It extends the proxy env with the binding 
@@ -1572,7 +1597,7 @@ extendProxyEnv pe scrut co case_bndr
     env2 = extendVarEnv_Acc add single env1 scrut1 (case_bndr,co)
     single cb_co = (scrut1, [cb_co]) 
     add cb_co (x, cb_cos) = (x, cb_co:cb_cos)
-    fvs2 = fvs1 `unionVarSet`  freeVarsCoI co
+    fvs2 = fvs1 `unionVarSet`  tyCoVarsOfCo co
 		`extendVarSet` case_bndr
 		`extendVarSet` scrut1
 
@@ -1580,10 +1605,11 @@ extendProxyEnv pe scrut co case_bndr
 	-- Localise the scrut_var before shadowing it; we're making a 
 	-- new binding for it, and it might have an External Name, or
 	-- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
-	-- Also we don't want any INLILNE or NOINLINE pragmas!
+	-- Also we don't want any INLINE or NOINLINE pragmas!
 
 -----------
-type ProxyBind = (Id, Id, CoercionI)
+type ProxyBind = (Id, Id, Coercion)
+     -- (scrut variable, case-binder variable, coercion)
 
 getProxies :: OccEnv -> Id -> Bag ProxyBind
 -- Return a bunch of bindings [...(xi,ei)...] 
@@ -1593,7 +1619,7 @@ getProxies (OccEnv { occ_proxy = PE pe _ }) case_bndr
   = -- pprTrace "wrapProxies" (ppr case_bndr) $
     go_fwd case_bndr
   where
-    fwd_pe :: IdEnv (Id, CoercionI)
+    fwd_pe :: IdEnv (Id, Coercion)
     fwd_pe = foldVarEnv add1 emptyVarEnv pe
            where
              add1 (x,ycos) env = foldr (add2 x) env ycos
@@ -1607,23 +1633,23 @@ getProxies (OccEnv { occ_proxy = PE pe _ }) case_bndr
 
     go_fwd' case_bndr
         | Just (scrut, co) <- lookupVarEnv fwd_pe case_bndr
-        = unitBag (scrut,  case_bndr, mkSymCoI co)
+        = unitBag (scrut,  case_bndr, mkSymCo co)
 	  `unionBags` go_fwd scrut
           `unionBags` go_bwd scrut [pr | pr@(cb,_) <- lookup_bwd scrut
                                        , cb /= case_bndr]
         | otherwise 
         = emptyBag
 
-    lookup_bwd :: Id -> [(Id, CoercionI)]
+    lookup_bwd :: Id -> [(Id, Coercion)]
 	-- Return case_bndrs that are connected to scrut 
     lookup_bwd scrut = case lookupVarEnv pe scrut of
           		  Nothing          -> []
 	  		  Just (_, cb_cos) -> cb_cos
 
-    go_bwd :: Id -> [(Id, CoercionI)] -> Bag ProxyBind
+    go_bwd :: Id -> [(Id, Coercion)] -> Bag ProxyBind
     go_bwd scrut cb_cos = foldr (unionBags . go_bwd1 scrut) emptyBag cb_cos
 
-    go_bwd1 :: Id -> (Id, CoercionI) -> Bag ProxyBind
+    go_bwd1 :: Id -> (Id, Coercion) -> Bag ProxyBind
     go_bwd1 scrut (case_bndr, co) 
        = -- pprTrace "go_bwd1" (ppr case_bndr) $
          unitBag (case_bndr, scrut, co)
@@ -1638,9 +1664,9 @@ mkAltEnv env scrut cb
   where
     pe  = occ_proxy env
     pe' = case scrut of
-             Var v           -> extendProxyEnv pe v (IdCo (idType v)) cb
-             Cast (Var v) co -> extendProxyEnv pe v (ACo co)          cb
-	     _other          -> trimProxyEnv pe [cb]
+             Var v           -> extendProxyEnv pe v (mkReflCo (idType v)) cb
+             Cast (Var v) co -> extendProxyEnv pe v co                    cb
+             _other          -> trimProxyEnv pe [cb]
 
 -----------
 trimOccEnv :: OccEnv -> [CoreBndr] -> OccEnv
@@ -1661,12 +1687,7 @@ trimProxyEnv (PE pe fvs) bndrs
     trim (scrut, cb_cos) | scrut `elemVarSet` bndr_set = (scrut, [])
 			 | otherwise = (scrut, filterOut discard cb_cos)
     discard (cb,co) = bndr_set `intersectsVarSet` 
-                      extendVarSet (freeVarsCoI co) cb
-                             
------------
-freeVarsCoI :: CoercionI -> VarSet
-freeVarsCoI (IdCo t) = tyVarsOfType t
-freeVarsCoI (ACo co) = tyVarsOfType co
+                      extendVarSet (tyCoVarsOfCo co) cb
 \end{code}
 
 
@@ -1733,7 +1754,7 @@ tagBinder usage binder
 
 setBinderOcc :: UsageDetails -> CoreBndr -> CoreBndr
 setBinderOcc usage bndr
-  | isTyCoVar bndr    = bndr
+  | isTyVar bndr      = bndr
   | isExportedId bndr = case idOccInfo bndr of
                           NoOccInfo -> bndr
                           _         -> setIdOccInfo bndr NoOccInfo

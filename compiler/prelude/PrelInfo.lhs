@@ -8,23 +8,23 @@ module PrelInfo (
         wiredInIds, ghcPrimIds,
         primOpRules, builtinRules,
 
-	ghcPrimExports,
-	wiredInThings, basicKnownKeyNames,
-	primOpId,
-	
-	-- Random other things
-	maybeCharLikeCon, maybeIntLikeCon,
+        ghcPrimExports,
+        wiredInThings, basicKnownKeyNames,
+        primOpId,
+        
+        -- Random other things
+        maybeCharLikeCon, maybeIntLikeCon,
 
-	-- Class categories
-	isNumericClass, isStandardClass
+        -- Class categories
+        isNumericClass, isStandardClass
 
     ) where
 
 #include "HsVersions.h"
 
-import PrelNames	( basicKnownKeyNames, 
-			  hasKey, charDataConKey, intDataConKey,
-			  numericClassKeys, standardClassKeys )
+import PrelNames        ( basicKnownKeyNames,
+                          hasKey, charDataConKey, intDataConKey,
+                          numericClassKeys, standardClassKeys )
 import PrelRules
 import PrimOp		( PrimOp, allThePrimOps, primOpOcc, primOpTag, maxPrimOpTag )
 import DataCon		( DataCon )

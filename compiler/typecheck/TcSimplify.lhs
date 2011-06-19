@@ -1,7 +1,7 @@
 \begin{code}
 module TcSimplify( 
        simplifyInfer,
-       simplifyDefault, simplifyDeriv,
+       simplifyDefault, simplifyDeriv, 
        simplifyRule, simplifyTop, simplifyInteractive
   ) where
 
@@ -15,10 +15,12 @@ import TcType
 import TcSMonad 
 import TcInteract
 import Inst
-import Unify( niFixTvSubst, niSubstTvSet )
+import Id	( evVarPred )
+import Unify	( niFixTvSubst, niSubstTvSet )
 import Var
 import VarSet
 import VarEnv 
+import Coercion
 import TypeRep
 
 import Name
@@ -49,7 +51,7 @@ simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- but when there is nothing to quantify we don't wrap
 -- in a degenerate implication, so we do that here instead
 simplifyTop wanteds 
-  = simplifyCheck SimplCheck wanteds
+  = simplifyCheck (SimplCheck (ptext (sLit "top level"))) wanteds
 
 ------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
@@ -61,7 +63,8 @@ simplifyDefault :: ThetaType	-- Wanted; has no type variables in it
                 -> TcM ()	-- Succeeds iff the constraint is soluble
 simplifyDefault theta
   = do { wanted <- newFlatWanteds DefaultOrigin theta
-       ; _ignored_ev_binds <- simplifyCheck SimplCheck (mkFlatWC wanted)
+       ; _ignored_ev_binds <- simplifyCheck (SimplCheck (ptext (sLit "defaults"))) 
+                                            (mkFlatWC wanted)
        ; return () }
 \end{code}
 
@@ -75,27 +78,29 @@ simplifyDefault theta
 
 \begin{code}
 simplifyDeriv :: CtOrigin
-		-> [TyVar]	
-		-> ThetaType		-- Wanted
-	        -> TcM ThetaType	-- Needed
+              -> PredType
+	      -> [TyVar]	
+	      -> ThetaType		-- Wanted
+	      -> TcM ThetaType	-- Needed
 -- Given  instance (wanted) => C inst_ty 
 -- Simplify 'wanted' as much as possibles
 -- Fail if not possible
-simplifyDeriv orig tvs theta 
-  = do { tvs_skols <- tcInstSuperSkolTyVars tvs -- Skolemize
-       	 	   -- One reason is that the constraint solving machinery
-		   -- expects *TcTyVars* not TyVars.  Another is that
-		   -- when looking up instances we don't want overlap
-		   -- of type variables
+simplifyDeriv orig pred tvs theta 
+  = do { tvs_skols <- tcInstSkolTyVars tvs -- Skolemize
+      	 	-- The constraint solving machinery 
+		-- expects *TcTyVars* not TyVars.  
+		-- We use *non-overlappable* (vanilla) skolems
+		-- See Note [Overlap and deriving]
 
        ; let skol_subst = zipTopTvSubst tvs $ map mkTyVarTy tvs_skols
              subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+	     doc = parens $ ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
 
        ; traceTc "simplifyDeriv" (ppr tvs $$ ppr theta $$ ppr wanted)
        ; (residual_wanted, _binds)
-             <- runTcS SimplInfer NoUntouchables $
+             <- runTcS (SimplInfer doc) NoUntouchables $
                 solveWanteds emptyInert (mkFlatWC wanted)
 
        ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
@@ -110,6 +115,31 @@ simplifyDeriv orig tvs theta
        ; let min_theta = mkMinimalBySCs (bagToList good)
        ; return (substTheta subst_skol min_theta) }
 \end{code}
+
+Note [Overlap and deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider some overlapping instances:
+  data Show a => Show [a] where ..
+  data Show [Char] where ...
+
+Now a data type with deriving:
+  data T a = MkT [a] deriving( Show )
+
+We want to get the derived instance
+  instance Show [a] => Show (T a) where...
+and NOT
+  instance Show a => Show (T a) where...
+so that the (Show (T Char)) instance does the Right Thing
+
+It's very like the situation when we're inferring the type
+of a function
+   f x = show [x]
+and we want to infer
+   f :: Show [a] => a -> String
+
+BOTTOM LINE: use vanilla, non-overlappable skolems when inferring
+             the context for the derived instance. 
+	     Hence tcInstSkolTyVars not tcInstSuperSkolTyVars
 
 Note [Exotic derived instance contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -222,7 +252,7 @@ simplifyInfer top_lvl apply_mr name_taus wanteds
             -- Step 2 
        	    -- Now simplify the possibly-bound constraints
        ; (simpl_results, tc_binds0)
-           <- runTcS SimplInfer NoUntouchables $
+           <- runTcS (SimplInfer (ppr (map fst name_taus))) NoUntouchables $
               simplifyWithApprox (zonked_wanteds { wc_flat = perhaps_bound })
 
        ; when (insolubleWC simpl_results)  -- Fail fast if there is an insoluble constraint
@@ -522,8 +552,8 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 		 -- variables; hence *no untouchables*
 
        ; (lhs_results, lhs_binds)
-              <- runTcS SimplRuleLhs untch $
-                 solveWanteds emptyInert lhs_wanted
+              <- runTcS (SimplRuleLhs name) untch $
+                 solveWanteds emptyInert zonked_lhs
 
        ; traceTc "simplifyRule" $
          vcat [ text "zonked_lhs"   <+> ppr zonked_lhs 
@@ -564,7 +594,8 @@ simplifyRule name tv_bndrs lhs_wanted rhs_wanted
 
 	     -- Hence the rather painful ad-hoc treatement here
        ; rhs_binds_var@(EvBindsVar evb_ref _)  <- newTcEvBinds
-       ; rhs_binds1 <- simplifyCheck SimplCheck $
+       ; let doc = ptext (sLit "rhs of rule") <+> doubleQuotes (ftext name)
+       ; rhs_binds1 <- simplifyCheck (SimplCheck doc) $
             WC { wc_flat = emptyBag
                , wc_insol = emptyBag
                , wc_impl = unitBag $
@@ -690,11 +721,10 @@ solve_wanteds inert wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = 
                       , text "inert   =" <+> ppr inert ]
            
            ; let (just_given_inert, unsolved_cans) = extractUnsolved inert
-                     -- unsolved_ccans contains either Wanted or Derived!
+                     -- unsolved_cans contains either Wanted or Derived!
 
-                -- Go inside each implication
            ; (implic_eqs, unsolved_implics) 
-                  <- solveNestedImplications just_given_inert implics
+                  <- solveNestedImplications just_given_inert unsolved_cans implics
 
                 -- Apply defaulting rules if and only if there
 		-- no floated equalities.  If there are, they may
@@ -719,30 +749,51 @@ solve_wanteds inert wanted@(WC { wc_flat = flats, wc_impl = implics, wc_insol = 
                                   unsolved_implics
            }
 
-solveNestedImplications :: InertSet -> Bag Implication
+givensFromWanteds :: SimplContext -> CanonicalCts -> Bag FlavoredEvVar
+-- Extract the Wanted ones from CanonicalCts and conver to
+-- Givens; not Given/Solved, see Note [Preparing inert set for implications]
+givensFromWanteds _ctxt = foldrBag getWanted emptyBag
+  where
+    getWanted :: CanonicalCt -> Bag FlavoredEvVar -> Bag FlavoredEvVar
+    getWanted cc givens
+      | pushable_wanted cc
+      = let given = mkEvVarX (cc_id cc) (mkGivenFlavor (cc_flavor cc) UnkSkol)
+        in given `consBag` givens     -- and not mkSolvedFlavor,
+                                      -- see Note [Preparing inert set for implications]
+      | otherwise = givens
+
+    pushable_wanted :: CanonicalCt -> Bool 
+    pushable_wanted cc 
+      | not (isCFrozenErr cc) 
+      , isWantedCt cc 
+      = isEqPred (evVarPred (cc_id cc)) -- see Note [Preparing inert set for implications]
+      | otherwise = False 
+ 
+solveNestedImplications :: InertSet -> CanonicalCts
+                        -> Bag Implication
                         -> TcS (Bag FlavoredEvVar, Bag Implication)
-solveNestedImplications inerts implics
+solveNestedImplications just_given_inert unsolved_cans implics
   | isEmptyBag implics
   = return (emptyBag, emptyBag)
   | otherwise 
-  = do { -- See Note [Preparing inert set for implications]
-         traceTcS "solveWanteds: preparing inerts for implications {"  empty
-       ; let inert_for_implics = inerts
-           -- DV: Used to be: 
-           -- inert_for_implics <- solveInteract inerts (makeGivens unsolved). 
-           -- But now the top-level simplifyInfer effectively converts the 
-           -- quantifiable wanteds to givens, and hence we don't need to add 
-           -- those unsolved as givens here; they will already be in the inert set.
+  = do {  -- See Note [Preparing inert set for implications]
+	  -- Push the unsolved wanteds inwards, but as givens
+             
+       ; simpl_ctx <- getTcSContext 
 
-       ; traceTcS "}" empty
+       ; let pushed_givens    = givensFromWanteds simpl_ctx unsolved_cans
+             tcs_untouchables = filterVarSet isFlexiTcsTv $
+                                tyVarsOfEvVarXs pushed_givens
+             -- See Note [Extra TcsTv untouchables]
 
-       ; traceTcS "solveWanteds: doing nested implications {" $
+       ; traceTcS "solveWanteds: preparing inerts for implications {"  
+                  (vcat [ppr tcs_untouchables, ppr pushed_givens])
+
+       ; (_, inert_for_implics) <- solveInteract just_given_inert pushed_givens 
+
+       ; traceTcS "solveWanteds: } now doing nested implications {" $
          vcat [ text "inerts_for_implics =" <+> ppr inert_for_implics
               , text "implics =" <+> ppr implics ]
-
-       ; let tcs_untouchables = filterVarSet isFlexiTcsTv $
-                                tyVarsOfInert inert_for_implics
-             -- See Note [Extra TcsTv untouchables]
 
        ; (implic_eqs, unsolved_implics)
            <- flatMapBagPairM (solveImplication tcs_untouchables inert_for_implics) implics
@@ -844,11 +895,6 @@ floatEqualities skols can_given wantders
         predTvs_under_fsks (EqPred ty1 ty2) = tvs_under_fsks ty1 `unionVarSet` tvs_under_fsks ty2
 \end{code}
 
-Note [Float Equalities out of Implications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-We want to float equalities out of vanilla existentials, but *not* out 
-of GADT pattern matches. 
-
 Note [Preparing inert set for implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before solving the nested implications, we convert any unsolved flat wanteds
@@ -856,11 +902,34 @@ to givens, and add them to the inert set.  Reasons:
 
   a) In checking mode, suppresses unnecessary errors.  We already have
      on unsolved-wanted error; adding it to the givens prevents any 
-     consequential errors from showing uop
+     consequential errors from showing up
 
   b) More importantly, in inference mode, we are going to quantify over this
      constraint, and we *don't* want to quantify over any constraints that
      are deducible from it.
+
+  c) Flattened type-family equalities must be exposed to the nested
+     constraints.  Consider
+	F b ~ alpha, (forall c.  F b ~ alpha)
+     Obviously this is soluble with [alpha := F b].  But the
+     unification is only done by solveCTyFunEqs, right at the end of
+     solveWanteds, and if we aren't careful we'll end up with an
+     unsolved goal inside the implication.  We need to "push" the
+     as-yes-unsolved (F b ~ alpha) inwards, as a *given*, so that it
+     can be used to solve the inner (F b
+     ~ alpha).  See Trac #4935.
+
+  d) There are other cases where interactions between wanteds that can help
+     to solve a constraint. For example
+
+  	class C a b | a -> b
+
+  	(C Int alpha), (forall d. C d blah => C Int a)
+
+     If we push the (C Int alpha) inwards, as a given, it can produce
+     a fundep (alpha~a) and this can float out again and be used to
+     fix alpha.  (In general we can't float class constraints out just
+     in case (C d blah) might help to solve (C Int a).)
 
 The unsolved wanteds are *canonical* but they may not be *inert*,
 because when made into a given they might interact with other givens.
@@ -872,31 +941,77 @@ We were not able to solve (a ~w [beta]) but we can't just assume it as
 given because the resulting set is not inert. Hence we have to do a
 'solveInteract' step first. 
 
+Finally, note that we convert them to [Given] and NOT [Given/Solved].
+The reason is that Given/Solved are weaker than Givens and may be discarded.
+As an example consider the inference case, where we may have, the following 
+original constraints: 
+     [Wanted] F Int ~ Int
+             (F Int ~ a => F Int ~ a)
+If we convert F Int ~ Int to [Given/Solved] instead of Given, then the next 
+given (F Int ~ a) is going to cause the Given/Solved to be ignored, casting 
+the (F Int ~ a) insoluble. Hence we should really convert the residual 
+wanteds to plain old Given. 
+
+We need only push in unsolved equalities both in checking mode and inference mode: 
+
+  (1) In checking mode we should not push given dictionaries in because of
+example LongWayOverlapping.hs, where we might get strange overlap
+errors between far-away constraints in the program.  But even in
+checking mode, we must still push type family equations. Consider:
+
+   type instance F True a b = a 
+   type instance F False a b = b
+
+   [w] F c a b ~ gamma 
+   (c ~ True) => a ~ gamma 
+   (c ~ False) => b ~ gamma
+
+Since solveCTyFunEqs happens at the very end of solving, the only way to solve
+the two implications is temporarily consider (F c a b ~ gamma) as Given (NB: not 
+merely Given/Solved because it has to interact with the top-level instance 
+environment) and push it inside the implications. Now, when we come out again at
+the end, having solved the implications solveCTyFunEqs will solve this equality.
+
+  (2) In inference mode, we recheck the final constraint in checking mode and
+hence we will be able to solve inner implications from top-level quantified
+constraints nonetheless.
+
+
 Note [Extra TcsTv untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Furthemore, we record the inert set simplifier-generated unification variables of the TcsTv
-kind (such as variables from instance that have been applied, or unification flattens). These
-variables must be passed to the implications as extra untouchable variables. Otherwise
-we have the danger of double unifications. Example (from trac ticket #4494):
+Furthemore, we record the inert set simplifier-generated unification
+variables of the TcsTv kind (such as variables from instance that have
+been applied, or unification flattens). These variables must be passed
+to the implications as extra untouchable variables. Otherwise we have
+the danger of double unifications. Example (from trac ticket #4494):
 
    (F Int ~ uf)  /\  (forall a. C a => F Int ~ beta) 
 
-In this example, beta is touchable inside the implication. The first solveInteract step
-leaves 'uf' ununified. Then we move inside the implication where a new constraint
+In this example, beta is touchable inside the implication. The first
+solveInteract step leaves 'uf' ununified. Then we move inside the
+implication where a new constraint
        uf  ~  beta  
-emerges. We may spontaneously solve it to get uf := beta, so the whole implication disappears
-but when we pop out again we are left with (F Int ~ uf) which will be unified by our final 
-solveCTyFunEqs stage and uf will get unified *once more* to  (F Int). 
+emerges. We may spontaneously solve it to get uf := beta, so the whole
+implication disappears but when we pop out again we are left with (F
+Int ~ uf) which will be unified by our final solveCTyFunEqs stage and
+uf will get unified *once more* to (F Int).
 
-The solution is to record the TcsTvs (i.e. the simplifier-generated unification variables)
-that are generated when solving the flats, and make them untouchables for the nested 
-implication. In the example above uf would become untouchable, so beta would be forced to 
-be unified as beta := uf.
+The solution is to record the TcsTvs (i.e. the simplifier-generated
+unification variables) that are generated when solving the flats, and
+make them untouchables for the nested implication. In the example
+above uf would become untouchable, so beta would be forced to be
+unified as beta := uf.
 
-NB: A consequence is that every simplifier-generated TcsTv variable that gets floated out 
-    of an implication becomes now untouchable next time we go inside that implication to 
-    solve any residual constraints. In effect, by floating an equality out of the implication 
-    we are committing to have it solved in the outside. 
+NB: A consequence is that every simplifier-generated TcsTv variable
+    that gets floated out of an implication becomes now untouchable
+    next time we go inside that implication to solve any residual
+    constraints. In effect, by floating an equality out of the
+    implication we are committing to have it solved in the outside.
+
+Note [Float Equalities out of Implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+We want to float equalities out of vanilla existentials, but *not* out 
+of GADT pattern matches. 
 
 
 \begin{code}
@@ -917,7 +1032,8 @@ solveCTyFunEqs cts
 
       ; return (niFixTvSubst ni_subst, unsolved_can_cts) }
   where
-    solve_one (cv,tv,ty) = setWantedTyBind tv ty >> setWantedCoBind cv ty
+    solve_one (cv,tv,ty) = do { setWantedTyBind tv ty
+                              ; setCoBind cv (mkReflCo ty) }
 
 ------------
 type FunEqBinds = (TvSubstEnv, [(CoVar, TcTyVar, TcType)])
@@ -960,7 +1076,7 @@ getSolvableCTyFunEqs untch cts
 
       , not (tv `elemVarSet` niSubstTvSet tv_subst (tyVarsOfTypes xis))
            -- Occurs check: see Note [Solving Family Equations], Point 2
-      = ASSERT ( not (isGiven fl) )
+      = ASSERT ( not (isGivenOrSolved fl) )
         (cts_in, extendFunEqBinds feb cv tv (mkTyConApp tc xis))
 
     dflt_funeq (cts_in, fun_eq_binds) ct

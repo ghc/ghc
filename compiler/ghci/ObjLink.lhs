@@ -28,6 +28,8 @@ import Control.Monad    ( when )
 import Foreign.C
 import Foreign		( nullPtr )
 import GHC.Exts         ( Ptr(..) )
+import GHC.IO.Encoding  ( fileSystemEncoding )
+import qualified GHC.Foreign as GHC
 
 
 
@@ -35,17 +37,21 @@ import GHC.Exts         ( Ptr(..) )
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
 
+-- UNICODE FIXME: Unicode object/archive/DLL file names on Windows will only work in the right code page
+withFileCString :: FilePath -> (CString -> IO a) -> IO a
+withFileCString = GHC.withCString fileSystemEncoding
+
 insertSymbol :: String -> String -> Ptr a -> IO ()
 insertSymbol obj_name key symbol
     = let str = prefixUnderscore key
-      in withCString obj_name $ \c_obj_name ->
-         withCString str $ \c_str ->
+      in withFileCString obj_name $ \c_obj_name ->
+         withCAString str $ \c_str ->
           c_insertSymbol c_obj_name c_str symbol
 
 lookupSymbol :: String -> IO (Maybe (Ptr a))
 lookupSymbol str_in = do
    let str = prefixUnderscore str_in
-   withCString str $ \c_str -> do
+   withCAString str $ \c_str -> do
      addr <- c_lookupSymbol c_str
      if addr == nullPtr
 	then return Nothing
@@ -60,7 +66,7 @@ loadDLL :: String -> IO (Maybe String)
 -- Nothing      => success
 -- Just err_msg => failure
 loadDLL str = do
-  maybe_errmsg <- withCString str $ \dll -> c_addDLL dll
+  maybe_errmsg <- withFileCString str $ \dll -> c_addDLL dll
   if maybe_errmsg == nullPtr
 	then return Nothing
 	else do str <- peekCString maybe_errmsg
@@ -68,19 +74,19 @@ loadDLL str = do
 
 loadArchive :: String -> IO ()
 loadArchive str = do
-   withCString str $ \c_str -> do
+   withFileCString str $ \c_str -> do
      r <- c_loadArchive c_str
      when (r == 0) (panic ("loadArchive " ++ show str ++ ": failed"))
 
 loadObj :: String -> IO ()
 loadObj str = do
-   withCString str $ \c_str -> do
+   withFileCString str $ \c_str -> do
      r <- c_loadObj c_str
      when (r == 0) (panic ("loadObj " ++ show str ++ ": failed"))
 
 unloadObj :: String -> IO ()
 unloadObj str =
-   withCString str $ \c_str -> do
+   withFileCString str $ \c_str -> do
      r <- c_unloadObj c_str
      when (r == 0) (panic ("unloadObj " ++ show str ++ ": failed"))
 

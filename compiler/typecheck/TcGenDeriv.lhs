@@ -42,7 +42,7 @@ import Name
 import HscTypes
 import PrelInfo
 import MkCore	( eRROR_ID )
-import PrelNames
+import PrelNames hiding (error_RDR)
 import PrimOp
 import SrcLoc
 import TyCon
@@ -50,7 +50,6 @@ import TcType
 import TysPrim
 import TysWiredIn
 import Type
-import Var( TyVar )
 import TypeRep
 import VarSet
 import State
@@ -779,7 +778,7 @@ gen_Ix_binds loc tycon
     single_con_range
       = mk_easy_FunBind loc range_RDR 
 	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
-	nlHsDo ListComp stmts con_expr
+	noLoc (mkHsComp ListComp stmts con_expr)
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 
@@ -893,15 +892,15 @@ gen_Read_binds get_fixity loc tycon
     read_nullary_cons 
       = case nullary_cons of
     	    []    -> []
-    	    [con] -> [nlHsDo DoExpr [bindLex (match_con con)] (result_expr con [])]
+    	    [con] -> [nlHsDo DoExpr (match_con con ++ [noLoc $ mkLastStmt (result_expr con [])])]
             _     -> [nlHsApp (nlHsVar choose_RDR) 
     		   	      (nlList (map mk_pair nullary_cons))]
         -- NB For operators the parens around (:=:) are matched by the
 	-- enclosing "parens" call, so here we must match the naked
 	-- data_con_str con
 
-    match_con con | isSym con_str = symbol_pat con_str
-                  | otherwise     = ident_pat  con_str
+    match_con con | isSym con_str = [symbol_pat con_str]
+                  | otherwise     = ident_h_pat  con_str
                   where
                     con_str = data_con_str con
 	-- For nullary constructors we must match Ident s for normal constrs
@@ -925,12 +924,12 @@ gen_Read_binds get_fixity loc tycon
 	prefix_parser = mk_parser prefix_prec prefix_stmts body
 
 	read_prefix_con
-	    | isSym con_str = [read_punc "(", bindLex (symbol_pat con_str), read_punc ")"]
-	    | otherwise     = [bindLex (ident_pat con_str)]
+	    | isSym con_str = [read_punc "(", symbol_pat con_str, read_punc ")"]
+	    | otherwise     = ident_h_pat con_str
      	 
 	read_infix_con
-	    | isSym con_str = [bindLex (symbol_pat con_str)]
-	    | otherwise     = [read_punc "`", bindLex (ident_pat con_str), read_punc "`"]
+	    | isSym con_str = [symbol_pat con_str]
+	    | otherwise     = [read_punc "`"] ++ ident_h_pat con_str ++ [read_punc "`"]
 
        	prefix_stmts		-- T a b c
        	  = read_prefix_con ++ read_args
@@ -965,15 +964,23 @@ gen_Read_binds get_fixity loc tycon
     ------------------------------------------------------------------------
     --		Helpers
     ------------------------------------------------------------------------
-    mk_alt e1 e2       = genOpApp e1 alt_RDR e2					-- e1 +++ e2
-    mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p, nlHsDo DoExpr ss b]	-- prec p (do { ss ; b })
-    bindLex pat	       = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))		-- pat <- lexP
-    con_app con as     = nlHsVarApps (getRdrName con) as			-- con as
-    result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as)		-- return (con as)
+    mk_alt e1 e2       = genOpApp e1 alt_RDR e2				-- e1 +++ e2
+    mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p	        -- prec p (do { ss ; b })
+                                           , nlHsDo DoExpr (ss ++ [noLoc $ mkLastStmt b])]
+    bindLex pat	       = noLoc (mkBindStmt pat (nlHsVar lexP_RDR))	-- pat <- lexP
+    con_app con as     = nlHsVarApps (getRdrName con) as		-- con as
+    result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as) -- return (con as)
     
     punc_pat s   = nlConPat punc_RDR   [nlLitPat (mkHsString s)]  -- Punc 'c'
-    ident_pat s  = nlConPat ident_RDR  [nlLitPat (mkHsString s)]  -- Ident "foo"
-    symbol_pat s = nlConPat symbol_RDR [nlLitPat (mkHsString s)]  -- Symbol ">>"
+
+    -- For constructors and field labels ending in '#', we hackily
+    -- let the lexer generate two tokens, and look for both in sequence
+    -- Thus [Ident "I"; Symbol "#"].  See Trac #5041
+    ident_h_pat s | Just (ss, '#') <- snocView s = [ ident_pat ss, symbol_pat "#" ]
+                  | otherwise                    = [ ident_pat s ]
+      		      		   
+    ident_pat  s = bindLex $ nlConPat ident_RDR  [nlLitPat (mkHsString s)]  -- Ident "foo" <- lexP
+    symbol_pat s = bindLex $ nlConPat symbol_RDR [nlLitPat (mkHsString s)]  -- Symbol ">>" <- lexP
     
     data_con_str con = occNameString (getOccName con)
     
@@ -991,11 +998,9 @@ gen_Read_binds get_fixity loc tycon
 	-- or	(#) = 4
 	-- Note the parens!
     read_lbl lbl | isSym lbl_str 
-		 = [read_punc "(", 
-		    bindLex (symbol_pat lbl_str),
-		    read_punc ")"]
+		 = [read_punc "(", symbol_pat lbl_str, read_punc ")"]
 		 | otherwise
-		 = [bindLex (ident_pat lbl_str)]
+		 = ident_h_pat lbl_str
 		 where	
 		   lbl_str = occNameString (getOccName lbl) 
 \end{code}
@@ -1831,7 +1836,7 @@ assoc_ty_id cls_str _ tbl ty
 					      text "for primitive type" <+> ppr ty)
   | otherwise = head res
   where
-    res = [id | (ty',id) <- tbl, ty `tcEqType` ty']
+    res = [id | (ty',id) <- tbl, ty `eqType` ty']
 
 -----------------------------------------------------------------------
 

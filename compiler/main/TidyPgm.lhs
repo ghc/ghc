@@ -46,6 +46,7 @@ import FastBool hiding ( fastOr )
 import Util
 import FastString
 
+import Control.Monad	( when )
 import Data.List	( sortBy )
 import Data.IORef	( IORef, readIORef, writeIORef )
 \end{code}
@@ -291,8 +292,7 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 				mg_binds = binds, 
 				mg_rules = imp_rules,
                                 mg_vect_info = vect_info,
-				mg_dir_imps = dir_imps, 
-				mg_anns = anns,
+                                mg_anns = anns,
                                 mg_deps = deps, 
 				mg_foreign = foreign_stubs,
 			        mg_hpc_info = hpc_info,
@@ -353,13 +353,19 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
                     (ptext (sLit "rules"))
                     (pprRulesForUser tidy_rules)
 
-        ; let dir_imp_mods = moduleEnvKeys dir_imps
+          -- Print one-line size info
+        ; let cs = coreBindsStats tidy_binds
+        ; when (dopt Opt_D_dump_core_stats dflags)
+	       (printDump (ptext (sLit "Tidy size (terms,types,coercions)") 
+                           <+> ppr (moduleName mod) <> colon 
+                           <+> int (cs_tm cs) 
+                           <+> int (cs_ty cs) 
+                           <+> int (cs_co cs) ))
 
-	; return (CgGuts { cg_module   = mod, 
-			   cg_tycons   = alg_tycons,
-			   cg_binds    = all_tidy_binds,
-			   cg_dir_imps = dir_imp_mods,
-			   cg_foreign  = foreign_stubs,
+        ; return (CgGuts { cg_module   = mod,
+                           cg_tycons   = alg_tycons,
+                           cg_binds    = all_tidy_binds,
+                           cg_foreign  = foreign_stubs,
 			   cg_dep_pkgs = dep_pkgs deps,
 			   cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks }, 
@@ -481,12 +487,16 @@ tidyInstances tidy_dfun ispecs
 
 \begin{code}
 tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
-tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar     = vars
-                                         , vectInfoPADFun  = pas
-                                         , vectInfoIso     = isos })
-  = info { vectInfoVar    = tidy_vars
-         , vectInfoPADFun = tidy_pas
-         , vectInfoIso    = tidy_isos }
+tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
+                                         , vectInfoPADFun       = pas
+                                         , vectInfoIso          = isos
+                                         , vectInfoScalarVars   = scalarVars
+                                         })
+  = info { vectInfoVar          = tidy_vars
+         , vectInfoPADFun       = tidy_pas
+         , vectInfoIso          = tidy_isos 
+         , vectInfoScalarVars   = tidy_scalarVars
+         }
   where
     tidy_vars = mkVarEnv
               $ map tidy_var_mapping
@@ -498,6 +508,10 @@ tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar     = vars
     tidy_var_mapping (from, to) = (from', (from', lookup_var to))
       where from' = lookup_var from
     tidy_snd_var (x, var) = (x, lookup_var var)
+
+    tidy_scalarVars = mkVarSet
+                    $ map lookup_var
+                    $ varSetElems scalarVars
       
     lookup_var var = lookupWithDefaultVarEnv var_env var var
 \end{code}
@@ -1150,6 +1164,7 @@ cafRefs p (Case e _bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts 
 cafRefs p (Note _n e) 	       = cafRefs p e
 cafRefs p (Cast e _co)         = cafRefs p e
 cafRefs _ (Type _) 	       = fastBool False
+cafRefs _ (Coercion _)         = fastBool False
 
 cafRefss :: VarEnv Id -> [Expr a] -> FastBool
 cafRefss _ [] 	  = fastBool False

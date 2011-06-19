@@ -169,11 +169,6 @@ data HsType name
 	-- add parens.  
 
   | HsNumberTy          Integer         -- Type level number
-      -- Uses a separate constructor from the generics one to avoid confusion.
-      -- In this way we could support both by just modifying the parser to
-      -- avoid the overlap between the two.
-
-  | HsNumTy             Integer		-- Generics only
 
   | HsPredTy		(HsPred name)	-- Only used in the type of an instance
 					-- declaration, eg.  Eq [a] -> Eq a
@@ -446,7 +441,6 @@ ppr_mono_ty _    (HsListTy ty)	     = brackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPArrTy ty)	     = pabrackets (ppr_mono_lty pREC_TOP ty)
 ppr_mono_ty _    (HsPredTy pred)     = ppr pred
 ppr_mono_ty _    (HsNumberTy n)      = integer n
-ppr_mono_ty _    (HsNumTy n)         = integer n  -- generics only
 ppr_mono_ty _    (HsSpliceTy s _ _)  = pprSplice s
 ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
 

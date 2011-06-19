@@ -29,7 +29,6 @@ import CgHpc
 
 import CLabel
 import OldCmm
-import OldCmmUtils
 import OldPprCmm
 
 import StgSyn
@@ -51,8 +50,7 @@ import Panic
 codeGen :: DynFlags
 	-> Module
 	-> [TyCon]
-	-> [Module]		-- directly-imported modules
-	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
+        -> CollectedCCs         -- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	-> HpcInfo
 	-> IO [Cmm]		-- Output
@@ -61,8 +59,7 @@ codeGen :: DynFlags
                 -- possible for object splitting to split up the
                 -- pieces later.
 
-codeGen dflags this_mod data_tycons imported_mods 
-	cost_centre_info stg_binds hpc_info
+codeGen dflags this_mod data_tycons cost_centre_info stg_binds hpc_info
   = do	
   { showPass dflags "CodeGen"
 
@@ -73,167 +70,46 @@ codeGen dflags this_mod data_tycons imported_mods
 		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
 		; cmm_tycons <- mapM cgTyCon data_tycons
 		; cmm_init   <- getCmm (mkModuleInit dflags cost_centre_info 
-					     this_mod imported_mods hpc_info)
-		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
+                                             this_mod hpc_info)
+                ; return (cmm_init : cmm_binds ++ concat cmm_tycons)
 		}
 		-- Put datatype_stuff after code_stuff, because the
 		-- datatype closure table (for enumeration types) to
 		-- (say) PrelBase_True_closure, which is defined in
 		-- code_stuff
 
+                -- Note [codegen-split-init] the cmm_init block must
+                -- come FIRST.  This is because when -split-objs is on
+                -- we need to combine this block with its
+                -- initialisation routines; see Note
+                -- [pipeline-split-init].
+
   ; dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms code_stuff)
 
   ; return code_stuff }
-\end{code}
 
-%************************************************************************
-%*									*
-\subsection[codegen-init]{Module initialisation code}
-%*									*
-%************************************************************************
-
-/* -----------------------------------------------------------------------------
-   Module initialisation
-
-   The module initialisation code looks like this, roughly:
-
-	FN(__stginit_Foo) {
- 	  JMP_(__stginit_Foo_1_p)
-	}
-
-	FN(__stginit_Foo_1_p) {
-	...
-	}
-
-   We have one version of the init code with a module version and the
-   'way' attached to it.  The version number helps to catch cases
-   where modules are not compiled in dependency order before being
-   linked: if a module has been compiled since any modules which depend on
-   it, then the latter modules will refer to a different version in their
-   init blocks and a link error will ensue.
-
-   The 'way' suffix helps to catch cases where modules compiled in different
-   ways are linked together (eg. profiled and non-profiled).
-
-   We provide a plain, unadorned, version of the module init code
-   which just jumps to the version with the label and way attached.  The
-   reason for this is that when using foreign exports, the caller of
-   startupHaskell() must supply the name of the init function for the "top"
-   module in the program, and we don't want to require that this name
-   has the version and way info appended to it.
-   --------------------------------------------------------------------------  */
-
-We initialise the module tree by keeping a work-stack, 
-	* pointed to by Sp
-	* that grows downward
-	* Sp points to the last occupied slot
-
-
-\begin{code}
-mkModuleInit 
+mkModuleInit
         :: DynFlags
 	-> CollectedCCs         -- cost centre info
 	-> Module
-	-> [Module]
-	-> HpcInfo
+        -> HpcInfo
 	-> Code
-mkModuleInit dflags cost_centre_info this_mod imported_mods hpc_info
-  = do	{ -- Allocate the static boolean that records if this
-          -- module has been registered already
-	  emitData Data [CmmDataLabel moduleRegdLabel, 
-		         CmmStaticLit zeroCLit]
 
+mkModuleInit dflags cost_centre_info this_mod hpc_info
+  = do	{ -- Allocate the static boolean that records if this
         ; whenC (opt_Hpc) $
               hpcTable this_mod hpc_info
-
-          -- we emit a recursive descent module search for all modules
-	  -- and *choose* to chase it in :Main, below.
-          -- In this way, Hpc enabled modules can interact seamlessly with
-	  -- not Hpc enabled moduled, provided Main is compiled with Hpc.
-
-        ; emitSimpleProc real_init_lbl $ do
-                       { ret_blk <- forkLabelledCode ret_code
-
-                        ; init_blk <- forkLabelledCode $ do
-                                        { mod_init_code; stmtC (CmmBranch ret_blk) }
-                                    
-                        ; stmtC (CmmCondBranch (cmmNeWord (CmmLit zeroCLit) mod_reg_val)
-                                    ret_blk)
-                        ; stmtC (CmmBranch init_blk)	    
-                        }
-
- 	    -- Make the "plain" procedure jump to the "real" init procedure
-	; emitSimpleProc plain_init_lbl jump_to_init
-
-	-- When compiling the module in which the 'main' function lives,
-	-- (that is, this_mod == main_mod)
-	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
-	-- RTS to invoke.  We must consult the -main-is flag in case the
-	-- user specified a different function to Main.main
- 
-        -- Notice that the recursive descent is optional, depending on what options
-	-- are enabled.
-
-	; whenC (this_mod == main_mod)
-		(emitSimpleProc plain_main_init_lbl rec_descent_init)
-    }
-  where
-    -- The way string we attach to the __stginit label to catch
-    -- accidental linking of modules compiled in different ways.  We
-    -- omit "dyn" from this way, because we want to be able to load
-    -- both dynamic and non-dynamic modules into a dynamic GHC.
-    way = mkBuildTag (filter want_way (ways dflags))
-    want_way w = not (wayRTSOnly w) && wayName w /= WayDyn
-
-    main_mod = mainModIs dflags
-
-    plain_init_lbl = mkPlainModuleInitLabel this_mod
-    real_init_lbl  = mkModuleInitLabel this_mod way
-    plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
-
-    jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
-
-    mod_reg_val = CmmLoad (mkLblExpr moduleRegdLabel) bWord
-
-    -- Main refers to GHC.TopHandler.runIO, so make sure we call the
-    -- init function for GHC.TopHandler.
-    extra_imported_mods
-	| this_mod == main_mod = [gHC_TOP_HANDLER]
-	| otherwise	       = []
-
-    mod_init_code = do
-	{ 	-- Set mod_reg to 1 to record that we've been here
-	  stmtC (CmmStore (mkLblExpr moduleRegdLabel) (CmmLit (mkIntCLit 1)))
 
         ; whenC (opt_SccProfilingOn) $ do 
 	    initCostCentres cost_centre_info
 
-        ; whenC (opt_Hpc) $
-            initHpc this_mod hpc_info
-         
-	; mapCs (registerModuleImport way)
-		(imported_mods++extra_imported_mods)
+            -- For backwards compatibility: user code may refer to this
+            -- label for calling hs_add_root().
+        ; emitData Data $ [ CmmDataLabel (mkPlainModuleInitLabel this_mod) ]
 
-	} 
-
-                    -- The return-code pops the work stack by 
-                    -- incrementing Sp, and then jumpd to the popped item
-    ret_code = stmtsC [ CmmAssign spReg (cmmRegOffW spReg 1)
-                      , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) bWord) [] ]
-
-
-    rec_descent_init = if opt_SccProfilingOn || isHpcUsed hpc_info
-		       then jump_to_init
-		       else ret_code
-
------------------------
-registerModuleImport :: String -> Module -> Code
-registerModuleImport way mod
-  | mod == gHC_PRIM
-  = nopC 
-  | otherwise 	-- Push the init procedure onto the work stack
-  = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
-	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel mod way)) ]
+        ; whenC (this_mod == mainModIs dflags) $
+             emitSimpleProc (mkPlainModuleInitLabel rOOT_MAIN) $ return ()
+    }
 \end{code}
 
 
@@ -252,9 +128,7 @@ initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
   | otherwise
   = do	{ mapM_ emitCostCentreDecl  	 local_CCs
 	; mapM_ emitCostCentreStackDecl  singleton_CCSs
-	; mapM_ emitRegisterCC           local_CCs
-	; mapM_ emitRegisterCCS          singleton_CCSs
-	}
+        }
 \end{code}
 
 %************************************************************************

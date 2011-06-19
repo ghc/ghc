@@ -18,7 +18,7 @@ import HsSyn
 import TcEnv            ( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
-import IfaceEnv         ( ifaceExportNames )
+import IfaceEnv		( ifaceExportNames )
 import LoadIface        ( loadSrcInterface )
 import TcRnMonad
 
@@ -112,8 +112,9 @@ rnImportDecl this_mod implicit_prelude
 	-- (Opt_WarnMissingImportList also checks for T(..) items
 	--  but that is done in checkDodgyImport below)
     case imp_details of
-        Just (False, _)       -> return ()
+        Just (False, _)       -> return ()	-- Explicit import list
         _  | implicit_prelude -> return ()
+           | qual_only	      -> return ()
            | otherwise        -> ifDOptM Opt_WarnMissingImportList $
                                  addWarn (missingImportListWarn imp_mod_name)
 
@@ -586,6 +587,7 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
                 = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
                 -- NB. use the RdrName for reporting the warning
 		| IEThingAll {} <- ieRdr
+		, not (is_qual decl_spec)
                 = ifDOptM Opt_WarnMissingImportList $
                   addWarn (missingImportListItem ieRdr)
             checkDodgyImport _
@@ -826,7 +828,7 @@ it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 type ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ([LIE Name],             -- Export items with Names
-        ExportOccMap,                -- Tracks exported occurrence names
+        ExportOccMap,           -- Tracks exported occurrence names
         [AvailInfo])            -- The accumulated exported stuff
                                 --   Not nub'd!
 
@@ -910,7 +912,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports)
-                      (L loc ie@(IEModuleContents mod))
+                      (L loc (IEModuleContents mod))
         | let earlier_mods = [ mod | (L _ (IEModuleContents mod)) <- ie_names ]
         , mod `elem` earlier_mods    -- Duplicate export of M
         = do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
@@ -935,7 +937,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                         -- The qualified and unqualified version of all of
                         -- these names are, in effect, used by this export
 
-             ; occs' <- check_occs ie occs names
+             ; occs' <- check_occs (IEModuleContents mod) occs names
                       -- This check_occs not only finds conflicts
                       -- between this item and others, but also
                       -- internally within this item.  That is, if
@@ -1053,7 +1055,7 @@ isModuleExported implicit_prelude mod (GRE { gre_name = name, gre_prov = prov })
 
 -------------------------------
 check_occs :: IE RdrName -> ExportOccMap -> [Name] -> RnM ExportOccMap
-check_occs ie occs names
+check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
   = foldlM check occs names
   where
     check occs name
@@ -1064,7 +1066,7 @@ check_occs ie occs names
             | name == name'   -- Duplicate export
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
-            -> do unless (diffModules ie ie') $ do
+            -> do unless (dupExport_ok name ie ie') $ do
                       warn_dup_exports <- doptM Opt_WarnDuplicateExports
                       warnIf warn_dup_exports (dupExportWarn name_occ ie ie')
                   return occs
@@ -1075,9 +1077,46 @@ check_occs ie occs names
                      return occs }
       where
         name_occ = nameOccName name
-        -- True if the two IE RdrName are different module exports.
-        diffModules (IEModuleContents n1) (IEModuleContents n2) = n1 /= n2
-        diffModules _                     _                     = False
+
+
+dupExport_ok :: Name -> IE RdrName -> IE RdrName -> Bool
+-- The Name is exported by both IEs. Is that ok?
+-- "No"  iff the name is mentioned explicitly in both IEs
+--        or one of the IEs mentions the name *alone*
+-- "Yes" otherwise
+-- 
+-- Examples of "no":  module M( f, f )
+--                    module M( fmap, Functor(..) )
+--                    module M( module Data.List, head )
+--
+-- Example of "yes"
+--    module M( module A, module B ) where
+--        import A( f )
+--        import B( f )
+--
+-- Example of "yes" (Trac #2436)
+--    module M( C(..), T(..) ) where
+--         class C a where { data T a }
+--         instace C Int where { data T Int = TInt }
+-- 
+-- Example of "yes" (Trac #2436)
+--    module Foo ( T ) where
+--      data family T a
+--    module Bar ( T(..), module Foo ) where
+--        import Foo
+--        data instance T Int = TInt
+
+dupExport_ok n ie1 ie2 
+  = not (  single ie1 || single ie2
+        || (explicit_in ie1 && explicit_in ie2) )
+  where
+    explicit_in (IEModuleContents _) = False                -- module M
+    explicit_in (IEThingAll r) = nameOccName n == rdrNameOcc r  -- T(..)
+    explicit_in _              = True
+  
+    single (IEVar {})      = True
+    single (IEThingAbs {}) = True
+    single _               = False
 \end{code}
 
 %*********************************************************
@@ -1248,13 +1287,16 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage imports rdr_env (Set.elems uses)
 
+       ; traceRn (ptext (sLit "Import usage") <+> ppr usage)
        ; ifDOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
        ; ifDOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
-    explicit_import (L loc _) = isGoodSrcSpan loc
+    explicit_import (L loc _) = case loc of
+                                UnhelpfulSpan _ -> False
+                                RealSrcSpan _ -> True
         -- Filter out the implicit Prelude import
         -- which we do not want to bleat about
 \end{code}

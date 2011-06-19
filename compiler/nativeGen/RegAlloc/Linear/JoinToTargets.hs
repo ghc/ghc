@@ -1,5 +1,3 @@
-{-# OPTIONS -fno-warn-missing-signatures #-}
-
 
 -- | Handles joining of a jump instruction to its targets.
 
@@ -35,14 +33,14 @@ import UniqSet
 --	vregs are in the correct regs for its destination.
 --
 joinToTargets
-	:: Instruction instr
+	:: (FR freeRegs, Instruction instr)
 	=> BlockMap RegSet		-- ^ maps the unique of the blockid to the set of vregs 
 					--	that are known to be live on the entry to each block.
 
 	-> BlockId			-- ^ id of the current block
 	-> instr			-- ^ branch instr on the end of the source block.
 
-	-> RegM ([NatBasicBlock instr]	--   fresh blocks of fixup code.
+	-> RegM freeRegs ([NatBasicBlock instr]	--   fresh blocks of fixup code.
 		, instr)		--   the original branch instruction, but maybe patched to jump
 					--	to a fixup block first.
 
@@ -57,7 +55,7 @@ joinToTargets block_live id instr
 
 -----
 joinToTargets'
-	:: Instruction instr
+	:: (FR freeRegs, Instruction instr)
 	=> BlockMap RegSet		-- ^ maps the unique of the blockid to the set of vregs 
 					--	that are known to be live on the entry to each block.
 
@@ -68,7 +66,7 @@ joinToTargets'
 
 	-> [BlockId]			-- ^ branch destinations still to consider.
 
-	-> RegM ( [NatBasicBlock instr]
+	-> RegM freeRegs ( [NatBasicBlock instr]
 		, instr)
 
 -- no more targets to consider. all done.
@@ -109,13 +107,24 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 
 -- this is the first time we jumped to this block.
+joinToTargets_first :: (FR freeRegs, Instruction instr)
+                    => BlockMap RegSet
+                    -> [NatBasicBlock instr]
+                    -> BlockId
+                    -> instr
+                    -> BlockId
+                    -> [BlockId]
+                    -> BlockAssignment freeRegs
+                    -> RegMap Loc
+                    -> [RealReg]
+                    -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_first block_live new_blocks block_id instr dest dests
 	block_assig src_assig 
-	(to_free :: [RealReg])
+	to_free
 
  = do	-- free up the regs that are not live on entry to this block.
   	freeregs 	<- getFreeRegsR
-	let freeregs' 	= foldr releaseReg freeregs to_free 
+	let freeregs' 	= foldr frReleaseReg freeregs to_free 
 	
 	-- remember the current assignment on entry to this block.
 	setBlockAssigR (mapInsert dest (freeregs', src_assig) block_assig)
@@ -124,6 +133,16 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
 
 -- we've jumped to this block before
+joinToTargets_again :: (Instruction instr, FR freeRegs)
+                    => BlockMap RegSet
+                    -> [NatBasicBlock instr]
+                    -> BlockId
+                    -> instr
+                    -> BlockId
+                    -> [BlockId]
+                    -> UniqFM Loc
+                    -> UniqFM Loc
+                    -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_again 
 	block_live new_blocks block_id instr dest dests
 	src_assig dest_assig
@@ -190,7 +209,7 @@ joinToTargets_again
 		 _	-> let	instr'	=  patchJumpInstr instr 
 		 				(\bid -> if bid == dest 
 								then mkBlockId fixup_block_id 
-								else dest)
+								else bid) -- no change!
 						
 		 	   in	joinToTargets' block_live (block : new_blocks) block_id instr' dests
 
@@ -262,7 +281,7 @@ expandNode vreg src dst
 --
 handleComponent 
 	:: Instruction instr
-	=> Int -> instr -> SCC (Unique, Loc, [Loc]) -> RegM [instr]
+	=> Int -> instr -> SCC (Unique, Loc, [Loc]) -> RegM freeRegs [instr]
 
 -- If the graph is acyclic then we won't get the swapping problem below.
 --	In this case we can just do the moves directly, and avoid having to
@@ -317,7 +336,7 @@ makeMove
 	-> Unique 	-- ^ unique of the vreg that we're moving.
 	-> Loc 		-- ^ source location.
 	-> Loc 		-- ^ destination location.
-	-> RegM instr	-- ^ move instruction.
+	-> RegM freeRegs instr	-- ^ move instruction.
 
 makeMove _     vreg (InReg src) (InReg dst)
  = do	recordSpill (SpillJoinRR vreg)

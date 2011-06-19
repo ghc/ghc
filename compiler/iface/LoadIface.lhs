@@ -729,14 +729,18 @@ pprFixities fixes = ptext (sLit "fixities") <+> pprWithCommas pprFix fixes
 		    pprFix (occ,fix) = ppr fix <+> ppr occ 
 
 pprVectInfo :: IfaceVectInfo -> SDoc
-pprVectInfo (IfaceVectInfo { ifaceVectInfoVar        = vars
-                           , ifaceVectInfoTyCon      = tycons
-                           , ifaceVectInfoTyConReuse = tyconsReuse
+pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
+                           , ifaceVectInfoTyCon        = tycons
+                           , ifaceVectInfoTyConReuse   = tyconsReuse
+                           , ifaceVectInfoScalarVars   = scalarVars
+                           , ifaceVectInfoScalarTyCons = scalarTyCons
                            }) = 
   vcat 
   [ ptext (sLit "vectorised variables:") <+> hsep (map ppr vars)
   , ptext (sLit "vectorised tycons:") <+> hsep (map ppr tycons)
   , ptext (sLit "vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
+  , ptext (sLit "scalar variables:") <+> hsep (map ppr scalarVars)
+  , ptext (sLit "scalar tycons:") <+> hsep (map ppr scalarTyCons)
   ]
 
 instance Outputable Warnings where

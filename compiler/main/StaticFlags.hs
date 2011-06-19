@@ -24,7 +24,7 @@ module StaticFlags (
 	opt_PprCols,
 	opt_PprCaseAsLet,
 	opt_PprStyle_Debug, opt_TraceLevel,
-        opt_NoDebugOutput,
+        opt_NoDebugOutput, 
 
 	-- Suppressing boring aspects of core dumps
 	opt_SuppressAll,
@@ -52,6 +52,7 @@ module StaticFlags (
 	opt_CprOff,
 	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
+	opt_NoOptCoercion,
 	opt_MaxWorkerArgs,
 
 	-- Unfolding control
@@ -166,7 +167,7 @@ try_read sw str
   = case reads str of
 	((x,_):_) -> x	-- Be forgiving: ignore trailing goop, and alternative parses
 	[]	  -> ghcError (UsageError ("Malformed argument " ++ str ++ " for flag " ++ sw))
-			-- ToDo: hack alert. We should really parse the arugments
+			-- ToDo: hack alert. We should really parse the arguments
 			-- 	 and announce errors in a more civilised way.
 
 
@@ -191,15 +192,11 @@ opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
 
 -- debugging options
 -- | Suppress all that is suppressable in core dumps.
+--   Except for uniques, as some simplifier phases introduce new varibles that
+--   have otherwise identical names.
 opt_SuppressAll :: Bool
 opt_SuppressAll	
 	= lookUp  (fsLit "-dsuppress-all")
-
--- | Suppress unique ids on variables.
-opt_SuppressUniques :: Bool
-opt_SuppressUniques
-	=  lookUp  (fsLit "-dsuppress-all")
-	|| lookUp  (fsLit "-dsuppress-uniques")
 
 -- | Suppress all coercions, them replacing with '...'
 opt_SuppressCoercions :: Bool
@@ -231,10 +228,16 @@ opt_SuppressTypeSignatures
 	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-type-signatures")
 
+-- | Suppress unique ids on variables.
+--   Except for uniques, as some simplifier phases introduce new variables that
+--   have otherwise identical names.
+opt_SuppressUniques :: Bool
+opt_SuppressUniques
+	=  lookUp  (fsLit "-dsuppress-uniques")
 
 -- | Display case expressions with a single alternative as strict let bindings
 opt_PprCaseAsLet :: Bool
-opt_PprCaseAsLet		= lookUp   (fsLit "-dppr-case-as-let")
+opt_PprCaseAsLet	= lookUp   (fsLit "-dppr-case-as-let")
 
 -- | Set the maximum width of the dumps
 --   If GHC's command line options are bad then the options parser uses the
@@ -265,7 +268,6 @@ opt_Fuel                        = lookup_def_int "-dopt-fuel" maxBound
 
 opt_NoDebugOutput   :: Bool
 opt_NoDebugOutput               = lookUp  (fsLit "-dno-debug-output")
-
 
 -- profiling opts
 opt_SccProfilingOn :: Bool
@@ -320,6 +322,9 @@ opt_SimplNoPreInlining		= lookUp  (fsLit "-fno-pre-inlining")
 opt_SimplExcessPrecision :: Bool
 opt_SimplExcessPrecision	= lookUp  (fsLit "-fexcess-precision")
 
+opt_NoOptCoercion :: Bool
+opt_NoOptCoercion    	        = lookUp  (fsLit "-fno-opt-coercion")
+
 -- Unfolding control
 -- See Note [Discounts and thresholds] in CoreUnfold
 
@@ -327,16 +332,16 @@ opt_UF_CreationThreshold, opt_UF_UseThreshold :: Int
 opt_UF_DearOp, opt_UF_FunAppDiscount, opt_UF_DictDiscount :: Int
 opt_UF_KeenessFactor :: Float
 
-opt_UF_CreationThreshold = lookup_def_int "-funfolding-creation-threshold" (45::Int)
-opt_UF_UseThreshold	 = lookup_def_int "-funfolding-use-threshold"	   (6::Int)
-opt_UF_FunAppDiscount	 = lookup_def_int "-funfolding-fun-discount"	   (6::Int)
+opt_UF_CreationThreshold = lookup_def_int "-funfolding-creation-threshold" (450::Int)
+opt_UF_UseThreshold      = lookup_def_int "-funfolding-use-threshold"      (60::Int)
+opt_UF_FunAppDiscount    = lookup_def_int "-funfolding-fun-discount"       (60::Int)
 
-opt_UF_DictDiscount	 = lookup_def_int "-funfolding-dict-discount"	   (3::Int)
+opt_UF_DictDiscount      = lookup_def_int "-funfolding-dict-discount"      (30::Int)
    -- Be fairly keen to inline a fuction if that means
    -- we'll be able to pick the right method from a dictionary
 
 opt_UF_KeenessFactor	 = lookup_def_float "-funfolding-keeness-factor"   (1.5::Float)
-opt_UF_DearOp            = ( 4 :: Int)
+opt_UF_DearOp            = ( 40 :: Int)
 
 
 -- Related to linking

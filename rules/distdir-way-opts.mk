@@ -17,9 +17,9 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 
 # Options for a Haskell compilation:
 #   - CONF_HC_OPTS                 source-tree-wide options, selected at
-#				   configure-time
+#                                  configure-time
 #   - SRC_HC_OPTS                  source-tree-wide options from build.mk
-#				   (optimisation, heap settings)
+#                                  (optimisation, heap settings)
 #   - libraries/base_HC_OPTS       options from Cabal for libraries/base
 #                                  for all ways
 #   - libraries/base_MORE_HC_OPTS  options from elsewhere in the build
@@ -27,7 +27,7 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 #   - libraries/base_v_HC_OPTS     options from libraries/base for way v
 #   - WAY_v_HC_OPTS                options for this way
 #   - EXTRA_HC_OPTS                options from the command-line
-#   - -Idir1 -Idir2 ...		   include-dirs from this package
+#   - -Idir1 -Idir2 ...            include-dirs from this package
 #   - -odir/-hidir/-stubdir        put the output files under $3/build
 #   - -osuf/-hisuf/-hcsuf          suffixes for the output files in this way
 
@@ -79,10 +79,8 @@ else
 $1_$2_DEP_INCLUDE_DIRS_FLAG = -I
 endif
 
-# We have to do this mangling using the shell, because words may contain
-# spaces and GNU make doesn't have any quoting interpretation.
-ifneq ($$(strip $$($1_$2_DEP_INCLUDE_DIRS)),)
-$1_$2_CC_INC_FLAGS:=$$(shell for i in $$($1_$2_DEP_INCLUDE_DIRS); do echo $$($1_$2_DEP_INCLUDE_DIRS_FLAG)\"$$$$i\"; done)
+ifneq ($$(strip $$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED)),)
+$1_$2_CC_INC_FLAGS := $$(subst $$(space)',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_FLAG)',$$(space)$$($1_$2_DEP_INCLUDE_DIRS_SINGLE_QUOTED))
 endif
 
 # The CONF_CC_OPTS_STAGE$4 options are what we use to get gcc to
@@ -104,8 +102,8 @@ $1_$2_DIST_CC_OPTS = \
  $$($1_$2_CC_INC_FLAGS) \
  $$($1_$2_DEP_CC_OPTS)
 
-ifneq ($$(strip $$($1_$2_DEP_LIB_DIRS)),)
-$1_$2_DIST_LD_LIB_DIRS:=$$(shell for i in $$($1_$2_DEP_LIB_DIRS); do echo \"-L$$$$i\"; done)
+ifneq ($$(strip $$($1_$2_DEP_LIB_DIRS_SINGLE_QUOTED)),)
+$1_$2_DIST_LD_LIB_DIRS := $$(subst $$(space)',$$(space)-L',$$(space)$$($1_$2_DEP_LIB_DIRS_SINGLE_QUOTED))
 endif
 
 $1_$2_DIST_LD_OPTS = \
@@ -136,6 +134,8 @@ $1_$2_$3_ALL_HSC2HS_OPTS = \
  --cflag=-D__GLASGOW_HASKELL__=$$(ProjectVersionInt) \
  $$($1_$2_$3_HSC2HS_CC_OPTS) \
  $$($1_$2_$3_HSC2HS_LD_OPTS) \
+ --cflag=-I$1/$2/build/autogen \
+ $$(if $$($1_PACKAGE),--cflag=-include --cflag=$1/$2/build/autogen/cabal_macros.h) \
  $$($$(basename $$<)_HSC2HS_OPTS) \
  $$(EXTRA_HSC2HS_OPTS)
 

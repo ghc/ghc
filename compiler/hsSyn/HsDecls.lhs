@@ -3,15 +3,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
-
-
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 {-# LANGUAGE DeriveDataTypeable #-}
 
 -- | Abstract syntax of global declarations.
@@ -34,6 +26,8 @@ module HsDecls (
   -- ** @RULE@ declarations
   RuleDecl(..), LRuleDecl, RuleBndr(..),
   collectRuleBndrSigTys,
+  -- ** @VECTORISE@ declarations
+  VectDecl(..), LVectDecl,
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Top-level template haskell splice
@@ -57,7 +51,7 @@ module HsDecls (
     ) where
 
 -- friends:
-import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
+import {-# SOURCE #-}	HsExpr( LHsExpr, HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
 
 import HsBinds
@@ -102,6 +96,7 @@ data HsDecl id
   | WarningD	(WarnDecl id)
   | AnnD	(AnnDecl id)
   | RuleD	(RuleDecl id)
+  | VectD	(VectDecl id)
   | SpliceD	(SpliceDecl id)
   | DocD	(DocDecl)
   | QuasiQuoteD	(HsQuasiQuote id)
@@ -139,13 +134,14 @@ data HsGroup id
 		-- Snaffled out of both top-level fixity signatures,
 		-- and those in class declarations
 
-	hs_defds  :: [LDefaultDecl id],
-	hs_fords  :: [LForeignDecl id],
-	hs_warnds :: [LWarnDecl id],
-	hs_annds   :: [LAnnDecl id],
-	hs_ruleds :: [LRuleDecl id],
+        hs_defds  :: [LDefaultDecl id],
+        hs_fords  :: [LForeignDecl id],
+        hs_warnds :: [LWarnDecl id],
+        hs_annds  :: [LAnnDecl id],
+        hs_ruleds :: [LRuleDecl id],
+        hs_vects  :: [LVectDecl id],
 
-	hs_docs   :: [LDocDecl]
+        hs_docs   :: [LDocDecl]
   } deriving (Data, Typeable)
 
 emptyGroup, emptyRdrGroup, emptyRnGroup :: HsGroup a
@@ -154,49 +150,52 @@ emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_tyclds = [], hs_instds = [], hs_derivds = [],
 		       hs_fixds = [], hs_defds = [], hs_annds = [],
-		       hs_fords = [], hs_warnds = [], hs_ruleds = [],
+		       hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
 		       hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_docs = [] }
 
 appendGroups :: HsGroup a -> HsGroup a -> HsGroup a
 appendGroups 
     HsGroup { 
-	hs_valds  = val_groups1,
-	hs_tyclds = tyclds1, 
-	hs_instds = instds1,
+        hs_valds  = val_groups1,
+        hs_tyclds = tyclds1, 
+        hs_instds = instds1,
         hs_derivds = derivds1,
-	hs_fixds  = fixds1, 
-	hs_defds  = defds1,
-	hs_annds  = annds1,
-	hs_fords  = fords1, 
-	hs_warnds = warnds1,
-	hs_ruleds = rulds1,
+        hs_fixds  = fixds1, 
+        hs_defds  = defds1,
+        hs_annds  = annds1,
+        hs_fords  = fords1, 
+        hs_warnds = warnds1,
+        hs_ruleds = rulds1,
+        hs_vects = vects1,
   hs_docs   = docs1 }
     HsGroup { 
-	hs_valds  = val_groups2,
-	hs_tyclds = tyclds2, 
-	hs_instds = instds2,
+        hs_valds  = val_groups2,
+        hs_tyclds = tyclds2, 
+        hs_instds = instds2,
         hs_derivds = derivds2,
-	hs_fixds  = fixds2, 
-	hs_defds  = defds2,
-	hs_annds  = annds2,
-	hs_fords  = fords2, 
-	hs_warnds = warnds2,
-	hs_ruleds = rulds2,
-  hs_docs   = docs2 }
+        hs_fixds  = fixds2, 
+        hs_defds  = defds2,
+        hs_annds  = annds2,
+        hs_fords  = fords2, 
+        hs_warnds = warnds2,
+        hs_ruleds = rulds2,
+        hs_vects  = vects2,
+        hs_docs   = docs2 }
   = 
     HsGroup { 
-	hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
-	hs_tyclds = tyclds1 ++ tyclds2, 
-	hs_instds = instds1 ++ instds2,
+        hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
+        hs_tyclds = tyclds1 ++ tyclds2, 
+        hs_instds = instds1 ++ instds2,
         hs_derivds = derivds1 ++ derivds2,
-	hs_fixds  = fixds1 ++ fixds2,
-	hs_annds  = annds1 ++ annds2,
-	hs_defds  = defds1 ++ defds2,
-	hs_fords  = fords1 ++ fords2, 
-	hs_warnds = warnds1 ++ warnds2,
-	hs_ruleds = rulds1 ++ rulds2,
-  hs_docs   = docs1  ++ docs2 }
+        hs_fixds  = fixds1 ++ fixds2,
+        hs_annds  = annds1 ++ annds2,
+        hs_defds  = defds1 ++ defds2,
+        hs_fords  = fords1 ++ fords2, 
+        hs_warnds = warnds1 ++ warnds2,
+        hs_ruleds = rulds1 ++ rulds2,
+        hs_vects  = vects1 ++ vects2,
+        hs_docs   = docs1  ++ docs2 }
 \end{code}
 
 \begin{code}
@@ -209,6 +208,7 @@ instance OutputableBndr name => Outputable (HsDecl name) where
     ppr (ForD fd)               = ppr fd
     ppr (SigD sd)               = ppr sd
     ppr (RuleD rd)              = ppr rd
+    ppr (VectD vect)            = ppr vect
     ppr (WarningD wd)           = ppr wd
     ppr (AnnD ad)               = ppr ad
     ppr (SpliceD dd)            = ppr dd
@@ -225,11 +225,13 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 		   hs_annds  = ann_decls,
 		   hs_fords  = foreign_decls,
 		   hs_defds  = default_decls,
-		   hs_ruleds = rule_decls })
+		   hs_ruleds = rule_decls,
+		   hs_vects  = vect_decls })
 	= vcat_mb empty 
             [ppr_ds fix_decls, ppr_ds default_decls, 
 	     ppr_ds deprec_decls, ppr_ds ann_decls,
 	     ppr_ds rule_decls,
+	     ppr_ds vect_decls,
 	     if isEmptyValBinds val_decls 
                 then Nothing 
                 else Just (ppr val_decls),
@@ -620,15 +622,15 @@ instance OutputableBndr name
                   (ppr new_or_data <+> 
 		   (if isJust typats then ptext (sLit "instance") else empty) <+>
 		   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
-		   ppr_sig mb_sig)
+		   ppr_sigx mb_sig)
 		  (pp_condecls condecls)
 		  derivings
       where
-	ppr_sig Nothing = empty
-	ppr_sig (Just kind) = dcolon <+> pprKind kind
+	ppr_sigx Nothing     = empty
+	ppr_sigx (Just kind) = dcolon <+> pprKind kind
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, 
-		    tcdFDs = fds, 
+		    tcdFDs  = fds, 
 		    tcdSigs = sigs, tcdMeths = methods, tcdATs = ats})
       | null sigs && null ats  -- No "where" part
       = top_matter
@@ -763,14 +765,14 @@ instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
 pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
-pprConDecl (ConDecl { con_name =con, con_explicit = expl, con_qvars = tvs
+pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = details
                     , con_res = ResTyH98, con_doc = doc })
-  = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details con details]
+  = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details details]
   where
-    ppr_details con (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
-    ppr_details con (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
-    ppr_details con (RecCon fields)  = ppr con <+> pprConDeclFields fields
+    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprHsInfix con, ppr t2]
+    ppr_details (PrefixCon tys)  = hsep (pprHsVar con : map ppr tys)
+    ppr_details (RecCon fields)  = ppr con <+> pprConDeclFields fields
 
 pprConDecl (ConDecl { con_name = con, con_explicit = expl, con_qvars = tvs
                     , con_cxt = cxt, con_details = PrefixCon arg_tys
@@ -792,7 +794,7 @@ pprConDecl (ConDecl {con_name = con, con_details = InfixCon {}, con_res = ResTyG
 
 %************************************************************************
 %*									*
-\subsection[InstDecl]{An instance declaration
+\subsection[InstDecl]{An instance declaration}
 %*									*
 %************************************************************************
 
@@ -825,14 +827,14 @@ instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats
 
 %************************************************************************
 %*									*
-\subsection[DerivDecl]{A stand-alone instance deriving declaration
+\subsection[DerivDecl]{A stand-alone instance deriving declaration}
 %*									*
 %************************************************************************
 
 \begin{code}
 type LDerivDecl name = Located (DerivDecl name)
 
-data DerivDecl name = DerivDecl (LHsType name)
+data DerivDecl name = DerivDecl { deriv_type :: LHsType name }
   deriving (Data, Typeable)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
@@ -994,6 +996,47 @@ instance OutputableBndr name => Outputable (RuleDecl name) where
 instance OutputableBndr name => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
    ppr (RuleBndrSig name ty) = ppr name <> dcolon <> ppr ty
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+\subsection{Vectorisation declarations}
+%*                                                                      *
+%************************************************************************
+
+A vectorisation pragma
+
+  {-# VECTORISE f = closure1 g (scalar_map g) #-} OR
+  {-# VECTORISE SCALAR f #-}
+  
+Note [Typechecked vectorisation pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In case of the first variant of vectorisation pragmas (with an explicit expression),
+we need to infer the type of that expression during type checking and then keep that type
+around until vectorisation, so that it can be checked against the *vectorised* type of 'f'.
+(We cannot determine vectorised types during type checking due to internal information of
+the vectoriser being needed.)
+
+To this end, we annotate the 'Id' of 'f' (the variable mentioned in the PRAGMA) with the
+inferred type of the expression.  This is slightly dodgy, as this is really the type of
+'$v_f' (the name of the vectorised function).
+
+\begin{code}
+type LVectDecl name = Located (VectDecl name)
+
+data VectDecl name
+  = HsVect
+      (Located name)
+      (Maybe (LHsExpr name))    -- 'Nothing' => SCALAR declaration
+  deriving (Data, Typeable)
+      
+instance OutputableBndr name => Outputable (VectDecl name) where
+  ppr (HsVect v rhs)
+    = sep [text "{-# VECTORISE" <+> ppr v,
+           nest 4 (case rhs of
+                     Nothing  -> text "SCALAR #-}"
+                     Just rhs -> pprExpr (unLoc rhs) <+> text "#-}") ]
 \end{code}
 
 %************************************************************************

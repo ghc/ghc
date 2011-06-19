@@ -23,7 +23,7 @@ interpret the filename as two, "c:\\Program" and "Files\\Haskell\\Project.hs".
 <!-- not clear whether there are current editions of Win32 OSes that
      doesn't do this by default.
 
-<para> Solution: don't use "Open With...", avoid spaces in file names, 
+<para> Solution: don't use "Open With...", avoid spaces in file names,
 or fiddle with the appropriate registry setting:
 <programlisting>
   HKEY_CLASSES_ROOT\Unknown\shell\openas\command
@@ -152,7 +152,7 @@ cygwin's bash), but what matters here is that - just like any other
 normal windows program - neither GHC nor the executables it produces
 are aware of cygwin's pretended unix hierarchy. GHC will happily
 accept either '/' or '\' as path separators, but it won't know where
-to find <filename>/home/joe/Main.hs</filename> or <filename>/bin/bash</filename> 
+to find <filename>/home/joe/Main.hs</filename> or <filename>/bin/bash</filename>
 or the like. This causes all
 kinds of fun when GHC is used from within cygwin's bash, or in
 make-sessions running under cygwin.
@@ -162,9 +162,9 @@ make-sessions running under cygwin.
 <sect2><title>Things to do</title>
 <itemizedlist>
 <listitem>
-<para> Don't use absolute paths in make, configure &amp; co if there is any chance 
+<para> Don't use absolute paths in make, configure &amp; co if there is any chance
   that those might be passed to GHC (or to GHC-compiled programs). Relative
-  paths are fine because cygwin tools are happy with them and GHC accepts 
+  paths are fine because cygwin tools are happy with them and GHC accepts
   '/' as path-separator. And relative paths don't depend on where cygwin's
   root directory is located, or on which partition or network drive your source
   tree happens to reside, as long as you 'cd' there first.
@@ -175,25 +175,25 @@ make-sessions running under cygwin.
   <literal>ROOT=`pwd`</literal> in makefile hierarchies or configure scripts), cygwin provides
   a tool called <command>cygpath</command> that can convert cygwin's unix-style paths to their
   actual windows-style counterparts. Many cygwin tools actually accept
-  absolute windows-style paths (remember, though, that you either need 
-  to escape '\' or convert '\' to '/'), so you should be fine just using those 
-  everywhere. If you need to use tools that do some kind of path-mangling 
-  that depends on unix-style paths (one fun example is trying to interpret ':' 
-  as a separator in path lists..), you can still try to convert paths using 
+  absolute windows-style paths (remember, though, that you either need
+  to escape '\' or convert '\' to '/'), so you should be fine just using those
+  everywhere. If you need to use tools that do some kind of path-mangling
+  that depends on unix-style paths (one fun example is trying to interpret ':'
+  as a separator in path lists..), you can still try to convert paths using
   <command>cygpath</command> just before they are passed to GHC and friends.
 </para></listitem>
-  
+
 <listitem>
 <para> If you don't have <command>cygpath</command>, you probably don't have cygwin and hence
   no problems with it... unless you want to write one build process for several
   platforms. Again, relative paths are your friend, but if you have to use
   absolute paths, and don't want to use different tools on different platforms,
   you can simply write a short Haskell program to print the current directory
-   (thanks to George Russell for this idea): compiled with GHC, this will give 
-  you the view of the file system that GHC depends on (which will differ 
+   (thanks to George Russell for this idea): compiled with GHC, this will give
+  you the view of the file system that GHC depends on (which will differ
   depending on whether GHC is compiled with cygwin's gcc or mingw's
-  gcc or on a real unix system..) - that little program can also deal with 
-  escaping '\' in paths. Apart from the banner and the startup time, 
+  gcc or on a real unix system..) - that little program can also deal with
+  escaping '\' in paths. Apart from the banner and the startup time,
   something like this would also do:
 <programlisting>
   $ echo "Directory.getCurrentDirectory >>= putStrLn . init . tail . show " | ghci
@@ -209,15 +209,6 @@ make-sessions running under cygwin.
 </title>
 
 <para>
-<emphasis>Making Haskell libraries into DLLs doesn't work on Windows at the
-moment; we hope to re-instate this facility in the future
-(see <xref linkend="using-shared-libs"/>).  Note that
-building an entire Haskell application as a single DLL is still supported: it's
-	just multi-DLL Haskell programs that don't work.  The Windows
-	distribution of GHC contains static libraries only.</emphasis></para>
-
-<!--
-<para>
 <indexterm><primary>Dynamic link libraries, Win32</primary></indexterm>
 <indexterm><primary>DLLs, Win32</primary></indexterm>
 On Win32 platforms, the compiler is capable of both producing and using
@@ -225,6 +216,33 @@ dynamic link libraries (DLLs) containing ghc-compiled code. This
 section shows you how to make use of this facility.
 </para>
 
+<para>
+There are two distinct ways in which DLLs can be used:
+<itemizedlist>
+  <listitem>
+    <para>
+      You can turn each Haskell package into a DLL, so that multiple
+      Haskell executables using the same packages can share the DLL files.
+      (As opposed to linking the libraries statically, which in effect
+      creates a new copy of the RTS and all libraries for each executable
+      produced.)
+    </para>
+    <para>
+      That is the same as the dynamic linking on other platforms, and it
+      is described in <xref linkend="using-shared-libs"/>.
+    </para>
+  </listitem>
+  <listitem>
+    <para>
+      You can package up a complete Haskell program as a DLL, to be called
+      by some external (usually non-Haskell) program. This is usually used
+      to implement plugins and the like, and is described below.
+    </para>
+  </listitem>
+</itemizedlist>
+</para>
+
+<!--
 <para>
 Until recently, <command>strip</command> didn't work reliably on DLLs, so you
 should test your version with care, or make sure you have the latest
@@ -240,7 +258,7 @@ cured the problem (it was supposedly fixed some years ago).
 The default on Win32 platforms is to link applications in such a way
 that the executables will use the Prelude and system libraries DLLs,
 rather than contain (large chunks of) them. This is transparent at the
-command-line, so 
+command-line, so
 </para>
 
 <para>
@@ -255,7 +273,7 @@ sh$ ls -l main.exe
 -rwxr-xr-x   1 544      everyone     4608 May  3 17:11 main.exe*
 sh$ ./main
 hello, world!
-sh$ 
+sh$
 </screen>
 </para>
 
@@ -429,8 +447,6 @@ foreign export stdcall adder :: Int -> Int -> IO Int
 // StartEnd.c
 #include &lt;Rts.h&gt;
 
-extern void __stginit_Adder(void);
-
 void HsStart()
 {
    int argc = 1;
@@ -439,9 +455,6 @@ void HsStart()
    // Initialize Haskell runtime
    char** args = argv;
    hs_init(&amp;argc, &amp;args);
-
-   // Tell Haskell about all root modules
-   hs_add_root(__stginit_Adder);
 }
 
 void HsEnd()

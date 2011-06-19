@@ -112,6 +112,7 @@
 #define EVENT_GC_END              10 /* ()                     */
 #define EVENT_REQUEST_SEQ_GC      11 /* ()                     */
 #define EVENT_REQUEST_PAR_GC      12 /* ()                     */
+/* 13, 14 deprecated */
 #define EVENT_CREATE_SPARK_THREAD 15 /* (spark_thread)         */
 #define EVENT_LOG_MSG             16 /* (message ...)          */
 #define EVENT_STARTUP             17 /* (num_capabilities)     */
@@ -120,12 +121,40 @@
 #define EVENT_GC_IDLE             20 /* () */
 #define EVENT_GC_WORK             21 /* () */
 #define EVENT_GC_DONE             22 /* () */
+/* 23, 24 used by eden */
+#define EVENT_CAPSET_CREATE       25 /* (capset, capset_type)  */
+#define EVENT_CAPSET_DELETE       26 /* (capset)               */
+#define EVENT_CAPSET_ASSIGN_CAP   27 /* (capset, cap)          */
+#define EVENT_CAPSET_REMOVE_CAP   28 /* (capset, cap)          */
+/* the RTS identifier is in the form of "GHC-version rts_way"  */
+#define EVENT_RTS_IDENTIFIER      29 /* (capset, name_version_string) */
+/* the vectors in these events are null separated strings             */
+#define EVENT_PROGRAM_ARGS        30 /* (capset, commandline_vector)  */
+#define EVENT_PROGRAM_ENV         31 /* (capset, environment_vector)  */
+#define EVENT_OSPROCESS_PID       32 /* (capset, pid)          */
+#define EVENT_OSPROCESS_PPID      33 /* (capset, parent_pid)   */
 
-#define NUM_EVENT_TAGS            23
+
+/* Range 34 - 59 is available for new events */
+
+/* Range 60 - 80 is used by eden for parallel tracing
+ * see http://www.mathematik.uni-marburg.de/~eden/
+ */
+
+/*
+ * The highest event code +1 that ghc itself emits. Note that some event
+ * ranges higher than this are reserved but not currently emitted by ghc.
+ * This must match the size of the EventDesc[] array in EventLog.c
+ */
+#define NUM_EVENT_TAGS            34
 
 #if 0  /* DEPRECATED EVENTS: */
+/* ghc changed how it handles sparks so these are no longer applicable */
 #define EVENT_CREATE_SPARK        13 /* (cap, thread) */
 #define EVENT_SPARK_TO_THREAD     14 /* (cap, thread, spark_thread) */
+/* these are used by eden but are replaced by new alternatives for ghc */
+#define EVENT_VERSION             23 /* (version_string) */
+#define EVENT_PROGRAM_INVOCATION  24 /* (commandline_string) */
 #endif
 
 /*
@@ -152,14 +181,23 @@
  */
 #define THREAD_SUSPENDED_FOREIGN_CALL 6
 
+/*
+ * Capset type values for EVENT_CAPSET_CREATE
+ */
+#define CAPSET_TYPE_CUSTOM      1  /* reserved for end-user applications */
+#define CAPSET_TYPE_OSPROCESS   2  /* caps belong to the same OS process */
+#define CAPSET_TYPE_CLOCKDOMAIN 3  /* caps share a local clock/time      */
+
 #ifndef EVENTLOG_CONSTANTS_ONLY
 
 typedef StgWord16 EventTypeNum;
-typedef StgWord64 EventTimestamp; // in nanoseconds
+typedef StgWord64 EventTimestamp; /* in nanoseconds */
 typedef StgWord32 EventThreadID;
 typedef StgWord16 EventCapNo;
-typedef StgWord16 EventPayloadSize; // variable-size events
-typedef StgWord16 EventThreadStatus; // status for EVENT_STOP_THREAD
+typedef StgWord16 EventPayloadSize; /* variable-size events */
+typedef StgWord16 EventThreadStatus; /* status for EVENT_STOP_THREAD */
+typedef StgWord32 EventCapsetID;
+typedef StgWord16 EventCapsetType;   /* types for EVENT_CAPSET_CREATE */
 
 #endif
 

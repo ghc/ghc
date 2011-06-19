@@ -234,6 +234,7 @@ main(int argc, char *argv[])
 
     field_offset(Capability, r);
     field_offset(Capability, lock);
+    struct_field(Capability, no);
     struct_field(Capability, mut_lists);
     struct_field(Capability, context_switch);
     struct_field(Capability, sparks);

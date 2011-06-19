@@ -4,7 +4,7 @@
   <indexterm><primary>GHCi</primary></indexterm>
   <indexterm><primary>interpreter</primary><see>GHCi</see></indexterm>
   <indexterm><primary>interactive</primary><see>GHCi</see></indexterm>
-  
+
   <para>GHCi<footnote>
       <para>The &lsquo;i&rsquo; stands for &ldquo;Interactive&rdquo;</para>
     </footnote>
@@ -33,7 +33,7 @@ Loading package ghc-prim ... linking ... done.
 Loading package integer-gmp ... linking ... done.
 Loading package base ... linking ... done.
 Loading package ffi-1.0 ... linking ... done.
-Prelude> 
+Prelude>
 </screen>
 
     <para>There may be a short pause while GHCi loads the prelude and
@@ -54,33 +54,33 @@ Prelude> 1+2
 3
 Prelude> let x = 42 in x / 9
 4.666666666666667
-Prelude> 
+Prelude>
 </screen>
 
     <para>GHCi interprets the whole line as an expression to evaluate.
-    The expression may not span several lines - as soon as you press enter, 
+    The expression may not span several lines - as soon as you press enter,
     GHCi will attempt to evaluate it.</para>
 
-    <para>GHCi also has a multiline mode, 
+    <para>GHCi also has a multiline mode,
     <indexterm><primary><literal>:set +m</literal></primary></indexterm>,
     which is terminated by an empty line:</para>
 
 <screen>
 Prelude> :set +m
 Prelude> let x = 42 in x / 9
-Prelude| 
+Prelude|
 4.666666666666667
-Prelude> 
+Prelude>
 </screen>
-    
+
     <para>In Haskell, a <literal>let</literal> expression is followed
-    by <literal>in</literal>.  However, in GHCi, since the expression 
-    can also be interpreted in the <literal>IO</literal> monad, 
-    a <literal>let</literal> binding with no accompanying 
-    <literal>in</literal> statement can be signalled by an empty line, 
+    by <literal>in</literal>.  However, in GHCi, since the expression
+    can also be interpreted in the <literal>IO</literal> monad,
+    a <literal>let</literal> binding with no accompanying
+    <literal>in</literal> statement can be signalled by an empty line,
     as in the above example.</para>
 
-    <para>Multiline mode is useful when entering monadic 
+    <para>Multiline mode is useful when entering monadic
     <literal>do</literal> statements:</para>
 
 <screen>
@@ -94,7 +94,7 @@ Control.Monad.State|
 0
 Control.Monad.State>
 </screen>
-  
+
    <para>During a multiline interaction, the user can interrupt and
    return to the top-level prompt.</para>
 
@@ -174,7 +174,7 @@ Ok, modules loaded: Main.
       <title>Modules vs. filenames</title>
       <indexterm><primary>modules</primary><secondary>and filenames</secondary></indexterm>
       <indexterm><primary>filenames</primary><secondary>of modules</secondary></indexterm>
-      
+
       <para>Question: How does GHC find the filename which contains
       module <replaceable>M</replaceable>?  Answer: it looks for the
       file <literal><replaceable>M</replaceable>.hs</literal>, or
@@ -279,7 +279,7 @@ Ok, modules loaded: A, B, C, D.
     because the source and everything it depends on
     is unchanged since the last compilation.</para>
 
-    <para>At any time you can use the command 
+    <para>At any time you can use the command
     <literal>:show modules</literal>
     to get a list of the modules currently loaded
     into GHCi:</para>
@@ -302,7 +302,7 @@ A                ( A.hs, interpreted )
 *Main> :reload
 Compiling D                ( D.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
-*Main> 
+*Main>
 </screen>
 
     <para>Note that module D was compiled, but in this instance
@@ -429,7 +429,7 @@ hello
       <title>Using <literal>do-</literal>notation at the prompt</title>
       <indexterm><primary>do-notation</primary><secondary>in GHCi</secondary></indexterm>
       <indexterm><primary>statements</primary><secondary>in GHCi</secondary></indexterm>
-      
+
       <para>GHCi actually accepts <firstterm>statements</firstterm>
       rather than just expressions at the prompt.  This means you can
       bind values and functions to names, and use them in future
@@ -454,10 +454,10 @@ Prelude>
       it as we did above.</para>
 
       <para>If <option>-fprint-bind-result</option> is set then
-      GHCi will print the result of a statement if and only if: 
+      GHCi will print the result of a statement if and only if:
 	<itemizedlist>
 	  <listitem>
-	    <para>The statement is not a binding, or it is a monadic binding 
+	    <para>The statement is not a binding, or it is a monadic binding
 	      (<literal>p &lt;- e</literal>) that binds exactly one
 	      variable.</para>
 	  </listitem>
@@ -501,9 +501,9 @@ Prelude> add 1 2
 3
 Prelude>
 </screen>
-        <para>However, this quickly gets tedious when defining functions 
+        <para>However, this quickly gets tedious when defining functions
         with multiple clauses, or groups of mutually recursive functions,
-        because the complete definition has to be given on a single line, 
+        because the complete definition has to be given on a single line,
         using explicit braces and semicolons instead of layout:</para>
 <screen>
 Prelude> let { f op n [] = n ; f op n (h:t) = h `op` f op n t }
@@ -525,9 +525,9 @@ Prelude> g (*) 1 [1..3]
 </screen>
       <para>Such multiline commands can be used with any GHCi command,
       and the lines between <literal>:{</literal> and
-      <literal>:}</literal> are simply merged into a single line for 
+      <literal>:}</literal> are simply merged into a single line for
       interpretation. That implies that each such group must form a single
-      valid command when merged, and that no layout rule is used. 
+      valid command when merged, and that no layout rule is used.
       The main purpose of multiline commands is not to replace module
       loading but to make definitions in .ghci-files (see <xref
       linkend="ghci-dot-files"/>) more readable and maintainable.</para>
@@ -571,7 +571,7 @@ xs :: [Integer]
     </sect2>
 
     <sect2 id="ghci-scope">
-      <title>What's really in scope at the prompt?</title> 
+      <title>What's really in scope at the prompt?</title>
 
       <para>When you type an expression at the prompt, what
       identifiers and types are in scope?  GHCi provides a flexible
@@ -637,7 +637,7 @@ Prelude IO>
       haskell <literal>import</literal> syntax as
       well, but this does not support
       <literal>*</literal> forms).
-      <literal>:module</literal> can also be shortened to 
+      <literal>:module</literal> can also be shortened to
       <literal>:m</literal>. The full syntax of the
       <literal>:module</literal> command is:</para>
 
@@ -785,13 +785,13 @@ bar
 
       </sect3>
     </sect2>
-  
+
 
     <sect2>
       <title>The <literal>it</literal> variable</title>
       <indexterm><primary><literal>it</literal></primary>
       </indexterm>
-      
+
       <para>Whenever an expression (or a non-binding statement, to be
       precise) is typed at the prompt, GHCi implicitly binds its value
       to the variable <literal>it</literal>.  For example:</para>
@@ -804,7 +804,7 @@ Prelude> it * 2
     <para>What actually happens is that GHCi typechecks the
     expression, and if it doesn't have an <literal>IO</literal> type,
     then it transforms it as follows: an expression
-    <replaceable>e</replaceable> turns into 
+    <replaceable>e</replaceable> turns into
 <screen>
 let it = <replaceable>e</replaceable>;
 print it
@@ -875,7 +875,7 @@ it &lt;- <replaceable>e</replaceable>
     rules (Section 4.3.4 of the Haskell 2010 Report) as follows.  The
     standard rules take each group of constraints <literal>(C1 a, C2 a, ..., Cn
     a)</literal> for each type variable <literal>a</literal>, and defaults the
-    type variable if 
+    type variable if
     <orderedlist>
         <listitem>
             <para>
@@ -973,7 +973,7 @@ def = toEnum 0
         <listitem>
           <para>The ability to set a <firstterm>breakpoint</firstterm> on a
             function definition or expression in the program.  When the function
-            is called, or the expression evaluated, GHCi suspends 
+            is called, or the expression evaluated, GHCi suspends
             execution and returns to the prompt, where you can inspect the
             values of local variables before continuing with the
             execution.</para>
@@ -999,7 +999,7 @@ def = toEnum 0
         </listitem>
       </itemizedlist>
     </para>
-      
+
     <para>There is currently no support for obtaining a &ldquo;stack
     trace&rdquo;, but the tracing and history features provide a
     useful second-best, which will often be enough to establish the
@@ -1007,14 +1007,14 @@ def = toEnum 0
     automatically when an exception is thrown, even if it is thrown
     from within compiled code (see <xref
     linkend="ghci-debugger-exceptions" />).</para>
-      
+
     <sect2 id="breakpoints">
       <title>Breakpoints and inspecting variables</title>
-      
+
       <para>Let's use quicksort as a running example.  Here's the code:</para>
 
 <programlisting>
-qsort [] = [] 
+qsort [] = []
 qsort (a:as) = qsort left ++ [a] ++ qsort right
   where (left,right) = (filter (&lt;=a) as, filter (&gt;a) as)
 
@@ -1028,7 +1028,7 @@ Prelude> :l qsort.hs
 [1 of 1] Compiling Main             ( qsort.hs, interpreted )
 Ok, modules loaded: Main.
 *Main>
-      </screen>       
+      </screen>
 
       <para>Now, let's set a breakpoint on the right-hand-side of the second
         equation of qsort:</para>
@@ -1038,12 +1038,12 @@ Ok, modules loaded: Main.
 Breakpoint 0 activated at qsort.hs:2:15-46
 *Main>
 </programlisting>
-      
+
       <para>The command <literal>:break 2</literal> sets a breakpoint on line
         2 of the most recently-loaded module, in this case
         <literal>qsort.hs</literal>.   Specifically, it picks the
         leftmost complete subexpression on that line on which to set the
-        breakpoint, which in this case is the expression 
+        breakpoint, which in this case is the expression
         <literal>(qsort left ++ [a] ++ qsort right)</literal>.</para>
 
       <para>Now, we run the program:</para>
@@ -1064,8 +1064,8 @@ right :: [a]
         location, we can use the <literal>:list</literal> command:</para>
 
 <programlisting>
-[qsort.hs:2:15-46] *Main> :list 
-1  qsort [] = [] 
+[qsort.hs:2:15-46] *Main> :list
+1  qsort [] = []
 2  qsort (a:as) = qsort left ++ [a] ++ qsort right
 3    where (left,right) = (filter (&lt;=a) as, filter (&gt;a) as)
 </programlisting>
@@ -1138,7 +1138,7 @@ left = (_t1::[a])
       <para>The flag <literal>-fprint-evld-with-show</literal> instructs
       <literal>:print</literal> to reuse
       available <literal>Show</literal> instances when possible. This happens
-      only when the contents of the variable being inspected 
+      only when the contents of the variable being inspected
       are completely evaluated.</para>
 
 
@@ -1174,7 +1174,7 @@ _t1 :: [Integer]
 [qsort.hs:2:15-46] *Main> a
 8
 </screen>
-      
+
       <para>You might find it useful to use Haskell's
         <literal>seq</literal> function to evaluate individual thunks rather
         than evaluating the whole expression with <literal>:force</literal>.
@@ -1205,7 +1205,7 @@ _result :: [a]
 a :: a
 left :: [a]
 right :: [a]
-[qsort.hs:2:15-46] *Main> 
+[qsort.hs:2:15-46] *Main>
 </screen>
 
       <para>The execution continued at the point it previously stopped, and has
@@ -1235,13 +1235,13 @@ right :: [a]
    :break <replaceable>line</replaceable>
    :break <replaceable>line</replaceable> <replaceable>column</replaceable>
    :break <replaceable>module</replaceable> <replaceable>line</replaceable>
-   :break <replaceable>module</replaceable> <replaceable>line</replaceable> <replaceable>column</replaceable> 
+   :break <replaceable>module</replaceable> <replaceable>line</replaceable> <replaceable>column</replaceable>
 </screen>
 
       <para>When a breakpoint is set on a particular line, GHCi sets the
         breakpoint on the
         leftmost subexpression that begins and ends on that line.  If two
-        complete subexpressions start at the same 
+        complete subexpressions start at the same
         column, the longest one is picked.  If there is no complete
         subexpression on the line, then the leftmost expression starting on
         the line is picked, and failing that the rightmost expression that
@@ -1255,7 +1255,7 @@ right :: [a]
           and doesn't match others.  The best advice is to avoid tab
           characters in your source code altogether (see
           <option>-fwarn-tabs</option> in <xref linkend="options-sanity"
-            />).</para> 
+            />).</para>
 
       <para>If the module is omitted, then the most recently-loaded module is
         used.</para>
@@ -1289,7 +1289,7 @@ right :: [a]
 *Main> :delete 0
 *Main> :show breaks
 [1] Main qsort.hs:2:15-46
-</screen>        
+</screen>
 
         <para>To delete all breakpoints at once, use <literal>:delete *</literal>.</para>
 
@@ -1301,7 +1301,7 @@ right :: [a]
 
       <para>Single-stepping is a great way to visualise the execution of your
         program, and it is also a useful tool for identifying the source of a
-        bug. GHCi offers two variants of stepping. Use 
+        bug. GHCi offers two variants of stepping. Use
 	<literal>:step</literal>  to enable all the
         breakpoints in the program, and execute until the next breakpoint is
         reached. Use <literal>:steplocal</literal> to limit the set
@@ -1320,7 +1320,7 @@ _result :: IO ()
         <replaceable>expr</replaceable></literal> begins the evaluation of
         <replaceable>expr</replaceable> in single-stepping mode.  If
         <replaceable>expr</replaceable> is omitted, then it single-steps from
-        the current breakpoint. <literal>:stepover</literal> 
+        the current breakpoint. <literal>:stepover</literal>
         works similarly.</para>
 
       <para>The <literal>:list</literal> command is particularly useful when
@@ -1328,9 +1328,9 @@ _result :: IO ()
 
 <screen>
 [qsort.hs:5:7-47] *Main> :list
-4  
+4
 5  main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
-6  
+6
 [qsort.hs:5:7-47] *Main>
 </screen>
 
@@ -1343,9 +1343,9 @@ _result :: IO ()
 [qsort.hs:5:7-47] *Main> :step
 Stopped at qsort.hs:5:14-46
 _result :: [Integer]
-4  
+4
 5  main = print (qsort [8, 4, 0, 3, 1, 23, 11, 18])
-6  
+6
 [qsort.hs:5:14-46] *Main>
 </screen>
     </sect2>
@@ -1439,13 +1439,13 @@ _result :: [a]
 
 <screen>
 *Main&gt; :list qsort
-1  qsort [] = [] 
+1  qsort [] = []
 2  qsort (a:as) = qsort left ++ [a] ++ qsort right
 3    where (left,right) = (filter (&lt;=a) as, filter (&gt;a) as)
-4  
+4
 *Main&gt; :b 1
 Breakpoint 1 activated at qsort.hs:1:11-12
-*Main&gt; 
+*Main&gt;
 </screen>
 
       <para>and then run a small <literal>qsort</literal> with
@@ -1490,7 +1490,7 @@ Logged breakpoint at qsort.hs:3:24-38
 _result :: [a]
 as :: [a]
 a :: a
-[-1: qsort.hs:3:24-38] *Main> 
+[-1: qsort.hs:3:24-38] *Main>
 </screen>
 
       <para>Note that the local variables at each step in the history have been
@@ -1532,10 +1532,10 @@ a :: a
         we can't set a breakpoint on it directly.  For this reason, GHCi
         provides the flags <literal>-fbreak-on-exception</literal> which causes
         the evaluator to stop when an exception is thrown, and <literal>
-	-fbreak-on-error</literal>, which works similarly but stops only on 
-	uncaught exceptions. When stopping at an exception, GHCi will act 
+	-fbreak-on-error</literal>, which works similarly but stops only on
+	uncaught exceptions. When stopping at an exception, GHCi will act
 	just as it does when a breakpoint is hit, with the deviation that it
-	will not show you any source code location. Due to this, these 
+	will not show you any source code location. Due to this, these
 	commands are only really useful in conjunction with
         <literal>:trace</literal>, in order to log the steps leading up to the
         exception.  For example:</para>
@@ -1575,15 +1575,15 @@ as = 'b' : 'c' : (_t1::[Char])
 
     <sect2><title>Example: inspecting functions</title>
       <para>
-        It is possible to use the debugger to examine function values. 
+        It is possible to use the debugger to examine function values.
         When we are at a breakpoint and a function is in scope, the debugger
-        cannot show 
-        you the source code for it; however, it is possible to get some 
-        information by applying it to some arguments and  observing the result. 
+        cannot show
+        you the source code for it; however, it is possible to get some
+        information by applying it to some arguments and  observing the result.
       </para>
 
       <para>
-        The process is slightly complicated when the binding is polymorphic. 
+        The process is slightly complicated when the binding is polymorphic.
         We show the process by means of an example.
         To keep things simple, we will use the well known <literal>map</literal> function:
 <programlisting>
@@ -1607,9 +1607,9 @@ x :: a
 f :: a -> b
 xs :: [a]
 </screen>
-      GHCi tells us that, among other bindings, <literal>f</literal> is in scope. 
-      However, its type is not fully known yet,  
-      and thus it is not possible to apply it to any 
+      GHCi tells us that, among other bindings, <literal>f</literal> is in scope.
+      However, its type is not fully known yet,
+      and thus it is not possible to apply it to any
       arguments. Nevertheless, observe that the type of its first argument is the
       same as the type of <literal>x</literal>, and its result type is shared
         with <literal>_result</literal>.
@@ -1617,12 +1617,12 @@ xs :: [a]
 
       <para>
         As we demonstrated earlier (<xref linkend="breakpoints" />),  the
-        debugger has some intelligence built-in to update the type of 
-        <literal>f</literal> whenever the types of <literal>x</literal> or 
+        debugger has some intelligence built-in to update the type of
+        <literal>f</literal> whenever the types of <literal>x</literal> or
         <literal>_result</literal> are discovered.  So what we do in this
         scenario is
-        force <literal>x</literal> a bit, in order to recover both its type 
-      and the argument part of <literal>f</literal>.  
+        force <literal>x</literal> a bit, in order to recover both its type
+      and the argument part of <literal>f</literal>.
 <screen>
 *Main> seq x ()
 *Main> :print x
@@ -1631,7 +1631,7 @@ x = 1
       </para>
       <para>
         We can check now that as expected, the type of <literal>x</literal>
-        has been reconstructed, and with it the 
+        has been reconstructed, and with it the
         type of <literal>f</literal> has been too:</para>
 <screen>
 *Main> :t x
@@ -1641,7 +1641,7 @@ f :: Integer -> b
 </screen>
       <para>
         From here, we can apply f to any argument of type Integer and observe
-        the results. 
+        the results.
 <screen><![CDATA[
 *Main> let b = f 10
 *Main> :t b
@@ -1667,10 +1667,10 @@ Just 20
 *Main> map f [1..5]
 [Just 1, Just 2, Just 3, Just 4, Just 5]
 ]]></screen>
-      In the first application of <literal>f</literal>, we had to do 
+      In the first application of <literal>f</literal>, we had to do
       some more type reconstruction
-      in order to recover the result type of <literal>f</literal>. 
-      But after that, we are free to use 
+      in order to recover the result type of <literal>f</literal>.
+      But after that, we are free to use
       <literal>f</literal> normally.
      </para>
     </sect2>
@@ -1691,7 +1691,7 @@ Just 20
             CAF at the prompt again.</para>
         </listitem>
 	<listitem><para>
-	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
+	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available
 	  at the scope of a breakpoint if there is an explicit type signature.
 	</para>
         </listitem>
@@ -1739,7 +1739,7 @@ $ ghci -package readline
 GHCi, version 6.8.1: http://www.haskell.org/ghc/  :? for help
 Loading package base ... linking ... done.
 Loading package readline-1.0 ... linking ... done.
-Prelude> 
+Prelude>
 </screen>
 
       <para>The following command works to load new packages into a
@@ -1757,7 +1757,7 @@ Prelude> :set -package <replaceable>name</replaceable>
     <sect2>
       <title>Extra libraries</title>
       <indexterm><primary>libraries</primary><secondary>with GHCi</secondary></indexterm>
-      
+
       <para>Extra libraries may be specified on the command line using
       the normal <literal>-l<replaceable>lib</replaceable></literal>
       option.  (The term <emphasis>library</emphasis> here refers to
@@ -1889,11 +1889,11 @@ $ ghci -lm
 	  modules from packages) only the non-<literal>*</literal>
     form of <literal>:browse</literal> is available.
     If the <literal>!</literal> symbol is appended to the
-    command, data constructors and class methods will be 
+    command, data constructors and class methods will be
     listed individually, otherwise, they will only be listed
-    in the context of their data type or class declaration. 
-    The <literal>!</literal>-form also annotates the listing 
-    with comments giving possible imports for each group of 
+    in the context of their data type or class declaration.
+    The <literal>!</literal>-form also annotates the listing
+    with comments giving possible imports for each group of
     entries.</para>
 <screen>
 Prelude> :browse! Data.Maybe
@@ -1961,7 +1961,7 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 
       <varlistentry>
 	<term>
-          <literal>:continue</literal> 
+          <literal>:continue</literal>
           <indexterm><primary><literal>:continue</literal></primary></indexterm>
         </term>
 	<listitem><para>Continue the current evaluation, when stopped at a
@@ -2067,7 +2067,7 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
-          <literal>:delete * | <replaceable>num</replaceable> ...</literal> 
+          <literal>:delete * | <replaceable>num</replaceable> ...</literal>
           <indexterm><primary><literal>:delete</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -2095,7 +2095,7 @@ Prelude> :. cmds.ghci
 
       <varlistentry>
 	<term>
-          <literal>:etags</literal> 
+          <literal>:etags</literal>
         </term>
 	<listitem>
 	  <para>See <literal>:ctags</literal>.</para>
@@ -2185,9 +2185,9 @@ Prelude> :. cmds.ghci
 	  the location of its definition in the source.</para>
 	  <para>For types and classes, GHCi also summarises instances that
 	  mention them.  To avoid showing irrelevant information, an instance
-	  is shown only if (a) its head mentions <replaceable>name</replaceable>, 
+	  is shown only if (a) its head mentions <replaceable>name</replaceable>,
 	  and (b) all the other things mentioned in the instance
-	  are in scope (either qualified or otherwise) as a result of 
+	  are in scope (either qualified or otherwise) as a result of
 	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
 	</listitem>
       </varlistentry>
@@ -2389,6 +2389,19 @@ bar
 
       <varlistentry>
 	<term>
+          <literal>:script</literal> <optional><replaceable>n</replaceable></optional>
+	  <literal>filename</literal>
+          <indexterm><primary><literal>:script</literal></primary></indexterm>
+        </term>
+	<listitem>
+    <para>Executes the lines of a file as a series of GHCi commands.  This command
+    is compatible with multiline statements as set by <literal>:set +m</literal>
+    </para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <literal>:set</literal> <optional><replaceable>option</replaceable>...</optional>
           <indexterm><primary><literal>:set</literal></primary></indexterm>
         </term>
@@ -2568,7 +2581,7 @@ bar
 
       <varlistentry>
 	<term>
-          <literal>:step [<replaceable>expr</replaceable>]</literal> 
+          <literal>:step [<replaceable>expr</replaceable>]</literal>
           <indexterm><primary><literal>:step</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -2696,7 +2709,7 @@ bar
 	    top-level expressions to be discarded after each
 	    evaluation (they are still retained
 	    <emphasis>during</emphasis> a single evaluation).</para>
-	  
+
 	    <para>This option may help if the evaluated top-level
 	    expressions are consuming large amounts of space, or if
 	    you need repeatable performance measurements.</para>
@@ -2744,7 +2757,7 @@ bar
 <screen>
 Prelude> :set -fglasgow-exts
 </screen>
-      
+
       <para>Any GHC command-line option that is designated as
       <firstterm>dynamic</firstterm> (see the table in <xref
       linkend="flag-reference"/>), may be set using
@@ -2799,7 +2812,7 @@ Prelude> :set -fno-glasgow-exts
     defining useful macros.  Placing a <filename>.ghci</filename> file
     in a directory with a Haskell project is a useful way to set
     certain project-wide options so you don't have to type them
-    everytime you start GHCi: eg. if your project uses GHC extensions
+    every time you start GHCi: eg. if your project uses GHC extensions
     and CPP, and has source files in three subdirectories A, B and C,
     you might put the following lines in
     <filename>.ghci</filename>:</para>
@@ -2823,7 +2836,7 @@ Prelude> :set -fno-glasgow-exts
 :def source readFile
 </screen>
 
-    <para>With this macro defined in your <filename>.ghci</filename> 
+    <para>With this macro defined in your <filename>.ghci</filename>
     file, you can use <literal>:source file</literal> to read GHCi
     commands from <literal>file</literal>. You can find (and contribute!-)
     other suggestions for <filename>.ghci</filename> files on this Haskell
@@ -2889,7 +2902,7 @@ Prelude> :set -fno-glasgow-exts
 
   <sect1 id="ghci-faq">
     <title>FAQ and Things To Watch Out For</title>
-    
+
     <variablelist>
       <varlistentry>
 	<term>The interpreter can't load modules with foreign export
@@ -2978,8 +2991,8 @@ Prelude> :set -fno-glasgow-exts
             because this is normally what you want in an interpreter:
             output appears as it is generated.
           </para>
-          <para> 
-            If you want line-buffered behaviour, as in GHC, you can 
+          <para>
+            If you want line-buffered behaviour, as in GHC, you can
             start your program thus:
             <programlisting>
                main = do { hSetBuffering stdout LineBuffering; ... }

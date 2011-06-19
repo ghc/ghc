@@ -114,11 +114,12 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_warns     = NoWarnings,
 		tcg_anns      = [],
 		tcg_insts     = [],
-		tcg_fam_insts = [],
-		tcg_rules     = [],
-		tcg_fords     = [],
-		tcg_dfun_n    = dfun_n_var,
-		tcg_keep      = keep_var,
+                tcg_fam_insts = [],
+                tcg_rules     = [],
+                tcg_fords     = [],
+                tcg_vects     = [],
+                tcg_dfun_n    = dfun_n_var,
+                tcg_keep      = keep_var,
 		tcg_doc_hdr   = Nothing,
                 tcg_hpc       = False,
                 tcg_main      = Nothing
@@ -405,7 +406,6 @@ traceRn, traceSplice :: SDoc -> TcRn ()
 traceRn      = traceOptTcRn Opt_D_dump_rn_trace
 traceSplice  = traceOptTcRn Opt_D_dump_splices
 
-
 traceIf, traceHiDiffs :: SDoc -> TcRnIf m n ()
 traceIf      = traceOptIf Opt_D_dump_if_trace
 traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
@@ -494,9 +494,10 @@ getSrcSpanM :: TcRn SrcSpan
 getSrcSpanM = do { env <- getLclEnv; return (tcl_loc env) }
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan loc thing_inside
-  | isGoodSrcSpan loc = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
-  | otherwise	      = thing_inside	-- Don't overwrite useful info with useless
+setSrcSpan loc@(RealSrcSpan _) thing_inside
+    = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
+-- Don't overwrite useful info with useless:
+setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
@@ -780,11 +781,6 @@ updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) -> 
 			   env { tcl_ctxt = upd ctxt })
 
--- Conditionally add an error context
-maybeAddErrCtxt :: Maybe Message -> TcM a -> TcM a
-maybeAddErrCtxt (Just msg) thing_inside = addErrCtxt msg thing_inside
-maybeAddErrCtxt Nothing    thing_inside = thing_inside
-
 popErrCtxt :: TcM a -> TcM a
 popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
@@ -896,6 +892,9 @@ add_err_tcm tidy_env err_msg loc ctxt
 mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
 -- Tidy the error info, trimming excessive contexts
 mkErrInfo env ctxts
+ | opt_PprStyle_Debug     -- In -dppr-debug style the output 
+ = return empty	          -- just becomes too voluminous
+ | otherwise
  = go 0 env ctxts
  where
    go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
@@ -991,10 +990,10 @@ captureConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- (captureConstraints m) runs m, and returns the type constraints it generates
 captureConstraints thing_inside
   = do { lie_var <- newTcRef emptyWC ;
-	 res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) 
-			  thing_inside ;
-	 lie <- readTcRef lie_var ;
-	 return (res, lie) }
+         res <- updLclEnv (\ env -> env { tcl_lie = lie_var }) 
+                          thing_inside ;
+         lie <- readTcRef lie_var ;
+         return (res, lie) }
 
 captureUntouchables :: TcM a -> TcM (a, Untouchables)
 captureUntouchables thing_inside
@@ -1019,14 +1018,21 @@ setLclTypeEnv lcl_env thing_inside
   = updLclEnv upd thing_inside
   where
     upd env = env { tcl_env = tcl_env lcl_env,
-		    tcl_tyvars = tcl_tyvars lcl_env }
+                    tcl_tyvars = tcl_tyvars lcl_env }
+
+traceTcConstraints :: String -> TcM ()
+traceTcConstraints msg
+  = do { lie_var <- getConstraintVar
+       ; lie     <- readTcRef lie_var
+       ; traceTc (msg ++ "LIE:") (ppr lie)
+       }
 \end{code}
 
 
 %************************************************************************
-%*									*
-	     Template Haskell context
-%*									*
+%*                                                                      *
+             Template Haskell context
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -1151,7 +1157,7 @@ failIfM :: Message -> IfL a
 failIfM msg
   = do 	{ env <- getLclEnv
 	; let full_msg = (if_loc env <> colon) $$ nest 2 msg
-	; liftIO (printErrs (full_msg defaultErrStyle))
+	; liftIO (printErrs full_msg defaultErrStyle)
 	; failM }
 
 --------------------
@@ -1186,7 +1192,7 @@ forkM_maybe doc thing_inside
 	  	    ; return Nothing }
 	}}
   where
-    print_errs sdoc = liftIO (printErrs (sdoc defaultErrStyle))
+    print_errs sdoc = liftIO (printErrs sdoc defaultErrStyle)
 
 forkM :: SDoc -> IfL a -> IfL a
 forkM doc thing_inside

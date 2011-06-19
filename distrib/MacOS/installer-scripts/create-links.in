@@ -20,7 +20,7 @@ if [ "$INSTALL_BASE" = / ]; then
   INSTALL_BASE=/usr
 fi
 
-VERSION=@ProjectVersion@-@TargetArch_CPP@
+VERSION=@FRAMEWORK_VERSION@
 GHC_BASE="$INSTALL_DEST/GHC.framework/Versions/$VERSION"
 
 INSTALL_BIN="$INSTALL_BASE/bin"

@@ -8,18 +8,10 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
 
-#ifndef OMIT_NATIVE_CODEGEN
-import AsmCodeGen	( nativeCodeGen )
-#endif
+import AsmCodeGen ( nativeCodeGen )
 import LlvmCodeGen ( llvmCodeGen )
 
 import UniqSupply	( mkSplitUniqSupply )
-
-#ifdef JAVA
-import JavaGen		( javaGen )
-import qualified PrintJava
-import OccurAnal	( occurAnalyseBinds )
-#endif
 
 import Finder		( mkStubPaths )
 import PprC		( writeCs )
@@ -30,6 +22,7 @@ import OldCmm		( RawCmm )
 import HscTypes
 import DynFlags
 import Config
+import SysTools
 
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
@@ -56,7 +49,7 @@ codeOutput :: DynFlags
 	   -> ForeignStubs
 	   -> [PackageId]
 	   -> [RawCmm]			-- Compiled C--
-	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
+           -> IO (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-})
 
 codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
   = 
@@ -84,12 +77,6 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm flat_abstractC pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm flat_abstractC;
-             HscJava        -> 
-#ifdef JAVA
-			       outputJava dflags filenm mod_name tycons core_binds;
-#else
-                               panic "Java support not compiled into this ghc";
-#endif
              HscNothing     -> panic "codeOutput: HscNothing"
 	  }
 	; return stubs_exist
@@ -148,24 +135,16 @@ outputC dflags filenm flat_absC packages
 
 \begin{code}
 outputAsm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
-
-#ifndef OMIT_NATIVE_CODEGEN
-
 outputAsm dflags filenm flat_absC
+ | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        {-# SCC "OutputAsm" #-} doOutput filenm $
-	   \f -> {-# SCC "NativeCodeGen" #-}
-	         nativeCodeGen dflags f ncg_uniqs flat_absC
-  where
+           \f -> {-# SCC "NativeCodeGen" #-}
+                 nativeCodeGen dflags f ncg_uniqs flat_absC
 
-#else /* OMIT_NATIVE_CODEGEN */
-
-outputAsm _ _ _
-  = pprPanic "This compiler was built without a native code generator"
-	     (text "Use -fvia-C instead")
-
-#endif
+ | otherwise
+  = panic "This compiler was built without a native code generator"
 \end{code}
 
 
@@ -185,26 +164,6 @@ outputLlvm dflags filenm flat_absC
 
 %************************************************************************
 %*									*
-\subsection{Java}
-%*									*
-%************************************************************************
-
-\begin{code}
-#ifdef JAVA
-outputJava dflags filenm mod tycons core_binds
-  = doOutput filenm (\ f -> printForUser f alwaysQualify pp_java)
-	-- User style printing for now to keep indentation
-  where
-    occ_anal_binds = occurAnalyseBinds core_binds
-	-- Make sure we have up to date dead-var information
-    java_code = javaGen mod [{- Should be imports-}] tycons occ_anal_binds
-    pp_java   = PrintJava.compilationUnit java_code
-#endif
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Foreign import/export}
 %*									*
 %************************************************************************
@@ -212,18 +171,21 @@ outputJava dflags filenm mod tycons core_binds
 \begin{code}
 outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
 		   -> IO (Bool, 	-- Header file created
-			  Bool)		-- C file created
+                          Maybe FilePath) -- C file created
 outputForeignStubs dflags mod location stubs
- = case stubs of
-   NoStubs -> do
+ = do
+   let stub_h = mkStubPaths dflags (moduleName mod) location
+   stub_c <- newTempName dflags "c"
+
+   case stubs of
+     NoStubs -> do
 	-- When compiling External Core files, may need to use stub
 	-- files from a previous compilation
-	stub_c_exists <- doesFileExist stub_c
-	stub_h_exists <- doesFileExist stub_h
-	return (stub_h_exists, stub_c_exists)
+        stub_h_exists <- doesFileExist stub_h
+        return (stub_h_exists, Nothing)
 
-   ForeignStubs h_code c_code -> do
-	let
+     ForeignStubs h_code c_code -> do
+        let
 	    stub_c_output_d = pprCode CStyle c_code
 	    stub_c_output_w = showSDoc stub_c_output_d
 	
@@ -232,7 +194,7 @@ outputForeignStubs dflags mod location stubs
 	    stub_h_output_w = showSDoc stub_h_output_d
 	-- in
 
-	createDirectoryHierarchy (takeDirectory stub_c)
+        createDirectoryHierarchy (takeDirectory stub_h)
 
 	dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export header file" stub_h_output_d
@@ -266,10 +228,10 @@ outputForeignStubs dflags mod location stubs
 	   -- isn't really HC code, so we need to define IN_STG_CODE==0 to
 	   -- avoid the register variables etc. being enabled.
 
-        return (stub_h_file_exists, stub_c_file_exists)
-  where
-   (stub_c, stub_h, _) = mkStubPaths dflags (moduleName mod) location
-
+        return (stub_h_file_exists, if stub_c_file_exists
+                                       then Just stub_c
+                                       else Nothing )
+ where
    cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
    cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
 

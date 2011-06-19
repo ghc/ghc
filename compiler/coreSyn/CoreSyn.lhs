@@ -15,7 +15,7 @@ module CoreSyn (
 
         -- ** 'Expr' construction
 	mkLets, mkLams,
-	mkApps, mkTyApps, mkVarApps,
+	mkApps, mkTyApps, mkCoApps, mkVarApps,
 	
 	mkIntLit, mkIntLitInt,
 	mkWordLit, mkWordLitWord,
@@ -23,18 +23,19 @@ module CoreSyn (
 	mkFloatLit, mkFloatLitFloat,
 	mkDoubleLit, mkDoubleLitDouble,
 	
-	mkConApp, mkTyBind,
+	mkConApp, mkTyBind, mkCoBind,
 	varToCoreExpr, varsToCoreExprs,
 
-        isTyCoVar, isId, cmpAltCon, cmpAlt, ltAlt,
+        isId, cmpAltCon, cmpAlt, ltAlt,
 	
 	-- ** Simple 'Expr' access functions and predicates
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
 	collectArgs, coreExprCc, flattenBinds, 
 
-	isValArg, isTypeArg, valArgCount, valBndrCount, isRuntimeArg, isRuntimeVar,
-	notSccNote,
+        isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
+        isRuntimeArg, isRuntimeVar,
+        notSccNote,
 
 	-- * Unfolding data types
         Unfolding(..),  UnfoldingGuidance(..), UnfoldingSource(..),
@@ -72,7 +73,10 @@ module CoreSyn (
 	-- ** Operations on 'CoreRule's 
 	seqRules, ruleArity, ruleName, ruleIdName, ruleActivation,
 	setRuleIdName,
-	isBuiltinRule, isLocalRule
+	isBuiltinRule, isLocalRule,
+
+	-- * Core vectorisation declarations data type
+	CoreVect(..)
     ) where
 
 #include "HsVersions.h"
@@ -92,7 +96,7 @@ import Util
 import Data.Data
 import Data.Word
 
-infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`
+infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
 \end{code}
 
@@ -236,6 +240,8 @@ data Expr b
 
   | Type  Type			        -- ^ A type: this should only show up at the top
                                         -- level of an Arg
+    
+  | Coercion Coercion                   -- ^ A coercion
   deriving (Data, Typeable)
 
 -- | Type synonym for expressions that occur in function argument positions.
@@ -398,6 +404,20 @@ isLocalRule = ru_local
 -- | Set the 'Name' of the 'Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
+\end{code}
+
+
+%************************************************************************
+%*                                                                      *
+\subsection{Vectorisation declarations}
+%*                                                                      *
+%************************************************************************
+
+Representation of desugared vectorisation declarations that are fed to the vectoriser (via
+'ModGuts').
+
+\begin{code}
+data CoreVect = Vect Id (Maybe CoreExpr)
 \end{code}
 
 
@@ -861,6 +881,8 @@ instance Outputable b => OutputableBndr (TaggedBndr b) where
 mkApps    :: Expr b -> [Arg b]  -> Expr b
 -- | Apply a list of type argument expressions to a function expression in a nested fashion
 mkTyApps  :: Expr b -> [Type]   -> Expr b
+-- | Apply a list of coercion argument expressions to a function expression in a nested fashion
+mkCoApps  :: Expr b -> [Coercion] -> Expr b
 -- | Apply a list of type or value variables to a function expression in a nested fashion
 mkVarApps :: Expr b -> [Var] -> Expr b
 -- | Apply a list of argument expressions to a data constructor in a nested fashion. Prefer to
@@ -869,6 +891,7 @@ mkConApp      :: DataCon -> [Arg b] -> Expr b
 
 mkApps    f args = foldl App		  	   f args
 mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
+mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
@@ -939,10 +962,16 @@ mkLets binds body   = foldr Let body binds
 mkTyBind :: TyVar -> Type -> CoreBind
 mkTyBind tv ty      = NonRec tv (Type ty)
 
+-- | Create a binding group where a type variable is bound to a type. Per "CoreSyn#type_let",
+-- this can only be used to bind something in a non-recursive @let@ expression
+mkCoBind :: CoVar -> Coercion -> CoreBind
+mkCoBind cv co      = NonRec cv (Coercion co)
+
 -- | Convert a binder into either a 'Var' or 'Type' 'Expr' appropriately
 varToCoreExpr :: CoreBndr -> Expr b
-varToCoreExpr v | isId v = Var v
-                | otherwise = Type (mkTyVarTy v)
+varToCoreExpr v | isTyVar v = Type (mkTyVarTy v)
+                | isCoVar v = Coercion (mkCoVarCo v)
+                | otherwise = ASSERT( isId v ) Var v
 
 varsToCoreExprs :: [CoreBndr] -> [Expr b]
 varsToCoreExprs vs = map varToCoreExpr vs
@@ -1008,7 +1037,7 @@ collectTyAndValBinders expr
 collectTyBinders expr
   = go [] expr
   where
-    go tvs (Lam b e) | isTyCoVar b = go (b:tvs) e
+    go tvs (Lam b e) | isTyVar b = go (b:tvs) e
     go tvs e			 = (reverse tvs, e)
 
 collectValBinders expr
@@ -1059,15 +1088,23 @@ isRuntimeVar = isId
 isRuntimeArg :: CoreExpr -> Bool
 isRuntimeArg = isValArg
 
--- | Returns @False@ iff the expression is a 'Type' expression at its top level
+-- | Returns @False@ iff the expression is a 'Type' or 'Coercion'
+-- expression at its top level
 isValArg :: Expr b -> Bool
-isValArg (Type _) = False
-isValArg _        = True
+isValArg e = not (isTypeArg e)
 
--- | Returns @True@ iff the expression is a 'Type' expression at its top level
+-- | Returns @True@ iff the expression is a 'Type' or 'Coercion'
+-- expression at its top level
+isTyCoArg :: Expr b -> Bool
+isTyCoArg (Type {})     = True
+isTyCoArg (Coercion {}) = True
+isTyCoArg _             = False
+
+-- | Returns @True@ iff the expression is a 'Type' expression at its
+-- top level.  Note this does NOT include 'Coercion's.
 isTypeArg :: Expr b -> Bool
-isTypeArg (Type _) = True
-isTypeArg _        = False
+isTypeArg (Type {}) = True
+isTypeArg _         = False
 
 -- | The number of binders that bind values rather than types
 valBndrCount :: [CoreBndr] -> Int
@@ -1097,9 +1134,10 @@ seqExpr (App f a)       = seqExpr f `seq` seqExpr a
 seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
 seqExpr (Let b e)       = seqBind b `seq` seqExpr e
 seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
-seqExpr (Cast e co)     = seqExpr e `seq` seqType co
+seqExpr (Cast e co)     = seqExpr e `seq` seqCo co
 seqExpr (Note n e)      = seqNote n `seq` seqExpr e
-seqExpr (Type t)        = seqType t
+seqExpr (Type t)       = seqType t
+seqExpr (Coercion co)   = seqCo co
 
 seqExprs :: [CoreExpr] -> ()
 seqExprs [] = ()
@@ -1153,9 +1191,11 @@ data AnnExpr' bndr annot
   | AnnApp	(AnnExpr bndr annot) (AnnExpr bndr annot)
   | AnnCase	(AnnExpr bndr annot) bndr Type [AnnAlt bndr annot]
   | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
-  | AnnCast     (AnnExpr bndr annot) Coercion
+  | AnnCast     (AnnExpr bndr annot) (annot, Coercion)
+    		   -- Put an annotation on the (root of) the coercion
   | AnnNote	Note (AnnExpr bndr annot)
   | AnnType	Type
+  | AnnCoercion Coercion
 
 -- | A clone of the 'Alt' type but allowing annotation at every tree node
 type AnnAlt bndr annot = (AltCon, [bndr], AnnExpr bndr annot)
@@ -1182,12 +1222,13 @@ deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
 deAnnotate' :: AnnExpr' bndr annot -> Expr bndr
-deAnnotate' (AnnType t)           = Type t
+deAnnotate' (AnnType t)          = Type t
+deAnnotate' (AnnCoercion co)      = Coercion co
 deAnnotate' (AnnVar  v)           = Var v
 deAnnotate' (AnnLit  lit)         = Lit lit
 deAnnotate' (AnnLam  binder body) = Lam binder (deAnnotate body)
 deAnnotate' (AnnApp  fun arg)     = App (deAnnotate fun) (deAnnotate arg)
-deAnnotate' (AnnCast e co)        = Cast (deAnnotate e) co
+deAnnotate' (AnnCast e (_,co))    = Cast (deAnnotate e) co
 deAnnotate' (AnnNote note body)   = Note note (deAnnotate body)
 
 deAnnotate' (AnnLet bind body)

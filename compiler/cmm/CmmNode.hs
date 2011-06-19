@@ -10,7 +10,7 @@
 module CmmNode
   ( CmmNode(..)
   , UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..)
-  , mapExp, mapExpDeep, foldExp, foldExpDeep
+  , mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf
   )
 where
 
@@ -30,30 +30,53 @@ import Prelude hiding (succ)
 
 data CmmNode e x where
   CmmEntry :: Label -> CmmNode C O
+
   CmmComment :: FastString -> CmmNode O O
+
   CmmAssign :: CmmReg -> CmmExpr -> CmmNode O O  -- Assign to register
+
   CmmStore :: CmmExpr -> CmmExpr -> CmmNode O O  -- Assign to memory location.  Size is
                                                  -- given by cmmExprType of the rhs.
+
   CmmUnsafeForeignCall ::         -- An unsafe foreign call; see Note [Foreign calls]
+  		       		  -- Like a "fat machine instruction"; can occur
+				  -- in the middle of a block
       ForeignTarget ->            -- call target
       CmmFormals ->               -- zero or more results
       CmmActuals ->               -- zero or more arguments
       CmmNode O O
+      -- Semantics: kills only result regs; all other regs (both GlobalReg
+      --            and LocalReg) are preserved.  But there is a current
+      --            bug for what can be put in arguments, see
+      --            Note [Register Parameter Passing]
+
   CmmBranch :: Label -> CmmNode O C  -- Goto another block in the same procedure
+
   CmmCondBranch :: {                 -- conditional branch
       cml_pred :: CmmExpr,
       cml_true, cml_false :: Label
   } -> CmmNode O C
+
   CmmSwitch :: CmmExpr -> [Maybe Label] -> CmmNode O C -- Table branch
       -- The scrutinee is zero-based;
       --      zero -> first block
       --      one  -> second block etc
       -- Undefined outside range, and when there's a Nothing
-  CmmCall :: {                -- A call (native or safe foreign)
+
+  CmmCall :: {                -- A native call or tail call
       cml_target :: CmmExpr,  -- never a CmmPrim to a CallishMachOp!
 
       cml_cont :: Maybe Label,
           -- Label of continuation (Nothing for return or tail call)
+
+-- ToDO: add this:
+--       cml_args_regs :: [GlobalReg],
+-- It says which GlobalRegs are live for the parameters at the
+-- moment of the call.  Later stages can use this to give liveness
+-- everywhere, which in turn guides register allocation.
+-- It is the companion of cml_args; cml_args says which stack words
+-- hold parameters, while cml_arg_regs says which global regs hold parameters.
+-- But do note [Register parameter passing]
 
       cml_args :: ByteOff,
           -- Byte offset, from the *old* end of the Area associated with
@@ -78,10 +101,12 @@ data CmmNode e x where
         -- cml_ret_off are treated as live, even if the sequel of
         -- the call goes into a loop.
   } -> CmmNode O C
+
   CmmForeignCall :: {           -- A safe foreign call; see Note [Foreign calls]
+  		    		-- Always the last node of a block
       tgt   :: ForeignTarget,   -- call target and convention
       res   :: CmmFormals,      -- zero or more results
-      args  :: CmmActuals,      -- zero or more arguments
+      args  :: CmmActuals,      -- zero or more arguments; see Note [Register parameter passing]
       succ  :: Label,           -- Label of continuation
       updfr :: UpdFrameOffset,  -- where the update frame is (for building infotable)
       intrbl:: Bool             -- whether or not the call is interruptible
@@ -89,9 +114,13 @@ data CmmNode e x where
 
 {- Note [Foreign calls]
 ~~~~~~~~~~~~~~~~~~~~~~~
-A MidForeign call is used for *unsafe* foreign calls;
-a LastForeign call is used for *safe* foreign calls.
-Unsafe ones are easy: think of them as a "fat machine instruction".
+A CmmUnsafeForeignCall is used for *unsafe* foreign calls;
+a CmmForeignCall call is used for *safe* foreign calls.
+
+Unsafe ones are mostly easy: think of them as a "fat machine
+instruction".  In particular, they do *not* kill all live registers,
+just the registers they return to (there was a bit of code in GHC that
+conservatively assumed otherwise.)  However, see [Register parameter passing].
 
 Safe ones are trickier.  A safe foreign call 
      r = f(x)
@@ -112,6 +141,21 @@ so that a LastCall passes no parameters or results.  But the smart
 constructors do *not* (currently) know the foreign call conventions.
 
 Note that a safe foreign call needs an info table.
+-}
+
+{- Note [Register parameter passing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+On certain architectures, some registers are utilized for parameter
+passing in the C calling convention.  For example, in x86-64 Linux
+convention, rdi, rsi, rdx and rcx (as well as r8 and r9) may be used for
+argument passing.  These are registers R3-R6, which our generated
+code may also be using; as a result, it's necessary to save these
+values before doing a foreign call.  This is done during initial
+code generation in callerSaveVolatileRegs in StgCmmUtils.hs.  However,
+one result of doing this is that the contents of these registers
+may mysteriously change if referenced inside the arguments.  This
+is dangerous, so you'll need to disable inlining much in the same
+way is done in cmm/CmmOpt.hs currently.  We should fix this!
 -}
 
 ---------------------------------------------

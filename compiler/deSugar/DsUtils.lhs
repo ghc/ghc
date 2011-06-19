@@ -53,7 +53,6 @@ import CoreUtils
 import MkCore
 import MkId
 import Id
-import Var
 import Name
 import Literal
 import TyCon
@@ -73,7 +72,6 @@ import ListSetOps
 import FastString
 import StaticFlags
 \end{code}
-
 
 
 %************************************************************************
@@ -256,10 +254,9 @@ wrapBinds [] e = e
 wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
 wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
-wrapBind new old body	-- Can deal with term variables *or* type variables
-  | new==old    = body
-  | isTyCoVar new = Let (mkTyBind new (mkTyVarTy old)) body
-  | otherwise   = Let (NonRec new (Var old))         body
+wrapBind new old body	-- NB: this function must deal with term
+  | new==old    = body	-- variables, type variables or coercion variables
+  | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
 seqVar var body = Case (Var var) var (exprType body)
@@ -299,10 +296,11 @@ mkCoPrimCaseMatchResult var ty match_alts
                                                   return (LitAlt lit, [], body)
 
 
-mkCoAlgCaseMatchResult :: Id					-- Scrutinee
-                    -> Type                                     -- Type of exp
-		    -> [(DataCon, [CoreBndr], MatchResult)]	-- Alternatives
-		    -> MatchResult
+mkCoAlgCaseMatchResult 
+  :: Id					   -- Scrutinee
+  -> Type                                  -- Type of exp
+  -> [(DataCon, [CoreBndr], MatchResult)]  -- Alternatives (bndrs *include* tyvars, dicts)
+  -> MatchResult
 mkCoAlgCaseMatchResult var ty match_alts 
   | isNewTyCon tycon		-- Newtype case; use a let
   = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
@@ -383,7 +381,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     isPArrFakeAlts [] = panic "DsUtils: unexpectedly found an empty list of PArr fake alternatives"
     --
     mk_parrCase fail = do
-      lengthP <- dsLookupGlobalId lengthPName
+      lengthP <- dsLookupDPHId lengthPName
       alt <- unboxAlt
       return (mkWildCase (len lengthP) intTy ty [alt])
       where
@@ -395,7 +393,7 @@ mkCoAlgCaseMatchResult var ty match_alts
 	--
 	unboxAlt = do
 	  l      <- newSysLocalDs intPrimTy
-	  indexP <- dsLookupGlobalId indexPName
+	  indexP <- dsLookupDPHId indexPName
 	  alts   <- mapM (mkAlt indexP) sorted_alts
 	  return (DataAlt intDataCon, [l], mkWildCase (Var l) intPrimTy ty (dft : alts))
           where
@@ -605,7 +603,7 @@ mkSelectorBinds pat val_expr
         return (bndr_var, rhs_expr)
       where
         error_expr = mkCoerce co (Var err_var)
-        co         = mkUnsafeCoercion (exprType (Var err_var)) (idType bndr_var)
+        co         = mkUnsafeCo (exprType (Var err_var)) (idType bndr_var)
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 

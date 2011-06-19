@@ -1,4 +1,3 @@
-{-# OPTIONS -w #-}
 
 -----------------------------------------------------------------------------
 --
@@ -13,10 +12,11 @@
 -- (c) the #if blah_TARGET_ARCH} things, the
 -- structure should not be too overwhelming.
 
-module PPC.CodeGen ( 
-	cmmTopCodeGen, 
-	InstrBlock 
-) 
+module PPC.CodeGen (
+        cmmTopCodeGen,
+        generateJumpTableForInstr,
+        InstrBlock
+)
 
 where
 
@@ -28,7 +28,6 @@ where
 import PPC.Instr
 import PPC.Cond
 import PPC.Regs
-import PPC.RegInfo
 import NCGMonad
 import Instruction
 import PIC
@@ -40,27 +39,23 @@ import Platform
 
 -- Our intermediate code:
 import BlockId
-import PprCmm		( pprExpr )
+import PprCmm           ( pprExpr )
 import OldCmm
 import CLabel
 
 -- The rest:
-import StaticFlags	( opt_PIC )
+import StaticFlags      ( opt_PIC )
 import OrdList
-import qualified Outputable as O
 import Outputable
 import Unique
 import DynFlags
 
-import Control.Monad	( mapAndUnzipM )
+import Control.Monad    ( mapAndUnzipM )
 import Data.Bits
-import Data.Int
 import Data.Word
 
-#if darwin_TARGET_OS || linux_TARGET_OS
 import BasicTypes
 import FastString
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Top-level of the instruction selector
@@ -70,28 +65,28 @@ import FastString
 -- left-to-right traversal (pre-order?) yields the insns in the correct
 -- order.
 
-cmmTopCodeGen 
-	:: DynFlags 
-	-> RawCmmTop 
-	-> NatM [NatCmmTop Instr]
+cmmTopCodeGen
+        :: RawCmmTop
+        -> NatM [NatCmmTop Instr]
 
-cmmTopCodeGen dflags (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
+  dflags <- getDynFlagsNat
   let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
       os   = platformOS $ targetPlatform dflags
   case picBaseMb of
       Just picBase -> initializePicBase_ppc ArchPPC os picBase tops
       Nothing -> return tops
-  
-cmmTopCodeGen dflags (CmmData sec dat) = do
+
+cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
-basicBlockCodeGen 
-	:: CmmBasicBlock 
-	-> NatM ( [NatBasicBlock Instr]
-		, [NatCmmTop Instr])
+basicBlockCodeGen
+        :: CmmBasicBlock
+        -> NatM ( [NatBasicBlock Instr]
+                , [NatCmmTop Instr])
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -100,14 +95,14 @@ basicBlockCodeGen (BasicBlock id stmts) = do
   -- instruction stream into basic blocks again.  Also, we extract
   -- LDATAs here too.
   let
-	(top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
-	
-	mkBlocks (NEWBLOCK id) (instrs,blocks,statics) 
-	  = ([], BasicBlock id instrs : blocks, statics)
-	mkBlocks (LDATA sec dat) (instrs,blocks,statics) 
-	  = (instrs, blocks, CmmData sec dat:statics)
-	mkBlocks instr (instrs,blocks,statics)
-	  = (instr:instrs, blocks, statics)
+        (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
+
+        mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
+          = ([], BasicBlock id instrs : blocks, statics)
+        mkBlocks (LDATA sec dat) (instrs,blocks,statics)
+          = (instrs, blocks, CmmData sec dat:statics)
+        mkBlocks instr (instrs,blocks,statics)
+          = (instr:instrs, blocks, statics)
   -- in
   return (BasicBlock id top : other_blocks, statics)
 
@@ -117,56 +112,56 @@ stmtsToInstrs stmts
         return (concatOL instrss)
 
 stmtToInstrs :: CmmStmt -> NatM InstrBlock
-stmtToInstrs stmt = case stmt of
-    CmmNop	   -> return nilOL
+stmtToInstrs stmt = do
+  dflags <- getDynFlagsNat
+  case stmt of
+    CmmNop         -> return nilOL
     CmmComment s   -> return (unitOL (COMMENT s))
 
     CmmAssign reg src
       | isFloatType ty -> assignReg_FltCode size reg src
-#if WORD_SIZE_IN_BITS==32
-      | isWord64 ty    -> assignReg_I64Code      reg src
-#endif
-      | otherwise	 -> assignReg_IntCode size reg src
-	where ty = cmmRegType reg
-	      size = cmmTypeSize ty
+      | target32Bit (targetPlatform dflags) &&
+        isWord64 ty    -> assignReg_I64Code      reg src
+      | otherwise        -> assignReg_IntCode size reg src
+        where ty = cmmRegType reg
+              size = cmmTypeSize ty
 
     CmmStore addr src
       | isFloatType ty -> assignMem_FltCode size addr src
-#if WORD_SIZE_IN_BITS==32
-      | isWord64 ty 	 -> assignMem_I64Code      addr src
-#endif
-      | otherwise	 -> assignMem_IntCode size addr src
-	where ty = cmmExprType src
-	      size = cmmTypeSize ty
+      | target32Bit (targetPlatform dflags) &&
+        isWord64 ty      -> assignMem_I64Code      addr src
+      | otherwise        -> assignMem_IntCode size addr src
+        where ty = cmmExprType src
+              size = cmmTypeSize ty
 
     CmmCall target result_regs args _ _
        -> genCCall target result_regs args
 
-    CmmBranch id	  -> genBranch id
+    CmmBranch id          -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
     CmmSwitch arg ids     -> genSwitch arg ids
-    CmmJump arg params	  -> genJump arg
-    CmmReturn params	  ->
+    CmmJump arg _         -> genJump arg
+    CmmReturn _           ->
       panic "stmtToInstrs: return statement should have been cps'd away"
 
 
 --------------------------------------------------------------------------------
 -- | 'InstrBlock's are the insn sequences generated by the insn selectors.
--- 	They are really trees of insns to facilitate fast appending, where a
--- 	left-to-right traversal yields the insns in the correct	order.
+--      They are really trees of insns to facilitate fast appending, where a
+--      left-to-right traversal yields the insns in the correct order.
 --
-type InstrBlock 
-	= OrdList Instr
+type InstrBlock
+        = OrdList Instr
 
 
 -- | Register's passed up the tree.  If the stix code forces the register
--- 	to live in a pre-decided machine register, it comes out as @Fixed@;
--- 	otherwise, it comes out as @Any@, and the parent can decide which
--- 	register to put it in.
+--      to live in a pre-decided machine register, it comes out as @Fixed@;
+--      otherwise, it comes out as @Any@, and the parent can decide which
+--      register to put it in.
 --
 data Register
-	= Fixed	Size Reg InstrBlock
-	| Any	Size (Reg -> InstrBlock)
+        = Fixed Size Reg InstrBlock
+        | Any   Size (Reg -> InstrBlock)
 
 
 swizzleRegisterRep :: Register -> Size -> Register
@@ -208,17 +203,6 @@ temporary, then do the other computation, and then use the temporary:
 -}
 
 
--- | Check whether an integer will fit in 32 bits.
---	A CmmInt is intended to be truncated to the appropriate 
--- 	number of bits, so here we truncate it to Int64.  This is
--- 	important because e.g. -1 as a CmmInt might be either
--- 	-1 or 18446744073709551615.
---
-is32BitInteger :: Integer -> Bool
-is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
-  where i64 = fromIntegral i :: Int64
-
-
 -- | Convert a BlockId to some CmmStatic data
 jumpTableEntry :: Maybe BlockId -> CmmStatic
 jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordWidth)
@@ -238,7 +222,7 @@ mangleIndexTree (CmmRegOff reg off)
   where width = typeWidth (cmmRegType reg)
 
 mangleIndexTree _
-	= panic "PPC.CodeGen.mangleIndexTree: no match"
+        = panic "PPC.CodeGen.mangleIndexTree: no match"
 
 -- -----------------------------------------------------------------------------
 --  Code gen for 64-bit arithmetic on 32-bit platforms
@@ -256,27 +240,27 @@ of the VRegUniqueLo form, and the upper-half VReg can be determined
 by applying getHiVRegFromLo to it.
 -}
 
-data ChildCode64 	-- a.k.a "Register64"
-      = ChildCode64 
-     	   InstrBlock 	-- code
-	   Reg	 	-- the lower 32-bit temporary which contains the
-			-- result; use getHiVRegFromLo to find the other
-			-- VRegUnique.  Rules of this simplified insn
-			-- selection game are therefore that the returned
-			-- Reg may be modified
+data ChildCode64        -- a.k.a "Register64"
+      = ChildCode64
+           InstrBlock   -- code
+           Reg          -- the lower 32-bit temporary which contains the
+                        -- result; use getHiVRegFromLo to find the other
+                        -- VRegUnique.  Rules of this simplified insn
+                        -- selection game are therefore that the returned
+                        -- Reg may be modified
 
 
 -- | The dual to getAnyReg: compute an expression into a register, but
--- 	we don't mind which one it is.
+--      we don't mind which one it is.
 getSomeReg :: CmmExpr -> NatM (Reg, InstrBlock)
 getSomeReg expr = do
   r <- getRegister expr
   case r of
     Any rep code -> do
-	tmp <- getNewRegNat rep
-	return (tmp, code tmp)
-    Fixed _ reg code -> 
-	return (reg, code)
+        tmp <- getNewRegNat rep
+        return (tmp, code tmp)
+    Fixed _ reg code ->
+        return (reg, code)
 
 getI64Amodes :: CmmExpr -> NatM (AddrMode, AddrMode, InstrBlock)
 getI64Amodes addrTree = do
@@ -292,21 +276,21 @@ getI64Amodes addrTree = do
 assignMem_I64Code :: CmmExpr -> CmmExpr -> NatM InstrBlock
 assignMem_I64Code addrTree valueTree = do
         (hi_addr, lo_addr, addr_code) <- getI64Amodes addrTree
-	ChildCode64 vcode rlo <- iselExpr64 valueTree
-	let 
-		rhi = getHiVRegFromLo rlo
+        ChildCode64 vcode rlo <- iselExpr64 valueTree
+        let
+                rhi = getHiVRegFromLo rlo
 
-		-- Big-endian store
-		mov_hi = ST II32 rhi hi_addr
-		mov_lo = ST II32 rlo lo_addr
-	-- in
-	return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
+                -- Big-endian store
+                mov_hi = ST II32 rhi hi_addr
+                mov_lo = ST II32 rlo lo_addr
+        -- in
+        return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
 
 
 assignReg_I64Code :: CmmReg  -> CmmExpr -> NatM InstrBlock
-assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
+assignReg_I64Code (CmmLocal (LocalReg u_dst _)) valueTree = do
    ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
-   let 
+   let
          r_dst_lo = RegVirtual $ mkVirtualReg u_dst II32
          r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_hi = getHiVRegFromLo r_src_lo
@@ -317,7 +301,7 @@ assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
         vcode `snocOL` mov_lo `snocOL` mov_hi
      )
 
-assignReg_I64Code lvalue valueTree
+assignReg_I64Code _ _
    = panic "assignReg_I64Code(powerpc): invalid lvalue"
 
 
@@ -327,7 +311,7 @@ iselExpr64 (CmmLoad addrTree ty) | isWord64 ty = do
     (rlo, rhi) <- getNewRegPairNat II32
     let mov_hi = LD II32 rhi hi_addr
         mov_lo = LD II32 rlo lo_addr
-    return $ ChildCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi) 
+    return $ ChildCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi)
                          rlo
 
 iselExpr64 (CmmReg (CmmLocal (LocalReg vu ty))) | isWord64 ty
@@ -336,17 +320,17 @@ iselExpr64 (CmmReg (CmmLocal (LocalReg vu ty))) | isWord64 ty
 iselExpr64 (CmmLit (CmmInt i _)) = do
   (rlo,rhi) <- getNewRegPairNat II32
   let
-	half0 = fromIntegral (fromIntegral i :: Word16)
-	half1 = fromIntegral ((fromIntegral i `shiftR` 16) :: Word16)
-	half2 = fromIntegral ((fromIntegral i `shiftR` 32) :: Word16)
-	half3 = fromIntegral ((fromIntegral i `shiftR` 48) :: Word16)
-	
-	code = toOL [
-		LIS rlo (ImmInt half1),
-		OR rlo rlo (RIImm $ ImmInt half0),
-		LIS rhi (ImmInt half3),
-		OR rlo rlo (RIImm $ ImmInt half2)
-		]
+        half0 = fromIntegral (fromIntegral i :: Word16)
+        half1 = fromIntegral ((fromIntegral i `shiftR` 16) :: Word16)
+        half2 = fromIntegral ((fromIntegral i `shiftR` 32) :: Word16)
+        half3 = fromIntegral ((fromIntegral i `shiftR` 48) :: Word16)
+
+        code = toOL [
+                LIS rlo (ImmInt half1),
+                OR rlo rlo (RIImm $ ImmInt half0),
+                LIS rhi (ImmInt half3),
+                OR rlo rlo (RIImm $ ImmInt half2)
+                ]
   -- in
   return (ChildCode64 code rlo)
 
@@ -355,12 +339,12 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
    ChildCode64 code2 r2lo <- iselExpr64 e2
    (rlo,rhi) <- getNewRegPairNat II32
    let
-	r1hi = getHiVRegFromLo r1lo
-	r2hi = getHiVRegFromLo r2lo
-	code =  code1 `appOL`
-		code2 `appOL`
-		toOL [ ADDC rlo r1lo r2lo,
-		       ADDE rhi r1hi r2hi ]
+        r1hi = getHiVRegFromLo r1lo
+        r2hi = getHiVRegFromLo r2lo
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ ADDC rlo r1lo r2lo,
+                       ADDE rhi r1hi r2hi ]
    -- in
    return (ChildCode64 code rlo)
 
@@ -377,46 +361,49 @@ iselExpr64 expr
 
 
 getRegister :: CmmExpr -> NatM Register
+getRegister e = do dflags <- getDynFlagsNat
+                   getRegister' dflags e
 
-getRegister (CmmReg (CmmGlobal PicBaseReg))
+getRegister' :: DynFlags -> CmmExpr -> NatM Register
+
+getRegister' _ (CmmReg (CmmGlobal PicBaseReg))
   = do
       reg <- getPicBaseNat archWordSize
       return (Fixed archWordSize reg nilOL)
 
-getRegister (CmmReg reg) 
-  = return (Fixed (cmmTypeSize (cmmRegType reg)) 
-		  (getRegisterReg reg) nilOL)
+getRegister' _ (CmmReg reg)
+  = return (Fixed (cmmTypeSize (cmmRegType reg))
+                  (getRegisterReg reg) nilOL)
 
-getRegister tree@(CmmRegOff _ _) 
-  = getRegister (mangleIndexTree tree)
+getRegister' dflags tree@(CmmRegOff _ _)
+  = getRegister' dflags (mangleIndexTree tree)
 
-
-#if WORD_SIZE_IN_BITS==32
     -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
 
-getRegister (CmmMachOp (MO_UU_Conv W64 W32)
-             [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
+getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32)
+                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister (CmmMachOp (MO_SS_Conv W64 W32)
-             [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]]) = do
+getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32)
+                     [CmmMachOp (MO_U_Shr W64) [x,CmmLit (CmmInt 32 _)]])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 (getHiVRegFromLo rlo) code
 
-getRegister (CmmMachOp (MO_UU_Conv W64 W32) [x]) = do
+getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32) [x])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister (CmmMachOp (MO_SS_Conv W64 W32) [x]) = do
+getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32) [x])
+ | target32Bit (targetPlatform dflags) = do
   ChildCode64 code rlo <- iselExpr64 x
-  return $ Fixed II32 rlo code       
+  return $ Fixed II32 rlo code
 
-#endif
-
-
-getRegister (CmmLoad mem pk)
+getRegister' _ (CmmLoad mem pk)
   | not (isWord64 pk)
   = do
         Amode addr addr_code <- getAmode mem
@@ -426,21 +413,21 @@ getRegister (CmmLoad mem pk)
           where size = cmmTypeSize pk
 
 -- catch simple cases of zero- or sign-extended load
-getRegister (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
+getRegister' _ (CmmMachOp (MO_UU_Conv W8 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II8 dst addr))
 
 -- Note: there is no Load Byte Arithmetic instruction, so no signed case here
 
-getRegister (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _]) = do
+getRegister' _ (CmmMachOp (MO_UU_Conv W16 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode mem
     return (Any II32 (\dst -> addr_code `snocOL` LD II16 dst addr))
 
-getRegister (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _]) = do
+getRegister' _ (CmmMachOp (MO_SS_Conv W16 W32) [CmmLoad mem _]) = do
     Amode addr addr_code <- getAmode mem
     return (Any II32 (\dst -> addr_code `snocOL` LA II16 dst addr))
 
-getRegister (CmmMachOp mop [x]) -- unary MachOps
+getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
       MO_Not rep   -> triv_ucode_int rep NOT
 
@@ -468,25 +455,25 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
       MO_UU_Conv W32 to -> conversionNop (intSize to) x
       MO_UU_Conv W16 W8 -> conversionNop II8 x
       MO_UU_Conv W8 to  -> trivialCode to False AND x (CmmLit (CmmInt 255 W32))
-      MO_UU_Conv W16 to -> trivialCode to False AND x (CmmLit (CmmInt 65535 W32)) 
-      _	-> panic "PPC.CodeGen.getRegister: no match"
+      MO_UU_Conv W16 to -> trivialCode to False AND x (CmmLit (CmmInt 65535 W32))
+      _ -> panic "PPC.CodeGen.getRegister: no match"
 
     where
-	triv_ucode_int   width instr = trivialUCode (intSize   width) instr x
-	triv_ucode_float width instr = trivialUCode (floatSize width) instr x
+        triv_ucode_int   width instr = trivialUCode (intSize   width) instr x
+        triv_ucode_float width instr = trivialUCode (floatSize width) instr x
 
         conversionNop new_size expr
-            = do e_code <- getRegister expr
+            = do e_code <- getRegister' dflags expr
                  return (swizzleRegisterRep e_code new_size)
 
-getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
+getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
   = case mop of
-      MO_F_Eq w -> condFltReg EQQ x y
-      MO_F_Ne w -> condFltReg NE  x y
-      MO_F_Gt w -> condFltReg GTT x y
-      MO_F_Ge w -> condFltReg GE  x y
-      MO_F_Lt w -> condFltReg LTT x y
-      MO_F_Le w -> condFltReg LE  x y
+      MO_F_Eq _ -> condFltReg EQQ x y
+      MO_F_Ne _ -> condFltReg NE  x y
+      MO_F_Gt _ -> condFltReg GTT x y
+      MO_F_Ge _ -> condFltReg GE  x y
+      MO_F_Lt _ -> condFltReg LTT x y
+      MO_F_Le _ -> condFltReg LE  x y
 
       MO_Eq rep -> condIntReg EQQ  (extendUExpr rep x) (extendUExpr rep y)
       MO_Ne rep -> condIntReg NE   (extendUExpr rep x) (extendUExpr rep y)
@@ -505,7 +492,7 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_F_Sub w  -> triv_float w FSUB
       MO_F_Mul w  -> triv_float w FMUL
       MO_F_Quot w -> triv_float w FDIV
-      
+
          -- optimize addition with 32-bit immediate
          -- (needed for PIC)
       MO_Add W32 ->
@@ -533,16 +520,16 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_Mul rep -> trivialCode rep True MULLW x y
 
       MO_S_MulMayOflo W32 -> trivialCodeNoImm' II32 MULLW_MayOflo x y
-      
-      MO_S_MulMayOflo rep -> panic "S_MulMayOflo (rep /= II32): not implemented"
-      MO_U_MulMayOflo rep -> panic "U_MulMayOflo: not implemented"
+
+      MO_S_MulMayOflo _ -> panic "S_MulMayOflo (rep /= II32): not implemented"
+      MO_U_MulMayOflo _ -> panic "U_MulMayOflo: not implemented"
 
       MO_S_Quot rep -> trivialCodeNoImm' (intSize rep) DIVW (extendSExpr rep x) (extendSExpr rep y)
       MO_U_Quot rep -> trivialCodeNoImm' (intSize rep) DIVWU (extendUExpr rep x) (extendUExpr rep y)
-      
+
       MO_S_Rem rep -> remainderCode rep DIVW (extendSExpr rep x) (extendSExpr rep y)
       MO_U_Rem rep -> remainderCode rep DIVWU (extendUExpr rep x) (extendUExpr rep y)
-      
+
       MO_And rep   -> trivialCode rep False AND x y
       MO_Or rep    -> trivialCode rep False OR x y
       MO_Xor rep   -> trivialCode rep False XOR x y
@@ -550,32 +537,32 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_Shl rep   -> trivialCode rep False SLW x y
       MO_S_Shr rep -> trivialCode rep False SRAW (extendSExpr rep x) y
       MO_U_Shr rep -> trivialCode rep False SRW (extendUExpr rep x) y
-      _		-> panic "PPC.CodeGen.getRegister: no match"
+      _         -> panic "PPC.CodeGen.getRegister: no match"
 
   where
     triv_float :: Width -> (Size -> Reg -> Reg -> Reg -> Instr) -> NatM Register
     triv_float width instr = trivialCodeNoImm (floatSize width) instr x y
 
-getRegister (CmmLit (CmmInt i rep))
+getRegister' _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
   = let
-    	code dst = unitOL (LI dst imm)
+        code dst = unitOL (LI dst imm)
     in
-    	return (Any (intSize rep) code)
+        return (Any (intSize rep) code)
 
-getRegister (CmmLit (CmmFloat f frep)) = do
+getRegister' _ (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
     dflags <- getDynFlagsNat
     dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let size = floatSize frep
-        code dst = 
-	    LDATA ReadOnlyData  [CmmDataLabel lbl,
-				 CmmStaticLit (CmmFloat f frep)]
+        code dst =
+            LDATA ReadOnlyData  [CmmDataLabel lbl,
+                                 CmmStaticLit (CmmFloat f frep)]
             `consOL` (addr_code `snocOL` LD size dst addr)
     return (Any size code)
 
-getRegister (CmmLit lit)
+getRegister' _ (CmmLit lit)
   = let rep = cmmLitType lit
         imm = litToImm lit
         code dst = toOL [
@@ -584,20 +571,23 @@ getRegister (CmmLit lit)
           ]
     in return (Any (cmmTypeSize rep) code)
 
-getRegister other = pprPanic "getRegister(ppc)" (pprExpr other)
-    
+getRegister' _ other = pprPanic "getRegister(ppc)" (pprExpr other)
+
     -- extend?Rep: wrap integer expression of type rep
     -- in a conversion to II32
+extendSExpr :: Width -> CmmExpr -> CmmExpr
 extendSExpr W32 x = x
 extendSExpr rep x = CmmMachOp (MO_SS_Conv rep W32) [x]
+
+extendUExpr :: Width -> CmmExpr -> CmmExpr
 extendUExpr W32 x = x
 extendUExpr rep x = CmmMachOp (MO_UU_Conv rep W32) [x]
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
 
-data Amode 
-	= Amode AddrMode InstrBlock
+data Amode
+        = Amode AddrMode InstrBlock
 
 {-
 Now, given a tree (the argument to an CmmLoad) that references memory,
@@ -649,13 +639,13 @@ getAmode (CmmLit lit)
         let imm = litToImm lit
             code = unitOL (LIS tmp (HA imm))
         return (Amode (AddrRegImm tmp (LO imm)) code)
-    
+
 getAmode (CmmMachOp (MO_Add W32) [x, y])
   = do
         (regX, codeX) <- getSomeReg x
         (regY, codeY) <- getSomeReg y
         return (Amode (AddrRegReg regX regY) (codeX `appOL` codeY))
-    
+
 getAmode other
   = do
         (reg, code) <- getSomeReg other
@@ -666,8 +656,8 @@ getAmode other
 
 
 --  The 'CondCode' type:  Condition codes passed up the tree.
-data CondCode 	
-	= CondCode Bool Cond InstrBlock
+data CondCode
+        = CondCode Bool Cond InstrBlock
 
 -- Set up a condition code for a conditional branch.
 
@@ -705,9 +695,9 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt rep -> condIntCode LU   (extendUExpr rep x) (extendUExpr rep y)
       MO_U_Le rep -> condIntCode LEU  (extendUExpr rep x) (extendUExpr rep y)
 
-      other -> pprPanic "getCondCode(powerpc)" (pprMachOp mop)
+      _ -> pprPanic "getCondCode(powerpc)" (pprMachOp mop)
 
-getCondCode other =  panic "getCondCode(2)(powerpc)"
+getCondCode _ = panic "getCondCode(2)(powerpc)"
 
 
 
@@ -722,7 +712,7 @@ condIntCode cond x (CmmLit (CmmInt y rep))
   = do
         (src1, code) <- getSomeReg x
         let
-            code' = code `snocOL` 
+            code' = code `snocOL`
                 (if condUnsigned cond then CMPL else CMP) II32 src1 (RIImm src2)
         return (CondCode False cond code')
 
@@ -730,19 +720,19 @@ condIntCode cond x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let
-	code' = code1 `appOL` code2 `snocOL`
-    	    	  (if condUnsigned cond then CMPL else CMP) II32 src1 (RIReg src2)
+        code' = code1 `appOL` code2 `snocOL`
+                  (if condUnsigned cond then CMPL else CMP) II32 src1 (RIReg src2)
     return (CondCode False cond code')
 
 condFltCode cond x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let
-	code'  = code1 `appOL` code2 `snocOL` FCMP src1 src2
-	code'' = case cond of -- twiddle CR to handle unordered case
+        code'  = code1 `appOL` code2 `snocOL` FCMP src1 src2
+        code'' = case cond of -- twiddle CR to handle unordered case
                     GE -> code' `snocOL` CRNOR ltbit eqbit gtbit
-	            LE -> code' `snocOL` CRNOR gtbit eqbit ltbit
-	            _ -> code'
+                    LE -> code' `snocOL` CRNOR gtbit eqbit ltbit
+                    _ -> code'
                  where
                     ltbit = 0 ; eqbit = 2 ; gtbit = 1
     return (CondCode True cond code'')
@@ -798,7 +788,7 @@ genJump (CmmLit (CmmLabel lbl))
 genJump tree
   = do
         (target,code) <- getSomeReg tree
-        return (code `snocOL` MTCTR target `snocOL` BCTR [])
+        return (code `snocOL` MTCTR target `snocOL` BCTR [] Nothing)
 
 
 -- -----------------------------------------------------------------------------
@@ -827,7 +817,7 @@ allocator.
 
 
 genCondJump
-    :: BlockId	    -- the branch target
+    :: BlockId      -- the branch target
     -> CmmExpr      -- the condition on which to branch
     -> NatM InstrBlock
 
@@ -843,31 +833,47 @@ genCondJump id bool = do
 -- Now the biggest nightmare---calls.  Most of the nastiness is buried in
 -- @get_arg@, which moves the arguments to the correct registers/stack
 -- locations.  Apart from that, the code is easy.
--- 
+--
 -- (If applicable) Do not fill the delay slots here; you will confuse the
 -- register allocator.
 
-genCCall
-    :: CmmCallTarget		-- function to call
-    -> HintedCmmFormals		-- where to put the result
-    -> HintedCmmActuals		-- arguments (of mixed type)
+genCCall :: CmmCallTarget            -- function to call
+         -> HintedCmmFormals         -- where to put the result
+         -> HintedCmmActuals         -- arguments (of mixed type)
+         -> NatM InstrBlock
+genCCall target dest_regs argsAndHints
+ = do dflags <- getDynFlagsNat
+      case platformOS (targetPlatform dflags) of
+          OSLinux    -> genCCall' GCPLinux  target dest_regs argsAndHints
+          OSDarwin   -> genCCall' GCPDarwin target dest_regs argsAndHints
+          OSSolaris2 -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSMinGW32  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSFreeBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSOpenBSD  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+          OSUnknown  -> panic "PPC.CodeGen.genCCall: not defined for this os"
+
+data GenCCallPlatform = GCPLinux | GCPDarwin
+
+genCCall'
+    :: GenCCallPlatform
+    -> CmmCallTarget            -- function to call
+    -> HintedCmmFormals         -- where to put the result
+    -> HintedCmmActuals         -- arguments (of mixed type)
     -> NatM InstrBlock
 
-
-#if darwin_TARGET_OS || linux_TARGET_OS
 {-
     The PowerPC calling convention for Darwin/Mac OS X
     is described in Apple's document
     "Inside Mac OS X - Mach-O Runtime Architecture".
-    
+
     PowerPC Linux uses the System V Release 4 Calling Convention
     for PowerPC. It is described in the
     "System V Application Binary Interface PowerPC Processor Supplement".
 
     Both conventions are similar:
     Parameters may be passed in general-purpose registers starting at r3, in
-    floating point registers starting at f1, or on the stack. 
-    
+    floating point registers starting at f1, or on the stack.
+
     But there are substantial differences:
     * The number of registers used for parameter passing and the exact set of
       nonvolatile registers differs (see MachRegs.lhs).
@@ -883,7 +889,7 @@ genCCall
       4-byte aligned like everything else on Darwin.
     * The SysV spec claims that FF32 is represented as FF64 on the stack. GCC on
       PowerPC Linux does not agree, so neither do we.
-      
+
     According to both conventions, The parameter area should be part of the
     caller's stack frame, allocated in the caller's prologue code (large enough
     to hold the parameter lists for all called routines). The NCG already
@@ -893,10 +899,10 @@ genCCall
 -}
 
 
-genCCall (CmmPrim MO_WriteBarrier) _ _ 
+genCCall' _ (CmmPrim MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
-genCCall target dest_regs argsAndHints
+genCCall' gcp target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [II8,II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
@@ -905,56 +911,67 @@ genCCall target dest_regs argsAndHints
                                                         allArgRegs allFPArgRegs
                                                         initialStackOffset
                                                         (toOL []) []
-                                                
+
         (labelOrExpr, reduceToFF32) <- case target of
-            CmmCallee (CmmLit (CmmLabel lbl)) conv -> return (Left lbl, False)
-            CmmCallee expr conv -> return  (Right expr, False)
-            CmmPrim mop -> outOfLineFloatOp mop
-                                                        
+            CmmCallee (CmmLit (CmmLabel lbl)) _ -> return (Left lbl, False)
+            CmmCallee expr _ -> return  (Right expr, False)
+            CmmPrim mop -> outOfLineMachOp mop
+
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode
             codeAfter = move_sp_up finalStack `appOL` moveResult reduceToFF32
 
         case labelOrExpr of
             Left lbl -> do
-		return (         codeBefore
+                return (         codeBefore
                         `snocOL` BL lbl usedRegs
-                        `appOL`	 codeAfter)
+                        `appOL`  codeAfter)
             Right dyn -> do
-		(dynReg, dynCode) <- getSomeReg dyn
-		return (         dynCode
-			`snocOL` MTCTR dynReg
-                        `appOL`	 codeBefore
+                (dynReg, dynCode) <- getSomeReg dyn
+                return (         dynCode
+                        `snocOL` MTCTR dynReg
+                        `appOL`  codeBefore
                         `snocOL` BCTRL usedRegs
-                        `appOL`	 codeAfter)
+                        `appOL`  codeAfter)
     where
-#if darwin_TARGET_OS
-        initialStackOffset = 24
-	    -- size of linkage area + size of arguments, in bytes	
-	stackDelta _finalStack = roundTo 16 $ (24 +) $ max 32 $ sum $
-	                         map (widthInBytes . typeWidth) argReps
-#elif linux_TARGET_OS
-        initialStackOffset = 8
-        stackDelta finalStack = roundTo 16 finalStack
-#endif
-	args = map hintlessCmm argsAndHints
-	argReps = map cmmExprType args
+        initialStackOffset = case gcp of
+                             GCPDarwin -> 24
+                             GCPLinux  -> 8
+            -- size of linkage area + size of arguments, in bytes
+        stackDelta finalStack = case gcp of
+                                GCPDarwin ->
+                                    roundTo 16 $ (24 +) $ max 32 $ sum $
+                                    map (widthInBytes . typeWidth) argReps
+                                GCPLinux -> roundTo 16 finalStack
 
-	roundTo a x | x `mod` a == 0 = x
-		    | otherwise = x + a - (x `mod` a)
+        -- need to remove alignment information
+        argsAndHints' | (CmmPrim mop) <- target,
+                        (mop == MO_Memcpy ||
+                         mop == MO_Memset ||
+                         mop == MO_Memmove)
+                      = init argsAndHints
+
+                      | otherwise
+                      = argsAndHints
+
+        args = map hintlessCmm argsAndHints'
+        argReps = map cmmExprType args
+
+        roundTo a x | x `mod` a == 0 = x
+                    | otherwise = x + a - (x `mod` a)
 
         move_sp_down finalStack
                | delta > 64 =
                         toOL [STU II32 sp (AddrRegImm sp (ImmInt (-delta))),
-	                      DELTA (-delta)]
-	       | otherwise = nilOL
-	       where delta = stackDelta finalStack
-	move_sp_up finalStack
-	       | delta > 64 =
+                              DELTA (-delta)]
+               | otherwise = nilOL
+               where delta = stackDelta finalStack
+        move_sp_up finalStack
+               | delta > 64 =
                         toOL [ADD sp sp (RIImm (ImmInt delta)),
                               DELTA 0]
-	       | otherwise = nilOL
-	       where delta = stackDelta finalStack
-	       
+               | otherwise = nilOL
+               where delta = stackDelta finalStack
+
 
         passArguments [] _ _ stackOffset accumCode accumUsed = return (stackOffset, accumCode, accumUsed)
         passArguments ((arg,arg_ty):args) gprs fprs stackOffset
@@ -963,57 +980,56 @@ genCCall target dest_regs argsAndHints
                 ChildCode64 code vr_lo <- iselExpr64 arg
                 let vr_hi = getHiVRegFromLo vr_lo
 
-#if darwin_TARGET_OS                
-                passArguments args
-                              (drop 2 gprs)
-                              fprs
-                              (stackOffset+8)
-                              (accumCode `appOL` code
-                                    `snocOL` storeWord vr_hi gprs stackOffset
-                                    `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
-                              ((take 2 gprs) ++ accumUsed)
-            where
-                storeWord vr (gpr:_) offset = MR gpr vr
-                storeWord vr [] offset = ST II32 vr (AddrRegImm sp (ImmInt offset))
-                
-#elif linux_TARGET_OS
-                let stackOffset' = roundTo 8 stackOffset
-                    stackCode = accumCode `appOL` code
-                        `snocOL` ST II32 vr_hi (AddrRegImm sp (ImmInt stackOffset'))
-                        `snocOL` ST II32 vr_lo (AddrRegImm sp (ImmInt (stackOffset'+4)))
-                    regCode hireg loreg =
-                        accumCode `appOL` code
-                            `snocOL` MR hireg vr_hi
-                            `snocOL` MR loreg vr_lo
-                                        
-                case gprs of
-                    hireg : loreg : regs | even (length gprs) ->
-                        passArguments args regs fprs stackOffset
-                                      (regCode hireg loreg) (hireg : loreg : accumUsed)
-                    _skipped : hireg : loreg : regs ->
-                        passArguments args regs fprs stackOffset
-                                      (regCode hireg loreg) (hireg : loreg : accumUsed)
-                    _ -> -- only one or no regs left
-                        passArguments args [] fprs (stackOffset'+8)
-                                      stackCode accumUsed
-#endif
-        
+                case gcp of
+                    GCPDarwin ->
+                        do let storeWord vr (gpr:_) _ = MR gpr vr
+                               storeWord vr [] offset
+                                   = ST II32 vr (AddrRegImm sp (ImmInt offset))
+                           passArguments args
+                                         (drop 2 gprs)
+                                         fprs
+                                         (stackOffset+8)
+                                         (accumCode `appOL` code
+                                               `snocOL` storeWord vr_hi gprs stackOffset
+                                               `snocOL` storeWord vr_lo (drop 1 gprs) (stackOffset+4))
+                                         ((take 2 gprs) ++ accumUsed)
+                    GCPLinux ->
+                        do let stackOffset' = roundTo 8 stackOffset
+                               stackCode = accumCode `appOL` code
+                                   `snocOL` ST II32 vr_hi (AddrRegImm sp (ImmInt stackOffset'))
+                                   `snocOL` ST II32 vr_lo (AddrRegImm sp (ImmInt (stackOffset'+4)))
+                               regCode hireg loreg =
+                                   accumCode `appOL` code
+                                       `snocOL` MR hireg vr_hi
+                                       `snocOL` MR loreg vr_lo
+
+                           case gprs of
+                               hireg : loreg : regs | even (length gprs) ->
+                                   passArguments args regs fprs stackOffset
+                                                 (regCode hireg loreg) (hireg : loreg : accumUsed)
+                               _skipped : hireg : loreg : regs ->
+                                   passArguments args regs fprs stackOffset
+                                                 (regCode hireg loreg) (hireg : loreg : accumUsed)
+                               _ -> -- only one or no regs left
+                                   passArguments args [] fprs (stackOffset'+8)
+                                                 stackCode accumUsed
+
         passArguments ((arg,rep):args) gprs fprs stackOffset accumCode accumUsed
             | reg : _ <- regs = do
                 register <- getRegister arg
                 let code = case register of
                             Fixed _ freg fcode -> fcode `snocOL` MR reg freg
                             Any _ acode -> acode reg
+                    stackOffsetRes = case gcp of
+                                     -- The Darwin ABI requires that we reserve
+                                     -- stack slots for register parameters
+                                     GCPDarwin -> stackOffset + stackBytes
+                                     -- ... the SysV ABI doesn't.
+                                     GCPLinux -> stackOffset
                 passArguments args
                               (drop nGprs gprs)
                               (drop nFprs fprs)
-#if darwin_TARGET_OS
-        -- The Darwin ABI requires that we reserve stack slots for register parameters
-                              (stackOffset + stackBytes)
-#elif linux_TARGET_OS
-        -- ... the SysV ABI doesn't.
-                              stackOffset
-#endif
+                              stackOffsetRes
                               (accumCode `appOL` code)
                               (reg : accumUsed)
             | otherwise = do
@@ -1025,30 +1041,44 @@ genCCall target dest_regs argsAndHints
                               (accumCode `appOL` code `snocOL` ST (cmmTypeSize rep) vr stackSlot)
                               accumUsed
             where
-#if darwin_TARGET_OS
-        -- stackOffset is at least 4-byte aligned
-        -- The Darwin ABI is happy with that.
-                stackOffset' = stackOffset
-#else
-        -- ... the SysV ABI requires 8-byte alignment for doubles.
-                stackOffset' | isFloatType rep && typeWidth rep == W64 =
-		                 roundTo 8 stackOffset
-                             | otherwise  =           stackOffset
-#endif
+                stackOffset' = case gcp of
+                               GCPDarwin ->
+                                   -- stackOffset is at least 4-byte aligned
+                                   -- The Darwin ABI is happy with that.
+                                   stackOffset
+                               GCPLinux
+                                   -- ... the SysV ABI requires 8-byte
+                                   -- alignment for doubles.
+                                | isFloatType rep && typeWidth rep == W64 ->
+                                   roundTo 8 stackOffset
+                                | otherwise ->
+                                   stackOffset
                 stackSlot = AddrRegImm sp (ImmInt stackOffset')
-                (nGprs, nFprs, stackBytes, regs) = case cmmTypeSize rep of
-                    II32 -> (1, 0, 4, gprs)
-#if darwin_TARGET_OS
-        -- The Darwin ABI requires that we skip a corresponding number of GPRs when
-        -- we use the FPRs.
-                    FF32 -> (1, 1, 4, fprs)
-                    FF64 -> (2, 1, 8, fprs)
-#elif linux_TARGET_OS
-        -- ... the SysV ABI doesn't.
-                    FF32 -> (0, 1, 4, fprs)
-                    FF64 -> (0, 1, 8, fprs)
-#endif
-        
+                (nGprs, nFprs, stackBytes, regs)
+                    = case gcp of
+                      GCPDarwin ->
+                          case cmmTypeSize rep of
+                          II32 -> (1, 0, 4, gprs)
+                          -- The Darwin ABI requires that we skip a
+                          -- corresponding number of GPRs when we use
+                          -- the FPRs.
+                          FF32 -> (1, 1, 4, fprs)
+                          FF64 -> (2, 1, 8, fprs)
+                          II8  -> panic "genCCall' passArguments II8"
+                          II16 -> panic "genCCall' passArguments II16"
+                          II64 -> panic "genCCall' passArguments II64"
+                          FF80 -> panic "genCCall' passArguments FF80"
+                      GCPLinux ->
+                          case cmmTypeSize rep of
+                          II32 -> (1, 0, 4, gprs)
+                          -- ... the SysV ABI doesn't.
+                          FF32 -> (0, 1, 4, fprs)
+                          FF64 -> (0, 1, 8, fprs)
+                          II8  -> panic "genCCall' passArguments II8"
+                          II16 -> panic "genCCall' passArguments II16"
+                          II64 -> panic "genCCall' passArguments II64"
+                          FF80 -> panic "genCCall' passArguments FF80"
+
         moveResult reduceToFF32 =
             case dest_regs of
                 [] -> nilOL
@@ -1060,8 +1090,9 @@ genCCall target dest_regs argsAndHints
                     | otherwise -> unitOL (MR r_dest r3)
                     where rep = cmmRegType (CmmLocal dest)
                           r_dest = getRegisterReg (CmmLocal dest)
-                          
-        outOfLineFloatOp mop =
+                _ -> panic "genCCall' moveResult: Bad dest_regs"
+
+        outOfLineMachOp mop =
             do
                 dflags <- getDynFlagsNat
                 mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
@@ -1075,49 +1106,50 @@ genCCall target dest_regs argsAndHints
                     MO_F32_Exp   -> (fsLit "exp", True)
                     MO_F32_Log   -> (fsLit "log", True)
                     MO_F32_Sqrt  -> (fsLit "sqrt", True)
-                        
+
                     MO_F32_Sin   -> (fsLit "sin", True)
                     MO_F32_Cos   -> (fsLit "cos", True)
                     MO_F32_Tan   -> (fsLit "tan", True)
-                    
+
                     MO_F32_Asin  -> (fsLit "asin", True)
                     MO_F32_Acos  -> (fsLit "acos", True)
                     MO_F32_Atan  -> (fsLit "atan", True)
-                    
+
                     MO_F32_Sinh  -> (fsLit "sinh", True)
                     MO_F32_Cosh  -> (fsLit "cosh", True)
                     MO_F32_Tanh  -> (fsLit "tanh", True)
                     MO_F32_Pwr   -> (fsLit "pow", True)
-                        
+
                     MO_F64_Exp   -> (fsLit "exp", False)
                     MO_F64_Log   -> (fsLit "log", False)
                     MO_F64_Sqrt  -> (fsLit "sqrt", False)
-                        
+
                     MO_F64_Sin   -> (fsLit "sin", False)
                     MO_F64_Cos   -> (fsLit "cos", False)
                     MO_F64_Tan   -> (fsLit "tan", False)
-                     
+
                     MO_F64_Asin  -> (fsLit "asin", False)
                     MO_F64_Acos  -> (fsLit "acos", False)
                     MO_F64_Atan  -> (fsLit "atan", False)
-                    
+
                     MO_F64_Sinh  -> (fsLit "sinh", False)
                     MO_F64_Cosh  -> (fsLit "cosh", False)
                     MO_F64_Tanh  -> (fsLit "tanh", False)
                     MO_F64_Pwr   -> (fsLit "pow", False)
+
+                    MO_Memcpy    -> (fsLit "memcpy", False)
+                    MO_Memset    -> (fsLit "memset", False)
+                    MO_Memmove   -> (fsLit "memmove", False)
+
                     other -> pprPanic "genCCall(ppc): unknown callish op"
                                     (pprCallishMachOp other)
-
-#else /* darwin_TARGET_OS || linux_TARGET_OS */
-genCCall = panic "PPC.CodeGen.genCCall: not defined for this os"
-#endif           
 
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
 
 genSwitch :: CmmExpr -> [Maybe BlockId] -> NatM InstrBlock
-genSwitch expr ids 
+genSwitch expr ids
   | opt_PIC
   = do
         (reg,e_code) <- getSomeReg expr
@@ -1126,22 +1158,12 @@ genSwitch expr ids
         dflags <- getDynFlagsNat
         dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
-        let
-            jumpTable = map jumpTableEntryRel ids
-            
-            jumpTableEntryRel Nothing
-                = CmmStaticLit (CmmInt 0 wordWidth)
-            jumpTableEntryRel (Just blockid)
-                = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                where blockLabel = mkAsmTempLabel (getUnique blockid)
-
-            code = e_code `appOL` t_code `appOL` toOL [
-                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+        let code = e_code `appOL` t_code `appOL` toOL [
                             SLW tmp reg (RIImm (ImmInt 2)),
                             LD II32 tmp (AddrRegReg tableReg tmp),
                             ADD tmp tmp (RIReg tableReg),
                             MTCTR tmp,
-                            BCTR [ id | Just id <- ids ]
+                            BCTR ids (Just lbl)
                     ]
         return code
   | otherwise
@@ -1149,26 +1171,34 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat II32
         lbl <- getNewLabelNat
-        let
-            jumpTable = map jumpTableEntry ids
-        
-            code = e_code `appOL` toOL [
-                            LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+        let code = e_code `appOL` toOL [
                             SLW tmp reg (RIImm (ImmInt 2)),
                             ADDIS tmp tmp (HA (ImmCLbl lbl)),
                             LD II32 tmp (AddrRegImm tmp (LO (ImmCLbl lbl))),
                             MTCTR tmp,
-                            BCTR [ id | Just id <- ids ]
+                            BCTR ids (Just lbl)
                     ]
         return code
 
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr (BCTR ids (Just lbl)) =
+    let jumpTable
+            | opt_PIC   = map jumpTableEntryRel ids
+            | otherwise = map jumpTableEntry ids
+                where jumpTableEntryRel Nothing
+                        = CmmStaticLit (CmmInt 0 wordWidth)
+                      jumpTableEntryRel (Just blockid)
+                        = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
+                            where blockLabel = mkAsmTempLabel (getUnique blockid)
+    in Just (CmmData ReadOnlyData (CmmDataLabel lbl : jumpTable))
+generateJumpTableForInstr _ = Nothing
 
 -- -----------------------------------------------------------------------------
 -- 'condIntReg' and 'condFltReg': condition codes into registers
 
 -- Turn those condition codes into integers now (when they appear on
 -- the right hand side of an assignment).
--- 
+--
 -- (If applicable) Do not fill the delay slots here; you will confuse the
 -- register allocator.
 
@@ -1193,27 +1223,27 @@ condReg getCond = do
                 MFCR dst,
                 RLWINM dst dst (bit + 1) 31 31
             ]
-        
+
         negate_code | do_negate = unitOL (CRNOR bit bit bit)
                     | otherwise = nilOL
-                    
+
         (bit, do_negate) = case cond of
             LTT -> (0, False)
             LE  -> (1, True)
             EQQ -> (2, False)
             GE  -> (0, True)
             GTT -> (1, False)
-            
+
             NE  -> (2, True)
-            
+
             LU  -> (0, False)
             LEU -> (1, True)
             GEU -> (0, True)
             GU  -> (1, False)
-	    _	-> panic "PPC.CodeGen.codeReg: no match"
-                
+            _   -> panic "PPC.CodeGen.codeReg: no match"
+
     return (Any II32 code)
-    
+
 condIntReg cond x y = condReg (condIntCode cond x y)
 condFltReg cond x y = condReg (condFltCode cond x y)
 
@@ -1243,38 +1273,38 @@ clobber any fixed registers.
 * The only expression for which getRegister returns Fixed is (CmmReg reg).
 
 * If getRegister returns Any, then the code it generates may modify only:
-	(a) fresh temporaries
-	(b) the destination register
+        (a) fresh temporaries
+        (b) the destination register
   It may *not* modify global registers, unless the global
   register happens to be the destination register.
   It may not clobber any other registers. In fact, only ccalls clobber any
   fixed registers.
   Also, it may not modify the counter register (used by genCCall).
-  
+
   Corollary: If a getRegister for a subexpression returns Fixed, you need
   not move it to a fresh temporary before evaluating the next subexpression.
   The Fixed register won't be modified.
   Therefore, we don't need a counterpart for the x86's getStableReg on PPC.
-  
+
 * SDM's First Rule is valid for PowerPC, too: subexpressions can depend on
   the value of the destination register.
 -}
 
-trivialCode 
-	:: Width
-	-> Bool
-	-> (Reg -> Reg -> RI -> Instr)
-	-> CmmExpr
-	-> CmmExpr
-	-> NatM Register
+trivialCode
+        :: Width
+        -> Bool
+        -> (Reg -> Reg -> RI -> Instr)
+        -> CmmExpr
+        -> CmmExpr
+        -> NatM Register
 
 trivialCode rep signed instr x (CmmLit (CmmInt y _))
-    | Just imm <- makeImmediate rep signed y 
+    | Just imm <- makeImmediate rep signed y
     = do
         (src1, code1) <- getSomeReg x
         let code dst = code1 `snocOL` instr dst src1 (RIImm imm)
         return (Any (intSize rep) code)
-  
+
 trivialCode rep _ instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
@@ -1282,28 +1312,28 @@ trivialCode rep _ instr x y = do
     return (Any (intSize rep) code)
 
 trivialCodeNoImm' :: Size -> (Reg -> Reg -> Reg -> Instr)
-		 -> CmmExpr -> CmmExpr -> NatM Register
+                 -> CmmExpr -> CmmExpr -> NatM Register
 trivialCodeNoImm' size instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let code dst = code1 `appOL` code2 `snocOL` instr dst src1 src2
     return (Any size code)
-    
+
 trivialCodeNoImm :: Size -> (Size -> Reg -> Reg -> Reg -> Instr)
-		 -> CmmExpr -> CmmExpr -> NatM Register
+                 -> CmmExpr -> CmmExpr -> NatM Register
 trivialCodeNoImm size instr x y = trivialCodeNoImm' size (instr size) x y
-    
-    
-trivialUCode 
-	:: Size
-	-> (Reg -> Reg -> Instr)
-	-> CmmExpr
-	-> NatM Register
+
+
+trivialUCode
+        :: Size
+        -> (Reg -> Reg -> Instr)
+        -> CmmExpr
+        -> NatM Register
 trivialUCode rep instr x = do
     (src, code) <- getSomeReg x
     let code' dst = code `snocOL` instr dst src
     return (Any rep code')
-    
+
 -- There is no "remainder" instruction on the PPC, so we have to do
 -- it the hard way.
 -- The "div" parameter is the division instruction to use (DIVW or DIVWU)
@@ -1331,32 +1361,32 @@ coerceInt2FP fromRep toRep x = do
     dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let
-    	code' dst = code `appOL` maybe_exts `appOL` toOL [
-		LDATA ReadOnlyData
-				[CmmDataLabel lbl,
-				 CmmStaticLit (CmmInt 0x43300000 W32),
-				 CmmStaticLit (CmmInt 0x80000000 W32)],
-		XORIS itmp src (ImmInt 0x8000),
-		ST II32 itmp (spRel 3),
-		LIS itmp (ImmInt 0x4330),
-		ST II32 itmp (spRel 2),
-		LD FF64 ftmp (spRel 2)
+        code' dst = code `appOL` maybe_exts `appOL` toOL [
+                LDATA ReadOnlyData
+                                [CmmDataLabel lbl,
+                                 CmmStaticLit (CmmInt 0x43300000 W32),
+                                 CmmStaticLit (CmmInt 0x80000000 W32)],
+                XORIS itmp src (ImmInt 0x8000),
+                ST II32 itmp (spRel 3),
+                LIS itmp (ImmInt 0x4330),
+                ST II32 itmp (spRel 2),
+                LD FF64 ftmp (spRel 2)
             ] `appOL` addr_code `appOL` toOL [
-		LD FF64 dst addr,
-		FSUB FF64 dst ftmp dst
-	    ] `appOL` maybe_frsp dst
-            
+                LD FF64 dst addr,
+                FSUB FF64 dst ftmp dst
+            ] `appOL` maybe_frsp dst
+
         maybe_exts = case fromRep of
                         W8 ->  unitOL $ EXTS II8 src src
                         W16 -> unitOL $ EXTS II16 src src
                         W32 -> nilOL
-			_	-> panic "PPC.CodeGen.coerceInt2FP: no match"
+                        _       -> panic "PPC.CodeGen.coerceInt2FP: no match"
 
-        maybe_frsp dst 
-		= case toRep of
+        maybe_frsp dst
+                = case toRep of
                         W32 -> unitOL $ FRSP dst dst
                         W64 -> nilOL
-			_	-> panic "PPC.CodeGen.coerceInt2FP: no match"
+                        _       -> panic "PPC.CodeGen.coerceInt2FP: no match"
 
     return (Any (floatSize toRep) code')
 
@@ -1366,11 +1396,11 @@ coerceFP2Int _ toRep x = do
     (src, code) <- getSomeReg x
     tmp <- getNewRegNat FF64
     let
-    	code' dst = code `appOL` toOL [
-		-- convert to int in FP reg
-    	    FCTIWZ tmp src,
-		-- store value (64bit) from FP to stack
-    	    ST FF64 tmp (spRel 2),
-		-- read low word of value (high word is undefined)
-    	    LD II32 dst (spRel 3)]	
+        code' dst = code `appOL` toOL [
+                -- convert to int in FP reg
+            FCTIWZ tmp src,
+                -- store value (64bit) from FP to stack
+            ST FF64 tmp (spRel 2),
+                -- read low word of value (high word is undefined)
+            LD II32 dst (spRel 3)]
     return (Any (intSize toRep) code')

@@ -541,8 +541,8 @@ dsCmd ids local_vars env_ids stack res_ty (HsLet binds body) = do
                         core_body,
         exprFreeVars core_binds `intersectVarSet` local_vars)
 
-dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts body _)
-  = dsCmdDo ids local_vars env_ids res_ty stmts body
+dsCmd ids local_vars env_ids [] res_ty (HsDo _ctxt stmts _)
+  = dsCmdDo ids local_vars env_ids res_ty stmts 
 
 --	A |- e :: forall e. a1 (e*ts1) t1 -> ... an (e*tsn) tn -> a (e*ts) t
 --	A | xs |- ci :: [tsi] ti
@@ -618,7 +618,6 @@ dsCmdDo :: DsCmdEnv		-- arrow combinators
 				-- so don't pull on it too early
 	-> Type			-- return type of the statement
 	-> [LStmt Id]		-- statements to desugar
-	-> LHsExpr Id		-- body
 	-> DsM (CoreExpr,	-- desugared expression
 		IdSet)		-- set of local vars that occur free
 
@@ -626,15 +625,17 @@ dsCmdDo :: DsCmdEnv		-- arrow combinators
 --	--------------------------
 --	A | xs |- do { c } :: [] t
 
-dsCmdDo ids local_vars env_ids res_ty [] body
+dsCmdDo _ _ _ _ [] = panic "dsCmdDo"
+
+dsCmdDo ids local_vars env_ids res_ty [L _ (LastStmt body _)]
   = dsLCmd ids local_vars env_ids [] res_ty body
 
-dsCmdDo ids local_vars env_ids res_ty (stmt:stmts) body = do
+dsCmdDo ids local_vars env_ids res_ty (stmt:stmts) = do
     let
         bound_vars = mkVarSet (collectLStmtBinders stmt)
         local_vars' = local_vars `unionVarSet` bound_vars
     (core_stmts, _, env_ids') <- fixDs (\ ~(_,_,env_ids') -> do
-        (core_stmts, fv_stmts) <- dsCmdDo ids local_vars' env_ids' res_ty stmts body
+        (core_stmts, fv_stmts) <- dsCmdDo ids local_vars' env_ids' res_ty stmts 
         return (core_stmts, fv_stmts, varSetElems fv_stmts))
     (core_stmt, fv_stmt) <- dsCmdLStmt ids local_vars env_ids env_ids' stmt
     return (do_compose ids
@@ -674,7 +675,7 @@ dsCmdStmt
 --		---> arr (\ (xs) -> ((xs1),(xs'))) >>> first c >>>
 --			arr snd >>> ss
 
-dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd _ c_ty) = do
+dsCmdStmt ids local_vars env_ids out_ids (ExprStmt cmd _ _ c_ty) = do
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars [] c_ty cmd
     core_mux <- matchEnvStack env_ids []
         (mkCorePairExpr (mkBigCoreVarTup env_ids1) (mkBigCoreVarTup out_ids))
@@ -1061,7 +1062,6 @@ collectl (L _ pat) bndrs
 
     go (SigPatIn pat _)           = collectl pat bndrs
     go (SigPatOut pat _)          = collectl pat bndrs
-    go (TypePat _)                = bndrs
     go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
     go (ViewPat _ pat _)          = collectl pat bndrs
     go p@(QuasiQuotePat {})       = pprPanic "collectl/go" (ppr p)

@@ -69,12 +69,13 @@ deSugar hsc_env
 	    	    	    tcg_anns         = anns,
 			    tcg_binds        = binds,
 		    	    tcg_imp_specs    = imp_specs,
-			    tcg_ev_binds     = ev_binds,
-			    tcg_fords        = fords,
-			    tcg_rules        = rules,
-		    	    tcg_insts        = insts,
-		    	    tcg_fam_insts    = fam_insts,
-			    tcg_hpc          = other_hpc_info })
+                            tcg_ev_binds     = ev_binds,
+                            tcg_fords        = fords,
+                            tcg_rules        = rules,
+                            tcg_vects        = vects,
+                            tcg_insts        = insts,
+                            tcg_fam_insts    = fam_insts,
+                            tcg_hpc          = other_hpc_info })
 
   = do	{ let dflags = hsc_dflags hsc_env
         ; showPass dflags "Desugar"
@@ -88,7 +89,7 @@ deSugar hsc_env
               <- case target of
 	           HscNothing ->
                        return (emptyMessages,
-                               Just ([], nilOL, [], NoStubs, hpcInfo, emptyModBreaks))
+                               Just ([], nilOL, [], [], NoStubs, hpcInfo, emptyModBreaks))
                    _        -> do
                      (binds_cvr,ds_hpc_info, modBreaks)
 			 <- if (opt_Hpc
@@ -98,47 +99,53 @@ deSugar hsc_env
                                                            (typeEnvTyCons type_env) binds 
                               else return (binds, hpcInfo, emptyModBreaks)
                      initDs hsc_env mod rdr_env type_env $ do
-		       do { ds_ev_binds <- dsEvBinds ev_binds
-		          ; core_prs <- dsTopLHsBinds auto_scc binds_cvr
+                       do { ds_ev_binds <- dsEvBinds ev_binds
+                          ; core_prs <- dsTopLHsBinds auto_scc binds_cvr
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
-	                  ; (ds_fords, foreign_prs) <- dsForeigns fords
-		          ; rules <- mapMaybeM dsRule rules
-		          ; return ( ds_ev_binds
+                          ; (ds_fords, foreign_prs) <- dsForeigns fords
+                          ; ds_rules <- mapMaybeM dsRule rules
+                          ; ds_vects <- mapM dsVect vects
+                          ; let hpc_init
+                                  | opt_Hpc   = hpcInitCode mod ds_hpc_info
+                                  | otherwise = empty
+                          ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
-                                   , spec_rules ++ rules
-                                   , ds_fords, ds_hpc_info, modBreaks) }
+                                   , spec_rules ++ ds_rules, ds_vects
+                                   , ds_fords `appendStubC` hpc_init
+                                   , ds_hpc_info, modBreaks) }
 
-	; case mb_res of {
-	   Nothing -> return (msgs, Nothing) ;
-	   Just (ds_ev_binds, all_prs, all_rules, ds_fords,ds_hpc_info, modBreaks) -> do
+        ; case mb_res of {
+           Nothing -> return (msgs, Nothing) ;
+           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords, ds_hpc_info, modBreaks) -> do
 
-	{ 	-- Add export flags to bindings
-	  keep_alive <- readIORef keep_var
-	; let (rules_for_locals, rules_for_imps) 
+        {       -- Add export flags to bindings
+          keep_alive <- readIORef keep_var
+        ; let (rules_for_locals, rules_for_imps) 
                    = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target
-	      		      export_set keep_alive rules_for_locals (fromOL all_prs)
+                              export_set keep_alive rules_for_locals (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
-	-- Notice that we put the whole lot in a big Rec, even the foreign binds
-	-- When compiling PrelFloat, which defines data Float = F# Float#
-	-- we want F# to be in scope in the foreign marshalling code!
-	-- You might think it doesn't matter, but the simplifier brings all top-level
-	-- things into the in-scope set before simplifying; so we get no unfolding for F#!
+        -- Notice that we put the whole lot in a big Rec, even the foreign binds
+        -- When compiling PrelFloat, which defines data Float = F# Float#
+        -- we want F# to be in scope in the foreign marshalling code!
+        -- You might think it doesn't matter, but the simplifier brings all top-level
+        -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-	-- Lint result if necessary, and print
+        -- Lint result if necessary, and print
         ; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared, before opt" $
                (vcat [ pprCoreBindings final_pgm
                      , pprRules rules_for_imps ])
 
-	; (ds_binds, ds_rules_for_imps) <- simpleOptPgm dflags final_pgm rules_for_imps
-	      		 -- The simpleOptPgm gets rid of type 
-			 -- bindings plus any stupid dead code
+        ; (ds_binds, ds_rules_for_imps, ds_vects) 
+            <- simpleOptPgm dflags final_pgm rules_for_imps vects0
+                         -- The simpleOptPgm gets rid of type 
+                         -- bindings plus any stupid dead code
 
-	; endPass dflags CoreDesugar ds_binds ds_rules_for_imps
+        ; endPass dflags CoreDesugar ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
-	; deps <- mkDependencies tcg_env
+        ; deps <- mkDependencies tcg_env
 
         ; let mod_guts = ModGuts {	
 		mg_module    	= mod,
@@ -161,6 +168,7 @@ deSugar hsc_env
 		mg_foreign   	= ds_fords,
 		mg_hpc_info  	= ds_hpc_info,
                 mg_modBreaks    = modBreaks,
+                mg_vect_decls   = ds_vects,
                 mg_vect_info    = noVectInfo
               }
         ; return (msgs, Just mod_guts)
@@ -371,6 +379,31 @@ switching off EnableRewriteRules.  See DsExpr.dsExplicitList.
 
 That keeps the desugaring of list comprehensions simple too.
 
+
+
 Nor do we want to warn of conversion identities on the LHS;
 the rule is precisly to optimise them:
   {-# RULES "fromRational/id" fromRational = id :: Rational -> Rational #-}
+
+
+%************************************************************************
+%*                                                                      *
+%*              Desugaring vectorisation declarations
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+dsVect :: LVectDecl Id -> DsM CoreVect
+dsVect (L loc (HsVect v rhs))
+  = putSrcSpanDs loc $ 
+    do { rhs' <- fmapMaybeM dsLExpr rhs
+       ; return $ Vect (unLoc v) rhs'
+  	   }
+-- dsVect (L loc (HsVect v Nothing))
+--   = return $ Vect v Nothing
+-- dsVect (L loc (HsVect v (Just rhs)))
+--   = putSrcSpanDs loc $ 
+--     do { rhs' <- dsLExpr rhs
+--        ; return $ Vect v (Just rhs')
+--       }
+\end{code}

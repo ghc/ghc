@@ -44,8 +44,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 
     <para>Language options can be controlled in two ways:
     <itemizedlist>
-      <listitem><para>Every language option can switched on by a command-line flag "<option>-X...</option>" 
-        (e.g. <option>-XTemplateHaskell</option>), and switched off by the flag "<option>-XNo...</option>"; 
+      <listitem><para>Every language option can switched on by a command-line flag "<option>-X...</option>"
+        (e.g. <option>-XTemplateHaskell</option>), and switched off by the flag "<option>-XNo...</option>";
         (e.g. <option>-XNoTemplateHaskell</option>).</para></listitem>
       <listitem><para>
           Language options recognised by Cabal can also be enabled using the <literal>LANGUAGE</literal> pragma,
@@ -55,11 +55,11 @@ documentation</ulink> describes all the libraries that come with GHC.
 
     <para>The flag <option>-fglasgow-exts</option>
           <indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
-	  is equivalent to enabling the following extensions: 
+	  is equivalent to enabling the following extensions:
           &what_glasgow_exts_does;
-	    Enabling these options is the <emphasis>only</emphasis> 
+	    Enabling these options is the <emphasis>only</emphasis>
 	    effect of <option>-fglasgow-exts</option>.
-          We are trying to move away from this portmanteau flag, 
+          We are trying to move away from this portmanteau flag,
 	  and towards enabling features individually.</para>
 
   </sect1>
@@ -77,8 +77,8 @@ While you really can use this stuff to write fast code,
   unboxed version in any case.  And if it isn't, we'd like to know
   about it.</para>
 
-<para>All these primitive data types and operations are exported by the 
-library <literal>GHC.Prim</literal>, for which there is 
+<para>All these primitive data types and operations are exported by the
+library <literal>GHC.Prim</literal>, for which there is
 <ulink url="&libraryGhcPrimLocation;/GHC-Prim.html">detailed online documentation</ulink>.
 (This documentation is generated from the file <filename>compiler/prelude/primops.txt.pp</filename>.)
 </para>
@@ -89,10 +89,10 @@ into scope.  Many of them have names ending in "&num;", and to mention such
 names you need the <option>-XMagicHash</option> extension (<xref linkend="magic-hash"/>).
 </para>
 
-<para>The primops make extensive use of <link linkend="glasgow-unboxed">unboxed types</link> 
+<para>The primops make extensive use of <link linkend="glasgow-unboxed">unboxed types</link>
 and <link linkend="unboxed-tuples">unboxed tuples</link>, which
 we briefly summarise here. </para>
-  
+
 <sect2 id="glasgow-unboxed">
 <title>Unboxed types
 </title>
@@ -124,7 +124,7 @@ know and love&mdash;usually one instruction.
 Primitive (unboxed) types cannot be defined in Haskell, and are
 therefore built into the language and compiler.  Primitive types are
 always unlifted; that is, a value of a primitive type cannot be
-bottom.  We use the convention (but it is only a convention) 
+bottom.  We use the convention (but it is only a convention)
 that primitive types, values, and
 operations have a <literal>&num;</literal> suffix (see <xref linkend="magic-hash"/>).
 For some primitive types we have special syntax for literals, also
@@ -283,7 +283,7 @@ You can have an unboxed tuple in a pattern binding, thus
   f x = let (# p,q #) = h x in ..body..
 </programlisting>
 If the types of <literal>p</literal> and <literal>q</literal> are not unboxed,
-the resulting binding is lazy like any other Haskell pattern binding.  The 
+the resulting binding is lazy like any other Haskell pattern binding.  The
 above example desugars like this:
 <programlisting>
   f x = let t = case h x o f{ (# p,q #) -> (p,q)
@@ -302,7 +302,7 @@ Indeed, the bindings can even be recursive.
 
 <sect1 id="syntax-extns">
 <title>Syntactic extensions</title>
- 
+
     <sect2 id="unicode-syntax">
       <title>Unicode syntax</title>
       <para>The language
@@ -425,17 +425,17 @@ Indeed, the bindings can even be recursive.
 	postfix modifier to identifiers.  Thus, "x&num;" is a valid variable, and "T&num;" is
 	a valid type constructor or data constructor.</para>
 
-      <para>The hash sign does not change sematics at all.  We tend to use variable
-	names ending in "&num;" for unboxed values or types (e.g. <literal>Int&num;</literal>), 
-	but there is no requirement to do so; they are just plain ordinary variables.
+      <para>The hash sign does not change semantics at all.  We tend to use variable
+	names ending in "&num;" for unboxed values or types (e.g. <literal>Int&num;</literal>),
+        but there is no requirement to do so; they are just plain ordinary variables.
 	Nor does the <option>-XMagicHash</option> extension bring anything into scope.
-	For example, to bring <literal>Int&num;</literal> into scope you must 
-	import <literal>GHC.Prim</literal> (see <xref linkend="primitives"/>); 
+	For example, to bring <literal>Int&num;</literal> into scope you must
+	import <literal>GHC.Prim</literal> (see <xref linkend="primitives"/>);
 	the <option>-XMagicHash</option> extension
 	then allows you to <emphasis>refer</emphasis> to the <literal>Int&num;</literal>
 	that is now in scope.</para>
       <para> The <option>-XMagicHash</option> also enables some new forms of literals (see <xref linkend="glasgow-unboxed"/>):
-	<itemizedlist> 
+	<itemizedlist>
 	  <listitem><para> <literal>'x'&num;</literal> has type <literal>Char&num;</literal></para> </listitem>
 	  <listitem><para> <literal>&quot;foo&quot;&num;</literal> has type <literal>Addr&num;</literal></para> </listitem>
 	  <listitem><para> <literal>3&num;</literal> has type <literal>Int&num;</literal>. In general,
@@ -530,7 +530,7 @@ where
 </programlisting>
 
 <para>
-The auxiliary functions are 
+The auxiliary functions are
 </para>
 
 <programlisting>
@@ -575,10 +575,10 @@ This is a bit shorter, but hardly better.  Of course, we can rewrite any set
 of pattern-matching, guarded equations as case expressions; that is
 precisely what the compiler does when compiling equations! The reason that
 Haskell provides guarded equations is because they allow us to write down
-the cases we want to consider, one at a time, independently of each other. 
+the cases we want to consider, one at a time, independently of each other.
 This structure is hidden in the case version.  Two of the right-hand sides
 are really the same (<function>fail</function>), and the whole expression
-tends to become more and more indented. 
+tends to become more and more indented.
 </para>
 
 <para>
@@ -594,9 +594,9 @@ clunky env var1 var2
 </programlisting>
 
 <para>
-The semantics should be clear enough.  The qualifiers are matched in order. 
+The semantics should be clear enough.  The qualifiers are matched in order.
 For a <literal>&lt;-</literal> qualifier, which I call a pattern guard, the
-right hand side is evaluated and matched against the pattern on the left. 
+right hand side is evaluated and matched against the pattern on the left.
 If the match fails then the whole guard fails and the next equation is
 tried.  If it succeeds, then the appropriate binding takes place, and the
 next qualifier is matched, in the augmented environment.  Unlike list
@@ -646,7 +646,7 @@ language as follows:
 
 <programlisting>
 type Typ
- 
+
 data TypView = Unit
              | Arrow Typ Typ
 
@@ -658,7 +658,7 @@ view :: Type -> TypeView
 The representation of Typ is held abstract, permitting implementations
 to use a fancy representation (e.g., hash-consing to manage sharing).
 
-Without view patterns, using this signature a little inconvenient: 
+Without view patterns, using this signature a little inconvenient:
 <programlisting>
 size :: Typ -> Integer
 size t = case view t of
@@ -673,7 +673,7 @@ against <literal>t</literal> is buried deep inside another pattern.
 
 <para>
 View patterns permit calling the view function inside the pattern and
-matching against the result: 
+matching against the result:
 <programlisting>
 size (view -> Unit) = 1
 size (view -> Arrow t1 t2) = size t1 + size t2
@@ -716,7 +716,7 @@ clunky env (lookup env -> Just val1) (lookup env -> Just val2) = val1 + val2
 </para>
 
 <para>
-More precisely, the scoping rules are: 
+More precisely, the scoping rules are:
 <itemizedlist>
 <listitem>
 <para>
@@ -734,7 +734,7 @@ example :: (String -> Integer) -> String -> Bool
 example f (f -> 4) = True
 </programlisting>
 That is, the scoping is the same as it would be if the curried arguments
-were collected into a tuple.  
+were collected into a tuple.
 </para>
 </listitem>
 
@@ -750,7 +750,7 @@ let {(x -> y) = e1 ;
      (y -> x) = e2 } in x
 </programlisting>
 
-(For some amplification on this design choice see 
+(For some amplification on this design choice see
 <ulink url="http://hackage.haskell.org/trac/ghc/ticket/4061">Trac #4061</ulink>.)
 
 </para>
@@ -771,8 +771,8 @@ a <replaceable>T2</replaceable>, then the whole view pattern matches a
 <ulink url="http://www.haskell.org/onlinereport/">Haskell 98
 Report</ulink>, add the following:
 <programlisting>
-case v of { (e -> p) -> e1 ; _ -> e2 } 
- = 
+case v of { (e -> p) -> e1 ; _ -> e2 }
+ =
 case (e v) of { p -> e1 ; _ -> e2 }
 </programlisting>
 That is, to match a variable <replaceable>v</replaceable> against a pattern
@@ -781,7 +781,7 @@ That is, to match a variable <replaceable>v</replaceable> against a pattern
 <literal>)</literal>, evaluate <literal>(</literal>
 <replaceable>exp</replaceable> <replaceable> v</replaceable>
 <literal>)</literal> and match the result against
-<replaceable>pat</replaceable>.  
+<replaceable>pat</replaceable>.
 </para></listitem>
 
 <listitem><para> Efficiency: When the same view function is applied in
@@ -839,7 +839,7 @@ it, you can use the <option>-XNoNPlusKPatterns</option> flag.
 
 <para>
 The do-notation of Haskell 98 does not allow <emphasis>recursive bindings</emphasis>,
-that is, the variables bound in a do-expression are visible only in the textually following 
+that is, the variables bound in a do-expression are visible only in the textually following
 code block. Compare this to a let-expression, where bound variables are visible in the entire binding
 group. It turns out that several applications can benefit from recursive bindings in
 the do-notation.  The <option>-XDoRec</option> flag provides the necessary syntactic support.
@@ -857,7 +857,7 @@ As you can guess <literal>justOnes</literal> will evaluate to <literal>Just [-1,
 The background and motivation for recursive do-notation is described in
 <ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>,
 by Levent Erkok, John Launchbury,
-Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania. 
+Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania.
 The theory behind monadic value recursion is explained further in Erkok's thesis
 <ulink url="http://sites.google.com/site/leventerkok/erkok-thesis.pdf">Value Recursion in Monadic Computations</ulink>.
 However, note that GHC uses a different syntax than the one described in these documents.
@@ -872,38 +872,38 @@ which wraps a mutually-recursive group of monadic statements,
 producing a single statement.
 </para>
 <para>Similar to a <literal>let</literal>
-statement, the variables bound in the <literal>rec</literal> are 
+statement, the variables bound in the <literal>rec</literal> are
 visible throughout the <literal>rec</literal> group, and below it.
 For example, compare
 <programlisting>
-do { a &lt;- getChar              do { a &lt;- getChar                    
-   ; let { r1 = f a r2	           ; rec { r1 &lt;- f a r2	
-         ; r2 = g r1 }	                 ; r2 &lt;- g r1 }	
+do { a &lt;- getChar              do { a &lt;- getChar
+   ; let { r1 = f a r2	           ; rec { r1 &lt;- f a r2
+         ; r2 = g r1 }	                 ; r2 &lt;- g r1 }
    ; return (r1 ++ r2) }          ; return (r1 ++ r2) }
 </programlisting>
-In both cases, <literal>r1</literal> and <literal>r2</literal> are 
+In both cases, <literal>r1</literal> and <literal>r2</literal> are
 available both throughout the <literal>let</literal> or <literal>rec</literal> block, and
 in the statements that follow it.  The difference is that <literal>let</literal> is non-monadic,
-while <literal>rec</literal> is monadic.  (In Haskell <literal>let</literal> is 
+while <literal>rec</literal> is monadic.  (In Haskell <literal>let</literal> is
 really <literal>letrec</literal>, of course.)
 </para>
 <para>
-The static and dynamic semantics of <literal>rec</literal> can be described as follows:  
+The static and dynamic semantics of <literal>rec</literal> can be described as follows:
 <itemizedlist>
 <listitem><para>
 First,
-similar to let-bindings, the <literal>rec</literal> is broken into 
+similar to let-bindings, the <literal>rec</literal> is broken into
 minimal recursive groups, a process known as <emphasis>segmentation</emphasis>.
 For example:
 <programlisting>
 rec { a &lt;- getChar      ===>     a &lt;- getChar
     ; b &lt;- f a c                 rec { b &lt;- f a c
     ; c &lt;- f b a                     ; c &lt;- f b a }
-    ; putChar c }                putChar c 
+    ; putChar c }                putChar c
 </programlisting>
 The details of segmentation are described in Section 3.2 of
 <ulink url="http://sites.google.com/site/leventerkok/">A recursive do for Haskell</ulink>.
-Segmentation improves polymorphism, reduces the size of the recursive "knot", and, as the paper 
+Segmentation improves polymorphism, reduces the size of the recursive "knot", and, as the paper
 describes, also has a semantic effect (unless the monad satisfies the right-shrinking law).
 </para></listitem>
 <listitem><para>
@@ -921,13 +921,13 @@ is desugared to the statement
 </programlisting>
 where <replaceable>vs</replaceable> is a tuple of the variables bound by <replaceable>ss</replaceable>.
 </para><para>
-The original <literal>rec</literal> typechecks exactly 
-when the above desugared version would do so.  For example, this means that 
+The original <literal>rec</literal> typechecks exactly
+when the above desugared version would do so.  For example, this means that
 the variables <replaceable>vs</replaceable> are all monomorphic in the statements
 following the <literal>rec</literal>, because they are bound by a lambda.
 </para>
 <para>
-The <literal>mfix</literal> function is defined in the <literal>MonadFix</literal> 
+The <literal>mfix</literal> function is defined in the <literal>MonadFix</literal>
 class, in <literal>Control.Monad.Fix</literal>, thus:
 <programlisting>
 class Monad m => MonadFix m where
@@ -951,14 +951,14 @@ then that monad must be declared an instance of the <literal>MonadFix</literal> 
 </para></listitem>
 
 <listitem><para>
-The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO. 
-Furthermore, the Control.Monad.ST and Control.Monad.ST.Lazy modules provide the instances of the MonadFix class 
+The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO.
+Furthermore, the Control.Monad.ST and Control.Monad.ST.Lazy modules provide the instances of the MonadFix class
 for Haskell's internal state monad (strict and lazy, respectively).
 </para></listitem>
 
 <listitem><para>
 Like <literal>let</literal> and <literal>where</literal> bindings,
-name shadowing is not allowed within a <literal>rec</literal>; 
+name shadowing is not allowed within a <literal>rec</literal>;
 that is, all the names bound in a single <literal>rec</literal> must
 be distinct (Section 3.3 of the paper).
 </para></listitem>
@@ -1007,7 +1007,7 @@ This name is not supported by GHC.
     example, the following zips together two lists:</para>
 
 <programlisting>
-   [ (x, y) | x &lt;- xs | y &lt;- ys ] 
+   [ (x, y) | x &lt;- xs | y &lt;- ys ]
 </programlisting>
 
     <para>The behavior of parallel list comprehensions follows that of
@@ -1020,26 +1020,26 @@ This name is not supported by GHC.
     <para>Given a parallel comprehension of the form: </para>
 
 <programlisting>
-   [ e | p1 &lt;- e11, p2 &lt;- e12, ... 
-       | q1 &lt;- e21, q2 &lt;- e22, ... 
-       ... 
-   ] 
+   [ e | p1 &lt;- e11, p2 &lt;- e12, ...
+       | q1 &lt;- e21, q2 &lt;- e22, ...
+       ...
+   ]
 </programlisting>
 
     <para>This will be translated to: </para>
 
 <programlisting>
-   [ e | ((p1,p2), (q1,q2), ...) &lt;- zipN [(p1,p2) | p1 &lt;- e11, p2 &lt;- e12, ...] 
-                                         [(q1,q2) | q1 &lt;- e21, q2 &lt;- e22, ...] 
-                                         ... 
-   ] 
+   [ e | ((p1,p2), (q1,q2), ...) &lt;- zipN [(p1,p2) | p1 &lt;- e11, p2 &lt;- e12, ...]
+                                         [(q1,q2) | q1 &lt;- e21, q2 &lt;- e22, ...]
+                                         ...
+   ]
 </programlisting>
 
     <para>where `zipN' is the appropriate zip for the given number of
     branches.</para>
 
   </sect2>
-  
+
   <!-- ===================== TRANSFORM LIST COMPREHENSIONS ===================  -->
 
   <sect2 id="generalised-list-comprehensions">
@@ -1059,7 +1059,7 @@ This name is not supported by GHC.
 	  Comprehensive comprehensions: comprehensions with "order by" and "group by"</ulink>,
     except that the syntax we use differs slightly from the paper.</para>
 <para>The extension is enabled with the flag <option>-XTransformListComp</option>.</para>
-<para>Here is an example: 
+<para>Here is an example:
 <programlisting>
 employees = [ ("Simon", "MS", 80)
 , ("Erik", "MS", 100)
@@ -1073,9 +1073,9 @@ output = [ (the dept, sum salary)
 , then sortWith by (sum salary)
 , then take 5 ]
 </programlisting>
-In this example, the list <literal>output</literal> would take on 
+In this example, the list <literal>output</literal> would take on
     the value:
-    
+
 <programlisting>
 [("Yale", 60), ("Ed", 85), ("MS", 180)]
 </programlisting>
@@ -1088,7 +1088,7 @@ function that is exported by <literal>GHC.Exts</literal>.)</para>
 all introduced by the (existing) keyword <literal>then</literal>:
     <itemizedlist>
     <listitem>
-    
+
 <programlisting>
 then f
 </programlisting>
@@ -1096,10 +1096,10 @@ then f
     This statement requires that <literal>f</literal> have the type <literal>
     forall a. [a] -> [a]</literal>. You can see an example of its use in the
     motivating example, as this form is used to apply <literal>take 5</literal>.
-    
+
     </listitem>
-    
-    
+
+
     <listitem>
 <para>
 <programlisting>
@@ -1107,13 +1107,13 @@ then f by e
 </programlisting>
 
     This form is similar to the previous one, but allows you to create a function
-    which will be passed as the first argument to f. As a consequence f must have 
+    which will be passed as the first argument to f. As a consequence f must have
     the type <literal>forall a. (a -> t) -> [a] -> [a]</literal>. As you can see
-    from the type, this function lets f &quot;project out&quot; some information 
+    from the type, this function lets f &quot;project out&quot; some information
     from the elements of the list it is transforming.</para>
 
-    <para>An example is shown in the opening example, where <literal>sortWith</literal> 
-    is supplied with a function that lets it find out the <literal>sum salary</literal> 
+    <para>An example is shown in the opening example, where <literal>sortWith</literal>
+    is supplied with a function that lets it find out the <literal>sum salary</literal>
     for any item in the list comprehension it transforms.</para>
 
     </listitem>
@@ -1134,7 +1134,7 @@ then group by e using f
     at every point after this statement, binders occurring before it in the comprehension
     refer to <emphasis>lists</emphasis> of possible values, not single values. To help understand
     this, let's look at an example:</para>
-    
+
 <programlisting>
 -- This works similarly to groupWith in GHC.Exts, but doesn't sort its input first
 groupRuns :: Eq b => (a -> b) -> [a] -> [[a]]
@@ -1152,8 +1152,8 @@ output = [ (the x, y)
 [(1, [4, 5, 6]), (2, [4, 5, 6]), (3, [4, 5, 6]), (1, [4, 5, 6]), (2, [4, 5, 6])]
 </programlisting>
 
-    <para>Note that we have used the <literal>the</literal> function to change the type 
-    of x from a list to its original numeric type. The variable y, in contrast, is left 
+    <para>Note that we have used the <literal>the</literal> function to change the type
+    of x from a list to its original numeric type. The variable y, in contrast, is left
     unchanged from the list form introduced by the grouping.</para>
 
     </listitem>
@@ -1166,13 +1166,13 @@ then group by e
 
     <para>This form of grouping is essentially the same as the one described above. However,
     since no function to use for the grouping has been supplied it will fall back on the
-    <literal>groupWith</literal> function defined in 
+    <literal>groupWith</literal> function defined in
     <ulink url="&libraryBaseLocation;/GHC-Exts.html"><literal>GHC.Exts</literal></ulink>. This
     is the form of the group statement that we made use of in the opening example.</para>
 
     </listitem>
-    
-    
+
+
     <listitem>
 
 <programlisting>
@@ -1182,7 +1182,7 @@ then group using f
     <para>With this form of the group statement, f is required to simply have the type
     <literal>forall a. [a] -> [[a]]</literal>, which will be used to group up the
     comprehension so far directly. An example of this form is as follows:</para>
-    
+
 <programlisting>
 output = [ x
 | y &lt;- [1..5]
@@ -1200,6 +1200,234 @@ output = [ x
 </itemizedlist>
 </para>
   </sect2>
+
+   <!-- ===================== MONAD COMPREHENSIONS ===================== -->
+
+<sect2 id="monad-comprehensions">
+    <title>Monad comprehensions</title>
+    <indexterm><primary>monad comprehensions</primary></indexterm>
+
+    <para>
+        Monad comprehensions generalise the list comprehension notation,
+        including parallel comprehensions
+        (<xref linkend="parallel-list-comprehensions"/>) and
+        transform comprehensions (<xref linkend="generalised-list-comprehensions"/>)
+        to work for any monad.
+    </para>
+
+    <para>Monad comprehensions support:</para>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                Bindings:
+            </para>
+
+<programlisting>
+[ x + y | x &lt;- Just 1, y &lt;- Just 2 ]
+</programlisting>
+
+            <para>
+                Bindings are translated with the <literal>(&gt;&gt;=)</literal> and
+                <literal>return</literal> functions to the usual do-notation:
+            </para>
+
+<programlisting>
+do x &lt;- Just 1
+   y &lt;- Just 2
+   return (x+y)
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Guards:
+            </para>
+
+<programlisting>
+[ x | x &lt;- [1..10], x &lt;= 5 ]
+</programlisting>
+
+            <para>
+                Guards are translated with the <literal>guard</literal> function,
+                which requires a <literal>MonadPlus</literal> instance:
+            </para>
+
+<programlisting>
+do x &lt;- [1..10]
+   guard (x &lt;= 5)
+   return x
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Transform statements (as with <literal>-XTransformListComp</literal>):
+            </para>
+
+<programlisting>
+[ x+y | x &lt;- [1..10], y &lt;- [1..x], then take 2 ]
+</programlisting>
+
+            <para>
+                This translates to:
+            </para>
+
+<programlisting>
+do (x,y) &lt;- take 2 (do x &lt;- [1..10]
+                       y &lt;- [1..x]
+                       return (x,y))
+   return (x+y)
+</programlisting>
+
+        </listitem>
+        <listitem>
+            <para>
+                Group statements (as with <literal>-XTransformListComp</literal>):
+            </para>
+
+<programlisting>
+[ x | x &lt;- [1,1,2,2,3], then group by x ]
+[ x | x &lt;- [1,1,2,2,3], then group by x using GHC.Exts.groupWith ]
+[ x | x &lt;- [1,1,2,2,3], then group using myGroup ]
+</programlisting>
+
+            <para>
+                The basic <literal>then group by e</literal> statement is
+                translated using the <literal>mgroupWith</literal> function, which
+                requires a <literal>MonadGroup</literal> instance, defined in
+                <ulink url="&libraryBaseLocation;/Control-Monad-Group.html"><literal>Control.Monad.Group</literal></ulink>:
+            </para>
+
+<programlisting>
+do x &lt;- mgroupWith (do x &lt;- [1,1,2,2,3]
+                       return x)
+   return x
+</programlisting>
+
+            <para>
+                Note that the type of <literal>x</literal> is changed by the
+                grouping statement.
+            </para>
+
+            <para>
+                The grouping function can also be defined with the
+                <literal>using</literal> keyword.
+            </para>
+
+        </listitem>
+        <listitem>
+            <para>
+                Parallel statements (as with <literal>-XParallelListComp</literal>):
+            </para>
+
+<programlisting>
+[ (x+y) | x &lt;- [1..10]
+        | y &lt;- [11..20]
+        ]
+</programlisting>
+
+            <para>
+                Parallel statements are translated using the
+                <literal>mzip</literal> function, which requires a
+                <literal>MonadZip</literal> instance defined in
+                <ulink url="&libraryBaseLocation;/Control-Monad-Zip.html"><literal>Control.Monad.Zip</literal></ulink>:
+            </para>
+
+<programlisting>
+do (x,y) &lt;- mzip (do x &lt;- [1..10]
+                     return x)
+                 (do y &lt;- [11..20]
+                     return y)
+   return (x+y)
+</programlisting>
+
+        </listitem>
+    </itemizedlist>
+
+    <para>
+        All these features are enabled by default if the
+        <literal>MonadComprehensions</literal> extension is enabled. The types
+        and more detailed examples on how to use comprehensions are explained
+        in the previous chapters <xref
+            linkend="generalised-list-comprehensions"/> and <xref
+            linkend="parallel-list-comprehensions"/>. In general you just have
+        to replace the type <literal>[a]</literal> with the type
+        <literal>Monad m => m a</literal> for monad comprehensions.
+    </para>
+
+    <para>
+        Note: Even though most of these examples are using the list monad,
+        monad comprehensions work for any monad.
+        The <literal>base</literal> package offers all necessary instances for
+        lists, which make <literal>MonadComprehensions</literal> backward
+        compatible to built-in, transform and parallel list comprehensions.
+    </para>
+<para> More formally, the desugaring is as follows.  We write <literal>D[ e | Q]</literal>
+to mean the desugaring of the monad comprehension <literal>[ e | Q]</literal>:
+<programlisting>
+Expressions: e
+Declarations: d
+Lists of qualifiers: Q,R,S
+
+-- Basic forms
+D[ e | ]               = return e
+D[ e | p &lt;- e, Q ]     = e &gt;&gt;= \p -&gt; D[ e | Q ]
+D[ e | e, Q ]          = guard e &gt;&gt; \p -&gt; D[ e | Q ]
+D[ e | let d, Q ]      = let d in D[ e | Q ]
+
+-- Parallel comprehensions (iterate for multiple parallel branches)
+D[ e | (Q | R), S ]    = mzip D[ Qv | Q ] D[ Rv | R ] &gt;&gt;= \(Qv,Rv) -&gt; D[ e | S ]
+
+-- Transform comprehensions
+D[ e | Q then f, R ]                  = f D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+
+D[ e | Q then f by b, R ]             = f b D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+
+D[ e | Q then group using f, R ]      = f D[ Qv | Q ] &gt;&gt;= \ys -&gt;
+                                        case (fmap selQv1 ys, ..., fmap selQvn ys) of
+                                 	     Qv -&gt; D[ e | R ]
+
+D[ e | Q then group by b using f, R ] = f b D[ Qv | Q ] &gt;&gt;= \ys -&gt;
+                                        case (fmap selQv1 ys, ..., fmap selQvn ys) of
+                                           Qv -&gt; D[ e | R ]
+
+where  Qv is the tuple of variables bound by Q (and used subsequently)
+       selQvi is a selector mapping Qv to the ith component of Qv
+
+Operator     Standard binding       Expected type
+--------------------------------------------------------------------
+return       GHC.Base               t1 -&gt; m t2
+(&gt;&gt;=)        GHC.Base               m1 t1 -&gt; (t2 -&gt; m2 t3) -&gt; m3 t3
+(&gt;&gt;)         GHC.Base               m1 t1 -&gt; m2 t2         -&gt; m3 t3
+guard        Control.Monad          t1 -&gt; m t2
+fmap         GHC.Base               forall a b. (a-&gt;b) -&gt; n a -&gt; n b
+mgroupWith   Control.Monad.Group    forall a. (a -&gt; t) -&gt; m1 a -&gt; m2 (n a)
+mzip         Control.Monad.Zip      forall a b. m a -&gt; m b -&gt; m (a,b)
+</programlisting>
+The comprehension should typecheck when its desugaring would typecheck.
+</para>
+<para>
+Monad comprehensions support rebindable syntax (<xref linkend="rebindable-syntax"/>).
+Without rebindable
+syntax, the operators from the "standard binding" module are used; with
+rebindable syntax, the operators are looked up in the current lexical scope.
+For example, parallel comprehensions will be typechecked and desugared
+using whatever "<literal>mzip</literal>" is in scope.
+</para>
+<para>
+The rebindable operators must have the "Expected type" given in the
+table above.  These types are surprisingly general.  For example, you can
+use a bind operator with the type
+<programlisting>
+(>>=) :: T x y a -> (a -> T y z b) -> T x z b
+</programlisting>
+In the case of transform comprehensions, notice that the groups are
+parameterised over some arbitrary type <literal>n</literal> (provided it
+has an <literal>fmap</literal>, as well as
+the comprehension being over an arbitrary monad.
+</para>
+</sect2>
 
    <!-- ===================== REBINDABLE SYNTAX ===================  -->
 
@@ -1221,7 +1449,7 @@ output = [ x
             hierarchy.  It completely defeats that purpose if the
             literal "1" means "<literal>Prelude.fromInteger
             1</literal>", which is what the Haskell Report specifies.
-            So the <option>-XRebindableSyntax</option> 
+            So the <option>-XRebindableSyntax</option>
 	      flag causes
             the following pieces of built-in syntax to refer to
             <emphasis>whatever is in scope</emphasis>, not the Prelude
@@ -1231,16 +1459,16 @@ output = [ x
 		<para>An integer literal <literal>368</literal> means
                 "<literal>fromInteger (368::Integer)</literal>", rather than
                 "<literal>Prelude.fromInteger (368::Integer)</literal>".
-</para> </listitem>	    
+</para> </listitem>
 
       <listitem><para>Fractional literals are handed in just the same way,
-	  except that the translation is 
+	  except that the translation is
 	      <literal>fromRational (3.68::Rational)</literal>.
-</para> </listitem>	    
+</para> </listitem>
 
 	  <listitem><para>The equality test in an overloaded numeric pattern
 	      uses whatever <literal>(==)</literal> is in scope.
-</para> </listitem>	    
+</para> </listitem>
 
 	  <listitem><para>The subtraction operation, and the
 	  greater-than-or-equal test, in <literal>n+k</literal> patterns
@@ -1282,7 +1510,7 @@ output = [ x
 </para>
 <para>
 In all cases (apart from arrow notation), the static semantics should be that of the desugared form,
-even if that is a little unexpected. For example, the 
+even if that is a little unexpected. For example, the
 static semantics of the literal <literal>368</literal>
 is exactly that of <literal>fromInteger (368::Integer)</literal>; it's fine for
 <literal>fromInteger</literal> to have any of the types:
@@ -1293,7 +1521,7 @@ fromInteger :: Num a => a -> Integer
 fromInteger :: Integer -> Bool -> Bool
 </programlisting>
 </para>
-	        
+
 	     <para>Be warned: this is an experimental facility, with
 	     fewer checks than usual.  Use <literal>-dcore-lint</literal>
 	     to typecheck the desugared program.  If Core Lint is happy
@@ -1381,7 +1609,7 @@ module Foo where
   import M
 
   data T = MkT { x :: Int }
-  
+
   ok1 (MkS { x = n }) = n+1   -- Unambiguous
   ok2 n = MkT { x = n+1 }     -- Unambiguous
 
@@ -1400,7 +1628,7 @@ it is not clear which of the two types is intended.
 Haskell 98 regards all four as ambiguous, but with the
 <option>-XDisambiguateRecordFields</option> flag, GHC will accept
 the former two.  The rules are precisely the same as those for instance
-declarations in Haskell 98, where the method names on the left-hand side 
+declarations in Haskell 98, where the method names on the left-hand side
 of the method bindings in an instance declaration refer unambiguously
 to the method of that class (provided they are in scope at all), even
 if there are other variables in scope with the same name.
@@ -1411,7 +1639,7 @@ records from different modules that use the same field name.
 Some details:
 <itemizedlist>
 <listitem><para>
-Field disambiguation can be combined with punning (see <xref linkend="record-puns"/>). For exampe:
+Field disambiguation can be combined with punning (see <xref linkend="record-puns"/>). For example:
 <programlisting>
 module Foo where
   import M
@@ -1421,8 +1649,8 @@ module Foo where
 </para></listitem>
 
 <listitem><para>
-With <option>-XDisambiguateRecordFields</option> you can use <emphasis>unqualifed</emphasis>
-field names even if the correponding selector is only in scope <emphasis>qualified</emphasis>
+With <option>-XDisambiguateRecordFields</option> you can use <emphasis>unqualified</emphasis>
+field names even if the corresponding selector is only in scope <emphasis>qualified</emphasis>
 For example, assuming the same module <literal>M</literal> as in our earlier example, this is legal:
 <programlisting>
 module Foo where
@@ -1430,7 +1658,7 @@ module Foo where
 
   ok4 (M.MkS { x = n }) = n+1   -- Unambiguous
 </programlisting>
-Since the constructore <literal>MkS</literal> is only in scope qualified, you must
+Since the constructor <literal>MkS</literal> is only in scope qualified, you must
 name it <literal>M.MkS</literal>, but the field <literal>x</literal> does not need
 to be qualified even though <literal>M.x</literal> is in scope but <literal>x</literal>
 is not.  (In effect, it is qualified by the constructor.)
@@ -1470,7 +1698,7 @@ f (C {a}) = a
 
 to mean the same pattern as above.  That is, in a record pattern, the
 pattern <literal>a</literal> expands into the pattern <literal>a =
-a</literal> for the same name <literal>a</literal>.  
+a</literal> for the same name <literal>a</literal>.
 </para>
 
 <para>
@@ -1481,7 +1709,7 @@ Record punning can also be used in an expression, writing, for example,
 <programlisting>
 let a = 1 in C {a}
 </programlisting>
-instead of 
+instead of
 <programlisting>
 let a = 1 in C {a = a}
 </programlisting>
@@ -1500,7 +1728,7 @@ f (C {a, b = 4}) = a
 
 <listitem><para>
 Puns can be used wherever record patterns occur (e.g. in
-<literal>let</literal> bindings or at the top-level).  
+<literal>let</literal> bindings or at the top-level).
 </para></listitem>
 
 <listitem><para>
@@ -1583,9 +1811,9 @@ the same as the omitted field names.
 </para></listitem>
 
 <listitem><para>
-The "<literal>..</literal>" expands to the missing 
+The "<literal>..</literal>" expands to the missing
 <emphasis>in-scope</emphasis> record fields, where "in scope"
-includes both unqualified and qualified-only.  
+includes both unqualified and qualified-only.
 Any fields that are not in scope are not filled in.  For example
 <programlisting>
 module M where
@@ -1620,7 +1848,7 @@ the semantics of such bindings very precisely.
 <programlisting>
 let f = ...
     infixr 3 `f`
-in 
+in
     ...
 </programlisting>
 and the fixity declaration applies wherever the binding is in scope.
@@ -1655,7 +1883,7 @@ necessary to enable them.
 <programlisting>
 import "network" Network.Socket
 </programlisting>
-  
+
   <para>would import the module <literal>Network.Socket</literal> from
     the package <literal>network</literal> (any version).  This may
     be used to disambiguate an import when the same module is
@@ -1679,7 +1907,7 @@ import "network" Network.Socket
     "stolen" by language extensions.
      We use
     notation and nonterminal names from the Haskell 98 lexical syntax
-    (see the Haskell 98 Report).  
+    (see the Haskell 98 Report).
     We only list syntax changes here that might affect
     existing working programs (i.e. "stolen" syntax).  Many of these
     extensions will also enable new context-free syntax, but in all
@@ -1701,7 +1929,7 @@ import "network" Network.Socket
 	on.</para>
       </listitem>
     </itemizedlist>
-    
+
 The following syntax is stolen:
 
     <variablelist>
@@ -1793,12 +2021,12 @@ The following syntax is stolen:
       <varlistentry>
 	<term>
 	      <replaceable>varid</replaceable>{<literal>&num;</literal>},
-	      <replaceable>char</replaceable><literal>&num;</literal>,	    
-	      <replaceable>string</replaceable><literal>&num;</literal>,    
-	      <replaceable>integer</replaceable><literal>&num;</literal>,    
-	      <replaceable>float</replaceable><literal>&num;</literal>,    
-	      <replaceable>float</replaceable><literal>&num;&num;</literal>,    
-	      <literal>(&num;</literal>, <literal>&num;)</literal>,	    
+	      <replaceable>char</replaceable><literal>&num;</literal>,
+	      <replaceable>string</replaceable><literal>&num;</literal>,
+	      <replaceable>integer</replaceable><literal>&num;</literal>,
+	      <replaceable>float</replaceable><literal>&num;</literal>,
+	      <replaceable>float</replaceable><literal>&num;&num;</literal>,
+	      <literal>(&num;</literal>, <literal>&num;)</literal>,
 	</term>
 	<listitem><para>
 	Stolen by: <option>-XMagicHash</option>,
@@ -1825,7 +2053,7 @@ a data type with no constructors.  For example:</para>
   data T a    -- T :: * -> *
 </programlisting>
 
-<para>Syntactically, the declaration lacks the "= constrs" part.  The 
+<para>Syntactically, the declaration lacks the "= constrs" part.  The
 type can be parameterised over types of any kind, but if the kind is
 not <literal>*</literal> then an explicit kind annotation must be used
 (see <xref linkend="kinding"/>).</para>
@@ -1893,7 +2121,7 @@ to be written infix, very much like expressions.  More specifically:
    type T (+) = Int + Int
    f :: T Either
    f = Left 3
- 
+
    liftA2 :: Arrow (~>)
 	  => (a -> b -> c) -> (e ~> a) -> (e ~> b) -> (e ~> c)
    liftA2 = ...
@@ -1931,7 +2159,7 @@ Type synonyms are like macros at the type level, but Haskell 98 imposes many rul
 on individual synonym declarations.
 With the <option>-XLiberalTypeSynonyms</option> extension,
 GHC does validity checking on types <emphasis>only after expanding type synonyms</emphasis>.
-That means that GHC can be very much more liberal about type synonyms than Haskell 98. 
+That means that GHC can be very much more liberal about type synonyms than Haskell 98.
 
 <itemizedlist>
 <listitem> <para>You can write a <literal>forall</literal> (including overloading)
@@ -1949,7 +2177,7 @@ in a type synonym, thus:
 </listitem>
 
 <listitem><para>
-If you also use <option>-XUnboxedTuples</option>, 
+If you also use <option>-XUnboxedTuples</option>,
 you can write an unboxed tuple in a type synonym:
 <programlisting>
   type Pr = (# Int, Int #)
@@ -1963,7 +2191,7 @@ you can write an unboxed tuple in a type synonym:
 You can apply a type synonym to a forall type:
 <programlisting>
   type Foo a = a -> a -> Bool
- 
+
   f :: Foo (forall b. b->b)
 </programlisting>
 After expanding the synonym, <literal>f</literal> has the legal (in GHC) type:
@@ -1977,7 +2205,7 @@ You can apply a type synonym to a partially applied type synonym:
 <programlisting>
   type Generic i o = forall x. i x -> o x
   type Id x = x
-  
+
   foo :: Generic Id []
 </programlisting>
 After expanding the synonym, <literal>foo</literal> has the legal (in GHC) type:
@@ -2226,7 +2454,7 @@ To make use of these hidden fields, we need to create some helper functions:
 <programlisting>
 inc :: Counter a -> Counter a
 inc (NewCounter x i d t) = NewCounter
-    { _this = i x, _inc = i, _display = d, tag = t } 
+    { _this = i x, _inc = i, _display = d, tag = t }
 
 display :: Counter a -> IO ()
 display NewCounter{ _this = x, _display = d } = d x
@@ -2235,11 +2463,11 @@ display NewCounter{ _this = x, _display = d } = d x
 Now we can define counters with different underlying implementations:
 
 <programlisting>
-counterA :: Counter String 
+counterA :: Counter String
 counterA = NewCounter
     { _this = 0, _inc = (1+), _display = print, tag = "A" }
 
-counterB :: Counter String 
+counterB :: Counter String
 counterB = NewCounter
     { _this = "", _inc = ('#':), _display = putStrLn, tag = "B" }
 
@@ -2443,16 +2671,16 @@ giving the type signatures of constructors explicitly.  For example:
       Just    :: a -> Maybe a
 </programlisting>
 The form is called a "GADT-style declaration"
-because Generalised Algebraic Data Types, described in <xref linkend="gadt"/>, 
+because Generalised Algebraic Data Types, described in <xref linkend="gadt"/>,
 can only be declared using this form.</para>
-<para>Notice that GADT-style syntax generalises existential types (<xref linkend="existential-quantification"/>).  
+<para>Notice that GADT-style syntax generalises existential types (<xref linkend="existential-quantification"/>).
 For example, these two declarations are equivalent:
 <programlisting>
   data Foo = forall a. MkFoo a (a -> Bool)
   data Foo' where { MKFoo :: a -> (a->Bool) -> Foo' }
 </programlisting>
 </para>
-<para>Any data type that can be declared in standard Haskell-98 syntax 
+<para>Any data type that can be declared in standard Haskell-98 syntax
 can also be declared using GADT-style syntax.
 The choice is largely stylistic, but GADT-style declarations differ in one important respect:
 they treat class constraints on the data constructors differently.
@@ -2469,14 +2697,14 @@ context is made available by pattern matching.  For example:
   insert a (MkSet as) | a `elem` as = MkSet as
                       | otherwise   = MkSet (a:as)
 </programlisting>
-A use of <literal>MkSet</literal> as a constructor (e.g. in the definition of <literal>makeSet</literal>) 
+A use of <literal>MkSet</literal> as a constructor (e.g. in the definition of <literal>makeSet</literal>)
 gives rise to a <literal>(Eq a)</literal>
 constraint, as you would expect.  The new feature is that pattern-matching on <literal>MkSet</literal>
 (as in the definition of <literal>insert</literal>) makes <emphasis>available</emphasis> an <literal>(Eq a)</literal>
 context.  In implementation terms, the <literal>MkSet</literal> constructor has a hidden field that stores
 the <literal>(Eq a)</literal> dictionary that is passed to <literal>MkSet</literal>; so
 when pattern-matching that dictionary becomes available for the right-hand side of the match.
-In the example, the equality dictionary is used to satisfy the equality constraint 
+In the example, the equality dictionary is used to satisfy the equality constraint
 generated by the call to <literal>elem</literal>, so that the type of
 <literal>insert</literal> itself has no <literal>Eq</literal> constraint.
 </para>
@@ -2492,36 +2720,36 @@ For example, one possible application is to reify dictionaries:
    plus :: NumInst a -> a -> a -> a
    plus MkNumInst p q = p + q
 </programlisting>
-Here, a value of type <literal>NumInst a</literal> is equivalent 
+Here, a value of type <literal>NumInst a</literal> is equivalent
 to an explicit <literal>(Num a)</literal> dictionary.
 </para>
 <para>
 All this applies to constructors declared using the syntax of <xref linkend="existential-with-context"/>.
-For example, the <literal>NumInst</literal> data type above could equivalently be declared 
+For example, the <literal>NumInst</literal> data type above could equivalently be declared
 like this:
 <programlisting>
-   data NumInst a 
+   data NumInst a
       = Num a => MkNumInst (NumInst a)
 </programlisting>
-Notice that, unlike the situation when declaring an existential, there is 
+Notice that, unlike the situation when declaring an existential, there is
 no <literal>forall</literal>, because the <literal>Num</literal> constrains the
-data type's universally quantified type variable <literal>a</literal>.  
+data type's universally quantified type variable <literal>a</literal>.
 A constructor may have both universal and existential type variables: for example,
 the following two declarations are equivalent:
 <programlisting>
-   data T1 a 
+   data T1 a
 	= forall b. (Num a, Eq b) => MkT1 a b
    data T2 a where
 	MkT2 :: (Num a, Eq b) => a -> b -> T2 a
 </programlisting>
 </para>
-<para>All this behaviour contrasts with Haskell 98's peculiar treatment of 
+<para>All this behaviour contrasts with Haskell 98's peculiar treatment of
 contexts on a data type declaration (Section 4.2.1 of the Haskell 98 Report).
 In Haskell 98 the definition
 <programlisting>
   data Eq a => Set' a = MkSet' [a]
 </programlisting>
-gives <literal>MkSet'</literal> the same type as <literal>MkSet</literal> above.  But instead of 
+gives <literal>MkSet'</literal> the same type as <literal>MkSet</literal> above.  But instead of
 <emphasis>making available</emphasis> an <literal>(Eq a)</literal> constraint, pattern-matching
 on <literal>MkSet'</literal> <emphasis>requires</emphasis> an <literal>(Eq a)</literal> constraint!
 GHC faithfully implements this behaviour, odd though it is.  But for GADT-style declarations,
@@ -2535,7 +2763,7 @@ type declarations.
 <itemizedlist>
 <listitem><para>
 The result type of each data constructor must begin with the type constructor being defined.
-If the result type of all constructors 
+If the result type of all constructors
 has the form <literal>T a1 ... an</literal>, where <literal>a1 ... an</literal>
 are distinct type variables, then the data type is <emphasis>ordinary</emphasis>;
 otherwise is a <emphasis>generalised</emphasis> data type (<xref linkend="gadt"/>).
@@ -2553,8 +2781,8 @@ In this example we give a single signature for <literal>T1</literal> and <litera
 
 <listitem><para>
 The type signature of
-each constructor is independent, and is implicitly universally quantified as usual. 
-In particular, the type variable(s) in the "<literal>data T a where</literal>" header 
+each constructor is independent, and is implicitly universally quantified as usual.
+In particular, the type variable(s) in the "<literal>data T a where</literal>" header
 have no scope, and different constructors may have different universally-quantified type variables:
 <programlisting>
   data T a where        -- The 'a' has no scope
@@ -2571,7 +2799,7 @@ different constructors.  For example, this is fine:
     T1 :: Eq b => b -> b -> T b
     T2 :: (Show c, Ix c) => c -> [c] -> T c
 </programlisting>
-When patten matching, these constraints are made available to discharge constraints
+When pattern matching, these constraints are made available to discharge constraints
 in the body of the match. For example:
 <programlisting>
   f :: T a -> String
@@ -2585,8 +2813,8 @@ and similarly the <literal>Show</literal> constraint arising from the use of <li
 </para></listitem>
 
 <listitem><para>
-Unlike a Haskell-98-style 
-data type declaration, the type variable(s) in the "<literal>data Set a where</literal>" header 
+Unlike a Haskell-98-style
+data type declaration, the type variable(s) in the "<literal>data Set a where</literal>" header
 have no scope.  Indeed, one can write a kind signature instead:
 <programlisting>
   data Set :: * -> * where ...
@@ -2623,7 +2851,7 @@ declaration.   For example, these two declarations are equivalent
       Just1    :: a -> Maybe1 a
     } deriving( Eq, Ord )
 
-  data Maybe2 a = Nothing2 | Just2 a 
+  data Maybe2 a = Nothing2 | Just2 a
        deriving( Eq, Ord )
 </programlisting>
 </para></listitem>
@@ -2637,10 +2865,10 @@ in the result type:
      Nil   :: Foo
 </programlisting>
 Here the type variable <literal>a</literal> does not appear in the result type
-of either constructor.  
+of either constructor.
 Although it is universally quantified in the type of the constructor, such
-a type variable is often called "existential".  
-Indeed, the above declaration declares precisely the same type as 
+a type variable is often called "existential".
+Indeed, the above declaration declares precisely the same type as
 the <literal>data Foo</literal> in <xref linkend="existential-quantification"/>.
 </para><para>
 The type may contain a class context too, of course:
@@ -2661,23 +2889,23 @@ You can use record syntax on a GADT-style data type declaration:
 As usual, for every constructor that has a field <literal>f</literal>, the type of
 field <literal>f</literal> must be the same (modulo alpha conversion).
 The <literal>Child</literal> constructor above shows that the signature
-may have a context, existentially-quantified variables, and strictness annotations, 
+may have a context, existentially-quantified variables, and strictness annotations,
 just as in the non-record case.  (NB: the "type" that follows the double-colon
 is not really a type, because of the record syntax and strictness annotations.
 A "type" of this form can appear only in a constructor signature.)
 </para></listitem>
 
-<listitem><para> 
-Record updates are allowed with GADT-style declarations, 
+<listitem><para>
+Record updates are allowed with GADT-style declarations,
 only fields that have the following property: the type of the field
 mentions no existential type variables.
 </para></listitem>
 
-<listitem><para> 
-As in the case of existentials declared using the Haskell-98-like record syntax 
+<listitem><para>
+As in the case of existentials declared using the Haskell-98-like record syntax
 (<xref linkend="existential-records"/>),
 record-selector functions are generated only for those fields that have well-typed
-selectors.  
+selectors.
 Here is the example of that section, in GADT-style syntax:
 <programlisting>
 data Counter a where
@@ -2697,18 +2925,18 @@ Nevertheless, you can still use all the field names in pattern matching and reco
 <sect2 id="gadt">
 <title>Generalised Algebraic Data Types (GADTs)</title>
 
-<para>Generalised Algebraic Data Types generalise ordinary algebraic data types 
+<para>Generalised Algebraic Data Types generalise ordinary algebraic data types
 by allowing constructors to have richer return types.  Here is an example:
 <programlisting>
   data Term a where
       Lit    :: Int -> Term Int
       Succ   :: Term Int -> Term Int
-      IsZero :: Term Int -> Term Bool	
+      IsZero :: Term Int -> Term Bool
       If     :: Term Bool -> Term a -> Term a -> Term a
       Pair   :: Term a -> Term b -> Term (a,b)
 </programlisting>
 Notice that the return type of the constructors is not always <literal>Term a</literal>, as is the
-case with ordinary data types.  This generality allows us to 
+case with ordinary data types.  This generality allows us to
 write a well-typed <literal>eval</literal> function
 for these <literal>Terms</literal>:
 <programlisting>
@@ -2719,22 +2947,22 @@ for these <literal>Terms</literal>:
   eval (If b e1 e2) = if eval b then eval e1 else eval e2
   eval (Pair e1 e2) = (eval e1, eval e2)
 </programlisting>
-The key point about GADTs is that <emphasis>pattern matching causes type refinement</emphasis>.  
+The key point about GADTs is that <emphasis>pattern matching causes type refinement</emphasis>.
 For example, in the right hand side of the equation
 <programlisting>
   eval :: Term a -> a
   eval (Lit i) =  ...
 </programlisting>
 the type <literal>a</literal> is refined to <literal>Int</literal>.  That's the whole point!
-A precise specification of the type rules is beyond what this user manual aspires to, 
+A precise specification of the type rules is beyond what this user manual aspires to,
 but the design closely follows that described in
 the paper <ulink
 url="http://research.microsoft.com/%7Esimonpj/papers/gadt/">Simple
 unification-based type inference for GADTs</ulink>,
 (ICFP 2006).
-The general principle is this: <emphasis>type refinement is only carried out 
+The general principle is this: <emphasis>type refinement is only carried out
 based on user-supplied type annotations</emphasis>.
-So if no type signature is supplied for <literal>eval</literal>, no type refinement happens, 
+So if no type signature is supplied for <literal>eval</literal>, no type refinement happens,
 and lots of obscure error messages will
 occur.  However, the refinement is quite general.  For example, if we had:
 <programlisting>
@@ -2754,14 +2982,14 @@ and Ralf Hinze's
 may use different notation to that implemented in GHC.
 </para>
 <para>
-The rest of this section outlines the extensions to GHC that support GADTs.   The extension is enabled with 
+The rest of this section outlines the extensions to GHC that support GADTs.   The extension is enabled with
 <option>-XGADTs</option>.  The <option>-XGADTs</option> flag also sets <option>-XRelaxedPolyRec</option>.
 <itemizedlist>
 <listitem><para>
-A GADT can only be declared using GADT-style syntax (<xref linkend="gadt-style"/>); 
+A GADT can only be declared using GADT-style syntax (<xref linkend="gadt-style"/>);
 the old Haskell-98 syntax for data declarations always declares an ordinary data type.
 The result type of each constructor must begin with the type constructor being defined,
-but for a GADT the arguments to the type constructor can be arbitrary monotypes.  
+but for a GADT the arguments to the type constructor can be arbitrary monotypes.
 For example, in the <literal>Term</literal> data
 type above, the type of each constructor must end with <literal>Term ty</literal>, but
 the <literal>ty</literal> need not be a type variable (e.g. the <literal>Lit</literal>
@@ -2787,7 +3015,7 @@ For example:
       Lit    { val  :: Int }      :: Term Int
       Succ   { num  :: Term Int } :: Term Int
       Pred   { num  :: Term Int } :: Term Int
-      IsZero { arg  :: Term Int } :: Term Bool	
+      IsZero { arg  :: Term Int } :: Term Bool
       Pair   { arg1 :: Term a
              , arg2 :: Term b
              }                    :: Term (a,b)
@@ -2796,11 +3024,11 @@ For example:
              , fls  :: Term a
              }                    :: Term a
 </programlisting>
-However, for GADTs there is the following additional constraint: 
+However, for GADTs there is the following additional constraint:
 every constructor that has a field <literal>f</literal> must have
 the same result type (modulo alpha conversion)
-Hence, in the above example, we cannot merge the <literal>num</literal> 
-and <literal>arg</literal> fields above into a 
+Hence, in the above example, we cannot merge the <literal>num</literal>
+and <literal>arg</literal> fields above into a
 single name.  Although their field types are both <literal>Term Int</literal>,
 their selector functions actually have different types:
 
@@ -2811,7 +3039,7 @@ their selector functions actually have different types:
 </para></listitem>
 
 <listitem><para>
-When pattern-matching against data constructors drawn from a GADT, 
+When pattern-matching against data constructors drawn from a GADT,
 for example in a <literal>case</literal> expression, the following rules apply:
 <itemizedlist>
 <listitem><para>The type of the scrutinee must be rigid.</para></listitem>
@@ -2855,12 +3083,12 @@ The natural generated <literal>Eq</literal> code would result in these instance 
   instance Eq (f a)     => Eq (T1 f a) where ...
   instance Eq (f (f a)) => Eq (T2 f a) where ...
 </programlisting>
-The first of these is obviously fine. The second is still fine, although less obviously. 
+The first of these is obviously fine. The second is still fine, although less obviously.
 The third is not Haskell 98, and risks losing termination of instances.
 </para>
 <para>
 GHC takes a conservative position: it accepts the first two, but not the third.  The  rule is this:
-each constraint in the inferred instance context must consist only of type variables, 
+each constraint in the inferred instance context must consist only of type variables,
 with no repetitions.
 </para>
 <para>
@@ -2884,10 +3112,10 @@ The syntax is identical to that of an ordinary instance declaration apart from (
 Note the following points:
 <itemizedlist>
 <listitem><para>
-You must supply an explicit context (in the example the context is <literal>(Eq a)</literal>), 
+You must supply an explicit context (in the example the context is <literal>(Eq a)</literal>),
 exactly as you would in an ordinary instance declaration.
-(In contrast, in a <literal>deriving</literal> clause 
-attached to a data type declaration, the context is inferred.) 
+(In contrast, in a <literal>deriving</literal> clause
+attached to a data type declaration, the context is inferred.)
 </para></listitem>
 
 <listitem><para>
@@ -2899,7 +3127,7 @@ controlled by the same flags; see <xref linkend="instance-decls"/>.
 <listitem><para>
 Unlike a <literal>deriving</literal>
 declaration attached to a <literal>data</literal> declaration, the instance can be more specific
-than the data type (assuming you also use 
+than the data type (assuming you also use
 <literal>-XFlexibleInstances</literal>, <xref linkend="instance-rules"/>).  Consider
 for example
 <programlisting>
@@ -2914,10 +3142,10 @@ but other types such as <literal>(Foo (Int,Bool))</literal> will not be an insta
 
 <listitem><para>
 Unlike a <literal>deriving</literal>
-declaration attached to a <literal>data</literal> declaration, 
+declaration attached to a <literal>data</literal> declaration,
 GHC does not restrict the form of the data type.  Instead, GHC simply generates the appropriate
 boilerplate code for the specified class, and typechecks it. If there is a type error, it is
-your problem. (GHC will show you the offending code if it has a type error.) 
+your problem. (GHC will show you the offending code if it has a type error.)
 The merit of this is that you can derive instances for GADTs and other exotic
 data types, providing only that the boilerplate code does indeed typecheck.  For example:
 <programlisting>
@@ -2927,8 +3155,8 @@ data types, providing only that the boilerplate code does indeed typecheck.  For
 
   deriving instance Show (T a)
 </programlisting>
-In this example, you cannot say <literal>... deriving( Show )</literal> on the 
-data type declaration for <literal>T</literal>, 
+In this example, you cannot say <literal>... deriving( Show )</literal> on the
+data type declaration for <literal>T</literal>,
 because <literal>T</literal> is a GADT, but you <emphasis>can</emphasis> generate
 the instance declaration using stand-alone deriving.
 </para>
@@ -2955,10 +3183,10 @@ GHC always treats the <emphasis>last</emphasis> parameter of the instance
 <title>Deriving clause for extra classes (<literal>Typeable</literal>, <literal>Data</literal>, etc)</title>
 
 <para>
-Haskell 98 allows the programmer to add "<literal>deriving( Eq, Ord )</literal>" to a data type 
-declaration, to generate a standard instance declaration for classes specified in the <literal>deriving</literal> clause.  
+Haskell 98 allows the programmer to add "<literal>deriving( Eq, Ord )</literal>" to a data type
+declaration, to generate a standard instance declaration for classes specified in the <literal>deriving</literal> clause.
 In Haskell 98, the only classes that may appear in the <literal>deriving</literal> clause are the standard
-classes <literal>Eq</literal>, <literal>Ord</literal>, 
+classes <literal>Eq</literal>, <literal>Ord</literal>,
 <literal>Enum</literal>, <literal>Ix</literal>, <literal>Bounded</literal>, <literal>Read</literal>, and <literal>Show</literal>.
 </para>
 <para>
@@ -2978,28 +3206,34 @@ Scrap More Boilerplate: Reflection, Zips, and Generalised Casts
 (Section 7.4 of the paper describes the multiple <literal>Typeable</literal> classes that
 are used, and only <literal>Typeable1</literal> up to
 <literal>Typeable7</literal> are provided in the library.)
-In other cases, there is nothing to stop the programmer writing a <literal>TypableX</literal>
+In other cases, there is nothing to stop the programmer writing a <literal>TypeableX</literal>
 class, whose kind suits that of the data type constructor, and
 then writing the data type instance by hand.
 </para>
 </listitem>
 
-<listitem><para> With <option>-XDeriveFunctor</option>, you can derive instances of 
+<listitem><para> With <option>-XDeriveGeneric</option>, you can derive
+instances of  the class <literal>Generic</literal>, defined in
+<literal>GHC.Generics</literal>. You can use these to define generic functions,
+as described in <xref linkend="generic-programming"/>.
+</para></listitem>
+
+<listitem><para> With <option>-XDeriveFunctor</option>, you can derive instances of
 the class <literal>Functor</literal>,
 defined in <literal>GHC.Base</literal>.
 </para></listitem>
 
-<listitem><para> With <option>-XDeriveFoldable</option>, you can derive instances of 
+<listitem><para> With <option>-XDeriveFoldable</option>, you can derive instances of
 the class <literal>Foldable</literal>,
 defined in <literal>Data.Foldable</literal>.
 </para></listitem>
 
-<listitem><para> With <option>-XDeriveTraversable</option>, you can derive instances of 
+<listitem><para> With <option>-XDeriveTraversable</option>, you can derive instances of
 the class <literal>Traversable</literal>,
 defined in <literal>Data.Traversable</literal>.
 </para></listitem>
 </itemizedlist>
-In each case the appropriate class must be in scope before it 
+In each case the appropriate class must be in scope before it
 can be mentioned in the <literal>deriving</literal> clause.
 </para>
 </sect2>
@@ -3016,7 +3250,7 @@ other classes you have to write an explicit instance declaration. For
 example, if you define
 
 <programlisting>
-  newtype Dollars = Dollars Int 
+  newtype Dollars = Dollars Int
 </programlisting>
 
 and you want to use arithmetic on <literal>Dollars</literal>, you have to
@@ -3037,9 +3271,9 @@ dictionary, only slower!
 
 <sect3> <title> Generalising the deriving clause </title>
 <para>
-GHC now permits such instances to be derived instead, 
+GHC now permits such instances to be derived instead,
 using the flag <option>-XGeneralizedNewtypeDeriving</option>,
-so one can write 
+so one can write
 <programlisting>
   newtype Dollars = Dollars Int deriving (Eq,Show,Num)
 </programlisting>
@@ -3061,10 +3295,10 @@ way. For example, suppose we have implemented state and failure monad
 transformers, such that
 
 <programlisting>
-  instance Monad m => Monad (State s m) 
+  instance Monad m => Monad (State s m)
   instance Monad m => Monad (Failure m)
 </programlisting>
-In Haskell 98, we can define a parsing monad by 
+In Haskell 98, we can define a parsing monad by
 <programlisting>
   type Parser tok m a = State [tok] (Failure m) a
 </programlisting>
@@ -3077,9 +3311,9 @@ without needing to write an instance of class <literal>Monad</literal>, via
   newtype Parser tok m a = Parser (State [tok] (Failure m) a)
                          deriving Monad
 </programlisting>
-In this case the derived instance declaration is of the form 
+In this case the derived instance declaration is of the form
 <programlisting>
-  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
+  instance Monad (State [tok] (Failure m)) => Monad (Parser tok m)
 </programlisting>
 
 Notice that, since <literal>Monad</literal> is a constructor class, the
@@ -3096,10 +3330,10 @@ application'' of the class appears in the <literal>deriving</literal>
 clause. For example, given the class
 
 <programlisting>
-  class StateMonad s m | m -> s where ... 
-  instance Monad m => StateMonad s (State s m) where ... 
+  class StateMonad s m | m -> s where ...
+  instance Monad m => StateMonad s (State s m) where ...
 </programlisting>
-then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
+then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by
 <programlisting>
   newtype Parser tok m a = Parser (State [tok] (Failure m) a)
                          deriving (Monad, StateMonad [tok])
@@ -3129,10 +3363,10 @@ Derived instance declarations are constructed as follows. Consider the
 declaration (after expansion of any type synonyms)
 
 <programlisting>
-  newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm) 
+  newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm)
 </programlisting>
 
-where 
+where
  <itemizedlist>
 <listitem><para>
   The <literal>ci</literal> are partial applications of
@@ -3146,15 +3380,15 @@ where
   The type <literal>t</literal> is an arbitrary type.
 </para></listitem>
 <listitem><para>
-  The type variables <literal>vk+1...vn</literal> do not occur in <literal>t</literal>, 
+  The type variables <literal>vk+1...vn</literal> do not occur in <literal>t</literal>,
   nor in the <literal>ci</literal>, and
 </para></listitem>
 <listitem><para>
-  None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>, 
+  None of the <literal>ci</literal> is <literal>Read</literal>, <literal>Show</literal>,
 		<literal>Typeable</literal>, or <literal>Data</literal>.  These classes
 		should not "look through" the type or its constructor.  You can still
-		derive these classes for a newtype, but it happens in the usual way, not 
-		via this new mechanism.  
+		derive these classes for a newtype, but it happens in the usual way, not
+		via this new mechanism.
 </para></listitem>
 </itemizedlist>
 Then, for each <literal>ci</literal>, the derived instance
@@ -3162,13 +3396,13 @@ declaration is:
 <programlisting>
   instance ci t => ci (T v1...vk)
 </programlisting>
-As an example which does <emphasis>not</emphasis> work, consider 
+As an example which does <emphasis>not</emphasis> work, consider
 <programlisting>
-  newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
+  newtype NonMonad m s = NonMonad (State s m s) deriving Monad
 </programlisting>
-Here we cannot derive the instance 
+Here we cannot derive the instance
 <programlisting>
-  instance Monad (State s m) => Monad (NonMonad m) 
+  instance Monad (State s m) => Monad (NonMonad m)
 </programlisting>
 
 because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
@@ -3184,7 +3418,7 @@ important, since we can only derive instances for the last one. If the
 <literal>StateMonad</literal> class above were instead defined as
 
 <programlisting>
-  class StateMonad m s | m -> s where ... 
+  class StateMonad m s | m -> s where ...
 </programlisting>
 
 then we would not have been able to derive an instance for the
@@ -3193,7 +3427,7 @@ classes usually have one "main" parameter for which deriving new
 instances is most interesting.
 </para>
 <para>Lastly, all of this applies only for classes other than
-<literal>Read</literal>, <literal>Show</literal>, <literal>Typeable</literal>, 
+<literal>Read</literal>, <literal>Show</literal>, <literal>Typeable</literal>,
 and <literal>Data</literal>, for which the built-in derivation applies (section
 4.3.3. of the Haskell Report).
 (For the standard classes <literal>Eq</literal>, <literal>Ord</literal>,
@@ -3226,7 +3460,7 @@ All the extensions are enabled by the <option>-fglasgow-exts</option> flag.
 <sect3>
 <title>Multi-parameter type classes</title>
 <para>
-Multi-parameter type classes are permitted, with flag <option>-XMultiParamTypeClasses</option>. 
+Multi-parameter type classes are permitted, with flag <option>-XMultiParamTypeClasses</option>.
 For example:
 
 
@@ -3244,11 +3478,11 @@ For example:
 
 <para>
 In Haskell 98 the context of a class declaration (which introduces superclasses)
-must be simple; that is, each predicate must consist of a class applied to 
-type variables.  The flag <option>-XFlexibleContexts</option> 
+must be simple; that is, each predicate must consist of a class applied to
+type variables.  The flag <option>-XFlexibleContexts</option>
 (<xref linkend="flexible-contexts"/>)
 lifts this restriction,
-so that the only restriction on the context in a class declaration is 
+so that the only restriction on the context in a class declaration is
 that the class hierarchy must be acyclic.  So these class declarations are OK:
 
 
@@ -3298,9 +3532,50 @@ class type variable, thus:
     elem     :: Eq a => a -> s a -> Bool
 </programlisting>
 The type of <literal>elem</literal> is illegal in Haskell 98, because it
-contains the constraint <literal>Eq a</literal>, constrains only the 
+contains the constraint <literal>Eq a</literal>, constrains only the
 class type variable (in this case <literal>a</literal>).
 GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
+</para>
+
+
+</sect3>
+
+
+<sect3 id="class-default-signatures">
+<title>Default signatures</title>
+
+<para>
+Haskell 98 allows you to define a default implementation when declaring a class:
+<programlisting>
+  class Enum a where
+    enum :: [a]
+    enum = []
+</programlisting>
+The type of the <literal>enum</literal> method is <literal>[a]</literal>, and
+this is also the type of the default method. You can lift this restriction
+and give another type to the default method using the flag
+<option>-XDefaultSignatures</option>. For instance, if you have written a
+generic implementation of enumeration in a class <literal>GEnum</literal>
+with method <literal>genum</literal> in terms of <literal>GHC.Generics</literal>,
+you can specify a default method that uses that generic implementation:
+<programlisting>
+  class Enum a where
+    enum :: [a]
+    default enum :: (Generic a, GEnum (Rep a)) => [a]
+    enum = map to genum
+</programlisting>
+We reuse the keyword <literal>default</literal> to signal that a signature
+applies to the default method only; when defining instances of the
+<literal>Enum</literal> class, the original type <literal>[a]</literal> of
+<literal>enum</literal> still applies. When giving an empty instance, however,
+the default implementation <literal>map to0 genum</literal> is filled-in,
+and type-checked with the type
+<literal>(Generic a, GEnum (Rep a)) => [a]</literal>.
+</para>
+
+<para>
+We use default signatures to simplify generic programming in GHC
+(<xref linkend="generic-programming"/>).
 </para>
 
 
@@ -3312,14 +3587,14 @@ GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
 </title>
 
 <para> Functional dependencies are implemented as described by Mark Jones
-in &ldquo;<ulink url="http://citeseer.ist.psu.edu/jones00type.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones, 
-In Proceedings of the 9th European Symposium on Programming, 
+in &ldquo;<ulink url="http://citeseer.ist.psu.edu/jones00type.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones,
+In Proceedings of the 9th European Symposium on Programming,
 ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782,
 .
 </para>
 <para>
-Functional dependencies are introduced by a vertical bar in the syntax of a 
-class declaration;  e.g. 
+Functional dependencies are introduced by a vertical bar in the syntax of a
+class declaration;  e.g.
 <programlisting>
   class (Monad m) => MonadState s m | m -> s where ...
 
@@ -3330,7 +3605,7 @@ There should be more documentation, but there isn't (yet).  Yell if you need it.
 
 <sect3><title>Rules for functional dependencies </title>
 <para>
-In a class declaration, all of the class type variables must be reachable (in the sense 
+In a class declaration, all of the class type variables must be reachable (in the sense
 mentioned in <xref linkend="flexible-contexts"/>)
 from the free variables of each method type.
 For example:
@@ -3383,7 +3658,7 @@ class like this:
 from the Hugs user manual, reproduced here (with minor changes) by kind
 permission of Mark Jones.
 </para>
-<para> 
+<para>
 Consider the following class, intended as part of a
 library for collection types:
 <programlisting>
@@ -3398,7 +3673,7 @@ instances of this class for lists or characteristic functions (both of which
 can be used to represent collections of any equality type), bit sets (which can
 be used to represent collections of characters), or hash tables (which can be
 used to represent any collection whose elements have a hash function). Omitting
-standard implementation details, this would lead to the following declarations: 
+standard implementation details, this would lead to the following declarations:
 <programlisting>
    instance Eq e => Collects e [e] where ...
    instance Eq e => Collects e (e -> Bool) where ...
@@ -3408,7 +3683,7 @@ standard implementation details, this would lead to the following declarations:
 </programlisting>
 All this looks quite promising; we have a class and a range of interesting
 implementations. Unfortunately, there are some serious problems with the class
-declaration. First, the empty function has an ambiguous type: 
+declaration. First, the empty function has an ambiguous type:
 <programlisting>
    empty :: Collects e ce => ce
 </programlisting>
@@ -3422,12 +3697,12 @@ type.
 We can sidestep this specific problem by removing the empty member from the
 class declaration. However, although the remaining members, insert and member,
 do not have ambiguous types, we still run into problems when we try to use
-them. For example, consider the following two functions: 
+them. For example, consider the following two functions:
 <programlisting>
    f x y = insert x . insert y
    g     = f True 'a'
 </programlisting>
-for which GHC infers the following types: 
+for which GHC infers the following types:
 <programlisting>
    f :: (Collects a c, Collects b c) => a -> b -> c -> c
    g :: (Collects Bool c, Collects Char c) => c -> c
@@ -3446,7 +3721,7 @@ might even be in a different module.
 
 <para>
 Faced with the problems described above, some Haskell programmers might be
-tempted to use something like the following version of the class declaration: 
+tempted to use something like the following version of the class declaration:
 <programlisting>
    class Collects e c where
       empty  :: c e
@@ -3457,16 +3732,16 @@ The key difference here is that we abstract over the type constructor c that is
 used to form the collection type c e, and not over that collection type itself,
 represented by ce in the original class declaration. This avoids the immediate
 problems that we mentioned above: empty has type <literal>Collects e c => c
-e</literal>, which is not ambiguous. 
+e</literal>, which is not ambiguous.
 </para>
 <para>
-The function f from the previous section has a more accurate type: 
+The function f from the previous section has a more accurate type:
 <programlisting>
    f :: (Collects e c) => e -> e -> c e -> c e
 </programlisting>
 The function g from the previous section is now rejected with a type error as
 we would hope because the type of f does not allow the two arguments to have
-different types. 
+different types.
 This, then, is an example of a multiple parameter class that does actually work
 quite well in practice, without ambiguity problems.
 There is, however, a catch. This version of the Collects class is nowhere near
@@ -3492,14 +3767,14 @@ underlying ideas are also discussed in a more theoretical and abstract setting
 in a manuscript [implparam], where they are identified as one point in a
 general design space for systems of implicit parameterization.).
 
-To start with an abstract example, consider a declaration such as: 
+To start with an abstract example, consider a declaration such as:
 <programlisting>
    class C a b where ...
 </programlisting>
 which tells us simply that C can be thought of as a binary relation on types
 (or type constructors, depending on the kinds of a and b). Extra clauses can be
 included in the definition of classes to add information about dependencies
-between parameters, as in the following examples: 
+between parameters, as in the following examples:
 <programlisting>
    class D a b | a -> b where ...
    class E a b | a -> b, b -> a where ...
@@ -3522,11 +3797,11 @@ annotated with multiple dependencies using commas as separators, as in the
 definition of E above. Some dependencies that we can write in this notation are
 redundant, and will be rejected because they don't serve any useful
 purpose, and may instead indicate an error in the program. Examples of
-dependencies like this include  <literal>a -&gt; a </literal>,  
-<literal>a -&gt; a a </literal>,  
+dependencies like this include  <literal>a -&gt; a </literal>,
+<literal>a -&gt; a a </literal>,
 <literal>a -&gt; </literal>, etc. There can also be
-some redundancy if multiple dependencies are given, as in  
-<literal>a-&gt;b</literal>, 
+some redundancy if multiple dependencies are given, as in
+<literal>a-&gt;b</literal>,
  <literal>b-&gt;c </literal>,  <literal>a-&gt;c </literal>, and
 in which some subset implies the remaining dependencies. Examples like this are
 not treated as errors. Note that dependencies appear only in class
@@ -3541,19 +3816,19 @@ compiler, on the other hand, is responsible for ensuring that the set of
 instances that are in scope at any given point in the program is consistent
 with any declared dependencies. For example, the following pair of instance
 declarations cannot appear together in the same scope because they violate the
-dependency for D, even though either one on its own would be acceptable: 
+dependency for D, even though either one on its own would be acceptable:
 <programlisting>
    instance D Bool Int where ...
    instance D Bool Char where ...
 </programlisting>
-Note also that the following declaration is not allowed, even by itself: 
+Note also that the following declaration is not allowed, even by itself:
 <programlisting>
    instance D [a] b where ...
 </programlisting>
 The problem here is that this instance would allow one particular choice of [a]
 to be associated with more than one choice for b, which contradicts the
 dependency specified in the definition of D. More generally, this means that,
-in any instance of the form: 
+in any instance of the form:
 <programlisting>
    instance D t s where ...
 </programlisting>
@@ -3566,7 +3841,7 @@ The benefit of including dependency information is that it allows us to define
 more general multiple parameter classes, without ambiguity problems, and with
 the benefit of more accurate types. To illustrate this, we return to the
 collection class example, and annotate the original definition of <literal>Collects</literal>
-with a simple dependency: 
+with a simple dependency:
 <programlisting>
    class Collects e ce | ce -> e where
       empty  :: ce
@@ -3595,18 +3870,18 @@ contains a variable on the left of the => that is not uniquely determined
 Dependencies also help to produce more accurate types for user defined
 functions, and hence to provide earlier detection of errors, and less cluttered
 types for programmers to work with. Recall the previous definition for a
-function f: 
+function f:
 <programlisting>
    f x y = insert x y = insert x . insert y
 </programlisting>
-for which we originally obtained a type: 
+for which we originally obtained a type:
 <programlisting>
    f :: (Collects a c, Collects b c) => a -> b -> c -> c
 </programlisting>
 Given the dependency information that we have for Collects, however, we can
 deduce that a and b must be equal because they both appear as the second
 parameter in a Collects constraint with the same first parameter c. Hence we
-can infer a shorter and more accurate type for f: 
+can infer a shorter and more accurate type for f:
 <programlisting>
    f :: (Collects a c) => a -> a -> c -> c
 </programlisting>
@@ -3717,7 +3992,7 @@ The Paterson Conditions: for each assertion in the context
 <replaceable>tvs</replaceable><subscript>left</subscript> <literal>-&gt;</literal>
 <replaceable>tvs</replaceable><subscript>right</subscript>,  of the class,
 every type variable in
-S(<replaceable>tvs</replaceable><subscript>right</subscript>) must appear in 
+S(<replaceable>tvs</replaceable><subscript>right</subscript>) must appear in
 S(<replaceable>tvs</replaceable><subscript>left</subscript>), where S is the
 substitution mapping each type variable in the class declaration to the
 corresponding type in the instance declaration.
@@ -3725,8 +4000,8 @@ corresponding type in the instance declaration.
 </orderedlist>
 These restrictions ensure that context reduction terminates: each reduction
 step makes the problem smaller by at least one
-constructor.  Both the Paterson Conditions and the Coverage Condition are lifted 
-if you give the <option>-XUndecidableInstances</option> 
+constructor.  Both the Paterson Conditions and the Coverage Condition are lifted
+if you give the <option>-XUndecidableInstances</option>
 flag (<xref linkend="undecidable-instances"/>).
 You can find lots of background material about the reason for these
 restrictions in the paper <ulink
@@ -3740,7 +4015,7 @@ For example, these are OK:
   instance Eq (S [a])         -- Structured type in head
 
       -- Repeated type variable in head
-  instance C4 a a => C4 [a] [a] 
+  instance C4 a a => C4 [a] [a]
   instance Stateful (ST s) (MutVar s)
 
       -- Head can consist of type variables only
@@ -3756,7 +4031,7 @@ But these are not:
 <programlisting>
       -- Context assertion no smaller than head
   instance C a => C a where ...
-      -- (C b b) has more more occurrences of b than the head
+      -- (C b b) has more occurrences of b than the head
   instance C b b => Foo [b] where ...
 </programlisting>
 </para>
@@ -3814,7 +4089,7 @@ the head, something that is excluded by the normal rules. For example:
 <programlisting>
   class HasConverter a b | a -> b where
      convert :: a -> b
-   
+
   data Foo a = MkFoo a
 
   instance (HasConverter a b,Show b) => Show (Foo a) where
@@ -3848,7 +4123,7 @@ makes instance inference go into a loop, because it requires the constraint
 <para>
 Nevertheless, GHC allows you to experiment with more liberal rules.  If you use
 the experimental flag <option>-XUndecidableInstances</option>
-<indexterm><primary>-XUndecidableInstances</primary></indexterm>, 
+<indexterm><primary>-XUndecidableInstances</primary></indexterm>,
 both the Paterson Conditions and the Coverage Condition
 (described in <xref linkend="instance-rules"/>) are lifted.  Termination is ensured by having a
 fixed-depth recursion stack.  If you exceed the stack depth you get a
@@ -3867,11 +4142,11 @@ declaration
 should be used to resolve a type-class constraint</emphasis>. This behaviour
 can be modified by two flags: <option>-XOverlappingInstances</option>
 <indexterm><primary>-XOverlappingInstances
-</primary></indexterm> 
+</primary></indexterm>
 and <option>-XIncoherentInstances</option>
 <indexterm><primary>-XIncoherentInstances
 </primary></indexterm>, as this section discusses.  Both these
-flags are dynamic flags, and can be set on a per-module basis, using 
+flags are dynamic flags, and can be set on a per-module basis, using
 an <literal>OPTIONS_GHC</literal> pragma if desired (<xref linkend="source-file-options"/>).</para>
 <para>
 When GHC tries to resolve, say, the constraint <literal>C Int Bool</literal>,
@@ -3885,14 +4160,14 @@ these declarations:
   instance context3 => C Int [a]   where ...  -- (C)
   instance context4 => C Int [Int] where ...  -- (D)
 </programlisting>
-The instances (A) and (B) match the constraint <literal>C Int Bool</literal>, 
+The instances (A) and (B) match the constraint <literal>C Int Bool</literal>,
 but (C) and (D) do not.  When matching, GHC takes
 no account of the context of the instance declaration
 (<literal>context1</literal> etc).
 GHC's default behaviour is that <emphasis>exactly one instance must match the
-constraint it is trying to resolve</emphasis>.  
+constraint it is trying to resolve</emphasis>.
 It is fine for there to be a <emphasis>potential</emphasis> of overlap (by
-including both declarations (A) and (B), say); an error is only reported if a 
+including both declarations (A) and (B), say); an error is only reported if a
 particular constraint matches more than one.
 </para>
 
@@ -3912,16 +4187,16 @@ However, GHC is conservative about committing to an overlapping instance.  For e
 Suppose that from the RHS of <literal>f</literal> we get the constraint
 <literal>C Int [b]</literal>.  But
 GHC does not commit to instance (C), because in a particular
-call of <literal>f</literal>, <literal>b</literal> might be instantiate 
+call of <literal>f</literal>, <literal>b</literal> might be instantiate
 to <literal>Int</literal>, in which case instance (D) would be more specific still.
-So GHC rejects the program.  
+So GHC rejects the program.
 (If you add the flag <option>-XIncoherentInstances</option>,
-GHC will instead pick (C), without complaining about 
+GHC will instead pick (C), without complaining about
 the problem of subsequent instantiations.)
 </para>
 <para>
 Notice that we gave a type signature to <literal>f</literal>, so GHC had to
-<emphasis>check</emphasis> that <literal>f</literal> has the specified type.  
+<emphasis>check</emphasis> that <literal>f</literal> has the specified type.
 Suppose instead we do not give a type signature, asking GHC to <emphasis>infer</emphasis>
 it instead.  In this case, GHC will refrain from
 simplifying the constraint <literal>C Int [b]</literal> (for the same reason
@@ -3929,10 +4204,10 @@ as before) but, rather than rejecting the program, it will infer the type
 <programlisting>
   f :: C Int [b] => [b] -> [b]
 </programlisting>
-That postpones the question of which instance to pick to the 
+That postpones the question of which instance to pick to the
 call site for <literal>f</literal>
 by which time more is known about the type <literal>b</literal>.
-You can write this type signature yourself if you use the 
+You can write this type signature yourself if you use the
 <link linkend="flexible-contexts"><option>-XFlexibleContexts</option></link>
 flag.
 </para>
@@ -3956,7 +4231,7 @@ of the instance declaration, thus:
 (You need <link linkend="instance-rules"><option>-XFlexibleInstances</option></link> to do this.)
 </para>
 <para>
-Warning: overlapping instances must be used with care.  They 
+Warning: overlapping instances must be used with care.  They
 can give rise to incoherence (ie different instance choices are made
 in different parts of the program) even without <option>-XIncoherentInstances</option>. Consider:
 <programlisting>
@@ -3990,20 +4265,20 @@ In function <literal>showHelp</literal> GHC sees no overlapping
 instances, and so uses the <literal>MyShow [a]</literal> instance
 without complaint.  In the call to <literal>myshow</literal> in <literal>main</literal>,
 GHC resolves the <literal>MyShow [T]</literal> constraint using the overlapping
-instance declaration in module <literal>Main</literal>. As a result, 
+instance declaration in module <literal>Main</literal>. As a result,
 the program prints
 <programlisting>
   "Used more specific instance"
   "Used generic instance"
 </programlisting>
-(An alternative possible behaviour, not currently implemented, 
+(An alternative possible behaviour, not currently implemented,
 would be to reject module <literal>Help</literal>
 on the grounds that a later instance declaration might overlap the local one.)
 </para>
 <para>
-The willingness to be overlapped or incoherent is a property of 
+The willingness to be overlapped or incoherent is a property of
 the <emphasis>instance declaration</emphasis> itself, controlled by the
-presence or otherwise of the <option>-XOverlappingInstances</option> 
+presence or otherwise of the <option>-XOverlappingInstances</option>
 and <option>-XIncoherentInstances</option> flags when that module is
 being defined.  Specifically, during the lookup process:
 <itemizedlist>
@@ -4022,12 +4297,12 @@ Suppose an instance declaration does not match the constraint being looked up, b
 does <emphasis>unify</emphasis> with it, so that it might match when the constraint is further
 instantiated.  Usually GHC will regard this as a reason for not committing to
 some other constraint.  But if the instance declaration was compiled with
-<option>-XIncoherentInstances</option>, GHC will skip the "does-it-unify?" 
+<option>-XIncoherentInstances</option>, GHC will skip the "does-it-unify?"
 check for that declaration.
 </para></listitem>
 </itemizedlist>
-These rules make it possible for a library author to design a library that relies on 
-overlapping instances without the library client having to know.  
+These rules make it possible for a library author to design a library that relies on
+overlapping instances without the library client having to know.
 </para>
 <para>The <option>-XIncoherentInstances</option> flag implies the
 <option>-XOverlappingInstances</option> flag, but not vice versa.
@@ -4075,7 +4350,7 @@ Haskell's defaulting mechanism is extended to cover string literals, when <optio
 Specifically:
 <itemizedlist>
 <listitem><para>
-Each type in a default declaration must be an 
+Each type in a default declaration must be an
 instance of <literal>Num</literal> <emphasis>or</emphasis> of <literal>IsString</literal>.
 </para></listitem>
 
@@ -4120,23 +4395,23 @@ to work since it gets translated into an equality comparison.
 
 <para>
   <firstterm>Indexed type families</firstterm> are a new GHC extension to
-  facilitate type-level 
+  facilitate type-level
   programming. Type families are a generalisation of <firstterm>associated
-  data types</firstterm> 
-  (&ldquo;<ulink url="http://www.cse.unsw.edu.au/~chak/papers/CKPM05.html">Associated 
+  data types</firstterm>
+  (&ldquo;<ulink url="http://www.cse.unsw.edu.au/~chak/papers/CKPM05.html">Associated
   Types with Class</ulink>&rdquo;, M. Chakravarty, G. Keller, S. Peyton Jones,
   and S. Marlow. In Proceedings of &ldquo;The 32nd Annual ACM SIGPLAN-SIGACT
      Symposium on Principles of Programming Languages (POPL'05)&rdquo;, pages
   1-13, ACM Press, 2005) and <firstterm>associated type synonyms</firstterm>
-  (&ldquo;<ulink url="http://www.cse.unsw.edu.au/~chak/papers/CKP05.html">Type  
+  (&ldquo;<ulink url="http://www.cse.unsw.edu.au/~chak/papers/CKP05.html">Type
   Associated Type Synonyms</ulink>&rdquo;. M. Chakravarty, G. Keller, and
-  S. Peyton Jones. 
+  S. Peyton Jones.
   In Proceedings of &ldquo;The Tenth ACM SIGPLAN International Conference on
   Functional Programming&rdquo;, ACM Press, pages 241-253, 2005).  Type families
-  themselves are described in the paper &ldquo;<ulink 
+  themselves are described in the paper &ldquo;<ulink
   url="http://www.cse.unsw.edu.au/~chak/papers/SPCS08.html">Type
   Checking with Open Type Functions</ulink>&rdquo;, T. Schrijvers,
-  S. Peyton-Jones, 
+  S. Peyton-Jones,
   M. Chakravarty, and M. Sulzmann, in Proceedings of &ldquo;ICFP 2008: The
   13th ACM SIGPLAN International Conference on Functional
   Programming&rdquo;, ACM Press, pages 51-62, 2008. Type families
@@ -4145,13 +4420,13 @@ to work since it gets translated into an equality comparison.
   interfaces as well as interfaces with enhanced static information, much like
   dependent types. They might also be regarded as an alternative to functional
   dependencies, but provide a more functional style of type-level programming
-  than the relational style of functional dependencies. 
+  than the relational style of functional dependencies.
 </para>
 <para>
   Indexed type families, or type families for short, are type constructors that
   represent sets of types. Set members are denoted by supplying the type family
   constructor with type parameters, which are called <firstterm>type
-  indices</firstterm>. The 
+  indices</firstterm>. The
   difference between vanilla parametrised type constructors and family
   constructors is much like between parametrically polymorphic functions and
   (ad-hoc polymorphic) methods of type classes. Parametric polymorphic functions
@@ -4159,14 +4434,14 @@ to work since it gets translated into an equality comparison.
   behaviour in dependence on the class type parameters. Similarly, vanilla type
   constructors imply the same data representation for all type instances, but
   family constructors can have varying representation types for varying type
-  indices. 
+  indices.
 </para>
 <para>
   Indexed type families come in two flavours: <firstterm>data
-    families</firstterm> and <firstterm>type synonym 
+    families</firstterm> and <firstterm>type synonym
     families</firstterm>. They are the indexed family variants of algebraic
   data types and type synonyms, respectively. The instances of data families
-  can be data types and newtypes. 
+  can be data types and newtypes.
 </para>
 <para>
   Type families are enabled by the flag <option>-XTypeFamilies</option>.
@@ -4180,7 +4455,7 @@ to work since it gets translated into an equality comparison.
 
   <para>
     Data families appear in two flavours: (1) they can be defined on the
-    toplevel 
+    toplevel
     or (2) they can appear inside type classes (in which case they are known as
     associated types). The former is the more general variant, as it lacks the
     requirement for the type-indexes to coincide with the class
@@ -4190,11 +4465,11 @@ to work since it gets translated into an equality comparison.
     and then cover the additional constraints placed on associated types.
   </para>
 
-  <sect3 id="data-family-declarations"> 
+  <sect3 id="data-family-declarations">
     <title>Data family declarations</title>
 
     <para>
-      Indexed data families are introduced by a signature, such as 
+      Indexed data families are introduced by a signature, such as
 <programlisting>
 data family GMap k :: * -> *
 </programlisting>
@@ -4208,7 +4483,7 @@ data family Array e
       Just as with
       [http://www.haskell.org/ghc/docs/latest/html/users_guide/gadt.html GADT
       declarations] named arguments are entirely optional, so that we can
-      declare <literal>Array</literal> alternatively with 
+      declare <literal>Array</literal> alternatively with
 <programlisting>
 data family Array :: * -> *
 </programlisting>
@@ -4219,7 +4494,7 @@ data family Array :: * -> *
       <para>
 	When a data family is declared as part of a type class, we drop
 	the <literal>family</literal> special.  The <literal>GMap</literal>
-	declaration takes the following form 
+	declaration takes the following form
 <programlisting>
 class GMapKey k where
   data GMap k :: * -> *
@@ -4230,7 +4505,7 @@ class GMapKey k where
 	the argument names must be class parameters.  Each class parameter may
 	only be used at most once per associated type, but some may be omitted
 	and they may be in an order other than in the class head.  Hence, the
-	following contrived example is admissible: 
+	following contrived example is admissible:
 <programlisting>
   class C a b c where
   data T c a :: *
@@ -4239,7 +4514,7 @@ class GMapKey k where
     </sect4>
   </sect3>
 
-  <sect3 id="data-instance-declarations"> 
+  <sect3 id="data-instance-declarations">
     <title>Data instance declarations</title>
 
     <para>
@@ -4253,7 +4528,7 @@ class GMapKey k where
       they are fully applied and expand to a type that is itself admissible -
       exactly as this is required for occurrences of type synonyms in class
       instance parameters.  For example, the <literal>Either</literal>
-      instance for <literal>GMap</literal> is 
+      instance for <literal>GMap</literal> is
 <programlisting>
 data instance GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
 </programlisting>
@@ -4262,18 +4537,18 @@ data instance GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
     </para>
     <para>
       Data and newtype instance declarations are only permitted when an
-      appropriate family declaration is in scope - just as a class instance declaratoin
+      appropriate family declaration is in scope - just as a class instance declaration
       requires the class declaration to be visible.  Moreover, each instance
       declaration has to conform to the kind determined by its family
       declaration.  This implies that the number of parameters of an instance
       declaration matches the arity determined by the kind of the family.
     </para>
     <para>
-      A data family instance declaration can use the full exprssiveness of
+      A data family instance declaration can use the full expressiveness of
       ordinary <literal>data</literal> or <literal>newtype</literal> declarations:
       <itemizedlist>
       <listitem><para> Although, a data family is <emphasis>introduced</emphasis> with
-      the keyword "<literal>data</literal>", a data family <emphasis>instance</emphasis> can 
+      the keyword "<literal>data</literal>", a data family <emphasis>instance</emphasis> can
       use either <literal>data</literal> or <literal>newtype</literal>. For example:
 <programlisting>
 data family T a
@@ -4301,7 +4576,7 @@ data instance G [a] b where
       Even if type families are defined as toplevel declarations, functions
       that perform different computations for different family instances may still
       need to be defined as methods of type classes.  In particular, the
-      following is not possible: 
+      following is not possible:
 <programlisting>
 data family T a
 data instance T Int  = A
@@ -4312,7 +4587,7 @@ foo B = 2             -- ...will produce a type error.
 </programlisting>
 Instead, you would have to write <literal>foo</literal> as a class operation, thus:
 <programlisting>
-class C a where 
+class C a where
   foo :: T a -> Int
 instance Foo Int where
   foo A = 1
@@ -4323,7 +4598,7 @@ instance Foo Char where
       Types), it might seem as if a definition, such as the above, should be
       feasible.  However, type families are - in contrast to GADTs - are
       <emphasis>open;</emphasis> i.e., new instances can always be added,
-      possibly in other 
+      possibly in other
       modules.  Supporting pattern matching across different data instances
       would require a form of extensible case construct.)
     </para>
@@ -4334,7 +4609,7 @@ instance Foo Char where
 	When an associated data family instance is declared within a type
 	class instance, we drop the <literal>instance</literal> keyword in the
 	family instance.  So, the <literal>Either</literal> instance
-	for <literal>GMap</literal> becomes: 
+	for <literal>GMap</literal> becomes:
 <programlisting>
 instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
   data GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
@@ -4347,7 +4622,7 @@ instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
         which coincides with the only class parameter.  Any parameters to the
         family constructor that do not correspond to class parameters, need to
         be variables in every instance; here this is the
-        variable <literal>v</literal>. 
+        variable <literal>v</literal>.
       </para>
       <para>
 	Instances for an associated family can only appear as part of
@@ -4357,7 +4632,7 @@ instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
 	types can be omitted in class instances.  If an associated family
 	instance is omitted, the corresponding instance type is not inhabited;
 	i.e., only diverging expressions, such
-	as <literal>undefined</literal>, can assume the type. 
+	as <literal>undefined</literal>, can assume the type.
       </para>
     </sect4>
 
@@ -4367,13 +4642,13 @@ instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
 	In the case of multi-parameter type classes, the visibility of class
 	parameters in the right-hand side of associated family instances
 	depends <emphasis>solely</emphasis> on the parameters of the data
-	family.  As an example, consider the simple class declaration 
+	family.  As an example, consider the simple class declaration
 <programlisting>
 class C a b where
   data T a
 </programlisting>
         Only one of the two class parameters is a parameter to the data
-        family.  Hence, the following instance declaration is invalid: 
+        family.  Hence, the following instance declaration is invalid:
 <programlisting>
 instance C [c] d where
   data T [c] = MkT (c, d)    -- WRONG!!  'd' is not in scope
@@ -4381,7 +4656,7 @@ instance C [c] d where
         Here, the right-hand side of the data instance mentions the type
         variable <literal>d</literal> that does not occur in its left-hand
         side.  We cannot admit such data instances as they would compromise
-        type safety. 
+        type safety.
       </para>
     </sect4>
 
@@ -4390,7 +4665,7 @@ instance C [c] d where
       <para>
 	Type class instances of instances of data families can be defined as
 	usual, and in particular data instance declarations can
-	have <literal>deriving</literal> clauses.  For example, we can write 
+	have <literal>deriving</literal> clauses.  For example, we can write
 <programlisting>
 data GMap () v = GMapUnit (Maybe v)
                deriving Show
@@ -4407,7 +4682,7 @@ instance Show v => Show (GMap () v) where ...
 	reasons that we cannot define a toplevel function that performs
 	pattern matching on the data constructors
 	of <emphasis>different</emphasis> instances of a single type family.
-	It would require a form of extensible case construct. 
+	It would require a form of extensible case construct.
       </para>
     </sect4>
 
@@ -4417,7 +4692,7 @@ instance Show v => Show (GMap () v) where ...
 	The instance declarations of a data family used in a single program
 	may not overlap at all, independent of whether they are associated or
 	not.  In contrast to type class instances, this is not only a matter
-	of consistency, but one of type safety. 
+	of consistency, but one of type safety.
       </para>
     </sect4>
 
@@ -4441,7 +4716,7 @@ instance Show v => Show (GMap () v) where ...
       an export item, these may be either imported or defined in the current
       module.  The treatment of import and export items that explicitly list
       data constructors, such as <literal>GMap(GMapEither)</literal>, is
-      analogous. 
+      analogous.
     </para>
 
     <sect4 id="data-family-impexp-assoc">
@@ -4456,7 +4731,7 @@ instance Show v => Show (GMap () v) where ...
 	type name needs to be prefixed by the keyword <literal>type</literal>.
 	So for example, when explicitly listing the components of
 	the <literal>GMapKey</literal> class, we write <literal>GMapKey(type
-	GMap, empty, lookup, insert)</literal>. 
+	GMap, empty, lookup, insert)</literal>.
       </para>
     </sect4>
 
@@ -4464,7 +4739,7 @@ instance Show v => Show (GMap () v) where ...
       <title>Examples</title>
       <para>
 	Assuming our running <literal>GMapKey</literal> class example, let us
-	look at some export lists and their meaning: 
+	look at some export lists and their meaning:
 	<itemizedlist>
 	  <listitem>
 	    <para><literal>module GMap (GMapKey) where...</literal>: Exports
@@ -4475,14 +4750,14 @@ instance Show v => Show (GMap () v) where ...
 	      Exports the class, the associated type <literal>GMap</literal>
 	      and the member
 	      functions <literal>empty</literal>, <literal>lookup</literal>,
-	      and <literal>insert</literal>.  None of the data constructors is 
+	      and <literal>insert</literal>.  None of the data constructors is
 	      exported.</para>
-	  </listitem> 
+	  </listitem>
 	  <listitem>
 	    <para><literal>module GMap (GMapKey(..), GMap(..))
 		where...</literal>: As before, but also exports all the data
-	      constructors <literal>GMapInt</literal>, 
-	      <literal>GMapChar</literal>,  
+	      constructors <literal>GMapInt</literal>,
+	      <literal>GMapChar</literal>,
 	      <literal>GMapUnit</literal>, <literal>GMapPair</literal>,
 	      and <literal>GMapUnit</literal>.</para>
 	  </listitem>
@@ -4503,7 +4778,7 @@ instance Show v => Show (GMap () v) where ...
 	write <literal>GMapKey(type GMap(..))</literal> &mdash; i.e.,
 	sub-component specifications cannot be nested.  To
 	specify <literal>GMap</literal>'s data constructors, you have to list
-	it separately. 
+	it separately.
       </para>
     </sect4>
 
@@ -4512,7 +4787,7 @@ instance Show v => Show (GMap () v) where ...
       <para>
 	Family instances are implicitly exported, just like class instances.
 	However, this applies only to the heads of instances, not to the data
-	constructors an instance defines. 
+	constructors an instance defines.
       </para>
     </sect4>
 
@@ -4539,13 +4814,13 @@ instance Show v => Show (GMap () v) where ...
     <title>Type family declarations</title>
 
     <para>
-      Indexed type families are introduced by a signature, such as 
+      Indexed type families are introduced by a signature, such as
 <programlisting>
 type family Elem c :: *
 </programlisting>
       The special <literal>family</literal> distinguishes family from standard
       type declarations.  The result kind annotation is optional and, as
-      usual, defaults to <literal>*</literal> if omitted.  An example is 
+      usual, defaults to <literal>*</literal> if omitted.  An example is
 <programlisting>
 type family Elem c
 </programlisting>
@@ -4556,13 +4831,13 @@ type family Elem c
       and it implies that the kind of a type family is not sufficient to
       determine a family's arity, and hence in general, also insufficient to
       determine whether a type family application is well formed.  As an
-      example, consider the following declaration: 
+      example, consider the following declaration:
 <programlisting>
-type family F a b :: * -> *   -- F's arity is 2, 
+type family F a b :: * -> *   -- F's arity is 2,
                               -- although its overall kind is * -> * -> * -> *
 </programlisting>
       Given this declaration the following are examples of well-formed and
-      malformed types: 
+      malformed types:
 <programlisting>
 F Char [Int]       -- OK!  Kind: * -> *
 F Char [Int] Bool  -- OK!  Kind: *
@@ -4576,7 +4851,7 @@ F Bool             -- WRONG: unsaturated application
       <para>
 	When a type family is declared as part of a type class, we drop
 	the <literal>family</literal> special.  The <literal>Elem</literal>
-	declaration takes the following form 
+	declaration takes the following form
 <programlisting>
 class Collects ce where
   type Elem ce :: *
@@ -4585,7 +4860,7 @@ class Collects ce where
         The argument names of the type family must be class parameters.  Each
         class parameter may only be used at most once per associated type, but
         some may be omitted and they may be in an order other than in the
-        class head.  Hence, the following contrived example is admissible: 
+        class head.  Hence, the following contrived example is admissible:
 <programlisting>
 class C a b c where
   type T c a :: *
@@ -4607,7 +4882,7 @@ class C a b c where
       type synonyms are allowed as long as they are fully applied and expand
       to a type that is admissible - these are the exact same requirements as
       for data instances.  For example, the <literal>[e]</literal> instance
-      for <literal>Elem</literal> is 
+      for <literal>Elem</literal> is
 <programlisting>
 type instance Elem [e] = e
 </programlisting>
@@ -4623,7 +4898,7 @@ type instance Elem [e] = e
       monotype (i.e., it may not include foralls) and after the expansion of
       all saturated vanilla type synonyms, no synonyms, except family synonyms
       may remain.  Here are some examples of admissible and illegal type
-      instances: 
+      instances:
 <programlisting>
 type family F a :: *
 type instance F [Int]              = Int         -- OK!
@@ -4644,7 +4919,7 @@ type instance G Int Char Float = Double  -- WRONG: must be two type parameters
 	When an associated family instance is declared within a type class
 	instance, we drop the <literal>instance</literal> keyword in the family
 	instance.  So, the <literal>[e]</literal> instance
-	for <literal>Elem</literal> becomes: 
+	for <literal>Elem</literal> becomes:
 <programlisting>
 instance (Eq (Elem [e])) => Collects ([e]) where
   type Elem [e] = e
@@ -4653,7 +4928,7 @@ instance (Eq (Elem [e])) => Collects ([e]) where
         The most important point about associated family instances is that the
 	type indexes corresponding to class parameters must be identical to the
         type given in the instance head; here this is <literal>[e]</literal>,
-        which coincides with the only class parameter. 
+        which coincides with the only class parameter.
       </para>
       <para>
         Instances for an associated family can only appear as part of  instances
@@ -4662,7 +4937,7 @@ instance (Eq (Elem [e])) => Collects ([e]) where
 	how methods are handled, declarations of associated types can be omitted
 	in class instances.  If an associated family instance is omitted, the
 	corresponding instance type is not inhabited; i.e., only diverging
-	expressions, such as <literal>undefined</literal>, can assume the type. 
+	expressions, such as <literal>undefined</literal>, can assume the type.
       </para>
     </sect4>
 
@@ -4677,11 +4952,11 @@ instance (Eq (Elem [e])) => Collects ([e]) where
 	that is the case, the right-hand sides of the instances must also be
 	syntactically equal under the same substitution.  This condition is
 	independent of whether the type family is associated or not, and it is
-	not only a matter of consistency, but one of type safety. 
+	not only a matter of consistency, but one of type safety.
       </para>
       <para>
 	Here are two example to illustrate the condition under which overlap
-	is permitted. 
+	is permitted.
 <programlisting>
 type instance F (a, Int) = [a]
 type instance F (Int, b) = [b]   -- overlap permitted
@@ -4698,15 +4973,15 @@ type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
 	In order to guarantee that type inference in the presence of type
 	families decidable, we need to place a number of additional
 	restrictions on the formation of type instance declarations (c.f.,
-	Definition 5 (Relaxed Conditions) of &ldquo;<ulink 
+	Definition 5 (Relaxed Conditions) of &ldquo;<ulink
         url="http://www.cse.unsw.edu.au/~chak/papers/SPCS08.html">Type
 	  Checking with Open Type Functions</ulink>&rdquo;).  Instance
-	  declarations have the general form 
+	  declarations have the general form
 <programlisting>
 type instance F t1 .. tn = t
 </programlisting>
         where we require that for every type family application <literal>(G s1
-        .. sm)</literal> in <literal>t</literal>,  
+        .. sm)</literal> in <literal>t</literal>,
 	<orderedlist>
 	  <listitem>
 	    <para><literal>s1 .. sm</literal> do not contain any type family
@@ -4715,7 +4990,7 @@ type instance F t1 .. tn = t
 	  <listitem>
 	    <para>the total number of symbols (data type constructors and type
 	    variables) in <literal>s1 .. sm</literal> is strictly smaller than
-	    in <literal>t1 .. tn</literal>, and</para> 
+	    in <literal>t1 .. tn</literal>, and</para>
 	  </listitem>
 	  <listitem>
 	    <para>for every type
@@ -4729,13 +5004,13 @@ type instance F t1 .. tn = t
 	of type inference in the presence of, so called, ''loopy equalities'',
 	such as <literal>a ~ [F a]</literal>, where a recursive occurrence of
 	a type variable is underneath a family application and data
-	constructor application - see the above mentioned paper for details.   
+	constructor application - see the above mentioned paper for details.
       </para>
       <para>
 	If the option <option>-XUndecidableInstances</option> is passed to the
 	compiler, the above restrictions are not enforced and it is on the
 	programmer to ensure termination of the normalisation of type families
-	during type inference. 
+	during type inference.
       </para>
     </sect4>
   </sect3>
@@ -4748,7 +5023,7 @@ type instance F t1 .. tn = t
       and <literal>t2</literal> need to be the same.  In the presence of type
       families, whether two types are equal cannot generally be decided
       locally.  Hence, the contexts of function signatures may include
-      equality constraints, as in the following example: 
+      equality constraints, as in the following example:
 <programlisting>
 sumCollects :: (Collects c1, Collects c2, Elem c1 ~ Elem c2) => c1 -> c2 -> c2
 </programlisting>
@@ -4757,13 +5032,13 @@ sumCollects :: (Collects c1, Collects c2, Elem c1 ~ Elem c2) => c1 -> c2 -> c2
       types <literal>t1</literal> and <literal>t2</literal> of an equality
       constraint may be arbitrary monotypes; i.e., they may not contain any
       quantifiers, independent of whether higher-rank types are otherwise
-      enabled. 
+      enabled.
     </para>
     <para>
       Equality constraints can also appear in class and instance contexts.
       The former enable a simple translation of programs using functional
       dependencies into programs using family synonyms instead.  The general
-      idea is to rewrite a class declaration of the form 
+      idea is to rewrite a class declaration of the form
 <programlisting>
 class C a b | a -> b
 </programlisting>
@@ -4778,18 +5053,18 @@ class (F a ~ b) => C a b where
       essentially giving a name to the functional dependency.  In class
       instances, we define the type instances of FD families in accordance
       with the class head.  Method signatures are not affected by that
-      process. 
+      process.
     </para>
     <para>
       NB: Equalities in superclass contexts are not fully implemented in
-      GHC 6.10. 
+      GHC 6.10.
     </para>
   </sect3>
 
   <sect3 id-="ty-fams-in-instances">
     <title>Type families and instance declarations</title>
-    <para>Type families require us to extend the rules for 
-      the form of instance heads, which are given 
+    <para>Type families require us to extend the rules for
+      the form of instance heads, which are given
       in <xref linkend="flexible-instance-head"/>.
       Specifically:
 <itemizedlist>
@@ -4844,9 +5119,9 @@ a type variable any more!
 <sect2 id="flexible-contexts"><title>The context of a type signature</title>
 <para>
 The <option>-XFlexibleContexts</option> flag lifts the Haskell 98 restriction
-that the type-class constraints in a type signature must have the 
+that the type-class constraints in a type signature must have the
 form <emphasis>(class type-variable)</emphasis> or
-<emphasis>(class (type-variable type-variable ...))</emphasis>. 
+<emphasis>(class (type-variable type-variable ...))</emphasis>.
 With <option>-XFlexibleContexts</option>
 these type signatures are perfectly OK
 <programlisting>
@@ -4884,8 +5159,8 @@ in GHC, you can give the foralls if you want.  See <xref linkend="explicit-foral
 
 A type variable <literal>a</literal> is "reachable" if it appears
 in the same constraint as either a type variable free in
-<literal>type</literal>, or another reachable type variable.  
-A value with a type that does not obey 
+<literal>type</literal>, or another reachable type variable.
+A value with a type that does not obey
 this reachability restriction cannot be used without introducing
 ambiguity; that is why the type is rejected.
 Here, for example, is an illegal type:
@@ -4964,8 +5239,8 @@ territory free in case we need it later.
 <sect2 id="implicit-parameters">
 <title>Implicit parameters</title>
 
-<para> Implicit parameters are implemented as described in 
-"Implicit parameters: dynamic scoping with static types", 
+<para> Implicit parameters are implemented as described in
+"Implicit parameters: dynamic scoping with static types",
 J Lewis, MB Shields, E Meijer, J Launchbury,
 27th ACM Symposium on Principles of Programming Languages (POPL'00),
 Boston, Jan 2000.
@@ -4992,7 +5267,7 @@ However, by a simple extension to the type class system of Haskell, we
 can support dynamic binding. Basically, we express the use of a
 dynamically bound variable as a constraint on the type. These
 constraints lead to types of the form <literal>(?x::t') => t</literal>, which says "this
-function uses a dynamically-bound variable <literal>?x</literal> 
+function uses a dynamically-bound variable <literal>?x</literal>
 of type <literal>t'</literal>". For
 example, the following expresses the type of a sort function,
 implicitly parameterized by a comparison function named <literal>cmp</literal>.
@@ -5002,11 +5277,11 @@ implicitly parameterized by a comparison function named <literal>cmp</literal>.
 The dynamic binding constraints are just a new form of predicate in the type class system.
 </para>
 <para>
-An implicit parameter occurs in an expression using the special form <literal>?x</literal>, 
+An implicit parameter occurs in an expression using the special form <literal>?x</literal>,
 where <literal>x</literal> is
-any valid identifier (e.g. <literal>ord ?x</literal> is a valid expression). 
+any valid identifier (e.g. <literal>ord ?x</literal> is a valid expression).
 Use of this construct also introduces a new
-dynamic-binding constraint in the type of the expression. 
+dynamic-binding constraint in the type of the expression.
 For example, the following definition
 shows how we can define an implicitly parameterized sort function in
 terms of an explicitly parameterized <literal>sortBy</literal> function:
@@ -5039,8 +5314,8 @@ propagate them.
 <para>
 An implicit-parameter type constraint differs from other type class constraints in the
 following way: All uses of a particular implicit parameter must have
-the same type. This means that the type of <literal>(?x, ?x)</literal> 
-is <literal>(?x::a) => (a,a)</literal>, and not 
+the same type. This means that the type of <literal>(?x, ?x)</literal>
+is <literal>(?x::a) => (a,a)</literal>, and not
 <literal>(?x::a, ?x::b) => (a, b)</literal>, as would be the case for type
 class constraints.
 </para>
@@ -5065,7 +5340,7 @@ Implicit-parameter constraints do not cause ambiguity.  For example, consider:
    g s = show (read s)
 </programlisting>
 Here, <literal>g</literal> has an ambiguous type, and is rejected, but <literal>f</literal>
-is fine.  The binding for <literal>?x</literal> at <literal>f</literal>'s call site is 
+is fine.  The binding for <literal>?x</literal> at <literal>f</literal>'s call site is
 quite unambiguous, and fixes the type <literal>a</literal>.
 </para>
 </sect3>
@@ -5085,8 +5360,8 @@ For example, we define the <literal>min</literal> function by binding
 </para>
 <para>
 A group of implicit-parameter bindings may occur anywhere a normal group of Haskell
-bindings can occur, except at top level.  That is, they can occur in a <literal>let</literal> 
-(including in a list comprehension, or do-notation, or pattern guards), 
+bindings can occur, except at top level.  That is, they can occur in a <literal>let</literal>
+(including in a list comprehension, or do-notation, or pattern guards),
 or a <literal>where</literal> clause.
 Note the following points:
 <itemizedlist>
@@ -5094,10 +5369,10 @@ Note the following points:
 An implicit-parameter binding group must be a
 collection of simple bindings to implicit-style variables (no
 function-style bindings, and no type signatures); these bindings are
-neither polymorphic or recursive.  
+neither polymorphic or recursive.
 </para></listitem>
 <listitem><para>
-You may not mix implicit-parameter bindings with ordinary bindings in a 
+You may not mix implicit-parameter bindings with ordinary bindings in a
 single <literal>let</literal>
 expression; use two nested <literal>let</literal>s instead.
 (In the case of <literal>where</literal> you are stuck, since you can't nest <literal>where</literal> clauses.)
@@ -5210,7 +5485,7 @@ problem that monads seem over-kill for certain sorts of problem, notably:
 Linear implicit parameters are just like ordinary implicit parameters,
 except that they are "linear"; that is, they cannot be copied, and
 must be explicitly "split" instead.  Linear implicit parameters are
-written '<literal>%x</literal>' instead of '<literal>?x</literal>'.  
+written '<literal>%x</literal>' instead of '<literal>?x</literal>'.
 (The '/' in the '%' suggests the split!)
 </para>
 <para>
@@ -5219,7 +5494,7 @@ For example:
     import GHC.Exts( Splittable )
 
     data NameSupply = ...
-    
+
     splitNS :: NameSupply -> (NameSupply, NameSupply)
     newName :: NameSupply -> Name
 
@@ -5234,7 +5509,7 @@ For example:
 		      env' = extend env x x'
     ...more equations for f...
 </programlisting>
-Notice that the implicit parameter %ns is consumed 
+Notice that the implicit parameter %ns is consumed
 <itemizedlist>
 <listitem> <para> once by the call to <literal>newName</literal> </para> </listitem>
 <listitem> <para> once by the recursive call to <literal>f</literal> </para></listitem>
@@ -5268,14 +5543,14 @@ and GHC will infer
 <programlisting>
 	g :: (Splittable a, %ns :: a) => b -> (b,a,a)
 </programlisting>
-The <literal>Splittable</literal> class is built into GHC.  It's exported by module 
+The <literal>Splittable</literal> class is built into GHC.  It's exported by module
 <literal>GHC.Exts</literal>.
 </para>
 <para>
 Other points:
 <itemizedlist>
-<listitem> <para> '<literal>?x</literal>' and '<literal>%x</literal>' 
-are entirely distinct implicit parameters: you 
+<listitem> <para> '<literal>?x</literal>' and '<literal>%x</literal>'
+are entirely distinct implicit parameters: you
   can use them together and they won't interfere with each other. </para>
 </listitem>
 
@@ -5308,7 +5583,7 @@ usually a harmless thing to do, we get:
 </programlisting>
 But now the name supply is consumed in <emphasis>three</emphasis> places
 (the two calls to newName,and the recursive call to f), so
-the result is utterly different.  Urk!  We don't even have 
+the result is utterly different.  Urk!  We don't even have
 the beta rule.
 </para>
 <para>
@@ -5357,7 +5632,7 @@ semantics of the program depends on whether or not foo has a type signature.
 Yikes!
 </para><para>
 You may say that this is a good reason to dislike linear implicit parameters
-and you'd be right.  That is why they are an experimental feature. 
+and you'd be right.  That is why they are an experimental feature.
 </para>
 </sect3>
 
@@ -5370,7 +5645,7 @@ and you'd be right.  That is why they are an experimental feature.
 
 <para>
 Haskell infers the kind of each type variable.  Sometimes it is nice to be able
-to give the kind explicitly as (machine-checked) documentation, 
+to give the kind explicitly as (machine-checked) documentation,
 just as it is nice to give a type signature for a function.  On some occasions,
 it is essential to do so.  For example, in his paper "Restricted Data Types in Haskell" (Haskell Workshop 1999)
 John Hughes had to define the data type:
@@ -5435,9 +5710,9 @@ The parentheses are required.
 </title>
 
 <para>
-GHC's type system supports <emphasis>arbitrary-rank</emphasis> 
+GHC's type system supports <emphasis>arbitrary-rank</emphasis>
 explicit universal quantification in
-types. 
+types.
 For example, all the following types are legal:
 <programlisting>
     f1 :: forall a b. a -> b -> a
@@ -5571,11 +5846,11 @@ the constructor to suitable values, just as usual.  For example,
 <programlisting>
     a1 :: T Int
     a1 = T1 (\xy->x) 3
-    
+
     a2, a3 :: Swizzle
     a2 = MkSwizzle sort
     a3 = MkSwizzle reverse
-    
+
     a4 :: MonadT Maybe
     a4 = let r x = Just x
 	     b m k = case m of
@@ -5642,7 +5917,7 @@ provides an explicit polymorphic type for x, or GHC's type inference will assume
 that x's type has no foralls in it</emphasis>.
 </para>
 <para>
-What does it mean to "provide" an explicit type for x?  You can do that by 
+What does it mean to "provide" an explicit type for x?  You can do that by
 giving a type signature for x directly, using a pattern type signature
 (<xref linkend="scoped-type-variables"/>), thus:
 <programlisting>
@@ -5678,10 +5953,10 @@ it needs to know.
 <title>Implicit quantification</title>
 
 <para>
-GHC performs implicit quantification as follows.  <emphasis>At the top level (only) of 
+GHC performs implicit quantification as follows.  <emphasis>At the top level (only) of
 user-written types, if and only if there is no explicit <literal>forall</literal>,
 GHC finds all the type variables mentioned in the type that are not already
-in scope, and universally quantifies them.</emphasis>  For example, the following pairs are 
+in scope, and universally quantifies them.</emphasis>  For example, the following pairs are
 equivalent:
 <programlisting>
   f :: a -> a
@@ -5726,11 +6001,8 @@ for rank-2 types.
 <sect2 id="impredicative-polymorphism">
 <title>Impredicative polymorphism
 </title>
-<para><emphasis>NOTE: the impredicative-polymorphism feature is deprecated in GHC 6.12, and
-will be removed or replaced in GHC 6.14.</emphasis></para>
-
-<para>GHC supports <emphasis>impredicative polymorphism</emphasis>, 
-enabled with <option>-XImpredicativeTypes</option>.  
+<para>GHC supports <emphasis>impredicative polymorphism</emphasis>,
+enabled with <option>-XImpredicativeTypes</option>.
 This means
 that you can call a polymorphic function at a polymorphic type, and
 parameterise data structures over polymorphic types.  For example:
@@ -5746,7 +6018,7 @@ Notice here that the <literal>Maybe</literal> type is parameterised by the
 <para>The technical details of this extension are described in the paper
 <ulink url="http://research.microsoft.com/%7Esimonpj/papers/boxy/">Boxy types:
 type inference for higher-rank types and impredicativity</ulink>,
-which appeared at ICFP 2006.  
+which appeared at ICFP 2006.
 </para>
 </sect2>
 
@@ -5768,9 +6040,9 @@ The type signature for <literal>f</literal> brings the type variable <literal>a<
 because of the explicit <literal>forall</literal> (<xref linkend="decl-type-sigs"/>).
 The type variables bound by a <literal>forall</literal> scope over
 the entire definition of the accompanying value declaration.
-In this example, the type variable <literal>a</literal> scopes over the whole 
+In this example, the type variable <literal>a</literal> scopes over the whole
 definition of <literal>f</literal>, including over
-the type signature for <varname>ys</varname>. 
+the type signature for <varname>ys</varname>.
 In Haskell 98 it is not possible to declare
 a type for <varname>ys</varname>; a major benefit of scoped type variables is that
 it becomes possible to do so.
@@ -5812,7 +6084,7 @@ A <emphasis>lexically scoped type variable</emphasis> can be bound by:
 In Haskell, a programmer-written type signature is implicitly quantified over
 its free type variables (<ulink
 url="http://www.haskell.org/onlinereport/decls.html#sect4.1.2">Section
-4.1.2</ulink> 
+4.1.2</ulink>
 of the Haskell Report).
 Lexically scoped type variables affect this implicit quantification rules
 as follows: any type variable that is in scope is <emphasis>not</emphasis> universally
@@ -5851,11 +6123,11 @@ signature is explicit.  For example:
   g (x:xs) = xs ++ [ x :: a ]
 </programlisting>
 This program will be rejected, because "<literal>a</literal>" does not scope
-over the definition of "<literal>f</literal>", so "<literal>x::a</literal>"
+over the definition of "<literal>g</literal>", so "<literal>x::a</literal>"
 means "<literal>x::forall a. a</literal>" by Haskell's usual implicit
 quantification rules.
 </para></listitem>
-<listitem><para> The signature gives a type for a function binding or a bare variable binding, 
+<listitem><para> The signature gives a type for a function binding or a bare variable binding,
 not a pattern binding.
 For example:
 <programlisting>
@@ -5865,7 +6137,7 @@ For example:
   f2 :: forall a. [a] -> [a]
   f2 = \(x:xs) -> xs ++ [ x :: a ]   -- OK
 
-  f3 :: forall a. [a] -> [a] 
+  f3 :: forall a. [a] -> [a]
   Just f3 = Just (\(x:xs) -> xs ++ [ x :: a ])   -- Not OK!
 </programlisting>
 The binding for <literal>f3</literal> is a pattern binding, and so its type signature
@@ -5887,8 +6159,8 @@ type variables, in the annotated expression.  For example:
 <programlisting>
   f = runST ( (op >>= \(x :: STRef s Int) -> g x) :: forall s. ST s Bool )
 </programlisting>
-Here, the type signature <literal>forall a. ST s Bool</literal> brings the 
-type variable <literal>s</literal> into scope, in the annotated expression 
+Here, the type signature <literal>forall s. ST s Bool</literal> brings the
+type variable <literal>s</literal> into scope, in the annotated expression
 <literal>(op >>= \(x :: STRef s Int) -> g x)</literal>.
 </para>
 
@@ -5898,7 +6170,7 @@ type variable <literal>s</literal> into scope, in the annotated expression
 <title>Pattern type signatures</title>
 <para>
 A type signature may occur in any pattern; this is a <emphasis>pattern type
-signature</emphasis>. 
+signature</emphasis>.
 For example:
 <programlisting>
   -- f and g assume that 'a' is already in scope
@@ -5925,7 +6197,7 @@ that are already in scope.  For example:
 </programlisting>
 Here, the pattern signatures for <literal>ys</literal> and <literal>zs</literal>
 are fine, but the one for <literal>v</literal> is not because <literal>b</literal> is
-not in scope. 
+not in scope.
 </para>
 <para>
 However, in all patterns <emphasis>other</emphasis> than pattern bindings, a pattern
@@ -5948,7 +6220,7 @@ not already in scope; the effect is to bring it into scope, standing for the
 existentially-bound type variable.
 </para>
 <para>
-When a pattern type signature binds a type variable in this way, GHC insists that the 
+When a pattern type signature binds a type variable in this way, GHC insists that the
 type variable is bound to a <emphasis>rigid</emphasis>, or fully-known, type variable.
 This means that any user-written type signature always stands for a completely known type.
 </para>
@@ -5958,7 +6230,7 @@ If all this seems a little odd, we think so too.  But we must have
 could not name existentially-bound type variables in subsequent type signatures.
 </para>
 <para>
-This is (now) the <emphasis>only</emphasis> situation in which a pattern type 
+This is (now) the <emphasis>only</emphasis> situation in which a pattern type
 signature is allowed to mention a lexical variable that is not already in
 scope.
 For example, both <literal>f</literal> and <literal>g</literal> would be
@@ -5968,7 +6240,7 @@ illegal if <literal>a</literal> was not already in scope.
 
 </sect3>
 
-<!-- ==================== Commented out part about result type signatures 
+<!-- ==================== Commented out part about result type signatures
 
 <sect3 id="result-type-sigs">
 <title>Result type signatures</title>
@@ -5986,7 +6258,7 @@ The result type of a function, lambda, or case expression alternative can be giv
   h xs = case xs of
 	    (y:ys) :: a -> y
 </programlisting>
-The final <literal>:: [a]</literal> after the patterns of <literal>f</literal> gives the type of 
+The final <literal>:: [a]</literal> after the patterns of <literal>f</literal> gives the type of
 the result of the function.  Similarly, the body of the lambda in the RHS of
 <literal>g</literal> is <literal>[Int]</literal>, and the RHS of the case
 alternative in <literal>h</literal> is <literal>a</literal>.
@@ -6052,12 +6324,12 @@ The Haskell Report specifies that a group of bindings (at top level, or in a
 <literal>let</literal> or <literal>where</literal>) should be sorted into
 strongly-connected components, and then type-checked in dependency order
 (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.1">Haskell
-Report, Section 4.5.1</ulink>).  
+Report, Section 4.5.1</ulink>).
 As each group is type-checked, any binders of the group that
 have
 an explicit type signature are put in the type environment with the specified
 polymorphic type,
-and all others are monomorphic until the group is generalised 
+and all others are monomorphic until the group is generalised
 (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.2">Haskell Report, Section 4.5.2</ulink>).
 </para>
 
@@ -6073,7 +6345,7 @@ typecheck.  For example, consider:
 <programlisting>
   f :: Eq a =&gt; a -> Bool
   f x = (x == x) || g True || g "Yes"
-  
+
   g y = (y &lt;= y) || f True
 </programlisting>
 This is rejected by Haskell 98, but under Jones's scheme the definition for
@@ -6090,7 +6362,7 @@ Now, the definition for <literal>f</literal> is typechecked, with this type for
 </para>
 
 <para>
-The same refined dependency analysis also allows the type signatures of 
+The same refined dependency analysis also allows the type signatures of
 mutually-recursive functions to have different contexts, something that is illegal in
 Haskell 98 (Section 4.5.2, last sentence).  With
 <option>-XRelaxedPolyRec</option>
@@ -6100,7 +6372,7 @@ pattern binding must have the same context.  For example, this is fine:
 <programlisting>
   f :: Eq a =&gt; a -> Bool
   f x = (x == x) || g True
-  
+
   g :: Ord a =&gt; a -> Bool
   g y = (y &lt;= y) || f True
 </programlisting>
@@ -6111,7 +6383,7 @@ pattern binding must have the same context.  For example, this is fine:
 <title>Monomorphic local bindings</title>
 <para>
 We are actively thinking of simplifying GHC's type system, by <emphasis>not generalising local bindings</emphasis>.
-The rationale is described in the paper 
+The rationale is described in the paper
 <ulink url="http://research.microsoft.com/~simonpj/papers/constraints/index.htm">Let should not be generalised</ulink>.
 </para>
 <para>
@@ -6124,14 +6396,14 @@ If you supply a type signature, then the flag has no effect.
 
 </sect1>
 <!-- ==================== End of type system extensions =================  -->
-  
+
 <!-- ====================== TEMPLATE HASKELL =======================  -->
 
 <sect1 id="template-haskell">
 <title>Template Haskell</title>
 
 <para>Template Haskell allows you to do compile-time meta-programming in
-Haskell.  
+Haskell.
 The background to
 the main technical innovations is discussed in "<ulink
 url="http://research.microsoft.com/~simonpj/papers/meta-haskell/">
@@ -6142,23 +6414,23 @@ There is a Wiki page about
 Template Haskell at <ulink url="http://www.haskell.org/haskellwiki/Template_Haskell">
 http://www.haskell.org/haskellwiki/Template_Haskell</ulink>, and that is the best place to look for
 further details.
-You may also 
+You may also
 consult the <ulink
 url="http://www.haskell.org/ghc/docs/latest/html/libraries/index.html">online
-Haskell library reference material</ulink> 
+Haskell library reference material</ulink>
 (look for module <literal>Language.Haskell.TH</literal>).
-Many changes to the original design are described in 
+Many changes to the original design are described in
       <ulink url="http://research.microsoft.com/~simonpj/papers/meta-haskell/notes2.ps">
 Notes on Template Haskell version 2</ulink>.
 Not all of these changes are in GHC, however.
 </para>
 
-<para> The first example from that paper is set out below (<xref linkend="th-example"/>) 
-as a worked example to help get you started. 
+<para> The first example from that paper is set out below (<xref linkend="th-example"/>)
+as a worked example to help get you started.
 </para>
 
 <para>
-The documentation here describes the realisation of Template Haskell in GHC.  It is not detailed enough to 
+The documentation here describes the realisation of Template Haskell in GHC.  It is not detailed enough to
 understand Template Haskell; see the <ulink url="http://haskell.org/haskellwiki/Template_Haskell">
 Wiki page</ulink>.
 </para>
@@ -6182,24 +6454,24 @@ Wiki page</ulink>.
 		  of "$" overrides its meaning as an infix operator, just as "M.x" overrides the meaning
 		  of "." as an infix operator.  If you want the infix operator, put spaces around it.
 		  </para>
-	      <para> A splice can occur in place of 
+	      <para> A splice can occur in place of
 		  <itemizedlist>
 		    <listitem><para> an expression; the spliced expression must
 		    have type <literal>Q Exp</literal></para></listitem>
 		    <listitem><para> an type; the spliced expression must
 		    have type <literal>Q Typ</literal></para></listitem>
-		    <listitem><para> a list of top-level declarations; the spliced expression 
+		    <listitem><para> a list of top-level declarations; the spliced expression
                     must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
             Note that pattern splices are not supported.
-	    Inside a splice you can can only call functions defined in imported modules,
+            Inside a splice you can only call functions defined in imported modules,
 	    not functions defined elsewhere in the same module.</para></listitem>
 
 	      <listitem><para>
 		  A expression quotation is written in Oxford brackets, thus:
 		  <itemizedlist>
-		    <listitem><para> <literal>[| ... |]</literal>, or <literal>[e| ... |]</literal>, 
-                             where the "..." is an expression; 
+		    <listitem><para> <literal>[| ... |]</literal>, or <literal>[e| ... |]</literal>,
+                             where the "..." is an expression;
                              the quotation has type <literal>Q Exp</literal>.</para></listitem>
 		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;
                              the quotation has type <literal>Q [Dec]</literal>.</para></listitem>
@@ -6224,17 +6496,17 @@ Wiki page</ulink>.
 		    <listitem><para> <literal>'f</literal> has type <literal>Name</literal>, and names the function <literal>f</literal>.
 		  Similarly <literal>'C</literal> has type <literal>Name</literal> and names the data constructor <literal>C</literal>.
 		  In general <literal>'</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in an expression context.
-		     </para></listitem> 
+		     </para></listitem>
 		    <listitem><para> <literal>''T</literal> has type <literal>Name</literal>, and names the type constructor  <literal>T</literal>.
 		  That is, <literal>''</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in a type context.
-		     </para></listitem> 
+		     </para></listitem>
 		  </itemizedlist>
 	          These <literal>Names</literal> can be used to construct Template Haskell expressions, patterns, declarations etc.  They
 	          may also be given as an argument to the <literal>reify</literal> function.
 	         </para>
 		</listitem>
 
-	      <listitem><para> You may omit the <literal>$(...)</literal> in a top-level declaration splice. 
+	      <listitem><para> You may omit the <literal>$(...)</literal> in a top-level declaration splice.
               Simply writing an expression (rather than a declaration) implies a splice.  For example, you can write
 <programlisting>
 module Foo where
@@ -6253,7 +6525,7 @@ h z = z-1
             This abbreviation makes top-level declaration slices quieter and less intimidating.
 	    </para></listitem>
 
-		  
+
 	</itemizedlist>
 (Compared to the original paper, there are many differences of detail.
 The syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>".
@@ -6279,7 +6551,7 @@ Pattern splices and quotations are not implemented.)
    <listitem><para>
    You can only run a function at compile time if it is imported
    from another module <emphasis>that is not part of a mutually-recursive group of modules
-   that includes the module currently being compiled</emphasis>.  Furthermore, all of the modules of 
+   that includes the module currently being compiled</emphasis>.  Furthermore, all of the modules of
    the mutually-recursive group must be reachable by non-SOURCE imports from the module where the
    splice is to be run.</para>
    <para>
@@ -6301,11 +6573,11 @@ Pattern splices and quotations are not implemented.)
 </itemizedlist>
 </para>
 <para> Template Haskell works in any mode (<literal>--make</literal>, <literal>--interactive</literal>,
-	or file-at-a-time).  There used to be a restriction to the former two, but that restriction 
+	or file-at-a-time).  There used to be a restriction to the former two, but that restriction
 	has been lifted.
 </para>
 </sect2>
- 
+
 <sect2 id="th-example">  <title> A Template Haskell Worked Example </title>
 <para>To help you get over the confidence barrier, try out this skeletal worked example.
   First cut and paste the two modules below into "Main.hs" and "Printf.hs":</para>
@@ -6375,7 +6647,7 @@ Hello
 <sect2>
 <title>Using Template Haskell with Profiling</title>
 <indexterm><primary>profiling</primary><secondary>with Template Haskell</secondary></indexterm>
- 
+
 <para>Template Haskell relies on GHC's built-in bytecode compiler and
 interpreter to run the splice expressions.  The bytecode interpreter
 runs the compiled expression on top of the same runtime on which GHC
@@ -6427,11 +6699,11 @@ A quasi-quote has the form
 <literal>[<replaceable>quoter</replaceable>| <replaceable>string</replaceable> |]</literal>.
 <itemizedlist>
 <listitem><para>
-The <replaceable>quoter</replaceable> must be the (unqualified) name of an imported 
-quoter; it cannot be an arbitrary expression.  
+The <replaceable>quoter</replaceable> must be the (unqualified) name of an imported
+quoter; it cannot be an arbitrary expression.
 </para></listitem>
 <listitem><para>
-The <replaceable>quoter</replaceable> cannot be "<literal>e</literal>", 
+The <replaceable>quoter</replaceable> cannot be "<literal>e</literal>",
 "<literal>t</literal>", "<literal>d</literal>", or "<literal>p</literal>", since
 those overlap with Template Haskell quotations.
 </para></listitem>
@@ -6440,7 +6712,7 @@ There must be no spaces in the token
 <literal>[<replaceable>quoter</replaceable>|</literal>.
 </para></listitem>
 <listitem><para>
-The quoted <replaceable>string</replaceable> 
+The quoted <replaceable>string</replaceable>
 can be arbitrary, and may contain newlines.
 </para></listitem>
 </itemizedlist>
@@ -6458,7 +6730,7 @@ A quasiquote may appear in place of
 </para></listitem>
 
 <listitem><para>
-A quoter is a value of type <literal>Language.Haskell.TH.Quote.QuasiQuoter</literal>, 
+A quoter is a value of type <literal>Language.Haskell.TH.Quote.QuasiQuoter</literal>,
 which is defined thus:
 <programlisting>
 data QuasiQuoter = QuasiQuoter { quoteExp  :: String -> Q Exp,
@@ -6651,7 +6923,7 @@ it won't make much sense unless you've read Hughes's paper.
        |  proc <replaceable>apat</replaceable> -> <replaceable>cmd</replaceable>
 </screen>
 where <literal>proc</literal> is a new keyword.
-The variables of the pattern are bound in the body of the 
+The variables of the pattern are bound in the body of the
 <literal>proc</literal>-expression,
 which is a new sort of thing called a <firstterm>command</firstterm>.
 The syntax of commands is as follows:
@@ -7054,7 +7326,7 @@ a new <literal>form</literal> keyword.
 <para>
 Although only GHC implements arrow notation directly,
 there is also a preprocessor
-(available from the 
+(available from the
 <ulink url="http://www.haskell.org/arrows/">arrows web page</ulink>)
 that translates arrow notation into Haskell 98
 for use with other Haskell systems.
@@ -7099,7 +7371,7 @@ Because the preprocessor targets Haskell (rather than Core),
 <indexterm><primary>Bang patterns</primary></indexterm>
 </title>
 <para>GHC supports an extension of pattern matching called <emphasis>bang
-patterns</emphasis>, written <literal>!<replaceable>pat</replaceable></literal>.   
+patterns</emphasis>, written <literal>!<replaceable>pat</replaceable></literal>.
 Bang patterns are under consideration for Haskell Prime.
 The <ulink
 url="http://hackage.haskell.org/trac/haskell-prime/wiki/BangPatterns">Haskell
@@ -7107,9 +7379,9 @@ prime feature description</ulink> contains more discussion and examples
 than the material below.
 </para>
 <para>
-The key change is the addition of a new rule to the 
+The key change is the addition of a new rule to the
 <ulink url="http://haskell.org/onlinereport/exps.html#sect3.17.2">semantics of pattern matching in the Haskell 98 report</ulink>.
-Add new bullet 10, saying: Matching the pattern <literal>!</literal><replaceable>pat</replaceable> 
+Add new bullet 10, saying: Matching the pattern <literal>!</literal><replaceable>pat</replaceable>
 against a value <replaceable>v</replaceable> behaves as follows:
 <itemizedlist>
 <listitem><para>if <replaceable>v</replaceable> is bottom, the match diverges</para></listitem>
@@ -7141,13 +7413,13 @@ Bang patterns can be nested of course:
 f2 (!x, y) = [x,y]
 </programlisting>
 Here, <literal>f2</literal> is strict in <literal>x</literal> but not in
-<literal>y</literal>.  
+<literal>y</literal>.
 A bang only really has an effect if it precedes a variable or wild-card pattern:
 <programlisting>
 f3 !(x,y) = [x,y]
 f4 (x,y)  = [x,y]
 </programlisting>
-Here, <literal>f3</literal> and <literal>f4</literal> are identical; 
+Here, <literal>f3</literal> and <literal>f4</literal> are identical;
 putting a bang before a pattern that
 forces evaluation anyway does nothing.
 </para>
@@ -7194,7 +7466,7 @@ g5 x = let y = f x in body
 g6 x = case f x of { y -&gt; body }
 g7 x = case f x of { !y -&gt; body }
 </programlisting>
-The functions <literal>g5</literal> and <literal>g6</literal> mean exactly the same thing.  
+The functions <literal>g5</literal> and <literal>g6</literal> mean exactly the same thing.
 But <literal>g7</literal> evaluates <literal>(f x)</literal>, binds <literal>y</literal> to the
 result, and then evaluates <literal>body</literal>.
 </para>
@@ -7224,7 +7496,7 @@ prefix notation:
 </programlisting>
 The semantics of Haskell pattern matching is described in <ulink
 url="http://www.haskell.org/onlinereport/exps.html#sect3.17.2">
-Section 3.17.2</ulink> of the Haskell Report.  To this description add 
+Section 3.17.2</ulink> of the Haskell Report.  To this description add
 one extra item 10, saying:
 <itemizedlist><listitem><para>Matching
 the pattern <literal>!pat</literal> against a value <literal>v</literal> behaves as follows:
@@ -7240,13 +7512,13 @@ case v of { !pat -> e; _ -> e' }
    = v `seq` case v of { pat -> e; _ -> e' }
 </programlisting>
 </para><para>
-That leaves let expressions, whose translation is given in 
+That leaves let expressions, whose translation is given in
 <ulink url="http://www.haskell.org/onlinereport/exps.html#sect3.12">Section
 3.12</ulink>
 of the Haskell Report.
-In the translation box, first apply 
-the following transformation:  for each pattern <literal>pi</literal> that is of 
-form <literal>!qi = ei</literal>, transform it to <literal>(xi,!qi) = ((),ei)</literal>, and and replace <literal>e0</literal> 
+In the translation box, first apply
+the following transformation:  for each pattern <literal>pi</literal> that is of
+form <literal>!qi = ei</literal>, transform it to <literal>(xi,!qi) = ((),ei)</literal>, and replace <literal>e0</literal>
 by <literal>(xi `seq` e0)</literal>.  Then, when none of the left-hand-side patterns
 have a bang at the top, apply the rules in the existing box.
 </para>
@@ -7374,7 +7646,7 @@ Assertion failures can be caught, see the documentation for the
 
     <para>Pragmas all take the form
 
-<literal>{-# <replaceable>word</replaceable> ... #-}</literal>  
+<literal>{-# <replaceable>word</replaceable> ... #-}</literal>
 
     where <replaceable>word</replaceable> indicates the type of
     pragma, and is followed optionally by information specific to that
@@ -7384,7 +7656,7 @@ Assertion failures can be caught, see the documentation for the
     in the following sections; any pragma encountered with an
     unrecognised <replaceable>word</replaceable> is
     ignored. The layout rule applies in pragmas, so the closing <literal>#-}</literal>
-    should start in a column to the right of the opening <literal>{-#</literal>. </para> 
+    should start in a column to the right of the opening <literal>{-#</literal>. </para>
 
     <para>Certain pragmas are <emphasis>file-header pragmas</emphasis>:
       <itemizedlist>
@@ -7394,7 +7666,7 @@ Assertion failures can be caught, see the documentation for the
 	  </para></listitem>
       <listitem><para>
       There can be as many file-header pragmas as you please, and they can be
-      preceded or followed by comments.  
+      preceded or followed by comments.
 	  </para></listitem>
       <listitem><para>
       File-header pragmas are read once only, before
@@ -7414,7 +7686,7 @@ Assertion failures can be caught, see the documentation for the
       <indexterm><primary>LANGUAGE</primary><secondary>pragma</secondary></indexterm>
       <indexterm><primary>pragma</primary><secondary>LANGUAGE</secondary></indexterm>
 
-      <para>The <literal>LANGUAGE</literal> pragma allows language extensions to be enabled 
+      <para>The <literal>LANGUAGE</literal> pragma allows language extensions to be enabled
 	in a portable way.
 	It is the intention that all Haskell compilers support the
 	<literal>LANGUAGE</literal> pragma with the same syntax, although not
@@ -7523,7 +7795,7 @@ Assertion failures can be caught, see the documentation for the
       (a) uses within the defining module, and
       (b) uses in an export list.
       The latter reduces spurious complaints within a library
-      in which one module gathers together and re-exports 
+      in which one module gathers together and re-exports
       the exports of several others.
       </para>
       <para>You can suppress the warnings with the flag
@@ -7560,7 +7832,7 @@ key_function :: Int -> String -> (Bool, Double)
         <para>The major effect of an <literal>INLINE</literal> pragma
         is to declare a function's &ldquo;cost&rdquo; to be very low.
         The normal unfolding machinery will then be very keen to
-        inline it.  However, an <literal>INLINE</literal> pragma for a 
+        inline it.  However, an <literal>INLINE</literal> pragma for a
 	function "<literal>f</literal>" has a number of other effects:
 <itemizedlist>
 <listitem><para>
@@ -7574,13 +7846,13 @@ there really isn't any point in inlining <literal>key_function</literal> to get
 map (\x -> <replaceable>body</replaceable>) xs
 </programlisting>
 In general, GHC only inlines the function if there is some reason (no matter
-how slight) to supose that it is useful to do so.
+how slight) to suppose that it is useful to do so.
 </para></listitem>
 
 <listitem><para>
-Moreover, GHC will only inline the function if it is <emphasis>fully applied</emphasis>, 
+Moreover, GHC will only inline the function if it is <emphasis>fully applied</emphasis>,
 where "fully applied"
-means applied to as many arguments as appear (syntactically) 
+means applied to as many arguments as appear (syntactically)
 on the LHS of the function
 definition.  For example:
 <programlisting>
@@ -7592,7 +7864,7 @@ comp2 :: (b -> c) -> (a -> b) -> a -> c
 {-# INLINE comp2 #-}
 comp2 f g x = f (g x)
 </programlisting>
-The two functions <literal>comp1</literal> and <literal>comp2</literal> have the 
+The two functions <literal>comp1</literal> and <literal>comp2</literal> have the
 same semantics, but <literal>comp1</literal> will be inlined when applied
 to <emphasis>two</emphasis> arguments, while <literal>comp2</literal> requires
 <emphasis>three</emphasis>.  This might make a big difference if you say
@@ -7602,14 +7874,14 @@ map (not `comp1` not) xs
 which will optimise better than the corresponding use of `comp2`.
 </para></listitem>
 
-<listitem><para> 
+<listitem><para>
 It is useful for GHC to optimise the definition of an
-INLINE function <literal>f</literal> just like any other non-INLINE function, 
+INLINE function <literal>f</literal> just like any other non-INLINE function,
 in case the non-inlined version of <literal>f</literal> is
-ultimately called.  But we don't want to inline 
+ultimately called.  But we don't want to inline
 the <emphasis>optimised</emphasis> version
 of <literal>f</literal>;
-a major reason for INLINE pragmas is to expose functions 
+a major reason for INLINE pragmas is to expose functions
 in <literal>f</literal>'s RHS that have
 rewrite rules, and it's no good if those functions have been optimised
 away.
@@ -7618,7 +7890,7 @@ away.
 So <emphasis>GHC guarantees to inline precisely the code that you wrote</emphasis>, no more
 and no less.  It does this by capturing a copy of the definition of the function to use
 for inlining (we call this the "inline-RHS"), which it leaves untouched,
-while optimising the ordinarly RHS as usual.  For externally-visible functions
+while optimising the ordinarily RHS as usual.  For externally-visible functions
 the inline-RHS (not the optimised RHS) is recorded in the interface file.
 </para></listitem>
 <listitem><para>
@@ -7653,13 +7925,13 @@ itself, so an INLINE pragma is always ignored.</para>
 {-# INLINE returnUs #-}
 </programlisting>
 
-	<para>See also the <literal>NOINLINE</literal> (<xref linkend="inlinable-pragma"/>) 
-        and <literal>INLINABLE</literal> (<xref linkend="noinline-pragma"/>) 
+	<para>See also the <literal>NOINLINE</literal> (<xref linkend="inlinable-pragma"/>)
+        and <literal>INLINABLE</literal> (<xref linkend="noinline-pragma"/>)
         pragmas.</para>
 
 	<para>Note: the HBC compiler doesn't like <literal>INLINE</literal> pragmas,
 	  so if you want your code to be HBC-compatible you'll have to surround
-	  the pragma with C pre-processor directives 
+	  the pragma with C pre-processor directives
 	  <literal>#ifdef __GLASGOW_HASKELL__</literal>...<literal>#endif</literal>.</para>
 
       </sect3>
@@ -7717,7 +7989,7 @@ The principal reason do to so to allow later use of <literal>SPECIALISE</literal
 
       <sect3 id="noinline-pragma">
 	<title>NOINLINE pragma</title>
-	
+
 	<indexterm><primary>NOINLINE</primary></indexterm>
 	<indexterm><primary>NOTINLINE</primary></indexterm>
 
@@ -7736,7 +8008,7 @@ The principal reason do to so to allow later use of <literal>SPECIALISE</literal
       <sect3 id="conlike-pragma">
 	<title>CONLIKE modifier</title>
 	<indexterm><primary>CONLIKE</primary></indexterm>
-        <para>An INLINE or NOINLINE pragma may have a CONLIKE modifier, 
+        <para>An INLINE or NOINLINE pragma may have a CONLIKE modifier,
         which affects matching in RULEs (only).  See <xref linkend="conlike"/>.
         </para>
       </sect3>
@@ -7810,27 +8082,27 @@ happen.
 
     <sect2 id="annotation-pragmas">
       <title>ANN pragmas</title>
-      
+
       <para>GHC offers the ability to annotate various code constructs with additional
       data by using three pragmas.  This data can then be inspected at a later date by
       using GHC-as-a-library.</para>
-            
+
       <sect3 id="ann-pragma">
         <title>Annotating values</title>
-        
+
         <indexterm><primary>ANN</primary></indexterm>
-        
+
         <para>Any expression that has both <literal>Typeable</literal> and <literal>Data</literal> instances may be attached to a top-level value
         binding using an <literal>ANN</literal> pragma. In particular, this means you can use <literal>ANN</literal>
         to annotate data constructors (e.g. <literal>Just</literal>) as well as normal values (e.g. <literal>take</literal>).
         By way of example, to annotate the function <literal>foo</literal> with the annotation <literal>Just "Hello"</literal>
         you would do this:</para>
-        
+
 <programlisting>
 {-# ANN foo (Just "Hello") #-}
 foo = ...
 </programlisting>
-        
+
         <para>
           A number of restrictions apply to use of annotations:
           <itemizedlist>
@@ -7839,46 +8111,46 @@ foo = ...
             <listitem><para>The expression you are annotating with must have a type with <literal>Typeable</literal> and <literal>Data</literal> instances</para></listitem>
             <listitem><para>The <ulink linkend="using-template-haskell">Template Haskell staging restrictions</ulink> apply to the
             expression being annotated with, so for example you cannot run a function from the module being compiled.</para>
-            
-            <para>To be precise, the annotation <literal>{-# ANN x e #-}</literal> is well staged if and only if <literal>$(e)</literal> would be 
+
+            <para>To be precise, the annotation <literal>{-# ANN x e #-}</literal> is well staged if and only if <literal>$(e)</literal> would be
             (disregarding the usual type restrictions of the splice syntax, and the usual restriction on splicing inside a splice - <literal>$([|1|])</literal> is fine as an annotation, albeit redundant).</para></listitem>
           </itemizedlist>
-          
+
           If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC">
           please give the GHC team a shout</ulink>.
         </para>
-        
+
         <para>However, apart from these restrictions, many things are allowed, including expressions which are not fully evaluated!
         Annotation expressions will be evaluated by the compiler just like Template Haskell splices are. So, this annotation is fine:</para>
-        
+
 <programlisting>
 {-# ANN f SillyAnnotation { foo = (id 10) + $([| 20 |]), bar = 'f } #-}
 f = ...
 </programlisting>
       </sect3>
-      
+
       <sect3 id="typeann-pragma">
         <title>Annotating types</title>
-        
+
         <indexterm><primary>ANN type</primary></indexterm>
         <indexterm><primary>ANN</primary></indexterm>
-        
+
         <para>You can annotate types with the <literal>ANN</literal> pragma by using the <literal>type</literal> keyword. For example:</para>
-        
+
 <programlisting>
 {-# ANN type Foo (Just "A `Maybe String' annotation") #-}
 data Foo = ...
 </programlisting>
       </sect3>
-      
+
       <sect3 id="modann-pragma">
         <title>Annotating modules</title>
-        
+
         <indexterm><primary>ANN module</primary></indexterm>
         <indexterm><primary>ANN</primary></indexterm>
-        
+
         <para>You can annotate modules with the <literal>ANN</literal> pragma by using the <literal>module</literal> keyword. For example:</para>
-        
+
 <programlisting>
 {-# ANN module (Just "A `Maybe String' annotation") #-}
 </programlisting>
@@ -7966,7 +8238,7 @@ data Foo = ...
   h :: Eq a => a -> a -> a
   {-# SPECIALISE h :: (Eq a) => [a] -> [a] -> [a] #-}
 </programlisting>
-The last of these examples will generate a 
+The last of these examples will generate a
 RULE with a somewhat-complex left-hand side (try it yourself), so it might not fire very
 well.  If you use this kind of specialisation, let us know how well it works.
 </para>
@@ -7975,7 +8247,7 @@ well.  If you use this kind of specialisation, let us know how well it works.
       <title>SPECIALIZE INLINE</title>
 
 <para>A <literal>SPECIALIZE</literal> pragma can optionally be followed with a
-<literal>INLINE</literal> or <literal>NOINLINE</literal> pragma, optionally 
+<literal>INLINE</literal> or <literal>NOINLINE</literal> pragma, optionally
 followed by a phase, as described in <xref linkend="inline-noinline-pragma"/>.
 The <literal>INLINE</literal> pragma affects the specialised version of the
 function (only), and applies even if the function is recursive.  The motivating
@@ -8010,7 +8282,7 @@ on an ordinarily-recursive function.</para>
 Generally, you can only give a <literal>SPECIALIZE</literal> pragma
 for a function defined in the same module.
 However if a function <literal>f</literal> is given an <literal>INLINABLE</literal>
-pragma at its definition site, then it can subequently be specialised by
+pragma at its definition site, then it can subsequently be specialised by
 importing modules (see <xref linkend="inlinable-pragma"/>).
 For example
 <programlisting>
@@ -8061,7 +8333,7 @@ pragma can be useful.
 </para>
 </sect3>
 
-<sect3><title>Obselete SPECIALIZE syntax</title>
+<sect3><title>Obsolete SPECIALIZE syntax</title>
 
       <para>Note: In earlier versions of GHC, it was possible to provide your own
       specialised function for a given type:
@@ -8086,7 +8358,7 @@ pragma can be useful.
 Same idea, except for instance declarations.  For example:
 
 <programlisting>
-instance (Eq a) => Eq (Foo a) where { 
+instance (Eq a) => Eq (Foo a) where {
    {-# SPECIALIZE instance Eq (Foo [(Int, Bar)]) #-}
    ... usual stuff ...
  }
@@ -8105,7 +8377,7 @@ of the pragma.
       <title>UNPACK pragma</title>
 
       <indexterm><primary>UNPACK</primary></indexterm>
-      
+
       <para>The <literal>UNPACK</literal> indicates to the compiler
       that it should unpack the contents of a constructor field into
       the constructor itself, removing a level of indirection.  For
@@ -8185,7 +8457,7 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 
 <para>
 The programmer can specify rewrite rules as part of the source program
-(in a pragma).  
+(in a pragma).
 Here is an example:
 
 <programlisting>
@@ -8318,7 +8590,7 @@ declarations.
 <para>
 Inside a RULE "<literal>forall</literal>" is treated as a keyword, regardless of
 any other flag settings.  Furthermore, inside a RULE, the language extension
-<option>-XScopedTypeVariables</option> is automatically enabled; see 
+<option>-XScopedTypeVariables</option> is automatically enabled; see
 <xref linkend="scoped-type-variables"/>.
 </para>
 </listitem>
@@ -8326,9 +8598,9 @@ any other flag settings.  Furthermore, inside a RULE, the language extension
 
 <para>
 Like other pragmas, RULE pragmas are always checked for scope errors, and
-are typechecked. Typechecking means that the LHS and RHS of a rule are typechecked, 
+are typechecked. Typechecking means that the LHS and RHS of a rule are typechecked,
 and must have the same type.  However, rules are only <emphasis>enabled</emphasis>
-if the <option>-fenable-rewrite-rules</option> flag is 
+if the <option>-fenable-rewrite-rules</option> flag is
 on (see <xref linkend="rule-semantics"/>).
 </para>
 </listitem>
@@ -8351,8 +8623,8 @@ Rules are enabled (that is, used during optimisation)
 by the <option>-fenable-rewrite-rules</option> flag.
 This flag is implied by <option>-O</option>, and may be switched
 off (as usual) by <option>-fno-enable-rewrite-rules</option>.
-(NB: enabling <option>-fenable-rewrite-rules</option> without <option>-O</option> 
-may not do what you expect, though, because without <option>-O</option> GHC 
+(NB: enabling <option>-fenable-rewrite-rules</option> without <option>-O</option>
+may not do what you expect, though, because without <option>-O</option> GHC
 ignores all optimisation information in interface files;
 see <option>-fignore-interface-pragmas</option>, <xref linkend="options-f"/>.)
 Note that <option>-fenable-rewrite-rules</option> is an <emphasis>optimisation</emphasis> flag, and
@@ -8461,12 +8733,12 @@ to give
 g y = y
 </programlisting>
 Now <literal>g</literal> is inlined into <literal>h</literal>, but <literal>f</literal>'s RULE has
-no chance to fire.  
+no chance to fire.
 If instead GHC had first inlined <literal>g</literal> into <literal>h</literal> then there
-would have been a better chance that <literal>f</literal>'s RULE might fire.  
+would have been a better chance that <literal>f</literal>'s RULE might fire.
 </para>
 <para>
-The way to get predictable behaviour is to use a NOINLINE 
+The way to get predictable behaviour is to use a NOINLINE
 pragma, or an INLINE[<replaceable>phase</replaceable>] pragma, on <literal>f</literal>, to ensure
 that it is not inlined until its RULEs have had a chance to fire.
 </para>
@@ -8489,12 +8761,12 @@ when this is a good idea, so we provide the CONLIKE pragma to declare it, thus:
 {-# INLINE[1] CONLIKE f #-}
 f x = <replaceable>blah</replaceable>
 </programlisting>
-CONLIKE is a modifier to an INLINE or NOINLINE pragam.  It specifies that an application
+CONLIKE is a modifier to an INLINE or NOINLINE pragma.  It specifies that an application
 of f to one argument (in general, the number of arguments to the left of the '=' sign)
 should be considered cheap enough to duplicate, if such a duplication would make rule
 fire.  (The name "CONLIKE" is short for "constructor-like", because constructors certainly
 have such a property.)
-The CONLIKE pragam is a modifier to INLINE/NOINLINE because it really only makes sense to match 
+The CONLIKE pragma is a modifier to INLINE/NOINLINE because it really only makes sense to match
 <literal>f</literal> on the LHS of a rule if you are sure that <literal>f</literal> is
 not going to be inlined before the rule has a chance to fire.
 </para>
@@ -8769,7 +9041,7 @@ comparison.
 Use <option>-ddump-rules</option> to see the rules that are defined
 <emphasis>in this module</emphasis>.
 This includes rules generated by the specialisation pass, but excludes
-rules imported from other modules. 
+rules imported from other modules.
 </para>
 </listitem>
 
@@ -8902,7 +9174,7 @@ allows control over inlining on a per-call-site basis.
 restrains the strictness analyser.
 </para></listitem>
 <listitem><para>
-<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>lazy</literal></ulink> 
+<ulink url="&libraryGhcPrimLocation;/GHC-Prim.html#v%3AunsafeCoerce%23"><literal>unsafeCoerce#</literal></ulink>
 allows you to fool the type checker.
 </para></listitem>
 </itemizedlist>
@@ -8914,256 +9186,184 @@ allows you to fool the type checker.
 <title>Generic classes</title>
 
 <para>
-The ideas behind this extension are described in detail in "Derivable type classes",
-Ralf Hinze and Simon Peyton Jones, Haskell Workshop, Montreal Sept 2000, pp94-105.
-An example will give the idea:
+GHC used to have an implementation of generic classes as defined in the paper
+"Derivable type classes", Ralf Hinze and Simon Peyton Jones, Haskell Workshop,
+Montreal Sept 2000, pp94-105. These have been removed and replaced by the more
+general <link linkend="generic-programming">support for generic programming</link>.
 </para>
 
-<programlisting>
-  import Data.Generics
+</sect1>
 
-  class Bin a where
-    toBin   :: a -> [Int]
-    fromBin :: [Int] -> (a, [Int])
-  
-    toBin {| Unit |}    Unit	  = []
-    toBin {| a :+: b |} (Inl x)   = 0 : toBin x
-    toBin {| a :+: b |} (Inr y)   = 1 : toBin y
-    toBin {| a :*: b |} (x :*: y) = toBin x ++ toBin y
-  
-    fromBin {| Unit |}    bs      = (Unit, bs)
-    fromBin {| a :+: b |} (0:bs)  = (Inl x, bs')    where (x,bs') = fromBin bs
-    fromBin {| a :+: b |} (1:bs)  = (Inr y, bs')    where (y,bs') = fromBin bs
-    fromBin {| a :*: b |} bs	  = (x :*: y, bs'') where (x,bs' ) = fromBin bs
-							  (y,bs'') = fromBin bs'
-</programlisting>
+
+<sect1 id="generic-programming">
+<title>Generic programming</title>
+
 <para>
-This class declaration explains how <literal>toBin</literal> and <literal>fromBin</literal>
-work for arbitrary data types.  They do so by giving cases for unit, product, and sum,
-which are defined thus in the library module <literal>Data.Generics</literal>:
-</para>
-<programlisting>
-  data Unit    = Unit
-  data a :+: b = Inl a | Inr b
-  data a :*: b = a :*: b
-</programlisting>
-<para>
-Now you can make a data type into an instance of Bin like this:
-<programlisting>
-  instance (Bin a, Bin b) => Bin (a,b)
-  instance Bin a => Bin [a]
-</programlisting>
-That is, just leave off the "where" clause.  Of course, you can put in the
-where clause and over-ride whichever methods you please.
+Using a combination of <option>-XDeriveGeneric</option>
+(<xref linkend="deriving-typeable"/>) and
+<option>-XDefaultSignatures</option> (<xref linkend="class-default-signatures"/>),
+you can easily do datatype-generic
+programming using the <literal>GHC.Generics</literal> framework. This section
+gives a very brief overview of how to do it. For more detail please refer to the
+<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
+or the original paper:
 </para>
 
-    <sect2>
-      <title> Using generics </title>
-      <para>To use generics you need to</para>
-      <itemizedlist>
-	<listitem>
-	  <para>
-            Use the flags <option>-XGenerics</option> (to enable the
-            extra syntax and generate extra per-data-type code),
-            and <option>-package syb</option> (to make the
-            <literal>Data.Generics</literal> module available.
-          </para>
-	</listitem>
-	<listitem>
-	  <para>Import the module <literal>Data.Generics</literal> from the
-          <literal>syb</literal> package.  This import brings into
-          scope the data types <literal>Unit</literal>,
-          <literal>:*:</literal>, and <literal>:+:</literal>.  (You
-          don't need this import if you don't mention these types
-          explicitly; for example, if you are simply giving instance
-          declarations.)</para>
-	</listitem>
-      </itemizedlist>
-    </sect2>
-
-<sect2> <title> Changes wrt the paper </title>
-<para>
-Note that the type constructors <literal>:+:</literal> and <literal>:*:</literal> 
-can be written infix (indeed, you can now use
-any operator starting in a colon as an infix type constructor).  Also note that
-the type constructors are not exactly as in the paper (Unit instead of 1, etc).
-Finally, note that the syntax of the type patterns in the class declaration
-uses "<literal>{|</literal>" and "<literal>|}</literal>" brackets; curly braces
-alone would ambiguous when they appear on right hand sides (an extension we 
-anticipate wanting).
-</para>
-</sect2>
-
-<sect2> <title>Terminology and restrictions</title>
-<para>
-Terminology.  A "generic default method" in a class declaration
-is one that is defined using type patterns as above.
-A "polymorphic default method" is a default method defined as in Haskell 98.
-A "generic class declaration" is a class declaration with at least one
-generic default method.
-</para>
-
-<para>
-Restrictions:
 <itemizedlist>
 <listitem>
 <para>
-Alas, we do not yet implement the stuff about constructor names and 
-field labels.
+Jos� Pedro Magalh�es, Atze Dijkstra, Johan Jeuring, and Andres L�h.
+<ulink url="http://dreixel.net/research/pdf/gdmh.pdf">
+  A generic deriving mechanism for Haskell</ulink>.
+<citetitle>Proceedings of the third ACM Haskell symposium on Haskell</citetitle>
+(Haskell'2010), pp. 37-48, ACM, 2010.
 </para>
 </listitem>
-
-<listitem>
-<para>
-A generic class can have only one parameter; you can't have a generic
-multi-parameter class.
-</para>
-</listitem>
-
-<listitem>
-<para>
-A default method must be defined entirely using type patterns, or entirely
-without.  So this is illegal:
-<programlisting>
-  class Foo a where
-    op :: a -> (a, Bool)
-    op {| Unit |} Unit = (Unit, True)
-    op x               = (x,    False)
-</programlisting>
-However it is perfectly OK for some methods of a generic class to have 
-generic default methods and others to have polymorphic default methods.
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type variable(s) in the type pattern for a generic method declaration
-scope over the right hand side.  So this is legal (note the use of the type variable ``p'' in a type signature on the right hand side:
-<programlisting>
-  class Foo a where
-    op :: a -> Bool
-    op {| p :*: q |} (x :*: y) = op (x :: p)
-    ...
-</programlisting>
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type patterns in a generic default method must take one of the forms:
-<programlisting>
-       a :+: b
-       a :*: b
-       Unit
-</programlisting>
-where "a" and "b" are type variables.  Furthermore, all the type patterns for
-a single type constructor (<literal>:*:</literal>, say) must be identical; they
-must use the same type variables.  So this is illegal:
-<programlisting>
-  class Foo a where
-    op :: a -> Bool
-    op {| a :+: b |} (Inl x) = True
-    op {| p :+: q |} (Inr y) = False
-</programlisting>
-The type patterns must be identical, even in equations for different methods of the class.
-So this too is illegal:
-<programlisting>
-  class Foo a where
-    op1 :: a -> Bool
-    op1 {| a :*: b |} (x :*: y) = True
-
-    op2 :: a -> Bool
-    op2 {| p :*: q |} (x :*: y) = False
-</programlisting>
-(The reason for this restriction is that we gather all the equations for a particular type constructor
-into a single generic instance declaration.)
-</para>
-</listitem>
-
-<listitem>
-<para>
-A generic method declaration must give a case for each of the three type constructors.
-</para>
-</listitem>
-
-<listitem>
-<para>
-The type for a generic method can be built only from:
-  <itemizedlist>
-  <listitem> <para> Function arrows </para> </listitem>
-  <listitem> <para> Type variables </para> </listitem>
-  <listitem> <para> Tuples </para> </listitem>
-  <listitem> <para> Arbitrary types not involving type variables </para> </listitem>
-  </itemizedlist>
-Here are some example type signatures for generic methods:
-<programlisting>
-    op1 :: a -> Bool
-    op2 :: Bool -> (a,Bool)
-    op3 :: [Int] -> a -> a
-    op4 :: [a] -> Bool
-</programlisting>
-Here, op1, op2, op3 are OK, but op4 is rejected, because it has a type variable
-inside a list.  
-</para>
-<para>
-This restriction is an implementation restriction: we just haven't got around to
-implementing the necessary bidirectional maps over arbitrary type constructors.
-It would be relatively easy to add specific type constructors, such as Maybe and list,
-to the ones that are allowed.</para>
-</listitem>
-
-<listitem>
-<para>
-In an instance declaration for a generic class, the idea is that the compiler
-will fill in the methods for you, based on the generic templates.  However it can only
-do so if
-  <itemizedlist>
-  <listitem>
-  <para>
-  The instance type is simple (a type constructor applied to type variables, as in Haskell 98).
-  </para>
-  </listitem>
-  <listitem>
-  <para>
-  No constructor of the instance type has unboxed fields.
-  </para>
-  </listitem>
-  </itemizedlist>
-(Of course, these things can only arise if you are already using GHC extensions.)
-However, you can still give an instance declarations for types which break these rules,
-provided you give explicit code to override any generic default methods.
-</para>
-</listitem>
-
 </itemizedlist>
-</para>
+
+<emphasis>Note</emphasis>: the current support for generic programming in GHC
+is preliminary. In particular, we only allow deriving instances for the
+<literal>Generic</literal> class. Support for deriving
+<literal>Generic1</literal> (and thus enabling generic functions of kind
+<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
+later stage.
+
+
+<sect2>
+<title>Deriving representations</title>
 
 <para>
-The option <option>-ddump-deriv</option> dumps incomprehensible stuff giving details of 
-what the compiler does with generic declarations.
-</para>
+The first thing we need is generic representations. The
+<literal>GHC.Generics</literal> module defines a couple of primitive types
+that can be used to represent most Haskell datatypes:
 
-</sect2>
-
-<sect2> <title> Another example </title>
-<para>
-Just to finish with, here's another example I rather like:
 <programlisting>
-  class Tag a where
-    nCons :: a -> Int
-    nCons {| Unit |}    _ = 1
-    nCons {| a :*: b |} _ = 1
-    nCons {| a :+: b |} _ = nCons (bot::a) + nCons (bot::b)
-  
-    tag :: a -> Int
-    tag {| Unit |}    _       = 1
-    tag {| a :*: b |} _       = 1   
-    tag {| a :+: b |} (Inl x) = tag x
-    tag {| a :+: b |} (Inr y) = nCons (bot::a) + tag y
+-- | Unit: used for constructors without arguments
+data U1 p = U1
+
+-- | Constants, additional parameters and recursion of kind *
+newtype K1 i c p = K1 { unK1 :: c }
+
+-- | Meta-information (constructor names, etc.)
+newtype M1 i c f p = M1 { unM1 :: f p }
+
+-- | Sums: encode choice between constructors
+infixr 5 :+:
+data (:+:) f g p = L1 (f p) | R1 (g p)
+
+-- | Products: encode multiple arguments to constructors
+infixr 6 :*:
+data (:*:) f g p = f p :*: g p
 </programlisting>
+
+For example, a user-defined datatype of trees <literal>data UserTree a = Node a
+(UserTree a) (UserTree a) | Leaf</literal> gets the following representation:
+
+<programlisting>
+instance Generic (UserTree a) where
+  -- Representation type
+  type Rep (UserTree a) =
+    M1 D D1UserTree (
+          M1 C C1_0UserTree (
+                M1 S NoSelector (K1 P a)
+            :*: M1 S NoSelector (K1 R (UserTree a))
+            :*: M1 S NoSelector (K1 R (UserTree a)))
+      :+: M1 C C1_1UserTree U1)
+
+  -- Conversion functions
+  from (Node x l r) = M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))
+  from Leaf         = M1 (R1 (M1 U1))
+  to (M1 (L1 (M1 (M1 (K1 x) :*: M1 (K1 l) :*: M1 (K1 r))))) = Node x l r
+  to (M1 (R1 (M1 U1)))                                      = Leaf
+
+-- Meta-information
+data D1UserTree
+data C1_0UserTree
+data C1_1UserTree
+
+instance Datatype D1UserTree where
+  datatypeName _ = "UserTree"
+  moduleName _   = "Main"
+
+instance Constructor C1_0UserTree where
+  conName _ = "Node"
+
+instance Constructor C1_1UserTree where
+  conName _ = "Leaf"
+</programlisting>
+
+This representation is generated automatically if a
+<literal>deriving Generic</literal> clause is attached to the datatype.
+<link linkend="stand-alone-deriving">Standalone deriving</link> can also be
+used.
 </para>
 </sect2>
+
+<sect2>
+<title>Writing generic functions</title>
+
+<para>
+A generic function is defined by creating a class and giving instances for
+each of the representation types of <literal>GHC.Generics</literal>. As an
+example we show generic serialization:
+<programlisting>
+data Bin = O | I
+
+class GSerialize f where
+  gput :: f a -> [Bin]
+
+instance GSerialize U1 where
+  gput U1 = []
+
+instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
+  gput (a :*: b) = gput a ++ gput b
+
+instance (GSerialize a, GSerialize b) => GSerialize (a :+: b) where
+  gput (L1 x) = O : gput x
+  gput (R1 x) = I : gput x
+
+instance (GSerialize a) => GSerialize (M1 i c a) where
+  gput (M1 x) = gput x
+
+instance (Serialize a) => GSerialize (K1 i c a) where
+  gput (K1 x) = put x
+</programlisting>
+
+Typically this class will not be exported, as it only makes sense to have
+instances for the representation types.
+</para>
+</sect2>
+
+<sect2>
+<title>Generic defaults</title>
+
+<para>
+The only thing left to do now is to define a "front-end" class, which is
+exposed to the user:
+<programlisting>
+class Serialize a where
+  put :: a -> [Bin]
+
+  default put :: (Generic a, GSerialize (Rep a)) => a -> [Bit]
+  put = gput . from
+</programlisting>
+Here we use a <link linkend="class-default-signatures">default signature</link>
+to specify that the user does not have to provide an implementation for
+<literal>put</literal>, as long as there is a <literal>Generic</literal>
+instance for the type to instantiate. For the <literal>UserTree</literal> type,
+for instance, the user can just write:
+
+<programlisting>
+instance (Serialize a) => Serialize (UserTree a)
+</programlisting>
+
+The default method for <literal>put</literal> is then used, corresponding to the
+generic implementation of serialization.
+</para>
+</sect2>
+
 </sect1>
+
 
 <sect1 id="monomorphism">
 <title>Control over monomorphism</title>
@@ -9176,7 +9376,7 @@ carried out at let and where bindings.
 <title>Switching off the dreaded Monomorphism Restriction</title>
           <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
 
-<para>Haskell's monomorphism restriction (see 
+<para>Haskell's monomorphism restriction (see
 <ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
 4.5.5</ulink>
 of the Haskell Report)
@@ -9191,7 +9391,7 @@ can be completely switched off by
           <indexterm><primary><option>-XMonoPatBinds</option></primary></indexterm>
 
 	  <para> As an experimental change, we are exploring the possibility of
-	  making pattern bindings monomorphic; that is, not generalised at all.  
+	  making pattern bindings monomorphic; that is, not generalised at all.
 	    A pattern binding is a binding whose LHS has no function arguments,
 	    and is not a simple variable.  For example:
 <programlisting>

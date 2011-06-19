@@ -7,7 +7,7 @@ Typecheck arrow notation
 \begin{code}
 module TcArrows ( tcProc ) where
 
-import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp )
+import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho, tcSyntaxOp, tcCheckId )
 
 import HsSyn
 import TcMatches
@@ -17,7 +17,9 @@ import TcBinds
 import TcPat
 import TcUnify
 import TcRnMonad
+import TcEnv
 import Coercion
+import Id( mkLocalId )
 import Inst
 import Name
 import TysWiredIn
@@ -41,17 +43,17 @@ import Control.Monad
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
        -> TcRhoType				-- Expected type of whole proc expression
-       -> TcM (OutPat TcId, LHsCmdTop TcId, CoercionI)
+       -> TcM (OutPat TcId, LHsCmdTop TcId, Coercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
     do	{ (coi, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty 
 	; (coi1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
+        ; (pat', cmd') <- tcPat ProcExpr pat arg_ty $
 			  tcCmdTop cmd_env cmd [] res_ty
-        ; let res_coi = mkTransCoI coi (mkAppTyCoI coi1 (IdCo res_ty))
-	; return (pat', cmd', res_coi) }
+        ; let res_coi = mkTransCo coi (mkAppCo coi1 (mkReflCo res_ty))
+        ; return (pat', cmd', res_coi) }
 \end{code}
 
 
@@ -83,20 +85,12 @@ tcCmdTop :: CmdEnv
 
 tcCmdTop env (L loc (HsCmdTop cmd _ _ names)) cmd_stk res_ty
   = setSrcSpan loc $
-    do	{ cmd'   <- tcGuardedCmd env cmd cmd_stk res_ty
+    do	{ cmd'   <- tcCmd env cmd (cmd_stk, res_ty)
 	; names' <- mapM (tcSyntaxName ProcOrigin (cmd_arr env)) names
 	; return (L loc $ HsCmdTop cmd' cmd_stk res_ty names') }
 
 
 ----------------------------------------
-tcGuardedCmd :: CmdEnv -> LHsExpr Name -> CmdStack
-	     -> TcTauType -> TcM (LHsExpr TcId)
--- A wrapper that deals with the refinement (if any)
-tcGuardedCmd env expr stk res_ty
-  = do	{ body <- tcCmd env expr (stk, res_ty)
-	; return body 
-        }
-
 tcCmd :: CmdEnv -> LHsExpr Name -> (CmdStack, TcTauType) -> TcM (LHsExpr TcId)
 	-- The main recursive function
 tcCmd env (L loc expr) res_ty
@@ -123,7 +117,7 @@ tc_cmd env in_cmd@(HsCase scrut matches) (stk, res_ty)
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
-    mc_body body res_ty' = tcGuardedCmd env body stk res_ty'
+    mc_body body res_ty' = tcCmd env body (stk, res_ty')
 
 tc_cmd env (HsIf mb_fun pred b1 b2) (stack_ty,res_ty)
   = do 	{ pred_ty <- newFlexiTyVarTy openTypeKind
@@ -187,8 +181,8 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 
 		-- Check the patterns, and the GRHSs inside
 	; (pats', grhss') <- setSrcSpan mtch_loc		$
-			     tcPats LambdaExpr pats cmd_stk	$
-			     tc_grhss grhss res_ty
+                             tcPats LambdaExpr pats cmd_stk     $
+                             tc_grhss grhss res_ty
 
 	; let match' = L mtch_loc (Match pats' Nothing grhss')
 	; return (HsLam (MatchGroup [match'] res_ty))
@@ -206,22 +200,18 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats _maybe_rhs_sig 
 	     ; return (GRHSs grhss' binds') }
 
     tc_grhs res_ty (GRHS guards body)
-	= do { (guards', rhs') <- tcStmts pg_ctxt tcGuardStmt guards res_ty $
-				  tcGuardedCmd env body stk'
+	= do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
+				  \ res_ty -> tcCmd env body (stk', res_ty)
 	     ; return (GRHS guards' rhs') }
 
 -------------------------------------------
 -- 		Do notation
 
-tc_cmd env cmd@(HsDo do_or_lc stmts body _ty) (cmd_stk, res_ty)
+tc_cmd env cmd@(HsDo do_or_lc stmts _) (cmd_stk, res_ty)
   = do 	{ checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
-	; (stmts', body') <- tcStmts do_or_lc (tcMDoStmt tc_rhs) stmts res_ty $
-			     tcGuardedCmd env body []
-	; return (HsDo do_or_lc stmts' body' res_ty) }
+	; stmts' <- tcStmts do_or_lc (tcArrDoStmt env) stmts res_ty 
+	; return (HsDo do_or_lc stmts' res_ty) }
   where
-    tc_rhs rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
-		    ; rhs' <- tcCmd env rhs ([], ty)
-		    ; return (rhs', ty) }
 
 
 -----------------------------------------------------------------
@@ -249,7 +239,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 			      e_res_ty
 
 		-- Check expr
-	; (inst_binds, expr') <- checkConstraints ArrowSkol [w_tv] [] $
+        ; (inst_binds, expr') <- checkConstraints ArrowSkol [w_tv] [] $
                                  escapeArrowScope (tcMonoExpr expr e_ty)
 
 		-- OK, now we are in a position to unscramble 
@@ -279,7 +269,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- Check that it has the right shape:
 		-- 	((w,s1) .. sn)
 		-- where the si do not mention w
-	   ; checkTc (corner_ty `tcEqType` mkTyVarTy w_tv && 
+	   ; checkTc (corner_ty `eqType` mkTyVarTy w_tv && 
 		      not (w_tv `elemVarSet` tyVarsOfTypes arg_tys))
 		     (badFormFun i tup_ty')
 
@@ -302,6 +292,69 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 tc_cmd _ cmd _
   = failWithTc (vcat [ptext (sLit "The expression"), nest 2 (ppr cmd), 
 		      ptext (sLit "was found where an arrow command was expected")])
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Stmts
+%*									*
+%************************************************************************
+
+\begin{code}
+--------------------------------
+--	Mdo-notation
+-- The distinctive features here are
+--	(a) RecStmts, and
+--	(b) no rebindable syntax
+
+tcArrDoStmt :: CmdEnv -> TcStmtChecker
+tcArrDoStmt env _ (LastStmt rhs _) res_ty thing_inside
+  = do	{ rhs' <- tcCmd env rhs ([], res_ty)
+	; thing <- thing_inside (panic "tcArrDoStmt")
+	; return (LastStmt rhs' noSyntaxExpr, thing) }
+
+tcArrDoStmt env _ (ExprStmt rhs _ _ _) res_ty thing_inside
+  = do	{ (rhs', elt_ty) <- tc_arr_rhs env rhs
+	; thing 	 <- thing_inside res_ty
+	; return (ExprStmt rhs' noSyntaxExpr noSyntaxExpr elt_ty, thing) }
+
+tcArrDoStmt env ctxt (BindStmt pat rhs _ _) res_ty thing_inside
+  = do	{ (rhs', pat_ty) <- tc_arr_rhs env rhs
+	; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat pat_ty $
+                            thing_inside res_ty
+	; return (BindStmt pat' rhs' noSyntaxExpr noSyntaxExpr, thing) }
+
+tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = laterNames
+                            , recS_rec_ids = recNames }) res_ty thing_inside
+  = do	{ rec_tys <- newFlexiTyVarTys (length recNames) liftedTypeKind
+	; let rec_ids = zipWith mkLocalId recNames rec_tys
+	; tcExtendIdEnv rec_ids $ do
+    	{ (stmts', (later_ids, rec_rets))
+		<- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty	$ \ _res_ty' ->
+			-- ToDo: res_ty not really right
+		   do { rec_rets <- zipWithM tcCheckId recNames rec_tys
+		      ; later_ids <- tcLookupLocalIds laterNames
+		      ; return (later_ids, rec_rets) }
+
+	; thing <- tcExtendIdEnv later_ids (thing_inside res_ty)
+		-- NB:	The rec_ids for the recursive things 
+		-- 	already scope over this part. This binding may shadow
+		--	some of them with polymorphic things with the same Name
+		--	(see note [RecStmt] in HsExpr)
+
+        ; return (emptyRecStmt { recS_stmts = stmts', recS_later_ids = later_ids
+                               , recS_rec_ids = rec_ids, recS_rec_rets = rec_rets
+                               , recS_ret_ty = res_ty }, thing)
+	}}
+
+tcArrDoStmt _ _ stmt _ _
+  = pprPanic "tcArrDoStmt: unexpected Stmt" (ppr stmt)
+
+tc_arr_rhs :: CmdEnv -> LHsExpr Name -> TcM (LHsExpr TcId, TcType)
+tc_arr_rhs env rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
+		        ; rhs' <- tcCmd env rhs ([], ty)
+		        ; return (rhs', ty) }
 \end{code}
 
 

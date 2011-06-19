@@ -31,6 +31,13 @@ void resetTracing (void);
 
 #endif /* TRACING */
 
+typedef StgWord32 CapsetID;
+typedef StgWord16 CapsetType;
+enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
+                  CapsetTypeOsProcess = CAPSET_TYPE_OSPROCESS,
+                  CapsetTypeClockdomain = CAPSET_TYPE_CLOCKDOMAIN };
+#define CAPSET_OSPROCESS_DEFAULT 0
+
 // -----------------------------------------------------------------------------
 // Message classes
 // -----------------------------------------------------------------------------
@@ -160,6 +167,23 @@ void traceUserMsg(Capability *cap, char *msg);
 
 void traceThreadStatus_ (StgTSO *tso);
 
+void traceEventStartup_ (int n_caps);
+
+/*
+ * Events for describing capability sets in the eventlog
+ *
+ * Note: unlike other events, these are not conditional on TRACE_sched or
+ * similar because they are not "real" events themselves but provide
+ * information and context for other "real" events. Other events depend on
+ * the capset info events so for simplicity, rather than working out if
+ * they're necessary we always emit them. They should be very low volume.
+ */
+void traceCapsetModify_ (EventTypeNum tag,
+                         CapsetID capset,
+                         StgWord32 other);
+
+void traceOSProcessInfo_ (void);
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -170,6 +194,9 @@ void traceThreadStatus_ (StgTSO *tso);
 #define debugTrace(class, str, ...) /* nothing */
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
+#define traceEventStartup_(n_caps) /* nothing */
+#define traceCapsetModify_(tag, capset, other) /* nothing */
+#define traceOSProcessInfo_() /* nothing */
 
 #endif /* TRACING */
 
@@ -226,6 +253,14 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
     HASKELLEVENT_GC_WORK(cap)
 #define dtraceGcDone(cap)                               \
     HASKELLEVENT_GC_DONE(cap)
+#define dtraceCapsetCreate(capset, capset_type)         \
+    HASKELLEVENT_CAPSET_CREATE(capset, capset_type)
+#define dtraceCapsetDelete(capset)                      \
+    HASKELLEVENT_CAPSET_DELETE(capset)
+#define dtraceCapsetAssignCap(capset, capno)            \
+    HASKELLEVENT_CAPSET_ASSIGN_CAP(capset, capno)
+#define dtraceCapsetRemoveCap(capset, capno)            \
+    HASKELLEVENT_CAPSET_REMOVE_CAP(capset, capno)
 
 #else /* !defined(DTRACE) */
 
@@ -248,6 +283,10 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
 #define dtraceGcIdle(cap)                               /* nothing */
 #define dtraceGcWork(cap)                               /* nothing */
 #define dtraceGcDone(cap)                               /* nothing */
+#define dtraceCapsetCreate(capset, capset_type)         /* nothing */
+#define dtraceCapsetDelete(capset)                      /* nothing */
+#define dtraceCapsetAssignCap(capset, capno)            /* nothing */
+#define dtraceCapsetRemoveCap(capset, capno)            /* nothing */
 
 #endif
 
@@ -374,17 +413,18 @@ INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED,
     dtraceCreateSparkThread((EventCapNo)cap->no, (EventThreadID)spark_tid);
 }
 
-// This applies only to dtrace as EVENT_STARTUP in the logging framework is
-// handled specially in 'EventLog.c'.
-//
-INLINE_HEADER void dtraceEventStartup(void)
+INLINE_HEADER void traceEventStartup(void)
 {
+    int n_caps;
 #ifdef THREADED_RTS
     // XXX n_capabilities hasn't been initislised yet
-    dtraceStartup(RtsFlags.ParFlags.nNodes);
+    n_caps = RtsFlags.ParFlags.nNodes;
 #else
-    dtraceStartup(1);
+    n_caps = 1;
 #endif
+
+    traceEventStartup_(n_caps);
+    dtraceStartup(n_caps);
 }
 
 INLINE_HEADER void traceEventGcIdle(Capability *cap STG_UNUSED)
@@ -403,6 +443,40 @@ INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
 {
     traceEvent(cap, EVENT_GC_DONE);
     dtraceGcDone((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceCapsetCreate(CapsetID   capset      STG_UNUSED,
+                                     CapsetType capset_type STG_UNUSED)
+{
+    traceCapsetModify_(EVENT_CAPSET_CREATE, capset, capset_type);
+    dtraceCapsetCreate(capset, capset_type);
+}
+
+INLINE_HEADER void traceCapsetDelete(CapsetID capset STG_UNUSED)
+{
+    traceCapsetModify_(EVENT_CAPSET_DELETE, capset, 0);
+    dtraceCapsetDelete(capset);
+}
+
+INLINE_HEADER void traceCapsetAssignCap(CapsetID capset STG_UNUSED,
+                                        nat      capno  STG_UNUSED)
+{
+    traceCapsetModify_(EVENT_CAPSET_ASSIGN_CAP, capset, capno);
+    dtraceCapsetAssignCap(capset, capno);
+}
+
+INLINE_HEADER void traceCapsetRemoveCap(CapsetID capset STG_UNUSED,
+                                        nat      capno  STG_UNUSED)
+{
+    traceCapsetModify_(EVENT_CAPSET_REMOVE_CAP, capset, capno);
+    dtraceCapsetRemoveCap(capset, capno);
+}
+
+INLINE_HEADER void traceOSProcessInfo(void)
+{
+    traceOSProcessInfo_();
+    /* Note: no DTrace equivalent because all this OS process info
+     * is available to DTrace directly */
 }
 
 #include "EndPrivate.h"

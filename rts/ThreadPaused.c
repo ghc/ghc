@@ -230,8 +230,40 @@ threadPaused(Capability *cap, StgTSO *tso)
 #ifdef THREADED_RTS
         retry:
 #endif
-	    if (bh_info == &stg_BLACKHOLE_info ||
-                bh_info == &stg_WHITEHOLE_info)
+            // If the info table is a WHITEHOLE or a BLACKHOLE, then
+            // another thread has claimed it (via the SET_INFO()
+            // below), or is in the process of doing so.  In that case
+            // we want to suspend the work that the current thread has
+            // done on this thunk and wait until the other thread has
+            // finished.
+            //
+            // If eager blackholing is taking place, it could be the
+            // case that the blackhole points to the current
+            // TSO. e.g.:
+            //
+            //    this thread                   other thread
+            //    --------------------------------------------------------
+            //                                  c->indirectee = other_tso;
+            //                                  c->header.info = EAGER_BH
+            //                                  threadPaused():
+            //                                    c->header.info = WHITEHOLE
+            //                                    c->indirectee = other_tso
+            //    c->indirectee = this_tso;
+            //    c->header.info = EAGER_BH
+            //                                    c->header.info = BLACKHOLE
+            //    threadPaused()
+            //    *** c->header.info is now BLACKHOLE,
+            //        c->indirectee  points to this_tso
+            //
+            // So in this case do *not* suspend the work of the
+            // current thread, because the current thread will become
+            // deadlocked on itself.  See #5226 for an instance of
+            // this bug.
+            //
+            if ((bh_info == &stg_WHITEHOLE_info ||
+                 bh_info == &stg_BLACKHOLE_info)
+                &&
+                ((StgInd*)bh)->indirectee != (StgClosure*)tso)
             {
 		debugTrace(DEBUG_squeeze,
 			   "suspending duplicate work: %ld words of stack",

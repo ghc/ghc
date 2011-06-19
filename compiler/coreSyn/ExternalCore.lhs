@@ -4,7 +4,6 @@
 \begin{code}
 module ExternalCore where
 
-
 data Module 
  = Module Mname [Tdef] [Vdefg]
 
@@ -51,22 +50,22 @@ data Alt
 type Vbind = (Var,Ty)
 type Tbind = (Tvar,Kind)
 
+-- Internally, we represent types and coercions separately; but for
+-- the purposes of external core (at least for now) it's still
+-- convenient to collapse them into a single type.
 data Ty 
   = Tvar Tvar
   | Tcon (Qual Tcon)
   | Tapp Ty Ty
   | Tforall Tbind Ty 
   | Tliteral TLit
--- We distinguish primitive coercions
--- (represented in GHC by wired-in names), because
--- External Core treats them specially, so we have
--- to print them out with special syntax.
+-- We distinguish primitive coercions because External Core treats
+-- them specially, so we have to print them out with special syntax.
   | TransCoercion Ty Ty
   | SymCoercion Ty
   | UnsafeCoercion Ty Ty
   | InstCoercion Ty Ty
-  | LeftCoercion Ty
-  | RightCoercion Ty
+  | NthCoercion Int Ty
 
 data Kind 
   = Klifted

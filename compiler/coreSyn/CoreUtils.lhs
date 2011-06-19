@@ -16,7 +16,7 @@ Utility functions on @Core@ syntax
 -- | Commonly useful utilites for manipulating the Core language
 module CoreUtils (
 	-- * Constructing expressions
-	mkSCC, mkCoerce, mkCoerceI,
+	mkSCC, mkCoerce,
 	bindNonRec, needsCaseBinding,
 	mkAltExpr, mkPiType, mkPiTypes,
 
@@ -32,6 +32,7 @@ module CoreUtils (
 
 	-- * Expression and bindings size
 	coreBindsSize, exprSize,
+        CoreStats(..), coreBindsStats, 
 
 	-- * Hashing
 	hashExpr,
@@ -44,7 +45,7 @@ module CoreUtils (
 
 	-- * Manipulating data constructors and types
 	applyTypeToArgs, applyTypeToArg,
-        dataConOrigInstPat, dataConRepInstPat, dataConRepFSInstPat
+        dataConRepInstPat, dataConRepFSInstPat
     ) where
 
 #include "HsVersions.h"
@@ -61,7 +62,6 @@ import DataCon
 import PrimOp
 import Id
 import IdInfo
-import TcType	( isPredTy )
 import Type
 import Coercion
 import TyCon
@@ -69,10 +69,10 @@ import CostCentre
 import Unique
 import Outputable
 import TysPrim
-import PrelNames( absentErrorIdKey )
 import FastString
 import Maybes
 import Util
+import Pair
 import Data.Word
 import Data.Bits
 \end{code}
@@ -91,9 +91,10 @@ exprType :: CoreExpr -> Type
 -- really be said to have a type
 exprType (Var var)	     = idType var
 exprType (Lit lit)	     = literalType lit
+exprType (Coercion co)	     = coercionType co
 exprType (Let _ body)	     = exprType body
 exprType (Case _ _ ty _)     = ty
-exprType (Cast _ co)         = snd (coercionKind co)
+exprType (Cast _ co)         = pSnd (coercionKind co)
 exprType (Note _ e)          = exprType e
 exprType (Lam binder expr)   = mkPiType binder (exprType expr)
 exprType e@(App _ _)
@@ -110,7 +111,7 @@ coreAltType (_,bs,rhs)
   where
     ty           = exprType rhs
     free_tvs     = tyVarsOfType ty
-    bad_binder b = isTyCoVar b && b `elemVarSet` free_tvs
+    bad_binder b = isTyVar b && b `elemVarSet` free_tvs
 
 coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
@@ -143,10 +144,10 @@ Various possibilities suggest themselves:
    we are doing here.  It's not too expensive, I think.
 
 \begin{code}
-mkPiType  :: EvVar -> Type -> Type
+mkPiType  :: Var -> Type -> Type
 -- ^ Makes a @(->)@ type or a forall type, depending
 -- on whether it is given a type variable or a term variable.
-mkPiTypes :: [EvVar] -> Type -> Type
+mkPiTypes :: [Var] -> Type -> Type
 -- ^ 'mkPiType' for multiple type or value arguments
 
 mkPiType v ty
@@ -172,11 +173,11 @@ applyTypeToArgs e op_ty (Type ty : args)
     go [ty] args
   where
     go rev_tys (Type ty : args) = go (ty:rev_tys) args
-    go rev_tys rest_args        = applyTypeToArgs e op_ty' rest_args
-			 	where
-				  op_ty' = applyTysD msg op_ty (reverse rev_tys)
-				  msg = ptext (sLit "applyTypeToArgs") <+> 
-		    			panic_msg e op_ty
+    go rev_tys rest_args         = applyTypeToArgs e op_ty' rest_args
+	                         where
+			 	   op_ty' = applyTysD msg op_ty (reverse rev_tys)
+				   msg = ptext (sLit "applyTypeToArgs") <+> 
+		    		 	 panic_msg e op_ty
 
 applyTypeToArgs e op_ty (_ : args)
   = case (splitFunTy_maybe op_ty) of
@@ -194,25 +195,22 @@ panic_msg e op_ty = pprCoreExpr e $$ ppr op_ty
 %************************************************************************
 
 \begin{code}
--- | Wrap the given expression in the coercion, dropping identity coercions and coalescing nested coercions
-mkCoerceI :: CoercionI -> CoreExpr -> CoreExpr
-mkCoerceI (IdCo _) e = e
-mkCoerceI (ACo co) e = mkCoerce co e
-
--- | Wrap the given expression in the coercion safely, coalescing nested coercions
+-- | Wrap the given expression in the coercion safely, dropping
+-- identity coercions and coalescing nested coercions
 mkCoerce :: Coercion -> CoreExpr -> CoreExpr
+mkCoerce co e | isReflCo co = e
 mkCoerce co (Cast expr co2)
-  = ASSERT(let { (from_ty, _to_ty) = coercionKind co; 
-                 (_from_ty2, to_ty2) = coercionKind co2} in
-           from_ty `coreEqType` to_ty2 )
-    mkCoerce (mkTransCoercion co2 co) expr
+  = ASSERT(let { Pair  from_ty  _to_ty  = coercionKind co; 
+                 Pair _from_ty2  to_ty2 = coercionKind co2} in
+           from_ty `eqType` to_ty2 )
+    mkCoerce (mkTransCo co2 co) expr
 
 mkCoerce co expr 
-  = let (from_ty, _to_ty) = coercionKind co in
---    if to_ty `coreEqType` from_ty
+  = let Pair from_ty _to_ty = coercionKind co in
+--    if to_ty `eqType` from_ty
 --    then expr
 --    else 
-        WARN(not (from_ty `coreEqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ pprEqPred (coercionKind co))
+        WARN(not (from_ty `eqType` exprType expr), text "Trying to coerce" <+> text "(" <> ppr expr $$ text "::" <+> ppr (exprType expr) <> text ")" $$ ppr co $$ pprEqPred (coercionKind co))
          (Cast expr co)
 \end{code}
 
@@ -415,7 +413,8 @@ discount.
 \begin{code}
 exprIsTrivial :: CoreExpr -> Bool
 exprIsTrivial (Var _)          = True        -- See Note [Variables are trivial]
-exprIsTrivial (Type _)         = True
+exprIsTrivial (Type _)        = True
+exprIsTrivial (Coercion _)     = True
 exprIsTrivial (Lit lit)        = litIsTrivial lit
 exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
 exprIsTrivial (Note _       e) = exprIsTrivial e  -- See Note [SCCs are trivial]
@@ -465,22 +464,28 @@ Note [exprIsDupable]
 
 \begin{code}
 exprIsDupable :: CoreExpr -> Bool
-exprIsDupable (Type _)   = True
-exprIsDupable (Var _)    = True
-exprIsDupable (Lit lit)  = litIsDupable lit
-exprIsDupable (Note _ e) = exprIsDupable e
-exprIsDupable (Cast e _) = exprIsDupable e
-exprIsDupable expr
-  = go expr 0
+exprIsDupable e
+  = isJust (go dupAppSize e)
   where
-    go (Var _)   _      = True
-    go (App f a) n_args =  n_args < dupAppSize
-			&& exprIsDupable a
-			&& go f (n_args+1)
-    go _         _      = False
+    go :: Int -> CoreExpr -> Maybe Int
+    go n (Type {})     = Just n
+    go n (Coercion {}) = Just n
+    go n (Var {})      = decrement n
+    go n (Note _ e)    = go n e
+    go n (Cast e _)    = go n e
+    go n (App f a) | Just n' <- go n a = go n' f
+    go n (Lit lit) | litIsDupable lit = decrement n
+    go _ _ = Nothing
+
+    decrement :: Int -> Maybe Int
+    decrement 0 = Nothing
+    decrement n = Just (n-1)
 
 dupAppSize :: Int
-dupAppSize = 4		-- Size of application we are prepared to duplicate
+dupAppSize = 8	 -- Size of term we are prepared to duplicate
+	         -- This is *just* big enough to make test MethSharing
+		 -- inline enough join points.  Really it should be
+		 -- smaller, and could be if we fixed Trac #4960.
 \end{code}
 
 %************************************************************************
@@ -535,13 +540,14 @@ exprIsExpandable = exprIsCheap' isExpandableApp	-- See Note [CONLIKE pragma] in 
 
 type CheapAppFun = Id -> Int -> Bool
 exprIsCheap' :: CheapAppFun -> CoreExpr -> Bool
-exprIsCheap' _          (Lit _)   = True
-exprIsCheap' _          (Type _)  = True
-exprIsCheap' _          (Var _)   = True
-exprIsCheap' good_app (Note _ e)  = exprIsCheap' good_app e
-exprIsCheap' good_app (Cast e _)  = exprIsCheap' good_app e
-exprIsCheap' good_app (Lam x e)   = isRuntimeVar x
-                                 || exprIsCheap' good_app e
+exprIsCheap' _        (Lit _)      = True
+exprIsCheap' _        (Type _)    = True
+exprIsCheap' _        (Coercion _) = True
+exprIsCheap' _        (Var _)      = True
+exprIsCheap' good_app (Note _ e)   = exprIsCheap' good_app e
+exprIsCheap' good_app (Cast e _)   = exprIsCheap' good_app e
+exprIsCheap' good_app (Lam x e)    = isRuntimeVar x
+                                  || exprIsCheap' good_app e
 
 exprIsCheap' good_app (Case e _ _ alts) = exprIsCheap' good_app e && 
 				          and [exprIsCheap' good_app rhs | (_,_,rhs) <- alts]
@@ -562,6 +568,7 @@ exprIsCheap' good_app other_expr 	-- Applications and variables
   = go other_expr []
   where
 	-- Accumulate value arguments, then decide
+    go (Cast e _) val_args                 = go e val_args
     go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
 			  | otherwise      = go f val_args
 
@@ -582,12 +589,16 @@ exprIsCheap' good_app other_expr 	-- Applications and variables
     go _ _ = False
  
     --------------
-    go_pap args = all exprIsTrivial args
- 	-- For constructor applications and primops, check that all
- 	-- the args are trivial.  We don't want to treat as cheap, say,
- 	-- 	(1:2:3:4:5:[])
- 	-- We'll put up with one constructor application, but not dozens
- 	
+    go_pap args = all (exprIsCheap' good_app) args
+        -- Used to be "all exprIsTrivial args" due to concerns about
+        -- duplicating nested constructor applications, but see #4978.
+	-- The principle here is that 
+	--    let x = a +# b in c *# x
+        -- should behave equivalently to
+        --    c *# (a +# b)
+        -- Since lets with cheap RHSs are accepted, 
+        -- so should paps with cheap arguments
+
     --------------
     go_primop op args = primOpIsCheap op && all (exprIsCheap' good_app) args
  	-- In principle we should worry about primops
@@ -678,8 +689,9 @@ it's applied only to dictionaries.
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
 exprOkForSpeculation :: CoreExpr -> Bool
-exprOkForSpeculation (Lit _)     = True
-exprOkForSpeculation (Type _)    = True
+exprOkForSpeculation (Lit _)      = True
+exprOkForSpeculation (Type _)     = True
+exprOkForSpeculation (Coercion _) = True
 
 exprOkForSpeculation (Var v)     
   | isTickBoxOp v = False     -- Tick boxes are *not* suitable for speculation
@@ -697,10 +709,7 @@ exprOkForSpeculation (Case e _ _ alts)
 
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
-	(Var f, args) | f `hasKey` absentErrorIdKey	-- Note [Absent error Id]
-                      -> all exprOkForSpeculation args  --    in WwLib
-                      | otherwise 
-                      -> spec_ok (idDetails f) args
+	(Var f, args) -> spec_ok (idDetails f) args
         _             -> False
  
   where
@@ -862,12 +871,14 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
 	-- we could get an infinite loop
 
     is_hnf_like (Lit _)          = True
-    is_hnf_like (Type _)         = True       -- Types are honorary Values;
+    is_hnf_like (Type _)        = True       -- Types are honorary Values;
                                               -- we don't mind copying them
+    is_hnf_like (Coercion _)     = True       -- Same for coercions
     is_hnf_like (Lam b e)        = isRuntimeVar b || is_hnf_like e
     is_hnf_like (Note _ e)       = is_hnf_like e
     is_hnf_like (Cast e _)       = is_hnf_like e
-    is_hnf_like (App e (Type _)) = is_hnf_like e
+    is_hnf_like (App e (Type _))    = is_hnf_like e
+    is_hnf_like (App e (Coercion _)) = is_hnf_like e
     is_hnf_like (App e a)        = app_is_value e [a]
     is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
     is_hnf_like _                = False
@@ -893,36 +904,26 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
 These InstPat functions go here to avoid circularity between DataCon and Id
 
 \begin{code}
-dataConRepInstPat, dataConOrigInstPat :: [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
-dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
+dataConRepInstPat   ::                 [Unique] -> DataCon -> [Type] -> ([TyVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyVar], [Id])
 
-dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat ((fsLit "ipv")))
-dataConRepFSInstPat = dataConInstPat dataConRepArgTys
-dataConOrigInstPat  = dataConInstPat dc_arg_tys       (repeat ((fsLit "ipv")))
-  where 
-    dc_arg_tys dc = map mkPredTy (dataConEqTheta dc) ++ map mkPredTy (dataConDictTheta dc) ++ dataConOrigArgTys dc
-	-- Remember to include the existential dictionaries
+dataConRepInstPat   = dataConInstPat (repeat ((fsLit "ipv")))
+dataConRepFSInstPat = dataConInstPat 
 
-dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
-                  -> [FastString]          -- A long enough list of FSs to use for names
-                  -> [Unique]              -- An equally long list of uniques, at least one for each binder
-                  -> DataCon
-	          -> [Type]                -- Types to instantiate the universally quantified tyvars
-	       -> ([TyVar], [CoVar], [Id]) -- Return instantiated variables
+dataConInstPat :: [FastString]          -- A long enough list of FSs to use for names
+               -> [Unique]              -- An equally long list of uniques, at least one for each binder
+               -> DataCon
+	       -> [Type]                -- Types to instantiate the universally quantified tyvars
+	       -> ([TyVar], [Id])          -- Return instantiated variables
 -- dataConInstPat arg_fun fss us con inst_tys returns a triple 
--- (ex_tvs, co_tvs, arg_ids),
+-- (ex_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
 --
---   co_tvs are intended to be used as binders for coercion args and the kinds
---     of these vars have been instantiated by the inst_tys and the ex_tys
---     The co_tvs include both GADT equalities (dcEqSpec) and 
---     programmer-specified equalities (dcEqTheta)
---
 --   arg_ids are indended to be used as binders for value arguments, 
 --     and their types have been instantiated with inst_tys and ex_tys
---     The arg_ids include both dicts (dcDictTheta) and
---     programmer-specified arguments (after rep-ing) (deRepArgTys)
+--     The arg_ids include both evidence and
+--     programmer-specified arguments (both after rep-ing)
 --
 -- Example.
 --  The following constructor T1
@@ -937,29 +938,22 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
 --
 --  dataConInstPat fss us T1 (a1',b') will return
 --
---  ([a1'', b''], [c :: (a1', b')~(a1'', b'')], [x :: Int, y :: b''])
+--  ([a1'', b''], [c :: (a1', b')~(a1'', b''), x :: Int, y :: b''])
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
-dataConInstPat arg_fun fss uniqs con inst_tys 
-  = (ex_bndrs, co_bndrs, arg_ids)
+dataConInstPat fss uniqs con inst_tys 
+  = (ex_bndrs, arg_ids)
   where 
     univ_tvs = dataConUnivTyVars con
     ex_tvs   = dataConExTyVars con
-    arg_tys  = arg_fun con
-    eq_spec  = dataConEqSpec con
-    eq_theta = dataConEqTheta con
-    eq_preds = eqSpecPreds eq_spec ++ eq_theta
+    arg_tys  = dataConRepArgTys con
 
     n_ex = length ex_tvs
-    n_co = length eq_preds
 
       -- split the Uniques and FastStrings
-    (ex_uniqs, uniqs')   = splitAt n_ex uniqs
-    (co_uniqs, id_uniqs) = splitAt n_co uniqs'
-
-    (ex_fss, fss')     = splitAt n_ex fss
-    (co_fss, id_fss)   = splitAt n_co fss'
+    (ex_uniqs, id_uniqs) = splitAt n_ex uniqs
+    (ex_fss,   id_fss)   = splitAt n_ex fss
 
       -- Make existential type variables
     ex_bndrs = zipWith3 mk_ex_var ex_uniqs ex_fss ex_tvs
@@ -971,17 +965,9 @@ dataConInstPat arg_fun fss uniqs con inst_tys
       -- Make the instantiating substitution
     subst = zipOpenTvSubst (univ_tvs ++ ex_tvs) (inst_tys ++ map mkTyVarTy ex_bndrs)
 
-      -- Make new coercion vars, instantiating kind
-    co_bndrs = zipWith3 mk_co_var co_uniqs co_fss eq_preds
-    mk_co_var uniq fs eq_pred = mkCoVar new_name co_kind
-       where
-         new_name = mkSysTvName uniq fs
-         co_kind  = substTy subst (mkPredTy eq_pred)
-
-      -- make value vars, instantiating types
-    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcSpan
+      -- Make value vars, instantiating types
+    mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (Type.substTy subst ty) noSrcSpan
     arg_ids = zipWith3 mk_id_var id_uniqs id_fss arg_tys
-
 \end{code}
 
 %************************************************************************
@@ -1000,7 +986,8 @@ cheapEqExpr :: Expr b -> Expr b -> Bool
 
 cheapEqExpr (Var v1)   (Var v2)   = v1==v2
 cheapEqExpr (Lit lit1) (Lit lit2) = lit1 == lit2
-cheapEqExpr (Type t1)  (Type t2)  = t1 `coreEqType` t2
+cheapEqExpr (Type t1) (Type t2) = t1 `eqType` t2
+cheapEqExpr (Coercion c1) (Coercion c2) = c1 `coreEqCoercion` c2
 
 cheapEqExpr (App f1 a1) (App f2 a2)
   = f1 `cheapEqExpr` f2 && a1 `cheapEqExpr` a2
@@ -1016,7 +1003,8 @@ exprIsBig :: Expr b -> Bool
 -- ^ Returns @True@ of expressions that are too big to be compared by 'cheapEqExpr'
 exprIsBig (Lit _)      = False
 exprIsBig (Var _)      = False
-exprIsBig (Type _)     = False
+exprIsBig (Type _)    = False
+exprIsBig (Coercion _) = False
 exprIsBig (Lam _ e)    = exprIsBig e
 exprIsBig (App f a)    = exprIsBig f || exprIsBig a
 exprIsBig (Cast e _)   = exprIsBig e	-- Hopefully coercions are not too big!
@@ -1058,14 +1046,15 @@ eqExprX id_unfolding_fun env e1 e2
       , Just e2' <- expandUnfolding_maybe (id_unfolding_fun (lookupRnInScope env v2))
       = go (nukeRnEnvR env) e1 e2'
 
-    go _   (Lit lit1)    (Lit lit2)    = lit1 == lit2
-    go env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
-    go env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && go env e1 e2
+    go _   (Lit lit1)    (Lit lit2)      = lit1 == lit2
+    go env (Type t1)    (Type t2)        = eqTypeX env t1 t2
+    go env (Coercion co1) (Coercion co2) = coreEqCoercion2 env co1 co2
+    go env (Cast e1 co1) (Cast e2 co2) = coreEqCoercion2 env co1 co2 && go env e1 e2
     go env (App f1 a1)   (App f2 a2)   = go env f1 f2 && go env a1 a2
     go env (Note n1 e1)  (Note n2 e2)  = go_note n1 n2 && go env e1 e2
 
     go env (Lam b1 e1)  (Lam b2 e2)  
-      =  tcEqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
+      =  eqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
       && go (rnBndr2 env b1 b2) e1 e2
 
     go env (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2) 
@@ -1081,7 +1070,7 @@ eqExprX id_unfolding_fun env e1 e2
 
     go env (Case e1 b1 _ a1) (Case e2 b2 _ a2)
       =  go env e1 e2
-      && tcEqTypeX env (idType b1) (idType b2)
+      && eqTypeX env (idType b1) (idType b2)
       && all2 (go_alt (rnBndr2 env b1 b2)) a1 a2
 
     go _ _ _ = False
@@ -1118,22 +1107,24 @@ coreBindsSize bs = foldr ((+) . bindSize) 0 bs
 exprSize :: CoreExpr -> Int
 -- ^ A measure of the size of the expressions, strictly greater than 0
 -- It also forces the expression pretty drastically as a side effect
+-- Counts *leaves*, not internal nodes. Types and coercions are not counted.
 exprSize (Var v)         = v `seq` 1
 exprSize (Lit lit)       = lit `seq` 1
 exprSize (App f a)       = exprSize f + exprSize a
 exprSize (Lam b e)       = varSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
 exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
-exprSize (Cast e co)     = (seqType co `seq` 1) + exprSize e
+exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
 exprSize (Note n e)      = noteSize n + exprSize e
-exprSize (Type t)        = seqType t `seq` 1
+exprSize (Type t)       = seqType t `seq` 1
+exprSize (Coercion co)   = seqCo co `seq` 1
 
 noteSize :: Note -> Int
 noteSize (SCC cc)       = cc `seq` 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
  
 varSize :: Var -> Int
-varSize b  | isTyCoVar b = 1
+varSize b  | isTyVar b = 1
 	   | otherwise = seqType (idType b)		`seq`
 			 megaSeqIdInfo (idInfo b) 	`seq`
 			 1
@@ -1152,6 +1143,55 @@ altSize :: CoreAlt -> Int
 altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 \end{code}
 
+\begin{code}
+data CoreStats = CS { cs_tm, cs_ty, cs_co :: Int }
+
+plusCS :: CoreStats -> CoreStats -> CoreStats
+plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1 })
+       (CS { cs_tm = p2, cs_ty = q2, cs_co = r2 })
+  = CS { cs_tm = p1+p2, cs_ty = q1+q2, cs_co = r1+r2 }
+  
+zeroCS, oneTM :: CoreStats
+zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0 }
+oneTM  = zeroCS { cs_tm = 1 }
+
+sumCS :: (a -> CoreStats) -> [a] -> CoreStats
+sumCS f = foldr (plusCS . f) zeroCS 
+ 
+coreBindsStats :: [CoreBind] -> CoreStats
+coreBindsStats = sumCS bindStats
+
+bindStats :: CoreBind -> CoreStats
+bindStats (NonRec v r) = bindingStats v r
+bindStats (Rec prs)    = sumCS (\(v,r) -> bindingStats v r) prs
+
+bindingStats :: Var -> CoreExpr -> CoreStats
+bindingStats v r = bndrStats v `plusCS` exprStats r
+
+bndrStats :: Var -> CoreStats
+bndrStats v = oneTM `plusCS` tyStats (varType v)
+
+exprStats :: CoreExpr -> CoreStats
+exprStats (Var {})        = oneTM
+exprStats (Lit {})        = oneTM
+exprStats (Type t)        = tyStats t
+exprStats (Coercion c)    = coStats c
+exprStats (App f a)       = exprStats f `plusCS` exprStats a 
+exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e 
+exprStats (Let b e)       = bindStats b `plusCS` exprStats e 
+exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b `plusCS` sumCS altStats as
+exprStats (Cast e co)     = coStats co `plusCS` exprStats e
+exprStats (Note _ e)      = exprStats e
+
+altStats :: CoreAlt -> CoreStats
+altStats (_, bs, r) = sumCS bndrStats bs `plusCS` exprStats r
+
+tyStats :: Type -> CoreStats
+tyStats ty = zeroCS { cs_ty = typeSize ty }
+
+coStats :: Coercion -> CoreStats
+coStats co = zeroCS { cs_co = coercionSize co }
+\end{code}
 
 %************************************************************************
 %*									*
@@ -1192,15 +1232,17 @@ hash_expr env (Lam b e)	              = hash_expr (extend_env env b) e
 hash_expr _   (Type _)                = WARN(True, text "hash_expr: type") 1
 -- Shouldn't happen.  Better to use WARN than trace, because trace
 -- prevents the CPR optimisation kicking in for hash_expr.
+hash_expr _   (Coercion _)            = WARN(True, text "hash_expr: coercion") 1
 
 fast_hash_expr :: HashEnv -> CoreExpr -> Word32
-fast_hash_expr env (Var v)     	= hashVar env v
-fast_hash_expr env (Type t)	= fast_hash_type env t
-fast_hash_expr _   (Lit lit)    = fromIntegral (hashLiteral lit)
-fast_hash_expr env (Cast e _)   = fast_hash_expr env e
-fast_hash_expr env (Note _ e)   = fast_hash_expr env e
-fast_hash_expr env (App _ a)    = fast_hash_expr env a	-- A bit idiosyncratic ('a' not 'f')!
-fast_hash_expr _   _            = 1
+fast_hash_expr env (Var v)     	 = hashVar env v
+fast_hash_expr env (Type t)	 = fast_hash_type env t
+fast_hash_expr env (Coercion co) = fast_hash_co env co
+fast_hash_expr _   (Lit lit)     = fromIntegral (hashLiteral lit)
+fast_hash_expr env (Cast e _)    = fast_hash_expr env e
+fast_hash_expr env (Note _ e)    = fast_hash_expr env e
+fast_hash_expr env (App _ a)     = fast_hash_expr env a	-- A bit idiosyncratic ('a' not 'f')!
+fast_hash_expr _   _             = 1
 
 fast_hash_type :: HashEnv -> Type -> Word32
 fast_hash_type env ty 
@@ -1208,6 +1250,13 @@ fast_hash_type env ty
   | Just (tc,tys) <- splitTyConApp_maybe ty = let hash_tc = fromIntegral (hashName (tyConName tc))
 					      in foldr (\t n -> fast_hash_type env t + n) hash_tc tys
   | otherwise				    = 1
+
+fast_hash_co :: HashEnv -> Coercion -> Word32
+fast_hash_co env co
+  | Just cv <- getCoVar_maybe co              = hashVar env cv
+  | Just (tc,cos) <- splitTyConAppCo_maybe co = let hash_tc = fromIntegral (hashName (tyConName tc))
+                                                in foldr (\c n -> fast_hash_co env c + n) hash_tc cos
+  | otherwise                                 = 1
 
 extend_env :: HashEnv -> Var -> (Int, VarEnv Int)
 extend_env (n,env) b = (n+1, extendVarEnv env b n)
@@ -1308,18 +1357,18 @@ need to address that here.
 \begin{code}
 tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body 
-  = go (reverse bndrs) body (IdCo (exprType body))
+  = go (reverse bndrs) body (mkReflCo (exprType body))
   where
     incoming_arity = count isId bndrs
 
     go :: [Var]	           -- Binders, innermost first, types [a3,a2,a1]
        -> CoreExpr         -- Of type tr
-       -> CoercionI        -- Of type tr ~ ts
+       -> Coercion         -- Of type tr ~ ts
        -> Maybe CoreExpr   -- Of type a1 -> a2 -> a3 -> ts
     -- See Note [Eta reduction with casted arguments]
     -- for why we have an accumulating coercion
     go [] fun co
-      | ok_fun fun = Just (mkCoerceI co fun)
+      | ok_fun fun = Just (mkCoerce co fun)
 
     go (b : bs) (App fun arg) co
       | Just co' <- ok_arg b arg co
@@ -1330,7 +1379,7 @@ tryEtaReduce bndrs body
     ---------------
     -- Note [Eta reduction conditions]
     ok_fun (App fun (Type ty)) 
-	| not (any (`elemVarSet` tyVarsOfType ty) bndrs)
+        | not (any (`elemVarSet` tyVarsOfType ty) bndrs)
 	=  ok_fun fun
     ok_fun (Var fun_id)
 	=  not (fun_id `elem` bndrs)
@@ -1346,22 +1395,22 @@ tryEtaReduce bndrs body
        | otherwise = idArity fun   	      
 
     ---------------
-    ok_lam v = isTyCoVar v || isDictId v
+    ok_lam v = isTyVar v || isEvVar v
 
     ---------------
-    ok_arg :: Var 	        -- Of type bndr_t
-           -> CoreExpr          -- Of type arg_t
-           -> CoercionI         -- Of kind (t1~t2)
-           -> Maybe CoercionI   -- Of type (arg_t -> t1 ~  bndr_t -> t2)
-	      	    		--   (and similarly for tyvars, coercion args)
+    ok_arg :: Var              -- Of type bndr_t
+           -> CoreExpr         -- Of type arg_t
+           -> Coercion         -- Of kind (t1~t2)
+           -> Maybe Coercion   -- Of type (arg_t -> t1 ~  bndr_t -> t2)
+                               --   (and similarly for tyvars, coercion args)
     -- See Note [Eta reduction with casted arguments]
     ok_arg bndr (Type ty) co
        | Just tv <- getTyVar_maybe ty
-       , bndr == tv  = Just (mkForAllTyCoI tv co)
+       , bndr == tv  = Just (mkForAllCo tv co)
     ok_arg bndr (Var v) co
-       | bndr == v   = Just (mkFunTyCoI (IdCo (idType bndr)) co)
+       | bndr == v   = Just (mkFunCo (mkReflCo (idType bndr)) co)
     ok_arg bndr (Cast (Var v) co_arg) co
-       | bndr == v  = Just (mkFunTyCoI (ACo (mkSymCoercion co_arg)) co)
+       | bndr == v  = Just (mkFunCo (mkSymCo co_arg) co)
        -- The simplifier combines multiple casts into one, 
        -- so we can have a simple-minded pattern match here
     ok_arg _ _ _ = Nothing

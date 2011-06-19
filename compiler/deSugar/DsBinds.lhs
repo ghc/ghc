@@ -11,7 +11,7 @@ lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-                 dsHsWrapper, dsTcEvBinds, dsEvBinds, wrapDsEvBinds,
+		 dsHsWrapper, dsTcEvBinds, dsEvBinds, wrapDsEvBinds, 
 		 DsEvBind(..), AutoScc(..)
   ) where
 
@@ -36,6 +36,7 @@ import Digraph
 
 import TcType
 import Type
+import Coercion
 import TysPrim  ( anyTypeOfKind )
 import CostCentre
 import Module
@@ -231,8 +232,8 @@ dsEvBinds bs = mapM dsEvGroup sccs
 
     free_vars_of :: EvTerm -> [EvVar]
     free_vars_of (EvId v)           = [v]
-    free_vars_of (EvCast v co)      = v : varSetElems (tyVarsOfType co)
-    free_vars_of (EvCoercion co)    = varSetElems (tyVarsOfType co)
+    free_vars_of (EvCast v co)      = v : varSetElems (tyCoVarsOfCo co)
+    free_vars_of (EvCoercion co)    = varSetElems (tyCoVarsOfCo co)
     free_vars_of (EvDFunApp _ _ vs) = vs
     free_vars_of (EvSuperClass d _) = [d]
     free_vars_of (EvInteger _)      = []
@@ -250,7 +251,7 @@ dsEvGroup (AcyclicSCC (EvBind co_var (EvSuperClass dict n)))
     (arg_tys, _) = splitFunTys rho
     bndrs = ex_tvs ++ map mk_wild_pred (theta `zip` [0..])
                    ++ map mkWildValBinder arg_tys
-    mk_wild_pred (p, i) | i==n      = ASSERT( p `tcEqPred` (coVarPred co_var)) 
+    mk_wild_pred (p, i) | i==n      = ASSERT( p `eqPred` (coVarPred co_var)) 
                                       co_var
                         | otherwise = mkWildEvBinder p
     
@@ -268,9 +269,8 @@ dsEvGroup (CyclicSCC bs)
 dsEvTerm :: MonadThings m => EvTerm -> m CoreExpr
 dsEvTerm (EvId v)         = return (Var v)
 dsEvTerm (EvCast v co)    = return (Cast (Var v) co)
-dsEvTerm (EvDFunApp df tys vars) =
-                            return (Var df `mkTyApps` tys `mkVarApps` vars)
-dsEvTerm (EvCoercion co)  = return (Type co)
+dsEvTerm (EvDFunApp df tys vars) = return (Var df `mkTyApps` tys `mkVarApps` vars)
+dsEvTerm (EvCoercion co)         = return (Coercion co)
 dsEvTerm (EvInteger n)    = mkIntegerExpr n
 dsEvTerm (EvAxiom x t)    = return (mkRuntimeErrorApp rUNTIME_ERROR_ID t x)
 dsEvTerm (EvSuperClass d n)
@@ -606,17 +606,13 @@ decomposeRuleLhs bndrs lhs
 
    bad_shape_msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar"))
                       2 (ppr opt_lhs)
-   dead_msg bndr = hang (ptext (sLit "Forall'd") <+> pp_bndr bndr
-				 <+> ptext (sLit "is not bound in RULE lhs"))
+   dead_msg bndr = hang (sep [ ptext (sLit "Forall'd") <+> pp_bndr bndr
+			     , ptext (sLit "is not bound in RULE lhs")])
                       2 (ppr opt_lhs)
    pp_bndr bndr
-    | isTyVar bndr = ptext (sLit "type variable") <+> ppr bndr
-    | isCoVar bndr = ptext (sLit "coercion variable") <+> ppr bndr
-    | isDictId bndr = ptext (sLit "constraint") <+> ppr (get_pred bndr)
-    | otherwise     = ptext (sLit "variable") <+> ppr bndr
-
-   get_pred b = ASSERT( isId b ) expectJust "decomposeRuleLhs" 
-                                 (tcSplitPredTy_maybe (idType b))
+    | isTyVar bndr  = ptext (sLit "type variable") <+> quotes (ppr bndr)
+    | isEvVar bndr  = ptext (sLit "constraint") <+> quotes (ppr (evVarPred bndr))
+    | otherwise     = ptext (sLit "variable") <+> quotes (ppr bndr)
 \end{code}
 
 Note [Simplifying the left-hand side of a RULE]
@@ -642,7 +638,6 @@ otherwise we don't match when given an argument like
 
 NB: tcSimplifyRuleLhs is very careful not to generate complicated
     dictionary expressions that we might have to match
-
 
 Note [Matching seqId]
 ~~~~~~~~~~~~~~~~~~~

@@ -1,5 +1,8 @@
 # Despite the name "package", this file contains the master list of 
-# the *repositories* that make up GHC. It is parsed by boot and darcs-all.
+# the *repositories* that make up GHC. It is parsed by
+# * boot
+# * sync-all
+# * rules/extra-packages.mk
 #
 # Some of this information is duplicated elsewhere in the build system:
 #    See Trac #3896
@@ -17,7 +20,7 @@
 #    - nofib and testsuite are optional helpers
 #
 # The format of the lines in this file is:
-#   localpath    tag    remotepath    VCS    upstream
+#   localpath    tag    remotepath    VCS
 # where
 #   * 'localpath' is where to put the repository in a checked out tree.
 #   * 'remotepath' is where the repository is in the central repository.
@@ -34,52 +37,45 @@
 #     deems to have the EXTRA_PACKAGE property: tags 'dph' and 'extra' 
 #     both give this property
 #
-#   * 'upstream' is the URL of the upstream repo, where there is one, or
-#     "-" if there is no upstream.
-#
 # Lines that start with a '#' are comments.
-.                               -           ghc                             git     -
-ghc-tarballs                    -           ghc-tarballs                    darcs   -
-utils/hsc2hs                    -           hsc2hs                          darcs   -
-# haddock does have an upstream:
-#   http://code.haskell.org/haddock/
-# but it stays buildable with the last stable release rather than tracking HEAD,
-# and is resynced with the GHC HEAD branch by David Waern when appropriate
-utils/haddock                   -           haddock2                        darcs   -
-libraries/array                 -           packages/array                  darcs   -
-libraries/base                  -           packages/base                   darcs   -
-libraries/binary                -           packages/binary                 darcs   http://code.haskell.org/binary/
-libraries/bytestring            -           packages/bytestring             darcs   http://darcs.haskell.org/bytestring/
-libraries/Cabal                 -           packages/Cabal                  darcs   http://darcs.haskell.org/cabal/
-libraries/containers            -           packages/containers             darcs   -
-libraries/directory             -           packages/directory              darcs   -
-libraries/extensible-exceptions -           packages/extensible-exceptions  darcs   -
-libraries/filepath              -           packages/filepath               darcs   -
-libraries/ghc-prim              -           packages/ghc-prim               darcs   -
-libraries/haskeline             -           packages/haskeline              darcs   http://code.haskell.org/haskeline/
-libraries/haskell98             -           packages/haskell98              darcs   -
-libraries/haskell2010           -           packages/haskell2010            darcs   -
-libraries/hoopl                 -           packages/hoopl                  darcs   -
-libraries/hpc                   -           packages/hpc                    darcs   -
-libraries/integer-gmp           -           packages/integer-gmp            darcs   -
-libraries/integer-simple        -           packages/integer-simple         darcs   -
-libraries/mtl                   -           packages/mtl                    darcs   -
-libraries/old-locale            -           packages/old-locale             darcs   -
-libraries/old-time              -           packages/old-time               darcs   -
-libraries/pretty                -           packages/pretty                 darcs   -
-libraries/process               -           packages/process                darcs   -
-libraries/random                -           packages/random                 darcs   -
-libraries/template-haskell      -           packages/template-haskell       darcs   -
-libraries/terminfo              -           packages/terminfo               darcs   http://code.haskell.org/terminfo/
-libraries/unix                  -           packages/unix                   darcs   -
-libraries/utf8-string           -           packages/utf8-string            darcs   http://code.haskell.org/utf8-string/
-libraries/Win32                 -           packages/Win32                  darcs   -
-libraries/xhtml                 -           packages/xhtml                  darcs   -
-testsuite                       testsuite   testsuite                       darcs   -
-nofib                           nofib       nofib                           darcs   -
-libraries/deepseq               extra       packages/deepseq                darcs   -
-libraries/parallel              extra       packages/parallel               darcs   -
-libraries/stm                   extra       packages/stm                    darcs   -
-libraries/primitive             dph         packages/primitive              darcs   http://code.haskell.org/primitive
-libraries/vector                dph         packages/vector                 darcs   http://code.haskell.org/vector
-libraries/dph                   dph         packages/dph                    darcs   -
+.                               -           ghc.git                             git
+ghc-tarballs                    -           ghc-tarballs.git                    git
+utils/hsc2hs                    -           hsc2hs.git                          git
+utils/haddock                   -           haddock2.git                        git
+libraries/array                 -           packages/array.git                  git
+libraries/base                  -           packages/base.git                   git
+libraries/binary                -           packages/binary.git                 git
+libraries/bytestring            -           packages/bytestring.git             git
+libraries/Cabal                 -           packages/Cabal.git                  git
+libraries/containers            -           packages/containers.git             git
+libraries/directory             -           packages/directory.git              git
+libraries/extensible-exceptions -           packages/extensible-exceptions.git  git
+libraries/filepath              -           packages/filepath.git               git
+libraries/ghc-prim              -           packages/ghc-prim.git               git
+libraries/haskeline             -           packages/haskeline.git              git
+libraries/haskell98             -           packages/haskell98.git              git
+libraries/haskell2010           -           packages/haskell2010.git            git
+libraries/hoopl                 -           packages/hoopl.git                  git
+libraries/hpc                   -           packages/hpc.git                    git
+libraries/integer-gmp           -           packages/integer-gmp.git            git
+libraries/integer-simple        -           packages/integer-simple.git         git
+libraries/mtl                   -           packages/mtl.git                    git
+libraries/old-locale            -           packages/old-locale.git             git
+libraries/old-time              -           packages/old-time.git               git
+libraries/pretty                -           packages/pretty.git                 git
+libraries/process               -           packages/process.git                git
+libraries/random                -           packages/random.git                 git
+libraries/template-haskell      -           packages/template-haskell.git       git
+libraries/terminfo              -           packages/terminfo.git               git
+libraries/unix                  -           packages/unix.git                   git
+libraries/utf8-string           -           packages/utf8-string.git            git
+libraries/Win32                 -           packages/Win32.git                  git
+libraries/xhtml                 -           packages/xhtml.git                  git
+testsuite                       testsuite   testsuite.git                       git
+nofib                           nofib       nofib.git                           git
+libraries/deepseq               extra       packages/deepseq.git                git
+libraries/parallel              extra       packages/parallel.git               git
+libraries/stm                   extra       packages/stm.git                    git
+libraries/primitive             dph         packages/primitive.git              git
+libraries/vector                dph         packages/vector.git                 git
+libraries/dph                   dph         packages/dph.git                    git

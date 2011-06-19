@@ -3,9 +3,10 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 
-Desugaring list comprehensions and array comprehensions
+Desugaring list comprehensions, monad comprehensions and array comprehensions
 
 \begin{code}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
@@ -13,11 +14,11 @@ Desugaring list comprehensions and array comprehensions
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module DsListComp ( dsListComp, dsPArrComp ) where
+module DsListComp ( dsListComp, dsPArrComp, dsMonadComp ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLocalBinds )
 
 import HsSyn
 import TcHsSyn
@@ -37,6 +38,7 @@ import PrelNames
 import SrcLoc
 import Outputable
 import FastString
+import TcType
 \end{code}
 
 List comprehensions may be desugared in one of two ways: ``ordinary''
@@ -47,12 +49,14 @@ There will be at least one ``qualifier'' in the input.
 
 \begin{code}
 dsListComp :: [LStmt Id] 
-	   -> LHsExpr Id
-	   -> Type		-- Type of list elements
+	   -> Type		-- Type of entire list 
 	   -> DsM CoreExpr
-dsListComp lquals body elt_ty = do 
+dsListComp lquals res_ty = do 
     dflags <- getDOptsDs
     let quals = map unLoc lquals
+        elt_ty = case tcTyConAppArgs res_ty of
+                   [elt_ty] -> elt_ty
+                   _ -> pprPanic "dsListComp" (ppr res_ty $$ ppr lquals)
     
     if not (dopt Opt_EnableRewriteRules dflags) || dopt Opt_IgnoreInterfacePragmas dflags
        -- Either rules are switched off, or we are ignoring what there are;
@@ -60,8 +64,8 @@ dsListComp lquals body elt_ty = do
        -- Wadler-style desugaring
        || isParallelComp quals
        -- Foldr-style desugaring can't handle parallel list comprehensions
-        then deListComp quals body (mkNilExpr elt_ty)
-        else mkBuildExpr elt_ty (\(c, _) (n, _) -> dfListComp c n quals body) 
+        then deListComp quals (mkNilExpr elt_ty)
+        else mkBuildExpr elt_ty (\(c, _) (n, _) -> dfListComp c n quals) 
              -- Foldr/build should be enabled, so desugar 
              -- into foldrs and builds
 
@@ -72,92 +76,69 @@ dsListComp lquals body elt_ty = do
     -- mix of possibly a single element in length, so we do this to leave the possibility open
     isParallelComp = any isParallelStmt
   
-    isParallelStmt (ParStmt _) = True
-    isParallelStmt _           = False
+    isParallelStmt (ParStmt _ _ _ _) = True
+    isParallelStmt _                 = False
     
     
 -- This function lets you desugar a inner list comprehension and a list of the binders
 -- of that comprehension that we need in the outer comprehension into such an expression
 -- and the type of the elements that it outputs (tuples of binders)
 dsInnerListComp :: ([LStmt Id], [Id]) -> DsM (CoreExpr, Type)
-dsInnerListComp (stmts, bndrs) = do
-        expr <- dsListComp stmts (mkBigLHsVarTup bndrs) bndrs_tuple_type
-        return (expr, bndrs_tuple_type)
-    where
-        bndrs_types = map idType bndrs
-        bndrs_tuple_type = mkBigCoreTupTy bndrs_types
+dsInnerListComp (stmts, bndrs)
+  = do { expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTup bndrs)]) 
+                            (mkListTy bndrs_tuple_type)
+       ; return (expr, bndrs_tuple_type) }
+  where
+    bndrs_tuple_type = mkBigCoreVarTupTy bndrs
         
-        
--- This function factors out commonality between the desugaring strategies for TransformStmt.
--- Given such a statement it gives you back an expression representing how to compute the transformed
--- list and the tuple that you need to bind from that list in order to proceed with your desugaring
-dsTransformStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsTransformStmt (TransformStmt stmts binders usingExpr maybeByExpr)
- = do { (expr, binders_tuple_type) <- dsInnerListComp (stmts, binders)
-      ; usingExpr' <- dsLExpr usingExpr
-    
-      ; using_args <-
-          case maybeByExpr of
-            Nothing -> return [expr]
-            Just byExpr -> do
-                byExpr' <- dsLExpr byExpr
-                
-                us <- newUniqueSupply
-                [tuple_binder] <- newSysLocalsDs [binders_tuple_type]
-                let byExprWrapper = mkTupleCase us binders byExpr' tuple_binder (Var tuple_binder)
-                
-                return [Lam tuple_binder byExprWrapper, expr]
-
-      ; let inner_list_expr = mkApps usingExpr' ((Type binders_tuple_type) : using_args)
-            pat = mkBigLHsVarPatTup binders
-      ; return (inner_list_expr, pat) }
-    
 -- This function factors out commonality between the desugaring strategies for GroupStmt.
 -- Given such a statement it gives you back an expression representing how to compute the transformed
 -- list and the tuple that you need to bind from that list in order to proceed with your desugaring
-dsGroupStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
-dsGroupStmt (GroupStmt stmts binderMap by using) = do
-    let (fromBinders, toBinders) = unzip binderMap
-        
-        fromBindersTypes = map idType fromBinders
-        toBindersTypes = map idType toBinders
-        
-        toBindersTupleType = mkBigCoreTupTy toBindersTypes
+dsTransStmt :: Stmt Id -> DsM (CoreExpr, LPat Id)
+dsTransStmt (TransStmt { trS_form = form, trS_stmts = stmts, trS_bndrs = binderMap
+                       , trS_by = by, trS_using = using }) = do
+    let (from_bndrs, to_bndrs) = unzip binderMap
+        from_bndrs_tys  = map idType from_bndrs
+        to_bndrs_tys    = map idType to_bndrs
+        to_bndrs_tup_ty = mkBigCoreTupTy to_bndrs_tys
     
     -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
-    (expr, from_tup_ty) <- dsInnerListComp (stmts, fromBinders)
+    (expr, from_tup_ty) <- dsInnerListComp (stmts, from_bndrs)
     
     -- Work out what arguments should be supplied to that expression: i.e. is an extraction
     -- function required? If so, create that desugared function and add to arguments
-    usingExpr' <- dsLExpr (either id noLoc using)
+    usingExpr' <- dsLExpr using
     usingArgs <- case by of
                    Nothing   -> return [expr]
  		   Just by_e -> do { by_e' <- dsLExpr by_e
-                                   ; us <- newUniqueSupply
-                                   ; [from_tup_id] <- newSysLocalsDs [from_tup_ty]
-                                   ; let by_wrap = mkTupleCase us fromBinders by_e' 
-                                                   from_tup_id (Var from_tup_id)
-                                   ; return [Lam from_tup_id by_wrap, expr] }
+                                   ; lam <- matchTuple from_bndrs by_e'
+                                   ; return [lam, expr] }
     
     -- Create an unzip function for the appropriate arity and element types and find "map"
-    (unzip_fn, unzip_rhs) <- mkUnzipBind fromBindersTypes
+    unzip_stuff <- mkUnzipBind form from_bndrs_tys
     map_id <- dsLookupGlobalId mapName
 
     -- Generate the expressions to build the grouped list
     let -- First we apply the grouping function to the inner list
-        inner_list_expr = mkApps usingExpr' ((Type from_tup_ty) : usingArgs)
+        inner_list_expr = mkApps usingExpr' usingArgs
         -- Then we map our "unzip" across it to turn the lists of tuples into tuples of lists
         -- We make sure we instantiate the type variable "a" to be a list of "from" tuples and
         -- the "b" to be a tuple of "to" lists!
-        unzipped_inner_list_expr = mkApps (Var map_id) 
-            [Type (mkListTy from_tup_ty), Type toBindersTupleType, Var unzip_fn, inner_list_expr]
         -- Then finally we bind the unzip function around that expression
-        bound_unzipped_inner_list_expr = Let (Rec [(unzip_fn, unzip_rhs)]) unzipped_inner_list_expr
-    
-    -- Build a pattern that ensures the consumer binds into the NEW binders, which hold lists rather than single values
-    let pat = mkBigLHsVarPatTup toBinders
+        bound_unzipped_inner_list_expr 
+          = case unzip_stuff of
+              Nothing -> inner_list_expr
+              Just (unzip_fn, unzip_rhs) -> Let (Rec [(unzip_fn, unzip_rhs)]) $
+                                            mkApps (Var map_id) $
+                                            [ Type (mkListTy from_tup_ty)
+                                            , Type to_bndrs_tup_ty
+                                            , Var unzip_fn
+                                            , inner_list_expr]
+
+    -- Build a pattern that ensures the consumer binds into the NEW binders, 
+    -- which hold lists rather than single values
+    let pat = mkBigLHsVarPatTup to_bndrs
     return (bound_unzipped_inner_list_expr, pat)
-    
 \end{code}
 
 %************************************************************************
@@ -226,53 +207,50 @@ with the Unboxed variety.
 
 \begin{code}
 
-deListComp :: [Stmt Id] -> LHsExpr Id -> CoreExpr -> DsM CoreExpr
+deListComp :: [Stmt Id] -> CoreExpr -> DsM CoreExpr
 
-deListComp (ParStmt stmtss_w_bndrs : quals) body list
-  = do
-    exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
-    let (exps, qual_tys) = unzip exps_and_qual_tys
+deListComp [] _ = panic "deListComp"
+
+deListComp (LastStmt body _ : quals) list 
+  =     -- Figure 7.4, SLPJ, p 135, rule C above
+    ASSERT( null quals )
+    do { core_body <- dsLExpr body
+       ; return (mkConsExpr (exprType core_body) core_body list) }
+
+	-- Non-last: must be a guard
+deListComp (ExprStmt guard _ _ _ : quals) list = do  -- rule B above
+    core_guard <- dsLExpr guard
+    core_rest <- deListComp quals list
+    return (mkIfThenElse core_guard core_rest list)
+
+-- [e | let B, qs] = let B in [e | qs]
+deListComp (LetStmt binds : quals) list = do
+    core_rest <- deListComp quals list
+    dsLocalBinds binds core_rest
+
+deListComp (stmt@(TransStmt {}) : quals) list = do
+    (inner_list_expr, pat) <- dsTransStmt stmt
+    deBindComp pat inner_list_expr quals list
+
+deListComp (BindStmt pat list1 _ _ : quals) core_list2 = do -- rule A' above
+    core_list1 <- dsLExpr list1
+    deBindComp pat core_list1 quals core_list2
+
+deListComp (ParStmt stmtss_w_bndrs _ _ _ : quals) list
+  = do { exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
+       ; let (exps, qual_tys) = unzip exps_and_qual_tys
     
-    (zip_fn, zip_rhs) <- mkZipBind qual_tys
+       ; (zip_fn, zip_rhs) <- mkZipBind qual_tys
 
 	-- Deal with [e | pat <- zip l1 .. ln] in example above
-    deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)) 
-		   quals body list
-
+       ; deBindComp pat (Let (Rec [(zip_fn, zip_rhs)]) (mkApps (Var zip_fn) exps)) 
+		    quals list }
   where 
 	bndrs_s = map snd stmtss_w_bndrs
 
 	-- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
 	pat  = mkBigLHsPatTup pats
 	pats = map mkBigLHsVarPatTup bndrs_s
-
-	-- Last: the one to return
-deListComp [] body list = do    -- Figure 7.4, SLPJ, p 135, rule C above
-    core_body <- dsLExpr body
-    return (mkConsExpr (exprType core_body) core_body list)
-
-	-- Non-last: must be a guard
-deListComp (ExprStmt guard _ _ : quals) body list = do  -- rule B above
-    core_guard <- dsLExpr guard
-    core_rest <- deListComp quals body list
-    return (mkIfThenElse core_guard core_rest list)
-
--- [e | let B, qs] = let B in [e | qs]
-deListComp (LetStmt binds : quals) body list = do
-    core_rest <- deListComp quals body list
-    dsLocalBinds binds core_rest
-
-deListComp (stmt@(TransformStmt {}) : quals) body list = do
-    (inner_list_expr, pat) <- dsTransformStmt stmt
-    deBindComp pat inner_list_expr quals body list
-
-deListComp (stmt@(GroupStmt {}) : quals) body list = do
-    (inner_list_expr, pat) <- dsGroupStmt stmt
-    deBindComp pat inner_list_expr quals body list
-
-deListComp (BindStmt pat list1 _ _ : quals) body core_list2 = do -- rule A' above
-    core_list1 <- dsLExpr list1
-    deBindComp pat core_list1 quals body core_list2
 \end{code}
 
 
@@ -280,10 +258,9 @@ deListComp (BindStmt pat list1 _ _ : quals) body core_list2 = do -- rule A' abov
 deBindComp :: OutPat Id
            -> CoreExpr
            -> [Stmt Id]
-           -> LHsExpr Id
            -> CoreExpr
            -> DsM (Expr Id)
-deBindComp pat core_list1 quals body core_list2 = do
+deBindComp pat core_list1 quals core_list2 = do
     let
         u3_ty@u1_ty = exprType core_list1	-- two names, same thing
 
@@ -300,7 +277,7 @@ deBindComp pat core_list1 quals body core_list2 = do
         core_fail   = App (Var h) (Var u3)
         letrec_body = App (Var h) core_list1
         
-    rest_expr <- deListComp quals body core_fail
+    rest_expr <- deListComp quals core_fail
     core_match <- matchSimply (Var u2) (StmtCtxt ListComp) pat rest_expr core_fail	
     
     let
@@ -335,48 +312,43 @@ TE[ e | p <- l , q ] c n = let
 \begin{code}
 dfListComp :: Id -> Id -- 'c' and 'n'
         -> [Stmt Id]   -- the rest of the qual's
-        -> LHsExpr Id
         -> DsM CoreExpr
 
-	-- Last: the one to return
-dfListComp c_id n_id [] body = do
-    core_body <- dsLExpr body
-    return (mkApps (Var c_id) [core_body, Var n_id])
+dfListComp _ _ [] = panic "dfListComp"
+
+dfListComp c_id n_id (LastStmt body _ : quals) 
+  = ASSERT( null quals )
+    do { core_body <- dsLExpr body
+       ; return (mkApps (Var c_id) [core_body, Var n_id]) }
 
 	-- Non-last: must be a guard
-dfListComp c_id n_id (ExprStmt guard _ _  : quals) body = do
+dfListComp c_id n_id (ExprStmt guard _ _ _  : quals) = do
     core_guard <- dsLExpr guard
-    core_rest <- dfListComp c_id n_id quals body
+    core_rest <- dfListComp c_id n_id quals
     return (mkIfThenElse core_guard core_rest (Var n_id))
 
-dfListComp c_id n_id (LetStmt binds : quals) body = do
+dfListComp c_id n_id (LetStmt binds : quals) = do
     -- new in 1.3, local bindings
-    core_rest <- dfListComp c_id n_id quals body
+    core_rest <- dfListComp c_id n_id quals
     dsLocalBinds binds core_rest
 
-dfListComp c_id n_id (stmt@(TransformStmt {}) : quals) body = do
-    (inner_list_expr, pat) <- dsTransformStmt stmt
-    -- Anyway, we bind the newly transformed list via the generic binding function
-    dfBindComp c_id n_id (pat, inner_list_expr) quals body
-
-dfListComp c_id n_id (stmt@(GroupStmt {}) : quals) body = do
-    (inner_list_expr, pat) <- dsGroupStmt stmt
+dfListComp c_id n_id (stmt@(TransStmt {}) : quals) = do
+    (inner_list_expr, pat) <- dsTransStmt stmt
     -- Anyway, we bind the newly grouped list via the generic binding function
-    dfBindComp c_id n_id (pat, inner_list_expr) quals body
+    dfBindComp c_id n_id (pat, inner_list_expr) quals 
     
-dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) body = do
+dfListComp c_id n_id (BindStmt pat list1 _ _ : quals) = do
     -- evaluate the two lists
     core_list1 <- dsLExpr list1
     
     -- Do the rest of the work in the generic binding builder
-    dfBindComp c_id n_id (pat, core_list1) quals body
+    dfBindComp c_id n_id (pat, core_list1) quals
                
 dfBindComp :: Id -> Id	        -- 'c' and 'n'
        -> (LPat Id, CoreExpr)
 	   -> [Stmt Id] 	        -- the rest of the qual's
-	   -> LHsExpr Id
 	   -> DsM CoreExpr
-dfBindComp c_id n_id (pat, core_list1) quals body = do
+dfBindComp c_id n_id (pat, core_list1) quals = do
     -- find the required type
     let x_ty   = hsLPatType pat
         b_ty   = idType n_id
@@ -385,7 +357,7 @@ dfBindComp c_id n_id (pat, core_list1) quals body = do
     [b, x] <- newSysLocalsDs [b_ty, x_ty]
 
     -- build rest of the comprehesion
-    core_rest <- dfListComp c_id b quals body
+    core_rest <- dfListComp c_id b quals
 
     -- build the pattern match
     core_expr <- matchSimply (Var x) (StmtCtxt ListComp)
@@ -439,7 +411,7 @@ mkZipBind elt_tys = do
 			-- Increasing order of tag
             
             
-mkUnzipBind :: [Type] -> DsM (Id, CoreExpr)
+mkUnzipBind :: TransForm -> [Type] -> DsM (Maybe (Id, CoreExpr))
 -- mkUnzipBind [t1, t2] 
 -- = (unzip, \ys :: [(t1, t2)] -> foldr (\ax :: (t1, t2) axs :: ([t1], [t2])
 --     -> case ax of
@@ -449,28 +421,29 @@ mkUnzipBind :: [Type] -> DsM (Id, CoreExpr)
 --      ys)
 -- 
 -- We use foldr here in all cases, even if rules are turned off, because we may as well!
-mkUnzipBind elt_tys = do
-    ax  <- newSysLocalDs elt_tuple_ty
-    axs <- newSysLocalDs elt_list_tuple_ty
-    ys  <- newSysLocalDs elt_tuple_list_ty
-    xs  <- mapM newSysLocalDs elt_tys
-    xss <- mapM newSysLocalDs elt_list_tys
+mkUnzipBind ThenForm _
+ = return Nothing    -- No unzipping for ThenForm
+mkUnzipBind _ elt_tys 
+  = do { ax  <- newSysLocalDs elt_tuple_ty
+       ; axs <- newSysLocalDs elt_list_tuple_ty
+       ; ys  <- newSysLocalDs elt_tuple_list_ty
+       ; xs  <- mapM newSysLocalDs elt_tys
+       ; xss <- mapM newSysLocalDs elt_list_tys
     
-    unzip_fn <- newSysLocalDs unzip_fn_ty
+       ; unzip_fn <- newSysLocalDs unzip_fn_ty
 
-    [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
+       ; [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
 
-    let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
-        
-        concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
-        tupled_concat_expression = mkBigCoreTup concat_expressions
-        
-        folder_body_inner_case = mkTupleCase us1 xss tupled_concat_expression axs (Var axs)
-        folder_body_outer_case = mkTupleCase us2 xs folder_body_inner_case ax (Var ax)
-        folder_body = mkLams [ax, axs] folder_body_outer_case
-        
-    unzip_body <- mkFoldrExpr elt_tuple_ty elt_list_tuple_ty folder_body nil_tuple (Var ys)
-    return (unzip_fn, mkLams [ys] unzip_body)
+       ; let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
+    	     concat_expressions = map mkConcatExpression (zip3 elt_tys (map Var xs) (map Var xss))
+    	     tupled_concat_expression = mkBigCoreTup concat_expressions
+    	    
+    	     folder_body_inner_case = mkTupleCase us1 xss tupled_concat_expression axs (Var axs)
+    	     folder_body_outer_case = mkTupleCase us2 xs folder_body_inner_case ax (Var ax)
+    	     folder_body = mkLams [ax, axs] folder_body_outer_case
+    	    
+       ; unzip_body <- mkFoldrExpr elt_tuple_ty elt_list_tuple_ty folder_body nil_tuple (Var ys)
+       ; return (Just (unzip_fn, mkLams [ys] unzip_body)) }
   where
     elt_tuple_ty       = mkBigCoreTupTy elt_tys
     elt_tuple_list_ty  = mkListTy elt_tuple_ty
@@ -480,9 +453,6 @@ mkUnzipBind elt_tys = do
     unzip_fn_ty        = elt_tuple_list_ty `mkFunTy` elt_list_tuple_ty
             
     mkConcatExpression (list_element_ty, head, tail) = mkConsExpr list_element_ty head tail
-            
-            
-
 \end{code}
 
 %************************************************************************
@@ -498,11 +468,10 @@ mkUnzipBind elt_tys = do
 --   [:e | qss:] = <<[:e | qss:]>> () [:():]
 --
 dsPArrComp :: [Stmt Id] 
-            -> LHsExpr Id
-            -> Type		    -- Don't use; called with `undefined' below
             -> DsM CoreExpr
-dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
-  dePArrParComp qss body
+
+-- Special case for parallel comprehension
+dsPArrComp (ParStmt qss _ _ _ : quals) = dePArrParComp qss quals
 
 -- Special case for simple generators:
 --
@@ -513,8 +482,8 @@ dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
 --  <<[:e' | p <- e, qs:]>> = 
 --    <<[:e' | qs:]>> p (filterP (\x -> case x of {p -> True; _ -> False}) e)
 --
-dsPArrComp (BindStmt p e _ _ : qs) body _ = do
-    filterP <- dsLookupGlobalId filterPName
+dsPArrComp (BindStmt p e _ _ : qs) = do
+    filterP <- dsLookupDPHId filterPName
     ce <- dsLExpr e
     let ety'ce  = parrElemType ce
         false   = Var falseDataConId
@@ -523,38 +492,41 @@ dsPArrComp (BindStmt p e _ _ : qs) body _ = do
     pred <- matchSimply (Var v) (StmtCtxt PArrComp) p true false
     let gen | isIrrefutableHsPat p = ce
             | otherwise            = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
-    dePArrComp qs body p gen
+    dePArrComp qs p gen
 
-dsPArrComp qs            body _  = do -- no ParStmt in `qs'
-    sglP <- dsLookupGlobalId singletonPName
+dsPArrComp qs = do -- no ParStmt in `qs'
+    sglP <- dsLookupDPHId singletonPName
     let unitArray = mkApps (Var sglP) [Type unitTy, mkCoreTup []]
-    dePArrComp qs body (noLoc $ WildPat unitTy) unitArray
+    dePArrComp qs (noLoc $ WildPat unitTy) unitArray
 
 
 
 -- the work horse
 --
 dePArrComp :: [Stmt Id] 
-	   -> LHsExpr Id
 	   -> LPat Id		-- the current generator pattern
 	   -> CoreExpr		-- the current generator expression
 	   -> DsM CoreExpr
+
+dePArrComp [] _ _ = panic "dePArrComp"
+
 --
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
-dePArrComp [] e' pa cea = do
-    mapP <- dsLookupGlobalId mapPName
-    let ty = parrElemType cea
-    (clam, ty'e') <- deLambda ty pa e'
-    return $ mkApps (Var mapP) [Type ty, Type ty'e', clam, cea]
+dePArrComp (LastStmt e' _ : quals) pa cea
+  = ASSERT( null quals )
+    do { mapP <- dsLookupDPHId mapPName
+       ; let ty = parrElemType cea
+       ; (clam, ty'e') <- deLambda ty pa e'
+       ; return $ mkApps (Var mapP) [Type ty, Type ty'e', clam, cea] }
 --
 --  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
 --
-dePArrComp (ExprStmt b _ _ : qs) body pa cea = do
-    filterP <- dsLookupGlobalId filterPName
+dePArrComp (ExprStmt b _ _ _ : qs) pa cea = do
+    filterP <- dsLookupDPHId filterPName
     let ty = parrElemType cea
     (clam,_) <- deLambda ty pa b
-    dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
+    dePArrComp qs pa (mkApps (Var filterP) [Type ty, clam, cea])
 
 --
 --  <<[:e' | p <- e, qs:]>> pa ea =
@@ -569,9 +541,9 @@ dePArrComp (ExprStmt b _ _ : qs) body pa cea = do
 --    in
 --    <<[:e' | qs:]>> (pa, p) (crossMapP ea ef)
 --
-dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
-    filterP <- dsLookupGlobalId filterPName
-    crossMapP <- dsLookupGlobalId crossMapPName
+dePArrComp (BindStmt p e _ _ : qs) pa cea = do
+    filterP <- dsLookupDPHId filterPName
+    crossMapP <- dsLookupDPHId crossMapPName
     ce <- dsLExpr e
     let ety'cea = parrElemType cea
         ety'ce  = parrElemType ce
@@ -585,7 +557,7 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
     let ety'cef = ety'ce		    -- filter doesn't change the element type
         pa'     = mkLHsPatTup [pa, p]
 
-    dePArrComp qs body pa' (mkApps (Var crossMapP) 
+    dePArrComp qs pa' (mkApps (Var crossMapP) 
                                  [Type ety'cea, Type ety'cef, cea, clam])
 --
 --  <<[:e' | let ds, qs:]>> pa ea = 
@@ -594,8 +566,8 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
 --  where
 --    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
 --
-dePArrComp (LetStmt ds : qs) body pa cea = do
-    mapP <- dsLookupGlobalId mapPName
+dePArrComp (LetStmt ds : qs) pa cea = do
+    mapP <- dsLookupDPHId mapPName
     let xs     = collectLocalBinders ds
         ty'cea = parrElemType cea
     v <- newSysLocalDs ty'cea
@@ -609,14 +581,14 @@ dePArrComp (LetStmt ds : qs) body pa cea = do
     ccase <- matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr
     let pa'    = mkLHsPatTup [pa, mkLHsPatTup (map nlVarPat xs)]
         proj   = mkLams [v] ccase
-    dePArrComp qs body pa' (mkApps (Var mapP) 
+    dePArrComp qs pa' (mkApps (Var mapP) 
                                    [Type ty'cea, Type errTy, proj, cea])
 --
 -- The parser guarantees that parallel comprehensions can only appear as
 -- singeltons qualifier lists, which we already special case in the caller.
 -- So, encountering one here is a bug.
 --
-dePArrComp (ParStmt _ : _) _ _ _ = 
+dePArrComp (ParStmt _ _ _ _ : _) _ _ = 
   panic "DsListComp.dePArrComp: malformed comprehension AST"
 
 --  <<[:e' | qs | qss:]>> pa ea = 
@@ -625,26 +597,26 @@ dePArrComp (ParStmt _ : _) _ _ _ =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrParComp :: [([LStmt Id], [Id])] -> LHsExpr Id -> DsM CoreExpr
-dePArrParComp qss body = do
+dePArrParComp :: [([LStmt Id], [Id])] -> [Stmt Id] -> DsM CoreExpr
+dePArrParComp qss quals = do
     (pQss, ceQss) <- deParStmt qss
-    dePArrComp [] body pQss ceQss
+    dePArrComp quals pQss ceQss
   where
     deParStmt []             =
       -- empty parallel statement lists have no source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
     deParStmt ((qs, xs):qss) = do        -- first statement
       let res_expr = mkLHsVarTuple xs
-      cqs <- dsPArrComp (map unLoc qs) res_expr undefined
+      cqs <- dsPArrComp (map unLoc qs ++ [mkLastStmt res_expr])
       parStmts qss (mkLHsVarPatTup xs) cqs
     ---
     parStmts []             pa cea = return (pa, cea)
     parStmts ((qs, xs):qss) pa cea = do  -- subsequent statements (zip'ed)
-      zipP <- dsLookupGlobalId zipPName
+      zipP <- dsLookupDPHId zipPName
       let pa'      = mkLHsPatTup [pa, mkLHsVarPatTup xs]
           ty'cea   = parrElemType cea
           res_expr = mkLHsVarTuple xs
-      cqs <- dsPArrComp (map unLoc qs) res_expr undefined
+      cqs <- dsPArrComp (map unLoc qs ++ [mkLastStmt res_expr])
       let ty'cqs = parrElemType cqs
           cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
       parStmts qss pa' cea'
@@ -681,4 +653,223 @@ parrElemType e  =
     Just (tycon, [ty]) | tycon == parrTyCon -> ty
     _							  -> panic
       "DsListComp.parrElemType: not a parallel array type"
+\end{code}
+
+Translation for monad comprehensions
+
+\begin{code}
+-- Entry point for monad comprehension desugaring
+dsMonadComp :: [LStmt Id] -> DsM CoreExpr
+dsMonadComp stmts = dsMcStmts stmts
+
+dsMcStmts :: [LStmt Id] -> DsM CoreExpr
+dsMcStmts []                    = panic "dsMcStmts"
+dsMcStmts (L loc stmt : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
+
+---------------
+dsMcStmt :: Stmt Id -> [LStmt Id] -> DsM CoreExpr
+
+dsMcStmt (LastStmt body ret_op) stmts
+  = ASSERT( null stmts )
+    do { body' <- dsLExpr body
+       ; ret_op' <- dsExpr ret_op
+       ; return (App ret_op' body') }
+
+--   [ .. | let binds, stmts ]
+dsMcStmt (LetStmt binds) stmts 
+  = do { rest <- dsMcStmts stmts
+       ; dsLocalBinds binds rest }
+
+--   [ .. | a <- m, stmts ]
+dsMcStmt (BindStmt pat rhs bind_op fail_op) stmts
+  = do { rhs' <- dsLExpr rhs
+       ; dsMcBindStmt pat rhs' bind_op fail_op stmts }
+
+-- Apply `guard` to the `exp` expression
+--
+--   [ .. | exp, stmts ]
+--
+dsMcStmt (ExprStmt exp then_exp guard_exp _) stmts 
+  = do { exp'       <- dsLExpr exp
+       ; guard_exp' <- dsExpr guard_exp
+       ; then_exp'  <- dsExpr then_exp
+       ; rest       <- dsMcStmts stmts
+       ; return $ mkApps then_exp' [ mkApps guard_exp' [exp']
+                                   , rest ] }
+
+-- Group statements desugar like this:
+--
+--   [| (q, then group by e using f); rest |]
+--   --->  f {qt} (\qv -> e) [| q; return qv |] >>= \ n_tup -> 
+--         case unzip n_tup of qv' -> [| rest |]
+--
+-- where   variables (v1:t1, ..., vk:tk) are bound by q
+--         qv = (v1, ..., vk)
+--         qt = (t1, ..., tk)
+--         (>>=) :: m2 a -> (a -> m3 b) -> m3 b
+--         f :: forall a. (a -> t) -> m1 a -> m2 (n a)
+--         n_tup :: n qt
+--         unzip :: n qt -> (n t1, ..., n tk)    (needs Functor n)
+
+dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
+                    , trS_by = by, trS_using = using
+                    , trS_ret = return_op, trS_bind = bind_op
+                    , trS_fmap = fmap_op, trS_form = form }) stmts_rest
+  = do { let (from_bndrs, to_bndrs) = unzip bndrs
+             from_bndr_tys          = map idType from_bndrs	-- Types ty
+
+       -- Desugar an inner comprehension which outputs a list of tuples of the "from" binders
+       ; expr <- dsInnerMonadComp stmts from_bndrs return_op
+
+       -- Work out what arguments should be supplied to that expression: i.e. is an extraction
+       -- function required? If so, create that desugared function and add to arguments
+       ; usingExpr' <- dsLExpr using
+       ; usingArgs <- case by of
+                        Nothing   -> return [expr]
+                        Just by_e -> do { by_e' <- dsLExpr by_e
+                                        ; lam <- matchTuple from_bndrs by_e'
+                                        ; return [lam, expr] }
+
+       -- Generate the expressions to build the grouped list
+       -- Build a pattern that ensures the consumer binds into the NEW binders, 
+       -- which hold monads rather than single values
+       ; bind_op' <- dsExpr bind_op
+       ; let bind_ty  = exprType bind_op'    -- m2 (n (a,b,c)) -> (n (a,b,c) -> r1) -> r2
+             n_tup_ty = funArgTy $ funArgTy $ funResultTy bind_ty   -- n (a,b,c)
+             tup_n_ty = mkBigCoreVarTupTy to_bndrs
+
+       ; body       <- dsMcStmts stmts_rest
+       ; n_tup_var  <- newSysLocalDs n_tup_ty
+       ; tup_n_var  <- newSysLocalDs tup_n_ty
+       ; tup_n_expr <- mkMcUnzipM form fmap_op n_tup_var from_bndr_tys
+       ; us         <- newUniqueSupply
+       ; let rhs'  = mkApps usingExpr' usingArgs
+             body' = mkTupleCase us to_bndrs body tup_n_var tup_n_expr
+		   
+       ; return (mkApps bind_op' [rhs', Lam n_tup_var body']) }
+
+-- Parallel statements. Use `Control.Monad.Zip.mzip` to zip parallel
+-- statements, for example:
+--
+--   [ body | qs1 | qs2 | qs3 ]
+--     ->  [ body | (bndrs1, (bndrs2, bndrs3)) 
+--                     <- [bndrs1 | qs1] `mzip` ([bndrs2 | qs2] `mzip` [bndrs3 | qs3]) ]
+--
+-- where `mzip` has type
+--   mzip :: forall a b. m a -> m b -> m (a,b)
+-- NB: we need a polymorphic mzip because we call it several times
+
+dsMcStmt (ParStmt pairs mzip_op bind_op return_op) stmts_rest
+ = do  { exps_w_tys  <- mapM ds_inner pairs   -- Pairs (exp :: m ty, ty)
+       ; mzip_op'    <- dsExpr mzip_op
+
+       ; let -- The pattern variables
+             pats = map (mkBigLHsVarPatTup . snd) pairs
+             -- Pattern with tuples of variables
+             -- [v1,v2,v3]  =>  (v1, (v2, v3))
+             pat = foldr1 (\p1 p2 -> mkLHsPatTup [p1, p2]) pats
+	     (rhs, _) = foldr1 (\(e1,t1) (e2,t2) -> 
+                                 (mkApps mzip_op' [Type t1, Type t2, e1, e2],
+                                  mkBoxedTupleTy [t1,t2])) 
+                               exps_w_tys
+
+       ; dsMcBindStmt pat rhs bind_op noSyntaxExpr stmts_rest }
+  where
+    ds_inner (stmts, bndrs) = do { exp <- dsInnerMonadComp stmts bndrs mono_ret_op
+                                 ; return (exp, tup_ty) }
+       where 
+         mono_ret_op = HsWrap (WpTyApp tup_ty) return_op
+         tup_ty      = mkBigCoreVarTupTy bndrs
+
+dsMcStmt stmt _ = pprPanic "dsMcStmt: unexpected stmt" (ppr stmt)
+
+
+matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
+-- (matchTuple [a,b,c] body)
+--       returns the Core term
+--  \x. case x of (a,b,c) -> body 
+matchTuple ids body
+  = do { us <- newUniqueSupply
+       ; tup_id <- newSysLocalDs (mkBigCoreVarTupTy ids)
+       ; return (Lam tup_id $ mkTupleCase us ids body tup_id (Var tup_id)) }
+
+-- general `rhs' >>= \pat -> stmts` desugaring where `rhs'` is already a
+-- desugared `CoreExpr`
+dsMcBindStmt :: LPat Id
+             -> CoreExpr        -- ^ the desugared rhs of the bind statement
+             -> SyntaxExpr Id
+             -> SyntaxExpr Id
+             -> [LStmt Id]
+             -> DsM CoreExpr
+dsMcBindStmt pat rhs' bind_op fail_op stmts
+  = do  { body     <- dsMcStmts stmts 
+        ; bind_op' <- dsExpr bind_op
+        ; var      <- selectSimpleMatchVarL pat
+        ; let bind_ty = exprType bind_op' 	-- rhs -> (pat -> res1) -> res2
+              res1_ty = funResultTy (funArgTy (funResultTy bind_ty))
+        ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
+                                  res1_ty (cantFailMatchResult body)
+        ; match_code <- handle_failure pat match fail_op
+        ; return (mkApps bind_op' [rhs', Lam var match_code]) }
+
+  where
+    -- In a monad comprehension expression, pattern-match failure just calls
+    -- the monadic `fail` rather than throwing an exception
+    handle_failure pat match fail_op
+      | matchCanFail match
+        = do { fail_op' <- dsExpr fail_op
+             ; fail_msg <- mkStringExpr (mk_fail_msg pat)
+             ; extractMatchResult match (App fail_op' fail_msg) }
+      | otherwise
+        = extractMatchResult match (error "It can't fail") 
+
+    mk_fail_msg :: Located e -> String
+    mk_fail_msg pat = "Pattern match failure in monad comprehension at " ++ 
+                      showSDoc (ppr (getLoc pat))
+
+-- Desugar nested monad comprehensions, for example in `then..` constructs
+--    dsInnerMonadComp quals [a,b,c] ret_op
+-- returns the desugaring of 
+--       [ (a,b,c) | quals ]
+
+dsInnerMonadComp :: [LStmt Id]
+                 -> [Id]	-- Return a tuple of these variables
+                 -> HsExpr Id	-- The monomorphic "return" operator
+                 -> DsM CoreExpr
+dsInnerMonadComp stmts bndrs ret_op
+  = dsMcStmts (stmts ++ [noLoc (LastStmt (mkBigLHsVarTup bndrs) ret_op)])
+
+-- The `unzip` function for `GroupStmt` in a monad comprehensions
+--
+--   unzip :: m (a,b,..) -> (m a,m b,..)
+--   unzip m_tuple = ( liftM selN1 m_tuple
+--                   , liftM selN2 m_tuple
+--                   , .. )
+--
+--   mkMcUnzipM fmap ys [t1, t2]
+--     = ( fmap (selN1 :: (t1, t2) -> t1) ys
+--       , fmap (selN2 :: (t1, t2) -> t2) ys )
+
+mkMcUnzipM :: TransForm
+           -> SyntaxExpr TcId	-- fmap
+	   -> Id		-- Of type n (a,b,c)
+	   -> [Type]		-- [a,b,c]
+	   -> DsM CoreExpr	-- Of type (n a, n b, n c)
+mkMcUnzipM ThenForm _ ys _ 	
+  = return (Var ys) -- No unzipping to do
+
+mkMcUnzipM _ fmap_op ys elt_tys
+  = do { fmap_op' <- dsExpr fmap_op
+       ; xs       <- mapM newSysLocalDs elt_tys
+       ; let tup_ty = mkBigCoreTupTy elt_tys
+       ; tup_xs   <- newSysLocalDs tup_ty
+ 
+       ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
+                           [ Type tup_ty, Type (elt_tys !! i)
+                           , mk_sel i, Var ys]
+
+             mk_sel n = Lam tup_xs $ 
+                        mkTupleSelector xs (xs !! n) tup_xs (Var tup_xs)
+
+       ; return (mkBigCoreTup (map mk_elt [0..length elt_tys - 1])) }
 \end{code}

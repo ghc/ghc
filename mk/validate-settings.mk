@@ -23,7 +23,7 @@ STRIP_CMD       = :
 CHECK_PACKAGES = YES
 
 # We want to install DPH when validating, so that we can test it
-InstallExtraPackages = YES    
+InstallExtraPackages = YES
 
 # dblatex with miktex under msys/mingw can't build the PS and PDF docs,
 # and just building the HTML docs is sufficient to check that the
@@ -36,8 +36,7 @@ ifeq "$(ValidateHpc)" "YES"
 GhcStage2HcOpts += -fhpc -hpcdir $(TOP)/testsuite/hpc_output/
 endif
 ifeq "$(ValidateSlow)" "YES"
-GhcStage2HcOpts += -XGenerics -DDEBUG
-GhcLibHcOpts    += -XGenerics
+GhcStage2HcOpts += -DDEBUG
 endif
 
 ######################################################################

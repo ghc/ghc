@@ -40,6 +40,7 @@
 
 #include "GC.h"
 #include "GCThread.h"
+#include "GCTDecl.h"
 #include "Compact.h"
 #include "Evac.h"
 #include "Scav.h"
@@ -146,8 +147,8 @@ static void start_gc_threads        (void);
 static void scavenge_until_all_done (void);
 static StgWord inc_running          (void);
 static StgWord dec_running          (void);
-static void wakeup_gc_threads       (nat n_threads, nat me);
-static void shutdown_gc_threads     (nat n_threads, nat me);
+static void wakeup_gc_threads       (nat me);
+static void shutdown_gc_threads     (nat me);
 static void collect_gct_blocks      (void);
 
 #if 0 && defined(DEBUG)
@@ -177,7 +178,7 @@ GarbageCollect (rtsBool force_major_gc,
   generation *gen;
   lnat live_blocks, live_words, allocated, max_copied, avg_copied;
   gc_thread *saved_gct;
-  nat g, t, n;
+  nat g, n;
 
   // necessary if we stole a callee-saves register for gct:
   saved_gct = gct;
@@ -198,11 +199,11 @@ GarbageCollect (rtsBool force_major_gc,
   ASSERT(sizeof(gen_workspace) == 16 * sizeof(StgWord));
   // otherwise adjust the padding in gen_workspace.
 
-  // tell the stats department that we've started a GC 
-  stat_startGC();
+  // this is the main thread
+  SET_GCT(gc_threads[cap->no]);
 
-  // tell the STM to discard any cached closures it's hoping to re-use
-  stmPreGCHook();
+  // tell the stats department that we've started a GC 
+  stat_startGC(gct);
 
   // lock the StablePtr table
   stablePtrPreGC();
@@ -277,11 +278,6 @@ GarbageCollect (rtsBool force_major_gc,
   // check sanity *before* GC
   IF_DEBUG(sanity, checkSanity(rtsFalse /* before GC */, major_gc));
 
-  // Initialise all our gc_thread structures
-  for (t = 0; t < n_gc_threads; t++) {
-      init_gc_thread(gc_threads[t]);
-  }
-
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
       prepare_collected_gen(&generations[g]);
@@ -290,6 +286,9 @@ GarbageCollect (rtsBool force_major_gc,
   for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
       prepare_uncollected_gen(&generations[g]);
   }
+
+  // Prepare this gc_thread
+  init_gc_thread(gct);
 
   /* Allocate a mark stack if we're doing a major collection.
    */
@@ -305,17 +304,6 @@ GarbageCollect (rtsBool force_major_gc,
       mark_sp           = NULL;
   }
 
-  // this is the main thread
-#ifdef THREADED_RTS
-  if (n_gc_threads == 1) {
-      SET_GCT(gc_threads[0]);
-  } else {
-      SET_GCT(gc_threads[cap->no]);
-  }
-#else
-SET_GCT(gc_threads[0]);
-#endif
-
   /* -----------------------------------------------------------------------
    * follow all the roots that we know about:
    */
@@ -325,7 +313,9 @@ SET_GCT(gc_threads[0]);
   // NB. do this after the mutable lists have been saved above, otherwise
   // the other GC threads will be writing into the old mutable lists.
   inc_running();
-  wakeup_gc_threads(n_gc_threads, gct->thread_index);
+  wakeup_gc_threads(gct->thread_index);
+
+  traceEventGcWork(gct->cap);
 
   // scavenge the capability-private mutable lists.  This isn't part
   // of markSomeCapabilities() because markSomeCapabilities() can only
@@ -340,7 +330,7 @@ SET_GCT(gc_threads[0]);
 #endif
       }
   } else {
-      scavenge_capability_mut_lists(&capabilities[gct->thread_index]);
+      scavenge_capability_mut_lists(gct->cap);
   }
 
   // follow roots from the CAF list (used by GHCi)
@@ -349,8 +339,16 @@ SET_GCT(gc_threads[0]);
 
   // follow all the roots that the application knows about.
   gct->evac_gen_no = 0;
-  markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
-                       rtsTrue/*prune sparks*/);
+  if (n_gc_threads == 1) {
+      for (n = 0; n < n_capabilities; n++) {
+          markCapability(mark_root, gct, &capabilities[n],
+                         rtsTrue/*don't mark sparks*/);
+      }
+  } else {
+      markCapability(mark_root, gct, cap, rtsTrue/*don't mark sparks*/);
+  }
+
+  markScheduler(mark_root, gct);
 
 #if defined(RTS_USER_SIGNALS)
   // mark the signal handlers (signals should be already blocked)
@@ -385,7 +383,7 @@ SET_GCT(gc_threads[0]);
       break;
   }
 
-  shutdown_gc_threads(n_gc_threads, gct->thread_index);
+  shutdown_gc_threads(gct->thread_index);
 
   // Now see which stable names are still alive.
   gcStablePtrTable();
@@ -396,7 +394,7 @@ SET_GCT(gc_threads[0]);
           pruneSparkQueue(&capabilities[n]);
       }
   } else {
-      pruneSparkQueue(&capabilities[gct->thread_index]);
+      pruneSparkQueue(gct->cap);
   }
 #endif
 
@@ -409,16 +407,6 @@ SET_GCT(gc_threads[0]);
 #endif
 
   // NO MORE EVACUATION AFTER THIS POINT!
-
-  // Two-space collector: free the old to-space.
-  // g0->old_blocks is the old nursery
-  // g0->blocks is to-space from the previous GC
-  if (RtsFlags.GcFlags.generations == 1) {
-      if (g0->blocks != NULL) {
-	  freeChain(g0->blocks);
-	  g0->blocks = NULL;
-      }
-  }
 
   // Finally: compact or sweep the oldest generation.
   if (major_gc && oldest_gen->mark) {
@@ -599,11 +587,6 @@ SET_GCT(gc_threads[0]);
   // update the max size of older generations after a major GC
   resize_generations();
   
-  // Start a new pinned_object_block
-  for (n = 0; n < n_capabilities; n++) {
-      capabilities[n].pinned_object_block = NULL;
-  }
-
   // Free the mark stack.
   if (mark_stack_top_bd != NULL) {
       debugTrace(DEBUG_gc, "mark stack: %d blocks",
@@ -645,8 +628,12 @@ SET_GCT(gc_threads[0]);
   // zero the scavenged static object list 
   if (major_gc) {
       nat i;
-      for (i = 0; i < n_gc_threads; i++) {
-          zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+      if (n_gc_threads == 1) {
+          zero_static_object_list(gct->scavenged_static_objects);
+      } else {
+          for (i = 0; i < n_gc_threads; i++) {
+              zero_static_object_list(gc_threads[i]->scavenged_static_objects);
+          }
       }
   }
 
@@ -713,7 +700,8 @@ SET_GCT(gc_threads[0]);
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(allocated, live_words, copied, N, max_copied, avg_copied,
+  stat_endGC(gct, allocated, live_words,
+             copied, N, max_copied, avg_copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */);
 
   // Guess which generation we'll collect *next* time
@@ -786,6 +774,8 @@ new_gc_thread (nat n, gc_thread *t)
 {
     nat g;
     gen_workspace *ws;
+
+    t->cap = &capabilities[n];
 
 #ifdef THREADED_RTS
     t->id = 0;
@@ -970,8 +960,6 @@ scavenge_until_all_done (void)
 	
 
 loop:
-    traceEventGcWork(&capabilities[gct->thread_index]);
-
 #if defined(THREADED_RTS)
     if (n_gc_threads > 1) {
         scavenge_loop();
@@ -987,7 +975,7 @@ loop:
     // scavenge_loop() only exits when there's no work to do
     r = dec_running();
     
-    traceEventGcIdle(&capabilities[gct->thread_index]);
+    traceEventGcIdle(gct->cap);
 
     debugTrace(DEBUG_gc, "%d GC threads still running", r);
     
@@ -995,6 +983,7 @@ loop:
         // usleep(1);
         if (any_work()) {
             inc_running();
+            traceEventGcWork(gct->cap);
             goto loop;
         }
         // any_work() does not remove the work from the queue, it
@@ -1003,7 +992,7 @@ loop:
         // scavenge_loop() to perform any pending work.
     }
     
-    traceEventGcDone(&capabilities[gct->thread_index]);
+    traceEventGcDone(gct->cap);
 }
 
 #if defined(THREADED_RTS)
@@ -1019,6 +1008,8 @@ gcWorkerThread (Capability *cap)
     gct = gc_threads[cap->no];
     gct->id = osThreadId();
 
+    stat_gcWorkerThreadStart(gct);
+
     // Wait until we're told to wake up
     RELEASE_SPIN_LOCK(&gct->mut_spin);
     gct->wakeup = GC_THREAD_STANDING_BY;
@@ -1032,12 +1023,15 @@ gcWorkerThread (Capability *cap)
     }
     papi_thread_start_gc1_count(gct->papi_events);
 #endif
-    
+
+    init_gc_thread(gct);
+
+    traceEventGcWork(gct->cap);
+
     // Every thread evacuates some roots.
     gct->evac_gen_no = 0;
-    markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads,
-                         rtsTrue/*prune sparks*/);
-    scavenge_capability_mut_lists(&capabilities[gct->thread_index]);
+    markCapability(mark_root, gct, cap, rtsTrue/*prune sparks*/);
+    scavenge_capability_mut_lists(cap);
 
     scavenge_until_all_done();
     
@@ -1063,6 +1057,9 @@ gcWorkerThread (Capability *cap)
                gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
+
+    // record the time spent doing GC in the Task structure
+    stat_gcWorkerThreadDone(gct);
 
     SET_GCT(saved_gct);
 }
@@ -1113,11 +1110,14 @@ start_gc_threads (void)
 }
 
 static void
-wakeup_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
+wakeup_gc_threads (nat me USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
     nat i;
-    for (i=0; i < n_threads; i++) {
+
+    if (n_gc_threads == 1) return;
+
+    for (i=0; i < n_gc_threads; i++) {
         if (i == me) continue;
 	inc_running();
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
@@ -1134,11 +1134,14 @@ wakeup_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
 // standby state, otherwise they may still be executing inside
 // any_work(), and may even remain awake until the next GC starts.
 static void
-shutdown_gc_threads (nat n_threads USED_IF_THREADS, nat me USED_IF_THREADS)
+shutdown_gc_threads (nat me USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
     nat i;
-    for (i=0; i < n_threads; i++) {
+
+    if (n_gc_threads == 1) return;
+
+    for (i=0; i < n_gc_threads; i++) {
         if (i == me) continue;
         while (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) { write_barrier(); }
     }
@@ -1244,7 +1247,7 @@ prepare_collected_gen (generation *gen)
 
     // for a compacted generation, we need to allocate the bitmap
     if (gen->mark) {
-        nat bitmap_size; // in bytes
+        lnat bitmap_size; // in bytes
         bdescr *bitmap_bdescr;
         StgWord *bitmap;
 	
@@ -1373,7 +1376,7 @@ init_gc_thread (gc_thread *t)
     t->static_objects = END_OF_STATIC_LIST;
     t->scavenged_static_objects = END_OF_STATIC_LIST;
     t->scan_bd = NULL;
-    t->mut_lists = capabilities[t->thread_index].mut_lists;
+    t->mut_lists = t->cap->mut_lists;
     t->evac_gen_no = 0;
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;

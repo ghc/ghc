@@ -1,3 +1,45 @@
+More notes (June 11)
+~~~~~~~~~~~~~~~~~~~~
+* Kill dead code assignArguments, argumentsSize in CmmCallConv.
+  Bake in ByteOff to ParamLocation and ArgumentFormat
+  CmmActuals -> [CmmActual]  similary CmmFormals
+
+* Possible refactoring: Nuke AGraph in favour of 
+      mkIfThenElse :: Expr -> Graph -> Graph -> FCode Graph
+  or even
+      mkIfThenElse :: HasUniques m => Expr -> Graph -> Graph -> m Graph
+  (Remmber that the .cmm file parser must use this function)
+
+  or parameterise FCode over its envt; the CgState part seem useful for both
+
+* Move top and tail calls to runCmmContFlowOpts from HscMain to CmmCps.cpsTop
+  (and rename the latter!)
+
+* "Remove redundant reloads" in CmmSpillReload should be redundant; since
+  insertLateReloads is now gone, every reload is reloading a live variable.
+  Test and nuke.
+
+* Sink and inline S(RegSlot(x)) = e in precisely the same way that we
+  sink and inline x = e
+
+* Stack layout is very like register assignment: find non-conflicting assigments.
+  In particular we can use colouring or linear scan (etc).
+
+  We'd fine-grain interference (on a word by word basis) to get maximum overlap.
+  But that may make very big interference graphs.  So linear scan might be
+  more attactive.
+
+  NB: linear scan does on-the-fly live range splitting.
+
+* When stubbing dead slots be careful not to write into an area that
+  overlaps with an area that's in use.  So stubbing needs to *follow* 
+  stack layout.
+
+
+More notes (May 11)
+~~~~~~~~~~~~~~~~~~~
+In CmmNode, consider spliting CmmCall into two: call and jump
+
 Notes on new codegen (Aug 10)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -15,14 +57,11 @@ Things to do:
 	This will fix the spill before stack check problem but only really as a side
 	effect. A 'real fix' probably requires making the spiller know about sp checks.
 
- - There is some silly stuff happening with the Sp. We end up with code like:
-   Sp = Sp + 8; R1 = _vwf::I64; Sp = Sp -8
-	Seems to be perhaps caused by the issue above but also maybe a optimisation
-	pass needed?
+   EZY: I don't understand this comment. David Terei, can you clarify?
 
- - Proc pass all arguments on the stack, adding more code and slowing down things
-   a lot. We either need to fix this or even better would be to get rid of
-	proc points.
+ - Proc points pass all arguments on the stack, adding more code and
+   slowing down things a lot. We either need to fix this or even better
+   would be to get rid of proc points.
 
  - CmmInfo.cmmToRawCmm uses Old.Cmm, so it is called after converting Cmm.Cmm to
    Old.Cmm. We should abstract it to work on both representations, it needs only to
@@ -32,7 +71,7 @@ Things to do:
    we could convert codeGen/StgCmm* clients to the Hoopl's semantics?
    It's all deeply unsatisfactory.
 
- - Improve preformance of Hoopl.
+ - Improve performance of Hoopl.
 
    A nofib comparison of -fasm vs -fnewcodegen nofib compilation parameters
    (using the same ghc-cmm branch +libraries compiled by the old codegenerator)
@@ -50,6 +89,9 @@ Things to do:
 
    So we generate a bit better code, but it takes us longer!
 
+   EZY: Also importantly, Hoopl uses dramatically more memory than the
+   old code generator.
+
  - Are all blockToNodeList and blockOfNodeList really needed? Maybe we could
    splice blocks instead?
 
@@ -57,7 +99,7 @@ Things to do:
    a block catenation function would be probably nicer than blockToNodeList
    / blockOfNodeList combo.
 
- - loweSafeForeignCall seems too lowlevel. Just use Dataflow. After that
+ - lowerSafeForeignCall seems too lowlevel. Just use Dataflow. After that
    delete splitEntrySeq from HooplUtils.
 
  - manifestSP seems to touch a lot of the graph representation. It is
@@ -76,6 +118,9 @@ Things to do:
    calling convention, and the code for calling foreign calls is generated
 
  - AsmCodeGen has a generic Cmm optimiser; move this into new pipeline
+   EZY (2011-04-16): The mini-inliner has been generalized and ported,
+   but the constant folding and other optimizations need to still be
+   ported.
 
  - AsmCodeGen has post-native-cg branch eliminator (shortCutBranches);
    we ultimately want to share this with the Cmm branch eliminator.
@@ -113,7 +158,7 @@ Things to do:
  - See "CAFs" below; we want to totally refactor the way SRTs are calculated
 
  - Pull out Areas into its own module
-   Parameterise AreaMap
+   Parameterise AreaMap (note there are type synonyms in CmmStackLayout!)
    Add ByteWidth = Int
    type SubArea    = (Area, ByteOff, ByteWidth) 
    ByteOff should not be defined in SMRep -- that is too high up the hierarchy
@@ -293,8 +338,8 @@ cpsTop:
        insert spills/reloads across 
 	   LastCalls, and 
 	   Branches to proc-points
-     Now sink those reloads:
-     - CmmSpillReload.insertLateReloads
+     Now sink those reloads (and other instructions):
+     - CmmSpillReload.rewriteAssignments
      - CmmSpillReload.removeDeadAssignmentsAndReloads
 
   * CmmStackLayout.stubSlotsOnDeath
@@ -344,7 +389,7 @@ to J that way. This is an awkward choice.  (We think that we currently
 never pass variables to join points via arguments.)
 
 Furthermore, there is *no way* to pass q to J in a register (other
-than a paramter register).
+than a parameter register).
 
 What we want is to do register allocation across the whole caboodle.
 Then we could drop all the code that deals with the above awkward

@@ -1447,18 +1447,18 @@ delete_threads_and_gc:
         recent_activity = ACTIVITY_YES;
     }
 
+    if (heap_census) {
+        debugTrace(DEBUG_sched, "performing heap census");
+        heapCensus();
+	performHeapProfile = rtsFalse;
+    }
+
 #if defined(THREADED_RTS)
     if (gc_type == PENDING_GC_PAR)
     {
         releaseGCThreads(cap);
     }
 #endif
-
-    if (heap_census) {
-        debugTrace(DEBUG_sched, "performing heap census");
-        heapCensus();
-	performHeapProfile = rtsFalse;
-    }
 
     if (heap_overflow && sched_state < SCHED_INTERRUPTING) {
         // GC set the heap_overflow flag, so we should proceed with
@@ -1874,9 +1874,9 @@ scheduleThread(Capability *cap, StgTSO *tso)
 void
 scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 {
-#if defined(THREADED_RTS)
     tso->flags |= TSO_LOCKED; // we requested explicit affinity; don't
 			      // move this thread from now on.
+#if defined(THREADED_RTS)
     cpu %= RtsFlags.ParFlags.nNodes;
     if (cpu == cap->no) {
 	appendToRunQueue(cap,tso);
@@ -2030,16 +2030,7 @@ exitScheduler (rtsBool wait_foreign USED_IF_THREADS)
     }
     sched_state = SCHED_SHUTTING_DOWN;
 
-#if defined(THREADED_RTS)
-    { 
-	nat i;
-	
-	for (i = 0; i < n_capabilities; i++) {
-            ASSERT(task->incall->tso == NULL);
-	    shutdownCapability(&capabilities[i], task, wait_foreign);
-	}
-    }
-#endif
+    shutdownCapabilities(task, wait_foreign);
 
     boundTaskExiting(task);
 }
@@ -2067,6 +2058,16 @@ freeScheduler( void )
 #if defined(THREADED_RTS)
     closeMutex(&sched_mutex);
 #endif
+}
+
+void markScheduler (evac_fn evac USED_IF_NOT_THREADS, 
+                    void *user USED_IF_NOT_THREADS)
+{
+#if !defined(THREADED_RTS)
+    evac(user, (StgClosure **)(void *)&blocked_queue_hd);
+    evac(user, (StgClosure **)(void *)&blocked_queue_tl);
+    evac(user, (StgClosure **)(void *)&sleeping_queue);
+#endif 
 }
 
 /* -----------------------------------------------------------------------------

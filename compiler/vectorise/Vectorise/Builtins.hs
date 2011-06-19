@@ -1,6 +1,6 @@
 
 -- | Builtin types and functions used by the vectoriser.
---   The source program uses functions from GHC.PArr, which the vectoriser rewrites
+--   The source program uses functions from Data.Array.Parallel, which the vectoriser rewrites
 --   to use equivalent vectorised versions in the DPH backend packages.
 --
 --   The `Builtins` structure holds the name of all the things in the DPH packages

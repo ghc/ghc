@@ -38,6 +38,8 @@ lmGlobalReg suf reg
         VanillaReg 4 _ -> wordGlobal $ "R4" ++ suf
         VanillaReg 5 _ -> wordGlobal $ "R5" ++ suf
         VanillaReg 6 _ -> wordGlobal $ "R6" ++ suf
+        VanillaReg 7 _ -> wordGlobal $ "R7" ++ suf
+        VanillaReg 8 _ -> wordGlobal $ "R8" ++ suf
         SpLim          -> wordGlobal $ "SpLim" ++ suf
         FloatReg 1     -> floatGlobal $"F1" ++ suf
         FloatReg 2     -> floatGlobal $"F2" ++ suf

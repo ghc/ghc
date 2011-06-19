@@ -14,6 +14,7 @@
 -----------------------------------------------------------------------------
 
 module CmmOpt (
+	cmmEliminateDeadBlocks,
 	cmmMiniInline,
 	cmmMachOpFold,
 	cmmLoopifyForC,
@@ -30,20 +31,81 @@ import UniqFM
 import Unique
 import FastTypes
 import Outputable
+import BlockId
 
 import Data.Bits
 import Data.Word
 import Data.Int
+import Data.Maybe
+import Data.List
+
+import Compiler.Hoopl hiding (Unique)
+
+-- -----------------------------------------------------------------------------
+-- Eliminates dead blocks
+
+{-
+We repeatedly expand the set of reachable blocks until we hit a
+fixpoint, and then prune any blocks that were not in this set.  This is
+actually a required optimization, as dead blocks can cause problems
+for invariants in the linear register allocator (and possibly other
+places.)
+-}
+
+-- Deep fold over statements could probably be abstracted out, but it
+-- might not be worth the effort since OldCmm is moribund
+cmmEliminateDeadBlocks :: [CmmBasicBlock] -> [CmmBasicBlock]
+cmmEliminateDeadBlocks [] = []
+cmmEliminateDeadBlocks blocks@(BasicBlock base_id _:_) =
+    let -- Calculate what's reachable from what block
+        reachableMap = foldl' f emptyUFM blocks -- lazy in values
+            where f m (BasicBlock block_id stmts) = addToUFM m block_id (reachableFrom stmts)
+        reachableFrom stmts = foldl stmt [] stmts
+            where
+                stmt m CmmNop = m
+                stmt m (CmmComment _) = m
+                stmt m (CmmAssign _ e) = expr m e
+                stmt m (CmmStore e1 e2) = expr (expr m e1) e2
+                stmt m (CmmCall c _ as _ _) = f (actuals m as) c
+                    where f m (CmmCallee e _) = expr m e
+                          f m (CmmPrim _) = m
+                stmt m (CmmBranch b) = b:m
+                stmt m (CmmCondBranch e b) = b:(expr m e)
+                stmt m (CmmSwitch e bs) = catMaybes bs ++ expr m e
+                stmt m (CmmJump e as) = expr (actuals m as) e
+                stmt m (CmmReturn as) = actuals m as
+                actuals m as = foldl' (\m h -> expr m (hintlessCmm h)) m as
+                -- We have to do a deep fold into CmmExpr because
+                -- there may be a BlockId in the CmmBlock literal.
+                expr m (CmmLit l) = lit m l
+                expr m (CmmLoad e _) = expr m e
+                expr m (CmmReg _) = m
+                expr m (CmmMachOp _ es) = foldl' expr m es
+                expr m (CmmStackSlot _ _) = m
+                expr m (CmmRegOff _ _) = m
+                lit m (CmmBlock b) = b:m
+                lit m _ = m
+        -- go todo done
+        reachable = go [base_id] (setEmpty :: BlockSet)
+          where go []     m = m
+                go (x:xs) m
+                    | setMember x m = go xs m
+                    | otherwise     = go (add ++ xs) (setInsert x m)
+                        where add = fromMaybe (panic "cmmEliminateDeadBlocks: unknown block")
+                                              (lookupUFM reachableMap x)
+    in filter (\(BasicBlock block_id _) -> setMember block_id reachable) blocks
 
 -- -----------------------------------------------------------------------------
 -- The mini-inliner
 
 {-
-This pass inlines assignments to temporaries that are used just
-once.  It works as follows:
+This pass inlines assignments to temporaries.  Temporaries that are
+only used once are unconditionally inlined.  Temporaries that are used
+two or more times are only inlined if they are assigned a literal.  It
+works as follows:
 
   - count uses of each temporary
-  - for each temporary that occurs just once:
+  - for each temporary:
 	- attempt to push it forward to the statement that uses it
         - only push forward past assignments to other temporaries
 	  (assumes that temporaries are single-assignment)
@@ -99,11 +161,37 @@ cmmMiniInline blocks = map do_inline blocks
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
 cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
-        -- not used at all: just discard this assignment
+        -- not used: just discard this assignment
   | Nothing <- lookupUFM uses u
   = cmmMiniInlineStmts uses stmts
 
-        -- used once: try to inline at the use site
+        -- used (literal): try to inline at all the use sites
+  | Just n <- lookupUFM uses u, isLit expr
+  =
+#ifdef NCG_DEBUG
+     trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
+#endif
+     case lookForInlineLit u expr stmts of
+         (m, stmts')
+             | n == m -> cmmMiniInlineStmts (delFromUFM uses u) stmts'
+             | otherwise ->
+                 stmt : cmmMiniInlineStmts (adjustUFM (\x -> x - m) uses u) stmts'
+
+        -- used (foldable to literal): try to inline at all the use sites
+  | Just n <- lookupUFM uses u,
+    CmmMachOp op es <- expr,
+    e@(CmmLit _) <- cmmMachOpFold op es
+  =
+#ifdef NCG_DEBUG
+     trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
+#endif
+     case lookForInlineLit u e stmts of
+         (m, stmts')
+             | n == m -> cmmMiniInlineStmts (delFromUFM uses u) stmts'
+             | otherwise ->
+                 stmt : cmmMiniInlineStmts (adjustUFM (\x -> x - m) uses u) stmts'
+
+        -- used once (non-literal): try to inline at the use site
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
@@ -115,12 +203,40 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
 cmmMiniInlineStmts uses (stmt:stmts)
   = stmt : cmmMiniInlineStmts uses stmts
 
-lookForInline u expr (stmt : rest)
+-- | Takes a register, a 'CmmLit' expression assigned to that
+-- register, and a list of statements.  Inlines the expression at all
+-- use sites of the register.  Returns the number of substituations
+-- made and the, possibly modified, list of statements.
+lookForInlineLit :: Unique -> CmmExpr -> [CmmStmt] -> (Int, [CmmStmt])
+lookForInlineLit _ _ [] = (0, [])
+lookForInlineLit u expr stmts@(stmt : rest)
+  | Just n <- lookupUFM (countUses stmt) u
+  = case lookForInlineLit u expr rest of
+      (m, stmts) -> let z = n + m
+                    in z `seq` (z, inlineStmt u expr stmt : stmts)
+
+  | ok_to_skip
+  = case lookForInlineLit u expr rest of
+      (n, stmts) -> (n, stmt : stmts)
+
+  | otherwise
+  = (0, stmts)
+  where
+    -- We skip over assignments to registers, unless the register
+    -- being assigned to is the one we're inlining.
+    ok_to_skip = case stmt of
+        CmmAssign (CmmLocal r@(LocalReg u' _)) _ | u' == u -> False
+        _other -> True
+
+lookForInline u expr stmts = lookForInline' u expr regset stmts
+    where regset = foldRegsUsed extendRegSet emptyRegSet expr
+
+lookForInline' u expr regset (stmt : rest)
   | Just 1 <- lookupUFM (countUses stmt) u, ok_to_inline
   = Just (inlineStmt u expr stmt : rest)
 
   | ok_to_skip
-  = case lookForInline u expr rest of
+  = case lookForInline' u expr regset rest of
            Nothing    -> Nothing
            Just stmts -> Just (stmt:stmts)
 
@@ -137,12 +253,18 @@ lookForInline u expr (stmt : rest)
 		     CmmCall{} -> hasNoGlobalRegs expr
 		     _ -> True
 
-   -- We can skip over assignments to other tempoararies, because we
-   -- know that expressions aren't side-effecting and temporaries are
-   -- single-assignment.
+   -- Expressions aren't side-effecting.  Temporaries may or may not
+   -- be single-assignment depending on the source (the old code
+   -- generator creates single-assignment code, but hand-written Cmm
+   -- and Cmm from the new code generator is not single-assignment.)
+   -- So we do an extra check to make sure that the register being
+   -- changed is not one we were relying on.  I don't know how much of a
+   -- performance hit this is (we have to create a regset for every
+   -- instruction.) -- EZY
     ok_to_skip = case stmt of
                  CmmNop -> True
-                 CmmAssign (CmmLocal (LocalReg u' _)) rhs | u' /= u -> True
+                 CmmComment{} -> True
+                 CmmAssign (CmmLocal r@(LocalReg u' _)) rhs | u' /= u && not (r `elemRegSet` regset) -> True
                  CmmAssign g@(CmmGlobal _) rhs -> not (g `regUsedIn` expr)
                  _other -> False
 
@@ -306,9 +428,18 @@ cmmMachOpFold op [x@(CmmLit _), y]
 -- PicBaseReg from the corresponding label (or label difference).
 --
 cmmMachOpFold mop1 [CmmMachOp mop2 [arg1,arg2], arg3]
-   | mop1 == mop2 && isAssociativeMachOp mop1
+   | mop2 `associates_with` mop1
      && not (isLit arg1) && not (isPicReg arg1)
-   = cmmMachOpFold mop1 [arg1, cmmMachOpFold mop2 [arg2,arg3]]
+   = cmmMachOpFold mop2 [arg1, cmmMachOpFold mop1 [arg2,arg3]]
+   where
+     MO_Add{} `associates_with` MO_Sub{} = True
+     mop1 `associates_with` mop2 =
+        mop1 == mop2 && isAssociativeMachOp mop1
+
+-- special case: (a - b) + c  ==>  a + (c - b)
+cmmMachOpFold mop1@(MO_Add{}) [CmmMachOp mop2@(MO_Sub{}) [arg1,arg2], arg3]
+   | not (isLit arg1) && not (isPicReg arg1)
+   = cmmMachOpFold mop1 [arg1, cmmMachOpFold mop2 [arg3,arg2]]
 
 -- Make a RegOff if we can
 cmmMachOpFold (MO_Add _) [CmmReg reg, CmmLit (CmmInt n rep)]
@@ -431,10 +562,10 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
   = case mop of
     	MO_Mul rep
 	   | Just p <- exactLog2 n ->
-                 CmmMachOp (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
+                 cmmMachOpFold (MO_Shl rep) [x, CmmLit (CmmInt p rep)]
     	MO_U_Quot rep
 	   | Just p <- exactLog2 n ->
-                 CmmMachOp (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)]
+                 cmmMachOpFold (MO_U_Shr rep) [x, CmmLit (CmmInt p rep)]
     	MO_S_Quot rep
 	   | Just p <- exactLog2 n, 
 	     CmmReg _ <- x ->	-- We duplicate x below, hence require
@@ -462,7 +593,7 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt n _))]
 			 CmmMachOp (MO_And rep) [x1, CmmLit (CmmInt (n-1) rep)]
 		    x3 = CmmMachOp (MO_Add rep) [x, x2]
 		in
-                CmmMachOp (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)]
+                cmmMachOpFold (MO_S_Shr rep) [x3, CmmLit (CmmInt p rep)]
     	other
            -> unchanged
     where

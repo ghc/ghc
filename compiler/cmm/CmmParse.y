@@ -396,13 +396,15 @@ stmt	:: { ExtCode }
 	| NAME '(' exprs0 ')' ';'
 		{% stmtMacro $1 $3  }
 	| 'switch' maybe_range expr '{' arms default '}'
-		{ doSwitch $2 $3 $5 $6 }
+		{ do as <- sequence $5; doSwitch $2 $3 as $6 }
 	| 'goto' NAME ';'
 		{ do l <- lookupLabel $2; stmtEC (CmmBranch l) }
 	| 'jump' expr maybe_actuals ';'
 		{ do e1 <- $2; e2 <- sequence $3; stmtEC (CmmJump e1 e2) }
         | 'return' maybe_actuals ';'
 		{ do e <- sequence $2; stmtEC (CmmReturn e) }
+	| 'if' bool_expr 'goto' NAME
+		{ do l <- lookupLabel $4; cmmRawIf $2 l }
 	| 'if' bool_expr '{' body '}' else 	
 		{ cmmIfThenElse $2 $4 $6 }
 
@@ -441,12 +443,16 @@ maybe_range :: { Maybe (Int,Int) }
 	: '[' INT '..' INT ']'	{ Just (fromIntegral $2, fromIntegral $4) }
 	| {- empty -}		{ Nothing }
 
-arms	:: { [([Int],ExtCode)] }
+arms	:: { [ExtFCode ([Int],Either BlockId ExtCode)] }
 	: {- empty -}			{ [] }
 	| arm arms			{ $1 : $2 }
 
-arm	:: { ([Int],ExtCode) }
-	: 'case' ints ':' '{' body '}'	{ ($2, $5) }
+arm	:: { ExtFCode ([Int],Either BlockId ExtCode) }
+	: 'case' ints ':' arm_body	{ do b <- $4; return ($2, b) }
+
+arm_body :: { ExtFCode (Either BlockId ExtCode) }
+	: '{' body '}'			{ return (Right $2) }
+	| 'goto' NAME ';'		{ do l <- lookupLabel $2; return (Left l) }
 
 ints	:: { [Int] }
 	: INT				{ [ fromIntegral $1 ] }
@@ -458,6 +464,8 @@ default :: { Maybe ExtCode }
 	-- 'default' branches
 	| {- empty -}			{ Nothing }
 
+-- Note: OldCmm doesn't support a first class 'else' statement, though
+-- CmmNode does.
 else 	:: { ExtCode }
 	: {- empty -}			{ nopEC }
 	| 'else' '{' body '}'		{ $3 }
@@ -681,15 +689,7 @@ machOps = listToUFM $
 	( "gtu",	MO_U_Gt ),
 	( "ltu",	MO_U_Lt ),
 
-	( "flt",	MO_S_Lt ),
-	( "fle",	MO_S_Le ),
-	( "feq",	MO_Eq ),
-	( "fne",	MO_Ne ),
-	( "fgt",	MO_S_Gt ),
-	( "fge",	MO_S_Ge ),
-	( "fneg",	MO_S_Neg ),
-
-	( "and",	MO_And ),
+        ( "and",        MO_And ),
 	( "or",		MO_Or ),
 	( "xor",	MO_Xor ),
 	( "com",	MO_Not ),
@@ -697,7 +697,20 @@ machOps = listToUFM $
 	( "shrl",	MO_U_Shr ),
 	( "shra",	MO_S_Shr ),
 
-	( "lobits8",  flip MO_UU_Conv W8  ),
+        ( "fadd",       MO_F_Add ),
+        ( "fsub",       MO_F_Sub ),
+        ( "fneg",       MO_F_Neg ),
+        ( "fmul",       MO_F_Mul ),
+        ( "fquot",      MO_F_Quot ),
+
+        ( "feq",        MO_F_Eq ),
+        ( "fne",        MO_F_Ne ),
+        ( "fge",        MO_F_Ge ),
+        ( "fle",        MO_F_Le ),
+        ( "fgt",        MO_F_Gt ),
+        ( "flt",        MO_F_Lt ),
+
+        ( "lobits8",  flip MO_UU_Conv W8  ),
 	( "lobits16", flip MO_UU_Conv W16 ),
 	( "lobits32", flip MO_UU_Conv W32 ),
 	( "lobits64", flip MO_UU_Conv W64 ),
@@ -722,7 +735,10 @@ machOps = listToUFM $
 
 callishMachOps = listToUFM $
 	map (\(x, y) -> (mkFastString x, y)) [
-        ( "write_barrier", MO_WriteBarrier )
+        ( "write_barrier", MO_WriteBarrier ),
+        ( "memcpy", MO_Memcpy ),
+        ( "memset", MO_Memset ),
+        ( "memmove", MO_Memmove )
         -- ToDo: the rest, maybe
     ]
 
@@ -952,6 +968,10 @@ cmmIfThenElse cond then_part else_part = do
      -- fall through to join
      code (labelC join_id)
 
+cmmRawIf cond then_id = do
+    c <- cond
+    emitCond c then_id
+
 -- 'emitCond cond true_id'  emits code to test whether the cond is true,
 -- branching to true_id if so, and falling through otherwise.
 emitCond (BoolTest e) then_id = do
@@ -991,7 +1011,7 @@ emitCond (e1 `BoolAnd` e2) then_id = do
 -- optional range on the switch (eg. switch [0..7] {...}), or by
 -- the minimum/maximum values from the branches.
 
-doSwitch :: Maybe (Int,Int) -> ExtFCode CmmExpr -> [([Int],ExtCode)]
+doSwitch :: Maybe (Int,Int) -> ExtFCode CmmExpr -> [([Int],Either BlockId ExtCode)]
          -> Maybe ExtCode -> ExtCode
 doSwitch mb_range scrut arms deflt
    = do 
@@ -1018,11 +1038,11 @@ doSwitch mb_range scrut arms deflt
 	-- ToDo: check for out of range and jump to default if necessary
         stmtEC (CmmSwitch expr entries)
    where
-	emitArm :: ([Int],ExtCode) -> ExtFCode [(Int,BlockId)]
-	emitArm (ints,code) = do
+	emitArm :: ([Int],Either BlockId ExtCode) -> ExtFCode [(Int,BlockId)]
+	emitArm (ints,Left blockid) = return [ (i,blockid) | i <- ints ]
+	emitArm (ints,Right code) = do
 	   blockid <- forkLabelledCodeEC code
 	   return [ (i,blockid) | i <- ints ]
-
 
 -- -----------------------------------------------------------------------------
 -- Putting it all together
@@ -1042,7 +1062,7 @@ parseCmmFile dflags filename = do
   showPass dflags "ParseCmm"
   buf <- hGetStringBuffer filename
   let
-	init_loc = mkSrcLoc (mkFastString filename) 1 1
+	init_loc = mkRealSrcLoc (mkFastString filename) 1 1
 	init_state = (mkPState dflags buf init_loc) { lex_state = [0] }
 		-- reset the lex_state: the Lexer monad leaves some stuff
 		-- in there we don't want.

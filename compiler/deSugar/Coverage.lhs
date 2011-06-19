@@ -5,7 +5,7 @@
 \section[Coverage]{@coverage@: the main function}
 
 \begin{code}
-module Coverage (addCoverageTicksToBinds) where
+module Coverage (addCoverageTicksToBinds, hpcInitCode) where
 
 import HsSyn
 import Module
@@ -25,6 +25,8 @@ import StaticFlags
 import TyCon
 import MonadUtils
 import Maybes
+import CLabel
+import Util
 
 import Data.Array
 import System.Directory ( createDirectoryIfMissing )
@@ -299,10 +301,9 @@ addTickHsExpr (HsLet binds e) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsExprNeverOrAlways e)
-addTickHsExpr (HsDo cxt stmts last_exp srcloc) = do
-        (stmts', last_exp') <- addTickLStmts' forQual stmts 
-                                     (addTickLHsExpr last_exp)
-	return (HsDo cxt stmts' last_exp' srcloc)
+addTickHsExpr (HsDo cxt stmts srcloc) 
+  = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
+       ; return (HsDo cxt stmts' srcloc) }
   where
 	forQual = case cxt of
 		    ListComp -> Just $ BinBox QualBinBox
@@ -363,6 +364,20 @@ addTickHsExpr (HsWrap w e) =
 		(return w)
 		(addTickHsExpr e)	-- explicitly no tick on inside
 
+addTickHsExpr (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
+        liftM5 HsArrApp
+	       (addTickLHsExpr e1)
+	       (addTickLHsExpr e2)
+	       (return ty1)
+	       (return arr_ty)
+	       (return lr)
+
+addTickHsExpr (HsArrForm e fix cmdtop) = 
+        liftM3 HsArrForm
+	       (addTickLHsExpr e)
+	       (return fix)
+	       (mapM (liftL (addTickHsCmdTop)) cmdtop)
+
 addTickHsExpr e@(HsType _) = return e
 
 -- Others dhould never happen in expression content.
@@ -408,45 +423,50 @@ addTickLStmts isGuard stmts = do
 addTickLStmts' :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM a 
                -> TM ([LStmt Id], a)
 addTickLStmts' isGuard lstmts res
-  = bindLocals binders $ do
-        lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
-        a <- res
-        return (lstmts', a)
-  where
-        binders = collectLStmtsBinders lstmts
+  = bindLocals (collectLStmtsBinders lstmts) $ 
+    do { lstmts' <- mapM (liftL (addTickStmt isGuard)) lstmts
+       ; a <- res
+       ; return (lstmts', a) }
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
+addTickStmt _isGuard (LastStmt e ret) = do
+	liftM2 LastStmt
+		(addTickLHsExpr e)
+		(addTickSyntaxExpr hpcSrcSpan ret)
 addTickStmt _isGuard (BindStmt pat e bind fail) = do
 	liftM4 BindStmt
 		(addTickLPat pat)
 		(addTickLHsExprAlways e)
 		(addTickSyntaxExpr hpcSrcSpan bind)
 		(addTickSyntaxExpr hpcSrcSpan fail)
-addTickStmt isGuard (ExprStmt e bind' ty) = do
-	liftM3 ExprStmt
+addTickStmt isGuard (ExprStmt e bind' guard' ty) = do
+	liftM4 ExprStmt
 		(addTick isGuard e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
+		(addTickSyntaxExpr hpcSrcSpan guard')
 		(return ty)
 addTickStmt _isGuard (LetStmt binds) = do
 	liftM LetStmt
 		(addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt pairs) = do
-    liftM ParStmt 
+addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr returnExpr) = do
+    liftM4 ParStmt 
         (mapM (addTickStmtAndBinders isGuard) pairs)
+        (addTickSyntaxExpr hpcSrcSpan mzipExpr)
+        (addTickSyntaxExpr hpcSrcSpan bindExpr)
+        (addTickSyntaxExpr hpcSrcSpan returnExpr)
 
-addTickStmt isGuard (TransformStmt stmts ids usingExpr maybeByExpr) = do
-    liftM4 TransformStmt 
-        (addTickLStmts isGuard stmts)
-        (return ids)
-        (addTickLHsExprAlways usingExpr)
-        (addTickMaybeByLHsExpr maybeByExpr)
-
-addTickStmt isGuard (GroupStmt stmts binderMap by using) = do
-    liftM4 GroupStmt 
-        (addTickLStmts isGuard stmts)
-        (return binderMap)
-        (fmapMaybeM  addTickLHsExprAlways by)
-	(fmapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) using)
+addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
+                                    , trS_by = by, trS_using = using
+                                    , trS_ret = returnExpr, trS_bind = bindExpr
+                                    , trS_fmap = liftMExpr }) = do
+    t_s <- addTickLStmts isGuard stmts
+    t_y <- fmapMaybeM  addTickLHsExprAlways by
+    t_u <- addTickLHsExprAlways using
+    t_f <- addTickSyntaxExpr hpcSrcSpan returnExpr
+    t_b <- addTickSyntaxExpr hpcSrcSpan bindExpr
+    t_m <- addTickSyntaxExpr hpcSrcSpan liftMExpr
+    return $ stmt { trS_stmts = t_s, trS_by = t_y, trS_using = t_u
+                  , trS_ret = t_f, trS_bind = t_b, trS_fmap = t_m }
 
 addTickStmt isGuard stmt@(RecStmt {})
   = do { stmts' <- addTickLStmts isGuard (recS_stmts stmt)
@@ -466,12 +486,6 @@ addTickStmtAndBinders isGuard (stmts, ids) =
     liftM2 (,) 
         (addTickLStmts isGuard stmts)
         (return ids)
-
-addTickMaybeByLHsExpr :: Maybe (LHsExpr Id) -> TM (Maybe (LHsExpr Id))
-addTickMaybeByLHsExpr maybeByExpr = 
-    case maybeByExpr of
-        Nothing -> return Nothing
-        Just byExpr -> addTickLHsExprAlways byExpr >>= (return . Just)
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 
@@ -553,10 +567,10 @@ addTickHsCmd (HsLet binds c) =
 	liftM2 HsLet
 		(addTickHsLocalBinds binds) -- to think about: !patterns.
                 (addTickLHsCmd c)
-addTickHsCmd (HsDo cxt stmts last_exp srcloc) = do
-        (stmts', last_exp') <- addTickLCmdStmts' stmts (addTickLHsCmd last_exp)
-	return (HsDo cxt stmts' last_exp' srcloc)
-  where
+addTickHsCmd (HsDo cxt stmts srcloc)
+  = do { (stmts', _) <- addTickLCmdStmts' stmts (return ())
+       ; return (HsDo cxt stmts' srcloc) }
+
 addTickHsCmd (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
         liftM5 HsArrApp
 	       (addTickLHsExpr e1)
@@ -594,9 +608,12 @@ addTickCmdGRHSs (GRHSs guarded local_binds) = do
     binders = collectLocalBinders local_binds
 
 addTickCmdGRHS :: GRHS Id -> TM (GRHS Id)
-addTickCmdGRHS (GRHS stmts cmd) = do
-  (stmts',expr') <- addTickLCmdStmts' stmts (addTickLHsCmd cmd)
-  return $ GRHS stmts' expr'
+-- The *guards* are *not* Cmds, although the body is
+-- C.f. addTickGRHS for the BinBox stuff
+addTickCmdGRHS (GRHS stmts cmd)
+  = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) 
+                                   stmts (addTickLHsCmd cmd)
+       ; return $ GRHS stmts' expr' }
 
 addTickLCmdStmts :: [LStmt Id] -> TM [LStmt Id]
 addTickLCmdStmts stmts = do
@@ -619,10 +636,15 @@ addTickCmdStmt (BindStmt pat c bind fail) = do
 		(addTickLHsCmd c)
 		(return bind)
 		(return fail)
-addTickCmdStmt (ExprStmt c bind' ty) = do
-	liftM3 ExprStmt
+addTickCmdStmt (LastStmt c ret) = do
+	liftM2 LastStmt
 		(addTickLHsCmd c)
-		(return bind')
+		(addTickSyntaxExpr hpcSrcSpan ret)
+addTickCmdStmt (ExprStmt c bind' guard' ty) = do
+	liftM4 ExprStmt
+		(addTickLHsCmd c)
+		(addTickSyntaxExpr hpcSrcSpan bind')
+                (addTickSyntaxExpr hpcSrcSpan guard')
 		(return ty)
 addTickCmdStmt (LetStmt binds) = do
 	liftM LetStmt
@@ -824,26 +846,16 @@ allocBinTickBox boxLabel pos m
 allocBinTickBox _boxLabel pos m = do e <- m; return (L pos e)
 
 isGoodSrcSpan' :: SrcSpan -> Bool
-isGoodSrcSpan' pos
-   | not (isGoodSrcSpan pos) = False
-   | start == end            = False
-   | otherwise		     = True
-  where
-   start = srcSpanStart pos
-   end   = srcSpanEnd pos
+isGoodSrcSpan' pos@(RealSrcSpan _) = srcSpanStart pos /= srcSpanEnd pos
+isGoodSrcSpan' (UnhelpfulSpan _) = False
 
 mkHpcPos :: SrcSpan -> HpcPos
-mkHpcPos pos 
-   | not (isGoodSrcSpan' pos) = panic "bad source span; expected such spans to be filtered out"
-   | otherwise		      = hpcPos
-  where
-   start = srcSpanStart pos
-   end   = srcSpanEnd pos
-   hpcPos = toHpcPos ( srcLocLine start
-		     , srcLocCol start
-		     , srcLocLine end
-		     , srcLocCol end - 1
-		     )
+mkHpcPos pos@(RealSrcSpan s)
+   | isGoodSrcSpan' pos = toHpcPos (srcSpanStartLine s,
+                                    srcSpanStartCol s,
+                                    srcSpanEndLine s,
+                                    srcSpanEndCol s)
+mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 
 hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
@@ -870,4 +882,57 @@ type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 mixHash :: FilePath -> Integer -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
 	(show $ Mix file tm 0 tabstop entries)
+\end{code}
+
+%************************************************************************
+%*									*
+%*              initialisation
+%*									*
+%************************************************************************
+
+Each module compiled with -fhpc declares an initialisation function of
+the form `hpc_init_<module>()`, which is emitted into the _stub.c file
+and annotated with __attribute__((constructor)) so that it gets
+executed at startup time.
+
+The function's purpose is to call hs_hpc_module to register this
+module with the RTS, and it looks something like this:
+
+static void hpc_init_Main(void) __attribute__((constructor));
+static void hpc_init_Main(void)
+{extern StgWord64 _hpc_tickboxes_Main_hpc[];
+ hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
+
+\begin{code}
+hpcInitCode :: Module -> HpcInfo -> SDoc
+hpcInitCode _ (NoHpcInfo {}) = empty
+hpcInitCode this_mod (HpcInfo tickCount hashNo)
+ = vcat
+    [ text "static void hpc_init_" <> ppr this_mod
+         <> text "(void) __attribute__((constructor));"
+    , text "static void hpc_init_" <> ppr this_mod <> text "(void)"
+    , braces (vcat [
+        ptext (sLit "extern StgWord64 ") <> tickboxes <>
+               ptext (sLit "[]") <> semi,
+        ptext (sLit "hs_hpc_module") <>
+          parens (hcat (punctuate comma [
+              doubleQuotes full_name_str,
+              int tickCount, -- really StgWord32
+              int hashNo,    -- really StgWord32
+              tickboxes
+            ])) <> semi
+       ])
+    ]
+  where
+    tickboxes = pprCLabel (mkHpcTicksLabel $ this_mod)
+
+    module_name  = hcat (map (text.charToC) $
+                         bytesFS (moduleNameFS (Module.moduleName this_mod)))
+    package_name = hcat (map (text.charToC) $
+                         bytesFS (packageIdFS  (modulePackageId this_mod)))
+    full_name_str
+       | modulePackageId this_mod == mainPackageId
+       = module_name
+       | otherwise
+       = package_name <> char '/' <> module_name
 \end{code}

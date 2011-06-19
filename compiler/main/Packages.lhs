@@ -36,7 +36,7 @@ where
 #include "HsVersions.h"
 
 import PackageConfig	
-import DynFlags		( dopt, DynFlag(..), DynFlags(..), PackageFlag(..), DPHBackend(..) )
+import DynFlags
 import StaticFlags
 import Config		( cProjectVersion )
 import Name		( Name, nameModule_maybe )
@@ -56,7 +56,8 @@ import ErrUtils         ( debugTraceMsg, putMsg, Message )
 import Exception
 
 import System.Directory
-import System.FilePath
+import System.FilePath as FilePath
+import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
 import Data.List as List
 import Data.Map (Map)
@@ -246,7 +247,8 @@ readPackageConfig dflags conf_file = do
 
   let
       top_dir = topDir dflags
-      pkg_configs1 = mungePackagePaths top_dir proto_pkg_configs
+      pkgroot = takeDirectory conf_file
+      pkg_configs1 = map (mungePackagePaths top_dir pkgroot) proto_pkg_configs
       pkg_configs2 = maybeHidePackages dflags pkg_configs1
   --
   return pkg_configs2
@@ -258,27 +260,54 @@ maybeHidePackages dflags pkgs
   where
     hide pkg = pkg{ exposed = False }
 
-mungePackagePaths :: String -> [PackageConfig] -> [PackageConfig]
--- Replace the string "$topdir" at the beginning of a path
--- with the current topdir (obtained from the -B option).
-mungePackagePaths top_dir ps = map munge_pkg ps
- where 
-  munge_pkg p = p{ importDirs  = munge_paths (importDirs p),
-		   includeDirs = munge_paths (includeDirs p),
-    		   libraryDirs = munge_paths (libraryDirs p),
-		   frameworkDirs = munge_paths (frameworkDirs p),
-                   haddockInterfaces = munge_paths (haddockInterfaces p),
-	           haddockHTMLs = munge_paths (haddockHTMLs p)
-                    }
+-- TODO: This code is duplicated in utils/ghc-pkg/Main.hs
+mungePackagePaths :: FilePath -> FilePath -> PackageConfig -> PackageConfig
+-- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
+-- (http://www.haskell.org/pipermail/libraries/2009-May/011772.html)
+-- Paths/URLs can be relative to ${pkgroot} or ${pkgrooturl}.
+-- The "pkgroot" is the directory containing the package database.
+--
+-- Also perform a similar substitution for the older GHC-specific
+-- "$topdir" variable. The "topdir" is the location of the ghc
+-- installation (obtained from the -B option).
+mungePackagePaths top_dir pkgroot pkg =
+    pkg {
+      importDirs  = munge_paths (importDirs pkg),
+      includeDirs = munge_paths (includeDirs pkg),
+      libraryDirs = munge_paths (libraryDirs pkg),
+      frameworkDirs = munge_paths (frameworkDirs pkg),
+      haddockInterfaces = munge_paths (haddockInterfaces pkg),
+      haddockHTMLs = munge_urls (haddockHTMLs pkg)
+    }
+  where 
+    munge_paths = map munge_path
+    munge_urls  = map munge_url
 
-  munge_paths = map munge_path
+    munge_path p
+      | Just p' <- stripVarPrefix "${pkgroot}" p = pkgroot ++ p'
+      | Just p' <- stripVarPrefix "$topdir"    p = top_dir ++ p'
+      | otherwise                                = p
 
-  munge_path p 
-	  | Just p' <- stripPrefix "$topdir"     p =            top_dir ++ p'
-	  | Just p' <- stripPrefix "$httptopdir" p = toHttpPath top_dir ++ p'
-	  | otherwise				    = p
+    munge_url p
+      | Just p' <- stripVarPrefix "${pkgrooturl}" p = toUrlPath pkgroot p'
+      | Just p' <- stripVarPrefix "$httptopdir"   p = toUrlPath top_dir p'
+      | otherwise                                   = p
 
-  toHttpPath p = "file:///" ++ p
+    toUrlPath r p = "file:///"
+                 -- URLs always use posix style '/' separators:
+                 ++ FilePath.Posix.joinPath
+                        (r : -- We need to drop a leading "/" or "\\"
+                             -- if there is one:
+                             dropWhile (all isPathSeparator)
+                                       (FilePath.splitDirectories p))
+
+    -- We could drop the separator here, and then use </> above. However,
+    -- by leaving it in and using ++ we keep the same path separator
+    -- rather than letting FilePath change it to use \ as the separator
+    stripVarPrefix var path = case stripPrefix var path of
+                              Just [] -> Just []
+                              Just cs@(c : _) | isPathSeparator c -> Just cs
+                              _ -> Nothing
 
 
 -- -----------------------------------------------------------------------------

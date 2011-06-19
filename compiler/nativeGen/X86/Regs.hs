@@ -249,7 +249,6 @@ floatregnos = fakeregnos ++ xmmregnos;
 -- argRegs is the set of regs which are read for an n-argument call to C.
 -- For archs which pass all args on the stack (x86), is empty.
 -- Sparc passes up to the first 6 args in regs.
--- Dunno about Alpha.
 argRegs :: RegNo -> [Reg]
 argRegs _	= panic "MachRegs.argRegs(x86): should not be used!"
 
@@ -333,10 +332,24 @@ fake5 = regSingle 21
 
 {-
 AMD x86_64 architecture:
-- Registers 0-16 have 32-bit counterparts (eax, ebx etc.)
-- Registers 0-7 have 16-bit counterparts (ax, bx etc.)
-- Registers 0-3 have 8 bit counterparts (ah, bh etc.)
+- All 16 integer registers are addressable as 8, 16, 32 and 64-bit values:
 
+  8     16    32    64
+  ---------------------
+  al    ax    eax   rax
+  bl    bx    ebx   rbx
+  cl    cx    ecx   rcx
+  dl    dx    edx   rdx
+  sil   si    esi   rsi
+  dil   si    edi   rdi
+  bpl   bp    ebp   rbp
+  spl   sp    esp   rsp
+  r10b  r10w  r10d  r10
+  r11b  r11w  r11d  r11
+  r12b  r12w  r12d  r12
+  r13b  r13w  r13d  r13
+  r14b  r14w  r14d  r14
+  r15b  r15w  r15d  r15
 -}
 
 rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, 

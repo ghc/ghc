@@ -73,7 +73,7 @@ if [ $no_clean -eq 0 ]; then
         INSTDIR=`cygpath -m "$INSTDIR"`
     fi
 
-    /usr/bin/perl -w boot --required-tag=dph
+    /usr/bin/perl -w boot --validate --required-tag=dph
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
@@ -85,6 +85,21 @@ $make -j$threads ValidateHpc=$hpc ValidateSlow=$slow
 
 $make binary-dist-prep
 $make test_bindist TEST_PREP=YES
+
+#
+# Install the mtl package into the bindist, because it is used by some
+# tests.  It isn't essential that we do this (the failing tests will
+# be treated as expected failures), but we get a bit more test
+# coverage, and also verify that we can install a package into the
+# bindist with Cabal.
+#
+bindistdir="bindisttest/install dir"
+cd libraries/mtl
+"$thisdir/$bindistdir/bin/runhaskell" Setup.hs configure --with-ghc="$thisdir/$bindistdir/bin/ghc" --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
+"$thisdir/$bindistdir/bin/runhaskell" Setup.hs build  --builddir=dist-bindist
+"$thisdir/$bindistdir/bin/runhaskell" Setup.hs install  --builddir=dist-bindist
+"$thisdir/$bindistdir/bin/runhaskell" Setup.hs clean  --builddir=dist-bindist
+cd $thisdir
 
 fi # testsuite-only
 

@@ -7,7 +7,7 @@
 \begin{code}
 module TcBinds ( tcLocalBinds, tcTopBinds, 
                  tcHsBootSigs, tcPolyBinds,
-                 PragFun, tcSpecPrags, mkPragFun, 
+                 PragFun, tcSpecPrags, tcVectDecls, mkPragFun, 
                  TcSigInfo(..), SigFun, mkSigFun,
                  badBootDeclErr ) where
 
@@ -25,7 +25,6 @@ import TcHsType
 import TcPat
 import TcMType
 import TcType
-import RnBinds( misplacedSigErr )
 import Coercion
 import TysPrim
 import Id
@@ -35,6 +34,7 @@ import NameSet
 import NameEnv
 import SrcLoc
 import Bag
+import ListSetOps
 import ErrUtils
 import Digraph
 import Maybes
@@ -43,7 +43,6 @@ import BasicTypes
 import Outputable
 import FastString
 
-import Data.List( partition )
 import Control.Monad
 
 #include "HsVersions.h"
@@ -324,11 +323,13 @@ tcPolyBinds :: TopLevelFlag -> SigFun -> PragFun
 tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
   = setSrcSpan loc                              $
     recoverM (recoveryCode binder_names sig_fn) $ do 
-        -- Set up main recoer; take advantage of any type sigs
+        -- Set up main recover; take advantage of any type sigs
 
     { traceTc "------------------------------------------------" empty
     ; traceTc "Bindings for" (ppr binder_names)
 
+    -- Instantiate the polytypes of any binders that have signatures
+    -- (as determined by sig_fn), returning a TcSigInfo for each
     ; tc_sig_fn <- tcInstSigs sig_fn binder_names
 
     ; dflags <- getDOpts
@@ -347,9 +348,10 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc bind_list
     ; return (binds, poly_ids) }
   where
     binder_names = collectHsBindListBinders bind_list
-    loc = getLoc (head bind_list)
-         -- TODO: location a bit awkward, but the mbinds have been
-         --       dependency analysed and may no longer be adjacent
+    loc = foldr1 combineSrcSpans (map getLoc bind_list)
+         -- The mbinds have been dependency analysed and 
+         -- may no longer be adjacent; so find the narrowest
+	 -- span that includes them all
 
 ------------------
 tcPolyNoGen 
@@ -387,7 +389,7 @@ tcPolyCheck :: TcSigInfo -> PragFun
 --   it binds a single variable,
 --   it has a signature,
 tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
-                           , sig_theta = theta, sig_tau = tau, sig_loc = loc })
+                           , sig_theta = theta, sig_tau = tau })
     prag_fn rec_tc bind_list
   = do { ev_vars <- newEvVars theta
        ; let skol_info = SigSkol (FunSigCtxt (idName id)) (mkPhiTy theta tau)
@@ -398,6 +400,7 @@ tcPolyCheck sig@(TcSigInfo { sig_id = id, sig_tvs = tvs, sig_scoped = scoped
 
        ; export <- mkExport prag_fn tvs theta mono_info
 
+       ; loc <- getSrcSpanM
        ; let (_, poly_id, _, _) = export
              abs_bind = L loc $ AbsBinds 
                         { abs_tvs = tvs
@@ -414,10 +417,10 @@ tcPolyInfer
                    -- dependencies based on type signatures
   -> [LHsBind Name]
   -> TcM (LHsBinds TcId, [TcId])
-tcPolyInfer top_lvl mono sig_fn prag_fn rec_tc bind_list
+tcPolyInfer top_lvl mono tc_sig_fn prag_fn rec_tc bind_list
   = do { ((binds', mono_infos), wanted) 
              <- captureConstraints $
-                tcMonoBinds sig_fn LetLclBndr rec_tc bind_list
+                tcMonoBinds tc_sig_fn LetLclBndr rec_tc bind_list
 
        ; unifyCtxts [sig | (_, Just sig, _) <- mono_infos] 
 
@@ -552,32 +555,97 @@ tcSpec _ prag = pprPanic "tcSpec" (ppr prag)
 
 --------------
 tcImpPrags :: [LSig Name] -> TcM [LTcSpecPrag]
+-- SPECIALISE pragamas for imported things
 tcImpPrags prags
   = do { this_mod <- getModule
-       ; let is_imp prag 
-               = case sigName prag of
-                   Nothing   -> False
-                   Just name -> not (nameIsLocalOrFrom this_mod name)
-             (spec_prags, others) = partition isSpecLSig $
-	     		  	    filter is_imp prags
-       ; mapM_ misplacedSigErr others 
-       -- Messy that this misplaced-sig error comes here
-       -- but the others come from the renamer
-       ; mapAndRecoverM (wrapLocM tcImpSpec) spec_prags }
+       ; dflags <- getDOpts
+       ; if not (dopt Opt_Specialise dflags) then
+            return []    -- Ignore SPECIALISE pragmas for imported things
+	    	   	 -- when -O is not on; otherwise we get bogus 
+			 -- complaints about lack of INLINABLE pragmas 
+			 -- in the imported module (also compiled without -O)
+			 -- Notably, when Haddocking the base library
+         else
+            mapAndRecoverM (wrapLocM tcImpSpec) 
+            [L loc (name,prag) | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
+                               , not (nameIsLocalOrFrom this_mod name) ] }
 
-tcImpSpec :: Sig Name -> TcM TcSpecPrag
-tcImpSpec prag@(SpecSig (L _ name) _ _)
+tcImpSpec :: (Name, Sig Name) -> TcM TcSpecPrag
+tcImpSpec (name, prag)
  = do { id <- tcLookupId name
       ; checkTc (isAnyInlinePragma (idInlinePragma id))
                 (impSpecErr name)
       ; tcSpec id prag }
-tcImpSpec p = pprPanic "tcImpSpec" (ppr p)
 
 impSpecErr :: Name -> SDoc
 impSpecErr name
   = hang (ptext (sLit "You cannot SPECIALISE") <+> quotes (ppr name))
        2 (vcat [ ptext (sLit "because its definition has no INLINE/INLINABLE pragma")
-               , ptext (sLit "(or you compiled its definining module without -O)")])
+               , parens $ sep 
+                   [ ptext (sLit "or its defining module") <+> quotes (ppr mod)
+                   , ptext (sLit "was compiled without -O")]])
+  where
+    mod = nameModule name
+
+--------------
+tcVectDecls :: [LVectDecl Name] -> TcM ([LVectDecl TcId])
+tcVectDecls decls 
+  = do { decls' <- mapM (wrapLocM tcVect) decls
+       ; let ids  = [unLoc id | L _ (HsVect id _) <- decls']
+             dups = findDupsEq (==) ids
+       ; mapM_ reportVectDups dups
+       ; traceTcConstraints "End of tcVectDecls"
+       ; return decls'
+       }
+  where
+    reportVectDups (first:_second:_more) 
+      = addErrAt (getSrcSpan first) $
+          ptext (sLit "Duplicate vectorisation declarations for") <+> ppr first
+    reportVectDups _ = return ()
+
+--------------
+tcVect :: VectDecl Name -> TcM (VectDecl TcId)
+-- We can't typecheck the expression of a vectorisation declaration against the vectorised type
+-- of the original definition as this requires internals of the vectoriser not available during
+-- type checking.  Instead, we infer the type of the expression and leave it to the vectoriser
+-- to check the compatibility of the Core types.
+tcVect (HsVect name Nothing)
+  = addErrCtxt (vectCtxt name) $
+    do { id <- wrapLocM tcLookupId name
+       ; return $ HsVect id Nothing
+       }
+tcVect (HsVect name@(L loc _) (Just rhs))
+  = addErrCtxt (vectCtxt name) $
+    do { _id <- wrapLocM tcLookupId name     -- need to ensure that the name is already defined
+
+         -- turn the vectorisation declaration into a single non-recursive binding
+       ; let bind    = L loc $ mkFunBind name [mkSimpleMatch [] rhs] 
+             sigFun  = const Nothing
+             pragFun = mkPragFun [] (unitBag bind)
+
+         -- perform type inference (including generalisation)
+       ; (binds, [id']) <- tcPolyInfer TopLevel False sigFun pragFun NonRecursive [bind]
+
+       ; traceTc "tcVect inferred type" $ ppr (varType id')
+       ; traceTc "tcVect bindings"      $ ppr binds
+       
+         -- add all bindings, including the type variable and dictionary bindings produced by type
+         -- generalisation to the right-hand side of the vectorisation declaration
+       ; let [AbsBinds tvs evs _ evBinds actualBinds] = (map unLoc . bagToList) binds
+       ; let [bind']                                  = bagToList actualBinds
+             MatchGroup 
+               [L _ (Match _ _ (GRHSs [L _ (GRHS _ rhs')] _))]
+               _                                      = (fun_matches . unLoc) bind'
+             rhsWrapped                               = mkHsLams tvs evs (mkHsDictLet evBinds rhs')
+        
+        -- We return the type-checked 'Id', to propagate the inferred signature
+        -- to the vectoriser - see "Note [Typechecked vectorisation pragmas]" in HsDecls
+       ; return $ HsVect (L loc id') (Just rhsWrapped)
+       }
+
+vectCtxt :: Located Name -> SDoc
+vectCtxt name = ptext (sLit "When checking the vectorisation declaration for") <+> ppr name
+
 --------------
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise 
@@ -791,7 +859,7 @@ unifyCtxts (sig1 : sigs)
                -- where F is a type function and (F a ~ [a])
                -- Then unification might succeed with a coercion.  But it's much
                -- much simpler to require that such signatures have identical contexts
-               checkTc (all isIdentityCoI cois)
+               checkTc (all isReflCo cois)
                        (ptext (sLit "Mutually dependent functions have syntactically distinct contexts"))
              }
 \end{code}

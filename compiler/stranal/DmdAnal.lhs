@@ -18,6 +18,7 @@ import StaticFlags	( opt_MaxWorkerArgs )
 import Demand	-- All of it
 import CoreSyn
 import PprCore	
+import Coercion		( isCoVarType )
 import CoreUtils	( exprIsHNF, exprIsTrivial )
 import CoreArity	( exprArity )
 import DataCon		( dataConTyCon, dataConRepStrictness )
@@ -28,19 +29,20 @@ import Id		( Id, idType, idInlineActivation,
 			  setIdStrictness, idDemandInfo, idUnfolding,
 			  idDemandInfo_maybe, setIdDemandInfo
 			)
-import Var		( Var )
+import Var		( Var, isTyVar )
 import VarEnv
 import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly,
 			  minusUFM, filterUFM )
-import Type		( isUnLiftedType, coreEqType, splitTyConApp_maybe )
+import Type		( isUnLiftedType, eqType, splitTyConApp_maybe )
 import Coercion         ( coercionKind )
 import Util		( mapAndUnzip, lengthIs, zipEqual )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
 			  RecFlag(..), isRec, isMarkedStrict )
 import Maybes		( orElse, expectJust )
 import Outputable
+import Pair
 import Data.List
 import FastString
 \end{code}
@@ -144,6 +146,7 @@ dmdAnal env dmd e
 
 dmdAnal _ _ (Lit lit) = (topDmdType, Lit lit)
 dmdAnal _ _ (Type ty) = (topDmdType, Type ty)	-- Doesn't happen, in fact
+dmdAnal _ _ (Coercion co) = (topDmdType, Coercion co)
 
 dmdAnal env dmd (Var var)
   = (dmdTransform env var dmd, Var var)
@@ -152,7 +155,7 @@ dmdAnal env dmd (Cast e co)
   = (dmd_ty, Cast e' co)
   where
     (dmd_ty, e') = dmdAnal env dmd' e
-    to_co        = snd (coercionKind co)
+    to_co        = pSnd (coercionKind co)
     dmd'
       | Just (tc, _) <- splitTyConApp_maybe to_co
       , isRecursiveTyCon tc = evalDmd
@@ -173,6 +176,11 @@ dmdAnal env dmd (App fun (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
 
+dmdAnal sigs dmd (App fun (Coercion co))
+  = (fun_ty, App fun' (Coercion co))
+  where
+    (fun_ty, fun') = dmdAnal sigs dmd fun
+
 -- Lots of the other code is there to make this
 -- beautiful, compositional, application rule :-)
 dmdAnal env dmd (App fun arg)	-- Non-type arguments
@@ -184,7 +192,7 @@ dmdAnal env dmd (App fun arg)	-- Non-type arguments
     (res_ty `bothType` arg_ty, App fun' arg')
 
 dmdAnal env dmd (Lam var body)
-  | isTyCoVar var
+  | isTyVar var
   = let   
 	(body_ty, body') = dmdAnal env dmd body
     in
@@ -328,7 +336,7 @@ dmdAnalAlt env dmd (con,bndrs,rhs)
 	--	   ; print len }
 
 	io_hack_reqd = con == DataAlt unboxedPairDataCon &&
-		       idType (head bndrs) `coreEqType` realWorldStatePrimTy
+		       idType (head bndrs) `eqType` realWorldStatePrimTy
     in	
     (final_alt_ty, (con, bndrs', rhs'))
 
@@ -838,7 +846,7 @@ annotateBndr :: DmdType -> Var -> (DmdType, Var)
 -- The returned var is annotated with demand info
 -- No effect on the argument demands
 annotateBndr dmd_ty@(DmdType fv ds res) var
-  | isTyCoVar var = (dmd_ty, var)
+  | isTyVar var = (dmd_ty, var)
   | otherwise   = (DmdType fv' ds res, setIdDemandInfo var dmd)
   where
     (fv', dmd) = removeFV fv var res
@@ -888,10 +896,15 @@ removeFV fv id res = (fv', zapUnlifted id dmd)
 zapUnlifted :: Id -> Demand -> Demand
 -- For unlifted-type variables, we are only 
 -- interested in Bot/Abs/Box Abs
-zapUnlifted _  Bot = Bot
-zapUnlifted _  Abs = Abs
-zapUnlifted id dmd | isUnLiftedType (idType id) = lazyDmd
-		   | otherwise			= dmd
+zapUnlifted id dmd
+  = case dmd of
+      _ | isCoVarType ty    -> lazyDmd	-- For coercions, ignore str/abs totally
+      Bot                   -> Bot
+      Abs                   -> Abs
+      _ | isUnLiftedType ty -> lazyDmd	-- For unlifted types, ignore strictness
+	| otherwise	    -> dmd
+  where
+    ty = idType id
 \end{code}
 
 Note [Lamba-bound unfoldings]

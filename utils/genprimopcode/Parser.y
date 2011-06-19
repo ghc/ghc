@@ -48,6 +48,7 @@ import Syntax
     lowerName       { TLowerName $$ }
     upperName       { TUpperName $$ }
     string          { TString $$ }
+    integer         { TInteger $$ }
     noBraces        { TNoBraces $$ }
 
 %%
@@ -66,6 +67,7 @@ pOption :: { Option }
 pOption : lowerName '=' false               { OptionFalse  $1 }
         | lowerName '=' true                { OptionTrue   $1 }
         | lowerName '=' pStuffBetweenBraces { OptionString $1 $3 }
+        | lowerName '=' integer             { OptionInteger $1 $3 }
 
 pEntries :: { [Entry] }
 pEntries : pEntry pEntries { $1 : $2 }

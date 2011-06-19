@@ -4,7 +4,7 @@
   <indexterm><primary>parallelism</primary>
   </indexterm>
 
-  <para>GHC implements some major extensions to Haskell to support 
+  <para>GHC implements some major extensions to Haskell to support
   concurrent and parallel programming.  Let us first establish terminology:
   <itemizedlist>
 	<listitem><para><emphasis>Parallelism</emphasis> means running
@@ -12,16 +12,16 @@
 	  performance.  Ideally, this should be done invisibly, and with no
 	  semantic changes.
 	    </para></listitem>
-	<listitem><para><emphasis>Concurrency</emphasis> means implementing 
+	<listitem><para><emphasis>Concurrency</emphasis> means implementing
 	  a program by using multiple I/O-performing threads.  While a
-	  concurrent Haskell program <emphasis>can</emphasis> run on a 
+	  concurrent Haskell program <emphasis>can</emphasis> run on a
 	  parallel machine, the primary goal of using concurrency is not to gain
 	  performance, but rather because that is the simplest and most
 	  direct way to write the program.  Since the threads perform I/O,
 	  the semantics of the program is necessarily non-deterministic.
 	    </para></listitem>
   </itemizedlist>
-  GHC supports both concurrency and parallelism. 
+  GHC supports both concurrency and parallelism.
   </para>
 
   <sect2 id="concurrent-haskell">
@@ -55,7 +55,7 @@ the FFI with concurrency</ulink>.</para></listitem>
    <sect2><title>Software Transactional Memory</title>
 
     <para>GHC now supports a new way to coordinate the activities of Concurrent
-    Haskell threads, called Software Transactional Memory (STM).  The 
+    Haskell threads, called Software Transactional Memory (STM).  The
     <ulink
     url="http://research.microsoft.com/%7Esimonpj/papers/stm/index.htm">STM
     papers</ulink> are an excellent introduction to what STM is, and how to use
@@ -78,7 +78,7 @@ All these features are described in the papers mentioned earlier.
 <sect2><title>Parallel Haskell</title>
 
   <para>GHC includes support for running Haskell programs in parallel
-  on symmetric, shared-memory multi-processor 
+  on symmetric, shared-memory multi-processor
       (SMP)<indexterm><primary>SMP</primary></indexterm>.
   By default GHC runs your program on one processor; if you
      want it to run in parallel you must link your program

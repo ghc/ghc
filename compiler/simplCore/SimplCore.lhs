@@ -123,8 +123,8 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
 
-doCorePass (CoreDoVectorisation be)  = {-# SCC "Vectorise" #-}
-                                       vectorise be
+doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
+                                       vectorise
 
 doCorePass CoreDoGlomBinds              = doPassDM  glomBinds
 doCorePass CoreDoPrintCore              = observe   printCore
@@ -211,7 +211,7 @@ simplifyExpr dflags expr
 	; us <-  mkSplitUniqSupply 's'
 
 	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 simplExprGently simplEnvForGHCi expr
+				 simplExprGently (simplEnvForGHCi dflags) expr
 
 	; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')
@@ -358,7 +358,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       = do {
 		-- Occurrence analysis
 	   let { tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm active_rule rules binds } ;
+                     occurAnalysePgm active_rule rules [] binds } ;
 	   Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 

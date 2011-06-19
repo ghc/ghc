@@ -70,12 +70,12 @@
 #include <sys/wait.h>
 #endif
 
-#if defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
-    defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
-    defined(openbsd_HOST_OS  ) || \
-    ( defined(darwin_HOST_OS ) && !defined(powerpc_HOST_ARCH) ) || \
-    defined(kfreebsdgnu_HOST_OS)
-/* Don't use mmap on powerpc-apple-darwin as mmap doesn't support
+#if !defined(powerpc_HOST_ARCH) && \
+    (   defined(linux_HOST_OS    ) || defined(freebsd_HOST_OS) || \
+        defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS ) || \
+        defined(openbsd_HOST_OS  ) || defined(darwin_HOST_OS ) || \
+        defined(kfreebsdgnu_HOST_OS) )
+/* Don't use mmap on powerpc_HOST_ARCH as mmap doesn't support
  * reallocating but we need to allocate jump islands just after each
  * object images. Otherwise relative branches to jump islands can fail
  * due to 24-bits displacement overflow.
@@ -101,6 +101,8 @@
 #elif defined(darwin_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include <regex.h>
+#  include <mach/machine.h>
+#  include <mach-o/fat.h>
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
 #  include <mach-o/reloc.h>
@@ -272,6 +274,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(signal_handlers)            \
       SymI_HasProto(stg_sig_install)            \
       SymI_HasProto(rtsTimerSignal)             \
+      SymI_HasProto(atexit)                     \
       SymI_NeedsProto(nocldstop)
 #endif
 
@@ -384,6 +387,8 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_asyncReadzh)                     \
       SymI_HasProto(stg_asyncWritezh)                    \
       SymI_HasProto(stg_asyncDoProczh)                   \
+      SymI_HasProto(getWin32ProgArgv)                    \
+      SymI_HasProto(setWin32ProgArgv)                    \
       SymI_HasProto(memset)                              \
       SymI_HasProto(inet_ntoa)                           \
       SymI_HasProto(inet_addr)                           \
@@ -829,6 +834,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(stg_newTVarzh)                      \
       SymI_HasProto(stg_noDuplicatezh)                  \
       SymI_HasProto(stg_atomicModifyMutVarzh)           \
+      SymI_HasProto(stg_casMutVarzh)                    \
       SymI_HasProto(stg_newPinnedByteArrayzh)           \
       SymI_HasProto(stg_newAlignedPinnedByteArrayzh)    \
       SymI_HasProto(newSpark)                           \
@@ -1182,11 +1188,11 @@ initLinker( void )
 #   endif /* RTLD_DEFAULT */
 
     compileResult = regcomp(&re_invalid,
-           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*invalid ELF header",
+           "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short)",
            REG_EXTENDED);
     ASSERT( compileResult == 0 );
     compileResult = regcomp(&re_realso,
-           "GROUP *\\( *(([^ )])+)",
+           "(GROUP|INPUT) *\\( *(([^ )])+)",
            REG_EXTENDED);
     ASSERT( compileResult == 0 );
 #   endif
@@ -1357,8 +1363,8 @@ addDLL( char *dll_name )
          if (regexec(&re_realso, line, (size_t) NMATCH, match, 0) == 0) {
             // success -- try to dlopen the first named file
             IF_DEBUG(linker, debugBelch("match%s\n",""));
-            line[match[1].rm_eo] = '\0';
-            errmsg = internal_dlopen(line+match[1].rm_so);
+            line[match[2].rm_eo] = '\0';
+            errmsg = internal_dlopen(line+match[2].rm_so);
             break;
          }
          // if control reaches here, no GROUP ( ... ) directive was found
@@ -1564,6 +1570,7 @@ mmapForLinker (size_t bytes, nat flags, int fd)
    int pagesize, size;
    static nat fixed = 0;
 
+   IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    pagesize = getpagesize();
    size = ROUND_UP(bytes, pagesize);
 
@@ -1575,6 +1582,8 @@ mmap_again:
    }
 #endif
 
+   IF_DEBUG(linker, debugBelch("mmapForLinker: \tprotection %#0x\n", PROT_EXEC | PROT_READ | PROT_WRITE));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: \tflags      %#0x\n", MAP_PRIVATE | TRY_MAP_32BIT | fixed | flags));
    result = mmap(map_addr, size, PROT_EXEC|PROT_READ|PROT_WRITE,
                     MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, 0);
 
@@ -1622,6 +1631,8 @@ mmap_again:
    }
 #endif
 
+   IF_DEBUG(linker, debugBelch("mmapForLinker: mapped %lu bytes starting at %p\n", (lnat)size, result));
+   IF_DEBUG(linker, debugBelch("mmapForLinker: done\n"));
    return result;
 }
 #endif // USE_MMAP
@@ -1637,6 +1648,7 @@ mkOc( char *path, char *image, int imageSize,
     ) {
    ObjectCode* oc;
 
+   IF_DEBUG(linker, debugBelch("mkOc: start\n"));
    oc = stgMallocBytes(sizeof(ObjectCode), "loadArchive(oc)");
 
 #  if defined(OBJFORMAT_ELF)
@@ -1678,6 +1690,7 @@ mkOc( char *path, char *image, int imageSize,
    oc->next              = objects;
    objects               = oc;
 
+   IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
 }
 
@@ -1693,13 +1706,33 @@ loadArchive( char *path )
     char *fileName;
     size_t fileNameSize;
     int isObject, isGnuIndex;
-    char tmp[12];
+    char tmp[20];
     char *gnuFileIndex;
     int gnuFileIndexSize;
-#if !defined(USE_MMAP) && defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS)
+    int i;
+    uint32_t nfat_arch, nfat_offset, cputype, cpusubtype;
+#if defined(i386_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_X86;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_X86_ALL;
+#elif defined(x86_64_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_X86_64;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_X86_64_ALL;
+#elif defined(powerpc_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_POWERPC;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
+#elif defined(powerpc64_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_POWERPC64;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
+#else
+#error Unknown Darwin architecture
+#endif
+#if !defined(USE_MMAP)
     int misalignment;
 #endif
+#endif
 
+    IF_DEBUG(linker, debugBelch("loadArchive: start\n"));
     IF_DEBUG(linker, debugBelch("loadArchive: Loading archive `%s'\n", path));
 
     gnuFileIndex = NULL;
@@ -1712,20 +1745,97 @@ loadArchive( char *path )
     if (!f)
         barf("loadObj: can't read `%s'", path);
 
+    /* Check if this is an archive by looking for the magic "!<arch>\n"
+     * string.  Usually, if this fails, we barf and quit.  On Darwin however,
+     * we may have a fat archive, which contains archives for more than
+     * one architecture.  Fat archives start with the magic number 0xcafebabe,
+     * always stored big endian.  If we find a fat_header, we scan through
+     * the fat_arch structs, searching through for one for our host
+     * architecture.  If a matching struct is found, we read the offset
+     * of our archive data (nfat_offset) and seek forward nfat_offset bytes
+     * from the start of the file.
+     *
+     * A subtlety is that all of the members of the fat_header and fat_arch
+     * structs are stored big endian, so we need to call byte order
+     * conversion functions.
+     *
+     * If we find the appropriate architecture in a fat archive, we gobble
+     * its magic "!<arch>\n" string and continue processing just as if
+     * we had a single architecture archive.
+     */
+
     n = fread ( tmp, 1, 8, f );
-    if (strncmp(tmp, "!<arch>\n", 8) != 0)
+    if (n != 8)
+        barf("loadArchive: Failed reading header from `%s'", path);
+    if (strncmp(tmp, "!<arch>\n", 8) != 0) {
+
+#if defined(darwin_HOST_OS)
+        /* Not a standard archive, look for a fat archive magic number: */
+        if (ntohl(*(uint32_t *)tmp) == FAT_MAGIC) {
+            nfat_arch = ntohl(*(uint32_t *)(tmp + 4));
+            IF_DEBUG(linker, debugBelch("loadArchive: found a fat archive containing %d architectures\n", nfat_arch));
+            nfat_offset = 0;
+
+            for (i = 0; i < (int)nfat_arch; i++) {
+                /* search for the right arch */
+                n = fread( tmp, 1, 20, f );
+                if (n != 8)
+                    barf("loadArchive: Failed reading arch from `%s'", path);
+                cputype = ntohl(*(uint32_t *)tmp);
+                cpusubtype = ntohl(*(uint32_t *)(tmp + 4));
+
+                if (cputype == mycputype && cpusubtype == mycpusubtype) {
+                    IF_DEBUG(linker, debugBelch("loadArchive: found my archive in a fat archive\n"));
+                    nfat_offset = ntohl(*(uint32_t *)(tmp + 8));
+                    break;
+                }
+            }
+
+            if (nfat_offset == 0) {
+               barf ("loadArchive: searched %d architectures, but no host arch found", (int)nfat_arch);
+            }
+            else {
+                n = fseek( f, nfat_offset, SEEK_SET );
+                if (n != 0)
+                    barf("loadArchive: Failed to seek to arch in `%s'", path);
+                n = fread ( tmp, 1, 8, f );
+                if (n != 8)
+                    barf("loadArchive: Failed reading header from `%s'", path);
+                if (strncmp(tmp, "!<arch>\n", 8) != 0) {
+                    barf("loadArchive: couldn't find archive in `%s' at offset %d", path, nfat_offset);
+                }
+            }
+        }
+        else {
+            barf("loadArchive: Neither an archive, nor a fat archive: `%s'", path);
+        }
+
+#else
         barf("loadArchive: Not an archive: `%s'", path);
+#endif
+    }
+
+    IF_DEBUG(linker, debugBelch("loadArchive: loading archive contents\n"));
 
     while(1) {
         n = fread ( fileName, 1, 16, f );
         if (n != 16) {
             if (feof(f)) {
+                IF_DEBUG(linker, debugBelch("loadArchive: EOF while reading from '%s'\n", path));
                 break;
             }
             else {
                 barf("loadArchive: Failed reading file name from `%s'", path);
             }
         }
+
+#if defined(darwin_HOST_OS)
+        if (strncmp(fileName, "!<arch>\n", 8) == 0) {
+            IF_DEBUG(linker, debugBelch("loadArchive: found the start of another archive, breaking\n"));
+            break;
+        }
+#endif
+
         n = fread ( tmp, 1, 12, f );
         if (n != 12)
             barf("loadArchive: Failed reading mod time from `%s'", path);
@@ -1745,7 +1855,11 @@ loadArchive( char *path )
         for (n = 0; isdigit(tmp[n]); n++);
         tmp[n] = '\0';
         memberSize = atoi(tmp);
+
+        IF_DEBUG(linker, debugBelch("loadArchive: size of this archive member is %d\n", memberSize));
         n = fread ( tmp, 1, 2, f );
+        if (n != 2)
+            barf("loadArchive: Failed reading magic from `%s'", path);
         if (strncmp(tmp, "\x60\x0A", 2) != 0)
             barf("loadArchive: Failed reading magic from `%s' at %ld. Got %c%c",
                  path, ftell(f), tmp[0], tmp[1]);
@@ -1771,6 +1885,11 @@ loadArchive( char *path )
                          path);
                 }
                 fileName[thisFileNameSize] = 0;
+
+                /* On OS X at least, thisFileNameSize is the size of the
+                   fileName field, not the length of the fileName
+                   itself. */
+                thisFileNameSize = strlen(fileName);
             }
             else {
                 barf("loadArchive: BSD-variant filename size not found while reading filename from `%s'", path);
@@ -1856,6 +1975,9 @@ loadArchive( char *path )
                 && fileName[thisFileNameSize - 2] == '.'
                 && fileName[thisFileNameSize - 1] == 'o';
 
+        IF_DEBUG(linker, debugBelch("loadArchive: \tthisFileNameSize = %d\n", (int)thisFileNameSize));
+        IF_DEBUG(linker, debugBelch("loadArchive: \tisObject = %d\n", isObject));
+
         if (isObject) {
             char *archiveMemberName;
 
@@ -1921,23 +2043,29 @@ loadArchive( char *path )
             gnuFileIndexSize = memberSize;
         }
         else {
+            IF_DEBUG(linker, debugBelch("loadArchive: '%s' does not appear to be an object file\n", fileName));
             n = fseek(f, memberSize, SEEK_CUR);
             if (n != 0)
                 barf("loadArchive: error whilst seeking by %d in `%s'",
                      memberSize, path);
         }
+
         /* .ar files are 2-byte aligned */
         if (memberSize % 2) {
+            IF_DEBUG(linker, debugBelch("loadArchive: trying to read one pad byte\n"));
             n = fread ( tmp, 1, 1, f );
             if (n != 1) {
                 if (feof(f)) {
+                    IF_DEBUG(linker, debugBelch("loadArchive: found EOF while reading one pad byte\n"));
                     break;
                 }
                 else {
                     barf("loadArchive: Failed reading padding from `%s'", path);
                 }
             }
+            IF_DEBUG(linker, debugBelch("loadArchive: successfully read one pad byte\n"));
         }
+        IF_DEBUG(linker, debugBelch("loadArchive: reached end of archive loading while loop\n"));
     }
 
     fclose(f);
@@ -1951,6 +2079,7 @@ loadArchive( char *path )
 #endif
     }
 
+    IF_DEBUG(linker, debugBelch("loadArchive: done\n"));
     return 1;
 }
 
@@ -2078,18 +2207,18 @@ static HsInt
 loadOc( ObjectCode* oc ) {
    int r;
 
-   IF_DEBUG(linker, debugBelch("loadOc\n"));
+   IF_DEBUG(linker, debugBelch("loadOc: start\n"));
 
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_ELF) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_ELF failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
        return r;
    }
 #endif
@@ -2105,7 +2234,7 @@ loadOc( ObjectCode* oc ) {
    barf("loadObj: no verify method");
 #  endif
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocVerifyImage_* failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocVerifyImage_* failed\n"));
        return r;
    }
 
@@ -2120,13 +2249,13 @@ loadOc( ObjectCode* oc ) {
    barf("loadObj: no getNames method");
 #  endif
    if (!r) {
-       IF_DEBUG(linker, debugBelch("ocGetNames_* failed\n"));
+       IF_DEBUG(linker, debugBelch("loadOc: ocGetNames_* failed\n"));
        return r;
    }
 
    /* loaded, but not resolved yet */
    oc->status = OBJECT_LOADED;
-   IF_DEBUG(linker, debugBelch("loadObj done.\n"));
+   IF_DEBUG(linker, debugBelch("loadOc: done.\n"));
 
    return 1;
 }
@@ -2208,6 +2337,7 @@ unloadObj( char *path )
             //  stgFree(oc->image);
             // #endif
             stgFree(oc->fileName);
+            stgFree(oc->archiveMemberName);
             stgFree(oc->symbols);
             stgFree(oc->sections);
             stgFree(oc);
@@ -2232,11 +2362,13 @@ unloadObj( char *path )
  * which may be prodded during relocation, and abort if we try and write
  * outside any of these.
  */
-static void addProddableBlock ( ObjectCode* oc, void* start, int size )
+static void
+addProddableBlock ( ObjectCode* oc, void* start, int size )
 {
    ProddableBlock* pb
       = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
-   IF_DEBUG(linker, debugBelch("addProddableBlock %p %p %d\n", oc, start, size));
+
+   IF_DEBUG(linker, debugBelch("addProddableBlock: %p %p %d\n", oc, start, size));
    ASSERT(size > 0);
    pb->start      = start;
    pb->size       = size;
@@ -2244,9 +2376,11 @@ static void addProddableBlock ( ObjectCode* oc, void* start, int size )
    oc->proddables = pb;
 }
 
-static void checkProddableBlock ( ObjectCode* oc, void* addr )
+static void
+checkProddableBlock (ObjectCode *oc, void *addr )
 {
    ProddableBlock* pb;
+
    for (pb = oc->proddables; pb != NULL; pb = pb->next) {
       char* s = (char*)(pb->start);
       char* e = s + pb->size - 1;
@@ -2262,7 +2396,8 @@ static void checkProddableBlock ( ObjectCode* oc, void* addr )
 /* -----------------------------------------------------------------------------
  * Section management.
  */
-static void addSection ( ObjectCode* oc, SectionKind kind,
+static void
+addSection ( ObjectCode* oc, SectionKind kind,
                          void* start, void* end )
 {
    Section* s   = stgMallocBytes(sizeof(Section), "addSection");
@@ -2271,10 +2406,9 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
    s->kind      = kind;
    s->next      = oc->sections;
    oc->sections = s;
-   /*
-   debugBelch("addSection: %p-%p (size %d), kind %d\n",
-                   start, ((char*)end)-1, end - start + 1, kind );
-   */
+
+   IF_DEBUG(linker, debugBelch("addSection: %p-%p (size %ld), kind %d\n",
+                               start, ((char*)end)-1, (long)end - (long)start + 1, kind ));
 }
 
 
@@ -2415,7 +2549,9 @@ static SymbolExtra* makeSymbolExtra( ObjectCode* oc,
    Because the PPC has split data/instruction caches, we have to
    do that whenever we modify code at runtime.
  */
-static void ocFlushInstructionCacheFrom(void* begin, size_t length)
+
+static void
+ocFlushInstructionCacheFrom(void* begin, size_t length)
 {
     size_t         n = (length + 3) / 4;
     unsigned long* p = begin;
@@ -2434,15 +2570,22 @@ static void ocFlushInstructionCacheFrom(void* begin, size_t length)
                        "isync"
                      );
 }
-static void ocFlushInstructionCache( ObjectCode *oc )
+
+static void
+ocFlushInstructionCache( ObjectCode *oc )
 {
     /* The main object code */
-    ocFlushInstructionCacheFrom(oc->image + oc->misalignment, oc->fileSize);
+    ocFlushInstructionCacheFrom(oc->image
+#ifdef darwin_HOST_OS
+            + oc->misalignment
+#endif
+            , oc->fileSize);
 
     /* Jump Islands */
     ocFlushInstructionCacheFrom(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
 }
-#endif
+#endif /* powerpc_HOST_ARCH */
+
 
 /* --------------------------------------------------------------------------
  * PEi386 specifics (Win32 targets)
@@ -3540,31 +3683,6 @@ PLTSize(void)
  * Generic ELF functions
  */
 
-static char *
-findElfSection ( void* objImage, Elf_Word sh_type )
-{
-   char* ehdrC = (char*)objImage;
-   Elf_Ehdr* ehdr = (Elf_Ehdr*)ehdrC;
-   Elf_Shdr* shdr = (Elf_Shdr*)(ehdrC + ehdr->e_shoff);
-   char* sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
-   char* ptr = NULL;
-   int i;
-
-   for (i = 0; i < ehdr->e_shnum; i++) {
-      if (shdr[i].sh_type == sh_type
-          /* Ignore the section header's string table. */
-          && i != ehdr->e_shstrndx
-          /* Ignore string tables named .stabstr, as they contain
-             debugging info. */
-          && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
-         ) {
-         ptr = ehdrC + shdr[i].sh_offset;
-         break;
-      }
-   }
-   return ptr;
-}
-
 static int
 ocVerifyImage_ELF ( ObjectCode* oc )
 {
@@ -3572,7 +3690,6 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    Elf_Sym*  stab;
    int i, j, nent, nstrtab, nsymtabs;
    char* sh_strtab;
-   char* strtab;
 
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*)ehdrC;
@@ -3654,20 +3771,64 @@ ocVerifyImage_ELF ( ObjectCode* oc )
                ehdrC + shdr[i].sh_offset,
                       ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
 
-      if (shdr[i].sh_type == SHT_REL) {
-          IF_DEBUG(linker,debugBelch("Rel  " ));
-      } else if (shdr[i].sh_type == SHT_RELA) {
-          IF_DEBUG(linker,debugBelch("RelA " ));
-      } else {
-          IF_DEBUG(linker,debugBelch("     "));
+#define SECTION_INDEX_VALID(ndx) (ndx > SHN_UNDEF && ndx < ehdr->e_shnum)
+
+      switch (shdr[i].sh_type) {
+
+        case SHT_REL:
+        case SHT_RELA:
+          IF_DEBUG(linker,debugBelch( shdr[i].sh_type == SHT_REL ? "Rel  " : "RelA "));
+
+          if (!SECTION_INDEX_VALID(shdr[i].sh_link)) {
+            if (shdr[i].sh_link == SHN_UNDEF)
+              errorBelch("\n%s: relocation section #%d has no symbol table\n"
+                         "This object file has probably been fully striped. "
+                         "Such files cannot be linked.\n",
+                         oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
+            else
+              errorBelch("\n%s: relocation section #%d has an invalid link field (%d)\n",
+                         oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+                         i, shdr[i].sh_link);
+            return 0;
+          }
+          if (shdr[shdr[i].sh_link].sh_type != SHT_SYMTAB) {
+            errorBelch("\n%s: relocation section #%d does not link to a symbol table\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
+            return 0;
+          }
+          if (!SECTION_INDEX_VALID(shdr[i].sh_info)) {
+            errorBelch("\n%s: relocation section #%d has an invalid info field (%d)\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+                       i, shdr[i].sh_info);
+            return 0;
+          }
+
+          break;
+        case SHT_SYMTAB:
+          IF_DEBUG(linker,debugBelch("Sym  "));
+
+          if (!SECTION_INDEX_VALID(shdr[i].sh_link)) {
+            errorBelch("\n%s: symbol table section #%d has an invalid link field (%d)\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName,
+                       i, shdr[i].sh_link);
+            return 0;
+          }
+          if (shdr[shdr[i].sh_link].sh_type != SHT_STRTAB) {
+            errorBelch("\n%s: symbol table section #%d does not link to a string table\n",
+                       oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
+
+            return 0;
+          }
+          break;
+        case SHT_STRTAB: IF_DEBUG(linker,debugBelch("Str  ")); break;
+        default:         IF_DEBUG(linker,debugBelch("     ")); break;
       }
       if (sh_strtab) {
           IF_DEBUG(linker,debugBelch("sname=%s\n", sh_strtab + shdr[i].sh_name ));
       }
    }
 
-   IF_DEBUG(linker,debugBelch( "\nString tables" ));
-   strtab = NULL;
+   IF_DEBUG(linker,debugBelch( "\nString tables\n" ));
    nstrtab = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type == SHT_STRTAB
@@ -3677,18 +3838,16 @@ ocVerifyImage_ELF ( ObjectCode* oc )
              debugging info. */
           && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
-         IF_DEBUG(linker,debugBelch("   section %d is a normal string table", i ));
-         strtab = ehdrC + shdr[i].sh_offset;
+         IF_DEBUG(linker,debugBelch("   section %d is a normal string table\n", i ));
          nstrtab++;
       }
    }
-   if (nstrtab != 1) {
-      errorBelch("%s: no string tables, or too many", oc->fileName);
-      return 0;
+   if (nstrtab == 0) {
+      IF_DEBUG(linker,debugBelch("   no normal string tables (potentially, but not necessarily a problem)\n"));
    }
 
    nsymtabs = 0;
-   IF_DEBUG(linker,debugBelch( "\nSymbol tables" ));
+   IF_DEBUG(linker,debugBelch( "Symbol tables\n" ));
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
       IF_DEBUG(linker,debugBelch( "section %d is a symbol table\n", i ));
@@ -3730,13 +3889,17 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          }
          IF_DEBUG(linker,debugBelch("  " ));
 
-         IF_DEBUG(linker,debugBelch("name=%s\n", strtab + stab[j].st_name ));
+         IF_DEBUG(linker,debugBelch("name=%s\n",
+                        ehdrC + shdr[shdr[i].sh_link].sh_offset
+                              + stab[j].st_name ));
       }
    }
 
    if (nsymtabs == 0) {
-      errorBelch("%s: didn't find any symbol tables", oc->fileName);
-      return 0;
+     // Not having a symbol table is not in principle a problem.
+     // When an object file has no symbols then the 'strip' program
+     // typically will remove the symbol table entirely.
+     IF_DEBUG(linker,debugBelch("   no symbol tables (potentially, but not necessarily a problem)\n"));
    }
 
    return 1;
@@ -3783,15 +3946,10 @@ ocGetNames_ELF ( ObjectCode* oc )
 
    char*     ehdrC    = (char*)(oc->image);
    Elf_Ehdr* ehdr     = (Elf_Ehdr*)ehdrC;
-   char*     strtab   = findElfSection ( ehdrC, SHT_STRTAB );
+   char*     strtab;
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
    ASSERT(symhash != NULL);
-
-   if (!strtab) {
-      errorBelch("%s: no strtab", oc->fileName);
-      return 0;
-   }
 
    k = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
@@ -3825,12 +3983,16 @@ ocGetNames_ELF ( ObjectCode* oc )
 
       /* copy stuff into this module's object symbol table */
       stab = (Elf_Sym*) (ehdrC + shdr[i].sh_offset);
+      strtab = ehdrC + shdr[shdr[i].sh_link].sh_offset;
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
 
       oc->n_symbols = nent;
       oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
                                    "ocGetNames_ELF(oc->symbols)");
 
+      //TODO: we ignore local symbols anyway right? So we can use the
+      //      shdr[i].sh_info to get the index of the first non-local symbol
+      // ie we should use j = shdr[i].sh_info
       for (j = 0; j < nent; j++) {
 
          char  isLocal = FALSE; /* avoids uninit-var warning */
@@ -3928,21 +4090,24 @@ ocGetNames_ELF ( ObjectCode* oc )
    relocations appear to be of this form. */
 static int
 do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
-                         Elf_Shdr* shdr, int shnum,
-                         Elf_Sym*  stab, char* strtab )
+                         Elf_Shdr* shdr, int shnum )
 {
    int j;
    char *symbol;
    Elf_Word* targ;
    Elf_Rel*  rtab = (Elf_Rel*) (ehdrC + shdr[shnum].sh_offset);
+   Elf_Sym*  stab;
+   char*     strtab;
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rel);
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
+   int strtab_shndx = shdr[symtab_shndx].sh_link;
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
+   strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
    targ  = (Elf_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d\n",
-                          target_shndx, symtab_shndx ));
+   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d and strtab %d\n",
+                          target_shndx, symtab_shndx, strtab_shndx ));
 
    /* Skip sections that we're not interested in. */
    {
@@ -4028,18 +4193,21 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    sparc-solaris relocations appear to be of this form. */
 static int
 do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
-                          Elf_Shdr* shdr, int shnum,
-                          Elf_Sym*  stab, char* strtab )
+                          Elf_Shdr* shdr, int shnum )
 {
    int j;
    char *symbol = NULL;
    Elf_Addr targ;
    Elf_Rela* rtab = (Elf_Rela*) (ehdrC + shdr[shnum].sh_offset);
+   Elf_Sym*  stab;
+   char*     strtab;
    int         nent = shdr[shnum].sh_size / sizeof(Elf_Rela);
    int target_shndx = shdr[shnum].sh_info;
    int symtab_shndx = shdr[shnum].sh_link;
+   int strtab_shndx = shdr[symtab_shndx].sh_link;
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
+   strtab= (char*)    (ehdrC + shdr[ strtab_shndx ].sh_offset);
    targ  = (Elf_Addr) (ehdrC + shdr[ target_shndx ].sh_offset);
    IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d\n",
                           target_shndx, symtab_shndx ));
@@ -4308,35 +4476,20 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 static int
 ocResolve_ELF ( ObjectCode* oc )
 {
-   char *strtab;
    int   shnum, ok;
-   Elf_Sym*  stab  = NULL;
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
-   /* first find "the" symbol table */
-   stab = (Elf_Sym*) findElfSection ( ehdrC, SHT_SYMTAB );
-
-   /* also go find the string table */
-   strtab = findElfSection ( ehdrC, SHT_STRTAB );
-
-   if (stab == NULL || strtab == NULL) {
-      errorBelch("%s: can't find string or symbol table", oc->fileName);
-      return 0;
-   }
-
    /* Process the relocation sections. */
    for (shnum = 0; shnum < ehdr->e_shnum; shnum++) {
       if (shdr[shnum].sh_type == SHT_REL) {
-         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr,
-                                       shnum, stab, strtab );
+         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, shnum );
          if (!ok) return ok;
       }
       else
       if (shdr[shnum].sh_type == SHT_RELA) {
-         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr,
-                                        shnum, stab, strtab );
+         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr, shnum );
          if (!ok) return ok;
       }
    }
@@ -4369,8 +4522,12 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 
   if( i == ehdr->e_shnum )
   {
-    errorBelch( "This ELF file contains no symtab" );
-    return 0;
+    // Not having a symbol table is not in principle a problem.
+    // When an object file has no symbols then the 'strip' program
+    // typically will remove the symbol table entirely.
+    IF_DEBUG(linker, debugBelch( "The ELF file %s contains no symtab\n",
+             oc->archiveMemberName ? oc->archiveMemberName : oc->fileName ));
+    return 1;
   }
 
   if( shdr[i].sh_entsize != sizeof( Elf_Sym ) )
@@ -4412,78 +4569,99 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 #endif
 
 #ifdef powerpc_HOST_ARCH
-static int ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+static int
+ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 {
     struct mach_header *header = (struct mach_header *) oc->image;
     struct load_command *lc = (struct load_command *) (header + 1);
     unsigned i;
 
-    for( i = 0; i < header->ncmds; i++ )
-    {
-        if( lc->cmd == LC_SYMTAB )
-        {
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
+
+    for (i = 0; i < header->ncmds; i++) {   
+        if (lc->cmd == LC_SYMTAB) {
+
                 // Find out the first and last undefined external
                 // symbol, so we don't have to allocate too many
-                // jump islands.
+            // jump islands/GOT entries.
+
             struct symtab_command *symLC = (struct symtab_command *) lc;
             unsigned min = symLC->nsyms, max = 0;
             struct nlist *nlist =
                 symLC ? (struct nlist*) ((char*) oc->image + symLC->symoff)
                       : NULL;
-            for(i=0;i<symLC->nsyms;i++)
-            {
-                if(nlist[i].n_type & N_STAB)
+
+            for (i = 0; i < symLC->nsyms; i++) {
+
+                if (nlist[i].n_type & N_STAB) {
                     ;
-                else if(nlist[i].n_type & N_EXT)
-                {
+                } else if (nlist[i].n_type & N_EXT) {
+
                     if((nlist[i].n_type & N_TYPE) == N_UNDF
-                        && (nlist[i].n_value == 0))
-                    {
-                        if(i < min)
+                        && (nlist[i].n_value == 0)) {
+
+                        if (i < min) {
                             min = i;
-                        if(i > max)
+                        }
+
+                        if (i > max) {
                             max = i;
                     }
                 }
             }
-            if(max >= min)
+            }
+
+            if (max >= min) {
                 return ocAllocateSymbolExtras(oc, max - min + 1, min);
+            }
 
             break;
         }
 
         lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
+
     return ocAllocateSymbolExtras(oc,0,0);
 }
+
 #endif
 #ifdef x86_64_HOST_ARCH
-static int ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+static int
+ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 {
     struct mach_header *header = (struct mach_header *) oc->image;
     struct load_command *lc = (struct load_command *) (header + 1);
     unsigned i;
 
-    for( i = 0; i < header->ncmds; i++ )
-    {
-        if( lc->cmd == LC_SYMTAB )
-        {
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
+
+    for (i = 0; i < header->ncmds; i++) {   
+        if (lc->cmd == LC_SYMTAB) {
+
                 // Just allocate one entry for every symbol
             struct symtab_command *symLC = (struct symtab_command *) lc;
 
+            IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: allocate %d symbols\n", symLC->nsyms));
+            IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: done\n"));
             return ocAllocateSymbolExtras(oc, symLC->nsyms, 0);
         }
 
         lc = (struct load_command *) ( ((char *)lc) + lc->cmdsize );
     }
+
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: allocated no symbols\n"));
+    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: done\n"));
     return ocAllocateSymbolExtras(oc,0,0);
 }
 #endif
 
-static int ocVerifyImage_MachO(ObjectCode* oc)
+static int
+ocVerifyImage_MachO(ObjectCode * oc)
 {
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
+
+    IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: start\n"));
 
 #if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
     if(header->magic != MH_MAGIC_64) {
@@ -4498,11 +4676,14 @@ static int ocVerifyImage_MachO(ObjectCode* oc)
         return 0;
     }
 #endif
+
     // FIXME: do some more verifying here
+    IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: done\n"));
     return 1;
 }
 
-static int resolveImports(
+static int
+resolveImports(
     ObjectCode* oc,
     char *image,
     struct symtab_command *symLC,
@@ -4517,12 +4698,13 @@ static int resolveImports(
 
 #if i386_HOST_ARCH
     int isJumpTable = 0;
-    if(!strcmp(sect->sectname,"__jump_table"))
-    {
+
+    if (strcmp(sect->sectname,"__jump_table") == 0) {
         isJumpTable = 1;
         itemSize = 5;
         ASSERT(sect->reserved2 == itemSize);
     }
+
 #endif
 
     for(i=0; i*itemSize < sect->size;i++)
@@ -4533,6 +4715,7 @@ static int resolveImports(
         void *addr = NULL;
 
         IF_DEBUG(linker, debugBelch("resolveImports: resolving %s\n", nm));
+
         if ((symbol->n_type & N_TYPE) == N_UNDF
             && (symbol->n_type & N_EXT) && (symbol->n_value != 0)) {
             addr = (void*) (symbol->n_value);
@@ -4549,10 +4732,10 @@ static int resolveImports(
         ASSERT(addr);
 
 #if i386_HOST_ARCH
-        if(isJumpTable)
-        {
+        if (isJumpTable) {
             checkProddableBlock(oc,image + sect->offset + i*itemSize);
-            *(image + sect->offset + i*itemSize) = 0xe9; // jmp
+
+            *(image + sect->offset + i * itemSize) = 0xe9; // jmp opcode
             *(unsigned*)(image + sect->offset + i*itemSize + 1)
                 = (char*)addr - (image + sect->offset + i*itemSize + 5);
         }
@@ -4690,9 +4873,12 @@ static int relocateSection(
         }
         else
         {
-            value = sections[reloc->r_symbolnum-1].offset
-                  - sections[reloc->r_symbolnum-1].addr
-                  + (uint64_t) image;
+	    // If the relocation is not through the global offset table
+	    // or external, then set the value to the baseValue.  This
+	    // will leave displacements into the __const section
+	    // unchanged (as they ought to be).
+
+	    value = baseValue;
         }
 
         IF_DEBUG(linker, debugBelch("relocateSection: value = %p\n", (void *)value));
@@ -4769,10 +4955,9 @@ static int relocateSection(
                     // and use #ifdefs for the other types.
 
                     // Step 1: Figure out what the relocated value should be
-                    if(scat->r_type == GENERIC_RELOC_VANILLA)
-                    {
-                        word = *wordPtr + (unsigned long) relocateAddress(
-                                                                oc,
+                    if (scat->r_type == GENERIC_RELOC_VANILLA) {
+                        word = *wordPtr
+                             + (unsigned long) relocateAddress(oc,
                                                                 nSections,
                                                                 sections,
                                                                 scat->r_value)
@@ -4792,9 +4977,10 @@ static int relocateSection(
                         struct scattered_relocation_info *pair =
                                 (struct scattered_relocation_info*) &relocs[i+1];
 
-                        if(!pair->r_scattered || pair->r_type != GENERIC_RELOC_PAIR)
+                        if (!pair->r_scattered || pair->r_type != GENERIC_RELOC_PAIR) {
                             barf("Invalid Mach-O file: "
                                  "RELOC_*_SECTDIFF not followed by RELOC_PAIR");
+                        }
 
                         word = (unsigned long)
                                (relocateAddress(oc, nSections, sections, scat->r_value)
@@ -4808,9 +4994,11 @@ static int relocateSection(
                          || scat->r_type == PPC_RELOC_LO14)
                     {   // these are generated by label+offset things
                         struct relocation_info *pair = &relocs[i+1];
-                        if((pair->r_address & R_SCATTERED) || pair->r_type != PPC_RELOC_PAIR)
+
+                        if ((pair->r_address & R_SCATTERED) || pair->r_type != PPC_RELOC_PAIR) {
                             barf("Invalid Mach-O file: "
                                  "PPC_RELOC_* not followed by PPC_RELOC_PAIR");
+                        }
 
                         if(scat->r_type == PPC_RELOC_LO16)
                         {
@@ -4841,8 +5029,7 @@ static int relocateSection(
                         i++;
                     }
  #endif
-                    else
-                    {
+                    else {
                         barf ("Don't know how to handle this Mach-O "
                               "scattered relocation entry: "
                               "object file %s; entry type %ld; "
@@ -4865,15 +5052,18 @@ static int relocateSection(
                         *wordPtr = word;
                     }
 #ifdef powerpc_HOST_ARCH
-                    else if(scat->r_type == PPC_RELOC_LO16_SECTDIFF || scat->r_type == PPC_RELOC_LO16)
+                    else if (scat->r_type == PPC_RELOC_LO16_SECTDIFF
+                          || scat->r_type == PPC_RELOC_LO16)
                     {
                         ((unsigned short*) wordPtr)[1] = word & 0xFFFF;
                     }
-                    else if(scat->r_type == PPC_RELOC_HI16_SECTDIFF || scat->r_type == PPC_RELOC_HI16)
+                    else if (scat->r_type == PPC_RELOC_HI16_SECTDIFF
+                          || scat->r_type == PPC_RELOC_HI16)
                     {
                         ((unsigned short*) wordPtr)[1] = (word >> 16) & 0xFFFF;
                     }
-                    else if(scat->r_type == PPC_RELOC_HA16_SECTDIFF || scat->r_type == PPC_RELOC_HA16)
+                    else if (scat->r_type == PPC_RELOC_HA16_SECTDIFF
+                          || scat->r_type == PPC_RELOC_HA16)
                     {
                         ((unsigned short*) wordPtr)[1] = ((word >> 16) & 0xFFFF)
                             + ((word & (1<<15)) ? 1 : 0);
@@ -4908,11 +5098,12 @@ static int relocateSection(
         else /* !(relocs[i].r_address & R_SCATTERED) */
         {
             struct relocation_info *reloc = &relocs[i];
-            if(reloc->r_pcrel && !reloc->r_extern)
+            if (reloc->r_pcrel && !reloc->r_extern) {
+                IF_DEBUG(linker, debugBelch("relocateSection: pc relative but not external, skipping\n"));
                 continue;
+            }
 
-            if(reloc->r_length == 2)
-            {
+            if (reloc->r_length == 2) {
                 unsigned long word = 0;
 #ifdef powerpc_HOST_ARCH
                 unsigned long jumpIsland = 0;
@@ -4924,34 +5115,28 @@ static int relocateSection(
                 unsigned long* wordPtr = (unsigned long*) (image + sect->offset + reloc->r_address);
                 checkProddableBlock(oc,wordPtr);
 
-                if(reloc->r_type == GENERIC_RELOC_VANILLA)
-                {
+                if (reloc->r_type == GENERIC_RELOC_VANILLA) {
                     word = *wordPtr;
                 }
 #ifdef powerpc_HOST_ARCH
-                else if(reloc->r_type == PPC_RELOC_LO16)
-                {
+                else if (reloc->r_type == PPC_RELOC_LO16) {
                     word = ((unsigned short*) wordPtr)[1];
                     word |= ((unsigned long) relocs[i+1].r_address & 0xFFFF) << 16;
                 }
-                else if(reloc->r_type == PPC_RELOC_HI16)
-                {
+                else if (reloc->r_type == PPC_RELOC_HI16) {
                     word = ((unsigned short*) wordPtr)[1] << 16;
                     word |= ((unsigned long) relocs[i+1].r_address & 0xFFFF);
                 }
-                else if(reloc->r_type == PPC_RELOC_HA16)
-                {
+                else if (reloc->r_type == PPC_RELOC_HA16) {
                     word = ((unsigned short*) wordPtr)[1] << 16;
                     word += ((short)relocs[i+1].r_address & (short)0xFFFF);
                 }
-                else if(reloc->r_type == PPC_RELOC_BR24)
-                {
+                else if (reloc->r_type == PPC_RELOC_BR24) {
                     word = *wordPtr;
                     word = (word & 0x03FFFFFC) | ((word & 0x02000000) ? 0xFC000000 : 0);
                 }
 #endif
-                else
-                {
+                else {
                     barf("Can't handle this Mach-O relocation entry "
                          "(not scattered): "
                          "object file %s; entry type %ld; address %#lx\n",
@@ -4961,28 +5146,24 @@ static int relocateSection(
                     return 0;
                 }
 
-                if(!reloc->r_extern)
-                {
-                    long delta =
-                        sections[reloc->r_symbolnum-1].offset
+                if (!reloc->r_extern) {
+                    long delta = sections[reloc->r_symbolnum-1].offset
                         - sections[reloc->r_symbolnum-1].addr
                         + ((long) image);
 
                     word += delta;
                 }
-                else
-                {
+                else {
                     struct nlist *symbol = &nlist[reloc->r_symbolnum];
                     char *nm = image + symLC->stroff + symbol->n_un.n_strx;
                     void *symbolAddress = lookupSymbol(nm);
-                    if(!symbolAddress)
-                    {
+
+                    if (!symbolAddress) {
                         errorBelch("\nunknown symbol `%s'", nm);
                         return 0;
                     }
 
-                    if(reloc->r_pcrel)
-                    {
+                    if (reloc->r_pcrel) {  
 #ifdef powerpc_HOST_ARCH
                             // In the .o file, this should be a relative jump to NULL
                             // and we'll change it to a relative jump to the symbol
@@ -4992,8 +5173,7 @@ static int relocateSection(
                                                          reloc->r_symbolnum,
                                                          (unsigned long) symbolAddress)
                                          -> jumpIsland;
-                        if(jumpIsland != 0)
-                        {
+                        if (jumpIsland != 0) {
                             offsetToJumpIsland = word + jumpIsland
                                 - (((long)image) + sect->offset - sect->addr);
                         }
@@ -5001,14 +5181,12 @@ static int relocateSection(
                         word += (unsigned long) symbolAddress
                                 - (((long)image) + sect->offset - sect->addr);
                     }
-                    else
-                    {
+                    else {
                         word += (unsigned long) symbolAddress;
                     }
                 }
 
-                if(reloc->r_type == GENERIC_RELOC_VANILLA)
-                {
+                if (reloc->r_type == GENERIC_RELOC_VANILLA) {
                     *wordPtr = word;
                     continue;
                 }
@@ -5016,34 +5194,36 @@ static int relocateSection(
                 else if(reloc->r_type == PPC_RELOC_LO16)
                 {
                     ((unsigned short*) wordPtr)[1] = word & 0xFFFF;
-                    i++; continue;
+                    i++;
+                    continue;
                 }
                 else if(reloc->r_type == PPC_RELOC_HI16)
                 {
                     ((unsigned short*) wordPtr)[1] = (word >> 16) & 0xFFFF;
-                    i++; continue;
+                    i++;
+                    continue;
                 }
                 else if(reloc->r_type == PPC_RELOC_HA16)
                 {
                     ((unsigned short*) wordPtr)[1] = ((word >> 16) & 0xFFFF)
                         + ((word & (1<<15)) ? 1 : 0);
-                    i++; continue;
+                    i++;
+                    continue;
                 }
                 else if(reloc->r_type == PPC_RELOC_BR24)
                 {
-                    if((word & 0x03) != 0)
+                    if ((word & 0x03) != 0) {
                         barf("%s: unconditional relative branch with a displacement "
                              "which isn't a multiple of 4 bytes: %#lx",
                              OC_INFORMATIVE_FILENAME(oc),
                              word);
+                    }
 
                     if((word & 0xFE000000) != 0xFE000000 &&
-                       (word & 0xFE000000) != 0x00000000)
-                    {
+                        (word & 0xFE000000) != 0x00000000) {
                         // The branch offset is too large.
                         // Therefore, we try to use a jump island.
-                        if(jumpIsland == 0)
-                        {
+                        if (jumpIsland == 0) {
                             barf("%s: unconditional relative branch out of range: "
                                  "no jump island available: %#lx",
                                  OC_INFORMATIVE_FILENAME(oc),
@@ -5051,12 +5231,14 @@ static int relocateSection(
                         }
 
                         word = offsetToJumpIsland;
+
                         if((word & 0xFE000000) != 0xFE000000 &&
-                           (word & 0xFE000000) != 0x00000000)
+                            (word & 0xFE000000) != 0x00000000) {
                             barf("%s: unconditional relative branch out of range: "
                                  "jump island out of range: %#lx",
                                  OC_INFORMATIVE_FILENAME(oc),
                                  word);
+                    }
                     }
                     *wordPtr = (*wordPtr & 0xFC000003) | (word & 0x03FFFFFC);
                     continue;
@@ -5078,11 +5260,13 @@ static int relocateSection(
         }
 #endif
     }
+
     IF_DEBUG(linker, debugBelch("relocateSection: done\n"));
     return 1;
 }
 
-static int ocGetNames_MachO(ObjectCode* oc)
+static int
+ocGetNames_MachO(ObjectCode* oc)
 {
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
@@ -5100,10 +5284,13 @@ static int ocGetNames_MachO(ObjectCode* oc)
 
     for(i=0;i<header->ncmds;i++)
     {
-        if(lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64)
+        if (lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64) {
             segLC = (struct segment_command*) lc;
-        else if(lc->cmd == LC_SYMTAB)
+        }
+        else if (lc->cmd == LC_SYMTAB) {
             symLC = (struct symtab_command*) lc;
+        }
+
         lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
     }
 
@@ -5111,14 +5298,19 @@ static int ocGetNames_MachO(ObjectCode* oc)
     nlist = symLC ? (struct nlist*) (image + symLC->symoff)
                   : NULL;
 
-    if(!segLC)
+    if (!segLC) {
         barf("ocGetNames_MachO: no segment load command");
+    }
 
+    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: will load %d sections\n", segLC->nsects));
     for(i=0;i<segLC->nsects;i++)
     {
-        IF_DEBUG(linker, debugBelch("ocGetNames_MachO: segment %d\n", i));
-        if (sections[i].size == 0)
+        IF_DEBUG(linker, debugBelch("ocGetNames_MachO: section %d\n", i));
+
+        if (sections[i].size == 0) {
+            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: found a zero length section, skipping\n"));
             continue;
+        }
 
         if((sections[i].flags & SECTION_TYPE) == S_ZEROFILL)
         {
@@ -5127,36 +5319,47 @@ static int ocGetNames_MachO(ObjectCode* oc)
             sections[i].offset = zeroFillArea - image;
         }
 
-        if(!strcmp(sections[i].sectname,"__text"))
+        if (!strcmp(sections[i].sectname,"__text")) {
+
+            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __text section\n"));
             addSection(oc, SECTIONKIND_CODE_OR_RODATA,
                 (void*) (image + sections[i].offset),
                 (void*) (image + sections[i].offset + sections[i].size));
-        else if(!strcmp(sections[i].sectname,"__const"))
-            addSection(oc, SECTIONKIND_RWDATA,
-                (void*) (image + sections[i].offset),
-                (void*) (image + sections[i].offset + sections[i].size));
-        else if(!strcmp(sections[i].sectname,"__data"))
-            addSection(oc, SECTIONKIND_RWDATA,
-                (void*) (image + sections[i].offset),
-                (void*) (image + sections[i].offset + sections[i].size));
-        else if(!strcmp(sections[i].sectname,"__bss")
-                || !strcmp(sections[i].sectname,"__common"))
-            addSection(oc, SECTIONKIND_RWDATA,
-                (void*) (image + sections[i].offset),
-                (void*) (image + sections[i].offset + sections[i].size));
+        }
+        else if (!strcmp(sections[i].sectname,"__const")) {
 
-        addProddableBlock(oc, (void*) (image + sections[i].offset),
+            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __const section\n"));
+            addSection(oc, SECTIONKIND_RWDATA,
+                (void*) (image + sections[i].offset),
+                (void*) (image + sections[i].offset + sections[i].size));
+        }    
+        else if (!strcmp(sections[i].sectname,"__data")) {
+
+            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __data section\n"));
+            addSection(oc, SECTIONKIND_RWDATA,
+                (void*) (image + sections[i].offset),
+                (void*) (image + sections[i].offset + sections[i].size));
+        }
+        else if(!strcmp(sections[i].sectname,"__bss")
+                || !strcmp(sections[i].sectname,"__common")) {
+
+            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: adding __bss section\n"));
+            addSection(oc, SECTIONKIND_RWDATA,
+                (void*) (image + sections[i].offset),
+                (void*) (image + sections[i].offset + sections[i].size));
+        }
+        addProddableBlock(oc,
+                          (void *) (image + sections[i].offset),
                                         sections[i].size);
     }
 
         // count external symbols defined here
     oc->n_symbols = 0;
-    if(symLC)
-    {
-        for(i=0;i<symLC->nsyms;i++)
-        {
-            if(nlist[i].n_type & N_STAB)
+    if (symLC) {
+        for (i = 0; i < symLC->nsyms; i++) {
+            if (nlist[i].n_type & N_STAB) {
                 ;
+            }
             else if(nlist[i].n_type & N_EXT)
             {
                 if((nlist[i].n_type & N_TYPE) == N_UNDF
@@ -5200,19 +5403,27 @@ static int ocGetNames_MachO(ObjectCode* oc)
                             oc->symbols[curSymbol++] = nm;
                     }
                 }
+                else
+                {
+                    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not external, skipping\n"));
+                }
+            }
+            else
+            {
+                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not defined in this section, skipping\n"));
             }
         }
     }
 
     commonStorage = stgCallocBytes(1,commonSize,"ocGetNames_MachO(common symbols)");
     commonCounter = (unsigned long)commonStorage;
-    if(symLC)
-    {
-        for(i=0;i<symLC->nsyms;i++)
-        {
+
+    if (symLC) {
+        for (i = 0; i < symLC->nsyms; i++) {
             if((nlist[i].n_type & N_TYPE) == N_UNDF
-                    && (nlist[i].n_type & N_EXT) && (nlist[i].n_value != 0))
-            {
+             && (nlist[i].n_type & N_EXT)
+             && (nlist[i].n_value != 0)) {
+
                 char *nm = image + symLC->stroff + nlist[i].n_un.n_strx;
                 unsigned long sz = nlist[i].n_value;
 
@@ -5227,10 +5438,13 @@ static int ocGetNames_MachO(ObjectCode* oc)
             }
         }
     }
+
+    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: done\n"));
     return 1;
 }
 
-static int ocResolve_MachO(ObjectCode* oc)
+static int
+ocResolve_MachO(ObjectCode* oc)
 {
     char *image = (char*) oc->image;
     struct mach_header *header = (struct mach_header*) image;
@@ -5245,12 +5459,19 @@ static int ocResolve_MachO(ObjectCode* oc)
     IF_DEBUG(linker, debugBelch("ocResolve_MachO: start\n"));
     for (i = 0; i < header->ncmds; i++)
     {
-        if(lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64)
+        if (lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64) {
             segLC = (struct segment_command*) lc;
-        else if(lc->cmd == LC_SYMTAB)
+            IF_DEBUG(linker, debugBelch("ocResolve_MachO: found a 32 or 64 bit segment load command\n"));
+        }
+        else if (lc->cmd == LC_SYMTAB) {
             symLC = (struct symtab_command*) lc;
-        else if(lc->cmd == LC_DYSYMTAB)
+            IF_DEBUG(linker, debugBelch("ocResolve_MachO: found a symbol table load command\n"));
+        }
+        else if (lc->cmd == LC_DYSYMTAB) {
             dsymLC = (struct dysymtab_command*) lc;
+            IF_DEBUG(linker, debugBelch("ocResolve_MachO: found a dynamic symbol table load command\n"));
+        }
+
         lc = (struct load_command *) ( ((char*)lc) + lc->cmdsize );
     }
 
@@ -5318,7 +5539,8 @@ static int ocResolve_MachO(ObjectCode* oc)
 
 extern void* symbolsWithoutUnderscore[];
 
-static void machoInitSymbolsWithoutUnderscore()
+static void
+machoInitSymbolsWithoutUnderscore(void)
 {
     void **p = symbolsWithoutUnderscore;
     __asm__ volatile(".globl _symbolsWithoutUnderscore\n.data\n_symbolsWithoutUnderscore:");
@@ -5346,7 +5568,8 @@ static void machoInitSymbolsWithoutUnderscore()
  * Figure out by how much to shift the entire Mach-O file in memory
  * when loading so that its single segment ends up 16-byte-aligned
  */
-static int machoGetMisalignment( FILE * f )
+static int
+machoGetMisalignment( FILE * f )
 {
     struct mach_header header;
     int misalignment;

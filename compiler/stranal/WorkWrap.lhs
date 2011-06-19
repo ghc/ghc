@@ -100,6 +100,7 @@ matching by looking for strict arguments of the correct type.
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
 wwExpr e@(Type {}) = return e
+wwExpr e@(Coercion {}) = return e
 wwExpr e@(Lit  {}) = return e
 wwExpr e@(Var  {}) = return e
 
@@ -425,6 +426,11 @@ then the splitting will go deeper too.
 --	    in case x of 
 --		 I# y -> let x = I# y in x }
 -- See comments above. Is it not beautifully short?
+-- Moreover, it works just as well when there are
+-- several binders, and if the binders are lifted
+-- E.g.     x = e
+--     -->  x = let x = e in
+--              case x of (a,b) -> let x = (a,b)  in x
 
 splitThunk :: Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk fn_id rhs = do

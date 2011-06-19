@@ -185,6 +185,7 @@ isStaticFlag f =
     "fsimple-list-literals",
     "fruntime-types",
     "fno-pre-inlining",
+    "fno-opt-coercion",
     "fexcess-precision",
     "static",
     "fhardwire-lib-paths",
@@ -209,7 +210,6 @@ unregFlags :: [Located String]
 unregFlags = map (mkGeneralLocated "in unregFlags")
    [ "-optc-DNO_REGS"
    , "-optc-DUSE_MINIINTERPRETER"
-   , "-fno-asm-mangling"
    , "-funregisterised" ]
 
 -----------------------------------------------------------------------------

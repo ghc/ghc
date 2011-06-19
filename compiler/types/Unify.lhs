@@ -8,9 +8,11 @@ module Unify (
 	--	the "tc" prefix indicates that matching always
 	--	respects newtypes (rather than looking through them)
 	tcMatchTy, tcMatchTys, tcMatchTyX, 
-	ruleMatchTyX, tcMatchPreds, MatchEnv(..),
-	
-	dataConCannotMatch,
+	ruleMatchTyX, tcMatchPreds, 
+
+	MatchEnv(..), matchList, 
+
+	typesCantMatch,
 
         -- Side-effect free unification
         tcUnifyTys, BindFlag(..),
@@ -23,16 +25,17 @@ module Unify (
 import Var
 import VarEnv
 import VarSet
+import Kind
 import Type
-import Coercion
 import TyCon
-import DataCon
 import TypeRep
 import Outputable
 import ErrUtils
 import Util
 import Maybes
 import FastString
+
+import Control.Monad (guard)
 \end{code}
 
 
@@ -67,9 +70,11 @@ Matching is much tricker than you might think.
 
 \begin{code}
 data MatchEnv
-  = ME	{ me_tmpls :: VarSet	-- Template tyvars
+  = ME	{ me_tmpls :: VarSet	-- Template variables
  	, me_env   :: RnEnv2	-- Renaming envt for nested foralls
-	}			--   In-scope set includes template tyvars
+	}			--   In-scope set includes template variables
+    -- Nota Bene: MatchEnv isn't specific to Types.  It is used
+    --            for matching terms and coercions as well as types
 
 tcMatchTy :: TyVarSet		-- Template tyvars
 	  -> Type		-- Template
@@ -121,7 +126,7 @@ tcMatchPreds
 	-> [PredType] -> [PredType]
    	-> Maybe TvSubstEnv
 tcMatchPreds tmpls ps1 ps2
-  = match_list (match_pred menv) emptyTvSubstEnv ps1 ps2
+  = matchList (match_pred menv) emptyTvSubstEnv ps1 ps2
   where
     menv = ME { me_tmpls = mkVarSet tmpls, me_env = mkRnEnv2 in_scope_tyvars }
     in_scope_tyvars = mkInScopeSet (tyVarsOfTheta ps1 `unionVarSet` tyVarsOfTheta ps2)
@@ -155,9 +160,8 @@ match menv subst ty1 ty2 | Just ty1' <- coreView ty1 = match menv subst ty1' ty2
 
 match menv subst (TyVarTy tv1) ty2
   | Just ty1' <- lookupVarEnv subst tv1'	-- tv1' is already bound
-  = if tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
+  = if eqTypeX (nukeRnEnvL rn_env) ty1' ty2
 	-- ty1 has no locally-bound variables, hence nukeRnEnvL
-	-- Note tcEqType...we are doing source-type matching here
     then Just subst
     else Nothing	-- ty2 doesn't match
 
@@ -203,14 +207,8 @@ match _ _ _ _
 match_kind :: MatchEnv -> TvSubstEnv -> TyVar -> Type -> Maybe TvSubstEnv
 -- Match the kind of the template tyvar with the kind of Type
 -- Note [Matching kinds]
-match_kind menv subst tv ty
-  | isCoVar tv = do { let (ty1,ty2) = coVarKind tv
-			  (ty3,ty4) = coercionKind ty
-		    ; subst1 <- match menv subst ty1 ty3
-		    ; match menv subst1 ty2 ty4 }
-  | otherwise  = if typeKind ty `isSubKind` tyVarKind tv
-		 then Just subst
-		 else Nothing
+match_kind _ subst tv ty
+  = guard (typeKind ty `isSubKind` tyVarKind tv) >> return subst
 
 -- Note [Matching kinds]
 -- ~~~~~~~~~~~~~~~~~~~~~
@@ -228,15 +226,15 @@ match_kind menv subst tv ty
 
 --------------
 match_tys :: MatchEnv -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv
-match_tys menv subst tys1 tys2 = match_list (match menv) subst tys1 tys2
+match_tys menv subst tys1 tys2 = matchList (match menv) subst tys1 tys2
 
 --------------
-match_list :: (TvSubstEnv -> a -> a -> Maybe TvSubstEnv)
-	   -> TvSubstEnv -> [a] -> [a] -> Maybe TvSubstEnv
-match_list _  subst []         []         = Just subst
-match_list fn subst (ty1:tys1) (ty2:tys2) = do	{ subst' <- fn subst ty1 ty2
-						; match_list fn subst' tys1 tys2 }
-match_list _  _     _          _          = Nothing
+matchList :: (env -> a -> b -> Maybe env)
+	   -> env -> [a] -> [b] -> Maybe env
+matchList _  subst []     []     = Just subst
+matchList fn subst (a:as) (b:bs) = do { subst' <- fn subst a b
+				      ; matchList fn subst' as bs }
+matchList _  _     _      _      = Nothing
 
 --------------
 match_pred :: MatchEnv -> TvSubstEnv -> PredType -> PredType -> Maybe TvSubstEnv
@@ -320,26 +318,9 @@ anything, type functions (incl newtypes) match anything, and only
 distinct data types fail to match.  We can elaborate later.
 
 \begin{code}
-dataConCannotMatch :: [Type] -> DataCon -> Bool
--- Returns True iff the data con *definitely cannot* match a 
---		    scrutinee of type (T tys)
---		    where T is the type constructor for the data con
---
-dataConCannotMatch tys con
-  | null eq_spec      = False	-- Common
-  | all isTyVarTy tys = False	-- Also common
-  | otherwise
-  = cant_match_s (map (substTyVar subst . fst) eq_spec)
-	         (map snd eq_spec)
+typesCantMatch :: [(Type,Type)] -> Bool
+typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
   where
-    dc_tvs  = dataConUnivTyVars con
-    eq_spec = dataConEqSpec con
-    subst   = zipTopTvSubst dc_tvs tys
-
-    cant_match_s :: [Type] -> [Type] -> Bool
-    cant_match_s tys1 tys2 = ASSERT( equalLength tys1 tys2 )
-			     or (zipWith cant_match tys1 tys2)
-
     cant_match :: Type -> Type -> Bool
     cant_match t1 t2
 	| Just t1' <- coreView t1 = cant_match t1' t2
@@ -350,7 +331,7 @@ dataConCannotMatch tys con
 
     cant_match (TyConApp tc1 tys1) (TyConApp tc2 tys2)
 	| isDataTyCon tc1 && isDataTyCon tc2
-	= tc1 /= tc2 || cant_match_s tys1 tys2
+	= tc1 /= tc2 || typesCantMatch (zipEqual "typesCantMatch" tys1 tys2)
 
     cant_match (FunTy {}) (TyConApp tc _) = isDataTyCon tc
     cant_match (TyConApp tc _) (FunTy {}) = isDataTyCon tc
@@ -375,7 +356,6 @@ dataConCannotMatch tys con
 --	look through newtypes
 --	take account of tyvar bindings (EQ example above)
 \end{code}
-
 
 
 %************************************************************************
@@ -422,7 +402,7 @@ niFixTvSubst env = f env
         | otherwise    = subst
         where
           range_tvs    = foldVarEnv (unionVarSet . tyVarsOfType) emptyVarSet e
-          subst        = mkTvSubst (mkInScopeSet range_tvs) e
+          subst        = mkTvSubst (mkInScopeSet range_tvs) e 
           not_fixpoint = foldVarSet ((||) . in_domain) False range_tvs
           in_domain tv = tv `elemVarEnv` e
 

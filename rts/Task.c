@@ -318,23 +318,28 @@ void
 taskTimeStamp (Task *task USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    Ticks currentElapsedTime, currentUserTime, elapsedGCTime;
+    Ticks currentElapsedTime, currentUserTime;
 
     currentUserTime = getThreadCPUTime();
     currentElapsedTime = getProcessElapsedTime();
 
-    // XXX this is wrong; we want elapsed GC time since the
-    // Task started.
-    elapsedGCTime = stat_getElapsedGCTime();
-    
-    task->mut_time = 
+    task->mut_time =
 	currentUserTime - task->muttimestart - task->gc_time;
     task->mut_etime = 
-	currentElapsedTime - task->elapsedtimestart - elapsedGCTime;
+        currentElapsedTime - task->elapsedtimestart - task->gc_etime;
 
+    if (task->gc_time   < 0) { task->gc_time   = 0; }
+    if (task->gc_etime  < 0) { task->gc_etime  = 0; }
     if (task->mut_time  < 0) { task->mut_time  = 0; }
     if (task->mut_etime < 0) { task->mut_etime = 0; }
 #endif
+}
+
+void
+taskDoneGC (Task *task, Ticks cpu_time, Ticks elapsed_time)
+{
+    task->gc_time  += cpu_time;
+    task->gc_etime += elapsed_time;
 }
 
 #if defined(THREADED_RTS)

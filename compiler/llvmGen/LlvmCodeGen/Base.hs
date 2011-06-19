@@ -9,8 +9,10 @@ module LlvmCodeGen.Base (
         LlvmCmmTop, LlvmBasicBlock,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
+        LlvmVersion, defaultLlvmVersion,
+
         LlvmEnv, initLlvmEnv, clearVars, varLookup, varInsert,
-        funLookup, funInsert,
+        funLookup, funInsert, getLlvmVer, setLlvmVer,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
@@ -128,33 +130,50 @@ tysToParams = map (\ty -> (ty, []))
 llvmPtrBits :: Int
 llvmPtrBits = widthInBits $ typeWidth gcWord
 
+-- ----------------------------------------------------------------------------
+-- * Llvm Version
+--
+
+-- | LLVM Version Number
+type LlvmVersion = Int
+
+-- | The LLVM Version we assume if we don't know
+defaultLlvmVersion :: LlvmVersion
+defaultLlvmVersion = 28
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
 --
 
-type LlvmEnvMap = UniqFM LlvmType
 -- two maps, one for functions and one for local vars.
-type LlvmEnv = (LlvmEnvMap, LlvmEnvMap)
+newtype LlvmEnv = LlvmEnv (LlvmEnvMap, LlvmEnvMap, LlvmVersion)
+type LlvmEnvMap = UniqFM LlvmType
 
 -- | Get initial Llvm environment.
 initLlvmEnv :: LlvmEnv
-initLlvmEnv = (emptyUFM, emptyUFM)
+initLlvmEnv = LlvmEnv (emptyUFM, emptyUFM, defaultLlvmVersion)
 
 -- | Clear variables from the environment.
 clearVars :: LlvmEnv -> LlvmEnv
-clearVars (e1, _) = (e1, emptyUFM)
+clearVars (LlvmEnv (e1, _, n)) = LlvmEnv (e1, emptyUFM, n)
 
 -- | Insert functions into the environment.
 varInsert, funInsert :: Uniquable key => key -> LlvmType -> LlvmEnv -> LlvmEnv
-varInsert s t (e1, e2) = (e1, addToUFM e2 s t)
-funInsert s t (e1, e2) = (addToUFM e1 s t, e2)
+varInsert s t (LlvmEnv (e1, e2, n)) = LlvmEnv (e1, addToUFM e2 s t, n)
+funInsert s t (LlvmEnv (e1, e2, n)) = LlvmEnv (addToUFM e1 s t, e2, n)
 
 -- | Lookup functions in the environment.
 varLookup, funLookup :: Uniquable key => key -> LlvmEnv -> Maybe LlvmType
-varLookup s (_, e2) = lookupUFM e2 s
-funLookup s (e1, _) = lookupUFM e1 s
+varLookup s (LlvmEnv (_, e2, _)) = lookupUFM e2 s
+funLookup s (LlvmEnv (e1, _, _)) = lookupUFM e1 s
 
+-- | Get the LLVM version we are generating code for
+getLlvmVer :: LlvmEnv -> LlvmVersion
+getLlvmVer (LlvmEnv (_, _, n)) = n
+
+-- | Set the LLVM version we are generating code for
+setLlvmVer :: LlvmVersion -> LlvmEnv -> LlvmEnv
+setLlvmVer n (LlvmEnv (e1, e2, _)) = LlvmEnv (e1, e2, n)
 
 -- ----------------------------------------------------------------------------
 -- * Label handling

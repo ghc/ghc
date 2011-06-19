@@ -27,6 +27,8 @@ includes_H_SUBDIRS += rts/storage
 includes_H_SUBDIRS += stg
 
 includes_H_FILES := $(wildcard $(patsubst %,includes/%/*.h,$(includes_H_SUBDIRS)))
+# This isn't necessary, but it makes the paths look a little prettier
+includes_H_FILES := $(subst /./,/,$(includes_H_FILES))
 
 #
 # Options

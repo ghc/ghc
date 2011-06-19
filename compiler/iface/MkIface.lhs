@@ -7,23 +7,23 @@
 module MkIface ( 
         mkUsedNames,
         mkDependencies,
-	mkIface, 	-- Build a ModIface from a ModGuts, 
-			-- including computing version information
+        mkIface,        -- Build a ModIface from a ModGuts, 
+                        -- including computing version information
 
         mkIfaceTc,
 
-	writeIfaceFile,	-- Write the interface file
+        writeIfaceFile, -- Write the interface file
 
-	checkOldIface,	-- See if recompilation is required, by
-			-- comparing version information
+        checkOldIface,  -- See if recompilation is required, by
+                        -- comparing version information
 
         tyThingToIfaceDecl -- Converting things to their Iface equivalents
  ) where
 \end{code}
 
-	-----------------------------------------------
-        	Recompilation checking
-	-----------------------------------------------
+  -----------------------------------------------
+          Recompilation checking
+  -----------------------------------------------
 
 A complete description of how recompilation checking works can be
 found in the wiki commentary:
@@ -59,10 +59,10 @@ import Annotations
 import CoreSyn
 import CoreFVs
 import Class
+import Kind
 import TyCon
 import DataCon
 import Type
-import Coercion
 import TcType
 import InstEnv
 import FamInstEnv
@@ -72,6 +72,7 @@ import HscTypes
 import Finder
 import DynFlags
 import VarEnv
+import VarSet
 import Var
 import Name
 import RdrName
@@ -325,18 +326,17 @@ mkIface_ hsc_env maybe_old_fingerprint
 
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
-     flattenVectInfo (VectInfo { vectInfoVar   = vVar
-                               , vectInfoTyCon = vTyCon
+     flattenVectInfo (VectInfo { vectInfoVar          = vVar
+                               , vectInfoTyCon        = vTyCon
+                               , vectInfoScalarVars   = vScalarVars
+                               , vectInfoScalarTyCons = vScalarTyCons
                                }) = 
-       IfaceVectInfo { 
-         ifaceVectInfoVar        = [ Var.varName v 
-                                   | (v, _) <- varEnvElts vVar],
-         ifaceVectInfoTyCon      = [ tyConName t 
-                                   | (t, t_v) <- nameEnvElts vTyCon
-                                   , t /= t_v],
-         ifaceVectInfoTyConReuse = [ tyConName t
-                                   | (t, t_v) <- nameEnvElts vTyCon
-                                   , t == t_v]
+       IfaceVectInfo
+       { ifaceVectInfoVar          = [Var.varName v | (v, _  ) <- varEnvElts  vVar]
+       , ifaceVectInfoTyCon        = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
+       , ifaceVectInfoTyConReuse   = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
+       , ifaceVectInfoScalarVars   = [Var.varName v | v <- varSetElems vScalarVars]
+       , ifaceVectInfoScalarTyCons = nameSetToList vScalarTyCons
        } 
 
 -----------------------------
@@ -900,8 +900,8 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
 	finsts_mod   = mi_finsts    iface
         hash_env     = mi_hash_fn   iface
         mod_hash     = mi_mod_hash  iface
-        export_hash | depend_on_exports mod = Just (mi_exp_hash iface)
-    		    | otherwise 	    = Nothing
+        export_hash | depend_on_exports = Just (mi_exp_hash iface)
+    		    | otherwise         = Nothing
     
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 
@@ -918,21 +918,21 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
                 Nothing -> pprPanic "mkUsage" (ppr mod <+> ppr occ <+> ppr used_names)
                 Just r  -> r
 
-        depend_on_exports mod = 
-           case lookupModuleEnv direct_imports mod of
-    	        Just _ -> True
-                  -- Even if we used 'import M ()', we have to register a
-                  -- usage on the export list because we are sensitive to
-                  -- changes in orphan instances/rules.
-	    	Nothing -> False
-                  -- In GHC 6.8.x the above line read "True", and in
-                  -- fact it recorded a dependency on *all* the
-                  -- modules underneath in the dependency tree.  This
-                  -- happens to make orphans work right, but is too
-                  -- expensive: it'll read too many interface files.
-                  -- The 'isNothing maybe_iface' check above saved us
-                  -- from generating many of these usages (at least in
-                  -- one-shot mode), but that's even more bogus!
+        depend_on_exports = is_direct_import
+        {- True
+              Even if we used 'import M ()', we have to register a
+              usage on the export list because we are sensitive to
+              changes in orphan instances/rules.
+           False
+              In GHC 6.8.x we always returned true, and in
+              fact it recorded a dependency on *all* the
+              modules underneath in the dependency tree.  This
+              happens to make orphans work right, but is too
+              expensive: it'll read too many interface files.
+              The 'isNothing maybe_iface' check above saved us
+              from generating many of these usages (at least in
+              one-shot mode), but that's even more bogus!
+        -}
 \end{code}
 
 \begin{code}
@@ -1335,9 +1335,9 @@ tyThingToIfaceDecl (AClass clas)
 	  (sel_tyvars, rho_ty) = splitForAllTys (idType sel_id)
 	  op_ty		       = funResultTy rho_ty
 
-    toDmSpec NoDefMeth   = NoDM
-    toDmSpec GenDefMeth  = GenericDM
-    toDmSpec (DefMeth _) = VanillaDM
+    toDmSpec NoDefMeth      = NoDM
+    toDmSpec (GenDefMeth _) = GenericDM
+    toDmSpec (DefMeth _)    = VanillaDM
 
     toIfaceFD (tvs1, tvs2) = (map getFS tvs1, map getFS tvs2)
 
@@ -1357,7 +1357,6 @@ tyThingToIfaceDecl (ATyCon tycon)
 		ifCons    = ifaceConDecls (algTyConRhs tycon),
 	  	ifRec     = boolToRecFlag (isRecursiveTyCon tycon),
 		ifGadtSyntax = isGadtSyntaxTyCon tycon,
-		ifGeneric = tyConHasGenerics tycon,
 		ifFamInst = famInstToIface (tyConFamInst_maybe tycon)}
 
   | isForeignTyCon tycon
@@ -1387,20 +1386,24 @@ tyThingToIfaceDecl (ATyCon tycon)
 	= IfCon   { ifConOcc   	 = getOccName (dataConName data_con),
 		    ifConInfix 	 = dataConIsInfix data_con,
 		    ifConWrapper = isJust (dataConWrapId_maybe data_con),
-		    ifConUnivTvs = toIfaceTvBndrs (dataConUnivTyVars data_con),
-		    ifConExTvs   = toIfaceTvBndrs (dataConExTyVars data_con),
-		    ifConEqSpec  = to_eq_spec (dataConEqSpec data_con),
-		    ifConCtxt    = toIfaceContext (dataConEqTheta data_con ++ dataConDictTheta data_con),
-		    ifConArgTys  = map toIfaceType (dataConOrigArgTys data_con),
+		    ifConUnivTvs = toIfaceTvBndrs univ_tvs,
+		    ifConExTvs   = toIfaceTvBndrs ex_tvs,
+		    ifConEqSpec  = to_eq_spec eq_spec,
+		    ifConCtxt    = toIfaceContext theta,
+		    ifConArgTys  = map toIfaceType arg_tys,
 		    ifConFields  = map getOccName 
 				       (dataConFieldLabels data_con),
 		    ifConStricts = dataConStrictMarks data_con }
+        where
+          (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
 
     to_eq_spec spec = [(getOccName tv, toIfaceType ty) | (tv,ty) <- spec]
 
     famInstToIface Nothing                    = Nothing
     famInstToIface (Just (famTyCon, instTys)) = 
       Just (toIfaceTyCon famTyCon, map toIfaceType instTys)
+
+tyThingToIfaceDecl c@(ACoAxiom _) = pprPanic "tyThingToIfaceDecl (ACoCon _)" (ppr c)
 
 tyThingToIfaceDecl (ADataCon dc)
  = pprPanic "toIfaceDecl" (ppr dc)	-- Should be trimmed out earlier
@@ -1566,6 +1569,8 @@ coreRuleToIfaceRule mod rule@(Rule { ru_name = name, ru_fn = fn,
 	-- construct the same ru_rough field as we have right now;
 	-- see tcIfaceRule
     do_arg (Type ty) = IfaceType (toIfaceType (deNoteType ty))
+    do_arg (Coercion co) = IfaceType (coToIfaceType co)
+                           
     do_arg arg       = toIfaceExpr arg
 
 	-- Compute orphanhood.  See Note [Orphans] in IfaceSyn
@@ -1585,15 +1590,16 @@ bogusIfaceRule id_name
 
 ---------------------
 toIfaceExpr :: CoreExpr -> IfaceExpr
-toIfaceExpr (Var v)       = toIfaceVar v
-toIfaceExpr (Lit l)       = IfaceLit l
-toIfaceExpr (Type ty)     = IfaceType (toIfaceType ty)
-toIfaceExpr (Lam x b)     = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
-toIfaceExpr (App f a)     = toIfaceApp f [a]
-toIfaceExpr (Case s x ty as) = IfaceCase (toIfaceExpr s) (getFS x) (toIfaceType ty) (map toIfaceAlt as)
-toIfaceExpr (Let b e)     = IfaceLet (toIfaceBind b) (toIfaceExpr e)
-toIfaceExpr (Cast e co)   = IfaceCast (toIfaceExpr e) (toIfaceType co)
-toIfaceExpr (Note n e)    = IfaceNote (toIfaceNote n) (toIfaceExpr e)
+toIfaceExpr (Var v)         = toIfaceVar v
+toIfaceExpr (Lit l)         = IfaceLit l
+toIfaceExpr (Type ty)       = IfaceType (toIfaceType ty)
+toIfaceExpr (Coercion co)   = IfaceCo   (coToIfaceType co)
+toIfaceExpr (Lam x b)       = IfaceLam (toIfaceBndr x) (toIfaceExpr b)
+toIfaceExpr (App f a)       = toIfaceApp f [a]
+toIfaceExpr (Case s x _ as) = IfaceCase (toIfaceExpr s) (getFS x) (map toIfaceAlt as)
+toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
+toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (coToIfaceType co)
+toIfaceExpr (Note n e)      = IfaceNote (toIfaceNote n) (toIfaceExpr e)
 
 ---------------------
 toIfaceNote :: Note -> IfaceNote

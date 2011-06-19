@@ -28,7 +28,9 @@ import Outputable
 import qualified Pretty as Prt
 import UniqSupply
 import Util
+import SysTools ( figureLlvmVersion )
 
+import Data.Maybe ( fromMaybe )
 import System.IO
 
 -- -----------------------------------------------------------------------------
@@ -48,8 +50,9 @@ llvmCodeGen dflags h us cmms
     in do
         bufh <- newBufHandle h
         Prt.bufLeftRender bufh $ pprLlvmHeader
-
-        env' <- cmmDataLlvmGens dflags bufh env cdata []
+        ver <- (fromMaybe defaultLlvmVersion) `fmap` figureLlvmVersion dflags
+        
+        env' <- cmmDataLlvmGens dflags bufh (setLlvmVer ver env) cdata []
         cmmProcLlvmGens dflags bufh us env' cmm 1 []
 
         bFlush bufh

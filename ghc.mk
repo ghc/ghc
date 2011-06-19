@@ -227,6 +227,7 @@ include rules/package-config.mk
 # -----------------------------------------------------------------------------
 # Building dependencies
 
+include rules/dependencies.mk
 include rules/build-dependencies.mk
 include rules/include-dependencies.mk
 
@@ -438,13 +439,13 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 # package-data.mk is sufficient, as that in turn depends on all the
 # libraries
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/ghc-pwd/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/ghc-pwd/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/ghc-cabal/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 utils/ghc-pkg/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/hsc2hs/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/compare_sizes/dist/package-data.mk: compiler/stage2/package-data.mk
-utils/runghc/dist/package-data.mk: compiler/stage2/package-data.mk
+utils/compare_sizes/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/runghc/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final two package.conf dependencies: ghc-prim depends on RTS,
 # and RTS depends on libffi.
@@ -544,7 +545,6 @@ BUILD_DIRS += \
 
 ifneq "$(GhcUnregisterised)" "YES"
 BUILD_DIRS += \
-   $(GHC_MANGLER_DIR) \
    $(GHC_SPLIT_DIR)
 endif
 
@@ -750,7 +750,7 @@ TAGS: TAGS_compiler
 # -----------------------------------------------------------------------------
 # Installation
 
-install: install_packages install_libs install_libexecs install_headers \
+install: install_libs install_packages install_libexecs install_headers \
          install_libexec_scripts install_bins install_topdirs
 ifeq "$(HADDOCK_DOCS)" "YES"
 install: install_docs
@@ -904,13 +904,13 @@ $(eval $(call bindist,.,\
     README \
     INSTALL \
     configure config.sub config.guess install-sh \
-    extra-gcc-opts.in \
+    settings.in \
     packages \
     Makefile \
     mk/config.mk.in \
     $(INPLACE_BIN)/mkdirhier \
     utils/ghc-cabal/dist-install/build/tmp/ghc-cabal \
-    utils/ghc-pwd/dist/build/tmp/ghc-pwd \
+    utils/ghc-pwd/dist-install/build/tmp/ghc-pwd \
     $(BINDIST_WRAPPERS) \
     $(BINDIST_PERL_SOURCES) \
     $(BINDIST_LIBS) \
@@ -920,7 +920,6 @@ $(eval $(call bindist,.,\
     $(includes_H_PLATFORM) \
     $(includes_H_FILES) \
     includes/ghcconfig.h \
-    includes/rts/Config.h \
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
@@ -934,7 +933,7 @@ $(eval $(call bindist,.,\
     compiler/stage2/doc \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
-    $(filter-out extra-gcc-opts,$(INSTALL_LIBS)) \
+    $(filter-out settings,$(INSTALL_LIBS)) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
     mk/install.mk.in \
@@ -955,7 +954,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep:
 	"$(RM)" $(RM_OPTS_REC) bindistprep/
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh extra-gcc-opts.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "LATEX_DOCS         = $(LATEX_DOCS)"         >> $(BIN_DIST_MK)
 	echo "BUILD_DOCBOOK_HTML = $(BUILD_DOCBOOK_HTML)" >> $(BIN_DIST_MK)
@@ -1044,7 +1043,7 @@ SRC_DIST_DIRS = mk rules docs distrib bindisttest libffi includes utils docs rts
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in ghc.spec extra-gcc-opts.in VERSION \
+	ghc.spec.in ghc.spec settings.in VERSION \
 	boot boot-pkgs packages ghc.mk
 
 SRC_DIST_TARBALL = $(SRC_DIST_NAME)-src.tar.bz2
@@ -1159,7 +1158,7 @@ distclean : clean
 	"$(RM)" $(RM_OPTS) config.cache config.status config.log mk/config.h mk/stamp-h
 	"$(RM)" $(RM_OPTS) mk/config.mk mk/are-validating.mk mk/project.mk
 	"$(RM)" $(RM_OPTS) mk/config.mk.old mk/project.mk.old
-	"$(RM)" $(RM_OPTS) extra-gcc-opts docs/users_guide/ug-book.xml
+	"$(RM)" $(RM_OPTS) settings docs/users_guide/ug-book.xml
 	"$(RM)" $(RM_OPTS) compiler/ghc.cabal compiler/ghc.cabal.old
 	"$(RM)" $(RM_OPTS) ghc/ghc-bin.cabal
 	"$(RM)" $(RM_OPTS) libraries/base/include/HsBaseConfig.h

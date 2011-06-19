@@ -45,6 +45,30 @@ void postUserMsg(Capability *cap, char *msg, va_list ap);
 
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
+void postEventStartup(EventCapNo n_caps);
+
+/*
+ * Post a capability set modification event
+ */
+void postCapsetModifyEvent (EventTypeNum tag,
+                            EventCapsetID capset,
+                            StgWord32 other);
+
+/*
+ * Post a capability set event with a string payload
+ */
+void postCapsetStrEvent (EventTypeNum tag,
+                         EventCapsetID capset,
+                         char *msg);
+
+/*
+ * Post a capability set event with several strings payload
+ */
+void postCapsetVecEvent (EventTypeNum tag,
+                         EventCapsetID capset,
+                         int argc,
+                         char *msg[]);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<section id="runtime-control">
+<sect1 id="runtime-control">
   <title>Running a compiled program</title>
 
   <indexterm><primary>runtime control of Haskell programs</primary></indexterm>
@@ -21,7 +21,7 @@
     options themselves.
   </para>
 
-  <section id="setting-rts-options">
+  <sect2 id="setting-rts-options">
     <title>Setting RTS options</title>
     <indexterm><primary>RTS options, setting</primary></indexterm>
 
@@ -53,7 +53,7 @@
       </itemizedlist>
     </para>
 
-    <section id="rts-opts-cmdline">
+    <sect3 id="rts-opts-cmdline">
       <title>Setting RTS options on the command line</title>
 
       <para>
@@ -127,9 +127,9 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
           <literal>+RTS -M128m -RTS</literal>
           to the command line.
         </para>
-      </section>
+      </sect3>
 
-      <section id="rts-opts-compile-time">
+      <sect3 id="rts-opts-compile-time">
         <title>Setting RTS options at compile time</title>
 
         <para>
@@ -139,9 +139,9 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
           set <literal>-H128m -K64m</literal>, link
           with <literal>-with-rtsopts="-H128m -K64m"</literal>.
         </para>
-      </section>
+      </sect3>
 
-      <section id="rts-options-environment">
+      <sect3 id="rts-options-environment">
         <title>Setting RTS options with the <envar>GHCRTS</envar>
           environment variable</title>
 
@@ -178,9 +178,9 @@ $ ./prog -f +RTS -H32m -S -RTS -h foo bar
           a crawl until the OS decides to kill the process (and you
           hope it kills the right one).
         </para>
-      </section>
+      </sect3>
 
-  <section id="rts-hooks">
+  <sect3 id="rts-hooks">
     <title>&ldquo;Hooks&rdquo; to change RTS behaviour</title>
 
     <indexterm><primary>hooks</primary><secondary>RTS</secondary></indexterm>
@@ -259,11 +259,11 @@ char *ghc_rts_opts = "-H128m -K1m";
     versions in the file
     <filename>ghc/compiler/parser/hschooks.c</filename> in a GHC
     source tree.</para>
-  </section>
+  </sect3>
 
-    </section>
+    </sect2>
 
-  <section id="rts-options-misc">
+  <sect2 id="rts-options-misc">
     <title>Miscellaneous RTS options</title>
 
     <variablelist>
@@ -329,7 +329,7 @@ char *ghc_rts_opts = "-H128m -K1m";
            with a message like &ldquo;<literal>failed to mmap() memory below 2Gb</literal>&rdquo;.  If you need to use this option to get GHCi working
            on your machine, please file a bug.
          </para>
-         
+
          <para>
            On 64-bit machines, the RTS needs to allocate memory in the
            low 2Gb of the address space.  Support for this across
@@ -347,9 +347,9 @@ char *ghc_rts_opts = "-H128m -K1m";
        </listitem>
      </varlistentry>
     </variablelist>
-  </section>
+  </sect2>
 
-  <section id="rts-options-gc">
+  <sect2 id="rts-options-gc">
     <title>RTS options to control the garbage collector</title>
 
     <indexterm><primary>garbage collector</primary><secondary>options</secondary></indexterm>
@@ -495,7 +495,7 @@ char *ghc_rts_opts = "-H128m -K1m";
             generation <replaceable>gen</replaceable> and higher.
             Omitting <replaceable>gen</replaceable> turns off the
             parallel GC completely, reverting to sequential GC.</para>
-          
+
           <para>The default parallel GC settings are usually suitable
             for parallel programs (i.e. those
             using <literal>par</literal>, Strategies, or with multiple
@@ -509,7 +509,7 @@ char *ghc_rts_opts = "-H128m -K1m";
             restrict parallel GC to the old generation
             with <literal>-qg1</literal>.</para>
         </listitem>
-      </varlistentry>        
+      </varlistentry>
 
       <varlistentry>
         <term>
@@ -524,7 +524,7 @@ char *ghc_rts_opts = "-H128m -K1m";
             generation <replaceable>gen</replaceable> and higher.
             Omitting <replaceable>gen</replaceable> disables
             load-balancing entirely.</para>
-          
+
           <para>
             Load-balancing shares out the work of GC between the
             available cores.  This is a good idea when the heap is
@@ -817,7 +817,7 @@ char *ghc_rts_opts = "-H128m -K1m";
       </listitem>
       <listitem>
         <para>
-          The peak memory the RTS has allocated from the OS. 
+          The peak memory the RTS has allocated from the OS.
         </para>
       </listitem>
       <listitem>
@@ -1012,12 +1012,12 @@ char *ghc_rts_opts = "-H128m -K1m";
       </listitem>
       <listitem>
         <para>
-          How many page faults occured this garbage collection.
+          How many page faults occurred this garbage collection.
         </para>
       </listitem>
       <listitem>
         <para>
-          How many page faults occured since the end of the last garbage
+          How many page faults occurred since the end of the last garbage
           collection.
         </para>
       </listitem>
@@ -1032,17 +1032,17 @@ char *ghc_rts_opts = "-H128m -K1m";
       </varlistentry>
     </variablelist>
 
-  </section>
+  </sect2>
 
-  <section>
+  <sect2>
     <title>RTS options for concurrency and parallelism</title>
 
     <para>The RTS options related to concurrency are described in
       <xref linkend="using-concurrent" />, and those for parallelism in
       <xref linkend="parallel-options"/>.</para>
-  </section>
+  </sect2>
 
-  <section id="rts-profiling">
+  <sect2 id="rts-profiling">
     <title>RTS options for profiling</title>
 
     <para>Most profiling runtime options are only available when you
@@ -1073,9 +1073,9 @@ char *ghc_rts_opts = "-H128m -K1m";
         </listitem>
       </varlistentry>
     </variablelist>
-  </section>
+  </sect2>
 
-  <section id="rts-eventlog">
+  <sect2 id="rts-eventlog">
     <title>Tracing</title>
 
     <indexterm><primary>tracing</primary></indexterm>
@@ -1166,9 +1166,9 @@ char *ghc_rts_opts = "-H128m -K1m";
       the binary eventlog file by using the <option>-l</option>
       option.
     </para>
-  </section>
+  </sect2>
 
-  <section id="rts-options-debugging">
+  <sect2 id="rts-options-debugging">
     <title>RTS options for hackers, debuggers, and over-interested
     souls</title>
 
@@ -1209,7 +1209,7 @@ char *ghc_rts_opts = "-H128m -K1m";
         </term>
 	<listitem>
 	  <para>
-            An RTS debugging flag; only availble if the program was
+            An RTS debugging flag; only available if the program was
 	    linked with the <option>-debug</option> option.  Various
 	    values of <replaceable>x</replaceable> are provided to
 	    enable debug messages and additional runtime sanity checks
@@ -1301,9 +1301,9 @@ char *ghc_rts_opts = "-H128m -K1m";
       </varlistentry>
     </variablelist>
 
-  </section>
+  </sect2>
 
-  <section>
+  <sect2>
     <title>Getting information about the RTS</title>
 
     <indexterm><primary>RTS</primary></indexterm>
@@ -1443,8 +1443,8 @@ $ ./a.out +RTS --info
 
     </variablelist>
 
-  </section>
-</section>
+  </sect2>
+</sect1>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***

@@ -1,205 +1,155 @@
-{-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
-
+{-# OPTIONS -fno-warn-unused-binds #-}
 -- -----------------------------------------------------------------------------
 -- | GHC LLVM Mangler
 --
 -- This script processes the assembly produced by LLVM, rearranging the code
--- so that an info table appears before its corresponding function. We also
--- use it to fix up the stack alignment, which needs to be 16 byte aligned
--- but always ends up off by 4 bytes because GHC sets it to the wrong starting
--- value in the RTS.
+-- so that an info table appears before its corresponding function.
 --
--- We only need this for Mac OS X, other targets don't use it.
+-- On OSX we also use it to fix up the stack alignment, which needs to be 16
+-- byte aligned but always ends up off by word bytes because GHC sets it to
+-- the 'wrong' starting value in the RTS.
 --
 
 module LlvmMangler ( llvmFixupAsm ) where
 
-import Data.ByteString.Char8 ( ByteString )
-import qualified Data.ByteString.Char8 as BS
+#include "HsVersions.h"
 
-import LlvmCodeGen.Ppr ( infoSection, iTableSuf )
+import LlvmCodeGen.Ppr ( infoSection )
 
+import Control.Exception
+import qualified Data.ByteString.Char8 as B
 import Data.Char
-import Outputable
-import Util
+import qualified Data.IntMap as I
+import System.IO
 
+-- Magic Strings
+secStmt, infoSec, newInfoSec, newLine, spInst, jmpInst :: B.ByteString
+secStmt    = B.pack "\t.section\t"
+infoSec    = B.pack infoSection
+newInfoSec = B.pack "\n\t.text"
+newLine    = B.pack "\n"
+jmpInst    = B.pack "\n\tjmp"
 
-{- Configuration. -}
-newSection, oldSection, functionSuf, tableSuf, funDivider, eol :: ByteString
-newSection  = BS.pack "\n.text\n"
-oldSection  = BS.pack infoSection
-functionSuf = BS.pack $ if ghciTablesNextToCode then "_info:" else "\n_"
-tableSuf    = BS.pack $ "_info" ++ iTableSuf ++ ":"
-funDivider  = BS.pack "\n\n"
-eol         = BS.pack "\n"
+infoLen, labelStart, spFix :: Int
+infoLen    = B.length infoSec
+labelStart = B.length jmpInst
 
+#if x86_64_TARGET_ARCH
+spInst     = B.pack ", %rsp\n"
+spFix      = 8
+#else
+spInst     = B.pack ", %esp\n"
+spFix      = 4
+#endif
 
+-- Search Predicates
 eolPred, dollarPred, commaPred :: Char -> Bool
-eolPred = ((==) '\n')
+eolPred    = ((==) '\n')
 dollarPred = ((==) '$')
-commaPred = ((==) ',')
+commaPred  = ((==) ',')
 
 -- | Read in assembly file and process
 llvmFixupAsm :: FilePath -> FilePath -> IO ()
 llvmFixupAsm f1 f2 = do
-    asm <- BS.readFile f1
-    BS.writeFile f2 BS.empty
-    allTables f2 asm
+    r <- openBinaryFile f1 ReadMode
+    w <- openBinaryFile f2 WriteMode
+    fixTables r w I.empty
+    B.hPut w (B.pack "\n\n")
+    hClose r
+    hClose w
     return ()
 
--- | Run over whole assembly file
-allTables :: FilePath -> ByteString -> IO ()
-allTables f str = do
-    rem <- oneTable f str
-    if BS.null rem
-       then return ()
-       else allTables f rem
-
 {- |
-  Look for the next function that needs to have its info table
-  arranged to be before it and process it. This will print out
-  any code before this function, then the info table, then the
-  function. It will return the remainder of the assembly code
-  to process.
+    Here we process the assembly file one function and data
+    definition at a time. When a function is encountered that
+    should have a info table we store it in a map. Otherwise
+    we print it. When an info table is found we retrieve its
+    function from the map and print them both.
 
-  We rely here on the fact that LLVM prints all global variables
-  at the end of the file, so an info table will always appear
-  after its function.
-
-  To try to help explain the string searches, here is some
-  assembly code that would be processed by this program, with
-  split markers placed in it like so, <split marker>:
-
-    [ ...asm code... ]
-    jmp *%eax
-    <before|fheader>
-    .def Main_main_info
-    .section TEXT
-    .globl _Main_main_info
-    _Main_main<bl|al>_info:
-        sub $12, %esp
-        [ ...asm code... ]
-        jmp *%eax
-    <fun|after>
-    .def .....
-
-    [ ...asm code... ]
-
-        .long 231231
-    <bit'|itable_h>
-    .section TEXT
-    .global _Main_main_entry
-    .align 4
-    <bit|itable>_Main_main_entry:
-        .long 0
-        [ ...asm code... ]
-    <itable'|ait>
-    .section TEXT
+    For all functions we fix up the stack alignment. We also
+    fix up the section definition for functions and info tables.
 -}
-oneTable :: FilePath -> ByteString -> IO ByteString
-oneTable f str =
-    let last' xs = if (null xs) then 0 else last xs
+fixTables :: Handle -> Handle -> I.IntMap B.ByteString -> IO ()
+fixTables r w m = do
+    f <- getFun r B.empty
+    if B.null f
+       then return ()
+       else let fun    = fixupStack f B.empty
+                (a,b)  = B.breakSubstring infoSec fun
+                (a',s) = B.breakEnd eolPred a
+                -- We search for the section header in two parts as it makes
+                -- us portable across OS types and LLVM version types since
+                -- section names are wrapped differently.
+                secHdr = secStmt `B.isPrefixOf` s
+                (x,c)  = B.break eolPred b
+                fun'   = a' `B.append` newInfoSec `B.append` c
+                n      = readInt $ B.takeWhile isDigit $ B.drop infoLen x
+                (bs, m') | B.null b || not secHdr = ([fun], m)
+                         | even n    = ([], I.insert n fun' m)
+                         | otherwise = case I.lookup (n+1) m of
+                               Just xf' -> ([fun',xf'], m)
+                               Nothing  -> ([fun'], m)
+            in mapM_ (B.hPut w) bs >> fixTables r w m'
 
-        -- get the function
-        (bl, al)          = BS.breakSubstring functionSuf str
-        start             = last' $ BS.findSubstrings funDivider bl
-        (before, fheader) = BS.splitAt start bl
-        (fun, after)      = BS.breakSubstring funDivider al
-        label             = snd $ BS.breakEnd eolPred bl
+-- | Read in the next function/data defenition
+getFun :: Handle -> B.ByteString -> IO B.ByteString
+getFun r f = do
+    l <- (try (B.hGetLine r))::IO (Either IOError B.ByteString)
+    case l of
+        Right l' | B.null l' -> return f
+                 | otherwise -> getFun r (f `B.append` newLine `B.append` l')
+        Left _ -> return B.empty
 
-        -- get the info table
-        ilabel            = label `BS.append` tableSuf
-        (bit, itable)     = BS.breakSubstring ilabel after
-        (itable', ait)    = BS.breakSubstring funDivider itable
-        istart            = last' $ BS.findSubstrings funDivider bit
-        (bit', iheader)   = BS.splitAt istart bit
+{-|
+    Mac OS X requires that the stack be 16 byte aligned when making a function
+    call (only really required though when making a call that will pass through
+    the dynamic linker). The alignment isn't correctly generated by LLVM as
+    LLVM rightly assumes that the stack will be aligned to 16n + 12 on entry
+    (since the function call was 16 byte aligned and the return address should
+    have been pushed, so sub 4). GHC though since it always uses jumps keeps
+    the stack 16 byte aligned on both function calls and function entry.
 
-        -- fixup stack alignment
-        fun' = fixupStack fun BS.empty
+    We correct the alignment here.
+-}
+fixupStack :: B.ByteString -> B.ByteString -> B.ByteString
 
-        -- fix up sections
-        fheader' = replaceSection fheader
-        iheader' = replaceSection iheader
+#if !darwin_TARGET_OS
+fixupStack = const
 
-        function = [before, eol, iheader', itable', eol, fheader', fun', eol]
-        remainder = bit' `BS.append` ait
-    in if BS.null al
-          then do
-              BS.appendFile f bl
-              return BS.empty
-
-          else if ghciTablesNextToCode
-                  then if BS.null itable
-                          then error $ "Function without matching info table! ("
-                                      ++ (BS.unpack label) ++ ")"
-                          else do
-                              mapM_ (BS.appendFile f) function
-                              return remainder
-
-                  else do
-                      -- TNTC not turned on so just fix up stack
-                      mapM_ (BS.appendFile f) [before, fheader, fun']
-                      return after
-
--- | Replace the current section in a function or table header with the
--- text section specifier.
-replaceSection :: ByteString -> ByteString
-replaceSection sec =
-    let (s1, s2) = BS.breakSubstring oldSection sec
-        s1'      = fst $ BS.breakEnd eolPred s1
-        s2'      = snd $ BS.break eolPred s2
-    in s1' `BS.append` newSection `BS.append` s2'
-
-
--- | Mac OS X requires that the stack be 16 byte aligned when making a function
--- call (only really required though when making a call that will pass through
--- the dynamic linker). During code generation we marked any points where we
--- make a call that requires this alignment. The alignment isn't correctly
--- generated by LLVM as LLVM rightly assumes that the stack wil be aligned to
--- 16n + 12 on entry (since the function call was 16 byte aligned and the return
--- address should have been pushed, so sub 4). GHC though since it always uses
--- jumps keeps the stack 16 byte aligned on both function calls and function
--- entry. We correct LLVM's alignment then by putting inline assembly in that
--- subtracts and adds 4 to the sp as required.
-fixupStack :: ByteString -> ByteString -> ByteString
-fixupStack fun nfun | BS.null nfun =
+#else
+fixupStack f f' | B.null f' =
     let -- fixup sub op
-        (a, b)       = BS.breakSubstring (BS.pack ", %esp\n") fun
-        (a', strNum) = BS.breakEnd dollarPred a
-        Just num     = readInt (BS.unpack strNum)
-        num'         = BS.pack $ show (num + 4::Int)
-        fix          = a' `BS.append` num'
-    in if BS.null b
-          then nfun `BS.append` a
-          else fixupStack b (nfun `BS.append` fix)
+        (a, c) = B.breakSubstring spInst f
+        (b, n) = B.breakEnd dollarPred a
+        num    = B.pack $ show $ readInt n + spFix
+    in if B.null c
+          then f' `B.append` f
+          else fixupStack c $ f' `B.append` b `B.append` num
 
-fixupStack fun nfun =
+fixupStack f f' =
     let -- fixup add ops
-        (a, b) = BS.breakSubstring (BS.pack "jmp") fun
+        (a, c)  = B.breakSubstring jmpInst f
+        -- we matched on a '\n' so go past it
+        (l', b) = B.break eolPred $ B.tail c
+        l       = (B.head c) `B.cons` l'
+        (a', n) = B.breakEnd dollarPred a
+        (n', x) = B.break commaPred n
+        num     = B.pack $ show $ readInt n' + spFix
         -- We need to avoid processing jumps to labels, they are of the form:
-        -- jmp\tL..., jmp\t_f..., jmpl\t_f..., jmpl\t*%eax...
-        labelJump   = BS.index b 4 == 'L'
-        (jmp, b')   = BS.break eolPred b
-        (a', numx)  = BS.breakEnd dollarPred a
-        (strNum, x) = BS.break commaPred numx
-        Just num    = readInt (BS.unpack strNum)
-        num'        = BS.pack $ show (num + 4::Int)
-        fix         = a' `BS.append` num' `BS.append` x `BS.append` jmp
-    in if BS.null b
-          then nfun `BS.append` a
-          else if labelJump
-                then fixupStack b' (nfun `BS.append` a `BS.append` jmp)
-                else fixupStack b' (nfun `BS.append` fix)
+        -- jmp\tL..., jmp\t_f..., jmpl\t_f..., jmpl\t*%eax..., jmpl *L...
+        targ = B.dropWhile ((==)'*') $ B.drop 1 $ B.dropWhile ((/=)'\t') $
+                B.drop labelStart c
+    in if B.null c
+          then f' `B.append` f
+          else if B.head targ == 'L'
+                then fixupStack b $ f' `B.append` a `B.append` l
+                else fixupStack b $ f' `B.append` a' `B.append` num `B.append`
+                                    x `B.append` l
+#endif
 
-
--- | 'read' is one of my least favourite functions.
-readInt :: String -> Maybe Int
-readInt str
-	| not $ null $ filter (not . isDigit) str
-	= pprTrace "LLvmMangler"
-		(text "Cannot read" <+> text (show str) <+> text "as it's not an Int")
-		Nothing
-
-	| otherwise
-	= Just $ read str
+-- | Read an int or error
+readInt :: B.ByteString -> Int
+readInt str | B.all isDigit str = (read . B.unpack) str
+            | otherwise = error $ "LLvmMangler Cannot read " ++ show str
+                                ++ " as it's not an Int"
 

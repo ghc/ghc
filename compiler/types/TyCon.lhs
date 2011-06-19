@@ -13,7 +13,9 @@ module TyCon(
 	AlgTyConRhs(..), visibleDataCons, 
         TyConParent(..), isNoParent,
 	SynTyConRhs(..),
-        CoTyConDesc(..),
+
+	-- ** Coercion axiom constructors
+        CoAxiom(..), coAxiomName, coAxiomArity,
 
         -- ** Constructing TyCons
 	mkAlgTyCon,
@@ -25,7 +27,6 @@ module TyCon(
 	mkTupleTyCon,
 	mkSynTyCon,
         mkSuperKindTyCon,
-        mkCoercionTyCon,
         mkForeignTyCon,
         mkAnyTyCon,
 
@@ -35,21 +36,20 @@ module TyCon(
         isFunTyCon, 
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, 
-        isSynTyCon, isClosedSynTyCon, 
+        isSynTyCon, isClosedSynTyCon,
         isSuperKindTyCon, isDecomposableTyCon,
-        isCoercionTyCon, isCoercionTyCon_maybe,
         isForeignTyCon, isAnyTyCon, tyConHasKind,
 
 	isInjectiveTyCon,
 	isDataTyCon, isProductTyCon, isEnumerationTyCon, 
-	isNewTyCon, isAbstractTyCon, 
+        isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isSynFamilyTyCon, isDataFamilyTyCon,
         isUnLiftedTyCon,
 	isGadtSyntaxTyCon,
 	isTyConAssoc,
 	isRecursiveTyCon,
 	isHiBootTyCon,
-        isImplicitTyCon, tyConHasGenerics,
+        isImplicitTyCon, 
 
         -- ** Extracting information out of TyCons
 	tyConName,
@@ -63,16 +63,16 @@ module TyCon(
         tyConParent,
 	tyConClass_maybe,
 	tyConFamInst_maybe, tyConFamilyCoercion_maybe,tyConFamInstSig_maybe,
-	synTyConDefn, synTyConRhs, synTyConType, 
-	tyConExtName,		-- External name for foreign types
+        synTyConDefn, synTyConRhs, synTyConType,
+        tyConExtName,           -- External name for foreign types
 	algTyConRhs,
         newTyConRhs, newTyConEtadRhs, unwrapNewTyCon_maybe, 
-        tupleTyConBoxity,
+        tupleTyConBoxity, tupleTyConArity,
 
         -- ** Manipulating TyCons
 	tcExpandTyCon_maybe, coreExpandTyCon_maybe,
 	makeTyConAbstract,
-	newTyConCo_maybe,
+	newTyConCo, newTyConCo_maybe,
 
         -- * Primitive representations of Types
 	PrimRep(..),
@@ -113,7 +113,7 @@ Note [Type synonym families]
 
 * Reply "yes" to isSynFamilyTyCon, and isFamilyTyCon
 
-* From the user's point of view (F Int) and Bool are simply 
+* From the user's point of view (F Int) and Bool are simply
   equivalent types.
 
 * A Haskell 98 type synonym is a degenerate form of a type synonym
@@ -121,6 +121,36 @@ Note [Type synonym families]
 
 * Type functions can't appear in the LHS of a type function:
 	type instance F (F Int) = ...	-- BAD!
+
+* Translation of type family decl:
+	type family F a :: *
+  translates to
+    a SynTyCon 'F', whose SynTyConRhs is SynFamilyTyCon
+
+* Translation of type instance decl:
+	type instance F [a] = Maybe a
+  translates to a "representation TyCon", 'R:FList', where
+     R:FList is a SynTyCon, whose 
+       SynTyConRhs is (SynonymTyCon (Maybe a))
+       TyConParent is (FamInstTyCon F [a] co)
+         where co :: F [a] ~ R:FList a
+
+  It's very much as if the user had written
+       type instance F [a] = R:FList a
+       type R:FList a = Maybe a
+  Indeed, in GHC's internal representation, the RHS of every
+  'type instance' is simply an application of the representation
+  TyCon to the quantified varaibles.
+
+  The intermediate representation TyCon is a bit gratuitous, but 
+  it means that:
+
+        each 'type instance' decls is in 1-1 correspondance 
+	with its representation TyCon
+
+  So the result of typechecking a 'type instance' decl is just a
+  TyCon.  In turn this means that type and data families can be
+  treated uniformly.
 
 * Translation of type family decl:
 	type family F a :: *
@@ -153,6 +183,8 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
 	data instance T Int = T1 | T2 Bool
 
   Here T is the "family TyCon".
+
+* Reply "yes" to isDataFamilyTyCon, and isFamilyTyCon
 
 * Reply "yes" to isDataFamilyTyCon, and isFamilyTyCon
 
@@ -253,9 +285,6 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
 --
 -- 4) Class declarations: @class Foo where@ creates the @Foo@ type constructor of kind @*@
 --
--- 5) Type coercions! This is because we represent a coercion from @t1@ to @t2@ 
---    as a 'Type', where that type has kind @t1 ~ t2@. See "Coercion" for more on this
---
 -- This data type also encodes a number of primitive, built in type constructors such as those
 -- for function and tuple types.
 data TyCon
@@ -304,11 +333,7 @@ data TyCon
 
 	algTcRec :: RecFlag,	  -- ^ Tells us whether the data type is part 
                                   -- of a mutually-recursive group or not
-
-	hasGenerics :: Bool,	  -- ^ Whether generic (in the -XGenerics sense) 
-                                  -- to\/from functions are available in the exports 
-                                  -- of the data type's source module.
-
+	
 	algTcParent :: TyConParent	-- ^ Gives the class or family declaration 'TyCon' 
                                         -- for derived 'TyCon's representing class 
                                         -- or family instances, respectively. 
@@ -324,8 +349,7 @@ data TyCon
 	tyConArity  :: Arity,
 	tyConBoxed  :: Boxity,
 	tyConTyVars :: [TyVar],
-	dataCon     :: DataCon, -- ^ Corresponding tuple data constructor
-	hasGenerics :: Bool
+	dataCon     :: DataCon -- ^ Corresponding tuple data constructor
     }
 
   -- | Represents type synonyms
@@ -368,17 +392,6 @@ data TyCon
                                            --   holds the name of the imported thing
     }
 
-  -- | Type coercions, such as @(~)@, @sym@, @trans@, @left@ and @right@.
-  -- INVARIANT: Coercion TyCons are always fully applied
-  -- 		But note that a CoTyCon can be *over*-saturated in a type.
-  -- 		E.g.  (sym g1) Int  will be represented as (TyConApp sym [g1,Int])
-  | CoTyCon {	
-	tyConUnique :: Unique,
-        tyConName   :: Name,
-	tyConArity  :: Arity,
-	coTcDesc    :: CoTyConDesc
-    }
-
   -- | Any types.  Like tuples, this is a potentially-infinite family of TyCons
   --   one for each distinct Kind. They have no values at all.
   --   Because there are infinitely many of them (like tuples) they are 
@@ -388,7 +401,7 @@ data TyCon
   | AnyTyCon {
 	tyConUnique  :: Unique,
 	tyConName    :: Name,
-	tc_kind    :: Kind	-- Never = *; that is done via PrimTyCon
+	tc_kind      :: Kind	-- Never = *; that is done via PrimTyCon
 		     		-- See Note [Any types] in TysPrim
     }
 
@@ -462,18 +475,14 @@ data AlgTyConRhs
 			-- shorter than the declared arity of the 'TyCon'.
 			
 			-- See Note [Newtype eta]
-      
-        nt_co :: Maybe TyCon   -- ^ A 'TyCon' (which is always a 'CoTyCon') that can 
-                               -- have a 'Coercion' extracted from it to create 
-                               -- the @newtype@ from the representation 'Type'.
-                               --
-                               -- This field is optional for non-recursive @newtype@s only.
-                               
-			       -- See Note [Newtype coercions]
-			       -- Invariant: arity = #tvs in nt_etad_rhs;
-			       --	See Note [Newtype eta]
-			       -- Watch out!  If any newtypes become transparent
-			       -- again check Trac #1072.
+        nt_co :: CoAxiom     -- The axiom coercion that creates the @newtype@ from 
+                             -- the representation 'Type'.
+                                
+                             -- See Note [Newtype coercions]
+                             -- Invariant: arity = #tvs in nt_etad_rhs;
+                             --	See Note [Newtype eta]
+                             -- Watch out!  If any newtypes become transparent
+                             -- again check Trac #1072.
     }
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
@@ -533,7 +542,7 @@ data TyConParent
     			  -- and Note [Type synonym families]
 	TyCon   -- The family TyCon
 	[Type]	-- Argument types (mentions the tyConTyVars of this TyCon)
-	TyCon   -- The coercion constructor
+        CoAxiom   -- The coercion constructor
 
 	-- E.g.  data intance T [a] = ...
 	-- gives a representation tycon:
@@ -564,20 +573,6 @@ data SynTyConRhs
 
    -- | A type synonym family  e.g. @type family F x y :: * -> *@
    | SynFamilyTyCon
-
---------------------
-data CoTyConDesc
-  = CoSym   | CoTrans
-  | CoLeft  | CoRight
-  | CoCsel1 | CoCsel2 | CoCselR
-  | CoInst
-
-  | CoAxiom	-- C tvs : F lhs-tys ~ rhs-ty
-      { co_ax_tvs :: [TyVar]
-      , co_ax_lhs :: Type
-      , co_ax_rhs :: Type }
-
-  | CoUnsafe 
 \end{code}
 
 Note [Enumeration types]
@@ -676,6 +671,31 @@ so the coercion tycon CoT must have
 
 %************************************************************************
 %*									*
+                    Coercion axioms
+%*									*
+%************************************************************************
+
+\begin{code}
+-- | A 'CoAxiom' is a \"coercion constructor\", i.e. a named equality axiom.
+data CoAxiom
+  = CoAxiom                   -- type equality axiom.
+    { co_ax_unique :: Unique   -- unique identifier
+    , co_ax_name   :: Name     -- name for pretty-printing
+    , co_ax_tvs    :: [TyVar]  -- bound type variables 
+    , co_ax_lhs    :: Type     -- left-hand side of the equality
+    , co_ax_rhs    :: Type     -- right-hand side of the equality
+    }
+
+coAxiomArity :: CoAxiom -> Arity
+coAxiomArity ax = length (co_ax_tvs ax)
+
+coAxiomName :: CoAxiom -> Name
+coAxiomName = co_ax_name
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{PrimRep}
 %*									*
 %************************************************************************
@@ -763,10 +783,9 @@ mkAlgTyCon :: Name
            -> AlgTyConRhs       -- ^ Information about dat aconstructors
            -> TyConParent
            -> RecFlag           -- ^ Is the 'TyCon' recursive?
-           -> Bool              -- ^ Does it have generic functions? See 'hasGenerics'
            -> Bool              -- ^ Was the 'TyCon' declared with GADT syntax?
            -> TyCon
-mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
+mkAlgTyCon name kind tyvars stupid rhs parent is_rec gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
 	tyConUnique	 = nameUnique name,
@@ -777,14 +796,13 @@ mkAlgTyCon name kind tyvars stupid rhs parent is_rec gen_info gadt_syn
 	algTcRhs         = rhs,
 	algTcParent	 = ASSERT( okParent name parent ) parent,
 	algTcRec	 = is_rec,
-	algTcGadtSyntax  = gadt_syn,
-	hasGenerics      = gen_info
+	algTcGadtSyntax  = gadt_syn
     }
 
 -- | Simpler specialization of 'mkAlgTyCon' for classes
 mkClassTyCon :: Name -> Kind -> [TyVar] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars rhs clas is_rec =
-  mkAlgTyCon name kind tyvars [] rhs (ClassTyCon clas) is_rec False False
+  mkAlgTyCon name kind tyvars [] rhs (ClassTyCon clas) is_rec False
 
 mkTupleTyCon :: Name 
              -> Kind    -- ^ Kind of the resulting 'TyCon'
@@ -792,9 +810,8 @@ mkTupleTyCon :: Name
              -> [TyVar] -- ^ 'TyVar's scoped over: see 'tyConTyVars'
              -> DataCon 
              -> Boxity  -- ^ Whether the tuple is boxed or unboxed
-             -> Bool    -- ^ Does it have generic functions? See 'hasGenerics'
              -> TyCon
-mkTupleTyCon name kind arity tyvars con boxed gen_info
+mkTupleTyCon name kind arity tyvars con boxed 
   = TupleTyCon {
 	tyConUnique = nameUnique name,
 	tyConName = name,
@@ -802,8 +819,7 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 	tyConArity = arity,
 	tyConBoxed = boxed,
 	tyConTyVars = tyvars,
-	dataCon = con,
-	hasGenerics = gen_info
+	dataCon = con
     }
 
 -- ^ Foreign-imported (.NET) type constructors are represented
@@ -866,17 +882,6 @@ mkSynTyCon name kind tyvars rhs parent
 	synTcRhs = rhs,
         synTcParent = parent
     }
-
--- | Create a coercion 'TyCon'
-mkCoercionTyCon :: Name -> Arity 
-                -> CoTyConDesc
-                -> TyCon
-mkCoercionTyCon name arity desc
-  = CoTyCon {
-        tyConName   = name,
-        tyConUnique = nameUnique name,
-        tyConArity  = arity,
-        coTcDesc    = desc }
 
 mkAnyTyCon :: Name -> Kind -> TyCon
 mkAnyTyCon name kind 
@@ -955,11 +960,11 @@ isNewTyCon _                                   = False
 -- | Take a 'TyCon' apart into the 'TyVar's it scopes over, the 'Type' it expands
 -- into, and (possibly) a coercion from the representation type to the @newtype@.
 -- Returns @Nothing@ if this is not possible.
-unwrapNewTyCon_maybe :: TyCon -> Maybe ([TyVar], Type, Maybe TyCon)
+unwrapNewTyCon_maybe :: TyCon -> Maybe ([TyVar], Type, CoAxiom)
 unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs, 
-				 algTcRhs = NewTyCon { nt_co = mb_co, 
+				 algTcRhs = NewTyCon { nt_co = co, 
 						       nt_rhs = rhs }})
-			   = Just (tvs, rhs, mb_co)
+			   = Just (tvs, rhs, co)
 unwrapNewTyCon_maybe _     = Nothing
 
 isProductTyCon :: TyCon -> Bool
@@ -991,9 +996,8 @@ isSynTyCon _		 = False
 
 isDecomposableTyCon :: TyCon -> Bool
 -- True iff we can decompose (T a b c) into ((T a b) c)
--- Specifically NOT true of synonyms (open and otherwise) and coercions
+-- Specifically NOT true of synonyms (open and otherwise)
 isDecomposableTyCon (SynTyCon {}) = False
-isDecomposableTyCon (CoTyCon {})  = False
 isDecomposableTyCon _other        = True
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
@@ -1035,7 +1039,7 @@ isInjectiveTyCon tc = not (isSynTyCon tc)
 	-- Ultimately we may have injective associated types
         -- in which case this test will become more interesting
 	--
-	-- It'd be unusual to call isInjectiveTyCon on a regular H98
+        -- It'd be unusual to call isInjectiveTyCon on a regular H98
 	-- type synonym, because you should probably have expanded it first
 	-- But regardless, it's not injective!
 
@@ -1074,6 +1078,11 @@ isBoxedTupleTyCon _                                  = False
 tupleTyConBoxity :: TyCon -> Boxity
 tupleTyConBoxity tc = tyConBoxed tc
 
+-- | Extract the arity of the given 'TyCon', if it is a 'TupleTyCon'.
+-- Panics otherwise
+tupleTyConArity :: TyCon -> Arity
+tupleTyConArity tc = tyConArity tc
+
 -- | Is this a recursive 'TyCon'?
 isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
@@ -1099,19 +1108,6 @@ isSuperKindTyCon _                   = False
 isAnyTyCon :: TyCon -> Bool
 isAnyTyCon (AnyTyCon {}) = True
 isAnyTyCon _              = False
-
--- | Attempt to pull a 'TyCon' apart into the arity and 'coKindFun' of
--- a coercion 'TyCon'. Returns @Nothing@ if the 'TyCon' is not of the
--- appropriate kind
-isCoercionTyCon_maybe :: TyCon -> Maybe (Arity, CoTyConDesc)
-isCoercionTyCon_maybe (CoTyCon {tyConArity = ar, coTcDesc = desc}) 
-  = Just (ar, desc)
-isCoercionTyCon_maybe _ = Nothing
-
--- | Is this a 'TyCon' that represents a coercion?
-isCoercionTyCon :: TyCon -> Bool
-isCoercionTyCon (CoTyCon {}) = True
-isCoercionTyCon _            = False
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -1142,14 +1138,15 @@ isImplicitTyCon _other                               = True
 \begin{code}
 tcExpandTyCon_maybe, coreExpandTyCon_maybe 
 	:: TyCon 
-	-> [Type]			-- ^ Arguments to 'TyCon'
-	-> Maybe ([(TyVar,Type)], 	
+	-> [tyco]		  -- ^ Arguments to 'TyCon'
+	-> Maybe ([(TyVar,tyco)], 	
 		  Type,			
-		  [Type])		-- ^ Returns a 'TyVar' substitution, the body type
-                                        -- of the synonym (not yet substituted) and any arguments
-                                        -- remaining from the application
+		  [tyco])	  -- ^ Returns a 'TyVar' substitution, the body type
+                                  -- of the synonym (not yet substituted) and any arguments
+                                  -- remaining from the application
 
--- ^ Used to create the view the /typechecker/ has on 'TyCon's. We expand (closed) synonyms only, cf. 'coreExpandTyCon_maybe'
+-- ^ Used to create the view the /typechecker/ has on 'TyCon's. 
+-- We expand (closed) synonyms only, cf. 'coreExpandTyCon_maybe'
 tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, 
 			       synTcRhs = SynonymTyCon rhs }) tys
    = expand tvs rhs tys
@@ -1157,36 +1154,26 @@ tcExpandTyCon_maybe _ _ = Nothing
 
 ---------------
 
--- ^ Used to create the view /Core/ has on 'TyCon's. We expand not only closed synonyms like 'tcExpandTyCon_maybe',
+-- ^ Used to create the view /Core/ has on 'TyCon's. We expand 
+-- not only closed synonyms like 'tcExpandTyCon_maybe',
 -- but also non-recursive @newtype@s
-coreExpandTyCon_maybe (AlgTyCon {
-         algTcRhs = NewTyCon { nt_etad_rhs = etad_rhs, nt_co = Nothing }}) tys
-   = case etad_rhs of	-- Don't do this in the pattern match, lest we accidentally
-			-- match the etad_rhs of a *recursive* newtype
-	(tvs,rhs) -> expand tvs rhs tys
-
 coreExpandTyCon_maybe tycon tys = tcExpandTyCon_maybe tycon tys
 
 
 ----------------
-expand	:: [TyVar] -> Type 			-- Template
-	-> [Type]				-- Args
-	-> Maybe ([(TyVar,Type)], Type, [Type])	-- Expansion
+expand	:: [TyVar] -> Type 		   -- Template
+	-> [a]				   -- Args
+	-> Maybe ([(TyVar,a)], Type, [a])  -- Expansion
 expand tvs rhs tys
   = case n_tvs `compare` length tys of
 	LT -> Just (tvs `zip` tys, rhs, drop n_tvs tys)
 	EQ -> Just (tvs `zip` tys, rhs, [])
-	GT -> Nothing
+        GT -> Nothing
    where
      n_tvs = length tvs
 \end{code}
 
 \begin{code}
--- | Does this 'TyCon' have any generic to\/from functions available? See also 'hasGenerics'
-tyConHasGenerics :: TyCon -> Bool
-tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
-tyConHasGenerics (TupleTyCon {hasGenerics = hg}) = hg
-tyConHasGenerics _                               = False        -- Synonyms
 
 tyConKind :: TyCon -> Kind
 tyConKind (FunTyCon   { tc_kind = k }) = k
@@ -1199,7 +1186,6 @@ tyConKind tc = pprPanic "tyConKind" (ppr tc)	-- SuperKindTyCon and CoTyCon
 
 tyConHasKind :: TyCon -> Bool
 tyConHasKind (SuperKindTyCon {}) = False
-tyConHasKind (CoTyCon {})        = False
 tyConHasKind _                   = True
 
 -- | As 'tyConDataCons_maybe', but returns the empty list of constructors if no constructors
@@ -1252,9 +1238,14 @@ newTyConEtadRhs tycon = pprPanic "newTyConEtadRhs" (ppr tycon)
 -- | Extracts the @newtype@ coercion from such a 'TyCon', which can be used to construct something
 -- with the @newtype@s type from its representation type (right hand side). If the supplied 'TyCon'
 -- is not a @newtype@, returns @Nothing@
-newTyConCo_maybe :: TyCon -> Maybe TyCon
-newTyConCo_maybe (AlgTyCon {algTcRhs = NewTyCon { nt_co = co }}) = co
-newTyConCo_maybe _						 = Nothing
+newTyConCo_maybe :: TyCon -> Maybe CoAxiom
+newTyConCo_maybe (AlgTyCon {algTcRhs = NewTyCon { nt_co = co }}) = Just co
+newTyConCo_maybe _					         = Nothing
+
+newTyConCo :: TyCon -> CoAxiom
+newTyConCo tc = case newTyConCo_maybe tc of
+ 	         Just co -> co
+                 Nothing -> pprPanic "newTyConCo" (ppr tc)
 
 -- | Find the primitive representation of a 'TyCon'
 tyConPrimRep :: TyCon -> PrimRep
@@ -1324,6 +1315,7 @@ tyConParent (AlgTyCon {algTcParent = parent}) = parent
 tyConParent (SynTyCon {synTcParent = parent}) = parent
 tyConParent _                                 = NoParentTyCon
 
+----------------------------------------------------------------------------
 -- | Is this 'TyCon' that for a family instance, be that for a synonym or an
 -- algebraic family instance?
 isFamInstTyCon :: TyCon -> Bool
@@ -1331,7 +1323,7 @@ isFamInstTyCon tc = case tyConParent tc of
                       FamInstTyCon {} -> True
                       _               -> False
 
-tyConFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], TyCon)
+tyConFamInstSig_maybe :: TyCon -> Maybe (TyCon, [Type], CoAxiom)
 tyConFamInstSig_maybe tc
   = case tyConParent tc of
       FamInstTyCon f ts co_tc -> Just (f, ts, co_tc)
@@ -1348,7 +1340,7 @@ tyConFamInst_maybe tc
 -- | If this 'TyCon' is that of a family instance, return a 'TyCon' which represents 
 -- a coercion identifying the representation type with the type instance family.
 -- Otherwise, return @Nothing@
-tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
+tyConFamilyCoercion_maybe :: TyCon -> Maybe CoAxiom
 tyConFamilyCoercion_maybe tc
   = case tyConParent tc of
       FamInstTyCon _ _ co -> Just co
@@ -1382,18 +1374,6 @@ instance Ord TyCon where
 instance Uniquable TyCon where
     getUnique tc = tyConUnique tc
 
-instance Outputable CoTyConDesc where
-    ppr CoSym    = ptext (sLit "SYM")
-    ppr CoTrans  = ptext (sLit "TRANS")
-    ppr CoLeft   = ptext (sLit "LEFT")
-    ppr CoRight  = ptext (sLit "RIGHT")
-    ppr CoCsel1  = ptext (sLit "CSEL1")
-    ppr CoCsel2  = ptext (sLit "CSEL2")
-    ppr CoCselR  = ptext (sLit "CSELR")
-    ppr CoInst   = ptext (sLit "INST")
-    ppr CoUnsafe = ptext (sLit "UNSAFE")
-    ppr (CoAxiom {}) = ptext (sLit "AXIOM")
-
 instance Outputable TyCon where
     ppr tc  = ppr (getName tc) 
 
@@ -1408,4 +1388,34 @@ instance Data.Data TyCon where
     toConstr _   = abstractConstr "TyCon"
     gunfold _ _  = error "gunfold"
     dataTypeOf _ = mkNoRepType "TyCon"
+
+-------------------
+instance Eq CoAxiom where
+    a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
+    a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
+  
+instance Ord CoAxiom where
+    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
+    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
+    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
+    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
+    compare a b = getUnique a `compare` getUnique b  
+
+instance Uniquable CoAxiom where
+    getUnique = co_ax_unique
+
+instance Outputable CoAxiom where
+    ppr = ppr . getName
+
+instance NamedThing CoAxiom where
+    getName = co_ax_name
+
+instance Data.Typeable CoAxiom where
+    typeOf _ = Data.mkTyConApp (Data.mkTyCon "CoAxiom") []
+
+instance Data.Data CoAxiom where
+    -- don't traverse?
+    toConstr _   = abstractConstr "CoAxiom"
+    gunfold _ _  = error "gunfold"
+    dataTypeOf _ = mkNoRepType "CoAxiom"
 \end{code}

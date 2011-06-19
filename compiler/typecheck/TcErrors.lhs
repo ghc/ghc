@@ -15,14 +15,14 @@ import TcMType
 import TcSMonad
 import TcType
 import TypeRep
-
+import Type( isTyVarTy )
+import Unify ( tcMatchTys )
 import Inst
 import InstEnv
-
 import TyCon
 import Name
 import NameEnv
-import Id	( idType )
+import Id	( idType, evVarPred )
 import Var
 import VarSet
 import VarEnv
@@ -105,7 +105,7 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
                        -- because they are unconditionally wrong
                        -- Moreover, if any of the insolubles are givens, stop right there
                        -- ignoring nested errors, because the code is inaccessible
-  = do { let (given, other) = partitionBag (isGiven . evVarX) insols
+  = do { let (given, other) = partitionBag (isGivenOrSolved . evVarX) insols
              insol_implics  = filterBag ic_insol implics
        ; if isEmptyBag given
          then do { mapBagM_ (reportInsoluble ctxt) other
@@ -153,7 +153,8 @@ reportInsoluble ctxt (EvVarX ev flav)
   | otherwise
   = pprPanic "reportInsoluble" (pprEvVarWithType ev)
   where
-    inaccessible_msg | Given loc <- flav
+    inaccessible_msg | Given loc GivenOrig <- flav
+                       -- If a GivenSolved then we should not report inaccessible code
                      = hang (ptext (sLit "Inaccessible code in"))
                           2 (ppr (ctLocOrigin loc))
                      | otherwise = empty
@@ -222,7 +223,7 @@ pprWithArising ev_vars
   where
     first_loc = evVarX (head ev_vars)
     ppr_one (EvVarX v loc)
-       = parens (pprPred (evVarPred v)) <+> pprArisingAt loc
+       = parens (pprPredTy (evVarPred v)) <+> pprArisingAt loc
 
 addErrorReport :: ReportErrCtxt -> SDoc -> TcM ()
 addErrorReport ctxt msg = addErrTcM (cec_tidy ctxt, msg $$ cec_extra ctxt)
@@ -299,8 +300,8 @@ getWantedEqExtra (TypeEqOrigin (UnifyOrigin { uo_actual = act, uo_expected = exp
                  ty1 ty2
   -- If the types in the error message are the same as the types we are unifying,
   -- don't add the extra expected/actual message
-  | act `tcEqType` ty1 && exp `tcEqType` ty2 = empty
-  | exp `tcEqType` ty1 && act `tcEqType` ty2 = empty
+  | act `eqType` ty1 && exp `eqType` ty2 = empty
+  | exp `eqType` ty1 && act `eqType` ty2 = empty
   | otherwise                                = mkExpectedActualMsg act exp
 
 getWantedEqExtra orig _ _ = pprArising orig
@@ -320,15 +321,10 @@ reportEqErr ctxt ty1 ty2
 reportTyVarEqErr :: ReportErrCtxt -> TcTyVar -> TcType -> TcM ()
 -- tv1 and ty2 are already tidied
 reportTyVarEqErr ctxt tv1 ty2
-  | not is_meta1
-  , Just tv2 <- tcGetTyVar_maybe ty2
-  , isMetaTyVar tv2
-  = -- sk ~ alpha: swap
-    reportTyVarEqErr ctxt tv2 ty1
-
-  | (not is_meta1)
-  = -- sk ~ ty, where ty isn't a meta-tyvar: mis-match
-    addErrorReport (addExtraInfo ctxt ty1 ty2)
+  |  isSkolemTyVar tv1 	  -- ty2 won't be a meta-tyvar, or else the thing would
+     		   	  -- be oriented the other way round; see TcCanonical.reOrient
+  || isSigTyVar tv1 && not (isTyVarTy ty2)
+  = addErrorReport (addExtraInfo ctxt ty1 ty2)
                    (misMatchOrCND ctxt ty1 ty2)
 
   -- So tv is a meta tyvar, and presumably it is
@@ -376,21 +372,26 @@ reportTyVarEqErr ctxt tv1 ty2
                          , ptext (sLit "bound at") <+> ppr (ctLocOrigin implic_loc)]
        ; addErrorReport (addExtraInfo ctxt ty1 ty2) (msg $$ nest 2 extra) }
 
-  | otherwise      -- This can happen, by a recursive decomposition of frozen
-                   -- occurs check constraints
-                   -- Example: alpha ~ T Int alpha has frozen.
-                   --          Then alpha gets unified to T beta gamma
-                   -- So now we have  T beta gamma ~ T Int (T beta gamma)
-                   -- Decompose to (beta ~ Int, gamma ~ T beta gamma)
-                   -- The (gamma ~ T beta gamma) is the occurs check, but
-                   -- the (beta ~ Int) isn't an error at all.  So return ()
-  = return ()
-
+  | otherwise
+  = pprTrace "reportTyVarEqErr" (ppr tv1 $$ ppr ty2 $$ ppr (cec_encl ctxt)) $
+    return () 
+    	-- I don't think this should happen, and if it does I want to know
+	-- Trac #5130 happened because an actual type error was not
+	-- reported at all!  So not reporting is pretty dangerous.
+	-- 
+	-- OLD, OUT OF DATE COMMENT
+        -- This can happen, by a recursive decomposition of frozen
+        -- occurs check constraints
+        -- Example: alpha ~ T Int alpha has frozen.
+        --          Then alpha gets unified to T beta gamma
+        -- So now we have  T beta gamma ~ T Int (T beta gamma)
+        -- Decompose to (beta ~ Int, gamma ~ T beta gamma)
+        -- The (gamma ~ T beta gamma) is the occurs check, but
+        -- the (beta ~ Int) isn't an error at all.  So return ()
   where         
-    is_meta1 = isMetaTyVar tv1
-    k1 	     = tyVarKind tv1
-    k2 	     = typeKind ty2
-    ty1      = mkTyVarTy tv1
+    k1 	= tyVarKind tv1
+    k2 	= typeKind ty2
+    ty1 = mkTyVarTy tv1
 
 mkTyFunInfoMsg :: TcType -> TcType -> SDoc
 -- See Note [Non-injective type functions]
@@ -419,18 +420,18 @@ couldNotDeduce :: [([EvVar], GivenLoc)] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
   = vcat [ hang (ptext (sLit "Could not deduce") <+> pprTheta wanteds)
               2 (pprArising orig)
-         , vcat pp_givens ]
-  where
-    pp_givens
-      = case givens of
+         , vcat (pp_givens givens)]
+
+pp_givens :: [([EvVar], GivenLoc)] -> [SDoc]
+pp_givens givens 
+   = case givens of
          []     -> []
          (g:gs) ->      ppr_given (ptext (sLit "from the context")) g
                  : map (ppr_given (ptext (sLit "or from"))) gs
-
-    ppr_given herald (gs,loc)
-      = hang (herald <+> pprEvVarTheta gs)
-           2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin loc)
-                  , ptext (sLit "at") <+> ppr (ctLocSpan loc)])
+    where ppr_given herald (gs,loc)
+           = hang (herald <+> pprEvVarTheta gs)
+                2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin loc)
+                       , ptext (sLit "at") <+> ppr (ctLocSpan loc)])
 
 addExtraInfo :: ReportErrCtxt -> TcType -> TcType -> ReportErrCtxt
 -- Add on extra info about the types themselves
@@ -458,12 +459,22 @@ typeExtraInfoMsg :: [Implication] -> Type -> SDoc
 -- Shows a bit of extra info about skolem constants
 typeExtraInfoMsg implics ty
   | Just tv <- tcGetTyVar_maybe ty
-  , isTcTyVar tv
-  , isSkolemTyVar tv
- = pprSkolTvBinding implics tv
-  where
-typeExtraInfoMsg _ _ = empty            -- Normal case
+  , isTcTyVar tv, isSkolemTyVar tv
+  , let pp_tv = quotes (ppr tv)
+ = case tcTyVarDetails tv of
+    SkolemTv {}   -> pp_tv <+> ppr_skol (getSkolemInfo implics tv) (getSrcLoc tv)
+    FlatSkol {}   -> pp_tv <+> ptext (sLit "is a flattening type variable")
+    RuntimeUnk {} -> pp_tv <+> ptext (sLit "is an interactive-debugger skolem")
+    MetaTv {}     -> empty
 
+ | otherwise             -- Normal case
+ = empty
+
+ where
+   ppr_skol UnkSkol _   = ptext (sLit "is an unknown type variable")  -- Unhelpful
+   ppr_skol info    loc = sep [ptext (sLit "is a rigid type variable bound by"),
+                               sep [ppr info, ptext (sLit "at") <+> ppr loc]]
+ 
 --------------------
 unifyCtxt :: EqOrigin -> TidyEnv -> TcM (TidyEnv, SDoc)
 unifyCtxt (UnifyOrigin { uo_actual = act_ty, uo_expected = exp_ty }) tidy_env
@@ -563,9 +574,21 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
     mk_overlap_msg (matches, unifiers)
       = ASSERT( not (null matches) )
         vcat [	addArising orig (ptext (sLit "Overlapping instances for") 
-				<+> pprPred pred)
+				<+> pprPredTy pred)
     	     ,	sep [ptext (sLit "Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
+
+             ,  if not (null overlapping_givens) then 
+                  sep [ptext (sLit "Matching givens (or their superclasses)") <> colon, nest 2 (vcat overlapping_givens)]
+                else empty
+
+             ,  if null overlapping_givens && isSingleton matches && null unifiers then
+                -- Intuitively, some given matched the wanted in their flattened or rewritten (from given equalities) 
+                -- form but the matcher can't figure that out because the constraints are non-flat and non-rewritten
+                -- so we simply report back the whole given context. Accelerate Smart.hs showed this problem.
+                  sep [ptext (sLit "There exists a (perhaps superclass) match") <> colon, nest 2 (vcat (pp_givens givens))]
+                else empty 
+
 	     ,	if not (isSingleton matches)
     		then 	-- Two or more matches
 		     empty
@@ -573,10 +596,38 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 		ASSERT( not (null unifiers) )
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
-			      ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
-			      ptext (sLit "when compiling the other instance declarations")])]
+			      if null (overlapping_givens) then
+                                   vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
+			                  ptext (sLit "when compiling the other instance declarations")]
+                              else empty])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
+
+        givens = getUserGivens ctxt
+        overlapping_givens = unifiable_givens givens
+
+        unifiable_givens [] = [] 
+        unifiable_givens (gg:ggs) 
+          | Just ggdoc <- matchable gg 
+          = ggdoc : unifiable_givens ggs 
+          | otherwise 
+          = unifiable_givens ggs 
+
+        matchable (evvars,gloc) 
+          = case ev_vars_matching of
+                 [] -> Nothing
+                 _  -> Just $ hang (pprTheta ev_vars_matching)
+                                2 (sep [ ptext (sLit "bound by") <+> ppr (ctLocOrigin gloc)
+                                       , ptext (sLit "at") <+> ppr (ctLocSpan gloc)])
+            where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
+                  ev_var_matches (ClassP clas' tys')
+                    | clas' == clas
+                    , Just _ <- tcMatchTys (tyVarsOfTypes tys) tys tys'
+                    = True 
+                  ev_var_matches (ClassP clas' tys') =
+                    any ev_var_matches (immSuperClasses clas' tys')
+                  ev_var_matches _ = False
+
 
 reportOverlap _ _ _ _ = panic "reportOverlap"    -- Not a ClassP
 
@@ -660,7 +711,6 @@ mkMonomorphismMsg :: ReportErrCtxt -> [TcTyVar] -> TcM (TidyEnv, SDoc)
 -- ASSUMPTION: the Insts are fully zonked
 mkMonomorphismMsg ctxt inst_tvs
   = do	{ dflags <- getDOpts
-        ; traceTc "Mono" (vcat (map (pprSkolTvBinding (cec_encl ctxt)) inst_tvs))
         ; (tidy_env, docs) <- findGlobals ctxt (mkVarSet inst_tvs)
 	; return (tidy_env, mk_msg dflags docs) }
   where
@@ -686,28 +736,6 @@ monomorphism_fix dflags
            else empty]	-- Only suggest adding "-XNoMonomorphismRestriction"
 			-- if it is not already set!
 
-
-pprSkolTvBinding :: [Implication] -> TcTyVar -> SDoc
--- Print info about the binding of a skolem tyvar, 
--- or nothing if we don't have anything useful to say
-pprSkolTvBinding implics tv
-  | isTcTyVar tv = quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
-  | otherwise    = quotes (ppr tv) <+> ppr_skol    (getSkolemInfo implics tv)
-  where
-    ppr_details (SkolemTv {})        = ppr_skol (getSkolemInfo implics tv)
-    ppr_details (FlatSkol {})        = ptext (sLit "is a flattening type variable")
-    ppr_details (RuntimeUnk {})      = ptext (sLit "is an interactive-debugger skolem")
-    ppr_details (MetaTv (SigTv n) _) = ptext (sLit "is bound by the type signature for")
-                                       <+> quotes (ppr n)
-    ppr_details (MetaTv _ _)         = ptext (sLit "is a meta type variable")
-
-
-    ppr_skol UnkSkol        = ptext (sLit "is an unknown type variable")        -- Unhelpful
-    ppr_skol RuntimeUnkSkol = ptext (sLit "is an unknown runtime type")
-    ppr_skol info           = sep [ptext (sLit "is a rigid type variable bound by"),
-                                   sep [ppr info,
-                                        ptext (sLit "at") <+> ppr (getSrcLoc tv)]]
- 
 getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
 getSkolemInfo [] tv
   = WARN( True, ptext (sLit "No skolem info:") <+> ppr tv )
@@ -847,9 +875,9 @@ flattenForAllErrorTcS fl ty _bad_eqs
 
 \begin{code}
 setCtFlavorLoc :: CtFlavor -> TcM a -> TcM a
-setCtFlavorLoc (Wanted  loc) thing = setCtLoc loc thing
-setCtFlavorLoc (Derived loc) thing = setCtLoc loc thing
-setCtFlavorLoc (Given   loc) thing = setCtLoc loc thing
+setCtFlavorLoc (Wanted  loc)   thing = setCtLoc loc thing
+setCtFlavorLoc (Derived loc)   thing = setCtLoc loc thing
+setCtFlavorLoc (Given loc _gk) thing = setCtLoc loc thing
 \end{code}
 
 %************************************************************************

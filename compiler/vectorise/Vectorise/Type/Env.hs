@@ -1,12 +1,9 @@
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# OPTIONS_GHC -XNoMonoLocalBinds #-}
--- Roman likes local bindings
--- If this module lives on I'd like to get rid of this flag in due course
 
 module Vectorise.Type.Env ( 
 	vectTypeEnv,
-)
-where
+) where
+  
 import Vectorise.Env
 import Vectorise.Vect
 import Vectorise.Monad
@@ -30,7 +27,6 @@ import FamInstEnv
 import OccName
 import Id
 import MkId
-import Var
 import NameEnv
 
 import Unique
@@ -42,20 +38,18 @@ import MonadUtils
 import Control.Monad
 import Data.List
 
-debug		= False
-dtrace s x	= if debug then pprTrace "VectType" s x else x
 
 -- | Vectorise a type environment.
 --   The type environment contains all the type things defined in a module.
-vectTypeEnv 
-	:: TypeEnv
-	-> VM ( TypeEnv			-- Vectorised type environment.
-	      , [FamInst]		-- New type family instances.
-	      , [(Var, CoreExpr)])	-- New top level bindings.
-	
+--
+vectTypeEnv :: TypeEnv
+            -> VM ( TypeEnv             -- Vectorised type environment.
+                  , [FamInst]           -- New type family instances.
+                  , [(Var, CoreExpr)])  -- New top level bindings.
 vectTypeEnv env
- = dtrace (ppr env)
- $ do
+  = do
+      traceVt "** vectTypeEnv" $ ppr env
+      
       cs <- readGEnv $ mk_map . global_tycons
 
       -- Split the list of TyCons into the ones we have to vectorise vs the
@@ -122,13 +116,10 @@ vectTypeEnv env
    where
     mk_map env = listToUFM_Directly [(u, getUnique n /= u) | (u,n) <- nameEnvUniqueElts env]
 
-
-
 buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> SumRepr -> VM Var
 buildTyConBindings orig_tc vect_tc prepr_tc pdata_tc repr
  = do vectDataConWorkers orig_tc vect_tc pdata_tc
       buildPADict vect_tc prepr_tc pdata_tc repr
-
 
 vectDataConWorkers :: TyCon -> TyCon -> TyCon -> VM ()
 vectDataConWorkers orig_tc vect_tc arr_tc

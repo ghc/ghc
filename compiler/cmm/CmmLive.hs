@@ -63,12 +63,12 @@ gen  a live = foldRegsUsed    extendRegSet      live a
 kill :: DefinerOfLocalRegs a => a -> RegSet -> RegSet
 kill a live = foldRegsDefd delOneFromUniqSet live a
 
+-- Testing!
 xferLive :: BwdTransfer CmmNode CmmLive
 xferLive = mkBTransfer3 fst mid lst
   where fst _ f = f
         mid :: CmmNode O O -> CmmLive -> CmmLive
-        mid n f = gen_kill n $ case n of CmmUnsafeForeignCall {} -> emptyRegSet
-                                         _                       -> f
+        mid n f = gen_kill n f
         lst :: CmmNode O C -> FactBase CmmLive -> CmmLive
         lst n f = gen_kill n $ case n of CmmCall {}            -> emptyRegSet
                                          CmmForeignCall {}     -> emptyRegSet

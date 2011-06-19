@@ -45,8 +45,7 @@ module MkCore (
 #include "HsVersions.h"
 
 import Id
-import IdInfo
-import Var      ( EvVar, mkWildCoVar, setTyVarUnique )
+import Var      ( EvVar, setTyVarUnique )
 
 import CoreSyn
 import CoreUtils        ( exprType, needsCaseBinding, bindNonRec )
@@ -58,8 +57,10 @@ import PrelNames
 
 import TcType		( mkSigmaTy )
 import Type
+import Coercion
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
+import IdInfo		( vanillaIdInfo, setStrictnessInfo, setArityInfo )
 import Demand
 import Name
 import Outputable
@@ -102,6 +103,7 @@ mkCoreApp :: CoreExpr -> CoreExpr -> CoreExpr
 -- Check the invariant that the arg of an App is ok-for-speculation if unlifted
 -- See CoreSyn Note [CoreSyn let/app invariant]
 mkCoreApp fun (Type ty) = App fun (Type ty)
+mkCoreApp fun (Coercion co) = App fun (Coercion co)
 mkCoreApp fun arg       = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg )
                           mk_val_app fun arg arg_ty res_ty
                       where
@@ -117,6 +119,7 @@ mkCoreApps orig_fun orig_args
   where
     go fun _      []               = fun
     go fun fun_ty (Type ty : args) = go (App fun (Type ty)) (applyTy fun_ty ty) args
+    go fun fun_ty (Coercion co : args) = go (App fun (Coercion co)) (applyCo fun_ty co) args
     go fun fun_ty (arg     : args) = ASSERT2( isFunTy fun_ty, ppr fun_ty $$ ppr orig_fun $$ ppr orig_args )
                                      go (mk_val_app fun arg arg_ty res_ty) res_ty args
                                    where
@@ -148,8 +151,7 @@ mk_val_app fun arg arg_ty res_ty
 	-- fragmet of it as the fun part of a 'mk_val_app'.
 
 mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred@(EqPred {}) = mkWildCoVar     (mkPredTy pred)
-mkWildEvBinder pred             = mkWildValBinder (mkPredTy pred)
+mkWildEvBinder pred = mkWildValBinder (mkPredTy pred)
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder 
 -- that you expect to use only at a *binding* site.  Do not use it at
@@ -648,6 +650,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, iRREFUT_PAT_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
+aBSENT_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 iRREFUT_PAT_ERROR_ID            = mkRuntimeErrorId irrefutPatErrorName
@@ -655,10 +658,7 @@ rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
 pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
-
-aBSENT_ERROR_ID :: Id
--- Not bottoming; no unfolding!  See Note [Absent error Id] in WwLib
-aBSENT_ERROR_ID = mkVanillaGlobal absentErrorName runtimeErrorTy
+aBSENT_ERROR_ID                 = mkRuntimeErrorId absentErrorName
 
 mkRuntimeErrorId :: Name -> Id
 mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy

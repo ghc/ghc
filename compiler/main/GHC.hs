@@ -92,7 +92,8 @@ module GHC (
 	typeKind,
 	parseName,
 	RunResult(..),  
-	runStmt, parseImportDecl, SingleStep(..),
+	runStmt, runStmtWithLocation,
+        parseImportDecl, SingleStep(..),
         resume,
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),
@@ -170,7 +171,7 @@ module GHC (
 	pprParendType, pprTypeApp, 
 	Kind,
 	PredType,
-	ThetaType, pprForAll, pprThetaArrow,
+	ThetaType, pprForAll, pprThetaArrow, pprThetaArrowTy,
 
 	-- ** Entities
 	TyThing(..), 
@@ -185,10 +186,10 @@ module GHC (
 	compareFixity,
 
 	-- ** Source locations
-	SrcLoc, pprDefnLoc,
-        mkSrcLoc, isGoodSrcLoc, noSrcLoc,
+	SrcLoc(..), RealSrcLoc, pprDefnLoc,
+        mkSrcLoc, noSrcLoc,
 	srcLocFile, srcLocLine, srcLocCol,
-        SrcSpan,
+        SrcSpan(..), RealSrcSpan,
         mkSrcSpan, srcLocSpan, isGoodSrcSpan, noSrcSpan,
         srcSpanStart, srcSpanEnd,
 	srcSpanFile, 
@@ -196,7 +197,7 @@ module GHC (
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Located
-	Located(..),
+	GenLocated(..), Located,
 
 	-- *** Constructing Located
 	noLoc, mkGeneralLocated,
@@ -255,7 +256,6 @@ import Type
 import Coercion		( synTyConResKind )
 import TcType		hiding( typeKind )
 import Id
-import Var
 import TysPrim		( alphaTyVars )
 import TyCon
 import Class
@@ -387,7 +387,7 @@ runGhc :: Maybe FilePath  -- ^ See argument to 'initGhcMonad'.
        -> Ghc a           -- ^ The action to perform.
        -> IO a
 runGhc mb_top_dir ghc = do
-  ref <- newIORef undefined
+  ref <- newIORef (panic "empty session")
   let session = Session ref
   flip unGhc session $ do
     initGhcMonad mb_top_dir
@@ -405,7 +405,7 @@ runGhcT :: (ExceptionMonad m, Functor m, MonadIO m) =>
         -> GhcT m a        -- ^ The action to perform.
         -> m a
 runGhcT mb_top_dir ghct = do
-  ref <- liftIO $ newIORef undefined
+  ref <- liftIO $ newIORef (panic "empty session")
   let session = Session ref
   flip unGhcT session $ do
     initGhcMonad mb_top_dir
@@ -430,8 +430,8 @@ initGhcMonad mb_top_dir = do
 
   liftIO $ StaticFlags.initStaticOpts
 
-  dflags0 <- liftIO $ initDynFlags defaultDynFlags
-  dflags <- liftIO $ initSysTools mb_top_dir dflags0
+  mySettings <- liftIO $ initSysTools mb_top_dir
+  dflags <- liftIO $ initDynFlags (defaultDynFlags mySettings)
   env <- liftIO $ newHscEnv dflags
   setSession env
 
@@ -755,9 +755,7 @@ data CoreModule
       -- | Type environment for types declared in this module
       cm_types    :: !TypeEnv,
       -- | Declarations
-      cm_binds    :: [CoreBind],
-      -- | Imports
-      cm_imports  :: ![Module]
+      cm_binds    :: [CoreBind]
     }
 
 instance Outputable CoreModule where
@@ -856,11 +854,11 @@ compileCore simplify fn = do
         gutsToCoreModule :: Either (CgGuts, ModDetails) ModGuts -> CoreModule
         gutsToCoreModule (Left (cg, md))  = CoreModule {
           cm_module = cg_module cg,    cm_types = md_types md,
-          cm_imports = cg_dir_imps cg, cm_binds = cg_binds cg
+          cm_binds = cg_binds cg
         }
         gutsToCoreModule (Right mg) = CoreModule {
           cm_module  = mg_module mg,                   cm_types   = mg_types mg,
-          cm_imports = moduleEnvKeys (mg_dir_imps mg), cm_binds   = mg_binds mg
+          cm_binds   = mg_binds mg
          }
 
 -- %************************************************************************
@@ -935,6 +933,10 @@ getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 #ifdef GHCI
 getPackageModuleInfo hsc_env mdl = do
   mb_avails <- hscGetModuleExports hsc_env mdl
+     -- This is the only use of hscGetModuleExports.  Perhaps we could use
+     -- hscRnImportDecls instead, but that does a lot more than we need
+     -- (building instance environment, checking family instance consistency
+     -- etc.).
   case mb_avails of
     Nothing -> return Nothing
     Just avails -> do
@@ -1103,7 +1105,7 @@ getModuleSourceAndFlags mod = do
 getTokenStream :: GhcMonad m => Module -> m [Located Token]
 getTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod
-  let startLoc = mkSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
     PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
@@ -1114,7 +1116,7 @@ getTokenStream mod = do
 getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod
-  let startLoc = mkSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
     PFailed span err -> throw $ mkSrcErr (unitBag $ mkPlainErrMsg span err)
@@ -1122,21 +1124,22 @@ getRichTokenStream mod = do
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
 -- tokens.
-addSourceToTokens :: SrcLoc -> StringBuffer -> [Located Token]
+addSourceToTokens :: RealSrcLoc -> StringBuffer -> [Located Token]
                   -> [(Located Token, String)]
 addSourceToTokens _ _ [] = []
 addSourceToTokens loc buf (t@(L span _) : ts)
-    | not (isGoodSrcSpan span) = (t,"") : addSourceToTokens loc buf ts
-    | otherwise = (t,str) : addSourceToTokens newLoc newBuf ts
-    where
-      (newLoc, newBuf, str) = go "" loc buf
-      start = srcSpanStart span
-      end = srcSpanEnd span
-      go acc loc buf | loc < start = go acc nLoc nBuf
-                     | start <= loc && loc < end = go (ch:acc) nLoc nBuf
-                     | otherwise = (loc, buf, reverse acc)
-          where (ch, nBuf) = nextChar buf
-                nLoc = advanceSrcLoc loc ch
+    = case span of
+      UnhelpfulSpan _ -> (t,"") : addSourceToTokens loc buf ts
+      RealSrcSpan s   -> (t,str) : addSourceToTokens newLoc newBuf ts
+        where
+          (newLoc, newBuf, str) = go "" loc buf
+          start = realSrcSpanStart s
+          end = realSrcSpanEnd s
+          go acc loc buf | loc < start = go acc nLoc nBuf
+                         | start <= loc && loc < end = go (ch:acc) nLoc nBuf
+                         | otherwise = (loc, buf, reverse acc)
+              where (ch, nBuf) = nextChar buf
+                    nLoc = advanceSrcLoc loc ch
 
 
 -- | Take a rich token stream such as produced from 'getRichTokenStream' and
@@ -1144,21 +1147,26 @@ addSourceToTokens loc buf (t@(L span _) : ts)
 -- insignificant whitespace.)
 showRichTokenStream :: [(Located Token, String)] -> String
 showRichTokenStream ts = go startLoc ts ""
-    where sourceFile = srcSpanFile (getLoc . fst . head $ ts)
-          startLoc = mkSrcLoc sourceFile 1 1
+    where sourceFile = getFile $ map (getLoc . fst) ts
+          getFile [] = panic "showRichTokenStream: No source file found"
+          getFile (UnhelpfulSpan _ : xs) = getFile xs
+          getFile (RealSrcSpan s : _) = srcSpanFile s
+          startLoc = mkRealSrcLoc sourceFile 1 1
           go _ [] = id
           go loc ((L span _, str):ts)
-              | not (isGoodSrcSpan span) = go loc ts
-              | locLine == tokLine = ((replicate (tokCol - locCol) ' ') ++)
-                                     . (str ++)
-                                     . go tokEnd ts
-              | otherwise = ((replicate (tokLine - locLine) '\n') ++)
-                            . ((replicate tokCol ' ') ++)
-                            . (str ++)
-                            . go tokEnd ts
-              where (locLine, locCol) = (srcLocLine loc, srcLocCol loc)
-                    (tokLine, tokCol) = (srcSpanStartLine span, srcSpanStartCol span)
-                    tokEnd = srcSpanEnd span
+              = case span of
+                UnhelpfulSpan _ -> go loc ts
+                RealSrcSpan s
+                 | locLine == tokLine -> ((replicate (tokCol - locCol) ' ') ++)
+                                       . (str ++)
+                                       . go tokEnd ts
+                 | otherwise -> ((replicate (tokLine - locLine) '\n') ++)
+                              . ((replicate tokCol ' ') ++)
+                              . (str ++)
+                              . go tokEnd ts
+                  where (locLine, locCol) = (srcLocLine loc, srcLocCol loc)
+                        (tokLine, tokCol) = (srcSpanStartLine s, srcSpanStartCol s)
+                        tokEnd = realSrcSpanEnd s
 
 -- -----------------------------------------------------------------------------
 -- Interactive evaluation
@@ -1256,7 +1264,7 @@ parser :: String         -- ^ Haskell module source text (full Unicode is suppor
 
 parser str dflags filename = 
    let
-       loc  = mkSrcLoc (mkFastString filename) 1 1
+       loc  = mkRealSrcLoc (mkFastString filename) 1 1
        buf  = stringToStringBuffer str
    in
    case unP Parser.parseModule (mkPState dflags buf loc) of

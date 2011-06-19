@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2004
+ * (c) The GHC Team, 1998-2011
  *
  * Out-of-line primitive operations
  *
@@ -212,6 +212,7 @@ stg_unsafeThawArrayzh
   }
 }
 
+
 /* -----------------------------------------------------------------------------
    MutVar primitives
    -------------------------------------------------------------------------- */
@@ -229,6 +230,25 @@ stg_newMutVarzh
     
     RET_P(mv);
 }
+
+stg_casMutVarzh
+ /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, a #) */
+{
+    W_ mv, old, new, h;
+
+    mv  = R1;
+    old = R2;
+    new = R3;
+
+    (h) = foreign "C" cas(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var,
+                          old, new) [];
+    if (h != old) {
+        RET_NP(1,h);
+    } else {
+        RET_NP(0,h);
+    }
+}
+
 
 stg_atomicModifyMutVarzh
 {
@@ -631,7 +651,7 @@ stg_threadStatuszh
     W_ tso;
     W_ why_blocked;
     W_ what_next;
-    W_ ret;
+    W_ ret, cap, locked;
 
     tso = R1;
 
@@ -651,7 +671,16 @@ stg_threadStatuszh
             ret = why_blocked;
         }
     }
-    RET_N(ret);
+
+    cap = TO_W_(Capability_no(StgTSO_cap(tso)));
+
+    if ((TO_W_(StgTSO_flags(tso)) & TSO_LOCKED) != 0) {
+        locked = 1;
+    } else {
+        locked = 0;
+    }
+
+    RET_NNN(ret,cap,locked);
 }
 
 /* -----------------------------------------------------------------------------
@@ -2035,7 +2064,20 @@ stg_traceEventzh
    // We should go through the macro HASKELLEVENT_USER_MSG_ENABLED from
    // RtsProbes.h, but that header file includes unistd.h, which doesn't
    // work in Cmm
+#if !defined(solaris2_TARGET_OS)
    (enabled) = foreign "C" __dtrace_isenabled$HaskellEvent$user__msg$v1() [];
+#else
+   // Solaris' DTrace can't handle the
+   //     __dtrace_isenabled$HaskellEvent$user__msg$v1
+   // call above. This call is just for testing whether the user__msg
+   // probe is enabled, and is here for just performance optimization.
+   // Since preparation for the probe is not that complex I disable usage of
+   // this test above for Solaris and enable the probe usage manually
+   // here. Please note that this does not mean that the probe will be
+   // used during the runtime! You still need to enable it by consumption
+   // in your dtrace script as you do with any other probe.
+   enabled = 1;
+#endif
    if (enabled != 0) {
      foreign "C" dtraceUserMsgWrapper(MyCapability() "ptr", msg "ptr") [];
    }

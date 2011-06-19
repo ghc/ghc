@@ -7,6 +7,7 @@ module FamInst (
 
 import HscTypes
 import FamInstEnv
+import LoadIface
 import TcMType
 import TcRnMonad
 import TyCon
@@ -82,20 +83,17 @@ checkFamInstConsistency famInstMods directlyImpMods
        ; (eps, hpt) <- getEpsAndHpt
 
        ; let { -- Fetch the iface of a given module.  Must succeed as
- 	       -- all imported modules must already have been loaded.
+ 	       -- all directly imported modules must already have been loaded.
 	       modIface mod = 
 	         case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of
                    Nothing    -> panic "FamInst.checkFamInstConsistency"
                    Just iface -> iface
 
              ; hmiModule     = mi_module . hm_iface
-	     ; hmiFamInstEnv = mkFamInstEnv . md_fam_insts . hm_details
-	     ; mkFamInstEnv  = extendFamInstEnvList emptyFamInstEnv
-             ; hptModInsts   = [ (hmiModule hmi, hmiFamInstEnv hmi) 
-			       | hmi <- eltsUFM hpt]
-             ; modInstsEnv   = eps_mod_fam_inst_env eps	-- external modules
-			       `extendModuleEnvList`	-- plus
-			       hptModInsts		-- home package modules
+	     ; hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv 
+                               . md_fam_insts . hm_details
+             ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi) 
+			                   | hmi <- eltsUFM hpt]
 	     ; groups        = map (dep_finsts . mi_deps . modIface) 
 				   directlyImpMods
 	     ; okPairs       = listToSet $ concatMap allPairs groups
@@ -106,22 +104,27 @@ checkFamInstConsistency famInstMods directlyImpMods
 	         -- the difference gives us the pairs we need to check now
 	     }
 
-       ; mapM_ (check modInstsEnv) toCheckPairs
+       ; mapM_ (check hpt_fam_insts) toCheckPairs
        }
   where
     allPairs []     = []
     allPairs (m:ms) = map (ModulePair m) ms ++ allPairs ms
 
-    -- The modules are guaranteed to be in the environment, as they are either
-    -- already loaded in the EPS or they are in the HPT.
-    --
-    check modInstsEnv (ModulePair m1 m2)
-      = let { instEnv1 = (expectJust "checkFamInstConsistency") . lookupModuleEnv modInstsEnv $ m1
-	    ; instEnv2 = (expectJust "checkFamInstConsistency") . lookupModuleEnv modInstsEnv $ m2
-	    ; insts1   = famInstEnvElts instEnv1
-	    }
-        in
-	mapM_ (checkForConflicts (emptyFamInstEnv, instEnv2)) insts1
+    check hpt_fam_insts (ModulePair m1 m2)
+      = do { env1 <- getFamInsts hpt_fam_insts m1
+           ; env2 <- getFamInsts hpt_fam_insts m2
+           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))   
+                   (famInstEnvElts env1) }
+
+getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv
+getFamInsts hpt_fam_insts mod
+  | Just env <- lookupModuleEnv hpt_fam_insts mod = return env
+  | otherwise = do { _ <- initIfaceTcRn (loadSysInterface doc mod)
+                   ; eps <- getEps
+                   ; return (expectJust "checkFamInstConsistency" $
+                             lookupModuleEnv (eps_mod_fam_inst_env eps) mod) }
+  where
+    doc = ppr mod <+> ptext (sLit "is a family-instance module")
 \end{code}
 
 %************************************************************************
@@ -196,17 +199,11 @@ addFamInstLoc famInst thing_inside
   = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
     loc = getSrcLoc famInst
-\end{code} 
-
-\begin{code} 
 
 tcGetFamInstEnvs :: TcM (FamInstEnv, FamInstEnv)
 -- Gets both the external-package inst-env
 -- and the home-pkg inst env (includes module being compiled)
 tcGetFamInstEnvs 
   = do { eps <- getEps; env <- getGblEnv
-       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) 
-       }
-
-
+       ; return (eps_fam_inst_env eps, tcg_fam_inst_env env) }
 \end{code}

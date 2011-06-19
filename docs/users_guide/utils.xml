@@ -270,6 +270,34 @@ tags:
 	</varlistentry>
 
 	<varlistentry>
+	  <term><literal>-k</literal> or
+	  <literal>&ndash;&ndash;keep-files</literal></term>
+	  <listitem>
+	    <para>Proceed as normal, but do not delete any intermediate files.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>-x</literal> or
+	  <literal>&ndash;&ndash;cross-compile</literal></term>
+	  <listitem>
+	    <para>Activate cross-compilation mode (see <xref linkend="hsc2hs_cross"/>).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>&ndash;&ndash;cross-safe</literal></term>
+	  <listitem>
+	    <para>Restrict the .hsc directives to those supported by the
+            <literal>--cross-compile</literal> mode (see <xref linkend="hsc2hs_cross"/>).
+            This should be useful if your <literal>.hsc</literal> files
+            must be safely cross-compiled and you wish to keep
+            non-cross-compilable constructs from creeping into them.</para>
+	  </listitem>
+	</varlistentry>
+
+
+	<varlistentry>
 	  <term><literal>-?</literal> or <literal>&ndash;&ndash;help</literal></term>
 	  <listitem>
 	    <para>Display a summary of the available flags and exit successfully.</para>
@@ -542,6 +570,29 @@ tags:
       to the macro name and wraps the definition in a
       <literal>printf</literal> call.</para>
 
+    </sect2>
+
+    <sect2 id="hsc2hs_cross">
+      <title>Cross-compilation</title>
+
+      <para><command>hsc2hs</command> normally operates by creating, compiling,
+      and running a C program. That approach doesn't work when cross-compiling --
+      in this case, the C compiler's generates code for the target machine,
+      not the host machine. For this situation, there's
+      a special mode <command>hsc2hs --cross-compile</command> which can generate
+      the .hs by extracting information from compilations only -- specifically,
+      whether or not compilation fails.
+      </para>
+
+      <para>Only a subset of <literal>.hsc</literal> syntax is supported by
+      <literal>--cross-compile</literal>. The following are unsupported:
+      <itemizedlist>
+	<listitem><literal>#{const_str}</literal></listitem>
+	<listitem><literal>#{let}</literal></listitem>
+	<listitem><literal>#{def}</literal></listitem>
+	<listitem>Custom constructs</listitem>
+      </itemizedlist>
+      </para>
     </sect2>
 
   </sect1>

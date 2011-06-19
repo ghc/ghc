@@ -301,7 +301,7 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 				         (map toVarArg fv_details)
 
 	-- RETURN
-	; return $ (regIdInfo bndr lf_info tmp, init) }
+	; regIdInfo bndr lf_info tmp init }
 
 -- Use with care; if used inappropriately, it could break invariants.
 stripNV :: NonVoid a -> a
@@ -336,7 +336,7 @@ cgStdThunk bndr cc _bndr_info body lf_info payload
   ; (tmp, init) <- allocDynClosure closure_info use_cc blame_cc payload_w_offsets
 
 	-- RETURN
-  ; returnFC $ (regIdInfo bndr lf_info tmp, init) }
+  ; regIdInfo bndr lf_info tmp init }
 
 mkClosureLFInfo :: Id		-- The binder
 		-> TopLevelFlag	-- True of top level

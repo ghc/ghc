@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 module PPC.RegInfo (
-        JumpDest( DestBlockId ), 
+        JumpDest( DestBlockId ), getJumpDestBlockId,
 	canShortcut, 
 	shortcutJump, 
 
@@ -30,6 +30,10 @@ import Outputable
 import Unique
 
 data JumpDest = DestBlockId BlockId | DestImm Imm
+
+getJumpDestBlockId :: JumpDest -> Maybe BlockId
+getJumpDestBlockId (DestBlockId bid) = Just bid
+getJumpDestBlockId _                 = Nothing
 
 canShortcut :: Instr -> Maybe JumpDest
 canShortcut _ = Nothing

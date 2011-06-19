@@ -26,7 +26,6 @@ module RnBinds (
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn
-import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnTypes        ( rnHsSigType, rnLHsType, checkPrecMatch)
@@ -306,7 +305,10 @@ rnValBindsRHS trim mb_bound_names (ValBindsIn mbinds sigs)
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
               where
                 valbind' = ValBindsOut anal_binds sigs'
-                valbind'_dus = usesOnly (hsSigsFVs sigs') `plusDU` anal_dus
+                valbind'_dus = anal_dus `plusDU` usesOnly (hsSigsFVs sigs')
+			       -- Put the sig uses *after* the bindings
+			       -- so that the binders are removed from 
+			       -- the uses in the sigs
        }
 
 rnValBindsRHS _ _ b = pprPanic "rnValBindsRHS" (ppr b)
@@ -357,7 +359,9 @@ rnLocalValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 		-- 	let x = x in 3
 		-- should report 'x' unused
 	; let real_uses = findUses dus result_fvs
-	; warnUnusedLocalBinds bound_names real_uses
+	      -- Insert fake uses for variables introduced implicitly by wildcards (#4404)
+	      implicit_uses = hsValBindsImplicits binds'
+	; warnUnusedLocalBinds bound_names (real_uses `unionNameSets` implicit_uses)
 
 	; let
             -- The variables "used" in the val binds are: 
@@ -453,7 +457,7 @@ rnBind :: (Name -> [Name])		-- Signature tyvar function
 rnBind _ trim (L loc bind@(PatBind { pat_lhs = pat
                                    , pat_rhs = grhss 
                                       -- pat fvs were stored in bind_fvs
-                                      -- after processing the LHS          
+                                      -- after processing the LHS
                                    , bind_fvs = pat_fvs }))
   = setSrcSpan loc $ 
     do	{ let bndrs = collectPatBinders pat
@@ -473,7 +477,7 @@ rnBind sig_fn trim
                             , fun_infix = is_infix 
                             , fun_matches = matches })) 
        -- invariant: no free vars here when it's a FunBind
-  = setSrcSpan loc $ 
+  = setSrcSpan loc $
     do	{ let plain_name = unLoc name
 
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
@@ -581,23 +585,33 @@ a binder.
 \begin{code}
 rnMethodBinds :: Name			-- Class name
 	      -> (Name -> [Name])	-- Signature tyvar function
-	      -> [Name]			-- Names for generic type variables
 	      -> LHsBinds RdrName
 	      -> RnM (LHsBinds Name, FreeVars)
 
-rnMethodBinds cls sig_fn gen_tyvars binds
-  = foldlM do_one (emptyBag,emptyFVs) (bagToList binds)
+rnMethodBinds cls sig_fn binds
+  = do { checkDupRdrNames meth_names
+	     -- Check that the same method is not given twice in the
+	     -- same instance decl	instance C T where
+	     --			      f x = ...
+	     --			      g y = ...
+	     --			      f x = ...
+	     -- We must use checkDupRdrNames because the Name of the
+	     -- method is the Name of the class selector, whose SrcSpan
+	     -- points to the class declaration; and we use rnMethodBinds
+	     -- for instance decls too
+
+       ; foldlM do_one (emptyBag, emptyFVs) (bagToList binds) }
   where 
+    meth_names  = collectMethodBinders binds
     do_one (binds,fvs) bind 
-       = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn gen_tyvars bind
+       = do { (bind', fvs_bind) <- rnMethodBind cls sig_fn bind
 	    ; return (binds `unionBags` bind', fvs_bind `plusFV` fvs) }
 
 rnMethodBind :: Name
 	      -> (Name -> [Name])
-	      -> [Name]
 	      -> LHsBindLR RdrName RdrName
 	      -> RnM (Bag (LHsBindLR Name Name), FreeVars)
-rnMethodBind cls sig_fn gen_tyvars 
+rnMethodBind cls sig_fn 
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
 				  , fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ do
@@ -606,7 +620,7 @@ rnMethodBind cls sig_fn gen_tyvars
         -- We use the selector name as the binder
 
     (new_matches, fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
-                          mapFvRn (rn_match (FunRhs plain_name is_infix)) matches
+                          mapFvRn (rnMatch (FunRhs plain_name is_infix)) matches
     let new_group = MatchGroup new_matches placeHolderType
 
     when is_infix $ checkPrecMatch plain_name new_group
@@ -615,24 +629,13 @@ rnMethodBind cls sig_fn gen_tyvars
                                  , bind_fvs    = fvs })),
              fvs `addOneFV` plain_name)
         -- The 'fvs' field isn't used for method binds
-  where
-	-- Truly gruesome; bring into scope the correct members of the generic 
-	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
-    rn_match info match@(L _ (Match (L _ (TypePat ty) : _) _ _))
-	= extendTyVarEnvFVRn gen_tvs 	$
-	  rnMatch info match
-	where
-	  tvs     = map (rdrNameOcc.unLoc) (extractHsTyRdrTyVars ty)
-	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
-
-    rn_match info match = rnMatch info match
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind _ _ _ (L loc bind@(PatBind {})) = do
+rnMethodBind _ _ (L loc bind@(PatBind {})) = do
     addErrAt loc (methodBindErr bind)
     return (emptyBag, emptyFVs)
 
-rnMethodBind _ _ _ b = pprPanic "rnMethodBind" (ppr b)
+rnMethodBind _ _ b = pprPanic "rnMethodBind" (ppr b)
 \end{code}
 
 
@@ -663,7 +666,12 @@ renameSigs mb_names ok_sig sigs
 	  	-- Check for duplicates on RdrName version, 
 		-- because renamed version has unboundName for
 		-- not-in-scope binders, which gives bogus dup-sig errors
-
+		-- NB: in a class decl, a 'generic' sig is not considered 
+		--     equal to an ordinary sig, so we allow, say
+		--     	     class C a where
+		--	       op :: a -> a
+ 		--             default op :: Eq a => a -> a
+		
 	; sigs' <- mapM (wrapLocM (renameSig mb_names)) sigs
 
 	; let (good_sigs, bad_sigs) = partition (ok_sig . unLoc) sigs'
@@ -690,6 +698,13 @@ renameSig mb_names sig@(TypeSig v ty)
 	; new_ty <- rnHsSigType (quotes (ppr v)) ty
 	; return (TypeSig new_v new_ty) }
 
+renameSig mb_names sig@(GenericSig v ty)
+  = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
+        ; unless defaultSigs_on (addErr (defaultSigErr sig))
+        ; new_v <- lookupSigOccRn mb_names sig v
+	; new_ty <- rnHsSigType (quotes (ppr v)) ty
+	; return (GenericSig new_v new_ty) }
+
 renameSig _ (SpecInstSig ty)
   = do	{ new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty
 	; return (SpecInstSig new_ty) }
@@ -697,7 +712,7 @@ renameSig _ (SpecInstSig ty)
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)
 -- we use lookupOccRn.  If there's both an imported and a local 'f'
--- then the SPECIALISE pragma is ambiguous, unlike alll other signatures
+-- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig mb_names sig@(SpecSig v ty inl)
   = do	{ new_v <- case mb_names of
                      Just {} -> lookupSigOccRn mb_names sig v
@@ -784,9 +799,9 @@ rnGRHS' ctxt (GRHS guards rhs)
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
-    is_standard_guard []                     = True
-    is_standard_guard [L _ (ExprStmt _ _ _)] = True
-    is_standard_guard _                      = False
+    is_standard_guard []                       = True
+    is_standard_guard [L _ (ExprStmt _ _ _ _)] = True
+    is_standard_guard _                        = False
 \end{code}
 
 %************************************************************************
@@ -811,6 +826,11 @@ misplacedSigErr (L loc sig)
   = addErrAt loc $
     sep [ptext (sLit "Misplaced") <+> hsSigDoc sig <> colon, ppr sig]
 
+defaultSigErr :: Sig RdrName -> SDoc
+defaultSigErr sig = vcat [ hang (ptext (sLit "Unexpected default signature:"))
+                              2 (ppr sig)
+                         , ptext (sLit "Use -XDefaultSignatures to enable default signatures") ] 
+
 methodBindErr :: HsBindLR RdrName RdrName -> SDoc
 methodBindErr mbind
  =  hang (ptext (sLit "Pattern bindings (except simple variables) not allowed in instance declarations"))
@@ -825,4 +845,5 @@ nonStdGuardErr :: [LStmtLR Name Name] -> SDoc
 nonStdGuardErr guards
   = hang (ptext (sLit "accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
        4 (interpp'SP guards)
+
 \end{code}

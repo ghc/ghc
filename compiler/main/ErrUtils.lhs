@@ -41,6 +41,9 @@ import StaticFlags	( opt_ErrorSpans )
 
 import System.Exit	( ExitCode(..), exitWith )
 import Data.List
+import qualified Data.Set as Set
+import Data.IORef
+import Control.Monad
 import System.IO
 
 -- -----------------------------------------------------------------------------
@@ -67,7 +70,8 @@ mkLocMessage locn msg
   -- would look strange.  Better to say explicitly "<no location info>".
 
 printError :: SrcSpan -> Message -> IO ()
-printError span msg = printErrs (mkLocMessage span msg $ defaultErrStyle)
+printError span msg =
+  printErrs (mkLocMessage span msg) defaultErrStyle
 
 
 -- -----------------------------------------------------------------------------
@@ -186,11 +190,11 @@ dumpIfSet_dyn dflags flag hdr doc
   = return ()
 
 dumpIfSet_dyn_or :: DynFlags -> [DynFlag] -> String -> SDoc -> IO ()
-dumpIfSet_dyn_or dflags flags hdr doc
-  | or [dopt flag dflags | flag <- flags]
-  || verbosity dflags >= 4 
-  = printDump (mkDumpDoc hdr doc)
-  | otherwise = return ()
+dumpIfSet_dyn_or _ [] _ _ = return ()
+dumpIfSet_dyn_or dflags (flag : flags) hdr doc
+    = if dopt flag dflags || verbosity dflags >= 4
+      then dumpSDoc dflags flag hdr doc
+      else dumpIfSet_dyn_or dflags flags hdr doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc 
@@ -207,19 +211,26 @@ mkDumpDoc hdr doc
 --	otherwise emit to stdout.
 dumpSDoc :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags dflag hdr doc
- = do	let mFile	= chooseDumpFile dflags dflag
- 	case mFile of
-		-- write the dump to a file
-		--	don't add the header in this case, we can see what kind
-		--	of dump it is from the filename.
-		Just fileName
-		 -> do	handle	<- openFile fileName AppendMode
-		 	hPrintDump handle doc
-		 	hClose handle
+ = do let mFile = chooseDumpFile dflags dflag
+      case mFile of
+            -- write the dump to a file
+            -- don't add the header in this case, we can see what kind
+            -- of dump it is from the filename.
+            Just fileName
+                 -> do
+                        let gdref = generatedDumps dflags
+                        gd <- readIORef gdref
+                        let append = Set.member fileName gd
+                            mode = if append then AppendMode else WriteMode
+                        when (not append) $
+                            writeIORef gdref (Set.insert fileName gd)
+                        handle <- openFile fileName mode
+                        hPrintDump handle doc
+                        hClose handle
 
-		-- write the dump to stdout
-		Nothing
-		 -> do	printDump (mkDumpDoc hdr doc)
+            -- write the dump to stdout
+            Nothing
+                 -> printDump (mkDumpDoc hdr doc)
 
 
 -- | Choose where to put a dump file based on DynFlags

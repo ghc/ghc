@@ -15,27 +15,28 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -- | A module concerned with finding the free variables of an expression.
 module CoreFVs (
         -- * Free variables of expressions and binding groups
-	exprFreeVars,	-- CoreExpr   -> VarSet	-- Find all locally-defined free Ids or tyvars
-	exprFreeIds,	-- CoreExpr   -> IdSet	-- Find all locally-defined free Ids
-	exprsFreeVars,	-- [CoreExpr] -> VarSet
-	bindFreeVars, 	-- CoreBind   -> VarSet
+        exprFreeVars,   -- CoreExpr   -> VarSet -- Find all locally-defined free Ids or tyvars
+        exprFreeIds,    -- CoreExpr   -> IdSet  -- Find all locally-defined free Ids
+        exprsFreeVars,  -- [CoreExpr] -> VarSet
+        bindFreeVars,   -- CoreBind   -> VarSet
 
         -- * Selective free variables of expressions
         InterestingVarFun,
-	exprSomeFreeVars, exprsSomeFreeVars,
+        exprSomeFreeVars, exprsSomeFreeVars,
 
         -- * Free variables of Rules, Vars and Ids
         varTypeTyVars, varTypeTcTyVars, 
-	idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
+        idUnfoldingVars, idFreeVars, idRuleAndUnfoldingVars,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
-	ruleRhsFreeVars, rulesFreeVars,
-	ruleLhsOrphNames, ruleLhsFreeIds, 
+        ruleRhsFreeVars, rulesFreeVars,
+        ruleLhsOrphNames, ruleLhsFreeIds, 
+        vectsFreeVars,
 
         -- * Core syntax tree annotation with free variables
-	CoreExprWithFVs,	-- = AnnExpr Id VarSet
-	CoreBindWithFVs,	-- = AnnBind Id VarSet
-	freeVars,		-- CoreExpr -> CoreExprWithFVs
-	freeVarsOf		-- CoreExprWithFVs -> IdSet
+        CoreExprWithFVs,        -- = AnnExpr Id VarSet
+        CoreBindWithFVs,        -- = AnnBind Id VarSet
+        freeVars,               -- CoreExpr -> CoreExprWithFVs
+        freeVarsOf              -- CoreExprWithFVs -> IdSet
     ) where
 
 #include "HsVersions.h"
@@ -49,6 +50,7 @@ import Name
 import VarSet
 import Var
 import TcType
+import Coercion
 import Util
 import BasicTypes( Activation )
 import Outputable
@@ -179,12 +181,13 @@ addBndrs bndrs fv = foldr addBndr fv bndrs
 expr_fvs :: CoreExpr -> FV
 
 expr_fvs (Type ty) 	 = someVars (tyVarsOfType ty)
+expr_fvs (Coercion co)   = someVars (tyCoVarsOfCo co)
 expr_fvs (Var var) 	 = oneVar var
 expr_fvs (Lit _)         = noVars
 expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
-expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyVarsOfType co)
+expr_fvs (Cast expr co)  = expr_fvs expr `union` someVars (tyCoVarsOfCo co)
 
 expr_fvs (Case scrut bndr ty alts)
   = expr_fvs scrut `union` someVars (tyVarsOfType ty) `union` addBndr bndr  
@@ -248,10 +251,11 @@ exprOrphNames e
       where n = idName v
     go (Lit _) 	   	    = emptyNameSet
     go (Type ty)   	    = orphNamesOfType ty	-- Don't need free tyvars
+    go (Coercion co)        = orphNamesOfCo co
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
     go (Lam v e)   	    = go e `delFromNameSet` idName v
     go (Note _ e)           = go e
-    go (Cast e co)          = go e `unionNameSets` orphNamesOfType co
+    go (Cast e co)          = go e `unionNameSets` orphNamesOfCo co
     go (Let (NonRec _ r) e) = go e `unionNameSets` go r
     go (Let (Rec prs) e)    = exprsOrphNames (map snd prs) `unionNameSets` go e
     go (Case e _ ty as)     = go e `unionNameSets` orphNamesOfType ty
@@ -265,9 +269,9 @@ exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \section[freevars-everywhere]{Attaching free variables to every sub-expression}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -275,7 +279,7 @@ exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
 ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
-  = delFromUFM fvs fn	 -- Note [Rule free var hack]
+  = delFromUFM fvs fn    -- Note [Rule free var hack]
   where
     fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
 
@@ -283,7 +287,7 @@ ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
 ruleFreeVars :: CoreRule -> VarSet
 ruleFreeVars (BuiltinRule {}) = noFVs
 ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
-  = delFromUFM fvs fn	-- Note [Rule free var hack]
+  = delFromUFM fvs fn   -- Note [Rule free var hack]
   where
     fvs = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
 
@@ -295,8 +299,8 @@ idRuleRhsVars is_active id
     get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
                   , ru_rhs = rhs, ru_act = act })
       | is_active act
-      	    -- See Note [Finding rule RHS free vars] in OccAnal.lhs
-      = delFromUFM fvs fn	 -- Note [Rule free var hack]
+            -- See Note [Finding rule RHS free vars] in OccAnal.lhs
+      = delFromUFM fvs fn        -- Note [Rule free var hack]
       where
         fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
     get_fvs _ = noFVs
@@ -312,19 +316,31 @@ ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
 \end{code}
 
+
 Note [Rule free var hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't include the Id in its own rhs free-var set.
 Otherwise the occurrence analyser makes bindings recursive
 that shoudn't be.  E.g.
-	RULE:  f (f x y) z  ==>  f x (f y z)
+        RULE:  f (f x y) z  ==>  f x (f y z)
 
 Also since rule_fn is a Name, not a Var, we have to use the grungy delUFM.
 
+
+\begin{code}
+-- |Free variables of a vectorisation declaration
+vectsFreeVars :: [CoreVect] -> VarSet
+vectsFreeVars = foldr (unionVarSet . vectFreeVars) emptyVarSet
+  where
+    vectFreeVars (Vect _ Nothing)    = noFVs
+    vectFreeVars (Vect _ (Just rhs)) = expr_fvs rhs isLocalId emptyVarSet
+\end{code}
+
+
 %************************************************************************
-%*									*
+%*                                                                      *
 \section[freevars-everywhere]{Attaching free variables to every sub-expression}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 The free variable pass annotates every node in the expression with its
@@ -392,15 +408,15 @@ varTypeTyVars :: Var -> TyVarSet
 -- Find the type variables free in the type of the variable
 -- Remember, coercion variables can mention type variables...
 varTypeTyVars var
-  | isLocalId var || isCoVar var = tyVarsOfType (idType var)
-  | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
+  | isLocalId var = tyVarsOfType (idType var)
+  | otherwise     = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 varTypeTcTyVars :: Var -> TyVarSet
 -- Find the type variables free in the type of the variable
 -- Remember, coercion variables can mention type variables...
 varTypeTcTyVars var
-  | isLocalId var || isCoVar var = tcTyVarsOfType (idType var)
-  | otherwise = emptyVarSet	-- Global Ids and non-coercion TyVars
+  | isLocalId var = tcTyVarsOfType (idType var)
+  | otherwise     = emptyVarSet	-- Global Ids and non-coercion TyVars
 
 idFreeVars :: Id -> VarSet
 -- Type variables, rule variables, and inline variables
@@ -411,7 +427,7 @@ idFreeVars id = ASSERT( isId id)
 bndrRuleAndUnfoldingVars ::Var -> VarSet
 -- A 'let' can bind a type variable, and idRuleVars assumes 
 -- it's seeing an Id. This function tests first.
-bndrRuleAndUnfoldingVars v | isTyCoVar v = emptyVarSet
+bndrRuleAndUnfoldingVars v | isTyVar v = emptyVarSet
 	                   | otherwise = idRuleAndUnfoldingVars v
 
 idRuleAndUnfoldingVars :: Id -> VarSet
@@ -510,12 +526,11 @@ freeVars (Let (Rec binds) body)
     body2     = freeVars body
     body_fvs  = freeVarsOf body2
 
-
 freeVars (Cast expr co)
-  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 co)
+  = (freeVarsOf expr2 `unionFVs` cfvs, AnnCast expr2 (cfvs, co))
   where
     expr2 = freeVars expr
-    cfvs  = tyVarsOfType co
+    cfvs  = tyCoVarsOfCo co
 
 freeVars (Note other_note expr)
   = (freeVarsOf expr2, AnnNote other_note expr2)
@@ -523,5 +538,7 @@ freeVars (Note other_note expr)
     expr2 = freeVars expr
 
 freeVars (Type ty) = (tyVarsOfType ty, AnnType ty)
+
+freeVars (Coercion co) = (tyCoVarsOfCo co, AnnCoercion co)
 \end{code}
 

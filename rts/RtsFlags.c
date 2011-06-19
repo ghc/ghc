@@ -13,6 +13,7 @@
 #include "RtsOpts.h"
 #include "RtsUtils.h"
 #include "Profiling.h"
+#include "RtsFlags.h"
 
 #ifdef HAVE_CTYPE_H
 #include <ctype.h>
@@ -32,7 +33,15 @@ int     full_prog_argc = 0;    /* an "int" so as to match normal "argc" */
 char  **full_prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
-char   *rts_argv[MAX_RTS_ARGS];
+char  **rts_argv = NULL;
+#if defined(mingw32_HOST_OS)
+// On Windows, we want to use GetCommandLineW rather than argc/argv,
+// but we need to mutate the command line arguments for withProgName and
+// friends. The System.Environment module achieves that using this bit of
+// shared state:
+int       win32_prog_argc = 0;
+wchar_t **win32_prog_argv = NULL;
+#endif
 
 /*
  * constants, used later 
@@ -44,19 +53,29 @@ char   *rts_argv[MAX_RTS_ARGS];
    Static function decls
    -------------------------------------------------------------------------- */
 
-static int		/* return NULL on error */
-open_stats_file (
-    I_ arg,
-    int argc, char *argv[],
-    int rts_argc, char *rts_argv[],
-    const char *FILENAME_FMT,
-    FILE **file_ret);
+static void procRtsOpts      (int rts_argc0, RtsOptsEnabledEnum enabled);
 
-static StgWord64 decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max);
-static void bad_option(const char *s);
+static void normaliseRtsOpts (void);
+
+static void initStatsFile    (FILE *f);
+
+static int  openStatsFile    (char *filename, const char *FILENAME_FMT,
+                              FILE **file_ret);
+
+static StgWord64 decodeSize  (const char *flag, nat offset,
+                              StgWord64 min, StgWord64 max);
+
+static void bad_option       (const char *s);
+
 #ifdef TRACING
 static void read_trace_flags(char *arg);
 #endif
+
+static void errorUsage      (void) GNU_ATTRIBUTE(__noreturn__);
+
+static char *  copyArg  (char *arg);
+static char ** copyArgv (int argc, char *argv[]);
+static void    freeArgv (int argc, char *argv[]);
 
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
@@ -305,7 +324,7 @@ usage_text[] = {
 "  -Da  DEBUG: apply",
 "  -Dl  DEBUG: linker",
 "  -Dm  DEBUG: stm",
-"  -Dz  DEBUG: stack squezing",
+"  -Dz  DEBUG: stack squeezing",
 "  -Dc  DEBUG: program coverage",
 "  -Dr  DEBUG: sparks",
 "",
@@ -360,8 +379,7 @@ strequal(const char *a, const char * b)
     return(strcmp(a, b) == 0);
 }
 
-static void
-splitRtsFlags(char *s, int *rts_argc, char *rts_argv[])
+static void splitRtsFlags(char *s)
 {
     char *c1, *c2;
 
@@ -373,40 +391,59 @@ splitRtsFlags(char *s, int *rts_argc, char *rts_argv[])
 	
 	if (c1 == c2) { break; }
 	
-	if (*rts_argc < MAX_RTS_ARGS-1) {
-	    s = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
-	    strncpy(s, c1, c2-c1);
-	    s[c2-c1] = '\0';
-	    rts_argv[(*rts_argc)++] = s;
-	} else {
-	    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
-	}
-	
+        s = stgMallocBytes(c2-c1+1, "RtsFlags.c:splitRtsFlags()");
+        strncpy(s, c1, c2-c1);
+        s[c2-c1] = '\0';
+        rts_argv[rts_argc++] = s;
+
 	c1 = c2;
     } while (*c1 != '\0');
 }
     
-void
-setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
+/* -----------------------------------------------------------------------------
+   Parse the command line arguments, collecting options for the RTS.
+
+   On return:
+     - argv[] is *modified*, any RTS options have been stripped out
+     - *argc  contains the new count of arguments in argv[]
+
+     - rts_argv[]  (global) contains a copy of the collected RTS args
+     - rts_argc    (global) contains the count of args in rts_argv
+
+     - prog_argv[] (global) contains a copy of the non-RTS args (== argv)
+     - prog_argc   (global) contains the count of args in prog_argv
+
+     - prog_name   (global) contains the basename of prog_argv[0]
+
+  -------------------------------------------------------------------------- */
+
+void setupRtsFlags (int *argc, char *argv[])
 {
-    rtsBool error = rtsFalse;
-    I_ mode;
-    I_ arg, total_arg;
+    nat mode;
+    nat total_arg;
+    nat arg, rts_argc0;
 
     setProgName (argv);
     total_arg = *argc;
     arg = 1;
 
     *argc = 1;
-    *rts_argc = 0;
+    rts_argc = 0;
+
+    rts_argv = stgCallocBytes(total_arg + 1, sizeof (char *), "setupRtsFlags");
+
+    rts_argc0 = rts_argc;
 
     // process arguments from the ghc_rts_opts global variable first.
     // (arguments from the GHCRTS environment variable and the command
     // line override these).
     {
 	if (ghc_rts_opts != NULL) {
-	    splitRtsFlags(ghc_rts_opts, rts_argc, rts_argv);
-	}
+            splitRtsFlags(ghc_rts_opts);
+            // opts from ghc_rts_opts are always enabled:
+            procRtsOpts(rts_argc0, RtsOptsAll);
+            rts_argc0 = rts_argc;
+        }
     }
 
     // process arguments from the GHCRTS environment variable next
@@ -415,14 +452,15 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	char *ghc_rts = getenv("GHCRTS");
 
 	if (ghc_rts != NULL) {
-            if (rtsOptsEnabled != rtsOptsNone) {
-                splitRtsFlags(ghc_rts, rts_argc, rts_argv);
-            }
-            else {
+            if (rtsOptsEnabled == RtsOptsNone) {
                 errorBelch("Warning: Ignoring GHCRTS variable as RTS options are disabled.\n         Link with -rtsopts to enable them.");
                 // We don't actually exit, just warn
+            } else {
+                splitRtsFlags(ghc_rts);
+                procRtsOpts(rts_argc0, rtsOptsEnabled);
+                rts_argc0 = rts_argc;
             }
-	}
+        }
     }
 
     // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
@@ -440,25 +478,16 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	    break;
 	}
 	else if (strequal("+RTS", argv[arg])) {
-            if (rtsOptsEnabled != rtsOptsNone) {
-                mode = RTS;
-            }
-            else {
-                errorBelch("RTS options are disabled. Link with -rtsopts to enable them.");
-                stg_exit(EXIT_FAILURE);
-            }
-	}
+            mode = RTS;
+        }
 	else if (strequal("-RTS", argv[arg])) {
 	    mode = PGM;
 	}
-	else if (mode == RTS && *rts_argc < MAX_RTS_ARGS-1) {
-            rts_argv[(*rts_argc)++] = argv[arg];
+        else if (mode == RTS) {
+            rts_argv[rts_argc++] = copyArg(argv[arg]);
         }
-        else if (mode == PGM) {
-	    argv[(*argc)++] = argv[arg];
-	}
-	else {
-	  barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
+        else {
+            argv[(*argc)++] = argv[arg];
 	}
     }
     // process remaining program arguments
@@ -466,16 +495,44 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 	argv[(*argc)++] = argv[arg];
     }
     argv[*argc] = (char *) 0;
-    rts_argv[*rts_argc] = (char *) 0;
+    rts_argv[rts_argc] = (char *) 0;
+
+    procRtsOpts(rts_argc0, rtsOptsEnabled);
+
+    normaliseRtsOpts();
+
+    setProgArgv(*argc, argv);
+
+    if (RtsFlags.GcFlags.statsFile != NULL) {
+        initStatsFile (RtsFlags.GcFlags.statsFile);
+    }
+    if (RtsFlags.TickyFlags.tickyFile != NULL) {
+        initStatsFile (RtsFlags.GcFlags.statsFile);
+    }
+}
+
+/* -----------------------------------------------------------------------------
+ * procRtsOpts: Process rts_argv between rts_argc0 and rts_argc.
+ * -------------------------------------------------------------------------- */
+
+static void procRtsOpts (int rts_argc0, RtsOptsEnabledEnum enabled)
+{
+    rtsBool error = rtsFalse;
+    int arg;
 
     // Process RTS (rts_argv) part: mainly to determine statsfile
-    for (arg = 0; arg < *rts_argc; arg++) {
-	if (rts_argv[arg][0] != '-') {
+    for (arg = rts_argc0; arg < rts_argc; arg++) {
+        if (rts_argv[arg][0] != '-') {
 	    fflush(stdout);
 	    errorBelch("unexpected RTS argument: %s", rts_argv[arg]);
 	    error = rtsTrue;
 
         } else {
+
+            if (enabled == RtsOptsNone) {
+                errorBelch("RTS options are disabled. Link with -rtsopts to enable them.");
+                stg_exit(EXIT_FAILURE);
+            }
 
             switch(rts_argv[arg][1]) {
             case '-':
@@ -488,8 +545,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
                 break;
             }
 
-            if (rtsOptsEnabled != rtsOptsAll)
-            {
+            if (enabled == RtsOptsSafeOnly) {
                 errorBelch("Most RTS options are disabled. Link with -rtsopts to enable them.");
                 stg_exit(EXIT_FAILURE);
             }
@@ -791,9 +847,8 @@ error = rtsTrue;
 	    stats:
 		{ 
 		    int r;
-		    r = open_stats_file(arg, *argc, argv,
-					*rts_argc, rts_argv, NULL,
-					&RtsFlags.GcFlags.statsFile);
+                    r = openStatsFile(rts_argv[arg]+2, NULL,
+                                      &RtsFlags.GcFlags.statsFile);
 		    if (r == -1) { error = rtsTrue; }
 		}
                 break;
@@ -1097,9 +1152,9 @@ error = rtsTrue;
 
 		{ 
 		    int r;
-		    r = open_stats_file(arg, *argc, argv,
-					*rts_argc, rts_argv, TICKY_FILENAME_FMT,
-					&RtsFlags.TickyFlags.tickyFile);
+                    r = openStatsFile(rts_argv[arg]+2,
+                                      TICKY_FILENAME_FMT,
+                                      &RtsFlags.TickyFlags.tickyFile);
 		    if (r == -1) { error = rtsTrue; }
 		}
 	        ) break;
@@ -1184,6 +1239,16 @@ error = rtsTrue;
 	}
     }
 
+    if (error) errorUsage();
+}
+
+/* -----------------------------------------------------------------------------
+ * normaliseRtsOpts: Set some derived values, and make sure things are
+ * within sensible ranges.
+ * -------------------------------------------------------------------------- */
+
+static void normaliseRtsOpts (void)
+{
     if (RtsFlags.MiscFlags.tickInterval < 0) {
         RtsFlags.MiscFlags.tickInterval = 50;
     }
@@ -1235,19 +1300,19 @@ error = rtsTrue;
     if (RtsFlags.GcFlags.stkChunkBufferSize >
         RtsFlags.GcFlags.stkChunkSize / 2) {
         errorBelch("stack chunk buffer size (-kb) must be less than 50%% of the stack chunk size (-kc)");
-        error = rtsTrue;
-    }
-
-    if (error) {
-	const char **p;
-
-        fflush(stdout);
-	for (p = usage_text; *p; p++)
-	    errorBelch("%s", *p);
-	stg_exit(EXIT_FAILURE);
+        errorUsage();
     }
 }
 
+static void errorUsage (void)
+{
+    const char **p;
+
+    fflush(stdout);
+    for (p = usage_text; *p; p++)
+        errorBelch("%s", *p);
+    stg_exit(EXIT_FAILURE);
+}
 
 static void
 stats_fprintf(FILE *f, char *s, ...)
@@ -1262,49 +1327,62 @@ stats_fprintf(FILE *f, char *s, ...)
     va_end(ap);
 }
 
-static int		/* return -1 on error */
-open_stats_file (
-    I_ arg,
-    int argc, char *argv[],
-    int rts_argc, char *rts_argv[],
-    const char *FILENAME_FMT,
-    FILE **file_ret)
+/* -----------------------------------------------------------------------------
+ * openStatsFile: open a file in which to put some runtime stats
+ * -------------------------------------------------------------------------- */
+
+static int // return -1 on error
+openStatsFile (char *filename,           // filename, or NULL
+               const char *filename_fmt, // if filename == NULL, use
+                                         // this fmt with sprintf to
+                                         // generate the filename.  %s
+                                         // expands to the program name.
+               FILE **file_ret)          // return the FILE*
 {
     FILE *f = NULL;
 
-    if (strequal(rts_argv[arg]+2, "stderr")
-        || (FILENAME_FMT == NULL && rts_argv[arg][2] == '\0')) {
+    if (strequal(filename, "stderr")
+        || (filename_fmt == NULL && *filename == '\0')) {
         f = NULL; /* NULL means use debugBelch */
     } else {
-        if (rts_argv[arg][2] != '\0') {  /* stats file specified */
-            f = fopen(rts_argv[arg]+2,"w");
+        if (*filename != '\0') {  /* stats file specified */
+            f = fopen(filename,"w");
         } else {
             char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.<ext> */
-            sprintf(stats_filename, FILENAME_FMT, argv[0]);
+            sprintf(stats_filename, filename_fmt, prog_name);
             f = fopen(stats_filename,"w");
         }
 	if (f == NULL) {
-	    errorBelch("Can't open stats file %s\n", rts_argv[arg]+2);
+            errorBelch("Can't open stats file %s\n", filename);
 	    return -1;
 	}
     }
     *file_ret = f;
 
-    {
-	/* Write argv and rtsv into start of stats file */
-	int count;
-	for(count = 0; count < argc; count++) {
-	    stats_fprintf(f, "%s ", argv[count]);
-	}
-	stats_fprintf(f, "+RTS ");
-	for(count = 0; count < rts_argc; count++)
-	    stats_fprintf(f, "%s ", rts_argv[count]);
-	stats_fprintf(f, "\n");
-    }
     return 0;
 }
 
+/* -----------------------------------------------------------------------------
+ * initStatsFile: write a line to the file containing the program name
+ * and the arguments it was invoked with.
+-------------------------------------------------------------------------- */
 
+static void initStatsFile (FILE *f)
+{
+    /* Write prog_argv and rts_argv into start of stats file */
+    int count;
+    for (count = 0; count < prog_argc; count++) {
+        stats_fprintf(f, "%s ", prog_argv[count]);
+    }
+    stats_fprintf(f, "+RTS ");
+    for (count = 0; count < rts_argc; count++)
+        stats_fprintf(f, "%s ", rts_argv[count]);
+    stats_fprintf(f, "\n");
+}
+
+/* -----------------------------------------------------------------------------
+ * decodeSize: parse a string containing a size, like 300K or 1.2M
+-------------------------------------------------------------------------- */
 
 static StgWord64
 decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
@@ -1380,6 +1458,41 @@ bad_option(const char *s)
   stg_exit(EXIT_FAILURE);
 }
 
+/* ----------------------------------------------------------------------------
+   Copying and freeing argc/argv
+   ------------------------------------------------------------------------- */
+
+static char * copyArg(char *arg)
+{
+    char *new_arg = stgMallocBytes(strlen(arg) + 1, "copyArg");
+    strcpy(new_arg, arg);
+    return new_arg;
+}
+
+static char ** copyArgv(int argc, char *argv[])
+{
+    int i;
+    char **new_argv;
+
+    new_argv = stgCallocBytes(argc + 1, sizeof (char *), "copyArgv 1");
+    for (i = 0; i < argc; i++) {
+        new_argv[i] = copyArg(argv[i]);
+    }
+    new_argv[argc] = NULL;
+    return new_argv;
+}
+
+static void freeArgv(int argc, char *argv[])
+{
+    int i;
+    if (argv != NULL) {
+        for (i = 0; i < argc; i++) {
+            stgFree(argv[i]);
+        }
+        stgFree(argv);
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Getting/Setting the program's arguments.
 
@@ -1420,14 +1533,28 @@ getProgArgv(int *argc, char **argv[])
 void
 setProgArgv(int argc, char *argv[])
 {
-   /* Usually this is done by startupHaskell, so we don't need to call this. 
-      However, sometimes Hugs wants to change the arguments which Haskell
-      getArgs >>= ... will be fed.  So you can do that by calling here
-      _after_ calling startupHaskell.
-   */
-   prog_argc = argc;
-   prog_argv = argv;
-   setProgName(prog_argv);
+    prog_argc = argc;
+    prog_argv = copyArgv(argc,argv);
+    setProgName(prog_argv);
+}
+
+static void
+freeProgArgv(void)
+{
+    freeArgv(prog_argc,prog_argv);
+    prog_argc = 0;
+    prog_argv = NULL;
+}
+
+/* ----------------------------------------------------------------------------
+   The full argv - a copy of the original program's argc/argv
+   ------------------------------------------------------------------------- */
+
+void
+setFullProgArgv(int argc, char *argv[])
+{
+    full_prog_argc = argc;
+    full_prog_argv = copyArgv(argc,argv);
 }
 
 /* These functions record and recall the full arguments, including the
@@ -1441,32 +1568,89 @@ getFullProgArgv(int *argc, char **argv[])
 }
 
 void
-setFullProgArgv(int argc, char *argv[])
+freeFullProgArgv (void)
+{
+    freeArgv(full_prog_argc, full_prog_argv);
+    full_prog_argc = 0;
+    full_prog_argv = NULL;
+}
+
+/* ----------------------------------------------------------------------------
+   The Win32 argv
+   ------------------------------------------------------------------------- */
+
+#if defined(mingw32_HOST_OS)
+void freeWin32ProgArgv (void);
+
+void
+freeWin32ProgArgv (void)
 {
     int i;
-    full_prog_argc = argc;
-    full_prog_argv = stgCallocBytes(argc + 1, sizeof (char *),
-                                    "setFullProgArgv 1");
-    for (i = 0; i < argc; i++) {
-        full_prog_argv[i] = stgMallocBytes(strlen(argv[i]) + 1,
-                                           "setFullProgArgv 2");
-        strcpy(full_prog_argv[i], argv[i]);
+
+    if (win32_prog_argv != NULL) {
+        for (i = 0; i < win32_prog_argc; i++) {
+            stgFree(win32_prog_argv[i]);
+        }
+        stgFree(win32_prog_argv);
     }
-    full_prog_argv[argc] = NULL;
+
+    win32_prog_argc = 0;
+    win32_prog_argv = NULL;
 }
 
 void
-freeFullProgArgv (void)
+getWin32ProgArgv(int *argc, wchar_t **argv[])
 {
-    int i;
+    *argc = win32_prog_argc;
+    *argv = win32_prog_argv;
+}
 
-    if (full_prog_argv != NULL) {
-        for (i = 0; i < full_prog_argc; i++) {
-            stgFree(full_prog_argv[i]);
-        }
-        stgFree(full_prog_argv);
+void
+setWin32ProgArgv(int argc, wchar_t *argv[])
+{
+	int i;
+    
+	freeWin32ProgArgv();
+
+    win32_prog_argc = argc;
+	if (argv == NULL) {
+		win32_prog_argv = NULL;
+		return;
+	}
+	
+    win32_prog_argv = stgCallocBytes(argc + 1, sizeof (wchar_t *),
+                                    "setWin32ProgArgv 1");
+    for (i = 0; i < argc; i++) {
+        win32_prog_argv[i] = stgMallocBytes((wcslen(argv[i]) + 1) * sizeof(wchar_t),
+                                           "setWin32ProgArgv 2");
+        wcscpy(win32_prog_argv[i], argv[i]);
     }
+    win32_prog_argv[argc] = NULL;
+}
+#endif
 
-    full_prog_argc = 0;
-    full_prog_argv = NULL;
+/* ----------------------------------------------------------------------------
+   The RTS argv
+   ------------------------------------------------------------------------- */
+
+static void
+freeRtsArgv(void)
+{
+    freeArgv(rts_argc,rts_argv);
+    rts_argc = 0;
+    rts_argv = NULL;
+}
+
+/* ----------------------------------------------------------------------------
+   All argvs
+   ------------------------------------------------------------------------- */
+
+void freeRtsArgs(void)
+{
+#if defined(mingw32_HOST_OS)
+    freeWin32ProgArgv();
+#endif
+    freeFullProgArgv();
+    freeProgArgv();
+    freeRtsArgv();
 }

@@ -197,31 +197,57 @@ pruneSparkQueue (Capability *cap)
       // We have to be careful here: in the parallel GC, another
       // thread might evacuate this closure while we're looking at it,
       // so grab the info pointer just once.
-      info = spark->header.info;
-      if (IS_FORWARDING_PTR(info)) {
-          tmp = (StgClosure*)UN_FORWARDING_PTR(info);
-          /* if valuable work: shift inside the pool */
-          if (closure_SHOULD_SPARK(tmp)) {
-              elements[botInd] = tmp; // keep entry (new address)
-              botInd++;
-              n++;
-          } else {
-              pruned_sparks++; // discard spark
-              cap->sparks_fizzled++;
-          }
-      } else if (HEAP_ALLOCED(spark) && 
-                 (Bdescr((P_)spark)->flags & BF_EVACUATED)) {
-          if (closure_SHOULD_SPARK(spark)) {
-              elements[botInd] = spark; // keep entry (new address)
-              botInd++;
-              n++;
-          } else {
-              pruned_sparks++; // discard spark
-              cap->sparks_fizzled++;
-          }
+      if (GET_CLOSURE_TAG(spark) != 0) {
+          // Tagged pointer is a value, so the spark has fizzled.  It
+          // probably never happens that we get a tagged pointer in
+          // the spark pool, because we would have pruned the spark
+          // during the previous GC cycle if it turned out to be
+          // evaluated, but it doesn't hurt to have this check for
+          // robustness.
+          pruned_sparks++;
+          cap->sparks_fizzled++;
       } else {
-          pruned_sparks++; // discard spark
-          cap->sparks_gcd++;
+          info = spark->header.info;
+          if (IS_FORWARDING_PTR(info)) {
+              tmp = (StgClosure*)UN_FORWARDING_PTR(info);
+              /* if valuable work: shift inside the pool */
+              if (closure_SHOULD_SPARK(tmp)) {
+                  elements[botInd] = tmp; // keep entry (new address)
+                  botInd++;
+                  n++;
+              } else {
+                  pruned_sparks++; // discard spark
+                  cap->sparks_fizzled++;
+              }
+          } else if (HEAP_ALLOCED(spark)) {
+              if ((Bdescr((P_)spark)->flags & BF_EVACUATED)) {
+                  if (closure_SHOULD_SPARK(spark)) {
+                      elements[botInd] = spark; // keep entry (new address)
+                      botInd++;
+                      n++;
+                  } else {
+                      pruned_sparks++; // discard spark
+                      cap->sparks_fizzled++;
+                  }
+              } else {
+                  pruned_sparks++; // discard spark
+                  cap->sparks_gcd++;
+              }
+          } else {
+              if (INFO_PTR_TO_STRUCT(info)->type == THUNK_STATIC) {
+                  if (*THUNK_STATIC_LINK(spark) != NULL) {
+                      elements[botInd] = spark; // keep entry (new address)
+                      botInd++;
+                      n++;
+                  } else {
+                      pruned_sparks++; // discard spark
+                      cap->sparks_gcd++;
+                  }
+              } else {
+                  pruned_sparks++; // discard spark
+                  cap->sparks_fizzled++;
+              }
+          }
       }
 
       currInd++;

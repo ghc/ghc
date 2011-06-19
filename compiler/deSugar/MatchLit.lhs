@@ -33,6 +33,7 @@ import Literal
 import SrcLoc
 import Data.Ratio
 import Outputable
+import BasicTypes
 import Util
 import FastString
 \end{code}
@@ -64,8 +65,8 @@ dsLit (HsStringPrim s) = return (Lit (MachStr s))
 dsLit (HsCharPrim   c) = return (Lit (MachChar c))
 dsLit (HsIntPrim    i) = return (Lit (MachInt i))
 dsLit (HsWordPrim   w) = return (Lit (MachWord w))
-dsLit (HsFloatPrim  f) = return (Lit (MachFloat f))
-dsLit (HsDoublePrim d) = return (Lit (MachDouble d))
+dsLit (HsFloatPrim  f) = return (Lit (MachFloat (fl_value f)))
+dsLit (HsDoublePrim d) = return (Lit (MachDouble (fl_value d)))
 
 dsLit (HsChar c)       = return (mkCharExpr c)
 dsLit (HsString str)   = mkStringExprFS str
@@ -73,8 +74,8 @@ dsLit (HsInteger i _)  = mkIntegerExpr i
 dsLit (HsInt i)	       = return (mkIntExpr i)
 
 dsLit (HsRat r ty) = do
-   num   <- mkIntegerExpr (numerator r)
-   denom <- mkIntegerExpr (denominator r)
+   num   <- mkIntegerExpr (numerator (fl_value r))
+   denom <- mkIntegerExpr (denominator (fl_value r))
    return (mkConApp ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty) 
@@ -112,8 +113,8 @@ hsLitKey (HsIntPrim     i) = mkMachInt  i
 hsLitKey (HsWordPrim    w) = mkMachWord w
 hsLitKey (HsCharPrim    c) = MachChar   c
 hsLitKey (HsStringPrim  s) = MachStr    s
-hsLitKey (HsFloatPrim   f) = MachFloat  f
-hsLitKey (HsDoublePrim  d) = MachDouble d
+hsLitKey (HsFloatPrim   f) = MachFloat  (fl_value f)
+hsLitKey (HsDoublePrim  d) = MachDouble (fl_value d)
 hsLitKey (HsString s)	   = MachStr    s
 hsLitKey l                 = pprPanic "hsLitKey" (ppr l)
 
@@ -124,8 +125,8 @@ hsOverLitKey (OverLit { ol_val = l }) neg = litValKey l neg
 litValKey :: OverLitVal -> Bool -> Literal
 litValKey (HsIntegral i)   False = MachInt i
 litValKey (HsIntegral i)   True  = MachInt (-i)
-litValKey (HsFractional r) False = MachFloat r
-litValKey (HsFractional r) True  = MachFloat (-r)
+litValKey (HsFractional r) False = MachFloat (fl_value r)
+litValKey (HsFractional r) True  = MachFloat (negate (fl_value r))
 litValKey (HsIsString s)   neg   = ASSERT( not neg) MachStr s
 \end{code}
 
@@ -152,8 +153,14 @@ tidyLitPat (HsString s)
 tidyLitPat lit = LitPat lit
 
 ----------------
-tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id -> Pat Id
-tidyNPat (OverLit val False _ ty) mb_neg _
+tidyNPat :: (HsLit -> Pat Id)	-- How to tidy a LitPat
+	    	 -- We need this argument because tidyNPat is called
+		 -- both by Match and by Check, but they tidy LitPats 
+		 -- slightly differently; and we must desugar 
+		 -- literals consistently (see Trac #5117)
+         -> HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id 
+         -> Pat Id
+tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _
 	-- False: Take short cuts only if the literal is not using rebindable syntax
 	-- 
 	-- Once that is settled, look for cases where the type of the 
@@ -169,7 +176,7 @@ tidyNPat (OverLit val False _ ty) mb_neg _
   | isWordTy ty,   Just int_lit <- mb_int_lit = mk_con_pat wordDataCon   (HsWordPrim   int_lit)
   | isFloatTy ty,  Just rat_lit <- mb_rat_lit = mk_con_pat floatDataCon  (HsFloatPrim  rat_lit)
   | isDoubleTy ty, Just rat_lit <- mb_rat_lit = mk_con_pat doubleDataCon (HsDoublePrim rat_lit)
-  | isStringTy ty, Just str_lit <- mb_str_lit = tidyLitPat (HsString str_lit)
+  | isStringTy ty, Just str_lit <- mb_str_lit = tidy_lit_pat (HsString str_lit)
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
     mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] ty)
@@ -180,12 +187,12 @@ tidyNPat (OverLit val False _ ty) mb_neg _
 		   (Just _,  HsIntegral i) -> Just (-i)
 		   _ -> Nothing
 	
-    mb_rat_lit :: Maybe Rational
+    mb_rat_lit :: Maybe FractionalLit
     mb_rat_lit = case (mb_neg, val) of
-		   (Nothing, HsIntegral   i) -> Just (fromInteger i)
-		   (Just _,  HsIntegral   i) -> Just (fromInteger (-i))
+		   (Nothing, HsIntegral   i) -> Just (integralFractionalLit (fromInteger i))
+		   (Just _,  HsIntegral   i) -> Just (integralFractionalLit (fromInteger (-i)))
 		   (Nothing, HsFractional f) -> Just f
-		   (Just _, HsFractional f)  -> Just (-f)
+		   (Just _, HsFractional f)  -> Just (negateFractionalLit f)
 		   _ -> Nothing
 	
     mb_str_lit :: Maybe FastString
@@ -193,7 +200,7 @@ tidyNPat (OverLit val False _ ty) mb_neg _
 		   (Nothing, HsIsString s) -> Just s
 		   _ -> Nothing
 
-tidyNPat over_lit mb_neg eq 
+tidyNPat _ over_lit mb_neg eq 
   = NPat over_lit mb_neg eq
 \end{code}
 

@@ -7,6 +7,7 @@
 *.BAK
 *.orig
 *.prof
+*.rej
 
 *.hi
 *.hi-boot
@@ -22,11 +23,18 @@
 *.o.cmd
 *.depend*
 log
+tags
 
 autom4te.cache
 config.log
 config.status
 configure
+
+# -----------------------------------------------------------------------------
+# Ignore any overlapped darcs repos and back up files
+
+*-darcs-backup*
+_darcs/
 
 # -----------------------------------------------------------------------------
 # sub-repositories
@@ -48,6 +56,7 @@ configure
 /libraries/haskeline/
 /libraries/haskell2010/
 /libraries/haskell98/
+/libraries/hoopl/
 /libraries/hpc/
 /libraries/integer-gmp/
 /libraries/integer-simple/
@@ -74,6 +83,10 @@ configure
 # -----------------------------------------------------------------------------
 # specific generated files
 
+/bindist-list
+/bindistprep/
+/bindisttest/HelloWorld
+/bindisttest/
 /ch01.html
 /ch02.html
 /compiler/cmm/CmmLex.hs
@@ -108,8 +121,15 @@ configure
 /docs/man/ghc.1
 /docs/users_guide/ug-book.xml
 /docs/users_guide/ug-ent.xml
+/docs/users_guide/users_guide.xml
+/docs/users_guide/users_guide/
+/docs/users_guide/what_glasgow_exts_does.gen.xml
+/driver/ghc/dist/
+/driver/haddock/dist/
 /driver/ghci/ghc-pkg-inplace
 /driver/ghci/ghci-inplace
+/driver/ghci/dist/
+/driver/ghci/ghci.res
 /driver/mangler/dist/ghc-asm
 /driver/mangler/dist/ghc-asm.prl
 /driver/package.conf
@@ -117,7 +137,7 @@ configure
 /driver/split/dist/ghc-split
 /driver/split/dist/ghc-split.prl
 /driver/stamp-pkg-conf-rts
-/extra-gcc-opts
+/settings
 /ghc.spec
 /ghc/ghc-bin.cabal
 /ghc/stage1/
@@ -139,10 +159,22 @@ configure
 /libffi/package.conf.inplace
 /libffi/package.conf.inplace.raw
 /libffi/stamp*
+/libffi/package.conf.install
+/libffi/package.conf.install.raw
 /libraries/bin-package-db/GNUmakefile
 /libraries/bin-package-db/ghc.mk
 /libraries/bootstrapping.conf
 /libraries/prologue.txt
+/libraries/doc-index*.html
+/libraries/frames.html
+/libraries/haddock-util.js
+/libraries/hslogo-16.png
+/libraries/index-frames.html
+/libraries/index.html
+/libraries/minus.gif
+/libraries/ocean.css
+/libraries/plus.gif
+/libraries/synopsis.png
 /libraries/stamp/
 /libraries/time/
 /libraries/*/dist-boot/
@@ -164,7 +196,10 @@ configure
 /rts/package.conf.inplace.raw
 /rts/sm/Evac_thr.c
 /rts/sm/Scav_thr.c
+/rts/package.conf.install
+/rts/package.conf.install.raw
 /stage3.package.conf
+/testsuite_summary.txt
 /testlog
 /utils/*/dist*/
 /utils/ext-core/Driver
@@ -196,3 +231,6 @@ configure
 /utils/runghc/runhaskell
 /utils/runstdtest/runstdtest
 /utils/unlit/unlit
+
+
+/extra-gcc-opts

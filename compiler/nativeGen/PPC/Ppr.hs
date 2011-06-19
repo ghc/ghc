@@ -12,7 +12,6 @@ module PPC.Ppr (
 	pprSectionHeader,
 	pprData,
 	pprInstr,
-	pprUserReg,
 	pprSize,
 	pprImm,
 	pprDataItem,
@@ -110,9 +109,7 @@ pprData (CmmStaticLit lit)       = pprDataItem lit
 pprGloblDecl :: CLabel -> Doc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext IF_ARCH_sparc((sLit ".global "), 
-				    (sLit ".globl ")) <>
-		pprCLabel_asm lbl
+  | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm lbl
 
 pprTypeAndSizeDecl :: CLabel -> Doc
 #if linux_TARGET_OS
@@ -156,9 +153,6 @@ pprAlign bytes =
 instance Outputable Instr where
     ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
 
-
-pprUserReg :: Reg -> Doc
-pprUserReg = pprReg
 
 pprReg :: Reg -> Doc
 
@@ -356,14 +350,9 @@ pprInstr :: Instr -> Doc
 pprInstr (COMMENT _) = empty -- nuke 'em
 {-
 pprInstr (COMMENT s)
-   =  IF_ARCH_alpha( ((<>) (ptext (sLit "\t# ")) (ftext s))
-     ,IF_ARCH_sparc( ((<>) (ptext (sLit "# "))   (ftext s))
-     ,IF_ARCH_i386( ((<>) (ptext (sLit "# "))   (ftext s))
-     ,IF_ARCH_x86_64( ((<>) (ptext (sLit "# "))   (ftext s))
-     ,IF_ARCH_powerpc( IF_OS_linux(
+     IF_OS_linux(
         ((<>) (ptext (sLit "# ")) (ftext s)),
         ((<>) (ptext (sLit "; ")) (ftext s)))
-     ,)))))
 -}
 pprInstr (DELTA d)
    = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
@@ -545,7 +534,7 @@ pprInstr (MTCTR reg) = hcat [
 	char '\t',
 	pprReg reg
     ]
-pprInstr (BCTR _) = hcat [
+pprInstr (BCTR _ _) = hcat [
 	char '\t',
 	ptext (sLit "bctr")
     ]

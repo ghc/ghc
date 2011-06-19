@@ -72,13 +72,16 @@ module BasicTypes(
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
 
-	SuccessFlag(..), succeeded, failed, successIf
+	SuccessFlag(..), succeeded, failed, successIf,
+	
+	FractionalLit(..), negateFractionalLit, integralFractionalLit
    ) where
 
 import FastString
 import Outputable
 
 import Data.Data hiding (Fixity)
+import Data.Function (on)
 \end{code}
 
 %************************************************************************
@@ -862,3 +865,36 @@ isEarlyActive (ActiveBefore {}) = True
 isEarlyActive _		        = False
 \end{code}
 
+
+
+\begin{code}
+-- Used (instead of Rational) to represent exactly the floating point literal that we
+-- encountered in the user's source program. This allows us to pretty-print exactly what
+-- the user wrote, which is important e.g. for floating point numbers that can't represented
+-- as Doubles (we used to via Double for pretty-printing). See also #2245.
+data FractionalLit
+  = FL { fl_text :: String         -- How the value was written in the source
+       , fl_value :: Rational      -- Numeric value of the literal
+       }
+  deriving (Data, Typeable, Show)
+  -- The Show instance is required for the derived Lexer.x:Token instance when DEBUG is on
+
+negateFractionalLit :: FractionalLit -> FractionalLit
+negateFractionalLit (FL { fl_text = '-':text, fl_value = value }) = FL { fl_text = text, fl_value = negate value }
+negateFractionalLit (FL { fl_text = text, fl_value = value }) = FL { fl_text = '-':text, fl_value = negate value }
+
+integralFractionalLit :: Integer -> FractionalLit
+integralFractionalLit i = FL { fl_text = show i, fl_value = fromInteger i }
+
+-- Comparison operations are needed when grouping literals
+-- for compiling pattern-matching (module MatchLit)
+
+instance Eq FractionalLit where
+  (==) = (==) `on` fl_value
+
+instance Ord FractionalLit where
+  compare = compare `on` fl_value
+
+instance Outputable FractionalLit where
+  ppr = text . fl_text
+\end{code}

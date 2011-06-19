@@ -161,6 +161,7 @@ ppLlvmStatement stmt
         Return      result        -> ppReturn result
         Expr        expr          -> ppLlvmExpression expr
         Unreachable               -> text "unreachable"
+        Nop                       -> empty
 
 
 -- | Print out an LLVM expression.

@@ -97,6 +97,16 @@ GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
 
+# These options modify whether or not a built compiler for a bootstrap
+# stage defaults to using the new code generation path.  The new
+# code generation path is a bit slower, so for development just
+# GhcStage2DefaultNewCodegen=YES, but it's also a good idea to try
+# building all libraries and the stage2 compiler with the
+# new code generator, which involves GhcStage1DefaultNewCodegen=YES.
+GhcStage1DefaultNewCodegen=NO
+GhcStage2DefaultNewCodegen=NO
+GhcStage3DefaultNewCodegen=NO
+
 GhcDebugged=NO
 GhcDynamic=NO
 
@@ -104,13 +114,18 @@ GhcDynamic=NO
 GhcProfiled=NO
 
 # Do we support shared libs?
-PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
-	i386-unknown-linux x86_64-unknown-linux \
+SharedLibsPlatformList = i386-unknown-linux x86_64-unknown-linux \
 	i386-unknown-freebsd x86_64-unknown-freebsd \
 	i386-unknown-openbsd x86_64-unknown-openbsd \
 	i386-unknown-mingw32 \
-	i386-unknown-solaris2 \
-	i386-apple-darwin powerpc-apple-darwin),YES,NO)
+	i386-apple-darwin powerpc-apple-darwin
+
+ifeq "$(SOLARIS_BROKEN_SHLD)" "NO"
+SharedLibsPlatformList += i386-unknown-solaris2
+endif
+
+PlatformSupportsSharedLibs = $(if $(filter $(TARGETPLATFORM),\
+	$(SharedLibsPlatformList)),YES,NO)
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
@@ -267,13 +282,8 @@ GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 #
 # 	-O(2) is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
-#
-#	-XGenerics switches on generation of support code for 
-#		derivable type classes.  This is now off by default,
-#		but we switch it on for the libraries so that we generate
-#		the code in case someone importing wants it
 
-GhcLibHcOpts=-O2 -XGenerics
+GhcLibHcOpts=-O2
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.
@@ -294,13 +304,14 @@ PackageSourceURL = http://darcs.haskell.org/packages/$(PACKAGE)/%{FILE}
 #		doing object-file splitting
 
 ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO))
-# Object splitting is disabled on darwin due to #4013
-OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
+OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 cygwin32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
+SplitObjsBroken = @SplitObjsBroken@
 
 # lazy test, so that $(GhcUnregisterised) can be set in build.mk
 SupportsSplitObjs=$(strip \
                     $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
                                $(filter YES,$(OsSupportsSplitObjs)),\
+                               $(filter NO,$(SplitObjsBroken)),\
                                $(filter NO,$(BootingFromHc)),\
                                $(filter NO,$(GhcUnregisterised))),\
                           YES,NO))
@@ -424,7 +435,6 @@ GHC_HP2PS_PGM           = hp2ps$(exeext)
 GHC_GHCTAGS_PGM         = ghctags$(exeext)
 GHC_HSC2HS_PGM          = hsc2hs$(exeext)
 GHC_TOUCHY_PGM          = touchy$(exeext)
-GHC_MANGLER_PGM         = ghc-asm
 GHC_SPLIT_PGM           = ghc-split
 GHC_SYSMAN_PGM          = SysMan
 GHC_GENPRIMOP_PGM       = genprimopcode$(exeext)
@@ -444,7 +454,6 @@ GHC_PERL		= $(PERL)
 endif
 
 HP2PS			= $(GHC_HP2PS_DIR)/$(GHC_HP2PS_PGM)
-MANGLER			= $(INPLACE_LIB)/$(GHC_MANGLER_PGM)
 SPLIT			= $(INPLACE_LIB)/$(GHC_SPLIT_PGM)
 SYSMAN 			= $(GHC_SYSMAN_DIR)/$(GHC_SYSMAN_PGM)
 LTX 			= $(GHC_LTX_DIR)/$(GHC_LTX_PGM)
@@ -526,18 +535,19 @@ endif
 # the flag --with-gcc=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-HaveGcc 	= @HaveGcc@
-UseGcc  	= YES
 WhatGccIsCalled = @WhatGccIsCalled@
 GccVersion      = @GccVersion@
-GccLT34		= @GccLT34@
-ifeq "$(strip $(HaveGcc))" "YES"
-ifneq "$(strip $(UseGcc))"  "YES"
-  CC	= cc
-else
-  CC	= $(WhatGccIsCalled)
-endif
-endif
+GccLT34         = @GccLT34@
+CC              = $(WhatGccIsCalled)
+CC_STAGE0       = @CC_STAGE0@
+CC_STAGE1       = $(CC)
+CC_STAGE2       = $(CC)
+CC_STAGE3       = $(CC)
+AS              = $(WhatGccIsCalled)
+AS_STAGE0       = @CC_STAGE0@
+AS_STAGE1       = $(AS)
+AS_STAGE2       = $(AS)
+AS_STAGE3       = $(AS)
 
 # C compiler and linker flags from configure (e.g. -m<blah> to select
 # correct C compiler backend). The stage number is the stage of GHC
@@ -559,6 +569,12 @@ ifeq "$(TARGETPLATFORM)" "ia64-unknown-linux"
 CONF_CC_OPTS += -G0
 endif
 
+# The .hsc files aren't currently safe for cross-compilation on Windows:
+#     libraries\haskeline\.\System\Console\Haskeline\Backend\Win32.hsc:160
+#     directive "let" is not safe for cross-compilation
+ifneq "$(Windows)" "YES"
+SRC_HSC2HS_OPTS += --cross-safe
+endif
 SRC_HSC2HS_OPTS += $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)))
 SRC_HSC2HS_OPTS += $(foreach d,$(GMP_INCLUDE_DIRS),-I$(d))
 
@@ -581,10 +597,24 @@ DLLTOOL			= inplace/mingw/bin/dlltool.exe
 
 AR			= @ArCmd@
 AR_OPTS			= @ArArgs@
-ArSupportsInput		= @ArSupportsInput@
 ArSupportsAtFile = @ArSupportsAtFile@
-# Yuckage: for ghc/utils/parallel -- todo: nuke this dependency!!
-BASH                    = /usr/local/bin/bash
+
+AR_STAGE0 = @AR_STAGE0@
+AR_STAGE1 = $(AR)
+AR_STAGE2 = $(AR)
+AR_STAGE3 = $(AR)
+AR_OPTS_STAGE0 = @AR_OPTS_STAGE0@
+AR_OPTS_STAGE1 = $(AR_OPTS)
+AR_OPTS_STAGE2 = $(AR_OPTS)
+AR_OPTS_STAGE3 = $(AR_OPTS)
+EXTRA_AR_ARGS_STAGE0 = $(EXTRA_AR_ARGS)
+EXTRA_AR_ARGS_STAGE1 = $(EXTRA_AR_ARGS)
+EXTRA_AR_ARGS_STAGE2 = $(EXTRA_AR_ARGS)
+EXTRA_AR_ARGS_STAGE3 = $(EXTRA_AR_ARGS)
+ArSupportsAtFile_STAGE0 = @ArSupportsAtFile_STAGE0@
+ArSupportsAtFile_STAGE1 = $(ArSupportsAtFile)
+ArSupportsAtFile_STAGE2 = $(ArSupportsAtFile)
+ArSupportsAtFile_STAGE3 = $(ArSupportsAtFile)
 
 CONTEXT_DIFF		= @ContextDiffCmd@
 CP			= cp
@@ -617,16 +647,13 @@ NROFF			= nroff
 PERL 			= @PerlCmd@
 PYTHON			= @PythonCmd@
 PIC			= pic
-PREPROCESSCMD		= $(CC) -E
 RANLIB			= @RANLIB@
 SED			= @SedCmd@
 TR 			= tr
 SHELL			= /bin/sh
 
 HaveDtrace		= @HaveDtrace@
-# There are problems with dtrace on 64bit 10.5. For now at least, we
-# just turn dtrace off unless you override USE_DTRACE
-USE_DTRACE = NO
+USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
 
 LD = @LdCmd@
@@ -640,6 +667,10 @@ LD_X			= @LdXFlag@
 # GNU ld supports input via a linker script, which is useful to avoid
 # overflowing command-line length limits.
 LdIsGNULd		= @LdIsGNULd@
+
+# Set to YES if ld has the --build-id flag.  Sometimes we need to
+# disable it with --build-id=none.
+LdHasBuildId	        = @LdHasBuildId@
 
 # On MSYS, building with SplitObjs=YES fails with 
 #   ar: Bad file number
@@ -737,8 +768,6 @@ ALEX_VERSION		= @AlexVersion@
 # Options to pass to Happy when we're going to compile the output with GHC
 #
 SRC_ALEX_OPTS		= -g
-
-HSTAGS = @HstagsCmd@
 
 # Should we build haddock docs?
 HADDOCK_DOCS = YES

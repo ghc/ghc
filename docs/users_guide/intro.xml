@@ -35,7 +35,7 @@
   possible while not making too much effort to optimise the generated
   code (although GHC probably isn't what you'd describe as a fast
   compiler :-).</para>
-  
+
   <para>GHC's profiling system supports &ldquo;cost centre
   stacks&rdquo;: a way of seeing the profile of a Haskell program in a
   call-graph like structure.  See <xref linkend="profiling"/> for more
@@ -104,7 +104,7 @@
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term>subscribe at:</term> 
+	      <term>subscribe at:</term>
 	      <listitem>
 		<para><ulink
 	      url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-users"><literal>http://www.haskell.org/mailman/listinfo/glasgow-haskell-users</literal></ulink>.</para>
@@ -145,7 +145,7 @@
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term>subscribe at:</term> 
+	      <term>subscribe at:</term>
 	      <listitem>
 		<para><ulink
 	      url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs"><literal>http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs</literal></ulink>.</para>
@@ -169,7 +169,7 @@
 	  </variablelist>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term>cvs-ghc:</term>
 	<listitem>
@@ -178,7 +178,7 @@
 	  other lists for other darcs
 	  repositories (most notably <literal>cvs-libraries</literal>).
 	  </para>
-	  
+
 	  <variablelist>
 	    <varlistentry>
 	      <term>list email address:</term>
@@ -188,7 +188,7 @@
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term>subscribe at:</term> 
+	      <term>subscribe at:</term>
 	      <listitem>
 		<para><ulink
 	      url="http://www.haskell.org/mailman/listinfo/cvs-ghc"><literal>http://www.haskell.org/mailman/listinfo/cvs-ghc</literal></ulink>.</para>
@@ -273,7 +273,7 @@
 	  </indexterm>
 	</listitem>
       </varlistentry>
-      
+
       <varlistentry>
 	<term>Stable snapshots</term>
 	<listitem>
@@ -338,7 +338,7 @@
 	</listitem>
       </varlistentry>
     </variablelist>
-    
+
     <para>The version number of your copy of GHC can be found by
     invoking <literal>ghc</literal> with the
     <literal>&ndash;&ndash;version</literal> flag (see <xref

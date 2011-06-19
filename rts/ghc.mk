@@ -158,6 +158,19 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
+ifeq "$(USE_DTRACE)" "YES"
+ifeq "$(TargetOS_CPP)" "solaris2"
+# On Darwin we don't need to generate binary containing probes defined
+# in DTrace script, but DTrace on Solaris expects generation of binary
+# from the DTrace probes definitions
+rts_$1_DTRACE_OBJS = rts/dist/build/RtsProbes.$$($1_osuf)
+
+rts/dist/build/RtsProbes.$$($1_osuf) : $$(rts_$1_OBJS)
+	$(DTRACE) -G -C -Iincludes -DDTRACE -s rts/RtsProbes.d -o \
+		$$@ $$(rts_$1_OBJS)
+endif
+endif
+
 rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
 # Making a shared library for the RTS.
@@ -168,19 +181,21 @@ $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/libs.depend
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
 	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) -o $$@
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS) rts/libs.depend
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) rts/libs.depend
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -package-name rts -shared -dynamic -dynload deploy \
-	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) -o $$@
+	  -no-auto-link-packages `cat rts/libs.depend` $$(rts_$1_OBJS) \
+	  $$(rts_$1_DTRACE_OBJS) -o $$@
 ifeq "$$(darwin_HOST_OS)" "1"
 	# Ensure library's install name is correct before anyone links with it.
 	install_name_tool -id $(ghclibdir)/$$(rts_$1_LIB_NAME) $$@
 endif
 endif
 else
-$$(rts_$1_LIB) : $$(rts_$1_OBJS)
+$$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
-	echo $$(rts_$1_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR)" $$(AR_OPTS) $$(EXTRA_AR_ARGS) $$@
+	echo $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 endif
 
 endif
@@ -280,6 +295,7 @@ rts/RtsMain_HC_OPTS += -optc-O0
 
 rts/RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 rts/RtsUtils_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
+rts/Trace_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 #
 rts/RtsUtils_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
 rts/RtsUtils_CC_OPTS += -DHostArch=\"$(HostArch_CPP)\"
@@ -441,7 +457,7 @@ rts_dist_MKDEPENDC_OPTS += -Irts/dist/build
 
 endif
 
-$(eval $(call build-dependencies,rts,dist,1))
+$(eval $(call dependencies,rts,dist,1))
 
 $(rts_dist_depfile_c_asm) : libffi/dist-install/build/ffi.h $(DTRACEPROBES_H)
 
@@ -466,10 +482,16 @@ rts_HC_OPTS		+= -DDTRACE
 # to force it to use a different gcc, we need to give the path in
 # the option cpppath.
 
-DTRACEPROBES_SRC = rts/RtsProbes.d
-$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) includes/ghcplatform.h | $(dir $@)/.
-	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C -x cpppath=$(WhatGccIsCalled) -h -o $@ -s $<
+ifeq "$(TargetOS_CPP)" "darwin"
+# Darwin has a flag to tell dtrace which cpp to use.
+# Unfortunately, this isn't supported on Solaris (See Solaris Dynamic Tracing
+# Guide, Chapter 16, for the configuration variables available on Solaris)
+DTRACE_FLAGS = -x cpppath=$(WhatGccIsCalled)
+endif
 
+DTRACEPROBES_SRC = rts/RtsProbes.d
+$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) includes/ghcplatform.h | $$(dir $$@)/.
+	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C $(DTRACE_FLAGS) -h -o $@ -s $<
 endif
 
 # -----------------------------------------------------------------------------
@@ -478,7 +500,7 @@ endif
 ifneq "$(BINDIST)" "YES"
 rts/dist/build/libHSrtsmain.a : rts/dist/build/Main.o
 	"$(RM)" $(RM_OPTS) $@
-	"$(AR)" $(AR_OPTS) $(EXTRA_AR_ARGS) $@ $<
+	"$(AR_STAGE1)" $(AR_OPTS_STAGE1) $(EXTRA_AR_ARGS_STAGE1) $@ $<
 endif
 
 # -----------------------------------------------------------------------------
@@ -510,5 +532,4 @@ INSTALL_LIBS += $(ALL_RTS_LIBS)
 $(eval $(call clean-target,rts,dist,rts/dist))
 
 BINDIST_EXTRAS += rts/package.conf.in
-BINDIST_EXTRAS += $(ALL_RTS_LIBS)
 

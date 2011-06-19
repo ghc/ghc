@@ -31,8 +31,8 @@ instance (Outputable a) => Outputable (ParamLocation a) where
 
 type ArgumentFormat a b = [(a, ParamLocation b)]
 
--- Stack parameters are returned as word offsets.
 assignArguments :: (a -> CmmType) -> [a] -> ArgumentFormat a WordOff
+-- Stack parameters are returned as word offsets.
 assignArguments _ _ = panic "assignArguments only used in dead codegen" -- assignments
 
 -- | JD: For the new stack story, I want arguments passed on the stack to manifest as
@@ -40,6 +40,8 @@ assignArguments _ _ = panic "assignArguments only used in dead codegen" -- assig
 -- Also, I want byte offsets, not word offsets.
 assignArgumentsPos :: (Outputable a) => Convention -> (a -> CmmType) -> [a] ->
                       ArgumentFormat a ByteOff
+-- Given a list of arguments, and a function that tells their types,
+-- return a list showing where each argument is passed
 assignArgumentsPos conv arg_ty reps = assignments
     where -- The calling conventions (CgCallConv.hs) are complicated, to say the least
       regs = case (reps, conv) of
@@ -47,7 +49,8 @@ assignArgumentsPos conv arg_ty reps = assignments
                (_,   NativeDirectCall) -> getRegsWithoutNode
                ([_], NativeReturn)     -> allRegs
                (_,   NativeReturn)     -> getRegsWithNode
-               (_,   GC)               -> getRegsWithNode
+               -- GC calling convention *must* put values in registers
+               (_,   GC)               -> allRegs
                (_,   PrimOpCall)       -> allRegs
                ([_], PrimOpReturn)     -> allRegs
                (_,   PrimOpReturn)     -> getRegsWithNode
@@ -61,6 +64,7 @@ assignArgumentsPos conv arg_ty reps = assignments
       (reg_assts, stk_args) = assign_regs [] reps regs
       stk_args' = case conv of NativeReturn -> part
                                PrimOpReturn -> part
+                               GC | length stk_args /= 0 -> panic "Failed to allocate registers for GC call"
                                _            -> stk_args
                   where part = uncurry (++)
                                        (L.partition (not . isGcPtrType . arg_ty) stk_args)

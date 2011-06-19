@@ -279,7 +279,6 @@ exposed-modules: Network.BSD,
 <programlisting>
 /usr/bin/ld: Undefined symbols:
 _ZCMain_main_closure
-___stginit_ZCMain
 </programlisting>
 </para>
 
@@ -463,7 +462,7 @@ depends: array-0.2.0.1-9cbf76a576b6ee9c1f880cf171a0928d
       The purpose of the package ID is to detect problems caused by
       re-installing a package without also recompiling the packages
       that depend on it.  Recompiling dependencies is necessary,
-      because the newly compiled package may have a differnt ABI
+      because the newly compiled package may have a different ABI
       (Application Binary Interface) than the previous version, even
       if both packages were built from the same source code using the
       same compiler.  With package IDs, a recompiled
@@ -986,7 +985,7 @@ ghc-pkg dot | tred | dot -Tpdf >pkgs.pdf
       </listitem>
       <listitem>
         <para>Versions of the Haskell libraries for use with GHCi may also
-          abe included: GHCi cannot load <literal>.a</literal> files
+          be included: GHCi cannot load <literal>.a</literal> files
           directly, instead it will look for an object file
           called <filename>HSfoo.o</filename> and load that.  On some
           systems, the <literal>ghc-pkg</literal> tool can automatically
@@ -1222,7 +1221,7 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
             <indexterm><primary><literal>maintainer</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
           <listitem>
-            <para>(optinoal freeform) The email address of the package's maintainer.</para>
+            <para>(optional freeform) The email address of the package's maintainer.</para>
           </listitem>
         </varlistentry>
 
@@ -1274,7 +1273,7 @@ haddock-html: /usr/share/doc/ghc/html/libraries/unix
             <indexterm><primary><literal>category</literal></primary><secondary>package specification</secondary></indexterm>
           </term>
           <listitem>
-            <para>(optinoal freeform) Which category the package belongs to.  This field
+            <para>(optional freeform) Which category the package belongs to.  This field
             is for use in conjunction with a future centralised package
             distribution framework, tentatively titled Hackage.</para>
           </listitem>

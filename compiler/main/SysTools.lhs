@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 \begin{code}
+{-# OPTIONS -fno-warn-unused-do-bind #-}
 module SysTools (
         -- Initialisation
         initSysTools,
@@ -14,17 +15,18 @@ module SysTools (
         -- Interface to system tools
         runUnlit, runCpp, runCc, -- [Option] -> IO ()
         runPp,                   -- [Option] -> IO ()
-        runMangle, runSplit,     -- [Option] -> IO ()
+        runSplit,                -- [Option] -> IO ()
         runAs, runLink,          -- [Option] -> IO ()
         runMkDLL,
         runWindres,
         runLlvmOpt,
         runLlvmLlc,
+        figureLlvmVersion,
+        readElfSection,
 
         touch,                  -- String -> String -> IO ()
         copy,
         copyWithHeader,
-        getExtraViaCOpts,
 
         -- Temporary-file management
         setTmpDir,
@@ -45,6 +47,7 @@ import ErrUtils
 import Panic
 import Util
 import DynFlags
+import StaticFlags
 import Exception
 
 import Data.IORef
@@ -58,6 +61,8 @@ import System.Directory
 import Data.Char
 import Data.List
 import qualified Data.Map as Map
+import Text.ParserCombinators.ReadP hiding (char)
+import qualified Text.ParserCombinators.ReadP as R
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -144,24 +149,46 @@ stuff.
 
 \begin{code}
 initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
-
-             -> DynFlags
-             -> IO DynFlags     -- Set all the mutable variables above, holding
+             -> IO Settings     -- Set all the mutable variables above, holding
                                 --      (a) the system programs
                                 --      (b) the package-config file
                                 --      (c) the GHC usage message
-
-
-initSysTools mbMinusB dflags0
+initSysTools mbMinusB
   = do  { top_dir <- findTopDir mbMinusB
                 -- see [Note topdir]
                 -- NB: top_dir is assumed to be in standard Unix
                 -- format, '/' separated
 
-        ; let installed :: FilePath -> FilePath
+        ; let settingsFile = top_dir </> "settings"
+              installed :: FilePath -> FilePath
               installed file = top_dir </> file
               installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
               installed_perl_bin file = top_dir </> ".." </> "perl" </> file
+
+        ; settingsStr <- readFile settingsFile
+        ; mySettings <- case maybeReadFuzzy settingsStr of
+                        Just s ->
+                            return s
+                        Nothing ->
+                            pgmError ("Can't parse " ++ show settingsFile)
+        ; let getSetting key = case lookup key mySettings of
+                               Just xs ->
+                                   return xs
+                               Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+        ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
+        -- On Windows, mingw is distributed with GHC,
+        -- so we look in TopDir/../mingw/bin
+        -- It would perhaps be nice to be able to override this
+        -- with the settings file, but it would be a little fiddly
+        -- to make that possible, so for now you can't.
+        ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
+                                       else getSetting "C compiler command"
+        ; gcc_args_str <- if isWindowsHost then return []
+                                           else getSetting "C compiler flags"
+        ; let gcc_args = map Option (words gcc_args_str)
+        ; perl_path <- if isWindowsHost
+                       then return $ installed_perl_bin "perl"
+                       else getSetting "perl command"
 
         ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -171,30 +198,20 @@ initSysTools mbMinusB dflags0
                 -- architecture-specific stuff is done when building Config.hs
               unlit_path = installed cGHC_UNLIT_PGM
 
-                -- split and mangle are Perl scripts
+                -- split is a Perl script
               split_script  = installed cGHC_SPLIT_PGM
-              mangle_script = installed cGHC_MANGLER_PGM
 
               windres_path  = installed_mingw_bin "windres"
 
         ; tmpdir <- getTemporaryDirectory
-        ; let dflags1 = setTmpDir tmpdir dflags0
 
-        -- On Windows, mingw is distributed with GHC,
-        --      so we look in TopDir/../mingw/bin
         ; let
-              gcc_prog
-                | isWindowsHost = installed_mingw_bin "gcc"
-                | otherwise     = cGCC
-              perl_path
-                | isWindowsHost = installed_perl_bin cGHC_PERL
-                | otherwise     = cGHC_PERL
               -- 'touch' is a GHC util for Windows
               touch_path
                 | isWindowsHost = installed cGHC_TOUCHY_PGM
                 | otherwise     = "touch"
               -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-              -- a call to Perl to get the invocation of split and mangle.
+              -- a call to Perl to get the invocation of split.
               -- On Unix, scripts are invoked using the '#!' method.  Binary
               -- installations of GHC on Unix place the correct line on the
               -- front of the script at installation time, so we don't want
@@ -202,9 +219,6 @@ initSysTools mbMinusB dflags0
               (split_prog,  split_args)
                 | isWindowsHost = (perl_path,    [Option split_script])
                 | otherwise     = (split_script, [])
-              (mangle_prog, mangle_args)
-                | isWindowsHost = (perl_path,   [Option mangle_script])
-                | otherwise     = (mangle_script, [])
               (mkdll_prog, mkdll_args)
                 | not isWindowsHost
                     = panic "Can't build DLLs on a non-Win32 system"
@@ -214,38 +228,57 @@ initSysTools mbMinusB dflags0
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
         -- Config.hs one day.
-        ; let cpp_path  = (gcc_prog,
-                           (Option "-E"):(map Option (words cRAWCPP_FLAGS)))
+        ; let cpp_prog  = gcc_prog
+              cpp_args  = Option "-E"
+                        : map Option (words cRAWCPP_FLAGS)
+                       ++ gcc_args
 
         -- Other things being equal, as and ld are simply gcc
         ; let   as_prog  = gcc_prog
+                as_args  = gcc_args
                 ld_prog  = gcc_prog
+                ld_args  = gcc_args
 
-        -- figure out llvm location. (TODO: Acutally implement).
+        -- We just assume on command line
         ; let lc_prog = "llc"
               lo_prog = "opt"
 
-        ; return dflags1{
-                        ghcUsagePath = ghc_usage_msg_path,
-                        ghciUsagePath = ghci_usage_msg_path,
-                        topDir  = top_dir,
-                        systemPackageConfig = pkgconfig_path,
-                        pgm_L   = unlit_path,
-                        pgm_P   = cpp_path,
-                        pgm_F   = "",
-                        pgm_c   = (gcc_prog,[]),
-                        pgm_m   = (mangle_prog,mangle_args),
-                        pgm_s   = (split_prog,split_args),
-                        pgm_a   = (as_prog,[]),
-                        pgm_l   = (ld_prog,[]),
-                        pgm_dll = (mkdll_prog,mkdll_args),
-                        pgm_T   = touch_path,
-                        pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
-                        pgm_windres = windres_path,
-                        pgm_lo  = (lo_prog,[]),
-                        pgm_lc  = (lc_prog,[])
+        ; return $ Settings {
+                        sTmpDir = normalise tmpdir,
+                        sGhcUsagePath = ghc_usage_msg_path,
+                        sGhciUsagePath = ghci_usage_msg_path,
+                        sTopDir  = top_dir,
+                        sRawSettings = mySettings,
+                        sExtraGccViaCFlags = words myExtraGccViaCFlags,
+                        sSystemPackageConfig = pkgconfig_path,
+                        sPgm_L   = unlit_path,
+                        sPgm_P   = (cpp_prog, cpp_args),
+                        sPgm_F   = "",
+                        sPgm_c   = (gcc_prog, gcc_args),
+                        sPgm_s   = (split_prog,split_args),
+                        sPgm_a   = (as_prog, as_args),
+                        sPgm_l   = (ld_prog, ld_args),
+                        sPgm_dll = (mkdll_prog,mkdll_args),
+                        sPgm_T   = touch_path,
+                        sPgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
+                        sPgm_windres = windres_path,
+                        sPgm_lo  = (lo_prog,[]),
+                        sPgm_lc  = (lc_prog,[]),
                         -- Hans: this isn't right in general, but you can
                         -- elaborate it in the same way as the others
+                        sOpt_L       = [],
+                        sOpt_P       = (if opt_PIC
+                                        then -- this list gets reversed
+                                             ["-D__PIC__", "-U __PIC__"]
+                                        else []),
+                        sOpt_F       = [],
+                        sOpt_c       = [],
+                        sOpt_a       = [],
+                        sOpt_m       = [],
+                        sOpt_l       = [],
+                        sOpt_windres = [],
+                        sOpt_lo      = [],
+                        sOpt_lc      = []
                 }
         }
 \end{code}
@@ -372,11 +405,6 @@ getGccEnv opts =
         = (path, '\"' : head b_dirs ++ "\";" ++ paths)
   mangle_path other = other
 
-runMangle :: DynFlags -> [Option] -> IO ()
-runMangle dflags args = do
-  let (p,args0) = pgm_m dflags
-  runSomething dflags "Mangler" p (args0++args)
-
 runSplit :: DynFlags -> [Option] -> IO ()
 runSplit dflags args = do
   let (p,args0) = pgm_s dflags
@@ -389,15 +417,53 @@ runAs dflags args = do
   mb_env <- getGccEnv args1
   runSomethingFiltered dflags id "Assembler" p args1 mb_env
 
+-- | Run the LLVM Optimiser
 runLlvmOpt :: DynFlags -> [Option] -> IO ()
 runLlvmOpt dflags args = do
   let (p,args0) = pgm_lo dflags
   runSomething dflags "LLVM Optimiser" p (args0++args)
 
+-- | Run the LLVM Compiler
 runLlvmLlc :: DynFlags -> [Option] -> IO ()
 runLlvmLlc dflags args = do
   let (p,args0) = pgm_lc dflags
   runSomething dflags "LLVM Compiler" p (args0++args)
+
+-- | Figure out which version of LLVM we are running this session
+figureLlvmVersion :: DynFlags -> IO (Maybe Int)
+figureLlvmVersion dflags = do
+  let (pgm,opts) = pgm_lc dflags
+      args = filter notNull (map showOpt opts)
+      -- we grab the args even though they should be useless just in
+      -- case the user is using a customised 'llc' that requires some
+      -- of the options they've specified. llc doesn't care what other
+      -- options are specified when '-version' is used.
+      args' = args ++ ["-version"]
+  ver <- catchIO (do
+             (pin, pout, perr, _) <- runInteractiveProcess pgm args'
+                                             Nothing Nothing
+             {- > llc -version
+                  Low Level Virtual Machine (http://llvm.org/):
+                    llvm version 2.8 (Ubuntu 2.8-0Ubuntu1)
+                    ...
+             -}
+             hSetBinaryMode pout False
+             _     <- hGetLine pout
+             vline <- hGetLine pout
+             v     <- case filter isDigit vline of
+                            []      -> fail "no digits!"
+                            [x]     -> fail $ "only 1 digit! (" ++ show x ++ ")"
+                            (x:y:_) -> return ((read [x,y]) :: Int)
+             hClose pin
+             hClose pout
+             hClose perr
+             return $ Just v
+            )
+            (\err -> do
+                putMsg dflags $ text $ "Warning: " ++ show err
+                return Nothing)
+  return ver
+  
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do
@@ -454,10 +520,26 @@ copyWithHeader dflags purpose maybe_header from to = do
   hClose hout
   hClose hin
 
-getExtraViaCOpts :: DynFlags -> IO [String]
-getExtraViaCOpts dflags = do
-  f <- readFile (topDir dflags </> "extra-gcc-opts")
-  return (words f)
+-- | read the contents of the named section in an ELF object as a
+-- String.
+readElfSection :: DynFlags -> String -> FilePath -> IO (Maybe String)
+readElfSection _dflags section exe = do
+  let
+     prog = "readelf"
+     args = [Option "-p", Option section, FileOption "" exe]
+  --
+  r <- readProcessWithExitCode prog (filter notNull (map showOpt args)) ""
+  case r of
+    (ExitSuccess, out, _err) -> return (doFilter (lines out))
+    _ -> return Nothing
+ where
+  doFilter [] = Nothing
+  doFilter (s:r) = case readP_to_S parse s of
+                    [(p,"")] -> Just p
+                    _r       -> doFilter r
+   where parse = do
+           skipSpaces; R.char '['; skipSpaces; string "0]"; skipSpaces;
+           munch (const True)
 \end{code}
 
 %************************************************************************
@@ -489,8 +571,8 @@ cleanTempFilesExcept dflags dont_delete
    $ do let ref = filesToClean dflags
         files <- readIORef ref
         let (to_keep, to_delete) = partition (`elem` dont_delete) files
-        removeTmpFiles dflags to_delete
         writeIORef ref to_keep
+        removeTmpFiles dflags to_delete
 
 
 -- find a temporary name that doesn't already exist.
@@ -512,8 +594,9 @@ newTempName dflags extn
 -- return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet
 getTempDir :: DynFlags -> IO FilePath
-getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
+getTempDir dflags
   = do let ref = dirsToClean dflags
+           tmp_dir = tmpDir dflags
        mapping <- readIORef ref
        case Map.lookup tmp_dir mapping of
            Nothing ->
@@ -744,20 +827,16 @@ data BuildMessage
   | EOF
 
 traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
--- a) trace the command (at two levels of verbosity)
--- b) don't do it at all if dry-run is set
+-- trace the command (at two levels of verbosity)
 traceCmd dflags phase_name cmd_line action
  = do   { let verb = verbosity dflags
         ; showPass dflags phase_name
         ; debugTraceMsg dflags 3 (text cmd_line)
         ; hFlush stderr
 
-           -- Test for -n flag
-        ; unless (dopt Opt_DryRun dflags) $ do {
-
            -- And run it!
         ; action `catchIO` handle_exn verb
-        }}
+        }
   where
     handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
                               ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
@@ -778,14 +857,15 @@ getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
 -- Assuming we are running ghc, accessed by path  $(stuff)/bin/ghc.exe,
 -- return the path $(stuff)/lib.
-getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
-                buf <- mallocArray len
-                ret <- getModuleFileName nullPtr buf len
-                if ret == 0 then free buf >> return Nothing
-                            else do s <- peekCString buf
-                                    free buf
-                                    return (Just (rootDir s))
+getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
   where
+    try_size size = allocaArray (fromIntegral size) $ \buf -> do
+        ret <- c_GetModuleFileName nullPtr buf size
+        case ret of
+          0 -> return Nothing
+          _ | ret < size -> fmap (Just . rootDir) $ peekCWString buf
+            | otherwise  -> try_size (size * 2)
+    
     rootDir s = case splitFileName $ normalise s of
                 (d, ghc_exe)
                  | lower ghc_exe `elem` ["ghc.exe",
@@ -800,8 +880,8 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
         where fail = panic ("can't decompose ghc.exe path: " ++ show s)
               lower = map toLower
 
-foreign import stdcall unsafe "GetModuleFileNameA"
-  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+  c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getBaseDir = return Nothing
 #endif

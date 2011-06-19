@@ -81,7 +81,7 @@ type ClassOpItem = (Id, DefMeth)
 
 data DefMeth = NoDefMeth 		-- No default method
 	     | DefMeth Name  		-- A polymorphic default method
-	     | GenDefMeth 		-- A generic default method
+	     | GenDefMeth Name 		-- A generic default method
              deriving Eq  
 
 -- | Convert a `DefMethSpec` to a `DefMeth`, which discards the name field in
@@ -91,7 +91,7 @@ defMethSpecOfDefMeth meth
  = case meth of
 	NoDefMeth	-> NoDM
 	DefMeth _	-> VanillaDM
-	GenDefMeth	-> GenericDM
+	GenDefMeth _	-> GenericDM
 
 \end{code}
 
@@ -208,9 +208,9 @@ instance Show Class where
     showsPrec p c = showsPrecSDoc p (ppr c)
 
 instance Outputable DefMeth where
-    ppr (DefMeth n) =  ptext (sLit "Default method") <+> ppr n
-    ppr GenDefMeth  =  ptext (sLit "Generic default method")
-    ppr NoDefMeth   =  empty   -- No default method
+    ppr (DefMeth n)    =  ptext (sLit "Default method") <+> ppr n
+    ppr (GenDefMeth n) =  ptext (sLit "Generic default method") <+> ppr n
+    ppr NoDefMeth      =  empty   -- No default method
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps []  = empty

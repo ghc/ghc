@@ -29,7 +29,6 @@ import TypeRep
 import TyCon
 import Coercion
 import VarSet
-import Var
 import Name
 import UniqFM
 import Outputable
@@ -85,7 +84,12 @@ instance Outputable FamInst where
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
   = hang (pprFamInstHdr famInst)
-	2 (ptext (sLit "--") <+> pprNameLoc (getName famInst))
+       2 (vcat [ ifPprDebug (ptext (sLit "Coercion axiom:") <+> pp_ax)
+               , ptext (sLit "--") <+> pprNameLoc (getName famInst)])
+  where
+    pp_ax = case tyConFamilyCoercion_maybe (fi_tycon famInst) of
+              Just ax -> ppr ax
+              Nothing -> ptext (sLit "<not there!>")
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr (FamInst {fi_tycon = rep_tc})
@@ -303,7 +307,7 @@ lookupFamInstEnvConflicts envs fam_inst skol_tvs
       --   anything else would be difficult to test for at this stage.
     conflicting old_fam_inst subst 
       | isAlgTyCon fam = True
-      | otherwise      = not (old_rhs `tcEqType` new_rhs)
+      | otherwise      = not (old_rhs `eqType` new_rhs)
       where
         old_tycon = famInstTyCon old_fam_inst
         old_tvs   = tyConTyVars old_tycon
@@ -439,35 +443,34 @@ topNormaliseType env ty
     go rec_nts ty | Just ty' <- coreView ty 	-- Expand synonyms
 	= go rec_nts ty'	
 
-    go rec_nts (TyConApp tc tys)		-- Expand newtypes
-	| Just co_con <- newTyConCo_maybe tc	-- See Note [Expanding newtypes]
-	= if tc `elem` rec_nts 			--  in Type.lhs
+    go rec_nts (TyConApp tc tys)
+        | isNewTyCon tc		-- Expand newtypes
+	= if tc `elem` rec_nts 	-- See Note [Expanding newtypes] in Type.lhs
 	  then Nothing
-	  else let nt_co = mkTyConApp co_con tys
-	       in add_co nt_co rec_nts' nt_rhs
-	where
-	  nt_rhs = newTyConInstRhs tc tys
-	  rec_nts' | isRecursiveTyCon tc = tc:rec_nts
-		   | otherwise		 = rec_nts
+          else let nt_co = mkAxInstCo (newTyConCo tc) tys
+               in add_co nt_co rec_nts' nt_rhs
 
-    go rec_nts (TyConApp tc tys)		-- Expand open tycons
-	| isFamilyTyCon tc
-	, (ACo co, ty) <- normaliseTcApp env tc tys
-	= 	-- The ACo says "something happened"
-		-- Note that normaliseType fully normalises, but it has do to so
-		-- to be sure that 
-	   add_co co rec_nts ty
+	| isFamilyTyCon tc		-- Expand open tycons
+	, (co, ty) <- normaliseTcApp env tc tys
+		-- Note that normaliseType fully normalises, 
+		-- but it has do to so to be sure that 
+        , not (isReflCo co)
+        = add_co co rec_nts ty
+        where
+          nt_rhs = newTyConInstRhs tc tys
+          rec_nts' | isRecursiveTyCon tc = tc:rec_nts
+                   | otherwise           = rec_nts
 
     go _ _ = Nothing
 
     add_co co rec_nts ty 
 	= case go rec_nts ty of
 		Nothing 	-> Just (co, ty)
-		Just (co', ty') -> Just (mkTransCoercion co co', ty')
+		Just (co', ty') -> Just (mkTransCo co co', ty')
 	 
 
 ---------------
-normaliseTcApp :: FamInstEnvs -> TyCon -> [Type] -> (CoercionI, Type)
+normaliseTcApp :: FamInstEnvs -> TyCon -> [Type] -> (Coercion, Type)
 normaliseTcApp env tc tys
   | isFamilyTyCon tc
   , tyConArity tc <= length tys	   -- Unsaturated data families are possible
@@ -475,61 +478,62 @@ normaliseTcApp env tc tys
   = let    -- A matching family instance exists
 	rep_tc         	= famInstTyCon fam_inst
 	co_tycon       	= expectJust "lookupFamInst" (tyConFamilyCoercion_maybe rep_tc)
-	co	       	= mkTyConApp co_tycon inst_tys
-	first_coi      	= mkTransCoI tycon_coi (ACo co)
-	(rest_coi, nty) = normaliseType env (mkTyConApp rep_tc inst_tys)
-	fix_coi         = mkTransCoI first_coi rest_coi
+	co              = mkAxInstCo co_tycon inst_tys
+	first_coi       = mkTransCo tycon_coi co
+	(rest_coi,nty)  = normaliseType env (mkTyConApp rep_tc inst_tys)
+	fix_coi         = mkTransCo first_coi rest_coi
     in 
     (fix_coi, nty)
 
-  | otherwise
+  | otherwise   -- No unique matching family instance exists;
+		-- we do not do anything
   = (tycon_coi, TyConApp tc ntys)
 
   where
 	-- Normalise the arg types so that they'll match 
 	-- when we lookup in in the instance envt
     (cois, ntys) = mapAndUnzip (normaliseType env) tys
-    tycon_coi    = mkTyConAppCoI tc cois
+    tycon_coi    = mkTyConAppCo tc cois
 
 ---------------
 normaliseType :: FamInstEnvs 		-- environment with family instances
 	      -> Type  			-- old type
-	      -> (CoercionI, Type)	-- (coercion,new type), where
+	      -> (Coercion, Type)	-- (coercion,new type), where
 					-- co :: old-type ~ new_type
 -- Normalise the input type, by eliminating *all* type-function redexes
--- Returns with IdCo if nothing happens
+-- Returns with Refl if nothing happens
 
 normaliseType env ty 
   | Just ty' <- coreView ty = normaliseType env ty' 
 normaliseType env (TyConApp tc tys)
   = normaliseTcApp env tc tys
-normaliseType _env ty@(LiteralTy _) = (IdCo ty, ty)
+normaliseType _env ty@(LiteralTy _) = (Refl ty, ty)
 normaliseType env (AppTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
-    in  (mkAppTyCoI coi1 coi2, mkAppTy nty1 nty2)
+    in  (mkAppCo coi1 coi2, mkAppTy nty1 nty2)
 normaliseType env (FunTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
-    in  (mkFunTyCoI coi1 coi2, mkFunTy nty1 nty2)
+    in  (mkFunCo coi1 coi2, mkFunTy nty1 nty2)
 normaliseType env (ForAllTy tyvar ty1)
   = let (coi,nty1) = normaliseType env ty1
-    in  (mkForAllTyCoI tyvar coi, ForAllTy tyvar nty1)
+    in  (mkForAllCo tyvar coi, ForAllTy tyvar nty1)
 normaliseType _   ty@(TyVarTy _)
-  = (IdCo ty,ty)
+  = (Refl ty,ty)
 normaliseType env (PredTy predty)
   = normalisePred env predty
 
 ---------------
-normalisePred :: FamInstEnvs -> PredType -> (CoercionI,Type)
+normalisePred :: FamInstEnvs -> PredType -> (Coercion,Type)
 normalisePred env (ClassP cls tys)
-  =	let (cois,tys') = mapAndUnzip (normaliseType env) tys
-	in  (mkClassPPredCoI cls cois, PredTy $ ClassP cls tys')
+  = let (cos,tys') = mapAndUnzip (normaliseType env) tys
+    in  (mkPredCo $ ClassP cls cos, PredTy $ ClassP cls tys')
 normalisePred env (IParam ipn ty)
-  = 	let (coi,ty') = normaliseType env ty
-	in  (mkIParamPredCoI ipn coi, PredTy $ IParam ipn ty')
+  = let (co,ty') = normaliseType env ty
+    in  (mkPredCo $ (IParam ipn co), PredTy $ IParam ipn ty')
 normalisePred env (EqPred ty1 ty2)
-  = 	let (coi1,ty1') = normaliseType env ty1
-            (coi2,ty2') = normaliseType env ty2
-	in  (mkEqPredCoI coi1 coi2, PredTy $ EqPred ty1' ty2')
+  = let (co1,ty1') = normaliseType env ty1
+        (co2,ty2') = normaliseType env ty2
+    in  (mkPredCo $ (EqPred co1 co2), PredTy $ EqPred ty1' ty2')
 \end{code}

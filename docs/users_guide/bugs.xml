@@ -5,7 +5,7 @@
   <sect1 id="vs-Haskell-defn">
     <title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
 </title>
-    
+
     <indexterm><primary>GHC vs the Haskell 98 language</primary></indexterm>
     <indexterm><primary>Haskell 98 language vs GHC</primary></indexterm>
 
@@ -19,11 +19,11 @@
 
   <sect2 id="haskell98-divergence">
     <title>Divergence from Haskell&nbsp;98</title>
-    
-      
+
+
     <sect3 id="infelicities-lexical">
       <title>Lexical syntax</title>
-      
+
       <itemizedlist>
 	<listitem>
 	  <para>Certain lexical rules regarding qualified identifiers
@@ -36,10 +36,10 @@
 	</listitem>
       </itemizedlist>
     </sect3>
-      
+
       <sect3 id="infelicities-syntax">
 	<title>Context-free syntax</title>
-	
+
 	<itemizedlist>
 	  <listitem>
 	    <para>GHC is a little less strict about the layout rule when used
@@ -101,14 +101,14 @@ main = do args &lt;- getArgs
       <option>-XNoMonoPatBinds</option>.  See <xref
       linkend="options-language" />.</para>
     </sect3>
-      
+
       <sect3 id="infelicities-Modules">
 	<title>Module system and interface files</title>
-	
+
 	<para>GHC requires the use of <literal>hs-boot</literal>
 	  files to cut the recursive loops among mutually recursive modules
 	  as described in <xref linkend="mutual-recursion"/>.  This more of an infelicity
-	    than a bug: the Haskell Report says 
+	    than a bug: the Haskell Report says
 	  (<ulink url="http://haskell.org/onlinereport/modules.html#sect5.7">Section 5.7</ulink>) "Depending on the Haskell
 	implementation used, separate compilation of mutually
 	recursive modules may require that imported modules contain
@@ -141,7 +141,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	  </listitem>
 	</varlistentry>
       </variablelist>
-      
+
     </sect3>
 
       <sect3 id="infelicities-Prelude">
@@ -251,7 +251,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	  the <literal>Int</literal> type.</para>
 
 	  <para>The <literal>fromInteger</literal><indexterm><primary><literal>fromInteger</literal></primary>
-	    </indexterm>function (and hence
+	    </indexterm> function (and hence
 	  also <literal>fromIntegral</literal><indexterm><primary><literal>fromIntegral</literal></primary>
 	    </indexterm>) is a special case when
 	  converting to <literal>Int</literal>.  The value of
@@ -265,7 +265,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 
 
 	   <para>Negative literals, such as <literal>-3</literal>, are
-             specified by (a careful reading of) the Haskell Report as 
+             specified by (a careful reading of) the Haskell Report as
              meaning <literal>Prelude.negate (Prelude.fromInteger 3)</literal>.
 	     So <literal>-2147483648</literal> means <literal>negate (fromInteger 2147483648)</literal>.
 	     Since <literal>fromInteger</literal> takes the lower 32 bits of the representation,
@@ -302,12 +302,12 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
 	</listitem>
       </varlistentry>
     </variablelist>
-      
+
     </sect2>
 
   <sect2 id="ffi-divergence">
     <title>Divergence from the FFI specification</title>
-    
+
     <variablelist>
       <varlistentry>
         <term><literal>hs_init()</literal> not allowed
@@ -321,7 +321,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
       </varlistentry>
     </variablelist>
   </sect2>
-    
+
   </sect1>
 
 
@@ -348,7 +348,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
       </listitem>
 
       <listitem>
-	<para>GHC does not allow you to have a data type with a context 
+	<para>GHC does not allow you to have a data type with a context
 	   that mentions type variables that are not data type parameters.
 	  For example:
 <programlisting>
@@ -369,10 +369,10 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
         using the standard way to encode recursion via a data type:</para>
 <programlisting>
   data U = MkU (U -> Bool)
-       
+
   russel :: U -> Bool
   russel u@(MkU p) = not $ p u
-  
+
   x :: Bool
   x = russel (MkU russel)
 </programlisting>
@@ -414,7 +414,7 @@ checking for duplicates.  The reason for this is efficiency, pure and simple.
         module (whatever that is).</para>
       </listitem>
 
-      <listitem> 
+      <listitem>
       <para>On Windows, there's a GNU ld/BFD bug
       whereby it emits bogus PE object files that have more than
       0xffff relocations. When GHCi tries to load a package affected by this

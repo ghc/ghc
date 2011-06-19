@@ -58,7 +58,7 @@ import CoreUtils
 import CoreLint		( lintCoreBindings )
 import PrelNames        ( iNTERACTIVE )
 import HscTypes
-import Module           ( PackageId, Module )
+import Module           ( Module )
 import DynFlags
 import StaticFlags	
 import Rules            ( RuleBase )
@@ -219,7 +219,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
                                            -- matching this string
-  | CoreDoVectorisation PackageId
+  | CoreDoVectorisation
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
@@ -240,10 +240,10 @@ coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse 
-coreDumpFlag (CoreDoVectorisation {}) = Just Opt_D_dump_vect
-coreDumpFlag CoreDesugar	      = Just Opt_D_dump_ds 
-coreDumpFlag CoreTidy 		      = Just Opt_D_dump_simpl
-coreDumpFlag CorePrep 		      = Just Opt_D_dump_prep
+coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
+coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds 
+coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
+coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 
 coreDumpFlag CoreDoPrintCore         = Nothing
 coreDumpFlag (CoreDoRuleCheck {})    = Nothing
@@ -264,9 +264,9 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecialising       = ptext (sLit "Specialise")
   ppr CoreDoSpecConstr         = ptext (sLit "SpecConstr")
   ppr CoreCSE                  = ptext (sLit "Common sub-expression")
-  ppr (CoreDoVectorisation {}) = ptext (sLit "Vectorisation")
-  ppr CoreDesugar	       = ptext (sLit "Desugar")
-  ppr CoreTidy 		       = ptext (sLit "Tidy Core")
+  ppr CoreDoVectorisation      = ptext (sLit "Vectorisation")
+  ppr CoreDesugar              = ptext (sLit "Desugar")
+  ppr CoreTidy                 = ptext (sLit "Tidy Core")
   ppr CorePrep 		       = ptext (sLit "CorePrep")
   ppr CoreDoPrintCore          = ptext (sLit "Print core")
   ppr (CoreDoRuleCheck {})     = ptext (sLit "Rule check")
@@ -370,18 +370,25 @@ getCoreToDo dflags
 
     simpl_phase phase names iter
       = CoreDoPasses
-          [ maybe_strictness_before phase
+      $   [ maybe_strictness_before phase
           , CoreDoSimplify iter
                 (base_mode { sm_phase = Phase phase
                            , sm_names = names })
 
-          , maybe_rule_check (Phase phase)
-          ]
+          , maybe_rule_check (Phase phase) ]
+
+          -- Vectorisation can introduce a fair few common sub expressions involving 
+          --  DPH primitives. For example, see the Reverse test from dph-examples.
+          --  We need to eliminate these common sub expressions before their definitions
+          --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings, 
+          --  so we also run simpl_gently to inline them.
+      ++  (if dopt Opt_Vectorise dflags && phase == 3
+	    then [CoreCSE, simpl_gently]
+	    else [])
 
     vectorisation
-      = runWhen (dopt Opt_Vectorise dflags)
-        $ CoreDoPasses [ simpl_gently, CoreDoVectorisation (dphPackage dflags) ]
-
+      = runWhen (dopt Opt_Vectorise dflags) $
+          CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
 
                 -- By default, we have 2 phases before phase 0.
 
@@ -402,7 +409,7 @@ getCoreToDo dflags
     simpl_gently = CoreDoSimplify max_iter
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
-                                  , sm_rules = True     -- Note [RULEs enabled in SimplGently]
+                                  , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
                                   , sm_inline = False
                                   , sm_case_case = False })
                           -- Don't do case-of-case transformations.
@@ -568,9 +575,6 @@ RULES are enabled when doing "gentle" simplification.  Two reasons:
 
 But watch out: list fusion can prevent floating.  So use phase control
 to switch off those rules until after floating.
-
-Currently (Oct10) I think that sm_rules is always True, so we
-could remove it.
 
 
 %************************************************************************

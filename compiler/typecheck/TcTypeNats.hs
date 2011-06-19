@@ -2,25 +2,26 @@
 module TcTypeNats ( canonicalNum, NumericsResult(..) ) where
 
 import TcSMonad   ( TcS, Xi
-                  , newWantedCoVar
-                  , setWantedCoBind, setDictBind, newDictVar
+                  , newCoVar, setCoBind
+                  , newDictVar, setDictBind
                   , getWantedLoc
                   , tcsLookupTyCon, tcsLookupClass
                   , CanonicalCt (..), CanonicalCts
                   , mkFrozenError
                   , traceTcS
+                  , WorkList, unionWorkList, emptyWorkList
                   )
 import TcRnTypes  ( CtFlavor(..) )
 import TcCanonical (mkCanonicals)
 import HsBinds    (EvTerm(..))
 import Class      ( Class, className, classTyCon )
 import Type       ( tcView, mkTyConApp, mkNumberTy, isNumberTy
-                  , tcEqType, tcCmpType, pprType
+                  , eqType, cmpType, pprType
                   )
 import TypeRep    (Type(..))
 import TyCon      (TyCon, tyConName)
 import Var        (EvVar)
-import Coercion   ( mkUnsafeCoercion )
+import Coercion   ( mkUnsafeCo )
 import Outputable
 import PrelNames  ( lessThanEqualClassName
                   , addTyFamName, mulTyFamName, expTyFamName
@@ -58,14 +59,14 @@ opFun x = case x of
 
 
 instance Eq Term where
-  Var x   == Var y    = tcEqType x y
+  Var x   == Var y    = eqType x y
   Num x _ == Num y _  = x == y
   _       == _        = False
 
 instance Ord Term where
   compare (Num x _) (Num y _) = compare x y
   compare (Num _ _) (Var _)   = LT
-  compare (Var x)   (Var y)   = tcCmpType x y
+  compare (Var x)   (Var y)   = cmpType x y
   compare (Var _)   (Num _ _) = GT
 
 
@@ -74,7 +75,7 @@ instance Ord Term where
 --------------------------------------------------------------------------------
 
 data NumericsResult = NumericsResult
-  { numNewWork :: CanonicalCts
+  { numNewWork :: WorkList
   , numInert   :: Maybe CanonicalCts   -- Nothing for "no change"
   , numNext    :: Maybe CanonicalCt
   }
@@ -105,16 +106,24 @@ toProp (CFunEqCan { cc_fun = tc, cc_tyargs = [xi11,xi12], cc_rhs = xi2 })
 toProp p = panic $
   "[TcTypeNats.toProp] Unexpected CanonicalCt: " ++ showSDoc (ppr p)
 
-
+-- XXX: Not doing anything, just trying to get things to compile.
 canonicalNum :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
                 TcS NumericsResult
-canonicalNum given derived wanted prop =
+canonicalNum _given _derived _wanted prop =
+  return NumericsResult { numInert    = Nothing
+                        , numNewWork  = emptyWorkList
+                        , numNext     = Just prop
+                        }
+
+{-
   case cc_flavor prop of
     Wanted {}   -> solveNumWanted given derived wanted prop
     Derived {}  -> addNumDerived  given derived wanted prop
     Given {}    -> addNumGiven    given derived wanted prop
+-}
 
 
+{-
 solveNumWanted :: CanonicalCts -> CanonicalCts -> CanonicalCts -> CanonicalCt ->
                 TcS NumericsResult
 solveNumWanted given derived wanted prop =
@@ -172,7 +181,7 @@ addNumDerived given derived wanted prop =
             goals <- mkCanonicals (Derived (getWantedLoc prop)) evs
             return NumericsResult
               { numNext = Just prop, numInert = Just (unionBags given derived)
-              , numNewWork = unionBags wanted goals }
+              , numNewWork = unionWorkList wanted goals }
 
        Impossible -> impossible prop
 
@@ -199,16 +208,17 @@ addNumGiven given derived wanted prop =
             facts <- mkCanonicals (cc_flavor prop) evs
             return NumericsResult
               { numNext = Just prop, numInert = Just (unionBags given derived)
-              , numNewWork = unionBags wanted facts }
+              , numNewWork = unionWorkList wanted facts }
 
        Impossible -> impossible prop
+-}
 
 impossible :: CanonicalCt -> TcS NumericsResult
 impossible c =
   do numTrace "Impossible" empty
      let err = mkFrozenError (cc_flavor c) (cc_id c)
      return NumericsResult
-       { numNext = Just err, numInert = Nothing, numNewWork = emptyBag }
+       { numNext = Just err, numInert = Nothing, numNewWork = emptyWorkList }
 
 
 
@@ -232,7 +242,7 @@ fromProp (EqFun op t1 t2 t3) =
 
 newSubGoal :: CvtProp -> TcS EvVar
 newSubGoal (CvtClass c ts) = newDictVar c ts
-newSubGoal (CvtCo t1 t2)   = newWantedCoVar t1 t2
+newSubGoal (CvtCo t1 t2)   = newCoVar t1 t2
 
 newFact :: CvtProp -> TcS EvVar
 newFact prop =
@@ -250,7 +260,7 @@ defineDummy d (CvtClass c ts) =
   setDictBind d $ EvAxiom "<=" $ mkTyConApp (classTyCon c) ts
 
 defineDummy c (CvtCo t1 t2) =
-  setWantedCoBind c $ mkUnsafeCoercion t1 t2
+  setCoBind c (mkUnsafeCo t1 t2)
 
 
 

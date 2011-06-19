@@ -1,0 +1,15 @@
+src/closures.c (selinux_enabled_check): Fix strncmp usage bug.
+
+http://github.com/atgreen/libffi/commit/eaf444eabc4c78703c0f98ac0197b1619c1b1bef
+
+--- src/closures.c
++++ src/closures.c
+@@ -146,7 +146,7 @@
+       p = strchr (p + 1, ' ');
+       if (p == NULL)
+         break;
+-      if (strncmp (p + 1, "selinuxfs ", 10) != 0)
++      if (strncmp (p + 1, "selinuxfs ", 10) == 0)
+         {
+           free (buf);
+           fclose (f);

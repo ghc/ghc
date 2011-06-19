@@ -9,15 +9,18 @@ This module defines interface types and binders
 module IfaceType (
 	IfExtName, IfLclName,
 
-        IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
+        IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..), IfaceCoCon(..),
         IfaceTyLit(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr, IfaceCoercion,
 	ifaceTyConName,
 
 	-- Conversion from Type -> IfaceType
-	toIfaceType, toIfacePred, toIfaceContext, 
+        toIfaceType, toIfaceContext,
 	toIfaceBndr, toIfaceIdBndr, toIfaceTvBndrs, 
 	toIfaceTyCon, toIfaceTyCon_name,
+
+        -- Conversion from Coercion -> IfaceType
+        coToIfaceType,
 
 	-- Printing
 	pprIfaceType, pprParendIfaceType, pprIfaceContext, 
@@ -26,11 +29,13 @@ module IfaceType (
 
     ) where
 
-import TypeRep
+import Coercion
+import TypeRep hiding( maybeParen )
 import TyCon
 import Id
 import Var
 import TysWiredIn
+import TysPrim
 import Name
 import BasicTypes
 import Outputable
@@ -60,14 +65,15 @@ type IfaceTvBndr  = (IfLclName, IfaceKind)
 type IfaceKind     = IfaceType
 type IfaceCoercion = IfaceType
 
-data IfaceType
-  = IfaceTyVar    IfLclName			-- Type variable only, not tycon
+data IfaceType	   -- A kind of universal type, used for types, kinds, and coercions
+  = IfaceTyVar    IfLclName			-- Type/coercion variable only, not tycon
   | IfaceAppTy    IfaceType IfaceType
+  | IfaceFunTy    IfaceType IfaceType
   | IfaceForAllTy IfaceTvBndr IfaceType
   | IfacePredTy   IfacePredType
-  | IfaceTyConApp IfaceTyCon [IfaceType]	-- Not necessarily saturated
-						-- Includes newtypes, synonyms, tuples
-  | IfaceFunTy  IfaceType IfaceType
+  | IfaceTyConApp IfaceTyCon [IfaceType]  -- Not necessarily saturated
+					  -- Includes newtypes, synonyms, tuples
+  | IfaceCoConApp IfaceCoCon [IfaceType]  -- Always saturated
   | IfaceLiteralTy IfaceTyLit
 
 data IfacePredType 	-- NewTypes are handled as ordinary TyConApps
@@ -80,19 +86,29 @@ data IfaceTyLit
 
 type IfaceContext = [IfacePredType]
 
-data IfaceTyCon 	-- Abbreviations for common tycons with known names
+data IfaceTyCon 	-- Encodes type consructors, kind constructors
+     			-- coercion constructors, the lot
   = IfaceTc IfExtName	-- The common case
   | IfaceIntTc | IfaceBoolTc | IfaceCharTc
   | IfaceListTc | IfacePArrTc
   | IfaceTupTc Boxity Arity 
   | IfaceAnyTc IfaceKind     -- Used for AnyTyCon (see Note [Any Types] in TysPrim)
     	       		     -- other than 'Any :: *' itself
+ 
+  -- Kind constructors
   | IfaceLiftedTypeKindTc | IfaceOpenTypeKindTc | IfaceUnliftedTypeKindTc
   | IfaceUbxTupleKindTc | IfaceArgTypeKindTc 
   | IfaceNatKindTc 
 
-ifaceTyConName :: IfaceTyCon -> IfExtName
-ifaceTyConName IfaceIntTc  	       = intTyConName
+  -- Coercion constructors
+data IfaceCoCon
+  = IfaceCoAx IfExtName
+  | IfaceReflCo    | IfaceUnsafeCo  | IfaceSymCo
+  | IfaceTransCo   | IfaceInstCo
+  | IfaceNthCo Int
+
+ifaceTyConName :: IfaceTyCon -> Name
+ifaceTyConName IfaceIntTc              = intTyConName
 ifaceTyConName IfaceBoolTc 	       = boolTyConName
 ifaceTyConName IfaceCharTc 	       = charTyConName
 ifaceTyConName IfaceListTc 	       = listTyConName
@@ -215,6 +231,10 @@ ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = ppr_tc_app ctxt_prec tc tys
 ppr_ty _         (IfacePredTy st)       = ppr st
 
+ppr_ty ctxt_prec (IfaceCoConApp tc tys) 
+  = maybeParen ctxt_prec tYCON_PREC 
+	       (sep [ppr tc, nest 4 (sep (map pprParendIfaceType tys))])
+
 	-- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
@@ -280,6 +300,15 @@ instance Outputable IfaceTyCon where
 			     -- so we fake it.  It's only for debug printing!
   ppr other_tc       = ppr (ifaceTyConName other_tc)
 
+instance Outputable IfaceCoCon where
+  ppr (IfaceCoAx n)  = ppr n
+  ppr IfaceReflCo    = ptext (sLit "Refl")
+  ppr IfaceUnsafeCo  = ptext (sLit "Unsafe")
+  ppr IfaceSymCo     = ptext (sLit "Sym")
+  ppr IfaceTransCo   = ptext (sLit "Trans")
+  ppr IfaceInstCo    = ptext (sLit "Inst")
+  ppr (IfaceNthCo d) = ptext (sLit "Nth:") <> int d
+
 instance Outputable IfaceTyLit where
   ppr = ppr_tylit
 
@@ -324,19 +353,16 @@ toIfaceKind = toIfaceType
 ---------------------
 toIfaceType :: Type -> IfaceType
 -- Synonyms are retained in the interface type
-toIfaceType (TyVarTy tv) =
-  IfaceTyVar (occNameFS (getOccName tv))
-toIfaceType (AppTy t1 t2) =
-  IfaceAppTy (toIfaceType t1) (toIfaceType t2)
-toIfaceType (FunTy t1 t2) =
-  IfaceFunTy (toIfaceType t1) (toIfaceType t2)
-toIfaceType (TyConApp tc tys) =
-  IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
-toIfaceType (ForAllTy tv t) =
-  IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
-toIfaceType (PredTy st) =
-  IfacePredTy (toIfacePred st)
-toIfaceType (LiteralTy n) = IfaceLiteralTy (toIfaceTyLit n)
+toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyCoVar tv)
+toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
+toIfaceType (FunTy t1 t2)     = IfaceFunTy (toIfaceType t1) (toIfaceType t2)
+toIfaceType (TyConApp tc tys) = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
+toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
+toIfaceType (PredTy st)       = IfacePredTy (toIfacePred toIfaceType st)
+toIfaceType (LiteralTy n)     = IfaceLiteralTy (toIfaceTyLit n)
+
+toIfaceTyCoVar :: TyCoVar -> FastString
+toIfaceTyCoVar = occNameFS . getOccName
 
 ----------------
 -- A little bit of (perhaps optional) trickiness here.  When
@@ -381,13 +407,10 @@ toIfaceTypes :: [Type] -> [IfaceType]
 toIfaceTypes ts = map toIfaceType ts
 
 ----------------
-toIfacePred :: PredType -> IfacePredType
-toIfacePred (ClassP cls ts) = 
-  IfaceClassP (getName cls) (toIfaceTypes ts)
-toIfacePred (IParam ip t) = 
-  IfaceIParam (mapIPName getOccName ip) (toIfaceType t)
-toIfacePred (EqPred ty1 ty2) =
-  IfaceEqPred (toIfaceType ty1) (toIfaceType ty2)
+toIfacePred :: (a -> IfaceType) -> Pred a -> IfacePredType
+toIfacePred to (ClassP cls ts)  = IfaceClassP (getName cls) (map to ts)
+toIfacePred to (IParam ip t)    = IfaceIParam (mapIPName getOccName ip) (to t)
+toIfacePred to (EqPred ty1 ty2) =  IfaceEqPred (to ty1) (to ty2)
 
 toIfaceTyLit :: TyLit -> IfaceTyLit
 toIfaceTyLit (NumberTyLit x) = IfaceNumberTyLit x
@@ -395,6 +418,32 @@ toIfaceTyLit (NumberTyLit x) = IfaceNumberTyLit x
 
 ----------------
 toIfaceContext :: ThetaType -> IfaceContext
-toIfaceContext cs = map toIfacePred cs
+toIfaceContext cs = map (toIfacePred toIfaceType) cs
+
+----------------
+coToIfaceType :: Coercion -> IfaceType
+coToIfaceType (Refl ty)             = IfaceCoConApp IfaceReflCo [toIfaceType ty]
+coToIfaceType (TyConAppCo tc cos)   = IfaceTyConApp (toIfaceTyCon tc) 
+                                                    (map coToIfaceType cos)
+coToIfaceType (AppCo co1 co2)       = IfaceAppTy    (coToIfaceType co1) 
+                                                    (coToIfaceType co2)
+coToIfaceType (ForAllCo v co)       = IfaceForAllTy (toIfaceTvBndr v) 
+                                                    (coToIfaceType co)
+coToIfaceType (CoVarCo cv)          = IfaceTyVar  (toIfaceTyCoVar cv)
+coToIfaceType (AxiomInstCo con cos) = IfaceCoConApp (IfaceCoAx (coAxiomName con))
+                                                    (map coToIfaceType cos)
+coToIfaceType (UnsafeCo ty1 ty2)    = IfaceCoConApp IfaceUnsafeCo 
+                                                    [ toIfaceType ty1
+                                                    , toIfaceType ty2 ]
+coToIfaceType (SymCo co)            = IfaceCoConApp IfaceSymCo 
+                                                    [ coToIfaceType co ]
+coToIfaceType (TransCo co1 co2)     = IfaceCoConApp IfaceTransCo
+                                                    [ coToIfaceType co1
+                                                    , coToIfaceType co2 ]
+coToIfaceType (NthCo d co)          = IfaceCoConApp (IfaceNthCo d)
+                                                    [ coToIfaceType co ]
+coToIfaceType (InstCo co ty)        = IfaceCoConApp IfaceInstCo 
+                                                    [ coToIfaceType co
+                                                    , toIfaceType ty ]
 \end{code}
 
