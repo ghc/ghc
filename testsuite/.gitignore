@@ -101,3 +101,5 @@ tests/ghc-regress/typecheck/should_fail/T3468.o-boot
 timeout/calibrate.out
 timeout/install-inplace/
 timeout/dist/
+
+/tests/ghc-regress/dph/dotp/dph-dotp-fast

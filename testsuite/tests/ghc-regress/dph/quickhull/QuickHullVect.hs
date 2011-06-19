@@ -5,7 +5,7 @@ module QuickHullVect (quickhull) where
 
 import Types
 
-import Data.Array.Parallel.Prelude
+import Data.Array.Parallel
 import Data.Array.Parallel.Prelude.Double
 import qualified Data.Array.Parallel.Prelude.Int as Int
 

@@ -20,7 +20,7 @@ where
 import qualified Data.Array.Parallel.Prelude.Word8	as W
 import Data.Array.Parallel.Prelude.Word8		(Word8)
 import Data.Array.Parallel.Prelude.Int
-import Data.Array.Parallel.Prelude
+import Data.Array.Parallel
 
 import qualified Prelude as Prel
 
