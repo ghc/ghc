@@ -2872,6 +2872,10 @@ Prelude> :set -fno-glasgow-exts
       </varlistentry>
     </variablelist>
 
+    <para>Additional <filename>.ghci</filename> files can be added
+    through the <option>-ghci-script</option> option. These are
+    loaded after the normal <filename>.ghci</filename> files.</para>
+
   </sect1>
 
   <sect1 id="ghci-obj">
