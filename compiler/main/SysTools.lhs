@@ -173,7 +173,14 @@ initSysTools mbMinusB
                             pgmError ("Can't parse " ++ show settingsFile)
         ; let getSetting key = case lookup key mySettings of
                                Just xs ->
-                                   return xs
+                                   return $ case stripPrefix "$topdir" xs of
+                                            Just [] ->
+                                                top_dir
+                                            Just xs'@(c:_)
+                                             | isPathSeparator c ->
+                                                top_dir ++ xs'
+                                            _ ->
+                                                xs
                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
         ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
         -- On Windows, mingw is distributed with GHC,
@@ -181,10 +188,8 @@ initSysTools mbMinusB
         -- It would perhaps be nice to be able to override this
         -- with the settings file, but it would be a little fiddly
         -- to make that possible, so for now you can't.
-        ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
-                                       else getSetting "C compiler command"
-        ; gcc_args_str <- if isWindowsHost then return []
-                                           else getSetting "C compiler flags"
+        ; gcc_prog <- getSetting "C compiler command"
+        ; gcc_args_str <- getSetting "C compiler flags"
         ; let gcc_args = map Option (words gcc_args_str)
         ; perl_path <- if isWindowsHost
                        then return $ installed_perl_bin "perl"

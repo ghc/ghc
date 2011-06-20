@@ -207,6 +207,7 @@ AC_CANONICAL_TARGET
 
 FPTOOLS_SET_PLATFORM_VARS
 
+windows=NO
 exeext=''
 soext='.so'
 case $host in
@@ -216,6 +217,7 @@ case $host in
     exit 1
     ;;
 *-unknown-mingw32)
+    windows=YES
     exeext='.exe'
     soext='.dll'
     ;;
@@ -569,6 +571,17 @@ AC_SUBST(CONF_LD_LINKER_OPTS_STAGE2)
 AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
+
+if test "$windows" = YES
+then
+    SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
+    SettingsCCompilerFlags=''
+else
+    SettingsCCompilerCommand="$WhatGccIsCalled"
+    SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+fi
+AC_SUBST(SettingsCCompilerCommand)
+AC_SUBST(SettingsCCompilerFlags)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF
