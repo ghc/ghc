@@ -89,6 +89,7 @@ thisdir=`utils/ghc-pwd/dist-boot/ghc-pwd`
 echo "Validating=YES" > mk/are-validating.mk
 
 $make -j$threads ValidateHpc=$hpc ValidateSlow=$slow
+# For a "debug make", add "--debug=b --debug=m"
 
 $make binary-dist-prep
 $make test_bindist TEST_PREP=YES
