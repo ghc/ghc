@@ -337,7 +337,8 @@ drop                   :: Int -> [a] -> [a]
 -- > splitAt 0 [1,2,3] == ([],[1,2,3])
 -- > splitAt (-1) [1,2,3] == ([],[1,2,3])
 --
--- It is equivalent to @('take' n xs, 'drop' n xs)@.
+-- It is equivalent to @('take' n xs, 'drop' n xs)@ when @n@ is not @_|_@
+-- (@splitAt _|_ xs = _|_@).
 -- 'splitAt' is an instance of the more general 'Data.List.genericSplitAt',
 -- in which @n@ may be of any integral type.
 splitAt                :: Int -> [a] -> ([a],[a])
