@@ -17,7 +17,14 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.Ptr where
+module GHC.Ptr (
+        Ptr(..), FunPtr(..),
+        nullPtr, castPtr, plusPtr, alignPtr, minusPtr,
+        nullFunPtr, castFunPtr,
+
+        -- * Unsafe functions
+        castFunPtrToPtr, castPtrToFunPtr
+    ) where
 
 import GHC.Base
 import GHC.Show
@@ -156,5 +163,5 @@ instance Show (Ptr a) where
 
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr
-\end{code}
 
+\end{code}

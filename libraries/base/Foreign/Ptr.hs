@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , ForeignFunctionInterface
@@ -67,7 +68,6 @@ import GHC.Show
 import GHC.Enum
 import GHC.Word         ( Word(..) )
 
--- import Data.Int
 import Data.Word
 #else
 import Control.Monad    ( liftM )

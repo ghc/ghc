@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Show (showSignedInt) where

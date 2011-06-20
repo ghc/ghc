@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP, ForeignFunctionInterface #-}
 
 -----------------------------------------------------------------------------
@@ -31,7 +32,7 @@ module System.Environment
 import Prelude
 
 #ifdef __GLASGOW_HASKELL__
-import Foreign
+import Foreign.Safe
 import Foreign.C
 import Control.Exception.Base   ( bracket )
 -- import GHC.IO

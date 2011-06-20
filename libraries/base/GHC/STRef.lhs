@@ -7,7 +7,7 @@
 -- Module      :  GHC.STRef
 -- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -17,7 +17,10 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.STRef where
+module GHC.STRef (
+        STRef(..),
+        newSTRef, readSTRef, writeSTRef
+    ) where
 
 import GHC.ST
 import GHC.Base
@@ -45,4 +48,5 @@ writeSTRef (STRef var#) val = ST $ \s1# ->
 -- Just pointer equality on mutable references:
 instance Eq (STRef s a) where
     STRef v1# == STRef v2# = sameMutVar# v1# v2#
+
 \end{code}

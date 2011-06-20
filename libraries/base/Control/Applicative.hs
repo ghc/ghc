@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
@@ -51,8 +52,8 @@ import Control.Arrow (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
 import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.Instances ()
 #ifndef __NHC__
-import Control.Monad.ST (ST)
-import qualified Control.Monad.ST.Lazy as Lazy (ST)
+import Control.Monad.ST.Safe (ST)
+import qualified Control.Monad.ST.Lazy.Safe as Lazy (ST)
 #endif
 import Data.Functor ((<$>), (<$))
 import Data.Monoid (Monoid(..))

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 #ifdef __GLASGOW_HASKELL__
 {-# LANGUAGE DeriveDataTypeable, DeriveGeneric, StandaloneDeriving #-}

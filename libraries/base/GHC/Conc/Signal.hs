@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, ForeignFunctionInterface #-}
 
 module GHC.Conc.Signal
@@ -19,8 +20,8 @@ import GHC.Arr (inRange)
 import GHC.Base
 import GHC.Conc.Sync (forkIO)
 import GHC.IO (mask_, unsafePerformIO)
-import GHC.IOArray (IOArray, boundsIOArray, newIOArray, unsafeReadIOArray,
-                    unsafeWriteIOArray)
+import GHC.IOArray (IOArray, boundsIOArray, newIOArray,
+                    unsafeReadIOArray, unsafeWriteIOArray)
 import GHC.Real (fromIntegral)
 import GHC.Word (Word8)
 

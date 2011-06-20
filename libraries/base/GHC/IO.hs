@@ -22,22 +22,22 @@
 
 -- #hide
 module GHC.IO (
-    IO(..), unIO, failIO, liftIO,
-    unsafePerformIO, unsafeInterleaveIO,
-    unsafeDupablePerformIO, unsafeDupableInterleaveIO,
-    noDuplicate,
+        IO(..), unIO, failIO, liftIO,
+        unsafePerformIO, unsafeInterleaveIO,
+        unsafeDupablePerformIO, unsafeDupableInterleaveIO,
+        noDuplicate,
 
         -- To and from from ST
-    stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
+        stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
 
-    FilePath,
+        FilePath,
 
-    catchException, catchAny, throwIO,
-    mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
-    MaskingState(..), getMaskingState,
-    block, unblock, blocked, unsafeUnmask,
-    onException, bracket, finally, evaluate
-  ) where
+        catchException, catchAny, throwIO,
+        mask, mask_, uninterruptibleMask, uninterruptibleMask_, 
+        MaskingState(..), getMaskingState,
+        block, unblock, blocked, unsafeUnmask,
+        onException, bracket, finally, evaluate
+    ) where
 
 import GHC.Base
 import GHC.ST

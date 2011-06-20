@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS -Wall -fno-warn-unused-binds #-}
 

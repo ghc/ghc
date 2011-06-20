@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 -- We believe we could deorphan this module, by moving lots of things
 -- around, but we haven't got there yet:

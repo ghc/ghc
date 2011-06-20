@@ -24,7 +24,13 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.Weak where
+module GHC.Weak (
+        Weak(..),
+        mkWeak,
+        deRefWeak,
+        finalize,
+        runFinalizerBatch
+    ) where
 
 import GHC.Base
 import Data.Maybe

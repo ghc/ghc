@@ -1,3 +1,6 @@
+#if sh_SAFE_DEFAULT
+{-# LANGUAGE Trustworthy #-}
+#endif
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
@@ -25,11 +28,15 @@ module Foreign
         , module Foreign.Storable
         , module Foreign.Marshal
 
+#if !sh_SAFE_DEFAULT
+        -- * Unsafe Functions
+
         -- | 'unsafePerformIO' is exported here for backwards
         -- compatibility reasons only.  For doing local marshalling in
         -- the FFI, use 'unsafeLocalState'.  For other uses, see
         -- 'System.IO.Unsafe.unsafePerformIO'.
         , unsafePerformIO
+#endif
         ) where
 
 import Data.Bits
@@ -41,4 +48,14 @@ import Foreign.StablePtr
 import Foreign.Storable
 import Foreign.Marshal
 
-import System.IO.Unsafe (unsafePerformIO)
+#if !sh_SAFE_DEFAULT
+import GHC.IO (IO)
+import qualified System.IO.Unsafe (unsafePerformIO)
+
+{-# DEPRECATED unsafePerformIO "Use System.IO.Unsafe.unsafePerformIO instead; This function will be removed in the next release" #-}
+
+{-# INLINE unsafePerformIO #-}
+unsafePerformIO :: IO a -> a
+unsafePerformIO = System.IO.Unsafe.unsafePerformIO
+#endif
+

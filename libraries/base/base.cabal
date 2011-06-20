@@ -52,38 +52,38 @@ Library {
             GHC.Exception,
             GHC.Exts,
             GHC.Float,
+            GHC.Float.ConversionUtils,
             GHC.Float.RealFracMethods,
             GHC.Foreign,
-            GHC.Float.ConversionUtils,
             GHC.ForeignPtr,
-            GHC.MVar,
+            GHC.Handle,
             GHC.IO,
-            GHC.IO.IOMode,
             GHC.IO.Buffer,
-            GHC.IO.Device,
             GHC.IO.BufferedIO,
-            GHC.IO.FD,
-            GHC.IO.Exception,
+            GHC.IO.Device,
             GHC.IO.Encoding,
-            GHC.IO.Encoding.Latin1,
-            GHC.IO.Encoding.UTF8,
-            GHC.IO.Encoding.UTF16,
-            GHC.IO.Encoding.UTF32,
-            GHC.IO.Encoding.Types,
-            GHC.IO.Encoding.Iconv,
             GHC.IO.Encoding.CodePage,
             GHC.IO.Encoding.Failure,
+            GHC.IO.Encoding.Iconv,
+            GHC.IO.Encoding.Latin1,
+            GHC.IO.Encoding.Types,
+            GHC.IO.Encoding.UTF16,
+            GHC.IO.Encoding.UTF32,
+            GHC.IO.Encoding.UTF8,
+            GHC.IO.Exception,
+            GHC.IO.FD,
             GHC.IO.Handle,
-            GHC.IO.Handle.Types,
-            GHC.IO.Handle.Internals,
             GHC.IO.Handle.FD,
+            GHC.IO.Handle.Internals,
             GHC.IO.Handle.Text,
-            GHC.IOBase,
-            GHC.Handle,
-            GHC.IORef,
+            GHC.IO.Handle.Types,
+            GHC.IO.IOMode,
             GHC.IOArray,
+            GHC.IOBase,
+            GHC.IORef,
             GHC.Int,
             GHC.List,
+            GHC.MVar,
             GHC.Num,
             GHC.PArr,
             GHC.Pack,
@@ -91,10 +91,10 @@ Library {
             GHC.Read,
             GHC.Real,
             GHC.ST,
-            GHC.STRef,
             GHC.Show,
             GHC.Stable,
             GHC.Storable,
+            GHC.STRef,
             GHC.TypeNats,
             GHC.TopHandler,
             GHC.Unicode,
@@ -122,9 +122,13 @@ Library {
         Control.Monad,
         Control.Monad.Fix,
         Control.Monad.Instances,
-        Control.Monad.ST
-        Control.Monad.ST.Lazy
-        Control.Monad.ST.Strict
+        Control.Monad.ST,
+        Control.Monad.ST.Safe,
+        Control.Monad.ST.Unsafe,
+        Control.Monad.ST.Lazy,
+        Control.Monad.ST.Lazy.Safe,
+        Control.Monad.ST.Lazy.Unsafe,
+        Control.Monad.ST.Strict,
         Control.Monad.Group
         Control.Monad.Zip
         Data.Bits,
@@ -165,13 +169,18 @@ Library {
         Foreign.C.String,
         Foreign.C.Types,
         Foreign.ForeignPtr,
+        Foreign.ForeignPtr.Safe,
+        Foreign.ForeignPtr.Unsafe,
         Foreign.Marshal,
         Foreign.Marshal.Alloc,
         Foreign.Marshal.Array,
         Foreign.Marshal.Error,
         Foreign.Marshal.Pool,
+        Foreign.Marshal.Safe,
         Foreign.Marshal.Utils,
+        Foreign.Marshal.Unsafe,
         Foreign.Ptr,
+        Foreign.Safe,
         Foreign.StablePtr,
         Foreign.Storable,
         Numeric,
@@ -197,6 +206,10 @@ Library {
         Text.Show,
         Text.Show.Functions
         Unsafe.Coerce
+    other-modules:
+        Control.Monad.ST.Imp
+        Control.Monad.ST.Lazy.Imp
+        Foreign.ForeignPtr.Imp
     c-sources:
         cbits/PrelIOUtils.c
         cbits/WCsubst.c
@@ -233,4 +246,5 @@ Library {
     -- as it's magic.
     ghc-options: -package-name base
     nhc98-options: -H4M -K3M
+    extensions: CPP
 }

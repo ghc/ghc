@@ -16,7 +16,13 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.ST where
+module GHC.ST (
+        ST(..), STret(..), STRep,
+        fixST, runST, runSTRep,
+
+        -- * Unsafe functions
+        liftST, unsafeInterleaveST
+    ) where
 
 import GHC.Base
 import GHC.Show

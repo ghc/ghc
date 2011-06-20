@@ -1,4 +1,5 @@
 \begin{code}
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
 {-# OPTIONS_HADDOCK hide #-}
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude #-}
 #ifndef __NHC__
 {-# LANGUAGE Rank2Types #-}

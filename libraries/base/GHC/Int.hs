@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, 
              StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -19,8 +20,8 @@
 
 -- #hide
 module GHC.Int (
-    Int8(..), Int16(..), Int32(..), Int64(..),
-    uncheckedIShiftL64#, uncheckedIShiftRA64#
+        Int8(..), Int16(..), Int32(..), Int64(..),
+        uncheckedIShiftL64#, uncheckedIShiftRA64#
     ) where
 
 import Data.Bits

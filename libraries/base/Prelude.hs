@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns #-}
 
 -----------------------------------------------------------------------------
@@ -156,8 +157,6 @@ import Data.Tuple
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
--- import GHC.IO
--- import GHC.IO.Exception
 import Text.Read
 import GHC.Enum
 import GHC.Num

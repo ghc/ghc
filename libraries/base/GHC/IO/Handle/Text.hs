@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , RecordWildCards
@@ -27,11 +28,11 @@
 
 -- #hide
 module GHC.IO.Handle.Text ( 
-   hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
-   commitBuffer',       -- hack, see below
-   hGetBuf, hGetBufSome, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking,
-   memcpy, hPutStrLn,
- ) where
+        hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
+        commitBuffer',       -- hack, see below
+        hGetBuf, hGetBufSome, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking,
+        memcpy, hPutStrLn,
+    ) where
 
 import GHC.IO
 import GHC.IO.FD

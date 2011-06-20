@@ -7,7 +7,7 @@
 -- Module      :  GHC.MVar
 -- Copyright   :  (c) The University of Glasgow 2008
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -27,11 +27,10 @@ module GHC.MVar (
         , tryPutMVar    -- :: MVar a -> a -> IO Bool
         , isEmptyMVar   -- :: MVar a -> IO Bool
         , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
-
-  ) where
+    ) where
 
 import GHC.Base
-import GHC.IO()   -- instance Monad IO
+import GHC.IO ()   -- instance Monad IO
 import Data.Maybe
 
 data MVar a = MVar (MVar# RealWorld a)
@@ -71,9 +70,9 @@ newMVar value =
     return mvar
 
 -- |Return the contents of the 'MVar'.  If the 'MVar' is currently
--- empty, 'takeMVar' will wait until it is full.  After a 'takeMVar', 
+-- empty, 'takeMVar' will wait until it is full.  After a 'takeMVar',
 -- the 'MVar' is left empty.
--- 
+--
 -- There are two further important properties of 'takeMVar':
 --
 --   * 'takeMVar' is single-wakeup.  That is, if there are multiple
@@ -133,13 +132,13 @@ tryPutMVar (MVar mvar#) x = IO $ \ s# ->
 -- the MVar may have been filled (or emptied) - so be extremely
 -- careful when using this operation.   Use 'tryTakeMVar' instead if possible.
 isEmptyMVar :: MVar a -> IO Bool
-isEmptyMVar (MVar mv#) = IO $ \ s# -> 
+isEmptyMVar (MVar mv#) = IO $ \ s# ->
     case isEmptyMVar# mv# s# of
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 
 -- |Add a finalizer to an 'MVar' (GHC only).  See "Foreign.ForeignPtr" and
 -- "System.Mem.Weak" for more about finalizers.
 addMVarFinalizer :: MVar a -> IO () -> IO ()
-addMVarFinalizer (MVar m) finalizer = 
+addMVarFinalizer (MVar m) finalizer =
   IO $ \s -> case mkWeak# m () finalizer s of { (# s1, _ #) -> (# s1, () #) }
 
