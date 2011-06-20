@@ -103,3 +103,10 @@ timeout/install-inplace/
 timeout/dist/
 
 /tests/ghc-regress/dph/dotp/dph-dotp-fast
+/tests/ghc-regress/dph/diophantine/dph-diophantine-fast
+/tests/ghc-regress/dph/diophantine/dph-diophantine-opt
+/tests/ghc-regress/dph/primespj/dph-primespj-fast
+/tests/ghc-regress/dph/quickhull/dph-quickhull-fast
+/tests/ghc-regress/dph/smvm/dph-smvm
+/tests/ghc-regress/dph/sumnats/dph-sumnats
+/tests/ghc-regress/dph/words/dph-words-fast
