@@ -90,7 +90,7 @@ stdHandleFinalizer fp m = do
 -- translation that the CRT IO library does.
 setBinaryMode :: FD.FD -> IO ()
 #ifdef mingw32_HOST_OS
-setBinaryMode fd = do _ <- setmode (fdFD fd) True
+setBinaryMode fd = do _ <- setmode (FD.fdFD fd) True
                       return ()
 #else
 setBinaryMode _ = return ()

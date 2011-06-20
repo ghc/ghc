@@ -20,7 +20,7 @@
 
 module GHC.Windows (
         HANDLE, DWORD, LPTSTR, iNFINITE,
-        throwGetLastError, maperrno
+        throwGetLastError, c_maperrno
     ) where
 
 import GHC.Base
