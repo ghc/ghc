@@ -599,6 +599,26 @@
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-trust</option> <replaceable>P</replaceable></entry>
+        <entry>Expose package <replaceable>P</replaceable> and set it to be
+          trusted</entry>
+	      <entry>static/<literal>:set</literal></entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-distrust</option> <replaceable>P</replaceable></entry>
+        <entry>Expose package <replaceable>P</replaceable> and set it to be
+          distrusted</entry>
+	      <entry>static/<literal>:set</literal></entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-distrust-all</option> </entry>
+        <entry>Distrust all packages by default</entry>
+	      <entry>static/<literal>:set</literal></entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
@@ -1032,6 +1052,30 @@
 	      <entry>Enable <link linkend="package-imports">package-qualified imports</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoPackageImports</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XSafe</option></entry>
+        <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Safe mode.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XTrustworthy</option></entry>
+        <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Trustworthy mode.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XSafeLanguage</option></entry>
+        <entry>Enable the <link linkend="safe-haskell">Safe Haskell</link> Safe Language.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XSafeImports</option></entry>
+        <entry>Enable <link linkend="safe-imports-ext">Safe Imports</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>

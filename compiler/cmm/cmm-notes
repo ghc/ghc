@@ -1,9 +1,5 @@
 More notes (June 11)
 ~~~~~~~~~~~~~~~~~~~~
-* Kill dead code assignArguments, argumentsSize in CmmCallConv.
-  Bake in ByteOff to ParamLocation and ArgumentFormat
-  CmmActuals -> [CmmActual]  similary CmmFormals
-
 * Possible refactoring: Nuke AGraph in favour of 
       mkIfThenElse :: Expr -> Graph -> Graph -> FCode Graph
   or even
@@ -12,15 +8,9 @@ More notes (June 11)
 
   or parameterise FCode over its envt; the CgState part seem useful for both
 
-* Move top and tail calls to runCmmContFlowOpts from HscMain to CmmCps.cpsTop
-  (and rename the latter!)
-
 * "Remove redundant reloads" in CmmSpillReload should be redundant; since
   insertLateReloads is now gone, every reload is reloading a live variable.
   Test and nuke.
-
-* Sink and inline S(RegSlot(x)) = e in precisely the same way that we
-  sink and inline x = e
 
 * Stack layout is very like register assignment: find non-conflicting assigments.
   In particular we can use colouring or linear scan (etc).
@@ -109,6 +99,8 @@ Things to do:
  - Sort out Label, LabelMap, LabelSet versus BlockId, BlockEnv, BlockSet
    dichotomy. Mostly this means global replace, but we also need to make
    Label an instance of Outputable (probably in the Outputable module).
+
+   EZY: We should use Label, since that's the terminology Hoopl uses.
 
  - NB that CmmProcPoint line 283 has a hack that works around a GADT-related
    bug in 6.10.
@@ -255,7 +247,7 @@ CmmCvt.hs      Conversion between old and new Cmm reps
 CmmOpt.hs      Hopefully-redundant optimiser
 
 -------- Stuff to keep ------------
-CmmCPS.hs                 Driver for new pipeline
+CmmPipeline.hs            Driver for new pipeline
 
 CmmLive.hs                Liveness analysis, dead code elim
 CmmProcPoint.hs           Identifying and splitting out proc-points
@@ -302,24 +294,24 @@ BlockId.hs          BlockId, BlockEnv, BlockSet
       type RawCmm = GenCmm CmmStatic [CmmStatic] (ListGraph CmmStmt)
 
 * HscMain.tryNewCodeGen
-    - STG->Cmm:    StgCmm.codeGen (new codegen)
-    - Optimise:    CmmContFlowOpt (simple optimisations, very self contained)
-    - Cps convert: CmmCPS.protoCmmCPS 
-    - Optimise:    CmmContFlowOpt again
-    - Convert:     CmmCvt.cmmOfZgraph (convert to old rep) very self contained
+    - STG->Cmm:         StgCmm.codeGen (new codegen)
+    - Optimize and CPS: CmmPipeline.cmmPipeline
+    - Convert:          CmmCvt.cmmOfZgraph (convert to old rep) very self contained
 
 * StgCmm.hs  The new STG -> Cmm conversion code generator
   Lots of modules StgCmmXXX
 
 
 ----------------------------------------------------
-      CmmCPS.protoCmmCPS   The new pipeline
+      CmmPipeline.cmmPipeline   The new pipeline
 ----------------------------------------------------
 
-CmmCPS.protoCmmCPS:
-   1. Do cpsTop for each procedures separately
-   2. Build SRT representation; this spans multiple procedures
-	(unless split-objs)
+CmmPipeline.cmmPipeline:
+   1. Do control flow optimization
+   2. Do cpsTop for each procedures separately
+   3. Build SRT representation; this spans multiple procedures
+        (unless split-objs)
+   4. Do control flow optimization on all resulting procedures
 
 cpsTop:
   * CmmCommonBlockElim.elimCommonBlocks:
@@ -457,7 +449,7 @@ a dominator analysis, using the Dataflow Engine.
   f's keep-alive refs to include h1.
 
 * The SRT info is the C_SRT field of Cmm.ClosureTypeInfo in a
-  CmmInfoTable attached to each CmmProc.  CmmCPS.toTops actually does
+  CmmInfoTable attached to each CmmProc.  CmmPipeline.toTops actually does
   the attaching, right at the end of the pipeline.  The C_SRT part
   gives offsets within a single, shared table of closure pointers.
 

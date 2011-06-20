@@ -251,7 +251,13 @@ rnLocalValBindsLHS :: MiniFixityEnv
                    -> HsValBinds RdrName
                    -> RnM ([Name], HsValBindsLR Name RdrName)
 rnLocalValBindsLHS fix_env binds 
-  = do { -- Do error checking: we need to check for dups here because we
+  = do { binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds 
+
+         -- Check for duplicates and shadowing
+	 -- Must do this *after* renaming the patterns
+	 -- See Note [Collect binders only after renaming] in HsUtils
+
+         -- We need to check for dups here because we
      	 -- don't don't bind all of the variables from the ValBinds at once
      	 -- with bindLocatedLocals any more.
          -- 
@@ -265,10 +271,10 @@ rnLocalValBindsLHS fix_env binds
      	 --   import A(f)
      	 --   g = let f = ... in f
      	 -- should.
-       ; binds' <- rnValBindsLHS (localRecNameMaker fix_env) binds 
        ; let bound_names = collectHsValBinders binds'
        ; envs <- getRdrEnvs
        ; checkDupAndShadowedNames envs bound_names
+
        ; return (bound_names, binds') }
 
 -- renames the left-hand sides
@@ -560,8 +566,9 @@ mkSigTvFn sigs
   where
     env :: NameEnv [Name]
     env = mkNameEnv [ (name, map hsLTyVarName ltvs)
-		    | L _ (TypeSig (L _ name) 
-			           (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs]
+		    | L _ (TypeSig names
+			           (L _ (HsForAllTy Explicit ltvs _ _))) <- sigs
+                    , (L _ name) <- names]
 	-- Note the pattern-match on "Explicit"; we only bind
 	-- type variables from signatures with an explicit top-level for-all
 \end{code}
@@ -693,16 +700,16 @@ renameSig :: Maybe NameSet -> Sig RdrName -> RnM (Sig Name)
 -- FixitySig is renamed elsewhere.
 renameSig _ (IdSig x)
   = return (IdSig x)	  -- Actually this never occurs
-renameSig mb_names sig@(TypeSig v ty)
-  = do	{ new_v <- lookupSigOccRn mb_names sig v
-	; new_ty <- rnHsSigType (quotes (ppr v)) ty
-	; return (TypeSig new_v new_ty) }
+renameSig mb_names sig@(TypeSig vs ty)
+  = do	{ new_vs <- mapM (lookupSigOccRn mb_names sig) vs
+	; new_ty <- rnHsSigType (quotes (ppr vs)) ty
+	; return (TypeSig new_vs new_ty) }
 
-renameSig mb_names sig@(GenericSig v ty)
+renameSig mb_names sig@(GenericSig vs ty)
   = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
         ; unless defaultSigs_on (addErr (defaultSigErr sig))
-        ; new_v <- lookupSigOccRn mb_names sig v
-	; new_ty <- rnHsSigType (quotes (ppr v)) ty
+        ; new_v <- mapM (lookupSigOccRn mb_names sig) vs
+	; new_ty <- rnHsSigType (quotes (ppr vs)) ty
 	; return (GenericSig new_v new_ty) }
 
 renameSig _ (SpecInstSig ty)

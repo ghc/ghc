@@ -13,8 +13,8 @@ module Inst (
 
        newOverloadedLit, mkOverLit, 
      
-       tcGetInstEnvs, getOverlapFlag, tcExtendLocalInstEnv,
-       instCallConstraints, newMethodFromName,
+       tcGetInstEnvs, getOverlapFlag,
+       tcExtendLocalInstEnv, instCallConstraints, newMethodFromName,
        tcSyntaxName,
 
        -- Simple functions over evidence variables
@@ -368,14 +368,15 @@ syntaxNameCtxt name orig ty tidy_env = do
 \begin{code}
 getOverlapFlag :: TcM OverlapFlag
 getOverlapFlag 
-  = do 	{ dflags <- getDOpts
-	; let overlap_ok    = xopt Opt_OverlappingInstances dflags
-	      incoherent_ok = xopt Opt_IncoherentInstances  dflags
-	      overlap_flag | incoherent_ok = Incoherent
-			   | overlap_ok    = OverlapOk
-			   | otherwise     = NoOverlap
-			   
-	; return overlap_flag }
+  = do  { dflags <- getDOpts
+        ; let overlap_ok    = xopt Opt_OverlappingInstances dflags
+              incoherent_ok = xopt Opt_IncoherentInstances  dflags
+              safeOverlap   = safeLanguageOn dflags
+              overlap_flag | incoherent_ok = Incoherent safeOverlap
+                           | overlap_ok    = OverlapOk safeOverlap
+                           | otherwise     = NoOverlap safeOverlap
+
+        ; return overlap_flag }
 
 tcGetInstEnvs :: TcM (InstEnv, InstEnv)
 -- Gets both the external-package inst-env
@@ -429,7 +430,7 @@ addLocalInst home_ie ispec
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
-	; let { (matches, _) = lookupInstEnv inst_envs cls tys'
+	; let { (matches, _, _) = lookupInstEnv inst_envs cls tys'
 	      ;	dup_ispecs = [ dup_ispec 
 			     | (dup_ispec, _) <- matches
 			     , let (_,_,_,dup_tys) = instanceHead dup_ispec

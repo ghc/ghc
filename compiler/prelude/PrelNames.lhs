@@ -219,6 +219,9 @@ basicKnownKeyNames
 	-- The Either type
 	, eitherTyConName, leftDataConName, rightDataConName
 
+        -- Plugins
+        , pluginTyConName
+                                            
 	-- dotnet interop
 	, objectTyConName, marshalObjectName, unmarshalObjectName
 	, marshalStringName, unmarshalStringName, checkDotnetResName
@@ -370,6 +373,12 @@ mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
 mkBaseModule_ m = mkModule basePackageId m
+
+mkThisGhcModule :: FastString -> Module
+mkThisGhcModule m = mkModule thisGhcPackageId (mkModuleNameFS m)
+
+mkThisGhcModule_ :: ModuleName -> Module
+mkThisGhcModule_ m = mkModule thisGhcPackageId m
 
 mkMainModule :: FastString -> Module
 mkMainModule m = mkModule mainPackageId (mkModuleNameFS m)
@@ -973,6 +982,12 @@ marshalObjectName   = varQual  dOTNET (fsLit "marshalObject") marshalObjectIdKey
 marshalStringName   = varQual  dOTNET (fsLit "marshalString") marshalStringIdKey
 unmarshalStringName = varQual  dOTNET (fsLit "unmarshalString") unmarshalStringIdKey
 checkDotnetResName  = varQual  dOTNET (fsLit "checkResult")     checkDotnetResNameIdKey
+
+-- plugins
+cORE_MONAD :: Module
+cORE_MONAD = mkThisGhcModule (fsLit "CoreMonad")
+pluginTyConName :: Name
+pluginTyConName = tcQual cORE_MONAD (fsLit "Plugin") pluginTyConKey
 \end{code}
 
 %************************************************************************
@@ -1192,6 +1207,9 @@ unsafeCoercionTyConKey                  = mkPreludeTyConUnique 98
 csel1CoercionTyConKey                   = mkPreludeTyConUnique 99
 csel2CoercionTyConKey                   = mkPreludeTyConUnique 100
 cselRCoercionTyConKey                   = mkPreludeTyConUnique 101
+
+pluginTyConKey :: Unique
+pluginTyConKey                          = mkPreludeTyConUnique 102
 
 unknownTyConKey, unknown1TyConKey, unknown2TyConKey, unknown3TyConKey,
     opaqueTyConKey :: Unique

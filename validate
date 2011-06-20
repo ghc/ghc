@@ -96,10 +96,13 @@ $make test_bindist TEST_PREP=YES
 #
 bindistdir="bindisttest/install dir"
 cd libraries/mtl
-"$thisdir/$bindistdir/bin/runhaskell" Setup.hs configure --with-ghc="$thisdir/$bindistdir/bin/ghc" --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
-"$thisdir/$bindistdir/bin/runhaskell" Setup.hs build  --builddir=dist-bindist
-"$thisdir/$bindistdir/bin/runhaskell" Setup.hs install  --builddir=dist-bindist
-"$thisdir/$bindistdir/bin/runhaskell" Setup.hs clean  --builddir=dist-bindist
+"$thisdir/$bindistdir/bin/ghc" --make Setup
+./Setup configure --with-ghc="$thisdir/$bindistdir/bin/ghc" --with-haddock="$thisdir/$bindistdir/bin/haddock" --global --builddir=dist-bindist --prefix="$thisdir/$bindistdir"
+./Setup build   --builddir=dist-bindist
+./Setup haddock --builddir=dist-bindist
+./Setup install --builddir=dist-bindist
+./Setup clean   --builddir=dist-bindist
+rm -f Setup Setup.exe Setup.hi Setup.o
 cd $thisdir
 
 fi # testsuite-only

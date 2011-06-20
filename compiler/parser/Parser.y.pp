@@ -500,11 +500,15 @@ importdecls :: { [LImportDecl RdrName] }
 	| {- empty -}				{ [] }
 
 importdecl :: { LImportDecl RdrName }
-	: 'import' maybe_src optqualified maybe_pkg modid maybeas maybeimpspec 
-		{ L (comb4 $1 $5 $6 $7) (ImportDecl $5 $4 $2 $3 (unLoc $6) (unLoc $7)) }
+	: 'import' maybe_src maybe_safe optqualified maybe_pkg modid maybeas maybeimpspec 
+		{ L (comb4 $1 $6 $7 $8) (ImportDecl $6 $5 $2 $3 $4 (unLoc $7) (unLoc $8)) }
 
 maybe_src :: { IsBootInterface }
 	: '{-# SOURCE' '#-}'			{ True }
+	| {- empty -}				{ False }
+
+maybe_safe :: { Bool }
+	: 'safe'				{ True }
 	| {- empty -}				{ False }
 
 maybe_pkg :: { Maybe FastString }
@@ -1241,7 +1245,7 @@ sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
                         {% do s <- checkValSig $1 $3 
                         ; return (LL $ unitOL (LL $ SigD s)) }
 	| var ',' sig_vars '::' sigtypedoc
-				{ LL $ toOL [ LL $ SigD (TypeSig n $5) | n <- $1 : unLoc $3 ] }
+				{ LL $ toOL [ LL $ SigD (TypeSig ($1 : unLoc $3) $5) ] }
 	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      

@@ -1,14 +1,13 @@
 
-
 module Vectorise.Builtins.Initialise (
-	-- * Initialisation
-	initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
-	initBuiltinPAs, initBuiltinPRs,
-	initBuiltinBoxedTyCons, initBuiltinScalars,
+  -- * Initialisation
+  initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
+  initBuiltinPAs, initBuiltinPRs,
+  initBuiltinBoxedTyCons
 ) where
+
 import Vectorise.Builtins.Base
 import Vectorise.Builtins.Modules
-import Vectorise.Builtins.Prelude
 
 import BasicTypes
 import PrelNames
@@ -30,20 +29,18 @@ import Outputable
 
 import Control.Monad
 import Data.Array
-import Data.List
 
--- | Create the initial map of builtin types and functions.
-initBuiltins 
-	:: PackageId 	-- ^ package id the builtins are in, eg dph-common
-	-> DsM Builtins
-
+-- |Create the initial map of builtin types and functions.
+--
+initBuiltins :: PackageId  -- ^ package id the builtins are in, eg dph-common
+             -> DsM Builtins
 initBuiltins pkg
  = do mapM_ load dph_Orphans
 
       -- From dph-common:Data.Array.Parallel.PArray.PData
       --     PData is a type family that maps an element type onto the type
       --     we use to hold an array of those elements.
-      pdataTyCon	<- externalTyCon	dph_PArray_PData  (fsLit "PData")
+      pdataTyCon  <- externalTyCon  dph_PArray_PData  (fsLit "PData")
 
       --     PR is a type class that holds the primitive operators we can 
       --     apply to array data. Its functions take arrays in terms of PData types.
@@ -53,7 +50,7 @@ initBuiltins pkg
 
 
       -- From dph-common:Data.Array.Parallel.PArray.PRepr
-      preprTyCon	<- externalTyCon 	dph_PArray_PRepr  (fsLit "PRepr")
+      preprTyCon  <- externalTyCon  dph_PArray_PRepr  (fsLit "PRepr")
       paClass           <- externalClass        dph_PArray_PRepr  (fsLit "PA")
       let paTyCon     = classTyCon paClass
           [paDataCon] = tyConDataCons paTyCon
@@ -62,9 +59,9 @@ initBuiltins pkg
       replicatePDVar    <- externalVar          dph_PArray_PRepr  (fsLit "replicatePD")
       emptyPDVar        <- externalVar          dph_PArray_PRepr  (fsLit "emptyPD")
       packByTagPDVar    <- externalVar          dph_PArray_PRepr  (fsLit "packByTagPD")
-      combines 		<- mapM (externalVar dph_PArray_PRepr)
-                       		[mkFastString ("combine" ++ show i ++ "PD")
-                          		| i <- [2..mAX_DPH_COMBINE]]
+      combines    <- mapM (externalVar dph_PArray_PRepr)
+                          [mkFastString ("combine" ++ show i ++ "PD")
+                              | i <- [2..mAX_DPH_COMBINE]]
 
       let combinePDVars = listArray (2, mAX_DPH_COMBINE) combines
 
@@ -73,45 +70,45 @@ initBuiltins pkg
       --     Scalar is the class of scalar values. 
       --     The dictionary contains functions to coerce U.Arrays of scalars
       --     to and from the PData representation.
-      scalarClass 	<- externalClass        dph_PArray_Scalar (fsLit "Scalar")
+      scalarClass   <- externalClass        dph_PArray_Scalar (fsLit "Scalar")
 
 
       -- From dph-common:Data.Array.Parallel.Lifted.PArray
       --   A PArray (Parallel Array) holds the array length and some array elements
       --   represented by the PData type family.
-      parrayTyCon	<- externalTyCon	dph_PArray_Base	  (fsLit "PArray")
+      parrayTyCon <- externalTyCon  dph_PArray_Base   (fsLit "PArray")
       let [parrayDataCon] = tyConDataCons parrayTyCon
 
       -- From dph-common:Data.Array.Parallel.PArray.Types
-      voidTyCon		<- externalTyCon        dph_PArray_Types  (fsLit "Void")
+      voidTyCon   <- externalTyCon        dph_PArray_Types  (fsLit "Void")
       voidVar           <- externalVar          dph_PArray_Types  (fsLit "void")
       fromVoidVar       <- externalVar          dph_PArray_Types  (fsLit "fromVoid")
-      wrapTyCon		<- externalTyCon        dph_PArray_Types  (fsLit "Wrap")
-      sum_tcs		<- mapM (externalTyCon  dph_PArray_Types) (numbered "Sum" 2 mAX_DPH_SUM)
+      wrapTyCon   <- externalTyCon        dph_PArray_Types  (fsLit "Wrap")
+      sum_tcs   <- mapM (externalTyCon  dph_PArray_Types) (numbered "Sum" 2 mAX_DPH_SUM)
 
       -- from dph-common:Data.Array.Parallel.PArray.PDataInstances
       pvoidVar          <- externalVar dph_PArray_PDataInstances  (fsLit "pvoid")
       punitVar          <- externalVar dph_PArray_PDataInstances  (fsLit "punit")
 
 
-      closureTyCon	<- externalTyCon dph_Closure		 (fsLit ":->")
+      closureTyCon  <- externalTyCon dph_Closure     (fsLit ":->")
 
 
       -- From dph-common:Data.Array.Parallel.Lifted.Unboxed
-      sel_tys		<- mapM (externalType dph_Unboxed)
-                           	(numbered "Sel" 2 mAX_DPH_SUM)
+      sel_tys   <- mapM (externalType dph_Unboxed)
+                            (numbered "Sel" 2 mAX_DPH_SUM)
 
-      sel_replicates	<- mapM (externalFun dph_Unboxed)
-				(numbered_hash "replicateSel" 2 mAX_DPH_SUM)
+      sel_replicates  <- mapM (externalFun dph_Unboxed)
+        (numbered_hash "replicateSel" 2 mAX_DPH_SUM)
 
-      sel_picks 	<- mapM (externalFun dph_Unboxed)
-				(numbered_hash "pickSel" 2 mAX_DPH_SUM)
+      sel_picks   <- mapM (externalFun dph_Unboxed)
+        (numbered_hash "pickSel" 2 mAX_DPH_SUM)
 
-      sel_tags		<- mapM (externalFun dph_Unboxed)
-				(numbered "tagsSel" 2 mAX_DPH_SUM)
+      sel_tags    <- mapM (externalFun dph_Unboxed)
+        (numbered "tagsSel" 2 mAX_DPH_SUM)
 
-      sel_els		<- mapM mk_elements
-				[(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
+      sel_els   <- mapM mk_elements
+        [(i,j) | i <- [2..mAX_DPH_SUM], j <- [0..i-1]]
 
 
       let selTys        = listArray (2, mAX_DPH_SUM) sel_tys
@@ -123,26 +120,26 @@ initBuiltins pkg
 
 
 
-      closureVar       <- externalVar dph_Closure	(fsLit "closure")
-      applyVar         <- externalVar dph_Closure	(fsLit "$:")
-      liftedClosureVar <- externalVar dph_Closure	(fsLit "liftedClosure")
-      liftedApplyVar   <- externalVar dph_Closure	(fsLit "liftedApply")
+      closureVar       <- externalVar dph_Closure (fsLit "closure")
+      applyVar         <- externalVar dph_Closure (fsLit "$:")
+      liftedClosureVar <- externalVar dph_Closure (fsLit "liftedClosure")
+      liftedApplyVar   <- externalVar dph_Closure (fsLit "liftedApply")
 
-      scalar_map	<- externalVar	dph_Scalar	(fsLit "scalar_map")
-      scalar_zip2   <- externalVar	dph_Scalar	(fsLit "scalar_zipWith")
-      scalar_zips	<- mapM (externalVar dph_Scalar)
-                          	(numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
+      scalar_map  <- externalVar  dph_Scalar  (fsLit "scalar_map")
+      scalar_zip2   <- externalVar  dph_Scalar  (fsLit "scalar_zipWith")
+      scalar_zips <- mapM (externalVar dph_Scalar)
+                            (numbered "scalar_zipWith" 3 mAX_DPH_SCALAR_ARGS)
 
-      let scalarZips 	= listArray (1, mAX_DPH_SCALAR_ARGS)
+      let scalarZips  = listArray (1, mAX_DPH_SCALAR_ARGS)
                                  (scalar_map : scalar_zip2 : scalar_zips)
 
-      closures 		<- mapM (externalVar dph_Closure)
-                       		(numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
+      closures    <- mapM (externalVar dph_Closure)
+                          (numbered "closure" 1 mAX_DPH_SCALAR_ARGS)
 
       let closureCtrFuns = listArray (1, mAX_DPH_COMBINE) closures
 
-      liftingContext	<- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy)
-				newUnique
+      liftingContext  <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy)
+        newUnique
 
       return   $ Builtins 
                { dphModules       = mods
@@ -221,32 +218,26 @@ initBuiltins pkg
 
 -- | Get the mapping of names in the Prelude to names in the DPH library.
 --
-initBuiltinVars :: Bool   -- FIXME
-                -> Builtins -> DsM [(Var, Var)]
-initBuiltinVars compilingDPH (Builtins { dphModules = mods })
+initBuiltinVars :: Builtins -> DsM [(Var, Var)]
+initBuiltinVars (Builtins { dphModules = mods })
   = do
-      uvars <- zipWithM externalVar umods ufs
-      vvars <- zipWithM externalVar vmods vfs
       cvars <- zipWithM externalVar cmods cfs
       return $ [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
                ++ zip (map dataConWorkId cons) cvars
-               ++ zip uvars vvars
   where
-    (umods, ufs, vmods, vfs) = if compilingDPH then ([], [], [], []) else unzip4 (preludeVars mods)
-    (cons, cmods, cfs)       = unzip3 (preludeDataCons mods)
+    (cons, cmods, cfs) = unzip3 (preludeDataCons mods)
 
     defaultDataConWorkers :: [DataCon]
     defaultDataConWorkers = [trueDataCon, falseDataCon, unitDataCon]
 
+    preludeDataCons :: Modules -> [(DataCon, Module, FastString)]
+    preludeDataCons (Modules { dph_Prelude_Tuple = dph_Prelude_Tuple })
+      = [mk_tup n dph_Prelude_Tuple (mkFastString $ "tup" ++ show n) | n <- [2..3]]
+      where
+        mk_tup n mod name = (tupleCon Boxed n, mod, name)
 
-preludeDataCons :: Modules -> [(DataCon, Module, FastString)]
-preludeDataCons (Modules { dph_Prelude_Tuple = dph_Prelude_Tuple })
-  = [mk_tup n dph_Prelude_Tuple (mkFastString $ "tup" ++ show n) | n <- [2..3]]
-  where
-    mk_tup n mod name = (tupleCon Boxed n, mod, name)
-
-
--- | Get a list of names to `TyCon`s in the mock prelude.
+-- |Get a list of names to `TyCon`s in the mock prelude.
+--
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
@@ -260,83 +251,82 @@ initBuiltinTyCons bi
 
              : [(tyConName tc, tc) | tc <- dft_tcs]
 
-  where	defaultTyCons :: DsM [TyCon]
-	defaultTyCons
-  	 = do	word8 <- dsLookupTyCon word8TyConName
-		return [intTyCon, boolTyCon, doubleTyCon, word8]
+  where 
+    defaultTyCons :: DsM [TyCon]
+    defaultTyCons
+       = do word8 <- dsLookupTyCon word8TyConName
+            return [intTyCon, boolTyCon, floatTyCon, doubleTyCon, word8]
 
-
--- | Get a list of names to `DataCon`s in the mock prelude.
+-- |Get a list of names to `DataCon`s in the mock prelude.
+--
 initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
 initBuiltinDataCons _
   = [(dataConName dc, dc)| dc <- defaultDataCons]
-  where	defaultDataCons :: [DataCon]
-	defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
+  where 
+    defaultDataCons :: [DataCon]
+    defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
 
-
--- | Get the names of all buildin instance functions for the PA class.
+-- |Get the names of all buildin instance functions for the PA class.
+--
 initBuiltinPAs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
 initBuiltinPAs (Builtins { dphModules = mods }) insts
   = liftM (initBuiltinDicts insts) (externalClass (dph_PArray_PRepr mods) (fsLit "PA"))
 
-
--- | Get the names of all builtin instance functions for the PR class.
+-- |Get the names of all builtin instance functions for the PR class.
+--
 initBuiltinPRs :: Builtins -> (InstEnv, InstEnv) -> DsM [(Name, Var)]
 initBuiltinPRs (Builtins { dphModules = mods }) insts
   = liftM (initBuiltinDicts insts) (externalClass (dph_PArray_PData mods) (fsLit "PR"))
 
-
--- | Get the names of all DPH instance functions for this class.
+-- |Get the names of all DPH instance functions for this class.
+--
 initBuiltinDicts :: (InstEnv, InstEnv) -> Class -> [(Name, Var)]
 initBuiltinDicts insts cls = map find $ classInstances insts cls
   where
-    find i | [Just tc] <- instanceRoughTcs i 	= (tc, instanceDFunId i)
-           | otherwise				= pprPanic "Invalid DPH instance" (ppr i)
+    find i | [Just tc] <- instanceRoughTcs i  = (tc, instanceDFunId i)
+           | otherwise        = pprPanic "Invalid DPH instance" (ppr i)
 
-
--- | Get a list of boxed `TyCons` in the mock prelude. This is Int only.
+-- |Get a list of boxed `TyCons` in the mock prelude. This is Int only.
+--
 initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinBoxedTyCons 
   = return . builtinBoxedTyCons
-  where	builtinBoxedTyCons :: Builtins -> [(Name, TyCon)]
-	builtinBoxedTyCons _ 
-  		= [(tyConName intPrimTyCon, intTyCon)]
+  where 
+    builtinBoxedTyCons :: Builtins -> [(Name, TyCon)]
+    builtinBoxedTyCons _ 
+      = [(tyConName intPrimTyCon, intTyCon)]
 
--- | Get a list of all scalar functions in the mock prelude.
+
+-- Auxilliary look up functions ----------------
+
+-- Lookup some variable given its name and the module that contains it.
 --
-initBuiltinScalars :: Bool 
-                   -> Builtins -> DsM [Var]
-initBuiltinScalars True  _bi = return []
-initBuiltinScalars False bi  = mapM (uncurry externalVar) (preludeScalars $ dphModules bi)
-
--- | Lookup some variable given its name and the module that contains it.
 externalVar :: Module -> FastString -> DsM Var
 externalVar mod fs
   = dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
 
-
--- | Like `externalVar` but wrap the `Var` in a `CoreExpr`
+-- Like `externalVar` but wrap the `Var` in a `CoreExpr`.
+--
 externalFun :: Module -> FastString -> DsM CoreExpr
 externalFun mod fs
  = do var <- externalVar mod fs
       return $ Var var
 
-
--- | Lookup some `TyCon` given its name and the module that contains it.
+-- Lookup some `TyCon` given its name and the module that contains it.
+--
 externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs
   = dsLookupTyCon =<< lookupOrig mod (mkTcOccFS fs)
 
-
--- | Lookup some `Type` given its name and the module that contains it.
+-- Lookup some `Type` given its name and the module that contains it.
+--
 externalType :: Module -> FastString -> DsM Type
 externalType mod fs
  = do  tycon <- externalTyCon mod fs
        return $ mkTyConApp tycon []
 
-
--- | Lookup some `Class` given its name and the module that contains it.
+-- Lookup some `Class` given its name and the module that contains it.
+--
 externalClass :: Module -> FastString -> DsM Class
 externalClass mod fs
   = dsLookupClass =<< lookupOrig mod (mkClsOccFS fs)
-

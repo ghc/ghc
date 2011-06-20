@@ -606,7 +606,7 @@ hsTyClDeclBinders (L _ (ForeignType {tcdLName = name})) = [name]
 
 hsTyClDeclBinders (L _ (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats}))
   = cls_name : 
-    concatMap hsTyClDeclBinders ats ++ [n | L _ (TypeSig n _) <- sigs]
+    concatMap hsTyClDeclBinders ats ++ [n | L _ (TypeSig ns _) <- sigs, n <- ns]
 
 hsTyClDeclBinders (L _ (TyData {tcdLName = tc_name, tcdCons = cons}))
   = tc_name : hsConDeclsBinders cons

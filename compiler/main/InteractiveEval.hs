@@ -75,13 +75,16 @@ import System.Directory
 import Data.Dynamic
 import Data.List (find)
 import Control.Monad
+#if __GLASGOW_HASKELL__ >= 701
+import Foreign.Safe
+#else
 import Foreign hiding (unsafePerformIO)
+#endif
 import Foreign.C
 import GHC.Exts
 import Data.Array
 import Exception
 import Control.Concurrent
--- import Foreign.StablePtr
 import System.IO
 import System.IO.Unsafe
 

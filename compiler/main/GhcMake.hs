@@ -1408,7 +1408,7 @@ preprocessFile hsc_env src_fn mb_phase (Just (buf, _time))
 	let local_opts = getOptions dflags buf src_fn
 
 	(dflags', leftovers, warns)
-            <- parseDynamicNoPackageFlags dflags local_opts
+            <- parseDynamicFilePragma dflags local_opts
         checkProcessArgsResult leftovers
         handleFlagWarnings dflags' warns
 
@@ -1456,20 +1456,53 @@ multiRootsErr summs@(summ1:_)
     files = map (expectJust "checkDup" . ml_hs_file . ms_location) summs
 
 cyclicModuleErr :: [ModSummary] -> SDoc
+-- From a strongly connected component we find 
+-- a single cycle to report
 cyclicModuleErr ms
-  = hang (ptext (sLit "Module imports form a cycle for modules:"))
-       2 (vcat (map show_one ms))
+  = ASSERT( not (null ms) )
+    hang (ptext (sLit "Module imports form a cycle:"))
+       2 (show_path (shortest [] root_mod))
   where
-    mods_in_cycle = map ms_mod_name ms
-    imp_modname = unLoc . ideclName . unLoc
-    just_in_cycle = filter ((`elem` mods_in_cycle) . imp_modname)
+    deps :: [(ModuleName, [ModuleName])]
+    deps = [ (moduleName (ms_mod m), get_deps m) | m <- ms ]
 
-    show_one ms = 
-           vcat [ show_mod (ms_hsc_src ms) (ms_mod_name ms) <+>
-                  maybe empty (parens . text) (ml_hs_file (ms_location ms)),
-                  nest 2 $ ptext (sLit "imports:") <+> vcat [
-                     pp_imps HsBootFile (just_in_cycle $ ms_srcimps ms),
-                     pp_imps HsSrcFile  (just_in_cycle $ ms_imps ms) ]
-                ]
-    show_mod hsc_src mod = ppr mod <> text (hscSourceString hsc_src)
-    pp_imps src imps = fsep (map (show_mod src . unLoc . ideclName . unLoc) imps)
+    get_deps :: ModSummary -> [ModuleName]
+    get_deps m = filter (\k -> Map.member k dep_env) (map unLoc (ms_home_imps m))
+
+    dep_env :: Map.Map ModuleName [ModuleName]
+    dep_env = Map.fromList deps
+
+    -- Find the module with fewest imports among the SCC modules
+    -- This is just a heuristic to find some plausible root module
+    root_mod  :: ModuleName
+    root_mod = fst (minWith (length . snd) deps)
+
+    shortest :: [ModuleName] -> ModuleName -> [ModuleName] 
+    -- (shortest [v1,v2,..,vn] m) assumes that 
+    --   m     is imported by v1
+    --   which is imported by v2
+    --   ...
+    --   which is imported by vn
+    -- It retuns an import chain [w1, w2, ..wm]
+    -- where  w1 imports w2 imports .... imports wm imports w1
+    shortest visited m 
+      | m `elem` visited
+      = m : reverse (takeWhile (/= m) visited)
+      | otherwise
+      = minWith length (map (shortest (m:visited)) deps)
+      where
+        Just deps = Map.lookup m dep_env
+
+    show_path []         = panic "show_path"
+    show_path [m]        = ptext (sLit "module") <+> quotes (ppr m) 
+                           <+> ptext (sLit "imports itself")
+    show_path (m1:m2:ms) = ptext (sLit "module") <+> quotes (ppr m1)
+                           <+> sep ( nest 6 (ptext (sLit "imports") <+> quotes (ppr m2))
+                                   : go ms)
+       where
+         go []     =  [ptext (sLit "which imports") <+> quotes (ppr m1)]
+         go (m:ms) = (ptext (sLit "which imports") <+> quotes (ppr m)) : go ms
+       
+minWith :: Ord b => (a -> b) -> [a] -> a
+minWith get_key xs = ASSERT( not (null xs) )
+                     head (sortWith get_key xs)

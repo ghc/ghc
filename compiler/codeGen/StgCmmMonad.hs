@@ -600,7 +600,7 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProcWithConvention :: Convention -> CmmInfoTable -> CLabel -> CmmFormals ->
+emitProcWithConvention :: Convention -> CmmInfoTable -> CLabel -> [CmmFormal] ->
                           CmmAGraph -> FCode ()
 emitProcWithConvention conv info lbl args blocks
   = do  { us <- newUniqSupply
@@ -611,7 +611,7 @@ emitProcWithConvention conv info lbl args blocks
         ; state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
-emitProc :: CmmInfoTable -> CLabel -> CmmFormals -> CmmAGraph -> FCode ()
+emitProc :: CmmInfoTable -> CLabel -> [CmmFormal] -> CmmAGraph -> FCode ()
 emitProc = emitProcWithConvention NativeNodeCall
 
 emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()

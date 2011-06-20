@@ -43,7 +43,7 @@ import Control.Monad
 -- Code generation for Foreign Calls
 
 cgForeignCall
-	:: HintedCmmFormals	-- where to put the results
+	:: [HintedCmmFormal]	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [StgArg]		-- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -64,7 +64,7 @@ cgForeignCall results fcall stg_args live
 
 
 emitForeignCall
-	:: HintedCmmFormals	-- where to put the results
+	:: [HintedCmmFormal]	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [CmmHinted CmmExpr] -- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -109,9 +109,12 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 
 
 -- alternative entry point, used by CmmParse
+-- the new code generator has utility function emitCCall and emitPrimCall
+-- which should be used instead of this (the equivalent emitForeignCall
+-- is not presently exported.)
 emitForeignCall'
 	:: Safety
-	-> HintedCmmFormals	-- where to put the results
+	-> [HintedCmmFormal]	-- where to put the results
 	-> CmmCallTarget	-- the op
 	-> [CmmHinted CmmExpr] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them

@@ -50,7 +50,7 @@ parseStaticFlags args = do
   ready <- readIORef v_opt_C_ready
   when ready $ ghcError (ProgramError "Too late for parseStaticFlags: call it before newSession")
 
-  (leftover, errs, warns1) <- processArgs static_flags args
+  (leftover, errs, warns1) <- processArgs static_flags args CmdLineOnly True
   when (not (null errs)) $ ghcError $ errorsToGhcException errs
 
     -- deal with the way flags: the way (eg. prof) gives rise to
@@ -62,7 +62,8 @@ parseStaticFlags args = do
   let unreg_flags | cGhcUnregisterised == "YES" = unregFlags
 		  | otherwise = []
 
-  (more_leftover, errs, warns2) <- processArgs static_flags (unreg_flags ++ way_flags')
+  (more_leftover, errs, warns2) <-
+      processArgs static_flags (unreg_flags ++ way_flags') CmdLineOnly True
 
     -- see sanity code in staticOpts
   writeIORef v_opt_C_ready True
@@ -103,65 +104,65 @@ static_flags :: [Flag IO]
 
 static_flags = [
         ------- GHCi -------------------------------------------------------
-    Flag "ignore-dot-ghci" (PassFlag addOpt) 
-  , Flag "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
+    flagC "ignore-dot-ghci" (PassFlag addOpt) 
+  , flagC "read-dot-ghci"   (NoArg (removeOpt "-ignore-dot-ghci"))
 
         ------- ways --------------------------------------------------------
-  , Flag "prof"           (NoArg (addWay WayProf)) 
-  , Flag "eventlog"       (NoArg (addWay WayEventLog))
-  , Flag "parallel"       (NoArg (addWay WayPar))
-  , Flag "gransim"        (NoArg (addWay WayGran))
-  , Flag "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
-  , Flag "debug"          (NoArg (addWay WayDebug))
-  , Flag "ndp"            (NoArg (addWay WayNDP))
-  , Flag "threaded"       (NoArg (addWay WayThreaded))
+  , flagC "prof"           (NoArg (addWay WayProf)) 
+  , flagC "eventlog"       (NoArg (addWay WayEventLog))
+  , flagC "parallel"       (NoArg (addWay WayPar))
+  , flagC "gransim"        (NoArg (addWay WayGran))
+  , flagC "smp"            (NoArg (addWay WayThreaded >> deprecate "Use -threaded instead"))
+  , flagC "debug"          (NoArg (addWay WayDebug))
+  , flagC "ndp"            (NoArg (addWay WayNDP))
+  , flagC "threaded"       (NoArg (addWay WayThreaded))
 
-  , Flag "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug))
+  , flagC "ticky"          (PassFlag (\f -> do addOpt f; addWay WayDebug))
     -- -ticky enables ticky-ticky code generation, and also implies -debug which
     -- is required to get the RTS ticky support.
 
         ------ Debugging ----------------------------------------------------
-  , Flag "dppr-debug"                  (PassFlag addOpt)
-  , Flag "dppr-cols"                   (AnySuffix addOpt)
-  , Flag "dppr-user-length"            (AnySuffix addOpt)
-  , Flag "dppr-case-as-let"            (PassFlag addOpt)
-  , Flag "dsuppress-all"               (PassFlag addOpt)
-  , Flag "dsuppress-uniques"           (PassFlag addOpt)
-  , Flag "dsuppress-coercions"         (PassFlag addOpt)
-  , Flag "dsuppress-module-prefixes"   (PassFlag addOpt)
-  , Flag "dsuppress-type-applications" (PassFlag addOpt)
-  , Flag "dsuppress-idinfo"            (PassFlag addOpt)
-  , Flag "dsuppress-type-signatures"   (PassFlag addOpt)
-  , Flag "dopt-fuel"                   (AnySuffix addOpt)
-  , Flag "dtrace-level"                (AnySuffix addOpt)
-  , Flag "dno-debug-output"            (PassFlag addOpt)
-  , Flag "dstub-dead-values"           (PassFlag addOpt)
+  , flagC "dppr-debug"                  (PassFlag addOpt)
+  , flagC "dppr-cols"                   (AnySuffix addOpt)
+  , flagC "dppr-user-length"            (AnySuffix addOpt)
+  , flagC "dppr-case-as-let"            (PassFlag addOpt)
+  , flagC "dsuppress-all"               (PassFlag addOpt)
+  , flagC "dsuppress-uniques"           (PassFlag addOpt)
+  , flagC "dsuppress-coercions"         (PassFlag addOpt)
+  , flagC "dsuppress-module-prefixes"   (PassFlag addOpt)
+  , flagC "dsuppress-type-applications" (PassFlag addOpt)
+  , flagC "dsuppress-idinfo"            (PassFlag addOpt)
+  , flagC "dsuppress-type-signatures"   (PassFlag addOpt)
+  , flagC "dopt-fuel"                   (AnySuffix addOpt)
+  , flagC "dtrace-level"                (AnySuffix addOpt)
+  , flagC "dno-debug-output"            (PassFlag addOpt)
+  , flagC "dstub-dead-values"           (PassFlag addOpt)
       -- rest of the debugging flags are dynamic
 
         ----- Linker --------------------------------------------------------
-  , Flag "static"         (PassFlag addOpt)
-  , Flag "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn))
+  , flagC "static"         (PassFlag addOpt)
+  , flagC "dynamic"        (NoArg (removeOpt "-static" >> addWay WayDyn))
     -- ignored for compat w/ gcc:
-  , Flag "rdynamic"       (NoArg (return ()))
+  , flagC "rdynamic"       (NoArg (return ()))
 
         ----- RTS opts ------------------------------------------------------
-  , Flag "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
+  , flagC "H"              (HasArg (\s -> liftEwM (setHeapSize (fromIntegral (decodeSize s)))))
         
-  , Flag "Rghc-timing"    (NoArg (liftEwM enableTimingStats))
+  , flagC "Rghc-timing"    (NoArg (liftEwM enableTimingStats))
 
         ------ Compiler flags -----------------------------------------------
 
         -- -fPIC requires extra checking: only the NCG supports it.
         -- See also DynFlags.parseDynamicFlags.
-  , Flag "fPIC" (PassFlag setPIC)
+  , flagC "fPIC" (PassFlag setPIC)
 
         -- All other "-fno-<blah>" options cancel out "-f<blah>" on the hsc cmdline
-  , Flag "fno-"
+  , flagC "fno-"
          (PrefixPred (\s -> isStaticFlag ("f"++s)) (\s -> removeOpt ("-f"++s)))
         
 
         -- Pass all remaining "-f<blah>" options to hsc
-  , Flag "f" (AnySuffixPred isStaticFlag addOpt)
+  , flagC "f" (AnySuffixPred isStaticFlag addOpt)
   ]
 
 setPIC :: String -> StaticP ()

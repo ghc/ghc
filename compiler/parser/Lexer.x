@@ -661,7 +661,7 @@ reservedWordsFM = listToUFM $
 	( "export",	ITexport,	 bit ffiBit),
 	( "label",	ITlabel,	 bit ffiBit),
 	( "dynamic",	ITdynamic,	 bit ffiBit),
-	( "safe",	ITsafe,		 bit ffiBit),
+	( "safe",	ITsafe,		 bit ffiBit .|. bit safeHaskellBit),
 	( "threadsafe",	ITthreadsafe,	 bit ffiBit),  -- ToDo: remove
 	( "interruptible", ITinterruptible, bit ffiBit),
 	( "unsafe",	ITunsafe,	 bit ffiBit),
@@ -1807,6 +1807,8 @@ relaxedLayoutBit :: Int
 relaxedLayoutBit = 24
 nondecreasingIndentationBit :: Int
 nondecreasingIndentationBit = 25
+safeHaskellBit :: Int
+safeHaskellBit = 26
 
 always :: Int -> Bool
 always           _     = True
@@ -1902,6 +1904,7 @@ mkPState flags buf loc =
                .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
                .|. relaxedLayoutBit  `setBitIf` xopt Opt_RelaxedLayout flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
+               .|. safeHaskellBit    `setBitIf` safeHaskellOn flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

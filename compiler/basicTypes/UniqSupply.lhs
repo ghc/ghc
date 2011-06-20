@@ -29,9 +29,10 @@ module UniqSupply (
 import Unique
 import FastTypes
 
+import GHC.IO (unsafeDupableInterleaveIO)
+
 import MonadUtils
 import Control.Monad
-import GHC.IO (unsafeDupableInterleaveIO)
 
 \end{code}
 

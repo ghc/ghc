@@ -34,7 +34,7 @@ import Packages
 -- import PackageConfig
 import UniqFM
 
-import HscTypes ( handleFlagWarnings )
+import HscTypes ( handleFlagWarnings, getSafeMode )
 import HsImpExp
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import RdrName (RdrName)
@@ -82,12 +82,13 @@ import System.Environment
 import System.Exit	( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
+import System.IO.Unsafe ( unsafePerformIO )
 import System.IO.Error
 import Data.Char
 import Data.Array
 import Control.Monad as Monad
 import Text.Printf
-import Foreign
+import Foreign.Safe
 import GHC.Exts		( unsafeCoerce# )
 
 import GHC.IO.Exception	( IOErrorType(InvalidArgument) )
@@ -134,6 +135,7 @@ builtin_commands = [
   ("help",      keepGoing help,                 noCompletion),
   ("history",   keepGoing historyCmd,           noCompletion),
   ("info",      keepGoing' info,                completeIdentifier),
+  ("issafe",    keepGoing' isSafeCmd,           completeModule),
   ("kind",      keepGoing' kindOfType,          completeIdentifier),
   ("load",      keepGoingPaths loadModule_,     completeHomeModuleOrFile),
   ("list",      keepGoing' listCmd,             noCompletion),
@@ -211,6 +213,7 @@ helpText =
  "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
  "   :help, :?                   display this list of commands\n" ++
  "   :info [<name> ...]          display information about the given names\n" ++
+ "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :load [*]<module> ...       load module(s) and their dependents\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
@@ -1318,6 +1321,54 @@ runScript filename = do
               else return ()
 
 -----------------------------------------------------------------------------
+-- Displaying SafeHaskell properties of a module
+
+isSafeCmd :: String -> InputT GHCi ()
+isSafeCmd m = 
+  case words m of
+    [s] | looksLikeModuleName s -> do
+        m <- lift $ lookupModule s
+        isSafeModule m
+    [] -> do
+        (as,bs) <- GHC.getContext
+                -- Guess which module the user wants to browse.  Pick
+                -- modules that are interpreted first.  The most
+                -- recently-added module occurs last, it seems.
+        case (as,bs) of
+          (as@(_:_), _)   -> isSafeModule $ last as
+          ([],  bs@(_:_)) -> do
+             let i = last bs
+             m <- GHC.findModule (unLoc (ideclName i)) (ideclPkgQual i)
+             isSafeModule m
+          ([], [])  -> ghcError (CmdLineError ":issafe: no current module")
+    _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
+
+isSafeModule :: Module -> InputT GHCi ()
+isSafeModule m = do
+  mb_mod_info <- GHC.getModuleInfo m
+  case mb_mod_info of
+    Nothing -> ghcError $ CmdLineError ("unknown module: " ++
+                                GHC.moduleNameString (GHC.moduleName m))
+    Just mi -> do
+        dflags <- getDynFlags
+        let iface = GHC.modInfoIface mi
+        case iface of
+             Just iface' -> do
+                 let trust = showPpr $ getSafeMode $ GHC.mi_trust iface'
+                     pkg   = if packageTrusted dflags m then "trusted" else "untrusted"
+                 liftIO $ putStrLn $ "Trust type is (Module: " ++ trust
+                                               ++ ", Package: " ++ pkg ++ ")"
+             Nothing -> ghcError $ CmdLineError ("can't load interface file for module: " ++
+                                            GHC.moduleNameString (GHC.moduleName m))
+  where
+    packageTrusted :: DynFlags -> Module -> Bool
+    packageTrusted dflags m
+        | thisPackage dflags == modulePackageId m = True
+        | otherwise = trusted $ getPackageDetails (pkgState dflags)
+                                                  (modulePackageId m)
+
+
+-----------------------------------------------------------------------------
 -- Browsing a module's contents
 
 browseCmd :: Bool -> String -> InputT GHCi ()
@@ -1556,10 +1607,10 @@ setCmd ""
           vcat (text "other dynamic, non-language, flag settings:" 
                :map (flagSetting dflags) others)
           ))
-  where flagSetting dflags (str, f, _)
+  where flagSetting dflags (str, _, f, _)
           | dopt f dflags = text "  " <> text "-f"    <> text str
           | otherwise     = text "  " <> text "-fno-" <> text str
-        (ghciFlags,others)  = partition (\(_, f, _) -> f `elem` flags)
+        (ghciFlags,others)  = partition (\(_, _, f, _) -> f `elem` flags)
                                         DynFlags.fFlags
         flags = [Opt_PrintExplicitForalls
                 ,Opt_PrintBindResult
@@ -1794,17 +1845,19 @@ showPackages = do
   liftIO $ putStrLn $ showSDoc $ vcat $
     text ("active package flags:"++if null pkg_flags then " none" else "")
     : map showFlag pkg_flags
-  where showFlag (ExposePackage p) = text $ "  -package " ++ p
-        showFlag (HidePackage p)   = text $ "  -hide-package " ++ p
-        showFlag (IgnorePackage p) = text $ "  -ignore-package " ++ p
+  where showFlag (ExposePackage   p) = text $ "  -package " ++ p
+        showFlag (HidePackage     p) = text $ "  -hide-package " ++ p
+        showFlag (IgnorePackage   p) = text $ "  -ignore-package " ++ p
         showFlag (ExposePackageId p) = text $ "  -package-id " ++ p
+        showFlag (TrustPackage    p) = text $ "  -trust " ++ p
+        showFlag (DistrustPackage p) = text $ "  -distrust " ++ p
 
 showLanguages :: GHCi ()
 showLanguages = do
    dflags <- getDynFlags
    liftIO $ putStrLn $ showSDoc $ vcat $
       text "active language flags:" :
-      [text ("  -X" ++ str) | (str, f, _) <- DynFlags.xFlags, xopt f dflags]
+      [text ("  -X" ++ str) | (str, _, f, _) <- DynFlags.xFlags, xopt f dflags]
 
 -- -----------------------------------------------------------------------------
 -- Completion

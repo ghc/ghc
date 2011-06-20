@@ -2,21 +2,24 @@
 -- Norman likes local bindings
 -- If this module lives on I'd like to get rid of this flag in due course
 
-module CmmCPS (
-  -- | Converts C-- with full proceedures and parameters
-  -- to a CPS transformed C-- with the stack made manifest.
-  -- Well, sort of.
-  protoCmmCPS
+module CmmPipeline (
+  -- | Converts C-- with an implicit stack and native C-- calls into
+  -- optimized, CPS converted and native-call-less C--.  The latter
+  -- C-- can be used to generate assembly.
+  cmmPipeline
 ) where
 
 import CLabel
 import Cmm
 import CmmDecl
+import CmmLive
 import CmmBuildInfoTables
 import CmmCommonBlockElim
 import CmmProcPoint
 import CmmSpillReload
+import CmmRewriteAssignments
 import CmmStackLayout
+import CmmContFlowOpt
 import OptimizationFuel
 
 import DynFlags
@@ -30,7 +33,7 @@ import Outputable
 import StaticFlags
 
 -----------------------------------------------------------------------------
--- |Top level driver for the CPS pass
+-- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
 -- There are two complications here:
 -- 1. We need to compile the procedures in two stages because we need
@@ -45,20 +48,27 @@ import StaticFlags
 -- 2. We need to thread the module's SRT around when the SRT tables
 --    are computed for each procedure.
 --    The SRT needs to be threaded because it is grown lazily.
-protoCmmCPS  :: HscEnv -- Compilation env including
+-- 3. We run control flow optimizations twice, once before any pipeline
+--    work is done, and once again at the very end on all of the
+--    resulting C-- blocks.  EZY: It's unclear whether or not whether
+--    we actually need to do the initial pass.
+cmmPipeline  :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cps-cmm
              -> (TopSRT, [Cmm])    -- SRT table and accumulating list of compiled procs
              -> Cmm                -- Input C-- with Procedures
              -> IO (TopSRT, [Cmm]) -- Output CPS transformed C--
-protoCmmCPS hsc_env (topSRT, rst) (Cmm tops) =
+cmmPipeline hsc_env (topSRT, rst) prog =
   do let dflags = hsc_dflags hsc_env
+         (Cmm tops) = runCmmContFlowOpts prog
      showPass dflags "CPSZ"
      (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
      let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
      (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
      let cmms = Cmm (reverse (concat tops))
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
-     return (topSRT, cmms : rst)
+     -- SRT is not affected by control flow optimization pass
+     let prog' = map runCmmContFlowOpts (cmms : rst)
+     return (topSRT, prog')
 
 {- [Note global fuel]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -98,9 +108,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
 
        ----------- Eliminate dead assignments -------------------
-       -- Remove redundant reloads (and any other redundant asst)
-       g <- runOptimization $ removeDeadAssignmentsAndReloads procPoints g
-       dump Opt_D_dump_cmmz_dead "Post Dead Assignment Elimination" g
+       g <- runOptimization $ removeDeadAssignments g
+       dump Opt_D_dump_cmmz_dead "Post remove dead assignments" g
 
        ----------- Zero dead stack slots (Debug only) ---------------
        -- Debugging: stubbing slots on death can cause crashes early

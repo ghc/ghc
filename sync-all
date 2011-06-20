@@ -519,5 +519,48 @@ sub main {
     }
 }
 
+END {
+    my $ec = $?;
+    my $pwd = getcwd();
+
+    message "== Checking for old haddock repo";
+    if (-d "utils/haddock/.git") {
+        chdir("utils/haddock");
+        if ((system "git log -1 87e2ca11c3d1b1bc49900fba0b5c5c6f85650718 > /dev/null 2> /dev/null") == 0) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You have an old haddock repository in your GHC tree!
+
+Please remove it (e.g. "rm -r utils/haddock"), and then run
+"./syncs-all get" to get the new repository.
+============================
+EOF
+        }
+        chdir($pwd);
+    }
+
+    message "== Checking for old binary repo";
+    if (-d "libraries/binary/.git") {
+        chdir("libraries/binary");
+        if ((system "git log -1 749ac0efbde3b14901417364a872796598747aaf > /dev/null 2> /dev/null") == 0) {
+            print <<EOF;
+============================
+ATTENTION!
+
+You have an old binary repository in your GHC tree!
+
+Please remove it (e.g. "rm -r libraries/binary"), and then run
+"./syncs-all get" to get the new repository.
+============================
+EOF
+        }
+        chdir($pwd);
+    }
+
+    $? = $ec;
+}
+
 main(@ARGV);
 

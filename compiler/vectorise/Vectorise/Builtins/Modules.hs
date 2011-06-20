@@ -22,13 +22,8 @@ data Modules
 	
   , dph_Closure	                :: Module
   , dph_Unboxed	                :: Module
-  , dph_Combinators             :: Module
   , dph_Scalar	                :: Module
 
-  , dph_Prelude_Int             :: Module
-  , dph_Prelude_Word8           :: Module
-  , dph_Prelude_Double          :: Module
-  , dph_Prelude_Bool            :: Module
   , dph_Prelude_Tuple           :: Module
   }
 
@@ -48,14 +43,9 @@ dph_Modules pkg
 	
   , dph_Closure                 = mk (fsLit "Data.Array.Parallel.Lifted.Closure")
   , dph_Unboxed                 = mk (fsLit "Data.Array.Parallel.Lifted.Unboxed")
-  , dph_Combinators             = mk (fsLit "Data.Array.Parallel.Lifted.Combinators")
   , dph_Scalar                  = mk (fsLit "Data.Array.Parallel.Lifted.Scalar")
 
-  , dph_Prelude_Int             = mk (fsLit "Data.Array.Parallel.Prelude.Base.Int")
-  , dph_Prelude_Word8           = mk (fsLit "Data.Array.Parallel.Prelude.Base.Word8")
-  , dph_Prelude_Double          = mk (fsLit "Data.Array.Parallel.Prelude.Base.Double")
-  , dph_Prelude_Bool            = mk (fsLit "Data.Array.Parallel.Prelude.Base.Bool")
-  , dph_Prelude_Tuple           = mk (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
+  , dph_Prelude_Tuple           = mk (fsLit "Data.Array.Parallel.Prelude.Tuple")
   }
   where	mk = mkModule pkg . mkModuleNameFS
 

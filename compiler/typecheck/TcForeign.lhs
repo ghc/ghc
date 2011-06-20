@@ -107,8 +107,8 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
     checkSafety safety
     case arg_tys of
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
-                        checkForeignRes nonIOok  isFFIExportResultTy res1_ty
-                        checkForeignRes mustBeIO isFFIDynResultTy    res_ty
+                        checkForeignRes nonIOok  False isFFIExportResultTy res1_ty
+                        checkForeignRes mustBeIO False isFFIDynResultTy    res_ty
                   where
                      (arg1_tys, res1_ty) = tcSplitFunTys arg1_ty
         _ -> addErrTc (illegalForeignTyErr empty sig_ty)
@@ -128,7 +128,9 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
           check (isFFIDynArgumentTy arg1_ty)
                 (illegalForeignTyErr argument arg1_ty)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
-          checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
+          let safe_on = safeLanguageOn dflags
+              ioOK    = if safe_on then mustBeIO else nonIOok
+          checkForeignRes ioOK safe_on (isFFIImportResultTy dflags) res_ty
           return idecl
   | cconv == PrimCallConv = do
       dflags <- getDOpts
@@ -140,7 +142,9 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
             (text "The safe/unsafe annotation should not be used with `foreign import prim'.")
       checkForeignArgs (isFFIPrimArgumentTy dflags) arg_tys
       -- prim import result is more liberal, allows (#,,#)
-      checkForeignRes nonIOok (isFFIPrimResultTy dflags) res_ty
+      let safe_on = safeLanguageOn dflags
+          ioOK    = if safe_on then mustBeIO else nonIOok
+      checkForeignRes ioOK safe_on (isFFIPrimResultTy dflags) res_ty
       return idecl
   | otherwise = do              -- Normal foreign import
       checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
@@ -149,7 +153,9 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
       checkCTarget target
       dflags <- getDOpts
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
-      checkForeignRes nonIOok (isFFIImportResultTy dflags) res_ty
+      let safe_on = safeLanguageOn dflags
+          ioOK    = if safe_on then mustBeIO else nonIOok
+      checkForeignRes ioOK safe_on (isFFIImportResultTy dflags) res_ty
       checkMissingAmpersand dflags arg_tys res_ty
       return idecl
 
@@ -221,7 +227,7 @@ tcCheckFEType sig_ty (CExport (CExportStatic str cconv)) = do
     check (isCLabelString str) (badCName str)
     checkCConv cconv
     checkForeignArgs isFFIExternalTy arg_tys
-    checkForeignRes nonIOok isFFIExportResultTy res_ty
+    checkForeignRes nonIOok False isFFIExportResultTy res_ty
   where
       -- Drop the foralls before inspecting n
       -- the structure of the foreign type.
@@ -249,13 +255,13 @@ checkForeignArgs pred tys
 -- Check that the type has the form
 --    (IO t) or (t) , and that t satisfies the given predicate.
 --
-checkForeignRes :: Bool -> (Type -> Bool) -> Type -> TcM ()
+checkForeignRes :: Bool -> Bool -> (Type -> Bool) -> Type -> TcM ()
 
 nonIOok, mustBeIO :: Bool
 nonIOok  = True
 mustBeIO = False
 
-checkForeignRes non_io_result_ok pred_res_ty ty
+checkForeignRes non_io_result_ok safehs_check pred_res_ty ty
         -- (IO t) is ok, and so is any newtype wrapping thereof
   | Just (_, res_ty, _) <- tcSplitIOType_maybe ty,
     pred_res_ty res_ty
@@ -263,7 +269,7 @@ checkForeignRes non_io_result_ok pred_res_ty ty
 
   | otherwise
   = check (non_io_result_ok && pred_res_ty ty)
-          (illegalForeignTyErr result ty)
+          (illegalForeignTyErr result ty $+$ safeHsErr safehs_check)
 \end{code}
 
 \begin{code}
@@ -337,6 +343,10 @@ illegalForeignTyErr arg_or_res ty
   = hang (hsep [ptext (sLit "Unacceptable"), arg_or_res,
                 ptext (sLit "type in foreign declaration:")])
        2 (hsep [ppr ty])
+
+safeHsErr :: Bool -> SDoc
+safeHsErr False = empty
+safeHsErr True  = ptext $ sLit "Safe Haskell is on, all FFI imports must be in the IO monad"
 
 -- Used for 'arg_or_res' argument to illegalForeignTyErr
 argument, result :: SDoc

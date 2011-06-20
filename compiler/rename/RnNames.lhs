@@ -53,6 +53,34 @@ import qualified Data.Map as Map
 %*                                                                      *
 %************************************************************************
 
+Note [Trust Transitive Property]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+So there is an interesting design question in regards to transitive trust
+checking. Say I have a module B compiled with -XSafe. B is dependent on a bunch
+of modules and packages, some packages it requires to be trusted as its using
+-XTrustworthy modules from them. Now if I have a module A that doesn't use safe
+haskell at all and simply imports B, should A inherit all the the trust
+requirements from B? Should A now also require that a package p is trusted since
+B required it?
+
+We currently say no but I saying yes also makes sense. The difference is, if a
+module M that doesn't use SafeHaskell imports a module N that does, should all
+the trusted package requirements be dropped since M didn't declare that it cares
+about Safe Haskell (so -XSafe is more strongly associated with the module doing
+the importing) or should it be done still since the author of the module N that
+uses Safe Haskell said they cared (so -XSafe is more strongly associated with
+the module that was compiled that used it).
+
+Going with yes is a simpler semantics we think and harder for the user to stuff
+up but it does mean that SafeHaskell will affect users who don't care about
+SafeHaskell as they might grab a package from Cabal which uses safe haskell (say
+network) and that packages imports -XTrustworthy modules from another package
+(say bytestring), so requires that package is trusted. The user may now get
+compilation errors in code that doesn't do anything with Safe Haskell simply
+because they are using the network package. They will have to call 'ghc-pkg
+trust network' to get everything working. Due to this invasive nature of going
+with yes we have gone with no for now.
+
 \begin{code}
 rnImports :: [LImportDecl RdrName]
            -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
@@ -65,7 +93,7 @@ rnImports imports
          implicit_prelude <- xoptM Opt_ImplicitPrelude
          let prel_imports       = mkPrelImports (moduleName this_mod) implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
-             is_source_import (L _ (ImportDecl _ _ is_boot _ _ _)) = is_boot
+             is_source_import (L _ (ImportDecl _ _ is_boot _ _ _ _)) = is_boot
 
          ifDOptM Opt_WarnImplicitPrelude (
             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
@@ -94,7 +122,8 @@ rnImportDecl  :: Module -> Bool
 
 rnImportDecl this_mod implicit_prelude
              (L loc (ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
-                                , ideclSource = want_boot, ideclQualified = qual_only
+                                , ideclSource = want_boot, ideclSafe = mod_safe
+                                , ideclQualified = qual_only
                                 , ideclAs = as_mod, ideclHiding = imp_details }))
   = setSrcSpan loc $ do
 
@@ -210,20 +239,32 @@ rnImportDecl this_mod implicit_prelude
                 -- Imported module is from another package
                 -- Dump the dependent modules
                 -- Add the package imp_mod comes from to the dependent packages
-                ASSERT2( not (pkg `elem` dep_pkgs deps), ppr pkg <+> ppr (dep_pkgs deps) )
-                ([], pkg : dep_pkgs deps)
+                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps)), ppr pkg <+> ppr (dep_pkgs deps) )
+                ([], (pkg, False) : dep_pkgs deps)
 
         -- True <=> import M ()
         import_all = case imp_details of
                         Just (is_hiding, ls) -> not is_hiding && null ls
                         _                    -> False
 
+        -- should the import be safe?
+        mod_safe' = mod_safe
+                    || (not implicit_prelude && safeDirectImpsReq dflags)
+                    || (implicit_prelude && safeImplicitImpsReq dflags)
+
         imports   = ImportAvails {
-                        imp_mods     = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc)],
-                        imp_orphs    = orphans,
-                        imp_finsts   = finsts,
-                        imp_dep_mods = mkModDeps dependent_mods,
-                        imp_dep_pkgs = dependent_pkgs
+                        imp_mods       = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],
+                        imp_orphs      = orphans,
+                        imp_finsts     = finsts,
+                        imp_dep_mods   = mkModDeps dependent_mods,
+                        imp_dep_pkgs   = map fst $ dependent_pkgs,
+                        -- Add in the imported modules trusted package
+                        -- requirements. ONLY do this though if we import the
+                        -- module as a safe import.
+                        -- see Note [Trust Transitive Property]
+                        imp_trust_pkgs = if mod_safe' 
+                                            then map fst $ filter snd dependent_pkgs
+                                            else []
                    }
 
     -- Complain if we import a deprecated module
@@ -233,7 +274,7 @@ rnImportDecl this_mod implicit_prelude
           _           -> return ()
      )
 
-    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot
+    let new_imp_decl = L loc (ImportDecl loc_imp_mod_name mb_pkg want_boot mod_safe'
                                          qual_only as_mod new_imp_details)
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
@@ -472,7 +513,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     val_bndrs :: [Located RdrName]
-    val_bndrs | is_hs_boot = [nm | L _ (TypeSig nm _) <- val_sigs]
+    val_bndrs | is_hs_boot = [n | L _ (TypeSig ns _) <- val_sigs, n <- ns]
               | otherwise  = for_hs_bndrs
 
     new_simple :: Located RdrName -> RnM (GenAvailInfo Name)
@@ -908,7 +949,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
     imported_modules = [ qual_name
                        | xs <- moduleEnvElts $ imp_mods imports,
-                         (qual_name, _, _) <- xs ]
+                         (qual_name, _, _, _) <- xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports)

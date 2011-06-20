@@ -10,7 +10,6 @@ module Vectorise.Env (
   GlobalEnv(..),
   initGlobalEnv,
   extendImportedVarsEnv,
-  extendScalars,
   setFamEnv,
   extendFamEnv,
   extendTyConsEnv,
@@ -46,18 +45,18 @@ data Scope a b
 -- LocalEnv -------------------------------------------------------------------
 -- | The local environment.
 data LocalEnv
-	= LocalEnv {
+  = LocalEnv {
         -- Mapping from local variables to their vectorised and lifted versions.
-            local_vars		:: VarEnv (Var, Var)
+            local_vars    :: VarEnv (Var, Var)
 
         -- In-scope type variables.
-        , local_tyvars		:: [TyVar]
+        , local_tyvars    :: [TyVar]
 
         -- Mapping from tyvars to their PA dictionaries.
-        , local_tyvar_pa	:: VarEnv CoreExpr
+        , local_tyvar_pa  :: VarEnv CoreExpr
 
         -- Local binding name.
-        , local_bind_name	:: FastString
+        , local_bind_name :: FastString
         }
 
 
@@ -162,12 +161,6 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
 extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
 extendImportedVarsEnv ps genv
   = genv { global_vars = extendVarEnvList (global_vars genv) ps }
-
--- |Extend the set of scalar variables in an environment.
---
-extendScalars :: [Var] -> GlobalEnv -> GlobalEnv
-extendScalars vs genv
-  = genv { global_scalar_vars = extendVarSetList (global_scalar_vars genv) vs }
 
 -- |Set the list of type family instances in an environment.
 --

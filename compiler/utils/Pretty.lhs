@@ -188,7 +188,6 @@ import Panic
 import StaticFlags
 import Numeric (fromRat)
 import System.IO
---import Foreign.Ptr (castPtr)
 
 #if defined(__GLASGOW_HASKELL__)
 --for a RULES
@@ -562,8 +561,7 @@ text  s = case iUnbox (length   s) of {sl -> textBeside_ (Str s)  sl Empty}
 ftext :: FastString -> Doc
 ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}
 ptext :: LitString -> Doc
-ptext s_= case iUnbox (lengthLS s) of {sl -> textBeside_ (LStr s sl) sl Empty}
-  where s = {-castPtr-} s_
+ptext s = case iUnbox (lengthLS s) of {sl -> textBeside_ (LStr s sl) sl Empty}
 zeroWidthText s = textBeside_ (Str s) (_ILIT(0)) Empty
 
 #if defined(__GLASGOW_HASKELL__)

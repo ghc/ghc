@@ -32,7 +32,7 @@ module Encoding (
 import Foreign
 import Data.Char
 import Numeric
-import GHC.Ptr          ( Ptr(..) )
+import GHC.Ptr ( Ptr(..) )
 import GHC.Base
 
 -- -----------------------------------------------------------------------------

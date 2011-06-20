@@ -1897,6 +1897,25 @@ import "network" Network.Socket
     another, rendering any package-qualified imports broken.</para>
 </sect2>
 
+<sect2 id="safe-imports-ext">
+  <title>Safe imports</title>
+
+  <para>With the <option>-XSafeImports</option> flag, GHC extends
+	the import declaration syntax to take an optional <literal>safe</literal>
+	keyword after the <literal>import</literal> keyword.  This feature
+	is part of the Safe Haskell GHC extension.  For example:</para>
+
+<programlisting>
+import safe qualified Network.Socket as NS
+</programlisting>
+
+  <para>would import the module <literal>Network.Socket</literal>
+  with compilation only succeeding if Network.Socket can be
+	safely imported. For a description of when a import is
+	considered safe see <xref linkend="safe-haskell"/></para>
+
+</sect2>
+
 <sect2 id="syntax-stolen">
 <title>Summary of stolen syntax</title>
 
@@ -9409,7 +9428,6 @@ standard behaviour.
 </para>
 </sect2>
 </sect1>
-
 
 
 <!-- Emacs stuff:

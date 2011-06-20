@@ -234,7 +234,7 @@ algorithm would be just as good, so that's what we do.
 
 -}
 
-data Protocol = Protocol Convention CmmFormals Area
+data Protocol = Protocol Convention [CmmFormal] Area
   deriving Eq
 instance Outputable Protocol where
   ppr (Protocol c fs a) = text "Protocol" <+> ppr c <+> ppr fs <+> ppr a

@@ -119,25 +119,25 @@ mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 
 ---------- Calls
-mkCall       :: CmmExpr -> (Convention, Convention) -> CmmFormals -> CmmActuals ->
+mkCall       :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmActual] ->
                   UpdFrameOffset -> CmmAGraph
-mkCmmCall    :: CmmExpr ->              CmmFormals -> CmmActuals ->
+mkCmmCall    :: CmmExpr ->              [CmmFormal] -> [CmmActual] ->
                   UpdFrameOffset -> CmmAGraph
   -- Native C-- calling convention
-mkSafeCall    :: ForeignTarget -> CmmFormals -> CmmActuals -> UpdFrameOffset -> Bool -> CmmAGraph
-mkUnsafeCall  :: ForeignTarget -> CmmFormals -> CmmActuals -> CmmAGraph
-mkFinalCall   :: CmmExpr -> CCallConv -> CmmActuals -> UpdFrameOffset -> CmmAGraph
+mkSafeCall    :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> UpdFrameOffset -> Bool -> CmmAGraph
+mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
+mkFinalCall   :: CmmExpr -> CCallConv -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
   -- Never returns; like exit() or barf()
 
 ---------- Control transfer
-mkJump          ::               CmmExpr -> CmmActuals -> UpdFrameOffset -> CmmAGraph
-mkDirectJump    ::               CmmExpr -> CmmActuals -> UpdFrameOffset -> CmmAGraph
-mkJumpGC        ::               CmmExpr -> CmmActuals -> UpdFrameOffset -> CmmAGraph
-mkForeignJump   :: Convention -> CmmExpr -> CmmActuals -> UpdFrameOffset -> CmmAGraph
+mkJump          ::               CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkDirectJump    ::               CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkJumpGC        ::               CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkForeignJump   :: Convention -> CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkCbranch       :: CmmExpr -> BlockId -> BlockId          -> CmmAGraph
 mkSwitch        :: CmmExpr -> [Maybe BlockId]             -> CmmAGraph
-mkReturn        :: CmmExpr -> CmmActuals -> UpdFrameOffset -> CmmAGraph
-mkReturnSimple  :: CmmActuals -> UpdFrameOffset -> CmmAGraph
+mkReturn        :: CmmExpr -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
+mkReturnSimple  :: [CmmActual] -> UpdFrameOffset -> CmmAGraph
 
 mkBranch        :: BlockId -> CmmAGraph
 mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> CmmAGraph
@@ -288,8 +288,8 @@ stackStubExpr w = CmmLit (CmmInt 0 w)
 -- the variables in their spill slots.
 -- Therefore, for copying arguments and results, we provide different
 -- functions to pass the arguments in an overflow area and to pass them in spill slots.
-copyInOflow  :: Convention -> Area -> CmmFormals -> (Int, CmmAGraph)
-copyInSlot   :: Convention -> CmmFormals -> [CmmNode O O]
+copyInOflow  :: Convention -> Area -> [CmmFormal] -> (Int, CmmAGraph)
+copyInSlot   :: Convention -> [CmmFormal] -> [CmmNode O O]
 copyOutSlot  :: Convention -> [LocalReg] -> [CmmNode O O]
 
 copyInOflow conv area formals = (offset, catAGraphs $ map mkMiddle nodes)
@@ -298,7 +298,7 @@ copyInSlot c f = snd $ copyIn oneCopySlotI c (panic "no area for copying to slot
 
 type SlotCopier = Area -> (LocalReg, ByteOff) -> (ByteOff, [CmmNode O O]) ->
                           (ByteOff, [CmmNode O O])
-type CopyIn  = SlotCopier -> Convention -> Area -> CmmFormals -> (ByteOff, [CmmNode O O])
+type CopyIn  = SlotCopier -> Convention -> Area -> [CmmFormal] -> (ByteOff, [CmmNode O O])
 
 -- Return the number of bytes used for copying arguments, as well as the
 -- instructions to copy the arguments.
@@ -331,7 +331,7 @@ oneCopySlotI _ (reg, _) (n, ms) =
 -- Factoring out the common parts of the copyout functions yielded something
 -- more complicated:
 
-copyOutOflow :: Convention -> Transfer -> Area -> CmmActuals -> UpdFrameOffset ->
+copyOutOflow :: Convention -> Transfer -> Area -> [CmmActual] -> UpdFrameOffset ->
                               (Int, CmmAGraph)
 -- Generate code to move the actual parameters into the locations
 -- required by the calling convention.  This includes a store for the return address.
@@ -355,7 +355,7 @@ copyOutOflow conv transfer area@(CallArea a) actuals updfr_off
                   else ([], 0)
                 Old -> ([], updfr_off)
 
-    args :: [(CmmExpr, ParamLocation ByteOff)]   -- The argument and where to put it
+    args :: [(CmmExpr, ParamLocation)]   -- The argument and where to put it
     args = assignArgumentsPos conv cmmExprType actuals
 
     args' = foldl adjust setRA args
@@ -372,10 +372,10 @@ copyOutSlot conv actuals = foldr co [] args
         toExp r = CmmReg (CmmLocal r)
         args = assignArgumentsPos conv localRegType actuals
 
-mkCallEntry :: Convention -> CmmFormals -> (Int, CmmAGraph)
+mkCallEntry :: Convention -> [CmmFormal] -> (Int, CmmAGraph)
 mkCallEntry conv formals = copyInOflow conv (CallArea Old) formals
 
-lastWithArgs :: Transfer -> Area -> Convention -> CmmActuals -> UpdFrameOffset ->
+lastWithArgs :: Transfer -> Area -> Convention -> [CmmActual] -> UpdFrameOffset ->
                 (ByteOff -> CmmAGraph) -> CmmAGraph
 lastWithArgs transfer area conv actuals updfr_off last =
   let (outArgs, copies) = copyOutOflow conv transfer area actuals updfr_off in
