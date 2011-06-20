@@ -67,9 +67,11 @@ module GHC (
 	modInfoInstances,
 	modInfoIsExportedName,
 	modInfoLookupName,
+        modInfoIface,
 	lookupGlobalName,
 	findGlobalAnns,
         mkPrintUnqualifiedForModule,
+        ModIface(..),
 
         -- * Querying the environment
         packageDbModules,
@@ -460,6 +462,11 @@ setSessionDynFlags dflags = do
   return preload
 
 
+parseDynamicFlags :: Monad m =>
+                     DynFlags -> [Located String]
+                  -> m (DynFlags, [Located String], [Located String])
+parseDynamicFlags = parseDynamicFlagsCmdLine
+
 
 -- %************************************************************************
 -- %*							                   *
@@ -598,7 +605,7 @@ instance ParsedMod TypecheckedModule where
 instance TypecheckedMod TypecheckedModule where
   renamedSource m     = tm_renamed_source m
   typecheckedSource m = tm_typechecked_source m
-  moduleInfo m = tm_checked_module_info m
+  moduleInfo m        = tm_checked_module_info m
   tm_internals m      = tm_internals_ m
 
 -- | The result of successful desugaring (i.e., translation to core).  Also
@@ -686,9 +693,10 @@ typecheckModule pmod = do
            minf_type_env  = md_types details,
            minf_exports   = availsToNameSet $ md_exports details,
            minf_rdr_env   = Just (tcg_rdr_env tc_gbl_env),
-           minf_instances = md_insts details
+           minf_instances = md_insts details,
+           minf_iface     = Nothing
 #ifdef GHCI
-           ,minf_modBreaks = emptyModBreaks
+          ,minf_modBreaks = emptyModBreaks
 #endif
          }}
 
@@ -905,11 +913,11 @@ data ModuleInfo = ModuleInfo {
 	minf_type_env  :: TypeEnv,
 	minf_exports   :: NameSet, -- ToDo, [AvailInfo] like ModDetails?
 	minf_rdr_env   :: Maybe GlobalRdrEnv,	-- Nothing for a compiled/package mod
-	minf_instances :: [Instance]
+	minf_instances :: [Instance],
+        minf_iface     :: Maybe ModIface
 #ifdef GHCI
-        ,minf_modBreaks :: ModBreaks 
+       ,minf_modBreaks :: ModBreaks 
 #endif
-	-- ToDo: this should really contain the ModIface too
   }
 	-- We don't want HomeModInfo here, because a ModuleInfo applies
 	-- to package modules too.
@@ -919,7 +927,7 @@ getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
 getModuleInfo mdl = withSession $ \hsc_env -> do
   let mg = hsc_mod_graph hsc_env
   if mdl `elem` map ms_mod mg
-	then liftIO $ getHomeModuleInfo hsc_env (moduleName mdl)
+	then liftIO $ getHomeModuleInfo hsc_env mdl
 	else do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
 	then return Nothing
@@ -940,7 +948,8 @@ getPackageModuleInfo hsc_env mdl = do
   case mb_avails of
     Nothing -> return Nothing
     Just avails -> do
-	eps <- readIORef (hsc_EPS hsc_env)
+	eps <- hscEPS hsc_env
+        iface <- lookupModuleIface hsc_env mdl
 	let 
             names  = availsToNameSet avails
 	    pte    = eps_PTE eps
@@ -952,29 +961,41 @@ getPackageModuleInfo hsc_env mdl = do
 			minf_exports   = names,
 			minf_rdr_env   = Just $! availsToGlobalRdrEnv (moduleName mdl) avails,
 			minf_instances = error "getModuleInfo: instances for package module unimplemented",
+                        minf_iface     = iface,
                         minf_modBreaks = emptyModBreaks  
 		}))
 #else
+-- bogusly different for non-GHCI (ToDo)
 getPackageModuleInfo _hsc_env _mdl = do
-  -- bogusly different for non-GHCI (ToDo)
   return Nothing
 #endif
 
-getHomeModuleInfo :: HscEnv -> ModuleName -> IO (Maybe ModuleInfo)
+getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl = 
-  case lookupUFM (hsc_HPT hsc_env) mdl of
+  case lookupUFM (hsc_HPT hsc_env) (moduleName mdl) of
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
+      iface <- lookupModuleIface hsc_env mdl
       return (Just (ModuleInfo {
 			minf_type_env  = md_types details,
 			minf_exports   = availsToNameSet (md_exports details),
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
-			minf_instances = md_insts details
+			minf_instances = md_insts details,
+                        minf_iface     = iface
 #ifdef GHCI
                        ,minf_modBreaks = getModBreaks hmi
 #endif
 			}))
+
+lookupModuleIface :: HscEnv -> Module -> IO (Maybe ModIface)
+lookupModuleIface env m = do
+    eps <- hscEPS env
+    let dflags    = hsc_dflags env
+        pkgIfaceT = eps_PIT eps
+        homePkgT  = hsc_HPT env
+        iface     = lookupIfaceByModule dflags homePkgT pkgIfaceT m
+    return iface
 
 -- | The list of top-level entities defined in a module
 modInfoTyThings :: ModuleInfo -> [TyThing]
@@ -1011,6 +1032,9 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
        eps <- liftIO $ readIORef (hsc_EPS hsc_env)
        return $! lookupType (hsc_dflags hsc_env) 
 			    (hsc_HPT hsc_env) (eps_PTE eps) name
+
+modInfoIface :: ModuleInfo -> Maybe ModIface
+modInfoIface = minf_iface
 
 #ifdef GHCI
 modInfoModBreaks :: ModuleInfo -> ModBreaks

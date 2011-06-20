@@ -86,7 +86,8 @@ import Panic
 #endif
 
 import Id		( Id )
-import Module		( emptyModuleEnv, ModLocation(..), Module )
+import Module
+import Packages
 import RdrName
 import HsSyn
 import CoreSyn
@@ -143,10 +144,9 @@ import UniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag
 import Exception
--- import MonadUtils
 
 import Control.Monad
--- import System.IO
+import Data.Maybe       ( catMaybes )
 import Data.IORef
 \end{code}
 #include "HsVersions.h"
@@ -770,13 +770,170 @@ batchMsg hsc_env mb_mod_index recomp mod_summary
 --------------------------------------------------------------
 
 hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
-hscFileFrontEnd mod_summary =
-    do rdr_module <- hscParse' mod_summary
-       hsc_env <- getHscEnv
-       {-# SCC "Typecheck-Rename" #-}
-         ioMsgMaybe $ 
-             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+hscFileFrontEnd mod_summary = do
+    rdr_module <- hscParse' mod_summary
+    hsc_env <- getHscEnv
+    tcg_env <-
+        {-# SCC "Typecheck-Rename" #-}
+        ioMsgMaybe $
+            tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+    dflags <- getDynFlags
+    -- XXX: See Note [SafeHaskell API]
+    if safeHaskellOn dflags
+        then do
+            tcg_env1 <- checkSafeImports dflags hsc_env tcg_env
+            if safeLanguageOn dflags
+                then do
+                    -- we also nuke user written RULES.
+                    logWarnings $ warns (tcg_rules tcg_env1)
+                    return tcg_env1 { tcg_rules = [] }
+                else do
+                    -- Wipe out trust required packages if the module isn't
+                    -- trusted. Not doing this doesn't cause any problems
+                    -- but means the hi file will say some pkgs should be
+                    -- trusted when they don't need to be (since its an
+                    -- untrusted module) and we don't force them to be.
+                    let imps  = tcg_imports tcg_env1
+                        imps' = imps { imp_trust_pkgs = [] }
+                    return tcg_env1 { tcg_imports = imps' }
 
+        else
+            return tcg_env
+
+    where
+        warns rules = listToBag $ map warnRules rules
+        warnRules (L loc (HsRule n _ _ _ _ _ _)) =
+            mkPlainWarnMsg loc $
+                text "Rule \"" <> ftext n <> text "\" ignored" $+$
+                text "User defined rules are disabled under SafeHaskell"
+
+--------------------------------------------------------------
+-- SafeHaskell
+--------------------------------------------------------------
+
+-- | Validate that safe imported modules are actually safe.
+-- For modules in the HomePackage (the package the module we
+-- are compiling in resides) this just involves checking its
+-- trust type is 'Safe' or 'Trustworthy'. For modules that
+-- reside in another package we also must check that the
+-- external pacakge is trusted.
+--
+-- Note [SafeHaskell API]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- XXX: We only call this in hscFileFrontend and don't expose
+-- it to the GHC API. External users of GHC can't properly use
+-- the GHC API and SafeHaskell.
+checkSafeImports :: DynFlags -> HscEnv -> TcGblEnv -> Hsc TcGblEnv
+checkSafeImports dflags hsc_env tcg_env
+    = do
+        imps <- mapM condense imports'
+        pkgs <- mapM checkSafe imps
+        checkPkgTrust pkg_reqs
+
+        -- add in trusted package requirements for this module
+        let new_trust = emptyImportAvails { imp_trust_pkgs = catMaybes pkgs }
+        return tcg_env { tcg_imports = imp_info `plusImportAvails` new_trust }
+
+    where
+        imp_info = tcg_imports tcg_env     -- ImportAvails
+        imports  = imp_mods imp_info       -- ImportedMods
+        imports' = moduleEnvToList imports -- (Module, [ImportedModsVal])
+        pkg_reqs = imp_trust_pkgs imp_info -- [PackageId]
+
+        condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)
+        condense (_, [])   = panic "HscMain.condense: Pattern match failure!"
+        condense (m, x:xs) = do (_,_,l,s) <- foldlM cond' x xs
+                                return (m, l, s)
+        
+        -- ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
+        cond' :: ImportedModsVal -> ImportedModsVal -> Hsc ImportedModsVal
+        cond' v1@(m1,_,l1,s1) (_,_,_,s2)
+            | s1 /= s2
+            = liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l1
+                    (text "Module" <+> ppr m1 <+> (text $ "is imported"
+                        ++ " both as a safe and unsafe import!"))
+            | otherwise
+            = return v1
+
+        lookup' :: Module -> Hsc (Maybe ModIface)
+        lookup' m = do
+            hsc_eps <- liftIO $ hscEPS hsc_env
+            let pkgIfaceT = eps_PIT hsc_eps
+                homePkgT = hsc_HPT hsc_env
+                iface = lookupIfaceByModule dflags homePkgT pkgIfaceT m
+            return iface
+
+        isHomePkg :: Module -> Bool
+        isHomePkg m
+            | thisPackage dflags == modulePackageId m = True
+            | otherwise                               = False
+
+        -- | Check the package a module resides in is trusted.
+        -- Safe compiled modules are trusted without requiring
+        -- that their package is trusted. For trustworthy modules,
+        -- modules in the home package are trusted but otherwise
+        -- we check the package trust flag.
+        packageTrusted :: SafeHaskellMode -> Module -> Bool
+        packageTrusted Sf_Safe _ = True
+        packageTrusted _ m
+            | isHomePkg m = True
+            | otherwise   = trusted $ getPackageDetails (pkgState dflags)
+                                                        (modulePackageId m)
+
+        -- Is a module trusted? Return Nothing if True, or a String
+        -- if it isn't, containing the reason it isn't
+        isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc)
+        isModSafe m l = do
+            iface <- lookup' m
+            case iface of
+                -- can't load iface to check trust!
+                Nothing -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
+                            $ text "Can't load the interface file for" <+> ppr m <>
+                              text ", to check that it can be safely imported"
+
+                -- got iface, check trust
+                Just iface' -> do
+                    let trust = getSafeMode $ mi_trust iface'
+                        -- check module is trusted
+                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
+                                            Sf_TrustworthyWithSafeLanguage]
+                        -- check package is trusted
+                        safeP = packageTrusted trust m
+                    if safeM && safeP
+                        then return Nothing
+                        else return $ Just $ if safeM
+                            then text "The package (" <> ppr (modulePackageId m) <>
+                                 text ") the module resides in isn't trusted."
+                            else text "The module itself isn't safe."
+
+        -- Here we check the transitive package trust requirements are OK still.
+        checkPkgTrust :: [PackageId] -> Hsc ()
+        checkPkgTrust pkgs = do
+            case errors of
+                [] -> return ()
+                _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
+            where
+                errors = catMaybes $ map go pkgs
+                go pkg
+                    | trusted $ getPackageDetails (pkgState dflags) pkg
+                    = Nothing
+                    | otherwise
+                    = Just $ mkPlainErrMsg noSrcSpan
+                           $ text "The package (" <> ppr pkg <> text ") is required"
+                          <> text " to be trusted but it isn't!"
+
+        checkSafe :: (Module, SrcSpan, IsSafeImport) -> Hsc (Maybe PackageId)
+        checkSafe (_, _, False) = return Nothing
+        checkSafe (m, l, True ) = do
+            module_safe <- isModSafe m l
+            case module_safe of
+                Nothing -> return pkg
+                Just s  -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
+                            $ ppr m <+> text "can't be safely imported!"
+                                <+> s
+            where pkg | isHomePkg m = Nothing
+                      | otherwise   = Just (modulePackageId m)
+                            
 --------------------------------------------------------------
 -- Simplifiers
 --------------------------------------------------------------

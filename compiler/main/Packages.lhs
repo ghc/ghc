@@ -171,7 +171,7 @@ initPackages :: DynFlags -> IO (DynFlags, [PackageId])
 initPackages dflags = do 
   pkg_db <- case pkgDatabase dflags of
                 Nothing -> readPackageConfigs dflags
-                Just db -> return $ maybeHidePackages dflags db
+                Just db -> return $ setBatchPackageFlags dflags db
   (pkg_state, preload, this_pkg)       
         <- mkPackageState dflags pkg_db [] (thisPackage dflags)
   return (dflags{ pkgDatabase = Just pkg_db,
@@ -249,16 +249,23 @@ readPackageConfig dflags conf_file = do
       top_dir = topDir dflags
       pkgroot = takeDirectory conf_file
       pkg_configs1 = map (mungePackagePaths top_dir pkgroot) proto_pkg_configs
-      pkg_configs2 = maybeHidePackages dflags pkg_configs1
+      pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
   --
   return pkg_configs2
 
-maybeHidePackages :: DynFlags -> [PackageConfig] -> [PackageConfig]
-maybeHidePackages dflags pkgs
-  | dopt Opt_HideAllPackages dflags = map hide pkgs
-  | otherwise 			    = pkgs
+setBatchPackageFlags :: DynFlags -> [PackageConfig] -> [PackageConfig]
+setBatchPackageFlags dflags pkgs = (maybeDistrustAll . maybeHideAll) pkgs
   where
+    maybeHideAll pkgs'
+      | dopt Opt_HideAllPackages dflags = map hide pkgs'
+      | otherwise                       = pkgs'
+
+    maybeDistrustAll pkgs'
+      | dopt Opt_DistrustAllPackages dflags = map distrust pkgs'
+      | otherwise                           = pkgs'
+
     hide pkg = pkg{ exposed = False }
+    distrust pkg = pkg{ exposed = False }
 
 -- TODO: This code is duplicated in utils/ghc-pkg/Main.hs
 mungePackagePaths :: FilePath -> FilePath -> PackageConfig -> PackageConfig
@@ -344,6 +351,20 @@ applyPackageFlag unusable pkgs flag =
          Right (ps,qs) -> return (map hide ps ++ qs)
     	  where hide p = p {exposed=False}
 
+    -- we trust all matching packages. Maybe should only trust first one?
+    -- and leave others the same or set them untrusted
+    TrustPackage str ->
+       case selectPackages (matchingStr str) pkgs unusable of
+         Left ps       -> packageFlagErr flag ps
+         Right (ps,qs) -> return (map trust ps ++ qs)
+    	  where trust p = p {trusted=True}
+
+    DistrustPackage str ->
+       case selectPackages (matchingStr str) pkgs unusable of
+         Left ps       -> packageFlagErr flag ps
+         Right (ps,qs) -> return (map distrust ps ++ qs)
+    	  where distrust p = p {trusted=False}
+
     _ -> panic "applyPackageFlag"
 
    where
@@ -407,6 +428,8 @@ packageFlagErr flag reasons = ghcError (CmdLineError (showSDoc $ err))
                      HidePackage p   -> text "-hide-package " <> text p
                      ExposePackage p -> text "-package " <> text p
                      ExposePackageId p -> text "-package-id " <> text p
+                     TrustPackage p    -> text "-trust " <> text p
+                     DistrustPackage p -> text "-distrust " <> text p
         ppr_reasons = vcat (map ppr_reason reasons)
         ppr_reason (p, reason) = pprReason (pprIPkg p <+> text "is") reason
 

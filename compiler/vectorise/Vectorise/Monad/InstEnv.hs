@@ -38,7 +38,7 @@ lookupInst :: Class -> [Type] -> VM (DFunId, [Type])
 lookupInst cls tys
   = do { instEnv <- getInstEnv
        ; case lookupInstEnv instEnv cls tys of
-	   ([(inst, inst_tys)], _) 
+	   ([(inst, inst_tys)], _, _) 
              | noFlexiVar -> return (instanceDFunId inst, inst_tys')
              | otherwise  -> pprPanic "VectMonad.lookupInst: flexi var: " 
                                       (ppr $ mkTyConApp (classTyCon cls) tys)

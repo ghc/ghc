@@ -65,6 +65,7 @@ putInstalledPackageInfo ipi = do
   put (exposed ipi)
   put (exposedModules ipi)
   put (hiddenModules ipi)
+  put (trusted ipi)
   put (importDirs ipi)
   put (libraryDirs ipi)
   put (hsLibraries ipi)
@@ -98,6 +99,7 @@ getInstalledPackageInfo = do
   exposed <- get
   exposedModules <- get
   hiddenModules <- get
+  trusted <- get
   importDirs <- get
   libraryDirs <- get
   hsLibraries <- get

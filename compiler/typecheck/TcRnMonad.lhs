@@ -84,8 +84,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
 		| keep_rn_syntax = Just empty_val
-		| otherwise	 = Nothing ;
-			
+		| otherwise      = Nothing ;
+
 	     gbl_env = TcGblEnv {
 		tcg_mod       = mod,
 		tcg_src	      = hsc_src,

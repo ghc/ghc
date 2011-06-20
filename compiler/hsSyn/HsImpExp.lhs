@@ -36,6 +36,7 @@ data ImportDecl name
       ideclName      :: Located ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe FastString,   -- ^ Package qualifier.
       ideclSource    :: Bool,               -- ^ True <=> {-# SOURCE #-} import
+      ideclSafe      :: Bool,               -- ^ True => safe import
       ideclQualified :: Bool,               -- ^ True => qualified
       ideclAs        :: Maybe ModuleName,   -- ^ as Module
       ideclHiding    :: Maybe (Bool, [LIE name]) -- ^ (True => hiding, names)
@@ -46,6 +47,7 @@ simpleImportDecl mn = ImportDecl {
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
       ideclSource    = False,
+      ideclSafe      = True,
       ideclQualified = False,
       ideclAs        = Nothing,
       ideclHiding    = Nothing
@@ -54,9 +56,9 @@ simpleImportDecl mn = ImportDecl {
 
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
-    ppr (ImportDecl mod pkg from qual as spec)
-      = hang (hsep [ptext (sLit "import"), ppr_imp from, 
-                    pp_qual qual, pp_pkg pkg, ppr mod, pp_as as])
+    ppr (ImportDecl mod' pkg from safe qual as spec)
+      = hang (hsep [ptext (sLit "import"), ppr_imp from, pp_safe safe,
+                    pp_qual qual, pp_pkg pkg, ppr mod', pp_as as])
 	     4 (pp_spec spec)
       where
         pp_pkg Nothing  = empty
@@ -64,6 +66,9 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 
 	pp_qual False   = empty
 	pp_qual True	= ptext (sLit "qualified")
+
+	pp_safe False   = empty
+	pp_safe True	= ptext (sLit "safe")
 
 	pp_as Nothing   = empty
 	pp_as (Just a)  = ptext (sLit "as") <+> ppr a

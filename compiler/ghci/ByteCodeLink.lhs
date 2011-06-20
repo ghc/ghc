@@ -38,19 +38,18 @@ import Panic
 import Outputable
 
 -- Standard libraries
-import GHC.Word		( Word(..) )
 
 import Data.Array.Base
-import GHC.Arr		( STArray(..) )
 
 import Control.Monad	( zipWithM )
 import Control.Monad.ST ( stToIO )
 
-import GHC.Exts
-import GHC.Arr		( Array(..) )
-import GHC.IOBase	( IO(..) )
-import GHC.Ptr		( Ptr(..), castPtr )
+import GHC.Arr          ( Array(..), STArray(..) )
 import GHC.Base		( writeArray#, RealWorld, Int(..), Word# )  
+import GHC.IOBase	( IO(..) )
+import GHC.Exts
+import GHC.Ptr		( Ptr(..), castPtr )
+import GHC.Word		( Word(..) )
 
 import Data.Word
 \end{code}

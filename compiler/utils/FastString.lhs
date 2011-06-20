@@ -96,7 +96,6 @@ import FastFunctions
 import Panic
 import Util
 
-import Foreign hiding   ( unsafePerformIO )
 import Foreign.C
 import GHC.Exts
 import System.IO
@@ -106,9 +105,15 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
 import Data.Char        ( ord )
 
-import GHC.IO ( IO(..) )
-
+import GHC.IO           ( IO(..) )
 import GHC.Ptr          ( Ptr(..) )
+
+#if __GLASGOW_HASKELL__ >= 701
+import Foreign.Safe
+#else
+import Foreign hiding ( unsafePerformIO )
+#endif
+
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Base         ( unpackCString# )
 #endif

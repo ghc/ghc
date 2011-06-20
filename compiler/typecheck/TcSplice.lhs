@@ -970,7 +970,7 @@ lookupClassInstances c ts
 
 	-- Now look up instances
         ; inst_envs <- tcGetInstEnvs
-        ; let (matches, unifies) = lookupInstEnv inst_envs cls tys
+        ; let (matches, unifies, _) = lookupInstEnv inst_envs cls tys
         ; mapM reifyClassInstance (map fst matches ++ unifies) } } }
   where
     doc = ptext (sLit "TcSplice.classInstances")

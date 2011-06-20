@@ -390,7 +390,8 @@ instance Binary ModIface where
 		 mi_rules     = rules,
 		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
-		 mi_hpc       = hpc_info }) = do
+		 mi_hpc       = hpc_info,
+		 mi_trust     = trust }) = do
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh iface_hash
@@ -411,6 +412,7 @@ instance Binary ModIface where
 	put_ bh orphan_hash
         put_ bh vect_info
 	put_ bh hpc_info
+	put_ bh trust
 
    get bh = do
 	mod_name  <- get bh
@@ -433,6 +435,7 @@ instance Binary ModIface where
 	orphan_hash <- get bh
         vect_info <- get bh
         hpc_info  <- get bh
+        trust     <- get bh
 	return (ModIface {
 		 mi_module    = mod_name,
 		 mi_boot      = is_boot,
@@ -455,6 +458,7 @@ instance Binary ModIface where
 		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
 		 mi_hpc       = hpc_info,
+		 mi_trust     = trust,
 			-- And build the cached values
 		 mi_warn_fn   = mkIfaceWarnCache warns,
 		 mi_fix_fn    = mkIfaceFixCache fixities,
@@ -507,12 +511,14 @@ instance Binary Usage where
         putByte bh 0
 	put_ bh (usg_mod usg)
 	put_ bh (usg_mod_hash usg)
+	put_ bh (usg_safe     usg)
     put_ bh usg@UsageHomeModule{} = do 
         putByte bh 1
 	put_ bh (usg_mod_name usg)
 	put_ bh (usg_mod_hash usg)
 	put_ bh (usg_exports  usg)
 	put_ bh (usg_entities usg)
+	put_ bh (usg_safe     usg)
 
     get bh = do
         h <- getByte bh
@@ -520,14 +526,16 @@ instance Binary Usage where
           0 -> do
             nm    <- get bh
             mod   <- get bh
-            return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod }
+            safe  <- get bh
+            return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod, usg_safe = safe }
           _ -> do
             nm    <- get bh
             mod   <- get bh
             exps  <- get bh
             ents  <- get bh
+            safe  <- get bh
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
-                            usg_exports = exps, usg_entities = ents }
+                     usg_exports = exps, usg_entities = ents, usg_safe = safe }
 
 instance Binary Warnings where
     put_ bh NoWarnings     = putByte bh 0
@@ -1418,14 +1426,15 @@ instance Binary IfaceFamInst where
 		return (IfaceFamInst fam tys tycon)
 
 instance Binary OverlapFlag where
-    put_ bh NoOverlap  = putByte bh 0
-    put_ bh OverlapOk  = putByte bh 1
-    put_ bh Incoherent = putByte bh 2
+    put_ bh (NoOverlap  b) = putByte bh 0 >> put_ bh b
+    put_ bh (OverlapOk  b) = putByte bh 1 >> put_ bh b
+    put_ bh (Incoherent b) = putByte bh 2 >> put_ bh b
     get bh = do h <- getByte bh
+                b <- get bh
 		case h of
-		  0 -> return NoOverlap
-		  1 -> return OverlapOk
-		  2 -> return Incoherent
+		  0 -> return $ NoOverlap b
+		  1 -> return $ OverlapOk b
+		  2 -> return $ Incoherent b
 		  _ -> panic ("get OverlapFlag " ++ show h)
 
 instance Binary IfaceConDecls where
@@ -1541,4 +1550,7 @@ instance Binary IfaceVectInfo where
 	    a5 <- get bh
 	    return (IfaceVectInfo a1 a2 a3 a4 a5)
 
+instance Binary IfaceTrustInfo where
+    put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
+    get bh = getByte bh >>= (return . numToTrustInfo)
 

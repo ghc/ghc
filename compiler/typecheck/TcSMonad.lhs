@@ -924,13 +924,13 @@ matchClass clas tys
   = do	{ let pred = mkClassPred clas tys 
         ; instEnvs <- getInstEnvs
         ; case lookupInstEnv instEnvs clas tys of {
-            ([], unifs)               -- Nothing matches  
+            ([], unifs, _)               -- Nothing matches  
                 -> do { traceTcS "matchClass not matching"
                                  (vcat [ text "dict" <+> ppr pred, 
                                          text "unifs" <+> ppr unifs ]) 
                       ; return MatchInstNo  
                       } ;  
-	    ([(ispec, inst_tys)], []) -- A single match 
+	    ([(ispec, inst_tys)], [], _) -- A single match 
 		-> do	{ let dfun_id = is_dfun ispec
 			; traceTcS "matchClass success"
 				   (vcat [text "dict" <+> ppr pred, 
@@ -939,7 +939,7 @@ matchClass clas tys
 				  -- Record that this dfun is needed
                         ; return $ MatchInstSingle (dfun_id, inst_tys)
                         } ;
-     	    (matches, unifs)          -- More than one matches 
+     	    (matches, unifs, _)          -- More than one matches 
 		-> do	{ traceTcS "matchClass multiple matches, deferring choice"
 			           (vcat [text "dict" <+> ppr pred,
 				   	  text "matches" <+> ppr matches,

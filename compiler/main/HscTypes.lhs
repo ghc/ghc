@@ -15,7 +15,7 @@ module HscTypes (
         -- * Information about modules
 	ModDetails(..),	emptyModDetails,
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
-        ImportedMods,
+        ImportedMods, ImportedModsVal,
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath,
@@ -91,6 +91,10 @@ module HscTypes (
         VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo, 
         noIfaceVectInfo,
 
+        -- * Safe Haskell information
+        IfaceTrustInfo, getSafeMode, setSafeMode, noIfaceTrustInfo,
+        trustInfoToNum, numToTrustInfo, IsSafeImport,
+
         -- * Compilation errors and warnings
         SourceError, GhcApiError, mkSrcErr, srcErrorMessages, mkApiErr,
         throwOneError, handleSourceError,
@@ -127,7 +131,7 @@ import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
-                          DynFlag(..) )
+                          DynFlag(..), SafeHaskellMode(..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -154,6 +158,7 @@ import Data.IORef
 import Data.Array       ( Array, array )
 import Data.List
 import Data.Map (Map)
+import Data.Word
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
 
@@ -680,8 +685,10 @@ data ModIface
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt. the old interface.
                         -- The 'OccName' is the parent of the name, if it has one.
-	mi_hpc    :: !AnyHpcUsage
+	mi_hpc    :: !AnyHpcUsage,
 	        -- ^ True if this program uses Hpc at any point in the program.
+	mi_trust  :: !IfaceTrustInfo
+	        -- ^ Safe Haskell Trust information for this module.
      }
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
@@ -711,7 +718,9 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
                              } 
 
 -- | Records the modules directly imported by a module for extracting e.g. usage information
-type ImportedMods = ModuleEnv [(ModuleName, Bool, SrcSpan)]
+type ImportedMods = ModuleEnv [ImportedModsVal]
+type ImportedModsVal = (ModuleName, Bool, SrcSpan, IsSafeImport)
+
 -- TODO: we are not actually using the codomain of this type at all, so it can be
 -- replaced with ModuleEnv ()
 
@@ -852,7 +861,8 @@ emptyModIface mod
 	       mi_warn_fn    = emptyIfaceWarnCache,
 	       mi_fix_fn    = emptyIfaceFixCache,
 	       mi_hash_fn   = emptyIfaceHashCache,
-	       mi_hpc       = False
+	       mi_hpc       = False,
+	       mi_trust     = noIfaceTrustInfo
     }		
 \end{code}
 
@@ -1425,7 +1435,7 @@ type IsBootInterface = Bool
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ Home-package module dependencies
-	 , dep_pkgs   :: [PackageId]
+	 , dep_pkgs   :: [(PackageId, Bool)]
 	                -- ^ External package dependencies
 	 , dep_orphs  :: [Module]	    
 	                -- ^ Orphan modules (whether home or external pkg),
@@ -1448,7 +1458,10 @@ data Usage
   = UsagePackageModule {
         usg_mod      :: Module,
            -- ^ External package module depended on
-        usg_mod_hash :: Fingerprint
+        usg_mod_hash :: Fingerprint,
+	    -- ^ Cached module fingerprint
+        usg_safe :: IsSafeImport
+            -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from another package
   | UsageHomeModule {
         usg_mod_name :: ModuleName,
@@ -1459,9 +1472,11 @@ data Usage
             -- ^ Entities we depend on, sorted by occurrence name and fingerprinted.
             -- NB: usages are for parent names only, e.g. type constructors 
             -- but not the associated data constructors.
-	usg_exports  :: Maybe Fingerprint
+	usg_exports  :: Maybe Fingerprint,
             -- ^ Fingerprint for the export list we used to depend on this module,
             -- if we depend on the export list
+        usg_safe :: IsSafeImport
+            -- ^ Was this module imported as a safe import
     }                                           -- ^ Module from the current package
     deriving( Eq )
 	-- The export list field is (Just v) if we depend on the export list:
@@ -1790,6 +1805,61 @@ concatVectInfo = foldr plusVectInfo noVectInfo
 
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Safe Haskell Support}
+%*									*
+%************************************************************************
+
+This stuff here is related to supporting the Safe Haskell extension,
+primarily about storing under what trust type a module has been compiled.
+
+\begin{code}
+-- | Is an import a safe import?
+type IsSafeImport = Bool
+
+-- | Safe Haskell information for 'ModIface'
+-- Simply a wrapper around SafeHaskellMode to sepperate iface and flags
+newtype IfaceTrustInfo = TrustInfo SafeHaskellMode
+
+getSafeMode :: IfaceTrustInfo -> SafeHaskellMode
+getSafeMode (TrustInfo x) = x
+
+setSafeMode :: SafeHaskellMode -> IfaceTrustInfo
+setSafeMode = TrustInfo
+
+noIfaceTrustInfo :: IfaceTrustInfo
+noIfaceTrustInfo = setSafeMode Sf_None
+
+trustInfoToNum :: IfaceTrustInfo -> Word8
+trustInfoToNum it
+  = case getSafeMode it of
+            Sf_None -> 0
+            Sf_SafeImports -> 1
+            Sf_SafeLanguage -> 2
+            Sf_Trustworthy -> 3
+            Sf_TrustworthyWithSafeLanguage -> 4
+            Sf_Safe -> 5
+
+numToTrustInfo :: Word8 -> IfaceTrustInfo
+numToTrustInfo 0 = setSafeMode Sf_None
+numToTrustInfo 1 = setSafeMode Sf_SafeImports
+numToTrustInfo 2 = setSafeMode Sf_SafeLanguage
+numToTrustInfo 3 = setSafeMode Sf_Trustworthy
+numToTrustInfo 4 = setSafeMode Sf_TrustworthyWithSafeLanguage
+numToTrustInfo 5 = setSafeMode Sf_Safe
+numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
+
+instance Outputable IfaceTrustInfo where
+    ppr (TrustInfo Sf_None)         = ptext $ sLit "none"
+    ppr (TrustInfo Sf_SafeImports)  = ptext $ sLit "safe-imports"
+    ppr (TrustInfo Sf_SafeLanguage) = ptext $ sLit "safe-language"
+    ppr (TrustInfo Sf_Trustworthy)  = ptext $ sLit "trustworthy"
+    ppr (TrustInfo Sf_TrustworthyWithSafeLanguage)
+                                    = ptext $ sLit "trustworthy + safe-language"
+    ppr (TrustInfo Sf_Safe)         = ptext $ sLit "safe"
 \end{code}
 
 %************************************************************************

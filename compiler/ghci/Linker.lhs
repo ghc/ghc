@@ -637,7 +637,7 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 
             boot_deps' = filter (not . (`elementOfUniqSet` acc_mods)) boot_deps
             acc_mods'  = addListToUniqSet acc_mods (moduleName mod : mod_deps)
-            acc_pkgs'  = addListToUniqSet acc_pkgs pkg_deps
+            acc_pkgs'  = addListToUniqSet acc_pkgs $ map fst pkg_deps
           --
           if pkg /= this_pkg
              then follow_deps mods acc_mods (addOneToUniqSet acc_pkgs' pkg)

@@ -1073,7 +1073,7 @@ checkFlag flag (dflags, _)
   where
     why = ptext (sLit "You need -X") <> text flag_str 
           <+> ptext (sLit "to derive an instance for this class")
-    flag_str = case [ s | (s, f, _) <- xFlags, f==flag ] of
+    flag_str = case [ s | (s, _, f, _) <- xFlags, f==flag ] of
                  [s]   -> s
                  other -> pprPanic "checkFlag" (ppr other)
 
@@ -1490,8 +1490,8 @@ the renamer.  What a great hack!
 -- Representation tycons differ from the tycon in the instance signature in
 -- case of instances for indexed families.
 --
-genInst :: Bool 	-- True <=> standalone deriving
-	-> OverlapFlag
+genInst :: Bool             -- True <=> standalone deriving
+        -> OverlapFlag
         -> DerivSpec -> TcM (InstInfo RdrName, DerivAuxBinds)
 genInst standalone_deriv oflag
         spec@(DS { ds_tc = rep_tycon, ds_tc_args = rep_tc_args
@@ -1641,7 +1641,8 @@ genGenericAll tc =
 -}
 genDtMeta :: (TyCon, MetaTyCons) -> TcM [(InstInfo RdrName, DerivAuxBinds)]
 genDtMeta (tc,metaDts) =
-  do  dClas <- tcLookupClass datatypeClassName
+  do  dflags <- getDOpts
+      dClas <- tcLookupClass datatypeClassName
       d_dfun_name <- new_dfun_name dClas tc
       cClas <- tcLookupClass constructorClassName
       c_dfun_names <- sequence [ new_dfun_name cClas tc | _ <- metaC metaDts ]
@@ -1652,11 +1653,12 @@ genDtMeta (tc,metaDts) =
       fix_env <- getFixityEnv
 
       let
+        safeOverlap = safeLanguageOn dflags
         (dBinds,cBinds,sBinds) = mkBindsMetaD fix_env tc
         
         -- Datatype
         d_metaTycon = metaD metaDts
-        d_inst = mkLocalInstance d_dfun NoOverlap
+        d_inst = mkLocalInstance d_dfun $ NoOverlap safeOverlap
         d_binds = VanillaInst dBinds [] False
         d_dfun  = mkDictFunId d_dfun_name (tyConTyVars tc) [] dClas 
                     [ mkTyConTy d_metaTycon ]
@@ -1664,7 +1666,7 @@ genDtMeta (tc,metaDts) =
         
         -- Constructor
         c_metaTycons = metaC metaDts
-        c_insts = [ mkLocalInstance (c_dfun c ds) NoOverlap 
+        c_insts = [ mkLocalInstance (c_dfun c ds) $ NoOverlap safeOverlap
                   | (c, ds) <- myZip1 c_metaTycons c_dfun_names ]
         c_binds = [ VanillaInst c [] False | c <- cBinds ]
         c_dfun c dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] cClas 
@@ -1674,7 +1676,8 @@ genDtMeta (tc,metaDts) =
         
         -- Selector
         s_metaTycons = metaS metaDts
-        s_insts = map (map (\(s,ds) -> mkLocalInstance (s_dfun s ds) NoOverlap))
+        s_insts = map (map (\(s,ds) -> mkLocalInstance (s_dfun s ds) $
+                                                  NoOverlap safeOverlap))
                     (myZip2 s_metaTycons s_dfun_names)
         s_binds = [ [ VanillaInst s [] False | s <- ss ] | ss <- sBinds ]
         s_dfun s dfun_name = mkDictFunId dfun_name (tyConTyVars tc) [] sClas

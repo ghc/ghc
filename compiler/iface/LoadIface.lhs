@@ -666,7 +666,9 @@ pprModIface iface
 	, vcat (map ppr (mi_fam_insts iface))
 	, vcat (map ppr (mi_rules iface))
         , pprVectInfo (mi_vect_info iface)
+        , pprVectInfo (mi_vect_info iface)
 	, ppr (mi_warns iface)
+	, pprTrustInfo (mi_trust iface)
  	]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
@@ -695,26 +697,34 @@ pprExport (mod, items)
 
 pprUsage :: Usage -> SDoc
 pprUsage usage@UsagePackageModule{}
-  = hsep [ptext (sLit "import"), ppr (usg_mod usage), 
-	  ppr (usg_mod_hash usage)]
+  = pprUsageImport usage usg_mod
 pprUsage usage@UsageHomeModule{}
-  = hsep [ptext (sLit "import"), ppr (usg_mod_name usage), 
-	  ppr (usg_mod_hash usage)] $$
+  = pprUsageImport usage usg_mod_name $$
     nest 2 (
 	maybe empty (\v -> text "exports: " <> ppr v) (usg_exports usage) $$
         vcat [ ppr n <+> ppr v | (n,v) <- usg_entities usage ]
         )
 
+pprUsageImport :: Outputable a => Usage -> (Usage -> a) -> SDoc
+pprUsageImport usage usg_mod'
+  = hsep [ptext (sLit "import"), safe, ppr (usg_mod' usage),
+                       ppr (usg_mod_hash usage)]
+    where
+        safe | usg_safe usage = ptext $ sLit "safe"
+             | otherwise      = ptext $ sLit " -/ "
+
 pprDeps :: Dependencies -> SDoc
 pprDeps (Deps { dep_mods = mods, dep_pkgs = pkgs, dep_orphs = orphs,
 		dep_finsts = finsts })
   = vcat [ptext (sLit "module dependencies:") <+> fsep (map ppr_mod mods),
-	  ptext (sLit "package dependencies:") <+> fsep (map ppr pkgs), 
+	  ptext (sLit "package dependencies:") <+> fsep (map ppr_pkg pkgs),
 	  ptext (sLit "orphans:") <+> fsep (map ppr orphs),
 	  ptext (sLit "family instance modules:") <+> fsep (map ppr finsts)
 	]
   where
     ppr_mod (mod_name, boot) = ppr mod_name <+> ppr_boot boot
+    ppr_pkg (pkg,trust_req)  = ppr pkg <>
+                               (if trust_req then text "*" else empty)
     ppr_boot True  = text "[boot]"
     ppr_boot False = empty
 
@@ -742,6 +752,9 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
   , ptext (sLit "scalar variables:") <+> hsep (map ppr scalarVars)
   , ptext (sLit "scalar tycons:") <+> hsep (map ppr scalarTyCons)
   ]
+
+pprTrustInfo :: IfaceTrustInfo -> SDoc
+pprTrustInfo trust = ptext (sLit "trusted:") <+> ppr trust
 
 instance Outputable Warnings where
     ppr = pprWarns
