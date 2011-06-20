@@ -1,4 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Evaluator.Syntax where
+
+#include "HsVersions.h"
 
 import Supercompile.Evaluator.Deeds
 
@@ -9,6 +12,14 @@ import Supercompile.Core.Syntax
 import Supercompile.Core.Tag
 
 import Supercompile.Utilities
+
+import Id       (idType)
+import PrimOp   (primOpType)
+import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType)
+import Pair     (pSnd)
+import DataCon  (dataConWorkId)
+import Literal  (literalType)
+import Coercion (coercionKind)
 
 import qualified Data.Map as M
 import Data.Traversable (Traversable(..))
@@ -200,6 +211,63 @@ instance Outputable StackFrame where
         CastIt co'                -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
 
 
+renameAnned :: (InScopeSet -> Renaming -> a -> a)
+            -> Anned (In a) -> a
+renameAnned rename in_x = x'
+  where (rn, x) = annee in_x
+        x' = rename (mkInScopeSet (annedFreeVars in_x)) rn x
+
+stateType :: State -> Type
+stateType (_, _, k, qa) = stackType k (qaType qa)
+
+stackType :: Stack -> Type -> Type
+stackType k ty = foldl' (flip stackFrameType) ty k
+
+stackFrameType :: Tagged StackFrame -> Type -> Type
+stackFrameType kf hole_ty = case tagee kf of
+    Apply x                   -> hole_ty `applyFunTy` idType x
+    TyApply ty                -> hole_ty `applyTy` ty
+    Scrutinise _ ty _         -> ty
+    PrimApply pop in_as in_es -> (primOpType pop `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> annedTermType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
+    Update _                  -> hole_ty
+    CastIt co                 -> pSnd (coercionKind co)
+
+qaType :: Anned QA -> Type
+qaType qa = case annee qa of
+    Question x' -> idType x'
+    Answer a    -> answerType (fmap (const a) qa)
+
+answerType :: Anned Answer -> Type
+answerType a = case annee a of
+    (Just (co, _), _)       -> pSnd (coercionKind co)
+    (Nothing,      (rn, v)) -> annedValueType' (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
+
+annedValueType' :: ValueF Anned -> Type
+annedValueType' (Indirect x)    = idType x
+annedValueType' (TyLambda x e)  = x `mkForAllTy` annedTermType e
+annedValueType' (Lambda x e)    = idType x `mkFunTy` annedTermType e
+annedValueType' (Data dc as xs) = (idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map idType xs
+annedValueType' (Literal l)     = literalType l
+
+annedTermType :: AnnedTerm -> Type
+annedTermType e = case annee e of
+    Var x         -> idType x
+    Value v       -> annedValueType' v
+    App e x       -> annedTermType e `applyFunTy` idType x
+    TyApp e a     -> annedTermType e `applyTy` a
+    PrimOp pop es -> primOpType pop `applyFunTys` map annedTermType es
+    Case _ _ ty _ -> ty
+    LetRec _ e    -> annedTermType e
+    Cast _ co     -> pSnd (coercionKind co)
+
+applyFunTy :: Type -> Type -> Type
+applyFunTy fun_ty got_arg_ty = ASSERT2(got_arg_ty `eqType` expected_arg_ty, text "applyFunTy:" <+> ppr got_arg_ty <+> ppr expected_arg_ty) res_ty
+  where (expected_arg_ty, res_ty) = splitFunTy fun_ty
+
+applyFunTys :: Type -> [Type] -> Type
+applyFunTys = foldl' applyFunTy
+
+
 heapBindingTerm :: HeapBinding -> Maybe (In AnnedTerm)
 heapBindingTerm = either (const Nothing) Just . heapBindingMeaning
 
@@ -225,6 +293,7 @@ stateSize :: State -> Size
 stateSize (_, h, k, qa) = heapSize h + stackSize k + annedSize qa
   where heapSize (Heap h _) = sum (map heapBindingSize (M.elems h))
         stackSize = sum . map (stackFrameSize . tagee)
+
 
 addStateDeeds :: Deeds -> (Deeds, a, b, c) -> (Deeds, a, b, c)
 addStateDeeds extra_deeds (deeds, h, k, in_e) = (extra_deeds + deeds, h, k, in_e)

@@ -1,4 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Core.FreeVars (
     module Supercompile.Core.FreeVars,
     module VarSet,
@@ -105,6 +106,9 @@ instance Ord1 FVed where
 
 instance Outputable1 FVed where
     pprPrec1 prec (FVed _ x) = pprPrec prec x
+
+instance Outputable a => Outputable (FVed a) where
+    pprPrec = pprPrec1
 
 
 type FVedTerm = FVed (TermF FVed)

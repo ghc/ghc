@@ -1,4 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Core.Size where
 
 import Supercompile.Core.FreeVars

@@ -451,13 +451,16 @@ Library
         Supercompile.Core.FreeVars
         Supercompile.Drive.Match
         Supercompile.Drive.Split
+        Supercompile.Drive.Process
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars
         Supercompile.Evaluator.Residualise
         Supercompile.Evaluator.Syntax
         Supercompile.StaticFlags
+        Supercompile.Termination.Combinators
         Supercompile.Termination.Generaliser
+        Supercompile.Termination.TagBag
         Supercompile.Utilities
         Supercompile
         Vectorise.Builtins.Base

@@ -17,6 +17,8 @@ module Supercompile.Utilities (
 
 import UniqSupply
 import Unique (Unique, getKey)
+import UniqFM (UniqFM, eltsUFM)
+import Maybes (expectJust)
 import Outputable
 
 import Control.Arrow (first, second, (***), (&&&))
@@ -31,6 +33,8 @@ import Data.List
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as S
+import qualified Data.Map as M
+import qualified Data.Graph as G
 import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 
@@ -293,6 +297,11 @@ plusMaybe f (Just x) (Just y) = Just (f x y)
 plusMaybe _ Nothing  mb_y     = mb_y
 plusMaybe _ mb_x     Nothing  = mb_x
 
+extractJusts :: (a -> Maybe b) -> [a] -> ([b], [a])
+extractJusts p = foldr step ([], [])
+  where step x rest | Just y <- p x = first  (y:) rest
+                    | otherwise     = second (x:) rest
+
 
 first3 :: (a -> d) -> (a, b, c) -> (d, b, c)
 first3 f (a, b, c) = (f a, b, c)
@@ -320,9 +329,19 @@ uncons :: [a] -> Maybe (a, [a])
 uncons []     = Nothing
 uncons (x:xs) = Just (x, xs)
 
+safeHead :: [a] -> Maybe a
+safeHead []    = Nothing
+safeHead (x:_) = Just x
+
+expectHead :: String -> [a] -> a
+expectHead s = expectJust s . safeHead
+
 splitBy :: [b] -> [a] -> ([a], [a])
 splitBy []     xs     = ([], xs)
 splitBy (_:ys) (x:xs) = first (x:) $ splitBy ys xs
+
+splitByReverse :: [b] -> [a] -> ([a], [a])
+splitByReverse ys xs = case splitBy ys (reverse xs) of (xs1, xs2) -> (reverse xs2, reverse xs1)
 
 splitManyBy :: [[b]] -> [a] -> [[a]]
 splitManyBy []       xs = [xs]
@@ -333,6 +352,9 @@ listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs
 
 bagContexts :: [a] -> [(a, [a])]
 bagContexts xs = [(x, is ++ ts) | (is, x, ts) <- listContexts xs]
+
+dropLastWhile :: (a -> Bool) -> [a] -> [a]
+dropLastWhile p = reverse . dropWhile p . reverse
 
 takeWhileJust :: (a -> Maybe b) -> [a] -> ([b], [a])
 takeWhileJust f = go
@@ -350,6 +372,43 @@ accumLN f = go
 
 sumMap :: (Foldable.Foldable f, Num b) => (a -> b) -> f a -> b
 sumMap f = Foldable.foldr (\x n -> f x + n) 0
+
+
+-- | Orders elements of a map into dependency order insofar as that is possible.
+--
+-- This function ignores any elements reported as reachable that are not present in the input.
+--
+-- An element (b1 :: b) strictly precedes (b2 :: b) in the output whenever b1 is reachable from b2 but not vice versa.
+-- Element b1 occurs in the same SCC as b2 whenever both b1 is reachable from b2 and b1 is reachable from b2.
+topologicalSort :: Ord a => (b -> UniqFM a) -> M.Map a b -> [M.Map a b]
+topologicalSort f got = [M.fromList [(a, b) | (b, a, _) <- G.flattenSCC scc] | scc <- G.stronglyConnCompR [(b, a, eltsUFM (f b)) | (a, b) <- M.toList got]]
+
+
+restrict :: Ord k => M.Map k v -> S.Set k -> M.Map k v
+-- restrict m s
+--   | M.size m < S.size s = M.filterWithKey (\k _ -> k `S.member` s) m                                                   -- O(m * log s)
+--   | otherwise           = S.fold (\k out -> case M.lookup k m of Nothing -> out; Just v -> M.insert k v out) M.empty s -- O(s * log m)
+restrict m s = M.fromDistinctAscList $ merge (M.toAscList m) (S.toAscList s)
+  where
+    -- Theoretically O(m + s), so should outperform previous algorithm...
+    merge _              []       = []
+    merge []             _        = []
+    merge ((k_m, v):kvs) (k_s:ks) = case compare k_m k_s of
+        LT ->          merge kvs            (k_s:ks)
+        EQ -> (k_m, v):merge kvs            ks
+        GT ->          merge ((k_m, v):kvs) ks
+
+exclude :: Ord k => M.Map k v -> S.Set k -> M.Map k v
+--exclude m s = M.filterWithKey (\k _ -> k `S.notMember` s) m -- O(m * log s)
+exclude m s = M.fromDistinctAscList $ merge (M.toAscList m) (S.toAscList s)
+  where
+    -- Theoretically O(m + s), so should outperform previous algorithm...
+    merge kvs            []       = kvs
+    merge []             _        = []
+    merge ((k_m, v):kvs) (k_s:ks) = case compare k_m k_s of
+        LT -> (k_m, v):merge kvs            (k_s:ks)
+        EQ ->          merge kvs            ks
+        GT ->          merge ((k_m, v):kvs) ks
 
 
 class (Functor t, Foldable.Foldable t) => Accumulatable t where
@@ -419,4 +478,4 @@ apportion orig_n weighting
 {-# NOINLINE prettyUniqSupply #-}
 supercompileUniqSupply, parseUniqSupply, expandUniqSupply, reduceUniqSupply, tagUniqSupply, prettyUniqSupply, matchUniqSupply, splitterUniqSupply :: UniqSupply
 supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
-(parseUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:splitterUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply
+(hFunctionsUniqSupply:parseUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:splitterUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply

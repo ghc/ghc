@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Core.Tag where
 
 import Supercompile.Utilities

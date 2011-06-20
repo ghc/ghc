@@ -1,4 +1,5 @@
 {-# LANGUAGE Rank2Types #-}
+{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module Supercompile.Core.Renaming (
     module Supercompile.Core.Renaming,
     InScopeSet, emptyInScopeSet, mkInScopeSet
@@ -11,7 +12,7 @@ import Supercompile.Utilities
 
 import CoreSubst
 import Coercion (CvSubstEnv, isCoVar, mkCoVarCo)
-import qualified CoreSyn as CoreSyn (CoreExpr, Expr(Var, Cast))
+import qualified CoreSyn as CoreSyn (CoreExpr, Expr(Var))
 import Type     (mkTyVarTy)
 import Var      (CoVar, TyVar, isTyVar)
 import VarEnv

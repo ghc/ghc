@@ -5,7 +5,7 @@ import Supercompile.Core.Renaming (Out)
 
 import Supercompile.Evaluator.Syntax
 
-import Supercompile.Utilities (Tagged, tag, Tag, tagInt, injectTag, FinMap, FinSet)
+import Supercompile.Utilities (Nat, Tagged, tag, Tag, tagInt, injectTag, FinMap, FinSet)
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -19,8 +19,8 @@ data Generaliser = Generaliser {
 generaliseNothing :: Generaliser
 generaliseNothing = Generaliser (\_ -> False) (\_ _ -> False)
     
-generaliserFromGrowing :: FinMap Bool -> Generaliser
-generaliserFromGrowing = generaliserFromFinSet . IM.keysSet . IM.filter id
+generaliserFromGrowing :: (a -> FinMap Nat) -> a -> a -> Generaliser
+generaliserFromGrowing extract x y = generaliserFromFinSet (IM.keysSet (IM.filter id (IM.intersectionWith (<) (extract x) (extract y))))
 
 generaliserFromFinSet :: FinSet -> Generaliser
 generaliserFromFinSet generalise_what = Generaliser {

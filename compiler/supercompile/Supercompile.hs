@@ -13,6 +13,7 @@ import Supercompile.Termination.Generaliser
 
 import Supercompile.Drive.Match
 import Supercompile.Drive.Split
+import Supercompile.Drive.Process ()
 
 -- import CoreSyn
 -- 

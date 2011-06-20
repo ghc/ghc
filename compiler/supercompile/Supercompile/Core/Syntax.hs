@@ -219,18 +219,18 @@ literal = value . Literal
 lambda :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann)
 lambda x = value . Lambda x
 
-lambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
-lambdas = flip $ foldr lambda
-
 data_ :: Symantics ann => DataCon -> [Var] -> ann (TermF ann)
 data_ dc = value . Data dc
+-}
+
+lambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
+lambdas = flip $ foldr (\x -> value . Lambda x)
 
 apps :: Symantics ann => ann (TermF ann) -> [Var] -> ann (TermF ann)
 apps = foldl app
 
 varApps :: Symantics ann => Var -> [Var] -> ann (TermF ann)
 varApps h xs = var h `apps` xs
--}
 
 letRecSmart :: Symantics ann => [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
 letRecSmart []  = id
