@@ -38,12 +38,14 @@ evaluatePrim tg pop args = do
     to :: Answer -> Maybe CoreSyn.CoreExpr
     to (mb_co, (rn, v)) = fmap (maybe id (flip CoreSyn.Cast . fst) mb_co) $ case v of
         Literal l      -> Just (CoreSyn.Lit l)
+        Coercion co    -> Just (CoreSyn.Coercion co)
         Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` tys `CoreSyn.mkVarApps` map (rename rn) xs)
         _              -> Nothing
     
     fro :: CoreSyn.CoreExpr -> Maybe Answer
-    fro (CoreSyn.Cast e co) = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
-    fro (CoreSyn.Lit l)     = Just (Nothing, (emptyRenaming, Literal l))
+    fro (CoreSyn.Cast e co)   = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
+    fro (CoreSyn.Lit l)       = Just (Nothing, (emptyRenaming, Literal l))
+    fro (CoreSyn.Coercion co) = Just (Nothing, (mkIdentityRenaming (tyCoVarsOfCo co), Coercion co))
     fro e | CoreSyn.Var f <- e_fun, Just dc <- isDataConId_maybe f, [] <- e_args'' = Just (Nothing, (mkIdentityRenaming (unionVarSets (map tyVarsOfType tys) `extendVarSetList` xs), Data dc tys xs))
           | otherwise = Nothing
       where (e_fun, e_args) = CoreSyn.collectArgs e
@@ -85,25 +87,27 @@ step' normalising state =
     go state
   where
     go :: (Deeds, Heap, Stack, In AnnedTerm) -> (Bool, State)
-    go (deeds, h@(Heap _ ids), k, (rn, e)) 
-     | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, h, k, anned_a)
+    go (deeds, heap@(Heap h ids), k, (rn, e)) 
+     | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, heap, k, anned_a)
      | otherwise = case annee e of
-        Var x             -> go_question (deeds, h, k, fmap (const (rename rn x)) e)
-        TyApp e ty        -> go (deeds, h, Tagged tg (TyApply (renameType ids rn ty))                             : k, (rn, e))
-        App e x           -> go (deeds, h, Tagged tg (Apply (rename rn x))                                        : k, (rn, e))
-        PrimOp pop (e:es) -> go (deeds, h, Tagged tg (PrimApply pop [] (map ((,) rn) es))                         : k, (rn, e))
-        Case e x ty alts  -> go (deeds, h, Tagged tg (Scrutinise (rename rn x) (renameType ids rn ty) (rn, alts)) : k, (rn, e))
-        Cast e co         -> go (deeds, h, Tagged tg (CastIt (renameCoercion ids rn co))                          : k, (rn, e))
-        LetRec xes e      -> go (allocate (deeds + 1) h k (rn, (xes, e)))
+        Var x             -> go_question (deeds, heap, k, fmap (const (rename rn x)) e)
+        TyApp e ty        -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                   : k, (rn, e))
+        App e x           -> go (deeds, heap,        Tagged tg (Apply (rename rn x))                              : k, (rn, e))
+        PrimOp pop (e:es) -> go (deeds, heap,        Tagged tg (PrimApply pop [] (map ((,) rn) es))               : k, (rn, e))
+        Case e x ty alts  -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts)) : k, (rn, e))
+          where (ids', rn', x') = renameNonRecBinder ids rn x
+        Cast e co         -> go (deeds, heap,        Tagged tg (CastIt (renameCoercion ids rn co))                : k, (rn, e))
+        Let x e1 e2
+          | isUnLiftedType (idType x) -> go (deeds,     Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
+          | otherwise                 -> go (deeds + 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                      k, (rn', e2))
+          where (ids', rn', (x', in_e1)) = renameNonRecBound ids rn (x, e1)
+        LetRec xes e      -> go (deeds + 1, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
+          where (ids', rn', xes') = renameBounds ids rn xes
         _                 -> panic "reduced" (text "Impossible expression" $$ ppr1 e)
       where tg = annedTag e
 
     go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) (\s -> (True, normalise s)) $ force  deeds h k (annedTag anned_x) (annee anned_x)
     go_answer   (deeds, h, k, anned_a) = maybe (False, (deeds, h, k, fmap Answer anned_a))   (\s -> (True, normalise s)) $ unwind deeds h k (annedTag anned_a) (annee anned_a)
-
-    allocate :: Deeds -> Heap -> Stack -> In ([(Var, AnnedTerm)], AnnedTerm) -> UnnormalisedState
-    allocate deeds (Heap h ids) k (rn, (xes, e)) = (deeds, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
-      where (ids', rn', xes') = renameBounds ids rn xes
 
     prepareAnswer :: Deeds
                   -> Out Var -- ^ Name to which the value is bound
@@ -149,6 +153,7 @@ step' normalising state =
         Apply x2'                 -> apply      deeds       (tag kf) h k      in_v x2'
         Scrutinise x' ty' in_alts -> scrutinise (deeds + 1)          h k tg_v in_v x' ty' in_alts
         PrimApply pop in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop in_vs in_v in_es
+        StrictLet x' in_e2        -> strictLet  (deeds + 1)          h k tg_v in_v x' in_e2
         CastIt co'                -> cast       deeds       (tag kf) h k      in_v co'
         Update x'
           | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
@@ -187,7 +192,7 @@ step' normalising state =
                               claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
               Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
                                         claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
-                where (ids', rn', [y']) = renameNonRecBinders ids rn [x `setIdType` arg_co_from_ty']
+                where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
                       [arg_co', res_co'] = decomposeCo 2 co'
                       e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` mkSymCo arg_co')
@@ -234,7 +239,7 @@ step' normalising state =
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
                                                                Nothing     -> return (deeds2, h1, ids, insertRenamings rn_alts' (alt_ys `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (x', alt_y, (dc_co, tg_co)) -> let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
-                                                                                                                                                  (ids', rn_alts', [y']) = renameNonRecBinders ids rn_alts [alt_y `setIdType` dc_co_to_ty']
+                                                                                                                                                  (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
                                                                                                                                                   e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` dc_co)
                                                                                                                                               in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
                                                                                     (deeds2, h1, ids, rn_alts') (zip3 xs' alt_ys dc_cos)
@@ -265,6 +270,9 @@ step' normalising state =
             deeds <- claimDeeds (deeds + sum (map annedSize anned_as) + answerSize' a + 1) (annedSize a') -- I don't think this can ever fail
             return (denormalise (deeds, h, k, fmap Answer a'))
         primop deeds tg_kf h k tg_a pop anned_as a (in_e:in_es) = Just (deeds, h, Tagged tg_kf (PrimApply pop (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
+
+        strictLet :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
+        strictLet deeds (Heap h ids) k tg_a a x' in_e2 = Just (deeds, Heap (M.insert x' (internallyBound (annedAnswerToAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, in_e2)
 
         cast :: Deeds -> Tag -> Heap -> Stack -> Answer -> Coercion -> Maybe UnnormalisedState
         cast deeds tg_kf (Heap h ids) k (mb_co, in_v) co' = Just (deeds', Heap h ids, k, annedAnswerToAnnedTerm ids (annedAnswer tg_kf ans'))

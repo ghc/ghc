@@ -445,13 +445,14 @@ Library
         UniqFM
         UniqSet
         Util
+        Supercompile.Core.FreeVars
         Supercompile.Core.Renaming
+        Supercompile.Core.Size
         Supercompile.Core.Syntax
         Supercompile.Core.Tag
-        Supercompile.Core.FreeVars
         Supercompile.Drive.Match
-        Supercompile.Drive.Split
         Supercompile.Drive.Process
+        Supercompile.Drive.Split
         Supercompile.Evaluator.Deeds
         Supercompile.Evaluator.Evaluate
         Supercompile.Evaluator.FreeVars

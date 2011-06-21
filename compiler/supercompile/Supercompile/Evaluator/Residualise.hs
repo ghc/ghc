@@ -48,6 +48,7 @@ residualiseStackFrame _   (Apply x2')                e1 = (([], []), e1 `app` x2
 residualiseStackFrame _   (TyApply ty')              e  = (([], []), e `tyApp` ty')
 residualiseStackFrame ids (Scrutinise x' ty in_alts) e  = (([], []), case_ e x' ty (detagAnnedAlts $ renameIn (renameAnnedAlts ids) in_alts))
 residualiseStackFrame ids (PrimApply pop as es')     e  = (([], []), primOp pop (map (residualiseAnswer ids . annee) as ++ e : map (residualiseTerm ids) es'))
+residualiseStackFrame ids (StrictLet x' in_e2)       e1 = (([], []), let_ x' e1 (residualiseTerm ids in_e2))
 residualiseStackFrame _   (Update x')                e  = (([], [(x', e)]), var x')
 residualiseStackFrame _   (CastIt co')               e  = (([], []), e `cast` co')
 

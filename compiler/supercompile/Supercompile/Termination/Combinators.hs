@@ -114,13 +114,13 @@ zipPair (f, g) (a, d) (b, e) = (f a b, g d e)
 -- | Type class of zippable things. Instances should satisfy the laws:
 --
 -- Naturality:
---   > fmap (f *** g) (zip_ as bs) == zip_ (fmap f as) (fmap g bs)
+-- > fmap (f *** g) (zip_ as bs) == zip_ (fmap f as) (fmap g bs)
 --
 -- Information preservation:
---   > fmap (const ()) as == fmap (const ()) bs
---   >  ==>
---   > fmap fst (zip_ ma mb) == ma
---   > fmap snd (zip_ ma mb) == mb
+-- > fmap (const ()) as == fmap (const ()) bs
+-- >  ==>
+-- > fmap fst (zip_ ma mb) == ma
+-- > fmap snd (zip_ ma mb) == mb
 class Functor z => Zippable z where
     zip_ :: z a -> z b -> z (a, b)
     zip_ = zipWith_ (,)

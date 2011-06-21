@@ -111,20 +111,31 @@ renameCoercion iss rn = substCo (joinSubst iss rn)
 renameIn :: (Renaming -> a -> a) -> In a -> a
 renameIn f (rn, x) = f rn x
 
-renameBinders, renameNonRecBinders :: InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
-renameBinders       = renameBinders' substRecBndrs
-renameNonRecBinders = renameBinders' substBndrs
 
-renameBinders' :: (Subst -> [Var] -> (Subst, [Var]))
-               -> InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
-renameBinders' subst_bndrs iss rn xs = (iss', rn', xs')
-  where (subst', xs') = subst_bndrs (joinSubst iss rn) xs
+renameBinders :: InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
+renameBinders iss rn xs = (iss', rn', xs')
+  where (subst', xs') = substRecBndrs (joinSubst iss rn) xs
         (iss', rn') = splitSubst subst'
+
+renameNonRecBinder :: InScopeSet -> Renaming -> Var -> (InScopeSet, Renaming, Var)
+renameNonRecBinder iss rn x = (iss', rn', x')
+  where (subst', x') = substBndr (joinSubst iss rn) x
+        (iss', rn') = splitSubst subst'
+
+renameNonRecBinders :: InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
+renameNonRecBinders iss rn xs = (iss', rn', xs')
+  where (subst', xs') = substBndrs (joinSubst iss rn) xs
+        (iss', rn') = splitSubst subst'
+
 
 renameBounds :: InScopeSet -> Renaming -> [(Var, a)] -> (InScopeSet, Renaming, [(Var, In a)])
 renameBounds iss rn xes = (iss', rn', xs' `zip` map ((,) rn') es)
   where (xs, es) = unzip xes
         (iss', rn', xs') = renameBinders iss rn xs
+
+renameNonRecBound :: InScopeSet -> Renaming -> (Var, a) -> (InScopeSet, Renaming, (Var, In a))
+renameNonRecBound iss rn (x, e) = (iss', rn', (x', (rn, e)))
+  where (iss', rn', x') = renameNonRecBinder iss rn x
 
 
 (renameTerm,                renameAlts,                renameValue,                renameValue')                = mkRename (\f rn (I e) -> I (f rn e))
@@ -148,7 +159,9 @@ mkRename rec = (term, alternatives, value, value')
       App e x -> App (term ids rn e) (rename rn x)
       PrimOp pop es -> PrimOp pop (map (term ids rn) es)
       Case e x ty alts -> Case (term ids rn e) x' (renameType ids rn ty) (alternatives ids' rn' alts)
-        where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
+        where (ids', rn', x') = renameNonRecBinder ids rn x
+      Let x e1 e2 -> Let x' (renameIn (term ids) in_e1) (term ids' rn' e2)
+        where (ids', rn', (x', in_e1)) = renameNonRecBound ids rn (x, e1)
       LetRec xes e -> LetRec (map (second (renameIn (term ids'))) xes') (term ids' rn' e)
         where (ids', rn', xes') = renameBounds ids rn xes
       Cast e co -> Cast (term ids rn e) (renameCoercion ids rn co)
@@ -157,11 +170,12 @@ mkRename rec = (term, alternatives, value, value')
     value' ids rn v = case v of
       Indirect x -> Indirect (rename rn x)
       TyLambda x e -> TyLambda x' (term ids' rn' e)
-        where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
+        where (ids', rn', x') = renameNonRecBinder ids rn x
       Lambda x e -> Lambda x' (term ids' rn' e)
-        where (ids', rn', [x']) = renameNonRecBinders ids rn [x]
+        where (ids', rn', x') = renameNonRecBinder ids rn x
       Data dc tys xs -> Data dc (map (renameType ids rn) tys) (map (rename rn) xs)
       Literal l -> Literal l
+      Coercion co -> Coercion (renameCoercion ids rn co)
     
     alternatives ids rn = map (alternative ids rn)
     

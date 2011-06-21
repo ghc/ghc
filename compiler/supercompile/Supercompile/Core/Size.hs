@@ -45,6 +45,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
         App e x         -> term e + var' x
         PrimOp _ es     -> sum (map term es)
         Case e _ _ alts -> term e + alternatives alts
+        Let _ e1 e2     -> term e1 + term e2
         LetRec xes e    -> sum (map (term . snd) xes) + term e
         Cast e _        -> term e
     
@@ -55,6 +56,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
         Lambda _ e   -> term e
         Data _ _ _   -> 0
         Literal _    -> 0
+        Coercion _   -> 0
     
     alternatives = sum . map alternative
     
@@ -81,6 +83,7 @@ instance Symantics (O Sized FVed) where
     app e = sizedFVedTerm . App e
     primOp pop = sizedFVedTerm . PrimOp pop
     case_ e x ty = sizedFVedTerm . Case e x ty
+    let_ x e1 = sizedFVedTerm . Let x e1
     letRec xes = sizedFVedTerm . LetRec xes
     cast e = sizedFVedTerm . Cast e
 

@@ -29,10 +29,9 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities
 
-import OccName    (occNameString)
-import Var        (varName, isTyVar)
+import Var        (isTyVar)
 import Id         (mkLocalId)
-import Name       (Name, nameOccName, mkSystemVarName)
+import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 
@@ -347,7 +346,7 @@ partitionFulfilments :: (a -> fulfilment -> Maybe b)  -- ^ Decide whether a fulf
                      -> [fulfilment]                  -- ^ Fulfilments to partition
                      -> ([fulfilment], [fulfilment])  -- ^ Fulfilments that should be bound and those that should continue to float, respectively
 partitionFulfilments p combine = go
-  where go x fs -- | traceRender ("partitionFulfilments", x, map (fun . fst) fs) False = undefined
+  where go x fs -- traceRender ("partitionFulfilments", x, map (fun . fst) fs) False = undefined
                 | null fs_now' = ([], fs) 
                 | otherwise    = first (fs_now' ++) $ go (combine xs') fs'
                 where (fs_now_xs', fs') = extractJusts (\fulfilment -> fmap ((,) fulfilment) $ p x fulfilment) fs
@@ -382,7 +381,6 @@ bindFloats extra_statics mx mcont
 
 fulfilmentsToBinds :: [Fulfilment] -> Out [(Var, FVedTerm)]
 fulfilmentsToBinds fs = sortBy (comparing ((read :: String -> Int) . dropLastWhile (== '\'') . drop 1 . varString . fst)) [(fun p, e') | (p, e') <- fs]
-  where varString = occNameString . nameOccName . varName
 
 freshHName :: ScpM (Name, Name)
 freshHName = ScpM $ \_e s k -> k (expectHead "freshHName" (names s)) (s { names = tail (names s) })

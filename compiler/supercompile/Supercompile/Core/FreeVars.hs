@@ -48,6 +48,7 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     term' (App e x)          = idFreeVars x `unionVarSet` term e
     term' (PrimOp _ es)      = unionVarSets $ map term es
     term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` (alternatives alts `delVarSet` x)
+    term' (Let x e1 e2)      = term e1 `unionVarSet` (term e2 `delVarSet` x)
     term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e) `delVarSetList` xs
       where (xs, es) = unzip xes
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
@@ -58,6 +59,7 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     value' (Lambda x e)    = term e `delVarSet` x
     value' (Data _ tys xs) = unionVarSets $ map typ tys ++ map idFreeVars xs
     value' (Literal _)     = emptyVarSet
+    value' (Coercion co)   = tyCoVarsOfCo co
     
     alternatives = unionVarSets . map alternative
     
@@ -123,6 +125,7 @@ instance Symantics FVed where
     app e = fvedTerm . App e
     primOp pop = fvedTerm . PrimOp pop
     case_ e x ty = fvedTerm . Case e x ty
+    let_ x e1 = fvedTerm . Let x e1
     letRec xes = fvedTerm . LetRec xes
     cast e = fvedTerm . Cast e
 

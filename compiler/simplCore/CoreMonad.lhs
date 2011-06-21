@@ -245,6 +245,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoSpecConstr
+  | CoreDoSupercomp
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
                                            -- matching this string
@@ -273,6 +274,7 @@ coreDumpFlag CoreDoStrictness 	      = Just Opt_D_dump_stranal
 coreDumpFlag CoreDoWorkerWrapper      = Just Opt_D_dump_worker_wrapper
 coreDumpFlag CoreDoSpecialising       = Just Opt_D_dump_spec
 coreDumpFlag CoreDoSpecConstr         = Just Opt_D_dump_spec
+coreDumpFlag CoreDoSupercomp          = Just Opt_D_dump_supercomp
 coreDumpFlag CoreCSE                  = Just Opt_D_dump_cse 
 coreDumpFlag CoreDoVectorisation      = Just Opt_D_dump_vect
 coreDumpFlag CoreDesugar              = Just Opt_D_dump_ds 
@@ -296,6 +298,7 @@ instance Outputable CoreToDo where
   ppr CoreDoWorkerWrapper      = ptext (sLit "Worker Wrapper binds")
   ppr CoreDoSpecialising       = ptext (sLit "Specialise")
   ppr CoreDoSpecConstr         = ptext (sLit "SpecConstr")
+  ppr CoreDoSupercomp          = ptext (sLit "Supercompilation")
   ppr CoreCSE                  = ptext (sLit "Common sub-expression")
   ppr CoreDoVectorisation      = ptext (sLit "Vectorisation")
   ppr CoreDesugar              = ptext (sLit "Desugar (before optimization)")

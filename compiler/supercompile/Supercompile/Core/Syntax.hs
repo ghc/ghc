@@ -8,7 +8,9 @@ import Supercompile.Utilities
 import Supercompile.StaticFlags
 
 import DataCon  (DataCon)
-import Var      (Var)
+import Var      (Var, varName)
+import Name     (Name, nameOccName)
+import OccName  (occNameString)
 import Id       (idType)
 import Literal  (Literal)
 import Type     (Type)
@@ -64,6 +66,7 @@ data TermF ann = Var Var
                | TyApp (ann (TermF ann)) Type
                | PrimOp PrimOp [ann (TermF ann)]
                | Case (ann (TermF ann)) Var Type [AltF ann]
+               | Let Var (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case the evaluation rules must change
                | LetRec [(Var, ann (TermF ann))] (ann (TermF ann))
                | Cast (ann (TermF ann)) Coercion
 
@@ -73,7 +76,8 @@ type AltF ann = (AltCon, ann (TermF ann))
 
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-data ValueF ann = Indirect Var | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Type] [Var] | Literal Literal
+data ValueF ann = Indirect Var | Literal Literal | Coercion Coercion
+                | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Type] [Var]
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
@@ -83,6 +87,7 @@ instance Outputable AltCon where
 
 instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
     pprPrec prec e = case e of
+        Let x e1 e2       -> pPrintPrecLet prec x (asPrettyFunction1 e1) (asPrettyFunction1 e2)
         LetRec xes e      -> pPrintPrecLetRec prec (map (second asPrettyFunction1) xes) (asPrettyFunction1 e)
         Var x             -> pPrintPrec prec x
         Value v           -> pPrintPrec prec v
@@ -110,6 +115,9 @@ pPrintPrecCase prec e x alts = prettyParen (prec > noPrec) $ hang (text "case" <
 pPrintPrecAlt :: (Outputable a, Outputable b) => Rational -> (a, b) -> SDoc
 pPrintPrecAlt _ (alt_con, alt_e) = hang (pPrintPrec noPrec alt_con <+> text "->") 2 (pPrintPrec noPrec alt_e)
 
+pPrintPrecLet :: (Outputable a, Outputable b, Outputable c) => Rational -> a -> b -> c -> SDoc
+pPrintPrecLet prec x e e_body = prettyParen (prec > noPrec) $ hang (text "let") 2 (pPrintPrec noPrec x <+> text "=" <+> pPrintPrec noPrec e) $$ text "in" <+> pPrintPrec noPrec e_body
+
 pPrintPrecLetRec :: (Outputable a, Outputable b, Outputable c) => Rational -> [(a, b)] -> c -> SDoc
 pPrintPrecLetRec prec xes e_body
   | [] <- xes = pPrintPrec prec e_body
@@ -125,6 +133,7 @@ instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
         Lambda x e     -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
         Data dc tys xs -> pPrintPrecApps prec (PrettyFunction (flip pPrintPrec dc)) ([PrettyFunction (flip pPrintPrec ty) | ty <- tys] ++ [PrettyFunction (flip pPrintPrec x) | x <- xs])
         Literal l      -> pPrintPrec prec l
+        Coercion co    -> pPrintPrec prec co
 
 pPrintPrecLam :: Outputable a => Rational -> [Var] -> a -> SDoc
 pPrintPrecLam prec xs e = prettyParen (prec > noPrec) $ text "\\" <> hsep [pPrintPrec appPrec y | y <- xs] <+> text "->" <+> pPrintPrec noPrec e
@@ -164,6 +173,12 @@ termToVar e = case extract e of
     Var x              -> Just (mkReflCo (idType x), x)
     _                  -> Nothing -- FIXME: cast things as well
 
+varString :: Var -> String
+varString = nameString . varName
+
+nameString :: Name -> String
+nameString = occNameString . nameOccName
+
 
 type Coerced a = (Maybe (Coercion, Tag), a)
 
@@ -175,6 +190,7 @@ class Functor ann => Symantics ann where
     app    :: ann (TermF ann) -> Var -> ann (TermF ann)
     primOp :: PrimOp -> [ann (TermF ann)] -> ann (TermF ann)
     case_  :: ann (TermF ann) -> Var -> Type -> [AltF ann] -> ann (TermF ann)
+    let_   :: Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
     letRec :: [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
     cast   :: ann (TermF ann) -> Coercion -> ann (TermF ann)
 
@@ -185,6 +201,7 @@ instance Symantics Identity where
     app e = I . App e
     primOp pop = I . PrimOp pop
     case_ e x ty = I . Case e x ty
+    let_ x e1 = I . Let x e1
     letRec xes = I . LetRec xes
     cast e = I . Cast e
 
@@ -200,6 +217,7 @@ reflect (I e) = case e of
     App e x          -> app (reflect e) x
     PrimOp pop es    -> primOp pop (map reflect es)
     Case e x ty alts -> case_ (reflect e) x ty (map (second reflect) alts)
+    Let x e1 e2      -> let_ x (reflect e1) (reflect e2)
     LetRec xes e     -> letRec (map (second reflect) xes) (reflect e)
     Cast e co        -> cast (reflect e) co
   where
@@ -210,6 +228,7 @@ reflect (I e) = case e of
         Lambda x e     -> Lambda x (reflect e)
         Data dc tys xs -> Data dc tys xs
         Literal l      -> Literal l
+        Coercion co    -> Coercion co
 
 
 {-

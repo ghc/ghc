@@ -303,6 +303,9 @@ extractJusts p = foldr step ([], [])
                     | otherwise     = second (x:) rest
 
 
+secondM :: Functor f => (b -> f c) -> (a, b) -> f (a, c)
+secondM f (x, y) = fmap ((,) x) (f y)
+
 first3 :: (a -> d) -> (a, b, c) -> (d, b, c)
 first3 f (a, b, c) = (f a, b, c)
 
@@ -476,6 +479,6 @@ apportion orig_n weighting
 
 
 {-# NOINLINE prettyUniqSupply #-}
-supercompileUniqSupply, parseUniqSupply, expandUniqSupply, reduceUniqSupply, tagUniqSupply, prettyUniqSupply, matchUniqSupply, splitterUniqSupply :: UniqSupply
+hFunctionsUniqSupply, supercompileUniqSupply, parseUniqSupply, expandUniqSupply, reduceUniqSupply, tagUniqSupply, prettyUniqSupply, matchUniqSupply, splitterUniqSupply :: UniqSupply
 supercompileUniqSupply = unsafePerformIO $ mkSplitUniqSupply 'p'
 (hFunctionsUniqSupply:parseUniqSupply:expandUniqSupply:reduceUniqSupply:tagUniqSupply:prettyUniqSupply:matchUniqSupply:splitterUniqSupply:_) = listSplitUniqSupply supercompileUniqSupply

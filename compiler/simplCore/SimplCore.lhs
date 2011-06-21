@@ -43,6 +43,7 @@ import LiberateCase     ( liberateCase )
 import SAT              ( doStaticArgs )
 import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
+import Supercompile     ( supercompileProgram )
 import DmdAnal          ( dmdAnalPgm )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
@@ -125,6 +126,7 @@ getCoreToDo dflags
     do_float_in   = dopt Opt_FloatIn                      dflags
     cse           = dopt Opt_CSE                          dflags
     spec_constr   = dopt Opt_SpecConstr                   dflags
+    supercomp     = dopt Opt_Supercompilation             dflags
     liberate_case = dopt Opt_LiberateCase                 dflags
     static_args   = dopt Opt_StaticArgumentTransformation dflags
     rules_on      = dopt Opt_EnableRewriteRules           dflags
@@ -204,6 +206,8 @@ getCoreToDo dflags
     -- up the output of the transformation we need at do at least one simplify
     -- after this before anything else
         runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
+
+        runWhen supercomp CoreDoSupercomp,
 
         -- We run vectorisation here for now, but we might also try to run
         -- it later
@@ -396,6 +400,9 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
+
+doCorePass CoreDoSupercomp           = {-# SCC "Supercomp" #-}
+                                       doPassD supercompileProgram
 
 doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
                                        vectorise

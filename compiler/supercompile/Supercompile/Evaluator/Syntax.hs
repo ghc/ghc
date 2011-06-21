@@ -19,7 +19,7 @@ import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType)
 import Pair     (pSnd)
 import DataCon  (dataConWorkId)
 import Literal  (literalType)
-import Coercion (coercionKind)
+import Coercion (coercionKind, coercionType)
 
 import qualified Data.Map as M
 import Data.Traversable (Traversable(..))
@@ -198,6 +198,7 @@ data StackFrame = Apply (Out Var)
                 | TyApply (Out Type)
                 | Scrutinise (Out Var) (Out Type) (In [AnnedAlt])
                 | PrimApply PrimOp [Anned Answer] [In AnnedTerm]
+                | StrictLet (Out Var) (In AnnedTerm)
                 | Update (Out Var)
                 | CastIt (Out Coercion)
 
@@ -207,6 +208,7 @@ instance Outputable StackFrame where
         TyApply ty'               -> pPrintPrecApp prec (PrettyDoc $ text "[_]") ty'
         Scrutinise x' _ty in_alts -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
         PrimApply pop in_vs in_es -> pPrintPrecPrimOp prec pop (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
+        StrictLet x' in_e2        -> pPrintPrecLet prec x' (PrettyDoc $ text "[_]") (PrettyFunction $ flip pPrintPrecAnnedTerm in_e2)
         Update x'                 -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
         CastIt co'                -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
 
@@ -228,7 +230,8 @@ stackFrameType kf hole_ty = case tagee kf of
     Apply x                   -> hole_ty `applyFunTy` idType x
     TyApply ty                -> hole_ty `applyTy` ty
     Scrutinise _ ty _         -> ty
-    PrimApply pop in_as in_es -> (primOpType pop `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> annedTermType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
+    PrimApply pop in_as in_es -> (primOpType pop `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
+    StrictLet _ in_e@(rn, e)  -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
     Update _                  -> hole_ty
     CastIt co                 -> pSnd (coercionKind co)
 
@@ -240,24 +243,26 @@ qaType qa = case annee qa of
 answerType :: Anned Answer -> Type
 answerType a = case annee a of
     (Just (co, _), _)       -> pSnd (coercionKind co)
-    (Nothing,      (rn, v)) -> annedValueType' (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
+    (Nothing,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
 
-annedValueType' :: ValueF Anned -> Type
-annedValueType' (Indirect x)    = idType x
-annedValueType' (TyLambda x e)  = x `mkForAllTy` annedTermType e
-annedValueType' (Lambda x e)    = idType x `mkFunTy` annedTermType e
-annedValueType' (Data dc as xs) = (idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map idType xs
-annedValueType' (Literal l)     = literalType l
+valueType :: Copointed ann => ValueF ann -> Type
+valueType (Indirect x)    = idType x
+valueType (TyLambda x e)  = x `mkForAllTy` termType e
+valueType (Lambda x e)    = idType x `mkFunTy` termType e
+valueType (Data dc as xs) = (idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map idType xs
+valueType (Literal l)     = literalType l
+valueType (Coercion co)   = coercionType co
 
-annedTermType :: AnnedTerm -> Type
-annedTermType e = case annee e of
+termType :: Copointed ann => ann (TermF ann) -> Type
+termType e = case extract e of
     Var x         -> idType x
-    Value v       -> annedValueType' v
-    App e x       -> annedTermType e `applyFunTy` idType x
-    TyApp e a     -> annedTermType e `applyTy` a
-    PrimOp pop es -> primOpType pop `applyFunTys` map annedTermType es
+    Value v       -> valueType v
+    App e x       -> termType e `applyFunTy` idType x
+    TyApp e a     -> termType e `applyTy` a
+    PrimOp pop es -> primOpType pop `applyFunTys` map termType es
     Case _ _ ty _ -> ty
-    LetRec _ e    -> annedTermType e
+    Let _ _ e     -> termType e
+    LetRec _ e    -> termType e
     Cast _ co     -> pSnd (coercionKind co)
 
 applyFunTy :: Type -> Type -> Type
@@ -286,6 +291,7 @@ stackFrameSize kf = 1 + case kf of
     TyApply _                -> 0
     Scrutinise _ _ (_, alts) -> annedAltsSize alts
     PrimApply _ as in_es     -> sum (map annedSize as ++ map (annedTermSize . snd) in_es)
+    StrictLet _ (_, e)       -> annedTermSize e
     Update _                 -> 0
     CastIt _                 -> 0
 

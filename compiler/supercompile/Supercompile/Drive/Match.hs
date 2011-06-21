@@ -88,8 +88,8 @@ matchInType ids (rn_l, AppTy ty1_l ty2_l)   (rn_r, AppTy ty1_r ty2_r)   = liftM2
 matchInType ids (rn_l, TyConApp tc_l tys_l) (rn_r, TyConApp tc_r tys_r) = guard "matchInType: TyConApp" (tc_l == tc_r) >> matchInList (matchInType ids) (rn_l, tys_l) (rn_r, tys_r)
 matchInType ids (rn_l, FunTy ty1_l ty2_l)   (rn_r, FunTy ty1_r ty2_r)   = liftM2 (++) (matchInType ids (rn_l, ty1_l) (rn_r, ty1_r)) (matchInType ids (rn_l, ty2_l) (rn_r, ty2_r))
 matchInType ids (rn_l, ForAllTy x_l ty_l)   (rn_r, ForAllTy x_r ty_r)   = matchInType ids'' (rn_l', ty_l) (rn_r', ty_r) >>= matchRigidBinders [(x_l', x_r')]
-  where (ids',  rn_l', [x_l']) = renameNonRecBinders ids  rn_l [x_l]
-        (ids'', rn_r', [x_r']) = renameNonRecBinders ids' rn_r [x_r]
+  where (ids',  rn_l', x_l') = renameNonRecBinder ids  rn_l x_l
+        (ids'', rn_r', x_r') = renameNonRecBinder ids' rn_r x_r
 matchInType ids (rn_l, PredTy pred_l)       (rn_r, PredTy pred_r)       = matchInPredType ids (rn_l, pred_l) (rn_r, pred_r)
 matchInType _ _ _ = fail "matchInType"
 
@@ -109,8 +109,8 @@ matchInCoercion ids (rn_l, Refl ty_l)              (rn_r, Refl ty_r)            
 matchInCoercion ids (rn_l, TyConAppCo tc_l cos_l)  (rn_r, TyConAppCo tc_r cos_r)  = guard "matchInCoercion: TyConAppCo" (tc_l == tc_r) >> matchInList (matchInCoercion ids) (rn_l, cos_l) (rn_r, cos_r)
 matchInCoercion ids (rn_l, AppCo co1_l co2_l)      (rn_r, AppCo co1_r co2_r)      = liftM2 (++) (matchInCoercion ids (rn_l, co1_l) (rn_r, co1_r)) (matchInCoercion ids (rn_l, co2_l) (rn_r, co2_r))
 matchInCoercion ids (rn_l, ForAllCo a_l co_l)      (rn_r, ForAllCo a_r co_r)      = matchInCoercion ids'' (rn_l', co_l) (rn_r', co_r) >>= matchRigidBinders [(a_l', a_r')]
-  where (ids',  rn_l', [a_l']) = renameNonRecBinders ids  rn_l [a_l]
-        (ids'', rn_r', [a_r']) = renameNonRecBinders ids' rn_r [a_r]
+  where (ids',  rn_l', a_l') = renameNonRecBinder ids  rn_l a_l
+        (ids'', rn_r', a_r') = renameNonRecBinder ids' rn_r a_r
 matchInCoercion _   (rn_l, CoVarCo a_l)            (rn_r, CoVarCo a_r)            = return [matchInVar (rn_l, a_l)  (rn_r, a_r)]
 matchInCoercion ids (rn_l, AxiomInstCo ax_l cos_l) (rn_r, AxiomInstCo ax_r cos_r) = guard "matchInCoercion: AxiomInstCo" (ax_l == ax_r) >> matchInList (matchInCoercion ids) (rn_l, cos_l) (rn_r, cos_r)
 matchInCoercion ids (rn_l, UnsafeCo ty1_l ty2_l)   (rn_r, UnsafeCo ty1_r ty2_r)   = liftM2 (++) (matchInType ids (rn_l, ty1_l) (rn_r, ty1_r)) (matchInType ids (rn_l, ty2_l) (rn_r, ty2_r))
@@ -130,8 +130,11 @@ matchInTerm' ids (rn_l, TyApp e_l ty_l)           (rn_r, TyApp e_r ty_r)        
 matchInTerm' ids (rn_l, App e_l x_l)              (rn_r, App e_r x_r)              = matchInTerm ids (rn_l, e_l) (rn_r, e_r) >>= \eqs -> return (matchInVar (rn_l, x_l) (rn_r, x_r) : eqs)
 matchInTerm' ids (rn_l, PrimOp pop_l es_l)        (rn_r, PrimOp pop_r es_r)        = guard "matchInTerm: primop" (pop_l == pop_r) >> matchInList (matchInTerm ids) (rn_l, es_l) (rn_r, es_r)
 matchInTerm' ids (rn_l, Case e_l x_l ty_l alts_l) (rn_r, Case e_r x_r ty_r alts_r) = liftM3 (\x y z -> x ++ y ++ z) (matchInTerm ids'' (rn_l, e_l) (rn_r, e_r)) (matchInType ids'' (rn_l, ty_l) (rn_r, ty_r)) (matchInAlts ids'' (rn_l', alts_l) (rn_r', alts_r)) >>= matchRigidBinders [(x_l', x_r')]
-  where (ids',  rn_l', [x_l']) = renameNonRecBinders ids  rn_l [x_l]
-        (ids'', rn_r', [x_r']) = renameNonRecBinders ids' rn_r [x_r]
+  where (ids',  rn_l', x_l') = renameNonRecBinder ids  rn_l x_l
+        (ids'', rn_r', x_r') = renameNonRecBinder ids' rn_r x_r
+matchInTerm' ids (rn_l, Let x_l e1_l e2_l)        (rn_r, Let x_r e1_r e2_r)        = matchInTerm ids'' (rn_l', e2_l) (rn_r', e2_r) >>= \eqs -> matchLetRecs ids'' eqs [(x_l', e1_l')] [(x_r', e1_r')]
+  where (ids',  rn_l', (x_l', e1_l')) = renameNonRecBound ids  rn_l (x_l, e1_l)
+        (ids'', rn_r', (x_r', e1_r')) = renameNonRecBound ids' rn_r (x_r, e1_r)
 matchInTerm' ids (rn_l, LetRec xes_l e_l)         (rn_r, LetRec xes_r e_r)         = matchInTerm ids'' (rn_l', e_l) (rn_r', e_r) >>= \eqs -> matchLetRecs ids'' eqs xes_l' xes_r'
   where (ids',  rn_l', xes_l') = renameBounds ids  rn_l xes_l
         (ids'', rn_r', xes_r') = renameBounds ids' rn_r xes_r
@@ -141,13 +144,14 @@ matchInTerm' _ _ _ = fail "matchInTerm'"
 matchInValue :: InScopeSet -> In AnnedValue -> In AnnedValue -> Match [(Var, Var)]
 matchInValue _   (rn_l, Indirect x_l)         (rn_r, Indirect x_r)         = return [matchInVar (rn_l, x_l) (rn_r, x_r)]
 matchInValue ids (rn_l, TyLambda x_l e_l)     (rn_r, TyLambda x_r e_r)     = matchInTerm ids'' (rn_l', e_l) (rn_r', e_r) >>= matchRigidBinders [(x_l', x_r')]
-  where (ids',  rn_l', [x_l']) = renameNonRecBinders ids  rn_l [x_l]
-        (ids'', rn_r', [x_r']) = renameNonRecBinders ids' rn_r [x_r]
+  where (ids',  rn_l', x_l') = renameNonRecBinder ids  rn_l x_l
+        (ids'', rn_r', x_r') = renameNonRecBinder ids' rn_r x_r
 matchInValue ids (rn_l, Lambda x_l e_l)       (rn_r, Lambda x_r e_r)       = matchInTerm ids'' (rn_l', e_l) (rn_r', e_r) >>= matchRigidBinders [(x_l', x_r')]
-  where (ids',  rn_l', [x_l']) = renameNonRecBinders ids  rn_l [x_l]
-        (ids'', rn_r', [x_r']) = renameNonRecBinders ids' rn_r [x_r]
+  where (ids',  rn_l', x_l') = renameNonRecBinder ids  rn_l x_l
+        (ids'', rn_r', x_r') = renameNonRecBinder ids' rn_r x_r
 matchInValue ids (rn_l, Data dc_l tys_l xs_l) (rn_r, Data dc_r tys_r xs_r) = guard "matchInValue: datacon" (dc_l == dc_r) >> liftM2 (++) (matchInList (matchInType ids) (rn_r, tys_r) (rn_l, tys_l)) (matchInVars (rn_l, xs_l) (rn_r, xs_r))
 matchInValue _   (_,    Literal l_l)          (_,    Literal l_r)          = guard "matchInValue: literal" (l_l == l_r) >> return []
+matchInValue ids (rn_l, Coercion co_l)        (rn_r, Coercion co_r)        = matchInCoercion ids (rn_l, co_l) (rn_r, co_r)
 matchInValue _ _ _ = fail "matchInValue"
 
 matchInAlts :: InScopeSet -> In [AnnedAlt] -> In [AnnedAlt] -> Match [(Var, Var)]
@@ -199,6 +203,7 @@ matchECFrame' (Apply x_l')                      (Apply x_r')                    
 matchECFrame' (TyApply ty_l')                   (TyApply ty_r')                   = fmap ((,) []) $ matchType ty_l' ty_r'
 matchECFrame' (Scrutinise x_l' ty_l' in_alts_l) (Scrutinise x_r' ty_r' in_alts_r) = fmap ((,) []) $ liftM2 (++) (matchType ty_l' ty_r') (matchInAlts (matchInScopeSet (inFreeVars annedAltsFreeVars) in_alts_l in_alts_r) in_alts_l in_alts_r >>= matchRigidBinders [(x_l', x_r')])
 matchECFrame' (PrimApply pop_l in_vs_l in_es_l) (PrimApply pop_r in_vs_r in_es_r) = fmap ((,) []) $ guard "matchECFrame': primop" (pop_l == pop_r) >> liftM2 (++) (matchList (\in_v_l in_v_r -> matchAnned (matchAnswer (matchInScopeSet annedFreeVars in_v_l in_v_r)) in_v_l in_v_r) in_vs_l in_vs_r) (matchList (\in_e_l in_e_r -> matchInTerm (matchInScopeSet (inFreeVars annedTermFreeVars) in_e_l in_e_r) in_e_l in_e_r) in_es_l in_es_r)
+matchECFrame' (StrictLet x_l' in_e_l)           (StrictLet x_r' in_e_r)           = fmap ((,) []) $ matchInTerm (matchInScopeSet (inFreeVars annedTermFreeVars) in_e_l in_e_r) in_e_l in_e_r >>= matchRigidBinders [(x_l', x_r')]
 matchECFrame' (Update x_l')                     (Update x_r')                     = return ([matchVar x_l' x_r'], [])
 matchECFrame' (CastIt co_l')                    (CastIt co_r')                    = fmap ((,) []) $ matchCoercion co_l' co_r'
 matchECFrame' _ _ = fail "matchECFrame'"

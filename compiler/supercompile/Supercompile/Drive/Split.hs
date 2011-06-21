@@ -516,9 +516,9 @@ splitt :: UniqSupply
        -> (IS.IntSet, Out VarSet)
        -> Deeds
        -> (Heap, NamedStack, ([Out Var], Bracketed (Entered, UnnormalisedState))) -- ^ The thing to split, and the Deeds we have available to do it
-       -> (Deeds,                             -- ^ The Deeds still available after splitting
-           M.Map (Out Var) (Bracketed State), -- ^ The residual "let" bindings
-           Bracketed State)                   -- ^ The residual "let" body
+       -> (Deeds,                             -- The Deeds still available after splitting
+           M.Map (Out Var) (Bracketed State), -- The residual "let" bindings
+           Bracketed State)                   -- The residual "let" body
 splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed_qa))
     = snd $ split_step split_fp
       -- Once we have the correct fixed point, go back and grab the associated information computed in the process
@@ -707,6 +707,7 @@ howToBindCheap e
     Data _ as xs | null as, null xs -> InternallyBound -- Heuristic: GHC will actually statically allocate data with no arguments (this also has the side effect of preventing tons of type errors due to [] getting shared)
                  | otherwise        -> LambdaBound
     Literal _  -> InternallyBound -- No allocation duplication since GHC will float them (and common them up, if necessary)
+    Coercion _ -> InternallyBound -- Not allocated at all
     Indirect _ -> InternallyBound -- Always eliminated by GHC
    -- GHC is unlikely to get anything useful from seeing the definition of cheap non-values, so we'll have them as unfoldings
   | otherwise = LambdaBound
@@ -835,6 +836,12 @@ cheapifyHeap deeds (Heap h ids) = (deeds', Heap (M.fromList [(x', internallyBoun
             (deeds2, ids2, floats0, in_es') = cheapifyMany deeds1 ids1 in_es
             (deeds3, ids3, floats1, in_e')  = cheapify deeds2 ids2 (rn', e)
       = (deeds3, ids3, zip in_xs in_es' ++ floats0 ++ floats1, in_e')
+      | Let x e1 e2 <- annee anned_e
+      , let deeds1 = deeds0 + 1
+            (ids1, rn', (x', in_e1)) = renameNonRecBound ids0 rn (x, e1)
+            (deeds2, ids2, floats0, in_e1')  = cheapify deeds1 ids1 in_e1
+            (deeds3, ids3, floats1, in_e2')  = cheapify deeds2 ids2 (rn', e2)
+      = (deeds3, ids3, (x', in_e1') : floats0 ++ floats1, in_e2')
     cheapify deeds ids in_e = (deeds, ids, [], in_e)
 
     cheapifyMany :: Deeds -> InScopeSet -> [In AnnedTerm] -> (Deeds, InScopeSet, [(Out Var, In AnnedTerm)], [In AnnedTerm])
@@ -939,9 +946,11 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> varSetToDataMap lambdaBound alt_bvs `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- scruts; return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
+            alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> varSetToDataMap lambdaBound (alt_bvs `extendVarSet` x') `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- scruts; return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map (\alt_con' -> fst $ altConOpenFreeVars alt_con' (emptyVarSet, emptyVarSet)) alt_cons'
             bracketed_alts = zipWith3 (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
+    StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` (fvs_body `delVarSet` x')) [id, (`extendVarSet` x')] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
+      where ctxt_id = uniqFromSupply ctxt_ids
     PrimApply pop in_vs in_es -> zipBracketeds (primOp pop) unionVarSets (repeat id) (\_ -> Nothing) (bracketed_vs ++ bracketed_hole : bracketed_es)
       where -- 0) Manufacture context identifier (actually, an infinite number of them - but who cares?)
             ctxt_idss = uniqsFromSupply ctxt_ids

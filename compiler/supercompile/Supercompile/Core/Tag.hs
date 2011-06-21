@@ -32,6 +32,8 @@ mkTagger rec = term
           where idss' = listSplitUniqSupply ids
         Case e x ty alts -> Case (term ids0' e) x ty (alternatives ids1' alts)
           where (ids0', ids1') = splitUniqSupply ids
+        Let x e1 e2      -> Let x (term ids0' e1) (term ids1' e2)
+          where (ids0', ids1') = splitUniqSupply ids
         LetRec xes e     -> LetRec (zipWith (\ids'' (x, e) -> (x, term ids'' e)) idss' xes) (term ids1' e)
           where (ids0', ids1') = splitUniqSupply ids
                 idss' = listSplitUniqSupply ids0'
@@ -43,6 +45,7 @@ mkTagger rec = term
         Lambda x e     -> Lambda x (term ids e)
         Data dc tys xs -> Data dc tys xs
         Literal l      -> Literal l
+        Coercion co    -> Coercion co
 
     alternatives = zipWith alternative . listSplitUniqSupply
     
@@ -72,6 +75,7 @@ mkDetag rec = (term, term', alternatives, value, value')
         App e x          -> App (term e) x
         PrimOp pop es    -> PrimOp pop (map term es)
         Case e x ty alts -> Case (term e) x ty (alternatives alts)
+        Let x e1 e2      -> Let x (term e1) (term e2)
         LetRec xes e     -> LetRec (map (second term) xes) (term e)
         Cast e co        -> Cast (term e) co
 
@@ -81,5 +85,6 @@ mkDetag rec = (term, term', alternatives, value, value')
     value' (Lambda x e)     = Lambda x (term e)
     value' (Data dc tys xs) = Data dc tys xs
     value' (Literal l)      = Literal l
+    value' (Coercion co)    = Coercion co
 
     alternatives = map (second term)
