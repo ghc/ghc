@@ -884,7 +884,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall <vars>. <ctxt> -> <type>@
           | ListT                         -- ^ @[]@
           | AppT Type Type                -- ^ @T a b@
           | SigT Type Kind                -- ^ @t :: k@
-          | LiteralT TyLit                -- ^ @0,1,2,...
+          | LiteralT TyLit                -- ^ @0,1,2, etc.@
       deriving( Show, Eq, Data, Typeable )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@
