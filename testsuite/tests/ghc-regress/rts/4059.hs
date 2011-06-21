@@ -1,8 +1,9 @@
 
 {-# LANGUAGE ForeignFunctionInterface #-}
 
-import Foreign
+import Foreign hiding ( unsafePerformIO )
 import Foreign.C
+import System.IO.Unsafe
 
 d f x = unsafePerformIO $ do
     g <- mkfun f

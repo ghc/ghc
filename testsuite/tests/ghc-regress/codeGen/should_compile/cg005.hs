@@ -1,8 +1,9 @@
 module Bug where
 
-import Foreign
+import Foreign hiding ( unsafePerformIO )
 import Foreign.ForeignPtr
 import Data.Char
+import System.IO.Unsafe
 
 data PackedString = PS !(ForeignPtr Word8) !Int !Int
 

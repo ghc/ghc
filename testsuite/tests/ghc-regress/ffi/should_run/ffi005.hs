@@ -1,7 +1,7 @@
 -- !!! test for foreign import dynamic/wrapper, orignally by Alastair Reid,
 -- with a few changes to get it to run on GHC by Simon Marlow.
 
-import Foreign
+import Foreign hiding ( unsafePerformIO )
 import Foreign.C
 import Control.Exception
 import System.IO.Unsafe

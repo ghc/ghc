@@ -6,7 +6,7 @@ import DynFlags
 import Language.Haskell.Extension
 
 main :: IO ()
-main = do let ghcExtensions = [ ext | (ext, _, _) <- xFlags ]
+main = do let ghcExtensions = [ ext | (ext, _, _, _) <- xFlags ]
               cabalExtensions = map show [ toEnum 0 :: KnownExtension .. ]
               ghcOnlyExtensions = ghcExtensions \\ cabalExtensions
               -- These are extensions which are deliberately not yet
