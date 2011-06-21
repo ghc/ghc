@@ -6,10 +6,12 @@ import qualified Supercompile.Evaluator.Syntax as S
 import qualified Supercompile.Drive.Process as S
 
 import CoreSyn
+import CoreUtils  (exprType)
 import DataCon    (DataCon, dataConWorkId, dataConName)
 import Var        (isTyVar)
 import Id         (mkSysLocalM, idType)
 import MkId       (mkPrimOpId)
+import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString)
 import PrimOp     (PrimOp, primOpType)
 import Type       (Type)
@@ -54,7 +56,7 @@ data ParseState = ParseState {
 
 initParseState :: ParseState
 initParseState = ParseState {
-    uniqSupply = parseUniqSupply,
+    uniqSupply = anfUniqSupply,
     dcWrappers = M.empty,
     primWrappers = M.empty
   }
@@ -118,8 +120,8 @@ appE e1 e2 = nameIt (argOf (desc e1)) e2 >>= \x2 -> return (e1 `S.app` x2)
 
 
 
-termToCoreExpr :: CoreExpr -> S.Term
-termToCoreExpr = uncurry S.letRecSmart . runParseM . term
+coreExprToTerm :: CoreExpr -> S.Term
+coreExprToTerm = uncurry S.letRecSmart . runParseM . term
   where
     term (Var x) -- | Just pop <- isPrimOpId_maybe x     = primWrapper pop
                  -- | Just dc <- isDataConWorkId_maybe x = dataConWrapper dc
@@ -142,8 +144,8 @@ termToCoreExpr = uncurry S.letRecSmart . runParseM . term
     alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc xs)) $ term e
     alt it                  = pprPanic "termToCoreExpr" (ppr it)
 
-coreExprToTerm :: S.Term -> CoreExpr
-coreExprToTerm = term
+termToCoreExpr :: S.Term -> CoreExpr
+termToCoreExpr = term
   where
     term e = case unI e of
         S.Var x            -> Var x
@@ -167,8 +169,15 @@ coreExprToTerm = term
     alt (S.LiteralAlt l,  e) = (LitAlt l,   [], term e)
     alt (S.DefaultAlt,    e) = (DEFAULT,    [], term e)
 
+coreBindsToCoreTerm :: [CoreBind] -> (CoreExpr, CoreExpr -> [CoreBind])
+coreBindsToCoreTerm binds
+  = (mkLets binds (mkBigCoreVarTup xs),
+     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector xs x wild_id e) | x <- xs])
+  where xs = bindersOfBinds binds
+
 supercompile :: CoreExpr -> CoreExpr
-supercompile = coreExprToTerm . snd . S.supercompile . termToCoreExpr
+supercompile = termToCoreExpr . snd . S.supercompile . coreExprToTerm
 
 supercompileProgram :: DynFlags -> [CoreBind] -> [CoreBind]
-supercompileProgram _dflags = undefined -- FIXME
+supercompileProgram _dflags binds = rebuild (supercompile e)
+  where (e, rebuild) = coreBindsToCoreTerm binds
