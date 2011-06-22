@@ -23,10 +23,10 @@ type FreeVars = VarSet
 type BoundVars = VarSet
 
 
-(termVarFreeVars',            termFreeVars,                termFreeVars',                altsFreeVars,                valueFreeVars,                valueFreeVars')                = mkFreeVars (\f (I e) -> f e)
-(fvedTermVarFreeVars',        fvedTermFreeVars,            fvedTermFreeVars',            fvedAltsFreeVars,            fvedValueFreeVars,            fvedValueFreeVars')            = mkFreeVars (\_ (FVed fvs _) -> fvs)
+(varFreeVars',                termFreeVars,                termFreeVars',                altsFreeVars,                valueFreeVars,                valueFreeVars')                = mkFreeVars (\f (I e) -> f e)
+(fvedVarFreeVars',            fvedTermFreeVars,            fvedTermFreeVars',            fvedAltsFreeVars,            fvedValueFreeVars,            fvedValueFreeVars')            = mkFreeVars (\_ (FVed fvs _) -> fvs)
 (sizedFVedVarFreeVars',       sizedFVedTermFreeVars,       sizedFVedTermFreeVars',       sizedFVedAltsFreeVars,       sizedFVedValueFreeVars,       sizedFVedValueFreeVars')       = mkFreeVars (\_ (Comp (Sized _ (FVed fvs _))) -> fvs)
-(taggedTermVarFreeVars',      taggedTermFreeVars,          taggedTermFreeVars',          taggedAltsFreeVars,          taggedValueFreeVars,          taggedValueFreeVars')          = mkFreeVars (\f (Tagged _ e) -> f e)
+(taggedVarFreeVars',          taggedTermFreeVars,          taggedTermFreeVars',          taggedAltsFreeVars,          taggedValueFreeVars,          taggedValueFreeVars')          = mkFreeVars (\f (Tagged _ e) -> f e)
 (taggedSizedFVedVarFreeVars', taggedSizedFVedTermFreeVars, taggedSizedFVedTermFreeVars', taggedSizedFVedAltsFreeVars, taggedSizedFVedValueFreeVars, taggedSizedFVedValueFreeVars') = mkFreeVars (\_ (Comp (Tagged _ (Comp (Sized _ (FVed fvs _))))) -> fvs)
 
 {-# INLINE mkFreeVars #-}
@@ -37,27 +37,25 @@ mkFreeVars :: (forall a. (a -> FreeVars) -> ann a -> FreeVars)
                [AltF ann]       -> FreeVars,
                ann (ValueF ann) -> FreeVars,
                ValueF ann       -> FreeVars)
-mkFreeVars rec = (var', term, term', alternatives, value, value')
+mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
   where
-    var' = idFreeVars
-    
     term = rec term'
-    term' (Var x)            = var' x
+    term' (Var x)            = unitVarSet x
     term' (Value v)          = value' v
     term' (TyApp e ty)       = typ ty `unionVarSet` term e
-    term' (App e x)          = idFreeVars x `unionVarSet` term e
+    term' (App e x)          = term e `extendVarSet` x
     term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
-    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` (alternatives alts `delVarSet` x)
-    term' (Let x e1 e2)      = term e1 `unionVarSet` (term e2 `delVarSet` x)
-    term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e) `delVarSetList` xs
+    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` (alternatives alts `delVarSet` x) `unionVarSet` idFreeVars x
+    term' (Let x e1 e2)      = term e1 `unionVarSet` (term e2 `delVarSet` x) `unionVarSet` idFreeVars x
+    term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e `unionVarSet` unionVarSets (map idFreeVars xs)) `delVarSetList` xs
       where (xs, es) = unzip xes
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
     
     value = rec value'
-    value' (Indirect x)    = idFreeVars x
+    value' (Indirect x)    = unitVarSet x
     value' (TyLambda x e)  = term e `delVarSet` x
-    value' (Lambda x e)    = term e `delVarSet` x
-    value' (Data _ tys xs) = unionVarSets $ map typ tys ++ map idFreeVars xs
+    value' (Lambda x e)    = (term e `delVarSet` x) `unionVarSet` idFreeVars x
+    value' (Data _ tys xs) = unionVarSets (map typ tys) `unionVarSet` mkVarSet xs
     value' (Literal _)     = emptyVarSet
     value' (Coercion co)   = tyCoVarsOfCo co
     
@@ -67,15 +65,15 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     
     typ = tyVarsOfType
 
-altConOpenFreeVars :: AltCon -> (BoundVars, FreeVars) -> (BoundVars, FreeVars)
-altConOpenFreeVars (DataAlt _ xs) (bvs, fvs) = (bvs `extendVarSetList` xs, fvs)
-altConOpenFreeVars (LiteralAlt _) (bvs, fvs) = (bvs, fvs)
-altConOpenFreeVars _              (bvs, fvs) = (bvs, fvs)
+altConBoundVars :: AltCon -> BoundVars
+altConBoundVars (DataAlt _ as xs) = mkVarSet xs `unionVarSet` mkVarSet as
+altConBoundVars (LiteralAlt _)    = emptyVarSet
+altConBoundVars _                 = emptyVarSet
 
 altConFreeVars :: AltCon -> FreeVars -> FreeVars
-altConFreeVars (DataAlt _ xs) = (`delVarSetList` xs)
-altConFreeVars (LiteralAlt _) = id
-altConFreeVars DefaultAlt     = id
+altConFreeVars (DataAlt _ as xs) = (`delVarSetList` as) . flip (foldr (\x fvs -> (fvs `delVarSet` x) `unionVarSet` idFreeVars x)) xs
+altConFreeVars (LiteralAlt _)    = id
+altConFreeVars DefaultAlt        = id
 
 
 coercedFreeVars :: (a -> FreeVars) -> Coerced a -> FreeVars
@@ -130,7 +128,7 @@ instance Symantics FVed where
     cast e = fvedTerm . Cast e
 
 fvedVar :: Var -> FVed Var
-fvedVar x = FVed (taggedTermVarFreeVars' x) x
+fvedVar x = FVed (taggedVarFreeVars' x) x
 
 fvedValue :: ValueF FVed -> FVed FVedValue
 fvedValue v = FVed (fvedValueFreeVars' v) v

@@ -42,6 +42,11 @@ import Data.Ord
 import qualified Data.Set as S
 
 
+pprTraceSC :: String -> SDoc -> a -> a
+--pprTraceSC = pprTrace
+pprTraceSC _ _ x = x
+
+
 -- The termination argument is a but subtler due to HowBounds but I think it still basically works.
 -- Key to the modified argument is that tieback cannot be prevented by any HeapBinding with HowBound /= LambdaBound:
 -- so we have to be careful to record tags on those guys.
@@ -84,7 +89,7 @@ instance Monoid SCStats where
 
 
 supercompile :: M.Map Var Term -> Term -> (SCStats, Term)
-supercompile unfoldings e = pprTrace "all input FVs" (ppr input_fvs) $ second fVedTermToTerm $ runScpM $ liftM snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
+supercompile unfoldings e = pprTraceSC "all input FVs" (ppr input_fvs) $ second fVedTermToTerm $ runScpM $ liftM snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
   where anned_e = toAnnedTerm tag_ids e
         input_fvs = annedTermFreeVars anned_e
         state = normalise ((bLOAT_FACTOR - 1) * annedSize anned_e, Heap (M.fromDistinctAscList anned_h_kvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
@@ -463,7 +468,7 @@ instance Monad ScpM where
     (!mx) >>= fxmy = ScpM $ \e s k -> unScpM mx e s (\x s -> unScpM (fxmy x) e s k)
 
 runScpM :: ScpM (Out FVedTerm) -> (SCStats, Out FVedTerm)
-runScpM me = unScpM me init_e init_s (\e' s -> (stats s, letRecSmart (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (fulfilments s)) e'))
+runScpM me = unScpM me init_e init_s (\e' s -> (stats s, letRecSmart (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (pprTrace "runScpM0" (ppr (fvedTermFreeVars e') <+> ppr e') $ fvedTermFreeVars e') (pprTrace "runScpM1" (ppr (map (fun . fst) (fulfilments s))) $ fulfilments s)) e'))
   where
     init_e = ScpEnv { promises = [], fulfilmentStack = [], depth = 0 }
     init_s = ScpState { names = h_names, fulfilments = [], stats = mempty }
@@ -509,7 +514,7 @@ sc' hist speculated state = (\raise -> check raise) `catchScpM` \(old_state, sta
                       Continue hist' -> continue hist'
                       Stop (old_state, rb) -> maybe (stop old_state state hist) ($ (old_state, state)) $ guard sC_ROLLBACK >> Just rb
     stop old_state state hist = do addStats $ mempty { stat_sc_stops = 1 }
-                                   trace "sc-stop" $ fromMaybe (trace "sc-stop: no generalisation" $ split state) (generalise (mK_GENERALISER old_state state) state) (sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
+                                   maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise (mK_GENERALISER old_state state) state) (sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
     continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState state'))
                        addStats stats
                        split state' (sc hist speculated')
@@ -523,7 +528,7 @@ memo opt speculated state0 = do
     ps <- getPromises
     case [ (p, (releaseStateDeed state0, fun p `varApps` tb_dynamic_vs))
          | p <- ps
-         , Just rn_lr <- [(\res -> if isNothing res then pprTrace "no match:" (ppr (fun p)) res else res) $
+         , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                            match (unI (meaning p)) state1]
           -- NB: because I can trim reduce the set of things abstracted over above, it's OK if the renaming derived from the meanings renames vars that aren't in the abstracted list, but NOT vice-versa
          -- , let bad_renames = S.fromList (abstracted p) S.\\ M.keysSet (unRenaming rn_lr) in ASSERT2(S.null bad_renames, text "Renaming was inexhaustive:" <+> pPrint bad_renames $$ pPrint (fun p) $$ pPrintFullState (unI (meaning p)) $$ pPrint rn_lr $$ pPrintFullState state3) True
@@ -572,4 +577,4 @@ rollbackBig opt speculated state
   | otherwise = opt speculated state
 
 traceRenderScpM :: Outputable a => String -> a -> ScpM ()
-traceRenderScpM msg x = ScpM (\e s k -> k (depth e) s) >>= \depth -> pprTrace msg (nest depth $ pPrint x) $ return ()
+traceRenderScpM msg x = ScpM (\e s k -> k (depth e) s) >>= \depth -> pprTraceSC msg (nest depth $ pPrint x) $ return ()

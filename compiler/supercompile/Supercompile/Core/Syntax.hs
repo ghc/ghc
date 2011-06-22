@@ -8,17 +8,17 @@ import Supercompile.Utilities
 import Supercompile.StaticFlags
 
 import DataCon  (DataCon)
-import Var      (Var, varName)
+import Var      (TyVar, Var, varName)
 import Name     (Name, nameOccName)
 import OccName  (occNameString)
-import Id       (idType)
+import Id       (Id, idType)
 import Literal  (Literal)
 import Type     (Type)
 import Coercion (Coercion, mkReflCo)
 import PrimOp   (PrimOp)
 
 
-data AltCon = DataAlt DataCon [Var] | LiteralAlt Literal | DefaultAlt
+data AltCon = DataAlt DataCon [TyVar] [Id] | LiteralAlt Literal | DefaultAlt
             deriving (Eq, Show)
 
 -- Note [Case wildcards]
@@ -60,14 +60,14 @@ data AltCon = DataAlt DataCon [Var] | LiteralAlt Literal | DefaultAlt
 
 type Term = Identity (TermF Identity)
 type TaggedTerm = Tagged (TermF Tagged)
-data TermF ann = Var Var
+data TermF ann = Var Id
                | Value (ValueF ann)
-               | App (ann (TermF ann)) Var
+               | App (ann (TermF ann)) Id
                | TyApp (ann (TermF ann)) Type
                | PrimOp PrimOp [Type] [ann (TermF ann)]
-               | Case (ann (TermF ann)) Var Type [AltF ann]
-               | Let Var (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case the evaluation rules must change
-               | LetRec [(Var, ann (TermF ann))] (ann (TermF ann))
+               | Case (ann (TermF ann)) Id Type [AltF ann]
+               | Let Id (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case the evaluation rules must change
+               | LetRec [(Id, ann (TermF ann))] (ann (TermF ann))
                | Cast (ann (TermF ann)) Coercion
 
 type Alt = AltF Identity
@@ -76,14 +76,14 @@ type AltF ann = (AltCon, ann (TermF ann))
 
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-data ValueF ann = Indirect Var | Literal Literal | Coercion Coercion
-                | TyLambda Var (ann (TermF ann)) | Lambda Var (ann (TermF ann)) | Data DataCon [Type] [Var]
+data ValueF ann = Indirect Id | Literal Literal | Coercion Coercion
+                | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) | Data DataCon [Type] [Id]
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
-        DataAlt dc xs   -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pPrintPrec appPrec) xs)
-        LiteralAlt l    -> pPrint l
-        DefaultAlt      -> text "_"
+        DataAlt dc as xs -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pPrintPrec appPrec) as ++ map (pPrintPrec appPrec) xs)
+        LiteralAlt l     -> pPrint l
+        DefaultAlt       -> text "_"
 
 instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
     pprPrec prec e = case e of
@@ -141,11 +141,6 @@ pPrintPrecLam prec xs e = prettyParen (prec > noPrec) $ text "\\" <> hsep [pPrin
 pPrintPrecApps :: (Outputable a, Outputable b) => Rational -> a -> [b] -> SDoc
 pPrintPrecApps prec e1 es2 = prettyParen (not (null es2) && prec >= appPrec) $ pPrintPrec opPrec e1 <+> hsep (map (pPrintPrec appPrec) es2)
 
-
-altConBinders :: AltCon -> [Var]
-altConBinders (DataAlt _ xs) = xs
-altConBinders (LiteralAlt _) = []
-altConBinders DefaultAlt     = []
 
 termToValue :: Copointed ann => ann (TermF ann) -> Maybe (ann (ValueF ann))
 termToValue e = case extract e of Value v -> Just (fmap (const v) e); _ -> Nothing

@@ -163,9 +163,9 @@ matchInAlt ids (rn_l, (alt_con_l, alt_e_l)) (rn_r, (alt_con_r, alt_e_r)) = match
         (ids'', rn_r', alt_con_r') = renameAltCon ids' rn_r alt_con_r
 
 matchAltCon :: AltCon -> AltCon -> Match [(Var, Var)]
-matchAltCon (DataAlt dc_l xs_l) (DataAlt dc_r xs_r) = guard "matchAltCon: datacon" (dc_l == dc_r) >> return (xs_l `zip` xs_r)
-matchAltCon (LiteralAlt l_l)    (LiteralAlt l_r)    = guard "matchAltCon: literal" (l_l == l_r) >> return []
-matchAltCon DefaultAlt          DefaultAlt          = return []
+matchAltCon (DataAlt dc_l as_l xs_l) (DataAlt dc_r as_r xs_r) = guard "matchAltCon: datacon" (dc_l == dc_r) >> return (as_l `zip` as_r ++ xs_l `zip` xs_r)
+matchAltCon (LiteralAlt l_l)         (LiteralAlt l_r)         = guard "matchAltCon: literal" (l_l == l_r) >> return []
+matchAltCon DefaultAlt               DefaultAlt               = return []
 matchAltCon _ _ = fail "matchAltCon"
 
 matchVar :: Out Var -> Out Var -> (Var, Var)

@@ -10,8 +10,9 @@ import CoreSyn
 import CoreUtils  (exprType)
 import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
-import Var        (Var, isTyVar)
-import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, isPrimOpId_maybe, isDataConWorkId_maybe)
+import Name       (localiseName)
+import Var        (Var, isTyVar, varName, setVarName)
+import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported)
 import MkId       (mkPrimOpId)
 import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
@@ -109,9 +110,10 @@ coreExprToTerm = uncurry S.letRecSmart . runParseM . term
     term (Type ty)                 = pprPanic "termToCoreExpr" (ppr ty)
     term (Coercion co)             = return $ S.value (S.Coercion co)
     
-    alt (DEFAULT,    [], e) = fmap ((,) S.DefaultAlt)      $ bindFloats (term e)
-    alt (LitAlt l,   [], e) = fmap ((,) (S.LiteralAlt l))  $ bindFloats (term e)
-    alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc xs)) $ bindFloats (term e)
+    alt (DEFAULT,    [], e) = fmap ((,) S.DefaultAlt)         $ bindFloats (term e)
+    alt (LitAlt l,   [], e) = fmap ((,) (S.LiteralAlt l))     $ bindFloats (term e)
+    alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc as ys)) $ bindFloats (term e)
+      where (as, ys) = span isTyVar xs
     alt it                  = pprPanic "termToCoreExpr" (ppr it)
 
 termToCoreExpr :: S.Term -> CoreExpr
@@ -135,15 +137,30 @@ termToCoreExpr = term
     value (S.Lambda x e)     = Lam x (term e)
     value (S.Data dc tys xs) = (Var (dataConWorkId dc) `mkTyApps` tys) `mkVarApps` xs
     
-    alt (S.DataAlt dc xs, e) = (DataAlt dc, xs, term e)
-    alt (S.LiteralAlt l,  e) = (LitAlt l,   [], term e)
-    alt (S.DefaultAlt,    e) = (DEFAULT,    [], term e)
+    alt (S.DataAlt dc as ys, e) = (DataAlt dc, as ++ ys, term e)
+    alt (S.LiteralAlt l,     e) = (LitAlt l,   [],       term e)
+    alt (S.DefaultAlt,       e) = (DEFAULT,    [],       term e)
 
 coreBindsToCoreTerm :: [CoreBind] -> (CoreExpr, CoreExpr -> [CoreBind])
 coreBindsToCoreTerm binds
-  = (mkLets binds (mkBigCoreVarTup xs),
-     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector xs x wild_id e) | x <- xs])
-  where xs = bindersOfBinds binds
+  = (mkLets internal_binds (mkBigCoreVarTup internal_xs),
+     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector internal_xs internal_x wild_id e) | (x, internal_x) <- xs `zip` internal_xs])
+  where
+    -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
+    -- an External name, because several Externals with the same name but different uniques will generate clashing
+    -- C labels at code-generation time (the unique is not included in the label).
+    --
+    -- To work around this, we deexternalise the variables at the *local binding sites* we are about to create.
+    -- Note that we leave the *use sites* totally intact: we rely on the fact that a) variables are compared only by
+    -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
+    -- The ice is thin, though!
+    xs = bindersOfBinds binds
+    internal_binds = [case bind of NonRec x e -> NonRec (localiseVar x) e
+                                   Rec xes    -> Rec (map (first localiseVar) xes)
+                     | bind <- binds]
+    internal_xs = bindersOfBinds internal_binds
+    localiseVar x = setIdNotExported (x `setVarName` localiseName (varName x))
+     -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
 
 termUnfoldings :: S.Term -> [(Var, S.Term)]
 termUnfoldings e = go (S.termFreeVars e) emptyVarSet []

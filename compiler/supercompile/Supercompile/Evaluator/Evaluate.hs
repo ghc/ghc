@@ -23,7 +23,6 @@ import PrelRules
 import Id
 import DataCon
 import Pair
-import Util (splitAtList)
 
 
 evaluatePrim :: Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
@@ -232,19 +231,18 @@ step' normalising state =
                                         in map (\arg_ty -> (liftCoSubst theta arg_ty, tg_co)) arg_tys -- Use tag from the original coercion everywhere
            -- b) Identify the first appropriate branch of the case and reduce -- apply the discovered coercions if necessary
           , (deeds3, h', ids', alt_e):_ <- [ res
-                                           | ((DataAlt alt_dc alt_xs, alt_e), rest) <- bagContexts alts
+                                           | ((DataAlt alt_dc alt_as alt_xs, alt_e), rest) <- bagContexts alts
                                            , alt_dc == dc
                                            , let xs' = map (rename rn_v_deref) xs
-                                                 (alt_as, alt_ys) = splitAtList tys alt_xs
                                                  rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys)
                                                  deeds2 = deeds1 + annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
-                                                               Nothing     -> return (deeds2, h1, ids, insertRenamings rn_alts' (alt_ys `zip` xs'))
+                                                               Nothing     -> return (deeds2, h1, ids, insertRenamings rn_alts' (alt_xs `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (x', alt_y, (dc_co, tg_co)) -> let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
                                                                                                                                                   (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
                                                                                                                                                   e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` dc_co)
                                                                                                                                               in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
-                                                                                    (deeds2, h1, ids, rn_alts') (zip3 xs' alt_ys dc_cos)
+                                                                                    (deeds2, h1, ids, rn_alts') (zip3 xs' alt_xs dc_cos)
                                                              return (deeds3, h', ids', (rn_alts', alt_e))]
                                            ]
           = Just (deeds3, Heap h' ids', k, alt_e)

@@ -49,7 +49,7 @@ lfpFrom join init_x f = lfpFrom' init_x (\x -> f x `join` x)
     -- Least point of a partially ordered monotone function. Does not checks that the function is monotone.
     lfpFrom' init_x f = go init_x
       where go x | x' == x      = x
-                 | otherwise    = error "lfpFrom: non-monotone function"
+                 | otherwise    = go x'
               where x' = f x
 
 
@@ -947,7 +947,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
             alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> varSetToDataMap lambdaBound (alt_bvs `extendVarSet` x') `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- scruts; return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
-            alt_bvss = map (\alt_con' -> fst $ altConOpenFreeVars alt_con' (emptyVarSet, emptyVarSet)) alt_cons'
+            alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3 (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` (fvs_body `delVarSet` x')) [id, (`extendVarSet` x')] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
       where ctxt_id = uniqFromSupply ctxt_ids
@@ -960,10 +960,9 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (Once ctxt_id, (0, Heap M.empty ids, [], in_e))) ctxt_idss in_es)
   where
     altConToValue :: AltCon -> Maybe (ValueF ann)
-    altConToValue (DataAlt dc xs) = Just $ Data dc (map mkTyVarTy as) ys
-      where (as, ys) = span isTyVar xs
-    altConToValue (LiteralAlt l)  = Just $ Literal l
-    altConToValue DefaultAlt      = Nothing
+    altConToValue (DataAlt dc as xs) = Just $ Data dc (map mkTyVarTy as) xs
+    altConToValue (LiteralAlt l)     = Just $ Literal l
+    altConToValue DefaultAlt         = Nothing
 
 -- I'm making use of a clever trick: after splitting an update frame for x, instead of continuing to split the stack with a
 -- noneBracketed for x in the focus, I split the stack with a oneBracketed for it in the focus.

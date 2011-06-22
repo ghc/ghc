@@ -184,6 +184,7 @@ mkRename rec = (term, alternatives, value, value')
 
 renameAltCon :: InScopeSet -> Renaming -> AltCon -> (InScopeSet, Renaming, AltCon)
 renameAltCon ids rn_alt alt_con = case alt_con of
-    DataAlt alt_dc alt_xs -> third3 (DataAlt alt_dc) $ renameNonRecBinders ids rn_alt alt_xs
-    LiteralAlt _          -> (ids, rn_alt, alt_con)
-    DefaultAlt            -> (ids, rn_alt, alt_con)
+    DataAlt alt_dc alt_as alt_xs -> third3 (DataAlt alt_dc alt_as') $ renameNonRecBinders ids' rn_alt' alt_xs
+      where (ids', rn_alt', alt_as') = renameNonRecBinders ids rn_alt alt_as
+    LiteralAlt _                 -> (ids, rn_alt, alt_con)
+    DefaultAlt                   -> (ids, rn_alt, alt_con)
