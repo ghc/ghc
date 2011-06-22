@@ -1,6 +1,0 @@
-
-ClassEqContext3.hs:6:1:
-    Alas, GHC 7.0 still cannot handle equality superclasses: a ~ b
-    In the context: (a ~ b)
-    While checking the super-classes of class `C'
-    In the class declaration for `C'

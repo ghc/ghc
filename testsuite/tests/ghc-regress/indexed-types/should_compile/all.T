@@ -93,10 +93,6 @@ test('ColInference4', normal, compile, [''])
 test('ColInference5', normal, compile, [''])
 test('ColInference6', normal, compile, [''])
 
-test('ClassEqContext', normal, compile_fail, [''])
-test('ClassEqContext2', normal, compile_fail, [''])
-test('ClassEqContext3', normal, compile_fail, [''])
-
 test('Col', normal, compile, [''])
 test('Col2', normal, compile, [''])
 
@@ -109,8 +105,6 @@ test('InstEqContext3', expect_fail, compile, [''])
 
 test('InstContextNorm', normal, compile, [''])
 
-test('HO', normal, compile_fail, [''])
-
 test('GivenCheck', normal, compile, [''])
 test('GivenCheckSwap', normal, compile, [''])
 test('GivenCheckDecomp', normal, compile, [''])
@@ -120,7 +114,7 @@ test('GivenCheckTop', normal, compile, [''])
 test('Gentle', normal, compile, [''])
 
 test('T1981', normal, compile, [''])
-test('T2238', expect_fail, compile, [''])
+test('T2238', normal, compile, [''])
 test('OversatDecomp', normal, compile, [''])
 
 test('T2219', normal, compile, [''])
@@ -178,3 +172,14 @@ test('T4981-V3', normal, compile, [''])
 test('T5002', normal, compile, [''])
 test('PushedInAsGivens', normal, compile, [''])
 test('SlowComp', reqlib('mtl'), compile, ['-fcontext-stack=300'])
+
+# Superclass equalities
+test('T4338', normal, compile, [''])
+test('T2715', normal, compile, [''])
+test('T2102', normal, compile, [''])
+test('ClassEqContext', normal, compile, [''])
+test('ClassEqContext2', normal, compile, [''])
+test('ClassEqContext3', normal, compile, [''])
+test('HO', normal, compile, [''])
+
+
