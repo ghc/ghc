@@ -11,16 +11,9 @@ class C a => B a where
 instance C [a] where 
   c x = () 
 
-instance B [(a,b)] where 
-  -- Silent: C [(a,b)] 
+instance {- silent: C [(a,b)] => -} B [(a,b)] where 
   b x = c [(undefined,undefined)]
-
--- DV: The silent parameter should not give us a failure to apply the instance!
-
-
-
-
-
-
-
-
+  -- We get wanted: C [(gamma, delta)], 
+  -- and gamma,delta are unconstrained
+  -- But we can apply the C [a] instance without difficulty
+  --  (except in the old days when we had silent dfun parameters)
