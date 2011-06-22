@@ -34,10 +34,10 @@ import DataCon
 import Class
 import Var
 import Pair
-import VarSet
+--import VarSet
 import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var), DFunArg(..), CoreExpr )
+import CoreSyn    ( Expr(Var), DFunArg(..), CoreExpr, varToCoreExpr )
 import Id
 import MkId
 import Name
@@ -824,27 +824,34 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        ; self_dict <- newEvVar (ClassP clas inst_tys)
        ; let class_tc      = classTyCon clas
              [dict_constr] = tyConDataCons class_tc
-             dict_bind     = mkVarBind self_dict dict_rhs
-             dict_rhs      = foldl mk_app inst_constr $
-                             map wrap_sc sc_args 
-                             ++ map (wrapId arg_wrapper) meth_ids
-             wrap_sc (DFunPolyArg (Var sc))  = wrapId arg_wrapper sc
-             wrap_sc (DFunConstArg (Var sc)) = HsVar sc
-	     wrap_sc _ = panic "wrap_sc"
+             dict_bind     = mkVarBind self_dict (L loc con_app_args)
 
-             inst_constr = L loc $ wrapId (mkWpTyApps inst_tys)
-                                          (dataConWrapId dict_constr)
                      -- We don't produce a binding for the dict_constr; instead we
                      -- rely on the simplifier to unfold this saturated application
                      -- We do this rather than generate an HsCon directly, because
                      -- it means that the special cases (e.g. dictionary with only one
                      -- member) are dealt with by the common MkId.mkDataConWrapId 
 		     -- code rather than needing to be repeated here.
+		     --    con_app_tys  = MkD ty1 ty2
+		     --    con_app_scs  = MkD ty1 ty2 sc1 sc2
+		     --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
+             con_app_tys  = wrapId (mkWpTyApps inst_tys)
+                                   (dataConWrapId dict_constr)
+             con_app_scs  = mkHsWrap (mkWpEvApps (map mk_sc_ev_term sc_args)) con_app_tys
+             con_app_args = foldl mk_app con_app_scs $
+                            map (wrapId arg_wrapper) meth_ids
 
-             mk_app :: LHsExpr Id -> HsExpr Id -> LHsExpr Id
-             mk_app fun arg = L loc (HsApp fun (L loc arg))
+             mk_app :: HsExpr Id -> HsExpr Id -> HsExpr Id
+             mk_app fun arg = HsApp (L loc fun) (L loc arg)
 
-             arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps (mkTyVarTys inst_tyvars)
+	     mk_sc_ev_term :: EvVar -> EvTerm
+             mk_sc_ev_term sc 
+               | null inst_tv_tys
+               , null dfun_ev_vars = evVarTerm sc
+               | otherwise         = EvDFunApp sc inst_tv_tys dfun_ev_vars
+
+	     inst_tv_tys    = mkTyVarTys inst_tyvars
+             arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
 	        -- Do not inline the dfun; instead give it a magic DFunFunfolding
 	        -- See Note [ClassOp/DFun selection]
@@ -853,9 +860,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 | isNewTyCon class_tc
                 = dfun_id `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
                 | otherwise
-                = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_ty (sc_args ++ meth_args)
+                = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_ty dfun_args
                           `setInlinePragma` dfunInlinePragma
-             meth_args = map (DFunPolyArg . Var) meth_ids
+
+             dfun_args :: [DFunArg CoreExpr]
+             dfun_args = map (DFunPolyArg . varToCoreExpr) sc_args ++
+                         map (DFunPolyArg . Var) meth_ids
 
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
@@ -876,22 +886,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
 ------------------------------
 tcSuperClass :: [TcTyVar] -> [EvVar] 
 	     -> (Id, PredType) 
-             -> TcM (DFunArg CoreExpr, LHsBinds Id)
+             -> TcM (TcId, LHsBinds TcId)
 
--- For a constant superclass (no free tyvars)
---   return    sc_dict, no bindings, DFunConstArg
--- For a non-constant superclass
--- build a top level decl like
+-- Build a top level decl like
 --	sc_op = /\a \d. let sc = ... in
 --			sc
--- and return sc_op, that binding, DFunPolyArg
+-- and return sc_op, that binding
 
 tcSuperClass tyvars ev_vars (sc_sel, sc_pred)
-  | isEmptyVarSet (tyVarsOfPred sc_pred)  -- Constant
-  = do { sc_dict  <- emitWanted ScOrigin sc_pred
-       ; return (DFunConstArg (Var sc_dict), emptyBag) }
-
-  | otherwise
   = do { (ev_binds, sc_dict)
              <- newImplication InstSkol tyvars ev_vars $
                 emitWanted ScOrigin sc_pred
@@ -901,14 +903,12 @@ tcSuperClass tyvars ev_vars (sc_sel, sc_pred)
 	     sc_op_name = mkDerivedInternalName mkClassOpAuxOcc uniq
 						(getName sc_sel)
 	     sc_op_id   = mkLocalId sc_op_name sc_op_ty
-	     sc_op_bind = VarBind { var_id = sc_op_id, var_inline = False
-                                  , var_rhs = L noSrcSpan $ wrapId sc_wrapper sc_dict }
+	     sc_op_bind = mkVarBind sc_op_id (L noSrcSpan $ wrapId sc_wrapper sc_dict)
              sc_wrapper = mkWpTyLams tyvars
                           <.> mkWpLams ev_vars
 			  <.> mkWpLet ev_binds
-	     binds = unitBag (noLoc sc_op_bind)
 
-       ; return (DFunPolyArg (Var sc_op_id), binds) }
+       ; return (sc_op_id, unitBag sc_op_bind) }
 
 ------------------------------
 tcSpecInstPrags :: DFunId -> InstBindings Name
@@ -1097,14 +1097,12 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                  rhs = HsWrap (mkWpEvVarApps [self_dict] <.> mkWpTyApps inst_tys) $
     		         HsVar dm_id 
 
-    	         meth_bind = L loc $ VarBind { var_id = local_meth_id
-                                             , var_rhs = L loc rhs 
-                                             , var_inline = False }
+    	         meth_bind = mkVarBind local_meth_id (L loc rhs)
                  meth_id1 = meth_id `setInlinePragma` dm_inline_prag
-    		   	    -- Copy the inline pragma (if any) from the default
-    			    -- method to this version. Note [INLINE and default methods]
+    		   	-- Copy the inline pragma (if any) from the default
+    			-- method to this version. Note [INLINE and default methods]
     			    
-                 bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars =  dfun_ev_vars
+                 bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
                                  , abs_exports = [( tyvars, meth_id1, local_meth_id
                                                   , mk_meth_spec_prags meth_id1 [])]
                                  , abs_ev_binds = EvBinds (unitBag self_ev_bind)
@@ -1198,15 +1196,12 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                                     inst_tys sel_id
 
             ; let meth_rhs  = wrapId (mk_op_wrapper sel_id rep_d) sel_id
-                  meth_bind = VarBind { var_id = local_meth_id
-                                      , var_rhs = L loc meth_rhs
-    				      , var_inline = False }
-
+                  meth_bind = mkVarBind local_meth_id (L loc meth_rhs)
 	          bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
                                    , abs_exports = [(tyvars, meth_id, 
                                                      local_meth_id, noSpecPrags)]
 				   , abs_ev_binds = rep_ev_binds
-                                   , abs_binds = unitBag $ L loc meth_bind }
+                                   , abs_binds = unitBag $ meth_bind }
 
             ; return (meth_id, L loc bind) }
 

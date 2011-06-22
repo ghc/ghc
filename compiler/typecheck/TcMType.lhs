@@ -1139,13 +1139,11 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     how_to_allow = parens (ptext (sLit "Use -XFlexibleContexts to permit this"))
 
 
-check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
+check_pred_ty dflags _ctxt pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
 		-- families are permitted
        ; checkTc (xopt Opt_TypeFamilies dflags || xopt Opt_GADTs dflags) 
                  (eqPredTyErr pred)
-       ; checkTc (case ctxt of ClassSCCtxt {} -> False; _ -> True)
-                 (eqSuperClassErr pred)
 
 		-- Check the form of the argument types
        ; checkValidMonoType ty1
@@ -1301,11 +1299,6 @@ checkThetaCtxt :: SourceTyCtxt -> ThetaType -> SDoc
 checkThetaCtxt ctxt theta
   = vcat [ptext (sLit "In the context:") <+> pprTheta theta,
 	  ptext (sLit "While checking") <+> pprSourceTyCtxt ctxt ]
-
-eqSuperClassErr :: PredType -> SDoc
-eqSuperClassErr pred
-  = hang (ptext (sLit "Alas, GHC 7.0 still cannot handle equality superclasses:"))
-       2 (ppr pred)
 
 badPredTyErr, eqPredTyErr, predTyVarErr :: PredType -> SDoc
 badPredTyErr pred = ptext (sLit "Illegal constraint") <+> pprPredTy pred

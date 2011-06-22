@@ -217,7 +217,7 @@ dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
 dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e) 	      = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
-dsExpr (HsVar var)     	      = return (Var var)
+dsExpr (HsVar var)     	      = return (varToCoreExpr var)   -- See Note [Desugaring vars]
 dsExpr (HsIPVar ip)    	      = return (Var (ipNameName ip))
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
@@ -239,6 +239,22 @@ dsExpr (HsApp fun arg)
   = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
 \end{code}
 
+Note [Desugaring vars]
+~~~~~~~~~~~~~~~~~~~~~~
+In one situation we can get a *coercion* variable in a HsVar, namely
+the support method for an equality superclass:
+   class (a~b) => C a b where ...
+   instance (blah) => C (T a) (T b) where ..
+Then we get
+   $dfCT :: forall ab. blah => C (T a) (T b)
+   $dfCT ab blah = MkC ($c$p1C a blah) ($cop a blah)
+
+   $c$p1C :: forall ab. blah => (T a ~ T b)
+   $c$p1C ab blah = let ...; g :: T a ~ T b = ... } in g
+
+That 'g' in the 'in' part is an evidence variable, and when
+converting to core it must become a CO.
+   
 Operator sections.  At first it looks as if we can convert
 \begin{verbatim}
 	(expr op)

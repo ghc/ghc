@@ -30,7 +30,7 @@ import Type
 import Coercion
 
 import TcRnMonad
-import Data.List	( partition )
+import Util		( isSingleton )
 import Outputable
 \end{code}
 	
@@ -248,12 +248,9 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	; op_items <- mapM (mk_op_item rec_clas) sig_stuff
 	  		-- Build the selector id and default method id
 
-	; let (eq_theta, dict_theta) = partition isEqPred sc_theta
-
-	      -- We only make selectors for the *value* superclasses, 
-	      -- not equality predicates 
+	      -- Make selectors for the superclasses 
 	; sc_sel_names <- mapM  (newImplicitBinder class_name . mkSuperDictSelOcc) 
-				[1..length dict_theta]
+				[1..length sc_theta]
         ; let sc_sel_ids = [ mkDictSelId no_unf sc_name rec_clas 
                            | sc_name <- sc_sel_names]
 	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
@@ -264,22 +261,23 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
 	
-	; let use_newtype = null eq_theta && (length dict_theta + length sig_stuff == 1)
-		-- Use a newtype if the data constructor has 
-		-- 	(a) exactly one value field
-		--	(b) no existential or equality-predicate fields
-		-- i.e. exactly one operation or superclass taken together
+	; let use_newtype = isSingleton arg_tys && not (any isEqPred sc_theta)
+		-- Use a newtype if the data constructor 
+		--   (a) has exactly one value field
+		--       i.e. exactly one operation or superclass taken together
+                --   (b) it's of lifted type 
+		-- (NB: for (b) don't look at the classes in sc_theta, because
+		--      they are part of the knot!  Hence isEqPred.)
 		-- See note [Class newtypes and equality predicates]
 
-		-- We play a bit fast and loose by treating the dictionary
-		-- superclasses as ordinary arguments.  That means that in 
-                -- the case of
+		-- We treat the dictionary superclasses as ordinary arguments.  
+                -- That means that in the case of
 		--     class C a => D a
 		-- we don't get a newtype with no arguments!
 	      args      = sc_sel_names ++ op_names
 	      op_tys	= [ty | (_,_,ty) <- sig_stuff]
 	      op_names  = [op | (op,_,_) <- sig_stuff]
-	      arg_tys   = map mkPredTy dict_theta ++ op_tys
+	      arg_tys   = map mkPredTy sc_theta ++ op_tys
               rec_tycon = classTyCon rec_clas
                
 	; dict_con <- buildDataCon datacon_name
@@ -288,7 +286,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 				   [{- No fields -}]
 				   tvs [{- no existentials -}]
                                    [{- No GADT equalities -}] 
-                                   eq_theta
+                                   [{- No theta -}]
                                    arg_tys
 				   (mkTyConApp rec_tycon (mkTyVarTys tvs))
 				   rec_tycon
@@ -312,9 +310,7 @@ buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      ; atTyCons = [tycon | ATyCon tycon <- ats]
 
 	      ; result = mkClass class_name tvs fds 
-			         (eq_theta ++ dict_theta)  -- Equalities first
-                                 (length eq_theta)	   -- Number of equalities
-                                 sc_sel_ids atTyCons
+			         sc_theta sc_sel_ids atTyCons
 				 op_items tycon
 	      }
 	; traceIf (text "buildClass" <+> ppr tycon) 
@@ -339,12 +335,12 @@ Consider
 	  op :: a -> b
 
 We cannot represent this by a newtype, even though it's not
-existential, and there's only one value field, because we do
-capture an equality predicate:
+existential, because there are two value fields (the equality
+predicate and op. See Trac #2238
 
-	data C a b where
-	  MkC :: forall a b. (a ~ F b) => (a->b) -> C a b
-
-We need to access this equality predicate when we get passes a C
-dictionary.  See Trac #2238
+Moreover, 
+	  class (a ~ F b) => C a b where {}
+Here we can't use a newtype either, even though there is only
+one field, because equality predicates are unboxed, and classes
+are boxed.
 
