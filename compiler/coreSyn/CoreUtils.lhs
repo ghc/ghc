@@ -1493,16 +1493,14 @@ rhsIsStatic :: (Name -> Bool) -> CoreExpr -> Bool
 rhsIsStatic _is_dynamic_name rhs = is_static False rhs
   where
   is_static :: Bool	-- True <=> in a constructor argument; must be atomic
-  	  -> CoreExpr -> Bool
+            -> CoreExpr -> Bool
   
-  is_static False (Lam b e)   = isRuntimeVar b || is_static False e
-  is_static in_arg (Note n e) = notSccNote n && is_static in_arg e
-  is_static in_arg (Cast e _) = is_static in_arg e
-  
-  is_static _      (Lit lit)
-    = case lit of
-  	MachLabel _ _ _ -> False
-        _             -> True
+  is_static False (Lam b e)   		= isRuntimeVar b || is_static False e
+  is_static in_arg (Note n e) 		= notSccNote n && is_static in_arg e
+  is_static in_arg (Cast e _) 		= is_static in_arg e
+  is_static _      (Coercion {})	= True   -- Behaves just like a literal
+  is_static _      (Lit (MachLabel {})) = False
+  is_static _      (Lit _)              = True
   	-- A MachLabel (foreign import "&foo") in an argument
   	-- prevents a constructor application from being static.  The
   	-- reason is that it might give rise to unresolvable symbols

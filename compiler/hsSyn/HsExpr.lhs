@@ -672,7 +672,6 @@ type HsRecordBinds id = HsRecFields id (LHsExpr id)
 \end{code}
 
 
-
 %************************************************************************
 %*                                                                      *
 \subsection{@Match@, @GRHSs@, and @GRHS@ datatypes}
