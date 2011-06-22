@@ -43,7 +43,7 @@ mkSize rec = (var', term, term', alternatives, value, value')
         Value v         -> value' v - 1 -- Slight hack here so that we don't get +2 size on values
         TyApp e _       -> term e
         App e x         -> term e + var' x
-        PrimOp _ es     -> sum (map term es)
+        PrimOp _ _ es   -> sum (map term es)
         Case e _ _ alts -> term e + alternatives alts
         Let _ e1 e2     -> term e1 + term e2
         LetRec xes e    -> sum (map (term . snd) xes) + term e
@@ -63,25 +63,12 @@ mkSize rec = (var', term, term', alternatives, value, value')
     alternative = term . snd
 
 
-{-
-instance Symantics Sized where
-    var = sizedTerm . Var
-    value = sizedTerm . Value
-    app e = sizedTerm . App e
-    primOp pop = sizedTerm . PrimOp pop
-    case_ e = sizedTerm . Case e
-    letRec xes e = sizedTerm (LetRec xes e)
-
-sizedTerm :: TermF Sized -> SizedTerm
-sizedTerm e = Sized (sizedTermSize' e) e
--}
-
 instance Symantics (O Sized FVed) where
     var = sizedFVedTerm . Var
     value = fmap Value . sizedFVedValue
     tyApp e = sizedFVedTerm . TyApp e
     app e = sizedFVedTerm . App e
-    primOp pop = sizedFVedTerm . PrimOp pop
+    primOp pop tys = sizedFVedTerm . PrimOp pop tys
     case_ e x ty = sizedFVedTerm . Case e x ty
     let_ x e1 = sizedFVedTerm . Let x e1
     letRec xes = sizedFVedTerm . LetRec xes

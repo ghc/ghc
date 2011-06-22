@@ -46,7 +46,7 @@ mkFreeVars rec = (var', term, term', alternatives, value, value')
     term' (Value v)          = value' v
     term' (TyApp e ty)       = typ ty `unionVarSet` term e
     term' (App e x)          = idFreeVars x `unionVarSet` term e
-    term' (PrimOp _ es)      = unionVarSets $ map term es
+    term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
     term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` (alternatives alts `delVarSet` x)
     term' (Let x e1 e2)      = term e1 `unionVarSet` (term e2 `delVarSet` x)
     term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e) `delVarSetList` xs
@@ -123,7 +123,7 @@ instance Symantics FVed where
     value = fmap Value . fvedValue
     tyApp e = fvedTerm . TyApp e
     app e = fvedTerm . App e
-    primOp pop = fvedTerm . PrimOp pop
+    primOp pop tys = fvedTerm . PrimOp pop tys
     case_ e x ty = fvedTerm . Case e x ty
     let_ x e1 = fvedTerm . Let x e1
     letRec xes = fvedTerm . LetRec xes

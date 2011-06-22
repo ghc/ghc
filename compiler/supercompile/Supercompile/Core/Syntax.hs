@@ -64,7 +64,7 @@ data TermF ann = Var Var
                | Value (ValueF ann)
                | App (ann (TermF ann)) Var
                | TyApp (ann (TermF ann)) Type
-               | PrimOp PrimOp [ann (TermF ann)]
+               | PrimOp PrimOp [Type] [ann (TermF ann)]
                | Case (ann (TermF ann)) Var Type [AltF ann]
                | Let Var (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case the evaluation rules must change
                | LetRec [(Var, ann (TermF ann))] (ann (TermF ann))
@@ -93,7 +93,7 @@ instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
         Value v           -> pPrintPrec prec v
         TyApp e ty        -> pPrintPrecApp prec (asPrettyFunction1 e) ty
         App e x           -> pPrintPrecApp prec (asPrettyFunction1 e) x
-        PrimOp pop es     -> pPrintPrecPrimOp prec pop (map asPrettyFunction1 es)
+        PrimOp pop tys es -> pPrintPrecPrimOp prec pop (map asPrettyFunction tys) (map asPrettyFunction1 es)
         Case e x _ty alts -> pPrintPrecCase prec (asPrettyFunction1 e) x (map (second asPrettyFunction1) alts)
         Cast e co         -> pPrintPrecCast prec (asPrettyFunction1 e) co
 
@@ -106,8 +106,8 @@ pPrintPrecCast prec e co = prettyParen (prec > noPrec) $ pPrintPrec opPrec e <+>
 pPrintPrecApp :: (Outputable a, Outputable b) => Rational -> a -> b -> SDoc
 pPrintPrecApp prec e1 e2 = prettyParen (prec >= appPrec) $ pPrintPrec opPrec e1 <+> pPrintPrec appPrec e2
 
-pPrintPrecPrimOp :: (Outputable a, Outputable b) => Rational -> a -> [b] -> SDoc
-pPrintPrecPrimOp prec pop xs = pPrintPrecApps prec pop xs
+pPrintPrecPrimOp :: (Outputable a, Outputable b, Outputable c) => Rational -> a -> [b] -> [c] -> SDoc
+pPrintPrecPrimOp prec pop as xs = pPrintPrecApps prec (PrettyFunction (\prec -> pPrintPrecApps prec pop as)) xs
 
 pPrintPrecCase :: (Outputable a, Outputable b, Outputable c, Outputable d) => Rational -> a -> b -> [(c, d)] -> SDoc
 pPrintPrecCase prec e x alts = prettyParen (prec > noPrec) $ hang (text "case" <+> pPrintPrec noPrec e <+> text "of" <+> pPrintPrec noPrec x) 2 $ vcat (map (pPrintPrecAlt noPrec) alts)
@@ -188,7 +188,7 @@ class Functor ann => Symantics ann where
     value  :: ValueF ann -> ann (TermF ann)
     tyApp  :: ann (TermF ann) -> Type -> ann (TermF ann)
     app    :: ann (TermF ann) -> Var -> ann (TermF ann)
-    primOp :: PrimOp -> [ann (TermF ann)] -> ann (TermF ann)
+    primOp :: PrimOp -> [Type] -> [ann (TermF ann)] -> ann (TermF ann)
     case_  :: ann (TermF ann) -> Var -> Type -> [AltF ann] -> ann (TermF ann)
     let_   :: Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
     letRec :: [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
@@ -199,7 +199,7 @@ instance Symantics Identity where
     value = I . Value
     tyApp e = I . TyApp e
     app e = I . App e
-    primOp pop = I . PrimOp pop
+    primOp pop tys = I . PrimOp pop tys
     case_ e x ty = I . Case e x ty
     let_ x e1 = I . Let x e1
     letRec xes = I . LetRec xes
@@ -211,15 +211,15 @@ reify x = x
 
 reflect :: Term -> (forall ann. Symantics ann => ann (TermF ann))
 reflect (I e) = case e of
-    Var x            -> var x
-    Value v          -> value (reflectValue v)
-    TyApp e ty       -> tyApp (reflect e) ty
-    App e x          -> app (reflect e) x
-    PrimOp pop es    -> primOp pop (map reflect es)
-    Case e x ty alts -> case_ (reflect e) x ty (map (second reflect) alts)
-    Let x e1 e2      -> let_ x (reflect e1) (reflect e2)
-    LetRec xes e     -> letRec (map (second reflect) xes) (reflect e)
-    Cast e co        -> cast (reflect e) co
+    Var x             -> var x
+    Value v           -> value (reflectValue v)
+    TyApp e ty        -> tyApp (reflect e) ty
+    App e x           -> app (reflect e) x
+    PrimOp pop tys es -> primOp pop tys (map reflect es)
+    Case e x ty alts  -> case_ (reflect e) x ty (map (second reflect) alts)
+    Let x e1 e2       -> let_ x (reflect e1) (reflect e2)
+    LetRec xes e      -> letRec (map (second reflect) xes) (reflect e)
+    Cast e co         -> cast (reflect e) co
   where
     reflectValue :: Value -> (forall ann. Symantics ann => ValueF ann)
     reflectValue v = case v of
@@ -241,6 +241,9 @@ lambda x = value . Lambda x
 data_ :: Symantics ann => DataCon -> [Var] -> ann (TermF ann)
 data_ dc = value . Data dc
 -}
+
+tyLambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
+tyLambdas = flip $ foldr (\x -> value . TyLambda x)
 
 lambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
 lambdas = flip $ foldr (\x -> value . Lambda x)

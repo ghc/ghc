@@ -83,13 +83,20 @@ instance Monoid SCStats where
       }
 
 
-supercompile :: Term -> (SCStats, Term)
-supercompile e = pprTrace "all input FVs" (ppr input_fvs) $ second fVedTermToTerm $ runScpM $ liftM snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
-  where input_fvs = annedTermFreeVars anned_e
+supercompile :: M.Map Var Term -> Term -> (SCStats, Term)
+supercompile unfoldings e = pprTrace "all input FVs" (ppr input_fvs) $ second fVedTermToTerm $ runScpM $ liftM snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
+  where anned_e = toAnnedTerm tag_ids e
+        input_fvs = annedTermFreeVars anned_e
         state = normalise ((bLOAT_FACTOR - 1) * annedSize anned_e, Heap (M.fromDistinctAscList anned_h_kvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
         
-        (tag_ids, anned_h_kvs) = mapAccumL (\tag_ids x' -> let (i, tag_ids') = takeUniqFromSupply tag_ids in (tag_ids', (x', environmentallyBound (mkTag (getKey i))))) tagUniqSupply (varSetElems input_fvs)
-        anned_e = toAnnedTerm tag_ids e
+        (tag_ids, anned_h_kvs) = mapAccumL add_one_heap_binding tagUniqSupply (varSetElems input_fvs)
+          where add_one_heap_binding tag_ids0 x' = (tag_ids2, (x', hb))
+                  where (hb, tag_ids2) = case M.lookup x' unfoldings of
+                                            Nothing | let (i, tag_ids1) = takeUniqFromSupply tag_ids0
+                                                    -> (environmentallyBound (mkTag (getKey i)), tag_ids1)
+                                            Just e  | let (tag_unf_ids, tag_ids1) = splitUniqSupply tag_ids0
+                                                          anned_e = toAnnedTerm tag_unf_ids e
+                                                    -> (letBound (mkIdentityRenaming (annedFreeVars anned_e), anned_e), tag_ids1)
 
 --
 -- == Bounded multi-step reduction ==

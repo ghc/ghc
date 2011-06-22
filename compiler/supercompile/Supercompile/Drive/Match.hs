@@ -128,7 +128,7 @@ matchInTerm' _   (rn_l, Var x_l)                  (rn_r, Var x_r)               
 matchInTerm' ids (rn_l, Value v_l)                (rn_r, Value v_r)                = matchInValue ids (rn_l, v_l) (rn_r, v_r)
 matchInTerm' ids (rn_l, TyApp e_l ty_l)           (rn_r, TyApp e_r ty_r)           = liftM2 (++) (matchInTerm ids (rn_l, e_l) (rn_r, e_r)) (matchInType ids (rn_l, ty_l) (rn_r, ty_r))
 matchInTerm' ids (rn_l, App e_l x_l)              (rn_r, App e_r x_r)              = matchInTerm ids (rn_l, e_l) (rn_r, e_r) >>= \eqs -> return (matchInVar (rn_l, x_l) (rn_r, x_r) : eqs)
-matchInTerm' ids (rn_l, PrimOp pop_l es_l)        (rn_r, PrimOp pop_r es_r)        = guard "matchInTerm: primop" (pop_l == pop_r) >> matchInList (matchInTerm ids) (rn_l, es_l) (rn_r, es_r)
+matchInTerm' ids (rn_l, PrimOp pop_l tys_l es_l)  (rn_r, PrimOp pop_r tys_r es_r)  = guard "matchInTerm: primop" (pop_l == pop_r) >> liftM2 (++) (matchInList (matchInType ids) (rn_l, tys_l) (rn_r, tys_r)) (matchInList (matchInTerm ids) (rn_l, es_l) (rn_r, es_r))
 matchInTerm' ids (rn_l, Case e_l x_l ty_l alts_l) (rn_r, Case e_r x_r ty_r alts_r) = liftM3 (\x y z -> x ++ y ++ z) (matchInTerm ids'' (rn_l, e_l) (rn_r, e_r)) (matchInType ids'' (rn_l, ty_l) (rn_r, ty_r)) (matchInAlts ids'' (rn_l', alts_l) (rn_r', alts_r)) >>= matchRigidBinders [(x_l', x_r')]
   where (ids',  rn_l', x_l') = renameNonRecBinder ids  rn_l x_l
         (ids'', rn_r', x_r') = renameNonRecBinder ids' rn_r x_r
@@ -199,13 +199,13 @@ matchECFrame :: Tagged StackFrame -> Tagged StackFrame -> Match ([(Var, Var)], [
 matchECFrame kf_l kf_r = matchECFrame' (tagee kf_l) (tagee kf_r)
 
 matchECFrame' :: StackFrame -> StackFrame -> Match ([(Var, Var)], [(Var, Var)])
-matchECFrame' (Apply x_l')                      (Apply x_r')                      = return ([], [matchVar x_l' x_r'])
-matchECFrame' (TyApply ty_l')                   (TyApply ty_r')                   = fmap ((,) []) $ matchType ty_l' ty_r'
-matchECFrame' (Scrutinise x_l' ty_l' in_alts_l) (Scrutinise x_r' ty_r' in_alts_r) = fmap ((,) []) $ liftM2 (++) (matchType ty_l' ty_r') (matchInAlts (matchInScopeSet (inFreeVars annedAltsFreeVars) in_alts_l in_alts_r) in_alts_l in_alts_r >>= matchRigidBinders [(x_l', x_r')])
-matchECFrame' (PrimApply pop_l in_vs_l in_es_l) (PrimApply pop_r in_vs_r in_es_r) = fmap ((,) []) $ guard "matchECFrame': primop" (pop_l == pop_r) >> liftM2 (++) (matchList (\in_v_l in_v_r -> matchAnned (matchAnswer (matchInScopeSet annedFreeVars in_v_l in_v_r)) in_v_l in_v_r) in_vs_l in_vs_r) (matchList (\in_e_l in_e_r -> matchInTerm (matchInScopeSet (inFreeVars annedTermFreeVars) in_e_l in_e_r) in_e_l in_e_r) in_es_l in_es_r)
-matchECFrame' (StrictLet x_l' in_e_l)           (StrictLet x_r' in_e_r)           = fmap ((,) []) $ matchInTerm (matchInScopeSet (inFreeVars annedTermFreeVars) in_e_l in_e_r) in_e_l in_e_r >>= matchRigidBinders [(x_l', x_r')]
-matchECFrame' (Update x_l')                     (Update x_r')                     = return ([matchVar x_l' x_r'], [])
-matchECFrame' (CastIt co_l')                    (CastIt co_r')                    = fmap ((,) []) $ matchCoercion co_l' co_r'
+matchECFrame' (Apply x_l')                             (Apply x_r')                             = return ([], [matchVar x_l' x_r'])
+matchECFrame' (TyApply ty_l')                          (TyApply ty_r')                          = fmap ((,) []) $ matchType ty_l' ty_r'
+matchECFrame' (Scrutinise x_l' ty_l' in_alts_l)        (Scrutinise x_r' ty_r' in_alts_r)        = fmap ((,) []) $ liftM2 (++) (matchType ty_l' ty_r') (matchInAlts (matchInScopeSet (inFreeVars annedAltsFreeVars) in_alts_l in_alts_r) in_alts_l in_alts_r >>= matchRigidBinders [(x_l', x_r')])
+matchECFrame' (PrimApply pop_l tys_l' in_vs_l in_es_l) (PrimApply pop_r tys_r' in_vs_r in_es_r) = fmap ((,) []) $ guard "matchECFrame': primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList matchType tys_l' tys_r') (matchList (\in_v_l in_v_r -> matchAnned (matchAnswer (matchInScopeSet annedFreeVars in_v_l in_v_r)) in_v_l in_v_r) in_vs_l in_vs_r) (matchList (\in_e_l in_e_r -> matchInTerm (matchInScopeSet (inFreeVars annedTermFreeVars) in_e_l in_e_r) in_e_l in_e_r) in_es_l in_es_r)
+matchECFrame' (StrictLet x_l' in_e_l)                  (StrictLet x_r' in_e_r)                  = fmap ((,) []) $ matchInTerm (matchInScopeSet (inFreeVars annedTermFreeVars) in_e_l in_e_r) in_e_l in_e_r >>= matchRigidBinders [(x_l', x_r')]
+matchECFrame' (Update x_l')                            (Update x_r')                            = return ([matchVar x_l' x_r'], [])
+matchECFrame' (CastIt co_l')                           (CastIt co_r')                           = fmap ((,) []) $ matchCoercion co_l' co_r'
 matchECFrame' _ _ = fail "matchECFrame'"
 
 matchRigidBinders :: [(Var, Var)] -> [(Var, Var)] -> Match [(Var, Var)]

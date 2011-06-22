@@ -157,7 +157,7 @@ mkRename rec = (term, alternatives, value, value')
       Value v -> Value (value' ids rn v)
       TyApp e ty -> TyApp (term ids rn e) (renameType ids rn ty)
       App e x -> App (term ids rn e) (rename rn x)
-      PrimOp pop es -> PrimOp pop (map (term ids rn) es)
+      PrimOp pop tys es -> PrimOp pop (map (renameType ids rn) tys) (map (term ids rn) es)
       Case e x ty alts -> Case (term ids rn e) x' (renameType ids rn ty) (alternatives ids' rn' alts)
         where (ids', rn', x') = renameNonRecBinder ids rn x
       Let x e1 e2 -> Let x' (renameIn (term ids) in_e1) (term ids' rn' e2)

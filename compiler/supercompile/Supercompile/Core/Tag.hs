@@ -24,20 +24,20 @@ mkTagger rec = term
     term ids = rec i (term' ids')
       where (i, ids') = takeUniqFromSupply ids
     term' ids e = case e of
-        Var x            -> Var x
-        Value v          -> Value (value' ids v)
-        TyApp e ty       -> TyApp (term ids e) ty
-        App e x          -> App (term ids e) x
-        PrimOp pop es    -> PrimOp pop (zipWith term idss' es)
+        Var x             -> Var x
+        Value v           -> Value (value' ids v)
+        TyApp e ty        -> TyApp (term ids e) ty
+        App e x           -> App (term ids e) x
+        PrimOp pop tys es -> PrimOp pop tys (zipWith term idss' es)
           where idss' = listSplitUniqSupply ids
-        Case e x ty alts -> Case (term ids0' e) x ty (alternatives ids1' alts)
+        Case e x ty alts  -> Case (term ids0' e) x ty (alternatives ids1' alts)
           where (ids0', ids1') = splitUniqSupply ids
-        Let x e1 e2      -> Let x (term ids0' e1) (term ids1' e2)
+        Let x e1 e2       -> Let x (term ids0' e1) (term ids1' e2)
           where (ids0', ids1') = splitUniqSupply ids
-        LetRec xes e     -> LetRec (zipWith (\ids'' (x, e) -> (x, term ids'' e)) idss' xes) (term ids1' e)
+        LetRec xes e      -> LetRec (zipWith (\ids'' (x, e) -> (x, term ids'' e)) idss' xes) (term ids1' e)
           where (ids0', ids1') = splitUniqSupply ids
                 idss' = listSplitUniqSupply ids0'
-        Cast e co        -> Cast (term ids e) co
+        Cast e co         -> Cast (term ids e) co
 
     value' ids v = case v of
         Indirect x     -> Indirect x
@@ -69,15 +69,15 @@ mkDetag rec = (term, term', alternatives, value, value')
   where
     term = rec term'
     term' e = case e of
-        Var x            -> Var x
-        Value v          -> Value (value' v)
-        TyApp e ty       -> TyApp (term e) ty
-        App e x          -> App (term e) x
-        PrimOp pop es    -> PrimOp pop (map term es)
-        Case e x ty alts -> Case (term e) x ty (alternatives alts)
-        Let x e1 e2      -> Let x (term e1) (term e2)
-        LetRec xes e     -> LetRec (map (second term) xes) (term e)
-        Cast e co        -> Cast (term e) co
+        Var x             -> Var x
+        Value v           -> Value (value' v)
+        TyApp e ty        -> TyApp (term e) ty
+        App e x           -> App (term e) x
+        PrimOp pop tys es -> PrimOp pop tys (map term es)
+        Case e x ty alts  -> Case (term e) x ty (alternatives alts)
+        Let x e1 e2       -> Let x (term e1) (term e2)
+        LetRec xes e      -> LetRec (map (second term) xes) (term e)
+        Cast e co         -> Cast (term e) co
 
     value = rec value'
     value' (Indirect x)     = Indirect x

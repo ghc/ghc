@@ -26,9 +26,9 @@ import Pair
 import Util (splitAtList)
 
 
-evaluatePrim :: Tag -> PrimOp -> [Answer] -> Maybe (Anned Answer)
-evaluatePrim tg pop args = do
-    args' <- mapM to args
+evaluatePrim :: Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
+evaluatePrim tg pop tys args = do
+    args' <- fmap (map CoreSyn.Type tys ++) $ mapM to args
     (res:_) <- return [res | CoreSyn.BuiltinRule { CoreSyn.ru_nargs = nargs, CoreSyn.ru_try = f }
                           <- primOpRules pop (error "evaluatePrim: dummy primop name")
                       , nargs == length args
@@ -90,20 +90,22 @@ step' normalising state =
     go (deeds, heap@(Heap h ids), k, (rn, e)) 
      | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, heap, k, anned_a)
      | otherwise = case annee e of
-        Var x             -> go_question (deeds, heap, k, fmap (const (rename rn x)) e)
-        TyApp e ty        -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                   : k, (rn, e))
-        App e x           -> go (deeds, heap,        Tagged tg (Apply (rename rn x))                              : k, (rn, e))
-        PrimOp pop (e:es) -> go (deeds, heap,        Tagged tg (PrimApply pop [] (map ((,) rn) es))               : k, (rn, e))
-        Case e x ty alts  -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts)) : k, (rn, e))
+        Var x            -> go_question (deeds, heap, k, fmap (const (rename rn x)) e)
+        Value v          -> pprPanic "step': values are always answers" (ppr v)
+        TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   : k, (rn, e))
+        App e x          -> go (deeds, heap,        Tagged tg (Apply (rename rn x))                                              : k, (rn, e))
+        PrimOp pop tys es
+          | (e:es) <- es -> go (deeds, heap,        Tagged tg (PrimApply pop (map (renameType ids rn) tys) [] (map ((,) rn) es)) : k, (rn, e))
+          | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
+        Case e x ty alts -> go (deeds, Heap h ids', Tagged tg (Scrutinise x' (renameType ids rn ty) (rn', alts))                 : k, (rn, e))
           where (ids', rn', x') = renameNonRecBinder ids rn x
-        Cast e co         -> go (deeds, heap,        Tagged tg (CastIt (renameCoercion ids rn co))                : k, (rn, e))
+        Cast e co        -> go (deeds, heap,        Tagged tg (CastIt (renameCoercion ids rn co))                                : k, (rn, e))
         Let x e1 e2
           | isUnLiftedType (idType x) -> go (deeds,     Heap h                                       ids', Tagged tg (StrictLet x' (rn', e2)) : k, in_e1)
           | otherwise                 -> go (deeds + 1, Heap (M.insert x' (internallyBound in_e1) h) ids',                                      k, (rn', e2))
           where (ids', rn', (x', in_e1)) = renameNonRecBound ids rn (x, e1)
-        LetRec xes e      -> go (deeds + 1, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
+        LetRec xes e     -> go (deeds + 1, Heap (h `M.union` M.fromList [(x', internallyBound in_e) | (x', in_e) <- xes']) ids', k, (rn', e))
           where (ids', rn', xes') = renameBounds ids rn xes
-        _                 -> panic "reduced" (text "Impossible expression" $$ ppr1 e)
       where tg = annedTag e
 
     go_question (deeds, h, k, anned_x) = maybe (False, (deeds, h, k, fmap Question anned_x)) (\s -> (True, normalise s)) $ force  deeds h k (annedTag anned_x) (annee anned_x)
@@ -149,12 +151,12 @@ step' normalising state =
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
     unwind deeds h k tg_v in_v = uncons k >>= \(kf, k) -> case tagee kf of
-        TyApply ty'               -> tyApply    (deeds + 1)          h k      in_v ty'
-        Apply x2'                 -> apply      deeds       (tag kf) h k      in_v x2'
-        Scrutinise x' ty' in_alts -> scrutinise (deeds + 1)          h k tg_v in_v x' ty' in_alts
-        PrimApply pop in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop in_vs in_v in_es
-        StrictLet x' in_e2        -> strictLet  (deeds + 1)          h k tg_v in_v x' in_e2
-        CastIt co'                -> cast       deeds       (tag kf) h k      in_v co'
+        TyApply ty'                    -> tyApply    (deeds + 1)          h k      in_v ty'
+        Apply x2'                      -> apply      deeds       (tag kf) h k      in_v x2'
+        Scrutinise x' ty' in_alts      -> scrutinise (deeds + 1)          h k tg_v in_v x' ty' in_alts
+        PrimApply pop tys' in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop tys' in_vs in_v in_es
+        StrictLet x' in_e2             -> strictLet  (deeds + 1)          h k tg_v in_v x' in_e2
+        CastIt co'                     -> cast       deeds       (tag kf) h k      in_v co'
         Update x'
           | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
           | otherwise                               -> update deeds h k tg_v x' in_v
@@ -260,16 +262,18 @@ step' normalising state =
                              | otherwise          = (deeds0, M.insert wild' (internallyBound (rn_v, annedTerm tg_v (Value v))) h0)
                                -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
 
-        primop :: Deeds -> Tag -> Heap -> Stack -> Tag -> PrimOp -> [Anned Answer] -> Answer -> [In AnnedTerm] -> Maybe UnnormalisedState
-        primop deeds tg_kf h k tg_a pop anned_as a [] = do
+        primop :: Deeds -> Tag -> Heap -> Stack -> Tag -> PrimOp -> [Out Type] -> [Anned Answer] -> Answer -> [In AnnedTerm] -> Maybe UnnormalisedState
+        primop deeds tg_kf h k tg_a pop tys' anned_as a [] = do
             guard eVALUATE_PRIMOPS -- NB: this is not faithful to paper 1 because we still turn primop expressions into
                                    -- stack frames.. this is bad because it will impede good specilations (without smart generalisation)
             let as' = map (dereference h) $ map annee anned_as ++ [a]
                 tg_kf' = tg_kf { tagOccurrences = if oCCURRENCE_GENERALISATION then tagOccurrences tg_kf + sum (map tagOccurrences (tg_a : map annedTag anned_as)) else 1 }
-            a' <- evaluatePrim tg_kf' pop as'
+            a' <- evaluatePrim tg_kf' pop tys' as'
             deeds <- claimDeeds (deeds + sum (map annedSize anned_as) + answerSize' a + 1) (annedSize a') -- I don't think this can ever fail
             return (denormalise (deeds, h, k, fmap Answer a'))
-        primop deeds tg_kf h k tg_a pop anned_as a (in_e:in_es) = Just (deeds, h, Tagged tg_kf (PrimApply pop (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
+        primop deeds tg_kf h k tg_a pop tys' anned_as a in_es = case in_es of
+            (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
+            []           -> Nothing
 
         strictLet :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
         strictLet deeds (Heap h ids) k tg_a a x' in_e2 = Just (deeds, Heap (M.insert x' (internallyBound (annedAnswerToAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, in_e2)

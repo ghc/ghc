@@ -951,7 +951,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             bracketed_alts = zipWith3 (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` (fvs_body `delVarSet` x')) [id, (`extendVarSet` x')] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
       where ctxt_id = uniqFromSupply ctxt_ids
-    PrimApply pop in_vs in_es -> zipBracketeds (primOp pop) unionVarSets (repeat id) (\_ -> Nothing) (bracketed_vs ++ bracketed_hole : bracketed_es)
+    PrimApply pop tys' in_vs in_es -> zipBracketeds (primOp pop tys') unionVarSets (repeat id) (\_ -> Nothing) (bracketed_vs ++ bracketed_hole : bracketed_es)
       where -- 0) Manufacture context identifier (actually, an infinite number of them - but who cares?)
             ctxt_idss = uniqsFromSupply ctxt_ids
             

@@ -186,6 +186,9 @@ internallyBound in_e = HB InternallyBound (Right in_e)
 environmentallyBound :: Tag -> HeapBinding
 environmentallyBound tg = HB LetBound (Left (Just tg))
 
+letBound :: In AnnedTerm -> HeapBinding
+letBound in_e = HB LetBound (Right in_e)
+
 type PureHeap = M.Map (Out Var) HeapBinding
 data Heap = Heap PureHeap InScopeSet
 
@@ -197,20 +200,20 @@ type Stack = [Tagged StackFrame]
 data StackFrame = Apply (Out Var)
                 | TyApply (Out Type)
                 | Scrutinise (Out Var) (Out Type) (In [AnnedAlt])
-                | PrimApply PrimOp [Anned Answer] [In AnnedTerm]
+                | PrimApply PrimOp [Out Type] [Anned Answer] [In AnnedTerm]
                 | StrictLet (Out Var) (In AnnedTerm)
                 | Update (Out Var)
                 | CastIt (Out Coercion)
 
 instance Outputable StackFrame where
     pprPrec prec kf = case kf of
-        Apply x'                  -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
-        TyApply ty'               -> pPrintPrecApp prec (PrettyDoc $ text "[_]") ty'
-        Scrutinise x' _ty in_alts -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
-        PrimApply pop in_vs in_es -> pPrintPrecPrimOp prec pop (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
-        StrictLet x' in_e2        -> pPrintPrecLet prec x' (PrettyDoc $ text "[_]") (PrettyFunction $ flip pPrintPrecAnnedTerm in_e2)
-        Update x'                 -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
-        CastIt co'                -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
+        Apply x'                       -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
+        TyApply ty'                    -> pPrintPrecApp prec (PrettyDoc $ text "[_]") ty'
+        Scrutinise x' _ty in_alts      -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
+        PrimApply pop tys' in_vs in_es -> pPrintPrecPrimOp prec pop (map (PrettyFunction . flip pPrintPrec) tys') (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
+        StrictLet x' in_e2             -> pPrintPrecLet prec x' (PrettyDoc $ text "[_]") (PrettyFunction $ flip pPrintPrecAnnedTerm in_e2)
+        Update x'                      -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
+        CastIt co'                     -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
 
 
 renameAnned :: (InScopeSet -> Renaming -> a -> a)
@@ -227,13 +230,13 @@ stackType k ty = foldl' (flip stackFrameType) ty k
 
 stackFrameType :: Tagged StackFrame -> Type -> Type
 stackFrameType kf hole_ty = case tagee kf of
-    Apply x                   -> hole_ty `applyFunTy` idType x
-    TyApply ty                -> hole_ty `applyTy` ty
-    Scrutinise _ ty _         -> ty
-    PrimApply pop in_as in_es -> (primOpType pop `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
-    StrictLet _ in_e@(rn, e)  -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
-    Update _                  -> hole_ty
-    CastIt co                 -> pSnd (coercionKind co)
+    Apply x                       -> hole_ty `applyFunTy` idType x
+    TyApply ty                    -> hole_ty `applyTy` ty
+    Scrutinise _ ty _             -> ty
+    PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
+    StrictLet _ in_e@(rn, e)      -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
+    Update _                      -> hole_ty
+    CastIt co                     -> pSnd (coercionKind co)
 
 qaType :: Anned QA -> Type
 qaType qa = case annee qa of
@@ -255,15 +258,15 @@ valueType (Coercion co)   = coercionType co
 
 termType :: Copointed ann => ann (TermF ann) -> Type
 termType e = case extract e of
-    Var x         -> idType x
-    Value v       -> valueType v
-    App e x       -> termType e `applyFunTy` idType x
-    TyApp e a     -> termType e `applyTy` a
-    PrimOp pop es -> primOpType pop `applyFunTys` map termType es
-    Case _ _ ty _ -> ty
-    Let _ _ e     -> termType e
-    LetRec _ e    -> termType e
-    Cast _ co     -> pSnd (coercionKind co)
+    Var x             -> idType x
+    Value v           -> valueType v
+    App e x           -> termType e `applyFunTy` idType x
+    TyApp e a         -> termType e `applyTy` a
+    PrimOp pop tys es -> (primOpType pop `applyTys` tys) `applyFunTys` map termType es
+    Case _ _ ty _     -> ty
+    Let _ _ e         -> termType e
+    LetRec _ e        -> termType e
+    Cast _ co         -> pSnd (coercionKind co)
 
 applyFunTy :: Type -> Type -> Type
 applyFunTy fun_ty got_arg_ty = ASSERT2(got_arg_ty `eqType` expected_arg_ty, text "applyFunTy:" <+> ppr got_arg_ty <+> ppr expected_arg_ty) res_ty
@@ -290,7 +293,7 @@ stackFrameSize kf = 1 + case kf of
     Apply _                  -> 0
     TyApply _                -> 0
     Scrutinise _ _ (_, alts) -> annedAltsSize alts
-    PrimApply _ as in_es     -> sum (map annedSize as ++ map (annedTermSize . snd) in_es)
+    PrimApply _ _ as in_es   -> sum (map annedSize as ++ map (annedTermSize . snd) in_es)
     StrictLet _ (_, e)       -> annedTermSize e
     Update _                 -> 0
     CastIt _                 -> 0
