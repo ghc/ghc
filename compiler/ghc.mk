@@ -94,8 +94,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cLeadingUnderscore    = "$(LeadingUnderscore)"'              >> $@
 	@echo 'cRAWCPP_FLAGS         :: String'                             >> $@
 	@echo 'cRAWCPP_FLAGS         = "$(RAWCPP_FLAGS)"'                   >> $@
-	@echo 'cMKDLL                :: String'                             >> $@
-	@echo 'cMKDLL                = "$(BLD_DLL)"'                        >> $@
 	@echo 'cLdIsGNULd            :: String'                             >> $@
 	@echo 'cLdIsGNULd            = "$(LdIsGNULd)"'                      >> $@
 	@echo 'cLdHasBuildId         :: String'                             >> $@

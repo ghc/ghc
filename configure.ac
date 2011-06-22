@@ -576,12 +576,24 @@ if test "$windows" = YES
 then
     SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
     SettingsCCompilerFlags=''
+    SettingsPerlCommand='$topdir/../perl/perl.exe'
+    SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
+    SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
+    SettingsTouchCommand='$topdir/touch.exe'
 else
     SettingsCCompilerCommand="$WhatGccIsCalled"
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+    SettingsPerlCommand="$PerlCmd"
+    SettingsDllWrapCommand="/bin/false"
+    SettingsWindresCommand="/bin/false"
+    SettingsTouchCommand='touch'
 fi
 AC_SUBST(SettingsCCompilerCommand)
 AC_SUBST(SettingsCCompilerFlags)
+AC_SUBST(SettingsPerlCommand)
+AC_SUBST(SettingsDllWrapCommand)
+AC_SUBST(SettingsWindresCommand)
+AC_SUBST(SettingsTouchCommand)
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

@@ -368,6 +368,7 @@ sub scmall {
         }
         elsif ($command =~ /^remote$/) {
             my @scm_args;
+            $ignore_failure = 1;
             if ($subcommand eq 'add') {
                 @scm_args = ("remote", "add", $branch_name, $path);
             } elsif ($subcommand eq 'rm') {

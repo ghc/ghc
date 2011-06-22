@@ -4,5 +4,8 @@
  ("ar command", "@ArCmd@"),
  ("ar flags", "@ArArgs@"),
  ("ar supports at file", "@ArSupportsAtFile@"),
- ("perl command", "@PerlCmd@")]
+ ("touch command", "@SettingsTouchCommand@"),
+ ("dllwrap command", "@SettingsDllWrapCommand@"),
+ ("windres command", "@SettingsWindresCommand@"),
+ ("perl command", "@SettingsPerlCommand@")]
 

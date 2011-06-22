@@ -162,8 +162,6 @@ initSysTools mbMinusB
         ; let settingsFile = top_dir </> "settings"
               installed :: FilePath -> FilePath
               installed file = top_dir </> file
-              installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
-              installed_perl_bin file = top_dir </> ".." </> "perl" </> file
 
         ; settingsStr <- readFile settingsFile
         ; mySettings <- case maybeReadFuzzy settingsStr of
@@ -191,9 +189,7 @@ initSysTools mbMinusB
         ; gcc_prog <- getSetting "C compiler command"
         ; gcc_args_str <- getSetting "C compiler flags"
         ; let gcc_args = map Option (words gcc_args_str)
-        ; perl_path <- if isWindowsHost
-                       then return $ installed_perl_bin "perl"
-                       else getSetting "perl command"
+        ; perl_path <- getSetting "perl command"
 
         ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -206,16 +202,13 @@ initSysTools mbMinusB
                 -- split is a Perl script
               split_script  = installed cGHC_SPLIT_PGM
 
-              windres_path  = installed_mingw_bin "windres"
+        ; windres_path <- getSetting "windres command"
 
         ; tmpdir <- getTemporaryDirectory
 
-        ; let
-              -- 'touch' is a GHC util for Windows
-              touch_path
-                | isWindowsHost = installed cGHC_TOUCHY_PGM
-                | otherwise     = "touch"
-              -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
+        ; touch_path <- getSetting "touch command"
+
+        ; let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
               -- a call to Perl to get the invocation of split.
               -- On Unix, scripts are invoked using the '#!' method.  Binary
               -- installations of GHC on Unix place the correct line on the
@@ -224,11 +217,8 @@ initSysTools mbMinusB
               (split_prog,  split_args)
                 | isWindowsHost = (perl_path,    [Option split_script])
                 | otherwise     = (split_script, [])
-              (mkdll_prog, mkdll_args)
-                | not isWindowsHost
-                    = panic "Can't build DLLs on a non-Win32 system"
-                | otherwise =
-                    (installed_mingw_bin cMKDLL, [])
+        ; mkdll_prog <- getSetting "dllwrap command"
+        ; let mkdll_args = []
 
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
