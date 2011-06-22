@@ -91,6 +91,8 @@ tcTyAndClassDecls boot_details decls_s
                 ; let rec_flags = calcRecFlags boot_details rec_tyclss
                 ; concatMapM (tcTyClDecl rec_flags) kc_decls }
 
+       ; traceTc "tcTyAndCl3" (ppr tyclss)
+
        ; tcExtendGlobalEnv tyclss $ do
        {  -- Perform the validity check
           -- We can do this now because we are done with the recursive knot
@@ -422,6 +424,7 @@ tcTyClDecl :: (Name -> RecFlag) -> LTyClDecl Name -> TcM [TyThing]
 
 tcTyClDecl calc_isrec (L loc decl)
   = setSrcSpan loc $ tcAddDeclCtxt decl $
+    traceTc "tcTyAndCl-x" (ppr decl) >>
     tcTyClDecl1 NoParentTyCon calc_isrec decl
 
   -- "type family" declarations
