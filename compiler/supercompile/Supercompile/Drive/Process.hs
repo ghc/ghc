@@ -428,17 +428,17 @@ promise p x' opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted
           fun' = mkLocalId x' (abstracted'_list `mkPiTypes` stateType (unI (meaning p)))
       ScpM $ \_e s k -> let fs' | abstracted_set == abstracted'_set || not rEFINE_FULFILMENT_FVS
                                  -- If the free variables are totally unchanged, there is nothing to be gained from clever fiddling
-                                = (P { fun = fun p, abstracted = abstracted p, meaning = Just (unI (meaning p)) }, lambdas (abstracted p) optimised_e) : fulfilments s
+                                = (P { fun = fun p, abstracted = abstracted p, meaning = Just (unI (meaning p)) }, tyVarIdLambdas (abstracted p) optimised_e) : fulfilments s
                                 | otherwise
                                  -- If the free variable set has got smaller, we can fulfill our old promise with a simple wrapper around a new one with fewer free variables
-                                = (P { fun = fun p, abstracted = abstracted p, meaning = Nothing }, lambdas (abstracted p) (fvedTerm (Var fun') `apps` abstracted'_list)) :
-                                  (P { fun = fun',  abstracted = abstracted'_list, meaning = Just (unI (meaning p)) }, lambdas abstracted'_list optimised_e) : fulfilments s
+                                = (P { fun = fun p, abstracted = abstracted p, meaning = Nothing }, tyVarIdLambdas (abstracted p) (var fun' `tyVarIdApps` abstracted'_list)) :
+                                  (P { fun = fun',  abstracted = abstracted'_list, meaning = Just (unI (meaning p)) }, tyVarIdLambdas abstracted'_list optimised_e) : fulfilments s
                         in k () (s { fulfilments = fs' })
       
       fmap (((abstracted_set `unionVarSet` stateLetBounders (unI (meaning p))) `unionVarSet`) . mkVarSet) getPromiseNames >>=
         \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr ("sc: FVs", fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
       
-      return (a, fun p `varApps` abstracted p)
+      return (a, var (fun p) `tyVarIdApps` abstracted p)
 
 
 data ScpEnv = ScpEnv {
@@ -526,7 +526,7 @@ memo opt speculated state0 = do
     let (_, state1) = gc state0 -- Necessary because normalisation might have made some stuff dead
     
     ps <- getPromises
-    case [ (p, (releaseStateDeed state0, fun p `varApps` tb_dynamic_vs))
+    case [ (p, (releaseStateDeed state0, var (fun p) `tyVarIdApps` tb_dynamic_vs))
          | p <- ps
          , Just rn_lr <- [(\res -> if isNothing res then pprTraceSC "no match:" (ppr (fun p)) res else res) $
                            match (unI (meaning p)) state1]

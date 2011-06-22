@@ -189,6 +189,7 @@ environmentallyBound tg = HB LetBound (Left (Just tg))
 letBound :: In AnnedTerm -> HeapBinding
 letBound in_e = HB LetBound (Right in_e)
 
+-- The Heap might contain bindings for TyVars as well, but will only map them to lambdaBound
 type PureHeap = M.Map (Out Var) HeapBinding
 data Heap = Heap PureHeap InScopeSet
 

@@ -8,12 +8,12 @@ import Supercompile.Utilities
 import Supercompile.StaticFlags
 
 import DataCon  (DataCon)
-import Var      (TyVar, Var, varName)
+import Var      (TyVar, Var, varName, isTyVar)
 import Name     (Name, nameOccName)
 import OccName  (occNameString)
 import Id       (Id, idType)
 import Literal  (Literal)
-import Type     (Type)
+import Type     (Type, mkTyVarTy)
 import Coercion (Coercion, mkReflCo)
 import PrimOp   (PrimOp)
 
@@ -237,17 +237,27 @@ data_ :: Symantics ann => DataCon -> [Var] -> ann (TermF ann)
 data_ dc = value . Data dc
 -}
 
-tyLambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
+tyLambdas :: Symantics ann => [TyVar] -> ann (TermF ann) -> ann (TermF ann)
 tyLambdas = flip $ foldr (\x -> value . TyLambda x)
 
-lambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
+lambdas :: Symantics ann => [Id] -> ann (TermF ann) -> ann (TermF ann)
 lambdas = flip $ foldr (\x -> value . Lambda x)
 
-apps :: Symantics ann => ann (TermF ann) -> [Var] -> ann (TermF ann)
+tyVarIdLambdas :: Symantics ann => [Var] -> ann (TermF ann) -> ann (TermF ann)
+tyVarIdLambdas = flip $ foldr (\x -> value . tyVarIdLambda x)
+  where tyVarIdLambda x e | isTyVar x = TyLambda x e
+                          | otherwise = Lambda   x e
+
+tyApps :: Symantics ann => ann (TermF ann) -> [Type] -> ann (TermF ann)
+tyApps = foldl tyApp
+
+apps :: Symantics ann => ann (TermF ann) -> [Id] -> ann (TermF ann)
 apps = foldl app
 
-varApps :: Symantics ann => Var -> [Var] -> ann (TermF ann)
-varApps h xs = var h `apps` xs
+tyVarIdApps :: Symantics ann => ann (TermF ann) -> [Var] -> ann (TermF ann)
+tyVarIdApps = foldl tyVarIdApp
+  where tyVarIdApp e x | isTyVar x = tyApp e (mkTyVarTy x)
+                       | otherwise = app   e x
 
 letRecSmart :: Symantics ann => [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
 letRecSmart []  = id

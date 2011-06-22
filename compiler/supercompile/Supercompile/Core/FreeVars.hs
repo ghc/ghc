@@ -14,9 +14,10 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Traversable as Traversable
 
 import CoreFVs
-import Coercion (tyCoVarsOfCo)
 import VarSet
-import Type (tyVarsOfType)
+import Coercion (tyCoVarsOfCo)
+import Var      (isTyVar)
+import Type     (tyVarsOfType)
 
 
 type FreeVars = VarSet
@@ -45,8 +46,8 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     term' (TyApp e ty)       = typ ty `unionVarSet` term e
     term' (App e x)          = term e `extendVarSet` x
     term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
-    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` nonRecIdBinderFreeVars x (alternatives alts)
-    term' (Let x e1 e2)      = term e1 `unionVarSet` nonRecIdBinderFreeVars x (term e2)
+    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` nonRecBinderFreeVars x (alternatives alts)
+    term' (Let x e1 e2)      = term e1 `unionVarSet` nonRecBinderFreeVars x (term e2)
     term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e `unionVarSet` unionVarSets (map idFreeVars xs)) `delVarSetList` xs
       where (xs, es) = unzip xes
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
@@ -65,11 +66,12 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     
     typ = tyVarsOfType
 
-nonRecIdBinderFreeVars :: Var -> FreeVars -> FreeVars
-nonRecIdBinderFreeVars x fvs = (fvs `delVarSet` x) `unionVarSet` idFreeVars x
+nonRecBinderFreeVars :: Var -> FreeVars -> FreeVars
+nonRecBinderFreeVars x fvs | isTyVar x = fvs `delVarSet` x
+                           | otherwise = (fvs `delVarSet` x) `unionVarSet` idFreeVars x
 
-nonRecIdBindersFreeVars :: [Var] -> FreeVars -> FreeVars
-nonRecIdBindersFreeVars xs = flip (foldr nonRecIdBinderFreeVars) xs
+nonRecBindersFreeVars :: [Var] -> FreeVars -> FreeVars
+nonRecBindersFreeVars xs = flip (foldr nonRecBinderFreeVars) xs
 
 altConBoundVars :: AltCon -> [Var]
 altConBoundVars (DataAlt _ as xs) = as ++ xs
@@ -77,7 +79,7 @@ altConBoundVars (LiteralAlt _)    = []
 altConBoundVars _                 = []
 
 altConFreeVars :: AltCon -> FreeVars -> FreeVars
-altConFreeVars (DataAlt _ as xs) = (`delVarSetList` as) . nonRecIdBindersFreeVars xs
+altConFreeVars (DataAlt _ as xs) = (`delVarSetList` as) . nonRecBindersFreeVars xs
 altConFreeVars (LiteralAlt _)    = id
 altConFreeVars DefaultAlt        = id
 

@@ -19,7 +19,6 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import Id (idUnique)
-import Var (isTyVar)
 import Type (mkTyVarTy)
 import PrelNames (undefinedName)
 import Unique (Uniquable)
@@ -312,7 +311,7 @@ generaliseSplit opt ctxt_ids split_from deeds (heap, named_k, focus) = optimiseS
 data Bracketed a = Bracketed {
     rebuild :: [Out FVedTerm] -> Out FVedTerm, -- Rebuild the full output term given outputs to plug into each hole
     extraFvs :: FreeVars,                      -- Maximum free variables added by the residual wrapped around the holes
-    extraBvs :: [BoundVars],                   -- Maximum bound variables added at each hole by the residual wrapped around the holes
+    extraBvs :: [[Var]],                       -- Maximum bound variables added at each hole by the residual wrapped around the holes, most tightly binding last
     fillers :: [a],                            -- Hole-fillers themselves. Usually State
     tails :: Maybe [Int]                       -- The indexes of all holes in tail position. If this is not Nothing, this is an *exhaustive* list of possible tail positions.
   }
@@ -342,21 +341,21 @@ oneBracketed :: a -> Bracketed a
 oneBracketed x = Bracketed {
     rebuild  = \[e] -> e,
     extraFvs = emptyVarSet,
-    extraBvs = [emptyVarSet],
+    extraBvs = [[]],
     fillers  = [x],
     tails    = Just [0]
   }
 
 zipBracketeds :: ([Out FVedTerm] -> Out FVedTerm)
               -> ([FreeVars] -> FreeVars)
-              -> [BoundVars -> BoundVars]
+              -> [[Var]]
               -> ([Maybe [Int]] -> Maybe [Int])
               -> [Bracketed a]
               -> Bracketed a
 zipBracketeds a b c d bracketeds = Bracketed {
       rebuild  = \es' -> let ess' = splitManyBy xss es' in a (zipWith rebuild bracketeds ess'),
-      extraFvs = b (map extraFvs bracketeds),
-      extraBvs = concat $ zipWith (\c_fn extra_bvs -> map c_fn extra_bvs) c (map extraBvs bracketeds), -- FIXME: should include the idFreeVars here? Need to be careful about *order* of BVs in that case...
+      extraFvs = b (zipWith nonRecBindersFreeVars c (map extraFvs bracketeds)),
+      extraBvs = concat (zipWith (\c -> map (c++)) c (map extraBvs bracketeds)),
       fillers  = concat xss,
       tails    = d $ snd $ foldl (\(i, tailss) bracketed -> (i + length (fillers bracketed), tailss ++ [fmap (map (+ i)) (tails bracketed)])) (0, []) bracketeds
     }
@@ -364,7 +363,7 @@ zipBracketeds a b c d bracketeds = Bracketed {
 
 bracketedFreeVars :: (a -> FreeVars) -> Bracketed a -> FreeVars
 bracketedFreeVars fvs bracketed = extraFvs bracketed `unionVarSet` transfer (map fvs (fillers bracketed))
-  where transfer fvss = unionVarSets (zipWith minusVarSet fvss (extraBvs bracketed))
+  where transfer fvss = unionVarSets (zipWith nonRecBindersFreeVars (extraBvs bracketed) fvss)
 
 releaseBracketedDeeds :: (a -> Deeds) -> Bracketed a -> Deeds
 releaseBracketedDeeds release b = sumMap release (fillers b)
@@ -405,7 +404,7 @@ optimiseBracketed :: MonadStatics m
                   -> (Deeds, Bracketed State)
                   -> m (Deeds, Out FVedTerm)
 optimiseBracketed opt (deeds, b) = liftM (second (rebuild b)) $ optimiseMany optimise_one (deeds, extraBvs b `zip` fillers b)
-  where optimise_one (deeds, (extra_bvs, (s_deeds, s_heap, s_k, s_e))) = liftM (\(xes, (deeds, e)) -> (deeds, letRecSmart xes e)) $ bindCapturedFloats extra_bvs $ opt (deeds + s_deeds, s_heap, s_k, s_e)
+  where optimise_one (deeds, (extra_bvs, (s_deeds, s_heap, s_k, s_e))) = liftM (\(xes, (deeds, e)) -> (deeds, letRecSmart xes e)) $ bindCapturedFloats (mkVarSet extra_bvs) $ opt (deeds + s_deeds, s_heap, s_k, s_e)
         -- Because h-functions might potentially refer to the lambda/case-alt bound variables around this hole,
         -- we use bindCapturedFloats to residualise such bindings within exactly this context.
         -- See Note [When to bind captured floats]
@@ -508,7 +507,7 @@ optimiseLetBinds opt leftover_deeds bracketeds_heap fvs' = -- traceRender ("opti
         (h_resid, bracketeds_deeded_heap_not_resid') = M.partitionWithKey (\x _br -> x `elemVarSet` resid_fvs) bracketeds_deeded_heap_not_resid
         (xs_resid', bracks_resid) = unzip $ M.toList h_resid
 
--- FIXME: I could use the improved entered info that comes from the final FVs to adjust the split and float more stuff inwards..
+-- TODO: I could use the improved entered info that comes from the final FVs to adjust the split and float more stuff inwards..
 
 type NamedStack = [(Int, Tagged StackFrame)]
 
@@ -563,7 +562,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
         (h_not_residualised, h_residualised) = M.partitionWithKey (\x' _ -> x' `elemVarSet` not_resid_xs) h
         bracketeds_nonupdated0 = M.mapMaybeWithKey (\x' hb -> do { guard (howBound hb == InternallyBound); return $ case heapBindingTerm hb of Nothing -> (error "Unimplemented: no tag for undefined", undefined "FIXME FIXME" (noneBracketed (fvedTerm (Var (undefined "tcLookupId" undefinedName))))); Just in_e@(_, e) -> (annedTag e, oneBracketed (Once (idUnique x'), (0, Heap M.empty ids, [], in_e))) }) h_residualised
         -- An idea from Arjan, which is sort of the dual of positive information propagation:
-        -- FIXME: this is too dangerous presently: we often end up adding an Update at the end just after we generalised it away, building ourselves a nice little loop :(
+        -- TODO: this is too dangerous presently: we often end up adding an Update at the end just after we generalised it away, building ourselves a nice little loop :(
         -- I have tried to work around this by only introducing Update frames for those things that don't presently have one... but that also doesn't work because if we start
         -- with (let x = v in x) then we reduce to (let x = v in \underbar{x}) and then split to (let x = v in x)
         --(deeds1, bracketeds_nonupdated) = M.mapAccumWithKey (\deeds x' (update_tg, brack) -> modifyTails (\states -> case claimDeeds deeds (length states) of Nothing -> (deeds, states); Just deeds -> (deeds, map (\(entered, (deeds, heap, k, in_e)) -> (entered, (deeds, heap, k ++ [Tagged update_tg (Update x')], in_e))) states)) brack `orElse` (deeds, brack)) deeds1a bracketeds_nonupdated0
@@ -927,12 +926,12 @@ splitStackFrame :: UniqSupply
 splitStackFrame ctxt_ids ids kf scruts bracketed_hole
   | Update x' <- tagee kf = splitUpdate ids (tag kf) scruts x' bracketed_hole
   | otherwise = ([], M.empty, case tagee kf of
-    Apply x2' -> zipBracketeds (\[e] -> e `app` x2') (\[fvs] -> fvs `extendVarSet` x2') [id] (\_ -> Nothing) [bracketed_hole]
-    TyApply ty' -> zipBracketeds (\[e] -> e `tyApp` ty') (\[fvs] -> fvs `unionVarSet` tyVarsOfType ty') [id] (\_ -> Nothing) [bracketed_hole]
-    CastIt co' -> zipBracketeds (\[e] -> e `cast` co') (\[fvs] -> fvs `unionVarSet` tyCoVarsOfCo co') [id] (\_ -> Nothing) [bracketed_hole]
+    Apply x2' -> zipBracketeds (\[e] -> e `app` x2') (\[fvs] -> fvs `extendVarSet` x2') [[]] (\_ -> Nothing) [bracketed_hole]
+    TyApply ty' -> zipBracketeds (\[e] -> e `tyApp` ty') (\[fvs] -> fvs `unionVarSet` tyVarsOfType ty') [[]] (\_ -> Nothing) [bracketed_hole]
+    CastIt co' -> zipBracketeds (\[e] -> e `cast` co') (\[fvs] -> fvs `unionVarSet` tyCoVarsOfCo co') [[]] (\_ -> Nothing) [bracketed_hole]
     Scrutinise x' ty' (rn, alts) -> -- (if null k_remaining then id else traceRender ("splitStack: FORCED SPLIT", M.keysSet entered_hole, [x' | Tagged _ (Update x') <- k_remaining])) $
                                     -- (if not (null k_not_inlined) then traceRender ("splitStack: generalise", k_not_inlined) else id) $
-                                    zipBracketeds (\(e_hole:es_alts) -> case_ e_hole x' ty' (alt_cons' `zip` es_alts)) (\(fvs_hole:fvs_alts) -> fvs_hole `unionVarSet` tyVarsOfType ty' `unionVarSet` nonRecIdBinderFreeVars x' (unionVarSets (zipWith nonRecIdBindersFreeVars alt_bvss fvs_alts))) (id:[\bvs -> (bvs `extendVarSetList` alt_bvs) `extendVarSet` x' | alt_bvs <- alt_bvss]) (\(_tails_hole:tailss_alts) -> liftM concat (sequence tailss_alts)) (bracketed_hole : bracketed_alts)
+                                    zipBracketeds (\(e_hole:es_alts) -> case_ e_hole x' ty' (alt_cons' `zip` es_alts)) (\(fvs_hole:fvs_alts) -> fvs_hole `unionVarSet` tyVarsOfType ty' `unionVarSet` unionVarSets fvs_alts) ([]:[x':alt_bvs | alt_bvs <- alt_bvss]) (\(_tails_hole:tailss_alts) -> liftM concat (sequence tailss_alts)) (bracketed_hole : bracketed_alts)
       where (alt_cons, alt_es) = unzip alts
             
             -- 0) Manufacture context identifier
@@ -949,10 +948,10 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- x':alt_bvs] `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- scruts; return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3 (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
-    StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` nonRecIdBinderFreeVars x' fvs_body) [id, (`extendVarSet` x')] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
+    StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` fvs_body) [[], [x']] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
       where ctxt_id = uniqFromSupply ctxt_ids
-    PrimApply pop tys' in_vs in_es -> zipBracketeds (primOp pop tys') unionVarSets (repeat id) (\_ -> Nothing) (bracketed_vs ++ bracketed_hole : bracketed_es)
-      where -- 0) Manufacture context identifier (actually, an infinite number of them - but who cares?)
+    PrimApply pop tys' in_vs in_es -> zipBracketeds (primOp pop tys') unionVarSets (repeat []) (\_ -> Nothing) (bracketed_vs ++ bracketed_hole : bracketed_es)
+      where -- 0) Manufacture context identifier (actually, an infinite number of them)
             ctxt_idss = uniqsFromSupply ctxt_ids
             
             -- 1) Split every value and expression remaining apart
@@ -977,16 +976,20 @@ splitUpdate ids tg_kf scruts x' bracketed_hole = (x' : scruts, M.singleton x' br
   where ctxt_id = idUnique x'
 
 splitValue :: InScopeSet -> In AnnedValue -> Bracketed (Entered, UnnormalisedState)
-splitValue ids (rn, Lambda x e) = zipBracketeds (\[e'] -> value (Lambda x' e')) (\[fvs'] -> nonRecIdBinderFreeVars x' fvs') [(`extendVarSet` x')] (\_ -> Nothing) [oneBracketed (Many, (0, Heap (M.singleton x' lambdaBound) ids', [], (rn', e)))]
-  where (ids', rn', [x']) = renameBinders ids rn [x]
-splitValue ids (rn, TyLambda x e) = -- zipBracketeds (\[e'] -> value (Lambda x' e')) (\[fvs'] -> fvs') [(`extendVarSet` x')] (\_ -> Nothing) [oneBracketed (Many, (0, Heap (M.singleton x' lambdaBound) ids', [], (rn', e)))]
-  where (ids', rn', [x']) = renameBinders ids rn [x]
-splitValue ids in_v             = noneBracketed (value (detagAnnedValue' $ renameIn (renameAnnedValue' ids) in_v))
+splitValue ids (rn, Lambda x e)   = splitLambdaLike Lambda   ids (rn, (x, e))
+splitValue ids (rn, TyLambda a e) = splitLambdaLike TyLambda ids (rn, (a, e))
+splitValue ids in_v               = noneBracketed (value (detagAnnedValue' $ renameIn (renameAnnedValue' ids) in_v))
+
+-- We create LambdaBound entries in the Heap for both type and value variables, so we can share the code:
+splitLambdaLike :: (Var -> FVedTerm -> ValueF FVed)
+                -> InScopeSet -> In (Var, AnnedTerm) -> Bracketed (Entered, UnnormalisedState)
+splitLambdaLike rebuild ids (rn, (x, e)) = zipBracketeds (\[e'] -> value (rebuild x' e')) (\[fvs'] -> fvs') [[x']] (\_ -> Nothing) [oneBracketed (Many, (0, Heap (M.singleton x' lambdaBound) ids', [], (rn', e)))]
+  where (ids', rn', x') = renameNonRecBinder ids rn x
 
 splitCoerced :: (a -> Bracketed (Entered, UnnormalisedState))
              -> Coerced a -> Bracketed (Entered, UnnormalisedState)
 splitCoerced f (Nothing,         x) = f x
-splitCoerced f (Just (co', _tg), x) = zipBracketeds (\[e'] -> cast e' co') (\[fvs'] -> fvs' `unionVarSet` tyCoVarsOfCo co') [id] (const Nothing) [f x]
+splitCoerced f (Just (co', _tg), x) = zipBracketeds (\[e'] -> cast e' co') (\[fvs'] -> fvs' `unionVarSet` tyCoVarsOfCo co') [[]] (const Nothing) [f x]
 
 splitQA :: InScopeSet -> QA -> Bracketed (Entered, UnnormalisedState)
 splitQA _   (Question x') = noneBracketed (var x')
