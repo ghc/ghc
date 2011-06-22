@@ -500,7 +500,6 @@ data Unfolding
 data DFunArg e   -- Given (df a b d1 d2 d3)
   = DFunPolyArg  e      -- Arg is (e a b d1 d2 d3)
   | DFunConstArg e      -- Arg is e, which is constant
-  | DFunLamArg   Int    -- Arg is one of [a,b,d1,d2,d3], zero indexed
   deriving( Functor )
 
   -- 'e' is often CoreExpr, which are usually variables, but can
@@ -510,7 +509,6 @@ dfunArgExprs :: [DFunArg e] -> [e]
 dfunArgExprs [] = []
 dfunArgExprs (DFunPolyArg  e : as) = e : dfunArgExprs as
 dfunArgExprs (DFunConstArg e : as) = e : dfunArgExprs as
-dfunArgExprs (DFunLamArg {}  : as) =     dfunArgExprs as
 
 
 ------------------------------------------------

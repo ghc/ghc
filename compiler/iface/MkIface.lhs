@@ -1498,7 +1498,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
 --------------------------
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId 		        = IfVanillaId
-toIfaceIdDetails (DFunId ns _)                  = IfDFunId ns
+toIfaceIdDetails (DFunId {})                    = IfDFunId 
 toIfaceIdDetails (RecSelId { sel_naughty = n
 		 	   , sel_tycon = tc })  = IfRecSelId (toIfaceTyCon tc) n
 toIfaceIdDetails other	     		        = pprTrace "toIfaceIdDetails" (ppr other) 

@@ -1300,7 +1300,6 @@ exprIsConApp_maybe id_unf expr
         , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
               subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
               mk_arg (DFunConstArg e) = e
-              mk_arg (DFunLamArg i)   = args !! i
               mk_arg (DFunPolyArg e)  = mkApps e args
         = Just (con, substTys subst dfun_res_tys, map mk_arg ops)
 

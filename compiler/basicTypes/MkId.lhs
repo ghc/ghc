@@ -826,26 +826,17 @@ mkDictFunId :: Name      -- Name to use for the dict fun;
 -- Implements the DFun Superclass Invariant (see TcInstDcls)
 
 mkDictFunId dfun_name tvs theta clas tys
-  = mkExportedLocalVar (DFunId n_silent is_nt)
+  = mkExportedLocalVar (DFunId is_nt)
                        dfun_name
                        dfun_ty
                        vanillaIdInfo
   where
     is_nt = isNewTyCon (classTyCon clas)
-    (n_silent, dfun_ty) = mkDictFunTy tvs theta clas tys
+    dfun_ty = mkDictFunTy tvs theta clas tys
 
-mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> (Int, Type)
+mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> Type
 mkDictFunTy tvs theta clas tys
-  = (length silent_theta, dfun_ty)
-  where
-    dfun_ty = mkSigmaTy tvs (silent_theta ++ theta) (mkDictTy clas tys)
-    silent_theta = filterOut discard $
-                   substTheta (zipTopTvSubst (classTyVars clas) tys)
-                              (classSCTheta clas)
-                   -- See Note [Silent Superclass Arguments]
-    discard pred = isEmptyVarSet (tyVarsOfPred pred)
-                 || any (`eqPred` pred) theta
-                 -- See the DFun Superclass Invariant in TcInstDcls
+  = mkSigmaTy tvs theta (mkDictTy clas tys)
 \end{code}
 
 

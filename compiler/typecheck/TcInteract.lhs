@@ -31,9 +31,9 @@ import Coercion
 import Outputable
 
 import TcRnTypes
-import TcMType ( isSilentEvVar )
 import TcErrors
 import TcSMonad
+import Maybes( orElse )
 import Bag
 import qualified Data.Map as Map
 
@@ -2086,8 +2086,7 @@ matchClassInst inerts clas tys loc
               | given_overlap untch -> 
                   do { traceTcS "Delaying instance application" $ 
                        vcat [ text "Workitem=" <+> pprPredTy (ClassP clas tys)
-                            , text "Silents and their superclasses=" <+> ppr silents_and_their_scs
-                            , text "All given dictionaries=" <+> ppr all_given_dicts ]
+                            , text "Relevant given dictionaries=" <+> ppr givens_for_this_clas ]
                      ; return NoInstance -- see Note [Instance and Given overlap]
                      }
 
@@ -2110,56 +2109,30 @@ matchClassInst inerts clas tys loc
                      ; return $ GenInst wevs (EvDFunApp dfun_id tys ev_vars) }
                  }
         }
-   where given_overlap :: TcsUntouchables -> Bool
-         given_overlap untch
-           = foldlBag (\r d -> r || matchable untch d) False all_given_dicts
+   where 
+     givens_for_this_clas :: CanonicalCts
+     givens_for_this_clas = Map.lookup clas (cts_given (inert_dicts inerts))
+                            `orElse` emptyBag
 
-         matchable untch (CDictCan { cc_class = clas', cc_tyargs = sys, cc_flavor = fl })
-           | Just GivenOrig <- isGiven_maybe fl
-           , clas' == clas
-           , does_not_originate_in_a_silent clas' sys
-           = case tcUnifyTys (\tv -> if isTouchableMetaTyVar_InRange untch tv && 
-                                        tv `elemVarSet` tyVarsOfTypes tys
-                                     then BindMe else Skolem) tys sys of
-           -- We can't learn anything more about any variable at this point, so the only
-           -- cause of overlap can be by an instantiation of a touchable unification
-           -- variable. Hence we only bind touchable unification variables. In addition,
-           -- we use tcUnifyTys instead of tcMatchTys to rule out cyclic substitutions.
-                Nothing -> False
-                Just _  -> True
-           | otherwise = False -- No overlap with a solved, already been taken care of 
-                               -- by the overlap check with the instance environment.
-         matchable _tys ct = pprPanic "Expecting dictionary!" (ppr ct)
+     given_overlap :: TcsUntouchables -> Bool
+     given_overlap untch = anyBag (matchable untch) givens_for_this_clas
 
-         does_not_originate_in_a_silent clas sys
-             -- UGLY: See Note [Silent parameters overlapping]
-           = null $ filter (eqPred (ClassP clas sys)) silents_and_their_scs
-
-         silents_and_their_scs 
-           = foldlBag (\acc rvnt -> case rvnt of
-                        CDictCan { cc_id = d, cc_class = c, cc_tyargs = s }
-                         | isSilentEvVar d -> (ClassP c s) : (transSuperClasses c s) ++ acc 
-                        _ -> acc) [] all_given_dicts
-
-         -- TODO:
-         -- When silent parameters will go away we should simply select from 
-         -- the given map of the inert set. 
-         all_given_dicts = Map.fold unionBags emptyCCan (cts_given $ inert_dicts inerts)
-
+     matchable untch (CDictCan { cc_class = clas_g, cc_tyargs = sys, cc_flavor = fl })
+       | Just GivenOrig <- isGiven_maybe fl
+       = ASSERT( clas_g == clas )
+         case tcUnifyTys (\tv -> if isTouchableMetaTyVar_InRange untch tv && 
+                                    tv `elemVarSet` tyVarsOfTypes tys
+                                 then BindMe else Skolem) tys sys of
+       -- We can't learn anything more about any variable at this point, so the only
+       -- cause of overlap can be by an instantiation of a touchable unification
+       -- variable. Hence we only bind touchable unification variables. In addition,
+       -- we use tcUnifyTys instead of tcMatchTys to rule out cyclic substitutions.
+            Nothing -> False
+            Just _  -> True
+       | otherwise = False -- No overlap with a solved, already been taken care of 
+                           -- by the overlap check with the instance environment.
+     matchable _tys ct = pprPanic "Expecting dictionary!" (ppr ct)
 \end{code}
-
-Note [Silent parameters overlapping]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-DV 12/05/2011:
-The long-term goal is to completely remove silent superclass
-parameters when checking instance declarations. But until then we must
-make sure that we never prevent the application of an instance
-declaration because of a potential match from a silent parameter --
-after all we are supposed to have solved that silent parameter from
-some instance, anyway! In effect silent parameters behave more like
-Solved than like Given.
-
-A concrete example appears in typecheck/SilentParametersOverlapping.hs
 
 Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

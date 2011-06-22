@@ -79,17 +79,10 @@ paDictOfType ty
          dfun <- maybeCantVectoriseM "No PA dictionary for type constructor"
                                       (ppr tc <+> text "in" <+> ppr ty)
                 $ lookupTyConPA tc
-         super <- super_dict tc ty_args
          dicts <- mapM paDictOfType ty_args
-         return $ Var dfun `mkTyApps` ty_args `mkApps` super `mkApps` dicts
+         return $ Var dfun `mkTyApps` ty_args `mkApps` dicts
 
     paDictOfTyApp _ _ = failure
-
-    super_dict _ [] = return []
-    super_dict tycon ty_args
-      = do
-          pr <- prDictOfPReprInst (TyConApp tycon ty_args)
-          return [pr]
 
     failure = cantVectorise "Can't construct PA dictionary for type" (ppr ty)
 
@@ -105,13 +98,6 @@ paMethod method _ ty
       fn   <- builtin method
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
-
--- | Given a type @ty@, return the PR dictionary for @PRepr ty@.
-prDictOfPReprInst :: Type -> VM CoreExpr
-prDictOfPReprInst ty
-  = do
-      (prepr_tc, prepr_args) <- preprSynTyCon ty
-      prDictOfPReprInstTyCon ty prepr_tc prepr_args
 
 -- | Given a type @ty@, its PRepr synonym tycon and its type arguments,
 -- return the PR @PRepr ty@. Suppose we have:

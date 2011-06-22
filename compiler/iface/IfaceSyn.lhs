@@ -177,7 +177,7 @@ type IfaceAnnTarget = AnnTarget OccName
 data IfaceIdDetails
   = IfVanillaId
   | IfRecSelId IfaceTyCon Bool
-  | IfDFunId Int          -- Number of silent args
+  | IfDFunId 
 
 data IfaceIdInfo
   = NoInfo                      -- When writing interface file without -O
@@ -672,7 +672,7 @@ instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = empty
   ppr (IfRecSelId tc b) = ptext (sLit "RecSel") <+> ppr tc
                           <+> if b then ptext (sLit "<naughty>") else empty
-  ppr (IfDFunId ns)     = ptext (sLit "DFunId") <> brackets (int ns)
+  ppr IfDFunId          = ptext (sLit "DFunId")
 
 instance Outputable IfaceIdInfo where
   ppr NoInfo       = empty

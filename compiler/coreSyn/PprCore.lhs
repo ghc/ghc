@@ -442,7 +442,6 @@ instance Outputable Unfolding where
 instance Outputable e => Outputable (DFunArg e) where
   ppr (DFunPolyArg e)  = braces (ppr e)
   ppr (DFunConstArg e) = ppr e
-  ppr (DFunLamArg i)   = char '<' <> int i <> char '>'
 \end{code}
 
 -----------------------------------------------------
