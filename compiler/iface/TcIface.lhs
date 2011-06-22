@@ -1026,8 +1026,8 @@ do_one (IfaceRec pairs) thing_inside
 \begin{code}
 tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
 tcIdDetails _  IfVanillaId = return VanillaId
-tcIdDetails ty (IfDFunId ns)
-  = return (DFunId ns (isNewTyCon (classTyCon cls)))
+tcIdDetails ty IfDFunId
+  = return (DFunId (isNewTyCon (classTyCon cls)))
   where
     (_, _, cls, _) = tcSplitDFunTy ty
 
@@ -1099,7 +1099,6 @@ tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
     doc = text "Class ops for dfun" <+> ppr name
     tc_arg (DFunPolyArg  e) = do { e' <- tcIfaceExpr e; return (DFunPolyArg e') }
     tc_arg (DFunConstArg e) = do { e' <- tcIfaceExpr e; return (DFunConstArg e') }
-    tc_arg (DFunLamArg i)   = return (DFunLamArg i)
 
 tcUnfolding name ty info (IfExtWrapper arity wkr)
   = tcIfaceWrapper name ty info arity (tcIfaceExtId wkr)

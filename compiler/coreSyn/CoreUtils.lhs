@@ -734,7 +734,7 @@ exprOkForSpeculation other_expr
 				-- A bit conservative: we don't really need
 				-- to care about lazy arguments, but this is easy
 
-    spec_ok (DFunId _ new_type) _ = not new_type
+    spec_ok (DFunId new_type) _ = not new_type
          -- DFuns terminate, unless the dict is implemented with a newtype
 	 -- in which case they may not
 

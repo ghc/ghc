@@ -33,7 +33,6 @@ import Util
 import FastString
 import Outputable
 import DynFlags
-import StaticFlags( opt_PprStyle_Debug )
 import Data.List( partition )
 import Control.Monad( when, unless )
 \end{code}
@@ -242,15 +241,8 @@ getUserGivens :: ReportErrCtxt -> [([EvVar], GivenLoc)]
 -- One item for each enclosing implication
 getUserGivens (CEC {cec_encl = ctxt})
   = reverse $
-    [ (givens', loc) | Implic {ic_given = givens, ic_loc = loc} <- ctxt
-                     , let givens' = get_user_givens givens
-                     , not (null givens') ]
-  where
-    get_user_givens givens | opt_PprStyle_Debug = givens
-                           | otherwise          = filterOut isSilentEvVar givens
-       -- In user mode, don't show the "silent" givens, used for
-       -- the "self" dictionary and silent superclass arguments for dfuns
-
+    [ (givens, loc) | Implic {ic_given = givens, ic_loc = loc} <- ctxt
+                    , not (null givens) ]
 \end{code}
 
 

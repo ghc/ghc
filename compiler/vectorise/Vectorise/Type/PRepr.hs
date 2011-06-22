@@ -1,10 +1,6 @@
 
 module Vectorise.Type.PRepr
-	( buildPReprTyCon
-	, buildToPRepr
-	, buildFromPRepr
-	, buildToArrPRepr
-	, buildFromArrPRepr)
+	( buildPReprTyCon, buildPAScAndMethods )
 where
 import Vectorise.Utils
 import Vectorise.Monad
@@ -47,6 +43,28 @@ buildPReprTyCon orig_tc vect_tc repr
   where
     tyvars = tyConTyVars vect_tc
 
+
+-----------------------------------------------------
+buildPAScAndMethods :: [(String, TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr)]
+-- buildPAScandmethods says how to build the PR superclass and methods of PA
+--    class class PR (PRepr a) => PA a where
+--      toPRepr      :: a -> PRepr a
+--      fromPRepr    :: PRepr a -> a
+--      toArrPRepr   :: PData a -> PData (PRepr a)
+--      fromArrPRepr :: PData (PRepr a) -> PData a
+
+buildPAScAndMethods = [("PR",           buildPRDict),
+             	       ("toPRepr",      buildToPRepr),
+             	       ("fromPRepr",    buildFromPRepr),
+             	       ("toArrPRepr",   buildToArrPRepr),
+             	       ("fromArrPRepr", buildFromArrPRepr)]
+
+buildPRDict :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
+buildPRDict vect_tc prepr_tc _ _
+  = prDictOfPReprInstTyCon inst_ty prepr_tc arg_tys
+  where
+    arg_tys = mkTyVarTys (tyConTyVars vect_tc)
+    inst_ty = mkTyConApp vect_tc arg_tys
 
 buildToPRepr :: TyCon -> TyCon -> TyCon -> SumRepr -> VM CoreExpr
 buildToPRepr vect_tc repr_tc _ repr

@@ -798,25 +798,13 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      -- See Note [Subtle interaction of recursion and overlap]
                      -- and Note [Binding when looking up instances]
        ; let (clas, inst_tys) = tcSplitDFunHead inst_head
-             (class_tyvars, sc_theta, _, op_items) = classBigSig clas
+             (class_tyvars, sc_theta, sc_sels, op_items) = classBigSig clas
              sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys) sc_theta
-             n_ty_args = length inst_tyvars
-             n_silent  = dfunNSilent dfun_id
-             (silent_theta, orig_theta) = splitAt n_silent dfun_theta
+       ; dfun_ev_vars <- newEvVars dfun_theta
 
-       ; silent_ev_vars <- mapM newSilentGiven silent_theta
-       ; orig_ev_vars   <- newEvVars orig_theta
-       ; let dfun_ev_vars = silent_ev_vars ++ orig_ev_vars
-
-       ; (sc_dicts, sc_args)
-             <- mapAndUnzipM (tcSuperClass n_ty_args dfun_ev_vars) sc_theta'
-
-       -- Check that any superclasses gotten from a silent arguemnt
-       -- can be deduced from the originally-specified dfun arguments
-       ; ct_loc <- getCtLoc ScOrigin
-       ; _ <- checkConstraints skol_info inst_tyvars orig_ev_vars $
-              emitFlats $ listToBag $
-              [ mkEvVarX sc ct_loc | sc <- sc_dicts, isSilentEvVar sc ]
+       ; (sc_args, sc_binds)
+             <- mapAndUnzipM (tcSuperClass inst_tyvars dfun_ev_vars) 
+                              (sc_sels `zip` sc_theta')
 
        -- Deal with 'SPECIALISE instance' pragmas
        -- See Note [SPECIALISE instance pragmas]
@@ -838,9 +826,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              [dict_constr] = tyConDataCons class_tc
              dict_bind     = mkVarBind self_dict dict_rhs
              dict_rhs      = foldl mk_app inst_constr $
-                             map HsVar sc_dicts ++ map (wrapId arg_wrapper) meth_ids
-             inst_constr   = L loc $ wrapId (mkWpTyApps inst_tys)
-                                            (dataConWrapId dict_constr)
+                             map wrap_sc sc_args 
+                             ++ map (wrapId arg_wrapper) meth_ids
+             wrap_sc (DFunPolyArg (Var sc))  = wrapId arg_wrapper sc
+             wrap_sc (DFunConstArg (Var sc)) = HsVar sc
+	     wrap_sc _ = panic "wrap_sc"
+
+             inst_constr = L loc $ wrapId (mkWpTyApps inst_tys)
+                                          (dataConWrapId dict_constr)
                      -- We don't produce a binding for the dict_constr; instead we
                      -- rely on the simplifier to unfold this saturated application
                      -- We do this rather than generate an HsCon directly, because
@@ -872,30 +865,50 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_binds = unitBag dict_bind }
 
        ; return (unitBag (L loc main_bind) `unionBags`
-                 listToBag meth_binds)
+                 listToBag meth_binds      `unionBags`
+                 unionManyBags sc_binds)
        }
  where
-   skol_info = InstSkol         
    dfun_ty   = idType dfun_id
    dfun_id   = instanceDFunId ispec
    loc       = getSrcSpan dfun_id
 
 ------------------------------
-tcSuperClass :: Int -> [EvVar] -> PredType -> TcM (EvVar, DFunArg CoreExpr)
--- All superclasses should be either
---   (a) be one of the arguments to the dfun, of
---   (b) be a constant, soluble at top level
-tcSuperClass n_ty_args ev_vars pred
-  | Just (ev, i) <- find n_ty_args ev_vars
-  = return (ev, DFunLamArg i)
+tcSuperClass :: [TcTyVar] -> [EvVar] 
+	     -> (Id, PredType) 
+             -> TcM (DFunArg CoreExpr, LHsBinds Id)
+
+-- For a constant superclass (no free tyvars)
+--   return    sc_dict, no bindings, DFunConstArg
+-- For a non-constant superclass
+-- build a top level decl like
+--	sc_op = /\a \d. let sc = ... in
+--			sc
+-- and return sc_op, that binding, DFunPolyArg
+
+tcSuperClass tyvars ev_vars (sc_sel, sc_pred)
+  | isEmptyVarSet (tyVarsOfPred sc_pred)  -- Constant
+  = do { sc_dict  <- emitWanted ScOrigin sc_pred
+       ; return (DFunConstArg (Var sc_dict), emptyBag) }
+
   | otherwise
-  = ASSERT2( isEmptyVarSet (tyVarsOfPred pred), ppr pred)       -- Constant!
-    do { sc_dict  <- emitWanted ScOrigin pred
-       ; return (sc_dict, DFunConstArg (Var sc_dict)) }
-  where
-    find _ [] = Nothing
-    find i (ev:evs) | pred `eqPred` evVarPred ev = Just (ev, i)
-                    | otherwise                  = find (i+1) evs
+  = do { (ev_binds, sc_dict)
+             <- newImplication InstSkol tyvars ev_vars $
+                emitWanted ScOrigin sc_pred
+
+       ; uniq <- newUnique
+       ; let sc_op_ty   = mkForAllTys tyvars $ mkPiTypes ev_vars (varType sc_dict)
+	     sc_op_name = mkDerivedInternalName mkClassOpAuxOcc uniq
+						(getName sc_sel)
+	     sc_op_id   = mkLocalId sc_op_name sc_op_ty
+	     sc_op_bind = VarBind { var_id = sc_op_id, var_inline = False
+                                  , var_rhs = L noSrcSpan $ wrapId sc_wrapper sc_dict }
+             sc_wrapper = mkWpTyLams tyvars
+                          <.> mkWpLams ev_vars
+			  <.> mkWpLet ev_binds
+	     binds = unitBag (noLoc sc_op_bind)
+
+       ; return (DFunPolyArg (Var sc_op_id), binds) }
 
 ------------------------------
 tcSpecInstPrags :: DFunId -> InstBindings Name
@@ -909,74 +922,26 @@ tcSpecInstPrags dfun_id (VanillaInst binds uprags _)
        ; return (spec_inst_prags, mkPragFun uprags binds) }
 \end{code}
 
-Note [Silent Superclass Arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Superclass loop avoidance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following (extreme) situation:
         class C a => D a where ...
         instance D [a] => D [a] where ...
 Although this looks wrong (assume D [a] to prove D [a]), it is only a
-more extreme case of what happens with recursive dictionaries.
+more extreme case of what happens with recursive dictionaries, and it
+can, just about, make sense because the methods do some work before
+recursing.
 
 To implement the dfun we must generate code for the superclass C [a],
-which we can get by superclass selection from the supplied argument!
-So we’d generate:
+which we had better not get by superclass selection from the supplied
+argument:
        dfun :: forall a. D [a] -> D [a]
        dfun = \d::D [a] -> MkD (scsel d) ..
 
-However this means that if we later encounter a situation where
-we have a [Wanted] dw::D [a] we could solve it thus:
-     dw := dfun dw
-Although recursive, this binding would pass the TcSMonadisGoodRecEv
-check because it appears as guarded.  But in reality, it will make a
-bottom superclass. The trouble is that isGoodRecEv can't "see" the
-superclass-selection inside dfun.
-
-Our solution to this problem is to change the way ‘dfuns’ are created
-for instances, so that we pass as first arguments to the dfun some
-``silent superclass arguments’’, which are the immediate superclasses
-of the dictionary we are trying to construct. In our example:
-       dfun :: forall a. (C [a], D [a] -> D [a]
-       dfun = \(dc::C [a]) (dd::D [a]) -> DOrd dc ...
-
-This gives us:
-
-     -----------------------------------------------------------
-     DFun Superclass Invariant
-     ~~~~~~~~~~~~~~~~~~~~~~~~
-     In the body of a DFun, every superclass argument to the
-     returned dictionary is
-       either   * one of the arguments of the DFun,
-       or       * constant, bound at top level
-     -----------------------------------------------------------
-
-This means that no superclass is hidden inside a dfun application, so
-the counting argument in isGoodRecEv (more dfun calls than superclass
-selections) works correctly.
-
-The extra arguments required to satisfy the DFun Superclass Invariant
-always come first, and are called the "silent" arguments.  DFun types
-are built (only) by MkId.mkDictFunId, so that is where we decide
-what silent arguments are to be added.
-
-This net effect is that it is safe to treat a dfun application as
-wrapping a dictionary constructor around its arguments (in particular,
-a dfun never picks superclasses from the arguments under the dictionary
-constructor).
-
-In our example, if we had  [Wanted] dw :: D [a] we would get via the instance:
-    dw := dfun d1 d2
-    [Wanted] (d1 :: C [a])
-    [Wanted] (d2 :: D [a])
-    [Derived] (d :: D [a])
-    [Derived] (scd :: C [a])   scd  := scsel d
-    [Derived] (scd2 :: C [a])  scd2 := scsel d2
-
-And now, though we *can* solve: 
-     d2 := dw
-we will get an isGoodRecEv failure when we try to solve:
-    d1 := scsel d 
- or
-    d1 := scsel d2 
+Rather, we want to get it by finding an instance for (C [a]).  We
+achieve this by 
+    not making the superclasses of a "wanted"
+    available for solving wanted constraints.
 
 Test case SCLoop tests this fix. 
          
@@ -1028,7 +993,7 @@ tcSpecInst dfun_id prag@(SpecInstSig hs_ty)
   = addErrCtxt (spec_ctxt prag) $
     do  { let name = idName dfun_id
         ; (tyvars, theta, clas, tys) <- tcHsInstHead hs_ty
-        ; let (_, spec_dfun_ty) = mkDictFunTy tyvars theta clas tys
+        ; let spec_dfun_ty = mkDictFunTy tyvars theta clas tys
 
         ; co_fn <- tcSubType (SpecPragOrigin name) SpecInstCtxt
                              (idType dfun_id) spec_dfun_ty
@@ -1097,11 +1062,7 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_default sel_id (GenDefMeth dm_name)
       = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id dm_name
            ; tc_body sel_id False {- Not generated code? -} meth_bind }
-{-
-    tc_default sel_id GenDefMeth    -- Derivable type classes stuff
-      = do { meth_bind <- mkGenericDefMethBind clas inst_tys sel_id
-           ; tc_body sel_id False {- Not generated code? -} meth_bind }
--}
+
     tc_default sel_id NoDefMeth	    -- No default method at all
       = do { warnMissingMethod sel_id
     	   ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars 

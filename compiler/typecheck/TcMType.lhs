@@ -26,7 +26,7 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newCoVar, newEvVars,
-  newIP, newDict, newSilentGiven, isSilentEvVar,
+  newIP, newDict, 
 
   newWantedEvVar, newWantedEvVars,
   newTcEvBinds, addTcEvBind,
@@ -160,26 +160,6 @@ newName occ
   = do { uniq <- newUnique
        ; loc  <- getSrcSpanM
        ; return (mkInternalName uniq occ loc) }
-
------------------
-newSilentGiven :: PredType -> TcM EvVar
--- Make a dictionary for a "silent" given dictionary
--- Behaves just like any EvVar except that it responds True to isSilentDict
--- This is used only to suppress confusing error reports
-newSilentGiven (ClassP cls tys)
-  = do { uniq <- newUnique
-       ; let name = mkSystemName uniq (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name (mkPredTy (ClassP cls tys))) }
-newSilentGiven (EqPred ty1 ty2)
-  = do { uniq <- newUnique
-       ; let name = mkSystemName uniq (mkTyVarOccFS (fsLit "co"))
-       ; return (mkCoVar name (mkPredTy (EqPred ty1 ty2))) }
-newSilentGiven pred@(IParam {})
-  = pprPanic "newSilentDict" (ppr pred) -- Implicit parameters rejected earlier
-
-isSilentEvVar :: EvVar -> Bool
-isSilentEvVar v = isSystemName (Var.varName v)
-  -- Notice that all *other* evidence variables get Internal Names
 \end{code}
 
 

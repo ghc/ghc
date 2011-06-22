@@ -129,14 +129,7 @@ data IdDetails
 
   | TickBoxOpId TickBoxOp	-- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
-  | DFunId Int Bool             -- ^ A dictionary function.
-       -- Int = the number of "silent" arguments to the dfun
-       --       e.g.  class D a => C a where ...
-       --             instance C a => C [a]
-       --       has is_silent = 1, because the dfun
-       --       has type  dfun :: (D a, C a) => C [a]
-       --       See the DFun Superclass Invariant in TcInstDcls
-       --
+  | DFunId Bool                 -- ^ A dictionary function.
        -- Bool = True <=> the class has only one method, so may be
        --                  implemented with a newtype, so it might be bad
        --                  to be strict on this dictionary
@@ -158,8 +151,7 @@ pprIdDetails other     = brackets (pp other)
    pp (PrimOpId _)      = ptext (sLit "PrimOp")
    pp (FCallId _)       = ptext (sLit "ForeignCall")
    pp (TickBoxOpId _)   = ptext (sLit "TickBoxOp")
-   pp (DFunId ns nt)    = ptext (sLit "DFunId")
-                             <> ppWhen (ns /= 0) (brackets (int ns))
+   pp (DFunId nt)       = ptext (sLit "DFunId")
                              <> ppWhen nt (ptext (sLit "(nt)"))
    pp (RecSelId { sel_naughty = is_naughty })
       			 = brackets $ ptext (sLit "RecSel") 
