@@ -207,28 +207,6 @@ AC_CANONICAL_TARGET
 
 FPTOOLS_SET_PLATFORM_VARS
 
-windows=NO
-exeext=''
-soext='.so'
-case $host in
-*-unknown-cygwin32)
-    AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
-    AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
-    exit 1
-    ;;
-*-unknown-mingw32)
-    windows=YES
-    exeext='.exe'
-    soext='.dll'
-    ;;
-i386-apple-darwin|powerpc-apple-darwin)
-    soext='.dylib'
-    ;;
-x86_64-apple-darwin)
-    soext='.dylib'
-    ;;
-esac
-
 # Testing if we shall enable shared libs support on Solaris.
 # Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
 
@@ -572,28 +550,7 @@ AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
 
-if test "$windows" = YES
-then
-    SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
-    SettingsCCompilerFlags=''
-    SettingsPerlCommand='$topdir/../perl/perl.exe'
-    SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
-    SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
-    SettingsTouchCommand='$topdir/touch.exe'
-else
-    SettingsCCompilerCommand="$WhatGccIsCalled"
-    SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
-    SettingsPerlCommand="$PerlCmd"
-    SettingsDllWrapCommand="/bin/false"
-    SettingsWindresCommand="/bin/false"
-    SettingsTouchCommand='touch'
-fi
-AC_SUBST(SettingsCCompilerCommand)
-AC_SUBST(SettingsCCompilerFlags)
-AC_SUBST(SettingsPerlCommand)
-AC_SUBST(SettingsDllWrapCommand)
-AC_SUBST(SettingsWindresCommand)
-AC_SUBST(SettingsTouchCommand)
+FP_SETTINGS
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

@@ -82,6 +82,8 @@ AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
 
+FP_SETTINGS
+
 #
 dnl ** how to invoke `ar' and `ranlib'
 #
