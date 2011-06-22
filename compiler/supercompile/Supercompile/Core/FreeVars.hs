@@ -45,8 +45,8 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     term' (TyApp e ty)       = typ ty `unionVarSet` term e
     term' (App e x)          = term e `extendVarSet` x
     term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
-    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` (alternatives alts `delVarSet` x) `unionVarSet` idFreeVars x
-    term' (Let x e1 e2)      = term e1 `unionVarSet` (term e2 `delVarSet` x) `unionVarSet` idFreeVars x
+    term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` nonRecIdBinderFreeVars x (alternatives alts)
+    term' (Let x e1 e2)      = term e1 `unionVarSet` nonRecIdBinderFreeVars x (term e2)
     term' (LetRec xes e)     = (unionVarSets (map term es) `unionVarSet` term e `unionVarSet` unionVarSets (map idFreeVars xs)) `delVarSetList` xs
       where (xs, es) = unzip xes
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
@@ -54,7 +54,7 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     value = rec value'
     value' (Indirect x)    = unitVarSet x
     value' (TyLambda x e)  = term e `delVarSet` x
-    value' (Lambda x e)    = (term e `delVarSet` x) `unionVarSet` idFreeVars x
+    value' (Lambda x e)    = nonRecBinderFreeVars x (term e)
     value' (Data _ tys xs) = unionVarSets (map typ tys) `unionVarSet` mkVarSet xs
     value' (Literal _)     = emptyVarSet
     value' (Coercion co)   = tyCoVarsOfCo co
@@ -65,13 +65,19 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     
     typ = tyVarsOfType
 
-altConBoundVars :: AltCon -> BoundVars
-altConBoundVars (DataAlt _ as xs) = mkVarSet xs `unionVarSet` mkVarSet as
-altConBoundVars (LiteralAlt _)    = emptyVarSet
-altConBoundVars _                 = emptyVarSet
+nonRecIdBinderFreeVars :: Var -> FreeVars -> FreeVars
+nonRecIdBinderFreeVars x fvs = (fvs `delVarSet` x) `unionVarSet` idFreeVars x
+
+nonRecIdBindersFreeVars :: [Var] -> FreeVars -> FreeVars
+nonRecIdBindersFreeVars xs = flip (foldr nonRecIdBinderFreeVars) xs
+
+altConBoundVars :: AltCon -> [Var]
+altConBoundVars (DataAlt _ as xs) = as ++ xs
+altConBoundVars (LiteralAlt _)    = []
+altConBoundVars _                 = []
 
 altConFreeVars :: AltCon -> FreeVars -> FreeVars
-altConFreeVars (DataAlt _ as xs) = (`delVarSetList` as) . flip (foldr (\x fvs -> (fvs `delVarSet` x) `unionVarSet` idFreeVars x)) xs
+altConFreeVars (DataAlt _ as xs) = (`delVarSetList` as) . nonRecIdBindersFreeVars xs
 altConFreeVars (LiteralAlt _)    = id
 altConFreeVars DefaultAlt        = id
 

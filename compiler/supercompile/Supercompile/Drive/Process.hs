@@ -43,8 +43,8 @@ import qualified Data.Set as S
 
 
 pprTraceSC :: String -> SDoc -> a -> a
---pprTraceSC = pprTrace
-pprTraceSC _ _ x = x
+pprTraceSC = pprTrace
+--pprTraceSC _ _ x = x
 
 
 -- The termination argument is a but subtler due to HowBounds but I think it still basically works.
