@@ -93,7 +93,7 @@ mkImplicitUnfolding expr = mkTopUnfolding False (simpleOptExpr expr)
 mkSimpleUnfolding :: CoreExpr -> Unfolding
 mkSimpleUnfolding = mkUnfolding InlineRhs False False
 
-mkDFunUnfolding :: Type -> [DFunArg CoreExpr] -> Unfolding
+mkDFunUnfolding :: Type -> [CoreExpr] -> Unfolding
 mkDFunUnfolding dfun_ty ops 
   = DFunUnfolding dfun_nargs data_con ops
   where
@@ -1299,8 +1299,7 @@ exprIsConApp_maybe id_unf expr
              pprTrace "Unsaturated dfun" (ppr fun <+> int dfun_nargs $$ ppr args) False   
         , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
               subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
-              mk_arg (DFunConstArg e) = e
-              mk_arg (DFunPolyArg e)  = mkApps e args
+              mk_arg e = mkApps e args
         = Just (con, substTys subst dfun_res_tys, map mk_arg ops)
 
 	-- Look through unfoldings, but only cheap ones, because

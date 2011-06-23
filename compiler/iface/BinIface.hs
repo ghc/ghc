@@ -18,7 +18,6 @@ import HscTypes
 import BasicTypes
 import Demand
 import Annotations
-import CoreSyn
 import IfaceSyn
 import Module
 import Name
@@ -1272,14 +1271,6 @@ instance Binary IfaceUnfolding where
 		  return (IfDFunUnfold as)
 	  _ -> do e <- get bh
 		  return (IfCompulsory e)
-
-instance Binary (DFunArg IfaceExpr) where
-    put_ bh (DFunPolyArg  e) = putByte bh 0 >> put_ bh e
-    put_ bh (DFunConstArg e) = putByte bh 1 >> put_ bh e
-    get bh = do { h <- getByte bh
-                ; case h of
-                    0 -> do { a <- get bh; return (DFunPolyArg a) }
-                    _ -> do { a <- get bh; return (DFunConstArg a) } }
 
 instance Binary IfaceNote where
     put_ bh (IfaceSCC aa) = do

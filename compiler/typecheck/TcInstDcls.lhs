@@ -37,7 +37,7 @@ import Pair
 --import VarSet
 import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
-import CoreSyn    ( Expr(Var), DFunArg(..), CoreExpr, varToCoreExpr )
+import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
 import Id
 import MkId
 import Name
@@ -863,9 +863,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                 = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_ty dfun_args
                           `setInlinePragma` dfunInlinePragma
 
-             dfun_args :: [DFunArg CoreExpr]
-             dfun_args = map (DFunPolyArg . varToCoreExpr) sc_args ++
-                         map (DFunPolyArg . Var) meth_ids
+             dfun_args :: [CoreExpr]
+             dfun_args = map varToCoreExpr sc_args ++
+                         map Var           meth_ids
 
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars

@@ -623,7 +623,7 @@ substUnfoldingSC subst unf 	 -- Short-cut version
 substUnfolding subst (DFunUnfolding ar con args)
   = DFunUnfolding ar con (map subst_arg args)
   where
-    subst_arg = fmap (substExpr (text "dfun-unf") subst)
+    subst_arg = substExpr (text "dfun-unf") subst
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!

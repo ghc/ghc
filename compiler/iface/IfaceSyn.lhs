@@ -27,8 +27,6 @@ module IfaceSyn (
 #include "HsVersions.h"
 
 import IfaceType
-import CoreSyn( DFunArg, dfunArgExprs )
-import PprCore()     -- Printing DFunArgs
 import Demand
 import Annotations
 import Class
@@ -220,7 +218,7 @@ data IfaceUnfolding
   | IfLclWrapper Arity IfLclName  --     because the worker can simplify to a function in
                                   --     another module.
 
-  | IfDFunUnfold [DFunArg IfaceExpr]
+  | IfDFunUnfold [IfaceExpr]
 
 --------------------------------
 data IfaceExpr
@@ -826,7 +824,7 @@ freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfExtWrapper _ v)     = unitNameSet v
 freeNamesIfUnfold (IfLclWrapper {})      = emptyNameSet
-freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr (dfunArgExprs vs)
+freeNamesIfUnfold (IfDFunUnfold vs)      = fnList freeNamesIfExpr vs
 
 freeNamesIfExpr :: IfaceExpr -> NameSet
 freeNamesIfExpr (IfaceExt v)      = unitNameSet v

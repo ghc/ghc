@@ -707,7 +707,7 @@ simplUnfolding :: SimplEnv-> TopLevelFlag
 simplUnfolding env _ _ _ (DFunUnfolding ar con ops)
   = return (DFunUnfolding ar con ops')
   where
-    ops' = map (fmap (substExpr (text "simplUnfolding") env)) ops
+    ops' = map (substExpr (text "simplUnfolding") env) ops
 
 simplUnfolding env top_lvl id _
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity

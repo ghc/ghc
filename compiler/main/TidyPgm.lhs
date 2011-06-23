@@ -726,7 +726,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
 		      CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_guidance = guide } 
 					    | show_unfolding src guide
 					    -> Just (unf_ext_ids src unf_rhs)
-                      DFunUnfolding _ _ ops -> Just (exprsFvsInOrder (dfunArgExprs ops))
+                      DFunUnfolding _ _ ops -> Just (exprsFvsInOrder ops)
 		      _                     -> Nothing
                   where
                     unf_ext_ids (InlineWrapper v) _ = (unitVarSet v, [v])
