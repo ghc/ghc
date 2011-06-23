@@ -58,8 +58,10 @@ test('stableptr005', normal, compile_and_run, [''])
 test('weak001', normal, compile_and_run, [''])
 
 # In the 65001 codepage, we can't even cat the expected output on msys:
-# $ cat 4006.stdout
-# It works here
-# cat: write error: Permission denied
+#     $ cat 4006.stdout
+#     It works here
+#     cat: write error: Permission denied
+# Seems to be a known problem, e.g.
+#     http://mingw-users.1079350.n2.nabble.com/Bug-re-Unicode-on-the-console-td3121717.html
 test('4006', if_msys(expect_fail), compile_and_run, [''])
 
