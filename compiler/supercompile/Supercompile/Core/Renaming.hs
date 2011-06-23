@@ -73,8 +73,27 @@ type Renaming = (IdSubstEnv, TvSubstEnv, CvSubstEnv)
 joinSubst :: InScopeSet -> Renaming -> Subst
 joinSubst iss (id_subst, tv_subst, co_subst) = mkSubst iss tv_subst co_subst id_subst
 
-splitSubst :: Subst -> (InScopeSet, Renaming)
-splitSubst (Subst iss id_subst tv_subst co_subst) = (iss, (id_subst, tv_subst, co_subst))
+-- GHC's binder-renaming stuff does this awful thing where a var->var renaming
+-- will always be added to the InScopeSet (which is really an InScopeMap) but
+-- will only be added to the IdSubstEnv *if the unique changes*.
+--
+-- This is a problem for us because we only store the Renaming with each In thing,
+-- not the full Subst. So we might lose some renamings recorded only in the InScopeSet.
+--
+-- The solution is either:
+--  1) Rewrite the rest of the supercompiler so it stores a Subst with each binding.
+--     Given the behaviour of GHCs binder-renamer, this is probably cleaner (and matches
+--     what the GHC does), but I'm not really interested in doing that work right now.
+--
+--     It also means you have te be very careful to join together InScopeSets if you
+--     pull one of those Subst-paired things down into a strictly deeper context. This
+--     is easy to get wrong.
+--
+--  2) Ensure that we always extend the IdSubstEnv, regardless of whether the unique changed.
+--     This is the solution I've adopted, and it is implemented here in splitSubst:
+splitSubst :: Subst -> [(Var, Var)] -> (InScopeSet, Renaming)
+splitSubst (Subst iss id_subst tv_subst co_subst) xs_extend
+  = (iss, (id_subst `extendVarEnvList` [(x, varToCoreSyn x') | (x, x') <- xs_extend], tv_subst, co_subst))
 
 
 splitVarList :: [Var] -> ([Id], [TyVar], [CoVar])
@@ -86,7 +105,7 @@ emptyRenaming :: Renaming
 emptyRenaming = (emptyVarEnv, emptyVarEnv, emptyVarEnv)
 
 mkIdentityRenaming :: FreeVars -> Renaming
-mkIdentityRenaming fvs = (mkVarEnv [(x, CoreSyn.Var x) | x <- id_list], mkVarEnv [(x, mkTyVarTy x) | x <- tv_list], mkVarEnv [(x, mkCoVarCo x) | x <- co_list])
+mkIdentityRenaming fvs = (mkVarEnv [(x, varToCoreSyn x) | x <- id_list], mkVarEnv [(x, mkTyVarTy x) | x <- tv_list], mkVarEnv [(x, mkCoVarCo x) | x <- co_list])
   where (id_list, tv_list, co_list) = splitVarList (varSetElems fvs)
 
 varToCoreSyn :: Var -> CoreSyn.CoreExpr
@@ -110,6 +129,8 @@ insertTypeSubsts (id_subst, tv_subst, co_subst) xtys = (id_subst, extendVarEnvLi
 
 insertCoercionSubst :: Renaming -> CoVar -> Out Coercion -> Renaming
 insertCoercionSubst (id_subst, tv_subst, co_subst) x co' = (id_subst, tv_subst, extendVarEnv co_subst x co')
+
+-- NB: these three function can supply emptyInScopeSet because of what I do in splitSubst
 
 renameId :: Renaming -> Id -> Out Id
 renameId rn = coreSynToVar . lookupIdSubst (text "renameId") (joinSubst emptyInScopeSet rn)
@@ -148,17 +169,17 @@ renameIn f (rn, x) = f rn x
 renameBinders :: InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
 renameBinders iss rn xs = (iss', rn', xs')
   where (subst', xs') = substRecBndrs (joinSubst iss rn) xs
-        (iss', rn') = splitSubst subst'
+        (iss', rn') = splitSubst subst' (xs `zip` xs')
 
 renameNonRecBinder :: InScopeSet -> Renaming -> Var -> (InScopeSet, Renaming, Var)
 renameNonRecBinder iss rn x = (iss', rn', x')
   where (subst', x') = substBndr (joinSubst iss rn) x
-        (iss', rn') = splitSubst subst'
+        (iss', rn') = splitSubst subst' [(x, x')]
 
 renameNonRecBinders :: InScopeSet -> Renaming -> [Var] -> (InScopeSet, Renaming, [Var])
 renameNonRecBinders iss rn xs = (iss', rn', xs')
   where (subst', xs') = substBndrs (joinSubst iss rn) xs
-        (iss', rn') = splitSubst subst'
+        (iss', rn') = splitSubst subst' (xs `zip` xs')
 
 
 renameBounds :: InScopeSet -> Renaming -> [(Var, a)] -> (InScopeSet, Renaming, [(Var, In a)])
