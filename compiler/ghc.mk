@@ -102,10 +102,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cLD_X                 = "$(LD_X)"'                           >> $@
 	@echo 'cGHC_DRIVER_DIR       :: String'                             >> $@
 	@echo 'cGHC_DRIVER_DIR       = "$(GHC_DRIVER_DIR)"'                 >> $@
-	@echo 'cGHC_TOUCHY_PGM       :: String'                             >> $@
-	@echo 'cGHC_TOUCHY_PGM       = "$(GHC_TOUCHY_PGM)"'                 >> $@
-	@echo 'cGHC_TOUCHY_DIR       :: String'                             >> $@
-	@echo 'cGHC_TOUCHY_DIR       = "$(GHC_TOUCHY_DIR)"'                 >> $@
 	@echo 'cGHC_UNLIT_PGM        :: String'                             >> $@
 	@echo 'cGHC_UNLIT_PGM        = "$(GHC_UNLIT_PGM)"'                  >> $@
 	@echo 'cGHC_UNLIT_DIR        :: String'                             >> $@
