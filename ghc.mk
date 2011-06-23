@@ -313,7 +313,7 @@ TH_PACKAGES := $(DPH_PACKAGES)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-STAGE0_PACKAGES = Cabal hpc extensible-exceptions binary bin-package-db hoopl
+STAGE0_PACKAGES = Cabal/cabal hpc extensible-exceptions binary bin-package-db hoopl
 
 # These packages are installed, but are installed hidden
 # Why install them at all?  Because the 'ghc' package depends on them
@@ -393,7 +393,7 @@ $(eval $(call addPackage,haskell2010))
 $(eval $(call addPackage,hpc))
 $(eval $(call addPackage,pretty))
 $(eval $(call addPackage,template-haskell))
-$(eval $(call addPackage,Cabal))
+$(eval $(call addPackage,Cabal/cabal))
 $(eval $(call addPackage,binary))
 $(eval $(call addPackage,bin-package-db))
 $(eval $(call addPackage,hoopl))
@@ -456,7 +456,10 @@ endif
 # --------------------------------
 # Misc package-related settings
 
-BOOT_PKG_CONSTRAINTS := $(foreach p,$(STAGE0_PACKAGES),--constraint "$p == $(shell grep -i "^Version:" libraries/$p/$p.cabal | sed "s/[^0-9.]//g")")
+BOOT_PKG_CONSTRAINTS := \
+    $(foreach d,$(STAGE0_PACKAGES),\
+        $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
+            --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
 
 # The actual .a and .so/.dll files: needed for dependencies.
 ALL_STAGE1_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_LIB))
@@ -672,16 +675,6 @@ endif
 
 $(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))
 
-# These three libraries do not depend on each other, so we can build
-# them straight off:
-
-$(eval $(call build-package,libraries/hpc,dist-boot,0))
-$(eval $(call build-package,libraries/extensible-exceptions,dist-boot,0))
-$(eval $(call build-package,libraries/Cabal,dist-boot,0))
-$(eval $(call build-package,libraries/binary,dist-boot,0))
-$(eval $(call build-package,libraries/bin-package-db,dist-boot,0))
-$(eval $(call build-package,libraries/hoopl,dist-boot,0))
-
 # register the boot packages in strict sequence, because running
 # multiple ghc-pkgs in parallel doesn't work (registrations may get
 # lost).
@@ -689,7 +682,9 @@ fixed_pkg_prev=
 $(foreach pkg,$(STAGE0_PACKAGES),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
 
 compiler/stage1/package-data.mk : $(fixed_pkg_prev)
+endif
 
+ifneq "$(BINDIST)" "YES"
 # Make sure we have all the GHCi libs by the time we've built
 # ghc-stage2.  DPH includes a bit of Template Haskell which needs the
 # GHCI libs, and we don't have a better way to express that dependency.
@@ -1145,6 +1140,8 @@ clean_libraries:
 # We have to define a clean target for each library manually, because the
 # libraries/*/ghc.mk files are not included when we're cleaning.
 ifeq "$(CLEANING)" "YES"
+$(foreach lib,$(STAGE0_PACKAGES),\
+  $(eval $(call clean-target,libraries/$(lib),dist-boot,libraries/$(lib)/dist-boot)))
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),\
   $(eval $(call clean-target,libraries/$(lib),dist-install,libraries/$(lib)/dist-install)))
 endif

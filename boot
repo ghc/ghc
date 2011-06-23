@@ -174,6 +174,7 @@ sub boot_pkgs {
                     or die "Opening $package/ghc.mk failed: $!";
                 print GHCMK "${package}_PACKAGE = ${pkg}\n";
                 print GHCMK "${package}_dist-install_GROUP = libraries\n";
+                print GHCMK "\$(if \$(filter ${dir},\$(STAGE0_PACKAGES)),\$(eval \$(call build-package,${package},dist-boot,0)))\n";
                 print GHCMK "\$(eval \$(call build-package,${package},dist-install,\$(if \$(filter ${dir},\$(STAGE2_PACKAGES)),2,1)))\n";
                 close GHCMK
                     or die "Closing $package/ghc.mk failed: $!";
