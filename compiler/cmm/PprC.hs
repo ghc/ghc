@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing of Cmm as C, suitable for feeding gcc
@@ -257,9 +250,13 @@ pprStmt stmt = case stmt of
 			-- for a dynamic call, no declaration is necessary.
 
     CmmCall (CmmPrim op) results args safety _ret ->
-	pprCall ppr_fn CCallConv results args safety
+	pprCall ppr_fn CCallConv results args' safety
 	where
     	ppr_fn = pprCallishMachOp_for_C op
+    	-- The mem primops carry an extra alignment arg, must drop it.
+    	-- We could maybe emit an alignment directive using this info.
+    	args'  | op == MO_Memcpy || op == MO_Memset || op == MO_Memmove = init args
+               | otherwise = args
 
     CmmBranch ident          -> pprBranch ident
     CmmCondBranch expr ident -> pprCondBranch expr ident
@@ -659,7 +656,10 @@ pprCallishMachOp_for_C mop
         MO_F32_Log  -> ptext (sLit "logf")
         MO_F32_Exp  -> ptext (sLit "expf")
         MO_F32_Sqrt -> ptext (sLit "sqrtf")
-	MO_WriteBarrier -> ptext (sLit "write_barrier")
+        MO_WriteBarrier -> ptext (sLit "write_barrier")
+        MO_Memcpy   -> ptext (sLit "memcpy")
+        MO_Memset   -> ptext (sLit "memset")
+        MO_Memmove  -> ptext (sLit "memmove")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines
