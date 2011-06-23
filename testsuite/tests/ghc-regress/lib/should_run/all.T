@@ -57,4 +57,9 @@ test('stableptr005', normal, compile_and_run, [''])
 
 test('weak001', normal, compile_and_run, [''])
 
-test('4006',		normal, compile_and_run, [''])
+# In the 65001 codepage, we can't even cat the expected output on msys:
+# $ cat 4006.stdout
+# It works here
+# cat: write error: Permission denied
+test('4006', if_msys(expect_fail), compile_and_run, [''])
+

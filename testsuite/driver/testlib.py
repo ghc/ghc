@@ -278,6 +278,18 @@ def if_wordsize( ws, f ):
     else:
         return normal
 
+def if_msys( f ):
+    if config.msys:
+        return f
+    else:
+        return normal
+
+def if_cygwin( f ):
+    if config.cygwin:
+        return f
+    else:
+        return normal
+
 # ---
 
 def if_in_tree_compiler( f ):

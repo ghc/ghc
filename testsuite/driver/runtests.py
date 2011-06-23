@@ -106,6 +106,14 @@ if config.use_threads == 1:
         print "Warning: Ignoring request to use threads as running on Windows"
         config.use_threads = 0
 
+config.cygwin = False
+config.msys = False
+if windows:
+    if cygwin:
+        config.cygwin = True
+    else:
+        config.msys = True
+
 # Try to use UTF8
 if windows:
     import ctypes
