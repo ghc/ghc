@@ -25,8 +25,8 @@ import DataCon
 import Pair
 
 
-evaluatePrim :: Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
-evaluatePrim tg pop tys args = do
+evaluatePrim :: InScopeSet -> Tag -> PrimOp -> [Type] -> [Answer] -> Maybe (Anned Answer)
+evaluatePrim iss tg pop tys args = do
     args' <- fmap (map CoreSyn.Type tys ++) $ mapM to args
     (res:_) <- return [res | CoreSyn.BuiltinRule { CoreSyn.ru_nargs = nargs, CoreSyn.ru_try = f }
                           <- primOpRules pop (error "evaluatePrim: dummy primop name")
@@ -38,7 +38,7 @@ evaluatePrim tg pop tys args = do
     to (mb_co, (rn, v)) = fmap (maybe id (flip CoreSyn.Cast . fst) mb_co) $ case v of
         Literal l      -> Just (CoreSyn.Lit l)
         Coercion co    -> Just (CoreSyn.Coercion co)
-        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` tys `CoreSyn.mkVarApps` map (renameId rn) xs)
+        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` map (renameType iss rn) tys `CoreSyn.mkVarApps` map (renameId rn) xs)
         _              -> Nothing
     
     fro :: CoreSyn.CoreExpr -> Maybe Answer
@@ -262,14 +262,14 @@ step' normalising state =
                                -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
 
         primop :: Deeds -> Tag -> Heap -> Stack -> Tag -> PrimOp -> [Out Type] -> [Anned Answer] -> Answer -> [In AnnedTerm] -> Maybe UnnormalisedState
-        primop deeds tg_kf h k tg_a pop tys' anned_as a [] = do
+        primop deeds tg_kf heap@(Heap _ ids) k tg_a pop tys' anned_as a [] = do
             guard eVALUATE_PRIMOPS -- NB: this is not faithful to paper 1 because we still turn primop expressions into
                                    -- stack frames.. this is bad because it will impede good specilations (without smart generalisation)
             let as' = map (dereference h) $ map annee anned_as ++ [a]
                 tg_kf' = tg_kf { tagOccurrences = if oCCURRENCE_GENERALISATION then tagOccurrences tg_kf + sum (map tagOccurrences (tg_a : map annedTag anned_as)) else 1 }
-            a' <- evaluatePrim tg_kf' pop tys' as'
+            a' <- evaluatePrim ids tg_kf' pop tys' as'
             deeds <- claimDeeds (deeds + sum (map annedSize anned_as) + answerSize' a + 1) (annedSize a') -- I don't think this can ever fail
-            return (denormalise (deeds, h, k, fmap Answer a'))
+            return (denormalise (deeds, heap, k, fmap Answer a'))
         primop deeds tg_kf h k tg_a pop tys' anned_as a in_es = case in_es of
             (in_e:in_es) -> Just (deeds, h, Tagged tg_kf (PrimApply pop tys' (anned_as ++ [annedAnswer tg_a a]) in_es) : k, in_e)
             []           -> Nothing
