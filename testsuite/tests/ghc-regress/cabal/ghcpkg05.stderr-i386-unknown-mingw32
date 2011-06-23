@@ -1,10 +1,10 @@
 There are problems in package testpkg-2.0:
   Warning: library-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
   Warning: include-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
-  import-dirs: /usr/local/lib/testpkg is a relative path
+  import-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
   import-dirs: c:/Program Files/testpkg doesn't exist or isn't a directory
-  library-dirs: /usr/local/lib/testpkg is a relative path
-  include-dirs: /usr/local/include/testpkg is a relative path
+  library-dirs: /usr/local/lib/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
+  include-dirs: /usr/local/include/testpkg is a relative path which makes no sense (as there is nothing for it to be relative to). You can make paths relative to the package database itself by using ${pkgroot}.
   file A.hi is missing
   file B.hi is missing
   file C\D.hi is missing
