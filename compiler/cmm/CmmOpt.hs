@@ -24,6 +24,7 @@ module CmmOpt (
 #include "HsVersions.h"
 
 import OldCmm
+import CmmNode (wrapRecExp)
 import CmmUtils
 import CLabel
 import StaticFlags
@@ -180,8 +181,7 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
 
         -- used (foldable to literal): try to inline at all the use sites
   | Just n <- lookupUFM uses u,
-    CmmMachOp op es <- expr,
-    e@(CmmLit _) <- cmmMachOpFold op es
+    e@(CmmLit _) <- wrapRecExp foldExp expr
   =
 #ifdef NCG_DEBUG
      trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
@@ -200,6 +200,9 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
      trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
 #endif
      cmmMiniInlineStmts uses stmts'
+ where
+  foldExp (CmmMachOp op args) = cmmMachOpFold op args
+  foldExp e = e
 
 cmmMiniInlineStmts uses (stmt:stmts)
   = stmt : cmmMiniInlineStmts uses stmts
