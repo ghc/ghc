@@ -29,7 +29,7 @@ import Supercompile.Termination.Generaliser
 import Supercompile.StaticFlags
 import Supercompile.Utilities
 
-import Var        (isTyVar)
+import Var        (isTyVar, varType)
 import Id         (mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
@@ -162,8 +162,10 @@ gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredV
             (h_pending_kvs', h_output', live') = M.foldrWithKey consider_inlining ([], h_output, live) h_pending
             h_pending' = M.fromDistinctAscList h_pending_kvs'
         
+            -- NB: It's important that type variables become live after inlining a binding, or we won't
+            -- necessarily lambda-abstract over all the free type variables of a h-function
             consider_inlining x' hb (h_pending_kvs, h_output, live)
-              | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb)
+              | x' `elemVarSet` live = (h_pending_kvs,            M.insert x' hb h_output, live `unionVarSet` heapBindingFreeVars hb `unionVarSet` tyVarsOfType (varType x')) -- FIXME: idFreeVars?
               | otherwise            = ((x', hb) : h_pending_kvs, h_output,                live)
     
     pruneLiveStack :: Deeds -> Stack -> FreeVars -> (Deeds, Stack)
@@ -532,9 +534,9 @@ memo opt speculated state0 = do
                            match (unI (meaning p)) state1]
           -- NB: because I can trim reduce the set of things abstracted over above, it's OK if the renaming derived from the meanings renames vars that aren't in the abstracted list, but NOT vice-versa
          -- , let bad_renames = S.fromList (abstracted p) S.\\ M.keysSet (unRenaming rn_lr) in ASSERT2(S.null bad_renames, text "Renaming was inexhaustive:" <+> pPrint bad_renames $$ pPrint (fun p) $$ pPrintFullState (unI (meaning p)) $$ pPrint rn_lr $$ pPrintFullState state3) True
-         , let rn_fvs = map (rename -- ("tieback: FVs for " ++ showSDoc (pPrint (fun p) $$ text "Us:" $$ pPrint state3 $$ text "Them:" $$ pPrint (meaning p)))
-                                    rn_lr) -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that I can't rename, so "rename" will cause an error. Not observed in practice yet.
-               tb_dynamic_vs = rn_fvs (abstracted p)
+          -- ("tieback: FVs for " ++ showSDoc (pPrint (fun p) $$ text "Us:" $$ pPrint state3 $$ text "Them:" $$ pPrint (meaning p)))
+         , let rn_fv x = M.findWithDefault (pprPanic "memo" (ppr x)) x rn_lr -- NB: If tb contains a dead PureHeap binding (hopefully impossible) then it may have a free variable that I can't rename, so "rename" will cause an error. Not observed in practice yet.
+               tb_dynamic_vs = map rn_fv (abstracted p)
          ] of
       (_p, res):_ -> {- traceRender ("tieback", pPrintFullState state3, fst res) $ -} do
         traceRenderScpM "=sc" (fun _p, PrettyDoc (pPrintFullState state1), res)

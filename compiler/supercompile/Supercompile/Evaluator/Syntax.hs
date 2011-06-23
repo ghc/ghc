@@ -13,7 +13,7 @@ import Supercompile.Core.Tag
 
 import Supercompile.Utilities
 
-import Id       (idType)
+import Id       (Id, idType)
 import PrimOp   (primOpType)
 import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType)
 import Pair     (pSnd)
@@ -102,7 +102,7 @@ termToAnswer iss (rn, anned_e) = flip traverse anned_e $ \e -> case e of
         _       -> Nothing
     _ -> Nothing
 
-data QA = Question (Out Var)
+data QA = Question (Out Id)
         | Answer   Answer
 
 instance Outputable QA where
@@ -198,12 +198,12 @@ instance Outputable Heap where
 
 
 type Stack = [Tagged StackFrame]
-data StackFrame = Apply (Out Var)
+data StackFrame = Apply (Out Id)
                 | TyApply (Out Type)
-                | Scrutinise (Out Var) (Out Type) (In [AnnedAlt])
+                | Scrutinise (Out Id) (Out Type) (In [AnnedAlt])
                 | PrimApply PrimOp [Out Type] [Anned Answer] [In AnnedTerm]
-                | StrictLet (Out Var) (In AnnedTerm)
-                | Update (Out Var)
+                | StrictLet (Out Id) (In AnnedTerm)
+                | Update (Out Id)
                 | CastIt (Out Coercion)
 
 instance Outputable StackFrame where

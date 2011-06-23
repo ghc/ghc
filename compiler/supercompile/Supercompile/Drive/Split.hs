@@ -18,11 +18,12 @@ import Supercompile.Termination.Generaliser (Generaliser(..))
 import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
-import Id (idUnique)
-import Type (mkTyVarTy)
+import Var       (varType)
+import Id        (idUnique)
+import Type      (mkTyVarTy)
 import PrelNames (undefinedName)
-import Unique (Uniquable)
-import UniqSet (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
+import Unique    (Uniquable)
+import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
 import VarEnv
 
 import qualified Data.Foldable as Foldable
@@ -798,9 +799,12 @@ transitiveInline init_h_inlineable _state@(deeds, Heap h ids, k, in_e)
         --
         -- NB: we also rely here on the fact that the original h contains "optional" bindings in the sense that they are shadowed
         -- by something bound above - i.e. it just tells us how to unfold case scrutinees within a case branch.
+        --
+        -- NB: It's important that type variables become live after inlining a binding, or we won't
+        -- necessarily lambda-abstract over all the free type variables of a h-function
         consider_inlining x' hb (deeds, h_output, live, live_in_let)
           = (deeds', M.insert x' inline_hb h_output, live `unionVarSet` fvs, if howBound inline_hb == LetBound then live_in_let `unionVarSet` fvs else live_in_let)
-          where fvs = heapBindingFreeVars inline_hb
+          where fvs = heapBindingFreeVars inline_hb `unionVarSet` tyVarsOfType (varType x') -- FIXME: idFreeVars?
                 (deeds', inline_hb) = case claimDeeds deeds (heapBindingSize hb) of -- Do we have enough deeds to inline an unmodified version?
                   Just deeds' ->                                                       (deeds', hb)
                   Nothing     -> trace (showSDoc $ text "inline-deeds:" <+> pPrint x') (deeds,  makeFreeForDeeds hb)

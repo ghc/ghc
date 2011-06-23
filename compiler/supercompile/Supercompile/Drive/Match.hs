@@ -12,7 +12,8 @@ import Supercompile.Evaluator.Syntax
 import Supercompile.Utilities hiding (guard)
 
 import Coercion
-import Id      (idType)
+import Var     (TyVar)
+import Id      (Id, idType)
 import VarEnv  (getInScopeVars)
 import TypeRep (Type(..), PredType, Pred(..))
 
@@ -49,9 +50,11 @@ matchInScopeSet f x y = mkInScopeSet (f x `unionVarSet` f y)
 --     mx1 `mplus` mx2 = Match $ unMatch mx1 `mplus` unMatch mx2
 
 
+type MatchResult = M.Map Var Var
+
 match :: State -- ^ Tieback semantics
       -> State -- ^ This semantics
-      -> Maybe Renaming -- ^ Renaming from left to right
+      -> Maybe MatchResult -- ^ Renaming from left to right
 match (_deeds_l, Heap h_l _, k_l, qa_l) (_deeds_r, Heap h_r _, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
   runMatch $ do
     free_eqs1 <- matchAnned (matchQA (matchInScopeSet annedFreeVars qa_l qa_r)) qa_l qa_r
@@ -84,7 +87,7 @@ matchType ty_l ty_r = matchInType ids (rn, ty_l) (rn, ty_r)
         rn = mkIdentityRenaming (getInScopeVars ids)
 
 matchInType :: InScopeSet -> In Type -> In Type -> Match [(Var, Var)]
-matchInType _   (rn_l, TyVarTy x_l)         (rn_r, TyVarTy x_r)         = return [matchInTyVar (rn_l, x_l) (rn_r, x_r)]
+matchInType _   (rn_l, TyVarTy x_l)         (rn_r, TyVarTy x_r)         = matchInTyVar (rn_l, x_l) (rn_r, x_r)
 matchInType ids (rn_l, AppTy ty1_l ty2_l)   (rn_r, AppTy ty1_r ty2_r)   = liftM2 (++) (matchInType ids (rn_l, ty1_l) (rn_r, ty1_r)) (matchInType ids (rn_l, ty2_l) (rn_r, ty2_r))
 matchInType ids (rn_l, TyConApp tc_l tys_l) (rn_r, TyConApp tc_r tys_r) = guard "matchInType: TyConApp" (tc_l == tc_r) >> matchInList (matchInType ids) (rn_l, tys_l) (rn_r, tys_r)
 matchInType ids (rn_l, FunTy ty1_l ty2_l)   (rn_r, FunTy ty1_r ty2_r)   = liftM2 (++) (matchInType ids (rn_l, ty1_l) (rn_r, ty1_r)) (matchInType ids (rn_l, ty2_l) (rn_r, ty2_r))
@@ -112,7 +115,7 @@ matchInCoercion ids (rn_l, AppCo co1_l co2_l)      (rn_r, AppCo co1_r co2_r)    
 matchInCoercion ids (rn_l, ForAllCo a_l co_l)      (rn_r, ForAllCo a_r co_r)      = matchInCoercion ids'' (rn_l', co_l) (rn_r', co_r) >>= matchRigidBinders [(a_l', a_r')]
   where (ids',  rn_l', a_l') = renameNonRecBinder ids  rn_l a_l
         (ids'', rn_r', a_r') = renameNonRecBinder ids' rn_r a_r
-matchInCoercion ids (rn_l, CoVarCo a_l)            (rn_r, CoVarCo a_r)            = matchInId ids (rn_l, a_l) (rn_r, a_r)
+matchInCoercion _   (rn_l, CoVarCo a_l)            (rn_r, CoVarCo a_r)            = matchInCoVar (rn_l, a_l) (rn_r, a_r)
 matchInCoercion ids (rn_l, AxiomInstCo ax_l cos_l) (rn_r, AxiomInstCo ax_r cos_r) = guard "matchInCoercion: AxiomInstCo" (ax_l == ax_r) >> matchInList (matchInCoercion ids) (rn_l, cos_l) (rn_r, cos_r)
 matchInCoercion ids (rn_l, UnsafeCo ty1_l ty2_l)   (rn_r, UnsafeCo ty1_r ty2_r)   = liftM2 (++) (matchInType ids (rn_l, ty1_l) (rn_r, ty1_r)) (matchInType ids (rn_l, ty2_l) (rn_r, ty2_r))
 matchInCoercion ids (rn_l, SymCo co_l)             (rn_r, SymCo co_r)             = matchInCoercion ids (rn_l, co_l) (rn_r, co_r)
@@ -169,14 +172,17 @@ matchAltCon (LiteralAlt l_l)         (LiteralAlt l_r)         = guard "matchAltC
 matchAltCon DefaultAlt               DefaultAlt               = return []
 matchAltCon _ _ = fail "matchAltCon"
 
-matchId :: Out Var -> Out Var -> Match [(Var, Var)]
+matchId :: Out Id -> Out Id -> Match [(Var, Var)]
 matchId x_l' x_r' = fmap ((x_l', x_r'):) $ matchType (idType x_l') (idType x_r')
 
-matchInId :: InScopeSet -> In Var -> In Var -> Match [(Var, Var)]
-matchInId ids (rn_l, x_l) (rn_r, x_r) = fmap ((rename rn_l x_l, rename rn_r x_r):) $ matchInType ids (rn_l, idType x_l) (rn_r, idType x_r)
+matchInId :: InScopeSet -> In Id -> In Id -> Match [(Var, Var)]
+matchInId ids (rn_l, x_l) (rn_r, x_r) = fmap ((renameId rn_l x_l, renameId rn_r x_r):) $ matchInType ids (rn_l, idType x_l) (rn_r, idType x_r)
 
-matchInTyVar :: In Var -> In Var -> (Var, Var)
-matchInTyVar (rn_l, x_l) (rn_r, x_r) = (rename rn_l x_l, rename rn_r x_r)
+matchInTyVar :: In TyVar -> In TyVar -> Match [(Var,Var)]
+matchInTyVar (rn_l, x_l) (rn_r, x_r) = matchType (lookupTyVarSubst rn_l x_l) (lookupTyVarSubst rn_r x_r)
+
+matchInCoVar :: In CoVar -> In CoVar -> Match [(Var, Var)]
+matchInCoVar (rn_l, x_l) (rn_r, x_r) = matchCoercion (lookupCoVarSubst rn_l x_l) (lookupCoVarSubst rn_r x_r)
 
 matchInIds :: InScopeSet -> In [Var] -> In [Var] -> Match [(Var, Var)]
 matchInIds ids = matchInList (\x_l' x_r' -> matchInId ids x_l' x_r')
@@ -224,7 +230,7 @@ occursCheck :: [(Var, Var)] -> [(Var, Var)] -> Match ()
 occursCheck bound_eqs eqs = guard "occursCheck" $ not $ any (\(x_l, x_r) -> any (\(bound_x_l, bound_x_r) -> (x_l == bound_x_l) /= (x_r == bound_x_r)) bound_eqs) eqs
 
 -- NB: if there are dead bindings in the left PureHeap then the output Renaming will not contain a renaming for their binders.
-matchHeap :: PureHeap -> PureHeap -> ([(Var, Var)], [(Var, Var)]) -> Match Renaming
+matchHeap :: PureHeap -> PureHeap -> ([(Var, Var)], [(Var, Var)]) -> Match MatchResult
 matchHeap init_h_l init_h_r (bound_eqs, free_eqs) = do
     -- 1) Find the initial matching by simply recursively matching used bindings from the Left
     --    heap against those from the Right heap (if any)
@@ -235,12 +241,12 @@ matchHeap init_h_l init_h_r (bound_eqs, free_eqs) = do
     --      a |-> True; ()<(a, a)> `match` c |-> True; d |-> True; ()<(c, d)>
     --      a |-> True; ()<(a, a)> `match` c |-> True; d |-> c; ()<(c, d)>
     -- However, I'm going to reject this for now (simpler).
-    safeMkRenaming eqs
+    safeMkMatchResult eqs
 
 --- Returns a renaming from the list only if the list maps a "left" variable to a unique "right" variable
-safeMkRenaming :: [(Var, Var)] -> Match Renaming
-safeMkRenaming eqs = guard "safeMkRenaming" (all (\(x_l, x_r) -> rename rn x_l == x_r) eqs) >> return rn
-  where rn = mkRenaming eqs
+safeMkMatchResult :: [(Var, Var)] -> Match MatchResult
+safeMkMatchResult eqs = guard "safeMkRenaming" (all (\(x_l, x_r) -> M.lookup x_l eqs_map == Just x_r) eqs) >> return eqs_map
+  where eqs_map = M.fromList eqs
 
 
 matchLetRecs :: InScopeSet -> [(Var, Var)] -> [(Var, In AnnedTerm)] -> [(Var, In AnnedTerm)] -> Match [(Var, Var)]

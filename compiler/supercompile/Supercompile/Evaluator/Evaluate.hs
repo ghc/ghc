@@ -38,7 +38,7 @@ evaluatePrim tg pop tys args = do
     to (mb_co, (rn, v)) = fmap (maybe id (flip CoreSyn.Cast . fst) mb_co) $ case v of
         Literal l      -> Just (CoreSyn.Lit l)
         Coercion co    -> Just (CoreSyn.Coercion co)
-        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` tys `CoreSyn.mkVarApps` map (rename rn) xs)
+        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` tys `CoreSyn.mkVarApps` map (renameId rn) xs)
         _              -> Nothing
     
     fro :: CoreSyn.CoreExpr -> Maybe Answer
@@ -89,10 +89,10 @@ step' normalising state =
     go (deeds, heap@(Heap h ids), k, (rn, e)) 
      | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, heap, k, anned_a)
      | otherwise = case annee e of
-        Var x            -> go_question (deeds, heap, k, fmap (const (rename rn x)) e)
+        Var x            -> go_question (deeds, heap, k, fmap (const (renameId rn x)) e)
         Value v          -> pprPanic "step': values are always answers" (ppr v)
         TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   : k, (rn, e))
-        App e x          -> go (deeds, heap,        Tagged tg (Apply (rename rn x))                                              : k, (rn, e))
+        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameId rn x))                                            : k, (rn, e))
         PrimOp pop tys es
           | (e:es) <- es -> go (deeds, heap,        Tagged tg (PrimApply pop (map (renameType ids rn) tys) [] (map ((,) rn) es)) : k, (rn, e))
           | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
@@ -171,7 +171,7 @@ step' normalising state =
         -- of the dereferenced thing - in this case we have to be sure to claim some deeds for that subcomponent. For example, if we
         -- dereference to get a lambda in our function application we had better claim deeds for the body.
         dereference :: Heap -> Answer -> Answer
-        dereference h (mb_co, (rn, Indirect x)) | Just anned_a <- lookupAnswer h (rename rn x) = dereference h (annee anned_a `castAnswer` mb_co)
+        dereference h (mb_co, (rn, Indirect x)) | Just anned_a <- lookupAnswer h (renameId rn x) = dereference h (annee anned_a `castAnswer` mb_co)
         dereference _ a = a
     
         deferenceLambdaish :: Heap -> Answer -> Maybe Answer
@@ -189,7 +189,7 @@ step' normalising state =
         apply deeds tg_v (Heap h ids) k in_v@(_, (_, v)) x' = do
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) in_v
             case mb_co of
-              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertRenaming rn x x', e_body))) $
+              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
                               claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
               Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
                                         claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
@@ -233,11 +233,12 @@ step' normalising state =
           , (deeds3, h', ids', alt_e):_ <- [ res
                                            | ((DataAlt alt_dc alt_as alt_xs, alt_e), rest) <- bagContexts alts
                                            , alt_dc == dc
-                                           , let xs' = map (rename rn_v_deref) xs
-                                                 rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys)
+                                           , let tys' = map (renameType ids rn_v_deref) tys
+                                                 xs' = map (renameId rn_v_deref) xs
+                                                 rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys')
                                                  deeds2 = deeds1 + annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
-                                                               Nothing     -> return (deeds2, h1, ids, insertRenamings rn_alts' (alt_xs `zip` xs'))
+                                                               Nothing     -> return (deeds2, h1, ids, insertIdRenamings rn_alts' (alt_xs `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (x', alt_y, (dc_co, tg_co)) -> let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
                                                                                                                                                   (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
                                                                                                                                                   e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` dc_co)
