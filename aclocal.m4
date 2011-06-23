@@ -115,7 +115,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
         SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
-        SettingsTouchCommand='$topdir/touch.exe'
+        SettingsTouchCommand='$topdir/touchy.exe'
     else
         SettingsCCompilerCommand="$WhatGccIsCalled"
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
