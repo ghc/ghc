@@ -3941,7 +3941,7 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
 static int
 ocGetNames_ELF ( ObjectCode* oc )
 {
-   int i, j, k, nent;
+   int i, j, nent;
    Elf_Sym* stab;
 
    char*     ehdrC    = (char*)(oc->image);
@@ -3951,7 +3951,6 @@ ocGetNames_ELF ( ObjectCode* oc )
 
    ASSERT(symhash != NULL);
 
-   k = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
       /* Figure out what kind of section it is.  Logic derived from
          Figure 1.14 ("Special Sections") of the ELF document
