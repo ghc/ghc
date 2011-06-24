@@ -347,8 +347,8 @@ taskDoneGC (Task *task, Ticks cpu_time, Ticks elapsed_time)
 void
 workerTaskStop (Task *task)
 {
-    OSThreadId id;
-    id = osThreadId();
+    DEBUG_ONLY( OSThreadId id );
+    DEBUG_ONLY( id = osThreadId() );
     ASSERT(task->id == id);
     ASSERT(myTask() == task);
 

@@ -1190,11 +1190,15 @@ initLinker( void )
     compileResult = regcomp(&re_invalid,
            "(([^ \t()])+\\.so([^ \t:()])*):([ \t])*(invalid ELF header|file too short)",
            REG_EXTENDED);
-    ASSERT( compileResult == 0 );
+    if (compileResult != 0) {
+        barf("Compiling re_invalid failed");
+    }
     compileResult = regcomp(&re_realso,
            "(GROUP|INPUT) *\\( *(([^ )])+)",
            REG_EXTENDED);
-    ASSERT( compileResult == 0 );
+    if (compileResult != 0) {
+        barf("Compiling re_realso failed");
+    }
 #   endif
 
 #if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
@@ -4124,10 +4128,14 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
       Elf_Addr  P  = ((Elf_Addr)targ) + offset;
       Elf_Word* pP = (Elf_Word*)P;
+#if defined(i386_HOST_ARCH) || defined(DEBUG)
       Elf_Addr  A  = *pP;
+#endif
       Elf_Addr  S;
       void*     S_tmp;
+#ifdef i386_HOST_ARCH
       Elf_Addr  value;
+#endif
       StgStablePtr stablePtr;
       StgPtr stableVal;
 
@@ -4171,7 +4179,9 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                              (void*)P, (void*)S, (void*)A ));
       checkProddableBlock ( oc, pP );
 
+#ifdef i386_HOST_ARCH
       value = S + A;
+#endif
 
       switch (ELF_R_TYPE(info)) {
 #        ifdef i386_HOST_ARCH

@@ -742,7 +742,8 @@ if test -z "$GCC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
-GccLT34=
+GccLT34=NO
+GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
     fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
@@ -752,9 +753,11 @@ AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
     # isn't a very good reason for that, but for now just make configure
     # fail.
     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
+AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
 dnl Small feature test for perl version. Assumes PerlCmd

@@ -839,7 +839,7 @@ heapCensusChain( Census *census, bdescr *bd )
     nat size;
     counter *ctr;
     nat real_size;
-    rtsBool prim;
+    PROFILING_ONLY( rtsBool prim );
 
     for (; bd != NULL; bd = bd->link) {
 
@@ -854,7 +854,7 @@ heapCensusChain( Census *census, bdescr *bd )
 	p = bd->start;
 	while (p < bd->free) {
 	    info = get_itbl((StgClosure *)p);
-	    prim = rtsFalse;
+	    PROFILING_ONLY( prim = rtsFalse );
 	    
 	    switch (info->type) {
 
@@ -904,7 +904,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		break;
 
 	    case BCO:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 		size = bco_sizeW((StgBCO *)p);
 		break;
 
@@ -915,7 +915,7 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case MUT_PRIM:
 	    case MUT_VAR_CLEAN:
 	    case MUT_VAR_DIRTY:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 		size = sizeW_fromITBL(info);
 		break;
 
@@ -932,7 +932,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		break;
 		
 	    case ARR_WORDS:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 		size = arr_words_sizeW((StgArrWords*)p);
 		break;
 		
@@ -940,12 +940,12 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case MUT_ARR_PTRS_DIRTY:
 	    case MUT_ARR_PTRS_FROZEN:
 	    case MUT_ARR_PTRS_FROZEN0:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 		size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
 		break;
 		
 	    case TSO:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 #ifdef PROFILING
 		if (RtsFlags.ProfFlags.includeTSOs) {
                     size = sizeofW(StgTSO);
@@ -961,7 +961,7 @@ heapCensusChain( Census *census, bdescr *bd )
 #endif
 
             case STACK:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 #ifdef PROFILING
 		if (RtsFlags.ProfFlags.includeTSOs) {
                     size = stack_sizeW((StgStack*)p);
@@ -977,7 +977,7 @@ heapCensusChain( Census *census, bdescr *bd )
 #endif
 
             case TREC_CHUNK:
-		prim = rtsTrue;
+		PROFILING_ONLY ( prim = rtsTrue );
 		size = sizeofW(StgTRecChunk);
 		break;
 

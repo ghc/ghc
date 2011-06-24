@@ -715,7 +715,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
     if (n_free_caps > 0) {
 	StgTSO *prev, *t, *next;
+#ifdef SPARK_PUSHING
 	rtsBool pushed_to_all;
+#endif
 
 	debugTrace(DEBUG_sched, 
 		   "cap %d: %s and %d free capabilities, sharing...", 
@@ -725,7 +727,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		   n_free_caps);
 
 	i = 0;
+#ifdef SPARK_PUSHING
 	pushed_to_all = rtsFalse;
+#endif
 
 	if (cap->run_queue_hd != END_TSO_QUEUE) {
 	    prev = cap->run_queue_hd;
@@ -740,7 +744,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                     setTSOPrev(cap, t, prev);
 		    prev = t;
 		} else if (i == n_free_caps) {
+#ifdef SPARK_PUSHING
 		    pushed_to_all = rtsTrue;
+#endif
 		    i = 0;
 		    // keep one for us
 		    setTSOLink(cap, prev, t);
@@ -1892,7 +1898,7 @@ Capability *
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 {
     Task *task;
-    StgThreadID id;
+    DEBUG_ONLY( StgThreadID id );
 
     // We already created/initialised the Task
     task = cap->running_task;
@@ -1908,7 +1914,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 
     appendToRunQueue(cap,tso);
 
-    id = tso->id;
+    DEBUG_ONLY( id = tso->id );
     debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)id);
 
     cap = schedule(cap,task);

@@ -535,6 +535,7 @@ endif
 WhatGccIsCalled = @WhatGccIsCalled@
 GccVersion      = @GccVersion@
 GccLT34         = @GccLT34@
+GccLT46         = @GccLT46@
 CC              = $(WhatGccIsCalled)
 CC_STAGE0       = @CC_STAGE0@
 CC_STAGE1       = $(CC)
