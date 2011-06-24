@@ -91,9 +91,6 @@ bdescr *
 grab_local_todo_block (gen_workspace *ws)
 {
     bdescr *bd;
-    generation *gen;
-
-    gen = ws->gen;
 
     bd = ws->todo_overflow;
     if (bd != NULL)
