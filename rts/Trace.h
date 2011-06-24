@@ -417,7 +417,7 @@ INLINE_HEADER void traceEventStartup(void)
 {
     int n_caps;
 #ifdef THREADED_RTS
-    // XXX n_capabilities hasn't been initislised yet
+    // XXX n_capabilities hasn't been initialised yet
     n_caps = RtsFlags.ParFlags.nNodes;
 #else
     n_caps = 1;
