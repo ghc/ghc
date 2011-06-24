@@ -7,13 +7,12 @@ test    ('dph-words-opt'
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'
-          , '-Odph -fdph-par'])
+          , '-Odph -fdph-par -fno-liberate-case'])
 
 
 test    ('dph-words-fast' 
         , [ reqlib('dph-par')
           , reqlib('dph-prim-par')
-          , expect_broken(5065)
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
         , [ 'Main'

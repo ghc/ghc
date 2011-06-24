@@ -71,8 +71,8 @@ stateOfString str
 	 | len == 1	= stateOfChar (str !: 0)
 	 | otherwise	
 	 =  let	half	= len `div` 2
-		s1	= sliceP 0    half str
-		s2	= sliceP half len  str
+		s1	= sliceP 0    half       str
+		s2	= sliceP half (len-half) str
 	    in	plusState (stateOfString s1) (stateOfString s2)
     in	result
 
