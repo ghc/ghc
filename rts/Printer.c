@@ -418,10 +418,8 @@ printStackObj( StgPtr sp )
 static void
 printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 {
-    StgPtr p;
     nat i;
 
-    p = payload;
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
 	debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-(payload+i)), payload+i);
 	if ((bitmap & 1) == 0) {
@@ -531,11 +529,9 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	{
 	    StgFunInfoTable *fun_info;
 	    StgRetFun *ret_fun;
-	    nat size;
 
 	    ret_fun = (StgRetFun *)sp;
 	    fun_info = get_fun_itbl(ret_fun->fun);
-	    size = ret_fun->size;
 	    debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, fun_info->f.fun_type);
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
