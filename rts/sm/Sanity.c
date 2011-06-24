@@ -45,10 +45,8 @@ static void      checkSTACK          (StgStack *stack);
 static void
 checkSmallBitmap( StgPtr payload, StgWord bitmap, nat size )
 {
-    StgPtr p;
     nat i;
 
-    p = payload;
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
 	if ((bitmap & 1) == 0) {
 	    checkClosureShallow((StgClosure *)payload[i]);
@@ -211,14 +209,12 @@ static void
 checkPAP (StgClosure *tagged_fun, StgClosure** payload, StgWord n_args)
 { 
     StgClosure *fun;
-    StgClosure *p;
     StgFunInfoTable *fun_info;
     
     fun = UNTAG_CLOSURE(tagged_fun);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
     fun_info = get_fun_itbl(fun);
     
-    p = (StgClosure *)payload;
     switch (fun_info->f.fun_type) {
     case ARG_GEN:
 	checkSmallBitmap( (StgPtr)payload, 
