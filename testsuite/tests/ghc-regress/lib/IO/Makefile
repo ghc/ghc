@@ -43,6 +43,6 @@ environment001-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 3307.hs -o 3307
 	echo Ni hao > chinese-file-小说
 	echo chinese-file-小说 > chinese-name
-	# The tests are run in a UTF-8 locale. We would test another one
-	# (like Big5) but GHC developers probably won't have it on their machines.
+	# The tests are run in whatever the default locale is. This is almost always UTF-8,
+	# but in cmd on Windows it will be the non-Unicode CP850 locale.
 	./3307 chinese-file-小说
