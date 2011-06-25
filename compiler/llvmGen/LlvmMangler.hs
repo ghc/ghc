@@ -95,11 +95,11 @@ fixTables r w m = do
 getFun :: Handle -> IO B.ByteString
 getFun r = go [] >>= return . B.intercalate newLine
     where go ls = do
-        l <- (try (B.hGetLine r))::IO (Either IOError B.ByteString)
-        case l of
-            Right l' | B.null l' -> (return B.empty : reverse ls)
-                     | otherwise -> go (l':ls)
-            Left _ -> return []
+            l <- (try (B.hGetLine r))::IO (Either IOError B.ByteString)
+            case l of
+                Right l' | B.null l' -> return (B.empty : reverse ls)
+                         | otherwise -> go (l':ls)
+                Left _ -> return []
 
 {-|
     Mac OS X requires that the stack be 16 byte aligned when making a function
