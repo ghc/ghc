@@ -313,7 +313,7 @@ TH_PACKAGES := $(DPH_PACKAGES)
 #
 # We assume that the stage0 compiler has a suitable bytestring package,
 # so we don't have to include it below.
-STAGE0_PACKAGES = Cabal/cabal hpc extensible-exceptions binary bin-package-db hoopl
+PACKAGES_STAGE0 = Cabal/cabal hpc extensible-exceptions binary bin-package-db hoopl
 
 # These packages are installed, but are installed hidden
 # Why install them at all?  Because the 'ghc' package depends on them
@@ -330,8 +330,8 @@ HIDDEN_PACKAGES = binary
 # Packages to build
 # The lists of packages that we *actually* going to build in each stage:
 #
-#  $(STAGE0_PACKAGE)	does double duty; it really is the list of packages
-#			we build the bootstrap compiler in stage 0
+#  $(PACKAGES_STAGE0)   does double duty; it really is the list of packages
+#                       we build the bootstrap compiler in stage 0
 #
 #  $(PACKAGES)          A list of directories relative to libraries/ containing
 #                       packages that will be built by stage1, in dependency
@@ -457,7 +457,7 @@ endif
 # Misc package-related settings
 
 BOOT_PKG_CONSTRAINTS := \
-    $(foreach d,$(STAGE0_PACKAGES),\
+    $(foreach d,$(PACKAGES_STAGE0),\
         $(foreach p,$(basename $(notdir $(wildcard libraries/$d/*.cabal))),\
             --constraint "$p == $(shell grep -i "^Version:" libraries/$d/$p.cabal | sed "s/[^0-9.]//g")"))
 
@@ -466,7 +466,7 @@ ALL_STAGE1_LIBS  = $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_v_L
 ifeq "$(BuildSharedLibs)" "YES"
 ALL_STAGE1_LIBS += $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_dyn_LIB))
 endif
-BOOT_LIBS = $(foreach lib,$(STAGE0_PACKAGES),$(libraries/$(lib)_dist-boot_v_LIB))
+BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB))
 
 OTHER_LIBS = libffi/dist-install/build/libHSffi$(v_libsuf) libffi/dist-install/build/HSffi.o
 ifeq "$(BuildSharedLibs)" "YES"
@@ -637,7 +637,7 @@ stage1_libs : $(ALL_STAGE1_LIBS)
 $(foreach pkg,$(PACKAGES) $(PACKAGES_STAGE2),$(eval libraries/$(pkg)_dist-install_HC_OPTS += $$(GhcLibHcOpts)))
 
 # Add $(GhcBootLibHcOpts) to all stage0 package builds
-$(foreach pkg,$(STAGE0_PACKAGES),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
+$(foreach pkg,$(PACKAGES_STAGE0),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$(GhcBootLibHcOpts)))
 
 # -----------------------------------------------
 # Haddock-related bits
@@ -645,7 +645,7 @@ $(foreach pkg,$(STAGE0_PACKAGES),$(eval libraries/$(pkg)_dist-boot_HC_OPTS += $$
 # Don't run Haddock for the package that will not be installed
 $(foreach p,$(INTREE_ONLY_PACKAGES),$(eval libraries/$p_dist-install_DO_HADDOCK = NO))
 # We don't haddock the bootstrapping libraries
-$(foreach p,$(STAGE0_PACKAGES),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
+$(foreach p,$(PACKAGES_STAGE0),$(eval libraries/$p_dist-boot_DO_HADDOCK = NO))
 
 # Build the Haddock contents and index
 ifeq "$(HADDOCK_DOCS)" "YES"
@@ -679,7 +679,7 @@ $(eval $(call clean-target,$(BOOTSTRAPPING_CONF),,$(BOOTSTRAPPING_CONF)))
 # multiple ghc-pkgs in parallel doesn't work (registrations may get
 # lost).
 fixed_pkg_prev=
-$(foreach pkg,$(STAGE0_PACKAGES),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
+$(foreach pkg,$(PACKAGES_STAGE0),$(eval $(call fixed_pkg_dep,$(pkg),dist-boot)))
 
 compiler/stage1/package-data.mk : $(fixed_pkg_prev)
 endif
@@ -1131,7 +1131,7 @@ clean_files :
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES) $(PACKAGES_STAGE2))
-clean_libraries: $(patsubst %,clean_libraries/%_dist-boot,$(STAGE0_PACKAGES))
+clean_libraries: $(patsubst %,clean_libraries/%_dist-boot,$(PACKAGES_STAGE0))
 
 clean_libraries:
 	"$(RM)" $(RM_OPTS_REC) $(patsubst %, libraries/%/dist, $(PACKAGES) $(PACKAGES_STAGE2))
@@ -1140,7 +1140,7 @@ clean_libraries:
 # We have to define a clean target for each library manually, because the
 # libraries/*/ghc.mk files are not included when we're cleaning.
 ifeq "$(CLEANING)" "YES"
-$(foreach lib,$(STAGE0_PACKAGES),\
+$(foreach lib,$(PACKAGES_STAGE0),\
   $(eval $(call clean-target,libraries/$(lib),dist-boot,libraries/$(lib)/dist-boot)))
 $(foreach lib,$(PACKAGES) $(PACKAGES_STAGE2),\
   $(eval $(call clean-target,libraries/$(lib),dist-install,libraries/$(lib)/dist-install)))
