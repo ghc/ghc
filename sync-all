@@ -413,7 +413,11 @@ sub help()
 {
         # Get the built in help
         my $help = <<END;
-What do you want to do?
+Usage:
+
+  ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out]
+             [--package-tag1] ... [--package-tagN] command
+
 Supported commands:
 
  * whatsnew
@@ -427,9 +431,9 @@ Supported commands:
  * fetch
  * send
  * new
- * remote add <branch-name>
- * remote rm <branch-name>
- * remote set-url [--push] <branch-name>
+ * remote add <remote-name>
+ * remote rm <remote-name>
+ * remote set-url [--push] <remote-name>
  * checkout
  * grep
  * clean
