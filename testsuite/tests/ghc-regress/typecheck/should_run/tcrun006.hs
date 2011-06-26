@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 -- !!! Selectors for data and newtypes with contexts
 
 -- This program, reported in Aug'00 by Jose Emilio Labra Gayo

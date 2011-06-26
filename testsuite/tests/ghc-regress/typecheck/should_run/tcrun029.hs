@@ -1,3 +1,4 @@
+{-# LANGUAGE DatatypeContexts #-}
 -- Killed GHC 5.02.3
 
 -- Confusion about whether the wrapper for a data constructor
