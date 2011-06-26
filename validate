@@ -73,7 +73,7 @@ if [ $no_clean -eq 0 ]; then
         INSTDIR=`cygpath -m "$INSTDIR"`
     fi
 
-    /usr/bin/perl -w boot --validate --required-tag=dph
+    /usr/bin/perl -w boot --validate
     ./configure --prefix="$INSTDIR" $config_args
 fi
 

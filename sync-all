@@ -472,7 +472,7 @@ sub main {
     }
 
     $tags{"-"} = 1;
-    $tags{"dph"} = 1;
+    # $tags{"dph"} = 1;
 
     while ($#_ ne -1) {
         my $arg = shift;
