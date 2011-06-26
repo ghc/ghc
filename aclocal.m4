@@ -1523,6 +1523,9 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
   pc|gentoo) # like i686-pc-linux-gnu and i686-gentoo-freebsd8
     $2="unknown"
     ;;
+  softfloat) # like armv5tel-softfloat-linux-gnueabi
+    $2="unknown"
+    ;;
   *)
     #pass thru by default
     $2="$1"
