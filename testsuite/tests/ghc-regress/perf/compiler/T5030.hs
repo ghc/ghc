@@ -4,7 +4,6 @@
 module SlowComp where
 
 import Control.Monad
--- import Control.Monad.State
 
 -------------------------------------------------------------------------------
 -- Usual Peano integers.
