@@ -128,18 +128,29 @@ StgFunPtr StgReturn(void)
 #define STG_GLOBAL ".global "
 #endif
 
-StgRegTable *
-StgRun(StgFunPtr f, StgRegTable *basereg) {
-
-    unsigned char space[ RESERVED_C_STACK_BYTES + 4*sizeof(void *) ];
-    StgRegTable * r;
-
+static void GNUC3_ATTRIBUTE(used)
+StgRunIsImplementedInAssembler(void)
+{
     __asm__ volatile (
+        STG_GLOBAL STG_RUN "\n"
+	STG_RUN ":\n\t"
+
+	/*
+         * move %esp down to reserve an area for temporary storage
+         * during the execution of STG code.
+         *
+         * The stack pointer has to be aligned to a multiple of 16
+         * bytes from here - this is a requirement of the C ABI, so
+         * that C code can assign SSE2 registers directly to/from
+         * stack locations.
+	 */
+        "subl %0, %%esp\n\t"
+
 	/*
 	 * save callee-saves registers on behalf of the STG code.
 	 */
-	"movl %%esp, %%eax\n\t"
-	"addl %4, %%eax\n\t"
+        "movl %%esp, %%eax\n\t"
+        "addl %0-16, %%eax\n\t"
         "movl %%ebx,0(%%eax)\n\t"
         "movl %%esi,4(%%eax)\n\t"
         "movl %%edi,8(%%eax)\n\t"
@@ -147,25 +158,17 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	/*
 	 * Set BaseReg
 	 */
-	"movl %3,%%ebx\n\t"
+        "movl 24(%%eax),%%ebx\n\t"
 	/*
 	 * grab the function argument from the stack
 	 */
-        "movl %2,%%eax\n\t"
-        
-	/*
-	 * Darwin note:
-	 * The stack pointer has to be aligned to a multiple of 16 bytes at
-	 * this point. This works out correctly with gcc 4.0.1, but it might
-	 * break at any time in the future. TODO: Make this future-proof.
-	 */
-
-	/*
+        "movl 20(%%eax),%%eax\n\t"
+        /*
 	 * jump to it
 	 */
         "jmp *%%eax\n\t"
 
-	STG_GLOBAL STG_RETURN "\n"
+        STG_GLOBAL STG_RETURN "\n"
        	STG_RETURN ":\n\t"
 
 	"movl %%esi, %%eax\n\t"   /* Return value in R1  */
@@ -174,18 +177,19 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	 * restore callee-saves registers.  (Don't stomp on %%eax!)
 	 */
 	"movl %%esp, %%edx\n\t"
-	"addl %4, %%edx\n\t"
+        "addl %0-16, %%edx\n\t"
         "movl 0(%%edx),%%ebx\n\t"	/* restore the registers saved above */
         "movl 4(%%edx),%%esi\n\t"
         "movl 8(%%edx),%%edi\n\t"
         "movl 12(%%edx),%%ebp\n\t"
 
-      : "=&a" (r), "=m" (space)
-      : "m" (f), "m" (basereg), "i" (RESERVED_C_STACK_BYTES)
-      : "edx" /* stomps on %edx */
-    );
+        "addl %0, %%esp\n\t"
+        "ret"
 
-    return r;
+      : : "i" (RESERVED_C_STACK_BYTES + 16 + 12)
+        // + 16 to make room for the 4 registers we have to save
+        // + 12 because we need to align %esp to a 16-byte boundary (#5250)
+    );
 }
 
 #endif

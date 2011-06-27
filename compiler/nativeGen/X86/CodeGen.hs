@@ -1620,10 +1620,10 @@ genCCall target dest_regs args =
                     let
                         sizes               = map (arg_size . cmmExprType . hintlessCmm) (reverse args)
                         raw_arg_size        = sum sizes
-                        tot_arg_size        = if isDarwin then roundTo 16 raw_arg_size else raw_arg_size
+                        tot_arg_size        = roundTo 16 raw_arg_size
                         arg_pad_size        = tot_arg_size - raw_arg_size
                     delta0 <- getDeltaNat
-                    when isDarwin $ setDeltaNat (delta0 - arg_pad_size)
+                    setDeltaNat (delta0 - arg_pad_size)
 
                     use_sse2 <- sse2Enabled
                     push_codes <- mapM (push_arg use_sse2) (reverse args)
@@ -1646,7 +1646,7 @@ genCCall target dest_regs args =
                                         ++ "probably because too many return values."
 
                     let push_code
-                            | isDarwin && (arg_pad_size /= 0)
+                            | arg_pad_size /= 0
                             = toOL [SUB II32 (OpImm (ImmInt arg_pad_size)) (OpReg esp),
                                     DELTA (delta0 - arg_pad_size)]
                               `appOL` concatOL push_codes
@@ -1657,10 +1657,9 @@ genCCall target dest_regs args =
                           -- but not for stdcall (callee does it)
                           --
                           -- We have to pop any stack padding we added
-                          -- on Darwin even if we are doing stdcall, though (#5052)
+                          -- even if we are doing stdcall, though (#5052)
                         pop_size | cconv /= StdCallConv = tot_arg_size
-                                 | isDarwin = arg_pad_size
-                                 | otherwise = 0
+                                 | otherwise = arg_pad_size
 
                         call = callinsns `appOL`
                                toOL (
@@ -1703,10 +1702,6 @@ genCCall target dest_regs args =
                             assign_code dest_regs)
 
                   where
-                    isDarwin = case platformOS (targetPlatform dflags) of
-                               OSDarwin -> True
-                               _        -> False
-
                     arg_size :: CmmType -> Int  -- Width in bytes
                     arg_size ty = widthInBytes (typeWidth ty)
 

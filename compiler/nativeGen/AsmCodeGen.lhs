@@ -197,6 +197,8 @@ nativeCodeGen dflags h us cmms
                          ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
                          ,ncgMakeFarBranches        = id
                      }
+                 ArchARM ->
+                     panic "nativeCodeGen: No NCG for ARM"
                  ArchPPC_64 ->
                      panic "nativeCodeGen: No NCG for PPC 64"
                  ArchUnknown ->
