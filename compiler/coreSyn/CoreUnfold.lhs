@@ -813,7 +813,9 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
           | active_unfolding -> tryUnfolding dflags id lone_variable 
                                     arg_infos cont_info unf_template is_top 
                                     is_cheap is_exp uf_arity guidance
-          | otherwise    -> Nothing
+          | dopt Opt_D_dump_inlinings dflags && dopt Opt_D_verbose_core2core dflags
+          -> pprTrace "Inactive unfolding:" (ppr id) Nothing
+          | otherwise -> Nothing
 	NoUnfolding 	 -> Nothing 
 	OtherCon {} 	 -> Nothing 
 	DFunUnfolding {} -> Nothing 	-- Never unfold a DFun
