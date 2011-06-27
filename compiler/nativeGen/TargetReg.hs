@@ -52,6 +52,7 @@ targetVirtualRegSqueeze
       ArchPPC     -> PPC.virtualRegSqueeze
       ArchSPARC   -> SPARC.virtualRegSqueeze
       ArchPPC_64  -> panic "targetVirtualRegSqueeze ArchPPC_64"
+      ArchARM     -> panic "targetVirtualRegSqueeze ArchARM"
       ArchUnknown -> panic "targetVirtualRegSqueeze ArchUnknown"
 
 targetRealRegSqueeze :: RegClass -> RealReg -> FastInt
@@ -62,6 +63,7 @@ targetRealRegSqueeze
       ArchPPC     -> PPC.realRegSqueeze
       ArchSPARC   -> SPARC.realRegSqueeze
       ArchPPC_64  -> panic "targetRealRegSqueeze ArchPPC_64"
+      ArchARM     -> panic "targetRealRegSqueeze ArchARM"
       ArchUnknown -> panic "targetRealRegSqueeze ArchUnknown"
 
 targetClassOfRealReg :: RealReg -> RegClass
@@ -72,6 +74,7 @@ targetClassOfRealReg
       ArchPPC     -> PPC.classOfRealReg
       ArchSPARC   -> SPARC.classOfRealReg
       ArchPPC_64  -> panic "targetClassOfRealReg ArchPPC_64"
+      ArchARM     -> panic "targetClassOfRealReg ArchARM"
       ArchUnknown -> panic "targetClassOfRealReg ArchUnknown"
 
 -- TODO: This should look at targetPlatform too
@@ -86,6 +89,7 @@ targetMkVirtualReg
       ArchPPC     -> PPC.mkVirtualReg
       ArchSPARC   -> SPARC.mkVirtualReg
       ArchPPC_64  -> panic "targetMkVirtualReg ArchPPC_64"
+      ArchARM     -> panic "targetMkVirtualReg ArchARM"
       ArchUnknown -> panic "targetMkVirtualReg ArchUnknown"
 
 targetRegDotColor :: RealReg -> SDoc
@@ -96,6 +100,7 @@ targetRegDotColor
       ArchPPC     -> PPC.regDotColor
       ArchSPARC   -> SPARC.regDotColor
       ArchPPC_64  -> panic "targetRegDotColor ArchPPC_64"
+      ArchARM     -> panic "targetRegDotColor ArchARM"
       ArchUnknown -> panic "targetRegDotColor ArchUnknown"
 
 
