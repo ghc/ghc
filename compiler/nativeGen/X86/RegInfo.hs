@@ -61,6 +61,7 @@ normalRegColors = case platformArch defaultTargetPlatform of
                   ArchPPC     -> panic "X86 normalRegColors ArchPPC"
                   ArchPPC_64  -> panic "X86 normalRegColors ArchPPC_64"
                   ArchSPARC   -> panic "X86 normalRegColors ArchSPARC"
+                  ArchARM     -> panic "X86 normalRegColors ArchARM"
                   ArchUnknown -> panic "X86 normalRegColors ArchUnknown"
 
 fpRegColors :: [(Reg,String)]
