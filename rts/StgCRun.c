@@ -177,7 +177,7 @@ StgRunIsImplementedInAssembler(void)
 	 * restore callee-saves registers.  (Don't stomp on %%eax!)
 	 */
 	"movl %%esp, %%edx\n\t"
-        "addl %0, %%edx\n\t"
+        "addl %0-16, %%edx\n\t"
         "movl 0(%%edx),%%ebx\n\t"	/* restore the registers saved above */
         "movl 4(%%edx),%%esi\n\t"
         "movl 8(%%edx),%%edi\n\t"
