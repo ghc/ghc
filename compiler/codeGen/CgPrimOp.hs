@@ -127,7 +127,27 @@ emitPrimOp [res] ParOp [arg] live
         NoC_SRT -- No SRT b/c we do PlayRisky
         CmmMayReturn
   where
+        newspark = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark")))
+
+emitPrimOp [res] SparkOp [arg] live = do
+    -- returns the value of arg in res.  We're going to therefore
+    -- refer to arg twice (once to pass to newSpark(), and once to
+    -- assign to res), so put it in a temporary.
+    tmp <- newTemp bWord
+    stmtC (CmmAssign (CmmLocal tmp) arg)
+
+    vols <- getVolatileRegs live
+    emitForeignCall' PlayRisky []
+    	(CmmCallee newspark CCallConv) 
+	[   (CmmHinted (CmmReg (CmmGlobal BaseReg)) AddrHint)
+          , (CmmHinted arg AddrHint)  ] 
+	(Just vols)
+        NoC_SRT -- No SRT b/c we do PlayRisky
+        CmmMayReturn
+    stmtC (CmmAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
+  where
 	newspark = CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark")))
+
 
 emitPrimOp [res] ReadMutVarOp [mutv] _
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
