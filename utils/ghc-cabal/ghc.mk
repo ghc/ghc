@@ -14,16 +14,16 @@
 
 # Euch, hideous hack:
 # XXX This should be in a different Makefile
-CABAL_DOTTED_VERSION := $(shell grep "^Version:" libraries/Cabal/Cabal.cabal | sed "s/^Version: //")
+CABAL_DOTTED_VERSION := $(shell grep "^Version:" libraries/Cabal/cabal/Cabal.cabal | sed "s/^Version: //")
 CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
 $(GHC_CABAL_INPLACE) : $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
-$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Distribution/*/*/*.hs)
-$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Distribution/*/*.hs)
-$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/Distribution/*.hs)
+$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/cabal/Distribution/*/*/*.hs)
+$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/cabal/Distribution/*/*.hs)
+$(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(wildcard libraries/Cabal/cabal/Distribution/*.hs)
 
 $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) --make $(GHC_CABAL_DIR)/Main.hs -o $@ \
@@ -32,7 +32,7 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs | $
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
-	       -ilibraries/Cabal \
+	       -ilibraries/Cabal/cabal \
 	       -ilibraries/filepath \
 	       -ilibraries/hpc
 	touch $@

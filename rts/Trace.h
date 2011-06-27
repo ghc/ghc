@@ -194,7 +194,7 @@ void traceOSProcessInfo_ (void);
 #define debugTrace(class, str, ...) /* nothing */
 #define debugTraceCap(class, cap, str, ...) /* nothing */
 #define traceThreadStatus(class, tso) /* nothing */
-#define traceEventStartup_(n_caps) /* nothing */
+INLINE_HEADER void traceEventStartup_ (int n_caps STG_UNUSED) {};
 #define traceCapsetModify_(tag, capset, other) /* nothing */
 #define traceOSProcessInfo_() /* nothing */
 
@@ -243,8 +243,9 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
     HASKELLEVENT_REQUEST_PAR_GC(cap)
 #define dtraceCreateSparkThread(cap, spark_tid)         \
     HASKELLEVENT_CREATE_SPARK_THREAD(cap, spark_tid)
-#define dtraceStartup(num_caps)                         \
+INLINE_HEADER void dtraceStartup (int n_caps) {
     HASKELLEVENT_STARTUP(num_caps)
+}
 #define dtraceUserMsg(cap, msg)                         \
     HASKELLEVENT_USER_MSG(cap, msg)
 #define dtraceGcIdle(cap)                               \
@@ -278,7 +279,7 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
 #define dtraceRequestSeqGc(cap)                         /* nothing */
 #define dtraceRequestParGc(cap)                         /* nothing */
 #define dtraceCreateSparkThread(cap, spark_tid)         /* nothing */
-#define dtraceStartup(num_caps)                         /* nothing */
+INLINE_HEADER void dtraceStartup (int n_caps STG_UNUSED) {};
 #define dtraceUserMsg(cap, msg)                         /* nothing */
 #define dtraceGcIdle(cap)                               /* nothing */
 #define dtraceGcWork(cap)                               /* nothing */
@@ -417,7 +418,7 @@ INLINE_HEADER void traceEventStartup(void)
 {
     int n_caps;
 #ifdef THREADED_RTS
-    // XXX n_capabilities hasn't been initislised yet
+    // XXX n_capabilities hasn't been initialised yet
     n_caps = RtsFlags.ParFlags.nNodes;
 #else
     n_caps = 1;

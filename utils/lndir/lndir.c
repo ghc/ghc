@@ -324,6 +324,8 @@ int rel;                        /* if true, prepend "../" to fn before using */
                     continue;
                 if (!strcmp (dp->d_name, ".svn"))
                     continue;
+                if (!strcmp (dp->d_name, ".git"))
+                    continue;
                 if (!strcmp (dp->d_name, "_darcs"))
                     continue;
                 if (!strcmp (dp->d_name, "CVS.adm"))

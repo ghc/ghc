@@ -132,7 +132,9 @@ check_$1: $$(GHC_CABAL_INPLACE)
 	$$(GHC_CABAL_INPLACE) check $1
 endif
 
+ifneq "$3" "0"
 $(call haddock,$1,$2)
+endif
 
 # Don't put bootstrapping packages in the bindist
 ifneq "$3" "0"

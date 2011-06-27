@@ -2261,9 +2261,6 @@ setObjTarget l = updM set
                          flag)
                 return dflags
          HscLlvm
-          | cGhcUnregisterised == "YES" ->
-             do addWarn ("Compiler unregisterised, so ignoring " ++ flag)
-                return dflags
           | not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin)) &&
             (not opt_Static || opt_PIC)
             ->
