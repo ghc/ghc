@@ -12,7 +12,7 @@ import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
 import Name       (localiseName)
 import Var        (Var, isTyVar, varName, setVarName)
-import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported)
+import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
 import MkId       (mkPrimOpId)
 import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
@@ -144,7 +144,7 @@ termToCoreExpr = term
 coreBindsToCoreTerm :: [CoreBind] -> (CoreExpr, CoreExpr -> [CoreBind])
 coreBindsToCoreTerm binds
   = (mkLets internal_binds (mkBigCoreVarTup internal_xs),
-     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector internal_xs internal_x wild_id e) | (x, internal_x) <- xs `zip` internal_xs])
+     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector internal_xs internal_x wild_id e) | (x, internal_x) <- xs_internal_xs])
   where
     -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
     -- an External name, because several Externals with the same name but different uniques will generate clashing
@@ -154,11 +154,15 @@ coreBindsToCoreTerm binds
     -- Note that we leave the *use sites* totally intact: we rely on the fact that a) variables are compared only by
     -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
     -- The ice is thin, though!
+    --
+    -- As an added twist, we only need to put *exported* Ids into the tuple we construct/deconstruct as part of this
+    -- transformation. This allows the supercompiler to determine that more things are used linearly.
     xs = bindersOfBinds binds
     internal_binds = [case bind of NonRec x e -> NonRec (localiseVar x) e
                                    Rec xes    -> Rec (map (first localiseVar) xes)
                      | bind <- binds]
-    internal_xs = bindersOfBinds internal_binds
+    xs_internal_xs = filter (\(x, _) -> isExportedId x) (xs `zip` bindersOfBinds internal_binds)
+    internal_xs = map snd xs_internal_xs
     localiseVar x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
 
