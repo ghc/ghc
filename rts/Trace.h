@@ -243,8 +243,8 @@ void dtraceUserMsgWrapper(Capability *cap, char *msg);
     HASKELLEVENT_REQUEST_PAR_GC(cap)
 #define dtraceCreateSparkThread(cap, spark_tid)         \
     HASKELLEVENT_CREATE_SPARK_THREAD(cap, spark_tid)
-INLINE_HEADER void dtraceStartup (int n_caps) {
-    HASKELLEVENT_STARTUP(num_caps)
+INLINE_HEADER void dtraceStartup (int num_caps) {
+    HASKELLEVENT_STARTUP(num_caps);
 }
 #define dtraceUserMsg(cap, msg)                         \
     HASKELLEVENT_USER_MSG(cap, msg)
@@ -279,7 +279,7 @@ INLINE_HEADER void dtraceStartup (int n_caps) {
 #define dtraceRequestSeqGc(cap)                         /* nothing */
 #define dtraceRequestParGc(cap)                         /* nothing */
 #define dtraceCreateSparkThread(cap, spark_tid)         /* nothing */
-INLINE_HEADER void dtraceStartup (int n_caps STG_UNUSED) {};
+INLINE_HEADER void dtraceStartup (int num_caps STG_UNUSED) {};
 #define dtraceUserMsg(cap, msg)                         /* nothing */
 #define dtraceGcIdle(cap)                               /* nothing */
 #define dtraceGcWork(cap)                               /* nothing */
