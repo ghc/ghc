@@ -157,6 +157,25 @@ cgCase (StgApp v []) _live_in_whole_case _live_in_alts bndr
     reps_compatible = idCgRep v == idCgRep bndr
 \end{code}
 
+Special case #2.5; seq#
+
+  case seq# a s of v
+    (# s', a' #) -> e
+
+  ==>
+
+  case a of v
+    (# s', a' #) -> e
+
+  (taking advantage of the fact that the return convention for (# State#, a #)
+  is the same as the return convention for just 'a')
+
+\begin{code}
+cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _)
+       live_in_whole_case live_in_alts bndr alt_type alts
+  = cgCase (StgApp a []) live_in_whole_case live_in_alts bndr alt_type alts
+\end{code}
+
 Special case #3: inline PrimOps and foreign calls.
 
 \begin{code}
