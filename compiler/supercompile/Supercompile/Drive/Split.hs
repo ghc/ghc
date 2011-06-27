@@ -148,13 +148,16 @@ mkEnteredEnv ent = mapVarEnv (const ent)
 -- This fixed point ensures we bind those h-functions that have as free variables any h-functions we are about to bind.
 
 
+qaScruts :: Anned QA -> [Out Var]
+qaScruts qa = case annee qa of Question x' -> [x']; Answer _ -> []
+
 {-# INLINE split #-}
 split :: MonadStatics m
       => State
       -> (State -> m (Deeds, Out FVedTerm))
       -> m (Deeds, Out FVedTerm)
 split (deeds, Heap h ids, k, qa) opt
-  = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (Heap h ids, [0..] `zip` k, \ids -> (case annee qa of Question x' -> [x']; Answer _ -> [], splitQA ids (annee qa)))
+  = generaliseSplit opt splitterUniqSupply (IS.empty, emptyVarSet) deeds (Heap h ids, [0..] `zip` k, \ids -> (qaScruts qa, splitQA ids (annee qa)))
 
 {-# INLINE generalise #-}
 generalise :: MonadStatics m
@@ -202,7 +205,7 @@ generalise gen (deeds, Heap h ids, k, qa) = do
     pprTrace "generalise" (ppr ("gen_kfs", gen_kfs, "gen_xs'", gen_xs')) $ return ()
     
     let (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
-    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> ([], oneBracketed (Once ctxt_id, denormalise (0, Heap M.empty ids, [], qa))))
+    return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed (Once ctxt_id, denormalise (0, Heap M.empty ids, [], qa))))
 
 {-# INLINE generaliseSplit #-}
 generaliseSplit :: MonadStatics m
@@ -949,7 +952,7 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- x':alt_bvs] `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- scruts; return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
+            alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- alt_bvs] `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- (x':scruts); return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3 (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` fvs_body) [[], [x']] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
