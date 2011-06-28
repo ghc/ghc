@@ -35,12 +35,15 @@ data CmmNode e x where
 
   CmmComment :: FastString -> CmmNode O O
 
-  CmmAssign :: CmmReg -> CmmExpr -> CmmNode O O  -- Assign to register
+  CmmAssign :: CmmReg -> CmmExpr -> CmmNode O O
+    -- Assign to register
 
-  CmmStore :: CmmExpr -> CmmExpr -> CmmNode O O  -- Assign to memory location.  Size is
-                                                 -- given by cmmExprType of the rhs.
+  CmmStore :: CmmExpr -> CmmExpr -> CmmNode O O
+    -- Assign to memory location.  Size is
+    -- given by cmmExprType of the rhs.
 
-  CmmUnsafeForeignCall ::         -- An unsafe foreign call; see Note [Foreign calls]
+  CmmUnsafeForeignCall ::         -- An unsafe foreign call;
+                                  -- see Note [Foreign calls]
   		       		  -- Like a "fat machine instruction"; can occur
 				  -- in the middle of a block
       ForeignTarget ->            -- call target
