@@ -29,6 +29,7 @@ import LlvmCodeGen.Regs
 
 import CLabel
 import CgUtils ( activeStgRegs )
+import Config
 import Constants
 import FastString
 import OldCmm
@@ -80,7 +81,8 @@ widthToLlvmInt w = LMInt $ widthInBits w
 
 -- | GHC Call Convention for LLVM
 llvmGhcCC :: LlvmCallConvention
-llvmGhcCC = CC_Ncc 10
+llvmGhcCC | cGhcUnregisterised == "NO" = CC_Ncc 10
+          | otherwise                  = CC_Ccc
 
 -- | Llvm Function type for Cmm function
 llvmFunTy :: LlvmType
