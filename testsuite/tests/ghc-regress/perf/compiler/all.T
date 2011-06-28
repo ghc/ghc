@@ -60,8 +60,8 @@ test('T3294',
                                    # (but varies a lot, depending on when
                                    # we GC relative to the peak).
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 800000000,
-                                                      850000000)),
+          compiler_stats_num_field('bytes allocated', 650000000,
+                                                      750000000)),
                                     # expected value: 815479800  (x86/Linux)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 1200000000,
@@ -111,18 +111,18 @@ test('T3064',
       # expected value: 18 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('peak_megabytes_allocated', 12, 16)),
-      # expected value: 68181508 (x86/Windows)
+      # expected value: 56380288 (x86/Linux) (28/6/2011)
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 65000000,
-                                                      75000000)),
+          compiler_stats_num_field('bytes allocated', 50000000,
+                                                      60000000)),
       # expected value: 108937496 (amd64/Linux) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 100000000,
                                                       120000000)),
-      # expected value: 3404504 (x86/OSX):
+      # expected value: 2247016 (x86/Linux) (28/6/2011):
       if_wordsize(32,
-          compiler_stats_num_field('max_bytes_used', 3000000,
-                                                     4000000)),
+          compiler_stats_num_field('max_bytes_used', 2000000,
+                                                     3000000)),
       # expected value: 4032024 (amd64/Linux, intree) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('max_bytes_used', 3000000,
