@@ -30,31 +30,13 @@ import Outputable
 --              MachOp
 -----------------------------------------------------------------------------
 
-{-
-Implementation notes:
-
-It might suffice to keep just a width, without distinguishing between
-floating and integer types.  However, keeping the distinction will
-help the native code generator to assign registers more easily.
--}
-
-
 {- |
 Machine-level primops; ones which we can reasonably delegate to the
-native code generators to handle.  Basically contains C's primops
-and no others.
+native code generators to handle.
 
-Nomenclature: all ops indicate width and signedness, where
-appropriate.  Widths: 8\/16\/32\/64 means the given size, obviously.
-Nat means the operation works on STG word sized objects.
-Signedness: S means signed, U means unsigned.  For operations where
-signedness is irrelevant or makes no difference (for example
-integer add), the signedness component is omitted.
-
-An exception: NatP is a ptr-typed native word.  From the point of
-view of the native code generators this distinction is irrelevant,
-but the C code generator sometimes needs this info to emit the
-right casts.
+Most operations are parameterised by the 'Width' that they operate on.
+Some operations have separate signed and unsigned versions, and float
+and integer versions.
 -}
 
 data MachOp
