@@ -1,7 +1,7 @@
-{-# OPTIONS_GHC -fno-warn-missing-methods #-}
+{-# OPTIONS_GHC -fno-warn-missing-methods -fno-warn-deprecations #-}
 module C where
 
- data RealFloat a => Complex a = !a :+ !a
+ data Complex a = !a :+ !a
      deriving (Eq, Show)
 
  instance  (RealFloat a) => Num (Complex a)  where
