@@ -26,7 +26,11 @@
 
 #define GLOBAL_REG_DECL(type,name,reg) register type name REG(reg);
 
+#ifdef llvm_CC_FLAVOR
+#define SET_GCT(to) (pthread_setspecific(gctKey, to))
+#else
 #define SET_GCT(to) gct = (to)
+#endif
 
 
 
@@ -36,12 +40,19 @@
 // about 5% in GC performance, but of course that might change as gcc
 // improves. -- SDM 2009/04/03
 //
-// We ought to do the same on MacOS X, but __thread is not
-// supported there yet (gcc 4.0.1).
+// For MacOSX, we can use an llvm-based C compiler which will store the gct
+// in a thread local variable using pthreads.
 
 extern __thread gc_thread* gct;
 #define DECLARE_GCT __thread gc_thread* gct;
 
+#elif defined(llvm_CC_FLAVOR)
+// LLVM does not support the __thread extension and will generate
+// incorrect code for global register variables. If we are compiling
+// with a C compiler that uses an LLVM back end (clang or llvm-gcc) then we
+// use pthread_getspecific() to handle the thread local storage for gct.
+#define gct ((gc_thread *)(pthread_getspecific(gctKey)))
+#define DECLARE_GCT /* nothing */
 
 #elif defined(sparc_HOST_ARCH)
 // On SPARC we can't pin gct to a register. Names like %l1 are just offsets

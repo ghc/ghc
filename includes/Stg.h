@@ -49,7 +49,10 @@
 # define _BSD_SOURCE
 #endif
 
-#if IN_STG_CODE == 0
+#if IN_STG_CODE == 0 || defined(llvm_CC_FLAVOR)
+// C compilers that use an LLVM back end (clang or llvm-gcc) do not
+// correctly support global register variables so we make sure that
+// we do not declare them for these compilers.
 # define NO_GLOBAL_REG_DECLS	/* don't define fixed registers */
 #endif
 

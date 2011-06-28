@@ -62,13 +62,23 @@ register double fake_f9 __asm__("$f9");
 #endif
 #endif
 
+// yeuch
+#define IN_STGCRUN 1
+#ifdef sparc_HOST_ARCH
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
-// yeuch
-#define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
+#else
+/* The other architectures do not require the actual register macro
+ * definitons here because they use hand written assembly to implement
+ * the StgRun function. The sparc code could be changed so that it does
+ * not require the register macro definitions.
+ */
+#include "Rts.h"
+#include "Stg.h"
+#endif
 
 #include "StgRun.h"
 #include "Capability.h"
