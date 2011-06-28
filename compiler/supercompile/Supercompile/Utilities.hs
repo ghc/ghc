@@ -444,6 +444,11 @@ zipWithEqualM _ []     []     = return []
 zipWithEqualM f (x:xs) (y:ys) = liftM2 (:) (f x y) (zipWithEqualM f xs ys)
 zipWithEqualM _ _ _ = fail "zipWithEqualM"
 
+foldZipEqualM :: Monad m => (a -> b -> c -> m a) -> a -> [b] -> [c] -> m a
+foldZipEqualM _ acc []     []     = return acc
+foldZipEqualM f acc (x:xs) (y:ys) = f acc x y >>= \acc' -> foldZipEqualM f acc' xs ys
+foldZipEqualM _ _ _ _ = fail "foldZipEqualM"
+
 
 -- | Splits up a number evenly across several partitions in proportions to weights given to those partitions.
 --
