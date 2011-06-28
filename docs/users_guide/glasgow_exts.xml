@@ -8416,7 +8416,11 @@ data T = T {-# UNPACK #-} !Float
       compiler).</para>
 
       <para>Unpacking constructor fields should only be used in
-      conjunction with <option>-O</option>, in order to expose
+      conjunction with <option>-O</option><footnote>in fact, UNPACK
+          has no effect without <option>-O</option>, for technical
+          reasons
+      (see <ulink url="http://hackage.haskell.org/trac/ghc/ticket/5252">tick
+            5252</ulink>)</footnote>, in order to expose
       unfoldings to the compiler so the reboxing can be removed as
       often as possible.  For example:</para>
 
