@@ -854,7 +854,12 @@ mkHpcPos pos@(RealSrcSpan s)
    | isGoodSrcSpan' pos = toHpcPos (srcSpanStartLine s,
                                     srcSpanStartCol s,
                                     srcSpanEndLine s,
-                                    srcSpanEndCol s)
+                                    srcSpanEndCol s - 1)
+                              -- the end column of a SrcSpan is one
+                              -- greater than the last column of the
+                              -- span (see SrcLoc), whereas HPC
+                              -- expects to the column range to be
+                              -- inclusive, hence we subtract one above.
 mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 
 hpcSrcSpan :: SrcSpan
