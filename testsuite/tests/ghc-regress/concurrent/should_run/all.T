@@ -88,7 +88,7 @@ test('conc013', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc014', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc015', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc015a', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc016', [ expect_fail_for(['threaded2']), # see comment in conc016.hs
+test('conc016', [ omit_ways(['threaded2']), # see comment in conc016.hs
                   only_compiler_types(['ghc']) ], compile_and_run, [''])
 test('conc017', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc017a', only_compiler_types(['ghc']), compile_and_run, [''])
