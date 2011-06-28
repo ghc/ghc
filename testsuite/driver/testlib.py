@@ -1339,15 +1339,15 @@ def compare_outputs( kind, normaliser, extra_normaliser,
                      expected_file, actual_file ):
     if os.path.exists(expected_file):
         expected_raw = read_no_crs(expected_file)
-        expected_str = normaliser(expected_raw)
+        expected_str = extra_normaliser(normaliser(expected_raw))
     else:
         expected_str = ''
         expected_file = ''
 
     actual_raw = read_no_crs(actual_file)
-    actual_str = normaliser(actual_raw)
+    actual_str = extra_normaliser(normaliser(actual_raw))
 
-    if extra_normaliser(expected_str) != extra_normaliser(actual_str):
+    if expected_str != actual_str:
         print 'Actual ' + kind + ' output differs from expected:'
 
         if expected_file == '':

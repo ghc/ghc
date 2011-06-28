@@ -21,11 +21,19 @@ test('ghcpkg04',
                    'local04.package.conf.old'])],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg04'])
+
+# Sometimes we get spurious warnings from ghc-pkg about missing
+# haddock-interfaces; this filters them out.
+def normalise_haddock_junk( str ):
+    return re.sub(r'Warning: haddock.*\n', '', str)
+
 test('ghcpkg05',
-     extra_clean(['local05a.package.conf',
-                  'local05a.package.conf.old',
-                  'local05b.package.conf',
-                  'local05b.package.conf.old']),
+     [ extra_clean(['local05a.package.conf',
+                    'local05a.package.conf.old',
+                    'local05b.package.conf',
+                    'local05b.package.conf.old']),
+       normalise_fun(normalise_haddock_junk)
+       ],
      run_command,
      ['$MAKE -s --no-print-directory ghcpkg05'])
 test('ghcpkg06',
