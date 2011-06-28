@@ -64,9 +64,10 @@ match :: State -- ^ Tieback semantics
 match s_l@(_deeds_l, Heap h_l _, k_l, qa_l) s_r@(_deeds_r, Heap h_r _, k_r, qa_r) = -- (\res -> traceRender ("match", M.keysSet h_l, residualiseDriveState (Heap h_l prettyIdSupply, k_l, in_e_l), M.keysSet h_r, residualiseDriveState (Heap h_r prettyIdSupply, k_r, in_e_r), res) res) $
   runMatch $ do
     let init_rn2 = matchRnEnv2 stateFreeVars s_l s_r
-    (rn2, free_eqs2) <- mfix $ \(~(rn2, _)) -> matchEC init_rn2 rn2 k_l k_r
-    free_eqs1 <- matchAnned (matchQA rn2) qa_l qa_r
-    matchPureHeap rn2 (free_eqs1 ++ free_eqs2) h_l h_r >>= safeMkMatchResult
+    (rn2, mfree_eqs2) <- mfix $ \(~(rn2, _)) -> matchEC init_rn2 rn2 k_l k_r
+    free_eqs1 <- pprTrace "match0" (rn2 `seq` empty) $ matchAnned (matchQA rn2) qa_l qa_r
+    free_eqs2 <- pprTrace "match1" empty $ mfree_eqs2
+    pprTrace "match2" (ppr free_eqs1) $ matchPureHeap rn2 (free_eqs1 ++ free_eqs2) h_l h_r >>= safeMkMatchResult
 
 matchAnned :: (a -> a -> b)
            -> Anned a -> Anned a -> b
@@ -205,20 +206,20 @@ matchIn :: (InScopeSet -> Renaming -> a -> a)
 matchIn rnm mtch rn2 (rn_l, x_l) (rn_r, x_r) = mtch rn2 (rnm iss rn_l x_l) (rnm iss rn_r x_r)
   where iss = rnInScopeSet rn2 -- NB: this line is the only thing that relies on the RnEnv2 InScopeSet being correct
 
-matchEC :: RnEnv2 -> RnEnv2 -> Stack -> Stack -> Match (RnEnv2, [(Var, Var)])
-matchEC init_rn2 rn2 k_l k_r = foldZipEqualM (\(init_rn2', eqs) kf_l kf_r -> fmap (\(init_rn2'', extra_eqs) -> (init_rn2'', extra_eqs ++ eqs)) $ matchECFrame init_rn2' rn2 kf_l kf_r) (init_rn2, []) k_l k_r
+matchEC :: RnEnv2 -> RnEnv2 -> Stack -> Stack -> Match (RnEnv2, Match [(Var, Var)])
+matchEC init_rn2 rn2 k_l k_r = foldZipEqualM (\(init_rn2', meqs) kf_l kf_r -> fmap (second (liftM2 (++) meqs)) $ matchECFrame init_rn2' rn2 kf_l kf_r) (init_rn2, return []) k_l k_r
 
-matchECFrame :: RnEnv2 -> RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, [(Var, Var)])
+matchECFrame :: RnEnv2 -> RnEnv2 -> Tagged StackFrame -> Tagged StackFrame -> Match (RnEnv2, Match [(Var, Var)])
 matchECFrame init_rn2 rn2 kf_l kf_r = go (tagee kf_l) (tagee kf_r)
   where
-    go :: StackFrame -> StackFrame -> Match (RnEnv2, [(Var, Var)])
-    go (Apply x_l')                          (Apply x_r')                          = fmap ((,) init_rn2) $ matchVar rn2 x_l' x_r'
-    go (TyApply ty_l')                       (TyApply ty_r')                       = fmap ((,) init_rn2) $ matchType rn2 ty_l' ty_r'
-    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = fmap ((,) init_rn2) $ liftM2 (++) (matchType rn2 ty_l' ty_r') (matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedAlts matchAlts rn2 in_alts_l in_alts_r)
-    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = fmap ((,) init_rn2) $ guard "matchECFrame: primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList (matchType rn2) tys_l' tys_r') (matchList (matchAnned (matchAnswer rn2)) as_l as_r) (matchList (matchIn renameAnnedTerm matchTerm rn2) in_es_l in_es_r)
-    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = fmap ((,) init_rn2) $ matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r
-    go (CastIt co_l')                        (CastIt co_r')                        = fmap ((,) init_rn2) $ matchCoercion rn2 co_l' co_r'
-    go (Update x_l')                         (Update x_r')                         = fmap ((,) (rnBndr2 rn2 x_l' x_r')) $ matchType rn2 (idType x_l') (idType x_r')
+    go :: StackFrame -> StackFrame -> Match (RnEnv2, Match [(Var, Var)])
+    go (Apply x_l')                          (Apply x_r')                          = return (init_rn2, matchVar rn2 x_l' x_r')
+    go (TyApply ty_l')                       (TyApply ty_r')                       = return (init_rn2, matchType rn2 ty_l' ty_r')
+    go (Scrutinise x_l' ty_l' in_alts_l)     (Scrutinise x_r' ty_r' in_alts_r)     = return (init_rn2, liftM2 (++) (matchType rn2 ty_l' ty_r') (matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedAlts matchAlts rn2 in_alts_l in_alts_r))
+    go (PrimApply pop_l tys_l' as_l in_es_l) (PrimApply pop_r tys_r' as_r in_es_r) = return (init_rn2, guard "matchECFrame: primop" (pop_l == pop_r) >> liftM3 (\x y z -> x ++ y ++ z) (matchList (matchType rn2) tys_l' tys_r') (matchList (matchAnned (matchAnswer rn2)) as_l as_r) (matchList (matchIn renameAnnedTerm matchTerm rn2) in_es_l in_es_r))
+    go (StrictLet x_l' in_e_l)               (StrictLet x_r' in_e_r)               = return (init_rn2, matchIdCoVarBndr rn2 x_l' x_r' $ \rn2 -> matchIn renameAnnedTerm matchTerm rn2 in_e_l in_e_r)
+    go (CastIt co_l')                        (CastIt co_r')                        = return (init_rn2, matchCoercion rn2 co_l' co_r')
+    go (Update x_l')                         (Update x_r')                         = return (rnBndr2 rn2 x_l' x_r', matchType rn2 (idType x_l') (idType x_r'))
     go _ _ = fail "matchECFrame"
 
 --- Returns a renaming from the list only if the list maps a "left" variable to a unique "right" variable
