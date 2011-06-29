@@ -147,7 +147,7 @@ adjustorCode:
 
 /* ********************************* i386 ********************************** */
 
-#elif defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+#elif defined(i386_HOST_ARCH)
 
 #define WS              4
 #define RETVAL_OFF      5
@@ -158,8 +158,13 @@ adjustorCode:
 #define FRAMESIZE_OFF   (HEADER_BYTES + 2*WS)
 #define ARGWORDS_OFF    (HEADER_BYTES + 3*WS)
 
+#ifdef LEADING_UNDERSCORE
     .globl _adjustorCode
 _adjustorCode:
+#else
+    .globl adjustorCode
+adjustorCode:
+#endif
     popl    %eax
     subl    $RETVAL_OFF, %eax
     
