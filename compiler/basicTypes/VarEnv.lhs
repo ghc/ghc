@@ -36,7 +36,7 @@ module VarEnv (
 	emptyInScopeSet, mkInScopeSet, delInScopeSet,
 	extendInScopeSet, extendInScopeSetList, extendInScopeSetSet, 
 	getInScopeVars, lookupInScope, lookupInScope_Directly, 
-        unionInScope, elemInScopeSet, uniqAway, uniqAwayByKey,
+        unionInScope, elemInScopeSet, uniqAway,
 
 	-- * The RnEnv2 type
 	RnEnv2, 
@@ -141,32 +141,27 @@ unionInScope (InScope s1 _) (InScope s2 n2)
 -- | @uniqAway in_scope v@ finds a unique that is not used in the
 -- in-scope set, and gives that to v. 
 uniqAway :: InScopeSet -> Var -> Var
-uniqAway iss var = setVarUnique var (uniqAwayByKey iss (getUnique var))
-
-uniqAway' :: InScopeSet -> Var -> Var
-uniqAway' iss var = setVarUnique var (uniqAwayByKey' iss (getUnique var))
-
-uniqAwayByKey :: InScopeSet -> Unique -> Unique
 -- It starts with v's current unique, of course, in the hope that it won't
 -- have to change, and thereafter uses a combination of that and the hash-code
 -- found in the in-scope set
-uniqAwayByKey in_scope@(InScope set _n) var
-  | var `elemVarSetByKey` set = uniqAwayByKey' in_scope var -- Make a new one
-  | otherwise                 = var                         -- Nothing to do
+uniqAway in_scope var
+  | var `elemInScopeSet` in_scope = uniqAway' in_scope var	-- Make a new one
+  | otherwise 			  = var				-- Nothing to do
 
-uniqAwayByKey' :: InScopeSet -> Unique -> Unique
+uniqAway' :: InScopeSet -> Var -> Var
 -- This one *always* makes up a new variable
-uniqAwayByKey' (InScope set n) orig_unique
+uniqAway' (InScope set n) var
   = try (_ILIT(1))
   where
+    orig_unique = getUnique var
     try k 
 	  | debugIsOn && (k ># _ILIT(1000))
-	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr orig_unique <+> int (iBox n)) 
+	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
 	  | uniq `elemVarSetByKey` set = try (k +# _ILIT(1))
 	  | debugIsOn && opt_PprStyle_Debug && (k ># _ILIT(3))
-	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr orig_unique <+> int (iBox n)) 
-	    uniq
-	  | otherwise = uniq
+	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
+	    setVarUnique var uniq
+	  | otherwise = setVarUnique var uniq
 	  where
 	    uniq = deriveUnique orig_unique (iBox (n *# k))
 \end{code}
