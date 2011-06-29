@@ -27,7 +27,7 @@ config.other_ways            = ['extcore','optextcore',
                                 'prof_hd','prof_hy','prof_hr',
                                 'threaded1_ls',
                                 'threaded2_hT',
-                                'llvm', 'optllvm']
+                                'llvm']
 
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
