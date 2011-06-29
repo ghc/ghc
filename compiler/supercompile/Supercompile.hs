@@ -6,13 +6,14 @@ import qualified Supercompile.Core.FreeVars as S
 import qualified Supercompile.Evaluator.Syntax as S
 import qualified Supercompile.Drive.Process as S
 
+import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn
 import CoreUtils  (exprType)
 import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
 import Name       (localiseName)
 import Var        (Var, isTyVar, varName, setVarName)
-import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
+import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, idInlinePragma, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
 import MkId       (mkPrimOpId)
 import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
@@ -178,10 +179,20 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
                         , Just e <- [varUnfolding x]]
 
     varUnfolding x
+      | not (shouldExposeUnfolding x)      = Nothing
       | Just pop <- isPrimOpId_maybe x     = Just $ primOpUnfolding pop
       | Just dc <- isDataConWorkId_maybe x = Just $ dataUnfolding dc
       | otherwise                          = fmap coreExprToTerm $ maybeUnfoldingTemplate (realIdUnfolding x)
        -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
+    
+    -- We don't want to expose an unfoldingif it would not be inlineable in the initial phase.
+    -- This gives normal RULES more of a chance to fire.
+    shouldExposeUnfolding x = case inl_inline inl_prag of
+        Inline          -> True
+        Inlinable       -> True
+        NoInline        -> isActiveIn 2 (inl_act inl_prag)
+        EmptyInlineSpec -> True
+      where inl_prag = idInlinePragma x
     
     primOpUnfolding pop = S.tyLambdas as $ S.lambdas xs $ S.primOp pop (map mkTyVarTy as) (map S.var xs)
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
