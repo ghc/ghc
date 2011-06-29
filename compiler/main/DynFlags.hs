@@ -1365,7 +1365,7 @@ dynamic_flags = [
 
         ------- Output Redirection ------------------------------------------
   , flagA "odir"              (hasArg setObjectDir)
-  , flagA "o"                 (SepArg (upd . setOutputFile . Just))
+  , flagA "o"                 (sepArg (setOutputFile . Just))
   , flagA "ohi"               (hasArg (setOutputHi . Just ))
   , flagA "osuf"              (hasArg setObjectSuf)
   , flagA "hcsuf"             (hasArg setHcSuf)
@@ -1522,8 +1522,8 @@ dynamic_flags = [
   , flagA "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
         
         ------ Plugin flags ------------------------------------------------
-  , flagA "fplugin"     (hasArg addPluginModuleName)
-  , flagA "fplugin-opt" (hasArg addPluginModuleNameOption)
+  , flagA "fplugin"     (sepArg addPluginModuleName)
+  , flagA "fplugin-opt" (sepArg addPluginModuleNameOption)
     
         ------ Optimisation flags ------------------------------------------
   , flagA "O"      (noArgM (setOptLevel 1))
@@ -1541,7 +1541,7 @@ dynamic_flags = [
   , flagA "fno-spec-constr-count"       (noArg (\d -> d{ specConstrCount = Nothing }))
   , flagA "fliberate-case-threshold"    (intSuffix (\n d -> d{ liberateCaseThreshold = Just n }))
   , flagA "fno-liberate-case-threshold" (noArg (\d -> d{ liberateCaseThreshold = Nothing }))
-  , flagA "frule-check"                 (SepArg (\s -> upd (\d -> d{ ruleCheck = Just s })))
+  , flagA "frule-check"                 (sepArg (\s d -> d{ ruleCheck = Just s }))
   , flagA "fcontext-stack"              (intSuffix (\n d -> d{ ctxtStkDepth = n }))
   , flagA "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , flagA "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
@@ -2136,6 +2136,9 @@ hasArg fn = HasArg (upd . fn)
 hasArgDF :: (String -> DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
 hasArgDF fn deprec = HasArg (\s -> do { upd (fn s)
                                       ; deprecate deprec })
+
+sepArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+sepArg fn = SepArg (upd . fn)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))
