@@ -1,0 +1,8 @@
+#!/bin/sh
+
+SCRIPT_DIR=$(cd $(dirname "$0"); pwd)
+INPLACE_DIR="$SCRIPT_DIR/../../inplace"
+
+# NB: this script relies on the installed Cabal (presumably from the bootstrapping compiler)
+# actually understanding the package metadata used by the in-tree Cabal. Risky, but works for now.
+cabal install --disable-library-profiling --user --with-ghc=$INPLACE_DIR/bin/ghc-stage2 --with-ghc-pkg=$INPLACE_DIR/bin/ghc-pkg --package-db=$INPLACE_DIR/lib/package.conf.d

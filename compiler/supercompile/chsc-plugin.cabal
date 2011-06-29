@@ -35,6 +35,15 @@ Library
         Supercompile.Termination.TagBag
         Supercompile.Utilities
         Supercompile
+    Extensions:
+        CPP,
+        PatternGuards,
+        ExistentialQuantification,
+        ScopedTypeVariables,
+        FlexibleInstances,
+        RankNTypes,
+        DeriveDataTypeable
     Build-Depends:
-        base >= 4,
-        ghc >= 7.1
+        base >= 4.3 && < 4.4,
+        containers >= 0.4 && < 0.5,
+        ghc >= 7.1 && < 7.2

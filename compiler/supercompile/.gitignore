@@ -1,0 +1,2 @@
+# Ignore directory created by install-plugin-inplace
+dist/

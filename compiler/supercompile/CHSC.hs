@@ -3,7 +3,9 @@ module CHSC (Supercompile(..), plugin) where
 import Supercompile
 import GhcPlugins
 
-import Data.List (nub)
+import Data.Data     (Data)
+import Data.Typeable (Typeable)
+import Data.List     (nub)
 
 
 -- The supercomplier behaves as follows:
@@ -33,7 +35,7 @@ pass unconditional guts = do
     should_sc <- case unconditional of
         True  -> return (const True)
         False -> do
-            anns <- getFirstAnnotations deserializeWithData guts
+            anns :: UniqFM Supercompile <- getFirstAnnotations deserializeWithData guts
             mod <- getModule
             return $ if mod `elemUFM` anns
                       then const True
