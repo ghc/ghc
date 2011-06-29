@@ -47,7 +47,7 @@ Haskell side.
 #include <string.h>
 #endif
 
-#if defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+#if defined(i386_HOST_ARCH)
 extern void adjustorCode(void);
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
 // from AdjustorAsm.s
@@ -288,7 +288,7 @@ typedef struct AdjustorStub {
 #endif
 #endif
 
-#if defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+#if defined(i386_HOST_ARCH)
 
 /* !!! !!! WARNING: !!! !!!
  * This structure is accessed from AdjustorAsm.s
@@ -304,7 +304,7 @@ typedef struct AdjustorStub {
 } AdjustorStub;
 #endif
 
-#if (defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
+#if defined(i386_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH)
 static int totalArgumentSize(char *typeString)
 {
     int sz = 0;
@@ -380,54 +380,14 @@ createAdjustor(int cconv, StgStablePtr hptr,
     break;
 
   case 1: /* _ccall */
-#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
-  /* Magic constant computed by inspecting the code length of
-     the following assembly language snippet
-     (offset and machine code prefixed):
-
-  <00>: 68 ef be ad de     pushl  $0xdeadbeef  	   # constant is large enough to
-        			   	           # hold a StgStablePtr
-  <05>:	b8 fa ef ff 00	   movl   $0x00ffeffa, %eax # load up wptr
-  <0a>: 68 ef be ad de     pushl  $obscure_ccall_ret_code # push the return address
-  <0f>: ff e0              jmp    *%eax            # jump to wptr
-
-    The ccall'ing version is a tad different, passing in the return
-    address of the caller to the auto-generated C stub (which enters
-    via the stable pointer.) (The auto-generated C stub is in on this
-    game, don't worry :-)
-
-    See the comment next to obscure_ccall_ret_code why we need to
-    perform a tail jump instead of a call, followed by some C stack
-    fixup.
-
-    Note: The adjustor makes the assumption that any return value
-    coming back from the C stub is not stored on the stack.
-    That's (thankfully) the case here with the restricted set of 
-    return types that we support.
-  */
-    adjustor = allocateExec(17,&code);
-    {
-	unsigned char *const adj_code = (unsigned char *)adjustor;
-
-	adj_code[0x00] = (unsigned char)0x68;  /* pushl hptr (which is a dword immediate ) */
-	*((StgStablePtr*)(adj_code+0x01)) = (StgStablePtr)hptr;
-
-	adj_code[0x05] = (unsigned char)0xb8;  /* movl  $wptr, %eax */
-	*((StgFunPtr*)(adj_code + 0x06)) = (StgFunPtr)wptr;
-
-	adj_code[0x0a] = (unsigned char)0x68;  /* pushl obscure_ccall_ret_code */
-	*((StgFunPtr*)(adj_code + 0x0b)) = 
-			(StgFunPtr)obscure_ccall_ret_code;
-
-	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
-	adj_code[0x10] = (unsigned char)0xe0; 
-    }
-#elif defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
+#if defined(i386_HOST_ARCH)
     {
         /*
-          What's special about Darwin/Mac OS X on i386?
-          It wants the stack to stay 16-byte aligned.
-          
+          Most of the trickiness here is due to the need to keep the
+          stack pointer 16-byte aligned (see #5250).  That means we
+          can't just push another argument on the stack and call the
+          wrapper, we may have to shuffle the whole argument block.
+
           We offload most of the work to AdjustorAsm.S.
         */
         AdjustorStub *adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
