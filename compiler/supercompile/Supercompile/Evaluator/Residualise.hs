@@ -36,7 +36,7 @@ residualisePureHeap ids h = partitionEithers [fmapEither ((,) x') ((,) x') (resi
 
 residualiseHeapBinding :: InScopeSet -> HeapBinding -> Either (Out PrettyFunction) (Out FVedTerm)
 residualiseHeapBinding ids (HB InternallyBound (Right in_e)) = Right (residualiseTerm ids in_e)
-residualiseHeapBinding _   hb                                = Left (PrettyFunction $ \prec -> pPrintPrec prec hb)
+residualiseHeapBinding _   hb                                = Left (asPrettyFunction hb)
 
 residualiseStack :: InScopeSet -> Stack -> Out FVedTerm -> ((Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)]), Out FVedTerm)
 residualiseStack _   []     e_body = (([], []), e_body)
@@ -54,12 +54,12 @@ residualiseStackFrame _   (CastIt co')                e  = (([], []), e `cast` c
 
 
 pPrintHeap :: Heap -> SDoc
-pPrintHeap (Heap h ids) = pPrint $ floats_static_h ++ [(x, PrettyFunction $ \prec -> pprPrec prec (Wrapper1 e)) | (x, e) <- floats_nonstatic_h]
+pPrintHeap (Heap h ids) = pPrint $ floats_static_h ++ [(x, asPrettyFunction1 e) | (x, e) <- floats_nonstatic_h]
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
 
 pPrintFullState :: State -> SDoc
 pPrintFullState = pPrintFullUnnormalisedState . denormalise
 
 pPrintFullUnnormalisedState :: UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (M.fromList floats_static) $$ pPrint (Wrapper1 e)
+pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (M.fromList floats_static) $$ pPrint e
   where (deeds, floats_static, e) = residualiseUnnormalisedState state

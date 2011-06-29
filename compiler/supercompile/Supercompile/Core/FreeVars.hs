@@ -115,6 +115,15 @@ instance Ord1 FVed where
 instance Outputable1 FVed where
     pprPrec1 prec (FVed _ x) = pprPrec prec x
 
+instance Show a => Show (FVed a) where
+    showsPrec = showsPrec1
+
+instance Eq a => Eq (FVed a) where
+    (==) = eq1
+
+instance Ord a => Ord (FVed a) where
+    compare = compare1
+
 instance Outputable a => Outputable (FVed a) where
     pprPrec = pprPrec1
 

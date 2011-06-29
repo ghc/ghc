@@ -97,9 +97,6 @@ instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
         Case e x _ty alts -> pPrintPrecCase prec (asPrettyFunction1 e) x (map (second asPrettyFunction1) alts)
         Cast e co         -> pPrintPrecCast prec (asPrettyFunction1 e) co
 
-asPrettyFunction1 :: (Outputable1 f, Outputable a) => f a -> PrettyFunction
-asPrettyFunction1 = asPrettyFunction . Wrapper1
-
 pPrintPrecCast :: (Outputable a) => Rational -> a -> Coercion -> SDoc
 pPrintPrecCast prec e co = prettyParen (prec > noPrec) $ pPrintPrec opPrec e <+> text "|>" <+> pPrintPrec appPrec co
 
@@ -131,7 +128,7 @@ instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
         --Lambda x e     -> pPrintPrecLam prec (x:xs) e'
         --  where (xs, e') = collectLambdas e
         Lambda x e     -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
-        Data dc tys xs -> pPrintPrecApps prec (PrettyFunction (flip pPrintPrec dc)) ([PrettyFunction (flip pPrintPrec ty) | ty <- tys] ++ [PrettyFunction (flip pPrintPrec x) | x <- xs])
+        Data dc tys xs -> pPrintPrecApps prec dc ([asPrettyFunction ty | ty <- tys] ++ [asPrettyFunction x | x <- xs])
         Literal l      -> pPrintPrec prec l
         Coercion co    -> pPrintPrec prec co
 

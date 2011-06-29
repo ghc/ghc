@@ -108,6 +108,9 @@ instance Outputable PrettyFunction where
 asPrettyFunction :: Outputable a => a -> PrettyFunction
 asPrettyFunction x = PrettyFunction (\prec -> pprPrec prec x)
 
+asPrettyFunction1 :: (Outputable1 f, Outputable a) => f a -> PrettyFunction
+asPrettyFunction1 = asPrettyFunction . Wrapper1
+
 
 instance Outputable IS.IntSet where
     ppr xs = braces $ hsep (punctuate comma (map ppr $ IS.toList xs))
@@ -152,6 +155,18 @@ instance Ord1 Identity where
 instance Outputable1 Identity where
     pprPrec1 prec (I x) = pprPrec prec x
 
+instance Show a => Show (Identity a) where
+    showsPrec = showsPrec1
+
+instance Eq a => Eq (Identity a) where
+    (==) = eq1
+
+instance Ord a => Ord (Identity a) where
+    compare = compare1
+
+instance Outputable a => Outputable (Identity a) where
+    pprPrec = pprPrec1
+
 
 newtype (O f g) a = Comp { unComp :: f (g a) }
 
@@ -171,6 +186,15 @@ instance (Functor f, Ord1 f, Ord1 g) => Ord1 (O f g) where
 
 instance (Functor f, Outputable1 f, Outputable1 g) => Outputable1 (O f g) where
     pprPrec1 prec (Comp x) = pprPrec1 prec (fmap Wrapper1 x)
+
+instance (Functor f, Show1 f, Show1 g, Show a) => Show (O f g a) where
+    showsPrec = showsPrec1
+
+instance (Functor f, Eq1 f, Eq1 g, Eq a) => Eq (O f g a) where
+    (==) = eq1
+
+instance (Functor f, Ord1 f, Ord1 g, Ord a) => Ord (O f g a) where
+    compare = compare1
 
 instance (Functor f, Outputable1 f, Outputable1 g, Outputable a) => Outputable (O f g a) where
     pprPrec = pprPrec1
@@ -243,6 +267,18 @@ instance Ord1 Tagged where
 instance Outputable1 Tagged where
     pprPrec1 prec (Tagged tg x) = braces (ppr tg) <+> pprPrec prec x
 
+instance Show a => Show (Tagged a) where
+    showsPrec = showsPrec1
+
+instance Eq a => Eq (Tagged a) where
+    (==) = eq1
+
+instance Ord a => Ord (Tagged a) where
+    compare = compare1
+
+instance Outputable a => Outputable (Tagged a) where
+    pprPrec = pprPrec1
+
 
 type Size = Int
 
@@ -271,6 +307,18 @@ instance Ord1 Sized where
 
 instance Outputable1 Sized where
     pprPrec1 prec (Sized sz x) = bananas (text (show sz)) <> pprPrec prec x
+
+instance Show a => Show (Sized a) where
+    showsPrec = showsPrec1
+
+instance Eq a => Eq (Sized a) where
+    (==) = eq1
+
+instance Ord a => Ord (Sized a) where
+    compare = compare1
+
+instance Outputable a => Outputable (Sized a) where
+    pprPrec = pprPrec1
 
 
 pPrint :: Outputable a => a -> SDoc

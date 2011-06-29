@@ -149,27 +149,27 @@ instance Outputable HowBound where
 
 data HeapBinding = HB { howBound :: HowBound, heapBindingMeaning :: Either (Maybe Tag) (In AnnedTerm) }
 
-pPrintPrecAnned :: (Outputable1 f, Outputable a)
+pPrintPrecAnned :: Outputable (f a)
                 => (f a -> FreeVars)
                 -> (InScopeSet -> Renaming -> f a -> f a)
                 -> Rational -> In (f a) -> SDoc
-pPrintPrecAnned fvs rename prec in_e = pprPrec prec $ Wrapper1 $ renameIn (rename (mkInScopeSet (inFreeVars fvs in_e))) in_e
+pPrintPrecAnned fvs rename prec in_e = pprPrec prec $ renameIn (rename (mkInScopeSet (inFreeVars fvs in_e))) in_e
 
 pPrintPrecAnnedAlts :: In [AnnedAlt] -> [(AltCon, PrettyFunction)]
-pPrintPrecAnnedAlts in_alts = map (second (\e -> PrettyFunction $ \prec -> pprPrec prec (Wrapper1 e))) $ renameIn (renameAnnedAlts (mkInScopeSet (inFreeVars annedAltsFreeVars in_alts))) in_alts
+pPrintPrecAnnedAlts in_alts = map (second asPrettyFunction) $ renameIn (renameAnnedAlts (mkInScopeSet (inFreeVars annedAltsFreeVars in_alts))) in_alts
 
 pPrintPrecAnnedValue :: Rational -> In (Anned AnnedValue) -> SDoc
 pPrintPrecAnnedValue prec in_e = pPrintPrec prec $ extract $ renameIn (renameAnnedValue (mkInScopeSet (inFreeVars annedValueFreeVars in_e))) in_e
 
 pPrintPrecAnnedTerm :: Rational -> In AnnedTerm -> SDoc
-pPrintPrecAnnedTerm prec in_e = pprPrec prec $ Wrapper1 $ renameIn (renameAnnedTerm (mkInScopeSet (inFreeVars annedTermFreeVars in_e))) in_e
+pPrintPrecAnnedTerm prec in_e = pprPrec prec $ renameIn (renameAnnedTerm (mkInScopeSet (inFreeVars annedTermFreeVars in_e))) in_e
 
 pPrintPrecAnnedAnswer :: Rational -> Anned Answer -> SDoc
-pPrintPrecAnnedAnswer prec a = pprPrec prec $ Wrapper1 $ fmap (\a -> PrettyFunction $ \prec -> pPrintPrecAnswer prec a) a
+pPrintPrecAnnedAnswer prec a = pprPrec prec $ fmap (\a -> PrettyFunction $ \prec -> pPrintPrecAnswer prec a) a
 
 pPrintPrecAnswer :: (Outputable a) => Rational -> (Maybe (Coercion, Tag), a) -> SDoc
 pPrintPrecAnswer prec (Nothing,       v) = pPrintPrec prec v
-pPrintPrecAnswer prec (Just (co, tg), v) = pPrintPrecCast prec (Wrapper1 $ Tagged tg v) co
+pPrintPrecAnswer prec (Just (co, tg), v) = pPrintPrecCast prec (Tagged tg v) co
 
 instance Outputable HeapBinding where
     pprPrec prec (HB how mb_in_e) = case how of
@@ -211,7 +211,7 @@ instance Outputable StackFrame where
         Apply x'                       -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
         TyApply ty'                    -> pPrintPrecApp prec (PrettyDoc $ text "[_]") ty'
         Scrutinise x' _ty in_alts      -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
-        PrimApply pop tys' in_vs in_es -> pPrintPrecPrimOp prec pop (map (PrettyFunction . flip pPrintPrec) tys') (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
+        PrimApply pop tys' in_vs in_es -> pPrintPrecPrimOp prec pop tys' (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
         StrictLet x' in_e2             -> pPrintPrecLet prec x' (PrettyDoc $ text "[_]") (PrettyFunction $ flip pPrintPrecAnnedTerm in_e2)
         Update x'                      -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
         CastIt co'                     -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
