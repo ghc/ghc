@@ -75,6 +75,8 @@ instance (Ord1 f, Ord a) => Ord (Wrapper1 f a) where
     compare = compare1 `on` unWrapper1
 
 
+-- Because we have this class, we can define Outputable for
+-- Supercompile.Core.Syntax.TermF without UndecidableInstances
 class Outputable1 f where
     pprPrec1 :: Outputable a => Rational -> f a -> SDoc
     
