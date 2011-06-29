@@ -1,4 +1,4 @@
-module Supercompile (supercompileProgram) where
+module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
 import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
@@ -8,18 +8,18 @@ import qualified Supercompile.Drive.Process as S
 
 import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn
+import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
 import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
 import Name       (localiseName)
 import Var        (Var, isTyVar, varName, setVarName)
-import Id         (mkSysLocal, mkSysLocalM, realIdUnfolding, idInlinePragma, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
+import Id         (Id, mkSysLocal, mkSysLocalM, realIdUnfolding, idInlinePragma, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
 import MkId       (mkPrimOpId)
 import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
 import PrimOp     (primOpSig)
 import Type       (mkTyVarTy)
-import DynFlags   (DynFlags)
 
 import Control.Monad
 import qualified Data.Map as M
@@ -142,11 +142,40 @@ termToCoreExpr = term
     alt (S.LiteralAlt l,     e) = (LitAlt l,   [],       term e)
     alt (S.DefaultAlt,       e) = (DEFAULT,    [],       term e)
 
-coreBindsToCoreTerm :: [CoreBind] -> (CoreExpr, CoreExpr -> [CoreBind])
-coreBindsToCoreTerm binds
-  = (mkLets internal_binds (mkBigCoreVarTup internal_xs),
-     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector internal_xs internal_x wild_id e) | (x, internal_x) <- xs_internal_xs])
+-- Split input bindings into two lists:
+--  1) CoreBinds binding variables with at least one binder marked by the predicate,
+--     and any CoreBinds that those CoreBinds transitively refer to
+--  2) The remaining CoreBinds. These may refer to those CoreBinds but are not referred
+--     to *by* them
+--
+-- As a bonus, it returns the free variables of the bindings in the second list.
+--
+-- NB: assumes no-shadowing at the top level. I don't want to have to rename stuff to
+-- commute CoreBinds...
+partitionBinds :: (Id -> Bool) -> [CoreBind] -> ([CoreBind], [CoreBind], S.FreeVars)
+partitionBinds should_sc initial_binds = go initial_inside [(b, unionVarSets (map exprFreeVars (rhssOfBind b))) | b <- initial_undecided]
   where
+    (initial_inside, initial_undecided) = partition (any should_sc . bindersOf) initial_binds
+    
+    go :: [CoreBind] -> [(CoreBind, S.FreeVars)] -> ([CoreBind], [CoreBind], S.FreeVars)
+    go inside undecided
+        | null inside' = (inside, map fst undecided, unionVarSets (map snd undecided))
+        | otherwise    = first3 (inside ++) $ go (map fst inside') undecided'
+      where
+        -- Move anything inside that refers to a binding that was moved inside last round
+        (inside', undecided') = partition (\(_, fvs) -> inside_bs `intersectsVarSet` fvs) undecided
+        inside_bs = mkVarSet [x | b <- inside, x <- bindersOf b]
+
+coreBindsToCoreTerm :: (Id -> Bool) -> [CoreBind] -> (CoreExpr, CoreExpr -> [CoreBind])
+coreBindsToCoreTerm should_sc binds
+  = (mkLets internal_sc_binds (mkBigCoreVarTup sc_internal_xs),
+     \e -> let wild_id = mkWildValBinder (exprType e) in [NonRec x (mkTupleSelector sc_internal_xs internal_x wild_id e) | (x, internal_x) <- sc_xs_internal_xs] ++ dont_sc_binds)
+  where
+    -- We put all the sc_binds into a local let, and use a tuple to bind back to the top level the names of
+    -- any of those sc_binds that are either exported *or* in the free variables of something from dont_sc_binds.
+    -- Making that list as small as possible allows the supercompiler to determine that more things are used linearly.
+    (sc_binds, dont_sc_binds, dont_sc_binds_fvs) = partitionBinds should_sc binds
+    
     -- This is a sweet hack. Most of the top-level binders will be External names. It is a Bad Idea to locally-bind
     -- an External name, because several Externals with the same name but different uniques will generate clashing
     -- C labels at code-generation time (the unique is not included in the label).
@@ -155,15 +184,12 @@ coreBindsToCoreTerm binds
     -- Note that we leave the *use sites* totally intact: we rely on the fact that a) variables are compared only by
     -- unique and b) the internality of these names will be carried down on the next simplifier run, so this works.
     -- The ice is thin, though!
-    --
-    -- As an added twist, we only need to put *exported* Ids into the tuple we construct/deconstruct as part of this
-    -- transformation. This allows the supercompiler to determine that more things are used linearly.
-    xs = bindersOfBinds binds
-    internal_binds = [case bind of NonRec x e -> NonRec (localiseVar x) e
-                                   Rec xes    -> Rec (map (first localiseVar) xes)
-                     | bind <- binds]
-    xs_internal_xs = filter (\(x, _) -> isExportedId x) (xs `zip` bindersOfBinds internal_binds)
-    internal_xs = map snd xs_internal_xs
+    sc_xs = bindersOfBinds sc_binds
+    internal_sc_binds = [case bind of NonRec x e -> NonRec (localiseVar x) e
+                                      Rec xes    -> Rec (map (first localiseVar) xes)
+                        | bind <- sc_binds]
+    sc_xs_internal_xs = filter (\(x, _) -> isExportedId x || x `elemVarSet` dont_sc_binds_fvs) (sc_xs `zip` bindersOfBinds internal_sc_binds)
+    sc_internal_xs = map snd sc_xs_internal_xs
     localiseVar x = setIdNotExported (x `setVarName` localiseName (varName x))
      -- If we don't mark these Ids as not exported then we get lots of residual top-level bindings of the form x = y
 
@@ -211,7 +237,10 @@ supercompile e = termToCoreExpr (snd (S.supercompile (M.fromList unfs) e'))
   where unfs = termUnfoldings e'
         e' = coreExprToTerm e
 
-supercompileProgram :: DynFlags -> [CoreBind] -> [CoreBind]
-supercompileProgram _dflags binds = NonRec x (supercompile e) : rebuild (Var x)
+supercompileProgram :: [CoreBind] -> [CoreBind]
+supercompileProgram = supercompileProgramSelective (const True)
+
+supercompileProgramSelective :: (Id -> Bool) -> [CoreBind] -> [CoreBind]
+supercompileProgramSelective should_sc binds = NonRec x (supercompile e) : rebuild (Var x)
   where x = mkSysLocal (fsLit "sc") topUnique (exprType e)
-        (e, rebuild) = coreBindsToCoreTerm binds
+        (e, rebuild) = coreBindsToCoreTerm should_sc binds

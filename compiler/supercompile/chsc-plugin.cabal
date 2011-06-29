@@ -1,0 +1,40 @@
+Name:           chsc-plugin
+Version:        1.0
+License:        BSD3
+Synopsis:       A plugin for GHC that performs supercompilation.
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+Author:         Max Bolingbroke <batterseapower@hotmail.com>
+Maintainer:     Max Bolingbroke <batterseapower@hotmail.com>
+
+Source-Repository head
+  type:     git
+  location: http://darcs.haskell.org/ghc.git
+  branch:   supercompiler
+
+Library
+    Exposed-Modules:
+        CHSC
+    Other-Modules:
+        Supercompile.Core.FreeVars
+        Supercompile.Core.Renaming
+        Supercompile.Core.Size
+        Supercompile.Core.Syntax
+        Supercompile.Core.Tag
+        Supercompile.Drive.Match
+        Supercompile.Drive.Process
+        Supercompile.Drive.Split
+        Supercompile.Evaluator.Deeds
+        Supercompile.Evaluator.Evaluate
+        Supercompile.Evaluator.FreeVars
+        Supercompile.Evaluator.Residualise
+        Supercompile.Evaluator.Syntax
+        Supercompile.StaticFlags
+        Supercompile.Termination.Combinators
+        Supercompile.Termination.Generaliser
+        Supercompile.Termination.TagBag
+        Supercompile.Utilities
+        Supercompile
+    Build-Depends:
+        base >= 4,
+        ghc >= 7.1
