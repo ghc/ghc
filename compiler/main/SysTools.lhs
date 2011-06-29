@@ -455,7 +455,9 @@ figureLlvmVersion dflags = do
              return $ Just v
             )
             (\err -> do
-                putMsg dflags $ text $ "Warning: " ++ show err
+                putMsg dflags $ text $ "Error (" ++ show err ++ ")"
+                putMsg dflags $ text "Warning: Couldn't figure out LLVM version!"
+                putMsg dflags $ text "Make sure you have installed LLVM"
                 return Nothing)
   return ver
   
