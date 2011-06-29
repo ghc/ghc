@@ -86,3 +86,4 @@ test('3677', extra_run_opts('+RTS -K8k -RTS'), compile_and_run, [''])
 test('4441', normal, compile_and_run, [''])
 test('5149', omit_ways(['ghci']), multisrc_compile_and_run,
                  ['5149', ['5149_cmm.cmm'], ''])
+test('5129', normal, compile_and_run, [''])
