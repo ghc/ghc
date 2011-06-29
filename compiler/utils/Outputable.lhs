@@ -596,6 +596,10 @@ keyword = bold
 -- | Class designating that some type has an 'SDoc' representation
 class Outputable a where
 	ppr :: a -> SDoc
+	pprPrec :: Rational -> a -> SDoc
+	
+	ppr = pprPrec 0
+	pprPrec _ = ppr
 \end{code}
 
 \begin{code}
@@ -655,6 +659,27 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e) 
 		   ppr c <> comma,
 		   ppr d <> comma,
 		   ppr e])
+
+instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e, Outputable f) =>
+	 Outputable (a, b, c, d, e, f) where
+    ppr (a,b,c,d,e,f) =
+      parens (sep [ppr a <> comma,
+		   ppr b <> comma,
+		   ppr c <> comma,
+		   ppr d <> comma,
+		   ppr e <> comma,
+		   ppr f])
+
+instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e, Outputable f, Outputable g) =>
+	 Outputable (a, b, c, d, e, f, g) where
+    ppr (a,b,c,d,e,f,g) =
+      parens (sep [ppr a <> comma,
+		   ppr b <> comma,
+		   ppr c <> comma,
+		   ppr d <> comma,
+		   ppr e <> comma,
+		   ppr f <> comma,
+		   ppr g])
 
 instance Outputable FastString where
     ppr fs = ftext fs		-- Prints an unadorned string,
