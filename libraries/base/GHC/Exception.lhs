@@ -62,7 +62,7 @@ in this case. You can now throw and catch @ThisException@ and
 @ThatException@ as exceptions:
 
 @
-*Main> throw ThisException `catch` \e -> putStrLn (\"Caught \" ++ show (e :: MyException))
+*Main> throw ThisException \`catch\` \\e -> putStrLn (\"Caught \" ++ show (e :: MyException))
 Caught ThisException
 @
 
