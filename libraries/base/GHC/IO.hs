@@ -469,4 +469,4 @@ a `finally` sequel =
 -- >   evaluate x = (return $! x) >>= return
 --
 evaluate :: a -> IO a
-evaluate a = IO $ \s -> let !va = a in (# s, va #) -- NB. see #2273
+evaluate a = IO $ \s -> seq# a s -- NB. see #2273, #5129
