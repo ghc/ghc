@@ -105,3 +105,13 @@ test('return_mem_to_os', normal, compile_and_run, [''])
 
 test('4850', extra_clean(['4850.o','4850.hi','4850']),
              run_command, ['$MAKE -s --no-print-directory 4850'])
+
+def config_5250(opts):
+    if not (config.arch in ['i386','x86_64']):
+        opts.skip = 1;
+
+test('5250', [ config_5250,
+               extra_clean(['spalign.o']),
+               omit_ways(['ghci']) ],
+             compile_and_run, ['spalign.c'])
+
