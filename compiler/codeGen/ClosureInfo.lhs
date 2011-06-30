@@ -1052,5 +1052,5 @@ getTyDescription ty
 getPredTyDescription :: PredType -> String
 getPredTyDescription (ClassP cl _) = getOccString cl
 getPredTyDescription (IParam ip _) = getOccString (ipNameName ip)
-getPredTyDescription (EqPred _ _) = panic "getPredTyDescription EqPred"
+getPredTyDescription (EqPred _ _)  = "Type equality"
 \end{code}

@@ -1086,10 +1086,9 @@ getTyDescription ty
     fun_result other	     = getTyDescription other
 
 getPredTyDescription :: PredType -> String
-getPredTyDescription (ClassP cl _)     = getOccString cl
-getPredTyDescription (IParam ip _)     = getOccString (ipNameName ip)
-getPredTyDescription (EqPred ty1 _ty2) = getTyDescription ty1	-- Urk?
-
+getPredTyDescription (ClassP cl _) = getOccString cl
+getPredTyDescription (IParam ip _) = getOccString (ipNameName ip)
+getPredTyDescription (EqPred {})   = "Type equality"
 
 --------------------------------------
 --   SRTs/CAFs
