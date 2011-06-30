@@ -1581,12 +1581,12 @@ linkBinary dflags o_files dep_packages = do
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
-#ifdef elf_OBJ_FORMAT
-        get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
-                                | otherwise = ["-L" ++ l]
-#else
-        get_pkg_lib_path_opts l = ["-L" ++ l]
-#endif
+        get_pkg_lib_path_opts l
+         | osElfTarget (platformOS (targetPlatform dflags)) &&
+           dynLibLoader dflags == SystemDependent &&
+           not opt_Static
+            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+         | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
@@ -1706,58 +1706,55 @@ maybeCreateManifest
    :: DynFlags
    -> FilePath                          -- filename of executable
    -> IO [FilePath]                     -- extra objects to embed, maybe
-#ifndef mingw32_TARGET_OS
-maybeCreateManifest _ _ = do
-  return []
-#else
-maybeCreateManifest dflags exe_filename = do
-  if not (dopt Opt_GenManifest dflags) then return [] else do
+maybeCreateManifest dflags exe_filename
+ | platformOS (targetPlatform dflags) == OSMinGW32 &&
+   dopt Opt_GenManifest dflags
+    = do let manifest_filename = exe_filename <.> "manifest"
 
-  let manifest_filename = exe_filename <.> "manifest"
+         writeFile manifest_filename $
+             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
+             "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
+             "  <assemblyIdentity version=\"1.0.0.0\"\n"++
+             "     processorArchitecture=\"X86\"\n"++
+             "     name=\"" ++ dropExtension exe_filename ++ "\"\n"++
+             "     type=\"win32\"/>\n\n"++
+             "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
+             "    <security>\n"++
+             "      <requestedPrivileges>\n"++
+             "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n"++
+             "        </requestedPrivileges>\n"++
+             "       </security>\n"++
+             "  </trustInfo>\n"++
+             "</assembly>\n"
 
-  writeFile manifest_filename $
-      "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
-      "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
-      "  <assemblyIdentity version=\"1.0.0.0\"\n"++
-      "     processorArchitecture=\"X86\"\n"++
-      "     name=\"" ++ dropExtension exe_filename ++ "\"\n"++
-      "     type=\"win32\"/>\n\n"++
-      "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
-      "    <security>\n"++
-      "      <requestedPrivileges>\n"++
-      "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n"++
-      "        </requestedPrivileges>\n"++
-      "       </security>\n"++
-      "  </trustInfo>\n"++
-      "</assembly>\n"
+         -- Windows will find the manifest file if it is named
+         -- foo.exe.manifest. However, for extra robustness, and so that
+         -- we can move the binary around, we can embed the manifest in
+         -- the binary itself using windres:
+         if not (dopt Opt_EmbedManifest dflags) then return [] else do
 
-  -- Windows will find the manifest file if it is named foo.exe.manifest.
-  -- However, for extra robustness, and so that we can move the binary around,
-  -- we can embed the manifest in the binary itself using windres:
-  if not (dopt Opt_EmbedManifest dflags) then return [] else do
+         rc_filename <- newTempName dflags "rc"
+         rc_obj_filename <- newTempName dflags (objectSuf dflags)
 
-  rc_filename <- newTempName dflags "rc"
-  rc_obj_filename <- newTempName dflags (objectSuf dflags)
+         writeFile rc_filename $
+             "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
+               -- magic numbers :-)
+               -- show is a bit hackish above, but we need to escape the
+               -- backslashes in the path.
 
-  writeFile rc_filename $
-      "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
-        -- magic numbers :-)
-        -- show is a bit hackish above, but we need to escape the
-        -- backslashes in the path.
+         let wr_opts = getOpts dflags opt_windres
+         runWindres dflags $ map SysTools.Option $
+               ["--input="++rc_filename,
+                "--output="++rc_obj_filename,
+                "--output-format=coff"]
+               ++ wr_opts
+               -- no FileOptions here: windres doesn't like seeing
+               -- backslashes, apparently
 
-  let wr_opts = getOpts dflags opt_windres
-  runWindres dflags $ map SysTools.Option $
-        ["--input="++rc_filename,
-         "--output="++rc_obj_filename,
-         "--output-format=coff"]
-        ++ wr_opts
-        -- no FileOptions here: windres doesn't like seeing
-        -- backslashes, apparently
+         removeFile manifest_filename
 
-  removeFile manifest_filename
-
-  return [rc_obj_filename]
-#endif
+         return [rc_obj_filename]
+ | otherwise = return []
 
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
@@ -1769,12 +1766,12 @@ linkDynLib dflags o_files dep_packages = do
 
     let pkg_lib_paths = collectLibraryPaths pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
-#ifdef elf_OBJ_FORMAT
-        get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
-                                | otherwise = ["-L" ++ l]
-#else
-        get_pkg_lib_path_opts l = ["-L" ++ l]
-#endif
+        get_pkg_lib_path_opts l
+         | osElfTarget (platformOS (targetPlatform dflags)) &&
+           dynLibLoader dflags == SystemDependent &&
+           not opt_Static
+            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+         | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
@@ -1786,11 +1783,11 @@ linkDynLib dflags o_files dep_packages = do
     -- not allow undefined symbols.
     -- The RTS library path is still added to the library search path
     -- above in case the RTS is being explicitly linked in (see #3807).
-#if !defined(mingw32_HOST_OS)
-    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
-#else
-    let pkgs_no_rts = pkgs
-#endif
+    let pkgs_no_rts = case platformOS (targetPlatform dflags) of
+                      OSMinGW32 ->
+                          pkgs
+                      _ ->
+                          filter ((/= rtsPackageId) . packageConfigId) pkgs
     let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
 
         -- probably _stub.o files
