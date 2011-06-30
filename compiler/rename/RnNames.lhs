@@ -171,6 +171,8 @@ rnImportDecl this_mod implicit_prelude
         orph_iface = mi_orphan iface
         has_finsts = mi_finsts iface
         deps       = mi_deps iface
+        trust      = getSafeMode $ mi_trust iface
+        trust_pkg  = mi_trust_pkg iface
 
         filtered_exports = filter not_this_mod (mi_exports iface)
         not_this_mod (mod,_) = mod /= this_mod
@@ -220,7 +222,13 @@ rnImportDecl this_mod implicit_prelude
 
         pkg = modulePackageId (mi_module iface)
 
-        (dependent_mods, dependent_pkgs)
+        -- Does this import mean we now require our own pkg
+        -- to be trusted? See Note [Trust Own Package]
+        ptrust = trust == Sf_Trustworthy
+               || trust == Sf_TrustworthyWithSafeLanguage
+               || trust_pkg
+
+        (dependent_mods, dependent_pkgs, pkg_trust_req)
            | pkg == thisPackage dflags =
                 -- Imported module is from the home package
                 -- Take its dependent modules and add imp_mod itself
@@ -233,14 +241,15 @@ rnImportDecl this_mod implicit_prelude
                 -- know if any of them depended on CM.hi-boot, in
                 -- which case we should do the hi-boot consistency
                 -- check.  See LoadIface.loadHiBootInterface
-                ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
+                ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps, ptrust)
 
            | otherwise =
                 -- Imported module is from another package
                 -- Dump the dependent modules
                 -- Add the package imp_mod comes from to the dependent packages
-                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps)), ppr pkg <+> ppr (dep_pkgs deps) )
-                ([], (pkg, False) : dep_pkgs deps)
+                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps))
+                       , ppr pkg <+> ppr (dep_pkgs deps) )
+                ([], (pkg, False) : dep_pkgs deps, False)
 
         -- True <=> import M ()
         import_all = case imp_details of
@@ -261,10 +270,14 @@ rnImportDecl this_mod implicit_prelude
                         -- Add in the imported modules trusted package
                         -- requirements. ONLY do this though if we import the
                         -- module as a safe import.
-                        -- see Note [Trust Transitive Property]
+                        -- See Note [Tracking Trust Transitively]
+                        -- and Note [Trust Transitive Property]
                         imp_trust_pkgs = if mod_safe' 
                                             then map fst $ filter snd dependent_pkgs
-                                            else []
+                                            else [],
+                        -- Do we require our own pkg to be trusted?
+                        -- See Note [Trust Own Package]
+                        imp_trust_own_pkg = pkg_trust_req
                    }
 
     -- Complain if we import a deprecated module

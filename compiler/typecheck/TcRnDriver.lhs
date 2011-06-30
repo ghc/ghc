@@ -338,7 +338,8 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_foreign   = NoStubs,
 				mg_hpc_info  = emptyHpcInfo False,
                                 mg_modBreaks = emptyModBreaks,
-                                mg_vect_info = noVectInfo
+                                mg_vect_info = noVectInfo,
+                                mg_trust_pkg = False
 		    } } ;
 
    tcCoreDump mod_guts ;

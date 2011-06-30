@@ -873,9 +873,9 @@ checkSafeImports dflags hsc_env tcg_env
         -- that their package is trusted. For trustworthy modules,
         -- modules in the home package are trusted but otherwise
         -- we check the package trust flag.
-        packageTrusted :: SafeHaskellMode -> Module -> Bool
-        packageTrusted Sf_Safe _ = True
-        packageTrusted _ m
+        packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
+        packageTrusted Sf_Safe False _ = True
+        packageTrusted _ _ m
             | isHomePkg m = True
             | otherwise   = trusted $ getPackageDetails (pkgState dflags)
                                                         (modulePackageId m)
@@ -894,11 +894,12 @@ checkSafeImports dflags hsc_env tcg_env
                 -- got iface, check trust
                 Just iface' -> do
                     let trust = getSafeMode $ mi_trust iface'
+                        trust_own_pkg = mi_trust_pkg iface'
                         -- check module is trusted
                         safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
                                             Sf_TrustworthyWithSafeLanguage]
                         -- check package is trusted
-                        safeP = packageTrusted trust m
+                        safeP = packageTrusted trust trust_own_pkg m
                     if safeM && safeP
                         then return Nothing
                         else return $ Just $ if safeM
@@ -1393,7 +1394,8 @@ mkModGuts mod binds = ModGuts {
   mg_modBreaks = emptyModBreaks,
   mg_vect_info = noVectInfo,
   mg_inst_env = emptyInstEnv,
-  mg_fam_inst_env = emptyFamInstEnv
+  mg_fam_inst_env = emptyFamInstEnv,
+  mg_trust_pkg = False
 }
 \end{code}
 
