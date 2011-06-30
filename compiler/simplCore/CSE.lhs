@@ -10,12 +10,13 @@ module CSE (
 
 #include "HsVersions.h"
 
+import CoreSubst
+import Var		( Var )
 import Id		( Id, idType, idInlineActivation, zapIdOccInfo )
 import CoreUtils	( hashExpr, eqExpr, exprIsBig, mkAltExpr, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
 import CoreSyn
-import VarEnv	
 import Outputable
 import StaticFlags	( opt_PprStyle_Debug )
 import BasicTypes	( isAlwaysActive )
@@ -60,12 +61,6 @@ For example, consider
 Here we must *not* do CSE on the inner x+x!  The simplifier used to guarantee no
 shadowing, but it doesn't any more (it proved too hard), so we clone as we go.
 We can simply add clones to the substitution already described.
-
-However, we do NOT clone type variables.  It's just too hard, because then we need
-to run the substitution over types and IdInfo.  No no no.  Instead, we just throw
-
-(In fact, I think the simplifier does guarantee no-shadowing for type variables.)
-
 
 Note [Case binders 1]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -187,25 +182,30 @@ cseBinds env (b:bs) = (b':bs')
 		      bs'        = cseBinds env1 bs
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
-cseBind env (NonRec b e) = let (env', (b',e')) = do_one env (b, e)
-			   in (env', NonRec b' e')
-cseBind env (Rec pairs)  = let (env', pairs') = mapAccumL do_one env pairs
-			   in (env', Rec pairs')
-			 
-
-do_one :: CSEnv -> (Id, CoreExpr) -> (CSEnv, (Id, CoreExpr))
-do_one env (id, rhs) 
-  = case lookupCSEnv env rhs' of
-	Just (Var other_id) -> (extendSubst env' id other_id, 	  (id', Var other_id))
-	Just other_expr     -> (env', 			      	  (id', other_expr))
-	Nothing             -> (addCSEnvItem env' rhs' (Var id'), (id', rhs'))
+cseBind env (NonRec b e) 
+  = (env2, NonRec b' e')
   where
-    (env', id') = addBinder env id
-    rhs' | isAlwaysActive (idInlineActivation id) = cseExpr env' rhs
-	 | otherwise			          = rhs
+    (env1, b') = addBinder env b
+    (env2, e') = cseRhs env1 (b',e)
+
+cseBind env (Rec pairs)
+  = (env2, Rec (bs' `zip` es'))
+  where
+    (bs,es) = unzip pairs
+    (env1, bs') = addRecBinders env bs
+    (env2, es') = mapAccumL cseRhs env1 (bs' `zip` es)
+
+cseRhs :: CSEnv -> (OutBndr, InExpr) -> (CSEnv, OutExpr)
+cseRhs env (id',rhs)
+  = case lookupCSEnv env rhs' of
+	Just other_expr     -> (env, 			         other_expr)
+	Nothing             -> (addCSEnvItem env rhs' (Var id'), rhs')
+  where
+    rhs' | isAlwaysActive (idInlineActivation id') = cseExpr env rhs
+	 | otherwise			           = rhs
 		-- See Note [CSE for INLINE and NOINLINE]
 
-tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
+tryForCSE :: CSEnv -> InExpr -> OutExpr
 tryForCSE _   (Type t) = Type t
 tryForCSE _   (Coercion c) = Coercion c
 tryForCSE env expr     = case lookupCSEnv env expr' of
@@ -214,11 +214,11 @@ tryForCSE env expr     = case lookupCSEnv env expr' of
 		       where
 	 	         expr' = cseExpr env expr
 
-cseExpr :: CSEnv -> CoreExpr -> CoreExpr
+cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr _   (Type t)               = Type t
 cseExpr _   (Coercion co)          = Coercion co
 cseExpr _   (Lit lit)              = Lit lit
-cseExpr env (Var v)		   = Var (lookupSubst env v)
+cseExpr env (Var v)		   = lookupSubst env v
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
 cseExpr env (Cast e co)            = Cast (cseExpr env e) co
@@ -226,8 +226,9 @@ cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
 				     in Let bind' (cseExpr env' e)
-cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty (cseAlts env' scrut' bndr bndr'' alts)
+cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty alts'
 				   where
+                                     alts' = cseAlts env' scrut' bndr bndr'' alts
 				     scrut' = tryForCSE env scrut
 				     (env', bndr') = addBinder env bndr
 				     bndr'' = zapIdOccInfo bndr'
@@ -235,7 +236,7 @@ cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr'' ty (cseAlts env' scru
 					-- cause a dead case binder to be alive, so we
 					-- play safe here and bring them all to life
 
-cseAlts :: CSEnv -> CoreExpr -> CoreBndr -> CoreBndr -> [CoreAlt] -> [CoreAlt]
+cseAlts :: CSEnv -> OutExpr -> InBndr -> InBndr -> [InAlt] -> [OutAlt]
 
 cseAlts env scrut' bndr _bndr' [(DataAlt con, args, rhs)]
   | isUnboxedTupleCon con
@@ -256,11 +257,11 @@ cseAlts env scrut' bndr bndr' alts
   where
     (con_target, alt_env)
 	= case scrut' of
-		Var v' -> (v',     extendSubst env bndr v')	-- See Note [Case binders 1]
+	    Var v' -> (v',     extendCSSubst env bndr v')	-- See Note [Case binders 1]
 								-- map: bndr -> v'
 
-		_      ->  (bndr', extendCSEnv env scrut' (Var  bndr'))	-- See Note [Case binders 2]
-									-- map: scrut' -> bndr'
+	    _      ->  (bndr', extendCSEnv env scrut' (Var  bndr')) -- See Note [Case binders 2]
+								    -- map: scrut' -> bndr'
 
     arg_tys = tyConAppArgs (idType bndr)
 
@@ -291,19 +292,25 @@ cseAlts env scrut' bndr bndr' alts
 %************************************************************************
 
 \begin{code}
-data CSEnv = CS CSEMap InScopeSet (IdEnv Id)
-			-- Simple substitution
+type InExpr  = CoreExpr		-- Pre-cloning
+type InBndr  = CoreBndr
+type InAlt   = CoreAlt
 
-type CSEMap = UniqFM [(CoreExpr, CoreExpr)]	-- This is the reverse mapping
+type OutExpr  = CoreExpr	-- Post-cloning
+type OutBndr  = CoreBndr
+type OutAlt   = CoreAlt
+
+data CSEnv  = CS CSEMap Subst
+type CSEMap = UniqFM [(OutExpr, OutExpr)]	-- This is the reverse mapping
 	-- It maps the hash-code of an expression e to list of (e,e') pairs
 	-- This means that it's good to replace e by e'
 	-- INVARIANT: The expr in the range has already been CSE'd
 
 emptyCSEnv :: CSEnv
-emptyCSEnv = CS emptyUFM emptyInScopeSet emptyVarEnv
+emptyCSEnv = CS emptyUFM emptySubst
 
-lookupCSEnv :: CSEnv -> CoreExpr -> Maybe CoreExpr
-lookupCSEnv (CS cs in_scope _) expr
+lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
+lookupCSEnv (CS cs sub) expr
   = case lookupUFM cs (hashExpr expr) of
 	Nothing -> Nothing
 	Just pairs -> lookup_list pairs
@@ -312,20 +319,21 @@ lookupCSEnv (CS cs in_scope _) expr
   -- Reason: when expressions differ we generally find out quickly
   --         but I found that cheapEqExpr was saying (\x.x) /= (\y.y),
   -- 	     and this kind of thing happened in real programs
-    lookup_list :: [(CoreExpr,CoreExpr)] -> Maybe CoreExpr
-    lookup_list []                                   = Nothing
-    lookup_list ((e,e'):es) | eqExpr in_scope e expr = Just e'
-        		    | otherwise	             = lookup_list es
+    lookup_list :: [(OutExpr,OutExpr)] -> Maybe OutExpr
+    lookup_list ((e,e'):es) 
+      | eqExpr (substInScope sub) e expr = Just e'
+      | otherwise	                 = lookup_list es
+    lookup_list []                       = Nothing
 
-addCSEnvItem :: CSEnv -> CoreExpr -> CoreExpr -> CSEnv
+addCSEnvItem :: CSEnv -> OutExpr -> OutExpr -> CSEnv
 addCSEnvItem env expr expr' | exprIsBig expr = env
 			    | otherwise      = extendCSEnv env expr expr'
    -- We don't try to CSE big expressions, because they are expensive to compare
    -- (and are unlikely to be the same anyway)
 
-extendCSEnv :: CSEnv -> CoreExpr -> CoreExpr -> CSEnv
-extendCSEnv (CS cs in_scope sub) expr expr'
-  = CS (addToUFM_C combine cs hash [(expr, expr')]) in_scope sub
+extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
+extendCSEnv (CS cs sub) expr expr'
+  = CS (addToUFM_C combine cs hash [(expr, expr')]) sub
   where
     hash = hashExpr expr
     combine old new 
@@ -336,26 +344,24 @@ extendCSEnv (CS cs in_scope sub) expr expr'
 	  long_msg | opt_PprStyle_Debug = (text "hash code" <+> text (show hash)) $$ ppr result 
 		   | otherwise	        = empty
 
-lookupSubst :: CSEnv -> Id -> Id
-lookupSubst (CS _ _ sub) x = case lookupVarEnv sub x of
-			       Just y  -> y
-			       Nothing -> x
+lookupSubst :: CSEnv -> Id -> OutExpr
+lookupSubst (CS _ sub) x = lookupIdSubst (text "CSE.lookupSubst") sub x
 
-extendSubst :: CSEnv -> Id  -> Id -> CSEnv
-extendSubst (CS cs in_scope sub) x y = CS cs in_scope (extendVarEnv sub x y)
+extendCSSubst :: CSEnv -> Id  -> Id -> CSEnv
+extendCSSubst (CS cs sub) x y = CS cs (extendIdSubst sub x (Var y))
 
-addBinder :: CSEnv -> Id -> (CSEnv, Id)
-addBinder (CS cs in_scope sub) v
-  | not (v `elemInScopeSet` in_scope) = (CS cs (extendInScopeSet in_scope v)  sub,		       v)
-  | isId v			      = (CS cs (extendInScopeSet in_scope v') (extendVarEnv sub v v'), v')
-  | otherwise			      = WARN( True, ppr v )
-				        (CS emptyUFM in_scope		      sub,		       v)
-	-- This last case is the unusual situation where we have shadowing of
-	-- a type variable; we have to discard the CSE mapping
-	-- See Note [Shadowing]
-  where
-    v' = uniqAway in_scope v
+addBinder :: CSEnv -> Var -> (CSEnv, Var)
+addBinder (CS cs sub) v = (CS cs sub', v') 
+                        where
+                          (sub', v') = substBndr sub v
 
-addBinders :: CSEnv -> [Id] -> (CSEnv, [Id])
-addBinders env vs = mapAccumL addBinder env vs
+addBinders :: CSEnv -> [Var] -> (CSEnv, [Var])
+addBinders (CS cs sub) vs = (CS cs sub', vs') 
+                          where
+                            (sub', vs') = substBndrs sub vs
+
+addRecBinders :: CSEnv -> [Id] -> (CSEnv, [Id])
+addRecBinders (CS cs sub) vs = (CS cs sub', vs') 
+                          where
+                            (sub', vs') = substRecBndrs sub vs
 \end{code}
