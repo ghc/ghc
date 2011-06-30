@@ -1528,8 +1528,8 @@ dynamic_flags = [
   , flagA "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
         
         ------ Plugin flags ------------------------------------------------
-  , flagA "fplugin"     (sepArg addPluginModuleName)
-  , flagA "fplugin-opt" (sepArg addPluginModuleNameOption)
+  , flagA "fplugin-opt" (hasArg addPluginModuleNameOption)
+  , flagA "fplugin"     (hasArg addPluginModuleName)
     
         ------ Optimisation flags ------------------------------------------
   , flagA "O"      (noArgM (setOptLevel 1))
