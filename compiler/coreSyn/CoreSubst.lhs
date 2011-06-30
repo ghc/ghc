@@ -27,7 +27,7 @@ module CoreSubst (
 
 	-- ** Substituting and cloning binders
 	substBndr, substBndrs, substRecBndrs,
-	cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+	cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
 	-- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith
@@ -45,7 +45,7 @@ import qualified Coercion
 
 	-- We are defining local versions
 import Type     hiding ( substTy, extendTvSubst, extendTvSubstList
-                       , isInScope, substTyVarBndr )
+                       , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substCoVarBndr )
 
 import OptCoercion ( optCoercion )
@@ -517,6 +517,16 @@ cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneIdBndrs subst us ids
   = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
 
+cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
+-- Works for all kinds of variables (typically case binders)
+-- not just Ids
+cloneBndrs subst us vs
+  = mapAccumL clone subst (vs `zip` uniqsFromSupply us)
+  where
+    clone subst (v,uniq) 
+      | isTyVar v = cloneTyVarBndr subst v uniq
+      | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
+
 -- | Clone a mutually recursive group of 'Id's
 cloneRecIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneRecIdBndrs subst us ids
@@ -555,6 +565,12 @@ Subst to a TvSubst.
 substTyVarBndr :: Subst -> TyVar -> (Subst, TyVar)
 substTyVarBndr (Subst in_scope id_env tv_env cv_env) tv
   = case Type.substTyVarBndr (TvSubst in_scope tv_env) tv of
+	(TvSubst in_scope' tv_env', tv') 
+	   -> (Subst in_scope' id_env tv_env' cv_env, tv')
+
+cloneTyVarBndr :: Subst -> TyVar -> Unique -> (Subst, TyVar)
+cloneTyVarBndr (Subst in_scope id_env tv_env cv_env) tv uniq
+  = case Type.cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq of
 	(TvSubst in_scope' tv_env', tv') 
 	   -> (Subst in_scope' id_env tv_env' cv_env, tv')
 

@@ -118,7 +118,7 @@ module Type (
 	-- ** Performing substitution on types
 	substTy, substTys, substTyWith, substTysWith, substTheta, 
         substPred, substTyVar, substTyVars, substTyVarBndr,
-        deShadowTy, lookupTyVar, 
+        cloneTyVarBndr, deShadowTy, lookupTyVar, 
 
 	-- * Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
@@ -145,6 +145,7 @@ import TyCon
 import TysPrim
 
 -- others
+import Unique		( Unique )
 import BasicTypes	( IPName )
 import Name		( Name )
 import StaticFlags
@@ -1468,7 +1469,7 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
 	    | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
 
     _no_capture = not (new_var `elemVarSet` tyVarsOfTypes (varEnvElts tenv))
-    -- Check that we are not capturing something in the substitution
+    -- Assertion check that we are not capturing something in the substitution
 
     no_change = new_var == old_var
 	-- no_change means that the new_var is identical in
@@ -1483,6 +1484,14 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
 
     new_var = uniqAway in_scope old_var
 	-- The uniqAway part makes sure the new variable is not already in scope
+
+cloneTyVarBndr :: TvSubst -> TyVar -> Unique -> (TvSubst, TyVar)
+cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq
+  = (TvSubst (extendInScopeSet in_scope tv')
+             (extendVarEnv tv_env tv (mkTyVarTy tv')), tv')
+  where
+    tv' = setVarUnique tv uniq	-- Simply set the unique; the kind
+    	  	       	  	-- has no type variables to worry about
 \end{code}
 
 ----------------------------------------------------

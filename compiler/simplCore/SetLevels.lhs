@@ -60,7 +60,7 @@ import CoreUtils	( exprType, exprOkForSpeculation, mkPiTypes )
 import CoreArity	( exprBotStrictness_maybe )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, substBndr, substRecBndrs,
-			  extendIdSubst, cloneIdBndr, cloneRecIdBndrs )
+			  extendIdSubst, cloneBndrs, cloneIdBndr, cloneRecIdBndrs )
 import Id
 import IdInfo
 import Var
@@ -341,29 +341,34 @@ lvlExpr ctxt_lvl env (_, AnnLet bind body) = do
     return (Let bind' body')
 
 lvlExpr ctxt_lvl env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
+  | [(con@(DataAlt {}), bs, rhs)] <- alts
+  , exprOkForSpeculation (deAnnotate scrut)
+  , not (isTopLvl dest_lvl)	-- Can't have top-level cases
+  = 	-- Float the case
+    do { scrut' <- lvlMFE True ctxt_lvl env scrut
+       ; (rhs_env, (case_bndr':bs')) <- cloneVars env (case_bndr:bs) dest_lvl
+       	 	   -- We don't need to use extendCaseBndrLvlEnv here
+		   -- because we are floating the case outwards so
+		   -- no need to do the binder-swap thing
+       ; rhs' <- lvlMFE True ctxt_lvl rhs_env rhs
+       ; let alt' = (con, [TB b (StayPut dest_lvl) | b <- bs'], rhs')
+       ; return (Case scrut' (TB case_bndr' (FloatMe dest_lvl)) ty [alt']) }
+
+  | otherwise	  -- Stays put
   = do { scrut' <- lvlMFE True ctxt_lvl env scrut
        ; let case_bndr' = TB case_bndr bndr_spec
              alts_env   = extendCaseBndrLvlEnv env scrut' case_bndr'
        ; alts' <- mapM (lvl_alt alts_env) alts
        ; return (Case scrut' case_bndr' ty alts') }
   where
-      incd_lvl = incMinorLvl ctxt_lvl
+      incd_lvl  = incMinorLvl ctxt_lvl
+      bndr_spec = StayPut incd_lvl
       dest_lvl = maxFvLevel (const True) env scrut_fvs
-
-      alt_ctxt_lvl :: Level 
-      bndr_spec    :: FloatSpec
-      (alt_ctxt_lvl, bndr_spec)
-         | [(DataAlt _, _, _)] <- alts
-         , exprOkForSpeculation (deAnnotate scrut)
-	 , not (isTopLvl dest_lvl)	-- Can't have top-level cases
-         = (ctxt_lvl, FloatMe dest_lvl)
    	      -- Don't abstact over type variables, hence const True
-         | otherwise 
-         = (incd_lvl, StayPut incd_lvl)
 
       lvl_alt alts_env (con, bs, rhs)
-          = do { rhs' <- lvlMFE True alt_ctxt_lvl new_env rhs
-               ; return (con, bs', rhs') }
+        = do { rhs' <- lvlMFE True incd_lvl new_env rhs
+             ; return (con, bs', rhs') }
         where
           bs'     = [ TB b bndr_spec | b <- bs ]
           new_env = extendLvlEnv alts_env bs'
@@ -603,7 +608,7 @@ lvlBind ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
   | null abs_vars
   = do  -- No type abstraction; clone existing binder
        rhs' <- lvlExpr dest_lvl env rhs
-       (env', bndr') <- cloneVar env bndr ctxt_lvl dest_lvl
+       (env', bndr') <- cloneVar env bndr dest_lvl
        return (NonRec (TB bndr' (FloatMe dest_lvl)) rhs', ctxt_lvl, env') 
 
   | otherwise
@@ -629,7 +634,7 @@ lvlBind ctxt_lvl env (AnnRec pairs)
        return (Rec (tagged_bndrs `zip` rhss'), bind_lvl, env')
 
   | null abs_vars 
-  = do (new_env, new_bndrs) <- cloneRecVars env bndrs ctxt_lvl dest_lvl
+  = do (new_env, new_bndrs) <- cloneRecVars env bndrs dest_lvl
        new_rhss <- mapM (lvlExpr ctxt_lvl new_env) rhss
        return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
               , ctxt_lvl, new_env)
@@ -651,7 +656,7 @@ lvlBind ctxt_lvl env (AnnRec pairs)
         (bndr,rhs) = head pairs
         (rhs_lvl, abs_vars_w_lvls) = lvlLamBndrs dest_lvl abs_vars
         rhs_env = extendLvlEnv env abs_vars_w_lvls
-    (rhs_env', new_bndr) <- cloneVar rhs_env bndr rhs_lvl rhs_lvl
+    (rhs_env', new_bndr) <- cloneVar rhs_env bndr rhs_lvl
     let
         (lam_bndrs, rhs_body)     = collectAnnBndrs rhs
         (body_lvl, new_lam_bndrs) = lvlLamBndrs rhs_lvl lam_bndrs
@@ -1025,33 +1030,46 @@ substLetBndrsRec
                           , le_subst = subst'
                           , le_env = delVarEnvList id_env bndrs }
 
-cloneVar :: LevelEnv -> Id -> Level -> Level -> LvlM (LevelEnv, Id)
-cloneVar env v ctxt_lvl dest_lvl
-  = ASSERT( isId v ) do
-    us <- getUniqueSupplyM
-    let
-      (subst', v1) = cloneIdBndr (le_subst env) us v
-      v2	   = zap_demand ctxt_lvl dest_lvl v1
-      env'	   = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
-    return (env', v2)
+cloneVar :: LevelEnv -> Id -> Level -> LvlM (LevelEnv, Id)
+cloneVar env v dest_lvl
+  = ASSERT( isId v )
+    do { us <- getUniqueSupplyM
+       ; let (subst', v1) = cloneIdBndr (le_subst env) us v
+      	     v2     	  = zapDemandIdInfo v1
+      	     env'	  = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
+       ; return (env', v2) }
 
-cloneRecVars :: LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEnv, [Id])
-cloneRecVars env vs ctxt_lvl dest_lvl
+cloneVars :: LevelEnv -> [Var] -> Level -> LvlM (LevelEnv, [Var])
+cloneVars env vs dest_lvl    -- Works for tyvars etc too; typically case alts
+  = do { us <- getUniqueSupplyM
+       ; let (subst', vs1) = cloneBndrs (le_subst env) us vs
+      	     vs2     	   = map zap_demand vs1 
+      	     env'	   = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
+       ; return (env', vs2) }
+  where
+    zap_demand :: Var -> Var -- Note [Zapping the demand info]
+    zap_demand  v | not (isId v) = v
+                  | otherwise    = zapDemandIdInfo v
+
+
+cloneRecVars :: LevelEnv -> [Id] -> Level -> LvlM (LevelEnv, [Id])
+cloneRecVars env vs dest_lvl
   = ASSERT( all isId vs ) do
     us <- getUniqueSupplyM
     let
       (subst', vs1) = cloneRecIdBndrs (le_subst env) us vs
-      vs2	    = map (zap_demand ctxt_lvl dest_lvl) vs1
+      vs2	    = map zapDemandIdInfo vs1  -- Note [Zapping the demand info]
       env'	    = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
     return (env', vs2)
-
-	-- VERY IMPORTANT: we must zap the demand info 
-	-- if the thing is going to float out past a lambda,
-	-- or if it's going to top level (where things can't be strict)
-zap_demand :: Level -> Level -> Id -> Id
-zap_demand dest_lvl ctxt_lvl id
-  | ctxt_lvl == dest_lvl,
-    not (isTopLvl dest_lvl) = id	-- Stays, and not going to top level
-  | otherwise		    = zapDemandIdInfo id	-- Floats out
 \end{code}
+
+Note [Zapping the demand info]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+VERY IMPORTANT: we must zap the demand info if the thing is going to
+float out, becuause it may be less demanded than at its original
+binding site.  Eg
+   f :: Int -> Int
+   f x = let v = 3*4 in v+x
+Here v is strict; but if we float v to top level, it isn't any more.
+
 	
