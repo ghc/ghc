@@ -18,7 +18,7 @@ import HsSyn
 import TcEnv            ( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
-import IfaceEnv		( ifaceExportNames )
+import IfaceEnv         ( ifaceExportNames )
 import LoadIface        ( loadSrcInterface )
 import TcRnMonad
 
@@ -130,9 +130,10 @@ because they are using the network package. They will have to call 'ghc-pkg
 trust network' to get everything working. Due to this invasive nature of going
 with yes we have gone with no for now.
 
+
 \begin{code}
 rnImports :: [LImportDecl RdrName]
-           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
+           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 
 rnImports imports
          -- PROCESS IMPORT DECLS
@@ -140,34 +141,37 @@ rnImports imports
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
          implicit_prelude <- xoptM Opt_ImplicitPrelude
-         let prel_imports       = mkPrelImports (moduleName this_mod) implicit_prelude imports
+         let prel_imports = mkPrelImports (moduleName this_mod)
+                                implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ _ is_boot _ _ _ _)) = is_boot
 
-         ifDOptM Opt_WarnImplicitPrelude (
-            when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
-          )
+         ifDOptM Opt_WarnImplicitPrelude $
+             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
 
          stuff1 <- mapM (rnImportDecl this_mod True)  prel_imports
          stuff2 <- mapM (rnImportDecl this_mod False) ordinary
          stuff3 <- mapM (rnImportDecl this_mod False) source
-         let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2 ++ stuff3)
+         -- Safe Haskell: See Note [Tracking Trust Transitively]
+         let (decls, rdr_env, imp_avails, hpc_usage) = 
+                        combine (stuff1 ++ stuff2 ++ stuff3)
          return (decls, rdr_env, imp_avails, hpc_usage)
 
     where
-   combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails,AnyHpcUsage)]
-           -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
-   combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails,False)
-        where plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
-                   (decls, gbl_env2, imp_avails2,hpc_usage2)
-                = (decl:decls,
-                   gbl_env1 `plusGlobalRdrEnv` gbl_env2,
-                   imp_avails1 `plusImportAvails` imp_avails2,
-                   hpc_usage1 || hpc_usage2)
+      combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
+              -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+      combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
+        where
+          plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
+               (decls, gbl_env2, imp_avails2,hpc_usage2)
+            = ( decl:decls,
+                gbl_env1 `plusGlobalRdrEnv` gbl_env2,
+                imp_avails1 `plusImportAvails` imp_avails2,
+                hpc_usage1 || hpc_usage2 )
 
 rnImportDecl  :: Module -> Bool
               -> LImportDecl RdrName
-              -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails,AnyHpcUsage)
+              -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 
 rnImportDecl this_mod implicit_prelude
              (L loc (ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
@@ -186,13 +190,13 @@ rnImportDecl this_mod implicit_prelude
         imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
-	-- Check for a missing import list
-	-- (Opt_WarnMissingImportList also checks for T(..) items
-	--  but that is done in checkDodgyImport below)
+        -- Check for a missing import list
+        -- (Opt_WarnMissingImportList also checks for T(..) items
+        --  but that is done in checkDodgyImport below)
     case imp_details of
-        Just (False, _)       -> return ()	-- Explicit import list
+        Just (False, _)       -> return () -- Explicit import list
         _  | implicit_prelude -> return ()
-           | qual_only	      -> return ()
+           | qual_only        -> return ()
            | otherwise        -> ifDOptM Opt_WarnMissingImportList $
                                  addWarn (missingImportListWarn imp_mod_name)
 
@@ -311,7 +315,8 @@ rnImportDecl this_mod implicit_prelude
                     || (implicit_prelude && safeImplicitImpsReq dflags)
 
         imports   = ImportAvails {
-                        imp_mods       = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],
+                        imp_mods       = unitModuleEnv imp_mod
+                                        [(qual_mod_name, import_all, loc, mod_safe')],
                         imp_orphs      = orphans,
                         imp_finsts     = finsts,
                         imp_dep_mods   = mkModDeps dependent_mods,
@@ -688,9 +693,9 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
             checkDodgyImport stuff
                 | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
                 = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
-                -- NB. use the RdrName for reporting the warning
-		| IEThingAll {} <- ieRdr
-		, not (is_qual decl_spec)
+                    -- NB. use the RdrName for reporting the warning
+                | IEThingAll {} <- ieRdr
+                , not (is_qual decl_spec)
                 = ifDOptM Opt_WarnMissingImportList $
                   addWarn (missingImportListItem ieRdr)
             checkDodgyImport _

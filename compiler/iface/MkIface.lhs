@@ -176,9 +176,9 @@ mkDependencies
                     tcg_th_used = th_var
                   }
  = do 
-      th_used   <- readIORef th_var                     -- Whether TH is used
-      let
-        dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
+      -- Template Haskell used?
+      th_used <- readIORef th_var
+      let dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that 
@@ -237,7 +237,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 				-- Sigh: see Note [Root-main Id] in TcRnDriver
 
 		; fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
-		; warns     = src_warns
+		; warns       = src_warns
 		; iface_rules = map (coreRuleToIfaceRule this_mod) rules
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
