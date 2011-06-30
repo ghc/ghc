@@ -90,11 +90,14 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
 	     -- c.f. TcSimplify.simplifyInfer
        ; zonked_forall_tvs <- zonkTcTyVarsAndFV forall_tvs
        ; gbl_tvs           <- tcGetGlobalTyVars	     -- Already zonked
-       ; qtvs <- zonkQuantifiedTyVars $
-                 varSetElems (zonked_forall_tvs `minusVarSet` gbl_tvs)
+       ; let extra_bound_tvs = zonked_forall_tvs 	     
+       	     		       `minusVarSet` gbl_tvs
+       	     		       `delVarSetList` tv_bndrs
+       ; qtvs <- zonkQuantifiedTyVars (varSetElems extra_bound_tvs)
 
+       	      -- The tv_bndrs are already skolems, so no need to zonk them
        ; return (HsRule name act
-		    (map (RuleBndr . noLoc) (qtvs ++ tpl_ids))	-- yuk
+		    (map (RuleBndr . noLoc) (tv_bndrs ++ qtvs ++ tpl_ids))	-- yuk
 		    (mkHsDictLet lhs_ev_binds lhs') fv_lhs
 		    (mkHsDictLet rhs_ev_binds rhs') fv_rhs) }
 
