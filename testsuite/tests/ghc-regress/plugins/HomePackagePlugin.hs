@@ -1,6 +1,6 @@
 module HomePackagePlugin where
 
-import GHCPlugins
+import GhcPlugins
 
 plugin :: Plugin
 plugin = defaultPlugin {
@@ -9,7 +9,7 @@ plugin = defaultPlugin {
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install _options todos = do
-    return $ (CoreDoPluginPass "String replacement" $ BindsToBindsPluginPass stringReplacementPass) : todos
+    return $ (CoreDoPluginPass "String replacement" $ bindsOnlyPass stringReplacementPass) : todos
 
 stringReplacementPass :: [CoreBind] -> CoreM [CoreBind]
 stringReplacementPass binds = return $ map replaceInBind binds
