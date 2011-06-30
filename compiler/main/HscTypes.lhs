@@ -687,8 +687,15 @@ data ModIface
                         -- The 'OccName' is the parent of the name, if it has one.
 	mi_hpc    :: !AnyHpcUsage,
 	        -- ^ True if this program uses Hpc at any point in the program.
-	mi_trust  :: !IfaceTrustInfo
+	mi_trust  :: !IfaceTrustInfo,
 	        -- ^ Safe Haskell Trust information for this module.
+	mi_trust_pkg :: !Bool
+	        -- ^ Do we require the package this module resides in be trusted
+	        -- to trust this module? This is used for the situation where a
+	        -- module is Safe (so doesn't require the package be trusted
+	        -- itself) but imports some trustworthy modules from its own
+	        -- package (which does require its own package be trusted).
+                -- See Note [RnNames . Trust Own Package]
      }
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
@@ -767,9 +774,12 @@ data ModGuts
 	mg_inst_env     :: InstEnv,
         -- ^ Class instance environment from /home-package/ modules (including
 	-- this one); c.f. 'tcg_inst_env'
-	mg_fam_inst_env :: FamInstEnv
+	mg_fam_inst_env :: FamInstEnv,
         -- ^ Type-family instance enviroment for /home-package/ modules
 	-- (including this one); c.f. 'tcg_fam_inst_env'
+        mg_trust_pkg :: Bool
+        -- ^ Do we need to trust our own package for Safe Haskell?
+        -- See Note [RnNames . Trust Own Package]
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -862,7 +872,8 @@ emptyModIface mod
 	       mi_fix_fn    = emptyIfaceFixCache,
 	       mi_hash_fn   = emptyIfaceHashCache,
 	       mi_hpc       = False,
-	       mi_trust     = noIfaceTrustInfo
+	       mi_trust     = noIfaceTrustInfo,
+               mi_trust_pkg = False
     }		
 \end{code}
 

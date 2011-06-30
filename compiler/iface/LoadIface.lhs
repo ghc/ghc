@@ -669,6 +669,7 @@ pprModIface iface
         , pprVectInfo (mi_vect_info iface)
 	, ppr (mi_warns iface)
 	, pprTrustInfo (mi_trust iface)
+	, pprTrustPkg (mi_trust_pkg iface)
  	]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
@@ -755,6 +756,9 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
 
 pprTrustInfo :: IfaceTrustInfo -> SDoc
 pprTrustInfo trust = ptext (sLit "trusted:") <+> ppr trust
+
+pprTrustPkg :: Bool -> SDoc
+pprTrustPkg tpkg = ptext (sLit "require own pkg trusted:") <+> ppr tpkg
 
 instance Outputable Warnings where
     ppr = pprWarns
