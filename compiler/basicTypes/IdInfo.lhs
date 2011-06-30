@@ -38,7 +38,7 @@ module IdInfo (
 
 	-- ** The OccInfo type
 	OccInfo(..),
-	isDeadOcc, isLoopBreaker,
+	isDeadOcc, isLoopBreaker, isNonRuleLoopBreaker,
 	occInfo, setOccInfo,
 
 	InsideLam, OneBranch,

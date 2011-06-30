@@ -274,6 +274,7 @@ vectTopRhs recFs var expr
       = do { let fvs = freeVars expr
            ; (inline, isScalar, vexpr) <- inBind var $
                                             vectPolyExpr (isLoopBreaker $ idOccInfo var) recFs fvs
+					    	-- Maybe isNonRuleLoopBreaker?
            ; return (inline, isScalar, vectorised vexpr)
            }
 
