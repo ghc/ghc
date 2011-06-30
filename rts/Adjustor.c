@@ -1067,25 +1067,17 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 void
 freeHaskellFunctionPtr(void* ptr)
 {
-#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
- if ( *(unsigned char*)ptr != 0x68 &&
+#if defined(i386_HOST_ARCH)
+ if ( *(unsigned char*)ptr != 0xe8 &&
       *(unsigned char*)ptr != 0x58 ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
-
- /* Free the stable pointer first..*/
- if (*(unsigned char*)ptr == 0x68) { /* Aha, a ccall adjustor! */
-    freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x01)));
+ if (*(unsigned char*)ptr == 0xe8) { /* Aha, a ccall adjustor! */
+     freeStablePtr(((AdjustorStub*)ptr)->hptr);
  } else {
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
  }
-#elif defined(i386_HOST_ARCH) && defined(darwin_HOST_OS)
-if ( *(unsigned char*)ptr != 0xe8 ) {
-   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
-   return;
- }
- freeStablePtr(((AdjustorStub*)ptr)->hptr);
 #elif defined(x86_64_HOST_ARCH)
  if ( *(StgWord16 *)ptr == 0x894d ) {
      freeStablePtr(*(StgStablePtr*)((StgWord8*)ptr+0x20));
