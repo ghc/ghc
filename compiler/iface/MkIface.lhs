@@ -533,9 +533,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                         -- dep_pkgs: see "Package Version Changes" on
                         -- wiki/Commentary/Compiler/RecompilationAvoidance
                        mi_trust iface0)
-                        -- TODO: Can probably make more fine grained. Only
-                        -- really need to have recompilation for overlapping
-                        -- instances.
+                        -- Make sure change of Safe Haskell mode causes recomp.
 
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = Map.elems $ Map.fromList $
@@ -924,7 +922,7 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
                 Just _                  -> pprPanic "mkUsage: empty direct import" empty
                 Nothing                 -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
-                -- is used in the source code. We require them to be safe in SafeHaskell
+                -- is used in the source code. We require them to be safe in Safe Haskell
     
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 

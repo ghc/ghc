@@ -113,7 +113,7 @@ requirements from B? Should A now also require that a package p is trusted since
 B required it?
 
 We currently say no but I saying yes also makes sense. The difference is, if a
-module M that doesn't use SafeHaskell imports a module N that does, should all
+module M that doesn't use Safe Haskell imports a module N that does, should all
 the trusted package requirements be dropped since M didn't declare that it cares
 about Safe Haskell (so -XSafe is more strongly associated with the module doing
 the importing) or should it be done still since the author of the module N that
@@ -121,8 +121,8 @@ uses Safe Haskell said they cared (so -XSafe is more strongly associated with
 the module that was compiled that used it).
 
 Going with yes is a simpler semantics we think and harder for the user to stuff
-up but it does mean that SafeHaskell will affect users who don't care about
-SafeHaskell as they might grab a package from Cabal which uses safe haskell (say
+up but it does mean that Safe Haskell will affect users who don't care about
+Safe Haskell as they might grab a package from Cabal which uses safe haskell (say
 network) and that packages imports -XTrustworthy modules from another package
 (say bytestring), so requires that package is trusted. The user may now get
 compilation errors in code that doesn't do anything with Safe Haskell simply

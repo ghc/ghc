@@ -778,7 +778,7 @@ hscFileFrontEnd mod_summary = do
         ioMsgMaybe $
             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
     dflags <- getDynFlags
-    -- XXX: See Note [SafeHaskell API]
+    -- XXX: See Note [Safe Haskell API]
     if safeHaskellOn dflags
         then do
             tcg_env1 <- checkSafeImports dflags hsc_env tcg_env

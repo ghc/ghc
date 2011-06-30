@@ -34,11 +34,11 @@ import Data.List
 
 data Flag m = Flag
     {   flagName    :: String,       -- Flag, without the leading "-"
-        flagSafety  :: FlagSafety,   -- Flag safety level (SafeHaskell)
+        flagSafety  :: FlagSafety,   -- Flag safety level (Safe Haskell)
         flagOptKind :: OptKind m     -- What to do if we see it
     }
 
--- | This determines how a flag should behave when SafeHaskell
+-- | This determines how a flag should behave when Safe Haskell
 -- mode is on.
 data FlagSafety
  = EnablesSafe         -- ^ This flag is a little bit of a hack. We give
@@ -107,7 +107,7 @@ setArg l s (EwM f) = EwM (\_ _ c es ws ->
               | otherwise = err l es ws
         err (L loc ('-' : arg)) es ws =
             let msg = "Warning: " ++ arg ++ " is not allowed in "
-                   ++ "SafeHaskell; ignoring " ++ arg
+                   ++ "Safe Haskell; ignoring " ++ arg
             in return (es, ws `snocBag` L loc msg, ())
         err _ _ _ = error "Bad pattern match in setArg"
     in check)
