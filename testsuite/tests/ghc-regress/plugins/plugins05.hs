@@ -1,6 +1,6 @@
-{-# OPTIONS_GHC -fplugin Plugins05_Helper #-}
+{-# OPTIONS_GHC -fplugin HomePackagePlugin #-}
 
--- Tests home-package plugins
+-- Tests home-package plugins from OPTIONS pragma
 module Main where
 
 main :: IO ()

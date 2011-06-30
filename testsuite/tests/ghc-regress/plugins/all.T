@@ -9,7 +9,8 @@ test('plugins01', normal, run_command, ['$MAKE -s --no-print-directory plugins01
 test('plugins02', normal, compile_fail, ['-package-conf simple-plugin/local.package.conf -fplugin Simple.BadlyTypedPlugin -package simple-plugin'])
 test('plugins03', normal, compile_fail, ['-package-conf simple-plugin/local.package.conf -fplugin Simple.NonExistantPlugin -package simple-plugin'])
 
-test('plugins05', extra_clean(['Plugins05_Helper.hi', 'Plugins05_Helper.o']), multimod_compile_and_run, ['plugins05', '-package ghc'])
+test('plugins04', extra_clean(['HomePackagePlugin.hi', 'HomePackagePlugin.o']), multimod_compile_and_run, ['plugins04', '-package ghc', '-fplugin HomePackagePlugin'])
+test('plugins05', extra_clean(['HomePackagePlugin.hi', 'HomePackagePlugin.o']), multimod_compile_and_run, ['plugins05', '-package ghc'])
 
 if default_testopts.cleanup != '':
     runCmd('$MAKE -C ' + in_testdir('') + ' clean')

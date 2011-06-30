@@ -1,4 +1,4 @@
-module Plugins05_Helper where
+module HomePackagePlugin where
 
 import GHCPlugins
 
