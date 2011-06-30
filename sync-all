@@ -118,9 +118,18 @@ sub getrepo {
     }
     elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
         # Local filesystem, either absolute or relative path
-        # (assumes a checked-out tree):
         $repo_base = $repo;
-        $checked_out_tree = 1;
+        if (-f "$repo/HEAD") {
+            # assume a local mirror:
+            $checked_out_tree = 0;
+            $repo_base =~ s#/[^/]+/?$##;
+        } elsif (-d "$repo/ghc.git") {
+            # assume a local mirror:
+            $checked_out_tree = 0;
+        } else {
+            # assume a checked-out tree:
+            $checked_out_tree = 1;
+        }
     }
     else {
         die "Couldn't work out repo";
