@@ -1322,7 +1322,7 @@ runScript filename = do
               else return ()
 
 -----------------------------------------------------------------------------
--- Displaying SafeHaskell properties of a module
+-- Displaying Safe Haskell properties of a module
 
 isSafeCmd :: String -> InputT GHCi ()
 isSafeCmd m = 
