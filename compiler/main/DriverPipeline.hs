@@ -934,8 +934,8 @@ runPhase (Hsc src_flavour) input_fn dflags0
                                         ms_location  = location4,
                                         ms_hs_date   = src_timestamp,
                                         ms_obj_date  = Nothing,
-                                        ms_imps      = imps,
-                                        ms_srcimps   = src_imps }
+                                        ms_textual_imps = imps,
+                                        ms_srcimps      = src_imps }
 
   -- run the compiler!
         result <- io $ hscCompileOneShot hsc_env'
