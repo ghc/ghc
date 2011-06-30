@@ -778,7 +778,7 @@ hscFileFrontEnd mod_summary = do
         ioMsgMaybe $
             tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
     dflags <- getDynFlags
-    -- XXX: See Note [SafeHaskell API]
+    -- XXX: See Note [Safe Haskell API]
     if safeHaskellOn dflags
         then do
             tcg_env1 <- checkSafeImports dflags hsc_env tcg_env
@@ -805,24 +805,53 @@ hscFileFrontEnd mod_summary = do
         warnRules (L loc (HsRule n _ _ _ _ _ _)) =
             mkPlainWarnMsg loc $
                 text "Rule \"" <> ftext n <> text "\" ignored" $+$
-                text "User defined rules are disabled under SafeHaskell"
+                text "User defined rules are disabled under Safe Haskell"
 
 --------------------------------------------------------------
--- SafeHaskell
+-- Safe Haskell
 --------------------------------------------------------------
+
+-- Note [Safe Haskell API]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- XXX: We only call this in hscFileFrontend and don't expose
+-- it to the GHC API. External users of GHC can't properly use
+-- the GHC API and Safe Haskell.
+
+
+-- Note [Safe Haskell Trust Check]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Safe Haskell checks that an import is trusted according to the following
+-- rules for an import of module M that resides in Package P:
+--
+--   * If M is recorded as Safe and all its trust dependencies are OK
+--     then M is considered safe.
+--   * If M is recorded as Trustworthy and P is considered trusted and
+--     all M's trust dependencies are OK then M is considered safe.
+--
+-- By trust dependencies we mean that the check is transitive. So if
+-- a module M that is Safe relies on a module N that is trustworthy,
+-- importing module M will first check (according to the second case)
+-- that N is trusted before checking M is trusted.
+--
+-- This is a minimal description, so please refer to the user guide
+-- for more details. The user guide is also considered the authoritative
+-- source in this matter, not the comments or code.
+
 
 -- | Validate that safe imported modules are actually safe.
 -- For modules in the HomePackage (the package the module we
 -- are compiling in resides) this just involves checking its
 -- trust type is 'Safe' or 'Trustworthy'. For modules that
 -- reside in another package we also must check that the
--- external pacakge is trusted.
+-- external pacakge is trusted. See the Note [Safe Haskell
+-- Trust Check] above for more information.
 --
--- Note [SafeHaskell API]
--- ~~~~~~~~~~~~~~~~~~~~~~
--- XXX: We only call this in hscFileFrontend and don't expose
--- it to the GHC API. External users of GHC can't properly use
--- the GHC API and SafeHaskell.
+-- The code for this is quite tricky as the whole algorithm
+-- is done in a few distinct phases in different parts of the
+-- code base. See RnNames.rnImportDecl for where package trust
+-- dependencies for a module are collected and unioned.
+-- Specifically see the Note [RnNames . Tracking Trust Transitively]
+-- and the Note [RnNames . Trust Own Package].
 checkSafeImports :: DynFlags -> HscEnv -> TcGblEnv -> Hsc TcGblEnv
 checkSafeImports dflags hsc_env tcg_env
     = do
@@ -873,9 +902,9 @@ checkSafeImports dflags hsc_env tcg_env
         -- that their package is trusted. For trustworthy modules,
         -- modules in the home package are trusted but otherwise
         -- we check the package trust flag.
-        packageTrusted :: SafeHaskellMode -> Module -> Bool
-        packageTrusted Sf_Safe _ = True
-        packageTrusted _ m
+        packageTrusted :: SafeHaskellMode -> Bool -> Module -> Bool
+        packageTrusted Sf_Safe False _ = True
+        packageTrusted _ _ m
             | isHomePkg m = True
             | otherwise   = trusted $ getPackageDetails (pkgState dflags)
                                                         (modulePackageId m)
@@ -894,11 +923,12 @@ checkSafeImports dflags hsc_env tcg_env
                 -- got iface, check trust
                 Just iface' -> do
                     let trust = getSafeMode $ mi_trust iface'
+                        trust_own_pkg = mi_trust_pkg iface'
                         -- check module is trusted
                         safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
                                             Sf_TrustworthyWithSafeLanguage]
                         -- check package is trusted
-                        safeP = packageTrusted trust m
+                        safeP = packageTrusted trust trust_own_pkg m
                     if safeM && safeP
                         then return Nothing
                         else return $ Just $ if safeM
@@ -1393,7 +1423,8 @@ mkModGuts mod binds = ModGuts {
   mg_modBreaks = emptyModBreaks,
   mg_vect_info = noVectInfo,
   mg_inst_env = emptyInstEnv,
-  mg_fam_inst_env = emptyFamInstEnv
+  mg_fam_inst_env = emptyFamInstEnv,
+  mg_trust_pkg = False
 }
 \end{code}
 

@@ -17,7 +17,7 @@ module HscTypes (
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods, ImportedModsVal,
 
-	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
+	ModSummary(..), ms_imps, ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath,
 
         -- * Information about the module being compiled
@@ -131,7 +131,7 @@ import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
-                          DynFlag(..), SafeHaskellMode(..) )
+                          DynFlag(..), SafeHaskellMode(..), dynFlagDependencies )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -687,8 +687,15 @@ data ModIface
                         -- The 'OccName' is the parent of the name, if it has one.
 	mi_hpc    :: !AnyHpcUsage,
 	        -- ^ True if this program uses Hpc at any point in the program.
-	mi_trust  :: !IfaceTrustInfo
+	mi_trust  :: !IfaceTrustInfo,
 	        -- ^ Safe Haskell Trust information for this module.
+	mi_trust_pkg :: !Bool
+	        -- ^ Do we require the package this module resides in be trusted
+	        -- to trust this module? This is used for the situation where a
+	        -- module is Safe (so doesn't require the package be trusted
+	        -- itself) but imports some trustworthy modules from its own
+	        -- package (which does require its own package be trusted).
+                -- See Note [RnNames . Trust Own Package]
      }
 
 -- | The 'ModDetails' is essentially a cache for information in the 'ModIface'
@@ -767,9 +774,12 @@ data ModGuts
 	mg_inst_env     :: InstEnv,
         -- ^ Class instance environment from /home-package/ modules (including
 	-- this one); c.f. 'tcg_inst_env'
-	mg_fam_inst_env :: FamInstEnv
+	mg_fam_inst_env :: FamInstEnv,
         -- ^ Type-family instance enviroment for /home-package/ modules
 	-- (including this one); c.f. 'tcg_fam_inst_env'
+        mg_trust_pkg :: Bool
+        -- ^ Do we need to trust our own package for Safe Haskell?
+        -- See Note [RnNames . Trust Own Package]
     }
 
 -- The ModGuts takes on several slightly different forms:
@@ -862,7 +872,8 @@ emptyModIface mod
 	       mi_fix_fn    = emptyIfaceFixCache,
 	       mi_hash_fn   = emptyIfaceHashCache,
 	       mi_hpc       = False,
-	       mi_trust     = noIfaceTrustInfo
+	       mi_trust     = noIfaceTrustInfo,
+               mi_trust_pkg = False
     }		
 \end{code}
 
@@ -1435,19 +1446,21 @@ type IsBootInterface = Bool
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ Home-package module dependencies
-	 , dep_pkgs   :: [(PackageId, Bool)]
-	                -- ^ External package dependencies
-	 , dep_orphs  :: [Module]	    
-	                -- ^ Orphan modules (whether home or external pkg),
-	                -- *not* including family instance orphans as they
-	                -- are anyway included in 'dep_finsts'
-         , dep_finsts :: [Module]	    
+         , dep_pkgs   :: [(PackageId, Bool)]
+                       -- ^ External package dependencies. The bool indicates
+                        -- if the package is required to be trusted when the
+                        -- module is imported as a safe import (Safe Haskell).
+                        -- See Note [RnNames . Tracking Trust Transitively]
+         , dep_orphs  :: [Module]
+                        -- ^ Orphan modules (whether home or external pkg),
+                        -- *not* including family instance orphans as they
+                        -- are anyway included in 'dep_finsts'
+         , dep_finsts :: [Module]
                         -- ^ Modules that contain family instances (whether the
                         -- instances are from the home or an external package)
          }
   deriving( Eq )
-	-- Equality used only for old/new comparison in MkIface.addVersionInfo
-
+        -- Equality used only for old/new comparison in MkIface.addVersionInfo
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 noDependencies :: Dependencies
@@ -1643,21 +1656,37 @@ emptyMG = []
 -- * An external-core source module
 data ModSummary
    = ModSummary {
-        ms_mod       :: Module,			-- ^ Identity of the module
-	ms_hsc_src   :: HscSource,		-- ^ The module source either plain Haskell, hs-boot or external core
-        ms_location  :: ModLocation,		-- ^ Location of the various files belonging to the module
-        ms_hs_date   :: ClockTime,		-- ^ Timestamp of source file
-	ms_obj_date  :: Maybe ClockTime,	-- ^ Timestamp of object, if we have one
-        ms_srcimps   :: [Located (ImportDecl RdrName)],	-- ^ Source imports of the module
-        ms_imps      :: [Located (ImportDecl RdrName)],	-- ^ Non-source imports of the module
-        ms_hspp_file :: FilePath,		-- ^ Filename of preprocessed source file
-        ms_hspp_opts :: DynFlags,               -- ^ Cached flags from @OPTIONS@, @INCLUDE@
+        ms_mod          :: Module,		-- ^ Identity of the module
+	ms_hsc_src      :: HscSource,		-- ^ The module source either plain Haskell, hs-boot or external core
+        ms_location     :: ModLocation,		-- ^ Location of the various files belonging to the module
+        ms_hs_date      :: ClockTime,		-- ^ Timestamp of source file
+	ms_obj_date     :: Maybe ClockTime,	-- ^ Timestamp of object, if we have one
+        ms_srcimps      :: [Located (ImportDecl RdrName)],	-- ^ Source imports of the module
+        ms_textual_imps :: [Located (ImportDecl RdrName)],	-- ^ Non-source imports of the module from the module *text*
+        ms_hspp_file    :: FilePath,		-- ^ Filename of preprocessed source file
+        ms_hspp_opts    :: DynFlags,            -- ^ Cached flags from @OPTIONS@, @INCLUDE@
                                                 -- and @LANGUAGE@ pragmas in the modules source code
-	ms_hspp_buf  :: Maybe StringBuffer    	-- ^ The actual preprocessed source, if we have it
+	ms_hspp_buf     :: Maybe StringBuffer   -- ^ The actual preprocessed source, if we have it
      }
 
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
+
+ms_imps :: ModSummary -> [Located (ImportDecl RdrName)]
+ms_imps ms = ms_textual_imps ms ++ map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
+  where
+    -- This is a not-entirely-satisfactory means of creating an import that corresponds to an
+    -- import that did not occur in the program text, such as those induced by the use of
+    -- plugins (the -plgFoo flag)
+    mk_additional_import mod_nm = noLoc $ ImportDecl {
+      ideclName = noLoc mod_nm,
+      ideclPkgQual = Nothing,
+      ideclSource = False,
+      ideclQualified = False,
+      ideclAs = Nothing,
+      ideclHiding = Nothing,
+      ideclSafe = False
+    }
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
@@ -1684,7 +1713,7 @@ instance Outputable ModSummary where
              nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
                           text "ms_mod =" <+> ppr (ms_mod ms) 
 				<> text (hscSourceString (ms_hsc_src ms)) <> comma,
-                          text "ms_imps =" <+> ppr (ms_imps ms),
+                          text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]

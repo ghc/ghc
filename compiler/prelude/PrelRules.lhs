@@ -24,9 +24,10 @@ import Id
 import Literal
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
+import TysPrim
 import TyCon       ( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon     ( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
-import CoreUtils   ( cheapEqExpr )
+import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
@@ -37,6 +38,7 @@ import Outputable
 import FastString
 import StaticFlags ( opt_SimplExcessPrecision )
 import Constants
+import BasicTypes
 
 import Data.Bits as Bits
 import Data.Int    ( Int64 )
@@ -174,9 +176,10 @@ primOpRules op op_name = primop_rule op
     primop_rule WordEqOp   = relop (==)
     primop_rule WordNeOp   = relop (/=)
 
+    primop_rule SeqOp      = mkBasicRule op_name 4 seqRule
+    primop_rule SparkOp    = mkBasicRule op_name 4 sparkRule
+
     primop_rule _          = []
-
-
 \end{code}
 
 %************************************************************************
@@ -536,6 +539,27 @@ dataToTagRule id_unf [_, val_arg]
     Just (mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
 
 dataToTagRule _ _ = Nothing
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{Rules for seq# and spark#}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+-- seq# :: forall a s . a -> State# s -> (# State# s, a #)
+seqRule :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+seqRule _ [ty_a, Type ty_s, a, s] | exprIsHNF a
+   = Just (mkConApp (tupleCon Unboxed 2)
+                    [Type (mkStatePrimTy ty_s), ty_a, s, a])
+seqRule _ _ = Nothing
+
+-- spark# :: forall a s . a -> State# s -> (# State# s, a #)
+sparkRule :: IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
+sparkRule = seqRule -- reduce on HNF, just the same
+  -- XXX perhaps we shouldn't do this, because a spark eliminated by
+  -- this rule won't be counted as a dud at runtime?
 \end{code}
 
 %************************************************************************

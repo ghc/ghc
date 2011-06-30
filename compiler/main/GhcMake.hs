@@ -1254,7 +1254,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                              ms_hspp_file = hspp_fn,
                              ms_hspp_opts = dflags',
 			     ms_hspp_buf  = Just buf,
-                             ms_srcimps = srcimps, ms_imps = the_imps,
+                             ms_srcimps = srcimps, ms_textual_imps = the_imps,
 			     ms_hs_date = src_timestamp,
 			     ms_obj_date = obj_timestamp })
 
@@ -1379,8 +1379,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 			      ms_hspp_file = hspp_fn,
                               ms_hspp_opts = dflags',
 			      ms_hspp_buf  = Just buf,
-			      ms_srcimps   = srcimps,
-			      ms_imps      = the_imps,
+			      ms_srcimps      = srcimps,
+			      ms_textual_imps = the_imps,
 			      ms_hs_date   = src_timestamp,
 			      ms_obj_date  = obj_timestamp }))
 

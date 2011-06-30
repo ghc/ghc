@@ -169,7 +169,8 @@ deSugar hsc_env
 		mg_hpc_info  	= ds_hpc_info,
                 mg_modBreaks    = modBreaks,
                 mg_vect_decls   = ds_vects,
-                mg_vect_info    = noVectInfo
+                mg_vect_info    = noVectInfo,
+                mg_trust_pkg    = imp_trust_own_pkg imports
               }
         ; return (msgs, Just mod_guts)
 	}}}

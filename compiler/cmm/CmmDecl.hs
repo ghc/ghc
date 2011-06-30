@@ -63,13 +63,6 @@ data GenCmmTop d h g
         [d]
 
 
--- A basic block containing a single label, at the beginning.
--- The list of basic blocks in a top-level code block may be re-ordered.
--- Fall-through is not allowed: there must be an explicit jump at the
--- end of each basic block, but the code generator might rearrange basic
--- blocks in order to turn some jumps into fallthroughs.
-
-
 -----------------------------------------------------------------------------
 --     Info Tables
 -----------------------------------------------------------------------------

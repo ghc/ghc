@@ -599,17 +599,17 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-	imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
-	  -- ^ Home-package modules needed by the module being compiled
-	  --
-	  -- It doesn't matter whether any of these dependencies
-	  -- are actually /used/ when compiling the module; they
-	  -- are listed if they are below it at all.  For
-	  -- example, suppose M imports A which imports X.  Then
-	  -- compiling M might not need to consult X.hi, but X
-	  -- is still listed in M's dependencies.
+        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
+          -- ^ Home-package modules needed by the module being compiled
+          --
+          -- It doesn't matter whether any of these dependencies
+          -- are actually /used/ when compiling the module; they
+          -- are listed if they are below it at all.  For
+          -- example, suppose M imports A which imports X.  Then
+          -- compiling M might not need to consult X.hi, but X
+          -- is still listed in M's dependencies.
 
-	imp_dep_pkgs :: [PackageId],
+        imp_dep_pkgs :: [PackageId],
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.
@@ -623,12 +623,19 @@ data ImportAvails
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.
+          -- See Note [RnNames . Tracking Trust Transitively]
 
- 	imp_orphs :: [Module],
+        imp_trust_own_pkg :: Bool,
+          -- ^ Do we require that our own package is trusted?
+          -- This is to handle efficiently the case where a Safe module imports
+          -- a Trustworthy module that resides in the same package as it.
+          -- See Note [RnNames . Trust Own Package]
+
+        imp_orphs :: [Module],
           -- ^ Orphan modules below us in the import tree (and maybe including
           -- us for imported modules)
 
- 	imp_finsts :: [Module]
+        imp_finsts :: [Module]
           -- ^ Family instance modules below us in the import tree (and maybe
           -- including us for imported modules)
       }
@@ -640,34 +647,41 @@ mkModDeps deps = foldl add emptyUFM deps
 		 add env elt@(m,_) = addToUFM env m elt
 
 emptyImportAvails :: ImportAvails
-emptyImportAvails = ImportAvails { imp_mods       = emptyModuleEnv,
-				   imp_dep_mods   = emptyUFM,
-				   imp_dep_pkgs   = [],
-                                   imp_trust_pkgs = [],
-				   imp_orphs      = [],
-				   imp_finsts     = [] }
+emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
+                                   imp_dep_mods      = emptyUFM,
+                                   imp_dep_pkgs      = [],
+                                   imp_trust_pkgs    = [],
+                                   imp_trust_own_pkg = False,
+                                   imp_orphs         = [],
+                                   imp_finsts        = [] }
 
+-- | Union two ImportAvails
+--
+-- This function is a key part of Import handling, basically
+-- for each import we create a seperate ImportAvails structure
+-- and then union them all together with this function.
 plusImportAvails ::  ImportAvails ->  ImportAvails ->  ImportAvails
 plusImportAvails
   (ImportAvails { imp_mods = mods1,
-		  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1,
-                  imp_trust_pkgs = tpkgs1,
+                  imp_dep_mods = dmods1, imp_dep_pkgs = dpkgs1,
+                  imp_trust_pkgs = tpkgs1, imp_trust_own_pkg = tself1,
                   imp_orphs = orphs1, imp_finsts = finsts1 })
   (ImportAvails { imp_mods = mods2,
-		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
-                  imp_trust_pkgs = tpkgs2,
+                  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
+                  imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
-  = ImportAvails { imp_mods       = plusModuleEnv_C (++) mods1 mods2,
-		   imp_dep_mods   = plusUFM_C plus_mod_dep dmods1 dmods2,	
-		   imp_dep_pkgs   = dpkgs1 `unionLists` dpkgs2,
-		   imp_trust_pkgs = tpkgs1 `unionLists` tpkgs2,
-		   imp_orphs      = orphs1 `unionLists` orphs2,
-		   imp_finsts     = finsts1 `unionLists` finsts2 }
+  = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
+                   imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
+                   imp_dep_pkgs      = dpkgs1 `unionLists` dpkgs2,
+                   imp_trust_pkgs    = tpkgs1 `unionLists` tpkgs2,
+                   imp_trust_own_pkg = tself1 || tself2,
+                   imp_orphs         = orphs1 `unionLists` orphs2,
+                   imp_finsts        = finsts1 `unionLists` finsts2 }
   where
     plus_mod_dep (m1, boot1) (m2, boot2) 
-	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
-		-- Check mod-names match
-	  (m1, boot1 && boot2)	-- If either side can "see" a non-hi-boot interface, use that
+        = WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
+                -- Check mod-names match
+          (m1, boot1 && boot2) -- If either side can "see" a non-hi-boot interface, use that
 \end{code}
 
 %************************************************************************

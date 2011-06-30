@@ -35,8 +35,10 @@ module VarEnv (
 	RnEnv2, 
 	
 	-- ** Operations on RnEnv2s
-	mkRnEnv2, rnBndr2, rnBndrs2, rnOccL, rnOccR, inRnEnvL, inRnEnvR,
+	mkRnEnv2, rnBndr2, rnBndrs2,
+	rnOccL, rnOccR, inRnEnvL, inRnEnvR, rnOccL_maybe, rnOccR_maybe,
         rnBndrL, rnBndrR, nukeRnEnvL, nukeRnEnvR,
+        delBndrL, delBndrR, delBndrsL, delBndrsR,
         addRnInScopeSet,
         rnEtaL, rnEtaR,
 	rnInScope, rnInScopeSet, lookupRnInScope,
@@ -283,10 +285,23 @@ rnEtaR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
   where
     new_b = uniqAway in_scope bR
 
+delBndrL, delBndrR :: RnEnv2 -> Var -> RnEnv2
+delBndrL rn@(RV2 { envL = env, in_scope = in_scope }) v = rn { envL = env `delVarEnv` v, in_scope = in_scope `extendInScopeSet` v }
+delBndrR rn@(RV2 { envR = env, in_scope = in_scope }) v = rn { envR = env `delVarEnv` v, in_scope = in_scope `extendInScopeSet` v }
+
+delBndrsL, delBndrsR :: RnEnv2 -> [Var] -> RnEnv2
+delBndrsL rn@(RV2 { envL = env, in_scope = in_scope }) v = rn { envL = env `delVarEnvList` v, in_scope = in_scope `extendInScopeSetList` v }
+delBndrsR rn@(RV2 { envR = env, in_scope = in_scope }) v = rn { envR = env `delVarEnvList` v, in_scope = in_scope `extendInScopeSetList` v }
+
 rnOccL, rnOccR :: RnEnv2 -> Var -> Var
 -- ^ Look up the renaming of an occurrence in the left or right term
 rnOccL (RV2 { envL = env }) v = lookupVarEnv env v `orElse` v
 rnOccR (RV2 { envR = env }) v = lookupVarEnv env v `orElse` v
+
+rnOccL_maybe, rnOccR_maybe :: RnEnv2 -> Var -> Maybe Var
+-- ^ Look up the renaming of an occurrence in the left or right term
+rnOccL_maybe (RV2 { envL = env }) v = lookupVarEnv env v
+rnOccR_maybe (RV2 { envR = env }) v = lookupVarEnv env v
 
 inRnEnvL, inRnEnvR :: RnEnv2 -> Var -> Bool
 -- ^ Tells whether a variable is locally bound

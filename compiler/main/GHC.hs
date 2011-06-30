@@ -816,7 +816,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
          ms_obj_date = Nothing,
          -- Only handling the single-module case for now, so no imports.
          ms_srcimps = [],
-         ms_imps = [],
+         ms_textual_imps = [],
          -- No source file
          ms_hspp_file = "",
          ms_hspp_opts = dflags,

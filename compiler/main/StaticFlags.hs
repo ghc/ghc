@@ -72,6 +72,7 @@ module StaticFlags (
 
 	-- misc opts
 	opt_IgnoreDotGhci,
+	opt_GhciScripts,
 	opt_ErrorSpans,
 	opt_GranMacros,
 	opt_HiVersion,
@@ -92,7 +93,7 @@ module StaticFlags (
 import Config
 import FastString
 import Util
-import Maybes		( firstJusts )
+import Maybes		( firstJusts, catMaybes )
 import Panic
 
 import Data.Maybe       ( listToMaybe )
@@ -121,6 +122,7 @@ lookUp	       	 :: FastString -> Bool
 lookup_def_int   :: String -> Int -> Int
 lookup_def_float :: String -> Float -> Float
 lookup_str       :: String -> Maybe String
+lookup_all_str   :: String -> [String]
 
 -- holds the static opts while they're being collected, before
 -- being unsafely read by unpacked_static_opts below.
@@ -150,6 +152,10 @@ lookup_str sw
 	Just ('=' : str) -> Just str
 	Just str         -> Just str
 	Nothing		 -> Nothing	
+
+lookup_all_str sw = map f $ catMaybes (map (stripPrefix sw) staticFlags) where
+   f ('=' : str) = str
+   f str = str
 
 lookup_def_int sw def = case (lookup_str sw) of
 			    Nothing -> def		-- Use default
@@ -189,6 +195,9 @@ unpacked_opts =
 
 opt_IgnoreDotGhci :: Bool
 opt_IgnoreDotGhci		= lookUp (fsLit "-ignore-dot-ghci")
+ 
+opt_GhciScripts :: [String]
+opt_GhciScripts = lookup_all_str "-ghci-script"
 
 -- debugging options
 -- | Suppress all that is suppressable in core dumps.

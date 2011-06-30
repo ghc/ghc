@@ -49,10 +49,6 @@ instance Outputable CmmType where
 instance Outputable CmmCat where
   ppr FloatCat  = ptext $ sLit("F")
   ppr _         = ptext $ sLit("I")
--- Temp Jan 08
---  ppr FloatCat        = ptext $ sLit("float")
---  ppr BitsCat   = ptext $ sLit("bits")
---  ppr GcPtrCat  = ptext $ sLit("gcptr")
 
 -- Why is CmmType stratified?  For native code generation,
 -- most of the time you just want to know what sort of register
@@ -244,7 +240,7 @@ definition of a function is not visible at all of its call sites, so
 the compiler cannot infer the hints.
 
 Here in Cmm, we're taking a slightly different approach.  We include
-the int vs. float hint in the MachRep, because (a) the majority of
+the int vs. float hint in the CmmType, because (a) the majority of
 platforms have a strong distinction between float and int registers,
 and (b) we don't want to do any heavyweight hint-inference in the
 native code backend in order to get good code.  We're treating the
@@ -272,7 +268,7 @@ of analysis that propagates hints around.  In Cmm we don't want to
 have to do this, so we plump for having richer types and keeping the
 type information consistent.
 
-If signed/unsigned hints are missing from MachRep, then the only
+If signed/unsigned hints are missing from CmmType, then the only
 choice we have is (a), because we don't know whether the result of an
 operation should be sign- or zero-extended.
 
@@ -287,7 +283,7 @@ convention can specify that signed 8-bit quantities are passed as
 sign-extended 32 bit quantities, for example (this is the case on the
 PowerPC).  So we *do* need sign information on foreign call arguments.
 
-Pros for adding signed vs. unsigned to MachRep:
+Pros for adding signed vs. unsigned to CmmType:
 
   - It would let us use convention (b) above, and get easier
     code generation for extending loads.
@@ -300,10 +296,10 @@ Cons:
 
   - More complexity
 
-  - What is the MachRep for a VanillaReg?  Currently it is
+  - What is the CmmType for a VanillaReg?  Currently it is
     always wordRep, but now we have to decide whether it is
     signed or unsigned.  The same VanillaReg can thus have
-    different MachReps in different parts of the program.
+    different CmmType in different parts of the program.
 
   - Extra coercions cluttering up expressions.
 

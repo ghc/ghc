@@ -39,6 +39,7 @@ data Arch
         | ArchPPC
         | ArchPPC_64
         | ArchSPARC
+        | ArchARM
         deriving (Show, Eq)
 
 
@@ -63,6 +64,7 @@ target32Bit p = case platformArch p of
                 ArchPPC     -> True
                 ArchPPC_64  -> False
                 ArchSPARC   -> True
+                ArchARM     -> True
 
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
@@ -95,6 +97,8 @@ defaultTargetArch       = ArchPPC
 defaultTargetArch       = ArchPPC_64
 #elif sparc_TARGET_ARCH
 defaultTargetArch       = ArchSPARC
+#elif arm_TARGET_ARCH
+defaultTargetArch       = ArchARM
 #else
 defaultTargetArch       = ArchUnknown
 #endif

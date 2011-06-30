@@ -621,7 +621,7 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
                         any ev_var_matches (immSuperClasses clas' tys')
                       ev_var_matches _ = False
 
-    -- Overlap error because of SafeHaskell (first match should be the most
+    -- Overlap error because of Safe Haskell (first match should be the most
     -- specific match)
     mk_overlap_msg (matches, _unifiers, True)
       = ASSERT( length matches > 1 )

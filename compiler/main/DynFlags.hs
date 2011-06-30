@@ -30,13 +30,14 @@ module DynFlags (
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
         DPHBackend(..), dphPackageMaybe,
-        wayNames,
+        wayNames, dynFlagDependencies,
 
-        -- ** SafeHaskell
+        -- ** Safe Haskell
         SafeHaskellMode(..),
         safeHaskellOn, safeLanguageOn,
         safeDirectImpsReq, safeImplicitImpsReq,
 
+        -- ** System tool settings and locations
         Settings(..),
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         extraGccViaCFlags, systemPackageConfig,
@@ -325,7 +326,7 @@ data DynFlag
 
 data Language = Haskell98 | Haskell2010
 
--- | The various SafeHaskell modes
+-- | The various Safe Haskell modes
 data SafeHaskellMode
    = Sf_None
    | Sf_SafeImports
@@ -979,17 +980,22 @@ setLanguage l = upd f
                          extensionFlags = flattenExtensionFlags mLang oneoffs
                      }
 
+-- | Some modules have dependencies on others through the DynFlags rather than textual imports
+dynFlagDependencies :: DynFlags -> [ModuleName]
+dynFlagDependencies = pluginModNames
+
+-- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
 safeLanguageOn dflags = s == Sf_SafeLanguage
                      || s == Sf_TrustworthyWithSafeLanguage
                      || s == Sf_Safe
                           where s = safeHaskell dflags
 
--- | Test if SafeHaskell is on in some form
+-- | Test if Safe Haskell is on in some form
 safeHaskellOn :: DynFlags -> Bool
 safeHaskellOn dflags = safeHaskell dflags /= Sf_None
 
--- | Set a 'SafeHaskell' flag
+-- | Set a 'Safe Haskell' flag
 setSafeHaskell :: SafeHaskellMode -> DynP ()
 setSafeHaskell s = updM f
     where f dfs = do
@@ -997,18 +1003,18 @@ setSafeHaskell s = updM f
               safeM <- combineSafeFlags sf s
               return $ dfs { safeHaskell = safeM }
 
--- | Are all direct imports required to be safe for this SafeHaskell mode?
+-- | Are all direct imports required to be safe for this Safe Haskell mode?
 -- Direct imports are when the code explicitly imports a module
 safeDirectImpsReq :: DynFlags -> Bool
 safeDirectImpsReq = safeLanguageOn
 
--- | Are all implicit imports required to be safe for this SafeHaskell mode?
+-- | Are all implicit imports required to be safe for this Safe Haskell mode?
 -- Implicit imports are things in the prelude. e.g System.IO when print is used.
 safeImplicitImpsReq :: DynFlags -> Bool
 safeImplicitImpsReq = safeLanguageOn
 
--- | Combine two SafeHaskell modes correctly. Used for dealing with multiple flags.
--- This makes SafeHaskell very much a monoid but for now I prefer this as I don't
+-- | Combine two Safe Haskell modes correctly. Used for dealing with multiple flags.
+-- This makes Safe Haskell very much a monoid but for now I prefer this as I don't
 -- want to export this functionality from the module but do want to export the
 -- type constructors.
 combineSafeFlags :: SafeHaskellMode -> SafeHaskellMode -> DynP SafeHaskellMode
@@ -1038,7 +1044,7 @@ combineSafeFlags a b =
               | otherwise -> err
 
     where err = do
-              let s = "Incompatible SafeHaskell flags! (" ++ showPpr a ++ ", " ++ showPpr b ++ ")"
+              let s = "Incompatible Safe Haskell flags! (" ++ showPpr a ++ ", " ++ showPpr b ++ ")"
               addErr s
               return $ panic s -- Just for saftey instead of returning say, a
 
@@ -1271,7 +1277,7 @@ shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
                      flip xopt_unset Opt_TemplateHaskell)]
 
         safeFailure str = [L noSrcSpan $ "Warning: " ++ str ++ " is not allowed in"
-                                      ++ " SafeHaskell; ignoring " ++ str]
+                                      ++ " Safe Haskell; ignoring " ++ str]
 
 
 {- **********************************************************************
@@ -1365,7 +1371,7 @@ dynamic_flags = [
 
         ------- Output Redirection ------------------------------------------
   , flagA "odir"              (hasArg setObjectDir)
-  , flagA "o"                 (SepArg (upd . setOutputFile . Just))
+  , flagA "o"                 (sepArg (setOutputFile . Just))
   , flagA "ohi"               (hasArg (setOutputHi . Just ))
   , flagA "osuf"              (hasArg setObjectSuf)
   , flagA "hcsuf"             (hasArg setHcSuf)
@@ -1522,8 +1528,8 @@ dynamic_flags = [
   , flagA "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
         
         ------ Plugin flags ------------------------------------------------
-  , flagA "fplugin"     (hasArg addPluginModuleName)
-  , flagA "fplugin-opt" (hasArg addPluginModuleNameOption)
+  , flagA "fplugin"     (sepArg addPluginModuleName)
+  , flagA "fplugin-opt" (sepArg addPluginModuleNameOption)
     
         ------ Optimisation flags ------------------------------------------
   , flagA "O"      (noArgM (setOptLevel 1))
@@ -1541,7 +1547,7 @@ dynamic_flags = [
   , flagA "fno-spec-constr-count"       (noArg (\d -> d{ specConstrCount = Nothing }))
   , flagA "fliberate-case-threshold"    (intSuffix (\n d -> d{ liberateCaseThreshold = Just n }))
   , flagA "fno-liberate-case-threshold" (noArg (\d -> d{ liberateCaseThreshold = Nothing }))
-  , flagA "frule-check"                 (SepArg (\s -> upd (\d -> d{ ruleCheck = Just s })))
+  , flagA "frule-check"                 (sepArg (\s d -> d{ ruleCheck = Just s }))
   , flagA "fcontext-stack"              (intSuffix (\n d -> d{ ctxtStkDepth = n }))
   , flagA "fstrictness-before"          (intSuffix (\n d -> d{ strictnessBefore = n : strictnessBefore d }))
   , flagA "ffloat-lam-args"             (intSuffix (\n d -> d{ floatLamArgs = Just n }))
@@ -2136,6 +2142,9 @@ hasArg fn = HasArg (upd . fn)
 hasArgDF :: (String -> DynFlags -> DynFlags) -> String -> OptKind (CmdLineP DynFlags)
 hasArgDF fn deprec = HasArg (\s -> do { upd (fn s)
                                       ; deprecate deprec })
+
+sepArg :: (String -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+sepArg fn = SepArg (upd . fn)
 
 intSuffix :: (Int -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffix fn = IntSuffix (\n -> upd (fn n))

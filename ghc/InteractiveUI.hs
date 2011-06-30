@@ -426,7 +426,8 @@ runGHCi paths maybe_exprs = do
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
 
   when (read_dot_files) $ do
-    mcfgs0 <- sequence [ current_dir, app_user_dir, home_dir ]
+    mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ]
+                         ++ map (return . Just) opt_GhciScripts
     mcfgs <- liftIO $ mapM canonicalizePath' (catMaybes mcfgs0)
     mapM_ sourceConfigFile $ nub $ catMaybes mcfgs
         -- nub, because we don't want to read .ghci twice if the
@@ -1321,7 +1322,7 @@ runScript filename = do
               else return ()
 
 -----------------------------------------------------------------------------
--- Displaying SafeHaskell properties of a module
+-- Displaying Safe Haskell properties of a module
 
 isSafeCmd :: String -> InputT GHCi ()
 isSafeCmd m = 

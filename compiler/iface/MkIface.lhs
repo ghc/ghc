@@ -123,18 +123,19 @@ mkIface :: HscEnv
                                 --          to write it
 
 mkIface hsc_env maybe_old_fingerprint mod_details
-         ModGuts{     mg_module    = this_mod,
-		      mg_boot      = is_boot,
-		      mg_used_names = used_names,
-		      mg_deps      = deps,
-                      mg_dir_imps  = dir_imp_mods,
-		      mg_rdr_env   = rdr_env,
-		      mg_fix_env   = fix_env,
-		      mg_warns   = warns,
-	              mg_hpc_info  = hpc_info }
+         ModGuts{     mg_module     = this_mod,
+                      mg_boot       = is_boot,
+                      mg_used_names = used_names,
+                      mg_deps       = deps,
+                      mg_dir_imps   = dir_imp_mods,
+                      mg_rdr_env    = rdr_env,
+                      mg_fix_env    = fix_env,
+                      mg_warns      = warns,
+                      mg_hpc_info   = hpc_info,
+                      mg_trust_pkg  = self_trust }
         = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod is_boot used_names deps rdr_env 
-                   fix_env warns hpc_info dir_imp_mods mod_details
+                   this_mod is_boot used_names deps rdr_env fix_env
+                   warns hpc_info dir_imp_mods self_trust mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -159,12 +160,15 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
           let hpc_info = emptyHpcInfo other_hpc_info
           mkIface_ hsc_env maybe_old_fingerprint
                    this_mod (isHsBoot hsc_src) used_names deps rdr_env 
-                   fix_env warns hpc_info (imp_mods imports) mod_details
+                   fix_env warns hpc_info (imp_mods imports)
+                   (imp_trust_own_pkg imports) mod_details
         
 
 mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
         
+-- | Extract information from the rename and typecheck phases to produce
+-- a dependencies information for the module being compiled.
 mkDependencies :: TcGblEnv -> IO Dependencies
 mkDependencies
           TcGblEnv{ tcg_mod = mod,
@@ -172,9 +176,9 @@ mkDependencies
                     tcg_th_used = th_var
                   }
  = do 
-      th_used   <- readIORef th_var                     -- Whether TH is used
-      let
-        dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
+      -- Template Haskell used?
+      th_used <- readIORef th_var
+      let dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that 
@@ -182,30 +186,31 @@ mkDependencies
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency 
                 --  check.)
 
-        pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
-             | otherwise = imp_dep_pkgs imports
+          pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
+               | otherwise = imp_dep_pkgs imports
 
-        -- add in safe haskell 'package needs to be safe' bool
-        sorted_pkgs = sortBy stablePackageIdCmp pkgs
-        trust_pkgs  = imp_trust_pkgs imports
-        dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
+          -- Set the packages required to be Safe according to Safe Haskell.
+          -- See Note [RnNames . Tracking Trust Transitively]
+          sorted_pkgs = sortBy stablePackageIdCmp pkgs
+          trust_pkgs  = imp_trust_pkgs imports
+          dep_pkgs'   = map (\x -> (x, x `elem` trust_pkgs)) sorted_pkgs
 
       return Deps { dep_mods   = sortBy (stableModuleNameCmp `on` fst) dep_mods,
                     dep_pkgs   = dep_pkgs',
                     dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
-                -- sort to get into canonical order
-                -- NB. remember to use lexicographic ordering
+                    -- sort to get into canonical order
+                    -- NB. remember to use lexicographic ordering
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
          -> NameSet -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
-         -> ImportedMods
+         -> ImportedMods -> Bool
          -> ModDetails
-	 -> IO (Messages, Maybe (ModIface, Bool))
+         -> IO (Messages, Maybe (ModIface, Bool))
 mkIface_ hsc_env maybe_old_fingerprint 
          this_mod is_boot used_names deps rdr_env fix_env src_warns hpc_info
-         dir_imp_mods
+         dir_imp_mods pkg_trust_req
 	 ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
@@ -232,7 +237,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 				-- Sigh: see Note [Root-main Id] in TcRnDriver
 
 		; fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
-		; warns     = src_warns
+		; warns       = src_warns
 		; iface_rules = map (coreRuleToIfaceRule this_mod) rules
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
@@ -271,6 +276,7 @@ mkIface_ hsc_env maybe_old_fingerprint
 			mi_hash_fn   = deliberatelyOmitted "hash_fn",
 			mi_hpc       = isHpcUsed hpc_info,
 			mi_trust     = trust_info,
+			mi_trust_pkg = pkg_trust_req,
 
 			-- And build the cached values
 			mi_warn_fn = mkIfaceWarnCache warns,
@@ -527,9 +533,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                         -- dep_pkgs: see "Package Version Changes" on
                         -- wiki/Commentary/Compiler/RecompilationAvoidance
                        mi_trust iface0)
-                        -- TODO: Can probably make more fine grained. Only
-                        -- really need to have recompilation for overlapping
-                        -- instances.
+                        -- Make sure change of Safe Haskell mode causes recomp.
 
    -- put the declarations in a canonical order, sorted by OccName
    let sorted_decls = Map.elems $ Map.fromList $
@@ -918,7 +922,7 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
                 Just _                  -> pprPanic "mkUsage: empty direct import" empty
                 Nothing                 -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
-                -- is used in the source code. We require them to be safe in SafeHaskell
+                -- is used in the source code. We require them to be safe in Safe Haskell
     
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 

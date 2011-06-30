@@ -487,6 +487,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ghci-script</option></entry>
+	      <entry>Load the given additional <filename>.ghci</filename> file</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-read-dot-ghci</option></entry>
 	      <entry>Enable reading of <filename>.ghci</filename> files</entry>
 	      <entry>static</entry>
