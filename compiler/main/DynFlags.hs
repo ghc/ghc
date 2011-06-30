@@ -30,7 +30,7 @@ module DynFlags (
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
         DPHBackend(..), dphPackageMaybe,
-        wayNames,
+        wayNames, dynFlagDependencies,
 
         -- ** Safe Haskell
         SafeHaskellMode(..),
@@ -979,6 +979,10 @@ setLanguage l = upd f
                          language = mLang,
                          extensionFlags = flattenExtensionFlags mLang oneoffs
                      }
+
+-- | Some modules have dependencies on others through the DynFlags rather than textual imports
+dynFlagDependencies :: DynFlags -> [ModuleName]
+dynFlagDependencies = pluginModNames
 
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool

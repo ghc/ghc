@@ -17,7 +17,7 @@ module HscTypes (
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods, ImportedModsVal,
 
-	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
+	ModSummary(..), ms_imps, ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath,
 
         -- * Information about the module being compiled
@@ -131,7 +131,7 @@ import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
-                          DynFlag(..), SafeHaskellMode(..) )
+                          DynFlag(..), SafeHaskellMode(..), dynFlagDependencies )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -1656,21 +1656,37 @@ emptyMG = []
 -- * An external-core source module
 data ModSummary
    = ModSummary {
-        ms_mod       :: Module,			-- ^ Identity of the module
-	ms_hsc_src   :: HscSource,		-- ^ The module source either plain Haskell, hs-boot or external core
-        ms_location  :: ModLocation,		-- ^ Location of the various files belonging to the module
-        ms_hs_date   :: ClockTime,		-- ^ Timestamp of source file
-	ms_obj_date  :: Maybe ClockTime,	-- ^ Timestamp of object, if we have one
-        ms_srcimps   :: [Located (ImportDecl RdrName)],	-- ^ Source imports of the module
-        ms_imps      :: [Located (ImportDecl RdrName)],	-- ^ Non-source imports of the module
-        ms_hspp_file :: FilePath,		-- ^ Filename of preprocessed source file
-        ms_hspp_opts :: DynFlags,               -- ^ Cached flags from @OPTIONS@, @INCLUDE@
+        ms_mod          :: Module,		-- ^ Identity of the module
+	ms_hsc_src      :: HscSource,		-- ^ The module source either plain Haskell, hs-boot or external core
+        ms_location     :: ModLocation,		-- ^ Location of the various files belonging to the module
+        ms_hs_date      :: ClockTime,		-- ^ Timestamp of source file
+	ms_obj_date     :: Maybe ClockTime,	-- ^ Timestamp of object, if we have one
+        ms_srcimps      :: [Located (ImportDecl RdrName)],	-- ^ Source imports of the module
+        ms_textual_imps :: [Located (ImportDecl RdrName)],	-- ^ Non-source imports of the module from the module *text*
+        ms_hspp_file    :: FilePath,		-- ^ Filename of preprocessed source file
+        ms_hspp_opts    :: DynFlags,            -- ^ Cached flags from @OPTIONS@, @INCLUDE@
                                                 -- and @LANGUAGE@ pragmas in the modules source code
-	ms_hspp_buf  :: Maybe StringBuffer    	-- ^ The actual preprocessed source, if we have it
+	ms_hspp_buf     :: Maybe StringBuffer   -- ^ The actual preprocessed source, if we have it
      }
 
 ms_mod_name :: ModSummary -> ModuleName
 ms_mod_name = moduleName . ms_mod
+
+ms_imps :: ModSummary -> [Located (ImportDecl RdrName)]
+ms_imps ms = ms_textual_imps ms ++ map mk_additional_import (dynFlagDependencies (ms_hspp_opts ms))
+  where
+    -- This is a not-entirely-satisfactory means of creating an import that corresponds to an
+    -- import that did not occur in the program text, such as those induced by the use of
+    -- plugins (the -plgFoo flag)
+    mk_additional_import mod_nm = noLoc $ ImportDecl {
+      ideclName = noLoc mod_nm,
+      ideclPkgQual = Nothing,
+      ideclSource = False,
+      ideclQualified = False,
+      ideclAs = Nothing,
+      ideclHiding = Nothing,
+      ideclSafe = False
+    }
 
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
@@ -1697,7 +1713,7 @@ instance Outputable ModSummary where
              nest 3 (sep [text "ms_hs_date = " <> text (show (ms_hs_date ms)),
                           text "ms_mod =" <+> ppr (ms_mod ms) 
 				<> text (hscSourceString (ms_hsc_src ms)) <> comma,
-                          text "ms_imps =" <+> ppr (ms_imps ms),
+                          text "ms_textual_imps =" <+> ppr (ms_textual_imps ms),
                           text "ms_srcimps =" <+> ppr (ms_srcimps ms)]),
              char '}'
             ]
