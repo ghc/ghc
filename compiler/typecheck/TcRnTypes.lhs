@@ -599,17 +599,17 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-	imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
-	  -- ^ Home-package modules needed by the module being compiled
-	  --
-	  -- It doesn't matter whether any of these dependencies
-	  -- are actually /used/ when compiling the module; they
-	  -- are listed if they are below it at all.  For
-	  -- example, suppose M imports A which imports X.  Then
-	  -- compiling M might not need to consult X.hi, but X
-	  -- is still listed in M's dependencies.
+        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
+          -- ^ Home-package modules needed by the module being compiled
+          --
+          -- It doesn't matter whether any of these dependencies
+          -- are actually /used/ when compiling the module; they
+          -- are listed if they are below it at all.  For
+          -- example, suppose M imports A which imports X.  Then
+          -- compiling M might not need to consult X.hi, but X
+          -- is still listed in M's dependencies.
 
-	imp_dep_pkgs :: [PackageId],
+        imp_dep_pkgs :: [PackageId],
           -- ^ Packages needed by the module being compiled, whether directly,
           -- or via other modules in this package, or via modules imported
           -- from other packages.

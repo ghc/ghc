@@ -53,6 +53,55 @@ import qualified Data.Map as Map
 %*                                                                      *
 %************************************************************************
 
+Note [Tracking Trust Transitively]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we import a package as well as checking that the direct imports are safe
+according to the rules outlined in the Note [HscMain . Safe Haskell Trust Check]
+we must also check that these rules hold transitively for all dependent modules
+and packages. Doing this without caching any trust information would be very
+slow as we would need to touch all packages and interface files a module depends
+on. To avoid this we make use of the property that if a modules Safe Haskell
+mode changes, this triggers a recompilation from that module in the dependcy
+graph. So we can just worry mostly about direct imports. There is one trust
+property that can change for a package though without recompliation being
+triggered, package trust. So we must check that all packages a module
+tranitively depends on to be trusted are still trusted when we are compiling
+this module (as due to recompilation avoidance some modules below may not be
+considered trusted any more without recompilation being triggered).
+
+We handle this by augmenting the existing transitive list of packages a module M
+depends on with a bool for each package that says if it must be trusted when the
+module M is being checked for trust. This list of trust required packages for a
+single import is gathered in the rnImportDecl function and stored in an
+ImportAvails data structure. The union of these trust required packages for all
+imports is done by the rnImports function using the combine function which calls
+the plusImportAvails function that is a union operation for the ImportAvails
+type. This gives us in an ImportAvails structure all packages required to be
+trusted for the module we are currently compiling. Checking that these packages
+are still trusted (and that direct imports are trusted) is done in
+HscMain.checkSafeImports.
+
+See the note below, [Trust Own Package] for a corner case in this method and
+how its handled.
+
+
+Note [Trust Own Package]
+~~~~~~~~~~~~~~~~~~~~~~~~
+There is a corner case of package trust checking that the usual transitive check
+doesn't cover. (For how the usual check operates see the Note [Tracking Trust
+Transitively] below). The case is when you import a -XSafe module M and M
+imports a -XTrustworthy module N. If N resides in a different package than M,
+then the usual check works as M will record a package dependency on N's package
+and mark it as required to be trusted. If N resides in the same package as M
+though, then importing M should require its own package be trusted due to N
+(since M is -XSafe so doesn't create this requirement by itself). The usual
+check fails as a module doesn't record a package dependency of its own package.
+So instead we now have a bool field in a modules interface file that simply
+states if the module requires its own package to be trusted. This field avoids
+us having to load all interface files that the module depends on to see if one
+is trustworthy.
+
+
 Note [Trust Transitive Property]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 So there is an interesting design question in regards to transitive trust

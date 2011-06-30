@@ -1446,19 +1446,21 @@ type IsBootInterface = Bool
 data Dependencies
   = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
                         -- ^ Home-package module dependencies
-	 , dep_pkgs   :: [(PackageId, Bool)]
-	                -- ^ External package dependencies
-	 , dep_orphs  :: [Module]	    
-	                -- ^ Orphan modules (whether home or external pkg),
-	                -- *not* including family instance orphans as they
-	                -- are anyway included in 'dep_finsts'
-         , dep_finsts :: [Module]	    
+         , dep_pkgs   :: [(PackageId, Bool)]
+                       -- ^ External package dependencies. The bool indicates
+                        -- if the package is required to be trusted when the
+                        -- module is imported as a safe import (Safe Haskell).
+                        -- See Note [RnNames . Tracking Trust Transitively]
+         , dep_orphs  :: [Module]
+                        -- ^ Orphan modules (whether home or external pkg),
+                        -- *not* including family instance orphans as they
+                        -- are anyway included in 'dep_finsts'
+         , dep_finsts :: [Module]
                         -- ^ Modules that contain family instances (whether the
                         -- instances are from the home or an external package)
          }
   deriving( Eq )
-	-- Equality used only for old/new comparison in MkIface.addVersionInfo
-
+        -- Equality used only for old/new comparison in MkIface.addVersionInfo
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 noDependencies :: Dependencies
