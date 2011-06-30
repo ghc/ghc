@@ -252,7 +252,8 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope $$ doc) 
+  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v 
+                            $$ ppr in_scope) 
 		Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
