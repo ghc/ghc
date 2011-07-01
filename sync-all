@@ -5,8 +5,8 @@ use Cwd;
 
 # Usage:
 #
-# ./sync-all [-q] [-s] [--ignore-failure] [-r repo]
-#            [--nofib] [--testsuite] [--checked-out] cmd [git flags]
+# ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
+#            [--nofib] [--extra] [--testsuite] cmd [git flags]
 #
 # Applies the command "cmd" to each repository in the tree.
 # sync-all will try to do the right thing for both git and darcs repositories.
@@ -30,6 +30,12 @@ use Cwd;
 #   the local filesystem is assumed to be checked-out, and repos accessed
 #   via HTTP or SSH are assumed to be in the main repo layout; use
 #   --checked-out to override the latter.
+#
+#   --bare says that the local repo is in bare layout, same as the main repo.
+#   It also means that these repos are bare. You only have to use this flag if
+#   you don't have a bare ghc.git in the current directory and would like to 'get'
+#   all of the repos bare. Requires packages.conf to be present in the current
+#   directory (a renamed packages file from the main ghc repo).
 #
 #   --nofib, --testsuite also get the nofib and testsuite repos respectively
 #
@@ -65,14 +71,14 @@ my $defaultrepo;
 my @packages;
 my $verbose = 2;
 my $ignore_failure = 0;
-my $checked_out_flag = 0;
+my $checked_out_flag = 0; # NOT the opposite of bare_flag (describes remote repo state)
 my $get_mode;
+my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo state)
 
 my %tags;
 
 # Figure out where to get the other repositories from.
 sub getrepo {
-    my $basedir = ".";
     my $repo;
 
     if (defined($defaultrepo)) {
@@ -81,9 +87,14 @@ sub getrepo {
     } else {
         # Figure out where to get the other repositories from,
         # based on where this GHC repo came from.
-        my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
-        my $remote = `git config branch.$branch.remote`;         chomp $remote;
-        $repo = `git config remote.$remote.url`;       chomp $repo;
+        my $git_dir = $bare_flag ? "--git-dir=ghc.git" : "";
+        my $branch  = `git $git_dir branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
+        my $remote  = `git $git_dir config branch.$branch.remote`;         chomp $remote;
+        if ($remote eq "") {
+            # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
+            $remote = "origin";
+        }
+        $repo       = `git $git_dir config remote.$remote.url`;            chomp $repo;
     }
 
     my $repo_base;
@@ -117,7 +128,7 @@ sub getrepo {
         }
     }
     elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
-        # Local filesystem, either absolute or relative path
+        # Local filesystem, either absolute (C:/ or /) or relative (../) path
         $repo_base = $repo;
         if (-f "$repo/HEAD") {
             # assume a local mirror:
@@ -142,7 +153,9 @@ sub parsePackages {
     my @repos;
     my $lineNum;
 
-    open IN, "< packages" or die "Can't open packages file";
+    open IN, "< packages.conf"
+        or open IN, "< packages" # clashes with packages directory when using --bare
+        or die "Can't open packages file (or packages.conf)";
     @repos = <IN>;
     close IN;
 
@@ -254,28 +267,25 @@ sub scmall {
     push(@args, @_);
 
     for $line (@packages) {
-
-        $localpath  = $$line{"localpath"};
         $tag        = $$line{"tag"};
-        $remotepath = $$line{"remotepath"};
         $scm        = $$line{"vcs"};
+        # Use the "remote" structure for bare git repositories
+        $localpath  = ($bare_flag && $scm eq "git") ?
+                      $$line{"remotepath"} : $$line{"localpath"};
+        $remotepath = ($checked_out_flag) ?
+                      $$line{"localpath"}  : $$line{"remotepath"};
 
         # Check the SCM is OK as early as possible
         die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
 
         # We can't create directories on GitHub, so we translate
-        # "package/foo" into "package-foo".
+        # "packages/foo" into "package-foo".
         if ($is_github_repo) {
             $remotepath =~ s/\//-/;
         }
 
-        # Work out the path for this package in the repo we pulled from
-        if ($checked_out_tree) {
-            $path = "$repo_base/$localpath";
-        }
-        else {
-            $path = "$repo_base/$remotepath";
-        }
+        # Construct the path for this package in the repo we pulled from
+        $path = "$repo_base/$remotepath";
 
         if ($command =~ /^(?:g|ge|get)$/) {
             # Skip any repositories we have not included the tag for
@@ -306,18 +316,20 @@ sub scmall {
                 scm (".", $scm, "get", $get_mode, $path, $localpath, @args);
             }
             else {
-                scm (".", $scm, "clone", $path, $localpath, @args);
+                scm (".", $scm, "clone", $path, $localpath, @args, $bare_flag);
                 scm ($localpath, $scm, "config", "core.ignorecase", "true");
             }
             next;
         }
 
-        if (-d "$localpath/_darcs") {
-            if (-d "$localpath/.git") {
+        my $darcs_repo_present = 1 if -d "$localpath/_darcs";
+        my $git_repo_present = 1 if -d "$localpath/.git" || ($bare_flag && -d "$localpath");
+        if ($darcs_repo_present) {
+            if ($git_repo_present) {
                 die "Found both _darcs and .git in $localpath";
             }
             $scm = "darcs";
-        } elsif (-d "$localpath/.git") {
+        } elsif ($git_repo_present) {
             $scm = "git";
         } elsif ($tag eq "") {
             die "Required repo $localpath is missing";
@@ -417,14 +429,13 @@ sub scmall {
     }
 }
 
-
 sub help()
 {
         # Get the built in help
         my $help = <<END;
 Usage:
 
-  ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out]
+  ./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
              [--package-tag1] ... [--package-tagN] command
 
 Supported commands:
@@ -450,12 +461,18 @@ Supported commands:
  * config
  * log
 
+Note: --cheched-out and --bare flags are NOT the opposite of each other.
+      --checked-out: describes the layout of the remote repository tree.
+      --bare:        describes the layout of the local repository tree.
+
 Available package-tags are:
 END
 
         # Collect all the tags in the packages file
         my %available_tags;
-        open IN, "< packages" or die "Can't open packages file";
+        open IN, "< packages.conf"
+            or open IN, "< packages" # clashes with packages directory when using --bare
+            or die "Can't open packages file (or packages.conf)";
         while (<IN>) {
             chomp;
             if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
@@ -476,9 +493,6 @@ END
 }
 
 sub main {
-    if (! -d ".git" || ! -d "compiler") {
-        die "error: sync-all must be run from the top level of the ghc tree."
-    }
 
     $tags{"-"} = 1;
     $tags{"dph"} = 1;
@@ -502,10 +516,15 @@ sub main {
         elsif ($arg eq "--complete" || $arg eq "--partial") {
             $get_mode = $arg;
         }
-        # Use --checked-out if the remote repos are a checked-out tree,
+        # Use --checked-out if the _remote_ repos are a checked-out tree,
         # rather than the master trees.
         elsif ($arg eq "--checked-out") {
             $checked_out_flag = 1;
+        }
+        # Use --bare if the _local_ repos are bare repos,
+        # rather than a checked-out tree.
+        elsif ($arg eq "--bare") {
+            $bare_flag = $arg;
         }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
@@ -522,6 +541,22 @@ sub main {
             }
             last;
         }
+    }
+
+    # check for ghc repositories in cwd
+    my $checked_out_found = 1 if (-d ".git" && -d "compiler");
+    my $bare_found = 1 if (-d "ghc.git");
+
+    if ($bare_flag && ! $bare_found && ! $defaultrepo) {
+        die "error: bare repository ghc.git not found.\n"
+          . "       Either clone a bare ghc repo first or specify the repo location. E.g.:\n"
+          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://darcs.haskell.org/ get\n"
+    }
+    elsif ($bare_found) {
+        $bare_flag = "--bare";
+    }
+    elsif (! $bare_flag && ! $checked_out_found) {
+        die "error: sync-all must be run from the top level of the ghc tree.";
     }
 
     if ($#_ eq -1) {
