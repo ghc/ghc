@@ -89,19 +89,24 @@ instance Monoid SCStats where
 
 
 supercompile :: M.Map Var Term -> Term -> (SCStats, Term)
-supercompile unfoldings e = pprTraceSC "all input FVs" (ppr input_fvs) $ second fVedTermToTerm $ runScpM $ liftM snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
-  where anned_e = toAnnedTerm tag_ids e
-        input_fvs = annedTermFreeVars anned_e
-        state = normalise ((bLOAT_FACTOR - 1) * annedSize anned_e, Heap (M.fromDistinctAscList anned_h_kvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
+supercompile unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
+                            pprTraceSC "all input FVs" (ppr input_fvs) $
+                            second fVedTermToTerm $ runScpM $ liftM snd $ sc (mkHistory (cofmap fst wQO)) S.empty state
+  where (tag_ids0, tag_ids1) = splitUniqSupply tagUniqSupply
+        anned_e = toAnnedTerm tag_ids0 e
         
-        (tag_ids, anned_h_kvs) = mapAccumL add_one_heap_binding tagUniqSupply (varSetElems input_fvs)
-          where add_one_heap_binding tag_ids0 x' = (tag_ids2, (x', hb))
-                  where (hb, tag_ids2) = case M.lookup x' unfoldings of
-                                            Nothing | let (i, tag_ids1) = takeUniqFromSupply tag_ids0
-                                                    -> (environmentallyBound (mkTag (getKey i)), tag_ids1)
-                                            Just e  | let (tag_unf_ids, tag_ids1) = splitUniqSupply tag_ids0
-                                                          anned_e = toAnnedTerm tag_unf_ids e
-                                                    -> (letBound (mkIdentityRenaming (annedFreeVars anned_e), anned_e), tag_ids1)
+        ((input_fvs, tag_ids2), h_unfoldings) = mapAccumL add_one_unfolding (annedTermFreeVars anned_e, tag_ids1) (M.toList unfoldings)
+          where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', letBound (mkIdentityRenaming (annedFreeVars anned_e), anned_e)))
+                    where (tag_unf_ids, tag_ids2) = splitUniqSupply tag_ids1
+                          anned_e = toAnnedTerm tag_unf_ids e
+                          input_fvs'' = input_fvs' `unionVarSet` annedFreeVars anned_e
+        
+        (_, h_fvs) = mapAccumL add_one_fv tag_ids2 (varSetElems input_fvs)
+          where add_one_fv tag_ids2 x' = (tag_ids3, (x', environmentallyBound (mkTag (getKey i))))
+                    where (i, tag_ids3) = takeUniqFromSupply tag_ids2
+        
+        -- NB: h_fvs might contain bindings for things also in h_unfoldings, so union them in the right order
+        state = normalise ((bLOAT_FACTOR - 1) * annedSize anned_e, Heap (M.fromList h_unfoldings `M.union` M.fromList h_fvs) (mkInScopeSet input_fvs), [], (mkIdentityRenaming input_fvs, anned_e))
 
 --
 -- == Bounded multi-step reduction ==
