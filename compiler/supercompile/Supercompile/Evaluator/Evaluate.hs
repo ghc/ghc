@@ -89,7 +89,7 @@ step' normalising state =
     go (deeds, heap@(Heap h ids), k, (rn, e)) 
      | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, heap, k, anned_a)
      | otherwise = case annee e of
-        Var x            -> go_question (deeds, heap, k, fmap (const (renameId rn x)) e)
+        Var x            -> go_question (deeds, heap, k, annedVar (annedTag e) (renameId rn x))
         Value v          -> pprPanic "step': values are always answers" (ppr v)
         TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   : k, (rn, e))
         App e x          -> go (deeds, heap,        Tagged tg (Apply (renameId rn x))                                            : k, (rn, e))
