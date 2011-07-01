@@ -5075,10 +5075,6 @@ class (F a ~ b) => C a b where
       with the class head.  Method signatures are not affected by that
       process.
     </para>
-    <para>
-      NB: Equalities in superclass contexts are not fully implemented in
-      GHC 6.10.
-    </para>
   </sect3>
 
   <sect3 id-="ty-fams-in-instances">
