@@ -140,7 +140,7 @@ supercompile unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
 --
 -- TODO: have the garbage collector collapse (let x = True in x) to (True) -- but note that this requires onceness analysis
 gc :: State -> (PureHeap, State)
-gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr ("gc", stateUncoveredVars gced_state, PrettyDoc (pPrintFullState _state), PrettyDoc (pPrintFullState gced_state)))
+gc _state@(deeds0, Heap h ids, k, in_e) = ASSERT2(isEmptyVarSet (stateUncoveredVars gced_state), ppr (stateUncoveredVars gced_state, PrettyDoc (pPrintFullState _state), PrettyDoc (pPrintFullState gced_state)))
                                           (h_dead, gced_state)
   where
     gced_state = (deeds2, Heap h' ids, k', in_e)
@@ -443,7 +443,7 @@ promise p x' opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted
                         in k () (s { fulfilments = fs' })
       
       fmap (((abstracted_set `unionVarSet` stateLetBounders (unI (meaning p))) `unionVarSet`) . mkVarSet) getPromiseNames >>=
-        \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr ("sc: FVs", fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
+        \fvs -> ASSERT2(optimised_fvs `subVarSet` fvs, ppr (fun p, optimised_fvs `minusVarSet` fvs, fvs, optimised_e)) return ()
       
       return (a, var (fun p) `tyVarIdApps` abstracted p)
 

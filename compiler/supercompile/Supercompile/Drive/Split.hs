@@ -171,11 +171,11 @@ generalise gen (deeds, Heap h ids, k, qa) = do
         NoGeneralisation -> Nothing
         AllEligible -> guard (not (IS.null gen_kfs) || not (isEmptyVarSet gen_xs'')) >> return (gen_kfs, gen_xs'')
           where gen_kfs = IS.fromList [i   | (i, kf) <- named_k, generaliseStackFrame gen kf]
-                gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList h, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr ("Bad generalisation", x'', hb, heapBindingTag hb)) True]
+                gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList h, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
         StackFirst -> (guard (not (IS.null gen_kfs)) >> return (gen_kfs, emptyVarSet)) `mplus`
                       (guard (not (isEmptyVarSet gen_xs''))  >> return (IS.empty, gen_xs''))
           where gen_kfs = IS.fromList [i   | (i, kf) <- named_k, generaliseStackFrame gen kf]
-                gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList h, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr ("Bad generalisation", x'', hb, heapBindingTag hb)) True]
+                gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList h, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
         DependencyOrder want_first -> listToMaybe ((if want_first then id else reverse) possibilities)
           where -- We consider possibilities starting from the root of the term -- i.e. the bottom of the stack.
                 -- This is motivated by how the interaction with subgraph generalisation for TreeFlip/TreeSum.
@@ -195,14 +195,14 @@ generalise gen (deeds, Heap h ids, k, qa) = do
                     (pending_hbs, unreached_hbs') = M.partitionWithKey (\x' _hb -> x' `elemVarSet` (pending_xs' `unionVarSet` extra_pending_xs')) unreached_hbs
                     
                     gen_kf_is = IS.fromList [i  | (i, kf) <- pending_kfs, generaliseStackFrame gen kf]
-                    gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList pending_hbs, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr ("Bad generalisation", x'', hb, heapBindingTag hb)) True]
+                    gen_xs'' = mkVarSet [x'' | (x'', hb) <- M.toList pending_hbs, generaliseHeapBinding gen x'' hb, ASSERT2(not (howBound hb == LambdaBound && isNothing (heapBindingTerm hb)), ppr (x'', hb, heapBindingTag hb)) True]
                     
                     reached_xs' = M.foldrWithKey (\_x' hb fvs -> heapBindingFreeVars hb `unionVarSet` fvs)
                                                  (unionVarSets (map (stackFrameFreeVars . tagee . snd) pending_kfs))
                                                  pending_hbs
     
     -- If we can find some fraction of the stack or heap to drop that looks like it will be admissable, just residualise those parts and continue
-    pprTrace "generalise" (ppr ("gen_kfs", gen_kfs, "gen_xs'", gen_xs')) $ return ()
+    pprTrace "generalise: (gen_kfs, gen_xs')" (ppr (gen_kfs, gen_xs')) $ return ()
     
     let (ctxt_id, ctxt_ids) = takeUniqFromSupply splitterUniqSupply
     return $ \opt -> generaliseSplit opt ctxt_ids (gen_kfs, gen_xs') deeds (Heap h ids, named_k, \ids -> (qaScruts qa, oneBracketed (Once ctxt_id, denormalise (0, Heap M.empty ids, [], qa))))
@@ -458,7 +458,7 @@ optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
     
     MASSERT2(noChange (sumMap (releaseBracketedDeeds releaseStateDeed) bracketeds_heap        + releaseBracketedDeeds releaseStateDeed bracketed_focus        + deeds)
                       (sumMap (releaseBracketedDeeds releaseStateDeed) bracketeds_deeded_heap + releaseBracketedDeeds releaseStateDeed bracketed_deeded_focus + deeds_initial),
-             ppr ("optimiseSplit: deeds lost or gained!", deeds, (deeds_initial, deeds_focus, deedss_heap)))
+             ppr (deeds, (deeds_initial, deeds_focus, deedss_heap)))
     
     -- 1) Recursively drive the focus itself
     let extra_statics = dataSetToVarSet (M.keysSet bracketeds_heap)
@@ -775,7 +775,7 @@ transitiveInline :: PureHeap          -- ^ What to inline. We have not claimed d
 transitiveInline init_h_inlineable _state@(deeds, Heap h ids, k, in_e)
     = -- (if not (S.null not_inlined_vs') then traceRender ("transitiveInline: generalise", not_inlined_vs') else id) $
       -- traceRender ("transitiveInline", "had bindings for", pureHeapBoundVars init_h_inlineable, "FVs were", state_fvs, "so inlining", pureHeapBoundVars h') $
-      ASSERT2(isEmptyVarSet (unnormalisedStateUncoveredVars final_state), ppr ("transitiveInline", M.keysSet h_inlineable, PrettyDoc $ pPrintFullUnnormalisedState _state, PrettyDoc $ pPrintFullUnnormalisedState final_state, unnormalisedStateUncoveredVars final_state, M.keysSet h', live'))
+      ASSERT2(isEmptyVarSet (unnormalisedStateUncoveredVars final_state), ppr (M.keysSet h_inlineable, PrettyDoc $ pPrintFullUnnormalisedState _state, PrettyDoc $ pPrintFullUnnormalisedState final_state, unnormalisedStateUncoveredVars final_state, M.keysSet h', live'))
       final_state
   where
     final_state = (deeds', Heap h' ids, k, in_e)
