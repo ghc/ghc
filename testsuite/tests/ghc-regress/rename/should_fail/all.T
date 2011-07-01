@@ -80,3 +80,4 @@ test('T4042', normal, compile_fail, [''])
 test('mc13', normal, compile_fail, [''])
 test('mc14', normal, compile_fail, [''])
 test('T5211', normal, compile, [''])  # Warnings only
+test('T1595', normal, compile_fail, ['']) 
