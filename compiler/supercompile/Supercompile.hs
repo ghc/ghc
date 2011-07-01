@@ -205,9 +205,9 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
                         , Just e <- [varUnfolding x]]
 
     varUnfolding x
-      | not (shouldExposeUnfolding x)      = Nothing
       | Just pop <- isPrimOpId_maybe x     = Just $ primOpUnfolding pop
       | Just dc <- isDataConWorkId_maybe x = Just $ dataUnfolding dc
+      | not (shouldExposeUnfolding x)      = Nothing
       | otherwise                          = fmap coreExprToTerm $ maybeUnfoldingTemplate (realIdUnfolding x)
        -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
     
