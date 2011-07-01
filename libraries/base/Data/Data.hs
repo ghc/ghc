@@ -587,7 +587,7 @@ repConstr dt cr =
         (IntRep,    IntConstr i)      -> mkIntConstr dt i
         (FloatRep,  FloatConstr f)    -> mkRealConstr dt f
         (CharRep,   CharConstr c)     -> mkCharConstr dt c
-        _ -> error "repConstr"
+        _ -> error "Data.Data.repConstr"
 
 
 
@@ -625,7 +625,7 @@ mkConstr dt str fields fix =
 dataTypeConstrs :: DataType -> [Constr]
 dataTypeConstrs dt = case datarep dt of
                         (AlgRep cons) -> cons
-                        _ -> error "dataTypeConstrs"
+                        _ -> error "Data.Data.dataTypeConstrs"
 
 
 -- | Gets the field labels of a constructor.  The list of labels
@@ -698,21 +698,21 @@ isAlgType dt = case datarep dt of
 indexConstr :: DataType -> ConIndex -> Constr
 indexConstr dt idx = case datarep dt of
                         (AlgRep cs) -> cs !! (idx-1)
-                        _           -> error "indexConstr"
+                        _           -> error "Data.Data.indexConstr"
 
 
 -- | Gets the index of a constructor (algebraic datatypes only)
 constrIndex :: Constr -> ConIndex
 constrIndex con = case constrRep con of
                     (AlgConstr idx) -> idx
-                    _ -> error "constrIndex"
+                    _ -> error "Data.Data.constrIndex"
 
 
 -- | Gets the maximum constructor index of an algebraic datatype
 maxConstrIndex :: DataType -> ConIndex
 maxConstrIndex dt = case dataTypeRep dt of
                         AlgRep cs -> length cs
-                        _            -> error "maxConstrIndex"
+                        _            -> error "Data.Data.maxConstrIndex"
 
 
 
@@ -757,8 +757,8 @@ mkPrimCon dt str cr = Constr
                         { datatype  = dt
                         , conrep    = cr
                         , constring = str
-                        , confields = error "constrFields"
-                        , confixity = error "constrFixity"
+                        , confields = error "Data.Data.confields"
+                        , confixity = error "Data.Data.confixity"
                         }
 
 -- | This function is now deprecated. Please use 'mkIntegralConstr' instead.
@@ -769,7 +769,7 @@ mkIntConstr = mkIntegralConstr
 mkIntegralConstr :: (Integral a) => DataType -> a -> Constr
 mkIntegralConstr dt i = case datarep dt of
                   IntRep -> mkPrimCon dt (show i) (IntConstr (toInteger  i))
-                  _ -> error "mkIntegralConstr"
+                  _ -> error "Data.Data.mkIntegralConstr"
 
 -- | This function is now deprecated. Please use 'mkRealConstr' instead.
 {-# DEPRECATED mkFloatConstr "Use mkRealConstr instead" #-}
@@ -779,7 +779,7 @@ mkFloatConstr dt = mkRealConstr dt . toRational
 mkRealConstr :: (Real a) => DataType -> a -> Constr
 mkRealConstr dt f = case datarep dt of
                     FloatRep -> mkPrimCon dt (show f) (FloatConstr (toRational f))
-                    _ -> error "mkRealConstr"
+                    _ -> error "Data.Data.mkRealConstr"
 
 -- | This function is now deprecated. Please use 'mkCharConstr' instead.
 {-# DEPRECATED mkStringConstr "Use mkCharConstr instead" #-}
@@ -788,14 +788,14 @@ mkStringConstr dt str =
   case datarep dt of
     CharRep -> case str of
       [c] -> mkPrimCon dt (show c) (CharConstr c)
-      _ -> error "mkStringConstr: input String must contain a single character"
-    _ -> error "mkStringConstr"
+      _ -> error "Data.Data.mkStringConstr: input String must contain a single character"
+    _ -> error "Data.Data.mkStringConstr"
 
 -- | Makes a constructor for 'Char'.
 mkCharConstr :: DataType -> Char -> Constr
 mkCharConstr dt c = case datarep dt of
                    CharRep -> mkPrimCon dt (show c) (CharConstr c)
-                   _ -> error "mkCharConstr"
+                   _ -> error "Data.Data.mkCharConstr"
 
 
 ------------------------------------------------------------------------------
@@ -880,7 +880,7 @@ instance Data Bool where
   gunfold _ z c  = case constrIndex c of
                      1 -> z False
                      2 -> z True
-                     _ -> error "gunfold"
+                     _ -> error "Data.Data.gunfold(Bool)"
   dataTypeOf _ = boolDataType
 
 
@@ -893,7 +893,7 @@ instance Data Char where
   toConstr x = mkCharConstr charType x
   gunfold _ z c = case constrRep c of
                     (CharConstr x) -> z x
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Char)"
   dataTypeOf _ = charType
 
 
@@ -906,7 +906,7 @@ instance Data Float where
   toConstr = mkRealConstr floatType
   gunfold _ z c = case constrRep c of
                     (FloatConstr x) -> z (realToFrac x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Float)"
   dataTypeOf _ = floatType
 
 
@@ -919,7 +919,7 @@ instance Data Double where
   toConstr = mkRealConstr doubleType
   gunfold _ z c = case constrRep c of
                     (FloatConstr x) -> z (realToFrac x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Double)"
   dataTypeOf _ = doubleType
 
 
@@ -932,7 +932,7 @@ instance Data Int where
   toConstr x = mkIntConstr intType (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Int)"
   dataTypeOf _ = intType
 
 
@@ -945,7 +945,7 @@ instance Data Integer where
   toConstr = mkIntConstr integerType
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z x
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Integer)"
   dataTypeOf _ = integerType
 
 
@@ -958,7 +958,7 @@ instance Data Int8 where
   toConstr x = mkIntConstr int8Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Int8)"
   dataTypeOf _ = int8Type
 
 
@@ -971,7 +971,7 @@ instance Data Int16 where
   toConstr x = mkIntConstr int16Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Int16)"
   dataTypeOf _ = int16Type
 
 
@@ -984,7 +984,7 @@ instance Data Int32 where
   toConstr x = mkIntConstr int32Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Int32)"
   dataTypeOf _ = int32Type
 
 
@@ -997,7 +997,7 @@ instance Data Int64 where
   toConstr x = mkIntConstr int64Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Int64)"
   dataTypeOf _ = int64Type
 
 
@@ -1010,7 +1010,7 @@ instance Data Word where
   toConstr x = mkIntConstr wordType (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Word)"
   dataTypeOf _ = wordType
 
 
@@ -1023,7 +1023,7 @@ instance Data Word8 where
   toConstr x = mkIntConstr word8Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Word8)"
   dataTypeOf _ = word8Type
 
 
@@ -1036,7 +1036,7 @@ instance Data Word16 where
   toConstr x = mkIntConstr word16Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Word16)"
   dataTypeOf _ = word16Type
 
 
@@ -1049,7 +1049,7 @@ instance Data Word32 where
   toConstr x = mkIntConstr word32Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Word32)"
   dataTypeOf _ = word32Type
 
 
@@ -1062,7 +1062,7 @@ instance Data Word64 where
   toConstr x = mkIntConstr word64Type (fromIntegral x)
   gunfold _ z c = case constrRep c of
                     (IntConstr x) -> z (fromIntegral x)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Word64)"
   dataTypeOf _ = word64Type
 
 
@@ -1078,7 +1078,7 @@ instance (Data a, Integral a) => Data (Ratio a) where
   gfoldl k z (a :% b) = z (:%) `k` a `k` b
   toConstr _ = ratioConstr
   gunfold k z c | constrIndex c == 1 = k (k (z (:%)))
-  gunfold _ _ _ = error "gunfold"
+  gunfold _ _ _ = error "Data.Data.gunfold(Ratio)"
   dataTypeOf _  = ratioDataType
 
 
@@ -1100,7 +1100,7 @@ instance Data a => Data [a] where
   gunfold k z c = case constrIndex c of
                     1 -> z []
                     2 -> k (k (z (:)))
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(List)"
   dataTypeOf _ = listDataType
   dataCast1 f  = gcast1 f
 
@@ -1134,7 +1134,7 @@ instance Data a => Data (Maybe a) where
   gunfold k z c = case constrIndex c of
                     1 -> z Nothing
                     2 -> k (z Just)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Maybe)"
   dataTypeOf _ = maybeDataType
   dataCast1 f  = gcast1 f
 
@@ -1162,7 +1162,7 @@ instance Data Ordering where
                     1 -> z LT
                     2 -> z EQ
                     3 -> z GT
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Ordering)"
   dataTypeOf _ = orderingDataType
 
 
@@ -1185,7 +1185,7 @@ instance (Data a, Data b) => Data (Either a b) where
   gunfold k z c = case constrIndex c of
                     1 -> k (z Left)
                     2 -> k (z Right)
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(Either)"
   dataTypeOf _ = eitherDataType
   dataCast2 f  = gcast2 f
 
@@ -1201,7 +1201,7 @@ tuple0DataType = mkDataType "Prelude.()" [tuple0Constr]
 instance Data () where
   toConstr ()   = tuple0Constr
   gunfold _ z c | constrIndex c == 1 = z ()
-  gunfold _ _ _ = error "gunfold"
+  gunfold _ _ _ = error "Data.Data.gunfold(unit)"
   dataTypeOf _  = tuple0DataType
 
 
@@ -1217,7 +1217,7 @@ instance (Data a, Data b) => Data (a,b) where
   gfoldl f z (a,b) = z (,) `f` a `f` b
   toConstr (_,_) = tuple2Constr
   gunfold k z c | constrIndex c == 1 = k (k (z (,)))
-  gunfold _ _ _ = error "gunfold"
+  gunfold _ _ _ = error "Data.Data.gunfold(tup2)"
   dataTypeOf _  = tuple2DataType
   dataCast2 f   = gcast2 f
 
@@ -1234,7 +1234,7 @@ instance (Data a, Data b, Data c) => Data (a,b,c) where
   gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
   toConstr (_,_,_) = tuple3Constr
   gunfold k z c | constrIndex c == 1 = k (k (k (z (,,))))
-  gunfold _ _ _ = error "gunfold"
+  gunfold _ _ _ = error "Data.Data.gunfold(tup3)"
   dataTypeOf _  = tuple3DataType
 
 
@@ -1252,7 +1252,7 @@ instance (Data a, Data b, Data c, Data d)
   toConstr (_,_,_,_) = tuple4Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (z (,,,)))))
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(tup4)"
   dataTypeOf _ = tuple4DataType
 
 
@@ -1270,7 +1270,7 @@ instance (Data a, Data b, Data c, Data d, Data e)
   toConstr (_,_,_,_,_) = tuple5Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (k (z (,,,,))))))
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(tup5)"
   dataTypeOf _ = tuple5DataType
 
 
@@ -1288,7 +1288,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f)
   toConstr (_,_,_,_,_,_) = tuple6Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (k (k (z (,,,,,)))))))
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(tup6)"
   dataTypeOf _ = tuple6DataType
 
 
@@ -1307,23 +1307,23 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
   toConstr  (_,_,_,_,_,_,_) = tuple7Constr
   gunfold k z c = case constrIndex c of
                     1 -> k (k (k (k (k (k (k (z (,,,,,,))))))))
-                    _ -> error "gunfold"
+                    _ -> error "Data.Data.gunfold(tup7)"
   dataTypeOf _ = tuple7DataType
 
 
 ------------------------------------------------------------------------------
 
 instance Typeable a => Data (Ptr a) where
-  toConstr _   = error "toConstr"
-  gunfold _ _  = error "gunfold"
+  toConstr _   = error "Data.Data.toConstr(Ptr)"
+  gunfold _ _  = error "Data.Data.gunfold(Ptr)"
   dataTypeOf _ = mkNoRepType "GHC.Ptr.Ptr"
 
 
 ------------------------------------------------------------------------------
 
 instance Typeable a => Data (ForeignPtr a) where
-  toConstr _   = error "toConstr"
-  gunfold _ _  = error "gunfold"
+  toConstr _   = error "Data.Data.toConstr(ForeignPtr)"
+  gunfold _ _  = error "Data.Data.gunfold(ForeignPtr)"
   dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
 
 
@@ -1333,7 +1333,7 @@ instance Typeable a => Data (ForeignPtr a) where
 instance (Typeable a, Data b, Ix a) => Data (Array a b)
  where
   gfoldl f z a = z (listArray (bounds a)) `f` (elems a)
-  toConstr _   = error "toConstr"
-  gunfold _ _  = error "gunfold"
+  toConstr _   = error "Data.Data.toConstr(Array)"
+  gunfold _ _  = error "Data.Data.gunfold(Array)"
   dataTypeOf _ = mkNoRepType "Data.Array.Array"
 
