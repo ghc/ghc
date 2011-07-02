@@ -1,4 +1,4 @@
-module T1595 where
+module T1595a where
 
 a, b :: Integer -> Tpyo
 a = undefined
