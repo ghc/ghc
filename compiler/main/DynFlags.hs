@@ -1317,7 +1317,7 @@ dynamic_flags = [
   , flagA "pgmP"           (hasArg setPgmP)
   , flagA "pgmF"           (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
   , flagA "pgmc"           (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
-  , flagA "pgmm"           (HasArg (\_ -> addWarn "The -keep-raw-s-files flag does nothing; it will be removed in a future GHC release"))
+  , flagA "pgmm"           (HasArg (\_ -> addWarn "The -pgmm flag does nothing; it will be removed in a future GHC release"))
   , flagA "pgms"           (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
   , flagA "pgma"           (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
   , flagA "pgml"           (hasArg (\f -> alterSettings (\s -> s { sPgm_l   = (f,[])})))
