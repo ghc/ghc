@@ -387,7 +387,6 @@ data ExtensionFlag
    | Opt_DeriveFoldable
    | Opt_DeriveGeneric            -- Allow deriving Generic/1
    | Opt_DefaultSignatures        -- Allow extra signatures for defmeths
-   | Opt_Generics                 -- Old generic classes, now deprecated
 
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -1600,6 +1599,8 @@ dynamic_flags = [
  ++ map (mkFlag turnOff "XNo"  unSetExtensionFlag) xFlags
  ++ map (mkFlag turnOn  "X"    setLanguage) languageFlags
  ++ map (mkFlag turnOn  "X"    setSafeHaskell) safeHaskellFlags
+ ++ [ flagA "XGenerics"       (NoArg (deprecate "it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support."))
+    , flagA "XNoGenerics"     (NoArg (deprecate "it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support.")) ]
 
 package_flags :: [Flag (CmdLineP DynFlags)]
 package_flags = [
@@ -1753,8 +1754,6 @@ fLangFlags = [
     deprecatedForExtension "ForeignFunctionInterface" ),
   ( "arrows",                           AlwaysAllowed, Opt_Arrows,
     deprecatedForExtension "Arrows" ),
-  ( "generics",                         AlwaysAllowed, Opt_Generics,
-    deprecatedForExtension "Generics" ),
   ( "implicit-prelude",                 AlwaysAllowed, Opt_ImplicitPrelude,
     deprecatedForExtension "ImplicitPrelude" ),
   ( "bang-patterns",                    AlwaysAllowed, Opt_BangPatterns,
@@ -1841,8 +1840,6 @@ xFlags = [
   ( "ParallelArrays",                   AlwaysAllowed, Opt_ParallelArrays, nop ),
   ( "TemplateHaskell",                  NeverAllowed, Opt_TemplateHaskell, checkTemplateHaskellOk ),
   ( "QuasiQuotes",                      AlwaysAllowed, Opt_QuasiQuotes, nop ),
-  ( "Generics",                         AlwaysAllowed, Opt_Generics,
-    \ _ -> deprecate "it does nothing; look into -XDefaultSignatures and -XDeriveGeneric for generic programming support." ),
   ( "ImplicitPrelude",                  AlwaysAllowed, Opt_ImplicitPrelude, nop ),
   ( "RecordWildCards",                  AlwaysAllowed, Opt_RecordWildCards, nop ),
   ( "NamedFieldPuns",                   AlwaysAllowed, Opt_RecordPuns, nop ),
