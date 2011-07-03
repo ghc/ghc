@@ -13,6 +13,7 @@ module DynFlags (
         -- * Dynamic flags and associated configuration types
         DynFlag(..),
         ExtensionFlag(..),
+        LogAction,
         glasgowExtsFlags,
         dopt,
         dopt_set,
@@ -50,6 +51,7 @@ module DynFlags (
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
+        defaultLogAction,
 
         getOpts,                        -- DynFlags -> (DynFlags -> [a]) -> [a]
         getVerbFlags,
@@ -545,7 +547,7 @@ data DynFlags = DynFlags {
   extensionFlags        :: [ExtensionFlag],
 
   -- | Message output action: use "ErrUtils" instead of this if you can
-  log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
+  log_action            :: LogAction,
 
   haddockOptions :: Maybe String
  }
@@ -863,19 +865,22 @@ defaultDynFlags mySettings =
         safeHaskell = Sf_None,
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
-
-        log_action = \severity srcSpan style msg ->
-                        case severity of
-                          SevOutput -> printSDoc msg style
-                          SevInfo   -> printErrs msg style
-                          SevFatal  -> printErrs msg style
-                          _         -> do 
-                                hPutChar stderr '\n'
-                                printErrs (mkLocMessage srcSpan msg) style
-                     -- careful (#2302): printErrs prints in UTF-8, whereas
-                     -- converting to string first and using hPutStr would
-                     -- just emit the low 8 bits of each unicode char.
+        log_action = defaultLogAction
       }
+
+type LogAction = Severity -> SrcSpan -> PprStyle -> Message -> IO ()
+
+defaultLogAction :: LogAction
+defaultLogAction severity srcSpan style msg
+ = case severity of
+   SevOutput -> printSDoc msg style
+   SevInfo   -> printErrs msg style
+   SevFatal  -> printErrs msg style
+   _         -> do hPutChar stderr '\n'
+                   printErrs (mkLocMessage srcSpan msg) style
+                   -- careful (#2302): printErrs prints in UTF-8, whereas
+                   -- converting to string first and using hPutStr would
+                   -- just emit the low 8 bits of each unicode char.
 
 {-
 Note [Verbosity levels]

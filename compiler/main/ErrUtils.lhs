@@ -24,7 +24,7 @@ module ErrUtils (
 	--  * Messages during compilation
         putMsg, putMsgWith,
 	errorMsg,
-	fatalErrorMsg,
+	fatalErrorMsg, fatalErrorMsg',
 	compilationProgressMsg,
 	showPass,
 	debugTraceMsg,	
@@ -36,7 +36,7 @@ import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import Util		( sortLe )
 import Outputable
 import SrcLoc
-import DynFlags		( DynFlags(..), DynFlag(..), dopt )
+import DynFlags
 import StaticFlags	( opt_ErrorSpans )
 
 import System.Exit	( ExitCode(..), exitWith )
@@ -296,7 +296,10 @@ errorMsg :: DynFlags -> Message -> IO ()
 errorMsg dflags msg = log_action dflags SevError noSrcSpan defaultErrStyle msg
 
 fatalErrorMsg :: DynFlags -> Message -> IO ()
-fatalErrorMsg dflags msg = log_action dflags SevFatal noSrcSpan defaultErrStyle msg
+fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) msg
+
+fatalErrorMsg' :: LogAction -> Message -> IO ()
+fatalErrorMsg' la msg = la SevFatal noSrcSpan defaultErrStyle msg
 
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
