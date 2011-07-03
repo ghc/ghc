@@ -11,7 +11,7 @@ import HscTypes         ( msHsFilePath )
 import Name             ( getOccString )
 --import ErrUtils         ( printBagOfErrors )
 import Panic            ( panic )
-import DynFlags         ( defaultDynFlags )
+import DynFlags         ( defaultLogAction )
 import Bag
 import Exception
 import FastString
@@ -102,7 +102,7 @@ main = do
                      then Just `liftM` openFile "TAGS" openFileMode
                      else return Nothing
 
-  GHC.defaultErrorHandler (defaultDynFlags (panic "No settings")) $
+  GHC.defaultErrorHandler defaultLogAction $
     runGhc (Just ghc_topdir) $ do
       --liftIO $ print "starting up session"
       dflags <- getSessionDynFlags
