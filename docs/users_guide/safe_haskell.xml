@@ -103,7 +103,7 @@
       the Safe language or place any restrictions on the allowed Haskell code.
       The trust guarantee is provided by the module author, not GHC. An import
       statement with the safe keyword results in a compilation error if the
-      imported module is not trussted. An import statement without the keyword
+      imported module is not trusted. An import statement without the keyword
       behaves as usual and can import any module whether trusted or
       not.</listitem>
     </itemizedlist>
@@ -184,7 +184,7 @@
        <title>Safe Language &amp; Imports without Trust</title>
 
        Safe Haskell also allows the new language extensions -- the Safe language
-       dialect and safe imports -- to be used independtly of any trust
+       dialect and safe imports -- to be used independently of any trust
        assertions for the code.
 
        <itemizedlist>
