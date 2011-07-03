@@ -44,7 +44,7 @@ module DynFlags (
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_sysman, pgm_windres, pgm_lo, pgm_lc,
-        opt_L, opt_P, opt_F, opt_c, opt_m, opt_a, opt_l,
+        opt_L, opt_P, opt_F, opt_c, opt_a, opt_l,
         opt_windres, opt_lo, opt_lc,
 
 
@@ -581,7 +581,6 @@ data Settings = Settings {
   sOpt_P                 :: [String],
   sOpt_F                 :: [String],
   sOpt_c                 :: [String],
-  sOpt_m                 :: [String],
   sOpt_a                 :: [String],
   sOpt_l                 :: [String],
   sOpt_windres           :: [String],
@@ -638,8 +637,6 @@ opt_F                 :: DynFlags -> [String]
 opt_F dflags = sOpt_F (settings dflags)
 opt_c                 :: DynFlags -> [String]
 opt_c dflags = sOpt_c (settings dflags)
-opt_m                 :: DynFlags -> [String]
-opt_m dflags = sOpt_m (settings dflags)
 opt_a                 :: DynFlags -> [String]
 opt_a dflags = sOpt_a (settings dflags)
 opt_l                 :: DynFlags -> [String]
@@ -1336,7 +1333,7 @@ dynamic_flags = [
   , flagA "optP"           (hasArg addOptP)
   , flagA "optF"           (hasArg (\f -> alterSettings (\s -> s { sOpt_F   = f : sOpt_F s})))
   , flagA "optc"           (hasArg (\f -> alterSettings (\s -> s { sOpt_c   = f : sOpt_c s})))
-  , flagA "optm"           (hasArg (\f -> alterSettings (\s -> s { sOpt_m   = f : sOpt_m s})))
+  , flagA "optm"           (HasArg (\_ -> addWarn "The -optm flag does nothing; it will be removed in a future GHC release"))
   , flagA "opta"           (hasArg (\f -> alterSettings (\s -> s { sOpt_a   = f : sOpt_a s})))
   , flagA "optl"           (hasArg addOptl)
   , flagA "optwindres"     (hasArg (\f -> alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
