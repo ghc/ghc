@@ -14,7 +14,18 @@
 #ifndef SMP_H
 #define SMP_H
 
+#if defined(__ARM_ARCH_2__) || defined(__ARM_ARCH_3__) || defined(__ARM_ARCH_3M__) || \
+    defined(__ARM_ARCH_4__) || defined(__ARM_ARCH_4T__) || defined(__ARM_ARCH_5__) || \
+    defined(__ARM_ARCH_5T__) || defined(__ARM_ARCH_5E__) || defined(__ARM_ARCH_5TE__)
+#define PRE_ARMv6
+#endif
+
 #if defined(THREADED_RTS)
+
+#if arm_HOST_ARCH && defined(PRE_ARMv6)
+void arm_atomic_spin_lock(void);
+void arm_atomic_spin_unlock(void);
+#endif
 
 /* ----------------------------------------------------------------------------
    Atomic operations
@@ -125,7 +136,12 @@ xchg(StgPtr p, StgWord w)
 	: "+r" (result), "+m" (*p)
 	: /* no input-only operands */
       );
+#elif arm_HOST_ARCH
+    __asm__ __volatile__ ("swp %0, %1, [%2]"
+                         : "=&r" (result)
+                         : "r" (w), "r" (p) : "memory");
 #elif !defined(WITHSMP)
+#error xchg() unimplemented on this architecture
     result = *p;
     *p = w;
 #else
@@ -169,7 +185,32 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 	: "memory"
     );
     return n;
+#elif arm_HOST_ARCH
+#if defined(PRE_ARMv6)
+    StgWord r;
+    arm_atomic_spin_lock();
+    r  = *p; 
+    if (r == o) { *p = n; } 
+    arm_atomic_spin_unlock();
+    return r;
+#else
+    StgWord result,tmp;
+
+    __asm__ __volatile__(
+        "1:     ldrex   %1, [%2]\n"
+        "       mov     %0, #0\n"
+        "       teq     %1, %3\n"
+        "       strexeq %0, %4, [%2]\n"
+        "       teq     %0, #1\n"
+        "       beq     1b\n"
+                : "=&r"(tmp), "=&r"(result)
+                : "r"(p), "r"(o), "r"(n)
+                : "cc","memory");
+
+    return result;
+#endif
 #elif !defined(WITHSMP)
+#error cas() unimplemented on this architecture
     StgWord result;
     result = *p;
     if (result == o) {
@@ -250,6 +291,8 @@ write_barrier(void) {
     __asm__ __volatile__ ("lwsync" : : : "memory");
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require store/store barriers. */
+    __asm__ __volatile__ ("" : : : "memory");
+#elif arm_HOST_ARCH
     __asm__ __volatile__ ("" : : : "memory");
 #elif !defined(WITHSMP)
     return;

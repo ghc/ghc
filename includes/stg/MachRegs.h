@@ -47,6 +47,7 @@
 #define powerpc_REGS  (powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH || rs6000_TARGET_ARCH)
 #define ia64_REGS     ia64_TARGET_ARCH
 #define sparc_REGS    sparc_TARGET_ARCH
+#define arm_REGS      arm_TARGET_ARCH
 #define darwin_REGS   darwin_TARGET_OS
 #else
 #define alpha_REGS    alpha_HOST_ARCH
@@ -58,6 +59,7 @@
 #define powerpc_REGS  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH || rs6000_HOST_ARCH)
 #define ia64_REGS     ia64_HOST_ARCH
 #define sparc_REGS    sparc_HOST_ARCH
+#define arm_REGS      arm_HOST_ARCH
 #define darwin_REGS   darwin_HOST_OS
 #endif
 
@@ -694,6 +696,25 @@
 #define NCG_FirstFloatReg f22
 
 #endif /* sparc */
+
+/* -----------------------------------------------------------------------------
+   The ARM EABI register mapping
+   -------------------------------------------------------------------------- */
+
+#if arm_REGS
+
+#define REG(x) __asm__(#x)
+
+#define REG_Base        r4
+#define REG_Sp          r5
+#define REG_Hp          r6
+#define REG_R1          r7
+#define REG_R2          r8
+#define REG_R3          r9
+#define REG_R4          r10
+#define REG_SpLim       r11
+
+#endif /* arm */
 
 #endif /* NO_REGS */
 

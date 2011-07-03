@@ -29,6 +29,7 @@ infoSec    = B.pack infoSection
 newInfoSec = B.pack "\n\t.text"
 newLine    = B.pack "\n"
 jmpInst    = B.pack "\n\tjmp"
+syntaxUnified = B.pack "\t.syntax unified"
 
 infoLen, labelStart, spFix :: Int
 infoLen    = B.length infoSec
@@ -98,6 +99,7 @@ getFun r = go [] >>= return . B.intercalate newLine
             l <- (try (B.hGetLine r))::IO (Either IOError B.ByteString)
             case l of
                 Right l' | B.null l' -> return (B.empty : reverse ls)
+                         | l' == syntaxUnified -> return (l':ls)
                          | otherwise -> go (l':ls)
                 Left _ -> return []
 
