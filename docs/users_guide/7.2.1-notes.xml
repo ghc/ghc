@@ -173,15 +173,15 @@ foreign import ccall interruptible
 
       <listitem>
         <para>
-          The <literal>OverlappingInstances</literal> exception used to
+          The <literal>OverlappingInstances</literal> extension used to
           allow overlapping instances only when all but the
           most specific instance were compiled with
           <literal>OverlappingInstances</literal>.
           Now overlap is allowed if <emphasis>either</emphasis> all but
           the most specific instance were compiled with
-          <literal>OverlappingInstances</literal>, or if the most
-          specific instance was compiled with
-          <literal>OverlappingInstances</literal>.
+          <literal>OverlappingInstances</literal>,
+          <emphasis>or</emphasis> if the most specific instance was
+          compiled with <literal>OverlappingInstances</literal>.
         </para>
       </listitem>
 
