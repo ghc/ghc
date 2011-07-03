@@ -263,7 +263,6 @@ data DynFlag
    | Opt_DoEtaReduction
    | Opt_CaseMerge
    | Opt_UnboxStrictFields
-   | Opt_MethodSharing	-- Now a no-op; remove in GHC 7.2
    | Opt_DictsCheap
    | Opt_EnableRewriteRules		-- Apply rewrite rules during simplification
    | Opt_Vectorise
@@ -1711,9 +1710,6 @@ fFlags = [
   ( "do-eta-reduction",                 AlwaysAllowed, Opt_DoEtaReduction, nop ),
   ( "case-merge",                       AlwaysAllowed, Opt_CaseMerge, nop ),
   ( "unbox-strict-fields",              AlwaysAllowed, Opt_UnboxStrictFields, nop ),
-  ( "method-sharing",                   AlwaysAllowed, Opt_MethodSharing, 
-     \_ -> deprecate "doesn't do anything any more"),
-     -- Remove altogether in GHC 7.2
   ( "dicts-cheap",                      AlwaysAllowed, Opt_DictsCheap, nop ),
   ( "excess-precision",                 AlwaysAllowed, Opt_ExcessPrecision, nop ),
   ( "eager-blackholing",                AlwaysAllowed, Opt_EagerBlackHoling, nop ),
