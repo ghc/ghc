@@ -33,6 +33,7 @@ newLine    = B.pack "\n"
 jmpInst    = B.pack "\n\tjmp"
 textStmt   = B.pack "\t.text"
 dataStmt   = B.pack "\t.data"
+syntaxUnified = B.pack "\t.syntax unified"
 
 infoLen, labelStart, spFix :: Int
 infoLen    = B.length infoSec
@@ -90,7 +91,10 @@ readSections r w = go B.empty [] []
                 writeSection w (hdr, fixupStack cts B.empty) >> return ss
 
       case e_l of
-        Right l | any (`B.isPrefixOf` l) [secStmt, textStmt, dataStmt]
+        Right l | l == syntaxUnified 
+                  -> finishSection >>= \ss' -> writeSection w (l, B.empty)
+                                   >> go B.empty ss' tys
+                | any (`B.isPrefixOf` l) [secStmt, textStmt, dataStmt]
                   -> finishSection >>= \ss' -> go l ss' tys
                 | otherwise
                   -> go hdr ss (l:ls)
