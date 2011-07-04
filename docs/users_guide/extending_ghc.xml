@@ -85,7 +85,7 @@ data Foo = ...
   <sect1 id="ghc-as-a-library">
     <title>Using GHC as a Library</title>
 
-    <para>The <literal>ghc</literal> package exposes most of GHC's frontend to users, and thus allows you to write programs that leverage it. This library is actually the same library used by GHC's internal, frontend compilation driver, and thus allows you to write tools that programatically compile source code and inspect it. Such functionality is useful in order to write things like IDE or refactoring tools. As a simple example, here's a program which compiles a module, much like ghc itself does by default when invoked:</para>
+    <para>The <literal>ghc</literal> package exposes most of GHC's frontend to users, and thus allows you to write programs that leverage it. This library is actually the same library used by GHC's internal, frontend compilation driver, and thus allows you to write tools that programmatically compile source code and inspect it. Such functionality is useful in order to write things like IDE or refactoring tools. As a simple example, here's a program which compiles a module, much like ghc itself does by default when invoked:</para>
 
 <programlisting>
 import GHC
