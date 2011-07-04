@@ -2016,6 +2016,40 @@ phase <replaceable>n</replaceable></entry>
     </sect2>
 
     <sect2>
+      <title>Plugin options</title>
+
+      <para><xref linkend="compiler-plugins"/></para>
+
+      <informaltable>
+	<tgroup cols="4" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fplugin</option>=<replaceable>module</replaceable></entry>
+	      <entry>Load a plugin exported by a given module</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fplugin-opt</option>=<replaceable>module:args</replaceable></entry>
+	      <entry>Give arguments to a plugin module; module must be specified with <option>-fplugin</option></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+
+    <sect2>
       <title>Replacing phases</title>
 
       <para><xref linkend="replacing-phases"/></para>

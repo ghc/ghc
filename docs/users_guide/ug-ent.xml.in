@@ -14,6 +14,7 @@
 <!ENTITY packages       SYSTEM "packages.xml" >
 <!ENTITY parallel       SYSTEM "parallel.xml" >
 <!ENTITY safehaskell    SYSTEM "safe_haskell.xml" >
+<!ENTITY extending-ghc  SYSTEM "extending_ghc.xml" >
 <!ENTITY phases         SYSTEM "phases.xml" >
 <!ENTITY separate       SYSTEM "separate_compilation.xml" >
 <!ENTITY bugs           SYSTEM "bugs.xml" >
