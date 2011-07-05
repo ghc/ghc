@@ -92,11 +92,9 @@ pprBasicBlock (BasicBlock blockid instrs) =
 
 
 pprDatas :: CmmStatics -> Doc
-pprDatas (Statics lbl dats) = vcat (map pprData (CmmDataLabel lbl:dats))
+pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> Doc
-pprData (CmmAlign bytes)         = pprAlign bytes
-pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
 pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
@@ -127,10 +125,6 @@ pprASCII str
     where
        do1 :: Word8 -> Doc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
-
-pprAlign :: Int -> Doc
-pprAlign bytes =
-	ptext (sLit ".align ") <> int bytes
 
 
 -- -----------------------------------------------------------------------------

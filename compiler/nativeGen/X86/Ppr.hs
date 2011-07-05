@@ -104,11 +104,9 @@ pprBasicBlock (BasicBlock blockid instrs) =
 
 
 pprDatas :: (Alignment, CmmStatics) -> Doc
-pprDatas (align, (Statics lbl dats)) = vcat (map pprData (CmmAlign align:CmmDataLabel lbl:dats)) -- TODO: could remove if align == 1
+pprDatas (align, (Statics lbl dats)) = vcat (pprAlign align : pprLabel lbl : map pprData dats) -- TODO: could remove if align == 1
 
 pprData :: CmmStatic -> Doc
-pprData (CmmAlign bytes)         = pprAlign bytes
-pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
 
 #if  darwin_TARGET_OS

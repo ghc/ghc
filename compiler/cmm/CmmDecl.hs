@@ -16,7 +16,6 @@ module CmmDecl (
 
 #include "HsVersions.h"
 
-import BasicTypes (Alignment)
 import CmmExpr
 import CLabel
 import SMRep
@@ -133,10 +132,6 @@ data CmmStatic
         -- a literal value, size given by cmmLitRep of the literal.
   | CmmUninitialised Int
         -- uninitialised data, N bytes long
-  | CmmAlign Alignment
-        -- align to next N-byte boundary (N must be a power of 2).
-  | CmmDataLabel CLabel
-        -- label the current position in this section.
   | CmmString [Word8]
         -- string of 8-bit values only, not zero terminated.
 
