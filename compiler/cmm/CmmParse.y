@@ -188,21 +188,24 @@ cmmtop	:: { ExtCode }
 --	* we can derive closure and info table labels from a single NAME
 
 cmmdata :: { ExtCode }
-	: 'section' STRING '{' statics '}' 
-		{ do ss <- sequence $4;
-		     code (emitData (section $2) (concat ss)) }
+	: 'section' STRING '{' static_label statics '}' 
+		{ do lbl <- $4;
+		     ss <- sequence $5;
+		     code (emitData (section $2) (Statics lbl $ concat ss)) }
 
 statics	:: { [ExtFCode [CmmStatic]] }
 	: {- empty -}			{ [] }
 	| static statics		{ $1 : $2 }
 
+static_label :: { ExtFCode CLabel }
+    : NAME ':'	
+		{% withThisPackage $ \pkg -> 
+		   return (mkCmmDataLabel pkg $1) }
+    
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static 	:: { ExtFCode [CmmStatic] }
-	: NAME ':'	
-		{% withThisPackage $ \pkg -> 
-		   return [CmmDataLabel (mkCmmDataLabel pkg $1)] }
-
+	: static_label { liftM (\x -> [CmmDataLabel x]) $1 }
 	| type expr ';'	{ do e <- $2;
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised

@@ -80,7 +80,7 @@ if_sse2 sse2 x87 = do
 
 cmmTopCodeGen
         :: RawCmmTop
-        -> NatM [NatCmmTop Instr]
+        -> NatM [NatCmmTop (Alignment, CmmStatics) Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -95,13 +95,13 @@ cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
       Nothing -> return tops
 
 cmmTopCodeGen (CmmData sec dat) = do
-  return [CmmData sec dat]  -- no translation, we just use CmmStatic
+  return [CmmData sec (1, dat)]  -- no translation, we just use CmmStatic
 
 
 basicBlockCodeGen
         :: CmmBasicBlock
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmTop Instr])
+                , [NatCmmTop (Alignment, CmmStatics) Instr])
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -1123,10 +1123,7 @@ memConstant align lit = do
                                return (addr, addr_code)
                        else return (ripRel (ImmCLbl lbl), nilOL)
   let code =
-        LDATA ReadOnlyData
-                [CmmAlign align,
-                 CmmDataLabel lbl,
-                 CmmStaticLit lit]
+        LDATA ReadOnlyData (align, Statics lbl [CmmStaticLit lit])
         `consOL` addr_code
   return (Amode addr code)
 
@@ -2041,11 +2038,11 @@ genSwitch expr ids
         -- in
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop (Alignment, CmmStatics) Instr)
 generateJumpTableForInstr (JMP_TBL _ ids section lbl) = Just (createJumpTable ids section lbl)
 generateJumpTableForInstr _ = Nothing
 
-createJumpTable :: [Maybe BlockId] -> Section -> CLabel -> GenCmmTop CmmStatic h g
+createJumpTable :: [Maybe BlockId] -> Section -> CLabel -> GenCmmTop (Alignment, CmmStatics) h g
 createJumpTable ids section lbl
     = let jumpTable
             | opt_PIC =
@@ -2056,7 +2053,7 @@ createJumpTable ids section lbl
                           where blockLabel = mkAsmTempLabel (getUnique blockid)
                   in map jumpTableEntryRel ids
             | otherwise = map jumpTableEntry ids
-      in CmmData section (CmmDataLabel lbl : jumpTable)
+      in CmmData section (1, Statics lbl jumpTable)
 
 -- -----------------------------------------------------------------------------
 -- 'condIntReg' and 'condFltReg': condition codes into registers

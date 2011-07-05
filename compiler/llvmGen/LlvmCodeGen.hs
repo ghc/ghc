@@ -62,7 +62,7 @@ llvmCodeGen dflags h us cmms
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.
 --
-cmmDataLlvmGens :: DynFlags -> BufHandle -> LlvmEnv -> [(Section,[CmmStatic])]
+cmmDataLlvmGens :: DynFlags -> BufHandle -> LlvmEnv -> [(Section,CmmStatics)]
                 -> [LlvmUnresData] -> IO ( LlvmEnv )
 
 cmmDataLlvmGens dflags h env [] lmdata

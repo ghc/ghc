@@ -75,7 +75,7 @@ data Instr
 	-- some static data spat out during code
 	-- generation.  Will be extracted before
 	-- pretty-printing.
-	| LDATA   Section [CmmStatic]	
+	| LDATA   Section CmmStatics	
 
 	-- start a new basic block.  Useful during
 	-- codegen, removed later.  Preceding 

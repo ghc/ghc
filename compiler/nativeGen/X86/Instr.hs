@@ -27,6 +27,7 @@ import FastBool
 import Outputable
 import Constants	(rESERVED_C_STACK_BYTES)
 
+import BasicTypes       (Alignment)
 import CLabel
 import UniqSet
 import Unique
@@ -151,7 +152,6 @@ bit precision.
 --SDM 1/2003
 -}
 
-
 data Instr
 	-- comment pseudo-op
 	= COMMENT FastString		
@@ -159,7 +159,7 @@ data Instr
 	-- some static data spat out during code
 	-- generation.  Will be extracted before
 	-- pretty-printing.
-	| LDATA   Section [CmmStatic]	
+	| LDATA   Section (Alignment, CmmStatics)
 
 	-- start a new basic block.  Useful during
 	-- codegen, removed later.  Preceding 
@@ -805,16 +805,24 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: BlockSet) insn
         shortcutJump' _ _ other = other
 
 -- Here because it knows about JumpDest
+shortcutStatics :: (BlockId -> Maybe JumpDest) -> (Alignment, CmmStatics) -> (Alignment, CmmStatics)
+shortcutStatics fn (align, Statics lbl statics)
+  = (align, Statics lbl $ map (shortcutStatic fn) statics)
+  -- we need to get the jump tables, so apply the mapping to the entries
+  -- of a CmmData too.
+
+shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
+shortcutLabel fn lab
+  | Just uq <- maybeAsmTemp lab = shortBlockId fn emptyUniqSet (mkBlockId uq)
+  | otherwise                   = lab
+
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
-  | Just uq <- maybeAsmTemp lab 
-  = CmmStaticLit (CmmLabel (shortBlockId fn emptyUniqSet (mkBlockId uq)))
+  = CmmStaticLit (CmmLabel (shortcutLabel fn lab))
 shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
-  | Just uq <- maybeAsmTemp lbl1
-  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn emptyUniqSet (mkBlockId uq)) lbl2 off)
+  = CmmStaticLit (CmmLabelDiffOff (shortcutLabel fn lbl1) lbl2 off)
         -- slightly dodgy, we're ignoring the second label, but this
         -- works with the way we use CmmLabelDiffOff for jump tables now.
-
 shortcutStatic _ other_static
         = other_static
 

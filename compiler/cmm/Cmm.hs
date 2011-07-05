@@ -53,8 +53,8 @@ type CmmBwdRewrite f = BwdRewrite FuelUniqSM CmmNode f
 
 data CmmStackInfo = StackInfo {arg_space :: ByteOff, updfr_space :: Maybe ByteOff}
 data CmmTopInfo   = TopInfo {info_tbl :: CmmInfoTable, stack_info :: CmmStackInfo}
-type Cmm          = GenCmm    CmmStatic CmmTopInfo CmmGraph
-type CmmTop       = GenCmmTop CmmStatic CmmTopInfo CmmGraph
+type Cmm          = GenCmm    CmmStatics CmmTopInfo CmmGraph
+type CmmTop       = GenCmmTop CmmStatics CmmTopInfo CmmGraph
 
 -------------------------------------------------
 -- Manipulating CmmGraphs

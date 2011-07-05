@@ -37,7 +37,7 @@ binSpillReasons reasons
 -- | Count reg-reg moves remaining in this code.
 countRegRegMovesNat 
 	:: Instruction instr
-	=> NatCmmTop instr -> Int
+	=> NatCmmTop statics instr -> Int
 
 countRegRegMovesNat cmm
 	= execState (mapGenBlockTopM countBlock cmm) 0
@@ -58,7 +58,7 @@ countRegRegMovesNat cmm
 -- | Pretty print some RegAllocStats
 pprStats 
 	:: Instruction instr 
-	=> [NatCmmTop instr] -> [RegAllocStats] -> SDoc
+	=> [NatCmmTop statics instr] -> [RegAllocStats] -> SDoc
 
 pprStats code statss
  = let	-- sum up all the instrs inserted by the spiller

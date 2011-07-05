@@ -709,8 +709,8 @@ pprImportedSymbol _ _ _
 
 initializePicBase_ppc 
 	:: Arch -> OS -> Reg 
-	-> [NatCmmTop PPC.Instr] 
-	-> NatM [NatCmmTop PPC.Instr]
+	-> [NatCmmTop CmmStatics PPC.Instr] 
+	-> NatM [NatCmmTop CmmStatics PPC.Instr]
 
 initializePicBase_ppc ArchPPC os picReg
     (CmmProc info lab (ListGraph blocks) : statics)
@@ -719,8 +719,7 @@ initializePicBase_ppc ArchPPC os picReg
         gotOffLabel <- getNewLabelNat
         tmp <- getNewRegNat $ intSize wordWidth
         let 
-            gotOffset = CmmData Text [
-                            CmmDataLabel gotOffLabel,
+            gotOffset = CmmData Text $ Statics gotOffLabel [
 			    CmmStaticLit (CmmLabelDiffOff gotLabel
                         	                          mkPicBaseLabel
 				                          0)
@@ -762,8 +761,8 @@ initializePicBase_ppc _ _ _ _
 
 initializePicBase_x86
 	:: Arch -> OS -> Reg 
-	-> [NatCmmTop X86.Instr] 
-	-> NatM [NatCmmTop X86.Instr]
+	-> [NatCmmTop (Alignment, CmmStatics) X86.Instr] 
+	-> NatM [NatCmmTop (Alignment, CmmStatics) X86.Instr]
 
 initializePicBase_x86 ArchX86 os picReg 
 	(CmmProc info lab (ListGraph blocks) : statics)

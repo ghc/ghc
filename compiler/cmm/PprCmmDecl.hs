@@ -54,12 +54,12 @@ import ClosureInfo
 #include "../includes/rts/storage/FunTypes.h"
 
 
-pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatic info g] -> SDoc
+pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatics info g] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ ptext (sLit "-------------------") $$ space
 
-writeCmms :: (Outputable info, Outputable g) => Handle -> [GenCmm CmmStatic info g] -> IO ()
+writeCmms :: (Outputable info, Outputable g) => Handle -> [GenCmm CmmStatics info g] -> IO ()
 writeCmms handle cmms = printForC handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
@@ -71,6 +71,9 @@ instance (Outputable d, Outputable info, Outputable g)
 instance (Outputable d, Outputable info, Outputable i)
 	=> Outputable (GenCmmTop d info i) where
     ppr t = pprTop t
+
+instance Outputable CmmStatics where
+    ppr e = pprStatics e
 
 instance Outputable CmmStatic where
     ppr e = pprStatic e
@@ -103,7 +106,7 @@ pprTop (CmmProc info lbl graph)
 --      section "data" { ... }
 --
 pprTop (CmmData section ds) = 
-    (hang (pprSection section <+> lbrace) 4 (vcat (map ppr ds)))
+    (hang (pprSection section <+> lbrace) 4 (ppr ds))
     $$ rbrace
 
 -- --------------------------------------------------------------------------
@@ -171,6 +174,9 @@ instance Outputable ForeignHint where
 --      Strings are printed as C strings, and we print them as I8[],
 --      following C--
 --
+pprStatics :: CmmStatics -> SDoc
+pprStatics (Statics lbl ds) = vcat (map ppr (CmmDataLabel lbl:ds))
+
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of
     CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
