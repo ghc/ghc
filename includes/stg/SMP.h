@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 2005-2009
+ * (c) The GHC Team, 2005-2011
  *
  * Macros for multi-CPU support
  *
@@ -136,10 +136,26 @@ xchg(StgPtr p, StgWord w)
 	: "+r" (result), "+m" (*p)
 	: /* no input-only operands */
       );
-#elif arm_HOST_ARCH
+#elif arm_HOST_ARCH && defined(PRE_ARMv6)
     __asm__ __volatile__ ("swp %0, %1, [%2]"
                          : "=&r" (result)
                          : "r" (w), "r" (p) : "memory");
+#elif arm_HOST_ARCH && !defined(PRE_ARMv6)
+    // swp instruction which is used in PRE_ARMv6 code above
+    // is deprecated in AMRv6 and later. ARM, Ltd. *highly* recommends
+    // to use ldrex/strex instruction pair for the same purpose
+    // see chapter: Synchronization and semaphores in ARM Architecture
+    // Reference manual
+    StgWord tmp;
+    __asm__ __volatile__ (
+                          "1:    ldrex  %0, [%3]\n"
+                          "      strex  %1, %2, [%3]\n"
+                          "      teq    %1, #1\n"
+                          "      beq    1b\n"
+                          : "=&r" (result), "=&r" (tmp)
+                          : "r" (w), "r" (p)
+                          : "memory"
+                          );
 #elif !defined(WITHSMP)
 #error xchg() unimplemented on this architecture
     result = *p;
