@@ -148,7 +148,6 @@ resData _ _ = panic "resData: Non CLabel expr as left type!"
 --
 
 -- | Handle static data
--- Don't handle 'CmmAlign' or a 'CmmDataLabel'.
 genData :: CmmStatic -> UnresStatic
 
 genData (CmmString str) =
@@ -161,12 +160,6 @@ genData (CmmUninitialised bytes)
 
 genData (CmmStaticLit lit)
     = genStaticLit lit
-
-genData (CmmAlign _)
-    = panic "genData: Can't handle CmmAlign!"
-
-genData (CmmDataLabel _)
-    = panic "genData: Can't handle data labels not at top of data!"
 
 
 -- | Generate Llvm code for a static literal.

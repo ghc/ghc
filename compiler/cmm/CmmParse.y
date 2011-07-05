@@ -188,25 +188,24 @@ cmmtop	:: { ExtCode }
 --	* we can derive closure and info table labels from a single NAME
 
 cmmdata :: { ExtCode }
-	: 'section' STRING '{' static_label statics '}' 
+	: 'section' STRING '{' data_label statics '}' 
 		{ do lbl <- $4;
 		     ss <- sequence $5;
 		     code (emitData (section $2) (Statics lbl $ concat ss)) }
 
-statics	:: { [ExtFCode [CmmStatic]] }
-	: {- empty -}			{ [] }
-	| static statics		{ $1 : $2 }
-
-static_label :: { ExtFCode CLabel }
+data_label :: { ExtFCode CLabel }
     : NAME ':'	
 		{% withThisPackage $ \pkg -> 
 		   return (mkCmmDataLabel pkg $1) }
+
+statics	:: { [ExtFCode [CmmStatic]] }
+	: {- empty -}			{ [] }
+	| static statics		{ $1 : $2 }
     
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static 	:: { ExtFCode [CmmStatic] }
-	: static_label { liftM (\x -> [CmmDataLabel x]) $1 }
-	| type expr ';'	{ do e <- $2;
+	: type expr ';'	{ do e <- $2;
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised
 							(widthInBytes (typeWidth $1))] }
@@ -216,7 +215,6 @@ static 	:: { ExtFCode [CmmStatic] }
         | typenot8 '[' INT ']' ';'	{ return [CmmUninitialised 
 						(widthInBytes (typeWidth $1) * 
 							fromIntegral $3)] }
-	| 'align' INT ';'		{ return [CmmAlign (fromIntegral $2)] }
 	| 'CLOSURE' '(' NAME lits ')'
 		{ do lits <- sequence $4;
 		     return $ map CmmStaticLit $

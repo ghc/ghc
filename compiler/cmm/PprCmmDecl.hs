@@ -175,14 +175,12 @@ instance Outputable ForeignHint where
 --      following C--
 --
 pprStatics :: CmmStatics -> SDoc
-pprStatics (Statics lbl ds) = vcat (map ppr (CmmDataLabel lbl:ds))
+pprStatics (Statics lbl ds) = vcat ((pprCLabel lbl <> colon) : map ppr ds)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of
     CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
-    CmmAlign i         -> nest 4 $ text "align" <+> int i
-    CmmDataLabel clbl  -> pprCLabel clbl <> colon
     CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
 
 -- --------------------------------------------------------------------------

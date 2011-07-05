@@ -498,8 +498,6 @@ pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of
 
     CmmStaticLit lit   -> nest 4 (pprLit lit)
-    CmmAlign i         -> nest 4 (ptext (sLit "/* align */") <+> int i)
-    CmmDataLabel clbl  -> pprCLabel clbl <> colon
     CmmUninitialised i -> nest 4 (mkC_ <> brackets (int i))
 
     -- these should be inlined, like the old .hc
