@@ -621,6 +621,7 @@ yieldCapability (Capability** pCap, Task *task)
         traceEventGcStart(cap);
         gcWorkerThread(cap);
         traceEventGcEnd(cap);
+        traceSparkCounters(cap);
         return;
     }
 
