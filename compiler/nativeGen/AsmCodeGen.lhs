@@ -62,6 +62,7 @@ import DynFlags
 import StaticFlags
 import Util
 
+import BasicTypes       ( Alignment )
 import Digraph
 import Pretty (Doc)
 import qualified Pretty
@@ -131,31 +132,32 @@ The machine-dependent bits break down as follows:
 -- -----------------------------------------------------------------------------
 -- Top-level of the native codegen
 
-data NcgImpl instr jumpDest = NcgImpl {
-    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop instr],
-    generateJumpTableForInstr :: instr -> Maybe (NatCmmTop instr),
+data NcgImpl statics instr jumpDest = NcgImpl {
+    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop statics instr],
+    generateJumpTableForInstr :: instr -> Maybe (NatCmmTop statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
-    shortcutStatic            :: (BlockId -> Maybe jumpDest) -> CmmStatic -> CmmStatic,
+    shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
-    pprNatCmmTop              :: NatCmmTop instr -> Doc,
+    pprNatCmmTop              :: NatCmmTop statics instr -> Doc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
-    ncg_x86fp_kludge          :: [NatCmmTop instr] -> [NatCmmTop instr],
-    ncgExpandTop              :: [NatCmmTop instr] -> [NatCmmTop instr],
+    ncg_x86fp_kludge          :: [NatCmmTop statics instr] -> [NatCmmTop statics instr],
+    ncgExpandTop              :: [NatCmmTop statics instr] -> [NatCmmTop statics instr],
     ncgMakeFarBranches        :: [NatBasicBlock instr] -> [NatBasicBlock instr]
     }
 
 --------------------
 nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 nativeCodeGen dflags h us cmms
- = let nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
+ = let nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
+       nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
        x86NcgImpl = NcgImpl {
                          cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
                         ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr
                         ,getJumpDestBlockId        = X86.Instr.getJumpDestBlockId
                         ,canShortcut               = X86.Instr.canShortcut
-                        ,shortcutStatic            = X86.Instr.shortcutStatic
+                        ,shortcutStatics           = X86.Instr.shortcutStatics
                         ,shortcutJump              = X86.Instr.shortcutJump
                         ,pprNatCmmTop              = X86.Ppr.pprNatCmmTop
                         ,maxSpillSlots             = X86.Instr.maxSpillSlots
@@ -173,7 +175,7 @@ nativeCodeGen dflags h us cmms
                          ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr
                          ,getJumpDestBlockId        = PPC.RegInfo.getJumpDestBlockId
                          ,canShortcut               = PPC.RegInfo.canShortcut
-                         ,shortcutStatic            = PPC.RegInfo.shortcutStatic
+                         ,shortcutStatics           = PPC.RegInfo.shortcutStatics
                          ,shortcutJump              = PPC.RegInfo.shortcutJump
                          ,pprNatCmmTop              = PPC.Ppr.pprNatCmmTop
                          ,maxSpillSlots             = PPC.Instr.maxSpillSlots
@@ -188,7 +190,7 @@ nativeCodeGen dflags h us cmms
                          ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr
                          ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
                          ,canShortcut               = SPARC.ShortcutJump.canShortcut
-                         ,shortcutStatic            = SPARC.ShortcutJump.shortcutStatic
+                         ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
                          ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
                          ,pprNatCmmTop              = SPARC.Ppr.pprNatCmmTop
                          ,maxSpillSlots             = SPARC.Instr.maxSpillSlots
@@ -204,9 +206,9 @@ nativeCodeGen dflags h us cmms
                  ArchUnknown ->
                      panic "nativeCodeGen: No NCG for unknown arch"
 
-nativeCodeGen' :: (Instruction instr, Outputable instr)
+nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                => DynFlags
-               -> NcgImpl instr jumpDest
+               -> NcgImpl statics instr jumpDest
                -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
@@ -270,20 +272,20 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens :: (Instruction instr, Outputable instr)
+cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags
-              -> NcgImpl instr jumpDest
+              -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> UniqSupply
               -> [RawCmmTop]
               -> [[CLabel]]
-              -> [ ([NatCmmTop instr],
-                   Maybe [Color.RegAllocStats instr],
+              -> [ ([NatCmmTop statics instr],
+                   Maybe [Color.RegAllocStats statics instr],
                    Maybe [Linear.RegAllocStats]) ]
               -> Int
               -> IO ( [[CLabel]],
-                      [([NatCmmTop instr],
-                      Maybe [Color.RegAllocStats instr],
+                      [([NatCmmTop statics instr],
+                      Maybe [Color.RegAllocStats statics instr],
                       Maybe [Linear.RegAllocStats])] )
 
 cmmNativeGens _ _ _ _ [] impAcc profAcc _
@@ -325,17 +327,17 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 --	Dumping the output of each stage along the way.
 --	Global conflict graph and NGC stats
 cmmNativeGen
-	:: (Instruction instr, Outputable instr)
+	:: (Outputable statics, Outputable instr, Instruction instr)
     => DynFlags
-    -> NcgImpl instr jumpDest
+    -> NcgImpl statics instr jumpDest
 	-> UniqSupply
 	-> RawCmmTop					-- ^ the cmm to generate code for
 	-> Int						-- ^ sequence number of this top thing
 	-> IO	( UniqSupply
-		, [NatCmmTop instr]			-- native code
-		, [CLabel]				-- things imported by this cmm
-		, Maybe [Color.RegAllocStats instr]	-- stats for the coloring register allocator
-		, Maybe [Linear.RegAllocStats])		-- stats for the linear register allocators
+		, [NatCmmTop statics instr]	            -- native code
+		, [CLabel]			            -- things imported by this cmm
+		, Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
+		, Maybe [Linear.RegAllocStats])		    -- stats for the linear register allocators
 
 cmmNativeGen dflags ncgImpl us cmm count
  = do
@@ -483,7 +485,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 		, ppr_raStatsLinear)
 
 
-x86fp_kludge :: NatCmmTop X86.Instr.Instr -> NatCmmTop X86.Instr.Instr
+x86fp_kludge :: NatCmmTop (Alignment, CmmStatics) X86.Instr.Instr -> NatCmmTop (Alignment, CmmStatics) X86.Instr.Instr
 x86fp_kludge top@(CmmData _ _) = top
 x86fp_kludge (CmmProc info lbl (ListGraph code)) = 
 	CmmProc info lbl (ListGraph $ X86.Instr.i386_insert_ffrees code)
@@ -556,7 +558,7 @@ makeImportsDoc dflags imports
 
 sequenceTop 
 	:: Instruction instr
-    => NcgImpl instr jumpDest -> NatCmmTop instr -> NatCmmTop instr
+    => NcgImpl statics instr jumpDest -> NatCmmTop statics instr -> NatCmmTop statics instr
 
 sequenceTop _       top@(CmmData _ _) = top
 sequenceTop ncgImpl (CmmProc info lbl (ListGraph blocks)) = 
@@ -670,8 +672,8 @@ makeFarBranches blocks
 -- Analyzes all native code and generates data sections for all jump
 -- table instructions.
 generateJumpTables
-	:: NcgImpl instr jumpDest
-    -> [NatCmmTop instr] -> [NatCmmTop instr]
+	:: NcgImpl statics instr jumpDest
+    -> [NatCmmTop statics instr] -> [NatCmmTop statics instr]
 generateJumpTables ncgImpl xs = concatMap f xs
     where f p@(CmmProc _ _ (ListGraph xs)) = p : concatMap g xs
           f p = [p]
@@ -682,9 +684,9 @@ generateJumpTables ncgImpl xs = concatMap f xs
 
 shortcutBranches
 	:: DynFlags
-    -> NcgImpl instr jumpDest
-	-> [NatCmmTop instr] 
-	-> [NatCmmTop instr]
+    -> NcgImpl statics instr jumpDest
+	-> [NatCmmTop statics instr] 
+	-> [NatCmmTop statics instr]
 
 shortcutBranches dflags ncgImpl tops
   | optLevel dflags < 1 = tops    -- only with -O or higher
@@ -693,7 +695,7 @@ shortcutBranches dflags ncgImpl tops
     (tops', mappings) = mapAndUnzip (build_mapping ncgImpl) tops
     mapping = foldr plusUFM emptyUFM mappings
 
-build_mapping :: NcgImpl instr jumpDest
+build_mapping :: NcgImpl statics instr jumpDest
               -> GenCmmTop d t (ListGraph instr)
               -> (GenCmmTop d t (ListGraph instr), UniqFM jumpDest)
 build_mapping _ top@(CmmData _ _) = (top, emptyUFM)
@@ -723,14 +725,12 @@ build_mapping ncgImpl (CmmProc info lbl (ListGraph (head:blocks)))
     mapping = foldl add emptyUFM shortcut_blocks
     add ufm (id,dest) = addToUFM ufm id dest
     
-apply_mapping :: NcgImpl instr jumpDest
+apply_mapping :: NcgImpl statics instr jumpDest
               -> UniqFM jumpDest
-              -> GenCmmTop CmmStatic h (ListGraph instr)
-              -> GenCmmTop CmmStatic h (ListGraph instr)
+              -> GenCmmTop statics h (ListGraph instr)
+              -> GenCmmTop statics h (ListGraph instr)
 apply_mapping ncgImpl ufm (CmmData sec statics)
-  = CmmData sec (map (shortcutStatic ncgImpl (lookupUFM ufm)) statics)
-  -- we need to get the jump tables, so apply the mapping to the entries
-  -- of a CmmData too.
+  = CmmData sec (shortcutStatics ncgImpl (lookupUFM ufm) statics)
 apply_mapping ncgImpl ufm (CmmProc info lbl (ListGraph blocks))
   = CmmProc info lbl (ListGraph $ map short_bb blocks)
   where
@@ -761,10 +761,10 @@ apply_mapping ncgImpl ufm (CmmProc info lbl (ListGraph blocks))
 
 genMachCode 
 	:: DynFlags 
-        -> (RawCmmTop -> NatM [NatCmmTop instr])
+        -> (RawCmmTop -> NatM [NatCmmTop statics instr])
 	-> RawCmmTop 
 	-> UniqSM 
-		( [NatCmmTop instr]
+		( [NatCmmTop statics instr]
 		, [CLabel])
 
 genMachCode dflags cmmTopCodeGen cmm_top

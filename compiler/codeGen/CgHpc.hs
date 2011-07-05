@@ -12,6 +12,7 @@ import OldCmm
 import CLabel
 import Module
 import OldCmmUtils
+import CgUtils
 import CgMonad
 import HscTypes
 
@@ -30,9 +31,8 @@ cgTickBox mod n = do
 
 hpcTable :: Module -> HpcInfo -> Code
 hpcTable this_mod (HpcInfo hpc_tickCount _) = do
-                        emitData Data $ [ CmmDataLabel (mkHpcTicksLabel this_mod)
-                                        ] ++
-                                        [ CmmStaticLit (CmmInt 0 W64)
+                        emitDataLits (mkHpcTicksLabel this_mod) $
+                                        [ CmmInt 0 W64
                                         | _ <- take hpc_tickCount [0::Int ..]
                                         ]
 

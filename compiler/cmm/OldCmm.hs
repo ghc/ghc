@@ -73,12 +73,12 @@ newtype ListGraph i = ListGraph [GenBasicBlock i]
    -- across a whole compilation unit.
 
 -- | Cmm with the info table as a data type
-type Cmm    = GenCmm    CmmStatic CmmInfo (ListGraph CmmStmt)
-type CmmTop = GenCmmTop CmmStatic CmmInfo (ListGraph CmmStmt)
+type Cmm    = GenCmm    CmmStatics CmmInfo (ListGraph CmmStmt)
+type CmmTop = GenCmmTop CmmStatics CmmInfo (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic'
-type RawCmm    = GenCmm    CmmStatic [CmmStatic] (ListGraph CmmStmt)
-type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] (ListGraph CmmStmt)
+type RawCmm    = GenCmm    CmmStatics [CmmStatic] (ListGraph CmmStmt)
+type RawCmmTop = GenCmmTop CmmStatics [CmmStatic] (ListGraph CmmStmt)
 
 
 -- A basic block containing a single label, at the beginning.

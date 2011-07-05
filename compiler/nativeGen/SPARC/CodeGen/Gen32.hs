@@ -83,9 +83,8 @@ getRegister (CmmLit (CmmFloat f W32)) = do
 
     let code dst = toOL [
             -- the data area         
-	    LDATA ReadOnlyData
-	                [CmmDataLabel lbl,
-			 CmmStaticLit (CmmFloat f W32)],
+	    LDATA ReadOnlyData $ Statics lbl
+			 [CmmStaticLit (CmmFloat f W32)],
 
             -- load the literal
 	    SETHI (HI (ImmCLbl lbl)) tmp,
@@ -97,9 +96,8 @@ getRegister (CmmLit (CmmFloat d W64)) = do
     lbl <- getNewLabelNat
     tmp <- getNewRegNat II32
     let code dst = toOL [
-	    LDATA ReadOnlyData
-	                [CmmDataLabel lbl,
-			 CmmStaticLit (CmmFloat d W64)],
+	    LDATA ReadOnlyData $ Statics lbl
+			 [CmmStaticLit (CmmFloat d W64)],
 	    SETHI (HI (ImmCLbl lbl)) tmp,
 	    LD II64 (AddrRegImm tmp (LO (ImmCLbl lbl))) dst] 
     return (Any FF64 code)

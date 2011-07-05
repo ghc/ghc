@@ -37,13 +37,13 @@ noUsage  = RU [] []
 -- Type synonyms for Cmm populated with native code
 type NatCmm instr
 	= GenCmm
-		CmmStatic
+		CmmStatics
 		[CmmStatic]
 		(ListGraph instr)
 
-type NatCmmTop instr
+type NatCmmTop statics instr
 	= GenCmmTop
-		CmmStatic
+		statics
 		[CmmStatic]
 		(ListGraph instr)
 

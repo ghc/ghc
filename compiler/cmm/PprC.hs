@@ -112,31 +112,21 @@ pprTop (CmmProc info clbl (ListGraph blocks)) =
 
 -- We only handle (a) arrays of word-sized things and (b) strings.
 
-pprTop (CmmData _section _ds@[CmmDataLabel lbl, CmmString str]) = 
+pprTop (CmmData _section (Statics lbl [CmmString str])) = 
   hcat [
     pprLocalness lbl, ptext (sLit "char "), pprCLabel lbl,
     ptext (sLit "[] = "), pprStringInCStyle str, semi
   ]
 
-pprTop (CmmData _section _ds@[CmmDataLabel lbl, CmmUninitialised size]) = 
+pprTop (CmmData _section (Statics lbl [CmmUninitialised size])) = 
   hcat [
     pprLocalness lbl, ptext (sLit "char "), pprCLabel lbl,
     brackets (int size), semi
   ]
 
-pprTop (CmmData _section (CmmDataLabel lbl : lits)) = 
+pprTop (CmmData _section (Statics lbl lits)) = 
   pprDataExterns lits $$
-  pprWordArray lbl lits  
-
--- Floating info table for safe a foreign call.
-pprTop (CmmData _section d@(_ : _))
-  | CmmDataLabel lbl : lits <- reverse d = 
-  let lits' = reverse lits
-  in pprDataExterns lits' $$
-     pprWordArray lbl lits'
-
--- these shouldn't appear?
-pprTop (CmmData _ _) = panic "PprC.pprTop: can't handle this data"
+  pprWordArray lbl lits
 
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.

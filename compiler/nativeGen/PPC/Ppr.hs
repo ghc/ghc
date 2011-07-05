@@ -49,9 +49,9 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop :: NatCmmTop CmmStatics Instr -> Doc
 pprNatCmmTop (CmmData section dats) = 
-  pprSectionHeader section $$ vcat (map pprData dats)
+  pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
 pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
@@ -92,6 +92,10 @@ pprBasicBlock (BasicBlock blockid instrs) =
   pprLabel (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
+
+
+pprDatas :: CmmStatics -> Doc
+pprDatas (Statics lbl dats) = vcat (map pprData (CmmDataLabel lbl:dats))
 
 pprData :: CmmStatic -> Doc
 pprData (CmmAlign bytes)         = pprAlign bytes

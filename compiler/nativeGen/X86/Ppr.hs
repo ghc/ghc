@@ -31,6 +31,7 @@ import Reg
 import PprBase
 
 
+import BasicTypes       (Alignment)
 import OldCmm
 import CLabel
 import Unique           ( pprUnique, Uniquable(..) )
@@ -48,9 +49,9 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop :: NatCmmTop (Alignment, CmmStatics) Instr -> Doc
 pprNatCmmTop (CmmData section dats) =
-  pprSectionHeader section $$ vcat (map pprData dats)
+  pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
 pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
@@ -101,6 +102,9 @@ pprBasicBlock (BasicBlock blockid instrs) =
   pprLabel (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
+
+pprDatas :: (Alignment, CmmStatics) -> Doc
+pprDatas (align, (Statics lbl dats)) = vcat (map pprData (CmmAlign align:CmmDataLabel lbl:dats)) -- TODO: could remove if align == 1
 
 pprData :: CmmStatic -> Doc
 pprData (CmmAlign bytes)         = pprAlign bytes

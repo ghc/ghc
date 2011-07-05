@@ -67,7 +67,7 @@ import FastString
 
 cmmTopCodeGen
         :: RawCmmTop
-        -> NatM [NatCmmTop Instr]
+        -> NatM [NatCmmTop CmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -86,7 +86,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen
         :: CmmBasicBlock
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmTop Instr])
+                , [NatCmmTop CmmStatics Instr])
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -557,8 +557,8 @@ getRegister' _ (CmmLit (CmmFloat f frep)) = do
     Amode addr addr_code <- getAmode dynRef
     let size = floatSize frep
         code dst =
-            LDATA ReadOnlyData  [CmmDataLabel lbl,
-                                 CmmStaticLit (CmmFloat f frep)]
+            LDATA ReadOnlyData (Statics lbl
+                                   [CmmStaticLit (CmmFloat f frep)])
             `consOL` (addr_code `snocOL` LD size dst addr)
     return (Any size code)
 
@@ -1180,7 +1180,7 @@ genSwitch expr ids
                     ]
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop CmmStatics Instr)
 generateJumpTableForInstr (BCTR ids (Just lbl)) =
     let jumpTable
             | opt_PIC   = map jumpTableEntryRel ids
@@ -1190,7 +1190,7 @@ generateJumpTableForInstr (BCTR ids (Just lbl)) =
                       jumpTableEntryRel (Just blockid)
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
                             where blockLabel = mkAsmTempLabel (getUnique blockid)
-    in Just (CmmData ReadOnlyData (CmmDataLabel lbl : jumpTable))
+    in Just (CmmData ReadOnlyData (Statics lbl jumpTable))
 generateJumpTableForInstr _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -1362,10 +1362,9 @@ coerceInt2FP fromRep toRep x = do
     Amode addr addr_code <- getAmode dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
-                LDATA ReadOnlyData
-                                [CmmDataLabel lbl,
-                                 CmmStaticLit (CmmInt 0x43300000 W32),
-                                 CmmStaticLit (CmmInt 0x80000000 W32)],
+                LDATA ReadOnlyData $ Statics lbl
+                                 [CmmStaticLit (CmmInt 0x43300000 W32),
+                                  CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),
                 ST II32 itmp (spRel 3),
                 LIS itmp (ImmInt 0x4330),

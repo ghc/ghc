@@ -37,8 +37,8 @@ structStr = fsLit "_struct"
 -- complete this completely though as we need to pass all CmmStatic
 -- sections before all references can be resolved. This last step is
 -- done by 'resolveLlvmData'.
-genLlvmData :: (Section, [CmmStatic]) -> LlvmUnresData
-genLlvmData (sec, CmmDataLabel lbl:xs) =
+genLlvmData :: (Section, CmmStatics) -> LlvmUnresData
+genLlvmData (sec, Statics lbl xs) =
     let static  = map genData xs
         label   = strCLabel_llvm lbl
 
@@ -49,8 +49,6 @@ genLlvmData (sec, CmmDataLabel lbl:xs) =
         strucTy = LMStruct types
         alias   = LMAlias ((label `appendFS` structStr), strucTy)
     in (lbl, sec, alias, static)
-
-genLlvmData _ = panic "genLlvmData: CmmData section doesn't start with label!"
 
 
 resolveLlvmDatas ::  LlvmEnv -> [LlvmUnresData] -> [LlvmData]

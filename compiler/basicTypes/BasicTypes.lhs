@@ -19,7 +19,9 @@ types that
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
-	Arity, 
+	Arity,
+	
+	Alignment,
 
         FunctionOrData(..),
 	
@@ -92,6 +94,16 @@ import Data.Function (on)
 
 \begin{code}
 type Arity = Int
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Alignment]{Alignment}
+%*									*
+%************************************************************************
+
+\begin{code}
+type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 \end{code}
 
 %************************************************************************

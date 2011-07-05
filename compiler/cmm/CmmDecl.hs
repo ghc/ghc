@@ -11,11 +11,12 @@ module CmmDecl (
         CmmInfoTable(..), HasStaticClosure, ClosureTypeInfo(..), ConstrDescription,
         ProfilingInfo(..), ClosureTypeTag,
         CmmActual, CmmFormal, ForeignHint(..),
-        CmmStatic(..), Section(..),
+        CmmStatics(..), CmmStatic(..), Section(..),
   ) where
 
 #include "HsVersions.h"
 
+import BasicTypes (Alignment)
 import CmmExpr
 import CLabel
 import SMRep
@@ -60,7 +61,7 @@ data GenCmmTop d h g
 
   | CmmData     -- Static data
         Section
-        [d]
+        d
 
 
 -----------------------------------------------------------------------------
@@ -132,10 +133,11 @@ data CmmStatic
         -- a literal value, size given by cmmLitRep of the literal.
   | CmmUninitialised Int
         -- uninitialised data, N bytes long
-  | CmmAlign Int
+  | CmmAlign Alignment
         -- align to next N-byte boundary (N must be a power of 2).
   | CmmDataLabel CLabel
         -- label the current position in this section.
   | CmmString [Word8]
         -- string of 8-bit values only, not zero terminated.
 
+data CmmStatics = Statics CLabel {- Label of statics -} [CmmStatic] {- The static data itself -}

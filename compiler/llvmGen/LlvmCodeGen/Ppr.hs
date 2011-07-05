@@ -83,7 +83,7 @@ pprLlvmCmmTop _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
 pprLlvmCmmTop env count (CmmProc info lbl (ListGraph blks))
-  = let static = CmmDataLabel lbl : info
+  = let static = Statics lbl info
         (idoc, ivar) = if not (null info)
                           then pprInfoTable env count lbl static
                           else (empty, [])
@@ -103,7 +103,7 @@ pprLlvmCmmTop env count (CmmProc info lbl (ListGraph blks))
 
 
 -- | Pretty print CmmStatic
-pprInfoTable :: LlvmEnv -> Int -> CLabel -> [CmmStatic] -> (Doc, [LlvmVar])
+pprInfoTable :: LlvmEnv -> Int -> CLabel -> CmmStatics -> (Doc, [LlvmVar])
 pprInfoTable env count lbl stat
   = let unres = genLlvmData (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres

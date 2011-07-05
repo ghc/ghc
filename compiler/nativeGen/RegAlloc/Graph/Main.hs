@@ -44,12 +44,12 @@ maxSpinCount	= 10
 
 -- | The top level of the graph coloring register allocator.
 regAlloc
-	:: (Outputable instr, Instruction instr)
+	:: (Outputable statics, Outputable instr, Instruction instr)
 	=> DynFlags
 	-> UniqFM (UniqSet RealReg)	-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
-	-> [LiveCmmTop instr]		-- ^ code annotated with liveness information.
-	-> UniqSM ( [NatCmmTop instr], [RegAllocStats instr] )
+	-> [LiveCmmTop statics instr]	-- ^ code annotated with liveness information.
+	-> UniqSM ( [NatCmmTop statics instr], [RegAllocStats statics instr] )
            -- ^ code with registers allocated and stats for each stage of
            -- allocation
 		
@@ -239,7 +239,7 @@ regAlloc_spin
 -- | Build a graph from the liveness and coalesce information in this code.
 buildGraph 
 	:: Instruction instr
-	=> [LiveCmmTop instr]
+	=> [LiveCmmTop statics instr]
 	-> UniqSM (Color.Graph VirtualReg RegClass RealReg)
 	
 buildGraph code
@@ -320,9 +320,9 @@ graphAddCoalesce _ _
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph 
-	:: (Outputable instr, Instruction instr)
+	:: (Outputable statics, Outputable instr, Instruction instr)
 	=> Color.Graph VirtualReg RegClass RealReg
-	-> LiveCmmTop instr -> LiveCmmTop instr
+	-> LiveCmmTop statics instr -> LiveCmmTop statics instr
 
 patchRegsFromGraph graph code
  = let
