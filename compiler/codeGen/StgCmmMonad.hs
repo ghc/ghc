@@ -593,7 +593,7 @@ emit ag
   = do	{ state <- getState
 	; setState $ state { cgs_stmts = cgs_stmts state <*> ag } }
 
-emitData :: Section -> [CmmStatic] -> FCode ()
+emitData :: Section -> CmmStatics -> FCode ()
 emitData sect lits
   = do 	{ state <- getState
 	; setState $ state { cgs_tops = cgs_tops state `snocOL` data_block } }

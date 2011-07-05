@@ -47,9 +47,9 @@ import Data.Word
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop :: NatCmmTop CmmStatics Instr -> Doc
 pprNatCmmTop (CmmData section dats) = 
-  pprSectionHeader section $$ vcat (map pprData dats)
+  pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
 pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
@@ -91,9 +91,10 @@ pprBasicBlock (BasicBlock blockid instrs) =
   vcat (map pprInstr instrs)
 
 
+pprDatas :: CmmStatics -> Doc
+pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+
 pprData :: CmmStatic -> Doc
-pprData (CmmAlign bytes)         = pprAlign bytes
-pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
 pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
@@ -124,10 +125,6 @@ pprASCII str
     where
        do1 :: Word8 -> Doc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
-
-pprAlign :: Int -> Doc
-pprAlign bytes =
-	ptext (sLit ".align ") <> int bytes
 
 
 -- -----------------------------------------------------------------------------

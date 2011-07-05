@@ -508,26 +508,26 @@ baseRegOffset reg		  = pprPanic "baseRegOffset:" (ppr reg)
 emitDataLits :: CLabel -> [CmmLit] -> FCode ()
 -- Emit a data-segment data block
 emitDataLits lbl lits
-  = emitData Data (CmmDataLabel lbl : map CmmStaticLit lits)
+  = emitData Data (Statics lbl $ map CmmStaticLit lits)
 
-mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info stmt
+mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatics info stmt
 -- Emit a data-segment data block
 mkDataLits lbl lits
-  = CmmData Data (CmmDataLabel lbl : map CmmStaticLit lits)
+  = CmmData Data (Statics lbl $ map CmmStaticLit lits)
 
 emitRODataLits :: CLabel -> [CmmLit] -> FCode ()
 -- Emit a read-only data block
 emitRODataLits lbl lits
-  = emitData section (CmmDataLabel lbl : map CmmStaticLit lits)
+  = emitData section (Statics lbl $ map CmmStaticLit lits)
   where section | any needsRelocation lits = RelocatableReadOnlyData
                 | otherwise                = ReadOnlyData
         needsRelocation (CmmLabel _)      = True
         needsRelocation (CmmLabelOff _ _) = True
         needsRelocation _                 = False
 
-mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info stmt
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatics info stmt
 mkRODataLits lbl lits
-  = CmmData section (CmmDataLabel lbl : map CmmStaticLit lits)
+  = CmmData section (Statics lbl $ map CmmStaticLit lits)
   where section | any needsRelocation lits = RelocatableReadOnlyData
                 | otherwise                = ReadOnlyData
         needsRelocation (CmmLabel _)      = True
@@ -543,7 +543,7 @@ mkByteStringCLit :: [Word8] -> FCode CmmLit
 mkByteStringCLit bytes
   = do 	{ uniq <- newUnique
 	; let lbl = mkStringLitLabel uniq
-	; emitData ReadOnlyData [CmmDataLabel lbl, CmmString bytes]
+	; emitData ReadOnlyData $ Statics lbl [CmmString bytes]
 	; return (CmmLabel lbl) }
 
 -------------------------------------------------------------------------

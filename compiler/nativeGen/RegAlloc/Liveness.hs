@@ -66,9 +66,9 @@ type BlockMap a = BlockEnv a
 
 
 -- | A top level thing which carries liveness information.
-type LiveCmmTop instr
+type LiveCmmTop statics instr
 	= GenCmmTop
-		CmmStatic
+		statics
 		LiveInfo
 		[SCC (LiveBasicBlock instr)]
 
@@ -224,7 +224,7 @@ instance Outputable LiveInfo where
 --
 mapBlockTop
 	:: (LiveBasicBlock instr -> LiveBasicBlock instr)
-	-> LiveCmmTop instr -> LiveCmmTop instr
+	-> LiveCmmTop statics instr -> LiveCmmTop statics instr
 
 mapBlockTop f cmm
 	= evalState (mapBlockTopM (\x -> return $ f x) cmm) ()
@@ -235,7 +235,7 @@ mapBlockTop f cmm
 mapBlockTopM
 	:: Monad m
 	=> (LiveBasicBlock instr -> m (LiveBasicBlock instr))
-	-> LiveCmmTop instr -> m (LiveCmmTop instr)
+	-> LiveCmmTop statics instr -> m (LiveCmmTop statics instr)
 
 mapBlockTopM _ cmm@(CmmData{})
 	= return cmm
@@ -283,7 +283,7 @@ mapGenBlockTopM f (CmmProc header label (ListGraph blocks))
 --
 slurpConflicts 
 	:: Instruction instr
-	=> LiveCmmTop instr 
+	=> LiveCmmTop statics instr 
 	-> (Bag (UniqSet Reg), Bag (Reg, Reg))
 
 slurpConflicts live
@@ -357,8 +357,8 @@ slurpConflicts live
 --
 --
 slurpReloadCoalesce 
-	:: forall instr. Instruction instr
-	=> LiveCmmTop instr
+	:: forall statics instr. Instruction instr
+	=> LiveCmmTop statics instr
 	-> Bag (Reg, Reg)
 
 slurpReloadCoalesce live
@@ -458,9 +458,9 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmTop
 stripLive 
-	:: (Outputable instr, Instruction instr)
-	=> LiveCmmTop instr 
-	-> NatCmmTop instr
+	:: (Outputable statics, Outputable instr, Instruction instr)
+	=> LiveCmmTop statics instr 
+	-> NatCmmTop statics instr
 
 stripLive live
 	= stripCmm live
@@ -525,8 +525,8 @@ stripLiveBlock (BasicBlock i lis)
 
 eraseDeltasLive 
 	:: Instruction instr
-	=> LiveCmmTop instr
-	-> LiveCmmTop instr
+	=> LiveCmmTop statics instr
+	-> LiveCmmTop statics instr
 
 eraseDeltasLive cmm
 	= mapBlockTop eraseBlock cmm
@@ -543,7 +543,7 @@ eraseDeltasLive cmm
 patchEraseLive
 	:: Instruction instr
 	=> (Reg -> Reg)
-	-> LiveCmmTop instr -> LiveCmmTop instr
+	-> LiveCmmTop statics instr -> LiveCmmTop statics instr
 
 patchEraseLive patchF cmm
 	= patchCmm cmm
@@ -620,8 +620,8 @@ patchRegsLiveInstr patchF li
 
 natCmmTopToLive 
 	:: Instruction instr
-	=> NatCmmTop instr
-	-> LiveCmmTop instr
+	=> NatCmmTop statics instr
+	-> LiveCmmTop statics instr
 
 natCmmTopToLive (CmmData i d)
 	= CmmData i d
@@ -658,8 +658,8 @@ sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
 --
 regLiveness
 	:: (Outputable instr, Instruction instr)
-	=> LiveCmmTop instr
-	-> UniqSM (LiveCmmTop instr)
+	=> LiveCmmTop statics instr
+	-> UniqSM (LiveCmmTop statics instr)
 
 regLiveness (CmmData i d)
 	= returnUs $ CmmData i d
@@ -720,7 +720,7 @@ checkIsReverseDependent sccs'
 
 -- | If we've compute liveness info for this code already we have to reverse
 --   the SCCs in each top to get them back to the right order so we can do it again.
-reverseBlocksInTops :: LiveCmmTop instr -> LiveCmmTop instr
+reverseBlocksInTops :: LiveCmmTop statics instr -> LiveCmmTop statics instr
 reverseBlocksInTops top
  = case top of
 	CmmData{}			-> top

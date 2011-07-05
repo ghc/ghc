@@ -49,9 +49,9 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop Instr -> Doc
+pprNatCmmTop :: NatCmmTop CmmStatics Instr -> Doc
 pprNatCmmTop (CmmData section dats) = 
-  pprSectionHeader section $$ vcat (map pprData dats)
+  pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
 pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
@@ -93,9 +93,11 @@ pprBasicBlock (BasicBlock blockid instrs) =
   vcat (map pprInstr instrs)
 
 
+
+pprDatas :: CmmStatics -> Doc
+pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+
 pprData :: CmmStatic -> Doc
-pprData (CmmAlign bytes)         = pprAlign bytes
-pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
 
 #if darwin_TARGET_OS
@@ -132,19 +134,6 @@ pprASCII str
     where
        do1 :: Word8 -> Doc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
-
-pprAlign :: Int -> Doc
-pprAlign bytes =
-	ptext (sLit ".align ") <> int pow2
-  where
-	pow2 = log2 bytes
-	
-	log2 :: Int -> Int  -- cache the common ones
-	log2 1 = 0 
-	log2 2 = 1
-	log2 4 = 2
-	log2 8 = 3
-	log2 n = 1 + log2 (n `quot` 2)
 
 
 -- -----------------------------------------------------------------------------

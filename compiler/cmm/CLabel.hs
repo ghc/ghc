@@ -691,13 +691,17 @@ externallyVisibleCLabel (PlainModuleInitLabel _)= True
 externallyVisibleCLabel (RtsLabel _)            = True
 externallyVisibleCLabel (CmmLabel _ _ _)	= True
 externallyVisibleCLabel (ForeignLabel{})	= True
-externallyVisibleCLabel (IdLabel name _ _)	= isExternalName name
+externallyVisibleCLabel (IdLabel name _ info)	= isExternalName name && externallyVisibleIdLabel info
 externallyVisibleCLabel (CC_Label _)		= True
 externallyVisibleCLabel (CCS_Label _)		= True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)	= True
 externallyVisibleCLabel (LargeBitmapLabel _)    = False
 externallyVisibleCLabel (LargeSRTLabel _)	= False
+
+externallyVisibleIdLabel :: IdLabelInfo -> Bool
+externallyVisibleIdLabel SRT = False
+externallyVisibleIdLabel _   = True
 
 -- -----------------------------------------------------------------------------
 -- Finding the "type" of a CLabel 

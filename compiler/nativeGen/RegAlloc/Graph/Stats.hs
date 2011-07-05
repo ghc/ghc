@@ -36,36 +36,36 @@ import State
 
 import Data.List
 
-data RegAllocStats instr
+data RegAllocStats statics instr
 
 	-- initial graph
 	= RegAllocStatsStart
-	{ raLiveCmm	:: [LiveCmmTop instr]		  		-- ^ initial code, with liveness
+	{ raLiveCmm	:: [LiveCmmTop statics instr]		  	-- ^ initial code, with liveness
 	, raGraph	:: Color.Graph VirtualReg RegClass RealReg   	-- ^ the initial, uncolored graph
 	, raSpillCosts	:: SpillCostInfo } 		 		-- ^ information to help choose which regs to spill
 
 	-- a spill stage
 	| RegAllocStatsSpill
-	{ raCode	:: [LiveCmmTop instr]				-- ^ the code we tried to allocate registers for
+	{ raCode	:: [LiveCmmTop statics instr]			-- ^ the code we tried to allocate registers for
 	, raGraph	:: Color.Graph VirtualReg RegClass RealReg	-- ^ the partially colored graph
 	, raCoalesced	:: UniqFM VirtualReg				-- ^ the regs that were coaleced
 	, raSpillStats	:: SpillStats 					-- ^ spiller stats
 	, raSpillCosts	:: SpillCostInfo 				-- ^ number of instrs each reg lives for
-	, raSpilled	:: [LiveCmmTop instr] }				-- ^ code with spill instructions added
+	, raSpilled	:: [LiveCmmTop statics instr] }			-- ^ code with spill instructions added
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raCode	  :: [LiveCmmTop instr]				-- ^ the code we tried to allocate registers for
+	{ raCode	  :: [LiveCmmTop statics instr]			-- ^ the code we tried to allocate registers for
 	, raGraph	  :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
 	, raGraphColored  :: Color.Graph VirtualReg RegClass RealReg 	-- ^ the coalesced and colored graph
 	, raCoalesced	  :: UniqFM VirtualReg				-- ^ the regs that were coaleced
-	, raCodeCoalesced :: [LiveCmmTop instr]				-- ^ code with coalescings applied 
-	, raPatched	  :: [LiveCmmTop instr] 			-- ^ code with vregs replaced by hregs
-	, raSpillClean    :: [LiveCmmTop instr]				-- ^ code with unneeded spill\/reloads cleaned out
-	, raFinal	  :: [NatCmmTop instr] 				-- ^ final code
+	, raCodeCoalesced :: [LiveCmmTop statics instr]			-- ^ code with coalescings applied 
+	, raPatched	  :: [LiveCmmTop statics instr] 		-- ^ code with vregs replaced by hregs
+	, raSpillClean    :: [LiveCmmTop statics instr]			-- ^ code with unneeded spill\/reloads cleaned out
+	, raFinal	  :: [NatCmmTop statics instr] 			-- ^ final code
 	, raSRMs	  :: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
 
-instance Outputable instr => Outputable (RegAllocStats instr) where
+instance (Outputable statics, Outputable instr) => Outputable (RegAllocStats statics instr) where
 
  ppr (s@RegAllocStatsStart{})
  	=  text "#  Start"
@@ -147,7 +147,7 @@ instance Outputable instr => Outputable (RegAllocStats instr) where
 
 -- | Do all the different analysis on this list of RegAllocStats
 pprStats 
-	:: [RegAllocStats instr] 
+	:: [RegAllocStats statics instr] 
 	-> Color.Graph VirtualReg RegClass RealReg 
 	-> SDoc
 	
@@ -162,7 +162,7 @@ pprStats stats graph
 
 -- | Dump a table of how many spill loads \/ stores were inserted for each vreg.
 pprStatsSpills
-	:: [RegAllocStats instr] -> SDoc
+	:: [RegAllocStats statics instr] -> SDoc
 
 pprStatsSpills stats
  = let
@@ -180,7 +180,7 @@ pprStatsSpills stats
 
 -- | Dump a table of how long vregs tend to live for in the initial code.
 pprStatsLifetimes
-	:: [RegAllocStats instr] -> SDoc
+	:: [RegAllocStats statics instr] -> SDoc
 
 pprStatsLifetimes stats
  = let	info		= foldl' plusSpillCostInfo zeroSpillCostInfo
@@ -208,7 +208,7 @@ binLifetimeCount fm
 
 -- | Dump a table of how many conflicts vregs tend to have in the initial code.
 pprStatsConflict
-	:: [RegAllocStats instr] -> SDoc
+	:: [RegAllocStats statics instr] -> SDoc
 
 pprStatsConflict stats
  = let	confMap	= foldl' (plusUFM_C (\(c1, n1) (_, n2) -> (c1, n1 + n2)))
@@ -225,7 +225,7 @@ pprStatsConflict stats
 -- | For every vreg, dump it's how many conflicts it has and its lifetime
 --	good for making a scatter plot.
 pprStatsLifeConflict
-	:: [RegAllocStats instr]
+	:: [RegAllocStats statics instr]
 	-> Color.Graph VirtualReg RegClass RealReg 	-- ^ global register conflict graph
 	-> SDoc
 
@@ -256,7 +256,7 @@ pprStatsLifeConflict stats graph
 --	Lets us see how well the register allocator has done.
 countSRMs 
 	:: Instruction instr
-	=> LiveCmmTop instr -> (Int, Int, Int)
+	=> LiveCmmTop statics instr -> (Int, Int, Int)
 
 countSRMs cmm
 	= execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
