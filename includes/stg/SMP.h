@@ -216,8 +216,10 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         "1:     ldrex   %1, [%2]\n"
         "       mov     %0, #0\n"
         "       teq     %1, %3\n"
+        "       it      eq\n"
         "       strexeq %0, %4, [%2]\n"
         "       teq     %0, #1\n"
+        "       it      eq\n"
         "       beq     1b\n"
                 : "=&r"(tmp), "=&r"(result)
                 : "r"(p), "r"(o), "r"(n)

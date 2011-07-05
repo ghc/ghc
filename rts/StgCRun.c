@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1998-2003
+ * (c) The GHC Team, 1998-2011
  *
  * STG-to-C glue.
  *
@@ -982,6 +982,13 @@ StgRun(StgFunPtr f, StgRegTable *basereg)
    -------------------------------------------------------------------------- */
 
 #ifdef arm_HOST_ARCH
+
+#if defined(__thumb__)
+#define THUMB_FUNC ".thumb\n\t.thumb_func\n\t"
+#else
+#define THUMB_FUNC
+#endif
+
 StgRegTable *
 StgRun(StgFunPtr f, StgRegTable *basereg) {
     StgRegTable * r;
@@ -1003,9 +1010,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
         /*
          * Jump to function argument.
          */
-        "mov pc, %1\n\t"
+        "bx %1\n\t"
 
-	".global " STG_RETURN "\n"
+	".global " STG_RETURN "\n\t"
+        THUMB_FUNC
+        ".type " STG_RETURN ", %%function\n"
        	STG_RETURN ":\n\t"
         /*
          * Free the space we allocated
