@@ -573,7 +573,7 @@ def test_common_work (name, opts, func, args):
                    '.comp.stderr.normalised',   '.comp.stdout.normalised',
                    '.interp.stderr',            '.interp.stdout',
                    '.interp.stderr.normalised', '.interp.stdout.normalised',
-                   '.stats',
+                   '.stats', '.comp.stats',
                    '.hi', '.o', '.prof', '.exe.prof', '.hc',
                    '_stub.h', '_stub.c', '_stub.o',
                    '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
