@@ -985,6 +985,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	 * save callee-saves registers on behalf of the STG code.
 	 */
 	"stmfd sp!, {r4-r10, fp, ip, lr}\n\t"
+        "vstmdb sp!, {d8-d11}\n\t"
         /*
          * allocate some space for Stg machine's temporary storage.
          * Note: RESERVER_C_STACK_BYTES has to be a round number here or
@@ -1015,6 +1016,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 	/*
 	 * restore callee-saves registers.
 	 */
+        "vldmia sp!, {d8-d11}\n\t"
 	"ldmfd sp!, {r4-r10, fp, ip, lr}\n\t"
       : "=r" (r)
       : "r" (f), "r" (basereg), "i" (RESERVED_C_STACK_BYTES)
