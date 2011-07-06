@@ -1397,13 +1397,6 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-fmethod-sharing</option></entry>
-	      <entry>Share specialisations of overloaded functions (default)</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-method-sharing</option></entry>
-	    </row>
-
-	    <row>
 	      <entry><option>-fdo-eta-reduction</option></entry>
 	      <entry>Enable eta-reduction. Implied by <option>-O</option>.</entry>
 	      <entry>dynamic</entry>
