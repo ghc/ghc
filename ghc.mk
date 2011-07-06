@@ -297,12 +297,12 @@ INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
 
 DPH_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
                 dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
-                vector primitive
+                vector primitive random
 
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
 # packages:
-STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010 random
+STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010
 # Packages that we shouldn't build if we don't have TH (e.g. because
 # we're building a profiled compiler):
 TH_PACKAGES := $(DPH_PACKAGES)
@@ -386,7 +386,6 @@ $(eval $(call addPackage,old-time))
 $(eval $(call addPackage,time))
 $(eval $(call addPackage,directory))
 $(eval $(call addPackage,process))
-$(eval $(call addPackage,random))
 $(eval $(call addPackage,extensible-exceptions))
 $(eval $(call addPackage,haskell98))
 $(eval $(call addPackage,haskell2010))
