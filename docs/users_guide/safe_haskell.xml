@@ -43,7 +43,7 @@
       <listitem><emphasis>Module boundary control.</emphasis> Haskell code
         compiled using the Safe language is guaranteed to only access
         symbols that are publicly available to it through other modules
-        export lists. An import part of this is that safe compiled code
+        export lists. An important part of this is that safe compiled code
         is not able to examine or create data values using data constructors
         that the module cannot import. If a module M establishes some
         invariants through careful use of its export list then code
