@@ -12,7 +12,7 @@ module GHC (
 	defaultCleanupHandler,
 
         -- * GHC Monad
-        Ghc, GhcT, GhcMonad(..),
+        Ghc, GhcT, GhcMonad(..), HscEnv,
         runGhc, runGhcT, initGhcMonad,
         gcatch, gbracket, gfinally,
         printException,
