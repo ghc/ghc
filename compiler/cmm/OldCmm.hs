@@ -76,9 +76,12 @@ newtype ListGraph i = ListGraph [GenBasicBlock i]
 type Cmm    = GenCmm    CmmStatics CmmInfo (ListGraph CmmStmt)
 type CmmTop = GenCmmTop CmmStatics CmmInfo (ListGraph CmmStmt)
 
--- | Cmm with the info tables converted to a list of 'CmmStatic'
-type RawCmm    = GenCmm    CmmStatics [CmmStatic] (ListGraph CmmStmt)
-type RawCmmTop = GenCmmTop CmmStatics [CmmStatic] (ListGraph CmmStmt)
+-- | Cmm with the info tables converted to a list of 'CmmStatic' along with the info
+-- table label. If we are building without tables-next-to-code there will be no statics
+--
+-- INVARIANT: if there is an info table, it has at least one CmmStatic
+type RawCmm    = GenCmm    CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
+type RawCmmTop = GenCmmTop CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
 
 
 -- A basic block containing a single label, at the beginning.

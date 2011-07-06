@@ -54,19 +54,24 @@ pprNatCmmTop (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmTop (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
 
-pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
+ -- special case for code without info table:
+pprNatCmmTop (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
-  (if null info then -- blocks guaranteed not null, so label needed
-       pprLabel lbl
-   else
+  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+  vcat (map pprBasicBlock blocks) $$
+  pprSizeDecl lbl
+
+pprNatCmmTop (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+  pprSectionHeader Text $$
+  (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
-            pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
-                <> char ':' $$
+       pprCLabel_asm (mkDeadStripPreventer info_lbl)
+           <> char ':' $$
 #endif
        vcat (map pprData info) $$
-       pprLabel (entryLblToInfoLbl lbl)
+       pprLabel info_lbl
   ) $$
   vcat (map pprBasicBlock blocks)
      -- above: Even the first block gets a label, because with branch-chain
@@ -78,14 +83,12 @@ pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
         -- from the entry code to a label on the _top_ of of the info table,
         -- so that the linker will not think it is unreferenced and dead-strip
         -- it. That's why the label is called a DeadStripPreventer (_dsp).
-  $$ if not (null info)
-                    then text "\t.long "
-                      <+> pprCLabel_asm (entryLblToInfoLbl lbl)
-                      <+> char '-'
-                      <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
-                    else empty
+  $$ text "\t.long "
+       <+> pprCLabel_asm info_lbl
+       <+> char '-'
+       <+> pprCLabel_asm (mkDeadStripPreventer info_lbl)
 #endif
-   $$ pprSizeDecl (if null info then lbl else entryLblToInfoLbl lbl)
+   $$ pprSizeDecl info_lbl
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: CLabel -> Doc

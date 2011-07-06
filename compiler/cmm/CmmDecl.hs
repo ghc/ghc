@@ -55,7 +55,7 @@ newtype GenCmm d h g = Cmm [GenCmmTop d h g]
 data GenCmmTop d h g
   = CmmProc     -- A procedure
      h                 -- Extra header such as the info table
-     CLabel            -- Used to generate both info & entry labels
+     CLabel            -- Used to generate both info & entry labels (though the info table label is in 'h' in RawCmmTop)
      g                 -- Control-flow graph for the procedure's code
 
   | CmmData     -- Static data
