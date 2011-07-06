@@ -28,7 +28,7 @@ import Data.Bits
 
 -- When we split at proc points, we need an empty info table.
 emptyContInfoTable :: CmmInfoTable
-emptyContInfoTable = CmmInfoTable False (ProfilingInfo zero zero) rET_SMALL
+emptyContInfoTable = CmmInfoTable False False (ProfilingInfo zero zero) rET_SMALL
                                   (ContInfo [] NoC_SRT)
     where zero = CmmInt 0 wordWidth
 
@@ -80,8 +80,8 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label blocks) =
       -- Code without an info table.  Easy.
       CmmNonInfoTable -> [CmmProc Nothing entry_label blocks]
 
-      CmmInfoTable _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
-          let info_label = entryLblToInfoLbl entry_label
+      CmmInfoTable is_local _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
+          let info_label = (if is_local then localiseLabel else id) $ entryLblToInfoLbl entry_label
               ty_prof'   = makeRelativeRefTo info_label ty_prof
               cl_prof'   = makeRelativeRefTo info_label cl_prof
           in case type_info of
