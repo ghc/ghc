@@ -88,7 +88,7 @@ pprInfo (CmmInfo _gc_target update_frame CmmNonInfoTable) =
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
                 maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
-pprInfo (CmmInfo _gc_target update_frame info_table@(CmmInfoTable _ _ _ _)) =
+pprInfo (CmmInfo _gc_target update_frame info_table@(CmmInfoTable _ _ _ _ _)) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>

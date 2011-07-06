@@ -56,7 +56,7 @@ module StgCmmClosure (
 	isToplevClosure,
 	closureValDescr, closureTypeDescr,	-- profiling
 
-	isStaticClosure,
+	closureInfoLocal, isStaticClosure,
 	cafBlackHoleClosureInfo, 
 
 	staticClosureNeedsLink, clHasCafRefs 
@@ -679,7 +679,8 @@ data ClosureInfo
 	closureSRT    :: !C_SRT,	  -- What SRT applies to this closure
 	closureType   :: !Type,		  -- Type of closure (ToDo: remove)
 	closureDescr  :: !String,	  -- closure description (for profiling)
-        closureCafs   :: !CafInfo         -- whether the closure may have CAFs
+        closureCafs   :: !CafInfo,        -- whether the closure may have CAFs
+	closureInfLcl :: Bool             -- can the info pointer be a local symbol?
     }
 
   -- Constructor closures don't have a unique info table label (they use
@@ -725,7 +726,12 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
 		  closureSRT = srt_info,
 		  closureType = idType id,
 		  closureDescr = descr,
-                  closureCafs = idCafInfo id }
+                  closureCafs = idCafInfo id,
+		  closureInfLcl = isDataConWorkId id }
+		    -- Make the _info pointer for the implicit datacon worker binding
+		    -- local. The reason we can do this is that importing code always
+		    -- either uses the _closure or _con_info. By the invariants in CorePrep
+		    -- anything else gets eta expanded.
   where
     name   = idName id
     sm_rep = chooseSMRep is_static lf_info tot_wds ptr_wds
@@ -756,7 +762,8 @@ cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
 		  closureSRT    = NoC_SRT,
 		  closureType   = ty,
 		  closureDescr  = "", 
-		  closureCafs   = cafs }
+		  closureCafs   = cafs,
+		  closureInfLcl = False }
 cafBlackHoleClosureInfo _ = panic "cafBlackHoleClosureInfo"
 
 
@@ -931,6 +938,10 @@ staticClosureNeedsLink (ConInfo { closureSMRep = sm_rep, closureCon = con })
 	   GenericRep _ _ _ ConstrNoCaf -> False
 	   _other			-> True
 
+closureInfoLocal :: ClosureInfo -> Bool
+closureInfoLocal ClosureInfo{ closureInfLcl = lcl } = lcl
+closureInfoLocal ConInfo{} = False
+
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 
@@ -997,9 +1008,9 @@ infoTableLabelFromCI cl@(ClosureInfo { closureName = name,
 	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
 		mkApInfoTableLabel upd_flag arity
 
-	LFThunk{}      -> mkLocalInfoTableLabel name $ clHasCafRefs cl
+	LFThunk{}      -> mkInfoTableLabel name $ clHasCafRefs cl
 
-	LFReEntrant _ _ _ _ -> mkLocalInfoTableLabel name $ clHasCafRefs cl
+	LFReEntrant _ _ _ _ -> mkInfoTableLabel name $ clHasCafRefs cl
 
 	_other -> panic "infoTableLabelFromCI"
 

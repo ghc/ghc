@@ -114,8 +114,9 @@ pprTop (CmmData section ds) =
 
 pprInfoTable :: CmmInfoTable -> SDoc
 pprInfoTable CmmNonInfoTable = empty
-pprInfoTable (CmmInfoTable stat_clos (ProfilingInfo closure_type closure_desc) tag info) =
-    vcat [ptext (sLit "has static closure: ") <> ppr stat_clos <+>
+pprInfoTable (CmmInfoTable is_local stat_clos (ProfilingInfo closure_type closure_desc) tag info) =
+    vcat [ptext (sLit "is local: ") <> ppr is_local <+>
+          ptext (sLit "has static closure: ") <> ppr stat_clos <+>
           ptext (sLit "type: ") <> pprLit closure_type,
           ptext (sLit "desc: ") <> pprLit closure_desc,
           ptext (sLit "tag: ") <> integer (toInteger tag),
