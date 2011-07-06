@@ -272,7 +272,7 @@ sub scmall {
         # Use the "remote" structure for bare git repositories
         $localpath  = ($bare_flag && $scm eq "git") ?
                       $$line{"remotepath"} : $$line{"localpath"};
-        $remotepath = ($checked_out_flag) ?
+        $remotepath = ($checked_out_tree) ?
                       $$line{"localpath"}  : $$line{"remotepath"};
 
         # Check the SCM is OK as early as possible
