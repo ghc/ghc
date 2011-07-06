@@ -64,7 +64,6 @@ libraries/old-locale            -           packages/old-locale.git             
 libraries/old-time              -           packages/old-time.git               git
 libraries/pretty                -           packages/pretty.git                 git
 libraries/process               -           packages/process.git                git
-libraries/random                -           packages/random.git                 git
 libraries/template-haskell      -           packages/template-haskell.git       git
 libraries/terminfo              -           packages/terminfo.git               git
 libraries/unix                  -           packages/unix.git                   git
@@ -76,6 +75,7 @@ nofib                           nofib       nofib.git                           
 libraries/deepseq               extra       packages/deepseq.git                git
 libraries/parallel              extra       packages/parallel.git               git
 libraries/stm                   extra       packages/stm.git                    git
+libraries/random                dph         packages/random.git                 git
 libraries/primitive             dph         packages/primitive.git              git
 libraries/vector                dph         packages/vector.git                 git
 libraries/dph                   dph         packages/dph.git                    git
