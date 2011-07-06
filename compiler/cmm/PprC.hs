@@ -83,11 +83,11 @@ pprC (Cmm tops) = vcat $ intersperse blankLine $ map pprTop tops
 -- top level procs
 -- 
 pprTop :: RawCmmTop -> SDoc
-pprTop (CmmProc info clbl (ListGraph blocks)) =
-    (if not (null info)
-        then pprDataExterns info $$
-             pprWordArray (entryLblToInfoLbl clbl) info
-        else empty) $$
+pprTop (CmmProc mb_info clbl (ListGraph blocks)) =
+    (case mb_info of
+       Nothing -> empty
+       Just (Statics info_clbl info_dat) -> pprDataExterns info_dat $$
+                                            pprWordArray info_clbl info_dat) $$
     (vcat [
            blankLine,
            extern_decls,

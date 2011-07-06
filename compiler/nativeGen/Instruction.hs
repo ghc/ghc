@@ -38,13 +38,13 @@ noUsage  = RU [] []
 type NatCmm instr
 	= GenCmm
 		CmmStatics
-		[CmmStatic]
+		(Maybe CmmStatics)
 		(ListGraph instr)
 
 type NatCmmTop statics instr
 	= GenCmmTop
 		statics
-		[CmmStatic]
+		(Maybe CmmStatics)
 		(ListGraph instr)
 
 

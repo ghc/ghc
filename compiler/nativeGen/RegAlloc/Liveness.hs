@@ -158,7 +158,7 @@ data Liveness
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
 data LiveInfo
 	= LiveInfo
-		[CmmStatic]				-- cmm static stuff
+		(Maybe CmmStatics)			-- cmm info table static stuff
 		(Maybe BlockId)				-- id of the first block
 		(Maybe (BlockMap RegSet))		-- argument locals live on entry to this block
 		(Map BlockId (Set Int))			-- stack slots live on entry to this block
@@ -212,8 +212,8 @@ instance Outputable instr
 		 | otherwise		= name <> (hcat $ punctuate space $ map ppr $ uniqSetToList regs)
 
 instance Outputable LiveInfo where
-	ppr (LiveInfo static firstId liveVRegsOnEntry liveSlotsOnEntry)
-		=  (vcat $ map ppr static)
+	ppr (LiveInfo mb_static firstId liveVRegsOnEntry liveSlotsOnEntry)
+		=  (maybe empty ppr mb_static)
 		$$ text "# firstId          = " <> ppr firstId
 		$$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
 		$$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)

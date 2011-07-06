@@ -13,7 +13,6 @@ import LlvmCodeGen.Data
 import LlvmCodeGen.Ppr
 import LlvmMangler
 
-import CLabel
 import CgUtils ( fixStgRegisters )
 import OldCmm
 import OldPprCmm
@@ -40,9 +39,9 @@ llvmCodeGen dflags h us cmms
         (cdata,env) = foldr split ([],initLlvmEnv) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _) (d,e) =
-            let lbl = strCLabel_llvm $ if not (null i)
-                   then entryLblToInfoLbl l
-                   else l
+            let lbl = strCLabel_llvm $ case i of
+                        Nothing                   -> l
+                        Just (Statics info_lbl _) -> info_lbl
                 env' = funInsert lbl llvmFunTy e
             in (d,env')
     in do

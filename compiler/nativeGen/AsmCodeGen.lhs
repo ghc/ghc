@@ -267,7 +267,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 		| dopt Opt_SplitObjs dflags = split_marker : tops
 		| otherwise		    = tops
 
-	split_marker = CmmProc [] mkSplitMarkerLabel (ListGraph [])
+	split_marker = CmmProc Nothing mkSplitMarkerLabel (ListGraph [])
 
 
 -- | Do native code generation on all these cmms.
