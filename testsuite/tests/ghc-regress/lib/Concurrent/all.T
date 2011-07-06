@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test('SampleVar001', reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
-test('4876', normal, compile_and_run, ['']) # another SampleVar test
+test('4876', reqlib('random'), compile_and_run, ['']) # another SampleVar test
 
 test('Chan001',      reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])
 test('MVar001',      reqlib('QuickCheck'), compile_and_run, ['-package QuickCheck'])

@@ -13,7 +13,7 @@ test('length001',
 
 test('ratio001', 	normal, compile_and_run, [''])
 
-test('rand001',		normal, compile_and_run, [''])
+test('rand001',		reqlib('random'), compile_and_run, [''])
 test('reads001',		normal, compile_and_run, [''])
 test('show001',		normal, compile_and_run, [''])
 test('text001',		normal, compile_and_run, [''])
