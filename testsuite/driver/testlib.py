@@ -1,4 +1,4 @@
-# 
+#
 # (c) Simon Marlow 2002
 #
 
@@ -436,7 +436,7 @@ def composes( fs ):
 def compose( f, g ):
     return lambda opts, f=f, g=g: _compose(opts,f,g)
 
-def _compose( opts, f, g ):    
+def _compose( opts, f, g ):
     f(opts)
     g(opts)
 
@@ -484,7 +484,7 @@ def runTest (opts, name, setup, func, args):
         test_common_work (name, opts, func, args)
 
 # name  :: String
-# setup :: TestOpts -> IO ()  
+# setup :: TestOpts -> IO ()
 def test (name, setup, func, args):
     global allTests
     global allTestNames
@@ -505,7 +505,7 @@ if config.use_threads:
             t.running_threads = t.running_threads - n
             t.thread_pool.notify()
             t.thread_pool.release()
-    
+
 def get_package_cache_timestamp():
     if config.package_conf_cache_file == '':
         return 0.0
@@ -624,7 +624,7 @@ def do_test(name, way, func, args):
                         str([t.n_unexpected_passes,   \
                              t.n_unexpected_failures, \
                              t.n_framework_failures])
-        
+
         if config.use_threads:
             t.lock.release()
 
@@ -642,7 +642,7 @@ def do_test(name, way, func, args):
         finally:
             if config.use_threads:
                 t.lock.acquire()
-        
+
         if getTestOpts().expect != 'pass' and getTestOpts().expect != 'fail':
             framework_fail(name, way, 'bad expected ' + getTestOpts().expect)
 
@@ -776,22 +776,43 @@ def ghci_script( name, way, script ):
 # Compile-only tests
 
 def compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', extra_hc_opts )
+    return do_compile( name, way, 0, '', [], extra_hc_opts )
 
 def compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', extra_hc_opts )
+    return do_compile( name, way, 1, '', [], extra_hc_opts )
 
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, 0, top_mod, extra_hc_opts )
+    return do_compile( name, way, 0, top_mod, [], extra_hc_opts )
 
 def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
-    return do_compile( name, way, 1, top_mod, extra_hc_opts )
+    return do_compile( name, way, 1, top_mod, [], extra_hc_opts )
 
-def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
+def multisrc_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
+    extra_mods = map ((lambda y : (y, '')), extra_mods)
+    return do_compile( name, way, 0, top_mod, extra_mods, extra_hc_opts)
+
+def multisrc_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
+    extra_mods = map ((lambda y : (y, '')), extra_mods)
+    return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
+
+def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return do_compile( name, way, 0, top_mod, extra_mods, extra_hc_opts)
+
+def multi_compile_fail( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return do_compile( name, way, 1, top_mod, extra_mods, extra_hc_opts)
+
+def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
     # print 'Compile only, extra args = ', extra_hc_opts
     pretest_cleanup(name)
-    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1)
-    
+
+    result = extras_build( way, extra_mods, extra_hc_opts )
+    if badResult(result):
+       return result
+    extra_hc_opts = result['hc_opts']
+
+    force = 1 if extra_mods else 0
+    result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1, force)
+
     if badResult(result):
         return result
 
@@ -817,22 +838,22 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run__( name, way, extra_hc_opts, top_mod, extra_mods ):
+def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
     # print 'Compile and run, extra args = ', extra_hc_opts
     pretest_cleanup(name)
 
-    for mod in extra_mods:	
-        result = simple_build( mod, way, extra_hc_opts, 0, '', 0, 0 )
-        extra_hc_opts += " " + replace_suffix(mod, 'o')
-        if badResult(result):
-            return result
+    result = extras_build( way, extra_mods, extra_hc_opts )
+    if badResult(result):
+       return result
+    extra_hc_opts = result['hc_opts']
 
     if way == 'ghci': # interpreted...
         return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
     elif way == 'extcore' or way == 'optextcore' :
         return extcore_run( name, way, extra_hc_opts, 0, top_mod )
     else: # compiled...
-        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1, 1 )
+        force = 1 if extra_mods else 0
+        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1, 1, force)
         if badResult(result):
             return result
 
@@ -844,13 +865,17 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod, extra_mods ):
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
 
 def compile_and_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, '', [])
+    return compile_and_run__( name, way, '', [], extra_hc_opts)
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, top_mod, [])
+    return compile_and_run__( name, way, top_mod, [], extra_hc_opts)
 
 def multisrc_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, '', extra_mods)
+    extra_mods = map ((lambda y : (y, '')), extra_mods)
+    return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
+
+def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
+    return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
 
 # -----------------------------------------------------------------------------
 # Check -t stats info
@@ -883,24 +908,43 @@ def checkStats(stats_file, num_fields):
 # -----------------------------------------------------------------------------
 # Build a single-module program
 
-def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf ):
+def extras_build( way, extra_mods, extra_hc_opts ):
+    for modopts in extra_mods:
+        mod, opts = modopts
+        result = simple_build( mod, way, opts + extra_hc_opts, 0, '', 0, 0, 0)
+        if not (mod.endswith(".hs") or mod.endswith(".lhs")):
+            extra_hc_opts += " " + replace_suffix(mod, 'o')
+        if badResult(result):
+            return result
+
+    return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
+
+
+def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, noforce ):
     opts = getTestOpts()
     errname = add_suffix(name, 'comp.stderr')
-    rm_no_fail( errname )
-    
+    rm_no_fail( qualify(errname, '') )
+
     if top_mod != '':
         srcname = top_mod
-        rm_no_fail( name )
+        rm_no_fail( qualify(name, '') )
+        base, suf = os.path.splitext(top_mod)
+        rm_no_fail( qualify(base, '') )
+        rm_no_fail( qualify(base, 'exe') )
     elif addsuf:
         srcname = add_hs_lhs_suffix(name)
-        rm_no_fail( name )
+        rm_no_fail( qualify(name, '') )
     else:
         srcname = name
-        rm_no_fail( name + '.o' )
+        rm_no_fail( qualify(name, 'o') )
+
+    rm_no_fail( qualify(replace_suffix(srcname, "o"), '') )
 
     to_do = ''
     if top_mod != '':
-        to_do = '--make -o ' + name
+        to_do = '--make '
+        if link:
+            to_do = to_do + '-o ' + name
     elif link:
         to_do = '-o ' + name
     elif opts.compile_to_hc:
@@ -917,9 +961,13 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf )
     else:
         cmd_prefix = getTestOpts().compile_cmd_prefix + ' '
 
+    comp_flags = config.compiler_always_flags
+    if noforce:
+        comp_flags = filter(lambda f: f != '-fforce-recomp', comp_flags)
+
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
-          + join(config.compiler_always_flags,' ') + ' ' \
+          + join(comp_flags,' ') + ' ' \
           + to_do + ' ' + srcname + ' ' \
           + join(config.way_flags[way],' ') + ' ' \
           + extra_hc_opts + ' ' \
@@ -953,7 +1001,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf )
 # Run a program and check its output
 #
 # If testname.stdin exists, route input from that, else
-# from /dev/null.  Route output to testname.run.stdout and 
+# from /dev/null.  Route output to testname.run.stdout and
 # testname.run.stderr.  Returns the exit code of the run.
 
 def simple_run( name, way, prog, args ):
@@ -977,7 +1025,7 @@ def simple_run( name, way, prog, args ):
     rm_no_fail(qualify(name, 'hp'))
     rm_no_fail(qualify(name,'ps'))
     rm_no_fail(qualify(name, 'prof'))
-   
+
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
@@ -1044,7 +1092,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail(outname)
     rm_no_fail(errname)
     rm_no_fail(name)
-    
+
     if getTestOpts().cmd_prefix == '':
         cmd_prefix = ''
     else:
@@ -1054,7 +1102,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         srcname = add_hs_lhs_suffix(name)
     else:
         srcname = top_mod
-        
+
     scriptname = add_suffix(name, 'genscript')
     qscriptname = in_testdir(scriptname)
     rm_no_fail(qscriptname)
@@ -1087,7 +1135,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if os.path.exists(stdin_file):
         stdin = open(stdin_file, 'r')
         os.system('cat ' + stdin_file + ' >>' + qscriptname)
-        
+
     script.close()
 
     cmd = 'cd ' + getTestOpts().testdir + " && " + cmd_prefix + "'" \
@@ -1146,20 +1194,20 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
         out2.write(line)
         line = infile.readline()
     out2.close()
-    
+
 # -----------------------------------------------------------------------------
 # Generate External Core for the given program, then compile the resulting Core
 # and compare its output to the expected output
 
 def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
- 
+
     depsfilename = qualify(name, 'deps')
     errname = add_suffix(name, 'comp.stderr')
     qerrname = qualify(errname,'')
-    
+
     hcname = qualify(name, 'hc')
     oname = qualify(name, 'o')
-    
+
     rm_no_fail( qerrname )
     rm_no_fail( qualify(name, '') )
 
@@ -1173,11 +1221,11 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail(qcorefilename)
 
     # Generate External Core
-    
+
     if (top_mod == ''):
         to_do = ' ' + srcname + ' '
     else:
-        to_do = ' --make ' + top_mod + ' ' 
+        to_do = ' --make ' + top_mod + ' '
 
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
@@ -1206,9 +1254,9 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
         deplist = string.replace(deps, '\n',' ');
         deplist2 = string.replace(deplist,'.lhs,', '.hcr');
         to_compile = string.replace(deplist2,'.hs,', '.hcr');
-        
+
     flags = join(filter(lambda f: f != '-fext-core',config.way_flags[way]),' ')
-    
+
     cmd = 'cd ' + getTestOpts().testdir + " && '" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
@@ -1218,7 +1266,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + flags                   \
           + ' -fglasgow-exts -o ' + name \
           + '>' + errname + ' 2>&1'
-          
+
     result = runCmd(cmd)
     exit_code = result >> 8
 
@@ -1232,7 +1280,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail ( hcname )
     rm_no_fail ( qcorefilename )
     rm_no_fail ( depsfilename )
-    
+
     return simple_run ( name, way, './'+name, getTestOpts().extra_run_opts )
 
 # -----------------------------------------------------------------------------
@@ -1301,7 +1349,7 @@ def check_hp_ok(name):
     hp2psResult = runCmdExitCode(hp2psCmd)
 
     actual_ps_file = qualify(name, 'ps')
-    
+
     if(hp2psResult == 0):
         if (os.path.exists(actual_ps_file)):
             if gs_working:
@@ -1311,9 +1359,9 @@ def check_hp_ok(name):
                 else:
                     print "hp2ps output for " + name + "is not valid PostScript"
             else: return (True) # assume postscript is valid without ghostscript
-        else: 
+        else:
             print "hp2ps did not generate PostScript for " + name
-            return (False) 
+            return (False)
     else:
         print "hp2ps error when processing heap profile for " + name
         return(False)
@@ -1443,10 +1491,10 @@ def rawSystem(cmd_and_args):
     else:
         return os.spawnv(os.P_WAIT, cmd_and_args[0], cmd_and_args)
 
-# cmd is a complex command in Bourne-shell syntax 
+# cmd is a complex command in Bourne-shell syntax
 # e.g (cd . && 'c:/users/simonpj/darcs/HEAD/compiler/stage1/ghc-inplace' ...etc)
 # Hence it must ultimately be run by a Bourne shell
-# 
+#
 # Mostly it invokes the command wrapped in 'timeout' thus
 #	timeout 300 'cd . && ...blah blah'
 # so it's timeout's job to invoke the Bourne shell
@@ -1478,7 +1526,7 @@ def genGSCmd(psfile):
     return (config.gs + ' -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE ' + psfile);
 
 def gsNotWorking():
-    global gs_working 
+    global gs_working
     print "GhostScript not available for hp2ps tests"
 
 global gs_working
@@ -1500,7 +1548,7 @@ if config.have_profiling:
 
 def rm_no_fail( file ):
    try:
-       os.remove( file )    
+       os.remove( file )
    finally:
        return
 
@@ -1508,7 +1556,7 @@ def add_suffix( name, suffix ):
     if suffix == '':
         return name
     else:
-        return name + '.' + suffix    
+        return name + '.' + suffix
 
 def add_hs_lhs_suffix(name):
     if getTestOpts().c_src:
@@ -1586,7 +1634,7 @@ def pretest_cleanup(name):
 def findTFiles(roots):
     return concat(map(findTFiles_,roots))
 
-def findTFiles_(path):    
+def findTFiles_(path):
     if os.path.isdir(path):
         paths = map(lambda x, p=path: p + '/' + x, os.listdir(path))
         return findTFiles(paths)

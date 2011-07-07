@@ -157,5 +157,3 @@ Test.hs:32:12: Warning: `q' is exported by `q' and `R(..)'
 Test.hs:32:15: Warning: `u' is exported by `u' and `R(..)'
 
 Test.hs:38:9: Warning: `a' is exported by `a' and `C(a, b)'
-Warning: output was redirected with -o, but no output will be generated
-because there is no Main module.
