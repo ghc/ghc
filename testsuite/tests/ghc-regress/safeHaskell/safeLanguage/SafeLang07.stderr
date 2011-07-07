@@ -1,0 +1,9 @@
+
+<no location info>:
+    Warning: -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving
+
+SafeLang07.hs:23:45:
+    Can't make a derived instance of `IntIso (Down a)':
+      `IntIso' is not a derivable class
+      Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+    In the newtype declaration for `Down'

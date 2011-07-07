@@ -1,0 +1,5 @@
+[1 of 2] Compiling BadImport02_A    ( BadImport02_A.hs, BadImport02_A.o )
+[2 of 2] Compiling Main             ( BadImport03.hs, BadImport03.o )
+
+BadImport03.hs:8:1:
+    base:Data.Typeable can't be safely imported! The module itself isn't safe.

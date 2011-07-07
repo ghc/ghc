@@ -1,0 +1,5 @@
+
+Dep04.hs:4:1:
+    Warning: In the use of `unsafeForeignPtrToPtr'
+             (imported from Foreign.ForeignPtr):
+             Deprecated: "Use Foreign.ForeignPtr.Unsafe.unsafeForeignPtrToPtr instead; This function will be removed in the next release"

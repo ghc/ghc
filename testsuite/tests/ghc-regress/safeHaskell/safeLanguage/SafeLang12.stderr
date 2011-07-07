@@ -1,0 +1,11 @@
+
+SafeLang12.hs:2:14:
+    Warning: XTemplateHaskell is not allowed in Safe Haskell; ignoring XTemplateHaskell
+
+SafeLang12_B.hs:2:14:
+    Warning: XTemplateHaskell is not allowed in Safe Haskell; ignoring XTemplateHaskell
+
+SafeLang12_B.hs:3:8:
+    File name does not match module name:
+    Saw: `SafeLang11_B'
+    Expected: `SafeLang12_B'

@@ -1,0 +1,5 @@
+
+Dep03.hs:3:1:
+    Warning: In the use of `unsafePerformIO'
+             (imported from Foreign):
+             Deprecated: "Use System.IO.Unsafe.unsafePerformIO instead; This function will be removed in the next release"
