@@ -16,22 +16,14 @@
 
 module Foreign.Marshal
         (
-         -- | The module "Foreign.Marshal" re-exports the other modules in the
+         -- | The module "Foreign.Marshal" re-exports the safe content in the
          -- @Foreign.Marshal@ hierarchy:
-          module Foreign.Marshal.Alloc
-        , module Foreign.Marshal.Array
-        , module Foreign.Marshal.Error
-        , module Foreign.Marshal.Pool
-        , module Foreign.Marshal.Utils
+          module Foreign.Marshal.Safe
          -- | and provides one function:
         , unsafeLocalState
         ) where
 
-import Foreign.Marshal.Alloc
-import Foreign.Marshal.Array
-import Foreign.Marshal.Error
-import Foreign.Marshal.Pool
-import Foreign.Marshal.Utils
+import Foreign.Marshal.Safe
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IO
