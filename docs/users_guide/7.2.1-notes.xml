@@ -814,9 +814,6 @@ GhcStage3DefaultNewCodegen=YES
     </itemizedlist>
   </sect2>
 
-<!--
-TODO: Library changes
-
   <sect2>
     <title>Libraries</title>
 
@@ -825,7 +822,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.3.0.2 (was 0.3.0.1)
+                    Version number 0.3.0.3 (was 0.3.0.2)
                 </para>
             </listitem>
         </itemizedlist>
@@ -836,7 +833,519 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 4.3.0.0 (was 4.2.0.2)
+                    Version number 4.4.0.0 (was 4.3.1.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Many of the base types now have derived
+                    <literal>Typeable<literal> instances,
+                    whereas before they had hand-written instances.
+                    This means that some of the strings in the instances
+                    are now different.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The result of <literal>gcd 0 0</literal> is now
+                    0, rather than throwing an exception.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The result of <literal>minBound `rem` -1</literal>
+                    and <literal>minBound `div` -1</literal> is now 0,
+                    rather than throwing an overflow exception.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Control.Concurrent</literal> now exports
+                    new functions
+                    <literal>forkIOWithUnmask</literal>,
+                    <literal>forkOn</literal>,
+                    <literal>forkOnWithUnmask</literal>,
+                    <literal>getNumCapabilities</literal> and
+                    <literal>threadCapability</literal>.
+                    The <literal>forkIOUnmasked</literal> function has
+                    been deprecated in favour of
+                    <literal>forkIOWithUnmask</literal>.
+                </para>
+
+                <para>
+                    The same changes have been made to
+                    <literal>GHC.Conc</literal> and
+                    <literal>GHC.Conc.Sync</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Control.Exception<literal> exports a new
+                    function <literal>allowInterrupt<literal> which, when
+                    invoked inside <literal>mask</literal>, allows a
+                    blocked asynchronous exception to be raised, if one
+                    exists.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.IO.Error</literal> now exports
+                    new functions <literal>catchIOError</literal> and
+                    <literal>tryIOError</literal>.
+                    The <literal>try</literal> and <literal>catch</literal>
+                    functions are now deprecated.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.Encoding</literal> now exports three
+                    new <literal>TextEncoding</literal>s:
+                </para>
+
+                <para>
+                    The <literal>fileSystemEncoding</literal> encoding
+                    is the Unicode encoding of the current locale, but
+                    allows arbitrary undecodable bytes to be
+                    round-tripped through it. It is used to decode and
+                    encode command line arguments and environment
+                    variables on non-Windows platforms.
+                </para>
+
+                <para>
+                    The <literal>foreignEncoding</literal> encoding
+                    is the Unicode encoding of the current locale, but
+                    undecodable bytes are replaced with their closest
+                    visual match. It's used for the
+                    <literal>CString</literal> marshalling functions in
+                    <literal>Foreign.C.String</literal>.
+                </para>
+
+                <para>
+                    In the <literal>char8</literal> encoding Unicode
+                    code points are translated to bytes by taking the
+                    code point modulo 256. When decoding, bytes are
+                    translated directly into the equivalent code point.
+                    This encoding is also exported by
+                    <literal>System.IO</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The functions to make
+                    <literal>TextEncoding</literal>s now have
+                    <literal>mk*</literal> variants which take a
+                    <literal>CodingFailureMode</literal> argument.
+                    The new functions, together with what they
+                    generalise, are:
+                </para>
+
+                <para>
+                    <informaltable>
+                        <tgroup cols="3">
+                        <tbody>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.Latin1</literal></entry>
+                              <entry><literal>latin1</literal></entry>
+                              <entry><literal>mkLatin1</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.Latin1</literal></entry>
+                              <entry><literal>latin1_checked</literal></entry>
+                              <entry><literal>mkLatin1_checked</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF8</literal></entry>
+                              <entry><literal>utf8</literal></entry>
+                              <entry><literal>mkUTF8</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF8</literal></entry>
+                              <entry><literal>utf8_bom</literal></entry>
+                              <entry><literal>mkUTF8_bom</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF16</literal></entry>
+                              <entry><literal>utf16</literal></entry>
+                              <entry><literal>mkUTF16</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF16</literal></entry>
+                              <entry><literal>utf16be</literal></entry>
+                              <entry><literal>mkUTF16be</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF16</literal></entry>
+                              <entry><literal>utf16le</literal></entry>
+                              <entry><literal>mkUTF16le</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF32</literal></entry>
+                              <entry><literal>utf32</literal></entry>
+                              <entry><literal>mkUTF32</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF32</literal></entry>
+                              <entry><literal>utf32be</literal></entry>
+                              <entry><literal>mkUTF32be</literal></entry>
+                            </row>
+                            <row>
+                              <entry><literal>GHC.IO.Encoding.UTF32</literal></entry>
+                              <entry><literal>utf32le</literal></entry>
+                              <entry><literal>mkUTF32le</literal></entry>
+                            </row>
+                        </tbody>
+                        </tgroup>
+                    </informaltable>
+                </para>
+
+                <para>
+                    Similarly, there are new
+                    <literal>mkCodePageEncoding</literal> and
+                    <literal>mkLocaleEncoding</literal>
+                    generalisations of
+                    <literal>codePageEncoding</literal> and
+                    <literal>localeEncoding</literal> in
+                    <literal>GHC.IO.Encoding.CodePage</literal>.
+                </para>
+
+                <para>
+                    <literal>GHC.IO.Encoding.Iconv</literal> has
+                    been similarly altered, and now only exports
+                    <literal>iconvEncoding</literal>,
+                    <literal>mkIconvEncoding</literal>,
+                    <literal>localeEncoding</literal> and
+                    <literal>mkLocaleEncoding</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.Encoding.Types</literal> and
+                    <literal>GHC.IO.Encoding</literal> now export a new
+                    type <literal>CodingProgress</literal> which
+                    describes the state of a text encoder. The
+                    <literal>BufferCodec</literal>,
+                    <literal>DecodeBuffer</literal> and
+                    <literal>EncodeBuffer</literal> types have also
+                    changed.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO</literal> now exports bracket.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.blocked</literal> is now deprecated
+                    in favour of
+                    <literal>Control.Exception.getMaskingState</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.Show</literal> now exports two new
+                    helpers, <literal>showLitString</literal> (analogous
+                    to <literal>showLitChar</literal>) and
+                    <literal>showMultiLineString</literal> (which breaks
+                    a string containing newlines characters up into
+                    multiple strings).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The type of <literal>GHC.IO.FD.openFile</literal>
+                    has changed to include a flag for whether to
+                    open the file in non-blocking mode.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>GHC.IO.Handle.FD</literal> now exports a
+                    variant <literal>openFileBlocking</literal> of
+                    <literal>openFile</literal>, which opens the file
+                    in blocking mode.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The type of
+                    <literal>Foreign.Marshal.Utils.maybeNew</literal>
+                    has been generalised to
+                    <literal>(a -> IO (Ptr b)) -> (Maybe a -> IO (Ptr b))</literal>
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Foreign.C.Types</literal> now exports new
+                    types <literal>CUSeconds</literal> and
+                    <literal>CSUSeconds</literal>, corresponding to the
+                    C types <literal>useconds_t</literal> and
+                    <literal>suseconds_t</literal> respectively.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.Posix.Internals</literal> new exports
+                    new functions <literal>peekFilePath</literal>
+                    and, on non-Windows platforms,
+                    <literal>peekFilePathLen</literal> and
+                    <literal>c_safe_open</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.List.inits</literal>,
+                    <literal>Data.List.tails</literal>,
+                    <literal>Data.List.intersperse</literal> and
+                    <literal>Data.List.intersectBy</literal>
+                    are now lazier.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Char</literal> no longer exports
+                    <literal>String</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.String</literal> now re-exports
+                    <literal>String</literal>,
+                    <literal>lines</literal>,
+                    <literal>unlines</literal>,
+                    <literal>words</literal> and
+                    <literal>unwords</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a <literal>Read</literal> instance for
+                    <literal>Data.Fixed.Fixed a</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>Eq</literal> instances for
+                    <literal>Control.Concurrent.Chan.Chan</literal>,
+                    <literal>Control.Concurrent.QSem.QSem</literal> and
+                    <literal>Control.Concurrent.QSemN.QSemN</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>Applicative</literal>
+                    instances for
+                    <literal>Control.Monad.ST.ST</literal> and
+                    <literal>Control.Monad.ST.Lazy.ST</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now a
+                    <literal>Typeable</literal> instance for
+                    <literal>Control.Concurrent.SampleVar.SampleVar</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Most of <literal>GHC.PArr</literal> has been moved
+                    into the dph package. Only the
+                    <literal>[::]</literal> datatype remains.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new module
+                    <literal>Control.Monad.Group</literal>
+                    for monadic grouping (used for monad comprehensions).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new module
+                    <literal>Control.Monad.Zip</literal>
+                    for monadic zipping (used for monad comprehensions).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new internal module
+                    <literal>GHC.Foreign</literal> which provides
+                    versions of some C string functions generalised
+                    to be usable with any encoding.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new internal module
+                    <literal>GHC.IO.Encoding.Failure</literal> which
+                    provides functionality for specifying how text
+                    encoding and decoding fails.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    On Windows, there is a new internal module
+                    <literal>GHC.Windows</literal> which duplicates
+                    part of <literal>System.Win32.Types</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Some functions have been moved from
+                    <literal>GHC.Base</literal> down into
+                    <literal>GHC.Classes</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now new internal modules
+                    <literal>GHC.Float.ConversionUtils</literal> and
+                    <literal>GHC.Float.RealFracMethods</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The safe parts of the <literal>Foreign</literal>
+                    module are now in a new module
+                    <literal>Foreign.Safe</literal>.
+                    <literal>Foreign</literal> now reexports
+                    all the safe code it used to, as well as
+                    deprecated copies of the unsafe functions.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Foreign.ForeignPtr</literal> module
+                    has been split into
+                    <literal>Foreign.ForeignPtr.Safe</literal> and
+                    <literal>Foreign.ForeignPtr.Unsafe</literal>.
+                    <literal>Foreign.ForeignPtr</literal> now
+                    reexports
+                    <literal>Foreign.ForeignPtr.Safe</literal> and
+                    a deprecated copy of the unsafe function
+                    (<literal>unsafeForeignPtrToPtr</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Foreign.Marshal</literal> module
+                    has been split into
+                    <literal>Foreign.Marshal.Safe</literal> and
+                    <literal>Foreign.Marshal.Unsafe</literal>.
+                    <literal>Foreign.Marshal</literal> now
+                    reexports
+                    <literal>Foreign.Marshal.Safe</literal> and
+                    a deprecated copy of the unsafe function
+                    (<literal>unsafeLocalState</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Control.Monad.ST</literal> module
+                    has been split into
+                    <literal>Control.Monad.ST.Safe</literal> and
+                    <literal>Control.Monad.ST.Unsafe</literal>.
+                    <literal>Control.Monad.ST</literal> now
+                    reexports
+                    <literal>Control.Monad.ST.Safe</literal> and
+                    deprecated copies of the unsafe functions
+                    (<literal>unsafeInterleaveST</literal>,
+                    <literal>unsafeIOToST</literal> and
+                    <literal>unsafeSTToIO</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Control.Monad.ST.Lazy</literal> module
+                    has been split into
+                    <literal>Control.Monad.ST.Lazy.Safe</literal> and
+                    <literal>Control.Monad.ST.Lazy.Unsafe</literal>.
+                    <literal>Control.Monad.ST.Lazy</literal> now
+                    reexports
+                    <literal>Control.Monad.ST.Lazy.Safe</literal> and
+                    deprecated copies of the unsafe functions
+                    (<literal>unsafeInterleaveST</literal>
+                    and <literal>unsafeIOToST</literal>).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>System.Event</literal> module has been
+                    renamed <literal>GHC.Event</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Following the removal of
+                    <literal>DatatypeContexts</literal> from the
+                    language, the definitions of
+                    <literal>Control.Arrow.ArrowMonad</literal>,
+                    <literal>Array</literal> and
+                    <literal>Complex</literal> and
+                    <literal>Ratio</literal> have had their
+                    datatype contexts removed.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Many modules have been marked
+                    <literal>Trustworthy</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>System.Posix.Internals</literal> now
+                    exports a function <literal>puts</literal>, for
+                    debugging within the base package.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The Unicode data is now based on version 6.0.0 (was
+                    5.1.0) of the Unicode spec.
                 </para>
             </listitem>
         </itemizedlist>
@@ -854,11 +1363,52 @@ TODO: Library changes
     </sect3>
 
     <sect3>
+        <title>binary</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    New package, version 0.5.1.0.
+                    TODO: Bump version
+                    It is not exposed by default.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
         <title>bytestring</title>
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.9.1.8 (was 0.9.1.7)
+                    Version number 0.9.2.0 (was 0.9.1.10)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is now an
+                    <literal>hPutNonBlocking</literal>
+                    function in
+                    <literal>Data.ByteString</literal>,
+                    <literal>Data.ByteString.Char8</literal>,
+                    <literal>Data.ByteString.Lazy</literal> and
+                    <literal>Data.ByteString.Lazy.Char8</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now <literal>hPutStrLn</literal>
+                    and <literal>putStrLn</literal> functions in
+                    <literal>Data.ByteString.Char8</literal> and
+                    <literal>Data.ByteString.Lazy.Char8</literal>.
+                </para>
+
+                <para>
+                    The functions in
+                    <literal>Data.ByteString</literal> and
+                    <literal>Data.ByteString.Lazy</literal>
+                    are now deprecated.
                 </para>
             </listitem>
         </itemizedlist>
@@ -869,7 +1419,16 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.10.0.0 (was 1.8.0.6)
+                    Version number 1.12.0.0 (was 1.10.2.0)
+                    TODO: Currently we have 1.11.0. The branch needs to
+                    be created.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    For details of changes to Cabal, please see the
+                    Cabal changelog.
                 </para>
             </listitem>
         </itemizedlist>
@@ -880,7 +1439,28 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.4.0.0 (was 0.3.0.0)
+                    Version number 0.4.1.0 (was 0.4.0.0)
+                    TODO: Bump version
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.Map</literal> now exports new
+                    functions <literal>foldrWithKey'</literal> and
+                    <literal>foldlWithKey'</literal>, which are strict
+                    variants of <literal>foldrWithKey</literal> and
+                    <literal>foldlWithKey</literal> respectively.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    <literal>Data.IntMap</literal> now exports new
+                    functions <literal>insertWith'</literal> and
+                    <literal>insertWithKey'</literal>, which are strict
+                    variants of <literal>insertWith</literal> and
+                    <literal>insertWithKey</literal> respectively.
                 </para>
             </listitem>
         </itemizedlist>
@@ -891,7 +1471,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.1.0.0 (was 1.0.1.1)
+                    Version number 1.1.0.1 (was 1.1.0.0)
                 </para>
             </listitem>
         </itemizedlist>
@@ -902,7 +1482,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.1.1.2 (was 0.1.1.1)
+                    Version number 0.1.1.3 (was 0.1.1.2)
                 </para>
             </listitem>
         </itemizedlist>
@@ -913,7 +1493,15 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.2.0.0 (was 1.1.0.4)
+                    Version number 1.2.0.1 (was 1.2.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The handling of &quot;.&quot; as a component in a
+                    <literal>FilePath</literal> is now more consistent.
+                    See <ulink url="http://hackage.haskell.org/trac/ghc/ticket/3975">#3975</ulink> for more information.
                 </para>
             </listitem>
         </itemizedlist>
@@ -924,7 +1512,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    This is an internal package, and should not be used.
+                    GHC no longer includes this internal package.
                 </para>
             </listitem>
         </itemizedlist>
@@ -946,7 +1534,17 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.1.0.0 (was 1.0.1.1)
+                    Version number 2.0.0.0 (was 1.1.0.1)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    It is no longer possible to use the haskell98
+                    package with the base package, as it now includes the
+                    <literal>Prelude</literal> and
+                    <literal>Numeric</literal> modules. The haskell98
+                    package is therefore now hidden by default.
                 </para>
             </listitem>
         </itemizedlist>
@@ -957,8 +1555,27 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    This is a new boot package, version 1.0.0.0.
-                    It is not exposed by default.
+                    Version number 1.1.0.0 (was 1.0.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>splitAt</literal> function now
+                    has the correct strictness, as defined by the
+                    report.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>hoopl</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    This is a new package, version 3.8.7.2.
+                    TODO: Bump version number. 3.8.7.1 is on hackage.
                 </para>
             </listitem>
         </itemizedlist>
@@ -969,7 +1586,14 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.5.0.6 (was 0.5.0.5)
+                    Version number 0.5.1.0 (was 0.5.0.6)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    A new function <literal>catchIO</literal> is now
+                    exported by <literal>Trace.Hpc.Util</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -980,7 +1604,15 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 0.2.0.2 (was 0.2.0.1)
+                    Version number 0.3.0.0 (was 0.2.0.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Now exposes two new modules,
+                    <literal>GHC.Integer.Logarithms</literal> and
+                    <literal>GHC.Integer.Logarithms.Internals</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -991,7 +1623,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    No change (version 1.0.0.2)
+                    Version number 1.0.0.3 (was 1.0.0.2)
                 </para>
             </listitem>
         </itemizedlist>
@@ -1002,7 +1634,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.0.0.6 (was 1.0.0.5)
+                    Version number 1.0.0.7 (was 1.0.0.6)
                 </para>
             </listitem>
         </itemizedlist>
@@ -1013,7 +1645,24 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.0.1.2 (was 1.0.1.1)
+                    Version number 1.1.0.0 (was 1.0.1.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>sizedText</literal>,
+                    which allows you to specify the width that a string
+                    should be considered to have.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>Doc</literal> type is now an instance
+                    of <literal>IsString</literal> and
+                    <literal>Monoid</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -1024,7 +1673,56 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.0.1.4 (was 1.0.1.3)
+                    Version number 1.1.0.0 (was 1.0.1.4)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>showCommandForUser</literal> in
+                    <literal>System.Process</literal> which,
+                    given a program and its arguments,
+                    returns a string suitable for pasting
+                    into sh (on POSIX OSs) or cmd.exe (on Windows).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There is a new function
+                    <literal>interruptProcessGroupOf</literal> in
+                    <literal>System.Process</literal> which
+                    sends an interrupt signal to the process group of
+                    the given process. On Unix systems, it sends the
+                    group the <literal>SIGINT</literal> signal.
+                    On Windows systems, it generates a
+                    <literal>CTRL_BREAK_EVENT</literal> and will only
+                    work for processes created using
+                    <literal>createProcess</literal> with the
+                    <literal>create_group</literal> flag set.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>CreateProcess</literal>
+                    constructor, exported by
+                    <literal>System.Process.Internals</literal> and
+                    <literal>System.Process</literal>, has a new
+                    <literal>Bool</literal> field
+                    <literal>create_group</literal>
+                    which specifies whether a process group should be created.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The type of <literal>withCEnvironment</literal>
+                    on Windows is now more consistent with other
+                    platforms, as the action now takes a
+                    <literal>Ptr CWString</literal> rather than
+                    <literal>Ptr ()</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -1035,6 +1733,7 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
+                    TODO:
                     Version number 1.0.0.3 (was 1.0.0.2)
                 </para>
             </listitem>
@@ -1046,7 +1745,77 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 2.5.0.0 (was 2.4.0.1)
+                    Version number 2.6.0.0 (was 2.5.0.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Language.Haskell.TH.Syntax</literal>
+                    the <literal>Exp</literal>, <literal>Pat</literal>
+                    and <literal>Type</literal> datatypes have new
+                    constructors <literal>UnboxedTupE</literal>,
+                    <literal>UnboxedTupP</literal> and
+                    <literal>UnboxedTupleT</literal> respectively.
+                    There are also new helper functions
+                    <literal>unboxedTupleTypeName</literal> and
+                    <literal>unboxedTupleDataName</literal>.
+                </para>
+
+                <para>
+                    There are corresponding helper functions
+                    <literal>unboxedTupE</literal>,
+                    <literal>unboxedTupP</literal> and
+                    <literal>unboxedTupleT</literal> in
+                    <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Language.Haskell.TH.Syntax</literal>
+                    the <literal>Safety</literal> type has a new
+                    constructor <literal>interruptible</literal>.
+                </para>
+
+                <para>
+                    There is a corresponding new value
+                    <literal>interruptible :: Safety</literal>
+                    in <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>Language.Haskell.TH.Syntax</literal>,
+                    the <literal>classInstances</literal> function now
+                    has type
+                    <literal>Name -> [Type] -> Q [ClassInstance]</literal>,
+                    and the <literal>qClassInstances</literal> instance
+                    of the <literal>Quasi</literal> class now has type
+                    <literal>Name -> [Type] -> m [ClassInstance]</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are now helper functions
+                    <literal>pprString</literal> and
+                    <literal>hashParens</literal> exported from
+                    <literal>Language.Haskell.TH.Ppr</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The helper functions
+                    <literal>combine</literal>,
+                    <literal>rename</literal>,
+                    <literal>genpat</literal>,
+                    <literal>alpha</literal> and
+                    <literal>simpleMatch</literal>
+                    have been removed from
+                    <literal>Language.Haskell.TH.Lib</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -1057,7 +1826,33 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 1.2.0.3 (was 1.1.4)
+                    Version number 1.2.0.5 (was 1.2.0.3)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>%-</literal>, <literal>%_</literal>
+                    and <literal>%0</literal> specifiers can now be
+                    used. For example,
+                </para>
+<programlisting>
+> parseTime defaultTimeLocale "%-m/%e/%Y" "3/9/2011" :: Maybe Day
+Just 2011-03-09
+</programlisting>
+            </listitem>
+
+            <listitem>
+                <para>
+                    The default year is now correctly in the range
+                    1969-2068, rather than 1900-1999.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    Some cases in which an exception was thrown now
+                    correctly return <literal>Nothing</literal>.
                 </para>
             </listitem>
         </itemizedlist>
@@ -1068,12 +1863,59 @@ TODO: Library changes
         <itemizedlist>
             <listitem>
                 <para>
-                    Version number 2.4.1.0 (was 2.4.0.2)
+                    Version number 2.5.0.0 (was 2.4.2.0)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>System.Posix.Process</literal>
+                    the <literal>createProcessGroup</literal>
+                    and <literal>setProcessGroupID</literal>
+                    functions have been deprecated.
+                </para>
+
+                <para>
+                    There are new functions, which subsume their
+                    functionality, called
+                    <literal>createProcessGroupFor</literal>,
+                    <literal>getProcessGroupIDOf</literal> and
+                    <literal>setProcessGroupIDOf</literal>.
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    In <literal>System.Posix.Error</literal>, there is a
+                    new variant of
+                    <literal>throwErrnoPathIfMinus1Retry</literal>
+                    called
+                    <literal>throwErrnoPathIfMinus1Retry_</literal>,
+                    which returns <literal>IO ()</literal>.
+                </para>
+            </listitem>
+        </itemizedlist>
+    </sect3>
+
+    <sect3>
+        <title>Win32</title>
+        <itemizedlist>
+            <listitem>
+                <para>
+                    Version number 2.2.1.0 (was 2.2.0.2)
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
+                    There are new functions
+                    <literal>getProcessId</literal> and
+                    <literal>c_GetProcessId</literal> in
+                    <literal>System.Win32.Process</literal>.
                 </para>
             </listitem>
         </itemizedlist>
     </sect3>
   </sect2>
--->
 </sect1>
 
