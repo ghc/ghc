@@ -98,8 +98,6 @@ module GHC.Base
         module GHC.Base,
         module GHC.Classes,
         module GHC.CString,
-        -- module GHC.Generics,        -- JPM: We no longer export GHC.Generics
-                                      -- by default to avoid name clashes
         module GHC.Ordering,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
@@ -110,8 +108,6 @@ module GHC.Base
 import GHC.Types
 import GHC.Classes
 import GHC.CString
--- JPM: Since we don't export it, we don't need to import GHC.Generics
--- import GHC.Generics
 import GHC.Ordering
 import GHC.Prim
 import {-# SOURCE #-} GHC.Show
