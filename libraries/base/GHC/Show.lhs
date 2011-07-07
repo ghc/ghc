@@ -362,13 +362,11 @@ showLitString (c   : cs) s = showLitChar c (showLitString cs s)
 
 showMultiLineString :: String -> [String]
 -- | Like 'showLitString' (expand escape characters using Haskell
--- escape conventions), but 
+-- escape conventions), but
 --   * break the string into multiple lines
 --   * wrap the entire thing in double quotes
--- Example:  @breakMultiLineString "hello\ngoodbye\nblah"@ 
--- returns   @["\"hello\\", "\\goodbye\\", "\\blah\"" ]@
--- where those "\\" are really just a single backslash
--- (but I'm writing them here as Haskell literals)
+-- Example:  @showLitString "hello\ngoodbye\nblah"@
+-- returns   @["\"hello\\", "\\goodbye\\", "\\blah\""]@
 showMultiLineString str
   = go '\"' str
   where
