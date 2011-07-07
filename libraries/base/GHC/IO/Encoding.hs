@@ -131,7 +131,7 @@ foreignEncoding = CodePage.mkLocaleEncoding IgnoreCodingFailure
 -- translated directly into the equivalent code point.
 --
 -- This encoding never fails in either direction.  However, encoding
--- discards informaiton, so encode followed by decode is not the
+-- discards information, so encode followed by decode is not the
 -- identity.
 char8 :: TextEncoding
 char8 = Latin1.latin1
