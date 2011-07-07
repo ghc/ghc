@@ -75,7 +75,7 @@ flag test
 executable haddock
   default-language:     Haskell2010
   build-depends:
-    base == 4.3.*,
+    base >= 4.3 && < 4.5,
     filepath,
     directory,
     pretty,
@@ -135,7 +135,7 @@ executable haddock
 library
   default-language:     Haskell2010
   build-depends:
-    base == 4.3.*,
+    base >= 4.3 && < 4.5,
     filepath,
     directory,
     pretty,
