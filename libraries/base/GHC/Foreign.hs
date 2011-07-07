@@ -3,7 +3,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.IO.Encoding
+-- Module      :  GHC.Foreign
 -- Copyright   :  (c) The University of Glasgow, 2008-2011
 -- License     :  see libraries/base/LICENSE
 -- 
