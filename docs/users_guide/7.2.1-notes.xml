@@ -31,6 +31,7 @@
         </para>
       </listitem>
 
+      <listitem>
         <para>
           The <literal>DatatypeContexts</literal> extension (which will
           not be in the next Haskell language standard) is now off by
@@ -934,7 +935,7 @@ GhcStage3DefaultNewCodegen=YES
             <listitem>
                 <para>
                     Many of the base types now have derived
-                    <literal>Typeable<literal> instances,
+                    <literal>Typeable</literal> instances,
                     whereas before they had hand-written instances.
                     This means that some of the strings in the instances
                     are now different.
@@ -979,8 +980,8 @@ GhcStage3DefaultNewCodegen=YES
 
             <listitem>
                 <para>
-                    <literal>Control.Exception<literal> exports a new
-                    function <literal>allowInterrupt<literal> which, when
+                    <literal>Control.Exception</literal> exports a new
+                    function <literal>allowInterrupt</literal> which, when
                     invoked inside <literal>mask</literal>, allows a
                     blocked asynchronous exception to be raised, if one
                     exists.
