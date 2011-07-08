@@ -53,6 +53,11 @@ import UniqSupply
 cgExpr	:: StgExpr -> FCode ()
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
+
+{- seq# a s ==> a -}
+cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
+  cgIdApp a []
+
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args)  = cgConApp con args
 cgExpr (StgSCC cc expr)   = do { emitSetCCC cc; cgExpr expr }
@@ -70,10 +75,6 @@ cgExpr (StgLetNoEscape _ _ binds expr) =
 
 cgExpr (StgCase expr _live_vars _save_vars bndr srt alt_type alts) =
   cgCase expr bndr srt alt_type alts
-
-{- seq# a s ==> a -}
-cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
-  cgIdApp a []
 
 cgExpr (StgLam {}) = panic "cgExpr: StgLam"
 
