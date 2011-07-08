@@ -1,7 +1,7 @@
 {-# LANGUAGE SafeImports #-}
 module Check01 ( main' ) where
 
-import safe CheckB
+import safe Check01_B
 
 main' = do
     let n = mainM 1

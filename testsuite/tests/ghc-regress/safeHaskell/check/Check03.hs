@@ -1,7 +1,8 @@
-{-# LANGUAGE SafeImports #-}
-module Main ( main ) where
+module Check03 where
 
-import Check01
+import Check03_B
 
-main = main'
+mainN = do
+    let n = mainM 1
+    print $ n
 
