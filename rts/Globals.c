@@ -19,7 +19,6 @@
 #include "Stable.h"
 
 typedef enum {
-    TypeableStore,
     GHCConcSignalSignalHandlerStore,
     GHCConcWindowsPendingDelaysStore,
     GHCConcWindowsIOManagerThreadStore,
@@ -79,13 +78,6 @@ static StgStablePtr getOrSetKey(StoreKey key, StgStablePtr ptr)
     }
     return ret;
 }    
-
-
-StgStablePtr
-getOrSetTypeableStore(StgStablePtr ptr)
-{
-    return getOrSetKey(TypeableStore,ptr);
-}
 
 StgStablePtr
 getOrSetGHCConcSignalSignalHandlerStore(StgStablePtr ptr)
