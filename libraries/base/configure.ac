@@ -167,6 +167,9 @@ FP_SEARCH_LIBS_PROTO(
     [AC_DEFINE([HAVE_LIBCHARSET], [1], [Define to 1 if you have libcharset.])
      EXTRA_LIBS="$EXTRA_LIBS $ac_lib"])
 
+# Hack - md5.h needs HsFFI.h.  Is there a better way to do this?
+CFLAGS="-I../../includes $CFLAGS"
+AC_CHECK_SIZEOF([struct MD5Context], ,[#include "include/md5.h"])
 
 AC_SUBST(EXTRA_LIBS)
 AC_CONFIG_FILES([base.buildinfo])

@@ -4,11 +4,8 @@ module Data.Typeable where
 
 import Data.Maybe
 import GHC.Base
+import {-# SOURCE #-} Data.Typeable.Internal
 
-data TypeRep
-data TyCon
-
-mkTyCon      :: String -> TyCon
 mkTyConApp   :: TyCon -> [TypeRep] -> TypeRep
 
 cast :: (Typeable a, Typeable b) => a -> Maybe b

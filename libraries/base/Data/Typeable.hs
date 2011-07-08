@@ -49,11 +49,14 @@ module Data.Typeable
 
         -- * Type representations
         TypeRep,        -- abstract, instance of: Eq, Show, Typeable
-        TyCon,          -- abstract, instance of: Eq, Show, Typeable
         showsTypeRep,
+
+        TyCon,          -- abstract, instance of: Eq, Show, Typeable
+        tyConString,    -- :: TyCon   -> String
 
         -- * Construction of type representations
         mkTyCon,        -- :: String  -> TyCon
+        mkTyCon3,       -- :: String  -> String -> String -> TyCon
         mkTyConApp,     -- :: TyCon   -> [TypeRep] -> TypeRep
         mkAppTy,        -- :: TypeRep -> TypeRep   -> TypeRep
         mkFunTy,        -- :: TypeRep -> TypeRep   -> TypeRep
@@ -63,8 +66,8 @@ module Data.Typeable
         funResultTy,    -- :: TypeRep -> TypeRep   -> Maybe TypeRep
         typeRepTyCon,   -- :: TypeRep -> TyCon
         typeRepArgs,    -- :: TypeRep -> [TypeRep]
-        tyConString,    -- :: TyCon   -> String
-        typeRepKey,     -- :: TypeRep -> IO Int
+        typeRepKey,     -- :: TypeRep -> IO TypeRepKey
+        TypeRepKey,     -- abstract, instance of Eq, Ord
 
         -- * The other Typeable classes
         -- | /Note:/ The general instances are provided for GHC only.
@@ -90,6 +93,8 @@ module Data.Typeable
         typeOf6Default  -- :: (Typeable7 t, Typeable a) => t a b c d e f g -> TypeRep
 
   ) where
+
+import Data.Typeable.Internal hiding (mkTyCon)
 
 import qualified Data.HashTable as HT
 import Data.Maybe
@@ -121,6 +126,13 @@ import GHC.Stable       ( StablePtr, newStablePtr, freeStablePtr,
                           castPtrToStablePtr )
 import GHC.Arr          ( Array, STArray )
 
+import GHC.Fingerprint.Type
+import {-# SOURCE #-} GHC.Fingerprint
+   -- loop: GHC.Fingerprint -> Foreign.Ptr -> Data.Typeable
+   -- Better to break the loop here, because we want non-SOURCE imports
+   -- of Data.Typeable as much as possible so we can optimise the derived
+   -- instances.
+
 #endif
 
 #ifdef __HUGS__
@@ -145,30 +157,6 @@ import Array    ( Array )
 
 #include "Typeable.h"
 
-#ifndef __HUGS__
-
--------------------------------------------------------------
---
---              Type representations
---
--------------------------------------------------------------
-
--- | A concrete representation of a (monomorphic) type.  'TypeRep'
--- supports reasonably efficient equality.
-data TypeRep = TypeRep !Key TyCon [TypeRep] 
-
--- Compare keys for equality
-instance Eq TypeRep where
-  (TypeRep k1 _ _) == (TypeRep k2 _ _) = k1 == k2
-
--- | An abstract representation of a type constructor.  'TyCon' objects can
--- be built using 'mkTyCon'.
-data TyCon = TyCon !Key String
-
-instance Eq TyCon where
-  (TyCon t1 _) == (TyCon t2 _) = t1 == t2
-#endif
-
 -- | Returns a unique integer associated with a 'TypeRep'.  This can
 -- be used for making a mapping with TypeReps
 -- as the keys, for example.  It is guaranteed that @t1 == t2@ if and only if
@@ -179,8 +167,8 @@ instance Eq TyCon where
 -- the equality property, not any actual key value.  The relative ordering
 -- of keys has no meaning either.
 --
-typeRepKey :: TypeRep -> IO Int
-typeRepKey (TypeRep (Key i) _ _) = return i
+typeRepKey :: TypeRep -> IO TypeRepKey
+typeRepKey (TypeRep f _ _) = return (TypeRepKey f)
 
         -- 
         -- let fTy = mkTyCon "Foo" in show (mkTyConApp (mkTyCon ",,")
@@ -193,12 +181,19 @@ typeRepKey (TypeRep (Key i) _ _) = return i
         -- sequence of commas, e.g., (mkTyCon ",,,,") returns
         -- the 5-tuple tycon.
 
+newtype TypeRepKey = TypeRepKey Fingerprint
+  deriving (Eq,Ord)
+
 ----------------- Construction --------------------
 
 -- | Applies a type constructor to a sequence of types
 mkTyConApp  :: TyCon -> [TypeRep] -> TypeRep
-mkTyConApp tc@(TyCon tc_k _) args 
-  = TypeRep (appKeys tc_k arg_ks) tc args
+mkTyConApp tc@(TyCon tc_k _ _ _) []
+  = TypeRep tc_k tc [] -- optimisation: all derived Typeable instances
+                       -- end up here, and it helps generate smaller
+                       -- code for derived Typeable.
+mkTyConApp tc@(TyCon tc_k _ _ _) args
+  = TypeRep (fingerprintFingerprints (tc_k : arg_ks)) tc args
   where
     arg_ks = [k | TypeRep k _ _ <- args]
 
@@ -225,7 +220,7 @@ funResultTy trFun trArg
 mkAppTy :: TypeRep -> TypeRep -> TypeRep
 mkAppTy (TypeRep tr_k tc trs) arg_tr
   = let (TypeRep arg_k _ _) = arg_tr
-     in  TypeRep (appKey tr_k arg_k) tc (trs++[arg_tr])
+     in  TypeRep (fingerprintFingerprints [tr_k,arg_k]) tc (trs++[arg_tr])
 
 -- If we enforce the restriction that there is only one
 -- @TyCon@ for a type & it is shared among all its uses,
@@ -242,14 +237,22 @@ mkAppTy (TypeRep tr_k tc trs) arg_tr
 -- | Builds a 'TyCon' object representing a type constructor.  An
 -- implementation of "Data.Typeable" should ensure that the following holds:
 --
--- >  mkTyCon "a" == mkTyCon "a"
+-- >  A==A' ^ B==B' ^ C==C' ==> mkTyCon A B C == mkTyCon A' B' C'
 --
 
-mkTyCon :: String       -- ^ the name of the type constructor (should be unique
-                        -- in the program, so it might be wise to use the
-                        -- fully qualified name).
+--
+mkTyCon3 :: String       -- ^ package name
+         -> String       -- ^ module name
+         -> String       -- ^ the name of the type constructor
+         -> TyCon        -- ^ A unique 'TyCon' object
+mkTyCon3 pkg modl name =
+  TyCon (fingerprintString (pkg++modl++name)) pkg modl name
+
+{-# DEPRECATED mkTyCon "use mkTyCon3 instead" #-}
+-- | Backwards-compatible API
+mkTyCon :: String       -- ^ unique string
         -> TyCon        -- ^ A unique 'TyCon' object
-mkTyCon str = TyCon (mkTyConKey str) str
+mkTyCon name = TyCon (fingerprintString name) "" "" name
 
 ----------------- Observation ---------------------
 
@@ -263,7 +266,7 @@ typeRepArgs (TypeRep _ _ args) = args
 
 -- | Observe string encoding of a type representation
 tyConString :: TyCon   -> String
-tyConString  (TyCon _ str) = str
+tyConString = tyConName
 
 ----------------- Showing TypeReps --------------------
 
@@ -287,11 +290,11 @@ showsTypeRep :: TypeRep -> ShowS
 showsTypeRep = shows
 
 instance Show TyCon where
-  showsPrec _ (TyCon _ s) = showString s
+  showsPrec _ t = showString (tyConName t)
 
 isTupleTyCon :: TyCon -> Bool
-isTupleTyCon (TyCon _ ('(':',':_)) = True
-isTupleTyCon _                     = False
+isTupleTyCon (TyCon _ _ _ ('(':',':_)) = True
+isTupleTyCon _                         = False
 
 -- Some (Show.TypeRep) helpers:
 
@@ -596,7 +599,7 @@ libraries/base/Data/Typeable.hs:589:1:
 -}
 instance Typeable2 (->) where { typeOf2 _ = mkTyConApp funTc [] }
 funTc :: TyCon
-funTc = mkTyCon "->"
+funTc = mkTyCon3 "ghc-prim" "GHC.Types" "->"
 #else
 INSTANCE_TYPEABLE2((->),funTc,"->")
 #endif
@@ -679,96 +682,7 @@ libraries/base/Data/Typeable.hs:674:1:
     In the stand-alone deriving instance for `Typeable RealWorld'
 -}
 realWorldTc :: TyCon; \
-realWorldTc = mkTyCon "GHC.Base.RealWorld"; \
+realWorldTc = mkTyCon3 "ghc-prim" "GHC.Types" "RealWorld"; \
 instance Typeable RealWorld where { typeOf _ = mkTyConApp realWorldTc [] }
 
 #endif
-
----------------------------------------------
---
---              Internals 
---
----------------------------------------------
-
-#ifndef __HUGS__
-newtype Key = Key Int deriving( Eq )
-#endif
-
-data KeyPr = KeyPr !Key !Key deriving( Eq )
-
-hashKP :: KeyPr -> Int32
-hashKP (KeyPr (Key k1) (Key k2)) = (HT.hashInt k1 + HT.hashInt k2) `rem` HT.prime
-
-data Cache = Cache { next_key :: !(IORef Key),  -- Not used by GHC (calls genSym instead)
-                     tc_tbl   :: !(HT.HashTable String Key),
-                     ap_tbl   :: !(HT.HashTable KeyPr Key) }
-
-{-# NOINLINE cache #-}
-#ifdef __GLASGOW_HASKELL__
-foreign import ccall unsafe "RtsTypeable.h getOrSetTypeableStore"
-    getOrSetTypeableStore :: Ptr a -> IO (Ptr a)
-#endif
-
-cache :: Cache
-cache = unsafePerformIO $ do
-                empty_tc_tbl <- HT.new (==) HT.hashString
-                empty_ap_tbl <- HT.new (==) hashKP
-                key_loc      <- newIORef (Key 1) 
-                let ret = Cache {       next_key = key_loc,
-                                        tc_tbl = empty_tc_tbl, 
-                                        ap_tbl = empty_ap_tbl }
-#ifdef __GLASGOW_HASKELL__
-                mask_ $ do
-                        stable_ref <- newStablePtr ret
-                        let ref = castStablePtrToPtr stable_ref
-                        ref2 <- getOrSetTypeableStore ref
-                        if ref==ref2
-                                then deRefStablePtr stable_ref
-                                else do
-                                        freeStablePtr stable_ref
-                                        deRefStablePtr
-                                                (castPtrToStablePtr ref2)
-#else
-                return ret
-#endif
-
-newKey :: IORef Key -> IO Key
-#ifdef __GLASGOW_HASKELL__
-newKey _ = do i <- genSym; return (Key i)
-#else
-newKey kloc = do { k@(Key i) <- readIORef kloc ;
-                   writeIORef kloc (Key (i+1)) ;
-                   return k }
-#endif
-
-#ifdef __GLASGOW_HASKELL__
-foreign import ccall unsafe "genSymZh"
-  genSym :: IO Int
-#endif
-
-mkTyConKey :: String -> Key
-mkTyConKey str 
-  = unsafePerformIO $ do
-        let Cache {next_key = kloc, tc_tbl = tbl} = cache
-        mb_k <- HT.lookup tbl str
-        case mb_k of
-          Just k  -> return k
-          Nothing -> do { k <- newKey kloc ;
-                          HT.insert tbl str k ;
-                          return k }
-
-appKey :: Key -> Key -> Key
-appKey k1 k2
-  = unsafePerformIO $ do
-        let Cache {next_key = kloc, ap_tbl = tbl} = cache
-        mb_k <- HT.lookup tbl kpr
-        case mb_k of
-          Just k  -> return k
-          Nothing -> do { k <- newKey kloc ;
-                          HT.insert tbl kpr k ;
-                          return k }
-  where
-    kpr = KeyPr k1 k2
-
-appKeys :: Key -> [Key] -> Key
-appKeys k ks = foldl appKey k ks
