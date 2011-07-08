@@ -3,7 +3,6 @@
 module Data.Typeable where
 
 import Data.Maybe
-import GHC.Base
 import {-# SOURCE #-} Data.Typeable.Internal
 
 mkTyConApp   :: TyCon -> [TypeRep] -> TypeRep
