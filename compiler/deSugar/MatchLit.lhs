@@ -65,6 +65,8 @@ dsLit (HsStringPrim s) = return (Lit (MachStr s))
 dsLit (HsCharPrim   c) = return (Lit (MachChar c))
 dsLit (HsIntPrim    i) = return (Lit (MachInt i))
 dsLit (HsWordPrim   w) = return (Lit (MachWord w))
+dsLit (HsInt64Prim  i) = return (Lit (MachInt64 i))
+dsLit (HsWord64Prim w) = return (Lit (MachWord64 w))
 dsLit (HsFloatPrim  f) = return (Lit (MachFloat (fl_value f)))
 dsLit (HsDoublePrim d) = return (Lit (MachDouble (fl_value d)))
 
@@ -111,6 +113,8 @@ hsLitKey :: HsLit -> Literal
 -- others have been removed by tidy
 hsLitKey (HsIntPrim     i) = mkMachInt  i
 hsLitKey (HsWordPrim    w) = mkMachWord w
+hsLitKey (HsInt64Prim   i) = mkMachInt64  i
+hsLitKey (HsWord64Prim  w) = mkMachWord64 w
 hsLitKey (HsCharPrim    c) = MachChar   c
 hsLitKey (HsStringPrim  s) = MachStr    s
 hsLitKey (HsFloatPrim   f) = MachFloat  (fl_value f)
