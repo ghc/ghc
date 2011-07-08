@@ -30,7 +30,9 @@ module Binary
 
    writeBinMem,
    readBinMem,
+
    fingerprintBinMem,
+   computeFingerprint,
 
    isEOFBin,
 
@@ -236,6 +238,18 @@ fingerprintBinMem (BinMem _ ix_r _ arr_r) = do
   arr <- readIORef arr_r
   ix <- readFastMutInt ix_r
   withForeignPtr arr $ \p -> fingerprintData p ix
+
+computeFingerprint :: Binary a
+                   => (BinHandle -> Name -> IO ())
+                   -> a
+                   -> IO Fingerprint
+
+computeFingerprint put_name a = do
+  bh <- openBinMem (3*1024) -- just less than a block
+  ud <- newWriteState put_name putFS
+  bh <- return $ setUserData bh ud
+  put_ bh a
+  fingerprintBinMem bh
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()

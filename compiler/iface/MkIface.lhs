@@ -474,7 +474,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
           = do let hash_fn = mk_put_name local_env
                    decl = abiDecl abi
                -- pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
-               hash <- computeFingerprint dflags hash_fn abi
+               hash <- computeFingerprint hash_fn abi
                return (extend_hash_env (hash,decl) local_env,
                        (hash,decl) : decls_w_hashes)
 
@@ -486,7 +486,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                let stable_abis = sortBy cmp_abiNames abis
                 -- put the cycle in a canonical order
-               hash <- computeFingerprint dflags hash_fn stable_abis
+               hash <- computeFingerprint hash_fn stable_abis
                let pairs = zip (repeat hash) decls
                return (foldr extend_hash_env local_env pairs,
                        pairs ++ decls_w_hashes)
@@ -520,12 +520,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                    $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
-   orphan_hash <- computeFingerprint dflags (mk_put_name local_env)
+   orphan_hash <- computeFingerprint (mk_put_name local_env)
                       (map ifDFun orph_insts, orph_rules, fam_insts)
 
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
-   export_hash <- computeFingerprint dflags putNameLiterally 
+   export_hash <- computeFingerprint putNameLiterally
                       (mi_exports iface0,
                        orphan_hash,
                        dep_orphan_hashes,
@@ -545,7 +545,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - orphans
    --   - deprecations
    --   - XXX vect info?
-   mod_hash <- computeFingerprint dflags putNameLiterally
+   mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,
                        orphan_hash,
@@ -556,7 +556,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --    - usages
    --    - deps
    --    - hpc
-   iface_hash <- computeFingerprint dflags putNameLiterally
+   iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash, 
                        mi_usages iface0,
                        sorted_deps,
@@ -748,19 +748,6 @@ putNameLiterally :: BinHandle -> Name -> IO ()
 putNameLiterally bh name = ASSERT( isExternalName name ) 
   do { put_ bh $! nameModule name
      ; put_ bh $! nameOccName name }
-
-computeFingerprint :: Binary a
-                   => DynFlags 
-                   -> (BinHandle -> Name -> IO ())
-                   -> a
-                   -> IO Fingerprint
-
-computeFingerprint _dflags put_name a = do
-  bh <- openBinMem (3*1024) -- just less than a block
-  ud <- newWriteState put_name putFS
-  bh <- return $ setUserData bh ud
-  put_ bh a
-  fingerprintBinMem bh
 
 {-
 -- for testing: use the md5sum command to generate fingerprints and
