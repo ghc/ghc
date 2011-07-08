@@ -46,7 +46,7 @@ libraries/array                 -           packages/array.git                  
 libraries/base                  -           packages/base.git                   git
 libraries/binary                -           packages/binary.git                 git
 libraries/bytestring            -           packages/bytestring.git             git
-libraries/Cabal                 -           packages/Cabal.git                  git
+libraries/Cabal                 -           packages/cabal-1.12.git             git
 libraries/containers            -           packages/containers.git             git
 libraries/directory             -           packages/directory.git              git
 libraries/extensible-exceptions -           packages/extensible-exceptions.git  git
