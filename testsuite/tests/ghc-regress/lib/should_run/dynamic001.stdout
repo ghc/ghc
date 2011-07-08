@@ -1,27 +1,27 @@
 *** Testing: toDyn ***
-[ <<GHC.Types.Int>>
-, <<GHC.Types.Char>>
-, <<GHC.Types.Bool>>
-, <<GHC.Types.Float>>
-, <<GHC.Types.Double>>
-, <<GHC.Integer.Type.Integer>>
-, <<GHC.Types.IO ()>>
-, <<[Data.Dynamic.Dynamic]>>
-, <<[GHC.Types.Int]>>
-, <<Data.Maybe.Maybe GHC.Types.Int>>
-, <<Data.Maybe.Maybe GHC.Types.Int>>
-, <<Data.Maybe.Maybe GHC.Types.Int>>
-, <<Data.Either.Either GHC.Types.Int GHC.Types.Bool>>
-, <<Data.Either.Either GHC.Types.Char GHC.Types.Int>>
+[ <<Int>>
+, <<Char>>
+, <<Bool>>
+, <<Float>>
+, <<Double>>
+, <<Integer>>
+, <<IO ()>>
+, <<[Dynamic]>>
+, <<[Int]>>
+, <<Maybe Int>>
+, <<Maybe Int>>
+, <<Maybe Int>>
+, <<Either Int Bool>>
+, <<Either Char Int>>
 , <<()>>
-, <<GHC.Ordering.Ordering>>
-, <<((),GHC.Types.Int)>>
-, <<((),GHC.Types.Int,GHC.Types.Char)>>
-, <<((),GHC.Types.Int,GHC.Types.Char,GHC.Types.Double)>>
-, <<((),GHC.Types.Int,GHC.Types.Char,GHC.Types.Double,(Data.Maybe.Maybe GHC.Types.Bool))>>
-, <<GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Int>>
-, <<GHC.Integer.Type.Integer -> GHC.Integer.Type.Integer -> GHC.Integer.Type.Integer>>
-, <<[GHC.Types.Char] -> [GHC.Types.Char] -> [GHC.Types.Char]>>
+, <<Ordering>>
+, <<((),Int)>>
+, <<((),Int,Char)>>
+, <<((),Int,Char,Double)>>
+, <<((),Int,Char,Double,(Maybe Bool))>>
+, <<Int -> Int -> Int>>
+, <<Integer -> Integer -> Integer>>
+, <<[Char] -> [Char] -> [Char]>>
 ]
 *** Testing: fromDyn ***
 1

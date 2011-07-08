@@ -8,7 +8,6 @@ import Data.Array.ST
 import Data.Array.IO
 import Data.Array.Unboxed
 import Data.Complex
-import Data.PackedString
 import Data.Int
 import Data.Word
 import Data.IORef
@@ -63,7 +62,6 @@ main = do
    print (typeOf (undefined :: AsyncException))
    print (typeOf (undefined :: (IOArray () ())))
    print (typeOf (undefined :: (IOUArray () ())))
-   print (typeOf (undefined :: PackedString))
    print (typeOf (undefined :: (STArray () () ())))
    print (typeOf (undefined :: (STUArray () () ())))
    print (typeOf (undefined :: (StableName ())))
@@ -84,7 +82,6 @@ main = do
    print (typeOf (undefined :: CULLong))
    print (typeOf (undefined :: CFloat))
    print (typeOf (undefined :: CDouble))
-   print (typeOf (undefined :: CLDouble))
 
    print (typeOf (undefined :: CPtrdiff))
    print (typeOf (undefined :: CSize))

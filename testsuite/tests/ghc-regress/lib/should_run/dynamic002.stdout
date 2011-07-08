@@ -33,11 +33,10 @@ Word8
 Word16
 Word32
 Word64
-GHC.Exception.ArithException
-GHC.IOBase.AsyncException
+ArithException
+AsyncException
 IOArray () ()
 IOUArray () ()
-PackedString
 STArray () () ()
 STUArray () () ()
 StableName ()
@@ -57,7 +56,6 @@ CLLong
 CULLong
 CFloat
 CDouble
-CLDouble
 CPtrdiff
 CSize
 CWchar
