@@ -47,6 +47,7 @@ int DEBUG_sparks;
 
 // events
 int TRACE_sched;
+int TRACE_spark;
 
 #ifdef THREADED_RTS
 static Mutex trace_utx;
@@ -90,7 +91,16 @@ void initTracing (void)
         RtsFlags.TraceFlags.scheduler ||
         RtsFlags.DebugFlags.scheduler;
 
+    // -Dr turns on spark tracing
+    TRACE_spark =
+        RtsFlags.TraceFlags.sparks ||
+        RtsFlags.DebugFlags.sparks;
+
     eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG;
+
+    /* Note: we can have TRACE_sched or TRACE_spark turned on even when
+       eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
+     */
 
     if (eventlog_enabled) {
         initEventLogging();

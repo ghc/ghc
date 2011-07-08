@@ -163,6 +163,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.tracing       = TRACE_NONE;
     RtsFlags.TraceFlags.timestamp     = rtsFalse;
     RtsFlags.TraceFlags.scheduler     = rtsFalse;
+    RtsFlags.TraceFlags.sparks        = rtsFalse;
 #endif
 
     RtsFlags.MiscFlags.tickInterval	= 20;  /* In milliseconds */
@@ -288,6 +289,7 @@ usage_text[] = {
 #  endif
 "             where [flags] can contain:",
 "                s    scheduler events",
+"                p    par spark events",
 #  ifdef DEBUG
 "                t    add time stamps (only useful with -v)",
 #  endif
@@ -1429,19 +1431,57 @@ decodeSize(const char *flag, nat offset, StgWord64 min, StgWord64 max)
 static void read_trace_flags(char *arg)
 {
     char *c;
+    rtsBool enabled = rtsTrue;
+    /* Syntax for tracing flags currently looks like:
+     *
+     *   -l    To turn on eventlog tracing with default trace classes
+     *   -lx   Turn on class 'x' (for some class listed below)
+     *   -l-x  Turn off class 'x'
+     *   -la   Turn on all classes
+     *   -l-a  Turn off all classes
+     *
+     * This lets users say things like:
+     *   -la-p    "all but sparks"
+     *   -l-ap    "only sparks"
+     */
+
+    /* Start by turning on the default tracing flags.
+     *
+     * Currently this is all the trace classes, but might not be in
+     * future, for example we might default to slightly less verbose
+     * scheduler or GC tracing.
+     */
+    RtsFlags.TraceFlags.scheduler = rtsTrue;
+    RtsFlags.TraceFlags.sparks = rtsTrue;
 
     for (c  = arg; *c != '\0'; c++) {
         switch(*c) {
         case '\0':
             break;
+        case '-':
+            enabled = rtsFalse;
+            break;
+        case 'a':
+            RtsFlags.TraceFlags.scheduler = enabled;
+            RtsFlags.TraceFlags.sparks = enabled;
+            enabled = rtsTrue;
+            break;
+
         case 's':
-            RtsFlags.TraceFlags.scheduler = rtsTrue;
+            RtsFlags.TraceFlags.scheduler = enabled;
+            enabled = rtsTrue;
+            break;
+        case 'p':
+            RtsFlags.TraceFlags.sparks = enabled;
+            enabled = rtsTrue;
             break;
         case 't':
-            RtsFlags.TraceFlags.timestamp = rtsTrue;
+            RtsFlags.TraceFlags.timestamp = enabled;
+            enabled = rtsTrue;
             break;
         case 'g':
             // ignored for backwards-compat
+            enabled = rtsTrue;
             break;
         default:
             errorBelch("unknown trace option: %c",*c);

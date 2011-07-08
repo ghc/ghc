@@ -62,6 +62,7 @@ extern int DEBUG_sparks;
 
 // events
 extern int TRACE_sched;
+extern int TRACE_spark;
 
 // -----------------------------------------------------------------------------
 // Posting events
@@ -91,6 +92,11 @@ void traceEnd (void);
 #define traceSchedEvent2(cap, tag, tso, info1, info2) \
     if (RTS_UNLIKELY(TRACE_sched)) {            \
         traceSchedEvent_(cap, tag, tso, info1, info2); \
+    }
+
+#define traceSparkEvent(cap, tag, tso, other)   \
+    if (RTS_UNLIKELY(TRACE_spark)) {            \
+        traceSchedEvent_(cap, tag, tso, other, 0); \
     }
 
 void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
@@ -192,6 +198,7 @@ void traceSparkCounters_ (Capability *cap,
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
 #define traceSchedEvent2(cap, tag, tso, other, info) /* nothing */
+#define traceSparkEvent(cap, tag, tso, other) /* nothing */
 #define traceEvent(cap, tag) /* nothing */
 #define traceCap(class, cap, msg, ...) /* nothing */
 #define trace(class, msg, ...) /* nothing */
@@ -402,7 +409,7 @@ INLINE_HEADER void traceEventRequestParGc(Capability *cap STG_UNUSED)
 INLINE_HEADER void traceEventRunSpark(Capability *cap STG_UNUSED, 
                                       StgTSO     *tso STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_RUN_SPARK, tso, 0);
+    traceSparkEvent(cap, EVENT_RUN_SPARK, tso, 0);
     dtraceRunSpark((EventCapNo)cap->no, (EventThreadID)tso->id);
 }
 
@@ -410,7 +417,7 @@ INLINE_HEADER void traceEventStealSpark(Capability *cap        STG_UNUSED,
                                         StgTSO     *tso        STG_UNUSED,
                                         nat         victim_cap STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_STEAL_SPARK, tso, victim_cap);
+    traceSparkEvent(cap, EVENT_STEAL_SPARK, tso, victim_cap);
     dtraceStealSpark((EventCapNo)cap->no, (EventThreadID)tso->id,
                      (EventCapNo)victim_cap);
 }
@@ -418,7 +425,7 @@ INLINE_HEADER void traceEventStealSpark(Capability *cap        STG_UNUSED,
 INLINE_HEADER void traceEventCreateSparkThread(Capability  *cap      STG_UNUSED, 
                                                StgThreadID spark_tid STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_CREATE_SPARK_THREAD, 0, spark_tid);
+    traceSparkEvent(cap, EVENT_CREATE_SPARK_THREAD, 0, spark_tid);
     dtraceCreateSparkThread((EventCapNo)cap->no, (EventThreadID)spark_tid);
 }
 

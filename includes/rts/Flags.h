@@ -127,8 +127,8 @@ struct PROFILING_FLAGS {
 struct TRACE_FLAGS {
     int tracing;
     rtsBool timestamp;      /* show timestamp in stderr output */
-
     rtsBool scheduler;      /* trace scheduler events */
+    rtsBool sparks;         /* trace spark events */
 };
 
 struct CONCURRENT_FLAGS {
