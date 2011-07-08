@@ -24,6 +24,14 @@
     <itemizedlist>
       <listitem>
         <para>
+          It is now possible to give classes equality superclasses,
+          i.e. you can write something like
+          <literal>class (F a ~ b) => C a b where { ... }</literal>.
+          See <xref linkend="equality-constraints" /> for more details.
+        </para>
+      </listitem>
+
+        <para>
           The <literal>DatatypeContexts</literal> extension (which will
           not be in the next Haskell language standard) is now off by
           default, and deprecated. It is still enabled by the
@@ -146,11 +154,16 @@ instance DefaultValue Char where
       <listitem>
         <para>
           The <literal>Generics</literal> extension has now been
-          removed (attempting to enable it will just give a warning).
-          Use the new <literal>DefaultSignatures</literal> and
+          removed. Use the new <literal>DefaultSignatures</literal> and
           <literal>DeriveGeneric</literal> extensions instead.
           The <literal>{| curly-pipe bracket |}</literal> syntax is thus
           no longer recognised.
+        </para>
+
+        <para>
+          The <literal>-XGenerics</literal> flag will give a warning,
+          but the <literal>-fgenerics</literal> flag is no longer
+          accepted.
         </para>
       </listitem>
 
@@ -199,6 +212,15 @@ foreign import ccall interruptible
         <para>
           The <literal>NewQualifiedOperators</literal> extension, which was
           deprecated, has now been removed.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          There is a new <literal>VECTORISE</literal> pragma, where
+          <literal> {-# VECTORISE var = exp #-}</literal>
+          prevents the vectoriser from vectorising
+          <literal>var</literal>.
         </para>
       </listitem>
     </itemizedlist>
@@ -389,8 +411,31 @@ import qualified Z
 
       <listitem>
         <para>
+          Profiling reports now use constant width columns, so large
+          values don't cause the layout to go wrong.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-L</literal> RTS flag, which sets the width of
+          the labels in heap profile graphs, can now also be used when
+          retainer profiling.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
           The <literal>-qw</literal> RTS flag is now deprecated. It does
           nothing, and will be removed in a future version of GHC.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          We now keep copies of the argument lists we are passed, so
+          it is safe for callers of <literal>hs_init()</literal> to
+          free the pointers they pass.
         </para>
       </listitem>
 
@@ -458,6 +503,12 @@ import qualified Z
               </tbody>
             </tgroup>
           </informaltable>
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The linker now supports <literal>kfreebsdgnu</literal>.
         </para>
       </listitem>
     </itemizedlist>
@@ -569,6 +620,12 @@ import qualified Z
           The <literal>-n</literal> flag has been removed.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          The <literal>-fmethod-sharing</literal> flag has been removed.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
@@ -620,6 +677,14 @@ Prelude>
         <para>
           The <literal>:m +M</literal> and <literal>import M</literal>
           GHCi commands now do exactly the same thing.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          With a new flag <literal>-ghci-script</literal> you can specify
+          additional files to be read on startup, in the same way that
+          <literal>.ghci</literal> is.
         </para>
       </listitem>
     </itemizedlist>
@@ -766,6 +831,12 @@ Prelude>
           repositories. Instructions for getting source trees are on
           <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building/GettingTheSources">the GHC wiki</ulink>.
         </para>
+
+        <para>
+          The <literal>sync-all</literal> script, rather than the
+          <literal>darcs-all</literal> script, is now used for dealing
+          with repositories.
+        </para>
       </listitem>
 
       <listitem>
@@ -777,6 +848,12 @@ Prelude>
       <listitem>
         <para>
           Building with gcc 4.6 now works.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          On Windows, we now bundle gcc 4.5.2-1 (was 4.5.0-1).
         </para>
       </listitem>
 
@@ -811,11 +888,28 @@ GhcStage3DefaultNewCodegen=YES
           in your <literal>mk/build.mk</literal>.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          Platforms with a vendor of <literal>softfloat</literal>, such
+          as <literal>armv5tel-softfloat-linux-gnueabi</literal>, are
+          now supported.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
   <sect2>
     <title>Libraries</title>
+
+    <itemizedlist>
+        <listitem>
+            <para>
+                Unicode support has generally been improved across
+                the core libraries.
+            </para>
+        </listitem>
+    </itemizedlist>
 
     <sect3>
         <title>array</title>
