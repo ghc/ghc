@@ -498,7 +498,7 @@ INLINE_HEADER void traceOSProcessInfo(void)
 INLINE_HEADER void traceSparkCounters(Capability *cap STG_UNUSED)
 {
 #ifdef THREADED_RTS
-    if (RTS_UNLIKELY(TRACE_sched)) {
+    if (RTS_UNLIKELY(TRACE_spark)) {
         traceSparkCounters_(cap, cap->spark_stats, sparkPoolSize(cap->sparks));
     }
 #endif
