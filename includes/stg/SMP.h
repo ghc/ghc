@@ -20,6 +20,10 @@
 #define PRE_ARMv6
 #endif
 
+#if defined(PRE_ARMv6) || defined(__ARM_ARCH_6__)
+#define PRE_ARMv7
+#endif
+
 #if defined(THREADED_RTS)
 
 #if arm_HOST_ARCH && defined(PRE_ARMv6)
@@ -310,8 +314,10 @@ write_barrier(void) {
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require store/store barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH
+#elif arm_HOST_ARCH && PRE_ARMv7
     __asm__ __volatile__ ("" : : : "memory");
+#elif arm_HOST_ARCH && !PRE_ARMv7
+    __asm__ __volatile__ ("dmb  st" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
@@ -329,6 +335,8 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
+#elif arm_HOST_ARCH && !PRE_ARMv7
+    __asm__ __volatile__ ("dmb" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
@@ -347,6 +355,8 @@ load_load_barrier(void) {
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
+#elif arm_HOST_ARCH && !PRE_ARMv7
+    __asm__ __volatile__ ("dmb" : : : "memory");
 #elif !defined(WITHSMP)
     return;
 #else
