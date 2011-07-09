@@ -279,6 +279,15 @@ pushWSDeque (WSDeque* q, void * elem)
     }
 
     q->elements[b & sz] = elem;
+    /*
+       KG: we need to put write barrier here since otherwise we might
+       end with elem not added to q->elements, but q->bottom already
+       modified (write reordering) and with stealWSDeque_ failing
+       later when invoked from another thread since it thinks elem is
+       there (in case there is just added element in the queue). This
+       issue concretely hit me on ARMv7 multi-core CPUs
+     */
+    write_barrier();
     q->bottom = b + 1;
     
     ASSERT_WSDEQUE_INVARIANTS(q); 
