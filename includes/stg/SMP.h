@@ -156,6 +156,9 @@ xchg(StgPtr p, StgWord w)
                           "      strex  %1, %2, [%3]\n"
                           "      teq    %1, #1\n"
                           "      beq    1b\n"
+#if !defined(PRE_ARMv7)
+                          "      dmb\n"
+#endif
                           : "=&r" (result), "=&r" (tmp)
                           : "r" (w), "r" (p)
                           : "memory"
@@ -225,6 +228,9 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         "       teq     %0, #1\n"
         "       it      eq\n"
         "       beq     1b\n"
+#if !defined(PRE_ARMv7)
+        "       dmb\n"
+#endif
                 : "=&r"(tmp), "=&r"(result)
                 : "r"(p), "r"(o), "r"(n)
                 : "cc","memory");
