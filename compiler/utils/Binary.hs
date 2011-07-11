@@ -76,6 +76,9 @@ import Data.Array
 import Data.IORef
 import Data.Char                ( ord, chr )
 import Data.Typeable
+#if __GLASGOW_HASKELL__ >= 701
+import Data.Typeable.Internal
+#endif
 import Control.Monad            ( when )
 import System.IO as IO
 import System.IO.Unsafe         ( unsafeInterleaveIO )
@@ -576,6 +579,14 @@ instance Binary (Bin a) where
 -- -----------------------------------------------------------------------------
 -- Instances for Data.Typeable stuff
 
+#if __GLASGOW_HASKELL__ >= 701
+instance Binary TyCon where
+    put_ bh (TyCon _ p m n) = do
+        put_ bh (p,m,n)
+    get bh = do
+        (p,m,n) <- get bh
+        return (mkTyCon3 p m n)
+#else
 instance Binary TyCon where
     put_ bh ty_con = do
         let s = tyConString ty_con
@@ -583,6 +594,7 @@ instance Binary TyCon where
     get bh = do
         s <- get bh
         return (mkTyCon s)
+#endif
 
 instance Binary TypeRep where
     put_ bh type_rep = do
