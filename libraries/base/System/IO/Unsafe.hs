@@ -17,18 +17,21 @@
 module System.IO.Unsafe (
    -- * Unsafe 'System.IO.IO' operations
    unsafePerformIO,     -- :: IO a -> a
+   unsafeDupablePerformIO, -- :: IO a -> a
    unsafeInterleaveIO,  -- :: IO a -> IO a
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IO      (unsafePerformIO, unsafeInterleaveIO)
+import GHC.IO      (unsafePerformIO, unsafeInterleaveIO, unsafeDupablePerformIO)
 #endif
 
 #ifdef __HUGS__
 import Hugs.IOExts (unsafePerformIO, unsafeInterleaveIO)
+unsafeDupablePerformIO = unsafePerformIO
 #endif
 
 #ifdef __NHC__
 import NHC.Internal (unsafePerformIO, unsafeInterleaveIO)
+unsafeDupablePerformIO = unsafePerformIO
 #endif
 
