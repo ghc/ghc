@@ -548,9 +548,9 @@ showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace")
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen") 
 
 typeOf_RDR, mkTyCon_RDR, mkTyConApp_RDR :: RdrName
-typeOf_RDR     = varQual_RDR tYPEABLE (fsLit "typeOf")
+typeOf_RDR     = varQual_RDR tYPEABLE_INTERNAL (fsLit "typeOf")
 mkTyCon_RDR    = varQual_RDR tYPEABLE_INTERNAL (fsLit "mkTyCon")
-mkTyConApp_RDR = varQual_RDR tYPEABLE (fsLit "mkTyConApp")
+mkTyConApp_RDR = varQual_RDR tYPEABLE_INTERNAL (fsLit "mkTyConApp")
 
 undefined_RDR :: RdrName
 undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
@@ -820,14 +820,14 @@ ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
 typeableClassName, typeable1ClassName, typeable2ClassName,
     typeable3ClassName, typeable4ClassName, typeable5ClassName,
     typeable6ClassName, typeable7ClassName :: Name
-typeableClassName  = clsQual tYPEABLE (fsLit "Typeable") typeableClassKey
-typeable1ClassName = clsQual tYPEABLE (fsLit "Typeable1") typeable1ClassKey
-typeable2ClassName = clsQual tYPEABLE (fsLit "Typeable2") typeable2ClassKey
-typeable3ClassName = clsQual tYPEABLE (fsLit "Typeable3") typeable3ClassKey
-typeable4ClassName = clsQual tYPEABLE (fsLit "Typeable4") typeable4ClassKey
-typeable5ClassName = clsQual tYPEABLE (fsLit "Typeable5") typeable5ClassKey
-typeable6ClassName = clsQual tYPEABLE (fsLit "Typeable6") typeable6ClassKey
-typeable7ClassName = clsQual tYPEABLE (fsLit "Typeable7") typeable7ClassKey
+typeableClassName  = clsQual tYPEABLE_INTERNAL (fsLit "Typeable") typeableClassKey
+typeable1ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable1") typeable1ClassKey
+typeable2ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable2") typeable2ClassKey
+typeable3ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable3") typeable3ClassKey
+typeable4ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable4") typeable4ClassKey
+typeable5ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable5") typeable5ClassKey
+typeable6ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable6") typeable6ClassKey
+typeable7ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable7") typeable7ClassKey
 
 typeableClassNames :: [Name]
 typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassName
