@@ -34,39 +34,11 @@ import GHC.Fingerprint.Type
 -- for SIZEOF_STRUCT_MD5CONTEXT:
 #include "HsBaseConfig.h"
 
+-- XXX instance Storable Fingerprint
+-- defined in Foreign.Storable to avoid orphan instance
+
 fingerprint0 :: Fingerprint
 fingerprint0 = Fingerprint 0 0
-
-instance Storable Fingerprint where
-  sizeOf _ = 16
-  alignment _ = 8
-  peek = peekFingerprint
-  poke = pokeFingerprint
-
--- peek/poke in fixed BIG-endian 128-bit format
-peekFingerprint :: Ptr Fingerprint -> IO Fingerprint
-peekFingerprint p = do
-      let peekW64 :: Ptr Word8 -> Int -> Word64 -> IO Word64
-          peekW64 _  0  !i = return i
-          peekW64 !p !n !i = do
-                w8 <- peek p
-                peekW64 (p `plusPtr` 1) (n-1) 
-                    ((i `shiftL` 8) .|. fromIntegral w8)
-
-      high <- peekW64 (castPtr p) 8 0
-      low  <- peekW64 (castPtr p `plusPtr` 8) 8 0
-      return (Fingerprint high low)
-
-pokeFingerprint :: Ptr Fingerprint -> Fingerprint -> IO ()
-pokeFingerprint p (Fingerprint high low) = do
-      let pokeW64 :: Ptr Word8 -> Int -> Word64 -> IO ()
-          pokeW64 p 0  !i = return ()
-          pokeW64 p !n !i = do
-                pokeElemOff p (n-1) (fromIntegral i)
-                pokeW64 p (n-1) (i `shiftR` 8)
-
-      pokeW64 (castPtr p) 8 high
-      pokeW64 (castPtr p `plusPtr` 8) 8 low
 
 fingerprintFingerprints :: [Fingerprint] -> Fingerprint
 fingerprintFingerprints fs = unsafeDupablePerformIO $
@@ -80,7 +52,7 @@ fingerprintData buf len = do
     c_MD5Update pctxt buf (fromIntegral len)
     allocaBytes 16 $ \pdigest -> do
       c_MD5Final pdigest pctxt
-      peekFingerprint (castPtr pdigest)
+      peek (castPtr pdigest :: Ptr Fingerprint)
 
 fingerprintString :: String -> Fingerprint
 fingerprintString str = unsafeDupablePerformIO $

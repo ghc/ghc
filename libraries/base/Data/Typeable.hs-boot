@@ -1,14 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Data.Typeable where
+module Data.Typeable (Typeable, mkTyConApp, cast) where
 
 import Data.Maybe
 import {-# SOURCE #-} Data.Typeable.Internal
 
-mkTyConApp   :: TyCon -> [TypeRep] -> TypeRep
-
 cast :: (Typeable a, Typeable b) => a -> Maybe b
-
-class Typeable a where
-  typeOf :: a -> TypeRep
 

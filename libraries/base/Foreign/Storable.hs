@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
+#ifdef __GLASGOW_HASKELL__
+{-# LANGUAGE BangPatterns #-}
+#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -51,6 +54,9 @@ import GHC.Word
 import GHC.Ptr
 import GHC.Err
 import GHC.Base
+import GHC.Fingerprint.Type
+import Data.Bits
+import GHC.Real
 #else
 import Data.Int
 import Data.Word
@@ -243,4 +249,38 @@ STORABLE(Int32,SIZEOF_INT32,ALIGNMENT_INT32,
 STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
          readInt64OffPtr,writeInt64OffPtr)
 
+#endif
+
+-- XXX: here to avoid orphan instance in GHC.Fingerprint
+#ifdef __GLASGOW_HASKELL__
+instance Storable Fingerprint where
+  sizeOf _ = 16
+  alignment _ = 8
+  peek = peekFingerprint
+  poke = pokeFingerprint
+
+-- peek/poke in fixed BIG-endian 128-bit format
+peekFingerprint :: Ptr Fingerprint -> IO Fingerprint
+peekFingerprint p0 = do
+      let peekW64 :: Ptr Word8 -> Int -> Word64 -> IO Word64
+          peekW64 _  0  !i = return i
+          peekW64 !p !n !i = do
+                w8 <- peek p
+                peekW64 (p `plusPtr` 1) (n-1) 
+                    ((i `shiftL` 8) .|. fromIntegral w8)
+
+      high <- peekW64 (castPtr p0) 8 0
+      low  <- peekW64 (castPtr p0 `plusPtr` 8) 8 0
+      return (Fingerprint high low)
+
+pokeFingerprint :: Ptr Fingerprint -> Fingerprint -> IO ()
+pokeFingerprint p0 (Fingerprint high low) = do
+      let pokeW64 :: Ptr Word8 -> Int -> Word64 -> IO ()
+          pokeW64 _ 0  _  = return ()
+          pokeW64 p !n !i = do
+                pokeElemOff p (n-1) (fromIntegral i)
+                pokeW64 p (n-1) (i `shiftR` 8)
+
+      pokeW64 (castPtr p0) 8 high
+      pokeW64 (castPtr p0 `plusPtr` 8) 8 low
 #endif

@@ -1,8 +1,10 @@
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash #-}
 module Data.Typeable.Internal (
+    Typeable(typeOf),
     TypeRep,
     TyCon,
-    mkTyCon
+    mkTyCon,
+    mkTyConApp
   ) where
 
 import GHC.Base
@@ -17,3 +19,8 @@ mkTyCon :: Word64# -> Word64# -> String -> String -> String -> TyCon
 #else
 mkTyCon :: Word#   -> Word#   -> String -> String -> String -> TyCon
 #endif
+
+mkTyConApp   :: TyCon -> [TypeRep] -> TypeRep
+
+class Typeable a where
+  typeOf :: a -> TypeRep
