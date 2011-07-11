@@ -160,7 +160,7 @@ newtype TypeRepKey = TypeRepKey Fingerprint
 
 ----------------- Construction ---------------------
 
-{-# DEPRECATED mkTyCon "use mkTyCon3 instead" #-}
+{-# DEPRECATED mkTyCon "either derive Typeable, or use mkTyCon3 instead" #-}
 -- | Backwards-compatible API
 mkTyCon :: String       -- ^ unique string
         -> TyCon        -- ^ A unique 'TyCon' object
