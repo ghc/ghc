@@ -1,0 +1,15 @@
+Name: safePkg01
+Version: 1.0
+Description: SafeHaskell Test Package
+License: BSD3
+Build-Type: Simple
+
+Library {
+    Build-Depends: base >= 4
+    Exposed-Modules:
+        M_SafePkg
+        M_SafePkg2
+        M_SafePkg3
+        M_SafePkg4
+}
+

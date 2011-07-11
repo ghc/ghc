@@ -1,0 +1,3 @@
+
+ImpSafeOnly03.hs:4:1:
+    safePkg01-1.0:M_SafePkg3 can't be safely imported! The package (safePkg01-1.0) the module resides in isn't trusted.

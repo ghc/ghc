@@ -1,0 +1,24 @@
+local.db:
+    safePkg01-1.0
+
+trusted: False
+
+M_SafePkg
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe
+require own pkg trusted: False
+
+M_SafePkg2
+package dependencies: base ghc-prim integer-gmp
+trusted: trustworthy
+require own pkg trusted: False
+
+M_SafePkg3
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe
+require own pkg trusted: True
+
+M_SafePkg4
+package dependencies: base* ghc-prim integer-gmp
+trusted: safe
+require own pkg trusted: True
