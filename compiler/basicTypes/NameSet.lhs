@@ -34,9 +34,6 @@ module NameSet (
 
 import Name
 import UniqSet
-import Util
-
-import Data.Data
 \end{code}
 
 %************************************************************************
@@ -48,20 +45,7 @@ import Data.Data
 \begin{code}
 type NameSet = UniqSet Name
 
--- TODO: These Data/Typeable instances look very dubious. Surely either
--- UniqFM should have the instances, or this should be a newtype?
-
-nameSetTc :: TyCon
-nameSetTc = mkTyCon "NameSet"
-instance Typeable NameSet where { typeOf _ = mkTyConApp nameSetTc [] }
-
-instance Data NameSet where
-  gfoldl k z s = z mkNameSet `k` nameSetToList s -- traverse abstractly
-  toConstr _   = abstractConstr "NameSet"
-  gunfold _ _  = error "gunfold"
-  dataTypeOf _ = mkNoRepType "NameSet"
-
-emptyNameSet	   :: NameSet
+emptyNameSet       :: NameSet
 unitNameSet	   :: Name -> NameSet
 addListToNameSet   :: NameSet -> [Name] -> NameSet
 addOneToNameSet    :: NameSet -> Name -> NameSet

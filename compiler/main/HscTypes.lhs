@@ -147,8 +147,6 @@ import FastString
 import StringBuffer	( StringBuffer )
 import Fingerprint
 import MonadUtils
-import Data.Dynamic     ( Typeable )
-import qualified Data.Dynamic as Dyn
 import Bag
 import ErrUtils
 
@@ -161,6 +159,7 @@ import Data.Map (Map)
 import Data.Word
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
+import Data.Typeable    ( Typeable )
 
 -- -----------------------------------------------------------------------------
 -- Source Errors
@@ -191,17 +190,12 @@ throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
 --
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
-data SourceError = SourceError ErrorMessages
+newtype SourceError = SourceError ErrorMessages
+  deriving Typeable
 
 instance Show SourceError where
   show (SourceError msgs) = unlines . map show . bagToList $ msgs
     -- ToDo: is there some nicer way to print this?
-
-sourceErrorTc :: Dyn.TyCon
-sourceErrorTc = Dyn.mkTyCon "SourceError"
-{-# NOINLINE sourceErrorTc #-}
-instance Typeable SourceError where
-  typeOf _ = Dyn.mkTyConApp sourceErrorTc []
 
 instance Exception SourceError
 
@@ -219,16 +213,11 @@ handleSourceError handler act =
 srcErrorMessages (SourceError msgs) = msgs
 
 -- | XXX: what exactly is an API error?
-data GhcApiError = GhcApiError SDoc
+newtype GhcApiError = GhcApiError SDoc
+ deriving Typeable
 
 instance Show GhcApiError where
   show (GhcApiError msg) = showSDoc msg
-
-ghcApiErrorTc :: Dyn.TyCon
-ghcApiErrorTc = Dyn.mkTyCon "GhcApiError"
-{-# NOINLINE ghcApiErrorTc #-}
-instance Typeable GhcApiError where
-  typeOf _ = Dyn.mkTyConApp ghcApiErrorTc []
 
 instance Exception GhcApiError
 
