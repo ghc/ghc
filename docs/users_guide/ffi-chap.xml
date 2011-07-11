@@ -101,7 +101,9 @@ OK:
           The problem is that it is not possible in general to
           interrupt a foreign call safely.  However, GHC does provide
           a way to interrupt blocking system calls which works for
-          most system calls on both Unix and Windows.  A foreign call
+          most system calls on both Unix and Windows.  When the
+          <literal>InterruptibleFFI</literal> extension is enabled,
+          a foreign call
           can be annotated with <literal>interruptible</literal> instead
           of <literal>safe</literal> or <literal>unsafe</literal>:
 

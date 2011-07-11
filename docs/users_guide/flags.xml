@@ -933,6 +933,12 @@
 	      <entry><option>-XNoUnliftedFFITypes</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-XInterruptibleFFI</option></entry>
+	      <entry>Enable interruptible FFI.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoInterruptibleFFI</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-XLiberalTypeSynonyms</option></entry>
 	      <entry>Enable <link linkend="type-synonyms">liberalised type synonyms</link>.</entry>
 	      <entry>dynamic</entry>
