@@ -164,9 +164,9 @@ unsafePerformIO :: IO a -> a
 unsafePerformIO m = unsafeDupablePerformIO (noDuplicate >> m)
 
 {-| 
-This version of 'unsafePerformIO' is slightly more efficient,
+This version of 'unsafePerformIO' is more efficient
 because it omits the check that the IO is only being performed by a
-single thread.  Hence, when you write 'unsafeDupablePerformIO',
+single thread.  Hence, when you use 'unsafeDupablePerformIO',
 there is a possibility that the IO action may be performed multiple
 times (on a multiprocessor), and you should therefore ensure that
 it gives the same results each time.
