@@ -45,5 +45,5 @@ It is expected that this operation will be
 replaced in a future revision of Haskell.
 -}
 unsafeLocalState :: IO a -> a
-unsafeLocalState = unsafePerformIO
+unsafeLocalState = unsafeDupablePerformIO
 
