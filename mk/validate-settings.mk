@@ -61,7 +61,9 @@ libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
 
 # Temporarily turn off unused-do-bind warnings for the time package
-libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
+libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind 
+# Temporary: mkTyCon is deprecated
+libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 # On Windows, there are also some unused import warnings
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
 
