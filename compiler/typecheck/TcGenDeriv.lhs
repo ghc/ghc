@@ -1210,7 +1210,7 @@ gen_Typeable_binds loc tycon
 
 mk_typeOf_RDR :: TyCon -> RdrName
 -- Use the arity of the TyCon to make the right typeOfn function
-mk_typeOf_RDR tycon = varQual_RDR tYPEABLE (mkFastString ("typeOf" ++ suffix))
+mk_typeOf_RDR tycon = varQual_RDR tYPEABLE_INTERNAL (mkFastString ("typeOf" ++ suffix))
 		where
 		  arity = tyConArity tycon
 		  suffix | arity == 0 = ""
