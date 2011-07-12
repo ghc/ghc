@@ -427,14 +427,18 @@ header 	:: { Located (HsModule RdrName) }
 		{% fileSrcSpan >>= \ loc ->
 		   return (L loc (HsModule (Just $3) $5 $7 [] $4 $1
                           ))}
-	| missing_module_keyword importdecls
+        | header_body2
 		{% fileSrcSpan >>= \ loc ->
-		   return (L loc (HsModule Nothing Nothing $2 [] Nothing
+                   return (L loc (HsModule Nothing Nothing $1 [] Nothing
                           Nothing)) }
 
 header_body :: { [LImportDecl RdrName] }
 	:  '{'            importdecls		{ $2 }
- 	|      vocurly    importdecls		{ $2 }
+        |      vocurly    importdecls           { $2 }
+
+header_body2 :: { [LImportDecl RdrName] }
+        :  '{' importdecls                      { $2 }
+        |  missing_module_keyword importdecls   { $2 }
 
 -----------------------------------------------------------------------------
 -- The Export List
