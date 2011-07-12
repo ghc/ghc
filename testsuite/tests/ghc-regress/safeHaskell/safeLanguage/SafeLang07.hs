@@ -12,7 +12,7 @@
 -- API of Y1.
 module Main where
 
-import SafeLang06_A
+import SafeLang07_A
 
 class IntIso t where
     intIso :: c t -> c Int
@@ -38,5 +38,4 @@ nums = [1,4,0,1,-5,2,3,5,-1,2,0,0,-4,-3,9]
 main = do
     printIntMinList a1
     printIntMinList a2
-
 

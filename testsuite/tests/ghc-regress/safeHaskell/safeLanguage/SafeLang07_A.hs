@@ -3,7 +3,7 @@
 -- | Here we expose a MinList API that only allows elements
 -- to be inserted into a list if they are at least greater
 -- than an initial element the list is created with.
-module SafeLang06_A (
+module SafeLang07_A (
         MinList,
         newMinList,
         insertMinList,
