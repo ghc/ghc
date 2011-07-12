@@ -35,6 +35,7 @@ import BasicTypes       (Alignment)
 import OldCmm
 import CLabel
 import Unique           ( pprUnique, Uniquable(..) )
+import Platform
 import Pretty
 import FastString
 import qualified Outputable
@@ -49,21 +50,21 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop (Alignment, CmmStatics) Instr -> Doc
-pprNatCmmTop (CmmData section dats) =
+pprNatCmmTop :: Platform -> NatCmmTop (Alignment, CmmStatics) Instr -> Doc
+pprNatCmmTop _ (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
 
  -- special case for code without info table:
-pprNatCmmTop (CmmProc Nothing lbl (ListGraph blocks)) =
+pprNatCmmTop platform (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   pprLabel lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map pprBasicBlock blocks) $$
-  pprSizeDecl lbl
+  pprSizeDecl platform lbl
 
-pprNatCmmTop (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+pprNatCmmTop platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
@@ -88,17 +89,15 @@ pprNatCmmTop (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph block
        <+> char '-'
        <+> pprCLabel_asm (mkDeadStripPreventer info_lbl)
 #endif
-   $$ pprSizeDecl info_lbl
+   $$ pprSizeDecl platform info_lbl
 
 -- | Output the ELF .size directive.
-pprSizeDecl :: CLabel -> Doc
-#if elf_OBJ_FORMAT
-pprSizeDecl lbl =
+pprSizeDecl :: Platform -> CLabel -> Doc
+pprSizeDecl platform lbl
+ | osElfTarget (platformOS platform) =
     ptext (sLit "\t.size") <+> pprCLabel_asm lbl
     <> ptext (sLit ", .-") <> pprCLabel_asm lbl
-#else
-pprSizeDecl _ = empty
-#endif
+ | otherwise = empty
 
 pprBasicBlock :: NatBasicBlock Instr -> Doc
 pprBasicBlock (BasicBlock blockid instrs) =
