@@ -451,7 +451,6 @@ data Token
   | ITlabel
   | ITdynamic
   | ITsafe
-  | ITthreadsafe
   | ITinterruptible
   | ITunsafe
   | ITstdcallconv
@@ -599,7 +598,6 @@ isSpecial ITexport    	= True
 isSpecial ITlabel     	= True
 isSpecial ITdynamic   	= True
 isSpecial ITsafe    	= True
-isSpecial ITthreadsafe 	= True
 isSpecial ITinterruptible = True
 isSpecial ITunsafe    	= True
 isSpecial ITccallconv   = True
@@ -662,7 +660,6 @@ reservedWordsFM = listToUFM $
 	( "label",	ITlabel,	 bit ffiBit),
 	( "dynamic",	ITdynamic,	 bit ffiBit),
 	( "safe",	ITsafe,		 bit ffiBit .|. bit safeHaskellBit),
-	( "threadsafe",	ITthreadsafe,	 bit ffiBit),  -- ToDo: remove
 	( "interruptible", ITinterruptible, bit interruptibleFfiBit),
 	( "unsafe",	ITunsafe,	 bit ffiBit),
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
