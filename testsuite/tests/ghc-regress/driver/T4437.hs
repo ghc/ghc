@@ -16,6 +16,7 @@ main = do let ghcExtensions = [ ext | (ext, _, _, _) <- xFlags ]
                      "RelaxedLayout",
                      "DeriveGeneric",
                      "DefaultSignatures",
+                     "InterruptibleFFI",
                      "AlternativeLayoutRule",
                      "AlternativeLayoutRuleTransitional",
                      "MonadComprehensions"]

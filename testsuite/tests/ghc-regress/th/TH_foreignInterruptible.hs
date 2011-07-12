@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell,ForeignFunctionInterface #-}
+{-# LANGUAGE TemplateHaskell, ForeignFunctionInterface, InterruptibleFFI #-}
 
 module TH_foreign where
 
