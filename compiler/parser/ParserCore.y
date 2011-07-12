@@ -279,7 +279,7 @@ exp	:: { IfaceExpr }
 --            }
         | '%external' STRING aty   { IfaceFCall (ForeignCall.CCall 
                                                     (CCallSpec (StaticTarget (mkFastString $2) Nothing) 
-                                                               CCallConv (PlaySafe False))) 
+                                                               CCallConv PlaySafe)) 
                                                  $3 }
 
 alts1	:: { [IfaceAlt] }

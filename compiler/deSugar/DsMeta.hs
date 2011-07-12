@@ -351,8 +351,7 @@ repCCallConv callConv    = notHandled "repCCallConv" (ppr callConv)
 repSafety :: Safety -> DsM (Core TH.Safety)
 repSafety PlayRisky = rep2 unsafeName []
 repSafety PlayInterruptible = rep2 interruptibleName []
-repSafety (PlaySafe False) = rep2 safeName []
-repSafety (PlaySafe True) = rep2 threadsafeName []
+repSafety PlaySafe = rep2 safeName []
 
 ds_msg :: SDoc
 ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
@@ -1797,7 +1796,6 @@ templateHaskellNames = [
     -- Safety
     unsafeName,
     safeName,
-    threadsafeName,
     interruptibleName,
     -- InlineSpec
     inlineSpecNoPhaseName, inlineSpecPhaseName,
@@ -2046,10 +2044,9 @@ cCallName = libFun (fsLit "cCall") cCallIdKey
 stdCallName = libFun (fsLit "stdCall") stdCallIdKey
 
 -- data Safety = ...
-unsafeName, safeName, threadsafeName, interruptibleName :: Name
+unsafeName, safeName, interruptibleName :: Name
 unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
-threadsafeName = libFun (fsLit "threadsafe") threadsafeIdKey
 interruptibleName = libFun (fsLit "interruptible") interruptibleIdKey
 
 -- data InlineSpec = ...
@@ -2328,10 +2325,9 @@ cCallIdKey      = mkPreludeMiscIdUnique 394
 stdCallIdKey    = mkPreludeMiscIdUnique 395
 
 -- data Safety = ...
-unsafeIdKey, safeIdKey, threadsafeIdKey, interruptibleIdKey :: Unique
+unsafeIdKey, safeIdKey, interruptibleIdKey :: Unique
 unsafeIdKey        = mkPreludeMiscIdUnique 400
 safeIdKey          = mkPreludeMiscIdUnique 401
-threadsafeIdKey    = mkPreludeMiscIdUnique 402
 interruptibleIdKey = mkPreludeMiscIdUnique 403
 
 -- data InlineSpec =

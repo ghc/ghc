@@ -88,15 +88,14 @@ tcFImport d = pprPanic "tcFImport" (ppr d)
 \begin{code}
 tcCheckFIType :: Type -> [Type] -> Type -> ForeignImport -> TcM ForeignImport
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ safety _ (CLabel _))
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport _ _ _ (CLabel _))
   = ASSERT( null arg_tys )
     do { checkCg checkCOrAsmOrLlvmOrInterp
-       ; checkSafety safety
        ; check (isFFILabelTy res_ty) (illegalForeignTyErr empty sig_ty)
        ; return idecl }      -- NB check res_ty not sig_ty!
                              --    In case sig_ty is (forall a. ForeignPtr a)
 
-tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
+tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv _ _ CWrapper) = do
         -- Foreign wrapper (former f.e.d.)
         -- The type must be of the form ft -> IO (FunPtr ft), where ft is a
         -- valid foreign type.  For legacy reasons ft -> IO (Ptr ft) as well
@@ -104,7 +103,6 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ CWrapper) = do
         -- is DEPRECATED, though.
     checkCg checkCOrAsmOrLlvmOrInterp
     checkCConv cconv
-    checkSafety safety
     case arg_tys of
         [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
                         checkForeignRes nonIOok  False isFFIExportResultTy res1_ty
@@ -118,7 +116,6 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
   | isDynamicTarget target = do -- Foreign import dynamic
       checkCg checkCOrAsmOrLlvmOrInterp
       checkCConv cconv
-      checkSafety safety
       case arg_tys of           -- The first arg must be Ptr, FunPtr, or Addr
         []                -> do
           check False (illegalForeignTyErr empty sig_ty)
@@ -149,7 +146,6 @@ tcCheckFIType sig_ty arg_tys res_ty idecl@(CImport cconv safety _ (CFunction tar
   | otherwise = do              -- Normal foreign import
       checkCg (checkCOrAsmOrLlvmOrDotNetOrInterp)
       checkCConv cconv
-      checkSafety safety
       checkCTarget target
       dflags <- getDOpts
       checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
@@ -321,14 +317,6 @@ checkCConv StdCallConv  = addWarnTc (text "the 'stdcall' calling convention is u
 #endif
 checkCConv PrimCallConv = addErrTc (text "The `prim' calling convention can only be used with `foreign import'")
 checkCConv CmmCallConv  = panic "checkCConv CmmCallConv"
-\end{code}
-
-Deprecated "threadsafe" calls
-
-\begin{code}
-checkSafety :: Safety -> TcM ()
-checkSafety (PlaySafe True) = addWarn (text "The `threadsafe' foreign import style is deprecated. Use `safe' instead.")
-checkSafety _               = return ()
 \end{code}
 
 Warnings

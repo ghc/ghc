@@ -238,7 +238,6 @@ incorrect.
  'label'	{ L _ ITlabel } 
  'dynamic'	{ L _ ITdynamic }
  'safe'		{ L _ ITsafe }
- 'threadsafe'	{ L _ ITthreadsafe }  -- ToDo: remove deprecated alias
  'interruptible' { L _ ITinterruptible }
  'unsafe'	{ L _ ITunsafe }
  'mdo'		{ L _ ITmdo }
@@ -894,7 +893,7 @@ fdecl :: { LHsDecl RdrName }
 fdecl : 'import' callconv safety fspec
 		{% mkImport $2 $3 (unLoc $4) >>= return.LL }
       | 'import' callconv        fspec		
-		{% do { d <- mkImport $2 (PlaySafe False) (unLoc $3);
+		{% do { d <- mkImport $2 PlaySafe (unLoc $3);
 			return (LL d) } }
       | 'export' callconv fspec
 		{% mkExport $2 (unLoc $3) >>= return.LL }
@@ -906,9 +905,8 @@ callconv :: { CCallConv }
 
 safety :: { Safety }
 	: 'unsafe'			{ PlayRisky }
-	| 'safe'			{ PlaySafe  False }
+	| 'safe'			{ PlaySafe }
 	| 'interruptible'		{ PlayInterruptible }
-	| 'threadsafe'			{ PlaySafe  True } -- deprecated alias
 
 fspec :: { Located (Located FastString, Located RdrName, LHsType RdrName) }
        : STRING var '::' sigtypedoc     { LL (L (getLoc $1) (getSTRING $1), $2, $4) }
@@ -1808,7 +1806,6 @@ tyvarid	:: { Located RdrName }
 	| 'unsafe' 		{ L1 $! mkUnqual tvName (fsLit "unsafe") }
 	| 'safe' 		{ L1 $! mkUnqual tvName (fsLit "safe") }
 	| 'interruptible' 	{ L1 $! mkUnqual tvName (fsLit "interruptible") }
-	| 'threadsafe' 		{ L1 $! mkUnqual tvName (fsLit "threadsafe") }
 
 tyvarsym :: { Located RdrName }
 -- Does not include "!", because that is used for strictness marks
@@ -1842,7 +1839,6 @@ varid :: { Located RdrName }
 	| 'unsafe'		{ L1 $! mkUnqual varName (fsLit "unsafe") }
 	| 'safe'		{ L1 $! mkUnqual varName (fsLit "safe") }
 	| 'interruptible'	{ L1 $! mkUnqual varName (fsLit "interruptible") }
-	| 'threadsafe'		{ L1 $! mkUnqual varName (fsLit "threadsafe") }
 	| 'forall'		{ L1 $! mkUnqual varName (fsLit "forall") }
 	| 'family'              { L1 $! mkUnqual varName (fsLit "family") }
 
