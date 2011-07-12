@@ -493,10 +493,9 @@ stdCall = StdCall
 -------------------------------------------------------------------------------
 -- *   Safety
 
-unsafe, safe, threadsafe, interruptible :: Safety
+unsafe, safe, interruptible :: Safety
 unsafe = Unsafe
 safe = Safe
-threadsafe = Threadsafe
 interruptible = Interruptible
 
 -------------------------------------------------------------------------------
