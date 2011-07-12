@@ -1,19 +1,19 @@
 # -----------------------------------------------------------------------------
 # Examples of use:
 #
-# 	make		-- run all the tests in the current directory
-# 	make verbose	-- as make test, but up the verbosity
-# 	make accept	-- run the tests, accepting the current output
+#  make           -- run all the tests in the current directory
+#  make verbose   -- as make test, but up the verbosity
+#  make accept    -- run the tests, accepting the current output
 #
 # The following variables may be set on the make command line:
 #
-#	TEST		-- specific test to run
-#	TESTS		-- specific tests to run (same as $TEST really)
-#	EXTRA_HC_OPTS	-- extra flags to send to the Haskell compiler
-#	EXTRA_RUNTEST_OPTS -- extra flags to give the test driver
-#	CONFIG		-- use a different configuration file
-#	COMPILER	-- select a configuration file from config/
-#       THREADS         -- run n tests at once
+#  TEST      -- specific test to run
+#  TESTS     -- specific tests to run (same as $TEST really)
+#  EXTRA_HC_OPTS      -- extra flags to send to the Haskell compiler
+#  EXTRA_RUNTEST_OPTS -- extra flags to give the test driver
+#  CONFIG    -- use a different configuration file
+#  COMPILER  -- select a configuration file from config/
+#  THREADS   -- run n tests at once
 #
 # -----------------------------------------------------------------------------
 
