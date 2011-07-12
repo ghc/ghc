@@ -357,6 +357,7 @@ data ExtensionFlag
    | Opt_ExtendedDefaultRules           -- Use GHC's extended rules for defaulting
    | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
+   | Opt_InterruptibleFFI
    | Opt_GHCForeignImportPrim
    | Opt_ParallelArrays                 -- Syntactic support for parallel arrays
    | Opt_Arrows                         -- Arrow-notation syntax
@@ -1823,6 +1824,7 @@ xFlags = [
   ( "MonadComprehensions",              AlwaysAllowed, Opt_MonadComprehensions, nop),
   ( "ForeignFunctionInterface",   RestrictedFunction, Opt_ForeignFunctionInterface, nop ),
   ( "UnliftedFFITypes",                 AlwaysAllowed, Opt_UnliftedFFITypes, nop ),
+  ( "InterruptibleFFI",                 AlwaysAllowed, Opt_InterruptibleFFI, nop ),
   ( "GHCForeignImportPrim",             AlwaysAllowed, Opt_GHCForeignImportPrim, nop ),
   ( "LiberalTypeSynonyms",              AlwaysAllowed, Opt_LiberalTypeSynonyms, nop ),
   ( "Rank2Types",                       AlwaysAllowed, Opt_Rank2Types, nop ),

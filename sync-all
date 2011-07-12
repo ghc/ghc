@@ -316,7 +316,9 @@ sub scmall {
                 scm (".", $scm, "get", $get_mode, $path, $localpath, @args);
             }
             else {
-                scm (".", $scm, "clone", $path, $localpath, @args, $bare_flag);
+                my @argsWithBare = @args;
+                push @argsWithBare, $bare_flag if $bare_flag;
+                scm (".", $scm, "clone", $path, $localpath, @argsWithBare);
                 scm ($localpath, $scm, "config", "core.ignorecase", "true");
             }
             next;

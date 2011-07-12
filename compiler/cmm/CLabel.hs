@@ -100,6 +100,7 @@ module CLabel (
 
         hasCAF,
 	infoLblToEntryLbl, entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
+	localiseLabel,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
@@ -278,11 +279,14 @@ pprDebugCLabel lbl
 	_		-> ppr lbl <> (parens $ text "other CLabel)")
 
 
+-- True if a local IdLabel that we won't mark as exported
+type IsLocal = Bool
+
 data IdLabelInfo
   = Closure		-- ^ Label for closure
   | SRT                 -- ^ Static reference table
-  | InfoTable		-- ^ Info tables for closures; always read-only
-  | Entry		-- ^ Entry point
+  | InfoTable IsLocal	-- ^ Info tables for closures; always read-only
+  | Entry IsLocal	-- ^ Entry point
   | Slow		-- ^ Slow entry point
 
   | RednCounts		-- ^ Label of place to keep Ticky-ticky  info for this Id
@@ -356,13 +360,13 @@ mkRednCountsLabel     	name c 	= IdLabel name  c RednCounts
 
 -- These have local & (possibly) external variants:
 mkLocalClosureLabel	name c 	= IdLabel name  c Closure
-mkLocalInfoTableLabel  	name c 	= IdLabel name  c InfoTable
-mkLocalEntryLabel	name c 	= IdLabel name  c Entry
+mkLocalInfoTableLabel  	name c 	= IdLabel name  c (InfoTable True)
+mkLocalEntryLabel	name c 	= IdLabel name  c (Entry True)
 mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 
 mkClosureLabel name         c     = IdLabel name c Closure
-mkInfoTableLabel name       c     = IdLabel name c InfoTable
-mkEntryLabel name           c     = IdLabel name c Entry
+mkInfoTableLabel name       c     = IdLabel name c (InfoTable False)
+mkEntryLabel name           c     = IdLabel name c (Entry False)
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
 mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
 mkLocalConEntryLabel	    c con = IdLabel con c ConEntry
@@ -498,7 +502,7 @@ mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
 -- Converting between info labels and entry/ret labels.
 
 infoLblToEntryLbl :: CLabel -> CLabel 
-infoLblToEntryLbl (IdLabel n c InfoTable)	= IdLabel n c Entry
+infoLblToEntryLbl (IdLabel n c (InfoTable lcl))	= IdLabel n c (Entry lcl)
 infoLblToEntryLbl (IdLabel n c ConInfoTable)	= IdLabel n c ConEntry
 infoLblToEntryLbl (IdLabel n c StaticInfoTable)	= IdLabel n c StaticConEntry
 infoLblToEntryLbl (CaseLabel n CaseReturnInfo)	= CaseLabel n CaseReturnPt
@@ -509,7 +513,7 @@ infoLblToEntryLbl _
 
 
 entryLblToInfoLbl :: CLabel -> CLabel 
-entryLblToInfoLbl (IdLabel n c Entry)		= IdLabel n c InfoTable
+entryLblToInfoLbl (IdLabel n c (Entry lcl))	= IdLabel n c (InfoTable lcl)
 entryLblToInfoLbl (IdLabel n c ConEntry)	= IdLabel n c ConInfoTable
 entryLblToInfoLbl (IdLabel n c StaticConEntry)	= IdLabel n c StaticInfoTable
 entryLblToInfoLbl (CaseLabel n CaseReturnPt)	= CaseLabel n CaseReturnInfo
@@ -519,8 +523,8 @@ entryLblToInfoLbl l
 	= pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
 
 
-cvtToClosureLbl   (IdLabel n c InfoTable)	= IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c Entry)		= IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c (InfoTable _))	= IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c (Entry _))	= IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c ConEntry)	= IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c RednCounts)	= IdLabel n c Closure
 cvtToClosureLbl l@(IdLabel n c Closure)		= l
@@ -528,12 +532,17 @@ cvtToClosureLbl l
 	= pprPanic "cvtToClosureLbl" (pprCLabel l)
 
 
-cvtToSRTLbl   (IdLabel n c InfoTable)		= mkSRTLabel n c
-cvtToSRTLbl   (IdLabel n c Entry)		= mkSRTLabel n c
+cvtToSRTLbl   (IdLabel n c (InfoTable _))	= mkSRTLabel n c
+cvtToSRTLbl   (IdLabel n c (Entry _))		= mkSRTLabel n c
 cvtToSRTLbl   (IdLabel n c ConEntry)		= mkSRTLabel n c
 cvtToSRTLbl l@(IdLabel n c Closure)		= mkSRTLabel n c
 cvtToSRTLbl l 
 	= pprPanic "cvtToSRTLbl" (pprCLabel l)
+
+localiseLabel :: CLabel -> CLabel
+localiseLabel (IdLabel n c (Entry _))     = IdLabel n c (Entry True)
+localiseLabel (IdLabel n c (InfoTable _)) = IdLabel n c (InfoTable True)
+localiseLabel l = l
 
 
 -- -----------------------------------------------------------------------------
@@ -700,8 +709,10 @@ externallyVisibleCLabel (LargeBitmapLabel _)    = False
 externallyVisibleCLabel (LargeSRTLabel _)	= False
 
 externallyVisibleIdLabel :: IdLabelInfo -> Bool
-externallyVisibleIdLabel SRT = False
-externallyVisibleIdLabel _   = True
+externallyVisibleIdLabel SRT             = False
+externallyVisibleIdLabel (Entry lcl)     = not lcl
+externallyVisibleIdLabel (InfoTable lcl) = not lcl
+externallyVisibleIdLabel _               = True
 
 -- -----------------------------------------------------------------------------
 -- Finding the "type" of a CLabel 
@@ -748,7 +759,7 @@ labelType _                                     = DataLabel
 
 idInfoLabelType info =
   case info of
-    InfoTable  	  -> DataLabel
+    InfoTable _   -> DataLabel
     Closure    	  -> GcPtrLabel
     ConInfoTable  -> DataLabel
     StaticInfoTable -> DataLabel
@@ -984,8 +995,8 @@ ppIdFlavor x = pp_cSEP <>
 	       (case x of
 		       Closure	    	-> ptext (sLit "closure")
 		       SRT		-> ptext (sLit "srt")
-		       InfoTable    	-> ptext (sLit "info")
-		       Entry	    	-> ptext (sLit "entry")
+		       InfoTable _	-> ptext (sLit "info")
+		       Entry _	    	-> ptext (sLit "entry")
 		       Slow	    	-> ptext (sLit "slow")
 		       RednCounts	-> ptext (sLit "ct")
 		       ConEntry	    	-> ptext (sLit "con_entry")

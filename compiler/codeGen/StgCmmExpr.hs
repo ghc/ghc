@@ -53,6 +53,11 @@ import UniqSupply
 cgExpr	:: StgExpr -> FCode ()
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
+
+{- seq# a s ==> a -}
+cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
+  cgIdApp a []
+
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args)  = cgConApp con args
 cgExpr (StgSCC cc expr)   = do { emitSetCCC cc; cgExpr expr }
@@ -321,6 +326,22 @@ cgCase scrut@(StgApp v []) _ _ (PrimAlt _) _
        ; restoreCurrentCostCentre mb_cc
        ; emit $ mkComment $ mkFastString "should be unreachable code"
        ; emit $ withFreshLabel "l" (\l -> mkLabel l <*> mkBranch l)}
+
+{-
+case seq# a s of v
+  (# s', a' #) -> e
+
+==>
+
+case a of v
+  (# s', a' #) -> e
+
+(taking advantage of the fact that the return convention for (# State#, a #)
+is the same as the return convention for just 'a')
+-}
+cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr srt alt_type alts
+  = -- handle seq#, same return convention as vanilla 'a'.
+    cgCase (StgApp a []) bndr srt alt_type alts
 
 cgCase scrut bndr srt alt_type alts 
   = -- the general case

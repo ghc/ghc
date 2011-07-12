@@ -33,6 +33,7 @@ import Util
 import Outputable
 import FastString
 
+import Data.Typeable hiding (TyCon)
 import qualified Data.Data as Data
 \end{code}
 
@@ -69,6 +70,7 @@ data Class
 	classTyCon :: TyCon		-- The data type constructor for
 					-- dictionaries of this class
      }
+  deriving Typeable
 
 type FunDep a = ([a],[a])  --  e.g. class C a b c | a b -> c, a c -> b where...
 			   --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
@@ -213,9 +215,6 @@ pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map pprFunDep fds))
 
 pprFunDep :: Outputable a => FunDep a -> SDoc
 pprFunDep (us, vs) = hsep [interppSP us, ptext (sLit "->"), interppSP vs]
-
-instance Data.Typeable Class where
-    typeOf _ = Data.mkTyConApp (Data.mkTyCon "Class") []
 
 instance Data.Data Class where
     -- don't traverse?

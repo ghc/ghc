@@ -78,7 +78,7 @@ data GhcException
 
   -- | An error in the user's code, probably.
   | ProgramError String
-  deriving Eq
+  deriving (Typeable, Eq)
 
 instance Exception GhcException
 
@@ -86,9 +86,6 @@ instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
   showsPrec _ e@(CmdLineError _) = showString "<command line>: " . showGhcException e
   showsPrec _ e = showString progName . showString ": " . showGhcException e
-
-instance Typeable GhcException where
-  typeOf _ = mkTyConApp ghcExceptionTc []
 
 
 -- | The name of this GHC.
@@ -152,11 +149,6 @@ throwGhcException = Exception.throw
 
 handleGhcException :: ExceptionMonad m => (GhcException -> m a) -> m a -> m a
 handleGhcException = ghandle
-
-
-ghcExceptionTc :: TyCon
-ghcExceptionTc = mkTyCon "GhcException"
-{-# NOINLINE ghcExceptionTc #-}
 
 
 -- | Panics and asserts.

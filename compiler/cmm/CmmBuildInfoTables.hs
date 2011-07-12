@@ -336,7 +336,7 @@ localCAFInfo :: CAFEnv -> CmmTop -> Maybe (CLabel, CAFSet)
 localCAFInfo _      (CmmData _ _) = Nothing
 localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
   case info_tbl top_info of
-    CmmInfoTable False _ _ _ ->
+    CmmInfoTable _ False _ _ _ ->
       Just (cvtToClosureLbl top_l,
             expectJust "maybeBindCAFs" $ mapLookup entry cafEnv)
     _ -> Nothing
@@ -397,8 +397,8 @@ updInfo toVars toSrt (CmmProc top_info top_l g) =
 updInfo _ _ t = t
 
 updInfoTbl :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmInfoTable -> CmmInfoTable
-updInfoTbl toVars toSrt (CmmInfoTable s p t typeinfo)
-  = CmmInfoTable s p t typeinfo'
+updInfoTbl toVars toSrt (CmmInfoTable l s p t typeinfo)
+  = CmmInfoTable l s p t typeinfo'
     where typeinfo' = case typeinfo of
             t@(ConstrInfo _ _ _)    -> t
             (FunInfo    c s a d e)  -> FunInfo c (toSrt s) a d e

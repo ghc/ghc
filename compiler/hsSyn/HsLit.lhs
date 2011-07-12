@@ -37,8 +37,10 @@ data HsLit
   | HsStringPrim    FastString		-- Packed string
   | HsInt	    Integer		-- Genuinely an Int; arises from TcGenDeriv, 
 					--	and from TRANSLATION
-  | HsIntPrim	    Integer		-- Unboxed Int
-  | HsWordPrim	    Integer		-- Unboxed Word
+  | HsIntPrim       Integer             -- literal Int#
+  | HsWordPrim      Integer             -- literal Word#
+  | HsInt64Prim     Integer             -- literal Int64#
+  | HsWord64Prim    Integer             -- literal Word64#
   | HsInteger	    Integer  Type	-- Genuinely an integer; arises only from TRANSLATION
 					-- 	(overloaded literals are done with HsOverLit)
   | HsRat	    FractionalLit Type	-- Genuinely a rational; arises only from TRANSLATION
@@ -55,6 +57,8 @@ instance Eq HsLit where
   (HsInt x1)	    == (HsInt x2)	 = x1==x2
   (HsIntPrim x1)    == (HsIntPrim x2)    = x1==x2
   (HsWordPrim x1)   == (HsWordPrim x2)   = x1==x2
+  (HsInt64Prim x1)  == (HsInt64Prim x2)  = x1==x2
+  (HsWord64Prim x1) == (HsWord64Prim x2) = x1==x2
   (HsInteger x1 _)  == (HsInteger x2 _)  = x1==x2
   (HsRat x1 _)	    == (HsRat x2 _)      = x1==x2
   (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
@@ -148,6 +152,8 @@ instance Outputable HsLit where
     ppr (HsDoublePrim d) = ppr d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
     ppr (HsWordPrim w)	 = integer w  <> text "##"
+    ppr (HsInt64Prim i)  = integer i  <> text "L#"
+    ppr (HsWord64Prim w) = integer w  <> text "L##"
 
 -- in debug mode, print the expression that it's resolved to, too
 instance OutputableBndr id => Outputable (HsOverLit id) where

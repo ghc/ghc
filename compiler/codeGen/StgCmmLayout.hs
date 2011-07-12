@@ -496,7 +496,7 @@ mkCmmInfo cl_info
 	               ad_lit <- mkStringCLit (closureValDescr  cl_info)
 	               return $ ProfilingInfo fd_lit ad_lit
                   else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
-	; return (CmmInfoTable (isStaticClosure cl_info) prof cl_type info) }
+	; return (CmmInfoTable (closureInfoLocal cl_info) (isStaticClosure cl_info) prof cl_type info) }
   where
     k_with_con_name con_info con info_lbl =
       do cstr <- mkByteStringCLit $ dataConIdentity con

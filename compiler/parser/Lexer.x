@@ -663,7 +663,7 @@ reservedWordsFM = listToUFM $
 	( "dynamic",	ITdynamic,	 bit ffiBit),
 	( "safe",	ITsafe,		 bit ffiBit .|. bit safeHaskellBit),
 	( "threadsafe",	ITthreadsafe,	 bit ffiBit),  -- ToDo: remove
-	( "interruptible", ITinterruptible, bit ffiBit),
+	( "interruptible", ITinterruptible, bit interruptibleFfiBit),
 	( "unsafe",	ITunsafe,	 bit ffiBit),
 	( "stdcall",    ITstdcallconv,	 bit ffiBit),
 	( "ccall",      ITccallconv,	 bit ffiBit),
@@ -1762,8 +1762,10 @@ setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 
 ffiBit :: Int
 ffiBit	   = 1
+interruptibleFfiBit :: Int
+interruptibleFfiBit = 2
 parrBit :: Int
-parrBit	   = 2
+parrBit	   = 3
 arrowsBit :: Int
 arrowsBit  = 4
 thBit :: Int
@@ -1880,31 +1882,32 @@ mkPState flags buf loc =
       alr_justClosedExplicitLetBlock = False
     }
     where
-      bitmap =     ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
-               .|. parrBit           `setBitIf` xopt Opt_ParallelArrays  flags
-               .|. arrowsBit         `setBitIf` xopt Opt_Arrows          flags
-               .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
-               .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes     flags
-               .|. ipBit             `setBitIf` xopt Opt_ImplicitParams  flags
-               .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll  flags
-               .|. bangPatBit        `setBitIf` xopt Opt_BangPatterns    flags
-               .|. tyFamBit          `setBitIf` xopt Opt_TypeFamilies    flags
-               .|. haddockBit        `setBitIf` dopt Opt_Haddock         flags
-               .|. magicHashBit      `setBitIf` xopt Opt_MagicHash       flags
-               .|. kindSigsBit       `setBitIf` xopt Opt_KindSignatures  flags
-               .|. recursiveDoBit    `setBitIf` xopt Opt_RecursiveDo     flags
-               .|. recBit            `setBitIf` xopt Opt_DoRec           flags
-               .|. recBit            `setBitIf` xopt Opt_Arrows          flags
-               .|. unicodeSyntaxBit  `setBitIf` xopt Opt_UnicodeSyntax   flags
-               .|. unboxedTuplesBit  `setBitIf` xopt Opt_UnboxedTuples   flags
-               .|. datatypeContextsBit `setBitIf` xopt Opt_DatatypeContexts flags
-               .|. transformComprehensionsBit `setBitIf` xopt Opt_TransformListComp flags
-               .|. transformComprehensionsBit `setBitIf` xopt Opt_MonadComprehensions flags
-               .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
-               .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
-               .|. relaxedLayoutBit  `setBitIf` xopt Opt_RelaxedLayout flags
+      bitmap =     ffiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
+               .|. interruptibleFfiBit         `setBitIf` xopt Opt_InterruptibleFFI         flags
+               .|. parrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
+               .|. arrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
+               .|. thBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
+               .|. qqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
+               .|. ipBit                       `setBitIf` xopt Opt_ImplicitParams           flags
+               .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
+               .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
+               .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
+               .|. haddockBit                  `setBitIf` dopt Opt_Haddock                  flags
+               .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
+               .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
+               .|. recursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
+               .|. recBit                      `setBitIf` xopt Opt_DoRec                    flags
+               .|. recBit                      `setBitIf` xopt Opt_Arrows                   flags
+               .|. unicodeSyntaxBit            `setBitIf` xopt Opt_UnicodeSyntax            flags
+               .|. unboxedTuplesBit            `setBitIf` xopt Opt_UnboxedTuples            flags
+               .|. datatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
+               .|. transformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
+               .|. transformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
+               .|. rawTokenStreamBit           `setBitIf` dopt Opt_KeepRawTokenStream       flags
+               .|. alternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
+               .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
-               .|. safeHaskellBit    `setBitIf` safeHaskellOn flags
+               .|. safeHaskellBit              `setBitIf` safeHaskellOn                     flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
