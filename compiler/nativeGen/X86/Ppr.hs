@@ -51,17 +51,17 @@ import Data.Bits
 -- Printing this stuff out
 
 pprNatCmmTop :: Platform -> NatCmmTop (Alignment, CmmStatics) Instr -> Doc
-pprNatCmmTop _ (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas dats
+pprNatCmmTop platform (CmmData section dats) =
+  pprSectionHeader section $$ pprDatas platform dats
 
  -- special case for split markers:
-pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmTop platform (CmmProc Nothing lbl (ListGraph [])) = pprLabel platform lbl
 
  -- special case for code without info table:
 pprNatCmmTop platform (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
-  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-  vcat (map pprBasicBlock blocks) $$
+  pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
+  vcat (map (pprBasicBlock platform) blocks) $$
   pprSizeDecl platform lbl
 
 pprNatCmmTop platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
@@ -71,10 +71,10 @@ pprNatCmmTop platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGr
        pprCLabel_asm (mkDeadStripPreventer info_lbl)
            <> char ':' $$
 #endif
-       vcat (map pprData info) $$
-       pprLabel info_lbl
+       vcat (map (pprData platform) info) $$
+       pprLabel platform info_lbl
   ) $$
-  vcat (map pprBasicBlock blocks)
+  vcat (map (pprBasicBlock platform) blocks)
      -- above: Even the first block gets a label, because with branch-chain
      -- elimination, it might be the target of a goto.
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
@@ -99,44 +99,42 @@ pprSizeDecl platform lbl
     <> ptext (sLit ", .-") <> pprCLabel_asm lbl
  | otherwise = empty
 
-pprBasicBlock :: NatBasicBlock Instr -> Doc
-pprBasicBlock (BasicBlock blockid instrs) =
-  pprLabel (mkAsmTempLabel (getUnique blockid)) $$
+pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
+pprBasicBlock platform (BasicBlock blockid instrs) =
+  pprLabel platform (mkAsmTempLabel (getUnique blockid)) $$
   vcat (map pprInstr instrs)
 
 
-pprDatas :: (Alignment, CmmStatics) -> Doc
-pprDatas (align, (Statics lbl dats)) = vcat (pprAlign align : pprLabel lbl : map pprData dats) -- TODO: could remove if align == 1
+pprDatas :: Platform -> (Alignment, CmmStatics) -> Doc
+pprDatas platform (align, (Statics lbl dats))
+ = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData platform) dats)
+ -- TODO: could remove if align == 1
 
-pprData :: CmmStatic -> Doc
-pprData (CmmString str)          = pprASCII str
+pprData :: Platform -> CmmStatic -> Doc
+pprData _ (CmmString str)          = pprASCII str
 
-#if  darwin_TARGET_OS
-pprData (CmmUninitialised bytes) = ptext (sLit ".space ") <> int bytes
-#else
-pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
-#endif
+pprData platform (CmmUninitialised bytes)
+ | platformOS platform == OSDarwin = ptext (sLit ".space ") <> int bytes
+ | otherwise                       = ptext (sLit ".skip ")  <> int bytes
 
-pprData (CmmStaticLit lit)       = pprDataItem lit
+pprData _ (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> Doc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = ptext (sLit ".globl ") <> pprCLabel_asm lbl
 
-pprTypeAndSizeDecl :: CLabel -> Doc
-#if elf_OBJ_FORMAT
-pprTypeAndSizeDecl lbl
-  | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext (sLit ".type ") <>
-                pprCLabel_asm lbl <> ptext (sLit ", @object")
-#else
-pprTypeAndSizeDecl _
-  = empty
-#endif
+pprTypeAndSizeDecl :: Platform -> CLabel -> Doc
+pprTypeAndSizeDecl platform lbl
+ | osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
+    = ptext (sLit ".type ") <>
+      pprCLabel_asm lbl <> ptext (sLit ", @object")
+ | otherwise = empty
 
-pprLabel :: CLabel -> Doc
-pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
+pprLabel :: Platform -> CLabel -> Doc
+pprLabel platform lbl = pprGloblDecl lbl
+                     $$ pprTypeAndSizeDecl platform lbl
+                     $$ (pprCLabel_asm lbl <> char ':')
 
 
 pprASCII :: [Word8] -> Doc
@@ -146,15 +144,13 @@ pprASCII str
        do1 :: Word8 -> Doc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
-pprAlign :: Int -> Doc
-
-
-pprAlign bytes
-        = ptext (sLit ".align ") <> int IF_OS_darwin(pow2, bytes)
+pprAlign :: Platform -> Int -> Doc
+pprAlign platform bytes
+        = ptext (sLit ".align ") <> int alignment
   where
-
-#if darwin_TARGET_OS
-        pow2 = log2 bytes
+        alignment = if platformOS platform == OSDarwin
+                    then log2 bytes
+                    else      bytes
 
         log2 :: Int -> Int  -- cache the common ones
         log2 1 = 0
@@ -162,7 +158,6 @@ pprAlign bytes
         log2 4 = 2
         log2 8 = 3
         log2 n = 1 + log2 (n `quot` 2)
-#endif
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
