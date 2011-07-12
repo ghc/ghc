@@ -616,7 +616,10 @@ endif
 # ----------------------------------------------
 # Actually include all the sub-ghc.mk's
 
-include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
+# BUILD_DIRS_EXTRA needs to come after BUILD_DIRS, because stuff in
+# libraries/dph/ghc.mk refers to stuff defined earlier, in particular
+# things like $(libraries/dph/dph-base_dist-install_GHCI_LIB)
+include $(patsubst %, %/ghc.mk, $(BUILD_DIRS) $(BUILD_DIRS_EXTRA))
 
 # A useful pseudo-target (must be after the include above, because it needs
 # the value of things like $(libraries/base_dist-install_v_LIB).
