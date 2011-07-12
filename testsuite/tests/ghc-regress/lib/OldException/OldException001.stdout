@@ -1,2 +1,2 @@
-Old got exception :: GHC.Exception.SomeException
+Old got exception :: SomeException
 New got MyException
