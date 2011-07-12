@@ -139,7 +139,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
-    pprNatCmmTop              :: NatCmmTop statics instr -> Doc,
+    pprNatCmmTop              :: Platform -> NatCmmTop statics instr -> Doc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
     ncg_x86fp_kludge          :: [NatCmmTop statics instr] -> [NatCmmTop statics instr],
@@ -226,7 +226,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 	-- dump native code
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm "Asm code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl) $ concat native)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) $ concat native)
 
 	-- dump global NCG stats for graph coloring allocator
 	(case concat $ catMaybes colorStats of
@@ -297,7 +297,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 		<- cmmNativeGen dflags ncgImpl us cmm count
 
 	Pretty.bufLeftRender h
-		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmTop ncgImpl) native
+		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmTop ncgImpl (targetPlatform dflags)) native
 
            -- carefully evaluate this strictly.  Binding it with 'let'
            -- and then using 'seq' doesn't work, because the let
@@ -363,7 +363,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_native "Native code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl) native)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) native)
 
 	-- tag instructions with register liveness information
 	let (withLiveness, usLive) =
@@ -401,7 +401,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 		-- dump out what happened during register allocation
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
-			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl) alloced)
+			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) alloced)
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc_stages "Build/spill stages"
@@ -432,7 +432,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
-			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl) alloced)
+			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) alloced)
 
 		let mPprStats =
 			if dopt Opt_D_dump_asm_stats dflags
@@ -476,7 +476,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl) expanded)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) expanded)
 
 	return 	( usAlloc
 		, expanded

@@ -40,6 +40,7 @@ import CLabel
 import Unique		( Uniquable(..), pprUnique )
 import qualified Outputable
 import Outputable	(Outputable, panic)
+import Platform
 import Pretty
 import FastString
 import Data.Word
@@ -47,20 +48,20 @@ import Data.Word
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop CmmStatics Instr -> Doc
-pprNatCmmTop (CmmData section dats) = 
+pprNatCmmTop :: Platform -> NatCmmTop CmmStatics Instr -> Doc
+pprNatCmmTop _ (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
 
  -- special case for code without info table:
-pprNatCmmTop (CmmProc Nothing lbl (ListGraph blocks)) = 
+pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   pprLabel lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map pprBasicBlock blocks)
 
-pprNatCmmTop (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) = 
+pprNatCmmTop _ (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
