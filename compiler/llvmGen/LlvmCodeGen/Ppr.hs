@@ -54,8 +54,8 @@ moduleLayout =
 #elif defined (arm_TARGET_ARCH)
 
 #if linux_TARGET_OS
-    text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f16:16:16-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n8:16:32\""
-    $+$ text "target triple = \"arm-unknown-linux\""
+    text "target datalayout = \"e-p:32:32:32-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v64:64:64-v128:64:128-a0:0:64-n32\""
+    $+$ text "target triple = \"arm-unknown-linux-gnueabi\""
 #endif
 
 #else
