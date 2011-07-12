@@ -17,15 +17,15 @@ clean:
 PREFIX := $(abspath install)
 $(eval $(call canonicalise,PREFIX))
 
-PKGCONF=local.db
-LGHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f $(PKGCONF)
+PKGCONF = local.db
+LGHC_PKG = '$(GHC_PKG)' --no-user-package-conf -f '$(PKGCONF)'
 
 safePkg01:
-	 $(MAKE) clean
+	'$(MAKE)' clean
 	'$(TEST_HC)' --make -o setup Setup.hs -v0
 
 	'$(GHC_PKG)' init local.db
-	./setup configure -v0 --prefix=$(PREFIX) --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS) -trust base' --with-hc-pkg='$(GHC_PKG)' --package-db=${PKGCONF} $(PROF)
+	./setup configure -v0 --prefix='$(PREFIX)' --with-compiler='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS) -trust base' --with-hc-pkg='$(GHC_PKG)' --package-db='$(PKGCONF)' $(PROF)
 	./setup build -v0
 	./setup copy -v0
 	./setup register --inplace -v0
@@ -33,14 +33,14 @@ safePkg01:
 	$(LGHC_PKG) field safePkg01-1.0 trusted
 	echo
 	echo 'M_SafePkg'
-	$(TEST_HC) --show-iface dist/build/M_SafePkg.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg2'
-	$(TEST_HC) --show-iface dist/build/M_SafePkg2.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg2.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg3'
-	$(TEST_HC) --show-iface dist/build/M_SafePkg3.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg3.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 	echo
 	echo 'M_SafePkg4'
-	$(TEST_HC) --show-iface dist/build/M_SafePkg4.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
+	'$(TEST_HC)' --show-iface dist/build/M_SafePkg4.hi | grep -E '^package dependencies:|^trusted:|^require own pkg trusted:'
 
