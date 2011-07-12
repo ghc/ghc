@@ -1093,26 +1093,18 @@ linkPackage dflags pkg
         classifieds   <- mapM (locateOneObj dirs) libs'
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
-	let dlls = [ dll | DLL dll    <- classifieds ]
-	    objs = [ obj | Object obj <- classifieds ]
-	    archs = [ arch | Archive arch <- classifieds ]
+        let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
+            dlls       = [ dll  | DLL dll        <- classifieds ]
+            objs       = [ obj  | Object obj     <- classifieds ]
+            archs      = [ arch | Archive arch   <- classifieds ]
 
 	maybePutStr dflags ("Loading package " ++ display (sourcePackageId pkg) ++ " ... ")
 
 	-- See comments with partOfGHCi
 	when (packageName pkg `notElem` partOfGHCi) $ do
 	    loadFrameworks pkg
-            -- When a library A needs symbols from a library B, the order in
-            -- extra_libraries/extra_ld_opts is "-lA -lB", because that's the
-            -- way ld expects it for static linking. Dynamic linking is a
-            -- different story: When A has no dependency information for B,
-            -- dlopen-ing A with RTLD_NOW (see addDLL in Linker.c) will fail
-            -- when B has not been loaded before. In a nutshell: Reverse the
-            -- order of DLLs for dynamic linking.
-	    -- This fixes a problem with the HOpenGL package (see "Compiling
-	    -- HOpenGL under recent versions of GHC" on the HOpenGL list).
-	    mapM_ (load_dyn dirs) (reverse dlls)
-	
+            mapM_ load_dyn (known_dlls ++ map mkSOName dlls)
+
 	-- After loading all the DLLs, we can load the static objects.
 	-- Ordering isn't important here, because we do one final link
 	-- step to resolve everything.
@@ -1124,12 +1116,17 @@ linkPackage dflags pkg
 	if succeeded ok then maybePutStrLn dflags "done."
 	      else ghcError (InstallationError ("unable to load package `" ++ display (sourcePackageId pkg) ++ "'"))
 
-load_dyn :: [FilePath] -> FilePath -> IO ()
-load_dyn dirs dll = do r <- loadDynamic dirs dll
-		       case r of
-			 Nothing  -> return ()
-			 Just err -> ghcError (CmdLineError ("can't load .so/.DLL for: " 
-                                 			      ++ dll ++ " (" ++ err ++ ")" ))
+-- we have already searched the filesystem; the strings passed to load_dyn
+-- can be passed directly to loadDLL.  They are either fully-qualified
+-- ("/usr/lib/libfoo.so"), or unqualified ("libfoo.so").  In the latter case,
+-- loadDLL is going to search the system paths to find the library.
+--
+load_dyn :: FilePath -> IO ()
+load_dyn dll = do r <- loadDLL dll
+                  case r of
+                    Nothing  -> return ()
+                    Just err -> ghcError (CmdLineError ("can't load .so/.DLL for: "
+                                                              ++ dll ++ " (" ++ err ++ ")" ))
 
 loadFrameworks :: InstalledPackageInfo_ ModuleName -> IO ()
 loadFrameworks pkg
@@ -1168,7 +1165,7 @@ locateOneObj dirs lib
      mk_dyn_lib_path dir = dir </> mkSOName dyn_lib_name
      findObject  = liftM (fmap Object)  $ findFile mk_obj_path  dirs
      findArchive = liftM (fmap Archive) $ findFile mk_arch_path dirs
-     findDll     = liftM (fmap DLL)     $ findFile mk_dyn_lib_path dirs
+     findDll     = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path dirs
      assumeDll   = return (DLL lib)
      infixr `orElse`
      f `orElse` g = do m <- f
