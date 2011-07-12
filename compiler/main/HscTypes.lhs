@@ -1856,27 +1856,20 @@ trustInfoToNum it
   = case getSafeMode it of
             Sf_None -> 0
             Sf_SafeImports -> 1
-            Sf_SafeLanguage -> 2
-            Sf_Trustworthy -> 3
-            Sf_TrustworthyWithSafeLanguage -> 4
-            Sf_Safe -> 5
+            Sf_Trustworthy -> 2
+            Sf_Safe -> 3
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
 numToTrustInfo 0 = setSafeMode Sf_None
 numToTrustInfo 1 = setSafeMode Sf_SafeImports
-numToTrustInfo 2 = setSafeMode Sf_SafeLanguage
-numToTrustInfo 3 = setSafeMode Sf_Trustworthy
-numToTrustInfo 4 = setSafeMode Sf_TrustworthyWithSafeLanguage
-numToTrustInfo 5 = setSafeMode Sf_Safe
+numToTrustInfo 2 = setSafeMode Sf_Trustworthy
+numToTrustInfo 3 = setSafeMode Sf_Safe
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_None)         = ptext $ sLit "none"
     ppr (TrustInfo Sf_SafeImports)  = ptext $ sLit "safe-imports"
-    ppr (TrustInfo Sf_SafeLanguage) = ptext $ sLit "safe-language"
     ppr (TrustInfo Sf_Trustworthy)  = ptext $ sLit "trustworthy"
-    ppr (TrustInfo Sf_TrustworthyWithSafeLanguage)
-                                    = ptext $ sLit "trustworthy + safe-language"
     ppr (TrustInfo Sf_Safe)         = ptext $ sLit "safe"
 \end{code}
 
