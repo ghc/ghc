@@ -102,7 +102,7 @@ pprSizeDecl platform lbl
 pprBasicBlock :: Platform -> NatBasicBlock Instr -> Doc
 pprBasicBlock platform (BasicBlock blockid instrs) =
   pprLabel platform (mkAsmTempLabel (getUnique blockid)) $$
-  vcat (map pprInstr instrs)
+  vcat (map (pprInstr platform) instrs)
 
 
 pprDatas :: Platform -> (Alignment, CmmStatics) -> Doc
@@ -163,12 +163,11 @@ pprAlign platform bytes
 -- pprInstr: print an 'Instr'
 
 instance Outputable Instr where
-    ppr instr = Outputable.docToSDoc $ pprInstr instr
+    ppr instr = Outputable.docToSDoc $ pprInstr defaultTargetPlatform instr
 
 
-pprReg :: Size -> Reg -> Doc
-
-pprReg s r
+pprReg :: Platform -> Size -> Reg -> Doc
+pprReg _ s r
   = case r of
       RegReal    (RealRegSingle i) -> ppr_reg_no s i
       RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
@@ -337,8 +336,8 @@ pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
 
 
 
-pprAddr :: AddrMode -> Doc
-pprAddr (ImmAddr imm off)
+pprAddr :: Platform -> AddrMode -> Doc
+pprAddr _ (ImmAddr imm off)
   = let pp_imm = pprImm imm
     in
     if (off == 0) then
@@ -348,11 +347,11 @@ pprAddr (ImmAddr imm off)
     else
         pp_imm <> char '+' <> int off
 
-pprAddr (AddrBaseIndex base index displacement)
+pprAddr platform (AddrBaseIndex base index displacement)
   = let
         pp_disp  = ppr_disp displacement
         pp_off p = pp_disp <> char '(' <> p <> char ')'
-        pp_reg r = pprReg archWordSize r
+        pp_reg r = pprReg platform archWordSize r
     in
     case (base, index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
@@ -485,23 +484,23 @@ pprDataItem lit
 
 
 
-pprInstr :: Instr -> Doc
+pprInstr :: Platform -> Instr -> Doc
 
-pprInstr (COMMENT _) = empty -- nuke 'em
+pprInstr _ (COMMENT _) = empty -- nuke 'em
 {-
-pprInstr (COMMENT s) = ptext (sLit "# ") <> ftext s
+pprInstr _ (COMMENT s) = ptext (sLit "# ") <> ftext s
 -}
-pprInstr (DELTA d)
-   = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+pprInstr platform (DELTA d)
+   = pprInstr platform (COMMENT (mkFastString ("\tdelta = " ++ show d)))
 
-pprInstr (NEWBLOCK _)
+pprInstr _ (NEWBLOCK _)
    = panic "PprMach.pprInstr: NEWBLOCK"
 
-pprInstr (LDATA _ _)
+pprInstr _ (LDATA _ _)
    = panic "PprMach.pprInstr: LDATA"
 
 {-
-pprInstr (SPILL reg slot)
+pprInstr _ (SPILL reg slot)
    = hcat [
         ptext (sLit "\tSPILL"),
         char ' ',
@@ -509,7 +508,7 @@ pprInstr (SPILL reg slot)
         comma,
         ptext (sLit "SLOT") <> parens (int slot)]
 
-pprInstr (RELOAD slot reg)
+pprInstr _ (RELOAD slot reg)
    = hcat [
         ptext (sLit "\tRELOAD"),
         char ' ',
@@ -518,48 +517,48 @@ pprInstr (RELOAD slot reg)
         pprUserReg reg]
 -}
 
-pprInstr (MOV size src dst)
-  = pprSizeOpOp (sLit "mov") size src dst
+pprInstr platform (MOV size src dst)
+  = pprSizeOpOp platform (sLit "mov") size src dst
 
-pprInstr (MOVZxL II32 src dst) = pprSizeOpOp (sLit "mov") II32 src dst
+pprInstr platform (MOVZxL II32 src dst) = pprSizeOpOp platform (sLit "mov") II32 src dst
         -- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
         -- movl.  But we represent it as a MOVZxL instruction, because
         -- the reg alloc would tend to throw away a plain reg-to-reg
         -- move, and we still want it to do that.
 
-pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce (sLit "movz") sizes II32 src dst
+pprInstr platform (MOVZxL sizes src dst) = pprSizeOpOpCoerce platform (sLit "movz") sizes II32 src dst
         -- zero-extension only needs to extend to 32 bits: on x86_64,
         -- the remaining zero-extension to 64 bits is automatic, and the 32-bit
         -- instruction is shorter.
 
-pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce (sLit "movs") sizes archWordSize src dst
+pprInstr platform (MOVSxL sizes src dst) = pprSizeOpOpCoerce platform (sLit "movs") sizes archWordSize src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
-pprInstr (LEA size (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr platform (LEA size (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
   | reg1 == reg3
-  = pprSizeOpOp (sLit "add") size (OpReg reg2) dst
+  = pprSizeOpOp platform (sLit "add") size (OpReg reg2) dst
 
-pprInstr (LEA size (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
+pprInstr platform (LEA size (OpAddr (AddrBaseIndex (EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
   | reg2 == reg3
-  = pprSizeOpOp (sLit "add") size (OpReg reg1) dst
+  = pprSizeOpOp platform (sLit "add") size (OpReg reg1) dst
 
-pprInstr (LEA size (OpAddr (AddrBaseIndex (EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3))
+pprInstr platform (LEA size (OpAddr (AddrBaseIndex (EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3))
   | reg1 == reg3
-  = pprInstr (ADD size (OpImm displ) dst)
+  = pprInstr platform (ADD size (OpImm displ) dst)
 
-pprInstr (LEA size src dst) = pprSizeOpOp (sLit "lea") size src dst
+pprInstr platform (LEA size src dst) = pprSizeOpOp platform (sLit "lea") size src dst
 
-pprInstr (ADD size (OpImm (ImmInt (-1))) dst)
-  = pprSizeOp (sLit "dec") size dst
-pprInstr (ADD size (OpImm (ImmInt 1)) dst)
-  = pprSizeOp (sLit "inc") size dst
-pprInstr (ADD size src dst)
-  = pprSizeOpOp (sLit "add") size src dst
-pprInstr (ADC size src dst)
-  = pprSizeOpOp (sLit "adc") size src dst
-pprInstr (SUB size src dst) = pprSizeOpOp (sLit "sub") size src dst
-pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
+pprInstr platform (ADD size (OpImm (ImmInt (-1))) dst)
+  = pprSizeOp platform (sLit "dec") size dst
+pprInstr platform (ADD size (OpImm (ImmInt 1)) dst)
+  = pprSizeOp platform (sLit "inc") size dst
+pprInstr platform (ADD size src dst)
+  = pprSizeOpOp platform (sLit "add") size src dst
+pprInstr platform (ADC size src dst)
+  = pprSizeOpOp platform (sLit "adc") size src dst
+pprInstr platform (SUB size src dst) = pprSizeOpOp platform (sLit "sub") size src dst
+pprInstr platform (IMUL size op1 op2) = pprSizeOpOp platform (sLit "imul") size op1 op2
 
 {- A hack.  The Intel documentation says that "The two and three
    operand forms [of IMUL] may also be used with unsigned operands
@@ -568,25 +567,25 @@ pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
    however, cannot be used to determine if the upper half of the
    result is non-zero."  So there.
 -}
-pprInstr (AND size src dst) = pprSizeOpOp (sLit "and") size src dst
-pprInstr (OR  size src dst) = pprSizeOpOp (sLit "or")  size src dst
+pprInstr platform (AND size src dst) = pprSizeOpOp platform (sLit "and") size src dst
+pprInstr platform (OR  size src dst) = pprSizeOpOp platform (sLit "or")  size src dst
 
-pprInstr (XOR FF32 src dst) = pprOpOp (sLit "xorps") FF32 src dst
-pprInstr (XOR FF64 src dst) = pprOpOp (sLit "xorpd") FF64 src dst
-pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
+pprInstr platform (XOR FF32 src dst) = pprOpOp platform (sLit "xorps") FF32 src dst
+pprInstr platform (XOR FF64 src dst) = pprOpOp platform (sLit "xorpd") FF64 src dst
+pprInstr platform (XOR size src dst) = pprSizeOpOp platform (sLit "xor")  size src dst
 
-pprInstr (NOT size op) = pprSizeOp (sLit "not") size op
-pprInstr (NEGI size op) = pprSizeOp (sLit "neg") size op
+pprInstr platform (NOT size op) = pprSizeOp platform (sLit "not") size op
+pprInstr platform (NEGI size op) = pprSizeOp platform (sLit "neg") size op
 
-pprInstr (SHL size src dst) = pprShift (sLit "shl") size src dst
-pprInstr (SAR size src dst) = pprShift (sLit "sar") size src dst
-pprInstr (SHR size src dst) = pprShift (sLit "shr") size src dst
+pprInstr platform (SHL size src dst) = pprShift platform (sLit "shl") size src dst
+pprInstr platform (SAR size src dst) = pprShift platform (sLit "sar") size src dst
+pprInstr platform (SHR size src dst) = pprShift platform (sLit "shr") size src dst
 
-pprInstr (BT  size imm src) = pprSizeImmOp (sLit "bt") size imm src
+pprInstr platform (BT  size imm src) = pprSizeImmOp platform (sLit "bt") size imm src
 
-pprInstr (CMP size src dst)
-  | is_float size =  pprSizeOpOp (sLit "ucomi") size src dst -- SSE2
-  | otherwise     =  pprSizeOpOp (sLit "cmp")   size src dst
+pprInstr platform (CMP size src dst)
+  | is_float size =  pprSizeOpOp platform (sLit "ucomi") size src dst -- SSE2
+  | otherwise     =  pprSizeOpOp platform (sLit "cmp")   size src dst
   where
         -- This predicate is needed here and nowhere else
     is_float FF32       = True
@@ -594,63 +593,63 @@ pprInstr (CMP size src dst)
     is_float FF80       = True
     is_float _          = False
 
-pprInstr (TEST size src dst) = pprSizeOpOp (sLit "test")  size src dst
-pprInstr (PUSH size op) = pprSizeOp (sLit "push") size op
-pprInstr (POP size op) = pprSizeOp (sLit "pop") size op
+pprInstr platform (TEST size src dst) = pprSizeOpOp platform (sLit "test")  size src dst
+pprInstr platform (PUSH size op) = pprSizeOp platform (sLit "push") size op
+pprInstr platform (POP size op) = pprSizeOp platform (sLit "pop") size op
 
 -- both unused (SDM):
 -- pprInstr PUSHA = ptext (sLit "\tpushal")
 -- pprInstr POPA = ptext (sLit "\tpopal")
 
-pprInstr NOP = ptext (sLit "\tnop")
-pprInstr (CLTD II32) = ptext (sLit "\tcltd")
-pprInstr (CLTD II64) = ptext (sLit "\tcqto")
+pprInstr _ NOP = ptext (sLit "\tnop")
+pprInstr _ (CLTD II32) = ptext (sLit "\tcltd")
+pprInstr _ (CLTD II64) = ptext (sLit "\tcqto")
 
-pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand II8 op)
+pprInstr platform (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand platform II8 op)
 
-pprInstr (JXX cond blockid)
+pprInstr _ (JXX cond blockid)
   = pprCondInstr (sLit "j") cond (pprCLabel_asm lab)
   where lab = mkAsmTempLabel (getUnique blockid)
 
-pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
+pprInstr _ (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
-pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
-pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand archWordSize op)
-pprInstr (JMP_TBL op _ _ _)  = pprInstr (JMP op)
-pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
-pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg archWordSize reg)
+pprInstr _ (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
+pprInstr platform (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand platform archWordSize op)
+pprInstr platform (JMP_TBL op _ _ _)  = pprInstr platform (JMP op)
+pprInstr _ (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
+pprInstr platform (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg platform archWordSize reg)
 
-pprInstr (IDIV sz op)   = pprSizeOp (sLit "idiv") sz op
-pprInstr (DIV sz op)    = pprSizeOp (sLit "div")  sz op
-pprInstr (IMUL2 sz op)  = pprSizeOp (sLit "imul") sz op
+pprInstr platform (IDIV sz op)   = pprSizeOp platform (sLit "idiv") sz op
+pprInstr platform (DIV sz op)    = pprSizeOp platform (sLit "div")  sz op
+pprInstr platform (IMUL2 sz op)  = pprSizeOp platform (sLit "imul") sz op
 
 -- x86_64 only
-pprInstr (MUL size op1 op2) = pprSizeOpOp (sLit "mul") size op1 op2
+pprInstr platform (MUL size op1 op2) = pprSizeOpOp platform (sLit "mul") size op1 op2
 
-pprInstr (FDIV size op1 op2) = pprSizeOpOp (sLit "div") size op1 op2
+pprInstr platform (FDIV size op1 op2) = pprSizeOpOp platform (sLit "div") size op1 op2
 
-pprInstr (CVTSS2SD from to)      = pprRegReg (sLit "cvtss2sd") from to
-pprInstr (CVTSD2SS from to)      = pprRegReg (sLit "cvtsd2ss") from to
-pprInstr (CVTTSS2SIQ sz from to) = pprSizeSizeOpReg (sLit "cvttss2si") FF32 sz from to
-pprInstr (CVTTSD2SIQ sz from to) = pprSizeSizeOpReg (sLit "cvttsd2si") FF64 sz from to
-pprInstr (CVTSI2SS sz from to)   = pprSizeOpReg (sLit "cvtsi2ss") sz from to
-pprInstr (CVTSI2SD sz from to)   = pprSizeOpReg (sLit "cvtsi2sd") sz from to
+pprInstr platform (CVTSS2SD from to)      = pprRegReg platform (sLit "cvtss2sd") from to
+pprInstr platform (CVTSD2SS from to)      = pprRegReg platform (sLit "cvtsd2ss") from to
+pprInstr platform (CVTTSS2SIQ sz from to) = pprSizeSizeOpReg platform (sLit "cvttss2si") FF32 sz from to
+pprInstr platform (CVTTSD2SIQ sz from to) = pprSizeSizeOpReg platform (sLit "cvttsd2si") FF64 sz from to
+pprInstr platform (CVTSI2SS sz from to)   = pprSizeOpReg platform (sLit "cvtsi2ss") sz from to
+pprInstr platform (CVTSI2SD sz from to)   = pprSizeOpReg platform (sLit "cvtsi2sd") sz from to
 
     -- FETCHGOT for PIC on ELF platforms
-pprInstr (FETCHGOT reg)
+pprInstr platform (FETCHGOT reg)
    = vcat [ ptext (sLit "\tcall 1f"),
-            hcat [ ptext (sLit "1:\tpopl\t"), pprReg II32 reg ],
+            hcat [ ptext (sLit "1:\tpopl\t"), pprReg platform II32 reg ],
             hcat [ ptext (sLit "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
-                   pprReg II32 reg ]
+                   pprReg platform II32 reg ]
           ]
 
     -- FETCHPC for PIC on Darwin/x86
     -- get the instruction pointer into a register
     -- (Terminology note: the IP is called Program Counter on PPC,
     --  and it's a good thing to use the same name on both platforms)
-pprInstr (FETCHPC reg)
+pprInstr platform (FETCHPC reg)
    = vcat [ ptext (sLit "\tcall 1f"),
-            hcat [ ptext (sLit "1:\tpopl\t"), pprReg II32 reg ]
+            hcat [ ptext (sLit "1:\tpopl\t"), pprReg platform II32 reg ]
           ]
 
 
@@ -660,36 +659,36 @@ pprInstr (FETCHPC reg)
 -- Simulating a flat register set on the x86 FP stack is tricky.
 -- you have to free %st(7) before pushing anything on the FP reg stack
 -- so as to preclude the possibility of a FP stack overflow exception.
-pprInstr g@(GMOV src dst)
+pprInstr platform g@(GMOV src dst)
    | src == dst
    = empty
    | otherwise
-   = pprG g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
+   = pprG platform g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
 
 -- GLD sz addr dst ==> FLDsz addr ; FSTP (dst+1)
-pprInstr g@(GLD sz addr dst)
- = pprG g (hcat [gtab, text "fld", pprSize_x87 sz, gsp,
-                 pprAddr addr, gsemi, gpop dst 1])
+pprInstr platform g@(GLD sz addr dst)
+ = pprG platform g (hcat [gtab, text "fld", pprSize_x87 sz, gsp,
+                          pprAddr platform addr, gsemi, gpop dst 1])
 
 -- GST sz src addr ==> FLD dst ; FSTPsz addr
-pprInstr g@(GST sz src addr)
+pprInstr platform g@(GST sz src addr)
  | src == fake0 && sz /= FF80 -- fstt instruction doesn't exist
- = pprG g (hcat [gtab,
-                 text "fst", pprSize_x87 sz, gsp, pprAddr addr])
+ = pprG platform g (hcat [gtab,
+                          text "fst", pprSize_x87 sz, gsp, pprAddr platform addr])
  | otherwise
- = pprG g (hcat [gtab, gpush src 0, gsemi,
-                 text "fstp", pprSize_x87 sz, gsp, pprAddr addr])
+ = pprG platform g (hcat [gtab, gpush src 0, gsemi,
+                          text "fstp", pprSize_x87 sz, gsp, pprAddr platform addr])
 
-pprInstr g@(GLDZ dst)
- = pprG g (hcat [gtab, text "fldz ; ", gpop dst 1])
-pprInstr g@(GLD1 dst)
- = pprG g (hcat [gtab, text "fld1 ; ", gpop dst 1])
+pprInstr platform g@(GLDZ dst)
+ = pprG platform g (hcat [gtab, text "fldz ; ", gpop dst 1])
+pprInstr platform g@(GLD1 dst)
+ = pprG platform g (hcat [gtab, text "fld1 ; ", gpop dst 1])
 
-pprInstr (GFTOI src dst)
-   = pprInstr (GDTOI src dst)
+pprInstr platform (GFTOI src dst)
+   = pprInstr platform (GDTOI src dst)
 
-pprInstr g@(GDTOI src dst)
-   = pprG g (vcat [
+pprInstr platform g@(GDTOI src dst)
+   = pprG platform g (vcat [
          hcat [gtab, text "subl $8, %esp ; fnstcw 4(%esp)"],
          hcat [gtab, gpush src 0],
          hcat [gtab, text "movzwl 4(%esp), ", reg,
@@ -700,20 +699,20 @@ pprInstr g@(GDTOI src dst)
          hcat [gtab, text "addl $8, %esp"]
      ])
    where
-     reg = pprReg II32 dst
+     reg = pprReg platform II32 dst
 
-pprInstr (GITOF src dst)
-   = pprInstr (GITOD src dst)
+pprInstr platform (GITOF src dst)
+   = pprInstr platform (GITOD src dst)
 
-pprInstr g@(GITOD src dst)
-   = pprG g (hcat [gtab, text "pushl ", pprReg II32 src,
-                   text " ; fildl (%esp) ; ",
-                   gpop dst 1, text " ; addl $4,%esp"])
+pprInstr platform g@(GITOD src dst)
+   = pprG platform g (hcat [gtab, text "pushl ", pprReg platform II32 src,
+                            text " ; fildl (%esp) ; ",
+                            gpop dst 1, text " ; addl $4,%esp"])
 
-pprInstr g@(GDTOF src dst)
-  = pprG g (vcat [gtab <> gpush src 0,
-                  gtab <> text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ;",
-                  gtab <> gpop dst 1])
+pprInstr platform g@(GDTOF src dst)
+  = pprG platform g (vcat [gtab <> gpush src 0,
+                           gtab <> text "subl $4,%esp ; fstps (%esp) ; flds (%esp) ; addl $4,%esp ;",
+                           gtab <> gpop dst 1])
 
 {- Gruesome swamp follows.  If you're unfortunate enough to have ventured
    this far into the jungle AND you give a Rat's Ass (tm) what's going
@@ -753,9 +752,9 @@ pprInstr g@(GDTOF src dst)
      decb %al      -- if (incomparable || different) then (%al == 0, ZF=1)
                                                      else (%al == 0xFF, ZF=0)
 -}
-pprInstr g@(GCMP cond src1 src2)
+pprInstr platform g@(GCMP cond src1 src2)
    | case cond of { NE -> True; _ -> False }
-   = pprG g (vcat [
+   = pprG platform g (vcat [
         hcat [gtab, text "pushl %eax ; ",gpush src1 0],
         hcat [gtab, text "fcomp ", greg src2 1,
                     text "; fstsw %ax ; sahf ;  setpe %ah"],
@@ -763,7 +762,7 @@ pprInstr g@(GCMP cond src1 src2)
               text "orb %ah,%al ;  decb %al ;  popl %eax"]
     ])
    | otherwise
-   = pprG g (vcat [
+   = pprG platform g (vcat [
         hcat [gtab, text "pushl %eax ; ",gpush src1 0],
         hcat [gtab, text "fcomp ", greg src2 1,
                     text "; fstsw %ax ; sahf ;  setpo %ah"],
@@ -785,95 +784,95 @@ pprInstr g@(GCMP cond src1 src2)
         -- there should be no others
 
 
-pprInstr g@(GABS _ src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
+pprInstr platform g@(GABS _ src dst)
+   = pprG platform g (hcat [gtab, gpush src 0, text " ; fabs ; ", gpop dst 1])
 
-pprInstr g@(GNEG _ src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
+pprInstr platform g@(GNEG _ src dst)
+   = pprG platform g (hcat [gtab, gpush src 0, text " ; fchs ; ", gpop dst 1])
 
-pprInstr g@(GSQRT sz src dst)
-   = pprG g (hcat [gtab, gpush src 0, text " ; fsqrt"] $$
-             hcat [gtab, gcoerceto sz, gpop dst 1])
+pprInstr platform g@(GSQRT sz src dst)
+   = pprG platform g (hcat [gtab, gpush src 0, text " ; fsqrt"] $$
+                      hcat [gtab, gcoerceto sz, gpop dst 1])
 
-pprInstr g@(GSIN sz l1 l2 src dst)
-   = pprG g (pprTrigOp "fsin" False l1 l2 src dst sz)
+pprInstr platform g@(GSIN sz l1 l2 src dst)
+   = pprG platform g (pprTrigOp "fsin" False l1 l2 src dst sz)
 
-pprInstr g@(GCOS sz l1 l2 src dst)
-   = pprG g (pprTrigOp "fcos" False l1 l2 src dst sz)
+pprInstr platform g@(GCOS sz l1 l2 src dst)
+   = pprG platform g (pprTrigOp "fcos" False l1 l2 src dst sz)
 
-pprInstr g@(GTAN sz l1 l2 src dst)
-   = pprG g (pprTrigOp "fptan" True l1 l2 src dst sz)
+pprInstr platform g@(GTAN sz l1 l2 src dst)
+   = pprG platform g (pprTrigOp "fptan" True l1 l2 src dst sz)
 
 -- In the translations for GADD, GMUL, GSUB and GDIV,
 -- the first two cases are mere optimisations.  The otherwise clause
 -- generates correct code under all circumstances.
 
-pprInstr g@(GADD _ src1 src2 dst)
+pprInstr platform g@(GADD _ src1 src2 dst)
    | src1 == dst
-   = pprG g (text "\t#GADD-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; faddp %st(0),", greg src1 1])
+   = pprG platform g (text "\t#GADD-xxxcase1" $$
+                      hcat [gtab, gpush src2 0,
+                            text " ; faddp %st(0),", greg src1 1])
    | src2 == dst
-   = pprG g (text "\t#GADD-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; faddp %st(0),", greg src2 1])
+   = pprG platform g (text "\t#GADD-xxxcase2" $$
+                      hcat [gtab, gpush src1 0,
+                            text " ; faddp %st(0),", greg src2 1])
    | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fadd ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
+   = pprG platform g (hcat [gtab, gpush src1 0,
+                            text " ; fadd ", greg src2 1, text ",%st(0)",
+                            gsemi, gpop dst 1])
 
 
-pprInstr g@(GMUL _ src1 src2 dst)
+pprInstr platform g@(GMUL _ src1 src2 dst)
    | src1 == dst
-   = pprG g (text "\t#GMUL-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fmulp %st(0),", greg src1 1])
+   = pprG platform g (text "\t#GMUL-xxxcase1" $$
+                      hcat [gtab, gpush src2 0,
+                            text " ; fmulp %st(0),", greg src1 1])
    | src2 == dst
-   = pprG g (text "\t#GMUL-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fmulp %st(0),", greg src2 1])
+   = pprG platform g (text "\t#GMUL-xxxcase2" $$
+                      hcat [gtab, gpush src1 0,
+                            text " ; fmulp %st(0),", greg src2 1])
    | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fmul ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
+   = pprG platform g (hcat [gtab, gpush src1 0,
+                            text " ; fmul ", greg src2 1, text ",%st(0)",
+                            gsemi, gpop dst 1])
 
 
-pprInstr g@(GSUB _ src1 src2 dst)
+pprInstr platform g@(GSUB _ src1 src2 dst)
    | src1 == dst
-   = pprG g (text "\t#GSUB-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fsubrp %st(0),", greg src1 1])
+   = pprG platform g (text "\t#GSUB-xxxcase1" $$
+                      hcat [gtab, gpush src2 0,
+                            text " ; fsubrp %st(0),", greg src1 1])
    | src2 == dst
-   = pprG g (text "\t#GSUB-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fsubp %st(0),", greg src2 1])
+   = pprG platform g (text "\t#GSUB-xxxcase2" $$
+                      hcat [gtab, gpush src1 0,
+                            text " ; fsubp %st(0),", greg src2 1])
    | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fsub ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
+   = pprG platform g (hcat [gtab, gpush src1 0,
+                            text " ; fsub ", greg src2 1, text ",%st(0)",
+                            gsemi, gpop dst 1])
 
 
-pprInstr g@(GDIV _ src1 src2 dst)
+pprInstr platform g@(GDIV _ src1 src2 dst)
    | src1 == dst
-   = pprG g (text "\t#GDIV-xxxcase1" $$
-             hcat [gtab, gpush src2 0,
-                   text " ; fdivrp %st(0),", greg src1 1])
+   = pprG platform g (text "\t#GDIV-xxxcase1" $$
+                      hcat [gtab, gpush src2 0,
+                            text " ; fdivrp %st(0),", greg src1 1])
    | src2 == dst
-   = pprG g (text "\t#GDIV-xxxcase2" $$
-             hcat [gtab, gpush src1 0,
-                   text " ; fdivp %st(0),", greg src2 1])
+   = pprG platform g (text "\t#GDIV-xxxcase2" $$
+                      hcat [gtab, gpush src1 0,
+                            text " ; fdivp %st(0),", greg src2 1])
    | otherwise
-   = pprG g (hcat [gtab, gpush src1 0,
-                   text " ; fdiv ", greg src2 1, text ",%st(0)",
-                   gsemi, gpop dst 1])
+   = pprG platform g (hcat [gtab, gpush src1 0,
+                            text " ; fdiv ", greg src2 1, text ",%st(0)",
+                            gsemi, gpop dst 1])
 
 
-pprInstr GFREE
+pprInstr _ GFREE
    = vcat [ ptext (sLit "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
             ptext (sLit "\tffree %st(4) ;ffree %st(5)")
           ]
 
-pprInstr _
+pprInstr _ _
         = panic "X86.Ppr.pprInstr: no match"
 
 
@@ -952,49 +951,49 @@ gregno (RegReal (RealRegSingle i)) = i
 gregno _           = --pprPanic "gregno" (ppr other)
                      999   -- bogus; only needed for debug printing
 
-pprG :: Instr -> Doc -> Doc
-pprG fake actual
-   = (char '#' <> pprGInstr fake) $$ actual
+pprG :: Platform -> Instr -> Doc -> Doc
+pprG platform fake actual
+   = (char '#' <> pprGInstr platform fake) $$ actual
 
 
-pprGInstr :: Instr -> Doc
-pprGInstr (GMOV src dst)   = pprSizeRegReg (sLit "gmov") FF64 src dst
-pprGInstr (GLD sz src dst) = pprSizeAddrReg (sLit "gld") sz src dst
-pprGInstr (GST sz src dst) = pprSizeRegAddr (sLit "gst") sz src dst
+pprGInstr :: Platform -> Instr -> Doc
+pprGInstr platform (GMOV src dst)   = pprSizeRegReg platform (sLit "gmov") FF64 src dst
+pprGInstr platform (GLD sz src dst) = pprSizeAddrReg platform (sLit "gld") sz src dst
+pprGInstr platform (GST sz src dst) = pprSizeRegAddr platform (sLit "gst") sz src dst
 
-pprGInstr (GLDZ dst) = pprSizeReg (sLit "gldz") FF64 dst
-pprGInstr (GLD1 dst) = pprSizeReg (sLit "gld1") FF64 dst
+pprGInstr platform (GLDZ dst) = pprSizeReg platform (sLit "gldz") FF64 dst
+pprGInstr platform (GLD1 dst) = pprSizeReg platform (sLit "gld1") FF64 dst
 
-pprGInstr (GFTOI src dst) = pprSizeSizeRegReg (sLit "gftoi") FF32 II32  src dst
-pprGInstr (GDTOI src dst) = pprSizeSizeRegReg (sLit "gdtoi") FF64 II32 src dst
+pprGInstr platform (GFTOI src dst) = pprSizeSizeRegReg platform (sLit "gftoi") FF32 II32  src dst
+pprGInstr platform (GDTOI src dst) = pprSizeSizeRegReg platform (sLit "gdtoi") FF64 II32 src dst
 
-pprGInstr (GITOF src dst) = pprSizeSizeRegReg (sLit "gitof") II32 FF32  src dst
-pprGInstr (GITOD src dst) = pprSizeSizeRegReg (sLit "gitod") II32 FF64 src dst
-pprGInstr (GDTOF src dst) = pprSizeSizeRegReg (sLit "gdtof") FF64 FF32 src dst
+pprGInstr platform (GITOF src dst) = pprSizeSizeRegReg platform (sLit "gitof") II32 FF32  src dst
+pprGInstr platform (GITOD src dst) = pprSizeSizeRegReg platform (sLit "gitod") II32 FF64 src dst
+pprGInstr platform (GDTOF src dst) = pprSizeSizeRegReg platform (sLit "gdtof") FF64 FF32 src dst
 
-pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") FF64 co src dst
-pprGInstr (GABS sz src dst) = pprSizeRegReg (sLit "gabs") sz src dst
-pprGInstr (GNEG sz src dst) = pprSizeRegReg (sLit "gneg") sz src dst
-pprGInstr (GSQRT sz src dst) = pprSizeRegReg (sLit "gsqrt") sz src dst
-pprGInstr (GSIN sz _ _ src dst) = pprSizeRegReg (sLit "gsin") sz src dst
-pprGInstr (GCOS sz _ _ src dst) = pprSizeRegReg (sLit "gcos") sz src dst
-pprGInstr (GTAN sz _ _ src dst) = pprSizeRegReg (sLit "gtan") sz src dst
+pprGInstr platform (GCMP co src dst) = pprCondRegReg platform (sLit "gcmp_") FF64 co src dst
+pprGInstr platform (GABS sz src dst) = pprSizeRegReg platform (sLit "gabs") sz src dst
+pprGInstr platform (GNEG sz src dst) = pprSizeRegReg platform (sLit "gneg") sz src dst
+pprGInstr platform (GSQRT sz src dst) = pprSizeRegReg platform (sLit "gsqrt") sz src dst
+pprGInstr platform (GSIN sz _ _ src dst) = pprSizeRegReg platform (sLit "gsin") sz src dst
+pprGInstr platform (GCOS sz _ _ src dst) = pprSizeRegReg platform (sLit "gcos") sz src dst
+pprGInstr platform (GTAN sz _ _ src dst) = pprSizeRegReg platform (sLit "gtan") sz src dst
 
-pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg (sLit "gadd") sz src1 src2 dst
-pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg (sLit "gsub") sz src1 src2 dst
-pprGInstr (GMUL sz src1 src2 dst) = pprSizeRegRegReg (sLit "gmul") sz src1 src2 dst
-pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg (sLit "gdiv") sz src1 src2 dst
+pprGInstr platform (GADD sz src1 src2 dst) = pprSizeRegRegReg platform (sLit "gadd") sz src1 src2 dst
+pprGInstr platform (GSUB sz src1 src2 dst) = pprSizeRegRegReg platform (sLit "gsub") sz src1 src2 dst
+pprGInstr platform (GMUL sz src1 src2 dst) = pprSizeRegRegReg platform (sLit "gmul") sz src1 src2 dst
+pprGInstr platform (GDIV sz src1 src2 dst) = pprSizeRegRegReg platform (sLit "gdiv") sz src1 src2 dst
 
-pprGInstr _ = panic "X86.Ppr.pprGInstr: no match"
+pprGInstr _ _ = panic "X86.Ppr.pprGInstr: no match"
 
 pprDollImm :: Imm -> Doc
 pprDollImm i =  ptext (sLit "$") <> pprImm i
 
 
-pprOperand :: Size -> Operand -> Doc
-pprOperand s (OpReg r)   = pprReg s r
-pprOperand _ (OpImm i)   = pprDollImm i
-pprOperand _ (OpAddr ea) = pprAddr ea
+pprOperand :: Platform -> Size -> Operand -> Doc
+pprOperand platform s (OpReg r)   = pprReg platform s r
+pprOperand _        _ (OpImm i)   = pprDollImm i
+pprOperand platform _ (OpAddr ea) = pprAddr platform ea
 
 
 pprMnemonic_  :: LitString -> Doc
@@ -1007,164 +1006,164 @@ pprMnemonic name size =
    char '\t' <> ptext name <> pprSize size <> space
 
 
-pprSizeImmOp :: LitString -> Size -> Imm -> Operand -> Doc
-pprSizeImmOp name size imm op1
+pprSizeImmOp :: Platform -> LitString -> Size -> Imm -> Operand -> Doc
+pprSizeImmOp platform name size imm op1
   = hcat [
         pprMnemonic name size,
         char '$',
         pprImm imm,
         comma,
-        pprOperand size op1
+        pprOperand platform size op1
     ]
 
 
-pprSizeOp :: LitString -> Size -> Operand -> Doc
-pprSizeOp name size op1
+pprSizeOp :: Platform -> LitString -> Size -> Operand -> Doc
+pprSizeOp platform name size op1
   = hcat [
         pprMnemonic name size,
-        pprOperand size op1
+        pprOperand platform size op1
     ]
 
 
-pprSizeOpOp :: LitString -> Size -> Operand -> Operand -> Doc
-pprSizeOpOp name size op1 op2
+pprSizeOpOp :: Platform -> LitString -> Size -> Operand -> Operand -> Doc
+pprSizeOpOp platform name size op1 op2
   = hcat [
         pprMnemonic name size,
-        pprOperand size op1,
+        pprOperand platform size op1,
         comma,
-        pprOperand size op2
+        pprOperand platform size op2
     ]
 
 
-pprOpOp :: LitString -> Size -> Operand -> Operand -> Doc
-pprOpOp name size op1 op2
+pprOpOp :: Platform -> LitString -> Size -> Operand -> Operand -> Doc
+pprOpOp platform name size op1 op2
   = hcat [
         pprMnemonic_ name,
-        pprOperand size op1,
+        pprOperand platform size op1,
         comma,
-        pprOperand size op2
+        pprOperand platform size op2
     ]
 
 
-pprSizeReg :: LitString -> Size -> Reg -> Doc
-pprSizeReg name size reg1
+pprSizeReg :: Platform -> LitString -> Size -> Reg -> Doc
+pprSizeReg platform name size reg1
   = hcat [
         pprMnemonic name size,
-        pprReg size reg1
+        pprReg platform size reg1
     ]
 
 
-pprSizeRegReg :: LitString -> Size -> Reg -> Reg -> Doc
-pprSizeRegReg name size reg1 reg2
+pprSizeRegReg :: Platform -> LitString -> Size -> Reg -> Reg -> Doc
+pprSizeRegReg platform name size reg1 reg2
   = hcat [
         pprMnemonic name size,
-        pprReg size reg1,
+        pprReg platform size reg1,
         comma,
-        pprReg size reg2
+        pprReg platform size reg2
     ]
 
 
-pprRegReg :: LitString -> Reg -> Reg -> Doc
-pprRegReg name reg1 reg2
+pprRegReg :: Platform -> LitString -> Reg -> Reg -> Doc
+pprRegReg platform name reg1 reg2
   = hcat [
         pprMnemonic_ name,
-        pprReg archWordSize reg1,
+        pprReg platform archWordSize reg1,
         comma,
-        pprReg archWordSize reg2
+        pprReg platform archWordSize reg2
     ]
 
 
-pprSizeOpReg :: LitString -> Size -> Operand -> Reg -> Doc
-pprSizeOpReg name size op1 reg2
+pprSizeOpReg :: Platform -> LitString -> Size -> Operand -> Reg -> Doc
+pprSizeOpReg platform name size op1 reg2
   = hcat [
         pprMnemonic name size,
-        pprOperand size op1,
+        pprOperand platform size op1,
         comma,
-        pprReg archWordSize reg2
+        pprReg platform archWordSize reg2
     ]
 
-pprCondRegReg :: LitString -> Size -> Cond -> Reg -> Reg -> Doc
-pprCondRegReg name size cond reg1 reg2
+pprCondRegReg :: Platform -> LitString -> Size -> Cond -> Reg -> Reg -> Doc
+pprCondRegReg platform name size cond reg1 reg2
   = hcat [
         char '\t',
         ptext name,
         pprCond cond,
         space,
-        pprReg size reg1,
+        pprReg platform size reg1,
         comma,
-        pprReg size reg2
+        pprReg platform size reg2
     ]
 
-pprSizeSizeRegReg :: LitString -> Size -> Size -> Reg -> Reg -> Doc
-pprSizeSizeRegReg name size1 size2 reg1 reg2
+pprSizeSizeRegReg :: Platform -> LitString -> Size -> Size -> Reg -> Reg -> Doc
+pprSizeSizeRegReg platform name size1 size2 reg1 reg2
   = hcat [
         char '\t',
         ptext name,
         pprSize size1,
         pprSize size2,
         space,
-        pprReg size1 reg1,
+        pprReg platform size1 reg1,
         comma,
-        pprReg size2 reg2
+        pprReg platform size2 reg2
     ]
 
-pprSizeSizeOpReg :: LitString -> Size -> Size -> Operand -> Reg -> Doc
-pprSizeSizeOpReg name size1 size2 op1 reg2
+pprSizeSizeOpReg :: Platform -> LitString -> Size -> Size -> Operand -> Reg -> Doc
+pprSizeSizeOpReg platform name size1 size2 op1 reg2
   = hcat [
         pprMnemonic name size2,
-        pprOperand size1 op1,
+        pprOperand platform size1 op1,
         comma,
-        pprReg size2 reg2
+        pprReg platform size2 reg2
     ]
 
-pprSizeRegRegReg :: LitString -> Size -> Reg -> Reg -> Reg -> Doc
-pprSizeRegRegReg name size reg1 reg2 reg3
+pprSizeRegRegReg :: Platform -> LitString -> Size -> Reg -> Reg -> Reg -> Doc
+pprSizeRegRegReg platform name size reg1 reg2 reg3
   = hcat [
         pprMnemonic name size,
-        pprReg size reg1,
+        pprReg platform size reg1,
         comma,
-        pprReg size reg2,
+        pprReg platform size reg2,
         comma,
-        pprReg size reg3
+        pprReg platform size reg3
     ]
 
 
-pprSizeAddrReg :: LitString -> Size -> AddrMode -> Reg -> Doc
-pprSizeAddrReg name size op dst
+pprSizeAddrReg :: Platform -> LitString -> Size -> AddrMode -> Reg -> Doc
+pprSizeAddrReg platform name size op dst
   = hcat [
         pprMnemonic name size,
-        pprAddr op,
+        pprAddr platform op,
         comma,
-        pprReg size dst
+        pprReg platform size dst
     ]
 
 
-pprSizeRegAddr :: LitString -> Size -> Reg -> AddrMode -> Doc
-pprSizeRegAddr name size src op
+pprSizeRegAddr :: Platform -> LitString -> Size -> Reg -> AddrMode -> Doc
+pprSizeRegAddr platform name size src op
   = hcat [
         pprMnemonic name size,
-        pprReg size src,
+        pprReg platform size src,
         comma,
-        pprAddr op
+        pprAddr platform op
     ]
 
 
-pprShift :: LitString -> Size -> Operand -> Operand -> Doc
-pprShift name size src dest
+pprShift :: Platform -> LitString -> Size -> Operand -> Operand -> Doc
+pprShift platform name size src dest
   = hcat [
         pprMnemonic name size,
-        pprOperand II8 src,  -- src is 8-bit sized
+        pprOperand platform II8 src,  -- src is 8-bit sized
         comma,
-        pprOperand size dest
+        pprOperand platform size dest
     ]
 
 
-pprSizeOpOpCoerce :: LitString -> Size -> Size -> Operand -> Operand -> Doc
-pprSizeOpOpCoerce name size1 size2 op1 op2
+pprSizeOpOpCoerce :: Platform -> LitString -> Size -> Size -> Operand -> Operand -> Doc
+pprSizeOpOpCoerce platform name size1 size2 op1 op2
   = hcat [ char '\t', ptext name, pprSize size1, pprSize size2, space,
-        pprOperand size1 op1,
+        pprOperand platform size1 op1,
         comma,
-        pprOperand size2 op2
+        pprOperand platform size2 op2
     ]
 
 
