@@ -925,8 +925,7 @@ checkSafeImports dflags hsc_env tcg_env
                     let trust = getSafeMode $ mi_trust iface'
                         trust_own_pkg = mi_trust_pkg iface'
                         -- check module is trusted
-                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
-                                            Sf_TrustworthyWithSafeLanguage]
+                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
                         -- check package is trusted
                         safeP = packageTrusted trust trust_own_pkg m
                     if safeM && safeP

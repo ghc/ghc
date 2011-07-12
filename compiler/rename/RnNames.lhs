@@ -277,9 +277,7 @@ rnImportDecl this_mod implicit_prelude
 
         -- Does this import mean we now require our own pkg
         -- to be trusted? See Note [Trust Own Package]
-        ptrust = trust == Sf_Trustworthy
-               || trust == Sf_TrustworthyWithSafeLanguage
-               || trust_pkg
+        ptrust = trust == Sf_Trustworthy || trust_pkg
 
         (dependent_mods, dependent_pkgs, pkg_trust_req)
            | pkg == thisPackage dflags =

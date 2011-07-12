@@ -331,18 +331,14 @@ data Language = Haskell98 | Haskell2010
 data SafeHaskellMode
    = Sf_None
    | Sf_SafeImports
-   | Sf_SafeLanguage
    | Sf_Trustworthy
-   | Sf_TrustworthyWithSafeLanguage
    | Sf_Safe
    deriving (Eq)
 
 instance Outputable SafeHaskellMode where
     ppr Sf_None = ptext $ sLit "None"
     ppr Sf_SafeImports = ptext $ sLit "SafeImports"
-    ppr Sf_SafeLanguage = ptext $ sLit "SafeLanguage"
     ppr Sf_Trustworthy = ptext $ sLit "Trustworthy"
-    ppr Sf_TrustworthyWithSafeLanguage = ptext $ sLit "Trustworthy + SafeLanguage"
     ppr Sf_Safe = ptext $ sLit "Safe"
 
 data ExtensionFlag
@@ -987,10 +983,7 @@ dynFlagDependencies = pluginModNames
 
 -- | Is the Safe Haskell safe language in use
 safeLanguageOn :: DynFlags -> Bool
-safeLanguageOn dflags = s == Sf_SafeLanguage
-                     || s == Sf_TrustworthyWithSafeLanguage
-                     || s == Sf_Safe
-                          where s = safeHaskell dflags
+safeLanguageOn dflags = safeHaskell dflags == Sf_Safe
 
 -- | Test if Safe Haskell is on in some form
 safeHaskellOn :: DynFlags -> Bool
@@ -1026,17 +1019,6 @@ combineSafeFlags a b =
 
         (Sf_SafeImports, sf) -> return sf
         (sf, Sf_SafeImports) -> return sf
-
-        (Sf_SafeLanguage, Sf_Safe) -> err
-        (Sf_Safe, Sf_SafeLanguage) -> err
-
-        (Sf_SafeLanguage, Sf_Trustworthy) -> return Sf_TrustworthyWithSafeLanguage
-        (Sf_Trustworthy, Sf_SafeLanguage) -> return Sf_TrustworthyWithSafeLanguage
-
-        (Sf_TrustworthyWithSafeLanguage, Sf_Trustworthy)  -> return Sf_TrustworthyWithSafeLanguage
-        (Sf_TrustworthyWithSafeLanguage, Sf_SafeLanguage) -> return Sf_TrustworthyWithSafeLanguage
-        (Sf_Trustworthy, Sf_TrustworthyWithSafeLanguage)  -> return Sf_TrustworthyWithSafeLanguage
-        (Sf_SafeLanguage, Sf_TrustworthyWithSafeLanguage) -> return Sf_TrustworthyWithSafeLanguage
 
         (Sf_Trustworthy, Sf_Safe) -> err
         (Sf_Safe, Sf_Trustworthy) -> err
@@ -1801,8 +1783,7 @@ languageFlags = [
 -- They are used to place hard requirements on what GHC Haskell language
 -- features can be used.
 safeHaskellFlags :: [FlagSpec SafeHaskellMode]
-safeHaskellFlags = [mkF Sf_SafeImports, mkF' Sf_SafeLanguage,
-                    mkF Sf_Trustworthy, mkF' Sf_Safe]
+safeHaskellFlags = [mkF Sf_SafeImports, mkF Sf_Trustworthy, mkF' Sf_Safe]
     where mkF  flag = (showPpr flag, AlwaysAllowed, flag, nop)
           mkF' flag = (showPpr flag, EnablesSafe,   flag, nop)
 
