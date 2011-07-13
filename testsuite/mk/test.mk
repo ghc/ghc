@@ -69,11 +69,14 @@ else
 RUNTEST_OPTS += -e ghc_with_dynamic_rts=0
 endif
 
+$(eval $(call get-ghc-field,GhcStage,Stage))
 $(eval $(call get-ghc-feature-bool,GhcWithInterpreter,Have interpreter))
-ifeq "$(GhcWithInterpreter)" "YES"
-RUNTEST_OPTS += -e ghc_with_interpreter=1
-else
+ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e ghc_with_interpreter=0
+else ifeq "$(GhcStage)" "1"
+RUNTEST_OPTS += -e ghc_with_interpreter=0
+else
+RUNTEST_OPTS += -e ghc_with_interpreter=1
 endif
 
 $(eval $(call get-ghc-feature-bool,GhcUnregisterised,Unregisterised))
