@@ -10,9 +10,9 @@ SRC_CC_OPTS     += -Wall $(WERROR)
 # we turn it on explicitly for consistency with other users
 ifeq "$(GccLT46)" "NO"
 SRC_CC_OPTS	    += -Werror=unused-but-set-variable
-endif
 # gcc 4.6 gives 3 warning for giveCapabilityToTask not being inlined
 SRC_CC_OPTS     += -Wno-error=inline
+endif
 
 SRC_HC_OPTS     += -Wall $(WERROR) -H64m -O0
 
