@@ -979,7 +979,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
         if_verbose(1,'Compile failed (status ' + `result` + ') errors were:')
-        if_verbose(1,open(actual_stderr).read())
+        if_verbose_dump(1,actual_stderr)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
@@ -1241,7 +1241,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     if exit_code != 0:
          if_verbose(1,'Compiling to External Core failed (status ' + `result` + ') errors were:')
-         if_verbose(1,open(qerrname).read())
+         if_verbose_dump(1,qerrname)
          return failBecause('ext core exit code non-0')
 
      # Compile the resulting files -- if there's more than one module, we need to read the output
@@ -1272,7 +1272,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
     if exit_code != 0:
         if_verbose(1,'Compiling External Core file(s) failed (status ' + `result` + ') errors were:')
-        if_verbose(1,open(qerrname).read())
+        if_verbose_dump(1,qerrname)
         return failBecause('ext core exit code non-0')
 
     # Clean up
@@ -1467,6 +1467,13 @@ def normalise_output( str ):
 def if_verbose( n, str ):
     if config.verbose >= n:
         print str
+
+def if_verbose_dump( n, f ):
+    if config.verbose >= n:
+        try:
+            print open(f).read()
+        except:
+            print ''
 
 # Guess flags suitable for the compiler.
 def guess_compiler_flags():
