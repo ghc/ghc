@@ -322,4 +322,4 @@ test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
 test('werror', normal, compile_fail, [''])
 
-test('T706', normal, run_command, ['$MAKE -s --no-print-directory T706'])
+test('T706', req_interp, run_command, ['$MAKE -s --no-print-directory T706'])

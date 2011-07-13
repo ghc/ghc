@@ -40,6 +40,7 @@ if (ghc_with_profiling == 1):
 		config.run_ways.append('profasm')
 
 if (ghc_with_interpreter == 1):
+	config.have_interp = True
 	config.run_ways.append('ghci')
 
 config.unregisterised = (ghc_unregisterised == 1)

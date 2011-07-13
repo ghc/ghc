@@ -5,7 +5,10 @@ setTestOpts(if_compiler_profiled(skip))
 # order for this to work with profiling, we would have to build the
 # program twice and use -osuf p_o (see the TH_splitE5_prof test).  For
 # now, just disable the profiling ways.
-test('ann01', omit_ways(['profasm','profthreaded']), compile, ['-v0'])
+test('ann01',
+     [req_interp, omit_ways(['profasm','profthreaded'])],
+     compile,
+     ['-v0'])
 
 """"
 Helpful things to C+P:

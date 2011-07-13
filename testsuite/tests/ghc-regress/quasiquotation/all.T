@@ -1,4 +1,4 @@
-test('T3953', only_compiler_types(['ghc']), compile_fail, [''])
+test('T3953', [req_interp, only_compiler_types(['ghc'])], compile_fail, [''])
 test('T4150',
      [only_compiler_types(['ghc']),
       expect_broken(4150),

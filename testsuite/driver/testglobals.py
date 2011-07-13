@@ -81,6 +81,9 @@ class TestConfig:
         # Do we have profiling support?
         self.have_profiling = False
 
+        # Do we have interpreter support?
+        self.have_interp = False
+
         # Do we have shared libraries?
         self.have_shared_libs = False
 

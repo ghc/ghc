@@ -1,2 +1,2 @@
-test('qq002', only_compiler_types(['ghc']),
+test('qq002', [req_interp, only_compiler_types(['ghc'])],
      compile_fail, [''])
