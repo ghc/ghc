@@ -170,7 +170,8 @@ instance DefaultValue Char where
 
       <listitem>
         <para>
-          It is now possible to annotate FFI imports as
+          When the new <literal>InterruptibleFFI</literal> extension is
+          enabled, it is now possible to annotate FFI imports as
           <literal>interruptible</literal>, e.g.
         </para>
 <programlisting>
@@ -759,6 +760,19 @@ Prelude>
           dynamically linked into an otherwise-unmodified GHC, and run
           at a place you specify in the Core optimisation pipeline.
         </para>
+
+        <para>
+          The new
+          <literal>-fplugin=<replaceable>module</replaceable></literal>
+          flag specifies that <replaceable>module</replaceable> is
+          to be used as a plugin, and
+          <literal>-fplugin-opt=<replaceable>module</replaceable>:<replaceable>args</replaceable></literal>
+          allows arguments to be passed to the plugin.
+        </para>
+
+        <para>
+          See <xref linkend="compiler-plugins" /> for more details.
+        </para>
       </listitem>
 
       <listitem>
@@ -860,6 +874,12 @@ Prelude>
 
       <listitem>
         <para>
+          GHC now works with LLVM 3.0.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
           The location of gcc, and various other settings, is now in a
           <literal>settings</literal> file. The
           <literal>extra-gcc-opts</literal> file is no longer used.
@@ -934,11 +954,16 @@ GhcStage3DefaultNewCodegen=YES
 
             <listitem>
                 <para>
-                    Many of the base types now have derived
-                    <literal>Typeable</literal> instances,
-                    whereas before they had hand-written instances.
-                    This means that some of the strings in the instances
-                    are now different.
+                    The <literal>Typeable</literal> module has been
+                    overhauled. The <literal>mkTyCon</literal> function
+                    has been deprecated in favour of a new function
+                    <literal>mkTyCon3</literal>, which takes separate
+                    strings for the package, module and name of the type
+                    constructor. Also, there is a new type
+                    <literal>TypeRepKey</literal>, and
+                    <literal>typeRepKey</literal> now
+                    returns <literal>IO TypeRepKey</literal> rather than
+                    <literal>IO Int</literal>.
                 </para>
             </listitem>
 
@@ -1828,8 +1853,7 @@ GhcStage3DefaultNewCodegen=YES
         <itemizedlist>
             <listitem>
                 <para>
-                    TODO:
-                    Version number 1.0.0.3 (was 1.0.0.2)
+                    GHC no longer includes the random library
                 </para>
             </listitem>
         </itemizedlist>
