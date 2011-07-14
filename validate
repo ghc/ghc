@@ -45,6 +45,13 @@ do
     shift
 done
 
+if ! [ -d testsuite ]
+then
+    echo 'You need the testsuite to validate' >&2
+    echo 'Run "./sync-all --testsuite get" to get it' >&2
+    exit 1
+fi
+
 if [ "$THREADS" = "" ]; then
     if [ "$CPUS" = "" ]; then
         threads=2
