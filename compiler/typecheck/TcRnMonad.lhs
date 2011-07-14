@@ -248,6 +248,9 @@ xoptM flag = do { dflags <- getDOpts; return (xopt flag dflags) }
 doptM :: DynFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
+woptM :: WarningFlag -> TcRnIf gbl lcl Bool
+woptM flag = do { dflags <- getDOpts; return (wopt flag dflags) }
+
 -- XXX setOptM and unsetOptM operate on different types. One should be renamed.
 
 setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
@@ -258,9 +261,17 @@ unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
+unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
+
 -- | Do it flag is true
 ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 ifDOptM flag thing_inside = do { b <- doptM flag; 
+				if b then thing_inside else return () }
+
+ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifWOptM flag thing_inside = do { b <- woptM flag; 
 				if b then thing_inside else return () }
 
 ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()

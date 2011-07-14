@@ -1445,12 +1445,12 @@ lex_quasiquote s = do
 -- -----------------------------------------------------------------------------
 -- Warnings
 
-warn :: DynFlag -> SDoc -> Action
+warn :: WarningFlag -> SDoc -> Action
 warn option warning srcspan _buf _len = do
     addWarning option (RealSrcSpan srcspan) warning
     lexToken
 
-warnThen :: DynFlag -> SDoc -> Action -> Action
+warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
     addWarning option (RealSrcSpan srcspan) warning
     action srcspan buf len
@@ -1878,11 +1878,11 @@ mkPState flags buf loc =
       b `setBitIf` cond | cond      = bit b
                         | otherwise = 0
 
-addWarning :: DynFlag -> SrcSpan -> SDoc -> P ()
+addWarning :: WarningFlag -> SrcSpan -> SDoc -> P ()
 addWarning option srcspan warning
  = P $ \s@PState{messages=(ws,es), dflags=d} ->
        let warning' = mkWarnMsg srcspan alwaysQualify warning
-           ws' = if dopt option d then ws `snocBag` warning' else ws
+           ws' = if wopt option d then ws `snocBag` warning' else ws
        in POk s{messages=(ws', es)} ()
 
 getMessages :: PState -> Messages

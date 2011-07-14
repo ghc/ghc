@@ -9,7 +9,7 @@
 module DsMonad (
 	DsM, mapM, mapAndUnzipM,
 	initDs, initDsTc, fixDs,
-	foldlM, foldrM, ifDOptM, unsetOptM,
+	foldlM, foldrM, ifDOptM, unsetOptM, unsetWOptM,
 	Applicative(..),(<$>),
 
         newLocalName,
@@ -20,7 +20,7 @@ module DsMonad (
         mkPrintUnqualifiedDs,
         newUnique, 
         UniqSupply, newUniqueSupply,
-        getDOptsDs, getGhcModeDs, doptDs,
+        getDOptsDs, getGhcModeDs, doptDs, woptDs,
         dsLookupGlobal, dsLookupGlobalId, dsLookupDPHId, dsLookupTyCon, dsLookupDataCon,
         dsLookupClass,
 
@@ -256,6 +256,9 @@ getDOptsDs = getDOpts
 
 doptDs :: DynFlag -> TcRnIf gbl lcl Bool
 doptDs = doptM
+
+woptDs :: WarningFlag -> TcRnIf gbl lcl Bool
+woptDs = woptM
 
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDOptsDs >>= return . ghcMode

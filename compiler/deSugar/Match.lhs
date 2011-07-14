@@ -74,18 +74,18 @@ matchCheck_really dflags ctx@(DsMatchContext hs_ctx _) vars ty qs
   where 
     (pats, eqns_shadow) = check qs
     incomplete = incomplete_flag hs_ctx && (notNull pats)
-    shadow     = dopt Opt_WarnOverlappingPatterns dflags
+    shadow     = wopt Opt_WarnOverlappingPatterns dflags
               	 && notNull eqns_shadow
 
     incomplete_flag :: HsMatchContext id -> Bool
-    incomplete_flag (FunRhs {})   = dopt Opt_WarnIncompletePatterns dflags
-    incomplete_flag CaseAlt       = dopt Opt_WarnIncompletePatterns dflags
+    incomplete_flag (FunRhs {})   = wopt Opt_WarnIncompletePatterns dflags
+    incomplete_flag CaseAlt       = wopt Opt_WarnIncompletePatterns dflags
 
-    incomplete_flag LambdaExpr    = dopt Opt_WarnIncompleteUniPatterns dflags
-    incomplete_flag PatBindRhs    = dopt Opt_WarnIncompleteUniPatterns dflags
-    incomplete_flag ProcExpr      = dopt Opt_WarnIncompleteUniPatterns dflags
+    incomplete_flag LambdaExpr    = wopt Opt_WarnIncompleteUniPatterns dflags
+    incomplete_flag PatBindRhs    = wopt Opt_WarnIncompleteUniPatterns dflags
+    incomplete_flag ProcExpr      = wopt Opt_WarnIncompleteUniPatterns dflags
 
-    incomplete_flag RecUpd        = dopt Opt_WarnIncompletePatternsRecUpd dflags
+    incomplete_flag RecUpd        = wopt Opt_WarnIncompletePatternsRecUpd dflags
 
     incomplete_flag ThPatQuote    = False
     incomplete_flag (StmtCtxt {}) = False  -- Don't warn about incomplete patterns

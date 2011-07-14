@@ -980,7 +980,7 @@ checkDupAndShadowedNames envs names
 -------------------------------------
 checkShadowedOccs :: (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
 checkShadowedOccs (global_env,local_env) loc_occs
-  = ifDOptM Opt_WarnNameShadowing $ 
+  = ifWOptM Opt_WarnNameShadowing $ 
     do	{ traceRn (text "shadow" <+> ppr loc_occs)
 	; mapM_ check_shadow loc_occs }
   where
@@ -1214,7 +1214,7 @@ mapFvRnCPS f (x:xs) cont = f x 		   $ \ x' ->
 \begin{code}
 warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
-    = ifDOptM Opt_WarnUnusedBinds
+    = ifWOptM Opt_WarnUnusedBinds
     $ do isBoot <- tcIsHsBoot
          let noParent gre = case gre_par gre of
                             NoParent -> True
@@ -1230,9 +1230,9 @@ warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> FreeVars -> RnM ()
 warnUnusedLocalBinds = check_unused Opt_WarnUnusedBinds
 warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
 
-check_unused :: DynFlag -> [Name] -> FreeVars -> RnM ()
+check_unused :: WarningFlag -> [Name] -> FreeVars -> RnM ()
 check_unused flag bound_names used_names
- = ifDOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
+ = ifWOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
 
 -------------------------
 --	Helpers

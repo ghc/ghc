@@ -169,7 +169,7 @@ checkCTarget DynamicTarget = panic "checkCTarget DynamicTarget"
 checkMissingAmpersand :: DynFlags -> [Type] -> Type -> TcM ()
 checkMissingAmpersand dflags arg_tys res_ty
   | null arg_tys && isFunPtrTy res_ty &&
-    dopt Opt_WarnDodgyForeignImports dflags
+    wopt Opt_WarnDodgyForeignImports dflags
   = addWarn (ptext (sLit "possible missing & in foreign import of FunPtr"))
   | otherwise
   = return ()

@@ -12,12 +12,16 @@
 module DynFlags (
         -- * Dynamic flags and associated configuration types
         DynFlag(..),
+        WarningFlag(..),
         ExtensionFlag(..),
         LogAction,
         glasgowExtsFlags,
         dopt,
         dopt_set,
         dopt_unset,
+        wopt,
+        wopt_set,
+        wopt_unset,
         xopt,
         xopt_set,
         xopt_unset,
@@ -29,7 +33,7 @@ module DynFlags (
         PackageFlag(..),
         Option(..), showOpt,
         DynLibLoader(..),
-        fFlags, fLangFlags, xFlags,
+        fFlags, fWarningFlags, fLangFlags, xFlags,
         DPHBackend(..), dphPackageMaybe,
         wayNames, dynFlagDependencies,
 
@@ -214,38 +218,6 @@ data DynFlag
    | Opt_DoAsmLinting
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
-   | Opt_WarnDuplicateExports
-   | Opt_WarnHiShadows
-   | Opt_WarnImplicitPrelude
-   | Opt_WarnIncompletePatterns
-   | Opt_WarnIncompleteUniPatterns
-   | Opt_WarnIncompletePatternsRecUpd
-   | Opt_WarnMissingFields
-   | Opt_WarnMissingImportList
-   | Opt_WarnMissingMethods
-   | Opt_WarnMissingSigs
-   | Opt_WarnMissingLocalSigs
-   | Opt_WarnNameShadowing
-   | Opt_WarnOverlappingPatterns
-   | Opt_WarnTypeDefaults
-   | Opt_WarnMonomorphism
-   | Opt_WarnUnusedBinds
-   | Opt_WarnUnusedImports
-   | Opt_WarnUnusedMatches
-   | Opt_WarnWarningsDeprecations
-   | Opt_WarnDeprecatedFlags
-   | Opt_WarnDodgyExports
-   | Opt_WarnDodgyImports
-   | Opt_WarnOrphans
-   | Opt_WarnAutoOrphans
-   | Opt_WarnIdentities
-   | Opt_WarnTabs
-   | Opt_WarnUnrecognisedPragmas
-   | Opt_WarnDodgyForeignImports
-   | Opt_WarnLazyUnliftedBindings
-   | Opt_WarnUnusedDoBind
-   | Opt_WarnWrongDoBind
-   | Opt_WarnAlternativeLayoutRuleTransitional
 
    | Opt_PrintExplicitForalls
 
@@ -323,6 +295,41 @@ data DynFlag
    | Opt_KeepRawTokenStream
    | Opt_KeepLlvmFiles
 
+   deriving (Eq, Show)
+
+data WarningFlag =
+     Opt_WarnDuplicateExports
+   | Opt_WarnHiShadows
+   | Opt_WarnImplicitPrelude
+   | Opt_WarnIncompletePatterns
+   | Opt_WarnIncompleteUniPatterns
+   | Opt_WarnIncompletePatternsRecUpd
+   | Opt_WarnMissingFields
+   | Opt_WarnMissingImportList
+   | Opt_WarnMissingMethods
+   | Opt_WarnMissingSigs
+   | Opt_WarnMissingLocalSigs
+   | Opt_WarnNameShadowing
+   | Opt_WarnOverlappingPatterns
+   | Opt_WarnTypeDefaults
+   | Opt_WarnMonomorphism
+   | Opt_WarnUnusedBinds
+   | Opt_WarnUnusedImports
+   | Opt_WarnUnusedMatches
+   | Opt_WarnWarningsDeprecations
+   | Opt_WarnDeprecatedFlags
+   | Opt_WarnDodgyExports
+   | Opt_WarnDodgyImports
+   | Opt_WarnOrphans
+   | Opt_WarnAutoOrphans
+   | Opt_WarnIdentities
+   | Opt_WarnTabs
+   | Opt_WarnUnrecognisedPragmas
+   | Opt_WarnDodgyForeignImports
+   | Opt_WarnLazyUnliftedBindings
+   | Opt_WarnUnusedDoBind
+   | Opt_WarnWrongDoBind
+   | Opt_WarnAlternativeLayoutRuleTransitional
    deriving (Eq, Show)
 
 data Language = Haskell98 | Haskell2010
@@ -531,6 +538,7 @@ data DynFlags = DynFlags {
 
   -- hsc dynamic flags
   flags                 :: [DynFlag],
+  warningFlags          :: [WarningFlag],
   -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
   -- | Safe Haskell mode
@@ -853,6 +861,7 @@ defaultDynFlags mySettings =
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
         flags = defaultFlags,
+        warningFlags = standardWarnings,
         language = Nothing,
         safeHaskell = Sf_None,
         extensions = [],
@@ -948,6 +957,18 @@ dopt_set dfs f = dfs{ flags = f : flags dfs }
 -- | Unset a 'DynFlag'
 dopt_unset :: DynFlags -> DynFlag -> DynFlags
 dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
+
+-- | Test whether a 'WarningFlag' is set
+wopt :: WarningFlag -> DynFlags -> Bool
+wopt f dflags  = f `elem` (warningFlags dflags)
+
+-- | Set a 'WarningFlag'
+wopt_set :: DynFlags -> WarningFlag -> DynFlags
+wopt_set dfs f = dfs{ warningFlags = f : warningFlags dfs }
+
+-- | Unset a 'WarningFlag'
+wopt_unset :: DynFlags -> WarningFlag -> DynFlags
+wopt_unset dfs f = dfs{ warningFlags = filter (/= f) (warningFlags dfs) }
 
 -- | Test whether a 'ExtensionFlag' is set
 xopt :: ExtensionFlag -> DynFlags -> Bool
@@ -1272,14 +1293,15 @@ shFlagsDisallowed dflags = foldl check_method (dflags, []) bad_flags
 allFlags :: [String]
 allFlags = map ('-':) $
            [ flagName flag | flag <- dynamic_flags, ok (flagOptKind flag) ] ++
-           map ("fno-"++) flags ++
-           map ("f"++) flags ++
-           map ("f"++) flags' ++
+           map ("fno-"++) fflags ++
+           map ("f"++) fflags ++
            map ("X"++) supportedExtensions
     where ok (PrefixPred _ _) = False
           ok _   = True
-          flags  = [ name | (name, _, _, _) <- fFlags ]
-          flags' = [ name | (name, _, _, _) <- fLangFlags ]
+          fflags = fflags0 ++ fflags1 ++ fflags2
+          fflags0 = [ name | (name, _, _, _) <- fFlags ]
+          fflags1 = [ name | (name, _, _, _) <- fWarningFlags ]
+          fflags2 = [ name | (name, _, _, _) <- fLangFlags ]
 
 --------------- The main flags themselves ------------------
 dynamic_flags :: [Flag (CmdLineP DynFlags)]
@@ -1502,14 +1524,14 @@ dynamic_flags = [
   , flagA "msse2"        (NoArg (setDynFlag Opt_SSE2))
 
      ------ Warning opts -------------------------------------------------
-  , flagA "W"      (NoArg (mapM_ setDynFlag   minusWOpts))
-  , flagA "Werror" (NoArg (setDynFlag         Opt_WarnIsError))
-  , flagA "Wwarn"  (NoArg (unSetDynFlag       Opt_WarnIsError))
-  , flagA "Wall"   (NoArg (mapM_ setDynFlag   minusWallOpts))
-  , flagA "Wnot"   (NoArg (do { mapM_ unSetDynFlag minusWallOpts
-                             ; deprecate "Use -w instead" }))
-  , flagA "w"      (NoArg (mapM_ unSetDynFlag minuswRemovesOpts))
-        
+  , flagA "W"      (NoArg (mapM_ setWarningFlag minusWOpts))
+  , flagA "Werror" (NoArg (setDynFlag           Opt_WarnIsError))
+  , flagA "Wwarn"  (NoArg (unSetDynFlag         Opt_WarnIsError))
+  , flagA "Wall"   (NoArg (mapM_ setWarningFlag minusWallOpts))
+  , flagA "Wnot"   (NoArg (do upd (\dfs -> dfs {warningFlags = []})
+                              deprecate "Use -w instead"))
+  , flagA "w"      (NoArg (upd (\dfs -> dfs {warningFlags = []})))
+
         ------ Plugin flags ------------------------------------------------
   , flagA "fplugin-opt" (hasArg addPluginModuleNameOption)
   , flagA "fplugin"     (hasArg addPluginModuleName)
@@ -1575,6 +1597,8 @@ dynamic_flags = [
  ]
  ++ map (mkFlag turnOn  "f"    setDynFlag  ) fFlags
  ++ map (mkFlag turnOff "fno-" unSetDynFlag) fFlags
+ ++ map (mkFlag turnOn  "f"    setWarningFlag  ) fWarningFlags
+ ++ map (mkFlag turnOff "fno-" unSetWarningFlag) fWarningFlags
  ++ map (mkFlag turnOn  "f"    setExtensionFlag  ) fLangFlags
  ++ map (mkFlag turnOff "fno-" unSetExtensionFlag) fLangFlags
  ++ map (mkFlag turnOn  "X"    setExtensionFlag  ) xFlags
@@ -1641,8 +1665,8 @@ nop :: TurnOnFlag -> DynP ()
 nop _ = return ()
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
-fFlags :: [FlagSpec DynFlag]
-fFlags = [
+fWarningFlags :: [FlagSpec WarningFlag]
+fWarningFlags = [
   ( "warn-dodgy-foreign-imports",       AlwaysAllowed, Opt_WarnDodgyForeignImports, nop ),
   ( "warn-dodgy-exports",               AlwaysAllowed, Opt_WarnDodgyExports, nop ),
   ( "warn-dodgy-imports",               AlwaysAllowed, Opt_WarnDodgyImports, nop ),
@@ -1675,7 +1699,11 @@ fFlags = [
   ( "warn-lazy-unlifted-bindings",      AlwaysAllowed, Opt_WarnLazyUnliftedBindings, nop),
   ( "warn-unused-do-bind",              AlwaysAllowed, Opt_WarnUnusedDoBind, nop ),
   ( "warn-wrong-do-bind",               AlwaysAllowed, Opt_WarnWrongDoBind, nop ),
-  ( "warn-alternative-layout-rule-transitional", AlwaysAllowed, Opt_WarnAlternativeLayoutRuleTransitional, nop ),
+  ( "warn-alternative-layout-rule-transitional", AlwaysAllowed, Opt_WarnAlternativeLayoutRuleTransitional, nop )]
+
+-- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
+fFlags :: [FlagSpec DynFlag]
+fFlags = [
   ( "print-explicit-foralls",           AlwaysAllowed, Opt_PrintExplicitForalls, nop ),
   ( "strictness",                       AlwaysAllowed, Opt_Strictness, nop ),
   ( "specialise",                       AlwaysAllowed, Opt_Specialise, nop ),
@@ -1897,8 +1925,6 @@ defaultFlags
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
              -- The default -O0 options
 
-    ++ standardWarnings
-
 impliedFlags :: [(ExtensionFlag, TurnOnFlag, ExtensionFlag)]
 impliedFlags
   = [ (Opt_RankNTypes,                turnOn, Opt_ExplicitForAll)
@@ -1970,7 +1996,7 @@ optLevelFlags
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
 
-standardWarnings :: [DynFlag]
+standardWarnings :: [WarningFlag]
 standardWarnings
     = [ Opt_WarnWarningsDeprecations,
         Opt_WarnDeprecatedFlags,
@@ -1985,7 +2011,7 @@ standardWarnings
         Opt_WarnAlternativeLayoutRuleTransitional
       ]
 
-minusWOpts :: [DynFlag]
+minusWOpts :: [WarningFlag]
 -- Things you get with -W
 minusWOpts
     = standardWarnings ++
@@ -1997,7 +2023,7 @@ minusWOpts
         Opt_WarnDodgyImports
       ]
 
-minusWallOpts :: [DynFlag]
+minusWallOpts :: [WarningFlag]
 -- Things you get with -Wall
 minusWallOpts
     = minusWOpts ++
@@ -2008,19 +2034,6 @@ minusWallOpts
         Opt_WarnOrphans,
         Opt_WarnUnusedDoBind
       ]
-
-minuswRemovesOpts :: [DynFlag]
--- minuswRemovesOpts should be every warning option 
-minuswRemovesOpts
-    = minusWallOpts ++
-      [Opt_WarnTabs,
-       Opt_WarnIncompletePatternsRecUpd,
-       Opt_WarnIncompleteUniPatterns,
-       Opt_WarnMonomorphism,
-       Opt_WarnUnrecognisedPragmas,
-       Opt_WarnAutoOrphans,
-       Opt_WarnImplicitPrelude
-     ]       
 
 enableGlasgowExts :: DynP ()
 enableGlasgowExts = do setDynFlag Opt_PrintExplicitForalls
@@ -2138,6 +2151,11 @@ setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
 setDynFlag   f = upd (\dfs -> dopt_set dfs f)
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
+
+--------------------------
+setWarningFlag, unSetWarningFlag :: WarningFlag -> DynP ()
+setWarningFlag   f = upd (\dfs -> wopt_set dfs f)
+unSetWarningFlag f = upd (\dfs -> wopt_unset dfs f)
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: ExtensionFlag -> DynP ()
