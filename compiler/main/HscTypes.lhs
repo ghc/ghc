@@ -130,8 +130,7 @@ import TyCon
 import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
-import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
-                          DynFlag(..), SafeHaskellMode(..), dynFlagDependencies )
+import DynFlags
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -235,7 +234,7 @@ printOrThrowWarnings dflags warns
 
 handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
 handleFlagWarnings dflags warns
- = when (dopt Opt_WarnDeprecatedFlags dflags) $ do
+ = when (wopt Opt_WarnDeprecatedFlags dflags) $ do
         -- It would be nicer if warns :: [Located Message], but that
         -- has circular import problems.
       let bag = listToBag [ mkPlainWarnMsg loc (text warn) 

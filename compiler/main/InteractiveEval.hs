@@ -197,7 +197,7 @@ runStmtWithLocation source linenumber expr step =
 
     -- Turn off -fwarn-unused-bindings when running a statement, to hide
     -- warnings about the implicit bindings we introduce.
-    let dflags'  = dopt_unset (hsc_dflags hsc_env) Opt_WarnUnusedBinds
+    let dflags'  = wopt_unset (hsc_dflags hsc_env) Opt_WarnUnusedBinds
         hsc_env' = hsc_env{ hsc_dflags = dflags' }
 
     r <- liftIO $ hscStmtWithLocation hsc_env' expr source linenumber

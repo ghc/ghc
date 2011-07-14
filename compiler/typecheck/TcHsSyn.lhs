@@ -44,7 +44,7 @@ import NameSet
 import Var
 import VarSet
 import VarEnv
-import DynFlags( DynFlag(..) )
+import DynFlags
 import Literal
 import BasicTypes
 import Maybes
@@ -286,7 +286,7 @@ zonkTopDecls ev_binds binds sig_ns rules vects imp_specs fords
 
 	 -- Warn about missing signatures
 	 -- Do this only when we we have a type to offer
-        ; warn_missing_sigs <- doptM Opt_WarnMissingSigs
+        ; warn_missing_sigs <- woptM Opt_WarnMissingSigs
         ; let sig_warn | warn_missing_sigs = topSigWarn sig_ns
                        | otherwise         = noSigWarn
 
@@ -307,7 +307,7 @@ zonkLocalBinds _ (HsValBinds (ValBindsIn {}))
   = panic "zonkLocalBinds" -- Not in typechecker output
 
 zonkLocalBinds env (HsValBinds vb@(ValBindsOut binds sigs))
-  = do	{ warn_missing_sigs <- doptM Opt_WarnMissingLocalSigs
+  = do	{ warn_missing_sigs <- woptM Opt_WarnMissingLocalSigs
         ; let sig_warn | not warn_missing_sigs = noSigWarn
                        | otherwise             = localSigWarn sig_ns
               sig_ns = getTypeSigNames vb

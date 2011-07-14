@@ -289,8 +289,8 @@ mkIface_ hsc_env maybe_old_fingerprint
                                          intermediate_iface decls
 
 		-- Warn about orphans
-	; let warn_orphs      = dopt Opt_WarnOrphans dflags
-              warn_auto_orphs = dopt Opt_WarnAutoOrphans dflags
+	; let warn_orphs      = wopt Opt_WarnOrphans dflags
+              warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
               orph_warnings   --- Laziness means no work done unless -fwarn-orphans
 	        | warn_orphs || warn_auto_orphs = rule_warns `unionBags` inst_warns
 	        | otherwise 	       	        = emptyBag

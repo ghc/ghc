@@ -563,7 +563,7 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 forAllWarn :: SDoc -> LHsType RdrName -> Located RdrName
            -> TcRnIf TcGblEnv TcLclEnv ()
 forAllWarn doc ty (L loc tyvar)
-  = ifDOptM Opt_WarnUnusedMatches 	$
+  = ifWOptM Opt_WarnUnusedMatches 	$
     addWarnAt loc (sep [ptext (sLit "The universally quantified type variable") <+> quotes (ppr tyvar),
 		 	nest 4 (ptext (sLit "does not appear in the type") <+> quotes (ppr ty))]
 		   $$

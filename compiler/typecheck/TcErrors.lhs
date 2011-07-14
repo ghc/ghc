@@ -818,7 +818,7 @@ find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 
 warnDefaulting :: [FlavoredEvVar] -> Type -> TcM ()
 warnDefaulting wanteds default_ty
-  = do { warn_default <- doptM Opt_WarnTypeDefaults
+  = do { warn_default <- woptM Opt_WarnTypeDefaults
        ; env0 <- tcInitTidyEnv
        ; let wanted_bag = listToBag wanteds
              tidy_env = tidyFreeTyVars env0 $
