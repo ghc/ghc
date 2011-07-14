@@ -585,32 +585,6 @@ data Token
   deriving Show -- debugging
 #endif
 
-{-
-isSpecial :: Token -> Bool
--- If we see M.x, where x is a keyword, but
--- is special, we treat is as just plain M.x,
--- not as a keyword.
-isSpecial ITas            = True
-isSpecial IThiding        = True
-isSpecial ITqualified     = True
-isSpecial ITforall        = True
-isSpecial ITexport        = True
-isSpecial ITlabel         = True
-isSpecial ITdynamic       = True
-isSpecial ITsafe          = True
-isSpecial ITinterruptible = True
-isSpecial ITunsafe        = True
-isSpecial ITccallconv     = True
-isSpecial ITstdcallconv   = True
-isSpecial ITprimcallconv  = True
-isSpecial ITmdo           = True
-isSpecial ITfamily        = True
-isSpecial ITgroup         = True
-isSpecial ITby            = True
-isSpecial ITusing         = True
-isSpecial _               = False
--}
-
 -- the bitmap provided as the third component indicates whether the
 -- corresponding extension keyword is valid under the extension options
 -- provided to the compiler; if the extension corresponding to *any* of the
@@ -798,11 +772,6 @@ isNormalComment bits _ _ (AI _ buf)
 
 spaceAndP :: StringBuffer -> (StringBuffer -> Bool) -> Bool
 spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
-
-{-
-haddockDisabledAnd p bits _ _ (AI _ buf)
-  = if haddockEnabled bits then False else (p buf)
--}
 
 atEOL :: AlexAccPred Int
 atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
@@ -1027,13 +996,13 @@ sym con span buf len =
 
 -- Variations on the integral numeric literal.
 tok_integral :: (Integer -> Token)
-     -> (Integer -> Integer)
- --    -> (StringBuffer -> StringBuffer) -> (Int -> Int)
-     -> Int -> Int
-     -> (Integer, (Char->Int)) -> Action
-tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
-  return $ L span $ itint $! transint $ parseUnsignedInteger
-     (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
+             -> (Integer -> Integer)
+             -> Int -> Int
+             -> (Integer, (Char -> Int))
+             -> Action
+tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
+ = return $ L span $ itint $! transint $ parseUnsignedInteger
+       (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
 -- some conveniences for use with tok_integral
 tok_num :: (Integer -> Integer)
