@@ -128,6 +128,7 @@ struct TRACE_FLAGS {
     int tracing;
     rtsBool timestamp;      /* show timestamp in stderr output */
     rtsBool scheduler;      /* trace scheduler events */
+    rtsBool gc;             /* trace GC events */
     rtsBool sparks;         /* trace spark events */
 };
 

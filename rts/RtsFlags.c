@@ -163,6 +163,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.tracing       = TRACE_NONE;
     RtsFlags.TraceFlags.timestamp     = rtsFalse;
     RtsFlags.TraceFlags.scheduler     = rtsFalse;
+    RtsFlags.TraceFlags.gc            = rtsFalse;
     RtsFlags.TraceFlags.sparks        = rtsFalse;
 #endif
 
@@ -289,6 +290,7 @@ usage_text[] = {
 #  endif
 "             where [flags] can contain:",
 "                s    scheduler events",
+"                g    GC events",
 "                p    par spark events",
 #  ifdef DEBUG
 "                t    add time stamps (only useful with -v)",
@@ -1452,6 +1454,7 @@ static void read_trace_flags(char *arg)
      * scheduler or GC tracing.
      */
     RtsFlags.TraceFlags.scheduler = rtsTrue;
+    RtsFlags.TraceFlags.gc        = rtsTrue;
     RtsFlags.TraceFlags.sparks = rtsTrue;
 
     for (c  = arg; *c != '\0'; c++) {
@@ -1463,6 +1466,7 @@ static void read_trace_flags(char *arg)
             break;
         case 'a':
             RtsFlags.TraceFlags.scheduler = enabled;
+            RtsFlags.TraceFlags.gc        = enabled;
             RtsFlags.TraceFlags.sparks = enabled;
             enabled = rtsTrue;
             break;
@@ -1480,7 +1484,7 @@ static void read_trace_flags(char *arg)
             enabled = rtsTrue;
             break;
         case 'g':
-            // ignored for backwards-compat
+            RtsFlags.TraceFlags.gc        = enabled;
             enabled = rtsTrue;
             break;
         default:

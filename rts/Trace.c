@@ -47,6 +47,7 @@ int DEBUG_sparks;
 
 // events
 int TRACE_sched;
+int TRACE_gc;
 int TRACE_spark;
 
 #ifdef THREADED_RTS
@@ -90,6 +91,11 @@ void initTracing (void)
     TRACE_sched =
         RtsFlags.TraceFlags.scheduler ||
         RtsFlags.DebugFlags.scheduler;
+
+    // -Dg turns on gc tracing too
+    TRACE_gc =
+        RtsFlags.TraceFlags.gc ||
+        RtsFlags.DebugFlags.gc;
 
     // -Dr turns on spark tracing
     TRACE_spark =
@@ -222,27 +228,6 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     case EVENT_SHUTDOWN:        // (cap)
         debugBelch("cap %d: shutting down\n", cap->no);
         break;
-    case EVENT_REQUEST_SEQ_GC:  // (cap)
-        debugBelch("cap %d: requesting sequential GC\n", cap->no);
-        break;
-    case EVENT_REQUEST_PAR_GC:  // (cap)
-        debugBelch("cap %d: requesting parallel GC\n", cap->no);
-        break;
-    case EVENT_GC_START:        // (cap)
-        debugBelch("cap %d: starting GC\n", cap->no);
-        break;
-    case EVENT_GC_END:          // (cap)
-        debugBelch("cap %d: finished GC\n", cap->no);
-        break;
-    case EVENT_GC_IDLE:        // (cap)
-        debugBelch("cap %d: GC idle\n", cap->no);
-        break;
-    case EVENT_GC_WORK:          // (cap)
-        debugBelch("cap %d: GC working\n", cap->no);
-        break;
-    case EVENT_GC_DONE:          // (cap)
-        debugBelch("cap %d: GC done\n", cap->no);
-        break;
     default:
         debugBelch("cap %d: thread %lu: event %d\n\n", 
                    cap->no, (lnat)tso->id, tag);
@@ -263,6 +248,56 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
 #endif
     {
         postSchedEvent(cap,tag,tso ? tso->id : 0, info1, info2);
+    }
+}
+
+#ifdef DEBUG
+static void traceGcEvent_stderr (Capability *cap, EventTypeNum tag)
+{
+    ACQUIRE_LOCK(&trace_utx);
+
+    tracePreface();
+    switch (tag) {
+      case EVENT_REQUEST_SEQ_GC:  // (cap)
+          debugBelch("cap %d: requesting sequential GC\n", cap->no);
+          break;
+      case EVENT_REQUEST_PAR_GC:  // (cap)
+          debugBelch("cap %d: requesting parallel GC\n", cap->no);
+          break;
+      case EVENT_GC_START:        // (cap)
+          debugBelch("cap %d: starting GC\n", cap->no);
+          break;
+      case EVENT_GC_END:          // (cap)
+          debugBelch("cap %d: finished GC\n", cap->no);
+          break;
+      case EVENT_GC_IDLE:         // (cap)
+          debugBelch("cap %d: GC idle\n", cap->no);
+          break;
+      case EVENT_GC_WORK:         // (cap)
+          debugBelch("cap %d: GC working\n", cap->no);
+          break;
+      case EVENT_GC_DONE:         // (cap)
+          debugBelch("cap %d: GC done\n", cap->no);
+          break;
+      default:
+          barf("traceGcEvent: unknown event tag %d", tag);
+          break;
+    }
+
+    RELEASE_LOCK(&trace_utx);
+}
+#endif
+
+void traceGcEvent_ (Capability *cap, EventTypeNum tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceGcEvent_stderr(cap, tag);
+    } else
+#endif
+    {
+        /* currently all GC events are nullary events */
+        postEvent(cap, tag);
     }
 }
 
@@ -357,19 +392,6 @@ void traceSparkCounters_ (Capability *cap,
 #endif
     {
         postSparkCountersEvent(cap, counters, remaining);
-    }
-}
-
-
-void traceEvent_ (Capability *cap, EventTypeNum tag)
-{
-#ifdef DEBUG
-    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
-        traceSchedEvent_stderr(cap, tag, 0, 0, 0);
-    } else
-#endif
-    {
-        postEvent(cap,tag);
     }
 }
 

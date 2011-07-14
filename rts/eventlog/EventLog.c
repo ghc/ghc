@@ -470,16 +470,12 @@ postSchedEvent (Capability *cap,
     }
 
     case EVENT_SHUTDOWN:        // (cap)
-    case EVENT_REQUEST_SEQ_GC:  // (cap)
-    case EVENT_REQUEST_PAR_GC:  // (cap)
-    case EVENT_GC_START:        // (cap)
-    case EVENT_GC_END:          // (cap)
     {
         break;
     }
 
     default:
-        barf("postEvent: unknown event tag %d", tag);
+        barf("postSchedEvent: unknown event tag %d", tag);
     }
 }
 

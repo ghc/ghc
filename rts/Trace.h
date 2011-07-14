@@ -62,6 +62,7 @@ extern int DEBUG_sparks;
 
 // events
 extern int TRACE_sched;
+extern int TRACE_gc;
 extern int TRACE_spark;
 
 // -----------------------------------------------------------------------------
@@ -102,16 +103,15 @@ void traceEnd (void);
 void traceSchedEvent_ (Capability *cap, EventTypeNum tag, 
                        StgTSO *tso, StgWord info1, StgWord info2);
 
-
-/*
- * Record a nullary event
+/* 
+ * Record a GC event
  */
-#define traceEvent(cap, tag)                    \
-    if (RTS_UNLIKELY(TRACE_sched)) {            \
-        traceEvent_(cap, tag);                  \
+#define traceGcEvent(cap, tag)    \
+    if (RTS_UNLIKELY(TRACE_gc)) { \
+        traceGcEvent_(cap, tag);  \
     }
 
-void traceEvent_ (Capability *cap, EventTypeNum tag);
+void traceGcEvent_ (Capability *cap, EventTypeNum tag);
 
 // variadic macros are C99, and supported by gcc.  However, the
 // ##__VA_ARGS syntax is a gcc extension, which allows the variable
@@ -198,8 +198,8 @@ void traceSparkCounters_ (Capability *cap,
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
 #define traceSchedEvent2(cap, tag, tso, other, info) /* nothing */
+#define traceGcEvent(cap, tag) /* nothing */
 #define traceSparkEvent(cap, tag, tso, other) /* nothing */
-#define traceEvent(cap, tag) /* nothing */
 #define traceCap(class, cap, msg, ...) /* nothing */
 #define trace(class, msg, ...) /* nothing */
 #define debugTrace(class, str, ...) /* nothing */
@@ -384,27 +384,46 @@ INLINE_HEADER void traceEventThreadWakeup(Capability *cap       STG_UNUSED,
 
 INLINE_HEADER void traceEventGcStart(Capability *cap STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_GC_START, 0, 0);
+    traceGcEvent(cap, EVENT_GC_START);
     dtraceGcStart((EventCapNo)cap->no);
 }
 
 INLINE_HEADER void traceEventGcEnd(Capability *cap STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_GC_END, 0, 0);
+    traceGcEvent(cap, EVENT_GC_END);
     dtraceGcEnd((EventCapNo)cap->no);
 }
 
 INLINE_HEADER void traceEventRequestSeqGc(Capability *cap STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_REQUEST_SEQ_GC, 0, 0);
+    traceGcEvent(cap, EVENT_REQUEST_SEQ_GC);
     dtraceRequestSeqGc((EventCapNo)cap->no);
 }
 
 INLINE_HEADER void traceEventRequestParGc(Capability *cap STG_UNUSED)
 {
-    traceSchedEvent(cap, EVENT_REQUEST_PAR_GC, 0, 0);
+    traceGcEvent(cap, EVENT_REQUEST_PAR_GC);
     dtraceRequestParGc((EventCapNo)cap->no);
 }
+
+INLINE_HEADER void traceEventGcIdle(Capability *cap STG_UNUSED)
+{
+    traceGcEvent(cap, EVENT_GC_IDLE);
+    dtraceGcIdle((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceEventGcWork(Capability *cap STG_UNUSED)
+{
+    traceGcEvent(cap, EVENT_GC_WORK);
+    dtraceGcWork((EventCapNo)cap->no);
+}
+
+INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
+{
+    traceGcEvent(cap, EVENT_GC_DONE);
+    dtraceGcDone((EventCapNo)cap->no);
+}
+
 
 INLINE_HEADER void traceEventRunSpark(Capability *cap STG_UNUSED, 
                                       StgTSO     *tso STG_UNUSED)
@@ -441,24 +460,6 @@ INLINE_HEADER void traceEventStartup(void)
 
     traceEventStartup_(n_caps);
     dtraceStartup(n_caps);
-}
-
-INLINE_HEADER void traceEventGcIdle(Capability *cap STG_UNUSED)
-{
-    traceEvent(cap, EVENT_GC_IDLE);
-    dtraceGcIdle((EventCapNo)cap->no);
-}
-
-INLINE_HEADER void traceEventGcWork(Capability *cap STG_UNUSED)
-{
-    traceEvent(cap, EVENT_GC_WORK);
-    dtraceGcWork((EventCapNo)cap->no);
-}
-
-INLINE_HEADER void traceEventGcDone(Capability *cap STG_UNUSED)
-{
-    traceEvent(cap, EVENT_GC_DONE);
-    dtraceGcDone((EventCapNo)cap->no);
 }
 
 INLINE_HEADER void traceCapsetCreate(CapsetID   capset      STG_UNUSED,
