@@ -87,6 +87,9 @@ data TypeRep = TypeRep {-# UNPACK #-} !Fingerprint TyCon [TypeRep]
 instance Eq TypeRep where
   (TypeRep k1 _ _) == (TypeRep k2 _ _) = k1 == k2
 
+instance Ord TypeRep where
+  (TypeRep k1 _ _) <= (TypeRep k2 _ _) = k1 <= k2
+
 -- | An abstract representation of a type constructor.  'TyCon' objects can
 -- be built using 'mkTyCon'.
 data TyCon = TyCon {
@@ -98,6 +101,9 @@ data TyCon = TyCon {
 
 instance Eq TyCon where
   (TyCon t1 _ _ _) == (TyCon t2 _ _ _) = t1 == t2
+
+instance Ord TyCon where
+  (TyCon k1 _ _ _) <= (TyCon k2 _ _ _) = k1 <= k2
 
 ----------------- Construction --------------------
 
