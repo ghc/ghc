@@ -152,7 +152,8 @@ createAdjustor (int cconv,
 #else 
 #define UNDERSCORE ""
 #endif
-#if defined(i386_HOST_ARCH) && !defined(darwin_HOST_OS)
+
+#if defined(x86_64_HOST_ARCH)
 /* 
   Now here's something obscure for you:
 
@@ -170,20 +171,6 @@ createAdjustor (int cconv,
   returning in some static piece of memory and arrange
   to return to it before tail jumping from the adjustor thunk.
 */
-static void  GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
-{
-  __asm__ (
-     ".globl " UNDERSCORE "obscure_ccall_ret_code\n"
-     UNDERSCORE "obscure_ccall_ret_code:\n\t"
-     "addl $0x4, %esp\n\t"
-     "ret"
-   );
-}
-extern void obscure_ccall_ret_code(void);
-
-#endif
-
-#if defined(x86_64_HOST_ARCH)
 static void GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
 {
   __asm__ (
