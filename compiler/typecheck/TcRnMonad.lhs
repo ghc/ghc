@@ -251,15 +251,13 @@ doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 woptM :: WarningFlag -> TcRnIf gbl lcl Bool
 woptM flag = do { dflags <- getDOpts; return (wopt flag dflags) }
 
--- XXX setOptM and unsetOptM operate on different types. One should be renamed.
+setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                          env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
-setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
-
-unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+unsetDOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetDOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->

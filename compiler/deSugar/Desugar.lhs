@@ -346,7 +346,7 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs' = [var | RuleBndr (L _ var) <- vars]
 
-        ; lhs' <- unsetOptM Opt_EnableRewriteRules $
+        ; lhs' <- unsetDOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
                   dsLExpr lhs   -- Note [Desugaring RULE left hand sides]
 
