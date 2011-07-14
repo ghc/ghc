@@ -9,7 +9,7 @@
 module DsMonad (
 	DsM, mapM, mapAndUnzipM,
 	initDs, initDsTc, fixDs,
-	foldlM, foldrM, ifDOptM, unsetOptM, unsetWOptM,
+	foldlM, foldrM, ifDOptM, unsetDOptM, unsetWOptM,
 	Applicative(..),(<$>),
 
         newLocalName,
