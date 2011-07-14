@@ -95,13 +95,14 @@ findSpark (Capability *cap)
       spark = tryStealSpark(cap->sparks);
       while (spark != NULL && fizzledSpark(spark)) {
           cap->spark_stats.fizzled++;
+          traceEventSparkFizzle(cap);
           spark = tryStealSpark(cap->sparks);
       }
       if (spark != NULL) {
           cap->spark_stats.converted++;
 
           // Post event for running a spark from capability's own pool.
-          traceEventRunSpark(cap, cap->r.rCurrentTSO);
+          traceEventSparkRun(cap);
 
           return spark;
       }
@@ -128,6 +129,7 @@ findSpark (Capability *cap)
           spark = tryStealSpark(robbed->sparks);
           while (spark != NULL && fizzledSpark(spark)) {
               cap->spark_stats.fizzled++;
+              traceEventSparkFizzle(cap);
               spark = tryStealSpark(robbed->sparks);
           }
           if (spark == NULL && !emptySparkPoolCap(robbed)) {
@@ -138,8 +140,7 @@ findSpark (Capability *cap)
 
           if (spark != NULL) {
               cap->spark_stats.converted++;
-
-              traceEventStealSpark(cap, cap->r.rCurrentTSO, robbed->no);
+              traceEventSparkSteal(cap, robbed->no);
               
               return spark;
           }

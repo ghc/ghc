@@ -61,13 +61,16 @@ newSpark (StgRegTable *reg, StgClosure *p)
 
     if (!fizzledSpark(p)) {
         if (pushWSDeque(pool,p)) {
-           cap->spark_stats.created++;
+            cap->spark_stats.created++;
+            traceEventSparkCreate(cap);
         } else {
             /* overflowing the spark pool */
             cap->spark_stats.overflowed++;
+            traceEventSparkOverflow(cap);
 	}
     } else {
         cap->spark_stats.dud++;
+        traceEventSparkDud(cap);
     }
 
     return 1;
@@ -174,6 +177,7 @@ pruneSparkQueue (Capability *cap)
           // robustness.
           pruned_sparks++;
           cap->spark_stats.fizzled++;
+          traceEventSparkFizzle(cap);
       } else {
           info = spark->header.info;
           if (IS_FORWARDING_PTR(info)) {
@@ -186,6 +190,7 @@ pruneSparkQueue (Capability *cap)
               } else {
                   pruned_sparks++; // discard spark
                   cap->spark_stats.fizzled++;
+                  traceEventSparkFizzle(cap);
               }
           } else if (HEAP_ALLOCED(spark)) {
               if ((Bdescr((P_)spark)->flags & BF_EVACUATED)) {
@@ -196,10 +201,12 @@ pruneSparkQueue (Capability *cap)
                   } else {
                       pruned_sparks++; // discard spark
                       cap->spark_stats.fizzled++;
+                      traceEventSparkFizzle(cap);
                   }
               } else {
                   pruned_sparks++; // discard spark
                   cap->spark_stats.gcd++;
+                  traceEventSparkGC(cap);
               }
           } else {
               if (INFO_PTR_TO_STRUCT(info)->type == THUNK_STATIC) {
@@ -210,10 +217,12 @@ pruneSparkQueue (Capability *cap)
                   } else {
                       pruned_sparks++; // discard spark
                       cap->spark_stats.gcd++;
+                      traceEventSparkGC(cap);
                   }
               } else {
                   pruned_sparks++; // discard spark
                   cap->spark_stats.fizzled++;
+                  traceEventSparkFizzle(cap);
               }
           }
       }

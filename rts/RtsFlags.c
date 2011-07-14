@@ -164,7 +164,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.timestamp     = rtsFalse;
     RtsFlags.TraceFlags.scheduler     = rtsFalse;
     RtsFlags.TraceFlags.gc            = rtsFalse;
-    RtsFlags.TraceFlags.sparks        = rtsFalse;
+    RtsFlags.TraceFlags.sparks_sampled= rtsFalse;
+    RtsFlags.TraceFlags.sparks_full   = rtsFalse;
 #endif
 
     RtsFlags.MiscFlags.tickInterval	= 20;  /* In milliseconds */
@@ -291,7 +292,8 @@ usage_text[] = {
 "             where [flags] can contain:",
 "                s    scheduler events",
 "                g    GC events",
-"                p    par spark events",
+"                p    par spark events (sampled)",
+"                f    par spark events (full detail)",
 #  ifdef DEBUG
 "                t    add time stamps (only useful with -v)",
 #  endif
@@ -1449,13 +1451,13 @@ static void read_trace_flags(char *arg)
 
     /* Start by turning on the default tracing flags.
      *
-     * Currently this is all the trace classes, but might not be in
-     * future, for example we might default to slightly less verbose
+     * Currently this is all the trace classes, except full-detail sparks.
+     * Similarly, in future we might default to slightly less verbose
      * scheduler or GC tracing.
      */
-    RtsFlags.TraceFlags.scheduler = rtsTrue;
-    RtsFlags.TraceFlags.gc        = rtsTrue;
-    RtsFlags.TraceFlags.sparks = rtsTrue;
+    RtsFlags.TraceFlags.scheduler      = rtsTrue;
+    RtsFlags.TraceFlags.gc             = rtsTrue;
+    RtsFlags.TraceFlags.sparks_sampled = rtsTrue;
 
     for (c  = arg; *c != '\0'; c++) {
         switch(*c) {
@@ -1465,9 +1467,10 @@ static void read_trace_flags(char *arg)
             enabled = rtsFalse;
             break;
         case 'a':
-            RtsFlags.TraceFlags.scheduler = enabled;
-            RtsFlags.TraceFlags.gc        = enabled;
-            RtsFlags.TraceFlags.sparks = enabled;
+            RtsFlags.TraceFlags.scheduler      = enabled;
+            RtsFlags.TraceFlags.gc             = enabled;
+            RtsFlags.TraceFlags.sparks_sampled = enabled;
+            RtsFlags.TraceFlags.sparks_full    = enabled;
             enabled = rtsTrue;
             break;
 
@@ -1476,7 +1479,11 @@ static void read_trace_flags(char *arg)
             enabled = rtsTrue;
             break;
         case 'p':
-            RtsFlags.TraceFlags.sparks = enabled;
+            RtsFlags.TraceFlags.sparks_sampled = enabled;
+            enabled = rtsTrue;
+            break;
+        case 'f':
+            RtsFlags.TraceFlags.sparks_full = enabled;
             enabled = rtsTrue;
             break;
         case 't':

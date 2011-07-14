@@ -129,7 +129,8 @@ struct TRACE_FLAGS {
     rtsBool timestamp;      /* show timestamp in stderr output */
     rtsBool scheduler;      /* trace scheduler events */
     rtsBool gc;             /* trace GC events */
-    rtsBool sparks;         /* trace spark events */
+    rtsBool sparks_sampled; /* trace spark events by a sampled method */
+    rtsBool sparks_full;    /* trace spark events 100% accurately */
 };
 
 struct CONCURRENT_FLAGS {

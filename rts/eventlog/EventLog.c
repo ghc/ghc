@@ -60,8 +60,6 @@ char *EventDesc[] = {
   [EVENT_STOP_THREAD]         = "Stop thread",
   [EVENT_THREAD_RUNNABLE]     = "Thread runnable",
   [EVENT_MIGRATE_THREAD]      = "Migrate thread",
-  [EVENT_RUN_SPARK]           = "Run spark",
-  [EVENT_STEAL_SPARK]         = "Steal spark",
   [EVENT_SHUTDOWN]            = "Shutdown",
   [EVENT_THREAD_WAKEUP]       = "Wakeup thread",
   [EVENT_GC_START]            = "Starting GC",
@@ -85,7 +83,14 @@ char *EventDesc[] = {
   [EVENT_PROGRAM_ENV]         = "Program environment variables",
   [EVENT_OSPROCESS_PID]       = "Process ID",
   [EVENT_OSPROCESS_PPID]      = "Parent process ID",
-  [EVENT_SPARK_COUNTERS]      = "Spark counters"
+  [EVENT_SPARK_COUNTERS]      = "Spark counters",
+  [EVENT_SPARK_CREATE]        = "Spark create",
+  [EVENT_SPARK_DUD]           = "Spark dud",
+  [EVENT_SPARK_OVERFLOW]      = "Spark overflow",
+  [EVENT_SPARK_RUN]           = "Spark run",
+  [EVENT_SPARK_STEAL]         = "Spark steal",
+  [EVENT_SPARK_FIZZLE]        = "Spark fizzle",
+  [EVENT_SPARK_GC]            = "Spark GC",
 };
 
 // Event type. 
@@ -254,13 +259,11 @@ initEventLogging(void)
         case EVENT_CREATE_THREAD:   // (cap, thread)
         case EVENT_RUN_THREAD:      // (cap, thread)
         case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        case EVENT_RUN_SPARK:       // (cap, thread)
         case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
             eventTypes[t].size = sizeof(EventThreadID);
             break;
 
         case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        case EVENT_STEAL_SPARK:     // (cap, thread, victim_cap)
         case EVENT_THREAD_WAKEUP:   // (cap, thread, other_cap)
             eventTypes[t].size =
                 sizeof(EventThreadID) + sizeof(EventCapNo);
@@ -296,6 +299,11 @@ initEventLogging(void)
                 sizeof(EventCapsetID) + sizeof(StgWord32);
             break;
 
+        case EVENT_SPARK_STEAL:     // (cap, victim_cap)
+            eventTypes[t].size =
+                sizeof(EventCapNo);
+            break;
+
         case EVENT_SHUTDOWN:        // (cap)
         case EVENT_REQUEST_SEQ_GC:  // (cap)
         case EVENT_REQUEST_PAR_GC:  // (cap)
@@ -304,6 +312,12 @@ initEventLogging(void)
         case EVENT_GC_IDLE:
         case EVENT_GC_WORK:
         case EVENT_GC_DONE:
+        case EVENT_SPARK_CREATE:    // (cap)
+        case EVENT_SPARK_DUD:       // (cap)
+        case EVENT_SPARK_OVERFLOW:  // (cap)
+        case EVENT_SPARK_RUN:       // (cap)
+        case EVENT_SPARK_FIZZLE:    // (cap)
+        case EVENT_SPARK_GC:        // (cap)
             eventTypes[t].size = 0;
             break;
 
@@ -440,7 +454,6 @@ postSchedEvent (Capability *cap,
     case EVENT_CREATE_THREAD:   // (cap, thread)
     case EVENT_RUN_THREAD:      // (cap, thread)
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-    case EVENT_RUN_SPARK:       // (cap, thread)
     {
         postThreadID(eb,thread);
         break;
@@ -453,7 +466,6 @@ postSchedEvent (Capability *cap,
     }
 
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-    case EVENT_STEAL_SPARK:     // (cap, thread, victim_cap)
     case EVENT_THREAD_WAKEUP:   // (cap, thread, other_cap)
     {
         postThreadID(eb,thread);
@@ -476,6 +488,50 @@ postSchedEvent (Capability *cap,
 
     default:
         barf("postSchedEvent: unknown event tag %d", tag);
+    }
+}
+
+void
+postSparkEvent (Capability *cap,
+                EventTypeNum tag,
+                StgWord info1)
+{
+    EventsBuf *eb;
+
+    eb = &capEventBuf[cap->no];
+
+    if (!hasRoomForEvent(eb, tag)) {
+        // Flush event buffer to make room for new event.
+        printAndClearEventBuf(eb);
+    }
+
+    postEventHeader(eb, tag);
+
+    switch (tag) {
+    case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
+    {
+        postThreadID(eb,info1 /* spark_thread */);
+        break;
+    }
+
+    case EVENT_SPARK_STEAL:         // (cap, victim_cap)
+    {
+        postCapNo(eb,info1 /* victim_cap */);
+        break;
+   }
+
+    case EVENT_SPARK_CREATE:        // (cap)
+    case EVENT_SPARK_DUD:           // (cap)
+    case EVENT_SPARK_OVERFLOW:      // (cap)
+    case EVENT_SPARK_RUN:           // (cap)
+    case EVENT_SPARK_FIZZLE:        // (cap)
+    case EVENT_SPARK_GC:            // (cap)
+    {
+        break;
+    }
+
+    default:
+        barf("postSparkEvent: unknown event tag %d", tag);
     }
 }
 
