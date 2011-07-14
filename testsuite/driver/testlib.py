@@ -175,7 +175,7 @@ def omit_compiler_types( compiler_types ):
 
 def _omit_compiler_types( opts, compiler_types ):
     if config.compiler_type in compiler_types:
-	opts.skip = 1
+        opts.skip = 1
 
 # -----
 
@@ -184,7 +184,7 @@ def only_compiler_types( compiler_types ):
 
 def _only_compiler_types( opts, compiler_types ):
     if config.compiler_type not in compiler_types:
-	opts.skip = 1
+        opts.skip = 1
 
 # -----
 
@@ -235,14 +235,14 @@ def _compiler_stats_num_field( opts, f, x, y ):
 # -----
 
 def skip_if_no_ghci(opts):
-  if not ('ghci' in config.run_ways):
-      opts.skip = 1
+    if not ('ghci' in config.run_ways):
+        opts.skip = 1
 
 # ----
 
 def skip_if_fast(opts):
-  if config.fast:
-      opts.skip = 1
+    if config.fast:
+        opts.skip = 1
 
 # -----
 
@@ -856,7 +856,10 @@ def compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts ):
     elif way == 'extcore' or way == 'optextcore' :
         return extcore_run( name, way, extra_hc_opts, 0, top_mod )
     else: # compiled...
-        force = 1 if extra_mods else 0
+        force = 0
+        if extra_mods:
+           force = 1
+
         result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1, 1, force)
         if badResult(result):
             return result
@@ -1041,7 +1044,7 @@ def simple_run( name, way, prog, args ):
     else:
         stdin_comes_from = ' <' + use_stdin
     cmd = 'cd ' + getTestOpts().testdir + ' && ' \
-	    + prog + ' ' + args + ' '  \
+       + prog + ' ' + args + ' '  \
         + my_rts_flags + ' '       \
         + stdin_comes_from         \
         + ' >' + run_stdout        \
@@ -1190,7 +1193,7 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
     while (re.sub('^\s*','',line) != delimiter and line != ''):
         out1.write(line)
         line = infile.readline()
-	line = re.sub('\r', '', line)
+    line = re.sub('\r', '', line)
     out1.close()
 
     line = infile.readline()
@@ -1507,7 +1510,7 @@ def rawSystem(cmd_and_args):
 # Hence it must ultimately be run by a Bourne shell
 #
 # Mostly it invokes the command wrapped in 'timeout' thus
-#	timeout 300 'cd . && ...blah blah'
+#  timeout 300 'cd . && ...blah blah'
 # so it's timeout's job to invoke the Bourne shell
 #
 # But watch out for the case when there is no timeout program!
@@ -1517,7 +1520,7 @@ def runCmd( cmd ):
     if_verbose( 1, cmd )
     r = 0
     if config.platform == 'i386-unknown-mingw32':
-	# On MinGW, we will always have timeout
+   # On MinGW, we will always have timeout
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
@@ -1633,7 +1636,7 @@ def pretest_cleanup(name):
    rm_no_fail(qualify(name,'comp.stderr'))
    rm_no_fail(qualify(name,'run.stderr'))
    rm_no_fail(qualify(name,'run.stdout'))
-   rm_no_fail(qualify(name,'tix'))	# remove the old tix file
+   rm_no_fail(qualify(name,'tix'))  # remove the old tix file
    # simple_build zaps the following:
    # rm_nofail(qualify("o"))
    # rm_nofail(qualify(""))
