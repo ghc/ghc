@@ -1722,17 +1722,13 @@ setAlrExpectingOCurly :: Maybe ALRLayout -> P ()
 setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 
 -- for reasons of efficiency, flags indicating language extensions (eg,
--- -fglasgow-exts or -XParallelArrays) are represented by a bitmap stored in an unboxed
--- integer
-
--- The "genericsBit" is now unused, available for others
--- genericsBit :: Int
--- genericsBit = 0 -- {|, |} and "generic"
+-- -fglasgow-exts or -XParallelArrays) are represented by a bitmap
+-- stored in an unboxed Int
 
 ffiBit :: Int
-ffiBit= 1
+ffiBit= 0
 interruptibleFfiBit :: Int
-interruptibleFfiBit = 2
+interruptibleFfiBit = 1
 parrBit :: Int
 parrBit = 3
 arrowsBit :: Int
