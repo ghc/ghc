@@ -131,15 +131,11 @@ import Array    ( Array )
 
 #include "Typeable.h"
 
--- | Returns a unique integer associated with a 'TypeRep'.  This can
--- be used for making a mapping with TypeReps
--- as the keys, for example.  It is guaranteed that @t1 == t2@ if and only if
--- @typeRepKey t1 == typeRepKey t2@.
---
--- It is in the 'IO' monad because the actual value of the key may
--- vary from run to run of the program.  You should only rely on
--- the equality property, not any actual key value.  The relative ordering
--- of keys has no meaning either.
+{-# DEPRECATED typeRepKey "TypeRep itself is now an instance of Ord" #-}
+-- | (DEPRECATED) Returns a unique key associated with a 'TypeRep'.
+-- This function is deprecated because 'TypeRep' itself is now an
+-- instance of 'Ord', so mappings can be made directly with 'TypeRep'
+-- as the key.
 --
 typeRepKey :: TypeRep -> IO TypeRepKey
 typeRepKey (TypeRep f _ _) = return (TypeRepKey f)
