@@ -1,0 +1,8 @@
+
+T5300.hs:15:9:
+    Ambiguous type variable `c0' in the constraint:
+      (C1 a1 b2 c0) arising from a use of `f1'
+    Probable fix: add a type signature that fixes these type variable(s)
+    In the first argument of `(>>=)', namely `f1 fm'
+    In the expression: f1 fm >>= return . undefined
+    In an equation for `f2': f2 fm = f1 fm >>= return . undefined
