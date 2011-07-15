@@ -44,9 +44,9 @@ import qualified SPARC.Regs     as SPARC
 --       We should be passing DynFlags in instead, and looking at
 --       its targetPlatform.
 
-targetVirtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
-targetVirtualRegSqueeze
-    = case platformArch defaultTargetPlatform of
+targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> FastInt
+targetVirtualRegSqueeze platform
+    = case platformArch platform of
       ArchX86     -> X86.virtualRegSqueeze
       ArchX86_64  -> X86.virtualRegSqueeze
       ArchPPC     -> PPC.virtualRegSqueeze
@@ -55,9 +55,9 @@ targetVirtualRegSqueeze
       ArchARM     -> panic "targetVirtualRegSqueeze ArchARM"
       ArchUnknown -> panic "targetVirtualRegSqueeze ArchUnknown"
 
-targetRealRegSqueeze :: RegClass -> RealReg -> FastInt
-targetRealRegSqueeze
-    = case platformArch defaultTargetPlatform of
+targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> FastInt
+targetRealRegSqueeze platform
+    = case platformArch platform of
       ArchX86     -> X86.realRegSqueeze
       ArchX86_64  -> X86.realRegSqueeze
       ArchPPC     -> PPC.realRegSqueeze

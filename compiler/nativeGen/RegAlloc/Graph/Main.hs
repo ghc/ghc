@@ -59,9 +59,10 @@ regAlloc dflags regsFree slotsFree code
 	-- TODO: the regClass function is currently hard coded to the default target
 	--	 architecture. Would prefer to determine this from dflags.
 	--	 There are other uses of targetRegClass later in this module.
-	let triv = trivColorable (targetPlatform dflags)
-			targetVirtualRegSqueeze
-			targetRealRegSqueeze
+	let platform = targetPlatform dflags
+	    triv = trivColorable platform
+			(targetVirtualRegSqueeze platform)
+			(targetRealRegSqueeze platform)
 
  	(code_final, debug_codeGraphs, _)
 		<- regAlloc_spin dflags 0 
@@ -349,8 +350,8 @@ patchRegsFromGraph platform graph code
 			$$ Color.dotGraph 
 				(\_ -> text "white") 
 				(trivColorable platform
-					targetVirtualRegSqueeze
-					targetRealRegSqueeze)
+					(targetVirtualRegSqueeze platform)
+					(targetRealRegSqueeze platform))
 				graph)
 
    in	patchEraseLive patchF code
