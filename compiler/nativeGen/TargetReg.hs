@@ -40,10 +40,6 @@ import qualified PPC.Regs       as PPC
 
 import qualified SPARC.Regs     as SPARC
 
--- TODO: We shouldn't be using defaultTargetPlatform here.
---       We should be passing DynFlags in instead, and looking at
---       its targetPlatform.
-
 targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> FastInt
 targetVirtualRegSqueeze platform
     = case platformArch platform of
@@ -95,8 +91,8 @@ targetMkVirtualReg platform
 targetRegDotColor :: Platform -> RealReg -> SDoc
 targetRegDotColor platform
     = case platformArch platform of
-      ArchX86     -> X86.regDotColor
-      ArchX86_64  -> X86.regDotColor
+      ArchX86     -> X86.regDotColor platform
+      ArchX86_64  -> X86.regDotColor platform
       ArchPPC     -> PPC.regDotColor
       ArchSPARC   -> SPARC.regDotColor
       ArchPPC_64  -> panic "targetRegDotColor ArchPPC_64"
