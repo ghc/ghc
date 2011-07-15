@@ -76,8 +76,8 @@ instance (Outputable statics, PlatformOutputable instr) => PlatformOutputable (R
 	$$ Color.dotGraph 
 		targetRegDotColor
 		(trivColorable platform
-			targetVirtualRegSqueeze
-			targetRealRegSqueeze)
+			(targetVirtualRegSqueeze platform)
+			(targetRealRegSqueeze platform))
 		(raGraph s)
 
 
@@ -113,8 +113,8 @@ instance (Outputable statics, PlatformOutputable instr) => PlatformOutputable (R
 	$$ Color.dotGraph 
 		targetRegDotColor
 		(trivColorable platform
-			targetVirtualRegSqueeze
-			targetRealRegSqueeze)
+			(targetVirtualRegSqueeze platform)
+			(targetRealRegSqueeze platform))
 		(raGraphColored s)
 	$$ text ""
 

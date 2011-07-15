@@ -212,7 +212,8 @@ nativeCodeGen' :: (Outputable statics, PlatformOutputable instr, Instruction ins
                -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
-	let split_cmms	= concat $ map add_split cmms
+	let platform = targetPlatform dflags
+	    split_cmms	= concat $ map add_split cmms
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
@@ -226,7 +227,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 	-- dump native code
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm "Asm code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) $ concat native)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) $ concat native)
 
 	-- dump global NCG stats for graph coloring allocator
 	(case concat $ catMaybes colorStats of
@@ -245,9 +246,9 @@ nativeCodeGen' dflags ncgImpl h us cmms
 			Opt_D_dump_asm_conflicts "Register conflict graph"
 			$ Color.dotGraph 
 				targetRegDotColor 
-				(Color.trivColorable (targetPlatform dflags)
-					targetVirtualRegSqueeze 
-					targetRealRegSqueeze)
+				(Color.trivColorable platform
+					(targetVirtualRegSqueeze platform)
+					(targetRealRegSqueeze platform))
 			$ graphGlobal)
 
 
