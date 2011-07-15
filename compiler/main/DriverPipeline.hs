@@ -1980,7 +1980,15 @@ joinObjectFiles dflags o_files output_fn = do
   let ld_r args = SysTools.runLink dflags ([
                             SysTools.Option "-nostdlib",
                             SysTools.Option "-nodefaultlibs",
-                            SysTools.Option "-Wl,-r",
+                            SysTools.Option "-Wl,-r"
+                            ]
+                            -- gcc on sparc sets -Wl,--relax implicitly, but
+                            -- -r and --relax are incompatible for ld, so
+                            -- disable --relax explicitly.
+                         ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                                then [SysTools.Option "-Wl,-no-relax"]
+                                else [])
+                         ++ [
                             SysTools.Option ld_build_id,
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",
