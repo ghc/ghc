@@ -41,6 +41,7 @@ import OldCmm
 import CLabel
 
 -- The rest:
+import DynFlags
 import StaticFlags	( opt_PIC )
 import OrdList
 import Outputable
@@ -50,21 +51,21 @@ import Unique
 import Control.Monad	( mapAndUnzipM )
 
 -- | Top level code generation
-cmmTopCodeGen :: Platform
-              -> RawCmmTop
+cmmTopCodeGen :: RawCmmTop
               -> NatM [NatCmmTop CmmStatics Instr]
 
-cmmTopCodeGen platform
-	(CmmProc info lab (ListGraph blocks)) 
- = do	
- 	(nat_blocks,statics) <- mapAndUnzipM (basicBlockCodeGen platform) blocks
+cmmTopCodeGen (CmmProc info lab (ListGraph blocks))
+ = do
+      dflags <- getDynFlagsNat
+      let platform = targetPlatform dflags
+      (nat_blocks,statics) <- mapAndUnzipM (basicBlockCodeGen platform) blocks
 
-	let proc 	= CmmProc info lab (ListGraph $ concat nat_blocks)
-	let tops 	= proc : concat statics
+      let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
+      let tops = proc : concat statics
 
-  	return tops
-  
-cmmTopCodeGen _ (CmmData sec dat) = do
+      return tops
+
+cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 
