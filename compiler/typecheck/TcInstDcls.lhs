@@ -33,8 +33,9 @@ import TyCon
 import DataCon
 import Class
 import Var
+import VarEnv( mkInScopeSet )
+import VarSet( mkVarSet )
 import Pair
---import VarSet
 import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
@@ -1186,7 +1187,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
      rep_pred = mkClassPred clas (init_inst_tys ++ [rep_ty])
 
      -- co : [p] ~ T p
-     co = substCoWithTys inst_tvs (mkTyVarTys tyvars) $
+     co = substCoWithTys (mkInScopeSet (mkVarSet tyvars))
+                         inst_tvs (mkTyVarTys tyvars) $
           mkSymCo coi
 
      ----------------

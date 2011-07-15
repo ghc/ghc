@@ -593,11 +593,9 @@ mkNthCo :: Int -> Coercion -> Coercion
 mkNthCo n (Refl ty) = Refl (getNth n ty)
 mkNthCo n co        = NthCo n co
 
--- | Instantiates a 'Coercion' with a 'Type' argument. If possible, it immediately performs
---   the resulting beta-reduction, otherwise it creates a suspended instantiation.
+-- | Instantiates a 'Coercion' with a 'Type' argument. 
 mkInstCo :: Coercion -> Type -> Coercion
-mkInstCo (ForAllCo tv co) ty = substCoWithTy tv ty co
-mkInstCo co ty               = InstCo co ty
+mkInstCo co ty = InstCo co ty
 
 -- | Manufacture a coercion from thin air. Needless to say, this is
 --   not usually safe, but it is used when we know we are dealing with
@@ -817,18 +815,16 @@ zipOpenCvSubst vs cos
 mkTopCvSubst :: [(Var,Coercion)] -> CvSubst
 mkTopCvSubst prs = CvSubst emptyInScopeSet emptyTvSubstEnv (mkVarEnv prs)
 
-substCoWithTy :: TyVar -> Type -> Coercion -> Coercion
-substCoWithTy tv ty = substCoWithTys [tv] [ty]
+substCoWithTy :: InScopeSet -> TyVar -> Type -> Coercion -> Coercion
+substCoWithTy in_scope tv ty = substCoWithTys in_scope [tv] [ty]
 
-substCoWithTys :: [TyVar] -> [Type] -> Coercion -> Coercion
-substCoWithTys tvs tys co
+substCoWithTys :: InScopeSet -> [TyVar] -> [Type] -> Coercion -> Coercion
+substCoWithTys in_scope tvs tys co
   | debugIsOn && (length tvs /= length tys)
   = pprTrace "substCoWithTys" (ppr tvs $$ ppr tys) co
   | otherwise 
   = ASSERT( length tvs == length tys )
     substCo (CvSubst in_scope (zipVarEnv tvs tys) emptyVarEnv) co
-  where
-    in_scope = mkInScopeSet (tyVarsOfTypes tys)
 
 -- | Substitute within a 'Coercion'
 substCo :: CvSubst -> Coercion -> Coercion
@@ -870,7 +866,7 @@ substCoVar :: CvSubst -> CoVar -> Coercion
 substCoVar (CvSubst in_scope _ cenv) cv
   | Just co  <- lookupVarEnv cenv cv      = co
   | Just cv1 <- lookupInScope in_scope cv = ASSERT( isCoVar cv1 ) CoVarCo cv1
-  | otherwise = WARN( True, ptext (sLit "substCoVar not in scope") <+> ppr cv )
+  | otherwise = WARN( True, ptext (sLit "substCoVar not in scope") <+> ppr cv $$ ppr in_scope)
                 ASSERT( isCoVar cv ) CoVarCo cv
 
 substCoVars :: CvSubst -> [CoVar] -> [Coercion]
