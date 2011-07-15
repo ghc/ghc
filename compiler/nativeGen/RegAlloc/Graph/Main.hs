@@ -165,7 +165,7 @@ regAlloc_spin
 	 	let code_patched	= map (patchRegsFromGraph platform graph_colored_lint) code_coalesced
 
 		-- clean out unneeded SPILL/RELOADs
-		let code_spillclean	= map cleanSpills code_patched
+		let code_spillclean	= map (cleanSpills platform) code_patched
 
 		-- strip off liveness information, 
 		--	and rewrite SPILL/RELOAD pseudos into real instructions along the way

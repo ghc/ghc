@@ -66,9 +66,9 @@ targetRealRegSqueeze platform
       ArchARM     -> panic "targetRealRegSqueeze ArchARM"
       ArchUnknown -> panic "targetRealRegSqueeze ArchUnknown"
 
-targetClassOfRealReg :: RealReg -> RegClass
-targetClassOfRealReg
-    = case platformArch defaultTargetPlatform of
+targetClassOfRealReg :: Platform -> RealReg -> RegClass
+targetClassOfRealReg platform
+    = case platformArch platform of
       ArchX86     -> X86.classOfRealReg
       ArchX86_64  -> X86.classOfRealReg
       ArchPPC     -> PPC.classOfRealReg
@@ -81,9 +81,9 @@ targetClassOfRealReg
 targetWordSize :: Size
 targetWordSize = intSize wordWidth
 
-targetMkVirtualReg :: Unique -> Size -> VirtualReg
-targetMkVirtualReg
-    = case platformArch defaultTargetPlatform of
+targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
+targetMkVirtualReg platform
+    = case platformArch platform of
       ArchX86     -> X86.mkVirtualReg
       ArchX86_64  -> X86.mkVirtualReg
       ArchPPC     -> PPC.mkVirtualReg
@@ -92,9 +92,9 @@ targetMkVirtualReg
       ArchARM     -> panic "targetMkVirtualReg ArchARM"
       ArchUnknown -> panic "targetMkVirtualReg ArchUnknown"
 
-targetRegDotColor :: RealReg -> SDoc
-targetRegDotColor
-    = case platformArch defaultTargetPlatform of
+targetRegDotColor :: Platform -> RealReg -> SDoc
+targetRegDotColor platform
+    = case platformArch platform of
       ArchX86     -> X86.regDotColor
       ArchX86_64  -> X86.regDotColor
       ArchPPC     -> PPC.regDotColor
@@ -104,10 +104,10 @@ targetRegDotColor
       ArchUnknown -> panic "targetRegDotColor ArchUnknown"
 
 
-targetClassOfReg :: Reg -> RegClass
-targetClassOfReg reg
+targetClassOfReg :: Platform -> Reg -> RegClass
+targetClassOfReg platform reg
  = case reg of
- 	RegVirtual vr	-> classOfVirtualReg vr
-	RegReal rr	-> targetClassOfRealReg rr
+   RegVirtual vr -> classOfVirtualReg vr
+   RegReal rr -> targetClassOfRealReg platform rr
 
 

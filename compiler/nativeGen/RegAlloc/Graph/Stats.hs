@@ -74,7 +74,7 @@ instance (Outputable statics, PlatformOutputable instr) => PlatformOutputable (R
 	$$ text ""
 	$$ text "#  Initial register conflict graph."
 	$$ Color.dotGraph 
-		targetRegDotColor
+		(targetRegDotColor platform)
 		(trivColorable platform
 			(targetVirtualRegSqueeze platform)
 			(targetRealRegSqueeze platform))
@@ -111,7 +111,7 @@ instance (Outputable statics, PlatformOutputable instr) => PlatformOutputable (R
 
 	$$ text "#  Register conflict graph (colored)."
 	$$ Color.dotGraph 
-		targetRegDotColor
+		(targetRegDotColor platform)
 		(trivColorable platform
 			(targetVirtualRegSqueeze platform)
 			(targetRealRegSqueeze platform))
