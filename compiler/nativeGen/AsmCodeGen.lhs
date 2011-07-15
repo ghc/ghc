@@ -245,7 +245,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 			Opt_D_dump_asm_conflicts "Register conflict graph"
 			$ Color.dotGraph 
 				targetRegDotColor 
-				(Color.trivColorable 
+				(Color.trivColorable (targetPlatform dflags)
 					targetVirtualRegSqueeze 
 					targetRealRegSqueeze)
 			$ graphGlobal)
