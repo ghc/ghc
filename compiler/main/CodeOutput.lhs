@@ -61,7 +61,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 
     do	{ when (dopt Opt_DoCmmLinting dflags) $ do
 		{ showPass dflags "CmmLint"
-		; let lints = map cmmLint flat_abstractC
+		; let lints = map (cmmLint (targetPlatform dflags)) flat_abstractC
 		; case firstJusts lints of
 			Just err -> do { printDump err
 				       ; ghcExit dflags 1

@@ -40,6 +40,7 @@ import OldPprCmm()
 
 import Digraph
 import Outputable
+import Platform
 import Unique
 import UniqSet
 import UniqFM
@@ -169,13 +170,13 @@ type LiveBasicBlock instr
         = GenBasicBlock (LiveInstr instr)
 
 
-instance Outputable instr
-      => Outputable (InstrSR instr) where
+instance PlatformOutputable instr
+      => PlatformOutputable (InstrSR instr) where
 
-        ppr (Instr realInstr)
-           = ppr realInstr
+        pprPlatform platform (Instr realInstr)
+           = pprPlatform platform realInstr
 
-        ppr (SPILL reg slot)
+        pprPlatform _ (SPILL reg slot)
            = hcat [
                 ptext (sLit "\tSPILL"),
                 char ' ',
@@ -183,7 +184,7 @@ instance Outputable instr
                 comma,
                 ptext (sLit "SLOT") <> parens (int slot)]
 
-        ppr (RELOAD slot reg)
+        pprPlatform _ (RELOAD slot reg)
            = hcat [
                 ptext (sLit "\tRELOAD"),
                 char ' ',
@@ -191,14 +192,14 @@ instance Outputable instr
                 comma,
                 ppr reg]
 
-instance Outputable instr
-      => Outputable (LiveInstr instr) where
+instance PlatformOutputable instr
+      => PlatformOutputable (LiveInstr instr) where
 
-        ppr (LiveInstr instr Nothing)
-         = ppr instr
+        pprPlatform platform (LiveInstr instr Nothing)
+         = pprPlatform platform instr
 
-        ppr (LiveInstr instr (Just live))
-         =  ppr instr
+        pprPlatform platform (LiveInstr instr (Just live))
+         =  pprPlatform platform instr
                 $$ (nest 8
                         $ vcat
                         [ pprRegs (ptext (sLit "# born:    ")) (liveBorn live)
@@ -458,11 +459,12 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmTop
 stripLive
-        :: (Outputable statics, Outputable instr, Instruction instr)
-        => LiveCmmTop statics instr
+        :: (Outputable statics, PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> LiveCmmTop statics instr
         -> NatCmmTop statics instr
 
-stripLive live
+stripLive platform live
         = stripCmm live
 
  where  stripCmm (CmmData sec ds)       = CmmData sec ds
@@ -484,8 +486,7 @@ stripLive live
 
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
         stripCmm proc
-                 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (ppr proc)
-
+                 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (pprPlatform platform proc)
 
 -- | Strip away liveness information from a basic block,
 --   and make real spill instructions out of SPILL, RELOAD pseudos along the way.
@@ -657,22 +658,23 @@ sccBlocks blocks = stronglyConnCompFromEdgedVertices graph
 -- Annotate code with register liveness information
 --
 regLiveness
-        :: (Outputable instr, Instruction instr)
-        => LiveCmmTop statics instr
+        :: (PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> LiveCmmTop statics instr
         -> UniqSM (LiveCmmTop statics instr)
 
-regLiveness (CmmData i d)
+regLiveness _ (CmmData i d)
         = returnUs $ CmmData i d
 
-regLiveness (CmmProc info lbl [])
+regLiveness _ (CmmProc info lbl [])
         | LiveInfo static mFirst _ _    <- info
         = returnUs $ CmmProc
                         (LiveInfo static mFirst (Just mapEmpty) Map.empty)
                         lbl []
 
-regLiveness (CmmProc info lbl sccs)
+regLiveness platform (CmmProc info lbl sccs)
         | LiveInfo static mFirst _ liveSlotsOnEntry     <- info
-        = let   (ann_sccs, block_live)  = computeLiveness sccs
+        = let   (ann_sccs, block_live)  = computeLiveness platform sccs
 
           in    returnUs $ CmmProc (LiveInfo static mFirst (Just block_live) liveSlotsOnEntry)
                            lbl ann_sccs
@@ -736,20 +738,21 @@ reverseBlocksInTops top
 --  want for the next pass.
 --
 computeLiveness
-        :: (Outputable instr, Instruction instr)
-        => [SCC (LiveBasicBlock instr)]
+        :: (PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> [SCC (LiveBasicBlock instr)]
         -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
                                                 -- which are "dead after this instruction".
                BlockMap RegSet)                 -- blocks annontated with set of live registers
                                                 -- on entry to the block.
 
-computeLiveness sccs
+computeLiveness platform sccs
  = case checkIsReverseDependent sccs of
         Nothing         -> livenessSCCs emptyBlockMap [] sccs
         Just bad        -> pprPanic "RegAlloc.Liveness.computeLivenss"
                                 (vcat   [ text "SCCs aren't in reverse dependent order"
                                         , text "bad blockId" <+> ppr bad
-                                        , ppr sccs])
+                                        , pprPlatform platform sccs])
 
 livenessSCCs
        :: Instruction instr

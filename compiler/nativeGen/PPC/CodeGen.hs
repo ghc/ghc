@@ -66,10 +66,11 @@ import FastString
 -- order.
 
 cmmTopCodeGen
-        :: RawCmmTop
+        :: Platform
+        -> RawCmmTop
         -> NatM [NatCmmTop CmmStatics Instr]
 
-cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen _ (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
   dflags <- getDynFlagsNat
@@ -80,7 +81,7 @@ cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
       Just picBase -> initializePicBase_ppc ArchPPC os picBase tops
       Nothing -> return tops
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen _ (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 basicBlockCodeGen

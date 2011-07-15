@@ -1075,7 +1075,7 @@ parseCmmFile dflags filename = do
         if (errorsFound dflags ms)
          then return (ms, Nothing)
          else do
-           dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (ppr cmm)
+           dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprPlatform (targetPlatform dflags) cmm)
            return (ms, Just cmm)
   where
 	no_module = panic "parseCmmFile: no module"

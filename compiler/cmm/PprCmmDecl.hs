@@ -43,6 +43,7 @@ import PprCmmExpr
 
 
 import Outputable
+import Platform
 import FastString
 
 import Data.List
@@ -54,23 +55,25 @@ import ClosureInfo
 #include "../includes/rts/storage/FunTypes.h"
 
 
-pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatics info g] -> SDoc
-pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
+pprCmms :: (Outputable info, PlatformOutputable g)
+        => Platform -> [GenCmm CmmStatics info g] -> SDoc
+pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pprPlatform platform) cmms))
         where
           separator = space $$ ptext (sLit "-------------------") $$ space
 
-writeCmms :: (Outputable info, Outputable g) => Handle -> [GenCmm CmmStatics info g] -> IO ()
-writeCmms handle cmms = printForC handle (pprCmms cmms)
+writeCmms :: (Outputable info, PlatformOutputable g)
+          => Platform -> Handle -> [GenCmm CmmStatics info g] -> IO ()
+writeCmms platform handle cmms = printForC handle (pprCmms platform cmms)
 
 -----------------------------------------------------------------------------
 
-instance (Outputable d, Outputable info, Outputable g)
-    => Outputable (GenCmm d info g) where
-    ppr c = pprCmm c
+instance (Outputable d, Outputable info, PlatformOutputable g)
+      => PlatformOutputable (GenCmm d info g) where
+    pprPlatform platform c = pprCmm platform c
 
-instance (Outputable d, Outputable info, Outputable i)
-	=> Outputable (GenCmmTop d info i) where
-    ppr t = pprTop t
+instance (Outputable d, Outputable info, PlatformOutputable i)
+      => PlatformOutputable (GenCmmTop d info i) where
+    pprPlatform platform t = pprTop platform t
 
 instance Outputable CmmStatics where
     ppr e = pprStatics e
@@ -84,20 +87,22 @@ instance Outputable CmmInfoTable where
 
 -----------------------------------------------------------------------------
 
-pprCmm :: (Outputable d, Outputable info, Outputable g) => GenCmm d info g -> SDoc
-pprCmm (Cmm tops) = vcat $ intersperse blankLine $ map pprTop tops
+pprCmm :: (Outputable d, Outputable info, PlatformOutputable g)
+       => Platform -> GenCmm d info g -> SDoc
+pprCmm platform (Cmm tops)
+    = vcat $ intersperse blankLine $ map (pprTop platform) tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop 	:: (Outputable d, Outputable info, Outputable i)
-	=> GenCmmTop d info i -> SDoc
+pprTop :: (Outputable d, Outputable info, PlatformOutputable i)
+       => Platform -> GenCmmTop d info i -> SDoc
 
-pprTop (CmmProc info lbl graph)
+pprTop platform (CmmProc info lbl graph)
 
   = vcat [ pprCLabel lbl <> lparen <> rparen
          , nest 8 $ lbrace <+> ppr info $$ rbrace
-         , nest 4 $ ppr graph
+         , nest 4 $ pprPlatform platform graph
          , rbrace ]
 
 -- --------------------------------------------------------------------------
@@ -105,7 +110,7 @@ pprTop (CmmProc info lbl graph)
 --
 --      section "data" { ... }
 --
-pprTop (CmmData section ds) = 
+pprTop _ (CmmData section ds) = 
     (hang (pprSection section <+> lbrace) 4 (ppr ds))
     $$ rbrace
 

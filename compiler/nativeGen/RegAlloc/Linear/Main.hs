@@ -127,7 +127,7 @@ import Control.Monad
 
 -- Allocate registers
 regAlloc
-        :: (Outputable instr, Instruction instr)
+        :: (PlatformOutputable instr, Instruction instr)
         => DynFlags
         -> LiveCmmTop statics instr
         -> UniqSM (NatCmmTop statics instr, Maybe RegAllocStats)
@@ -170,7 +170,7 @@ regAlloc _ (CmmProc _ _ _)
 --   an entry in the block map or it is the first block.
 --
 linearRegAlloc
-        :: (Outputable instr, Instruction instr)
+        :: (PlatformOutputable instr, Instruction instr)
         => DynFlags
         -> BlockId                      -- ^ the first block
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
@@ -178,51 +178,54 @@ linearRegAlloc
         -> UniqSM ([NatBasicBlock instr], RegAllocStats)
 
 linearRegAlloc dflags first_id block_live sccs
- = case platformArch $ targetPlatform dflags of
-   ArchX86     -> linearRegAlloc' (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
-   ArchX86_64  -> linearRegAlloc' (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
-   ArchSPARC   -> linearRegAlloc' (frInitFreeRegs :: SPARC.FreeRegs) first_id block_live sccs
-   ArchPPC     -> linearRegAlloc' (frInitFreeRegs :: PPC.FreeRegs)   first_id block_live sccs
-   ArchARM     -> panic "linearRegAlloc ArchARM"
-   ArchPPC_64  -> panic "linearRegAlloc ArchPPC_64"
-   ArchUnknown -> panic "linearRegAlloc ArchUnknown"
+ = let platform = targetPlatform dflags
+   in case platformArch platform of
+      ArchX86     -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
+      ArchX86_64  -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
+      ArchSPARC   -> linearRegAlloc' platform (frInitFreeRegs :: SPARC.FreeRegs) first_id block_live sccs
+      ArchPPC     -> linearRegAlloc' platform (frInitFreeRegs :: PPC.FreeRegs)   first_id block_live sccs
+      ArchARM     -> panic "linearRegAlloc ArchARM"
+      ArchPPC_64  -> panic "linearRegAlloc ArchPPC_64"
+      ArchUnknown -> panic "linearRegAlloc ArchUnknown"
 
 linearRegAlloc'
-        :: (FR freeRegs, Outputable instr, Instruction instr)
-        => freeRegs
+        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> freeRegs
         -> BlockId                      -- ^ the first block
         -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> [SCC (LiveBasicBlock instr)] -- ^ instructions annotated with "deaths"
         -> UniqSM ([NatBasicBlock instr], RegAllocStats)
 
-linearRegAlloc' initFreeRegs first_id block_live sccs
+linearRegAlloc' platform initFreeRegs first_id block_live sccs
  = do   us      <- getUs
         let (_, _, stats, blocks) =
                 runR emptyBlockMap initFreeRegs emptyRegMap emptyStackMap us
-                    $ linearRA_SCCs first_id block_live [] sccs
+                    $ linearRA_SCCs platform first_id block_live [] sccs
         return  (blocks, stats)
 
 
-linearRA_SCCs :: (FR freeRegs, Instruction instr, Outputable instr)
-              => BlockId
+linearRA_SCCs :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
+              => Platform
+              -> BlockId
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
               -> [SCC (LiveBasicBlock instr)]
               -> RegM freeRegs [NatBasicBlock instr]
 
-linearRA_SCCs _ _ blocksAcc []
+linearRA_SCCs _ _ _ blocksAcc []
         = return $ reverse blocksAcc
 
-linearRA_SCCs first_id block_live blocksAcc (AcyclicSCC block : sccs)
- = do   blocks' <- processBlock block_live block
-        linearRA_SCCs first_id block_live
+linearRA_SCCs platform first_id block_live blocksAcc (AcyclicSCC block : sccs)
+ = do   blocks' <- processBlock platform block_live block
+        linearRA_SCCs platform first_id block_live
                 ((reverse blocks') ++ blocksAcc)
                 sccs
 
-linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
+linearRA_SCCs platform first_id block_live blocksAcc (CyclicSCC blocks : sccs)
  = do
-        blockss' <- process first_id block_live blocks [] (return []) False
-        linearRA_SCCs first_id block_live
+        blockss' <- process platform first_id block_live blocks [] (return []) False
+        linearRA_SCCs platform first_id block_live
                 (reverse (concat blockss') ++ blocksAcc)
                 sccs
 
@@ -238,8 +241,9 @@ linearRA_SCCs first_id block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 
-process :: (FR freeRegs, Instruction instr, Outputable instr)
-        => BlockId
+process :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
+        => Platform
+        -> BlockId
         -> BlockMap RegSet
         -> [GenBasicBlock (LiveInstr instr)]
         -> [GenBasicBlock (LiveInstr instr)]
@@ -247,10 +251,10 @@ process :: (FR freeRegs, Instruction instr, Outputable instr)
         -> Bool
         -> RegM freeRegs [[NatBasicBlock instr]]
 
-process _ _ [] []         accum _
+process _ _ _ [] []         accum _
         = return $ reverse accum
 
-process first_id block_live [] next_round accum madeProgress
+process platform first_id block_live [] next_round accum madeProgress
         | not madeProgress
 
           {- BUGS: There are so many unreachable blocks in the code the warnings are overwhelming.
@@ -260,10 +264,10 @@ process first_id block_live [] next_round accum madeProgress
         = return $ reverse accum
 
         | otherwise
-        = process first_id block_live
+        = process platform first_id block_live
                   next_round [] accum False
 
-process first_id block_live (b@(BasicBlock id _) : blocks)
+process platform first_id block_live (b@(BasicBlock id _) : blocks)
         next_round accum madeProgress
  = do
         block_assig <- getBlockAssigR
@@ -271,26 +275,27 @@ process first_id block_live (b@(BasicBlock id _) : blocks)
         if isJust (mapLookup id block_assig)
              || id == first_id
          then do
-                b'  <- processBlock block_live b
-                process first_id block_live blocks
+                b'  <- processBlock platform block_live b
+                process platform first_id block_live blocks
                         next_round (b' : accum) True
 
-         else   process first_id block_live blocks
+         else   process platform first_id block_live blocks
                         (b : next_round) accum madeProgress
 
 
 -- | Do register allocation on this basic block
 --
 processBlock
-        :: (FR freeRegs, Outputable instr, Instruction instr)
-        => BlockMap RegSet              -- ^ live regs on entry to each basic block
+        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
 
-processBlock block_live (BasicBlock id instrs)
+processBlock platform block_live (BasicBlock id instrs)
  = do   initBlock id
         (instrs', fixups)
-                <- linearRA block_live [] [] id instrs
+                <- linearRA platform block_live [] [] id instrs
         return  $ BasicBlock id instrs' : fixups
 
 
@@ -316,8 +321,9 @@ initBlock id
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: (FR freeRegs, Outputable instr, Instruction instr)
-        => BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
+        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> [NatBasicBlock instr]                -- ^ accumulator for blocks of fixup code.
         -> BlockId                              -- ^ id of the current block, for debugging.
@@ -328,24 +334,25 @@ linearRA
                 , [NatBasicBlock instr])        --   fresh blocks of fixup code.
 
 
-linearRA _          accInstr accFixup _ []
+linearRA _        _          accInstr accFixup _ []
         = return
                 ( reverse accInstr              -- instrs need to be returned in the correct order.
                 , accFixup)                     -- it doesn't matter what order the fixup blocks are returned in.
 
 
-linearRA block_live accInstr accFixups id (instr:instrs)
+linearRA platform block_live accInstr accFixups id (instr:instrs)
  = do
         (accInstr', new_fixups)
-                <- raInsn block_live accInstr id instr
+                <- raInsn platform block_live accInstr id instr
 
-        linearRA block_live accInstr' (new_fixups ++ accFixups) id instrs
+        linearRA platform block_live accInstr' (new_fixups ++ accFixups) id instrs
 
 
 -- | Do allocation for a single instruction.
 raInsn
-        :: (FR freeRegs, Outputable instr, Instruction instr)
-        => BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
+        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
+        => Platform
+        -> BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
         -> LiveInstr instr                      -- ^ the instr to have its regs allocated, with liveness info.
@@ -353,17 +360,17 @@ raInsn
                 ( [instr]                       -- new instructions
                 , [NatBasicBlock instr])        -- extra fixup blocks
 
-raInsn _     new_instrs _ (LiveInstr ii Nothing)
+raInsn _ _     new_instrs _ (LiveInstr ii Nothing)
         | Just n        <- takeDeltaInstr ii
         = do    setDeltaR n
                 return (new_instrs, [])
 
-raInsn _     new_instrs _ (LiveInstr ii Nothing)
+raInsn _ _     new_instrs _ (LiveInstr ii Nothing)
         | isMetaInstr ii
         = return (new_instrs, [])
 
 
-raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
+raInsn _ block_live new_instrs id (LiveInstr (Instr instr) (Just live))
  = do
     assig    <- getAssigR
 
@@ -403,11 +410,11 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
                         (uniqSetToList $ liveDieWrite live)
 
 
-raInsn _ _ _ instr
-        = pprPanic "raInsn" (text "no match for:" <> ppr instr)
+raInsn platform _ _ _ instr
+        = pprPanic "raInsn" (text "no match for:" <> pprPlatform platform instr)
 
 
-genRaInsn :: (FR freeRegs, Instruction instr, Outputable instr)
+genRaInsn :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
           => BlockMap RegSet
           -> [instr]
           -> BlockId
@@ -546,7 +553,7 @@ releaseRegs regs = do
 
 
 saveClobberedTemps
-        :: (Outputable instr, Instruction instr)
+        :: (PlatformOutputable instr, Instruction instr)
         => [RealReg]            -- real registers clobbered by this instruction
         -> [Reg]                -- registers which are no longer live after this insn
         -> RegM freeRegs [instr]         -- return: instructions to spill any temps that will
@@ -638,7 +645,7 @@ data SpillLoc = ReadMem StackSlot  -- reading from register only in memory
 --   the list of free registers and free stack slots.
 
 allocateRegsAndSpill
-        :: (FR freeRegs, Outputable instr, Instruction instr)
+        :: (FR freeRegs, PlatformOutputable instr, Instruction instr)
         => Bool                 -- True <=> reading (load up spilled regs)
         -> [VirtualReg]         -- don't push these out
         -> [instr]              -- spill insns
@@ -682,7 +689,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
-allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
+allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, PlatformOutputable instr)
                         => Bool
                         -> [VirtualReg]
                         -> [instr]
@@ -787,7 +794,7 @@ newLocation _ my_reg = InReg my_reg
 
 -- | Load up a spilled temporary if we need to (read from memory).
 loadTemp
-        :: (Outputable instr, Instruction instr)
+        :: (PlatformOutputable instr, Instruction instr)
         => VirtualReg   -- the temp being loaded
         -> SpillLoc     -- the current location of this temp
         -> RealReg      -- the hreg to load the temp into

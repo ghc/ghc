@@ -49,6 +49,7 @@ import PprCmmExpr
 import Util
 
 import BasicTypes
+import Platform
 import Compiler.Hoopl
 import Data.List
 import Prelude hiding (succ)
@@ -76,20 +77,20 @@ instance Outputable ForeignTarget where
     ppr = pprForeignTarget
 
 
-instance Outputable (Block CmmNode C C) where
-    ppr = pprBlock
-instance Outputable (Block CmmNode C O) where
-    ppr = pprBlock
-instance Outputable (Block CmmNode O C) where
-    ppr = pprBlock
-instance Outputable (Block CmmNode O O) where
-    ppr = pprBlock
+instance PlatformOutputable (Block CmmNode C C) where
+    pprPlatform _ = pprBlock
+instance PlatformOutputable (Block CmmNode C O) where
+    pprPlatform _ = pprBlock
+instance PlatformOutputable (Block CmmNode O C) where
+    pprPlatform _ = pprBlock
+instance PlatformOutputable (Block CmmNode O O) where
+    pprPlatform _ = pprBlock
 
-instance Outputable (Graph CmmNode e x) where
-    ppr = pprGraph
+instance PlatformOutputable (Graph CmmNode e x) where
+    pprPlatform = pprGraph
 
-instance Outputable CmmGraph where
-    ppr = pprCmmGraph
+instance PlatformOutputable CmmGraph where
+    pprPlatform platform = pprCmmGraph platform
 
 ----------------------------------------------------------
 -- Outputting types Cmm contains
@@ -107,7 +108,8 @@ pprTopInfo (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) =
 ----------------------------------------------------------
 -- Outputting blocks and graphs
 
-pprBlock :: IndexedCO x SDoc SDoc ~ SDoc => Block CmmNode e x -> IndexedCO e SDoc SDoc
+pprBlock :: IndexedCO x SDoc SDoc ~ SDoc
+         => Block CmmNode e x -> IndexedCO e SDoc SDoc
 pprBlock block = foldBlockNodesB3 ( ($$) . ppr
                                   , ($$) . (nest 4) . ppr
                                   , ($$) . (nest 4) . ppr
@@ -115,21 +117,22 @@ pprBlock block = foldBlockNodesB3 ( ($$) . ppr
                                   block
                                   empty
 
-pprGraph :: Graph CmmNode e x -> SDoc
-pprGraph GNil = empty
-pprGraph (GUnit block) = ppr block
-pprGraph (GMany entry body exit)
+pprGraph :: Platform -> Graph CmmNode e x -> SDoc
+pprGraph _ GNil = empty
+pprGraph platform (GUnit block) = pprPlatform platform block
+pprGraph platform (GMany entry body exit)
    = text "{"
-  $$ nest 2 (pprMaybeO entry $$ (vcat $ map ppr $ bodyToBlockList body) $$ pprMaybeO exit)
+  $$ nest 2 (pprMaybeO entry $$ (vcat $ map (pprPlatform platform) $ bodyToBlockList body) $$ pprMaybeO exit)
   $$ text "}"
-  where pprMaybeO :: Outputable (Block CmmNode e x) => MaybeO ex (Block CmmNode e x) -> SDoc
+  where pprMaybeO :: PlatformOutputable (Block CmmNode e x)
+                  => MaybeO ex (Block CmmNode e x) -> SDoc
         pprMaybeO NothingO = empty
-        pprMaybeO (JustO block) = ppr block
+        pprMaybeO (JustO block) = pprPlatform platform block
 
-pprCmmGraph :: CmmGraph -> SDoc
-pprCmmGraph g
+pprCmmGraph :: Platform -> CmmGraph -> SDoc
+pprCmmGraph platform g
    = text "{" <> text "offset"
-  $$ nest 2 (vcat $ map ppr blocks)
+  $$ nest 2 (vcat $ map (pprPlatform platform) blocks)
   $$ text "}"
   where blocks = postorderDfs g
 

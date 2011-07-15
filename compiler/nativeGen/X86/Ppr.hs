@@ -39,7 +39,7 @@ import Platform
 import Pretty
 import FastString
 import qualified Outputable
-import Outputable       (panic, Outputable)
+import Outputable       (panic, PlatformOutputable)
 
 import Data.Word
 
@@ -162,8 +162,8 @@ pprAlign platform bytes
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
-instance Outputable Instr where
-    ppr instr = Outputable.docToSDoc $ pprInstr defaultTargetPlatform instr
+instance PlatformOutputable Instr where
+    pprPlatform platform instr = Outputable.docToSDoc $ pprInstr platform instr
 
 
 pprReg :: Platform -> Size -> Reg -> Doc

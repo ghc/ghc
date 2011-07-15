@@ -862,6 +862,8 @@ entry.
 
 instance Outputable CLabel where
   ppr = pprCLabel
+instance PlatformOutputable CLabel where
+  pprPlatform _ = pprCLabel
 
 pprCLabel :: CLabel -> SDoc
 
