@@ -376,7 +376,7 @@ ppr_expr (OpApp e1 op _ e2)
       = hang (ppr op) 2 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [nest 2 pp_e1, pprHsInfix v, nest 2 pp_e2]
+      = sep [pp_e1, sep [pprHsInfix v, nest 2 pp_e2]]
 
 ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
