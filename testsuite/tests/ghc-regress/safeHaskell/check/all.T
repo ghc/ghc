@@ -5,7 +5,9 @@ def f( opts ):
 setTestOpts(f)
 
 test('CheckA', normal, compile, [''])
-test('CheckB', normal, multimod_compile, ['CheckB', '-trust base'])
+test('CheckB',
+     extra_clean(['CheckB_Aux.hi', 'CheckB_Aux.o']),
+     multimod_compile, ['CheckB', '-trust base'])
 
 # fail as we don't trust base when compiling Check01
 test('Check01', normal, multi_compile_fail, ['Check01', [
