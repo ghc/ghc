@@ -876,7 +876,15 @@ simplExprF :: SimplEnv -> InExpr -> SimplCont
            -> SimplM (SimplEnv, OutExpr)
 
 simplExprF env e cont
-  = -- pprTrace "simplExprF" (ppr e $$ ppr cont $$ ppr (seTvSubst env) $$ ppr (seIdSubst env) {- $$ ppr (seFloats env) -} ) $
+  = {- pprTrace "simplExprF" (vcat 
+      [ ppr e
+      , text "cont =" <+> ppr cont
+      , text "inscope =" <+> ppr (seInScope env)
+      , text "tvsubst =" <+> ppr (seTvSubst env)
+      , text "idsubst =" <+> ppr (seIdSubst env)
+      , text "cvsubst =" <+> ppr (seCvSubst env)
+      {- , ppr (seFloats env) -} 
+      ]) $ -}
     simplExprF1 env e cont
 
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
@@ -1009,7 +1017,8 @@ simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplEnv, OutExpr)
 simplCast env body co0 cont0
   = do  { co1 <- simplCoercion env co0
-        ; simplExprF env body (addCoerce co1 cont0) }
+        ; -- pprTrace "simplCast" (ppr co1) $
+          simplExprF env body (addCoerce co1 cont0) }
   where
        addCoerce co cont = add_coerce co (coercionKind co) cont
 
@@ -1082,7 +1091,8 @@ simplCast env body co0 cont0
            --    (->) t1 t2 ~ (->) s1 s2
            [co1, co2] = decomposeCo 2 co
            new_arg    = mkCoerce (mkSymCo co1) arg'
-           arg'       = substExpr (text "move-cast") (arg_se `setInScope` env) arg
+           arg'       = substExpr (text "move-cast") arg_se' arg
+           arg_se'    = arg_se `setInScope` env
 
        add_coerce co _ cont = CoerceIt co cont
 \end{code}
