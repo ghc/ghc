@@ -245,7 +245,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_conflicts "Register conflict graph"
 			$ Color.dotGraph 
-				targetRegDotColor 
+				(targetRegDotColor platform)
 				(Color.trivColorable platform
 					(targetVirtualRegSqueeze platform)
 					(targetRealRegSqueeze platform))
@@ -386,7 +386,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 	  	-- the regs usable for allocation
 		let (alloc_regs :: UniqFM (UniqSet RealReg))
 			= foldr (\r -> plusUFM_C unionUniqSets
-					$ unitUFM (targetClassOfRealReg r) (unitUniqSet r))
+					$ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
 				emptyUFM
 			$ allocatableRegs ncgImpl
 

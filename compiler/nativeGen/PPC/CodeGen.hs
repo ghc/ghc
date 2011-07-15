@@ -404,11 +404,12 @@ getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32) [x])
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ (CmmLoad mem pk)
+getRegister' dflags (CmmLoad mem pk)
   | not (isWord64 pk)
   = do
+        let platform = targetPlatform dflags
         Amode addr addr_code <- getAmode mem
-        let code dst = ASSERT((targetClassOfReg dst == RcDouble) == isFloatType pk)
+        let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
                        addr_code `snocOL` LD size dst addr
         return (Any size code)
           where size = cmmTypeSize pk

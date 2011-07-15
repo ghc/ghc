@@ -43,6 +43,7 @@ import OldCmm
 import FastString
 import FastBool
 import Outputable
+import Platform
 
 
 -- | Register or immediate
@@ -363,15 +364,16 @@ sparc_patchJumpInstr insn patchF
 -- | Make a spill instruction.
 -- 	On SPARC we spill below frame pointer leaving 2 words/spill
 sparc_mkSpillInstr
-	:: Reg		-- ^ register to spill
-	-> Int		-- ^ current stack delta
-	-> Int		-- ^ spill slot to use
-	-> Instr
+    :: Platform
+    -> Reg      -- ^ register to spill
+    -> Int      -- ^ current stack delta
+    -> Int      -- ^ spill slot to use
+    -> Instr
 
-sparc_mkSpillInstr reg _ slot
+sparc_mkSpillInstr platform reg _ slot
  = let	off     = spillSlotToOffset slot
         off_w	= 1 + (off `div` 4)
-        sz 	= case targetClassOfReg reg of
+        sz 	= case targetClassOfReg platform reg of
 			RcInteger -> II32
 			RcFloat   -> FF32
 			RcDouble  -> FF64
@@ -382,15 +384,16 @@ sparc_mkSpillInstr reg _ slot
 
 -- | Make a spill reload instruction.
 sparc_mkLoadInstr
-	:: Reg		-- ^ register to load into
-	-> Int		-- ^ current stack delta
-	-> Int		-- ^ spill slot to use
-	-> Instr
+    :: Platform
+    -> Reg      -- ^ register to load into
+    -> Int      -- ^ current stack delta
+    -> Int      -- ^ spill slot to use
+    -> Instr
 
-sparc_mkLoadInstr reg _ slot
+sparc_mkLoadInstr platform reg _ slot
   = let off     = spillSlotToOffset slot
 	off_w	= 1 + (off `div` 4)
-        sz	= case targetClassOfReg reg of
+        sz	= case targetClassOfReg platform reg of
 			RcInteger -> II32
 			RcFloat   -> FF32
 			RcDouble  -> FF64
@@ -430,13 +433,14 @@ sparc_isMetaInstr instr
 --	have to go via memory.
 --
 sparc_mkRegRegMoveInstr
-	:: Reg
-	-> Reg
-	-> Instr
+    :: Platform
+    -> Reg
+    -> Reg
+    -> Instr
 
-sparc_mkRegRegMoveInstr src dst
-	| srcClass	<- targetClassOfReg src
-	, dstClass	<- targetClassOfReg dst
+sparc_mkRegRegMoveInstr platform src dst
+	| srcClass	<- targetClassOfReg platform src
+	, dstClass	<- targetClassOfReg platform dst
 	, srcClass == dstClass
 	= case srcClass of
 		RcInteger -> ADD  False False src (RIReg g0) dst

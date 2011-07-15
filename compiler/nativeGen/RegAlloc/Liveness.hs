@@ -127,7 +127,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
                 Instr instr     -> isMetaInstr instr
                 _               -> False
 
-        mkRegRegMoveInstr r1 r2 = Instr (mkRegRegMoveInstr r1 r2)
+        mkRegRegMoveInstr platform r1 r2
+            = Instr (mkRegRegMoveInstr platform r1 r2)
 
         takeRegRegMoveInstr i
          = case i of
@@ -478,7 +479,7 @@ stripLive platform live
                                 = partition ((== first_id) . blockId) final_blocks
 
            in   CmmProc info label
-                          (ListGraph $ map stripLiveBlock $ first' : rest')
+                          (ListGraph $ map (stripLiveBlock platform) $ first' : rest')
 
         -- procs used for stg_split_markers don't contain any blocks, and have no first_id.
         stripCmm (CmmProc (LiveInfo info Nothing _ _) label [])
@@ -493,10 +494,11 @@ stripLive platform live
 
 stripLiveBlock
         :: Instruction instr
-        => LiveBasicBlock instr
+        => Platform
+        -> LiveBasicBlock instr
         -> NatBasicBlock instr
 
-stripLiveBlock (BasicBlock i lis)
+stripLiveBlock platform (BasicBlock i lis)
  =      BasicBlock i instrs'
 
  where  (instrs', _)
@@ -507,11 +509,11 @@ stripLiveBlock (BasicBlock i lis)
 
         spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
          = do   delta   <- get
-                spillNat (mkSpillInstr reg delta slot : acc) instrs
+                spillNat (mkSpillInstr platform reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
          = do   delta   <- get
-                spillNat (mkLoadInstr reg delta slot : acc) instrs
+                spillNat (mkLoadInstr platform reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr

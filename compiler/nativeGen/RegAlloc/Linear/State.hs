@@ -36,6 +36,7 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
+import Platform
 import Unique
 import UniqSupply
 
@@ -81,21 +82,21 @@ makeRAStats state
 	{ ra_spillInstrs	= binSpillReasons (ra_spills state) }
 
 
-spillR 	:: Instruction instr
-	=> Reg -> Unique -> RegM freeRegs (instr, Int)
+spillR :: Instruction instr
+       => Platform -> Reg -> Unique -> RegM freeRegs (instr, Int)
 
-spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
+spillR platform reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
   let (stack',slot) = getStackSlotFor stack temp
-      instr  = mkSpillInstr reg delta slot
+      instr  = mkSpillInstr platform reg delta slot
   in
   (# s{ra_stack=stack'}, (instr,slot) #)
 
 
-loadR 	:: Instruction instr
-	=> Reg -> Int -> RegM freeRegs instr
+loadR :: Instruction instr
+      => Platform -> Reg -> Int -> RegM freeRegs instr
 
-loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
-  (# s, mkLoadInstr reg delta slot #)
+loadR platform reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
+  (# s, mkLoadInstr platform reg delta slot #)
 
 getFreeRegsR :: RegM freeRegs freeRegs
 getFreeRegsR = RegM $ \ s@RA_State{ra_freeregs = freeregs} ->
