@@ -13,8 +13,6 @@ module CoreMonad (
     FloatOutSwitches(..),
     dumpSimplPhase,
 
-    defaultGentleSimplToDo,
-    
     -- * Plugins
     PluginPass, Plugin(..), CommandLineOption, 
     defaultPlugin, bindsOnlyPass,
@@ -339,17 +337,6 @@ pprFloatOutSwitches sw
      [ ptext (sLit "Lam =")    <+> ppr (floatOutLambdas sw)
      , ptext (sLit "Consts =") <+> ppr (floatOutConstants sw)
      , ptext (sLit "PAPs =")   <+> ppr (floatOutPartialApplications sw) ])
-
--- | A reasonably gentle simplification pass for doing "obvious" simplifications
-defaultGentleSimplToDo :: CoreToDo
-defaultGentleSimplToDo = CoreDoSimplify 4 -- 4 is the default maxSimpleIterations
-                       (SimplMode { sm_phase = InitialPhase
-                                  , sm_names = ["Gentle"]
-                                  , sm_rules = True     -- Note [RULEs enabled in SimplGently]
-                                  , sm_inline = False
-                                  , sm_eta_expand = False
-                                  , sm_case_case = False 
-                                  })
 
 -- The core-to-core pass ordering is derived from the DynFlags:
 runWhen :: Bool -> CoreToDo -> CoreToDo
