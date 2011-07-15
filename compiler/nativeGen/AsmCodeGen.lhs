@@ -133,7 +133,7 @@ The machine-dependent bits break down as follows:
 -- Top-level of the native codegen
 
 data NcgImpl statics instr jumpDest = NcgImpl {
-    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop statics instr],
+    cmmTopCodeGen             :: Platform -> RawCmmTop -> NatM [NatCmmTop statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmTop statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
@@ -150,7 +150,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
 --------------------
 nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 nativeCodeGen dflags h us cmms
- = let nCG' :: (Outputable statics, Outputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
+ = let nCG' :: (Outputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
        x86NcgImpl = NcgImpl {
                          cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
@@ -206,7 +206,7 @@ nativeCodeGen dflags h us cmms
                  ArchUnknown ->
                      panic "nativeCodeGen: No NCG for unknown arch"
 
-nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
+nativeCodeGen' :: (Outputable statics, PlatformOutputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
                -> Handle -> UniqSupply -> [RawCmm] -> IO ()
@@ -272,7 +272,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
+cmmNativeGens :: (Outputable statics, PlatformOutputable instr, Instruction instr)
               => DynFlags
               -> NcgImpl statics instr jumpDest
               -> BufHandle
@@ -327,7 +327,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 --	Dumping the output of each stage along the way.
 --	Global conflict graph and NGC stats
 cmmNativeGen
-	:: (Outputable statics, Outputable instr, Instruction instr)
+	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
     => DynFlags
     -> NcgImpl statics instr jumpDest
 	-> UniqSupply
@@ -341,6 +341,7 @@ cmmNativeGen
 
 cmmNativeGen dflags ncgImpl us cmm count
  = do
+        let platform = targetPlatform dflags
 
 	-- rewrite assignments to global regs
  	let fixed_cmm =
@@ -354,27 +355,27 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_opt_cmm "Optimised Cmm"
-		(pprCmm $ Cmm [opt_cmm])
+		(pprCmm platform $ Cmm [opt_cmm])
 
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =
 		{-# SCC "genMachCode" #-}
-		initUs us $ genMachCode dflags (cmmTopCodeGen ncgImpl) opt_cmm
+		initUs us $ genMachCode dflags (cmmTopCodeGen ncgImpl platform) opt_cmm
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_native "Native code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) native)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) native)
 
 	-- tag instructions with register liveness information
 	let (withLiveness, usLive) =
 		{-# SCC "regLiveness" #-}
 		initUs usGen 
-			$ mapUs regLiveness 
+			$ mapUs (regLiveness platform)
 			$ map natCmmTopToLive native
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_liveness "Liveness annotations added"
-		(vcat $ map ppr withLiveness)
+		(vcat $ map (pprPlatform platform) withLiveness)
 		
 	-- allocate registers
 	(alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear) <-
@@ -401,14 +402,14 @@ cmmNativeGen dflags ncgImpl us cmm count
 		-- dump out what happened during register allocation
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
-			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) alloced)
+			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) alloced)
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc_stages "Build/spill stages"
 			(vcat 	$ map (\(stage, stats)
 					-> text "# --------------------------"
 					$$ text "#  cmm " <> int count <> text " Stage " <> int stage
-					$$ ppr stats)
+					$$ pprPlatform platform stats)
 				$ zip [0..] regAllocStats)
 
 		let mPprStats =
@@ -432,7 +433,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
-			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) alloced)
+			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) alloced)
 
 		let mPprStats =
 			if dopt Opt_D_dump_asm_stats dflags
@@ -476,7 +477,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) expanded)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) expanded)
 
 	return 	( usAlloc
 		, expanded

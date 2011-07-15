@@ -79,10 +79,11 @@ if_sse2 sse2 x87 = do
   if b then sse2 else x87
 
 cmmTopCodeGen
-        :: RawCmmTop
+        :: Platform
+        -> RawCmmTop
         -> NatM [NatCmmTop (Alignment, CmmStatics) Instr]
 
-cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen _ (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
   dflags <- getDynFlagsNat
@@ -94,7 +95,7 @@ cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
       Just picBase -> initializePicBase_x86 ArchX86 os picBase tops
       Nothing -> return tops
 
-cmmTopCodeGen (CmmData sec dat) = do
+cmmTopCodeGen _ (CmmData sec dat) = do
   return [CmmData sec (1, dat)]  -- no translation, we just use CmmStatic
 
 

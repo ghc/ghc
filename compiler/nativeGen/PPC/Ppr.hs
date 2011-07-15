@@ -41,7 +41,7 @@ import Platform
 import Pretty
 import FastString
 import qualified Outputable
-import Outputable	( Outputable, panic )
+import Outputable ( PlatformOutputable, panic )
 
 import Data.Word
 import Data.Bits
@@ -142,8 +142,8 @@ pprASCII str
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
-instance Outputable Instr where
-    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
+instance PlatformOutputable Instr where
+    pprPlatform _ instr = Outputable.docToSDoc $ pprInstr instr
 
 
 pprReg :: Reg -> Doc

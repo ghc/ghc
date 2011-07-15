@@ -13,6 +13,7 @@ import CmmExpr
 import MkGraph
 import qualified OldCmm as Old
 import OldPprCmm ()
+import Platform
 
 import Compiler.Hoopl hiding ((<*>), mkLabel, mkBranch)
 import Control.Monad
@@ -21,23 +22,23 @@ import Maybes
 import Outputable
 import UniqSupply
 
-cmmToZgraph :: Old.Cmm -> UniqSM Cmm
-cmmOfZgraph :: Cmm     -> Old.Cmm
+cmmToZgraph :: Platform -> Old.Cmm -> UniqSM Cmm
+cmmOfZgraph :: Cmm -> Old.Cmm
 
-cmmToZgraph (Cmm tops) = liftM Cmm $ mapM mapTop tops
+cmmToZgraph platform (Cmm tops) = liftM Cmm $ mapM mapTop tops
   where mapTop (CmmProc (Old.CmmInfo _ _ info_tbl) l g) =
-          do (stack_info, g) <- toZgraph (showSDoc $ ppr l) g
+          do (stack_info, g) <- toZgraph platform (showSDoc $ ppr l) g
              return $ CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) l g
         mapTop (CmmData s ds) = return $ CmmData s ds
 cmmOfZgraph (Cmm tops) = Cmm $ map mapTop tops
   where mapTop (CmmProc h l g) = CmmProc (Old.CmmInfo Nothing Nothing (info_tbl h)) l (ofZgraph g)
         mapTop (CmmData s ds) = CmmData s ds
 
-toZgraph :: String -> Old.ListGraph Old.CmmStmt -> UniqSM (CmmStackInfo, CmmGraph)
-toZgraph _ (Old.ListGraph []) =
+toZgraph :: Platform -> String -> Old.ListGraph Old.CmmStmt -> UniqSM (CmmStackInfo, CmmGraph)
+toZgraph _ _ (Old.ListGraph []) =
   do g <- lgraphOfAGraph emptyAGraph
      return (StackInfo {arg_space=0, updfr_space=Nothing}, g)
-toZgraph fun_name g@(Old.ListGraph (Old.BasicBlock id ss : other_blocks)) = 
+toZgraph platform fun_name g@(Old.ListGraph (Old.BasicBlock id ss : other_blocks)) =
            let (offset, entry) = mkCallEntry NativeNodeCall [] in
            do g <- labelAGraph id $
                      entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
@@ -64,7 +65,7 @@ toZgraph fun_name g@(Old.ListGraph (Old.BasicBlock id ss : other_blocks)) =
         mkStmts (last : []) = mkLast last
         mkStmts []          = bad "fell off end"
         mkStmts (_ : _ : _) = bad "last node not at end"
-        bad msg = pprPanic (msg ++ " in function " ++ fun_name) (ppr g)
+        bad msg = pprPanic (msg ++ " in function " ++ fun_name) (pprPlatform platform g)
         mkLast (Old.CmmCall (Old.CmmCallee f conv) []     args _ Old.CmmNeverReturns) =
             mkFinalCall f conv (map Old.hintlessCmm args) updfr_sz
         mkLast (Old.CmmCall (Old.CmmPrim {}) _ _ _ Old.CmmNeverReturns) =

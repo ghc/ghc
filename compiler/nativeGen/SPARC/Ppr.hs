@@ -39,7 +39,7 @@ import CLabel
 
 import Unique		( Uniquable(..), pprUnique )
 import qualified Outputable
-import Outputable	(Outputable, panic)
+import Outputable (PlatformOutputable, panic)
 import Platform
 import Pretty
 import FastString
@@ -133,8 +133,8 @@ pprASCII str
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
-instance Outputable Instr where
-    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
+instance PlatformOutputable Instr where
+    pprPlatform _ instr = Outputable.docToSDoc $ pprInstr instr
 
 
 -- | Pretty print a register.

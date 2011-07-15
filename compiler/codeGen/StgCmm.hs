@@ -81,7 +81,7 @@ codeGen dflags this_mod data_tycons
                 -- initialisation routines; see Note
                 -- [pipeline-split-init].
 
-        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms code_stuff)
+        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms (targetPlatform dflags) code_stuff)
 
         ; return code_stuff }
 
