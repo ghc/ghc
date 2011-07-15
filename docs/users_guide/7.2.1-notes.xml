@@ -225,6 +225,14 @@ foreign import ccall interruptible
           <literal>var</literal>.
         </para>
       </listitem>
+
+      <listitem>
+        <para>
+          Characters in the unicode <literal>OtherNumber</literal>
+          category are now treated as being 'digit's, rather than 'other
+          graphical' characters.
+        </para>
+      </listitem>
     </itemizedlist>
   </sect2>
 
