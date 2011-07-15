@@ -1454,7 +1454,7 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
             escape = concatMap (charToC.fromIntegral.ord)
 
             elfSectionNote :: String
-            elfSectionNote = case platformArch defaultTargetPlatform of
+            elfSectionNote = case platformArch (targetPlatform dflags) of
                                ArchX86    -> "@note"
                                ArchX86_64 -> "@note"
                                ArchPPC    -> "@note"
