@@ -133,7 +133,7 @@ The machine-dependent bits break down as follows:
 -- Top-level of the native codegen
 
 data NcgImpl statics instr jumpDest = NcgImpl {
-    cmmTopCodeGen             :: Platform -> RawCmmTop -> NatM [NatCmmTop statics instr],
+    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmTop statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
@@ -361,7 +361,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =
 		{-# SCC "genMachCode" #-}
-		initUs us $ genMachCode dflags (cmmTopCodeGen ncgImpl platform) opt_cmm
+		initUs us $ genMachCode dflags (cmmTopCodeGen ncgImpl) opt_cmm
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_native "Native code"
