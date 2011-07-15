@@ -584,7 +584,7 @@ mkProductBox arg_ids ty
     result_expr
       | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
       = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
-      | otherwise = mkConApp pack_con (map Type tycon_args ++ map Var arg_ids)
+      | otherwise = mkConApp pack_con (map Type tycon_args ++ varsToCoreExprs arg_ids)
 
     wrap expr = wrapNewTypeBody tycon tycon_args expr
 
