@@ -114,9 +114,9 @@ cleanSpin platform spinCount code
 
 -- | Clean one basic block
 cleanBlockForward
-    :: Platform
-    -> Instruction instr
-    => LiveBasicBlock instr
+    :: Instruction instr
+    => Platform
+    -> LiveBasicBlock instr
     -> CleanM (LiveBasicBlock instr)
 
 cleanBlockForward platform (BasicBlock blockId instrs)
