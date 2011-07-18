@@ -39,6 +39,7 @@ import UniqFM
 import Unique
 import State
 import Outputable
+import Platform
 
 import Data.List
 import Data.Maybe
@@ -52,22 +53,23 @@ type Slot = Int
 
 
 -- | Clean out unneeded spill\/reloads from this top level thing.
-cleanSpills 
-	:: Instruction instr
-	=> LiveCmmTop statics instr -> LiveCmmTop statics instr
+cleanSpills
+    :: Instruction instr
+    => Platform -> LiveCmmTop statics instr -> LiveCmmTop statics instr
 
-cleanSpills cmm
-	= evalState (cleanSpin 0 cmm) initCleanS
+cleanSpills platform cmm
+    = evalState (cleanSpin platform 0 cmm) initCleanS
 
 -- | do one pass of cleaning
-cleanSpin 
-	:: Instruction instr
-	=> Int 
-	-> LiveCmmTop statics instr 
-	-> CleanM (LiveCmmTop statics instr)
+cleanSpin
+    :: Instruction instr
+    => Platform
+    -> Int
+    -> LiveCmmTop statics instr
+    -> CleanM (LiveCmmTop statics instr)
 
 {-
-cleanSpin spinCount code
+cleanSpin _ spinCount code
  = do	jumpValid	<- gets sJumpValid
 	pprTrace "cleanSpin"
 	 	(  int spinCount
@@ -78,7 +80,7 @@ cleanSpin spinCount code
 	 $ cleanSpin' spinCount code
 -}
 
-cleanSpin spinCount code
+cleanSpin platform spinCount code
  = do
  	-- init count of cleaned spills\/reloads
 	modify $ \s -> s
@@ -86,7 +88,7 @@ cleanSpin spinCount code
 		, sCleanedReloadsAcc	= 0
 		, sReloadedBy		= emptyUFM }
 
- 	code_forward	<- mapBlockTopM cleanBlockForward  code
+ 	code_forward	<- mapBlockTopM (cleanBlockForward platform) code
 	code_backward	<- cleanTopBackward code_forward
 	
 	-- During the cleaning of each block we collected information about what regs
@@ -107,16 +109,17 @@ cleanSpin spinCount code
 	   then return code
 
 	-- otherwise go around again
-	   else cleanSpin (spinCount + 1) code_backward
+	   else cleanSpin platform (spinCount + 1) code_backward
 
 
 -- | Clean one basic block
-cleanBlockForward 
-	:: Instruction instr
-	=> LiveBasicBlock instr 
-	-> CleanM (LiveBasicBlock instr)
+cleanBlockForward
+    :: Instruction instr
+    => Platform
+    -> LiveBasicBlock instr
+    -> CleanM (LiveBasicBlock instr)
 
-cleanBlockForward (BasicBlock blockId instrs)
+cleanBlockForward platform (BasicBlock blockId instrs)
  = do
  	-- see if we have a valid association for the entry to this block
  	jumpValid	<- gets sJumpValid
@@ -124,7 +127,7 @@ cleanBlockForward (BasicBlock blockId instrs)
 				Just assoc	-> assoc
 				Nothing		-> emptyAssoc
 
- 	instrs_reload	<- cleanForward    blockId assoc [] instrs
+ 	instrs_reload	<- cleanForward platform blockId assoc [] instrs
 	return	$ BasicBlock blockId instrs_reload
 
 
@@ -135,37 +138,38 @@ cleanBlockForward (BasicBlock blockId instrs)
 --	  then we don't need to do the reload.
 --
 cleanForward
-	:: Instruction instr
-	=> BlockId			-- ^ the block that we're currently in
-	-> Assoc Store	 		-- ^ two store locations are associated if they have the same value
-	-> [LiveInstr instr]		-- ^ acc
-	-> [LiveInstr instr] 		-- ^ instrs to clean (in backwards order)
-	-> CleanM [LiveInstr instr]	-- ^ cleaned instrs  (in forward   order)
+    :: Instruction instr
+    => Platform
+    -> BlockId                  -- ^ the block that we're currently in
+    -> Assoc Store              -- ^ two store locations are associated if they have the same value
+    -> [LiveInstr instr]        -- ^ acc
+    -> [LiveInstr instr]        -- ^ instrs to clean (in backwards order)
+    -> CleanM [LiveInstr instr] -- ^ cleaned instrs  (in forward   order)
 
-cleanForward _ _ acc []
+cleanForward _ _ _ acc []
 	= return acc
 
 -- write out live range joins via spill slots to just a spill and a reg-reg move
 --	hopefully the spill will be also be cleaned in the next pass
 --
-cleanForward blockId assoc acc (li1 : li2 : instrs)
+cleanForward platform blockId assoc acc (li1 : li2 : instrs)
 
 	| LiveInstr (SPILL  reg1  slot1) _	<- li1
 	, LiveInstr (RELOAD slot2 reg2)  _	<- li2
 	, slot1 == slot2
 	= do
 		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
-		cleanForward blockId assoc acc
-			(li1 : LiveInstr (mkRegRegMoveInstr reg1 reg2) Nothing : instrs)
+		cleanForward platform blockId assoc acc
+			(li1 : LiveInstr (mkRegRegMoveInstr platform reg1 reg2) Nothing : instrs)
 
 
-cleanForward blockId assoc acc (li@(LiveInstr i1 _) : instrs)
+cleanForward platform blockId assoc acc (li@(LiveInstr i1 _) : instrs)
 	| Just (r1, r2)	<- takeRegRegMoveInstr i1
 	= if r1 == r2
 		-- erase any left over nop reg reg moves while we're here
 		--	this will also catch any nop moves that the "write out live range joins" case above
 		--	happens to add
-		then cleanForward blockId assoc acc instrs
+		then cleanForward platform blockId assoc acc instrs
 
 		-- if r1 has the same value as some slots and we copy r1 to r2,
 		--	then r2 is now associated with those slots instead
@@ -173,50 +177,51 @@ cleanForward blockId assoc acc (li@(LiveInstr i1 _) : instrs)
 					$ delAssoc (SReg r2)
 					$ assoc
 
-			cleanForward blockId assoc' (li : acc) instrs
+			cleanForward platform blockId assoc' (li : acc) instrs
 
 
-cleanForward blockId assoc acc (li : instrs)
+cleanForward platform blockId assoc acc (li : instrs)
 
 	-- update association due to the spill
 	| LiveInstr (SPILL reg slot) _	<- li
 	= let	assoc'	= addAssoc (SReg reg)  (SSlot slot)
 			$ delAssoc (SSlot slot)
 			$ assoc
-	  in	cleanForward blockId assoc' (li : acc) instrs
+	  in	cleanForward platform blockId assoc' (li : acc) instrs
 
 	-- clean a reload instr
 	| LiveInstr (RELOAD{}) _	<- li
-	= do	(assoc', mli)	<- cleanReload blockId assoc li
+	= do	(assoc', mli)	<- cleanReload platform blockId assoc li
 		case mli of
-		 Nothing	-> cleanForward blockId assoc' acc 		instrs
-		 Just li'	-> cleanForward blockId assoc' (li' : acc)	instrs
+		 Nothing	-> cleanForward platform blockId assoc' acc 		instrs
+		 Just li'	-> cleanForward platform blockId assoc' (li' : acc)	instrs
 
 	-- remember the association over a jump
 	| LiveInstr instr _ 	<- li
 	, targets		<- jumpDestsOfInstr instr
 	, not $ null targets
 	= do	mapM_ (accJumpValid assoc) targets
-		cleanForward blockId assoc (li : acc) instrs
+		cleanForward platform blockId assoc (li : acc) instrs
 
 	-- writing to a reg changes its value.
 	| LiveInstr instr _	<- li
 	, RU _ written		<- regUsageOfInstr instr
 	= let assoc'	= foldr delAssoc assoc (map SReg $ nub written)
-	  in  cleanForward blockId assoc' (li : acc) instrs
+	  in  cleanForward platform blockId assoc' (li : acc) instrs
 
 
 
 -- | Try and rewrite a reload instruction to something more pleasing
 --
-cleanReload 
-	:: Instruction instr
-	=> BlockId 
-	-> Assoc Store 
-	-> LiveInstr instr
-	-> CleanM (Assoc Store, Maybe (LiveInstr instr))
+cleanReload
+    :: Instruction instr
+    => Platform
+    -> BlockId
+    -> Assoc Store
+    -> LiveInstr instr
+    -> CleanM (Assoc Store, Maybe (LiveInstr instr))
 
-cleanReload blockId assoc li@(LiveInstr (RELOAD slot reg) _)
+cleanReload platform blockId assoc li@(LiveInstr (RELOAD slot reg) _)
 
 	-- if the reg we're reloading already has the same value as the slot
 	--	then we can erase the instruction outright
@@ -233,7 +238,7 @@ cleanReload blockId assoc li@(LiveInstr (RELOAD slot reg) _)
 				$ delAssoc (SReg reg)
 				$ assoc
 
-		return	(assoc', Just $ LiveInstr (mkRegRegMoveInstr reg2 reg) Nothing)
+		return	(assoc', Just $ LiveInstr (mkRegRegMoveInstr platform reg2 reg) Nothing)
 
 	-- gotta keep this instr
 	| otherwise
@@ -247,7 +252,7 @@ cleanReload blockId assoc li@(LiveInstr (RELOAD slot reg) _)
 
 	    	return	(assoc', Just li)
 
-cleanReload _ _ _
+cleanReload _ _ _ _
 	= panic "RegSpillClean.cleanReload: unhandled instr"
 
 

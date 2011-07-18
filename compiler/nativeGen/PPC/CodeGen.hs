@@ -66,11 +66,10 @@ import FastString
 -- order.
 
 cmmTopCodeGen
-        :: Platform
-        -> RawCmmTop
+        :: RawCmmTop
         -> NatM [NatCmmTop CmmStatics Instr]
 
-cmmTopCodeGen _ (CmmProc info lab (ListGraph blocks)) = do
+cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
   dflags <- getDynFlagsNat
@@ -81,7 +80,7 @@ cmmTopCodeGen _ (CmmProc info lab (ListGraph blocks)) = do
       Just picBase -> initializePicBase_ppc ArchPPC os picBase tops
       Nothing -> return tops
 
-cmmTopCodeGen _ (CmmData sec dat) = do
+cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
 basicBlockCodeGen
@@ -404,11 +403,12 @@ getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32) [x])
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ (CmmLoad mem pk)
+getRegister' dflags (CmmLoad mem pk)
   | not (isWord64 pk)
   = do
+        let platform = targetPlatform dflags
         Amode addr addr_code <- getAmode mem
-        let code dst = ASSERT((targetClassOfReg dst == RcDouble) == isFloatType pk)
+        let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
                        addr_code `snocOL` LD size dst addr
         return (Any size code)
           where size = cmmTypeSize pk

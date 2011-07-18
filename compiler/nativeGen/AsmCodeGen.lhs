@@ -133,7 +133,7 @@ The machine-dependent bits break down as follows:
 -- Top-level of the native codegen
 
 data NcgImpl statics instr jumpDest = NcgImpl {
-    cmmTopCodeGen             :: Platform -> RawCmmTop -> NatM [NatCmmTop statics instr],
+    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmTop statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
@@ -212,7 +212,8 @@ nativeCodeGen' :: (Outputable statics, PlatformOutputable instr, Instruction ins
                -> Handle -> UniqSupply -> [RawCmm] -> IO ()
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
-	let split_cmms	= concat $ map add_split cmms
+	let platform = targetPlatform dflags
+	    split_cmms	= concat $ map add_split cmms
         -- BufHandle is a performance hack.  We could hide it inside
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
@@ -226,7 +227,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 	-- dump native code
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm "Asm code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl (targetPlatform dflags)) $ concat native)
+		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) $ concat native)
 
 	-- dump global NCG stats for graph coloring allocator
 	(case concat $ catMaybes colorStats of
@@ -244,10 +245,10 @@ nativeCodeGen' dflags ncgImpl h us cmms
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_conflicts "Register conflict graph"
 			$ Color.dotGraph 
-				targetRegDotColor 
-				(Color.trivColorable 
-					targetVirtualRegSqueeze 
-					targetRealRegSqueeze)
+				(targetRegDotColor platform)
+				(Color.trivColorable platform
+					(targetVirtualRegSqueeze platform)
+					(targetRealRegSqueeze platform))
 			$ graphGlobal)
 
 
@@ -360,7 +361,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =
 		{-# SCC "genMachCode" #-}
-		initUs us $ genMachCode dflags (cmmTopCodeGen ncgImpl platform) opt_cmm
+		initUs us $ genMachCode dflags (cmmTopCodeGen ncgImpl) opt_cmm
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_native "Native code"
@@ -385,7 +386,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 	  	-- the regs usable for allocation
 		let (alloc_regs :: UniqFM (UniqSet RealReg))
 			= foldr (\r -> plusUFM_C unionUniqSets
-					$ unitUFM (targetClassOfRealReg r) (unitUniqSet r))
+					$ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
 				emptyUFM
 			$ allocatableRegs ncgImpl
 

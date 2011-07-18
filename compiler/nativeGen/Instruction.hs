@@ -14,6 +14,7 @@ import Reg
 
 import BlockId
 import OldCmm
+import Platform
 
 -- | Holds a list of source and destination registers used by a
 --      particular instruction.
@@ -103,7 +104,8 @@ class   Instruction instr where
 
         -- | An instruction to spill a register into a spill slot.
         mkSpillInstr
-                :: Reg          -- ^ the reg to spill
+                :: Platform
+                -> Reg          -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ spill slot to use
                 -> instr
@@ -111,7 +113,8 @@ class   Instruction instr where
 
         -- | An instruction to reload a register from a spill slot.
         mkLoadInstr
-                :: Reg          -- ^ the reg to reload.
+                :: Platform
+                -> Reg          -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use
                 -> instr
@@ -137,7 +140,8 @@ class   Instruction instr where
         -- | Copy the value in a register to another one.
         --      Must work for all register classes.
         mkRegRegMoveInstr
-                :: Reg          -- ^ source register
+                :: Platform
+                -> Reg          -- ^ source register
                 -> Reg          -- ^ destination register
                 -> instr
 

@@ -59,9 +59,10 @@ regAlloc dflags regsFree slotsFree code
 	-- TODO: the regClass function is currently hard coded to the default target
 	--	 architecture. Would prefer to determine this from dflags.
 	--	 There are other uses of targetRegClass later in this module.
-	let triv = trivColorable 
-			targetVirtualRegSqueeze
-			targetRealRegSqueeze
+	let platform = targetPlatform dflags
+	    triv = trivColorable platform
+			(targetVirtualRegSqueeze platform)
+			(targetRealRegSqueeze platform)
 
  	(code_final, debug_codeGraphs, _)
 		<- regAlloc_spin dflags 0 
@@ -164,7 +165,7 @@ regAlloc_spin
 	 	let code_patched	= map (patchRegsFromGraph platform graph_colored_lint) code_coalesced
 
 		-- clean out unneeded SPILL/RELOADs
-		let code_spillclean	= map cleanSpills code_patched
+		let code_spillclean	= map (cleanSpills platform) code_patched
 
 		-- strip off liveness information, 
 		--	and rewrite SPILL/RELOAD pseudos into real instructions along the way
@@ -348,9 +349,9 @@ patchRegsFromGraph platform graph code
 			$$ pprPlatform platform code
 			$$ Color.dotGraph 
 				(\_ -> text "white") 
-				(trivColorable 
-					targetVirtualRegSqueeze
-					targetRealRegSqueeze)
+				(trivColorable platform
+					(targetVirtualRegSqueeze platform)
+					(targetRealRegSqueeze platform))
 				graph)
 
    in	patchEraseLive patchF code
