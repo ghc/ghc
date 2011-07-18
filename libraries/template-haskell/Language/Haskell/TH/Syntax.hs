@@ -862,7 +862,7 @@ data Pred = ClassP Name [Type]    -- ^ @Eq (Int, a)@
           | EqualP Type Type      -- ^ @F a ~ Bool@
           deriving( Show, Eq, Data, Typeable )
 
-data Strict = IsStrict | NotStrict
+data Strict = IsStrict | NotStrict | Unpacked
          deriving( Show, Eq, Data, Typeable )
 
 data Con = NormalC Name [StrictType]          -- ^ @C Int a@

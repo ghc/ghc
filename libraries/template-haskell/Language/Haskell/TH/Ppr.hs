@@ -374,6 +374,7 @@ pprStrictType :: (Strict, Type) -> Doc
 -- Prints with parens if not already atomic
 pprStrictType (IsStrict, t) = char '!' <> pprParendType t
 pprStrictType (NotStrict, t) = pprParendType t
+pprStrictType (Unpacked, t) = text "{-# UNPACK #-} !" <> pprParendType t
 
 ------------------------------
 pprParendType :: Type -> Doc

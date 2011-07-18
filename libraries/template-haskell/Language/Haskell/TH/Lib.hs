@@ -457,9 +457,10 @@ sigT t k
       t' <- t
       return $ SigT t' k
 
-isStrict, notStrict :: Q Strict
+isStrict, notStrict, unpacked :: Q Strict
 isStrict = return $ IsStrict
 notStrict = return $ NotStrict
+unpacked = return Unpacked
 
 strictType :: Q Strict -> TypeQ -> StrictTypeQ
 strictType = liftM2 (,)
