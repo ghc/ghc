@@ -297,6 +297,9 @@ usage_text[] = {
 #  ifdef DEBUG
 "                t    add time stamps (only useful with -v)",
 #  endif
+"                a    all event classes above",
+"               -x    disable an event class, for any flag above",
+"             the initial enabled event classes are 'sgp'",
 #endif
 
 #if !defined(PROFILING)
