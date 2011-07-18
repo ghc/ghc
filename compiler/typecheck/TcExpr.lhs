@@ -1050,22 +1050,6 @@ Here's a concrete example that does this (test tc200):
 Current solution: only do the "method sharing" thing for the first type/dict
 application, not for the iterated ones.  A horribly subtle point.
 
-Note [No method sharing]
-~~~~~~~~~~~~~~~~~~~~~~~~
-The -fno-method-sharing flag controls what happens so far as the LIE
-is concerned.  The default case is that for an overloaded function we 
-generate a "method" Id, and add the Method Inst to the LIE.  So you get
-something like
-	f :: Num a => a -> a
-	f = /\a (d:Num a) -> let m = (+) a d in \ (x:a) -> m x x
-If you specify -fno-method-sharing, the dictionary application 
-isn't shared, so we get
-	f :: Num a => a -> a
-	f = /\a (d:Num a) (x:a) -> (+) a d x x
-This gets a bit less sharing, but
-	a) it's better for RULEs involving overloaded functions
-	b) perhaps fewer separated lambdas
-
 \begin{code}
 doStupidChecks :: TcId
 	       -> [TcType]
@@ -1337,7 +1321,7 @@ checkMissingFields data_con rbinds
     unless (null missing_s_fields)
 	   (addErrTc (missingStrictFields data_con missing_s_fields))
 
-    warn <- doptM Opt_WarnMissingFields
+    warn <- woptM Opt_WarnMissingFields
     unless (not (warn && notNull missing_ns_fields))
 	   (warnTc True (missingFields data_con missing_ns_fields))
 

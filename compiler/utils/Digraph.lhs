@@ -164,6 +164,9 @@ flattenSCC (CyclicSCC vs) = vs
 instance Outputable a => Outputable (SCC a) where
    ppr (AcyclicSCC v) = text "NONREC" $$ (nest 3 (ppr v))
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
+instance PlatformOutputable a => PlatformOutputable (SCC a) where
+   pprPlatform platform (AcyclicSCC v) = text "NONREC" $$ (nest 3 (pprPlatform platform v))
+   pprPlatform platform (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map (pprPlatform platform) vs)))
 \end{code}
 
 %************************************************************************

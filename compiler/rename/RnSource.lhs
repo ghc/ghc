@@ -169,7 +169,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (H) Rename Everything else
 
    (rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
-   (rn_rule_decls,    src_fvs3) <- setOptM Opt_ScopedTypeVariables $
+   (rn_rule_decls,    src_fvs3) <- setXOptM Opt_ScopedTypeVariables $
                                    rnList rnHsRuleDecl    rule_decls ;
                            -- Inside RULES, scoped type variables are on
    (rn_vect_decls,    src_fvs4) <- rnList rnHsVectDecl    vect_decls ;

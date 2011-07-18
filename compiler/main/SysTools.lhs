@@ -269,7 +269,6 @@ initSysTools mbMinusB
                         sOpt_F       = [],
                         sOpt_c       = [],
                         sOpt_a       = [],
-                        sOpt_m       = [],
                         sOpt_l       = [],
                         sOpt_windres = [],
                         sOpt_lo      = [],

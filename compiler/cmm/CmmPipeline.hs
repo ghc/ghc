@@ -65,7 +65,7 @@ cmmPipeline hsc_env (topSRT, rst) prog =
      let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
      (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
      let cmms = Cmm (reverse (concat tops))
-     dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (ppr cmms)
+     dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (pprPlatform (targetPlatform dflags) cmms)
      -- SRT is not affected by control flow optimization pass
      let prog' = map runCmmContFlowOpts (cmms : rst)
      return (topSRT, prog')
@@ -90,33 +90,33 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ----------- Eliminate common blocks -------------------
        g <- return $ elimCommonBlocks g
-       dump Opt_D_dump_cmmz_cbe "Post common block elimination" g
+       dumpPlatform platform Opt_D_dump_cmmz_cbe "Post common block elimination" g
        -- Any work storing block Labels must be performed _after_ elimCommonBlocks
 
        ----------- Proc points -------------------
        let callPPs = callProcPoints g
-       procPoints <- run $ minimalProcPointSet callPPs g
+       procPoints <- run $ minimalProcPointSet (targetPlatform dflags) callPPs g
        g <- run $ addProcPointProtocols callPPs procPoints g
-       dump Opt_D_dump_cmmz_proc "Post Proc Points Added" g
+       dumpPlatform platform Opt_D_dump_cmmz_proc "Post Proc Points Added" g
 
        ----------- Spills and reloads -------------------
        g <- run $ dualLivenessWithInsertion procPoints g
-       dump Opt_D_dump_cmmz_spills "Post spills and reloads" g
+       dumpPlatform platform Opt_D_dump_cmmz_spills "Post spills and reloads" g
 
        ----------- Sink and inline assignments -------------------
        g <- runOptimization $ rewriteAssignments g
-       dump Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
+       dumpPlatform platform Opt_D_dump_cmmz_rewrite "Post rewrite assignments" g
 
        ----------- Eliminate dead assignments -------------------
        g <- runOptimization $ removeDeadAssignments g
-       dump Opt_D_dump_cmmz_dead "Post remove dead assignments" g
+       dumpPlatform platform Opt_D_dump_cmmz_dead "Post remove dead assignments" g
 
        ----------- Zero dead stack slots (Debug only) ---------------
        -- Debugging: stubbing slots on death can cause crashes early
        g <- if opt_StubDeadValues
                 then run $ stubSlotsOnDeath g
                 else return g
-       dump Opt_D_dump_cmmz_stub "Post stub dead stack slots" g
+       dumpPlatform platform Opt_D_dump_cmmz_stub "Post stub dead stack slots" g
 
        --------------- Stack layout ----------------
        slotEnv <- run $ liveSlotAnal g
@@ -127,7 +127,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 
        ------------  Manifest the stack pointer --------
        g  <- run $ manifestSP spEntryMap areaMap entry_off g
-       dump Opt_D_dump_cmmz_sp "Post manifestSP" g
+       dumpPlatform platform Opt_D_dump_cmmz_sp "Post manifestSP" g
        -- UGH... manifestSP can require updates to the procPointMap.
        -- We can probably do something quicker here for the update...
 
@@ -136,7 +136,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        dump Opt_D_dump_cmmz_procmap "procpoint map" procPointMap
        gs <- run $ splitAtProcPoints l callPPs procPoints procPointMap
                                        (CmmProc h l g)
-       mapM_ (dump Opt_D_dump_cmmz_split "Post splitting") gs
+       mapM_ (dumpPlatform platform Opt_D_dump_cmmz_split "Post splitting") gs
 
        ------------- More CAFs and foreign calls ------------
        cafEnv <- run $ cafAnal g
@@ -144,23 +144,26 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        mbpprTrace "localCAFs" (ppr localCAFs) $ return ()
 
        gs <- run $ mapM (lowerSafeForeignCalls areaMap) gs
-       mapM_ (dump Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls") gs
+       mapM_ (dumpPlatform platform Opt_D_dump_cmmz_lower "Post lowerSafeForeignCalls") gs
 
        -- NO MORE GRAPH TRANSFORMATION AFTER HERE -- JUST MAKING INFOTABLES
        gs <- return $ map (setInfoTableStackMap slotEnv areaMap) gs
-       mapM_ (dump Opt_D_dump_cmmz_info "after setInfoTableStackMap") gs
+       mapM_ (dumpPlatform platform Opt_D_dump_cmmz_info "after setInfoTableStackMap") gs
        gs <- return $ map (bundleCAFs cafEnv) gs
-       mapM_ (dump Opt_D_dump_cmmz_cafs "after bundleCAFs") gs
+       mapM_ (dumpPlatform platform Opt_D_dump_cmmz_cafs "after bundleCAFs") gs
        return (localCAFs, gs)
   where dflags = hsc_dflags hsc_env
+        platform = targetPlatform dflags
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z
-        dump f txt g = do
+        dump f = dumpWith ppr f
+        dumpPlatform platform = dumpWith (pprPlatform platform)
+        dumpWith pprFun f txt g = do
             -- ToDo: No easy way of say "dump all the cmmz, *and* split
             -- them into files."  Also, -ddump-cmmz doesn't play nicely
             -- with -ddump-to-file, since the headers get omitted.
-            dumpIfSet_dyn dflags f txt (ppr g)
+            dumpIfSet_dyn dflags f txt (pprFun g)
             when (not (dopt f dflags)) $
-                dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (ppr g)
+                dumpIfSet_dyn dflags Opt_D_dump_cmmz txt (pprFun g)
         -- Runs a required transformation/analysis
         run = runInfiniteFuelIO (hsc_OptFuel hsc_env)
         -- Runs an optional transformation/analysis (and should

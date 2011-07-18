@@ -5075,10 +5075,6 @@ class (F a ~ b) => C a b where
       with the class head.  Method signatures are not affected by that
       process.
     </para>
-    <para>
-      NB: Equalities in superclass contexts are not fully implemented in
-      GHC 6.10.
-    </para>
   </sect3>
 
   <sect3 id-="ty-fams-in-instances">
@@ -8100,82 +8096,6 @@ happen.
       </sect3>
     </sect2>
 
-    <sect2 id="annotation-pragmas">
-      <title>ANN pragmas</title>
-
-      <para>GHC offers the ability to annotate various code constructs with additional
-      data by using three pragmas.  This data can then be inspected at a later date by
-      using GHC-as-a-library.</para>
-
-      <sect3 id="ann-pragma">
-        <title>Annotating values</title>
-
-        <indexterm><primary>ANN</primary></indexterm>
-
-        <para>Any expression that has both <literal>Typeable</literal> and <literal>Data</literal> instances may be attached to a top-level value
-        binding using an <literal>ANN</literal> pragma. In particular, this means you can use <literal>ANN</literal>
-        to annotate data constructors (e.g. <literal>Just</literal>) as well as normal values (e.g. <literal>take</literal>).
-        By way of example, to annotate the function <literal>foo</literal> with the annotation <literal>Just "Hello"</literal>
-        you would do this:</para>
-
-<programlisting>
-{-# ANN foo (Just "Hello") #-}
-foo = ...
-</programlisting>
-
-        <para>
-          A number of restrictions apply to use of annotations:
-          <itemizedlist>
-            <listitem><para>The binder being annotated must be at the top level (i.e. no nested binders)</para></listitem>
-            <listitem><para>The binder being annotated must be declared in the current module</para></listitem>
-            <listitem><para>The expression you are annotating with must have a type with <literal>Typeable</literal> and <literal>Data</literal> instances</para></listitem>
-            <listitem><para>The <ulink linkend="using-template-haskell">Template Haskell staging restrictions</ulink> apply to the
-            expression being annotated with, so for example you cannot run a function from the module being compiled.</para>
-
-            <para>To be precise, the annotation <literal>{-# ANN x e #-}</literal> is well staged if and only if <literal>$(e)</literal> would be
-            (disregarding the usual type restrictions of the splice syntax, and the usual restriction on splicing inside a splice - <literal>$([|1|])</literal> is fine as an annotation, albeit redundant).</para></listitem>
-          </itemizedlist>
-
-          If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC">
-          please give the GHC team a shout</ulink>.
-        </para>
-
-        <para>However, apart from these restrictions, many things are allowed, including expressions which are not fully evaluated!
-        Annotation expressions will be evaluated by the compiler just like Template Haskell splices are. So, this annotation is fine:</para>
-
-<programlisting>
-{-# ANN f SillyAnnotation { foo = (id 10) + $([| 20 |]), bar = 'f } #-}
-f = ...
-</programlisting>
-      </sect3>
-
-      <sect3 id="typeann-pragma">
-        <title>Annotating types</title>
-
-        <indexterm><primary>ANN type</primary></indexterm>
-        <indexterm><primary>ANN</primary></indexterm>
-
-        <para>You can annotate types with the <literal>ANN</literal> pragma by using the <literal>type</literal> keyword. For example:</para>
-
-<programlisting>
-{-# ANN type Foo (Just "A `Maybe String' annotation") #-}
-data Foo = ...
-</programlisting>
-      </sect3>
-
-      <sect3 id="modann-pragma">
-        <title>Annotating modules</title>
-
-        <indexterm><primary>ANN module</primary></indexterm>
-        <indexterm><primary>ANN</primary></indexterm>
-
-        <para>You can annotate modules with the <literal>ANN</literal> pragma by using the <literal>module</literal> keyword. For example:</para>
-
-<programlisting>
-{-# ANN module (Just "A `Maybe String' annotation") #-}
-</programlisting>
-      </sect3>
-    </sect2>
 
     <sect2 id="line-pragma">
       <title>LINE pragma</title>

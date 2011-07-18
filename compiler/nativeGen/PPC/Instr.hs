@@ -32,6 +32,7 @@ import OldCmm
 import FastString
 import CLabel
 import Outputable
+import Platform
 import FastBool
 
 --------------------------------------------------------------------------------
@@ -43,18 +44,18 @@ archWordSize	= II32
 
 -- | Instruction instance for powerpc
 instance Instruction Instr where
-	regUsageOfInstr		= ppc_regUsageOfInstr
-	patchRegsOfInstr	= ppc_patchRegsOfInstr
-	isJumpishInstr		= ppc_isJumpishInstr
-	jumpDestsOfInstr	= ppc_jumpDestsOfInstr
-	patchJumpInstr		= ppc_patchJumpInstr
-	mkSpillInstr		= ppc_mkSpillInstr
-	mkLoadInstr		= ppc_mkLoadInstr
-	takeDeltaInstr		= ppc_takeDeltaInstr
-	isMetaInstr		= ppc_isMetaInstr
-	mkRegRegMoveInstr	= ppc_mkRegRegMoveInstr
-	takeRegRegMoveInstr	= ppc_takeRegRegMoveInstr
-	mkJumpInstr		= ppc_mkJumpInstr
+        regUsageOfInstr         = ppc_regUsageOfInstr
+        patchRegsOfInstr        = ppc_patchRegsOfInstr
+        isJumpishInstr          = ppc_isJumpishInstr
+        jumpDestsOfInstr        = ppc_jumpDestsOfInstr
+        patchJumpInstr          = ppc_patchJumpInstr
+        mkSpillInstr            = ppc_mkSpillInstr
+        mkLoadInstr             = ppc_mkLoadInstr
+        takeDeltaInstr          = ppc_takeDeltaInstr
+        isMetaInstr             = ppc_isMetaInstr
+        mkRegRegMoveInstr _     = ppc_mkRegRegMoveInstr
+        takeRegRegMoveInstr     = ppc_takeRegRegMoveInstr
+        mkJumpInstr             = ppc_mkJumpInstr
 
 
 -- -----------------------------------------------------------------------------
@@ -75,7 +76,7 @@ data Instr
 	-- some static data spat out during code
 	-- generation.  Will be extracted before
 	-- pretty-printing.
-	| LDATA   Section [CmmStatic]	
+	| LDATA   Section CmmStatics	
 
 	-- start a new basic block.  Useful during
 	-- codegen, removed later.  Preceding 
@@ -346,15 +347,16 @@ ppc_patchJumpInstr insn patchF
 
 -- | An instruction to spill a register into a spill slot.
 ppc_mkSpillInstr
-   :: Reg		-- register to spill
-   -> Int		-- current stack delta
-   -> Int		-- spill slot to use
+   :: Platform
+   -> Reg       -- register to spill
+   -> Int       -- current stack delta
+   -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkSpillInstr reg delta slot
+ppc_mkSpillInstr platform reg delta slot
   = let	off     = spillSlotToOffset slot
     in
-    let sz = case targetClassOfReg reg of
+    let sz = case targetClassOfReg platform reg of
                 RcInteger -> II32
                 RcDouble  -> FF64
 		_	  -> panic "PPC.Instr.mkSpillInstr: no match"
@@ -362,15 +364,16 @@ ppc_mkSpillInstr reg delta slot
 
 
 ppc_mkLoadInstr
-   :: Reg		-- register to load
-   -> Int		-- current stack delta
-   -> Int		-- spill slot to use
+   :: Platform
+   -> Reg       -- register to load
+   -> Int       -- current stack delta
+   -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkLoadInstr reg delta slot
+ppc_mkLoadInstr platform reg delta slot
   = let off     = spillSlotToOffset slot
     in
-    let sz = case targetClassOfReg reg of
+    let sz = case targetClassOfReg platform reg of
                 RcInteger -> II32
                 RcDouble  -> FF64
 		_         -> panic "PPC.Instr.mkLoadInstr: no match"

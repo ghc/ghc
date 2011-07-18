@@ -127,11 +127,12 @@ opt_co' env sym (UnsafeCo ty1 ty2)
     ty2' = substTy env ty2
 
 opt_co' env sym (TransCo co1 co2)
-  | sym       = opt_trans opt_co2 opt_co1   -- sym (g `o` h) = sym h `o` sym g
-  | otherwise = opt_trans opt_co1 opt_co2
+  | sym       = opt_trans in_scope opt_co2 opt_co1   -- sym (g `o` h) = sym h `o` sym g
+  | otherwise = opt_trans in_scope opt_co1 opt_co2
   where
     opt_co1 = opt_co env sym co1
     opt_co2 = opt_co env sym co2
+    in_scope = getCvInScope env
 
 opt_co' env sym (NthCo n co)
   | TyConAppCo tc cos <- co'
@@ -149,9 +150,10 @@ opt_co' env sym (InstCo co ty)
   | Just (tv, co_body) <- splitForAllCo_maybe co
   = opt_co (extendTvSubst env tv ty') sym co_body
 
-    -- See if it is a forall after optimization
+     -- See if it is a forall after optimization
+     -- If so, do an inefficient one-variable substitution
   | Just (tv, co'_body) <- splitForAllCo_maybe co'
-  = substCoWithTy tv ty' co'_body   -- An inefficient one-variable substitution
+  = substCoWithTy (getCvInScope env) tv ty' co'_body   
 
   | otherwise = InstCo co' ty'
 
@@ -160,111 +162,111 @@ opt_co' env sym (InstCo co ty)
     ty' = substTy env ty
 
 -------------
-opt_transList :: [NormalCo] -> [NormalCo] -> [NormalCo]
-opt_transList = zipWith opt_trans
+opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
+opt_transList is = zipWith (opt_trans is)
 
-opt_trans :: NormalCo -> NormalCo -> NormalCo
-opt_trans co1 co2
+opt_trans :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
+opt_trans is co1 co2
   | isReflCo co1 = co2
-  | otherwise    = opt_trans1 co1 co2
+  | otherwise    = opt_trans1 is co1 co2
 
-opt_trans1 :: NormalNonIdCo -> NormalCo -> NormalCo
+opt_trans1 :: InScopeSet -> NormalNonIdCo -> NormalCo -> NormalCo
 -- First arg is not the identity
-opt_trans1 co1 co2
+opt_trans1 is co1 co2
   | isReflCo co2 = co1
-  | otherwise    = opt_trans2 co1 co2
+  | otherwise    = opt_trans2 is co1 co2
 
-opt_trans2 :: NormalNonIdCo -> NormalNonIdCo -> NormalCo
+opt_trans2 :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> NormalCo
 -- Neither arg is the identity
-opt_trans2 (TransCo co1a co1b) co2
+opt_trans2 is (TransCo co1a co1b) co2
     -- Don't know whether the sub-coercions are the identity
-  = opt_trans co1a (opt_trans co1b co2)  
+  = opt_trans is co1a (opt_trans is co1b co2)  
 
-opt_trans2 co1 co2 
-  | Just co <- opt_trans_rule co1 co2
+opt_trans2 is co1 co2 
+  | Just co <- opt_trans_rule is co1 co2
   = co
 
-opt_trans2 co1 (TransCo co2a co2b)
-  | Just co1_2a <- opt_trans_rule co1 co2a
+opt_trans2 is co1 (TransCo co2a co2b)
+  | Just co1_2a <- opt_trans_rule is co1 co2a
   = if isReflCo co1_2a
     then co2b
-    else opt_trans1 co1_2a co2b
+    else opt_trans1 is co1_2a co2b
 
-opt_trans2 co1 co2
+opt_trans2 _ co1 co2
   = mkTransCo co1 co2
 
 ------
 -- Optimize coercions with a top-level use of transitivity.
-opt_trans_rule :: NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
+opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
 -- push transitivity down through matching top-level constructors.
-opt_trans_rule in_co1@(TyConAppCo tc1 cos1) in_co2@(TyConAppCo tc2 cos2)
+opt_trans_rule is in_co1@(TyConAppCo tc1 cos1) in_co2@(TyConAppCo tc2 cos2)
   | tc1 == tc2 = fireTransRule "PushTyConApp" in_co1 in_co2 $
-                 TyConAppCo tc1 (opt_transList cos1 cos2)
+                 TyConAppCo tc1 (opt_transList is cos1 cos2)
 
 -- push transitivity through matching destructors
-opt_trans_rule in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
+opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
   | d1 == d2
   , co1 `compatible_co` co2
   = fireTransRule "PushNth" in_co1 in_co2 $
-    mkNthCo d1 (opt_trans co1 co2)
+    mkNthCo d1 (opt_trans is co1 co2)
 
 -- Push transitivity inside instantiation
-opt_trans_rule in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
+opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   | ty1 `eqType` ty2
   , co1 `compatible_co` co2
   = fireTransRule "TrPushInst" in_co1 in_co2 $
-    mkInstCo (opt_trans co1 co2) ty1
+    mkInstCo (opt_trans is co1 co2) ty1
  
 -- Push transitivity inside apply
-opt_trans_rule in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
+opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   = fireTransRule "TrPushApp" in_co1 in_co2 $
-    mkAppCo (opt_trans co1a co2a) (opt_trans co1b co2b)
+    mkAppCo (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
-opt_trans_rule co1@(TyConAppCo tc cos1) co2
+opt_trans_rule is co1@(TyConAppCo tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
   = ASSERT( length cos1 == length cos2 )
     fireTransRule "EtaCompL" co1 co2 $
-    TyConAppCo tc (zipWith opt_trans cos1 cos2)
+    TyConAppCo tc (opt_transList is cos1 cos2)
 
-opt_trans_rule co1 co2@(TyConAppCo tc cos2)
+opt_trans_rule is co1 co2@(TyConAppCo tc cos2)
   | Just cos1 <- etaTyConAppCo_maybe tc co1
   = ASSERT( length cos1 == length cos2 )
     fireTransRule "EtaCompR" co1 co2 $
-    TyConAppCo tc (zipWith opt_trans cos1 cos2)
+    TyConAppCo tc (opt_transList is cos1 cos2)
 
 -- Push transitivity inside forall
-opt_trans_rule co1 co2
+opt_trans_rule is co1 co2
   | Just (tv1,r1) <- splitForAllCo_maybe co1
   , Just (tv2,r2) <- etaForAllCo_maybe co2
-  , let r2' = substCoWithTy tv2 (mkTyVarTy tv1) r2
+  , let r2' = substCoWithTy is tv2 (mkTyVarTy tv1) r2
   = fireTransRule "EtaAllL" co1 co2 $
-    mkForAllCo tv1 (opt_trans2 r1 r2')
+    mkForAllCo tv1 (opt_trans2 (extendInScopeSet is tv1) r1 r2')
 
   | Just (tv2,r2) <- splitForAllCo_maybe co2
   , Just (tv1,r1) <- etaForAllCo_maybe co1
-  , let r1' = substCoWithTy tv1 (mkTyVarTy tv2) r1
+  , let r1' = substCoWithTy is tv1 (mkTyVarTy tv2) r1
   = fireTransRule "EtaAllR" co1 co2 $
-    mkForAllCo tv1 (opt_trans2 r1' r2)
+    mkForAllCo tv1 (opt_trans2 (extendInScopeSet is tv2) r1' r2)
 
 -- Push transitivity inside axioms
-opt_trans_rule co1 co2
+opt_trans_rule is co1 co2
 
   -- TrPushAxR/TrPushSymAxR
   | Just (sym, con, cos1) <- co1_is_axiom_maybe
   , Just cos2 <- matchAxiom sym con co2
   = fireTransRule "TrPushAxR" co1 co2 $
     if sym 
-    then SymCo $ AxiomInstCo con (opt_transList (map mkSymCo cos2) cos1)
-    else         AxiomInstCo con (opt_transList cos1 cos2)
+    then SymCo $ AxiomInstCo con (opt_transList is (map mkSymCo cos2) cos1)
+    else         AxiomInstCo con (opt_transList is cos1 cos2)
 
   -- TrPushAxL/TrPushSymAxL
   | Just (sym, con, cos2) <- co2_is_axiom_maybe
   , Just cos1 <- matchAxiom (not sym) con co1
   = fireTransRule "TrPushAxL" co1 co2 $
     if sym 
-    then SymCo $ AxiomInstCo con (opt_transList cos2 (map mkSymCo cos1))
-    else         AxiomInstCo con (opt_transList cos1 cos2)
+    then SymCo $ AxiomInstCo con (opt_transList is cos2 (map mkSymCo cos1))
+    else         AxiomInstCo con (opt_transList is cos1 cos2)
 
   -- TrPushAxSym/TrPushSymAx
   | Just (sym1, con1, cos1) <- co1_is_axiom_maybe
@@ -278,20 +280,20 @@ opt_trans_rule co1 co2
   , all (`elemVarSet` pivot_tvs) qtvs
   = fireTransRule "TrPushAxSym" co1 co2 $
     if sym2
-    then liftCoSubstWith qtvs (opt_transList cos1 (map mkSymCo cos2)) lhs  -- TrPushAxSym
-    else liftCoSubstWith qtvs (opt_transList (map mkSymCo cos1) cos2) rhs  -- TrPushSymAx
+    then liftCoSubstWith qtvs (opt_transList is cos1 (map mkSymCo cos2)) lhs  -- TrPushAxSym
+    else liftCoSubstWith qtvs (opt_transList is (map mkSymCo cos1) cos2) rhs  -- TrPushSymAx
   where
     co1_is_axiom_maybe = isAxiom_maybe co1
     co2_is_axiom_maybe = isAxiom_maybe co2
 
-opt_trans_rule co1 co2	-- Identity rule
+opt_trans_rule _ co1 co2	-- Identity rule
   | Pair ty1 _ <- coercionKind co1
   , Pair _ ty2 <- coercionKind co2
   , ty1 `eqType` ty2
   = fireTransRule "RedTypeDirRefl" co1 co2 $
     Refl ty2
 
-opt_trans_rule _ _ = Nothing
+opt_trans_rule _ _ _ = Nothing
 
 fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
 fireTransRule _rule _co1 _co2 res

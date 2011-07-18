@@ -282,7 +282,7 @@ gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
-    gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, gENERICS,
+    gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC, tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     dOTNET, rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_GROUP, mONAD_ZIP,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
     cONTROL_EXCEPTION_BASE :: Module
@@ -323,7 +323,8 @@ gHC_FLOAT	= mkBaseModule (fsLit "GHC.Float")
 gHC_TOP_HANDLER	= mkBaseModule (fsLit "GHC.TopHandler")
 sYSTEM_IO	= mkBaseModule (fsLit "System.IO")
 dYNAMIC		= mkBaseModule (fsLit "Data.Dynamic")
-tYPEABLE	= mkBaseModule (fsLit "Data.Typeable")
+tYPEABLE        = mkBaseModule (fsLit "Data.Typeable")
+tYPEABLE_INTERNAL = mkBaseModule (fsLit "Data.Typeable.Internal")
 gENERICS        = mkBaseModule (fsLit "Data.Data")
 dOTNET		= mkBaseModule (fsLit "GHC.Dotnet")
 rEAD_PREC	= mkBaseModule (fsLit "Text.ParserCombinators.ReadPrec")
@@ -546,10 +547,10 @@ showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
 showSpace_RDR           = varQual_RDR gHC_SHOW (fsLit "showSpace") 
 showParen_RDR           = varQual_RDR gHC_SHOW (fsLit "showParen") 
 
-typeOf_RDR, mkTypeRep_RDR, mkTyConRep_RDR :: RdrName
-typeOf_RDR     = varQual_RDR tYPEABLE (fsLit "typeOf")
-mkTypeRep_RDR  = varQual_RDR tYPEABLE (fsLit "mkTyConApp")
-mkTyConRep_RDR = varQual_RDR tYPEABLE (fsLit "mkTyCon")
+typeOf_RDR, mkTyCon_RDR, mkTyConApp_RDR :: RdrName
+typeOf_RDR     = varQual_RDR tYPEABLE_INTERNAL (fsLit "typeOf")
+mkTyCon_RDR    = varQual_RDR tYPEABLE_INTERNAL (fsLit "mkTyCon")
+mkTyConApp_RDR = varQual_RDR tYPEABLE_INTERNAL (fsLit "mkTyConApp")
 
 undefined_RDR :: RdrName
 undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
@@ -819,14 +820,14 @@ ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
 typeableClassName, typeable1ClassName, typeable2ClassName,
     typeable3ClassName, typeable4ClassName, typeable5ClassName,
     typeable6ClassName, typeable7ClassName :: Name
-typeableClassName  = clsQual tYPEABLE (fsLit "Typeable") typeableClassKey
-typeable1ClassName = clsQual tYPEABLE (fsLit "Typeable1") typeable1ClassKey
-typeable2ClassName = clsQual tYPEABLE (fsLit "Typeable2") typeable2ClassKey
-typeable3ClassName = clsQual tYPEABLE (fsLit "Typeable3") typeable3ClassKey
-typeable4ClassName = clsQual tYPEABLE (fsLit "Typeable4") typeable4ClassKey
-typeable5ClassName = clsQual tYPEABLE (fsLit "Typeable5") typeable5ClassKey
-typeable6ClassName = clsQual tYPEABLE (fsLit "Typeable6") typeable6ClassKey
-typeable7ClassName = clsQual tYPEABLE (fsLit "Typeable7") typeable7ClassKey
+typeableClassName  = clsQual tYPEABLE_INTERNAL (fsLit "Typeable") typeableClassKey
+typeable1ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable1") typeable1ClassKey
+typeable2ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable2") typeable2ClassKey
+typeable3ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable3") typeable3ClassKey
+typeable4ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable4") typeable4ClassKey
+typeable5ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable5") typeable5ClassKey
+typeable6ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable6") typeable6ClassKey
+typeable7ClassName = clsQual tYPEABLE_INTERNAL (fsLit "Typeable7") typeable7ClassKey
 
 typeableClassNames :: [Name]
 typeableClassNames = 	[ typeableClassName, typeable1ClassName, typeable2ClassName

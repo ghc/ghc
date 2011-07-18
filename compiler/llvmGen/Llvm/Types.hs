@@ -7,6 +7,7 @@ module Llvm.Types where
 #include "HsVersions.h"
 
 import Data.Char
+import Data.List (intercalate)
 import Numeric
 
 import Constants
@@ -59,12 +60,12 @@ instance Show LlvmType where
   show (LMStruct tys  ) = "<{" ++ (commaCat tys) ++ "}>"
 
   show (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
-    = let args = ((drop 1).concat) $ -- use drop since it can handle empty lists
-                  map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
-          varg' = case varg of
-                        VarArgs | not (null args) -> ", ..."
-                                | otherwise       -> "..."
-                        _otherwise                -> ""
+    = let varg' = case varg of
+                        VarArgs | null args -> "..."
+                                | otherwise -> ", ..."
+                        _otherwise          -> ""
+          -- by default we don't print param attributes
+          args = intercalate ", " $ map (show . fst) p
       in show r ++ " (" ++ args ++ varg' ++ ")"
 
   show (LMAlias (s,_)) = "%" ++ unpackFS s
@@ -135,29 +136,13 @@ instance Show LlvmStatic where
   show (LMStaticLit   l  ) = show l
   show (LMUninitType    t) = show t ++ " undef"
   show (LMStaticStr   s t) = show t ++ " c\"" ++ unpackFS s ++ "\\00\""
-
-  show (LMStaticArray d t)
-      = let struc = case d of
-              [] -> "[]"
-              ts -> "[" ++ show (head ts) ++
-                      concat (map (\x -> "," ++ show x) (tail ts)) ++ "]"
-        in show t ++ " " ++ struc
-
-  show (LMStaticStruc d t)
-      = let struc = case d of
-              [] -> "<{}>"
-              ts -> "<{" ++ show (head ts) ++
-                      concat (map (\x -> "," ++ show x) (tail ts)) ++ "}>"
-        in show t ++ " " ++ struc
-
+  show (LMStaticArray d t) = show t ++ " [" ++ commaCat d ++ "]"
+  show (LMStaticStruc d t) = show t ++ "<{" ++ commaCat d ++ "}>"
   show (LMStaticPointer v) = show v
-
   show (LMBitc v t)
       = show t ++ " bitcast (" ++ show v ++ " to " ++ show t ++ ")"
-
   show (LMPtoI v t)
       = show t ++ " ptrtoint (" ++ show v ++ " to " ++ show t ++ ")"
-
   show (LMAdd s1 s2)
       = let ty1 = getStatType s1
             op  = if isFloat ty1 then " fadd (" else " add ("
@@ -176,13 +161,7 @@ instance Show LlvmStatic where
 
 -- | Concatenate an array together, separated by commas
 commaCat :: Show a => [a] -> String
-commaCat [] = ""
-commaCat x  = show (head x) ++ (concat $ map (\y -> "," ++ show y) (tail x))
-
--- | Concatenate an array together, separated by commas
-spaceCat :: Show a => [a] -> String
-spaceCat [] = ""
-spaceCat x  = show (head x) ++ (concat $ map (\y -> " " ++ show y) (tail x))
+commaCat xs = intercalate ", " $ map show xs
 
 -- -----------------------------------------------------------------------------
 -- ** Operations on LLVM Basic Types and Variables
@@ -207,12 +186,12 @@ getPlainName (LMLitVar    x          ) = getLit x
 
 -- | Print a literal value. No type.
 getLit :: LlvmLit -> String
-getLit (LMIntLit   i _) = show ((fromInteger i)::Int)
+getLit (LMIntLit   i _       ) = show ((fromInteger i)::Int)
 getLit (LMFloatLit r LMFloat ) = fToStr $ realToFrac r
 getLit (LMFloatLit r LMDouble) = dToStr r
 getLit f@(LMFloatLit _ _) = error $ "Can't print this float literal!" ++ show f
-getLit (LMNullLit _) = "null"
-getLit (LMUndefLit _) = "undef"
+getLit (LMNullLit _     ) = "null"
+getLit (LMUndefLit _    ) = "undef"
 
 -- | Return the 'LlvmType' of the 'LlvmVar'
 getVarType :: LlvmVar -> LlvmType
@@ -366,15 +345,15 @@ data LlvmFunctionDecl = LlvmFunctionDecl {
 
 instance Show LlvmFunctionDecl where
   show (LlvmFunctionDecl n l c r varg p a)
-    = let args = ((drop 1).concat) $ -- use drop since it can handle empty lists
-                  map (\(t,a) -> "," ++ show t ++ " " ++ spaceCat a) p
-          varg' = case varg of
-                        VarArgs | not (null args) -> ", ..."
-                                | otherwise       -> "..."
-                        _otherwise                -> ""
+    = let varg' = case varg of
+                        VarArgs | null args -> "..."
+                                | otherwise -> ", ..."
+                        _otherwise          -> ""
           align = case a of
                        Just a' -> " align " ++ show a'
                        Nothing -> ""
+          -- by default we don't print param attributes
+          args = intercalate ", " $ map (show . fst) p
       in show l ++ " " ++ show c ++ " " ++ show r ++ " @" ++ unpackFS n ++
              "(" ++ args ++ varg' ++ ")" ++ align
 

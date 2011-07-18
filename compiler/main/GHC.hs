@@ -319,23 +319,23 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => DynFlags -> m a -> m a
-defaultErrorHandler dflags inner =
+defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => LogAction -> m a -> m a
+defaultErrorHandler la inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   ghandle (\exception -> liftIO $ do
            hFlush stdout
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
-                  fatalErrorMsg dflags (text (show ioe))
+                  fatalErrorMsg' la (text (show ioe))
                 _ -> case fromException exception of
 		     Just UserInterrupt -> exitWith (ExitFailure 1)
                      Just StackOverflow ->
-                         fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
+                         fatalErrorMsg' la (text "stack overflow: use +RTS -K<size> to increase it")
                      _ -> case fromException exception of
                           Just (ex :: ExitCode) -> throw ex
                           _ ->
-                              fatalErrorMsg dflags
+                              fatalErrorMsg' la
                                   (text (show (Panic (show exception))))
            exitWith (ExitFailure 1)
          ) $
@@ -347,7 +347,7 @@ defaultErrorHandler dflags inner =
   		case ge of
 		     PhaseFailed _ code -> exitWith code
 		     Signal _ -> exitWith (ExitFailure 1)
-		     _ -> do fatalErrorMsg dflags (text (show ge))
+		     _ -> do fatalErrorMsg' la (text (show ge))
 			     exitWith (ExitFailure 1)
 	    ) $
   inner

@@ -67,7 +67,7 @@ import FastString
 
 cmmTopCodeGen
         :: RawCmmTop
-        -> NatM [NatCmmTop Instr]
+        -> NatM [NatCmmTop CmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -86,7 +86,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen
         :: CmmBasicBlock
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmTop Instr])
+                , [NatCmmTop CmmStatics Instr])
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -403,11 +403,12 @@ getRegister' dflags (CmmMachOp (MO_SS_Conv W64 W32) [x])
   ChildCode64 code rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
 
-getRegister' _ (CmmLoad mem pk)
+getRegister' dflags (CmmLoad mem pk)
   | not (isWord64 pk)
   = do
+        let platform = targetPlatform dflags
         Amode addr addr_code <- getAmode mem
-        let code dst = ASSERT((targetClassOfReg dst == RcDouble) == isFloatType pk)
+        let code dst = ASSERT((targetClassOfReg platform dst == RcDouble) == isFloatType pk)
                        addr_code `snocOL` LD size dst addr
         return (Any size code)
           where size = cmmTypeSize pk
@@ -557,8 +558,8 @@ getRegister' _ (CmmLit (CmmFloat f frep)) = do
     Amode addr addr_code <- getAmode dynRef
     let size = floatSize frep
         code dst =
-            LDATA ReadOnlyData  [CmmDataLabel lbl,
-                                 CmmStaticLit (CmmFloat f frep)]
+            LDATA ReadOnlyData (Statics lbl
+                                   [CmmStaticLit (CmmFloat f frep)])
             `consOL` (addr_code `snocOL` LD size dst addr)
     return (Any size code)
 
@@ -903,7 +904,7 @@ genCCall' _ (CmmPrim MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
 genCCall' gcp target dest_regs argsAndHints
-  = ASSERT (not $ any (`elem` [II8,II16]) $ map cmmTypeSize argReps)
+  = ASSERT (not $ any (`elem` [II16]) $ map cmmTypeSize argReps)
         -- we rely on argument promotion in the codeGen
     do
         (finalStack,passArgumentsCode,usedRegs) <- passArguments
@@ -1058,23 +1059,23 @@ genCCall' gcp target dest_regs argsAndHints
                     = case gcp of
                       GCPDarwin ->
                           case cmmTypeSize rep of
+                          II8  -> (1, 0, 4, gprs)
                           II32 -> (1, 0, 4, gprs)
                           -- The Darwin ABI requires that we skip a
                           -- corresponding number of GPRs when we use
                           -- the FPRs.
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
-                          II8  -> panic "genCCall' passArguments II8"
                           II16 -> panic "genCCall' passArguments II16"
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
                       GCPLinux ->
                           case cmmTypeSize rep of
+                          II8  -> (1, 0, 4, gprs)
                           II32 -> (1, 0, 4, gprs)
                           -- ... the SysV ABI doesn't.
                           FF32 -> (0, 1, 4, fprs)
                           FF64 -> (0, 1, 8, fprs)
-                          II8  -> panic "genCCall' passArguments II8"
                           II16 -> panic "genCCall' passArguments II16"
                           II64 -> panic "genCCall' passArguments II64"
                           FF80 -> panic "genCCall' passArguments FF80"
@@ -1180,7 +1181,7 @@ genSwitch expr ids
                     ]
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop CmmStatics Instr)
 generateJumpTableForInstr (BCTR ids (Just lbl)) =
     let jumpTable
             | opt_PIC   = map jumpTableEntryRel ids
@@ -1190,7 +1191,7 @@ generateJumpTableForInstr (BCTR ids (Just lbl)) =
                       jumpTableEntryRel (Just blockid)
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
                             where blockLabel = mkAsmTempLabel (getUnique blockid)
-    in Just (CmmData ReadOnlyData (CmmDataLabel lbl : jumpTable))
+    in Just (CmmData ReadOnlyData (Statics lbl jumpTable))
 generateJumpTableForInstr _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -1362,10 +1363,9 @@ coerceInt2FP fromRep toRep x = do
     Amode addr addr_code <- getAmode dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
-                LDATA ReadOnlyData
-                                [CmmDataLabel lbl,
-                                 CmmStaticLit (CmmInt 0x43300000 W32),
-                                 CmmStaticLit (CmmInt 0x80000000 W32)],
+                LDATA ReadOnlyData $ Statics lbl
+                                 [CmmStaticLit (CmmInt 0x43300000 W32),
+                                  CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),
                 ST II32 itmp (spRel 3),
                 LIS itmp (ImmInt 0x4330),

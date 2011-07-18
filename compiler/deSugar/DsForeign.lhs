@@ -40,6 +40,8 @@ import BasicTypes
 import SrcLoc
 import Outputable
 import FastString
+import DynFlags
+import Platform
 import Config
 import Constants
 import OrdList
@@ -298,8 +300,9 @@ dsFExport fn_id ty ext_name cconv isDyn=  do
            Nothing                    -> return (orig_res_ty, False) 
                    -- The function returns t
     
+    dflags <- getDOpts
     return $
-      mkFExportCBits ext_name 
+      mkFExportCBits dflags ext_name
                      (if isDyn then Nothing else Just fn_id)
                      fe_arg_tys res_ty is_IO_res_ty cconv
 \end{code}
@@ -420,7 +423,8 @@ The C stub constructs the application of the exported Haskell function
 using the hugs/ghc rts invocation API.
 
 \begin{code}
-mkFExportCBits :: FastString
+mkFExportCBits :: DynFlags
+               -> FastString
 	       -> Maybe Id 	-- Just==static, Nothing==dynamic
 	       -> [Type] 
 	       -> Type 
@@ -431,7 +435,7 @@ mkFExportCBits :: FastString
 		   String, 	-- the argument reps
 		   Int		-- total size of arguments
 		  )
-mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
+mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
  = (header_bits, c_bits, type_string,
     sum [ widthInBytes (typeWidth rep) | (_,_,_,rep) <- aug_arg_info] -- all the args
 	 -- NB. the calculation here isn't strictly speaking correct.
@@ -474,7 +478,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   -- add some auxiliary args; the stable ptr in the wrapper case, and
   -- a slot for the dummy return address in the wrapper + ccall case
   aug_arg_info
-    | isNothing maybe_target = stable_ptr_arg : insertRetAddr cc arg_info
+    | isNothing maybe_target = stable_ptr_arg : insertRetAddr dflags cc arg_info
     | otherwise              = arg_info
 
   stable_ptr_arg = 
@@ -627,26 +631,27 @@ typeTyCon ty = case tcSplitTyConApp_maybe (repType ty) of
                  Just (tc,_) -> tc
 	         Nothing     -> pprPanic "DsForeign.typeTyCon" (ppr ty)
 
-insertRetAddr :: CCallConv -> [(SDoc, SDoc, Type, CmmType)]
-                           -> [(SDoc, SDoc, Type, CmmType)]
-#if !defined(x86_64_TARGET_ARCH)
-insertRetAddr CCallConv args = ret_addr_arg : args
-insertRetAddr _ args = args
-#else
--- On x86_64 we insert the return address after the 6th
--- integer argument, because this is the point at which we
--- need to flush a register argument to the stack (See rts/Adjustor.c for
--- details).
-insertRetAddr CCallConv args = go 0 args
-  where  go :: Int -> [(SDoc, SDoc, Type, CmmType)]
-                   -> [(SDoc, SDoc, Type, CmmType)]
-         go 6 args = ret_addr_arg : args
-	 go n (arg@(_,_,_,rep):args)
-	  | cmmEqType_ignoring_ptrhood rep b64 = arg : go (n+1) args
-	  | otherwise  = arg : go n     args
-	 go _ [] = []
-insertRetAddr _ args = args
-#endif
+insertRetAddr :: DynFlags -> CCallConv
+              -> [(SDoc, SDoc, Type, CmmType)]
+              -> [(SDoc, SDoc, Type, CmmType)]
+insertRetAddr dflags CCallConv args
+    = case platformArch (targetPlatform dflags) of
+      ArchX86_64 ->
+          -- On x86_64 we insert the return address after the 6th
+          -- integer argument, because this is the point at which we
+          -- need to flush a register argument to the stack (See
+          -- rts/Adjustor.c for details).
+          let go :: Int -> [(SDoc, SDoc, Type, CmmType)]
+                        -> [(SDoc, SDoc, Type, CmmType)]
+              go 6 args = ret_addr_arg : args
+              go n (arg@(_,_,_,rep):args)
+               | cmmEqType_ignoring_ptrhood rep b64 = arg : go (n+1) args
+               | otherwise  = arg : go n     args
+              go _ [] = []
+          in go 0 args
+      _ ->
+          ret_addr_arg : args
+insertRetAddr _ _ args = args
 
 ret_addr_arg :: (SDoc, SDoc, Type, CmmType)
 ret_addr_arg = (text "original_return_addr", text "void*", undefined, 

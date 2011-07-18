@@ -925,8 +925,7 @@ checkSafeImports dflags hsc_env tcg_env
                     let trust = getSafeMode $ mi_trust iface'
                         trust_own_pkg = mi_trust_pkg iface'
                         -- check module is trusted
-                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
-                                            Sf_TrustworthyWithSafeLanguage]
+                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
                         -- check package is trusted
                         safeP = packageTrusted trust trust_own_pkg m
                     if safeM && safeP
@@ -1055,6 +1054,7 @@ hscGenHardCode cgguts mod_summary
                      cg_dep_pkgs = dependencies,
                      cg_hpc_info = hpc_info } = cgguts
              dflags = hsc_dflags hsc_env
+             platform = targetPlatform dflags
              location = ms_location mod_summary
              data_tycons = filter isDataTyCon tycons
              -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1090,7 +1090,7 @@ hscGenHardCode cgguts mod_summary
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
-         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (ppr rawcmms)
+         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
          (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
                 dependencies rawcmms
@@ -1161,10 +1161,11 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
 tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info =
   do    { let dflags = hsc_dflags hsc_env
+              platform = targetPlatform dflags
         ; prog <- StgCmm.codeGen dflags this_mod data_tycons
                          cost_centre_info stg_binds hpc_info
         ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
-                (pprCmms prog)
+                (pprCmms platform prog)
 
         -- We are building a single SRT for the entire module, so
         -- we must thread it through all the procedures as we cps-convert them.
@@ -1173,7 +1174,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
         ; (topSRT, prog) <- foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
         ; let prog' = map cmmOfZgraph (srtToData topSRT : prog)
-        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (ppr prog')
+        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')
         ; return prog' }
 
 
@@ -1190,11 +1191,12 @@ optionallyConvertAndOrCPS hsc_env cmms =
 testCmmConversion :: HscEnv -> Cmm -> IO Cmm
 testCmmConversion hsc_env cmm =
     do let dflags = hsc_dflags hsc_env
+           platform = targetPlatform dflags
        showPass dflags "CmmToCmm"
-       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (ppr cmm)
+       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (pprPlatform platform cmm)
        --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
        us <- mkSplitUniqSupply 'C'
-       let zgraph = initUs_ us (cmmToZgraph cmm)
+       let zgraph = initUs_ us (cmmToZgraph platform cmm)
        chosen_graph <-
         if dopt Opt_RunCPSZ dflags
             then do us <- mkSplitUniqSupply 'S'
@@ -1202,10 +1204,10 @@ testCmmConversion hsc_env cmm =
                     (_, [zgraph]) <- cmmPipeline hsc_env (topSRT, []) zgraph
                     return zgraph
             else return (runCmmContFlowOpts zgraph)
-       dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
+       dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (pprPlatform platform chosen_graph)
        showPass dflags "Convert from Z back to Cmm"
        let cvt = cmmOfZgraph chosen_graph
-       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (ppr cvt)
+       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (pprPlatform platform cvt)
        return cvt
 
 myCoreToStg :: DynFlags -> Module -> [CoreBind]

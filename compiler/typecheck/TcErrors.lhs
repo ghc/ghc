@@ -29,6 +29,7 @@ import VarEnv
 import SrcLoc
 import Bag
 import ListSetOps( equivClasses )
+import Maybes( mapCatMaybes )
 import Util
 import FastString
 import Outputable
@@ -555,13 +556,8 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 
        ; case lookupInstEnv inst_envs clas tys_flat of
                 ([], _, _) -> return (Just pred)            -- No match
-		-- The case of exactly one match and no unifiers means a
-		-- successful lookup.  That can't happen here, because dicts
-		-- only end up here if they didn't match in Inst.lookupInst
-		([_],[], _)
-		 | debugIsOn -> pprPanic "check_overlap" (ppr pred)
-                res          -> do { addErrorReport ctxt (mk_overlap_msg res)
-                                   ; return Nothing } }
+                res        -> do { addErrorReport ctxt (mk_overlap_msg res)
+                                 ; return Nothing } }
   where
     -- Normal overlap error
     mk_overlap_msg (matches, unifiers, False)
@@ -571,25 +567,29 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
     	     ,	sep [ptext (sLit "Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])]
 
-             ,  if not (null overlapping_givens) then 
-                  sep [ptext (sLit "Matching givens (or their superclasses)") <> colon, nest 2 (vcat overlapping_givens)]
+             ,  if not (null matching_givens) then 
+                  sep [ptext (sLit "Matching givens (or their superclasses)") <> colon
+                      , nest 2 (vcat matching_givens)]
                 else empty
 
-             ,  if null overlapping_givens && isSingleton matches && null unifiers then
-                -- Intuitively, some given matched the wanted in their flattened or rewritten (from given equalities) 
-                -- form but the matcher can't figure that out because the constraints are non-flat and non-rewritten
-                -- so we simply report back the whole given context. Accelerate Smart.hs showed this problem.
-                  sep [ptext (sLit "There exists a (perhaps superclass) match") <> colon, nest 2 (vcat (pp_givens givens))]
+             ,  if null matching_givens && isSingleton matches && null unifiers then
+                -- Intuitively, some given matched the wanted in their
+                -- flattened or rewritten (from given equalities) form
+                -- but the matcher can't figure that out because the
+                -- constraints are non-flat and non-rewritten so we
+                -- simply report back the whole given
+                -- context. Accelerate Smart.hs showed this problem.
+                  sep [ ptext (sLit "There exists a (perhaps superclass) match") <> colon
+                      , nest 2 (vcat (pp_givens givens))]
                 else empty 
 
 	     ,	if not (isSingleton matches)
     		then 	-- Two or more matches
 		     empty
-    		else 	-- One match, plus some unifiers
-		ASSERT( not (null unifiers) )
+    		else 	-- One match
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
-			      if null (overlapping_givens) then
+			      if null (matching_givens) then
                                    vcat [ ptext (sLit "To pick the first instance above, use -XIncoherentInstances"),
 			                  ptext (sLit "when compiling the other instance declarations")]
                               else empty])]
@@ -597,15 +597,8 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
             ispecs = [ispec | (ispec, _) <- matches]
 
             givens = getUserGivens ctxt
-            overlapping_givens = unifiable_givens givens
-    
-            unifiable_givens [] = [] 
-            unifiable_givens (gg:ggs) 
-              | Just ggdoc <- matchable gg 
-              = ggdoc : unifiable_givens ggs 
-              | otherwise 
-              = unifiable_givens ggs 
-    
+            matching_givens = mapCatMaybes matchable givens
+
             matchable (evvars,gloc) 
               = case ev_vars_matching of
                      [] -> Nothing
@@ -818,7 +811,7 @@ find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 
 warnDefaulting :: [FlavoredEvVar] -> Type -> TcM ()
 warnDefaulting wanteds default_ty
-  = do { warn_default <- doptM Opt_WarnTypeDefaults
+  = do { warn_default <- woptM Opt_WarnTypeDefaults
        ; env0 <- tcInitTidyEnv
        ; let wanted_bag = listToBag wanteds
              tidy_env = tidyFreeTyVars env0 $

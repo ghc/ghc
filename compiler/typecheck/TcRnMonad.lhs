@@ -248,19 +248,28 @@ xoptM flag = do { dflags <- getDOpts; return (xopt flag dflags) }
 doptM :: DynFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
--- XXX setOptM and unsetOptM operate on different types. One should be renamed.
+woptM :: WarningFlag -> TcRnIf gbl lcl Bool
+woptM flag = do { dflags <- getDOpts; return (wopt flag dflags) }
 
-setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
+setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                          env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
-unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+unsetDOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetDOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+
+unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
 ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 ifDOptM flag thing_inside = do { b <- doptM flag; 
+				if b then thing_inside else return () }
+
+ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifWOptM flag thing_inside = do { b <- woptM flag; 
 				if b then thing_inside else return () }
 
 ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()

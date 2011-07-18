@@ -113,15 +113,18 @@ ppLlvmFunction (LlvmFunction dec args attrs sec body) =
 -- | Print out a function defenition header.
 ppLlvmFunctionHeader :: LlvmFunctionDecl -> [LMString] -> Doc
 ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
-  = let varg' = if varg == VarArgs then text ", ..." else empty
+  = let varg' = case varg of
+                      VarArgs | null p    -> text "..."
+                              | otherwise -> text ", ..."
+                      _otherwise          -> empty
         align = case a of
-                     Just a' -> space <> text "align" <+> texts a'
+                     Just a' -> text " align" <+> texts a'
                      Nothing -> empty
         args' = map (\((ty,p),n) -> texts ty <+> ppSpaceJoin p <+> text "%"
                                     <> ftext n)
                     (zip p args)
     in texts l <+> texts c <+> texts r <+> text "@" <> ftext n <> lparen <>
-        (hcat $ intersperse comma args') <> varg' <> rparen <> align
+        (hcat $ intersperse (comma <> space) args') <> varg' <> rparen <> align
 
 
 -- | Print out a list of function declaration.
@@ -132,7 +135,18 @@ ppLlvmFunctionDecls decs = vcat $ map ppLlvmFunctionDecl decs
 -- Declarations define the function type but don't define the actual body of
 -- the function.
 ppLlvmFunctionDecl :: LlvmFunctionDecl -> Doc
-ppLlvmFunctionDecl dec = text "declare" <+> texts dec
+ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
+  = let varg' = case varg of
+                      VarArgs | null p    -> text "..."
+                              | otherwise -> text ", ..."
+                      _otherwise          -> empty
+        align = case a of
+                     Just a' -> text " align" <+> texts a'
+                     Nothing -> empty
+        args = hcat $ intersperse (comma <> space) $
+                  map (\(t,a) -> texts t <+> ppSpaceJoin a) p
+    in text "declare" <+> texts l <+> texts c <+> texts r <+> text "@" <>
+        ftext n <> lparen <> args <> varg' <> rparen <> align
 
 
 -- | Print out a list of LLVM blocks.
@@ -204,7 +218,7 @@ ppCall ct fptr vals attrs = case fptr of
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
                 ppValues = ppCommaJoin vals
-                ppParams = map (\(ty,p) -> texts ty <+> ppSpaceJoin p) params
+                ppParams = map (texts . fst) params
                 ppArgTy  = (hcat $ intersperse comma ppParams) <>
                            (case argTy of
                                VarArgs   -> text ", ..."
@@ -317,15 +331,14 @@ ppAsm asm constraints rty vars sideeffect alignstack =
 -- * Misc functions
 --------------------------------------------------------------------------------
 ppCommaJoin :: (Show a) => [a] -> Doc
-ppCommaJoin strs = hcat $ intersperse comma (map texts strs)
+ppCommaJoin strs = hcat $ intersperse (comma <> space) (map texts strs)
 
 ppSpaceJoin :: (Show a) => [a] -> Doc
 ppSpaceJoin strs = hcat $ intersperse space (map texts strs)
 
 -- | Convert SDoc to Doc
 llvmSDoc :: Out.SDoc -> Doc
-llvmSDoc d
-	= Out.withPprStyleDoc (Out.mkCodeStyle Out.CStyle) d
+llvmSDoc d = Out.withPprStyleDoc (Out.mkCodeStyle Out.CStyle) d
 
 -- | Showable to Doc
 texts :: (Show a) => a -> Doc

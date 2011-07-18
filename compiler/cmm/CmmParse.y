@@ -188,22 +188,24 @@ cmmtop	:: { ExtCode }
 --	* we can derive closure and info table labels from a single NAME
 
 cmmdata :: { ExtCode }
-	: 'section' STRING '{' statics '}' 
-		{ do ss <- sequence $4;
-		     code (emitData (section $2) (concat ss)) }
+	: 'section' STRING '{' data_label statics '}' 
+		{ do lbl <- $4;
+		     ss <- sequence $5;
+		     code (emitData (section $2) (Statics lbl $ concat ss)) }
+
+data_label :: { ExtFCode CLabel }
+    : NAME ':'	
+		{% withThisPackage $ \pkg -> 
+		   return (mkCmmDataLabel pkg $1) }
 
 statics	:: { [ExtFCode [CmmStatic]] }
 	: {- empty -}			{ [] }
 	| static statics		{ $1 : $2 }
-
+    
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static 	:: { ExtFCode [CmmStatic] }
-	: NAME ':'	
-		{% withThisPackage $ \pkg -> 
-		   return [CmmDataLabel (mkCmmDataLabel pkg $1)] }
-
-	| type expr ';'	{ do e <- $2;
+	: type expr ';'	{ do e <- $2;
 			     return [CmmStaticLit (getLit e)] }
 	| type ';'			{ return [CmmUninitialised
 							(widthInBytes (typeWidth $1))] }
@@ -213,7 +215,6 @@ static 	:: { ExtFCode [CmmStatic] }
         | typenot8 '[' INT ']' ';'	{ return [CmmUninitialised 
 						(widthInBytes (typeWidth $1) * 
 							fromIntegral $3)] }
-	| 'align' INT ';'		{ return [CmmAlign (fromIntegral $2)] }
 	| 'CLOSURE' '(' NAME lits ')'
 		{ do lits <- sequence $4;
 		     return $ map CmmStaticLit $
@@ -265,7 +266,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg ->
 		   do prof <- profilingInfo $11 $13
 		      return (mkCmmEntryLabel pkg $3,
-			CmmInfoTable False prof (fromIntegral $9)
+			CmmInfoTable False False prof (fromIntegral $9)
 				     (ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
 			[]) }
 	
@@ -274,7 +275,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg -> 
 		   do prof <- profilingInfo $11 $13
 		      return (mkCmmEntryLabel pkg $3,
-			CmmInfoTable False prof (fromIntegral $9)
+			CmmInfoTable False False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT
 				      0  -- Arity zero
 				      (ArgSpec (fromIntegral $15))
@@ -289,7 +290,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg ->
 		   do prof <- profilingInfo $11 $13
 		      return (mkCmmEntryLabel pkg $3,
-			CmmInfoTable False prof (fromIntegral $9)
+			CmmInfoTable False False prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $17)
 				      (ArgSpec (fromIntegral $15))
 				      zeroCLit),
@@ -305,7 +306,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		     -- but that's the way the old code did it we can fix it some other time.
 		      desc_lit <- code $ mkStringCLit $13
 		      return (mkCmmEntryLabel pkg $3,
-			CmmInfoTable False prof (fromIntegral $11)
+			CmmInfoTable False False prof (fromIntegral $11)
 				     (ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
 			[]) }
 	
@@ -314,7 +315,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg ->
 		   do prof <- profilingInfo $9 $11
 		      return (mkCmmEntryLabel pkg $3,
-			CmmInfoTable False prof (fromIntegral $7)
+			CmmInfoTable False False prof (fromIntegral $7)
 				     (ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
 			[]) }
 
@@ -323,7 +324,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg ->
 		   do let infoLabel = mkCmmInfoLabel pkg $3
 		      return (mkCmmRetLabel pkg $3,
-			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
+			CmmInfoTable False False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 				     (ContInfo [] NoC_SRT),
 			[]) }
 
@@ -332,7 +333,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg ->
 		   do live <- sequence (map (liftM Just) $7)
 		      return (mkCmmRetLabel pkg $3,
-			CmmInfoTable False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
+			CmmInfoTable False False (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 			             (ContInfo live NoC_SRT),
 			live) }
 
@@ -873,9 +874,8 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
                 code (emitForeignCall' PlayRisky results 
                    (CmmCallee expr' convention) args vols NoC_SRT ret)
               CmmSafe srt ->
-                code (emitForeignCall' (PlaySafe unused) results 
+                code (emitForeignCall' PlaySafe results 
                    (CmmCallee expr' convention) args vols NoC_SRT ret) where
-	        unused = panic "not used by emitForeignCall'"
               CmmInterruptible ->
                 code (emitForeignCall' PlayInterruptible results 
                    (CmmCallee expr' convention) args vols NoC_SRT ret)
@@ -910,9 +910,8 @@ primCall results_code name args_code vols safety
 		    code (emitForeignCall' PlayRisky results
 		      (CmmPrim p) args vols NoC_SRT CmmMayReturn)
 		  CmmSafe srt ->
-		    code (emitForeignCall' (PlaySafe unused) results 
+		    code (emitForeignCall' PlaySafe results 
 		      (CmmPrim p) args vols NoC_SRT CmmMayReturn) where
-		    unused = panic "not used by emitForeignCall'"
 		  CmmInterruptible ->
 		    code (emitForeignCall' PlayInterruptible results 
 		      (CmmPrim p) args vols NoC_SRT CmmMayReturn)
@@ -1076,7 +1075,7 @@ parseCmmFile dflags filename = do
         if (errorsFound dflags ms)
          then return (ms, Nothing)
          else do
-           dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (ppr cmm)
+           dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprPlatform (targetPlatform dflags) cmm)
            return (ms, Just cmm)
   where
 	no_module = panic "parseCmmFile: no module"

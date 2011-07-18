@@ -27,9 +27,13 @@
 #	  add P to the list of packages
 
 define extra-packages
+
+# Collects some dirs containing ghc.mk files that we need to include:
+BUILD_DIRS_EXTRA=
+
 $$(foreach p,$$(patsubst libraries/%,%,$$(wildcard $$(shell grep '^[^ #][^ ]* \+\(dph\|extra\) \+[^ ]\+ \+[^ ]\+$$$$' packages | sed 's/ .*//'))),\
     $$(if $$(wildcard libraries/$$p/ghc-packages),\
-        $$(eval BUILD_DIRS += libraries/$$p) \
+        $$(eval BUILD_DIRS_EXTRA += libraries/$$p) \
         $$(foreach q,$$(shell cat libraries/$$p/ghc-packages2),$$(eval $$(call extra-package,$$p,$$p/$$q))),\
         $$(eval $$(call extra-package,$$p,$$p)))\
 )

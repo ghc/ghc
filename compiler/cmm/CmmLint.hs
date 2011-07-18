@@ -23,6 +23,7 @@ import Outputable
 import OldPprCmm()
 import Constants
 import FastString
+import Platform
 
 import Data.Maybe
 
@@ -30,21 +31,22 @@ import Data.Maybe
 -- Exported entry points:
 
 cmmLint :: (Outputable d, Outputable h)
-	=> GenCmm d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLint (Cmm tops) = runCmmLint (mapM_ lintCmmTop) tops
+        => Platform -> GenCmm d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLint platform (Cmm tops) = runCmmLint platform (mapM_ lintCmmTop) tops
 
 cmmLintTop :: (Outputable d, Outputable h)
-	   => GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLintTop top = runCmmLint lintCmmTop top
+           => Platform -> GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLintTop platform top = runCmmLint platform lintCmmTop top
 
-runCmmLint :: Outputable a => (a -> CmmLint b) -> a -> Maybe SDoc
-runCmmLint l p = 
+runCmmLint :: PlatformOutputable a
+           => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint platform l p =
    case unCL (l p) of
-	Left err -> Just (vcat [ptext $ sLit ("Cmm lint error:"),
-				nest 2 err,
-				ptext $ sLit ("Program was:"),
-				nest 2 (ppr p)])
-  	Right _  -> Nothing
+   Left err -> Just (vcat [ptext $ sLit ("Cmm lint error:"),
+                           nest 2 err,
+                           ptext $ sLit ("Program was:"),
+                           nest 2 (pprPlatform platform p)])
+   Right _  -> Nothing
 
 lintCmmTop :: (GenCmmTop h i (ListGraph CmmStmt)) -> CmmLint ()
 lintCmmTop (CmmProc _ lbl (ListGraph blocks))

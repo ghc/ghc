@@ -98,18 +98,15 @@ the most efficient variant tried. Benchmark compiling 10-times SHA1.lhs follows.
                                  100.00%   166.23%   94.18%    100.95%
 -}
 
--- TODO: We shouldn't be using defaultTargetPlatform here.
---       We should be passing DynFlags in instead, and looking at
---       its targetPlatform.
-
 trivColorable
-        :: (RegClass -> VirtualReg -> FastInt)
+        :: Platform
+        -> (RegClass -> VirtualReg -> FastInt)
         -> (RegClass -> RealReg    -> FastInt)
         -> Triv VirtualReg RegClass RealReg
 
-trivColorable virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
+trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
         | let !cALLOCATABLE_REGS_INTEGER
-                  = iUnbox (case platformArch defaultTargetPlatform of
+                  = iUnbox (case platformArch platform of
                             ArchX86     -> 3
                             ArchX86_64  -> 5
                             ArchPPC     -> 16
@@ -127,9 +124,9 @@ trivColorable virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
 
         = count3 <# cALLOCATABLE_REGS_INTEGER
 
-trivColorable virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
+trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
         | let !cALLOCATABLE_REGS_FLOAT
-                  = iUnbox (case platformArch defaultTargetPlatform of
+                  = iUnbox (case platformArch platform of
                             ArchX86     -> 0
                             ArchX86_64  -> 0
                             ArchPPC     -> 0
@@ -147,9 +144,9 @@ trivColorable virtualRegSqueeze realRegSqueeze RcFloat conflicts exclusions
 
         = count3 <# cALLOCATABLE_REGS_FLOAT
 
-trivColorable virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
+trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
         | let !cALLOCATABLE_REGS_DOUBLE
-                  = iUnbox (case platformArch defaultTargetPlatform of
+                  = iUnbox (case platformArch platform of
                             ArchX86     -> 6
                             ArchX86_64  -> 0
                             ArchPPC     -> 26
@@ -167,9 +164,9 @@ trivColorable virtualRegSqueeze realRegSqueeze RcDouble conflicts exclusions
 
         = count3 <# cALLOCATABLE_REGS_DOUBLE
 
-trivColorable virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
+trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts exclusions
         | let !cALLOCATABLE_REGS_SSE
-                  = iUnbox (case platformArch defaultTargetPlatform of
+                  = iUnbox (case platformArch platform of
                             ArchX86     -> 8
                             ArchX86_64  -> 10
                             ArchPPC     -> 0

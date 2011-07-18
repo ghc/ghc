@@ -33,8 +33,9 @@ import TyCon
 import DataCon
 import Class
 import Var
+import VarEnv( mkInScopeSet )
+import VarSet( mkVarSet )
 import Pair
---import VarSet
 import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
@@ -473,7 +474,7 @@ tcLocalInstDecl1 (L loc (InstDecl poly_ty binds uprags ats))
            ; let class_ats   = map tyConName (classATs clas)
                  defined_ats = listToNameSet . map (tcdName.unLoc.fst)  $ ats
                  omitted     = filterOut (`elemNameSet` defined_ats) class_ats
-           ; warn <- doptM Opt_WarnMissingMethods
+           ; warn <- woptM Opt_WarnMissingMethods
            ; mapM_ (warnTc warn . omittedATWarn) omitted
 
              -- Ensure that all AT indexes that correspond to class parameters
@@ -1186,7 +1187,8 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
      rep_pred = mkClassPred clas (init_inst_tys ++ [rep_ty])
 
      -- co : [p] ~ T p
-     co = substCoWithTys inst_tvs (mkTyVarTys tyvars) $
+     co = substCoWithTys (mkInScopeSet (mkVarSet tyvars))
+                         inst_tvs (mkTyVarTys tyvars) $
           mkSymCo coi
 
      ----------------
@@ -1250,7 +1252,7 @@ derivBindCtxt sel_id clas tys _bind
 
 warnMissingMethod :: Id -> TcM ()
 warnMissingMethod sel_id
-  = do { warn <- doptM Opt_WarnMissingMethods		
+  = do { warn <- woptM Opt_WarnMissingMethods		
        ; warnTc (warn  -- Warn only if -fwarn-missing-methods
                  && not (startsWithUnderscore (getOccName sel_id)))
 					-- Don't warn about _foo methods

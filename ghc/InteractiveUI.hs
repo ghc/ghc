@@ -897,6 +897,14 @@ noArgs :: GHCi () -> String -> GHCi ()
 noArgs m "" = m
 noArgs _ _  = liftIO $ putStrLn "This command takes no arguments"
 
+withSandboxOnly :: String -> GHCi () -> GHCi ()
+withSandboxOnly cmd this = do
+   dflags <- getDynFlags
+   if not (dopt Opt_GhciSandbox dflags)
+      then printForUser (text cmd <+>
+                         ptext (sLit "is not supported with -fno-ghci-sandbox"))
+      else this
+
 help :: String -> GHCi ()
 help _ = liftIO (putStr helpText)
 
@@ -2086,32 +2094,37 @@ pprintCommand bind force str = do
   pprintClosureCommand bind force str
 
 stepCmd :: String -> GHCi ()
-stepCmd []         = doContinue (const True) GHC.SingleStep
-stepCmd expression = runStmt expression GHC.SingleStep >> return ()
+stepCmd arg = withSandboxOnly ":step" $ step arg
+  where
+  step []         = doContinue (const True) GHC.SingleStep
+  step expression = runStmt expression GHC.SingleStep >> return ()
 
 stepLocalCmd :: String -> GHCi ()
-stepLocalCmd  [] = do 
-  mb_span <- getCurrentBreakSpan
-  case mb_span of
-    Nothing  -> stepCmd []
-    Just loc -> do
-       Just mod <- getCurrentBreakModule
-       current_toplevel_decl <- enclosingTickSpan mod loc
-       doContinue (`isSubspanOf` current_toplevel_decl) GHC.SingleStep
-
-stepLocalCmd expression = stepCmd expression
+stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
+  where
+  step expr
+   | not (null expr) = stepCmd expr
+   | otherwise = do
+      mb_span <- getCurrentBreakSpan
+      case mb_span of
+        Nothing  -> stepCmd []
+        Just loc -> do
+           Just mod <- getCurrentBreakModule
+           current_toplevel_decl <- enclosingTickSpan mod loc
+           doContinue (`isSubspanOf` current_toplevel_decl) GHC.SingleStep
 
 stepModuleCmd :: String -> GHCi ()
-stepModuleCmd  [] = do 
-  mb_span <- getCurrentBreakSpan
-  case mb_span of
-    Nothing  -> stepCmd []
-    Just _ -> do
-       Just span <- getCurrentBreakSpan
-       let f some_span = srcSpanFileName_maybe span == srcSpanFileName_maybe some_span
-       doContinue f GHC.SingleStep
-
-stepModuleCmd expression = stepCmd expression
+stepModuleCmd arg = withSandboxOnly ":stepmodule" $ step arg
+  where
+  step expr
+   | not (null expr) = stepCmd expr
+   | otherwise = do
+      mb_span <- getCurrentBreakSpan
+      case mb_span of
+        Nothing  -> stepCmd []
+        Just span -> do
+           let f some_span = srcSpanFileName_maybe span == srcSpanFileName_maybe some_span
+           doContinue f GHC.SingleStep
 
 -- | Returns the span of the largest tick containing the srcspan given
 enclosingTickSpan :: Module -> SrcSpan -> GHCi SrcSpan
@@ -2127,11 +2140,14 @@ enclosingTickSpan mod (RealSrcSpan src) = do
   return . head . sortBy leftmost_largest $ enclosing_spans
 
 traceCmd :: String -> GHCi ()
-traceCmd []         = doContinue (const True) GHC.RunAndLogSteps
-traceCmd expression = runStmt expression GHC.RunAndLogSteps >> return ()
+traceCmd arg
+  = withSandboxOnly ":trace" $ trace arg
+  where
+  trace []         = doContinue (const True) GHC.RunAndLogSteps
+  trace expression = runStmt expression GHC.RunAndLogSteps >> return ()
 
 continueCmd :: String -> GHCi ()
-continueCmd = noArgs $ doContinue (const True) GHC.RunToCompletion
+continueCmd = noArgs $ withSandboxOnly ":continue" $ doContinue (const True) GHC.RunToCompletion
 
 -- doContinue :: SingleStep -> GHCi ()
 doContinue :: (SrcSpan -> Bool) -> SingleStep -> GHCi ()
@@ -2141,12 +2157,12 @@ doContinue pred step = do
   return ()
 
 abandonCmd :: String -> GHCi ()
-abandonCmd = noArgs $ do
+abandonCmd = noArgs $ withSandboxOnly ":abandon" $ do
   b <- GHC.abandon -- the prompt will change to indicate the new context
   when (not b) $ liftIO $ putStrLn "There is no computation running."
 
 deleteCmd :: String -> GHCi ()
-deleteCmd argLine = do
+deleteCmd argLine = withSandboxOnly ":delete" $ do
    deleteSwitch $ words argLine
    where
    deleteSwitch :: [String] -> GHCi ()
@@ -2194,7 +2210,7 @@ bold c | do_bold   = text start_bold <> c <> text end_bold
        | otherwise = c
 
 backCmd :: String -> GHCi ()
-backCmd = noArgs $ do
+backCmd = noArgs $ withSandboxOnly ":back" $ do
   (names, _, span) <- GHC.back
   printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr span
   printTypeOfNames names
@@ -2203,7 +2219,7 @@ backCmd = noArgs $ do
   enqueueCommands [stop st]
 
 forwardCmd :: String -> GHCi ()
-forwardCmd = noArgs $ do
+forwardCmd = noArgs $ withSandboxOnly ":forward" $ do
   (names, ix, span) <- GHC.forward
   printForUser $ (if (ix == 0)
                     then ptext (sLit "Stopped at")
@@ -2215,8 +2231,7 @@ forwardCmd = noArgs $ do
 
 -- handle the "break" command
 breakCmd :: String -> GHCi ()
-breakCmd argLine = do
-   breakSwitch $ words argLine
+breakCmd argLine = withSandboxOnly ":break" $ breakSwitch $ words argLine
 
 breakSwitch :: [String] -> GHCi ()
 breakSwitch [] = do

@@ -130,8 +130,7 @@ import TyCon
 import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
-import DynFlags		( DynFlags(..), isOneShot, HscTarget (..), dopt,
-                          DynFlag(..), SafeHaskellMode(..), dynFlagDependencies )
+import DynFlags
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( IPName, defaultFixity, WarningTxt(..) )
 import OptimizationFuel	( OptFuelState )
@@ -147,8 +146,6 @@ import FastString
 import StringBuffer	( StringBuffer )
 import Fingerprint
 import MonadUtils
-import Data.Dynamic     ( Typeable )
-import qualified Data.Dynamic as Dyn
 import Bag
 import ErrUtils
 
@@ -161,6 +158,7 @@ import Data.Map (Map)
 import Data.Word
 import Control.Monad    ( mplus, guard, liftM, when )
 import Exception
+import Data.Typeable    ( Typeable )
 
 -- -----------------------------------------------------------------------------
 -- Source Errors
@@ -191,17 +189,12 @@ throwOneError err = liftIO $ throwIO $ mkSrcErr $ unitBag err
 --
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
-data SourceError = SourceError ErrorMessages
+newtype SourceError = SourceError ErrorMessages
+  deriving Typeable
 
 instance Show SourceError where
   show (SourceError msgs) = unlines . map show . bagToList $ msgs
     -- ToDo: is there some nicer way to print this?
-
-sourceErrorTc :: Dyn.TyCon
-sourceErrorTc = Dyn.mkTyCon "SourceError"
-{-# NOINLINE sourceErrorTc #-}
-instance Typeable SourceError where
-  typeOf _ = Dyn.mkTyConApp sourceErrorTc []
 
 instance Exception SourceError
 
@@ -219,16 +212,11 @@ handleSourceError handler act =
 srcErrorMessages (SourceError msgs) = msgs
 
 -- | XXX: what exactly is an API error?
-data GhcApiError = GhcApiError SDoc
+newtype GhcApiError = GhcApiError SDoc
+ deriving Typeable
 
 instance Show GhcApiError where
   show (GhcApiError msg) = showSDoc msg
-
-ghcApiErrorTc :: Dyn.TyCon
-ghcApiErrorTc = Dyn.mkTyCon "GhcApiError"
-{-# NOINLINE ghcApiErrorTc #-}
-instance Typeable GhcApiError where
-  typeOf _ = Dyn.mkTyConApp ghcApiErrorTc []
 
 instance Exception GhcApiError
 
@@ -246,7 +234,7 @@ printOrThrowWarnings dflags warns
 
 handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
 handleFlagWarnings dflags warns
- = when (dopt Opt_WarnDeprecatedFlags dflags) $ do
+ = when (wopt Opt_WarnDeprecatedFlags dflags) $ do
         -- It would be nicer if warns :: [Located Message], but that
         -- has circular import problems.
       let bag = listToBag [ mkPlainWarnMsg loc (text warn) 
@@ -1867,27 +1855,20 @@ trustInfoToNum it
   = case getSafeMode it of
             Sf_None -> 0
             Sf_SafeImports -> 1
-            Sf_SafeLanguage -> 2
-            Sf_Trustworthy -> 3
-            Sf_TrustworthyWithSafeLanguage -> 4
-            Sf_Safe -> 5
+            Sf_Trustworthy -> 2
+            Sf_Safe -> 3
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
 numToTrustInfo 0 = setSafeMode Sf_None
 numToTrustInfo 1 = setSafeMode Sf_SafeImports
-numToTrustInfo 2 = setSafeMode Sf_SafeLanguage
-numToTrustInfo 3 = setSafeMode Sf_Trustworthy
-numToTrustInfo 4 = setSafeMode Sf_TrustworthyWithSafeLanguage
-numToTrustInfo 5 = setSafeMode Sf_Safe
+numToTrustInfo 2 = setSafeMode Sf_Trustworthy
+numToTrustInfo 3 = setSafeMode Sf_Safe
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_None)         = ptext $ sLit "none"
     ppr (TrustInfo Sf_SafeImports)  = ptext $ sLit "safe-imports"
-    ppr (TrustInfo Sf_SafeLanguage) = ptext $ sLit "safe-language"
     ppr (TrustInfo Sf_Trustworthy)  = ptext $ sLit "trustworthy"
-    ppr (TrustInfo Sf_TrustworthyWithSafeLanguage)
-                                    = ptext $ sLit "trustworthy + safe-language"
     ppr (TrustInfo Sf_Safe)         = ptext $ sLit "safe"
 \end{code}
 

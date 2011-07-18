@@ -29,6 +29,7 @@ import UniqFM
 import UniqSet
 import Digraph		(flattenSCCs)
 import Outputable
+import Platform
 import State
 
 import Data.List	(nub, minimumBy)
@@ -62,12 +63,12 @@ plusSpillCostRecord (r1, a1, b1, c1) (r2, a2, b2, c2)
 --	for each vreg, the number of times it was written to, read from,
 --	and the number of instructions it was live on entry to (lifetime)
 --
-slurpSpillCostInfo
-	:: (Outputable instr, Instruction instr)
-	=> LiveCmmTop instr
-	-> SpillCostInfo
+slurpSpillCostInfo :: (PlatformOutputable instr, Instruction instr)
+                   => Platform
+                   -> LiveCmmTop statics instr
+                   -> SpillCostInfo
 
-slurpSpillCostInfo cmm
+slurpSpillCostInfo platform cmm
 	= execState (countCmm cmm) zeroSpillCostInfo
  where
 	countCmm CmmData{}		= return ()
@@ -96,7 +97,7 @@ slurpSpillCostInfo cmm
 
 		| otherwise
 		= pprPanic "RegSpillCost.slurpSpillCostInfo"
-			(text "no liveness information on instruction " <> ppr instr)
+			(text "no liveness information on instruction " <> pprPlatform platform instr)
 
 	countLIs rsLiveEntry (LiveInstr instr (Just live) : lis)
 	 = do

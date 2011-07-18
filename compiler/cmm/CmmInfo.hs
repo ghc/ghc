@@ -28,7 +28,7 @@ import Data.Bits
 
 -- When we split at proc points, we need an empty info table.
 emptyContInfoTable :: CmmInfoTable
-emptyContInfoTable = CmmInfoTable False (ProfilingInfo zero zero) rET_SMALL
+emptyContInfoTable = CmmInfoTable False False (ProfilingInfo zero zero) rET_SMALL
                                   (ContInfo [] NoC_SRT)
     where zero = CmmInt 0 wordWidth
 
@@ -78,10 +78,10 @@ mkInfoTable _    (CmmData sec dat) = [CmmData sec dat]
 mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label blocks) =
     case info of
       -- Code without an info table.  Easy.
-      CmmNonInfoTable -> [CmmProc [] entry_label blocks]
+      CmmNonInfoTable -> [CmmProc Nothing entry_label blocks]
 
-      CmmInfoTable _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
-          let info_label = entryLblToInfoLbl entry_label
+      CmmInfoTable is_local _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
+          let info_label = (if is_local then localiseLabel else id) $ entryLblToInfoLbl entry_label
               ty_prof'   = makeRelativeRefTo info_label ty_prof
               cl_prof'   = makeRelativeRefTo info_label cl_prof
           in case type_info of
@@ -153,7 +153,7 @@ mkInfoTableAndCode :: CLabel
                    -> [RawCmmTop]
 mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl blocks
   | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
-  = [CmmProc (map CmmStaticLit (reverse extra_bits ++ std_info))
+  = [CmmProc (Just (Statics info_lbl $ map CmmStaticLit (reverse extra_bits ++ std_info)))
              entry_lbl blocks]
 
   | ListGraph [] <- blocks -- No code; only the info table is significant
@@ -163,7 +163,7 @@ mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl blocks
 
   | otherwise	-- Separately emit info table (with the function entry 
   =		-- point as first entry) and the entry code 
-    [CmmProc [] entry_lbl blocks,
+    [CmmProc Nothing entry_lbl blocks,
      mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)]
 
 mkSRTLit :: CLabel

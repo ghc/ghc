@@ -39,7 +39,8 @@ import CLabel
 
 import Unique		( Uniquable(..), pprUnique )
 import qualified Outputable
-import Outputable	(Outputable, panic)
+import Outputable (PlatformOutputable, panic)
+import Platform
 import Pretty
 import FastString
 import Data.Word
@@ -47,24 +48,28 @@ import Data.Word
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: NatCmmTop Instr -> Doc
-pprNatCmmTop (CmmData section dats) = 
-  pprSectionHeader section $$ vcat (map pprData dats)
+pprNatCmmTop :: Platform -> NatCmmTop CmmStatics Instr -> Doc
+pprNatCmmTop _ (CmmData section dats) =
+  pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
 
-pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) = 
+ -- special case for code without info table:
+pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
-  (if null info then -- blocks guaranteed not null, so label needed
-       pprLabel lbl
-   else
+  pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+  vcat (map pprBasicBlock blocks)
+
+pprNatCmmTop _ (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+  pprSectionHeader Text $$
+  (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
-            pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
-                <> char ':' $$
+       pprCLabel_asm (mkDeadStripPreventer info_lbl)
+           <> char ':' $$
 #endif
        vcat (map pprData info) $$
-       pprLabel (entryLblToInfoLbl lbl)
+       pprLabel info_lbl
   ) $$
   vcat (map pprBasicBlock blocks)
      -- above: Even the first block gets a label, because with branch-chain
@@ -76,12 +81,10 @@ pprNatCmmTop (CmmProc info lbl (ListGraph blocks)) =
         -- from the entry code to a label on the _top_ of of the info table,
         -- so that the linker will not think it is unreferenced and dead-strip
         -- it. That's why the label is called a DeadStripPreventer (_dsp).
-  $$ if not (null info)
-		    then text "\t.long "
-		      <+> pprCLabel_asm (entryLblToInfoLbl lbl)
-		      <+> char '-'
-		      <+> pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
-		    else empty
+  $$ text "\t.long "
+	<+> pprCLabel_asm info_lbl
+	<+> char '-'
+	<+> pprCLabel_asm (mkDeadStripPreventer info_lbl)
 #endif
 
 
@@ -91,9 +94,10 @@ pprBasicBlock (BasicBlock blockid instrs) =
   vcat (map pprInstr instrs)
 
 
+pprDatas :: CmmStatics -> Doc
+pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+
 pprData :: CmmStatic -> Doc
-pprData (CmmAlign bytes)         = pprAlign bytes
-pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
 pprData (CmmUninitialised bytes) = ptext (sLit ".skip ") <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
@@ -125,16 +129,12 @@ pprASCII str
        do1 :: Word8 -> Doc
        do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
-pprAlign :: Int -> Doc
-pprAlign bytes =
-	ptext (sLit ".align ") <> int bytes
-
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
-instance Outputable Instr where
-    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
+instance PlatformOutputable Instr where
+    pprPlatform _ instr = Outputable.docToSDoc $ pprInstr instr
 
 
 -- | Pretty print a register.

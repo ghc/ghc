@@ -375,8 +375,7 @@ cvtForD (ImportF callconv safety from nm ty)
   where
     safety' = case safety of
                      Unsafe     -> PlayRisky
-                     Safe       -> PlaySafe False
-                     Threadsafe -> PlaySafe True
+                     Safe       -> PlaySafe
                      Interruptible -> PlayInterruptible
 
 cvtForD (ExportF callconv as nm ty)

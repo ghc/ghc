@@ -81,7 +81,7 @@ codeGen dflags this_mod data_tycons
                 -- initialisation routines; see Note
                 -- [pipeline-split-init].
 
-        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms code_stuff)
+        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "New Cmm" (pprCmms (targetPlatform dflags) code_stuff)
 
         ; return code_stuff }
 
@@ -182,7 +182,7 @@ mkModuleInit cost_centre_info this_mod hpc_info
         ; initCostCentres cost_centre_info
             -- For backwards compatibility: user code may refer to this
             -- label for calling hs_add_root().
-        ; emitData Data $ [ CmmDataLabel (mkPlainModuleInitLabel this_mod) ]
+        ; emitData Data $ Statics (mkPlainModuleInitLabel this_mod) []
         }
 
 ---------------------------------------------------------------
