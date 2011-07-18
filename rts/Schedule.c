@@ -581,6 +581,10 @@ static void
 schedulePreLoop(void)
 {
   // initialisation for scheduler - what cannot go into initScheduler()  
+
+#if defined(mingw32_HOST_OS)
+    win32AllocStack();
+#endif
 }
 
 /* -----------------------------------------------------------------------------
