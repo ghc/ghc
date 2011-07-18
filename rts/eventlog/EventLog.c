@@ -101,7 +101,7 @@ typedef struct _EventType {
   char *desc;     // Description
 } EventType;
 
-EventType eventTypes[NUM_EVENT_TAGS];
+EventType eventTypes[NUM_GHC_EVENT_TAGS];
 
 static void initEventsBuf(EventsBuf* eb, StgWord64 size, EventCapNo capno);
 static void resetEventsBuf(EventsBuf* eb);
@@ -200,7 +200,7 @@ initEventLogging(void)
                                         + 10 /* .eventlog */,
                                         "initEventLogging");
 
-    if (sizeof(EventDesc) / sizeof(char*) != NUM_EVENT_TAGS) {
+    if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
         barf("EventDesc array has the wrong number of elements");
     }
 
@@ -250,7 +250,7 @@ initEventLogging(void)
 
     // Mark beginning of event types in the header.
     postInt32(&eventBuf, EVENT_HET_BEGIN);
-    for (t = 0; t < NUM_EVENT_TAGS; ++t) {
+    for (t = 0; t < NUM_GHC_EVENT_TAGS; ++t) {
 
         eventTypes[t].etNum = t;
         eventTypes[t].desc = EventDesc[t];
