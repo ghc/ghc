@@ -586,8 +586,7 @@ reportOverlap ctxt inst_envs orig pred@(ClassP clas tys)
 	     ,	if not (isSingleton matches)
     		then 	-- Two or more matches
 		     empty
-    		else 	-- One match, plus some unifiers
-		ASSERT( not (null unifiers) )
+    		else 	-- One match
 		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfPred pred))),
 			      if null (matching_givens) then
