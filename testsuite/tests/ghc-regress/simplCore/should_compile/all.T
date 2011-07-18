@@ -121,3 +121,5 @@ test('T5168',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T5168'])
+
+test('T5329', normal, compile, [''])
