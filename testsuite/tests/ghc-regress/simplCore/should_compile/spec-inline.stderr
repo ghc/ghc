@@ -144,7 +144,7 @@ Roman.foo =
 
 ------ Local rules for imported ids --------
 "SC:$wgo0" [ALWAYS]
-    forall {sc :: GHC.Prim.Int# sc1 :: GHC.Prim.Int#}
+    forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
       Roman.$wgo (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc1))
                  (Data.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc))
       = Roman.foo_$s$wgo sc sc1

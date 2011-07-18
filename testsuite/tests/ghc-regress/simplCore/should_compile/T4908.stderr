@@ -64,9 +64,9 @@ T4908.f =
 
 ------ Local rules for imported ids --------
 "SC:$wf0" [ALWAYS]
-    forall {sc :: GHC.Types.Int
-            sc1 :: GHC.Prim.Int#
-            sc2 :: GHC.Prim.Int#}
+    forall (sc :: GHC.Types.Int)
+           (sc1 :: GHC.Prim.Int#)
+           (sc2 :: GHC.Prim.Int#).
       T4908.$wf sc2 (sc, GHC.Types.I# sc1)
       = T4908.f_$s$wf sc sc1 sc2
 
