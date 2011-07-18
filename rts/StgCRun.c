@@ -192,6 +192,18 @@ StgRunIsImplementedInAssembler(void)
     );
 }
 
+#if defined(mingw32_HOST_OS)
+// On windows the stack has to be allocated 4k at a time, otherwise
+// we get a segfault.  The C compiler knows how to do this (it calls
+// _alloca()), so we make sure that we can allocate as much stack as
+// we need:
+StgWord8 *win32AllocStack(void)
+{
+    StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
+    return stack;
+}
+#endif
+
 #endif
 
 /* ----------------------------------------------------------------------------
