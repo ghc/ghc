@@ -57,7 +57,7 @@ static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
 static lnat max_residency     = 0; // in words; for stats only
-static lnat avg_residency     = 0;
+static lnat cumulative_residency = 0;
 static lnat residency_samples = 0; // for stats only
 static lnat max_slop          = 0;
 
@@ -151,7 +151,7 @@ initStats0(void)
 #endif
 
     max_residency = 0;
-    avg_residency = 0;
+    cumulative_residency = 0;
     residency_samples = 0;
     max_slop = 0;
 
@@ -368,7 +368,7 @@ stat_endGC (gc_thread *gct,
 		max_residency = live;
 	    }
 	    residency_samples++;
-	    avg_residency += live;
+	    cumulative_residency += live;
 	}
 
         if (slop > max_slop) max_slop = slop;
@@ -745,7 +745,7 @@ stat_exit(int alloc)
 	  statsPrintf(fmt2,
 		    total_collections,
 		    residency_samples == 0 ? 0 : 
-		        avg_residency*sizeof(W_)/residency_samples, 
+		        cumulative_residency*sizeof(W_)/residency_samples, 
 		    max_residency*sizeof(W_), 
 		    residency_samples,
 		    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
