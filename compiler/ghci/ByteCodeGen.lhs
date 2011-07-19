@@ -1240,7 +1240,6 @@ pushAtom _ _ (AnnLit lit)
         MachChar _    -> code NonPtrArg
         MachNullAddr  -> code NonPtrArg
         MachStr s     -> pushStr s
-        l             -> pprPanic "pushAtom" (ppr l)
      where
         code rep
            = let size_host_words = fromIntegral (cgRepSizeW rep)
