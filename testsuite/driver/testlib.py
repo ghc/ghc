@@ -814,7 +814,9 @@ def do_compile( name, way, should_fail, top_mod, extra_mods, extra_hc_opts ):
        return result
     extra_hc_opts = result['hc_opts']
 
-    force = 1 if extra_mods else 0
+    force = 0
+    if extra_mods:
+       force = 1
     result = simple_build( name, way, extra_hc_opts, should_fail, top_mod, 0, 1, force)
 
     if badResult(result):
