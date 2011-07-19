@@ -932,6 +932,8 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
 	then return Nothing
 	else -} liftIO $ getPackageModuleInfo hsc_env mdl
+   -- ToDo: we don't understand what the following comment means.
+   --    (SDM, 19/7/2011)
    -- getPackageModuleInfo will attempt to find the interface, so
    -- we don't want to call it for a home module, just in case there
    -- was a problem loading the module and the interface doesn't
