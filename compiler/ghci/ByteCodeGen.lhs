@@ -1232,7 +1232,9 @@ pushAtom _ _ (AnnLit lit)
    = case lit of
         MachLabel _ _ _ -> code NonPtrArg
         MachWord _    -> code NonPtrArg
-        MachInt _     -> code PtrArg
+        MachInt _     -> code NonPtrArg
+        MachWord64 _  -> code LongArg
+        MachInt64 _   -> code LongArg
         MachFloat _   -> code FloatArg
         MachDouble _  -> code DoubleArg
         MachChar _    -> code NonPtrArg
