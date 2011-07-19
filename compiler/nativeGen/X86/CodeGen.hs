@@ -323,7 +323,7 @@ iselExpr64 (CmmLit (CmmInt i _)) = do
   (rlo,rhi) <- getNewRegPairNat II32
   let
         r = fromIntegral (fromIntegral i :: Word32)
-        q = fromIntegral ((fromIntegral i `shiftR` 32) :: Word32)
+        q = fromIntegral (fromIntegral (i `shiftR` 32) :: Word32)
         code = toOL [
                 MOV II32 (OpImm (ImmInteger r)) (OpReg rlo),
                 MOV II32 (OpImm (ImmInteger q)) (OpReg rhi)
