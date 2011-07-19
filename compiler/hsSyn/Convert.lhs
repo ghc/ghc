@@ -464,7 +464,6 @@ cvtl e = wrapL (cvt e)
 			    ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
     cvt (TupE [e])     = cvt e	-- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Boxed }
-    cvt (UnboxedTupE [e])     = cvt e	-- Singleton tuples treated like nothing (just parens)
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Unboxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
 			    ; return $ HsIf (Just noSyntaxExpr) x' y' z' }
