@@ -1418,14 +1418,20 @@ def compare_outputs( kind, normaliser, extra_normaliser,
 
         # Ignore whitespace when diffing. We should only get to this
         # point if there are non-whitespace differences
-        r = os.system( 'diff -uw ' + expected_normalised_file + \
-                               ' ' + actual_normalised_file )
+        #
+        # Note we are diffing the *actual* output, not the normalised
+        # output.  The normalised output may have whitespace squashed
+        # (including newlines) so the diff would be hard to read.
+        # This does mean that the diff might contain changes that
+        # would be normalised away.
+        r = os.system( 'diff -uw ' + expected_file + \
+                               ' ' + actual_file )
 
         # If for some reason there were no non-whitespace differences,
         # then do a full diff
         if r == 0:
-            r = os.system( 'diff -u ' + expected_normalised_file + \
-                                  ' ' + actual_normalised_file )
+            r = os.system( 'diff -u ' + expected_file + \
+                                  ' ' + actual_file )
 
         if config.accept:
             if expected_file == '':
