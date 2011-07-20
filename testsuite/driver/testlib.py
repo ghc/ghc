@@ -1399,7 +1399,7 @@ def compare_outputs( kind, normaliser, extra_normaliser,
         expected_str = extra_normaliser(normaliser(expected_raw))
     else:
         expected_str = ''
-        expected_file = ''
+        expected_file = '/dev/null'
 
     actual_raw = read_no_crs(actual_file)
     actual_str = extra_normaliser(normaliser(actual_raw))
@@ -1407,7 +1407,7 @@ def compare_outputs( kind, normaliser, extra_normaliser,
     if expected_str != actual_str:
         print 'Actual ' + kind + ' output differs from expected:'
 
-        if expected_file == '':
+        if expected_file == '/dev/null':
             expected_normalised_file = '/dev/null'
 
         else:
