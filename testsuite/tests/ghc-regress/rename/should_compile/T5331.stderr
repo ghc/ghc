@@ -1,0 +1,18 @@
+
+T5331.hs:9:32:
+    Warning: Unused quantified type variable `a'
+             In the type `forall a. Eq (T Int)'
+             In a SPECIALISE instance pragma
+
+T5331.hs:11:17:
+    Warning: Unused quantified type variable `a'
+             In the definition of data constructor `S1'
+
+T5331.hs:14:16:
+    Warning: Unused quantified type variable `a'
+             In the definition of data constructor `W1'
+
+T5331.hs:16:13:
+    Warning: Unused quantified type variable `a'
+             In the type `forall a. Int'
+             In the type signature for `f'

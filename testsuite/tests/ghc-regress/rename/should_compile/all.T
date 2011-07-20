@@ -175,3 +175,5 @@ test('T2436',
        extra_clean(['T2436a.hi', 'T2436a.o']) ],
      multimod_compile,
      ['T2436', '-v0'])
+test('T5331', normal, compile, [''])   # Unused tyvar warnings
+test('T5334', normal, compile, [''])   # Unused tyvar warnings
