@@ -41,6 +41,7 @@ import Pair
 import CoreUtils  ( mkPiTypes )
 import CoreUnfold ( mkDFunUnfolding )
 import CoreSyn    ( Expr(Var), CoreExpr, varToCoreExpr )
+import PrelNames  ( typeableClassNames )
 
 import Bag
 import BasicTypes
@@ -408,6 +409,16 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                     tcExtendGlobalEnv (concatMap implicitTyThings all_tycons) $
                     addFamInsts deriv_ty_insts $
                     addInsts deriv_inst_info getGblEnv
+
+       -- Check that if the module is compiled with -XSafe, there are no
+       -- hand written instances of Typeable as then unsafe casts could be
+       -- performed. Derivied instances are OK.
+       ; dflags <- getDOpts
+       ; when (safeLanguageOn dflags) $
+             mapM_ (\x -> when (is_cls (iSpec x) `elem` typeableClassNames)
+                               (addErrAt (getSrcSpan $ iSpec x) typInstErr))
+                   local_info
+
        ; return ( addTcgDUs gbl_env deriv_dus,
                   deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
