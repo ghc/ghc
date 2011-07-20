@@ -11,7 +11,8 @@ module RnEnv (
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 	lookupLocalDataTcNames, lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
-	lookupInstDeclBndr, lookupSubBndr, lookupConstructorFields,
+	lookupInstDeclBndr, lookupSubBndr, 
+        lookupSubBndrGREs, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupIfThenElse,
 	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn, addUsedRdrNames,
@@ -288,32 +289,19 @@ lookupSubBndr parent doc rdr_name
   = lookupOrig rdr_mod rdr_occ
 
   | otherwise	-- Find all the things the rdr-name maps to
-  = do	{	-- and pick the one with the right parent name
-	; env <- getGlobalRdrEnv
-        ; let gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-	; case pick parent gres  of
+  = do	{	-- and pick the one with the right parent namep
+	  env <- getGlobalRdrEnv
+	; case lookupSubBndrGREs env parent rdr_name of
 		-- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
 		--     The latter does pickGREs, but we want to allow 'x'
 		--     even if only 'M.x' is in scope
 	    [gre] -> do { addUsedRdrName gre (used_rdr_name gre)
                         ; return (gre_name gre) }
 	    []    -> do { addErr (unknownSubordinateErr doc rdr_name)
-			; traceRn (text "RnEnv.lookup_sub_bndr" <+> (ppr rdr_name $$ ppr gres))
 			; return (mkUnboundName rdr_name) }
 	    gres  -> do { addNameClashErrRn rdr_name gres
 			; return (gre_name (head gres)) } }
   where
-    rdr_occ = rdrNameOcc rdr_name    
-
-    pick NoParent gres		-- Normal lookup 
-      = pickGREs rdr_name gres
-    pick (ParentIs p) gres	-- Disambiguating lookup
-      | isUnqual rdr_name = filter (right_parent p) gres
-      | otherwise         = filter (right_parent p) (pickGREs rdr_name gres)
-
-    right_parent p (GRE { gre_par = ParentIs p' }) = p==p' 
-    right_parent _ _                               = False
-
     -- Note [Usage for sub-bndrs]
     used_rdr_name gre
       | isQual rdr_name = rdr_name
@@ -328,7 +316,26 @@ lookupSubBndr parent doc rdr_name
       = 	    -- Only qualified imports available, so make up 
 		    -- a suitable qualifed name from the first imp_spec
         ASSERT( not (null imp_specs) )
-        mkRdrQual (is_as (is_decl (head imp_specs))) rdr_occ
+        mkRdrQual (is_as (is_decl (head imp_specs))) (rdrNameOcc rdr_name)
+
+lookupSubBndrGREs :: GlobalRdrEnv -> Parent -> RdrName -> [GlobalRdrElt]
+-- If Parent = NoParent, just do a normal lookup
+-- If Parent = Parent p then find all GREs that
+--   (a) have parent p
+--   (b) for Unqual, are in scope qualified or unqualified
+--       for Qual, are in scope with that qualification
+lookupSubBndrGREs env parent rdr_name
+  = case parent of
+      NoParent   -> pickGREs rdr_name gres
+      ParentIs p 
+        | isUnqual rdr_name -> filter (parent_is p) gres
+        | otherwise         -> filter (parent_is p) (pickGREs rdr_name gres)
+
+  where
+    gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
+
+    parent_is p (GRE { gre_par = ParentIs p' }) = p == p'
+    parent_is _ _                               = False
 
 newIPNameRn :: IPName RdrName -> TcRnIf m n (IPName Name)
 newIPNameRn ip_rdr = newIPName (mapIPName rdrNameOcc ip_rdr)
