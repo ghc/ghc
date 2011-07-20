@@ -963,15 +963,21 @@ GhcStage3DefaultNewCodegen=YES
             <listitem>
                 <para>
                     The <literal>Typeable</literal> module has been
-                    overhauled. The <literal>mkTyCon</literal> function
-                    has been deprecated in favour of a new function
+                    overhauled. The <literal>mkTyCon</literal>
+                    function has been deprecated; the preferable fix
+                    is to derive <literal>Typeable</literal> instead
+                    (see <xref linkend="deriving-typeable"/>),
+                    although there is also a replacement
+                    for <literal>mkTyCon</literal> in the form of a
+                    new function
                     <literal>mkTyCon3</literal>, which takes separate
-                    strings for the package, module and name of the type
-                    constructor. Also, there is a new type
-                    <literal>TypeRepKey</literal>, and
-                    <literal>typeRepKey</literal> now
-                    returns <literal>IO TypeRepKey</literal> rather than
-                    <literal>IO Int</literal>.
+                    strings for the package, module and name of the
+                    type constructor.
+                    Also, <literal>typeRepKey</literal> is deprecated,
+                    and both <literal>TypeRep</literal>
+                    and <literal>TyCon</literal> now
+                    have <literal>Ord</literal> instances which means
+                    they can be used as Map keys.
                 </para>
             </listitem>
 
