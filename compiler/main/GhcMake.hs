@@ -735,15 +735,16 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 	    			   where 
 	    			     iface = hm_iface hm_info
 
-	    compile_it :: Maybe Linkable -> IO HomeModInfo
-	    compile_it  mb_linkable = 
+            compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
+            compile_it  mb_linkable src_modified =
                   compile hsc_env summary' mod_index nmods 
-                          mb_old_iface mb_linkable
+                          mb_old_iface mb_linkable src_modified
 
-            compile_it_discard_iface :: Maybe Linkable -> IO HomeModInfo
-            compile_it_discard_iface mb_linkable =
+            compile_it_discard_iface :: Maybe Linkable -> SourceModified
+                                     -> IO HomeModInfo
+            compile_it_discard_iface mb_linkable  src_modified =
                   compile hsc_env summary' mod_index nmods
-                          Nothing mb_linkable
+                          Nothing mb_linkable src_modified
 
             -- With the HscNothing target we create empty linkables to avoid
             -- recompilation.  We have to detect these to recompile anyway if
@@ -776,7 +777,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
                            (text "compiling stable on-disk mod:" <+> ppr this_mod_name)
                 linkable <- liftIO $ findObjectLinkable this_mod obj_fn
                               (expectJust "upsweep1" mb_obj_date)
-                compile_it (Just linkable)
+                compile_it (Just linkable) SourceUnmodifiedAndStable
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
 
@@ -797,7 +798,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
-                compile_it (Just l)
+                compile_it (Just l) SourceUnmodified
                 -- we have an old BCO that is up to date with respect
                 -- to the source: do a recompilation check as normal.
 
@@ -819,17 +820,17 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
                       isObjectLinkable l && linkableTime l == obj_date -> do
                           liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                                      (text "compiling mod with new on-disk obj:" <+> ppr this_mod_name)
-                          compile_it (Just l)
+                          compile_it (Just l) SourceUnmodified
                   _otherwise -> do
                           liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                                      (text "compiling mod with new on-disk obj2:" <+> ppr this_mod_name)
                           linkable <- liftIO $ findObjectLinkable this_mod obj_fn obj_date
-                          compile_it_discard_iface (Just linkable)
+                          compile_it_discard_iface (Just linkable) SourceUnmodified
 
          _otherwise -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling mod:" <+> ppr this_mod_name)
-                compile_it Nothing
+                compile_it Nothing SourceModified
 
 
 

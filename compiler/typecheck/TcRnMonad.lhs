@@ -74,7 +74,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
       	tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
-	th_var	     <- newIORef False ;
+        th_var       <- newIORef False ;
+        th_splice_var<- newIORef False ;
         lie_var      <- newIORef emptyWC ;
 	dfun_n_var   <- newIORef emptyOccSet ;
 	type_env_var <- case hsc_type_env_var hsc_env of {
@@ -98,7 +99,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_inst_env  = emptyInstEnv,
 		tcg_fam_inst_env  = emptyFamInstEnv,
                 tcg_th_used   = th_var,
-		tcg_exports  = [],
+                tcg_th_splice_used   = th_splice_var,
+                tcg_exports  = [],
 		tcg_imports  = emptyImportAvails,
                 tcg_used_rdrnames = used_rdr_var,
 		tcg_dus      = emptyDUs,
@@ -1047,6 +1049,9 @@ traceTcConstraints msg
 \begin{code}
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
+
+recordThSpliceUse :: TcM ()
+recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
 
 keepAliveTc :: Id -> TcM ()  	-- Record the name in the keep-alive set
 keepAliveTc id 
