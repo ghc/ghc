@@ -16,7 +16,9 @@
 
 #include "BeginPrivate.h"
 
-void GarbageCollect(rtsBool force_major_gc, nat gc_type, Capability *cap);
+void GarbageCollect (rtsBool force_major_gc,
+                     rtsBool do_heap_census,
+                     nat gc_type, Capability *cap);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
 

@@ -171,6 +171,7 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
 void
 GarbageCollect (rtsBool force_major_gc, 
+                rtsBool do_heap_census,
                 nat gc_type USED_IF_THREADS,
                 Capability *cap)
 {
@@ -660,6 +661,15 @@ GarbageCollect (rtsBool force_major_gc,
   // closures, which will cause problems with THREADED where we don't
   // fill slop.
   IF_DEBUG(sanity, checkSanity(rtsTrue /* after GC */, major_gc));
+
+  // If a heap census is due, we need to do it before
+  // resurrectThreads(), for the same reason as checkSanity above:
+  // resurrectThreads() will overwrite some closures and leave slop
+  // behind.
+  if (do_heap_census) {
+      debugTrace(DEBUG_sched, "performing heap census");
+      heapCensus();
+  }
 
   // send exceptions to any threads which were about to die
   RELEASE_SM_LOCK;
