@@ -1570,12 +1570,14 @@ fi
 AC_SUBST($1)
 ])
 
-# LIBRARY_VERSION(lib)
+# LIBRARY_VERSION(lib, [dir])
 # --------------------------------
 # Gets the version number of a library.
 # If $1 is ghc-prim, then we define LIBRARY_ghc_prim_VERSION as 1.2.3
+# $2 points to the directory under libraries/
 AC_DEFUN([LIBRARY_VERSION],[
-LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/$1/$1.cabal | sed "s/.* //"`
+dir=m4_default([$2],[$1])
+LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/${dir}/$1.cabal | sed "s/.* //"`
 AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 ])
 
