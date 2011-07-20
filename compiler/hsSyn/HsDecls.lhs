@@ -716,10 +716,13 @@ data ConDecl name
 
     , con_qvars     :: [LHsTyVarBndr name]
         -- ^ Type variables.  Depending on 'con_res' this describes the
-	-- follewing entities
+	-- following entities
         --
         --  - ResTyH98:  the constructor's *existential* type variables
         --  - ResTyGADT: *all* the constructor's quantified type variables
+	--
+	-- If con_explicit is Implicit, then con_qvars is irrelevant
+	-- until after renaming.  
 
     , con_cxt       :: LHsContext name
         -- ^ The context.  This /does not/ include the \"stupid theta\" which
