@@ -110,9 +110,9 @@ endif
 
 .PHONY: test
 test:
-	$(MAKE) -C testsuite/tests/ghc-regress CLEANUP=1 OUTPUT_SUMMARY=../../../testsuite_summary.txt fast
+	$(MAKE) -C testsuite/tests CLEANUP=1 OUTPUT_SUMMARY=../../../testsuite_summary.txt fast
 
 .PHONY: fulltest
 fulltest:
-	$(MAKE) -C testsuite/tests/ghc-regress CLEANUP=1 OUTPUT_SUMMARY=../../../testsuite_summary.txt
+	$(MAKE) -C testsuite/tests CLEANUP=1 OUTPUT_SUMMARY=../../../testsuite_summary.txt
 
