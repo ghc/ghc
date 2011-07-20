@@ -17,7 +17,7 @@
 #
 # -----------------------------------------------------------------------------
 
-# export the value of $MAKE for invocation in ghc-regress/driver/
+# export the value of $MAKE for invocation in tests/driver/
 export MAKE
 
 RUNTESTS     = $(TOP)/driver/runtests.py

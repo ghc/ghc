@@ -15,7 +15,7 @@ boot:
 	$(MAKE) -C $(TOP)/timeout all
 
 all:
-	$(MAKE) -C $(TOP)/tests/ghc-regress all
+	$(MAKE) -C $(TOP)/tests all
 
 endif
 endif
