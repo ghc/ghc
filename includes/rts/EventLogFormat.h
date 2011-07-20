@@ -104,8 +104,7 @@
 #define EVENT_STOP_THREAD          2 /* (thread, status, blockinfo) */
 #define EVENT_THREAD_RUNNABLE      3 /* (thread)               */
 #define EVENT_MIGRATE_THREAD       4 /* (thread, new_cap)      */
-#define EVENT_RUN_SPARK            5 /* (thread)               */
-#define EVENT_STEAL_SPARK          6 /* (thread, victim_cap)   */
+/* 5, 6 deprecated */
 #define EVENT_SHUTDOWN             7 /* ()                     */
 #define EVENT_THREAD_WAKEUP        8 /* (thread, other_cap)    */
 #define EVENT_GC_START             9 /* ()                     */
@@ -133,22 +132,36 @@
 #define EVENT_PROGRAM_ENV         31 /* (capset, environment_vector)  */
 #define EVENT_OSPROCESS_PID       32 /* (capset, pid)          */
 #define EVENT_OSPROCESS_PPID      33 /* (capset, parent_pid)   */
+#define EVENT_SPARK_COUNTERS      34 /* (crt,dud,ovf,cnv,fiz,gcd,rem) */
+#define EVENT_SPARK_CREATE        35 /* ()                     */
+#define EVENT_SPARK_DUD           36 /* ()                     */
+#define EVENT_SPARK_OVERFLOW      37 /* ()                     */
+#define EVENT_SPARK_RUN           38 /* ()                     */
+#define EVENT_SPARK_STEAL         39 /* (victim_cap)           */
+#define EVENT_SPARK_FIZZLE        40 /* ()                     */
+#define EVENT_SPARK_GC            41 /* ()                     */
+#define EVENT_INTERN_STRING       42 /* (string, id) {not used by ghc} */
 
 
-/* Range 34 - 59 is available for new events */
+/* Range 43 - 59 is available for new GHC and common events */
 
 /* Range 60 - 80 is used by eden for parallel tracing
  * see http://www.mathematik.uni-marburg.de/~eden/
  */
+
+/* Range 100 - 139 is reserved for Mercury */
 
 /*
  * The highest event code +1 that ghc itself emits. Note that some event
  * ranges higher than this are reserved but not currently emitted by ghc.
  * This must match the size of the EventDesc[] array in EventLog.c
  */
-#define NUM_EVENT_TAGS            34
+#define NUM_GHC_EVENT_TAGS        42
 
 #if 0  /* DEPRECATED EVENTS: */
+/* we don't actually need to record the thread, it's implicit */
+#define EVENT_RUN_SPARK            5 /* (thread)               */
+#define EVENT_STEAL_SPARK          6 /* (thread, victim_cap)   */
 /* ghc changed how it handles sparks so these are no longer applicable */
 #define EVENT_CREATE_SPARK        13 /* (cap, thread) */
 #define EVENT_SPARK_TO_THREAD     14 /* (cap, thread, spark_thread) */

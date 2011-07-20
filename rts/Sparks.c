@@ -17,14 +17,10 @@
 
 #if defined(THREADED_RTS)
 
-void
-initSparkPools( void )
+SparkPool *
+allocSparkPool( void )
 {
-    /* walk over the capabilities, allocating a spark pool for each one */
-    nat i;
-    for (i = 0; i < n_capabilities; i++) {
-      capabilities[i].sparks = newWSDeque(RtsFlags.ParFlags.maxLocalSparks);
-    }
+    return newWSDeque(RtsFlags.ParFlags.maxLocalSparks);
 }
 
 void
@@ -63,46 +59,21 @@ newSpark (StgRegTable *reg, StgClosure *p)
     Capability *cap = regTableToCapability(reg);
     SparkPool *pool = cap->sparks;
 
-    /* I am not sure whether this is the right thing to do.
-     * Maybe it is better to exploit the tag information
-     * instead of throwing it away?
-     */
-    p = UNTAG_CLOSURE(p);
-
-    if (closure_SHOULD_SPARK(p)) {
-        pushWSDeque(pool,p);
-        cap->sparks_created++;
+    if (!fizzledSpark(p)) {
+        if (pushWSDeque(pool,p)) {
+            cap->spark_stats.created++;
+            traceEventSparkCreate(cap);
+        } else {
+            /* overflowing the spark pool */
+            cap->spark_stats.overflowed++;
+            traceEventSparkOverflow(cap);
+	}
     } else {
-        cap->sparks_dud++;
+        cap->spark_stats.dud++;
+        traceEventSparkDud(cap);
     }
 
     return 1;
-}
-
-/* -----------------------------------------------------------------------------
- * 
- * tryStealSpark: try to steal a spark from a Capability.
- *
- * Returns a valid spark, or NULL if the pool was empty, and can
- * occasionally return NULL if there was a race with another thread
- * stealing from the same pool.  In this case, try again later.
- *
- -------------------------------------------------------------------------- */
-
-StgClosure *
-tryStealSpark (Capability *cap)
-{
-  SparkPool *pool = cap->sparks;
-  StgClosure *stolen;
-
-  do { 
-      stolen = stealWSDeque_(pool); 
-      // use the no-loopy version, stealWSDeque_(), since if we get a
-      // spurious NULL here the caller may want to try stealing from
-      // other pools before trying again.
-  } while (stolen != NULL && !closure_SHOULD_SPARK(stolen));
-
-  return stolen;
 }
 
 /* --------------------------------------------------------------------------
@@ -205,7 +176,8 @@ pruneSparkQueue (Capability *cap)
           // evaluated, but it doesn't hurt to have this check for
           // robustness.
           pruned_sparks++;
-          cap->sparks_fizzled++;
+          cap->spark_stats.fizzled++;
+          traceEventSparkFizzle(cap);
       } else {
           info = spark->header.info;
           if (IS_FORWARDING_PTR(info)) {
@@ -217,7 +189,8 @@ pruneSparkQueue (Capability *cap)
                   n++;
               } else {
                   pruned_sparks++; // discard spark
-                  cap->sparks_fizzled++;
+                  cap->spark_stats.fizzled++;
+                  traceEventSparkFizzle(cap);
               }
           } else if (HEAP_ALLOCED(spark)) {
               if ((Bdescr((P_)spark)->flags & BF_EVACUATED)) {
@@ -227,11 +200,13 @@ pruneSparkQueue (Capability *cap)
                       n++;
                   } else {
                       pruned_sparks++; // discard spark
-                      cap->sparks_fizzled++;
+                      cap->spark_stats.fizzled++;
+                      traceEventSparkFizzle(cap);
                   }
               } else {
                   pruned_sparks++; // discard spark
-                  cap->sparks_gcd++;
+                  cap->spark_stats.gcd++;
+                  traceEventSparkGC(cap);
               }
           } else {
               if (INFO_PTR_TO_STRUCT(info)->type == THUNK_STATIC) {
@@ -241,11 +216,13 @@ pruneSparkQueue (Capability *cap)
                       n++;
                   } else {
                       pruned_sparks++; // discard spark
-                      cap->sparks_gcd++;
+                      cap->spark_stats.gcd++;
+                      traceEventSparkGC(cap);
                   }
               } else {
                   pruned_sparks++; // discard spark
-                  cap->sparks_fizzled++;
+                  cap->spark_stats.fizzled++;
+                  traceEventSparkFizzle(cap);
               }
           }
       }

@@ -43,8 +43,6 @@ provider HaskellEvent {
   probe stop__thread (EventCapNo, EventThreadID, EventThreadStatus, EventThreadID);
   probe thread__runnable (EventCapNo, EventThreadID);
   probe migrate__thread (EventCapNo, EventThreadID, EventCapNo);
-  probe run__spark (EventCapNo, EventThreadID);
-  probe steal__spark (EventCapNo, EventThreadID, EventCapNo);
   probe shutdown (EventCapNo);
   probe thread_wakeup (EventCapNo, EventThreadID, EventCapNo);
   probe gc__start (EventCapNo);
@@ -67,4 +65,16 @@ provider HaskellEvent {
   probe capset__assign__cap(EventCapsetID, EventCapNo);
   probe capset__remove__cap(EventCapsetID, EventCapNo);
 
+  probe spark__counters(EventCapNo,
+                        StgWord, StgWord, StgWord
+                        StgWord, StgWord, StgWord
+                        StgWord);
+
+  probe spark__create   (EventCapNo);
+  probe spark__dud      (EventCapNo);
+  probe spark__overflow (EventCapNo);
+  probe spark__run      (EventCapNo);
+  probe spark__steal    (EventCapNo, EventCapNo);
+  probe spark__fizzle   (EventCapNo);
+  probe spark__gc       (EventCapNo);
 };

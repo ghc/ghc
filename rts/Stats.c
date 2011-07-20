@@ -629,21 +629,20 @@ stat_exit(int alloc)
 
             {
                 nat i;
-                lnat sparks_created   = 0;
-                lnat sparks_dud       = 0;
-                lnat sparks_converted = 0;
-                lnat sparks_gcd       = 0;
-                lnat sparks_fizzled   = 0;
+                SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
                 for (i = 0; i < n_capabilities; i++) {
-                    sparks_created   += capabilities[i].sparks_created;
-                    sparks_dud       += capabilities[i].sparks_dud;
-                    sparks_converted += capabilities[i].sparks_converted;
-                    sparks_gcd       += capabilities[i].sparks_gcd;
-                    sparks_fizzled   += capabilities[i].sparks_fizzled;
+                    sparks.created   += capabilities[i].spark_stats.created;
+                    sparks.dud       += capabilities[i].spark_stats.dud;
+                    sparks.overflowed+= capabilities[i].spark_stats.overflowed;
+                    sparks.converted += capabilities[i].spark_stats.converted;
+                    sparks.gcd       += capabilities[i].spark_stats.gcd;
+                    sparks.fizzled   += capabilities[i].spark_stats.fizzled;
                 }
 
-                statsPrintf("  SPARKS: %ld (%ld converted, %ld dud, %ld GC'd, %ld fizzled)\n\n",
-                            sparks_created + sparks_dud, sparks_converted, sparks_dud, sparks_gcd, sparks_fizzled);
+                statsPrintf("  SPARKS: %ld (%ld converted, %ld overflowed, %ld dud, %ld GC'd, %ld fizzled)\n\n",
+                            sparks.created + sparks.dud + sparks.overflowed,
+                            sparks.converted, sparks.overflowed, sparks.dud,
+                            sparks.gcd, sparks.fizzled);
             }
 #endif
 

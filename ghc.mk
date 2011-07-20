@@ -1078,7 +1078,7 @@ sdist-prep :
 	$(call sdist_file,compiler,stage2,parser,,Lexer,x)
 	$(call sdist_file,compiler,stage2,parser,,Parser,y.pp)
 	$(call sdist_file,compiler,stage2,parser,,ParserCore,y)
-	$(call sdist_file,utils/hpc,dist,,,HpcParser,y)
+	$(call sdist_file,utils/hpc,dist-install,,,HpcParser,y)
 	$(call sdist_file,utils/genprimopcode,dist,,,Lexer,x)
 	$(call sdist_file,utils/genprimopcode,dist,,,Parser,y)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)
