@@ -1754,6 +1754,7 @@ retainRoot(void *user STG_UNUSED, StgClosure **tl)
     currentStackBoundary = stackTop;
 
     c = UNTAG_CLOSURE(*tl);
+    maybeInitRetainerSet(c);
     if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
 	retainClosure(c, c, getRetainerFrom(c));
     } else {
@@ -1856,6 +1857,15 @@ computeRetainerSet( void )
  *    However, this is not necessary because any static indirection objects
  *    are just traversed through to reach dynamic objects. In other words,
  *    they are not taken into consideration in computing retainer sets.
+ *
+ * SDM (20/7/2011): I don't think this is doing anything sensible,
+ * because it happens before retainerProfile() and at the beginning of
+ * retainerProfil() we change the sense of 'flip'.  So all of the
+ * calls to maybeInitRetainerSet() here are initialising retainer sets
+ * with the wrong flip.  Also, I don't see why this is necessary.  I
+ * added a maybeInitRetainerSet() call to retainRoot(), and that seems
+ * to have fixed the assertion failure in retainerSetOf() I was
+ * encountering.
  * -------------------------------------------------------------------------- */
 void
 resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
