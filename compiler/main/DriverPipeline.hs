@@ -101,6 +101,7 @@ compile :: HscEnv
         -> Int             -- ^ ... of M
         -> Maybe ModIface  -- ^ old interface, if we have one
         -> Maybe Linkable  -- ^ old linkable, if we have one
+        -> SourceModified
         -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compile = compile' (hscCompileNothing, hscCompileInteractive, hscCompileBatch)
@@ -115,10 +116,12 @@ compile' ::
         -> Int             -- ^ ... of M
         -> Maybe ModIface  -- ^ old interface, if we have one
         -> Maybe Linkable  -- ^ old linkable, if we have one
+        -> SourceModified
         -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compile' (nothingCompiler, interactiveCompiler, batchCompiler)
         hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
+        source_modified0
  = do
    let dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -156,7 +159,9 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
 
    -- -fforce-recomp should also work with --make
    let force_recomp = dopt Opt_ForceRecomp dflags
-       source_unchanged = isJust maybe_old_linkable && not force_recomp
+       source_modified
+         | force_recomp || isNothing maybe_old_linkable = SourceModified
+         | otherwise = source_modified0
        object_filename = ml_obj_file location
 
    let handleBatch HscNoRecomp
@@ -223,7 +228,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
        --            -> m HomeModInfo
        runCompiler compiler handle
            = do (result, iface, details)
-                    <- compiler hsc_env' summary source_unchanged mb_old_iface
+                    <- compiler hsc_env' summary source_modified mb_old_iface
                                 (Just (mod_index, nmods))
                 linkable <- handle result
                 return (HomeModInfo{ hm_details  = details,
@@ -893,22 +898,21 @@ runPhase (Hsc src_flavour) input_fn dflags0
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
         src_timestamp <- io $ getModificationTime (basename <.> suff)
 
-        let force_recomp = dopt Opt_ForceRecomp dflags
-            hsc_lang = hscTarget dflags
+        let hsc_lang = hscTarget dflags
         source_unchanged <- io $
-          if force_recomp || not (isStopLn stop)
-                -- Set source_unchanged to False unconditionally if
+          if not (isStopLn stop)
+                -- SourceModified unconditionally if
                 --      (a) recompilation checker is off, or
                 --      (b) we aren't going all the way to .o file (e.g. ghc -S)
-             then return False
+             then return SourceModified
                 -- Otherwise look at file modification dates
              else do o_file_exists <- doesFileExist o_file
                      if not o_file_exists
-                        then return False       -- Need to recompile
+                        then return SourceModified       -- Need to recompile
                         else do t2 <- getModificationTime o_file
                                 if t2 > src_timestamp
-                                  then return True
-                                  else return False
+                                  then return SourceUnmodified
+                                  else return SourceModified
 
   -- get the DynFlags
         let next_phase = hscNextPhase dflags src_flavour hsc_lang

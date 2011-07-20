@@ -126,6 +126,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
          ModGuts{     mg_module     = this_mod,
                       mg_boot       = is_boot,
                       mg_used_names = used_names,
+                      mg_used_th    = used_th,
                       mg_deps       = deps,
                       mg_dir_imps   = dir_imp_mods,
                       mg_rdr_env    = rdr_env,
@@ -134,7 +135,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_hpc_info   = hpc_info,
                       mg_trust_pkg  = self_trust }
         = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod is_boot used_names deps rdr_env fix_env
+                   this_mod is_boot used_names used_th deps rdr_env fix_env
                    warns hpc_info dir_imp_mods self_trust mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
@@ -152,14 +153,16 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
                       tcg_rdr_env = rdr_env,
                       tcg_fix_env = fix_env,
                       tcg_warns = warns,
-                      tcg_hpc = other_hpc_info
+                      tcg_hpc = other_hpc_info,
+                      tcg_th_splice_used = tc_splice_used
                     }
   = do
           let used_names = mkUsedNames tc_result
           deps <- mkDependencies tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
+          used_th <- readIORef tc_splice_used
           mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod (isHsBoot hsc_src) used_names deps rdr_env 
+                   this_mod (isHsBoot hsc_src) used_names used_th deps rdr_env
                    fix_env warns hpc_info (imp_mods imports)
                    (imp_trust_own_pkg imports) mod_details
         
@@ -203,14 +206,14 @@ mkDependencies
                     -- NB. remember to use lexicographic ordering
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
-         -> NameSet -> Dependencies -> GlobalRdrEnv
+         -> NameSet -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> ImportedMods -> Bool
          -> ModDetails
          -> IO (Messages, Maybe (ModIface, Bool))
 mkIface_ hsc_env maybe_old_fingerprint 
-         this_mod is_boot used_names deps rdr_env fix_env src_warns hpc_info
-         dir_imp_mods pkg_trust_req
+         this_mod is_boot used_names used_th deps rdr_env fix_env src_warns
+         hpc_info dir_imp_mods pkg_trust_req
 	 ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
@@ -268,7 +271,8 @@ mkIface_ hsc_env maybe_old_fingerprint
 			mi_iface_hash = fingerprint0,
 			mi_mod_hash  = fingerprint0,
  			mi_exp_hash  = fingerprint0,
- 			mi_orphan_hash = fingerprint0,
+                        mi_used_th   = used_th,
+                        mi_orphan_hash = fingerprint0,
 			mi_orphan    = False,	-- Always set by addVersionInfo, but
 						-- it's a strict field, so we can't omit it.
                         mi_finsts    = False,   -- Ditto
@@ -1032,21 +1036,20 @@ so we may need to split up a single Avail into multiple ones.
 \begin{code}
 checkOldIface :: HscEnv
 	      -> ModSummary
-	      -> Bool 			-- Source unchanged
+              -> SourceModified
 	      -> Maybe ModIface 	-- Old interface from compilation manager, if any
 	      -> IO (RecompileRequired, Maybe ModIface)
 
-checkOldIface hsc_env mod_summary source_unchanged maybe_iface
+checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  showPass (hsc_dflags hsc_env) $
             "Checking old interface for " ++ (showSDoc $ ppr $ ms_mod mod_summary)
         initIfaceCheck hsc_env $
-            check_old_iface hsc_env mod_summary source_unchanged maybe_iface
+            check_old_iface hsc_env mod_summary source_modified maybe_iface
 
-check_old_iface :: HscEnv -> ModSummary -> Bool -> Maybe ModIface
+check_old_iface :: HscEnv -> ModSummary -> SourceModified -> Maybe ModIface
                 -> IfG (Bool, Maybe ModIface)
-check_old_iface hsc_env mod_summary src_unchanged maybe_iface
-  = let src_changed = not src_unchanged
-        dflags = hsc_dflags hsc_env
+check_old_iface hsc_env mod_summary src_modified maybe_iface
+  = let dflags = hsc_dflags hsc_env
         getIface =
              case maybe_iface of
                  Just _  -> do
@@ -1064,23 +1067,34 @@ check_old_iface hsc_env mod_summary src_unchanged maybe_iface
                              return $ Just iface
 
     in do
-        when src_changed
+         let src_changed
+              | dopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
+              | SourceModified <- src_modified = True
+              | otherwise = False
+
+         when src_changed
              (traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
 
-         -- If the source has changed and we're in interactive mode, avoid reading
-         -- an interface; just return the one we might have been supplied with.
-        if not (isObjectTarget $ hscTarget dflags) && src_changed
+         -- If the source has changed and we're in interactive mode,
+         -- avoid reading an interface; just return the one we might
+         -- have been supplied with.
+         if not (isObjectTarget $ hscTarget dflags) && src_changed
             then return (outOfDate, maybe_iface)
             else do
                 -- Try and read the old interface for the current module
                 -- from the .hi file left from the last time we compiled it
                 maybe_iface' <- getIface
+                if src_changed
+                   then return (outOfDate, maybe_iface')
+                   else do
                 case maybe_iface' of
                     Nothing -> return (outOfDate, maybe_iface')
-                    Just iface -> do
-                        -- We have got the old iface; check its versions
-                        recomp <- checkVersions hsc_env src_unchanged mod_summary iface
-                        return recomp
+                    Just iface ->
+                      -- We have got the old iface; check its versions
+                      -- even in the SourceUnmodifiedAndStable case we
+                      -- should check versions because some packages
+                      -- might have changed or gone away.
+                      checkVersions hsc_env mod_summary iface
 \end{code}
 
 @recompileRequired@ is called from the HscMain.   It checks whether
@@ -1101,16 +1115,10 @@ safeHsChanged hsc_env iface
   = (getSafeMode $ mi_trust iface) /= (safeHaskell $ hsc_dflags hsc_env)
 
 checkVersions :: HscEnv
-	      -> Bool		-- True <=> source unchanged
               -> ModSummary
 	      -> ModIface 	-- Old interface
 	      -> IfG (RecompileRequired, Maybe ModIface)
-checkVersions hsc_env source_unchanged mod_summary iface
-  | not source_unchanged
-  = let iface' = if safeHsChanged hsc_env iface then Nothing else Just iface
-    in return (outOfDate, iface')
-
-  | otherwise
+checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 

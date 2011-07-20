@@ -236,6 +236,11 @@ data TcGblEnv
           -- is implicit rather than explicit, so we have to zap a
           -- mutable variable.
 
+        tcg_th_splice_used :: TcRef Bool,
+          -- ^ @True@ <=> A Template Haskell splice was used.
+          --
+          -- Splices disable recompilation avoidance (see #481)
+
 	tcg_dfun_n  :: TcRef OccSet,
           -- ^ Allows us to choose unique DFun names.
 
