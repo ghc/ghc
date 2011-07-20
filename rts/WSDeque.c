@@ -32,7 +32,7 @@
  * 
  * Both popWSDeque and stealWSDeque also return NULL when the queue is empty.
  *
- * Testing: see testsuite/tests/ghc-regress/rts/testwsdeque.c.  If
+ * Testing: see testsuite/tests/rts/testwsdeque.c.  If
  * there's anything wrong with the deque implementation, this test
  * will probably catch it.
  * 
