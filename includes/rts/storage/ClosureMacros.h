@@ -452,10 +452,10 @@ INLINE_HEADER StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, lnat n)
    In multicore mode, we *cannot* overwrite slop with zeroes, because
    another thread might be reading it.  So,
 
-      PROFILING is not compatible with  +RTS -N<n> (for n > 1)
+      LDV PROFILING is not compatible with +RTS -N<n> (for n > 1)
 
       THREADED_RTS can be used with DEBUG, but full heap sanity
-      checking is disabled.
+      checking is disabled except after major GC.
 
    -------------------------------------------------------------------------- */
 
