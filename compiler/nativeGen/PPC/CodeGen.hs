@@ -28,6 +28,7 @@ where
 import PPC.Instr
 import PPC.Cond
 import PPC.Regs
+import CPrim
 import NCGMonad
 import Instruction
 import PIC
@@ -1141,6 +1142,8 @@ genCCall' gcp target dest_regs argsAndHints
                     MO_Memcpy    -> (fsLit "memcpy", False)
                     MO_Memset    -> (fsLit "memset", False)
                     MO_Memmove   -> (fsLit "memmove", False)
+
+                    MO_PopCnt w  -> (fsLit $ popCntLabel w, False)
 
                     other -> pprPanic "genCCall(ppc): unknown callish op"
                                     (pprCallishMachOp other)

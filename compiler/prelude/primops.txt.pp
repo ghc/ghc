@@ -302,6 +302,22 @@ primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Bool
 primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Bool
 primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Bool
 
+primop   PopCnt8Op   "popCnt8#"   Monadic   Word# -> Word#
+    {Count the number of set bits in the lower 8 bits of a word.}
+primop   PopCnt16Op   "popCnt16#"   Monadic   Word# -> Word#
+    {Count the number of set bits in the lower 16 bits of a word.}
+primop   PopCnt32Op   "popCnt32#"   Monadic   Word# -> Word#
+    {Count the number of set bits in the lower 32 bits of a word.}
+#if WORD_SIZE_IN_BITS < 64
+primop   PopCnt64Op   "popCnt64#"   Monadic   Word64# -> Word#
+    {Count the number of set bits in a 64-bit word.}
+#else
+primop   PopCnt64Op   "popCnt64#"   Monadic   Word# -> Word#
+    {Count the number of set bits in a 64-bit word.}
+#endif
+primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
+    {Count the number of set bits in a word.}
+
 ------------------------------------------------------------------------
 section "Narrowings" 
 	{Explicit narrowing of native-sized ints or words.}
@@ -1926,6 +1942,3 @@ primop  TraceEventOp "traceEvent#" GenPrimOp
 ------------------------------------------------------------------------
 
 thats_all_folks
-
-
-

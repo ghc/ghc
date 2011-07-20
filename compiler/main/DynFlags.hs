@@ -276,6 +276,7 @@ data DynFlag
    | Opt_SharedImplib
    | Opt_BuildingCabalPackage
    | Opt_SSE2
+   | Opt_SSE4_2
    | Opt_GhciSandbox
    | Opt_HelpfulErrors
 
@@ -1518,6 +1519,7 @@ dynamic_flags = [
   , flagA "monly-3-regs" (NoArg (addWarn "The -monly-3-regs flag does nothing; it will be removed in a future GHC release"))
   , flagA "monly-4-regs" (NoArg (addWarn "The -monly-4-regs flag does nothing; it will be removed in a future GHC release"))
   , flagA "msse2"        (NoArg (setDynFlag Opt_SSE2))
+  , flagA "msse4.2"      (NoArg (setDynFlag Opt_SSE4_2))
 
      ------ Warning opts -------------------------------------------------
   , flagA "W"      (NoArg (mapM_ setWarningFlag minusWOpts))

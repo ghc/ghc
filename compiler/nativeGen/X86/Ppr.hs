@@ -574,6 +574,8 @@ pprInstr platform (XOR FF32 src dst) = pprOpOp platform (sLit "xorps") FF32 src 
 pprInstr platform (XOR FF64 src dst) = pprOpOp platform (sLit "xorpd") FF64 src dst
 pprInstr platform (XOR size src dst) = pprSizeOpOp platform (sLit "xor")  size src dst
 
+pprInstr platform (POPCNT size src dst) = pprOpOp platform (sLit "popcnt") size src (OpReg dst)
+
 pprInstr platform (NOT size op) = pprSizeOp platform (sLit "not") size op
 pprInstr platform (NEGI size op) = pprSizeOp platform (sLit "neg") size op
 

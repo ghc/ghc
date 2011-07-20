@@ -374,6 +374,12 @@ emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] live =
 emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] live =
     doCopyMutableByteArrayOp src src_off dst dst_off n live
 
+-- Population count
+emitPrimOp [res] PopCnt8Op [w] live = emitPopCntCall res w W8 live
+emitPrimOp [res] PopCnt16Op [w] live = emitPopCntCall res w W16 live
+emitPrimOp [res] PopCnt32Op [w] live = emitPopCntCall res w W32 live
+emitPrimOp [res] PopCnt64Op [w] live = emitPopCntCall res w W64 live
+emitPrimOp [res] PopCntOp [w] live = emitPopCntCall res w wordWidth live
 
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg] _
@@ -908,3 +914,14 @@ emitAllocateCall res cap n live = do
   where
     allocate = CmmLit (CmmLabel (mkForeignLabel (fsLit "allocate") Nothing
                                  ForeignLabelInExternalPackage IsFunction))
+
+emitPopCntCall :: LocalReg -> CmmExpr -> Width -> StgLiveVars -> Code
+emitPopCntCall res x width live = do
+    vols <- getVolatileRegs live
+    emitForeignCall' PlayRisky
+        [CmmHinted res NoHint]
+        (CmmPrim (MO_PopCnt width))
+        [(CmmHinted x NoHint)]
+        (Just vols)
+        NoC_SRT -- No SRT b/c we do PlayRisky
+        CmmMayReturn

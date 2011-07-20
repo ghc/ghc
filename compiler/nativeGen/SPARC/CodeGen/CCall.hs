@@ -13,6 +13,7 @@ import SPARC.Instr
 import SPARC.Imm
 import SPARC.Regs
 import SPARC.Base
+import CPrim
 import NCGMonad
 import PIC
 import Instruction
@@ -331,6 +332,8 @@ outOfLineMachOp_table mop
         MO_Memcpy    -> fsLit "memcpy"
         MO_Memset    -> fsLit "memset"
         MO_Memmove   -> fsLit "memmove"
+
+        MO_PopCnt w  -> fsLit $ popCntLabel w
 
 	_ -> pprPanic "outOfLineMachOp(sparc): Unknown callish mach op "
               		(pprCallishMachOp mop)

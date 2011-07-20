@@ -310,6 +310,8 @@ data Instr
                           	 --       call 1f
                           	 -- 1:    popl %reg
 	
+    -- SSE4.2
+    | POPCNT      Size Operand Reg -- src, dst
 
 data Operand
 	= OpReg  Reg	        -- register
@@ -402,6 +404,8 @@ x86_regUsageOfInstr instr
 
     COMMENT _		-> noUsage
     DELTA   _           -> noUsage
+
+    POPCNT _ src dst -> mkRU (use_R src) [dst]
 
     _other		-> panic "regUsage: unrecognised instr"
 
@@ -538,6 +542,8 @@ x86_patchRegsOfInstr instr env
     JXX _ _		-> instr
     JXX_GBL _ _		-> instr
     CLTD _		-> instr
+
+    POPCNT sz src dst -> POPCNT sz (patchOp src) (env dst)
 
     _other		-> panic "patchRegs: unrecognised instr"
 

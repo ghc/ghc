@@ -497,6 +497,7 @@ Library
             RegClass
             PIC
             Platform
+            CPrim
             X86.Regs
             X86.RegInfo
             X86.Instr

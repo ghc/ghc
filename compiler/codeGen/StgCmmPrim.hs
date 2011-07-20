@@ -443,6 +443,13 @@ emitPrimOp [] CopyByteArrayOp [src,src_off,dst,dst_off,n] =
 emitPrimOp [] CopyMutableByteArrayOp [src,src_off,dst,dst_off,n] =
     doCopyMutableByteArrayOp src src_off dst dst_off n
 
+-- Population count
+emitPrimOp [res] PopCnt8Op [w] = emitPopCntCall res w W8
+emitPrimOp [res] PopCnt16Op [w] = emitPopCntCall res w W16
+emitPrimOp [res] PopCnt32Op [w] = emitPopCntCall res w W32
+emitPrimOp [res] PopCnt64Op [w] = emitPopCntCall res w W64
+emitPrimOp [res] PopCntOp [w] = emitPopCntCall res w wordWidth
+
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg]
    | nopOp op
@@ -940,3 +947,10 @@ emitAllocateCall res cap n = do
   where
     allocate = CmmLit (CmmLabel (mkForeignLabel (fsLit "allocate") Nothing
                                  ForeignLabelInExternalPackage IsFunction))
+
+emitPopCntCall :: LocalReg -> CmmExpr -> Width -> FCode ()
+emitPopCntCall res x width = do
+    emitPrimCall
+        [ res ]
+        (MO_PopCnt width)
+        [ x ]

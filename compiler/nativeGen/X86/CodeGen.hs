@@ -28,6 +28,7 @@ import X86.Instr
 import X86.Cond
 import X86.Regs
 import X86.RegInfo
+import CPrim
 import Instruction
 import PIC
 import NCGMonad
@@ -70,8 +71,13 @@ sse2Enabled = do
                     -- calling convention specifies the use of xmm regs,
                     -- and possibly other places.
                     return True
-      ArchX86    -> return (dopt Opt_SSE2 dflags)
+      ArchX86    -> return (dopt Opt_SSE2 dflags || dopt Opt_SSE4_2 dflags)
       _          -> panic "sse2Enabled: Not an X86* arch"
+
+sse4_2Enabled :: NatM Bool
+sse4_2Enabled = do
+  dflags <- getDynFlagsNat
+  return (dopt Opt_SSE4_2 dflags)
 
 if_sse2 :: NatM a -> NatM a -> NatM a
 if_sse2 sse2 x87 = do
@@ -1574,6 +1580,26 @@ genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
         -- write barrier compiles to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
+genCCall (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
+         args@[CmmHinted src _] = do
+    sse4_2 <- sse4_2Enabled
+    if sse4_2
+        then do code_src <- getAnyReg src
+                src_r <- getNewRegNat size
+                return $ code_src src_r `appOL`
+                    (if width == W8 then
+                         -- The POPCNT instruction doesn't take a r/m8
+                         unitOL (MOVZxL II8 (OpReg src_r) (OpReg src_r)) `appOL`
+                         unitOL (POPCNT II16 (OpReg src_r)
+                                 (getRegisterReg False (CmmLocal dst)))
+                     else
+                         unitOL (POPCNT size (OpReg src_r)
+                                 (getRegisterReg False (CmmLocal dst))))
+        else genCCall (CmmCallee (fn width) CCallConv) dest_regs args
+  where size = intSize width
+        fn w = CmmLit (CmmLabel (mkForeignLabel (fsLit (popCntLabel w)) Nothing
+                                 ForeignLabelInExternalPackage IsFunction))
+
 genCCall target dest_regs args =
     do dflags <- getDynFlagsNat
        if target32Bit (targetPlatform dflags)
@@ -1989,6 +2015,8 @@ outOfLineCmmOp mop res args
               MO_Memcpy    -> fsLit "memcpy"
               MO_Memset    -> fsLit "memset"
               MO_Memmove   -> fsLit "memmove"
+
+              MO_PopCnt _  -> fsLit "popcnt"
 
               other -> panic $ "outOfLineCmmOp: unmatched op! (" ++ show other ++ ")"
 
