@@ -25,3 +25,10 @@ test('T3001-2',
 test('scc001', [expect_broken(4414), req_profiling],
      run_command, ['$MAKE -s --no-print-directory scc001'])
 
+
+test('5314',
+     composes([only_ways(prof_ways + extra_prof_ways),
+               extra_ways(extra_prof_ways),
+               req_profiling]),
+     compile_and_run,
+     [''])
