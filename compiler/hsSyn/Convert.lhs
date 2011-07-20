@@ -630,7 +630,6 @@ cvtp (TH.LitP l)
 cvtp (TH.VarP s)      = do { s' <- vName s; return $ Hs.VarPat s' }
 cvtp (TupP [p])       = cvtp p
 cvtp (TupP ps)        = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
-cvtp (UnboxedTupP [p]) = cvtp p
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed void }
 cvtp (ConP s ps)      = do { s' <- cNameL s; ps' <- cvtPats ps; return $ ConPatIn s' (PrefixCon ps') }
 cvtp (InfixP p1 s p2) = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -708,8 +707,6 @@ cvtType ty
              -> if n==1 then return (head tys')	-- Singleton tuples treated
                                                 -- like nothing (ie just parens)
                         else returnL (HsTupleTy Unboxed tys')
-             | n == 1
-             -> failWith (ptext (sLit "Illegal 1-unboxed-tuple type constructor"))
              | otherwise
              -> mk_apps (HsTyVar (getRdrName (tupleTyCon Unboxed n))) tys'
            ArrowT 
