@@ -307,7 +307,7 @@ p = subprocess.Popen([config.compiler, "--print-libdir"], stdout=subprocess.PIPE
 libdir = chop(p.stdout.read())
 p.stdout.close
 
-test('5313', extra_run_opts(libdir), compile_and_run, ['-package ghc'])
+test('5313', extra_run_opts('"' + libdir + '"'), compile_and_run, ['-package ghc'])
 
 test('2464', normal, compile, [''])
 test('3674', ignore_output, run_command, 
