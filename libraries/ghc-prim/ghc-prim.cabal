@@ -42,6 +42,7 @@ Library {
     c-sources:
         cbits/debug.c
         cbits/longlong.c
+        cbits/popcnt.c
     extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes,
                 UnboxedTuples, EmptyDataDecls, NoImplicitPrelude
     -- We need to set the package name to ghc-prim (without a version number)
