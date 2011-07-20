@@ -1443,9 +1443,9 @@ delete_threads_and_gc:
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     waiting_for_gc = 0;
-    GarbageCollect(force_major || heap_census, gc_type, cap);
+    GarbageCollect(force_major || heap_census, heap_census, gc_type, cap);
 #else
-    GarbageCollect(force_major || heap_census, 0, cap);
+    GarbageCollect(force_major || heap_census, heap_census, 0, cap);
 #endif
     traceEventGcEnd(cap);
 
@@ -1473,10 +1473,9 @@ delete_threads_and_gc:
     ASSERT(checkSparkCountInvariant());
 #endif
 
+    // The heap census itself is done during GarbageCollect().
     if (heap_census) {
-        debugTrace(DEBUG_sched, "performing heap census");
-        heapCensus();
-	performHeapProfile = rtsFalse;
+        performHeapProfile = rtsFalse;
     }
 
 #if defined(THREADED_RTS)
