@@ -182,4 +182,5 @@ test('T5126', normal, compile, ['-v0'])
 test('T5217', normal, compile, ['-v0 -dsuppress-uniques -ddump-splices'])
 test('T5037', normal, compile, ['-v0'])
 test('TH_unboxedSingleton', normal, compile, ['-v0'])
+test('T5290', normal, compile, ['-v0 -ddump-splices'])
 
