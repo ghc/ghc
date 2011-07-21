@@ -16,6 +16,6 @@ test('Dep09', normal, compile, [''])
 test('Dep10', normal, compile, [''])
 
 test('BadImport01', normal, compile_fail, [''])
-test('BadImport02', normal, compile_and_run, ['--make'])
-test('BadImport03', normal, compile_fail, ['--make'])
+test('BadImport02', normal, multimod_compile_and_run, ['BadImport02', ''])
+test('BadImport03', normal, multimod_compile_fail, ['BadImport03', ''])
 
