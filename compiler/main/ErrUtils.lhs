@@ -312,5 +312,4 @@ showPass dflags what
 debugTraceMsg :: DynFlags -> Int -> Message -> IO ()
 debugTraceMsg dflags val msg
   = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
-
 \end{code}
