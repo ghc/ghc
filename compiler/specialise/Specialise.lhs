@@ -1138,6 +1138,9 @@ specCalls subst rules_for_me calls_for_me fn rhs
 		-- Add a suitable unfolding if the spec_inl_prag says so
 		-- See Note [Inline specialisations]
 		spec_inl_prag 
+		  | not is_local && isStrongLoopBreaker (idOccInfo fn)
+                  = neverInlinePragma	-- See Note [Specialising imported functions] in OccurAnal
+                  | otherwise	
 		  = case inl_prag of
                        InlinePragma { inl_inline = Inlinable } 
                           -> inl_prag { inl_inline = EmptyInlineSpec }

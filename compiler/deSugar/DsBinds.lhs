@@ -517,8 +517,11 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let spec_id  = mkLocalId spec_name spec_ty 
          	            `setInlinePragma` inl_prag
          	 	    `setIdUnfolding`  spec_unf
-             inl_prag | isDefaultInlinePragma spec_inl = idInlinePragma poly_id
-         	      | otherwise                      = spec_inl
+             inl_prag | not (isDefaultInlinePragma spec_inl)    = spec_inl
+         	      | not is_local_id  -- See Note [Specialising imported functions]
+		      	    		 -- in OccurAnal
+                      , isStrongLoopBreaker (idOccInfo poly_id) = neverInlinePragma
+		      | otherwise                               = idInlinePragma poly_id
        	      -- Get the INLINE pragma from SPECIALISE declaration, or,
               -- failing that, from the original Id
 
