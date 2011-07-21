@@ -51,6 +51,7 @@ import VarSet
 import Var
 import TcType
 import Coercion
+import Maybes( orElse )
 import Util
 import BasicTypes( Activation )
 import Outputable
@@ -443,13 +444,15 @@ idUnfoldingVars :: Id -> VarSet
 -- and we'll get exponential behaviour if we look at both unf and rhs!
 -- But do look at the *real* unfolding, even for loop breakers, else
 -- we might get out-of-scope variables
-idUnfoldingVars id = stableUnfoldingVars (realIdUnfolding id)
+idUnfoldingVars id = stableUnfoldingVars isLocalId (realIdUnfolding id) `orElse` emptyVarSet
 
-stableUnfoldingVars :: Unfolding -> VarSet
-stableUnfoldingVars (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-  | isStableSource src                       = exprFreeVars rhs
-stableUnfoldingVars (DFunUnfolding _ _ args) = exprsFreeVars args
-stableUnfoldingVars _                        = emptyVarSet
+stableUnfoldingVars :: InterestingVarFun -> Unfolding -> Maybe VarSet
+stableUnfoldingVars fv_cand unf
+  = case unf of
+      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
+         | isStableSource src -> Just (exprSomeFreeVars fv_cand rhs)
+      DFunUnfolding _ _ args  -> Just (exprsSomeFreeVars fv_cand args)
+      _other                  -> Nothing
 \end{code}
 
 
