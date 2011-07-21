@@ -1609,16 +1609,28 @@ setCmd ""
    	   ))
        dflags <- getDynFlags
        liftIO $ putStrLn (showSDoc (
-          vcat (text "GHCi-specific dynamic flag settings:" 
-               :map (flagSetting dflags) ghciFlags)
+          text "GHCi-specific dynamic flag settings:" $$
+              nest 2 (vcat (map (flagSetting dflags) ghciFlags))
           ))
        liftIO $ putStrLn (showSDoc (
-          vcat (text "other dynamic, non-language, flag settings:" 
-               :map (flagSetting dflags) others)
+          text "other dynamic, non-language, flag settings:" $$
+              nest 2 (vcat (map (flagSetting dflags) others))
           ))
+       liftIO $ putStrLn (showSDoc (
+          text "warning settings:" $$
+              nest 2 (vcat (map (warnSetting dflags) DynFlags.fWarningFlags))
+          ))
+
   where flagSetting dflags (str, _, f, _)
-          | dopt f dflags = text "  " <> text "-f"    <> text str
-          | otherwise     = text "  " <> text "-fno-" <> text str
+          | dopt f dflags = fstr str
+          | otherwise     = fnostr str
+        warnSetting dflags (str, _, f, _)
+          | wopt f dflags = fstr str
+          | otherwise     = fnostr str
+
+        fstr   str = text "-f"    <> text str
+        fnostr str = text "-fno-" <> text str
+
         (ghciFlags,others)  = partition (\(_, _, f, _) -> f `elem` flags)
                                         DynFlags.fFlags
         flags = [Opt_PrintExplicitForalls
