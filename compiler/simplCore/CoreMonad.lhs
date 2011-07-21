@@ -11,7 +11,7 @@ module CoreMonad (
     CoreToDo(..), runWhen, runMaybe,
     SimplifierMode(..),
     FloatOutSwitches(..),
-    dumpSimplPhase,
+    dumpSimplPhase, pprPassDetails, 
 
     defaultGentleSimplToDo,
     
@@ -41,7 +41,7 @@ module CoreMonad (
     getAnnotations, getFirstAnnotations,
     
     -- ** Debug output
-    showPass, endPass, endIteration, dumpIfSet,
+    showPass, endPass, dumpPassResult, lintPassResult, dumpIfSet,
 
     -- ** Screen output
     putMsg, putMsgS, errorMsg, errorMsgS, 
@@ -118,48 +118,52 @@ showPass :: DynFlags -> CoreToDo -> IO ()
 showPass dflags pass = Err.showPass dflags (showSDoc (ppr pass))
 
 endPass :: DynFlags -> CoreToDo -> [CoreBind] -> [CoreRule] -> IO ()
-endPass dflags pass = dumpAndLint dflags True pass empty (coreDumpFlag pass)
-
--- Same as endPass but doesn't dump Core even with -dverbose-core2core
-endIteration :: DynFlags -> CoreToDo -> Int -> [CoreBind] -> [CoreRule] -> IO ()
-endIteration dflags pass n
-  = dumpAndLint dflags False pass (ptext (sLit "iteration=") <> int n)
-                (Just Opt_D_dump_simpl_iterations)
+endPass dflags pass binds rules
+  = do { dumpPassResult dflags mb_flag (ppr pass) empty binds rules
+       ; lintPassResult dflags pass binds }      
+  where
+    mb_flag = case coreDumpFlag pass of
+                Just dflag | dopt dflag dflags                   -> Just dflag
+                           | dopt Opt_D_verbose_core2core dflags -> Just dflag
+                _ -> Nothing
 
 dumpIfSet :: Bool -> CoreToDo -> SDoc -> SDoc -> IO ()
 dumpIfSet dump_me pass extra_info doc
   = Err.dumpIfSet dump_me (showSDoc (ppr pass <+> extra_info)) doc
 
-dumpAndLint :: DynFlags -> Bool -> CoreToDo -> SDoc -> Maybe DynFlag
-            -> [CoreBind] -> [CoreRule] -> IO ()
--- The "show_all" parameter says to print dump if -dverbose-core2core is on
-dumpAndLint dflags show_all pass extra_info mb_dump_flag binds rules
-  = do {  -- Report result size if required
+dumpPassResult :: DynFlags 
+               -> Maybe DynFlag		-- Just df => show details in a file whose
+	       	  			--            name is specified by df
+               -> SDoc 			-- Header
+               -> SDoc 			-- Extra info to appear after header
+               -> [CoreBind] -> [CoreRule] 
+               -> IO ()
+dumpPassResult dflags mb_flag hdr extra_info binds rules
+  | Just dflag <- mb_flag
+  = Err.dumpSDoc dflags dflag (showSDoc hdr) dump_doc
+
+  | otherwise
+  = Err.debugTraceMsg dflags 2 $
+    (text "Result size of" <+> hdr <+> equals <+> int (coreBindsSize binds))
+          -- Report result size 
 	  -- This has the side effect of forcing the intermediate to be evaluated
-       ; Err.debugTraceMsg dflags 2 $
-		(text "    Result size =" <+> int (coreBindsSize binds))
 
-	-- Report verbosely, if required
-       ; let pass_name = showSDoc (ppr pass <+> extra_info)
-             dump_doc  = pprCoreBindings binds 
-                         $$ ppUnless (null rules) pp_rules
-
-       ; case mb_dump_flag of
-            Nothing        -> return ()
-            Just dump_flag -> Err.dumpIfSet_dyn_or dflags dump_flags pass_name dump_doc
-               where
-                 dump_flags | show_all  = [dump_flag, Opt_D_verbose_core2core]
-		 	    | otherwise = [dump_flag] 
-
-	-- Type check
-       ; when (dopt Opt_DoCoreLinting dflags) $
-         do { let (warns, errs) = lintCoreBindings binds
-            ; Err.showPass dflags ("Core Linted result of " ++ pass_name)
-            ; displayLintResults dflags pass warns errs binds  } }
   where
+    dump_doc  = vcat [ text "Result size =" <+> int (coreBindsSize binds)
+                     , extra_info
+		     , blankLine
+                     , pprCoreBindings binds 
+                     , ppUnless (null rules) pp_rules ]
     pp_rules = vcat [ blankLine
                     , ptext (sLit "------ Local rules for imported ids --------")
                     , pprRules rules ]
+
+lintPassResult :: DynFlags -> CoreToDo -> [CoreBind] -> IO ()
+lintPassResult dflags pass binds
+  = when (dopt Opt_DoCoreLinting dflags) $
+    do { let (warns, errs) = lintCoreBindings binds
+       ; Err.showPass dflags ("Core Linted result of " ++ showSDoc (ppr pass))
+       ; displayLintResults dflags pass warns errs binds  }
 
 displayLintResults :: DynFlags -> CoreToDo
                    -> Bag Err.Message -> Bag Err.Message -> [CoreBind]
@@ -263,9 +267,7 @@ coreDumpFlag CoreDoGlomBinds         = Nothing
 coreDumpFlag (CoreDoPasses {})       = Nothing
 
 instance Outputable CoreToDo where
-  ppr (CoreDoSimplify n md)  = ptext (sLit "Simplifier")
-                               <+> ppr md
-                                 <+> ptext (sLit "max-iterations=") <> int n
+  ppr (CoreDoSimplify _ _)     = ptext (sLit "Simplifier")
   ppr (CoreDoPluginPass s _)   = ptext (sLit "Core plugin: ") <+> text s
   ppr CoreDoFloatInwards       = ptext (sLit "Float inwards")
   ppr (CoreDoFloatOutwards f)  = ptext (sLit "Float out") <> parens (ppr f)
@@ -285,6 +287,10 @@ instance Outputable CoreToDo where
   ppr CoreDoGlomBinds          = ptext (sLit "Glom binds")
   ppr CoreDoNothing            = ptext (sLit "CoreDoNothing")
   ppr (CoreDoPasses {})        = ptext (sLit "CoreDoPasses")
+
+pprPassDetails :: CoreToDo -> SDoc
+pprPassDetails (CoreDoSimplify n md) = ppr md <+> ptext (sLit "max-iterations=") <> int n
+pprPassDetails _ = empty
 \end{code}
 
 \begin{code}
