@@ -21,7 +21,7 @@ import Type
 import Id
 import OccName
 import DynFlags
-import BasicTypes           ( isLoopBreaker )
+import BasicTypes           ( isStrongLoopBreaker )
 import Outputable
 import Util                 ( zipLazy )
 import MonadUtils
@@ -273,8 +273,7 @@ vectTopRhs recFs var expr
     rhs False         Nothing                         -- Case (3)
       = do { let fvs = freeVars expr
            ; (inline, isScalar, vexpr) <- inBind var $
-                                            vectPolyExpr (isLoopBreaker $ idOccInfo var) recFs fvs
-					    	-- Maybe isNonRuleLoopBreaker?
+                                          vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs fvs
            ; return (inline, isScalar, vectorised vexpr)
            }
 

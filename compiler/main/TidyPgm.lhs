@@ -708,7 +708,7 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
     idinfo	   = idInfo id
     show_unfold    = show_unfolding (unfoldingInfo idinfo)
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
-    loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
+    loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
 
 	-- Stuff to do with the Id's unfolding

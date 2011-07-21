@@ -182,7 +182,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
         -- Check whether binder's specialisations contain any out-of-scope variables
        ; mapM_ (checkBndrIdInScope binder) bndr_vars 
 
-       ; when (isNonRuleLoopBreaker (idOccInfo binder) && isInlinePragma (idInlinePragma binder))
+       ; when (isStrongLoopBreaker (idOccInfo binder) && isInlinePragma (idInlinePragma binder))
               (addWarnL (ptext (sLit "INLINE binder is (non-rule) loop breaker:") <+> ppr binder))
 	      -- Only non-rule loop breakers inhibit inlining
 

@@ -30,7 +30,7 @@ import Var
 import VarEnv
 import VarSet
 import Id
-import BasicTypes( isLoopBreaker )
+import BasicTypes( isStrongLoopBreaker )
 import Literal
 import TysWiredIn
 import TysPrim
@@ -153,7 +153,7 @@ vectExpr (_, AnnLet (AnnRec bs) body)
     vect_rhs bndr rhs = localV
                       . inBind bndr
                       . liftM (\(_,_,z)->z)
-                      $ vectPolyExpr (isLoopBreaker $ idOccInfo bndr) [] rhs
+                      $ vectPolyExpr (isStrongLoopBreaker $ idOccInfo bndr) [] rhs
 
 vectExpr e@(_, AnnLam bndr _)
   | isId bndr = liftM (\(_,_,z) ->z) $ vectFnExpr True False [] e
