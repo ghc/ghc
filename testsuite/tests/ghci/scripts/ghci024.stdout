@@ -3,6 +3,7 @@ options currently set: none.
 GHCi-specific dynamic flag settings:
   -fno-print-explicit-foralls
 other dynamic, non-language, flag settings:
+warning settings:
   -fno-warn-implicit-prelude
 ~~~~~~~~~~ Testing :show languages
 active language flags:
