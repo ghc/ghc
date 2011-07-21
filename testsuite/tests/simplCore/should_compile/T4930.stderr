@@ -1,5 +1,7 @@
 
 ==================== Tidy Core ====================
+Result size = 23
+
 lvl :: [GHC.Types.Char]
 [GblId]
 lvl = GHC.CString.unpackCString# "Too small"

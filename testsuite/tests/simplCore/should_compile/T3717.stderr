@@ -1,5 +1,7 @@
 
 ==================== Tidy Core ====================
+Result size = 22
+
 Rec {
 T3717.$wfoo [Occ=LoopBreaker] :: GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType L]

@@ -1,5 +1,7 @@
 
 ==================== Tidy Core ====================
+Result size = 26
+
 Rec {
 xs :: GHC.Prim.Int# -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=DmdType L]
