@@ -16,4 +16,7 @@ test('SafeLang09', exit_code(1), compile_and_run, [''])
 test('SafeLang10', normal, compile_fail, ['--make -trust base'])
 test('SafeLang11', req_interp, compile_and_run, ['--make -trust base'])
 test('SafeLang12', normal, compile_fail, ['--make -trust base'])
+test('SafeLang13', normal, compile_and_run, ['--make -trust base'])
+test('SafeLang14', normal, compile_fail, ['--make -trust base -XSafe'])
+test('SafeLang15', exit_code(1), compile_and_run, ['--make -trust base -XSafe'])
 
