@@ -66,8 +66,8 @@ provider HaskellEvent {
   probe capset__remove__cap(EventCapsetID, EventCapNo);
 
   probe spark__counters(EventCapNo,
-                        StgWord, StgWord, StgWord
-                        StgWord, StgWord, StgWord
+                        StgWord, StgWord, StgWord,
+                        StgWord, StgWord, StgWord,
                         StgWord);
 
   probe spark__create   (EventCapNo);

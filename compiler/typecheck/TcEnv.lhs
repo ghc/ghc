@@ -60,12 +60,10 @@ import TcType
 import TcIface	
 import PrelNames
 import TysWiredIn
--- import qualified Type
 import Id
 import Coercion
 import Var
 import VarSet
--- import VarEnv
 import RdrName
 import InstEnv
 import FamInstEnv

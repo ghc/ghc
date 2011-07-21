@@ -498,7 +498,7 @@ Note [Global Ids in the substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We look up even a global (eg imported) Id in the substitution. Consider
    case X.g_34 of b { (a,b) ->  ... case X.g_34 of { (p,q) -> ...} ... }
-The binder-swap in the occurence analyser will add a binding
+The binder-swap in the occurrence analyser will add a binding
 for a LocalId version of g (with the same unique though):
    case X.g_34 of b { (a,b) ->  let g_34 = b in 
 				... case X.g_34 of { (p,q) -> ...} ... }

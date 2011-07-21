@@ -737,12 +737,17 @@ loadModule tcm = do
                          return (Just l)
                      _otherwise -> return Nothing
                                                 
+   let source_modified | isNothing mb_linkable = SourceModified
+                       | otherwise             = SourceUnmodified
+                       -- we can't determine stability here
+
    -- compile doesn't change the session
    hsc_env <- getSession
    mod_info <- liftIO $ compile' (hscNothingBackendOnly     tcg,
                                   hscInteractiveBackendOnly tcg,
                                   hscBatchBackendOnly       tcg)
                                   hsc_env ms 1 1 Nothing mb_linkable
+                                  source_modified
 
    modifySession $ \e -> e{ hsc_HPT = addToUFM (hsc_HPT e) mod mod_info }
    return tcm
@@ -932,6 +937,8 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
 	then return Nothing
 	else -} liftIO $ getPackageModuleInfo hsc_env mdl
+   -- ToDo: we don't understand what the following comment means.
+   --    (SDM, 19/7/2011)
    -- getPackageModuleInfo will attempt to find the interface, so
    -- we don't want to call it for a home module, just in case there
    -- was a problem loading the module and the interface doesn't

@@ -61,7 +61,8 @@ deSugar hsc_env
 		    	    tcg_imports      = imports,
 		    	    tcg_exports      = exports,
 			    tcg_keep	     = keep_var,
-		    	    tcg_rdr_env      = rdr_env,
+                            tcg_th_splice_used = tc_splice_used,
+                            tcg_rdr_env      = rdr_env,
 		    	    tcg_fix_env      = fix_env,
 		    	    tcg_inst_env     = inst_env,
 		    	    tcg_fam_inst_env = fam_inst_env,
@@ -138,7 +139,7 @@ deSugar hsc_env
                      , pprRules rules_for_imps ])
 
         ; (ds_binds, ds_rules_for_imps, ds_vects) 
-            <- simpleOptPgm dflags final_pgm rules_for_imps vects0
+            <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
                          -- The simpleOptPgm gets rid of type 
                          -- bindings plus any stupid dead code
 
@@ -147,13 +148,16 @@ deSugar hsc_env
         ; let used_names = mkUsedNames tcg_env
         ; deps <- mkDependencies tcg_env
 
-        ; let mod_guts = ModGuts {	
+        ; used_th <- readIORef tc_splice_used
+
+        ; let mod_guts = ModGuts {
 		mg_module    	= mod,
 		mg_boot	     	= isHsBoot hsc_src,
 		mg_exports   	= exports,
 		mg_deps	     	= deps,
 		mg_used_names   = used_names,
-		mg_dir_imps  	= imp_mods imports,
+                mg_used_th      = used_th,
+                mg_dir_imps     = imp_mods imports,
 	        mg_rdr_env   	= rdr_env,
 		mg_fix_env   	= fix_env,
 		mg_warns   	= warns,

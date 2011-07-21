@@ -1812,18 +1812,35 @@ the same as the omitted field names.
 
 <listitem><para>
 The "<literal>..</literal>" expands to the missing
-<emphasis>in-scope</emphasis> record fields, where "in scope"
-includes both unqualified and qualified-only.
-Any fields that are not in scope are not filled in.  For example
+<emphasis>in-scope</emphasis> record fields.  
+Specifically the expansion of "<literal>C {..}</literal>" includes
+<literal>f</literal> if and only if:
+<itemizedlist>
+<listitem><para>
+<literal>f</literal> is a record field of constructor <literal>C</literal>.
+</para></listitem>
+<listitem><para>
+The record field <literal>f</literal> is in scope somehow (either qualified or unqualified).
+</para></listitem>
+<listitem><para>
+In the case of expressions (but not patterns), 
+the variable <literal>f</literal> is in scope unqualified, 
+apart from the binding of the record selector itself.
+</para></listitem>
+</itemizedlist>
+For example
 <programlisting>
 module M where
   data R = R { a,b,c :: Int }
 module X where
-  import qualified M( R(a,b) )
-  f a b = R { .. }
+  import M( R(a,c) )
+  f b = R { .. }
 </programlisting>
-The <literal>{..}</literal> expands to <literal>{M.a=a,M.b=b}</literal>,
-omitting <literal>c</literal> since it is not in scope at all.
+The <literal>R{..}</literal> expands to <literal>R{M.a=a}</literal>,
+omitting <literal>b</literal> since the record field is not in scope,
+and omitting <literal>c</literal> since the variable <literal>c</literal>
+is not in scope (apart from the binding of the 
+record selector <literal>c</literal>, of course).
 </para></listitem>
 </itemizedlist>
 </para>

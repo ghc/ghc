@@ -47,7 +47,8 @@ import Name
 import NameSet
 import RdrName
 import BasicTypes
-import ListSetOps	( removeDups, minusList )
+import Util		( notNull )
+import ListSetOps	( removeDups )
 import Outputable
 import SrcLoc
 import FastString
@@ -468,15 +469,13 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
             Nothing  -> ptext (sLit "constructor field name")
             Just con -> ptext (sLit "field of constructor") <+> quotes (ppr con)
 
-    name_to_arg (L loc n) = L loc (mk_arg (mkRdrUnqual (nameOccName n)))
-
     rn_fld pun_ok parent (HsRecField { hsRecFieldId = fld
                        	      	     , hsRecFieldArg = arg
                        	      	     , hsRecPun = pun })
-      = do { fld' <- wrapLocM (lookupSubBndr parent doc) fld
+      = do { fld'@(L loc fld_nm) <- wrapLocM (lookupSubBndr parent doc) fld
            ; arg' <- if pun 
                      then do { checkErr pun_ok (badPun fld)
-                             ; return (name_to_arg fld') }
+                             ; return (L loc (mk_arg (mkRdrUnqual (nameOccName fld_nm)))) }
                      else return arg
            ; return (HsRecField { hsRecFieldId = fld'
                                 , hsRecFieldArg = arg'
@@ -491,30 +490,54 @@ rnHsRecFields1 ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot }
         do { loc <- getSrcSpanM	-- Rather approximate
            ; dd_flag <- xoptM Opt_RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)
-
+	   ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
            ; let present_flds = getFieldIds flds
-                 absent_flds  = con_fields `minusList` present_flds
+                 parent_tc = find_tycon rdr_env con
                  extras = [ HsRecField
-                              { hsRecFieldId = L loc f
-                              , hsRecFieldArg = name_to_arg (L loc f)
+                              { hsRecFieldId = loc_f
+                              , hsRecFieldArg = L loc (mk_arg arg_rdr)
                               , hsRecPun = False }
-                          | f <- absent_flds ]
+                          | f <- con_fields
+			  , let loc_f = L loc f 
+			        arg_rdr = mkRdrUnqual (nameOccName f)
+			  , not (f `elem` present_flds)
+			  , fld_in_scope f
+                          , case ctxt of
+                              HsRecFieldCon {} -> arg_in_scope arg_rdr
+                              _other           -> True ]
+
+                   -- Only fill in fields whose selectors are in scope (somehow)
+	         fld_in_scope fld = not (null (lookupGRE_Name rdr_env fld))
+
+                   -- For constructor uses, the arg should be in scope (unqualified)
+		   -- ignoring the record field itself
+		   -- Eg.  data R = R { x,y :: Int }
+                   --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
+		 arg_in_scope rdr = rdr `elemLocalRdrEnv` lcl_env
+                                 || notNull [ gre | gre <- lookupGRE_RdrName rdr rdr_env
+                                                  , case gre_par gre of
+                                                      ParentIs p -> p /= parent_tc
+                                                      _          -> True ]
 
            ; return (flds ++ extras) }
 
     check_disambiguation :: Bool -> Maybe Name -> RnM Parent
-    -- When disambiguation is on, return the parent *type constructor*
-    -- That is, the parent of the data constructor.  That's the parent
-    -- to use for looking up record fields.
+    -- When disambiguation is on, 
     check_disambiguation disambig_ok mb_con
       | disambig_ok, Just con <- mb_con
-      = do { env <- getGlobalRdrEnv
-           ; return (case lookupGRE_Name env con of
-	       	       [gre] -> gre_par gre
-               	       gres  -> WARN( True, ppr con <+> ppr gres ) NoParent) }
+      = do { env <- getGlobalRdrEnv; return (ParentIs (find_tycon env con)) }
       | otherwise = return NoParent
  
+    find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Name {- TyCon -}
+    -- Return the parent *type constructor* of the data constructor
+    -- That is, the parent of the data constructor.  
+    -- That's the parent to use for looking up record fields.
+    find_tycon env con 
+      = case lookupGRE_Name env con of
+	  [GRE { gre_par = ParentIs p }] -> p
+          gres  -> pprPanic "find_tycon" (ppr con $$ ppr gres)
+
     dup_flds :: [[RdrName]]
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
