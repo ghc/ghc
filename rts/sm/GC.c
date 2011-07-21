@@ -668,7 +668,9 @@ GarbageCollect (rtsBool force_major_gc,
   // behind.
   if (do_heap_census) {
       debugTrace(DEBUG_sched, "performing heap census");
+      RELEASE_SM_LOCK;
       heapCensus();
+      ACQUIRE_SM_LOCK;
   }
 
   // send exceptions to any threads which were about to die
