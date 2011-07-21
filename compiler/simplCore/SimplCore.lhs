@@ -706,13 +706,18 @@ simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
 -------------------
 end_iteration :: DynFlags -> CoreToDo -> Int 
              -> SimplCount -> [CoreBind] -> [CoreRule] -> IO ()
--- Same as endIteration but with simplifier counts
 end_iteration dflags pass iteration_no counts binds rules
-  = do { dumpIfSet (dopt Opt_D_dump_simpl_iterations dflags)
-                   pass (ptext (sLit "Simplifier counts"))
-		   (pprSimplCount counts)
+  = do { dumpPassResult dflags mb_flag hdr pp_counts binds rules
+       ; lintPassResult dflags pass binds }
+  where
+    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases 
+    	    | otherwise			       	      = Nothing
+	    -- Show details if Opt_D_dump_simpl_iterations is on
 
-       ; endIteration dflags pass iteration_no binds rules }
+    hdr = ptext (sLit "Simplifier iteration=") <> int iteration_no
+    pp_counts = vcat [ ptext (sLit "---- Simplifier counts for") <+> hdr
+ 		     , pprSimplCount counts
+                     , ptext (sLit "---- End of simplifier counts for") <+> hdr ]
 \end{code}
 
 
