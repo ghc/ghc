@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface,InterruptibleFFI #-}
 {-# OPTIONS -cpp #-}
 module Main where
 
