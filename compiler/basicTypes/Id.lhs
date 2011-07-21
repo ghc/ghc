@@ -508,8 +508,8 @@ isStrictId id
 idUnfolding :: Id -> Unfolding
 -- Do not expose the unfolding of a loop breaker!
 idUnfolding id 
-  | isNonRuleLoopBreaker (occInfo info) = NoUnfolding
-  | otherwise                           = unfoldingInfo info
+  | isStrongLoopBreaker (occInfo info) = NoUnfolding
+  | otherwise                          = unfoldingInfo info
   where
     info = idInfo id
 

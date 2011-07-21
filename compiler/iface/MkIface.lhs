@@ -1531,7 +1531,7 @@ toIfaceIdInfo id_info
 
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info) 
-    loop_breaker  = isNonRuleLoopBreaker (occInfo id_info)
+    loop_breaker  = isStrongLoopBreaker (occInfo id_info)
 					
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info

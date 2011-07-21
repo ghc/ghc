@@ -40,7 +40,7 @@ import TyCon
 import DataCon
 import TysWiredIn
 import TysPrim          ( anyTyConOfKind )
-import BasicTypes       ( Arity, nonRuleLoopBreaker )
+import BasicTypes       ( Arity, strongLoopBreaker )
 import qualified Var
 import VarEnv
 import VarSet
@@ -1055,7 +1055,7 @@ tcIdInfo ignore_prags name ty info
 	-- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf) 
       = do { unf <- tcUnfolding name ty info if_unf
-    	   ; let info1 | lb        = info `setOccInfo` nonRuleLoopBreaker
+    	   ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
 	     	       | otherwise = info
 	   ; return (info1 `setUnfoldingInfoLazily` unf) }
 \end{code}

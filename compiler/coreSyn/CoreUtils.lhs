@@ -1391,7 +1391,7 @@ tryEtaReduce bndrs body
 
     ---------------
     fun_arity fun 	      -- See Note [Arity care]
-       | isLocalId fun && isNonRuleLoopBreaker (idOccInfo fun) = 0
+       | isLocalId fun && isStrongLoopBreaker (idOccInfo fun) = 0
        | otherwise = idArity fun   	      
 
     ---------------
