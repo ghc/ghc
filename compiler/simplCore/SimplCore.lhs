@@ -579,7 +579,8 @@ simplifyPgmIO :: CoreToDo
 
 simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
               hsc_env us hpt_rule_base 
-              guts@(ModGuts { mg_binds = binds, mg_rules = rules
+              guts@(ModGuts { mg_module = this_mod
+                            , mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts') 
 	   <- do_iteration us 1 [] binds rules 
@@ -596,7 +597,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     dflags      = hsc_dflags hsc_env
     dump_phase  = dumpSimplPhase dflags mode
     simpl_env   = mkSimplEnv mode
-    active_rule = activeRule dflags simpl_env
+    active_rule = activeRule simpl_env
 
     do_iteration :: UniqSupply
                  -> Int		 -- Counts iterations
@@ -634,7 +635,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                                   InitialPhase -> mg_vect_decls guts
                                   _            -> []
                ; tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm active_rule rules maybeVects binds 
+                     occurAnalysePgm this_mod active_rule rules maybeVects binds 
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);

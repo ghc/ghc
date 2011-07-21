@@ -212,6 +212,7 @@ simplTopBinds env0 binds0
                 -- so that if a transformation rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
+		-- See note [Glomming] in OccurAnal.
         ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
         ; dflags <- getDOptsSmpl
         ; let dump_flag = dopt Opt_D_verbose_core2core dflags
@@ -1421,17 +1422,15 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
   | otherwise
-  = do { dflags <- getDOptsSmpl
-       ; case activeRule dflags env of {
-           Nothing     -> return Nothing  ; -- No rules apply
-           Just act_fn -> 
-         case lookupRule act_fn (getUnfoldingInRuleMatch env) (getInScope env) fn args rules of {
+  = do { case lookupRule (activeRule env) (getUnfoldingInRuleMatch env) 
+                         (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
 
              do { tick (RuleFired (ru_name rule))
+                ; dflags <- getDOptsSmpl
                 ; trace_dump dflags rule rule_rhs $
-                  return (Just (ruleArity rule, rule_rhs)) }}}}
+                  return (Just (ruleArity rule, rule_rhs)) }}}
   where
     trace_dump dflags rule rule_rhs stuff
       | not (dopt Opt_D_dump_rule_firings dflags)

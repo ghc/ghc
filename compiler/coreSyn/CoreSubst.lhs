@@ -51,6 +51,7 @@ import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substC
 
 import OptCoercion ( optCoercion )
 import PprCore     ( pprCoreBindings )
+import Module	   ( Module )
 import VarSet
 import VarEnv
 import Id
@@ -794,15 +795,16 @@ simpleOptExprWith :: Subst -> InExpr -> OutExpr
 simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
 
 ----------------------
-simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> [CoreVect] 
+simpleOptPgm :: DynFlags -> Module 
+             -> [CoreBind] -> [CoreRule] -> [CoreVect] 
              -> IO ([CoreBind], [CoreRule], [CoreVect])
-simpleOptPgm dflags binds rules vects
+simpleOptPgm dflags this_mod binds rules vects
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                        (pprCoreBindings occ_anald_binds);
 
        ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
-    occ_anald_binds  = occurAnalysePgm Nothing {- No rules active -}
+    occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
                                        rules vects binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
                        

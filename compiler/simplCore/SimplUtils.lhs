@@ -669,11 +669,11 @@ active_unfolding_gentle id
     prag = idInlinePragma id
 
 ----------------------
-activeRule :: DynFlags -> SimplEnv -> Maybe (Activation -> Bool)
+activeRule :: SimplEnv -> Activation -> Bool
 -- Nothing => No rules at all
-activeRule _dflags env
-  | not (sm_rules mode) = Nothing     -- Rewriting is off
-  | otherwise           = Just (isActive (sm_phase mode))
+activeRule env
+  | not (sm_rules mode) = \_ -> False     -- Rewriting is off
+  | otherwise           = isActive (sm_phase mode)
   where
     mode = getMode env
 \end{code}
@@ -906,7 +906,7 @@ postInlineUnconditionally
     -> Bool
 postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | not active		        = False
-  | isLoopBreaker occ_info      = False	-- If it's a loop-breaker of any kind, don't inline
+  | isWeakLoopBreaker occ_info  = False	-- If it's a loop-breaker of any kind, don't inline
 					-- because it might be referred to "earlier"
   | isExportedId bndr           = False
   | isStableUnfolding unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
@@ -1000,6 +1000,7 @@ ones that are trivial):
   * There is less point, because the main goal is to get rid of local
     bindings used in multiple case branches.  
     
+  * The inliner should inline trivial things at call sites anyway.
 
 Note [InlineRule and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

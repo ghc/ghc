@@ -139,7 +139,7 @@ deSugar hsc_env
                      , pprRules rules_for_imps ])
 
         ; (ds_binds, ds_rules_for_imps, ds_vects) 
-            <- simpleOptPgm dflags final_pgm rules_for_imps vects0
+            <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
                          -- The simpleOptPgm gets rid of type 
                          -- bindings plus any stupid dead code
 
