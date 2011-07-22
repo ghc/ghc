@@ -38,7 +38,6 @@ Library {
             Foreign.Concurrent,
             GHC.Arr,
             GHC.Base,
-            GHC.Classes,
             GHC.Conc,
             GHC.Conc.IO,
             GHC.Conc.Signal,
