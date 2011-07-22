@@ -293,6 +293,12 @@
         compilation error will occur. A simple way to think of this is a
         <emphasis>same origin policy</emphasis> for overlapping instances
         defined in Safe compiled modules.</listitem>
+	  <listitem><emphasis>Data.Typeable</emphasis> &mdash; We restrict Typeable
+		  instances to only derived ones (offered by GHC through the 
+		  <link linkend="deriving-typeable"><option>-XDeriveDataTypeable</option>
+		  </link> extension). Hand crafted instances of the Typeable type class
+		  are not allowed in Safe Haskell as this can easily be abused to 
+		  unsafely coerce between types.</listitem>
     </itemizedlist>
   </sect2>
 
