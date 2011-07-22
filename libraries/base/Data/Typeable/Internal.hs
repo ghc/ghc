@@ -59,7 +59,7 @@ import GHC.Word
 import GHC.Show
 import GHC.Err          (undefined)
 import Data.Maybe
-import Data.List        (intersperse)
+import Data.List
 import GHC.Num
 import GHC.Real
 import GHC.IORef
@@ -171,7 +171,7 @@ mkTyCon3 :: String       -- ^ package name
          -> String       -- ^ the name of the type constructor
          -> TyCon        -- ^ A unique 'TyCon' object
 mkTyCon3 pkg modl name =
-  TyCon (fingerprintString (pkg++modl++name)) pkg modl name
+  TyCon (fingerprintString (unwords [pkg, modl, name])) pkg modl name
 
 ----------------- Observation ---------------------
 
