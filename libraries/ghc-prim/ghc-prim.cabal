@@ -22,6 +22,8 @@ flag include-ghc-prim {
 Library {
     build-depends: rts
     exposed-modules:
+        GHC.Classes
+        GHC.CString
         GHC.Debug
         GHC.Generics
         GHC.Magic
@@ -32,7 +34,6 @@ Library {
         GHC.Tuple
         GHC.Types
         GHC.Unit
-        GHC.CString
 
     if flag(include-ghc-prim) {
         exposed-modules: GHC.Prim
