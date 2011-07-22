@@ -1195,10 +1195,8 @@ gen_Typeable_binds loc tycon
                                   HsString modl_fs,
                                   HsString name_fs])
 
-    Fingerprint high low =
-             fingerprintString (unpackFS pkg_fs ++
-                                unpackFS modl_fs ++
-                                unpackFS name_fs)
+    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
+    Fingerprint high low = fingerprintString hashThis
 
     int64
       | wORD_SIZE == 4 = HsWord64Prim . fromIntegral
