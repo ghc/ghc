@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2011
@@ -1459,51 +1461,32 @@ multiRootsErr summs@(summ1:_)
 cyclicModuleErr :: [ModSummary] -> SDoc
 -- From a strongly connected component we find 
 -- a single cycle to report
-cyclicModuleErr ms
-  = ASSERT( not (null ms) )
-    hang (ptext (sLit "Module imports form a cycle:"))
-       2 (show_path (shortest [] root_mod))
+cyclicModuleErr mss
+  = ASSERT( not (null mss) )
+    case findCycle graph of
+       Nothing   -> ptext (sLit "Unexpected non-cycle") <+> ppr mss
+       Just path -> vcat [ ptext (sLit "Module imports form a cycle:")
+                         , nest 2 (show_path path) ]
   where
-    deps :: [(ModuleName, [ModuleName])]
-    deps = [ (moduleName (ms_mod m), get_deps m) | m <- ms ]
+    graph :: [Node NodeKey ModSummary]
+    graph = [(ms, msKey ms, get_deps ms) | ms <- mss]
 
-    get_deps :: ModSummary -> [ModuleName]
-    get_deps m = filter (\k -> Map.member k dep_env) (map unLoc (ms_home_imps m))
-
-    dep_env :: Map.Map ModuleName [ModuleName]
-    dep_env = Map.fromList deps
-
-    -- Find the module with fewest imports among the SCC modules
-    -- This is just a heuristic to find some plausible root module
-    root_mod  :: ModuleName
-    root_mod = fst (minWith (length . snd) deps)
-
-    shortest :: [ModuleName] -> ModuleName -> [ModuleName] 
-    -- (shortest [v1,v2,..,vn] m) assumes that 
-    --   m     is imported by v1
-    --   which is imported by v2
-    --   ...
-    --   which is imported by vn
-    -- It retuns an import chain [w1, w2, ..wm]
-    -- where  w1 imports w2 imports .... imports wm imports w1
-    shortest visited m 
-      | m `elem` visited
-      = m : reverse (takeWhile (/= m) visited)
-      | otherwise
-      = minWith length (map (shortest (m:visited)) deps)
-      where
-        Just deps = Map.lookup m dep_env
+    get_deps :: ModSummary -> [NodeKey]
+    get_deps ms = ([ (unLoc m, HsBootFile) | m <- ms_home_srcimps ms ] ++
+                   [ (unLoc m, HsSrcFile)  | m <- ms_home_imps    ms ])
 
     show_path []         = panic "show_path"
-    show_path [m]        = ptext (sLit "module") <+> quotes (ppr m) 
+    show_path [m]        = ptext (sLit "module") <+> ppr_ms m
                            <+> ptext (sLit "imports itself")
-    show_path (m1:m2:ms) = ptext (sLit "module") <+> quotes (ppr m1)
-                           <+> sep ( nest 6 (ptext (sLit "imports") <+> quotes (ppr m2))
-                                   : go ms)
+    show_path (m1:m2:ms) = vcat ( nest 7 (ptext (sLit "module") <+> ppr_ms m1)
+                                : nest 6 (ptext (sLit "imports") <+> ppr_ms m2)
+                                : go ms )
        where
-         go []     =  [ptext (sLit "which imports") <+> quotes (ppr m1)]
-         go (m:ms) = (ptext (sLit "which imports") <+> quotes (ppr m)) : go ms
+         go []     = [ptext (sLit "which imports") <+> ppr_ms m1]
+         go (m:ms) = (ptext (sLit "which imports") <+> ppr_ms m) : go ms
        
-minWith :: Ord b => (a -> b) -> [a] -> a
-minWith get_key xs = ASSERT( not (null xs) )
-                     head (sortWith get_key xs)
+
+    ppr_ms :: ModSummary -> SDoc
+    ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+> 
+    	        (parens (text (msHsFilePath ms)))
+

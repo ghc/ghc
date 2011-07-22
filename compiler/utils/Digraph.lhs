@@ -3,10 +3,11 @@
 %
 
 \begin{code}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Digraph(
         Graph, graphFromVerticesAndAdjacency, graphFromEdgedVertices,
 
-        SCC(..), flattenSCC, flattenSCCs,
+        SCC(..), Node, flattenSCC, flattenSCCs,
         stronglyConnCompG, topologicalSortG, 
         verticesG, edgesG, hasVertexG,
         reachableG, transposeG,
@@ -14,6 +15,8 @@ module Digraph(
         vertexGroupsG, emptyG,
         componentsG,
 
+        findCycle,
+  
         -- For backwards compatability with the simpler version of Digraph
         stronglyConnCompFromEdgedVertices, stronglyConnCompFromEdgedVerticesR,
 
@@ -37,7 +40,7 @@ module Digraph(
 ------------------------------------------------------------------------------
 
 
-import Util        ( sortLe )
+import Util        ( sortLe, minWith, count )
 import Outputable
 import Maybes      ( expectJust )
 import MonadUtils  ( allM )
@@ -51,6 +54,8 @@ import Data.Maybe
 import Data.Array
 import Data.List   ( (\\) )
 import Data.Array.ST
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 \end{code}
 
 %************************************************************************
@@ -78,6 +83,13 @@ data Graph node = Graph {
 
 data Edge node = Edge node node
 
+type Node key payload = (payload, key, [key])	
+     -- The payload is user data, just carried around in this module
+     -- The keys are ordered
+     -- The [key] are the dependencies of the node; 
+     --    it's ok to have extra keys in the dependencies that
+     --	   are not the key of any Node in the graph
+
 emptyGraph :: Graph a
 emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
 
@@ -101,10 +113,10 @@ graphFromVerticesAndAdjacency vertices edges = Graph graph vertex_node (key_vert
 
 graphFromEdgedVertices
         :: Ord key
-        => [(node, key, [key])]         -- The graph; its ok for the
+        => [Node key payload]           -- The graph; its ok for the
                                         -- out-list to contain keys which arent
                                         -- a vertex key, they are ignored
-        -> Graph (node, key, [key])
+        -> Graph (Node key payload)
 graphFromEdgedVertices []             = emptyGraph
 graphFromEdgedVertices edged_vertices = Graph graph vertex_fn (key_vertex . key_extractor)
   where key_extractor (_, k, _) = k
@@ -138,6 +150,63 @@ reduceNodesIntoVertices nodes key_extractor = (bounds, (!) vertex_map, key_verte
                                     LT -> find a (mid - 1)
                                     EQ -> Just mid
                                     GT -> find (mid + 1) b
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+%*      SCC
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+type WorkItem key payload
+  = (Node key payload,	-- Tip of the path
+     [payload])	  	-- Rest of the path; 
+     			--  [a,b,c] means c depends on b, b depends on a
+
+-- | Find a reasonably short cycle a->b->c->a, in a strongly
+-- connected component.  The input nodes are presumed to be
+-- a SCC, so you can start anywhere.
+findCycle :: forall payload key. Ord key 
+          => [Node key payload]     -- The nodes.  The dependencies can
+	     	     	  	    -- contain extra keys, which are ignored
+	  -> Maybe [payload]        -- A cycle, starting with node
+	     			    -- so each depends on the next
+findCycle graph
+  = go Set.empty (new_work root_deps []) []
+  where
+    env :: Map.Map key (Node key payload)
+    env = Map.fromList [ (key, node) | node@(_, key, _) <- graph ]
+
+    -- Find the node with fewest dependencies among the SCC modules
+    -- This is just a heuristic to find some plausible root module
+    root :: Node key payload
+    root = fst (minWith snd [ (node, count (`Map.member` env) deps) 
+                            | node@(_,_,deps) <- graph ])
+    (root_payload,root_key,root_deps) = root
+
+
+    -- 'go' implements Dijkstra's algorithm, more or less
+    go :: Set.Set key	-- Visited
+       -> [WorkItem key payload]	-- Work list, items length n
+       -> [WorkItem key payload]	-- Work list, items length n+1
+       -> Maybe [payload]		-- Returned cycle
+       -- Invariant: in a call (go visited ps qs),
+       --            visited = union (map tail (ps ++ qs))
+
+    go _       [] [] = Nothing	-- No cycles
+    go visited [] qs = go visited qs []
+    go visited (((payload,key,deps), path) : ps) qs 
+       | key == root_key           = Just (root_payload : reverse path)
+       | key `Set.member` visited  = go visited ps qs
+       | key `Map.notMember` env   = go visited ps qs
+       | otherwise                 = go (Set.insert key visited)
+                                        ps (new_qs ++ qs)
+       where
+	 new_qs = new_work deps (payload : path)
+
+    new_work :: [key] -> [payload] -> [WorkItem key payload]
+    new_work deps path = [ (n, path) | Just n <- map (`Map.lookup` env) deps ]
 \end{code}
 
 %************************************************************************
@@ -194,8 +263,8 @@ stronglyConnCompG (Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn }
 -- The following two versions are provided for backwards compatability:
 stronglyConnCompFromEdgedVertices
         :: Ord key
-        => [(node, key, [key])]
-        -> [SCC node]
+        => [Node key payload]
+        -> [SCC payload]
 stronglyConnCompFromEdgedVertices = map (fmap get_node) . stronglyConnCompFromEdgedVerticesR
   where get_node (n, _, _) = n
 
@@ -203,8 +272,8 @@ stronglyConnCompFromEdgedVertices = map (fmap get_node) . stronglyConnCompFromEd
 -- the (some of) the result of SCC, so you dont want to lose the dependency info
 stronglyConnCompFromEdgedVerticesR
         :: Ord key
-        => [(node, key, [key])]
-        -> [SCC (node, key, [key])]
+        => [Node key payload]
+        -> [SCC (Node key payload)]
 stronglyConnCompFromEdgedVerticesR = stronglyConnCompG . graphFromEdgedVertices
 \end{code}
 
