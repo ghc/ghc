@@ -85,6 +85,7 @@ import GHC.IntWord64 (
        )
 #endif
 
+import GHC.Classes
 import GHC.Ordering
 import GHC.Types
 
@@ -332,6 +333,10 @@ neqInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i /=# 0#
 neqInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i /=# 0#
 neqInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) /=# 0#
 
+instance  Eq Integer  where
+    (==) = eqInteger
+    (/=) = neqInteger
+
 ------------------------------------------------------------------------
 
 leInteger :: Integer -> Integer -> Bool
@@ -378,6 +383,13 @@ compareInteger (J# s1 d1) (J# s2 d2)
      if res# <# 0# then LT else
      if res# ># 0# then GT else EQ
      }
+
+instance Ord Integer where
+    (<=) = leInteger
+    (>)  = gtInteger
+    (<)  = ltInteger
+    (>=) = geInteger
+    compare = compareInteger
 \end{code}
 
 
