@@ -123,3 +123,4 @@ test('T5168',
      ['$MAKE -s --no-print-directory T5168'])
 
 test('T5329', normal, compile, [''])
+test('T5303', reqlib('mtl'), compile, [''])   # Coercion-optimiation test
