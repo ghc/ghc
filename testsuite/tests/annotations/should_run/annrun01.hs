@@ -16,29 +16,31 @@ import qualified Language.Haskell.TH as TH
 import Data.List
 import Data.Function
 
+main :: IO ()
 main = defaultErrorHandler defaultLogAction
      $ runGhc (Just cTop) $ do
     liftIO $ putStrLn "Initializing Package Database"
     dflags <- getSessionDynFlags
     let dflags' = dflags
     setSessionDynFlags dflags'
-    
+
     let mod_nm = mkModuleName "Annrun01_Help"
-    
+
     liftIO $ putStrLn "Setting Target"
     setTargets [Target (TargetModule mod_nm) True Nothing]
     liftIO $ putStrLn "Loading Targets"
     load LoadAllTargets
-    
+
     liftIO $ putStrLn "Finding Module"
     mod <- findModule mod_nm Nothing
     liftIO $ putStrLn "Getting Module Info"
     Just mod_info <- getModuleInfo mod
-    
+
     liftIO $ putStrLn "Showing Details For Module"
     showTargetAnns (ModuleTarget mod)
     liftIO $ putStrLn "Showing Details For Exports"
-    mapM (showTargetAnns . NamedTarget) $ sortBy (compare `on` getOccName) $ modInfoExports mod_info
+    let exports = sortBy (compare `on` getOccName) $ modInfoExports mod_info
+    mapM_ (showTargetAnns . NamedTarget) exports
 
 showTargetAnns :: CoreAnnTarget -> Ghc ()
 showTargetAnns target = do
