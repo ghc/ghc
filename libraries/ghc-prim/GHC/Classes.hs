@@ -19,7 +19,6 @@
 
 module GHC.Classes where
 
-import GHC.Integer
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
 import GHC.Ordering
@@ -98,10 +97,6 @@ deriving instance Eq Ordering
 instance Eq Char where
     (C# c1) == (C# c2) = c1 `eqChar#` c2
     (C# c1) /= (C# c2) = c1 `neChar#` c2
-
-instance  Eq Integer  where
-    (==) = eqInteger
-    (/=) = neqInteger
 
 instance Eq Float where
     (F# x) == (F# y) = x `eqFloat#` y
@@ -206,13 +201,6 @@ instance Ord Char where
     (C# c1) >= (C# c2) = c1 `geChar#` c2
     (C# c1) <= (C# c2) = c1 `leChar#` c2
     (C# c1) <  (C# c2) = c1 `ltChar#` c2
-
-instance Ord Integer where
-    (<=) = leInteger
-    (>)  = gtInteger
-    (<)  = ltInteger
-    (>=) = geInteger
-    compare = compareInteger
 
 instance Ord Float where
     (F# x) `compare` (F# y)
