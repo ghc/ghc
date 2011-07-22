@@ -1,3 +1,4 @@
+Some extra functions to extend Data.Map
 
 \begin{code}
 module FiniteMap (
