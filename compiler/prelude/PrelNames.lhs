@@ -558,13 +558,6 @@ undefined_RDR = varQual_RDR gHC_ERR (fsLit "undefined")
 error_RDR :: RdrName
 error_RDR = varQual_RDR gHC_ERR (fsLit "error")
 
--- Old Generics (constructors and functions)
-crossDataCon_RDR, inlDataCon_RDR, inrDataCon_RDR, genUnitDataCon_RDR :: RdrName
-crossDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
-inlDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Inl")
-inrDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Inr")
-genUnitDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "Unit")
-
 -- Generics (constructors and functions)
 u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   k1DataCon_RDR, m1DataCon_RDR, l1DataCon_RDR, r1DataCon_RDR,
