@@ -222,6 +222,8 @@ instance Bits Int where
     (I# x#) `shift` (I# i#)
         | i# >=# 0#        = I# (x# `iShiftL#` i#)
         | otherwise        = I# (x# `iShiftRA#` negateInt# i#)
+    (I# x#) `shiftL` (I# i#) = I# (x# `iShiftL#` i#)
+    (I# x#) `shiftR` (I# i#) = I# (x# `iShiftRA#` i#)
 
     {-# INLINE rotate #-} 	-- See Note [Constant folding for rotate]
     (I# x#) `rotate` (I# i#) =

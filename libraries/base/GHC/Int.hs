@@ -139,6 +139,8 @@ instance Bits Int8 where
     (I8# x#) `shift` (I# i#)
         | i# >=# 0#           = I8# (narrow8Int# (x# `iShiftL#` i#))
         | otherwise           = I8# (x# `iShiftRA#` negateInt# i#)
+    (I8# x#) `shiftL` (I# i#) = I8# (narrow8Int# (x# `iShiftL#` i#))
+    (I8# x#) `shiftR` (I# i#) = I8# (x# `iShiftRA#` i#)
     (I8# x#) `rotate` (I# i#)
         | i'# ==# 0# 
         = I8# x#
@@ -281,6 +283,8 @@ instance Bits Int16 where
     (I16# x#) `shift` (I# i#)
         | i# >=# 0#            = I16# (narrow16Int# (x# `iShiftL#` i#))
         | otherwise            = I16# (x# `iShiftRA#` negateInt# i#)
+    (I16# x#) `shiftL` (I# i#) = I16# (narrow16Int# (x# `iShiftL#` i#))
+    (I16# x#) `shiftR` (I# i#) = I16# (x# `iShiftRA#` i#)
     (I16# x#) `rotate` (I# i#)
         | i'# ==# 0# 
         = I16# x#
@@ -452,6 +456,8 @@ instance Bits Int32 where
     (I32# x#) `shift` (I# i#)
         | i# >=# 0#            = I32# (x# `iShiftL32#` i#)
         | otherwise            = I32# (x# `iShiftRA32#` negateInt# i#)
+    (I32# x#) `shiftL` (I# i#) = I32# (x# `iShiftL32#` i#)
+    (I32# x#) `shiftR` (I# i#) = I32# (x# `iShiftRA32#` i#)
     (I32# x#) `rotate` (I# i#)
         | i'# ==# 0# 
         = I32# x#
@@ -571,6 +577,8 @@ instance Bits Int32 where
     (I32# x#) `shift` (I# i#)
         | i# >=# 0#            = I32# (narrow32Int# (x# `iShiftL#` i#))
         | otherwise            = I32# (x# `iShiftRA#` negateInt# i#)
+    (I32# x#) `shiftL` (I# i#) = I32# (narrow32Int# (x# `iShiftL#` i#))
+    (I32# x#) `shiftR` (I# i#) = I32# (x# `iShiftRA#` i#)
     (I32# x#) `rotate` (I# i#)
         | i'# ==# 0# 
         = I32# x#
@@ -754,6 +762,8 @@ instance Bits Int64 where
     (I64# x#) `shift` (I# i#)
         | i# >=# 0#            = I64# (x# `iShiftL64#` i#)
         | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
+    (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL64#` i#)
+    (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA64#` i#)
     (I64# x#) `rotate` (I# i#)
         | i'# ==# 0# 
         = I64# x#
@@ -877,6 +887,8 @@ instance Bits Int64 where
     (I64# x#) `shift` (I# i#)
         | i# >=# 0#            = I64# (x# `iShiftL#` i#)
         | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
+    (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL#` i#)
+    (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA#` i#)
     (I64# x#) `rotate` (I# i#)
         | i'# ==# 0# 
         = I64# x#
