@@ -1,6 +1,8 @@
 \begin{code}
 {-# LANGUAGE BangPatterns, CPP, MagicHash #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude #-}
+-- TODO: Get rid of orphan instances
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -132,14 +134,11 @@ integerToInt64 (S# i) = intToInt64# i
 integerToInt64 (J# s d) = integerToInt64# s d
 
 int64ToInteger :: Int64# -> Integer
-int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) && 
+int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
                        (i `geInt64#` intToInt64# -0x80000000#))
                    then smallInteger (int64ToInt# i)
                    else case int64ToInteger# i of
                         (# s, d #) -> J# s d
-    where -- XXX Move the (&&) definition below us?
-          True  && x = x
-          False && _ = False
 #endif
 
 toInt# :: Integer -> Int#
@@ -212,13 +211,6 @@ divModInteger (S# i) (S# j) = (# S# d, S# m #)
          else r#
           where !r# = x# `remInt#` y#
 
-      (&&) :: Bool -> Bool -> Bool
-      True  && x = x
-      False && _ = False
-
-      (||) :: Bool -> Bool -> Bool
-      True  || _ = True
-      False || x = x
 divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
 divModInteger (J# s1 d1) (J# s2 d2)
