@@ -2,6 +2,8 @@
 {-# LANGUAGE CPP, MagicHash, ForeignFunctionInterface,
              NoImplicitPrelude, BangPatterns, UnboxedTuples,
              UnliftedFFITypes #-}
+-- TODO: Get rid of orphan instances
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -40,6 +42,7 @@ module GHC.Integer (
 
 import GHC.Integer.Type
 
+import GHC.Classes
 import GHC.Ordering
 import GHC.Prim
 import GHC.Types
@@ -371,6 +374,10 @@ x `neqInteger` y = case x `compareInteger` y of
                    EQ -> False
                    _ -> True
 
+instance  Eq Integer  where
+    (==) = eqInteger
+    (/=) = neqInteger
+
 ltInteger :: Integer -> Integer -> Bool
 x `ltInteger` y = case x `compareInteger` y of
                   LT -> True
@@ -390,6 +397,13 @@ geInteger :: Integer -> Integer -> Bool
 x `geInteger` y = case x `compareInteger` y of
                   LT -> False
                   _ -> True
+
+instance Ord Integer where
+    (<=) = leInteger
+    (>)  = gtInteger
+    (<)  = ltInteger
+    (>=) = geInteger
+    compare = compareInteger
 
 absInteger :: Integer -> Integer
 absInteger (Negative x) = Positive x
