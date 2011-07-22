@@ -1,10 +1,10 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude      #-}
-{-# OPTIONS_GHC -XEmptyDataDecls         #-}
-{-# OPTIONS_GHC -XMultiParamTypeClasses  #-}
-{-# OPTIONS_GHC -XTypeSynonymInstances   #-}
-{-# OPTIONS_GHC -XTypeOperators          #-}
-{-# OPTIONS_GHC -XKindSignatures         #-}
-{-# OPTIONS_GHC -XTypeFamilies           #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE EmptyDataDecls         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE TypeSynonymInstances   #-}
+{-# LANGUAGE TypeOperators          #-}
+{-# LANGUAGE KindSignatures         #-}
+{-# LANGUAGE TypeFamilies           #-}
 
 module GHC.Generics  (
   -- * Generic representation types
