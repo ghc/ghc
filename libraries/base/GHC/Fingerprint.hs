@@ -26,8 +26,6 @@ import GHC.List
 import GHC.Real
 import Foreign
 import Foreign.C
-import GHC.IO.Encoding
-import GHC.Foreign
 
 import GHC.Fingerprint.Type
 
@@ -54,10 +52,18 @@ fingerprintData buf len = do
       c_MD5Final pdigest pctxt
       peek (castPtr pdigest :: Ptr Fingerprint)
 
+-- This is duplicated in compiler/utils/Fingerprint.hsc
 fingerprintString :: String -> Fingerprint
 fingerprintString str = unsafeDupablePerformIO $
-  GHC.Foreign.withCStringLen utf8 str $ \(p,len) ->
-     fingerprintData (castPtr p) len
+  withArrayLen word8s $ \len p ->
+     fingerprintData p len
+    where word8s = concatMap f str
+          f c = let w32 :: Word32
+                    w32 = fromIntegral (ord c)
+                in [fromIntegral (w32 `shiftR` 24),
+                    fromIntegral (w32 `shiftR` 16),
+                    fromIntegral (w32 `shiftR` 8),
+                    fromIntegral w32]
 
 data MD5Context
 
