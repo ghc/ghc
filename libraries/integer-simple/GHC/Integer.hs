@@ -23,7 +23,7 @@
 
 module GHC.Integer (
     Integer,
-    smallInteger, wordToInteger, integerToWord, toInt#,
+    smallInteger, wordToInteger, integerToWord, integerToInt,
 #if WORD_SIZE_IN_BITS < 64
     integerToWord64, word64ToInteger,
     integerToInt64, int64ToInteger,
@@ -75,8 +75,8 @@ integerToWord (Negative (Some w _)) = 0## `minusWord#` w
 -- Must be Naught by the invariant:
 integerToWord _ = 0##
 
-toInt# :: Integer -> Int#
-toInt# i = word2Int# (integerToWord i)
+integerToInt :: Integer -> Int#
+integerToInt i = word2Int# (integerToWord i)
 
 #if WORD_SIZE_IN_BITS == 64
 -- Nothing
