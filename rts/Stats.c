@@ -84,11 +84,17 @@ Ticks stat_getElapsedTime(void)
    ------------------------------------------------------------------------ */
 
 double
+mut_user_time_until( Ticks t )
+{
+    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+}
+
+double
 mut_user_time( void )
 {
     Ticks cpu;
     cpu = getProcessCPUTime();
-    return TICK_TO_DBL(cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+    return mut_user_time_until(cpu);
 }
 
 #ifdef PROFILING
