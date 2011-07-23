@@ -113,12 +113,10 @@ basicKnownKeyNames
  ++ [   -- Type constructors (synonyms especially)
         ioTyConName, ioDataConName,
         runMainIOName,
-        orderingTyConName,
         rationalTyConName,
         stringTyConName,
         ratioDataConName,
         ratioTyConName,
-        integerTyConName, smallIntegerName,
 
         --  Classes.  *Must* include:
         --      classes that are grabbed by key (e.g., eqClassKey)
@@ -201,11 +199,21 @@ basicKnownKeyNames
 
         -- Others
         otherwiseIdName, inlineIdName,
-        plusIntegerName, timesIntegerName,
         eqStringName, assertName, breakpointName, breakpointCondName,
         breakpointAutoName,  opaqueTyConName,
         assertErrorName, runSTRepName,
         printName, fstName, sndName,
+
+        -- Integer
+        integerTyConName, plusIntegerName, timesIntegerName, smallIntegerName,
+        integerToWordName, integerToIntName, minusIntegerName,
+        negateIntegerName, eqIntegerName, neqIntegerName,
+        absIntegerName, signumIntegerName,
+        leIntegerName, gtIntegerName, ltIntegerName, geIntegerName,
+        compareIntegerName,
+        gcdIntegerName, lcmIntegerName,
+        andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
+        shiftLIntegerName, shiftRIntegerName,
 
         -- MonadFix
         monadFixClassName, mfixName,
@@ -215,6 +223,9 @@ basicKnownKeyNames
 
         -- Annotation type checking
         toAnnotationWrapperName
+
+        -- The Ordering type
+        , orderingTyConName, ltDataConName, eqDataConName, gtDataConName
 
         -- The Either type
         , eitherTyConName, leftDataConName, rightDataConName
@@ -638,8 +649,11 @@ wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
-orderingTyConName :: Name
+orderingTyConName, ltDataConName, eqDataConName, gtDataConName :: Name
 orderingTyConName = tcQual   gHC_ORDERING (fsLit "Ordering") orderingTyConKey
+ltDataConName = conName gHC_ORDERING (fsLit "LT") ltDataConKey
+eqDataConName = conName gHC_ORDERING (fsLit "EQ") eqDataConKey
+gtDataConName = conName gHC_ORDERING (fsLit "GT") gtDataConKey
 
 eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
@@ -769,17 +783,46 @@ fstName           = varQual dATA_TUPLE (fsLit "fst") fstIdKey
 sndName           = varQual dATA_TUPLE (fsLit "snd") sndIdKey
 
 -- Module GHC.Num
-numClassName, fromIntegerName, minusName, negateName, plusIntegerName,
-    timesIntegerName,
-    integerTyConName, smallIntegerName :: Name
+numClassName, fromIntegerName, minusName, negateName :: Name
 numClassName      = clsQual  gHC_NUM (fsLit "Num") numClassKey
 fromIntegerName   = methName gHC_NUM (fsLit "fromInteger") fromIntegerClassOpKey
 minusName         = methName gHC_NUM (fsLit "-") minusClassOpKey
 negateName        = methName gHC_NUM (fsLit "negate") negateClassOpKey
-plusIntegerName   = varQual  gHC_INTEGER (fsLit "plusInteger") plusIntegerIdKey
-timesIntegerName  = varQual  gHC_INTEGER (fsLit "timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual   gHC_INTEGER_TYPE (fsLit "Integer") integerTyConKey
-smallIntegerName = varQual gHC_INTEGER (fsLit "smallInteger") smallIntegerIdKey
+
+integerTyConName, plusIntegerName, timesIntegerName, smallIntegerName,
+    integerToWordName, integerToIntName, minusIntegerName,
+    negateIntegerName, eqIntegerName, neqIntegerName,
+    absIntegerName, signumIntegerName,
+    leIntegerName, gtIntegerName, ltIntegerName, geIntegerName,
+    compareIntegerName,
+    gcdIntegerName, lcmIntegerName,
+    andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
+    shiftLIntegerName, shiftRIntegerName :: Name
+integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+plusIntegerName       = varQual gHC_INTEGER      (fsLit "plusInteger")       plusIntegerIdKey
+timesIntegerName      = varQual gHC_INTEGER      (fsLit "timesInteger")      timesIntegerIdKey
+smallIntegerName      = varQual gHC_INTEGER      (fsLit "smallInteger")      smallIntegerIdKey
+integerToWordName     = varQual gHC_INTEGER      (fsLit "integerToWord")     integerToWordIdKey
+integerToIntName      = varQual gHC_INTEGER      (fsLit "integerToInt")      integerToIntIdKey
+minusIntegerName      = varQual gHC_INTEGER      (fsLit "minusInteger")      minusIntegerIdKey
+negateIntegerName     = varQual gHC_INTEGER      (fsLit "negateInteger")     negateIntegerIdKey
+eqIntegerName         = varQual gHC_INTEGER      (fsLit "eqInteger")         eqIntegerIdKey
+neqIntegerName        = varQual gHC_INTEGER      (fsLit "neqInteger")        neqIntegerIdKey
+absIntegerName        = varQual gHC_INTEGER      (fsLit "absInteger")        absIntegerIdKey
+signumIntegerName     = varQual gHC_INTEGER      (fsLit "signumInteger")     signumIntegerIdKey
+leIntegerName         = varQual gHC_INTEGER      (fsLit "leInteger")         leIntegerIdKey
+gtIntegerName         = varQual gHC_INTEGER      (fsLit "gtInteger")         gtIntegerIdKey
+ltIntegerName         = varQual gHC_INTEGER      (fsLit "ltInteger")         ltIntegerIdKey
+geIntegerName         = varQual gHC_INTEGER      (fsLit "geInteger")         geIntegerIdKey
+compareIntegerName    = varQual gHC_INTEGER      (fsLit "compareInteger")    compareIntegerIdKey
+gcdIntegerName        = varQual gHC_INTEGER      (fsLit "gcdInteger")        gcdIntegerIdKey
+lcmIntegerName        = varQual gHC_INTEGER      (fsLit "lcmInteger")        lcmIntegerIdKey
+andIntegerName        = varQual gHC_INTEGER      (fsLit "andInteger")        andIntegerIdKey
+orIntegerName         = varQual gHC_INTEGER      (fsLit "orInteger")         orIntegerIdKey
+xorIntegerName        = varQual gHC_INTEGER      (fsLit "xorInteger")        xorIntegerIdKey
+complementIntegerName = varQual gHC_INTEGER      (fsLit "complementInteger") complementIntegerIdKey
+shiftLIntegerName     = varQual gHC_INTEGER      (fsLit "shiftLInteger")     shiftLIntegerIdKey
+shiftRIntegerName     = varQual gHC_INTEGER      (fsLit "shiftRInteger")     shiftRIntegerIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -1301,6 +1344,11 @@ parrDataConKey                          = mkPreludeDataConUnique 24
 leftDataConKey, rightDataConKey :: Unique
 leftDataConKey                          = mkPreludeDataConUnique 25
 rightDataConKey                         = mkPreludeDataConUnique 26
+
+ltDataConKey, eqDataConKey, gtDataConKey :: Unique
+ltDataConKey                            = mkPreludeDataConUnique 27
+eqDataConKey                            = mkPreludeDataConUnique 28
+gtDataConKey                            = mkPreludeDataConUnique 29
 \end{code}
 
 %************************************************************************
@@ -1320,111 +1368,141 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey :: Unique
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
-augmentIdKey                  = mkPreludeMiscIdUnique  3
-appendIdKey                   = mkPreludeMiscIdUnique  4
-buildIdKey                    = mkPreludeMiscIdUnique  5
-errorIdKey                    = mkPreludeMiscIdUnique  6
-foldrIdKey                    = mkPreludeMiscIdUnique  8
-recSelErrorIdKey              = mkPreludeMiscIdUnique  9
-seqIdKey                      = mkPreludeMiscIdUnique 15
-irrefutPatErrorIdKey          = mkPreludeMiscIdUnique 16
-eqStringIdKey                 = mkPreludeMiscIdUnique 17
-noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 18
-nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 19
-runtimeErrorIdKey             = mkPreludeMiscIdUnique 20
-patErrorIdKey                 = mkPreludeMiscIdUnique 23
-realWorldPrimIdKey            = mkPreludeMiscIdUnique 24
-recConErrorIdKey              = mkPreludeMiscIdUnique 25
-unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 28
-unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 29
-unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 30
-unpackCStringIdKey            = mkPreludeMiscIdUnique 31
+augmentIdKey                  = mkPreludeMiscIdUnique  2
+appendIdKey                   = mkPreludeMiscIdUnique  3
+buildIdKey                    = mkPreludeMiscIdUnique  4
+errorIdKey                    = mkPreludeMiscIdUnique  5
+foldrIdKey                    = mkPreludeMiscIdUnique  6
+recSelErrorIdKey              = mkPreludeMiscIdUnique  7
+seqIdKey                      = mkPreludeMiscIdUnique  8
+irrefutPatErrorIdKey          = mkPreludeMiscIdUnique  9
+eqStringIdKey                 = mkPreludeMiscIdUnique 10
+noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
+nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
+runtimeErrorIdKey             = mkPreludeMiscIdUnique 13
+patErrorIdKey                 = mkPreludeMiscIdUnique 14
+realWorldPrimIdKey            = mkPreludeMiscIdUnique 15
+recConErrorIdKey              = mkPreludeMiscIdUnique 16
+unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 17
+unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 18
+unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 19
+unpackCStringIdKey            = mkPreludeMiscIdUnique 20
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,
-    smallIntegerIdKey, plusIntegerIdKey, timesIntegerIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
     fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey, runSTRepIdKey :: Unique
-unsafeCoerceIdKey             = mkPreludeMiscIdUnique 32
-concatIdKey                   = mkPreludeMiscIdUnique 33
-filterIdKey                   = mkPreludeMiscIdUnique 34
-zipIdKey                      = mkPreludeMiscIdUnique 35
-bindIOIdKey                   = mkPreludeMiscIdUnique 36
-returnIOIdKey                 = mkPreludeMiscIdUnique 37
-newStablePtrIdKey             = mkPreludeMiscIdUnique 39
-smallIntegerIdKey             = mkPreludeMiscIdUnique 40
-plusIntegerIdKey              = mkPreludeMiscIdUnique 41
-timesIntegerIdKey             = mkPreludeMiscIdUnique 42
-printIdKey                    = mkPreludeMiscIdUnique 43
-failIOIdKey                   = mkPreludeMiscIdUnique 44
-nullAddrIdKey                 = mkPreludeMiscIdUnique 46
-voidArgIdKey                  = mkPreludeMiscIdUnique 47
-fstIdKey                      = mkPreludeMiscIdUnique 49
-sndIdKey                      = mkPreludeMiscIdUnique 50
-otherwiseIdKey                = mkPreludeMiscIdUnique 51
-assertIdKey                   = mkPreludeMiscIdUnique 53
-runSTRepIdKey                 = mkPreludeMiscIdUnique 54
+unsafeCoerceIdKey             = mkPreludeMiscIdUnique 30
+concatIdKey                   = mkPreludeMiscIdUnique 31
+filterIdKey                   = mkPreludeMiscIdUnique 32
+zipIdKey                      = mkPreludeMiscIdUnique 33
+bindIOIdKey                   = mkPreludeMiscIdUnique 34
+returnIOIdKey                 = mkPreludeMiscIdUnique 35
+newStablePtrIdKey             = mkPreludeMiscIdUnique 36
+printIdKey                    = mkPreludeMiscIdUnique 37
+failIOIdKey                   = mkPreludeMiscIdUnique 38
+nullAddrIdKey                 = mkPreludeMiscIdUnique 39
+voidArgIdKey                  = mkPreludeMiscIdUnique 40
+fstIdKey                      = mkPreludeMiscIdUnique 41
+sndIdKey                      = mkPreludeMiscIdUnique 42
+otherwiseIdKey                = mkPreludeMiscIdUnique 43
+assertIdKey                   = mkPreludeMiscIdUnique 44
+runSTRepIdKey                 = mkPreludeMiscIdUnique 45
+
+smallIntegerIdKey, integerToWordIdKey, integerToIntIdKey,
+    plusIntegerIdKey, timesIntegerIdKey, minusIntegerIdKey,
+    negateIntegerIdKey,
+    eqIntegerIdKey, neqIntegerIdKey, absIntegerIdKey, signumIntegerIdKey,
+    leIntegerIdKey, gtIntegerIdKey, ltIntegerIdKey, geIntegerIdKey,
+    compareIntegerIdKey,
+    gcdIntegerIdKey, lcmIntegerIdKey,
+    andIntegerIdKey, orIntegerIdKey, xorIntegerIdKey, complementIntegerIdKey,
+    shiftLIntegerIdKey, shiftRIntegerIdKey :: Unique
+smallIntegerIdKey             = mkPreludeMiscIdUnique 60
+integerToWordIdKey            = mkPreludeMiscIdUnique 61
+integerToIntIdKey             = mkPreludeMiscIdUnique 62
+plusIntegerIdKey              = mkPreludeMiscIdUnique 63
+timesIntegerIdKey             = mkPreludeMiscIdUnique 64
+minusIntegerIdKey             = mkPreludeMiscIdUnique 65
+negateIntegerIdKey            = mkPreludeMiscIdUnique 66
+eqIntegerIdKey                = mkPreludeMiscIdUnique 67
+neqIntegerIdKey               = mkPreludeMiscIdUnique 68
+absIntegerIdKey               = mkPreludeMiscIdUnique 69
+signumIntegerIdKey            = mkPreludeMiscIdUnique 70
+leIntegerIdKey                = mkPreludeMiscIdUnique 71
+gtIntegerIdKey                = mkPreludeMiscIdUnique 72
+ltIntegerIdKey                = mkPreludeMiscIdUnique 73
+geIntegerIdKey                = mkPreludeMiscIdUnique 74
+compareIntegerIdKey           = mkPreludeMiscIdUnique 75
+gcdIntegerIdKey               = mkPreludeMiscIdUnique 85
+lcmIntegerIdKey               = mkPreludeMiscIdUnique 86
+andIntegerIdKey               = mkPreludeMiscIdUnique 87
+orIntegerIdKey                = mkPreludeMiscIdUnique 88
+xorIntegerIdKey               = mkPreludeMiscIdUnique 89
+complementIntegerIdKey        = mkPreludeMiscIdUnique 90
+shiftLIntegerIdKey            = mkPreludeMiscIdUnique 91
+shiftRIntegerIdKey            = mkPreludeMiscIdUnique 92
 
 rootMainKey, runMainKey :: Unique
-rootMainKey                   = mkPreludeMiscIdUnique 55
-runMainKey                    = mkPreludeMiscIdUnique 56
+rootMainKey                   = mkPreludeMiscIdUnique 100
+runMainKey                    = mkPreludeMiscIdUnique 101
 
 thenIOIdKey, lazyIdKey, assertErrorIdKey :: Unique
-thenIOIdKey                   = mkPreludeMiscIdUnique 59
-lazyIdKey                     = mkPreludeMiscIdUnique 60
-assertErrorIdKey              = mkPreludeMiscIdUnique 61
+thenIOIdKey                   = mkPreludeMiscIdUnique 102
+lazyIdKey                     = mkPreludeMiscIdUnique 103
+assertErrorIdKey              = mkPreludeMiscIdUnique 104
 
 breakpointIdKey, breakpointCondIdKey, breakpointAutoIdKey,
     breakpointJumpIdKey, breakpointCondJumpIdKey,
     breakpointAutoJumpIdKey :: Unique
-breakpointIdKey               = mkPreludeMiscIdUnique 62
-breakpointCondIdKey           = mkPreludeMiscIdUnique 63
-breakpointAutoIdKey           = mkPreludeMiscIdUnique 64
-breakpointJumpIdKey           = mkPreludeMiscIdUnique 65
-breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 66
-breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 67
+breakpointIdKey               = mkPreludeMiscIdUnique 110
+breakpointCondIdKey           = mkPreludeMiscIdUnique 111
+breakpointAutoIdKey           = mkPreludeMiscIdUnique 112
+breakpointJumpIdKey           = mkPreludeMiscIdUnique 113
+breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 114
+breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 115
 
 inlineIdKey :: Unique
-inlineIdKey                   = mkPreludeMiscIdUnique 68
+inlineIdKey                   = mkPreludeMiscIdUnique 120
 
 mapIdKey, groupWithIdKey, dollarIdKey :: Unique
-mapIdKey              = mkPreludeMiscIdUnique 69
-groupWithIdKey        = mkPreludeMiscIdUnique 70
-dollarIdKey           = mkPreludeMiscIdUnique 71
+mapIdKey              = mkPreludeMiscIdUnique 121
+groupWithIdKey        = mkPreludeMiscIdUnique 122
+dollarIdKey           = mkPreludeMiscIdUnique 123
 
 coercionTokenIdKey :: Unique
-coercionTokenIdKey    = mkPreludeMiscIdUnique 72
+coercionTokenIdKey    = mkPreludeMiscIdUnique 124
 
 -- Parallel array functions
 singletonPIdKey, nullPIdKey, lengthPIdKey, replicatePIdKey, mapPIdKey,
     filterPIdKey, zipPIdKey, crossMapPIdKey, indexPIdKey, toPIdKey,
     enumFromToPIdKey, enumFromThenToPIdKey, emptyPIdKey, appPIdKey :: Unique
-singletonPIdKey               = mkPreludeMiscIdUnique 79
-nullPIdKey                    = mkPreludeMiscIdUnique 80
-lengthPIdKey                  = mkPreludeMiscIdUnique 81
-replicatePIdKey               = mkPreludeMiscIdUnique 82
-mapPIdKey                     = mkPreludeMiscIdUnique 83
-filterPIdKey                  = mkPreludeMiscIdUnique 84
-zipPIdKey                     = mkPreludeMiscIdUnique 85
-crossMapPIdKey                = mkPreludeMiscIdUnique 86
-indexPIdKey                   = mkPreludeMiscIdUnique 87
-toPIdKey                      = mkPreludeMiscIdUnique 88
-enumFromToPIdKey              = mkPreludeMiscIdUnique 89
-enumFromThenToPIdKey          = mkPreludeMiscIdUnique 90
-emptyPIdKey                   = mkPreludeMiscIdUnique 91
-appPIdKey                     = mkPreludeMiscIdUnique 92
+singletonPIdKey               = mkPreludeMiscIdUnique 130
+nullPIdKey                    = mkPreludeMiscIdUnique 131
+lengthPIdKey                  = mkPreludeMiscIdUnique 132
+replicatePIdKey               = mkPreludeMiscIdUnique 133
+mapPIdKey                     = mkPreludeMiscIdUnique 134
+filterPIdKey                  = mkPreludeMiscIdUnique 135
+zipPIdKey                     = mkPreludeMiscIdUnique 136
+crossMapPIdKey                = mkPreludeMiscIdUnique 137
+indexPIdKey                   = mkPreludeMiscIdUnique 138
+toPIdKey                      = mkPreludeMiscIdUnique 139
+enumFromToPIdKey              = mkPreludeMiscIdUnique 140
+enumFromThenToPIdKey          = mkPreludeMiscIdUnique 141
+emptyPIdKey                   = mkPreludeMiscIdUnique 142
+appPIdKey                     = mkPreludeMiscIdUnique 143
 
 -- dotnet interop
 unmarshalObjectIdKey, marshalObjectIdKey, marshalStringIdKey,
     unmarshalStringIdKey, checkDotnetResNameIdKey :: Unique
-unmarshalObjectIdKey          = mkPreludeMiscIdUnique 94
-marshalObjectIdKey            = mkPreludeMiscIdUnique 95
-marshalStringIdKey            = mkPreludeMiscIdUnique 96
-unmarshalStringIdKey          = mkPreludeMiscIdUnique 97
-checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 98
+unmarshalObjectIdKey          = mkPreludeMiscIdUnique 150
+marshalObjectIdKey            = mkPreludeMiscIdUnique 151
+marshalStringIdKey            = mkPreludeMiscIdUnique 152
+unmarshalStringIdKey          = mkPreludeMiscIdUnique 153
+checkDotnetResNameIdKey       = mkPreludeMiscIdUnique 154
 
 undefinedKey :: Unique
-undefinedKey                  = mkPreludeMiscIdUnique 99
+undefinedKey                  = mkPreludeMiscIdUnique 155
 
 \end{code}
 
@@ -1435,7 +1513,7 @@ during type checking.
 \begin{code}
         -- Just a place holder for  unbound variables  produced by the renamer:
 unboundKey :: Unique
-unboundKey                    = mkPreludeMiscIdUnique 101
+unboundKey                    = mkPreludeMiscIdUnique 160
 
 fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
     enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,
@@ -1443,56 +1521,56 @@ fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
     failMClassOpKey, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey,
     fmapClassOpKey
     :: Unique
-fromIntegerClassOpKey         = mkPreludeMiscIdUnique 102
-minusClassOpKey               = mkPreludeMiscIdUnique 103
-fromRationalClassOpKey        = mkPreludeMiscIdUnique 104
-enumFromClassOpKey            = mkPreludeMiscIdUnique 105
-enumFromThenClassOpKey        = mkPreludeMiscIdUnique 106
-enumFromToClassOpKey          = mkPreludeMiscIdUnique 107
-enumFromThenToClassOpKey      = mkPreludeMiscIdUnique 108
-eqClassOpKey                  = mkPreludeMiscIdUnique 109
-geClassOpKey                  = mkPreludeMiscIdUnique 110
-negateClassOpKey              = mkPreludeMiscIdUnique 111
-failMClassOpKey               = mkPreludeMiscIdUnique 112
-bindMClassOpKey               = mkPreludeMiscIdUnique 113 -- (>>=)
-thenMClassOpKey               = mkPreludeMiscIdUnique 114 -- (>>)
-fmapClassOpKey                = mkPreludeMiscIdUnique 115
-returnMClassOpKey             = mkPreludeMiscIdUnique 117
+fromIntegerClassOpKey         = mkPreludeMiscIdUnique 160
+minusClassOpKey               = mkPreludeMiscIdUnique 161
+fromRationalClassOpKey        = mkPreludeMiscIdUnique 162
+enumFromClassOpKey            = mkPreludeMiscIdUnique 163
+enumFromThenClassOpKey        = mkPreludeMiscIdUnique 164
+enumFromToClassOpKey          = mkPreludeMiscIdUnique 165
+enumFromThenToClassOpKey      = mkPreludeMiscIdUnique 166
+eqClassOpKey                  = mkPreludeMiscIdUnique 167
+geClassOpKey                  = mkPreludeMiscIdUnique 168
+negateClassOpKey              = mkPreludeMiscIdUnique 169
+failMClassOpKey               = mkPreludeMiscIdUnique 170
+bindMClassOpKey               = mkPreludeMiscIdUnique 171 -- (>>=)
+thenMClassOpKey               = mkPreludeMiscIdUnique 172 -- (>>)
+fmapClassOpKey                = mkPreludeMiscIdUnique 173
+returnMClassOpKey             = mkPreludeMiscIdUnique 174
 
 -- Recursive do notation
 mfixIdKey :: Unique
-mfixIdKey       = mkPreludeMiscIdUnique 118
+mfixIdKey       = mkPreludeMiscIdUnique 175
 
 -- Arrow notation
 arrAIdKey, composeAIdKey, firstAIdKey, appAIdKey, choiceAIdKey,
     loopAIdKey :: Unique
-arrAIdKey       = mkPreludeMiscIdUnique 119
-composeAIdKey   = mkPreludeMiscIdUnique 120 -- >>>
-firstAIdKey     = mkPreludeMiscIdUnique 121
-appAIdKey       = mkPreludeMiscIdUnique 122
-choiceAIdKey    = mkPreludeMiscIdUnique 123 --  |||
-loopAIdKey      = mkPreludeMiscIdUnique 124
+arrAIdKey       = mkPreludeMiscIdUnique 180
+composeAIdKey   = mkPreludeMiscIdUnique 181 -- >>>
+firstAIdKey     = mkPreludeMiscIdUnique 182
+appAIdKey       = mkPreludeMiscIdUnique 183
+choiceAIdKey    = mkPreludeMiscIdUnique 184 --  |||
+loopAIdKey      = mkPreludeMiscIdUnique 185
 
 fromStringClassOpKey :: Unique
-fromStringClassOpKey          = mkPreludeMiscIdUnique 125
+fromStringClassOpKey          = mkPreludeMiscIdUnique 186
 
 -- Annotation type checking
 toAnnotationWrapperIdKey :: Unique
-toAnnotationWrapperIdKey      = mkPreludeMiscIdUnique 126
+toAnnotationWrapperIdKey      = mkPreludeMiscIdUnique 187
 
 -- Conversion functions
 fromIntegralIdKey, realToFracIdKey, toIntegerClassOpKey, toRationalClassOpKey :: Unique
-fromIntegralIdKey    = mkPreludeMiscIdUnique 127
-realToFracIdKey      = mkPreludeMiscIdUnique 128
-toIntegerClassOpKey  = mkPreludeMiscIdUnique 129
-toRationalClassOpKey = mkPreludeMiscIdUnique 130
+fromIntegralIdKey    = mkPreludeMiscIdUnique 190
+realToFracIdKey      = mkPreludeMiscIdUnique 191
+toIntegerClassOpKey  = mkPreludeMiscIdUnique 192
+toRationalClassOpKey = mkPreludeMiscIdUnique 193
 
 -- Monad comprehensions
 guardMIdKey, liftMIdKey, groupMIdKey, mzipIdKey :: Unique
-guardMIdKey     = mkPreludeMiscIdUnique 131
-liftMIdKey      = mkPreludeMiscIdUnique 132
-groupMIdKey     = mkPreludeMiscIdUnique 133
-mzipIdKey       = mkPreludeMiscIdUnique 134
+guardMIdKey     = mkPreludeMiscIdUnique 194
+liftMIdKey      = mkPreludeMiscIdUnique 195
+groupMIdKey     = mkPreludeMiscIdUnique 196
+mzipIdKey       = mkPreludeMiscIdUnique 197
 
 
 ---------------- Template Haskell -------------------

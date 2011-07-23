@@ -15,6 +15,11 @@ module TysWiredIn (
 	trueDataCon,  trueDataConId,  true_RDR,
 	falseDataCon, falseDataConId, false_RDR,
 
+        -- * Ordering
+        ltDataCon, ltDataConId,
+        eqDataCon, eqDataConId,
+        gtDataCon, gtDataConId,
+
         -- * Char
 	charTyCon, charDataCon, charTyCon_RDR,
 	charTy, stringTy, charTyConName,
@@ -424,6 +429,20 @@ trueDataCon  = pcDataCon trueDataConName  [] [] boolTyCon
 falseDataConId, trueDataConId :: Id
 falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
+
+orderingTyCon :: TyCon
+orderingTyCon = pcTyCon True NonRecursive orderingTyConName
+                        [] [ltDataCon, eqDataCon, gtDataCon]
+
+ltDataCon, eqDataCon, gtDataCon :: DataCon
+ltDataCon = pcDataCon ltDataConName  [] [] orderingTyCon
+eqDataCon = pcDataCon eqDataConName  [] [] orderingTyCon
+gtDataCon = pcDataCon gtDataConName  [] [] orderingTyCon
+
+ltDataConId, eqDataConId, gtDataConId :: Id
+ltDataConId = dataConWorkId ltDataCon
+eqDataConId = dataConWorkId eqDataCon
+gtDataConId = dataConWorkId gtDataCon
 \end{code}
 
 %************************************************************************
