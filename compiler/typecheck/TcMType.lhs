@@ -42,10 +42,10 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   SourceTyCtxt(..), checkValidTheta, 
-  checkValidInstHead, checkValidInstance, 
+  checkValidInstHead, checkValidInstance, validDerivPred,
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness, 
   arityErr, 
-  growPredTyVars, growThetaTyVars, validDerivPred,
+  growPredTyVars, growThetaTyVars, 
 
   --------------------------------
   -- Zonking
@@ -1385,6 +1385,29 @@ instTypeErr pp_ty msg
 	 nest 2 msg]
 \end{code}
 
+validDeivPred checks for OK 'deriving' context.  See Note [Exotic
+derived instance contexts] in TcSimplify.  However the predicate is
+here because it uses sizeTypes, fvTypes.
+
+Also check for a bizarre corner case, when the derived instance decl 
+would look like
+    instance C a b => D (T a) where ...
+Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
+problems; in particular, it's hard to compare solutions for equality
+when finding the fixpoint, and that means the inferContext loop does
+not converge.  See Trac #5287.
+
+\begin{code}
+validDerivPred :: TyVarSet -> PredType -> Bool
+validDerivPred tv_set (ClassP _ tys) 
+  =  hasNoDups fvs 
+  && sizeTypes tys == length fvs
+  && all (`elemVarSet` tv_set) fvs
+  where 
+    fvs = fvTypes tys
+validDerivPred _ _  = False
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -1462,17 +1485,6 @@ nomoreMsg, smallerMsg, undecidableMsg :: SDoc
 nomoreMsg = ptext (sLit "Variable occurs more often in a constraint than in the instance head")
 smallerMsg = ptext (sLit "Constraint is no smaller than the instance head")
 undecidableMsg = ptext (sLit "Use -XUndecidableInstances to permit this")
-\end{code}
-
-validDeivPred checks for OK 'deriving' context.  See Note [Exotic
-derived instance contexts] in TcSimplify.  However the predicate is
-here because it uses sizeTypes, fvTypes.
-
-\begin{code}
-validDerivPred :: PredType -> Bool
-validDerivPred (ClassP _ tys) = hasNoDups fvs && sizeTypes tys == length fvs
-                              where fvs = fvTypes tys
-validDerivPred _              = False
 \end{code}
 
 

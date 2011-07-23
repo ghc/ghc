@@ -28,7 +28,7 @@ module TcType (
   MetaDetails(Flexi, Indirect), MetaInfo(..), 
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy,
   isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
-  metaTvRef, 
+  isAmbiguousTyVar, metaTvRef, 
   isFlexi, isIndirect, isRuntimeUnkSkol,
 
   --------------------------------
@@ -573,7 +573,7 @@ isImmutableTyVar tv
   | otherwise    = True
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar :: TcTyVar -> Bool 
+  isMetaTyVar, isAmbiguousTyVar :: TcTyVar -> Bool 
 
 isTyConableTyVar tv	
 	-- True of a meta-type variable that can be filled in 
@@ -601,8 +601,20 @@ isOverlappableTyVar tv
 isMetaTyVar tv 
   = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-	MetaTv _ _ -> True
-	_          -> False
+	MetaTv {} -> True
+	_         -> False
+
+-- isAmbiguousTyVar is used only when reporting type errors
+-- It picks out variables that are unbound, namely meta
+-- type variables and the RuntimUnk variables created by
+-- RtClosureInspect.zonkRTTIType.  These are "ambiguous" in
+-- the sense that they stand for an as-yet-unknown type
+isAmbiguousTyVar tv 
+  = ASSERT2( isTcTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
+	MetaTv {}     -> True
+	RuntimeUnk {} -> True
+	_             -> False
 
 isMetaTyVarTy :: TcType -> Bool
 isMetaTyVarTy (TyVarTy tv) = isMetaTyVar tv

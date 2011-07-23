@@ -123,10 +123,8 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
 
        	   -- Only report ambiguity if no other errors (at all) happened
 	   -- See Note [Avoiding spurious errors] in TcSimplify
-       ; ifErrsM (return ()) $ reportAmbigErrs ctxt skols ambigs }
+       ; ifErrsM (return ()) $ reportAmbigErrs ctxt ambigs }
   where
-    skols = foldr (unionVarSet . ic_skols) emptyVarSet (cec_encl ctxt)
- 
 	-- Report equalities of form (a~ty) first.  They are usually
 	-- skolem-equalities, and they cause confusing knock-on 
 	-- effects in other errors; see test T4093b.
@@ -138,9 +136,9 @@ reportTidyWanteds ctxt (WC { wc_flat = flats, wc_insol = insols, wc_impl = impli
 	--   (a) it is a class constraint
         --   (b) it constrains only type variables
 	--       (else we'd prefer to report it as "no instance for...")
-        --   (c) it mentions type variables that are not skolems
+        --   (c) it mentions a (presumably un-filled-in) meta type variable
     is_ambiguous d = isTyVarClassPred pred
-                  && not (tyVarsOfPred pred `subVarSet` skols)
+                  && any isAmbiguousTyVar (varSetElems (tyVarsOfPred pred))
 		  where   
                      pred = evVarOfPred d
 
@@ -217,13 +215,13 @@ pprWithArising :: [WantedEvVar] -> (WantedLoc, SDoc)
 pprWithArising [] 
   = panic "pprWithArising"
 pprWithArising [EvVarX ev loc]
-  = (loc, pprEvVarTheta [ev] <+> pprArising (ctLocOrigin loc))
+  = (loc, hang (pprEvVarTheta [ev]) 2 (pprArising (ctLocOrigin loc)))
 pprWithArising ev_vars
   = (first_loc, vcat (map ppr_one ev_vars))
   where
     first_loc = evVarX (head ev_vars)
     ppr_one (EvVarX v loc)
-       = parens (pprPredTy (evVarPred v)) <+> pprArisingAt loc
+       = hang (parens (pprPredTy (evVarPred v))) 2 (pprArisingAt loc)
 
 addErrorReport :: ReportErrCtxt -> SDoc -> TcM ()
 addErrorReport ctxt msg = addErrTcM (cec_tidy ctxt, msg $$ cec_extra ctxt)
@@ -684,59 +682,58 @@ that match such things.  And flattening under a for-all is problematic
 anyway; consider C (forall a. F a)
 
 \begin{code}
-reportAmbigErrs :: ReportErrCtxt -> TcTyVarSet -> [WantedEvVar] -> TcM ()
-reportAmbigErrs ctxt skols ambigs 
+reportAmbigErrs :: ReportErrCtxt -> [WantedEvVar] -> TcM ()
+reportAmbigErrs ctxt ambigs 
 -- Divide into groups that share a common set of ambiguous tyvars
-  = mapM_ report (equivClasses cmp ambigs_w_tvs)
-  where
-    ambigs_w_tvs = [ (d, varSetElems (tyVarsOfEvVarX d `minusVarSet` skols))
+  = mapM_ (reportAmbigGroup ctxt) (equivClasses cmp ambigs_w_tvs) 
+ where
+    ambigs_w_tvs = [ (d, filter isAmbiguousTyVar (varSetElems (tyVarsOfEvVarX d)))
                    | d <- ambigs ]
     cmp (_,tvs1) (_,tvs2) = tvs1 `compare` tvs2
 
-    report :: [(WantedEvVar, [TcTyVar])] -> TcM ()
-    report pairs
-       = setCtLoc loc $
-         do { let main_msg = sep [ text "Ambiguous type variable" <> plural tvs
-	         	           <+> pprQuotedList tvs
-                                   <+> text "in the constraint" <> plural pairs <> colon
-                                 , nest 2 pp_wanteds ]
-             ; (tidy_env, mono_msg) <- mkMonomorphismMsg ctxt tvs
-            ; addErrTcM (tidy_env, main_msg $$ mono_msg) }
-       where
-         (_, tvs) : _ = pairs
-         (loc, pp_wanteds) = pprWithArising (map fst pairs)
 
-mkMonomorphismMsg :: ReportErrCtxt -> [TcTyVar] -> TcM (TidyEnv, SDoc)
--- There's an error with these Insts; if they have free type variables
--- it's probably caused by the monomorphism restriction. 
--- Try to identify the offending variable
--- ASSUMPTION: the Insts are fully zonked
-mkMonomorphismMsg ctxt inst_tvs
-  = do	{ dflags <- getDOpts
-        ; (tidy_env, docs) <- findGlobals ctxt (mkVarSet inst_tvs)
-	; return (tidy_env, mk_msg dflags docs) }
+reportAmbigGroup :: ReportErrCtxt -> [(WantedEvVar, [TcTyVar])] -> TcM ()
+-- The pairs all have the same [TcTyVar]
+reportAmbigGroup ctxt pairs
+  = setCtLoc loc $
+    do { dflags <- getDOpts
+       ; (tidy_env, docs) <- findGlobals ctxt (mkVarSet tvs)
+       ; addErrTcM (tidy_env, main_msg $$ mk_msg dflags docs) }
   where
-    mk_msg _ _ | any isRuntimeUnkSkol inst_tvs  -- See Note [Runtime skolems]
+    (wev, tvs) : _ = pairs
+    (loc, pp_wanteds) = pprWithArising (map fst pairs)
+    main_msg = sep [ text "Ambiguous type variable" <> plural tvs
+	             <+> pprQuotedList tvs
+                     <+> text "in the constraint" <> plural pairs <> colon
+                   , nest 2 pp_wanteds ]
+
+    mk_msg dflags docs 
+        | any isRuntimeUnkSkol tvs  -- See Note [Runtime skolems]
         =  vcat [ptext (sLit "Cannot resolve unknown runtime types:") <+>
-                   (pprWithCommas ppr inst_tvs),
-                ptext (sLit "Use :print or :force to determine these types")]
-    mk_msg _ []   = ptext (sLit "Probable fix: add a type signature that fixes these type variable(s)")
+                   (pprWithCommas ppr tvs),
+                 ptext (sLit "Use :print or :force to determine these types")]
+
+        | DerivOrigin <- ctLocOrigin (evVarX wev)
+        = ptext (sLit "Probable fix: use a 'standalone deriving' declaration instead")
+
+        | null docs 
+        = ptext (sLit "Probable fix: add a type signature that fixes these type variable(s)")
 			-- This happens in things like
 			--	f x = show (read "foo")
 			-- where monomorphism doesn't play any role
-    mk_msg dflags docs 
+        | otherwise
 	= vcat [ptext (sLit "Possible cause: the monomorphism restriction applied to the following:"),
 		nest 2 (vcat docs),
-		monomorphism_fix dflags]
+		mono_fix dflags]
 
-monomorphism_fix :: DynFlags -> SDoc
-monomorphism_fix dflags
-  = ptext (sLit "Probable fix:") <+> vcat
-	[ptext (sLit "give these definition(s) an explicit type signature"),
-	 if xopt Opt_MonomorphismRestriction dflags
-           then ptext (sLit "or use -XNoMonomorphismRestriction")
-           else empty]	-- Only suggest adding "-XNoMonomorphismRestriction"
-			-- if it is not already set!
+    mono_fix :: DynFlags -> SDoc
+    mono_fix dflags
+      = ptext (sLit "Probable fix:") <+> vcat
+     	[ptext (sLit "give these definition(s) an explicit type signature"),
+     	 if xopt Opt_MonomorphismRestriction dflags
+         then ptext (sLit "or use -XNoMonomorphismRestriction")
+         else empty]	-- Only suggest adding "-XNoMonomorphismRestriction"
+     			-- if it is not already set!
 
 getSkolemInfo :: [Implication] -> TcTyVar -> SkolemInfo
 getSkolemInfo [] tv
