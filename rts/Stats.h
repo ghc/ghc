@@ -49,7 +49,6 @@ void      stat_workerStop(void);
 void      initStats0(void);
 void      initStats1(void);
 
-double    mut_user_time_during_GC(void);
 double    mut_user_time_until(Ticks t);
 double    mut_user_time(void);
 
