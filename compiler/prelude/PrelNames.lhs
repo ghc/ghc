@@ -185,7 +185,7 @@ basicKnownKeyNames
         groupWithName,
 
 	-- Strings and lists
-	unpackCStringName, unpackCStringAppendName,
+	unpackCStringName,
 	unpackCStringFoldrName, unpackCStringUtf8Name,
 
 	-- List operations
@@ -638,9 +638,6 @@ wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
-orderingTyConName :: Name
-orderingTyConName = tcQual   gHC_ORDERING (fsLit "Ordering") orderingTyConKey
-
 eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName	  = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
 leftDataConName   = conName dATA_EITHER (fsLit "Left")   leftDataConKey
@@ -685,7 +682,6 @@ rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
 unpackCStringName, unpackCStringAppendName, unpackCStringFoldrName,
     unpackCStringUtf8Name, eqStringName, stringTyConName :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
-unpackCStringAppendName = varQual gHC_CSTRING (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
 unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName	 	= varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
@@ -1097,7 +1093,7 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
     int32TyConKey, int64PrimTyConKey, int64TyConKey, integerTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
     mutableArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
-    orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
+    mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
     realWorldTyConKey, stablePtrPrimTyConKey, stablePtrTyConKey,
     anyTyConKey :: Unique
 addrPrimTyConKey			= mkPreludeTyConUnique	1
@@ -1125,7 +1121,6 @@ foreignObjPrimTyConKey			= mkPreludeTyConUnique 24
 weakPrimTyConKey			= mkPreludeTyConUnique 27
 mutableArrayPrimTyConKey		= mkPreludeTyConUnique 28
 mutableByteArrayPrimTyConKey		= mkPreludeTyConUnique 29
-orderingTyConKey			= mkPreludeTyConUnique 30
 mVarPrimTyConKey		    	= mkPreludeTyConUnique 31
 ratioTyConKey				= mkPreludeTyConUnique 32
 rationalTyConKey			= mkPreludeTyConUnique 33
@@ -1509,15 +1504,6 @@ mzipIdKey       = mkPreludeMiscIdUnique 134
 %************************************************************************
 
 \begin{code}
-numericTyKeys :: [Unique]
-numericTyKeys = 
-	[ wordTyConKey
-	, intTyConKey
-	, integerTyConKey
-	, doubleTyConKey
-	, floatTyConKey
-	]
-
 kindKeys :: [Unique] 
 kindKeys = [ liftedTypeKindTyConKey
 	   , openTypeKindTyConKey
@@ -1552,13 +1538,6 @@ fractionalClassKeys =
     	, floatingClassKey
     	, realFracClassKey
     	, realFloatClassKey
-    	]
-
-	-- the strictness analyser needs to know about numeric types
-	-- (see SaAbsInt.lhs)
-needsDataDeclCtxtClassKeys :: [Unique]
-needsDataDeclCtxtClassKeys = -- see comments in TcDeriv
-  	[ readClassKey
     	]
 
 -- The "standard classes" are used in defaulting (Haskell 98 report 4.3.4),
