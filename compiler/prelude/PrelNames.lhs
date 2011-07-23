@@ -638,6 +638,9 @@ wildCardName = mkSystemVarName wildCardKey (fsLit "wild")
 runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
+orderingTyConName :: Name
+orderingTyConName = tcQual   gHC_ORDERING (fsLit "Ordering") orderingTyConKey
+
 eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
 leftDataConName   = conName dATA_EITHER (fsLit "Left")   leftDataConKey
@@ -679,7 +682,7 @@ repTyConName  = tcQual gHC_GENERICS (fsLit "Rep")  repTyConKey
 rep1TyConName = tcQual gHC_GENERICS (fsLit "Rep1") rep1TyConKey
 
 -- Base strings Strings
-unpackCStringName, unpackCStringAppendName, unpackCStringFoldrName,
+unpackCStringName, unpackCStringFoldrName,
     unpackCStringUtf8Name, eqStringName, stringTyConName :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
@@ -1093,7 +1096,7 @@ addrPrimTyConKey, arrayPrimTyConKey, boolTyConKey, byteArrayPrimTyConKey,
     int32TyConKey, int64PrimTyConKey, int64TyConKey, integerTyConKey,
     listTyConKey, foreignObjPrimTyConKey, weakPrimTyConKey,
     mutableArrayPrimTyConKey, mutableByteArrayPrimTyConKey,
-    mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
+    orderingTyConKey, mVarPrimTyConKey, ratioTyConKey, rationalTyConKey,
     realWorldTyConKey, stablePtrPrimTyConKey, stablePtrTyConKey,
     anyTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
@@ -1121,6 +1124,7 @@ foreignObjPrimTyConKey                  = mkPreludeTyConUnique 24
 weakPrimTyConKey                        = mkPreludeTyConUnique 27
 mutableArrayPrimTyConKey                = mkPreludeTyConUnique 28
 mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 29
+orderingTyConKey                        = mkPreludeTyConUnique 30
 mVarPrimTyConKey                        = mkPreludeTyConUnique 31
 ratioTyConKey                           = mkPreludeTyConUnique 32
 rationalTyConKey                        = mkPreludeTyConUnique 33
