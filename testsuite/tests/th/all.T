@@ -184,3 +184,11 @@ test('T5037', normal, compile, ['-v0'])
 test('TH_unboxedSingleton', normal, compile, ['-v0'])
 test('T5290', normal, compile, ['-v0 -ddump-splices'])
 
+test('TH_unresolvedInfix',
+     extra_clean(['TH_unresolvedInfix_Lib.hi', 'TH_unresolvedInfix_Lib.o']),
+     multimod_compile_and_run,
+     ['TH_unresolvedInfix.hs', '-v0'])
+test('TH_unresolvedInfix2',
+     extra_clean(['TH_unresolvedInfix_Lib.hi', 'TH_unresolvedInfix_Lib.o']),
+     multimod_compile_fail,
+     ['TH_unresolvedInfix2.hs', '-v0'])

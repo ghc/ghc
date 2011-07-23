@@ -1,0 +1,12 @@
+
+TH_unresolvedInfix2.hs:6:11:
+   The operator `:+' [infixl 6] of a section
+       must have lower precedence than that of the operand,
+         namely `:+' [infixl 6]
+       in the section: `:+ N :+ N'
+   In the result of the splice:
+     $(infixE Nothing plus (Just $ n +? n))
+   To see what the splice expanded to, use -ddump-splices
+   In the expression: $(infixE Nothing plus (Just $ n +? n))
+   In an equation for `expr':
+       expr = $(infixE Nothing plus (Just $ n +? n))
