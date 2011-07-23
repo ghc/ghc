@@ -68,7 +68,7 @@ instance Num Int8 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I8# (narrow8Int# (toInt# i))
+    fromInteger i          = I8# (narrow8Int# (integerToInt i))
 
 instance Real Int8 where
     toRational x = toInteger x % 1
@@ -210,7 +210,7 @@ instance Num Int16 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I16# (narrow16Int# (toInt# i))
+    fromInteger i          = I16# (narrow16Int# (integerToInt i))
 
 instance Real Int16 where
     toRational x = toInteger x % 1
@@ -500,7 +500,7 @@ instance Num Int32 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I32# (narrow32Int# (toInt# i))
+    fromInteger i          = I32# (narrow32Int# (integerToInt i))
 
 instance Enum Int32 where
     succ x
@@ -815,7 +815,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I64# (toInt# i)
+    fromInteger i          = I64# (integerToInt i)
 
 instance Enum Int64 where
     succ x

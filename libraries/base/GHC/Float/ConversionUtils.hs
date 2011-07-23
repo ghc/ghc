@@ -46,7 +46,7 @@ elim64# n e =
 
 #else
 
-#define TO64    toInt#
+#define TO64    integerToInt
 
 -- Double mantissae fit it Int#
 elim64# :: Int# -> Int# -> (# Integer, Int# #)

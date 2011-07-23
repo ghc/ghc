@@ -356,7 +356,7 @@ instance  Real Double  where
           (# m, e# #)
             | e# >=# 0#                                         ->
                 shiftLInteger m e# :% 1
-            | (int2Word# (toInt# m) `and#` 1##) `eqWord#` 0##   ->
+            | (int2Word# (integerToInt m) `and#` 1##) `eqWord#` 0##   ->
                 case elimZerosInteger m (negateInt# e#) of
                     (# n, d# #) ->  n :% shiftLInteger 1 d#
             | otherwise                                         ->

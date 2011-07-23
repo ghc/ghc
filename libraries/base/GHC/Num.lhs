@@ -113,7 +113,7 @@ instance  Num Int  where
              | otherwise   = 1
 
     {-# INLINE fromInteger #-}	 -- Just to be sure!
-    fromInteger i = I# (toInt# i)
+    fromInteger i = I# (integerToInt i)
 
 quotRemInt :: Int -> Int -> (Int, Int)
 quotRemInt a@(I# _) b@(I# _) = (a `quotInt` b, a `remInt` b)
@@ -251,7 +251,7 @@ instance  Enum Integer  where
     succ x               = x + 1
     pred x               = x - 1
     toEnum (I# n)        = smallInteger n
-    fromEnum n           = I# (toInt# n)
+    fromEnum n           = I# (integerToInt n)
 
     {-# INLINE enumFrom #-}
     {-# INLINE enumFromThen #-}
