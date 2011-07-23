@@ -16,9 +16,10 @@ nestDepth :: Int
 nestDepth = 4
 
 type Precedence = Int
-appPrec, opPrec, noPrec :: Precedence
-appPrec = 2    -- Argument of a function application
-opPrec  = 1    -- Argument of an infix operator
+appPrec, unopPrec, opPrec, noPrec :: Precedence
+appPrec = 3    -- Argument of a function application
+opPrec  = 2    -- Argument of an infix operator
+unopPrec = 1   -- Argument of an unresolved infix operator
 noPrec  = 0    -- Others
 
 parensIf :: Bool -> Doc -> Doc
@@ -98,6 +99,11 @@ pprExp _ (ConE c)     = pprName' Applied c
 pprExp i (LitE l)     = pprLit i l
 pprExp i (AppE e1 e2) = parensIf (i >= appPrec) $ pprExp opPrec e1
                                               <+> pprExp appPrec e2
+pprExp _ (ParensE e)  = parens (pprExp noPrec e)
+pprExp i (UInfixE e1 op e2)
+ = parensIf (i > unopPrec) $ pprExp unopPrec e1
+                         <+> pprInfixExp op
+                         <+> pprExp unopPrec e2
 pprExp i (InfixE (Just e1) op (Just e2))
  = parensIf (i >= opPrec) $ pprExp opPrec e1
                         <+> pprInfixExp op
@@ -194,6 +200,11 @@ pprPat _ (TupP ps)    = parens $ sep $ punctuate comma $ map ppr ps
 pprPat _ (UnboxedTupP ps) = hashParens $ sep $ punctuate comma $ map ppr ps
 pprPat i (ConP s ps)  = parensIf (i >= appPrec) $ pprName' Applied s
                                               <+> sep (map (pprPat appPrec) ps)
+pprPat _ (ParensP p)  = parens $ pprPat noPrec p
+pprPat i (UInfixP p1 n p2)
+                      = parensIf (i > unopPrec) (pprPat unopPrec p1 <+>
+                                                 pprName' Infix n   <+>
+                                                 pprPat unopPrec p2)
 pprPat i (InfixP p1 n p2)
                       = parensIf (i >= opPrec) (pprPat opPrec p1 <+>
                                                 pprName' Infix n <+>

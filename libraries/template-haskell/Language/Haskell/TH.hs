@@ -46,7 +46,8 @@ module Language.Haskell.TH(
 	intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
 	charL, stringL, stringPrimL,
     -- *** Patterns
-	litP, varP, tupP, conP, infixP, tildeP, bangP, asP, wildP, recP,
+	litP, varP, tupP, conP, uInfixP, parensP, infixP,
+	tildeP, bangP, asP, wildP, recP,
 	listP, sigP, viewP,
 	fieldPat,
 
@@ -54,7 +55,8 @@ module Language.Haskell.TH(
 	normalB, guardedB, normalG, normalGE, patG, patGE, match, clause, 
 
     -- *** Expressions
-	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
+	dyn, global, varE, conE, litE, appE, uInfixE, parensE,
+	infixE, infixApp, sectionL, sectionR, 
 	lamE, lam1E, tupE, condE, letE, caseE, appsE,
 	listE, sigE, recConE, recUpdE, stringE, fieldExp,
     -- **** Ranges

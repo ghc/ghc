@@ -33,6 +33,7 @@ module Language.Haskell.TH.Syntax(
         showName, showName', NameIs(..),
 
 	-- * The algebraic data types
+	-- $infix
 	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
 	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, ClassInstance(..),
@@ -689,6 +690,68 @@ defaultFixity = Fixity maxPrecedence InfixL
 --
 -----------------------------------------------------
 
+{- $infix #infix#
+Note [Unresolved infix]
+~~~~~~~~~~~~~~~~~~~~~~~
+
+When implementing antiquotation for quasiquoters, one often wants
+to parse strings into expressions:
+
+> parse :: String -> Maybe 'Exp'
+
+But how should we parse @a + b * c@? If we don't know the fixities of
+@+@ and @*@, we don't know whether to parse it as @a + (b * c)@ or @(a
++ b) * c@.
+
+In cases like this, use 'UInfixE' or 'UInfixP', which stand for
+\"unresolved infix expression\" and \"unresolved infix pattern\". When
+the compiler is given a splice containing a tree of @UInfixE@
+applications such as
+
+> UInfixE
+>   (UInfixE e1 op1 e2)
+>   op2
+>   (UInfixE e3 op3 e4)
+
+it will look up and the fixities of the relevant operators and
+reassociate the tree as necessary.
+
+  * trees will not be reassociated across 'ParensE' or 'ParensP',
+    which are of use for parsing expressions like
+
+    > (a + b * c) + d * e
+
+  * 'InfixE' and 'InfixP' expressions are never reassociated.
+
+  * The 'UInfixE' constructor doesn't support sections. Sections
+    such as @(a *)@ have no ambiguity, so 'InfixE' suffices. For longer
+    sections such as @(a + b * c -)@, use an 'InfixE' constructor for the
+    outer-most section, and use 'UInfixE' constructors for all
+    other operators:
+
+    > InfixE
+    >   Just (UInfixE ...a + b * c...)
+    >   op
+    >   Nothing
+
+    Sections such as @(a + b +)@ and @((a + b) +)@ should be rendered
+    into 'Exp's differently:
+
+    > (+ a + b)   ---> InfixE Nothing + (Just $ UInfixE a + b)
+    >                    -- will result in a fixity error if (+) is left-infix
+    > (+ (a + b)) ---> InfixE Nothing + (Just $ ParensE $ UInfixE a + b)
+    >                    -- no fixity errors
+
+  * Quoted expressions such as
+
+    > [| a * b + c |] :: Q Exp
+    > [p| a : b : c |] :: Q Pat
+
+    will never contain 'UInfixE', 'UInfixP', 'ParensE', or 'ParensP'
+    constructors.
+
+-}
+
 data Lit = CharL Char 
          | StringL String 
          | IntegerL Integer     -- ^ Used for overloaded and non-overloaded
@@ -715,6 +778,12 @@ data Pat
   | UnboxedTupP [Pat]             -- ^ @{ (# p1,p2 #) }@
   | ConP Name [Pat]               -- ^ @data T1 = C1 t1 t2; {C1 p1 p1} = e@
   | InfixP Pat Name Pat           -- ^ @foo ({x :+ y}) = e@
+  | UInfixP Pat Name Pat          -- ^ @foo ({x :+ y}) = e@
+                                  --
+                                  -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
+  | ParensP Pat                   -- ^ @{(p)}@
+                                  --
+                                  -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
   | TildeP Pat                    -- ^ @{ ~p }@
   | BangP Pat                     -- ^ @{ !p }@
   | AsP Name Pat                  -- ^ @{ x \@ p }@
@@ -756,6 +825,12 @@ data Exp
     -- Maybe there should be a var-or-con type?
     -- Or maybe we should leave it to the String itself?
 
+  | UInfixE Exp Exp Exp                -- ^ @{x + y}@
+                                       --
+                                       -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
+  | ParensE Exp                        -- ^ @{ (e) }@
+                                       --
+                                       -- See Note [Unresolved infix] at "Language.Haskell.TH.Syntax#infix"
   | LamE [Pat] Exp                     -- ^ @{ \ p1 p2 -> e }@
   | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
   | UnboxedTupE [Exp]                  -- ^ @{ (# e1,e2 #) }  @

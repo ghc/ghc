@@ -73,6 +73,14 @@ infixP :: PatQ -> Name -> PatQ -> PatQ
 infixP p1 n p2 = do p1' <- p1
                     p2' <- p2
                     return (InfixP p1' n p2')
+uInfixP :: PatQ -> Name -> PatQ -> PatQ
+uInfixP p1 n p2 = do p1' <- p1
+                     p2' <- p2
+                     return (UInfixP p1' n p2')
+parensP :: PatQ -> PatQ
+parensP p = do p' <- p
+               return (ParensP p')
+
 tildeP :: PatQ -> PatQ
 tildeP p = do p' <- p
               return (TildeP p')
@@ -199,6 +207,13 @@ litE c = return (LitE c)
 
 appE :: ExpQ -> ExpQ -> ExpQ
 appE x y = do { a <- x; b <- y; return (AppE a b)}
+
+parensE :: ExpQ -> ExpQ
+parensE x = do { x' <- x; return (ParensE x') }
+
+uInfixE :: ExpQ -> ExpQ -> ExpQ -> ExpQ
+uInfixE x s y = do { x' <- x; s' <- s; y' <- y;
+                     return (UInfixE x' s' y') }
 
 infixE :: Maybe ExpQ -> ExpQ -> Maybe ExpQ -> ExpQ
 infixE (Just x) s (Just y) = do { a <- x; s' <- s; b <- y;
