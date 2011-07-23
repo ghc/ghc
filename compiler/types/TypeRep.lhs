@@ -150,7 +150,7 @@ data Type
 			-- See Note [Equality-constrained types]
 
   | ForAllTy
-	TyCoVar         -- Type variable
+	TyVar         -- Type variable
 	Type	        -- ^ A polymorphic type
 
   | PredTy
@@ -301,10 +301,10 @@ isCoercionKind _                    = False
 %************************************************************************
 
 \begin{code}
-tyVarsOfPred :: PredType -> TyCoVarSet
+tyVarsOfPred :: PredType -> TyVarSet
 tyVarsOfPred = varsOfPred tyVarsOfType
 
-tyVarsOfTheta :: ThetaType -> TyCoVarSet
+tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = varsOfTheta tyVarsOfType
 
 tyVarsOfType :: Type -> VarSet

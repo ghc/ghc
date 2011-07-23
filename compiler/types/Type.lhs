@@ -1266,7 +1266,7 @@ getTvInScope (TvSubst in_scope _) = in_scope
 isInScope :: Var -> TvSubst -> Bool
 isInScope v (TvSubst in_scope _) = v `elemInScopeSet` in_scope
 
-notElemTvSubst :: TyCoVar -> TvSubst -> Bool
+notElemTvSubst :: CoVar -> TvSubst -> Bool
 notElemTvSubst v (TvSubst _ tenv) = not (v `elemVarEnv` tenv)
 
 setTvSubstEnv :: TvSubst -> TvSubstEnv -> TvSubst

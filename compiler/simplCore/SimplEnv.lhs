@@ -110,9 +110,9 @@ data SimplEnv
         seCC        :: CostCentreStack, -- The enclosing CCS (when profiling)
 
 	-- The current substitution
-	seTvSubst   :: TvSubstEnv,	-- InTyVar   |--> OutType
-        seCvSubst   :: CvSubstEnv,      -- InTyCoVar |--> OutCoercion
-	seIdSubst   :: SimplIdSubst,	-- InId      |--> OutExpr
+	seTvSubst   :: TvSubstEnv,	-- InTyVar |--> OutType
+        seCvSubst   :: CvSubstEnv,      -- InCoVar |--> OutCoercion
+	seIdSubst   :: SimplIdSubst,	-- InId    |--> OutExpr
 
      ----------- Dynamic part of the environment -----------
      -- Dynamic in the sense of describing the setup where

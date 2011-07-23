@@ -101,7 +101,7 @@ data Subst
                       -- applying the substitution
           IdSubstEnv  -- Substitution for Ids
           TvSubstEnv  -- Substitution from TyVars to Types
-          CvSubstEnv  -- Substitution from TyCoVars to Coercions
+          CvSubstEnv  -- Substitution from CoVars to Coercions
 
 	-- INVARIANT 1: See #in_scope_invariant#
 	-- This is what lets us deal with name capture properly
@@ -213,14 +213,14 @@ extendTvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids (extendVarEn
 extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
 extendTvSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope ids (extendVarEnvList tvs prs) cvs
 
--- | Add a substitution from a 'TyCoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
+-- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
-extendCvSubst :: Subst -> TyCoVar -> Coercion -> Subst
+extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids tvs (extendVarEnv cvs v r)
 
--- | Adds multiple 'TyCoVar' -> 'Coercion' substitutions to the
+-- | Adds multiple 'CoVar' -> 'Coercion' substitutions to the
 -- 'Subst': see also 'extendCvSubst'
-extendCvSubstList :: Subst -> [(TyCoVar,Coercion)] -> Subst
+extendCvSubstList :: Subst -> [(CoVar,Coercion)] -> Subst
 extendCvSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope ids tvs (extendVarEnvList cvs prs)
 
 -- | Add a substitution appropriate to the thing being substituted
@@ -261,7 +261,7 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
 lookupTvSubst :: Subst -> TyVar -> Type
 lookupTvSubst (Subst _ _ tvs _) v = ASSERT( isTyVar v) lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
 
--- | Find the coercion substitution for a 'TyCoVar' in the 'Subst'
+-- | Find the coercion substitution for a 'CoVar' in the 'Subst'
 lookupCvSubst :: Subst -> CoVar -> Coercion
 lookupCvSubst (Subst _ _ _ cvs) v = ASSERT( isCoVar v ) lookupVarEnv cvs v `orElse` mkCoVarCo v
 
