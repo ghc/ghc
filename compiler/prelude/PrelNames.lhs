@@ -1311,15 +1311,12 @@ rightDataConKey				= mkPreludeDataConUnique 26
 %************************************************************************
 
 \begin{code}
-absentErrorIdKey, augmentIdKey, appendIdKey, buildIdKey, errorIdKey,
-    foldlIdKey, foldrIdKey, recSelErrorIdKey, 
-    integerMinusOneIdKey, integerPlusOneIdKey,
-    integerPlusTwoIdKey, integerZeroIdKey,
-    int2IntegerIdKey, seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
+wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
+    buildIdKey, errorIdKey, foldrIdKey, recSelErrorIdKey,
+    seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
-    runtimeErrorIdKey, parErrorIdKey, parIdKey, patErrorIdKey,
-    realWorldPrimIdKey, recConErrorIdKey, recUpdErrorIdKey,
-    traceIdKey, wildCardKey,
+    runtimeErrorIdKey, patErrorIdKey,
+    realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey :: Unique
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard]
@@ -1328,34 +1325,24 @@ augmentIdKey		      = mkPreludeMiscIdUnique  3
 appendIdKey		      = mkPreludeMiscIdUnique  4
 buildIdKey		      = mkPreludeMiscIdUnique  5
 errorIdKey		      = mkPreludeMiscIdUnique  6
-foldlIdKey		      = mkPreludeMiscIdUnique  7
 foldrIdKey		      = mkPreludeMiscIdUnique  8
 recSelErrorIdKey	      = mkPreludeMiscIdUnique  9
-integerMinusOneIdKey	      = mkPreludeMiscIdUnique 10
-integerPlusOneIdKey	      = mkPreludeMiscIdUnique 11
-integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 12
-integerZeroIdKey	      = mkPreludeMiscIdUnique 13
-int2IntegerIdKey	      = mkPreludeMiscIdUnique 14
 seqIdKey		      = mkPreludeMiscIdUnique 15
 irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 16
 eqStringIdKey		      = mkPreludeMiscIdUnique 17
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 18
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 19
 runtimeErrorIdKey	      = mkPreludeMiscIdUnique 20 
-parErrorIdKey		      = mkPreludeMiscIdUnique 21
-parIdKey		      = mkPreludeMiscIdUnique 22
 patErrorIdKey		      = mkPreludeMiscIdUnique 23
 realWorldPrimIdKey	      = mkPreludeMiscIdUnique 24
 recConErrorIdKey	      = mkPreludeMiscIdUnique 25
-recUpdErrorIdKey	      = mkPreludeMiscIdUnique 26
-traceIdKey		      = mkPreludeMiscIdUnique 27
 unpackCStringUtf8IdKey	      = mkPreludeMiscIdUnique 28
 unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 29
 unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 30
 unpackCStringIdKey	      = mkPreludeMiscIdUnique 31
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
-    returnIOIdKey, deRefStablePtrIdKey, newStablePtrIdKey,
+    returnIOIdKey, newStablePtrIdKey,
     smallIntegerIdKey, plusIntegerIdKey, timesIntegerIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
     fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey, runSTRepIdKey :: Unique
@@ -1365,7 +1352,6 @@ filterIdKey		      = mkPreludeMiscIdUnique 34
 zipIdKey		      = mkPreludeMiscIdUnique 35
 bindIOIdKey		      = mkPreludeMiscIdUnique 36
 returnIOIdKey		      = mkPreludeMiscIdUnique 37
-deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
 newStablePtrIdKey	      = mkPreludeMiscIdUnique 39
 smallIntegerIdKey	      = mkPreludeMiscIdUnique 40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
