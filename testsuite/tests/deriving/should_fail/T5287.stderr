@@ -1,0 +1,11 @@
+ghc-stage2.exe: panic! (the 'impossible' happened)
+  (GHC version 7.3.20110721 for i386-unknown-mingw32):
+	solveDerivEqns: probable loop
+    (T5287.hs:6:29-32 main:Bug.$fReadE{v rhW} [e{tv aaR} [tv]] base:GHC.Read.Read{tc 2d} [main:Bug.E{tc raM}
+                                                                                            e{tv aaR} [tv]] = [base:GHC.Read.Read{tc 2d}
+                                                                                                                 (main:Bug.D{tc raO}
+                                                                                                                    e{tv aaR} [tv])])
+    [[main:Bug.A{tc raQ} e{tv aaR} [tv] oops{tv alO} [tcs]]]
+
+Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug
+
