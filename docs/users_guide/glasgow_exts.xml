@@ -5052,7 +5052,7 @@ type instance F t1 .. tn = t
     </sect4>
   </sect3>
 
-  <sect3 id-="equality-constraints">
+  <sect3 id="equality-constraints">
     <title>Equality constraints</title>
     <para>
       Type context can include equality constraints of the form <literal>t1 ~
@@ -5094,7 +5094,7 @@ class (F a ~ b) => C a b where
     </para>
   </sect3>
 
-  <sect3 id-="ty-fams-in-instances">
+  <sect3 id="ty-fams-in-instances">
     <title>Type families and instance declarations</title>
     <para>Type families require us to extend the rules for
       the form of instance heads, which are given
