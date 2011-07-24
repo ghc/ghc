@@ -422,6 +422,9 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
                   deriv_inst_info ++ local_info,
                   aux_binds `plusHsValBinds` deriv_binds)
     }}}
+  where
+      typInstErr = ptext $ sLit $ "Can't create hand written instances of Typeable in Safe"
+                                ++ " Haskell! Can only derive them"
 
 addInsts :: [InstInfo Name] -> TcM a -> TcM a
 addInsts infos thing_inside
