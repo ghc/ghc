@@ -9,17 +9,6 @@
   </para>
 
   <sect2>
-    <title>Highlights</title>
-    <itemizedlist>
-      <listitem>
-        <para>
-          XXX
-        </para>
-      </listitem>
-    </itemizedlist>
-  </sect2>
-
-  <sect2>
     <title>Language changes</title>
     <itemizedlist>
       <listitem>
@@ -51,6 +40,29 @@
           backwards compatibility) on in <literal>Haskell98</literal>,
           but off in <literal>Haskell2010</literal>.
         </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          The new <literal>RelaxedLayout</literal> extension now
+          controls a small extension to the layout rule that GHC has
+          supported unconditionally for some time. It allows explicit
+          braces to be less indented than implicit braces, without
+          closing the implicit braces, e.g.:
+        </para>
+<programlisting>
+f x = case x of
+     False -> do
+    { return x; }
+</programlisting>
+        <para>
+          parses as
+        </para>
+<programlisting>
+f x = case x of
+     {False -> do
+    { return x; }}
+</programlisting>
       </listitem>
 
       <listitem>
@@ -92,14 +104,6 @@ import safe Network.Socket
           extension, although all imports are required to be trusted
           anyway.
           See <xref linkend="safe-language" /> for more details.
-        </para>
-
-        <para>
-          The new <literal>SafeLanguage</literal> extension is the same
-          as the <literal>Safe</literal> extension, except that imports
-          are not required to be trusted, and thus the module itself is
-          not trusted.
-          See <xref linkend="safe-no-trust" /> for more details.
         </para>
       </listitem>
 
@@ -188,6 +192,13 @@ foreign import ccall interruptible
 
       <listitem>
         <para>
+          The <literal>threadsafe</literal> FFI annotation is no longer
+          supported. Use <literal>safe</literal> instead.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
           The <literal>OverlappingInstances</literal> extension used to
           allow overlapping instances only when all but the
           most specific instance were compiled with
@@ -219,10 +230,10 @@ foreign import ccall interruptible
 
       <listitem>
         <para>
-          There is a new <literal>VECTORISE</literal> pragma, where
-          <literal> {-# VECTORISE var = exp #-}</literal>
-          prevents the vectoriser from vectorising
-          <literal>var</literal>.
+          There are new pragmas <literal>VECTORISE</literal>,
+          <literal>VECTORISE_SCALAR</literal> and
+          <literal>NOVECTORISE</literal> for controlling the behaviour
+          of the vectoriser.
         </para>
       </listitem>
 
@@ -1029,6 +1040,19 @@ GhcStage3DefaultNewCodegen=YES
 
             <listitem>
                 <para>
+                    <literal>System.IO.Unsafe</literal> now exports
+                    the new function
+                    <literal>unsafeDupablePerformIO</literal>.
+                    This is a more efficient version of
+                    <literal>unsafePerformIO</literal>, but may run the
+                    IO action multiple times (currently, in GHC, only
+                    when multiple threads try to evaluate it
+                    simultaneously).
+                </para>
+            </listitem>
+
+            <listitem>
+                <para>
                     <literal>System.IO.Error</literal> now exports
                     new functions <literal>catchIOError</literal> and
                     <literal>tryIOError</literal>.
@@ -1749,6 +1773,13 @@ GhcStage3DefaultNewCodegen=YES
                     <literal>GHC.Integer.Logarithms.Internals</literal>.
                 </para>
             </listitem>
+
+            <listitem>
+                <para>
+                    The <literal>toInt#</literal> function has been
+                    renamed to <literal>integerToInt</literal>.
+                </para>
+            </listitem>
         </itemizedlist>
     </sect3>
 
@@ -1908,13 +1939,20 @@ GhcStage3DefaultNewCodegen=YES
                 <para>
                     In <literal>Language.Haskell.TH.Syntax</literal>
                     the <literal>Safety</literal> type has a new
-                    constructor <literal>interruptible</literal>.
+                    constructor <literal>Interruptible</literal>.
                 </para>
 
                 <para>
                     There is a corresponding new value
                     <literal>interruptible :: Safety</literal>
                     in <literal>Language.Haskell.TH.Lib</literal>.
+                </para>
+
+                <para>
+                    However, the <literal>Threadsafe</literal>
+                    constructor and <literal>threadsafe</literal>
+                    helper have been removed, following the removal
+                    of the feature from GHC.
                 </para>
             </listitem>
 
