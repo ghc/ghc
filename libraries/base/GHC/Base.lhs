@@ -119,6 +119,9 @@ import {-# SOURCE #-} GHC.IO (failIO)
 -- as imports here helps to get the dependencies right in the new build system.
 import GHC.Tuple ()
 import GHC.Unit ()
+-- Likewise we need Integer when deriving things like Eq instances, and
+-- this is a convenient place to force it to be built
+import GHC.Integer ()
 
 infixr 9  .
 infixr 5  ++
