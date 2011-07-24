@@ -86,7 +86,7 @@ Ticks stat_getElapsedTime(void)
 double
 mut_user_time_until( Ticks t )
 {
-    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time));
 }
 
 double
@@ -105,13 +105,13 @@ mut_user_time( void )
 double
 mut_user_time_during_RP( void )
 {
-  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time);
 }
 
 double
 mut_user_time_during_heap_census( void )
 {
-  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time);
 }
 #endif /* PROFILING */
 
