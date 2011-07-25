@@ -9165,30 +9165,16 @@ Using a combination of <option>-XDeriveGeneric</option>
 <option>-XDefaultSignatures</option> (<xref linkend="class-default-signatures"/>),
 you can easily do datatype-generic
 programming using the <literal>GHC.Generics</literal> framework. This section
-gives a very brief overview of how to do it. For more detail please refer to the
-<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
-or the original paper:
+gives a very brief overview of how to do it.
 </para>
 
-<itemizedlist>
-<listitem>
 <para>
-Jos� Pedro Magalh�es, Atze Dijkstra, Johan Jeuring, and Andres L�h.
-<ulink url="http://dreixel.net/research/pdf/gdmh.pdf">
-  A generic deriving mechanism for Haskell</ulink>.
-<citetitle>Proceedings of the third ACM Haskell symposium on Haskell</citetitle>
-(Haskell'2010), pp. 37-48, ACM, 2010.
+Generic programming support in GHC allows defining classes with methods that
+do not need a user specification when instantiating: the method body is
+automatically derived by GHC. This is similar to what happens for standard
+classes such as <literal>Read</literal> and <literal>Show</literal>, for
+instance, but now for user-defined classes.
 </para>
-</listitem>
-</itemizedlist>
-
-<emphasis>Note</emphasis>: the current support for generic programming in GHC
-is preliminary. In particular, we only allow deriving instances for the
-<literal>Generic</literal> class. Support for deriving
-<literal>Generic1</literal> (and thus enabling generic functions of kind
-<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
-later stage.
-
 
 <sect2>
 <title>Deriving representations</title>
@@ -9196,7 +9182,7 @@ later stage.
 <para>
 The first thing we need is generic representations. The
 <literal>GHC.Generics</literal> module defines a couple of primitive types
-that can be used to represent most Haskell datatypes:
+that are used to represent Haskell datatypes:
 
 <programlisting>
 -- | Unit: used for constructors without arguments
@@ -9216,7 +9202,28 @@ data (:+:) f g p = L1 (f p) | R1 (g p)
 infixr 6 :*:
 data (:*:) f g p = f p :*: g p
 </programlisting>
+</para>
 
+<para>
+The <literal>Generic</literal> class mediates between user-defined datatypes
+and their internal representation as a sum-of-products:
+
+<programlisting>
+class Generic a where
+  -- Encode the representation of a user datatype
+  type Rep a :: * -> *
+  -- Convert from the datatype to its representation
+  from  :: a -> (Rep a) x
+  -- Convert from the representation to the datatype
+  to    :: (Rep a) x -> a
+</programlisting>
+
+Instances of this class can be derived by GHC with the
+<option>-XDeriveGeneric</option> (<xref linkend="deriving-typeable"/>), and are
+necessary to be able to define generic instances automatically.
+</para>
+
+<para>
 For example, a user-defined datatype of trees <literal>data UserTree a = Node a
 (UserTree a) (UserTree a) | Leaf</literal> gets the following representation:
 
@@ -9258,6 +9265,7 @@ This representation is generated automatically if a
 <link linkend="stand-alone-deriving">Standalone deriving</link> can also be
 used.
 </para>
+
 </sect2>
 
 <sect2>
@@ -9277,7 +9285,7 @@ instance GSerialize U1 where
   gput U1 = []
 
 instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
-  gput (a :*: b) = gput a ++ gput b
+  gput (x :*: y) = gput x ++ gput y
 
 instance (GSerialize a, GSerialize b) => GSerialize (a :+: b) where
   gput (L1 x) = O : gput x
@@ -9286,7 +9294,7 @@ instance (GSerialize a, GSerialize b) => GSerialize (a :+: b) where
 instance (GSerialize a) => GSerialize (M1 i c a) where
   gput (M1 x) = gput x
 
-instance (Serialize a) => GSerialize (K1 i c a) where
+instance (Serialize a) => GSerialize (K1 i a) where
   gput (K1 x) = put x
 </programlisting>
 
@@ -9321,6 +9329,36 @@ instance (Serialize a) => Serialize (UserTree a)
 The default method for <literal>put</literal> is then used, corresponding to the
 generic implementation of serialization.
 </para>
+</sect2>
+
+
+<sect2>
+<title>More information</title>
+
+<para>
+For more detail please refer to the
+<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
+or the original paper:
+</para>
+
+<itemizedlist>
+<listitem>
+<para>
+Jose Pedro Magalhaes, Atze Dijkstra, Johan Jeuring, and Andres Loeh.
+<ulink url="http://dreixel.net/research/pdf/gdmh.pdf">
+  A generic deriving mechanism for Haskell</ulink>.
+<citetitle>Proceedings of the third ACM Haskell symposium on Haskell</citetitle>
+(Haskell'2010), pp. 37-48, ACM, 2010.
+</para>
+</listitem>
+</itemizedlist>
+
+<emphasis>Note</emphasis>: the current support for generic programming in GHC
+is preliminary. In particular, we only allow deriving instances for the
+<literal>Generic</literal> class. Support for deriving
+<literal>Generic1</literal> (and thus enabling generic functions of kind
+<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
+later stage.
 </sect2>
 
 </sect1>
