@@ -57,7 +57,7 @@ static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
 static lnat max_residency     = 0; // in words; for stats only
-static lnat avg_residency     = 0;
+static lnat cumulative_residency = 0;
 static lnat residency_samples = 0; // for stats only
 static lnat max_slop          = 0;
 
@@ -84,11 +84,17 @@ Ticks stat_getElapsedTime(void)
    ------------------------------------------------------------------------ */
 
 double
+mut_user_time_until( Ticks t )
+{
+    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time));
+}
+
+double
 mut_user_time( void )
 {
     Ticks cpu;
     cpu = getProcessCPUTime();
-    return TICK_TO_DBL(cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+    return mut_user_time_until(cpu);
 }
 
 #ifdef PROFILING
@@ -99,13 +105,13 @@ mut_user_time( void )
 double
 mut_user_time_during_RP( void )
 {
-  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time);
 }
 
 double
 mut_user_time_during_heap_census( void )
 {
-  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time);
 }
 #endif /* PROFILING */
 
@@ -145,7 +151,7 @@ initStats0(void)
 #endif
 
     max_residency = 0;
-    avg_residency = 0;
+    cumulative_residency = 0;
     residency_samples = 0;
     max_slop = 0;
 
@@ -362,7 +368,7 @@ stat_endGC (gc_thread *gct,
 		max_residency = live;
 	    }
 	    residency_samples++;
-	    avg_residency += live;
+	    cumulative_residency += live;
 	}
 
         if (slop > max_slop) max_slop = slop;
@@ -739,7 +745,7 @@ stat_exit(int alloc)
 	  statsPrintf(fmt2,
 		    total_collections,
 		    residency_samples == 0 ? 0 : 
-		        avg_residency*sizeof(W_)/residency_samples, 
+		        cumulative_residency*sizeof(W_)/residency_samples, 
 		    max_residency*sizeof(W_), 
 		    residency_samples,
 		    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),

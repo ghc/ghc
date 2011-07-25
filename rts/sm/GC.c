@@ -669,7 +669,7 @@ GarbageCollect (rtsBool force_major_gc,
   if (do_heap_census) {
       debugTrace(DEBUG_sched, "performing heap census");
       RELEASE_SM_LOCK;
-      heapCensus();
+      heapCensus(gct->gc_start_cpu);
       ACQUIRE_SM_LOCK;
   }
 
