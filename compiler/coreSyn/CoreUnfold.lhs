@@ -1212,48 +1212,92 @@ a data constructor.
 However e might not *look* as if 
 
 \begin{code}
+data ConCont = CC [CoreExpr] Coercion	
+     	          -- Substitution already applied
+
 -- | Returns @Just (dc, [t1..tk], [x1..xn])@ if the argument expression is 
 -- a *saturated* constructor application of the form @dc t1..tk x1 .. xn@,
 -- where t1..tk are the *universally-qantified* type args of 'dc'
 exprIsConApp_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
+exprIsConApp_maybe id_unf expr
+  = go Nothing expr (CC [] (mkReflCo (exprType expr)))
+  where
+    in_scope = mkInScopeSet (exprFreeVars expr)
 
-exprIsConApp_maybe id_unf (Note note expr)
-  | notSccNote note
-  = exprIsConApp_maybe id_unf expr
-	-- We ignore all notes except SCCs.  For example,
-	--  	case _scc_ "foo" (C a b) of
-	--			C a b -> e
-	-- should not be optimised away, because we'll lose the
-	-- entry count on 'foo'; see Trac #4414
+    go :: Maybe Subst -> CoreExpr -> ConCont 
+       -> Maybe (DataCon, [Type], [CoreExpr])
+    go subst (Note note expr) cont 
+       | notSccNote note = go subst expr cont
+    go subst (Cast expr co1) (CC [] co2)
+       = go subst expr (CC [] (subst_co subst co1 `mkTransCo` co2))
+    go subst (App fun arg) (CC args co)
+       = go subst fun (CC (subst_arg subst arg : args) co)
+    go subst (Lam var body) (CC (arg:args) co)
+       | isTyCoArg arg	    -- Only beta-reduce types and coercions
+       = go (Just (extend subst var arg)) body (CC args co)
+    go (Just sub) (Var v) cont
+       = go Nothing (lookupIdSubst (text "exprIsConApp") sub v) cont
 
-exprIsConApp_maybe id_unf (Cast expr co)
+    go Nothing (Var fun) cont@(CC args co)
+	| Just con <- isDataConWorkId_maybe fun
+        , count isValArg args == idArity fun
+	, let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars con) args
+	= dealWithCoercion co (con, stripTypeArgs univ_ty_args, rest_args)
+
+	-- Look through dictionary functions; see Note [Unfolding DFuns]
+        | DFunUnfolding dfun_nargs con ops <- unfolding
+        , length args == dfun_nargs    -- See Note [DFun arity check]
+        , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
+              subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
+              mk_arg e = mkApps e args
+        = dealWithCoercion co (con, substTys subst dfun_res_tys, map mk_arg ops)
+
+	-- Look through unfoldings, but only cheap ones, because
+	-- we are effectively duplicating the unfolding
+	| Just rhs <- expandUnfolding_maybe unfolding
+	= -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
+          go Nothing rhs cont
+        where
+	  unfolding = id_unf fun
+
+    go _ _ _ = Nothing
+
+    ----------------------------
+    -- Operations on the (Just CoreSubst)
+    -- The Nothing case is wildly dominant
+    subst_co Nothing  co = co
+    subst_co (Just s) co = CoreSubst.substCo s co
+
+    subst_arg Nothing  e = e
+    subst_arg (Just s) e = substExpr (text "exprIsConApp") s e
+
+    extend Nothing  v e = extendSubst (mkEmptySubst in_scope) v e
+    extend (Just s) v e = extendSubst s v e
+
+dealWithCoercion :: Coercion
+                 -> (DataCon, [Type], [CoreExpr])
+                 -> Maybe (DataCon, [Type], [CoreExpr])
+dealWithCoercion co stuff@(dc, _dc_univ_args, dc_args)
+  | isReflCo co 
+  = Just stuff
+
+  | Pair _from_ty to_ty <- coercionKind co
+  , Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
+  , to_tc == dataConTyCon dc
+	-- These two tests can fail; we might see 
+	--	(C x y) `cast` (g :: T a ~ S [a]),
+	-- where S is a type function.  In fact, exprIsConApp
+	-- will probably not be called in such circumstances,
+	-- but there't nothing wrong with it 
+
   =     -- Here we do the KPush reduction rule as described in the FC paper
 	-- The transformation applies iff we have
 	--	(C e1 ... en) `cast` co
 	-- where co :: (T t1 .. tn) ~ to_ty
 	-- The left-hand one must be a T, because exprIsConApp returned True
 	-- but the right-hand one might not be.  (Though it usually will.)
-
-    case exprIsConApp_maybe id_unf expr of {
-	Nothing 	                 -> Nothing ;
-	Just (dc, _dc_univ_args, dc_args) -> 
-
-    let Pair _from_ty to_ty = coercionKind co
-	dc_tc = dataConTyCon dc
-    in
-    case splitTyConApp_maybe to_ty of {
-	Nothing -> Nothing ;
-	Just (to_tc, to_tc_arg_tys) 
-		| dc_tc /= to_tc -> Nothing
-		-- These two Nothing cases are possible; we might see 
-		--	(C x y) `cast` (g :: T a ~ S [a]),
-		-- where S is a type function.  In fact, exprIsConApp
-		-- will probably not be called in such circumstances,
-		-- but there't nothing wrong with it 
-
-	 	| otherwise  ->
     let
-	tc_arity       = tyConArity dc_tc
+	tc_arity       = tyConArity to_tc
 	dc_univ_tyvars = dataConUnivTyVars dc
         dc_ex_tyvars   = dataConExTyVars dc
         arg_tys        = dataConRepArgTys dc
@@ -1275,59 +1319,14 @@ exprIsConApp_maybe id_unf (Cast expr co)
                          ppr arg_tys, ppr dc_args,        ppr _dc_univ_args,
                          ppr ex_args, ppr val_args]
     in
-    ASSERT2( eqType _from_ty (mkTyConApp dc_tc _dc_univ_args), dump_doc )
+    ASSERT2( eqType _from_ty (mkTyConApp to_tc _dc_univ_args), dump_doc )
     ASSERT2( all isTypeArg ex_args, dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
 #endif
-
     Just (dc, to_tc_arg_tys, ex_args ++ new_val_args)
-    }}
 
-exprIsConApp_maybe id_unf expr 
-  = analyse expr [] 
-  where
-    analyse (App fun arg) args = analyse fun (arg:args)
-    analyse fun@(Lam {})  args = beta fun [] args 
-
-    analyse (Var fun) args
-	| Just con <- isDataConWorkId_maybe fun
-        , count isValArg args == idArity fun
-	, let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars con) args
-	= Just (con, stripTypeArgs univ_ty_args, rest_args)
-
-	-- Look through dictionary functions; see Note [Unfolding DFuns]
-        | DFunUnfolding dfun_nargs con ops <- unfolding
-        , let sat = length args == dfun_nargs    -- See Note [DFun arity check]
-          in if sat then True else 
-             pprTrace "Unsaturated dfun" (ppr fun <+> int dfun_nargs $$ ppr args) False   
-        , let (dfun_tvs, _n_theta, _cls, dfun_res_tys) = tcSplitDFunTy (idType fun)
-              subst    = zipOpenTvSubst dfun_tvs (stripTypeArgs (takeList dfun_tvs args))
-              mk_arg e = mkApps e args
-        = Just (con, substTys subst dfun_res_tys, map mk_arg ops)
-
-	-- Look through unfoldings, but only cheap ones, because
-	-- we are effectively duplicating the unfolding
-	| Just rhs <- expandUnfolding_maybe unfolding
-	= -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
-          analyse rhs args
-        where
-	  unfolding = id_unf fun
-
-    analyse _ _ = Nothing
-
-    -----------
-    beta (Lam v body) pairs (arg : args) 
-        | isTyCoArg arg
-        = beta body ((v,arg):pairs) args 
-
-    beta (Lam {}) _ _    -- Un-saturated, or not a type lambda
-	= Nothing
-
-    beta fun pairs args
-        = analyse (substExpr (text "subst-expr-is-con-app") subst fun) args
-        where
-          subst = mkOpenSubst (mkInScopeSet (exprFreeVars fun)) pairs
-	  -- doc = vcat [ppr fun, ppr expr, ppr pairs, ppr args]
+  | otherwise
+  = Nothing
 
 stripTypeArgs :: [CoreExpr] -> [Type]
 stripTypeArgs args = ASSERT2( all isTypeArg args, ppr args )
