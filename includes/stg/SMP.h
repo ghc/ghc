@@ -14,19 +14,9 @@
 #ifndef SMP_H
 #define SMP_H
 
-#if defined(__ARM_ARCH_2__) || defined(__ARM_ARCH_3__) || defined(__ARM_ARCH_3M__) || \
-    defined(__ARM_ARCH_4__) || defined(__ARM_ARCH_4T__) || defined(__ARM_ARCH_5__) || \
-    defined(__ARM_ARCH_5T__) || defined(__ARM_ARCH_5E__) || defined(__ARM_ARCH_5TE__)
-#define PRE_ARMv6
-#endif
-
-#if defined(PRE_ARMv6) || defined(__ARM_ARCH_6__)
-#define PRE_ARMv7
-#endif
-
 #if defined(THREADED_RTS)
 
-#if arm_HOST_ARCH && defined(PRE_ARMv6)
+#if arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
 void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
 #endif
@@ -140,12 +130,12 @@ xchg(StgPtr p, StgWord w)
 	: "+r" (result), "+m" (*p)
 	: /* no input-only operands */
       );
-#elif arm_HOST_ARCH && defined(PRE_ARMv6)
+#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
     __asm__ __volatile__ ("swp %0, %1, [%2]"
                          : "=&r" (result)
                          : "r" (w), "r" (p) : "memory");
-#elif arm_HOST_ARCH && !defined(PRE_ARMv6)
-    // swp instruction which is used in PRE_ARMv6 code above
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
+    // swp instruction which is used in pre-ARMv6 code above
     // is deprecated in AMRv6 and later. ARM, Ltd. *highly* recommends
     // to use ldrex/strex instruction pair for the same purpose
     // see chapter: Synchronization and semaphores in ARM Architecture
@@ -156,7 +146,7 @@ xchg(StgPtr p, StgWord w)
                           "      strex  %1, %2, [%3]\n"
                           "      teq    %1, #1\n"
                           "      beq    1b\n"
-#if !defined(PRE_ARMv7)
+#if !defined(arm_HOST_ARCH_PRE_ARMv7)
                           "      dmb\n"
 #endif
                           : "=&r" (result), "=&r" (tmp)
@@ -164,7 +154,6 @@ xchg(StgPtr p, StgWord w)
                           : "memory"
                           );
 #elif !defined(WITHSMP)
-#error xchg() unimplemented on this architecture
     result = *p;
     *p = w;
 #else
@@ -208,15 +197,14 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
 	: "memory"
     );
     return n;
-#elif arm_HOST_ARCH
-#if defined(PRE_ARMv6)
+#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
     StgWord r;
     arm_atomic_spin_lock();
     r  = *p; 
     if (r == o) { *p = n; } 
     arm_atomic_spin_unlock();
     return r;
-#else
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv6)
     StgWord result,tmp;
 
     __asm__ __volatile__(
@@ -228,7 +216,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
         "       teq     %0, #1\n"
         "       it      eq\n"
         "       beq     1b\n"
-#if !defined(PRE_ARMv7)
+#if !defined(arm_HOST_ARCH_PRE_ARMv7)
         "       dmb\n"
 #endif
                 : "=&r"(tmp), "=&r"(result)
@@ -236,9 +224,7 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
                 : "cc","memory");
 
     return result;
-#endif
 #elif !defined(WITHSMP)
-#error cas() unimplemented on this architecture
     StgWord result;
     result = *p;
     if (result == o) {
@@ -320,9 +306,9 @@ write_barrier(void) {
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require store/store barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH && PRE_ARMv7
+#elif arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH && !PRE_ARMv7
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb  st" : : : "memory");
 #elif !defined(WITHSMP)
     return;
@@ -341,7 +327,7 @@ store_load_barrier(void) {
     __asm__ __volatile__ ("sync" : : : "memory");
 #elif sparc_HOST_ARCH
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
-#elif arm_HOST_ARCH && !PRE_ARMv7
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif !defined(WITHSMP)
     return;
@@ -361,7 +347,7 @@ load_load_barrier(void) {
 #elif sparc_HOST_ARCH
     /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH && !PRE_ARMv7
+#elif arm_HOST_ARCH && !defined(arm_HOST_ARCH_PRE_ARMv7)
     __asm__ __volatile__ ("dmb" : : : "memory");
 #elif !defined(WITHSMP)
     return;

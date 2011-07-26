@@ -746,6 +746,7 @@
 #define REG_R4          r10
 #define REG_SpLim       r11
 
+#if !defined(arm_HOST_ARCH_PRE_ARMv6)
 /* d8 */
 #define REG_F1    s16
 #define REG_F2    s17
@@ -755,6 +756,7 @@
 
 #define REG_D1    d10
 #define REG_D2    d11
+#endif
 
 #endif /* arm */
 

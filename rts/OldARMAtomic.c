@@ -1,3 +1,12 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 2011
+ *
+ * Inefficient but necessary atomic locks used for implementing atomic
+ * operations on ARM architectures pre-ARMv6.
+ *
+ * -------------------------------------------------------------------------- */
+
 #include "PosixSource.h"
 #include "Stg.h"
 
@@ -7,7 +16,7 @@
 
 #if defined(THREADED_RTS)
 
-#if arm_HOST_ARCH && defined(PRE_ARMv6)
+#if arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
 
 static volatile int atomic_spin = 0;
 
@@ -41,7 +50,7 @@ void arm_atomic_spin_unlock()
   atomic_spin = 0;
 } 
 
-#endif  /* arm_HOST_ARCH && defined(PRE_ARMv6) */
+#endif  /* arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6) */
 
 #endif  /* defined(THREADED_RTS) */
 

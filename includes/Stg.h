@@ -225,6 +225,8 @@ typedef StgFunPtr       F_;
    Other Stg stuff...
    -------------------------------------------------------------------------- */
 
+#include "stg/ArchSpecific.h" /* required by MachRegs.h and SMP.h */
+
 #include "stg/DLL.h"
 #include "stg/MachRegs.h"
 #include "stg/Regs.h"
