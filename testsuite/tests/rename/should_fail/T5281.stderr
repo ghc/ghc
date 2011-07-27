@@ -1,0 +1,5 @@
+
+T5281.hs:2:8:
+    Warning: In the use of `catch'
+             (imported from Prelude, but defined in System.IO.Error):
+             Deprecated: "Please use the new exceptions variant, Control.Exception.catch"

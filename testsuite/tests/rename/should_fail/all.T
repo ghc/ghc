@@ -81,3 +81,4 @@ test('mc13', normal, compile_fail, [''])
 test('mc14', normal, compile_fail, [''])
 test('T5211', normal, compile, [''])  # Warnings only
 test('T1595a', normal, compile_fail, [''])
+test('T5281', normal, compile, [''])  # Warnings only
