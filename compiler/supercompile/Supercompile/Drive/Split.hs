@@ -933,6 +933,7 @@ splitStackFrame :: UniqSupply
 splitStackFrame ctxt_ids ids kf scruts bracketed_hole
   | Update x' <- tagee kf = splitUpdate ids (tag kf) scruts x' bracketed_hole
   | otherwise = ([], M.empty, case tagee kf of
+    Update x' -> pprPanic "splitStackFrame" (text "Encountered update frame for" <+> pPrint x' <+> text "that was handled above")
     Apply x2' -> zipBracketeds (\[e] -> e `app` x2') (\[fvs] -> fvs `extendVarSet` x2') [[]] (\_ -> Nothing) [bracketed_hole]
     TyApply ty' -> zipBracketeds (\[e] -> e `tyApp` ty') (\[fvs] -> fvs `unionVarSet` tyVarsOfType ty') [[]] (\_ -> Nothing) [bracketed_hole]
     CastIt co' -> zipBracketeds (\[e] -> e `cast` co') (\[fvs] -> fvs `unionVarSet` tyCoVarsOfCo co') [[]] (\_ -> Nothing) [bracketed_hole]
