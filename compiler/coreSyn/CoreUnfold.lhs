@@ -57,7 +57,7 @@ import BasicTypes	( Arity )
 import Type
 import Coercion
 import PrelNames
-import VarEnv           ( mkInScopeSet )
+import VarEnv 
 import Bag
 import Util
 import Pair
@@ -1220,11 +1220,12 @@ data ConCont = CC [CoreExpr] Coercion
 -- where t1..tk are the *universally-qantified* type args of 'dc'
 exprIsConApp_maybe :: IdUnfoldingFun -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe id_unf expr
-  = go Nothing expr (CC [] (mkReflCo (exprType expr)))
+  = go (Left in_scope) expr (CC [] (mkReflCo (exprType expr)))
   where
     in_scope = mkInScopeSet (exprFreeVars expr)
 
-    go :: Maybe Subst -> CoreExpr -> ConCont 
+    go :: Either InScopeSet Subst 
+       -> CoreExpr -> ConCont 
        -> Maybe (DataCon, [Type], [CoreExpr])
     go subst (Note note expr) cont 
        | notSccNote note = go subst expr cont
@@ -1233,12 +1234,14 @@ exprIsConApp_maybe id_unf expr
     go subst (App fun arg) (CC args co)
        = go subst fun (CC (subst_arg subst arg : args) co)
     go subst (Lam var body) (CC (arg:args) co)
-       | isTyCoArg arg	    -- Only beta-reduce types and coercions
-       = go (Just (extend subst var arg)) body (CC args co)
-    go (Just sub) (Var v) cont
-       = go Nothing (lookupIdSubst (text "exprIsConApp") sub v) cont
+       | exprIsTrivial arg	    -- Don't duplicate stuff!
+       = go (extend subst var arg) body (CC args co)
+    go (Right sub) (Var v) cont
+       = go (Left (substInScope sub)) 
+            (lookupIdSubst (text "exprIsConApp" <+> ppr expr) sub v) 
+            cont
 
-    go Nothing (Var fun) cont@(CC args co)
+    go (Left in_scope) (Var fun) cont@(CC args co)
 	| Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
 	, let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars con) args
@@ -1256,23 +1259,28 @@ exprIsConApp_maybe id_unf expr
 	-- we are effectively duplicating the unfolding
 	| Just rhs <- expandUnfolding_maybe unfolding
 	= -- pprTrace "expanding" (ppr fun $$ ppr rhs) $
-          go Nothing rhs cont
+          let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
+              res = go (Left in_scope') rhs cont
+          in WARN( unfoldingArity unfolding > 0 && isJust res,
+                   text "Interesting! exprIsConApp_maybe:" 
+                   <+> ppr fun <+> ppr expr)
+             res
         where
 	  unfolding = id_unf fun
 
     go _ _ _ = Nothing
 
     ----------------------------
-    -- Operations on the (Just CoreSubst)
-    -- The Nothing case is wildly dominant
-    subst_co Nothing  co = co
-    subst_co (Just s) co = CoreSubst.substCo s co
+    -- Operations on the (Either InScopeSet CoreSubst)
+    -- The Left case is wildly dominant
+    subst_co (Left {}) co = co
+    subst_co (Right s) co = CoreSubst.substCo s co
 
-    subst_arg Nothing  e = e
-    subst_arg (Just s) e = substExpr (text "exprIsConApp") s e
+    subst_arg (Left {}) e = e
+    subst_arg (Right s) e = substExpr (text "exprIsConApp") s e
 
-    extend Nothing  v e = extendSubst (mkEmptySubst in_scope) v e
-    extend (Just s) v e = extendSubst s v e
+    extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
+    extend (Right s)       v e = Right (extendSubst s v e)
 
 dealWithCoercion :: Coercion
                  -> (DataCon, [Type], [CoreExpr])
