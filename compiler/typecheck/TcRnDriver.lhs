@@ -328,10 +328,11 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 	final_type_env = 
              extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;
 
-	mod_guts = ModGuts {	mg_module    = this_mod,
+        mod_guts = ModGuts {    mg_module    = this_mod,
 				mg_boot	     = False,
 				mg_used_names = emptyNameSet, -- ToDo: compute usage
-				mg_dir_imps  = emptyModuleEnv, -- ??
+                                mg_used_th   = False,
+                                mg_dir_imps  = emptyModuleEnv, -- ??
 				mg_deps      = noDependencies,	-- ??
 				mg_exports   = my_exports,
 				mg_types     = final_type_env,

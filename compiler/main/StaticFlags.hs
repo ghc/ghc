@@ -231,7 +231,7 @@ opt_SuppressIdInfo
 	=  lookUp  (fsLit "-dsuppress-all")
 	|| lookUp  (fsLit "-dsuppress-idinfo")
 
--- | Suppress seprate type signatures in core, but leave types on lambda bound vars
+-- | Suppress separate type signatures in core, but leave types on lambda bound vars
 opt_SuppressTypeSignatures :: Bool
 opt_SuppressTypeSignatures
 	=  lookUp  (fsLit "-dsuppress-all")

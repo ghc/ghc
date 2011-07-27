@@ -17,18 +17,22 @@ module LlvmMangler ( llvmFixupAsm ) where
 import LlvmCodeGen.Ppr ( infoSection )
 
 import Control.Exception
+import Control.Monad ( when )
 import qualified Data.ByteString.Char8 as B
 import Data.Char
-import qualified Data.IntMap as I
 import System.IO
 
+import Data.List ( sortBy )
+import Data.Function ( on )
+
 -- Magic Strings
-secStmt, infoSec, newInfoSec, newLine, spInst, jmpInst :: B.ByteString
+secStmt, infoSec, newLine, spInst, jmpInst, textStmt, dataStmt :: B.ByteString
 secStmt    = B.pack "\t.section\t"
 infoSec    = B.pack infoSection
-newInfoSec = B.pack "\n\t.text"
 newLine    = B.pack "\n"
 jmpInst    = B.pack "\n\tjmp"
+textStmt   = B.pack "\t.text"
+dataStmt   = B.pack "\t.data"
 
 infoLen, labelStart, spFix :: Int
 infoLen    = B.length infoSec
@@ -53,54 +57,79 @@ llvmFixupAsm :: FilePath -> FilePath -> IO ()
 llvmFixupAsm f1 f2 = do
     r <- openBinaryFile f1 ReadMode
     w <- openBinaryFile f2 WriteMode
-    fixTables r w I.empty
-    B.hPut w (B.pack "\n\n")
+    ss <- readSections r w
     hClose r
+    let fixed = fixTables ss
+    mapM_ (writeSection w) fixed
     hClose w
     return ()
 
-{- |
-    Here we process the assembly file one function and data
-    definition at a time. When a function is encountered that
-    should have a info table we store it in a map. Otherwise
-    we print it. When an info table is found we retrieve its
-    function from the map and print them both.
+type Section = (B.ByteString, B.ByteString)
 
-    For all functions we fix up the stack alignment. We also
-    fix up the section definition for functions and info tables.
--}
-fixTables :: Handle -> Handle -> I.IntMap B.ByteString -> IO ()
-fixTables r w m = do
-    f <- getFun r
-    if B.null f
-       then return ()
-       else let fun    = fixupStack f B.empty
-                (a,b)  = B.breakSubstring infoSec fun
-                (a',s) = B.breakEnd eolPred a
-                -- We search for the section header in two parts as it makes
-                -- us portable across OS types and LLVM version types since
-                -- section names are wrapped differently.
-                secHdr = secStmt `B.isPrefixOf` s
-                (x,c)  = B.break eolPred b
-                fun'   = a' `B.append` newInfoSec `B.append` c
-                n      = readInt $ B.takeWhile isDigit $ B.drop infoLen x
-                (bs, m') | B.null b || not secHdr = ([fun], m)
-                         | even n    = ([], I.insert n fun' m)
-                         | otherwise = case I.lookup (n+1) m of
-                               Just xf' -> ([fun',xf'], m)
-                               Nothing  -> ([fun'], m)
-            in mapM_ (B.hPut w) bs >> fixTables r w m'
+-- | Splits the file contents into its sections. Each is returned as a
+-- pair of the form (header line, contents lines)
+readSections :: Handle -> Handle -> IO [Section]
+readSections r w = go B.empty [] []
+  where
+    go hdr ss ls = do
+      e_l <- (try (B.hGetLine r))::IO (Either IOError B.ByteString)
 
--- | Read in the next function/data defenition
-getFun :: Handle -> IO B.ByteString
-getFun r = go [] >>= return . B.intercalate newLine
-    where go ls = do
-            l <- (try (B.hGetLine r))::IO (Either IOError B.ByteString)
-            case l of
-                Right l' | B.null l' -> return (B.empty : reverse ls)
-                         | otherwise -> go (l':ls)
-                Left _ -> return []
+      -- Note that ".type" directives at the end of a section refer to
+      -- the first directive of the *next* section, therefore we take
+      -- it over to that section.
+      let (tys, ls') = span isType ls
+          isType = B.isPrefixOf (B.pack "\t.type")
+          cts = B.intercalate newLine $ reverse ls'
 
+      -- Decide whether to directly output the section or append it
+      -- to the list for resorting.
+      let finishSection
+            | infoSec `B.isInfixOf` hdr =
+                cts `seq` return $ (hdr, cts):ss
+            | otherwise =
+                writeSection w (hdr, fixupStack cts B.empty) >> return ss
+
+      case e_l of
+        Right l | any (`B.isPrefixOf` l) [secStmt, textStmt, dataStmt]
+                  -> finishSection >>= \ss' -> go l ss' tys
+                | otherwise
+                  -> go hdr ss (l:ls)
+        Left _    -> finishSection >>= \ss' -> return (reverse ss')
+
+-- | Writes sections back
+writeSection :: Handle -> Section -> IO ()
+writeSection w (hdr, cts) = do
+  when (not $ B.null hdr) $
+    B.hPutStrLn w hdr
+  B.hPutStrLn w cts
+
+-- | Reorder and convert sections so info tables end up next to the
+-- code. Also does stack fixups.
+fixTables :: [Section] -> [Section]
+fixTables ss = fixed
+  where
+    -- Resort sections: We only assign a non-zero number to all
+    -- sections having the "STRIP ME" marker. As sortBy is stable,
+    -- this will cause all these sections to be appended to the end of
+    -- the file in the order given by the indexes.
+    extractIx hdr
+      | B.null a  = 0
+      | otherwise = 1 + readInt (B.takeWhile isDigit $ B.drop infoLen a)
+      where (_,a) = B.breakSubstring infoSec hdr
+    indexed = zip (map (extractIx . fst) ss) ss
+    sorted = map snd $ sortBy (compare `on` fst) indexed
+
+    -- Turn all the "STRIP ME" sections into normal text sections, as
+    -- they are in the right place now.
+    strip (hdr, cts)
+      | infoSec `B.isInfixOf` hdr = (textStmt, cts)
+      | otherwise                 = (hdr, cts)
+    stripped = map strip sorted
+
+    -- Do stack fixup
+    fix (hdr, cts) = (hdr, fixupStack cts B.empty)
+    fixed = map fix stripped
+ 
 {-|
     Mac OS X requires that the stack be 16 byte aligned when making a function
     call (only really required though when making a call that will pass through

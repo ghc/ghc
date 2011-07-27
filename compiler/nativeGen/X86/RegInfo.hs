@@ -28,20 +28,17 @@ mkVirtualReg u size
         FF80	-> VirtualRegD   u
         _other  -> VirtualRegI   u
 
-regDotColor :: RealReg -> SDoc
-regDotColor reg
- = let	Just	str	= lookupUFM regColors reg
-   in	text str
+regDotColor :: Platform -> RealReg -> SDoc
+regDotColor platform reg
+ = let Just str = lookupUFM (regColors platform) reg
+   in text str
 
-regColors :: UniqFM [Char]
-regColors = listToUFM (normalRegColors ++ fpRegColors)
+regColors :: Platform -> UniqFM [Char]
+regColors platform = listToUFM (normalRegColors platform ++ fpRegColors)
 
--- TODO: We shouldn't be using defaultTargetPlatform here.
---       We should be passing DynFlags in instead, and looking at
---       its targetPlatform.
-
-normalRegColors :: [(Reg,String)]
-normalRegColors = case platformArch defaultTargetPlatform of
+normalRegColors :: Platform -> [(Reg,String)]
+normalRegColors platform
+                = case platformArch platform of
                   ArchX86 -> [ (eax, "#00ff00")
                              , (ebx, "#0000ff")
                              , (ecx, "#00ffff")

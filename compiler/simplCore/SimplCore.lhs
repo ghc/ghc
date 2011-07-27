@@ -247,7 +247,6 @@ getCoreToDo dflags
         runWhen strictness (CoreDoPasses [
                 CoreDoStrictness,
                 CoreDoWorkerWrapper,
-                CoreDoGlomBinds,
                 simpl_phase 0 ["post-worker-wrapper"] max_iter
                 ]),
 
@@ -391,7 +390,6 @@ doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
 doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
                                        vectorise
 
-doCorePass CoreDoGlomBinds              = doPassDM  glomBinds
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
@@ -515,48 +513,6 @@ simplExprGently env expr = do
 
 %************************************************************************
 %*									*
-\subsection{Glomming}
-%*									*
-%************************************************************************
-
-\begin{code}
-glomBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
--- Glom all binds together in one Rec, in case any
--- transformations have introduced any new dependencies
---
--- NB: the global invariant is this:
---	*** the top level bindings are never cloned, and are always unique ***
---
--- We sort them into dependency order, but applying transformation rules may
--- make something at the top refer to something at the bottom:
---	f = \x -> p (q x)
---	h = \y -> 3
---	
---	RULE:  p (q x) = h x
---
--- Applying this rule makes f refer to h, 
--- although it doesn't appear to in the source program.  
--- This pass lets us control where it happens.
---
--- NOTICE that this cannot happen for rules whose head is a locally-defined
--- function.  It only happens for rules whose head is an imported function
--- (p in the example above).  So, for example, the rule had been
---	RULE: f (p x) = h x
--- then the rule for f would be attached to f itself (in its IdInfo) 
--- by prepareLocalRuleBase and h would be regarded by the occurrency 
--- analyser as free in f.
-
-glomBinds dflags binds
-  = do { Err.showPass dflags "GlomBinds" ;
-	 let { recd_binds = [Rec (flattenBinds binds)] } ;
-	 return recd_binds }
-	-- Not much point in printing the result... 
-	-- just consumes output bandwidth
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{The driver for the simplifier}
 %*									*
 %************************************************************************
@@ -579,7 +535,8 @@ simplifyPgmIO :: CoreToDo
 
 simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
               hsc_env us hpt_rule_base 
-              guts@(ModGuts { mg_binds = binds, mg_rules = rules
+              guts@(ModGuts { mg_module = this_mod
+                            , mg_binds = binds, mg_rules = rules
                             , mg_fam_inst_env = fam_inst_env })
   = do { (termination_msg, it_count, counts_out, guts') 
 	   <- do_iteration us 1 [] binds rules 
@@ -596,7 +553,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
     dflags      = hsc_dflags hsc_env
     dump_phase  = dumpSimplPhase dflags mode
     simpl_env   = mkSimplEnv mode
-    active_rule = activeRule dflags simpl_env
+    active_rule = activeRule simpl_env
 
     do_iteration :: UniqSupply
                  -> Int		 -- Counts iterations
@@ -634,7 +591,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                                   InitialPhase -> mg_vect_decls guts
                                   _            -> []
                ; tagged_binds = {-# SCC "OccAnal" #-} 
-                     occurAnalysePgm active_rule rules maybeVects binds 
+                     occurAnalysePgm this_mod active_rule rules maybeVects binds 
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);
@@ -706,13 +663,18 @@ simplifyPgmIO _ _ _ _ _ = panic "simplifyPgmIO"
 -------------------
 end_iteration :: DynFlags -> CoreToDo -> Int 
              -> SimplCount -> [CoreBind] -> [CoreRule] -> IO ()
--- Same as endIteration but with simplifier counts
 end_iteration dflags pass iteration_no counts binds rules
-  = do { dumpIfSet (dopt Opt_D_dump_simpl_iterations dflags)
-                   pass (ptext (sLit "Simplifier counts"))
-		   (pprSimplCount counts)
+  = do { dumpPassResult dflags mb_flag hdr pp_counts binds rules
+       ; lintPassResult dflags pass binds }
+  where
+    mb_flag | dopt Opt_D_dump_simpl_iterations dflags = Just Opt_D_dump_simpl_phases 
+    	    | otherwise			       	      = Nothing
+	    -- Show details if Opt_D_dump_simpl_iterations is on
 
-       ; endIteration dflags pass iteration_no binds rules }
+    hdr = ptext (sLit "Simplifier iteration=") <> int iteration_no
+    pp_counts = vcat [ ptext (sLit "---- Simplifier counts for") <+> hdr
+ 		     , pprSimplCount counts
+                     , ptext (sLit "---- End of simplifier counts for") <+> hdr ]
 \end{code}
 
 

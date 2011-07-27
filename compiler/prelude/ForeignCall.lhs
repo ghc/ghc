@@ -62,10 +62,6 @@ data Safety
 			-- by a separate OS thread, i.e., _concurrently_ to the
 			-- execution of other Haskell threads.
 
-      Bool              -- Indicates the deprecated "threadsafe" annotation
-                        -- which is now an alias for "safe". This information
-                        -- is never used except to emit a deprecation warning.
-
   | PlayInterruptible   -- Like PlaySafe, but additionally
                         -- the worker thread running this foreign call may
                         -- be unceremoniously killed, so it must be scheduled
@@ -78,15 +74,14 @@ data Safety
   {-! derive: Binary !-}
 
 instance Outputable Safety where
-  ppr (PlaySafe False) = ptext (sLit "safe")
-  ppr (PlaySafe True)  = ptext (sLit "threadsafe")
+  ppr PlaySafe = ptext (sLit "safe")
   ppr PlayInterruptible = ptext (sLit "interruptible")
   ppr PlayRisky = ptext (sLit "unsafe")
 
 playSafe :: Safety -> Bool
-playSafe PlaySafe{} = True
+playSafe PlaySafe = True
 playSafe PlayInterruptible = True
-playSafe PlayRisky  = False
+playSafe PlayRisky = False
 
 playInterruptible :: Safety -> Bool
 playInterruptible PlayInterruptible = True
@@ -244,9 +239,8 @@ instance Binary ForeignCall where
     get bh = do aa <- get bh; return (CCall aa)
 
 instance Binary Safety where
-    put_ bh (PlaySafe aa) = do
+    put_ bh PlaySafe = do
 	    putByte bh 0
-	    put_ bh aa
     put_ bh PlayInterruptible = do
 	    putByte bh 1
     put_ bh PlayRisky = do
@@ -254,8 +248,7 @@ instance Binary Safety where
     get bh = do
 	    h <- getByte bh
 	    case h of
-	      0 -> do aa <- get bh
-		      return (PlaySafe aa)
+	      0 -> do return PlaySafe
 	      1 -> do return PlayInterruptible
 	      _ -> do return PlayRisky
 

@@ -1071,14 +1071,14 @@ heapCensusChain( Census *census, bdescr *bd )
 }
 
 void
-heapCensus( void )
+heapCensus( Ticks t )
 {
   nat g, n;
   Census *census;
   gen_workspace *ws;
 
   census = &censuses[era];
-  census->time  = mut_user_time();
+  census->time  = mut_user_time_until(t);
     
   // calculate retainer sets if necessary
 #ifdef PROFILING

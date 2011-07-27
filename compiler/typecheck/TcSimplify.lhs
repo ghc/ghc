@@ -94,6 +94,7 @@ simplifyDeriv orig pred tvs theta
 
        ; let skol_subst = zipTopTvSubst tvs $ map mkTyVarTy tvs_skols
              subst_skol = zipTopTvSubst tvs_skols $ map mkTyVarTy tvs
+             skol_set   = mkVarSet tvs_skols
 	     doc = parens $ ptext (sLit "deriving") <+> parens (ppr pred)
 
        ; wanted <- newFlatWanteds orig (substTheta skol_subst theta)
@@ -106,8 +107,8 @@ simplifyDeriv orig pred tvs theta
        ; let (good, bad) = partitionBagWith get_good (wc_flat residual_wanted)
                          -- See Note [Exotic derived instance contexts]
              get_good :: WantedEvVar -> Either PredType WantedEvVar
-             get_good wev | validDerivPred p = Left p
-                          | otherwise        = Right wev
+             get_good wev | validDerivPred skol_set p = Left p
+                          | otherwise                 = Right wev
                           where p = evVarOfPred wev
 
        ; reportUnsolved (residual_wanted { wc_flat = bad })

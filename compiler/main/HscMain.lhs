@@ -487,7 +487,7 @@ type InteractiveResult = (InteractiveStatus, ModIface, ModDetails)
 --        'interactive' mode. They should be removed from 'oneshot' mode.
 type Compiler result =  HscEnv
                      -> ModSummary
-                     -> Bool                -- True <=> source unchanged
+                     -> SourceModified
                      -> Maybe ModIface      -- Old interface, if available
                      -> Maybe (Int,Int)     -- Just (i,n) <=> module i of n (for msgs)
                      -> IO result
@@ -515,38 +515,64 @@ data HsCompiler a
   }
 
 genericHscCompile :: HsCompiler a
-                  -> (HscEnv -> Maybe (Int,Int) -> Bool -> ModSummary -> IO ())
-                  -> HscEnv -> ModSummary -> Bool
+                  -> (HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ())
+                  -> HscEnv -> ModSummary -> SourceModified
                   -> Maybe ModIface -> Maybe (Int, Int)
                   -> IO a
 genericHscCompile compiler hscMessage hsc_env
-                  mod_summary source_unchanged
+                  mod_summary source_modified
                   mb_old_iface0 mb_mod_index
  = do
      (recomp_reqd, mb_checked_iface)
          <- {-# SCC "checkOldIface" #-}
             checkOldIface hsc_env mod_summary 
-                          source_unchanged mb_old_iface0
+                          source_modified mb_old_iface0
      -- save the interface that comes back from checkOldIface.
      -- In one-shot mode we don't have the old iface until this
      -- point, when checkOldIface reads it from the disk.
      let mb_old_hash = fmap mi_iface_hash mb_checked_iface
+
+     let
+       skip iface = do
+         hscMessage hsc_env mb_mod_index RecompNotRequired mod_summary
+         runHsc hsc_env $ hscNoRecomp compiler iface
+
+       compile reason = do
+         hscMessage hsc_env mb_mod_index reason mod_summary
+         runHsc hsc_env $ hscRecompile compiler mod_summary mb_old_hash
+
+       stable = case source_modified of
+                  SourceUnmodifiedAndStable -> True
+                  _ -> False
+
+        -- If the module used TH splices when it was last compiled,
+        -- then the recompilation check is not accurate enough (#481)
+        -- and we must ignore it.  However, if the module is stable
+        -- (none of the modules it depends on, directly or indirectly,
+        -- changed), then we *can* skip recompilation.  This is why
+        -- the SourceModified type contains SourceUnmodifiedAndStable,
+        -- and it's pretty important: otherwise ghc --make would
+        -- always recompile TH modules, even if nothing at all has
+        -- changed.  Stability is just the same check that make is
+        -- doing for us in one-shot mode.
+
      case mb_checked_iface of
-       Just iface | not recomp_reqd
-           -> do hscMessage hsc_env mb_mod_index False mod_summary
-                 runHsc hsc_env $ hscNoRecomp compiler iface
-       _otherwise
-           -> do hscMessage hsc_env mb_mod_index True mod_summary
-                 runHsc hsc_env $ hscRecompile compiler mod_summary mb_old_hash
+       Just iface | not recomp_reqd ->
+           if mi_used_th iface && not stable
+               then compile RecompForcedByTH
+               else skip iface
+       _otherwise ->
+           compile RecompRequired
+
 
 hscCheckRecompBackend :: HsCompiler a -> TcGblEnv -> Compiler a
 hscCheckRecompBackend compiler tc_result 
-                   hsc_env mod_summary source_unchanged mb_old_iface _m_of_n
+                   hsc_env mod_summary source_modified mb_old_iface _m_of_n
   = do
      (recomp_reqd, mb_checked_iface)
          <- {-# SCC "checkOldIface" #-}
             checkOldIface hsc_env mod_summary
-                          source_unchanged mb_old_iface
+                          source_modified mb_old_iface
 
      let mb_old_hash = fmap mi_iface_hash mb_checked_iface
      case mb_checked_iface of
@@ -749,24 +775,31 @@ genModDetails old_iface
 -- Progress displayers.
 --------------------------------------------------------------
 
-oneShotMsg :: HscEnv -> Maybe (Int,Int) -> Bool -> ModSummary -> IO ()
-oneShotMsg hsc_env _mb_mod_index recomp _mod_summary =
-         if recomp
-            then return ()
-            else compilationProgressMsg (hsc_dflags hsc_env) $
-                     "compilation IS NOT required"
+data RecompReason = RecompNotRequired | RecompRequired | RecompForcedByTH
+  deriving Eq
 
-batchMsg :: HscEnv -> Maybe (Int,Int) -> Bool -> ModSummary -> IO ()
+oneShotMsg :: HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ()
+oneShotMsg hsc_env _mb_mod_index recomp _mod_summary =
+  case recomp of
+    RecompNotRequired ->
+            compilationProgressMsg (hsc_dflags hsc_env) $
+                   "compilation IS NOT required"
+    _other ->
+            return ()
+
+batchMsg :: HscEnv -> Maybe (Int,Int) -> RecompReason -> ModSummary -> IO ()
 batchMsg hsc_env mb_mod_index recomp mod_summary
-  = do
-         let showMsg msg = compilationProgressMsg (hsc_dflags hsc_env) $
-                           (showModuleIndex mb_mod_index ++
-                            msg ++ showModMsg (hscTarget (hsc_dflags hsc_env)) recomp mod_summary)
-         if recomp
-            then showMsg "Compiling "
-            else if verbosity (hsc_dflags hsc_env) >= 2
-                    then showMsg "Skipping  "
-                    else return ()
+ = case recomp of
+     RecompRequired -> showMsg "Compiling "
+     RecompNotRequired
+       | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  "
+       | otherwise -> return ()
+     RecompForcedByTH -> showMsg "Compiling [TH] "
+   where
+     showMsg msg =
+        compilationProgressMsg (hsc_dflags hsc_env) $
+         (showModuleIndex mb_mod_index ++
+         msg ++ showModMsg (hscTarget (hsc_dflags hsc_env)) (recomp == RecompRequired) mod_summary)
 
 --------------------------------------------------------------
 -- FrontEnds
@@ -928,8 +961,7 @@ checkSafeImports dflags hsc_env tcg_env
                     let trust = getSafeMode $ mi_trust iface'
                         trust_own_pkg = mi_trust_pkg iface'
                         -- check module is trusted
-                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy,
-                                            Sf_TrustworthyWithSafeLanguage]
+                        safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
                         -- check package is trusted
                         safeP = packageTrusted trust trust_own_pkg m
                     if safeM && safeP
@@ -1058,6 +1090,7 @@ hscGenHardCode cgguts mod_summary
                      cg_dep_pkgs = dependencies,
                      cg_hpc_info = hpc_info } = cgguts
              dflags = hsc_dflags hsc_env
+             platform = targetPlatform dflags
              location = ms_location mod_summary
              data_tycons = filter isDataTyCon tycons
              -- cg_tycons includes newtypes, for the benefit of External Core,
@@ -1093,7 +1126,7 @@ hscGenHardCode cgguts mod_summary
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
-         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (ppr rawcmms)
+         dumpIfSet_dyn dflags Opt_D_dump_raw_cmm "Raw Cmm" (pprPlatform platform rawcmms)
          (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
                 dependencies rawcmms
@@ -1164,10 +1197,11 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
 tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info =
   do    { let dflags = hsc_dflags hsc_env
+              platform = targetPlatform dflags
         ; prog <- StgCmm.codeGen dflags this_mod data_tycons
                          cost_centre_info stg_binds hpc_info
         ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Cmm produced by new codegen" 
-                (pprCmms prog)
+                (pprCmms platform prog)
 
         -- We are building a single SRT for the entire module, so
         -- we must thread it through all the procedures as we cps-convert them.
@@ -1176,7 +1210,7 @@ tryNewCodeGen hsc_env this_mod data_tycons
         ; (topSRT, prog) <- foldM (cmmPipeline hsc_env) (initTopSRT, []) prog
 
         ; let prog' = map cmmOfZgraph (srtToData topSRT : prog)
-        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (ppr prog')
+        ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')
         ; return prog' }
 
 
@@ -1193,11 +1227,12 @@ optionallyConvertAndOrCPS hsc_env cmms =
 testCmmConversion :: HscEnv -> Cmm -> IO Cmm
 testCmmConversion hsc_env cmm =
     do let dflags = hsc_dflags hsc_env
+           platform = targetPlatform dflags
        showPass dflags "CmmToCmm"
-       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (ppr cmm)
+       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (pprPlatform platform cmm)
        --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
        us <- mkSplitUniqSupply 'C'
-       let zgraph = initUs_ us (cmmToZgraph cmm)
+       let zgraph = initUs_ us (cmmToZgraph platform cmm)
        chosen_graph <-
         if dopt Opt_RunCPSZ dflags
             then do us <- mkSplitUniqSupply 'S'
@@ -1205,10 +1240,10 @@ testCmmConversion hsc_env cmm =
                     (_, [zgraph]) <- cmmPipeline hsc_env (topSRT, []) zgraph
                     return zgraph
             else return (runCmmContFlowOpts zgraph)
-       dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
+       dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (pprPlatform platform chosen_graph)
        showPass dflags "Convert from Z back to Cmm"
        let cvt = cmmOfZgraph chosen_graph
-       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (ppr cvt)
+       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (pprPlatform platform cvt)
        return cvt
 
 myCoreToStg :: DynFlags -> Module -> [CoreBind]
@@ -1411,6 +1446,7 @@ mkModGuts mod binds = ModGuts {
   mg_deps = noDependencies,
   mg_dir_imps = emptyModuleEnv,
   mg_used_names = emptyNameSet,
+  mg_used_th = False,
   mg_rdr_env = emptyGlobalRdrEnv,
   mg_fix_env = emptyFixityEnv,
   mg_types = emptyTypeEnv,

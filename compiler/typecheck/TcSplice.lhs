@@ -810,6 +810,8 @@ runMeta :: (Outputable hs_syn)
 	-> TcM hs_syn		-- Of type t
 runMeta show_code run_and_convert expr
   = do	{ traceTc "About to run" (ppr expr)
+        ; recordThSpliceUse -- seems to be the best place to do this,
+                            -- we catch all kinds of splices and annotations.
 
 	-- Desugar
 	; ds_expr <- initDsTc (dsLExpr expr)
@@ -1315,8 +1317,9 @@ reifyFixity name
       conv_dir BasicTypes.InfixN = TH.InfixN
 
 reifyStrict :: BasicTypes.HsBang -> TH.Strict
-reifyStrict bang | isBanged bang = TH.IsStrict
-                 | otherwise     = TH.NotStrict
+reifyStrict bang | bang == HsUnpack = TH.Unpacked
+                 | isBanged bang    = TH.IsStrict
+                 | otherwise        = TH.NotStrict
 
 ------------------------------
 noTH :: LitString -> SDoc -> TcM a

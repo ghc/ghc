@@ -126,6 +126,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
          ModGuts{     mg_module     = this_mod,
                       mg_boot       = is_boot,
                       mg_used_names = used_names,
+                      mg_used_th    = used_th,
                       mg_deps       = deps,
                       mg_dir_imps   = dir_imp_mods,
                       mg_rdr_env    = rdr_env,
@@ -134,7 +135,7 @@ mkIface hsc_env maybe_old_fingerprint mod_details
                       mg_hpc_info   = hpc_info,
                       mg_trust_pkg  = self_trust }
         = mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod is_boot used_names deps rdr_env fix_env
+                   this_mod is_boot used_names used_th deps rdr_env fix_env
                    warns hpc_info dir_imp_mods self_trust mod_details
 
 -- | make an interface from the results of typechecking only.  Useful
@@ -152,14 +153,16 @@ mkIfaceTc hsc_env maybe_old_fingerprint mod_details
                       tcg_rdr_env = rdr_env,
                       tcg_fix_env = fix_env,
                       tcg_warns = warns,
-                      tcg_hpc = other_hpc_info
+                      tcg_hpc = other_hpc_info,
+                      tcg_th_splice_used = tc_splice_used
                     }
   = do
           let used_names = mkUsedNames tc_result
           deps <- mkDependencies tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
+          used_th <- readIORef tc_splice_used
           mkIface_ hsc_env maybe_old_fingerprint
-                   this_mod (isHsBoot hsc_src) used_names deps rdr_env 
+                   this_mod (isHsBoot hsc_src) used_names used_th deps rdr_env
                    fix_env warns hpc_info (imp_mods imports)
                    (imp_trust_own_pkg imports) mod_details
         
@@ -203,14 +206,14 @@ mkDependencies
                     -- NB. remember to use lexicographic ordering
 
 mkIface_ :: HscEnv -> Maybe Fingerprint -> Module -> IsBootInterface
-         -> NameSet -> Dependencies -> GlobalRdrEnv
+         -> NameSet -> Bool -> Dependencies -> GlobalRdrEnv
          -> NameEnv FixItem -> Warnings -> HpcInfo
          -> ImportedMods -> Bool
          -> ModDetails
          -> IO (Messages, Maybe (ModIface, Bool))
 mkIface_ hsc_env maybe_old_fingerprint 
-         this_mod is_boot used_names deps rdr_env fix_env src_warns hpc_info
-         dir_imp_mods pkg_trust_req
+         this_mod is_boot used_names used_th deps rdr_env fix_env src_warns
+         hpc_info dir_imp_mods pkg_trust_req
 	 ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
@@ -268,7 +271,8 @@ mkIface_ hsc_env maybe_old_fingerprint
 			mi_iface_hash = fingerprint0,
 			mi_mod_hash  = fingerprint0,
  			mi_exp_hash  = fingerprint0,
- 			mi_orphan_hash = fingerprint0,
+                        mi_used_th   = used_th,
+                        mi_orphan_hash = fingerprint0,
 			mi_orphan    = False,	-- Always set by addVersionInfo, but
 						-- it's a strict field, so we can't omit it.
                         mi_finsts    = False,   -- Ditto
@@ -289,8 +293,8 @@ mkIface_ hsc_env maybe_old_fingerprint
                                          intermediate_iface decls
 
 		-- Warn about orphans
-	; let warn_orphs      = dopt Opt_WarnOrphans dflags
-              warn_auto_orphs = dopt Opt_WarnAutoOrphans dflags
+	; let warn_orphs      = wopt Opt_WarnOrphans dflags
+              warn_auto_orphs = wopt Opt_WarnAutoOrphans dflags
               orph_warnings   --- Laziness means no work done unless -fwarn-orphans
 	        | warn_orphs || warn_auto_orphs = rule_warns `unionBags` inst_warns
 	        | otherwise 	       	        = emptyBag
@@ -474,7 +478,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
           = do let hash_fn = mk_put_name local_env
                    decl = abiDecl abi
                -- pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
-               hash <- computeFingerprint dflags hash_fn abi
+               hash <- computeFingerprint hash_fn abi
                return (extend_hash_env (hash,decl) local_env,
                        (hash,decl) : decls_w_hashes)
 
@@ -486,7 +490,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                -- pprTrace "fingerprinting" (ppr (map ifName decls) ) $ do
                let stable_abis = sortBy cmp_abiNames abis
                 -- put the cycle in a canonical order
-               hash <- computeFingerprint dflags hash_fn stable_abis
+               hash <- computeFingerprint hash_fn stable_abis
                let pairs = zip (repeat hash) decls
                return (foldr extend_hash_env local_env pairs,
                        pairs ++ decls_w_hashes)
@@ -520,12 +524,12 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                    $ dep_orphs sorted_deps
    dep_orphan_hashes <- getOrphanHashes hsc_env orph_mods
 
-   orphan_hash <- computeFingerprint dflags (mk_put_name local_env)
+   orphan_hash <- computeFingerprint (mk_put_name local_env)
                       (map ifDFun orph_insts, orph_rules, fam_insts)
 
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
-   export_hash <- computeFingerprint dflags putNameLiterally 
+   export_hash <- computeFingerprint putNameLiterally
                       (mi_exports iface0,
                        orphan_hash,
                        dep_orphan_hashes,
@@ -545,7 +549,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - orphans
    --   - deprecations
    --   - XXX vect info?
-   mod_hash <- computeFingerprint dflags putNameLiterally
+   mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,
                        orphan_hash,
@@ -556,7 +560,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --    - usages
    --    - deps
    --    - hpc
-   iface_hash <- computeFingerprint dflags putNameLiterally
+   iface_hash <- computeFingerprint putNameLiterally
                       (mod_hash, 
                        mi_usages iface0,
                        sorted_deps,
@@ -748,19 +752,6 @@ putNameLiterally :: BinHandle -> Name -> IO ()
 putNameLiterally bh name = ASSERT( isExternalName name ) 
   do { put_ bh $! nameModule name
      ; put_ bh $! nameOccName name }
-
-computeFingerprint :: Binary a
-                   => DynFlags 
-                   -> (BinHandle -> Name -> IO ())
-                   -> a
-                   -> IO Fingerprint
-
-computeFingerprint _dflags put_name a = do
-  bh <- openBinMem (3*1024) -- just less than a block
-  ud <- newWriteState put_name putFS
-  bh <- return $ setUserData bh ud
-  put_ bh a
-  fingerprintBinMem bh
 
 {-
 -- for testing: use the md5sum command to generate fingerprints and
@@ -1045,21 +1036,20 @@ so we may need to split up a single Avail into multiple ones.
 \begin{code}
 checkOldIface :: HscEnv
 	      -> ModSummary
-	      -> Bool 			-- Source unchanged
+              -> SourceModified
 	      -> Maybe ModIface 	-- Old interface from compilation manager, if any
 	      -> IO (RecompileRequired, Maybe ModIface)
 
-checkOldIface hsc_env mod_summary source_unchanged maybe_iface
+checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  showPass (hsc_dflags hsc_env) $
             "Checking old interface for " ++ (showSDoc $ ppr $ ms_mod mod_summary)
         initIfaceCheck hsc_env $
-            check_old_iface hsc_env mod_summary source_unchanged maybe_iface
+            check_old_iface hsc_env mod_summary source_modified maybe_iface
 
-check_old_iface :: HscEnv -> ModSummary -> Bool -> Maybe ModIface
+check_old_iface :: HscEnv -> ModSummary -> SourceModified -> Maybe ModIface
                 -> IfG (Bool, Maybe ModIface)
-check_old_iface hsc_env mod_summary src_unchanged maybe_iface
-  = let src_changed = not src_unchanged
-        dflags = hsc_dflags hsc_env
+check_old_iface hsc_env mod_summary src_modified maybe_iface
+  = let dflags = hsc_dflags hsc_env
         getIface =
              case maybe_iface of
                  Just _  -> do
@@ -1077,23 +1067,34 @@ check_old_iface hsc_env mod_summary src_unchanged maybe_iface
                              return $ Just iface
 
     in do
-        when src_changed
+         let src_changed
+              | dopt Opt_ForceRecomp (hsc_dflags hsc_env) = True
+              | SourceModified <- src_modified = True
+              | otherwise = False
+
+         when src_changed
              (traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
 
-         -- If the source has changed and we're in interactive mode, avoid reading
-         -- an interface; just return the one we might have been supplied with.
-        if not (isObjectTarget $ hscTarget dflags) && src_changed
+         -- If the source has changed and we're in interactive mode,
+         -- avoid reading an interface; just return the one we might
+         -- have been supplied with.
+         if not (isObjectTarget $ hscTarget dflags) && src_changed
             then return (outOfDate, maybe_iface)
             else do
                 -- Try and read the old interface for the current module
                 -- from the .hi file left from the last time we compiled it
                 maybe_iface' <- getIface
+                if src_changed
+                   then return (outOfDate, maybe_iface')
+                   else do
                 case maybe_iface' of
                     Nothing -> return (outOfDate, maybe_iface')
-                    Just iface -> do
-                        -- We have got the old iface; check its versions
-                        recomp <- checkVersions hsc_env src_unchanged mod_summary iface
-                        return recomp
+                    Just iface ->
+                      -- We have got the old iface; check its versions
+                      -- even in the SourceUnmodifiedAndStable case we
+                      -- should check versions because some packages
+                      -- might have changed or gone away.
+                      checkVersions hsc_env mod_summary iface
 \end{code}
 
 @recompileRequired@ is called from the HscMain.   It checks whether
@@ -1114,16 +1115,10 @@ safeHsChanged hsc_env iface
   = (getSafeMode $ mi_trust iface) /= (safeHaskell $ hsc_dflags hsc_env)
 
 checkVersions :: HscEnv
-	      -> Bool		-- True <=> source unchanged
               -> ModSummary
 	      -> ModIface 	-- Old interface
 	      -> IfG (RecompileRequired, Maybe ModIface)
-checkVersions hsc_env source_unchanged mod_summary iface
-  | not source_unchanged
-  = let iface' = if safeHsChanged hsc_env iface then Nothing else Just iface
-    in return (outOfDate, iface')
-
-  | otherwise
+checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
@@ -1536,7 +1531,7 @@ toIfaceIdInfo id_info
 
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info) 
-    loop_breaker  = isNonRuleLoopBreaker (occInfo id_info)
+    loop_breaker  = isStrongLoopBreaker (occInfo id_info)
 					
     ------------  Inline prag  --------------
     inline_prag = inlinePragInfo id_info

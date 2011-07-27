@@ -16,6 +16,7 @@
 &sooner;
 &lang-features;
 &ffi-chap;
+&extending-ghc;
 &wrong;
 &utils;
 &win32-dll;

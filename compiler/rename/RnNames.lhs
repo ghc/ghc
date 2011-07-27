@@ -146,7 +146,7 @@ rnImports prel_imp_loc imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ _ is_boot _ _ _ _)) = is_boot
 
-         ifDOptM Opt_WarnImplicitPrelude $
+         ifWOptM Opt_WarnImplicitPrelude $
              when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
 
          stuff1 <- mapM (rnImportDecl this_mod True)  prel_imports
@@ -197,7 +197,7 @@ rnImportDecl this_mod implicit_prelude
         Just (False, _)       -> return () -- Explicit import list
         _  | implicit_prelude -> return ()
            | qual_only        -> return ()
-           | otherwise        -> ifDOptM Opt_WarnMissingImportList $
+           | otherwise        -> ifWOptM Opt_WarnMissingImportList $
                                  addWarn (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
@@ -277,9 +277,7 @@ rnImportDecl this_mod implicit_prelude
 
         -- Does this import mean we now require our own pkg
         -- to be trusted? See Note [Trust Own Package]
-        ptrust = trust == Sf_Trustworthy
-               || trust == Sf_TrustworthyWithSafeLanguage
-               || trust_pkg
+        ptrust = trust == Sf_Trustworthy || trust_pkg
 
         (dependent_mods, dependent_pkgs, pkg_trust_req)
            | pkg == thisPackage dflags =
@@ -335,7 +333,7 @@ rnImportDecl this_mod implicit_prelude
                    }
 
     -- Complain if we import a deprecated module
-    ifDOptM Opt_WarnWarningsDeprecations        (
+    ifWOptM Opt_WarnWarningsDeprecations        (
        case warns of
           WarnAll txt -> addWarn (moduleWarn imp_mod_name txt)
           _           -> return ()
@@ -692,11 +690,11 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
             -- Warn when importing T(..) if T was exported abstractly
             checkDodgyImport stuff
                 | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
-                = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
+                = ifWOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
                     -- NB. use the RdrName for reporting the warning
                 | IEThingAll {} <- ieRdr
                 , not (is_qual decl_spec)
-                = ifDOptM Opt_WarnMissingImportList $
+                = ifWOptM Opt_WarnMissingImportList $
                   addWarn (missingImportListItem ieRdr)
             checkDodgyImport _
                 = return ()
@@ -1023,13 +1021,13 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                       (L loc (IEModuleContents mod))
         | let earlier_mods = [ mod | (L _ (IEModuleContents mod)) <- ie_names ]
         , mod `elem` earlier_mods    -- Duplicate export of M
-        = do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
+        = do { warn_dup_exports <- woptM Opt_WarnDuplicateExports ;
                warnIf warn_dup_exports (dupModuleExport mod) ;
                return acc }
 
         | otherwise
         = do { implicit_prelude <- xoptM Opt_ImplicitPrelude
-             ; warnDodgyExports <- doptM Opt_WarnDodgyExports
+             ; warnDodgyExports <- woptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
                             || (moduleName this_mod == mod)
                    ; gres = filter (isModuleExported implicit_prelude mod)
@@ -1092,7 +1090,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                                 Nothing -> mkRdrUnqual
                                 Just (modName, _) -> mkRdrQual modName
              addUsedRdrNames $ map (mkKidRdrName . nameOccName) kids
-             warnDodgyExports <- doptM Opt_WarnDodgyExports
+             warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null kids) $
                   if isTyConName name
                   then when warnDodgyExports $ addWarn (dodgyExportWarn name)
@@ -1175,7 +1173,7 @@ check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
             -> do unless (dupExport_ok name ie ie') $ do
-                      warn_dup_exports <- doptM Opt_WarnDuplicateExports
+                      warn_dup_exports <- woptM Opt_WarnDuplicateExports
                       warnIf warn_dup_exports (dupExportWarn name_occ ie ie')
                   return occs
 
@@ -1241,7 +1239,7 @@ finishWarnings :: DynFlags -> Maybe WarningTxt
 --     All this happens only once per module
 finishWarnings dflags mod_warn tcg_env
   = do  { (eps,hpt) <- getEpsAndHpt
-        ; ifDOptM Opt_WarnWarningsDeprecations $
+        ; ifWOptM Opt_WarnWarningsDeprecations $
           mapM_ (check hpt (eps_PIT eps)) all_gres
                 -- By this time, typechecking is complete,
                 -- so the PIT is fully populated
@@ -1397,7 +1395,7 @@ warnUnusedImportDecls gbl_env
 
        ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
                        , ptext (sLit "Import usage") <+> ppr usage])
-       ; ifDOptM Opt_WarnUnusedImports $
+       ; ifWOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
        ; ifDOptM Opt_D_dump_minimal_imports $

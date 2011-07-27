@@ -669,11 +669,11 @@ active_unfolding_gentle id
     prag = idInlinePragma id
 
 ----------------------
-activeRule :: DynFlags -> SimplEnv -> Maybe (Activation -> Bool)
+activeRule :: SimplEnv -> Activation -> Bool
 -- Nothing => No rules at all
-activeRule _dflags env
-  | not (sm_rules mode) = Nothing     -- Rewriting is off
-  | otherwise           = Just (isActive (sm_phase mode))
+activeRule env
+  | not (sm_rules mode) = \_ -> False     -- Rewriting is off
+  | otherwise           = isActive (sm_phase mode)
   where
     mode = getMode env
 \end{code}
@@ -906,7 +906,7 @@ postInlineUnconditionally
     -> Bool
 postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
   | not active		        = False
-  | isLoopBreaker occ_info      = False	-- If it's a loop-breaker of any kind, don't inline
+  | isWeakLoopBreaker occ_info  = False	-- If it's a loop-breaker of any kind, don't inline
 					-- because it might be referred to "earlier"
   | isExportedId bndr           = False
   | isStableUnfolding unfolding = False	-- Note [InlineRule and postInlineUnconditionally]
@@ -1000,6 +1000,7 @@ ones that are trivial):
   * There is less point, because the main goal is to get rid of local
     bindings used in multiple case branches.  
     
+  * The inliner should inline trivial things at call sites anyway.
 
 Note [InlineRule and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1117,17 +1118,20 @@ tryEtaExpand env bndr rhs
          return (new_arity, new_rhs) }
   where
     try_expand dflags
+      | exprIsTrivial rhs
+      = return (exprArity rhs, rhs)
+
       | sm_eta_expand (getMode env)      -- Provided eta-expansion is on
-      , not (exprIsTrivial rhs)
       , let dicts_cheap = dopt Opt_DictsCheap dflags
             new_arity   = findArity dicts_cheap bndr rhs old_arity
-      , new_arity > rhs_arity
+      , new_arity > manifest_arity  	-- And the curent manifest arity isn't enough
+      		    			-- See Note [Eta expansion to manifes arity]
       = do { tick (EtaExpansion bndr)
            ; return (new_arity, etaExpand new_arity rhs) }
       | otherwise
-      = return (rhs_arity, rhs)
+      = return (manifest_arity, rhs)
 
-    rhs_arity  = exprArity rhs
+    manifest_arity = manifestArity rhs
     old_arity  = idArity bndr
     _dmd_arity = length $ fst $ splitStrictSig $ idStrictness bndr
 
@@ -1215,6 +1219,23 @@ We do not want to eta-expand to
 because then 'genMap' will inline, and it really shouldn't: at least
 as far as the programmer is concerned, it's not applied to two
 arguments!
+
+Note [Eta expansion to manifest arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Eta expansion does *not* eta-expand trivial RHSs, like
+    x = y
+because these will get substituted out in short order.  (Indeed
+we *eta-contract* if that yields a trivial RHS.)
+
+Otherwise we eta-expand to produce enough manifest lambdas.
+This *does* eta-expand partial applications.  eg
+      x = map g		-->    x = \v -> map g v
+      y = \_ -> map g	-->    y = \_ v -> map g v
+One benefit this is that in the definition of y there was 
+a danger that full laziness would transform to
+      lvl = map g
+      y = \_ -> lvl
+which is stupid.  This doesn't happen in the eta-expanded form.
 
 Note [Arity analysis]
 ~~~~~~~~~~~~~~~~~~~~~

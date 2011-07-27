@@ -1114,11 +1114,60 @@ char *ghc_rts_opts = "-H128m -K1m";
         <listitem>
           <para>
             Log events in binary format to the
-            file <filename><replaceable>program</replaceable>.eventlog</filename>,
-            where <replaceable>flags</replaceable> is a sequence of
-            zero or more characters indicating which kinds of events
-            to log.  Currently there is only one type
-            supported: <literal>-ls</literal>, for scheduler events.
+            file <filename><replaceable>program</replaceable>.eventlog</filename>.
+            Without any <replaceable>flags</replaceable> specified, this logs a
+            default set of events, suitable for use with tools like ThreadScope.
+          </para>
+
+          <para>
+            For some special use cases you may want more control over which
+            events are included. The <replaceable>flags</replaceable> is a
+            sequence of zero or more characters indicating which classes of
+            events to log. Currently there are four classes of events that can
+            be enabled/disabled:
+            <simplelist>
+              <member>
+                <option>s</option> &#8212; scheduler events, including Haskell
+                thread creation and start/stop events
+              </member>
+              <member>
+                <option>g</option> &#8212; GC events, including GC start/stop
+              </member>
+              <member>
+                <option>p</option> &#8212; parallel sparks (sampled)
+              </member>
+              <member>
+                <option>f</option> &#8212; parallel sparks (fully accurate)
+              </member>
+            </simplelist>
+          </para>
+
+          <para>            
+            For spark events there are two modes: sampled and fully accurate.
+            There are various events in the life cycle of each spark, usually
+            just creating and running, but there are some more exceptional
+            possibilities. In the sampled mode the number of occurrences of each
+            kind of spark event is sampled at frequent intervals. In the fully
+            accurate mode every spark event is logged individually. The latter
+            has a higher runtime overhead and is not enabled by default.
+          </para>
+
+          <para>            
+            The initial enabled event classes are 's', 'g' and 'p'. In addition
+            you can disable specific classes, or enable/disable all classes at
+            once:
+            <simplelist>
+              <member>
+                <option>a</option> &#8212; enable all event classes listed above
+              </member>
+              <member>
+                <option>-<replaceable>x</replaceable></option> &#8212; disable the
+                given class of events, for any event class listed above or
+                <option>-a</option> for all classes
+              </member>
+            </simplelist>
+            For example, <option>-l-ag</option> would disable all event classes
+            (<option>-a</option>) except for GC events (<option>g</option>).
           </para>
 
           <para>
@@ -1128,7 +1177,7 @@ char *ghc_rts_opts = "-H128m -K1m";
             the <ulink url="http://hackage.haskell.org/package/ghc-events">ghc-events</ulink>
             library.  To dump the contents of
             a <literal>.eventlog</literal> file as text, use the
-            tool <literal>show-ghc-events</literal> that comes with
+            tool <literal>ghc-events-show</literal> that comes with
             the <ulink url="http://hackage.haskell.org/package/ghc-events">ghc-events</ulink>
             package.
           </para>

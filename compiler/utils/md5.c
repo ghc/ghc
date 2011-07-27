@@ -15,6 +15,8 @@
  * will fill a supplied 16-byte array with the digest.
  */
 
+#if __GLASGOW_HASKELL__ < 701
+
 #include "HsFFI.h"
 #include "md5.h"
 #include <string.h>
@@ -236,3 +238,4 @@ MD5Transform(word32 buf[4], word32 const in[16])
 	buf[3] += d;
 }
 
+#endif

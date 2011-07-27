@@ -13,6 +13,7 @@
 module Outputable (
 	-- * Type classes
 	Outputable(..), OutputableBndr(..),
+	PlatformOutputable(..),
 
         -- * Pretty printing combinators
 	SDoc, runSDoc, initSDocContext,
@@ -74,6 +75,7 @@ import {-# SOURCE #-} 	OccName( OccName )
 import StaticFlags
 import FastString 
 import FastTypes
+import Platform
 import qualified Pretty
 import Pretty		( Doc, Mode(..) )
 import Panic
@@ -603,6 +605,13 @@ class Outputable a where
 
 	ppr = pprPrec 0
 	pprPrec _ = ppr
+
+class PlatformOutputable a where
+	pprPlatform :: Platform -> a -> SDoc
+	pprPlatformPrec :: Platform -> Rational -> a -> SDoc
+	
+	pprPlatform platform = pprPlatformPrec platform 0
+	pprPlatformPrec platform _ = pprPlatform platform
 \end{code}
 
 \begin{code}
@@ -624,12 +633,19 @@ instance Outputable Word where
 
 instance Outputable () where
    ppr _ = text "()"
+instance PlatformOutputable () where
+   pprPlatform _ _ = text "()"
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
+instance (PlatformOutputable a) => PlatformOutputable [a] where
+    pprPlatform platform xs = brackets (fsep (punctuate comma (map (pprPlatform platform) xs)))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
+instance (PlatformOutputable a, PlatformOutputable b) => PlatformOutputable (a, b) where
+    pprPlatform platform (x,y)
+     = parens (sep [pprPlatform platform x <> comma, pprPlatform platform y])
 
 instance Outputable a => Outputable (Maybe a) where
   ppr Nothing = ptext (sLit "Nothing")
@@ -690,6 +706,8 @@ instance Outputable FastString where
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
+instance (PlatformOutputable key, PlatformOutputable elt) => PlatformOutputable (M.Map key elt) where
+    pprPlatform platform m = pprPlatform platform (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
 \end{code}

@@ -379,7 +379,7 @@ filterVarEnv_Directly :: (Unique -> a -> Bool) -> VarEnv a -> VarEnv a
 restrictVarEnv    :: VarEnv a -> VarSet -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv	  :: VarEnv a -> Var -> VarEnv a
-minusVarEnv       :: VarEnv a -> VarEnv a -> VarEnv a
+minusVarEnv       :: VarEnv a -> VarEnv b -> VarEnv a
 intersectsVarEnv  :: VarEnv a -> VarEnv a -> Bool
 plusVarEnv_C	  :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 mapVarEnv	  :: (a -> b) -> VarEnv a -> VarEnv b

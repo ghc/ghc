@@ -47,6 +47,9 @@ int DEBUG_sparks;
 
 // events
 int TRACE_sched;
+int TRACE_gc;
+int TRACE_spark_sampled;
+int TRACE_spark_full;
 
 #ifdef THREADED_RTS
 static Mutex trace_utx;
@@ -90,7 +93,24 @@ void initTracing (void)
         RtsFlags.TraceFlags.scheduler ||
         RtsFlags.DebugFlags.scheduler;
 
+    // -Dg turns on gc tracing too
+    TRACE_gc =
+        RtsFlags.TraceFlags.gc ||
+        RtsFlags.DebugFlags.gc;
+
+    TRACE_spark_sampled =
+        RtsFlags.TraceFlags.sparks_sampled;
+
+    // -Dr turns on full spark tracing
+    TRACE_spark_full =
+        RtsFlags.TraceFlags.sparks_full ||
+        RtsFlags.DebugFlags.sparks;
+
     eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG;
+
+    /* Note: we can have TRACE_sched or TRACE_spark turned on even when
+       eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
+     */
 
     if (eventlog_enabled) {
         initEventLogging();
@@ -179,20 +199,8 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         debugBelch("cap %d: thread %lu appended to run queue\n", 
                    cap->no, (lnat)tso->id);
         break;
-    case EVENT_RUN_SPARK:       // (cap, thread)
-        debugBelch("cap %d: thread %lu running a spark\n", 
-                   cap->no, (lnat)tso->id);
-        break;
-    case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
-        debugBelch("cap %d: creating spark thread %lu\n", 
-                   cap->no, (long)info1);
-        break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
         debugBelch("cap %d: thread %lu migrating to cap %d\n", 
-                   cap->no, (lnat)tso->id, (int)info1);
-        break;
-    case EVENT_STEAL_SPARK:     // (cap, thread, victim_cap)
-        debugBelch("cap %d: thread %lu stealing a spark from cap %d\n", 
                    cap->no, (lnat)tso->id, (int)info1);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, info1_cap)
@@ -211,27 +219,6 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
         break;
     case EVENT_SHUTDOWN:        // (cap)
         debugBelch("cap %d: shutting down\n", cap->no);
-        break;
-    case EVENT_REQUEST_SEQ_GC:  // (cap)
-        debugBelch("cap %d: requesting sequential GC\n", cap->no);
-        break;
-    case EVENT_REQUEST_PAR_GC:  // (cap)
-        debugBelch("cap %d: requesting parallel GC\n", cap->no);
-        break;
-    case EVENT_GC_START:        // (cap)
-        debugBelch("cap %d: starting GC\n", cap->no);
-        break;
-    case EVENT_GC_END:          // (cap)
-        debugBelch("cap %d: finished GC\n", cap->no);
-        break;
-    case EVENT_GC_IDLE:        // (cap)
-        debugBelch("cap %d: GC idle\n", cap->no);
-        break;
-    case EVENT_GC_WORK:          // (cap)
-        debugBelch("cap %d: GC working\n", cap->no);
-        break;
-    case EVENT_GC_DONE:          // (cap)
-        debugBelch("cap %d: GC done\n", cap->no);
         break;
     default:
         debugBelch("cap %d: thread %lu: event %d\n\n", 
@@ -253,6 +240,56 @@ void traceSchedEvent_ (Capability *cap, EventTypeNum tag,
 #endif
     {
         postSchedEvent(cap,tag,tso ? tso->id : 0, info1, info2);
+    }
+}
+
+#ifdef DEBUG
+static void traceGcEvent_stderr (Capability *cap, EventTypeNum tag)
+{
+    ACQUIRE_LOCK(&trace_utx);
+
+    tracePreface();
+    switch (tag) {
+      case EVENT_REQUEST_SEQ_GC:  // (cap)
+          debugBelch("cap %d: requesting sequential GC\n", cap->no);
+          break;
+      case EVENT_REQUEST_PAR_GC:  // (cap)
+          debugBelch("cap %d: requesting parallel GC\n", cap->no);
+          break;
+      case EVENT_GC_START:        // (cap)
+          debugBelch("cap %d: starting GC\n", cap->no);
+          break;
+      case EVENT_GC_END:          // (cap)
+          debugBelch("cap %d: finished GC\n", cap->no);
+          break;
+      case EVENT_GC_IDLE:         // (cap)
+          debugBelch("cap %d: GC idle\n", cap->no);
+          break;
+      case EVENT_GC_WORK:         // (cap)
+          debugBelch("cap %d: GC working\n", cap->no);
+          break;
+      case EVENT_GC_DONE:         // (cap)
+          debugBelch("cap %d: GC done\n", cap->no);
+          break;
+      default:
+          barf("traceGcEvent: unknown event tag %d", tag);
+          break;
+    }
+
+    RELEASE_LOCK(&trace_utx);
+}
+#endif
+
+void traceGcEvent_ (Capability *cap, EventTypeNum tag)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        traceGcEvent_stderr(cap, tag);
+    } else
+#endif
+    {
+        /* currently all GC events are nullary events */
+        postEvent(cap, tag);
     }
 }
 
@@ -335,15 +372,80 @@ void traceOSProcessInfo_(void) {
     }
 }
 
-void traceEvent_ (Capability *cap, EventTypeNum tag)
+#ifdef DEBUG
+static void traceSparkEvent_stderr (Capability *cap, EventTypeNum tag, 
+                                    StgWord info1)
+{
+    ACQUIRE_LOCK(&trace_utx);
+
+    tracePreface();
+    switch (tag) {
+
+    case EVENT_CREATE_SPARK_THREAD: // (cap, spark_thread)
+        debugBelch("cap %d: creating spark thread %lu\n", 
+                   cap->no, (long)info1);
+        break;
+    case EVENT_SPARK_CREATE:        // (cap)
+        debugBelch("cap %d: added spark to pool\n",
+                   cap->no);
+        break;
+    case EVENT_SPARK_DUD:           //  (cap)
+        debugBelch("cap %d: discarded dud spark\n", 
+                   cap->no);
+        break;
+    case EVENT_SPARK_OVERFLOW:      // (cap)
+        debugBelch("cap %d: discarded overflowed spark\n", 
+                   cap->no);
+        break;
+    case EVENT_SPARK_RUN:           // (cap)
+        debugBelch("cap %d: running a spark\n", 
+                   cap->no);
+        break;
+    case EVENT_SPARK_STEAL:         // (cap, victim_cap)
+        debugBelch("cap %d: stealing a spark from cap %d\n", 
+                   cap->no, (int)info1);
+        break;
+    case EVENT_SPARK_FIZZLE:        // (cap)
+        debugBelch("cap %d: fizzled spark removed from pool\n", 
+                   cap->no);
+        break;
+    case EVENT_SPARK_GC:            // (cap)
+        debugBelch("cap %d: GCd spark removed from pool\n", 
+                   cap->no);
+        break;
+    default:
+        barf("traceSparkEvent: unknown event tag %d", tag);
+        break;
+    }
+
+    RELEASE_LOCK(&trace_utx);
+}
+#endif
+
+void traceSparkEvent_ (Capability *cap, EventTypeNum tag, StgWord info1)
 {
 #ifdef DEBUG
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
-        traceSchedEvent_stderr(cap, tag, 0, 0, 0);
+        traceSparkEvent_stderr(cap, tag, info1);
     } else
 #endif
     {
-        postEvent(cap,tag);
+        postSparkEvent(cap,tag,info1);
+    }
+}
+
+void traceSparkCounters_ (Capability *cap,
+                          SparkCounters counters,
+                          StgWord remaining)
+{
+#ifdef DEBUG
+    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
+        /* we currently don't do debug tracing of spark stats but we must
+           test for TRACE_STDERR because of the !eventlog_enabled case. */
+    } else
+#endif
+    {
+        postSparkCountersEvent(cap, counters, remaining);
     }
 }
 

@@ -1216,7 +1216,7 @@ checkStrictBinds top_lvl rec_group binds poly_ids
         -- This should be a checkTc, not a warnTc, but as of GHC 6.11
         -- the versions of alex and happy available have non-conforming
         -- templates, so the GHC build fails if it's an error:
-        ; warnUnlifted <- doptM Opt_WarnLazyUnliftedBindings
+        ; warnUnlifted <- woptM Opt_WarnLazyUnliftedBindings
         ; warnTc (warnUnlifted && not bang_pat && lifted_pat)
                  -- No outer bang, but it's a compound pattern
                  -- E.g   (I# x#) = blah

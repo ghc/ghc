@@ -655,6 +655,7 @@ pprModIface iface
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
         , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
+        , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (ptext (sLit "where"))
 	, vcat (map pprExport (mi_exports iface))
 	, pprDeps (mi_deps iface)

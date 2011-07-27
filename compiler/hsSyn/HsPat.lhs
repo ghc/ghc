@@ -68,6 +68,7 @@ data Pat id
   | LazyPat     (LPat id)               -- Lazy pattern
   | AsPat	(Located id) (LPat id)  -- As pattern
   | ParPat      (LPat id)		-- Parenthesised pattern
+    		      			-- See Note [Parens in HsSyn] in HsExpr
   | BangPat	(LPat id)		-- Bang pattern
 
 	------------ Lists, tuples, arrays ---------------
@@ -238,17 +239,8 @@ pprParendLPat :: (OutputableBndr name) => LPat name -> SDoc
 pprParendLPat (L _ p) = pprParendPat p
 
 pprParendPat :: (OutputableBndr name) => Pat name -> SDoc
-pprParendPat p | patNeedsParens p = parens (pprPat p)
-               | otherwise        = pprPat p
-
-patNeedsParens :: Pat name -> Bool
-patNeedsParens (ConPatIn _ d)               = not (null (hsConPatArgs d))
-patNeedsParens (ConPatOut { pat_args = d }) = not (null (hsConPatArgs d))
-patNeedsParens (SigPatIn {})  = True
-patNeedsParens (SigPatOut {}) = True
-patNeedsParens (ViewPat {})   = True
-patNeedsParens (CoPat {})     = True
-patNeedsParens _              = False
+pprParendPat p | hsPatNeedsParens p = parens (pprPat p)
+               | otherwise          = pprPat p
 
 pprPat :: (OutputableBndr name) => Pat name -> SDoc
 pprPat (VarPat var)  	  = pprPatBndr var
@@ -268,8 +260,9 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
   = getPprStyle $ \ sty ->	-- Tiresome; in TcBinds.tcRhs we print out a 
     if debugStyle sty then 	-- typechecked Pat in an error message, 
 				-- and we want to make sure it prints nicely
-	ppr con <+> sep [ hsep (map pprPatBndr tvs) <+> hsep (map pprPatBndr dicts),
-		   	  ppr binds, pprConArgs details]
+	ppr con <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+		   	       , ppr binds])  
+                <+> pprConArgs details
     else pprUserCon con details
 
 pprPat (LitPat s)	    = ppr s
@@ -438,29 +431,29 @@ isIrrefutableHsPat pat
     urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
 
 hsPatNeedsParens :: Pat a -> Bool
+hsPatNeedsParens (NPlusKPat {})      = True
+hsPatNeedsParens (QuasiQuotePat {})  = True
+hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
+hsPatNeedsParens p@(ConPatOut {})    = conPatNeedsParens (pat_args p)
+hsPatNeedsParens (SigPatIn {})       = True
+hsPatNeedsParens (SigPatOut {})      = True
+hsPatNeedsParens (ViewPat {})        = True
+hsPatNeedsParens (CoPat {})          = True
 hsPatNeedsParens (WildPat {})        = False
 hsPatNeedsParens (VarPat {})         = False
 hsPatNeedsParens (LazyPat {})        = False
 hsPatNeedsParens (BangPat {})        = False
-hsPatNeedsParens (CoPat {})          = True
 hsPatNeedsParens (ParPat {})         = False
 hsPatNeedsParens (AsPat {})          = False
-hsPatNeedsParens (ViewPat {})        = True
-hsPatNeedsParens (SigPatIn {})       = True
-hsPatNeedsParens (SigPatOut {})      = True
 hsPatNeedsParens (TuplePat {})       = False
 hsPatNeedsParens (ListPat {})        = False
 hsPatNeedsParens (PArrPat {})        = False	
-hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
-hsPatNeedsParens (ConPatOut {})      = True
 hsPatNeedsParens (LitPat {})   	     = False
 hsPatNeedsParens (NPat {})	     = False
-hsPatNeedsParens (NPlusKPat {})      = True
-hsPatNeedsParens (QuasiQuotePat {})  = True
 
 conPatNeedsParens :: HsConDetails a b -> Bool
 conPatNeedsParens (PrefixCon args) = not (null args)
-conPatNeedsParens (InfixCon {})    = False
-conPatNeedsParens (RecCon {})      = False
+conPatNeedsParens (InfixCon {})    = True
+conPatNeedsParens (RecCon {})      = True
 \end{code}
 

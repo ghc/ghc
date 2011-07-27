@@ -28,6 +28,7 @@ import UniqSet
 import UniqFM
 import Bag
 import Outputable
+import Platform
 import DynFlags
 
 import Data.List
@@ -44,12 +45,12 @@ maxSpinCount	= 10
 
 -- | The top level of the graph coloring register allocator.
 regAlloc
-	:: (Outputable instr, Instruction instr)
+	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
 	=> DynFlags
 	-> UniqFM (UniqSet RealReg)	-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
-	-> [LiveCmmTop instr]		-- ^ code annotated with liveness information.
-	-> UniqSM ( [NatCmmTop instr], [RegAllocStats instr] )
+	-> [LiveCmmTop statics instr]	-- ^ code annotated with liveness information.
+	-> UniqSM ( [NatCmmTop statics instr], [RegAllocStats statics instr] )
            -- ^ code with registers allocated and stats for each stage of
            -- allocation
 		
@@ -58,9 +59,10 @@ regAlloc dflags regsFree slotsFree code
 	-- TODO: the regClass function is currently hard coded to the default target
 	--	 architecture. Would prefer to determine this from dflags.
 	--	 There are other uses of targetRegClass later in this module.
-	let triv = trivColorable 
-			targetVirtualRegSqueeze
-			targetRealRegSqueeze
+	let platform = targetPlatform dflags
+	    triv = trivColorable platform
+			(targetVirtualRegSqueeze platform)
+			(targetRealRegSqueeze platform)
 
  	(code_final, debug_codeGraphs, _)
 		<- regAlloc_spin dflags 0 
@@ -79,6 +81,7 @@ regAlloc_spin
 	debug_codeGraphs 
 	code
  = do
+        let platform = targetPlatform dflags
  	-- if any of these dump flags are turned on we want to hang on to
 	--	intermediate structures in the allocator - otherwise tell the
 	--	allocator to ditch them early so we don't end up creating space leaks.
@@ -111,7 +114,7 @@ regAlloc_spin
 	-- build a map of the cost of spilling each instruction
 	--	this will only actually be computed if we have to spill something.
 	let spillCosts	= foldl' plusSpillCostInfo zeroSpillCostInfo
-			$ map slurpSpillCostInfo code
+			$ map (slurpSpillCostInfo platform) code
 
 	-- the function to choose regs to leave uncolored
 	let spill	= chooseSpill spillCosts
@@ -159,14 +162,14 @@ regAlloc_spin
 				else graph_colored
 
 		-- patch the registers using the info in the graph
-	 	let code_patched	= map (patchRegsFromGraph graph_colored_lint) code_coalesced
+	 	let code_patched	= map (patchRegsFromGraph platform graph_colored_lint) code_coalesced
 
 		-- clean out unneeded SPILL/RELOADs
-		let code_spillclean	= map cleanSpills code_patched
+		let code_spillclean	= map (cleanSpills platform) code_patched
 
 		-- strip off liveness information, 
 		--	and rewrite SPILL/RELOAD pseudos into real instructions along the way
-		let code_final		= map stripLive code_spillclean
+		let code_final		= map (stripLive platform) code_spillclean
 
 		-- record what happened in this stage for debugging
 		let stat		=
@@ -211,7 +214,7 @@ regAlloc_spin
 		-- NOTE: we have to reverse the SCCs here to get them back into the reverse-dependency
 		--       order required by computeLiveness. If they're not in the correct order
 		--       that function will panic.
-		code_relive	<- mapM (regLiveness . reverseBlocksInTops) code_spilled
+		code_relive	<- mapM (regLiveness platform . reverseBlocksInTops) code_spilled
 
 		-- record what happened in this stage for debugging
 		let stat	=
@@ -239,7 +242,7 @@ regAlloc_spin
 -- | Build a graph from the liveness and coalesce information in this code.
 buildGraph 
 	:: Instruction instr
-	=> [LiveCmmTop instr]
+	=> [LiveCmmTop statics instr]
 	-> UniqSM (Color.Graph VirtualReg RegClass RealReg)
 	
 buildGraph code
@@ -320,11 +323,11 @@ graphAddCoalesce _ _
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph 
-	:: (Outputable instr, Instruction instr)
-	=> Color.Graph VirtualReg RegClass RealReg
-	-> LiveCmmTop instr -> LiveCmmTop instr
+	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
+	=> Platform -> Color.Graph VirtualReg RegClass RealReg
+	-> LiveCmmTop statics instr -> LiveCmmTop statics instr
 
-patchRegsFromGraph graph code
+patchRegsFromGraph platform graph code
  = let
  	-- a function to lookup the hardreg for a virtual reg from the graph.
  	patchF reg
@@ -343,12 +346,12 @@ patchRegsFromGraph graph code
 		| otherwise
 		= pprPanic "patchRegsFromGraph: register mapping failed." 
 			(  text "There is no node in the graph for register " <> ppr reg
-			$$ ppr code
+			$$ pprPlatform platform code
 			$$ Color.dotGraph 
 				(\_ -> text "white") 
-				(trivColorable 
-					targetVirtualRegSqueeze
-					targetRealRegSqueeze)
+				(trivColorable platform
+					(targetVirtualRegSqueeze platform)
+					(targetRealRegSqueeze platform))
 				graph)
 
    in	patchEraseLive patchF code

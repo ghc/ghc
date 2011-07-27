@@ -1382,13 +1382,15 @@ D[ e | (Q | R), S ]    = mzip D[ Qv | Q ] D[ Rv | R ] &gt;&gt;= \(Qv,Rv) -&gt; D
 -- Transform comprehensions
 D[ e | Q then f, R ]                  = f D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
 
-D[ e | Q then f by b, R ]             = f b D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+D[ e | Q then f by b, R ]             = f (\Qv -&gt; b) D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
 
 D[ e | Q then group using f, R ]      = f D[ Qv | Q ] &gt;&gt;= \ys -&gt;
                                         case (fmap selQv1 ys, ..., fmap selQvn ys) of
                                  	     Qv -&gt; D[ e | R ]
 
-D[ e | Q then group by b using f, R ] = f b D[ Qv | Q ] &gt;&gt;= \ys -&gt;
+D[ e | Q then group by b, R ]         = D[ e | Q then group by b using mgroupWith, R ]
+
+D[ e | Q then group by b using f, R ] = f (\Qv -&gt; b) D[ Qv | Q ] &gt;&gt;= \ys -&gt;
                                         case (fmap selQv1 ys, ..., fmap selQvn ys) of
                                            Qv -&gt; D[ e | R ]
 
@@ -1812,18 +1814,35 @@ the same as the omitted field names.
 
 <listitem><para>
 The "<literal>..</literal>" expands to the missing
-<emphasis>in-scope</emphasis> record fields, where "in scope"
-includes both unqualified and qualified-only.
-Any fields that are not in scope are not filled in.  For example
+<emphasis>in-scope</emphasis> record fields.  
+Specifically the expansion of "<literal>C {..}</literal>" includes
+<literal>f</literal> if and only if:
+<itemizedlist>
+<listitem><para>
+<literal>f</literal> is a record field of constructor <literal>C</literal>.
+</para></listitem>
+<listitem><para>
+The record field <literal>f</literal> is in scope somehow (either qualified or unqualified).
+</para></listitem>
+<listitem><para>
+In the case of expressions (but not patterns), 
+the variable <literal>f</literal> is in scope unqualified, 
+apart from the binding of the record selector itself.
+</para></listitem>
+</itemizedlist>
+For example
 <programlisting>
 module M where
   data R = R { a,b,c :: Int }
 module X where
-  import qualified M( R(a,b) )
-  f a b = R { .. }
+  import M( R(a,c) )
+  f b = R { .. }
 </programlisting>
-The <literal>{..}</literal> expands to <literal>{M.a=a,M.b=b}</literal>,
-omitting <literal>c</literal> since it is not in scope at all.
+The <literal>R{..}</literal> expands to <literal>R{M.a=a}</literal>,
+omitting <literal>b</literal> since the record field is not in scope,
+and omitting <literal>c</literal> since the variable <literal>c</literal>
+is not in scope (apart from the binding of the 
+record selector <literal>c</literal>, of course).
 </para></listitem>
 </itemizedlist>
 </para>
@@ -5035,7 +5054,7 @@ type instance F t1 .. tn = t
     </sect4>
   </sect3>
 
-  <sect3 id-="equality-constraints">
+  <sect3 id="equality-constraints">
     <title>Equality constraints</title>
     <para>
       Type context can include equality constraints of the form <literal>t1 ~
@@ -5075,13 +5094,9 @@ class (F a ~ b) => C a b where
       with the class head.  Method signatures are not affected by that
       process.
     </para>
-    <para>
-      NB: Equalities in superclass contexts are not fully implemented in
-      GHC 6.10.
-    </para>
   </sect3>
 
-  <sect3 id-="ty-fams-in-instances">
+  <sect3 id="ty-fams-in-instances">
     <title>Type families and instance declarations</title>
     <para>Type families require us to extend the rules for
       the form of instance heads, which are given
@@ -8100,82 +8115,6 @@ happen.
       </sect3>
     </sect2>
 
-    <sect2 id="annotation-pragmas">
-      <title>ANN pragmas</title>
-
-      <para>GHC offers the ability to annotate various code constructs with additional
-      data by using three pragmas.  This data can then be inspected at a later date by
-      using GHC-as-a-library.</para>
-
-      <sect3 id="ann-pragma">
-        <title>Annotating values</title>
-
-        <indexterm><primary>ANN</primary></indexterm>
-
-        <para>Any expression that has both <literal>Typeable</literal> and <literal>Data</literal> instances may be attached to a top-level value
-        binding using an <literal>ANN</literal> pragma. In particular, this means you can use <literal>ANN</literal>
-        to annotate data constructors (e.g. <literal>Just</literal>) as well as normal values (e.g. <literal>take</literal>).
-        By way of example, to annotate the function <literal>foo</literal> with the annotation <literal>Just "Hello"</literal>
-        you would do this:</para>
-
-<programlisting>
-{-# ANN foo (Just "Hello") #-}
-foo = ...
-</programlisting>
-
-        <para>
-          A number of restrictions apply to use of annotations:
-          <itemizedlist>
-            <listitem><para>The binder being annotated must be at the top level (i.e. no nested binders)</para></listitem>
-            <listitem><para>The binder being annotated must be declared in the current module</para></listitem>
-            <listitem><para>The expression you are annotating with must have a type with <literal>Typeable</literal> and <literal>Data</literal> instances</para></listitem>
-            <listitem><para>The <ulink linkend="using-template-haskell">Template Haskell staging restrictions</ulink> apply to the
-            expression being annotated with, so for example you cannot run a function from the module being compiled.</para>
-
-            <para>To be precise, the annotation <literal>{-# ANN x e #-}</literal> is well staged if and only if <literal>$(e)</literal> would be
-            (disregarding the usual type restrictions of the splice syntax, and the usual restriction on splicing inside a splice - <literal>$([|1|])</literal> is fine as an annotation, albeit redundant).</para></listitem>
-          </itemizedlist>
-
-          If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC">
-          please give the GHC team a shout</ulink>.
-        </para>
-
-        <para>However, apart from these restrictions, many things are allowed, including expressions which are not fully evaluated!
-        Annotation expressions will be evaluated by the compiler just like Template Haskell splices are. So, this annotation is fine:</para>
-
-<programlisting>
-{-# ANN f SillyAnnotation { foo = (id 10) + $([| 20 |]), bar = 'f } #-}
-f = ...
-</programlisting>
-      </sect3>
-
-      <sect3 id="typeann-pragma">
-        <title>Annotating types</title>
-
-        <indexterm><primary>ANN type</primary></indexterm>
-        <indexterm><primary>ANN</primary></indexterm>
-
-        <para>You can annotate types with the <literal>ANN</literal> pragma by using the <literal>type</literal> keyword. For example:</para>
-
-<programlisting>
-{-# ANN type Foo (Just "A `Maybe String' annotation") #-}
-data Foo = ...
-</programlisting>
-      </sect3>
-
-      <sect3 id="modann-pragma">
-        <title>Annotating modules</title>
-
-        <indexterm><primary>ANN module</primary></indexterm>
-        <indexterm><primary>ANN</primary></indexterm>
-
-        <para>You can annotate modules with the <literal>ANN</literal> pragma by using the <literal>module</literal> keyword. For example:</para>
-
-<programlisting>
-{-# ANN module (Just "A `Maybe String' annotation") #-}
-</programlisting>
-      </sect3>
-    </sect2>
 
     <sect2 id="line-pragma">
       <title>LINE pragma</title>
@@ -9228,30 +9167,16 @@ Using a combination of <option>-XDeriveGeneric</option>
 <option>-XDefaultSignatures</option> (<xref linkend="class-default-signatures"/>),
 you can easily do datatype-generic
 programming using the <literal>GHC.Generics</literal> framework. This section
-gives a very brief overview of how to do it. For more detail please refer to the
-<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
-or the original paper:
+gives a very brief overview of how to do it.
 </para>
 
-<itemizedlist>
-<listitem>
 <para>
-Jos� Pedro Magalh�es, Atze Dijkstra, Johan Jeuring, and Andres L�h.
-<ulink url="http://dreixel.net/research/pdf/gdmh.pdf">
-  A generic deriving mechanism for Haskell</ulink>.
-<citetitle>Proceedings of the third ACM Haskell symposium on Haskell</citetitle>
-(Haskell'2010), pp. 37-48, ACM, 2010.
+Generic programming support in GHC allows defining classes with methods that
+do not need a user specification when instantiating: the method body is
+automatically derived by GHC. This is similar to what happens for standard
+classes such as <literal>Read</literal> and <literal>Show</literal>, for
+instance, but now for user-defined classes.
 </para>
-</listitem>
-</itemizedlist>
-
-<emphasis>Note</emphasis>: the current support for generic programming in GHC
-is preliminary. In particular, we only allow deriving instances for the
-<literal>Generic</literal> class. Support for deriving
-<literal>Generic1</literal> (and thus enabling generic functions of kind
-<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
-later stage.
-
 
 <sect2>
 <title>Deriving representations</title>
@@ -9259,7 +9184,7 @@ later stage.
 <para>
 The first thing we need is generic representations. The
 <literal>GHC.Generics</literal> module defines a couple of primitive types
-that can be used to represent most Haskell datatypes:
+that are used to represent Haskell datatypes:
 
 <programlisting>
 -- | Unit: used for constructors without arguments
@@ -9279,7 +9204,28 @@ data (:+:) f g p = L1 (f p) | R1 (g p)
 infixr 6 :*:
 data (:*:) f g p = f p :*: g p
 </programlisting>
+</para>
 
+<para>
+The <literal>Generic</literal> class mediates between user-defined datatypes
+and their internal representation as a sum-of-products:
+
+<programlisting>
+class Generic a where
+  -- Encode the representation of a user datatype
+  type Rep a :: * -> *
+  -- Convert from the datatype to its representation
+  from  :: a -> (Rep a) x
+  -- Convert from the representation to the datatype
+  to    :: (Rep a) x -> a
+</programlisting>
+
+Instances of this class can be derived by GHC with the
+<option>-XDeriveGeneric</option> (<xref linkend="deriving-typeable"/>), and are
+necessary to be able to define generic instances automatically.
+</para>
+
+<para>
 For example, a user-defined datatype of trees <literal>data UserTree a = Node a
 (UserTree a) (UserTree a) | Leaf</literal> gets the following representation:
 
@@ -9321,6 +9267,7 @@ This representation is generated automatically if a
 <link linkend="stand-alone-deriving">Standalone deriving</link> can also be
 used.
 </para>
+
 </sect2>
 
 <sect2>
@@ -9340,7 +9287,7 @@ instance GSerialize U1 where
   gput U1 = []
 
 instance (GSerialize a, GSerialize b) => GSerialize (a :*: b) where
-  gput (a :*: b) = gput a ++ gput b
+  gput (x :*: y) = gput x ++ gput y
 
 instance (GSerialize a, GSerialize b) => GSerialize (a :+: b) where
   gput (L1 x) = O : gput x
@@ -9349,7 +9296,7 @@ instance (GSerialize a, GSerialize b) => GSerialize (a :+: b) where
 instance (GSerialize a) => GSerialize (M1 i c a) where
   gput (M1 x) = gput x
 
-instance (Serialize a) => GSerialize (K1 i c a) where
+instance (Serialize a) => GSerialize (K1 i a) where
   gput (K1 x) = put x
 </programlisting>
 
@@ -9384,6 +9331,36 @@ instance (Serialize a) => Serialize (UserTree a)
 The default method for <literal>put</literal> is then used, corresponding to the
 generic implementation of serialization.
 </para>
+</sect2>
+
+
+<sect2>
+<title>More information</title>
+
+<para>
+For more detail please refer to the
+<ulink url="http://www.haskell.org/haskellwiki/Generics">HaskellWiki page</ulink>
+or the original paper:
+</para>
+
+<itemizedlist>
+<listitem>
+<para>
+Jose Pedro Magalhaes, Atze Dijkstra, Johan Jeuring, and Andres Loeh.
+<ulink url="http://dreixel.net/research/pdf/gdmh.pdf">
+  A generic deriving mechanism for Haskell</ulink>.
+<citetitle>Proceedings of the third ACM Haskell symposium on Haskell</citetitle>
+(Haskell'2010), pp. 37-48, ACM, 2010.
+</para>
+</listitem>
+</itemizedlist>
+
+<emphasis>Note</emphasis>: the current support for generic programming in GHC
+is preliminary. In particular, we only allow deriving instances for the
+<literal>Generic</literal> class. Support for deriving
+<literal>Generic1</literal> (and thus enabling generic functions of kind
+<literal>* -> *</literal> such as <literal>fmap</literal>) will come at a
+later stage.
 </sect2>
 
 </sect1>

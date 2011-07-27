@@ -56,6 +56,7 @@ import FastString
 import Module
 
 import qualified Data.Data as Data
+import qualified Data.Typeable
 import Data.Char
 import Data.Word
 \end{code}
@@ -374,6 +375,7 @@ data DataCon
 				-- Used for Template Haskell and 'deriving' only
 				-- The actual fixity is stored elsewhere
   }
+  deriving Data.Typeable.Typeable
 
 -- | Contains the Ids of the data constructor functions
 data DataConIds
@@ -455,9 +457,6 @@ instance Outputable DataCon where
 
 instance Show DataCon where
     showsPrec p con = showsPrecSDoc p (ppr con)
-
-instance Data.Typeable DataCon where
-    typeOf _ = Data.mkTyConApp (Data.mkTyCon "DataCon") []
 
 instance Data.Data DataCon where
     -- don't traverse?

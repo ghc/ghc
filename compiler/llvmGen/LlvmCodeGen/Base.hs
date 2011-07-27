@@ -41,7 +41,7 @@ import Unique
 -- * Some Data Types
 --
 
-type LlvmCmmTop = GenCmmTop LlvmData [CmmStatic] (ListGraph LlvmStatement)
+type LlvmCmmTop = GenCmmTop [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Unresolved code.

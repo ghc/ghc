@@ -83,7 +83,7 @@ EXTERN_INLINE void busy_wait_nop(void);
  * http://gee.cs.oswego.edu/dl/jmm/cookbook.html
  *
  * To check whether you got these right, try the test in 
- *   testsuite/tests/ghc-regress/rts/testwsdeque.c
+ *   testsuite/tests/rts/testwsdeque.c
  * This tests the work-stealing deque implementation, which relies on
  * properly working store_load and load_load memory barriers.
  */ 

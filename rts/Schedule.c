@@ -581,6 +581,10 @@ static void
 schedulePreLoop(void)
 {
   // initialisation for scheduler - what cannot go into initScheduler()  
+
+#if defined(mingw32_HOST_OS)
+    win32AllocStack();
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -779,6 +783,10 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		if (emptySparkPoolCap(free_caps[i])) {
 		    spark = tryStealSpark(cap->sparks);
 		    if (spark != NULL) {
+                        /* TODO: if anyone wants to re-enable this code then
+                         * they must consider the fizzledSpark(spark) case
+                         * and update the per-cap spark statistics.
+                         */
 			debugTrace(DEBUG_sched, "pushing spark %p to capability %d", spark, free_caps[i]->no);
 
             traceEventStealSpark(free_caps[i], t, cap->no);
@@ -1406,6 +1414,11 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
         waitForGcThreads(cap);
+        
+#if defined(THREADED_RTS)
+        // Stable point where we can do a global check on our spark counters
+        ASSERT(checkSparkCountInvariant());
+#endif
     }
 
 #endif
@@ -1430,11 +1443,13 @@ delete_threads_and_gc:
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     waiting_for_gc = 0;
-    GarbageCollect(force_major || heap_census, gc_type, cap);
+    GarbageCollect(force_major || heap_census, heap_census, gc_type, cap);
 #else
-    GarbageCollect(force_major || heap_census, 0, cap);
+    GarbageCollect(force_major || heap_census, heap_census, 0, cap);
 #endif
     traceEventGcEnd(cap);
+
+    traceSparkCounters(cap);
 
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
     {
@@ -1453,10 +1468,14 @@ delete_threads_and_gc:
         recent_activity = ACTIVITY_YES;
     }
 
+#if defined(THREADED_RTS)
+    // Stable point where we can do a global check on our spark counters
+    ASSERT(checkSparkCountInvariant());
+#endif
+
+    // The heap census itself is done during GarbageCollect().
     if (heap_census) {
-        debugTrace(DEBUG_sched, "performing heap census");
-        heapCensus();
-	performHeapProfile = rtsFalse;
+        performHeapProfile = rtsFalse;
     }
 
 #if defined(THREADED_RTS)
@@ -1991,10 +2010,6 @@ initScheduler(void)
   initCapabilities();
 
   initTaskManager();
-
-#if defined(THREADED_RTS)
-  initSparkPools();
-#endif
 
   RELEASE_LOCK(&sched_mutex);
 

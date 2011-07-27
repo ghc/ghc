@@ -170,11 +170,33 @@ floatBind (Rec pairs)
       | isTopLvl dest_lvl  -- See Note [floatBind for top level]
       = case (floatExpr rhs) of { (fs, rhs_floats, rhs') ->
         (fs, emptyFloats, addTopFloatPairs (flattenTopFloats rhs_floats) [(name, rhs')])}
-      | otherwise
-      = case (floatBody dest_lvl rhs) of { (fs, rhs_floats, rhs') ->
-	(fs, rhs_floats, [(name, rhs')]) }
+      | otherwise	  -- Note [Floating out of Rec rhss]
+      = case (floatExpr rhs) of { (fs, rhs_floats, rhs') ->
+        case (partitionByLevel dest_lvl rhs_floats) of { (rhs_floats', heres) ->
+        case (splitRecFloats heres) of { (pairs, case_heres) ->
+        (fs, rhs_floats', (name, installUnderLambdas case_heres rhs') : pairs) }}}
       where
         dest_lvl = floatSpecLevel spec
+
+splitRecFloats :: Bag FloatBind -> ([(Id,CoreExpr)], Bag FloatBind)
+-- The "tail" begins with a case
+-- See Note [Floating out of Rec rhss]
+splitRecFloats fs
+  = go [] (bagToList fs)
+  where
+    go prs (FloatLet (NonRec b r) : fs) = go ((b,r):prs) fs
+    go prs (FloatLet (Rec prs')   : fs) = go (prs' ++ prs) fs
+    go prs fs                           = (prs, listToBag fs)
+
+installUnderLambdas :: Bag FloatBind -> CoreExpr -> CoreExpr
+-- Note [Floating out of Rec rhss]
+installUnderLambdas floats e
+  | isEmptyBag floats = e
+  | otherwise         = go e
+  where
+    go (Lam b e)                 = Lam b (go e)
+    go (Note n e) | notSccNote n = Note n (go e)
+    go e                         = install floats e
 
 ---------------
 floatList :: (a -> (FloatStats, FloatBinds, b)) -> [a] -> (FloatStats, FloatBinds, [b])
@@ -183,6 +205,27 @@ floatList f (a:as) = case f a		 of { (fs_a,  binds_a,  b)  ->
 		     case floatList f as of { (fs_as, binds_as, bs) ->
 		     (fs_a `add_stats` fs_as, binds_a `plusFloats`  binds_as, b:bs) }}
 \end{code}
+
+Note [Floating out of Rec rhss]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   Rec { f<1,0> = \xy. body }
+From the body we may get some floats. The ones with level <1,0> must
+stay here, since they may mention f.  Ideally we'd like to make them
+part of the Rec block pairs -- but we can't if there are any
+FloatCases involved.  
+
+Nor is it a good idea to dump them in the rhs, but outside the lambda
+    f = case x of I# y -> \xy. body
+because now f's arity might get worse, which is Not Good. (And if
+there's an SCC around the RHS it might not get better again.  
+See Trac #5342.)
+
+So, gruesomely, we split the floats into 
+ * the outer FloatLets, which can join the Rec, and 
+ * an inner batch starting in a FloatCase, which are then
+   pushed *inside* the lambdas.  
+This loses full-laziness the rare situation where there is a 
+FloatCase and a Rec interacting.
 
 Note [floatBind for top level]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -297,12 +297,12 @@ INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
 
 DPH_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
                 dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
-                vector primitive
+                vector primitive random
 
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
 # packages:
-STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010 random
+STAGE2_PACKAGES := $(DPH_PACKAGES) haskell98 haskell2010
 # Packages that we shouldn't build if we don't have TH (e.g. because
 # we're building a profiled compiler):
 TH_PACKAGES := $(DPH_PACKAGES)
@@ -386,7 +386,6 @@ $(eval $(call addPackage,old-time))
 $(eval $(call addPackage,time))
 $(eval $(call addPackage,directory))
 $(eval $(call addPackage,process))
-$(eval $(call addPackage,random))
 $(eval $(call addPackage,extensible-exceptions))
 $(eval $(call addPackage,haskell98))
 $(eval $(call addPackage,haskell2010))
@@ -617,7 +616,10 @@ endif
 # ----------------------------------------------
 # Actually include all the sub-ghc.mk's
 
-include $(patsubst %, %/ghc.mk, $(BUILD_DIRS))
+# BUILD_DIRS_EXTRA needs to come after BUILD_DIRS, because stuff in
+# libraries/dph/ghc.mk refers to stuff defined earlier, in particular
+# things like $(libraries/dph/dph-base_dist-install_GHCI_LIB)
+include $(patsubst %, %/ghc.mk, $(BUILD_DIRS) $(BUILD_DIRS_EXTRA))
 
 # A useful pseudo-target (must be after the include above, because it needs
 # the value of things like $(libraries/base_dist-install_v_LIB).
@@ -886,6 +888,10 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	    $(call make-command,                                           \
 	           "$(INSTALLED_GHC_PKG_REAL)"                             \
 	               --global-conf "$(INSTALLED_PACKAGE_CONF)" hide $p))
+# when we install the packages above, ghc-pkg obeys umask when creating
+# package.cache, but for everything else we specify the permissions. We
+# therefore now fix the permissions of package.cache
+	$(CREATE_DATA) '$(INSTALLED_PACKAGE_CONF)/package.cache'
 
 # -----------------------------------------------------------------------------
 # Binary distributions
@@ -1072,7 +1078,7 @@ sdist-prep :
 	$(call sdist_file,compiler,stage2,parser,,Lexer,x)
 	$(call sdist_file,compiler,stage2,parser,,Parser,y.pp)
 	$(call sdist_file,compiler,stage2,parser,,ParserCore,y)
-	$(call sdist_file,utils/hpc,dist,,,HpcParser,y)
+	$(call sdist_file,utils/hpc,dist-install,,,HpcParser,y)
 	$(call sdist_file,utils/genprimopcode,dist,,,Lexer,x)
 	$(call sdist_file,utils/genprimopcode,dist,,,Parser,y)
 	$(call sdist_file,utils/haddock,dist,src,Haddock,Lex,x)

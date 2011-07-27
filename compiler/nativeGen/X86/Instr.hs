@@ -25,8 +25,10 @@ import OldCmm
 import FastString
 import FastBool
 import Outputable
+import Platform
 import Constants	(rESERVED_C_STACK_BYTES)
 
+import BasicTypes       (Alignment)
 import CLabel
 import UniqSet
 import Unique
@@ -151,7 +153,6 @@ bit precision.
 --SDM 1/2003
 -}
 
-
 data Instr
 	-- comment pseudo-op
 	= COMMENT FastString		
@@ -159,7 +160,7 @@ data Instr
 	-- some static data spat out during code
 	-- generation.  Will be extracted before
 	-- pretty-printing.
-	| LDATA   Section [CmmStatic]	
+	| LDATA   Section (Alignment, CmmStatics)
 
 	-- start a new basic block.  Useful during
 	-- codegen, removed later.  Preceding 
@@ -603,16 +604,17 @@ x86_patchJumpInstr insn patchF
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
 x86_mkSpillInstr
-	:: Reg		-- register to spill
-	-> Int		-- current stack delta
-	-> Int		-- spill slot to use
-	-> Instr
+    :: Platform
+    -> Reg      -- register to spill
+    -> Int      -- current stack delta
+    -> Int      -- spill slot to use
+    -> Instr
 
-x86_mkSpillInstr reg delta slot
+x86_mkSpillInstr platform reg delta slot
   = let	off     = spillSlotToOffset slot
     in
     let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
-    in case targetClassOfReg reg of
+    in case targetClassOfReg platform reg of
 	   RcInteger   -> MOV IF_ARCH_i386(II32,II64)
                               (OpReg reg) (OpAddr (spRel off_w))
 	   RcDouble    -> GST FF80 reg (spRel off_w) {- RcFloat/RcDouble -}
@@ -622,16 +624,17 @@ x86_mkSpillInstr reg delta slot
 
 -- | Make a spill reload instruction.
 x86_mkLoadInstr
-	:: Reg		-- register to load
-	-> Int		-- current stack delta
-	-> Int		-- spill slot to use
-	-> Instr
+    :: Platform
+    -> Reg      -- register to load
+    -> Int      -- current stack delta
+    -> Int      -- spill slot to use
+    -> Instr
 
-x86_mkLoadInstr reg delta slot
+x86_mkLoadInstr platform reg delta slot
   = let off     = spillSlotToOffset slot
     in
 	let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
-        in case targetClassOfReg reg of
+        in case targetClassOfReg platform reg of
               RcInteger -> MOV IF_ARCH_i386(II32,II64) 
                                (OpAddr (spRel off_w)) (OpReg reg)
               RcDouble  -> GLD FF80 (spRel off_w) reg {- RcFloat/RcDouble -}
@@ -689,12 +692,13 @@ x86_isMetaInstr instr
 --	have to go via memory.
 --
 x86_mkRegRegMoveInstr
-	:: Reg
-	-> Reg
-	-> Instr
+    :: Platform
+    -> Reg
+    -> Reg
+    -> Instr
 
-x86_mkRegRegMoveInstr src dst
- = case targetClassOfReg src of
+x86_mkRegRegMoveInstr platform src dst
+ = case targetClassOfReg platform src of
 #if   i386_TARGET_ARCH
         RcInteger -> MOV II32 (OpReg src) (OpReg dst)
 #else
@@ -805,16 +809,24 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: BlockSet) insn
         shortcutJump' _ _ other = other
 
 -- Here because it knows about JumpDest
+shortcutStatics :: (BlockId -> Maybe JumpDest) -> (Alignment, CmmStatics) -> (Alignment, CmmStatics)
+shortcutStatics fn (align, Statics lbl statics)
+  = (align, Statics lbl $ map (shortcutStatic fn) statics)
+  -- we need to get the jump tables, so apply the mapping to the entries
+  -- of a CmmData too.
+
+shortcutLabel :: (BlockId -> Maybe JumpDest) -> CLabel -> CLabel
+shortcutLabel fn lab
+  | Just uq <- maybeAsmTemp lab = shortBlockId fn emptyUniqSet (mkBlockId uq)
+  | otherwise                   = lab
+
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
-  | Just uq <- maybeAsmTemp lab 
-  = CmmStaticLit (CmmLabel (shortBlockId fn emptyUniqSet (mkBlockId uq)))
+  = CmmStaticLit (CmmLabel (shortcutLabel fn lab))
 shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
-  | Just uq <- maybeAsmTemp lbl1
-  = CmmStaticLit (CmmLabelDiffOff (shortBlockId fn emptyUniqSet (mkBlockId uq)) lbl2 off)
+  = CmmStaticLit (CmmLabelDiffOff (shortcutLabel fn lbl1) lbl2 off)
         -- slightly dodgy, we're ignoring the second label, but this
         -- works with the way we use CmmLabelDiffOff for jump tables now.
-
 shortcutStatic _ other_static
         = other_static
 

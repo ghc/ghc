@@ -50,20 +50,23 @@ import PprCmmExpr
 import BasicTypes
 import ForeignCall
 import Outputable
+import Platform
 import FastString
 
 import Data.List
 
 -----------------------------------------------------------------------------
 
-instance (Outputable instr) => Outputable (ListGraph instr) where
-    ppr (ListGraph blocks) = vcat (map ppr blocks)
+instance PlatformOutputable instr => PlatformOutputable (ListGraph instr) where
+    pprPlatform platform (ListGraph blocks) = vcat (map (pprPlatform platform) blocks)
 
-instance (Outputable instr) => Outputable (GenBasicBlock instr) where
-    ppr b = pprBBlock b
+instance PlatformOutputable instr => PlatformOutputable (GenBasicBlock instr) where
+    pprPlatform platform b = pprBBlock platform b
 
 instance Outputable CmmStmt where
     ppr s = pprStmt s
+instance PlatformOutputable CmmStmt where
+    pprPlatform _ = ppr
 
 instance Outputable CmmInfo where
     ppr e = pprInfo e
@@ -88,7 +91,7 @@ pprInfo (CmmInfo _gc_target update_frame CmmNonInfoTable) =
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
                 maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
-pprInfo (CmmInfo _gc_target update_frame info_table@(CmmInfoTable _ _ _ _)) =
+pprInfo (CmmInfo _gc_target update_frame info_table@(CmmInfoTable _ _ _ _ _)) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
@@ -99,9 +102,9 @@ pprInfo (CmmInfo _gc_target update_frame info_table@(CmmInfoTable _ _ _ _)) =
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.
 --      lbl: stmt ; stmt ; ..
-pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
-pprBBlock (BasicBlock ident stmts) =
-    hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
+pprBBlock :: PlatformOutputable stmt => Platform -> GenBasicBlock stmt -> SDoc
+pprBBlock platform (BasicBlock ident stmts) =
+    hang (ppr ident <> colon) 4 (vcat (map (pprPlatform platform) stmts))
 
 -- --------------------------------------------------------------------------
 -- Statements. C-- usually, exceptions to this should be obvious.

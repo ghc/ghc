@@ -67,6 +67,8 @@ import Compiler.Hoopl   hiding (Unique)
 import Data.Function (on)
 import qualified Data.IntMap as M
 import qualified Data.Foldable as Foldable
+import Data.Typeable
+import Data.Data
 \end{code}
 
 %************************************************************************
@@ -164,6 +166,7 @@ ufmToList	:: UniqFM elt -> [(Unique, elt)]
 
 \begin{code}
 newtype UniqFM ele = UFM { unUFM :: M.IntMap ele }
+  deriving (Typeable,Data)
 
 instance Eq ele => Eq (UniqFM ele) where
     (==) = (==) `on` unUFM

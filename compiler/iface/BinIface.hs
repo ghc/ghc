@@ -380,7 +380,8 @@ instance Binary ModIface where
 		 mi_usages    = usages,
 		 mi_exports   = exports,
 		 mi_exp_hash  = exp_hash,
-		 mi_fixities  = fixities,
+                 mi_used_th   = used_th,
+                 mi_fixities  = fixities,
 		 mi_warns     = warns,
 		 mi_anns      = anns,
 		 mi_decls     = decls,
@@ -402,7 +403,8 @@ instance Binary ModIface where
 	lazyPut bh usages
 	put_ bh exports
 	put_ bh exp_hash
-	put_ bh fixities
+        put_ bh used_th
+        put_ bh fixities
 	lazyPut bh warns
 	lazyPut bh anns
         put_ bh decls
@@ -426,7 +428,8 @@ instance Binary ModIface where
 	usages	  <- {-# SCC "bin_usages" #-} lazyGet bh
 	exports	  <- {-# SCC "bin_exports" #-} get bh
 	exp_hash  <- get bh
-	fixities  <- {-# SCC "bin_fixities" #-} get bh
+        used_th   <- get bh
+        fixities  <- {-# SCC "bin_fixities" #-} get bh
 	warns     <- {-# SCC "bin_warns" #-} lazyGet bh
 	anns      <- {-# SCC "bin_anns" #-} lazyGet bh
         decls 	  <- {-# SCC "bin_tycldecls" #-} get bh
@@ -448,8 +451,9 @@ instance Binary ModIface where
 		 mi_deps      = deps,
 		 mi_usages    = usages,
 		 mi_exports   = exports,
-		 mi_exp_hash  = exp_hash,
-		 mi_anns      = anns,
+                 mi_exp_hash  = exp_hash,
+                 mi_used_th   = used_th,
+                 mi_anns      = anns,
 		 mi_fixities  = fixities,
 		 mi_warns     = warns,
 		 mi_decls     = decls,
