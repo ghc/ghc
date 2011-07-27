@@ -2,24 +2,6 @@
 ==================== Tidy Core ====================
 Result size = 155
 
-Roman.foo2 :: GHC.Types.Int
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType m,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 110}]
-Roman.foo2 = GHC.Types.I# 6
-
-Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
-[GblId,
- Caf=NoCafRefs,
- Str=DmdType,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
-         ConLike=True, Cheap=True, Expandable=True,
-         Guidance=IF_ARGS [] 10 110}]
-Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
-
 Roman.foo3 :: GHC.Types.Int
 [GblId, Str=DmdType b]
 Roman.foo3 =
@@ -124,6 +106,24 @@ Roman.foo_go =
   \ (w :: Data.Maybe.Maybe GHC.Types.Int)
     (w1 :: Data.Maybe.Maybe GHC.Types.Int) ->
     case Roman.$wgo w w1 of ww { __DEFAULT -> GHC.Types.I# ww }
+
+Roman.foo2 :: GHC.Types.Int
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 110}]
+Roman.foo2 = GHC.Types.I# 6
+
+Roman.foo1 :: Data.Maybe.Maybe GHC.Types.Int
+[GblId,
+ Caf=NoCafRefs,
+ Str=DmdType,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Arity=0, Value=True,
+         ConLike=True, Cheap=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 110}]
+Roman.foo1 = Data.Maybe.Just @ GHC.Types.Int Roman.foo2
 
 Roman.foo :: GHC.Types.Int -> GHC.Types.Int
 [GblId,
