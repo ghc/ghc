@@ -2,4 +2,5 @@
 rnfail044.hs:5:12:
     Ambiguous occurrence `splitAt'
     It could refer to either `A.splitAt', defined at rnfail044.hs:8:3
-                          or `Data.List.splitAt', imported from Prelude
+                          or `Data.List.splitAt',
+                             imported from Prelude at rnfail044.hs:5:8
