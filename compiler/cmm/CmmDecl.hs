@@ -77,9 +77,11 @@ data CmmInfoTable
       ClosureTypeInfo
   | CmmNonInfoTable   -- Procedure doesn't need an info table
 
--- | If the table is local, we don't export its identifier even if the corresponding Id is exported.
--- It's always safe to say 'False' here, but it might save symbols to say 'True'
+-- | If the table is local, we don't export its identifier even if the
+-- corresponding Id is exported.  It's always safe to say 'False'
+-- here, but it might save symbols to say 'True'
 type LocalInfoTable = Bool
+
 type HasStaticClosure = Bool
 
 -- TODO: The GC target shouldn't really be part of CmmInfo

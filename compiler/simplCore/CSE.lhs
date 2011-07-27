@@ -13,7 +13,8 @@ module CSE (
 import CoreSubst
 import Var		( Var )
 import Id		( Id, idType, idInlineActivation, zapIdOccInfo )
-import CoreUtils	( hashExpr, eqExpr, exprIsBig, mkAltExpr, exprIsCheap )
+import CoreUtils	( hashExpr, eqExpr, exprIsBig, mkAltExpr
+                        , exprIsTrivial, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
 import CoreSyn
@@ -206,22 +207,21 @@ cseRhs env (id',rhs)
 		-- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
-tryForCSE _   (Type t) = Type t
-tryForCSE _   (Coercion c) = Coercion c
-tryForCSE env expr     = case lookupCSEnv env expr' of
-			    Just smaller_expr -> smaller_expr
- 			    Nothing  	      -> expr'
-		       where
-	 	         expr' = cseExpr env expr
+tryForCSE env expr
+  | exprIsTrivial expr'                   = expr'	-- No point
+  | Just smaller <- lookupCSEnv env expr' = smaller
+  | otherwise                             = expr'
+  where
+    expr' = cseExpr env expr
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
-cseExpr _   (Type t)               = Type t
-cseExpr _   (Coercion co)          = Coercion co
+cseExpr env (Type t)               = Type (substTy (csEnvSubst env) t)
+cseExpr env (Coercion c)           = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)		   = lookupSubst env v
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
-cseExpr env (Cast e co)            = Cast (cseExpr env e) co
+cseExpr env (Cast e co)            = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
@@ -308,6 +308,9 @@ type CSEMap = UniqFM [(OutExpr, OutExpr)]	-- This is the reverse mapping
 
 emptyCSEnv :: CSEnv
 emptyCSEnv = CS emptyUFM emptySubst
+
+csEnvSubst :: CSEnv -> Subst
+csEnvSubst (CS _ subst) = subst
 
 lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
 lookupCSEnv (CS cs sub) expr

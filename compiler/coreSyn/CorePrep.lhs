@@ -367,7 +367,8 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 	       	    	       -- Note [Silly extra arguments]
 	       	    (do { v <- newVar (idType bndr)
 		        ; let float = mkFloat False False v rhs2
-		        ; return (addFloat floats2 float, cpeEtaExpand arity (Var v)) })
+		        ; return ( addFloat floats2 float
+                                 , cpeEtaExpand arity (Var v)) })
 
      	-- Record if the binder is evaluated
 	-- and otherwise trim off the unfolding altogether
@@ -655,7 +656,7 @@ cpeArg env is_strict arg arg_ty
        { v <- newVar arg_ty
        ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
        	     arg_float = mkFloat is_strict is_unlifted v arg3
-       ; return (addFloat floats2 arg_float, Var v) } }
+       ; return (addFloat floats2 arg_float, varToCoreExpr v) } }
   where
     is_unlifted = isUnLiftedType arg_ty
     want_float = wantFloatNested NonRecursive (is_strict || is_unlifted)
