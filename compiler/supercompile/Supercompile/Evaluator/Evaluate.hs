@@ -80,7 +80,8 @@ step' normalising state =
     (\res@(_reduced, stepped_state) -> ASSERT2(noChange (releaseUnnormalisedStateDeed state) (releaseStateDeed stepped_state),
                                                hang (text "step': deeds lost or gained:") 2 (pPrintFullUnnormalisedState state $$ pPrintFullState stepped_state))
                                        ASSERT2(subVarSet (stateFreeVars stepped_state) (unnormalisedStateFreeVars state),
-                                               text "step': FVs" $$ pPrint (unnormalisedStateFreeVars state) $$ pPrintFullUnnormalisedState state $$ pPrint (stateFreeVars stepped_state) $$ pPrintFullState stepped_state)
+                                               text "step': FVs" $$ hang (text "Before:") 2 (pPrint (unnormalisedStateFreeVars state) $$ pPrintFullUnnormalisedState state) $$
+                                                                    hang (text "After:")  2 (pPrint (stateFreeVars stepped_state) $$ pPrintFullState stepped_state))
                                        -- traceRender (text "normalising" $$ nest 2 (pPrintFullUnnormalisedState state) $$ text "to" $$ nest 2 (pPrintFullState stepped_state)) $
                                        res) $
     go state
