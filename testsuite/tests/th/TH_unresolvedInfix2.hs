@@ -1,6 +1,14 @@
 module TH_unresolvedInfix2 where
 
-import TH_unresolvedInfix_Lib
 import Language.Haskell.TH
 
-expr = $( infixE Nothing plus (Just $ n +? n) )
+infixl 6 :+
+
+data Tree = N
+  | Tree :+ Tree 
+  | Tree :* Tree 
+
+-- Should fail
+expr = $( let plus = conE '(:+)
+              n = conE 'N
+          in infixE Nothing plus (Just $ uInfixE n plus n) )
