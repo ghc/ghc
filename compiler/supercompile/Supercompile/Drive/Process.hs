@@ -30,7 +30,7 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities
 
 import Var        (isTyVar, varType)
-import Id         (mkLocalId)
+import Id         (idType, mkLocalId)
 import Name       (Name, mkSystemVarName)
 import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
@@ -428,13 +428,17 @@ promise p x' opt = ScpM $ \e s k -> {- traceRender ("promise", fun p, abstracted
       -- actually need. We aren't able to do anything about the stuff they spuriously allocate as a result, but we can make generate a little wrapper that just discards
       -- those arguments. With luck, GHC will inline it and good things will happen.
       --
+      -- We have to be careful when generating the wrapper: the *type variables* of the optimised_fvs must also be abstracted over!
+      --
       -- TODO: we can generate the wrappers in a smarter way now that we can always see all possible fulfilments?
-      let optimised_fvs = fvedTermFreeVars optimised_e
+      let optimised_fvs_incomplete = fvedTermFreeVars optimised_e
+          optimised_fvs = optimised_fvs_incomplete `unionVarSet` tyVarsOfTypes (map idType (varSetElems optimised_fvs_incomplete))
           abstracted_set = mkVarSet (abstracted p)
           abstracted'_set = optimised_fvs `intersectVarSet` abstracted_set -- We still don't want to abstract over e.g. phantom bindings
           abstracted'_list = sortLambdaBounds $ varSetElems abstracted'_set
           fun' = mkLocalId x' (abstracted'_list `mkPiTypes` stateType (unI (meaning p)))
-      ScpM $ \_e s k -> let fs' | abstracted_set == abstracted'_set || not rEFINE_FULFILMENT_FVS
+      pprTrace "promise" (ppr optimised_fvs $$ ppr optimised_e) $
+       ScpM $ \_e s k -> let fs' | abstracted_set == abstracted'_set || not rEFINE_FULFILMENT_FVS
                                  -- If the free variables are totally unchanged, there is nothing to be gained from clever fiddling
                                 = (P { fun = fun p, abstracted = abstracted p, meaning = Just (unI (meaning p)) }, tyVarIdLambdas (abstracted p) optimised_e) : fulfilments s
                                 | otherwise

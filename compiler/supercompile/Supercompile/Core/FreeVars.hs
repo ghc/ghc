@@ -3,7 +3,7 @@
 module Supercompile.Core.FreeVars (
     module Supercompile.Core.FreeVars,
     module VarSet,
-    tyVarsOfType, tyCoVarsOfCo
+    tyVarsOfType, tyVarsOfTypes, tyCoVarsOfCo
   ) where
 
 import Supercompile.Core.Syntax
@@ -17,7 +17,7 @@ import CoreFVs
 import VarSet
 import Coercion (tyCoVarsOfCo)
 import Var      (isTyVar)
-import Type     (tyVarsOfType)
+import Type     (tyVarsOfType, tyVarsOfTypes)
 
 
 type FreeVars = VarSet
