@@ -226,9 +226,9 @@ step' normalising state =
                                         
                                             -- Make the "theta" from Fig 3 of the paper
                                             gammas = decomposeCo tc_arity co'
-                                            theta  = zipOpenCvSubst (dc_univ_tyvars ++ dc_ex_tyvars)
-                                                                    (gammas         ++ map mkReflCo tys)
-                                        in map (\arg_ty -> (liftCoSubst theta arg_ty, tg_co)) arg_tys -- Use tag from the original coercion everywhere
+                                            theta_subst = liftCoSubstWith (dc_univ_tyvars ++ dc_ex_tyvars)
+                                                                          (gammas         ++ map mkReflCo tys)
+                                        in map (\arg_ty -> (theta_subst arg_ty, tg_co)) arg_tys -- Use tag from the original coercion everywhere
            -- b) Identify the first appropriate branch of the case and reduce -- apply the discovered coercions if necessary
           , (deeds3, h', ids', alt_e):_ <- [ res
                                            | ((DataAlt alt_dc alt_as alt_xs, alt_e), rest) <- bagContexts alts
