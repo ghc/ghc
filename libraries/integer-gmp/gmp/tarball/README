@@ -1,0 +1,8 @@
+
+Download linked from http://gmplib.org/
+
+Untar.
+Remove doc/ directory.
+Apply patch.
+Re-tar.
+
