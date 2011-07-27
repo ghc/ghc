@@ -192,7 +192,7 @@ GHC note: the new thread inherits the /masked/ state of the parent
 The newly created thread has an exception handler that discards the
 exceptions 'BlockedIndefinitelyOnMVar', 'BlockedIndefinitelyOnSTM', and
 'ThreadKilled', and passes all other exceptions to the uncaught
-exception handler (see 'setUncaughtExceptionHandler').
+exception handler.
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s ->
