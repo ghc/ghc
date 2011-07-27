@@ -50,7 +50,7 @@ import Type     hiding ( substTy, extendTvSubst, extendTvSubstList
 import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substCoVarBndr )
 
 import OptCoercion ( optCoercion )
-import PprCore     ( pprCoreBindings )
+import PprCore     ( pprCoreBindings, pprRules )
 import VarSet
 import VarEnv
 import Id
@@ -798,7 +798,7 @@ simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> [CoreVect]
              -> IO ([CoreBind], [CoreRule], [CoreVect])
 simpleOptPgm dflags binds rules vects
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-                       (pprCoreBindings occ_anald_binds);
+                       (pprCoreBindings occ_anald_binds $$ pprRules rules );
 
        ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
