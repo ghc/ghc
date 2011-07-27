@@ -247,7 +247,6 @@ getCoreToDo dflags
         runWhen strictness (CoreDoPasses [
                 CoreDoStrictness,
                 CoreDoWorkerWrapper,
-                CoreDoGlomBinds,
                 simpl_phase 0 ["post-worker-wrapper"] max_iter
                 ]),
 
@@ -391,7 +390,6 @@ doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
 doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
                                        vectorise
 
-doCorePass CoreDoGlomBinds              = doPassDM  glomBinds
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
@@ -510,48 +508,6 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 simplExprGently env expr = do
     expr1 <- simplExpr env (occurAnalyseExpr expr)
     simplExpr env (occurAnalyseExpr expr1)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Glomming}
-%*									*
-%************************************************************************
-
-\begin{code}
-glomBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
--- Glom all binds together in one Rec, in case any
--- transformations have introduced any new dependencies
---
--- NB: the global invariant is this:
---	*** the top level bindings are never cloned, and are always unique ***
---
--- We sort them into dependency order, but applying transformation rules may
--- make something at the top refer to something at the bottom:
---	f = \x -> p (q x)
---	h = \y -> 3
---	
---	RULE:  p (q x) = h x
---
--- Applying this rule makes f refer to h, 
--- although it doesn't appear to in the source program.  
--- This pass lets us control where it happens.
---
--- NOTICE that this cannot happen for rules whose head is a locally-defined
--- function.  It only happens for rules whose head is an imported function
--- (p in the example above).  So, for example, the rule had been
---	RULE: f (p x) = h x
--- then the rule for f would be attached to f itself (in its IdInfo) 
--- by prepareLocalRuleBase and h would be regarded by the occurrency 
--- analyser as free in f.
-
-glomBinds dflags binds
-  = do { Err.showPass dflags "GlomBinds" ;
-	 let { recd_binds = [Rec (flattenBinds binds)] } ;
-	 return recd_binds }
-	-- Not much point in printing the result... 
-	-- just consumes output bandwidth
 \end{code}
 
 
