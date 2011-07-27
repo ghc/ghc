@@ -34,7 +34,8 @@ $(GHC_CABAL_DIR)/dist/build/tmp/ghc-cabal$(exeext): $(GHC_CABAL_DIR)/Main.hs | $
 	       -hidir bootstrapping \
 	       -ilibraries/Cabal/cabal \
 	       -ilibraries/filepath \
-	       -ilibraries/hpc
+	       -ilibraries/hpc \
+	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS)
 	touch $@
 
 # touch is required, because otherwise if mkdirhier is newer, we
