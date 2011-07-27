@@ -95,6 +95,9 @@ failWith m = CvtM (\_ -> Left m)
 returnL :: a -> CvtM (Located a)
 returnL x = CvtM (\loc -> Right (L loc x))
 
+wrapParL :: (Located a -> a) -> a -> CvtM a
+wrapParL add_par x = CvtM (\loc -> Right (add_par (L loc x)))
+
 wrapMsg :: (Show a, TH.Ppr a) => String -> a -> CvtM b -> CvtM b
 -- E.g  wrapMsg "declaration" dec thing
 wrapMsg what item (CvtM m)
@@ -464,8 +467,8 @@ cvtl e = wrapL (cvt e)
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e 
 			    ; return $ HsLam (mkMatchGroup [mkSimpleMatch ps' e']) }
     cvt (TupE [e])     = do { e' <- cvtl e; return $ HsPar e' }
-                          -- Note [Dropping constructors]
-                          -- Singleton tuples treated like nothing (just parens)
+    	      	       	         -- Note [Dropping constructors]
+                                 -- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Boxed }
     cvt (UnboxedTupE es)      = do { es' <- mapM cvtl es; return $ ExplicitTuple (map Present es') Unboxed }
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
@@ -483,20 +486,27 @@ cvtl e = wrapL (cvt e)
       | Just s <- allCharLs xs       = do { l' <- cvtLit (StringL s); return (HsLit l') }
       	     -- Note [Converting strings]
       | otherwise                    = do { xs' <- mapM cvtl xs; return $ ExplicitList void xs' }
+
+    -- Infix expressions
     cvt (InfixE (Just x) s (Just y)) = do { x' <- cvtl x; s' <- cvtl s; y' <- cvtl y
-                                          ; x'' <- returnL (HsPar x'); y'' <- returnL (HsPar y')
-					  ; e' <- returnL $ OpApp x'' s' undefined y''
-					  ; return $ HsPar e' }
+					  ; wrapParL HsPar $ 
+                                            OpApp (mkLHsPar x') s' undefined (mkLHsPar y') }
+  					    -- Parenthesise both arguments and result, 
+					    -- to ensure this operator application does
+ 					    -- does not get re-associated
+			    -- See Note [Operator association]
     cvt (InfixE Nothing  s (Just y)) = do { s' <- cvtl s; y' <- cvtl y
-					  ; sec <- returnL $ SectionR s' y'
-					  ; return $ HsPar sec }
+					  ; wrapParL HsPar $ SectionR s' y' }
+					    -- See Note [Sections in HsSyn] in HsExpr
     cvt (InfixE (Just x) s Nothing ) = do { x' <- cvtl x; s' <- cvtl s
-					  ; sec <- returnL $ SectionL x' s'
-					  ; return $ HsPar sec }
+					  ; wrapParL HsPar $ SectionL x' s' }
+
     cvt (InfixE Nothing  s Nothing ) = do { s' <- cvtl s; return $ HsPar s' }
                                        -- Can I indicate this is an infix thing?
                                        -- Note [Dropping constructors]
+
     cvt (UInfixE x s y)  = do { x' <- cvtl x; cvtOpApp x' s y } --  Note [Converting UInfix]
+
     cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar e' }
     cvt (SigE e t)	 = do { e' <- cvtl e; t' <- cvtType t
 			      ; return $ ExprWithTySig e' t' }
@@ -534,8 +544,16 @@ cvtDD (FromThenR x y)     = do { x' <- cvtl x; y' <- cvtl y; return $ FromThen x
 cvtDD (FromToR x y)       = do { x' <- cvtl x; y' <- cvtl y; return $ FromTo x' y' }
 cvtDD (FromThenToR x y z) = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z; return $ FromThenTo x' y' z' }
 
-{- Note [Converting UInfix]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Operator assocation]
+We must be quite careful about adding parens:
+  * Infix (UInfix ...) op arg      Needs parens round the first arg
+  * Infix (Infix ...) op arg       Needs parens round the first arg
+  * UInfix (UInfix ...) op arg     No parens for first arg
+  * UInfix (Infix ...) op arg      Needs parens round first arg
+
+
+Note [Converting UInfix]
+~~~~~~~~~~~~~~~~~~~~~~~~
 When converting @UInfixE@ and @UInfixP@ values, we want to readjust
 the trees to reflect the fixities of the underlying operators:
 
@@ -697,31 +715,32 @@ cvtPat pat = wrapL (cvtp pat)
 
 cvtp :: TH.Pat -> CvtM (Hs.Pat RdrName)
 cvtp (TH.LitP l)
-  | overloadedLit l   = do { l' <- cvtOverLit l
-		 	   ; return (mkNPat l' Nothing) }
+  | overloadedLit l    = do { l' <- cvtOverLit l
+		 	    ; return (mkNPat l' Nothing) }
 		 		  -- Not right for negative patterns; 
 		 		  -- need to think about that!
-  | otherwise	      = do { l' <- cvtLit l; return $ Hs.LitPat l' }
-cvtp (TH.VarP s)      = do { s' <- vName s; return $ Hs.VarPat s' }
-cvtp (TupP [p])       = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
-cvtp (TupP ps)        = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
+  | otherwise	       = do { l' <- cvtLit l; return $ Hs.LitPat l' }
+cvtp (TH.VarP s)       = do { s' <- vName s; return $ Hs.VarPat s' }
+cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat p' } -- Note [Dropping constructors]
+cvtp (TupP ps)         = do { ps' <- cvtPats ps; return $ TuplePat ps' Boxed void }
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps; return $ TuplePat ps' Unboxed void }
-cvtp (ConP s ps)      = do { s' <- cNameL s; ps' <- cvtPats ps; return $ ConPatIn s' (PrefixCon ps') }
-cvtp (InfixP p1 s p2) = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
-                           ; p1'' <- returnL (ParPat p1'); p2'' <- returnL (ParPat p2')
-                           ; p <- returnL $ ConPatIn s' (InfixCon p1'' p2'')
-                           ; return $ ParPat p }
-cvtp (UInfixP p1 s p2)= do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Converting UInfix]
-cvtp (ParensP p)      = do { p' <- cvtPat p; return $ ParPat p' }
-cvtp (TildeP p)       = do { p' <- cvtPat p; return $ LazyPat p' }
-cvtp (BangP p)        = do { p' <- cvtPat p; return $ BangPat p' }
-cvtp (TH.AsP s p)     = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
-cvtp TH.WildP         = return $ WildPat void
-cvtp (RecP c fs)      = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
-		  	   ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
-cvtp (ListP ps)       = do { ps' <- cvtPats ps; return $ ListPat ps' void }
-cvtp (SigP p t)       = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
-cvtp (ViewP e p)      = do { e' <- cvtl e; p' <- cvtPat p; return $ ViewPat e' p' void }
+cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
+                            ; return $ ConPatIn s' (PrefixCon ps') }
+cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
+                            ; wrapParL ParPat $ 
+                              ConPatIn s' (InfixCon (mkParPat p1') (mkParPat p2')) }
+			    -- See Note [Operator association]
+cvtp (UInfixP p1 s p2) = do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Converting UInfix]
+cvtp (ParensP p)       = do { p' <- cvtPat p; return $ ParPat p' }
+cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat p' }
+cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat p' }
+cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
+cvtp TH.WildP          = return $ WildPat void
+cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
+		       	   ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
+cvtp (ListP ps)        = do { ps' <- cvtPats ps; return $ ListPat ps' void }
+cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
+cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p; return $ ViewPat e' p' void }
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
