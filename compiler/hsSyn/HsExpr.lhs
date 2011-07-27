@@ -919,10 +919,10 @@ data StmtLR idL idR
       }
   deriving (Data, Typeable)
 
-data TransForm		-- The 'f' below is the 'using' function, 'e' is the by function
-  = ThenForm		-- then f          or    then f by e
-  | GroupFormU		-- group using f   or    group using f by e
-  | GroupFormB    	-- group by e  
+data TransForm	 -- The 'f' below is the 'using' function, 'e' is the by function
+  = ThenForm	 -- then f          or    then f by e        (depending on trS_by)
+  | GroupFormU	 -- group using f   or    group using f by e (depending on trS_by)
+  | GroupFormB   -- group by e  
       -- In the GroupByFormB, trS_using is filled in with
       --    'groupWith' (list comprehensions) or 
       --    'groupM' (monad comprehensions)

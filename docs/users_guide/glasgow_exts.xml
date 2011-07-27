@@ -1382,13 +1382,15 @@ D[ e | (Q | R), S ]    = mzip D[ Qv | Q ] D[ Rv | R ] &gt;&gt;= \(Qv,Rv) -&gt; D
 -- Transform comprehensions
 D[ e | Q then f, R ]                  = f D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
 
-D[ e | Q then f by b, R ]             = f b D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
+D[ e | Q then f by b, R ]             = f (\Qv -&gt; b) D[ Qv | Q ] &gt;&gt;= \Qv -&gt; D[ e | R ]
 
 D[ e | Q then group using f, R ]      = f D[ Qv | Q ] &gt;&gt;= \ys -&gt;
                                         case (fmap selQv1 ys, ..., fmap selQvn ys) of
                                  	     Qv -&gt; D[ e | R ]
 
-D[ e | Q then group by b using f, R ] = f b D[ Qv | Q ] &gt;&gt;= \ys -&gt;
+D[ e | Q then group by b, R ]         = D[ e | Q then group by b using mgroupWith, R ]
+
+D[ e | Q then group by b using f, R ] = f (\Qv -&gt; b) D[ Qv | Q ] &gt;&gt;= \ys -&gt;
                                         case (fmap selQv1 ys, ..., fmap selQvn ys) of
                                            Qv -&gt; D[ e | R ]
 
