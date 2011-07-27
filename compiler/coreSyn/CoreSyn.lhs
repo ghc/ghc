@@ -244,23 +244,14 @@ These data types are the heart of the compiler
 -- *  A coercion
 data Expr b
   = Var	  Id
-
   | Lit   Literal
-
   | App   (Expr b) (Arg b)
-
   | Lam   b (Expr b)
-
   | Let   (Bind b) (Expr b)
-
   | Case  (Expr b) b Type [Alt b]
-
   | Cast  (Expr b) Coercion
-
   | Note  Note (Expr b)
-
   | Type  Type
-
   | Coercion Coercion
   deriving (Data, Typeable)
 
