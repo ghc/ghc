@@ -36,6 +36,7 @@ import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 
 import qualified Data.Foldable as Foldable
+import Data.Traversable (Traversable(traverse))
 import qualified Data.Map as M
 import Data.Monoid
 import Data.Ord
@@ -247,9 +248,9 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
                   Stop (_old_state, rb) -> (no_change, rb)
                   Continue hist -> case reduce state of
                       (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
-                        | Answer a <- annee qa
+                        | Just a <- traverse qaToAnswer qa
                         , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
-                              in_e' = annedAnswerToAnnedTerm (mkInScopeSet (annedFreeVars qa)) (fmap (const a) qa)
+                              in_e' = annedAnswerToAnnedTerm (mkInScopeSet (annedFreeVars a)) a
                         -> ((stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap hist h_unspeculated)
                       _ -> (no_change, speculation_failure)
                 where state = normalise (deeds, Heap h_speculated_ok ids, [], in_e)

@@ -123,6 +123,9 @@ qaToAnnedTerm' :: InScopeSet -> QA -> TermF Anned
 qaToAnnedTerm' _   (Question x) = Var x
 qaToAnnedTerm' iss (Answer a)   = answerToAnnedTerm' iss a
 
+qaToAnswer :: QA -> Maybe Answer
+qaToAnswer qa = case qa of Answer a -> Just a; Question _ -> Nothing
+
 
 type UnnormalisedState = (Deeds, Heap, Stack, In AnnedTerm)
 type State = (Deeds, Heap, Stack, Anned QA)
@@ -234,9 +237,9 @@ stackFrameType kf hole_ty = case tagee kf of
     CastIt co                     -> pSnd (coercionKind co)
 
 qaType :: Anned QA -> Type
-qaType qa = case annee qa of
-    Question x' -> idType x'
-    Answer a    -> answerType (fmap (const a) qa)
+qaType anned_qa = case traverse (\qa -> case qa of Question x' -> Left (idType x'); Answer a -> Right a) anned_qa of
+    Left q_ty     -> q_ty
+    Right anned_a -> answerType anned_a
 
 answerType :: Anned Answer -> Type
 answerType a = case annee a of

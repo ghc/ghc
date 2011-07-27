@@ -17,6 +17,8 @@ import Type     (Type, mkTyVarTy)
 import Coercion (Coercion, mkReflCo)
 import PrimOp   (PrimOp)
 
+import Data.Traversable (Traversable(traverse))
+
 
 data AltCon = DataAlt DataCon [TyVar] [Id] | LiteralAlt Literal | DefaultAlt
             deriving (Eq, Show)
@@ -139,8 +141,12 @@ pPrintPrecApps :: (Outputable a, Outputable b) => Rational -> a -> [b] -> SDoc
 pPrintPrecApps prec e1 es2 = prettyParen (not (null es2) && prec >= appPrec) $ pPrintPrec opPrec e1 <+> hsep (map (pPrintPrec appPrec) es2)
 
 
-termToValue :: Copointed ann => ann (TermF ann) -> Maybe (ann (ValueF ann))
-termToValue e = case extract e of Value v -> Just (fmap (const v) e); _ -> Nothing
+termToValue :: Traversable ann => ann (TermF ann) -> Maybe (ann (ValueF ann))
+termToValue anned_e = traverse termToValue' anned_e
+
+termToValue' :: TermF ann -> Maybe (ValueF ann)
+termToValue' (Value v) = Just v
+termToValue' _         = Nothing
 
 termIsValue :: Copointed ann => ann (TermF ann) -> Bool
 termIsValue = isValue . extract
