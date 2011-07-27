@@ -1209,7 +1209,7 @@ checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 -- Should work even for recursive newtypes
 -- eg Manuel had:	newtype T = MkT (Ptr T)
 checkRepTyCon check_tc ty
-  = go [] ty
+  = go emptyNameSet ty
   where
     go rec_nts ty
       | Just (tc,tys) <- splitTyConApp_maybe ty

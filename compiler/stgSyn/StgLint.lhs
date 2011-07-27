@@ -11,7 +11,7 @@ import StgSyn
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import Id               ( Id, idType, isLocalId )
 import VarSet
-import DataCon          ( DataCon, dataConInstArgTys, dataConRepType )
+import DataCon
 import CoreSyn          ( AltCon(..) )
 import PrimOp           ( primOpType )
 import Literal          ( literalType )
@@ -19,15 +19,15 @@ import Maybes
 import Name             ( getSrcLoc )
 import ErrUtils         ( Message, mkLocMessage )
 import TypeRep
-import Type             ( mkFunTys, splitFunTy_maybe, splitTyConApp_maybe,
-                          isUnLiftedType, isTyVarTy, dropForAlls
-                        )
-import TyCon            ( isAlgTyCon, isNewTyCon, tyConDataCons )
-import Util             ( zipEqual, equalLength )
+import Type
+import TyCon
+import Util 
 import SrcLoc
 import Outputable
 import FastString
 import Control.Monad
+
+#include "HsVersions.h"
 \end{code}
 
 Checks for
@@ -107,18 +107,21 @@ lint_binds_help :: (Id, StgRhs) -> LintM ()
 lint_binds_help (binder, rhs)
   = addLoc (RhsOf binder) $ do
         -- Check the rhs
-        maybe_rhs_ty <- lintStgRhs rhs
+        _maybe_rhs_ty <- lintStgRhs rhs
 
         -- Check binder doesn't have unlifted type
         checkL (not (isUnLiftedType binder_ty))
                (mkUnLiftedTyMsg binder rhs)
 
         -- Check match to RHS type
-        case maybe_rhs_ty of
-          Nothing     -> return ()
-          Just rhs_ty -> checkTys binder_ty
-                                  rhs_ty
-                                  (mkRhsMsg binder rhs_ty)
+	-- Actually we *can't* check the RHS type, because
+	-- unsafeCoerce means it really might not match at all
+	-- notably;  eg x::Int = (error @Bool "urk") |> unsafeCoerce...
+	-- case maybe_rhs_ty of
+        --  Nothing     -> return ()
+        --    Just rhs_ty -> checkTys binder_ty
+        --                          rhs_ty
+        ---                         (mkRhsMsg binder rhs_ty)
 
         return ()
   where
@@ -126,7 +129,7 @@ lint_binds_help (binder, rhs)
 \end{code}
 
 \begin{code}
-lintStgRhs :: StgRhs -> LintM (Maybe Type)
+lintStgRhs :: StgRhs -> LintM (Maybe Type)   -- Just ty => type is exact
 
 lintStgRhs (StgRhsClosure _ _ _ _ _ [] expr)
   = lintStgExpr expr
@@ -145,7 +148,7 @@ lintStgRhs (StgRhsCon _ con args) = runMaybeT $ do
 \end{code}
 
 \begin{code}
-lintStgExpr :: StgExpr -> LintM (Maybe Type) -- Nothing if error found
+lintStgExpr :: StgExpr -> LintM (Maybe Type) -- Just ty => type is exact
 
 lintStgExpr (StgLit l) = return (Just (literalType l))
 
@@ -160,17 +163,17 @@ lintStgExpr e@(StgConApp con args) = runMaybeT $ do
   where
     con_ty = dataConRepType con
 
-lintStgExpr (StgOpApp (StgFCallOp _ _) args res_ty) = runMaybeT $ do
-        -- We don't have enough type information to check
-        -- the application; ToDo
-    _maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
-    return res_ty
-
 lintStgExpr e@(StgOpApp (StgPrimOp op) args _) = runMaybeT $ do
     arg_tys <- mapM (MaybeT . lintStgArg) args
     MaybeT $ checkFunApp op_ty arg_tys (mkFunAppMsg op_ty arg_tys e)
   where
     op_ty = primOpType op
+
+lintStgExpr (StgOpApp _ args res_ty) = runMaybeT $ do
+        -- We don't have enough type information to check
+        -- the application for StgFCallOp and StgPrimCallOp; ToDo
+    _maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
+    return res_ty
 
 lintStgExpr (StgLam _ bndrs _) = do
     addErrL (ptext (sLit "Unexpected StgLam") <+> ppr bndrs)
@@ -190,7 +193,7 @@ lintStgExpr (StgLetNoEscape _ _ binds body) = do
 
 lintStgExpr (StgSCC _ expr) = lintStgExpr expr
 
-lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
+lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
     _ <- MaybeT $ lintStgExpr scrut
 
     MaybeT $ liftM Just $
@@ -200,28 +203,21 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
         UbxTupAlt tc -> check_bndr tc
         PolyAlt      -> return ()
 
-    MaybeT $ do
-        -- we only allow case of tail-call or primop.
-     case scrut of
-        StgApp _ _     -> return ()
-        StgConApp _ _  -> return ()
-        StgOpApp _ _ _ -> return ()
-        _              -> addErrL (mkCaseOfCaseMsg e)
-
-     addInScopeVars [bndr] $
-        lintStgAlts alts scrut_ty
+    MaybeT $ addInScopeVars [bndr] $
+             lintStgAlts alts scrut_ty
   where
     scrut_ty      = idType bndr
-    bad_bndr      = mkDefltMsg bndr
-    check_bndr tc = case splitTyConApp_maybe scrut_ty of
+    check_bndr tc = case splitTyConApp_maybe (repType scrut_ty) of
                         Just (bndr_tc, _) -> checkL (tc == bndr_tc) bad_bndr
                         Nothing           -> addErrL bad_bndr
+                  where
+                     bad_bndr = mkDefltMsg bndr tc
 
 lintStgExpr e = pprPanic "lintStgExpr" (ppr e)
 
 lintStgAlts :: [StgAlt]
             -> Type               -- Type of scrutinee
-            -> LintM (Maybe Type) -- Type of alternatives
+            -> LintM (Maybe Type) -- Just ty => type is accurage
 
 lintStgAlts alts scrut_ty = do
     maybe_result_tys <- mapM (lintAlt scrut_ty) alts
@@ -230,10 +226,12 @@ lintStgAlts alts scrut_ty = do
     case catMaybes (maybe_result_tys) of
       []             -> return Nothing
 
-      (first_ty:tys) -> do mapM_ check tys
+      (first_ty:_tys) -> do -- mapM_ check tys
                            return (Just first_ty)
         where
-          check ty = checkTys first_ty ty (mkCaseAltMsg alts)
+          -- check ty = checkTys first_ty ty (mkCaseAltMsg alts)
+	  -- We can't check that the alternatives have the
+	  -- same type, becuase they don't, with unsafeCoerce#
 
 lintAlt :: Type -> (AltCon, [Id], [Bool], StgExpr) -> LintM (Maybe Type)
 lintAlt _ (DEFAULT, _, _, rhs)
@@ -250,11 +248,12 @@ lintAlt scrut_ty (DataAlt con, args, _, rhs) = do
          let
            cons    = tyConDataCons tycon
            arg_tys = dataConInstArgTys con tys_applied
-                -- This almost certainly does not work for existential constructors
+                -- This does not work for existential constructors
 
          checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con)
-         checkL (equalLength arg_tys args) (mkAlgAltMsg3 con args)
-         mapM_ check (zipEqual "lintAlgAlt:stg" arg_tys args)
+         checkL (length args == dataConRepArity con) (mkAlgAltMsg3 con args)
+         when (isVanillaDataCon con) $
+           mapM_ check (zipEqual "lintAlgAlt:stg" arg_tys args)
          return ()
       _ ->
          addErrL (mkAltMsg1 scrut_ty)
@@ -381,30 +380,80 @@ have long since disappeared.
 \begin{code}
 checkFunApp :: Type                 -- The function type
             -> [Type]               -- The arg type(s)
-            -> Message              -- Error messgae
-            -> LintM (Maybe Type)   -- The result type
+            -> Message              -- Error message
+            -> LintM (Maybe Type)   -- Just ty => result type is accurate
 
-checkFunApp fun_ty arg_tys msg = LintM checkFunApp'
+checkFunApp fun_ty arg_tys msg
+ = do { case mb_msg of
+          Just msg -> addErrL msg
+          Nothing  -> return ()
+      ; return mb_ty }
  where
-  checkFunApp' loc _scope errs
-   = cfa fun_ty arg_tys
-   where
-    cfa fun_ty []      -- Args have run out; that's fine
-      = (Just fun_ty, errs)
+  (mb_ty, mb_msg) = cfa True fun_ty arg_tys
 
-    cfa fun_ty (_:arg_tys)   
-      | Just (_arg_ty, res_ty) <- splitFunTy_maybe (dropForAlls fun_ty)
-      = cfa res_ty arg_tys
+  cfa :: Bool -> Type -> [Type] -> (Maybe Type		-- Accurate result?
+                                   , Maybe Message)	-- Errors?
 
-      | isTyVarTy fun_ty      -- Expected arg tys ran out first;
-      = (Just fun_ty, errs)   -- first see if fun_ty is a tyvar template;
-                              -- otherwise, maybe fun_ty is a
-                              -- dictionary type which is actually a function?
+  cfa accurate fun_ty []      -- Args have run out; that's fine
+      = (if accurate then Just fun_ty else Nothing, Nothing)
+
+  cfa accurate fun_ty arg_tys@(arg_ty':arg_tys')   
+      | Just (arg_ty, res_ty) <- splitFunTy_maybe fun_ty
+      = if accurate && not (arg_ty `stgEqType` arg_ty') 
+        then (Nothing, Just msg)       -- Arg type mismatch
+        else cfa accurate res_ty arg_tys'
+
+      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
+      = cfa False fun_ty' arg_tys
+
+      | Just (tc,tc_args) <- splitTyConApp_maybe fun_ty
+      , isNewTyCon tc
+      = if length tc_args < tyConArity tc 
+        then WARN( True, text "cfa: unsaturated newtype" <+> ppr fun_ty $$ msg )
+             (Nothing, Nothing)   -- This is odd, but I've seen it
+        else cfa False (newTyConInstRhs tc tc_args) arg_tys
+
+      | Just (tc,_) <- splitTyConApp_maybe fun_ty
+      , not (isSynFamilyTyCon tc)       -- Definite error
+      = (Nothing, Just msg)             -- Too many args
+
       | otherwise
-      = (Nothing, addErr errs msg loc)     -- Too many args
+      = (Nothing, Nothing)
 \end{code}
 
 \begin{code}
+stgEqType :: Type -> Type -> Bool
+-- Compare types, but crudely because we have discarded
+-- both casts and type applications, so types might look
+-- different but be the same.  So reply "True" if in doubt.
+-- "False" means that the types are definitely different.
+--
+-- Fundamentally this is a losing battle because of unsafeCoerce
+
+stgEqType orig_ty1 orig_ty2 
+  = go rep_ty1 rep_ty2
+  where
+    rep_ty1 = deepRepType orig_ty1
+    rep_ty2 = deepRepType orig_ty2
+    go ty1 ty2
+      | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
+      , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
+      , let res = if tc1 == tc2 
+        	  then equalLength tc_args1 tc_args2 
+        	    && and (zipWith go tc_args1 tc_args2)
+        	  else  -- TyCons don't match; but don't bleat if either is a 
+    		        -- family TyCon because a coercion might have made it 
+        	        -- equal to something else
+        	    (isFamilyTyCon tc1 || isFamilyTyCon tc2)
+      = if res then True
+        else 
+        pprTrace "stgEqType: unequal" (vcat [ppr orig_ty1, ppr orig_ty2, ppr rep_ty1
+                                            , ppr rep_ty2, ppr ty1, ppr ty2]) 
+        False
+
+      | otherwise = True  -- Conservatively say "fine".  
+      		    	  -- Type variables in particular
+
 checkInScope :: Id -> LintM ()
 checkInScope id = LintM $ \loc scope errs
  -> if isLocalId id && not (id `elemVarSet` scope) then
@@ -413,22 +462,22 @@ checkInScope id = LintM $ \loc scope errs
         ((), errs)
 
 checkTys :: Type -> Type -> Message -> LintM ()
-checkTys _ty1 _ty2 _msg = LintM $ \_loc _scope errs
- -> -- if (ty1 == ty2) then
-    ((), errs)
-    -- else ((), addErr errs msg loc)
+checkTys ty1 ty2 msg = LintM $ \loc _scope errs
+  -> if (ty1 `stgEqType` ty2)
+     then ((), errs)
+     else ((), addErr errs msg loc)
 \end{code}
 
 \begin{code}
-mkCaseAltMsg :: [StgAlt] -> Message
-mkCaseAltMsg _alts
+_mkCaseAltMsg :: [StgAlt] -> Message
+_mkCaseAltMsg _alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
             (empty) -- LATER: ppr alts
 
-mkDefltMsg :: Id -> Message
-mkDefltMsg _bndr
+mkDefltMsg :: Id -> TyCon -> Message
+mkDefltMsg bndr tc
   = ($$) (ptext (sLit "Binder of a case expression doesn't match type of scrutinee:"))
-            (panic "mkDefltMsg")
+         (ppr bndr $$ ppr (idType bndr) $$ ppr tc)
 
 mkFunAppMsg :: Type -> [Type] -> StgExpr -> Message
 mkFunAppMsg fun_ty arg_tys expr
@@ -472,12 +521,8 @@ mkAlgAltMsg4 ty arg
         ppr arg
     ]
 
-mkCaseOfCaseMsg :: StgExpr -> Message
-mkCaseOfCaseMsg e
-  = text "Case of non-tail-call:" $$ ppr e
-
-mkRhsMsg :: Id -> Type -> Message
-mkRhsMsg binder ty
+_mkRhsMsg :: Id -> Type -> Message
+_mkRhsMsg binder ty
   = vcat [hsep [ptext (sLit "The type of this binder doesn't match the type of its RHS:"),
                      ppr binder],
               hsep [ptext (sLit "Binder's type:"), ppr (idType binder)],
