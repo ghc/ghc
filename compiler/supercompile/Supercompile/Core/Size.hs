@@ -19,30 +19,27 @@ type TaggedSizedFVedAlt = AltF (O Tagged (O Sized FVed))
 type TaggedSizedFVedValue = ValueF (O Tagged (O Sized FVed))
 
 
-(varSize',                termSize,                termSize',                altsSize,                valueSize,                valueSize')                = mkSize (\f (I e) -> f e)
-(fvedVarSize',            fvedTermSize,            fvedTermSize',            fvedAltsSize,            fvedValueSize,            fvedValueSize')            = mkSize (\f (FVed _ e) -> f e)
-(sizedVarSize',           sizedTermSize,           sizedTermSize',           sizedAltsSize,           sizedValueSize,           sizedValueSize')           = mkSize (\_ (Sized sz _) -> sz)
-(sizedFVedVarSize',       sizedFVedTermSize,       sizedFVedTermSize',       sizedFVedAltsSize,       sizedFVedValueSize,       sizedFVedValueSize')       = mkSize (\_ (Comp (Sized sz (FVed _ _))) -> sz)
-(taggedSizedFVedVarSize', taggedSizedFVedTermSize, taggedSizedFVedTermSize', taggedSizedFVedAltsSize, taggedSizedFVedValueSize, taggedSizedFVedValueSize') = mkSize (\_ (Comp (Tagged _ (Comp (Sized sz (FVed _ _))))) -> sz)
+(termSize,                termSize',                altsSize,                valueSize,                valueSize')                = mkSize (\f (I e) -> f e)
+(fvedTermSize,            fvedTermSize',            fvedAltsSize,            fvedValueSize,            fvedValueSize')            = mkSize (\f (FVed _ e) -> f e)
+(sizedTermSize,           sizedTermSize',           sizedAltsSize,           sizedValueSize,           sizedValueSize')           = mkSize (\_ (Sized sz _) -> sz)
+(sizedFVedTermSize,       sizedFVedTermSize',       sizedFVedAltsSize,       sizedFVedValueSize,       sizedFVedValueSize')       = mkSize (\_ (Comp (Sized sz (FVed _ _))) -> sz)
+(taggedSizedFVedTermSize, taggedSizedFVedTermSize', taggedSizedFVedAltsSize, taggedSizedFVedValueSize, taggedSizedFVedValueSize') = mkSize (\_ (Comp (Tagged _ (Comp (Sized sz (FVed _ _))))) -> sz)
 
 {-# INLINE mkSize #-}
 mkSize :: (forall a. (a -> Size) -> ann a -> Size)
-       -> (Var              -> Size,
-           ann (TermF ann)  -> Size,
+       -> (ann (TermF ann)  -> Size,
            TermF ann        -> Size,
            [AltF ann]       -> Size,
            ann (ValueF ann) -> Size,
            ValueF ann       -> Size)
-mkSize rec = (var', term, term', alternatives, value, value')
+mkSize rec = (term, term', alternatives, value, value')
   where
-    var' = const 0
-    
     term = rec term'
     term' e = 1 + case e of
-        Var x           -> var' x
+        Var _           -> 0
         Value v         -> value' v - 1 -- Slight hack here so that we don't get +2 size on values
         TyApp e _       -> term e
-        App e x         -> term e + var' x
+        App e _         -> term e
         PrimOp _ _ es   -> sum (map term es)
         Case e _ _ alts -> term e + alternatives alts
         Let _ e1 e2     -> term e1 + term e2
@@ -73,9 +70,6 @@ instance Symantics (O Sized FVed) where
     let_ x e1 = sizedFVedTerm . Let x e1
     letRec xes = sizedFVedTerm . LetRec xes
     cast e = sizedFVedTerm . Cast e
-
-sizedFVedVar :: Var -> (O Sized FVed) Var
-sizedFVedVar x = Comp (Sized (sizedFVedVarSize' x) (FVed (sizedFVedVarFreeVars' x) x))
 
 sizedFVedValue :: SizedFVedValue -> (O Sized FVed) SizedFVedValue
 sizedFVedValue v = Comp (Sized (sizedFVedValueSize' v) (FVed (sizedFVedValueFreeVars' v) v))

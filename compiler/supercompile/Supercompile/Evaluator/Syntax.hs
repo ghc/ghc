@@ -54,7 +54,6 @@ annedValueFreeVars = taggedSizedFVedValueFreeVars
 annedValueFreeVars' = taggedSizedFVedValueFreeVars'
 annedAltsFreeVars = taggedSizedFVedAltsFreeVars
 
-annedVarSize' = taggedSizedFVedVarSize'
 annedTermSize' = taggedSizedFVedTermSize'
 annedTermSize = taggedSizedFVedTermSize
 annedValueSize' = taggedSizedFVedValueSize'
@@ -72,9 +71,6 @@ detagAnnedValue = taggedSizedFVedValueToFVedValue
 detagAnnedValue' = taggedSizedFVedValue'ToFVedValue'
 detagAnnedAlts = taggedSizedFVedAltsToFVedAlts
 
-
-annedVar :: Tag -> Var -> Anned Var
-annedVar   tg x = Comp (Tagged tg (Comp (Sized (annedVarSize' x)   (FVed (annedVarFreeVars' x)  x))))
 
 annedTerm :: Tag -> TermF Anned -> AnnedTerm
 annedTerm  tg e = Comp (Tagged tg (Comp (Sized (annedTermSize' e)  (FVed (annedTermFreeVars' e)  e))))
