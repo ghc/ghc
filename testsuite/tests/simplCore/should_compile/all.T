@@ -124,3 +124,4 @@ test('T5168',
 
 test('T5329', normal, compile, [''])
 test('T5303', reqlib('mtl'), compile, [''])   # Coercion-optimiation test
+test('T5342', normal, compile, [''])  # Lint error with -prof
