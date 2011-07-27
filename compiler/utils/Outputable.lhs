@@ -597,7 +597,10 @@ keyword = bold
 class Outputable a where
 	ppr :: a -> SDoc
 	pprPrec :: Rational -> a -> SDoc
-	
+		-- 0 binds least tightly
+		-- We use Rational because there is always a
+		-- Rational between any other two Rationals
+
 	ppr = pprPrec 0
 	pprPrec _ = ppr
 \end{code}
