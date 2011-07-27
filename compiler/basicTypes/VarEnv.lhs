@@ -286,12 +286,16 @@ rnEtaR (RV2 { envL = envL, envR = envR, in_scope = in_scope }) bR
     new_b = uniqAway in_scope bR
 
 delBndrL, delBndrR :: RnEnv2 -> Var -> RnEnv2
-delBndrL rn@(RV2 { envL = env, in_scope = in_scope }) v = rn { envL = env `delVarEnv` v, in_scope = in_scope `extendInScopeSet` v }
-delBndrR rn@(RV2 { envR = env, in_scope = in_scope }) v = rn { envR = env `delVarEnv` v, in_scope = in_scope `extendInScopeSet` v }
+delBndrL rn@(RV2 { envL = env, in_scope = in_scope }) v 
+  = rn { envL = env `delVarEnv` v, in_scope = in_scope `extendInScopeSet` v }
+delBndrR rn@(RV2 { envR = env, in_scope = in_scope }) v 
+  = rn { envR = env `delVarEnv` v, in_scope = in_scope `extendInScopeSet` v }
 
 delBndrsL, delBndrsR :: RnEnv2 -> [Var] -> RnEnv2
-delBndrsL rn@(RV2 { envL = env, in_scope = in_scope }) v = rn { envL = env `delVarEnvList` v, in_scope = in_scope `extendInScopeSetList` v }
-delBndrsR rn@(RV2 { envR = env, in_scope = in_scope }) v = rn { envR = env `delVarEnvList` v, in_scope = in_scope `extendInScopeSetList` v }
+delBndrsL rn@(RV2 { envL = env, in_scope = in_scope }) v 
+  = rn { envL = env `delVarEnvList` v, in_scope = in_scope `extendInScopeSetList` v }
+delBndrsR rn@(RV2 { envR = env, in_scope = in_scope }) v 
+  = rn { envR = env `delVarEnvList` v, in_scope = in_scope `extendInScopeSetList` v }
 
 rnOccL, rnOccR :: RnEnv2 -> Var -> Var
 -- ^ Look up the renaming of an occurrence in the left or right term

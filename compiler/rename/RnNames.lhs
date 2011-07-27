@@ -132,16 +132,16 @@ with yes we have gone with no for now.
 
 
 \begin{code}
-rnImports :: [LImportDecl RdrName]
+rnImports :: SrcSpan -> [LImportDecl RdrName]
            -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 
-rnImports imports
+rnImports prel_imp_loc imports
          -- PROCESS IMPORT DECLS
          -- Do the non {- SOURCE -} ones first, so that we get a helpful
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
          implicit_prelude <- xoptM Opt_ImplicitPrelude
-         let prel_imports = mkPrelImports (moduleName this_mod)
+         let prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
                                 implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ _ is_boot _ _ _ _)) = is_boot
@@ -1393,18 +1393,20 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage imports rdr_env (Set.elems uses)
 
-       ; traceRn (ptext (sLit "Import usage") <+> ppr usage)
+       ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
+                       , ptext (sLit "Import usage") <+> ppr usage])
        ; ifWOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
        ; ifDOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
-    explicit_import (L loc _) = case loc of
-                                UnhelpfulSpan _ -> False
-                                RealSrcSpan _ -> True
+    explicit_import (L _ decl) = unLoc (ideclName decl) /= pRELUDE_NAME
         -- Filter out the implicit Prelude import
         -- which we do not want to bleat about
+	-- This also filters out an *explicit* Prelude import
+	-- but solving that problem involves more plumbing, and
+	-- it just doesn't seem worth it
 \end{code}
 
 \begin{code}

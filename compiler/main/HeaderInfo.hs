@@ -70,8 +70,8 @@ getImports dflags buf filename source_filename = do
 	  case rdr_module of
 	    L _ (HsModule mb_mod _ imps _ _ _) ->
 	      let
-                main_loc = mkSrcLoc (mkFastString source_filename) 1 1
-		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
+                main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename) 1 1)
+		mod = mb_mod `orElse` L main_loc mAIN_NAME
 	        (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
 
 		     -- GHC.Prim doesn't exist physically, so don't go looking for it.
@@ -79,18 +79,20 @@ getImports dflags buf filename source_filename = do
 					ord_idecls
 
                 implicit_prelude = xopt Opt_ImplicitPrelude dflags
-                implicit_imports = mkPrelImports (unLoc mod) implicit_prelude imps
+                implicit_imports = mkPrelImports (unLoc mod) main_loc implicit_prelude imps
 	      in
 	      return (src_idecls, implicit_imports ++ ordinary_imps, mod)
 
-mkPrelImports :: ModuleName -> Bool -> [LImportDecl RdrName]
+mkPrelImports :: ModuleName 
+              -> SrcSpan    -- Attribute the "import Prelude" to this location
+              -> Bool -> [LImportDecl RdrName]
               -> [LImportDecl RdrName]
 -- Consruct the implicit declaration "import Prelude" (or not)
 --
 -- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 -- because the former doesn't even look at Prelude.hi for instance
 -- declarations, whereas the latter does.
-mkPrelImports this_mod implicit_prelude import_decls
+mkPrelImports this_mod loc implicit_prelude import_decls
   | this_mod == pRELUDE_NAME
    || explicit_prelude_import
    || not implicit_prelude
@@ -111,8 +113,6 @@ mkPrelImports this_mod implicit_prelude import_decls
                False    {- Not qualified -}
                Nothing  {- No "as" -}
                Nothing  {- No import list -}
-
-      loc = mkGeneralSrcSpan (fsLit "Implicit import declaration")
 
 parseError :: SrcSpan -> Message -> IO a
 parseError span err = throwOneError $ mkPlainErrMsg span err
