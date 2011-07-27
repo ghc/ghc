@@ -42,6 +42,10 @@ annedFreeVars = freeVars . sizee . unComp . tagee . unComp
 annedTag :: Anned a -> Tag
 annedTag = tag . unComp
 
+renameAnned :: In (Anned a) -> Anned (In a)
+renameAnned (rn, Comp (Tagged tg (Comp (Sized sz (FVed fvs x)))))
+  = Comp (Tagged tg (Comp (Sized sz (FVed (renameFreeVars rn fvs) (rn, x)))))
+
 
 annedVarFreeVars' = taggedSizedFVedVarFreeVars'
 annedTermFreeVars = taggedSizedFVedTermFreeVars
@@ -95,7 +99,7 @@ answerFreeVars' :: Answer -> FreeVars
 answerFreeVars' = annedTermFreeVars' . answerToAnnedTerm' emptyInScopeSet
 
 termToAnswer :: InScopeSet -> In AnnedTerm -> Maybe (Anned Answer)
-termToAnswer iss (rn, anned_e) = flip traverse anned_e $ \e -> case e of
+termToAnswer iss in_anned_e = flip traverse (renameAnned in_anned_e) $ \(rn, e) -> case e of
     Value v          -> Just (Nothing, (rn, v))
     Cast anned_e' co -> case extract anned_e' of
         Value v -> Just (Just (renameCoercion iss rn co, annedTag anned_e'), (rn, v))
@@ -216,12 +220,6 @@ instance Outputable StackFrame where
         Update x'                      -> pPrintPrecApp prec (PrettyDoc $ text "update") x'
         CastIt co'                     -> pPrintPrecCast prec (PrettyDoc $ text "[_]") co'
 
-
-renameAnned :: (InScopeSet -> Renaming -> a -> a)
-            -> Anned (In a) -> a
-renameAnned rename in_x = x'
-  where (rn, x) = annee in_x
-        x' = rename (mkInScopeSet (annedFreeVars in_x)) rn x
 
 stateType :: State -> Type
 stateType (_, _, k, qa) = stackType k (qaType qa)
