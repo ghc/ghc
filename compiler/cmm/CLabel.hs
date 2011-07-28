@@ -65,6 +65,7 @@ module CLabel (
 
 	mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
+        mkCAFBlackHoleEntryLabel,
 	mkRtsPrimOpLabel,
 	mkRtsSlowTickyCtrLabel,
 
@@ -99,7 +100,7 @@ module CLabel (
         mkHpcTicksLabel,
 
         hasCAF,
-	infoLblToEntryLbl, entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
+	entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
 	localiseLabel,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
@@ -390,6 +391,7 @@ mkMAP_DIRTY_infoLabel		= CmmLabel rtsPackageId (fsLit "stg_MUT_ARR_PTRS_DIRTY") 
 mkEMPTY_MVAR_infoLabel		= CmmLabel rtsPackageId (fsLit "stg_EMPTY_MVAR")	CmmInfo
 mkTopTickyCtrLabel		= CmmLabel rtsPackageId (fsLit "top_ct")		CmmData
 mkCAFBlackHoleInfoTableLabel	= CmmLabel rtsPackageId (fsLit "stg_CAF_BLACKHOLE")	CmmInfo
+mkCAFBlackHoleEntryLabel	= CmmLabel rtsPackageId (fsLit "stg_CAF_BLACKHOLE")	CmmEntry
 
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
@@ -500,17 +502,6 @@ mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
 
 -- -----------------------------------------------------------------------------
 -- Converting between info labels and entry/ret labels.
-
-infoLblToEntryLbl :: CLabel -> CLabel 
-infoLblToEntryLbl (IdLabel n c (InfoTable lcl))	= IdLabel n c (Entry lcl)
-infoLblToEntryLbl (IdLabel n c ConInfoTable)	= IdLabel n c ConEntry
-infoLblToEntryLbl (IdLabel n c StaticInfoTable)	= IdLabel n c StaticConEntry
-infoLblToEntryLbl (CaseLabel n CaseReturnInfo)	= CaseLabel n CaseReturnPt
-infoLblToEntryLbl (CmmLabel m str CmmInfo)	= CmmLabel m str CmmEntry
-infoLblToEntryLbl (CmmLabel m str CmmRetInfo)	= CmmLabel m str CmmRet
-infoLblToEntryLbl _
-	= panic "CLabel.infoLblToEntryLbl"
-
 
 entryLblToInfoLbl :: CLabel -> CLabel 
 entryLblToInfoLbl (IdLabel n c (Entry lcl))	= IdLabel n c (InfoTable lcl)
