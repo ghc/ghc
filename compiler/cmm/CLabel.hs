@@ -101,7 +101,6 @@ module CLabel (
 
         hasCAF,
 	entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
-	localiseLabel,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
@@ -529,11 +528,6 @@ cvtToSRTLbl   (IdLabel n c ConEntry)		= mkSRTLabel n c
 cvtToSRTLbl l@(IdLabel n c Closure)		= mkSRTLabel n c
 cvtToSRTLbl l 
 	= pprPanic "cvtToSRTLbl" (pprCLabel l)
-
-localiseLabel :: CLabel -> CLabel
-localiseLabel (IdLabel n c (Entry _))     = IdLabel n c (Entry True)
-localiseLabel (IdLabel n c (InfoTable _)) = IdLabel n c (InfoTable True)
-localiseLabel l = l
 
 
 -- -----------------------------------------------------------------------------
