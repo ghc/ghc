@@ -31,17 +31,11 @@ $(eval $(call build-prog,utils/haddock,dist,2))
 utils/haddock_dist_MODULES += Paths_haddock
 
 ifeq "$(HADDOCK_DOCS)" "YES"
-install: install_utils/haddock_html
 install: install_utils/haddock_data
 ifeq "$(Windows)" "NO"
 install: install_utils/haddock_link
 endif
 endif
-
-.PHONY: install_utils/haddock_html
-install_utils/haddock_html:
-	$(call INSTALL_DIR,"$(DESTDIR)$(docdir)/html")
-	"$(CP)" -R utils/haddock/html "$(DESTDIR)$(docdir)/html"
 
 .PHONY: install_utils/haddock_data
 install_utils/haddock_data:
