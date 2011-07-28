@@ -123,7 +123,7 @@ termToCoreExpr = term
     term e = case unI e of
         S.Var x             -> Var x
         S.Value v           -> value v
-        S.App e x           -> term e `App` Var x
+        S.App e x           -> term e `App` varToCoreExpr x
         S.TyApp e ty        -> term e `App` Type ty
         S.PrimOp pop tys es -> Var (mkPrimOpId pop) `mkTyApps` tys `mkApps` map term es
         S.Case e x ty alts  -> Case (term e) x ty (map alt alts)

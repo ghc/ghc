@@ -38,7 +38,7 @@ evaluatePrim iss tg pop tys args = do
     to (mb_co, (rn, v)) = fmap (maybe id (flip CoreSyn.Cast . fst) mb_co) $ case v of
         Literal l      -> Just (CoreSyn.Lit l)
         Coercion co    -> Just (CoreSyn.Coercion co)
-        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` map (renameType iss rn) tys `CoreSyn.mkVarApps` map (renameId rn) xs)
+        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` map (renameType iss rn) tys `CoreSyn.mkVarApps` map (renameIdCoVar rn) xs)
         _              -> Nothing
     
     fro :: CoreSyn.CoreExpr -> Maybe Answer
@@ -93,7 +93,7 @@ step' normalising state =
         Var x            -> go_question (deeds, heap, k, fmap (\(rn, Var _) -> renameId rn x) (renameAnned (rn, e)))
         Value v          -> pprPanic "step': values are always answers" (ppr v)
         TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   : k, (rn, e))
-        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameId rn x))                                            : k, (rn, e))
+        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameIdCoVar rn x))                                       : k, (rn, e))
         PrimOp pop tys es
           | (e:es) <- es -> go (deeds, heap,        Tagged tg (PrimApply pop (map (renameType ids rn) tys) [] (map ((,) rn) es)) : k, (rn, e))
           | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
@@ -190,7 +190,7 @@ step' normalising state =
         apply deeds tg_v (Heap h ids) k in_v@(_, (_, v)) x' = do
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) in_v
             case mb_co of
-              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
+              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdCoVarRenaming rn x x', e_body))) $
                               claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
               Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
                                         claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
@@ -235,11 +235,11 @@ step' normalising state =
                                            | ((DataAlt alt_dc alt_as alt_xs, alt_e), rest) <- bagContexts alts
                                            , alt_dc == dc
                                            , let tys' = map (renameType ids rn_v_deref) tys
-                                                 xs' = map (renameId rn_v_deref) xs
+                                                 xs' = map (renameIdCoVar rn_v_deref) xs
                                                  rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys')
                                                  deeds2 = deeds1 + annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
-                                                               Nothing     -> return (deeds2, h1, ids, insertIdRenamings rn_alts' (alt_xs `zip` xs'))
+                                                               Nothing     -> return (deeds2, h1, ids, insertIdCoVarRenamings rn_alts' (alt_xs `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (x', alt_y, (dc_co, tg_co)) -> let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
                                                                                                                                                   (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
                                                                                                                                                   e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` dc_co)

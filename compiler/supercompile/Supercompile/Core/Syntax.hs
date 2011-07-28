@@ -64,7 +64,7 @@ type Term = Identity (TermF Identity)
 type TaggedTerm = Tagged (TermF Tagged)
 data TermF ann = Var Id
                | Value (ValueF ann)
-               | App (ann (TermF ann)) Id
+               | App (ann (TermF ann)) Id -- NB: might be a CoVar
                | TyApp (ann (TermF ann)) Type
                | PrimOp PrimOp [Type] [ann (TermF ann)]
                | Case (ann (TermF ann)) Id Type [AltF ann]
@@ -78,8 +78,10 @@ type AltF ann = (AltCon, ann (TermF ann))
 
 type Value = ValueF Identity
 type TaggedValue = ValueF Tagged
-data ValueF ann = Indirect Id | Literal Literal | Coercion Coercion
-                | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) | Data DataCon [Type] [Id]
+data ValueF ann = Indirect Id -- NB: for the avoidance of doubt, these cannot be CoVars
+                | Literal Literal | Coercion Coercion
+                | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) -- NB: might bind a CoVar
+                | Data DataCon [Type] [Id]
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
