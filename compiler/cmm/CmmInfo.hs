@@ -1,5 +1,5 @@
 module CmmInfo (
-  emptyContInfoTable,
+  mkEmptyContInfoTable,
   cmmToRawCmm,
   mkInfoTable,
 ) where
@@ -27,9 +27,9 @@ import UniqSupply
 import Data.Bits
 
 -- When we split at proc points, we need an empty info table.
-emptyContInfoTable :: CmmInfoTable
-emptyContInfoTable = CmmInfoTable False False (ProfilingInfo zero zero) rET_SMALL
-                                  (ContInfo [] NoC_SRT)
+mkEmptyContInfoTable :: CLabel -> CmmInfoTable
+mkEmptyContInfoTable info_lbl = CmmInfoTable info_lbl False (ProfilingInfo zero zero) rET_SMALL
+                                             (ContInfo [] NoC_SRT)
     where zero = CmmInt 0 wordWidth
 
 cmmToRawCmm :: [Cmm] -> IO [RawCmm]
@@ -80,9 +80,8 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label blocks) =
       -- Code without an info table.  Easy.
       CmmNonInfoTable -> [CmmProc Nothing entry_label blocks]
 
-      CmmInfoTable is_local _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
-          let info_label = (if is_local then localiseLabel else id) $ entryLblToInfoLbl entry_label
-              ty_prof'   = makeRelativeRefTo info_label ty_prof
+      CmmInfoTable info_label _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
+          let ty_prof'   = makeRelativeRefTo info_label ty_prof
               cl_prof'   = makeRelativeRefTo info_label cl_prof
           in case type_info of
           -- A function entry point.
