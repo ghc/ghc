@@ -185,7 +185,7 @@ mkStaticClosureFields cl_info ccs caf_refs payload
   = mkStaticClosure info_lbl ccs payload padding_wds 
 	static_link_field saved_info_field
   where
-    info_lbl = infoTableLabelFromCI cl_info $ clHasCafRefs cl_info
+    info_lbl = infoTableLabelFromCI cl_info
 
     -- CAFs must have consistent layout, regardless of whether they
     -- are actually updatable or not.  The layout of a CAF is:
@@ -302,7 +302,7 @@ hpStkCheck cl_info is_fun reg_save_code code
         -- Strictly speaking, we should tag node here.  But if
         -- node doesn't point to the closure, the code for the closure
         -- cannot depend on the value of R1 anyway, so we're safe.
-    closure_lbl = closureLabelFromCI cl_info (clHasCafRefs cl_info)
+    closure_lbl = closureLabelFromCI cl_info
 
     full_save_code = node_asst `plusStmts` reg_save_code
 
@@ -570,8 +570,7 @@ allocDynClosure cl_info use_cc _blame_cc amodes_with_offsets
 		-- Remember, virtHp points to last allocated word, 
 		-- ie 1 *before* the info-ptr word of new object.
 
-		info_ptr = CmmLit (CmmLabel (infoTableLabelFromCI cl_info
-                                                   (clHasCafRefs cl_info)))
+		info_ptr = CmmLit (CmmLabel (infoTableLabelFromCI cl_info))
 		hdr_w_offsets = initDynHdr info_ptr use_cc `zip` [0..]
 
 	-- SAY WHAT WE ARE ABOUT TO DO

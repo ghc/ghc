@@ -47,7 +47,7 @@ module CgUtils (
 	packHalfWordsCLit,
 	blankWord,
 
-	getSRTInfo, clHasCafRefs
+	getSRTInfo
   ) where
 
 #include "HsVersions.h"
@@ -994,12 +994,6 @@ getSRTInfo = do
 		-- The fromIntegral converts to StgHalfWord
 
 srt_escape = (-1) :: StgHalfWord
-
-clHasCafRefs :: ClosureInfo -> CafInfo
-clHasCafRefs (ClosureInfo {closureSRT = srt}) = 
-  case srt of NoC_SRT -> NoCafRefs
-              _       -> MayHaveCafRefs
-clHasCafRefs (ConInfo {}) = NoCafRefs
 
 -- -----------------------------------------------------------------------------
 --

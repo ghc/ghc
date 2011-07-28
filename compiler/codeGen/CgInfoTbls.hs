@@ -59,7 +59,7 @@ emitClosureCodeAndInfoTable cl_info args body
         ; info <- mkCmmInfo cl_info
         ; emitInfoTableAndCode (infoLblToEntryLbl info_lbl) info args blks }
   where
-    info_lbl  = infoTableLabelFromCI cl_info $ clHasCafRefs cl_info
+    info_lbl  = infoTableLabelFromCI cl_info
 
 -- We keep the *zero-indexed* tag in the srt_len field of the info
 -- table of a data constructor.
@@ -105,7 +105,7 @@ mkCmmInfo cl_info = do
                    ThunkInfo (ptrs, nptrs) srt
                _ -> panic "unexpected lambda form in mkCmmInfo"
   where
-    info_lbl = infoTableLabelFromCI cl_info has_caf_refs
+    info_lbl = infoTableLabelFromCI cl_info
     has_caf_refs = clHasCafRefs cl_info
 
     cl_type  = smRepClosureTypeInt (closureSMRep cl_info)
