@@ -62,7 +62,6 @@ import GHC.IOArray
 import GHC.IORef
 import GHC.MVar
 import Foreign.C.Types
-import GHC.Show
 import Data.Typeable
 
 type FD = CInt
