@@ -80,8 +80,6 @@ import FastString
 import Outputable
 import Constants
 import DynFlags
-
-import Control.Arrow ((***))
 \end{code}
 
 
@@ -936,7 +934,7 @@ labelsFromCI :: ClosureInfo -> (CLabel, CLabel) -- (Info, Entry)
 labelsFromCI cl@(ClosureInfo { closureName = name,
 			       closureLFInfo = lf_info,
 			       closureInfLcl = is_lcl })
-  = (if is_lcl then (localiseLabel *** localiseLabel) else id) $ case lf_info of
+  = case lf_info of
 	LFBlackHole -> (mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel)
 
 	LFThunk _ _ upd_flag (SelectorThunk offset) _ -> 
@@ -945,11 +943,12 @@ labelsFromCI cl@(ClosureInfo { closureName = name,
 	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
 		bothL (mkApInfoTableLabel, mkApEntryLabel) upd_flag arity
 
-	LFThunk{}      -> bothL (mkInfoTableLabel, mkEntryLabel) name $ clHasCafRefs cl
+	LFThunk{}      -> bothL std_mk_lbls name $ clHasCafRefs cl
 
-	LFReEntrant _ _ _ _ -> bothL (mkInfoTableLabel, mkEntryLabel) name $ clHasCafRefs cl
+	LFReEntrant _ _ _ _ -> bothL std_mk_lbls name $ clHasCafRefs cl
 
 	_ -> panic "labelsFromCI"
+  where std_mk_lbls = if is_lcl then (mkLocalInfoTableLabel, mkLocalEntryLabel) else (mkInfoTableLabel, mkEntryLabel)
 
 labelsFromCI cl@(ConInfo { closureCon = con, 
 			           closureSMRep = rep })
