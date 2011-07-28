@@ -463,7 +463,7 @@ splitAtProcPoints entry_label callPPs procPoints procMap
              CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info})
                      top_l (replacePPIds g)
            else
-             CmmProc (TopInfo {info_tbl=emptyContInfoTable, stack_info=stack_info})
+             CmmProc (TopInfo {info_tbl=mkEmptyContInfoTable (entryLblToInfoLbl lbl), stack_info=stack_info})
                      lbl (replacePPIds g)
            where lbl = expectJust "pp label" $ Map.lookup bid procLabels
          to_proc (bid, (stack_info, g)) =

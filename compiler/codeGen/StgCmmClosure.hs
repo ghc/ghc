@@ -35,7 +35,7 @@ module StgCmmClosure (
 	closureGoodStuffSize, closurePtrsSize,
 	slopSize, 
 
-	closureName, infoTableLabelFromCI,
+	closureName, infoTableLabelFromCI, entryLabelFromCI,
 	closureLabelFromCI,
 	closureTypeInfo,
 	closureLFInfo, isLFThunk,closureSMRep, closureUpdReqd, 
@@ -56,7 +56,7 @@ module StgCmmClosure (
 	isToplevClosure,
 	closureValDescr, closureTypeDescr,	-- profiling
 
-	closureInfoLocal, isStaticClosure,
+	isStaticClosure,
 	cafBlackHoleClosureInfo, 
 
 	staticClosureNeedsLink, clHasCafRefs 
@@ -938,10 +938,6 @@ staticClosureNeedsLink (ConInfo { closureSMRep = sm_rep, closureCon = con })
 	   GenericRep _ _ _ ConstrNoCaf -> False
 	   _other			-> True
 
-closureInfoLocal :: ClosureInfo -> Bool
-closureInfoLocal ClosureInfo{ closureInfLcl = lcl } = lcl
-closureInfoLocal ConInfo{} = False
-
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 
@@ -998,8 +994,9 @@ isToplevClosure _ = False
 
 infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI cl@(ClosureInfo { closureName = name,
-				       closureLFInfo = lf_info })
-  = case lf_info of
+				       closureLFInfo = lf_info,
+				       closureInfLcl = is_lcl })
+  = (if is_lcl then localiseLabel else id) $ case lf_info of
 	LFBlackHole info -> info
 
 	LFThunk _ _ upd_flag (SelectorThunk offset) _ -> 
@@ -1019,6 +1016,9 @@ infoTableLabelFromCI cl@(ConInfo { closureCon = con, closureSMRep = rep })
   | otherwise	    = mkConInfoTableLabel     name $ clHasCafRefs cl
   where
     name = dataConName con
+
+entryLabelFromCI :: ClosureInfo -> CLabel
+entryLabelFromCI = infoLblToEntryLbl . infoTableLabelFromCI
 
 -- ClosureInfo for a closure (as opposed to a constructor) is always local
 closureLabelFromCI :: ClosureInfo -> CLabel

@@ -55,7 +55,7 @@ newtype GenCmm d h g = Cmm [GenCmmTop d h g]
 data GenCmmTop d h g
   = CmmProc     -- A procedure
      h                 -- Extra header such as the info table
-     CLabel            -- Used to generate both info & entry labels (though the info table label is in 'h' in RawCmmTop)
+     CLabel            -- Entry label
      g                 -- Control-flow graph for the procedure's code
 
   | CmmData     -- Static data
@@ -70,16 +70,13 @@ data GenCmmTop d h g
 -- Info table as a haskell data type
 data CmmInfoTable
   = CmmInfoTable
-      LocalInfoTable
+      CLabel -- Info table label
       HasStaticClosure
       ProfilingInfo
       ClosureTypeTag -- Int
       ClosureTypeInfo
   | CmmNonInfoTable   -- Procedure doesn't need an info table
 
--- | If the table is local, we don't export its identifier even if the corresponding Id is exported.
--- It's always safe to say 'False' here, but it might save symbols to say 'True'
-type LocalInfoTable = Bool
 type HasStaticClosure = Bool
 
 -- TODO: The GC target shouldn't really be part of CmmInfo
