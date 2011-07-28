@@ -100,7 +100,7 @@ module CLabel (
         mkHpcTicksLabel,
 
         hasCAF,
-	entryLblToInfoLbl, cvtToClosureLbl, cvtToSRTLbl,
+	entryLblToInfoLbl, cvtToClosureLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
@@ -520,14 +520,6 @@ cvtToClosureLbl   (IdLabel n c RednCounts)	= IdLabel n c Closure
 cvtToClosureLbl l@(IdLabel n c Closure)		= l
 cvtToClosureLbl l 
 	= pprPanic "cvtToClosureLbl" (pprCLabel l)
-
-
-cvtToSRTLbl   (IdLabel n c (InfoTable _))	= mkSRTLabel n c
-cvtToSRTLbl   (IdLabel n c (Entry _))		= mkSRTLabel n c
-cvtToSRTLbl   (IdLabel n c ConEntry)		= mkSRTLabel n c
-cvtToSRTLbl l@(IdLabel n c Closure)		= mkSRTLabel n c
-cvtToSRTLbl l 
-	= pprPanic "cvtToSRTLbl" (pprCLabel l)
 
 
 -- -----------------------------------------------------------------------------
