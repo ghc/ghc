@@ -12,7 +12,7 @@ module VarEnv (
 	emptyVarEnv, unitVarEnv, mkVarEnv,
 	elemVarEnv, varEnvElts, varEnvKeys,
 	extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnvList,
-	plusVarEnv, plusVarEnv_C,
+	plusVarEnv, plusVarEnv_C, alterVarEnv,
 	delVarEnvList, delVarEnv,
         minusVarEnv, intersectsVarEnv,
 	lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
@@ -364,6 +364,7 @@ emptyVarEnv	  :: VarEnv a
 mkVarEnv	  :: [(Var, a)] -> VarEnv a
 zipVarEnv	  :: [Var] -> [a] -> VarEnv a
 unitVarEnv	  :: Var -> a -> VarEnv a
+alterVarEnv	  :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
 extendVarEnv	  :: VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_C	  :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
@@ -395,6 +396,7 @@ foldVarEnv	  :: (a -> b -> b) -> b -> VarEnv a -> b
 \begin{code}
 elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
+alterVarEnv      = alterUFM
 extendVarEnv	 = addToUFM
 extendVarEnv_C	 = addToUFM_C
 extendVarEnv_Acc = addToUFM_Acc
