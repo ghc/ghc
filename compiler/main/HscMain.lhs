@@ -309,9 +309,12 @@ hscRnImportDecls
 -- because tcRnImports will force-load any orphan modules necessary, making extra
 -- instances/family instances visible (GHC #4832)
 hscRnImportDecls hsc_env this_mod import_decls
-  = runHsc hsc_env $ ioMsgMaybe $ initTc hsc_env HsSrcFile False this_mod $
-          fmap tcg_rdr_env $ tcRnImports hsc_env this_mod import_decls
-
+  = runHsc hsc_env $ ioMsgMaybe $ 
+    initTc hsc_env HsSrcFile False this_mod $
+    fmap tcg_rdr_env $ 
+    tcRnImports hsc_env this_mod loc import_decls
+  where
+    loc = mkGeneralSrcSpan (mkFastString "In a call to hscRnImportDecls")
 #endif
 
 -- -----------------------------------------------------------------------------
