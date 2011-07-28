@@ -80,6 +80,8 @@ import FastString
 import Outputable
 import Constants
 import DynFlags
+
+import Control.Arrow ((***))
 \end{code}
 
 
@@ -925,33 +927,39 @@ Label generation.
 
 \begin{code}
 infoTableLabelFromCI :: ClosureInfo -> CLabel
-infoTableLabelFromCI cl@(ClosureInfo { closureName = name,
-				       closureLFInfo = lf_info,
-				       closureInfLcl = is_lcl })
-  = (if is_lcl then localiseLabel else id) $ case lf_info of
-	LFBlackHole -> mkCAFBlackHoleInfoTableLabel
+infoTableLabelFromCI = fst . labelsFromCI
+
+entryLabelFromCI :: ClosureInfo -> CLabel
+entryLabelFromCI = snd . labelsFromCI
+
+labelsFromCI :: ClosureInfo -> (CLabel, CLabel) -- (Info, Entry)
+labelsFromCI cl@(ClosureInfo { closureName = name,
+			       closureLFInfo = lf_info,
+			       closureInfLcl = is_lcl })
+  = (if is_lcl then (localiseLabel *** localiseLabel) else id) $ case lf_info of
+	LFBlackHole -> (mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel)
 
 	LFThunk _ _ upd_flag (SelectorThunk offset) _ -> 
-		mkSelectorInfoLabel upd_flag offset
+		bothL (mkSelectorInfoLabel, mkSelectorEntryLabel) upd_flag offset
 
 	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
-		mkApInfoTableLabel upd_flag arity
+		bothL (mkApInfoTableLabel, mkApEntryLabel) upd_flag arity
 
-	LFThunk{}      -> mkInfoTableLabel name $ clHasCafRefs cl
+	LFThunk{}      -> bothL (mkInfoTableLabel, mkEntryLabel) name $ clHasCafRefs cl
 
-	LFReEntrant _ _ _ _ -> mkInfoTableLabel name $ clHasCafRefs cl
+	LFReEntrant _ _ _ _ -> bothL (mkInfoTableLabel, mkEntryLabel) name $ clHasCafRefs cl
 
-	_ -> panic "infoTableLabelFromCI"
+	_ -> panic "labelsFromCI"
 
-infoTableLabelFromCI cl@(ConInfo { closureCon = con, 
+labelsFromCI cl@(ConInfo { closureCon = con, 
 			           closureSMRep = rep })
-  | isStaticRep rep = mkStaticInfoTableLabel  name $ clHasCafRefs cl
-  | otherwise	    = mkConInfoTableLabel     name $ clHasCafRefs cl
+  | isStaticRep rep = bothL (mkStaticInfoTableLabel, mkStaticConEntryLabel)  name $ clHasCafRefs cl
+  | otherwise	    = bothL (mkConInfoTableLabel,    mkConEntryLabel)        name $ clHasCafRefs cl
   where
     name = dataConName con
 
-entryLabelFromCI :: ClosureInfo -> CLabel
-entryLabelFromCI = infoLblToEntryLbl . infoTableLabelFromCI
+bothL :: (a -> b -> c, a -> b -> c) -> a -> b -> (c, c)
+bothL (f, g) x y = (f x y, g x y)
 
 -- ClosureInfo for a closure (as opposed to a constructor) is always local
 closureLabelFromCI :: ClosureInfo -> CLabel
