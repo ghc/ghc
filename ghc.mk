@@ -889,9 +889,11 @@ install_packages: libffi/package.conf.install rts/package.conf.install
 	           "$(INSTALLED_GHC_PKG_REAL)"                             \
 	               --global-conf "$(INSTALLED_PACKAGE_CONF)" hide $p))
 # when we install the packages above, ghc-pkg obeys umask when creating
-# package.cache, but for everything else we specify the permissions. We
-# therefore now fix the permissions of package.cache
-	$(CREATE_DATA) '$(INSTALLED_PACKAGE_CONF)/package.cache'
+# the package.conf files, but for everything else we specify the
+# permissions. We therefore now fix the permissions of package.cache.
+# This means "sudo make install" does the right thing even if it runs
+# with an 077 umask.
+	for f in '$(INSTALLED_PACKAGE_CONF)'/*; do $(CREATE_DATA) "$$f"; done
 
 # -----------------------------------------------------------------------------
 # Binary distributions
