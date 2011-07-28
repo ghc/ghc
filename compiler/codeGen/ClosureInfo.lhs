@@ -184,7 +184,6 @@ data LambdaFormInfo
   | LFBlackHole		-- Used for the closures allocated to hold the result
 			-- of a CAF.  We want the target of the update frame to
 			-- be in the heap, so we make a black hole to hold it.
-        CLabel          -- Flavour (info label, eg CAF_BLACKHOLE_info).
 
 
 -------------------------
@@ -314,7 +313,7 @@ mkLFImported id
 \begin{code}
 isLFThunk :: LambdaFormInfo -> Bool
 isLFThunk (LFThunk _ _ _ _ _)  = True
-isLFThunk (LFBlackHole _)      = True
+isLFThunk LFBlackHole          = True
 	-- return True for a blackhole: this function is used to determine
 	-- whether to use the thunk header in SMP mode, and a blackhole
 	-- must have one.
@@ -529,7 +528,7 @@ nodeMustPointToIt (LFThunk _ _ _ _ _)
   = True  -- Node must point to any standard-form thunk
 
 nodeMustPointToIt (LFUnknown _)     = True
-nodeMustPointToIt (LFBlackHole _)   = True    -- BH entry may require Node to point
+nodeMustPointToIt LFBlackHole       = True    -- BH entry may require Node to point
 nodeMustPointToIt (LFLetNoEscape _) = False 
 \end{code}
 
@@ -647,7 +646,7 @@ getCallMethod _ name _ (LFUnknown False) n_args
   | otherwise
   = EnterIt -- Not a function
 
-getCallMethod _ _ _ (LFBlackHole _) _
+getCallMethod _ _ _ LFBlackHole _
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
@@ -856,7 +855,7 @@ closureUpdReqd ConInfo{} = False
 
 lfUpdatable :: LambdaFormInfo -> Bool
 lfUpdatable (LFThunk _ _ upd _ _)  = upd
-lfUpdatable (LFBlackHole _)	   = True
+lfUpdatable LFBlackHole 	   = True
 	-- Black-hole closures are allocated to receive the results of an
 	-- alg case with a named default... so they need to be updated.
 lfUpdatable _ = False
@@ -930,7 +929,7 @@ infoTableLabelFromCI cl@(ClosureInfo { closureName = name,
 				       closureLFInfo = lf_info,
 				       closureInfLcl = is_lcl })
   = (if is_lcl then localiseLabel else id) $ case lf_info of
-	LFBlackHole info -> info
+	LFBlackHole -> mkCAFBlackHoleInfoTableLabel
 
 	LFThunk _ _ upd_flag (SelectorThunk offset) _ -> 
 		mkSelectorInfoLabel upd_flag offset
@@ -1013,7 +1012,7 @@ cafBlackHoleClosureInfo :: ClosureInfo -> ClosureInfo
 cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
 				       closureType = ty })
   = ClosureInfo { closureName   = nm,
-		  closureLFInfo = LFBlackHole mkCAFBlackHoleInfoTableLabel,
+		  closureLFInfo = LFBlackHole,
 		  closureSMRep  = BlackHoleRep,
 		  closureSRT    = NoC_SRT,
 		  closureType   = ty,
