@@ -74,6 +74,7 @@ nonRecBinderFreeVars x fvs | isTyVar x = fvs `delVarSet` x
 nonRecBindersFreeVars :: [Var] -> FreeVars -> FreeVars
 nonRecBindersFreeVars xs = flip (foldr nonRecBinderFreeVars) xs
 
+-- Returns the most tightly binding variable last
 altConBoundVars :: AltCon -> [Var]
 altConBoundVars (DataAlt _ as qs xs) = as ++ qs ++ xs
 altConBoundVars (LiteralAlt _)       = []
