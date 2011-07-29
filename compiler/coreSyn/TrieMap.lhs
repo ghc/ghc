@@ -10,7 +10,8 @@ module TrieMap(
    TypeMap, 
    CoercionMap, 
    MaybeMap, 
-   ListMap
+   ListMap,
+   TrieMap(..)
  ) where
 
 import CoreSyn
@@ -31,6 +32,13 @@ import NameEnv
 import Outputable
 import Control.Monad( (>=>) )
 \end{code}
+
+This module implements TrieMaps, which are finite mappings
+whose key is a structured value like a CoreExpr or Type.
+
+The code is very regular and boilerplate-like, but there is
+some neat handling of *binders*.  In effect they are deBruijn 
+numbered on the fly.
 
 %************************************************************************
 %*									*
@@ -206,6 +214,20 @@ xtLit = alterTM
 %*									*
 %************************************************************************
 
+Note [Binders]
+~~~~~~~~~~~~~~
+ * In general we check binders as late as possible because types are
+   less likely to differ than expression structure.  That's why
+      cm_lam :: CoreMap (TypeMap a)
+   rather than
+      cm_lam :: TypeMap (CoreMap a)
+
+ * We don't need to look at the type of some binders, notalby
+     - the case binder in (Case _ b _ _)
+     - the binders in an alternative
+   because they are totally fixed by the context
+
+
 \begin{code}
 data CoreMap a
   = EmptyCM
@@ -220,10 +242,9 @@ data CoreMap a
        , cm_letn :: CoreMap (CoreMap (BndrMap a))
        , cm_letr :: ListMap CoreMap (CoreMap (ListMap BndrMap a))
        , cm_case :: CoreMap (ListMap AltMap a)
-       -- In general we check binders as late as possible
-       -- because types are less likely to differ than 
-       -- expression structure
+       	 -- Note [Binders]
      }
+
 
 wrapEmptyCM :: CoreMap a
 wrapEmptyCM = CM { cm_var = emptyTM, cm_lit = emptyLiteralMap
