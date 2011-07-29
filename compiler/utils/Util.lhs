@@ -74,7 +74,7 @@ module Util (
         doesDirNameExist,
         modificationTimeIfExists,
 
-        global, consIORef, globalMVar, globalEmptyMVar,
+        global, consIORef, globalM,
 
         -- * Filenames and paths
         Suffix,
@@ -99,7 +99,6 @@ import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
-import Control.Concurrent.MVar ( MVar, newMVar, newEmptyMVar )
 
 #ifdef DEBUG
 import FastTypes
@@ -857,11 +856,8 @@ consIORef var x = do
 \end{code}
 
 \begin{code}
-globalMVar :: a -> MVar a
-globalMVar a = unsafePerformIO (newMVar a)
-
-globalEmptyMVar :: MVar a
-globalEmptyMVar = unsafePerformIO newEmptyMVar
+globalM :: IO a -> IORef a
+globalM ma = unsafePerformIO (ma >>= newIORef)
 \end{code}
 
 Module names:

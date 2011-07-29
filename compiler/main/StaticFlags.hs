@@ -85,7 +85,10 @@ module StaticFlags (
         opt_Ticky,
 
     -- For the parser
-    addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready
+    addOpt, removeOpt, addWay, getWayFlags, v_opt_C_ready,
+    
+    -- Saving/restoring globals
+    saveStaticFlagGlobals, restoreStaticFlagGlobals
   ) where
 
 #include "HsVersions.h"
@@ -96,6 +99,7 @@ import Util
 import Maybes		( firstJusts, catMaybes )
 import Panic
 
+import Control.Monad    ( liftM3 )
 import Data.Maybe       ( listToMaybe )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
@@ -562,3 +566,21 @@ way_details =
 	[ "-XParr"
 	, "-fvectorise"]
   ]
+
+-----------------------------------------------------------------------------
+-- Tunneling our global variables into a new instance of the GHC library
+
+-- Ignore the v_Ld_inputs global because:
+--  a) It is mutated even once GHC has been initialised, which means that I'd
+--     have to add another layer of indirection to truly share the value
+--  b) We can get away without sharing it because it only affects the link,
+--     and is mutated by the GHC exe. Users who load up a new copy of the GHC
+--     library while another is running almost certainly won't actually access it.
+saveStaticFlagGlobals :: IO (Bool, [String], [Way])
+saveStaticFlagGlobals = liftM3 (,,) (readIORef v_opt_C_ready) (readIORef v_opt_C) (readIORef v_Ways)
+
+restoreStaticFlagGlobals :: (Bool, [String], [Way]) -> IO ()
+restoreStaticFlagGlobals (c_ready, c, ways) = do
+    writeIORef v_opt_C_ready c_ready
+    writeIORef v_opt_C c
+    writeIORef v_Ways ways
