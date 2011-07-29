@@ -401,10 +401,13 @@ splitAtProcPoints entry_label callPPs procPoints procMap
                where graph  = mapLookup procId graphEnv `orElse` mapEmpty
                      graph' = mapInsert bid b graph
      graphEnv <- return $ foldGraphBlocks addBlock emptyBlockMap g
-     -- Build a map from proc point BlockId to labels for their new procedures
+     -- Build a map from proc point BlockId to pairs of:
+     --  * Labels for their new procedures
+     --  * Labels for the info tables of their new procedures (only if the proc point is a callPP)
      -- Due to common blockification, we may overestimate the set of procpoints.
-     let add_label map pp = return $ Map.insert pp lbl map
+     let add_label map pp = return $ Map.insert pp (lbl, mb_info_lbl) map
            where lbl = if pp == entry then entry_label else blockLbl pp
+                 mb_info_lbl = guard (setMember id callPPs) >> Just (entryLblToInfoLbl lbl)
      procLabels <- foldM add_label Map.empty
                          (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
      -- For each procpoint, we need to know the SP offset on entry.
@@ -427,9 +430,8 @@ splitAtProcPoints entry_label callPPs procPoints procMap
            do bid <- liftM mkBlockId getUniqueM
               let b = blockOfNodeList (JustC (CmmEntry bid), [], JustC jump)
                   StackInfo {arg_space = argSpace, updfr_space = off} = getStackInfo pp
-                  jump = CmmCall (CmmLit (CmmLabel l')) Nothing argSpace 0
+                  jump = CmmCall (CmmLit (CmmLabel l)) Nothing argSpace 0
                                  (off `orElse` 0) -- Jump's shouldn't need the offset...
-                  l' = if setMember pp callPPs then entryLblToInfoLbl l else l
               return (mapInsert pp bid env, b : bs)
          add_jumps (newGraphEnv) (ppId, blockEnv) =
            do let needed_jumps = -- find which procpoints we currently branch to
@@ -442,8 +444,8 @@ splitAtProcPoints entry_label callPPs procPoints procMap
                       CmmSwitch _ tbl       -> foldr add_if_pp rst (catMaybes tbl)
                       _                     -> rst
                   add_if_pp id rst = case Map.lookup id procLabels of
-                                       Just x -> (id, x) : rst
-                                       Nothing -> rst
+                                       Just (lbl, mb_info_lbl) -> (id, mb_info_lbl `orElse` lbl) : rst
+                                       Nothing                 -> rst
               (jumpEnv, jumpBlocks) <-
                  foldM add_jump_block (mapEmpty, []) needed_jumps
                   -- update the entry block
@@ -458,24 +460,23 @@ splitAtProcPoints entry_label callPPs procPoints procMap
               -- pprTrace "g' pre jumps" (ppr g') $ do
               return (mapInsert ppId g' newGraphEnv)
      graphEnv <- foldM add_jumps emptyBlockMap $ mapToList graphEnv
-     let to_proc (bid, (stack_info, g)) | setMember bid callPPs =
-           if bid == entry then
-             CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info})
-                     top_l (replacePPIds g)
-           else
-             CmmProc (TopInfo {info_tbl=mkEmptyContInfoTable (entryLblToInfoLbl lbl), stack_info=stack_info})
-                     lbl (replacePPIds g)
-           where lbl = expectJust "pp label" $ Map.lookup bid procLabels
-         to_proc (bid, (stack_info, g)) =
-           CmmProc (TopInfo {info_tbl=CmmNonInfoTable, stack_info=stack_info})
-                   lbl (replacePPIds g)
-             where lbl = expectJust "pp label" $ Map.lookup bid procLabels
+     let to_proc (bid, (stack_info, g)) = case expectJust "pp label" $ Map.lookup bid procLabels of
+             (lbl, Just info_lbl)
+               | bid == entry
+               -> CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info})
+                          top_l (replacePPIds g)
+               | otherwise
+               -> CmmProc (TopInfo {info_tbl=mkEmptyContInfoTable info_lbl, stack_info=stack_info})
+                          lbl (replacePPIds g)
+             (lbl, Nothing)
+               -> CmmProc (TopInfo {info_tbl=CmmNonInfoTable, stack_info=stack_info})
+                          lbl (replacePPIds g)
          -- References to procpoint IDs can now be replaced with the infotable's label
          replacePPIds g = mapGraphNodes (id, mapExp repl, mapExp repl) g
            where repl e@(CmmLit (CmmBlock bid)) =
                    case Map.lookup bid procLabels of
-                     Just l  -> CmmLit (CmmLabel (entryLblToInfoLbl l))
-                     Nothing -> e
+                     Just (_, Just info_lbl)  -> CmmLit (CmmLabel info_lbl)
+                     _ -> e
                  repl e = e
      -- The C back end expects to see return continuations before the call sites.
      -- Here, we sort them in reverse order -- it gets reversed later.
