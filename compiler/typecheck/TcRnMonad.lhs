@@ -582,11 +582,7 @@ addMessages (m_warns, m_errs)
 discardWarnings :: TcRn a -> TcRn a
 -- Ignore warnings inside the thing inside;
 -- used to ignore-unused-variable warnings inside derived code
--- With -dppr-debug, the effects is switched off, so you can still see
--- what warnings derived code would give
 discardWarnings thing_inside
-  | opt_PprStyle_Debug = thing_inside
-  | otherwise
   = do	{ errs_var <- newTcRef emptyMessages
 	; result <- setErrsVar errs_var thing_inside
 	; (_warns, errs) <- readTcRef errs_var
