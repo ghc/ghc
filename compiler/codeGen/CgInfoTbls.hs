@@ -57,9 +57,7 @@ emitClosureCodeAndInfoTable :: ClosureInfo -> [CmmFormal] -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
  = do	{ blks <- cgStmtsToBlocks body
         ; info <- mkCmmInfo cl_info
-        ; emitInfoTableAndCode (infoLblToEntryLbl info_lbl) info args blks }
-  where
-    info_lbl  = infoTableLabelFromCI cl_info
+        ; emitInfoTableAndCode (entryLabelFromCI cl_info) info args blks }
 
 -- We keep the *zero-indexed* tag in the srt_len field of the info
 -- table of a data constructor.
@@ -84,12 +82,12 @@ mkCmmInfo cl_info = do
            info = ConstrInfo (ptrs, nptrs)
                              (fromIntegral (dataConTagZ con))
                              conName
-       return $ CmmInfo gc_target Nothing (CmmInfoTable False False prof cl_type info)
+       return $ CmmInfo gc_target Nothing (CmmInfoTable (infoTableLabelFromCI cl_info) False prof cl_type info)
 
     ClosureInfo { closureName   = name,
                   closureLFInfo = lf_info,
                   closureSRT    = srt } ->
-       return $ CmmInfo gc_target Nothing (CmmInfoTable (closureInfoLocal cl_info) False prof cl_type info)
+       return $ CmmInfo gc_target Nothing (CmmInfoTable (infoTableLabelFromCI cl_info) False prof cl_type info)
        where
          info =
              case lf_info of
@@ -142,16 +140,17 @@ emitReturnTarget name stmts
         ; let info = CmmInfo
                        gc_target
                        Nothing
-                       (CmmInfoTable False False
+                       (CmmInfoTable info_lbl False
                         (ProfilingInfo zeroCLit zeroCLit)
                         rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
                         (ContInfo frame srt_info))
-        ; emitInfoTableAndCode (infoLblToEntryLbl info_lbl) info args blks
+        ; emitInfoTableAndCode entry_lbl info args blks
 	; return info_lbl }
   where
     args      = {- trace "emitReturnTarget: missing args" -} []
     uniq      = getUnique name
     info_lbl  = mkReturnInfoLabel uniq
+    entry_lbl = mkReturnPtLabel uniq
 
     -- The gc_target is to inform the CPS pass when it inserts a stack check.
     -- Since that pass isn't used yet we'll punt for now.

@@ -29,7 +29,7 @@ module ClosureInfo (
 	closureGoodStuffSize, closurePtrsSize,
 	slopSize, 
 
-	infoTableLabelFromCI,
+	infoTableLabelFromCI, entryLabelFromCI,
 	closureLabelFromCI,
 	isLFThunk, closureUpdReqd,
 	closureNeedsUpdSpace, closureIsThunk,
@@ -50,7 +50,7 @@ module ClosureInfo (
 	isToplevClosure,
 	closureValDescr, closureTypeDescr,	-- profiling
 
-	closureInfoLocal, isStaticClosure,
+	isStaticClosure,
 	cafBlackHoleClosureInfo,
 
 	staticClosureNeedsLink,
@@ -184,7 +184,6 @@ data LambdaFormInfo
   | LFBlackHole		-- Used for the closures allocated to hold the result
 			-- of a CAF.  We want the target of the update frame to
 			-- be in the heap, so we make a black hole to hold it.
-        CLabel          -- Flavour (info label, eg CAF_BLACKHOLE_info).
 
 
 -------------------------
@@ -314,7 +313,7 @@ mkLFImported id
 \begin{code}
 isLFThunk :: LambdaFormInfo -> Bool
 isLFThunk (LFThunk _ _ _ _ _)  = True
-isLFThunk (LFBlackHole _)      = True
+isLFThunk LFBlackHole          = True
 	-- return True for a blackhole: this function is used to determine
 	-- whether to use the thunk header in SMP mode, and a blackhole
 	-- must have one.
@@ -529,7 +528,7 @@ nodeMustPointToIt (LFThunk _ _ _ _ _)
   = True  -- Node must point to any standard-form thunk
 
 nodeMustPointToIt (LFUnknown _)     = True
-nodeMustPointToIt (LFBlackHole _)   = True    -- BH entry may require Node to point
+nodeMustPointToIt LFBlackHole       = True    -- BH entry may require Node to point
 nodeMustPointToIt (LFLetNoEscape _) = False 
 \end{code}
 
@@ -647,7 +646,7 @@ getCallMethod _ name _ (LFUnknown False) n_args
   | otherwise
   = EnterIt -- Not a function
 
-getCallMethod _ _ _ (LFBlackHole _) _
+getCallMethod _ _ _ LFBlackHole _
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
@@ -847,10 +846,6 @@ staticClosureRequired _ _ _ = True
 %************************************************************************
 
 \begin{code}
-closureInfoLocal :: ClosureInfo -> Bool
-closureInfoLocal ClosureInfo{ closureInfLcl = lcl } = lcl
-closureInfoLocal ConInfo{} = False
-
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 
@@ -860,7 +855,7 @@ closureUpdReqd ConInfo{} = False
 
 lfUpdatable :: LambdaFormInfo -> Bool
 lfUpdatable (LFThunk _ _ upd _ _)  = upd
-lfUpdatable (LFBlackHole _)	   = True
+lfUpdatable LFBlackHole 	   = True
 	-- Black-hole closures are allocated to receive the results of an
 	-- alg case with a named default... so they need to be updated.
 lfUpdatable _ = False
@@ -930,29 +925,40 @@ Label generation.
 
 \begin{code}
 infoTableLabelFromCI :: ClosureInfo -> CLabel
-infoTableLabelFromCI cl@(ClosureInfo { closureName = name,
-				       closureLFInfo = lf_info })
+infoTableLabelFromCI = fst . labelsFromCI
+
+entryLabelFromCI :: ClosureInfo -> CLabel
+entryLabelFromCI = snd . labelsFromCI
+
+labelsFromCI :: ClosureInfo -> (CLabel, CLabel) -- (Info, Entry)
+labelsFromCI cl@(ClosureInfo { closureName = name,
+			       closureLFInfo = lf_info,
+			       closureInfLcl = is_lcl })
   = case lf_info of
-	LFBlackHole info -> info
+	LFBlackHole -> (mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel)
 
 	LFThunk _ _ upd_flag (SelectorThunk offset) _ -> 
-		mkSelectorInfoLabel upd_flag offset
+		bothL (mkSelectorInfoLabel, mkSelectorEntryLabel) upd_flag offset
 
 	LFThunk _ _ upd_flag (ApThunk arity) _ -> 
-		mkApInfoTableLabel upd_flag arity
+		bothL (mkApInfoTableLabel, mkApEntryLabel) upd_flag arity
 
-	LFThunk{}      -> mkInfoTableLabel name $ clHasCafRefs cl
+	LFThunk{}      -> bothL std_mk_lbls name $ clHasCafRefs cl
 
-	LFReEntrant _ _ _ _ -> mkInfoTableLabel name $ clHasCafRefs cl
+	LFReEntrant _ _ _ _ -> bothL std_mk_lbls name $ clHasCafRefs cl
 
-	_ -> panic "infoTableLabelFromCI"
+	_ -> panic "labelsFromCI"
+  where std_mk_lbls = if is_lcl then (mkLocalInfoTableLabel, mkLocalEntryLabel) else (mkInfoTableLabel, mkEntryLabel)
 
-infoTableLabelFromCI cl@(ConInfo { closureCon = con, 
+labelsFromCI cl@(ConInfo { closureCon = con, 
 			           closureSMRep = rep })
-  | isStaticRep rep = mkStaticInfoTableLabel  name $ clHasCafRefs cl
-  | otherwise	    = mkConInfoTableLabel     name $ clHasCafRefs cl
+  | isStaticRep rep = bothL (mkStaticInfoTableLabel, mkStaticConEntryLabel)  name $ clHasCafRefs cl
+  | otherwise	    = bothL (mkConInfoTableLabel,    mkConEntryLabel)        name $ clHasCafRefs cl
   where
     name = dataConName con
+
+bothL :: (a -> b -> c, a -> b -> c) -> a -> b -> (c, c)
+bothL (f, g) x y = (f x y, g x y)
 
 -- ClosureInfo for a closure (as opposed to a constructor) is always local
 closureLabelFromCI :: ClosureInfo -> CLabel
@@ -1013,7 +1019,7 @@ cafBlackHoleClosureInfo :: ClosureInfo -> ClosureInfo
 cafBlackHoleClosureInfo (ClosureInfo { closureName = nm,
 				       closureType = ty })
   = ClosureInfo { closureName   = nm,
-		  closureLFInfo = LFBlackHole mkCAFBlackHoleInfoTableLabel,
+		  closureLFInfo = LFBlackHole,
 		  closureSMRep  = BlackHoleRep,
 		  closureSRT    = NoC_SRT,
 		  closureType   = ty,

@@ -481,10 +481,8 @@ emitClosureAndInfoTable ::
 emitClosureAndInfoTable cl_info conv args body
   = do { info <- mkCmmInfo cl_info
        ; blks <- getCode body
-       ; emitProcWithConvention conv info (infoLblToEntryLbl info_lbl) args blks
+       ; emitProcWithConvention conv info (entryLabelFromCI cl_info) args blks
        }
-  where
-    info_lbl = infoTableLabelFromCI cl_info
 
 -- Convert from 'ClosureInfo' to 'CmmInfoTable'.
 -- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
@@ -496,7 +494,7 @@ mkCmmInfo cl_info
 	               ad_lit <- mkStringCLit (closureValDescr  cl_info)
 	               return $ ProfilingInfo fd_lit ad_lit
                   else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
-	; return (CmmInfoTable (closureInfoLocal cl_info) (isStaticClosure cl_info) prof cl_type info) }
+	; return (CmmInfoTable (infoTableLabelFromCI cl_info) (isStaticClosure cl_info) prof cl_type info) }
   where
     k_with_con_name con_info con info_lbl =
       do cstr <- mkByteStringCLit $ dataConIdentity con
