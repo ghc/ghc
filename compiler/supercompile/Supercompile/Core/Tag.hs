@@ -27,6 +27,7 @@ mkTagger rec = term
         Var x             -> Var x
         Value v           -> Value (value' ids v)
         TyApp e ty        -> TyApp (term ids e) ty
+        CoApp e co        -> CoApp (term ids e) co
         App e x           -> App (term ids e) x
         PrimOp pop tys es -> PrimOp pop tys (zipWith term idss' es)
           where idss' = listSplitUniqSupply ids
@@ -40,12 +41,12 @@ mkTagger rec = term
         Cast e co         -> Cast (term ids e) co
 
     value' ids v = case v of
-        Indirect x     -> Indirect x
-        TyLambda x e   -> TyLambda x (term ids e)
-        Lambda x e     -> Lambda x (term ids e)
-        Data dc tys xs -> Data dc tys xs
-        Literal l      -> Literal l
-        Coercion co    -> Coercion co
+        Indirect x         -> Indirect x
+        TyLambda x e       -> TyLambda x (term ids e)
+        Lambda x e         -> Lambda x (term ids e)
+        Data dc tys cos xs -> Data dc tys cos xs
+        Literal l          -> Literal l
+        Coercion co        -> Coercion co
 
     alternatives = zipWith alternative . listSplitUniqSupply
     
@@ -72,6 +73,7 @@ mkDetag rec = (term, term', alternatives, value, value')
         Var x             -> Var x
         Value v           -> Value (value' v)
         TyApp e ty        -> TyApp (term e) ty
+        CoApp e co        -> CoApp (term e) co
         App e x           -> App (term e) x
         PrimOp pop tys es -> PrimOp pop tys (map term es)
         Case e x ty alts  -> Case (term e) x ty (alternatives alts)
@@ -80,11 +82,11 @@ mkDetag rec = (term, term', alternatives, value, value')
         Cast e co         -> Cast (term e) co
 
     value = rec value'
-    value' (Indirect x)     = Indirect x
-    value' (TyLambda x e)   = TyLambda x (term e)
-    value' (Lambda x e)     = Lambda x (term e)
-    value' (Data dc tys xs) = Data dc tys xs
-    value' (Literal l)      = Literal l
-    value' (Coercion co)    = Coercion co
+    value' (Indirect x)         = Indirect x
+    value' (TyLambda x e)       = TyLambda x (term e)
+    value' (Lambda x e)         = Lambda x (term e)
+    value' (Data dc tys cos xs) = Data dc tys cos xs
+    value' (Literal l)          = Literal l
+    value' (Coercion co)        = Coercion co
 
     alternatives = map (second term)

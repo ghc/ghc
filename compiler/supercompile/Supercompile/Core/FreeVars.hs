@@ -44,6 +44,7 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     term' (Var x)            = unitVarSet x
     term' (Value v)          = value' v
     term' (TyApp e ty)       = typ ty `unionVarSet` term e
+    term' (CoApp e co)       = term e `unionVarSet` tyCoVarsOfCo co
     term' (App e x)          = term e `extendVarSet` x
     term' (PrimOp _ tys es)  = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map term es)
     term' (Case e x ty alts) = typ ty `unionVarSet` term e `unionVarSet` nonRecBinderFreeVars x (alternatives alts)
@@ -53,12 +54,12 @@ mkFreeVars rec = (unitVarSet, term, term', alternatives, value, value')
     term' (Cast e co)        = term e `unionVarSet` tyCoVarsOfCo co
     
     value = rec value'
-    value' (Indirect x)    = unitVarSet x
-    value' (TyLambda x e)  = term e `delVarSet` x
-    value' (Lambda x e)    = nonRecBinderFreeVars x (term e)
-    value' (Data _ tys xs) = unionVarSets (map typ tys) `unionVarSet` mkVarSet xs
-    value' (Literal _)     = emptyVarSet
-    value' (Coercion co)   = tyCoVarsOfCo co
+    value' (Indirect x)        = unitVarSet x
+    value' (TyLambda x e)      = term e `delVarSet` x
+    value' (Lambda x e)        = nonRecBinderFreeVars x (term e)
+    value' (Data _ tys cos xs) = unionVarSets (map typ tys) `unionVarSet` unionVarSets (map tyCoVarsOfCo cos) `unionVarSet` mkVarSet xs
+    value' (Literal _)         = emptyVarSet
+    value' (Coercion co)       = tyCoVarsOfCo co
     
     alternatives = unionVarSets . map alternative
     
@@ -74,14 +75,14 @@ nonRecBindersFreeVars :: [Var] -> FreeVars -> FreeVars
 nonRecBindersFreeVars xs = flip (foldr nonRecBinderFreeVars) xs
 
 altConBoundVars :: AltCon -> [Var]
-altConBoundVars (DataAlt _ as xs) = as ++ xs
-altConBoundVars (LiteralAlt _)    = []
-altConBoundVars _                 = []
+altConBoundVars (DataAlt _ as qs xs) = as ++ qs ++ xs
+altConBoundVars (LiteralAlt _)       = []
+altConBoundVars _                    = []
 
 altConFreeVars :: AltCon -> FreeVars -> FreeVars
-altConFreeVars (DataAlt _ as xs) = (`delVarSetList` as) . nonRecBindersFreeVars xs
-altConFreeVars (LiteralAlt _)    = id
-altConFreeVars DefaultAlt        = id
+altConFreeVars (DataAlt _ as qs xs) = (`delVarSetList` as) . nonRecBindersFreeVars (qs ++ xs)
+altConFreeVars (LiteralAlt _)       = id
+altConFreeVars DefaultAlt           = id
 
 
 coercedFreeVars :: (a -> FreeVars) -> Coerced a -> FreeVars
@@ -137,6 +138,7 @@ instance Symantics FVed where
     var = fvedTerm . Var
     value = fmap Value . fvedValue
     tyApp e = fvedTerm . TyApp e
+    coApp e = fvedTerm . CoApp e
     app e = fvedTerm . App e
     primOp pop tys = fvedTerm . PrimOp pop tys
     case_ e x ty = fvedTerm . Case e x ty

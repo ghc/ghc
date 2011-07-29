@@ -38,8 +38,9 @@ stackFrameFreeVars = snd . stackFrameOpenFreeVars
 
 stackFrameOpenFreeVars :: StackFrame -> (BoundVars, FreeVars)
 stackFrameOpenFreeVars kf = case kf of
-    Apply x'                 -> (emptyVarSet, unitVarSet x')
     TyApply ty'              -> (emptyVarSet, tyVarsOfType ty')
+    CoApply co'              -> (emptyVarSet, tyCoVarsOfCo co')
+    Apply x'                 -> (emptyVarSet, unitVarSet x')
     Scrutinise x' ty in_alts -> (emptyVarSet, (inFreeVars annedAltsFreeVars in_alts `delVarSet` x') `unionVarSet` tyVarsOfType ty)
     PrimApply _ tys as in_es -> (emptyVarSet, unionVarSets (map tyVarsOfType tys) `unionVarSet` unionVarSets (map annedFreeVars as) `unionVarSet` unionVarSets (map (inFreeVars annedTermFreeVars) in_es))
     StrictLet x' in_e2       -> (emptyVarSet, inFreeVars annedTermFreeVars in_e2 `delVarSet` x')

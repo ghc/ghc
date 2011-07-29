@@ -44,8 +44,9 @@ residualiseStack ids (kf:k) e_body = first ((static_floats ++) *** (nonstatic_fl
   where ((static_floats, nonstatic_floats), e) = residualiseStackFrame ids (tagee kf) e_body
 
 residualiseStackFrame :: InScopeSet -> StackFrame -> Out FVedTerm -> ((Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)]), Out FVedTerm)
-residualiseStackFrame _   (Apply x2')                 e1 = (([], []), e1 `app` x2')
 residualiseStackFrame _   (TyApply ty')               e  = (([], []), e `tyApp` ty')
+residualiseStackFrame _   (CoApply co')               e  = (([], []), e `coApp` co')
+residualiseStackFrame _   (Apply x2')                 e1 = (([], []), e1 `app` x2')
 residualiseStackFrame ids (Scrutinise x' ty in_alts)  e  = (([], []), case_ e x' ty (detagAnnedAlts $ renameIn (renameAnnedAlts ids) in_alts))
 residualiseStackFrame ids (PrimApply pop tys' as es') e  = (([], []), primOp pop tys' (map (residualiseAnswer ids . annee) as ++ e : map (residualiseTerm ids) es'))
 residualiseStackFrame ids (StrictLet x' in_e2)        e1 = (([], []), let_ x' e1 (residualiseTerm ids in_e2))

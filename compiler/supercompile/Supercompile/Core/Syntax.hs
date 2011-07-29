@@ -14,13 +14,13 @@ import OccName  (occNameString)
 import Id       (Id, idType)
 import Literal  (Literal)
 import Type     (Type, mkTyVarTy)
-import Coercion (Coercion, mkReflCo)
+import Coercion (CoVar, Coercion, mkReflCo)
 import PrimOp   (PrimOp)
 
 import Data.Traversable (Traversable(traverse))
 
 
-data AltCon = DataAlt DataCon [TyVar] [Id] | LiteralAlt Literal | DefaultAlt
+data AltCon = DataAlt DataCon [TyVar] [CoVar] [Id] | LiteralAlt Literal | DefaultAlt
             deriving (Eq, Show)
 
 -- Note [Case wildcards]
@@ -60,12 +60,19 @@ data AltCon = DataAlt DataCon [TyVar] [Id] | LiteralAlt Literal | DefaultAlt
 --
 -- Conclusion: I don't think rewriting to use the case wildcard buys us anything at all.
 
+-- Note [CoApp]
+-- ~~~~~~~~~~~~
+-- CoApp might seem redundant because we almost never substitute CoVars for Coercions, so we you might think we could get away
+-- with just reusing the App constructor but having the Var be either an Id or a CoVar. Unfortunately mkCoVarCo sometimes returns Refl so
+-- we can't guarantee that all CoVar substitutions will be variable-for-variable. We add CoApp to work around this fragility.
+
 type Term = Identity (TermF Identity)
 type TaggedTerm = Tagged (TermF Tagged)
 data TermF ann = Var Id
                | Value (ValueF ann)
-               | App (ann (TermF ann)) Id -- NB: might be a CoVar
                | TyApp (ann (TermF ann)) Type
+               | CoApp (ann (TermF ann)) Coercion
+               | App (ann (TermF ann)) Id
                | PrimOp PrimOp [Type] [ann (TermF ann)]
                | Case (ann (TermF ann)) Id Type [AltF ann]
                | Let Id (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case the evaluation rules must change
@@ -81,13 +88,13 @@ type TaggedValue = ValueF Tagged
 data ValueF ann = Indirect Id -- NB: for the avoidance of doubt, these cannot be CoVars
                 | Literal Literal | Coercion Coercion
                 | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) -- NB: might bind a CoVar
-                | Data DataCon [Type] [Id]
+                | Data DataCon [Type] [Coercion] [Id]
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
-        DataAlt dc as xs -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pPrintPrec appPrec) as ++ map (pPrintPrec appPrec) xs)
-        LiteralAlt l     -> pPrint l
-        DefaultAlt       -> text "_"
+        DataAlt dc as qs xs -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pPrintPrec appPrec) as ++ map (pPrintPrec appPrec) qs ++ map (pPrintPrec appPrec) xs)
+        LiteralAlt l        -> pPrint l
+        DefaultAlt          -> text "_"
 
 instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
     pprPrec prec e = case e of
@@ -96,6 +103,7 @@ instance (Functor ann, Outputable1 ann) => Outputable (TermF ann) where
         Var x             -> pPrintPrec prec x
         Value v           -> pPrintPrec prec v
         TyApp e ty        -> pPrintPrecApp prec (asPrettyFunction1 e) ty
+        CoApp e co        -> pPrintPrecApp prec (asPrettyFunction1 e) co
         App e x           -> pPrintPrecApp prec (asPrettyFunction1 e) x
         PrimOp pop tys es -> pPrintPrecPrimOp prec pop (map asPrettyFunction tys) (map asPrettyFunction1 es)
         Case e x _ty alts -> pPrintPrecCase prec (asPrettyFunction1 e) x (map (second asPrettyFunction1) alts)
@@ -126,15 +134,15 @@ pPrintPrecLetRec prec xes e_body
 
 instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
     pprPrec prec v = case v of
-        Indirect x     -> pPrintPrec prec x
-        TyLambda x e   -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
+        Indirect x         -> pPrintPrec prec x
+        TyLambda x e       -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
         -- Unfortunately, this nicer pretty-printing doesn't work for general (TermF ann):
         --Lambda x e     -> pPrintPrecLam prec (x:xs) e'
         --  where (xs, e') = collectLambdas e
-        Lambda x e     -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
-        Data dc tys xs -> pPrintPrecApps prec dc ([asPrettyFunction ty | ty <- tys] ++ [asPrettyFunction x | x <- xs])
-        Literal l      -> pPrintPrec prec l
-        Coercion co    -> pPrintPrec prec co
+        Lambda x e         -> pPrintPrecLam prec [x] (asPrettyFunction1 e)
+        Data dc tys cos xs -> pPrintPrecApps prec dc ([asPrettyFunction ty | ty <- tys] ++ [asPrettyFunction co | co <- cos] ++ [asPrettyFunction x | x <- xs])
+        Literal l          -> pPrintPrec prec l
+        Coercion co        -> pPrintPrec prec co
 
 pPrintPrecLam :: Outputable a => Rational -> [Var] -> a -> SDoc
 pPrintPrecLam prec xs e = prettyParen (prec > noPrec) $ text "\\" <> hsep [pPrintPrec appPrec y | y <- xs] <+> text "->" <+> pPrintPrec noPrec e
@@ -186,8 +194,9 @@ type Coerced a = (Maybe (Coercion, Tag), a)
 class Functor ann => Symantics ann where
     var    :: Var -> ann (TermF ann)
     value  :: ValueF ann -> ann (TermF ann)
-    tyApp  :: ann (TermF ann) -> Type -> ann (TermF ann)
     app    :: ann (TermF ann) -> Var -> ann (TermF ann)
+    coApp  :: ann (TermF ann) -> Coercion -> ann (TermF ann)
+    tyApp  :: ann (TermF ann) -> Type -> ann (TermF ann)
     primOp :: PrimOp -> [Type] -> [ann (TermF ann)] -> ann (TermF ann)
     case_  :: ann (TermF ann) -> Var -> Type -> [AltF ann] -> ann (TermF ann)
     let_   :: Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
@@ -198,6 +207,7 @@ instance Symantics Identity where
     var = I . Var
     value = I . Value
     tyApp e = I . TyApp e
+    coApp e = I . CoApp e
     app e = I . App e
     primOp pop tys = I . PrimOp pop tys
     case_ e x ty = I . Case e x ty
@@ -215,6 +225,7 @@ reflect (I e) = case e of
     Value v           -> value (reflectValue v)
     TyApp e ty        -> tyApp (reflect e) ty
     App e x           -> app (reflect e) x
+    CoApp e co        -> coApp (reflect e) co
     PrimOp pop tys es -> primOp pop tys (map reflect es)
     Case e x ty alts  -> case_ (reflect e) x ty (map (second reflect) alts)
     Let x e1 e2       -> let_ x (reflect e1) (reflect e2)
@@ -223,12 +234,12 @@ reflect (I e) = case e of
   where
     reflectValue :: Value -> (forall ann. Symantics ann => ValueF ann)
     reflectValue v = case v of
-        Indirect x     -> Indirect x
-        TyLambda x e   -> TyLambda x (reflect e)
-        Lambda x e     -> Lambda x (reflect e)
-        Data dc tys xs -> Data dc tys xs
-        Literal l      -> Literal l
-        Coercion co    -> Coercion co
+        Indirect x         -> Indirect x
+        TyLambda x e       -> TyLambda x (reflect e)
+        Lambda x e         -> Lambda x (reflect e)
+        Data dc tys cos xs -> Data dc tys cos xs
+        Literal l          -> Literal l
+        Coercion co        -> Coercion co
 
 
 {-

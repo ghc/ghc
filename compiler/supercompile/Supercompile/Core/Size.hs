@@ -39,6 +39,7 @@ mkSize rec = (term, term', alternatives, value, value')
         Var _           -> 0
         Value v         -> value' v - 1 -- Slight hack here so that we don't get +2 size on values
         TyApp e _       -> term e
+        CoApp e _       -> term e
         App e _         -> term e
         PrimOp _ _ es   -> sum (map term es)
         Case e _ _ alts -> term e + alternatives alts
@@ -51,7 +52,7 @@ mkSize rec = (term, term', alternatives, value, value')
         Indirect _   -> 0
         TyLambda _ e -> term e
         Lambda _ e   -> term e
-        Data _ _ _   -> 0
+        Data _ _ _ _ -> 0
         Literal _    -> 0
         Coercion _   -> 0
     
@@ -64,6 +65,7 @@ instance Symantics (O Sized FVed) where
     var = sizedFVedTerm . Var
     value = fmap Value . sizedFVedValue
     tyApp e = sizedFVedTerm . TyApp e
+    coApp e = sizedFVedTerm . CoApp e
     app e = sizedFVedTerm . App e
     primOp pop tys = sizedFVedTerm . PrimOp pop tys
     case_ e x ty = sizedFVedTerm . Case e x ty

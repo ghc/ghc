@@ -126,7 +126,7 @@ matchTerm rn2 = matchAnned go
     go (TyApp e_l ty_l)           (TyApp e_r ty_r)           = liftM2 (++) (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r)
     go (App e_l x_l)              (App e_r x_r)              = liftM2 (++) (matchTerm rn2 e_l e_r) (matchVar   rn2 x_l x_r)
     go (PrimOp pop_l tys_l es_l)  (PrimOp pop_r tys_r es_r)  = guard "matchTerm: primop" (pop_l == pop_r) >> liftM2 (++) (matchList (matchType rn2) tys_l tys_r) (matchList (matchTerm rn2) es_l es_r)
-    go (Case e_l x_l ty_l alts_l) (Case e_r x_r ty_r alts_r) = liftM3 (\x y z -> x ++ y ++ z) (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchAlts rn2 alts_l alts_r)
+    go (Case e_l x_l ty_l alts_l) (Case e_r x_r ty_r alts_r) = liftM3 app3 (matchTerm rn2 e_l e_r) (matchType rn2 ty_l ty_r) (matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchAlts rn2 alts_l alts_r)
     go (Let x_l e1_l e2_l)        (Let x_r e1_r e2_r)        = matchTerm rn2' e2_l e2_r >>= \eqs -> matchLet NonRecursive rn2 eqs [(x_l, e1_l)] [(x_r, e1_r)]
       where rn2' = (rn2 `delBndrL` x_l) `delBndrR` x_r
     go (LetRec xes_l e_l)         (LetRec xes_r e_r)         = matchTerm rn2' e_l  e_r  >>= \eqs -> matchLet Recursive rn2' eqs xes_l xes_r
@@ -135,12 +135,12 @@ matchTerm rn2 = matchAnned go
     go _ _ = fail "matchTerm"
 
 matchValue :: RnEnv2 -> AnnedValue -> AnnedValue -> Match [(Var, Var)]
-matchValue rn2 (Indirect x_l)         (Indirect x_r)         = matchVar rn2 x_l x_r
-matchValue rn2 (TyLambda a_l e_l)     (TyLambda a_r e_r)     = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchTerm rn2 e_l e_r
-matchValue rn2 (Lambda x_l e_l)       (Lambda x_r e_r)       = matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e_l e_r
-matchValue rn2 (Data dc_l tys_l xs_l) (Data dc_r tys_r xs_r) = guard "matchValue: datacon" (dc_l == dc_r) >> liftM2 (++) (matchList (matchType rn2) (tys_r) (tys_l)) (matchList (matchVar rn2) xs_l xs_r)
-matchValue _   (Literal l_l)          (Literal l_r)          = guard "matchValue: literal" (l_l == l_r) >> return []
-matchValue rn2 (Coercion co_l)        (Coercion co_r)        = matchCoercion rn2 (co_l) (co_r)
+matchValue rn2 (Indirect x_l)               (Indirect x_r)               = matchVar rn2 x_l x_r
+matchValue rn2 (TyLambda a_l e_l)           (TyLambda a_r e_r)           = matchTyVarBndr rn2 a_l a_r $ \rn2 -> matchTerm rn2 e_l e_r
+matchValue rn2 (Lambda x_l e_l)             (Lambda x_r e_r)             = matchIdCoVarBndr rn2 x_l x_r $ \rn2 -> matchTerm rn2 e_l e_r
+matchValue rn2 (Data dc_l tys_l cos_l xs_l) (Data dc_r tys_r cos_r xs_r) = guard "matchValue: datacon" (dc_l == dc_r) >> liftM3 app3 (matchList (matchType rn2) tys_l tys_r) (matchList (matchCoercion rn2) cos_l cos_r) (matchList (matchVar rn2) xs_l xs_r)
+matchValue _   (Literal l_l)                (Literal l_r)                = guard "matchValue: literal" (l_l == l_r) >> return []
+matchValue rn2 (Coercion co_l)              (Coercion co_r)              = matchCoercion rn2 (co_l) (co_r)
 matchValue _ _ _ = fail "matchValue"
 
 matchAlts :: RnEnv2 -> [AnnedAlt] -> [AnnedAlt] -> Match [(Var, Var)]
@@ -150,9 +150,9 @@ matchAlt :: RnEnv2 -> AnnedAlt -> AnnedAlt -> Match [(Var, Var)]
 matchAlt rn2 (alt_con_l, alt_e_l) (alt_con_r, alt_e_r) = matchAltCon rn2 alt_con_l alt_con_r $ \rn2 -> matchTerm rn2 alt_e_l alt_e_r
 
 matchAltCon :: RnEnv2 -> AltCon -> AltCon -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
-matchAltCon rn2 (DataAlt dc_l as_l xs_l) (DataAlt dc_r as_r xs_r) k = guard "matchAltCon: datacon" (dc_l == dc_r) >> (matchTyVarBndrs rn2 as_l as_r $ \rn2 -> matchIdCoVarBndrs rn2 xs_l xs_r k)
-matchAltCon rn2 (LiteralAlt l_l)         (LiteralAlt l_r)         k = guard "matchAltCon: literal" (l_l == l_r) >> k rn2
-matchAltCon rn2 DefaultAlt               DefaultAlt               k = k rn2
+matchAltCon rn2 (DataAlt dc_l as_l qs_l xs_l) (DataAlt dc_r as_r qs_r xs_r) k = guard "matchAltCon: datacon" (dc_l == dc_r) >> (matchTyVarBndrs rn2 as_l as_r $ \rn2 -> matchIdCoVarBndrs rn2 qs_l qs_r $ \rn2 -> matchIdCoVarBndrs rn2 xs_l xs_r k)
+matchAltCon rn2 (LiteralAlt l_l)              (LiteralAlt l_r)              k = guard "matchAltCon: literal" (l_l == l_r) >> k rn2
+matchAltCon rn2 DefaultAlt                    DefaultAlt                    k = k rn2
 matchAltCon _ _ _ _ = fail "matchAltCon"
 
 matchTyVarBndr :: RnEnv2 -> TyVar -> TyVar -> (RnEnv2 -> Match [(Var, Var)]) -> Match [(Var, Var)]
@@ -374,3 +374,6 @@ matchPureHeap rn2 init_free_eqs h_l h_r
                 -- Don't forget to match types of binders as well:
                 ty_free_eqs <- matchVarType rn2 x_l x_r
                 matchLoop ((x_l, x_r) : ty_free_eqs ++ known) (extra_free_eqs ++ free_eqs) used_l' used_r'
+
+app3 :: [a] -> [a] -> [a] -> [a]
+app3 x y z = x ++ y ++ z

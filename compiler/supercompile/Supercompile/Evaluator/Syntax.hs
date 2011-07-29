@@ -201,8 +201,9 @@ instance Outputable Heap where
 
 
 type Stack = [Tagged StackFrame]
-data StackFrame = Apply (Out Id)
-                | TyApply (Out Type)
+data StackFrame = TyApply (Out Type)
+                | CoApply (Out Coercion)
+                | Apply (Out Id)
                 | Scrutinise (Out Id) (Out Type) (In [AnnedAlt])
                 | PrimApply PrimOp [Out Type] [Anned Answer] [In AnnedTerm]
                 | StrictLet (Out Id) (In AnnedTerm)
@@ -211,8 +212,9 @@ data StackFrame = Apply (Out Id)
 
 instance Outputable StackFrame where
     pprPrec prec kf = case kf of
-        Apply x'                       -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
         TyApply ty'                    -> pPrintPrecApp prec (PrettyDoc $ text "[_]") ty'
+        CoApply co'                    -> pPrintPrecApp prec (PrettyDoc $ text "[_]") co'
+        Apply x'                       -> pPrintPrecApp prec (PrettyDoc $ text "[_]") x'
         Scrutinise x' _ty in_alts      -> pPrintPrecCase prec (PrettyDoc $ text "[_]") x' (pPrintPrecAnnedAlts in_alts)
         PrimApply pop tys' in_vs in_es -> pPrintPrecPrimOp prec pop tys' (map (PrettyFunction . flip pPrintPrecAnnedAnswer) in_vs ++ map (PrettyFunction . flip pPrintPrecAnnedTerm) in_es)
         StrictLet x' in_e2             -> pPrintPrecLet prec x' (PrettyDoc $ text "[_]") (PrettyFunction $ flip pPrintPrecAnnedTerm in_e2)
@@ -228,8 +230,9 @@ stackType k ty = foldl' (flip stackFrameType) ty k
 
 stackFrameType :: Tagged StackFrame -> Type -> Type
 stackFrameType kf hole_ty = case tagee kf of
-    Apply x                       -> hole_ty `applyFunTy` idType x
     TyApply ty                    -> hole_ty `applyTy` ty
+    CoApply co                    -> hole_ty `applyFunTy` coercionType co
+    Apply x                       -> hole_ty `applyFunTy` idType x
     Scrutinise _ ty _             -> ty
     PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
     StrictLet _ in_e@(rn, e)      -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
@@ -247,19 +250,20 @@ answerType a = case annee a of
     (Nothing,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
 
 valueType :: Copointed ann => ValueF ann -> Type
-valueType (Indirect x)    = idType x
-valueType (TyLambda x e)  = x `mkForAllTy` termType e
-valueType (Lambda x e)    = idType x `mkFunTy` termType e
-valueType (Data dc as xs) = (idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map idType xs
-valueType (Literal l)     = literalType l
-valueType (Coercion co)   = coercionType co
+valueType (Indirect x)        = idType x
+valueType (TyLambda x e)      = x `mkForAllTy` termType e
+valueType (Lambda x e)        = idType x `mkFunTy` termType e
+valueType (Data dc as cos xs) = ((idType (dataConWorkId dc) `applyTys` as) `applyFunTys` map coercionType cos) `applyFunTys` map idType xs
+valueType (Literal l)         = literalType l
+valueType (Coercion co)       = coercionType co
 
 termType :: Copointed ann => ann (TermF ann) -> Type
 termType e = case extract e of
     Var x             -> idType x
     Value v           -> valueType v
-    App e x           -> termType e `applyFunTy` idType x
     TyApp e a         -> termType e `applyTy` a
+    CoApp e co        -> termType e `applyFunTy` coercionType co
+    App e x           -> termType e `applyFunTy` idType x
     PrimOp pop tys es -> (primOpType pop `applyTys` tys) `applyFunTys` map termType es
     Case _ _ ty _     -> ty
     Let _ _ e         -> termType e
@@ -288,8 +292,9 @@ heapBindingSize _                                   = 0
 -- | Size of StackFrame for Deeds purposes
 stackFrameSize :: StackFrame -> Size
 stackFrameSize kf = 1 + case kf of
-    Apply _                  -> 0
     TyApply _                -> 0
+    CoApply _                -> 0
+    Apply _                  -> 0
     Scrutinise _ _ (_, alts) -> annedAltsSize alts
     PrimApply _ _ as in_es   -> sum (map annedSize as ++ map (annedTermSize . snd) in_es)
     StrictLet _ (_, e)       -> annedTermSize e

@@ -36,23 +36,27 @@ evaluatePrim iss tg pop tys args = do
   where
     to :: Answer -> Maybe CoreSyn.CoreExpr
     to (mb_co, (rn, v)) = fmap (maybe id (flip CoreSyn.Cast . fst) mb_co) $ case v of
-        Literal l      -> Just (CoreSyn.Lit l)
-        Coercion co    -> Just (CoreSyn.Coercion co)
-        Data dc tys xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` map (renameType iss rn) tys `CoreSyn.mkVarApps` map (renameIdCoVar rn) xs)
-        _              -> Nothing
+        Literal l          -> Just (CoreSyn.Lit l)
+        Coercion co        -> Just (CoreSyn.Coercion co)
+        Data dc tys cos xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` map (renameType iss rn) tys `CoreSyn.mkCoApps` cos `CoreSyn.mkVarApps` map (renameId rn) xs)
+        _                  -> Nothing
     
     fro :: CoreSyn.CoreExpr -> Maybe Answer
     fro (CoreSyn.Cast e co)   = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
     fro (CoreSyn.Lit l)       = Just (Nothing, (emptyRenaming, Literal l))
     fro (CoreSyn.Coercion co) = Just (Nothing, (mkIdentityRenaming (tyCoVarsOfCo co), Coercion co))
-    fro e | CoreSyn.Var f <- e_fun, Just dc <- isDataConId_maybe f, [] <- e_args'' = Just (Nothing, (mkIdentityRenaming (unionVarSets (map tyVarsOfType tys) `extendVarSetList` xs), Data dc tys xs))
+    fro e | CoreSyn.Var f <- e_fun, Just dc <- isDataConId_maybe f, [] <- e_args3 = Just (Nothing, (mkIdentityRenaming (unionVarSets (map tyVarsOfType tys) `extendVarSetList` xs), Data dc tys cos xs))
           | otherwise = Nothing
-      where (e_fun, e_args) = CoreSyn.collectArgs e
-            (tys, e_args') = takeWhileJust toType_maybe e_args
-            (xs, e_args'') = takeWhileJust toVar_maybe  e_args'
+      where (e_fun, e_args0) = CoreSyn.collectArgs e
+            (tys, e_args1) = takeWhileJust toType_maybe     e_args0
+            (cos, e_args2) = takeWhileJust toCoercion_maybe e_args1
+            (xs,  e_args3) = takeWhileJust toVar_maybe      e_args2
             
             toType_maybe (CoreSyn.Type ty) = Just ty
             toType_maybe _                 = Nothing
+            
+            toCoercion_maybe (CoreSyn.Coercion co) = Just co
+            toCoercion_maybe _                     = Nothing
             
             toVar_maybe (CoreSyn.Var x) = Just x
             toVar_maybe _               = Nothing
@@ -93,7 +97,8 @@ step' normalising state =
         Var x            -> go_question (deeds, heap, k, fmap (\(rn, Var _) -> renameId rn x) (renameAnned (rn, e)))
         Value v          -> pprPanic "step': values are always answers" (ppr v)
         TyApp e ty       -> go (deeds, heap,        Tagged tg (TyApply (renameType ids rn ty))                                   : k, (rn, e))
-        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameIdCoVar rn x))                                       : k, (rn, e))
+        CoApp e co       -> go (deeds, heap,        Tagged tg (CoApply (renameCoercion ids rn co))                               : k, (rn, e))
+        App e x          -> go (deeds, heap,        Tagged tg (Apply (renameId rn x))                                            : k, (rn, e))
         PrimOp pop tys es
           | (e:es) <- es -> go (deeds, heap,        Tagged tg (PrimApply pop (map (renameType ids rn) tys) [] (map ((,) rn) es)) : k, (rn, e))
           | otherwise    -> pprPanic "step': nullary primops unsupported" (ppr pop)
@@ -152,6 +157,7 @@ step' normalising state =
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
     unwind deeds h k tg_v in_v = uncons k >>= \(kf, k) -> case tagee kf of
         TyApply ty'                    -> tyApply    (deeds + 1)          h k      in_v ty'
+        CoApply co'                    -> coApply    (deeds + 1)          h k      in_v co'
         Apply x2'                      -> apply      deeds       (tag kf) h k      in_v x2'
         Scrutinise x' ty' in_alts      -> scrutinise (deeds + 1)          h k tg_v in_v x' ty' in_alts
         PrimApply pop tys' in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop tys' in_vs in_v in_es
@@ -186,6 +192,21 @@ step' normalising state =
             fmap (\deeds -> (deeds, h, case mb_co of Nothing -> k; Just (co', tg_co) -> Tagged tg_co (CastIt (co' `mkInstCo` ty')) : k, (insertTypeSubst rn x ty', e_body))) $
                  claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
 
+        coApply :: Deeds -> Heap -> Stack -> Answer -> Out Coercion -> Maybe UnnormalisedState
+        coApply deeds h k in_v@(_, (_, v)) apply_co' = do
+            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h in_v
+            flip fmap (claimDeeds (deeds + annedValueSize' v) (annedSize e_body)) $ \deeds -> case mb_co of
+                Nothing           -> (deeds, h, k,                                 (insertCoercionSubst rn x apply_co', e_body))
+                Just (co', tg_co) -> (deeds, h, Tagged tg_co (CastIt res_co') : k, (insertCoercionSubst rn x cast_apply_co', e_body))
+                  where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
+                        -- You can derive this rule from the rules in "Practical aspects of evidence-based compilation" by combining:
+                        --  1. TPush, to move the co' from the lambda to the argument and result (arg_co' and res_co')
+                        --  2. The rules in Figure 5, to replace a cast of a coercion value with a simple coercion value
+                        --  3. The fact that nth commutes with sym to clean up the result (can be proven from Figure 4)
+                        [arg_co', res_co'] = decomposeCo 2 co'
+                        [arg_from_co', arg_to_co'] = decomposeCo 2 arg_co'
+                        cast_apply_co' = arg_from_co' `mkTransCo` apply_co' `mkTransCo` mkSymCo arg_to_co'
+
         apply :: Deeds -> Tag -> Heap -> Stack -> Answer -> Out Var -> Maybe UnnormalisedState
         apply deeds tg_v (Heap h ids) k in_v@(_, (_, v)) x' = do
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) in_v
@@ -209,7 +230,7 @@ step' normalising state =
           = Just (deeds2, Heap h1 ids, k, alt_e)
           
            -- Data is a big stinking mess! I hate you, KPush rule.
-          | Data dc tys xs <- v_deref
+          | Data dc tys cos xs <- v_deref
            -- a) Ensure that the coercion on the data (if any) lets us do the reduction, and determine
            --    the appropriate coercions to use (if any) on each value argument to the DataCon
           , Just mb_dc_cos <- case mb_co_deref_kind of
@@ -232,19 +253,21 @@ step' normalising state =
                                         in map (\arg_ty -> (theta_subst arg_ty, tg_co)) arg_tys -- Use tag from the original coercion everywhere
            -- b) Identify the first appropriate branch of the case and reduce -- apply the discovered coercions if necessary
           , (deeds3, h', ids', alt_e):_ <- [ res
-                                           | ((DataAlt alt_dc alt_as alt_xs, alt_e), rest) <- bagContexts alts
+                                           | ((DataAlt alt_dc alt_as alt_qs alt_xs, alt_e), rest) <- bagContexts alts
                                            , alt_dc == dc
                                            , let tys' = map (renameType ids rn_v_deref) tys
-                                                 xs' = map (renameIdCoVar rn_v_deref) xs
+                                                 cos' = map (renameCoercion ids rn_v_deref) cos
+                                                 xs' = map (renameId rn_v_deref) xs
                                                  rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys')
                                                  deeds2 = deeds1 + annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
-                                                               Nothing     -> return (deeds2, h1, ids, insertIdCoVarRenamings rn_alts' (alt_xs `zip` xs'))
-                                                               Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (x', alt_y, (dc_co, tg_co)) -> let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
-                                                                                                                                                  (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
-                                                                                                                                                  e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` dc_co)
-                                                                                                                                              in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
-                                                                                    (deeds2, h1, ids, rn_alts') (zip3 xs' alt_xs dc_cos)
+                                                               Nothing     -> return (deeds2, h1, ids, insertIdCoVarRenamings (insertCoercionSubsts rn_alts' (alt_qs `zip` cos')) (alt_xs `zip` xs'))
+                                                               Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (uncast_e_arg', alt_y, (dc_co, tg_co)) ->
+                                                                                        let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
+                                                                                            (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
+                                                                                            e_arg = annedTerm tg_co $ annedTerm tg_v uncast_e_arg' `Cast` dc_co
+                                                                                        in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
+                                                                                    (deeds2, h1, ids, rn_alts') (zip3 (map (Value . Coercion) cos' ++ map Var xs') (alt_qs ++ alt_xs) dc_cos)
                                                              return (deeds3, h', ids', (rn_alts', alt_e))]
                                            ]
           = Just (deeds3, Heap h' ids', k, alt_e)

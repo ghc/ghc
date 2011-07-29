@@ -10,6 +10,7 @@ import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
+import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo)
 import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
 import Name       (localiseName)
@@ -44,8 +45,9 @@ desc = desc' . unI
 desc' :: S.TermF Identity -> Description
 desc' (S.Var x)            = Opaque (S.varString x)
 desc' (S.Value _)          = Opaque "value"
-desc' (S.App e1 _)         = argOf (desc e1)
 desc' (S.TyApp e1 _)       = argOf (desc e1)
+desc' (S.CoApp e1 _)       = argOf (desc e1)
+desc' (S.App e1 _)         = argOf (desc e1)
 desc' (S.PrimOp pop as es) = foldr (\() d -> argOf d) (Opaque (show pop)) (map (const ()) as ++ map (const ()) es)
 desc' (S.Case _ _ _ _)     = Opaque "case"
 desc' (S.Cast _ _)         = Opaque "cast"
@@ -72,15 +74,22 @@ runParseM :: ParseM a -> ([(Var, S.Term)], a)
 runParseM act = (floats, x)
   where (_s, floats, x) = unParseM act anfUniqSupply'
 
-freshFloatVar :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Var)
-freshFloatVar _ (I (S.Var x)) = return (Nothing, x)
-freshFloatVar n e             = fmap (\x -> (Just (x, e), x)) $ mkSysLocalM (mkFastString n) (S.termType e)
+freshFloatId :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Var)
+freshFloatId _ (I (S.Var x)) = return (Nothing, x)
+freshFloatId n e             = fmap (\x -> (Just (x, e), x)) $ mkSysLocalM (mkFastString n) (S.termType e)
+
+freshFloatCoVar :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Coercion)
+freshFloatCoVar _ (I (S.Value (S.Coercion co))) = return (Nothing, co)
+freshFloatCoVar n e                             = fmap (\x -> (Just (x, e), mkCoVarCo x)) $ mkSysLocalM (mkFastString n) (S.termType e)
 
 floatIt :: [(Var, S.Term)] -> ParseM ()
 floatIt floats = ParseM $ \s -> (s, floats, ())
 
 nameIt :: Description -> S.Term -> ParseM Var
-nameIt d e = freshFloatVar ("a" ++ descriptionString d) e >>= \(mb_float, x) -> floatIt (maybeToList mb_float) >> return x
+nameIt d e = freshFloatId ("a" ++ descriptionString d) e >>= \(mb_float, x) -> floatIt (maybeToList mb_float) >> return x
+
+nameCo :: Description -> S.Term -> ParseM Coercion
+nameCo d e = freshFloatCoVar ("c" ++ descriptionString d) e >>= \(mb_float, co) -> floatIt (maybeToList mb_float) >> return co
 
 bindFloats :: ParseM S.Term -> ParseM S.Term
 bindFloats = bindFloatsWith . fmap ((,) [])
@@ -89,7 +98,9 @@ bindFloatsWith :: ParseM ([(Var, S.Term)], S.Term) -> ParseM S.Term
 bindFloatsWith act = ParseM $ \s -> case unParseM act s of (s, floats, (xes, e)) -> (s, [], S.letRecSmart (xes ++ floats) e)
 
 appE :: S.Term -> S.Term -> ParseM S.Term
-appE e1 e2 = nameIt (argOf (desc e1)) e2 >>= \x2 -> return (e1 `S.app` x2)
+appE e1 e2
+  | isCoVarType (S.termType e2) = fmap (e1 `S.coApp`) $ nameCo (argOf (desc e1)) e2
+  | otherwise                   = fmap (e1 `S.app`)   $ nameIt (argOf (desc e1)) e2
 
 
 
@@ -111,10 +122,11 @@ coreExprToTerm = uncurry S.letRecSmart . runParseM . term
     term (Type ty)                 = pprPanic "termToCoreExpr" (ppr ty)
     term (Coercion co)             = return $ S.value (S.Coercion co)
     
-    alt (DEFAULT,    [], e) = fmap ((,) S.DefaultAlt)         $ bindFloats (term e)
-    alt (LitAlt l,   [], e) = fmap ((,) (S.LiteralAlt l))     $ bindFloats (term e)
-    alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc as ys)) $ bindFloats (term e)
+    alt (DEFAULT,    [], e) = fmap ((,) S.DefaultAlt)            $ bindFloats (term e)
+    alt (LitAlt l,   [], e) = fmap ((,) (S.LiteralAlt l))        $ bindFloats (term e)
+    alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc as qs zs)) $ bindFloats (term e)
       where (as, ys) = span isTyVar xs
+            (qs, zs) = span isCoVar ys
     alt it                  = pprPanic "termToCoreExpr" (ppr it)
 
 termToCoreExpr :: S.Term -> CoreExpr
@@ -123,24 +135,25 @@ termToCoreExpr = term
     term e = case unI e of
         S.Var x             -> Var x
         S.Value v           -> value v
-        S.App e x           -> term e `App` varToCoreExpr x
         S.TyApp e ty        -> term e `App` Type ty
+        S.CoApp e co        -> term e `App` Coercion co
+        S.App e x           -> term e `App` Var x
         S.PrimOp pop tys es -> Var (mkPrimOpId pop) `mkTyApps` tys `mkApps` map term es
         S.Case e x ty alts  -> Case (term e) x ty (map alt alts)
         S.Let x e1 e2       -> Let (NonRec x (term e1)) (term e2)
         S.LetRec xes e      -> Let (Rec (map (second term) xes)) (term e)
         S.Cast e co         -> Cast (term e) co
     
-    value (S.Indirect x)     = Var x
-    value (S.Literal l)      = Lit l
-    value (S.Coercion co)    = Coercion co
-    value (S.TyLambda a e)   = Lam a (term e)
-    value (S.Lambda x e)     = Lam x (term e)
-    value (S.Data dc tys xs) = (Var (dataConWorkId dc) `mkTyApps` tys) `mkVarApps` xs
+    value (S.Indirect x)         = Var x
+    value (S.Literal l)          = Lit l
+    value (S.Coercion co)        = Coercion co
+    value (S.TyLambda a e)       = Lam a (term e)
+    value (S.Lambda x e)         = Lam x (term e)
+    value (S.Data dc tys cos xs) = ((Var (dataConWorkId dc) `mkTyApps` tys) `mkCoApps` cos) `mkVarApps` xs
     
-    alt (S.DataAlt dc as ys, e) = (DataAlt dc, as ++ ys, term e)
-    alt (S.LiteralAlt l,     e) = (LitAlt l,   [],       term e)
-    alt (S.DefaultAlt,       e) = (DEFAULT,    [],       term e)
+    alt (S.DataAlt dc as qs ys, e) = (DataAlt dc, as ++ qs ++ ys, term e)
+    alt (S.LiteralAlt l,        e) = (LitAlt l,   [],             term e)
+    alt (S.DefaultAlt,          e) = (DEFAULT,    [],             term e)
 
 -- Split input bindings into two lists:
 --  1) CoreBinds binding variables with at least one binder marked by the predicate,
@@ -224,10 +237,11 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys
     
-    dataUnfolding dc = S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) xs)
+    dataUnfolding dc = S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) (map mkCoVarCo qs) ys)
       where as = dataConAllTyVars dc
             arg_tys = dataConRepArgTys dc
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys
+            (qs, ys) = span isCoVar xs
     
     -- It doesn't matter if we reuse Uniques here because by construction they can't shadow other uses of the anfUniqSupply'
     bv_uniques = uniqsFromSupply anfUniqSupply'

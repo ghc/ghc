@@ -21,6 +21,7 @@ import Supercompile.Utilities hiding (tails)
 import Var       (varType)
 import Id        (idUnique)
 import Type      (mkTyVarTy)
+import Coercion  (mkCoVarCo)
 import PrelNames (undefinedName)
 import Unique    (Uniquable)
 import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
@@ -707,8 +708,8 @@ howToBindCheap e
   | Value v <- annee e = case v of
     TyLambda _ _ -> LetBound -- Heuristic: GHC would lose too much if we cut the
     Lambda   _ _ -> LetBound -- connection between the definition and use sites
-    Data _ as xs | null as, null xs -> InternallyBound -- Heuristic: GHC will actually statically allocate data with no arguments (this also has the side effect of preventing tons of type errors due to [] getting shared)
-                 | otherwise        -> LambdaBound
+    Data _ as cos xs | null as, null cos, null xs -> InternallyBound -- Heuristic: GHC will actually statically allocate data with no arguments (this also has the side effect of preventing tons of type errors due to [] getting shared)
+                     | otherwise                  -> LambdaBound
     Literal _  -> InternallyBound -- No allocation duplication since GHC will float them (and common them up, if necessary)
     Coercion _ -> InternallyBound -- Not allocated at all
     Indirect _ -> InternallyBound -- Always eliminated by GHC
@@ -934,8 +935,9 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
   | Update x' <- tagee kf = splitUpdate ids (tag kf) scruts x' bracketed_hole
   | otherwise = ([], M.empty, case tagee kf of
     Update x' -> pprPanic "splitStackFrame" (text "Encountered update frame for" <+> pPrint x' <+> text "that was handled above")
-    Apply x2' -> zipBracketeds (\[e] -> e `app` x2') (\[fvs] -> fvs `extendVarSet` x2') [[]] (\_ -> Nothing) [bracketed_hole]
     TyApply ty' -> zipBracketeds (\[e] -> e `tyApp` ty') (\[fvs] -> fvs `unionVarSet` tyVarsOfType ty') [[]] (\_ -> Nothing) [bracketed_hole]
+    CoApply co' -> zipBracketeds (\[e] -> e `coApp` co') (\[fvs] -> fvs `unionVarSet` tyCoVarsOfCo co') [[]] (\_ -> Nothing) [bracketed_hole]
+    Apply x2' -> zipBracketeds (\[e] -> e `app` x2') (\[fvs] -> fvs `extendVarSet` x2') [[]] (\_ -> Nothing) [bracketed_hole]
     CastIt co' -> zipBracketeds (\[e] -> e `cast` co') (\[fvs] -> fvs `unionVarSet` tyCoVarsOfCo co') [[]] (\_ -> Nothing) [bracketed_hole]
     Scrutinise x' ty' (rn, alts) -> -- (if null k_remaining then id else traceRender ("splitStack: FORCED SPLIT", M.keysSet entered_hole, [x' | Tagged _ (Update x') <- k_remaining])) $
                                     -- (if not (null k_not_inlined) then traceRender ("splitStack: generalise", k_not_inlined) else id) $
@@ -967,9 +969,9 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (Once ctxt_id, (0, Heap M.empty ids, [], in_e))) ctxt_idss in_es)
   where
     altConToValue :: AltCon -> Maybe (ValueF ann)
-    altConToValue (DataAlt dc as xs) = Just $ Data dc (map mkTyVarTy as) xs
-    altConToValue (LiteralAlt l)     = Just $ Literal l
-    altConToValue DefaultAlt         = Nothing
+    altConToValue (DataAlt dc as qs xs) = Just $ Data dc (map mkTyVarTy as) (map mkCoVarCo qs) xs
+    altConToValue (LiteralAlt l)        = Just $ Literal l
+    altConToValue DefaultAlt            = Nothing
 
 -- I'm making use of a clever trick: after splitting an update frame for x, instead of continuing to split the stack with a
 -- noneBracketed for x in the focus, I split the stack with a oneBracketed for it in the focus.
