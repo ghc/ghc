@@ -100,7 +100,7 @@ module CLabel (
         mkHpcTicksLabel,
 
         hasCAF,
-	entryLblToInfoLbl, cvtToClosureLbl,
+	cvtToClosureLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
@@ -500,18 +500,7 @@ mkPlainModuleInitLabel :: Module -> CLabel
 mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
 
 -- -----------------------------------------------------------------------------
--- Converting between info labels and entry/ret labels.
-
-entryLblToInfoLbl :: CLabel -> CLabel 
-entryLblToInfoLbl (IdLabel n c (Entry lcl))	= IdLabel n c (InfoTable lcl)
-entryLblToInfoLbl (IdLabel n c ConEntry)	= IdLabel n c ConInfoTable
-entryLblToInfoLbl (IdLabel n c StaticConEntry)	= IdLabel n c StaticInfoTable
-entryLblToInfoLbl (CaseLabel n CaseReturnPt)	= CaseLabel n CaseReturnInfo
-entryLblToInfoLbl (CmmLabel m str CmmEntry)	= CmmLabel m str CmmInfo
-entryLblToInfoLbl (CmmLabel m str CmmRet)	= CmmLabel m str CmmRetInfo
-entryLblToInfoLbl l				
-	= pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
-
+-- Brutal method of obtaining a closure label
 
 cvtToClosureLbl   (IdLabel n c (InfoTable _))	= IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c (Entry _))	= IdLabel n c Closure

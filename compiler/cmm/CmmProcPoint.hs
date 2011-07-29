@@ -384,7 +384,8 @@ add_CopyOuts protos procPoints g = foldGraphBlocks mb_copy_out (return mapEmpty)
 splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
                      CmmTop -> FuelUniqSM [CmmTop]
 splitAtProcPoints entry_label callPPs procPoints procMap
-                  (CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info})
+                  (CmmProc (TopInfo {info_tbl=info_tbl,
+                                     stack_info=stack_info})
                            top_l g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
      let addBlock b graphEnv =
@@ -405,11 +406,14 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      --  * Labels for their new procedures
      --  * Labels for the info tables of their new procedures (only if the proc point is a callPP)
      -- Due to common blockification, we may overestimate the set of procpoints.
-     let add_label map pp = return $ Map.insert pp (lbl, mb_info_lbl) map
-           where lbl = if pp == entry then entry_label else blockLbl pp
-                 mb_info_lbl = guard (setMember id callPPs) >> Just (entryLblToInfoLbl lbl)
-     procLabels <- foldM add_label Map.empty
-                         (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
+     let add_label map pp = Map.insert pp lbls map
+           where lbls | pp == entry = (entry_label, Just entry_info_lbl)
+                      | otherwise   = (blockLbl pp, guard (setMember pp callPPs) >> Just (infoTblLbl pp))
+                 entry_info_lbl = case info_tbl of
+                     CmmInfoTable entry_info_label _ _ _ _ -> entry_info_label
+                     CmmNonInfoTable -> pprPanic "splitAtProcPoints: looked at info label for entry without info table" (ppr pp)
+         procLabels = foldl add_label Map.empty
+                            (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
      -- For each procpoint, we need to know the SP offset on entry.
      -- If the procpoint is:
      --  - continuation of a call, the SP offset is in the call
