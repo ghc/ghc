@@ -14,7 +14,7 @@ Total ticks:     45
 
 14 PreInlineUnconditionally
     1 n
-    1 a1
+    1 a
     1 g
     1 xs
     1 ys
@@ -24,7 +24,7 @@ Total ticks:     45
     1 g
     1 h
     1 n
-    1 a1
+    1 a
     1 lvl
     1 lvl
 2 PostInlineUnconditionally
@@ -41,7 +41,7 @@ Total ticks:     45
 1 LetFloatFromLet
     1
 22 BetaReduction
-    1 a1
+    1 a
     1 b
     1 a
     1 g
@@ -62,7 +62,7 @@ Total ticks:     45
     1 b
     1 c
     1 n
-    1 a1
+    1 a
 10 SimplifierDone
     10
 
