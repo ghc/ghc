@@ -36,19 +36,19 @@ you will screw up the layout where they are used in case expressions!
 name :: IORef (ty);                \
 name = Util.global (value);
 
-#define GLOBAL_MVAR(name,value,ty) \
-{-# NOINLINE name #-};             \
-name :: MVar (ty);                 \
-name = Util.globalMVar (value);
+#define GLOBAL_VAR_M(name,value,ty) \
+{-# NOINLINE name #-};              \
+name :: IORef (ty);                 \
+name = Util.globalM (value);
 #endif
 #else /* __HADDOCK__ */
 #define GLOBAL_VAR(name,value,ty)  \
 name :: IORef (ty);                \
 name = Util.global (value);
 
-#define GLOBAL_MVAR(name,value,ty) \
-name :: MVar (ty);                 \
-name = Util.globalMVar (value);
+#define GLOBAL_VAR_M(name,value,ty) \
+name :: IORef (ty);                 \
+name = Util.globalM (value);
 #endif
 
 #define COMMA ,
