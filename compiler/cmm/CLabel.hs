@@ -858,6 +858,33 @@ Many of these distinctions are only for documentation reasons.  For
 example, _ret is only distinguished from _entry to make it easy to
 tell whether a code fragment is a return point or a closure/function
 entry.
+
+Note [Closure and info labels]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a function 'foo, we have:
+   foo_info    : Points to the info table describing foo's closure
+   	       	 (and entry code for foo with tables next to code)
+   foo_closure : Static (no-free-var) closure only: 
+                 points to the statically-allocated closure
+
+For a data constructor (such as Just or Nothing), we have:
+    Just_con_info: Info table for the data constructor itself
+    		   the first word of a heap-allocated Just
+    Just_info:     Info table for the *worker function*, an 
+    	       	   ordinary Haskell function of arity 1 that 
+		   allocates a (Just x) box:
+                      Just = \x -> Just x
+    Just_closure:  The closure for this worker
+
+    Nothing_closure: a statically allocated closure for Nothing
+    Nothing_static_info: info table for Nothing_closure
+
+All these must be exported symbol, EXCEPT Just_info.  We don't need to
+export this because in other modules we either have
+       * A reference to 'Just'; use Just_closure
+       * A saturated call 'Just x'; allocate using Just_con_info
+Not exporting these Just_info labels reduces the number of symbols
+somewhat.
 -}
 
 instance Outputable CLabel where
