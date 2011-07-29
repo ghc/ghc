@@ -211,7 +211,7 @@ step' normalising state =
         apply deeds tg_v (Heap h ids) k in_v@(_, (_, v)) x' = do
             (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) in_v
             case mb_co of
-              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdCoVarRenaming rn x x', e_body))) $
+              Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
                               claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
               Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
                                         claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
@@ -261,7 +261,7 @@ step' normalising state =
                                                  rn_alts' = insertTypeSubsts rn_alts (alt_as `zip` tys')
                                                  deeds2 = deeds1 + annedAltsSize rest
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
-                                                               Nothing     -> return (deeds2, h1, ids, insertIdCoVarRenamings (insertCoercionSubsts rn_alts' (alt_qs `zip` cos')) (alt_xs `zip` xs'))
+                                                               Nothing     -> return (deeds2, h1, ids, insertIdRenamings (insertCoercionSubsts rn_alts' (alt_qs `zip` cos')) (alt_xs `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (uncast_e_arg', alt_y, (dc_co, tg_co)) ->
                                                                                         let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
                                                                                             (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')

@@ -7,7 +7,6 @@ module Supercompile.Core.Renaming (
     
     -- | Extending the renaming
     insertIdRenaming, insertIdRenamings,
-    insertIdCoVarRenaming, insertIdCoVarRenamings,
     insertTypeSubst, insertTypeSubsts,
     insertCoercionSubst, insertCoercionSubsts,
     
@@ -122,14 +121,6 @@ insertIdRenaming (id_subst, tv_subst, co_subst) x x'
 
 insertIdRenamings :: Renaming -> [(Id, Out Id)] -> Renaming
 insertIdRenamings = foldr (\(x, x') rn -> insertIdRenaming rn x x')
-
-insertIdCoVarRenaming :: Renaming -> Id -> Out Id -> Renaming
-insertIdCoVarRenaming rn x x'
-  | isCoVar x = insertCoercionSubst rn x (mkCoVarCo x')
-  | otherwise = insertIdRenaming rn x x'
-
-insertIdCoVarRenamings :: Renaming -> [(Id, Out Id)] -> Renaming
-insertIdCoVarRenamings = foldr (\(x, x') rn -> insertIdCoVarRenaming rn x x')
 
 insertTypeSubst :: Renaming -> TyVar -> Out Type -> Renaming
 insertTypeSubst (id_subst, tv_subst, co_subst) x ty' = (id_subst, extendVarEnv tv_subst x ty', co_subst)
