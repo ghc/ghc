@@ -11,7 +11,7 @@ integerConstantFolding:
 # All the 100nnn values should be constant-folded away
 	! grep -q '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl || { echo "Unfolded values found"; grep '\<100[0-9][0-9][0-9]\>' integerConstantFolding.simpl; }
 	$(call CHECK,\<200007\>,plusInteger)
-	$(call CHECK,\<10001100030\>,timesInteger)
+	$(call CHECK,\<683234160\>,timesInteger)
 	$(call CHECK,-991\>,minusIntegerN)
 	$(call CHECK,\<989\>,minusIntegerP)
 	$(call CHECK,-200011\>,negateInteger)

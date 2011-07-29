@@ -48,7 +48,7 @@ plusInteger :: Integer
 plusInteger = 100003 + 100004
 
 timesInteger :: Integer
-timesInteger = 100005 * 100006
+timesInteger = 100005 * 6832
 
 minusIntegerN :: Integer
 minusIntegerN = 100007 - 100998
