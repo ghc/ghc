@@ -7960,8 +7960,8 @@ itself, so an INLINE pragma is always ignored.</para>
 {-# INLINE returnUs #-}
 </programlisting>
 
-	<para>See also the <literal>NOINLINE</literal> (<xref linkend="inlinable-pragma"/>)
-        and <literal>INLINABLE</literal> (<xref linkend="noinline-pragma"/>)
+	<para>See also the <literal>NOINLINE</literal> (<xref linkend="noinline-pragma"/>)
+        and <literal>INLINABLE</literal> (<xref linkend="inlinable-pragma"/>)
         pragmas.</para>
 
 	<para>Note: the HBC compiler doesn't like <literal>INLINE</literal> pragmas,
