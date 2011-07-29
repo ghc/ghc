@@ -58,6 +58,7 @@ import GHC.Base		( Int(..), Int#, (<#), (==#) )
 import Language.Haskell.TH.Syntax.Internals
 import Data.Data (Data(..), Typeable, mkConstr, mkDataType, constrIndex)
 import qualified Data.Data as Data
+import Control.Applicative( Applicative(..) )
 import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad (liftM)
@@ -70,7 +71,7 @@ import Data.Char        ( isAlpha )
 --
 -----------------------------------------------------
 
-class (Monad m, Functor m) => Quasi m where
+class (Monad m, Applicative m) => Quasi m where
   qNewName :: String -> m Name
 	-- ^ Fresh names
 
@@ -148,6 +149,10 @@ instance Monad Q where
 
 instance Functor Q where
   fmap f (Q x) = Q (fmap f x)
+
+instance Applicative Q where 
+  pure x = Q (pure x) 
+  Q f <*> Q x = Q (f <*> x) 
 
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
