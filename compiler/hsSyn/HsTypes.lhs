@@ -161,13 +161,9 @@ data HsType name
 
   | HsOpTy		(LHsType name) (Located name) (LHsType name)
 
-  | HsParTy		(LHsType name)   
+  | HsParTy		(LHsType name)   -- See Note [Parens in HsSyn] in HsExpr
 	-- Parenthesis preserved for the precedence re-arrangement in RnTypes
 	-- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
-	-- 
-	-- However, NB that toHsType doesn't add HsParTys (in an effort to keep
-	-- interface files smaller), so when printing a HsType we may need to
-	-- add parens.  
 
   | HsPredTy		(HsPred name)	-- Only used in the type of an instance
 					-- declaration, eg.  Eq [a] -> Eq a

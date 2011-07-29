@@ -319,23 +319,23 @@ import Prelude hiding (init)
 -- Unless you want to handle exceptions yourself, you should wrap this around
 -- the top level of your program.  The default handlers output the error
 -- message(s) to stderr and exit cleanly.
-defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => DynFlags -> m a -> m a
-defaultErrorHandler dflags inner =
+defaultErrorHandler :: (ExceptionMonad m, MonadIO m) => LogAction -> m a -> m a
+defaultErrorHandler la inner =
   -- top-level exception handler: any unrecognised exception is a compiler bug.
   ghandle (\exception -> liftIO $ do
            hFlush stdout
            case fromException exception of
                 -- an IO exception probably isn't our fault, so don't panic
                 Just (ioe :: IOException) ->
-                  fatalErrorMsg dflags (text (show ioe))
+                  fatalErrorMsg' la (text (show ioe))
                 _ -> case fromException exception of
 		     Just UserInterrupt -> exitWith (ExitFailure 1)
                      Just StackOverflow ->
-                         fatalErrorMsg dflags (text "stack overflow: use +RTS -K<size> to increase it")
+                         fatalErrorMsg' la (text "stack overflow: use +RTS -K<size> to increase it")
                      _ -> case fromException exception of
                           Just (ex :: ExitCode) -> throw ex
                           _ ->
-                              fatalErrorMsg dflags
+                              fatalErrorMsg' la
                                   (text (show (Panic (show exception))))
            exitWith (ExitFailure 1)
          ) $
@@ -347,7 +347,7 @@ defaultErrorHandler dflags inner =
   		case ge of
 		     PhaseFailed _ code -> exitWith code
 		     Signal _ -> exitWith (ExitFailure 1)
-		     _ -> do fatalErrorMsg dflags (text (show ge))
+		     _ -> do fatalErrorMsg' la (text (show ge))
 			     exitWith (ExitFailure 1)
 	    ) $
   inner
@@ -737,12 +737,17 @@ loadModule tcm = do
                          return (Just l)
                      _otherwise -> return Nothing
                                                 
+   let source_modified | isNothing mb_linkable = SourceModified
+                       | otherwise             = SourceUnmodified
+                       -- we can't determine stability here
+
    -- compile doesn't change the session
    hsc_env <- getSession
    mod_info <- liftIO $ compile' (hscNothingBackendOnly     tcg,
                                   hscInteractiveBackendOnly tcg,
                                   hscBatchBackendOnly       tcg)
                                   hsc_env ms 1 1 Nothing mb_linkable
+                                  source_modified
 
    modifySession $ \e -> e{ hsc_HPT = addToUFM (hsc_HPT e) mod mod_info }
    return tcm
@@ -816,7 +821,7 @@ compileCoreToObj simplify cm@(CoreModule{ cm_module = mName }) = do
          ms_obj_date = Nothing,
          -- Only handling the single-module case for now, so no imports.
          ms_srcimps = [],
-         ms_imps = [],
+         ms_textual_imps = [],
          -- No source file
          ms_hspp_file = "",
          ms_hspp_opts = dflags,
@@ -932,6 +937,8 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
 	then return Nothing
 	else -} liftIO $ getPackageModuleInfo hsc_env mdl
+   -- ToDo: we don't understand what the following comment means.
+   --    (SDM, 19/7/2011)
    -- getPackageModuleInfo will attempt to find the interface, so
    -- we don't want to call it for a home module, just in case there
    -- was a problem loading the module and the interface doesn't

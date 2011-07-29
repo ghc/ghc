@@ -14,7 +14,7 @@ fi
 
 if [ "$#" -ne 1 ]
 then
-    die "Must be given on argument (the bindist)"
+    die "Must be given one argument (the bindist)"
 fi
 
 BINDIST="$1"

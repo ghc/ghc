@@ -24,6 +24,7 @@ module CmmOpt (
 #include "HsVersions.h"
 
 import OldCmm
+import CmmNode (wrapRecExp)
 import CmmUtils
 import CLabel
 import StaticFlags
@@ -180,8 +181,7 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
 
         -- used (foldable to literal): try to inline at all the use sites
   | Just n <- lookupUFM uses u,
-    CmmMachOp op es <- expr,
-    e@(CmmLit _) <- cmmMachOpFold op es
+    e@(CmmLit _) <- wrapRecExp foldExp expr
   =
 #ifdef NCG_DEBUG
      trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
@@ -200,6 +200,9 @@ cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts
      trace ("nativeGen: inlining " ++ showSDoc (pprStmt stmt)) $
 #endif
      cmmMiniInlineStmts uses stmts'
+ where
+  foldExp (CmmMachOp op args) = cmmMachOpFold op args
+  foldExp e = e
 
 cmmMiniInlineStmts uses (stmt:stmts)
   = stmt : cmmMiniInlineStmts uses stmts
@@ -670,12 +673,11 @@ exactLog2 x_
 -}
 
 cmmLoopifyForC :: RawCmmTop -> RawCmmTop
-cmmLoopifyForC p@(CmmProc info entry_lbl
-                 (ListGraph blocks@(BasicBlock top_id _ : _)))
-  | null info = p  -- only if there's an info table, ignore case alts
-  | otherwise =  
+cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
+cmmLoopifyForC p@(CmmProc (Just info@(Statics info_lbl _)) entry_lbl
+                 (ListGraph blocks@(BasicBlock top_id _ : _))) =
 --  pprTrace "jump_lbl" (ppr jump_lbl <+> ppr entry_lbl) $
-  CmmProc info entry_lbl (ListGraph blocks')
+  CmmProc (Just info) entry_lbl (ListGraph blocks')
   where blocks' = [ BasicBlock id (map do_stmt stmts)
 		  | BasicBlock id stmts <- blocks ]
 
@@ -683,7 +685,7 @@ cmmLoopifyForC p@(CmmProc info entry_lbl
 		= CmmBranch top_id
 	do_stmt stmt = stmt
 
-	jump_lbl | tablesNextToCode = entryLblToInfoLbl entry_lbl
+	jump_lbl | tablesNextToCode = info_lbl
 		 | otherwise        = entry_lbl
 
 cmmLoopifyForC top = top

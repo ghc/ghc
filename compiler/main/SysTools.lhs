@@ -162,8 +162,6 @@ initSysTools mbMinusB
         ; let settingsFile = top_dir </> "settings"
               installed :: FilePath -> FilePath
               installed file = top_dir </> file
-              installed_mingw_bin file = top_dir </> ".." </> "mingw" </> "bin" </> file
-              installed_perl_bin file = top_dir </> ".." </> "perl" </> file
 
         ; settingsStr <- readFile settingsFile
         ; mySettings <- case maybeReadFuzzy settingsStr of
@@ -173,7 +171,14 @@ initSysTools mbMinusB
                             pgmError ("Can't parse " ++ show settingsFile)
         ; let getSetting key = case lookup key mySettings of
                                Just xs ->
-                                   return xs
+                                   return $ case stripPrefix "$topdir" xs of
+                                            Just [] ->
+                                                top_dir
+                                            Just xs'@(c:_)
+                                             | isPathSeparator c ->
+                                                top_dir ++ xs'
+                                            _ ->
+                                                xs
                                Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
         ; myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
         -- On Windows, mingw is distributed with GHC,
@@ -181,14 +186,10 @@ initSysTools mbMinusB
         -- It would perhaps be nice to be able to override this
         -- with the settings file, but it would be a little fiddly
         -- to make that possible, so for now you can't.
-        ; gcc_prog <- if isWindowsHost then return $ installed_mingw_bin "gcc"
-                                       else getSetting "C compiler command"
-        ; gcc_args_str <- if isWindowsHost then return []
-                                           else getSetting "C compiler flags"
+        ; gcc_prog <- getSetting "C compiler command"
+        ; gcc_args_str <- getSetting "C compiler flags"
         ; let gcc_args = map Option (words gcc_args_str)
-        ; perl_path <- if isWindowsHost
-                       then return $ installed_perl_bin "perl"
-                       else getSetting "perl command"
+        ; perl_path <- getSetting "perl command"
 
         ; let pkgconfig_path = installed "package.conf.d"
               ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -201,16 +202,13 @@ initSysTools mbMinusB
                 -- split is a Perl script
               split_script  = installed cGHC_SPLIT_PGM
 
-              windres_path  = installed_mingw_bin "windres"
+        ; windres_path <- getSetting "windres command"
 
         ; tmpdir <- getTemporaryDirectory
 
-        ; let
-              -- 'touch' is a GHC util for Windows
-              touch_path
-                | isWindowsHost = installed cGHC_TOUCHY_PGM
-                | otherwise     = "touch"
-              -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
+        ; touch_path <- getSetting "touch command"
+
+        ; let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
               -- a call to Perl to get the invocation of split.
               -- On Unix, scripts are invoked using the '#!' method.  Binary
               -- installations of GHC on Unix place the correct line on the
@@ -219,11 +217,8 @@ initSysTools mbMinusB
               (split_prog,  split_args)
                 | isWindowsHost = (perl_path,    [Option split_script])
                 | otherwise     = (split_script, [])
-              (mkdll_prog, mkdll_args)
-                | not isWindowsHost
-                    = panic "Can't build DLLs on a non-Win32 system"
-                | otherwise =
-                    (installed_mingw_bin cMKDLL, [])
+        ; mkdll_prog <- getSetting "dllwrap command"
+        ; let mkdll_args = []
 
         -- cpp is derived from gcc on all platforms
         -- HACK, see setPgmP below. We keep 'words' here to remember to fix
@@ -274,7 +269,6 @@ initSysTools mbMinusB
                         sOpt_F       = [],
                         sOpt_c       = [],
                         sOpt_a       = [],
-                        sOpt_m       = [],
                         sOpt_l       = [],
                         sOpt_windres = [],
                         sOpt_lo      = [],
@@ -460,7 +454,9 @@ figureLlvmVersion dflags = do
              return $ Just v
             )
             (\err -> do
-                putMsg dflags $ text $ "Warning: " ++ show err
+                putMsg dflags $ text $ "Error (" ++ show err ++ ")"
+                putMsg dflags $ text "Warning: Couldn't figure out LLVM version!"
+                putMsg dflags $ text "Make sure you have installed LLVM"
                 return Nothing)
   return ver
   

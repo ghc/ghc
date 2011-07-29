@@ -21,7 +21,7 @@
 --    - pragma-end should be only valid in a pragma
 
 --   qualified operator NOTES.
---   
+--
 --   - If M.(+) is a single lexeme, then..
 --     - Probably (+) should be a single lexeme too, for consistency.
 --       Otherwise ( + ) would be a prefix operator, but M.( + ) would not be.
@@ -47,10 +47,10 @@
 
 module Lexer (
    Token(..), lexer, pragState, mkPState, PState(..),
-   P(..), ParseResult(..), getSrcLoc, 
+   P(..), ParseResult(..), getSrcLoc,
    getPState, getDynFlags, withThisPackage,
    failLocMsgP, failSpanMsgP, srcParseFail,
-   getMessages, 
+   getMessages,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
@@ -69,8 +69,8 @@ import UniqFM
 import DynFlags
 import Module
 import Ctype
-import BasicTypes	( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
-import Util		( readRational )
+import BasicTypes       ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..) )
+import Util             ( readRational )
 
 import Control.Monad
 import Data.Bits
@@ -108,7 +108,7 @@ $small     = [$ascsmall $unismall \_]
 $unigraphic = \x06 -- Trick Alex into handling Unicode. See alexGetChar.
 $graphic   = [$small $large $symbol $digit $special $unigraphic \:\"\']
 
-$octit	   = 0-7
+$octit     = 0-7
 $hexit     = [$decdigit A-F a-f]
 $symchar   = [$symbol \:]
 $nl        = [\n\r]
@@ -142,7 +142,7 @@ $docsym    = [\| \^ \* \$]
 haskell :-
 
 -- everywhere: skip whitespace and comments
-$white_no_nl+ 				;
+$white_no_nl+ ;
 $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out
@@ -159,7 +159,7 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- have to exclude those.
 
 -- Since Haddock comments aren't valid in every state, we need to rule them
--- out here.  
+-- out here.
 
 -- The following two rules match comments that begin with two dashes, but
 -- continue with a different character. The rules test that this character
@@ -202,53 +202,53 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- as a nested comment.  We don't bother with this: if the line begins
 -- with {-#, then we'll assume it's a pragma we know about and go for do_bol.
 <bol> {
-  \n					;
-  ^\# (line)?				{ begin line_prag1 }
-  ^\# pragma .* \n			; -- GCC 3.3 CPP generated, apparently
-  ^\# \! .* \n				; -- #!, for scripts
-  ()					{ do_bol }
+  \n                                    ;
+  ^\# (line)?                           { begin line_prag1 }
+  ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
+  ^\# \! .* \n                          ; -- #!, for scripts
+  ()                                    { do_bol }
 }
 
 -- after a layout keyword (let, where, do, of), we begin a new layout
 -- context if the curly brace is missing.
 -- Careful! This stuff is quite delicate.
 <layout, layout_do> {
-  \{ / { notFollowedBy '-' }		{ hopefully_open_brace }
-	-- we might encounter {-# here, but {- has been handled already
-  \n					;
-  ^\# (line)?				{ begin line_prag1 }
+  \{ / { notFollowedBy '-' }            { hopefully_open_brace }
+        -- we might encounter {-# here, but {- has been handled already
+  \n                                    ;
+  ^\# (line)?                           { begin line_prag1 }
 }
 
 -- do is treated in a subtly different way, see new_layout_context
-<layout>    ()				{ new_layout_context True }
-<layout_do> ()				{ new_layout_context False }
+<layout>    ()                          { new_layout_context True }
+<layout_do> ()                          { new_layout_context False }
 
 -- after a new layout context which was found to be to the left of the
 -- previous context, we have generated a '{' token, and we now need to
 -- generate a matching '}' token.
-<layout_left>  ()			{ do_layout_left }
+<layout_left>  ()                       { do_layout_left }
 
-<0,option_prags> \n				{ begin bol }
+<0,option_prags> \n                     { begin bol }
 
 "{-#" $whitechar* $pragmachar+ / { known_pragma linePrags }
                                 { dispatch_pragmas linePrags }
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
-<line_prag1> $decdigit+			{ setLine line_prag1a }
-<line_prag1a> \" [$graphic \ ]* \"	{ setFile line_prag1b }
-<line_prag1b> .*			{ pop }
+<line_prag1> $decdigit+                 { setLine line_prag1a }
+<line_prag1a> \" [$graphic \ ]* \"      { setFile line_prag1b }
+<line_prag1b> .*                        { pop }
 
 -- Haskell-style line pragmas, of the form
 --    {-# LINE <line> "<file>" #-}
-<line_prag2> $decdigit+			{ setLine line_prag2a }
-<line_prag2a> \" [$graphic \ ]* \"	{ setFile line_prag2b }
-<line_prag2b> "#-}"|"-}"		{ pop }
+<line_prag2> $decdigit+                 { setLine line_prag2a }
+<line_prag2a> \" [$graphic \ ]* \"      { setFile line_prag2b }
+<line_prag2b> "#-}"|"-}"                { pop }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
 
 <0,option_prags> {
-  "{-#" $whitechar* $pragmachar+ 
+  "{-#" $whitechar* $pragmachar+
         $whitechar+ $pragmachar+ / { known_pragma twoWordPrags }
                                  { dispatch_pragmas twoWordPrags }
 
@@ -260,14 +260,14 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
                                  { dispatch_pragmas ignoredPrags }
 
   -- ToDo: should only be valid inside a pragma:
-  "#-}" 				{ endPrag }
+  "#-}"                          { endPrag }
 }
 
 <option_prags> {
   "{-#"  $whitechar* $pragmachar+ / { known_pragma fileHeaderPrags }
                                    { dispatch_pragmas fileHeaderPrags }
 
-  "-- #"                                 { multiline_doc_comment }
+  "-- #"                           { multiline_doc_comment }
 }
 
 <0> {
@@ -297,19 +297,19 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- "special" symbols
 
 <0> {
-  "[:" / { ifExtension parrEnabled }	{ token ITopabrack }
-  ":]" / { ifExtension parrEnabled }	{ token ITcpabrack }
+  "[:" / { ifExtension parrEnabled }    { token ITopabrack }
+  ":]" / { ifExtension parrEnabled }    { token ITcpabrack }
 }
-  
+
 <0> {
-  "[|"	    / { ifExtension thEnabled }	{ token ITopenExpQuote }
-  "[e|"	    / { ifExtension thEnabled }	{ token ITopenExpQuote }
-  "[p|"	    / { ifExtension thEnabled }	{ token ITopenPatQuote }
-  "[d|"	    / { ifExtension thEnabled }	{ layout_token ITopenDecQuote }
-  "[t|"	    / { ifExtension thEnabled }	{ token ITopenTypQuote }
-  "|]"	    / { ifExtension thEnabled }	{ token ITcloseQuote }
-  \$ @varid / { ifExtension thEnabled }	{ skip_one_varid ITidEscape }
-  "$("	    / { ifExtension thEnabled }	{ token ITparenEscape }
+  "[|"      / { ifExtension thEnabled } { token ITopenExpQuote }
+  "[e|"     / { ifExtension thEnabled } { token ITopenExpQuote }
+  "[p|"     / { ifExtension thEnabled } { token ITopenPatQuote }
+  "[d|"     / { ifExtension thEnabled } { layout_token ITopenDecQuote }
+  "[t|"     / { ifExtension thEnabled } { token ITopenTypQuote }
+  "|]"      / { ifExtension thEnabled } { token ITcloseQuote }
+  \$ @varid / { ifExtension thEnabled } { skip_one_varid ITidEscape }
+  "$("      / { ifExtension thEnabled } { token ITparenEscape }
 
 -- For backward compatibility, accept the old dollar syntax
   "[$" @varid "|"  / { ifExtension qqEnabled }
@@ -321,12 +321,12 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 
 <0> {
   "(|" / { ifExtension arrowsEnabled `alexAndPred` notFollowedBySymbol }
-					{ special IToparenbar }
+                                        { special IToparenbar }
   "|)" / { ifExtension arrowsEnabled }  { special ITcparenbar }
 }
 
 <0> {
-  \? @varid / { ifExtension ipEnabled }	{ skip_one_varid ITdupipvarid }
+  \? @varid / { ifExtension ipEnabled } { skip_one_varid ITdupipvarid }
 }
 
 <0> {
@@ -337,23 +337,23 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 }
 
 <0,option_prags> {
-  \(					{ special IToparen }
-  \)					{ special ITcparen }
-  \[					{ special ITobrack }
-  \]					{ special ITcbrack }
-  \,					{ special ITcomma }
-  \;					{ special ITsemi }
-  \`					{ special ITbackquote }
- 				
-  \{					{ open_brace }
-  \}					{ close_brace }
+  \(                                    { special IToparen }
+  \)                                    { special ITcparen }
+  \[                                    { special ITobrack }
+  \]                                    { special ITcbrack }
+  \,                                    { special ITcomma }
+  \;                                    { special ITsemi }
+  \`                                    { special ITbackquote }
+
+  \{                                    { open_brace }
+  \}                                    { close_brace }
 }
 
 <0,option_prags> {
-  @qual @varid			{ idtoken qvarid }
-  @qual @conid			{ idtoken qconid }
-  @varid			{ varid }
-  @conid			{ idtoken conid }
+  @qual @varid                  { idtoken qvarid }
+  @qual @conid                  { idtoken qconid }
+  @varid                        { varid }
+  @conid                        { idtoken conid }
 }
 
 <0> {
@@ -410,8 +410,8 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- lexer, we would still have to parse the string afterward in order
 -- to convert it to a String.
 <0> {
-  \'				{ lex_char_tok }
-  \" 				{ lex_string_tok }
+  \'                            { lex_char_tok }
+  \"                            { lex_string_tok }
 }
 
 {
@@ -419,7 +419,7 @@ $tab+         { warn Opt_WarnTabs (text "Warning: Tab character") }
 -- The token type
 
 data Token
-  = ITas  			-- Haskell keywords
+  = ITas                        -- Haskell keywords
   | ITcase
   | ITclass
   | ITdata
@@ -443,15 +443,14 @@ data Token
   | ITthen
   | ITtype
   | ITwhere
-  | ITscc			-- ToDo: remove (we use {-# SCC "..." #-} now)
+  | ITscc                       -- ToDo: remove (we use {-# SCC "..." #-} now)
 
-  | ITforall			-- GHC extension keywords
+  | ITforall                    -- GHC extension keywords
   | ITforeign
   | ITexport
   | ITlabel
   | ITdynamic
   | ITsafe
-  | ITthreadsafe
   | ITinterruptible
   | ITunsafe
   | ITstdcallconv
@@ -463,10 +462,10 @@ data Token
   | ITby
   | ITusing
 
-	-- Pragmas
+  -- Pragmas
   | ITinline_prag InlineSpec RuleMatchInfo
-  | ITspec_prag			-- SPECIALISE	
-  | ITspec_inline_prag Bool	-- SPECIALISE INLINE (or NOINLINE)
+  | ITspec_prag                 -- SPECIALISE
+  | ITspec_inline_prag Bool     -- SPECIALISE INLINE (or NOINLINE)
   | ITsource_prag
   | ITrules_prag
   | ITwarning_prag
@@ -485,7 +484,7 @@ data Token
   | ITvect_scalar_prag
   | ITnovect_prag
 
-  | ITdotdot  			-- reserved symbols
+  | ITdotdot                    -- reserved symbols
   | ITcolon
   | ITdcolon
   | ITequal
@@ -501,17 +500,17 @@ data Token
   | ITstar
   | ITdot
 
-  | ITbiglam			-- GHC-extension symbols
+  | ITbiglam                    -- GHC-extension symbols
 
-  | ITocurly  			-- special symbols
+  | ITocurly                    -- special symbols
   | ITccurly
   | ITocurlybar                 -- {|, for type applications
   | ITccurlybar                 -- |}, for type applications
   | ITvocurly
   | ITvccurly
   | ITobrack
-  | ITopabrack			-- [:, for parallel arrays with -XParallelArrays
-  | ITcpabrack			-- :], for parallel arrays with -XParallelArrays
+  | ITopabrack                  -- [:, for parallel arrays with -XParallelArrays
+  | ITcpabrack                  -- :], for parallel arrays with -XParallelArrays
   | ITcbrack
   | IToparen
   | ITcparen
@@ -522,7 +521,7 @@ data Token
   | ITunderscore
   | ITbackquote
 
-  | ITvarid   FastString	-- identifiers
+  | ITvarid   FastString        -- identifiers
   | ITconid   FastString
   | ITvarsym  FastString
   | ITconsym  FastString
@@ -533,7 +532,7 @@ data Token
   | ITprefixqvarsym (FastString,FastString)
   | ITprefixqconsym (FastString,FastString)
 
-  | ITdupipvarid   FastString	-- GHC extension: implicit param: ?x
+  | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
 
   | ITchar       Char
   | ITstring     FastString
@@ -548,29 +547,29 @@ data Token
   | ITprimdouble FractionalLit
 
   -- Template Haskell extension tokens
-  | ITopenExpQuote  		--  [| or [e|
-  | ITopenPatQuote		--  [p|
-  | ITopenDecQuote		--  [d|
-  | ITopenTypQuote		--  [t|         
-  | ITcloseQuote		--  |]
-  | ITidEscape   FastString	--  $x
-  | ITparenEscape		--  $( 
-  | ITvarQuote			--  '
-  | ITtyQuote			--  ''
+  | ITopenExpQuote              --  [| or [e|
+  | ITopenPatQuote              --  [p|
+  | ITopenDecQuote              --  [d|
+  | ITopenTypQuote              --  [t|
+  | ITcloseQuote                --  |]
+  | ITidEscape   FastString     --  $x
+  | ITparenEscape               --  $(
+  | ITvarQuote                  --  '
+  | ITtyQuote                   --  ''
   | ITquasiQuote (FastString,FastString,RealSrcSpan) --  [:...|...|]
 
   -- Arrow notation extension
   | ITproc
   | ITrec
-  | IToparenbar			--  (|
-  | ITcparenbar			--  |)
-  | ITlarrowtail		--  -<
-  | ITrarrowtail		--  >-
-  | ITLarrowtail		--  -<<
-  | ITRarrowtail		--  >>-
+  | IToparenbar                 --  (|
+  | ITcparenbar                 --  |)
+  | ITlarrowtail                --  -<
+  | ITrarrowtail                --  >-
+  | ITLarrowtail                --  -<<
+  | ITRarrowtail                --  >>-
 
-  | ITunknown String		-- Used when the lexer can't make sense of it
-  | ITeof			-- end of file token
+  | ITunknown String            -- Used when the lexer can't make sense of it
+  | ITeof                       -- end of file token
 
   -- Documentation annotations
   | ITdocCommentNext  String     -- something beginning '-- |'
@@ -586,33 +585,6 @@ data Token
   deriving Show -- debugging
 #endif
 
-{-
-isSpecial :: Token -> Bool
--- If we see M.x, where x is a keyword, but
--- is special, we treat is as just plain M.x, 
--- not as a keyword.
-isSpecial ITas        	= True
-isSpecial IThiding    	= True
-isSpecial ITqualified 	= True
-isSpecial ITforall    	= True
-isSpecial ITexport    	= True
-isSpecial ITlabel     	= True
-isSpecial ITdynamic   	= True
-isSpecial ITsafe    	= True
-isSpecial ITthreadsafe 	= True
-isSpecial ITinterruptible = True
-isSpecial ITunsafe    	= True
-isSpecial ITccallconv   = True
-isSpecial ITstdcallconv = True
-isSpecial ITprimcallconv = True
-isSpecial ITmdo		= True
-isSpecial ITfamily	= True
-isSpecial ITgroup   = True
-isSpecial ITby      = True
-isSpecial ITusing   = True
-isSpecial _             = False
--}
-
 -- the bitmap provided as the third component indicates whether the
 -- corresponding extension keyword is valid under the extension options
 -- provided to the compiler; if the extension corresponding to *any* of the
@@ -622,55 +594,56 @@ isSpecial _             = False
 --
 reservedWordsFM :: UniqFM (Token, Int)
 reservedWordsFM = listToUFM $
-	map (\(x, y, z) -> (mkFastString x, (y, z)))
-       [( "_",		ITunderscore, 	0 ),
-	( "as",		ITas, 		0 ),
-	( "case",	ITcase, 	0 ),     
-	( "class",	ITclass, 	0 ),    
-	( "data",	ITdata, 	0 ),     
-	( "default",	ITdefault, 	0 ),  
-	( "deriving",	ITderiving, 	0 ), 
-	( "do",		ITdo, 		0 ),       
-	( "else",	ITelse, 	0 ),     
-	( "hiding",	IThiding, 	0 ),
-	( "if",		ITif, 		0 ),       
-	( "import",	ITimport, 	0 ),   
-	( "in",		ITin, 		0 ),       
-	( "infix",	ITinfix, 	0 ),    
-	( "infixl",	ITinfixl, 	0 ),   
-	( "infixr",	ITinfixr, 	0 ),   
-	( "instance",	ITinstance, 	0 ), 
-	( "let",	ITlet, 		0 ),      
-	( "module",	ITmodule, 	0 ),   
-	( "newtype",	ITnewtype, 	0 ),  
-	( "of",		ITof, 		0 ),       
-	( "qualified",	ITqualified, 	0 ),
-	( "then",	ITthen, 	0 ),     
-	( "type",	ITtype, 	0 ),     
-	( "where",	ITwhere, 	0 ),
-	( "_scc_",	ITscc, 		0 ),		-- ToDo: remove
+    map (\(x, y, z) -> (mkFastString x, (y, z)))
+        [( "_",              ITunderscore,    0 ),
+         ( "as",             ITas,            0 ),
+         ( "case",           ITcase,          0 ),
+         ( "class",          ITclass,         0 ),
+         ( "data",           ITdata,          0 ),
+         ( "default",        ITdefault,       0 ),
+         ( "deriving",       ITderiving,      0 ),
+         ( "do",             ITdo,            0 ),
+         ( "else",           ITelse,          0 ),
+         ( "hiding",         IThiding,        0 ),
+         ( "if",             ITif,            0 ),
+         ( "import",         ITimport,        0 ),
+         ( "in",             ITin,            0 ),
+         ( "infix",          ITinfix,         0 ),
+         ( "infixl",         ITinfixl,        0 ),
+         ( "infixr",         ITinfixr,        0 ),
+         ( "instance",       ITinstance,      0 ),
+         ( "let",            ITlet,           0 ),
+         ( "module",         ITmodule,        0 ),
+         ( "newtype",        ITnewtype,       0 ),
+         ( "of",             ITof,            0 ),
+         ( "qualified",      ITqualified,     0 ),
+         ( "then",           ITthen,          0 ),
+         ( "type",           ITtype,          0 ),
+         ( "where",          ITwhere,         0 ),
+         ( "_scc_",          ITscc,           0 ),            -- ToDo: remove
 
-    ( "forall",	ITforall,	 bit explicitForallBit .|. bit inRulePragBit),
-	( "mdo",	ITmdo,		 bit recursiveDoBit),
-	( "family",	ITfamily,	 bit tyFamBit),
-    ( "group",  ITgroup,     bit transformComprehensionsBit),
-    ( "by",     ITby,        bit transformComprehensionsBit),
-    ( "using",  ITusing,     bit transformComprehensionsBit),
+         ( "forall",         ITforall,        bit explicitForallBit .|.
+                                              bit inRulePragBit),
+         ( "mdo",            ITmdo,           bit recursiveDoBit),
+         ( "family",         ITfamily,        bit tyFamBit),
+         ( "group",          ITgroup,         bit transformComprehensionsBit),
+         ( "by",             ITby,            bit transformComprehensionsBit),
+         ( "using",          ITusing,         bit transformComprehensionsBit),
 
-	( "foreign",	ITforeign,	 bit ffiBit),
-	( "export",	ITexport,	 bit ffiBit),
-	( "label",	ITlabel,	 bit ffiBit),
-	( "dynamic",	ITdynamic,	 bit ffiBit),
-	( "safe",	ITsafe,		 bit ffiBit .|. bit safeHaskellBit),
-	( "threadsafe",	ITthreadsafe,	 bit ffiBit),  -- ToDo: remove
-	( "interruptible", ITinterruptible, bit ffiBit),
-	( "unsafe",	ITunsafe,	 bit ffiBit),
-	( "stdcall",    ITstdcallconv,	 bit ffiBit),
-	( "ccall",      ITccallconv,	 bit ffiBit),
-	( "prim",       ITprimcallconv,	 bit ffiBit),
+         ( "foreign",        ITforeign,       bit ffiBit),
+         ( "export",         ITexport,        bit ffiBit),
+         ( "label",          ITlabel,         bit ffiBit),
+         ( "dynamic",        ITdynamic,       bit ffiBit),
+         ( "safe",           ITsafe,          bit ffiBit .|.
+                                              bit safeHaskellBit),
+         ( "interruptible",  ITinterruptible, bit interruptibleFfiBit),
+         ( "unsafe",         ITunsafe,        bit ffiBit),
+         ( "stdcall",        ITstdcallconv,   bit ffiBit),
+         ( "ccall",          ITccallconv,     bit ffiBit),
+         ( "prim",           ITprimcallconv,  bit ffiBit),
 
-	( "rec",	ITrec,		 bit recBit),
-	( "proc",	ITproc,		 bit arrowsBit)
+         ( "rec",            ITrec,           bit recBit),
+         ( "proc",           ITproc,          bit arrowsBit)
      ]
 
 reservedSymsFM :: UniqFM (Token, Int -> Bool)
@@ -736,16 +709,16 @@ idtoken :: (StringBuffer -> Int -> Token) -> Action
 idtoken f span buf len = return (L span $! (f buf len))
 
 skip_one_varid :: (FastString -> Token) -> Action
-skip_one_varid f span buf len 
+skip_one_varid f span buf len
   = return (L span $! f (lexemeToFastString (stepOn buf) (len-1)))
 
 strtoken :: (String -> Token) -> Action
-strtoken f span buf len = 
+strtoken f span buf len =
   return (L span $! (f $! lexemeToString buf len))
 
 init_strtoken :: Int -> (String -> Token) -> Action
 -- like strtoken, but drops the last N character(s)
-init_strtoken drop f span buf len = 
+init_strtoken drop f span buf len =
   return (L span $! (f $! lexemeToString buf (len-drop)))
 
 begin :: Int -> Action
@@ -777,7 +750,7 @@ nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
 nextCharIs buf p = not (atEnd buf) && p (currentChar buf)
 
 notFollowedBy :: Char -> AlexAccPred Int
-notFollowedBy char _ _ _ (AI _ buf) 
+notFollowedBy char _ _ _ (AI _ buf)
   = nextCharIs buf (/=char)
 
 notFollowedBySymbol :: AlexAccPred Int
@@ -800,11 +773,6 @@ isNormalComment bits _ _ (AI _ buf)
 spaceAndP :: StringBuffer -> (StringBuffer -> Bool) -> Bool
 spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
 
-{-
-haddockDisabledAnd p bits _ _ (AI _ buf)
-  = if haddockEnabled bits then False else (p buf)
--}
-
 atEOL :: AlexAccPred Int
 atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
 
@@ -815,14 +783,14 @@ multiline_doc_comment :: Action
 multiline_doc_comment span buf _len = withLexedDocType (worker "")
   where
     worker commentAcc input docType oneLine = case alexGetChar input of
-      Just ('\n', input') 
+      Just ('\n', input')
         | oneLine -> docCommentEnd input commentAcc docType buf span
         | otherwise -> case checkIfCommentLine input' of
           Just input -> worker ('\n':commentAcc) input docType False
           Nothing -> docCommentEnd input commentAcc docType buf span
       Just (c, input) -> worker (c:commentAcc) input docType oneLine
       Nothing -> docCommentEnd input commentAcc docType buf span
-      
+
     checkIfCommentLine input = check (dropNonNewlineSpace input)
       where
         check input = case alexGetChar input of
@@ -834,7 +802,7 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
           _ -> Nothing
 
         dropNonNewlineSpace input = case alexGetChar input of
-          Just (c, input') 
+          Just (c, input')
             | isSpace c && c /= '\n' -> dropNonNewlineSpace input'
             | otherwise -> input
           Nothing -> input
@@ -900,8 +868,8 @@ withLexedDocType lexDocComment = do
     '*' -> lexDocSection 1 input
     '#' -> lexDocComment input ITdocOptionsOld False
     _ -> panic "withLexedDocType: Bad doc type"
- where 
-    lexDocSection n input = case alexGetChar input of 
+ where
+    lexDocSection n input = case alexGetChar input of
       Just ('*', input) -> lexDocSection (n+1) input
       Just (_,   _)     -> lexDocComment input (ITdocSection n) True
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
@@ -922,31 +890,31 @@ endPrag span _buf _len = do
 -------------------------------------------------------------------------------
 -- This function is quite tricky. We can't just return a new token, we also
 -- need to update the state of the parser. Why? Because the token is longer
--- than what was lexed by Alex, and the lexToken function doesn't know this, so 
+-- than what was lexed by Alex, and the lexToken function doesn't know this, so
 -- it writes the wrong token length to the parser state. This function is
--- called afterwards, so it can just update the state. 
+-- called afterwards, so it can just update the state.
 
 docCommentEnd :: AlexInput -> String -> (String -> Token) -> StringBuffer ->
-                 RealSrcSpan -> P (RealLocated Token) 
+                 RealSrcSpan -> P (RealLocated Token)
 docCommentEnd input commentAcc docType buf span = do
   setInput input
   let (AI loc nextBuf) = input
       comment = reverse commentAcc
       span' = mkRealSrcSpan (realSrcSpanStart span) loc
       last_len = byteDiff buf nextBuf
-      
+
   span `seq` setLastToken span' last_len
   return (L span' (docType comment))
- 
+
 errBrace :: AlexInput -> RealSrcSpan -> P a
 errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) end "unterminated `{-'"
 
 open_brace, close_brace :: Action
-open_brace span _str _len = do 
+open_brace span _str _len = do
   ctx <- getContext
   setContext (NoLayout:ctx)
   return (L span ITocurly)
-close_brace span _str _len = do 
+close_brace span _str _len = do
   popContext
   return (L span ITccurly)
 
@@ -961,44 +929,44 @@ splitQualName :: StringBuffer -> Int -> Bool -> (FastString,FastString)
 splitQualName orig_buf len parens = split orig_buf orig_buf
   where
     split buf dot_buf
-	| orig_buf `byteDiff` buf >= len  = done dot_buf
-	| c == '.'                	  = found_dot buf'
-	| otherwise               	  = split buf' dot_buf
+        | orig_buf `byteDiff` buf >= len  = done dot_buf
+        | c == '.'                        = found_dot buf'
+        | otherwise                       = split buf' dot_buf
       where
        (c,buf') = nextChar buf
-  
+
     -- careful, we might get names like M....
     -- so, if the character after the dot is not upper-case, this is
     -- the end of the qualifier part.
     found_dot buf -- buf points after the '.'
-	| isUpper c    = split buf' buf
-	| otherwise    = done buf
+        | isUpper c    = split buf' buf
+        | otherwise    = done buf
       where
        (c,buf') = nextChar buf
 
     done dot_buf =
-	(lexemeToFastString orig_buf (qual_size - 1),
-	 if parens -- Prelude.(+)
+        (lexemeToFastString orig_buf (qual_size - 1),
+         if parens -- Prelude.(+)
             then lexemeToFastString (stepOn dot_buf) (len - qual_size - 2)
             else lexemeToFastString dot_buf (len - qual_size))
       where
-	qual_size = orig_buf `byteDiff` dot_buf
+        qual_size = orig_buf `byteDiff` dot_buf
 
 varid :: Action
 varid span buf len =
   fs `seq`
   case lookupUFM reservedWordsFM fs of
-	Just (keyword,0)    -> do
-		maybe_layout keyword
-		return (L span keyword)
-	Just (keyword,exts) -> do
-		b <- extension (\i -> exts .&. i /= 0)
-		if b then do maybe_layout keyword
-			     return (L span keyword)
-		     else return (L span (ITvarid fs))
-	_other -> return (L span (ITvarid fs))
+        Just (keyword,0)    -> do
+                maybe_layout keyword
+                return (L span keyword)
+        Just (keyword,exts) -> do
+                b <- extension (\i -> exts .&. i /= 0)
+                if b then do maybe_layout keyword
+                             return (L span keyword)
+                     else return (L span (ITvarid fs))
+        _other -> return (L span (ITvarid fs))
   where
-	fs = lexemeToFastString buf len
+        fs = lexemeToFastString buf len
 
 conid :: StringBuffer -> Int -> Token
 conid buf len = ITconid fs
@@ -1016,25 +984,25 @@ consym = sym ITconsym
 
 sym :: (FastString -> Token) -> RealSrcSpan -> StringBuffer -> Int
     -> P (RealLocated Token)
-sym con span buf len = 
+sym con span buf len =
   case lookupUFM reservedSymsFM fs of
-	Just (keyword,exts) -> do
-		b <- extension exts
-		if b then return (L span keyword)
-		     else return (L span $! con fs)
-	_other -> return (L span $! con fs)
+        Just (keyword,exts) -> do
+                b <- extension exts
+                if b then return (L span keyword)
+                     else return (L span $! con fs)
+        _other -> return (L span $! con fs)
   where
-	fs = lexemeToFastString buf len
+        fs = lexemeToFastString buf len
 
 -- Variations on the integral numeric literal.
 tok_integral :: (Integer -> Token)
-     -> (Integer -> Integer)
- --    -> (StringBuffer -> StringBuffer) -> (Int -> Int)
-     -> Int -> Int
-     -> (Integer, (Char->Int)) -> Action
-tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
-  return $ L span $ itint $! transint $ parseUnsignedInteger
-     (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
+             -> (Integer -> Integer)
+             -> Int -> Int
+             -> (Integer, (Char -> Int))
+             -> Action
+tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
+ = return $ L span $ itint $! transint $ parseUnsignedInteger
+       (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
 -- some conveniences for use with tok_integral
 tok_num :: (Integer -> Integer)
@@ -1071,20 +1039,20 @@ readFractionalLit str = (FL $! str) $! readRational str
 -- we're at the first token on a line, insert layout tokens if necessary
 do_bol :: Action
 do_bol span _str _len = do
-	pos <- getOffside
-	case pos of
-	    LT -> do
+        pos <- getOffside
+        case pos of
+            LT -> do
                 --trace "layout: inserting '}'" $ do
-		popContext
-		-- do NOT pop the lex state, we might have a ';' to insert
-		return (L span ITvccurly)
-	    EQ -> do
+                popContext
+                -- do NOT pop the lex state, we might have a ';' to insert
+                return (L span ITvccurly)
+            EQ -> do
                 --trace "layout: inserting ';'" $ do
-		_ <- popLexState
-		return (L span ITsemi)
-	    GT -> do
-		_ <- popLexState
-		lexToken
+                _ <- popLexState
+                return (L span ITsemi)
+            GT -> do
+                _ <- popLexState
+                lexToken
 
 -- certain keywords put us in the "layout" state, where we might
 -- add an opening curly brace.
@@ -1124,16 +1092,16 @@ new_layout_context strict span _buf _len = do
     nondecreasing <- extension nondecreasingIndentation
     let strict' = strict || not nondecreasing
     case ctx of
-	Layout prev_off : _  | 
-	   (strict'     && prev_off >= offset  ||
-	    not strict' && prev_off > offset) -> do
-		-- token is indented to the left of the previous context.
-		-- we must generate a {} sequence now.
-		pushLexState layout_left
-		return (L span ITvocurly)
-	_ -> do
-		setContext (Layout offset : ctx)
-		return (L span ITvocurly)
+        Layout prev_off : _  |
+           (strict'     && prev_off >= offset  ||
+            not strict' && prev_off > offset) -> do
+                -- token is indented to the left of the previous context.
+                -- we must generate a {} sequence now.
+                pushLexState layout_left
+                return (L span ITvocurly)
+        _ -> do
+                setContext (Layout offset : ctx)
+                return (L span ITvocurly)
 
 do_layout_left :: Action
 do_layout_left span _buf _len = do
@@ -1148,7 +1116,7 @@ setLine :: Int -> Action
 setLine code span buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
   setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
-	-- subtract one: the line number refers to the *following* line
+        -- subtract one: the line number refers to the *following* line
   _ <- popLexState
   pushLexState code
   lexToken
@@ -1201,7 +1169,7 @@ lex_string_prag mkTok span _buf _len
 lex_string_tok :: Action
 lex_string_tok span _buf _len = do
   tok <- lex_string ""
-  end <- getSrcLoc 
+  end <- getSrcLoc
   return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok)
 
 lex_string :: String -> P Token
@@ -1211,32 +1179,32 @@ lex_string s = do
     Nothing -> lit_error i
 
     Just ('"',i)  -> do
-	setInput i
-	magicHash <- extension magicHashEnabled
-	if magicHash
-	  then do
-	    i <- getInput
-	    case alexGetChar' i of
-	      Just ('#',i) -> do
-		   setInput i
-		   if any (> '\xFF') s
+        setInput i
+        magicHash <- extension magicHashEnabled
+        if magicHash
+          then do
+            i <- getInput
+            case alexGetChar' i of
+              Just ('#',i) -> do
+                   setInput i
+                   if any (> '\xFF') s
                     then failMsgP "primitive string literal must contain only characters <= \'\\xFF\'"
                     else let s' = mkZFastString (reverse s) in
-			 return (ITprimstring s')
-			-- mkZFastString is a hack to avoid encoding the
-			-- string in UTF-8.  We just want the exact bytes.
-	      _other ->
-		return (ITstring (mkFastString (reverse s)))
-	  else
-		return (ITstring (mkFastString (reverse s)))
+                         return (ITprimstring s')
+                        -- mkZFastString is a hack to avoid encoding the
+                        -- string in UTF-8.  We just want the exact bytes.
+              _other ->
+                return (ITstring (mkFastString (reverse s)))
+          else
+                return (ITstring (mkFastString (reverse s)))
 
     Just ('\\',i)
-	| Just ('&',i) <- next -> do 
-		setInput i; lex_string s
-	| Just (c,i) <- next, c <= '\x7f' && is_space c -> do
+        | Just ('&',i) <- next -> do
+                setInput i; lex_string s
+        | Just (c,i) <- next, c <= '\x7f' && is_space c -> do
                            -- is_space only works for <= '\x7f' (#3751)
-		setInput i; lex_stringgap s
-	where next = alexGetChar' i
+                setInput i; lex_stringgap s
+        where next = alexGetChar' i
 
     Just (c, i1) -> do
         case c of
@@ -1257,172 +1225,172 @@ lex_stringgap s = do
 lex_char_tok :: Action
 -- Here we are basically parsing character literals, such as 'x' or '\n'
 -- but, when Template Haskell is on, we additionally spot
--- 'x and ''T, returning ITvarQuote and ITtyQuote respectively, 
+-- 'x and ''T, returning ITvarQuote and ITtyQuote respectively,
 -- but WITHOUT CONSUMING the x or T part  (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
-lex_char_tok span _buf _len = do	-- We've seen '
-   i1 <- getInput	-- Look ahead to first character
+lex_char_tok span _buf _len = do        -- We've seen '
+   i1 <- getInput       -- Look ahead to first character
    let loc = realSrcSpanStart span
    case alexGetChar' i1 of
-	Nothing -> lit_error  i1
+        Nothing -> lit_error  i1
 
-	Just ('\'', i2@(AI end2 _)) -> do 	-- We've seen ''
-		  th_exts <- extension thEnabled
-		  if th_exts then do
-			setInput i2
-			return (L (mkRealSrcSpan loc end2)  ITtyQuote)
-		   else lit_error i1
+        Just ('\'', i2@(AI end2 _)) -> do       -- We've seen ''
+                  th_exts <- extension thEnabled
+                  if th_exts then do
+                        setInput i2
+                        return (L (mkRealSrcSpan loc end2)  ITtyQuote)
+                   else lit_error i1
 
-	Just ('\\', i2@(AI _end2 _)) -> do 	-- We've seen 'backslash
-		  setInput i2
-		  lit_ch <- lex_escape
+        Just ('\\', i2@(AI _end2 _)) -> do      -- We've seen 'backslash
+                  setInput i2
+                  lit_ch <- lex_escape
                   i3 <- getInput
-		  mc <- getCharOrFail i3 -- Trailing quote
-		  if mc == '\'' then finish_char_tok loc lit_ch
-			        else lit_error i3
+                  mc <- getCharOrFail i3 -- Trailing quote
+                  if mc == '\'' then finish_char_tok loc lit_ch
+                                else lit_error i3
 
         Just (c, i2@(AI _end2 _))
-		| not (isAny c) -> lit_error i1
-		| otherwise ->
+                | not (isAny c) -> lit_error i1
+                | otherwise ->
 
-		-- We've seen 'x, where x is a valid character
-		--  (i.e. not newline etc) but not a quote or backslash
-	   case alexGetChar' i2 of	-- Look ahead one more character
-		Just ('\'', i3) -> do 	-- We've seen 'x'
-			setInput i3 
-			finish_char_tok loc c
-		_other -> do 		-- We've seen 'x not followed by quote
-		       	  		-- (including the possibility of EOF)
-					-- If TH is on, just parse the quote only
-			th_exts <- extension thEnabled	
-			let (AI end _) = i1
-			if th_exts then return (L (mkRealSrcSpan loc end) ITvarQuote)
-				   else lit_error i2
+                -- We've seen 'x, where x is a valid character
+                --  (i.e. not newline etc) but not a quote or backslash
+           case alexGetChar' i2 of      -- Look ahead one more character
+                Just ('\'', i3) -> do   -- We've seen 'x'
+                        setInput i3
+                        finish_char_tok loc c
+                _other -> do            -- We've seen 'x not followed by quote
+                                        -- (including the possibility of EOF)
+                                        -- If TH is on, just parse the quote only
+                        th_exts <- extension thEnabled
+                        let (AI end _) = i1
+                        if th_exts then return (L (mkRealSrcSpan loc end) ITvarQuote)
+                                   else lit_error i2
 
 finish_char_tok :: RealSrcLoc -> Char -> P (RealLocated Token)
-finish_char_tok loc ch	-- We've already seen the closing quote
-			-- Just need to check for trailing #
-  = do	magicHash <- extension magicHashEnabled
-	i@(AI end _) <- getInput
-	if magicHash then do
-		case alexGetChar' i of
-			Just ('#',i@(AI end _)) -> do
-				setInput i
-				return (L (mkRealSrcSpan loc end) (ITprimchar ch))
-			_other ->
-				return (L (mkRealSrcSpan loc end) (ITchar ch))
-	    else do
-		   return (L (mkRealSrcSpan loc end) (ITchar ch))
+finish_char_tok loc ch  -- We've already seen the closing quote
+                        -- Just need to check for trailing #
+  = do  magicHash <- extension magicHashEnabled
+        i@(AI end _) <- getInput
+        if magicHash then do
+                case alexGetChar' i of
+                        Just ('#',i@(AI end _)) -> do
+                                setInput i
+                                return (L (mkRealSrcSpan loc end) (ITprimchar ch))
+                        _other ->
+                                return (L (mkRealSrcSpan loc end) (ITchar ch))
+            else do
+                   return (L (mkRealSrcSpan loc end) (ITchar ch))
 
 isAny :: Char -> Bool
 isAny c | c > '\x7f' = isPrint c
-	| otherwise  = is_any c
+        | otherwise  = is_any c
 
 lex_escape :: P Char
 lex_escape = do
   i0 <- getInput
   c <- getCharOrFail i0
   case c of
-	'a'   -> return '\a'
-	'b'   -> return '\b'
-	'f'   -> return '\f'
-	'n'   -> return '\n'
-	'r'   -> return '\r'
-	't'   -> return '\t'
-	'v'   -> return '\v'
-	'\\'  -> return '\\'
-	'"'   -> return '\"'
-	'\''  -> return '\''
-	'^'   -> do i1 <- getInput
+        'a'   -> return '\a'
+        'b'   -> return '\b'
+        'f'   -> return '\f'
+        'n'   -> return '\n'
+        'r'   -> return '\r'
+        't'   -> return '\t'
+        'v'   -> return '\v'
+        '\\'  -> return '\\'
+        '"'   -> return '\"'
+        '\''  -> return '\''
+        '^'   -> do i1 <- getInput
                     c <- getCharOrFail i1
-		    if c >= '@' && c <= '_'
-			then return (chr (ord c - ord '@'))
-			else lit_error i1
+                    if c >= '@' && c <= '_'
+                        then return (chr (ord c - ord '@'))
+                        else lit_error i1
 
-	'x'   -> readNum is_hexdigit 16 hexDigit
-	'o'   -> readNum is_octdigit  8 octDecDigit
-	x | is_decdigit x -> readNum2 is_decdigit 10 octDecDigit (octDecDigit x)
+        'x'   -> readNum is_hexdigit 16 hexDigit
+        'o'   -> readNum is_octdigit  8 octDecDigit
+        x | is_decdigit x -> readNum2 is_decdigit 10 octDecDigit (octDecDigit x)
 
-	c1 ->  do
-	   i <- getInput
-	   case alexGetChar' i of
-	    Nothing -> lit_error i0
-	    Just (c2,i2) -> 
+        c1 ->  do
+           i <- getInput
+           case alexGetChar' i of
+            Nothing -> lit_error i0
+            Just (c2,i2) ->
               case alexGetChar' i2 of
-		Nothing	-> do lit_error i0
-		Just (c3,i3) -> 
-		   let str = [c1,c2,c3] in
-		   case [ (c,rest) | (p,c) <- silly_escape_chars,
-			      	     Just rest <- [stripPrefix p str] ] of
-			  (escape_char,[]):_ -> do
-				setInput i3
-				return escape_char
-			  (escape_char,_:_):_ -> do
-				setInput i2
-				return escape_char
-			  [] -> lit_error i0
+                Nothing -> do lit_error i0
+                Just (c3,i3) ->
+                   let str = [c1,c2,c3] in
+                   case [ (c,rest) | (p,c) <- silly_escape_chars,
+                                     Just rest <- [stripPrefix p str] ] of
+                          (escape_char,[]):_ -> do
+                                setInput i3
+                                return escape_char
+                          (escape_char,_:_):_ -> do
+                                setInput i2
+                                return escape_char
+                          [] -> lit_error i0
 
 readNum :: (Char -> Bool) -> Int -> (Char -> Int) -> P Char
 readNum is_digit base conv = do
   i <- getInput
   c <- getCharOrFail i
-  if is_digit c 
-	then readNum2 is_digit base conv (conv c)
-	else lit_error i
+  if is_digit c
+        then readNum2 is_digit base conv (conv c)
+        else lit_error i
 
 readNum2 :: (Char -> Bool) -> Int -> (Char -> Int) -> Int -> P Char
 readNum2 is_digit base conv i = do
   input <- getInput
   read i input
   where read i input = do
-	  case alexGetChar' input of
-	    Just (c,input') | is_digit c -> do
+          case alexGetChar' input of
+            Just (c,input') | is_digit c -> do
                let i' = i*base + conv c
                if i' > 0x10ffff
                   then setInput input >> lexError "numeric escape sequence out of range"
                   else read i' input'
-	    _other -> do
+            _other -> do
               setInput input; return (chr i)
 
 
 silly_escape_chars :: [(String, Char)]
 silly_escape_chars = [
-	("NUL", '\NUL'),
-	("SOH", '\SOH'),
-	("STX", '\STX'),
-	("ETX", '\ETX'),
-	("EOT", '\EOT'),
-	("ENQ", '\ENQ'),
-	("ACK", '\ACK'),
-	("BEL", '\BEL'),
-	("BS", '\BS'),
-	("HT", '\HT'),
-	("LF", '\LF'),
-	("VT", '\VT'),
-	("FF", '\FF'),
-	("CR", '\CR'),
-	("SO", '\SO'),
-	("SI", '\SI'),
-	("DLE", '\DLE'),
-	("DC1", '\DC1'),
-	("DC2", '\DC2'),
-	("DC3", '\DC3'),
-	("DC4", '\DC4'),
-	("NAK", '\NAK'),
-	("SYN", '\SYN'),
-	("ETB", '\ETB'),
-	("CAN", '\CAN'),
-	("EM", '\EM'),
-	("SUB", '\SUB'),
-	("ESC", '\ESC'),
-	("FS", '\FS'),
-	("GS", '\GS'),
-	("RS", '\RS'),
-	("US", '\US'),
-	("SP", '\SP'),
-	("DEL", '\DEL')
-	]
+        ("NUL", '\NUL'),
+        ("SOH", '\SOH'),
+        ("STX", '\STX'),
+        ("ETX", '\ETX'),
+        ("EOT", '\EOT'),
+        ("ENQ", '\ENQ'),
+        ("ACK", '\ACK'),
+        ("BEL", '\BEL'),
+        ("BS", '\BS'),
+        ("HT", '\HT'),
+        ("LF", '\LF'),
+        ("VT", '\VT'),
+        ("FF", '\FF'),
+        ("CR", '\CR'),
+        ("SO", '\SO'),
+        ("SI", '\SI'),
+        ("DLE", '\DLE'),
+        ("DC1", '\DC1'),
+        ("DC2", '\DC2'),
+        ("DC3", '\DC3'),
+        ("DC4", '\DC4'),
+        ("NAK", '\NAK'),
+        ("SYN", '\SYN'),
+        ("ETB", '\ETB'),
+        ("CAN", '\CAN'),
+        ("EM", '\EM'),
+        ("SUB", '\SUB'),
+        ("ESC", '\ESC'),
+        ("FS", '\FS'),
+        ("GS", '\GS'),
+        ("RS", '\RS'),
+        ("US", '\US'),
+        ("SP", '\SP'),
+        ("DEL", '\DEL')
+        ]
 
 -- before calling lit_error, ensure that the current input is pointing to
 -- the position of the error in the buffer.  This is so that we can report
@@ -1434,8 +1402,8 @@ lit_error i = do setInput i; lexError "lexical error in string/character literal
 getCharOrFail :: AlexInput -> P Char
 getCharOrFail i =  do
   case alexGetChar' i of
-	Nothing -> lexError "unexpected end-of-file in string/character literal"
-	Just (c,i)  -> do setInput i; return c
+        Nothing -> lexError "unexpected end-of-file in string/character literal"
+        Just (c,i)  -> do setInput i; return c
 
 -- -----------------------------------------------------------------------------
 -- QuasiQuote
@@ -1443,11 +1411,11 @@ getCharOrFail i =  do
 lex_quasiquote_tok :: Action
 lex_quasiquote_tok span buf len = do
   let quoter = tail (lexemeToString buf (len - 1))
-		-- 'tail' drops the initial '[', 
-		-- while the -1 drops the trailing '|'
-  quoteStart <- getSrcLoc              
+                -- 'tail' drops the initial '[',
+                -- while the -1 drops the trailing '|'
+  quoteStart <- getSrcLoc
   quote <- lex_quasiquote ""
-  end <- getSrcLoc 
+  end <- getSrcLoc
   return (L (mkRealSrcSpan (realSrcSpanStart span) end)
            (ITquasiQuote (mkFastString quoter,
                           mkFastString (reverse quote),
@@ -1460,29 +1428,29 @@ lex_quasiquote s = do
     Nothing -> lit_error i
 
     Just ('\\',i)
-	| Just ('|',i) <- next -> do 
-		setInput i; lex_quasiquote ('|' : s)
-	| Just (']',i) <- next -> do 
-		setInput i; lex_quasiquote (']' : s)
-	where next = alexGetChar' i
+        | Just ('|',i) <- next -> do
+                setInput i; lex_quasiquote ('|' : s)
+        | Just (']',i) <- next -> do
+                setInput i; lex_quasiquote (']' : s)
+        where next = alexGetChar' i
 
     Just ('|',i)
-	| Just (']',i) <- next -> do 
-		setInput i; return s
-	where next = alexGetChar' i
+        | Just (']',i) <- next -> do
+                setInput i; return s
+        where next = alexGetChar' i
 
     Just (c, i) -> do
-	 setInput i; lex_quasiquote (c : s)
+         setInput i; lex_quasiquote (c : s)
 
 -- -----------------------------------------------------------------------------
 -- Warnings
 
-warn :: DynFlag -> SDoc -> Action
+warn :: WarningFlag -> SDoc -> Action
 warn option warning srcspan _buf _len = do
     addWarning option (RealSrcSpan srcspan) warning
     lexToken
 
-warnThen :: DynFlag -> SDoc -> Action -> Action
+warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
     addWarning option (RealSrcSpan srcspan) warning
     action srcspan buf len
@@ -1497,22 +1465,23 @@ data LayoutContext
 
 data ParseResult a
   = POk PState a
-  | PFailed 
-	SrcSpan		-- The start and end of the text span related to
-			-- the error.  Might be used in environments which can 
-			-- show this span, e.g. by highlighting it.
-	Message		-- The error message
+  | PFailed
+        SrcSpan         -- The start and end of the text span related to
+                        -- the error.  Might be used in environments which can
+                        -- show this span, e.g. by highlighting it.
+        Message         -- The error message
 
-data PState = PState { 
-	buffer	   :: StringBuffer,
+data PState = PState {
+        buffer     :: StringBuffer,
         dflags     :: DynFlags,
         messages   :: Messages,
-        last_loc   :: RealSrcSpan,	-- pos of previous token
-	last_len   :: !Int,	-- len of previous token
-        loc        :: RealSrcLoc,   -- current loc (end of prev token + 1)
-	extsBitmap :: !Int,	-- bitmap that determines permitted extensions
-	context	   :: [LayoutContext],
-	lex_state  :: [Int],
+        last_loc   :: RealSrcSpan, -- pos of previous token
+        last_len   :: !Int,        -- len of previous token
+        loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
+        extsBitmap :: !Int,        -- bitmap that determines permitted
+                                   -- extensions
+        context    :: [LayoutContext],
+        lex_state  :: [Int],
         -- Used in the alternative layout rule:
         -- These tokens are the next ones to be sent out. They are
         -- just blindly emitted, without the rule looking at them again:
@@ -1532,11 +1501,11 @@ data PState = PState {
         -- token doesn't need to close anything:
         alr_justClosedExplicitLetBlock :: Bool
      }
-	-- last_loc and last_len are used when generating error messages,
-	-- and in pushCurrentContext only.  Sigh, if only Happy passed the
-	-- current token to happyError, we could at least get rid of last_len.
-	-- Getting rid of last_loc would require finding another way to 
-	-- implement pushCurrentContext (which is only called from one place).
+        -- last_loc and last_len are used when generating error messages,
+        -- and in pushCurrentContext only.  Sigh, if only Happy passed the
+        -- current token to happyError, we could at least get rid of last_len.
+        -- Getting rid of last_loc would require finding another way to
+        -- implement pushCurrentContext (which is only called from one place).
 
 data ALRContext = ALRNoLayout Bool{- does it contain commas? -}
                               Bool{- is it a 'let' block? -}
@@ -1558,9 +1527,9 @@ returnP a = a `seq` (P $ \s -> POk s a)
 
 thenP :: P a -> (a -> P b) -> P b
 (P m) `thenP` k = P $ \ s ->
-	case m s of
-		POk s1 a         -> (unP (k a)) s1
-		PFailed span err -> PFailed span err
+        case m s of
+                POk s1 a         -> (unP (k a)) s1
+                PFailed span err -> PFailed span err
 
 failP :: String -> P a
 failP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
@@ -1582,8 +1551,8 @@ getDynFlags = P $ \s -> POk s (dflags s)
 
 withThisPackage :: (PackageId -> a) -> P a
 withThisPackage f
- = do	pkg	<- liftM thisPackage getDynFlags
-	return	$ f pkg
+ = do pkg <- liftM thisPackage getDynFlags
+      return $ f pkg
 
 extension :: (Int -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)
@@ -1601,8 +1570,8 @@ getSrcLoc :: P RealSrcLoc
 getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
 setLastToken :: RealSrcSpan -> Int -> P ()
-setLastToken loc len = P $ \s -> POk s { 
-  last_loc=loc, 
+setLastToken loc len = P $ \s -> POk s {
+  last_loc=loc,
   last_len=len
   } ()
 
@@ -1612,63 +1581,63 @@ alexInputPrevChar :: AlexInput -> Char
 alexInputPrevChar (AI _ buf) = prevChar buf '\n'
 
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar (AI loc s) 
+alexGetChar (AI loc s)
   | atEnd s   = Nothing
-  | otherwise = adj_c `seq` loc' `seq` s' `seq` 
-		--trace (show (ord c)) $
-		Just (adj_c, (AI loc' s'))
+  | otherwise = adj_c `seq` loc' `seq` s' `seq`
+                --trace (show (ord c)) $
+                Just (adj_c, (AI loc' s'))
   where (c,s') = nextChar s
         loc'   = advanceSrcLoc loc c
 
-	non_graphic     = '\x0'
-	upper 		= '\x1'
-	lower		= '\x2'
-	digit		= '\x3'
-	symbol		= '\x4'
-	space		= '\x5'
-	other_graphic	= '\x6'
+        non_graphic     = '\x0'
+        upper           = '\x1'
+        lower           = '\x2'
+        digit           = '\x3'
+        symbol          = '\x4'
+        space           = '\x5'
+        other_graphic   = '\x6'
 
-	adj_c 
-	  | c <= '\x06' = non_graphic
-	  | c <= '\x7f' = c
+        adj_c
+          | c <= '\x06' = non_graphic
+          | c <= '\x7f' = c
           -- Alex doesn't handle Unicode, so when Unicode
           -- character is encountered we output these values
           -- with the actual character value hidden in the state.
-	  | otherwise = 
-		case generalCategory c of
-		  UppercaseLetter       -> upper
-		  LowercaseLetter       -> lower
-		  TitlecaseLetter       -> upper
-		  ModifierLetter        -> other_graphic
-		  OtherLetter           -> lower -- see #1103
-		  NonSpacingMark        -> other_graphic
-		  SpacingCombiningMark  -> other_graphic
-		  EnclosingMark         -> other_graphic
-		  DecimalNumber         -> digit
-		  LetterNumber          -> other_graphic
+          | otherwise =
+                case generalCategory c of
+                  UppercaseLetter       -> upper
+                  LowercaseLetter       -> lower
+                  TitlecaseLetter       -> upper
+                  ModifierLetter        -> other_graphic
+                  OtherLetter           -> lower -- see #1103
+                  NonSpacingMark        -> other_graphic
+                  SpacingCombiningMark  -> other_graphic
+                  EnclosingMark         -> other_graphic
+                  DecimalNumber         -> digit
+                  LetterNumber          -> other_graphic
                   OtherNumber           -> digit -- see #4373
-		  ConnectorPunctuation  -> symbol
-		  DashPunctuation       -> symbol
-		  OpenPunctuation       -> other_graphic
-		  ClosePunctuation      -> other_graphic
-		  InitialQuote          -> other_graphic
-		  FinalQuote            -> other_graphic
-		  OtherPunctuation      -> symbol
-		  MathSymbol            -> symbol
-		  CurrencySymbol        -> symbol
-		  ModifierSymbol        -> symbol
-		  OtherSymbol           -> symbol
-		  Space                 -> space
-		  _other		-> non_graphic
+                  ConnectorPunctuation  -> symbol
+                  DashPunctuation       -> symbol
+                  OpenPunctuation       -> other_graphic
+                  ClosePunctuation      -> other_graphic
+                  InitialQuote          -> other_graphic
+                  FinalQuote            -> other_graphic
+                  OtherPunctuation      -> symbol
+                  MathSymbol            -> symbol
+                  CurrencySymbol        -> symbol
+                  ModifierSymbol        -> symbol
+                  OtherSymbol           -> symbol
+                  Space                 -> space
+                  _other                -> non_graphic
 
 -- This version does not squash unicode characters, it is used when
 -- lexing strings.
 alexGetChar' :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar' (AI loc s) 
+alexGetChar' (AI loc s)
   | atEnd s   = Nothing
-  | otherwise = c `seq` loc' `seq` s' `seq` 
-		--trace (show (ord c)) $
-		Just (c, (AI loc' s'))
+  | otherwise = c `seq` loc' `seq` s' `seq`
+                --trace (show (ord c)) $
+                Just (c, (AI loc' s'))
   where (c,s') = nextChar s
         loc'   = advanceSrcLoc loc c
 
@@ -1753,30 +1722,28 @@ setAlrExpectingOCurly :: Maybe ALRLayout -> P ()
 setAlrExpectingOCurly b = P $ \s -> POk (s {alr_expecting_ocurly = b}) ()
 
 -- for reasons of efficiency, flags indicating language extensions (eg,
--- -fglasgow-exts or -XParallelArrays) are represented by a bitmap stored in an unboxed
--- integer
-
--- The "genericsBit" is now unused, available for others
--- genericsBit :: Int
--- genericsBit = 0 -- {|, |} and "generic"
+-- -fglasgow-exts or -XParallelArrays) are represented by a bitmap
+-- stored in an unboxed Int
 
 ffiBit :: Int
-ffiBit	   = 1
+ffiBit= 0
+interruptibleFfiBit :: Int
+interruptibleFfiBit = 1
 parrBit :: Int
-parrBit	   = 2
+parrBit = 3
 arrowsBit :: Int
 arrowsBit  = 4
 thBit :: Int
-thBit	   = 5
+thBit = 5
 ipBit :: Int
-ipBit      = 6
+ipBit = 6
 explicitForallBit :: Int
 explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
 bangPatBit :: Int
-bangPatBit = 8	-- Tells the parser to understand bang-patterns
-		-- (doesn't affect the lexer)
+bangPatBit = 8  -- Tells the parser to understand bang-patterns
+                -- (doesn't affect the lexer)
 tyFamBit :: Int
-tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
+tyFamBit = 9    -- indexed type families: 'family' keyword and kind sigs
 haddockBit :: Int
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit :: Int
@@ -1794,7 +1761,7 @@ datatypeContextsBit = 16
 transformComprehensionsBit :: Int
 transformComprehensionsBit = 17
 qqBit :: Int
-qqBit	   = 18 -- enable quasiquoting
+qqBit = 18 -- enable quasiquoting
 inRulePragBit :: Int
 inRulePragBit = 19
 rawTokenStreamBit :: Int
@@ -1880,41 +1847,42 @@ mkPState flags buf loc =
       alr_justClosedExplicitLetBlock = False
     }
     where
-      bitmap =     ffiBit            `setBitIf` xopt Opt_ForeignFunctionInterface flags
-               .|. parrBit           `setBitIf` xopt Opt_ParallelArrays  flags
-               .|. arrowsBit         `setBitIf` xopt Opt_Arrows          flags
-               .|. thBit             `setBitIf` xopt Opt_TemplateHaskell flags
-               .|. qqBit             `setBitIf` xopt Opt_QuasiQuotes     flags
-               .|. ipBit             `setBitIf` xopt Opt_ImplicitParams  flags
-               .|. explicitForallBit `setBitIf` xopt Opt_ExplicitForAll  flags
-               .|. bangPatBit        `setBitIf` xopt Opt_BangPatterns    flags
-               .|. tyFamBit          `setBitIf` xopt Opt_TypeFamilies    flags
-               .|. haddockBit        `setBitIf` dopt Opt_Haddock         flags
-               .|. magicHashBit      `setBitIf` xopt Opt_MagicHash       flags
-               .|. kindSigsBit       `setBitIf` xopt Opt_KindSignatures  flags
-               .|. recursiveDoBit    `setBitIf` xopt Opt_RecursiveDo     flags
-               .|. recBit            `setBitIf` xopt Opt_DoRec           flags
-               .|. recBit            `setBitIf` xopt Opt_Arrows          flags
-               .|. unicodeSyntaxBit  `setBitIf` xopt Opt_UnicodeSyntax   flags
-               .|. unboxedTuplesBit  `setBitIf` xopt Opt_UnboxedTuples   flags
-               .|. datatypeContextsBit `setBitIf` xopt Opt_DatatypeContexts flags
-               .|. transformComprehensionsBit `setBitIf` xopt Opt_TransformListComp flags
-               .|. transformComprehensionsBit `setBitIf` xopt Opt_MonadComprehensions flags
-               .|. rawTokenStreamBit `setBitIf` dopt Opt_KeepRawTokenStream flags
-               .|. alternativeLayoutRuleBit `setBitIf` xopt Opt_AlternativeLayoutRule flags
-               .|. relaxedLayoutBit  `setBitIf` xopt Opt_RelaxedLayout flags
+      bitmap =     ffiBit                      `setBitIf` xopt Opt_ForeignFunctionInterface flags
+               .|. interruptibleFfiBit         `setBitIf` xopt Opt_InterruptibleFFI         flags
+               .|. parrBit                     `setBitIf` xopt Opt_ParallelArrays           flags
+               .|. arrowsBit                   `setBitIf` xopt Opt_Arrows                   flags
+               .|. thBit                       `setBitIf` xopt Opt_TemplateHaskell          flags
+               .|. qqBit                       `setBitIf` xopt Opt_QuasiQuotes              flags
+               .|. ipBit                       `setBitIf` xopt Opt_ImplicitParams           flags
+               .|. explicitForallBit           `setBitIf` xopt Opt_ExplicitForAll           flags
+               .|. bangPatBit                  `setBitIf` xopt Opt_BangPatterns             flags
+               .|. tyFamBit                    `setBitIf` xopt Opt_TypeFamilies             flags
+               .|. haddockBit                  `setBitIf` dopt Opt_Haddock                  flags
+               .|. magicHashBit                `setBitIf` xopt Opt_MagicHash                flags
+               .|. kindSigsBit                 `setBitIf` xopt Opt_KindSignatures           flags
+               .|. recursiveDoBit              `setBitIf` xopt Opt_RecursiveDo              flags
+               .|. recBit                      `setBitIf` xopt Opt_DoRec                    flags
+               .|. recBit                      `setBitIf` xopt Opt_Arrows                   flags
+               .|. unicodeSyntaxBit            `setBitIf` xopt Opt_UnicodeSyntax            flags
+               .|. unboxedTuplesBit            `setBitIf` xopt Opt_UnboxedTuples            flags
+               .|. datatypeContextsBit         `setBitIf` xopt Opt_DatatypeContexts         flags
+               .|. transformComprehensionsBit  `setBitIf` xopt Opt_TransformListComp        flags
+               .|. transformComprehensionsBit  `setBitIf` xopt Opt_MonadComprehensions      flags
+               .|. rawTokenStreamBit           `setBitIf` dopt Opt_KeepRawTokenStream       flags
+               .|. alternativeLayoutRuleBit    `setBitIf` xopt Opt_AlternativeLayoutRule    flags
+               .|. relaxedLayoutBit            `setBitIf` xopt Opt_RelaxedLayout            flags
                .|. nondecreasingIndentationBit `setBitIf` xopt Opt_NondecreasingIndentation flags
-               .|. safeHaskellBit    `setBitIf` safeHaskellOn flags
+               .|. safeHaskellBit              `setBitIf` safeHaskellOn                     flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
                         | otherwise = 0
 
-addWarning :: DynFlag -> SrcSpan -> SDoc -> P ()
+addWarning :: WarningFlag -> SrcSpan -> SDoc -> P ()
 addWarning option srcspan warning
  = P $ \s@PState{messages=(ws,es), dflags=d} ->
        let warning' = mkWarnMsg srcspan alwaysQualify warning
-           ws' = if dopt option d then ws `snocBag` warning' else ws
+           ws' = if wopt option d then ws `snocBag` warning' else ws
        in POk s{messages=(ws', es)} ()
 
 getMessages :: PState -> Messages
@@ -1927,40 +1895,40 @@ setContext :: [LayoutContext] -> P ()
 setContext ctx = P $ \s -> POk s{context=ctx} ()
 
 popContext :: P ()
-popContext = P $ \ s@(PState{ buffer = buf, context = ctx, 
+popContext = P $ \ s@(PState{ buffer = buf, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
-	(_:tl) -> POk s{ context = tl } ()
-	[]     -> PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
+        (_:tl) -> POk s{ context = tl } ()
+        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 -- This is only used at the outer level of a module when the 'module'
 -- keyword is missing.
 pushCurrentContext :: P ()
-pushCurrentContext = P $ \ s@PState{ last_loc=loc, context=ctx } -> 
+pushCurrentContext = P $ \ s@PState{ last_loc=loc, context=ctx } ->
     POk s{context = Layout (srcSpanStartCol loc) : ctx} ()
 
 getOffside :: P Ordering
 getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
                 let offs = srcSpanStartCol loc in
-		let ord = case stk of
-			(Layout n:_) -> --trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $ 
+                let ord = case stk of
+                        (Layout n:_) -> --trace ("layout: " ++ show n ++ ", offs: " ++ show offs) $
                                         compare offs n
-			_            -> GT
-		in POk s ord
+                        _            -> GT
+                in POk s ord
 
 -- ---------------------------------------------------------------------------
 -- Construct a parse error
 
 srcParseErr
-  :: StringBuffer	-- current buffer (placed just after the last token)
-  -> Int		-- length of the previous token
+  :: StringBuffer       -- current buffer (placed just after the last token)
+  -> Int                -- length of the previous token
   -> Message
 srcParseErr buf len
-  = hcat [ if null token 
-	     then ptext (sLit "parse error (possibly incorrect indentation)")
-	     else hcat [ptext (sLit "parse error on input "),
-          	  	char '`', text token, char '\'']
+  = hcat [ if null token
+             then ptext (sLit "parse error (possibly incorrect indentation)")
+             else hcat [ptext (sLit "parse error on input "),
+                        char '`', text token, char '\'']
     ]
   where token = lexemeToString (offsetBytes (-len) buf) len
 
@@ -1968,8 +1936,8 @@ srcParseErr buf len
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, last_len = len, 	
-			    last_loc = last_loc } ->
+srcParseFail = P $ \PState{ buffer = buf, last_len = len,
+                            last_loc = last_loc } ->
     PFailed (RealSrcSpan last_loc) (srcParseErr buf len)
 
 -- A lexical error is reported at a particular position in the source file,
@@ -2238,12 +2206,10 @@ reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
   | atEnd buf = failLocMsgP loc1 loc2 (str ++ " at end of input")
   | otherwise =
-  let 
-	c = fst (nextChar buf)
-  in
-  if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
-    then failLocMsgP loc2 loc2 (str ++ " (UTF-8 decoding error)")
-    else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
+  let c = fst (nextChar buf)
+  in if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
+     then failLocMsgP loc2 loc2 (str ++ " (UTF-8 decoding error)")
+     else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
 
 lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
 lexTokenStream buf loc dflags = unP go initState
@@ -2274,7 +2240,7 @@ oneWordPrags = Map.fromList([("rules", rulePrag),
                            ("inline", token (ITinline_prag Inline FunLike)),
                            ("inlinable", token (ITinline_prag Inlinable FunLike)),
                            ("inlineable", token (ITinline_prag Inlinable FunLike)),
-			   		  -- Spelling variant
+                                          -- Spelling variant
                            ("notinline", token (ITinline_prag NoInline FunLike)),
                            ("specialize", token ITspec_prag),
                            ("source", token ITsource_prag),

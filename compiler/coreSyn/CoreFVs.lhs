@@ -51,6 +51,7 @@ import VarSet
 import Var
 import TcType
 import Coercion
+import Maybes( orElse )
 import Util
 import BasicTypes( Activation )
 import Outputable
@@ -278,18 +279,16 @@ exprsOrphNames es = foldr (unionNameSets . exprOrphNames) emptyNameSet es
 -- | Those variables free in the right hand side of a rule
 ruleRhsFreeVars :: CoreRule -> VarSet
 ruleRhsFreeVars (BuiltinRule {}) = noFVs
-ruleRhsFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs })
-  = delFromUFM fvs fn    -- Note [Rule free var hack]
-  where
-    fvs = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
+ruleRhsFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs })
+  = addBndrs bndrs (expr_fvs rhs) isLocalVar emptyVarSet
+      -- See Note [Rule free var hack]
 
 -- | Those variables free in the both the left right hand sides of a rule
 ruleFreeVars :: CoreRule -> VarSet
 ruleFreeVars (BuiltinRule {}) = noFVs
-ruleFreeVars (Rule { ru_fn = fn, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
-  = delFromUFM fvs fn   -- Note [Rule free var hack]
-  where
-    fvs = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
+ruleFreeVars (Rule { ru_fn = _, ru_bndrs = bndrs, ru_rhs = rhs, ru_args = args })
+  = addBndrs bndrs (exprs_fvs (rhs:args)) isLocalVar emptyVarSet
+      -- See Note [Rule free var hack]
 
 idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
 -- Just the variables free on the *rhs* of a rule
@@ -316,16 +315,16 @@ ruleLhsFreeIds (Rule { ru_bndrs = bndrs, ru_args = args })
   = addBndrs bndrs (exprs_fvs args) isLocalId emptyVarSet
 \end{code}
 
-
-Note [Rule free var hack]
+Note [Rule free var hack]  (Not a hack any more)
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-Don't include the Id in its own rhs free-var set.
-Otherwise the occurrence analyser makes bindings recursive
-that shoudn't be.  E.g.
+We used not to include the Id in its own rhs free-var set.
+Otherwise the occurrence analyser makes bindings recursive:
+        f x y = x+y
         RULE:  f (f x y) z  ==>  f x (f y z)
-
-Also since rule_fn is a Name, not a Var, we have to use the grungy delUFM.
-
+However, the occurrence analyser distinguishes "non-rule loop breakers" 
+from "rule-only loop breakers" (see BasicTypes.OccInfo).  So it will
+put this 'f' in a Rec block, but will mark the binding as a non-rule loop
+breaker, which is perfectly inlinable.
 
 \begin{code}
 -- |Free variables of a vectorisation declaration
@@ -445,13 +444,15 @@ idUnfoldingVars :: Id -> VarSet
 -- and we'll get exponential behaviour if we look at both unf and rhs!
 -- But do look at the *real* unfolding, even for loop breakers, else
 -- we might get out-of-scope variables
-idUnfoldingVars id = stableUnfoldingVars (realIdUnfolding id)
+idUnfoldingVars id = stableUnfoldingVars isLocalId (realIdUnfolding id) `orElse` emptyVarSet
 
-stableUnfoldingVars :: Unfolding -> VarSet
-stableUnfoldingVars (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-  | isStableSource src                       = exprFreeVars rhs
-stableUnfoldingVars (DFunUnfolding _ _ args) = exprsFreeVars (dfunArgExprs args)
-stableUnfoldingVars _                        = emptyVarSet
+stableUnfoldingVars :: InterestingVarFun -> Unfolding -> Maybe VarSet
+stableUnfoldingVars fv_cand unf
+  = case unf of
+      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
+         | isStableSource src -> Just (exprSomeFreeVars fv_cand rhs)
+      DFunUnfolding _ _ args  -> Just (exprsSomeFreeVars fv_cand args)
+      _other                  -> Nothing
 \end{code}
 
 

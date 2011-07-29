@@ -40,69 +40,70 @@ import qualified PPC.Regs       as PPC
 
 import qualified SPARC.Regs     as SPARC
 
--- TODO: We shouldn't be using defaultTargetPlatform here.
---       We should be passing DynFlags in instead, and looking at
---       its targetPlatform.
-
-targetVirtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
-targetVirtualRegSqueeze
-    = case platformArch defaultTargetPlatform of
+targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> FastInt
+targetVirtualRegSqueeze platform
+    = case platformArch platform of
       ArchX86     -> X86.virtualRegSqueeze
       ArchX86_64  -> X86.virtualRegSqueeze
       ArchPPC     -> PPC.virtualRegSqueeze
       ArchSPARC   -> SPARC.virtualRegSqueeze
       ArchPPC_64  -> panic "targetVirtualRegSqueeze ArchPPC_64"
+      ArchARM     -> panic "targetVirtualRegSqueeze ArchARM"
       ArchUnknown -> panic "targetVirtualRegSqueeze ArchUnknown"
 
-targetRealRegSqueeze :: RegClass -> RealReg -> FastInt
-targetRealRegSqueeze
-    = case platformArch defaultTargetPlatform of
+targetRealRegSqueeze :: Platform -> RegClass -> RealReg -> FastInt
+targetRealRegSqueeze platform
+    = case platformArch platform of
       ArchX86     -> X86.realRegSqueeze
       ArchX86_64  -> X86.realRegSqueeze
       ArchPPC     -> PPC.realRegSqueeze
       ArchSPARC   -> SPARC.realRegSqueeze
       ArchPPC_64  -> panic "targetRealRegSqueeze ArchPPC_64"
+      ArchARM     -> panic "targetRealRegSqueeze ArchARM"
       ArchUnknown -> panic "targetRealRegSqueeze ArchUnknown"
 
-targetClassOfRealReg :: RealReg -> RegClass
-targetClassOfRealReg
-    = case platformArch defaultTargetPlatform of
+targetClassOfRealReg :: Platform -> RealReg -> RegClass
+targetClassOfRealReg platform
+    = case platformArch platform of
       ArchX86     -> X86.classOfRealReg
       ArchX86_64  -> X86.classOfRealReg
       ArchPPC     -> PPC.classOfRealReg
       ArchSPARC   -> SPARC.classOfRealReg
       ArchPPC_64  -> panic "targetClassOfRealReg ArchPPC_64"
+      ArchARM     -> panic "targetClassOfRealReg ArchARM"
       ArchUnknown -> panic "targetClassOfRealReg ArchUnknown"
 
 -- TODO: This should look at targetPlatform too
 targetWordSize :: Size
 targetWordSize = intSize wordWidth
 
-targetMkVirtualReg :: Unique -> Size -> VirtualReg
-targetMkVirtualReg
-    = case platformArch defaultTargetPlatform of
+targetMkVirtualReg :: Platform -> Unique -> Size -> VirtualReg
+targetMkVirtualReg platform
+    = case platformArch platform of
       ArchX86     -> X86.mkVirtualReg
       ArchX86_64  -> X86.mkVirtualReg
       ArchPPC     -> PPC.mkVirtualReg
       ArchSPARC   -> SPARC.mkVirtualReg
       ArchPPC_64  -> panic "targetMkVirtualReg ArchPPC_64"
+      ArchARM     -> panic "targetMkVirtualReg ArchARM"
       ArchUnknown -> panic "targetMkVirtualReg ArchUnknown"
 
-targetRegDotColor :: RealReg -> SDoc
-targetRegDotColor
-    = case platformArch defaultTargetPlatform of
-      ArchX86     -> X86.regDotColor
-      ArchX86_64  -> X86.regDotColor
+targetRegDotColor :: Platform -> RealReg -> SDoc
+targetRegDotColor platform
+    = case platformArch platform of
+      ArchX86     -> X86.regDotColor platform
+      ArchX86_64  -> X86.regDotColor platform
       ArchPPC     -> PPC.regDotColor
       ArchSPARC   -> SPARC.regDotColor
       ArchPPC_64  -> panic "targetRegDotColor ArchPPC_64"
+      ArchARM     -> panic "targetRegDotColor ArchARM"
       ArchUnknown -> panic "targetRegDotColor ArchUnknown"
 
 
-targetClassOfReg :: Reg -> RegClass
-targetClassOfReg reg
+targetClassOfReg :: Platform -> Reg -> RegClass
+targetClassOfReg platform reg
  = case reg of
- 	RegVirtual vr	-> classOfVirtualReg vr
-	RegReal rr	-> targetClassOfRealReg rr
+   RegVirtual vr -> classOfVirtualReg vr
+   RegReal rr -> targetClassOfRealReg platform rr
 
 

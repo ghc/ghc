@@ -487,7 +487,9 @@ mkDictSelId no_unf name clas
     rhs = mkLams tyvars  (Lam dict_id   rhs_body)
     rhs_body | new_tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
              | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
-                                [(DataAlt data_con, arg_ids, Var the_arg_id)]
+                                [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
+				-- varToCoreExpr needed for equality superclass selectors
+				--   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
 dictSelRule :: Int -> Arity 
             -> IdUnfoldingFun -> [CoreExpr] -> Maybe CoreExpr
@@ -582,7 +584,7 @@ mkProductBox arg_ids ty
     result_expr
       | isNewTyCon tycon && not (isRecursiveTyCon tycon) 
       = wrap (mkProductBox arg_ids (newTyConInstRhs tycon tycon_args))
-      | otherwise = mkConApp pack_con (map Type tycon_args ++ map Var arg_ids)
+      | otherwise = mkConApp pack_con (map Type tycon_args ++ varsToCoreExprs arg_ids)
 
     wrap expr = wrapNewTypeBody tycon tycon_args expr
 

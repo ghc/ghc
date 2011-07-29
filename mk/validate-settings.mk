@@ -4,7 +4,16 @@
 WERROR          = -Werror
 
 HADDOCK_DOCS    = YES
+
 SRC_CC_OPTS     += -Wall $(WERROR)
+# Debian doesn't turn -Werror=unused-but-set-variable on by default, so
+# we turn it on explicitly for consistency with other users
+ifeq "$(GccLT46)" "NO"
+SRC_CC_OPTS	    += -Werror=unused-but-set-variable
+# gcc 4.6 gives 3 warning for giveCapabilityToTask not being inlined
+SRC_CC_OPTS     += -Wno-error=inline
+endif
+
 SRC_HC_OPTS     += -Wall $(WERROR) -H64m -O0
 
 # Safe by default
@@ -45,6 +54,11 @@ endif
 ######################################################################
 # Disable some warnings in packages we use
 
+# Cabal doesn't promise to be warning-free
+utils/ghc-cabal_dist_EXTRA_HC_OPTS += -w
+libraries/Cabal/cabal_dist-boot_EXTRA_HC_OPTS += -w
+libraries/Cabal/cabal_dist-install_EXTRA_HC_OPTS += -w
+
 # Temporarily turn off incomplete-pattern warnings for containers
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 
@@ -52,7 +66,9 @@ libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 libraries/bytestring_dist-install_EXTRA_HC_OPTS += -fno-warn-identities
 
 # Temporarily turn off unused-do-bind warnings for the time package
-libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind
+libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-do-bind 
+# Temporary: mkTyCon is deprecated
+libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-deprecations
 # On Windows, there are also some unused import warnings
 libraries/time_dist-install_EXTRA_HC_OPTS += -fno-warn-unused-imports -fno-warn-identities
 

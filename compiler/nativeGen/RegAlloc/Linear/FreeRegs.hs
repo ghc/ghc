@@ -58,16 +58,14 @@ instance FR SPARC.FreeRegs where
     frInitFreeRegs = SPARC.initFreeRegs
     frReleaseReg   = SPARC.releaseReg
 
--- TODO: We shouldn't be using defaultTargetPlatform here.
---       We should be passing DynFlags in instead, and looking at
---       its targetPlatform.
-
-maxSpillSlots :: Int
-maxSpillSlots = case platformArch defaultTargetPlatform of
+maxSpillSlots :: Platform -> Int
+maxSpillSlots platform
+              = case platformArch platform of
                 ArchX86     -> X86.Instr.maxSpillSlots
                 ArchX86_64  -> X86.Instr.maxSpillSlots
                 ArchPPC     -> PPC.Instr.maxSpillSlots
                 ArchSPARC   -> SPARC.Instr.maxSpillSlots
+                ArchARM     -> panic "maxSpillSlots ArchARM"
                 ArchPPC_64  -> panic "maxSpillSlots ArchPPC_64"
                 ArchUnknown -> panic "maxSpillSlots ArchUnknown"
 

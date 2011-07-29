@@ -84,7 +84,7 @@ codeGen dflags this_mod data_tycons cost_centre_info stg_binds hpc_info
                 -- initialisation routines; see Note
                 -- [pipeline-split-init].
 
-  ; dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms code_stuff)
+  ; dumpIfSet_dyn dflags Opt_D_dump_cmm "Cmm" (pprCmms (targetPlatform dflags) code_stuff)
 
   ; return code_stuff }
 
@@ -105,7 +105,7 @@ mkModuleInit dflags cost_centre_info this_mod hpc_info
 
             -- For backwards compatibility: user code may refer to this
             -- label for calling hs_add_root().
-        ; emitData Data $ [ CmmDataLabel (mkPlainModuleInitLabel this_mod) ]
+        ; emitData Data $ Statics (mkPlainModuleInitLabel this_mod) []
 
         ; whenC (this_mod == mainModIs dflags) $
              emitSimpleProc (mkPlainModuleInitLabel rOOT_MAIN) $ return ()

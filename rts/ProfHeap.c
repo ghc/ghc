@@ -827,6 +827,84 @@ dumpCensus( Census *census )
     printSample(rtsFalse, census->time);
 }
 
+
+static void heapProfObject(Census *census, StgClosure *p, nat size,
+                           rtsBool prim
+#ifndef PROFILING
+                           STG_UNUSED
+#endif
+                           )
+{
+    void *identity;
+    nat real_size;
+    counter *ctr;
+
+            identity = NULL;
+
+#ifdef PROFILING
+	    // subtract the profiling overhead
+	    real_size = size - sizeofW(StgProfHeader);
+#else
+	    real_size = size;
+#endif
+
+	    if (closureSatisfiesConstraints((StgClosure*)p)) {
+#ifdef PROFILING
+		if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+		    if (prim)
+			census->prim += real_size;
+		    else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
+			census->not_used += real_size;
+		    else
+			census->used += real_size;
+		} else
+#endif
+		{
+		    identity = closureIdentity((StgClosure *)p);
+
+		    if (identity != NULL) {
+			ctr = lookupHashTable( census->hash, (StgWord)identity );
+			if (ctr != NULL) {
+#ifdef PROFILING
+			    if (RtsFlags.ProfFlags.bioSelector != NULL) {
+				if (prim)
+				    ctr->c.ldv.prim += real_size;
+				else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
+				    ctr->c.ldv.not_used += real_size;
+				else
+				    ctr->c.ldv.used += real_size;
+			    } else
+#endif
+			    {
+				ctr->c.resid += real_size;
+			    }
+			} else {
+			    ctr = arenaAlloc( census->arena, sizeof(counter) );
+			    initLDVCtr(ctr);
+			    insertHashTable( census->hash, (StgWord)identity, ctr );
+			    ctr->identity = identity;
+			    ctr->next = census->ctrs;
+			    census->ctrs = ctr;
+
+#ifdef PROFILING
+			    if (RtsFlags.ProfFlags.bioSelector != NULL) {
+				if (prim)
+				    ctr->c.ldv.prim = real_size;
+				else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
+				    ctr->c.ldv.not_used = real_size;
+				else
+				    ctr->c.ldv.used = real_size;
+			    } else
+#endif
+			    {
+				ctr->c.resid = real_size;
+			    }
+			}
+		    }
+		}
+	    }
+}
+
 /* -----------------------------------------------------------------------------
  * Code to perform a heap census.
  * -------------------------------------------------------------------------- */
@@ -835,26 +913,26 @@ heapCensusChain( Census *census, bdescr *bd )
 {
     StgPtr p;
     StgInfoTable *info;
-    void *identity;
     nat size;
-    counter *ctr;
-    nat real_size;
     rtsBool prim;
 
     for (; bd != NULL; bd = bd->link) {
 
-	// HACK: ignore pinned blocks, because they contain gaps.
-	// It's not clear exactly what we'd like to do here, since we
-	// can't tell which objects in the block are actually alive.
-	// Perhaps the whole block should be counted as SYSTEM memory.
-	if (bd->flags & BF_PINNED) {
-	    continue;
-	}
+        // HACK: pretend a pinned block is just one big ARR_WORDS
+        // owned by CCS_SYSTEM.  These blocks can be full of holes due
+        // to alignment constraints so we can't traverse the memory
+        // and do a proper census.
+        if (bd->flags & BF_PINNED) {
+            StgClosure arr;
+            SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_SYSTEM);
+            heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, rtsTrue);
+            continue;
+        }
 
 	p = bd->start;
 	while (p < bd->free) {
 	    info = get_itbl((StgClosure *)p);
-	    prim = rtsFalse;
+            prim = rtsFalse;
 	    
 	    switch (info->type) {
 
@@ -904,7 +982,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		break;
 
 	    case BCO:
-		prim = rtsTrue;
+                prim = rtsTrue;
 		size = bco_sizeW((StgBCO *)p);
 		break;
 
@@ -985,70 +1063,7 @@ heapCensusChain( Census *census, bdescr *bd )
 		barf("heapCensus, unknown object: %d", info->type);
 	    }
 	    
-	    identity = NULL;
-
-#ifdef PROFILING
-	    // subtract the profiling overhead
-	    real_size = size - sizeofW(StgProfHeader);
-#else
-	    real_size = size;
-#endif
-
-	    if (closureSatisfiesConstraints((StgClosure*)p)) {
-#ifdef PROFILING
-		if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-		    if (prim)
-			census->prim += real_size;
-		    else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
-			census->not_used += real_size;
-		    else
-			census->used += real_size;
-		} else
-#endif
-		{
-		    identity = closureIdentity((StgClosure *)p);
-
-		    if (identity != NULL) {
-			ctr = lookupHashTable( census->hash, (StgWord)identity );
-			if (ctr != NULL) {
-#ifdef PROFILING
-			    if (RtsFlags.ProfFlags.bioSelector != NULL) {
-				if (prim)
-				    ctr->c.ldv.prim += real_size;
-				else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
-				    ctr->c.ldv.not_used += real_size;
-				else
-				    ctr->c.ldv.used += real_size;
-			    } else
-#endif
-			    {
-				ctr->c.resid += real_size;
-			    }
-			} else {
-			    ctr = arenaAlloc( census->arena, sizeof(counter) );
-			    initLDVCtr(ctr);
-			    insertHashTable( census->hash, (StgWord)identity, ctr );
-			    ctr->identity = identity;
-			    ctr->next = census->ctrs;
-			    census->ctrs = ctr;
-
-#ifdef PROFILING
-			    if (RtsFlags.ProfFlags.bioSelector != NULL) {
-				if (prim)
-				    ctr->c.ldv.prim = real_size;
-				else if ((LDVW(p) & LDV_STATE_MASK) == LDV_STATE_CREATE)
-				    ctr->c.ldv.not_used = real_size;
-				else
-				    ctr->c.ldv.used = real_size;
-			    } else
-#endif
-			    {
-				ctr->c.resid = real_size;
-			    }
-			}
-		    }
-		}
-	    }
+            heapProfObject(census,(StgClosure*)p,size,prim);
 
 	    p += size;
 	}
@@ -1056,14 +1071,14 @@ heapCensusChain( Census *census, bdescr *bd )
 }
 
 void
-heapCensus( void )
+heapCensus( Ticks t )
 {
   nat g, n;
   Census *census;
   gen_workspace *ws;
 
   census = &censuses[era];
-  census->time  = mut_user_time();
+  census->time  = mut_user_time_until(t);
     
   // calculate retainer sets if necessary
 #ifdef PROFILING

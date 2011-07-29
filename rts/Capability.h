@@ -98,11 +98,7 @@ struct Capability_ {
     SparkPool *sparks;
 
     // Stats on spark creation/conversion
-    nat sparks_created;
-    nat sparks_dud;
-    nat sparks_converted;
-    nat sparks_gcd;
-    nat sparks_fizzled;
+    SparkCounters spark_stats;
 #endif
 
     // Per-capability STM-related data
@@ -142,6 +138,10 @@ struct Capability_ {
 	    cap->run_queue_tl == END_TSO_QUEUE : 1);	\
   ASSERT(myTask() == task);				\
   ASSERT_TASK_ID(task);
+
+#if defined(THREADED_RTS)
+rtsBool checkSparkCountInvariant (void);
+#endif
 
 // Converts a *StgRegTable into a *Capability.
 //

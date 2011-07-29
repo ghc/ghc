@@ -1,6 +1,9 @@
 # -----------------------------------------------------------------------------
 # generic generated file patterns
 
+Thumbs.db
+.DS_Store
+
 *~
 #*#
 *.bak

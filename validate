@@ -45,6 +45,13 @@ do
     shift
 done
 
+if ! [ -d testsuite ]
+then
+    echo 'You need the testsuite to validate' >&2
+    echo 'Run "./sync-all --testsuite get" to get it' >&2
+    exit 1
+fi
+
 if [ "$THREADS" = "" ]; then
     if [ "$CPUS" = "" ]; then
         threads=2
@@ -147,7 +154,7 @@ the minimal testing procedure, please do further testing as necessary.
 When you are satisfied that you haven't broken anything, go ahead and
 push/send your patches.
 EOF
-        if grep -q "^[^#]" mk/validate.mk
+        if [ -f mk/validate.mk ] && grep -q "^[^#]" mk/validate.mk
         then
             cat <<EOF
 

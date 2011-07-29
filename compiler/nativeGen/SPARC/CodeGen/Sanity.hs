@@ -15,15 +15,17 @@ import Instruction
 import OldCmm
 
 import Outputable
+import Platform
 
 
 -- | Enforce intra-block invariants.
 --
-checkBlock
-	:: CmmBasicBlock 
-	-> NatBasicBlock Instr -> NatBasicBlock Instr
+checkBlock :: Platform
+           -> CmmBasicBlock
+           -> NatBasicBlock Instr
+           -> NatBasicBlock Instr
 
-checkBlock cmm block@(BasicBlock _ instrs)
+checkBlock platform cmm block@(BasicBlock _ instrs)
 	| checkBlockInstrs instrs
 	= block
 	
@@ -31,9 +33,9 @@ checkBlock cmm block@(BasicBlock _ instrs)
 	= pprPanic 
 		("SPARC.CodeGen: bad block\n")
 		( vcat	[ text " -- cmm -----------------\n"
-			, ppr cmm
+			, pprPlatform platform cmm
 			, text " -- native code ---------\n"
-			, ppr block ])
+			, pprPlatform platform block ])
 
 
 checkBlockInstrs :: [Instr] -> Bool

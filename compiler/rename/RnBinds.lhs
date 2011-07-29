@@ -702,18 +702,18 @@ renameSig _ (IdSig x)
   = return (IdSig x)	  -- Actually this never occurs
 renameSig mb_names sig@(TypeSig vs ty)
   = do	{ new_vs <- mapM (lookupSigOccRn mb_names sig) vs
-	; new_ty <- rnHsSigType (quotes (ppr vs)) ty
+	; new_ty <- rnHsSigType (ppr_sig_bndrs vs) ty
 	; return (TypeSig new_vs new_ty) }
 
 renameSig mb_names sig@(GenericSig vs ty)
   = do	{ defaultSigs_on <- xoptM Opt_DefaultSignatures
         ; unless defaultSigs_on (addErr (defaultSigErr sig))
         ; new_v <- mapM (lookupSigOccRn mb_names sig) vs
-	; new_ty <- rnHsSigType (quotes (ppr vs)) ty
+	; new_ty <- rnHsSigType (ppr_sig_bndrs vs) ty
 	; return (GenericSig new_v new_ty) }
 
 renameSig _ (SpecInstSig ty)
-  = do	{ new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty
+  = do	{ new_ty <- rnLHsType (text "In a SPECIALISE instance pragma") ty
 	; return (SpecInstSig new_ty) }
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
@@ -734,6 +734,9 @@ renameSig mb_names sig@(InlineSig v s)
 renameSig mb_names sig@(FixSig (FixitySig v f))
   = do	{ new_v <- lookupSigOccRn mb_names sig v
 	; return (FixSig (FixitySig new_v f)) }
+
+ppr_sig_bndrs :: [Located RdrName] -> SDoc
+ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 \end{code}
 
 

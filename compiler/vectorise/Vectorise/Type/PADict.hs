@@ -73,7 +73,7 @@ buildPADict vect_tc prepr_tc arr_tc repr
       -- Set the unfolding for the inliner.
       raw_dfun <- newExportedVar dfun_name dfun_ty
       let dfun_unf = mkDFunUnfolding dfun_ty $
-                     map (DFunPolyArg . Var) method_ids
+                     map Var method_ids
           dfun = raw_dfun `setIdUnfolding`  dfun_unf
                           `setInlinePragma` dfunInlinePragma
 

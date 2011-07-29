@@ -171,17 +171,22 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
 void
 GarbageCollect (rtsBool force_major_gc, 
+                rtsBool do_heap_census,
                 nat gc_type USED_IF_THREADS,
                 Capability *cap)
 {
   bdescr *bd;
   generation *gen;
   lnat live_blocks, live_words, allocated, max_copied, avg_copied;
+#if defined(THREADED_RTS)
   gc_thread *saved_gct;
+#endif
   nat g, n;
 
   // necessary if we stole a callee-saves register for gct:
+#if defined(THREADED_RTS)
   saved_gct = gct;
+#endif
 
 #ifdef PROFILING
   CostCentreStack *prev_CCS;
@@ -657,6 +662,17 @@ GarbageCollect (rtsBool force_major_gc,
   // fill slop.
   IF_DEBUG(sanity, checkSanity(rtsTrue /* after GC */, major_gc));
 
+  // If a heap census is due, we need to do it before
+  // resurrectThreads(), for the same reason as checkSanity above:
+  // resurrectThreads() will overwrite some closures and leave slop
+  // behind.
+  if (do_heap_census) {
+      debugTrace(DEBUG_sched, "performing heap census");
+      RELEASE_SM_LOCK;
+      heapCensus(gct->gc_start_cpu);
+      ACQUIRE_SM_LOCK;
+  }
+
   // send exceptions to any threads which were about to die
   RELEASE_SM_LOCK;
   resurrectThreads(resurrected_threads);
@@ -956,7 +972,7 @@ any_work (void)
 static void
 scavenge_until_all_done (void)
 {
-    nat r;
+    DEBUG_ONLY( nat r );
 	
 
 loop:
@@ -973,8 +989,13 @@ loop:
     collect_gct_blocks();
 
     // scavenge_loop() only exits when there's no work to do
+
+#ifdef DEBUG
     r = dec_running();
-    
+#else
+    dec_running();
+#endif
+
     traceEventGcIdle(gct->cap);
 
     debugTrace(DEBUG_gc, "%d GC threads still running", r);
@@ -1400,8 +1421,10 @@ mark_root(void *user USED_IF_THREADS, StgClosure **root)
     // so we need to save and restore it here.  NB. only call
     // mark_root() from the main GC thread, otherwise gct will be
     // incorrect.
+#if defined(THREADED_RTS)
     gc_thread *saved_gct;
     saved_gct = gct;
+#endif
     SET_GCT(user);
     
     evacuate(root);

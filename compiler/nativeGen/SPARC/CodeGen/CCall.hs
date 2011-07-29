@@ -24,8 +24,10 @@ import CLabel
 import BasicTypes
 
 import OrdList
+import DynFlags
 import FastString
 import Outputable
+import Platform
 
 {-
    Now the biggest nightmare---calls.  Most of the nastiness is buried in
@@ -137,6 +139,7 @@ genCCall target dest_regs argsAndHints
         let transfer_code
            	= toOL (move_final vregs allArgRegs extraStackArgsHere)
 				
+	dflags <- getDynFlagsNat
 	return 
 	 $ 	argcode			`appOL`
 		move_sp_down		`appOL`
@@ -144,7 +147,7 @@ genCCall target dest_regs argsAndHints
 		callinsns		`appOL`
 		unitOL NOP		`appOL`
 		move_sp_up		`appOL`
-		assign_code dest_regs
+		assign_code (targetPlatform dflags) dest_regs
 
 
 -- | Generate code to calculate an argument, and move it into one
@@ -224,11 +227,11 @@ move_final (v:vs) (a:az) offset
 -- | Assign results returned from the call into their 
 --	desination regs.
 --
-assign_code :: [CmmHinted LocalReg] -> OrdList Instr
+assign_code :: Platform -> [CmmHinted LocalReg] -> OrdList Instr
 
-assign_code []	= nilOL
+assign_code _ [] = nilOL
 
-assign_code [CmmHinted dest _hint]	
+assign_code platform [CmmHinted dest _hint]
  = let	rep	= localRegType dest
 	width	= typeWidth rep
 	r_dest 	= getRegisterReg (CmmLocal dest)
@@ -244,20 +247,20 @@ assign_code [CmmHinted dest _hint]
 
 		| not $ isFloatType rep
 		, W32	<- width
-		= unitOL $ mkRegRegMoveInstr (regSingle $ oReg 0) r_dest
+		= unitOL $ mkRegRegMoveInstr platform (regSingle $ oReg 0) r_dest
 
 		| not $ isFloatType rep
 		, W64		<- width
 		, r_dest_hi	<- getHiVRegFromLo r_dest
-		= toOL 	[ mkRegRegMoveInstr (regSingle $ oReg 0) r_dest_hi
-			, mkRegRegMoveInstr (regSingle $ oReg 1) r_dest]
+		= toOL 	[ mkRegRegMoveInstr platform (regSingle $ oReg 0) r_dest_hi
+			, mkRegRegMoveInstr platform (regSingle $ oReg 1) r_dest]
 
 		| otherwise
 		= panic "SPARC.CodeGen.GenCCall: no match"
 		
    in	result
 
-assign_code _
+assign_code _ _
 	= panic "SPARC.CodeGen.GenCCall: no match"
 
 

@@ -417,9 +417,6 @@ SRC_HC_OPTS += -H32m -O
 # These flags make flex 8-bit
 SRC_FLEX_OPTS	+= -8
 
-# Default fptools options for dllwrap.
-SRC_BLD_DLL_OPTS += --target=i386-mingw32
-
 # Flags for CPP when running GreenCard on .pgc files
 GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
 
@@ -538,6 +535,7 @@ endif
 WhatGccIsCalled = @WhatGccIsCalled@
 GccVersion      = @GccVersion@
 GccLT34         = @GccLT34@
+GccLT46         = @GccLT46@
 CC              = $(WhatGccIsCalled)
 CC_STAGE0       = @CC_STAGE0@
 CC_STAGE1       = $(CC)
@@ -741,8 +739,6 @@ XSLTPROC_LABEL_OPTS	 = --stringparam toc.section.depth 3 \
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
-
-BLD_DLL			= dllwrap
 
 #
 # ghc-pkg

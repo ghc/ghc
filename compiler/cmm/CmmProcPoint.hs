@@ -25,6 +25,7 @@ import MkGraph
 import Control.Monad
 import OptimizationFuel
 import Outputable
+import Platform
 import UniqSet
 import UniqSupply
 
@@ -139,10 +140,10 @@ callProcPoints g = foldGraphBlocks add (setSingleton (g_entry g)) g
                       CmmForeignCall {succ=k}     -> setInsert k set
                       _ -> set
 
-minimalProcPointSet :: ProcPointSet -> CmmGraph -> FuelUniqSM ProcPointSet
+minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph -> FuelUniqSM ProcPointSet
 -- Given the set of successors of calls (which must be proc-points)
 -- figure out the minimal set of necessary proc-points
-minimalProcPointSet callProcPoints g = extendPPSet g (postorderDfs g) callProcPoints
+minimalProcPointSet platform callProcPoints g = extendPPSet platform g (postorderDfs g) callProcPoints
 
 procPointAnalysis :: ProcPointSet -> CmmGraph -> FuelUniqSM (BlockEnv Status)
 -- Once you know what the proc-points are, figure out
@@ -151,8 +152,8 @@ procPointAnalysis procPoints g =
   liftM snd $ dataflowPassFwd g initProcPoints $ analFwd lattice forward
   where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints]
 
-extendPPSet :: CmmGraph -> [CmmBlock] -> ProcPointSet -> FuelUniqSM ProcPointSet
-extendPPSet g blocks procPoints =
+extendPPSet :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> FuelUniqSM ProcPointSet
+extendPPSet platform g blocks procPoints =
     do env <- procPointAnalysis procPoints g
        let add block pps = let id = entryLabel block
                            in  case mapLookup id env of
@@ -163,7 +164,7 @@ extendPPSet g blocks procPoints =
            newPoint  = listToMaybe newPoints
            ppSuccessor b =
                let nreached id = case mapLookup id env `orElse`
-                                       pprPanic "no ppt" (ppr id <+> ppr b) of
+                                       pprPanic "no ppt" (ppr id <+> pprPlatform platform b) of
                                    ProcPoint -> 1
                                    ReachedBy ps -> setSize ps
                    block_procpoints = nreached (entryLabel b)
@@ -181,7 +182,7 @@ extendPPSet g blocks procPoints =
 -}
        case newPoint of Just id ->
                           if setMember id procPoints' then panic "added old proc pt"
-                          else extendPPSet g blocks (setInsert id procPoints')
+                          else extendPPSet platform g blocks (setInsert id procPoints')
                         Nothing -> return procPoints'
 
 

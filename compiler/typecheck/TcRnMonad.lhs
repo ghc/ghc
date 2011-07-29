@@ -74,7 +74,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
       	tvs_var      <- newIORef emptyVarSet ;
         keep_var     <- newIORef emptyNameSet ;
         used_rdr_var <- newIORef Set.empty ;
-	th_var	     <- newIORef False ;
+        th_var       <- newIORef False ;
+        th_splice_var<- newIORef False ;
         lie_var      <- newIORef emptyWC ;
 	dfun_n_var   <- newIORef emptyOccSet ;
 	type_env_var <- case hsc_type_env_var hsc_env of {
@@ -98,7 +99,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		tcg_inst_env  = emptyInstEnv,
 		tcg_fam_inst_env  = emptyFamInstEnv,
                 tcg_th_used   = th_var,
-		tcg_exports  = [],
+                tcg_th_splice_used   = th_splice_var,
+                tcg_exports  = [],
 		tcg_imports  = emptyImportAvails,
                 tcg_used_rdrnames = used_rdr_var,
 		tcg_dus      = emptyDUs,
@@ -248,19 +250,28 @@ xoptM flag = do { dflags <- getDOpts; return (xopt flag dflags) }
 doptM :: DynFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
 
--- XXX setOptM and unsetOptM operate on different types. One should be renamed.
+woptM :: WarningFlag -> TcRnIf gbl lcl Bool
+woptM flag = do { dflags <- getDOpts; return (wopt flag dflags) }
 
-setOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
+setXOptM :: ExtensionFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setXOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                          env { env_top = top { hsc_dflags = xopt_set (hsc_dflags top) flag}} )
 
-unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
-			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+unsetDOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetDOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
+
+unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+unsetWOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+                            env { env_top = top { hsc_dflags = wopt_unset (hsc_dflags top) flag}} )
 
 -- | Do it flag is true
 ifDOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 ifDOptM flag thing_inside = do { b <- doptM flag; 
+				if b then thing_inside else return () }
+
+ifWOptM :: WarningFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+ifWOptM flag thing_inside = do { b <- woptM flag; 
 				if b then thing_inside else return () }
 
 ifXOptM :: ExtensionFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
@@ -1038,6 +1049,9 @@ traceTcConstraints msg
 \begin{code}
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
+
+recordThSpliceUse :: TcM ()
+recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
 
 keepAliveTc :: Id -> TcM ()  	-- Record the name in the keep-alive set
 keepAliveTc id 

@@ -52,13 +52,17 @@ import TysWiredIn
 import Type
 import TypeRep
 import VarSet
+import Module
 import State
 import Util
 import MonadUtils
 import Outputable
 import FastString
 import Bag
-import Data.List	( partition, intersperse )
+import Fingerprint
+import Constants
+
+import Data.List        ( partition, intersperse )
 \end{code}
 
 \begin{code}
@@ -1161,8 +1165,9 @@ From the data type
 
 we generate
 
-	instance Typeable2 T where
-		typeOf2 _ = mkTyConApp (mkTyConRep "T") []
+        instance Typeable2 T where
+                typeOf2 _ = mkTyConApp (mkTyCon <hash-high> <hash-low>
+                                                <pkg> <module> "T") []
 
 We are passed the Typeable2 class as well as T
 
@@ -1173,13 +1178,34 @@ gen_Typeable_binds loc tycon
 	mk_easy_FunBind loc 
 		(mk_typeOf_RDR tycon) 	-- Name of appropriate type0f function
 		[nlWildPat] 
-		(nlHsApps mkTypeRep_RDR [tycon_rep, nlList []])
+                (nlHsApps mkTyConApp_RDR [tycon_rep, nlList []])
   where
-    tycon_rep = nlHsVar mkTyConRep_RDR `nlHsApp` nlHsLit (mkHsString (showSDocOneLine (ppr tycon)))
+    tycon_name = tyConName tycon
+    modl       = nameModule tycon_name
+    pkg        = modulePackageId modl
+
+    modl_fs    = moduleNameFS (moduleName modl)
+    pkg_fs     = packageIdFS pkg
+    name_fs    = occNameFS (nameOccName tycon_name)
+
+    tycon_rep = nlHsApps mkTyCon_RDR
+                    (map nlHsLit [int64 high,
+                                  int64 low,
+                                  HsString pkg_fs,
+                                  HsString modl_fs,
+                                  HsString name_fs])
+
+    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
+    Fingerprint high low = fingerprintString hashThis
+
+    int64
+      | wORD_SIZE == 4 = HsWord64Prim . fromIntegral
+      | otherwise      = HsWordPrim . fromIntegral
+
 
 mk_typeOf_RDR :: TyCon -> RdrName
 -- Use the arity of the TyCon to make the right typeOfn function
-mk_typeOf_RDR tycon = varQual_RDR tYPEABLE (mkFastString ("typeOf" ++ suffix))
+mk_typeOf_RDR tycon = varQual_RDR tYPEABLE_INTERNAL (mkFastString ("typeOf" ++ suffix))
 		where
 		  arity = tyConArity tycon
 		  suffix | arity == 0 = ""

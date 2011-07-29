@@ -40,7 +40,7 @@ import TyCon
 import DataCon
 import TysWiredIn
 import TysPrim          ( anyTyConOfKind )
-import BasicTypes       ( Arity, nonRuleLoopBreaker )
+import BasicTypes       ( Arity, strongLoopBreaker )
 import qualified Var
 import VarEnv
 import VarSet
@@ -1055,7 +1055,7 @@ tcIdInfo ignore_prags name ty info
 	-- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf) 
       = do { unf <- tcUnfolding name ty info if_unf
-    	   ; let info1 | lb        = info `setOccInfo` nonRuleLoopBreaker
+    	   ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
 	     	       | otherwise = info
 	   ; return (info1 `setUnfoldingInfoLazily` unf) }
 \end{code}
@@ -1091,14 +1091,12 @@ tcUnfolding name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
     }
 
 tcUnfolding name dfun_ty _ (IfDFunUnfold ops)
-  = do { mb_ops1 <- forkM_maybe doc $ mapM tc_arg ops
+  = do { mb_ops1 <- forkM_maybe doc $ mapM tcIfaceExpr ops
        ; return (case mb_ops1 of
        	 	    Nothing   -> noUnfolding
                     Just ops1 -> mkDFunUnfolding dfun_ty ops1) }
   where
     doc = text "Class ops for dfun" <+> ppr name
-    tc_arg (DFunPolyArg  e) = do { e' <- tcIfaceExpr e; return (DFunPolyArg e') }
-    tc_arg (DFunConstArg e) = do { e' <- tcIfaceExpr e; return (DFunConstArg e') }
 
 tcUnfolding name ty info (IfExtWrapper arity wkr)
   = tcIfaceWrapper name ty info arity (tcIfaceExtId wkr)

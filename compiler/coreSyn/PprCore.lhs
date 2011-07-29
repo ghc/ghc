@@ -271,38 +271,39 @@ instance OutputableBndr Var where
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
   | isTyVar binder = pprKindedTyVarBndr binder
-  | otherwise      = pprTypedBinder binder $$ 
+  | otherwise      = pprTypedLetBinder binder $$ 
 		     ppIdInfo binder (idInfo binder)
 
 -- Lambda bound type variables are preceded by "@"
 pprCoreBinder bind_site bndr 
   = getPprStyle $ \ sty ->
-    pprTypedLCBinder bind_site (debugStyle sty) bndr
+    pprTypedLamBinder bind_site (debugStyle sty) bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
   | isTyVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
-pprTypedLCBinder :: BindingSite -> Bool -> Var -> SDoc
+pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
 -- For lambda and case binders, show the unfolding info (usually none)
-pprTypedLCBinder bind_site debug_on var
+pprTypedLamBinder bind_site debug_on var
   | not debug_on && isDeadBinder var    = char '_'
   | not debug_on, CaseBind <- bind_site = pprUntypedBinder var  -- No parens, no kind info
+  | opt_SuppressAll                     = pprUntypedBinder var  -- Suppress the signature
   | isTyVar var                         = parens (pprKindedTyVarBndr var)
   | otherwise = parens (hang (pprIdBndr var) 
                            2 (vcat [ dcolon <+> pprType (idType var), pp_unf]))
-              where
-		unf_info = unfoldingInfo (idInfo var)
-                pp_unf | hasSomeUnfolding unf_info = ptext (sLit "Unf=") <> ppr unf_info
-                       | otherwise                 = empty
+  where
+    unf_info = unfoldingInfo (idInfo var)
+    pp_unf | hasSomeUnfolding unf_info = ptext (sLit "Unf=") <> ppr unf_info
+           | otherwise                 = empty
 
-pprTypedBinder :: Var -> SDoc
+pprTypedLetBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
-pprTypedBinder binder
-  | isTyVar binder		= pprKindedTyVarBndr binder
-  | opt_SuppressTypeSignatures	= empty
-  | otherwise			= hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
+pprTypedLetBinder binder
+  | isTyVar binder	       = pprKindedTyVarBndr binder
+  | opt_SuppressTypeSignatures = pprIdBndr binder
+  | otherwise		       = hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
@@ -438,10 +439,6 @@ instance Outputable Unfolding where
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic 
 	    -- blowup in the size of the printout!
-
-instance Outputable e => Outputable (DFunArg e) where
-  ppr (DFunPolyArg e)  = braces (ppr e)
-  ppr (DFunConstArg e) = ppr e
 \end{code}
 
 -----------------------------------------------------
@@ -463,7 +460,8 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
                 ru_bndrs = tpl_vars, ru_args = tpl_args,
                 ru_rhs = rhs })
   = hang (doubleQuotes (ftext name) <+> ppr act)
-       4 (sep [ptext (sLit "forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
+       4 (sep [ptext (sLit "forall") <+> 
+                  sep (map (pprCoreBinder LambdaBind) tpl_vars) <> dot,
                nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
                nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
             ])

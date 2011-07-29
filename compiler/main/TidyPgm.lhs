@@ -701,111 +701,142 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
       let unfold_env' = extendVarEnv unfold_env id (name',False)
       tidy_internal ids unfold_env' occ_env'
 
-addExternal :: Bool -> Id -> ([Id],Bool)
+addExternal :: Bool -> Id -> ([Id], Bool)
 addExternal expose_all id = (new_needed_ids, show_unfold)
   where
-    new_needed_ids = unfold_ids ++
-                     filter (\id -> isLocalId id &&
-                                    not (id `elemVarSet` unfold_set))
-                       (varSetElems spec_ids) -- XXX non-det ordering
-
+    new_needed_ids = bndrFvsInOrder show_unfold id
     idinfo	   = idInfo id
+    show_unfold    = show_unfolding (unfoldingInfo idinfo)
     never_active   = isNeverActive (inlinePragmaActivation (inlinePragInfo idinfo))
-    loop_breaker   = isNonRuleLoopBreaker (occInfo idinfo)
+    loop_breaker   = isStrongLoopBreaker (occInfo idinfo)
     bottoming_fn   = isBottomingSig (strictnessInfo idinfo `orElse` topSig)
-    spec_ids	   = specInfoFreeVars (specInfo idinfo)
 
 	-- Stuff to do with the Id's unfolding
 	-- We leave the unfolding there even if there is a worker
-	-- In GHCI the unfolding is used by importers
-    show_unfold = isJust mb_unfold_ids
-    (unfold_set, unfold_ids) = mb_unfold_ids `orElse` (emptyVarSet, [])
+	-- In GHCi the unfolding is used by importers
 
-    mb_unfold_ids :: Maybe (IdSet, [Id])	-- Nothing => don't unfold
-    mb_unfold_ids = case unfoldingInfo idinfo of
-		      CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src, uf_guidance = guide } 
-					    | show_unfolding src guide
-					    -> Just (unf_ext_ids src unf_rhs)
-                      DFunUnfolding _ _ ops -> Just (exprsFvsInOrder (dfunArgExprs ops))
-		      _                     -> Nothing
-                  where
-                    unf_ext_ids (InlineWrapper v) _ = (unitVarSet v, [v])
-                    unf_ext_ids _           unf_rhs = exprFvsInOrder unf_rhs
-		    -- For a wrapper, externalise the wrapper id rather than the
-		    -- fvs of the rhs.  The two usually come down to the same thing
-		    -- but I've seen cases where we had a wrapper id $w but a
-		    -- rhs where $w had been inlined; see Trac #3922
-
-    show_unfolding unf_source unf_guidance
+    show_unfolding (CoreUnfolding { uf_src = src, uf_guidance = guidance })
        =  expose_all 	     -- 'expose_all' says to expose all 
 			     -- unfoldings willy-nilly
 
-       || isStableSource unf_source	     -- Always expose things whose 
-       	  		     		     -- source is an inline rule
+       || isStableSource src	     -- Always expose things whose 
+       	  		    	     -- source is an inline rule
 
        || not (bottoming_fn	 -- No need to inline bottom functions
 	   || never_active	 -- Or ones that say not to
 	   || loop_breaker	 -- Or that are loop breakers
-	   || neverUnfoldGuidance unf_guidance)
+	   || neverUnfoldGuidance guidance)
+    show_unfolding (DFunUnfolding {}) = True
+    show_unfolding _                  = False
+\end{code}
 
--- We want a deterministic free-variable list.  exprFreeVars gives us
--- a VarSet, which is in a non-deterministic order when converted to a
--- list.  Hence, here we define a free-variable finder that returns
--- the free variables in the order that they are encountered.
---
--- Note [choosing external names]
+%************************************************************************
+%*									*
+               Deterministic free variables
+%*									*
+%************************************************************************
 
-exprFvsInOrder :: CoreExpr -> (VarSet, [Id])
-exprFvsInOrder e = run (dffvExpr e)
+We want a deterministic free-variable list.  exprFreeVars gives us
+a VarSet, which is in a non-deterministic order when converted to a
+list.  Hence, here we define a free-variable finder that returns
+the free variables in the order that they are encountered.
 
-exprsFvsInOrder :: [CoreExpr] -> (VarSet, [Id])
-exprsFvsInOrder es = run (mapM_ dffvExpr es)
+Note [choosing external names]
 
-run :: DFFV () -> (VarSet, [Id])
-run (DFFV m) = case m emptyVarSet [] of
-                 (set,ids,_) -> (set,ids)
+\begin{code}
+bndrFvsInOrder :: Bool -> Id -> [Id]
+bndrFvsInOrder show_unfold id
+  = run (dffvLetBndr show_unfold id)
 
-newtype DFFV a = DFFV (VarSet -> [Var] -> (VarSet,[Var],a))
+run :: DFFV () -> [Id]
+run (DFFV m) = case m emptyVarSet (emptyVarSet, []) of
+                 ((_,ids),_) -> ids
+
+newtype DFFV a 
+  = DFFV (VarSet	      -- Envt: non-top-level things that are in scope
+                              -- we don't want to record these as free vars
+      -> (VarSet, [Var])      -- Input State: (set, list) of free vars so far 
+      -> ((VarSet,[Var]),a))  -- Output state
 
 instance Monad DFFV where
-  return a = DFFV $ \set ids -> (set, ids, a)
-  (DFFV m) >>= k = DFFV $ \set ids ->
-    case m set ids of
-       (set',ids',a) -> case k a of
-                          DFFV f -> f set' ids' 
+  return a = DFFV $ \_ st -> (st, a)
+  (DFFV m) >>= k = DFFV $ \env st ->
+    case m env st of
+       (st',a) -> case k a of
+                     DFFV f -> f env st'
+
+extendScope :: Var -> DFFV a -> DFFV a
+extendScope v (DFFV f) = DFFV (\env st -> f (extendVarSet env v) st)
+
+extendScopeList :: [Var] -> DFFV a -> DFFV a
+extendScopeList vs (DFFV f) = DFFV (\env st -> f (extendVarSetList env vs) st)
 
 insert :: Var -> DFFV ()
-insert v = DFFV $ \ set ids  -> case () of 
- _ | v `elemVarSet` set -> (set,ids,())
-   | otherwise          -> (extendVarSet set v, v:ids, ())
+insert v = DFFV $ \ env (set, ids) -> 
+           let keep_me = isLocalId v && 
+                         not (v `elemVarSet` env) &&
+	   		   not (v `elemVarSet` set)
+           in if keep_me 
+              then ((extendVarSet set v, v:ids), ())
+              else ((set,                ids),   ())
+
 
 dffvExpr :: CoreExpr -> DFFV ()
-dffvExpr e = go emptyVarSet e
-  where
-    go scope e = case e of
-      Var v | isLocalId v && not (v `elemVarSet` scope) -> insert v
-      App e1 e2          -> do go scope e1; go scope e2
-      Lam v e            -> go (extendVarSet scope v) e
-      Note _ e           -> go scope e
-      Cast e _           -> go scope e
-      Let (NonRec x r) e -> do go scope r; go (extendVarSet scope x) e
-      Let (Rec prs) e    -> do let scope' = extendVarSetList scope (map fst prs)
-                               mapM_ (go scope') (map snd prs)
-                               go scope' e
-      Case e b _ as      -> do go scope e
-                               mapM_ (go_alt (extendVarSet scope b)) as
-      _other             -> return ()
+dffvExpr (Var v)              = insert v
+dffvExpr (App e1 e2) 	      = dffvExpr e1 >> dffvExpr e2
+dffvExpr (Lam v e)   	      = extendScope v (dffvExpr e)
+dffvExpr (Note _ e)  	      = dffvExpr e
+dffvExpr (Cast e _)  	      = dffvExpr e
+dffvExpr (Let (NonRec x r) e) = dffvBind (x,r) >> extendScope x (dffvExpr e)
+dffvExpr (Let (Rec prs) e)    = extendScopeList (map fst prs) $
+                                (mapM_ dffvBind prs >> dffvExpr e)
+dffvExpr (Case e b _ as)      = dffvExpr e >> extendScope b (mapM_ dffvAlt as)
+dffvExpr _other               = return ()
 
-    go_alt scope (_,xs,r) = go (extendVarSetList scope xs) r
+dffvAlt :: (t, [Var], CoreExpr) -> DFFV ()
+dffvAlt (_,xs,r) = extendScopeList xs (dffvExpr r)
+
+dffvBind :: (Id, CoreExpr) -> DFFV ()
+dffvBind(x,r)    = dffvLetBndr True x >> dffvExpr r
+
+dffvLetBndr :: Bool -> Id -> DFFV ()
+dffvLetBndr show_unfold id
+  | not (isId id) = return ()
+  | otherwise
+  = do { when show_unfold (go_unf (unfoldingInfo idinfo))
+       ; extendScope id $   -- See Note [Rule free var hack] in CoreFVs
+         mapM_ go_rule (specInfoRules (specInfo idinfo)) }
+  where
+    idinfo = idInfo id
+
+    go_unf (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
+       = case src of
+           InlineWrapper v -> insert v
+           _               -> dffvExpr rhs
+	    -- For a wrapper, externalise the wrapper id rather than the
+	    -- fvs of the rhs.  The two usually come down to the same thing
+	    -- but I've seen cases where we had a wrapper id $w but a
+	    -- rhs where $w had been inlined; see Trac #3922
+
+    go_unf (DFunUnfolding _ _ args) = mapM_ dffvExpr args
+    go_unf _ = return ()
+
+    go_rule (BuiltinRule {}) = return ()
+    go_rule (Rule { ru_bndrs = bndrs, ru_rhs = rhs })
+      = extendScopeList bndrs (dffvExpr rhs)
 \end{code}
 
 
---------------------------------------------------------------------
---		tidyTopName
--- This is where we set names to local/global based on whether they really are 
--- externally visible (see comment at the top of this module).  If the name
--- was previously local, we have to give it a unique occurrence name if
--- we intend to externalise it.
+%************************************************************************
+%*									*
+               tidyTopName
+%*									*
+%************************************************************************
+
+This is where we set names to local/global based on whether they really are 
+externally visible (see comment at the top of this module).  If the name
+was previously local, we have to give it a unique occurrence name if
+we intend to externalise it.
 
 \begin{code}
 tidyTopName :: Module -> IORef NameCache -> Maybe Id -> TidyOccEnv

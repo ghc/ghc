@@ -159,7 +159,7 @@ def validate(opts, args, parser):
   if opts.dir:
     fname = opts.output
     if fname is None:
-      fname = datetime.today().strftime("%Y-%m%-%d_%H-%M-%S") + ".fp"
+      fname = datetime.today().strftime("%Y-%m-%d_%H-%M-%S") + ".fp"
     path = os.path.join(opts.dir, fname)
     opts.output_file = path
     opts.output = file(path, "w")

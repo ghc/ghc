@@ -41,28 +41,30 @@ import OldCmm
 import CLabel
 
 -- The rest:
+import DynFlags
 import StaticFlags	( opt_PIC )
 import OrdList
 import Outputable
+import Platform
 import Unique
 
 import Control.Monad	( mapAndUnzipM )
 
 -- | Top level code generation
-cmmTopCodeGen 
-	:: RawCmmTop 
-	-> NatM [NatCmmTop Instr]
+cmmTopCodeGen :: RawCmmTop
+              -> NatM [NatCmmTop CmmStatics Instr]
 
-cmmTopCodeGen
-	(CmmProc info lab (ListGraph blocks)) 
- = do	
- 	(nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
+cmmTopCodeGen (CmmProc info lab (ListGraph blocks))
+ = do
+      dflags <- getDynFlagsNat
+      let platform = targetPlatform dflags
+      (nat_blocks,statics) <- mapAndUnzipM (basicBlockCodeGen platform) blocks
 
-	let proc 	= CmmProc info lab (ListGraph $ concat nat_blocks)
-	let tops 	= proc : concat statics
+      let proc = CmmProc info lab (ListGraph $ concat nat_blocks)
+      let tops = proc : concat statics
 
-  	return tops
-  
+      return tops
+
 cmmTopCodeGen (CmmData sec dat) = do
   return [CmmData sec dat]  -- no translation, we just use CmmStatic
 
@@ -72,12 +74,12 @@ cmmTopCodeGen (CmmData sec dat) = do
 -- 	are indicated by the NEWBLOCK instruction.  We must split up the
 -- 	instruction stream into basic blocks again.  Also, we extract
 -- 	LDATAs here too.
-basicBlockCodeGen 
-	:: CmmBasicBlock
-	-> NatM ( [NatBasicBlock Instr]
-		, [NatCmmTop Instr])
+basicBlockCodeGen :: Platform
+                  -> CmmBasicBlock
+                  -> NatM ( [NatBasicBlock Instr]
+                          , [NatCmmTop CmmStatics Instr])
 
-basicBlockCodeGen cmm@(BasicBlock id stmts) = do
+basicBlockCodeGen platform cmm@(BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
   let
 	(top,other_blocks,statics) 
@@ -94,7 +96,7 @@ basicBlockCodeGen cmm@(BasicBlock id stmts) = do
 
 	-- do intra-block sanity checking
 	blocksChecked
-	  	= map (checkBlock cmm)
+	  	= map (checkBlock platform cmm)
 	  	$ BasicBlock id top : other_blocks
 
   return (blocksChecked, statics)
@@ -313,8 +315,8 @@ genSwitch expr ids
 			, JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
 			, NOP ]
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop CmmStatics Instr)
 generateJumpTableForInstr (JMP_TBL _ ids label) =
 	let jumpTable = map jumpTableEntry ids
-	in Just (CmmData ReadOnlyData (CmmDataLabel label : jumpTable))
+	in Just (CmmData ReadOnlyData (Statics label jumpTable))
 generateJumpTableForInstr _ = Nothing

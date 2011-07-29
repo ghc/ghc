@@ -344,6 +344,17 @@ instance Outputable TickInfo where
               parens (int (tickInfo_number info) <+> ppr (tickInfo_module info) <+>
                       ppr (tickInfo_locals info))
 
+returnUnboxedAtom :: Word16 -> Sequel -> BCEnv 
+                 -> AnnExpr' Id VarSet -> CgRep
+                 -> BcM BCInstrList
+-- Returning an unlifted value.
+-- Heave it on the stack, SLIDE, and RETURN.
+returnUnboxedAtom d s p e e_rep
+   = do (push, szw) <- pushAtom d p e
+        return (push                       -- value onto stack
+                `appOL`  mkSLIDE szw (d-s) -- clear to sequel
+                `snocOL` RETURN_UBX e_rep) -- go
+
 -- Compile code to apply the given expression to the remaining args
 -- on the stack, returning a HNF.
 schemeE :: Word16 -> Sequel -> BCEnv -> AnnExpr' Id VarSet -> BcM BCInstrList
@@ -353,31 +364,16 @@ schemeE d s p e
    = schemeE d s p e'
 
 -- Delegate tail-calls to schemeT.
-schemeE d s p e@(AnnApp _ _)
-   = schemeT d s p e
+schemeE d s p e@(AnnApp _ _) = schemeT d s p e
+
+schemeE d s p e@(AnnLit lit)     = returnUnboxedAtom d s p e (typeCgRep (literalType lit))
+schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e VoidArg
 
 schemeE d s p e@(AnnVar v)
-   | not (isUnLiftedType v_type)
-   =  -- Lifted-type thing; push it in the normal way
-     schemeT d s p e
-
-   | otherwise
-   = do -- Returning an unlifted value.
-        -- Heave it on the stack, SLIDE, and RETURN.
-        (push, szw) <- pushAtom d p (AnnVar v)
-        return (push                       -- value onto stack
-                `appOL`  mkSLIDE szw (d-s) -- clear to sequel
-                `snocOL` RETURN_UBX v_rep) -- go
+   | isUnLiftedType v_type = returnUnboxedAtom d s p e (typeCgRep v_type)
+   | otherwise             = schemeT d s p e
    where
-      v_type = idType v
-      v_rep = typeCgRep v_type
-
-schemeE d s p (AnnLit literal)
-   = do (push, szw) <- pushAtom d p (AnnLit literal)
-        let l_rep = typeCgRep (literalType literal)
-        return (push                       -- value onto stack
-                `appOL`  mkSLIDE szw (d-s) -- clear to sequel
-                `snocOL` RETURN_UBX l_rep) -- go
+     v_type = idType v
 
 schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
    | (AnnVar v, args_r_to_l) <- splitApp rhs,
@@ -1236,13 +1232,14 @@ pushAtom _ _ (AnnLit lit)
    = case lit of
         MachLabel _ _ _ -> code NonPtrArg
         MachWord _    -> code NonPtrArg
-        MachInt _     -> code PtrArg
+        MachInt _     -> code NonPtrArg
+        MachWord64 _  -> code LongArg
+        MachInt64 _   -> code LongArg
         MachFloat _   -> code FloatArg
         MachDouble _  -> code DoubleArg
         MachChar _    -> code NonPtrArg
         MachNullAddr  -> code NonPtrArg
         MachStr s     -> pushStr s
-        l             -> pprPanic "pushAtom" (ppr l)
      where
         code rep
            = let size_host_words = fromIntegral (cgRepSizeW rep)

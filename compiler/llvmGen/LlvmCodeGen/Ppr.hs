@@ -82,16 +82,16 @@ pprLlvmCmmTop :: LlvmEnv -> Int -> LlvmCmmTop -> (Doc, [LlvmVar])
 pprLlvmCmmTop _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmTop env count (CmmProc info lbl (ListGraph blks))
-  = let static = CmmDataLabel lbl : info
-        (idoc, ivar) = if not (null info)
-                          then pprInfoTable env count lbl static
-                          else (empty, [])
+pprLlvmCmmTop env count (CmmProc mb_info entry_lbl (ListGraph blks))
+  = let (idoc, ivar) = case mb_info of
+                        Nothing -> (empty, [])
+                        Just (Statics info_lbl dat)
+                         -> pprInfoTable env count info_lbl (Statics entry_lbl dat)
     in (idoc $+$ (
         let sec = mkLayoutSection (count + 1)
-            (lbl',sec') = if not (null info)
-                            then (entryLblToInfoLbl lbl, sec)
-                            else (lbl, Nothing)
+            (lbl',sec') = case mb_info of
+                           Nothing                   -> (entry_lbl, Nothing)
+                           Just (Statics info_lbl _) -> (info_lbl,  sec)
             link = if externallyVisibleCLabel lbl'
                       then ExternallyVisible
                       else Internal
@@ -103,14 +103,14 @@ pprLlvmCmmTop env count (CmmProc info lbl (ListGraph blks))
 
 
 -- | Pretty print CmmStatic
-pprInfoTable :: LlvmEnv -> Int -> CLabel -> [CmmStatic] -> (Doc, [LlvmVar])
-pprInfoTable env count lbl stat
+pprInfoTable :: LlvmEnv -> Int -> CLabel -> CmmStatics -> (Doc, [LlvmVar])
+pprInfoTable env count info_lbl stat
   = let unres = genLlvmData (Text, stat)
         (_, (ldata, ltypes)) = resolveLlvmData env unres
 
         setSection ((LMGlobalVar _ ty l _ _ c), d)
             = let sec = mkLayoutSection count
-                  ilabel = strCLabel_llvm (entryLblToInfoLbl lbl)
+                  ilabel = strCLabel_llvm info_lbl
                               `appendFS` fsLit iTableSuf
                   gv = LMGlobalVar ilabel ty l sec llvmInfAlign c
                   v = if l == Internal then [gv] else []

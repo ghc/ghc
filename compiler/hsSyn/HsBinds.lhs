@@ -148,8 +148,8 @@ data HsBindLR idL idR
 	abs_ev_vars :: [EvVar],	 -- Includes equality constraints
 
        -- AbsBinds only gets used when idL = idR after renaming,
-       -- but these need to be idL's for the collect... code in HsUtil to have
-       -- the right type
+       -- but these need to be idL's for the collect... code in HsUtil 
+       -- to have the right type
 	abs_exports :: [([TyVar], idL, idL, TcSpecPrags)],	-- (tvs, poly_id, mono_id, prags)
 
         abs_ev_binds :: TcEvBinds,     -- Evidence bindings
@@ -378,7 +378,7 @@ data HsWrapper
   = WpHole			-- The identity coercion
 
   | WpCompose HsWrapper HsWrapper	
-       -- (wrap1 `WpCompse` wrap2)[e] = wrap1[ wrap2[ e ]]
+       -- (wrap1 `WpCompose` wrap2)[e] = wrap1[ wrap2[ e ]]
        -- 
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)

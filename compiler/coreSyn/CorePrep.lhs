@@ -318,7 +318,7 @@ cpeBind :: TopLevelFlag
 	-> CorePrepEnv -> CoreBind
 	-> UniqSM (CorePrepEnv, Floats)
 cpeBind top_lvl env (NonRec bndr rhs)
-  = do { (_, bndr1) <- cloneBndr env bndr
+  = do { (_, bndr1) <- cpCloneBndr env bndr
        ; let is_strict   = isStrictDmd (idDemandInfo bndr)
              is_unlifted = isUnLiftedType (idType bndr)
        ; (floats, bndr2, rhs2) <- cpePair top_lvl NonRecursive 
@@ -333,7 +333,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
 
 cpeBind top_lvl env (Rec pairs)
   = do { let (bndrs,rhss) = unzip pairs
-       ; (env', bndrs1) <- cloneBndrs env (map fst pairs)
+       ; (env', bndrs1) <- cpCloneBndrs env (map fst pairs)
        ; stuff <- zipWithM (cpePair top_lvl Recursive False env') bndrs1 rhss
 
        ; let (floats_s, bndrs2, rhss2) = unzip3 stuff
@@ -367,7 +367,8 @@ cpePair top_lvl is_rec is_strict_or_unlifted env bndr rhs
 	       	    	       -- Note [Silly extra arguments]
 	       	    (do { v <- newVar (idType bndr)
 		        ; let float = mkFloat False False v rhs2
-		        ; return (addFloat floats2 float, cpeEtaExpand arity (Var v)) })
+		        ; return ( addFloat floats2 float
+                                 , cpeEtaExpand arity (Var v)) })
 
      	-- Record if the binder is evaluated
 	-- and otherwise trim off the unfolding altogether
@@ -472,7 +473,7 @@ cpeRhsE env (Cast expr co)
 
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
-        ; (env', bndrs') <- cloneBndrs env bndrs
+        ; (env', bndrs') <- cpCloneBndrs env bndrs
 	; body' <- cpeBodyNF env' body
 	; return (emptyFloats, mkLams bndrs' body') }
 
@@ -485,12 +486,12 @@ cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
        ; let bndr1 = bndr `setIdUnfolding` evaldUnfolding
             -- Record that the case binder is evaluated in the alternatives
-       ; (env', bndr2) <- cloneBndr env bndr1
+       ; (env', bndr2) <- cpCloneBndr env bndr1
        ; alts' <- mapM (sat_alt env') alts
        ; return (floats, Case scrut' bndr2 ty alts') }
   where
     sat_alt env (con, bs, rhs)
-       = do { (env2, bs') <- cloneBndrs env bs
+       = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
 
@@ -655,7 +656,7 @@ cpeArg env is_strict arg arg_ty
        { v <- newVar arg_ty
        ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
        	     arg_float = mkFloat is_strict is_unlifted v arg3
-       ; return (addFloat floats2 arg_float, Var v) } }
+       ; return (addFloat floats2 arg_float, varToCoreExpr v) } }
   where
     is_unlifted = isUnLiftedType arg_ty
     want_float = wantFloatNested NonRecursive (is_strict || is_unlifted)
@@ -1074,11 +1075,11 @@ lookupCorePrepEnv (CPE env) id
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
-cloneBndrs :: CorePrepEnv -> [Var] -> UniqSM (CorePrepEnv, [Var])
-cloneBndrs env bs = mapAccumLM cloneBndr env bs
+cpCloneBndrs :: CorePrepEnv -> [Var] -> UniqSM (CorePrepEnv, [Var])
+cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
-cloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
-cloneBndr env bndr
+cpCloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
+cpCloneBndr env bndr
   | isLocalId bndr, not (isCoVar bndr)
   = do bndr' <- setVarUnique bndr <$> getUniqueM
        

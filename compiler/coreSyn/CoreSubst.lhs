@@ -8,7 +8,8 @@ Utility functions on @Core@ syntax
 \begin{code}
 module CoreSubst (
 	-- * Main data types
-	Subst, TvSubstEnv, IdSubstEnv, InScopeSet,
+	Subst(..), -- Implementation exported for supercompiler's Renaming.hs only
+	TvSubstEnv, IdSubstEnv, InScopeSet,
 
         -- ** Substituting into expressions and related types
 	deShadowBinds, substSpec, substRulesForImportedIds,
@@ -27,7 +28,7 @@ module CoreSubst (
 
 	-- ** Substituting and cloning binders
 	substBndr, substBndrs, substRecBndrs,
-	cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+	cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
 	-- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith
@@ -45,11 +46,12 @@ import qualified Coercion
 
 	-- We are defining local versions
 import Type     hiding ( substTy, extendTvSubst, extendTvSubstList
-                       , isInScope, substTyVarBndr )
+                       , isInScope, substTyVarBndr, cloneTyVarBndr )
 import Coercion hiding ( substTy, substCo, extendTvSubst, substTyVarBndr, substCoVarBndr )
 
 import OptCoercion ( optCoercion )
-import PprCore     ( pprCoreBindings )
+import PprCore     ( pprCoreBindings, pprRules )
+import Module	   ( Module )
 import VarSet
 import VarEnv
 import Id
@@ -99,7 +101,7 @@ data Subst
                       -- applying the substitution
           IdSubstEnv  -- Substitution for Ids
           TvSubstEnv  -- Substitution from TyVars to Types
-          CvSubstEnv  -- Substitution from TyCoVars to Coercions
+          CvSubstEnv  -- Substitution from CoVars to Coercions
 
 	-- INVARIANT 1: See #in_scope_invariant#
 	-- This is what lets us deal with name capture properly
@@ -211,14 +213,14 @@ extendTvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids (extendVarEn
 extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
 extendTvSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope ids (extendVarEnvList tvs prs) cvs
 
--- | Add a substitution from a 'TyCoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
+-- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
 -- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
-extendCvSubst :: Subst -> TyCoVar -> Coercion -> Subst
+extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r = Subst in_scope ids tvs (extendVarEnv cvs v r)
 
--- | Adds multiple 'TyCoVar' -> 'Coercion' substitutions to the
+-- | Adds multiple 'CoVar' -> 'Coercion' substitutions to the
 -- 'Subst': see also 'extendCvSubst'
-extendCvSubstList :: Subst -> [(TyCoVar,Coercion)] -> Subst
+extendCvSubstList :: Subst -> [(CoVar,Coercion)] -> Subst
 extendCvSubstList (Subst in_scope ids tvs cvs) prs = Subst in_scope ids tvs (extendVarEnvList cvs prs)
 
 -- | Add a substitution appropriate to the thing being substituted
@@ -251,14 +253,15 @@ lookupIdSubst doc (Subst in_scope ids _ _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v $$ ppr in_scope $$ doc) 
+  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> doc <+> ppr v 
+                            $$ ppr in_scope) 
 		Var v
 
 -- | Find the substitution for a 'TyVar' in the 'Subst'
 lookupTvSubst :: Subst -> TyVar -> Type
 lookupTvSubst (Subst _ _ tvs _) v = ASSERT( isTyVar v) lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
 
--- | Find the coercion substitution for a 'TyCoVar' in the 'Subst'
+-- | Find the coercion substitution for a 'CoVar' in the 'Subst'
 lookupCvSubst :: Subst -> CoVar -> Coercion
 lookupCvSubst (Subst _ _ _ cvs) v = ASSERT( isCoVar v ) lookupVarEnv cvs v `orElse` mkCoVarCo v
 
@@ -517,6 +520,16 @@ cloneIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneIdBndrs subst us ids
   = mapAccumL (clone_id subst) subst (ids `zip` uniqsFromSupply us)
 
+cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
+-- Works for all kinds of variables (typically case binders)
+-- not just Ids
+cloneBndrs subst us vs
+  = mapAccumL clone subst (vs `zip` uniqsFromSupply us)
+  where
+    clone subst (v,uniq) 
+      | isTyVar v = cloneTyVarBndr subst v uniq
+      | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
+
 -- | Clone a mutually recursive group of 'Id's
 cloneRecIdBndrs :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 cloneRecIdBndrs subst us ids
@@ -555,6 +568,12 @@ Subst to a TvSubst.
 substTyVarBndr :: Subst -> TyVar -> (Subst, TyVar)
 substTyVarBndr (Subst in_scope id_env tv_env cv_env) tv
   = case Type.substTyVarBndr (TvSubst in_scope tv_env) tv of
+	(TvSubst in_scope' tv_env', tv') 
+	   -> (Subst in_scope' id_env tv_env' cv_env, tv')
+
+cloneTyVarBndr :: Subst -> TyVar -> Unique -> (Subst, TyVar)
+cloneTyVarBndr (Subst in_scope id_env tv_env cv_env) tv uniq
+  = case Type.cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq of
 	(TvSubst in_scope' tv_env', tv') 
 	   -> (Subst in_scope' id_env tv_env' cv_env, tv')
 
@@ -623,7 +642,7 @@ substUnfoldingSC subst unf 	 -- Short-cut version
 substUnfolding subst (DFunUnfolding ar con args)
   = DFunUnfolding ar con (map subst_arg args)
   where
-    subst_arg = fmap (substExpr (text "dfun-unf") subst)
+    subst_arg = substExpr (text "dfun-unf") subst
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
 	-- Retain an InlineRule!
@@ -776,15 +795,16 @@ simpleOptExprWith :: Subst -> InExpr -> OutExpr
 simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
 
 ----------------------
-simpleOptPgm :: DynFlags -> [CoreBind] -> [CoreRule] -> [CoreVect] 
+simpleOptPgm :: DynFlags -> Module 
+             -> [CoreBind] -> [CoreRule] -> [CoreVect] 
              -> IO ([CoreBind], [CoreRule], [CoreVect])
-simpleOptPgm dflags binds rules vects
+simpleOptPgm dflags this_mod binds rules vects
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-                       (pprCoreBindings occ_anald_binds);
+                       (pprCoreBindings occ_anald_binds $$ pprRules rules );
 
        ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
-    occ_anald_binds  = occurAnalysePgm Nothing {- No rules active -}
+    occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
                                        rules vects binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
                        

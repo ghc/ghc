@@ -101,6 +101,7 @@ compile :: HscEnv
         -> Int             -- ^ ... of M
         -> Maybe ModIface  -- ^ old interface, if we have one
         -> Maybe Linkable  -- ^ old linkable, if we have one
+        -> SourceModified
         -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compile = compile' (hscCompileNothing, hscCompileInteractive, hscCompileBatch)
@@ -115,10 +116,12 @@ compile' ::
         -> Int             -- ^ ... of M
         -> Maybe ModIface  -- ^ old interface, if we have one
         -> Maybe Linkable  -- ^ old linkable, if we have one
+        -> SourceModified
         -> IO HomeModInfo   -- ^ the complete HomeModInfo, if successful
 
 compile' (nothingCompiler, interactiveCompiler, batchCompiler)
         hsc_env0 summary mod_index nmods mb_old_iface maybe_old_linkable
+        source_modified0
  = do
    let dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -156,7 +159,9 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
 
    -- -fforce-recomp should also work with --make
    let force_recomp = dopt Opt_ForceRecomp dflags
-       source_unchanged = isJust maybe_old_linkable && not force_recomp
+       source_modified
+         | force_recomp || isNothing maybe_old_linkable = SourceModified
+         | otherwise = source_modified0
        object_filename = ml_obj_file location
 
    let handleBatch HscNoRecomp
@@ -223,7 +228,7 @@ compile' (nothingCompiler, interactiveCompiler, batchCompiler)
        --            -> m HomeModInfo
        runCompiler compiler handle
            = do (result, iface, details)
-                    <- compiler hsc_env' summary source_unchanged mb_old_iface
+                    <- compiler hsc_env' summary source_modified mb_old_iface
                                 (Just (mod_index, nmods))
                 linkable <- handle result
                 return (HomeModInfo{ hm_details  = details,
@@ -893,22 +898,21 @@ runPhase (Hsc src_flavour) input_fn dflags0
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
         src_timestamp <- io $ getModificationTime (basename <.> suff)
 
-        let force_recomp = dopt Opt_ForceRecomp dflags
-            hsc_lang = hscTarget dflags
+        let hsc_lang = hscTarget dflags
         source_unchanged <- io $
-          if force_recomp || not (isStopLn stop)
-                -- Set source_unchanged to False unconditionally if
+          if not (isStopLn stop)
+                -- SourceModified unconditionally if
                 --      (a) recompilation checker is off, or
                 --      (b) we aren't going all the way to .o file (e.g. ghc -S)
-             then return False
+             then return SourceModified
                 -- Otherwise look at file modification dates
              else do o_file_exists <- doesFileExist o_file
                      if not o_file_exists
-                        then return False       -- Need to recompile
+                        then return SourceModified       -- Need to recompile
                         else do t2 <- getModificationTime o_file
                                 if t2 > src_timestamp
-                                  then return True
-                                  else return False
+                                  then return SourceUnmodified
+                                  else return SourceModified
 
   -- get the DynFlags
         let next_phase = hscNextPhase dflags src_flavour hsc_lang
@@ -934,8 +938,8 @@ runPhase (Hsc src_flavour) input_fn dflags0
                                         ms_location  = location4,
                                         ms_hs_date   = src_timestamp,
                                         ms_obj_date  = Nothing,
-                                        ms_imps      = imps,
-                                        ms_srcimps   = src_imps }
+                                        ms_textual_imps = imps,
+                                        ms_srcimps      = src_imps }
 
   -- run the compiler!
         result <- io $ hscCompileOneShot hsc_env'
@@ -1440,7 +1444,10 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
       | isWindowsTarget = empty
       | otherwise = hcat [
           text "__asm__(\"\\t.section ", text ghcLinkInfoSectionName,
-                                    text ",\\\"\\\",@note\\n",
+                                    text ",\\\"\\\",",
+                                    text elfSectionNote,
+                                    text "\\n",
+
                     text "\\t.ascii \\\"", info', text "\\\"\\n\");" ]
           where
             -- we need to escape twice: once because we're inside a C string,
@@ -1449,6 +1456,16 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
 
             escape :: String -> String
             escape = concatMap (charToC.fromIntegral.ord)
+
+            elfSectionNote :: String
+            elfSectionNote = case platformArch (targetPlatform dflags) of
+                               ArchX86    -> "@note"
+                               ArchX86_64 -> "@note"
+                               ArchPPC    -> "@note"
+                               ArchPPC_64 -> "@note"
+                               ArchSPARC  -> "@note"
+                               ArchARM    -> "%note"
+                               ArchUnknown -> panic "elfSectionNote ArchUnknown"
 
 -- The "link info" is a string representing the parameters of the
 -- link.  We save this information in the binary, and the next time we
@@ -1568,12 +1585,12 @@ linkBinary dflags o_files dep_packages = do
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
-#ifdef elf_OBJ_FORMAT
-        get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
-                                | otherwise = ["-L" ++ l]
-#else
-        get_pkg_lib_path_opts l = ["-L" ++ l]
-#endif
+        get_pkg_lib_path_opts l
+         | osElfTarget (platformOS (targetPlatform dflags)) &&
+           dynLibLoader dflags == SystemDependent &&
+           not opt_Static
+            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+         | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
@@ -1649,6 +1666,17 @@ linkBinary dflags o_files dep_packages = do
                           then ["-Wl,--enable-auto-import"]
                           else [])
 
+                      -- '-no_pie' - On OS X, the linker otherwise complains that it cannot build 
+                      --             position independent code due to some offensive code in GMP.
+                      -- '-no_compact_unwind'
+                      --           - C++/Objective-C exceptions cannot use optimised stack
+                      --             unwinding code (the optimised form is the default in Xcode 4 on
+                      --             x86_64).
+                      ++ (if platformOS   (targetPlatform dflags) == OSDarwin   && 
+                             platformArch (targetPlatform dflags) == ArchX86_64
+                          then ["-Wl,-no_pie", "-Wl,-no_compact_unwind"]
+                          else [])
+
                       ++ o_files
                       ++ extra_ld_inputs
                       ++ lib_path_opts
@@ -1693,58 +1721,55 @@ maybeCreateManifest
    :: DynFlags
    -> FilePath                          -- filename of executable
    -> IO [FilePath]                     -- extra objects to embed, maybe
-#ifndef mingw32_TARGET_OS
-maybeCreateManifest _ _ = do
-  return []
-#else
-maybeCreateManifest dflags exe_filename = do
-  if not (dopt Opt_GenManifest dflags) then return [] else do
+maybeCreateManifest dflags exe_filename
+ | platformOS (targetPlatform dflags) == OSMinGW32 &&
+   dopt Opt_GenManifest dflags
+    = do let manifest_filename = exe_filename <.> "manifest"
 
-  let manifest_filename = exe_filename <.> "manifest"
+         writeFile manifest_filename $
+             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
+             "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
+             "  <assemblyIdentity version=\"1.0.0.0\"\n"++
+             "     processorArchitecture=\"X86\"\n"++
+             "     name=\"" ++ dropExtension exe_filename ++ "\"\n"++
+             "     type=\"win32\"/>\n\n"++
+             "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
+             "    <security>\n"++
+             "      <requestedPrivileges>\n"++
+             "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n"++
+             "        </requestedPrivileges>\n"++
+             "       </security>\n"++
+             "  </trustInfo>\n"++
+             "</assembly>\n"
 
-  writeFile manifest_filename $
-      "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
-      "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
-      "  <assemblyIdentity version=\"1.0.0.0\"\n"++
-      "     processorArchitecture=\"X86\"\n"++
-      "     name=\"" ++ dropExtension exe_filename ++ "\"\n"++
-      "     type=\"win32\"/>\n\n"++
-      "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
-      "    <security>\n"++
-      "      <requestedPrivileges>\n"++
-      "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n"++
-      "        </requestedPrivileges>\n"++
-      "       </security>\n"++
-      "  </trustInfo>\n"++
-      "</assembly>\n"
+         -- Windows will find the manifest file if it is named
+         -- foo.exe.manifest. However, for extra robustness, and so that
+         -- we can move the binary around, we can embed the manifest in
+         -- the binary itself using windres:
+         if not (dopt Opt_EmbedManifest dflags) then return [] else do
 
-  -- Windows will find the manifest file if it is named foo.exe.manifest.
-  -- However, for extra robustness, and so that we can move the binary around,
-  -- we can embed the manifest in the binary itself using windres:
-  if not (dopt Opt_EmbedManifest dflags) then return [] else do
+         rc_filename <- newTempName dflags "rc"
+         rc_obj_filename <- newTempName dflags (objectSuf dflags)
 
-  rc_filename <- newTempName dflags "rc"
-  rc_obj_filename <- newTempName dflags (objectSuf dflags)
+         writeFile rc_filename $
+             "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
+               -- magic numbers :-)
+               -- show is a bit hackish above, but we need to escape the
+               -- backslashes in the path.
 
-  writeFile rc_filename $
-      "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
-        -- magic numbers :-)
-        -- show is a bit hackish above, but we need to escape the
-        -- backslashes in the path.
+         let wr_opts = getOpts dflags opt_windres
+         runWindres dflags $ map SysTools.Option $
+               ["--input="++rc_filename,
+                "--output="++rc_obj_filename,
+                "--output-format=coff"]
+               ++ wr_opts
+               -- no FileOptions here: windres doesn't like seeing
+               -- backslashes, apparently
 
-  let wr_opts = getOpts dflags opt_windres
-  runWindres dflags $ map SysTools.Option $
-        ["--input="++rc_filename,
-         "--output="++rc_obj_filename,
-         "--output-format=coff"]
-        ++ wr_opts
-        -- no FileOptions here: windres doesn't like seeing
-        -- backslashes, apparently
+         removeFile manifest_filename
 
-  removeFile manifest_filename
-
-  return [rc_obj_filename]
-#endif
+         return [rc_obj_filename]
+ | otherwise = return []
 
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
@@ -1756,12 +1781,12 @@ linkDynLib dflags o_files dep_packages = do
 
     let pkg_lib_paths = collectLibraryPaths pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
-#ifdef elf_OBJ_FORMAT
-        get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
-                                | otherwise = ["-L" ++ l]
-#else
-        get_pkg_lib_path_opts l = ["-L" ++ l]
-#endif
+        get_pkg_lib_path_opts l
+         | osElfTarget (platformOS (targetPlatform dflags)) &&
+           dynLibLoader dflags == SystemDependent &&
+           not opt_Static
+            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+         | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
@@ -1773,11 +1798,11 @@ linkDynLib dflags o_files dep_packages = do
     -- not allow undefined symbols.
     -- The RTS library path is still added to the library search path
     -- above in case the RTS is being explicitly linked in (see #3807).
-#if !defined(mingw32_HOST_OS)
-    let pkgs_no_rts = filter ((/= rtsPackageId) . packageConfigId) pkgs
-#else
-    let pkgs_no_rts = pkgs
-#endif
+    let pkgs_no_rts = case platformOS (targetPlatform dflags) of
+                      OSMinGW32 ->
+                          pkgs
+                      _ ->
+                          filter ((/= rtsPackageId) . packageConfigId) pkgs
     let pkg_link_opts = collectLinkOpts dflags pkgs_no_rts
 
         -- probably _stub.o files
@@ -1970,7 +1995,15 @@ joinObjectFiles dflags o_files output_fn = do
   let ld_r args = SysTools.runLink dflags ([
                             SysTools.Option "-nostdlib",
                             SysTools.Option "-nodefaultlibs",
-                            SysTools.Option "-Wl,-r",
+                            SysTools.Option "-Wl,-r"
+                            ]
+                            -- gcc on sparc sets -Wl,--relax implicitly, but
+                            -- -r and --relax are incompatible for ld, so
+                            -- disable --relax explicitly.
+                         ++ (if platformArch (targetPlatform dflags) == ArchSPARC
+                                then [SysTools.Option "-Wl,-no-relax"]
+                                else [])
+                         ++ [
                             SysTools.Option ld_build_id,
                             SysTools.Option ld_x_flag,
                             SysTools.Option "-o",

@@ -120,11 +120,11 @@ data HsExpr id
   | NegApp      (LHsExpr id)    -- negated expr
                 (SyntaxExpr id) -- Name of 'negate'
 
-  | HsPar       (LHsExpr id)    -- parenthesised expr
+  | HsPar       (LHsExpr id)    -- Parenthesised expr; see Note [Parens in HsSyn]
 
-  | SectionL    (LHsExpr id)    -- operand
+  | SectionL    (LHsExpr id)    -- operand; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operator
-  | SectionR    (LHsExpr id)    -- operator
+  | SectionR    (LHsExpr id)    -- operator; see Note [Sections in HsSyn]
                 (LHsExpr id)    -- operand
 
   | ExplicitTuple		-- Used for explicit tuples and sections thereof
@@ -300,6 +300,28 @@ type PendingSplice = (Name, LHsExpr Id) -- Typechecked splices, waiting to be
                                         -- pasted back in by the desugarer
 \end{code}
 
+Note [Parens in HsSyn]
+~~~~~~~~~~~~~~~~~~~~~~
+HsPar (and ParPat in patterns, HsParTy in types) is used as follows
+
+  * Generally HsPar is optional; the pretty printer adds parens where
+    necessary.  Eg (HsApp f (HsApp g x)) is fine, and prints 'f (g x)'
+
+  * HsPars are pretty printed as '( .. )' regardless of whether 
+    or not they are strictly necssary
+
+  * HsPars are respected when rearranging operator fixities.
+    So   a * (b + c)  means what it says (where the parens are an HsPar)
+
+Note [Sections in HsSyn]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Sections should always appear wrapped in an HsPar, thus
+	 HsPar (SectionR ...)
+The parser parses sections in a wider variety of situations 
+(See Note [Parsing sections]), but the renamer checks for those
+parens.  This invariant makes pretty-printing easier; we don't need 
+a special case for adding the parens round sections.
+
 Note [Rebindable if]
 ~~~~~~~~~~~~~~~~~~~~
 The rebindable syntax for 'if' is a bit special, because when
@@ -376,7 +398,7 @@ ppr_expr (OpApp e1 op _ e2)
       = hang (ppr op) 2 (sep [pp_e1, pp_e2])
 
     pp_infixly v
-      = sep [nest 2 pp_e1, pprHsInfix v, nest 2 pp_e2]
+      = sep [pp_e1, sep [pprHsInfix v, nest 2 pp_e2]]
 
 ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
@@ -400,8 +422,7 @@ ppr_expr (SectionR op expr)
 
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext (sLit "x_")])
                        4 ((<>) pp_expr rparen)
-    pp_infixly v
-      = (sep [pprHsInfix v, pp_expr])
+    pp_infixly v = sep [pprHsInfix v, pp_expr]
 
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens boxity (fcat (ppr_tup_args exprs))
@@ -557,29 +578,33 @@ pprDebugParendExpr expr
 
 pprParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
 pprParendExpr expr
-  = let
-        pp_as_was = pprLExpr expr
+  | hsExprNeedsParens (unLoc expr) = parens (pprLExpr expr)
+  | otherwise                      = pprLExpr expr
         -- Using pprLExpr makes sure that we go 'deeper'
         -- I think that is usually (always?) right
-    in
-    case unLoc expr of
-      ArithSeq {}       -> pp_as_was
-      PArrSeq {}        -> pp_as_was
-      HsLit {}          -> pp_as_was
-      HsOverLit {}      -> pp_as_was
-      HsVar {}          -> pp_as_was
-      HsIPVar {}        -> pp_as_was
-      ExplicitTuple {}  -> pp_as_was
-      ExplicitList {}   -> pp_as_was
-      ExplicitPArr {}   -> pp_as_was
-      HsPar {}          -> pp_as_was
-      HsBracket {}      -> pp_as_was
-      HsBracketOut _ [] -> pp_as_was
-      HsDo sc _ _
-       | isListCompExpr sc -> pp_as_was
-      _                    -> parens pp_as_was
 
-isAtomicHsExpr :: HsExpr id -> Bool -- A single token
+hsExprNeedsParens :: HsExpr id -> Bool
+-- True of expressions for which '(e)' and 'e' 
+-- mean the same thing
+hsExprNeedsParens (ArithSeq {})       = False
+hsExprNeedsParens (PArrSeq {})        = False
+hsExprNeedsParens (HsLit {})          = False
+hsExprNeedsParens (HsOverLit {})      = False
+hsExprNeedsParens (HsVar {})          = False
+hsExprNeedsParens (HsIPVar {})        = False
+hsExprNeedsParens (ExplicitTuple {})  = False
+hsExprNeedsParens (ExplicitList {})   = False
+hsExprNeedsParens (ExplicitPArr {})   = False
+hsExprNeedsParens (HsPar {})          = False
+hsExprNeedsParens (HsBracket {})      = False
+hsExprNeedsParens (HsBracketOut _ []) = False
+hsExprNeedsParens (HsDo sc _ _)
+       | isListCompExpr sc            = False
+hsExprNeedsParens _ = True
+
+
+isAtomicHsExpr :: HsExpr id -> Bool 
+-- True of a single token
 isAtomicHsExpr (HsVar {})     = True
 isAtomicHsExpr (HsLit {})     = True
 isAtomicHsExpr (HsOverLit {}) = True
@@ -670,7 +695,6 @@ data HsCmdTop id
 \begin{code}
 type HsRecordBinds id = HsRecFields id (LHsExpr id)
 \end{code}
-
 
 
 %************************************************************************
@@ -920,10 +944,10 @@ data StmtLR idL idR
       }
   deriving (Data, Typeable)
 
-data TransForm		-- The 'f' below is the 'using' function, 'e' is the by function
-  = ThenForm		-- then f          or    then f by e
-  | GroupFormU		-- group using f   or    group using f by e
-  | GroupFormB    	-- group by e  
+data TransForm	 -- The 'f' below is the 'using' function, 'e' is the by function
+  = ThenForm	 -- then f          or    then f by e        (depending on trS_by)
+  | GroupFormU	 -- group using f   or    group using f by e (depending on trS_by)
+  | GroupFormB   -- group by e  
       -- In the GroupByFormB, trS_using is filled in with
       --    'groupWith' (list comprehensions) or 
       --    'groupM' (monad comprehensions)

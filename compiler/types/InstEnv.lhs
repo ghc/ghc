@@ -432,7 +432,7 @@ lookupInstEnv :: (InstEnv, InstEnv) 	-- External and home package inst-env
 	      -> ([InstMatch], 		-- Successful matches
 		  [Instance],		-- These don't match but do unify
                   Bool)                 -- True if error condition caused by
-                                        -- SafeHaskell condition.
+                                        -- Safe Haskell condition.
 
 -- The second component of the result pair happens when we look up
 --	Foo [a]
@@ -462,7 +462,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
 	-- misleading (complaining of multiple matches when some should be
 	-- overlapped away)
 
-    -- SafeHaskell: We restrict code compiled in 'Safe' mode from 
+    -- Safe Haskell: We restrict code compiled in 'Safe' mode from 
     -- overriding code compiled in any other mode. The rational is
     -- that code compiled in 'Safe' mode is code that is untrusted
     -- by the ghc user. So we shouldn't let that code change the

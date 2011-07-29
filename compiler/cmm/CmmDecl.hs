@@ -11,7 +11,7 @@ module CmmDecl (
         CmmInfoTable(..), HasStaticClosure, ClosureTypeInfo(..), ConstrDescription,
         ProfilingInfo(..), ClosureTypeTag,
         CmmActual, CmmFormal, ForeignHint(..),
-        CmmStatic(..), Section(..),
+        CmmStatics(..), CmmStatic(..), Section(..),
   ) where
 
 #include "HsVersions.h"
@@ -55,19 +55,12 @@ newtype GenCmm d h g = Cmm [GenCmmTop d h g]
 data GenCmmTop d h g
   = CmmProc     -- A procedure
      h                 -- Extra header such as the info table
-     CLabel            -- Used to generate both info & entry labels
+     CLabel            -- Used to generate both info & entry labels (though the info table label is in 'h' in RawCmmTop)
      g                 -- Control-flow graph for the procedure's code
 
   | CmmData     -- Static data
         Section
-        [d]
-
-
--- A basic block containing a single label, at the beginning.
--- The list of basic blocks in a top-level code block may be re-ordered.
--- Fall-through is not allowed: there must be an explicit jump at the
--- end of each basic block, but the code generator might rearrange basic
--- blocks in order to turn some jumps into fallthroughs.
+        d
 
 
 -----------------------------------------------------------------------------
@@ -77,11 +70,17 @@ data GenCmmTop d h g
 -- Info table as a haskell data type
 data CmmInfoTable
   = CmmInfoTable
+      LocalInfoTable
       HasStaticClosure
       ProfilingInfo
       ClosureTypeTag -- Int
       ClosureTypeInfo
   | CmmNonInfoTable   -- Procedure doesn't need an info table
+
+-- | If the table is local, we don't export its identifier even if the
+-- corresponding Id is exported.  It's always safe to say 'False'
+-- here, but it might save symbols to say 'True'
+type LocalInfoTable = Bool
 
 type HasStaticClosure = Bool
 
@@ -139,10 +138,7 @@ data CmmStatic
         -- a literal value, size given by cmmLitRep of the literal.
   | CmmUninitialised Int
         -- uninitialised data, N bytes long
-  | CmmAlign Int
-        -- align to next N-byte boundary (N must be a power of 2).
-  | CmmDataLabel CLabel
-        -- label the current position in this section.
   | CmmString [Word8]
         -- string of 8-bit values only, not zero terminated.
 
+data CmmStatics = Statics CLabel {- Label of statics -} [CmmStatic] {- The static data itself -}

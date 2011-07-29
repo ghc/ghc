@@ -351,8 +351,7 @@ repCCallConv callConv    = notHandled "repCCallConv" (ppr callConv)
 repSafety :: Safety -> DsM (Core TH.Safety)
 repSafety PlayRisky = rep2 unsafeName []
 repSafety PlayInterruptible = rep2 interruptibleName []
-repSafety (PlaySafe False) = rep2 safeName []
-repSafety (PlaySafe True) = rep2 threadsafeName []
+repSafety PlaySafe = rep2 safeName []
 
 ds_msg :: SDoc
 ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
@@ -435,8 +434,9 @@ repBangTy ty= do
   rep2 strictTypeName [s, t]
   where 
     (str, ty') = case ty of
-		   L _ (HsBangTy _ ty) -> (isStrictName,  ty)
-		   _                   -> (notStrictName, ty)
+		   L _ (HsBangTy HsUnpack ty) -> (unpackedName,  ty)
+		   L _ (HsBangTy _ ty)        -> (isStrictName,  ty)
+		   _                          -> (notStrictName, ty)
 
 -------------------------------------------------------
 -- 			Deriving clause
@@ -1778,7 +1778,7 @@ templateHaskellNames = [
     -- Pred
     classPName, equalPName,
     -- Strict
-    isStrictName, notStrictName,
+    isStrictName, notStrictName, unpackedName,
     -- Con
     normalCName, recCName, infixCName, forallCName,
     -- StrictType
@@ -1797,7 +1797,6 @@ templateHaskellNames = [
     -- Safety
     unsafeName,
     safeName,
-    threadsafeName,
     interruptibleName,
     -- InlineSpec
     inlineSpecNoPhaseName, inlineSpecPhaseName,
@@ -1998,9 +1997,10 @@ classPName = libFun (fsLit "classP") classPIdKey
 equalPName = libFun (fsLit "equalP") equalPIdKey
 
 -- data Strict = ...
-isStrictName, notStrictName :: Name
+isStrictName, notStrictName, unpackedName :: Name
 isStrictName      = libFun  (fsLit "isStrict")      isStrictKey
 notStrictName     = libFun  (fsLit "notStrict")     notStrictKey
+unpackedName      = libFun  (fsLit "unpacked")      unpackedKey
 
 -- data Con = ...
 normalCName, recCName, infixCName, forallCName :: Name
@@ -2046,10 +2046,9 @@ cCallName = libFun (fsLit "cCall") cCallIdKey
 stdCallName = libFun (fsLit "stdCall") stdCallIdKey
 
 -- data Safety = ...
-unsafeName, safeName, threadsafeName, interruptibleName :: Name
+unsafeName, safeName, interruptibleName :: Name
 unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
-threadsafeName = libFun (fsLit "threadsafe") threadsafeIdKey
 interruptibleName = libFun (fsLit "interruptible") interruptibleIdKey
 
 -- data InlineSpec = ...
@@ -2280,9 +2279,10 @@ classPIdKey         = mkPreludeMiscIdUnique 361
 equalPIdKey         = mkPreludeMiscIdUnique 362
 
 -- data Strict = ...
-isStrictKey, notStrictKey :: Unique
+isStrictKey, notStrictKey, unpackedKey :: Unique
 isStrictKey         = mkPreludeMiscIdUnique 363
 notStrictKey        = mkPreludeMiscIdUnique 364
+unpackedKey         = mkPreludeMiscIdUnique 365
 
 -- data Con = ...
 normalCIdKey, recCIdKey, infixCIdKey, forallCIdKey :: Unique
@@ -2328,10 +2328,9 @@ cCallIdKey      = mkPreludeMiscIdUnique 394
 stdCallIdKey    = mkPreludeMiscIdUnique 395
 
 -- data Safety = ...
-unsafeIdKey, safeIdKey, threadsafeIdKey, interruptibleIdKey :: Unique
+unsafeIdKey, safeIdKey, interruptibleIdKey :: Unique
 unsafeIdKey        = mkPreludeMiscIdUnique 400
 safeIdKey          = mkPreludeMiscIdUnique 401
-threadsafeIdKey    = mkPreludeMiscIdUnique 402
 interruptibleIdKey = mkPreludeMiscIdUnique 403
 
 -- data InlineSpec =

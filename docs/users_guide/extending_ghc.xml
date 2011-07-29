@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<chapter id="extending-ghc">
+  <title>Extending and using GHC as a Library</title>
+
+  <para>GHC exposes its internal APIs to users through the built-in ghc package. It allows you to write programs that leverage GHC's entire compilation driver, in order to analyze or compile Haskell code programmatically. Furthermore, GHC gives users the ability to load compiler plugins during compilation - modules which are allowed to view and change GHC's internal intermediate representation, Core. Plugins are suitable for things like experimental optimizations or analysis, and offer a lower barrier of entry to compiler development for many common cases.</para>
+
+  <para>Furthermore, GHC offers a lightweight annotation mechanism that you can use to annotate your source code with metadata, which you can later inspect with either the compiler API or a compiler plugin.</para>
+
+  <sect1 id="annotation-pragmas">
+    <title>Source annotations</title>
+
+    <para>Annotations are small pragmas that allow you to attach data to identifiers in source code, which are persisted when compiled. These pieces of data can then inspected and utilized when using GHC as a library or writing a compiler plugin.</para>
+
+    <sect2 id="ann-pragma">
+      <title>Annotating values</title>
+
+      <indexterm><primary>ANN</primary></indexterm>
+
+      <para>Any expression that has both <literal>Typeable</literal> and <literal>Data</literal> instances may be attached to a top-level value
+      binding using an <literal>ANN</literal> pragma. In particular, this means you can use <literal>ANN</literal>
+      to annotate data constructors (e.g. <literal>Just</literal>) as well as normal values (e.g. <literal>take</literal>).
+      By way of example, to annotate the function <literal>foo</literal> with the annotation <literal>Just "Hello"</literal>
+      you would do this:</para>
+
+<programlisting>
+{-# ANN foo (Just "Hello") #-}
+foo = ...
+</programlisting>
+
+      <para>
+        A number of restrictions apply to use of annotations:
+        <itemizedlist>
+          <listitem><para>The binder being annotated must be at the top level (i.e. no nested binders)</para></listitem>
+          <listitem><para>The binder being annotated must be declared in the current module</para></listitem>
+          <listitem><para>The expression you are annotating with must have a type with <literal>Typeable</literal> and <literal>Data</literal> instances</para></listitem>
+          <listitem><para>The <ulink linkend="using-template-haskell">Template Haskell staging restrictions</ulink> apply to the
+          expression being annotated with, so for example you cannot run a function from the module being compiled.</para>
+
+          <para>To be precise, the annotation <literal>{-# ANN x e #-}</literal> is well staged if and only if <literal>$(e)</literal> would be
+          (disregarding the usual type restrictions of the splice syntax, and the usual restriction on splicing inside a splice - <literal>$([|1|])</literal> is fine as an annotation, albeit redundant).</para></listitem>
+        </itemizedlist>
+
+        If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC">
+        please give the GHC team a shout</ulink>.
+      </para>
+
+      <para>However, apart from these restrictions, many things are allowed, including expressions which are not fully evaluated!
+      Annotation expressions will be evaluated by the compiler just like Template Haskell splices are. So, this annotation is fine:</para>
+
+<programlisting>
+{-# ANN f SillyAnnotation { foo = (id 10) + $([| 20 |]), bar = 'f } #-}
+f = ...
+</programlisting>
+    </sect2>
+
+    <sect2 id="typeann-pragma">
+      <title>Annotating types</title>
+
+      <indexterm><primary>ANN type</primary></indexterm>
+      <indexterm><primary>ANN</primary></indexterm>
+
+      <para>You can annotate types with the <literal>ANN</literal> pragma by using the <literal>type</literal> keyword. For example:</para>
+
+<programlisting>
+{-# ANN type Foo (Just "A `Maybe String' annotation") #-}
+data Foo = ...
+</programlisting>
+    </sect2>
+
+    <sect2 id="modann-pragma">
+      <title>Annotating modules</title>
+
+      <indexterm><primary>ANN module</primary></indexterm>
+      <indexterm><primary>ANN</primary></indexterm>
+
+      <para>You can annotate modules with the <literal>ANN</literal> pragma by using the <literal>module</literal> keyword. For example:</para>
+
+<programlisting>
+{-# ANN module (Just "A `Maybe String' annotation") #-}
+</programlisting>
+    </sect2>
+
+  </sect1>
+
+  <sect1 id="ghc-as-a-library">
+    <title>Using GHC as a Library</title>
+
+    <para>The <literal>ghc</literal> package exposes most of GHC's frontend to users, and thus allows you to write programs that leverage it. This library is actually the same library used by GHC's internal, frontend compilation driver, and thus allows you to write tools that programmatically compile source code and inspect it. Such functionality is useful in order to write things like IDE or refactoring tools. As a simple example, here's a program which compiles a module, much like ghc itself does by default when invoked:</para>
+
+<programlisting>
+import GHC
+import GHC.Paths ( libdir )
+import DynFlags ( defaultDynFlags )
+ 
+main = 
+    defaultErrorHandler defaultDynFlags $ do
+      runGhc (Just libdir) $ do
+        dflags &lt;- getSessionDynFlags
+        setSessionDynFlags dflags
+        target &lt;- guessTarget "test_main.hs" Nothing
+        setTargets [target]
+        load LoadAllTargets
+</programlisting>
+
+    <para>The argument to <literal>runGhc</literal> is a bit tricky. GHC needs this to find its libraries, so the argument must refer to the directory that is printed by <literal>ghc --print-libdir</literal> for the same version of GHC that the program is being compiled with. Above we therefore use the <literal>ghc-paths</literal> package which provides this for us. </para>
+
+    <para>Compiling it results in:</para>
+
+<programlisting>
+$ cat test_main.hs
+main = putStrLn "hi"
+$ ghc -package ghc simple_ghc_api.hs
+[1 of 1] Compiling Main             ( simple_ghc_api.hs, simple_ghc_api.o )
+Linking simple_ghc_api ...
+$ ./simple_ghc_api
+$ ./test_main 
+hi
+$ 
+</programlisting>
+
+    <para>For more information on using the API, as well as more samples and references, please see <ulink url="http://haskell.org/haskellwiki/GHC/As_a_library">this Haskell.org wiki page</ulink>.</para>
+  </sect1>
+
+  <sect1 id="compiler-plugins">
+    <title>Compiler Plugins</title>
+
+    <para>GHC has the ability to load compiler plugins at compile time. The feature is similar to the one provided by <ulink url="http://gcc.gnu.org/wiki/plugins">GCC</ulink>, and allows users to write plugins that can inspect and modify the compilation pipeline, as well as transform and inspect GHC's intermediate language, Core. Plugins are suitable for experimental analysis or optimization, and require no changes to GHC's source code to use.</para>
+
+    <para>Plugins cannot optimize/inspect C--, nor can they implement things like parser/front-end modifications like GCC. If you feel strongly that any of these restrictions are too onerous, <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC"> please give the GHC team a shout</ulink>.</para>
+
+    <sect2 id="using-compiler-plugins">
+      <title>Using compiler plugins</title>
+
+      <para>Plugins can be specified on the command line with the option <literal>-fplugin=<replaceable>module</replaceable></literal> where <replaceable>module</replaceable> is a module in a registered package that exports a plugin. Arguments can be given to plugins with the command line option <literal>-fplugin-opt=<replaceable>module</replaceable>:<replaceable>args</replaceable></literal>, where <replaceable>args</replaceable> are arguments interpreted by the plugin provided by <replaceable>module</replaceable>.</para>
+
+      <para>As an example, in order to load the plugin exported by <literal>Foo.Plugin</literal> in the package <literal>foo-ghc-plugin</literal>, and give it the parameter "baz", we would invoke GHC like this:</para>
+
+<programlisting>
+$ ghc -fplugin Foo.Plugin -fplugin-opt Foo.Plugin:baz Test.hs
+[1 of 1] Compiling Main             ( Test.hs, Test.o )
+Loading package ghc-prim ... linking ... done.
+Loading package integer-gmp ... linking ... done.
+Loading package base ... linking ... done.
+Loading package ffi-1.0 ... linking ... done.
+Loading package foo-ghc-plugin-0.1 ... linking ... done.
+...
+Linking Test ...
+$ 
+</programlisting>
+
+      <para>Since plugins are exported by registered packages, it's safe to put dependencies on them in cabal for example, and specify plugin arguments to GHC through the <literal>ghc-options</literal> field.</para>
+    </sect2>
+
+    <sect2 id="writing-compiler-plugins">
+      <title>Writing compiler plugins</title>
+
+      <para>Plugins are modules that export at least a single identifier, <literal>plugin</literal>, of type <literal>GhcPlugins.Plugin</literal>. All plugins should <literal>import GhcPlugins</literal> as it defines the interface to the compilation pipeline.</para>
+
+      <para>A <literal>Plugin</literal> effectively holds a function which installs a compilation pass into the compiler pipeline. By default there is the empty plugin which does nothing, <literal>GhcPlugins.defaultPlugin</literal>, which you should override with record syntax to specify your installation function. Since the exact fields of the <literal>Plugin</literal> type are open to change, this is the best way to ensure your plugins will continue to work in the future with minimal interface impact.</para>
+
+      <para><literal>Plugin</literal> exports a field, <literal>installCoreToDos</literal> which is a function of type <literal>[CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]</literal>. A <literal>CommandLineOption</literal> is effectively just <literal>String</literal>, and a <literal>CoreToDo</literal> is basically a function of type <literal>Core -> Core</literal>. A <literal>CoreToDo</literal> gives your pass a name and runs it over every compiled module when you invoke GHC.</para>
+
+      <para>As a quick example, here is a simple plugin that just does nothing and just returns the original compilation pipeline, unmodified, and says 'Hello':</para>
+
+<programlisting>
+module DoNothing.Plugin (plugin) where
+import GhcPlugins
+
+plugin :: Plugin
+plugin = defaultPlugin {
+  installCoreToDos = install
+  }
+
+install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
+install _ todo = do
+  putMsgS "Hello!"
+  return todo
+</programlisting>
+
+      <para>Provided you compiled this plugin and registered it in a package (with cabal for instance,) you can then use it by just specifying <literal>-fplugin=DoNothing.Plugin</literal> on the command line, and during the compilation you should see GHC say 'Hello'.</para>
+
+      <sect3 id="coretodo-in-more-detail">
+        <title><literal>CoreToDo</literal> in more detail</title>
+
+        <para><literal>CoreToDo</literal> is effectively a data type that describes all the kinds of optimization passes GHC does on Core. There are passes for simplification, CSE, vectorisation, etc. There is a specific case for plugins, <literal>CoreDoPluginPass :: String -> PluginPass -> CoreToDo</literal> which should be what you always use when inserting your own pass into the pipeline. The first parameter is the name of the plugin, and the second is the pass you wish to insert.</para>
+
+        <para><literal>CoreM</literal> is a monad that all of the Core optimizations live and operate inside of.</para>
+
+        <para>A plugin's installation function (<literal>install</literal> in the above example) takes a list of <literal>CoreToDo</literal>s and returns a list of <literal>CoreToDo</literal>. Before GHC begins compiling modules, it enumerates all the needed plugins you tell it to load, and runs all of their installation functions, initially on a list of passes that GHC specifies itself. After doing this for every plugin, the final list of passes is given to the optimizer, and are run by simply going over the list in order.</para>
+
+        <para>You should be careful with your installation function, because the list of passes you give back isn't questioned or double checked by GHC at the time of this writing. An installation function like the following:</para>
+
+<programlisting>
+install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
+install _ _ = return []
+</programlisting>
+
+        <para>is certainly valid, but also certainly not what anyone really wants.</para>
+      </sect3>
+
+      <sect3 id="manipulating-bindings">
+        <title>Manipulating bindings</title>
+
+        <para>In the last section we saw that besides a name, a <literal>CoreDoPluginPass</literal> takes a pass of type <literal>PluginPass</literal>. A <literal>PluginPass</literal> is a synonym for <literal>(ModGuts -> CoreM ModGuts)</literal>. <literal>ModGuts</literal> is a type that represents the one module being compiled by GHC at any given time.</para>
+
+        <para>A <literal>ModGuts</literal> holds all of the module's top level bindings which we can examine. These bindings are of type <literal>CoreBind</literal> and effectively represent the binding of a name to body of code. Top-level module bindings are part of a <literal>ModGuts</literal> in the field <literal>mg_binds</literal>. Implementing a pass that manipulates the top level bindings merely needs to iterate over this field, and return a new <literal>ModGuts</literal> with an updated <literal>mg_binds</literal> field. Because this is such a common case, there is a function provided named <literal>bindsOnlyPass</literal> which lifts a function of type <literal>([CoreBind] -> CoreM [CoreBind])</literal> to type <literal>(ModGuts -> CoreM ModGuts)</literal>. </para>
+
+        <para>Continuing with our example from the last section, we can write a simple plugin that just prints out the name of all the non-recursive bindings in a module it compiles:</para>
+
+<programlisting>
+module SayNames.Plugin (plugin) where
+import GhcPlugins
+
+plugin :: Plugin
+plugin = defaultPlugin {
+  installCoreToDos = install
+  }
+
+install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
+install _ todo = return (CoreDoPluginPass "Say name" pass : todo)
+
+pass :: ModGuts -> CoreM ModGuts
+pass = bindsOnlyPass (mapM printBind)
+  where printBind :: CoreBind -> CoreM CoreBind
+        printBind bndr@(NonRec b _) = do
+          putMsgS $ "Non-recursive binding named " ++ showSDoc (ppr b)
+          return bndr 
+        printBind bndr = return bndr
+</programlisting>
+      </sect3>
+
+      <sect3 id="getting-annotations">
+        <title>Using Annotations</title>
+        
+        <para>Previously we discussed annotation pragmas (<xref linkend="annotation-pragmas"/>), which we mentioned could be used to give compiler plugins extra guidance or information. Annotations for a module can be retrieved by a plugin, but you must go through the modules <literal>ModGuts</literal> in order to get it. Because annotations can be arbitrary instances of <literal>Data</literal> and <literal>Typeable</literal>, you need to give a type annotation specifying the proper type of data to retrieve from the interface file, and you need to make sure the annotation type used by your users is the same one your plugin uses. For this reason, we advise distributing annotations as part of the package which also provides compiler plugins if possible.</para>
+
+        <para>To get the annotations of a single binder, you can use `getAnnotations` and specify the proper type. Here's an example that will print out the name of any top-level non-recursive binding with the <literal>SomeAnn</literal> annotation:</para>
+
+<programlisting>
+{-# LANGUAGE DeriveDataTypeable #-}
+module SayAnnNames.Plugin (plugin, SomeAnn) where
+import GhcPlugins
+import Control.Monad (when)
+import Data.Data
+import Data.Typeable
+
+data SomeAnn = SomeAnn deriving (Data, Typeable)
+
+plugin :: Plugin
+plugin = defaultPlugin {
+  installCoreToDos = install
+  }
+
+install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
+install _ todo = return (CoreDoPluginPass "Say name" pass : todo)
+
+pass :: ModGuts -> CoreM ModGuts
+pass g = mapM_ (printAnn g) (mg_binds g) >> return g
+  where printAnn :: ModGuts -> CoreBind -> CoreM CoreBind
+        printAnn guts bndr@(NonRec b _) = do
+          anns &lt;- annotationsOn guts b :: CoreM [SomeAnn]
+          when (not $ null anns) $ putMsgS $ "Annotated binding found: " ++  showSDoc (ppr b)
+          return bndr
+        printAnn _ bndr = return bndr
+
+annotationsOn :: Data a => ModGuts -> CoreBndr -> CoreM [a]
+annotationsOn guts bndr = do
+  anns &lt;- getAnnotations deserializeWithData guts
+  return $ lookupWithDefaultUFM anns [] (varUnique bndr)
+</programlisting>
+
+        <para>Please see the GHC API documentation for more about how to use internal APIs, etc.</para>
+      </sect3>
+    </sect2>
+
+  </sect1>
+
+</chapter>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->

@@ -59,7 +59,7 @@ emitClosureCodeAndInfoTable cl_info args body
         ; info <- mkCmmInfo cl_info
         ; emitInfoTableAndCode (infoLblToEntryLbl info_lbl) info args blks }
   where
-    info_lbl  = infoTableLabelFromCI cl_info $ clHasCafRefs cl_info
+    info_lbl  = infoTableLabelFromCI cl_info
 
 -- We keep the *zero-indexed* tag in the srt_len field of the info
 -- table of a data constructor.
@@ -84,12 +84,12 @@ mkCmmInfo cl_info = do
            info = ConstrInfo (ptrs, nptrs)
                              (fromIntegral (dataConTagZ con))
                              conName
-       return $ CmmInfo gc_target Nothing (CmmInfoTable False prof cl_type info)
+       return $ CmmInfo gc_target Nothing (CmmInfoTable False False prof cl_type info)
 
     ClosureInfo { closureName   = name,
                   closureLFInfo = lf_info,
                   closureSRT    = srt } ->
-       return $ CmmInfo gc_target Nothing (CmmInfoTable False prof cl_type info)
+       return $ CmmInfo gc_target Nothing (CmmInfoTable (closureInfoLocal cl_info) False prof cl_type info)
        where
          info =
              case lf_info of
@@ -105,7 +105,7 @@ mkCmmInfo cl_info = do
                    ThunkInfo (ptrs, nptrs) srt
                _ -> panic "unexpected lambda form in mkCmmInfo"
   where
-    info_lbl = infoTableLabelFromCI cl_info has_caf_refs
+    info_lbl = infoTableLabelFromCI cl_info
     has_caf_refs = clHasCafRefs cl_info
 
     cl_type  = smRepClosureTypeInt (closureSMRep cl_info)
@@ -142,7 +142,7 @@ emitReturnTarget name stmts
         ; let info = CmmInfo
                        gc_target
                        Nothing
-                       (CmmInfoTable False
+                       (CmmInfoTable False False
                         (ProfilingInfo zeroCLit zeroCLit)
                         rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
                         (ContInfo frame srt_info))

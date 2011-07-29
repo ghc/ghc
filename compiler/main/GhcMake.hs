@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2011
@@ -735,15 +737,16 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 	    			   where 
 	    			     iface = hm_iface hm_info
 
-	    compile_it :: Maybe Linkable -> IO HomeModInfo
-	    compile_it  mb_linkable = 
+            compile_it :: Maybe Linkable -> SourceModified -> IO HomeModInfo
+            compile_it  mb_linkable src_modified =
                   compile hsc_env summary' mod_index nmods 
-                          mb_old_iface mb_linkable
+                          mb_old_iface mb_linkable src_modified
 
-            compile_it_discard_iface :: Maybe Linkable -> IO HomeModInfo
-            compile_it_discard_iface mb_linkable =
+            compile_it_discard_iface :: Maybe Linkable -> SourceModified
+                                     -> IO HomeModInfo
+            compile_it_discard_iface mb_linkable  src_modified =
                   compile hsc_env summary' mod_index nmods
-                          Nothing mb_linkable
+                          Nothing mb_linkable src_modified
 
             -- With the HscNothing target we create empty linkables to avoid
             -- recompilation.  We have to detect these to recompile anyway if
@@ -776,7 +779,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
                            (text "compiling stable on-disk mod:" <+> ppr this_mod_name)
                 linkable <- liftIO $ findObjectLinkable this_mod obj_fn
                               (expectJust "upsweep1" mb_obj_date)
-                compile_it (Just linkable)
+                compile_it (Just linkable) SourceUnmodifiedAndStable
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
 
@@ -797,7 +800,7 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
-                compile_it (Just l)
+                compile_it (Just l) SourceUnmodified
                 -- we have an old BCO that is up to date with respect
                 -- to the source: do a recompilation check as normal.
 
@@ -819,17 +822,17 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
                       isObjectLinkable l && linkableTime l == obj_date -> do
                           liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                                      (text "compiling mod with new on-disk obj:" <+> ppr this_mod_name)
-                          compile_it (Just l)
+                          compile_it (Just l) SourceUnmodified
                   _otherwise -> do
                           liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                                      (text "compiling mod with new on-disk obj2:" <+> ppr this_mod_name)
                           linkable <- liftIO $ findObjectLinkable this_mod obj_fn obj_date
-                          compile_it_discard_iface (Just linkable)
+                          compile_it_discard_iface (Just linkable) SourceUnmodified
 
          _otherwise -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling mod:" <+> ppr this_mod_name)
-                compile_it Nothing
+                compile_it Nothing SourceModified
 
 
 
@@ -1254,7 +1257,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                              ms_hspp_file = hspp_fn,
                              ms_hspp_opts = dflags',
 			     ms_hspp_buf  = Just buf,
-                             ms_srcimps = srcimps, ms_imps = the_imps,
+                             ms_srcimps = srcimps, ms_textual_imps = the_imps,
 			     ms_hs_date = src_timestamp,
 			     ms_obj_date = obj_timestamp })
 
@@ -1379,8 +1382,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 			      ms_hspp_file = hspp_fn,
                               ms_hspp_opts = dflags',
 			      ms_hspp_buf  = Just buf,
-			      ms_srcimps   = srcimps,
-			      ms_imps      = the_imps,
+			      ms_srcimps      = srcimps,
+			      ms_textual_imps = the_imps,
 			      ms_hs_date   = src_timestamp,
 			      ms_obj_date  = obj_timestamp }))
 
@@ -1458,51 +1461,32 @@ multiRootsErr summs@(summ1:_)
 cyclicModuleErr :: [ModSummary] -> SDoc
 -- From a strongly connected component we find 
 -- a single cycle to report
-cyclicModuleErr ms
-  = ASSERT( not (null ms) )
-    hang (ptext (sLit "Module imports form a cycle:"))
-       2 (show_path (shortest [] root_mod))
+cyclicModuleErr mss
+  = ASSERT( not (null mss) )
+    case findCycle graph of
+       Nothing   -> ptext (sLit "Unexpected non-cycle") <+> ppr mss
+       Just path -> vcat [ ptext (sLit "Module imports form a cycle:")
+                         , nest 2 (show_path path) ]
   where
-    deps :: [(ModuleName, [ModuleName])]
-    deps = [ (moduleName (ms_mod m), get_deps m) | m <- ms ]
+    graph :: [Node NodeKey ModSummary]
+    graph = [(ms, msKey ms, get_deps ms) | ms <- mss]
 
-    get_deps :: ModSummary -> [ModuleName]
-    get_deps m = filter (\k -> Map.member k dep_env) (map unLoc (ms_home_imps m))
-
-    dep_env :: Map.Map ModuleName [ModuleName]
-    dep_env = Map.fromList deps
-
-    -- Find the module with fewest imports among the SCC modules
-    -- This is just a heuristic to find some plausible root module
-    root_mod  :: ModuleName
-    root_mod = fst (minWith (length . snd) deps)
-
-    shortest :: [ModuleName] -> ModuleName -> [ModuleName] 
-    -- (shortest [v1,v2,..,vn] m) assumes that 
-    --   m     is imported by v1
-    --   which is imported by v2
-    --   ...
-    --   which is imported by vn
-    -- It retuns an import chain [w1, w2, ..wm]
-    -- where  w1 imports w2 imports .... imports wm imports w1
-    shortest visited m 
-      | m `elem` visited
-      = m : reverse (takeWhile (/= m) visited)
-      | otherwise
-      = minWith length (map (shortest (m:visited)) deps)
-      where
-        Just deps = Map.lookup m dep_env
+    get_deps :: ModSummary -> [NodeKey]
+    get_deps ms = ([ (unLoc m, HsBootFile) | m <- ms_home_srcimps ms ] ++
+                   [ (unLoc m, HsSrcFile)  | m <- ms_home_imps    ms ])
 
     show_path []         = panic "show_path"
-    show_path [m]        = ptext (sLit "module") <+> quotes (ppr m) 
+    show_path [m]        = ptext (sLit "module") <+> ppr_ms m
                            <+> ptext (sLit "imports itself")
-    show_path (m1:m2:ms) = ptext (sLit "module") <+> quotes (ppr m1)
-                           <+> sep ( nest 6 (ptext (sLit "imports") <+> quotes (ppr m2))
-                                   : go ms)
+    show_path (m1:m2:ms) = vcat ( nest 7 (ptext (sLit "module") <+> ppr_ms m1)
+                                : nest 6 (ptext (sLit "imports") <+> ppr_ms m2)
+                                : go ms )
        where
-         go []     =  [ptext (sLit "which imports") <+> quotes (ppr m1)]
-         go (m:ms) = (ptext (sLit "which imports") <+> quotes (ppr m)) : go ms
+         go []     = [ptext (sLit "which imports") <+> ppr_ms m1]
+         go (m:ms) = (ptext (sLit "which imports") <+> ppr_ms m) : go ms
        
-minWith :: Ord b => (a -> b) -> [a] -> a
-minWith get_key xs = ASSERT( not (null xs) )
-                     head (sortWith get_key xs)
+
+    ppr_ms :: ModSummary -> SDoc
+    ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+> 
+    	        (parens (text (msHsFilePath ms)))
+

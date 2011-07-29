@@ -57,7 +57,7 @@ static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #endif
 
 static lnat max_residency     = 0; // in words; for stats only
-static lnat avg_residency     = 0;
+static lnat cumulative_residency = 0;
 static lnat residency_samples = 0; // for stats only
 static lnat max_slop          = 0;
 
@@ -84,11 +84,17 @@ Ticks stat_getElapsedTime(void)
    ------------------------------------------------------------------------ */
 
 double
+mut_user_time_until( Ticks t )
+{
+    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time));
+}
+
+double
 mut_user_time( void )
 {
     Ticks cpu;
     cpu = getProcessCPUTime();
-    return TICK_TO_DBL(cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+    return mut_user_time_until(cpu);
 }
 
 #ifdef PROFILING
@@ -99,13 +105,13 @@ mut_user_time( void )
 double
 mut_user_time_during_RP( void )
 {
-  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time);
 }
 
 double
 mut_user_time_during_heap_census( void )
 {
-  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time);
 }
 #endif /* PROFILING */
 
@@ -145,7 +151,7 @@ initStats0(void)
 #endif
 
     max_residency = 0;
-    avg_residency = 0;
+    cumulative_residency = 0;
     residency_samples = 0;
     max_slop = 0;
 
@@ -362,7 +368,7 @@ stat_endGC (gc_thread *gct,
 		max_residency = live;
 	    }
 	    residency_samples++;
-	    avg_residency += live;
+	    cumulative_residency += live;
 	}
 
         if (slop > max_slop) max_slop = slop;
@@ -629,21 +635,20 @@ stat_exit(int alloc)
 
             {
                 nat i;
-                lnat sparks_created   = 0;
-                lnat sparks_dud       = 0;
-                lnat sparks_converted = 0;
-                lnat sparks_gcd       = 0;
-                lnat sparks_fizzled   = 0;
+                SparkCounters sparks = { 0, 0, 0, 0, 0, 0};
                 for (i = 0; i < n_capabilities; i++) {
-                    sparks_created   += capabilities[i].sparks_created;
-                    sparks_dud       += capabilities[i].sparks_dud;
-                    sparks_converted += capabilities[i].sparks_converted;
-                    sparks_gcd       += capabilities[i].sparks_gcd;
-                    sparks_fizzled   += capabilities[i].sparks_fizzled;
+                    sparks.created   += capabilities[i].spark_stats.created;
+                    sparks.dud       += capabilities[i].spark_stats.dud;
+                    sparks.overflowed+= capabilities[i].spark_stats.overflowed;
+                    sparks.converted += capabilities[i].spark_stats.converted;
+                    sparks.gcd       += capabilities[i].spark_stats.gcd;
+                    sparks.fizzled   += capabilities[i].spark_stats.fizzled;
                 }
 
-                statsPrintf("  SPARKS: %ld (%ld converted, %ld dud, %ld GC'd, %ld fizzled)\n\n",
-                            sparks_created + sparks_dud, sparks_converted, sparks_dud, sparks_gcd, sparks_fizzled);
+                statsPrintf("  SPARKS: %ld (%ld converted, %ld overflowed, %ld dud, %ld GC'd, %ld fizzled)\n\n",
+                            sparks.created + sparks.dud + sparks.overflowed,
+                            sparks.converted, sparks.overflowed, sparks.dud,
+                            sparks.gcd, sparks.fizzled);
             }
 #endif
 
@@ -740,7 +745,7 @@ stat_exit(int alloc)
 	  statsPrintf(fmt2,
 		    total_collections,
 		    residency_samples == 0 ? 0 : 
-		        avg_residency*sizeof(W_)/residency_samples, 
+		        cumulative_residency*sizeof(W_)/residency_samples, 
 		    max_residency*sizeof(W_), 
 		    residency_samples,
 		    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),

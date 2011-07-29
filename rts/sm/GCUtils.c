@@ -91,9 +91,6 @@ bdescr *
 grab_local_todo_block (gen_workspace *ws)
 {
     bdescr *bd;
-    generation *gen;
-
-    gen = ws->gen;
 
     bd = ws->todo_overflow;
     if (bd != NULL)
@@ -214,8 +211,8 @@ todo_block_full (nat size, gen_workspace *ws)
         // Otherwise, push this block out to the global list.
         else 
         {
-            generation *gen;
-            gen = ws->gen;
+            DEBUG_ONLY( generation *gen );
+            DEBUG_ONLY( gen = ws->gen );
             debugTrace(DEBUG_gc, "push todo block %p (%ld words), step %d, todo_q: %ld", 
                   bd->start, (unsigned long)(bd->free - bd->u.scan),
                   gen->no, dequeElements(ws->todo_q));

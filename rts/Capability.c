@@ -92,12 +92,17 @@ findSpark (Capability *cap)
       //   spark = reclaimSpark(cap->sparks);
       // However, measurements show that this makes at least one benchmark
       // slower (prsa) and doesn't affect the others.
-      spark = tryStealSpark(cap);
+      spark = tryStealSpark(cap->sparks);
+      while (spark != NULL && fizzledSpark(spark)) {
+          cap->spark_stats.fizzled++;
+          traceEventSparkFizzle(cap);
+          spark = tryStealSpark(cap->sparks);
+      }
       if (spark != NULL) {
-          cap->sparks_converted++;
+          cap->spark_stats.converted++;
 
           // Post event for running a spark from capability's own pool.
-          traceEventRunSpark(cap, cap->r.rCurrentTSO);
+          traceEventSparkRun(cap);
 
           return spark;
       }
@@ -121,7 +126,12 @@ findSpark (Capability *cap)
           if (emptySparkPoolCap(robbed)) // nothing to steal here
               continue;
 
-          spark = tryStealSpark(robbed);
+          spark = tryStealSpark(robbed->sparks);
+          while (spark != NULL && fizzledSpark(spark)) {
+              cap->spark_stats.fizzled++;
+              traceEventSparkFizzle(cap);
+              spark = tryStealSpark(robbed->sparks);
+          }
           if (spark == NULL && !emptySparkPoolCap(robbed)) {
               // we conflicted with another thread while trying to steal;
               // try again later.
@@ -129,9 +139,8 @@ findSpark (Capability *cap)
           }
 
           if (spark != NULL) {
-              cap->sparks_converted++;
-
-              traceEventStealSpark(cap, cap->r.rCurrentTSO, robbed->no);
+              cap->spark_stats.converted++;
+              traceEventSparkSteal(cap, robbed->no);
               
               return spark;
           }
@@ -224,11 +233,13 @@ initCapability( Capability *cap, nat i )
     cap->returning_tasks_hd = NULL;
     cap->returning_tasks_tl = NULL;
     cap->inbox              = (Message*)END_TSO_QUEUE;
-    cap->sparks_created     = 0;
-    cap->sparks_dud         = 0;
-    cap->sparks_converted   = 0;
-    cap->sparks_gcd         = 0;
-    cap->sparks_fizzled     = 0;
+    cap->sparks             = allocSparkPool();
+    cap->spark_stats.created    = 0;
+    cap->spark_stats.dud        = 0;
+    cap->spark_stats.overflowed = 0;
+    cap->spark_stats.converted  = 0;
+    cap->spark_stats.gcd        = 0;
+    cap->spark_stats.fizzled    = 0;
 #endif
 
     cap->f.stgEagerBlackholeInfo = (W_)&__stg_EAGER_BLACKHOLE_info;
@@ -255,6 +266,9 @@ initCapability( Capability *cap, nat i )
     cap->pinned_object_block = NULL;
 
     traceCapsetAssignCap(CAPSET_OSPROCESS_DEFAULT, i);
+#if defined(THREADED_RTS)
+    traceSparkCounters(cap);
+#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -608,6 +622,7 @@ yieldCapability (Capability** pCap, Task *task)
         traceEventGcStart(cap);
         gcWorkerThread(cap);
         traceEventGcEnd(cap);
+        traceSparkCounters(cap);
         return;
     }
 
@@ -819,7 +834,9 @@ shutdownCapability (Capability *cap,
     // threads performing foreign calls that will eventually try to 
     // return via resumeThread() and attempt to grab cap->lock.
     // closeMutex(&cap->lock);
-    
+
+    traceSparkCounters(cap);
+
 #endif /* THREADED_RTS */
 
     traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
@@ -834,6 +851,10 @@ shutdownCapabilities(Task *task, rtsBool safe)
         shutdownCapability(&capabilities[i], task, safe);
     }
     traceCapsetDelete(CAPSET_OSPROCESS_DEFAULT);
+
+#if defined(THREADED_RTS)
+    ASSERT(checkSparkCountInvariant());
+#endif
 }
 
 static void
@@ -904,3 +925,34 @@ markCapabilities (evac_fn evac, void *user)
         markCapability(evac, user, &capabilities[n], rtsFalse);
     }
 }
+
+#if defined(THREADED_RTS)
+rtsBool checkSparkCountInvariant (void)
+{
+    SparkCounters sparks = { 0, 0, 0, 0, 0, 0 };
+    StgWord64 remaining = 0;
+    nat i;
+
+    for (i = 0; i < n_capabilities; i++) {
+        sparks.created   += capabilities[i].spark_stats.created;
+        sparks.dud       += capabilities[i].spark_stats.dud;
+        sparks.overflowed+= capabilities[i].spark_stats.overflowed;
+        sparks.converted += capabilities[i].spark_stats.converted;
+        sparks.gcd       += capabilities[i].spark_stats.gcd;
+        sparks.fizzled   += capabilities[i].spark_stats.fizzled;
+        remaining        += sparkPoolSize(capabilities[i].sparks);
+    }
+    
+    /* The invariant is
+     *   created = converted + remaining + gcd + fizzled
+     */
+    debugTrace(DEBUG_sparks,"spark invariant: %ld == %ld + %ld + %ld + %ld "
+                            "(created == converted + remaining + gcd + fizzled)",
+                            sparks.created, sparks.converted, remaining,
+                            sparks.gcd, sparks.fizzled);
+
+    return (sparks.created ==
+              sparks.converted + remaining + sparks.gcd + sparks.fizzled);
+
+}
+#endif

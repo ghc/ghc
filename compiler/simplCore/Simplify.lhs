@@ -212,6 +212,7 @@ simplTopBinds env0 binds0
                 -- so that if a transformation rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
+		-- See note [Glomming] in OccurAnal.
         ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
         ; dflags <- getDOptsSmpl
         ; let dump_flag = dopt Opt_D_verbose_core2core dflags
@@ -707,7 +708,7 @@ simplUnfolding :: SimplEnv-> TopLevelFlag
 simplUnfolding env _ _ _ (DFunUnfolding ar con ops)
   = return (DFunUnfolding ar con ops')
   where
-    ops' = map (fmap (substExpr (text "simplUnfolding") env)) ops
+    ops' = map (substExpr (text "simplUnfolding") env) ops
 
 simplUnfolding env top_lvl id _
     (CoreUnfolding { uf_tmpl = expr, uf_arity = arity
@@ -876,7 +877,15 @@ simplExprF :: SimplEnv -> InExpr -> SimplCont
            -> SimplM (SimplEnv, OutExpr)
 
 simplExprF env e cont
-  = -- pprTrace "simplExprF" (ppr e $$ ppr cont $$ ppr (seTvSubst env) $$ ppr (seIdSubst env) {- $$ ppr (seFloats env) -} ) $
+  = {- pprTrace "simplExprF" (vcat 
+      [ ppr e
+      , text "cont =" <+> ppr cont
+      , text "inscope =" <+> ppr (seInScope env)
+      , text "tvsubst =" <+> ppr (seTvSubst env)
+      , text "idsubst =" <+> ppr (seIdSubst env)
+      , text "cvsubst =" <+> ppr (seCvSubst env)
+      {- , ppr (seFloats env) -} 
+      ]) $ -}
     simplExprF1 env e cont
 
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
@@ -1009,7 +1018,8 @@ simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplEnv, OutExpr)
 simplCast env body co0 cont0
   = do  { co1 <- simplCoercion env co0
-        ; simplExprF env body (addCoerce co1 cont0) }
+        ; -- pprTrace "simplCast" (ppr co1) $
+          simplExprF env body (addCoerce co1 cont0) }
   where
        addCoerce co cont = add_coerce co (coercionKind co) cont
 
@@ -1082,7 +1092,8 @@ simplCast env body co0 cont0
            --    (->) t1 t2 ~ (->) s1 s2
            [co1, co2] = decomposeCo 2 co
            new_arg    = mkCoerce (mkSymCo co1) arg'
-           arg'       = substExpr (text "move-cast") (arg_se `setInScope` env) arg
+           arg'       = substExpr (text "move-cast") arg_se' arg
+           arg_se'    = arg_se `setInScope` env
 
        add_coerce co _ cont = CoerceIt co cont
 \end{code}
@@ -1411,17 +1422,15 @@ tryRules env rules fn args call_cont
   | null rules
   = return Nothing
   | otherwise
-  = do { dflags <- getDOptsSmpl
-       ; case activeRule dflags env of {
-           Nothing     -> return Nothing  ; -- No rules apply
-           Just act_fn -> 
-         case lookupRule act_fn (getUnfoldingInRuleMatch env) (getInScope env) fn args rules of {
+  = do { case lookupRule (activeRule env) (getUnfoldingInRuleMatch env) 
+                         (getInScope env) fn args rules of {
            Nothing               -> return Nothing ;   -- No rule matches
            Just (rule, rule_rhs) ->
 
              do { tick (RuleFired (ru_name rule))
+                ; dflags <- getDOptsSmpl
                 ; trace_dump dflags rule rule_rhs $
-                  return (Just (ruleArity rule, rule_rhs)) }}}}
+                  return (Just (ruleArity rule, rule_rhs)) }}}
   where
     trace_dump dflags rule rule_rhs stuff
       | not (dopt Opt_D_dump_rule_firings dflags)

@@ -96,6 +96,7 @@ import FastString
 import Constants
 import Util
 import qualified Data.Data as Data
+import Data.Typeable hiding (TyCon)
 \end{code}
 
 -----------------------------------------------
@@ -416,6 +417,7 @@ data TyCon
         tyConUnique :: Unique,
         tyConName   :: Name
     }
+  deriving Typeable
 
 -- | Names of the fields in an algebraic record type
 type FieldLabel = Name
@@ -685,6 +687,7 @@ data CoAxiom
     , co_ax_lhs    :: Type     -- left-hand side of the equality
     , co_ax_rhs    :: Type     -- right-hand side of the equality
     }
+  deriving Typeable
 
 coAxiomArity :: CoAxiom -> Arity
 coAxiomArity ax = length (co_ax_tvs ax)
@@ -1380,9 +1383,6 @@ instance Outputable TyCon where
 instance NamedThing TyCon where
     getName = tyConName
 
-instance Data.Typeable TyCon where
-    typeOf _ = Data.mkTyConApp (Data.mkTyCon "TyCon") []
-
 instance Data.Data TyCon where
     -- don't traverse?
     toConstr _   = abstractConstr "TyCon"
@@ -1409,9 +1409,6 @@ instance Outputable CoAxiom where
 
 instance NamedThing CoAxiom where
     getName = co_ax_name
-
-instance Data.Typeable CoAxiom where
-    typeOf _ = Data.mkTyConApp (Data.mkTyCon "CoAxiom") []
 
 instance Data.Data CoAxiom where
     -- don't traverse?

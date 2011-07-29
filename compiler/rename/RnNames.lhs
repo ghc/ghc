@@ -18,7 +18,7 @@ import HsSyn
 import TcEnv            ( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
-import IfaceEnv		( ifaceExportNames )
+import IfaceEnv         ( ifaceExportNames )
 import LoadIface        ( loadSrcInterface )
 import TcRnMonad
 
@@ -53,6 +53,55 @@ import qualified Data.Map as Map
 %*                                                                      *
 %************************************************************************
 
+Note [Tracking Trust Transitively]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we import a package as well as checking that the direct imports are safe
+according to the rules outlined in the Note [HscMain . Safe Haskell Trust Check]
+we must also check that these rules hold transitively for all dependent modules
+and packages. Doing this without caching any trust information would be very
+slow as we would need to touch all packages and interface files a module depends
+on. To avoid this we make use of the property that if a modules Safe Haskell
+mode changes, this triggers a recompilation from that module in the dependcy
+graph. So we can just worry mostly about direct imports. There is one trust
+property that can change for a package though without recompliation being
+triggered, package trust. So we must check that all packages a module
+tranitively depends on to be trusted are still trusted when we are compiling
+this module (as due to recompilation avoidance some modules below may not be
+considered trusted any more without recompilation being triggered).
+
+We handle this by augmenting the existing transitive list of packages a module M
+depends on with a bool for each package that says if it must be trusted when the
+module M is being checked for trust. This list of trust required packages for a
+single import is gathered in the rnImportDecl function and stored in an
+ImportAvails data structure. The union of these trust required packages for all
+imports is done by the rnImports function using the combine function which calls
+the plusImportAvails function that is a union operation for the ImportAvails
+type. This gives us in an ImportAvails structure all packages required to be
+trusted for the module we are currently compiling. Checking that these packages
+are still trusted (and that direct imports are trusted) is done in
+HscMain.checkSafeImports.
+
+See the note below, [Trust Own Package] for a corner case in this method and
+how its handled.
+
+
+Note [Trust Own Package]
+~~~~~~~~~~~~~~~~~~~~~~~~
+There is a corner case of package trust checking that the usual transitive check
+doesn't cover. (For how the usual check operates see the Note [Tracking Trust
+Transitively] below). The case is when you import a -XSafe module M and M
+imports a -XTrustworthy module N. If N resides in a different package than M,
+then the usual check works as M will record a package dependency on N's package
+and mark it as required to be trusted. If N resides in the same package as M
+though, then importing M should require its own package be trusted due to N
+(since M is -XSafe so doesn't create this requirement by itself). The usual
+check fails as a module doesn't record a package dependency of its own package.
+So instead we now have a bool field in a modules interface file that simply
+states if the module requires its own package to be trusted. This field avoids
+us having to load all interface files that the module depends on to see if one
+is trustworthy.
+
+
 Note [Trust Transitive Property]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 So there is an interesting design question in regards to transitive trust
@@ -64,7 +113,7 @@ requirements from B? Should A now also require that a package p is trusted since
 B required it?
 
 We currently say no but I saying yes also makes sense. The difference is, if a
-module M that doesn't use SafeHaskell imports a module N that does, should all
+module M that doesn't use Safe Haskell imports a module N that does, should all
 the trusted package requirements be dropped since M didn't declare that it cares
 about Safe Haskell (so -XSafe is more strongly associated with the module doing
 the importing) or should it be done still since the author of the module N that
@@ -72,8 +121,8 @@ uses Safe Haskell said they cared (so -XSafe is more strongly associated with
 the module that was compiled that used it).
 
 Going with yes is a simpler semantics we think and harder for the user to stuff
-up but it does mean that SafeHaskell will affect users who don't care about
-SafeHaskell as they might grab a package from Cabal which uses safe haskell (say
+up but it does mean that Safe Haskell will affect users who don't care about
+Safe Haskell as they might grab a package from Cabal which uses safe haskell (say
 network) and that packages imports -XTrustworthy modules from another package
 (say bytestring), so requires that package is trusted. The user may now get
 compilation errors in code that doesn't do anything with Safe Haskell simply
@@ -81,44 +130,48 @@ because they are using the network package. They will have to call 'ghc-pkg
 trust network' to get everything working. Due to this invasive nature of going
 with yes we have gone with no for now.
 
-\begin{code}
-rnImports :: [LImportDecl RdrName]
-           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
 
-rnImports imports
+\begin{code}
+rnImports :: SrcSpan -> [LImportDecl RdrName]
+           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+
+rnImports prel_imp_loc imports
          -- PROCESS IMPORT DECLS
          -- Do the non {- SOURCE -} ones first, so that we get a helpful
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
          implicit_prelude <- xoptM Opt_ImplicitPrelude
-         let prel_imports       = mkPrelImports (moduleName this_mod) implicit_prelude imports
+         let prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
+                                implicit_prelude imports
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ _ is_boot _ _ _ _)) = is_boot
 
-         ifDOptM Opt_WarnImplicitPrelude (
-            when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
-          )
+         ifWOptM Opt_WarnImplicitPrelude $
+             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
 
          stuff1 <- mapM (rnImportDecl this_mod True)  prel_imports
          stuff2 <- mapM (rnImportDecl this_mod False) ordinary
          stuff3 <- mapM (rnImportDecl this_mod False) source
-         let (decls, rdr_env, imp_avails, hpc_usage) = combine (stuff1 ++ stuff2 ++ stuff3)
+         -- Safe Haskell: See Note [Tracking Trust Transitively]
+         let (decls, rdr_env, imp_avails, hpc_usage) = 
+                        combine (stuff1 ++ stuff2 ++ stuff3)
          return (decls, rdr_env, imp_avails, hpc_usage)
 
     where
-   combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails,AnyHpcUsage)]
-           -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
-   combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails,False)
-        where plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
-                   (decls, gbl_env2, imp_avails2,hpc_usage2)
-                = (decl:decls,
-                   gbl_env1 `plusGlobalRdrEnv` gbl_env2,
-                   imp_avails1 `plusImportAvails` imp_avails2,
-                   hpc_usage1 || hpc_usage2)
+      combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
+              -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+      combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
+        where
+          plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
+               (decls, gbl_env2, imp_avails2,hpc_usage2)
+            = ( decl:decls,
+                gbl_env1 `plusGlobalRdrEnv` gbl_env2,
+                imp_avails1 `plusImportAvails` imp_avails2,
+                hpc_usage1 || hpc_usage2 )
 
 rnImportDecl  :: Module -> Bool
               -> LImportDecl RdrName
-              -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails,AnyHpcUsage)
+              -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 
 rnImportDecl this_mod implicit_prelude
              (L loc (ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
@@ -137,14 +190,14 @@ rnImportDecl this_mod implicit_prelude
         imp_mod_name = unLoc loc_imp_mod_name
         doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
-	-- Check for a missing import list
-	-- (Opt_WarnMissingImportList also checks for T(..) items
-	--  but that is done in checkDodgyImport below)
+        -- Check for a missing import list
+        -- (Opt_WarnMissingImportList also checks for T(..) items
+        --  but that is done in checkDodgyImport below)
     case imp_details of
-        Just (False, _)       -> return ()	-- Explicit import list
+        Just (False, _)       -> return () -- Explicit import list
         _  | implicit_prelude -> return ()
-           | qual_only	      -> return ()
-           | otherwise        -> ifDOptM Opt_WarnMissingImportList $
+           | qual_only        -> return ()
+           | otherwise        -> ifWOptM Opt_WarnMissingImportList $
                                  addWarn (missingImportListWarn imp_mod_name)
 
     iface <- loadSrcInterface doc imp_mod_name want_boot mb_pkg
@@ -171,6 +224,8 @@ rnImportDecl this_mod implicit_prelude
         orph_iface = mi_orphan iface
         has_finsts = mi_finsts iface
         deps       = mi_deps iface
+        trust      = getSafeMode $ mi_trust iface
+        trust_pkg  = mi_trust_pkg iface
 
         filtered_exports = filter not_this_mod (mi_exports iface)
         not_this_mod (mod,_) = mod /= this_mod
@@ -220,7 +275,11 @@ rnImportDecl this_mod implicit_prelude
 
         pkg = modulePackageId (mi_module iface)
 
-        (dependent_mods, dependent_pkgs)
+        -- Does this import mean we now require our own pkg
+        -- to be trusted? See Note [Trust Own Package]
+        ptrust = trust == Sf_Trustworthy || trust_pkg
+
+        (dependent_mods, dependent_pkgs, pkg_trust_req)
            | pkg == thisPackage dflags =
                 -- Imported module is from the home package
                 -- Take its dependent modules and add imp_mod itself
@@ -233,14 +292,15 @@ rnImportDecl this_mod implicit_prelude
                 -- know if any of them depended on CM.hi-boot, in
                 -- which case we should do the hi-boot consistency
                 -- check.  See LoadIface.loadHiBootInterface
-                ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
+                ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps, ptrust)
 
            | otherwise =
                 -- Imported module is from another package
                 -- Dump the dependent modules
                 -- Add the package imp_mod comes from to the dependent packages
-                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps)), ppr pkg <+> ppr (dep_pkgs deps) )
-                ([], (pkg, False) : dep_pkgs deps)
+                ASSERT2( not (pkg `elem` (map fst $ dep_pkgs deps))
+                       , ppr pkg <+> ppr (dep_pkgs deps) )
+                ([], (pkg, False) : dep_pkgs deps, False)
 
         -- True <=> import M ()
         import_all = case imp_details of
@@ -253,7 +313,8 @@ rnImportDecl this_mod implicit_prelude
                     || (implicit_prelude && safeImplicitImpsReq dflags)
 
         imports   = ImportAvails {
-                        imp_mods       = unitModuleEnv imp_mod [(qual_mod_name, import_all, loc, mod_safe')],
+                        imp_mods       = unitModuleEnv imp_mod
+                                        [(qual_mod_name, import_all, loc, mod_safe')],
                         imp_orphs      = orphans,
                         imp_finsts     = finsts,
                         imp_dep_mods   = mkModDeps dependent_mods,
@@ -261,14 +322,18 @@ rnImportDecl this_mod implicit_prelude
                         -- Add in the imported modules trusted package
                         -- requirements. ONLY do this though if we import the
                         -- module as a safe import.
-                        -- see Note [Trust Transitive Property]
+                        -- See Note [Tracking Trust Transitively]
+                        -- and Note [Trust Transitive Property]
                         imp_trust_pkgs = if mod_safe' 
                                             then map fst $ filter snd dependent_pkgs
-                                            else []
+                                            else [],
+                        -- Do we require our own pkg to be trusted?
+                        -- See Note [Trust Own Package]
+                        imp_trust_own_pkg = pkg_trust_req
                    }
 
     -- Complain if we import a deprecated module
-    ifDOptM Opt_WarnWarningsDeprecations        (
+    ifWOptM Opt_WarnWarningsDeprecations        (
        case warns of
           WarnAll txt -> addWarn (moduleWarn imp_mod_name txt)
           _           -> return ()
@@ -625,11 +690,11 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
             -- Warn when importing T(..) if T was exported abstractly
             checkDodgyImport stuff
                 | IEThingAll n <- ieRdr, (_, AvailTC _ [_]):_ <- stuff
-                = ifDOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
-                -- NB. use the RdrName for reporting the warning
-		| IEThingAll {} <- ieRdr
-		, not (is_qual decl_spec)
-                = ifDOptM Opt_WarnMissingImportList $
+                = ifWOptM Opt_WarnDodgyImports (addWarn (dodgyImportWarn n))
+                    -- NB. use the RdrName for reporting the warning
+                | IEThingAll {} <- ieRdr
+                , not (is_qual decl_spec)
+                = ifWOptM Opt_WarnMissingImportList $
                   addWarn (missingImportListItem ieRdr)
             checkDodgyImport _
                 = return ()
@@ -956,13 +1021,13 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                       (L loc (IEModuleContents mod))
         | let earlier_mods = [ mod | (L _ (IEModuleContents mod)) <- ie_names ]
         , mod `elem` earlier_mods    -- Duplicate export of M
-        = do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
+        = do { warn_dup_exports <- woptM Opt_WarnDuplicateExports ;
                warnIf warn_dup_exports (dupModuleExport mod) ;
                return acc }
 
         | otherwise
         = do { implicit_prelude <- xoptM Opt_ImplicitPrelude
-             ; warnDodgyExports <- doptM Opt_WarnDodgyExports
+             ; warnDodgyExports <- woptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
                             || (moduleName this_mod == mod)
                    ; gres = filter (isModuleExported implicit_prelude mod)
@@ -1025,7 +1090,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                                 Nothing -> mkRdrUnqual
                                 Just (modName, _) -> mkRdrQual modName
              addUsedRdrNames $ map (mkKidRdrName . nameOccName) kids
-             warnDodgyExports <- doptM Opt_WarnDodgyExports
+             warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null kids) $
                   if isTyConName name
                   then when warnDodgyExports $ addWarn (dodgyExportWarn name)
@@ -1108,7 +1173,7 @@ check_occs ie occs names  -- 'names' are the entities specifed by 'ie'
             -- But we don't want to warn if the same thing is exported
             -- by two different module exports. See ticket #4478.
             -> do unless (dupExport_ok name ie ie') $ do
-                      warn_dup_exports <- doptM Opt_WarnDuplicateExports
+                      warn_dup_exports <- woptM Opt_WarnDuplicateExports
                       warnIf warn_dup_exports (dupExportWarn name_occ ie ie')
                   return occs
 
@@ -1174,7 +1239,7 @@ finishWarnings :: DynFlags -> Maybe WarningTxt
 --     All this happens only once per module
 finishWarnings dflags mod_warn tcg_env
   = do  { (eps,hpt) <- getEpsAndHpt
-        ; ifDOptM Opt_WarnWarningsDeprecations $
+        ; ifWOptM Opt_WarnWarningsDeprecations $
           mapM_ (check hpt (eps_PIT eps)) all_gres
                 -- By this time, typechecking is complete,
                 -- so the PIT is fully populated
@@ -1328,18 +1393,20 @@ warnUnusedImportDecls gbl_env
        ; let usage :: [ImportDeclUsage]
              usage = findImportUsage imports rdr_env (Set.elems uses)
 
-       ; traceRn (ptext (sLit "Import usage") <+> ppr usage)
-       ; ifDOptM Opt_WarnUnusedImports $
+       ; traceRn (vcat [ ptext (sLit "Uses:") <+> ppr (Set.elems uses)
+                       , ptext (sLit "Import usage") <+> ppr usage])
+       ; ifWOptM Opt_WarnUnusedImports $
          mapM_ warnUnusedImport usage
 
        ; ifDOptM Opt_D_dump_minimal_imports $
          printMinimalImports usage }
   where
-    explicit_import (L loc _) = case loc of
-                                UnhelpfulSpan _ -> False
-                                RealSrcSpan _ -> True
+    explicit_import (L _ decl) = unLoc (ideclName decl) /= pRELUDE_NAME
         -- Filter out the implicit Prelude import
         -- which we do not want to bleat about
+	-- This also filters out an *explicit* Prelude import
+	-- but solving that problem involves more plumbing, and
+	-- it just doesn't seem worth it
 \end{code}
 
 \begin{code}

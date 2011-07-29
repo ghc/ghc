@@ -11,11 +11,11 @@ module StgCmmHpc ( initHpc, mkTickBox ) where
 import StgCmmMonad
 
 import MkGraph
-import CmmDecl
 import CmmExpr
 import CLabel
 import Module
 import CmmUtils
+import StgCmmUtils
 import HscTypes
 import StaticFlags
 
@@ -36,9 +36,8 @@ initHpc _ (NoHpcInfo {})
   = return ()
 initHpc this_mod (HpcInfo tickCount _hashNo)
   = whenC opt_Hpc $
-    do  { emitData Data $ [ CmmDataLabel (mkHpcTicksLabel this_mod)
-              ] ++
-              [ CmmStaticLit (CmmInt 0 W64)
-              | _ <- take tickCount [0::Int ..]
-              ]
+    do  { emitDataLits (mkHpcTicksLabel this_mod)
+                       [ (CmmInt 0 W64)
+                       | _ <- take tickCount [0::Int ..]
+                       ]
        }

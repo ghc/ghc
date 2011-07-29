@@ -18,7 +18,6 @@ import HscTypes
 import BasicTypes
 import Demand
 import Annotations
-import CoreSyn
 import IfaceSyn
 import Module
 import Name
@@ -381,7 +380,8 @@ instance Binary ModIface where
 		 mi_usages    = usages,
 		 mi_exports   = exports,
 		 mi_exp_hash  = exp_hash,
-		 mi_fixities  = fixities,
+                 mi_used_th   = used_th,
+                 mi_fixities  = fixities,
 		 mi_warns     = warns,
 		 mi_anns      = anns,
 		 mi_decls     = decls,
@@ -390,8 +390,9 @@ instance Binary ModIface where
 		 mi_rules     = rules,
 		 mi_orphan_hash = orphan_hash,
                  mi_vect_info = vect_info,
-		 mi_hpc       = hpc_info,
-		 mi_trust     = trust }) = do
+                 mi_hpc       = hpc_info,
+                 mi_trust     = trust,
+                 mi_trust_pkg = trust_pkg }) = do
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh iface_hash
@@ -402,7 +403,8 @@ instance Binary ModIface where
 	lazyPut bh usages
 	put_ bh exports
 	put_ bh exp_hash
-	put_ bh fixities
+        put_ bh used_th
+        put_ bh fixities
 	lazyPut bh warns
 	lazyPut bh anns
         put_ bh decls
@@ -413,6 +415,7 @@ instance Binary ModIface where
         put_ bh vect_info
 	put_ bh hpc_info
 	put_ bh trust
+	put_ bh trust_pkg
 
    get bh = do
 	mod_name  <- get bh
@@ -425,7 +428,8 @@ instance Binary ModIface where
 	usages	  <- {-# SCC "bin_usages" #-} lazyGet bh
 	exports	  <- {-# SCC "bin_exports" #-} get bh
 	exp_hash  <- get bh
-	fixities  <- {-# SCC "bin_fixities" #-} get bh
+        used_th   <- get bh
+        fixities  <- {-# SCC "bin_fixities" #-} get bh
 	warns     <- {-# SCC "bin_warns" #-} lazyGet bh
 	anns      <- {-# SCC "bin_anns" #-} lazyGet bh
         decls 	  <- {-# SCC "bin_tycldecls" #-} get bh
@@ -436,6 +440,7 @@ instance Binary ModIface where
         vect_info <- get bh
         hpc_info  <- get bh
         trust     <- get bh
+        trust_pkg <- get bh
 	return (ModIface {
 		 mi_module    = mod_name,
 		 mi_boot      = is_boot,
@@ -446,8 +451,9 @@ instance Binary ModIface where
 		 mi_deps      = deps,
 		 mi_usages    = usages,
 		 mi_exports   = exports,
-		 mi_exp_hash  = exp_hash,
-		 mi_anns      = anns,
+                 mi_exp_hash  = exp_hash,
+                 mi_used_th   = used_th,
+                 mi_anns      = anns,
 		 mi_fixities  = fixities,
 		 mi_warns     = warns,
 		 mi_decls     = decls,
@@ -459,6 +465,7 @@ instance Binary ModIface where
                  mi_vect_info = vect_info,
 		 mi_hpc       = hpc_info,
 		 mi_trust     = trust,
+		 mi_trust_pkg = trust_pkg,
 			-- And build the cached values
 		 mi_warn_fn   = mkIfaceWarnCache warns,
 		 mi_fix_fn    = mkIfaceFixCache fixities,
@@ -1272,14 +1279,6 @@ instance Binary IfaceUnfolding where
 		  return (IfDFunUnfold as)
 	  _ -> do e <- get bh
 		  return (IfCompulsory e)
-
-instance Binary (DFunArg IfaceExpr) where
-    put_ bh (DFunPolyArg  e) = putByte bh 0 >> put_ bh e
-    put_ bh (DFunConstArg e) = putByte bh 1 >> put_ bh e
-    get bh = do { h <- getByte bh
-                ; case h of
-                    0 -> do { a <- get bh; return (DFunPolyArg a) }
-                    _ -> do { a <- get bh; return (DFunConstArg a) } }
 
 instance Binary IfaceNote where
     put_ bh (IfaceSCC aa) = do

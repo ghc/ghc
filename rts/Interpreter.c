@@ -49,13 +49,21 @@
 
 /* Sp points to the lowest live word on the stack. */
 
-#define BCO_NEXT      instrs[bciPtr++]
-#define BCO_NEXT_32   (bciPtr += 2, (((StgWord) instrs[bciPtr-2]) << 16) + ((StgWord) instrs[bciPtr-1]))
-#define BCO_NEXT_64   (bciPtr += 4, (((StgWord) instrs[bciPtr-4]) << 48) + (((StgWord) instrs[bciPtr-3]) << 32) + (((StgWord) instrs[bciPtr-2]) << 16) + ((StgWord) instrs[bciPtr-1]))
+#define BCO_NEXT         instrs[bciPtr++]
+#define BCO_NEXT_32      (bciPtr += 2)
+#define BCO_READ_NEXT_32 (BCO_NEXT_32, (((StgWord) instrs[bciPtr-2]) << 16) \
+                                     + ( (StgWord) instrs[bciPtr-1]))
+#define BCO_NEXT_64      (bciPtr += 4)
+#define BCO_READ_NEXT_64 (BCO_NEXT_64, (((StgWord) instrs[bciPtr-4]) << 48) \
+                                     + (((StgWord) instrs[bciPtr-3]) << 32) \
+                                     + (((StgWord) instrs[bciPtr-2]) << 16) \
+                                     + ( (StgWord) instrs[bciPtr-1]))
 #if WORD_SIZE_IN_BITS == 32
 #define BCO_NEXT_WORD BCO_NEXT_32
+#define BCO_READ_NEXT_WORD BCO_READ_NEXT_32
 #elif WORD_SIZE_IN_BITS == 64
 #define BCO_NEXT_WORD BCO_NEXT_64
+#define BCO_READ_NEXT_WORD BCO_READ_NEXT_64
 #else
 #error Cannot cope with WORD_SIZE_IN_BITS being nether 32 nor 64
 #endif
@@ -776,8 +784,12 @@ run_BCO:
 	register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
 	register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
 	register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
+#ifdef DEBUG
 	int bcoSize;
-    bcoSize = BCO_NEXT_WORD;
+    bcoSize = BCO_READ_NEXT_WORD;
+#else
+    BCO_NEXT_WORD;
+#endif
 	IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
 
 #ifdef INTERP_STATS

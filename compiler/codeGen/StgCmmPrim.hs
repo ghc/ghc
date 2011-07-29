@@ -210,6 +210,18 @@ emitPrimOp [res] ParOp [arg]
     	(CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
 	[(CmmReg (CmmGlobal BaseReg), AddrHint), (arg,AddrHint)] 
 
+emitPrimOp [res] SparkOp [arg]
+  = do
+        -- returns the value of arg in res.  We're going to therefore
+        -- refer to arg twice (once to pass to newSpark(), and once to
+        -- assign to res), so put it in a temporary.
+        tmp <- assignTemp arg
+        emitCCall
+            []
+            (CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId (fsLit "newSpark"))))
+            [(CmmReg (CmmGlobal BaseReg), AddrHint), ((CmmReg (CmmLocal tmp)), AddrHint)]
+        emit (mkAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
+
 emitPrimOp [res] ReadMutVarOp [mutv]
    = emit (mkAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize gcWord))
 

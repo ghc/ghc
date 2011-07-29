@@ -13,7 +13,7 @@ module Class (
 
 	FunDep,	pprFundeps, pprFunDep,
 
-	mkClass, classTyVars, classArity, classSCNEqs,
+	mkClass, classTyVars, classArity, 
 	classKey, className, classATs, classTyCon, classMethods,
 	classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
         classAllSelIds, classSCSelId
@@ -33,6 +33,7 @@ import Util
 import Outputable
 import FastString
 
+import Data.Typeable hiding (TyCon)
 import qualified Data.Data as Data
 \end{code}
 
@@ -57,20 +58,19 @@ data Class
         -- We need value-level selectors for the dictionary 
 	-- superclasses, but not for the equality superclasses
 	classSCTheta :: [PredType],	-- Immediate superclasses, 
-		     			---   *with equalities first*
-        classSCNEqs  :: Int,		-- How many equalities
 	classSCSels  :: [Id],		-- Selector functions to extract the
-		     			--   *dictionary* superclasses from a 
+		     			--   superclasses from a 
 					--   dictionary of this class
 	-- Associated types
         classATs     :: [TyCon],	-- Associated type families
 
-        -- Class operations
+        -- Class operations (methods, not superclasses)
 	classOpStuff :: [ClassOpItem],	-- Ordered by tag
 
 	classTyCon :: TyCon		-- The data type constructor for
 					-- dictionaries of this class
      }
+  deriving Typeable
 
 type FunDep a = ([a],[a])  --  e.g. class C a b c | a b -> c, a c -> b where...
 			   --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
@@ -100,20 +100,19 @@ The @mkClass@ function fills in the indirect superclasses.
 \begin{code}
 mkClass :: Name -> [TyVar]
 	-> [([TyVar], [TyVar])]
-	-> [PredType] -> Int -> [Id]
+	-> [PredType] -> [Id]
 	-> [TyCon]
 	-> [ClassOpItem]
 	-> TyCon
 	-> Class
 
-mkClass name tyvars fds super_classes n_eqs superdict_sels ats 
+mkClass name tyvars fds super_classes superdict_sels ats 
 	op_stuff tycon
   = Class {	classKey     = getUnique name, 
 		className    = name,
 		classTyVars  = tyvars,
 		classFunDeps = fds,
 		classSCTheta = super_classes,
-                classSCNEqs  = n_eqs,
 		classSCSels  = superdict_sels,
 		classATs     = ats,
 		classOpStuff = op_stuff,
@@ -142,11 +141,9 @@ classSCSelId :: Class -> Int -> Id
 -- Get the n'th superclass selector Id
 -- where n is 0-indexed, and counts 
 --    *all* superclasses including equalities
-classSCSelId (Class { classSCNEqs = n_eqs, classSCSels = sc_sels }) n
-  = ASSERT( sc_sel_index >= 0 && sc_sel_index < length sc_sels )
-    sc_sels !! sc_sel_index
-  where
-    sc_sel_index = n - n_eqs	-- 0-index into classSCSels
+classSCSelId (Class { classSCSels = sc_sels }) n
+  = ASSERT( n >= 0 && n < length sc_sels )
+    sc_sels !! n
 
 classMethods :: Class -> [Id]
 classMethods (Class {classOpStuff = op_stuff})
@@ -218,9 +215,6 @@ pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map pprFunDep fds))
 
 pprFunDep :: Outputable a => FunDep a -> SDoc
 pprFunDep (us, vs) = hsep [interppSP us, ptext (sLit "->"), interppSP vs]
-
-instance Data.Typeable Class where
-    typeOf _ = Data.mkTyConApp (Data.mkTyCon "Class") []
 
 instance Data.Data Class where
     -- don't traverse?

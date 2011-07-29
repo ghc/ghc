@@ -581,6 +581,10 @@ static void
 schedulePreLoop(void)
 {
   // initialisation for scheduler - what cannot go into initScheduler()  
+
+#if defined(mingw32_HOST_OS)
+    win32AllocStack();
+#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -715,7 +719,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 
     if (n_free_caps > 0) {
 	StgTSO *prev, *t, *next;
+#ifdef SPARK_PUSHING
 	rtsBool pushed_to_all;
+#endif
 
 	debugTrace(DEBUG_sched, 
 		   "cap %d: %s and %d free capabilities, sharing...", 
@@ -725,7 +731,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		   n_free_caps);
 
 	i = 0;
+#ifdef SPARK_PUSHING
 	pushed_to_all = rtsFalse;
+#endif
 
 	if (cap->run_queue_hd != END_TSO_QUEUE) {
 	    prev = cap->run_queue_hd;
@@ -740,7 +748,9 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                     setTSOPrev(cap, t, prev);
 		    prev = t;
 		} else if (i == n_free_caps) {
+#ifdef SPARK_PUSHING
 		    pushed_to_all = rtsTrue;
+#endif
 		    i = 0;
 		    // keep one for us
 		    setTSOLink(cap, prev, t);
@@ -773,6 +783,10 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
 		if (emptySparkPoolCap(free_caps[i])) {
 		    spark = tryStealSpark(cap->sparks);
 		    if (spark != NULL) {
+                        /* TODO: if anyone wants to re-enable this code then
+                         * they must consider the fizzledSpark(spark) case
+                         * and update the per-cap spark statistics.
+                         */
 			debugTrace(DEBUG_sched, "pushing spark %p to capability %d", spark, free_caps[i]->no);
 
             traceEventStealSpark(free_caps[i], t, cap->no);
@@ -1400,6 +1414,11 @@ scheduleDoGC (Capability *cap, Task *task USED_IF_THREADS, rtsBool force_major)
         // multi-threaded GC: make sure all the Capabilities donate one
         // GC thread each.
         waitForGcThreads(cap);
+        
+#if defined(THREADED_RTS)
+        // Stable point where we can do a global check on our spark counters
+        ASSERT(checkSparkCountInvariant());
+#endif
     }
 
 #endif
@@ -1424,11 +1443,13 @@ delete_threads_and_gc:
     // reset waiting_for_gc *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     waiting_for_gc = 0;
-    GarbageCollect(force_major || heap_census, gc_type, cap);
+    GarbageCollect(force_major || heap_census, heap_census, gc_type, cap);
 #else
-    GarbageCollect(force_major || heap_census, 0, cap);
+    GarbageCollect(force_major || heap_census, heap_census, 0, cap);
 #endif
     traceEventGcEnd(cap);
+
+    traceSparkCounters(cap);
 
     if (recent_activity == ACTIVITY_INACTIVE && force_major)
     {
@@ -1447,10 +1468,14 @@ delete_threads_and_gc:
         recent_activity = ACTIVITY_YES;
     }
 
+#if defined(THREADED_RTS)
+    // Stable point where we can do a global check on our spark counters
+    ASSERT(checkSparkCountInvariant());
+#endif
+
+    // The heap census itself is done during GarbageCollect().
     if (heap_census) {
-        debugTrace(DEBUG_sched, "performing heap census");
-        heapCensus();
-	performHeapProfile = rtsFalse;
+        performHeapProfile = rtsFalse;
     }
 
 #if defined(THREADED_RTS)
@@ -1892,7 +1917,7 @@ Capability *
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 {
     Task *task;
-    StgThreadID id;
+    DEBUG_ONLY( StgThreadID id );
 
     // We already created/initialised the Task
     task = cap->running_task;
@@ -1908,7 +1933,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *cap)
 
     appendToRunQueue(cap,tso);
 
-    id = tso->id;
+    DEBUG_ONLY( id = tso->id );
     debugTrace(DEBUG_sched, "new bound thread (%lu)", (unsigned long)id);
 
     cap = schedule(cap,task);
@@ -1985,10 +2010,6 @@ initScheduler(void)
   initCapabilities();
 
   initTaskManager();
-
-#if defined(THREADED_RTS)
-  initSparkPools();
-#endif
 
   RELEASE_LOCK(&sched_mutex);
 

@@ -19,7 +19,7 @@ import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, rdrNameOcc )
 import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn
-import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext, rnConDeclFields )
+import RnTypes
 import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSigTvFn,
                                 makeMiniFixityEnv)
 import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
@@ -169,7 +169,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- (H) Rename Everything else
 
    (rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
-   (rn_rule_decls,    src_fvs3) <- setOptM Opt_ScopedTypeVariables $
+   (rn_rule_decls,    src_fvs3) <- setXOptM Opt_ScopedTypeVariables $
                                    rnList rnHsRuleDecl    rule_decls ;
                            -- Inside RULES, scoped type variables are on
    (rn_vect_decls,    src_fvs4) <- rnList rnHsVectDecl    vect_decls ;
@@ -531,7 +531,7 @@ rnSrcDerivDecl :: DerivDecl RdrName -> RnM (DerivDecl Name, FreeVars)
 rnSrcDerivDecl (DerivDecl ty)
   = do { standalone_deriv_ok <- xoptM Opt_StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
-       ; ty' <- rnLHsType (text "a deriving decl") ty
+       ; ty' <- rnLHsType (text "In a deriving declaration") ty
        ; let fvs = extractHsTyNames ty'
        ; return (DerivDecl ty', fvs) }
 
@@ -919,12 +919,16 @@ rnConDecl decl@(ConDecl { con_name = name, con_qvars = tvs
         ; rdr_env <- getLocalRdrEnv
         ; let in_scope     = (`elemLocalRdrEnv` rdr_env) . unLoc
 	      arg_tys      = hsConDeclArgTys details
-	      implicit_tvs = case res_ty of
+	      mentioned_tvs = case res_ty of
 	      	    	       ResTyH98 -> filterOut in_scope (get_rdr_tvs arg_tys)
 	      	    	       ResTyGADT ty -> get_rdr_tvs (ty : arg_tys)
-	      new_tvs = case expl of
-	        	  Explicit -> tvs
-		    	  Implicit -> userHsTyVarBndrs implicit_tvs
+
+         -- With an Explicit forall, check for unused binders
+	 -- With Implicit, find the mentioned ones, and use them as binders
+	; new_tvs <- case expl of
+	    	       Implicit -> return (userHsTyVarBndrs mentioned_tvs)
+            	       Explicit -> do { warnUnusedForAlls doc tvs mentioned_tvs
+                                      ; return tvs }
 
         ; mb_doc' <- rnMbLHsDoc mb_doc 
 

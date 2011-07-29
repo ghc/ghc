@@ -22,6 +22,7 @@ where
 import RegAlloc.Linear.FreeRegs
 
 import Outputable
+import Platform
 import UniqFM
 import Unique
 
@@ -39,8 +40,8 @@ data StackMap
 
 
 -- | An empty stack map, with all slots available.
-emptyStackMap :: StackMap
-emptyStackMap = StackMap [0..maxSpillSlots] emptyUFM
+emptyStackMap :: Platform -> StackMap
+emptyStackMap platform = StackMap [0 .. maxSpillSlots platform] emptyUFM
 
 
 -- | If this vreg unique already has a stack assignment then return the slot number,

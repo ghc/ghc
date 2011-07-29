@@ -487,6 +487,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-ghci-script</option></entry>
+	      <entry>Load the given additional <filename>.ghci</filename> file</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-read-dot-ghci</option></entry>
 	      <entry>Enable reading of <filename>.ghci</filename> files</entry>
 	      <entry>static</entry>
@@ -925,6 +931,12 @@
 	      <entry>Enable unlifted FFI types.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoUnliftedFFITypes</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XInterruptibleFFI</option></entry>
+	      <entry>Enable interruptible FFI.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoInterruptibleFFI</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XLiberalTypeSynonyms</option></entry>
@@ -1388,13 +1400,6 @@
 	      <entry>Make dictionaries strict</entry>
 	      <entry>static</entry>
 	      <entry><option>-fno-dicts-strict</option></entry>
-	    </row>
-
-	    <row>
-	      <entry><option>-fmethod-sharing</option></entry>
-	      <entry>Share specialisations of overloaded functions (default)</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-method-sharing</option></entry>
 	    </row>
 
 	    <row>
@@ -2008,6 +2013,40 @@ phase <replaceable>n</replaceable></entry>
 	</tgroup>
       </informaltable>
     </sect2>
+
+    <sect2>
+      <title>Plugin options</title>
+
+      <para><xref linkend="compiler-plugins"/></para>
+
+      <informaltable>
+	<tgroup cols="4" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fplugin</option>=<replaceable>module</replaceable></entry>
+	      <entry>Load a plugin exported by a given module</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fplugin-opt</option>=<replaceable>module:args</replaceable></entry>
+	      <entry>Give arguments to a plugin module; module must be specified with <option>-fplugin</option></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
 
     <sect2>
       <title>Replacing phases</title>

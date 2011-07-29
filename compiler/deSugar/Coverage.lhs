@@ -364,20 +364,6 @@ addTickHsExpr (HsWrap w e) =
 		(return w)
 		(addTickHsExpr e)	-- explicitly no tick on inside
 
-addTickHsExpr (HsArrApp	 e1 e2 ty1 arr_ty lr) = 
-        liftM5 HsArrApp
-	       (addTickLHsExpr e1)
-	       (addTickLHsExpr e2)
-	       (return ty1)
-	       (return arr_ty)
-	       (return lr)
-
-addTickHsExpr (HsArrForm e fix cmdtop) = 
-        liftM3 HsArrForm
-	       (addTickLHsExpr e)
-	       (return fix)
-	       (mapM (liftL (addTickHsCmdTop)) cmdtop)
-
 addTickHsExpr e@(HsType _) = return e
 
 -- Others dhould never happen in expression content.
@@ -544,8 +530,8 @@ addTickLHsCmd (L pos c0) = do
 addTickHsCmd :: HsCmd Id -> TM (HsCmd Id)
 addTickHsCmd (HsLam matchgroup) =
         liftM HsLam (addTickCmdMatchGroup matchgroup)
-addTickHsCmd (HsApp e1 e2) = 
-	liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
+addTickHsCmd (HsApp c e) = 
+	liftM2 HsApp (addTickLHsCmd c) (addTickLHsExpr e)
 addTickHsCmd (OpApp e1 c2 fix c3) = 
 	liftM4 OpApp 
 		(addTickLHsExpr e1) 
@@ -854,7 +840,12 @@ mkHpcPos pos@(RealSrcSpan s)
    | isGoodSrcSpan' pos = toHpcPos (srcSpanStartLine s,
                                     srcSpanStartCol s,
                                     srcSpanEndLine s,
-                                    srcSpanEndCol s)
+                                    srcSpanEndCol s - 1)
+                              -- the end column of a SrcSpan is one
+                              -- greater than the last column of the
+                              -- span (see SrcLoc), whereas HPC
+                              -- expects to the column range to be
+                              -- inclusive, hence we subtract one above.
 mkHpcPos _ = panic "bad source span; expected such spans to be filtered out"
 
 hpcSrcSpan :: SrcSpan

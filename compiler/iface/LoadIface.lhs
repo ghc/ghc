@@ -655,6 +655,7 @@ pprModIface iface
         , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
         , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
+        , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (ptext (sLit "where"))
 	, vcat (map pprExport (mi_exports iface))
 	, pprDeps (mi_deps iface)
@@ -669,6 +670,7 @@ pprModIface iface
         , pprVectInfo (mi_vect_info iface)
 	, ppr (mi_warns iface)
 	, pprTrustInfo (mi_trust iface)
+	, pprTrustPkg (mi_trust_pkg iface)
  	]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
@@ -755,6 +757,9 @@ pprVectInfo (IfaceVectInfo { ifaceVectInfoVar          = vars
 
 pprTrustInfo :: IfaceTrustInfo -> SDoc
 pprTrustInfo trust = ptext (sLit "trusted:") <+> ppr trust
+
+pprTrustPkg :: Bool -> SDoc
+pprTrustPkg tpkg = ptext (sLit "require own pkg trusted:") <+> ppr tpkg
 
 instance Outputable Warnings where
     ppr = pprWarns

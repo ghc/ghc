@@ -78,6 +78,58 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_VENDOR([$target_vendor], [TargetVendor])
         GHC_CONVERT_OS([$target_os], [TargetOS])
     fi
+
+    windows=NO
+    exeext=''
+    soext='.so'
+    case $host in
+    *-unknown-cygwin32)
+        AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
+        AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
+        exit 1
+        ;;
+    *-unknown-mingw32)
+        windows=YES
+        exeext='.exe'
+        soext='.dll'
+        ;;
+    i386-apple-darwin|powerpc-apple-darwin)
+        soext='.dylib'
+        ;;
+    x86_64-apple-darwin)
+        soext='.dylib'
+        ;;
+    esac
+])
+
+
+# FP_SETTINGS
+# ----------------------------------
+# Set the variables used in the settings file
+AC_DEFUN([FP_SETTINGS],
+[
+    if test "$windows" = YES
+    then
+        SettingsCCompilerCommand='$topdir/../mingw/bin/gcc.exe'
+        SettingsCCompilerFlags=''
+        SettingsPerlCommand='$topdir/../perl/perl.exe'
+        SettingsDllWrapCommand='$topdir/../mingw/bin/dllwrap.exe'
+        SettingsWindresCommand='$topdir/../mingw/bin/windres.exe'
+        SettingsTouchCommand='$topdir/touchy.exe'
+    else
+        SettingsCCompilerCommand="$WhatGccIsCalled"
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsPerlCommand="$PerlCmd"
+        SettingsDllWrapCommand="/bin/false"
+        SettingsWindresCommand="/bin/false"
+        SettingsTouchCommand='touch'
+    fi
+    AC_SUBST(SettingsCCompilerCommand)
+    AC_SUBST(SettingsCCompilerFlags)
+    AC_SUBST(SettingsPerlCommand)
+    AC_SUBST(SettingsDllWrapCommand)
+    AC_SUBST(SettingsWindresCommand)
+    AC_SUBST(SettingsTouchCommand)
 ])
 
 
@@ -690,7 +742,8 @@ if test -z "$GCC"
 then
   AC_MSG_ERROR([gcc is required])
 fi
-GccLT34=
+GccLT34=NO
+GccLT46=NO
 AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
 [
     fp_cv_gcc_version="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/g'`"
@@ -700,9 +753,11 @@ AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
     # isn't a very good reason for that, but for now just make configure
     # fail.
     FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [3.4], GccLT34=YES)
+    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
 ])
 AC_SUBST([GccVersion], [$fp_cv_gcc_version])
 AC_SUBST(GccLT34)
+AC_SUBST(GccLT46)
 ])# FP_GCC_VERSION
 
 dnl Small feature test for perl version. Assumes PerlCmd
@@ -1466,6 +1521,9 @@ case "$1" in
 AC_DEFUN([GHC_CONVERT_VENDOR],[
   case "$1" in
   pc|gentoo) # like i686-pc-linux-gnu and i686-gentoo-freebsd8
+    $2="unknown"
+    ;;
+  softfloat) # like armv5tel-softfloat-linux-gnueabi
     $2="unknown"
     ;;
   *)

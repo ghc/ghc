@@ -1229,10 +1229,10 @@ hash_expr env (Let (NonRec b r) e)    = hash_expr (extend_env env b) e * fast_ha
 hash_expr env (Let (Rec ((b,_):_)) e) = hash_expr (extend_env env b) e
 hash_expr env (Case e _ _ _)	      = hash_expr env e
 hash_expr env (Lam b e)	              = hash_expr (extend_env env b) e
+hash_expr env (Coercion co)           = fast_hash_co env co
 hash_expr _   (Type _)                = WARN(True, text "hash_expr: type") 1
 -- Shouldn't happen.  Better to use WARN than trace, because trace
 -- prevents the CPR optimisation kicking in for hash_expr.
-hash_expr _   (Coercion _)            = WARN(True, text "hash_expr: coercion") 1
 
 fast_hash_expr :: HashEnv -> CoreExpr -> Word32
 fast_hash_expr env (Var v)     	 = hashVar env v
@@ -1391,7 +1391,7 @@ tryEtaReduce bndrs body
 
     ---------------
     fun_arity fun 	      -- See Note [Arity care]
-       | isLocalId fun && isLoopBreaker (idOccInfo fun) = 0
+       | isLocalId fun && isStrongLoopBreaker (idOccInfo fun) = 0
        | otherwise = idArity fun   	      
 
     ---------------
@@ -1493,16 +1493,14 @@ rhsIsStatic :: (Name -> Bool) -> CoreExpr -> Bool
 rhsIsStatic _is_dynamic_name rhs = is_static False rhs
   where
   is_static :: Bool	-- True <=> in a constructor argument; must be atomic
-  	  -> CoreExpr -> Bool
+            -> CoreExpr -> Bool
   
-  is_static False (Lam b e)   = isRuntimeVar b || is_static False e
-  is_static in_arg (Note n e) = notSccNote n && is_static in_arg e
-  is_static in_arg (Cast e _) = is_static in_arg e
-  
-  is_static _      (Lit lit)
-    = case lit of
-  	MachLabel _ _ _ -> False
-        _             -> True
+  is_static False (Lam b e)   		= isRuntimeVar b || is_static False e
+  is_static in_arg (Note n e) 		= notSccNote n && is_static in_arg e
+  is_static in_arg (Cast e _) 		= is_static in_arg e
+  is_static _      (Coercion {})	= True   -- Behaves just like a literal
+  is_static _      (Lit (MachLabel {})) = False
+  is_static _      (Lit _)              = True
   	-- A MachLabel (foreign import "&foo") in an argument
   	-- prevents a constructor application from being static.  The
   	-- reason is that it might give rise to unresolvable symbols

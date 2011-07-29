@@ -41,7 +41,7 @@ module Util (
         nTimes,
 
         -- * Sorting
-        sortLe, sortWith, on,
+        sortLe, sortWith, minWith, on,
 
         -- * Comparisons
         isEqual, eqListBy,
@@ -542,6 +542,10 @@ sortWith :: Ord b => (a->b) -> [a] -> [a]
 sortWith get_key xs = sortLe le xs
   where
     x `le` y = get_key x < get_key y
+
+minWith :: Ord b => (a -> b) -> [a] -> a
+minWith get_key xs = ASSERT( not (null xs) )
+                     head (sortWith get_key xs)
 
 on :: (a -> a -> c) -> (b -> a) -> b -> b -> c
 on cmp sel = \x y -> sel x `cmp` sel y

@@ -217,7 +217,7 @@ dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
 dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e) 	      = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
-dsExpr (HsVar var)     	      = return (Var var)
+dsExpr (HsVar var)     	      = return (varToCoreExpr var)   -- See Note [Desugaring vars]
 dsExpr (HsIPVar ip)    	      = return (Var (ipNameName ip))
 dsExpr (HsLit lit)     	      = dsLit lit
 dsExpr (HsOverLit lit) 	      = dsOverLit lit
@@ -225,7 +225,7 @@ dsExpr (HsOverLit lit) 	      = dsOverLit lit
 dsExpr (HsWrap co_fn e)
   = do { co_fn' <- dsHsWrapper co_fn
        ; e' <- dsExpr e
-       ; warn_id <- doptDs Opt_WarnIdentities
+       ; warn_id <- woptDs Opt_WarnIdentities
        ; when warn_id $ warnAboutIdentities e' co_fn'
        ; return (co_fn' e') }
 
@@ -239,6 +239,22 @@ dsExpr (HsApp fun arg)
   = mkCoreAppDs <$> dsLExpr fun <*>  dsLExpr arg
 \end{code}
 
+Note [Desugaring vars]
+~~~~~~~~~~~~~~~~~~~~~~
+In one situation we can get a *coercion* variable in a HsVar, namely
+the support method for an equality superclass:
+   class (a~b) => C a b where ...
+   instance (blah) => C (T a) (T b) where ..
+Then we get
+   $dfCT :: forall ab. blah => C (T a) (T b)
+   $dfCT ab blah = MkC ($c$p1C a blah) ($cop a blah)
+
+   $c$p1C :: forall ab. blah => (T a ~ T b)
+   $c$p1C ab blah = let ...; g :: T a ~ T b = ... } in g
+
+That 'g' in the 'in' part is an evidence variable, and when
+converting to core it must become a CO.
+   
 Operator sections.  At first it looks as if we can convert
 \begin{verbatim}
 	(expr op)
@@ -814,13 +830,13 @@ warnDiscardedDoBindings :: LHsExpr Id -> Type -> DsM ()
 warnDiscardedDoBindings rhs rhs_ty
   | Just (m_ty, elt_ty) <- tcSplitAppTy_maybe rhs_ty
   = do {  -- Warn about discarding non-() things in 'monadic' binding
-       ; warn_unused <- doptDs Opt_WarnUnusedDoBind
+       ; warn_unused <- woptDs Opt_WarnUnusedDoBind
        ; if warn_unused && not (isUnitTy elt_ty)
          then warnDs (unusedMonadBind rhs elt_ty)
          else 
          -- Warn about discarding m a things in 'monadic' binding of the same type,
          -- but only if we didn't already warn due to Opt_WarnUnusedDoBind
-    do { warn_wrong <- doptDs Opt_WarnWrongDoBind
+    do { warn_wrong <- woptDs Opt_WarnWrongDoBind
        ; case tcSplitAppTy_maybe elt_ty of
            Just (elt_m_ty, _) | warn_wrong, m_ty `eqType` elt_m_ty
                               -> warnDs (wrongMonadBind rhs elt_ty)

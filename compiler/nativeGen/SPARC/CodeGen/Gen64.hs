@@ -23,6 +23,7 @@ import Reg
 
 import OldCmm
 
+import DynFlags
 import OrdList
 import Outputable
 
@@ -182,10 +183,12 @@ iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr])
 	-- compute expr and load it into r_dst_lo
 	(a_reg, a_code)	<- getSomeReg expr
 
-	let code	= a_code
+	dflags <- getDynFlagsNat
+	let platform = targetPlatform dflags
+	    code	= a_code
 		`appOL`	toOL
-			[ mkRegRegMoveInstr g0    r_dst_hi 	-- clear high 32 bits
-			, mkRegRegMoveInstr a_reg r_dst_lo ]
+			[ mkRegRegMoveInstr platform g0    r_dst_hi 	-- clear high 32 bits
+			, mkRegRegMoveInstr platform a_reg r_dst_lo ]
 			
 	return	$ ChildCode64 code r_dst_lo
 

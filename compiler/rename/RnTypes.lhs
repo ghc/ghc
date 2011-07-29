@@ -11,7 +11,7 @@ module RnTypes (
 
 	-- Precence related stuff
 	mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
-	checkPrecMatch, checkSectionPrec,
+	checkPrecMatch, checkSectionPrec, warnUnusedForAlls,
 
 	-- Splice related stuff
 	rnSplice, checkTH
@@ -36,6 +36,7 @@ import Name
 import SrcLoc
 import NameSet
 
+import Util		( filterOut )
 import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
 			  Fixity(..), FixityDirection(..) )
 import Outputable
@@ -93,19 +94,16 @@ rnHsType doc (HsForAllTy Implicit _ ctxt ty) = do
 
     rnForAll doc Implicit tyvar_bndrs ctxt ty
 
-rnHsType doc (HsForAllTy Explicit forall_tyvars ctxt tau) = do
-	-- Explicit quantification.
-	-- Check that the forall'd tyvars are actually 
-	-- mentioned in the type, and produce a warning if not
-    let
-	mentioned	   = map unLoc (extractHsRhoRdrTyVars ctxt tau)
-	forall_tyvar_names = hsLTyVarLocNames forall_tyvars
+rnHsType doc ty@(HsForAllTy Explicit forall_tyvars ctxt tau)
+  = do { 	-- Explicit quantification.
+         -- Check that the forall'd tyvars are actually 
+	 -- mentioned in the type, and produce a warning if not
+         let mentioned   = extractHsRhoRdrTyVars ctxt tau
+             in_type_doc = ptext (sLit "In the type") <+> quotes (ppr ty)
+       ; warnUnusedForAlls (in_type_doc $$ doc) forall_tyvars mentioned
 
-	-- Explicitly quantified but not mentioned in ctxt or tau
-	warn_guys = filter ((`notElem` mentioned) . unLoc) forall_tyvar_names
-
-    mapM_ (forAllWarn doc tau) warn_guys
-    rnForAll doc Explicit forall_tyvars ctxt tau
+       ; -- rnForAll does the rest
+         rnForAll doc Explicit forall_tyvars ctxt tau }
 
 rnHsType _ (HsTyVar tyvar) = do
     tyvar' <- lookupOccRn tyvar
@@ -560,14 +558,19 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 %*********************************************************
 
 \begin{code}
-forAllWarn :: SDoc -> LHsType RdrName -> Located RdrName
-           -> TcRnIf TcGblEnv TcLclEnv ()
-forAllWarn doc ty (L loc tyvar)
-  = ifDOptM Opt_WarnUnusedMatches 	$
-    addWarnAt loc (sep [ptext (sLit "The universally quantified type variable") <+> quotes (ppr tyvar),
-		 	nest 4 (ptext (sLit "does not appear in the type") <+> quotes (ppr ty))]
-		   $$
-		   doc)
+warnUnusedForAlls :: SDoc -> [LHsTyVarBndr RdrName] -> [Located RdrName] -> TcM ()
+warnUnusedForAlls in_doc bound used
+  = ifWOptM Opt_WarnUnusedMatches $
+    mapM_ add_warn bound_but_not_used
+  where
+    bound_names        = hsLTyVarLocNames bound
+    bound_but_not_used = filterOut ((`elem` mentioned_rdrs) . unLoc) bound_names
+    mentioned_rdrs     = map unLoc used
+
+    add_warn (L loc tv) 
+      = addWarnAt loc $
+        vcat [ ptext (sLit "Unused quantified type variable") <+> quotes (ppr tv)
+             , in_doc ]
 
 opTyErr :: RdrName -> HsType RdrName -> SDoc
 opTyErr op ty@(HsOpTy ty1 _ _)

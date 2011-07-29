@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.1], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [7.3], [glasgow-haskell-bugs@haskell.org], [ghc])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -206,26 +206,6 @@ AC_CANONICAL_HOST
 AC_CANONICAL_TARGET
 
 FPTOOLS_SET_PLATFORM_VARS
-
-exeext=''
-soext='.so'
-case $host in
-*-unknown-cygwin32)
-    AC_MSG_WARN([GHC does not support the Cygwin target at the moment])
-    AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
-    exit 1
-    ;;
-*-unknown-mingw32)
-    exeext='.exe'
-    soext='.dll'
-    ;;
-i386-apple-darwin|powerpc-apple-darwin)
-    soext='.dylib'
-    ;;
-x86_64-apple-darwin)
-    soext='.dylib'
-    ;;
-esac
 
 # Testing if we shall enable shared libs support on Solaris.
 # Anything older than SunOS 5.11 aka Solaris 11 (Express) is broken.
@@ -423,25 +403,6 @@ then
     fi
 fi
 
-dnl ** Which gcc to use?
-dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
-export CC
-WhatGccIsCalled="$CC"
-AC_SUBST(WhatGccIsCalled)
-
-dnl ** Which ld to use?
-dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([LD], [ld])
-LdCmd="$LD"
-AC_SUBST([LdCmd])
-
-dnl ** Which nm to use?
-dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
-NmCmd="$NM"
-AC_SUBST([NmCmd])
-
 SplitObjsBroken=NO
 if test "$TargetOS_CPP" = "darwin"
 then
@@ -476,6 +437,33 @@ changequote([, ])dnl
     fi
 fi
 AC_SUBST([SplitObjsBroken])
+
+dnl ** Which gcc to use?
+dnl --------------------------------------------------------------
+if test "$TargetOS_CPP" = "darwin" &&
+   test "$XCodeVersion1" -ge 4
+then
+  # From Xcode 4, use 'gcc-4.2' to force the use of the gcc legacy backend (instead of the LLVM
+  # backend)
+  FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc-4.2])
+else
+  FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
+fi
+export CC
+WhatGccIsCalled="$CC"
+AC_SUBST(WhatGccIsCalled)
+
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([LD], [ld])
+LdCmd="$LD"
+AC_SUBST([LdCmd])
+
+dnl ** Which nm to use?
+dnl --------------------------------------------------------------
+FP_ARG_WITH_PATH_GNU_PROG([NM], [nm])
+NmCmd="$NM"
+AC_SUBST([NmCmd])
 
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
@@ -569,6 +557,8 @@ AC_SUBST(CONF_LD_LINKER_OPTS_STAGE2)
 AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
+
+FP_SETTINGS
 
 dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF

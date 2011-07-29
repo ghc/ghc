@@ -62,7 +62,7 @@ module Coercion (
 	substTyVarBndr, substCoVarBndr,
 
 	-- ** Lifting
-	liftCoMatch, liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, 
+	liftCoMatch, liftCoSubstTyVar, liftCoSubstWith, 
         
         -- ** Comparison
         coreEqCoercion, coreEqCoercion2,
@@ -80,7 +80,7 @@ module Coercion (
 
 #include "HsVersions.h"
 
-import Unify	( MatchEnv(..), ruleMatchTyX, matchList )
+import Unify	( MatchEnv(..), matchList )
 import TypeRep
 import qualified Type
 import Type hiding( substTy, substTyVarBndr, extendTvSubst )
@@ -90,7 +90,6 @@ import TyCon
 import Var
 import VarEnv
 import VarSet
-import UniqFM   ( minusUFM )
 import Maybes	( orElse )
 import Name	( Name, NamedThing(..), nameUnique )
 import OccName 	( isSymOcc )
@@ -546,7 +545,7 @@ mkTyConAppCo :: TyCon -> [Coercion] -> Coercion
 mkTyConAppCo tc cos
 	       -- Expand type synonyms
   | Just (tv_co_prs, rhs_ty, leftover_cos) <- tcExpandTyCon_maybe tc cos
-  = mkAppCos (liftCoSubst (mkTopCvSubst tv_co_prs) rhs_ty) leftover_cos
+  = mkAppCos (liftCoSubst tv_co_prs rhs_ty) leftover_cos
 
   | Just tys <- traverse isReflCo_maybe cos 
   = Refl (mkTyConApp tc tys)	-- See Note [Refl invariant]
@@ -593,11 +592,9 @@ mkNthCo :: Int -> Coercion -> Coercion
 mkNthCo n (Refl ty) = Refl (getNth n ty)
 mkNthCo n co        = NthCo n co
 
--- | Instantiates a 'Coercion' with a 'Type' argument. If possible, it immediately performs
---   the resulting beta-reduction, otherwise it creates a suspended instantiation.
+-- | Instantiates a 'Coercion' with a 'Type' argument. 
 mkInstCo :: Coercion -> Type -> Coercion
-mkInstCo (ForAllCo tv co) ty = substCoWithTy tv ty co
-mkInstCo co ty               = InstCo co ty
+mkInstCo co ty = InstCo co ty
 
 -- | Manufacture a coercion from thin air. Needless to say, this is
 --   not usually safe, but it is used when we know we are dealing with
@@ -814,21 +811,16 @@ zipOpenCvSubst vs cos
   | otherwise 
   = CvSubst (mkInScopeSet (tyCoVarsOfCos cos)) emptyTvSubstEnv (zipVarEnv vs cos)
 
-mkTopCvSubst :: [(Var,Coercion)] -> CvSubst
-mkTopCvSubst prs = CvSubst emptyInScopeSet emptyTvSubstEnv (mkVarEnv prs)
+substCoWithTy :: InScopeSet -> TyVar -> Type -> Coercion -> Coercion
+substCoWithTy in_scope tv ty = substCoWithTys in_scope [tv] [ty]
 
-substCoWithTy :: TyVar -> Type -> Coercion -> Coercion
-substCoWithTy tv ty = substCoWithTys [tv] [ty]
-
-substCoWithTys :: [TyVar] -> [Type] -> Coercion -> Coercion
-substCoWithTys tvs tys co
+substCoWithTys :: InScopeSet -> [TyVar] -> [Type] -> Coercion -> Coercion
+substCoWithTys in_scope tvs tys co
   | debugIsOn && (length tvs /= length tys)
   = pprTrace "substCoWithTys" (ppr tvs $$ ppr tys) co
   | otherwise 
   = ASSERT( length tvs == length tys )
     substCo (CvSubst in_scope (zipVarEnv tvs tys) emptyVarEnv) co
-  where
-    in_scope = mkInScopeSet (tyVarsOfTypes tys)
 
 -- | Substitute within a 'Coercion'
 substCo :: CvSubst -> Coercion -> Coercion
@@ -870,7 +862,7 @@ substCoVar :: CvSubst -> CoVar -> Coercion
 substCoVar (CvSubst in_scope _ cenv) cv
   | Just co  <- lookupVarEnv cenv cv      = co
   | Just cv1 <- lookupInScope in_scope cv = ASSERT( isCoVar cv1 ) CoVarCo cv1
-  | otherwise = WARN( True, ptext (sLit "substCoVar not in scope") <+> ppr cv )
+  | otherwise = WARN( True, ptext (sLit "substCoVar not in scope") <+> ppr cv $$ ppr in_scope)
                 ASSERT( isCoVar cv ) CoVarCo cv
 
 substCoVars :: CvSubst -> [CoVar] -> [Coercion]
@@ -891,26 +883,33 @@ lookupCoVar (CvSubst _ _ cenv) v = lookupVarEnv cenv v
 %************************************************************************
 
 \begin{code}
+data LiftCoSubst = LCS InScopeSet LiftCoEnv
+
+type LiftCoEnv = VarEnv Coercion
+     -- Maps *type variables* to *coercions*
+     -- That's the whole point of this function!
+
 liftCoSubstWith :: [TyVar] -> [Coercion] -> Type -> Coercion
-liftCoSubstWith tvs cos = liftCoSubst (zipOpenCvSubst tvs cos)
+liftCoSubstWith tvs cos ty
+  = liftCoSubst (zipEqual "liftCoSubstWith" tvs cos) ty
+
+liftCoSubst :: [(TyVar,Coercion)] -> Type -> Coercion
+liftCoSubst prs ty
+ | null prs  = Refl ty
+ | otherwise = ty_co_subst (LCS (mkInScopeSet (tyCoVarsOfCos (map snd prs)))
+                                (mkVarEnv prs)) ty
 
 -- | The \"lifting\" operation which substitutes coercions for type
 --   variables in a type to produce a coercion.
 --
 --   For the inverse operation, see 'liftCoMatch' 
-liftCoSubst :: CvSubst -> Type -> Coercion
--- The CvSubst maps TyVar -> Type      (mainly for cloning foralls)
---                  TyVar -> Coercion  (this is the payload)
--- The unusual thing is that the *coercion* substitution maps
--- some *type* variables. That's the whole point of this function!
-liftCoSubst subst ty | isEmptyCvSubst subst = Refl ty
-                     | otherwise            = ty_co_subst subst ty
-
-ty_co_subst :: CvSubst -> Type -> Coercion
+ty_co_subst :: LiftCoSubst -> Type -> Coercion
 ty_co_subst subst ty
   = go ty
   where
     go (TyVarTy tv)      = liftCoSubstTyVar subst tv `orElse` Refl (TyVarTy tv)
+       			     -- A type variable from a non-cloned forall
+			     -- won't be in the substitution
     go (AppTy ty1 ty2)   = mkAppCo (go ty1) (go ty2)
     go (TyConApp tc tys) = mkTyConAppCo tc (map go tys)
     go (FunTy ty1 ty2)   = mkFunCo (go ty1) (go ty2)
@@ -919,35 +918,19 @@ ty_co_subst subst ty
                            (subst', v') = liftCoSubstTyVarBndr subst v
     go (PredTy p)        = mkPredCo (go <$> p)
 
-liftCoSubstTyVar :: CvSubst -> TyVar -> Maybe Coercion
-liftCoSubstTyVar subst@(CvSubst _ tenv cenv) tv
-  = case (lookupVarEnv tenv tv, lookupVarEnv cenv tv) of
-      (Nothing, Nothing) -> Nothing
-      (Just ty, Nothing) -> Just (Refl ty)
-      (Nothing, Just co) -> Just co
-      (Just {}, Just {}) -> pprPanic "ty_co_subst" (ppr tv $$ ppr subst)
-                                    
-liftCoSubstTyVarBndr :: CvSubst -> TyVar -> (CvSubst, TyVar)
-liftCoSubstTyVarBndr (CvSubst in_scope tenv cenv) old_var
-  = (CvSubst (in_scope `extendInScopeSet` new_var) 
-             new_tenv
-             (delVarEnv cenv old_var)	-- See Note [Lifting substitutions]
-    , new_var)		
+liftCoSubstTyVar :: LiftCoSubst -> TyVar -> Maybe Coercion
+liftCoSubstTyVar (LCS _ cenv) tv = lookupVarEnv cenv tv 
+
+liftCoSubstTyVarBndr :: LiftCoSubst -> TyVar -> (LiftCoSubst, TyVar)
+liftCoSubstTyVarBndr (LCS in_scope cenv) old_var
+  = (LCS (in_scope `extendInScopeSet` new_var) new_cenv, new_var)		
   where
-    new_tenv | no_change = delVarEnv tenv old_var
-	     | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
+    new_cenv | no_change = delVarEnv cenv old_var
+	     | otherwise = extendVarEnv cenv old_var (Refl (TyVarTy new_var))
 
     no_change = new_var == old_var
     new_var = uniqAway in_scope old_var
 \end{code}
-
-Note [Lifting substitutions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider liftCoSubstWith [a] [co] (a, forall a. a)
-Then we want to substitute for the free 'a', but obviously not for
-the bound 'a'.  hence the (delVarEnv cent old_var) in liftCoSubstTyVarBndr.
-
-This also why we need a full CvSubst when doing lifting substitutions.
 
 \begin{code}
 -- | 'liftCoMatch' is sort of inverse to 'liftCoSubst'.  In particular, if
@@ -955,48 +938,33 @@ This also why we need a full CvSubst when doing lifting substitutions.
 --   That is, it matches a type against a coercion of the same
 --   "shape", and returns a lifting substitution which could have been
 --   used to produce the given coercion from the given type.
-liftCoMatch :: TyVarSet -> Type -> Coercion -> Maybe CvSubst
+liftCoMatch :: TyVarSet -> Type -> Coercion -> Maybe LiftCoSubst
 liftCoMatch tmpls ty co 
-  = case ty_co_match menv (emptyVarEnv, emptyVarEnv) ty co of
-      Just (tv_env, cv_env) -> Just (CvSubst in_scope tv_env cv_env)
-      Nothing               -> Nothing
+  = case ty_co_match menv emptyVarEnv ty co of
+      Just cenv -> Just (LCS in_scope cenv)
+      Nothing   -> Nothing
   where
     menv     = ME { me_tmpls = tmpls, me_env = mkRnEnv2 in_scope }
     in_scope = mkInScopeSet (tmpls `unionVarSet` tyCoVarsOfCo co)
     -- Like tcMatchTy, assume all the interesting variables 
     -- in ty are in tmpls
 
-type TyCoSubstEnv = (TvSubstEnv, CvSubstEnv)
-     -- Used locally inside ty_co_match only
-
 -- | 'ty_co_match' does all the actual work for 'liftCoMatch'.
-ty_co_match :: MatchEnv -> TyCoSubstEnv -> Type -> Coercion -> Maybe TyCoSubstEnv
-ty_co_match menv subst ty co | Just ty' <- coreView ty = ty_co_match menv subst ty' co
-
-   -- Deal with the Refl case by delegating to type matching
-ty_co_match menv (tenv, cenv) ty co
-  | Just ty' <- isReflCo_maybe co
-  = case ruleMatchTyX ty_menv tenv ty ty' of
-      Just tenv' -> Just (tenv', cenv) 
-      Nothing    -> Nothing
-  where
-    ty_menv = menv { me_tmpls = me_tmpls menv `minusUFM` cenv }
-    -- Remove from the template set any variables already bound to non-refl coercions
+ty_co_match :: MatchEnv -> LiftCoEnv -> Type -> Coercion -> Maybe LiftCoEnv
+ty_co_match menv subst ty co 
+  | Just ty' <- coreView ty = ty_co_match menv subst ty' co
 
   -- Match a type variable against a non-refl coercion
-ty_co_match menv subst@(tenv, cenv) (TyVarTy tv1) co
-  | Just {} <- lookupVarEnv tenv tv1'      -- tv1' is already bound to (Refl ty)
-  = Nothing    -- The coercion 'co' is not Refl
-
+ty_co_match menv cenv (TyVarTy tv1) co
   | Just co1' <- lookupVarEnv cenv tv1'      -- tv1' is already bound to co1
   = if coreEqCoercion2 (nukeRnEnvL rn_env) co1' co
-    then Just subst
+    then Just cenv
     else Nothing       -- no match since tv1 matches two different coercions
 
   | tv1' `elemVarSet` me_tmpls menv           -- tv1' is a template var
   = if any (inRnEnvR rn_env) (varSetElems (tyCoVarsOfCo co))
     then Nothing      -- occurs check failed
-    else return (tenv, extendVarEnv cenv tv1' co)
+    else return (extendVarEnv cenv tv1' co)
         -- BAY: I don't think we need to do any kind matching here yet
         -- (compare 'match'), but we probably will when moving to SHE.
 
@@ -1025,10 +993,19 @@ ty_co_match menv subst (ForAllTy tv1 ty) (ForAllCo tv2 co)
   where
     menv' = menv { me_env = rnBndr2 (me_env menv) tv1 tv2 }
 
-ty_co_match _ _ _ _ = Nothing
+ty_co_match menv subst ty co
+  | Just co' <- pushRefl co = ty_co_match menv subst ty co'
+  | otherwise               = Nothing
 
-ty_co_matches :: MatchEnv -> TyCoSubstEnv -> [Type] -> [Coercion] -> Maybe TyCoSubstEnv
+ty_co_matches :: MatchEnv -> LiftCoEnv -> [Type] -> [Coercion] -> Maybe LiftCoEnv
 ty_co_matches menv = matchList (ty_co_match menv)
+
+pushRefl :: Coercion -> Maybe Coercion
+pushRefl (Refl (AppTy ty1 ty2))   = Just (AppCo (Refl ty1) (Refl ty2))
+pushRefl (Refl (FunTy ty1 ty2))   = Just (TyConAppCo funTyCon [Refl ty1, Refl ty2])
+pushRefl (Refl (TyConApp tc tys)) = Just (TyConAppCo tc (map Refl tys))
+pushRefl (Refl (ForAllTy tv ty))  = Just (ForAllCo tv (Refl ty))
+pushRefl _                        = Nothing
 \end{code}
 
 %************************************************************************

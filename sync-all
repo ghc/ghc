@@ -3,76 +3,21 @@
 use strict;
 use Cwd;
 
-# Usage:
-#
-# ./sync-all [-q] [-s] [--ignore-failure] [-r repo]
-#            [--nofib] [--testsuite] [--checked-out] cmd [git flags]
-#
-# Applies the command "cmd" to each repository in the tree.
-# sync-all will try to do the right thing for both git and darcs repositories.
-#
-# e.g.
-#      ./sync-all -r http://darcs.haskell.org/ghc get
-#          To get any repos which do not exist in the local tree
-#
-#      ./sync-all pull
-#          To pull everything from the default repos
-#
-# -------------- Flags -------------------
-#   -q says to be quite, and -s to be silent.
-#
-#   --ignore-failure says to ignore errors and move on to the next repository
-#
-#   -r repo says to use repo as the location of package repositories
-#
-#   --checked-out says that the remote repo is in checked-out layout, as
-#   opposed to the layout used for the main repo.  By default a repo on
-#   the local filesystem is assumed to be checked-out, and repos accessed
-#   via HTTP or SSH are assumed to be in the main repo layout; use
-#   --checked-out to override the latter.
-#
-#   --nofib, --testsuite also get the nofib and testsuite repos respectively
-#
-# ------------ Which repos to use -------------
-# sync-all uses the following algorithm to decide which remote repos to use
-#
-#  It always computes the remote repos from a single base, $repo_base
-#  How is $repo_base set?  
-#    If you say "-r repo", then that's $repo_base
-#    otherwise $repo_base is set by asking git where the ghc repo came
-#    from, and removing the last component (e.g. /ghc.git/ of /ghc/).
-#
-#  Then sync-all iterates over the package found in the file
-#  ./packages; see that file for a description of the contents.
-# 
-#    If $repo_base looks like a local filesystem path, or if you give
-#    the --checked-out flag, sync-all works on repos of form
-#          $repo_base/<local-path>
-#    otherwise sync-all works on repos of form
-#          $repo_base/<remote-path>
-#    This logic lets you say
-#      both    sync-all -r http://darcs.haskell.org/ghc-6.12 pull
-#      and     sync-all -r ../HEAD pull
-#    The latter is called a "checked-out tree".
-
-# NB: sync-all *ignores* the defaultrepo of all repos other than the
-# root one.  So the remote repos must be laid out in one of the two
-# formats given by <local-path> and <remote-path> in the file 'packages'.
-
 $| = 1; # autoflush stdout after each print, to avoid output after die
 
 my $defaultrepo;
 my @packages;
 my $verbose = 2;
+my $try_to_resume = 0;
 my $ignore_failure = 0;
-my $checked_out_flag = 0;
+my $checked_out_flag = 0; # NOT the opposite of bare_flag (describes remote repo state)
 my $get_mode;
+my $bare_flag = ""; # NOT the opposite of checked_out_flag (describes local repo state)
 
 my %tags;
 
 # Figure out where to get the other repositories from.
 sub getrepo {
-    my $basedir = ".";
     my $repo;
 
     if (defined($defaultrepo)) {
@@ -81,9 +26,14 @@ sub getrepo {
     } else {
         # Figure out where to get the other repositories from,
         # based on where this GHC repo came from.
-        my $branch = `git branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
-        my $remote = `git config branch.$branch.remote`;         chomp $remote;
-        $repo = `git config remote.$remote.url`;       chomp $repo;
+        my $git_dir = $bare_flag ? "--git-dir=ghc.git" : "";
+        my $branch  = `git $git_dir branch | grep "\* " | sed "s/^\* //"`; chomp $branch;
+        my $remote  = `git $git_dir config branch.$branch.remote`;         chomp $remote;
+        if ($remote eq "") {
+            # remotes are not mandatory for branches (e.g. not recorded by default for bare repos)
+            $remote = "origin";
+        }
+        $repo       = `git $git_dir config remote.$remote.url`;            chomp $repo;
     }
 
     my $repo_base;
@@ -117,10 +67,19 @@ sub getrepo {
         }
     }
     elsif ($repo =~ /^\/|\.\.\/|.:(\/|\\)/) {
-        # Local filesystem, either absolute or relative path
-        # (assumes a checked-out tree):
+        # Local filesystem, either absolute (C:/ or /) or relative (../) path
         $repo_base = $repo;
-        $checked_out_tree = 1;
+        if (-f "$repo/HEAD") {
+            # assume a local mirror:
+            $checked_out_tree = 0;
+            $repo_base =~ s#/[^/]+/?$##;
+        } elsif (-d "$repo/ghc.git") {
+            # assume a local mirror:
+            $checked_out_tree = 0;
+        } else {
+            # assume a checked-out tree:
+            $checked_out_tree = 1;
+        }
     }
     else {
         die "Couldn't work out repo";
@@ -133,7 +92,9 @@ sub parsePackages {
     my @repos;
     my $lineNum;
 
-    open IN, "< packages" or die "Can't open packages file";
+    open IN, "< packages.conf"
+        or open IN, "< packages" # clashes with packages directory when using --bare
+        or die "Can't open packages file (or packages.conf)";
     @repos = <IN>;
     close IN;
 
@@ -207,6 +168,10 @@ sub scmall {
     my $pwd;
     my @args;
 
+    my $started;
+    my $doing;
+    my $start_repo;
+
     my ($repo_base, $checked_out_tree) = getrepo();
 
     my $is_github_repo = $repo_base =~ m/(git@|git:\/\/|https:\/\/)github.com/;
@@ -219,16 +184,16 @@ sub scmall {
         while (@_ > 0 && $_[0] =~ /^-/) {
             push(@args,shift);
         }
-        if (@_ < 1) { help(); }
+        if (@_ < 1) { help(1); }
         $subcommand = shift;
         if ($subcommand ne 'add' && $subcommand ne 'rm' && $subcommand ne 'set-url') {
-            help();
+            help(1);
         }
         while (@_ > 0 && $_[0] =~ /^-/) {
             push(@args,shift);
         }
         if (($subcommand eq 'add' || $subcommand eq 'rm') && @_ < 1) {
-            help();
+            help(1);
         } elsif (@_ < 1) { # set-url
             $branch_name = 'origin';
         } else {
@@ -244,29 +209,59 @@ sub scmall {
 
     push(@args, @_);
 
-    for $line (@packages) {
+    # $doing is a good enough approximation to what we are doing that
+    # we can use it to check that --resume is resuming the right command
+    $doing = join(" ", ($command, @args));
+    $started = 1;
+    if ($try_to_resume && -f "resume") {
+        my $what;
+        open RESUME, "< resume"
+            or die "Can't open resume file";
+        $start_repo = <RESUME>;
+        chomp $start_repo;
+        $what = <RESUME>;
+        chomp $what;
+        close RESUME;
+        if ($what eq $doing) {
+            $started = 0;
+        }
+    }
 
-        $localpath  = $$line{"localpath"};
+    for $line (@packages) {
         $tag        = $$line{"tag"};
-        $remotepath = $$line{"remotepath"};
         $scm        = $$line{"vcs"};
+        # Use the "remote" structure for bare git repositories
+        $localpath  = ($bare_flag && $scm eq "git") ?
+                      $$line{"remotepath"} : $$line{"localpath"};
+        $remotepath = ($checked_out_tree) ?
+                      $$line{"localpath"}  : $$line{"remotepath"};
+
+        if (!$started) {
+            if ($start_repo eq $localpath) {
+                $started = 1;
+            }
+            else {
+                next;
+            }
+        }
+
+        open RESUME, "> resume.tmp";
+        print RESUME "$localpath\n";
+        print RESUME "$doing\n";
+        close RESUME;
+        rename "resume.tmp", "resume";
 
         # Check the SCM is OK as early as possible
         die "Unknown SCM: $scm" if (($scm ne "darcs") and ($scm ne "git"));
 
         # We can't create directories on GitHub, so we translate
-        # "package/foo" into "package-foo".
+        # "packages/foo" into "package-foo".
         if ($is_github_repo) {
             $remotepath =~ s/\//-/;
         }
 
-        # Work out the path for this package in the repo we pulled from
-        if ($checked_out_tree) {
-            $path = "$repo_base/$localpath";
-        }
-        else {
-            $path = "$repo_base/$remotepath";
-        }
+        # Construct the path for this package in the repo we pulled from
+        $path = "$repo_base/$remotepath";
 
         if ($command =~ /^(?:g|ge|get)$/) {
             # Skip any repositories we have not included the tag for
@@ -297,18 +292,22 @@ sub scmall {
                 scm (".", $scm, "get", $get_mode, $path, $localpath, @args);
             }
             else {
-                scm (".", $scm, "clone", $path, $localpath, @args);
+                my @argsWithBare = @args;
+                push @argsWithBare, $bare_flag if $bare_flag;
+                scm (".", $scm, "clone", $path, $localpath, @argsWithBare);
                 scm ($localpath, $scm, "config", "core.ignorecase", "true");
             }
             next;
         }
 
-        if (-d "$localpath/_darcs") {
-            if (-d "$localpath/.git") {
+        my $darcs_repo_present = 1 if -d "$localpath/_darcs";
+        my $git_repo_present = 1 if -d "$localpath/.git" || ($bare_flag && -d "$localpath");
+        if ($darcs_repo_present) {
+            if ($git_repo_present) {
                 die "Found both _darcs and .git in $localpath";
             }
             $scm = "darcs";
-        } elsif (-d "$localpath/.git") {
+        } elsif ($git_repo_present) {
             $scm = "git";
         } elsif ($tag eq "") {
             die "Required repo $localpath is missing";
@@ -368,6 +367,7 @@ sub scmall {
         }
         elsif ($command =~ /^remote$/) {
             my @scm_args;
+            $ignore_failure = 1;
             if ($subcommand eq 'add') {
                 @scm_args = ("remote", "add", $branch_name, $path);
             } elsif ($subcommand eq 'rm') {
@@ -405,43 +405,159 @@ sub scmall {
             die "Unknown command: $command";
         }
     }
+
+    unlink "resume";
 }
 
-
-sub help()
+sub help
 {
+        my $exit = shift;
+
         # Get the built in help
         my $help = <<END;
-What do you want to do?
-Supported commands:
+Usage:
 
- * whatsnew
- * commit
- * push
- * pull
- * get, with options:
-  * --<package-tag>
-  * --complete
-  * --partial
- * fetch
- * send
- * new
- * remote add <branch-name>
- * remote rm <branch-name>
- * remote set-url [--push] <branch-name>
- * checkout
- * grep
- * clean
- * reset
- * config
- * log
+./sync-all [-q] [-s] [--ignore-failure] [-r repo] [--checked-out] [--bare]
+           [--nofib] [--extra] [--testsuite] [--resume] cmd [git flags]
+
+Applies the command "cmd" to each repository in the tree.
+
+A full repository tree is obtained by first cloning the ghc
+repository, then getting the subrepositories with "sync-all get":
+
+  \$ git clone http://darcs.haskell.org/ghc.git
+  \$ cd ghc
+  \$ ./sync-all get
+
+After this, "./sync-all pull" will pull from the original repository
+tree.
+
+A remote pointing to another local repository tree can be added like
+this:
+
+  \$ ./sync-all -r /path/to/ghc remote add otherlocal
+
+and then we can pull from this other tree with
+
+  \$ ./sync-all pull otherlocal
+
+-------------- Commands -----------------
+get
+
+    Clones all sub-repositories from the same place that the ghc
+    repository was cloned from.  See "which repos to use" below
+    for details of how the subrepositories are laid out.
+
+    There are various --<package-tag> options that can be given
+    before "get" that enable extra repositories.  The full list is
+    given at the end of this help.  For example:
+
+    ./sync-all --testsuite get
+
+    would get the testsuite repository in addition to the usual set of
+    subrepositories.
+
+remote add <remote-name>
+remote rm <remote-name>
+remote set-url [--push] <remote-name>
+
+    Runs a "git remote" command on each subrepository, adjusting the
+    repository location in each case appropriately.  For example, to
+    add a new remote pointing to the upstream repositories:
+
+    ./sync-all -r http://darcs.haskell.org/ remote add upstream
+
+    The -r flag points to the root of the repository tree (see "which
+    repos to use" below).  For a repository on the local filesystem it
+    would point to the ghc reposiroty, and for a remote repository it
+    points to the directory containing "ghc.git".
+
+These commands just run the equivalent git command on each repository, passing
+any extra arguments to git:
+
+  checkout
+  clean
+  commit
+  config
+  fetch
+  grep
+  log
+  new
+  pull
+  push
+  reset
+  send
+  status
+
+-------------- Flags -------------------
+  These flags are given *before* the command and modify the way
+  sync-all behaves.  Flags given *after* the command are passed to
+  git.
+
+  -q says to be quite, and -s to be silent.
+
+  --resume will restart a command that failed, from the repo at which
+  it failed. This means you don't need to wait while, e.g., "pull"
+  goes through all the repos it's just pulled, and tries to pull them
+  again.
+
+  --ignore-failure says to ignore errors and move on to the next repository
+
+  -r repo says to use repo as the location of package repositories
+
+  --checked-out says that the remote repo is in checked-out layout, as
+  opposed to the layout used for the main repo.  By default a repo on
+  the local filesystem is assumed to be checked-out, and repos accessed
+  via HTTP or SSH are assumed to be in the main repo layout; use
+  --checked-out to override the latter.
+
+  --bare says that the local repo is in bare layout, same as the main repo.
+  It also means that these repos are bare. You only have to use this flag if
+  you don't have a bare ghc.git in the current directory and would like to 'get'
+  all of the repos bare. Requires packages.conf to be present in the current
+  directory (a renamed packages file from the main ghc repo).
+
+  Note: --cheched-out and --bare flags are NOT the opposite of each other.
+        --checked-out: describes the layout of the remote repository tree.
+        --bare:        describes the layout of the local repository tree.
+
+  --nofib, --testsuite also get the nofib and testsuite repos respectively
+
+
+------------ Which repos to use -------------
+  sync-all uses the following algorithm to decide which remote repos to use
+ 
+  It always computes the remote repos from a single base, <repo_base>
+  How is <repo_base> set?
+    If you say "-r repo", then that's <repo_base>
+    otherwise <repo_base> is set by asking git where the ghc repo came
+    from, and removing the last component (e.g. /ghc.git/ or /ghc/).
+ 
+  Then sync-all iterates over the package found in the file
+  ./packages; see that file for a description of the contents.
+ 
+    If <repo_base> looks like a local filesystem path, or if you give
+    the --checked-out flag, sync-all works on repos of form
+          <repo_base>/<local-path>
+    otherwise sync-all works on repos of form
+          <repo_base>/<remote-path>
+    This logic lets you say
+      both    sync-all -r http://darcs.haskell.org/ghc-6.12 remote add ghc-6.12
+      and     sync-all -r ../working remote add working
+    The latter is called a "checked-out tree".
+
+  NB: sync-all *ignores* the defaultrepo of all repos other than the
+  root one.  So the remote repos must be laid out in one of the two
+  formats given by <local-path> and <remote-path> in the file 'packages'.
 
 Available package-tags are:
 END
 
         # Collect all the tags in the packages file
         my %available_tags;
-        open IN, "< packages" or die "Can't open packages file";
+        open IN, "< packages.conf"
+            or open IN, "< packages" # clashes with packages directory when using --bare
+            or die "Can't open packages file (or packages.conf)";
         while (<IN>) {
             chomp;
             if (/^([^# ]+) +(?:([^ ]+) +)?([^ ]+) +([^ ]+)/) {
@@ -457,14 +573,11 @@ END
         
         # Show those tags and the help text
         my @available_tags = keys %available_tags;
-        print "$help@available_tags\n";
-        exit 1;
+        print "$help@available_tags\n\n";
+        exit $exit;
 }
 
 sub main {
-    if (! -d ".git" || ! -d "compiler") {
-        die "error: sync-all must be run from the top level of the ghc tree."
-    }
 
     $tags{"-"} = 1;
     $tags{"dph"} = 1;
@@ -482,16 +595,27 @@ sub main {
         elsif ($arg eq "-r") {
             $defaultrepo = shift;
         }
+        elsif ($arg eq "--resume") {
+            $try_to_resume = 1;
+        }
         elsif ($arg eq "--ignore-failure") {
             $ignore_failure = 1;
         }
         elsif ($arg eq "--complete" || $arg eq "--partial") {
             $get_mode = $arg;
         }
-        # Use --checked-out if the remote repos are a checked-out tree,
+        # Use --checked-out if the _remote_ repos are a checked-out tree,
         # rather than the master trees.
         elsif ($arg eq "--checked-out") {
             $checked_out_flag = 1;
+        }
+        # Use --bare if the _local_ repos are bare repos,
+        # rather than a checked-out tree.
+        elsif ($arg eq "--bare") {
+            $bare_flag = $arg;
+        }
+        elsif ($arg eq "--help") {
+            help(0);
         }
         # --<tag> says we grab the libs tagged 'tag' with
         # 'get'. It has no effect on the other commands.
@@ -510,8 +634,24 @@ sub main {
         }
     }
 
+    # check for ghc repositories in cwd
+    my $checked_out_found = 1 if (-d ".git" && -d "compiler");
+    my $bare_found = 1 if (-d "ghc.git");
+
+    if ($bare_flag && ! $bare_found && ! $defaultrepo) {
+        die "error: bare repository ghc.git not found.\n"
+          . "       Either clone a bare ghc repo first or specify the repo location. E.g.:\n"
+          . "       ./sync-all --bare [--testsuite --nofib --extra] -r http://darcs.haskell.org/ get\n"
+    }
+    elsif ($bare_found) {
+        $bare_flag = "--bare";
+    }
+    elsif (! $bare_flag && ! $checked_out_found) {
+        die "error: sync-all must be run from the top level of the ghc tree.";
+    }
+
     if ($#_ eq -1) {
-        help();
+        help(1);
     }
     else {
         # Give the command and rest of the arguments to the main loop

@@ -93,7 +93,7 @@ module Type (
         -- * Other views onto Types
         coreView, tcView, 
 
-        repType, 
+        repType, deepRepType,
 
 	-- * Type representation for the code generator
 	PrimRep(..),
@@ -118,7 +118,7 @@ module Type (
 	-- ** Performing substitution on types
 	substTy, substTys, substTyWith, substTysWith, substTheta, 
         substPred, substTyVar, substTyVars, substTyVarBndr,
-        deShadowTy, lookupTyVar, 
+        cloneTyVarBndr, deShadowTy, lookupTyVar, 
 
 	-- * Pretty-printing
 	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
@@ -145,8 +145,10 @@ import TyCon
 import TysPrim
 
 -- others
+import Unique		( Unique )
 import BasicTypes	( IPName )
 import Name		( Name )
+import NameSet
 import StaticFlags
 import Util
 import Outputable
@@ -566,36 +568,58 @@ newtype at outermost level; and bale out if we see it again.
 --
 -- It's useful in the back end of the compiler.
 repType :: Type -> Type
--- Only applied to types of kind *; hence tycons are saturated
 repType ty
-  = go [] ty
+  = go emptyNameSet ty
   where
-    go :: [TyCon] -> Type -> Type
-    go rec_nts (ForAllTy _ ty)		-- Look through foralls
+    go :: NameSet -> Type -> Type
+    go rec_nts ty    	  		-- Expand predicates and synonyms
+      | Just ty' <- coreView ty
+      = go rec_nts ty'
+
+    go rec_nts (ForAllTy _ ty)		-- Drop foralls
 	= go rec_nts ty
 
-    go rec_nts (PredTy p)		-- Expand predicates
-        = go rec_nts (predTypeRep p)
-
-    go rec_nts (TyConApp tc tys)	-- Expand newtypes and synonyms
-      | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc tys 
-      = go rec_nts (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
-
+    go rec_nts (TyConApp tc tys)	-- Expand newtypes
       | Just (rec_nts', ty') <- carefullySplitNewType_maybe rec_nts tc tys
       = go rec_nts' ty'
 
     go _ ty = ty
 
+deepRepType :: Type -> Type
+-- Same as repType, but looks recursively
+deepRepType ty
+  = go emptyNameSet ty
+  where
+    go rec_nts ty    	  		-- Expand predicates and synonyms
+      | Just ty' <- coreView ty
+      = go rec_nts ty'
 
-carefullySplitNewType_maybe :: [TyCon] -> TyCon -> [Type] -> Maybe ([TyCon],Type)
+    go rec_nts (ForAllTy _ ty)		-- Drop foralls
+	= go rec_nts ty
+
+    go rec_nts (TyConApp tc tys)	-- Expand newtypes
+      | Just (rec_nts', ty') <- carefullySplitNewType_maybe rec_nts tc tys
+      = go rec_nts' ty'
+
+      -- Apply recursively; this is the "deep" bit
+    go rec_nts (TyConApp tc tys) = mkTyConApp tc (map (go rec_nts) tys)
+    go rec_nts (AppTy ty1 ty2)   = mkAppTy (go rec_nts ty1) (go rec_nts ty2)
+    go rec_nts (FunTy ty1 ty2)   = FunTy   (go rec_nts ty1) (go rec_nts ty2)
+
+    go _ ty = ty
+
+carefullySplitNewType_maybe :: NameSet -> TyCon -> [Type] -> Maybe (NameSet,Type)
 -- Return the representation of a newtype, unless 
 -- we've seen it already: see Note [Expanding newtypes]
+-- Assumes the newtype is saturated
 carefullySplitNewType_maybe rec_nts tc tys
   | isNewTyCon tc
-  , not (tc `elem` rec_nts)  = Just (rec_nts', newTyConInstRhs tc tys)
-  | otherwise	   	     = Nothing
+  , tys `lengthAtLeast` tyConArity tc
+  , not (tc_name `elemNameSet` rec_nts) = Just (rec_nts', newTyConInstRhs tc tys)
+  | otherwise	   	                = Nothing
   where
-    rec_nts' | isRecursiveTyCon tc = tc:rec_nts
+    tc_name = tyConName tc
+    rec_nts' | isRecursiveTyCon tc = addOneToNameSet rec_nts tc_name
 	     | otherwise	   = rec_nts
 
 
@@ -1265,7 +1289,7 @@ getTvInScope (TvSubst in_scope _) = in_scope
 isInScope :: Var -> TvSubst -> Bool
 isInScope v (TvSubst in_scope _) = v `elemInScopeSet` in_scope
 
-notElemTvSubst :: TyCoVar -> TvSubst -> Bool
+notElemTvSubst :: CoVar -> TvSubst -> Bool
 notElemTvSubst v (TvSubst _ tenv) = not (v `elemVarEnv` tenv)
 
 setTvSubstEnv :: TvSubst -> TvSubstEnv -> TvSubst
@@ -1468,7 +1492,7 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
 	    | otherwise = extendVarEnv tenv old_var (TyVarTy new_var)
 
     _no_capture = not (new_var `elemVarSet` tyVarsOfTypes (varEnvElts tenv))
-    -- Check that we are not capturing something in the substitution
+    -- Assertion check that we are not capturing something in the substitution
 
     no_change = new_var == old_var
 	-- no_change means that the new_var is identical in
@@ -1483,6 +1507,14 @@ substTyVarBndr subst@(TvSubst in_scope tenv) old_var
 
     new_var = uniqAway in_scope old_var
 	-- The uniqAway part makes sure the new variable is not already in scope
+
+cloneTyVarBndr :: TvSubst -> TyVar -> Unique -> (TvSubst, TyVar)
+cloneTyVarBndr (TvSubst in_scope tv_env) tv uniq
+  = (TvSubst (extendInScopeSet in_scope tv')
+             (extendVarEnv tv_env tv (mkTyVarTy tv')), tv')
+  where
+    tv' = setVarUnique tv uniq	-- Simply set the unique; the kind
+    	  	       	  	-- has no type variables to worry about
 \end{code}
 
 ----------------------------------------------------

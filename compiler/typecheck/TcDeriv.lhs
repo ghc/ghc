@@ -374,7 +374,7 @@ renameDeriv is_boot gen_binds insts
 
   | otherwise
   = discardWarnings $ 	 -- Discard warnings about unused bindings etc
-    do	{ (rn_gen, dus_gen) <- setOptM Opt_ScopedTypeVariables $  -- Type signatures in patterns 
+    do	{ (rn_gen, dus_gen) <- setXOptM Opt_ScopedTypeVariables $  -- Type signatures in patterns 
 								  -- are used in the generic binds
 			       rnTopBinds (ValBindsIn gen_binds [])
 	; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to be kept alive
@@ -1372,21 +1372,7 @@ inferInstanceContexts oflag infer_specs
 		 , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs })
       = setSrcSpan loc	$
 	addErrCtxt (derivInstCtxt the_pred) $ 
-	do {      -- Check for a bizarre corner case, when the derived instance decl should
-		  -- have form 	instance C a b => D (T a) where ...
-		  -- Note that 'b' isn't a parameter of T.  This gives rise to all sorts
-		  -- of problems; in particular, it's hard to compare solutions for
-		  -- equality when finding the fixpoint.  Moreover, simplifyDeriv
-		  -- has an assert failure because it finds a TyVar when it expects
-		  -- only TcTyVars.  So I just rule it out for now.  I'm not 
-		  -- even sure how it can arise.
-		  
- 	   ; let tv_set = mkVarSet tyvars
-	         weird_preds = [pred | pred <- deriv_rhs
-                                     , not (tyVarsOfPred pred `subVarSet` tv_set)]
-	   ; mapM_ (addErrTc . badDerivedPred) weird_preds	
-
-           ; theta <- simplifyDeriv orig the_pred tyvars deriv_rhs
+	do { theta <- simplifyDeriv orig the_pred tyvars deriv_rhs
 	   	-- checkValidInstance tyvars theta clas inst_tys
 		-- Not necessary; see Note [Exotic derived instance contexts]
 		-- 		  in TcSimplify
@@ -1745,10 +1731,4 @@ standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for"
 derivInstCtxt :: PredType -> Message
 derivInstCtxt pred
   = ptext (sLit "When deriving the instance for") <+> parens (ppr pred)
-
-badDerivedPred :: PredType -> Message
-badDerivedPred pred
-  = vcat [ptext (sLit "Can't derive instances where the instance context mentions"),
-	  ptext (sLit "type variables that are not data type parameters"),
-	  nest 2 (ptext (sLit "Offending constraint:") <+> ppr pred)]
 \end{code}

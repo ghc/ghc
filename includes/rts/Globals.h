@@ -17,7 +17,6 @@
 #ifndef RTS_GLOBALS_H
 #define RTS_GLOBALS_H
 
-StgStablePtr getOrSetTypeableStore(StgStablePtr value);
 StgStablePtr getOrSetGHCConcSignalSignalHandlerStore(StgStablePtr value);
 StgStablePtr getOrSetGHCConcWindowsPendingDelaysStore(StgStablePtr ptr);
 StgStablePtr getOrSetGHCConcWindowsIOManagerThreadStore(StgStablePtr ptr);
