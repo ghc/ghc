@@ -286,7 +286,7 @@ data IdLabelInfo
   = Closure		-- ^ Label for closure
   | SRT                 -- ^ Static reference table
   | InfoTable IsLocal	-- ^ Info tables for closures; always read-only
-  | Entry IsLocal	-- ^ Entry point
+  | Entry	        -- ^ Entry point
   | Slow		-- ^ Slow entry point
 
   | RednCounts		-- ^ Label of place to keep Ticky-ticky  info for this Id
@@ -361,12 +361,12 @@ mkRednCountsLabel     	name c 	= IdLabel name  c RednCounts
 -- These have local & (possibly) external variants:
 mkLocalClosureLabel	name c 	= IdLabel name  c Closure
 mkLocalInfoTableLabel  	name c 	= IdLabel name  c (InfoTable True)
-mkLocalEntryLabel	name c 	= IdLabel name  c (Entry True)
+mkLocalEntryLabel	name c 	= IdLabel name  c Entry
 mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 
 mkClosureLabel name         c     = IdLabel name c Closure
 mkInfoTableLabel name       c     = IdLabel name c (InfoTable False)
-mkEntryLabel name           c     = IdLabel name c (Entry False)
+mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
 mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
 mkLocalConEntryLabel	    c con = IdLabel con c ConEntry
@@ -503,7 +503,7 @@ mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
 -- Brutal method of obtaining a closure label
 
 cvtToClosureLbl   (IdLabel n c (InfoTable _))	= IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c (Entry _))	= IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c Entry)	        = IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c ConEntry)	= IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c RednCounts)	= IdLabel n c Closure
 cvtToClosureLbl l@(IdLabel n c Closure)		= l
@@ -676,7 +676,6 @@ externallyVisibleCLabel (LargeSRTLabel _)	= False
 
 externallyVisibleIdLabel :: IdLabelInfo -> Bool
 externallyVisibleIdLabel SRT             = False
-externallyVisibleIdLabel (Entry lcl)     = not lcl
 externallyVisibleIdLabel (InfoTable lcl) = not lcl
 externallyVisibleIdLabel _               = True
 
@@ -964,7 +963,7 @@ ppIdFlavor x = pp_cSEP <>
 		       Closure	    	-> ptext (sLit "closure")
 		       SRT		-> ptext (sLit "srt")
 		       InfoTable _	-> ptext (sLit "info")
-		       Entry _	    	-> ptext (sLit "entry")
+		       Entry	    	-> ptext (sLit "entry")
 		       Slow	    	-> ptext (sLit "slow")
 		       RednCounts	-> ptext (sLit "ct")
 		       ConEntry	    	-> ptext (sLit "con_entry")
