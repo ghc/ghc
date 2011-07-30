@@ -289,7 +289,7 @@ pRELUDE         = mkBaseModule_ pRELUDE_NAME
 gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
     gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_CSTRING,
-    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER, gHC_INTEGER_TYPE, gHC_LIST,
+    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_LIST,
     gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING, dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -312,7 +312,6 @@ gHC_ENUM        = mkBaseModule (fsLit "GHC.Enum")
 gHC_SHOW        = mkBaseModule (fsLit "GHC.Show")
 gHC_READ        = mkBaseModule (fsLit "GHC.Read")
 gHC_NUM         = mkBaseModule (fsLit "GHC.Num")
-gHC_INTEGER     = mkIntegerModule (fsLit "GHC.Integer")
 gHC_INTEGER_TYPE= mkIntegerModule (fsLit "GHC.Integer.Type")
 gHC_LIST        = mkBaseModule (fsLit "GHC.List")
 gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
@@ -799,30 +798,30 @@ integerTyConName, plusIntegerName, timesIntegerName, smallIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName :: Name
 integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
-plusIntegerName       = varQual gHC_INTEGER      (fsLit "plusInteger")       plusIntegerIdKey
-timesIntegerName      = varQual gHC_INTEGER      (fsLit "timesInteger")      timesIntegerIdKey
-smallIntegerName      = varQual gHC_INTEGER      (fsLit "smallInteger")      smallIntegerIdKey
-integerToWordName     = varQual gHC_INTEGER      (fsLit "integerToWord")     integerToWordIdKey
-integerToIntName      = varQual gHC_INTEGER      (fsLit "integerToInt")      integerToIntIdKey
-minusIntegerName      = varQual gHC_INTEGER      (fsLit "minusInteger")      minusIntegerIdKey
-negateIntegerName     = varQual gHC_INTEGER      (fsLit "negateInteger")     negateIntegerIdKey
-eqIntegerName         = varQual gHC_INTEGER      (fsLit "eqInteger")         eqIntegerIdKey
-neqIntegerName        = varQual gHC_INTEGER      (fsLit "neqInteger")        neqIntegerIdKey
-absIntegerName        = varQual gHC_INTEGER      (fsLit "absInteger")        absIntegerIdKey
-signumIntegerName     = varQual gHC_INTEGER      (fsLit "signumInteger")     signumIntegerIdKey
-leIntegerName         = varQual gHC_INTEGER      (fsLit "leInteger")         leIntegerIdKey
-gtIntegerName         = varQual gHC_INTEGER      (fsLit "gtInteger")         gtIntegerIdKey
-ltIntegerName         = varQual gHC_INTEGER      (fsLit "ltInteger")         ltIntegerIdKey
-geIntegerName         = varQual gHC_INTEGER      (fsLit "geInteger")         geIntegerIdKey
-compareIntegerName    = varQual gHC_INTEGER      (fsLit "compareInteger")    compareIntegerIdKey
-gcdIntegerName        = varQual gHC_INTEGER      (fsLit "gcdInteger")        gcdIntegerIdKey
-lcmIntegerName        = varQual gHC_INTEGER      (fsLit "lcmInteger")        lcmIntegerIdKey
-andIntegerName        = varQual gHC_INTEGER      (fsLit "andInteger")        andIntegerIdKey
-orIntegerName         = varQual gHC_INTEGER      (fsLit "orInteger")         orIntegerIdKey
-xorIntegerName        = varQual gHC_INTEGER      (fsLit "xorInteger")        xorIntegerIdKey
-complementIntegerName = varQual gHC_INTEGER      (fsLit "complementInteger") complementIntegerIdKey
-shiftLIntegerName     = varQual gHC_INTEGER      (fsLit "shiftLInteger")     shiftLIntegerIdKey
-shiftRIntegerName     = varQual gHC_INTEGER      (fsLit "shiftRInteger")     shiftRIntegerIdKey
+plusIntegerName       = varQual gHC_INTEGER_TYPE (fsLit "plusInteger")       plusIntegerIdKey
+timesIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "timesInteger")      timesIntegerIdKey
+smallIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "smallInteger")      smallIntegerIdKey
+integerToWordName     = varQual gHC_INTEGER_TYPE (fsLit "integerToWord")     integerToWordIdKey
+integerToIntName      = varQual gHC_INTEGER_TYPE (fsLit "integerToInt")      integerToIntIdKey
+minusIntegerName      = varQual gHC_INTEGER_TYPE (fsLit "minusInteger")      minusIntegerIdKey
+negateIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "negateInteger")     negateIntegerIdKey
+eqIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "eqInteger")         eqIntegerIdKey
+neqIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "neqInteger")        neqIntegerIdKey
+absIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "absInteger")        absIntegerIdKey
+signumIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "signumInteger")     signumIntegerIdKey
+leIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "leInteger")         leIntegerIdKey
+gtIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "gtInteger")         gtIntegerIdKey
+ltIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "ltInteger")         ltIntegerIdKey
+geIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "geInteger")         geIntegerIdKey
+compareIntegerName    = varQual gHC_INTEGER_TYPE (fsLit "compareInteger")    compareIntegerIdKey
+gcdIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "gcdInteger")        gcdIntegerIdKey
+lcmIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "lcmInteger")        lcmIntegerIdKey
+andIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "andInteger")        andIntegerIdKey
+orIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "orInteger")         orIntegerIdKey
+xorIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "xorInteger")        xorIntegerIdKey
+complementIntegerName = varQual gHC_INTEGER_TYPE (fsLit "complementInteger") complementIntegerIdKey
+shiftLIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftLInteger")     shiftLIntegerIdKey
+shiftRIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftRInteger")     shiftRIntegerIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
