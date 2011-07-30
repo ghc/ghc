@@ -19,7 +19,6 @@ module GHC.Integer.Logarithms.Internals
 
 import GHC.Prim
 import GHC.Integer.Type
-import GHC.Integer
 
 default ()
 
