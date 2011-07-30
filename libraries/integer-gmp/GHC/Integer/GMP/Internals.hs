@@ -5,8 +5,6 @@
 
 #include "MachDeps.h"
 module GHC.Integer.GMP.Internals (
-    Integer(..),
-
     cmpInteger#,
     cmpIntegerInt#,
 
@@ -52,7 +50,6 @@ module GHC.Integer.GMP.Internals (
   ) where
 
 import GHC.Prim
-import GHC.Integer.Type
 
 -- Double isn't available yet, and we shouldn't be using defaults anyway:
 default ()

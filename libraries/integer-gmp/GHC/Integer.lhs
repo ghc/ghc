@@ -60,9 +60,9 @@ import GHC.Prim (
     and#, or#, xor#
  )
 
-import GHC.Integer.GMP.Internals (
-    Integer(..),
+import GHC.Integer.Type ( Integer(..) )
 
+import GHC.Integer.GMP.Internals (
     -- GMP-related primitives
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, minusInteger#, timesInteger#,
