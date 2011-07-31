@@ -92,14 +92,19 @@ joinSubst iss (id_subst, tv_subst, co_subst) = mkSubst iss tv_subst co_subst id_
 --  2) Ensure that we always extend the IdSubstEnv, regardless of whether the unique changed.
 --     This is the solution I've adopted, and it is implemented here in splitSubst:
 splitSubst :: Subst -> [(Var, Var)] -> (InScopeSet, Renaming)
-splitSubst (Subst iss id_subst tv_subst co_subst) xs_extend
-  = (iss, (id_subst `extendVarEnvList` [(x, varToCoreSyn x') | (x, x') <- xs_extend], tv_subst, co_subst))
+splitSubst (Subst iss id_subst tv_subst co_subst) extend
+  = (iss, (id_subst `extendVarEnvList` [(x, varToCoreSyn x') | (x, x') <- ids_extend],
+           tv_subst `extendVarEnvList` [(a, mkTyVarTy a')    | (a, a') <- tvs_extend],
+           co_subst `extendVarEnvList` [(q, mkCoVarCo q')    | (q, q') <- cos_extend]))
+  where (ids_extend, tvs_extend, cos_extend) = splitVarLikeList fst extend
 
+splitVarLikeList :: (a -> Var) -> [a] -> ([a], [a], [a])
+splitVarLikeList f xs = (id_list, tv_list, co_list)
+  where (tv_list, coid_list) = partition (isTyVar . f) xs
+        (co_list, id_list)   = partition (isCoVar . f) coid_list
 
 splitVarList :: [Var] -> ([Id], [TyVar], [CoVar])
-splitVarList xs = (id_list, tv_list, co_list)
-  where (tv_list, coid_list) = partition isTyVar xs
-        (co_list, id_list)   = partition isCoVar coid_list
+splitVarList = splitVarLikeList id
 
 emptyRenaming :: Renaming
 emptyRenaming = (emptyVarEnv, emptyVarEnv, emptyVarEnv)
