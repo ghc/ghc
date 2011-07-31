@@ -295,11 +295,9 @@ include rules/bindist.mk
 # Packages that are built but not installed
 INTREE_ONLY_PACKAGES := haskeline mtl terminfo utf8-string xhtml
 
-# We don't build dph for now (#5360)
-# DPH_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
-#                 dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
-#                 vector primitive random
-DPH_PACKAGES := vector primitive random
+DPH_PACKAGES := dph/dph-base dph/dph-prim-interface dph/dph-prim-seq \
+                dph/dph-common dph/dph-prim-par dph/dph-par dph/dph-seq \
+                vector primitive random
 
 # Packages that, if present, must be built by the stage2 compiler,
 # because they use TH and/or annotations, or depend on other stage2
