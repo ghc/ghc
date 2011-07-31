@@ -78,5 +78,4 @@ libraries/stm                   extra       packages/stm.git                    
 libraries/random                dph         packages/random.git                 git
 libraries/primitive             dph         packages/primitive.git              git
 libraries/vector                dph         packages/vector.git                 git
-# Don't build dph for now: it doesn't work (#5360)
-# libraries/dph                   dph         packages/dph.git                    git
+libraries/dph                   dph         packages/dph.git                    git
