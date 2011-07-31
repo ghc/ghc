@@ -7,11 +7,9 @@ module GHC.Stats
     , getGCStats
 ) where
 
-import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Storable
 import Foreign.Ptr
-import System.Mem
 import Data.Int
 
 #include "Rts.h"
@@ -65,6 +63,7 @@ data GCStats = GCStats
 -- | Retrieves garbage collection and memory statistics as of the last
 -- garbage collection.  If you would like your statistics as recent as
 -- possible, first run a 'performGC' from "System.Mem".
+getGCStats :: IO GCStats
 getGCStats = allocaBytes (#size GCStats) $ \p -> do
     getGCStats_ p
     bytes_allocated <- (# peek GCStats, bytes_allocated) p
