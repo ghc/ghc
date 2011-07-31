@@ -112,6 +112,16 @@ union stg_ieee754_dbl
 #ifdef IEEE_FLOATING_POINT
 
 HsInt
+isDoubleFinite(HsDouble d)
+{
+  union stg_ieee754_dbl u;
+
+  u.d = d;
+
+  return u.ieee.exponent != 2047;
+}
+
+HsInt
 isDoubleNaN(HsDouble d)
 {
   union stg_ieee754_dbl u;
@@ -188,6 +198,14 @@ isDoubleNegativeZero(HsDouble d)
  fraction     22-0         fraction (bits to right of binary point)
 */
 
+
+HsInt
+isFloatFinite(HsFloat f)
+{
+    union stg_ieee754_flt u;
+    u.f = f;
+    return u.ieee.exponent != 255;
+}
 
 HsInt
 isFloatNaN(HsFloat f)
@@ -426,11 +444,13 @@ rintDouble(HsDouble d)
 
 #else /* ! IEEE_FLOATING_POINT */
 
-/* Dummy definitions of predicates - they all return false */
+/* Dummy definitions of predicates - they all return "normal" values */
+HsInt isDoubleFinite(d) HsDouble d; { return 1;}
 HsInt isDoubleNaN(d) HsDouble d; { return 0; }
 HsInt isDoubleInfinite(d) HsDouble d; { return 0; }
 HsInt isDoubleDenormalized(d) HsDouble d; { return 0; }
 HsInt isDoubleNegativeZero(d) HsDouble d; { return 0; }
+HsInt isFloatFinite(f) HsFloat f; { return 1; }
 HsInt isFloatNaN(f) HsFloat f; { return 0; }
 HsInt isFloatInfinite(f) HsFloat f; { return 0; }
 HsInt isFloatDenormalized(f) HsFloat f; { return 0; }
