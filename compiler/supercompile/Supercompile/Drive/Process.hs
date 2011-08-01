@@ -97,7 +97,7 @@ supercompile unfoldings e = pprTraceSC "unfoldings" (ppr (M.keys unfoldings)) $
         anned_e = toAnnedTerm tag_ids0 e
         
         ((input_fvs, tag_ids2), h_unfoldings) = mapAccumL add_one_unfolding (annedTermFreeVars anned_e, tag_ids1) (M.toList unfoldings)
-          where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', letBound (mkIdentityRenaming (annedFreeVars anned_e), anned_e)))
+          where add_one_unfolding (input_fvs', tag_ids1) (x', e) = ((input_fvs'', tag_ids2), (x', letBound (renamedTerm anned_e)))
                     where (tag_unf_ids, tag_ids2) = splitUniqSupply tag_ids1
                           anned_e = toAnnedTerm tag_unf_ids e
                           input_fvs'' = input_fvs' `unionVarSet` annedFreeVars anned_e
@@ -250,7 +250,7 @@ speculate speculated (stats, (deeds, Heap h ids, k, in_e)) = (M.keysSet h, (stat
                       (extra_stats, (deeds, Heap h_speculated_ok' ids, [], qa))
                         | Just a <- traverse qaToAnswer qa
                         , let h_unspeculated = h_speculated_ok' M.\\ h_speculated_ok
-                              in_e' = annedAnswerToAnnedTerm (mkInScopeSet (annedFreeVars a)) a
+                              in_e' = annedAnswerToInAnnedTerm (mkInScopeSet (annedFreeVars a)) a
                         -> ((stats `mappend` extra_stats, deeds, M.insert x' (internallyBound in_e') h_speculated_ok, h_speculated_failure, ids), speculateManyMap hist h_unspeculated)
                       _ -> (no_change, speculation_failure)
                 where state = normalise (deeds, Heap h_speculated_ok ids, [], in_e)

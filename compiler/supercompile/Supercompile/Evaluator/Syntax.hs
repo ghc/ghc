@@ -47,6 +47,13 @@ renameAnned (rn, Comp (Tagged tg (Comp (Sized sz (FVed fvs x)))))
   = Comp (Tagged tg (Comp (Sized sz (FVed (renameFreeVars rn fvs) (rn, x)))))
 
 
+renamedValue :: AnnedValue -> In AnnedValue
+renamedValue v = (mkIdentityRenaming (annedValueFreeVars' v), v)
+
+renamedTerm :: AnnedTerm -> In AnnedTerm
+renamedTerm e = (mkIdentityRenaming (annedTermFreeVars e), e)
+
+
 annedVarFreeVars' = taggedSizedFVedVarFreeVars'
 annedTermFreeVars = taggedSizedFVedTermFreeVars
 annedTermFreeVars' = taggedSizedFVedTermFreeVars'
@@ -108,16 +115,14 @@ data QA = Question (Out Id)
 instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
 
-annedAnswerToAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
-annedAnswerToAnnedTerm iss anned_a = (mkIdentityRenaming (annedFreeVars anned_e), anned_e)
-  where e' = answerToAnnedTerm' iss (annee anned_a)
-        anned_e = annedTerm (annedTag anned_a) e'
+annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
+annedAnswerToInAnnedTerm iss anned_a = renamedTerm $ annedTerm (annedTag anned_a) $ answerToAnnedTerm' iss (annee anned_a)
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
-answerToAnnedTerm' iss (mb_co, (rn, v)) = case mb_co of
-    Nothing       -> Value v'
-    Just (co, tg) -> Cast (annedTerm tg (Value v')) co
-  where v' = renameAnnedValue' iss rn v
+answerToAnnedTerm' iss (mb_co, (rn, v)) = maybe Value castValueToAnnedTerm' mb_co $ renameAnnedValue' iss rn v
+
+castValueToAnnedTerm' :: (Coercion, Tag) -> ValueF Anned -> TermF Anned
+castValueToAnnedTerm' (co, tg) v' = Cast (annedTerm tg (Value v')) co
 
 qaToAnnedTerm' :: InScopeSet -> QA -> TermF Anned
 qaToAnnedTerm' _   (Question x) = Var x

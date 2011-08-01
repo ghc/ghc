@@ -45,7 +45,7 @@ evaluatePrim iss tg pop tys args = do
     fro (CoreSyn.Cast e co)   = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
     fro (CoreSyn.Lit l)       = Just (Nothing, (emptyRenaming, Literal l))
     fro (CoreSyn.Coercion co) = Just (Nothing, (mkIdentityRenaming (tyCoVarsOfCo co), Coercion co))
-    fro e | CoreSyn.Var f <- e_fun, Just dc <- isDataConId_maybe f, [] <- e_args3 = Just (Nothing, (mkIdentityRenaming (unionVarSets (map tyVarsOfType tys) `extendVarSetList` xs), Data dc tys cos xs))
+    fro e | CoreSyn.Var f <- e_fun, Just dc <- isDataConId_maybe f, [] <- e_args3 = Just (Nothing, (renamedValue (Data dc tys cos xs)))
           | otherwise = Nothing
       where (e_fun, e_args0) = CoreSyn.collectArgs e
             (tys, e_args1) = takeWhileJust toType_maybe     e_args0
@@ -151,7 +151,7 @@ step' normalising state =
         return $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
             kf : _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                         k, in_e)
-            _                              -> (deeds, Heap (M.delete x' h)                                                                          ids, Tagged tg (Update x') : k, in_e)
+            _                              -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') : k, in_e)
 
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
@@ -213,7 +213,7 @@ step' normalising state =
             case mb_co of
               Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
                               claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
-              Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
+              Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
                                         claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
@@ -266,7 +266,7 @@ step' normalising state =
                                                                                         let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
                                                                                             (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
                                                                                             e_arg = annedTerm tg_co $ annedTerm tg_v uncast_e_arg' `Cast` dc_co
-                                                                                        in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (mkIdentityRenaming (annedTermFreeVars e_arg), e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
+                                                                                        in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (renamedTerm e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
                                                                                     (deeds2, h1, ids, rn_alts') (zip3 (map (Value . Coercion) cos' ++ map Var xs') (alt_qs ++ alt_xs) dc_cos)
                                                              return (deeds3, h', ids', (rn_alts', alt_e))]
                                            ]
@@ -281,8 +281,11 @@ step' normalising state =
           = Nothing
           where (mb_co_deref, (rn_v_deref, v_deref)) = dereference (Heap h0 ids) (mb_co_v, (rn_v, v))
                 mb_co_deref_kind = fmap (\(co, tg_co) -> (co, tg_co, coercionKind co)) mb_co_deref
-                (deeds1, h1) | isDeadBinder wild' = (deeds0 + annedValueSize' v, h0)
-                             | otherwise          = (deeds0, M.insert wild' (internallyBound (rn_v, annedTerm tg_v (Value v))) h0)
+                (deeds1, h1) | isDeadBinder wild' = (deeds0 + annedValueSize' v + maybe 0 (const 1) mb_co_v, h0)
+                             | otherwise          = (deeds0,                                                 M.insert wild' wild_hb h0)
+                               where wild_hb = case mb_co_v of
+                                                 Nothing      -> internallyBound (rn_v, annedTerm tg_v (Value v))
+                                                 Just co_tg_v -> internallyBound (renamedTerm $ annedTerm tg_v (castValueToAnnedTerm' co_tg_v (renameAnnedValue' ids rn_v v)))
                                -- NB: we add the *non-dereferenced* value to the heap for a case wildcard, because anything else may duplicate allocation
 
         primop :: Deeds -> Tag -> Heap -> Stack -> Tag -> PrimOp -> [Out Type] -> [Anned Answer] -> Answer -> [In AnnedTerm] -> Maybe UnnormalisedState
@@ -299,10 +302,10 @@ step' normalising state =
             []           -> Nothing
 
         strictLet :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> In AnnedTerm -> Maybe UnnormalisedState
-        strictLet deeds (Heap h ids) k tg_a a x' in_e2 = Just (deeds, Heap (M.insert x' (internallyBound (annedAnswerToAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, in_e2)
+        strictLet deeds (Heap h ids) k tg_a a x' in_e2 = Just (deeds, Heap (M.insert x' (internallyBound (annedAnswerToInAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, in_e2)
 
         cast :: Deeds -> Tag -> Heap -> Stack -> Answer -> Coercion -> Maybe UnnormalisedState
-        cast deeds tg_kf (Heap h ids) k (mb_co, in_v) co' = Just (deeds', Heap h ids, k, annedAnswerToAnnedTerm ids (annedAnswer tg_kf ans'))
+        cast deeds tg_kf (Heap h ids) k (mb_co, in_v) co' = Just (deeds', Heap h ids, k, annedAnswerToInAnnedTerm ids (annedAnswer tg_kf ans'))
           where (deeds', ans') = case mb_co of
                     Nothing           -> (deeds,     (Just (co',                tg_kf), in_v))
                     Just (co, _tg_co) -> (deeds + 1, (Just (co `mkTransCo` co', tg_kf), in_v))
@@ -312,4 +315,4 @@ step' normalising state =
             (deeds', prepared_in_v) <- case prepareAnswer deeds x' a of
                 Nothing                      -> pprTrace "update-deeds:" (pPrint x') Nothing
                 Just (deeds', prepared_in_v) -> Just (deeds', prepared_in_v)
-            return (deeds', Heap (M.insert x' (internallyBound (annedAnswerToAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, annedAnswerToAnnedTerm ids (annedAnswer tg_a prepared_in_v))
+            return (deeds', Heap (M.insert x' (internallyBound (annedAnswerToInAnnedTerm ids (annedAnswer tg_a a))) h) ids, k, annedAnswerToInAnnedTerm ids (annedAnswer tg_a prepared_in_v))
