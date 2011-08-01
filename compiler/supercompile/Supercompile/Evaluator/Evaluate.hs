@@ -155,17 +155,17 @@ step' normalising state =
 
     -- Deal with a value at the top of the stack
     unwind :: Deeds -> Heap -> Stack -> Tag -> Answer -> Maybe UnnormalisedState
-    unwind deeds h k tg_v in_v = uncons k >>= \(kf, k) -> case tagee kf of
-        TyApply ty'                    -> tyApply    (deeds + 1)          h k      in_v ty'
-        CoApply co'                    -> coApply    (deeds + 1)          h k      in_v co'
-        Apply x2'                      -> apply      deeds       (tag kf) h k      in_v x2'
-        Scrutinise x' ty' in_alts      -> scrutinise (deeds + 1)          h k tg_v in_v x' ty' in_alts
-        PrimApply pop tys' in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop tys' in_vs in_v in_es
-        StrictLet x' in_e2             -> strictLet  (deeds + 1)          h k tg_v in_v x' in_e2
-        CastIt co'                     -> cast       deeds       (tag kf) h k      in_v co'
+    unwind deeds h k tg_v a = uncons k >>= \(kf, k) -> case tagee kf of
+        TyApply ty'                    -> tyApply    (deeds + 1)          h k      a ty'
+        CoApply co'                    -> coApply    (deeds + 1)          h k      a co'
+        Apply x2'                      -> apply      deeds       (tag kf) h k      a x2'
+        Scrutinise x' ty' in_alts      -> scrutinise (deeds + 1)          h k tg_v a x' ty' in_alts
+        PrimApply pop tys' in_vs in_es -> primop     deeds       (tag kf) h k tg_v pop tys' in_vs a in_es
+        StrictLet x' in_e2             -> strictLet  (deeds + 1)          h k tg_v a x' in_e2
+        CastIt co'                     -> cast       deeds       (tag kf) h k      a co'
         Update x'
           | normalising, dUPLICATE_VALUES_EVALUATOR -> Nothing -- If duplicating values, we ensure normalisation by not executing updates
-          | otherwise                               -> update deeds h k tg_v x' in_v
+          | otherwise                               -> update deeds h k tg_v x' a
       where
         -- When derereferencing an indirection, it is important that the resulting value is not stored anywhere. The reasons are:
         --  1) That would cause allocation to be duplicated if we residualised immediately afterwards, because the value would still be in the heap
@@ -187,15 +187,15 @@ step' normalising state =
           | otherwise = Just (dereference h a)
     
         tyApply :: Deeds -> Heap -> Stack -> Answer -> Out Type -> Maybe UnnormalisedState
-        tyApply deeds h k in_v@(_, (_, v)) ty' = do
-            (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h in_v
+        tyApply deeds h k a@(_, (_, v)) ty' = do
+            (mb_co, (rn, TyLambda x e_body)) <- deferenceLambdaish h a
             fmap (\deeds -> (deeds, h, case mb_co of Nothing -> k; Just (co', tg_co) -> Tagged tg_co (CastIt (co' `mkInstCo` ty')) : k, (insertTypeSubst rn x ty', e_body))) $
-                 claimDeeds (deeds + annedValueSize' v) (annedSize e_body)
+                 claimDeeds (deeds + answerSize' a) (annedSize e_body)
 
         coApply :: Deeds -> Heap -> Stack -> Answer -> Out Coercion -> Maybe UnnormalisedState
-        coApply deeds h k in_v@(_, (_, v)) apply_co' = do
-            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h in_v
-            flip fmap (claimDeeds (deeds + annedValueSize' v) (annedSize e_body)) $ \deeds -> case mb_co of
+        coApply deeds h k a@(_, (_, v)) apply_co' = do
+            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish h a
+            flip fmap (claimDeeds (deeds + answerSize' a) (annedSize e_body)) $ \deeds -> case mb_co of
                 Nothing           -> (deeds, h, k,                                 (insertCoercionSubst rn x apply_co', e_body))
                 Just (co', tg_co) -> (deeds, h, Tagged tg_co (CastIt res_co') : k, (insertCoercionSubst rn x cast_apply_co', e_body))
                   where -- Implements the special case of beta-reduction of cast lambda where the argument is an explicit coercion value.
@@ -208,20 +208,20 @@ step' normalising state =
                         cast_apply_co' = arg_from_co' `mkTransCo` apply_co' `mkTransCo` mkSymCo arg_to_co'
 
         apply :: Deeds -> Tag -> Heap -> Stack -> Answer -> Out Var -> Maybe UnnormalisedState
-        apply deeds tg_v (Heap h ids) k in_v@(_, (_, v)) x' = do
-            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) in_v
+        apply deeds tg_v (Heap h ids) k a@(_, (_, v)) x' = do
+            (mb_co, (rn, Lambda x e_body)) <- deferenceLambdaish (Heap h ids) a
             case mb_co of
               Nothing -> fmap (\deeds -> (deeds, Heap h ids, k, (insertIdRenaming rn x x', e_body))) $
-                              claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_body)
+                              claimDeeds (deeds + 1 + answerSize' a) (annedSize e_body)
               Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
-                                        claimDeeds (deeds + 1 + annedValueSize' v) (annedSize e_arg + annedSize e_body)
+                                        claimDeeds (deeds + 1 + answerSize' a) (annedSize e_arg + annedSize e_body)
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
                       Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
                       [arg_co', res_co'] = decomposeCo 2 co'
                       e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` mkSymCo arg_co')
 
         scrutinise :: Deeds -> Heap -> Stack -> Tag -> Answer -> Out Var -> Out Type -> In [AnnedAlt] -> Maybe UnnormalisedState
-        scrutinise deeds0 (Heap h0 ids) k tg_v (mb_co_v, (rn_v, v)) wild' _ty' (rn_alts, alts)
+        scrutinise deeds0 (Heap h0 ids) k tg_v a@(mb_co_v, (rn_v, v)) wild' _ty' (rn_alts, alts)
            -- Literals are easy -- we can make the simplifying assumption that the types of literals are
            -- always simple TyCons without any universally quantified type variables.
           | Literal l <- v_deref
@@ -281,8 +281,8 @@ step' normalising state =
           = Nothing
           where (mb_co_deref, (rn_v_deref, v_deref)) = dereference (Heap h0 ids) (mb_co_v, (rn_v, v))
                 mb_co_deref_kind = fmap (\(co, tg_co) -> (co, tg_co, coercionKind co)) mb_co_deref
-                (deeds1, h1) | isDeadBinder wild' = (deeds0 + annedValueSize' v + maybe 0 (const 1) mb_co_v, h0)
-                             | otherwise          = (deeds0,                                                 M.insert wild' wild_hb h0)
+                (deeds1, h1) | isDeadBinder wild' = (deeds0 + answerSize' a, h0)
+                             | otherwise          = (deeds0,                M.insert wild' wild_hb h0)
                                where wild_hb = case mb_co_v of
                                                  Nothing      -> internallyBound (rn_v, annedTerm tg_v (Value v))
                                                  Just co_tg_v -> internallyBound (renamedTerm $ annedTerm tg_v (castValueToAnnedTerm' co_tg_v (renameAnnedValue' ids rn_v v)))
