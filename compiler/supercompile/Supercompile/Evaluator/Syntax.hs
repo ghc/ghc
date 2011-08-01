@@ -116,7 +116,7 @@ instance Outputable QA where
     pprPrec prec = pPrintPrec prec . qaToAnnedTerm' emptyInScopeSet
 
 annedAnswerToInAnnedTerm :: InScopeSet -> Anned Answer -> In AnnedTerm
-annedAnswerToInAnnedTerm iss anned_a = renamedTerm $ annedTerm (annedTag anned_a) $ answerToAnnedTerm' iss (annee anned_a)
+annedAnswerToInAnnedTerm iss = renamedTerm . fmap (answerToAnnedTerm' iss)
 
 answerToAnnedTerm' :: InScopeSet -> Answer -> TermF Anned
 answerToAnnedTerm' iss (mb_co, (rn, v)) = maybe Value castValueToAnnedTerm' mb_co $ renameAnnedValue' iss rn v
