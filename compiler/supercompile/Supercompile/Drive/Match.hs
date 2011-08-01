@@ -244,7 +244,7 @@ matchLet is_rec rhs_rn2 init_free_eqs xes_l xes_r
   = matchLoop [] init_free_eqs emptyVarSet emptyVarSet >>=
     trimBounds (mkVarSet (M.keys h_l)) (mkVarSet (M.keys h_r))
   where
-    markUsed x' e used = if isCheap (annee e) then used else used `extendVarSet` x'
+    markUsed x' e used = if termIsCheap e then used else used `extendVarSet` x'
     
     h_l = M.fromList xes_l
     h_r = M.fromList xes_r
@@ -295,7 +295,7 @@ matchPureHeap rn2 init_free_eqs h_l h_r
     -- We can account for staticness using the standard generalisation mechanism, and there is no need for the
     -- matcher to have hacks like that (though we still have to be careful about how we match phantoms).
     
-    markUsed x' (_, e) used = if isCheap (annee e) then used else used `extendVarSet` x'
+    markUsed x' (_, e) used = if termIsCheap e then used else used `extendVarSet` x'
     
     matchLoop known [] _ _ = return known
     matchLoop known ((x_l, x_r):free_eqs) used_l used_r

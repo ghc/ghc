@@ -694,7 +694,7 @@ splitt ctxt_ids (gen_kfs, gen_xs) deeds (Heap h ids, named_k, (scruts, bracketed
        -- We better not try to push down any bindings that would introduce work-duplication issues
       | InternallyBound <- howBound hb
       , Just (_, e) <- heapBindingTerm hb
-      = if isCheap (annee e)
+      = if termIsCheap e
         then hb {                                    howBound = howToBindCheap e } -- Use binding heuristics to determine how to refer to the cheap thing
         else hb { heapBindingMeaning = Left Nothing, howBound = LambdaBound }      -- GHC is unlikely to get any benefit from seeing the binding sites for non-cheap things
        -- Inline phantom/unfolding stuff verbatim: there is no work duplication issue (the caller would not have created the bindings unless they were safe-for-duplication)

@@ -11,14 +11,12 @@ import DataCon  (DataCon)
 import Var      (TyVar, Var, varName, isTyVar)
 import Name     (Name, nameOccName)
 import OccName  (occNameString)
-import Id       (Id, idType)
+import Id       (Id)
 import Literal  (Literal)
 import Type     (Type, mkTyVarTy)
-import Coercion (CoVar, Coercion, mkReflCo)
+import Coercion (CoVar, Coercion)
 import PrimOp   (PrimOp)
 import PprCore  ()
-
-import Data.Traversable (Traversable(traverse))
 
 
 data AltCon = DataAlt DataCon [TyVar] [CoVar] [Id] | LiteralAlt Literal | DefaultAlt
@@ -152,35 +150,24 @@ pPrintPrecApps :: (Outputable a, Outputable b) => Rational -> a -> [b] -> SDoc
 pPrintPrecApps prec e1 es2 = prettyParen (not (null es2) && prec >= appPrec) $ pPrintPrec opPrec e1 <+> hsep (map (pPrintPrec appPrec) es2)
 
 
-termToValue :: Traversable ann => ann (TermF ann) -> Maybe (ann (ValueF ann))
-termToValue anned_e = traverse termToValue' anned_e
-
-termToValue' :: TermF ann -> Maybe (ValueF ann)
-termToValue' (Value v) = Just v
-termToValue' _         = Nothing
-
+-- Find those things that are Values and cannot be further evaluated. Primarily used to prevent the
+-- speculator from re-speculating values, but also as an approximation for what GHC considers a value.
 termIsValue :: Copointed ann => ann (TermF ann) -> Bool
 termIsValue = isValue . extract
+  where
+    isValue (Value _)                         = True
+    isValue (Cast e _) | Value _ <- extract e = True
+    isValue _                                 = False
 
-isValue :: TermF ann -> Bool
-isValue (Value _) = True
-isValue _         = False
-
+-- Find those things that we are willing to duplicate.
 termIsCheap :: Copointed ann => ann (TermF ann) -> Bool
 termIsCheap = isCheap . extract
-
-isCheap :: Copointed ann => TermF ann -> Bool
-isCheap _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required...
-isCheap (Var _)         = True
-isCheap (Value _)       = True
-isCheap (Case e _ _ []) = isCheap (extract e) -- NB: important for pushing down let-bound applications of ``error''
-isCheap _               = False
-
-termToVar :: Copointed ann => ann (TermF ann) -> Maybe (Coercion, Var)
-termToVar e = case extract e of
-    Value (Indirect x) -> Just (mkReflCo (idType x), x)
-    Var x              -> Just (mkReflCo (idType x), x)
-    _                  -> Nothing -- FIXME: cast things as well
+  where
+    isCheap _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required...
+    isCheap (Var _)         = True
+    isCheap (Value _)       = True
+    isCheap (Case e _ _ []) = isCheap (extract e) -- NB: important for pushing down let-bound applications of ``error''
+    isCheap _               = False
 
 varString :: Var -> String
 varString = nameString . varName
