@@ -22,9 +22,7 @@ static int shademapindex = 0;
  */
 
 void
-ShadeFor(ident, shade)
-  char* ident; 
-  floatish shade;
+ShadeFor(char *ident, floatish shade)
 {
     if (! shademap) {
 	shademapmax = (nidents > TWENTY ? nidents : TWENTY) * 2;
@@ -51,8 +49,7 @@ ShadeFor(ident, shade)
 static floatish ThinkOfAShade PROTO((void));	/* forward */
 
 floatish
-ShadeOf(ident)
-  char* ident;
+ShadeOf(char *ident)
 {
     int i;
     floatish shade;
@@ -93,7 +90,7 @@ static floatish c_shades[ N_COLOUR_SHADES ] = {
 };
 
 static floatish
-ThinkOfAShade()
+ThinkOfAShade(void)
 {
     static int thisshade = -1;
 
@@ -104,9 +101,7 @@ ThinkOfAShade()
 }
 
 static floatish
-extract_colour(shade,factor)
-  floatish shade;
-  intish factor;
+extract_colour(floatish shade, intish factor)
 {
     intish i,j;
 
@@ -116,8 +111,7 @@ extract_colour(shade,factor)
 }
 
 void
-SetPSColour(shade)
-  floatish shade;
+SetPSColour(floatish shade)
 {
     if (cflag) {
 	fprintf(psfp, "%f %f %f setrgbcolor\n",

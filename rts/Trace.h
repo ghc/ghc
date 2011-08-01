@@ -512,7 +512,6 @@ INLINE_HEADER void traceSparkCounters(Capability *cap STG_UNUSED)
     if (RTS_UNLIKELY(TRACE_spark_sampled)) {
         traceSparkCounters_(cap, cap->spark_stats, sparkPoolSize(cap->sparks));
     }
-#endif
     dtraceSparkCounters((EventCapNo)cap->no,
                         cap->spark_stats.created,
                         cap->spark_stats.dud,
@@ -521,6 +520,7 @@ INLINE_HEADER void traceSparkCounters(Capability *cap STG_UNUSED)
                         cap->spark_stats.gcd,
                         cap->spark_stats.fizzled,
                         sparkPoolSize(cap->sparks));
+#endif
 }
 
 INLINE_HEADER void traceEventSparkCreate(Capability *cap STG_UNUSED)

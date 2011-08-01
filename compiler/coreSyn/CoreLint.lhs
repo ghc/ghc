@@ -936,7 +936,7 @@ checkBndrIdInScope binder id
      msg = ptext (sLit "is out of scope inside info for") <+> 
 	   ppr binder
 
-checkTyCoVarInScope :: TyCoVar -> LintM ()
+checkTyCoVarInScope :: Var -> LintM ()
 checkTyCoVarInScope v = checkInScope (ptext (sLit "is out of scope")) v
 
 checkInScope :: SDoc -> Var -> LintM ()

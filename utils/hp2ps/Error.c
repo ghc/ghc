@@ -37,8 +37,7 @@ Disaster(const char *fmt, ...)
 }
 
 void
-Usage(str)
-  const char *str;
+Usage(const char *str)
 {
    if (str) printf("error: %s\n", str);
    printf("usage: %s -b -d -ef -g -i -p -mn -p -s -tf -y [file[.hp]]\n", programname);

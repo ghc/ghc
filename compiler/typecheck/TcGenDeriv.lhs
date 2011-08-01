@@ -59,11 +59,9 @@ import MonadUtils
 import Outputable
 import FastString
 import Bag
-import Binary hiding (get,put)
 import Fingerprint
 import Constants
 
-import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        ( partition, intersperse )
 \end{code}
 
@@ -1197,11 +1195,8 @@ gen_Typeable_binds loc tycon
                                   HsString modl_fs,
                                   HsString name_fs])
 
-    Fingerprint high low = unsafePerformIO $ -- ugh
-             computeFingerprint (error "gen_typeable_binds")
-                                (unpackFS pkg_fs ++
-                                 unpackFS modl_fs ++
-                                 unpackFS name_fs)
+    hashThis = unwords $ map unpackFS [pkg_fs, modl_fs, name_fs]
+    Fingerprint high low = fingerprintString hashThis
 
     int64
       | wORD_SIZE == 4 = HsWord64Prim . fromIntegral

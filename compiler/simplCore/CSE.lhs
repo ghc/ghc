@@ -10,19 +10,33 @@ module CSE (
 
 #include "HsVersions.h"
 
+-- Note [Keep old CSEnv rep]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Temporarily retain code for the old representation for CSEnv
+-- Keeping it only so that we can switch back if a bug shows up
+-- or we want to do some performance comparisions
+--
+-- NB: when you remove this, also delete hashExpr from CoreUtils
+#ifdef OLD_CSENV_REP
+import CoreUtils        ( exprIsBig, hashExpr, eqExpr )
+import StaticFlags	( opt_PprStyle_Debug )
+import Util		( lengthExceeds )
+import UniqFM
+import FastString
+#else
+import TrieMap
+#endif
+
 import CoreSubst
 import Var		( Var )
 import Id		( Id, idType, idInlineActivation, zapIdOccInfo )
-import CoreUtils	( hashExpr, eqExpr, exprIsBig, mkAltExpr, exprIsCheap )
+import CoreUtils	( mkAltExpr
+                        , exprIsTrivial, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
 import CoreSyn
 import Outputable
-import StaticFlags	( opt_PprStyle_Debug )
 import BasicTypes	( isAlwaysActive )
-import Util		( lengthExceeds )
-import UniqFM
-import FastString
 
 import Data.List
 \end{code}
@@ -206,22 +220,21 @@ cseRhs env (id',rhs)
 		-- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
-tryForCSE _   (Type t) = Type t
-tryForCSE _   (Coercion c) = Coercion c
-tryForCSE env expr     = case lookupCSEnv env expr' of
-			    Just smaller_expr -> smaller_expr
- 			    Nothing  	      -> expr'
-		       where
-	 	         expr' = cseExpr env expr
+tryForCSE env expr
+  | exprIsTrivial expr'                   = expr'	-- No point
+  | Just smaller <- lookupCSEnv env expr' = smaller
+  | otherwise                             = expr'
+  where
+    expr' = cseExpr env expr
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
-cseExpr _   (Type t)               = Type t
-cseExpr _   (Coercion co)          = Coercion co
+cseExpr env (Type t)               = Type (substTy (csEnvSubst env) t)
+cseExpr env (Coercion c)           = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)		   = lookupSubst env v
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
-cseExpr env (Cast e co)            = Cast (cseExpr env e) co
+cseExpr env (Cast e co)            = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
@@ -300,28 +313,34 @@ type OutExpr  = CoreExpr	-- Post-cloning
 type OutBndr  = CoreBndr
 type OutAlt   = CoreAlt
 
-data CSEnv  = CS CSEMap Subst
+-- See Note [Keep old CsEnv rep]
+#ifdef OLD_CSENV_REP
+data CSEnv  = CS { cs_map    :: CSEMap
+                 , cs_subst  :: Subst }
+
 type CSEMap = UniqFM [(OutExpr, OutExpr)]	-- This is the reverse mapping
 	-- It maps the hash-code of an expression e to list of (e,e') pairs
 	-- This means that it's good to replace e by e'
 	-- INVARIANT: The expr in the range has already been CSE'd
 
 emptyCSEnv :: CSEnv
-emptyCSEnv = CS emptyUFM emptySubst
+emptyCSEnv = CS { cs_map = emptyUFM, cs_subst = emptySubst }
 
 lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
-lookupCSEnv (CS cs sub) expr
-  = case lookupUFM cs (hashExpr expr) of
-	Nothing -> Nothing
-	Just pairs -> lookup_list pairs
+lookupCSEnv (CS { cs_map = oldmap, cs_subst = sub}) expr
+  = case lookupUFM oldmap (hashExpr expr) of
+             	Nothing -> Nothing
+         	Just pairs -> lookup_list pairs
   where
+    in_scope = substInScope sub
+
   -- In this lookup we use full expression equality
   -- Reason: when expressions differ we generally find out quickly
   --         but I found that cheapEqExpr was saying (\x.x) /= (\y.y),
   -- 	     and this kind of thing happened in real programs
     lookup_list :: [(OutExpr,OutExpr)] -> Maybe OutExpr
     lookup_list ((e,e'):es) 
-      | eqExpr (substInScope sub) e expr = Just e'
+      | eqExpr in_scope e expr = Just e'
       | otherwise	                 = lookup_list es
     lookup_list []                       = Nothing
 
@@ -332,8 +351,8 @@ addCSEnvItem env expr expr' | exprIsBig expr = env
    -- (and are unlikely to be the same anyway)
 
 extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
-extendCSEnv (CS cs sub) expr expr'
-  = CS (addToUFM_C combine cs hash [(expr, expr')]) sub
+extendCSEnv cse@(CS { cs_map = oldmap }) expr expr'
+  = cse { cs_map = addToUFM_C combine oldmap hash [(expr, expr')] }
   where
     hash = hashExpr expr
     combine old new 
@@ -344,24 +363,55 @@ extendCSEnv (CS cs sub) expr expr'
 	  long_msg | opt_PprStyle_Debug = (text "hash code" <+> text (show hash)) $$ ppr result 
 		   | otherwise	        = empty
 
+#else
+------------ NEW ----------------
+
+data CSEnv  = CS { cs_map    :: CoreMap (OutExpr, OutExpr)   -- Key, value
+                 , cs_subst  :: Subst }
+
+emptyCSEnv :: CSEnv
+emptyCSEnv = CS { cs_map = emptyCoreMap, cs_subst = emptySubst }
+
+lookupCSEnv :: CSEnv -> OutExpr -> Maybe OutExpr
+lookupCSEnv (CS { cs_map = csmap }) expr 
+  = case lookupCoreMap csmap expr of
+      Just (_,e) -> Just e
+      Nothing    -> Nothing
+
+addCSEnvItem :: CSEnv -> OutExpr -> OutExpr -> CSEnv
+addCSEnvItem = extendCSEnv
+   -- We used to avoid trying to CSE big expressions, on the grounds
+   -- that they are expensive to compare.  But now we have CoreMaps
+   -- we can happily insert them and laziness will mean that the
+   -- insertions only get fully done if we look up in that part
+   -- of the trie. No need for a size test.
+
+extendCSEnv :: CSEnv -> OutExpr -> OutExpr -> CSEnv
+extendCSEnv cse expr expr'
+  = cse { cs_map = extendCoreMap (cs_map cse) expr (expr,expr') }
+#endif
+
+csEnvSubst :: CSEnv -> Subst
+csEnvSubst = cs_subst
+
 lookupSubst :: CSEnv -> Id -> OutExpr
-lookupSubst (CS _ sub) x = lookupIdSubst (text "CSE.lookupSubst") sub x
+lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst (text "CSE.lookupSubst") sub x
 
 extendCSSubst :: CSEnv -> Id  -> Id -> CSEnv
-extendCSSubst (CS cs sub) x y = CS cs (extendIdSubst sub x (Var y))
+extendCSSubst cse x y = cse { cs_subst = extendIdSubst (cs_subst cse) x (Var y) }
 
 addBinder :: CSEnv -> Var -> (CSEnv, Var)
-addBinder (CS cs sub) v = (CS cs sub', v') 
-                        where
-                          (sub', v') = substBndr sub v
+addBinder cse v = (cse { cs_subst = sub' }, v') 
+                where
+                  (sub', v') = substBndr (cs_subst cse) v
 
 addBinders :: CSEnv -> [Var] -> (CSEnv, [Var])
-addBinders (CS cs sub) vs = (CS cs sub', vs') 
-                          where
-                            (sub', vs') = substBndrs sub vs
+addBinders cse vs = (cse { cs_subst = sub' }, vs') 
+                where
+                  (sub', vs') = substBndrs (cs_subst cse) vs
 
 addRecBinders :: CSEnv -> [Id] -> (CSEnv, [Id])
-addRecBinders (CS cs sub) vs = (CS cs sub', vs') 
-                          where
-                            (sub', vs') = substRecBndrs sub vs
+addRecBinders cse vs = (cse { cs_subst = sub' }, vs') 
+                where
+                  (sub', vs') = substRecBndrs (cs_subst cse) vs
 \end{code}

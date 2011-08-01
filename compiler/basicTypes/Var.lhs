@@ -32,7 +32,7 @@
 
 module Var (
         -- * The main data type and synonyms
-        Var, TyVar, CoVar, TyCoVar, Id, DictId, DFunId, EvVar, EvId, IpId,
+        Var, TyVar, CoVar, Id, DictId, DFunId, EvVar, EvId, IpId,
 
 	-- ** Taking 'Var's apart
 	varName, varUnique, varType, 
@@ -103,7 +103,6 @@ type TyVar = Var
 type CoVar = Id		-- A coercion variable is simply an Id
 			-- variable of kind @ty1 ~ ty2@. Hence its
 			-- 'varType' is always @PredTy (EqPred t1 t2)@
-type TyCoVar = TyVar    -- Something that is a type OR coercion variable.
 \end{code}
 
 %************************************************************************

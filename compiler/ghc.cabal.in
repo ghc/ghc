@@ -259,6 +259,7 @@ Library
         CorePrep
         CoreSubst
         CoreSyn
+        TrieMap
         CoreTidy
         CoreUnfold
         CoreUtils

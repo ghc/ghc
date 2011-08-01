@@ -9,9 +9,10 @@
 -- ----------------------------------------------------------------------------
 
 module Fingerprint (
-        Fingerprint(..), fingerprint0, 
+        Fingerprint(..), fingerprint0,
         readHexFingerprint,
-        fingerprintData
+        fingerprintData,
+        fingerprintString
    ) where
 
 #include "md5.h"
@@ -28,8 +29,10 @@ import GHC.Fingerprint
 ##endif
 
 ##if __GLASGOW_HASKELL__ < 701
+import Data.Char
 import Foreign
 import Foreign.C
+import GHC.IO (unsafeDupablePerformIO)
 
 -- Using 128-bit MD5 fingerprints for now.
 
@@ -62,6 +65,19 @@ fingerprintData buf len = do
     allocaBytes 16 $ \pdigest -> do
       c_MD5Final pdigest pctxt
       peekFingerprint (castPtr pdigest)
+
+-- This is duplicated in libraries/base/GHC/Fingerprint.hs
+fingerprintString :: String -> Fingerprint
+fingerprintString str = unsafeDupablePerformIO $
+  withArrayLen word8s $ \len p ->
+     fingerprintData p len
+    where word8s = concatMap f str
+          f c = let w32 :: Word32
+                    w32 = fromIntegral (ord c)
+                in [fromIntegral (w32 `shiftR` 24),
+                    fromIntegral (w32 `shiftR` 16),
+                    fromIntegral (w32 `shiftR` 8),
+                    fromIntegral w32]
 
 data MD5Context
 

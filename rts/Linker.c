@@ -793,6 +793,7 @@ typedef struct _RtsSymbolVal {
       SymI_HasProto(getOrSetGHCConcWindowsProddingStore)                \
       SymI_HasProto(getOrSetSystemEventThreadEventManagerStore)         \
       SymI_HasProto(getOrSetSystemEventThreadIOManagerThreadStore)      \
+      SymI_HasProto(getGCStats)                         \
       SymI_HasProto(genSymZh)                           \
       SymI_HasProto(genericRaise)                       \
       SymI_HasProto(getProgArgv)                        \

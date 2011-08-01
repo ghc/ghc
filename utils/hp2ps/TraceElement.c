@@ -19,7 +19,7 @@
 
 extern floatish thresholdpercent;
 
-void TraceElement()
+void TraceElement(void)
 {
     intish i;
     intish j;

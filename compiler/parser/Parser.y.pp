@@ -1437,7 +1437,7 @@ texp :: { LHsExpr RdrName }
         -- Then when converting expr to pattern we unravel it again
 	-- Meanwhile, the renamer checks that real sections appear
 	-- inside parens.
-        | infixexp qop 	{ LL $ SectionL $1 $2 }
+        | infixexp qop 	      { LL $ SectionL $1 $2 }
 	| qopm infixexp       { LL $ SectionR $1 $2 }
 
        -- View patterns get parenthesized above

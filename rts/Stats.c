@@ -56,9 +56,12 @@ static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 #define PROF_VAL(x)   0
 #endif
 
-static lnat max_residency     = 0; // in words; for stats only
-static lnat avg_residency     = 0;
+// current = current as of last GC
+static lnat current_residency = 0; // in words; for stats only
+static lnat max_residency     = 0;
+static lnat cumulative_residency = 0;
 static lnat residency_samples = 0; // for stats only
+static lnat current_slop      = 0;
 static lnat max_slop          = 0;
 
 static lnat GC_end_faults = 0;
@@ -84,11 +87,17 @@ Ticks stat_getElapsedTime(void)
    ------------------------------------------------------------------------ */
 
 double
+mut_user_time_until( Ticks t )
+{
+    return TICK_TO_DBL(t - GC_tot_cpu - PROF_VAL(RP_tot_time));
+}
+
+double
 mut_user_time( void )
 {
     Ticks cpu;
     cpu = getProcessCPUTime();
-    return TICK_TO_DBL(cpu - GC_tot_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+    return mut_user_time_until(cpu);
 }
 
 #ifdef PROFILING
@@ -99,13 +108,13 @@ mut_user_time( void )
 double
 mut_user_time_during_RP( void )
 {
-  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(RP_start_time - GC_tot_cpu - RP_tot_time);
 }
 
 double
 mut_user_time_during_heap_census( void )
 {
-  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time - HC_tot_time);
+  return TICK_TO_DBL(HC_start_time - GC_tot_cpu - RP_tot_time);
 }
 #endif /* PROFILING */
 
@@ -145,7 +154,7 @@ initStats0(void)
 #endif
 
     max_residency = 0;
-    avg_residency = 0;
+    cumulative_residency = 0;
     residency_samples = 0;
     max_slop = 0;
 
@@ -361,8 +370,9 @@ stat_endGC (gc_thread *gct,
 	    if (live > max_residency) {
 		max_residency = live;
 	    }
+            current_residency = live;
 	    residency_samples++;
-	    avg_residency += live;
+	    cumulative_residency += live;
 	}
 
         if (slop > max_slop) max_slop = slop;
@@ -504,6 +514,9 @@ StgInt TOTAL_CALLS=1;
   statsPrintf("  (SLOW_CALLS_" #arity ") %% of (TOTAL_CALLS) : %.1f%%\n", \
 	      SLOW_CALLS_##arity * 100.0/TOTAL_CALLS)
 
+static inline Ticks get_init_cpu(void) { return end_init_cpu - start_init_cpu; }
+static inline Ticks get_init_elapsed(void) { return end_init_elapsed - start_init_elapsed; }
+
 void
 stat_exit(int alloc)
 {
@@ -547,8 +560,8 @@ stat_exit(int alloc)
             gc_elapsed += GC_coll_elapsed[i];
         }
 
-        init_cpu     = end_init_cpu - start_init_cpu;
-        init_elapsed = end_init_elapsed - start_init_elapsed;
+        init_cpu     = get_init_cpu();
+        init_elapsed = get_init_elapsed();
 
         exit_cpu     = end_exit_cpu - start_exit_cpu;
         exit_elapsed = end_exit_elapsed - start_exit_elapsed;
@@ -739,7 +752,7 @@ stat_exit(int alloc)
 	  statsPrintf(fmt2,
 		    total_collections,
 		    residency_samples == 0 ? 0 : 
-		        avg_residency*sizeof(W_)/residency_samples, 
+		        cumulative_residency*sizeof(W_)/residency_samples, 
 		    max_residency*sizeof(W_), 
 		    residency_samples,
 		    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
@@ -837,6 +850,70 @@ statDescribeGens(void)
 
 extern HsInt64 getAllocations( void ) 
 { return (HsInt64)GC_tot_alloc * sizeof(W_); }
+
+/* EZY: I'm not convinced I got all the casting right. */
+
+extern void getGCStats( GCStats *s )
+{
+    nat total_collections = 0;
+    nat g;
+    Ticks gc_cpu = 0;
+    Ticks gc_elapsed = 0;
+    Ticks current_elapsed = 0;
+    Ticks current_cpu = 0;
+
+    getProcessTimes(&current_cpu, &current_elapsed);
+
+    /* EZY: static inline'ify these */
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++)
+        total_collections += generations[g].collections;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        gc_cpu     += GC_coll_cpu[g];
+        gc_elapsed += GC_coll_elapsed[g];
+    }
+
+    s->bytes_allocated = GC_tot_alloc*(StgWord64)sizeof(W_);
+    s->num_gcs = total_collections;
+    s->num_byte_usage_samples = residency_samples;
+    s->max_bytes_used = max_residency*sizeof(W_);
+    s->cumulative_bytes_used = cumulative_residency*(StgWord64)sizeof(W_);
+    s->peak_megabytes_allocated = (StgWord64)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L));
+    s->bytes_copied = GC_tot_copied*(StgWord64)sizeof(W_);
+    s->max_bytes_slop = max_slop*(StgWord64)sizeof(W_);
+    s->current_bytes_used = current_residency*(StgWord64)sizeof(W_);
+    s->current_bytes_slop = current_slop*(StgWord64)sizeof(W_);
+    /*
+    s->init_cpu_seconds = TICK_TO_DBL(get_init_cpu());
+    s->init_wall_seconds = TICK_TO_DBL(get_init_elapsed());
+    */
+    s->mutator_cpu_seconds = TICK_TO_DBL(current_cpu - end_init_cpu - gc_cpu - PROF_VAL(RP_tot_time + HC_tot_time));
+    s->mutator_wall_seconds = TICK_TO_DBL(current_elapsed- end_init_elapsed - gc_elapsed);
+    s->gc_cpu_seconds = TICK_TO_DBL(gc_cpu);
+    s->gc_wall_seconds = TICK_TO_DBL(gc_elapsed);
+    s->par_avg_bytes_copied = GC_par_avg_copied*(StgWord64)sizeof(W_);
+    s->par_max_bytes_copied = GC_par_max_copied*(StgWord64)sizeof(W_);
+}
+// extern void getTaskStats( TaskStats **s ) {}
+#if 0
+extern void getSparkStats( SparkCounters *s ) {
+    nat i;
+    s->created = 0;
+    s->dud = 0;
+    s->overflowed = 0;
+    s->converted = 0;
+    s->gcd = 0;
+    s->fizzled = 0;
+    for (i = 0; i < n_capabilities; i++) {
+        s->created   += capabilities[i].spark_stats.created;
+        s->dud       += capabilities[i].spark_stats.dud;
+        s->overflowed+= capabilities[i].spark_stats.overflowed;
+        s->converted += capabilities[i].spark_stats.converted;
+        s->gcd       += capabilities[i].spark_stats.gcd;
+        s->fizzled   += capabilities[i].spark_stats.fizzled;
+    }
+}
+#endif
 
 /* -----------------------------------------------------------------------------
    Dumping stuff in the stats file, or via the debug message interface

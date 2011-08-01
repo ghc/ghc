@@ -173,6 +173,9 @@ instance Uniquable FastString where
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
+
+instance Uniquable n => Uniquable (IPName n) where
+  getUnique (IPName n) = getUnique n
 \end{code}
 
 

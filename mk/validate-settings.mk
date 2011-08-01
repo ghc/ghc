@@ -54,6 +54,11 @@ endif
 ######################################################################
 # Disable some warnings in packages we use
 
+# Cabal doesn't promise to be warning-free
+utils/ghc-cabal_dist_EXTRA_HC_OPTS += -w
+libraries/Cabal/cabal_dist-boot_EXTRA_HC_OPTS += -w
+libraries/Cabal/cabal_dist-install_EXTRA_HC_OPTS += -w
+
 # Temporarily turn off incomplete-pattern warnings for containers
 libraries/containers_dist-install_EXTRA_HC_OPTS += -fno-warn-incomplete-patterns
 

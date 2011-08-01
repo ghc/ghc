@@ -338,15 +338,18 @@ toIfaceKind = toIfaceType
 ---------------------
 toIfaceType :: Type -> IfaceType
 -- Synonyms are retained in the interface type
-toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyCoVar tv)
+toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
 toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (FunTy t1 t2)     = IfaceFunTy (toIfaceType t1) (toIfaceType t2)
 toIfaceType (TyConApp tc tys) = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTypes tys)
 toIfaceType (ForAllTy tv t)   = IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 toIfaceType (PredTy st)       = IfacePredTy (toIfacePred toIfaceType st)
 
-toIfaceTyCoVar :: TyCoVar -> FastString
-toIfaceTyCoVar = occNameFS . getOccName
+toIfaceTyVar :: TyVar -> FastString
+toIfaceTyVar = occNameFS . getOccName
+
+toIfaceCoVar :: CoVar -> FastString
+toIfaceCoVar = occNameFS . getOccName
 
 ----------------
 -- A little bit of (perhaps optional) trickiness here.  When
@@ -408,7 +411,7 @@ coToIfaceType (AppCo co1 co2)       = IfaceAppTy    (coToIfaceType co1)
                                                     (coToIfaceType co2)
 coToIfaceType (ForAllCo v co)       = IfaceForAllTy (toIfaceTvBndr v) 
                                                     (coToIfaceType co)
-coToIfaceType (CoVarCo cv)          = IfaceTyVar  (toIfaceTyCoVar cv)
+coToIfaceType (CoVarCo cv)          = IfaceTyVar  (toIfaceCoVar cv)
 coToIfaceType (AxiomInstCo con cos) = IfaceCoConApp (IfaceCoAx (coAxiomName con))
                                                     (map coToIfaceType cos)
 coToIfaceType (UnsafeCo ty1 ty2)    = IfaceCoConApp IfaceUnsafeCo 

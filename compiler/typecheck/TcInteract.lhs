@@ -35,10 +35,10 @@ import TcErrors
 import TcSMonad
 import Maybes( orElse )
 import Bag
-import qualified Data.Map as Map
 
 import Control.Monad( when )
-
+import Unique
+import UniqFM
 import FastString ( sLit ) 
 import DynFlags
 \end{code}
@@ -89,52 +89,51 @@ implication constraint (when in top-level inference mode).
 
 \begin{code}
 
-data CCanMap a = CCanMap { cts_given   :: Map.Map a CanonicalCts
+data CCanMap a = CCanMap { cts_given   :: UniqFM CanonicalCts
                                           -- Invariant: all Given
-                         , cts_derived :: Map.Map a CanonicalCts 
+                         , cts_derived :: UniqFM CanonicalCts 
                                           -- Invariant: all Derived
-                         , cts_wanted  :: Map.Map a CanonicalCts } 
+                         , cts_wanted  :: UniqFM CanonicalCts } 
                                           -- Invariant: all Wanted
 
-cCanMapToBag :: Ord a => CCanMap a -> CanonicalCts 
-cCanMapToBag cmap = Map.fold unionBags rest_wder (cts_given cmap)
-  where rest_wder = Map.fold unionBags rest_der  (cts_wanted cmap) 
-        rest_der  = Map.fold unionBags emptyCCan (cts_derived cmap)
+cCanMapToBag :: CCanMap a -> CanonicalCts 
+cCanMapToBag cmap = foldUFM unionBags rest_wder (cts_given cmap)
+  where rest_wder = foldUFM unionBags rest_der  (cts_wanted cmap) 
+        rest_der  = foldUFM unionBags emptyCCan (cts_derived cmap)
 
 emptyCCanMap :: CCanMap a 
-emptyCCanMap = CCanMap { cts_given = Map.empty
-                       , cts_derived = Map.empty, cts_wanted = Map.empty } 
+emptyCCanMap = CCanMap { cts_given = emptyUFM, cts_derived = emptyUFM, cts_wanted = emptyUFM } 
 
-updCCanMap:: Ord a => (a,CanonicalCt) -> CCanMap a -> CCanMap a 
+updCCanMap:: Uniquable a => (a,CanonicalCt) -> CCanMap a -> CCanMap a 
 updCCanMap (a,ct) cmap 
   = case cc_flavor ct of 
-      Wanted {} 
-          -> cmap { cts_wanted = Map.insertWith unionBags a this_ct (cts_wanted cmap) } 
-      Given {} 
-          -> cmap { cts_given = Map.insertWith unionBags a this_ct (cts_given cmap) }
-      Derived {}
-          -> cmap { cts_derived = Map.insertWith unionBags a this_ct (cts_derived cmap) }
-  where this_ct = singleCCan ct 
+      Wanted {}  -> cmap { cts_wanted  = insert_into (cts_wanted cmap)  } 
+      Given {}   -> cmap { cts_given   = insert_into (cts_given cmap)   }
+      Derived {} -> cmap { cts_derived = insert_into (cts_derived cmap) }
+  where 
+    insert_into m = addToUFM_C (flip unionBags) m a (singleCCan ct)
 
-getRelevantCts :: Ord a => a -> CCanMap a -> (CanonicalCts, CCanMap a) 
+getRelevantCts :: Uniquable a => a -> CCanMap a -> (CanonicalCts, CCanMap a) 
 -- Gets the relevant constraints and returns the rest of the CCanMap
 getRelevantCts a cmap 
-    = let relevant = unionManyBags [ Map.findWithDefault emptyCCan a (cts_wanted cmap)
-                                   , Map.findWithDefault emptyCCan a (cts_given cmap)
-                                   , Map.findWithDefault emptyCCan a (cts_derived cmap) ]
-          residual_map = cmap { cts_wanted = Map.delete a (cts_wanted cmap) 
-                              , cts_given = Map.delete a (cts_given cmap) 
-                              , cts_derived = Map.delete a (cts_derived cmap) }
+    = let relevant = lookup (cts_wanted cmap) `unionBags`
+                     lookup (cts_given cmap)  `unionBags`
+                     lookup (cts_derived cmap) 
+          residual_map = cmap { cts_wanted  = delFromUFM (cts_wanted cmap) a
+                              , cts_given   = delFromUFM (cts_given cmap) a
+                              , cts_derived = delFromUFM (cts_derived cmap) a }
       in (relevant, residual_map) 
+  where
+    lookup map = lookupUFM map a `orElse` emptyCCan
 
-extractUnsolvedCMap :: Ord a => CCanMap a -> (CanonicalCts, CCanMap a)
+extractUnsolvedCMap :: CCanMap a -> (CanonicalCts, CCanMap a)
 -- Gets the wanted or derived constraints and returns a residual
 -- CCanMap with only givens.
 extractUnsolvedCMap cmap =
-  let wntd = Map.fold unionBags emptyCCan (cts_wanted cmap)
-      derd = Map.fold unionBags emptyCCan (cts_derived cmap)
+  let wntd = foldUFM unionBags emptyCCan (cts_wanted cmap)
+      derd = foldUFM unionBags emptyCCan (cts_derived cmap)
   in (wntd `unionBags` derd, 
-           cmap { cts_wanted = Map.empty, cts_derived = Map.empty })
+      cmap { cts_wanted = emptyUFM, cts_derived = emptyUFM })
 
 
 -- See Note [InertSet invariants]
@@ -2111,8 +2110,8 @@ matchClassInst inerts clas tys loc
         }
    where 
      givens_for_this_clas :: CanonicalCts
-     givens_for_this_clas = Map.lookup clas (cts_given (inert_dicts inerts))
-                            `orElse` emptyBag
+     givens_for_this_clas = lookupUFM (cts_given (inert_dicts inerts)) clas 
+                            `orElse` emptyCCan
 
      given_overlap :: TcsUntouchables -> Bool
      given_overlap untch = anyBag (matchable untch) givens_for_this_clas

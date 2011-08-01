@@ -20,7 +20,7 @@ static void ShadeCurve
     PROTO((floatish *x, floatish *y, floatish *py, floatish shade));
 
 void
-Curves()
+Curves(void)
 {
     intish i;
 
@@ -35,8 +35,7 @@ Curves()
  */
 
 static void
-Curve(e)
-  struct entry* e;
+Curve(struct entry *e)
 {
     struct chunk* ch;
     int j;
@@ -61,8 +60,7 @@ static void SaveCurve PROTO((floatish *, floatish *)); /* forward */
  */
  
 floatish
-xpage(x)
-  floatish x;
+xpage(floatish x)
 {
     return (x + graphx0); 
 }
@@ -74,8 +72,7 @@ xpage(x)
  */
  
 floatish
-ypage(y)
-  floatish y;
+ypage(floatish y)
 {
     return (y + graphy0); 
 }
@@ -87,8 +84,7 @@ ypage(y)
  */
 
 static void
-ShadeCurve(x, y, py, shade)
-  floatish *x; floatish *y; floatish *py; floatish shade;
+ShadeCurve(floatish *x, floatish *y, floatish *py, floatish shade)
 {
     fprintf(psfp, "%f %f moveto\n", xpage(x[0]), ypage(py[0]));
     PlotCurveLeftToRight(x, py);
@@ -111,8 +107,7 @@ ShadeCurve(x, y, py, shade)
 }
 
 static void
-PlotCurveLeftToRight(x,y)
-  floatish *x; floatish *y;
+PlotCurveLeftToRight(floatish *x, floatish *y)
 {
     intish i;
 
@@ -122,8 +117,7 @@ PlotCurveLeftToRight(x,y)
 }
 
 static void
-PlotCurveRightToLeft(x,y)
-  floatish *x; floatish *y;
+PlotCurveRightToLeft(floatish *x, floatish *y)
 {
     intish i;
 
@@ -137,8 +131,7 @@ PlotCurveRightToLeft(x,y)
  */
 
 static void
-SaveCurve(y, py)
-  floatish *y; floatish* py;
+SaveCurve(floatish *y, floatish *py)
 {
     intish i;
 
@@ -150,7 +143,7 @@ SaveCurve(y, py)
 extern floatish xrange;
 
 void
-CurvesInit()
+CurvesInit(void)
 {
     intish i;
 

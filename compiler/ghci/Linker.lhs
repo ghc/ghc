@@ -16,7 +16,10 @@ module Linker ( HValue, getHValue, showLinkerState,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs, 
 		linkPackages,initDynLinker,linkModule,
-                dataConInfoPtrToName, lessUnsafeCoerce
+                dataConInfoPtrToName, lessUnsafeCoerce,
+
+		-- Saving/restoring globals
+		PersistentLinkerState, saveLinkerGlobals, restoreLinkerGlobals
 	) where
 
 #include "HsVersions.h"
@@ -86,13 +89,22 @@ import Exception
 The persistent linker state *must* match the actual state of the 
 C dynamic linker at all times, so we keep it in a private global variable.
 
+The global IORef used for PersistentLinkerState actually contains another MVar.
+The reason for this is that we want to allow another loaded copy of the GHC
+library to side-effect the PLS and for those changes to be reflected here.
 
 The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
 
 \begin{code}
-GLOBAL_MVAR(v_PersistentLinkerState, panic "Dynamic linker not initialised", PersistentLinkerState)
+GLOBAL_VAR_M(v_PersistentLinkerState, newMVar (panic "Dynamic linker not initialised"), MVar PersistentLinkerState)
 GLOBAL_VAR(v_InitLinkerDone, False, Bool)	-- Set True when dynamic linker is initialised
+
+modifyPLS_ :: (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
+modifyPLS_ f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ f
+
+modifyPLS :: (PersistentLinkerState -> IO (PersistentLinkerState, a)) -> IO a
+modifyPLS f = readIORef v_PersistentLinkerState >>= flip modifyMVar f
 
 data PersistentLinkerState
    = PersistentLinkerState {
@@ -138,19 +150,19 @@ emptyPLS _ = PersistentLinkerState {
 \begin{code}
 extendLoadedPkgs :: [PackageId] -> IO ()
 extendLoadedPkgs pkgs =
-  modifyMVar_ v_PersistentLinkerState $ \s ->
+  modifyPLS_ $ \s ->
       return s{ pkgs_loaded = pkgs ++ pkgs_loaded s }
 
 extendLinkEnv :: [(Name,HValue)] -> IO ()
 -- Automatically discards shadowed bindings
 extendLinkEnv new_bindings =
-  modifyMVar_ v_PersistentLinkerState $ \pls ->
+  modifyPLS_ $ \pls ->
     let new_closure_env = extendClosureEnv (closure_env pls) new_bindings
     in return pls{ closure_env = new_closure_env }
 
 deleteFromLinkEnv :: [Name] -> IO ()
 deleteFromLinkEnv to_remove =
-  modifyMVar_ v_PersistentLinkerState $ \pls ->
+  modifyPLS_ $ \pls ->
     let new_closure_env = delListFromNameEnv (closure_env pls) to_remove
     in return pls{ closure_env = new_closure_env }
 
@@ -267,7 +279,7 @@ dataConInfoPtrToName x = do
 getHValue :: HscEnv -> Name -> IO HValue
 getHValue hsc_env name = do
   initDynLinker (hsc_dflags hsc_env)
-  pls <- modifyMVar v_PersistentLinkerState $ \pls -> do
+  pls <- modifyPLS $ \pls -> do
            if (isExternalName name) then do
              (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [nameModule name]
              if (failed ok) then ghcError (ProgramError "")
@@ -313,7 +325,7 @@ withExtendedLinkEnv new_env action
         -- package), so the reset action only removes the names we
         -- added earlier.
           reset_old_env = liftIO $ do
-            modifyMVar_ v_PersistentLinkerState $ \pls ->
+            modifyPLS_ $ \pls ->
                 let cur = closure_env pls
                     new = delListFromNameEnv cur (map fst new_env)
                 in return pls{ closure_env = new }
@@ -337,7 +349,7 @@ filterNameMap mods env
 -- | Display the persistent linker state.
 showLinkerState :: IO ()
 showLinkerState
-  = do pls <- readMVar v_PersistentLinkerState
+  = do pls <- readIORef v_PersistentLinkerState >>= readMVar 
        printDump (vcat [text "----- Linker state -----",
 			text "Pkgs:" <+> ppr (pkgs_loaded pls),
 			text "Objs:" <+> ppr (objs_loaded pls),
@@ -374,7 +386,7 @@ showLinkerState
 --
 initDynLinker :: DynFlags -> IO ()
 initDynLinker dflags =
-  modifyMVar_ v_PersistentLinkerState $ \pls0 -> do
+  modifyPLS_ $ \pls0 -> do
     done <- readIORef v_InitLinkerDone
     if done then return pls0
             else do writeIORef v_InitLinkerDone True
@@ -512,7 +524,7 @@ linkExpr hsc_env span root_ul_bco
    ; initDynLinker dflags
 
         -- Take lock for the actual work.
-   ; modifyMVar v_PersistentLinkerState $ \pls0 -> do {
+   ; modifyPLS $ \pls0 -> do {
 
 	-- Link the packages and modules required
    ; (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
@@ -711,10 +723,10 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
 linkModule :: HscEnv -> Module -> IO ()
 linkModule hsc_env mod = do
   initDynLinker (hsc_dflags hsc_env)
-  modifyMVar v_PersistentLinkerState $ \pls -> do
+  modifyPLS_ $ \pls -> do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
     if (failed ok) then ghcError (ProgramError "could not link module")
-      else return (pls',())
+      else return pls'
 
 -- | Coerce a value as usual, but:
 --
@@ -921,7 +933,7 @@ unload dflags linkables
 	initDynLinker dflags
 
 	new_pls
-            <- modifyMVar v_PersistentLinkerState $ \pls -> do
+            <- modifyPLS $ \pls -> do
 	         pls1 <- unload_wkr dflags linkables pls
                  return (pls1, pls1)
 
@@ -1034,7 +1046,7 @@ linkPackages dflags new_pkgs = do
   -- It's probably not safe to try to load packages concurrently, so we take
   -- a lock.
   initDynLinker dflags
-  modifyMVar_ v_PersistentLinkerState $ \pls -> do
+  modifyPLS_ $ \pls -> do
     linkPackages' dflags new_pkgs pls
 
 linkPackages' :: DynFlags -> [PackageId] -> PersistentLinkerState
@@ -1247,4 +1259,20 @@ maybePutStr dflags s | verbosity dflags > 0 = putStr s
 maybePutStrLn :: DynFlags -> String -> IO ()
 maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
 		       | otherwise	      = return ()
+\end{code}
+
+%************************************************************************
+%*									*
+	Tunneling global variables into new instance of GHC library
+%*									*
+%************************************************************************
+
+\begin{code}
+saveLinkerGlobals :: IO (MVar PersistentLinkerState, Bool)
+saveLinkerGlobals = liftM2 (,) (readIORef v_PersistentLinkerState) (readIORef v_InitLinkerDone)
+
+restoreLinkerGlobals :: (MVar PersistentLinkerState, Bool) -> IO ()
+restoreLinkerGlobals (pls, ild) = do
+    writeIORef v_PersistentLinkerState pls
+    writeIORef v_InitLinkerDone ild
 \end{code}

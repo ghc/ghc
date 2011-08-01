@@ -35,6 +35,9 @@ module CoreMonad (
     liftIO, liftIOWithCount,
     liftIO1, liftIO2, liftIO3, liftIO4,
     
+    -- ** Global initialization
+    reinitializeGlobals,
+    
     -- ** Dealing with annotations
     getAnnotations, getFirstAnnotations,
     
@@ -96,8 +99,16 @@ import Control.Monad
 import Prelude hiding   ( read )
 
 #ifdef GHCI
+import Control.Concurrent.MVar (MVar)
+import Linker ( PersistentLinkerState, saveLinkerGlobals, restoreLinkerGlobals )
 import {-# SOURCE #-} TcSplice ( lookupThName_maybe )
 import qualified Language.Haskell.TH as TH
+#else
+saveLinkerGlobals :: IO ()
+saveLinkerGlobals = return ()
+
+restoreLinkerGlobals :: () -> IO ()
+restoreLinkerGlobals () = return ()
 #endif
 \end{code}
 
@@ -224,7 +235,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoSpecConstr
-  | CoreDoGlomBinds
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
                                            -- matching this string
@@ -261,7 +271,6 @@ coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 coreDumpFlag CoreDoPrintCore         = Nothing
 coreDumpFlag (CoreDoRuleCheck {})    = Nothing
 coreDumpFlag CoreDoNothing           = Nothing
-coreDumpFlag CoreDoGlomBinds         = Nothing
 coreDumpFlag (CoreDoPasses {})       = Nothing
 
 instance Outputable CoreToDo where
@@ -282,7 +291,6 @@ instance Outputable CoreToDo where
   ppr CorePrep 		       = ptext (sLit "CorePrep")
   ppr CoreDoPrintCore          = ptext (sLit "Print core")
   ppr (CoreDoRuleCheck {})     = ptext (sLit "Rule check")
-  ppr CoreDoGlomBinds          = ptext (sLit "Glom binds")
   ppr CoreDoNothing            = ptext (sLit "CoreDoNothing")
   ppr (CoreDoPasses {})        = ptext (sLit "CoreDoPasses")
 
@@ -691,7 +699,13 @@ newtype CoreState = CoreState {
 data CoreReader = CoreReader {
         cr_hsc_env :: HscEnv,
         cr_rule_base :: RuleBase,
-        cr_module :: Module
+        cr_module :: Module,
+        cr_globals :: ((Bool, [String], [Way]),
+#ifdef GHCI
+                       (MVar PersistentLinkerState, Bool))
+#else
+                       ())
+#endif
 }
 
 data CoreWriter = CoreWriter {
@@ -749,13 +763,15 @@ runCoreM :: HscEnv
          -> Module
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base us mod m =
-        liftM extract $ runIOEnv reader $ unCoreM m state
+runCoreM hsc_env rule_base us mod m = do
+        glbls <- liftM2 (,) saveStaticFlagGlobals saveLinkerGlobals
+        liftM extract $ runIOEnv (reader glbls) $ unCoreM m state
   where
-    reader = CoreReader {
+    reader glbls = CoreReader {
             cr_hsc_env = hsc_env,
             cr_rule_base = rule_base,
-            cr_module = mod
+            cr_module = mod,
+            cr_globals = glbls
         }
     state = CoreState { 
             cs_uniq_supply = us
@@ -844,6 +860,49 @@ getOrigNameCache = do
     liftIO $ fmap nsNames $ readIORef nameCacheRef
 \end{code}
 
+%************************************************************************
+%*									*
+             Initializing globals
+%*									*
+%************************************************************************
+
+This is a rather annoying function. When a plugin is loaded, it currently
+gets linked against a *newly loaded* copy of the GHC package. This would
+not be a problem, except that the new copy has its own mutable state
+that is not shared with that state that has already been initialized by
+the original GHC package.
+
+This leads to loaded plugins calling GHC code which pokes the static flags,
+and then dying with a panic because the static flags *it* sees are uninitialized.
+
+There are two possible solutions:
+  1. Export the symbols from the GHC executable from the GHC library and link
+     against this existing copy rather than a new copy of the GHC library
+  2. Carefully ensure that the global state in the two copies of the GHC
+     library matches
+
+I tried 1. and it *almost* works (and speeds up plugin load times!) except
+on Windows. On Windows the GHC library tends to export more than 65536 symbols
+(see #5292) which overflows the limit of what we can export from the EXE and
+causes breakage.
+
+(Note that if the GHC exeecutable was dynamically linked this wouldn't be a problem,
+because we could share the GHC library it links to.)
+
+We are going to try 2. instead. Unfortunately, this means that every plugin
+will have to say `reinitializeGlobals` before it does anything, but never mind.
+
+I've threaded the cr_globals through CoreM rather than giving them as an
+argument to the plugin function so that we can turn this function into
+(return ()) without breaking any plugins when we eventually get 1. working.
+
+\begin{code}
+reinitializeGlobals :: CoreM ()
+reinitializeGlobals = do
+    (sf_globals, linker_globals) <- read cr_globals
+    liftIO $ restoreStaticFlagGlobals sf_globals
+    liftIO $ restoreLinkerGlobals linker_globals
+\end{code}
 
 %************************************************************************
 %*									*
