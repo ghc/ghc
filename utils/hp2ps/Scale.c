@@ -18,7 +18,7 @@
  */
 
 floatish
-MaxCombinedHeight()
+MaxCombinedHeight(void)
 {
     intish i;
     intish j;
@@ -64,7 +64,7 @@ extern floatish xrange;
 extern floatish yrange;
 
 void
-Scale()
+Scale(void)
 {
     intish i;
     intish j;

@@ -20,9 +20,7 @@ static int ordermapindex = 0;
 
 
 void
-OrderFor(ident, order)
-  char* ident; 
-  int order;
+OrderFor(char *ident, int order)
 {
     if (! ordermap) {
 	ordermapmax = (nidents > TWENTY ? nidents : TWENTY) * 2;
@@ -46,8 +44,7 @@ OrderFor(ident, order)
  */
 
 int
-OrderOf(ident)
-  char* ident;
+OrderOf(char *ident)
 {
     int i;
 
@@ -65,7 +62,7 @@ OrderOf(ident)
  */
 
 void
-Reorder()
+Reorder(void)
 {
     intish i;
     intish j;

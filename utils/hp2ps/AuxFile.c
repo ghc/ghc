@@ -15,8 +15,7 @@ static void GetAuxLine PROTO((FILE *));	/* forward */
 static void GetAuxTok  PROTO((FILE *));	/* forward */
 
 void
-GetAuxFile(auxfp)
-  FILE* auxfp;
+GetAuxFile(FILE *auxfp)
 {
     ch = ' ';
     endfile = 0;
@@ -39,8 +38,7 @@ GetAuxFile(auxfp)
  */
 
 static void
-GetAuxLine(auxfp)
-  FILE* auxfp;
+GetAuxLine(FILE *auxfp)
 {
     switch (thetok) {
     case X_RANGE_TOK:
@@ -108,8 +106,7 @@ GetAuxLine(auxfp)
  * 	in the case of identifiers it is assigned to "theident".
  */
  
-static void GetAuxTok(auxfp)
-FILE* auxfp;
+static void GetAuxTok(FILE *auxfp)
 {
 
     while (isspace(ch)) {               /* skip whitespace */
@@ -147,8 +144,7 @@ FILE* auxfp;
 }
 
 void
-PutAuxFile(auxfp)
-  FILE* auxfp;
+PutAuxFile(FILE *auxfp)
 {
     int i;
 

@@ -15,6 +15,6 @@
  */
  
 void
-OnExitHook ()
+OnExitHook (void)
 {
 }

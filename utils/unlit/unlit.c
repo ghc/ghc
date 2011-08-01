@@ -121,8 +121,7 @@ void myputc(char c, FILE *ostream)
 
 /* As getc, but does TAB expansion */
 int
-egetc(istream)
-FILE *istream;
+egetc(FILE *istream)
 {
     static int spleft = 0;
     static int linepos = 0;
@@ -170,8 +169,7 @@ FILE *istream;
  * stream.
  */
 
-line readline(istream,ostream)
-FILE *istream, *ostream; {
+line readline(FILE *istream, FILE *ostream) {
     int c, c1;
     char buf[100];
     int i;

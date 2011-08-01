@@ -19,7 +19,7 @@
  */
 
 void
-TopTwenty()
+TopTwenty(void)
 {
     intish i;
     intish j;

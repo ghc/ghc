@@ -63,9 +63,7 @@ intish nidents;
 floatish THRESHOLD_PERCENT = DEFAULT_THRESHOLD;
 int TWENTY = DEFAULT_TWENTY;
 
-int main(argc, argv)
-int argc;
-char* argv[];
+int main(int argc, char *argv[])
 {
 
     programname = copystring(Basename(argv[0]));
@@ -195,8 +193,7 @@ typedef enum {POINTS, INCHES, MILLIMETRES} pim;
 static pim Units PROTO((char *));   /* forward */
 
 static floatish
-WidthInPoints(wstr)
-  char *wstr;
+WidthInPoints(char *wstr)
 {
     floatish result;
 
@@ -221,8 +218,7 @@ WidthInPoints(wstr)
 
 	
 static pim
-Units(wstr)
-  char* wstr;
+Units(char *wstr)
 {
 int i;
 
@@ -240,8 +236,7 @@ int i;
 }
 
 static FILE *
-Fp(rootname, filename, suffix, mode)
-  char* rootname; char** filename; char* suffix; char* mode;
+Fp(char *rootname, char **filename, char *suffix, char *mode)
 {
     *filename = copystring2(rootname, suffix);
 

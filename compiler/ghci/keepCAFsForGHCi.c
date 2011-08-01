@@ -7,9 +7,9 @@
 // files.
 
 #ifdef DYNAMIC
-static void keepCAFsForGHCi() __attribute__((constructor));
+static void keepCAFsForGHCi(void) __attribute__((constructor));
 
-static void keepCAFsForGHCi()
+static void keepCAFsForGHCi(void)
 {
     keepCAFs = 1;
 }

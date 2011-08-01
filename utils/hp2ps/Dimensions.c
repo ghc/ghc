@@ -31,7 +31,7 @@ floatish graphwidth;
 static floatish KeyWidth PROTO((void)); /* forward */
 
 void
-Dimensions()
+Dimensions(void)
 {
     boolish keyOnGraph;
 
@@ -63,7 +63,7 @@ Dimensions()
  */
 
 static floatish
-KeyWidth()
+KeyWidth(void)
 {
     intish i;
     floatish c;
@@ -193,8 +193,7 @@ floatish fonttab[] = {
 #define FUDGE (2.834646 * 0.6)
 
 floatish
-StringSize(s)
-  char* s;
+StringSize(char *s)
 {
     floatish r;
 
