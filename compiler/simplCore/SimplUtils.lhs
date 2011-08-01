@@ -791,8 +791,9 @@ Inlining them won't make the program run faster!
 
 Note [Do not inline CoVars unconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Coercion variables appear inside coercions, and have a separate
-substitution, so don't inline them via the IdSubst!
+Coercion variables appear inside coercions, and the RHS of a let-binding
+is a term (not a coercion) so we can't necessarily inline the latter in
+the former.
 
 \begin{code}
 preInlineUnconditionally :: SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
