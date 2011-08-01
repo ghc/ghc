@@ -515,18 +515,19 @@ addStats :: SCStats -> ScpM ()
 addStats scstats = ScpM $ \_e s k -> k () (let scstats' = stats s `mappend` scstats in scstats' `seqSCStats` s { stats = scstats' })
 
 
-type RollbackScpM = (State, State) -> ScpM (Deeds, Out FVedTerm)
+type RollbackScpM = Generaliser -> ScpM (Deeds, Out FVedTerm)
 
 sc  :: History (State, RollbackScpM) -> AlreadySpeculated -> State -> ScpM (Deeds, Out FVedTerm)
 sc' :: History (State, RollbackScpM) -> AlreadySpeculated -> State -> ScpM (Deeds, Out FVedTerm)
 sc  hist = rollbackBig (memo (sc' hist))
-sc' hist speculated state = (\raise -> check raise) `catchScpM` \(old_state, state) -> stop old_state state hist -- TODO: I want to use the original history here, but I think doing so leads to non-term as it contains rollbacks from "below us" (try DigitsOfE2)
+sc' hist speculated state = (\raise -> check raise) `catchScpM` \gen -> stop gen state hist -- TODO: I want to use the original history here, but I think doing so leads to non-term as it contains rollbacks from "below us" (try DigitsOfE2)
   where
     check this_rb = case terminate hist (state, this_rb) of
                       Continue hist' -> continue hist'
-                      Stop (old_state, rb) -> maybe (stop old_state state hist) ($ (old_state, state)) $ guard sC_ROLLBACK >> Just rb
-    stop old_state state hist = do addStats $ mempty { stat_sc_stops = 1 }
-                                   maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise (mK_GENERALISER old_state state) state) (sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
+                      Stop (shallower_state, rb) -> maybe (stop gen state hist) ($ gen) $ guard sC_ROLLBACK >> Just rb
+                        where gen = mK_GENERALISER shallower_state state
+    stop gen state hist = do addStats $ mempty { stat_sc_stops = 1 }
+                             maybe (trace "sc-stop: no generalisation" $ split state) (trace "sc-stop: generalisation") (generalise gen state) (sc hist speculated) -- Keep the trace exactly here or it gets floated out by GHC
     continue hist = do traceRenderScpM "reduce end (continue)" (PrettyDoc (pPrintFullState state'))
                        addStats stats
                        split state' (sc hist speculated')
