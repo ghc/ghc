@@ -15,12 +15,12 @@ import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
 import Name       (localiseName)
 import Var        (Var, isTyVar, varName, setVarName)
-import Id         (Id, mkSysLocal, mkSysLocalM, realIdUnfolding, idInlinePragma, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
+import Id         (Id, mkSysLocal, idType, mkSysLocalM, realIdUnfolding, idInlinePragma, isPrimOpId_maybe, isDataConWorkId_maybe, setIdNotExported, isExportedId)
 import MkId       (mkPrimOpId)
 import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
 import PrimOp     (primOpSig)
-import Type       (mkTyVarTy)
+import Type       (mkTyVarTy, isUnLiftedType)
 
 import Control.Monad
 import qualified Data.Map as M
@@ -95,7 +95,12 @@ bindFloats :: ParseM S.Term -> ParseM S.Term
 bindFloats = bindFloatsWith . fmap ((,) [])
 
 bindFloatsWith :: ParseM ([(Var, S.Term)], S.Term) -> ParseM S.Term
-bindFloatsWith act = ParseM $ \s -> case unParseM act s of (s, floats, (xes, e)) -> (s, [], S.letRecSmart (xes ++ floats) e)
+bindFloatsWith act = ParseM $ \s -> case unParseM act s of (s, floats, (xes, e)) -> (s, [], S.bindManyMixedLiftedness S.termFreeVars (xes ++ floats) e)
+
+bindUnliftedFloats :: ParseM S.Term -> ParseM S.Term
+bindUnliftedFloats act = ParseM $ \s -> case unParseM act s of (s, floats, e) -> if any (isUnLiftedType . idType . fst) floats
+                                                                                 then (s, [], S.bindManyMixedLiftedness S.termFreeVars floats e)
+                                                                                 else (s, floats, e)
 
 appE :: S.Term -> S.Term -> ParseM S.Term
 appE e1 e2
@@ -105,16 +110,16 @@ appE e1 e2
 
 
 coreExprToTerm :: CoreExpr -> S.Term
-coreExprToTerm = uncurry S.letRecSmart . runParseM . term
+coreExprToTerm = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM . term
   where
     -- PrimOp and Data are dealt with later on by generating appropriate unfoldings
     term (Var x)                   = return $ S.var x
     term (Lit l)                   = return $ S.value (S.Literal l)
     term (App e_fun (Type ty_arg)) = fmap (flip S.tyApp ty_arg) (term e_fun)
-    term (App e_fun e_arg)         = join $ liftM2 appE (term e_fun) (term e_arg)
+    term (App e_fun e_arg)         = join $ liftM2 appE (term e_fun) (maybeUnLiftedTerm (exprType e_arg) e_arg)
     term (Lam x e) | isTyVar x     = fmap (S.value . S.TyLambda x) (bindFloats (term e))
                    | otherwise     = fmap (S.value . S.Lambda x) (bindFloats (term e))
-    term (Let (NonRec x e1) e2)    = liftM2 (S.let_ x) (term e1) (bindFloats (term e2))
+    term (Let (NonRec x e1) e2)    = liftM2 (S.let_ x) (maybeUnLiftedTerm (idType x) e1) (bindFloats (term e2))
     term (Let (Rec xes) e)         = bindFloatsWith (liftM2 (,) (mapM (secondM term) xes) (term e))
     term (Case e x ty alts)        = liftM2 (\e alts -> S.case_ e x ty alts) (term e) (mapM alt alts)
     term (Cast e co)               = fmap (flip S.cast co) (term e)
@@ -122,6 +127,13 @@ coreExprToTerm = uncurry S.letRecSmart . runParseM . term
     term (Type ty)                 = pprPanic "termToCoreExpr" (ppr ty)
     term (Coercion co)             = return $ S.value (S.Coercion co)
     
+    -- We can float unlifted bindings out of an unlifted argument/let
+    -- because they were certain to be evaluated anyway. Otherwise we have
+    -- to residualise all the floats if any of them were unlifted.
+    maybeUnLiftedTerm ty e
+      | isUnLiftedType ty = term e
+      | otherwise         = bindUnliftedFloats (term e)
+
     alt (DEFAULT,    [], e) = fmap ((,) S.DefaultAlt)            $ bindFloats (term e)
     alt (LitAlt l,   [], e) = fmap ((,) (S.LiteralAlt l))        $ bindFloats (term e)
     alt (DataAlt dc, xs, e) = fmap ((,) (S.DataAlt dc as qs zs)) $ bindFloats (term e)

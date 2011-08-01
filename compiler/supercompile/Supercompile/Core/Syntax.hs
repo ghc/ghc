@@ -263,10 +263,6 @@ tyVarIdApps = foldl tyVarIdApp
   where tyVarIdApp e x | isTyVar x = tyApp e (mkTyVarTy x)
                        | otherwise = app   e x
 
-letRecSmart :: Symantics ann => [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
-letRecSmart []  = id
-letRecSmart xes = letRec xes
-
 {-
 strictLet :: Symantics ann => Var -> ann (TermF ann) -> ann (TermF ann) -> ann (TermF ann)
 strictLet x e1 e2 = case_ e1 [(DefaultAlt (Just x), e2)]

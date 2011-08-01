@@ -15,7 +15,7 @@ import Supercompile.Utilities
 
 import Id       (Id, idType)
 import PrimOp   (primOpType)
-import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType)
+import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType, isUnLiftedType)
 import Pair     (pSnd)
 import DataCon  (dataConWorkId)
 import Literal  (literalType)
@@ -329,3 +329,23 @@ releaseUnnormalisedStateDeed (deeds, Heap h _, k, (_, e)) = releaseStackDeeds (r
 
 releaseStateDeed :: State -> Deeds
 releaseStateDeed (deeds, Heap h _, k, a) = releaseStackDeeds (releasePureHeapDeeds (deeds + annedSize a) h) k
+
+
+-- Unlifted bindings are irritating. They mean that the PureHeap has an implicit order that we need to carefully
+-- preserve when we turn it back into a term: unlifted bindings must be bound by a "let".
+--
+-- An alternative to this would be to record the binding struture in the PureHeap itself, but that would get pretty
+-- fiddly (in particuar, update frames would need to hold a "cursor" saying where in the PureHeap to update upon
+-- completion). It's probably better to take the complexity hit here and now.
+bindManyMixedLiftedness :: Symantics ann => (ann (TermF ann) -> FreeVars) -> [(Var, ann (TermF ann))] -> ann (TermF ann) -> ann (TermF ann)
+bindManyMixedLiftedness get_fvs = go
+  where go []  = id
+        go xes = case takeFirst (\(x, _) -> isUnLiftedType (idType x)) xes of
+            Nothing                 -> letRec xes
+            Just ((x, e), rest_xes) -> go xes_above . let_ x e . go xes_below
+              where (xes_above, xes_below) = partition_one (get_fvs e) rest_xes
+
+        partition_one bvs_below xes | bvs_below' == bvs_below = (xes_above, xes_below)
+                                    | otherwise               = second (xes_below ++) $ partition_one bvs_below' xes_above
+          where (xes_below, xes_above) = partition (\(x, _) -> x `elemVarSet` bvs_below) xes
+                bvs_below' = bvs_below `unionVarSet` mkVarSet (map fst xes_below)

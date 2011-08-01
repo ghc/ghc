@@ -480,7 +480,7 @@ instance Monad ScpM where
     (!mx) >>= fxmy = ScpM $ \e s k -> unScpM mx e s (\x s -> unScpM (fxmy x) e s k)
 
 runScpM :: ScpM (Out FVedTerm) -> (SCStats, Out FVedTerm)
-runScpM me = unScpM me init_e init_s (\e' s -> (stats s, letRecSmart (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (fulfilments s)) e'))
+runScpM me = unScpM me init_e init_s (\e' s -> (stats s, bindManyMixedLiftedness fvedTermFreeVars (fulfilmentsToBinds $ fst $ partitionFulfilments fulfilmentReferredTo unionVarSets (fvedTermFreeVars e') (fulfilments s)) e'))
   where
     init_e = ScpEnv { promises = [], fulfilmentStack = [], depth = 0 }
     init_s = ScpState { names = h_names, fulfilments = [], stats = mempty }

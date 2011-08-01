@@ -27,7 +27,7 @@ residualiseTerm :: InScopeSet -> In AnnedTerm -> Out FVedTerm
 residualiseTerm ids = detagAnnedTerm . renameIn (renameAnnedTerm ids)
 
 residualiseHeap :: Heap -> (InScopeSet -> ((Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)]), Out FVedTerm)) -> (Out [(Var, PrettyFunction)], Out FVedTerm)
-residualiseHeap (Heap h ids) resid_body = (floats_static_h ++ floats_static_k, letRecSmart (floats_nonstatic_h ++ floats_nonstatic_k) e)
+residualiseHeap (Heap h ids) resid_body = (floats_static_h ++ floats_static_k, bindManyMixedLiftedness fvedTermFreeVars (floats_nonstatic_h ++ floats_nonstatic_k) e)
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
         ((floats_static_k, floats_nonstatic_k), e) = resid_body ids
 

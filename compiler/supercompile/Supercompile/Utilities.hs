@@ -409,6 +409,13 @@ bagContexts xs = [(x, is ++ ts) | (is, x, ts) <- listContexts xs]
 dropLastWhile :: (a -> Bool) -> [a] -> [a]
 dropLastWhile p = reverse . dropWhile p . reverse
 
+takeFirst :: (a -> Bool) -> [a] -> Maybe (a, [a])
+takeFirst f = go []
+  where go _   []     = Nothing
+        go acc (x:xs) = if f x
+                        then Just (x, reverse acc ++ xs)
+                        else go (x:acc) xs
+
 takeWhileJust :: (a -> Maybe b) -> [a] -> ([b], [a])
 takeWhileJust f = go
   where

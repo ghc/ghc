@@ -409,7 +409,7 @@ optimiseBracketed :: MonadStatics m
                   -> (Deeds, Bracketed State)
                   -> m (Deeds, Out FVedTerm)
 optimiseBracketed opt (deeds, b) = liftM (second (rebuild b)) $ optimiseMany optimise_one (deeds, extraBvs b `zip` fillers b)
-  where optimise_one (deeds, (extra_bvs, (s_deeds, s_heap, s_k, s_e))) = liftM (\(xes, (deeds, e)) -> (deeds, letRecSmart xes e)) $ bindCapturedFloats (mkVarSet extra_bvs) $ opt (deeds + s_deeds, s_heap, s_k, s_e)
+  where optimise_one (deeds, (extra_bvs, (s_deeds, s_heap, s_k, s_e))) = liftM (\(xes, (deeds, e)) -> (deeds, bindManyMixedLiftedness fvedTermFreeVars xes e)) $ bindCapturedFloats (mkVarSet extra_bvs) $ opt (deeds + s_deeds, s_heap, s_k, s_e)
         -- Because h-functions might potentially refer to the lambda/case-alt bound variables around this hole,
         -- we use bindCapturedFloats to residualise such bindings within exactly this context.
         -- See Note [When to bind captured floats]
@@ -474,7 +474,7 @@ optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
     
         -- 3) Combine the residualised let bindings with the let body
         return (sumMap (releaseBracketedDeeds releaseStateDeed) bracketeds_deeded_heap + leftover_deeds,
-                letRecSmart xes e_focus)
+                bindManyMixedLiftedness fvedTermFreeVars xes e_focus)
   where
     -- TODO: clean up this incomprehensible loop
     -- TODO: investigate the possibility of just fusing in the optimiseLetBinds loop with this one
