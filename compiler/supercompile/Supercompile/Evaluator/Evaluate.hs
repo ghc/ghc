@@ -121,10 +121,11 @@ step' normalising state =
                   -> Answer  -- ^ Bound value, which we have *exactly* 1 deed for already that is not recorded in the Deeds itself
                   -> Maybe (Deeds, Answer) -- Outgoing deeds have that 1 latent deed included in them, and we have claimed deeds for the outgoing value
     prepareAnswer deeds x' a
-      | dUPLICATE_VALUES_EVALUATOR = fmap (flip (,) a) $ claimDeeds (deeds + 1) (answerSize' a)
+      | dUPLICATE_VALUES_EVALUATOR      = fmap (flip (,) a) $ claimDeeds (deeds + 1) (answerSize' a)
        -- Avoid creating indirections to indirections: implements indirection compression
-      | (_, (_, Indirect _)) <- a  = return (deeds, a)
-      | otherwise                  = return (deeds, (Nothing, (mkIdentityRenaming (unitVarSet x'), Indirect x')))
+       -- FIXME: for cast things as well?
+      | (Nothing, (_, Indirect _)) <- a = return (deeds, a)
+      | otherwise                       = return (deeds, (Nothing, (mkIdentityRenaming (unitVarSet x'), Indirect x')))
 
     -- We have not yet claimed deeds for the result of this function
     lookupAnswer :: Heap -> Out Var -> Maybe (Anned Answer)
@@ -150,6 +151,7 @@ step' normalising state =
         in_e <- heapBindingTerm hb
         return $ case k of
              -- Avoid creating consecutive update frames: implements "stack squeezing"
+             -- FIXME: squeeze through casts as well?
             kf : _ | Update y' <- tagee kf -> (deeds, Heap (M.insert x' (internallyBound (mkIdentityRenaming (unitVarSet y'), annedTerm (tag kf) (Var y'))) h) ids,                         k, in_e)
             _                              -> (deeds, Heap (M.delete x' h)                                                                                     ids, Tagged tg (Update x') : k, in_e)
 
