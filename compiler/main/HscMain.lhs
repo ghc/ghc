@@ -943,8 +943,11 @@ checkSafeImports dflags hsc_env tcg_env
                                                         (modulePackageId m)
 
         -- Is a module trusted? Return Nothing if True, or a String
-        -- if it isn't, containing the reason it isn't
-        isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc)
+        -- if it isn't, containing the reason it isn't. Also return
+        -- if the module trustworthy (true) or safe (false) so we know
+        -- if we should check if the package itself is trusted in the
+        -- future.
+        isModSafe :: Module -> SrcSpan -> Hsc (Maybe SDoc, Bool)
         isModSafe m l = do
             iface <- lookup' m
             case iface of
@@ -962,11 +965,12 @@ checkSafeImports dflags hsc_env tcg_env
                         -- check package is trusted
                         safeP = packageTrusted trust trust_own_pkg m
                     if safeM && safeP
-                        then return Nothing
-                        else return $ Just $ if safeM
-                            then text "The package (" <> ppr (modulePackageId m) <>
-                                 text ") the module resides in isn't trusted."
-                            else text "The module itself isn't safe."
+                        then return (Nothing, trust == Sf_Trustworthy)
+                        else let err = Just $ if safeM
+                                    then text "The package (" <> ppr (modulePackageId m) <>
+                                         text ") the module resides in isn't trusted."
+                                    else text "The module itself isn't safe."
+                              in return (err, False)
 
         -- Here we check the transitive package trust requirements are OK still.
         checkPkgTrust :: [PackageId] -> Hsc ()
@@ -987,14 +991,15 @@ checkSafeImports dflags hsc_env tcg_env
         checkSafe :: (Module, SrcSpan, IsSafeImport) -> Hsc (Maybe PackageId)
         checkSafe (_, _, False) = return Nothing
         checkSafe (m, l, True ) = do
-            module_safe <- isModSafe m l
+            (module_safe, tw) <- isModSafe m l
             case module_safe of
-                Nothing -> return pkg
+                Nothing -> return $ pkg tw
                 Just s  -> liftIO $ throwIO $ mkSrcErr $ unitBag $ mkPlainErrMsg l
                             $ ppr m <+> text "can't be safely imported!"
                                 <+> s
-            where pkg | isHomePkg m = Nothing
-                      | otherwise   = Just (modulePackageId m)
+            where pkg False = Nothing
+                  pkg True | isHomePkg m = Nothing
+                           | otherwise   = Just (modulePackageId m)
                             
 --------------------------------------------------------------
 -- Simplifiers
