@@ -23,6 +23,7 @@ import Id        (idUnique)
 import Type      (mkTyVarTy)
 import Coercion  (mkCoVarCo)
 import PrelNames (undefinedName)
+import Util      (zipWithEqual, zipWith3Equal, zipWith4Equal)
 import Unique    (Uniquable)
 import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
 import VarEnv
@@ -358,9 +359,9 @@ zipBracketeds :: ([Out FVedTerm] -> Out FVedTerm)
               -> [Bracketed a]
               -> Bracketed a
 zipBracketeds a b c d bracketeds = Bracketed {
-      rebuild  = \es' -> let ess' = splitManyBy xss es' in a (zipWith rebuild bracketeds ess'),
-      extraFvs = b (zipWith nonRecBindersFreeVars c (map extraFvs bracketeds)),
-      extraBvs = concat (zipWith (\c -> map (c++)) c (map extraBvs bracketeds)),
+      rebuild  = \es' -> let ess' = splitManyBy xss es' in a (zipWithEqual "zipBracketeds:rebuild" rebuild bracketeds ess'),
+      extraFvs = b (zipWithEqual "zipBracketeds:extraFvs" nonRecBindersFreeVars c (map extraFvs bracketeds)),
+      extraBvs = concat (zipWithEqual "zipBracketeds:extraBvs" (\c -> map (c++)) c (map extraBvs bracketeds)),
       fillers  = concat xss,
       tails    = d $ snd $ foldl (\(i, tailss) bracketed -> (i + length (fillers bracketed), tailss ++ [fmap (map (+ i)) (tails bracketed)])) (0, []) bracketeds
     }
@@ -368,7 +369,7 @@ zipBracketeds a b c d bracketeds = Bracketed {
 
 bracketedFreeVars :: (a -> FreeVars) -> Bracketed a -> FreeVars
 bracketedFreeVars fvs bracketed = extraFvs bracketed `unionVarSet` transfer (map fvs (fillers bracketed))
-  where transfer fvss = unionVarSets (zipWith nonRecBindersFreeVars (extraBvs bracketed) fvss)
+  where transfer fvss = unionVarSets (zipWithEqual "bracketedFreeVars" nonRecBindersFreeVars (extraBvs bracketed) fvss)
 
 releaseBracketedDeeds :: (a -> Deeds) -> Bracketed a -> Deeds
 releaseBracketedDeeds release b = sumMap release (fillers b)
@@ -454,8 +455,8 @@ optimiseSplit opt deeds bracketeds_heap bracketed_focus = do
           | Proportional <- dEEDS_POLICY = transformWholeList (apportion deeds) (1 : bracketSizes bracketed_focus) (map bracketSizes bracketeds_heap_elts)
           | otherwise                    = (deeds : [0 | _ <- bracketSizes bracketed_focus], [[0 | _ <- bracketSizes b] | b <- bracketeds_heap_elts])
         
-        bracketeds_deeded_heap = M.fromList (heap_xs `zip` zipWith (\deeds_heap -> modifyFillers (zipWith addStateDeeds deeds_heap)) deedss_heap bracketeds_heap_elts)
-        bracketed_deeded_focus = modifyFillers (zipWith addStateDeeds deeds_focus) bracketed_focus
+        bracketeds_deeded_heap = M.fromList (heap_xs `zip` zipWithEqual "optimiseSplit:heap" (\deeds_heap -> modifyFillers (zipWith addStateDeeds deeds_heap)) deedss_heap bracketeds_heap_elts)
+        bracketed_deeded_focus = modifyFillers (zipWithEqual "optimisedSplit:focus" addStateDeeds deeds_focus) bracketed_focus
     
     MASSERT2(noChange (sumMap (releaseBracketedDeeds releaseStateDeed) bracketeds_heap        + releaseBracketedDeeds releaseStateDeed bracketed_focus        + deeds)
                       (sumMap (releaseBracketedDeeds releaseStateDeed) bracketeds_deeded_heap + releaseBracketedDeeds releaseStateDeed bracketed_deeded_focus + deeds_initial),
@@ -955,9 +956,9 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith4 (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- alt_bvs] `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- (x':scruts); return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
+            alt_hs = zipWith4Equal "alt_hs" (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- alt_bvs] `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- (x':scruts); return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
-            bracketed_alts = zipWith3 (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
+            bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` fvs_body) [[], [x']] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
       where ctxt_id = uniqFromSupply ctxt_ids
     PrimApply pop tys' in_vs in_es -> zipBracketeds (primOp pop tys') unionVarSets (repeat []) (\_ -> Nothing) (bracketed_vs ++ bracketed_hole : bracketed_es)
