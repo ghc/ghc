@@ -217,19 +217,19 @@ __hscore_memcpy_src_off( char *dst, char *src, int src_off, size_t sz )
 { return memcpy(dst, src+src_off, sz); }
 
 INLINE HsInt
-__hscore_bufsiz()
+__hscore_bufsiz(void)
 {
   return BUFSIZ;
 }
 
 INLINE int
-__hscore_seek_cur()
+__hscore_seek_cur(void)
 {
   return SEEK_CUR;
 }
 
 INLINE int
-__hscore_o_binary()
+__hscore_o_binary(void)
 {
 #if defined(_MSC_VER)
   return O_BINARY;
@@ -239,7 +239,7 @@ __hscore_o_binary()
 }
 
 INLINE int
-__hscore_o_rdonly()
+__hscore_o_rdonly(void)
 {
 #ifdef O_RDONLY
   return O_RDONLY;
@@ -656,12 +656,12 @@ INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
 // You should not access _environ directly on Darwin in a bundle/shared library.
 // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
 #include <crt_externs.h>
-INLINE char **__hscore_environ() { return *(_NSGetEnviron()); }
+INLINE char **__hscore_environ(void) { return *(_NSGetEnviron()); }
 #else
 /* ToDo: write a feature test that doesn't assume 'environ' to
  *    be in scope at link-time. */
 extern char** environ;
-INLINE char **__hscore_environ() { return environ; }
+INLINE char **__hscore_environ(void) { return environ; }
 #endif
 
 /* lossless conversions between pointers and integral types */

@@ -143,7 +143,10 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     significand x       =  encodeFloat m (negate (floatDigits x))
                            where (m,_) = decodeFloat x
 
-    scaleFloat k x      =  encodeFloat m (n + clamp b k)
+    scaleFloat 0 x      =  x
+    scaleFloat k x
+      | isFix           =  x
+      | otherwise       =  encodeFloat m (n + clamp b k)
                            where (m,n) = decodeFloat x
                                  (l,h) = floatRange x
                                  d     = floatDigits x
@@ -156,6 +159,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
                                  -- for smaller than l - d.
                                  -- Add a little extra to keep clear
                                  -- from the boundary cases.
+                                 isFix = x == 0 || isNaN x || isInfinite x
 
     atan2 y x
       | x > 0            =  atan (y/x)
@@ -313,9 +317,13 @@ instance  RealFloat Float  where
     significand x       = case decodeFloat x of
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
-    scaleFloat k x      = case decodeFloat x of
+    scaleFloat 0 x      = x
+    scaleFloat k x
+      | isFix           = x
+      | otherwise       = case decodeFloat x of
                             (m,n) -> encodeFloat m (n + clamp bf k)
                         where bf = FLT_MAX_EXP - (FLT_MIN_EXP) + 4*FLT_MANT_DIG
+                              isFix = x == 0 || isFloatFinite x == 0
 
     isNaN x          = 0 /= isFloatNaN x
     isInfinite x     = 0 /= isFloatInfinite x
@@ -464,9 +472,13 @@ instance  RealFloat Double  where
     significand x       = case decodeFloat x of
                             (m,_) -> encodeFloat m (negate (floatDigits x))
 
-    scaleFloat k x      = case decodeFloat x of
+    scaleFloat 0 x      = x
+    scaleFloat k x
+      | isFix           = x
+      | otherwise       = case decodeFloat x of
                             (m,n) -> encodeFloat m (n + clamp bd k)
                         where bd = DBL_MAX_EXP - (DBL_MIN_EXP) + 4*DBL_MANT_DIG
+                              isFix = x == 0 || isDoubleFinite x == 0
 
     isNaN x             = 0 /= isDoubleNaN x
     isInfinite x        = 0 /= isDoubleInfinite x
@@ -1046,12 +1058,13 @@ foreign import ccall unsafe "isFloatNaN" isFloatNaN :: Float -> Int
 foreign import ccall unsafe "isFloatInfinite" isFloatInfinite :: Float -> Int
 foreign import ccall unsafe "isFloatDenormalized" isFloatDenormalized :: Float -> Int
 foreign import ccall unsafe "isFloatNegativeZero" isFloatNegativeZero :: Float -> Int
-
+foreign import ccall unsafe "isFloatFinite" isFloatFinite :: Float -> Int
 
 foreign import ccall unsafe "isDoubleNaN" isDoubleNaN :: Double -> Int
 foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
 foreign import ccall unsafe "isDoubleDenormalized" isDoubleDenormalized :: Double -> Int
 foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Double -> Int
+foreign import ccall unsafe "isDoubleFinite" isDoubleFinite :: Double -> Int
 \end{code}
 
 %*********************************************************
