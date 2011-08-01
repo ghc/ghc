@@ -87,7 +87,7 @@ type TaggedValue = ValueF Tagged
 data ValueF ann = Indirect Id -- NB: for the avoidance of doubt, these cannot be CoVars
                 | Literal Literal | Coercion Coercion
                 | TyLambda TyVar (ann (TermF ann)) | Lambda Id (ann (TermF ann)) -- NB: might bind a CoVar
-                | Data DataCon [Type] [Coercion] [Id]
+                | Data DataCon [Type] [Coercion] [Id] -- NB: includes universal and existential type arguments, in that order
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of

@@ -19,10 +19,9 @@ import Supercompile.StaticFlags
 import Supercompile.Utilities hiding (tails)
 
 import Var       (varType)
-import Id        (idUnique)
-import Type      (mkTyVarTy)
-import Coercion  (mkCoVarCo)
+import Id        (idUnique, idType)
 import PrelNames (undefinedName)
+import Type      (splitTyConApp_maybe)
 import Util      (zipWithEqual, zipWith3Equal, zipWith4Equal)
 import Unique    (Uniquable)
 import UniqSet   (UniqSet, mkUniqSet, uniqSetToList, elementOfUniqSet)
@@ -956,7 +955,12 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             -- ===>
             --  case x of C -> let unk = C; z = C in ...
             alt_in_es = alt_rns `zip` alt_es
-            alt_hs = zipWith4Equal "alt_hs" (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- alt_bvs] `M.union` M.fromList (do { Just scrut_v <- [altConToValue alt_con]; scrut_e <- [annedTerm alt_tg (Value scrut_v)]; scrut <- (x':scruts); return (scrut, HB (howToBindCheap scrut_e) (Right (alt_rn, scrut_e))) })) alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
+            alt_hs = zipWith4Equal "alt_hs" (\alt_rn alt_con alt_bvs alt_tg -> M.fromList [(x, lambdaBound) | x <- alt_bvs] `M.union`
+                                                                               M.fromList (do Just scrut_v <- [altConToValue (idType x') (alt_rn, alt_con)]
+                                                                                              let in_scrut_e@(_, scrut_e) = renamedTerm (annedTerm alt_tg (Value scrut_v))
+                                                                                              scrut <- (x':scruts)
+                                                                                              return (scrut, HB (howToBindCheap scrut_e) (Right in_scrut_e)) ))
+                                            alt_rns alt_cons alt_bvss (map annedTag alt_es) -- NB: don't need to grab deeds for these just yet, due to the funny contract for transitiveInline
             alt_bvss = map altConBoundVars alt_cons'
             bracketed_alts = zipWith3Equal "bracketed_alts" (\alt_h alt_ids alt_in_e -> oneBracketed (Once ctxt_id, (0, Heap alt_h alt_ids, [], alt_in_e))) alt_hs alt_idss alt_in_es
     StrictLet x' in_e -> zipBracketeds (\[e_hole, e_body] -> let_ x' e_hole e_body) (\[fvs_hole, fvs_body] -> fvs_hole `unionVarSet` fvs_body) [[], [x']] (\[_tails_hole, tails_body] -> tails_body) [bracketed_hole, oneBracketed (Once ctxt_id, (0, Heap (M.singleton x' lambdaBound) ids, [], in_e))]
@@ -969,10 +973,12 @@ splitStackFrame ctxt_ids ids kf scruts bracketed_hole
             bracketed_vs = map (splitAnswer ids . annee) in_vs
             bracketed_es  = zipWith (\ctxt_id in_e -> oneBracketed (Once ctxt_id, (0, Heap M.empty ids, [], in_e))) ctxt_idss in_es)
   where
-    altConToValue :: AltCon -> Maybe (ValueF ann)
-    altConToValue (DataAlt dc as qs xs) = Just $ Data dc (map mkTyVarTy as) (map mkCoVarCo qs) xs
-    altConToValue (LiteralAlt l)        = Just $ Literal l
-    altConToValue DefaultAlt            = Nothing
+    altConToValue :: Type -> In AltCon -> Maybe (ValueF ann)
+    altConToValue ty' (rn, DataAlt dc as qs xs) = do
+        (_, univ_tys') <- splitTyConApp_maybe ty'
+        Just (Data dc (univ_tys' ++ map (lookupTyVarSubst rn) as) (map (lookupCoVarSubst rn) qs) (map (renameId rn) xs))
+    altConToValue _  (_,  LiteralAlt l) = Just (Literal l)
+    altConToValue _  (_,  DefaultAlt)   = Nothing
 
 -- I'm making use of a clever trick: after splitting an update frame for x, instead of continuing to split the stack with a
 -- noneBracketed for x in the focus, I split the stack with a oneBracketed for it in the focus.

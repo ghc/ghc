@@ -11,7 +11,7 @@ import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
 import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo)
-import DataCon    (dataConWorkId, dataConUnivTyVars, dataConExTyVars, dataConRepArgTys)
+import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
 import VarSet
 import Name       (localiseName)
 import Var        (Var, isTyVar, varName, setVarName)
@@ -237,9 +237,8 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys
     
-    dataUnfolding dc = S.tyLambdas univ_as $ S.tyLambdas ex_as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy ex_as) (map mkCoVarCo qs) ys)
-      where univ_as = dataConUnivTyVars dc
-            ex_as   = dataConExTyVars dc
+    dataUnfolding dc = S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) (map mkCoVarCo qs) ys)
+      where as = dataConAllTyVars dc
             arg_tys = dataConRepArgTys dc
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys
             (qs, ys) = span isCoVar xs
