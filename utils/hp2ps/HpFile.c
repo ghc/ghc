@@ -66,8 +66,7 @@ floatish *markmap;		/* sample marks		*/
  */
 
 void
-GetHpFile(infp)
-  FILE *infp;
+GetHpFile(FILE *infp)
 {
     nsamples = 0;
     nmarks   = 0;
@@ -117,8 +116,7 @@ GetHpFile(infp)
  */
 
 static void
-GetHpLine(infp)
-  FILE* infp;
+GetHpLine(FILE *infp)
 {
     static intish nmarkmax = 0, nsamplemax = 0;
 
@@ -246,8 +244,7 @@ GetHpLine(infp)
 
 
 char *
-TokenToString(t)
-  token t;
+TokenToString(token t)
 {
    switch (t) {
 	case EOF_TOK:		return "EOF";
@@ -280,8 +277,7 @@ TokenToString(t)
  */
 
 static void
-GetHpTok(infp)
-  FILE* infp;
+GetHpTok(FILE *infp)
 {
 
     while (isspace(ch)) {		/* skip whitespace */
@@ -339,8 +335,7 @@ GetHpTok(infp)
 static char numberstring[ NUMBER_LENGTH - 1 ];
 
 token
-GetNumber(infp)
-  FILE* infp;
+GetNumber(FILE *infp)
 {
     int i;
     int containsdot;
@@ -374,8 +369,7 @@ GetNumber(infp)
  */
 
 void
-GetIdent(infp)
-  FILE *infp;
+GetIdent(FILE *infp)
 {
     unsigned int i;
     char idbuffer[5000];
@@ -400,8 +394,7 @@ GetIdent(infp)
  */
 
 void
-GetString(infp)
-  FILE *infp;
+GetString(FILE *infp)
 {
     unsigned int i;
     char *stringbuffer;
@@ -436,8 +429,7 @@ GetString(infp)
 }
 
 boolish
-IsIdChar(ch)
-  int ch;
+IsIdChar(int ch)
 {
     return (!isspace(ch));
 }
@@ -454,8 +446,7 @@ IsIdChar(ch)
 static struct entry* hashtable[ N_HASH ];
 
 static intish
-Hash(s)
-  char *s;
+Hash(char *s)
 {
     int r;
  
@@ -474,7 +465,7 @@ Hash(s)
  */
  
 static struct chunk*
-MakeChunk()
+MakeChunk(void)
 {
     struct chunk* ch;
     struct datapoint* d;
@@ -496,8 +487,7 @@ MakeChunk()
  */
  
 struct entry *
-MakeEntry(name)
-  char *name;
+MakeEntry(char *name)
 {
     struct entry* e;
 
@@ -513,8 +503,7 @@ MakeEntry(name)
  */
 
 static struct entry *
-GetEntry(name)
-  char* name;
+GetEntry(char *name)
 {
     intish h;
     struct entry* e;
@@ -544,8 +533,7 @@ GetEntry(name)
  */
  
 void
-StoreSample(en, bucket, value)
-  struct entry* en; intish bucket; floatish value;
+StoreSample(struct entry *en, intish bucket, floatish value)
 {
     struct chunk* chk; 
 
@@ -575,7 +563,7 @@ struct entry** identtable;
  */
 
 static void
-MakeIdentTable()
+MakeIdentTable(void)
 {
     intish i;
     intish j;

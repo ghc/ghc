@@ -12,7 +12,7 @@
 
 static void KeyEntry PROTO((floatish, char *, floatish));
 
-void Key()
+void Key(void)
 {
     intish i;
     floatish c;
@@ -39,8 +39,7 @@ void Key()
 
 
 static void
-KeyEntry(centreline, name, colour)
-  floatish centreline; char* name; floatish colour;
+KeyEntry(floatish centreline, char *name, floatish colour)
 {
     floatish namebase;
     floatish keyboxbase;

@@ -21,7 +21,7 @@ static void TitleOutlineBox PROTO((void)); /* forward */
 static void BigTitleText PROTO((void)); /* forward */
 static void TitleText PROTO((void)); /* forward */
 
-static void DoTitleAndBox()
+static void DoTitleAndBox(void)
 {
     BorderOutlineBox();
 
@@ -37,14 +37,14 @@ static void DoTitleAndBox()
 static void Landscape PROTO((void));			/* forward */
 static void Portrait  PROTO((void));			/* forward */
 
-void NextPage() {
+void NextPage(void) {
     fprintf(psfp, "showpage\n");
     if (gflag) Portrait(); else Landscape();
     DoTitleAndBox();
 }
 
 void
-PutPsFile()
+PutPsFile(void)
 {
     Prologue();
     Variables();
@@ -75,7 +75,7 @@ static void EPSFSpecialComments PROTO((floatish));	/* forward */
 static void Scaling   PROTO((floatish));		/* forward */
 
 static void
-Prologue()
+Prologue(void)
 {
     if (eflag) {
 	floatish epsfscale = epsfwidth / (floatish) borderwidth;
@@ -91,7 +91,7 @@ extern char *jobstring;
 extern char *datestring;
 
 static void
-StandardSpecialComments()
+StandardSpecialComments(void)
 {
     fprintf(psfp, "%%!PS-Adobe-2.0\n");
     fprintf(psfp, "%%%%Title: %s\n", jobstring);
@@ -101,8 +101,7 @@ StandardSpecialComments()
 } 
 
 static void
-EPSFSpecialComments(epsfscale)
-  floatish epsfscale;
+EPSFSpecialComments(floatish epsfscale)
 {
     fprintf(psfp, "%%!PS-Adobe-2.0\n");
     fprintf(psfp, "%%%%Title: %s\n", jobstring);
@@ -117,7 +116,7 @@ EPSFSpecialComments(epsfscale)
 
 
 static void
-Landscape()
+Landscape(void)
 {
     fprintf(psfp, "-90 rotate\n");
     fprintf(psfp, "%f %f translate\n", -(borderwidth + (floatish) START_Y), 
@@ -125,21 +124,20 @@ Landscape()
 }
 
 static void
-Portrait()
+Portrait(void)
 {
     fprintf(psfp, "%f %f translate\n", (floatish) START_X, (floatish) START_Y); 
 }
 
 static void
-Scaling(epsfscale)
-  floatish epsfscale;
+Scaling(floatish epsfscale)
 {
     fprintf(psfp, "%f %f scale\n", epsfscale, epsfscale);
 }
 
 
 static void
-Variables()
+Variables(void)
 {
     fprintf(psfp, "/HE%d /Helvetica findfont %d scalefont def\n",
                   NORMAL_FONT, NORMAL_FONT);
@@ -150,7 +148,7 @@ Variables()
 
 
 static void
-BorderOutlineBox()
+BorderOutlineBox(void)
 {
     fprintf(psfp, "newpath\n");
     fprintf(psfp, "0 0 moveto\n");
@@ -163,7 +161,7 @@ BorderOutlineBox()
 }
 
 static void
-BigTitleOutlineBox()
+BigTitleOutlineBox(void)
 {
     fprintf(psfp, "newpath\n");
     fprintf(psfp, "%f %f moveto\n", borderspace,
@@ -183,7 +181,7 @@ BigTitleOutlineBox()
 
 
 static void
-TitleOutlineBox()
+TitleOutlineBox(void)
 {
     fprintf(psfp, "newpath\n");
     fprintf(psfp, "%f %f moveto\n", borderspace, 
@@ -199,7 +197,7 @@ TitleOutlineBox()
 static void EscapePrint PROTO((char *, int));	/* forward */
 
 static void
-BigTitleText()
+BigTitleText(void)
 {
     floatish x, y;
 
@@ -238,7 +236,7 @@ BigTitleText()
 
 
 static void
-TitleText()
+TitleText(void)
 {
     floatish x, y;
  
@@ -283,8 +281,7 @@ TitleText()
  */
 
 static void
-EscapePrint(s,w)
-  char* s; int w;
+EscapePrint(char *s, int w)
 {
     for ( ; *s && w > 0; s++, w--) {
 	if (*s == '(') {		/* escape required */

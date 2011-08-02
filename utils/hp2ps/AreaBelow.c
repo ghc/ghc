@@ -15,7 +15,7 @@
  */
  
 floatish
-AreaBelow()
+AreaBelow(void)
 {
     intish i;
     intish j;

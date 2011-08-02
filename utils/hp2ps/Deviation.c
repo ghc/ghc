@@ -18,7 +18,7 @@
  */
 
 void
-Deviation()
+Deviation(void)
 {
     intish i;
     intish j;
@@ -96,8 +96,7 @@ Deviation()
 }
 
 void
-Identorder(iflag)
-    int iflag;	/* a funny three-way flag ? WDP 95/03 */
+Identorder(int iflag) /* iflag is a funny three-way flag ? WDP 95/03 */
 {
     int i;
     int j;

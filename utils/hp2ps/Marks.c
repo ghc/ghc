@@ -10,7 +10,7 @@
 static void Caret PROTO((floatish, floatish, floatish));
 
 void
-Marks()
+Marks(void)
 {
     intish i;
     floatish m;
@@ -27,8 +27,7 @@ Marks()
  */
 
 static void
-Caret(x,y,d)
-  floatish x; floatish y; floatish d;
+Caret(floatish x, floatish y, floatish d)
 {
     fprintf(psfp, "%f %f moveto\n", x - d, y);
     fprintf(psfp, "%f %f rlineto\n",  d, -d);

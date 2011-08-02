@@ -6,8 +6,7 @@
 extern void* malloc();
 
 char*
-Basename(name)
-  char* name;
+Basename(char *name)
 {
     char* t;
 
@@ -24,8 +23,7 @@ Basename(name)
 }
 
 void
-DropSuffix(name, suffix)
-  char* name; char* suffix;
+DropSuffix(char *name, char *suffix)
 {
     char* t;
 
@@ -44,8 +42,7 @@ DropSuffix(name, suffix)
 }
 
 FILE*
-OpenFile(s, mode)
-  char* s; char* mode;
+OpenFile(char *s, char *mode)
 {
     FILE* r;
 
@@ -65,9 +62,7 @@ OpenFile(s, mode)
  */
 
 void
-CommaPrint(fp,n)
-  FILE* fp;
-  intish n;
+CommaPrint(FILE *fp, intish n)
 {
     if (n < ONETHOUSAND) {
         fprintf(fp, "%d", (int)n);
@@ -78,8 +73,7 @@ CommaPrint(fp,n)
 }
 
 void *
-xmalloc(n)
-  size_t n;
+xmalloc(size_t n)
 {
     void *r;
 
@@ -92,9 +86,7 @@ xmalloc(n)
 }
 
 void *
-xrealloc(p, n)
-  void *p;
-  size_t n;
+xrealloc(void *p, size_t n)
 {
     void *r;
     extern void *realloc();
@@ -108,8 +100,7 @@ xrealloc(p, n)
 }
 
 char *
-copystring(s)
-  char *s;
+copystring(char *s)
 {
     char *r;
 
@@ -119,8 +110,7 @@ copystring(s)
 }
 
 char *
-copystring2(s, t)
-  char *s, *t;
+copystring2(char *s, char *t)
 {
     char *r;
 
