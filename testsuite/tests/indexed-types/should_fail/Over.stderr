@@ -1,8 +1,8 @@
 
 OverB.hs:7:15:
     Conflicting family instance declarations:
-      data instance OverA.C [Int] [a] -- Defined at OverB.hs:7:15
-      data instance OverA.C [a] [Int] -- Defined at OverC.hs:7:15
+      data instance C [Int] [a] -- Defined at OverB.hs:7:15
+      data instance C [a] [Int] -- Defined at OverC.hs:7:15
 
 OverB.hs:9:15:
     Conflicting family instance declarations:
