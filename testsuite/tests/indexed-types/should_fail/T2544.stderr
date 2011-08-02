@@ -1,12 +1,12 @@
 
-T2544.hs:15:12:
-    Could not deduce (IxMap l ~ IxMap i0)
+T2544.hs:15:18:
+    Could not deduce (IxMap i0 ~ IxMap l)
     from the context (Ix l, Ix r)
       bound by the instance declaration at T2544.hs:13:10-37
     NB: `IxMap' is a type function, and may not be injective
-    Expected type: IxMap (l :|: r) [Int]
-      Actual type: BiApp (IxMap i0) (IxMap r) [Int]
-    In the return type of a call of `BiApp'
+    Expected type: IxMap l [Int]
+      Actual type: IxMap i0 [Int]
+    In the first argument of `BiApp', namely `empty'
     In the expression: BiApp empty empty
     In an equation for `empty': empty = BiApp empty empty
 
