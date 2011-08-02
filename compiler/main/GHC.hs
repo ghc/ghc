@@ -38,7 +38,7 @@ module GHC (
 	
 	-- * Loading\/compiling the program
 	depanal,
-	load, LoadHowMuch(..),
+	load, LoadHowMuch(..), InteractiveImport(..),
 	SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
 	workingDirectoryChanged,

@@ -42,6 +42,7 @@ module HscTypes (
 
         -- * Interactive context
 	InteractiveContext(..), emptyInteractiveContext, 
+        InteractiveImport(..),
 	icPrintUnqual, extendInteractiveContext,
         substInteractiveContext,
         mkPrintUnqualified, pprModulePrefix,
@@ -883,15 +884,12 @@ emptyModIface mod
 --
 data InteractiveContext 
   = InteractiveContext { 
-         -- These two fields are only stored here so that the client
-         -- can retrieve them with GHC.getContext.  GHC itself doesn't
-         -- use them, but it does reset them to empty sometimes (such
+         -- This field is only stored here so that the client
+         -- can retrieve it with GHC.getContext.  GHC itself doesn't
+         -- use it, but does reset it to empty sometimes (such
          -- as before a GHC.load).  The context is set with GHC.setContext.
-         ic_toplev_scope :: [Module],
-             -- ^ The context includes the "top-level" scope of
-             -- these modules
-         ic_imports :: [ImportDecl RdrName],
-             -- ^ The context is extended with these import declarations
+         ic_imports :: [InteractiveImport],
+             -- ^ The GHCi context is extended with these imports
 
          ic_rn_gbl_env :: GlobalRdrEnv,
              -- ^ The contexts' cached 'GlobalRdrEnv', built by
@@ -914,11 +912,17 @@ data InteractiveContext
              -- virtual CWD of the program
     }
 
+data InteractiveImport 
+  = IIDecl (ImportDecl RdrName)	-- Bring the exports of a particular module
+    	   	       		-- (filtered by an import decl) into scope
 
+  | IIModule Module	-- Bring into scope the entire top-level envt of
+    	     		-- of this module, including the things imported
+			-- into it.
+ 
 emptyInteractiveContext :: InteractiveContext
 emptyInteractiveContext
-  = InteractiveContext { ic_toplev_scope = [],
-                         ic_imports = [],
+  = InteractiveContext { ic_imports = [],
 			 ic_rn_gbl_env = emptyGlobalRdrEnv,
 			 ic_tmp_ids = []
 #ifdef GHCI
@@ -948,6 +952,10 @@ substInteractiveContext ictxt@InteractiveContext{ic_tmp_ids=ids} subst
   = ictxt { ic_tmp_ids = map subst_ty ids }
   where
    subst_ty id = id `setIdType` substTy subst (idType id)
+
+instance Outputable InteractiveImport where
+  ppr (IIModule m) = char '*' <> ppr m
+  ppr (IIDecl d)   = ppr d
 \end{code}
 
 %************************************************************************
@@ -1675,6 +1683,7 @@ ms_imps ms = ms_textual_imps ms ++ map mk_additional_import (dynFlagDependencies
       ideclName = noLoc mod_nm,
       ideclPkgQual = Nothing,
       ideclSource = False,
+      ideclImplicit = True,	-- Maybe implicit because not "in the program text"
       ideclQualified = False,
       ideclAs = Nothing,
       ideclHiding = Nothing,

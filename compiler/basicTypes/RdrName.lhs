@@ -682,9 +682,12 @@ ppr_defn (UnhelpfulLoc _) = empty
 
 instance Outputable ImportSpec where
    ppr imp_spec
-     = ptext (sLit "imported from") <+> ppr (importSpecModule imp_spec) 
+     = ptext (sLit "imported") <+> qual 
+        <+> ptext (sLit "from") <+> ppr (importSpecModule imp_spec) 
 	<+> pprLoc
      where
+       qual | is_qual (is_decl imp_spec) = ptext (sLit "qualified")
+            | otherwise                  = empty
        loc = importSpecLoc imp_spec
        pprLoc = case loc of
                 RealSrcSpan s -> ptext (sLit "at") <+> ppr s
