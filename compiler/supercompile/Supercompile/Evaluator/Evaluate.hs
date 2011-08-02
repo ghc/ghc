@@ -252,9 +252,12 @@ step' normalising state =
                                             arg_tys        = dataConRepArgTys dc
                                         
                                             -- Make the "theta" from Fig 3 of the paper
+                                            (_univ_tys, ex_tys) = splitAt tc_arity tys
                                             gammas = decomposeCo tc_arity co'
-                                            theta_subst = liftCoSubstWith (dc_univ_tyvars ++ dc_ex_tyvars)
-                                                                          (gammas         ++ map mkReflCo tys)
+                                            theta_subst = ASSERT2(length dc_univ_tyvars == tc_arity,      ppr dc $$ ppr dc_univ_tyvars $$ ppr tc_arity)
+                                                          ASSERT2(length dc_ex_tyvars   == length ex_tys, ppr dc $$ ppr dc_ex_tyvars $$ ppr (length ex_tys))
+                                                          liftCoSubstWith (dc_univ_tyvars ++ dc_ex_tyvars)
+                                                                          (gammas         ++ map mkReflCo ex_tys)
                                         in map (\arg_ty -> (theta_subst arg_ty, tg_co)) arg_tys -- Use tag from the original coercion everywhere
            -- b) Identify the first appropriate branch of the case and reduce -- apply the discovered coercions if necessary
           , (deeds3, h', ids', alt_e):_ <- [ res
