@@ -598,11 +598,12 @@ def test_common_work (name, opts, func, args):
     if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
         framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
-def clean(names):
-    clean_full_paths(map (lambda name: in_testdir(name), names))
+def clean(strs):
+    for str in strs:
+        for name in glob.glob(in_testdir(str)):
+            clean_full_path(name)
 
-def clean_full_paths(names):
-    for name in names:
+def clean_full_path(name):
         try:
             # Remove files...
             os.remove(name)
