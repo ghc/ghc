@@ -342,9 +342,9 @@ bindManyMixedLiftedness get_fvs = go
         go xes = case takeFirst (\(x, _) -> isUnLiftedType (idType x)) xes of
             Nothing                 -> letRec xes
             Just ((x, e), rest_xes) -> go xes_above . let_ x e . go xes_below
-              where (xes_above, xes_below) = partition_one (get_fvs e) rest_xes
+              where (xes_above, xes_below) = partition_one (unitVarSet x) rest_xes
 
         partition_one bvs_below xes | bvs_below' == bvs_below = (xes_above, xes_below)
                                     | otherwise               = second (xes_below ++) $ partition_one bvs_below' xes_above
-          where (xes_below, xes_above) = partition (\(x, _) -> x `elemVarSet` bvs_below) xes
+          where (xes_below, xes_above) = partition (\(_, e) -> get_fvs e `intersectsVarSet` bvs_below) xes
                 bvs_below' = bvs_below `unionVarSet` mkVarSet (map fst xes_below)
