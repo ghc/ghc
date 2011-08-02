@@ -1581,4 +1581,30 @@ LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/${di
 AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 ])
 
+# XCODE_VERSION()
+# --------------------------------
+# Gets the version number of XCode, if on a Mac
+AC_DEFUN([XCODE_VERSION],[
+    if test "$TargetOS_CPP" = "darwin"
+    then
+        AC_MSG_CHECKING(XCode version)
+        XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`
+        # Old XCode versions don't actually give the XCode version
+        if test "$XCodeVersion" = ""
+        then
+            AC_MSG_RESULT(not found (too old?))
+            XCodeVersion1=0
+            XCodeVersion2=0
+        else
+            AC_MSG_RESULT($XCodeVersion)
+            XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+            changequote(, )dnl
+            XCodeVersion2=`echo "$XCodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
+            changequote([, ])dnl
+            AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
+            AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
+        fi
+    fi
+])
+
 # LocalWords:  fi
