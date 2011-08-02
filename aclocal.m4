@@ -1607,4 +1607,22 @@ AC_DEFUN([XCODE_VERSION],[
     fi
 ])
 
+# FIND_GCC()
+# --------------------------------
+# Finds where gcc is
+AC_DEFUN([FIND_GCC],[
+    if test "$TargetOS_CPP" = "darwin" &&
+        test "$XCodeVersion1" -ge 4
+    then
+        # From Xcode 4, use 'gcc-4.2' to force the use of the gcc legacy
+        # backend (instead of the LLVM backend)
+        FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc-4.2])
+    else
+        FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
+    fi
+    export CC
+    WhatGccIsCalled="$CC"
+    AC_SUBST(WhatGccIsCalled)
+])
+
 # LocalWords:  fi
