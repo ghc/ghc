@@ -549,10 +549,13 @@ data Details
   }
 
 instance Outputable Details where
-   ppr (ND { nd_bndr = bndr, nd_uds = uds })
-     = ptext (sLit "ND") <> braces 
-        (sep [ ptext (sLit "bndr =") <+> ppr bndr
-             , ptext (sLit "uds =") <+> ppr uds ])
+   ppr nd = ptext (sLit "ND") <> braces 
+             (sep [ ptext (sLit "bndr =") <+> ppr (nd_bndr nd)
+                  , ptext (sLit "uds =") <+> ppr (nd_uds nd)
+                  , ptext (sLit "inl =") <+> ppr (nd_inl nd)
+                  , ptext (sLit "weak =") <+> ppr (nd_weak nd)
+                  , ptext (sLit "rule =") <+> ppr (nd_active_rule_fvs nd)
+	     ])
 
 makeNode :: OccEnv -> VarSet -> (Var, CoreExpr) -> Node Details
 makeNode env bndr_set (bndr, rhs)
@@ -628,9 +631,8 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
 
   | otherwise	-- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (vcat
-    --  [ text "tagged nodes" <+> ppr tagged_nodes
-    --  , text "non_boring" <+> ppr (any non_boring bndrs)
-    --  , text "lb edges" <+> ppr loop_breaker_edges])
+    --   [ text "tagged nodes" <+> ppr tagged_nodes
+    --   , text "lb edges" <+> ppr loop_breaker_edges])
     (final_uds, Rec pairs : binds)
 
   where
@@ -651,8 +653,8 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
     ---------------------------
     -- Now reconstruct the cycle
     pairs :: [(Id,CoreExpr)]
-    pairs | isEmptyVarSet weak_fvs = loopBreakNodes 0 bndr_set weak_fvs loop_breaker_edges []
-          | otherwise              = reOrderNodes   0 bndr_set weak_fvs tagged_nodes       []
+    pairs | isEmptyVarSet weak_fvs = reOrderNodes   0 bndr_set weak_fvs tagged_nodes       []
+          | otherwise              = loopBreakNodes 0 bndr_set weak_fvs loop_breaker_edges []
 	  -- If weak_fvs is empty, the loop_breaker_edges will include all 
 	  -- the edges in tagged_nodes, so there isn't any point in doing 
 	  -- a fresh SCC computation that will yield a single CyclicSCC result.
@@ -736,7 +738,7 @@ reOrderNodes :: Int -> VarSet -> VarSet -> [Node Details] -> [Binding] -> [Bindi
 reOrderNodes _ _ _ [] _  = panic "reOrderNodes"
 reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
   = -- pprTrace "reOrderNodes" (text "unchosen" <+> ppr unchosen $$ 
-    --                            text "chosen" <+> ppr chosen_nodes) $
+    --                           text "chosen" <+> ppr chosen_nodes) $
     loopBreakNodes new_depth bndr_set weak_fvs unchosen $
     (map mk_loop_breaker chosen_nodes ++ binds)
   where
