@@ -1398,8 +1398,10 @@ browseModule bang modl exports_only = do
 
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
+  -- Use mySetContext so we get an implicit Prelude import 
+  -- for the PrintUnqualified
   imports <- GHC.getContext
-  lift $ mySetContext (if exports_only 
+  lift $ mySetContext (if exports_only	
                        then [IIDecl $ simpleImportDecl (GHC.moduleName modl)]
                        else [IIModule modl])
   target_unqual <- GHC.getPrintUnqual
@@ -1475,13 +1477,12 @@ browseModule bang modl exports_only = do
 
 -----------------------------------------------------------------------------
 -- Setting the module context
-
-newContextCmd :: CtxtCmd -> GHCi ()
-newContextCmd cmd = do
-  playCtxtCmds True [cmd]
-  st <- getGHCiState
-  let cmds = remembered_ctx st
-  setGHCiState st{ remembered_ctx = cmds ++ [cmd] }
+-- This handles  Command     Constructor in CtxtCmd
+--               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--               :m X        SetContext
+--               :m +X       AddModules
+--               :m -X       RemModules    
+--               import X    Import
 
 moduleCmd :: String -> GHCi ()
 moduleCmd str
@@ -1504,11 +1505,18 @@ moduleCmd str
     starred ('*':m) = Left m
     starred m       = Right m
 
+newContextCmd :: CtxtCmd -> GHCi ()
+newContextCmd cmd = do
+  playCtxtCmds True [cmd]
+  st <- getGHCiState
+  let cmds = remembered_ctx st
+  setGHCiState st{ remembered_ctx = cmds ++ [cmd] }
+
 playCtxtCmds :: Bool -> [CtxtCmd] -> GHCi ()
 playCtxtCmds fail cmds = do
   ctx <- GHC.getContext
   ctx' <- foldM (playCtxtCmd fail) ctx cmds
-  mySetContext ctx'
+  mySetContext ctx'	-- Eliminate dups and add Prelude if not there
 
 playCtxtCmd:: Bool -> [InteractiveImport] -> CtxtCmd -> GHCi [InteractiveImport]
 playCtxtCmd fail prev cmd = do
