@@ -839,7 +839,7 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
     this_pkg = thisPackage dflags
 
     used_mods    = moduleEnvKeys ent_map
-    dir_imp_mods = (moduleEnvKeys direct_imports)
+    dir_imp_mods = moduleEnvKeys direct_imports
     all_mods     = used_mods ++ filter (`notElem` used_mods) dir_imp_mods
     usage_mods   = sortBy stableModuleCmp all_mods
                         -- canonical order is imported, to avoid interface-file
@@ -854,12 +854,14 @@ mk_usage_info pit hsc_env this_mod direct_imports used_names
         | isWiredInName name = mv_map  -- ignore wired-in names
         | otherwise
         = case nameModule_maybe name of
-             Nothing  -> pprPanic "mkUsageInfo: internal name?" (ppr name)
+             Nothing  -> ASSERT( isSystemName name ) mv_map
+	     	-- See Note [Internal used_names]
+
              Just mod -> -- This lambda function is really just a
                          -- specialised (++); originally came about to
                          -- avoid quadratic behaviour (trac #2680)
                          extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod [occ]
-    		   where occ = nameOccName name
+    	        where occ = nameOccName name
     
     -- We want to create a Usage for a home module if 
     --	a) we used something from it; has something in used_names
@@ -1023,6 +1025,15 @@ That is, in Y,
 
 In the result of MkIfaceExports, the names are grouped by defining module,
 so we may need to split up a single Avail into multiple ones.
+
+Note [Internal used_names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most of the used_names are External Names, but we can have Internal
+Names too: see Note [Binders in Template Haskell] in Convert, and Trac
+#5362 for an example.  Such Names are always
+  - Such Names are always for locally-defined things, for which we
+    don't gather usage info, so we can just ignore them in ent_map
+  - They are always System Names, hence the assert, just as a double check.
 
 
 %************************************************************************
