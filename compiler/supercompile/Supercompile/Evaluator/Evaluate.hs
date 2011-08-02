@@ -16,6 +16,7 @@ import Supercompile.Utilities
 import qualified Data.Map as M
 
 import qualified CoreSyn as CoreSyn
+import CoreUnfold (exprIsConApp_maybe)
 import Coercion
 import TyCon
 import Type
@@ -45,14 +46,16 @@ evaluatePrim iss tg pop tys args = do
     fro (CoreSyn.Cast e co)   = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
     fro (CoreSyn.Lit l)       = Just (Nothing, (emptyRenaming, Literal l))
     fro (CoreSyn.Coercion co) = Just (Nothing, (mkIdentityRenaming (tyCoVarsOfCo co), Coercion co))
-    fro e | CoreSyn.Var f <- e_fun, Just dc <- isDataConId_maybe f, [] <- e_args3 = Just (Nothing, (renamedValue (Data dc tys cos xs)))
-          | otherwise = Nothing
-      where (e_fun, e_args0) = CoreSyn.collectArgs e
-            (tys, e_args1) = takeWhileJust toType_maybe     e_args0
-            (cos, e_args2) = takeWhileJust toCoercion_maybe e_args1
-            (xs,  e_args3) = takeWhileJust toVar_maybe      e_args2
-            
-            toType_maybe (CoreSyn.Type ty) = Just ty
+    fro e = do (dc, univ_tys, e_args0) <- exprIsConApp_maybe (const CoreSyn.NoUnfolding) e
+               case newTyConCo_maybe (dataConTyCon dc) of
+                 Just co_axiom -> let [e_arg0] = e_args0 in fro (e_arg0 `CoreSyn.Cast` mkAxInstCo co_axiom univ_tys)
+                 Nothing -> do
+                   let (ex_tys, e_args1) = takeWhileJust toType_maybe     e_args0
+                       (cos,    e_args2) = takeWhileJust toCoercion_maybe e_args1
+                       (xs,     e_args3) = takeWhileJust toVar_maybe      e_args2
+                   [] <- return e_args3
+                   return (Nothing, (renamedValue (Data dc (univ_tys ++ ex_tys) cos xs)))
+      where toType_maybe (CoreSyn.Type ty) = Just ty
             toType_maybe _                 = Nothing
             
             toCoercion_maybe (CoreSyn.Coercion co) = Just co

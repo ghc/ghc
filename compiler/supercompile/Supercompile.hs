@@ -10,8 +10,9 @@ import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn
 import CoreFVs    (exprFreeVars)
 import CoreUtils  (exprType)
-import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo)
-import DataCon    (dataConWorkId, dataConAllTyVars, dataConRepArgTys)
+import CoreUnfold (exprIsConApp_maybe)
+import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo, mkAxInstCo)
+import DataCon    (DataCon, dataConWorkId, dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConName)
 import VarSet
 import Name       (localiseName)
 import Var        (Var, isTyVar, varName, setVarName)
@@ -21,6 +22,7 @@ import MkCore     (mkBigCoreVarTup, mkTupleSelector, mkWildValBinder)
 import FastString (mkFastString, fsLit)
 import PrimOp     (primOpSig)
 import Type       (mkTyVarTy, isUnLiftedType)
+import TyCon      (newTyConCo_maybe)
 
 import Control.Monad
 import qualified Data.Map as M
@@ -70,9 +72,12 @@ instance Monad ParseM where
 instance MonadUnique ParseM where
     getUniqueSupplyM = ParseM $ \us -> case splitUniqSupply us of (us1, us2) -> (us1, [], us2)
 
-runParseM :: ParseM a -> ([(Var, S.Term)], a)
-runParseM act = (floats, x)
+runParseM' :: ParseM a -> ([(Var, S.Term)], a)
+runParseM' act = (floats, x)
   where (_s, floats, x) = unParseM act anfUniqSupply'
+
+runParseM :: ParseM S.Term -> S.Term
+runParseM = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM'
 
 freshFloatId :: String -> S.Term -> ParseM (Maybe (Var, S.Term), Var)
 freshFloatId _ (I (S.Var x)) = return (Nothing, x)
@@ -109,10 +114,37 @@ appE e1 e2
 
 
 
-coreExprToTerm :: CoreExpr -> S.Term
-coreExprToTerm = uncurry (S.bindManyMixedLiftedness S.termFreeVars) . runParseM . term
+conAppToTerm :: DataCon -> [CoreExpr] -> ParseM S.Term
+conAppToTerm dc es
+  | Just co_axiom <- newTyConCo_maybe (dataConTyCon dc)
+  , let [co_val_e] = co_val_es -- NB: newtypes may not have existential arguments
+  = fmap (`S.cast` mkAxInstCo co_axiom tys') $ coreExprToTerm co_val_e
+  | otherwise
+  = do -- Convert all arguments to supercompiler syntax and divide into type/coercion/value
+       co_val_es' <- mapM coreExprToTerm co_val_es
+       let (co_es', val_es') = span (isCoVarType . S.termType) co_val_es'
+ 
+       -- Put each argument into a form suitable for an explicit value
+       -- NB: if any argument is non-trivial then the resulting binding will not be a simple value
+       -- (some let-bindings will surround it) and inlining will be impeded.
+       (d, cos') <- mapAccumLM (\d co_e' -> fmap ((,) (argOf d)) $ nameCo (argOf d) co_e')
+                               (Opaque (S.nameString (dataConName dc))) co_es'
+       (_, xs') <- mapAccumLM (\d val_e' -> fmap ((,) (argOf d)) $ nameIt (argOf d) val_e')
+                              d val_es'
+       return $ S.value (S.Data dc tys' cos' xs')
   where
-    -- PrimOp and Data are dealt with later on by generating appropriate unfoldings
+    (tys', co_val_es) = takeWhileJust fromType_maybe es
+
+    fromType_maybe (Type ty) = Just ty
+    fromType_maybe _         = Nothing
+
+coreExprToTerm :: CoreExpr -> ParseM S.Term
+coreExprToTerm = term
+  where
+    -- PrimOp and (partially applied) Data are dealt with later on by generating appropriate unfoldings
+    -- We use exprIsConApp_maybe here to ensure we desugar explicit constructor use into something that looks cheap
+    term e | Just (dc, univ_tys, es) <- exprIsConApp_maybe (const NoUnfolding) e
+           = conAppToTerm dc (map Type univ_tys ++ es)
     term (Var x)                   = return $ S.var x
     term (Lit l)                   = return $ S.value (S.Literal l)
     term (App e_fun (Type ty_arg)) = fmap (flip S.tyApp ty_arg) (term e_fun)
@@ -233,10 +265,14 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
       | Just pop <- isPrimOpId_maybe x     = Just $ primOpUnfolding pop
       | Just dc <- isDataConWorkId_maybe x = Just $ dataUnfolding dc
       | not (shouldExposeUnfolding x)      = Nothing
-      | otherwise                          = fmap coreExprToTerm $ maybeUnfoldingTemplate (realIdUnfolding x)
-       -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
+      | otherwise                          = case realIdUnfolding x of
+        NoUnfolding                   -> Nothing
+        OtherCon _                    -> Nothing
+        DFunUnfolding _ dc es         -> Just $ runParseM $ conAppToTerm dc es
+        CoreUnfolding { uf_tmpl = e } -> Just $ runParseM $ coreExprToTerm e
+         -- NB: it's OK if the unfolding is a non-value, as the evaluator won't inline LetBound non-values
     
-    -- We don't want to expose an unfoldingif it would not be inlineable in the initial phase.
+    -- We don't want to expose an unfolding if it would not be inlineable in the initial phase.
     -- This gives normal RULES more of a chance to fire.
     shouldExposeUnfolding x = case inl_inline inl_prag of
         Inline          -> True
@@ -249,19 +285,24 @@ termUnfoldings e = go (S.termFreeVars e) emptyVarSet []
       where (as, arg_tys, _res_ty, _arity, _strictness) = primOpSig pop
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys
     
-    dataUnfolding dc = S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) (map mkCoVarCo qs) ys)
+    dataUnfolding dc
+      | Just co_axiom <- newTyConCo_maybe (dataConTyCon dc)
+      , let [x] = xs
+      = S.tyLambdas as $ S.lambdas [x] $ S.var x `S.cast` mkAxInstCo co_axiom (map mkTyVarTy as)
+      | otherwise
+      = S.tyLambdas as $ S.lambdas xs $ S.value (S.Data dc (map mkTyVarTy as) (map mkCoVarCo qs) ys)
       where as = dataConAllTyVars dc
             arg_tys = dataConRepArgTys dc
             xs = zipWith (mkSysLocal (fsLit "x")) bv_uniques arg_tys
             (qs, ys) = span isCoVar xs
-    
+
     -- It doesn't matter if we reuse Uniques here because by construction they can't shadow other uses of the anfUniqSupply'
     bv_uniques = uniqsFromSupply anfUniqSupply'
 
 supercompile :: CoreExpr -> CoreExpr
 supercompile e = termToCoreExpr (snd (S.supercompile (M.fromList unfs) e'))
   where unfs = termUnfoldings e'
-        e' = coreExprToTerm e
+        e' = runParseM (coreExprToTerm e)
 
 supercompileProgram :: [CoreBind] -> [CoreBind]
 supercompileProgram = supercompileProgramSelective (const True)
