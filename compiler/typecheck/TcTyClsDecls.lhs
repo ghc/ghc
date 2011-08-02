@@ -776,7 +776,14 @@ is working over (say) GHC souce files.
 Note [Recursive unboxing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Be careful not to try to unbox this!
-	data T = MkT !T Int
+	data T = MkT {-# UNPACK #-} !T Int
+Reason: consider
+  data R = MkR {-# UNPACK #-} !S Int
+  data S = MkS {-# UNPACK #-} !Int
+The representation arguments of MkR are the *representation* arguments
+of S (plus Int); the rep args of MkS are Int#.  This is obviously no
+good for T, because then we'd get an infinite number of arguments.
+
 But it's the *argument* type that matters. This is fine:
 	data S = MkS S !Int
 because Int is non-recursive.
