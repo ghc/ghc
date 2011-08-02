@@ -817,7 +817,7 @@ runMeta show_code run_and_convert expr
 	-- For example, if we found an error in an earlier defn f, but
 	-- recovered giving it type f :: forall a.a, it'd be very dodgy
 	-- to carry ont.  Mind you, the staging restrictions mean we won't
-	-- *run* f, but it still seems wrong. And, more concretely, 
+	-- actually run f, but it still seems wrong. And, more concretely, 
 	-- see Trac #5358 for an example that fell over when trying to
 	-- reify a function with a "?" kind in it.  (These don't occur
 	-- in type-correct programs.
