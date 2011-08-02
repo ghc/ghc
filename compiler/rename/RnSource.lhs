@@ -30,7 +30,7 @@ import RnEnv		( lookupLocalDataTcNames, lookupLocatedOccRn,
 			  bindLocalNames, checkDupRdrNames, mapFvRn
 			)
 import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn )
-import HscTypes      	( GenAvailInfo(..), availsToNameSet )
+import HscTypes      	( AvailInfo(..), availsToNameSet )
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 

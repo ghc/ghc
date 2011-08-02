@@ -26,14 +26,13 @@ import PrelNames        ( basicKnownKeyNames,
                           hasKey, charDataConKey, intDataConKey,
                           numericClassKeys, standardClassKeys )
 import PrelRules
-import PrimOp		( PrimOp, allThePrimOps, primOpOcc, primOpTag, maxPrimOpTag )
+import PrimOp		( PrimOp, allThePrimOps, primOpTag, maxPrimOpTag )
 import DataCon		( DataCon )
 import Id		( Id, idName )
 import MkId		-- All of it, for re-export
-import Name		( nameOccName )
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import HscTypes 	( TyThing(..), implicitTyThings, GenAvailInfo(..), RdrAvailInfo )
+import HscTypes 	( TyThing(..), implicitTyThings, AvailInfo(..), IfaceExport )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
 import TyCon		( tyConName )
@@ -82,7 +81,7 @@ wiredInThings
 	, map AnId wiredInIds
 
 		-- PrimOps
-	, map (AnId . mkPrimOpId) allThePrimOps
+	, map (AnId . primOpId) allThePrimOps
     ]
   where
     tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
@@ -99,9 +98,10 @@ sense of them in interface pragmas. It's cool, though they all have
 %************************************************************************
 
 \begin{code}
-primOpIds :: Array Int Id	-- Indexed by PrimOp tag
+primOpIds :: Array Int Id	
+-- A cache of the PrimOp Ids, indexed by PrimOp tag
 primOpIds = array (1,maxPrimOpTag) [ (primOpTag op, mkPrimOpId op) 
-				   | op <- allThePrimOps]
+				   | op <- allThePrimOps ]
 
 primOpId :: PrimOp -> Id
 primOpId op = primOpIds ! primOpTag op
@@ -118,13 +118,12 @@ GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
 
 \begin{code}
-ghcPrimExports :: [RdrAvailInfo]
+ghcPrimExports :: [IfaceExport]
 ghcPrimExports
- = map (Avail . nameOccName . idName) ghcPrimIds ++
-   map (Avail . primOpOcc) allThePrimOps ++
-   [ AvailTC occ [occ] |
-     n <- funTyCon : primTyCons, let occ = nameOccName (tyConName n) 
-   ]
+ = map (Avail . idName) ghcPrimIds ++
+   map (Avail . idName . primOpId) allThePrimOps ++
+   [ AvailTC n [n] 
+   | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
 \end{code}
 
 

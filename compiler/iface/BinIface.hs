@@ -496,7 +496,7 @@ instance Binary Dependencies where
 		return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
 			       dep_finsts = fis })
 
-instance (Binary name) => Binary (GenAvailInfo name) where
+instance Binary AvailInfo where
     put_ bh (Avail aa) = do
 	    putByte bh 0
 	    put_ bh aa
