@@ -16,7 +16,6 @@ module Linker ( HValue, getHValue, showLinkerState,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs, 
 		linkPackages,initDynLinker,linkModule,
-                dataConInfoPtrToName, lessUnsafeCoerce,
 
 		-- Saving/restoring globals
 		PersistentLinkerState, saveLinkerGlobals, restoreLinkerGlobals
@@ -29,9 +28,6 @@ import ObjLink
 import ByteCodeLink
 import ByteCodeItbls
 import ByteCodeAsm
-import CgInfoTbls
-import SMRep
-import IfaceEnv
 import TcRnMonad
 import Packages
 import DriverPhases
@@ -40,7 +36,6 @@ import HscTypes
 import Name
 import NameEnv
 import NameSet
-import qualified OccName
 import UniqFM
 import Module
 import ListSetOps
@@ -54,20 +49,16 @@ import ErrUtils
 import SrcLoc
 import qualified Maybes
 import UniqSet
-import Constants
 import FastString
 import Config
-
-import GHC.Exts (unsafeCoerce#)
+import SysTools
 
 -- Standard libraries
 import Control.Monad
 
-import Data.Char
 import Data.IORef
 import Data.List
 import qualified Data.Map as Map
-import Foreign
 import Control.Concurrent.MVar
 
 import System.FilePath
@@ -145,9 +136,8 @@ emptyPLS _ = PersistentLinkerState {
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
   where init_pkgs = [rtsPackageId]
-\end{code}
 
-\begin{code}
+
 extendLoadedPkgs :: [PackageId] -> IO ()
 extendLoadedPkgs pkgs =
   modifyPLS_ $ \s ->
@@ -165,111 +155,6 @@ deleteFromLinkEnv to_remove =
   modifyPLS_ $ \pls ->
     let new_closure_env = delListFromNameEnv (closure_env pls) to_remove
     in return pls{ closure_env = new_closure_env }
-
--- | Given a data constructor in the heap, find its Name.
---   The info tables for data constructors have a field which records
---   the source name of the constructor as a Ptr Word8 (UTF-8 encoded
---   string). The format is:
---
---   > Package:Module.Name
---
---   We use this string to lookup the interpreter's internal representation of the name
---   using the lookupOrig.    
---
-dataConInfoPtrToName :: Ptr () -> TcM (Either String Name)
-dataConInfoPtrToName x = do 
-   theString <- liftIO $ do
-      let ptr = castPtr x :: Ptr StgInfoTable
-      conDescAddress <- getConDescAddress ptr 
-      peekArray0 0 conDescAddress  
-   let (pkg, mod, occ) = parse theString 
-       pkgFS = mkFastStringByteList pkg
-       modFS = mkFastStringByteList mod
-       occFS = mkFastStringByteList occ
-       occName = mkOccNameFS OccName.dataName occFS
-       modName = mkModule (fsToPackageId pkgFS) (mkModuleNameFS modFS) 
-   return (Left$ showSDoc$ ppr modName <> dot <> ppr occName ) 
-    `recoverM` (Right `fmap` lookupOrig modName occName)
-
-   where
-
-   {- To find the string in the constructor's info table we need to consider 
-      the layout of info tables relative to the entry code for a closure.
-
-      An info table can be next to the entry code for the closure, or it can
-      be separate. The former (faster) is used in registerised versions of ghc, 
-      and the latter (portable) is for non-registerised versions. 
-
-      The diagrams below show where the string is to be found relative to 
-      the normal info table of the closure.
-
-      1) Code next to table:
-
-         --------------
-         |            |   <- pointer to the start of the string
-         --------------
-         |            |   <- the (start of the) info table structure
-         |            |
-         |            |
-         --------------
-         | entry code | 
-         |    ....    |
-
-         In this case the pointer to the start of the string can be found in
-         the memory location _one word before_ the first entry in the normal info 
-         table.
-
-      2) Code NOT next to table:
-
-                                 --------------
-         info table structure -> |     *------------------> --------------
-                                 |            |             | entry code |
-                                 |            |             |    ....    | 
-                                 --------------
-         ptr to start of str ->  |            |   
-                                 --------------
-
-         In this case the pointer to the start of the string can be found
-         in the memory location: info_table_ptr + info_table_size
-   -}
-
-   getConDescAddress :: Ptr StgInfoTable -> IO (Ptr Word8)
-   getConDescAddress ptr
-    | ghciTablesNextToCode = do
-       offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
-       return $ (ptr `plusPtr` stdInfoTableSizeB) `plusPtr` (fromIntegral (offsetToString :: StgWord))
-    | otherwise =
-       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + fromIntegral stdInfoTableSizeB
-
-   -- parsing names is a little bit fiddly because we have a string in the form: 
-   -- pkg:A.B.C.foo, and we want to split it into three parts: ("pkg", "A.B.C", "foo").
-   -- Thus we split at the leftmost colon and the rightmost occurrence of the dot.
-   -- It would be easier if the string was in the form pkg:A.B.C:foo, but alas
-   -- this is not the conventional way of writing Haskell names. We stick with
-   -- convention, even though it makes the parsing code more troublesome.
-   -- Warning: this code assumes that the string is well formed.
-   parse :: [Word8] -> ([Word8], [Word8], [Word8])
-   parse input 
-      = ASSERT (all (>0) (map length [pkg, mod, occ])) (pkg, mod, occ)
-      where
-      dot = fromIntegral (ord '.')
-      (pkg, rest1) = break (== fromIntegral (ord ':')) input 
-      (mod, occ) 
-         = (concat $ intersperse [dot] $ reverse modWords, occWord)
-         where
-         (modWords, occWord) = ASSERT (length rest1 > 0) (parseModOcc [] (tail rest1))
-      parseModOcc :: [[Word8]] -> [Word8] -> ([[Word8]], [Word8])
-      -- We only look for dots if str could start with a module name,
-      -- i.e. if it starts with an upper case character.
-      -- Otherwise we might think that "X.:->" is the module name in
-      -- "X.:->.+", whereas actually "X" is the module name and
-      -- ":->.+" is a constructor name.
-      parseModOcc acc str@(c : _)
-       | isUpper $ chr $ fromIntegral c
-         = case break (== dot) str of
-              (top, []) -> (acc, top)
-              (top, _ : bot) -> parseModOcc (top : acc) bot
-      parseModOcc acc str = (acc, str)
 
 -- | Get the 'HValue' associated with the given name.
 --
@@ -342,10 +227,8 @@ filterNameMap mods env
    where
      keep_elt (n,_) = isExternalName n 
 		      && (nameModule n `elem` mods)
-\end{code}
 
 
-\begin{code}
 -- | Display the persistent linker state.
 showLinkerState :: IO ()
 showLinkerState
@@ -355,8 +238,6 @@ showLinkerState
 			text "Objs:" <+> ppr (objs_loaded pls),
 			text "BCOs:" <+> ppr (bcos_loaded pls)])
 \end{code}
-			
-	
 
 
 %************************************************************************
@@ -406,14 +287,15 @@ reallyInitDynLinker dflags =
 	   	-- (c) Link libraries from the command-line
 	; let optl = getOpts dflags opt_l
 	; let minus_ls = [ lib | '-':'l':lib <- optl ]
+        ; let lib_paths = libraryPaths dflags
+        ; libspecs <- mapM (locateLib dflags False lib_paths) minus_ls
 
 	   	-- (d) Link .o files from the command-line
-	; let lib_paths = libraryPaths dflags
-	; cmdline_ld_inputs <- readIORef v_Ld_inputs
+        ; cmdline_ld_inputs <- readIORef v_Ld_inputs
 
 	; classified_ld_inputs <- mapM classifyLdInput cmdline_ld_inputs
 
-	   	-- (e) Link any MacOS frameworks
+                -- (e) Link any MacOS frameworks
 	; let framework_paths
                | isDarwinTarget = frameworkPaths dflags
                | otherwise      = []
@@ -422,7 +304,7 @@ reallyInitDynLinker dflags =
                | otherwise      = []
 		-- Finally do (c),(d),(e)	
         ; let cmdline_lib_specs = [ l | Just l <- classified_ld_inputs ]
-			       ++ map DLL       minus_ls 
+                               ++ libspecs
 			       ++ map Framework frameworks
 	; if null cmdline_lib_specs then return pls
 				    else do
@@ -460,7 +342,7 @@ preloadLib dflags lib_paths framework_paths lib_spec
                                                 else "not found")
 
           DLL dll_unadorned
-             -> do maybe_errstr <- loadDynamic lib_paths dll_unadorned
+             -> do maybe_errstr <- loadDLL (mkSOName dll_unadorned)
                    case maybe_errstr of
                       Nothing -> maybePutStrLn dflags "done"
                       Just mm -> preloadFailed mm lib_paths lib_spec
@@ -717,9 +599,8 @@ getLinkDeps hsc_env hpt pls maybe_normal_osuf span mods
               Loading a single module
 %*									*
 %************************************************************************
-\begin{code}
 
--- | Link a single module
+\begin{code}
 linkModule :: HscEnv -> Module -> IO ()
 linkModule hsc_env mod = do
   initDynLinker (hsc_dflags hsc_env)
@@ -727,22 +608,6 @@ linkModule hsc_env mod = do
     (pls', ok) <- linkDependencies hsc_env pls noSrcSpan [mod]
     if (failed ok) then ghcError (ProgramError "could not link module")
       else return pls'
-
--- | Coerce a value as usual, but:
---
--- 1) Evaluate it immediately to get a segfault early if the coercion was wrong
---
--- 2) Wrap it in some debug messages at verbosity 3 or higher so we can see what happened
---    if it /does/ segfault
-lessUnsafeCoerce :: DynFlags -> String -> a -> IO b
-lessUnsafeCoerce dflags context what = do
-    debugTraceMsg dflags 3 $ (ptext $ sLit "Coercing a value in") <+> (text context) <> (ptext $ sLit "...")
-    output <- evaluate (unsafeCoerce# what)
-    debugTraceMsg dflags 3 $ ptext $ sLit "Successfully evaluated coercion"
-    return output
-
-
-
 \end{code}
 
 %************************************************************************
@@ -1084,13 +949,14 @@ linkPackage dflags pkg
    = do 
         let dirs      =  Packages.libraryDirs pkg
 
-        let libs      =  Packages.hsLibraries pkg
+        let hs_libs   =  Packages.hsLibraries pkg
             -- The FFI GHCi import lib isn't needed as
             -- compiler/ghci/Linker.lhs + rts/Linker.c link the
             -- interpreted references to FFI to the compiled FFI.
             -- We therefore filter it out so that we don't get
             -- duplicate symbol errors.
-            libs'     =  filter ("HSffi" /=) libs
+            hs_libs'  =  filter ("HSffi" /=) hs_libs
+
         -- Because of slight differences between the GHC dynamic linker and
         -- the native system linker some packages have to link with a
         -- different list of libraries when using GHCi. Examples include: libs
@@ -1098,11 +964,15 @@ linkPackage dflags pkg
         -- libs do not exactly match the .so/.dll equivalents. So if the
         -- package file provides an "extra-ghci-libraries" field then we use
         -- that instead of the "extra-libraries" field.
-                      ++ (if null (Packages.extraGHCiLibraries pkg)
+            extra_libs =
+                      (if null (Packages.extraGHCiLibraries pkg)
                             then Packages.extraLibraries pkg
                             else Packages.extraGHCiLibraries pkg)
                       ++ [ lib | '-':'l':lib <- Packages.ldOptions pkg ]
-        classifieds   <- mapM (locateOneObj dirs) libs'
+
+        hs_classifieds    <- mapM (locateLib dflags True  dirs) hs_libs'
+        extra_classifieds <- mapM (locateLib dflags False dirs) extra_libs
+        let classifieds = hs_classifieds ++ extra_classifieds
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
         let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
@@ -1155,29 +1025,48 @@ loadFrameworks pkg
                                			        ++ fw ++ " (" ++ err ++ ")" ))
 
 -- Try to find an object file for a given library in the given paths.
--- If it isn't present, we assume it's a dynamic library.
-locateOneObj :: [FilePath] -> String -> IO LibrarySpec
-locateOneObj dirs lib
-  | not ("HS" `isPrefixOf` lib)
-    -- For non-Haskell libraries (e.g. gmp, iconv) we assume dynamic library
-  = assumeDll
+-- If it isn't present, we assume that addDLL in the RTS can find it,
+-- which generally means that it should be a dynamic library in the
+-- standard system search path.
+
+locateLib :: DynFlags -> Bool -> [FilePath] -> String -> IO LibrarySpec
+locateLib dflags is_hs dirs lib
+  | not is_hs
+    -- For non-Haskell libraries (e.g. gmp, iconv):
+    --   first look in library-dirs for a dynamic library (libfoo.so)
+    --   then  look in library-dirs for a static library (libfoo.a)
+    --   then  try "gcc --print-file-name" to search gcc's search path
+    --       for a dynamic library (#5289)
+    --   otherwise, assume loadDLL can find it
+    --
+  = findDll `orElse` findArchive `orElse` tryGcc `orElse` assumeDll
+
   | not isDynamicGhcLib
     -- When the GHC package was not compiled as dynamic library
     -- (=DYNAMIC not set), we search for .o libraries or, if they
     -- don't exist, .a libraries.
   = findObject `orElse` findArchive `orElse` assumeDll
+
   | otherwise
     -- When the GHC package was compiled as dynamic library (=DYNAMIC set),
     -- we search for .so libraries first.
-  = findDll `orElse` findObject `orElse` findArchive `orElse` assumeDll
+  = findHSDll `orElse` findObject `orElse` findArchive `orElse` assumeDll
    where
      mk_obj_path dir = dir </> (lib <.> "o")
      mk_arch_path dir = dir </> ("lib" ++ lib <.> "a")
-     dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
-     mk_dyn_lib_path dir = dir </> mkSOName dyn_lib_name
+
+     hs_dyn_lib_name = lib ++ "-ghc" ++ cProjectVersion
+     mk_hs_dyn_lib_path dir = dir </> mkSOName hs_dyn_lib_name
+
+     so_name = mkSOName lib
+     mk_dyn_lib_path dir = dir </> so_name
+
      findObject  = liftM (fmap Object)  $ findFile mk_obj_path  dirs
      findArchive = liftM (fmap Archive) $ findFile mk_arch_path dirs
+     findHSDll   = liftM (fmap DLLPath) $ findFile mk_hs_dyn_lib_path dirs
      findDll     = liftM (fmap DLLPath) $ findFile mk_dyn_lib_path dirs
+     tryGcc      = liftM (fmap DLLPath) $ searchForLibUsingGcc dflags so_name dirs
+
      assumeDll   = return (DLL lib)
      infixr `orElse`
      f `orElse` g = do m <- f
@@ -1185,20 +1074,19 @@ locateOneObj dirs lib
                            Just x -> return x
                            Nothing -> g
 
+searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
+searchForLibUsingGcc dflags so dirs = do
+   str <- askCc dflags (map (FileOption "-L") dirs
+                          ++ [Option "--print-file-name", Option so])
+   let file = case lines str of
+                []  -> ""
+                l:_ -> l
+   if (file == so)
+      then return Nothing
+      else return (Just file)
+
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
-
--- return Nothing == success, else Just error message from dlopen
-loadDynamic :: [FilePath] -> FilePath -> IO (Maybe String)
-loadDynamic paths rootname
-  = do	{ mb_dll <- findFile mk_dll_path paths
-	; case mb_dll of
-	    Just dll -> loadDLL dll
-	    Nothing  -> loadDLL (mkSOName rootname) }
-			-- Tried all our known library paths, so let 
-			-- dlopen() search its own builtin paths now.
-  where
-    mk_dll_path dir = dir </> mkSOName rootname
 
 mkSOName :: FilePath -> FilePath
 mkSOName root

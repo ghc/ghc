@@ -16,7 +16,7 @@ module DynamicLoading (
     ) where
 
 #ifdef GHCI
-import Linker           ( linkModule, getHValue, lessUnsafeCoerce )
+import Linker           ( linkModule, getHValue )
 import OccName          ( occNameSpace )
 import Name             ( nameOccName )
 import SrcLoc           ( noSrcSpan )
@@ -29,6 +29,7 @@ import RdrName          ( RdrName, Provenance(..), ImportSpec(..), ImpDeclSpec(.
                           mkGlobalRdrEnv, lookupGRE_RdrName, gre_name, rdrNameSpace )
 import RnNames          ( gresFromAvails )
 import PrelNames        ( iNTERACTIVE )
+import DynFlags
 
 import HscTypes         ( HscEnv(..), FindResult(..), lookupTypeHscEnv )
 import TypeRep          ( TyThing(..), pprTyThingCategory )
@@ -39,9 +40,12 @@ import Id               ( idType )
 import Module           ( Module, ModuleName )
 import Panic            ( GhcException(..), throwGhcException )
 import FastString
+import ErrUtils
 import Outputable
+import Exception
 
 import Data.Maybe        ( mapMaybe )
+import GHC.Exts          ( unsafeCoerce# )
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
@@ -106,6 +110,21 @@ getValueSafely hsc_env val_name expected_type = do
                 return $ Just value
              else return Nothing
         Just val_thing -> throwCmdLineErrorS $ wrongTyThingError val_name val_thing
+
+
+-- | Coerce a value as usual, but:
+--
+-- 1) Evaluate it immediately to get a segfault early if the coercion was wrong
+--
+-- 2) Wrap it in some debug messages at verbosity 3 or higher so we can see what happened
+--    if it /does/ segfault
+lessUnsafeCoerce :: DynFlags -> String -> a -> IO b
+lessUnsafeCoerce dflags context what = do
+    debugTraceMsg dflags 3 $ (ptext $ sLit "Coercing a value in") <+> (text context) <> (ptext $ sLit "...")
+    output <- evaluate (unsafeCoerce# what)
+    debugTraceMsg dflags 3 $ ptext $ sLit "Successfully evaluated coercion"
+    return output
+
 
 -- | Finds the 'Name' corresponding to the given 'RdrName' in the context of the 'ModuleName'. Returns @Nothing@ if no
 -- such 'Name' could be found. Any other condition results in an exception:

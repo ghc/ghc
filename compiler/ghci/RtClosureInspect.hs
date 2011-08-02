@@ -25,6 +25,7 @@ module RtClosureInspect(
 
 #include "HsVersions.h"
 
+import DebuggerUtils
 import ByteCodeItbls    ( StgInfoTable )
 import qualified ByteCodeItbls as BCI( StgInfoTable(..) )
 import HscTypes

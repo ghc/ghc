@@ -24,6 +24,8 @@ module SysTools (
         figureLlvmVersion,
         readElfSection,
 
+        askCc,
+
         touch,                  -- String -> String -> IO ()
         copy,
         copyWithHeader,
@@ -380,6 +382,38 @@ runCc dflags args =   do
 isContainedIn :: String -> String -> Bool
 xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
+askCc :: DynFlags -> [Option] -> IO String
+askCc dflags args = do
+  let (p,args0) = pgm_c dflags
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
+  let real_args = filter notNull (map showOpt args1)
+  handleProc p "gcc" $
+    readCreateProcess (proc p real_args){ env = mb_env }
+
+-- Version of System.Process.readProcessWithExitCode that takes an environment
+readCreateProcess
+    :: CreateProcess
+    -> IO (ExitCode, String)    -- ^ stdout
+readCreateProcess proc = do
+    (_, Just outh, _, pid) <-
+        createProcess proc{ std_out = CreatePipe }
+
+    -- fork off a thread to start consuming the output
+    output  <- hGetContents outh
+    outMVar <- newEmptyMVar
+    _ <- forkIO $ evaluate (length output) >> putMVar outMVar ()
+
+    -- wait on the output
+    takeMVar outMVar
+    hClose outh
+
+    -- wait on the process
+    ex <- waitForProcess pid
+
+    return (ex, output)
+
+
 -- If the -B<dir> option is set, add <dir> to PATH.  This works around
 -- a bug in gcc on Windows Vista where it can't find its auxiliary
 -- binaries (see bug #1110).
@@ -682,31 +716,31 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
       cmdLine = unwords (pgm:real_args)
 #endif
   traceCmd dflags phase_name cmdLine $ do
-  (exit_code, doesn'tExist) <-
-     catchIO (do
-         rc <- builderMainLoop dflags filter_fn pgm real_args mb_env
-         case rc of
-           ExitSuccess{} -> return (rc, False)
-           ExitFailure n
-             -- rawSystem returns (ExitFailure 127) if the exec failed for any
-             -- reason (eg. the program doesn't exist).  This is the only clue
-             -- we have, but we need to report something to the user because in
-             -- the case of a missing program there will otherwise be no output
-             -- at all.
-            | n == 127  -> return (rc, True)
-            | otherwise -> return (rc, False))
-                -- Should 'rawSystem' generate an IO exception indicating that
-                -- 'pgm' couldn't be run rather than a funky return code, catch
-                -- this here (the win32 version does this, but it doesn't hurt
-                -- to test for this in general.)
-              (\ err ->
-                if IO.isDoesNotExistError err
-                 then return (ExitFailure 1, True)
-                 else IO.ioError err)
-  case (doesn'tExist, exit_code) of
-     (True, _)        -> ghcError (InstallationError ("could not execute: " ++ pgm))
-     (_, ExitSuccess) -> return ()
-     _                -> ghcError (PhaseFailed phase_name exit_code)
+  handleProc pgm phase_name $ do
+     r <- builderMainLoop dflags filter_fn pgm real_args mb_env
+     return (r,())
+
+handleProc :: String -> String -> IO (ExitCode, r) -> IO r
+handleProc pgm phase_name proc = do
+    (rc, r) <- proc `catchIO` handler
+    case rc of
+      ExitSuccess{} -> return r
+      ExitFailure n
+        -- rawSystem returns (ExitFailure 127) if the exec failed for any
+        -- reason (eg. the program doesn't exist).  This is the only clue
+        -- we have, but we need to report something to the user because in
+        -- the case of a missing program there will otherwise be no output
+        -- at all.
+       | n == 127  -> does_not_exist
+       | otherwise -> ghcError (PhaseFailed phase_name rc)
+  where
+    handler err =
+       if IO.isDoesNotExistError err
+          then does_not_exist
+          else IO.ioError err
+
+    does_not_exist = ghcError (InstallationError ("could not execute: " ++ pgm))
+
 
 builderMainLoop :: DynFlags -> (String -> String) -> FilePath
                 -> [String] -> Maybe [(String, String)]
