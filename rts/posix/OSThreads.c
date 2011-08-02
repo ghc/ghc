@@ -101,14 +101,14 @@ waitCondition ( Condition* pCond, Mutex* pMut )
 }
 
 void
-yieldThread()
+yieldThread(void)
 {
   sched_yield();
   return;
 }
 
 void
-shutdownThread()
+shutdownThread(void)
 {
   pthread_exit(NULL);
 }
@@ -123,7 +123,7 @@ createOSThread (OSThreadId* pId, OSThreadProc *startProc, void *param)
 }
 
 OSThreadId
-osThreadId()
+osThreadId(void)
 {
   return pthread_self();
 }
