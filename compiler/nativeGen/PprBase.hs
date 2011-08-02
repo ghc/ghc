@@ -21,7 +21,14 @@ import qualified Outputable
 import CLabel
 import Pretty
 
+-- castSTUArray has moved to Data.Array.Unsafe
+#if __GLASGOW_HASKELL__ >= 701
+import Data.Array.Unsafe( castSTUArray )
+import Data.Array.ST hiding( castSTUArray )
+#else
 import Data.Array.ST
+#endif
+
 import Control.Monad.ST
 
 import Data.Word
