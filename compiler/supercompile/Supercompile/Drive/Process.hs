@@ -36,7 +36,6 @@ import FastString (mkFastString)
 import CoreUtils  (mkPiTypes)
 
 import qualified Data.Foldable as Foldable
-import Data.Traversable (Traversable(traverse))
 import qualified Data.Map as M
 import Data.Monoid
 import Data.Ord

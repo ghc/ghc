@@ -399,10 +399,6 @@ splitBy (_:ys) (x:xs) = first (x:) $ splitBy ys xs
 splitByReverse :: [b] -> [a] -> ([a], [a])
 splitByReverse ys xs = case splitBy ys (reverse xs) of (xs1, xs2) -> (reverse xs2, reverse xs1)
 
-splitManyBy :: [[b]] -> [a] -> [[a]]
-splitManyBy []       [] = []
-splitManyBy (ys:yss) xs = case splitBy ys xs of (xs1, xs2) -> xs1 : splitManyBy yss xs2
-
 listContexts :: [a] -> [([a], a, [a])]
 listContexts xs = zipWith (\is (t:ts) -> (is, t, ts)) (inits xs) (init (tails xs))
 
