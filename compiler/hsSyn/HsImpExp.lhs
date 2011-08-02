@@ -38,6 +38,7 @@ data ImportDecl name
       ideclSource    :: Bool,               -- ^ True <=> {-# SOURCE #-} import
       ideclSafe      :: Bool,               -- ^ True => safe import
       ideclQualified :: Bool,               -- ^ True => qualified
+      ideclImplicit  :: Bool, 		    -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe ModuleName,   -- ^ as Module
       ideclHiding    :: Maybe (Bool, [LIE name]) -- ^ (True => hiding, names)
     } deriving (Data, Typeable)
@@ -48,6 +49,7 @@ simpleImportDecl mn = ImportDecl {
       ideclPkgQual   = Nothing,
       ideclSource    = False,
       ideclSafe      = True,
+      ideclImplicit  = False,
       ideclQualified = False,
       ideclAs        = Nothing,
       ideclHiding    = Nothing
@@ -56,11 +58,17 @@ simpleImportDecl mn = ImportDecl {
 
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
-    ppr (ImportDecl mod' pkg from safe qual as spec)
-      = hang (hsep [ptext (sLit "import"), ppr_imp from, pp_safe safe,
+    ppr (ImportDecl { ideclName = mod', ideclPkgQual = pkg
+                    , ideclSource = from, ideclSafe = safe
+                    , ideclQualified = qual, ideclImplicit = implicit
+                    , ideclAs = as, ideclHiding = spec })
+      = hang (hsep [ptext (sLit "import"), ppr_imp from, pp_implicit implicit, pp_safe safe,
                     pp_qual qual, pp_pkg pkg, ppr mod', pp_as as])
 	     4 (pp_spec spec)
       where
+        pp_implicit False = empty
+        pp_implicit True = ptext (sLit ("(implicit)"))
+
         pp_pkg Nothing  = empty
         pp_pkg (Just p) = doubleQuotes (ftext p)
 

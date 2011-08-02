@@ -37,6 +37,7 @@ import InstEnv
 import FamInstEnv
 import TcAnnotations
 import TcBinds
+import HeaderInfo       ( mkPrelImports )
 import TcType	( tidyTopType )
 import TcDefaults
 import TcEnv
@@ -131,8 +132,15 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 		
    initTc hsc_env hsc_src save_rn_syntax this_mod $ 
    setSrcSpan loc $
-   do {		-- Deal with imports;
-	tcg_env <- tcRnImports hsc_env this_mod prel_imp_loc import_decls ;
+   do {		-- Deal with imports; first add implicit prelude
+        implicit_prelude <- xoptM Opt_ImplicitPrelude;
+        let { prel_imports = mkPrelImports (moduleName this_mod) prel_imp_loc
+                                         implicit_prelude import_decls } ;
+
+        ifWOptM Opt_WarnImplicitPrelude $
+             when (notNull prel_imports) $ addWarn (implicitPreludeWarn) ;
+
+	tcg_env <- tcRnImports hsc_env this_mod (prel_imports ++ import_decls) ;
 	setGblEnv tcg_env		$ do {
 
 		-- Load the hi-boot interface for this module, if any
@@ -192,6 +200,11 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	tcDump tcg_env ;
 	return tcg_env
     }}}}
+
+
+implicitPreludeWarn :: SDoc
+implicitPreludeWarn
+  = ptext (sLit "Module `Prelude' implicitly imported")
 \end{code}
 
 
@@ -203,10 +216,9 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
 \begin{code}
 tcRnImports :: HscEnv -> Module 
-            -> SrcSpan 	 -- Location for the implicit prelude import
             -> [LImportDecl RdrName] -> TcM TcGblEnv
-tcRnImports hsc_env this_mod prel_imp_loc import_decls
-  = do	{ (rn_imports, rdr_env, imports,hpc_info) <- rnImports prel_imp_loc import_decls ;
+tcRnImports hsc_env this_mod import_decls
+  = do	{ (rn_imports, rdr_env, imports,hpc_info) <- rnImports import_decls ;
 
 	; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
 	        -- Make sure we record the dependencies from the DynFlags in the EPS or we

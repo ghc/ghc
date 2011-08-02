@@ -504,7 +504,11 @@ importdecls :: { [LImportDecl RdrName] }
 
 importdecl :: { LImportDecl RdrName }
 	: 'import' maybe_src maybe_safe optqualified maybe_pkg modid maybeas maybeimpspec 
-		{ L (comb4 $1 $6 $7 $8) (ImportDecl $6 $5 $2 $3 $4 (unLoc $7) (unLoc $8)) }
+		{ L (comb4 $1 $6 $7 $8) $
+                  ImportDecl { ideclName = $6, ideclPkgQual = $5
+                             , ideclSource = $2, ideclSafe = $3
+                             , ideclQualified = $4, ideclImplicit = False
+                             , ideclAs = unLoc $7, ideclHiding = unLoc $8 } }
 
 maybe_src :: { IsBootInterface }
 	: '{-# SOURCE' '#-}'			{ True }

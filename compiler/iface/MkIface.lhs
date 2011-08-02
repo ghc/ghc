@@ -1147,7 +1147,7 @@ checkDependencies hsc_env summary iface
    orM = foldr f (return False)
     where f m rest = do b <- m; if b then return True else rest
 
-   dep_missing (L _ (ImportDecl (L _ mod) pkg _ _ _ _ _)) = do
+   dep_missing (L _ (ImportDecl { ideclName = L _ mod, ideclPkgQual = pkg })) = do
      find_res <- liftIO $ findImportedModule hsc_env mod pkg
      case find_res of
         Found _ mod

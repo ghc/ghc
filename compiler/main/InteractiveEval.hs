@@ -778,29 +778,32 @@ fromListBL bound l = BL (length l) bound l []
 -- Setting the context doesn't throw away any bindings; the bindings
 -- we've built up in the InteractiveContext simply move to the new
 -- module.  They always shadow anything in scope in the current context.
-setContext :: GhcMonad m =>
-        [Module]	-- ^ entire top level scope of these modules
-        -> [ImportDecl RdrName]       -- ^ these import declarations
-        -> m ()
-setContext toplev_mods import_decls = do
-    hsc_env <- getSession
-    let old_ic  = hsc_IC     hsc_env
-        hpt     = hsc_HPT    hsc_env
-        imprt_decls = map noLoc import_decls
-    --
-    import_env  <-
-        if null imprt_decls then return emptyGlobalRdrEnv else do
-            let this_mod | null toplev_mods = pRELUDE
-                         | otherwise        = head toplev_mods
-            liftIO $ hscRnImportDecls hsc_env this_mod imprt_decls
+setContext :: GhcMonad m => [InteractiveImport] -> m ()
+setContext imports
+  = do { hsc_env <- getSession
+       ; let old_ic = hsc_IC hsc_env
+       ; all_env <- liftIO $ findGlobalRdrEnv hsc_env imports
+       ; modifySession $ \_ ->
+         hsc_env{ hsc_IC = old_ic { ic_imports      = imports
+                                  , ic_rn_gbl_env   = all_env }}}
 
-    toplev_envs <- liftIO $ mapM (mkTopLevEnv hpt) toplev_mods
+findGlobalRdrEnv :: HscEnv -> [InteractiveImport] -> IO GlobalRdrEnv
+-- Compute the GlobalRdrEnv for the interactive context
+findGlobalRdrEnv hsc_env imports
+  = do { idecls_env <- hscRnImportDecls hsc_env this_mod idecls
+       	 	    -- This call also loads any orphan modules
+       ; imods_env  <- mapM (mkTopLevEnv (hsc_HPT hsc_env)) imods
+       ; return (foldr plusGlobalRdrEnv idecls_env imods_env) }
+  where
+    idecls :: [LImportDecl RdrName]
+    idecls = [noLoc d | IIDecl d <- imports]
 
-    let all_env = foldr plusGlobalRdrEnv import_env toplev_envs
-    modifySession $ \_ ->
-        hsc_env{ hsc_IC = old_ic { ic_toplev_scope = toplev_mods,
-                                   ic_imports      = import_decls,
-                                   ic_rn_gbl_env   = all_env }}
+    imods :: [Module]
+    imods = [m | IIModule m <- imports]
+
+    this_mod = case imods of 
+                 []    -> pRELUDE
+                 (m:_) -> m
 
 availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
 availsToGlobalRdrEnv mod_name avails
@@ -828,9 +831,9 @@ mkTopLevEnv hpt modl
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
 -- of modules from which we take just the exports respectively.
-getContext :: GhcMonad m => m ([Module],[ImportDecl RdrName])
+getContext :: GhcMonad m => m [InteractiveImport]
 getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
-               return (ic_toplev_scope ic, ic_imports ic)
+             return (ic_imports ic)
 
 -- | Returns @True@ if the specified module is interpreted, and hence has
 -- its full top-level scope available.

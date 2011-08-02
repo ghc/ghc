@@ -100,19 +100,21 @@ mkPrelImports this_mod loc implicit_prelude import_decls
   | otherwise = [preludeImportDecl]
   where
       explicit_prelude_import
-       = notNull [ () | L _ (ImportDecl mod Nothing _ _ _ _ _) <- import_decls,
-	           unLoc mod == pRELUDE_NAME ]
+       = notNull [ () | L _ (ImportDecl { ideclName = mod
+                                        , ideclPkgQual = Nothing }) 
+                          <- import_decls
+	              , unLoc mod == pRELUDE_NAME ]
 
       preludeImportDecl :: LImportDecl RdrName
       preludeImportDecl
-        = L loc $
-          ImportDecl (L loc pRELUDE_NAME)
-               Nothing  {- No specific package -}
-               False    {- Not a boot interface -}
-               False    {- Not a safe import -}
-               False    {- Not qualified -}
-               Nothing  {- No "as" -}
-               Nothing  {- No import list -}
+        = L loc $ ImportDecl { ideclName      = L loc pRELUDE_NAME,
+      		    	       ideclPkgQual   = Nothing,
+      		    	       ideclSource    = False,
+      		    	       ideclSafe      = False,  -- Not a safe import
+      		    	       ideclQualified = False,
+      		    	       ideclImplicit  = True,	-- Implicit!
+      		    	       ideclAs        = Nothing,
+      		    	       ideclHiding    = Nothing  }
 
 parseError :: SrcSpan -> Message -> IO a
 parseError span err = throwOneError $ mkPlainErrMsg span err

@@ -22,7 +22,7 @@ import Debugger
 -- The GHC interface
 import qualified GHC hiding (resume, runStmt)
 import GHC              ( LoadHowMuch(..), Target(..),  TargetId(..),
-                          TyThing(..), Phase,
+                          InteractiveImport(..), TyThing(..), Phase,
                           BreakIndex, Resume, SingleStep,
                           Ghc, handleSourceError )
 import PprTyThing
@@ -53,6 +53,7 @@ import Linker
 import Util
 import NameSet
 import Maybes		( orElse, expectJust )
+import ListSetOps( removeRedundant )
 import FastString
 import Encoding
 import Foreign.C
@@ -350,7 +351,7 @@ interactiveUI srcs maybe_exprs = do
 
    -- initial context is just the Prelude
    let prel_mn = GHC.mkModuleName "Prelude"
-   GHC.setContext [] [simpleImportDecl prel_mn]
+   GHC.setContext [IIDecl (simpleImportDecl prel_mn)]
 
    default_editor <- liftIO $ findEditor
 
@@ -548,7 +549,7 @@ fileLoop hdl = do
 
 mkPrompt :: GHCi String
 mkPrompt = do
-  (toplevs,imports) <- GHC.getContext
+  imports <- GHC.getContext
   resumes <- GHC.getResumeContext
   -- st <- getGHCiState
 
@@ -573,8 +574,8 @@ mkPrompt = do
        --  let (btoplevs, bexports) = fromMaybe ([],[]) (remembered_ctx st) in
        --  hsep (map (\m -> text "!*" <> ppr (GHC.moduleName m)) btoplevs) <+>
        --  hsep (map (\m -> char '!'  <> ppr (GHC.moduleName m)) bexports) <+>
-             hsep (map (\m -> char '*'  <> ppr (GHC.moduleName m)) toplevs) <+>
-             hsep (map ppr (nub (map ideclName imports)))
+             hsep [ char '*' <> ppr (GHC.moduleName m) | IIModule m <- imports ] <+>
+             hsep (map ppr (nub [unLoc (ideclName d) | IIDecl d <- imports]))
 
         deflt_prompt = dots <> context_bit <> modules_bit
 
@@ -1163,7 +1164,7 @@ reloadModule m = do
                   else LoadUpTo (GHC.mkModuleName m)
   return ()
 
-doLoad :: Bool -> ([Module],[ImportDecl RdrName]) -> LoadHowMuch -> InputT GHCi SuccessFlag
+doLoad :: Bool -> [InteractiveImport] -> LoadHowMuch -> InputT GHCi SuccessFlag
 doLoad retain_context prev_context howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
@@ -1172,7 +1173,7 @@ doLoad retain_context prev_context howmuch = do
   afterLoad ok retain_context prev_context
   return ok
 
-afterLoad :: SuccessFlag -> Bool -> ([Module],[ImportDecl RdrName]) -> InputT GHCi ()
+afterLoad :: SuccessFlag -> Bool -> [InteractiveImport] -> InputT GHCi ()
 afterLoad ok retain_context prev_context = do
   lift revertCAFs  -- always revert CAFs on load.
   lift discardTickArrays
@@ -1184,10 +1185,9 @@ afterLoad ok retain_context prev_context = do
   lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
 
-setContextAfterLoad :: ([Module],[ImportDecl RdrName]) -> Bool -> [GHC.ModSummary] -> GHCi ()
+setContextAfterLoad :: [InteractiveImport] -> Bool -> [GHC.ModSummary] -> GHCi ()
 setContextAfterLoad prev keep_ctxt [] = do
-  prel_mod <- getPrelude
-  setContextKeepingPackageModules prev keep_ctxt ([], [simpleImportDecl prel_mod])
+  setContextKeepingPackageModules prev keep_ctxt []
 setContextAfterLoad prev keep_ctxt ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- GHC.getTargets
@@ -1212,39 +1212,35 @@ setContextAfterLoad prev keep_ctxt ms = do
 
    load_this summary | m <- GHC.ms_mod summary = do
 	b <- GHC.moduleIsInterpreted m
-	if b then setContextKeepingPackageModules prev keep_ctxt ([m], [])
+	if b then setContextKeepingPackageModules prev keep_ctxt [IIModule m]
        	     else do
-                prel_mod <- getPrelude
                 setContextKeepingPackageModules prev keep_ctxt
-                  ([], [simpleImportDecl prel_mod,
-                        simpleImportDecl (GHC.moduleName m)])
+                  [IIDecl $ simpleImportDecl (GHC.moduleName m)]
 
 -- | Keep any package modules (except Prelude) when changing the context.
 setContextKeepingPackageModules
-        :: ([Module],[ImportDecl RdrName])          -- previous context
+        :: [InteractiveImport]          -- previous context
         -> Bool                         -- re-execute :module commands
-        -> ([Module],[ImportDecl RdrName])          -- new context
+        -> [InteractiveImport]          -- new context
         -> GHCi ()
-setContextKeepingPackageModules prev_context keep_ctxt (as,bs) = do
-  let (_,imports0) = prev_context
+setContextKeepingPackageModules prev_context keep_ctxt new_context = do
   prel_mod <- getPrelude
   -- filter everything, not just lefts
 
-  let is_pkg_mod i
-         | unLoc (ideclName i) == prel_mod = return False
-         | otherwise = do
-              e <- gtry $ GHC.findModule (unLoc (ideclName i)) (ideclPkgQual i)
+  let is_pkg_import :: InteractiveImport -> GHCi Bool
+      is_pkg_import (IIDecl d)
+         | let mod_name = unLoc (ideclName d) 
+         , mod_name /= prel_mod
+         = do e <- gtry $ GHC.findModule mod_name (ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isHomeModule m))
+      is_pkg_import _ =  return False
 
-  pkg_modules <- filterM is_pkg_mod imports0
+  prev_pkg_imports <- filterM is_pkg_import prev_context
 
-  let bs1 = if null as
-               then nubBy sameMod (simpleImportDecl prel_mod : bs)
-               else bs
-
-  GHC.setContext as (nubBy sameMod (bs1 ++ pkg_modules))
+  mySetContext (prev_pkg_imports ++ new_context)
+       --
   if keep_ctxt
      then do
           st <- getGHCiState
@@ -1255,9 +1251,6 @@ setContextKeepingPackageModules prev_context keep_ctxt (as,bs) = do
 
 isHomeModule :: Module -> Bool
 isHomeModule mod = GHC.modulePackageId mod == mainPackageId
-
-sameMod :: ImportDecl RdrName -> ImportDecl RdrName -> Bool
-sameMod x y = unLoc (ideclName x) == unLoc (ideclName y)
 
 modulesLoadedMsg :: SuccessFlag -> [ModuleName] -> InputT GHCi ()
 modulesLoadedMsg ok mods = do
@@ -1338,18 +1331,8 @@ isSafeCmd m =
     [s] | looksLikeModuleName s -> do
         m <- lift $ lookupModule s
         isSafeModule m
-    [] -> do
-        (as,bs) <- GHC.getContext
-                -- Guess which module the user wants to browse.  Pick
-                -- modules that are interpreted first.  The most
-                -- recently-added module occurs last, it seems.
-        case (as,bs) of
-          (as@(_:_), _)   -> isSafeModule $ last as
-          ([],  bs@(_:_)) -> do
-             let i = last bs
-             m <- GHC.findModule (unLoc (ideclName i)) (ideclPkgQual i)
+    [] -> do m <- guessCurrentModule
              isSafeModule m
-          ([], [])  -> ghcError (CmdLineError ":issafe: no current module")
     _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
 
 isSafeModule :: Module -> InputT GHCi ()
@@ -1389,19 +1372,20 @@ browseCmd bang m =
     [s] | looksLikeModuleName s -> do
         m <- lift $ lookupModule s
         browseModule bang m True
-    [] -> do
-        (as,bs) <- GHC.getContext
-                -- Guess which module the user wants to browse.  Pick
-                -- modules that are interpreted first.  The most
-                -- recently-added module occurs last, it seems.
-        case (as,bs) of
-          (as@(_:_), _)   -> browseModule bang (last as) True
-          ([],  bs@(_:_)) -> do
-             let i = last bs
-             m <- GHC.findModule (unLoc (ideclName i)) (ideclPkgQual i)
+    [] -> do m <- guessCurrentModule
              browseModule bang m True
-          ([], [])  -> ghcError (CmdLineError ":browse: no current module")
     _ -> ghcError (CmdLineError "syntax:  :browse <module>")
+
+guessCurrentModule :: InputT GHCi Module
+-- Guess which module the user wants to browse.  Pick
+-- modules that are interpreted first.  The most
+-- recently-added module occurs last, it seems.
+guessCurrentModule 
+  = do { imports <- GHC.getContext
+       ; when (null imports) (ghcError (CmdLineError ":issafe: no current module"))
+       ; case (last imports) of
+          IIModule m -> return m
+          IIDecl d   -> GHC.findModule (unLoc (ideclName d)) (ideclPkgQual d) }
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -1411,15 +1395,17 @@ browseModule :: Bool -> Module -> Bool -> InputT GHCi ()
 browseModule bang modl exports_only = do
   -- :browse! reports qualifiers wrt current context
   current_unqual <- GHC.getPrintUnqual
+
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
-  (as,bs) <- GHC.getContext
-  prel_mod <- lift getPrelude
-  if exports_only then GHC.setContext [] [simpleImportDecl prel_mod,
-                                          simpleImportDecl (GHC.moduleName modl)]
-                  else GHC.setContext [modl] []
+  -- Use mySetContext so we get an implicit Prelude import 
+  -- for the PrintUnqualified
+  imports <- GHC.getContext
+  lift $ mySetContext (if exports_only	
+                       then [IIDecl $ simpleImportDecl (GHC.moduleName modl)]
+                       else [IIModule modl])
   target_unqual <- GHC.getPrintUnqual
-  GHC.setContext as bs
+  GHC.setContext imports
 
   let unqual = if bang then current_unqual else target_unqual
 
@@ -1491,13 +1477,12 @@ browseModule bang modl exports_only = do
 
 -----------------------------------------------------------------------------
 -- Setting the module context
-
-newContextCmd :: CtxtCmd -> GHCi ()
-newContextCmd cmd = do
-  playCtxtCmds True [cmd]
-  st <- getGHCiState
-  let cmds = remembered_ctx st
-  setGHCiState st{ remembered_ctx = cmds ++ [cmd] }
+-- This handles  Command     Constructor in CtxtCmd
+--               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--               :m X        SetContext
+--               :m +X       AddModules
+--               :m -X       RemModules    
+--               import X    Import
 
 moduleCmd :: String -> GHCi ()
 moduleCmd str
@@ -1520,65 +1505,66 @@ moduleCmd str
     starred ('*':m) = Left m
     starred m       = Right m
 
-type Context = ([GHC.Module], [GHC.ImportDecl GHC.RdrName])
+newContextCmd :: CtxtCmd -> GHCi ()
+newContextCmd cmd = do
+  playCtxtCmds True [cmd]
+  st <- getGHCiState
+  let cmds = remembered_ctx st
+  setGHCiState st{ remembered_ctx = cmds ++ [cmd] }
 
 playCtxtCmds :: Bool -> [CtxtCmd] -> GHCi ()
 playCtxtCmds fail cmds = do
   ctx <- GHC.getContext
-  (as,bs) <- foldM (playCtxtCmd fail) ctx cmds
-  GHC.setContext as bs
+  ctx' <- foldM (playCtxtCmd fail) ctx cmds
+  mySetContext ctx'	-- Eliminate dups and add Prelude if not there
 
-playCtxtCmd:: Bool -> Context -> CtxtCmd -> GHCi Context
-playCtxtCmd fail (prev_as, prev_bs) cmd = do
+playCtxtCmd:: Bool -> [InteractiveImport] -> CtxtCmd -> GHCi [InteractiveImport]
+playCtxtCmd fail prev cmd = do
     case cmd of
         SetContext as bs -> do
           (as',bs') <- do_checks as bs
-          prel_mod <- getPrelude
-          let bs'' = if null as && prel_mod `notElem` bs'
-                        then prel_mod : bs'
-                        else bs'
-          return (as', map simpleImportDecl bs'')
+          return (mk_imps as' bs')
 
         AddModules as bs -> do
           (as',bs') <- do_checks as bs
-          let (remaining_as, remaining_bs) =
-                   prev_without (map moduleName as' ++ bs')
-          return (remaining_as ++ as', remaining_bs ++ map simpleImportDecl bs')
+          return (prev_without as' bs' prev ++ mk_imps as' bs')
 
         RemModules as bs -> do
           (as',bs') <- do_checks as bs
-          let (new_as, new_bs) = prev_without (map moduleName as' ++ bs')
-          return (new_as, new_bs)
+          return (prev_without as' bs' prev)
 
         Import str -> do
           m_idecl <- maybe_fail $ GHC.parseImportDecl str
           case m_idecl of
-            Nothing    -> return (prev_as, prev_bs)
+            Nothing    -> return prev
             Just idecl -> do
               m_mdl <- maybe_fail $ loadModuleName idecl
               case m_mdl of
-                Nothing -> return (prev_as, prev_bs)
-                Just _  -> return (prev_as,  prev_bs ++ [idecl])
-                     -- we don't filter the module out of the old declarations,
+                Nothing -> return prev
+                Just _  -> return (prev ++ [IIDecl idecl])
+                     -- We don't filter the module out of the old declarations,
                      -- because 'import' is supposed to be cumulative.
   where
     maybe_fail | fail      = liftM Just
                | otherwise = trymaybe
 
-    prev_without names = (as',bs')
-      where as' = deleteAllBy sameModName prev_as names
-            bs' = deleteAllBy importsSameMod prev_bs names
+    prev_without :: [Module] -> [ModuleName]
+                 -> [InteractiveImport] -> [InteractiveImport]
+    prev_without as bs imports
+      = filterOut is_new imports
+      where
+        is_new ii = iiModuleName ii `elem` new
+        new = map moduleName as ++ bs
 
+    do_checks :: [String] -> [String] -> GHCi ([Module], [ModuleName])
     do_checks as bs = do
          as' <- mapM (maybe_fail . wantInterpretedModule) as
          bs' <- mapM (maybe_fail . liftM moduleName . lookupModule) bs
          return (catMaybes as', catMaybes bs')
 
-    sameModName a b = moduleName a == b
-    importsSameMod a b = unLoc (ideclName a) == b
-
-    deleteAllBy :: (a -> b -> Bool) -> [a] -> [b] -> [a]
-    deleteAllBy f as bs = filter (\a-> not (any (f a) bs)) as
+    mk_imps :: [Module] -> [ModuleName] -> [InteractiveImport]
+    mk_imps as bs = [IIModule a | a <- as] ++
+                    [IIDecl (simpleImportDecl b) | b <- bs]
 
 trymaybe ::GHCi a -> GHCi (Maybe a)
 trymaybe m = do
@@ -1586,6 +1572,42 @@ trymaybe m = do
     case r of
       Left _  -> return Nothing
       Right a -> return (Just a)
+
+mySetContext :: [InteractiveImport] -> GHCi ()
+-- Remove redundant imports
+-- and add an implicit Prelude one
+mySetContext imports
+  = do { prel_mod <- getPrelude
+       ; let imports1 = removeRedundant subsumesID imports
+             prel_imports 
+               | any no_prelude_imp imports1 = []
+               | otherwise                   = [IIDecl (simpleImportDecl prel_mod)]
+             no_prelude_imp (IIModule {}) = True
+             no_prelude_imp (IIDecl d)    = unLoc (ideclName d) == prel_mod
+
+       ; GHC.setContext (prel_imports ++ imports1) }
+
+iiModuleName :: InteractiveImport -> ModuleName
+iiModuleName (IIModule m) = moduleName m
+iiModuleName (IIDecl d)   = unLoc (ideclName d)
+
+iiModules :: [InteractiveImport] -> [Module]
+iiModules is = [m | IIModule m <- is]
+
+-- iiDecls :: [InteractiveImport] -> [ImportDecl RdrName]
+-- iiDecls is = [d | IIDecl d <- is]
+
+subsumesID :: InteractiveImport -> InteractiveImport -> Bool
+-- Remove any redundant imports
+subsumesID (IIModule m1) (IIModule m2) = m1==m2
+subsumesID (IIModule m1) (IIDecl d)    = moduleName m1 == unLoc (ideclName d)
+subsumesID (IIDecl d1) (IIDecl d2)      -- A bit crude
+  =  unLoc (ideclName d1) == unLoc (ideclName d2)
+  && ideclAs d1 == ideclAs d2
+  && not (ideclQualified d1)
+  && isNothing (ideclHiding d1) 
+subsumesID _ _ = False
+
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
@@ -1731,7 +1753,7 @@ newDynFlags minus_opts = do
         _ <- GHC.load LoadAllTargets
         liftIO (linkPackages dflags new_pkgs)
         -- package flags changed, we can't re-use any of the old context
-        setContextAfterLoad ([],[]) False []
+        setContextAfterLoad [] False []
       return ()
 
 
@@ -1933,8 +1955,8 @@ completeModule = wrapIdentCompleter $ \w -> do
 completeSetModule = wrapIdentCompleterWithModifier "+-" $ \m w -> do
   modules <- case m of
     Just '-' -> do
-      (toplevs, imports) <- GHC.getContext
-      return $ map GHC.moduleName toplevs ++ map (unLoc.ideclName) imports
+      imports <- GHC.getContext
+      return $ map iiModuleName imports
     _ -> do
       dflags <- GHC.getSessionDynFlags
       let pkg_mods = allExposedModules dflags
@@ -2253,8 +2275,8 @@ breakSwitch (arg1:rest)
         mod <- wantInterpretedModule arg1
         breakByModule mod rest
    | all isDigit arg1 = do
-        (toplevel, _) <- GHC.getContext
-        case toplevel of
+        imports <- GHC.getContext
+        case iiModules imports of
            (mod : _) -> breakByModuleLine mod (read arg1) rest
            [] -> do 
               liftIO $ putStrLn "Cannot find default module for breakpoint." 
@@ -2410,8 +2432,8 @@ listCmd' str = list2 (words str)
 
 list2 :: [String] -> InputT GHCi ()
 list2 [arg] | all isDigit arg = do
-    (toplevel, _) <- GHC.getContext
-    case toplevel of
+    imports <- GHC.getContext
+    case iiModules imports of
         [] -> liftIO $ putStrLn "No module to list"
         (mod : _) -> listModuleLine mod (read arg)
 list2 [arg1,arg2] | looksLikeModuleName arg1, all isDigit arg2 = do

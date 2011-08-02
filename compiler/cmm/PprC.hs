@@ -48,7 +48,14 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Word
 
+-- castSTUArray has moved to Data.Array.Unsafe
+#if __GLASGOW_HASKELL__ >= 701
+import Data.Array.Unsafe( castSTUArray )
+import Data.Array.ST hiding( castSTUArray )
+#else
 import Data.Array.ST
+#endif
+
 import Control.Monad.ST
 
 #if defined(alpha_TARGET_ARCH) || defined(mips_TARGET_ARCH) || defined(mipsel_TARGET_ARCH) || defined(arm_TARGET_ARCH)
