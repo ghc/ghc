@@ -74,7 +74,7 @@ data TermF ann = Var Id
                | App (ann (TermF ann)) Id
                | PrimOp PrimOp [Type] [ann (TermF ann)]
                | Case (ann (TermF ann)) Id Type [AltF ann]
-               | Let Id (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case the evaluation rules must change
+               | Let Id (ann (TermF ann)) (ann (TermF ann)) -- NB: might bind an unlifted thing, in which case evaluation changes. Unlike GHC, we do NOT assume the RHSes of unlifted bindings are ok-for-speculation.
                | LetRec [(Id, ann (TermF ann))] (ann (TermF ann))
                | Cast (ann (TermF ann)) Coercion
 

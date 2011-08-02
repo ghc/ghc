@@ -9,7 +9,7 @@ import qualified Supercompile.Drive.Process as S
 import BasicTypes (InlinePragma(..), InlineSpec(..), isActiveIn)
 import CoreSyn
 import CoreFVs    (exprFreeVars)
-import CoreUtils  (exprType)
+import CoreUtils  (exprType, bindNonRec)
 import CoreUnfold (exprIsConApp_maybe)
 import Coercion   (Coercion, isCoVar, isCoVarType, mkCoVarCo, mkAxInstCo)
 import DataCon    (DataCon, dataConWorkId, dataConAllTyVars, dataConRepArgTys, dataConTyCon, dataConName)
@@ -184,7 +184,7 @@ termToCoreExpr = term
         S.App e x           -> term e `App` Var x
         S.PrimOp pop tys es -> Var (mkPrimOpId pop) `mkTyApps` tys `mkApps` map term es
         S.Case e x ty alts  -> Case (term e) x ty (map alt alts)
-        S.Let x e1 e2       -> Let (NonRec x (term e1)) (term e2)
+        S.Let x e1 e2       -> bindNonRec x (term e1) (term e2)
         S.LetRec xes e      -> Let (Rec (map (second term) xes)) (term e)
         S.Cast e co         -> Cast (term e) co
     
