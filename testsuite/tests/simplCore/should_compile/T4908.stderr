@@ -11,10 +11,10 @@ T4908.f_$s$wf =
   \ (sc :: GHC.Prim.Int#)
     (sc1 :: GHC.Types.Int)
     (sc2 :: GHC.Prim.Int#) ->
-    case sc of ds {
+    case sc2 of ds {
       __DEFAULT ->
-        case sc2 of ds1 {
-          __DEFAULT -> T4908.f_$s$wf (GHC.Prim.-# ds 1) sc1 ds1;
+        case sc of ds1 {
+          __DEFAULT -> T4908.f_$s$wf ds1 sc1 (GHC.Prim.-# ds 1);
           0 -> GHC.Types.True
         };
       0 -> GHC.Types.True
@@ -38,7 +38,7 @@ T4908.$wf =
         case w of _ { (a, b) ->
         case b of _ { GHC.Types.I# ds1 ->
         case ds1 of ds2 {
-          __DEFAULT -> T4908.f_$s$wf (GHC.Prim.-# ds 1) a ds2;
+          __DEFAULT -> T4908.f_$s$wf ds2 a (GHC.Prim.-# ds 1);
           0 -> GHC.Types.True
         }
         }
@@ -69,7 +69,7 @@ T4908.f =
     forall (sc :: GHC.Prim.Int#)
            (sc1 :: GHC.Types.Int)
            (sc2 :: GHC.Prim.Int#).
-      T4908.$wf sc (sc1, GHC.Types.I# sc2)
+      T4908.$wf sc2 (sc1, GHC.Types.I# sc)
       = T4908.f_$s$wf sc sc1 sc2
 
 
