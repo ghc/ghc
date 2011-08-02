@@ -671,25 +671,36 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
   = ptext (sLit "defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
   = case whys of
-	(why:_) -> sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
+	(why:_) -> sep [ppr why, ppr_defn_site why name]
 	[] -> panic "pprNameProvenance"
 
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
-ppr_defn :: SrcLoc -> SDoc
-ppr_defn (RealSrcLoc loc) = parens (ptext (sLit "defined at") <+> ppr loc)
-ppr_defn (UnhelpfulLoc _) = empty
+ppr_defn_site :: ImportSpec -> Name -> SDoc
+ppr_defn_site imp_spec name 
+  | same_module && not (isGoodSrcSpan loc)
+  = empty	       -- Nothing interesting to say
+  | otherwise
+  = parens $ hang (ptext (sLit "and originally defined") <+> pp_mod)
+                2 (pprLoc loc)
+  where
+    loc = nameSrcSpan name
+    defining_mod = nameModule name
+    same_module = importSpecModule imp_spec == moduleName defining_mod
+    pp_mod | same_module = empty
+           | otherwise   = ptext (sLit "in") <+> quotes (ppr defining_mod)
+
 
 instance Outputable ImportSpec where
    ppr imp_spec
      = ptext (sLit "imported") <+> qual 
-        <+> ptext (sLit "from") <+> ppr (importSpecModule imp_spec) 
-	<+> pprLoc
+        <+> ptext (sLit "from") <+> quotes (ppr (importSpecModule imp_spec))
+	<+> pprLoc (importSpecLoc imp_spec)
      where
        qual | is_qual (is_decl imp_spec) = ptext (sLit "qualified")
             | otherwise                  = empty
-       loc = importSpecLoc imp_spec
-       pprLoc = case loc of
-                RealSrcSpan s -> ptext (sLit "at") <+> ppr s
-                UnhelpfulSpan _ -> empty
+
+pprLoc :: SrcSpan -> SDoc
+pprLoc (RealSrcSpan s)    = ptext (sLit "at") <+> ppr s
+pprLoc (UnhelpfulSpan {}) = empty
 \end{code}

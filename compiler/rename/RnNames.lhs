@@ -1674,8 +1674,9 @@ exportClashErr global_env name1 name2 ie1 ie2
          , ppr_export ie2' name2' ]
   where
     occ = nameOccName name1
-    ppr_export ie name = nest 2 (quotes (ppr ie) <+> ptext (sLit "exports") <+>
-                                 quotes (ppr name) <+> pprNameProvenance (get_gre name))
+    ppr_export ie name = nest 3 (hang (quotes (ppr ie) <+> ptext (sLit "exports") <+>
+                                       quotes (ppr name))
+                                    2 (pprNameProvenance (get_gre name)))
 
     -- get_gre finds a GRE for the Name, so that we can show its provenance
     get_gre name
