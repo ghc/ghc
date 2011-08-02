@@ -977,54 +977,17 @@ mkIfaceAnnotation (Annotation { ann_target = target, ann_value = serialized }) =
 \end{code}
 
 \begin{code}
-mkIfaceExports :: [AvailInfo]
-               -> [(Module, [GenAvailInfo OccName])]
-                  -- Group by module and sort by occurrence
+mkIfaceExports :: [AvailInfo] -> [IfaceExport]  -- Sort to make canonical
 mkIfaceExports exports
-  = [ (mod, Map.elems avails)
-    | (mod, avails) <- sortBy (stableModuleCmp `on` fst)
-                              (moduleEnvToList groupFM)
-                       -- NB. the Map.toList is in a random order,
-                       -- because Ord Module is not a predictable
-                       -- ordering.  Hence we perform a final sort
-                       -- using the stable Module ordering.
-    ]
+  = sortBy stableAvailCmp (map sort_subs exports)
   where
-	-- Group by the module where the exported entities are defined
-	-- (which may not be the same for all Names in an Avail)
-	-- Deliberately use Map rather than UniqFM so we
-	-- get a canonical ordering
-    groupFM :: ModuleEnv (Map FastString (GenAvailInfo OccName))
-    groupFM = foldl add emptyModuleEnv exports
-
-    add_one :: ModuleEnv (Map FastString (GenAvailInfo OccName))
-	    -> Module -> GenAvailInfo OccName
-	    -> ModuleEnv (Map FastString (GenAvailInfo OccName))
-    add_one env mod avail 
-      -- XXX Is there a need to flip Map.union here?
-      =  extendModuleEnvWith (flip Map.union) env mod 
-		(Map.singleton (occNameFS (availName avail)) avail)
-
-	-- NB: we should not get T(X) and T(Y) in the export list
-	--     else the Map.union will simply discard one!  They
-	--     should have been combined by now.
-    add env (Avail n)
-      = ASSERT( isExternalName n ) 
-        add_one env (nameModule n) (Avail (nameOccName n))
-
-    add env (AvailTC tc ns)
-      = ASSERT( all isExternalName ns ) 
-	foldl add_for_mod env mods
-      where
-	tc_occ = nameOccName tc
-	mods   = nub (map nameModule ns)
-		-- Usually just one, but see Note [Original module]
-
-	add_for_mod env mod
-	    = add_one env mod (AvailTC tc_occ (sort names_from_mod))
-              -- NB. sort the children, we need a canonical order
-	    where
-	      names_from_mod = [nameOccName n | n <- ns, nameModule n == mod]
+    sort_subs :: AvailInfo -> AvailInfo
+    sort_subs (Avail n) = Avail n
+    sort_subs (AvailTC n []) = AvailTC n []
+    sort_subs (AvailTC n (m:ms)) 
+       | n==m      = AvailTC n (m:sortBy stableNameCmp ms)
+       | otherwise = AvailTC n (sortBy stableNameCmp (m:ms))
+       -- Maintain the AvailTC Invariant
 \end{code}
 
 Note [Orignal module]

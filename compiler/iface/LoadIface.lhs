@@ -590,7 +590,7 @@ initExternalPackageState
 ghcPrimIface :: ModIface
 ghcPrimIface
   = (emptyModIface gHC_PRIM) {
-	mi_exports  = [(gHC_PRIM, ghcPrimExports)],
+	mi_exports  = ghcPrimExports,
 	mi_decls    = [],
 	mi_fixities = fixities,
 	mi_fix_fn  = mkIfaceFixCache fixities
@@ -657,7 +657,8 @@ pprModIface iface
         , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (ptext (sLit "where"))
-	, vcat (map pprExport (mi_exports iface))
+	, ptext (sLit "exports:")
+        , nest 2 (vcat (map pprExport (mi_exports iface)))
 	, pprDeps (mi_deps iface)
 	, vcat (map pprUsage (mi_usages iface))
 	, vcat (map pprIfaceAnnotation (mi_anns iface))
@@ -684,16 +685,12 @@ When printing export lists, we print like this:
 
 \begin{code}
 pprExport :: IfaceExport -> SDoc
-pprExport (mod, items)
- = hsep [ ptext (sLit "export"), ppr mod, hsep (map pp_avail items) ]
-  where
-    pp_avail :: GenAvailInfo OccName -> SDoc
-    pp_avail (Avail occ)    = ppr occ
-    pp_avail (AvailTC _ []) = empty
-    pp_avail (AvailTC n (n':ns)) 
-	| n==n'     = ppr n <> pp_export ns
- 	| otherwise = ppr n <> char '|' <> pp_export (n':ns)
-    
+pprExport (Avail n)      = ppr n
+pprExport (AvailTC _ []) = empty
+pprExport (AvailTC n (n':ns)) 
+  | n==n'     = ppr n <> pp_export ns
+  | otherwise = ppr n <> char '|' <> pp_export (n':ns)
+  where  
     pp_export []    = empty
     pp_export names = braces (hsep (map ppr names))
 

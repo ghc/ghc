@@ -57,7 +57,7 @@ module Name (
 	isValName, isVarName,
 	isWiredInName, isBuiltInSyntax,
 	wiredInNameTyThing_maybe, 
-	nameIsLocalOrFrom,
+	nameIsLocalOrFrom, stableNameCmp,
 
 	-- * Class 'NamedThing' and overloaded friends
 	NamedThing(..),
@@ -341,6 +341,26 @@ hashName name = getKey (nameUnique name) + 1
 
 cmpName :: Name -> Name -> Ordering
 cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
+
+stableNameCmp :: Name -> Name -> Ordering
+-- Compare lexicographically
+stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
+	      (Name { n_sort = s2, n_occ = occ2 })
+  = (s1 `sort_cmp` s2) `thenCmp` (occ1 `compare` occ2)
+    -- The ordinary compare on OccNames is lexicogrpahic
+  where
+    -- Later constructors are bigger
+    sort_cmp (External m1) (External m2)       = m1 `stableModuleCmp` m2
+    sort_cmp (External {}) _                   = LT
+    sort_cmp (WiredIn {}) (External {})        = GT
+    sort_cmp (WiredIn m1 _ _) (WiredIn m2 _ _) = m1 `stableModuleCmp` m2
+    sort_cmp (WiredIn {})     _                = LT
+    sort_cmp Internal         (External {})    = GT
+    sort_cmp Internal         (WiredIn {})     = GT
+    sort_cmp Internal         Internal         = EQ
+    sort_cmp Internal         System           = LT
+    sort_cmp System           System           = EQ
+    sort_cmp System           _                = GT
 \end{code}
 
 %************************************************************************

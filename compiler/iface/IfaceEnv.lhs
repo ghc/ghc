@@ -123,25 +123,7 @@ newImplicitBinder base_name mk_sys_occ
     loc = nameSrcSpan base_name
 
 ifaceExportNames :: [IfaceExport] -> TcRnIf gbl lcl [AvailInfo]
-ifaceExportNames exports = do
-  mod_avails <- mapM (\(mod,avails) -> mapM (lookupAvail mod) avails) exports
-  return (concat mod_avails)
-
--- Convert OccNames in GenAvailInfo to Names.
-lookupAvail :: Module -> GenAvailInfo OccName -> TcRnIf a b AvailInfo
-lookupAvail mod (Avail n) = do 
-  n' <- lookupOrig mod n
-  return (Avail n')
-lookupAvail mod (AvailTC p_occ occs) = do
-  p_name <- lookupOrig mod p_occ
-  let lookup_sub occ | occ == p_occ = return p_name
-                     | otherwise    = lookupOrig mod occ
-  subs <- mapM lookup_sub occs
-  return (AvailTC p_name subs)
-	-- Remember that 'occs' is all the exported things, including
-	-- the parent.  It's possible to export just class ops without
-	-- the class, which shows up as C( op ) here. If the class was
-	-- exported too we'd have C( C, op )
+ifaceExportNames exports = return exports
 
 lookupOrig :: Module -> OccName ->  TcRnIf a b Name
 lookupOrig mod occ
