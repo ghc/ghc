@@ -403,7 +403,6 @@ then
     fi
 fi
 
-SplitObjsBroken=NO
 if test "$TargetOS_CPP" = "darwin"
 then
     AC_MSG_CHECKING(XCode version)
@@ -412,7 +411,8 @@ then
     if test "$XCodeVersion" = ""
     then
         AC_MSG_RESULT(not found (too old?))
-        SplitObjsBroken=YES
+        XCodeVersion1=0
+        XCodeVersion2=0
     else
         AC_MSG_RESULT($XCodeVersion)
         XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
@@ -421,17 +421,22 @@ changequote(, )dnl
 changequote([, ])dnl
         AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
         AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
-        # Split objects is broken (#4013) with XCode < 3.2
-        if test "$XCodeVersion1" -lt 3
+    fi
+fi
+
+SplitObjsBroken=NO
+if test "$TargetOS_CPP" = "darwin"
+then
+    # Split objects is broken (#4013) with XCode < 3.2
+    if test "$XCodeVersion1" -lt 3
+    then
+        SplitObjsBroken=YES
+    else
+        if test "$XCodeVersion1" -eq 3
         then
-            SplitObjsBroken=YES
-        else
-            if test "$XCodeVersion1" -eq 3
+            if test "$XCodeVersion2" -lt 2
             then
-                if test "$XCodeVersion2" -lt 2
-                then
-                    SplitObjsBroken=YES
-                fi
+                SplitObjsBroken=YES
             fi
         fi
     fi
@@ -443,8 +448,8 @@ dnl --------------------------------------------------------------
 if test "$TargetOS_CPP" = "darwin" &&
    test "$XCodeVersion1" -ge 4
 then
-  # From Xcode 4, use 'gcc-4.2' to force the use of the gcc legacy backend (instead of the LLVM
-  # backend)
+  # From Xcode 4, use 'gcc-4.2' to force the use of the gcc legacy
+  # backend (instead of the LLVM backend)
   FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc-4.2])
 else
   FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
