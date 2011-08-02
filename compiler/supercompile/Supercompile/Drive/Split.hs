@@ -372,15 +372,29 @@ zipBracketeds :: Bracketed (Bracketed a)
                -> Bracketed a
 zipBracketeds (TailsUnknown bshell bholes) = TailsUnknown (Shell shell_fvs (\es -> shell_wrapper es [])) holes
   where (shell_fvs, shell_wrapper, holes) = foldr go (shellExtraFvs bshell, \[] es' -> shellWrapper bshell es', []) bholes
-        go (Hole bvs bracketed) (shell_extra_fvs, shell_wrapper, holes) = (shell_extra_fvs `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed), \es es' -> case splitBy (bracketedHoles rbracketed) es of (es_here, es_later) -> shell_wrapper es_later (shellWrapper (bracketedShell rbracketed) es_here:es'), holes ++ bracketedHoles rbracketed)
+        go (Hole bvs bracketed) (shell_extra_fvs, shell_wrapper, holes)
+          = (shell_extra_fvs `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed),
+             \es es' -> case splitBy (bracketedHoles rbracketed) es of
+                          (es_here, es_later) -> shell_wrapper es_later (shellWrapper (bracketedShell rbracketed) es_here:es'),
+             holes ++ bracketedHoles rbracketed)
           where rbracketed = rigidizeBracketed bracketed
-zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of Left holes  -> TailsUnknown (Shell (mk_shell_fvs bty) (\es -> mk_shell_wrapper bty es [])) holes
-                                                                   Right holes -> TailsKnown bty (\ty -> Shell (mk_shell_fvs ty) (\es -> mk_shell_wrapper ty es [])) holes
+zipBracketeds (TailsKnown bty mk_bshell bholes) = case ei_holes of
+    Left holes  -> TailsUnknown          (Shell (mk_shell_fvs bty) (\es -> mk_shell_wrapper bty es [])) holes
+    Right holes -> TailsKnown bty (\ty -> Shell (mk_shell_fvs ty)  (\es -> mk_shell_wrapper ty  es [])) holes
   where (mk_shell_fvs, mk_shell_wrapper, ei_holes) = foldr go (\ty -> shellExtraFvs (mk_bshell ty), \ty [] es' -> shellWrapper (mk_bshell ty) es', Right []) bholes
         go (TailishHole is_tail (Hole bvs bracketed)) (shell_extra_fvs, shell_wrapper, ei_holes) = case bracketed of
           TailsKnown _ty mk_shell holes
-            | is_tail, Right old_holes <- ei_holes -> (\ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (shellExtraFvs (mk_shell ty)), \ty es es' -> case splitBy holes es of (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (mk_shell ty) es_here:es'), Right (old_holes ++ holes))
-          _                                        -> (\ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed), \ty es es' -> case splitBy (bracketedHoles rbracketed) es of (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (bracketedShell rbracketed) es_here:es'), case ei_holes of Left old_holes -> Left (old_holes ++ bracketedHoles rbracketed); Right old_holes -> if is_tail then Left (map tailishHole old_holes ++ bracketedHoles rbracketed) else Right (old_holes ++ map (TailishHole False) (bracketedHoles rbracketed)))
+            | is_tail, Right old_holes <- ei_holes
+            -> (\ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (shellExtraFvs (mk_shell ty)),
+                \ty es es' -> case splitBy holes es of
+                                (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (mk_shell ty) es_here:es'),
+                Right (old_holes ++ holes))
+          _ -> (\ty -> shell_extra_fvs ty `unionVarSet` nonRecBindersFreeVars bvs (bracketedExtraFvs rbracketed),
+                \ty es es' -> case splitBy (bracketedHoles rbracketed) es of
+                                (es_here, es_later) -> shell_wrapper ty es_later (shellWrapper (bracketedShell rbracketed) es_here:es'),
+                case ei_holes of Left old_holes -> Left (old_holes ++ bracketedHoles rbracketed)
+                                 Right old_holes | is_tail   -> Left (map tailishHole old_holes ++ bracketedHoles rbracketed)
+                                                 | otherwise -> Right (old_holes ++ map (TailishHole False) (bracketedHoles rbracketed)))
             where rbracketed = rigidizeBracketed bracketed
 
 modifyTails :: forall a b. (Type -> Type) -> ([a] -> (b, [a])) -> Bracketed a -> Maybe (b, Bracketed a)
