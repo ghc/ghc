@@ -9,6 +9,8 @@ module Supercompile.Utilities (
     module Control.Applicative,
     module Control.Monad,
     
+    module Data.Foldable,
+    module Data.Traversable,
     module Data.Maybe,
     module Data.List
   ) where
@@ -20,23 +22,24 @@ import Unique (Unique, getKey)
 import UniqFM (UniqFM, eltsUFM)
 import Maybes (expectJust)
 import Outputable
+import State hiding (mapAccumLM)
 
 import Control.Arrow (first, second, (***), (&&&))
-import Control.Applicative (Applicative(..))
+import Control.Applicative (Applicative(..), (<$>))
 import Control.Monad hiding (join)
 
 import Data.Function (on)
 import Data.Maybe
-import Data.Monoid (Monoid(..))
 import Data.Ord
 import Data.List
+import Data.Foldable (Foldable(foldMap))
+import Data.Traversable (Traversable(traverse))
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.Graph as G
 import qualified Data.Foldable as Foldable
-import qualified Data.Traversable as Traversable
 
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -139,10 +142,10 @@ instance Monad Identity where
 instance Functor Identity where
     fmap f (I x) = I (f x)
 
-instance Foldable.Foldable Identity where
+instance Foldable Identity where
     foldMap f (I x) = f x
 
-instance Traversable.Traversable Identity where
+instance Traversable Identity where
     traverse f (I x) = pure I <*> f x
 
 instance Show1 Identity where
@@ -204,11 +207,11 @@ instance (Functor f, Outputable1 f, Outputable1 g, Outputable a) => Outputable (
 instance (Functor f, Functor g) => Functor (O f g) where
     fmap f (Comp x) = Comp (fmap (fmap f) x)
 
-instance (Foldable.Foldable f, Foldable.Foldable g) => Foldable.Foldable (O f g) where
-    foldMap f = Foldable.foldMap (Foldable.foldMap f) . unComp
+instance (Foldable f, Foldable g) => Foldable (O f g) where
+    foldMap f = foldMap (foldMap f) . unComp
 
-instance (Traversable.Traversable f, Traversable.Traversable g) => Traversable.Traversable (O f g) where
-    traverse f = fmap Comp . Traversable.traverse (Traversable.traverse f) . unComp
+instance (Traversable f, Traversable g) => Traversable (O f g) where
+    traverse f = fmap Comp . traverse (traverse f) . unComp
 
 
 -- | Natural numbers on the cheap (for efficiency reasons)
@@ -251,10 +254,10 @@ instance Copointed Tagged where
 instance Functor Tagged where
     fmap f (Tagged tg x) = Tagged tg (f x)
 
-instance Foldable.Foldable Tagged where
+instance Foldable Tagged where
     foldMap f (Tagged _ x) = f x
 
-instance Traversable.Traversable Tagged where
+instance Traversable Tagged where
     traverse f (Tagged tg x) = pure (Tagged tg) <*> f x
 
 instance Show1 Tagged where
@@ -292,10 +295,10 @@ instance Copointed Sized where
 instance Functor Sized where
     fmap f (Sized sz x) = Sized sz (f x)
 
-instance Foldable.Foldable Sized where
+instance Foldable Sized where
     foldMap f (Sized _ x) = f x
 
-instance Traversable.Traversable Sized where
+instance Traversable Sized where
     traverse f (Sized sz x) = pure (Sized sz) <*> f x
 
 instance Show1 Sized where
@@ -430,7 +433,7 @@ accumLN f = go
     go acc n | n <= 0            = (acc, []) 
              | (acc, x) <- f acc = second (x:) (go acc (n - 1))
 
-sumMap :: (Foldable.Foldable f, Num b) => (a -> b) -> f a -> b
+sumMap :: (Foldable f, Num b) => (a -> b) -> f a -> b
 sumMap f = Foldable.foldr (\x n -> f x + n) 0
 
 
@@ -471,17 +474,11 @@ exclude m s = M.fromDistinctAscList $ merge (M.toAscList m) (S.toAscList s)
         GT ->          merge ((k_m, v):kvs) ks
 
 
-class (Functor t, Foldable.Foldable t) => Accumulatable t where
+class (Functor t, Foldable t) => Accumulatable t where
     mapAccumT  ::            (acc -> x ->   (acc, y)) -> acc -> t x ->   (acc, t y)
     mapAccumTM :: Monad m => (acc -> x -> m (acc, y)) -> acc -> t x -> m (acc, t y)
     
     mapAccumT f acc x = unI (mapAccumTM (\acc' x' -> I (f acc' x')) acc x)
-
-fmapDefault :: (Accumulatable t) => (a -> b) -> t a -> t b
-fmapDefault f = snd . mapAccumT (\() x -> ((), f x)) ()
-
-foldMapDefault :: (Accumulatable t, Monoid m) => (a -> m) -> t a -> m
-foldMapDefault f = fst . mapAccumT (\acc x -> (f x `mappend` acc, ())) mempty
 
 instance Accumulatable [] where
     mapAccumT  = mapAccumL
@@ -494,6 +491,22 @@ mapAccumLM f = go []
     go ys acc (x:xs) = do
       (acc, y) <- f acc x
       go (y:ys) acc xs
+
+
+traverseAll :: Traversable t => ([a] -> (c, [b])) -> t a -> (c, t b)
+traverseAll f t = if null used_as' then (c, t') else error "traverseAll: replacing with too many elements"
+  where
+    (t', (rev_as, used_as')) = runState (traverse go t) ([], as')
+    (c, as') = f (reverse rev_as)
+    go a = State $ \(as, ~(a':as')) -> (# a', (a:as, as') #)
+
+traverseSome :: Traversable t => (a -> Bool) -> ([a] -> (c, [a])) -> t a -> (c, t a)
+traverseSome p f t = if null used_as' then (c, t') else error "traverseSome: replacing with too many elements"
+  where
+    (t', (rev_as, used_as')) = runState (traverse go t) ([], as')
+    (c, as') = f (reverse rev_as)
+    go a | p a       = State $ \(as, ~(a':as')) -> (# a', (a:as, as') #)
+         | otherwise = return a
 
 
 zipWithEqualM :: Monad m => (a -> b -> m c) -> [a] -> [b] -> m [c]

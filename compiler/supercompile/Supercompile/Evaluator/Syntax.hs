@@ -22,7 +22,6 @@ import Literal  (literalType)
 import Coercion (coercionKind, coercionType)
 
 import qualified Data.Map as M
-import Data.Traversable (Traversable(..))
 
 
 type Anned = O Tagged (O Sized FVed)

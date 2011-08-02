@@ -20,7 +20,7 @@ type TagBag = FinMap Nat
 embedWithTagBags :: TagBagType -> (TTest State, State -> State -> Generaliser)
 embedWithTagBags tbt = if tagBagPairwiseGrowth tbt then embedWithTagBags' (zippableT wellOrderedT) else embedWithTagBags' (cofmap Foldable.sum wellOrderedT)
 
-embedWithTagBags' :: (forall f. (Foldable.Foldable f, Zippable f, Finite (f ())) => TTest (f Nat))
+embedWithTagBags' :: (forall f. (Foldable f, Zippable f, Finite (f ())) => TTest (f Nat))
                   -> (TTest State, State -> State -> Generaliser)
 embedWithTagBags' nats = (cofmap stateTags (equalDomainT nats), generaliserFromGrowing stateTags)
   where

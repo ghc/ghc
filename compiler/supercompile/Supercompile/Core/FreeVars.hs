@@ -10,9 +10,6 @@ import Supercompile.Core.Syntax
 
 import Supercompile.Utilities
 
-import qualified Data.Foldable as Foldable
-import qualified Data.Traversable as Traversable
-
 import CoreFVs
 import VarSet
 import Coercion (tyCoVarsOfCo)
@@ -99,10 +96,10 @@ instance Copointed FVed where
 instance Functor FVed where
     fmap f (FVed fvs x) = FVed fvs (f x)
 
-instance Foldable.Foldable FVed where
+instance Foldable FVed where
     foldMap f (FVed _ x) = f x
 
-instance Traversable.Traversable FVed where
+instance Traversable FVed where
     traverse f (FVed fvs x) = pure (FVed fvs) <*> f x
 
 instance Show1 FVed where
