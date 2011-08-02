@@ -18,7 +18,6 @@ import HsSyn
 import TcEnv            ( isBrackStage )
 import RnEnv
 import RnHsDoc          ( rnHsDoc )
-import IfaceEnv         ( ifaceExportNames )
 import LoadIface        ( loadSrcInterface )
 import TcRnMonad
 import PrelNames
@@ -35,7 +34,7 @@ import ErrUtils
 import Util
 import FastString
 import ListSetOps
-import Data.List        ( partition, (\\), delete, find )
+import Data.List        ( partition, (\\), find )
 import qualified Data.Set as Set
 import System.IO
 import Control.Monad
@@ -217,8 +216,17 @@ rnImportDecl this_mod
         trust      = getSafeMode $ mi_trust iface
         trust_pkg  = mi_trust_pkg iface
 
-        filtered_exports = filter not_this_mod (mi_exports iface)
-        not_this_mod (mod,_) = mod /= this_mod
+        qual_mod_name = case as_mod of
+                          Nothing           -> imp_mod_name
+                          Just another_name -> another_name
+        imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
+                                  is_dloc = loc, is_as = qual_mod_name }
+
+    -- filter the imports according to the import declaration
+    (new_imp_details, gres) <- filterImports iface imp_spec imp_details
+
+    let gbl_env = mkGlobalRdrEnv (filterOut from_this_mod gres)
+        from_this_mod gre = nameModule (gre_name gre) == this_mod
         -- If the module exports anything defined in this module, just
         -- ignore it.  Reason: otherwise it looks as if there are two
         -- local definition sites for the thing, and an error gets
@@ -227,7 +235,7 @@ rnImportDecl this_mod
         -- itself, or another module that imported it.  (Necessarily,
         -- this invoves a loop.)
         --
-        -- Tiresome consequence: if you say
+        -- We do this *after* filterImports, so that if you say
         --      module A where
         --         import B( AType )
         --         type AType = ...
@@ -235,24 +243,9 @@ rnImportDecl this_mod
         --      module B( AType ) where
         --         import {-# SOURCE #-} A( AType )
         --
-        -- then you'll get a 'B does not export AType' message.  Oh well.
+        -- then you won't get a 'B does not export AType' message.
 
-        qual_mod_name = case as_mod of
-                          Nothing           -> imp_mod_name
-                          Just another_name -> another_name
-        imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
-                                  is_dloc = loc, is_as = qual_mod_name }
 
-    -- Get the total exports from this module
-    total_avails <- ifaceExportNames filtered_exports
-
-    -- filter the imports according to the import declaration
-    (new_imp_details, gbl_env) <-
-        filterImports iface imp_spec imp_details total_avails
-
-    dflags <- getDOpts
-
-    let
         -- Compute new transitive dependencies
 
         orphans | orph_iface = ASSERT( not (imp_mod `elem` dep_orphs deps) )
@@ -536,7 +529,7 @@ getLocalNonValBinders group
   = do { gbl_env <- getGblEnv
        ; get_local_binders gbl_env group }
 
-get_local_binders :: TcGblEnv -> HsGroup RdrName -> RnM [GenAvailInfo Name]
+get_local_binders :: TcGblEnv -> HsGroup RdrName -> RnM [AvailInfo]
 get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
                                     hs_tyclds = tycl_decls,
                                     hs_instds = inst_decls,
@@ -571,7 +564,7 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
     val_bndrs | is_hs_boot = [n | L _ (TypeSig ns _) <- val_sigs, n <- ns]
               | otherwise  = for_hs_bndrs
 
-    new_simple :: Located RdrName -> RnM (GenAvailInfo Name)
+    new_simple :: Located RdrName -> RnM AvailInfo
     new_simple rdr_name = do
         nm <- newTopSrcBinder rdr_name
         return (Avail nm)
@@ -608,16 +601,15 @@ available, and filters it through the import spec (if any).
 filterImports :: ModIface
               -> ImpDeclSpec                    -- The span for the entire import decl
               -> Maybe (Bool, [LIE RdrName])    -- Import spec; True => hiding
-              -> [AvailInfo]                    -- What's available
               -> RnM (Maybe (Bool, [LIE Name]), -- Import spec w/ Names
-                      GlobalRdrEnv)             -- Same again, but in GRE form
-filterImports _ decl_spec Nothing all_avails
-  = return (Nothing, mkGlobalRdrEnv (gresFromAvails prov all_avails))
+                      [GlobalRdrElt])           -- Same again, but in GRE form
+filterImports iface decl_spec Nothing
+  = return (Nothing, gresFromAvails prov (mi_exports iface))
   where
     prov = Imported [ImpSpec { is_decl = decl_spec, is_item = ImpAll }]
 
 
-filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
+filterImports iface decl_spec (Just (want_hiding, import_items))
   = do  -- check for errors, convert RdrNames to Names
         opt_typeFamilies <- xoptM Opt_TypeFamilies
         items1 <- mapM (lookup_lie opt_typeFamilies) import_items
@@ -635,8 +627,10 @@ filterImports iface decl_spec (Just (want_hiding, import_items)) all_avails
             gres | want_hiding = gresFromAvails hiding_prov pruned_avails
                  | otherwise   = concatMap (gresFromIE decl_spec) items2
 
-        return (Just (want_hiding, map fst items2), mkGlobalRdrEnv gres)
+        return (Just (want_hiding, map fst items2), gres)
   where
+    all_avails = mi_exports iface
+
         -- This environment is how we map names mentioned in the import
         -- list to the actual Name they correspond to, and the name family
         -- that the Name belongs to (the AvailInfo).  The situation is
@@ -779,6 +773,27 @@ catMaybeErr ms =  [ a | Succeeded a <- ms ]
 %*                                                                      *
 %************************************************************************
 
+Note [Exports of data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose you see (Trac #5306)
+	module M where
+          import X( F )
+          data instance F Int = FInt
+What does M export?  AvailTC F [FInt] 
+                  or AvailTC F [F,FInt]?
+The former is strictly right because F isn't defined in this module.
+But then you can never do an explicit import of M, thus
+    import M( F( FInt ) )
+becuase F isn't exported by M.  Nor can you import FInt alone from here
+    import M( FInt )
+because we don't have syntax to support that.  (It looks like an import of 
+the type FInt.)  
+
+So we compromise.  When constructing exports with no export list, or
+with module M( module M ), we add the parent to the exports as well.
+But not when you see module M( f ), even if f is a class method with
+a parent.  Hence the include_parent flag to greExportAvail.
+
 \begin{code}
 -- | make a 'GlobalRdrEnv' where all the elements point to the same
 -- import declaration (useful for "hiding" imports, or imports with
@@ -794,17 +809,30 @@ gresFromAvail prov_fn avail
            gre_prov = prov_fn n}
     | n <- availNames avail ]
 
-greAvail :: GlobalRdrElt -> AvailInfo
-greAvail gre = mkUnitAvail (gre_name gre) (gre_par gre)
+greExportAvail :: Bool -> GlobalRdrElt -> AvailInfo
+-- For 'include_parent' see Note [Exports of data families]
+greExportAvail include_parent gre 
+  = case gre_par gre of
+      ParentIs p | include_parent -> AvailTC p  [p,me]
+                 | otherwise      -> AvailTC p  [me]
+      NoParent   | isTyConName me -> AvailTC me [me]
+                 | otherwise      -> Avail   me
+  where
+    me = gre_name gre
 
-mkUnitAvail :: Name -> Parent -> AvailInfo
-mkUnitAvail me (ParentIs p)              = AvailTC p  [me]
-mkUnitAvail me NoParent | isTyConName me = AvailTC me [me]
-                        | otherwise      = Avail me
-
-plusAvail :: GenAvailInfo Name -> GenAvailInfo Name -> GenAvailInfo Name
-plusAvail (Avail n1)      (Avail _)        = Avail n1
-plusAvail (AvailTC _ ns1) (AvailTC n2 ns2) = AvailTC n2 (ns1 `unionLists` ns2)
+plusAvail :: AvailInfo -> AvailInfo -> AvailInfo
+plusAvail a1 a2
+  | debugIsOn && availName a1 /= availName a2 
+  = pprPanic "RnEnv.plusAvail names differ" (hsep [ppr a1,ppr a2])
+plusAvail a1@(Avail {})         (Avail {})      = a1
+plusAvail (AvailTC _ [])        a2@(AvailTC {}) = a2
+plusAvail a1@(AvailTC {})       (AvailTC _ [])  = a1
+plusAvail (AvailTC n1 (s1:ss1)) (AvailTC n2 (s2:ss2))
+  = case (n1==s1, n2==s2) of  -- Maintain invariant the parent is first
+       (True,True)   -> AvailTC n1 (s1 : (ss1 `unionLists` ss2))
+       (True,False)  -> AvailTC n1 (s1 : (ss1 `unionLists` (s2:ss2)))
+       (False,True)  -> AvailTC n1 (s2 : ((s1:ss1) `unionLists` ss2))
+       (False,False) -> AvailTC n1 ((s1:ss1) `unionLists` (s2:ss2))
 plusAvail a1 a2 = pprPanic "RnEnv.plusAvail" (hsep [ppr a1,ppr a2])
 
 availParent :: Name -> AvailInfo -> Parent
@@ -851,54 +879,16 @@ mkChildEnv gres = foldr add emptyNameEnv gres
 
 findChildren :: NameEnv [Name] -> Name -> [Name]
 findChildren env n = lookupNameEnv env n `orElse` []
-\end{code}
 
----------------------------------------
-        AvailEnv and friends
-
-All this AvailEnv stuff is hardly used; only in a very small
-part of RnNames.  Todo: remove?
----------------------------------------
-
-\begin{code}
-type AvailEnv = NameEnv AvailInfo       -- Maps a Name to the AvailInfo that contains it
-
-emptyAvailEnv :: AvailEnv
-emptyAvailEnv = emptyNameEnv
-
-{- Dead code
-unitAvailEnv :: AvailInfo -> AvailEnv
-unitAvailEnv a = unitNameEnv (availName a) a
-
-plusAvailEnv :: AvailEnv -> AvailEnv -> AvailEnv
-plusAvailEnv = plusNameEnv_C plusAvail
-
-availEnvElts :: AvailEnv -> [AvailInfo]
-availEnvElts = nameEnvElts
--}
-
-addAvail :: AvailEnv -> AvailInfo -> AvailEnv
-addAvail avails avail = extendNameEnv_C plusAvail avails (availName avail) avail
-
-mkAvailEnv :: [AvailInfo] -> AvailEnv
+-- | Combines 'AvailInfo's from the same family
 -- 'avails' may have several items with the same availName
 -- E.g  import Ix( Ix(..), index )
 -- will give Ix(Ix,index,range) and Ix(index)
 -- We want to combine these; addAvail does that
-mkAvailEnv avails = foldl addAvail emptyAvailEnv avails
-
--- After combining the avails, we need to ensure that the parent name is the
--- first entry in the list of subnames, if it is included at all.  (Subsequent
--- functions rely on that.)
-normaliseAvail :: AvailInfo -> AvailInfo
-normaliseAvail avail@(Avail _)     = avail
-normaliseAvail (AvailTC name subs) = AvailTC name subs'
-  where
-    subs' = if name `elem` subs then name : (delete name subs) else subs
-
--- | combines 'AvailInfo's from the same family
 nubAvails :: [AvailInfo] -> [AvailInfo]
-nubAvails avails = map normaliseAvail . nameEnvElts . mkAvailEnv $ avails
+nubAvails avails = nameEnvElts (foldl add emptyNameEnv avails)
+  where
+    add env avail = extendNameEnv_C plusAvail env (availName avail) avail
 \end{code}
 
 
@@ -986,8 +976,9 @@ exports_from_avail Nothing rdr_env _imports _this_mod
  = -- The same as (module M) where M is the current module name,
    -- so that's how we handle it.
    let
-       avails = [ greAvail gre | gre <- globalRdrEnvElts rdr_env,
-                                 isLocalGRE gre ]
+       avails = [ greExportAvail True gre 
+                | gre <- globalRdrEnvElts rdr_env
+                , isLocalGRE gre ]
    in
    return (Nothing, avails)
 
@@ -1041,7 +1032,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                       -- several members of mod_avails with the same
                       -- OccName.
              ; return (L loc (IEModuleContents mod) : ie_names,
-                       occs', map greAvail gres ++ exports) }
+                       occs', map (greExportAvail True) gres ++ exports) }
 
     exports_from_item acc@(lie_names, occs, exports) (L loc ie)
         | isDoc ie
@@ -1062,7 +1053,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_ie :: IE RdrName -> RnM (IE Name, AvailInfo)
     lookup_ie (IEVar rdr)
         = do gre <- lookupGreRn rdr
-             return (IEVar (gre_name gre), greAvail gre)
+             return (IEVar (gre_name gre), greExportAvail False gre)
 
     lookup_ie (IEThingAbs rdr)
         = do gre <- lookupGreRn rdr
@@ -1550,18 +1541,15 @@ printMinimalImports imports_w_usage
     to_ie _ (AvailTC n [m])
        | n==m = [IEThingAbs n]
     to_ie iface (AvailTC n ns)
-      = case [xs | (m,as) <- mi_exports iface
-                 , m == n_mod
-                 , AvailTC x xs <- as
-                 , x == nameOccName n
+      = case [xs | AvailTC x xs <- mi_exports iface
+                 , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
            [xs] | all_used xs -> [IEThingAll n]
                 | otherwise   -> [IEThingWith n (filter (/= n) ns)]
-           _other             -> (map IEVar ns)
+           _other             -> map IEVar ns
         where
-          all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
-          n_mod = ASSERT( isExternalName n ) nameModule n
+          all_used avail_occs = all (`elem` ns) avail_occs
 \end{code}
 
 Note [Partial export]

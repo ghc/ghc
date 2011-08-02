@@ -72,8 +72,8 @@ module HscTypes (
 	Dependencies(..), noDependencies,
 	NameCache(..), OrigNameCache, OrigIParamCache,
 	Avails, availsToNameSet, availsToNameEnv, availName, availNames,
-	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
-	IfaceExport,
+	AvailInfo(..),
+	IfaceExport, stableAvailCmp, 
 
 	-- * Warnings
 	Warnings(..), WarningTxt(..), plusWarns,
@@ -150,6 +150,7 @@ import Fingerprint
 import MonadUtils
 import Bag
 import ErrUtils
+import Util
 
 import System.FilePath
 import System.Time	( ClockTime )
@@ -1335,27 +1336,24 @@ plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
 \begin{code}
 -- | A collection of 'AvailInfo' - several things that are \"available\"
 type Avails	  = [AvailInfo]
--- | 'Name'd things that are available
-type AvailInfo    = GenAvailInfo Name
--- | 'RdrName'd things that are available
-type RdrAvailInfo = GenAvailInfo OccName
 
 -- | Records what things are "available", i.e. in scope
-data GenAvailInfo name	= Avail name	 -- ^ An ordinary identifier in scope
-			| AvailTC name
-				  [name] -- ^ A type or class in scope. Parameters:
-				         --
-				         --  1) The name of the type or class
-				         --
-				         --  2) The available pieces of type or class.
-					 --     NB: If the type or class is itself
-					 --     to be in scope, it must be in this list.
-					 --     Thus, typically: @AvailTC Eq [Eq, ==, \/=]@
-			deriving( Eq )
+data AvailInfo = Avail Name	 -- ^ An ordinary identifier in scope
+	       | AvailTC Name
+			 [Name]  -- ^ A type or class in scope. Parameters:
+			         --
+				 --  1) The name of the type or class
+				 --  2) The available pieces of type or class.
+				 -- 
+				 -- The AvailTC Invariant:
+				 --   * If the type or class is itself
+				 --     to be in scope, it must be *first* in this list.
+				 --     Thus, typically: @AvailTC Eq [Eq, ==, \/=]@
+		deriving( Eq )
 			-- Equality used when deciding if the interface has changed
 
 -- | The original names declared of a certain module that are exported
-type IfaceExport = (Module, [GenAvailInfo OccName])
+type IfaceExport = AvailInfo
 
 availsToNameSet :: [AvailInfo] -> NameSet
 availsToNameSet avails = foldr add emptyNameSet avails
@@ -1368,21 +1366,29 @@ availsToNameEnv avails = foldr add emptyNameEnv avails
 
 -- | Just the main name made available, i.e. not the available pieces
 -- of type or class brought into scope by the 'GenAvailInfo'
-availName :: GenAvailInfo name -> name
+availName :: AvailInfo -> Name
 availName (Avail n)     = n
 availName (AvailTC n _) = n
 
 -- | All names made available by the availability information
-availNames :: GenAvailInfo name -> [name]
+availNames :: AvailInfo -> [Name]
 availNames (Avail n)      = [n]
 availNames (AvailTC _ ns) = ns
 
-instance Outputable n => Outputable (GenAvailInfo n) where
+instance Outputable AvailInfo where
    ppr = pprAvail
 
-pprAvail :: Outputable n => GenAvailInfo n -> SDoc
+pprAvail :: AvailInfo -> SDoc
 pprAvail (Avail n)      = ppr n
 pprAvail (AvailTC n ns) = ppr n <> braces (hsep (punctuate comma (map ppr ns)))
+
+stableAvailCmp :: AvailInfo -> AvailInfo -> Ordering
+-- Compare lexicographically
+stableAvailCmp (Avail n1)     (Avail n2)     = n1 `stableNameCmp` n2
+stableAvailCmp (Avail {})     (AvailTC {})   = LT
+stableAvailCmp (AvailTC n ns) (AvailTC m ms) = (n `stableNameCmp` m) `thenCmp`
+                                               (cmpList stableNameCmp ns ms)
+stableAvailCmp (AvailTC {})   (Avail {})     = GT
 \end{code}
 
 \begin{code}

@@ -509,13 +509,11 @@ lookupQualifiedName rdr_name
    -- and respect hiddenness of modules/packages, hence loadSrcInterface.
    = loadSrcInterface doc mod False Nothing	`thenM` \ iface ->
 
-   case  [ (mod,occ) | 
-	   (mod,avails) <- mi_exports iface,
-    	   avail	<- avails,
-    	   name 	<- availNames avail,
-    	   name == occ ] of
-      ((mod,occ):ns) -> ASSERT (null ns) 
-			lookupOrig mod occ
+   case  [ name
+	 | avail <- mi_exports iface,
+    	   name  <- availNames avail,
+    	   nameOccName name == occ ] of
+      (n:ns) -> ASSERT (null ns) return n
       _ -> unboundName WL_Any rdr_name
 
   | otherwise
