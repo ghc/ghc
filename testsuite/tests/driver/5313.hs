@@ -12,7 +12,7 @@ main = do
                     GHC.verbosity  = 0}
       _ <- GHC.setSessionDynFlags df1
       -- begin reset
-      GHC.setContext [] []
+      GHC.setContext []
       GHC.setTargets []
       _ <- GHC.load GHC.LoadAllTargets
       return ()
