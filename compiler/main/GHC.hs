@@ -38,7 +38,7 @@ module GHC (
 	
 	-- * Loading\/compiling the program
 	depanal,
-	load, LoadHowMuch(..), InteractiveImport(..),
+        load, LoadHowMuch(..), InteractiveImport(..),
 	SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
 	workingDirectoryChanged,
@@ -983,18 +983,19 @@ getHomeModuleInfo hsc_env mdl =
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
-      iface <- lookupModuleIface hsc_env mdl
+      let iface   = hm_iface hmi
       return (Just (ModuleInfo {
 			minf_type_env  = md_types details,
 			minf_exports   = availsToNameSet (md_exports details),
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details,
-                        minf_iface     = iface
+                        minf_iface     = Just iface
 #ifdef GHCI
                        ,minf_modBreaks = getModBreaks hmi
 #endif
 			}))
 
+#ifdef GHCI
 lookupModuleIface :: HscEnv -> Module -> IO (Maybe ModIface)
 lookupModuleIface env m = do
     eps <- hscEPS env
@@ -1003,6 +1004,7 @@ lookupModuleIface env m = do
         homePkgT  = hsc_HPT env
         iface     = lookupIfaceByModule dflags homePkgT pkgIfaceT m
     return iface
+#endif
 
 -- | The list of top-level entities defined in a module
 modInfoTyThings :: ModuleInfo -> [TyThing]
