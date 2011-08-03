@@ -15,7 +15,7 @@ main = do
     t1 <- block $ forkIO (thread r t2)
     t2 <- block $ forkIO (thread r t1)
   threadDelay 1000000
-  readIORef r >>= print
+  readIORef r >>= print . (/= 0)
 
 thread r t = run
   where 
