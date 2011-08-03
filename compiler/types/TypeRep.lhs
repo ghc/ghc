@@ -511,9 +511,30 @@ pprThetaArrow :: (Prec -> a -> SDoc) -> [Pred a] -> SDoc
 pprThetaArrow _ []      = empty
 pprThetaArrow pp [pred]
       | noParenPred pred = pprPred pp pred <+> darrow
-pprThetaArrow pp preds   = parens (sep (punctuate comma (map (pprPred pp) preds)))
+pprThetaArrow pp preds   = parens (fsep (punctuate comma (map (pprPred pp) preds)))
                             <+> darrow
-
+    -- Notice 'fsep' here rather that 'sep', so that
+    -- type contexts don't get displayed in a giant column
+    -- Rather than
+    --  instance (Eq a,
+    --            Eq b,
+    --            Eq c,
+    --            Eq d,
+    --            Eq e,
+    --            Eq f,
+    --            Eq g,
+    --            Eq h,
+    --            Eq i,
+    --            Eq j,
+    --            Eq k,
+    --            Eq l) =>
+    --           Eq (a, b, c, d, e, f, g, h, i, j, k, l)
+    -- we get
+    --
+    --  instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i,
+    --            Eq j, Eq k, Eq l) =>
+    --           Eq (a, b, c, d, e, f, g, h, i, j, k, l)
+			   
 noParenPred :: Pred a -> Bool
 -- A predicate that can appear without parens before a "=>"
 --       C a => a -> a
