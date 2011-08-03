@@ -43,9 +43,10 @@ module TcType (
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, repSplitAppTy_maybe,
+  tcSplitPredTy_maybe,
   tcInstHeadTyNotSynonym, tcInstHeadTyAppAllTyVars,
   tcGetTyVar_maybe, tcGetTyVar,
-  tcSplitSigmaTy, tcDeepSplitSigmaTy_maybe, 
+  tcSplitSigmaTy, tcDeepSplitSigmaTy_maybe,  
 
   ---------------------------------
   -- Predicates. 
@@ -57,16 +58,25 @@ module TcType (
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
   isSynFamilyTyConApp,
-
+  isPredTy, isTyVarClassPred,
+  
   ---------------------------------
   -- Misc type manipulators
   deNoteType,
   orphNamesOfType, orphNamesOfDFunHead, orphNamesOfCo,
   getDFunTyKey,
+  evVarPred_maybe, evVarPred,
 
   ---------------------------------
   -- Predicate types  
   mkMinimalBySCs, transSuperClasses, immSuperClasses,
+  getClassPredTys, getClassPredTys_maybe,
+
+  -- * Finding type instances
+  tcTyFamInsts,
+
+  -- * Finding "exact" (non-dead) type variables
+  exactTyVarsOfType, exactTyVarsOfTypes,
 
   -- * Tidying type related things up for printing
   tidyType,      tidyTypes,
@@ -111,12 +121,11 @@ module TcType (
   mkTyConApp, mkAppTy, mkAppTys, applyTy, applyTys,
   mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys, 
 
-  getClassPredTys_maybe, getClassPredTys, 
-  isClassPred, isTyVarClassPred, isEqPred, 
-  mkClassPred, mkIPPred, splitPredTy_maybe, 
-  mkDictTy, isPredTy, isDictTy, isDictLikeTy,
+  isClassPred, isEqPred, isIPPred,
+  mkClassPred, mkIPPred, mkDictTy,
+  isDictLikeTy,
   tcSplitDFunTy, tcSplitDFunHead, 
-  isIPPred, mkEqPred,
+  mkEqPred,
 
   -- Type substitutions
   TvSubst(..), 	-- Representation visible to a few friends
@@ -133,8 +142,7 @@ module TcType (
   isPrimitiveType, 
 
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-  tcTyVarsOfType, tcTyVarsOfTypes, tcTyVarsOfPred, exactTyVarsOfType,
-  exactTyVarsOfTypes, 
+  tcTyVarsOfType, tcTyVarsOfTypes, tcTyVarsOfPred,
 
   pprKind, pprParendKind,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory,
@@ -561,6 +569,93 @@ tidyCos env = map (tidyCo env)
 \end{code}
 
 %************************************************************************
+%*                  *
+    Finding type family instances
+%*                  *
+%************************************************************************
+
+\begin{code}
+
+-- | Finds type family instances occuring in a type after expanding synonyms.
+tcTyFamInsts :: Type -> [(TyCon, [Type])]
+tcTyFamInsts ty 
+  | Just exp_ty <- tcView ty    = tcTyFamInsts exp_ty
+tcTyFamInsts (TyVarTy _)          = []
+tcTyFamInsts (TyConApp tc tys) 
+  | isSynFamilyTyCon tc           = [(tc, tys)]
+  | otherwise                   = concat (map tcTyFamInsts tys)
+tcTyFamInsts (FunTy ty1 ty2)      = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
+tcTyFamInsts (AppTy ty1 ty2)      = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
+tcTyFamInsts (ForAllTy _ ty)      = tcTyFamInsts ty
+tcTyFamInsts (PredTy pty)         = tcPredFamInsts pty
+
+-- | Finds type family instances occuring in a predicate type after expanding 
+-- synonyms.
+tcPredFamInsts :: PredType -> [(TyCon, [Type])]
+tcPredFamInsts (ClassP _cla tys) = concat (map tcTyFamInsts tys)
+tcPredFamInsts (IParam _ ty)     = tcTyFamInsts ty
+tcPredFamInsts (EqPred ty1 ty2)  = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
+
+\end{code}
+
+%************************************************************************
+%*                  *
+          The "exact" free variables of a type
+%*                  *
+%************************************************************************
+
+Note [Silly type synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  type T a = Int
+What are the free tyvars of (T x)?  Empty, of course!  
+Here's the example that Ralf Laemmel showed me:
+  foo :: (forall a. C u a -> C u a) -> u
+  mappend :: Monoid u => u -> u -> u
+
+  bar :: Monoid u => u
+  bar = foo (\t -> t `mappend` t)
+We have to generalise at the arg to f, and we don't
+want to capture the constraint (Monad (C u a)) because
+it appears to mention a.  Pretty silly, but it was useful to him.
+
+exactTyVarsOfType is used by the type checker to figure out exactly
+which type variables are mentioned in a type.  It's also used in the
+smart-app checking code --- see TcExpr.tcIdApp
+
+On the other hand, consider a *top-level* definition
+  f = (\x -> x) :: T a -> T a
+If we don't abstract over 'a' it'll get fixed to GHC.Prim.Any, and then
+if we have an application like (f "x") we get a confusing error message 
+involving Any.  So the conclusion is this: when generalising
+  - at top level use tyVarsOfType
+  - in nested bindings use exactTyVarsOfType
+See Trac #1813 for example.
+
+\begin{code}
+exactTyVarsOfType :: Type -> TyVarSet
+-- Find the free type variables (of any kind)
+-- but *expand* type synonyms.  See Note [Silly type synonym] above.
+exactTyVarsOfType ty
+  = go ty
+  where
+    go ty | Just ty' <- tcView ty = go ty'  -- This is the key line
+    go (TyVarTy tv)         = unitVarSet tv
+    go (TyConApp _ tys)     = exactTyVarsOfTypes tys
+    go (PredTy ty)      = go_pred ty
+    go (FunTy arg res)      = go arg `unionVarSet` go res
+    go (AppTy fun arg)      = go fun `unionVarSet` go arg
+    go (ForAllTy tyvar ty)  = delVarSet (go ty) tyvar
+
+    go_pred (IParam _ ty)    = go ty
+    go_pred (ClassP _ tys)   = exactTyVarsOfTypes tys
+    go_pred (EqPred ty1 ty2) = go ty1 `unionVarSet` go ty2
+
+exactTyVarsOfTypes :: [Type] -> TyVarSet
+exactTyVarsOfTypes tys = foldr (unionVarSet . exactTyVarsOfType) emptyVarSet tys
+\end{code}
+
+%************************************************************************
 %*									*
 		Predicates
 %*									*
@@ -724,9 +819,8 @@ tcIsForAllTy _             = False
 
 tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
-tcSplitPredFunTy_maybe ty | Just ty' <- tcView ty = tcSplitPredFunTy_maybe ty'
 tcSplitPredFunTy_maybe (FunTy arg res)
-  | Just p <- splitPredTy_maybe arg = Just (p, res)
+  | Just p <- tcSplitPredTy_maybe arg = Just (p, res)
 tcSplitPredFunTy_maybe _
   = Nothing
 
@@ -881,7 +975,7 @@ tcSplitDFunTy ty
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead tau  
-  = case splitPredTy_maybe tau of 
+  = case tcSplitPredTy_maybe tau of 
 	Just (ClassP clas tys) -> (clas, tys)
 	_ -> pprPanic "tcSplitDFunHead" (ppr tau)
 
@@ -923,6 +1017,40 @@ tcInstHeadTyAppAllTyVars ty
 \subsection{Predicate types}
 %*									*
 %************************************************************************
+
+Deconstructors and tests on predicate types
+
+\begin{code}
+tcSplitPredTy_maybe :: Type -> Maybe PredType
+-- Returns Just for predicates only
+tcSplitPredTy_maybe ty | Just ty' <- tcView ty = tcSplitPredTy_maybe ty'
+tcSplitPredTy_maybe (PredTy p)    = Just p
+tcSplitPredTy_maybe _             = Nothing
+
+isPredTy :: Type -> Bool
+isPredTy ty = isJust (tcSplitPredTy_maybe ty)
+
+isTyVarClassPred :: PredType -> Bool
+isTyVarClassPred (ClassP _ tys) = all isTyVarTy tys
+isTyVarClassPred _              = False
+
+getClassPredTys_maybe :: PredType -> Maybe (Class, [Type])
+getClassPredTys_maybe (ClassP clas tys) = Just (clas, tys)
+getClassPredTys_maybe _                 = Nothing
+
+getClassPredTys :: PredType -> (Class, [Type])
+getClassPredTys (ClassP clas tys) = (clas, tys)
+getClassPredTys _ = panic "getClassPredTys"
+
+evVarPred_maybe :: EvVar -> Maybe PredType
+evVarPred_maybe = tcSplitPredTy_maybe . varType
+
+evVarPred :: EvVar -> PredType
+evVarPred var
+  = case evVarPred_maybe var of
+      Just pred -> pred
+      Nothing   -> pprPanic "tcEvVarPred" (ppr var <+> ppr (varType var))
+\end{code}
 
 Superclasses
 

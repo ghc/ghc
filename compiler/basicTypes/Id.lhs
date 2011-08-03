@@ -58,7 +58,7 @@ module Id (
 	hasNoBinding, 
 
 	-- ** Evidence variables
-	DictId, isDictId, isEvVar, evVarPred,
+	DictId, isDictId, isCertainlyEvVar,
 
 	-- ** Inline pragma stuff
 	idInlinePragma, setInlinePragma, modifyInlinePragma,
@@ -98,7 +98,7 @@ import IdInfo
 import BasicTypes
 
 -- Imported and re-exported 
-import Var( Var, Id, DictId, EvVar,
+import Var( Var, Id, DictId,
             idInfo, idDetails, globaliseId, varType,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
@@ -447,17 +447,11 @@ isTickBoxOp_maybe id =
 %************************************************************************
 
 \begin{code}
-isEvVar :: Var -> Bool
-isEvVar var = isPredTy (varType var)
+isCertainlyEvVar :: Var -> Bool
+isCertainlyEvVar var = isCertainlyPredReprTy (varType var)
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (idType id)
-
-evVarPred :: EvVar -> PredType
-evVarPred var
-  = case splitPredTy_maybe (varType var) of
-      Just pred -> pred
-      Nothing   -> pprPanic "evVarPred" (ppr var <+> ppr (varType var))
 \end{code}
 
 %************************************************************************

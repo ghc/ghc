@@ -9,6 +9,7 @@ module OptCoercion ( optCoercion ) where
 
 import Coercion
 import Type hiding( substTyVarBndr, substTy, extendTvSubst )
+import TcType       ( exactTyVarsOfType )
 import TyCon
 import Var
 import VarSet
