@@ -5,8 +5,36 @@
   <para>
     The significant changes to the various parts of the compiler are
     listed in the following sections. There have also been numerous bug
-    fixes and performance improvements over the 7.0 branch.
+    fixes and performance improvements over the 7.0 branch. The 7.2
+    branch is intended to be more of a "technology preview" than normal
+    GHC stable branches.
   </para>
+
+  <sect2>
+    <title>Highlights</title>
+    <itemizedlist>
+      <listitem>
+        <para>
+          DPH support (<xref linkend="dph" />) has been significantly
+          improved.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          A new feature Safe Haskell (<xref linkend="safe-haskell" />)
+          has been implemented.
+        </para>
+      </listitem>
+
+      <listitem>
+        <para>
+          It is now possible to write compiler plugins
+          (<xref linkend="compiler-plugins" />).
+        </para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
 
   <sect2>
     <title>Language changes</title>

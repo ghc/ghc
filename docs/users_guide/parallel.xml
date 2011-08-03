@@ -185,7 +185,7 @@ nfib n | n &#60;= 1 = 1
       parallel <literal>map</literal>.</para>
   </sect2>
 
-<sect2><title>Data Parallel Haskell</title>
+<sect2 id="dph"><title>Data Parallel Haskell</title>
   <para>GHC includes experimental support for Data Parallel Haskell (DPH). This code
         is highly unstable and is only provided as a technology preview. More
         information can be found on the corresponding <ulink
