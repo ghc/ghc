@@ -34,7 +34,7 @@ module Type (
 	funResultTy, funArgTy, zipFunTys, 
 
 	mkTyConApp, mkTyConTy, 
-	tyConAppTyCon, tyConAppArgs, 
+	tyConAppTyCon_maybe, tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs, 
 	splitTyConApp_maybe, splitTyConApp, 
 
         mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
@@ -154,6 +154,7 @@ import Util
 import Outputable
 import FastString
 
+import Maybes		( orElse )
 import Data.Maybe	( isJust )
 
 infixr 3 `mkFunTy`	-- Associates to the right
@@ -476,12 +477,25 @@ funArgTy ty                = pprPanic "funArgTy" (ppr ty)
 -- including functions are returned as Just ..
 
 -- | The same as @fst . splitTyConApp@
+tyConAppTyCon_maybe :: Type -> Maybe TyCon
+tyConAppTyCon_maybe ty | Just ty' <- coreView ty = tyConAppTyCon_maybe ty'
+tyConAppTyCon_maybe (TyConApp tc _) = Just tc
+tyConAppTyCon_maybe (FunTy {})      = Just funTyCon
+tyConAppTyCon_maybe _               = Nothing
+
 tyConAppTyCon :: Type -> TyCon
-tyConAppTyCon ty = fst (splitTyConApp ty)
+tyConAppTyCon ty = tyConAppTyCon_maybe ty `orElse` pprPanic "tyConAppTyCon" (ppr ty)
 
 -- | The same as @snd . splitTyConApp@
+tyConAppArgs_maybe :: Type -> Maybe [Type]
+tyConAppArgs_maybe ty | Just ty' <- coreView ty = tyConAppArgs_maybe ty'
+tyConAppArgs_maybe (TyConApp _ tys) = Just tys
+tyConAppArgs_maybe (FunTy arg res)  = Just [arg,res]
+tyConAppArgs_maybe _                = Nothing
+
+
 tyConAppArgs :: Type -> [Type]
-tyConAppArgs ty = snd (splitTyConApp ty)
+tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor. Panics if that is not possible.
@@ -982,9 +996,9 @@ isUnLiftedType (TyConApp tc _)   = isUnLiftedTyCon tc
 isUnLiftedType _                 = False
 
 isUnboxedTupleType :: Type -> Bool
-isUnboxedTupleType ty = case splitTyConApp_maybe ty of
-                           Just (tc, _ty_args) -> isUnboxedTupleTyCon tc
-                           _                   -> False
+isUnboxedTupleType ty = case tyConAppTyCon_maybe ty of
+                           Just tc -> isUnboxedTupleTyCon tc
+                           _       -> False
 
 -- | See "Type#type_classification" for what an algebraic type is.
 -- Should only be applied to /types/, as opposed to e.g. partially

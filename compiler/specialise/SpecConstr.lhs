@@ -809,9 +809,9 @@ forceSpecBndr _ _ = False
 ignoreDataCon env dc = ignoreTyCon env (dataConTyCon dc)
 
 ignoreType env ty
-  = case splitTyConApp_maybe ty of
-      Just (tycon, _) -> ignoreTyCon env tycon
-      _               -> False
+  = case tyConAppTyCon_maybe ty of
+      Just tycon -> ignoreTyCon env tycon
+      _          -> False
 
 ignoreTyCon :: ScEnv -> TyCon -> Bool
 ignoreTyCon env tycon

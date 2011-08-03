@@ -35,7 +35,7 @@ import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
 import UniqFM		( addToUFM_Directly, lookupUFM_Directly,
 			  minusUFM, filterUFM )
-import Type		( isUnLiftedType, eqType, splitTyConApp_maybe )
+import Type		( isUnLiftedType, eqType, tyConAppTyCon_maybe )
 import Coercion         ( coercionKind )
 import Util		( mapAndUnzip, lengthIs, zipEqual )
 import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
@@ -157,7 +157,7 @@ dmdAnal env dmd (Cast e co)
     (dmd_ty, e') = dmdAnal env dmd' e
     to_co        = pSnd (coercionKind co)
     dmd'
-      | Just (tc, _) <- splitTyConApp_maybe to_co
+      | Just tc <- tyConAppTyCon_maybe to_co
       , isRecursiveTyCon tc = evalDmd
       | otherwise           = dmd
 	-- This coerce usually arises from a recursive

@@ -304,9 +304,8 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; alt_ty   <- lintInTy alt_ty  
      ; var_ty   <- lintInTy (idType var)	
 
-     ; let mb_tc_app = splitTyConApp_maybe (idType var)
-     ; case mb_tc_app of 
-         Just (tycon, _)
+     ; case tyConAppTyCon_maybe (idType var) of 
+         Just tycon
               | debugIsOn &&
                 isAlgTyCon tycon && 
 		not (isFamilyTyCon tycon || isAbstractTyCon tycon) &&
@@ -478,9 +477,9 @@ checkCaseAlts e ty alts =
     non_deflt (DEFAULT, _, _) = False
     non_deflt _               = True
 
-    is_infinite_ty = case splitTyConApp_maybe ty of
-                        Nothing         -> False
-                        Just (tycon, _) -> isPrimTyCon tycon
+    is_infinite_ty = case tyConAppTyCon_maybe ty of
+                        Nothing    -> False
+                        Just tycon -> isPrimTyCon tycon
 \end{code}
 
 \begin{code}
@@ -696,7 +695,7 @@ lintCoercion (InstCo co arg_ty)
 ----------
 checkTcApp :: Coercion -> Int -> Type -> LintM Type
 checkTcApp co n ty
-  | Just (_, tys) <- splitTyConApp_maybe ty
+  | Just tys <- tyConAppArgs_maybe ty
   , n < length tys
   = return (tys !! n)
   | otherwise

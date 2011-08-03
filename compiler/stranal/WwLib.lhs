@@ -515,7 +515,7 @@ mk_absent_let :: Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let arg 
   | not (isUnLiftedType arg_ty)
   = Just (Let (NonRec arg abs_rhs))
-  | Just (tc, _) <- splitTyConApp_maybe arg_ty
+  | Just tc <- tyConAppTyCon_maybe arg_ty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit)))
   | arg_ty `eqType` realWorldStatePrimTy 

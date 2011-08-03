@@ -207,9 +207,9 @@ lintStgExpr (StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
              lintStgAlts alts scrut_ty
   where
     scrut_ty      = idType bndr
-    check_bndr tc = case splitTyConApp_maybe (repType scrut_ty) of
-                        Just (bndr_tc, _) -> checkL (tc == bndr_tc) bad_bndr
-                        Nothing           -> addErrL bad_bndr
+    check_bndr tc = case tyConAppTyCon_maybe (repType scrut_ty) of
+                        Just bndr_tc -> checkL (tc == bndr_tc) bad_bndr
+                        Nothing      -> addErrL bad_bndr
                   where
                      bad_bndr = mkDefltMsg bndr tc
 
@@ -413,7 +413,7 @@ checkFunApp fun_ty arg_tys msg
              (Nothing, Nothing)   -- This is odd, but I've seen it
         else cfa False (newTyConInstRhs tc tc_args) arg_tys
 
-      | Just (tc,_) <- splitTyConApp_maybe fun_ty
+      | Just tc <- tyConAppTyCon_maybe fun_ty
       , not (isSynFamilyTyCon tc)       -- Definite error
       = (Nothing, Just msg)             -- Too many args
 

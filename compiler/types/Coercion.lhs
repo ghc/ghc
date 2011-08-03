@@ -1073,7 +1073,7 @@ coercionKinds :: [Coercion] -> Pair [Type]
 coercionKinds tys = sequenceA $ map coercionKind tys
 
 getNth :: Int -> Type -> Type
-getNth n ty | Just (_, tys) <- splitTyConApp_maybe ty
+getNth n ty | Just tys <- tyConAppArgs_maybe ty
             = ASSERT2( n < length tys, ppr n <+> ppr tys ) tys !! n
 getNth n ty = pprPanic "getNth" (ppr n <+> ppr ty)
 \end{code}

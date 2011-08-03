@@ -619,9 +619,9 @@ isStateHackType ty
   | opt_NoStateHack 
   = False
   | otherwise
-  = case splitTyConApp_maybe ty of
-	Just (tycon,_) -> tycon == statePrimTyCon
-        _              -> False
+  = case tyConAppTyCon_maybe ty of
+	Just tycon -> tycon == statePrimTyCon
+        _          -> False
 	-- This is a gross hack.  It claims that 
 	-- every function over realWorldStatePrimTy is a one-shot
 	-- function.  This is pretty true in practice, and makes a big

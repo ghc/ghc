@@ -433,14 +433,14 @@ coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
 \begin{code}
 mkStgAltType :: Id -> [CoreAlt] -> AltType
 mkStgAltType bndr alts
-  = case splitTyConApp_maybe (repType (idType bndr)) of
-        Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
-                    | isUnLiftedTyCon tc     -> PrimAlt tc
-                    | isHiBootTyCon tc       -> look_for_better_tycon
-                    | isAlgTyCon tc          -> AlgAlt tc
-                    | otherwise              -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
-                                                PolyAlt
-        Nothing                              -> PolyAlt
+  = case tyConAppTyCon_maybe (repType (idType bndr)) of
+        Just tc | isUnboxedTupleTyCon tc -> UbxTupAlt tc
+                | isUnLiftedTyCon tc     -> PrimAlt tc
+                | isHiBootTyCon tc       -> look_for_better_tycon
+                | isAlgTyCon tc          -> AlgAlt tc
+                | otherwise              -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
+                                            PolyAlt
+        Nothing                          -> PolyAlt
 
   where
    _is_poly_alt_tycon tc

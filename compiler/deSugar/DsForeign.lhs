@@ -135,8 +135,8 @@ dsCImport :: Id
 	  -> DsM ([Binding], SDoc, SDoc)
 dsCImport id (CLabel cid) cconv _ = do
    let ty = idType id
-       fod = case splitTyConApp_maybe (repType ty) of
-             Just (tycon, _)
+       fod = case tyConAppTyCon_maybe (repType ty) of
+             Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
                  IsFunction
              _ -> IsData

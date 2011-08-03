@@ -138,7 +138,7 @@ unboxArg arg
   = unboxArg (mkCoerce co arg)
       
   -- Booleans
-  | Just (tc,_) <- splitTyConApp_maybe arg_ty, 
+  | Just tc <- tyConAppTyCon_maybe arg_ty, 
     tc `hasKey` boolTyConKey
   = do prim_arg <- newSysLocalDs intPrimTy
        return (Var prim_arg,
@@ -225,8 +225,8 @@ unboxArg arg
     (data_con_arg_ty1 : _)			= data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
-    maybe_arg3_tycon    	   = splitTyConApp_maybe data_con_arg_ty3
-    Just (arg3_tycon,_)		   = maybe_arg3_tycon
+    maybe_arg3_tycon    	   = tyConAppTyCon_maybe data_con_arg_ty3
+    Just arg3_tycon		   = maybe_arg3_tycon
 \end{code}
 
 
@@ -259,7 +259,7 @@ boxResult result_ty
 		= case res of
 		     (Just ty,_) 
 		       | isUnboxedTupleType ty 
-		       -> let (Just (_, ls)) = splitTyConApp_maybe ty in tail ls
+		       -> let Just ls = tyConAppArgs_maybe ty in tail ls
 		     _ -> []
 
 	      return_result state anss
@@ -320,7 +320,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     		-- The ccall returns a non-() value
   | isUnboxedTupleType prim_res_ty= do
     let
-        Just (_, ls) = splitTyConApp_maybe prim_res_ty
+        Just ls = tyConAppArgs_maybe prim_res_ty
         arity = 1 + length ls
     args_ids@(result_id:as) <- mapM newSysLocalDs ls
     state_id <- newSysLocalDs realWorldStatePrimTy
