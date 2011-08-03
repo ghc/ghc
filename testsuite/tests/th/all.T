@@ -192,3 +192,5 @@ test('TH_unresolvedInfix2',
      normal,
      compile_fail,
      ['-v0'])
+
+test('T5358', normal, compile_fail, [''])
