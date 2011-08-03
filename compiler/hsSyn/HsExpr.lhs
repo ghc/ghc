@@ -3,7 +3,7 @@
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \begin{code}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, ScopedTypeVariables #-}
 
 -- | Abstract Haskell syntax for expressions.
 module HsExpr where
@@ -369,7 +369,7 @@ pprBinds b = pprDeeper (ppr b)
 ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
-ppr_expr :: OutputableBndr id => HsExpr id -> SDoc
+ppr_expr :: forall id. OutputableBndr id => HsExpr id -> SDoc
 ppr_expr (HsVar v)       = pprHsVar v
 ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
@@ -436,14 +436,12 @@ ppr_expr (ExplicitTuple exprs boxity)
     punc []               = empty
 
 --avoid using PatternSignatures for stage1 code portability
-ppr_expr exprType@(HsLam matches)
-  = pprMatches (LambdaExpr `asTypeOf` idType exprType) matches
- where idType :: HsExpr id -> HsMatchContext id; idType = undefined
+ppr_expr (HsLam matches)
+  = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
-ppr_expr exprType@(HsCase expr matches)
+ppr_expr (HsCase expr matches)
   = sep [ sep [ptext (sLit "case"), nest 4 (ppr expr), ptext (sLit "of {")],
-          nest 2 (pprMatches (CaseAlt `asTypeOf` idType exprType) matches <+> char '}') ]
- where idType :: HsExpr id -> HsMatchContext id; idType = undefined
+          nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches <+> char '}') ]
 
 ppr_expr (HsIf _ e1 e2 e3)
   = sep [hsep [ptext (sLit "if"), nest 2 (ppr e1), ptext (sLit "then")],
@@ -780,13 +778,10 @@ pprFunBind :: (OutputableBndr idL, OutputableBndr idR) => idL -> Bool -> MatchGr
 pprFunBind fun inf matches = pprMatches (FunRhs fun inf) matches
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprPatBind :: (OutputableBndr bndr, OutputableBndr id)
+pprPatBind :: forall bndr id. (OutputableBndr bndr, OutputableBndr id)
            => LPat bndr -> GRHSs id -> SDoc
-pprPatBind pat ty@(grhss)
- = sep [ppr pat, nest 2 (pprGRHSs (PatBindRhs `asTypeOf` idType ty) grhss)]
---avoid using PatternSignatures for stage1 code portability
- where idType :: GRHSs id -> HsMatchContext id; idType = undefined
-
+pprPatBind pat (grhss)
+ = sep [ppr pat, nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext id) grhss)]
 
 pprMatch :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> Match idR -> SDoc
 pprMatch ctxt (Match pats maybe_ty grhss)
