@@ -4,4 +4,4 @@ mod73.hs:3:7:
     Perhaps you meant one of these:
       `Prelude.id' (imported from Prelude),
       `Prelude.gcd' (imported from Prelude),
-      `Prelude.log' (imported from Prelude)
+      `Prelude.or' (imported from Prelude)
