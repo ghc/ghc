@@ -261,10 +261,8 @@ import Id
 import TysPrim		( alphaTyVars )
 import TyCon
 import Class
--- import FunDeps
 import DataCon
 import Name             hiding ( varName )
--- import OccName		( parenSymOcc )
 import InstEnv
 import SrcLoc
 import CoreSyn          ( CoreBind )
@@ -946,18 +944,11 @@ getModuleInfo mdl = withSession $ \hsc_env -> do
 
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 #ifdef GHCI
-getPackageModuleInfo hsc_env mdl = do
-  mb_avails <- hscGetModuleExports hsc_env mdl
-     -- This is the only use of hscGetModuleExports.  Perhaps we could use
-     -- hscRnImportDecls instead, but that does a lot more than we need
-     -- (building instance environment, checking family instance consistency
-     -- etc.).
-  case mb_avails of
-    Nothing -> return Nothing
-    Just avails -> do
-	eps <- hscEPS hsc_env
-        iface <- lookupModuleIface hsc_env mdl
+getPackageModuleInfo hsc_env mdl 
+  = do	eps <- hscEPS hsc_env
+        iface <- hscGetModuleInterface hsc_env mdl
 	let 
+	    avails = mi_exports iface
             names  = availsToNameSet avails
 	    pte    = eps_PTE eps
 	    tys    = [ ty | name <- concatMap availNames avails,
@@ -968,7 +959,7 @@ getPackageModuleInfo hsc_env mdl = do
 			minf_exports   = names,
 			minf_rdr_env   = Just $! availsToGlobalRdrEnv (moduleName mdl) avails,
 			minf_instances = error "getModuleInfo: instances for package module unimplemented",
-                        minf_iface     = iface,
+                        minf_iface     = Just iface,
                         minf_modBreaks = emptyModBreaks  
 		}))
 #else
@@ -983,7 +974,7 @@ getHomeModuleInfo hsc_env mdl =
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
-      let iface   = hm_iface hmi
+          iface   = hm_iface hmi
       return (Just (ModuleInfo {
 			minf_type_env  = md_types details,
 			minf_exports   = availsToNameSet (md_exports details),
@@ -994,17 +985,6 @@ getHomeModuleInfo hsc_env mdl =
                        ,minf_modBreaks = getModBreaks hmi
 #endif
 			}))
-
-#ifdef GHCI
-lookupModuleIface :: HscEnv -> Module -> IO (Maybe ModIface)
-lookupModuleIface env m = do
-    eps <- hscEPS env
-    let dflags    = hsc_dflags env
-        pkgIfaceT = eps_PIT eps
-        homePkgT  = hsc_HPT env
-        iface     = lookupIfaceByModule dflags homePkgT pkgIfaceT m
-    return iface
-#endif
 
 -- | The list of top-level entities defined in a module
 modInfoTyThings :: ModuleInfo -> [TyThing]

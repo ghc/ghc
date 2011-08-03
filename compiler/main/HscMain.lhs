@@ -59,8 +59,8 @@ module HscMain
     , hscTcRcLookupName
     , hscTcRnGetInfo
 #ifdef GHCI
+    , hscGetModuleInterface
     , hscRnImportDecls
-    , hscGetModuleExports
     , hscTcRnLookupRdrName
     , hscStmt, hscStmtWithLocation
     , hscTcExpr, hscImport, hscKcType
@@ -292,13 +292,12 @@ hscTcRnGetInfo hsc_env name =
   runHsc hsc_env $ ioMsgMaybe' $ tcRnGetInfo hsc_env name
 
 #ifdef GHCI
-hscGetModuleExports :: HscEnv -> Module -> IO (Maybe [AvailInfo])
-hscGetModuleExports hsc_env mdl =
-  runHsc hsc_env $ ioMsgMaybe' $ getModuleExports hsc_env mdl
+hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
+hscGetModuleInterface hsc_env mod
+  = runHsc hsc_env $ ioMsgMaybe $ getModuleInterface hsc_env mod
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
-
 hscRnImportDecls
         :: HscEnv
         -> Module

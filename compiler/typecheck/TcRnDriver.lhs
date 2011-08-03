@@ -9,7 +9,7 @@ module TcRnDriver (
 #ifdef GHCI
 	tcRnStmt, tcRnExpr, tcRnType,
 	tcRnLookupRdrName,
-	getModuleExports,
+	getModuleInterface,
 #endif
 	tcRnImports,
 	tcRnLookupName,
@@ -84,7 +84,6 @@ import TcHsType
 import TcMatches
 import RnTypes
 import RnExpr
-import IfaceEnv
 import MkId
 import BasicTypes
 import TidyPgm	  ( globaliseAndTidyId )
@@ -269,7 +268,8 @@ tcRnImports hsc_env this_mod import_decls
 		-- Load any orphan-module and family instance-module
 		-- interfaces, so that their rules and instance decls will be
 		-- found.
-	; loadOrphanModules (imp_orphs  imports) False
+	; loadModuleInterfaces (ptext (sLit "Loading orphan modules")) 
+                               (imp_orphs imports)
 
                 -- Check type-family consistency
 	; traceRn (text "rn1: checking family instance consistency")
@@ -1391,25 +1391,10 @@ tcRnType hsc_env ictxt rdr_type
 -- a package module with an interface on disk.  If neither of these is
 -- true, then the result will be an error indicating the interface
 -- could not be found.
-getModuleExports :: HscEnv -> Module -> IO (Messages, Maybe [AvailInfo])
-getModuleExports hsc_env mod
-  = initTc hsc_env HsSrcFile False iNTERACTIVE (tcGetModuleExports mod)
-
--- Get the export avail info and also load all orphan and family-instance
--- modules.  Finally, check that the family instances of all modules in the
--- interactive context are consistent (these modules are in the second
--- argument).
-tcGetModuleExports :: Module -> TcM [AvailInfo]
-tcGetModuleExports mod
-  = do { let doc = ptext (sLit "context for compiling statements")
-       ; iface <- initIfaceTcRn $ loadSysInterface doc mod
-
-  		-- Load any orphan-module and family instance-module
-  		-- interfaces, so their instances are visible.
-       ; loadOrphanModules (dep_orphs (mi_deps iface)) False 
-
-       ; ifaceExportNames (mi_exports iface)
-       }
+getModuleInterface :: HscEnv -> Module -> IO (Messages, Maybe ModIface)
+getModuleInterface hsc_env mod
+  = initTc hsc_env HsSrcFile False iNTERACTIVE $
+    loadModuleInterface (ptext (sLit "getModuleInterface")) mod
 
 tcRnLookupRdrName :: HscEnv -> RdrName -> IO (Messages, Maybe [Name])
 tcRnLookupRdrName hsc_env rdr_name 

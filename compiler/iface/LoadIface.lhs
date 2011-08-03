@@ -7,8 +7,13 @@ Loading interface files
 
 \begin{code}
 module LoadIface (
-	loadInterface, loadInterfaceForName, loadWiredInHomeIface, 
-	loadSrcInterface, loadSysInterface, loadUserInterface, loadOrphanModules, 
+        -- RnM/TcM functions
+        loadModuleInterface, loadModuleInterfaces, 
+        loadSrcInterface, loadInterfaceForName, 
+
+        -- IfM functions
+	loadInterface, loadWiredInHomeIface, 
+	loadSysInterface, loadUserInterface, 
 	findAndReadIface, readIface,	-- Used when reading the module's old interface
 	loadDecls,	-- Should move to TcIface and be renamed
 	initExternalPackageState,
@@ -90,22 +95,17 @@ loadSrcInterface doc mod want_boot maybe_pkg  = do
         let dflags = hsc_dflags hsc_env in
 	failWithTc (cannotFindInterface dflags mod err)
 
--- | Load interfaces for a collection of orphan modules.
-loadOrphanModules :: [Module]	      -- the modules
-		  -> Bool	      -- these are family instance-modules
-		  -> TcM ()
-loadOrphanModules mods isFamInstMod
+-- | Load interface for a module.
+loadModuleInterface :: SDoc -> Module -> TcM ModIface
+loadModuleInterface doc mod = initIfaceTcRn (loadSysInterface doc mod)
+
+-- | Load interfaces for a collection of modules.
+loadModuleInterfaces :: SDoc -> [Module] -> TcM ()
+loadModuleInterfaces doc mods
   | null mods = return ()
-  | otherwise = initIfaceTcRn $
-		do { traceIf (text "Loading orphan modules:" <+> 
-		     		 fsep (map ppr mods))
-		   ; mapM_ load mods
-		   ; return () }
+  | otherwise = initIfaceTcRn (mapM_ load mods)
   where
-    load mod   = loadSysInterface (mk_doc mod) mod
-    mk_doc mod 
-      | isFamInstMod = ppr mod <+> ptext (sLit "is a family-instance module")
-      | otherwise    = ppr mod <+> ptext (sLit "is a orphan-instance module")
+    load mod = loadSysInterface (doc <+> parens (ppr mod)) mod
 
 -- | Loads the interface for a given Name.
 loadInterfaceForName :: SDoc -> Name -> TcRn ModIface
@@ -119,33 +119,6 @@ loadInterfaceForName doc name
   ; ASSERT2( isExternalName name, ppr name ) 
     initIfaceTcRn $ loadSysInterface doc (nameModule name)
   }
-
--- | An 'IfM' function to load the home interface for a wired-in thing,
--- so that we're sure that we see its instance declarations and rules
--- See Note [Loading instances for wired-in things] in TcIface
-loadWiredInHomeIface :: Name -> IfM lcl ()
-loadWiredInHomeIface name
-  = ASSERT( isWiredInName name )
-    do _ <- loadSysInterface doc (nameModule name); return ()
-  where
-    doc = ptext (sLit "Need home interface for wired-in thing") <+> ppr name
-
--- | Loads a system interface and throws an exception if it fails
-loadSysInterface :: SDoc -> Module -> IfM lcl ModIface
-loadSysInterface doc mod_name = loadInterfaceWithException doc mod_name ImportBySystem
-
--- | Loads a user interface and throws an exception if it fails. The first parameter indicates
--- whether we should import the boot variant of the module
-loadUserInterface :: Bool -> SDoc -> Module -> IfM lcl ModIface
-loadUserInterface is_boot doc mod_name = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
-
--- | A wrapper for 'loadInterface' that throws an exception if it fails
-loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
-loadInterfaceWithException doc mod_name where_from
-  = do	{ mb_iface <- loadInterface doc mod_name where_from
-	; case mb_iface of 
-	    Failed err      -> ghcError (ProgramError (showSDoc err))
-	    Succeeded iface -> return iface }
 \end{code}
 
 
@@ -160,6 +133,38 @@ loadInterfaceWithException doc mod_name where_from
 %*********************************************************
 
 \begin{code}
+-- | An 'IfM' function to load the home interface for a wired-in thing,
+-- so that we're sure that we see its instance declarations and rules
+-- See Note [Loading instances for wired-in things] in TcIface
+loadWiredInHomeIface :: Name -> IfM lcl ()
+loadWiredInHomeIface name
+  = ASSERT( isWiredInName name )
+    do _ <- loadSysInterface doc (nameModule name); return ()
+  where
+    doc = ptext (sLit "Need home interface for wired-in thing") <+> ppr name
+
+------------------
+-- | Loads a system interface and throws an exception if it fails
+loadSysInterface :: SDoc -> Module -> IfM lcl ModIface
+loadSysInterface doc mod_name = loadInterfaceWithException doc mod_name ImportBySystem
+
+------------------
+-- | Loads a user interface and throws an exception if it fails. The first parameter indicates
+-- whether we should import the boot variant of the module
+loadUserInterface :: Bool -> SDoc -> Module -> IfM lcl ModIface
+loadUserInterface is_boot doc mod_name 
+  = loadInterfaceWithException doc mod_name (ImportByUser is_boot)
+
+------------------
+-- | A wrapper for 'loadInterface' that throws an exception if it fails
+loadInterfaceWithException :: SDoc -> Module -> WhereFrom -> IfM lcl ModIface
+loadInterfaceWithException doc mod_name where_from
+  = do	{ mb_iface <- loadInterface doc mod_name where_from
+	; case mb_iface of 
+	    Failed err      -> ghcError (ProgramError (showSDoc err))
+	    Succeeded iface -> return iface }
+
+------------------
 loadInterface :: SDoc -> Module -> WhereFrom
 	      -> IfM lcl (MaybeErr Message ModIface)
 
