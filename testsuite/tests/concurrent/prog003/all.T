@@ -27,6 +27,7 @@ test('concprog003',
            'Main.hi', 'Main.o',
            'TestData.hi', 'TestData.o'
          ]),
+      reqlib('random'),
       extra_run_opts('IMM -t test-8-3000-3000-2-1-4'),
      ],
      multimod_compile_and_run,

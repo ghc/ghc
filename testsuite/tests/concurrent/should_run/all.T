@@ -114,6 +114,7 @@ else:
 
 test('conc023', composes([skip_if_fast,
                           only_compiler_types(['ghc']),
+                          reqlib('random'),
                           conc023_ways]), compile_and_run, [''])
 
 test('conc024', only_compiler_types(['ghc']), compile_and_run, [''])
