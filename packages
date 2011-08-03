@@ -38,6 +38,10 @@
 #     both give this property
 #
 # Lines that start with a '#' are comments.
+#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#    localpath                tag           remotepath                          VCS
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .                               -           ghc.git                             git
 ghc-tarballs                    -           ghc-tarballs.git                    git
 utils/hsc2hs                    -           hsc2hs.git                          git
