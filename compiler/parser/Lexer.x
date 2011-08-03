@@ -1427,17 +1427,13 @@ lex_quasiquote s = do
   case alexGetChar' i of
     Nothing -> lit_error i
 
-    Just ('\\',i)
-        | Just ('|',i) <- next -> do
-                setInput i; lex_quasiquote ('|' : s)
-        | Just (']',i) <- next -> do
-                setInput i; lex_quasiquote (']' : s)
-        where next = alexGetChar' i
-
+    -- NB: The string "|]" terminates the quasiquote,
+    -- with absolutely no escaping. See the extensive
+    -- discussion on Trac #5348 for why there is no
+    -- escape handling.
     Just ('|',i)
-        | Just (']',i) <- next -> do
-                setInput i; return s
-        where next = alexGetChar' i
+        | Just (']',i) <- alexGetChar' i
+        -> do { setInput i; return s }
 
     Just (c, i) -> do
          setInput i; lex_quasiquote (c : s)
