@@ -177,3 +177,9 @@ test('T2436',
      ['T2436', '-v0'])
 test('T5331', normal, compile, [''])   # Unused tyvar warnings
 test('T5334', normal, compile, [''])   # Unused tyvar warnings
+test('T5306',
+     [only_compiler_types(['ghc']),
+      extra_clean(['T5306a.hi', 'T5306a.o',
+                   'T5306b.hi', 'T5306b.o'])],
+     multimod_compile,
+     ['T5306', '-v0'])
