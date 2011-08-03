@@ -13,7 +13,7 @@ ghcilink001 :
 	mkdir dir001
 	"$(TEST_HC)" -c f.c -o dir001/foo.o
 	ar cqs dir001/libfoo.a dir001/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -v0 -Ldir001 -lfoo TestLink.hs
+	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir001 -lfoo TestLink.hs
 
 # Test 2: ghci -Ldir -lfoo
 #   with dir/libfoo.so
@@ -30,7 +30,7 @@ ghcilink002 :
 	mkdir dir002
 	"$(TEST_HC)" -c -dynamic f.c -o dir002/foo.o
 	"$(TEST_HC)" -shared -v0 -o dir002/$(call DLL,foo) dir002/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -v0 -Ldir002 -lfoo TestLink.hs
+	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -Ldir002 -lfoo TestLink.hs
 
 # Test 3: ghci -lstdc++
 #    where libstdc++.so is normally found in a directory private to gcc,
@@ -38,7 +38,7 @@ ghcilink002 :
 
 .PHONY: ghcilink003
 ghcilink003 :
-	echo ":q" | "$(TEST_HC)" --interactive -v0 -lstdc++
+	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -lstdc++
 
 # Test 4: 
 #   package P
@@ -65,7 +65,7 @@ ghcilink004 :
 	#
 	"$(TEST_HC)" -c f.c -o dir004/foo.o
 	ar cqs dir004/libfoo.a dir004/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -v0 -package-conf $(LOCAL_PKGCONF004) -package test TestLink.hs
+	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF004) -package test TestLink.hs
 
 
 # Test 5: 
@@ -93,7 +93,7 @@ ghcilink005 :
 	#
 	"$(TEST_HC)" -c -dynamic f.c -o dir005/foo.o
 	"$(TEST_HC)" -shared -o dir005/$(call DLL,foo) dir005/foo.o
-	echo "test" | "$(TEST_HC)" --interactive -v0 -package-conf $(LOCAL_PKGCONF005) -package test TestLink.hs
+	echo "test" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF005) -package test TestLink.hs
 
 # Test 6: 
 #   package P
@@ -114,5 +114,5 @@ ghcilink006 :
 	echo "[]" >$(LOCAL_PKGCONF006)
 	'$(GHC_PKG)' --no-user-package-conf -f $(LOCAL_PKGCONF006) register $(PKG006) -v0
 	#
-	echo ":q" | "$(TEST_HC)" --interactive -v0 -package-conf $(LOCAL_PKGCONF006) -package test
+	echo ":q" | "$(TEST_HC)" --interactive -ignore-dot-ghci -v0 -package-conf $(LOCAL_PKGCONF006) -package test
 
