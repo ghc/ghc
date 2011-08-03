@@ -19,7 +19,7 @@ import Type     (applyTy, applyTys, mkForAllTy, mkFunTy, splitFunTy, eqType, isU
 import Pair     (pSnd)
 import DataCon  (dataConWorkId)
 import Literal  (literalType)
-import Coercion (coercionKind, coercionType)
+import Coercion (coercionType)
 
 import qualified Data.Map as M
 
@@ -241,7 +241,7 @@ stackFrameType kf hole_ty = case tagee kf of
     PrimApply pop tys in_as in_es -> ((primOpType pop `applyTys` tys) `applyFunTys` map answerType in_as) `applyFunTys` map (\in_e@(rn, e) -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)) in_es
     StrictLet _ in_e@(rn, e)      -> termType (renameAnnedTerm (mkInScopeSet (inFreeVars annedFreeVars in_e)) rn e)
     Update _                      -> hole_ty
-    CastIt co                     -> pSnd (coercionKind co)
+    CastIt co                     -> pSnd (coercionKindNonRepr co)
 
 qaType :: Anned QA -> Type
 qaType anned_qa = case traverse (\qa -> case qa of Question x' -> Left (idType x'); Answer a -> Right a) anned_qa of
@@ -250,7 +250,7 @@ qaType anned_qa = case traverse (\qa -> case qa of Question x' -> Left (idType x
 
 answerType :: Anned Answer -> Type
 answerType a = case annee a of
-    (Just (co, _), _)       -> pSnd (coercionKind co)
+    (Just (co, _), _)       -> pSnd (coercionKindNonRepr co)
     (Nothing,      (rn, v)) -> valueType (renameAnnedValue' (mkInScopeSet (annedFreeVars a)) rn v)
 
 valueType :: Copointed ann => ValueF ann -> Type
@@ -272,7 +272,7 @@ termType e = case extract e of
     Case _ _ ty _     -> ty
     Let _ _ e         -> termType e
     LetRec _ e        -> termType e
-    Cast _ co         -> pSnd (coercionKind co)
+    Cast _ co         -> pSnd (coercionKindNonRepr co)
 
 applyFunTy :: Type -> Type -> Type
 applyFunTy fun_ty got_arg_ty = ASSERT2(got_arg_ty `eqType` expected_arg_ty, text "applyFunTy:" <+> ppr got_arg_ty <+> ppr expected_arg_ty) res_ty

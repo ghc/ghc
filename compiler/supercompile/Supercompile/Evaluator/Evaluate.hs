@@ -221,7 +221,7 @@ step' normalising state =
               Just (co', tg_co) -> fmap (\deeds -> (deeds, Heap (M.insert y' (internallyBound (renamedTerm e_arg)) h) ids', Tagged tg_co (CastIt res_co') : k, (rn', e_body))) $
                                         claimDeeds (deeds + answerSize' a) (annedSize e_arg + annedSize e_body)
                 where (ids', rn', y') = renameNonRecBinder ids rn (x `setIdType` arg_co_from_ty')
-                      Pair arg_co_from_ty' _arg_co_to_ty' = coercionKind arg_co'
+                      Pair arg_co_from_ty' _arg_co_to_ty' = coercionKindNonRepr arg_co'
                       [arg_co', res_co'] = decomposeCo 2 co'
                       e_arg = annedTerm tg_co (annedTerm tg_v (Var x') `Cast` mkSymCo arg_co')
 
@@ -271,7 +271,7 @@ step' normalising state =
                                            , Just res <- [do (deeds3, h', ids', rn_alts') <- case mb_dc_cos of
                                                                Nothing     -> return (deeds2, h1, ids, insertIdRenamings (insertCoercionSubsts rn_alts' (alt_qs `zip` cos')) (alt_xs `zip` xs'))
                                                                Just dc_cos -> foldM (\(deeds, h, ids, rn_alts) (uncast_e_arg', alt_y, (dc_co, tg_co)) ->
-                                                                                        let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKind dc_co -- TODO: use to_tc_arg_tys' from above?
+                                                                                        let Pair _dc_co_from_ty' dc_co_to_ty' = coercionKindNonRepr dc_co -- TODO: use to_tc_arg_tys' from above?
                                                                                             (ids', rn_alts', y') = renameNonRecBinder ids rn_alts (alt_y `setIdType` dc_co_to_ty')
                                                                                             e_arg = annedTerm tg_co $ annedTerm tg_v uncast_e_arg' `Cast` dc_co
                                                                                         in fmap (\deeds' -> (deeds', M.insert y' (internallyBound (renamedTerm e_arg)) h, ids', rn_alts')) $ claimDeeds deeds (annedSize e_arg))
@@ -288,7 +288,7 @@ step' normalising state =
           | otherwise
           = Nothing
           where (mb_co_deref, (rn_v_deref, v_deref)) = dereference (Heap h0 ids) a
-                mb_co_deref_kind = fmap (\(co, tg_co) -> (co, tg_co, coercionKind co)) mb_co_deref
+                mb_co_deref_kind = fmap (\(co, tg_co) -> (co, tg_co, coercionKindNonRepr co)) mb_co_deref
                 (deeds1, h1) | isDeadBinder wild' = (deeds0 + answerSize' a, h0)
                              | otherwise          = (deeds0,                 M.insert wild' wild_hb h0)
                                where wild_hb = internallyBound $ annedAnswerToInAnnedTerm ids (annedAnswer tg_v a)
