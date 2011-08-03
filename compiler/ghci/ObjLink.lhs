@@ -23,6 +23,7 @@ module ObjLink (
 import Panic
 import BasicTypes	( SuccessFlag, successIf )
 import Config		( cLeadingUnderscore )
+import Util
 
 import Control.Monad    ( when )
 import Foreign.C
@@ -30,7 +31,7 @@ import Foreign		( nullPtr )
 import GHC.Exts         ( Ptr(..) )
 import GHC.IO.Encoding  ( fileSystemEncoding )
 import qualified GHC.Foreign as GHC
-
+import System.FilePath  ( dropExtension )
 
 
 -- ---------------------------------------------------------------------------
@@ -62,10 +63,24 @@ prefixUnderscore
  | cLeadingUnderscore == "YES" = ('_':)
  | otherwise                   = id
 
+-- | loadDLL loads a dynamic library using the OS's native linker
+-- (i.e. dlopen() on Unix, LoadLibrary() on Windows).  It takes either
+-- an absolute pathname to the file, or a relative filename
+-- (e.g. "libfoo.so" or "foo.dll").  In the latter case, loadDLL
+-- searches the standard locations for the appropriate library.
+--
 loadDLL :: String -> IO (Maybe String)
 -- Nothing      => success
 -- Just err_msg => failure
-loadDLL str = do
+loadDLL str0 = do
+  let
+     -- On Windows, addDLL takes a filename without an extension, because
+     -- it tries adding both .dll and .drv.  To keep things uniform in the
+     -- layers above, loadDLL always takes a filename with an extension, and
+     -- we drop it here on Windows only.
+     str | isWindowsHost = dropExtension str0
+         | otherwise     = str0
+  --
   maybe_errmsg <- withFileCString str $ \dll -> c_addDLL dll
   if maybe_errmsg == nullPtr
 	then return Nothing

@@ -1091,9 +1091,7 @@ searchForLibUsingGcc dflags so dirs = do
 mkSOName :: FilePath -> FilePath
 mkSOName root
  | isDarwinTarget  = ("lib" ++ root) <.> "dylib"
- | isWindowsTarget = -- Win32 DLLs have no .dll extension here, because
-                     -- addDLL tries both foo.dll and foo.drv
-                     root
+ | isWindowsTarget = root <.> "dll"
  | otherwise       = ("lib" ++ root) <.> "so"
 
 -- Darwin / MacOS X only: load a framework
