@@ -1827,10 +1827,10 @@ doTopReact _inerts (CFunEqCan { cc_flavor = fl })
 doTopReact _inerts workItem@(CFunEqCan { cc_id = cv, cc_flavor = fl
                                        , cc_fun = tc, cc_tyargs = args, cc_rhs = xi })
   = ASSERT (isSynFamilyTyCon tc)   -- No associated data families have reached that far 
-    do { match_res <- matchFam tc args -- See Note [MATCHING-SYNONYMS]
+    do { match_res <- matchFam tc args   -- See Note [MATCHING-SYNONYMS]
        ; case match_res of 
-           MatchInstNo -> return NoTopInt 
-           MatchInstSingle (rep_tc, rep_tys)
+           Nothing -> return NoTopInt 
+           Just (rep_tc, rep_tys)
              -> do { let Just coe_tc = tyConFamilyCoercion_maybe rep_tc
                          Just rhs_ty = tcView (mkTyConApp rep_tc rep_tys)
 			    -- Eagerly expand away the type synonym on the
@@ -1864,8 +1864,6 @@ doTopReact _inerts workItem@(CFunEqCan { cc_id = cv, cc_flavor = fl
                                                      , tir_new_inert = Stop }
                                         }
                    }
-           _ 
-             -> panicTcS $ text "TcSMonad.matchFam returned multiple instances!"
        }
 
 

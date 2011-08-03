@@ -941,15 +941,6 @@ matchClass clas tys
 	}
         }
 
-matchFam :: TyCon
-         -> [Type] 
-         -> TcS (MatchInstResult (TyCon, [Type]))
-matchFam tycon args
-  = do { mb <- wrapTcS $ TcM.tcLookupFamInst tycon args
-       ; case mb of 
-           Nothing  -> return MatchInstNo 
-           Just res -> return $ MatchInstSingle res
-       -- DV: We never return MatchInstMany, since tcLookupFamInst never returns 
-       -- multiple matches. Check. 
-       }
+matchFam :: TyCon -> [Type] -> TcS (Maybe (TyCon, [Type]))
+matchFam tycon args = wrapTcS $ TcM.tcLookupFamInst tycon args
 \end{code}
