@@ -5,6 +5,7 @@ import ByteCodeLink
 import CoreMonad
 import Data.Array
 import DataCon
+import DebuggerUtils
 import GHC
 import HscTypes
 import Linker

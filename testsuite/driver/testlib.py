@@ -598,11 +598,12 @@ def test_common_work (name, opts, func, args):
     if package_conf_cache_file_start_timestamp != package_conf_cache_file_end_timestamp:
         framework_fail(name, 'whole-test', 'Package cache timestamps do not match: ' + str(package_conf_cache_file_start_timestamp) + ' ' + str(package_conf_cache_file_end_timestamp))
 
-def clean(names):
-    clean_full_paths(map (lambda name: in_testdir(name), names))
+def clean(strs):
+    for str in strs:
+        for name in glob.glob(in_testdir(str)):
+            clean_full_path(name)
 
-def clean_full_paths(names):
-    for name in names:
+def clean_full_path(name):
         try:
             # Remove files...
             os.remove(name)
@@ -1397,9 +1398,10 @@ def compare_outputs( kind, normaliser, extra_normaliser,
     if os.path.exists(expected_file):
         expected_raw = read_no_crs(expected_file)
         expected_str = extra_normaliser(normaliser(expected_raw))
+        expected_file_for_diff = expected_file
     else:
         expected_str = ''
-        expected_file = '/dev/null'
+        expected_file_for_diff = '/dev/null'
 
     actual_raw = read_no_crs(actual_file)
     actual_str = extra_normaliser(normaliser(actual_raw))
@@ -1407,12 +1409,12 @@ def compare_outputs( kind, normaliser, extra_normaliser,
     if expected_str != actual_str:
         print 'Actual ' + kind + ' output differs from expected:'
 
-        if expected_file == '/dev/null':
+        if expected_file_for_diff == '/dev/null':
             expected_normalised_file = '/dev/null'
-
         else:
             expected_normalised_file = expected_file + ".normalised"
             write_file(expected_normalised_file, expected_str)
+
         actual_normalised_file = actual_file + ".normalised"
         write_file(actual_normalised_file, actual_str)
 
@@ -1424,24 +1426,18 @@ def compare_outputs( kind, normaliser, extra_normaliser,
         # (including newlines) so the diff would be hard to read.
         # This does mean that the diff might contain changes that
         # would be normalised away.
-        r = os.system( 'diff -uw ' + expected_file + \
+        r = os.system( 'diff -uw ' + expected_file_for_diff + \
                                ' ' + actual_file )
 
         # If for some reason there were no non-whitespace differences,
         # then do a full diff
         if r == 0:
-            r = os.system( 'diff -u ' + expected_file + \
+            r = os.system( 'diff -u ' + expected_file_for_diff + \
                                   ' ' + actual_file )
 
         if config.accept:
-            if expected_file == '':
-                print '*** cannot accept new output: ' + kind + \
-                      ' file does not exist.'
-                return 0
-            else:
-                print 'Accepting new output.'
-                write_file(expected_file, actual_raw)
-                return 1
+            print 'Accepting new output.'
+            write_file(expected_file, actual_raw)
         return 0
     return 1
 
