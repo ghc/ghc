@@ -55,12 +55,12 @@ residualiseStackFrame _   (CastIt co')                e  = (([], []), e `cast` c
 
 
 pPrintHeap :: Heap -> SDoc
-pPrintHeap (Heap h ids) = pPrint $ map (first (PrettyDoc . pprBndr LetBind)) $ floats_static_h ++ [(x, asPrettyFunction1 e) | (x, e) <- floats_nonstatic_h]
+pPrintHeap (Heap h ids) = pPrint $ map (first (PrettyDoc . pPrintBndr LetBind)) $ floats_static_h ++ [(x, asPrettyFunction1 e) | (x, e) <- floats_nonstatic_h]
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
 
 pPrintFullState :: State -> SDoc
 pPrintFullState = pPrintFullUnnormalisedState . denormalise
 
 pPrintFullUnnormalisedState :: UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (map (first (PrettyDoc . pprBndr LetBind)) floats_static) $$ pPrint e
+pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) $$ pPrint e
   where (deeds, floats_static, e) = residualiseUnnormalisedState state

@@ -8,7 +8,7 @@ import Supercompile.Utilities
 import Supercompile.StaticFlags
 
 import DataCon  (DataCon)
-import Var      (TyVar, Var, varName, isTyVar)
+import Var      (TyVar, Var, varName, isTyVar, varType)
 import Name     (Name, nameOccName)
 import OccName  (occNameString)
 import Id       (Id)
@@ -18,6 +18,13 @@ import Coercion (CoVar, Coercion)
 import PrimOp   (PrimOp)
 import PprCore  ()
 
+
+-- NB: don't use GHC's pprBndr because its way too noisy, printing unfoldings etc
+pPrintBndr :: BindingSite -> Var -> SDoc
+pPrintBndr bs x = prettyParen needs_parens $ ppr x <+> text "::" <+> ppr (varType x)
+  where needs_parens = case bs of LambdaBind -> True
+                                  CaseBind   -> True
+                                  LetBind    -> False
 
 data AltCon = DataAlt DataCon [TyVar] [CoVar] [Id] | LiteralAlt Literal | DefaultAlt
             deriving (Eq, Show)
@@ -92,7 +99,7 @@ data ValueF ann = Indirect Id -- NB: for the avoidance of doubt, these cannot be
 
 instance Outputable AltCon where
     pprPrec prec altcon = case altcon of
-        DataAlt dc as qs xs -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pprBndr CaseBind) as ++ map (pprBndr CaseBind) qs ++ map (pprBndr CaseBind) xs)
+        DataAlt dc as qs xs -> prettyParen (prec >= appPrec) $ ppr dc <+> hsep (map (pPrintBndr CaseBind) as ++ map (pPrintBndr CaseBind) qs ++ map (pPrintBndr CaseBind) xs)
         LiteralAlt l        -> pPrint l
         DefaultAlt          -> text "_"
 
@@ -118,19 +125,19 @@ pPrintPrecApp prec e1 e2 = prettyParen (prec >= appPrec) $ pPrintPrec opPrec e1 
 pPrintPrecPrimOp :: (Outputable a, Outputable b, Outputable c) => Rational -> a -> [b] -> [c] -> SDoc
 pPrintPrecPrimOp prec pop as xs = pPrintPrecApps prec (PrettyFunction (\prec -> pPrintPrecApps prec pop as)) xs
 
-pPrintPrecCase :: (Outputable a, OutputableBndr b, Outputable c, Outputable d) => Rational -> a -> b -> [(c, d)] -> SDoc
-pPrintPrecCase prec e x alts = prettyParen (prec > noPrec) $ hang (text "case" <+> pPrintPrec noPrec e <+> text "of" <+> pprBndr CaseBind x) 2 $ vcat (map (pPrintPrecAlt noPrec) alts)
+pPrintPrecCase :: (Outputable a, Outputable b, Outputable c) => Rational -> a -> Var -> [(b, c)] -> SDoc
+pPrintPrecCase prec e x alts = prettyParen (prec > noPrec) $ hang (text "case" <+> pPrintPrec noPrec e <+> text "of" <+> pPrintBndr CaseBind x) 2 $ vcat (map (pPrintPrecAlt noPrec) alts)
 
 pPrintPrecAlt :: (Outputable a, Outputable b) => Rational -> (a, b) -> SDoc
 pPrintPrecAlt _ (alt_con, alt_e) = hang (pPrintPrec noPrec alt_con <+> text "->") 2 (pPrintPrec noPrec alt_e)
 
-pPrintPrecLet :: (OutputableBndr a, Outputable b, Outputable c) => Rational -> a -> b -> c -> SDoc
-pPrintPrecLet prec x e e_body = prettyParen (prec > noPrec) $ hang (text "let") 2 (pprBndr LetBind x <+> text "=" <+> pPrintPrec noPrec e) $$ text "in" <+> pPrintPrec noPrec e_body
+pPrintPrecLet :: (Outputable a, Outputable b) => Rational -> Var -> a -> b -> SDoc
+pPrintPrecLet prec x e e_body = prettyParen (prec > noPrec) $ hang (text "let") 2 (pPrintBndr LetBind x <+> text "=" <+> pPrintPrec noPrec e) $$ text "in" <+> pPrintPrec noPrec e_body
 
-pPrintPrecLetRec :: (OutputableBndr a, Outputable b, Outputable c) => Rational -> [(a, b)] -> c -> SDoc
+pPrintPrecLetRec :: (Outputable a, Outputable b) => Rational -> [(Var, a)] -> b -> SDoc
 pPrintPrecLetRec prec xes e_body
   | [] <- xes = pPrintPrec prec e_body
-  | otherwise = prettyParen (prec > noPrec) $ hang (text "letrec") 2 (vcat [pprBndr LetBind x <+> text "=" <+> pPrintPrec noPrec e | (x, e) <- xes]) $$ text "in" <+> pPrintPrec noPrec e_body
+  | otherwise = prettyParen (prec > noPrec) $ hang (text "letrec") 2 (vcat [pPrintBndr LetBind x <+> text "=" <+> pPrintPrec noPrec e | (x, e) <- xes]) $$ text "in" <+> pPrintPrec noPrec e_body
 
 instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
     pprPrec prec v = case v of
@@ -145,7 +152,7 @@ instance (Functor ann, Outputable1 ann) => Outputable (ValueF ann) where
         Coercion co        -> pPrintPrec prec co
 
 pPrintPrecLam :: Outputable a => Rational -> [Var] -> a -> SDoc
-pPrintPrecLam prec xs e = prettyParen (prec > noPrec) $ text "\\" <> hsep [pprBndr LambdaBind y | y <- xs] <+> text "->" <+> pPrintPrec noPrec e
+pPrintPrecLam prec xs e = prettyParen (prec > noPrec) $ text "\\" <> hsep [pPrintBndr LambdaBind y | y <- xs] <+> text "->" <+> pPrintPrec noPrec e
 
 pPrintPrecApps :: (Outputable a, Outputable b) => Rational -> a -> [b] -> SDoc
 pPrintPrecApps prec e1 es2 = prettyParen (not (null es2) && prec >= appPrec) $ pPrintPrec opPrec e1 <+> hsep (map (pPrintPrec appPrec) es2)
