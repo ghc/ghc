@@ -3,11 +3,20 @@
     The (Interactive) Glasgow Haskell Compiler -- version 7.2.1
    =============================================================
 
-The GHC Team is pleased to announce a new major release of GHC. There
-have been a number of significant changes since the last major release,
-including:
+The GHC Team is pleased to announce a new major release of GHC, 7.2.1.
 
-<TODO: release note highlights>
+The 7.2 branch is intended to be more of a "technology preview" than
+normal GHC stable branches; in particular, it supports a significantly
+improved version of DPH, as well as new features such as compiler
+plugins and "safe Haskell". The design of these new features may evolve
+as we get more experience with them. See the release notes for more
+details of what's new and what's changed.
+
+We are also using this branch as an opportunity to work out the best
+workflows to use with git.
+
+We expect the 7.2 branch to be short-lived, with 7.4.1 coming out
+shortly after ICFP as normal.
 
 
 Full release notes are here:
