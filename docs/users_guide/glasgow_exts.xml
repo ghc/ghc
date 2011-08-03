@@ -6750,6 +6750,18 @@ There must be no spaces in the token
 The quoted <replaceable>string</replaceable>
 can be arbitrary, and may contain newlines.
 </para></listitem>
+<listitem><para>
+The quoted <replaceable>string</replaceable>
+finishes at the first occurrence of the two-character sequence <literal>"|]"</literal>.
+Absolutely no escaping is performed.  If you want to embed that character
+sequence in the string, you must invent your own escape convention (such
+as, say, using the string <literal>"|~]"</literal> instead), and make your 
+quoter function interpret <literal>"|~]"</literal> as <literal>"|]"</literal>.
+One way to implement this is to compose your quoter with a pre-processing pass to
+perform your escape conversion.  See the 
+<ulink url="http://hackage.haskell.org/trac/ghc/ticket/5348">
+discussion in Trac</ulink> for details.
+</para></listitem>
 </itemizedlist>
 </para></listitem>
 
