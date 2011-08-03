@@ -280,7 +280,15 @@ that is what is seen by importing module with --make
 Note [Orphans]: the ifInstOrph and ifRuleOrph fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If a module contains any "orphans", then its interface file is read
-regardless, so that its instances are not missed.
+regardless, so that its instances are not missed. 
+
+ - If an instance is an orphan its ifInstOprh field is Nothing
+   Otherwise ifInstOrph is (Just n) where n is the Name of a
+   local class or tycon that witnesses its non-orphan-hood.
+   This computation is done by MkIface.instanceToIfaceInst
+
+ - Similarly for ifRuleOrph
+   The computation is done by MkIface.coreRuleToIfaceRule
 
 Roughly speaking, an instance is an orphan if its head (after the =>)
 mentions nothing defined in this module.  Functional dependencies
