@@ -650,9 +650,22 @@ type IfaceDeclABI = (Module, IfaceDecl, IfaceDeclExtras)
 
 data IfaceDeclExtras 
   = IfaceIdExtras    Fixity [IfaceRule]
-  | IfaceDataExtras  Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
-  | IfaceClassExtras Fixity [IfaceInstABI] [(Fixity,[IfaceRule])]
+
+  | IfaceDataExtras  
+       Fixity			-- Fixity of the tycon itself
+       [IfaceInstABI]		-- Local instances of this tycon
+       				-- See Note [Orphans] in IfaceSyn
+       [(Fixity,[IfaceRule])]	-- For each construcotr, fixity and RULES
+
+  | IfaceClassExtras 
+       Fixity			-- Fixity of the class itself
+       [IfaceInstABI] 		-- Local instances of this class *or*
+       				--   of its associated data types
+       				-- See Note [Orphans] in IfaceSyn
+       [(Fixity,[IfaceRule])]	-- For each class method, fixity and RULES
+
   | IfaceSynExtras   Fixity
+
   | IfaceOtherDeclExtras
 
 abiDecl :: IfaceDeclABI -> IfaceDecl
@@ -727,9 +740,12 @@ declExtras fix_fn rule_env inst_env decl
                      IfaceDataExtras (fix_fn n)
                         (map ifDFun $ lookupOccEnvL inst_env n)
                         (map (id_extras . ifConOcc) (visibleIfConDecls cons))
-      IfaceClass{ifSigs=sigs} -> 
+      IfaceClass{ifSigs=sigs, ifATs=ats} -> 
                      IfaceClassExtras (fix_fn n)
-                        (map ifDFun $ lookupOccEnvL inst_env n)
+                        (map ifDFun $ (concatMap (lookupOccEnvL inst_env . ifName) ats)
+                                    ++ lookupOccEnvL inst_env n)
+		           -- Include instances of the associated types
+			   -- as well as instances of the class (Trac #5147)
                         [id_extras op | IfaceClassOp op _ _ <- sigs]
       IfaceSyn{} -> IfaceSynExtras (fix_fn n)
       _other -> IfaceOtherDeclExtras
