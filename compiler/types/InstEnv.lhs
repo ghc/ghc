@@ -350,14 +350,11 @@ or, to put it another way, we have
 ---------------------------------------------------
 type InstEnv = UniqFM ClsInstEnv	-- Maps Class to instances for that class
 
-data ClsInstEnv 
+newtype ClsInstEnv 
   = ClsIE [Instance]	-- The instances for a particular class, in any order
-  	  Bool 		-- True <=> there is an instance of form C a b c
-			-- 	If *not* then the common case of looking up
-			--	(C a b c) can fail immediately
 
 instance Outputable ClsInstEnv where
-  ppr (ClsIE is b) = ptext (sLit "ClsIE") <+> ppr b <+> pprInstances is
+  ppr (ClsIE is) = pprInstances is
 
 -- INVARIANTS:
 --  * The is_tvs are distinct in each Instance
@@ -372,26 +369,24 @@ emptyInstEnv :: InstEnv
 emptyInstEnv = emptyUFM
 
 instEnvElts :: InstEnv -> [Instance]
-instEnvElts ie = [elt | ClsIE elts _ <- eltsUFM ie, elt <- elts]
+instEnvElts ie = [elt | ClsIE elts <- eltsUFM ie, elt <- elts]
 
 classInstances :: (InstEnv,InstEnv) -> Class -> [Instance]
 classInstances (pkg_ie, home_ie) cls 
   = get home_ie ++ get pkg_ie
   where
     get env = case lookupUFM env cls of
-		Just (ClsIE insts _) -> insts
-		Nothing		     -> []
+		Just (ClsIE insts) -> insts
+		Nothing		   -> []
 
 extendInstEnvList :: InstEnv -> [Instance] -> InstEnv
 extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> Instance -> InstEnv
-extendInstEnv inst_env ins_item@(Instance { is_cls = cls_nm, is_tcs = mb_tcs })
-  = addToUFM_C add inst_env cls_nm (ClsIE [ins_item] ins_tyvar)
+extendInstEnv inst_env ins_item@(Instance { is_cls = cls_nm })
+  = addToUFM_C add inst_env cls_nm (ClsIE [ins_item])
   where
-    add (ClsIE cur_insts cur_tyvar) _ = ClsIE (ins_item : cur_insts)
-					      (ins_tyvar || cur_tyvar)
-    ins_tyvar = not (any isJust mb_tcs)
+    add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
 \end{code}
 
 
@@ -442,7 +437,7 @@ lookupInstEnv :: (InstEnv, InstEnv) 	-- External and home package inst-env
 -- Then which we choose would depend on the way in which 'a'
 -- is instantiated.  So we report that Foo [b] is a match (mapping b->a)
 -- but Foo [Int] is a unifier.  This gives the caller a better chance of
--- giving a suitable error messagen
+-- giving a suitable error message
 
 lookupInstEnv (pkg_ie, home_ie) cls tys
   = (safe_matches, all_unifs, safe_fail)
@@ -494,22 +489,9 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     --------------
     lookup env = case lookupUFM env cls of
 		   Nothing -> ([],[])	-- No instances for this class
-		   Just (ClsIE insts has_tv_insts)
-			| all_tvs && not has_tv_insts
-			-> ([],[])	-- Short cut for common case
-			-- The thing we are looking up is of form (C a b c), and
-			-- the ClsIE has no instances of that form, so don't bother to search
-	
-			| otherwise
-			-> find [] [] insts
+		   Just (ClsIE insts) -> find [] [] insts
 
     --------------
-    lookup_tv :: TvSubst -> TyVar -> Either TyVar Type	
-	-- See Note [InstTypes: instantiating types]
-    lookup_tv subst tv = case lookupTyVar subst tv of
-				Just ty -> Right ty
-				Nothing -> Left tv
-
     find ms us [] = (ms, us)
     find ms us (item@(Instance { is_tcs = mb_tcs, is_tvs = tpl_tvs, 
 				 is_tys = tpl_tys, is_flag = oflag,
@@ -540,6 +522,13 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
         case tcUnifyTys instanceBindFun tpl_tys tys of
 	    Just _   -> find ms (item:us) rest
 	    Nothing  -> find ms us	  rest
+
+    ----------------
+    lookup_tv :: TvSubst -> TyVar -> Either TyVar Type	
+	-- See Note [InstTypes: instantiating types]
+    lookup_tv subst tv = case lookupTyVar subst tv of
+				Just ty -> Right ty
+				Nothing -> Left tv
 
 ---------------
 ---------------
