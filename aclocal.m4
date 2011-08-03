@@ -1570,13 +1570,59 @@ fi
 AC_SUBST($1)
 ])
 
-# LIBRARY_VERSION(lib)
+# LIBRARY_VERSION(lib, [dir])
 # --------------------------------
 # Gets the version number of a library.
 # If $1 is ghc-prim, then we define LIBRARY_ghc_prim_VERSION as 1.2.3
+# $2 points to the directory under libraries/
 AC_DEFUN([LIBRARY_VERSION],[
-LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/$1/$1.cabal | sed "s/.* //"`
+dir=m4_default([$2],[$1])
+LIBRARY_[]translit([$1], [-], [_])[]_VERSION=`grep -i "^version:" libraries/${dir}/$1.cabal | sed "s/.* //"`
 AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
+])
+
+# XCODE_VERSION()
+# --------------------------------
+# Gets the version number of XCode, if on a Mac
+AC_DEFUN([XCODE_VERSION],[
+    if test "$TargetOS_CPP" = "darwin"
+    then
+        AC_MSG_CHECKING(XCode version)
+        XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`
+        # Old XCode versions don't actually give the XCode version
+        if test "$XCodeVersion" = ""
+        then
+            AC_MSG_RESULT(not found (too old?))
+            XCodeVersion1=0
+            XCodeVersion2=0
+        else
+            AC_MSG_RESULT($XCodeVersion)
+            XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+            changequote(, )dnl
+            XCodeVersion2=`echo "$XCodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
+            changequote([, ])dnl
+            AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
+            AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
+        fi
+    fi
+])
+
+# FIND_GCC()
+# --------------------------------
+# Finds where gcc is
+AC_DEFUN([FIND_GCC],[
+    if test "$TargetOS_CPP" = "darwin" &&
+        test "$XCodeVersion1" -ge 4
+    then
+        # From Xcode 4, use 'gcc-4.2' to force the use of the gcc legacy
+        # backend (instead of the LLVM backend)
+        FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc-4.2])
+    else
+        FP_ARG_WITH_PATH_GNU_PROG([CC], [gcc])
+    fi
+    export CC
+    WhatGccIsCalled="$CC"
+    AC_SUBST(WhatGccIsCalled)
 ])
 
 # LocalWords:  fi
