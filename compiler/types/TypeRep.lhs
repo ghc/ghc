@@ -155,11 +155,11 @@ data Type
 
   | PredTy
 	PredType	-- ^ The type of evidence for a type predictate.
-                        -- Note that a @PredTy (EqPred _ _)@ can appear only as the kind
-                        -- of a coercion variable; never as the argument or result of a
-                        -- 'FunTy' (unlike the 'PredType' constructors 'ClassP' or 'IParam')
-	                
-	                -- See Note [PredTy], and Note [Equality predicates]
+	                -- See Note [PredTy]
+			-- By the time we are in Core-land, PredTys are
+			-- synonymous with their representation
+			-- (see Type.predTypeRep)
+
   deriving (Data.Data, Data.Typeable)
 
 -- | The key type representing kinds in the compiler.
@@ -230,24 +230,6 @@ represented using
 The predicate really does turn into a real extra argument to the
 function.  If the argument has type (PredTy p) then the predicate p is
 represented by evidence (a dictionary, for example, of type (predRepTy p).
-
-Note [Equality predicates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-	forall a b. (a ~ S b) => a -> b
-could be represented by
-	ForAllTy a (ForAllTy b (FunTy (PredTy (EqPred a (S b))) ...))
-OR
-	ForAllTy a (ForAllTy b (ForAllTy (c::PredTy (EqPred a (S b))) ...))
-
-The latter is what we do.  (Unlike for class and implicit parameter
-constraints, which do use FunTy.)
-
-Reason:
-	* FunTy is always a *value* function
-	* ForAllTy is discarded at runtime
-
-We often need to make a "wildcard" (c::PredTy..).  We always use the same
-name (wildCoVarName), since it's not mentioned.
 
 
 %************************************************************************

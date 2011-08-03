@@ -99,7 +99,7 @@ import Outputable
 import Unique
 import Pair
 import TysPrim		( eqPredPrimTyCon )
-import PrelNames	( funTyConKey )
+import PrelNames	( funTyConKey, eqPredPrimTyConKey )
 import Control.Applicative
 import Data.Traversable (traverse, sequenceA)
 import Control.Arrow (second)
@@ -279,7 +279,10 @@ isCoVar :: Var -> Bool
 isCoVar v = isCoVarType (varType v)
 
 isCoVarType :: Type -> Bool
-isCoVarType = isEqPredTy
+-- Don't rely on a PredTy; look at the representation type
+isCoVarType ty 
+  | Just tc <- tyConAppTyCon_maybe ty = tc `hasKey` eqPredPrimTyConKey
+  | otherwise                         = False
 \end{code}
 
 
