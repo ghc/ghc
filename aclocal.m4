@@ -517,9 +517,12 @@ if test ! -f compiler/cmm/CmmLex.hs || test ! -f compiler/parser/Lexer.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[2.1.0],
       [AC_MSG_ERROR([Alex version 2.1.0 or later is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-ge],[3.0],
+      [Alex3=YES],[Alex3=NO])
 fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
+AC_SUBST(Alex3)
 ])
 
 
