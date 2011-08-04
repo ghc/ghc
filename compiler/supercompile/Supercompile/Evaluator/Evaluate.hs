@@ -73,27 +73,36 @@ castAnswer (mb_co, in_v) mb_co' = (plusMaybe (\(co, _tg) (co', tg') -> (co `mkTr
 -- Normalisation only ever releases deeds: it is *never* a net consumer of deeds. So normalisation
 -- will never be impeded by a lack of deeds.
 normalise :: UnnormalisedState -> State
-normalise = snd . step' True
+normalise = snd . step' True . Right
 
 -- | Possibly non-normalising simplification we can only do if we are allowed to by a termination test
 --
 -- Unlike normalisation, stepping may be a net consumer of deeds and thus be impeded by a lack of them.
 step :: State -> Maybe State
 step s = guard reduced >> return result
-  where (reduced, result) = step' False $ denormalise s
+  where (reduced, result) = step' False $ Left s
 
-step' :: Bool -> UnnormalisedState -> (Bool, State) -- The flag indicates whether we managed to reduce any steps *at all*
-step' normalising state =
-    (\res@(_reduced, stepped_state) -> ASSERT2(noChange (releaseUnnormalisedStateDeed state) (releaseStateDeed stepped_state),
-                                               hang (text "step': deeds lost or gained:") 2 (pPrintFullUnnormalisedState state $$ pPrintFullState stepped_state))
-                                       ASSERT2(subVarSet (stateFreeVars stepped_state) (unnormalisedStateFreeVars state),
-                                               text "step': FVs" $$ hang (text "Before:") 2 (pPrint (unnormalisedStateFreeVars state) $$ pPrintFullUnnormalisedState state) $$
+step' :: Bool -> Either State UnnormalisedState -> (Bool, State) -- The flag indicates whether we managed to reduce any steps *at all*
+step' normalising ei_state =
+    (\res@(_reduced, stepped_state) -> let _deeds = either releaseStateDeed releaseUnnormalisedStateDeed ei_state
+                                           _doc = either pPrintFullState pPrintFullUnnormalisedState ei_state
+                                           _fvs = either stateFreeVars unnormalisedStateFreeVars ei_state in
+                                       ASSERT2(noChange _deeds (releaseStateDeed stepped_state),
+                                               hang (text "step': deeds lost or gained:") 2 (_doc $$ pPrintFullState stepped_state))
+                                       ASSERT2(subVarSet (stateFreeVars stepped_state) _fvs,
+                                               text "step': FVs" $$ hang (text "Before:") 2 (pPrint _fvs $$ _doc) $$
                                                                     hang (text "After:")  2 (pPrint (stateFreeVars stepped_state) $$ pPrintFullState stepped_state))
                                        -- traceRender (text "normalising" $$ nest 2 (pPrintFullUnnormalisedState state) $$ text "to" $$ nest 2 (pPrintFullState stepped_state)) $
                                        res) $
-    go state
+    go_entry ei_state
   where
-    go :: (Deeds, Heap, Stack, In AnnedTerm) -> (Bool, State)
+    go_entry :: Either State UnnormalisedState -> (Bool, State)
+    go_entry (Left (deeds, heap, k, anned_qa)) = case annee anned_qa of
+      Question x' -> go_question (deeds, heap, k, fmap (\(Question x) -> x) anned_qa)
+      Answer   a  -> go_answer   (deeds, heap, k, fmap (\(Answer a) -> a)   anned_qa)
+    go_entry (Right state) = go state
+
+    go :: UnnormalisedState -> (Bool, State)
     go (deeds, heap@(Heap h ids), k, (rn, e)) 
      | Just anned_a <- termToAnswer ids (rn, e) = go_answer (deeds, heap, k, anned_a)
      | otherwise = case annee e of
