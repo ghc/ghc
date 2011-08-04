@@ -919,10 +919,7 @@ $(eval $(call bindist,.,\
     $(BINDIST_LIBS) \
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
-    $(includes_H_CONFIG) \
-    $(includes_H_PLATFORM) \
     $(includes_H_FILES) \
-    includes/ghcconfig.h \
     $(INSTALL_HEADERS) \
     $(INSTALL_LIBEXECS) \
     $(INSTALL_LIBEXEC_SCRIPTS) \
