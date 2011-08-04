@@ -176,6 +176,7 @@ termIsCheap = isCheap . extract
     isCheap _ | cALL_BY_NAME = True -- A cunning hack. I think this is all that should be required...
     isCheap (Var _)         = True
     isCheap (Value _)       = True
+    isCheap (Cast e _)      = isCheap (extract e)
     isCheap (Case e _ _ []) = isCheap (extract e) -- NB: important for pushing down let-bound applications of ``error''
     isCheap _               = False
 
