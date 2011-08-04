@@ -14,11 +14,12 @@ import qualified Data.Map as M
 
 
 residualiseState :: State -> (Deeds, Out [(Var, PrettyFunction)], Out FVedTerm)
-residualiseState = residualiseUnnormalisedState . denormalise
+residualiseState s = (deeds, floats_static, bindManyMixedLiftedness fvedTermFreeVars floats_nonstatic e)
+ where (deeds, floats_static, floats_nonstatic, e) = residualiseUnnormalisedState (denormalise s)
 
-residualiseUnnormalisedState :: UnnormalisedState -> (Deeds, Out [(Var, PrettyFunction)], Out FVedTerm)
-residualiseUnnormalisedState (deeds, heap, k, in_e) = (deeds, floats_static, e)
-  where (floats_static, e) = residualiseHeap heap (\ids -> residualiseStack ids k (residualiseTerm ids in_e))
+residualiseUnnormalisedState :: UnnormalisedState -> (Deeds, Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)], Out FVedTerm)
+residualiseUnnormalisedState (deeds, heap, k, in_e) = (deeds, floats_static, floats_nonstatic, e)
+  where (floats_static, floats_nonstatic, e) = residualiseHeap heap (\ids -> residualiseStack ids k (residualiseTerm ids in_e))
 
 residualiseAnswer :: InScopeSet -> Answer -> Out FVedTerm
 residualiseAnswer ids = fvedTerm . detagAnnedTerm' . answerToAnnedTerm' ids
@@ -26,8 +27,8 @@ residualiseAnswer ids = fvedTerm . detagAnnedTerm' . answerToAnnedTerm' ids
 residualiseTerm :: InScopeSet -> In AnnedTerm -> Out FVedTerm
 residualiseTerm ids = detagAnnedTerm . renameIn (renameAnnedTerm ids)
 
-residualiseHeap :: Heap -> (InScopeSet -> ((Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)]), Out FVedTerm)) -> (Out [(Var, PrettyFunction)], Out FVedTerm)
-residualiseHeap (Heap h ids) resid_body = (floats_static_h ++ floats_static_k, bindManyMixedLiftedness fvedTermFreeVars (floats_nonstatic_h ++ floats_nonstatic_k) e)
+residualiseHeap :: Heap -> (InScopeSet -> ((Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)]), Out FVedTerm)) -> (Out [(Var, PrettyFunction)], Out [(Var, FVedTerm)], Out FVedTerm)
+residualiseHeap (Heap h ids) resid_body = (floats_static_h ++ floats_static_k, floats_nonstatic_h ++ floats_nonstatic_k, e)
   where (floats_static_h, floats_nonstatic_h) = residualisePureHeap ids h
         ((floats_static_k, floats_nonstatic_k), e) = resid_body ids
 
@@ -62,5 +63,6 @@ pPrintFullState :: State -> SDoc
 pPrintFullState = pPrintFullUnnormalisedState . denormalise
 
 pPrintFullUnnormalisedState :: UnnormalisedState -> SDoc
-pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) $$ pPrint e
-  where (deeds, floats_static, e) = residualiseUnnormalisedState state
+pPrintFullUnnormalisedState state = text "Deeds:" <+> pPrint deeds $$ pPrint (map (first (PrettyDoc . pPrintBndr LetBind)) floats_static) $$ body
+  where (deeds, floats_static, floats_nonstatic, e) = residualiseUnnormalisedState state
+        body = pPrintPrecLetRec noPrec floats_nonstatic (PrettyDoc (angleBrackets (pPrint e)))
