@@ -819,6 +819,8 @@ tcIsForAllTy _             = False
 
 tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
 -- Split off the first predicate argument from a type
+tcSplitPredFunTy_maybe ty 
+  | Just ty' <- tcView ty = tcSplitPredFunTy_maybe ty'
 tcSplitPredFunTy_maybe (FunTy arg res)
   | Just p <- tcSplitPredTy_maybe arg = Just (p, res)
 tcSplitPredFunTy_maybe _
