@@ -112,6 +112,7 @@ def config_5250(opts):
 
 test('5250', [ config_5250,
                extra_clean(['spalign.o']),
+               expect_broken_for(4211, ['optllvm']),
                omit_ways(['ghci']) ],
              compile_and_run, ['spalign.c'])
 
