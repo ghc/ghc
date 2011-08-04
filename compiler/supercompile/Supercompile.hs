@@ -1,5 +1,7 @@
 module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
+-- FIXME: I need to document the basis on which I push down unlifted heap bindings
+
 import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
 import qualified Supercompile.Core.FreeVars as S
