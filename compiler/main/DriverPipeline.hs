@@ -1666,13 +1666,15 @@ linkBinary dflags o_files dep_packages = do
                           then ["-Wl,--enable-auto-import"]
                           else [])
 
+                      -- '-no_pie' - On OS X, the linker otherwise complains that it cannot build 
+                      --             position independent code due to some offensive code in GMP.
                       -- '-no_compact_unwind'
                       --           - C++/Objective-C exceptions cannot use optimised stack
                       --             unwinding code (the optimised form is the default in Xcode 4 on
                       --             x86_64).
-                      ++ (if platformOS   (targetPlatform dflags) == OSDarwin   &&
+                      ++ (if platformOS   (targetPlatform dflags) == OSDarwin   && 
                              platformArch (targetPlatform dflags) == ArchX86_64
-                          then ["-Wl,-no_compact_unwind"]
+                          then ["-Wl,-no_pie", "-Wl,-no_compact_unwind"]
                           else [])
 
                       ++ o_files
