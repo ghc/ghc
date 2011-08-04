@@ -68,3 +68,36 @@ diff -ur gmp-5.0.2.orig/memory.c gmp-5.0.2/memory.c
  
  
  /* Default allocation functions.  In case of failure to allocate/reallocate
+--- gmp-5.0.2.orig/configure.in	2011-08-04 16:35:01.000000000 +1000
++++ gmp-5.0.2/configure.in	2011-08-04 16:39:03.000000000 +1000
+@@ -3178,6 +3178,7 @@
+           AC_DEFINE(HAVE_HOST_CPU_FAMILY_x86_64)
+ 	  case $host in
+ 	    *-*-darwin*)
++	      GMP_DEFINE_RAW(["define(<PIC_ALWAYS>,<yes>)"])
+ 	      GMP_INCLUDE_MPN(x86_64/darwin.m4) ;;
+ 	  esac
+           ;;
+--- gmp-5.0.2.orig/configure	2011-08-04 17:38:22.000000000 +1000
++++ gmp-5.0.2/configure	2011-08-04 17:39:04.000000000 +1000
+@@ -27567,6 +27567,9 @@
+ 	  case $host in
+ 	    *-*-darwin*)
+ 
++echo "define(<PIC_ALWAYS>,<yes>)" >> $gmp_tmpconfigm4
++
++
+ echo "include_mpn(\`x86_64/darwin.m4')" >> $gmp_tmpconfigm4i
+  ;;
+ 	  esac
+--- gmp-5.0.2.orig/mpn/asm-defs.m4	2011-08-04 23:11:19.000000000 +1000
++++ gmp-5.0.2/mpn/asm-defs.m4	2011-08-04 23:11:59.000000000 +1000
+@@ -1041,7 +1041,7 @@
+ dnl  systems which are always PIC.  PIC_ALWAYS established in config.m4
+ dnl  identifies these for us.
+ 
+-ifelse(`PIC_ALWAYS',`yes',`define(`PIC')')
++ifelse(PIC_ALWAYS,yes,`define(`PIC')')
+ 
+ 
+ dnl  Various possible defines passed from the Makefile that are to be tested
