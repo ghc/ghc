@@ -15,7 +15,6 @@ import TcType
 import TcSMonad 
 import TcInteract
 import Inst
-import Id	( evVarPred )
 import Unify	( niFixTvSubst, niSubstTvSet )
 import Var
 import VarSet

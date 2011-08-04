@@ -64,7 +64,7 @@ vectType ty@(ForAllTy _ _)
       let (tyArgs, tyResult) = splitFunTys    tyBody
 
       let (tyArgs_dict, tyArgs_regular) 
-                  = partition isDictType tyArgs
+                  = partition isDictTy tyArgs
 
       -- vectorise the body.
       let tyBody' = mkFunTys tyArgs_regular tyResult
@@ -86,14 +86,6 @@ vectType ty = cantVectorise "Can't vectorise type" (ppr ty)
 -- | Add quantified vars and dictionary parameters to the front of a type.
 abstractType :: [TyVar] -> [Type] -> Type -> Type
 abstractType tyvars dicts = mkForAllTys tyvars . mkFunTys dicts
-
-
--- | Check if some type is a type class dictionary.
-isDictType :: Type -> Bool
-isDictType ty
- = case splitTyConApp_maybe ty of
-	Just (tyCon, _)		-> isClassTyCon tyCon
-	_			-> False
 
 
 -- | Create the boxed version of a vectorised type.

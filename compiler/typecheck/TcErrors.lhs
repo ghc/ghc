@@ -22,7 +22,7 @@ import InstEnv
 import TyCon
 import Name
 import NameEnv
-import Id	( idType, evVarPred )
+import Id	( idType )
 import Var
 import VarSet
 import VarEnv

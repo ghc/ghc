@@ -462,11 +462,9 @@ splitForAllCo_maybe _                = Nothing
 -- and some coercion kind stuff
 
 coVarPred :: CoVar -> PredType
-coVarPred cv
-  = ASSERT( isCoVar cv )
-    case splitPredTy_maybe (varType cv) of
-	Just pred -> pred
-	other	  -> pprPanic "coVarPred" (ppr cv $$ ppr other)
+coVarPred cv = case coVarKind_maybe cv of
+  Just (ty1, ty2) -> mkEqPred (ty1, ty2)
+  Nothing         -> pprPanic "coVarPred" (ppr cv $$ ppr (varType cv))
 
 coVarKind :: CoVar -> (Type,Type) 
 -- c :: t1 ~ t2
@@ -475,7 +473,9 @@ coVarKind cv = case coVarKind_maybe cv of
                  Nothing -> pprPanic "coVarKind" (ppr cv $$ ppr (tyVarKind cv))
 
 coVarKind_maybe :: CoVar -> Maybe (Type,Type) 
-coVarKind_maybe cv = splitEqPredTy_maybe (varType cv)
+coVarKind_maybe cv = case splitTyConApp_maybe (varType cv) of
+  Just (tc, [ty1, ty2]) | tc `hasKey` eqPredPrimTyConKey -> Just (ty1, ty2)
+  _ -> Nothing
 
 -- | Makes a coercion type from two types: the types whose equality 
 -- is proven by the relevant 'Coercion'

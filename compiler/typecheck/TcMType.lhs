@@ -1510,7 +1510,7 @@ checkValidTypeInst typats rhs
          -- we have a decidable instance unless otherwise permitted
        ; undecidable_ok <- xoptM Opt_UndecidableInstances
        ; unless undecidable_ok $
-	   mapM_ addErrTc (checkFamInst typats (tyFamInsts rhs))
+	   mapM_ addErrTc (checkFamInst typats (tcTyFamInsts rhs))
        }
 
 -- Make sure that each type family instance is 
@@ -1548,7 +1548,7 @@ checkTyFamFreeness ty
 -- Check that a type does not contain any type family applications.
 --
 isTyFamFree :: Type -> Bool
-isTyFamFree = null . tyFamInsts
+isTyFamFree = null . tcTyFamInsts
 
 -- Error messages
 

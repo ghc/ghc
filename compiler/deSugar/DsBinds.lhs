@@ -614,9 +614,9 @@ decomposeRuleLhs bndrs lhs
 			     , ptext (sLit "is not bound in RULE lhs")])
                       2 (ppr opt_lhs)
    pp_bndr bndr
-    | isTyVar bndr  = ptext (sLit "type variable") <+> quotes (ppr bndr)
-    | isEvVar bndr  = ptext (sLit "constraint") <+> quotes (ppr (evVarPred bndr))
-    | otherwise     = ptext (sLit "variable") <+> quotes (ppr bndr)
+    | isTyVar bndr                      = ptext (sLit "type variable") <+> quotes (ppr bndr)
+    | Just pred <- evVarPred_maybe bndr = ptext (sLit "constraint") <+> quotes (ppr pred)
+    | otherwise                         = ptext (sLit "variable") <+> quotes (ppr bndr)
 \end{code}
 
 Note [Simplifying the left-hand side of a RULE]

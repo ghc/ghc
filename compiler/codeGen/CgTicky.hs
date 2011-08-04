@@ -60,6 +60,7 @@ import Module
 -- Turgid imports for showTypeCategory
 import PrelNames
 import TcType
+import Type
 import TyCon
 
 import DynFlags

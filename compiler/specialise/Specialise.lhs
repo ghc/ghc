@@ -10,6 +10,7 @@ module Specialise ( specProgram ) where
 
 import Id
 import TcType
+import Type
 import CoreMonad
 import CoreSubst 
 import CoreUnfold

@@ -66,6 +66,7 @@ import DynFlags
 -- Turgid imports for showTypeCategory
 import PrelNames
 import TcType
+import Type
 import TyCon
 
 import Data.Maybe

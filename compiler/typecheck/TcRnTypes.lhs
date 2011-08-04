@@ -64,7 +64,6 @@ module TcRnTypes(
 import HsSyn
 import HscTypes
 import Type
-import Id	( evVarPred )
 import Class    ( Class )
 import DataCon  ( DataCon, dataConUserType )
 import TcType

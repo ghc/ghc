@@ -8,7 +8,6 @@ module TcCanonical(
 #include "HsVersions.h"
 
 import BasicTypes
-import Id	( evVarPred )
 import TcErrors
 import TcRnTypes
 import FunDeps
