@@ -134,6 +134,15 @@ BUILD_DOCBOOK_HTML = NO
 BUILD_DOCBOOK_PS   = NO
 BUILD_DOCBOOK_PDF  = NO
 
+# After stage 1 and the libraries have been built, you can uncomment this line:
+
+# stage=2
+
+# Then stage 1 will not be touched by the build system, until
+# you uncomment the line again.  This is a useful trick for when you're
+# working on stage 2 and want to freeze stage 1 and the libraries for
+# a while.
+
 endif
 
 # -------- A Unregisterised build) -------------------------------------------
