@@ -26,6 +26,7 @@ import State hiding (mapAccumLM)
 
 import Control.Arrow (first, second, (***), (&&&))
 import Control.Applicative (Applicative(..), (<$>))
+import Control.Exception (bracket)
 import Control.Monad hiding (join)
 
 import Data.Function (on)
@@ -41,7 +42,29 @@ import qualified Data.Map as M
 import qualified Data.Graph as G
 import qualified Data.Foldable as Foldable
 
+import System.Directory
+import System.Exit
+import System.IO
 import System.IO.Unsafe (unsafePerformIO)
+import System.Process
+
+
+{-# NOINLINE pprPreview2 #-}
+pprPreview2 :: String -> SDoc -> SDoc -> a -> a
+pprPreview2 fp_base doc1 doc2 x = unsafePerformIO $ do
+    withTempFile (fp_base ++ "-1") $ \fp1 h1 -> do
+        hPutStrLn h1 (showSDoc doc1) >> hFlush h1
+        withTempFile (fp_base ++ "-2") $ \fp2 h2 -> do
+            hPutStrLn h2 (showSDoc doc2) >> hFlush h2
+            ec <- system $ "$EDITOR " ++ fp1 ++ " " ++ fp2
+            case ec of ExitSuccess   -> return x
+                       ExitFailure c -> error $ "pprPreview2(" ++ fp_base ++ "): preview failed with exit code " ++ show c
+
+withTempFile :: String -> (FilePath -> Handle -> IO a) -> IO a
+withTempFile fp_base act = do
+    tmp_dir <- getTemporaryDirectory
+    bracket (openTempFile tmp_dir fp_base) (hClose . snd) (uncurry act)
+
 
 
 -- | Copointed functors. The defining property is:
