@@ -1,7 +1,7 @@
-foo :: GHC.Types.Int -> GHC.Types.Int
-foo x_0 | x_0 GHC.Classes.== 5 = 6
-foo x_1 = 7
-bar :: Data.Maybe.Maybe GHC.Types.Int -> GHC.Types.Int
-bar x_0 | Data.Maybe.Just y_1 <- x_0
-            = y_1
-bar _ = 9
+foo_0 :: GHC.Types.Int -> GHC.Types.Int
+foo_0 x_1 | x_1 GHC.Classes.== 5 = 6
+foo_0 x_2 = 7
+bar_0 :: Data.Maybe.Maybe GHC.Types.Int -> GHC.Types.Int
+bar_0 x_1 | Data.Maybe.Just y_2 <- x_1
+              = y_2
+bar_0 _ = 9
