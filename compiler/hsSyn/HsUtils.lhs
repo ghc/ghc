@@ -88,6 +88,7 @@ import Util
 import Bag
 
 import Data.Either
+import Data.Maybe
 \end{code}
 
 
@@ -601,15 +602,21 @@ hsTyClDeclBinders :: Eq name => Located (TyClDecl name) -> [Located name]
 -- occurence.  We use the equality to filter out duplicate field names
 
 hsTyClDeclBinders (L _ (TyFamily    {tcdLName = name})) = [name]
-hsTyClDeclBinders (L _ (TySynonym   {tcdLName = name})) = [name]
 hsTyClDeclBinders (L _ (ForeignType {tcdLName = name})) = [name]
 
 hsTyClDeclBinders (L _ (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats}))
   = cls_name : 
     concatMap hsTyClDeclBinders ats ++ [n | L _ (TypeSig ns _) <- sigs, n <- ns]
 
-hsTyClDeclBinders (L _ (TyData {tcdLName = tc_name, tcdCons = cons}))
-  = tc_name : hsConDeclsBinders cons
+hsTyClDeclBinders (L _ (TySynonym   {tcdLName = name, tcdTyPats = mb_pats })) 
+  | isJust mb_pats = []
+  | otherwise      = [name]
+  -- See Note [Binders in family instances]
+
+hsTyClDeclBinders (L _ (TyData {tcdLName = tc_name, tcdCons = cons, tcdTyPats = mb_pats }))
+  | isJust mb_pats = hsConDeclsBinders cons
+  | otherwise      = tc_name : hsConDeclsBinders cons
+  -- See Note [Binders in family instances]
 
 hsConDeclsBinders :: (Eq name) => [LConDecl name] -> [Located name]
   -- See hsTyClDeclBinders for what this does
@@ -627,6 +634,13 @@ hsConDeclsBinders cons
     do_one (flds_seen, acc) (L _ (ConDecl { con_name = lname }))
 	= (flds_seen, lname:acc)
 \end{code}
+
+Note [Binders in family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a type or data family instance declaration, the type 
+constructor is an *occurrence* not a binding site
+    type instance T Int = Int -> Int   -- No binders
+    data instance S Bool = S1 | S2     -- Binders are S1,S2
 
 
 %************************************************************************
