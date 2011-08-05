@@ -455,7 +455,7 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- The typechecker (not the renamer) checks that all 
 	-- the declarations are for the right class
     let
-	at_names = map (head . hsTyClDeclBinders) ats
+	at_names = map (tcdLName . unLoc) ats	-- The names of the associated types
     in
     checkDupRdrNames at_names		`thenM_`
 	-- See notes with checkDupRdrNames for methods, above

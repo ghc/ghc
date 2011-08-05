@@ -492,7 +492,7 @@ currently collecting the binders declared in that HsGroup, these binders will
 not have been added to the global environment yet.
 
 In the case of type classes, this problem does not arise, as a class instance
-does not define any binders of it's own.  So, we simply don't attempt to look
+does not define any binders of its own.  So, we simply don't attempt to look
 up the class names of class instances in 'get_local_binders' below.
 
 If we don't look up class instances, can't we get away without looking up type
@@ -508,8 +508,8 @@ difficult to look up.
 
 We solve this problem as follows:
 
-  (a) We process all type declarations other than type instances first.
-  (b) Then, we compute a 'GlobalRdrEnv' from the result of the first step.
+  (a) We process all type declarations *other* than type instances first.
+  (b) Then, we compute an 'OccEnv' from the result of the first step.
   (c) Finally, we process all type instances (both those on the toplevel and
       those nested in class instances) and check for the family names in the
       'GlobalRdrEnv' produced in the previous step before using 'lookupOccRn'.
@@ -540,18 +540,26 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
               tyinst_decls = tyinst_decls1 ++ instDeclATs inst_decls
 
           -- process all type/class decls except family instances
-        ; tc_names  <- mapM new_tc tycl_decls_noinsts
+        ; tc_avails  <- mapM new_tc tycl_decls_noinsts
 
-          -- create a temporary rdr env of the type binders
-        ; let tc_gres     = gresFromAvails LocalDef tc_names
-              tc_name_env = foldl extendGlobalRdrEnv emptyGlobalRdrEnv tc_gres
+          -- Create a temporary env of the type binders
+	  -- See Note [Looking up family names in family instances]
+	  -- NB: associated types may be a sub-bndr of a class
+	  -- 		AvailTC C [C,T,op]
+	  -- Hence availNames, not availName
+        ; let local_tc_env :: OccEnv Name
+              local_tc_env = mkOccEnv [ (occ, n) 
+                                      | a <- tc_avails
+                                      , n <- availNames a
+				      , let occ = nameOccName n
+                                      , isTcOcc occ  ]
 
-          -- process all family instances
-        ; ti_names  <- mapM (new_ti tc_name_env) tyinst_decls
+          -- Process all family instances
+        ; ti_avails <- mapM (new_ti local_tc_env) tyinst_decls
 
           -- finish off with value binder in case of a hs-boot file
-        ; val_names <- mapM new_simple val_bndrs
-        ; return (val_names ++ tc_names ++ ti_names) }
+        ; val_avails <- mapM new_simple val_bndrs
+        ; return (val_avails ++ tc_avails ++ ti_avails) }
   where
     is_hs_boot = isHsBoot (tcg_src gbl_env) ;
 
@@ -565,24 +573,23 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
               | otherwise  = for_hs_bndrs
 
     new_simple :: Located RdrName -> RnM AvailInfo
-    new_simple rdr_name = do
-        nm <- newTopSrcBinder rdr_name
-        return (Avail nm)
+    new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
+                            ; return (Avail nm) }
 
     new_tc tc_decl              -- NOT for type/data instances
-        = do { main_name <- newTopSrcBinder main_rdr
-             ; sub_names <- mapM newTopSrcBinder sub_rdrs
-             ; return (AvailTC main_name (main_name : sub_names)) }
-      where
-        (main_rdr : sub_rdrs) = hsTyClDeclBinders tc_decl
+        = do { names@(main_name : _) <- mapM newTopSrcBinder (hsTyClDeclBinders tc_decl)
+             ; return (AvailTC main_name names) }
 
-    new_ti tc_name_env ti_decl  -- ONLY for type/data instances
-        = do { main_name <- lookupFamInstDeclBndr tc_name_env main_rdr
-             ; sub_names <- mapM newTopSrcBinder sub_rdrs
+    new_ti local_tc_env ti_decl  -- ONLY for type/data instances
+        = do { let tc_rdr = tcdName (unLoc ti_decl)
+             ; main_name <- case lookupOccEnv local_tc_env (rdrNameOcc tc_rdr) of
+                              Nothing -> lookupGlobalOccRn tc_rdr
+                              Just n  -> return n
+		    -- See Note [Looking up family names in family instances]
+
+             ; sub_names <- mapM newTopSrcBinder (hsTyClDeclBinders ti_decl)
              ; return (AvailTC main_name sub_names) }
                         -- main_name is not bound here!
-      where
-        (main_rdr : sub_rdrs) = hsTyClDeclBinders ti_decl
 
 get_local_binders _ g = pprPanic "get_local_binders" (ppr g)
 \end{code}
