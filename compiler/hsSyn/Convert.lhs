@@ -816,7 +816,8 @@ badOcc ctxt_ns occ
 	<+> ptext (sLit "name:") <+> quotes (text occ)
 
 thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
--- This turns a Name into a RdrName
+-- This turns a TH Name into a RdrName; used for both binders and occurrences
+-- See Note [Binders in Template Haskell]
 -- The passed-in name space tells what the context is expecting;
 --	use it unless the TH name knows what name-space it comes
 -- 	from, in which case use the latter
@@ -911,7 +912,7 @@ a) We don't want to complain about "x" being bound twice in
    the pattern [x1,x2]
 b) We don't want x3 to shadow the x1,x2
 c) We *do* want 'x' (dynamically bound with mkName) to bind 
-   to the innermost binding of "x", namely x3.. (In this
+   to the innermost binding of "x", namely x3.
 d) When pretty printing, we want to print a unique with x1,x2 
    etc, else they'll all print as "x" which isn't very helpful
 
@@ -926,7 +927,7 @@ Achieving (a) is a bit awkward, because
      RdrNames arising from TH and the Unqual RdrNames that would
      come from a user writing \[x,x] -> blah
 
-So in Convert (here) we translate
+So in Convert.thRdrName we translate
    TH Name		            RdrName
    --------------------------------------------------------
    NameU (arising from newName) --> Exact (Name{ System })
@@ -951,4 +952,4 @@ So RnEnv.newGlobalBinder we spot Exact RdrNames that wrap a
 non-External Name, and make an External name for.  (Remember, 
 constructors and the like need External Names.)  Oddly, the 
 *occurrences* will continue to be that (non-External) System Name, 
-but that will come out in the wash.
+but the first sweep of the optimiser will fix that.
