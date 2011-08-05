@@ -1,6 +1,9 @@
 module Supercompile (supercompileProgram, supercompileProgramSelective) where
 
 -- FIXME: I need to document the basis on which I push down unlifted heap bindings
+-- TODO:
+--  * Why does the supercompiler not match as much as it should? (e.g. Interpreter, UInterpreter)
+--  * Does the matcher match the types of variables bound in the heap?
 
 import Supercompile.Utilities
 import qualified Supercompile.Core.Syntax as S
