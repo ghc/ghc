@@ -97,7 +97,7 @@ ifneq "$(BINDIST)" "YES"
 ghc/stage1/build/tmp/$(ghc_stage1_PROG) : $(BOOT_LIBS)
 ifeq "$(GhcProfiled)" "YES"
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_p_LIB)
-ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES),$(libraries/$(lib)_dist-install_p_LIB))
+ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_p_LIB))
 endif
 
 # Modules here import HsVersions.h, so we need ghc_boot_platform.h

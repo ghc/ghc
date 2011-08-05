@@ -173,12 +173,16 @@ plugin = defaultPlugin {
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install _ todo = do
+  reinitializeGlobals
   putMsgS "Hello!"
   return todo
 </programlisting>
 
       <para>Provided you compiled this plugin and registered it in a package (with cabal for instance,) you can then use it by just specifying <literal>-fplugin=DoNothing.Plugin</literal> on the command line, and during the compilation you should see GHC say 'Hello'.</para>
 
+      <para>Note carefully the <literal>reinitializeGlobals</literal> call at the beginning of the installation function. Due to bugs in the windows linker dealing with <literal>libghc</literal>, this call is necessary to properly ensure compiler plugins have the same global state as GHC at the time of invocation. Without <literal>reinitializeGlobals</literal>, compiler plugins can crash at runtime because they may require state that hasn't otherwise been initialized.</para>
+
+      <para>In the future, when the linking bugs are fixed, <literal>reinitializeGlobals</literal> will be deprecated with a warning, and changed to do nothing.</para>
       <sect3 id="coretodo-in-more-detail">
         <title><literal>CoreToDo</literal> in more detail</title>
 
@@ -217,7 +221,9 @@ plugin = defaultPlugin {
   }
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
-install _ todo = return (CoreDoPluginPass "Say name" pass : todo)
+install _ todo = do
+  reinitializeGlobals
+  return (CoreDoPluginPass "Say name" pass : todo)
 
 pass :: ModGuts -> CoreM ModGuts
 pass = bindsOnlyPass (mapM printBind)
@@ -252,7 +258,9 @@ plugin = defaultPlugin {
   }
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
-install _ todo = return (CoreDoPluginPass "Say name" pass : todo)
+install _ todo = do
+  reinitializeGlobals
+  return (CoreDoPluginPass "Say name" pass : todo)
 
 pass :: ModGuts -> CoreM ModGuts
 pass g = mapM_ (printAnn g) (mg_binds g) >> return g

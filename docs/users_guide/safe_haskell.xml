@@ -51,7 +51,7 @@
       Haskell code easier to analyze and reason about. It also codifies an
       existing culture in the Haskell community of trying to avoid using such
       unsafe functions unless absolutely necessary. As such using the safe
-      language (through the <option>-XSafe</option> flag) can be though of as a
+      language (through the <option>-XSafe</option> flag) can be thought of as a
       way of enforcing good style, similar to the function of
       <option>-Wall</option>.
     </sect3>

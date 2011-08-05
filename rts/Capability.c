@@ -366,11 +366,13 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
                cap->no, task->incall->tso ? "bound task" : "worker",
                (void *)task->id);
     ACQUIRE_LOCK(&task->lock);
-    task->wakeup = rtsTrue;
-    // the wakeup flag is needed because signalCondition() doesn't
-    // flag the condition if the thread is already runniing, but we want
-    // it to be sticky.
-    signalCondition(&task->cond);
+    if (task->wakeup == rtsFalse) {
+        task->wakeup = rtsTrue;
+        // the wakeup flag is needed because signalCondition() doesn't
+        // flag the condition if the thread is already runniing, but we want
+        // it to be sticky.
+        signalCondition(&task->cond);
+    }
     RELEASE_LOCK(&task->lock);
 }
 #endif

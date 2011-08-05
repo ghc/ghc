@@ -33,6 +33,9 @@ import FastString
 import Ctype
 import Util
 --import TRACE
+
+import Data.Word
+import Data.Char
 }
 
 $whitechar   = [\ \t\n\r\f\v\xa0] -- \xa0 is Unicode no-break space
@@ -320,11 +323,19 @@ type AlexInput = (RealSrcLoc,StringBuffer)
 alexInputPrevChar :: AlexInput -> Char
 alexInputPrevChar (_,s) = prevChar s '\n'
 
+-- backwards compatibility for Alex 2.x
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
-alexGetChar (loc,s) 
+alexGetChar inp = case alexGetByte inp of
+                    Nothing    -> Nothing
+                    Just (b,i) -> c `seq` Just (c,i)
+                       where c = chr $ fromIntegral b
+
+alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
+alexGetByte (loc,s)
   | atEnd s   = Nothing
-  | otherwise = c `seq` loc' `seq` s' `seq` Just (c, (loc', s'))
-  where c = currentChar s
+  | otherwise = b `seq` loc' `seq` s' `seq` Just (b, (loc', s'))
+  where c    = currentChar s
+        b    = fromIntegral $ ord $ c
         loc' = advanceSrcLoc loc c
 	s'   = stepOn s
 
