@@ -591,8 +591,9 @@ get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
              ; return (AvailTC main_name names) }
 
     new_ti local_tc_env ti_decl  -- ONLY for type/data instances
-        = do { let tc_rdr = tcdName (unLoc ti_decl)
-             ; main_name <- case lookupOccEnv local_tc_env (rdrNameOcc tc_rdr) of
+        = do { let L loc tc_rdr = tcdLName (unLoc ti_decl)
+             ; main_name <- setSrcSpan loc $
+                            case lookupOccEnv local_tc_env (rdrNameOcc tc_rdr) of
                               Nothing -> lookupGlobalOccRn tc_rdr
                               Just n  -> return n
 		    -- See Note [Looking up family names in family instances]
