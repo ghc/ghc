@@ -320,7 +320,6 @@ extendLocalRdrEnvList env names
   = extendOccEnvList env [(nameOccName n, n) | n <- names]
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
-lookupLocalRdrEnv _   (Exact name) = Just name
 lookupLocalRdrEnv env (Unqual occ) = lookupOccEnv env occ
 lookupLocalRdrEnv _   _            = Nothing
 
@@ -437,7 +436,8 @@ globalRdrEnvElts :: GlobalRdrEnv -> [GlobalRdrElt]
 globalRdrEnvElts env = foldOccEnv (++) [] env
 
 instance Outputable GlobalRdrElt where
-  ppr gre = ppr name <+> parens (ppr (gre_par gre) <+> pprNameProvenance gre)
+  ppr gre = hang (ppr name)
+               2 (parens (ppr (gre_par gre) <+> pprNameProvenance gre))
 	  where
 	    name = gre_name gre
 

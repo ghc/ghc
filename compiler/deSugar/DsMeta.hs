@@ -103,7 +103,7 @@ dsBracket brack splices
 repTopP :: LPat Name -> DsM (Core TH.PatQ)
 repTopP pat = do { ss <- mkGenSyms (collectPatBinders pat) 
                  ; pat' <- addBinds ss (repLP pat)
-                 ; wrapNongenSyms ss pat' }
+                 ; wrapGenSyms ss pat' }
 
 repTopDs :: HsGroup Name -> DsM (Core (TH.Q [TH.Dec]))
 repTopDs group
@@ -132,8 +132,7 @@ repTopDs group
 	dec_ty <- lookupType decTyConName ;
 	q_decs  <- repSequenceQ dec_ty core_list ;
 
-	wrapNongenSyms ss q_decs
-	-- Do *not* gensym top-level binders
+	wrapGenSyms ss q_decs
       }
 
 
@@ -311,11 +310,9 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
 		   ; ss <- mkGenSyms (collectHsBindsBinders binds)
 		   ; binds1 <- addBinds ss (rep_binds binds)
                    ; ats1   <- repLAssocFamInst ats
-		   ; decls1 <- coreList decQTyConName (ats1 ++ binds1)
-		   ; decls2 <- wrapNongenSyms ss decls1
-		   -- wrapNongenSyms: do not clone the class op names!
-		   -- They must be called 'op' etc, not 'op34'
-		   ; repInst cxt1 inst_ty1 (decls2)
+		   ; decls <- coreList decQTyConName (ats1 ++ binds1)
+		   ; inst_decl <- repInst cxt1 inst_ty1 decls
+		   ; wrapGenSyms ss inst_decl
                    }
 	; return (loc, i)}
  where
@@ -1254,21 +1251,6 @@ wrapGenSyms binds body@(MkC b)
 	   ; gensym_app <- repGensym lit_str
 	   ; repBindQ var_ty elt_ty 
 		      gensym_app (MkC (Lam id body')) }
-
--- Just like wrapGenSym, but don't actually do the gensym
--- Instead use the existing name:
---	let x = "x" in ...
--- Only used for [Decl], and for the class ops in class 
--- and instance decls
-wrapNongenSyms :: [GenSymBind] -> Core a -> DsM (Core a)
-wrapNongenSyms binds (MkC body)
-  = do { binds' <- mapM do_one binds ;
-	 return (MkC (mkLets binds' body)) }
-  where
-    do_one (name,id) 
-	= do { MkC lit_str <- occNameLit name
-	     ; MkC var <- rep2 mkNameName [lit_str]
-	     ; return (NonRec id var) }
 
 occNameLit :: Name -> DsM (Core String)
 occNameLit n = coreStringLit (occNameString (nameOccName n))
