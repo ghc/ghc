@@ -828,7 +828,8 @@ runMeta show_code run_and_convert expr
 	-- Compile and link it; might fail if linking fails
 	; hsc_env <- getTopEnv
 	; src_span <- getSrcSpanM
-	; either_hval <- tryM $ liftIO $
+	; traceTc "About to run (desugared)" (ppr ds_expr)
+        ; either_hval <- tryM $ liftIO $
 			 HscMain.hscCompileCoreExpr hsc_env src_span ds_expr
 	; case either_hval of {
 	    Left exn   -> failWithTc (mk_msg "compile and link" exn) ;

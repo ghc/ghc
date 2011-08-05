@@ -133,6 +133,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
          val_avails = map Avail val_binders 
        } ;
    (tcg_env, tcl_env) <- extendGlobalRdrEnvRn val_avails local_fix_env ;
+   traceRn (ptext (sLit "Val binders") <+> (ppr val_binders)) ;
    setEnvs (tcg_env, tcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
