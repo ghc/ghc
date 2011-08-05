@@ -36,12 +36,21 @@ evaluatePrim iss tg pop tys args = do
     fmap (annedAnswer tg) $ fro res
   where
     to :: Answer -> Maybe CoreSyn.CoreExpr
-    to (mb_co, (rn, v)) = fmap (maybe id (flip CoreSyn.Cast . fst) mb_co) $ case v of
+    to (mb_co, (rn, v)) = fmap coerce $ case v of
         Literal l          -> Just (CoreSyn.Lit l)
         Coercion co        -> Just (CoreSyn.Coercion co)
         Data dc tys cos xs -> Just (CoreSyn.Var (dataConWrapId dc) `CoreSyn.mkTyApps` map (renameType iss rn) tys `CoreSyn.mkCoApps` cos `CoreSyn.mkVarApps` map (renameId rn) xs)
         _                  -> Nothing
-    
+      where
+        -- It is quite important that we don't wrap things with spurious refl coercions when it comes
+        -- to RULEs, because the default constant-folding rules don't trigger if there are too many coercions
+        coerce | Just (co, _tg) <- mb_co
+               , let Pair ty1 ty2 = coercionKind co
+               , not (ty1 `eqType` ty2)
+               = (`CoreSyn.Cast` co)
+               | otherwise
+               = id
+
     fro :: CoreSyn.CoreExpr -> Maybe Answer
     fro (CoreSyn.Cast e co)   = fmap (\(mb_co', in_v) -> (Just (maybe co (\(co', _) -> co' `mkTransCo` co) mb_co', tg), in_v)) $ fro e
     fro (CoreSyn.Lit l)       = Just (Nothing, (emptyRenaming, Literal l))
