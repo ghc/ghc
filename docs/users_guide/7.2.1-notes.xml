@@ -50,6 +50,27 @@
 
       <listitem>
         <para>
+          The <literal>TypeSynonymInstances</literal> extension now
+          correctly requires that instances are valid once the type
+          synonym is expanded. For example, in order to have
+        </para>
+<programlisting>
+instance SomeClass String where
+    ...
+</programlisting>
+        <para>
+          you need both <literal>TypeSynonymInstances</literal> and
+          <literal>FlexibleInstances</literal> enabled, as the latter
+          is necessary for
+        </para>
+<programlisting>
+instance SomeClass [Char] where
+    ...
+</programlisting>
+      </listitem>
+
+      <listitem>
+        <para>
           The <literal>DatatypeContexts</literal> extension (which will
           not be in the next Haskell language standard) is now off by
           default, and deprecated. It is still enabled by the
