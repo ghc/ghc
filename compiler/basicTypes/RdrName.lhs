@@ -367,13 +367,50 @@ data GlobalRdrElt
     }
 
 -- | The children of a Name are the things that are abbreviated by the ".."
---   notation in export lists.  Specifically:
---	TyCon	Children are * data constructors
---			     * record field ids
---	Class	Children are * class operations
--- Each child has the parent thing as its Parent
+--   notation in export lists.  See Note [Parents]
 data Parent = NoParent | ParentIs Name
 	      deriving (Eq)
+
+{- Note [Parents]
+~~~~~~~~~~~~~~~~~
+  What             Children
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  data T           Data constructors
+		   Record-field ids
+
+  data family T    Data constructors and record-field ids
+                   of all visible data instances of T
+
+  class	C          Class operations
+		   Associated type constructors
+
+Note [Combining parents]
+~~~~~~~~~~~~~~~~~~~~~~~~
+With an associated type we might have
+   module M where
+     class C a where
+       data T a
+       op :: T a -> a
+     instance C Int where
+       data T Int = TInt
+     instance C Bool where
+       data T Bool = TBool
+
+Then:   C is the parent of T
+	T is the parent of TInt and TBool
+So: in an export list
+    C(..) is short for C( op, T )
+    T(..) is short for T( TInt, TBool )
+
+Module M exports everything, so its exports will be
+   AvailTC C [C,T,op]
+   AvailTC T [T,TInt,TBool]
+On import we convert to GlobalRdrElt and the combine
+those.  For T that will mean we have 
+  one GRE with Parent C
+  one GRE with NoParent
+That's why plusParent picks the "best" case.
+-} 
 
 instance Outputable Parent where
    ppr NoParent     = empty
@@ -381,8 +418,17 @@ instance Outputable Parent where
    
 
 plusParent :: Parent -> Parent -> Parent
-plusParent p1 p2 = ASSERT2( p1 == p2, parens (ppr p1) <+> parens (ppr p2) )
-                   p1
+-- See Note [Combining parents]
+plusParent (ParentIs n) p2 = hasParent n p2
+plusParent p1 (ParentIs n) = hasParent n p1
+plusParent _ _ = NoParent
+
+hasParent :: Name -> Parent -> Parent
+#ifdef DEBUG
+hasParent n (ParentIs n') 
+  | n /= n' = pprPanic "hasParent" (ppr n <+> ppr n')  -- Parents should agree
+#endif
+hasParent n _  = ParentIs n
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
