@@ -98,8 +98,8 @@ step' normalising ei_state =
   where
     go_entry :: Either State UnnormalisedState -> (Bool, State)
     go_entry (Left (deeds, heap, k, anned_qa)) = case annee anned_qa of
-      Question x' -> go_question (deeds, heap, k, fmap (\(Question x) -> x) anned_qa)
-      Answer   a  -> go_answer   (deeds, heap, k, fmap (\(Answer a) -> a)   anned_qa)
+      Question _ -> go_question (deeds, heap, k, fmap (\(Question x') -> x') anned_qa)
+      Answer   _ -> go_answer   (deeds, heap, k, fmap (\(Answer a) -> a)     anned_qa)
     go_entry (Right state) = go state
 
     go :: UnnormalisedState -> (Bool, State)
