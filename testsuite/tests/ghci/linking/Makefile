@@ -20,6 +20,8 @@ ghcilink001 :
 
 ifeq "$(WINDOWS)" "YES"
 DLL = $1.dll
+else ifeq "$(DARWIN)" "YES"
+DLL = lib$1.dylib
 else
 DLL = lib$1.so
 endif

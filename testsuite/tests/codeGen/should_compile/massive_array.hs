@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-ignore-interface-pragmas -fasm #-}
+{-# OPTIONS_GHC -fno-ignore-interface-pragmas #-}
 
 -- This test breaks the linear register allocator when compiled the
 -- flags -fnew-codegen, -fPIC and -dynamic, running out of stack

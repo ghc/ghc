@@ -27,10 +27,11 @@ test('T1969',
                                     #                 221667908 (x86/OS X)
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 420000000,
-                                                      550000000)),
+                                                      580000000)),
                                     # 17/11/2009:     434,845,560 (amd64/Linux)
                                     # 08/12/2009:     459,776,680 (amd64/Linux)
                                     # 17/05/2010:     519,377,728 (amd64/Linux)
+                                    # 05/08/2011:     561,382,568 (amd64/OS X)
       only_ways(['normal'])
       ],
      compile,
@@ -79,16 +80,18 @@ test('T4801',
       if_wordsize(32,
           compiler_stats_num_field('peak_megabytes_allocated', 30, 40)),
       # expected value: 66 (amd64/Linux):
+      # expected value: 72 (amd64/OS X):
       if_wordsize(64,
-          compiler_stats_num_field('peak_megabytes_allocated', 55, 70)),
+          compiler_stats_num_field('peak_megabytes_allocated', 55, 75)),
       # expected value: 353463196 (x86/Windows)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 330000000,
                                                       370000000)),
-      # expected value: 145038576 (amd64/Linux):
+      # expected value: 145038576 (amd64/Linux):  ?? makes no sense -=chak
+      # expected value: 813714032 (amd64/OS X):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 600000000,
-                                                      750000000)),
+                                                      850000000)),
       # expected value: 14181360 (x86/Linux)
       if_wordsize(32,
           compiler_stats_num_field('max_bytes_used', 11000000,
@@ -114,7 +117,7 @@ test('T3064',
       # expected value: 56380288 (x86/Linux) (28/6/2011)
       if_wordsize(32,
           compiler_stats_num_field('bytes allocated', 50000000,
-                                                      63000000)),
+                                                      70000000)),
       # expected value: 108937496 (amd64/Linux) (28/6/2011):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 110000000,
@@ -150,4 +153,18 @@ test('T5030',
       ],
      compile,
      ['-fcontext-stack=300'])
+
+test('parsing001',
+     [# expected value: ?
+      if_wordsize(32,
+          compiler_stats_num_field('bytes allocated', 260000000,
+                                                      300000000)),
+      # expected value: 587079016 (amd64/Linux):
+      if_wordsize(64,
+          compiler_stats_num_field('bytes allocated', 540000000,
+                                                      600000000)),
+       only_ways(['normal']),
+      ],
+     compile_fail, [''])
+
 
