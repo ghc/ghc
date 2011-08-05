@@ -35,7 +35,8 @@ test('divbyzero',
              if_platform('i386-unknown-mingw32', exit_code(1))]),
      compile_and_run, [''])
 
-test('outofmem', normal, run_command, ['$MAKE -s --no-print-directory outofmem'])
+test('outofmem', if_os('darwin', skip), 
+                 run_command, ['$MAKE -s --no-print-directory outofmem'])
 test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
 
