@@ -301,15 +301,20 @@ negateInteger (Negative p) = Positive p
 negateInteger Naught       = Naught
 
 plusInteger :: Integer -> Integer -> Integer
-Positive p1 `plusInteger` Positive p2 = Positive (p1 `plusPositive` p2)
-Negative p1 `plusInteger` Negative p2 = Negative (p1 `plusPositive` p2)
-Positive p1 `plusInteger` Negative p2 = case p1 `comparePositive` p2 of
-                                        GT -> Positive (p1 `minusPositive` p2)
-                                        EQ -> Naught
-                                        LT -> Negative (p2 `minusPositive` p1)
-Negative p1 `plusInteger` Positive p2 = Positive p2 `plusInteger` Negative p1
-Naught      `plusInteger` (!i)        = i
-(!i)        `plusInteger` Naught      = i
+Positive p1    `plusInteger` Positive p2 = Positive (p1 `plusPositive` p2)
+Negative p1    `plusInteger` Negative p2 = Negative (p1 `plusPositive` p2)
+Positive p1    `plusInteger` Negative p2
+    = case p1 `comparePositive` p2 of
+      GT -> Positive (p1 `minusPositive` p2)
+      EQ -> Naught
+      LT -> Negative (p2 `minusPositive` p1)
+Negative p1    `plusInteger` Positive p2
+    = Positive p2 `plusInteger` Negative p1
+Naught         `plusInteger` Naught         = Naught
+Naught         `plusInteger` i@(Positive _) = i
+Naught         `plusInteger` i@(Negative _) = i
+i@(Positive _) `plusInteger` Naught         = i
+i@(Negative _) `plusInteger` Naught         = i
 
 minusInteger :: Integer -> Integer -> Integer
 i1 `minusInteger` i2 = i1 `plusInteger` negateInteger i2
@@ -486,15 +491,16 @@ Some x xs `comparePositive` Some y ys = case xs `comparePositive` ys of
                                               else                       EQ
                                         res -> res
 None      `comparePositive` None      = EQ
-(!_)      `comparePositive` None      = GT
-None      `comparePositive` (!_)      = LT
+(Some {}) `comparePositive` None      = GT
+None      `comparePositive` (Some {}) = LT
 
 plusPositive :: Positive -> Positive -> Positive
 plusPositive x0 y0 = addWithCarry 0## x0 y0
  where -- digit `elem` [0, 1]
        addWithCarry :: Digit -> Positive -> Positive -> Positive
-       addWithCarry c (!xs) None  = addOnCarry c xs
-       addWithCarry c None  (!ys) = addOnCarry c ys
+       addWithCarry c None            None            = addOnCarry c None
+       addWithCarry c xs@(Some {})    None            = addOnCarry c xs
+       addWithCarry c None            ys@(Some {})    = addOnCarry c ys
        addWithCarry c xs@(Some x xs') ys@(Some y ys')
         = if x `ltWord#` y then addWithCarry c ys xs
           -- Now x >= y
@@ -550,28 +556,38 @@ Some x xs `minusPositive` Some y ys
          case z `plusWord#` x of
          z' -> -- z = 2^n + (x - y), calculated without overflow
           Some z' ((xs `minusPositive` ys) `minusPositive` onePositive)
-(!xs) `minusPositive` None = xs
-None  `minusPositive` (!_) = errorPositive -- XXX Can't happen
+xs@(Some {}) `minusPositive` None      = xs
+None         `minusPositive` None      = None
+None         `minusPositive` (Some {}) = errorPositive -- XXX Can't happen
 -- XXX None `minusPositive` _ = error "minusPositive: Requirement x > y not met"
 
 timesPositive :: Positive -> Positive -> Positive
 -- XXX None's can't happen here:
-None             `timesPositive` (!_)        = errorPositive
-(!_)             `timesPositive` None        = errorPositive
+None            `timesPositive` None        = errorPositive
+None            `timesPositive` (Some {})   = errorPositive
+(Some {})       `timesPositive` None        = errorPositive
 -- x and y are the last digits in Positive numbers, so are not 0:
-Some x None      `timesPositive` Some y None = x `timesDigit` y
-xs@(Some _ None) `timesPositive` (!ys)       = ys `timesPositive` xs
--- y is the last digit in a Positive number, so is not 0:
-Some x xs'       `timesPositive` ys@(Some y None)
-    = -- We could actually skip this test, and everything would
-      -- turn out OK. We already play tricks like that in timesPositive.
-      let zs = Some 0## (xs' `timesPositive` ys)
-      in if x `eqWord#` 0##
-         then zs
-         else (x `timesDigit` y) `plusPositive` zs
-Some x xs' `timesPositive` ys@(Some _ _)
-    = (Some x None `timesPositive` ys) `plusPositive`
-      Some 0## (xs' `timesPositive` ys)
+xs@(Some x xs') `timesPositive` ys@(Some y ys')
+ = case xs' of
+   None ->
+       case ys' of
+           None ->
+               x `timesDigit` y
+           Some {} ->
+               ys `timesPositive` xs
+   Some {} ->
+       case ys' of
+       None ->
+           -- y is the last digit in a Positive number, so is not 0.
+           let zs = Some 0## (xs' `timesPositive` ys)
+           in -- We could actually skip this test, and everything would
+              -- turn out OK. We already play tricks like that in timesPositive.
+              if x `eqWord#` 0##
+              then zs
+              else (x `timesDigit` y) `plusPositive` zs
+       Some {} ->
+           (Some x None `timesPositive` ys) `plusPositive`
+           Some 0## (xs' `timesPositive` ys)
 
 {-
 -- Requires arguments /= 0
@@ -708,8 +724,9 @@ some (!w) None  = if w `eqWord#` 0## then None else Some w None
 some (!w) (!ws) = Some w ws
 
 andDigits :: Digits -> Digits -> Digits
-andDigits (!_)          None          = None
-andDigits None          (!_)          = None
+andDigits None          None          = None
+andDigits (Some {})     None          = None
+andDigits None          (Some {})     = None
 andDigits (Some w1 ws1) (Some w2 ws2) = Some (w1 `and#` w2) (andDigits ws1 ws2)
 
 -- DigitsOnes is just like Digits, only None is really 0xFFFFFFF...,
@@ -719,19 +736,22 @@ andDigits (Some w1 ws1) (Some w2 ws2) = Some (w1 `and#` w2) (andDigits ws1 ws2)
 newtype DigitsOnes = DigitsOnes Digits
 
 andDigitsOnes :: DigitsOnes -> Digits -> Digits
-andDigitsOnes (!_)                       None          = None
-andDigitsOnes (DigitsOnes None)          (!ws2)        = ws2
+andDigitsOnes (DigitsOnes None)          None          = None
+andDigitsOnes (DigitsOnes None)          ws2@(Some {}) = ws2
+andDigitsOnes (DigitsOnes (Some {}))     None          = None
 andDigitsOnes (DigitsOnes (Some w1 ws1)) (Some w2 ws2)
     = Some (w1 `and#` w2) (andDigitsOnes (DigitsOnes ws1) ws2)
 
 orDigits :: Digits -> Digits -> Digits
-orDigits None          (!ds)         = ds
-orDigits (!ds)         None          = ds
+orDigits None          None          = None
+orDigits None          ds@(Some {})  = ds
+orDigits ds@(Some {})  None          = ds
 orDigits (Some w1 ds1) (Some w2 ds2) = Some (w1 `or#` w2) (orDigits ds1 ds2)
 
 xorDigits :: Digits -> Digits -> Digits
-xorDigits None          (!ds)         = ds
-xorDigits (!ds)         None          = ds
+xorDigits None          None          = None
+xorDigits None          ds@(Some {})  = ds
+xorDigits ds@(Some {})  None          = ds
 xorDigits (Some w1 ds1) (Some w2 ds2) = Some (w1 `xor#` w2) (xorDigits ds1 ds2)
 
 -- XXX We'd really like word2Double# for this
