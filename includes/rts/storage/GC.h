@@ -198,6 +198,8 @@ typedef struct _GCStats {
   StgDouble mutator_wall_seconds;
   StgDouble gc_cpu_seconds;
   StgDouble gc_wall_seconds;
+  StgDouble cpu_seconds;
+  StgDouble wall_seconds;
 } GCStats;
 void getGCStats (GCStats *s);
 

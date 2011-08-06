@@ -891,6 +891,9 @@ extern void getGCStats( GCStats *s )
     s->mutator_wall_seconds = TICK_TO_DBL(current_elapsed- end_init_elapsed - gc_elapsed);
     s->gc_cpu_seconds = TICK_TO_DBL(gc_cpu);
     s->gc_wall_seconds = TICK_TO_DBL(gc_elapsed);
+    /* EZY: Being consistent with incremental output, but maybe should also discount init */
+    s->cpu_seconds = TICK_TO_DBL(current_cpu);
+    s->wall_seconds = TICK_TO_DBL(current_elapsed - end_init_elapsed);
     s->par_avg_bytes_copied = GC_par_avg_copied*(StgWord64)sizeof(W_);
     s->par_max_bytes_copied = GC_par_max_copied*(StgWord64)sizeof(W_);
 }
