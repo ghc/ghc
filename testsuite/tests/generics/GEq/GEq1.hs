@@ -3,7 +3,7 @@
 module Main where
 
 import GHC.Generics hiding (C, D)
-import GEq
+import GEq1A
 
 -- We should be able to generate a generic representation for these types
 
