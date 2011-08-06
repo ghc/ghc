@@ -91,4 +91,6 @@ test('mc15', normal, compile, [''])
 test('mc16', normal, compile, [''])
 test('EmptyDecls', normal, compile, [''])
 
-test('T5243', normal, multimod_compile, ['T5243',''])
+test('T5243', extra_clean(['T5243A.hi', 'T5243A.o']),
+     multimod_compile, ['T5243',''])
+
