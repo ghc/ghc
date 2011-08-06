@@ -387,8 +387,7 @@ askCc dflags args = do
   let (p,args0) = pgm_c dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv args1
-  let real_args = filter notNull (map showOpt args1)
-  handleProc p "gcc" $
+  runSomethingWith dflags "gcc" p args1 $ \real_args ->
     readCreateProcess (proc p real_args){ env = mb_env }
 
 -- Version of System.Process.readProcessWithExitCode that takes an environment
@@ -709,16 +708,23 @@ runSomethingFiltered
   -> Maybe [(String,String)] -> IO ()
 
 runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
+    runSomethingWith dflags phase_name pgm args $ \real_args -> do
+        r <- builderMainLoop dflags filter_fn pgm real_args mb_env
+        return (r,())
+
+runSomethingWith
+  :: DynFlags -> String -> String -> [Option]
+  -> ([String] -> IO (ExitCode, a))
+  -> IO a
+
+runSomethingWith dflags phase_name pgm args io = do
   let real_args = filter notNull (map showOpt args)
 #if __GLASGOW_HASKELL__ >= 701
       cmdLine = showCommandForUser pgm real_args
 #else
       cmdLine = unwords (pgm:real_args)
 #endif
-  traceCmd dflags phase_name cmdLine $ do
-  handleProc pgm phase_name $ do
-     r <- builderMainLoop dflags filter_fn pgm real_args mb_env
-     return (r,())
+  traceCmd dflags phase_name cmdLine $ handleProc pgm phase_name $ io real_args
 
 handleProc :: String -> String -> IO (ExitCode, r) -> IO r
 handleProc pgm phase_name proc = do
@@ -856,7 +862,7 @@ data BuildMessage
   | BuildError !SrcLoc !SDoc
   | EOF
 
-traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
+traceCmd :: DynFlags -> String -> String -> IO a -> IO a
 -- trace the command (at two levels of verbosity)
 traceCmd dflags phase_name cmd_line action
  = do   { let verb = verbosity dflags
