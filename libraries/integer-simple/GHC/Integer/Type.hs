@@ -300,6 +300,7 @@ negateInteger (Positive p) = Negative p
 negateInteger (Negative p) = Positive p
 negateInteger Naught       = Naught
 
+-- Note [Avoid patError]
 plusInteger :: Integer -> Integer -> Integer
 Positive p1    `plusInteger` Positive p2 = Positive (p1 `plusPositive` p2)
 Negative p1    `plusInteger` Negative p2 = Negative (p1 `plusPositive` p2)
@@ -484,6 +485,7 @@ positiveToWord64 (Some low (Some high _))
     = wordToWord64# low `or64#` (wordToWord64# high `uncheckedShiftL64#` 32#)
 #endif
 
+-- Note [Avoid patError]
 comparePositive :: Positive -> Positive -> Ordering
 Some x xs `comparePositive` Some y ys = case xs `comparePositive` ys of
                                         EQ ->      if x `ltWord#` y then LT
@@ -497,6 +499,7 @@ None      `comparePositive` (Some {}) = LT
 plusPositive :: Positive -> Positive -> Positive
 plusPositive x0 y0 = addWithCarry 0## x0 y0
  where -- digit `elem` [0, 1]
+       -- Note [Avoid patError]
        addWithCarry :: Digit -> Positive -> Positive -> Positive
        addWithCarry c None            None            = addOnCarry c None
        addWithCarry c xs@(Some {})    None            = addOnCarry c xs
@@ -543,6 +546,7 @@ succPositive (Some w ws) = if w `eqWord#` fullBound ()
 
 -- Requires x > y
 -- In recursive calls, x >= y and x == y => result is None
+-- Note [Avoid patError]
 minusPositive :: Positive -> Positive -> Positive
 Some x xs `minusPositive` Some y ys
  = if x `eqWord#` y
@@ -561,6 +565,7 @@ None         `minusPositive` None      = None
 None         `minusPositive` (Some {}) = errorPositive -- XXX Can't happen
 -- XXX None `minusPositive` _ = error "minusPositive: Requirement x > y not met"
 
+-- Note [Avoid patError]
 timesPositive :: Positive -> Positive -> Positive
 -- XXX None's can't happen here:
 None            `timesPositive` None        = errorPositive
@@ -723,6 +728,7 @@ some :: Digit -> Digits -> Digits
 some (!w) None  = if w `eqWord#` 0## then None else Some w None
 some (!w) (!ws) = Some w ws
 
+-- Note [Avoid patError]
 andDigits :: Digits -> Digits -> Digits
 andDigits None          None          = None
 andDigits (Some {})     None          = None
@@ -735,6 +741,7 @@ andDigits (Some w1 ws1) (Some w2 ws2) = Some (w1 `and#` w2) (andDigits ws1 ws2)
 -- result.
 newtype DigitsOnes = DigitsOnes Digits
 
+-- Note [Avoid patError]
 andDigitsOnes :: DigitsOnes -> Digits -> Digits
 andDigitsOnes (DigitsOnes None)          None          = None
 andDigitsOnes (DigitsOnes None)          ws2@(Some {}) = ws2
@@ -742,12 +749,14 @@ andDigitsOnes (DigitsOnes (Some {}))     None          = None
 andDigitsOnes (DigitsOnes (Some w1 ws1)) (Some w2 ws2)
     = Some (w1 `and#` w2) (andDigitsOnes (DigitsOnes ws1) ws2)
 
+-- Note [Avoid patError]
 orDigits :: Digits -> Digits -> Digits
 orDigits None          None          = None
 orDigits None          ds@(Some {})  = ds
 orDigits ds@(Some {})  None          = ds
 orDigits (Some w1 ds1) (Some w2 ds2) = Some (w1 `or#` w2) (orDigits ds1 ds2)
 
+-- Note [Avoid patError]
 xorDigits :: Digits -> Digits -> Digits
 xorDigits None          None          = None
 xorDigits None          ds@(Some {})  = ds
@@ -777,4 +786,27 @@ floatFromPositive (Some w ds)
        `plusFloat#` int2Float# (word2Int# l)
 
 #endif
+
+{-
+Note [Avoid patError]
+
+If we use the natural set of definitions for functions, e.g.:
+
+    orDigits None          ds            = ds
+    orDigits ds            None          = ds
+    orDigits (Some w1 ds1) (Some w2 ds2) = Some ... ...
+
+then GHC may not be smart enough (especially when compiling with -O0)
+to see that all the cases are handled, and will thus insert calls to
+base:Control.Exception.Base.patError. But we are below base in the
+package hierarchy, so this causes build failure!
+
+We therefore help GHC out, by being more explicit about what all the
+cases are:
+
+    orDigits None          None          = None
+    orDigits None          ds@(Some {})  = ds
+    orDigits ds@(Some {})  None          = ds
+    orDigits (Some w1 ds1) (Some w2 ds2) = Some ... ...
+-}
 
