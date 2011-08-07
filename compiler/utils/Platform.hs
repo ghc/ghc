@@ -116,6 +116,8 @@ defaultTargetOS = OSSolaris2
 defaultTargetOS = OSMinGW32
 #elif freebsd_TARGET_OS
 defaultTargetOS = OSFreeBSD
+#elif kfreebsdgnu_TARGET_OS
+defaultTargetOS = OSFreeBSD
 #elif openbsd_TARGET_OS
 defaultTargetOS = OSOpenBSD
 #else
