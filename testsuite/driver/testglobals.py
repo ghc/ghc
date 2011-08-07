@@ -98,6 +98,9 @@ class TestConfig:
         self.threads = 1
         self.use_threads = 0
 
+        # Should we check for files being written more than once?
+        self.check_files_written = False
+
 global config
 config = TestConfig()
 
