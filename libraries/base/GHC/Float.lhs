@@ -102,15 +102,30 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     -- appropriately scaled exponent (an 'Int').  If @'decodeFloat' x@
     -- yields @(m,n)@, then @x@ is equal in value to @m*b^^n@, where @b@
     -- is the floating-point radix, and furthermore, either @m@ and @n@
-    -- are both zero or else @b^(d-1) <= m < b^d@, where @d@ is the value
-    -- of @'floatDigits' x@.  In particular, @'decodeFloat' 0 = (0,0)@.
+    -- are both zero or else @b^(d-1) <= 'abs' m < b^d@, where @d@ is
+    -- the value of @'floatDigits' x@.
+    -- In particular, @'decodeFloat' 0 = (0,0)@. If the type
+    -- contains a negative zero, also @'decodeFloat' (-0.0) = (0,0)@.
+    -- /The result of/ @'decodeFloat' x@ /is unspecified if either of/
+    -- @'isNaN' x@ /or/ @'isInfinite' x@ /is/ 'True'.
     decodeFloat         :: a -> (Integer,Int)
-    -- | 'encodeFloat' performs the inverse of 'decodeFloat'
+    -- | 'encodeFloat' performs the inverse of 'decodeFloat' in the
+    -- sense that for finite @x@ with the exception of @-0.0@,
+    -- @'uncurry' 'encodeFloat' ('decodeFloat' x) = x@.
+    -- @'encodeFloat' m n@, is the closest representable floating-point
+    -- number to @m*b^^n@ (or @&#177;Infinity@ if overflow occurs).
     encodeFloat         :: Integer -> Int -> a
-    -- | the second component of 'decodeFloat'.
+    -- | 'exponent' corresponds to the second component of 'decodeFloat'.
+    -- @'exponent' 0 = 0@ and for finite nonzero @x@,
+    -- @'exponent' x = snd ('decodeFloat' x) + 'floatDigits' x@.
+    -- If @x@ is a finite floating-point number, it is equal in value to
+    -- @'significand' x * b ^^ 'exponent' x@, where @b@ is the
+    -- floating-point radix.
+    -- The behaviour is unspecified on infinite or @NaN@ values.
     exponent            :: a -> Int
-    -- | the first component of 'decodeFloat', scaled to lie in the open
-    -- interval (@-1@,@1@)
+    -- | The first component of 'decodeFloat', scaled to lie in the open
+    -- interval (@-1@,@1@), either @0.0@ or of absolute value @>= 0.5@.
+    -- The behaviour is unspecified on infinite or @NaN@ values.
     significand         :: a -> a
     -- | multiplies a floating-point number by an integer power of the radix
     scaleFloat          :: Int -> a -> a
