@@ -995,7 +995,25 @@ GhcStage3DefaultNewCodegen=YES
         <listitem>
             <para>
                 Unicode support has generally been improved across
-                the core libraries.
+                the core libraries. This has a few consequences:
+            </para>
+            
+            <para>
+                Code that has been using the <literal>*CString</literal>
+                functions may need to be corrected to use the
+                <literal>*CAString</literal> functions.
+            </para>
+
+            <para>
+                Users may now observe strings &mdash; particularly
+                those from the commandline &mdash; containing
+                private-use characters, i.e. those in the range 0xEF00
+                to 0xEFFF inclusive.
+            </para>
+
+            <para>
+                Programs may now get exceptions when writing strings
+                in the wrong encoding to (for example) stdout.
             </para>
         </listitem>
     </itemizedlist>
