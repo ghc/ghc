@@ -4,7 +4,7 @@
 -- should disallow. SafeLang14 will do that.
 module Main where
 
-import SafeLang13_A
+import SafeLang15_A
 import Data.Typeable
 
 data H = H String deriving (Typeable, Show)
