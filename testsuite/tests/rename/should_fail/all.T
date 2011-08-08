@@ -86,3 +86,7 @@ test('T5372',
      extra_clean(['T5372a.hi', 'T5372a.o']),
      multimod_compile_fail,
      ['T5372','-v0'])
+test('T5385',
+     extra_clean(['T5385a.hi', 'T5385a.o']),
+     multimod_compile_fail,
+     ['T5385','-v0'])
