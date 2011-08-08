@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude, TypeFamilies, DeriveGeneric #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -14,14 +15,10 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -XNoImplicitPrelude  #-}
-{-# OPTIONS_GHC -XTypeFamilies       #-}
-{-# OPTIONS_GHC -XDeriveGeneric      #-}
-
 module GHC.Types (
-    Bool(..), Char(..), Int(..)
-  , Float(..), Double(..), IO(..)
-  ) where
+        Bool(..), Char(..), Int(..),
+        Float(..), Double(..), IO(..)
+    ) where
 
 import GHC.Prim
 import GHC.Generics
@@ -29,19 +26,16 @@ import GHC.Generics
 
 infixr 5 :
 
-data [] a = [] | a : [a]
-        deriving Generic
+data [] a = [] | a : [a] deriving Generic
 
-data Bool = False | True
-        deriving Generic
+data Bool = False | True deriving Generic
 
-{-| The character type 'Char' is an enumeration whose values represent
-Unicode (or equivalently ISO\/IEC 10646) characters
-(see <http://www.unicode.org/> for details).
-This set extends the ISO 8859-1 (Latin-1) character set
-(the first 256 charachers), which is itself an extension of the ASCII
-character set (the first 128 characters).
-A character literal in Haskell has type 'Char'.
+{- | The character type 'Char' is an enumeration whose values represent
+Unicode (or equivalently ISO\/IEC 10646) characters (see
+<http://www.unicode.org/> for details).  This set extends the ISO 8859-1
+(Latin-1) character set (the first 256 characters), which is itself an extension
+of the ASCII character set (the first 128 characters).  A character literal in
+Haskell has type 'Char'.
 
 To convert a 'Char' to or from the corresponding 'Int' value defined
 by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
@@ -49,22 +43,22 @@ by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
 -}
 data Char = C# Char#
 
-data Int = I# Int#
--- ^A fixed-precision integer type with at least the range @[-2^29 .. 2^29-1]@.
+-- | A fixed-precision integer type with at least the range @[-2^29 .. 2^29-1]@.
 -- The exact range for a given implementation can be determined by using
 -- 'Prelude.minBound' and 'Prelude.maxBound' from the 'Prelude.Bounded' class.
+data Int = I# Int#
 
 -- | Single-precision floating point numbers.
 -- It is desirable that this type be at least equal in range and precision
 -- to the IEEE single-precision type.
-data Float      = F# Float#
+data Float = F# Float#
 
 -- | Double-precision floating point numbers.
 -- It is desirable that this type be at least equal in range and precision
 -- to the IEEE double-precision type.
-data Double     = D# Double#
+data Double = D# Double#
 
-{-|
+{- |
 A value of type @'IO' a@ is a computation which, when performed,
 does some I\/O before returning a value of type @a@.
 
@@ -150,3 +144,4 @@ instance Generic Char where
   type Rep Char = D1 D_Char (C1 C_Char (S1 NoSelector (Rec0 Char)))
   from x = M1 (M1 (M1 (K1 x)))
   to (M1 (M1 (M1 (K1 x)))) = x
+

@@ -1,4 +1,4 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE Trustworthy            #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE EmptyDataDecls         #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
@@ -24,7 +24,7 @@ module GHC.Generics  (
   , Generic(..), Generic1(..)
 
   ) where
-  
+
 -- We use some base types
 import {-# SOURCE #-} GHC.Types
 -- We need this to give the Generic instances in ghc-prim
@@ -138,14 +138,14 @@ prec :: Fixity -> Int
 prec Prefix      = I# 10#
 prec (Infix _ n) = n
 
--- | Datatype to represent the associativy of a constructor
-data Associativity = LeftAssociative 
+-- | Datatype to represent the associativity of a constructor
+data Associativity = LeftAssociative
                    | RightAssociative
                    | NotAssociative
 -- Eq, Show, Ord, and Read instances are in GHC.Int
 
 -- | Representable types of kind *.
--- This class is derivable in GHC with the XDeriveRepresentable flag on.
+-- This class is derivable in GHC with the DeriveRepresentable flag on.
 class Generic a where
   -- | Generic representation type
   type Rep a :: * -> *
@@ -163,3 +163,4 @@ class Generic1 f where
   from1  :: f a -> (Rep1 f) a
   -- | Convert from the representation to the datatype
   to1    :: (Rep1 f) a -> f a
+

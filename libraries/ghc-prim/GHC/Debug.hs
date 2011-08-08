@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 
-module GHC.Debug (debugLn, debugErrLn) where
+module GHC.Debug ( debugLn, debugErrLn ) where
 
 import GHC.Prim
 import GHC.Types

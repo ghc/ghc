@@ -1,4 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Magic
@@ -10,14 +11,13 @@
 -- Portability :  non-portable (GHC Extensions)
 --
 -- GHC magic.
+--
 -- Use GHC.Exts from the base package instead of importing this
 -- module directly.
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
-
-module GHC.Magic (inline) where
+module GHC.Magic ( inline ) where
 
 -- | The call '(inline f)' reduces to 'f', but 'inline' has a BuiltInRule
 -- that tries to inline 'f' (if it has an unfolding) unconditionally

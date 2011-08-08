@@ -1,4 +1,4 @@
-
+{-# LANGUAGE NoImplicitPrelude, BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.CString
@@ -15,14 +15,10 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XNoGenerics        #-}
-{-# OPTIONS_GHC -XBangPatterns      #-}
-
 module GHC.CString (
-    unpackCString#, unpackAppendCString#, unpackFoldrCString#
-  , unpackCStringUtf8#, unpackNBytes#
-  ) where
+        unpackCString#, unpackAppendCString#, unpackFoldrCString#,
+        unpackCStringUtf8#, unpackNBytes#
+    ) where
 
 import {-# SOURCE #-} GHC.Types
 import GHC.Prim
@@ -40,11 +36,10 @@ import GHC.Prim
 
 unpackCString# :: Addr# -> [Char]
 {-# NOINLINE unpackCString# #-}
-    -- There's really no point in inlining this, ever, cos
-    -- the loop doesn't specialise in an interesting
-    -- But it's pretty small, so there's a danger that
-    -- it'll be inlined at every literal, which is a waste
-unpackCString# addr 
+    -- There's really no point in inlining this, ever, as the loop doesn't
+    -- specialise in an interesting But it's pretty small, so there's a danger
+    -- that it'll be inlined at every literal, which is a waste
+unpackCString# addr
   = unpack 0#
   where
     unpack nh
@@ -55,7 +50,7 @@ unpackCString# addr
 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCString# #-}
-     -- See the NOINLINE note on unpackCString# 
+     -- See the NOINLINE note on unpackCString#
 unpackAppendCString# addr rest
   = unpack 0#
   where
@@ -65,7 +60,7 @@ unpackAppendCString# addr rest
       where
         !ch = indexCharOffAddr# addr nh
 
-unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
+unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 
 -- Usually the unpack-list rule turns unpackFoldrCString# into unpackCString#
 
@@ -81,7 +76,7 @@ unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 -- literal strings, and making a separate 'unpack' loop for
 -- each is highly gratuitous.  See nofib/real/anna/PrettyPrint.
 
-unpackFoldrCString# addr f z 
+unpackFoldrCString# addr f z
   = unpack 0#
   where
     unpack nh
@@ -91,7 +86,7 @@ unpackFoldrCString# addr f z
         !ch = indexCharOffAddr# addr nh
 
 unpackCStringUtf8# :: Addr# -> [Char]
-unpackCStringUtf8# addr 
+unpackCStringUtf8# addr
   = unpack 0#
   where
     unpack nh
@@ -121,6 +116,7 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
     where
      unpack acc i#
       | i# <# 0#  = acc
-      | True      = 
+      | True      =
          case indexCharOffAddr# addr i# of
             ch -> unpack (C# ch : acc) (i# -# 1#)
+

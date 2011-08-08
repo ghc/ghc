@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -20,9 +20,9 @@
 -- #hide
 module GHC.IntWord64 (
 #if WORD_SIZE_IN_BITS < 64
-    Int64#, Word64#, module GHC.IntWord64
+        Int64#, Word64#, module GHC.IntWord64
 #endif
- ) where
+    ) where
 
 #if WORD_SIZE_IN_BITS < 64
 import GHC.Prim

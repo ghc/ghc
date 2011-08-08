@@ -17,6 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module GHC.Classes where
 
 -- GHC.Magic is used in some derived instances
@@ -283,3 +284,4 @@ deriving instance Eq Fixity
 deriving instance Ord Arity
 deriving instance Ord Associativity
 deriving instance Ord Fixity
+

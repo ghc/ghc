@@ -1,7 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude  #-}
-{-# OPTIONS_GHC -XDeriveGeneric      #-}
-
+{-# LANGUAGE NoImplicitPrelude, DeriveGeneric #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Tuple
@@ -10,7 +8,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  unportable
+-- Portability :  non-portable (GHC extensions)
 --
 -- The tuple data types
 --
@@ -338,3 +336,4 @@ deriving instance Generic ((,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 deriving instance Generic ((,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_ l_ m_ n_ o_ p_ q_ r_ s_ t_ u_ v_ w_ x_ y_ z_ a__ b__ c__ d__ e__ f__ g__ h__ i__)
 deriving instance Generic ((,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,) a b c d e f g h i j k l m n o p q r s t u v w x y z a_ b_ c_ d_ e_ f_ g_ h_ i_ j_ k_ l_ m_ n_ o_ p_ q_ r_ s_ t_ u_ v_ w_ x_ y_ z_ a__ b__ c__ d__ e__ f__ g__ h__ i__ j__)
 -}
+

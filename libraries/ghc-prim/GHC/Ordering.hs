@@ -1,6 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
-{-# OPTIONS_GHC -XDeriveGeneric     #-}
+{-# LANGUAGE NoImplicitPrelude, DeriveGeneric #-}
 
 module GHC.Ordering where
 

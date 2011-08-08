@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XNoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.Types where
 
