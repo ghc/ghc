@@ -597,8 +597,7 @@ ppr_forall_type p ty
 
 ppr_tvar :: TyVar -> SDoc
 ppr_tvar tv  -- Note [Infix type variables]
-  | isSymOcc (getOccName tv)  = parens (ppr tv)
-  | otherwise		      = ppr tv
+  = parenSymOcc (getOccName tv) (ppr tv)
 
 -------------------
 pprForAll :: [TyVar] -> SDoc

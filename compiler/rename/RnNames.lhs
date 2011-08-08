@@ -1609,18 +1609,20 @@ badImportItemErrDataCon dataType iface decl_spec ie
              <+> ptext (sLit "is a data constructor of")
              <+> quotes (ppr dataType)
          , ptext (sLit "To import it use")
-         , nest 2 $ quotes (ptext (sLit "import")
+         , nest 2 $ quotes (ptext (sLit "import"))
              <+> ppr (is_mod decl_spec)
-             <+> parens (ppr dataType <+> parens datacon))
+             <> parens_sp (ppr dataType <> parens_sp datacon)
          , ptext (sLit "or")
-         , nest 2 $ quotes (ptext (sLit "import")
+         , nest 2 $ quotes (ptext (sLit "import"))
              <+> ppr (is_mod decl_spec)
-             <+> parens (ppr dataType <+> parens (ptext $ sLit "..")))
+             <> parens_sp (ppr dataType <> ptext (sLit "(..)"))
          ]
   where
-    datacon = ppr . rdrNameOcc $ ieName ie
+    datacon_occ = rdrNameOcc $ ieName ie
+    datacon = parenSymOcc datacon_occ (ppr datacon_occ) 
     source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
                   | otherwise     = empty
+    parens_sp d = parens (space <> d <> space)	-- T( f,g )
 
 badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> [AvailInfo] -> SDoc
 badImportItemErr iface decl_spec ie avails

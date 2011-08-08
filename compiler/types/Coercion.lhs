@@ -92,7 +92,7 @@ import VarEnv
 import VarSet
 import Maybes	( orElse )
 import Name	( Name, NamedThing(..), nameUnique )
-import OccName 	( isSymOcc )
+import OccName 	( parenSymOcc )
 import Util
 import BasicTypes
 import Outputable
@@ -367,9 +367,7 @@ ppr_co p (AppCo co1 co2)    = maybeParen p TyConPrec $
 
 ppr_co p co@(ForAllCo {}) = ppr_forall_co p co
 
-ppr_co _ (CoVarCo cv)
-  | isSymOcc (getOccName cv) = parens (ppr cv)
-  | otherwise                = ppr cv
+ppr_co _ (CoVarCo cv)     = parenSymOcc (getOccName cv) (ppr cv)
 
 ppr_co p (AxiomInstCo con cos) = pprTypeNameApp p ppr_co (getName con) cos
 
