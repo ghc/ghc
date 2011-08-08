@@ -200,7 +200,7 @@ class TestOptions:
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
-       self.alone = 0
+       self.alone = False
 
        # Does this test use a literate (.lhs) file?
        self.literate = 0

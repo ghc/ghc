@@ -376,7 +376,7 @@ def unless_tag( tag, f ):
 
 # ---
 def alone(opts):
-    opts.alone = 1
+    opts.alone = True
 
 # ---
 def literate( opts ):
