@@ -13,10 +13,13 @@ module ParserM (
     -- Positions
     get_pos, show_pos,
     -- Input
-    alexGetChar, alexInputPrevChar, input, position,
+    alexGetChar, alexGetByte, alexInputPrevChar, input, position,
     -- Other
     happyError
  ) where
+
+import Data.Word (Word8)
+import Data.Char (ord)
 
 -- Parser Monad
 newtype ParserM a = ParserM (AlexInput -> St -> Either String (AlexInput, St, a))
@@ -132,6 +135,13 @@ show_pos (Pos l c) = "line " ++ show l ++ ", column " ++ show c
 -- Input
 
 data AlexInput = AlexInput {position :: !Pos, input :: String}
+
+-- alexGetByte is for Alex >= 3.0, alexGetChar for earlier
+-- XXX no UTF-8; we should do this properly sometime
+alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
+alexGetByte (AlexInput p (x:xs)) = Just (fromIntegral (ord x),
+                                         AlexInput (alexMove p x) xs)
+alexGetByte (AlexInput _ []) = Nothing
 
 alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
 alexGetChar (AlexInput p (x:xs)) = Just (x, AlexInput (alexMove p x) xs)
