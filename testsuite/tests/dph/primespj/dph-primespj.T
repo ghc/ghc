@@ -2,6 +2,7 @@
 test    ('dph-primespj-opt' 
         , [ alone
           , skip_if_fast
+          , extra_clean(['Main.hi', 'Main.o', 'PrimesVect.hi', 'PrimesVect.o'])
           , reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
@@ -10,7 +11,8 @@ test    ('dph-primespj-opt'
           , '-Odph -fdph-par'])
 
 test    ('dph-primespj-fast' 
-        , [ reqlib('dph-par')
+        , [ extra_clean(['Main.hi', 'Main.o', 'PrimesVect.hi', 'PrimesVect.o'])
+          , reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal', 'threaded1', 'threaded2']) ] 
         , multimod_compile_and_run 

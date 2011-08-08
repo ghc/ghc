@@ -8,3 +8,6 @@ skip_if_not_osx = if_not_platform(['i386-apple-darwin','x86_64-apple-darwin'], s
 
 test('objc-hi', [ skip_if_not_osx, objc_src ],
      compile_and_run, ['-framework Foundation'])
+
+test('objcpp-hi', [ skip_if_not_osx, objcpp_src ],
+     compile_and_run, ['-framework Foundation -lstdc++'])

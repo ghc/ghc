@@ -388,6 +388,9 @@ def c_src( opts ):
 def objc_src( opts ):
     opts.objc_src = 1;
 
+def objcpp_src( opts ):
+    opts.objcpp_src = 1;
+
 # ----
 
 def pre_cmd( cmd ):
@@ -580,14 +583,15 @@ def test_common_work (name, opts, func, args):
                    '.stats', '.comp.stats',
                    '.hi', '.o', '.prof', '.exe.prof', '.hc',
                    '_stub.h', '_stub.c', '_stub.o',
-                   '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
+                   '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog',
+                   '.strace']))
 
         clean(getTestOpts().clean_files)
 
         try:
             cleanCmd = getTestOpts().clean_cmd
             if cleanCmd != None:
-                result = runCmd('cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
+                result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + cleanCmd)
                 if result != 0:
                     framework_fail(name, 'cleaning', 'clean-command failed: ' + str(result))
         except e:
@@ -636,7 +640,7 @@ def do_test(name, way, func, args):
         try:
             preCmd = getTestOpts().pre_cmd
             if preCmd != None:
-                result = runCmd('cd ' + getTestOpts().testdir + ' && ' + preCmd)
+                result = runCmdFor(name, 'cd ' + getTestOpts().testdir + ' && ' + preCmd)
                 if result != 0:
                     framework_fail(name, way, 'pre-command failed: ' + str(result))
         except e:
@@ -984,7 +988,7 @@ def simple_build( name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, 
           + opts.extra_hc_opts + ' ' \
           + '>' + errname + ' 2>&1'
 
-    result = runCmd(cmd)
+    result = runCmdFor(name, cmd)
 
     if result != 0 and not should_fail:
         actual_stderr = qualify(name, 'comp.stderr')
@@ -1054,7 +1058,7 @@ def simple_run( name, way, prog, args ):
         + ' 2>' + run_stderr
 
     # run the command
-    result = runCmd(cmd)
+    result = runCmdFor(name, cmd)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1157,7 +1161,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + getTestOpts().extra_hc_opts + ' ' \
           + '<' + scriptname +  ' 1>' + outname + ' 2>' + errname
 
-    result = runCmd(cmd)
+    result = runCmdFor(name, cmd)
 
     exit_code = result >> 8
     signal    = result & 0xff
@@ -1245,7 +1249,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + getTestOpts().extra_hc_opts \
           + to_do \
           + '>' + errname + ' 2>&1'
-    result = runCmd(cmd)
+    result = runCmdFor(name, cmd)
 
     exit_code = result >> 8
 
@@ -1259,7 +1263,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
     if (top_mod == ''):
         to_compile = corefilename
     else:
-        result = runCmd('grep Compiling ' + qerrname + ' |  awk \'{print $4}\' > ' + depsfilename)
+        result = runCmdFor(name, 'grep Compiling ' + qerrname + ' |  awk \'{print $4}\' > ' + depsfilename)
         deps = open(depsfilename).read()
         deplist = string.replace(deps, '\n',' ');
         deplist2 = string.replace(deplist,'.lhs,', '.hcr');
@@ -1277,7 +1281,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
           + ' -fglasgow-exts -o ' + name \
           + '>' + errname + ' 2>&1'
 
-    result = runCmd(cmd)
+    result = runCmdFor(name, cmd)
     exit_code = result >> 8
 
     if exit_code != 0:
@@ -1533,9 +1537,118 @@ def runCmd( cmd ):
         r = os.system(cmd)
     return r << 8
 
+def runCmdFor( name, cmd ):
+    if_verbose( 1, cmd )
+    r = 0
+    if config.platform == 'i386-unknown-mingw32':
+   # On MinGW, we will always have timeout
+        assert config.timeout_prog!=''
+
+    if config.timeout_prog != '':
+        if config.check_files_written:
+            fn = name + ".strace"
+            r = rawSystem(["strace", "-o", fn, "-f", "-e", "creat,open",
+                           config.timeout_prog, str(config.timeout),
+                           cmd])
+            addTestFilesWritten(name, fn)
+        else:
+            r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
+    else:
+        r = os.system(cmd)
+    return r << 8
+
 def runCmdExitCode( cmd ):
     return (runCmd(cmd) >> 8);
 
+
+# -----------------------------------------------------------------------------
+# checking for files being written to by multiple tests
+
+# Work in progress, but largely works. Known issues:
+# * only supported when using the timeout program
+# * 'test.strace' files aren't cleaned, as they end up in the root
+#   directory rather than the test's directory
+# * Doesn't yet track what the current directory is, so finds several
+#   files like "A.o" being written by multiple tests (and conversely,
+#   may be missing writes to the same file from different directories)
+# * Lots of tests write to $HOME/.ghc/ghci_history. We should probably
+#   be passing ghci a flag to stop this from happening.
+# * Some .strace lines aren't understood yet, causing framework failures
+# * One .strace file can cause muiltiple framework failures, if it
+#   contains lots of lines that aren't understood
+
+# Performance:
+# Threads       fast testsuite time     fast testsuite time with checks
+# 1             16:36.14                25:16.07
+# 5              5:33.95                 8:04.05
+
+re_strace_call_start = '^[0-9]+ +'
+re_strace_call_end = '(\) += ([0-9]+|-1 E.*)| <unfinished ...>)$'
+re_strace_open              = re.compile(re_strace_call_start + 'open\("([^"]*)", ([A-Z_|]*)(, [0-9]+)?' + re_strace_call_end)
+re_strace_open_resumed      = re.compile(re_strace_call_start + '<... open resumed> '                    + re_strace_call_end)
+re_strace_ignore_sigchild   = re.compile(re_strace_call_start + '--- SIGCHLD \(Child exited\) @ 0 \(0\) ---$')
+re_strace_ignore_sigvtalarm = re.compile(re_strace_call_start + '--- SIGVTALRM \(Virtual timer expired\) @ 0 \(0\) ---$')
+re_strace_ignore_sigint     = re.compile(re_strace_call_start + '--- SIGINT \(Interrupt\) @ 0 \(0\) ---$')
+re_strace_ignore_sigfpe     = re.compile(re_strace_call_start + '--- SIGFPE \(Floating point exception\) @ 0 \(0\) ---$')
+re_strace_ignore_sigsegv    = re.compile(re_strace_call_start + '--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
+
+files_used = {}
+
+def addTestFilesWritten(name, fn):
+    if config.use_threads:
+        with t.lockFilesWritten:
+            addTestFilesWrittenHelper(name, fn)
+    else:
+        addTestFilesWrittenHelper(name, fn)
+
+def addTestFilesWrittenHelper(name, fn):
+    with open(fn, 'r') as f:
+        for line in f:
+            m_open = re_strace_open.match(line)
+
+            if m_open:
+                file = m_open.group(1)
+                if not file in ['/dev/tty', '/dev/null'] and not file.startswith("/tmp/ghc"):
+                    flags = m_open.group(2).split('|')
+                    if 'O_WRONLY' in flags or 'O_RDWR' in flags:
+                        try:
+                            cur = files_used[file]
+                            if not name in files_used[file]:
+                                files_used[file].append(name)
+                        except:
+                            files_used[file] = [name]
+                    elif 'O_RDONLY' in flags:
+                        pass
+                    else:
+                        framework_fail(name, 'strace', "Can't understand flags in open strace line: " + line)
+            elif re_strace_open_resumed.match(line):
+                pass
+            elif re_strace_ignore_sigchild.match(line):
+                pass
+            elif re_strace_ignore_sigvtalarm.match(line):
+                pass
+            elif re_strace_ignore_sigint.match(line):
+                pass
+            elif re_strace_ignore_sigfpe.match(line):
+                pass
+            elif re_strace_ignore_sigsegv.match(line):
+                pass
+            else:
+                framework_fail(name, 'strace', "Can't understand strace line: " + line)
+ 
+def checkForFilesWrittenMoreThanOnce(file):
+    foundProblem = False
+
+    for f in files_used.keys():
+        if len(files_used[f]) > 1:
+            if not foundProblem:
+                foundProblem = True
+                print ""
+                file.write("\nSome files are written by multiple tests:\n")
+            file.write("    " + f + " (" + str(files_used[f]) + ")\n")
+
+    if foundProblem:
+        file.write("\n")
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
@@ -1581,6 +1694,8 @@ def add_hs_lhs_suffix(name):
         return add_suffix(name, 'c')
     elif getTestOpts().objc_src:
         return add_suffix(name, 'm')
+    elif getTestOpts().objcpp_src:
+        return add_suffix(name, 'mm')
     elif getTestOpts().literate:
         return add_suffix(name, 'lhs')
     else:
@@ -1694,6 +1809,9 @@ def summary(t, file):
     if t.n_unexpected_failures > 0:
         file.write('Unexpected failures:\n')
         printFailingTestInfosSummary(file, t.unexpected_failures)
+
+    if config.check_files_written:
+        checkForFilesWrittenMoreThanOnce(file)
 
 def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()

@@ -98,6 +98,9 @@ class TestConfig:
         self.threads = 1
         self.use_threads = 0
 
+        # Should we check for files being written more than once?
+        self.check_files_written = False
+
 global config
 config = TestConfig()
 
@@ -202,9 +205,10 @@ class TestOptions:
        # Does this test use a literate (.lhs) file?
        self.literate = 0
 
-       # Does this test use a .c or .m file?
-       self.c_src    = 0
-       self.objc_src = 0
+       # Does this test use a .c, .m or .mm file?
+       self.c_src      = 0
+       self.objc_src   = 0
+       self.objcpp_src = 0
 
        # Command to run before the test
        self.pre_cmd = None

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators, DefaultSignatures, FlexibleContexts, FlexibleInstances #-}
 
-module GEq where
+module GEq1A where
 
 import GHC.Generics
 

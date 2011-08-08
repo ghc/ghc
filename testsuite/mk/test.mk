@@ -121,6 +121,10 @@ ifneq "$(THREADS)" ""
 RUNTEST_OPTS += --threads=$(THREADS)
 endif
 
+ifneq "$(CHECK_FILES_WRITTEN)" ""
+RUNTEST_OPTS += --check-files-written
+endif
+
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config=$(CONFIG) \

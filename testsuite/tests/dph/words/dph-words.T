@@ -2,6 +2,7 @@
 test    ('dph-words-opt' 
         , [ alone
           , skip_if_fast
+          , extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
           , reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
@@ -11,7 +12,8 @@ test    ('dph-words-opt'
 
 
 test    ('dph-words-fast' 
-        , [ reqlib('dph-par')
+        , [ extra_clean(['Main.hi', 'Main.o', 'WordsVect.hi', 'WordsVect.o'])
+          , reqlib('dph-par')
           , reqlib('dph-prim-par')
           , only_ways(['normal']) ] 
         , multimod_compile_and_run 
