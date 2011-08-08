@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE EmptyDataDecls         #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}

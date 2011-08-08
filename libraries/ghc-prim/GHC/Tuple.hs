@@ -1,3 +1,4 @@
+{-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -XNoImplicitPrelude  #-}
 {-# OPTIONS_GHC -XDeriveGeneric      #-}
 
