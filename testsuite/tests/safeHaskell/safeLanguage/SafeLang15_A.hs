@@ -1,4 +1,4 @@
-module SafeLang13_A (IsoInt, h, showH, P, p, showP) where
+module SafeLang15_A (IsoInt, h, showH, P, p, showP) where
 
 newtype IsoInt = I Int
 
