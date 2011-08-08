@@ -142,7 +142,8 @@ echo "-------------------------------------------------------------------"
 if
     grep '\<0 caused framework failures' testlog >/dev/null 2>/dev/null &&
     grep '\<0 unexpected passes' testlog >/dev/null 2>/dev/null &&
-    grep '\<0 unexpected failures' testlog >/dev/null 2>/dev/null ; then
+    grep '\<0 unexpected failures' testlog >/dev/null 2>/dev/null &&
+    ! grep 'Some files are written by multiple tests' testlog >/dev/null 2>/dev/null ; then
     if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]
     then
         cat <<EOF
