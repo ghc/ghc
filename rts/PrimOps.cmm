@@ -1451,10 +1451,6 @@ stg_tryPutMVarzh
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
-    }
-
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
     	unlockClosure(mvar, info);
@@ -1462,6 +1458,10 @@ stg_tryPutMVarzh
 	RET_N(0);
     }
   
+    if (info == stg_MVAR_CLEAN_info) {
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
+    }
+
     q = StgMVar_head(mvar);
 loop:
     if (q == stg_END_TSO_QUEUE_closure) {
