@@ -10,7 +10,7 @@ test('CheckB',
      multimod_compile, ['CheckB', '-trust base'])
 
 # fail as we don't trust base when compiling Check01
-test('Check01', normal, multi_compile_fail, ['Check01', [
+test('Check01', normal, multi_compile_fail, ['Check01 -distrust base', [
                                             ('Check01_A.hs', ''),
                                             ('Check01_B.hs', '-trust base')
                                             ], ''])
