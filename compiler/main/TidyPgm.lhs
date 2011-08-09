@@ -589,7 +589,7 @@ getImplicitBinds type_env
 %*				 					* 
 %************************************************************************
 
-Sete Note [choosing external names].
+See Note [Choosing external names].
 
 \begin{code}
 type UnfoldEnv  = IdEnv (Name{-new name-}, Bool {-show unfolding-})
@@ -719,8 +719,8 @@ addExternal expose_all id = (new_needed_ids, show_unfold)
        =  expose_all 	     -- 'expose_all' says to expose all 
 			     -- unfoldings willy-nilly
 
-       || isStableSource src	     -- Always expose things whose 
-       	  		    	     -- source is an inline rule
+       || isStableSource src	 -- Always expose things whose 
+       	  		    	 -- source is an inline rule
 
        || not (bottoming_fn	 -- No need to inline bottom functions
 	   || never_active	 -- Or ones that say not to
@@ -741,7 +741,7 @@ a VarSet, which is in a non-deterministic order when converted to a
 list.  Hence, here we define a free-variable finder that returns
 the free variables in the order that they are encountered.
 
-Note [choosing external names]
+See Note [Choosing external names]
 
 \begin{code}
 bndrFvsInOrder :: Bool -> Id -> [Id]
@@ -797,22 +797,34 @@ dffvAlt :: (t, [Var], CoreExpr) -> DFFV ()
 dffvAlt (_,xs,r) = extendScopeList xs (dffvExpr r)
 
 dffvBind :: (Id, CoreExpr) -> DFFV ()
-dffvBind(x,r)    = dffvLetBndr True x >> dffvExpr r
+dffvBind(x,r) 
+  | not (isId x) = dffvExpr r
+  | otherwise    = dffvLetBndr False x >> dffvExpr r
+	      	-- Pass False because we are doing the RHS right here
+		-- If you say True you'll get *exponential* behaviour!
 
 dffvLetBndr :: Bool -> Id -> DFFV ()
-dffvLetBndr show_unfold id
-  | not (isId id) = return ()
-  | otherwise
-  = do { when show_unfold (go_unf (unfoldingInfo idinfo))
-       ; extendScope id $   -- See Note [Rule free var hack] in CoreFVs
-         mapM_ go_rule (specInfoRules (specInfo idinfo)) }
+-- Gather the free vars of the RULES and unfolding of a binder
+-- We always get the free vars of a *stable* unfolding, but
+-- for a *vanilla* one (InlineRhs), the flag controls what happens:
+--   True <=> get fvs of even a *vanilla* unfolding
+--   False <=> ignore an InlineRhs
+-- For nested bindings (call from dffvBind) we always say "False" because
+--       we are taking the fvs of the RHS anyway
+-- For top-level bindings (call from addExternal, via bndrFvsInOrder)
+--       we say "True" if we are exposing that unfolding
+dffvLetBndr vanilla_unfold id
+  = do { go_unf (unfoldingInfo idinfo)
+       ; mapM_ go_rule (specInfoRules (specInfo idinfo)) }
   where
     idinfo = idInfo id
 
     go_unf (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
        = case src of
-           InlineWrapper v -> insert v
-           _               -> dffvExpr rhs
+           InlineRhs | vanilla_unfold -> dffvExpr rhs
+                     | otherwise      -> return ()
+           InlineWrapper v 	      -> insert v    
+           _               	      -> dffvExpr rhs
 	    -- For a wrapper, externalise the wrapper id rather than the
 	    -- fvs of the rhs.  The two usually come down to the same thing
 	    -- but I've seen cases where we had a wrapper id $w but a
