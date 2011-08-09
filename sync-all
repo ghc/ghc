@@ -401,6 +401,9 @@ sub scmall {
             scm ($localpath, $scm, "config", @args)
                 unless $scm eq "darcs";
         }
+        elsif ($command =~ /^tag$/) {
+            scm ($localpath, $scm, "tag", @args);
+        }
         else {
             die "Unknown command: $command";
         }
