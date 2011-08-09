@@ -1049,10 +1049,10 @@ getNonClobberedOperand (CmmLoad mem pk) = do
                 then do
                    tmp <- getNewRegNat archWordSize
                    return (AddrBaseIndex (EABaseReg tmp) EAIndexNone (ImmInt 0),
-                           unitOL (LEA II32 (OpAddr src) (OpReg tmp)))
+                           unitOL (LEA archWordSize (OpAddr src) (OpReg tmp)))
                 else
                    return (src, nilOL)
-      return (OpAddr src', save_code `appOL` mem_code)
+      return (OpAddr src', mem_code `appOL` save_code)
     else do
       getNonClobberedOperand_generic (CmmLoad mem pk)
 
