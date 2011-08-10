@@ -8,7 +8,7 @@
  * -------------------------------------------------------------------------- */
 
 #include "PosixSource.h"
-#include "Stg.h"
+#include "Rts.h"
 
 #if defined(HAVE_SCHED_H)
 #include <sched.h>
