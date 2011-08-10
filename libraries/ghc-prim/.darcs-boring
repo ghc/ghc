@@ -1,7 +1,0 @@
-^dist(/|$)
-^Setup$
-^GNUmakefile$
-^Makefile.local$
-^.depend(.bak)?$
-^GHC/Prim.hs$
-^GHC/PrimopWrappers.hs$
