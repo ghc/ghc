@@ -389,7 +389,7 @@ linkingNeeded dflags linkables pkg_deps = do
 -- previous binary was linked with "the same options".
 checkLinkInfo :: DynFlags -> [PackageId] -> FilePath -> IO Bool
 checkLinkInfo dflags pkg_deps exe_file
- | isWindowsTarget || isDarwinTarget
+ | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
  -- ToDo: Windows and OS X do not use the ELF binary format, so
  -- readelf does not work there.  We need to find another way to do
  -- this.
@@ -403,6 +403,11 @@ checkLinkInfo dflags pkg_deps exe_file
    m_exe_link_info <- readElfSection dflags ghcLinkInfoSectionName exe_file
    debugTraceMsg dflags 3 $ text ("Exe link info: " ++ show m_exe_link_info)
    return (Just link_info /= m_exe_link_info)
+
+platformSupportsSavingLinkOpts :: OS -> Bool
+platformSupportsSavingLinkOpts os
+  | os == OSSolaris2 = False -- see #5382
+  | otherwise        = osElfTarget os
 
 ghcLinkInfoSectionName :: String
 ghcLinkInfoSectionName = ".debug-ghc-link-info"
@@ -1441,9 +1446,9 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
           Just opts -> text "char *ghc_rts_opts = " <> text (show opts) <> semi
 
     link_opts info
-      | isDarwinTarget  = empty
-      | isWindowsTarget = empty
-      | otherwise = hcat [
+     | not (platformSupportsSavingLinkOpts (platformOS (targetPlatform dflags)))
+     = empty
+     | otherwise = hcat [
           text "__asm__(\"\\t.section ", text ghcLinkInfoSectionName,
                                     text ",\\\"\\\",",
                                     text elfSectionNote,
