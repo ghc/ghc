@@ -17,7 +17,7 @@ author: simonmar@microsoft.com
 exposed: True
 exposed-modules: A
 hidden-modules: B C.D
-trusted: False
+trusted: True
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
@@ -51,7 +51,7 @@ author: simonmar@microsoft.com
 exposed: True
 exposed-modules: A
 hidden-modules: B C.D
-trusted: False
+trusted: True
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
@@ -91,7 +91,7 @@ author: simonmar@microsoft.com
 exposed: False
 exposed-modules: A
 hidden-modules: B C.D C.E
-trusted: False
+trusted: True
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
@@ -125,7 +125,7 @@ author: simonmar@microsoft.com
 exposed: False
 exposed-modules: A
 hidden-modules: B C.D C.E
-trusted: False
+trusted: True
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-2.0
@@ -159,7 +159,7 @@ author: simonmar@microsoft.com
 exposed: True
 exposed-modules: A
 hidden-modules: B C.D
-trusted: False
+trusted: True
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
@@ -200,7 +200,7 @@ author: simonmar@microsoft.com
 exposed: False
 exposed-modules: A
 hidden-modules: B C.D
-trusted: False
+trusted: True
 import-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 library-dirs: /usr/local/lib/testpkg "c:/Program Files/testpkg"
 hs-libraries: testpkg-1.2.3.4
