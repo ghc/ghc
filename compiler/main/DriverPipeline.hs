@@ -1465,13 +1465,8 @@ mkExtraObjToLinkIntoBinary dflags dep_packages = do
 
             elfSectionNote :: String
             elfSectionNote = case platformArch (targetPlatform dflags) of
-                               ArchX86    -> "@note"
-                               ArchX86_64 -> "@note"
-                               ArchPPC    -> "@note"
-                               ArchPPC_64 -> "@note"
-                               ArchSPARC  -> "@note"
                                ArchARM    -> "%note"
-                               ArchUnknown -> panic "elfSectionNote ArchUnknown"
+                               _          -> "@note"
 
 -- The "link info" is a string representing the parameters of the
 -- link.  We save this information in the binary, and the next time we
