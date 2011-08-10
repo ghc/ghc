@@ -26,7 +26,7 @@ import Data.List ( sortBy )
 import Data.Function ( on )
 
 -- Magic Strings
-secStmt, infoSec, newLine, spInst, jmpInst, textStmt, dataStmt :: B.ByteString
+secStmt, infoSec, newLine, spInst, jmpInst, textStmt, dataStmt, syntaxUnified :: B.ByteString
 secStmt    = B.pack "\t.section\t"
 infoSec    = B.pack infoSection
 newLine    = B.pack "\n"
