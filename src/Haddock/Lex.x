@@ -31,11 +31,10 @@ import DynFlags
 import FastString
 
 import Data.Char
+import Data.Word (Word8)
 import Numeric
 import System.IO.Unsafe
 }
-
-%wrapper "posn"
 
 $ws    = $white # \n
 $digit = [0-9]
@@ -139,6 +138,37 @@ tokenPos t = let AlexPn _ line col = snd t in (line, col)
 
 -- -----------------------------------------------------------------------------
 -- Alex support stuff
+
+-- XXX: copied the posn wrapper code from Alex to make this lexer work
+-- with both Alex 2.x and Alex 3.x.  However, we are not using the
+-- Unicode/UTF-8 support in Alex 3.x, and Unicode documentation will
+-- probably get mangled.
+
+type AlexInput = (AlexPosn,     -- current position,
+                  Char,         -- previous char
+                  String)       -- current input string
+
+alexInputPrevChar :: AlexInput -> Char
+alexInputPrevChar (p,c,s) = c
+
+alexGetByte :: AlexInput -> Maybe (Word8,AlexInput)
+alexGetByte (p,c,[]) = Nothing
+alexGetByte (p,_,(c:s))  = let p' = alexMove p c
+                              in p' `seq`  Just (fromIntegral (ord c), (p', c, s))
+
+-- for compat with Alex 2.x:
+alexGetChar :: AlexInput -> Maybe (Char,AlexInput)
+alexGetChar i = case alexGetByte i of
+                  Nothing     -> Nothing
+                  Just (b,i') -> Just (chr (fromIntegral b), i')
+
+alexMove :: AlexPosn -> Char -> AlexPosn
+alexMove (AlexPn a l c) '\t' = AlexPn (a+1)  l     (((c+7) `div` 8)*8+1)
+alexMove (AlexPn a l c) '\n' = AlexPn (a+1) (l+1)   1
+alexMove (AlexPn a l c) _    = AlexPn (a+1)  l     (c+1)
+
+data AlexPosn = AlexPn !Int !Int !Int
+        deriving (Eq,Show)
 
 type StartCode = Int
 type Action = AlexPosn -> String -> StartCode -> (StartCode -> [LToken]) -> DynFlags -> [LToken]
