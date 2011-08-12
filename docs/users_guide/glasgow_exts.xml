@@ -4626,7 +4626,7 @@ foo B = 2             -- ...will produce a type error.
 </programlisting>
 Instead, you would have to write <literal>foo</literal> as a class operation, thus:
 <programlisting>
-class C a where
+class Foo a where
   foo :: T a -> Int
 instance Foo Int where
   foo A = 1
