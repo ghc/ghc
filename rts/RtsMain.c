@@ -38,6 +38,7 @@ static StgClosure *progmain_closure;  /* This will be ZCMain_main_closure */
  * INTERPRETER is set
  */
 #ifndef INTERPRETER /* Hack */
+static void real_main(void) GNUC3_ATTRIBUTE(__noreturn__);
 static void real_main(void)
 {
     int exit_status;
@@ -112,6 +113,5 @@ int hs_main(int argc, char *argv[], StgClosure *main_closure)
 #if defined(mingw32_HOST_OS)
     END_CATCH
 #endif
-    return 0; /* not reached, but keeps gcc -Wall happy */
 }
 # endif /* BATCH_MODE */

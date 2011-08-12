@@ -424,12 +424,14 @@ shutdownHaskell(void)
 void
 shutdownHaskellAndExit(int n)
 {
+    // even if hs_init_count > 1, we still want to shut down the RTS
+    // and exit immediately (see #5402)
+    hs_init_count = 1;
+
     // we're about to exit(), no need to wait for foreign calls to return.
     hs_exit_(rtsFalse);
 
-    if (hs_init_count == 0) {
-	stg_exit(n);
-    }
+    stg_exit(n);
 }
 
 #ifndef mingw32_HOST_OS

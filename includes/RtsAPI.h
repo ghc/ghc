@@ -43,7 +43,11 @@ typedef struct Capability_ Capability;
 extern void startupHaskell         ( int argc, char *argv[], 
 				     void (*init_root)(void) );
 extern void shutdownHaskell        ( void );
-extern void shutdownHaskellAndExit ( int exitCode );
+extern void shutdownHaskellAndExit ( int exitCode )
+#if __GNUC__ >= 3
+    __attribute__((__noreturn__))
+#endif
+    ;
 extern void getProgArgv            ( int *argc, char **argv[] );
 extern void setProgArgv            ( int argc, char *argv[] );
 extern void getFullProgArgv        ( int *argc, char **argv[] );
