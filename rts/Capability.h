@@ -342,7 +342,7 @@ sparkPoolSizeCap (Capability *cap)
 
 INLINE_HEADER void
 discardSparksCap (Capability *cap) 
-{ return discardSparks(cap->sparks); }
+{ discardSparks(cap->sparks); }
 #endif
 
 INLINE_HEADER void
