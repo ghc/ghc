@@ -267,10 +267,7 @@ schedule (Capability *initialCapability, Task *task)
 	break;
     case SCHED_INTERRUPTING:
 	debugTrace(DEBUG_sched, "SCHED_INTERRUPTING");
-#if defined(THREADED_RTS)
-	discardSparksCap(cap);
-#endif
-	/* scheduleDoGC() deletes all the threads */
+        /* scheduleDoGC() deletes all the threads */
 	cap = scheduleDoGC(cap,task,rtsFalse);
 
         // after scheduleDoGC(), we must be shutting down.  Either some
@@ -1433,7 +1430,19 @@ delete_threads_and_gc:
      */
     if (sched_state == SCHED_INTERRUPTING) {
 	deleteAllThreads(cap);
-	sched_state = SCHED_SHUTTING_DOWN;
+#if defined(THREADED_RTS)
+        // Discard all the sparks from every Capability.  Why?
+        // They'll probably be GC'd anyway since we've killed all the
+        // threads.  It just avoids the GC having to do any work to
+        // figure out that any remaining sparks are garbage.
+        for (i = 0; i < n_capabilities; i++) {
+            capabilities[i].spark_stats.gcd +=
+                sparkPoolSize(capabilities[i].sparks);
+            // No race here since all Caps are stopped.
+            discardSparksCap(&capabilities[i]);
+        }
+#endif
+        sched_state = SCHED_SHUTTING_DOWN;
     }
     
     heap_census = scheduleNeedHeapProfile(rtsTrue);
