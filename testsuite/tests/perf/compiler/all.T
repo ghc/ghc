@@ -157,8 +157,8 @@ test('T5030',
 test('parsing001',
      [# expected value: ?
       if_wordsize(32,
-          compiler_stats_num_field('bytes allocated', 260000000,
-                                                      300000000)),
+          compiler_stats_num_field('bytes allocated', 280000000,
+                                                      320000000)),
       # expected value: 587079016 (amd64/Linux):
       if_wordsize(64,
           compiler_stats_num_field('bytes allocated', 540000000,
