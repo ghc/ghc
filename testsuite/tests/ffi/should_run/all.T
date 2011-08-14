@@ -166,3 +166,12 @@ test('4038', normal, compile_and_run, flagsFor4038)
 test('4221', [ omit_ways(['ghci']), extra_clean(['4221_c.o']) ],
                compile_and_run, ['4221_c.c'])
 
+test('5402', [ omit_ways(['ghci']),
+               exit_code(42),
+               extra_clean(['5402_main.o']),
+                 # The 5402_setup hack is to ensure that we generate
+                 # 5402_stub.h before compiling 5402_main.c, which
+                 # needs it.
+               compile_cmd_prefix('$MAKE --no-print-directory 5402_setup && ') ],
+             compile_and_run, ["-no-hs-main 5402_main.c"])
+
