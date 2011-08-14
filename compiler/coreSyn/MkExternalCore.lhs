@@ -236,7 +236,6 @@ make_tyConApp tc ts =
 	    (map make_ty ts)
 
 make_kind :: Kind -> C.Kind
-make_kind (PredTy (EqPred t1 t2)) = C.Keq (make_ty t1) (make_ty t2)
 make_kind (FunTy k1 k2)  = C.Karrow (make_kind k1) (make_kind k2)
 make_kind k
   | isLiftedTypeKind k   = C.Klifted
