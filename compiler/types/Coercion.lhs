@@ -18,7 +18,7 @@ module Coercion (
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
         isUbxTupleKind, isArgTypeKind, isKind, isTySuperKind, 
-        isSuperKind, isCoercionKind, 
+        isSuperKind, 
 	mkArrowKind, mkArrowKinds,
 
         isSubArgTypeKind, isSubOpenTypeKind, isSubKind, defaultKind, eqKind,

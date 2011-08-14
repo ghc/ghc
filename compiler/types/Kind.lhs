@@ -28,7 +28,7 @@ module Kind (
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
         isUbxTupleKind, isArgTypeKind, isKind, isTySuperKind, 
-        isSuperKind, isCoercionKind, 
+        isSuperKind, 
         isLiftedTypeKindCon,
 
         isSubArgTypeKind, isSubOpenTypeKind, isSubKind, defaultKind,

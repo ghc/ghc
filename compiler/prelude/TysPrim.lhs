@@ -26,7 +26,7 @@ module TysPrim(
         -- Kinds
 	liftedTypeKind, unliftedTypeKind, openTypeKind,
         argTypeKind, ubxTupleKind,
-        mkArrowKind, mkArrowKinds, isCoercionKind,
+        mkArrowKind, mkArrowKinds,
 
         funTyCon, funTyConName,
         primTyCons,

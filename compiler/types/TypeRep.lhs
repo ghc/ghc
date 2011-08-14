@@ -18,7 +18,7 @@ module TypeRep (
 
         -- Functions over types
         mkTyConApp, mkTyConTy, mkTyVarTy, mkTyVarTys,
-        isLiftedTypeKind, isCoercionKind, 
+        isLiftedTypeKind, 
 
         -- Pretty-printing
 	pprType, pprParendType, pprTypeApp,
@@ -266,13 +266,6 @@ isLiftedTypeKind :: Kind -> Bool
 -- This function is here because it's used in the pretty printer
 isLiftedTypeKind (TyConApp tc []) = tc `hasKey` liftedTypeKindTyConKey
 isLiftedTypeKind _                = False
-
-isCoercionKind :: Kind -> Bool
--- All coercions are of form (ty1 ~ ty2)
--- This function is here rather than in Coercion, because it
--- is used in a knot-tied way to enforce invariants in Var
-isCoercionKind (PredTy (EqPred {})) = True
-isCoercionKind _                    = False
 \end{code}
 
 

@@ -1335,10 +1335,7 @@ bindIfaceTyVars bndrs thing_inside
 mk_iface_tyvar :: Name -> IfaceKind -> IfL TyVar
 mk_iface_tyvar name ifKind
    = do { kind <- tcIfaceType ifKind
-	; if isCoercionKind kind then 
-		return (Var.mkCoVar name kind)
-	  else
-		return (Var.mkTyVar name kind) }
+	; return (Var.mkTyVar name kind) }
 
 bindIfaceTyVars_AT :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 -- Used for type variable in nested associated data/type declarations
