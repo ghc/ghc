@@ -147,7 +147,9 @@ instance Bits Word where
         | i# >=# 0#          = W# (x# `shiftL#` i#)
         | otherwise          = W# (x# `shiftRL#` negateInt# i#)
     (W# x#) `shiftL` (I# i#) = W# (x# `shiftL#` i#)
+    (W# x#) `unsafeShiftL` (I# i#) = W# (x# `uncheckedShiftL#` i#)
     (W# x#) `shiftR` (I# i#) = W# (x# `shiftRL#` i#)
+    (W# x#) `unsafeShiftR` (I# i#) = W# (x# `uncheckedShiftRL#` i#)
     (W# x#) `rotate` (I# i#)
         | i'# ==# 0# = W# x#
         | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
@@ -254,7 +256,10 @@ instance Bits Word8 where
         | i# >=# 0#           = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
     (W8# x#) `shiftL` (I# i#) = W8# (narrow8Word# (x# `shiftL#` i#))
+    (W8# x#) `unsafeShiftL` (I# i#) =
+        W8# (narrow8Word# (x# `uncheckedShiftL#` i#))
     (W8# x#) `shiftR` (I# i#) = W8# (x# `shiftRL#` i#)
+    (W8# x#) `unsafeShiftR` (I# i#) = W8# (x# `uncheckedShiftRL#` i#)
     (W8# x#) `rotate` (I# i#)
         | i'# ==# 0# = W8# x#
         | otherwise  = W8# (narrow8Word# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -388,7 +393,10 @@ instance Bits Word16 where
         | i# >=# 0#            = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
     (W16# x#) `shiftL` (I# i#) = W16# (narrow16Word# (x# `shiftL#` i#))
+    (W16# x#) `unsafeShiftL` (I# i#) =
+        W16# (narrow16Word# (x# `uncheckedShiftL#` i#))
     (W16# x#) `shiftR` (I# i#) = W16# (x# `shiftRL#` i#)
+    (W16# x#) `unsafeShiftR` (I# i#) = W16# (x# `uncheckedShiftRL#` i#)
     (W16# x#) `rotate` (I# i#)
         | i'# ==# 0# = W16# x#
         | otherwise  = W16# (narrow16Word# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -563,7 +571,10 @@ instance Bits Word32 where
         | i# >=# 0#            = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
     (W32# x#) `shiftL` (I# i#) = W32# (narrow32Word# (x# `shiftL#` i#))
+    (W32# x#) `unsafeShiftL` (I# i#) =
+        W32# (narrow32Word# (x# `uncheckedShiftL#` i#))
     (W32# x#) `shiftR` (I# i#) = W32# (x# `shiftRL#` i#)
+    (W32# x#) `unsafeShiftR` (I# i#) = W32# (x# `uncheckedShiftRL#` i#)
     (W32# x#) `rotate` (I# i#)
         | i'# ==# 0# = W32# x#
         | otherwise  = W32# (narrow32Word# ((x# `uncheckedShiftL#` i'#) `or#`
@@ -690,7 +701,9 @@ instance Bits Word64 where
         | i# >=# 0#            = W64# (x# `shiftL64#` i#)
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
     (W64# x#) `shiftL` (I# i#) = W64# (x# `shiftL64#` i#)
+    (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL64#` i#)
     (W64# x#) `shiftR` (I# i#) = W64# (x# `shiftRL64#` i#)
+    (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL64#` i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
         | otherwise  = W64# ((x# `uncheckedShiftL64#` i'#) `or64#`
@@ -797,7 +810,9 @@ instance Bits Word64 where
         | i# >=# 0#            = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
     (W64# x#) `shiftL` (I# i#) = W64# (x# `shiftL#` i#)
+    (W64# x#) `unsafeShiftL` (I# i#) = W64# (x# `uncheckedShiftL#` i#)
     (W64# x#) `shiftR` (I# i#) = W64# (x# `shiftRL#` i#)
+    (W64# x#) `unsafeShiftR` (I# i#) = W64# (x# `uncheckedShiftRL#` i#)
     (W64# x#) `rotate` (I# i#)
         | i'# ==# 0# = W64# x#
         | otherwise  = W64# ((x# `uncheckedShiftL#` i'#) `or#`

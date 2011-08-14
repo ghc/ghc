@@ -101,6 +101,8 @@ instance Bits T where { \
   (T x) `xor`   (T y)   = T (x `xor` y) ; \
   complement    (T x)   = T (complement x) ; \
   shift         (T x) n = T (shift x n) ; \
+  unsafeShiftL  (T x) n = T (unsafeShiftL x n) ; \
+  unsafeShiftR  (T x) n = T (unsafeShiftR x n) ; \
   rotate        (T x) n = T (rotate x n) ; \
   bit                 n = T (bit n) ; \
   setBit        (T x) n = T (setBit x n) ; \
