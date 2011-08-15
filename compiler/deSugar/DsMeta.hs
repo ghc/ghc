@@ -301,20 +301,23 @@ repLAssocFamInst = liftM de_loc . mapMaybeM repTyClD
 --
 repInstD' :: LInstDecl Name -> DsM (SrcSpan, Core TH.DecQ)
 repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
-  = do { i <- addTyVarBinds tvs $ \_ ->
-		-- We must bring the type variables into scope, so their
-		-- occurrences don't fail, even though the binders don't 
-                -- appear in the resulting data structure
-		do { cxt1 <- repContext cxt
-		   ; inst_ty1 <- repPredTy (HsClassP cls tys)
-		   ; ss <- mkGenSyms (collectHsBindsBinders binds)
-		   ; binds1 <- addBinds ss (rep_binds binds)
-                   ; ats1   <- repLAssocFamInst ats
-		   ; decls <- coreList decQTyConName (ats1 ++ binds1)
-		   ; inst_decl <- repInst cxt1 inst_ty1 decls
-		   ; wrapGenSyms ss inst_decl
-                   }
-	; return (loc, i)}
+  = do { dec <- addTyVarBinds tvs $ \_ ->
+	    -- We must bring the type variables into scope, so their
+	    -- occurrences don't fail, even though the binders don't 
+            -- appear in the resulting data structure
+	    --
+	    -- But we do NOT bring the binders of 'binds' into scope
+	    -- becuase they are properly regarded as occurrences
+	    -- For example, the method names should be bound to
+	    -- the selector Ids, not to fresh names (Trac #5410)
+	    --
+            do { cxt1 <- repContext cxt
+               ; inst_ty1 <- repPredTy (HsClassP cls tys)
+               ; binds1 <- rep_binds binds
+               ; ats1 <- repLAssocFamInst ats
+               ; decls <- coreList decQTyConName (ats1 ++ binds1)
+               ; repInst cxt1 inst_ty1 decls }
+       ; return (loc, dec) }
  where
    (tvs, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
 
@@ -1146,26 +1149,24 @@ addBinds :: [GenSymBind] -> DsM a -> DsM a
 -- by the desugarer monad) 
 addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,Bound id) | (n,id) <- bs]) m
 
--- Look up a locally bound name
---
-lookupLBinder :: Located Name -> DsM (Core TH.Name)
-lookupLBinder (L _ n) = lookupBinder n
-
-lookupBinder :: Name -> DsM (Core TH.Name)
-lookupBinder n 
-  = do { mb_val <- dsLookupMetaEnv n;
-	 case mb_val of
-	    Just (Bound x) -> return (coreVar x)
-	    _              -> failWithDs msg }
-  where
-    msg = ptext (sLit "DsMeta: failed binder lookup when desugaring a TH bracket:") <+> ppr n
-
 dupBinder :: (Name, Name) -> DsM (Name, DsMetaVal)
 dupBinder (new, old) 
   = do { mb_val <- dsLookupMetaEnv old
        ; case mb_val of
            Just val -> return (new, val)
            Nothing  -> pprPanic "dupBinder" (ppr old) }
+
+-- Look up a locally bound name
+--
+lookupLBinder :: Located Name -> DsM (Core TH.Name)
+lookupLBinder (L _ n) = lookupBinder n
+
+lookupBinder :: Name -> DsM (Core TH.Name)
+lookupBinder = lookupOcc
+  -- Binders are brought into scope before the pattern or what-not is
+  -- desugared.  Moreover, in instance declaration the binder of a method
+  -- will be the selector Id and hence a global; so we need the 
+  -- globalVar case of lookupOcc
 
 -- Look up a name that is either locally bound or a global name
 --
