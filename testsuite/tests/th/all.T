@@ -196,3 +196,5 @@ test('TH_unresolvedInfix2',
 
 test('T5358', normal, compile_fail, [''])
 test('T5379', normal, compile_and_run, [''])
+test('T5404', normal, compile, ['-v0'])
+test('T5410', normal, compile_and_run, ['-v0'])
