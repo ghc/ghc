@@ -942,14 +942,5 @@ temporary variables "a". Since there are lots of things called "a" we
 usually want to print the name with the unique, and that is indeed
 the way System Names are printed.
 
-There's a small complication of course.  For data types and
-classes we'll now have system Names in the binding positions
-for constructors, TyCons etc.  For example
-    [d| data T = MkT Int |]
-when we splice in and Convert to HsSyn RdrName, we'll get
-    data (Exact (system Name "T")) = (Exact (system Name "MkT")) ...
-So RnEnv.newGlobalBinder we spot Exact RdrNames that wrap a
-non-External Name, and make an External name for.  (Remember, 
-constructors and the like need External Names.)  Oddly, the 
-*occurrences* will continue to be that (non-External) System Name, 
-but the first sweep of the optimiser will fix that.
+There's a small complication of course; see Note [Looking up Exact
+RdrNames] in RnEnv.
