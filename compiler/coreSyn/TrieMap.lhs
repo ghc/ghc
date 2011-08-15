@@ -125,6 +125,9 @@ instance TrieMap UniqFM where
 %*									*
 %************************************************************************
 
+If              m is a map from k -> val
+then (MaybeMap m) is a map from (Maybe k) -> val
+
 \begin{code}
 data MaybeMap m a = MM { mm_nothing  :: Maybe a, mm_just :: m a }
 
