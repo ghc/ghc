@@ -1,9 +1,10 @@
 
-tcfail198.hs:6:17:
-    Couldn't match expected type `t0 -> t1'
-                with actual type `forall a. [a] -> [a]'
-    The lambda expression `\ (x : xs) -> xs ++ ...' has one argument,
-    but its type `forall a. [a] -> [a]' has none
-    In the first argument of `Just', namely
-      `(\ (x : xs) -> xs ++ [x :: a])'
-    In the expression: Just (\ (x : xs) -> xs ++ [x :: a])
+tcfail198.hs:6:36:
+    Couldn't match type `a' with `a1'
+      `a' is a rigid type variable bound by
+          the inferred type of f3 :: [a] -> [a] at tcfail198.hs:6:1
+      `a1' is a rigid type variable bound by
+           an expression type signature: a1 at tcfail198.hs:6:36
+    In the expression: x :: a
+    In the second argument of `(++)', namely `[x :: a]'
+    In the expression: xs ++ [x :: a]
