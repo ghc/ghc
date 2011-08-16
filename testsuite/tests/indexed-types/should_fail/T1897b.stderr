@@ -1,0 +1,13 @@
+
+T1897b.hs:16:1:
+    Could not deduce (Depend a0 ~ Depend a)
+    from the context (Bug a)
+      bound by the inferred type for `isValid':
+                 Bug a => [Depend a] -> Bool
+      at T1897b.hs:16:1-41
+    NB: `Depend' is a type function, and may not be injective
+    Expected type: [Depend a] -> Bool
+      Actual type: [Depend a0] -> Bool
+    When checking that `isValid'
+      has the inferred type `forall a1. Bug a1 => [Depend a1] -> Bool'
+    Probable cause: the inferred type is ambiguous
