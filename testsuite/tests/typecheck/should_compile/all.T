@@ -168,7 +168,7 @@ test('tc164', normal, compile, [''])
 test('tc165', normal, compile, [''])
 test('tc166', only_compiler_types(['ghc']), compile, [''])
 test('tc167', only_compiler_types(['ghc']), compile, [''])
-test('tc168', only_compiler_types(['ghc']), compile, ['-ddump-types'])
+test('tc168', only_compiler_types(['ghc']), compile_fail, [''])
 test('tc169', normal, compile, [''])
 
 test('tc170',
