@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XTypeFamilies  #-}
+{-# LANGUAGE TypeFamilies  #-}
 
 -- Trac #3346
 
@@ -16,4 +16,6 @@ foo :: EP a => a -> a
 -- This is typed in a way rather similarly to RULE rule1
 foo x = to (from x)
 
-bar x = from (to x)
+-- 'bar' has an ambiguous type and is rightly rejected
+-- bar :: forall a. Result a -> Result a
+-- bar x = from (to x :: a)
