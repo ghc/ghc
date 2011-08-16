@@ -37,7 +37,6 @@ import Digraph
 import TcType
 import Type
 import Coercion
-import TysPrim  ( anyTypeOfKind )
 import CostCentre
 import Module
 import Id
@@ -122,15 +121,17 @@ dsHsBind auto_scc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
 	-- Non-recursive bindings come through this way
 	-- So do self-recursive bindings, and recursive bindings
 	-- that have been chopped up with type signatures
-dsHsBind auto_scc (AbsBinds { abs_tvs = all_tyvars, abs_ev_vars = dicts
-               		    , abs_exports = [(tyvars, global, local, prags)]
+dsHsBind auto_scc (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
+               		    , abs_exports = [export]
                		    , abs_ev_binds = ev_binds, abs_binds = binds })
-  = ASSERT( all (`elem` tyvars) all_tyvars )
-    do	{ bind_prs    <- ds_lhs_binds NoSccs binds
+  | ABE { abe_wrap = wrap, abe_poly = global
+        , abe_mono = local, abe_prags = prags } <- export
+  = do	{ bind_prs    <- ds_lhs_binds NoSccs binds
         ; ds_ev_binds <- dsTcEvBinds ev_binds
-
+        ; wrap_fn <- dsHsWrapper wrap
 	; let	core_bind = Rec (fromOL bind_prs)
 	        rhs       = addAutoScc auto_scc global $
+			    wrap_fn $  -- Usually the identity
 			    mkLams tyvars $ mkLams dicts $ 
 	                    wrapDsEvBinds ds_ev_binds $
                             Let core_bind $
@@ -144,14 +145,14 @@ dsHsBind auto_scc (AbsBinds { abs_tvs = all_tyvars, abs_ev_vars = dicts
     
 	; return (main_bind `consOL` spec_binds) }
 
-dsHsBind auto_scc (AbsBinds { abs_tvs = all_tyvars, abs_ev_vars = dicts
+dsHsBind auto_scc (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                             , abs_exports = exports, abs_ev_binds = ev_binds
                        	    , abs_binds = binds })
   = do	{ bind_prs    <- ds_lhs_binds NoSccs binds
         ; ds_ev_binds <- dsTcEvBinds ev_binds
 	; let env = mkABEnv exports
-	      do_one (lcl_id,rhs) | Just (_, gbl_id, _, _prags) <- lookupVarEnv env lcl_id
-			          = (lcl_id, addAutoScc auto_scc gbl_id rhs)
+	      do_one (lcl_id,rhs) | Just export <- lookupVarEnv env lcl_id
+			          = (lcl_id, addAutoScc auto_scc (abe_poly export) rhs)
 				  | otherwise = (lcl_id,rhs)
 	       
 	      core_bind = Rec (map do_one (fromOL bind_prs))
@@ -159,37 +160,27 @@ dsHsBind auto_scc (AbsBinds { abs_tvs = all_tyvars, abs_ev_vars = dicts
 
 	      tup_expr     = mkBigCoreVarTup locals
 	      tup_ty	   = exprType tup_expr
-	      poly_tup_rhs = mkLams all_tyvars $ mkLams dicts $
+	      poly_tup_rhs = mkLams tyvars $ mkLams dicts $
 	      		     wrapDsEvBinds ds_ev_binds $
 			     Let core_bind $
 	 	     	     tup_expr
-	      locals       = [local | (_, _, local, _) <- exports]
-	      local_tys    = map idType locals
+	      locals       = map abe_mono exports
 
 	; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
 
-	; let mk_bind ((tyvars, global, _, spec_prags), n)  -- locals!!n == local
-	        = 	-- Need to make fresh locals to bind in the selector,
-		      	-- because some of the tyvars will be bound to 'Any'
-		  do { let ty_args = map mk_ty_arg all_tyvars
-		           substitute = substTyWith all_tyvars ty_args
-		     ; locals' <- newSysLocalsDs (map substitute local_tys)
-		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
-	             ; let rhs = mkLams tyvars $ mkLams dicts $
-	      	     		 mkTupleSelector locals' (locals' !! n) tup_id $
-			         mkVarApps (mkTyApps (Var poly_tup_id) ty_args)
-			 		   dicts
-                           full_rhs = Let (NonRec poly_tup_id poly_tup_rhs) rhs
-		     ; (spec_binds, rules) <- dsSpecs full_rhs spec_prags
-				                      
+	; let mk_bind (ABE { abe_wrap = wrap, abe_poly = global
+                           , abe_mono = local, abe_prags = spec_prags })
+	        = do { wrap_fn <- dsHsWrapper wrap
+		     ; tup_id  <- newSysLocalDs tup_ty
+	             ; let rhs = wrap_fn $ mkLams tyvars $ mkLams dicts $
+	      	     		 mkTupleSelector locals local tup_id $
+			         mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
+                           rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
+		     ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
 		     ; let global' = addIdSpecialisations global rules
 		     ; return ((global', rhs) `consOL` spec_binds) }
-	        where
-	          mk_ty_arg all_tyvar
-			| all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
-	      		| otherwise		  = dsMkArbitraryType all_tyvar
 
-	; export_binds_s <- mapM mk_bind (exports `zip` [0..])
+	; export_binds_s <- mapM mk_bind exports
 	     -- Don't scc (auto-)annotate the tuple itself.
 
 	; return ((poly_tup_id, poly_tup_rhs) `consOL` 
@@ -311,14 +302,14 @@ dictArity dicts = count isId dicts
 
 
 ------------------------
-type AbsBindEnv = VarEnv ([TyVar], Id, Id, TcSpecPrags)
+type AbsBindEnv = VarEnv (ABExport Id)
 	-- Maps the "lcl_id" for an AbsBind to
 	-- its "gbl_id" and associated pragmas, if any
 
-mkABEnv :: [([TyVar], Id, Id, TcSpecPrags)] -> AbsBindEnv
+mkABEnv :: [ABExport Id] -> AbsBindEnv
 -- Takes the exports of a AbsBinds, and returns a mapping
 --	lcl_id -> (tyvars, gbl_id, lcl_id, prags)
-mkABEnv exports = mkVarEnv [ (lcl_id, export) | export@(_, _, lcl_id, _) <- exports]
+mkABEnv exports = mkVarEnv [ (abe_mono export, export) | export <- exports]
 \end{code}
 
 Note [Rules and inlining]
@@ -560,9 +551,6 @@ specUnfolding wrap_fn spec_ty (DFunUnfolding _ _ ops)
 -}
 specUnfolding _ _ _
   = return (noUnfolding, nilOL)
-
-dsMkArbitraryType :: TcTyVar -> Type
-dsMkArbitraryType tv = anyTypeOfKind (tyVarKind tv)
 \end{code}
 
 %************************************************************************

@@ -336,6 +336,7 @@ data MetaInfo
 data UserTypeCtxt
   = FunSigCtxt Name	-- Function type signature
 			-- Also used for types in SPECIALISE pragmas
+  | InfSigCtxt Name	-- Inferred type for function
   | ExprSigCtxt		-- Expression type signature
   | ConArgCtxt Name	-- Data constructor argument
   | TySynCtxt Name	-- RHS of a type synonym decl
@@ -410,19 +411,20 @@ pprTcTyVarDetails (MetaTv TcsTv _) = ptext (sLit "tcs")
 pprTcTyVarDetails (MetaTv SigTv _) = ptext (sLit "sig")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (FunSigCtxt n)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt     = ptext (sLit "an expression type signature")
-pprUserTypeCtxt (ConArgCtxt c)  = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)   = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
-pprUserTypeCtxt GenPatCtxt      = ptext (sLit "the type pattern of a generic definition")
-pprUserTypeCtxt ThBrackCtxt     = ptext (sLit "a Template Haskell quotation [t|...|]")
-pprUserTypeCtxt LamPatSigCtxt   = ptext (sLit "a pattern type signature")
-pprUserTypeCtxt BindPatSigCtxt  = ptext (sLit "a pattern type signature")
-pprUserTypeCtxt ResSigCtxt      = ptext (sLit "a result type signature")
-pprUserTypeCtxt (ForSigCtxt n)  = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt = ptext (sLit "a type in a `default' declaration")
-pprUserTypeCtxt SpecInstCtxt    = ptext (sLit "a SPECIALISE instance pragma")
-pprUserTypeCtxt GenSigCtxt      = ptext (sLit "a type expected by the context")
+pprUserTypeCtxt (InfSigCtxt n)   = ptext (sLit "the inferred type for") <+> quotes (ppr n)
+pprUserTypeCtxt (FunSigCtxt n)   = ptext (sLit "the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt      = ptext (sLit "an expression type signature")
+pprUserTypeCtxt (ConArgCtxt c)   = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)    = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
+pprUserTypeCtxt GenPatCtxt       = ptext (sLit "the type pattern of a generic definition")
+pprUserTypeCtxt ThBrackCtxt      = ptext (sLit "a Template Haskell quotation [t|...|]")
+pprUserTypeCtxt LamPatSigCtxt    = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt BindPatSigCtxt   = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt ResSigCtxt       = ptext (sLit "a result type signature")
+pprUserTypeCtxt (ForSigCtxt n)   = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt  = ptext (sLit "a type in a `default' declaration")
+pprUserTypeCtxt SpecInstCtxt     = ptext (sLit "a SPECIALISE instance pragma")
+pprUserTypeCtxt GenSigCtxt       = ptext (sLit "a type expected by the context")
 \end{code}
 
 

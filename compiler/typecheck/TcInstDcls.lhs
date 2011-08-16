@@ -781,7 +781,7 @@ tcInstDecls2 tycl_decls inst_decls
         ; let dm_ids = collectHsBindsBinders dm_binds
               -- Add the default method Ids (again)
               -- See Note [Default methods and instances]
-        ; inst_binds_s <- tcExtendIdEnv dm_ids $
+        ; inst_binds_s <- tcExtendLetEnv TopLevel dm_ids $
                           mapM tcInstDecl2 inst_decls
 
           -- Done
@@ -884,10 +884,11 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              dfun_args = map varToCoreExpr sc_args ++
                          map Var           meth_ids
 
+             export = ABE { abe_wrap = idHsWrapper, abe_poly = dfun_id_w_fun
+                          , abe_mono = self_dict, abe_prags = SpecPrags spec_inst_prags }
              main_bind = AbsBinds { abs_tvs = inst_tyvars
                                   , abs_ev_vars = dfun_ev_vars
-                                  , abs_exports = [(inst_tyvars, dfun_id_w_fun, self_dict,
-                                                    SpecPrags spec_inst_prags)]
+                                  , abs_exports = [export]
                                   , abs_ev_binds = emptyTcEvBinds
                                   , abs_binds = unitBag dict_bind }
 
@@ -1119,9 +1120,12 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                         -- Copy the inline pragma (if any) from the default
                         -- method to this version. Note [INLINE and default methods]
 
+                  
+                 export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id1
+                              , abe_mono = local_meth_id
+                              , abe_prags = mk_meth_spec_prags meth_id1 [] }
                  bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
-                                 , abs_exports = [( tyvars, meth_id1, local_meth_id
-                                                  , mk_meth_spec_prags meth_id1 [])]
+                                 , abs_exports = [export]
                                  , abs_ev_binds = EvBinds (unitBag self_ev_bind)
                                  , abs_binds    = unitBag meth_bind }
              -- Default methods in an instance declaration can't have their own
@@ -1215,9 +1219,10 @@ tcInstanceMethods dfun_id clas tyvars dfun_ev_vars inst_tys
 
             ; let meth_rhs  = wrapId (mk_op_wrapper sel_id rep_d) sel_id
                   meth_bind = mkVarBind local_meth_id (L loc meth_rhs)
+                  export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
+                               , abe_mono = local_meth_id, abe_prags = noSpecPrags }
                   bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
-                                   , abs_exports = [(tyvars, meth_id,
-                                                     local_meth_id, noSpecPrags)]
+                                   , abs_exports = [export]
                                    , abs_ev_binds = rep_ev_binds
                                    , abs_binds = unitBag $ meth_bind }
 

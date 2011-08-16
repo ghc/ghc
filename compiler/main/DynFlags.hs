@@ -910,18 +910,14 @@ languageExtensions :: Maybe Language -> [ExtensionFlag]
 
 languageExtensions Nothing
     -- Nothing => the default case
-    = Opt_MonoPatBinds   -- Experimentally, I'm making this non-standard
-                         -- behaviour the default, to see if anyone notices
-                         -- SLPJ July 06
-      -- In due course I'd like Opt_MonoLocalBinds to be on by default
-      -- But NB it's implied by GADTs etc
-      -- SLPJ September 2010
-    : Opt_NondecreasingIndentation -- This has been on by default for some time
+    = Opt_NondecreasingIndentation -- This has been on by default for some time
     : delete Opt_DatatypeContexts  -- The Haskell' committee decided to
                                    -- remove datatype contexts from the
                                    -- language:
    -- http://www.haskell.org/pipermail/haskell-prime/2011-January/003335.html
       (languageExtensions (Just Haskell2010))
+
+   -- NB: MonoPatBinds is no longer the default
 
 languageExtensions (Just Haskell98)
     = [Opt_ImplicitPrelude,
@@ -1863,7 +1859,8 @@ xFlags = [
   ( "NPlusKPatterns",                   AlwaysAllowed, Opt_NPlusKPatterns, nop ),
   ( "DoAndIfThenElse",                  AlwaysAllowed, Opt_DoAndIfThenElse, nop ),
   ( "RebindableSyntax",                 AlwaysAllowed, Opt_RebindableSyntax, nop ),
-  ( "MonoPatBinds",                     AlwaysAllowed, Opt_MonoPatBinds, nop ),
+  ( "MonoPatBinds",                     AlwaysAllowed, Opt_MonoPatBinds, 
+    \ turn_on -> when turn_on $ deprecate "Experimental feature now removed; has no effect" ),
   ( "ExplicitForAll",                   AlwaysAllowed, Opt_ExplicitForAll, nop ),
   ( "AlternativeLayoutRule",            AlwaysAllowed, Opt_AlternativeLayoutRule, nop ),
   ( "AlternativeLayoutRuleTransitional",AlwaysAllowed, Opt_AlternativeLayoutRuleTransitional, nop ),

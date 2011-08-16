@@ -226,16 +226,6 @@ pprWithArising ev_vars
 addErrorReport :: ReportErrCtxt -> SDoc -> TcM ()
 addErrorReport ctxt msg = addErrTcM (cec_tidy ctxt, msg $$ cec_extra ctxt)
 
-pprErrCtxtLoc :: ReportErrCtxt -> SDoc
-pprErrCtxtLoc ctxt 
-  = case map (ctLocOrigin . ic_loc) (cec_encl ctxt) of
-       []           -> ptext (sLit "the top level")	-- Should not happen
-       (orig:origs) -> ppr_skol orig $$ 
-                       vcat [ ptext (sLit "or") <+> ppr_skol orig | orig <- origs ]
-  where
-    ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
-    ppr_skol skol_info      = ppr skol_info
-
 getUserGivens :: ReportErrCtxt -> [([EvVar], GivenLoc)]
 -- One item for each enclosing implication
 getUserGivens (CEC {cec_encl = ctxt})
@@ -514,13 +504,10 @@ reportDictErrs ctxt wanteds orig
 
       | otherwise
       = vcat [ couldNotDeduce givens (min_wanteds, orig)
-             , show_fixes (fix1 : (fixes2 ++ fixes3)) ]
+             , show_fixes (fixes1 ++ fixes2 ++ fixes3) ]
       where
         givens = getUserGivens ctxt
         min_wanteds = mkMinimalBySCs wanteds
-        fix1 = sep [ ptext (sLit "add") <+> pprTheta min_wanteds
-                          <+> ptext (sLit "to the context of")
-	           , nest 2 $ pprErrCtxtLoc ctxt ]
 
         fixes2 = case instance_dicts of
                    []  -> []
@@ -543,6 +530,23 @@ reportDictErrs ctxt wanteds orig
 	show_fixes []     = empty
 	show_fixes (f:fs) = sep [ptext (sLit "Possible fix:"), 
 				 nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
+
+        fixes1 | (orig:origs) <- mapCatMaybes get_good_orig (cec_encl ctxt)
+               = [sep [ ptext (sLit "add") <+> pprTheta min_wanteds
+                        <+> ptext (sLit "to the context of")
+	              , nest 2 $ ppr_skol orig $$ 
+                                 vcat [ ptext (sLit "or") <+> ppr_skol orig 
+                                      | orig <- origs ]
+                 ]    ]
+               | otherwise = []
+
+        ppr_skol (PatSkol dc _) = ptext (sLit "the data constructor") <+> quotes (ppr dc)
+        ppr_skol skol_info      = ppr skol_info
+
+	-- Do not suggest adding constraints to an *inferred* type signature!
+        get_good_orig ic = case ctLocOrigin (ic_loc ic) of 
+                             SigSkol (InfSigCtxt {}) _ -> Nothing
+                             origin                    -> Just origin
 
 reportOverlap :: ReportErrCtxt -> (InstEnv,InstEnv) -> CtOrigin
               -> PredType -> TcM (Maybe PredType)

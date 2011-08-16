@@ -235,15 +235,17 @@ tcInstanceMethodBody skol_info tyvars dfun_ev_vars
                              -- Substitute the local_meth_name for the binder
 			     -- NB: the binding is always a FunBind
         ; traceTc "TIM" (ppr local_meth_id $$ ppr (meth_sig_fn (idName local_meth_id))) 
-	; (ev_binds, (tc_bind, _)) 
+	; (ev_binds, (tc_bind, _, _)) 
                <- checkConstraints skol_info tyvars dfun_ev_vars $
 		  tcExtendIdEnv [local_meth_id] $
 	          tcPolyBinds TopLevel meth_sig_fn no_prag_fn 
 		  	     NonRecursive NonRecursive
 		  	     [lm_bind]
 
-        ; let full_bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
-                                   , abs_exports = [(tyvars, meth_id, local_meth_id, specs)]
+        ; let export = ABE { abe_wrap = idHsWrapper, abe_poly = meth_id
+                           , abe_mono = local_meth_id, abe_prags = specs }
+              full_bind = AbsBinds { abs_tvs = tyvars, abs_ev_vars = dfun_ev_vars
+                                   , abs_exports = [export]
                                    , abs_ev_binds = ev_binds
                                    , abs_binds = tc_bind }
 
@@ -357,8 +359,8 @@ mkGenericDefMethBind clas inst_tys sel_id dm_name
 		   (vcat [ppr clas <+> ppr inst_tys,
 			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
-        ; return (noLoc $ mkFunBind (noLoc (idName sel_id))
-                                    [mkSimpleMatch [] rhs]) }
+        ; return (noLoc $ mkTopFunBind (noLoc (idName sel_id))
+                                       [mkSimpleMatch [] rhs]) }
   where
     rhs = nlHsVar dm_name
 \end{code}

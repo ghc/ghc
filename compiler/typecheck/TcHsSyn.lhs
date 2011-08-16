@@ -425,15 +425,17 @@ zonk_bind env sig_warn (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
     	    ; new_val_binds <- zonkMonoBinds env3 noSigWarn val_binds
     	    ; new_exports   <- mapM (zonkExport env3) exports
     	    ; return (new_val_binds, new_exports) } 
-       ; sig_warn True [b | (_,b,_,_) <- new_exports]
+       ; sig_warn True (map abe_poly new_exports)
        ; return (AbsBinds { abs_tvs = tyvars, abs_ev_vars = new_evs, abs_ev_binds = new_ev_binds
 			  , abs_exports = new_exports, abs_binds = new_val_bind }) }
   where
-    zonkExport env (tyvars, global, local, prags)
-	-- The tyvars are already zonked
-	= zonkIdBndr env global			`thenM` \ new_global ->
-	  zonkSpecPrags env prags		`thenM` \ new_prags -> 
-	  returnM (tyvars, new_global, zonkIdOcc env local, new_prags)
+    zonkExport env (ABE{ abe_wrap = wrap, abe_poly = poly_id
+                       , abe_mono = mono_id, abe_prags = prags })
+	= zonkIdBndr env poly_id		`thenM` \ new_poly_id ->
+	  zonkCoFn env wrap                     `thenM` \ (_, new_wrap) ->
+          zonkSpecPrags env prags		`thenM` \ new_prags -> 
+	  returnM (ABE{ abe_wrap = new_wrap, abe_poly = new_poly_id
+                      , abe_mono = zonkIdOcc env mono_id, abe_prags = new_prags })
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod

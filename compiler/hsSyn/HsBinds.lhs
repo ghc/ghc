@@ -150,7 +150,7 @@ data HsBindLR idL idR
        -- AbsBinds only gets used when idL = idR after renaming,
        -- but these need to be idL's for the collect... code in HsUtil 
        -- to have the right type
-	abs_exports :: [([TyVar], idL, idL, TcSpecPrags)],	-- (tvs, poly_id, mono_id, prags)
+	abs_exports :: [ABExport idL],
 
         abs_ev_binds :: TcEvBinds,     -- Evidence bindings
 	abs_binds    :: LHsBinds idL   -- Typechecked user bindings
@@ -170,6 +170,14 @@ data HsBindLR idL idR
 	-- See section 9 of static semantics paper for more details.
 	-- (You can get a PhD for explaining the True Meaning
 	--  of this last construct.)
+
+data ABExport id 
+  = ABE { abe_poly  :: id 
+        , abe_mono  :: id 
+        , abe_wrap  :: HsWrapper  -- See Note [AbsBinds wrappers]
+             -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
+        , abe_prags :: TcSpecPrags }
+  deriving (Data, Typeable)
 
 placeHolderNames :: NameSet
 -- Used for the NameSet in FunBind and PatBind prior to the renamer
@@ -306,17 +314,19 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
   = sep [ptext (sLit "AbsBinds"),
   	 brackets (interpp'SP tyvars),
   	 brackets (interpp'SP dictvars),
-  	 brackets (sep (punctuate comma (map ppr_exp exports)))]
+  	 brackets (sep (punctuate comma (map ppr exports)))]
     $$
-    nest 2 ( vcat [pprBndr LetBind x | (_,x,_,_) <- exports]
+    nest 2 ( vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
   			-- Print type signatures
   	     $$ pprLHsBinds val_binds )
     $$
     ifPprDebug (ppr ev_binds)
-  where
-    ppr_exp (tvs, gbl, lcl, prags)
-	= vcat [ppr gbl <+> ptext (sLit "<=") <+> ppr tvs <+> ppr lcl,
-	  	nest 2 (pprTcSpecPrags prags)]
+
+instance (OutputableBndr id) => Outputable (ABExport id) where
+  ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
+    = vcat [ ppr gbl <+> ptext (sLit "<=") <+> ppr lcl
+	   , nest 2 (pprTcSpecPrags prags)
+           , nest 2 (ppr wrap)]
 \end{code}
 
 
@@ -513,12 +523,12 @@ mkWpLet (EvBinds b) | isEmptyBag b = WpHole
 mkWpLet ev_binds                   = WpLet ev_binds
 
 mk_co_lam_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
-mk_co_lam_fn f as = foldr (\x wrap -> f x `WpCompose` wrap) WpHole as
+mk_co_lam_fn f as = foldr (\x wrap -> f x <.> wrap) WpHole as
 
 mk_co_app_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
 -- For applications, the *first* argument must
 -- come *last* in the composition sequence
-mk_co_app_fn f as = foldr (\x wrap -> wrap `WpCompose` f x) WpHole as
+mk_co_app_fn f as = foldr (\x wrap -> wrap <.> f x) WpHole as
 
 idHsWrapper :: HsWrapper
 idHsWrapper = WpHole

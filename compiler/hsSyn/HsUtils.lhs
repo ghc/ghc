@@ -29,7 +29,7 @@ module HsUtils(
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
 
   -- Bindings
-  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, 
+  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
 
   -- Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, 
@@ -407,14 +407,23 @@ missingTupArg = Missing placeHolderType
 %************************************************************************
 
 \begin{code}
-mkFunBind :: Located id -> [LMatch id] -> HsBind id
+mkFunBind :: Located RdrName -> [LMatch RdrName] -> HsBind RdrName
 -- Not infix, with place holders for coercion and free vars
-mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False, fun_matches = mkMatchGroup ms,
-			    fun_co_fn = idHsWrapper, bind_fvs = placeHolderNames,
-			    fun_tick = Nothing }
+mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
+                          , fun_matches = mkMatchGroup ms
+			  , fun_co_fn = idHsWrapper
+                          , bind_fvs = placeHolderNames
+			  , fun_tick = Nothing }
 
+mkTopFunBind :: Located Name -> [LMatch Name] -> HsBind Name
+-- In Name-land, with empty bind_fvs
+mkTopFunBind fn ms = FunBind { fun_id = fn, fun_infix = False
+                             , fun_matches = mkMatchGroup ms
+			     , fun_co_fn = idHsWrapper
+                             , bind_fvs = emptyNameSet	-- NB: closed binding
+			     , fun_tick = Nothing }
 
-mkHsVarBind :: SrcSpan -> id -> LHsExpr id -> LHsBind id
+mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
 mkHsVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
 mkVarBind :: id -> LHsExpr id -> LHsBind id
@@ -422,9 +431,8 @@ mkVarBind var rhs = L (getLoc rhs) $
 		    VarBind { var_id = var, var_rhs = rhs, var_inline = False }
 
 ------------
-mk_easy_FunBind :: SrcSpan -> id -> [LPat id]
-		-> LHsExpr id -> LHsBind id
-
+mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
+		-> LHsExpr RdrName -> LHsBind RdrName
 mk_easy_FunBind loc fun pats expr
   = L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds]
 
@@ -483,7 +491,7 @@ collect_bind (PatBind { pat_lhs = p })    acc = collect_lpat p acc
 collect_bind (FunBind { fun_id = L _ f }) acc = f : acc
 collect_bind (VarBind { var_id = f })     acc = f : acc
 collect_bind (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
-  = [dp | (_,dp,_,_) <- dbinds] ++ acc 
+  = map abe_poly dbinds ++ acc 
 	-- ++ foldr collect_bind acc binds
 	-- I don't think we want the binders from the nested binds
 	-- The only time we collect binders from a typechecked 

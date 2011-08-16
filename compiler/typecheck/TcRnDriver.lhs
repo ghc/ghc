@@ -1222,9 +1222,10 @@ mkPlan :: LStmt Name -> TcM PlanResult
 mkPlan (L loc (ExprStmt expr _ _ _))	-- An expression typed at the prompt 
   = do	{ uniq <- newUnique		-- is treated very specially
 	; let fresh_it  = itName uniq
-	      the_bind  = L loc $ mkFunBind (L loc fresh_it) matches
+	      the_bind  = L loc $ mkTopFunBind (L loc fresh_it) matches
 	      matches   = [mkMatch [] expr emptyLocalBinds]
-	      let_stmt  = L loc $ LetStmt (HsValBinds (ValBindsOut [(NonRecursive,unitBag the_bind)] []))
+	      let_stmt  = L loc $ LetStmt $ HsValBinds $
+                          ValBindsOut [(NonRecursive,unitBag the_bind)] []
 	      bind_stmt = L loc $ BindStmt (nlVarPat fresh_it) expr
 					   (HsVar bindIOName) noSyntaxExpr 
 	      print_it  = L loc $ ExprStmt (nlHsApp (nlHsVar printName) (nlHsVar fresh_it))
@@ -1343,10 +1344,11 @@ tcRnExpr hsc_env ictxt rdr_expr
     uniq <- newUnique ;
     let { fresh_it  = itName uniq } ;
     ((_tc_expr, res_ty), lie)	<- captureConstraints (tcInferRho rn_expr) ;
-    ((qtvs, dicts, _), lie_top) <- captureConstraints $ 
-                                   simplifyInfer TopLevel False {- No MR for now -}
-                                                 [(fresh_it, res_ty)]
-                                                 lie  ;
+    ((qtvs, dicts, _, _), lie_top) <- captureConstraints $ 
+                                      simplifyInfer True {- Free vars are closed -}
+                                                    False {- No MR for now -}
+                                                    [(fresh_it, res_ty)]
+                                                    lie  ;
     _ <- simplifyInteractive lie_top ;       -- Ignore the dicionary bindings
 
     let { all_expr_ty = mkForAllTys qtvs (mkPiTypes dicts res_ty) } ;

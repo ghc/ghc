@@ -136,7 +136,7 @@ dsStrictBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_binds = binds }) body
   = do { ds_ev_binds <- dsTcEvBinds ev_binds
        ; let body1 = foldr bind_export body exports
-             bind_export (_, g, l, _) b = bindNonRec g (Var l) b
+             bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
        ; body2 <- foldlBagM (\body bind -> dsStrictBind (unLoc bind) body) 
                             body1 binds 
        ; return (wrapDsEvBinds ds_ev_binds body2) }
@@ -542,8 +542,8 @@ dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
                      = nlHsVar (lookupNameEnv upd_fld_env field_name `orElse` pat_arg_id)
 		 inst_con = noLoc $ HsWrap wrap (HsVar (dataConWrapId con))
 			-- Reconstruct with the WrapId so that unpacking happens
-		 wrap = mkWpEvVarApps theta_vars          `WpCompose` 
-			mkWpTyApps    (mkTyVarTys ex_tvs) `WpCompose`
+		 wrap = mkWpEvVarApps theta_vars          <.>
+			mkWpTyApps    (mkTyVarTys ex_tvs) <.>
 			mkWpTyApps [ty | (tv, ty) <- univ_tvs `zip` out_inst_tys
 				       , not (tv `elemVarEnv` wrap_subst) ]
     	         rhs = foldl (\a b -> nlHsApp a b) inst_con val_args

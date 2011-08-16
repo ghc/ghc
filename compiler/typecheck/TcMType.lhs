@@ -438,7 +438,9 @@ zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar (varSetElems tyvar
 -----------------  Types
 zonkTcTypeCarefully :: TcType -> TcM TcType
 -- Do not zonk type variables free in the environment
-zonkTcTypeCarefully ty
+zonkTcTypeCarefully ty = zonkTcType ty   -- I think this function is out of date
+
+{-
   = do { env_tvs <- tcGetGlobalTyVars
        ; zonkType (zonk_tv env_tvs) ty }
   where
@@ -455,6 +457,7 @@ zonkTcTypeCarefully ty
                               ; case cts of
 			           Flexi       -> return (TyVarTy tv)
 			           Indirect ty -> zonkType (zonk_tv env_tvs) ty }
+-}
 
 zonkTcType :: TcType -> TcM TcType
 -- Simply look through all Flexis
@@ -836,6 +839,7 @@ checkValidType ctxt ty = do
 
 		 ExprSigCtxt 	-> gen_rank 1
 		 FunSigCtxt _   -> gen_rank 1
+		 InfSigCtxt _   -> ArbitraryRank	-- Inferred type
 		 ConArgCtxt _   | polycomp -> gen_rank 2
                                 -- We are given the type of the entire
                                 -- constructor, hence rank 1

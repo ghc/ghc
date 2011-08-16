@@ -1015,7 +1015,7 @@ isUntouchable :: TcTyVar -> TcM Bool
 isUntouchable tv = do { env <- getLclEnv
                       ; return (varUnique tv < tcl_untch env) }
 
-getLclTypeEnv :: TcM (NameEnv TcTyThing)
+getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }
 
 setLclTypeEnv :: TcLclEnv -> TcM a -> TcM a

@@ -334,8 +334,10 @@ rnLocalValBindsRHS :: NameSet  -- names bound by the LHSes
 rnLocalValBindsRHS bound_names binds
   = rnValBindsRHS trim (Just bound_names) binds
   where
-    trim fvs = intersectNameSet bound_names fvs 
-	-- Only keep the names the names from this group
+    trim fvs = filterNameSet isInternalName fvs
+     -- Keep Internal Names; these are the non-top-level ones
+     -- As well as dependency analysis, we need these for the
+     -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
 -- for local binds
 -- wrapper that does both the left- and right-hand sides 
