@@ -28,7 +28,7 @@ module CoreSubst (
 
 	-- ** Substituting and cloning binders
 	substBndr, substBndrs, substRecBndrs,
-	cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
+	cloneBndr, cloneBndrs, cloneIdBndr, cloneIdBndrs, cloneRecIdBndrs,
 
 	-- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith
@@ -524,9 +524,10 @@ cloneBndrs :: Subst -> UniqSupply -> [Var] -> (Subst, [Var])
 -- Works for all kinds of variables (typically case binders)
 -- not just Ids
 cloneBndrs subst us vs
-  = mapAccumL clone subst (vs `zip` uniqsFromSupply us)
-  where
-    clone subst (v,uniq) 
+  = mapAccumL (\subst (v, u) -> cloneBndr subst u v) subst (vs `zip` uniqsFromSupply us)
+
+cloneBndr :: Subst -> Unique -> Var -> (Subst, Var)
+cloneBndr subst uniq v
       | isTyVar v = cloneTyVarBndr subst v uniq
       | otherwise = clone_id subst subst (v,uniq)  -- Works for coercion variables too
 
@@ -544,13 +545,14 @@ clone_id    :: Subst			-- Substitution for the IdInfo
 	    -> Subst -> (Id, Unique)	-- Substitition and Id to transform
 	    -> (Subst, Id)		-- Transformed pair
 
-clone_id rec_subst subst@(Subst in_scope env tvs cvs) (old_id, uniq)
-  = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs cvs, new_id)
+clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
+  = (Subst (in_scope `extendInScopeSet` new_id) new_idvs tvs new_cvs, new_id)
   where
     id1	    = setVarUnique old_id uniq
     id2     = substIdType subst id1
     new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
-    new_env = extendVarEnv env old_id (Var new_id)
+    (new_idvs, new_cvs) | isCoVar old_id = (idvs, extendVarEnv cvs old_id (mkCoVarCo new_id))
+                        | otherwise      = (extendVarEnv idvs old_id (Var new_id), cvs)
 \end{code}
 
 
