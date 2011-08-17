@@ -582,8 +582,9 @@ mk_tup_name n_commas space
   = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
-    -- XXX Should it be GHC.Unit for 0 commas?
-    tup_mod = mkModName "GHC.Tuple"
+    tup_mod | n_commas ==0 = mkModName "GHC.Unit"
+            | otherwise    = mkModName "GHC.Tuple"
+    -- Oddly () is in a different module than the other tuples
 
 -- Unboxed tuple data and type constructors
 unboxedTupleDataName :: Int -> Name    -- ^ Data constructor
