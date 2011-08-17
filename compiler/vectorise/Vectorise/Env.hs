@@ -76,55 +76,56 @@ emptyLocalEnv = LocalEnv {
 --
 data GlobalEnv 
         = GlobalEnv
-        { global_vars           :: VarEnv Var
+        { global_vars                 :: VarEnv Var
           -- ^Mapping from global variables to their vectorised versions — aka the /vectorisation
           -- map/.
 
-        , global_vect_decls     :: VarEnv (Type, CoreExpr)
+        , global_vect_decls           :: VarEnv (Type, CoreExpr)
           -- ^Mapping from global variables that have a vectorisation declaration to the right-hand
           -- side of that declaration and its type.  This mapping only applies to non-scalar
           -- vectorisation declarations.  All variables with a scalar vectorisation declaration are
           -- mentioned in 'global_scalars_vars'.
 
-        , global_scalar_vars    :: VarSet
+        , global_scalar_vars          :: VarSet
           -- ^Purely scalar variables. Code which mentions only these variables doesn't have to be
           -- lifted.  This includes variables from the current module that have a scalar
           -- vectorisation declaration and those that the vectoriser determines to be scalar.
 
-        , global_scalar_tycons  :: NameSet
-          -- ^Type constructors whose values can only contain scalar data.  Scalar code may only
-          -- operate on such data.
+        , global_scalar_tycons       :: NameSet
+          -- ^Type constructors whose values can only contain scalar data and that appear in a
+          -- 'VECTORISE SCALAR type' pragma in the current or an imported module.  Scalar code may
+          -- only operate on such data.
         
-        , global_novect_vars    :: VarSet
+        , global_novect_vars          :: VarSet
           -- ^Variables that are not vectorised.  (They may be referenced in the right-hand sides
           -- of vectorisation declarations, though.)
 
-        , global_exported_vars  :: VarEnv (Var, Var)
+        , global_exported_vars        :: VarEnv (Var, Var)
           -- ^Exported variables which have a vectorised version.
 
-        , global_tycons         :: NameEnv TyCon
+        , global_tycons               :: NameEnv TyCon
           -- ^Mapping from TyCons to their vectorised versions.
           -- TyCons which do not have to be vectorised are mapped to themselves.
 
-        , global_datacons       :: NameEnv DataCon
+        , global_datacons             :: NameEnv DataCon
           -- ^Mapping from DataCons to their vectorised versions.
 
-        , global_pa_funs        :: NameEnv Var
+        , global_pa_funs              :: NameEnv Var
           -- ^Mapping from TyCons to their PA dfuns.
 
-        , global_pr_funs        :: NameEnv Var
+        , global_pr_funs              :: NameEnv Var
           -- ^Mapping from TyCons to their PR dfuns.
 
-        , global_boxed_tycons   :: NameEnv TyCon
+        , global_boxed_tycons         :: NameEnv TyCon
           -- ^Mapping from unboxed TyCons to their boxed versions.
 
-        , global_inst_env       :: (InstEnv, InstEnv)
+        , global_inst_env             :: (InstEnv, InstEnv)
           -- ^External package inst-env & home-package inst-env for class instances.
 
-        , global_fam_inst_env   :: FamInstEnvs
+        , global_fam_inst_env         :: FamInstEnvs
           -- ^External package inst-env & home-package inst-env for family instances.
 
-        , global_bindings       :: [(Var, CoreExpr)]
+        , global_bindings             :: [(Var, CoreExpr)]
           -- ^Hoisted bindings.
         }
 
@@ -133,25 +134,26 @@ data GlobalEnv
 initGlobalEnv :: VectInfo -> [CoreVect] -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
 initGlobalEnv info vectDecls instEnvs famInstEnvs
   = GlobalEnv 
-  { global_vars          = mapVarEnv snd $ vectInfoVar info
-  , global_vect_decls    = mkVarEnv vects
-  , global_scalar_vars   = vectInfoScalarVars   info `extendVarSetList` scalars
-  , global_scalar_tycons = vectInfoScalarTyCons info
-  , global_novect_vars   = mkVarSet novects
-  , global_exported_vars = emptyVarEnv
-  , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
-  , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
-  , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
-  , global_pr_funs       = emptyNameEnv
-  , global_boxed_tycons  = emptyNameEnv
-  , global_inst_env      = instEnvs
-  , global_fam_inst_env  = famInstEnvs
-  , global_bindings      = []
+  { global_vars                 = mapVarEnv snd $ vectInfoVar info
+  , global_vect_decls           = mkVarEnv vects
+  , global_scalar_vars          = vectInfoScalarVars info   `extendVarSetList` scalar_vars
+  , global_scalar_tycons        = vectInfoScalarTyCons info `addListToNameSet` scalar_tycons
+  , global_novect_vars          = mkVarSet novects
+  , global_exported_vars        = emptyVarEnv
+  , global_tycons               = mapNameEnv snd $ vectInfoTyCon info
+  , global_datacons             = mapNameEnv snd $ vectInfoDataCon info
+  , global_pa_funs              = mapNameEnv snd $ vectInfoPADFun info
+  , global_pr_funs              = emptyNameEnv
+  , global_boxed_tycons         = emptyNameEnv
+  , global_inst_env             = instEnvs
+  , global_fam_inst_env         = famInstEnvs
+  , global_bindings             = []
   }
   where
-    vects   = [(var, (varType var, exp)) | Vect var (Just exp) <- vectDecls]
-    scalars = [var                       | Vect var Nothing    <- vectDecls]
-    novects = [var                       | NoVect var          <- vectDecls]
+    vects         = [(var, (varType var, exp)) | Vect     var   (Just exp) <- vectDecls]
+    scalar_vars   = [var                       | Vect     var   Nothing    <- vectDecls]
+    novects       = [var                       | NoVect   var              <- vectDecls]
+    scalar_tycons = [tyConName tycon           | VectType tycon Nothing    <- vectDecls]
 
 
 -- Operators on Global Environments -------------------------------------------
@@ -214,9 +216,9 @@ modVectInfo :: GlobalEnv -> TypeEnv -> VectInfo -> VectInfo
 modVectInfo env tyenv info
   = info 
     { vectInfoVar          = global_exported_vars env
-    , vectInfoTyCon        = mk_env typeEnvTyCons global_tycons
+    , vectInfoTyCon        = mk_env typeEnvTyCons   global_tycons
     , vectInfoDataCon      = mk_env typeEnvDataCons global_datacons
-    , vectInfoPADFun       = mk_env typeEnvTyCons global_pa_funs
+    , vectInfoPADFun       = mk_env typeEnvTyCons   global_pa_funs
     , vectInfoScalarVars   = global_scalar_vars   env `minusVarSet`  vectInfoScalarVars   info
     , vectInfoScalarTyCons = global_scalar_tycons env `minusNameSet` vectInfoScalarTyCons info
     }

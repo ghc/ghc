@@ -87,12 +87,13 @@ import Coercion
 import Name
 import Literal
 import DataCon
+import TyCon
 import BasicTypes
 import FastString
 import Outputable
 import Util
 
-import Data.Data
+import Data.Data hiding (TyCon)
 import Data.Word
 
 infixl 4 `mkApps`, `mkTyApps`, `mkVarApps`, `App`, `mkCoApps`
@@ -428,9 +429,9 @@ Representation of desugared vectorisation declarations that are fed to the vecto
 'ModGuts').
 
 \begin{code}
-data CoreVect = Vect   Id (Maybe CoreExpr)
-              | NoVect Id
-
+data CoreVect = Vect     Id    (Maybe CoreExpr)
+              | NoVect   Id
+              | VectType TyCon (Maybe Type)
 \end{code}
 
 

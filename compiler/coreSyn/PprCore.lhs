@@ -473,8 +473,11 @@ pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 
 \begin{code}
 instance Outputable CoreVect where
-  ppr (Vect   var Nothing)  = ptext (sLit "VECTORISE SCALAR") <+> ppr var
-  ppr (Vect   var (Just e)) = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
-                                4 (pprCoreExpr e)
-  ppr (NoVect var)          = ptext (sLit "NOVECTORISE") <+> ppr var
+  ppr (Vect     var Nothing)   = ptext (sLit "VECTORISE SCALAR") <+> ppr var
+  ppr (Vect     var (Just e))  = hang (ptext (sLit "VECTORISE") <+> ppr var <+> char '=')
+                                   4 (pprCoreExpr e)
+  ppr (NoVect   var)           = ptext (sLit "NOVECTORISE") <+> ppr var
+  ppr (VectType var Nothing)   = ptext (sLit "VECTORISE SCALAR type") <+> ppr var
+  ppr (VectType var (Just ty)) = hang (ptext (sLit "VECTORISE type") <+> ppr var <+> char '=')
+                                   4 (ppr ty)
 \end{code}

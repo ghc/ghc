@@ -659,24 +659,37 @@ badRuleLhsErr name lhs bad_e
 \begin{code}
 rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
 rnHsVectDecl (HsVect var Nothing)
-  = do { var' <- wrapLocM lookupTopBndrRn var
+  = do { var' <- lookupLocatedTopBndrRn var
        ; return (HsVect var' Nothing, unitFV (unLoc var'))
        }
 rnHsVectDecl (HsVect var (Just rhs))
-  = do { var' <- wrapLocM lookupTopBndrRn var
+  = do { var' <- lookupLocatedTopBndrRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
        }
 rnHsVectDecl (HsNoVect var)
-  = do { var' <- wrapLocM lookupTopBndrRn var
+  = do { var' <- lookupLocatedTopBndrRn var
        ; return (HsNoVect var', unitFV (unLoc var'))
        }
+rnHsVectDecl (HsVectTypeIn tycon Nothing)
+  = do { tycon' <- lookupLocatedOccRn tycon
+       ; return (HsVectTypeIn tycon' Nothing, unitFV (unLoc tycon'))
+       }
+rnHsVectDecl (HsVectTypeIn tycon (Just ty))
+  = do { tycon' <- lookupLocatedOccRn tycon
+       ; (ty', fv_ty) <- rnHsTypeFVs vect_doc ty
+       ; return (HsVectTypeIn tycon' (Just ty'), fv_ty `addOneFV` unLoc tycon')
+       }
+  where
+    vect_doc = text "In the VECTORISE pragma for type constructor" <+> quotes (ppr tycon)
+rnHsVectDecl (HsVectTypeOut _ _)
+  = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectTypeOut'"
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type, class and iface sig declarations}
-%*							*
+%*                                                      *
 %*********************************************************
 
 @rnTyDecl@ uses the `global name function' to create a new type
@@ -711,7 +724,7 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdExtName = ext_name})
     return (ForeignType {tcdLName = name', tcdExtName = ext_name},
 	     emptyFVs)
 
--- all flavours of type family declarations ("type family", "newtype fanily",
+-- all flavours of type family declarations ("type family", "newtype family",
 -- and "data family")
 rnTyClDecl tydecl@TyFamily {} = rnFamily tydecl bindTyVarsFV
 

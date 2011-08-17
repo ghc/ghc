@@ -563,8 +563,8 @@ topdecls :: { OrdList (LHsDecl RdrName) }
         | topdecl                               { $1 }
 
 topdecl :: { OrdList (LHsDecl RdrName) }
-        : cl_decl                       { unitOL (L1 (TyClD (unLoc $1))) }
-        | ty_decl                       { unitOL (L1 (TyClD (unLoc $1))) }
+        : cl_decl                               { unitOL (L1 (TyClD (unLoc $1))) }
+        | ty_decl                               { unitOL (L1 (TyClD (unLoc $1))) }
         | 'instance' inst_type where_inst
             { let (binds, sigs, ats, _) = cvBindsAndSigs (unLoc $3)
               in 
@@ -575,9 +575,13 @@ topdecl :: { OrdList (LHsDecl RdrName) }
         | '{-# DEPRECATED' deprecations '#-}'   { $2 }
         | '{-# WARNING' warnings '#-}'          { $2 }
         | '{-# RULES' rules '#-}'               { $2 }
-        | '{-# VECTORISE_SCALAR' qvar '#-}'     { unitOL $ LL $ VectD (HsVect   $2 Nothing) }
-        | '{-# VECTORISE' qvar '=' exp '#-}'    { unitOL $ LL $ VectD (HsVect   $2 (Just $4)) }
-        | '{-# NOVECTORISE' qvar '#-}'     			{ unitOL $ LL $ VectD (HsNoVect $2) }
+        | '{-# VECTORISE_SCALAR' qvar '#-}'     { unitOL $ LL $ VectD (HsVect       $2 Nothing) }
+        | '{-# VECTORISE' qvar '=' exp '#-}'    { unitOL $ LL $ VectD (HsVect       $2 (Just $4)) }
+        | '{-# NOVECTORISE' qvar '#-}'          { unitOL $ LL $ VectD (HsNoVect     $2) }
+        | '{-# VECTORISE_SCALAR' 'type' qtycon '#-}'     
+                                                { unitOL $ LL $ VectD (HsVectTypeIn $3 Nothing) }
+        | '{-# VECTORISE' 'type' qtycon '=' ctype '#-}'     
+                                                { unitOL $ LL $ VectD (HsVectTypeIn $3 (Just $5)) }
         | annotation { unitOL $1 }
         | decl                                  { unLoc $1 }
 

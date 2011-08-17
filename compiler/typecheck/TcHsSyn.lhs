@@ -1,4 +1,4 @@
-1%
+%
 % (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1996-1998
 %
@@ -1022,19 +1022,20 @@ zonkVects :: ZonkEnv -> [LVectDecl TcId] -> TcM [LVectDecl Id]
 zonkVects env = mappM (wrapLocM (zonkVect env))
 
 zonkVect :: ZonkEnv -> VectDecl TcId -> TcM (VectDecl Id)
-zonkVect env (HsVect v Nothing)
+zonkVect env (HsVect v e)
   = do { v' <- wrapLocM (zonkIdBndr env) v
-       ; return $ HsVect v' Nothing
-       }
-zonkVect env (HsVect v (Just e))
-  = do { v' <- wrapLocM (zonkIdBndr env) v
-       ; e' <- zonkLExpr env e
-       ; return $ HsVect v' (Just e')
+       ; e' <- fmapMaybeM (zonkLExpr env) e
+       ; return $ HsVect v' e'
        }
 zonkVect env (HsNoVect v)
   = do { v' <- wrapLocM (zonkIdBndr env) v
        ; return $ HsNoVect v'
        }
+zonkVect _env (HsVectTypeOut t ty)
+  = do { ty' <- fmapMaybeM zonkTypeZapping ty
+       ; return $ HsVectTypeOut t ty'
+       }
+zonkVect _ (HsVectTypeIn _ _) = panic "TcHsSyn.zonkVect: HsVectTypeIn"
 \end{code}
 
 %************************************************************************

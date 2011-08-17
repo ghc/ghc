@@ -403,7 +403,11 @@ dsVect (L loc (HsVect (L _ v) rhs))
   = putSrcSpanDs loc $ 
     do { rhs' <- fmapMaybeM dsLExpr rhs
        ; return $ Vect v rhs'
-  	   }
+       }
 dsVect (L _loc (HsNoVect (L _ v)))
   = return $ NoVect v
+dsVect (L _loc (HsVectTypeOut tycon ty))
+  = return $ VectType tycon ty
+dsVect vd@(L _ (HsVectTypeIn _ _ty))
+  = pprPanic "Desugar.dsVect: unexpected 'HsVectTypeIn'" (ppr vd)
 \end{code}

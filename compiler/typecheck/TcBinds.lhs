@@ -24,6 +24,7 @@ import TcSimplify
 import TcHsType
 import TcPat
 import TcMType
+import TyCon
 import TcType
 -- import Coercion
 import TysPrim
@@ -682,9 +683,22 @@ tcVect (HsNoVect name)
     do { id <- wrapLocM tcLookupId name
        ; return $ HsNoVect id
        }
+tcVect (HsVectTypeIn lname@(L _ name) ty)
+  = addErrCtxt (vectCtxt lname) $
+    do { tycon <- tcLookupTyCon name
+       ; checkTc (tyConArity tycon /= 0) scalarTyConMustBeNullary
+
+       ; ty' <- fmapMaybeM dsHsType ty
+       ; return $ HsVectTypeOut tycon ty'
+       }
+tcVect (HsVectTypeOut _ _)
+  = panic "TcBinds.tcVect: Unexpected 'HsVectTypeOut'"
 
 vectCtxt :: Located Name -> SDoc
 vectCtxt name = ptext (sLit "When checking the vectorisation declaration for") <+> ppr name
+
+scalarTyConMustBeNullary :: Message
+scalarTyConMustBeNullary = ptext (sLit "VECTORISE SCALAR type constructor must be nullary")
 
 --------------
 -- If typechecking the binds fails, then return with each

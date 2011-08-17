@@ -1,17 +1,10 @@
+-- |Compute the representation type for data type constructors.
 
--- | Representation of Algebraic Data Types.
-module Vectorise.Type.Repr
-	( CompRepr	(..)
-	, ProdRepr	(..)
-	, ConRepr	(..)
-	, SumRepr	(..)
-	, tyConRepr
-	, sumReprType
-	, conReprType
-	, prodReprType
-	, compReprType
-	, compOrigType)
-where
+module Vectorise.Type.Repr ( 
+  CompRepr (..), ProdRepr (..), ConRepr (..), SumRepr (..),
+  tyConRepr, sumReprType, conReprType, prodReprType, compReprType, compOrigType
+) where
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
@@ -41,10 +34,12 @@ data SumRepr  = EmptySum
               | Sum  { repr_sum_tc   :: TyCon  -- representation sum tycon
                      , repr_psum_tc  :: TyCon  -- PData representation tycon
                      , repr_sel_ty   :: Type   -- type of selector
-                     , repr_con_tys :: [Type]  -- representation types of
+                     , repr_con_tys  :: [Type] -- representation types of
                      , repr_cons     :: [ConRepr]           -- components
                      }
 
+-- |Determine the representation type of a data type constructor.
+--
 tyConRepr :: TyCon -> VM SumRepr
 tyConRepr tc = sum_repr (tyConDataCons tc)
   where
@@ -102,9 +97,10 @@ prodReprType (Prod { repr_tup_tc = tup_tc, repr_comp_tys = tys })
 
 compReprType :: CompRepr -> VM Type
 compReprType (Keep ty _) = return ty
-compReprType (Wrap ty) = do
-                             wrap_tc <- builtin wrapTyCon
-                             return $ mkTyConApp wrap_tc [ty]
+compReprType (Wrap ty)
+  = do { wrap_tc <- builtin wrapTyCon
+       ; return $ mkTyConApp wrap_tc [ty]
+       }
 
 compOrigType :: CompRepr -> Type
 compOrigType (Keep ty _) = ty

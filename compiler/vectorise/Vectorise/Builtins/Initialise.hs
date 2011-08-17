@@ -1,3 +1,4 @@
+-- Set up the data structures provided by 'Vectorise.Builtins'.
 
 module Vectorise.Builtins.Initialise (
   -- * Initialisation
@@ -81,10 +82,10 @@ initBuiltins pkg
 
       -- From dph-common:Data.Array.Parallel.PArray.Types
       voidTyCon   <- externalTyCon        dph_PArray_Types  (fsLit "Void")
-      voidVar           <- externalVar          dph_PArray_Types  (fsLit "void")
-      fromVoidVar       <- externalVar          dph_PArray_Types  (fsLit "fromVoid")
+      voidVar     <- externalVar          dph_PArray_Types  (fsLit "void")
+      fromVoidVar <- externalVar          dph_PArray_Types  (fsLit "fromVoid")
       wrapTyCon   <- externalTyCon        dph_PArray_Types  (fsLit "Wrap")
-      sum_tcs   <- mapM (externalTyCon  dph_PArray_Types) (numbered "Sum" 2 mAX_DPH_SUM)
+      sum_tcs     <- mapM (externalTyCon  dph_PArray_Types) (numbered "Sum" 2 mAX_DPH_SUM)
 
       -- from dph-common:Data.Array.Parallel.PArray.PDataInstances
       pvoidVar          <- externalVar dph_PArray_PDataInstances  (fsLit "pvoid")
