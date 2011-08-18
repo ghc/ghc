@@ -4,6 +4,7 @@
 module Types ( Point, Line, points, xsOf, ysOf) where
 
 import Data.Array.Parallel
+import Data.Array.Parallel.Prelude.Double
 
 type Point = (Double, Double)
 type Line  = (Point, Point)
