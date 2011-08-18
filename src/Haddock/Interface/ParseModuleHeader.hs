@@ -59,7 +59,8 @@ parseModuleHeader dflags str0 =
             hmi_description = docOpt,
             hmi_portability = portabilityOpt,
             hmi_stability = stabilityOpt,
-            hmi_maintainer = maintainerOpt
+            hmi_maintainer = maintainerOpt,
+            hmi_safety = Nothing
             }, doc)
 
 -- | This function is how we read keys.

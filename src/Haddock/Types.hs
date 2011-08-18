@@ -330,6 +330,7 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_portability :: Maybe String
   , hmi_stability   :: Maybe String
   , hmi_maintainer  :: Maybe String
+  , hmi_safety      :: Maybe String
   }
 
 
@@ -339,6 +340,7 @@ emptyHaddockModInfo = HaddockModInfo
   , hmi_portability = Nothing
   , hmi_stability   = Nothing
   , hmi_maintainer  = Nothing
+  , hmi_safety      = Nothing
   }
 
 

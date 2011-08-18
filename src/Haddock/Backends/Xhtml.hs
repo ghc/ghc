@@ -200,7 +200,8 @@ moduleInfo iface =
       entries = mapMaybe doOneEntry [
          ("Portability",hmi_portability),
          ("Stability",hmi_stability),
-         ("Maintainer",hmi_maintainer)
+         ("Maintainer",hmi_maintainer),
+         ("Safe Haskell",hmi_safety)
          ]
    in
       case entries of
