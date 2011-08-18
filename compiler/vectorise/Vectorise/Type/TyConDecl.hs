@@ -1,6 +1,7 @@
-module Vectorise.Type.TyConDecl
-	(vectTyConDecls)
-where
+module Vectorise.Type.TyConDecl (
+  vectTyConDecls
+) where
+
 import Vectorise.Type.Type
 import Vectorise.Monad
 import BuildTyCl
@@ -16,13 +17,13 @@ import Util
 import Control.Monad
 
 
--- | Vectorise some (possibly recursively defined) type constructors.
+-- |Vectorise some (possibly recursively defined) type constructors.
+--
 vectTyConDecls :: [TyCon] -> VM [TyCon]
 vectTyConDecls tcs = fixV $ \tcs' ->
   do
     mapM_ (uncurry defTyCon) (zipLazy tcs tcs')
     mapM vectTyConDecl tcs
-
 
 -- | Vectorise a single type construcrtor.
 vectTyConDecl :: TyCon -> VM TyCon

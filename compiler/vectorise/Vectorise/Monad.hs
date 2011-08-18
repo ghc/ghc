@@ -45,7 +45,7 @@ import FastString
 import Control.Monad
 import VarSet
 
--- | Run a vectorisation computation.
+-- |Run a vectorisation computation.
 --
 initV :: HscEnv
       -> ModGuts
@@ -69,7 +69,6 @@ initV hsc_env guts info thing_inside
            ; builtin_vars    <- initBuiltinVars builtins
            ; builtin_tycons  <- initBuiltinTyCons builtins
            ; let builtin_datacons = initBuiltinDataCons builtins
-           ; builtin_boxed   <- initBuiltinBoxedTyCons builtins
 
                -- set up class and type family envrionments
            ; eps <- liftIO $ hscEPS hsc_env
@@ -85,7 +84,6 @@ initV hsc_env guts info thing_inside
                         . extendDataConsEnv   builtin_datacons
                         . extendPAFunsEnv     builtin_pas
                         . setPRFunsEnv        builtin_prs
-                        . setBoxedTyConsEnv   builtin_boxed
                         $ initGlobalEnv info (mg_vect_decls guts) instEnvs famInstEnvs
  
                -- perform vectorisation
@@ -95,7 +93,7 @@ initV hsc_env guts info thing_inside
                No           -> return Nothing
            } }
 
-    new_info genv = modVectInfo genv (mg_types guts) info
+    new_info genv = modVectInfo genv (mg_types guts) (mg_vect_decls guts) info
 
     selectBackendErr = sLit "To use -fvectorise select a DPH backend with -fdph-par or -fdph-seq"
 

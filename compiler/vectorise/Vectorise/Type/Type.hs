@@ -1,9 +1,11 @@
+-- Apply the vectorisation transformation to types. This is the \mathcal{L}_t scheme in HtM.
 
-module Vectorise.Type.Type
-	( vectTyCon
-	, vectAndLiftType
-	, vectType)
-where
+module Vectorise.Type.Type (
+  vectTyCon,
+  vectAndLiftType,
+  vectType
+) where
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
@@ -15,8 +17,8 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 
-
 -- | Vectorise a type constructor.
+--
 vectTyCon :: TyCon -> VM TyCon
 vectTyCon tc
   | isFunTyCon tc        = builtin closureTyCon
@@ -24,10 +26,10 @@ vectTyCon tc
   | isUnLiftedTyCon tc   = return tc
   | otherwise            
   = maybeCantVectoriseM "Tycon not vectorised: " (ppr tc)
-	$ lookupTyCon tc
+  $ lookupTyCon tc
 
-
--- | Produce the vectorised and lifted versions of a type.
+-- |Produce the vectorised and lifted versions of a type.
+--
 vectAndLiftType :: Type -> VM (Type, Type)
 vectAndLiftType ty | Just ty' <- coreView ty = vectAndLiftType ty'
 vectAndLiftType ty
@@ -41,18 +43,17 @@ vectAndLiftType ty
   where
     (tyvars, mono_ty) = splitForAllTys ty
 
-
--- | Vectorise a type.
+-- |Vectorise a type.
+--
 vectType :: Type -> VM Type
 vectType ty
-	| Just ty'	<- coreView ty
-	= vectType ty'
-	
-vectType (TyVarTy tv) 		= return $ TyVarTy tv
-vectType (AppTy ty1 ty2) 	= liftM2 AppTy    (vectType ty1) (vectType ty2)
-vectType (TyConApp tc tys) 	= liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
-vectType (FunTy ty1 ty2)   	= liftM2 TyConApp (builtin closureTyCon)
-                                             	  (mapM vectAndBoxType [ty1,ty2])
+  | Just ty'  <- coreView ty
+  = vectType ty'
+  
+vectType (TyVarTy tv)      = return $ TyVarTy tv
+vectType (AppTy ty1 ty2)   = liftM2 AppTy    (vectType ty1) (vectType ty2)
+vectType (TyConApp tc tys) = liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
+vectType (FunTy ty1 ty2)   = liftM2 TyConApp (builtin closureTyCon) (mapM vectType [ty1,ty2])
 
 -- For each quantified var we need to add a PA dictionary out the front of the type.
 -- So          forall a. C  a => a -> a   
@@ -82,28 +83,7 @@ vectType ty@(ForAllTy _ _)
 
 vectType ty = cantVectorise "Can't vectorise type" (ppr ty)
 
-
--- | Add quantified vars and dictionary parameters to the front of a type.
+-- |Add quantified vars and dictionary parameters to the front of a type.
+--
 abstractType :: [TyVar] -> [Type] -> Type -> Type
 abstractType tyvars dicts = mkForAllTys tyvars . mkFunTys dicts
-
-
--- | Create the boxed version of a vectorised type.
-vectAndBoxType :: Type -> VM Type
-vectAndBoxType ty = vectType ty >>= boxType
-
-
--- | Create the boxed version of a type.
-boxType :: Type -> VM Type
-boxType ty
-  | Just (tycon, []) <- splitTyConApp_maybe ty
-  , isUnLiftedTyCon tycon
-  = do
-      r <- lookupBoxedTyCon tycon
-      case r of
-        Just tycon' -> return $ mkTyConApp tycon' []
-        Nothing     -> return ty
-
-  | otherwise	= return ty
-
-

@@ -1816,6 +1816,10 @@ on just the OccName easily in a Core pass.
 \begin{code}
 -- |Vectorisation information for 'ModGuts', 'ModDetails' and 'ExternalPackageState'; see also
 -- documentation at 'Vectorise.Env.GlobalEnv'.
+--
+-- NB: The following tables may also include 'Var's, 'TyCon's and 'DataCon's from imported modules,
+--     which have been subsequently vectorised in the current module.
+--
 data VectInfo      
   = VectInfo
     { vectInfoVar          :: VarEnv  (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@

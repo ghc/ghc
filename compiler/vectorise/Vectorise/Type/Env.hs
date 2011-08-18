@@ -53,7 +53,7 @@ import Data.List
 -- (1) Data type constructor 'T' that may be used in vectorised code, where 'T' represents itself,
 --     but the representation of 'T' is opaque in vectorised code.  
 --
---     An example is the treatment of Int'.  'Int's can be used in vectorised code and remain
+--     An example is the treatment of 'Int'.  'Int's can be used in vectorised code and remain
 --     unchanged by vectorisation.  However, the representation of 'Int' by the 'I#' data
 --     constructor wrapping an 'Int#' is not exposed in vectorised code.  Instead, computations
 --     involving the representation need to be confined to scalar code.
@@ -64,7 +64,8 @@ import Data.List
 --     Type constructors declared with {-# VECTORISE SCALAR type T #-} are treated in this manner.
 --     (The vectoriser never treats a type constructor automatically in this manner.)
 --
--- (2) Data type constructor 'T' that together with its constructors 'Cn' may be used in vectorised
+-- (2) [NOT FULLY IMPLEMENTED YET]
+--     Data type constructor 'T' that together with its constructors 'Cn' may be used in vectorised
 --     code, where 'T' and the 'Cn' represent themselves in vectorised code.
 --
 --     An example is the treatment of 'Bool'.  'Bool' together with 'False' and 'True' may appear in
@@ -121,6 +122,10 @@ vectTypeEnv env vectTypeDecls
              keep_dcs               = concatMap tyConDataCons keep_tcs
              
              keep_and_scalar_tcs    = keep_tcs ++ localScalarTyCons
+
+       ; traceVt " declared SCALAR: " $ ppr localScalarTyCons
+       ; traceVt " reuse          : " $ ppr keep_tcs
+       ; traceVt " convert        : " $ ppr conv_tcs
 
            -- Of those type constructors that we don't need to vectorise, we use the original
            -- representation in both unvectorised and vectorised code.  For those declared VECTORISE

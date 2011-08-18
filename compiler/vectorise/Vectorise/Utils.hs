@@ -1,4 +1,3 @@
-
 module Vectorise.Utils (
   module Vectorise.Utils.Base,
   module Vectorise.Utils.Closure,
@@ -21,8 +20,8 @@ module Vectorise.Utils (
 
   -- * Naming
   newLocalVar
-) 
-where
+) where
+
 import Vectorise.Utils.Base
 import Vectorise.Utils.Closure
 import Vectorise.Utils.Hoisting
@@ -37,6 +36,7 @@ import Control.Monad
 
 
 -- Annotated Exprs ------------------------------------------------------------
+
 collectAnnTypeArgs :: AnnExpr b ann -> (AnnExpr b ann, [Type])
 collectAnnTypeArgs expr = go expr []
   where
@@ -69,58 +69,52 @@ isAnnTypeArg _              = False
 --   in dph-common/D.A.P.Lifted/PArray.hs
 --
 
--- | An empty array of the given type.
+-- |An empty array of the given type.
+--
 emptyPD :: Type -> VM CoreExpr
 emptyPD = paMethod emptyPDVar "emptyPD"
 
-
--- | Produce an array containing copies of a given element.
-replicatePD
-	:: CoreExpr	-- ^ Number of copies in the resulting array.
-	-> CoreExpr	-- ^ Value to replicate.
-	-> VM CoreExpr
-
+-- |Produce an array containing copies of a given element.
+--
+replicatePD :: CoreExpr -- ^ Number of copies in the resulting array.
+            -> CoreExpr -- ^ Value to replicate.
+            -> VM CoreExpr
 replicatePD len x 
-	= liftM (`mkApps` [len,x])
+  = liftM (`mkApps` [len,x])
         $ paMethod replicatePDVar "replicatePD" (exprType x)
-
 
 -- | Select some elements from an array that correspond to a particular tag value
 ---  and pack them into a new array.
 --   eg  packByTagPD Int# [:23, 42, 95, 50, 27, 49:]  3 [:1, 2, 1, 2, 3, 2:] 2 
 --          ==> [:42, 50, 49:]
 --
-packByTagPD 
-	:: Type		-- ^ Element type.
-	-> CoreExpr	-- ^ Source array.
-	-> CoreExpr	-- ^ Length of resulting array.
-	-> CoreExpr	-- ^ Tag values of elements in source array.
-	-> CoreExpr	-- ^ The tag value for the elements to select.
-	-> VM CoreExpr
-
+packByTagPD :: Type   -- ^ Element type.
+            -> CoreExpr -- ^ Source array.
+            -> CoreExpr -- ^ Length of resulting array.
+            -> CoreExpr -- ^ Tag values of elements in source array.
+            -> CoreExpr -- ^ The tag value for the elements to select.
+            -> VM CoreExpr
 packByTagPD ty xs len tags t
   = liftM (`mkApps` [xs, len, tags, t])
           (paMethod packByTagPDVar "packByTagPD" ty)
 
-
 -- | Combine some arrays based on a selector.
 --     The selector says which source array to choose for each element of the
 --     resulting array.
-combinePD 
-	:: Type		-- ^ Element type
-	-> CoreExpr	-- ^ Length of resulting array
-	-> CoreExpr	-- ^ Selector.
-	-> [CoreExpr]	-- ^ Arrays to combine.
-	-> VM CoreExpr
-
+--
+combinePD :: Type   -- ^ Element type
+          -> CoreExpr -- ^ Length of resulting array
+          -> CoreExpr -- ^ Selector.
+          -> [CoreExpr] -- ^ Arrays to combine.
+          -> VM CoreExpr
 combinePD ty len sel xs
   = liftM (`mkApps` (len : sel : xs))
           (paMethod (combinePDVar n) ("combine" ++ show n ++ "PD") ty)
   where
     n = length xs
 
-
--- | Like `replicatePD` but use the lifting context in the vectoriser state.
+-- |Like `replicatePD` but use the lifting context in the vectoriser state.
+--
 liftPD :: CoreExpr -> VM CoreExpr
 liftPD x
   = do
@@ -129,6 +123,7 @@ liftPD x
 
 
 -- Scalars --------------------------------------------------------------------
+
 zipScalars :: [Type] -> Type -> VM CoreExpr
 zipScalars arg_tys res_ty
   = do
@@ -139,7 +134,6 @@ zipScalars arg_tys res_ty
     where
       ty_args = arg_tys ++ [res_ty]
 
-
 scalarClosure :: [Type] -> Type -> CoreExpr -> CoreExpr -> VM CoreExpr
 scalarClosure arg_tys res_ty scalar_fun array_fun
   = do
@@ -147,19 +141,3 @@ scalarClosure arg_tys res_ty scalar_fun array_fun
       pas <- mapM paDictOfType (init arg_tys)
       return $ Var ctr `mkTyApps` (arg_tys ++ [res_ty])
                        `mkApps`   (pas ++ [scalar_fun, array_fun])
-
-
-
-{-
-boxExpr :: Type -> VExpr -> VM VExpr
-boxExpr ty (vexpr, lexpr)
-  | Just (tycon, []) <- splitTyConApp_maybe ty
-  , isUnLiftedTyCon tycon
-  = do
-      r <- lookupBoxedTyCon tycon
-      case r of
-        Just tycon' -> let [dc] = tyConDataCons tycon'
-                       in
-                       return (mkConApp dc [vexpr], lexpr)
-        Nothing     -> return (vexpr, lexpr)
--}

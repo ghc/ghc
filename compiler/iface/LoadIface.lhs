@@ -668,19 +668,18 @@ pprModIface iface
 	, vcat (map pprUsage (mi_usages iface))
 	, vcat (map pprIfaceAnnotation (mi_anns iface))
 	, pprFixities (mi_fixities iface)
-	, vcat (map pprIfaceDecl (mi_decls iface))
-	, vcat (map ppr (mi_insts iface))
-	, vcat (map ppr (mi_fam_insts iface))
-	, vcat (map ppr (mi_rules iface))
+        , vcat (map pprIfaceDecl (mi_decls iface))
+        , vcat (map ppr (mi_insts iface))
+        , vcat (map ppr (mi_fam_insts iface))
+        , vcat (map ppr (mi_rules iface))
         , pprVectInfo (mi_vect_info iface)
-        , pprVectInfo (mi_vect_info iface)
-	, ppr (mi_warns iface)
-	, pprTrustInfo (mi_trust iface)
-	, pprTrustPkg (mi_trust_pkg iface)
- 	]
+        , ppr (mi_warns iface)
+        , pprTrustInfo (mi_trust iface)
+        , pprTrustPkg (mi_trust_pkg iface)
+        ]
   where
     pp_boot | mi_boot iface = ptext (sLit "[boot]")
-	    | otherwise     = empty
+            | otherwise     = empty
 \end{code}
 
 When printing export lists, we print like this:

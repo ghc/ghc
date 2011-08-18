@@ -15,7 +15,7 @@ module Vectorise.Monad.Global (
   globalScalarVars, isGlobalScalar, globalScalarTyCons,
   
   -- * TyCons
-  lookupTyCon, lookupBoxedTyCon,
+  lookupTyCon,
   defTyCon, globalVectTyCons,
   
   -- * Datacons
@@ -118,13 +118,6 @@ lookupTyCon tc
   = return (Just tc)
   | otherwise 
   = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
-
--- |Lookup the vectorised version of a boxed `TyCon` from the global environment.
---
-lookupBoxedTyCon :: TyCon -> VM (Maybe TyCon)
-lookupBoxedTyCon tc 
-  = readGEnv $ \env -> lookupNameEnv (global_boxed_tycons env)
-                                     (tyConName tc)
 
 -- |Add a mapping between plain and vectorised `TyCon`s to the global environment.
 --

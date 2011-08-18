@@ -25,7 +25,6 @@ module Vectorise.Builtins (
   -- * Initialisation
   initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
-  initBuiltinBoxedTyCons,
   
   -- * Lookup
   primMethod,

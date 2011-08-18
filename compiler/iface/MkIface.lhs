@@ -548,12 +548,13 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - export list
    --   - orphans
    --   - deprecations
-   --   - XXX vect info?
+   --   - vect info
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,
                        orphan_hash,
-                       mi_warns iface0)
+                       mi_warns iface0,
+                       mi_vect_info iface0)
 
    -- The interface hash depends on:
    --    - the ABI hash, plus

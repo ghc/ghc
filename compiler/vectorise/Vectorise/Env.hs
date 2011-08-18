@@ -1,4 +1,3 @@
-
 module Vectorise.Env (
   Scope(..),
 
@@ -16,7 +15,6 @@ module Vectorise.Env (
   extendDataConsEnv,
   extendPAFunsEnv,
   setPRFunsEnv,
-  setBoxedTyConsEnv,
   modVectInfo
 ) where
 
@@ -116,9 +114,6 @@ data GlobalEnv
         , global_pr_funs              :: NameEnv Var
           -- ^Mapping from TyCons to their PR dfuns.
 
-        , global_boxed_tycons         :: NameEnv TyCon
-          -- ^Mapping from unboxed TyCons to their boxed versions.
-
         , global_inst_env             :: (InstEnv, InstEnv)
           -- ^External package inst-env & home-package inst-env for class instances.
 
@@ -144,7 +139,6 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   , global_datacons             = mapNameEnv snd $ vectInfoDataCon info
   , global_pa_funs              = mapNameEnv snd $ vectInfoPADFun info
   , global_pr_funs              = emptyNameEnv
-  , global_boxed_tycons         = emptyNameEnv
   , global_inst_env             = instEnvs
   , global_fam_inst_env         = famInstEnvs
   , global_bindings             = []
@@ -202,29 +196,29 @@ setPRFunsEnv :: [(Name, Var)] -> GlobalEnv -> GlobalEnv
 setPRFunsEnv ps genv
   = genv { global_pr_funs = mkNameEnv ps }
 
--- |Set the list of boxed type constructor in an environment.
---
-setBoxedTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
-setBoxedTyConsEnv ps genv
-  = genv { global_boxed_tycons = mkNameEnv ps }
-
 -- |Compute vectorisation information that goes into 'ModGuts' (and is stored in interface files).
 -- The incoming 'vectInfo' is that from the 'HscEnv' and 'EPS'.  The outgoing one contains only the
--- definitions for the currently compiled module.
+-- definitions for the currently compiled module; this includes variables, type constructors, and
+-- data constructors referenced in VECTORISE pragmas.
 --
-modVectInfo :: GlobalEnv -> TypeEnv -> VectInfo -> VectInfo
-modVectInfo env tyenv info
+modVectInfo :: GlobalEnv -> TypeEnv -> [CoreVect]-> VectInfo -> VectInfo
+modVectInfo env tyenv vectDecls info
   = info 
     { vectInfoVar          = global_exported_vars env
-    , vectInfoTyCon        = mk_env typeEnvTyCons   global_tycons
-    , vectInfoDataCon      = mk_env typeEnvDataCons global_datacons
-    , vectInfoPADFun       = mk_env typeEnvTyCons   global_pa_funs
+    , vectInfoTyCon        = mk_env tyCons   (global_tycons   env)
+    , vectInfoDataCon      = mk_env dataCons (global_datacons env)
+    , vectInfoPADFun       = mk_env tyCons   (global_pa_funs  env)
     , vectInfoScalarVars   = global_scalar_vars   env `minusVarSet`  vectInfoScalarVars   info
     , vectInfoScalarTyCons = global_scalar_tycons env `minusNameSet` vectInfoScalarTyCons info
     }
   where
-    mk_env from_tyenv from_env 
-      = mkNameEnv [(name, (from,to))
-                  | from     <- from_tyenv tyenv
-                  , let name =  getName from
-                  , Just to  <- [lookupNameEnv (from_env env) name]]
+    vectTypeTyCons = [tycon | VectType tycon _ <- vectDecls]
+    tyCons         = typeEnvTyCons   tyenv ++ vectTypeTyCons
+    dataCons       = typeEnvDataCons tyenv ++ concatMap tyConDataCons vectTypeTyCons
+    
+    -- Produce an entry for every declaration that is mentioned in the domain of the 'inspectedEnv'
+    mk_env decls inspectedEnv
+      = mkNameEnv [(name, (decl, to))
+                  | decl     <- decls
+                  , let name = getName decl
+                  , Just to  <- [lookupNameEnv inspectedEnv name]]

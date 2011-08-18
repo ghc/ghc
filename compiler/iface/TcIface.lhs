@@ -705,57 +705,72 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                              , ifaceVectInfoScalarVars   = scalarVars
                              , ifaceVectInfoScalarTyCons = scalarTyCons
                              })
-  = do { vVars     <- mapM vectVarMapping vars
-       ; tyConRes1 <- mapM vectTyConMapping      tycons
-       ; tyConRes2 <- mapM vectTyConReuseMapping tyconsReuse
+  = do { let scalarTyConsSet = mkNameSet scalarTyCons
+       ; vVars     <- mapM vectVarMapping                          vars
+       ; tyConRes1 <- mapM vectTyConMapping                        tycons
+       ; tyConRes2 <- mapM (vectTyConReuseMapping scalarTyConsSet) tyconsReuse
        ; let (vTyCons, vDataCons, vPAs, vIsos) = unzip4 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
-                  { vectInfoVar          = mkVarEnv     vVars
-                  , vectInfoTyCon        = mkNameEnv    vTyCons
-                  , vectInfoDataCon      = mkNameEnv    (concat vDataCons)
-                  , vectInfoPADFun       = mkNameEnv    vPAs
-                  , vectInfoIso          = mkNameEnv    vIsos
+                  { vectInfoVar          = mkVarEnv  vVars
+                  , vectInfoTyCon        = mkNameEnv vTyCons
+                  , vectInfoDataCon      = mkNameEnv (concat vDataCons)
+                  , vectInfoPADFun       = mkNameEnv (catMaybes vPAs)
+                  , vectInfoIso          = mkNameEnv (catMaybes vIsos)
                   , vectInfoScalarVars   = mkVarSet  (map lookupVar scalarVars)
-                  , vectInfoScalarTyCons = mkNameSet scalarTyCons
+                  , vectInfoScalarTyCons = scalarTyConsSet
                   }
        }
   where
     vectVarMapping name 
       = do { vName <- lookupOrig mod (mkVectOcc (nameOccName name))
-           ; let { var  = lookupVar name
-                 ; vVar = lookupVar vName
-                 }
+           ; var  <- forkM (text ("vect var")  <+> ppr name)  $
+                     tcIfaceExtId name
+           ; vVar <- forkM (text ("vect vVar") <+> ppr vName) $
+                     tcIfaceExtId vName
            ; return (var, (var, vVar))
            }
     vectTyConMapping name 
       = do { vName   <- lookupOrig mod (mkVectTyConOcc (nameOccName name))
            ; paName  <- lookupOrig mod (mkPADFunOcc    (nameOccName name))
            ; isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
+           -- FIXME: we will need to use tcIfaceTyCon/tcIfaceExtId on some of these (but depends
+           --   on how we exactly define the 'VECTORISE type' pragma to work)
            ; let { tycon    = lookupTyCon name
                  ; vTycon   = lookupTyCon vName
                  ; paTycon  = lookupVar paName
                  ; isoTycon = lookupVar isoName
                  }
            ; vDataCons <- mapM vectDataConMapping (tyConDataCons tycon)
-           ; return ((name, (tycon, vTycon)),    -- (T, T_v)
-                     vDataCons,                  -- list of (Ci, Ci_v)
-                     (vName, (vTycon, paTycon)), -- (T_v, paT)
-                     (name, (tycon, isoTycon)))  -- (T, isoT)
+           ; return ( (name, (tycon, vTycon))          -- (T, T_v)
+                    , vDataCons                        -- list of (Ci, Ci_v)
+                    , Just (vName, (vTycon, paTycon))  -- (T_v, paT)
+                    , Just (name, (tycon, isoTycon))   -- (T, isoT)
+                    )
            }
-    vectTyConReuseMapping name 
-      = do { paName  <- lookupOrig mod (mkPADFunOcc    (nameOccName name))
-           ; isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
-           ; let { tycon      = lookupTyCon name
-                 ; paTycon    = lookupVar paName
+    vectTyConReuseMapping scalarNames name 
+      = do { paName  <- lookupOrig mod (mkPADFunOcc  (nameOccName name))
+           ; isoName <- lookupOrig mod (mkVectIsoOcc (nameOccName name))
+           ; tycon <- forkM (text ("vect reuse tycon") <+> ppr name) $
+                      tcIfaceTyCon (IfaceTc name) -- somewhat naughty for wired in tycons, but ok
+           ; if name `elemNameSet` scalarNames
+             then do
+           { return ( (name, (tycon, tycon))      -- scalar type constructors expose no data...
+                    , []                          -- ...constructors and have no PA and ISO vars...
+                    , Nothing                     -- ...see "Note [Pragmas to vectorise tycons]" in..
+                    , Nothing                     -- ...'Vectorise.Type.Env'
+                    )
+           } else do 
+           { let { paTycon    = lookupVar paName
                  ; isoTycon   = lookupVar isoName
                  ; vDataCons  = [ (dataConName dc, (dc, dc)) 
                                 | dc <- tyConDataCons tycon]
                  }
-           ; return ((name, (tycon, tycon)),     -- (T, T)
-                     vDataCons,                  -- list of (Ci, Ci)
-                     (name, (tycon, paTycon)),   -- (T, paT)
-                     (name, (tycon, isoTycon)))  -- (T, isoT)
-           }
+           ; return ( (name, (tycon, tycon))          -- (T, T)
+                    , vDataCons                       -- list of (Ci, Ci)
+                    , Just (name, (tycon, paTycon))   -- (T, paT)
+                    , Just (name, (tycon, isoTycon))  -- (T, isoT)
+                    )
+           }}
     vectDataConMapping datacon
       = do { let name = dataConName datacon
            ; vName <- lookupOrig mod (mkVectDataConOcc (nameOccName name))
@@ -766,21 +781,21 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
     lookupVar name = case lookupTypeEnv typeEnv name of
                        Just (AnId var) -> var
                        Just _         -> 
-                         panic "TcIface.tcIfaceVectInfo: not an id"
+                         pprPanic "TcIface.tcIfaceVectInfo: not an id" (ppr name)
                        Nothing        ->
-                         panic "TcIface.tcIfaceVectInfo: unknown name"
+                         pprPanic "TcIface.tcIfaceVectInfo: unknown name of id" (ppr name)
     lookupTyCon name = case lookupTypeEnv typeEnv name of
                          Just (ATyCon tc) -> tc
                          Just _         -> 
-                           panic "TcIface.tcIfaceVectInfo: not a tycon"
+                           pprPanic "TcIface.tcIfaceVectInfo: not a tycon" (ppr name)
                          Nothing        ->
-                           panic "TcIface.tcIfaceVectInfo: unknown name"
+                           pprPanic "TcIface.tcIfaceVectInfo: unknown name of tycon" (ppr name)
     lookupDataCon name = case lookupTypeEnv typeEnv name of
                            Just (ADataCon dc) -> dc
                            Just _         -> 
-                             panic "TcIface.tcIfaceVectInfo: not a datacon"
+                             pprPanic "TcIface.tcIfaceVectInfo: not a datacon" (ppr name)
                            Nothing        ->
-                             panic "TcIface.tcIfaceVectInfo: unknown name"
+                             pprPanic "TcIface.tcIfaceVectInfo: unknown name of datacon" (ppr name)
 \end{code}
 
 %************************************************************************

@@ -331,20 +331,20 @@ tidyProgram hsc_env  (ModGuts { mg_module = mod, mg_exports = exports,
 		-- we want Global, IdInfo-rich (or not) DFunId in the
 		-- tidy_insts
 
-	      ; tidy_rules = tidyRules tidy_env ext_rules
-		-- You might worry that the tidy_env contains IdInfo-rich stuff
-		-- and indeed it does, but if omit_prags is on, ext_rules is
-		-- empty
+              ; tidy_rules = tidyRules tidy_env ext_rules
+                -- You might worry that the tidy_env contains IdInfo-rich stuff
+                -- and indeed it does, but if omit_prags is on, ext_rules is
+                -- empty
 
               ; tidy_vect_info = tidyVectInfo tidy_env vect_info
 
-	      -- See Note [Injecting implicit bindings]
-    	      ; all_tidy_binds = implicit_binds ++ tidy_binds
+              -- See Note [Injecting implicit bindings]
+              ; all_tidy_binds = implicit_binds ++ tidy_binds
 
-	      ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
-	      }
+              ; alg_tycons = filter isAlgTyCon (typeEnvTyCons type_env)
+              }
 
-   	; endPass dflags CoreTidy all_tidy_binds tidy_rules
+        ; endPass dflags CoreTidy all_tidy_binds tidy_rules
 
 	  -- If the endPass didn't print the rules, but ddump-rules is on, print now
 	; dumpIfSet (dopt Opt_D_dump_rules dflags 

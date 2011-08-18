@@ -686,7 +686,7 @@ tcVect (HsNoVect name)
 tcVect (HsVectTypeIn lname@(L _ name) ty)
   = addErrCtxt (vectCtxt lname) $
     do { tycon <- tcLookupTyCon name
-       ; checkTc (tyConArity tycon /= 0) scalarTyConMustBeNullary
+       ; checkTc (tyConArity tycon == 0) scalarTyConMustBeNullary
 
        ; ty' <- fmapMaybeM dsHsType ty
        ; return $ HsVectTypeOut tycon ty'

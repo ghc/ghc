@@ -61,6 +61,7 @@ import HsTypes
 import HsDoc
 import TyCon
 import NameSet
+import Name
 import {- Kind parts of -} Type
 import BasicTypes
 import ForeignCall
@@ -1048,11 +1049,11 @@ data VectDecl name
       (Maybe Type)              -- 'Nothing' => SCALAR declaration
   deriving (Data, Typeable)
 
-lvectDeclName :: Outputable name => LVectDecl name -> name
-lvectDeclName (L _ (HsVect        (L _ name) _)) = name
-lvectDeclName (L _ (HsNoVect      (L _ name)))   = name
-lvectDeclName (L _ (HsVectTypeIn  (L _ name) _)) = name
-lvectDeclName (L _ (HsVectTypeOut name _))       = pprPanic "HsDecls.HsVectTypeOut" (ppr name)
+lvectDeclName :: NamedThing name => LVectDecl name -> Name
+lvectDeclName (L _ (HsVect        (L _ name) _)) = getName name
+lvectDeclName (L _ (HsNoVect      (L _ name)))   = getName name
+lvectDeclName (L _ (HsVectTypeIn  (L _ name) _)) = getName name
+lvectDeclName (L _ (HsVectTypeOut tycon _))      = getName tycon
 
 instance OutputableBndr name => Outputable (VectDecl name) where
   ppr (HsVect v Nothing)
