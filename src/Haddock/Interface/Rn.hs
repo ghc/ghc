@@ -9,8 +9,9 @@ import Name        ( Name )
 import Outputable  ( ppr, showSDoc )
 
 rnHaddockModInfo :: GlobalRdrEnv -> HaddockModInfo RdrName -> HaddockModInfo Name
-rnHaddockModInfo gre (HaddockModInfo desc port stab maint) =
-  HaddockModInfo (fmap (rnDoc gre) desc) port stab maint
+rnHaddockModInfo gre hmod =
+  let desc = hmi_description hmod
+  in hmod { hmi_description = fmap (rnDoc gre) desc }
 
 ids2string :: [RdrName] -> String
 ids2string []    = []

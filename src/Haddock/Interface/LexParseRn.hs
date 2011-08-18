@@ -25,6 +25,7 @@ import Haddock.Doc
 import Data.Maybe
 import FastString
 import GHC
+import Outputable ( showPpr )
 import RdrName
 
 data HaddockCommentType = NormalHaddockComment | DocSectionComment
@@ -59,14 +60,18 @@ lexParseRnMbHaddockComment dflags hty gre (Just d) = lexParseRnHaddockComment df
 -- yes, you always get a HaddockModInfo though it might be empty
 lexParseRnHaddockModHeader :: DynFlags -> GlobalRdrEnv -> GhcDocHdr -> ErrMsgM (HaddockModInfo Name, Maybe (Doc Name))
 lexParseRnHaddockModHeader dflags gre mbStr = do
-  let failure = (emptyHaddockModInfo, Nothing)
-  case mbStr of
-    Nothing -> return failure
-    Just (L _ (HsDocString fs)) -> do
-      let str = unpackFS fs
-      case parseModuleHeader dflags str of
-        Left mess -> do
-          tell ["haddock module header parse failed: " ++ mess]
-          return failure
-        Right (info, doc) ->
-          return (rnHaddockModInfo gre info, Just (rnDoc gre doc))
+    (hmod, docn) <- case mbStr of
+          Nothing -> return failure
+          Just (L _ (HsDocString fs)) -> do
+            let str = unpackFS fs
+            case parseModuleHeader dflags str of
+              Left mess -> do
+                tell ["haddock module header parse failed: " ++ mess]
+                return failure
+              Right (info, doc) ->
+                return (rnHaddockModInfo gre info, Just (rnDoc gre doc))
+    return (hmod { hmi_safety = safety }, docn)
+
+  where
+    safety  = Just $ showPpr $ safeHaskell dflags
+    failure = (emptyHaddockModInfo, Nothing)

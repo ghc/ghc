@@ -511,13 +511,15 @@ instance Binary name => Binary (HaddockModInfo name) where
     put_ bh (hmi_portability hmi)
     put_ bh (hmi_stability   hmi)
     put_ bh (hmi_maintainer  hmi)
+    put_ bh (hmi_safety      hmi)
 
   get bh = do
     descr <- get bh
     porta <- get bh
     stabi <- get bh
     maint <- get bh
-    return (HaddockModInfo descr porta stabi maint)
+    safet <- get bh
+    return (HaddockModInfo descr porta stabi maint safet)
 
 
 instance Binary DocName where
