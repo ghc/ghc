@@ -34,7 +34,7 @@ import Packages
 -- import PackageConfig
 import UniqFM
 
-import HscTypes ( handleFlagWarnings, getSafeMode )
+import HscTypes ( handleFlagWarnings, getSafeMode, dep_pkgs )
 import HsImpExp
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import RdrName (RdrName)
@@ -1327,37 +1327,54 @@ runScript filename = do
 
 isSafeCmd :: String -> InputT GHCi ()
 isSafeCmd m = 
-  case words m of
-    [s] | looksLikeModuleName s -> do
-        m <- lift $ lookupModule s
-        isSafeModule m
-    [] -> do m <- guessCurrentModule
-             isSafeModule m
-    _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
+    case words m of
+        [s] | looksLikeModuleName s -> do
+            m <- lift $ lookupModule s
+            isSafeModule m
+        [] -> do m <- guessCurrentModule
+                 isSafeModule m
+        _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
 
 isSafeModule :: Module -> InputT GHCi ()
 isSafeModule m = do
-  mb_mod_info <- GHC.getModuleInfo m
-  case mb_mod_info of
-    Nothing -> ghcError $ CmdLineError ("unknown module: " ++
-                                GHC.moduleNameString (GHC.moduleName m))
-    Just mi -> do
-        dflags <- getDynFlags
-        let iface = GHC.modInfoIface mi
-        case iface of
-             Just iface' -> do
-                 let trust = showPpr $ getSafeMode $ GHC.mi_trust iface'
-                     pkg   = if packageTrusted dflags m then "trusted" else "untrusted"
-                 liftIO $ putStrLn $ "Trust type is (Module: " ++ trust
-                                               ++ ", Package: " ++ pkg ++ ")"
-             Nothing -> ghcError $ CmdLineError ("can't load interface file for module: " ++
-                                            GHC.moduleNameString (GHC.moduleName m))
+    mb_mod_info <- GHC.getModuleInfo m
+    when (isNothing mb_mod_info)
+         (ghcError $ CmdLineError $ "unknown module: " ++ mname)
+
+    dflags <- getDynFlags
+    let iface = GHC.modInfoIface $ fromJust mb_mod_info
+    when (isNothing iface)
+         (ghcError $ CmdLineError $ "can't load interface file for module: " ++
+                                    (GHC.moduleNameString $ GHC.moduleName m))
+
+    let iface' = fromJust iface
+        trust  = showPpr $ getSafeMode $ GHC.mi_trust iface'
+        pkg    = if packageTrusted dflags m then "trusted" else "untrusted"
+        (good, bad) = tallyPkgs dflags $
+                        map fst $ filter snd $ dep_pkgs $ GHC.mi_deps iface'
+
+    liftIO $ putStrLn $ "Trust type is (Module: " ++ trust ++ ", Package: " ++ pkg ++ ")"
+    when (not $ null good)
+         (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
+                        (intercalate ", " $ map packageIdString good))
+    if (null bad)
+        then liftIO $ putStrLn $ mname ++ " is trusted!"
+        else do
+            liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
+                        ++ (intercalate ", " $ map packageIdString bad)
+            liftIO $ putStrLn $ mname ++ " is NOT trusted!")
+
   where
-    packageTrusted :: DynFlags -> Module -> Bool
+    mname = GHC.moduleNameString $ GHC.moduleName m
+
     packageTrusted dflags m
         | thisPackage dflags == modulePackageId m = True
         | otherwise = trusted $ getPackageDetails (pkgState dflags)
                                                   (modulePackageId m)
+
+    tallyPkgs dflags deps = partition part deps
+        where state = pkgState dflags
+              part pkg = trusted $ getPackageDetails state pkg
 
 
 -----------------------------------------------------------------------------
