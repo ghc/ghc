@@ -15,51 +15,48 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 #include "HsVersions.h"
 
 import qualified GhciMonad
-import GhciMonad hiding (runStmt)
+import GhciMonad hiding ( runStmt )
 import GhciTags
 import Debugger
 
 -- The GHC interface
-import qualified GHC hiding (resume, runStmt)
-import GHC              ( LoadHowMuch(..), Target(..),  TargetId(..),
-                          InteractiveImport(..), TyThing(..), Phase,
-                          BreakIndex, Resume, SingleStep,
-                          Ghc, handleSourceError )
+import qualified GHC
+import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
+             TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
+             handleSourceError )
 import PprTyThing
 import DynFlags
 import qualified Lexer
 import StringBuffer
 
 import Packages
--- import PackageConfig
 import UniqFM
 
 import HscTypes ( handleFlagWarnings, getSafeMode, dep_pkgs )
 import HsImpExp
-import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
-import RdrName (RdrName)
-import Outputable       hiding (printForUser, printForUserPartWay, bold)
-import Module           -- for ModuleEnv
+import RdrName ( RdrName, getGRE_NameQualifier_maybes )
+import Outputable hiding ( printForUser, printForUserPartWay, bold )
+import Module
 import Name
 import SrcLoc
 
 -- Other random utilities
 import Digraph
-import BasicTypes hiding (isTopLevel)
-import Panic      hiding (showException)
+import BasicTypes hiding ( isTopLevel )
+import Panic hiding ( showException )
 import Config
 import StaticFlags
 import Linker
 import Util
 import NameSet
-import Maybes		( orElse, expectJust )
-import ListSetOps( removeRedundant )
+import Maybes ( orElse, expectJust )
+import ListSetOps ( removeRedundant )
 import FastString
 import Encoding
 import Foreign.C
 
 #ifndef mingw32_HOST_OS
-import System.Posix hiding (getEnv)
+import System.Posix hiding ( getEnv )
 #else
 import qualified System.Win32
 #endif
@@ -68,11 +65,7 @@ import System.Console.Haskeline as Haskeline
 import qualified System.Console.Haskeline.Encoding as Encoding
 import Control.Monad.Trans
 
---import SystemExts
-
 import Exception hiding (catch, block, unblock)
-
--- import Control.Concurrent
 
 import System.FilePath
 import qualified Data.ByteString.Char8 as BS
@@ -80,7 +73,7 @@ import Data.List
 import Data.Maybe
 import System.Cmd
 import System.Environment
-import System.Exit	( exitWith, ExitCode(..) )
+import System.Exit ( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
@@ -90,14 +83,14 @@ import Data.Array
 import Control.Monad as Monad
 import Text.Printf
 import Foreign.Safe
-import GHC.Exts		( unsafeCoerce# )
+import GHC.Exts ( unsafeCoerce# )
 
-import GHC.IO.Exception	( IOErrorType(InvalidArgument) )
-import GHC.IO.Handle    ( hFlushAll )
+import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
+import GHC.IO.Handle ( hFlushAll )
 
 import GHC.TopHandler
 
-import Data.IORef	( IORef, readIORef, writeIORef )
+import Data.IORef ( IORef, readIORef, writeIORef )
 
 -----------------------------------------------------------------------------
 
@@ -196,94 +189,94 @@ shortHelpText = "use :? for help.\n"
 
 helpText :: String
 helpText =
- " Commands available from the prompt:\n" ++
- "\n" ++
- "   <statement>                 evaluate/run <statement>\n" ++
- "   :                           repeat last command\n" ++
- "   :{\\n ..lines.. \\n:}\\n       multiline command\n" ++
- "   :add [*]<module> ...        add module(s) to the current target set\n" ++
- "   :browse[!] [[*]<mod>]       display the names defined by module <mod>\n" ++
- "                               (!: more details; *: all top-level names)\n" ++
- "   :cd <dir>                   change directory to <dir>\n" ++
- "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
- "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
- "                               (!: use regex instead of line number)\n" ++
- "   :def <cmd> <expr>           define a command :<cmd>\n" ++
- "   :edit <file>                edit file\n" ++
- "   :edit                       edit last module\n" ++
- "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
- "   :help, :?                   display this list of commands\n" ++
- "   :info [<name> ...]          display information about the given names\n" ++
- "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
- "   :kind <type>                show the kind of <type>\n" ++
- "   :load [*]<module> ...       load module(s) and their dependents\n" ++
- "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
- "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
- "   :quit                       exit GHCi\n" ++
- "   :reload                     reload the current module set\n" ++
- "   :run function [<arguments> ...] run the function with the given arguments\n" ++
- "   :script <filename>          run the script <filename>" ++
- "   :type <expr>                show the type of <expr>\n" ++
- "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
- "   :!<command>                 run the shell command <command>\n" ++
- "\n" ++
- " -- Commands for debugging:\n" ++
- "\n" ++
- "   :abandon                    at a breakpoint, abandon current computation\n" ++
- "   :back                       go back in the history (after :trace)\n" ++
- "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
- "   :break <name>               set a breakpoint on the specified function\n" ++
- "   :continue                   resume after a breakpoint\n" ++
- "   :delete <number>            delete the specified breakpoint\n" ++
- "   :delete *                   delete all breakpoints\n" ++
- "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
- "   :forward                    go forward in the history (after :back)\n" ++
- "   :history [<n>]              after :trace, show the execution history\n" ++
- "   :list                       show the source code around current breakpoint\n" ++
- "   :list identifier            show the source code for <identifier>\n" ++
- "   :list [<module>] <line>     show the source code around line number <line>\n" ++
- "   :print [<name> ...]         prints a value without forcing its computation\n" ++
- "   :sprint [<name> ...]        simplifed version of :print\n" ++
- "   :step                       single-step after stopping at a breakpoint\n"++
- "   :step <expr>                single-step into <expr>\n"++
- "   :steplocal                  single-step within the current top-level binding\n"++
- "   :stepmodule                 single-step restricted to the current module\n"++
- "   :trace                      trace after stopping at a breakpoint\n"++
- "   :trace <expr>               evaluate <expr> with tracing on (see :history)\n"++
-
- "\n" ++
- " -- Commands for changing settings:\n" ++
- "\n" ++
- "   :set <option> ...           set options\n" ++
- "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
- "   :set prog <progname>        set the value returned by System.getProgName\n" ++
- "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
- "   :set editor <cmd>           set the command used for :edit\n" ++
- "   :set stop [<n>] <cmd>       set the command to run when a breakpoint is hit\n" ++
- "   :unset <option> ...         unset options\n" ++
- "\n" ++
- "  Options for ':set' and ':unset':\n" ++
- "\n" ++
- "    +m            allow multiline commands\n" ++             
- "    +r            revert top-level expressions after each evaluation\n" ++
- "    +s            print timing/memory stats after each evaluation\n" ++
- "    +t            print type after evaluation\n" ++
- "    -<flags>      most GHC command line flags can also be set here\n" ++
- "                         (eg. -v2, -fglasgow-exts, etc.)\n" ++
- "                    for GHCi-specific flags, see User's Guide,\n"++
- "                    Flag reference, Interactive-mode options\n" ++
- "\n" ++
- " -- Commands for displaying information:\n" ++
- "\n" ++
- "   :show bindings              show the current bindings made at the prompt\n" ++
- "   :show breaks                show the active breakpoints\n" ++
- "   :show context               show the breakpoint context\n" ++
- "   :show modules               show the currently loaded modules\n" ++
- "   :show packages              show the currently active package flags\n" ++
- "   :show languages             show the currently active language flags\n" ++
- "   :show <setting>             show value of <setting>, which is one of\n" ++
- "                                  [args, prog, prompt, editor, stop]\n" ++
- "\n" 
+  " Commands available from the prompt:\n" ++
+  "\n" ++
+  "   <statement>                 evaluate/run <statement>\n" ++
+  "   :                           repeat last command\n" ++
+  "   :{\\n ..lines.. \\n:}\\n       multiline command\n" ++
+  "   :add [*]<module> ...        add module(s) to the current target set\n" ++
+  "   :browse[!] [[*]<mod>]       display the names defined by module <mod>\n" ++
+  "                               (!: more details; *: all top-level names)\n" ++
+  "   :cd <dir>                   change directory to <dir>\n" ++
+  "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
+  "   :ctags[!] [<file>]          create tags file for Vi (default: \"tags\")\n" ++
+  "                               (!: use regex instead of line number)\n" ++
+  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
+  "   :edit <file>                edit file\n" ++
+  "   :edit                       edit last module\n" ++
+  "   :etags [<file>]             create tags file for Emacs (default: \"TAGS\")\n" ++
+  "   :help, :?                   display this list of commands\n" ++
+  "   :info [<name> ...]          display information about the given names\n" ++
+  "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
+  "   :kind <type>                show the kind of <type>\n" ++
+  "   :load [*]<module> ...       load module(s) and their dependents\n" ++
+  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
+  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
+  "   :quit                       exit GHCi\n" ++
+  "   :reload                     reload the current module set\n" ++
+  "   :run function [<arguments> ...] run the function with the given arguments\n" ++
+  "   :script <filename>          run the script <filename>" ++
+  "   :type <expr>                show the type of <expr>\n" ++
+  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+  "   :!<command>                 run the shell command <command>\n" ++
+  "\n" ++
+  " -- Commands for debugging:\n" ++
+  "\n" ++
+  "   :abandon                    at a breakpoint, abandon current computation\n" ++
+  "   :back                       go back in the history (after :trace)\n" ++
+  "   :break [<mod>] <l> [<col>]  set a breakpoint at the specified location\n" ++
+  "   :break <name>               set a breakpoint on the specified function\n" ++
+  "   :continue                   resume after a breakpoint\n" ++
+  "   :delete <number>            delete the specified breakpoint\n" ++
+  "   :delete *                   delete all breakpoints\n" ++
+  "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
+  "   :forward                    go forward in the history (after :back)\n" ++
+  "   :history [<n>]              after :trace, show the execution history\n" ++
+  "   :list                       show the source code around current breakpoint\n" ++
+  "   :list identifier            show the source code for <identifier>\n" ++
+  "   :list [<module>] <line>     show the source code around line number <line>\n" ++
+  "   :print [<name> ...]         prints a value without forcing its computation\n" ++
+  "   :sprint [<name> ...]        simplifed version of :print\n" ++
+  "   :step                       single-step after stopping at a breakpoint\n"++
+  "   :step <expr>                single-step into <expr>\n"++
+  "   :steplocal                  single-step within the current top-level binding\n"++
+  "   :stepmodule                 single-step restricted to the current module\n"++
+  "   :trace                      trace after stopping at a breakpoint\n"++
+  "   :trace <expr>               evaluate <expr> with tracing on (see :history)\n"++
+ 
+  "\n" ++
+  " -- Commands for changing settings:\n" ++
+  "\n" ++
+  "   :set <option> ...           set options\n" ++
+  "   :set args <arg> ...         set the arguments returned by System.getArgs\n" ++
+  "   :set prog <progname>        set the value returned by System.getProgName\n" ++
+  "   :set prompt <prompt>        set the prompt used in GHCi\n" ++
+  "   :set editor <cmd>           set the command used for :edit\n" ++
+  "   :set stop [<n>] <cmd>       set the command to run when a breakpoint is hit\n" ++
+  "   :unset <option> ...         unset options\n" ++
+  "\n" ++
+  "  Options for ':set' and ':unset':\n" ++
+  "\n" ++
+  "    +m            allow multiline commands\n" ++             
+  "    +r            revert top-level expressions after each evaluation\n" ++
+  "    +s            print timing/memory stats after each evaluation\n" ++
+  "    +t            print type after evaluation\n" ++
+  "    -<flags>      most GHC command line flags can also be set here\n" ++
+  "                         (eg. -v2, -fglasgow-exts, etc.)\n" ++
+  "                    for GHCi-specific flags, see User's Guide,\n"++
+  "                    Flag reference, Interactive-mode options\n" ++
+  "\n" ++
+  " -- Commands for displaying information:\n" ++
+  "\n" ++
+  "   :show bindings              show the current bindings made at the prompt\n" ++
+  "   :show breaks                show the active breakpoints\n" ++
+  "   :show context               show the breakpoint context\n" ++
+  "   :show modules               show the currently loaded modules\n" ++
+  "   :show packages              show the currently active package flags\n" ++
+  "   :show languages             show the currently active language flags\n" ++
+  "   :show <setting>             show value of <setting>, which is one of\n" ++
+  "                                  [args, prog, prompt, editor, stop]\n" ++
+  "\n" 
 
 findEditor :: IO String
 findEditor = do
@@ -361,7 +354,6 @@ interactiveUI srcs maybe_exprs = do
                    prompt = default_prompt,
                    stop = default_stop,
                    editor = default_editor,
---                   session = session,
                    options = [],
                    prelude = prel_mn,
                    line_number = 1,
@@ -504,25 +496,24 @@ nextInputLine show_prompt is_tty
 
 checkPerms :: String -> IO Bool
 #ifdef mingw32_HOST_OS
-checkPerms _ =
-  return True
+checkPerms _ = return True
 #else
 checkPerms name =
   handleIO (\_ -> return False) $ do
-     st <- getFileStatus name
-     me <- getRealUserID
-     if fileOwner st /= me then do
-   	putStrLn $ "WARNING: " ++ name ++ " is owned by someone else, IGNORING!"
-   	return False
-      else do
-   	let mode =  System.Posix.fileMode st
-   	if (groupWriteMode == (mode `intersectFileModes` groupWriteMode))
-   	   || (otherWriteMode == (mode `intersectFileModes` otherWriteMode)) 
-   	   then do
-   	       putStrLn $ "*** WARNING: " ++ name ++ 
-   			  " is writable by someone else, IGNORING!"
-   	       return False
-   	  else return True
+    st <- getFileStatus name
+    me <- getRealUserID
+    if fileOwner st /= me then do
+        putStrLn $ "WARNING: " ++ name ++ " is owned by someone else, IGNORING!"
+        return False
+     else do
+        let mode = System.Posix.fileMode st
+        if (groupWriteMode == (mode `intersectFileModes` groupWriteMode))
+            || (otherWriteMode == (mode `intersectFileModes` otherWriteMode)) 
+            then do
+                putStrLn $ "*** WARNING: " ++ name ++ 
+                           " is writable by someone else, IGNORING!"
+                return False
+            else return True
 #endif
 
 incrementLines :: InputT GHCi ()
@@ -551,7 +542,6 @@ mkPrompt :: GHCi String
 mkPrompt = do
   imports <- GHC.getContext
   resumes <- GHC.getResumeContext
-  -- st <- getGHCiState
 
   context_bit <-
         case resumes of
@@ -583,7 +573,7 @@ mkPrompt = do
         f ('%':'%':xs) = char '%' <> f xs
         f (x:xs) = char x <> f xs
         f [] = empty
-   --
+
   st <- getGHCiState
   return (showSDoc (f (prompt st)))
 
@@ -599,7 +589,7 @@ queryQueue = do
 runCommands :: Bool -> InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands = runCommands' handler
 
-runCommands' :: (SomeException -> GHCi Bool) -- Exception handler
+runCommands' :: (SomeException -> GHCi Bool) -- ^ Exception handler
              -> Bool
              -> InputT GHCi (Maybe String) -> InputT GHCi ()
 runCommands' eh resetLineTo1 getCmd = do
@@ -662,7 +652,7 @@ runOneCommand eh getCmd = do
                  else collectCommand q (c ++ "\n" ++ map normSpace l))
       where normSpace '\r' = ' '
             normSpace   c  = c
-    -- QUESTION: is userError the one to use here?
+    -- SDM (2007-11-07): is userError the one to use here?
     collectError = userError "unterminated multiline command :{ .. :}"
     doCommand (':' : cmd) = do
       result <- specialCommand cmd
@@ -913,18 +903,18 @@ info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = handleSourceError GHC.printException $
           do { let names = words s
-	     ; dflags <- getDynFlags
-	     ; let pefas = dopt Opt_PrintExplicitForalls dflags
-	     ; mapM_ (infoThing pefas) names }
+             ; dflags <- getDynFlags
+             ; let pefas = dopt Opt_PrintExplicitForalls dflags
+             ; mapM_ (infoThing pefas) names }
   where
     infoThing pefas str = do
-	names     <- GHC.parseName str
-	mb_stuffs <- mapM GHC.getInfo names
-	let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
-	unqual <- GHC.getPrintUnqual
-	liftIO $ putStrLn $ showSDocForUser unqual $
-     		     vcat (intersperse (text "") $
-		           map (pprInfo pefas) filtered)
+        names     <- GHC.parseName str
+        mb_stuffs <- mapM GHC.getInfo names
+        let filtered = filterOutChildren (\(t,_f,_i) -> t) (catMaybes mb_stuffs)
+        unqual <- GHC.getPrintUnqual
+        liftIO $ putStrLn $ showSDocForUser unqual $
+                     vcat (intersperse (text "") $
+                           map (pprInfo pefas) filtered)
 
   -- Filter out names whose parent is also there Good
   -- example is '[]', which is both a type and data
@@ -945,8 +935,8 @@ pprInfo pefas (thing, fixity, insts)
   $$ vcat (map GHC.pprInstance insts)
   where
     show_fixity fix 
-	| fix == GHC.defaultFixity = empty
-	| otherwise		   = ppr fix <+> ppr (GHC.getName thing)
+        | fix == GHC.defaultFixity = empty
+        | otherwise                = ppr fix <+> ppr (GHC.getName thing)
 
 runMain :: String -> GHCi ()
 runMain s = case toArgs s of
@@ -1184,7 +1174,6 @@ afterLoad ok retain_context prev_context = do
 
   lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
-
 setContextAfterLoad :: [InteractiveImport] -> Bool -> [GHC.ModSummary] -> GHCi ()
 setContextAfterLoad prev keep_ctxt [] = do
   setContextKeepingPackageModules prev keep_ctxt []
@@ -1265,7 +1254,6 @@ modulesLoadedMsg ok mods = do
        liftIO $ putStrLn $ showSDoc (text "Failed, modules loaded: " <> mod_commas)
     Succeeded  ->
        liftIO $ putStrLn $ showSDoc (text "Ok, modules loaded: " <> mod_commas)
-
 
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str 
@@ -1362,7 +1350,7 @@ isSafeModule m = do
         else do
             liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
                         ++ (intercalate ", " $ map packageIdString bad)
-            liftIO $ putStrLn $ mname ++ " is NOT trusted!")
+            liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
     mname = GHC.moduleNameString $ GHC.moduleName m
@@ -1375,7 +1363,6 @@ isSafeModule m = do
     tallyPkgs dflags deps = partition part deps
         where state = pkgState dflags
               part pkg = trusted $ getPackageDetails state pkg
-
 
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
@@ -1469,7 +1456,7 @@ browseModule bang modl exports_only = do
             qualifier  = maybe "-- defined locally" 
                              (("-- imported via "++) . intercalate ", " 
                                . map GHC.moduleNameString)
-            importInfo = RdrName.getGRE_NameQualifier_maybes rdr_env
+            importInfo = getGRE_NameQualifier_maybes rdr_env
             modNames   = map (importInfo . GHC.getName) things
                                         
             -- annotate groups of imports with their import modules
@@ -1624,7 +1611,6 @@ subsumesID (IIDecl d1) (IIDecl d2)      -- A bit crude
   && not (ideclQualified d1)
   && isNothing (ideclHiding d1) 
 subsumesID _ _ = False
-
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
