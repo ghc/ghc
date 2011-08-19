@@ -113,3 +113,15 @@ timeout/dist/
 /tests/dph/smvm/dph-smvm
 /tests/dph/sumnats/dph-sumnats
 /tests/dph/words/dph-words-fast
+
+/tests/driver/recomp009/Main
+/tests/driver/recomp009/Sub.hs
+/tests/plugins/simple-plugin/dist/
+/tests/plugins/simple-plugin/install/
+/tests/plugins/simple-plugin/local.package.conf
+/tests/plugins/simple-plugin/setup
+/tests/programs/hs-boot/Main
+/tests/safeHaskell/check/pkg01/dist/
+/tests/safeHaskell/check/pkg01/install/
+/tests/safeHaskell/check/pkg01/local.db/
+/tests/safeHaskell/check/pkg01/setup
