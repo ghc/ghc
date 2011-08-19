@@ -156,6 +156,12 @@ div#style-menu-holder {
 }
 
 #module-header {
+	overflow: hidden; /* makes sure info float is properly contained */
+	display: inline-block; /* triggers hasLayout in IE*/
+}
+
+#module-header {
+	display: block; /* back to block */
 	background-color: #0077dd;
 	padding: 5px;
 }
