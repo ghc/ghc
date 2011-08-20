@@ -184,7 +184,7 @@ linearRegAlloc dflags first_id block_live sccs
       ArchX86_64  -> linearRegAlloc' platform (frInitFreeRegs :: X86.FreeRegs)   first_id block_live sccs
       ArchSPARC   -> linearRegAlloc' platform (frInitFreeRegs :: SPARC.FreeRegs) first_id block_live sccs
       ArchPPC     -> linearRegAlloc' platform (frInitFreeRegs :: PPC.FreeRegs)   first_id block_live sccs
-      ArchARM     -> panic "linearRegAlloc ArchARM"
+      ArchARM _ _ -> panic "linearRegAlloc ArchARM"
       ArchPPC_64  -> panic "linearRegAlloc ArchPPC_64"
       ArchUnknown -> panic "linearRegAlloc ArchUnknown"
 

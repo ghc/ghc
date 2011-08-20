@@ -112,7 +112,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchPPC     -> 16
                             ArchSPARC   -> 14
                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                            ArchARM     -> panic "trivColorable ArchARM"
+                            ArchARM _ _ -> panic "trivColorable ArchARM"
                             ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_INTEGER
                                 (virtualRegSqueeze RcInteger)
@@ -132,7 +132,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchPPC     -> 0
                             ArchSPARC   -> 22
                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                            ArchARM     -> panic "trivColorable ArchARM"
+                            ArchARM _ _ -> panic "trivColorable ArchARM"
                             ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_FLOAT
                                 (virtualRegSqueeze RcFloat)
@@ -152,7 +152,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchPPC     -> 26
                             ArchSPARC   -> 11
                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                            ArchARM     -> panic "trivColorable ArchARM"
+                            ArchARM _ _ -> panic "trivColorable ArchARM"
                             ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_DOUBLE
                                 (virtualRegSqueeze RcDouble)
@@ -172,7 +172,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDoubleSSE conflicts ex
                             ArchPPC     -> 0
                             ArchSPARC   -> 0
                             ArchPPC_64  -> panic "trivColorable ArchPPC_64"
-                            ArchARM     -> panic "trivColorable ArchARM"
+                            ArchARM _ _ -> panic "trivColorable ArchARM"
                             ArchUnknown -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze (_ILIT(0)) cALLOCATABLE_REGS_SSE
                                 (virtualRegSqueeze RcDoubleSSE)
