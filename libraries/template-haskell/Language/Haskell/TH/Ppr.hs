@@ -6,7 +6,7 @@ module Language.Haskell.TH.Ppr where
     -- be "public" functions.  The main module TH
     -- re-exports them all.
 
-import Text.PrettyPrint.HughesPJ (render)
+import Text.PrettyPrint (render)
 import Language.Haskell.TH.PprLib
 import Language.Haskell.TH.Syntax
 import Data.Char ( toLower )
