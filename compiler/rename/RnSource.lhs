@@ -662,11 +662,18 @@ rnHsVectDecl (HsVect var Nothing)
   = do { var' <- lookupLocatedTopBndrRn var
        ; return (HsVect var' Nothing, unitFV (unLoc var'))
        }
-rnHsVectDecl (HsVect var (Just rhs))
+-- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
+--        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
+rnHsVectDecl (HsVect var (Just rhs@(L _ (HsVar _))))
   = do { var' <- lookupLocatedTopBndrRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
        }
+rnHsVectDecl (HsVect _var (Just _rhs))
+  = failWith $ vcat 
+               [ ptext (sLit "IMPLEMENTATION RESTRICTION: right-hand side of a VECTORISE pragma")
+               , ptext (sLit "must be an identifier")
+               ]
 rnHsVectDecl (HsNoVect var)
   = do { var' <- lookupLocatedTopBndrRn var
        ; return (HsNoVect var', unitFV (unLoc var'))
@@ -681,7 +688,7 @@ rnHsVectDecl (HsVectTypeIn tycon (Just ty))
        ; return (HsVectTypeIn tycon' (Just ty'), fv_ty `addOneFV` unLoc tycon')
        }
   where
-    vect_doc = text "In the VECTORISE pragma for type constructor" <+> quotes (ppr tycon)
+    vect_doc = ptext (sLit "In the VECTORISE pragma for type constructor") <+> quotes (ppr tycon)
 rnHsVectDecl (HsVectTypeOut _ _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectTypeOut'"
 \end{code}
