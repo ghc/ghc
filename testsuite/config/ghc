@@ -27,7 +27,7 @@ config.other_ways            = ['extcore','optextcore',
                                 'prof_hd','prof_hy','prof_hr',
                                 'threaded1_ls',
                                 'threaded2_hT',
-                                'llvm']
+                                'llvm', 'debugllvm']
 
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
@@ -68,6 +68,7 @@ config.way_flags = {
         'optasm'     : ['-O -fasm'],
 	'llvm'       : ['-fllvm'],
 	'optllvm'    : ['-O -fllvm'],
+	'debugllvm'    : ['-fllvm -keep-llvm-files'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
 	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
 	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
@@ -92,6 +93,7 @@ config.way_rts_flags = {
         'optasm'     : [],
 	'llvm'       : [],
 	'optllvm'    : [],
+	'debugllvm'  : [],
 	'profasm'    : ['-hc'], # test heap profiling too
 	'profthreaded' : ['-p'],
 	'ghci'       : [],
