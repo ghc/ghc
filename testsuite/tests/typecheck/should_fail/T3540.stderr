@@ -1,25 +1,25 @@
 
 T3540.hs:4:12:
-    Predicate used as a type: a ~ Int
-    In the type signature for `thing':
-      thing :: a ~ Int
+    Predicate `a ~ Int' used as a type
+    Expected kind `*', but `a ~ Int' has kind `Constraint'
+    In the type signature for `thing': thing :: a ~ Int
 
 T3540.hs:7:20:
-    Predicate used as a type: a ~ Int
-    In the type signature for `thing1':
-      thing1 :: Int -> (a ~ Int)
+    Predicate `a ~ Int' used as a type
+    Expected kind `?', but `a ~ Int' has kind `Constraint'
+    In the type signature for `thing1': thing1 :: Int -> (a ~ Int)
 
 T3540.hs:10:13:
-    Predicate used as a type: a ~ Int
-    In the type signature for `thing2':
-      thing2 :: (a ~ Int) -> Int
+    Predicate `a ~ Int' used as a type
+    Expected kind `??', but `a ~ Int' has kind `Constraint'
+    In the type signature for `thing2': thing2 :: (a ~ Int) -> Int
 
 T3540.hs:13:12:
-    Predicate used as a type: ?dude :: Int
-    In the type signature for `thing3':
-      thing3 :: (?dude :: Int) -> Int
+    Predicate `?dude :: Int' used as a type
+    Expected kind `??', but `?dude :: Int' has kind `Constraint'
+    In the type signature for `thing3': thing3 :: (?dude :: Int) -> Int
 
 T3540.hs:16:11:
-    Class `Eq' used as a type
-    In the type signature for `thing4':
-      thing4 :: (Eq a) -> Int
+    Predicate `Eq a' used as a type
+    Expected kind `??', but `Eq a' has kind `Constraint'
+    In the type signature for `thing4': thing4 :: (Eq a) -> Int

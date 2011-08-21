@@ -1,0 +1,8 @@
+
+tcfail212.hs:10:1:
+    Unexpected tuple component kind: * -> *
+    In the type signature for `f': f :: (Maybe, Either Int)
+
+tcfail212.hs:13:1:
+    Unexpected tuple component kind: #
+    In the type signature for `g': g :: (Int#, Int#)

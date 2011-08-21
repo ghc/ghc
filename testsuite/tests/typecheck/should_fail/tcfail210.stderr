@@ -1,0 +1,5 @@
+
+tcfail210.hs:4:31:
+    Unexpected named kind:
+        Constraint
+    Perhaps you meant to use -XConstraintKind?

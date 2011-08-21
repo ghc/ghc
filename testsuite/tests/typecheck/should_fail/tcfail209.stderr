@@ -1,0 +1,11 @@
+
+tcfail209.hs:5:1:
+    Illegal irreducible constraint Showish a
+    (Use -XConstraintKind to permit this)
+    In the type signature for `f': f :: Showish a => a -> a
+
+tcfail209.hs:8:8:
+    Predicate `Show a' used as a type
+    Expected kind `*', but `Show a' has kind `Constraint'
+    In the type signature for `g':
+      g :: ((Show a, Num a), Eq a) => a -> a

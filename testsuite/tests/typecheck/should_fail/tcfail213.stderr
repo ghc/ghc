@@ -1,0 +1,7 @@
+
+tcfail213.hs:6:1:
+    Illegal irreducible constraint F a
+    in superclass/instance head context (Use -XUndecidableInstances to permit this)
+    In the context: (F a)
+    While checking the super-classes of class `C'
+    In the class declaration for `C'

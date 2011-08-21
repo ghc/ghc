@@ -95,7 +95,7 @@ RnFail055.hs-boot:27:22:
 RnFail055.hs-boot:28:7:
     Class `C2' has conflicting definitions in the module and its hs-boot file
     Main module: class C2 a b
-                     RecFlag NonRecursive
+                     RecFlag Recursive
                      m2 :: a -> b m2' :: a -> b
     Boot file:   class C2 a b
                      RecFlag NonRecursive
@@ -103,5 +103,5 @@ RnFail055.hs-boot:28:7:
 
 RnFail055.hs-boot:29:24:
     Class `C3' has conflicting definitions in the module and its hs-boot file
-    Main module: class (Eq a, Ord a) => C3 a RecFlag NonRecursive
+    Main module: class (Eq a, Ord a) => C3 a RecFlag Recursive
     Boot file:   class (Ord a, Eq a) => C3 a RecFlag NonRecursive
