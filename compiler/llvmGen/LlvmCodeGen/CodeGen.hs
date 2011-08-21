@@ -169,6 +169,28 @@ genCall env (CmmPrim MO_WriteBarrier) _ _ _ = do
         lmTrue  = mkIntLit i1 (-1)
 #endif
 
+-- Handle popcnt function specifically since GHC only really has i32 and i64
+-- types and things like Word8 are backed by an i32 and just present a logical
+-- i8 range. So we must handle conversions from i32 to i8 explicitly as LLVM
+-- is strict about types.
+genCall env t@(CmmPrim (MO_PopCnt w)) [CmmHinted dst _] args _ = do
+    let width = widthToLlvmInt w
+        dstTy = cmmToLlvmType $ localRegType dst
+        funTy = \n -> LMFunction $ LlvmFunctionDecl n ExternallyVisible
+                          CC_Ccc width FixedArgs (tysToParams [width]) Nothing
+        (env1, dstV, stmts1, top1) = getCmmReg env (CmmLocal dst)
+
+    (env2, argsV, stmts2, top2) <- arg_vars env1 args ([], nilOL, [])
+    (env3, fptr, stmts3, top3)  <- getFunPtr env2 funTy t
+    (argsV', stmts4)            <- castVars $ zip argsV [width]
+    (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
+    ([retV'], stmts5)           <- castVars [(retV,dstTy)]
+    let s2                       = Store retV' dstV
+
+    let stmts = stmts1 `appOL` stmts2 `appOL` stmts3 `appOL` stmts4 `snocOL`
+                s1 `appOL` stmts5 `snocOL` s2
+    return (env3, stmts, top1 ++ top2 ++ top3)
+
 -- Handle memcpy function specifically since llvm's intrinsic version takes
 -- some extra parameters.
 genCall env t@(CmmPrim op) [] args CmmMayReturn | op == MO_Memcpy ||
@@ -435,6 +457,8 @@ cmmPrimOpFunctions env mop
     MO_Memcpy     -> fsLit $ "llvm.memcpy."  ++ intrinTy1
     MO_Memmove    -> fsLit $ "llvm.memmove." ++ intrinTy1
     MO_Memset     -> fsLit $ "llvm.memset."  ++ intrinTy2
+
+    (MO_PopCnt w) -> fsLit $ "llvm.ctpop."  ++ show (widthToLlvmInt w)
 
     a -> panic $ "cmmPrimOpFunctions: Unknown callish op! (" ++ show a ++ ")"
 
