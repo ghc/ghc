@@ -265,9 +265,12 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- ptrs, nptrs, closure type, description, type
 		{% withThisPackage $ \pkg ->
 		   do let prof = profilingInfo $11 $13
-			  rep = mkHeapRep False (fromIntegral $5) (fromIntegral $7) Thunk
-			-- ToDo: Type tag $9 redundant
-		      return (mkCmmEntryLabel pkg $3,
+                          rep  = mkRTSRep (fromIntegral $9) $
+                                   mkHeapRep False (fromIntegral $5)
+                                                   (fromIntegral $7) Thunk
+                              -- not really Thunk, but that makes the info table
+                              -- we want.
+                      return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
                				   , cit_prof = prof, cit_srt = NoC_SRT },
@@ -277,11 +280,12 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- ptrs, nptrs, closure type, description, type, fun type
 		{% withThisPackage $ \pkg -> 
 		   do let prof = profilingInfo $11 $13
-			  rep = mkHeapRep False (fromIntegral $5) (fromIntegral $7) ty
-                          ty  = Fun 0  -- Arity zero
-				     (ArgSpec (fromIntegral $15))
-			-- ToDo: Type tag $9 redundant
-		      return (mkCmmEntryLabel pkg $3,
+                          ty   = Fun 0 (ArgSpec (fromIntegral $15))
+                                -- Arity zero, arg_type $15
+                          rep = mkRTSRep (fromIntegral $9) $
+                                    mkHeapRep False (fromIntegral $5)
+                                                    (fromIntegral $7) ty
+                      return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
                				   , cit_prof = prof, cit_srt = NoC_SRT },
@@ -289,32 +293,16 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- we leave most of the fields zero here.  This is only used
 		-- to generate the BCO info table in the RTS at the moment.
 
-	-- A variant with a non-zero arity (needed to write Main_main in Cmm)
-	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ',' INT ')'
-		-- ptrs, nptrs, closure type, description, type, fun type, arity
-		{% withThisPackage $ \pkg ->
-		   do let prof = profilingInfo $11 $13
-			  rep = mkHeapRep False (fromIntegral $5) (fromIntegral $7) ty
-			  ty  = Fun (fromIntegral $17)  -- Arity 
-				     (ArgSpec (fromIntegral $15))
-			-- ToDo: Type tag $9 redundant
-		      return (mkCmmEntryLabel pkg $3,
-			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
-				           , cit_rep = rep
-               				   , cit_prof = prof, cit_srt = NoC_SRT },
-			      []) }
-		-- we leave most of the fields zero here.  This is only used
-		-- to generate the BCO info table in the RTS at the moment.
-	
-	| 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
+        | 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, tag, closure type, description, type
 		{% withThisPackage $ \pkg ->
 		   do let prof = profilingInfo $13 $15
-			  rep = mkHeapRep False (fromIntegral $5) (fromIntegral $7) ty
-			  ty  = Constr (fromIntegral $9)  -- Tag
+                          ty  = Constr (fromIntegral $9)  -- Tag
 	                           	(stringToWord8s $13)
-			-- ToDo: Type tag $11 redundant
-		      return (mkCmmEntryLabel pkg $3,
+                          rep = mkRTSRep (fromIntegral $11) $
+                                  mkHeapRep False (fromIntegral $5)
+                                                  (fromIntegral $7) ty
+                      return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
                				   , cit_prof = prof, cit_srt = NoC_SRT },
@@ -327,10 +315,10 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- selector, closure type, description, type
 		{% withThisPackage $ \pkg ->
 		   do let prof = profilingInfo $9 $11
-			  rep = mkHeapRep False (fromIntegral $5) (fromIntegral $7) ty
                           ty  = ThunkSelector (fromIntegral $5)
-			-- ToDo: Type tag $7 redundant
-		      return (mkCmmEntryLabel pkg $3,
+                          rep = mkRTSRep (fromIntegral $7) $
+                                   mkHeapRep False 0 0 ty
+                      return (mkCmmEntryLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
                				   , cit_prof = prof, cit_srt = NoC_SRT },
@@ -340,9 +328,8 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		-- closure type (no live regs)
 		{% withThisPackage $ \pkg ->
 		   do let prof = NoProfilingInfo
-			  rep  = mkStackRep []
-			-- ToDo: Type tag $5 redundant
-		      return (mkCmmRetLabel pkg $3,
+                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep []
+                      return (mkCmmRetLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
                				   , cit_prof = prof, cit_srt = NoC_SRT },
@@ -353,9 +340,9 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		{% withThisPackage $ \pkg ->
 		   do live <- sequence (map (liftM Just) $7)
 		      let prof = NoProfilingInfo
-			  rep  = mkStackRep []
-			-- ToDo: Type tag $5 redundant
-		      return (mkCmmRetLabel pkg $3,
+                          bitmap = mkLiveness live
+                          rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
+                      return (mkCmmRetLabel pkg $3,
 			      CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
 				           , cit_rep = rep
                				   , cit_prof = prof, cit_srt = NoC_SRT },

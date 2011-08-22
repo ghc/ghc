@@ -77,7 +77,7 @@ mkInfoTable (CmmProc (CmmInfo _ _ info) entry_label blocks)
   = return [CmmProc Nothing entry_label blocks]
                                
   | CmmInfoTable { cit_lbl = info_lbl } <- info
-  = do { (top_decls, info_cts) <- mkInfoTableContents info
+  = do { (top_decls, info_cts) <- mkInfoTableContents info Nothing
        ; return (top_decls  ++
                  mkInfoTableAndCode info_lbl info_cts
                                     entry_label blocks) }
@@ -89,30 +89,37 @@ type InfoTableContents = ( [CmmLit]	     -- The standard part
 -- These Lits have *not* had mkRelativeTo applied to them
 
 mkInfoTableContents :: CmmInfoTable
-                    -> UniqSM ([RawCmmTop],		-- Auxiliary top decls
+                    -> Maybe StgHalfWord    -- override default RTS type tag?
+                    -> UniqSM ([RawCmmTop],             -- Auxiliary top decls
                                InfoTableContents)	-- Info tbl + extra bits
+
+mkInfoTableContents info@(CmmInfoTable { cit_rep = RTSRep ty rep }) _
+ = mkInfoTableContents info{cit_rep = rep} (Just ty)
+
 mkInfoTableContents (CmmInfoTable { cit_lbl  = info_lbl
                                   , cit_rep  = smrep
-                                  , cit_prof = prof, cit_srt = srt }) 
+                                  , cit_prof = prof
+                                  , cit_srt = srt }) mb_rts_tag
   | StackRep frame <- smrep
-  = do { (prof_lits,    prof_data)     <- mkProfLits prof
+  = do { (prof_lits, prof_data) <- mkProfLits prof
+       ; let (srt_label, srt_bitmap) = mkSRTLit srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits frame
-       ; let (extra_bits, srt_bitmap) = mkSRTLit srt
+       ; let
              std_info = mkStdInfoTable prof_lits rts_tag srt_bitmap liveness_lit
-             rts_tag | null liveness_data = rET_SMALL  -- Fits in extra_bits
-                     | otherwise          = rET_BIG    -- Does not; extra_bits is
-                                                       -- a label
-       ; return (prof_data ++ liveness_data, (std_info, extra_bits)) }
+             rts_tag | Just tag <- mb_rts_tag = tag
+                     | null liveness_data     = rET_SMALL -- Fits in extra_bits
+                     | otherwise              = rET_BIG   -- Does not; extra_bits is
+                                                          -- a label
+       ; return (prof_data ++ liveness_data, (std_info, srt_label)) }
 
   | HeapRep _ ptrs nonptrs closure_type <- smrep
-  = do { let rts_tag = rtsClosureType smrep
-             layout  = packHalfWordsCLit ptrs nonptrs
-  	     (srt_label, srt_bitmap) = mkSRTLit srt
-
+  = do { let layout  = packHalfWordsCLit ptrs nonptrs
        ; (prof_lits, prof_data) <- mkProfLits prof
-       ; (mb_srt_field, mb_layout, extra_bits, ct_data) 
+       ; let (srt_label, srt_bitmap) = mkSRTLit srt
+       ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
-       ; let std_info = mkStdInfoTable prof_lits rts_tag 
+       ; let std_info = mkStdInfoTable prof_lits
+                                       (mb_rts_tag   `orElse` rtsClosureType smrep)
                                        (mb_srt_field `orElse` srt_bitmap)
                                        (mb_layout    `orElse` layout)
        ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
@@ -152,7 +159,8 @@ mkInfoTableContents (CmmInfoTable { cit_lbl  = info_lbl
 
     mk_pieces BlackHole _ = panic "mk_pieces: BlackHole"
 
-mkInfoTableContents _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
+
+mkInfoTableContents _ _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
 
 mkSRTLit :: C_SRT
          -> ([CmmLit],    -- srt_label, if any

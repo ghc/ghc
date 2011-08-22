@@ -20,7 +20,7 @@ module SMRep (
         IsStatic, 
         ClosureTypeInfo(..), ArgDescr(..), Liveness,
         ConstrDescription, 
-	mkHeapRep, blackHoleRep, mkStackRep,
+        mkHeapRep, blackHoleRep, mkStackRep, mkRTSRep,
 
 	isStaticRep, isStaticNoCafCon,
         heapClosureSize,
@@ -99,6 +99,10 @@ data SMRep
   | StackRep            -- Stack frame (RET_SMALL or RET_BIG)
         Liveness
 
+  | RTSRep              -- The RTS needs to declare info tables with specific
+        StgHalfWord     -- type tags, so this form lets us override the default
+        SMRep           -- tag for an SMRep.
+
 -- | True <=> This is a static closure.  Affects how we garbage-collect it.
 -- Static closure have an extra static link field at the end.
 type IsStatic = Bool
@@ -159,9 +163,11 @@ mkHeapRep is_static ptr_wds nonptr_wds cl_type_info
      hdr_size     = closureTypeHdrSize cl_type_info
      payload_size = ptr_wds + nonptr_wds
 
+mkRTSRep :: StgHalfWord -> SMRep -> SMRep
+mkRTSRep = RTSRep
 
 mkStackRep :: [Bool] -> SMRep
-mkStackRep = StackRep
+mkStackRep liveness = StackRep liveness
 
 blackHoleRep :: SMRep
 blackHoleRep = HeapRep False 0 0 BlackHole
@@ -198,11 +204,13 @@ thunkHdrSize = fixedHdrSize + smp_hdr
 
 isStaticRep :: SMRep -> IsStatic
 isStaticRep (HeapRep is_static _ _ _) = is_static
-isStaticRep (StackRep {})	         = False
+isStaticRep (StackRep {})             = False
+isStaticRep (RTSRep _ rep)            = isStaticRep rep
 
 nonHdrSize :: SMRep -> WordOff
 nonHdrSize (HeapRep _ p np _) = p + np
 nonHdrSize (StackRep bs)      = length bs
+nonHdrSize (RTSRep _ rep)     = nonHdrSize rep
 
 heapClosureSize :: SMRep -> WordOff
 heapClosureSize (HeapRep _ p np ty) = closureTypeHdrSize ty + p + np
@@ -229,6 +237,8 @@ closureTypeHdrSize ty = case ty of
 
 -- | Derives the RTS closure type from an 'SMRep'
 rtsClosureType :: SMRep -> StgHalfWord
+rtsClosureType (RTSRep ty _)  = ty
+
 rtsClosureType (HeapRep False 1 0 Constr{}) = CONSTR_1_0
 rtsClosureType (HeapRep False 0 1 Constr{}) = CONSTR_0_1
 rtsClosureType (HeapRep False 2 0 Constr{}) = CONSTR_2_0
@@ -312,6 +322,8 @@ instance Outputable SMRep where
 
    ppr (StackRep bs) = ptext (sLit "StackRep") <+> ppr bs
 
+   ppr (RTSRep ty rep) = ptext (sLit "tag:") <> ppr ty <+> ppr rep
+
 instance Outputable ArgDescr where
   ppr (ArgSpec n) = ptext (sLit "ArgSpec") <+> integer (toInteger n)
   ppr (ArgGen ls) = ptext (sLit "ArgGen") <+> ppr ls
@@ -332,7 +344,6 @@ pprTypeInfo (ThunkSelector offset)
 
 pprTypeInfo Thunk     = ptext (sLit "Thunk")
 pprTypeInfo BlackHole = ptext (sLit "BlackHole")
-
 
 stringToWord8s :: String -> [Word8]
 stringToWord8s s = map (fromIntegral . ord) s
