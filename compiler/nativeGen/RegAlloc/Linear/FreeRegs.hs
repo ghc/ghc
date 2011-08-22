@@ -65,7 +65,7 @@ maxSpillSlots platform
                 ArchX86_64  -> X86.Instr.maxSpillSlots
                 ArchPPC     -> PPC.Instr.maxSpillSlots
                 ArchSPARC   -> SPARC.Instr.maxSpillSlots
-                ArchARM     -> panic "maxSpillSlots ArchARM"
+                ArchARM _ _ -> panic "maxSpillSlots ArchARM"
                 ArchPPC_64  -> panic "maxSpillSlots ArchPPC_64"
                 ArchUnknown -> panic "maxSpillSlots ArchUnknown"
 

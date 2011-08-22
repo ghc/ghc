@@ -7,6 +7,8 @@ module Platform (
         Platform(..),
         Arch(..),
         OS(..),
+        ArmISA(..),
+        ArmISAExt(..),
 
         defaultTargetPlatform,
         target32Bit,
@@ -40,6 +42,8 @@ data Arch
         | ArchPPC_64
         | ArchSPARC
         | ArchARM
+          { armISA    :: ArmISA
+          , armISAExt :: [ArmISAExt] }
         deriving (Show, Eq)
 
 
@@ -55,6 +59,22 @@ data OS
         | OSOpenBSD
         deriving (Show, Eq)
 
+-- | ARM Instruction Set Architecture and Extensions
+--
+data ArmISA
+    = ARMv5
+    | ARMv6
+    | ARMv7
+    deriving (Show, Eq)
+
+data ArmISAExt
+    = VFPv2
+    | VFPv3
+    | VFPv3D16
+    | NEON
+    | IWMMX2
+    deriving (Show, Eq)
+
 
 target32Bit :: Platform -> Bool
 target32Bit p = case platformArch p of
@@ -64,7 +84,7 @@ target32Bit p = case platformArch p of
                 ArchPPC     -> True
                 ArchPPC_64  -> False
                 ArchSPARC   -> True
-                ArchARM     -> True
+                ArchARM _ _ -> True
 
 
 -- | This predicates tells us whether the OS supports ELF-like shared libraries.
@@ -98,7 +118,7 @@ defaultTargetArch       = ArchPPC_64
 #elif sparc_TARGET_ARCH
 defaultTargetArch       = ArchSPARC
 #elif arm_TARGET_ARCH
-defaultTargetArch       = ArchARM
+defaultTargetArch       = ArchARM defaultTargetArmISA defaultTargetArmISAExt
 #else
 defaultTargetArch       = ArchUnknown
 #endif
@@ -124,3 +144,22 @@ defaultTargetOS = OSOpenBSD
 defaultTargetOS = OSUnknown
 #endif
 
+#if arm_TARGET_ARCH
+defaultTargetArmISA :: ArmISA
+#if defined(arm_HOST_ARCH_PRE_ARMv6)
+defaultTargetArmISA = ARMv5
+#elif defined(arm_HOST_ARCH_PRE_ARMv7)
+defaultTargetArmISA = ARMv6
+#else
+defaultTargetArmISA = ARMv7
+#endif
+
+defaultTargetArmISAExt :: [ArmISAExt]
+#if defined(arm_TARGET_ARCH) && !defined(arm_HOST_ARCH_PRE_ARMv7)
+/* wild guess really, in case of ARMv7 we assume both VFPv3 and NEON presented
+   however this is not true for SoCs like NVidia Tegra2 and Marvell Dove */
+defaultTargetArmISAExt = [VFPv3, NEON]
+#else
+defaultTargetArmISAExt = []
+#endif
+#endif /* arm_TARGET_ARCH */

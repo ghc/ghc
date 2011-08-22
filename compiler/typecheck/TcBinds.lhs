@@ -641,19 +641,26 @@ tcVectDecls decls
 
 --------------
 tcVect :: VectDecl Name -> TcM (VectDecl TcId)
--- We can't typecheck the expression of a vectorisation declaration against the vectorised type
--- of the original definition as this requires internals of the vectoriser not available during
--- type checking.  Instead, we infer the type of the expression and leave it to the vectoriser
--- to check the compatibility of the Core types.
+-- FIXME: We can't typecheck the expression of a vectorisation declaration against the vectorised
+--   type of the original definition as this requires internals of the vectoriser not available
+--   during type checking.  Instead, constrain the rhs of a vectorisation declaration to be a single
+--   identifier (this is checked in 'rnHsVectDecl').
 tcVect (HsVect name Nothing)
   = addErrCtxt (vectCtxt name) $
     do { id <- wrapLocM tcLookupId name
        ; return $ HsVect id Nothing
        }
-tcVect (HsVect name@(L loc _) (Just rhs))
-  = addErrCtxt (vectCtxt name) $
-    do { _id <- wrapLocM tcLookupId name     -- need to ensure that the name is already defined
+tcVect (HsVect lname@(L loc name) (Just rhs))
+  = addErrCtxt (vectCtxt lname) $
+    do { id <- tcLookupId name
 
+       ; let L rhs_loc (HsVar rhs_var_name) = rhs
+       ; rhs_id <- tcLookupId rhs_var_name
+       ; let typedId = setIdType id (idType rhs_id)
+       ; return $ HsVect (L loc typedId) (Just $ L rhs_loc (HsVar rhs_id))
+       }
+
+{- OLD CODE:
          -- turn the vectorisation declaration into a single non-recursive binding
        ; let bind    = L loc $ mkTopFunBind name [mkSimpleMatch [] rhs] 
              sigFun  = const Nothing
@@ -661,7 +668,7 @@ tcVect (HsVect name@(L loc _) (Just rhs))
 
          -- perform type inference (including generalisation)
        ; (binds, [id'], _) <- tcPolyInfer False True sigFun pragFun NonRecursive [bind]
-
+       
        ; traceTc "tcVect inferred type" $ ppr (varType id')
        ; traceTc "tcVect bindings"      $ ppr binds
        
@@ -678,6 +685,7 @@ tcVect (HsVect name@(L loc _) (Just rhs))
         -- to the vectoriser - see "Note [Typechecked vectorisation pragmas]" in HsDecls
        ; return $ HsVect (L loc id') (Just rhsWrapped)
        }
+ -}
 tcVect (HsNoVect name)
   = addErrCtxt (vectCtxt name) $
     do { id <- wrapLocM tcLookupId name
