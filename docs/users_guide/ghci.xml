@@ -1895,7 +1895,8 @@ $ ghci -lm
 	     modules from packages) only the non-<literal>*</literal>
              form of <literal>:browse</literal> is available.</para>
           </listitem>
-          <listitem>Data constructors and class methods are usually
+          <listitem>
+          <para>Data constructors and class methods are usually
           displayed in the context of their data type or class declaration.
           However, if the <literal>!</literal> symbol is appended to the
           command, thus <literal>:browse!</literal>, 
@@ -1929,6 +1930,8 @@ maybe :: b -> (a -> b) -> Maybe a -> b
     unqualified, or with a <literal>Prelude.</literal> qualifier.
   </para>
           </listitem>
+	</itemizedlist>
+      </para>
 	</listitem>
       </varlistentry>
 
