@@ -111,9 +111,7 @@ updCCanMap (a,ct) cmap
       Given {}   -> cmap { cts_given   = insert_into (cts_given cmap)   }
       Derived {} -> cmap { cts_derived = insert_into (cts_derived cmap) }
   where 
-    insert_into m = addToUFM_C (flip unionBags) m a (singleCCan ct)
-    -- The "flip" is a horrid hack to maintain constraints in the order
-    -- that the vectoriser expects them.  See Trac #5369
+    insert_into m = addToUFM_C unionBags m a (singleCCan ct)
 
 getRelevantCts :: Uniquable a => a -> CCanMap a -> (CanonicalCts, CCanMap a) 
 -- Gets the relevant constraints and returns the rest of the CCanMap
