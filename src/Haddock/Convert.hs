@@ -47,7 +47,22 @@ tyThingToLHsDecl t = noLoc $ case t of
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
-  ATyCon tc -> TyClD (synifyTyCon tc)
+  ATyCon tc
+    | Just cl <- tyConClass_maybe tc -- classes are just a little tedious
+    -> TyClD $ ClassDecl
+         (synifyCtx (classSCTheta cl))
+         (synifyName cl)
+         (synifyTyVars (classTyVars cl))
+         (map (\ (l,r) -> noLoc
+                    (map getName l, map getName r) ) $
+            snd $ classTvsFds cl)
+         (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
+              (classMethods cl))
+         emptyBag --ignore default method definitions, they don't affect signature
+         (map synifyClassAT (classATs cl))
+         [] --we don't have any docs at this point
+    | otherwise
+    -> TyClD (synifyTyCon tc)
 
   -- type-constructors (e.g. Maybe) are complicated, put the definition
   -- later in the file (also it's used for class associated-types too.)
@@ -56,20 +71,6 @@ tyThingToLHsDecl t = noLoc $ case t of
   -- a data-constructor alone just gets rendered as a function:
   ADataCon dc -> SigD (TypeSig [synifyName dc]
     (synifyType ImplicitizeForAll (dataConUserType dc)))
-  -- classes are just a little tedious
-  AClass cl ->
-    TyClD $ ClassDecl
-      (synifyCtx (classSCTheta cl))
-      (synifyName cl)
-      (synifyTyVars (classTyVars cl))
-      (map (\ (l,r) -> noLoc
-                 (map getName l, map getName r) ) $
-         snd $ classTvsFds cl)
-      (map (noLoc . synifyIdSig DeleteTopLevelQuantification)
-           (classMethods cl))
-      emptyBag --ignore default method definitions, they don't affect signature
-      (map synifyClassAT (classATs cl))
-      [] --we don't have any docs at this point
 
 
 -- class associated-types are a subset of TyCon
@@ -224,25 +225,7 @@ synifyIdSig s i = TypeSig [synifyName i] (synifyType s (varType i))
 
 
 synifyCtx :: [PredType] -> LHsContext Name
-synifyCtx = noLoc . map synifyPred
-
-
-synifyPred :: PredType -> LHsPred Name
-synifyPred (ClassP cls tys) =
-    let sTys = map (synifyType WithinType) tys
-    in noLoc $
-        HsClassP (getName cls) sTys
-synifyPred (IParam ip ty) =
-    let sTy = synifyType WithinType ty
-    -- IPName should be in class NamedThing...
-    in noLoc $
-      HsIParam ip sTy
-synifyPred (EqPred ty1 ty2) =
-    let
-     s1 = synifyType WithinType ty1
-     s2 = synifyType WithinType ty2
-    in noLoc $
-      HsEqualP s1 s2
+synifyCtx = noLoc . map (synifyType WithinType)
 
 
 synifyTyVars :: [TyVar] -> [LHsTyVarBndr Name]
@@ -273,8 +256,6 @@ data SynifyTypeState
 
 
 synifyType :: SynifyTypeState -> Type -> LHsType Name
-synifyType _ (PredTy{}) = --should never happen.
-  error "synifyType: PredTys are not, in themselves, source-level types."
 synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
@@ -310,12 +291,3 @@ synifyType s forallty@(ForAllTy _tv _ty) =
       sTau = synifyType WithinType tau
      in noLoc $
            HsForAllTy forallPlicitness sTvs sCtx sTau
-
-
-synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
-                  ([HsPred Name], Name, [HsType Name])
-synifyInstHead (_, preds, cls, ts) =
-  ( map (unLoc . synifyPred) preds
-  , getName cls
-  , map (unLoc . synifyType WithinType) ts
-  )

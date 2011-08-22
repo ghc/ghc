@@ -259,7 +259,7 @@ type DocInstance name = (InstHead name, Maybe (Doc name))
 
 -- | The head of an instance. Consists of a context, a class name and a list
 -- of instance types.
-type InstHead name = ([HsPred name], name, [HsType name])
+type InstHead name = ([HsType name], name, [HsType name])
 
 
 -----------------------------------------------------------------------------

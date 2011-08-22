@@ -208,25 +208,6 @@ renameFnArgsDoc :: FnArgsDoc Name -> RnM (FnArgsDoc DocName)
 renameFnArgsDoc = mapM renameDoc
 
 
-renameLPred :: LHsPred Name -> RnM (LHsPred DocName)
-renameLPred = mapM renamePred
-
-
-renamePred :: HsPred Name -> RnM (HsPred DocName)
-renamePred (HsClassP name types) = do
-  name'  <- rename name
-  types' <- mapM renameLType types
-  return (HsClassP name' types')
-renamePred (HsEqualP type1 type2) = do
-  type1' <- renameLType type1
-  type2' <- renameLType type2
-  return (HsEqualP type1' type2')
-renamePred (HsIParam (IPName name) t) = do
-  name' <- rename name
-  t'    <- renameLType t
-  return (HsIParam (IPName name') t')
-
-
 renameLType :: LHsType Name -> RnM (LHsType DocName)
 renameLType = mapM renameType
 
@@ -265,8 +246,6 @@ renameType t = case t of
 
   HsParTy ty -> return . HsParTy =<< renameLType ty
 
-  HsPredTy p -> return . HsPredTy =<< renamePred p
-
   HsKindSig ty k -> do
     ty' <- renameLType ty
     return (HsKindSig ty' k)
@@ -285,15 +264,15 @@ renameLTyVarBndr (L loc tv) = do
   return $ L loc (replaceTyVarName tv name')
 
 
-renameLContext :: Located [LHsPred Name] -> RnM (Located [LHsPred DocName])
+renameLContext :: Located [LHsType Name] -> RnM (Located [LHsType DocName])
 renameLContext (L loc context) = do
-  context' <- mapM renameLPred context
+  context' <- mapM renameLType context
   return (L loc context')
 
 
 renameInstHead :: InstHead Name -> RnM (InstHead DocName)
 renameInstHead (preds, className, types) = do
-  preds' <- mapM renamePred preds
+  preds' <- mapM renameLType preds
   className' <- rename className
   types' <- mapM renameType types
   return (preds', className', types')
