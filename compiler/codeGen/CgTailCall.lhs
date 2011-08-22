@@ -27,7 +27,6 @@ import CgHeapery
 import CgUtils
 import CgTicky
 import ClosureInfo
-import SMRep
 import OldCmm	
 import OldCmmUtils
 import CLabel

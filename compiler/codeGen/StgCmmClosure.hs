@@ -358,17 +358,6 @@ isLFReEntrant _                = False
 --		Choosing SM reps
 -----------------------------------------------------------------------------
 
-chooseSMRep
-	:: Bool			-- True <=> static closure
-	-> LambdaFormInfo
-	-> WordOff -> WordOff	-- Tot wds, ptr wds
-	-> SMRep
-
-chooseSMRep is_static lf_info tot_wds ptr_wds
-  = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
-  where
-    nonptr_wds = tot_wds - ptr_wds
-
 lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
 lfClosureType (LFReEntrant _ arity _ argd) = Fun (fromIntegral arity) argd
 lfClosureType (LFCon con)                  =  Constr (fromIntegral (dataConTagZ con))

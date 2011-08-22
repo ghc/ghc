@@ -247,6 +247,7 @@ tickySlowCallPat _args = return ()
     (str, True)  -> bumpTickyCounter' (mkRtsSlowTickyCtrLabel pat)
     (str, False) -> bumpTickyCounter  (sLit "TICK_SLOW_CALL_OTHER")
 
+-- Don't use CgRep; put this function in StgCmmLayout
 callPattern :: [CgRep] -> (String,Bool)
 callPattern reps 
   | match == length reps = (chars, True)

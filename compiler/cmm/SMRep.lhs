@@ -15,18 +15,6 @@ module SMRep (
 	hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
 	WordOff, ByteOff,
 
-	-- Argument/return representations
-	CgRep(..), nonVoidArg,
-	argMachRep, primRepToCgRep, 
--- Temp primRepHint, typeHint,
-	isFollowableArg, isVoidArg, 
-	isFloatingArg, is64BitArg,
-	separateByPtrFollowness,
-	cgRepSizeW, cgRepSizeB,
-	retAddrSizeW,
-
-	typeCgRep, idCgRep, tyConCgRep, 
-
 	-- Closure repesentation
         SMRep(..),	-- CmmInfo sees the rep; no one else does
         IsStatic, 
@@ -49,10 +37,6 @@ module SMRep (
 #include "../HsVersions.h"
 #include "../includes/MachDeps.h"
 
-import CmmType
-import Id
-import Type
-import TyCon
 import StaticFlags
 import Constants
 import Outputable
@@ -94,148 +78,6 @@ hALF_WORD_SIZE_IN_BITS = 32
 #else
 #error unknown SIZEOF_HSWORD
 #endif
-\end{code}
-
-
-%************************************************************************
-%*									*
-			CgRep
-%*									*
-%************************************************************************
-
-An CgRep is an abstraction of a Type which tells the code generator
-all it needs to know about the calling convention for arguments (and
-results) of that type.  In particular, the ArgReps of a function's
-arguments are used to decide which of the RTS's generic apply
-functions to call when applying an unknown function.
-
-It contains more information than the back-end data type MachRep,
-so one can easily convert from CgRep -> MachRep.  (Except that
-there's no MachRep for a VoidRep.)
-
-It distinguishes 
-	pointers from non-pointers (we sort the pointers together
-	when building closures)
-
-	void from other types: a void argument is different from no argument
-
-All 64-bit types map to the same CgRep, because they're passed in the
-same register, but a PtrArg is still different from an NonPtrArg
-because the function's entry convention has to take into account the
-pointer-hood of arguments for the purposes of describing the stack on
-entry to the garbage collector.
-
-\begin{code}
-data CgRep 
-  = VoidArg 	-- Void
-  | PtrArg 	-- Word-sized heap pointer, followed
-		-- by the garbage collector
-  | NonPtrArg 	-- Word-sized non-pointer
-		-- (including addresses not followed by GC)
-  | LongArg	-- 64-bit non-pointer
-  | FloatArg 	-- 32-bit float
-  | DoubleArg 	-- 64-bit float
-  deriving Eq
-
-instance Outputable CgRep where
-    ppr VoidArg   = ptext (sLit "V_")
-    ppr PtrArg    = ptext (sLit "P_")
-    ppr NonPtrArg = ptext (sLit "I_")
-    ppr LongArg   = ptext (sLit "L_")
-    ppr FloatArg  = ptext (sLit "F_")
-    ppr DoubleArg = ptext (sLit "D_")
-
-argMachRep :: CgRep -> CmmType
-argMachRep PtrArg    = gcWord
-argMachRep NonPtrArg = bWord
-argMachRep LongArg   = b64
-argMachRep FloatArg  = f32
-argMachRep DoubleArg = f64
-argMachRep VoidArg   = panic "argMachRep:VoidRep"
-
-primRepToCgRep :: PrimRep -> CgRep
-primRepToCgRep VoidRep    = VoidArg
-primRepToCgRep PtrRep     = PtrArg
-primRepToCgRep IntRep	  = NonPtrArg
-primRepToCgRep WordRep	  = NonPtrArg
-primRepToCgRep Int64Rep   = LongArg
-primRepToCgRep Word64Rep  = LongArg
-primRepToCgRep AddrRep    = NonPtrArg
-primRepToCgRep FloatRep   = FloatArg
-primRepToCgRep DoubleRep  = DoubleArg
-
-idCgRep :: Id -> CgRep
-idCgRep x = typeCgRep . idType $ x
-
-tyConCgRep :: TyCon -> CgRep
-tyConCgRep = primRepToCgRep . tyConPrimRep
-
-typeCgRep :: Type -> CgRep
-typeCgRep = primRepToCgRep . typePrimRep 
-\end{code}
-
-Whether or not the thing is a pointer that the garbage-collector
-should follow. Or, to put it another (less confusing) way, whether
-the object in question is a heap object. 
-
-Depending on the outcome, this predicate determines what stack
-the pointer/object possibly will have to be saved onto, and the
-computation of GC liveness info.
-
-\begin{code}
-isFollowableArg :: CgRep -> Bool  -- True <=> points to a heap object
-isFollowableArg PtrArg  = True
-isFollowableArg _       = False
-
-isVoidArg :: CgRep -> Bool
-isVoidArg VoidArg = True
-isVoidArg _       = False
-
-nonVoidArg :: CgRep -> Bool
-nonVoidArg VoidArg = False
-nonVoidArg _       = True
-
--- isFloatingArg is used to distinguish @Double@ and @Float@ which
--- cause inadvertent numeric conversions if you aren't jolly careful.
--- See codeGen/CgCon:cgTopRhsCon.
-
-isFloatingArg :: CgRep -> Bool
-isFloatingArg DoubleArg = True
-isFloatingArg FloatArg  = True
-isFloatingArg _         = False
-
-is64BitArg :: CgRep -> Bool
-is64BitArg LongArg = True
-is64BitArg _       = False
-\end{code}
-
-\begin{code}
-separateByPtrFollowness :: [(CgRep,a)] -> ([(CgRep,a)], [(CgRep,a)])
--- Returns (ptrs, non-ptrs)
-separateByPtrFollowness things
-  = sep_things things [] []
-    -- accumulating params for follow-able and don't-follow things...
-  where
-    sep_things []    	       bs us = (reverse bs, reverse us)
-    sep_things ((PtrArg,a):ts) bs us = sep_things ts ((PtrArg,a):bs) us
-    sep_things (t         :ts) bs us = sep_things ts bs		     (t:us)
-\end{code}
-
-\begin{code}
-cgRepSizeB :: CgRep -> ByteOff
-cgRepSizeB DoubleArg = dOUBLE_SIZE
-cgRepSizeB LongArg   = wORD64_SIZE
-cgRepSizeB VoidArg   = 0
-cgRepSizeB _         = wORD_SIZE
-
-cgRepSizeW :: CgRep -> ByteOff
-cgRepSizeW DoubleArg = dOUBLE_SIZE `quot` wORD_SIZE
-cgRepSizeW LongArg   = wORD64_SIZE `quot` wORD_SIZE
-cgRepSizeW VoidArg   = 0
-cgRepSizeW _         = 1
-
-retAddrSizeW :: WordOff
-retAddrSizeW = 1	-- One word
 \end{code}
 
 %************************************************************************

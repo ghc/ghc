@@ -42,7 +42,6 @@ module CgTicky (
 import ClosureInfo
 import CgUtils
 import CgMonad
-import SMRep
 
 import OldCmm
 import OldCmmUtils

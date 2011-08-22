@@ -30,7 +30,6 @@ import CLabel
 import ClosureInfo
 import CostCentre
 import Id
-import SMRep
 import BasicTypes
 \end{code}
 

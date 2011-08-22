@@ -26,7 +26,6 @@ import CgProf
 import CgInfoTbls
 
 import ClosureInfo
-import SMRep
 import OldCmmUtils
 import OldCmm
 

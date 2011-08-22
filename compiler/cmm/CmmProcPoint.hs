@@ -13,7 +13,6 @@ import Prelude hiding (last, unzip, succ, zip)
 import BlockId
 import CLabel
 import Cmm
-import CmmExpr
 import CmmUtils
 import CmmContFlowOpt
 import CmmInfo

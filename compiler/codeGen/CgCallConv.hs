@@ -35,6 +35,7 @@ import CLabel
 
 import Constants
 import CgStackery
+import ClosureInfo( CgRep(..), nonVoidArg, idCgRep, cgRepSizeW, isFollowableArg )
 import OldCmmUtils
 import Maybes
 import Id

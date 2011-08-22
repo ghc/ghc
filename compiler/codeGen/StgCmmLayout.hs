@@ -38,7 +38,6 @@ import StgCmmUtils
 import MkGraph
 import SMRep
 import Cmm
-import CmmUtils
 import CLabel
 import StgSyn
 import Id
@@ -240,6 +239,9 @@ lRepSizeW L = wORD64_SIZE `quot` wORD_SIZE
 lRepSizeW D = dOUBLE_SIZE `quot` wORD_SIZE
 lRepSizeW V = 0
 
+idLRep :: Id -> LRep
+idLRep = toLRep . idPrimRep
+
 -------------------------------------------------------------------------
 ----	Laying out objects on the heap and stack
 -------------------------------------------------------------------------
@@ -314,7 +316,7 @@ mkArgDescr _nm args
 	Nothing      -> return (ArgGen arg_bits)
   where
     arg_bits = argBits arg_reps
-    arg_reps = filter isNonV (map (toLRep . idPrimRep) args)
+    arg_reps = filter isNonV (map idLRep args)
 	-- Getting rid of voids eases matching of standard patterns
 
 argBits :: [LRep] -> [Bool]	-- True for non-ptr, False for ptr

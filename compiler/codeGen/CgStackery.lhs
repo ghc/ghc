@@ -25,6 +25,7 @@ module CgStackery (
 import CgMonad
 import CgUtils
 import CgProf
+import ClosureInfo( CgRep(..), cgRepSizeW )
 import SMRep
 import OldCmm
 import OldCmmUtils
