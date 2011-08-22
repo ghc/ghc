@@ -25,7 +25,7 @@ import FamInstEnv       ( topNormaliseType )
 import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness )
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
-import Demand           ( isStrictDmd )
+import Demand           ( isStrictDmd, StrictSig(..), dmdTypeDepth )
 import PprCore          ( pprParendExpr, pprCoreExpr )
 import CoreUnfold 
 import CoreUtils
@@ -661,8 +661,17 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 	    info2 = info1 `setUnfoldingInfo` new_unfolding
 
 	      -- Demand info: Note [Setting the demand info]
-            info3 | isEvaldUnfolding new_unfolding = zapDemandInfo info2 `orElse` info2
-                  | otherwise                      = info2
+              --
+              -- We also have to nuke demand info if for some reason
+              -- eta-expansion *reduces* the arity of the binding to less
+              -- than that of the strictness sig. This can happen: see Note [Arity decrease].
+            info3 | isEvaldUnfolding new_unfolding
+                    || (case strictnessInfo info2 of
+                          Just (StrictSig dmd_ty) -> new_arity < dmdTypeDepth dmd_ty
+                          Nothing                 -> False)
+                  = zapDemandInfo info2 `orElse` info2
+                  | otherwise
+                  = info2
 
             final_id = new_bndr `setIdInfo` info3
 
@@ -682,6 +691,8 @@ addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplM SimplEnv
 -- Then we float the y-binding out (via abstractFloats and addPolyBind)
 -- but 'x' may well then be inlined in 'body' in which case we'd like the 
 -- opportunity to inline 'y' too.
+--
+-- INVARIANT: the arity is correct on the incoming binders
 
 addPolyBind top_lvl env (NonRec poly_id rhs)
   = do  { unfolding <- simplUnfolding env top_lvl poly_id rhs noUnfolding
@@ -689,7 +700,6 @@ addPolyBind top_lvl env (NonRec poly_id rhs)
 			-- which is perhaps wrong.  ToDo: think about this
         ; let final_id = setIdInfo poly_id $
                          idInfo poly_id `setUnfoldingInfo` unfolding
-                                        `setArityInfo`     exprArity rhs
 
         ; return (addNonRec env final_id rhs) }
 
@@ -2215,10 +2225,11 @@ mkDupableAlt env case_bndr (con, bndrs', rhs')
                 really_final_bndrs     = map one_shot final_bndrs'
                 one_shot v | isId v    = setOneShotLambda v
                            | otherwise = v
-                join_rhs  = mkLams really_final_bndrs rhs'
-                join_call = mkApps (Var join_bndr) final_args
+                join_rhs   = mkLams really_final_bndrs rhs'
+                join_arity = exprArity join_rhs
+                join_call  = mkApps (Var join_bndr) final_args
 
-	; env' <- addPolyBind NotTopLevel env (NonRec join_bndr join_rhs)
+	; env' <- addPolyBind NotTopLevel env (NonRec (join_bndr `setIdArity` join_arity) join_rhs)
         ; return (env', (con, bndrs', join_call)) }
                 -- See Note [Duplicated env]
 \end{code}
