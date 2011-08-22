@@ -1,4 +1,3 @@
-
 import os
 import re
 
@@ -10,105 +9,106 @@ config.compiler_type         = 'ghc'
 config.compiler              = 'ghc'
 config.compiler_always_flags = ['-fforce-recomp', '-dcore-lint', '-dcmm-lint', '-dno-debug-output', '-no-user-package-conf', '-rtsopts']
 
-config.hp2ps		     = 'hp2ps'
-config.hpc		     = 'hpc'
-config.gs		     = 'gs'
+config.hp2ps                 = 'hp2ps'
+config.hpc                   = 'hpc'
+config.gs                    = 'gs'
 config.confdir               = '.'
 
 # By default, we test the 'normal', 'opt' and 'hpc' ways.
 # 'optasm' is added by mk/test.mk if the compiler has a native code gen,
 # 'prof'   is added by mk/test.mk if the profiling way is enabled.
-config.compile_ways	     = ['normal', 'hpc']
-config.run_ways		     = ['normal', 'hpc']
+config.compile_ways       = ['normal', 'hpc']
+config.run_ways           = ['normal', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
-config.other_ways            = ['extcore','optextcore',
-                                'prof_hc_hb','prof_hb',
-                                'prof_hd','prof_hy','prof_hr',
-                                'threaded1_ls',
-                                'threaded2_hT',
-                                'llvm']
+config.other_ways         = ['extcore','optextcore',
+                             'prof_hc_hb','prof_hb',
+                             'prof_hd','prof_hy','prof_hr',
+                             'threaded1_ls', 'threaded2_hT',
+                             'llvm', 'debugllvm']
 
 if (ghc_with_native_codegen == 1):
-	config.compile_ways.append('optasm')
-	config.run_ways.append('optasm')
+    config.compile_ways.append('optasm')
+    config.run_ways.append('optasm')
 
 if (ghc_with_profiling == 1):
-	config.have_profiling = True
-	if (ghc_with_native_codegen == 1):
-		config.compile_ways.append('profasm')
-		config.run_ways.append('profasm')
+    config.have_profiling = True
+    if (ghc_with_native_codegen == 1):
+        config.compile_ways.append('profasm')
+        config.run_ways.append('profasm')
 
 if (ghc_with_interpreter == 1):
-	config.have_interp = True
-	config.run_ways.append('ghci')
+    config.have_interp = True
+    config.run_ways.append('ghci')
 
 config.unregisterised = (ghc_unregisterised == 1)
 
 if (ghc_with_threaded_rts == 1):
-	config.run_ways.append('threaded1')
-	if (ghc_with_smp == 1):
-		config.run_ways.append('threaded2')
+    config.run_ways.append('threaded1')
+    if (ghc_with_smp == 1):
+        config.run_ways.append('threaded2')
 
 if (ghc_with_dynamic_rts == 1):
-        config.have_shared_libs = True
-	config.run_ways.append('dyn')
+    config.have_shared_libs = True
+    config.run_ways.append('dyn')
 
 if (ghc_with_profiling == 1 and ghc_with_threaded_rts == 1):
-        config.run_ways.append('profthreaded')
+    config.run_ways.append('profthreaded')
 
 if (ghc_with_llvm == 1):
-        config.run_ways.append('optllvm')
+    config.run_ways.append('optllvm')
 
 config.in_tree_compiler = in_tree_compiler
 
 config.way_flags = {
-	'normal'     : [],
-        'g1'         : [],
-        'optasm'     : ['-O -fasm'],
-	'llvm'       : ['-fllvm'],
-	'optllvm'    : ['-O -fllvm'],
-	'profasm'    : ['-O -prof -auto-all -fasm'],
-	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
-	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
-	'extcore'    : ['-fext-core'],
-	'optextcore' : ['-O -fext-core'],
-        'threaded1'  : ['-threaded', '-debug'],
-        'threaded1_ls'  : ['-threaded', '-debug'],
-        'threaded2'  : ['-O', '-threaded', '-eventlog'],
-        'threaded2_hT'  : ['-O', '-threaded'],
-        'hpc'        : ['-O', '-fhpc' ],
-        'prof_hc_hb' : ['-O -prof -auto-all'],
-        'prof_hb'    : ['-O -prof -auto-all'],
-        'prof_hd'    : ['-O -prof -auto-all'],
-        'prof_hy'    : ['-O -prof -auto-all'],
-        'prof_hr'    : ['-O -prof -auto-all'],
-        'dyn'        : ['-O -dynamic']
-	}
+    'normal'       : [],
+    'g1'           : [],
+    'optasm'       : ['-O -fasm'],
+    'llvm'         : ['-fllvm'],
+    'optllvm'      : ['-O -fllvm'],
+    'debugllvm'    : ['-fllvm -keep-llvm-files'],
+    'profasm'      : ['-O -prof -auto-all -fasm'],
+    'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
+    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '+RTS', '-I0.1', '-RTS'],
+    'extcore'      : ['-fext-core'],
+    'optextcore'   : ['-O -fext-core'],
+    'threaded1'    : ['-threaded', '-debug'],
+    'threaded1_ls' : ['-threaded', '-debug'],
+    'threaded2'    : ['-O', '-threaded', '-eventlog'],
+    'threaded2_hT' : ['-O', '-threaded'],
+    'hpc'          : ['-O', '-fhpc' ],
+    'prof_hc_hb'   : ['-O -prof -auto-all'],
+    'prof_hb'      : ['-O -prof -auto-all'],
+    'prof_hd'      : ['-O -prof -auto-all'],
+    'prof_hy'      : ['-O -prof -auto-all'],
+    'prof_hr'      : ['-O -prof -auto-all'],
+    'dyn'          : ['-O -dynamic']
+   }
 
 config.way_rts_flags = { 
-        'normal'     : [],
-        'g1'         : ['-G1'],
-        'optasm'     : [],
-	'llvm'       : [],
-	'optllvm'    : [],
-	'profasm'    : ['-hc'], # test heap profiling too
-	'profthreaded' : ['-p'],
-	'ghci'       : [],
-	'extcore'    : [],
-        'optextcore' : [],
-	'threaded1'  : [],
-        'threaded1_ls'  : ['-ls'],
-        'threaded2'  : ['-N2 -ls'],
-        'threaded2_hT'  : ['-N2', '-hT'],
-        'hpc'        : [],
-        'prof_hc_hb' : ['-hc -hbvoid'],
-        'prof_hb'    : ['-hb'],
-        'prof_hd'    : ['-hd'],
-        'prof_hy'    : ['-hy'],
-        'prof_hr'    : ['-hr'],
-        'dyn'        : []
-    	}
+    'normal'       : [],
+    'g1'           : ['-G1'],
+    'optasm'       : [],
+    'llvm'         : [],
+    'optllvm'      : [],
+    'debugllvm'    : [],
+    'profasm'      : ['-hc'], # test heap profiling too
+    'profthreaded' : ['-p'],
+    'ghci'         : [],
+    'extcore'      : [],
+    'optextcore'   : [],
+    'threaded1'    : [],
+    'threaded1_ls' : ['-ls'],
+    'threaded2'    : ['-N2 -ls'],
+    'threaded2_hT' : ['-N2', '-hT'],
+    'hpc'          : [],
+    'prof_hc_hb'   : ['-hc -hbvoid'],
+    'prof_hb'      : ['-hb'],
+    'prof_hd'      : ['-hd'],
+    'prof_hy'      : ['-hy'],
+    'prof_hr'      : ['-hr'],
+    'dyn'          : []
+   }
 
 # Useful classes of ways:
 
@@ -119,7 +119,7 @@ threaded_ways = filter(lambda x: x in config.run_ways,
                        ['threaded1','threaded2','ghci','profthreaded'])
 
 def get_compiler_info():
-    # This should really not go through the shell
+# This should really not go through the shell
     h = os.popen('"' + config.compiler + '" --info', 'r')
     s = h.read()
     s = re.sub('[\r\n]', '', s)
@@ -143,6 +143,6 @@ def get_compiler_info():
         config.compiler_profiled = False
 
     try:
-            config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
+        config.package_conf_cache_file = compilerInfoDict["Global Package DB"] + '/package.cache'
     except:
-            config.package_conf_cache_file = ''
+        config.package_conf_cache_file = ''
