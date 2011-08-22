@@ -1,4 +1,2 @@
 
 tcfail051.hs:3:10: Not in scope: type constructor or class `B'
-
-tcfail051.hs:4:2: `op1' is not a (visible) method of class `B'
