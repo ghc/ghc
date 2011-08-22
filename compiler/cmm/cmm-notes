@@ -1,3 +1,20 @@
+More notes (Aug 11)
+~~~~~~~~~~~~~~~~~~
+* CmmInfo.cmmToRawCmm expands info tables to their representations
+  (needed for .cmm files as well as the code generators)
+
+* Why is FCode a lazy monad?  That makes it inefficient.
+  We want laziness to get code out one procedure at a time,
+  but not at the instruction level.
+
+Things we did
+  * Remove CmmCvt.graphToZgraph (Conversion from old to new Cmm reps)
+  * Remove HscMain.optionallyConvertAndOrCPS (converted old Cmm to
+    new, ran pipeline, and converted back)
+  * Remove CmmDecl. Put its types in Cmm.  Import Cmm into OldCmm
+    so it can get those types.
+
+
 More notes (June 11)
 ~~~~~~~~~~~~~~~~~~~~
 * Possible refactoring: Nuke AGraph in favour of 
@@ -235,15 +252,13 @@ Things to do:
 ----------------------------------------------------
 
 -------- Testing stuff ------------
-HscMain.optionallyConvertAndOrCPS
-        testCmmConversion
-DynFlags:  -fconvert-to-zipper-and-back, -frun-cpsz
+DynFlags: -frun-cpsz
 
 -------- Moribund stuff ------------
 OldCmm.hs      Definition of flowgraph of old representation
+               Imports some data types from (new) Cmm
 OldCmmUtil.hs  Utilites that operates mostly on on CmmStmt
 OldPprCmm.hs   Pretty print for CmmStmt, GenBasicBlock and ListGraph
-CmmCvt.hs      Conversion between old and new Cmm reps
 CmmOpt.hs      Hopefully-redundant optimiser
 
 -------- Stuff to keep ------------
@@ -264,20 +279,19 @@ CmmInfo.hs                Defn of InfoTables, and conversion to exact byte layou
 
 ---------- Cmm data types --------------
 Cmm.hs              Cmm instantiations of dataflow graph framework
-MkGraph.hs          Interface for building Cmm for codeGen/Stg*.hs modules
+  CmmExpr.hs        Type of Cmm expression
+  CmmType.hs        Type of Cmm types and their widths
+  CmmMachOp.hs      MachOp type and accompanying utilities
 
-CmmDecl.hs          Shared Cmm types of both representations
-CmmExpr.hs          Type of Cmm expression
-CmmType.hs          Type of Cmm types and their widths
-CmmMachOp.hs        MachOp type and accompanying utilities
+PprCmm.hs	    Pretty printer for Cmm
+  PprCmmExpr.hs     Pretty printer for CmmExpr
+
+MkGraph.hs          Interface for building Cmm for codeGen/Stg*.hs modules
 
 CmmUtils.hs
 CmmLint.hs
 
 PprC.hs	            Pretty print Cmm in C syntax
-PprCmm.hs	    Pretty printer for CmmGraph.
-PprCmmDecl.hs       Pretty printer for common Cmm types.
-PprCmmExpr.hs       Pretty printer for Cmm expressions.
 
 CLabel.hs           CLabel
 BlockId.hs          BlockId, BlockEnv, BlockSet
@@ -351,9 +365,17 @@ cpsTop:
        Manifest the stack pointer
 
    * Split into separate procedures
+
       - CmmProcPoint.procPointAnalysis
-        Given set of proc points, which blocks are reachable from each
-        Claim: too few proc-points => code duplication, but program still works??
+        Given set of proc points (computed earlier by
+           CmmProcPoint.minimalProcPointSet) find which blocks 
+           are reachable from each
+	Each block should be reachable from *one* proc point, so 
+	  the blocks reachable from P are the internal nodes of 
+	  the final procedure P
+        NB: if we the earlier analysis had produced too few proc-points 
+            we should nevertheless be fine by code duplication; but
+	    that is not implemented
 
       - CmmProcPoint.splitAtProcPoints
 	Using this info, split into separate procedures
