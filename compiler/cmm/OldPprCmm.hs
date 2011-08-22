@@ -86,18 +86,12 @@ instance Outputable CmmSafety where
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
 pprInfo :: CmmInfo -> SDoc
-pprInfo (CmmInfo _gc_target update_frame CmmNonInfoTable) =
-    vcat [{-ptext (sLit "gc_target: ") <>
-                maybe (ptext (sLit "<none>")) ppr gc_target,-}
-          ptext (sLit "update_frame: ") <>
-                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
-pprInfo (CmmInfo _gc_target update_frame info_table@(CmmInfoTable _ _ _ _ _)) =
+pprInfo (CmmInfo _gc_target update_frame info_table) =
     vcat [{-ptext (sLit "gc_target: ") <>
                 maybe (ptext (sLit "<none>")) ppr gc_target,-}
           ptext (sLit "update_frame: ") <>
                 maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
           ppr info_table]
-
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.

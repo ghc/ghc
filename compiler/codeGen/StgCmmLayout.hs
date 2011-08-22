@@ -15,7 +15,7 @@ module StgCmmLayout (
 
 	slowCall, directCall, 
 
-	mkVirtHeapOffsets, getHpRelOffset, hpRel,
+	mkVirtHeapOffsets, mkVirtConstrOffsets, getHpRelOffset, hpRel,
 
 	stdInfoTableSizeB,
 	entryCode, closureInfoPtr,
@@ -23,7 +23,7 @@ module StgCmmLayout (
         cmmGetClosureType,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
-	funInfoTable, makeRelativeRefTo
+	funInfoTable
   ) where
 
 
@@ -32,26 +32,20 @@ module StgCmmLayout (
 import StgCmmClosure
 import StgCmmEnv
 import StgCmmTicky
-import StgCmmUtils
 import StgCmmMonad
+import StgCmmUtils
 
 import MkGraph
 import SMRep
-import CmmDecl
-import CmmExpr
+import Cmm
 import CmmUtils
 import CLabel
 import StgSyn
-import DataCon
 import Id
 import Name
 import TyCon		( PrimRep(..) )
-import Unique
 import BasicTypes	( Arity )
 import StaticFlags
-
-import Bitmap
-import Data.Bits
 
 import Constants
 import Util
@@ -293,6 +287,10 @@ mkVirtHeapOffsets is_thunk things
       = (wds_so_far + lRepSizeW (toLRep rep), 
 	 (NonVoid thing, hdr_size + wds_so_far))
 
+mkVirtConstrOffsets :: [(PrimRep,a)] -> (WordOff, WordOff, [(NonVoid a, VirtualHpOffset)])
+-- Just like mkVirtHeapOffsets, but for constructors
+mkVirtConstrOffsets = mkVirtHeapOffsets False
+
 
 -------------------------------------------------------------------------
 --
@@ -309,28 +307,15 @@ mkVirtHeapOffsets is_thunk things
 -- bring in ARG_P, ARG_N, etc.
 #include "../includes/rts/storage/FunTypes.h"
 
--------------------------
--- argDescrType :: ArgDescr -> StgHalfWord
--- -- The "argument type" RTS field type
--- argDescrType (ArgSpec n) = n
--- argDescrType (ArgGen liveness)
---   | isBigLiveness liveness = ARG_GEN_BIG
---   | otherwise		   = ARG_GEN
-
-
 mkArgDescr :: Name -> [Id] -> FCode ArgDescr
-mkArgDescr nm args 
+mkArgDescr _nm args 
   = case stdPattern arg_reps of
 	Just spec_id -> return (ArgSpec spec_id)
-	Nothing      -> do { liveness <- mkLiveness nm size bitmap
-			   ; return (ArgGen liveness) }
+	Nothing      -> return (ArgGen arg_bits)
   where
+    arg_bits = argBits arg_reps
     arg_reps = filter isNonV (map (toLRep . idPrimRep) args)
 	-- Getting rid of voids eases matching of standard patterns
-
-    bitmap   = mkBitmap arg_bits
-    arg_bits = argBits arg_reps
-    size     = length arg_bits
 
 argBits :: [LRep] -> [Bool]	-- True for non-ptr, False for ptr
 argBits [] 		= []
@@ -370,78 +355,6 @@ stdPattern reps
 
 -------------------------------------------------------------------------
 --
---	Liveness info
---
--------------------------------------------------------------------------
-
--- TODO: This along with 'mkArgDescr' should be unified
--- with 'CmmInfo.mkLiveness'.  However that would require
--- potentially invasive changes to the 'ClosureInfo' type.
--- For now, 'CmmInfo.mkLiveness' handles only continuations and
--- this one handles liveness everything else.  Another distinction
--- between these two is that 'CmmInfo.mkLiveness' information
--- about the stack layout, and this one is information about
--- the heap layout of PAPs.
-mkLiveness :: Name -> Int -> Bitmap -> FCode Liveness
-mkLiveness name size bits
-  | size > mAX_SMALL_BITMAP_SIZE		-- Bitmap does not fit in one word
-  = do	{ let lbl = mkBitmapLabel (getUnique name)
-	; emitRODataLits lbl ( mkWordCLit (fromIntegral size)
-		             : map mkWordCLit bits)
-	; return (BigLiveness lbl) }
-  
-  | otherwise		-- Bitmap fits in one word
-  = let
-        small_bits = case bits of 
-			[]  -> 0
-                        [b] -> b
-			_   -> panic "livenessToAddrMode"
-    in
-    return (smallLiveness size small_bits)
-
-smallLiveness :: Int -> StgWord -> Liveness
-smallLiveness size small_bits = SmallLiveness bits
-  where bits = fromIntegral size .|. (small_bits `shiftL` bITMAP_BITS_SHIFT)
-
--------------------
--- isBigLiveness :: Liveness -> Bool
--- isBigLiveness (BigLiveness _)   = True
--- isBigLiveness (SmallLiveness _) = False
-
--------------------
--- mkLivenessCLit :: Liveness -> CmmLit
--- mkLivenessCLit (BigLiveness lbl)    = CmmLabel lbl
--- mkLivenessCLit (SmallLiveness bits) = mkWordCLit bits
-
-
--------------------------------------------------------------------------
---
---		Bitmap describing register liveness
---		across GC when doing a "generic" heap check
---		(a RET_DYN stack frame).
---
--- NB. Must agree with these macros (currently in StgMacros.h): 
--- GET_NON_PTRS(), GET_PTRS(), GET_LIVENESS().
--------------------------------------------------------------------------
-
-{- 	Not used in new code gen
-mkRegLiveness :: [(Id, GlobalReg)] -> Int -> Int -> StgWord
-mkRegLiveness regs ptrs nptrs
-  = (fromIntegral nptrs `shiftL` 16) .|. 
-    (fromIntegral ptrs  `shiftL` 24) .|.
-    all_non_ptrs `xor` reg_bits regs
-  where
-    all_non_ptrs = 0xff
-
-    reg_bits [] = 0
-    reg_bits ((id, VanillaReg i) : regs) | isGcPtrRep (idPrimRep id)
-  	= (1 `shiftL` (i - 1)) .|. reg_bits regs
-    reg_bits (_ : regs)
-	= reg_bits regs
--}
- 
--------------------------------------------------------------------------
---
 --	Generating the info table and code for a closure
 --
 -------------------------------------------------------------------------
@@ -479,27 +392,19 @@ emitClosureProcAndInfoTable top_lvl bndr cl_info args body
 emitClosureAndInfoTable ::
   ClosureInfo -> Convention -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable cl_info conv args body
-  = do { info <- mkCmmInfo cl_info
+  = do { let info = mkCmmInfo cl_info
        ; blks <- getCode body
        ; emitProcWithConvention conv info (entryLabelFromCI cl_info) args blks
        }
 
 -- Convert from 'ClosureInfo' to 'CmmInfoTable'.
--- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
-mkCmmInfo :: ClosureInfo -> FCode CmmInfoTable
+-- Not used for return points.
+mkCmmInfo :: ClosureInfo -> CmmInfoTable
 mkCmmInfo cl_info
-  = do	{ info <- closureTypeInfo cl_info k_with_con_name return 
-        ; prof <- if opt_SccProfilingOn then
-                    do fd_lit <- mkStringCLit (closureTypeDescr cl_info)
-	               ad_lit <- mkStringCLit (closureValDescr  cl_info)
-	               return $ ProfilingInfo fd_lit ad_lit
-                  else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
-	; return (CmmInfoTable (infoTableLabelFromCI cl_info) (isStaticClosure cl_info) prof cl_type info) }
-  where
-    k_with_con_name con_info con info_lbl =
-      do cstr <- mkByteStringCLit $ dataConIdentity con
-         return $ con_info $ makeRelativeRefTo info_lbl cstr
-    cl_type  = smRepClosureTypeInt (closureSMRep cl_info)
+  = CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
+                   cit_rep  = closureSMRep cl_info,
+                   cit_prof = closureProf cl_info,
+                   cit_srt  = closureSRT cl_info }
 
 -----------------------------------------------------------------------------
 --
@@ -612,37 +517,3 @@ funInfoTable info_ptr
   = cmmOffsetW info_ptr (1 + stdInfoTableSizeW)
 				-- Past the entry code pointer
 
--------------------------------------------------------------------------
---
---	Static reference tables
---
--------------------------------------------------------------------------
-
--- srtLabelAndLength :: C_SRT -> CLabel -> (CmmLit, StgHalfWord)
--- srtLabelAndLength NoC_SRT _		
---   = (zeroCLit, 0)
--- srtLabelAndLength (C_SRT lbl off bitmap) info_lbl
---   = (makeRelativeRefTo info_lbl $ cmmLabelOffW lbl off, bitmap)
-
--------------------------------------------------------------------------
---
---	Position independent code
---
--------------------------------------------------------------------------
--- In order to support position independent code, we mustn't put absolute
--- references into read-only space. Info tables in the tablesNextToCode
--- case must be in .text, which is read-only, so we doctor the CmmLits
--- to use relative offsets instead.
-
--- Note that this is done even when the -fPIC flag is not specified,
--- as we want to keep binary compatibility between PIC and non-PIC.
-
-makeRelativeRefTo :: CLabel -> CmmLit -> CmmLit
-        
-makeRelativeRefTo info_lbl (CmmLabel lbl)
-  | tablesNextToCode
-  = CmmLabelDiffOff lbl info_lbl 0
-makeRelativeRefTo info_lbl (CmmLabelOff lbl off)
-  | tablesNextToCode
-  = CmmLabelDiffOff lbl info_lbl off
-makeRelativeRefTo _ lit = lit

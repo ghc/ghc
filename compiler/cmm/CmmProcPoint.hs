@@ -13,8 +13,8 @@ import Prelude hiding (last, unzip, succ, zip)
 import BlockId
 import CLabel
 import Cmm
-import CmmDecl
 import CmmExpr
+import CmmUtils
 import CmmContFlowOpt
 import CmmInfo
 import CmmLive
@@ -408,10 +408,9 @@ splitAtProcPoints entry_label callPPs procPoints procMap
      -- Due to common blockification, we may overestimate the set of procpoints.
      let add_label map pp = Map.insert pp lbls map
            where lbls | pp == entry = (entry_label, Just entry_info_lbl)
-                      | otherwise   = (blockLbl pp, guard (setMember pp callPPs) >> Just (infoTblLbl pp))
-                 entry_info_lbl = case info_tbl of
-                     CmmInfoTable entry_info_label _ _ _ _ -> entry_info_label
-                     CmmNonInfoTable -> pprPanic "splitAtProcPoints: looked at info label for entry without info table" (ppr pp)
+                      | otherwise   = (blockLbl pp, guard (setMember pp callPPs) >> 
+                                                    Just (infoTblLbl pp))
+                 entry_info_lbl = cit_lbl info_tbl
          procLabels = foldl add_label Map.empty
                             (filter (flip mapMember (toBlockMap g)) (setElems procPoints))
      -- For each procpoint, we need to know the SP offset on entry.

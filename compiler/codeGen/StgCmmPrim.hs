@@ -24,8 +24,7 @@ import StgCmmProf
 import BasicTypes
 import MkGraph
 import StgSyn
-import CmmDecl
-import CmmExpr
+import Cmm
 import Type	( Type, tyConAppTyCon )
 import TyCon
 import CLabel

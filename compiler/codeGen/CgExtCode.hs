@@ -39,7 +39,7 @@ where
 import CgMonad
 
 import CLabel
-import OldCmm
+import OldCmm hiding( ClosureTypeInfo(..) )
 
 -- import BasicTypes
 import BlockId
@@ -51,11 +51,11 @@ import Unique
 
 -- | The environment contains variable definitions or blockids.
 data Named 	
-	= Var 	CmmExpr		-- ^ Holds CmmLit(CmmLabel ..) which gives the label type,
+	= VarN CmmExpr		-- ^ Holds CmmLit(CmmLabel ..) which gives the label type,
 				--	eg, RtsLabel, ForeignLabel, CmmLabel etc. 
 
-	| Fun	PackageId	-- ^ A function name from this package
-	| Label BlockId		-- ^ A blockid of some code or data.
+	| FunN	 PackageId	-- ^ A function name from this package
+	| LabelN BlockId		-- ^ A blockid of some code or data.
 	
 -- | An environment of named things.
 type Env   	= UniqFM Named
@@ -103,12 +103,12 @@ getEnv 	= EC $ \e s -> return (s, e)
 --	The CmmExpr says where the value is stored. 
 addVarDecl :: FastString -> CmmExpr -> ExtCode
 addVarDecl var expr 
-	= EC $ \_ s -> return ((var, Var expr):s, ())
+	= EC $ \_ s -> return ((var, VarN expr):s, ())
 
 -- | Add a new label to the list of local declarations.
 addLabel :: FastString -> BlockId -> ExtCode
 addLabel name block_id 
-	= EC $ \_ s -> return ((name, Label block_id):s, ())
+	= EC $ \_ s -> return ((name, LabelN block_id):s, ())
 
 
 -- | Create a fresh local variable of a given type.
@@ -139,7 +139,7 @@ newFunctionName
 	-> ExtCode
 	
 newFunctionName name pkg
-	= EC $ \_ s -> return ((name, Fun pkg):s, ())
+	= EC $ \_ s -> return ((name, FunN pkg):s, ())
 	
 	
 -- | Add an imported foreign label to the list of local declarations.
@@ -161,7 +161,7 @@ lookupLabel name = do
   env <- getEnv
   return $ 
      case lookupUFM env name of
-	Just (Label l) 	-> l
+	Just (LabelN l) -> l
 	_other 		-> mkBlockId (newTagUnique (getUnique name) 'L')
 
 
@@ -174,8 +174,8 @@ lookupName name = do
   env    <- getEnv
   return $ 
      case lookupUFM env name of
-	Just (Var e) 	-> e
-	Just (Fun pkg)	-> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
+	Just (VarN e) 	-> e
+	Just (FunN pkg)	-> CmmLit (CmmLabel (mkCmmCodeLabel pkg          name))
 	_other 		-> CmmLit (CmmLabel (mkCmmCodeLabel rtsPackageId name))
 
 

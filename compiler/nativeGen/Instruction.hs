@@ -37,7 +37,7 @@ noUsage  = RU [] []
 -- Our flavours of the Cmm types
 -- Type synonyms for Cmm populated with native code
 type NatCmm instr
-        = GenCmm
+        = GenCmmPgm
                 CmmStatics
                 (Maybe CmmStatics)
                 (ListGraph instr)

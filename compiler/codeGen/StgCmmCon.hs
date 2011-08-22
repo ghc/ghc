@@ -34,6 +34,7 @@ import Module
 import Constants
 import DataCon
 import FastString
+import IdInfo( CafInfo(..) )
 import Id
 import Literal
 import PrelInfo
@@ -68,10 +69,13 @@ cgTopRhsCon id con args
 	; let
 	    name          = idName id
 	    lf_info	  = mkConLFInfo con
-    	    closure_label = mkClosureLabel name $ idCafInfo id
-	    caffy         = any stgArgHasCafRefs args
-	    (closure_info, nv_args_w_offsets) 
-			= layOutStaticConstr con (addArgReps args)
+    	    closure_label = mkClosureLabel name caffy
+	    caffy         = idCafInfo id -- any stgArgHasCafRefs args
+            
+    	    (tot_wds, --  #ptr_wds + #nonptr_wds
+    	     ptr_wds, --  #ptr_wds
+    	     nv_args_w_offsets) = mkVirtConstrOffsets (addArgReps args)
+	    closure_info = mkConInfo False caffy con tot_wds ptr_wds
 
 	    get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
 				        ; return lit }
@@ -190,8 +194,10 @@ buildDynCon binder _cc con [arg]
 
 -------- buildDynCon: the general case -----------
 buildDynCon binder ccs con args
-  = do	{ let (cl_info, args_w_offsets) = layOutDynConstr con (addArgReps args)
+  = do	{ let (tot_wds, ptr_wds, args_w_offsets) 
+                = mkVirtConstrOffsets (addArgReps args)
 		-- No void args in args_w_offsets
+              cl_info = mkConInfo False NoCafRefs con tot_wds ptr_wds
 	; (tmp, init) <- allocDynClosure cl_info use_cc blame_cc args_w_offsets
 	; regIdInfo binder lf_info tmp init }
   where
@@ -217,7 +223,7 @@ bindConArgs (DataAlt con) base args
   = ASSERT(not (isUnboxedTupleCon con))
     mapM bind_arg args_w_offsets
   where
-    (_, args_w_offsets) = layOutDynConstr con (addIdReps args)
+    (_, _, args_w_offsets) = mkVirtConstrOffsets (addIdReps args)
 
     tag = tagForCon con
 

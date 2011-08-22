@@ -16,7 +16,7 @@ module CmmRewriteAssignments
   ) where
 
 import Cmm
-import CmmExpr
+import CmmUtils
 import CmmOpt
 import OptimizationFuel
 import StgCmmUtils

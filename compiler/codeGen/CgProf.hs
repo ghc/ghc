@@ -294,8 +294,8 @@ emitCostCentreDecl
    :: CostCentre
    -> Code
 emitCostCentreDecl cc = do 
-  { label <- mkStringCLit (costCentreUserName cc)
-  ; modl  <- mkStringCLit (Module.moduleNameString 
+  { label <- newStringCLit (costCentreUserName cc)
+  ; modl  <- newStringCLit (Module.moduleNameString 
                                 (Module.moduleName (cc_mod cc)))
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.

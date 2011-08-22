@@ -33,9 +33,9 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
+llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmPgm] -> IO ()
 llvmCodeGen dflags h us cmms
-  = let cmm = concat $ map (\(Cmm top) -> top) cmms
+  = let cmm = concat cmms
         (cdata,env) = foldr split ([],initLlvmEnv) cmm
         split (CmmData s d' ) (d,e) = ((s,d'):d,e)
         split (CmmProc i l _) (d,e) =
@@ -115,7 +115,7 @@ cmmLlvmGen dflags us env cmm = do
     let fixed_cmm = fixStgRegisters cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm"
-        (pprCmm (targetPlatform dflags) $ Cmm [fixed_cmm])
+        (pprCmmPgm (targetPlatform dflags) [fixed_cmm])
 
     -- generate llvm code from cmm
     let ((env', llvmBC), usGen) = initUs us $ genLlvmProc env fixed_cmm

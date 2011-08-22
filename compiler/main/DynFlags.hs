@@ -283,7 +283,6 @@ data DynFlag
 	-- temporary flags
    | Opt_RunCPS
    | Opt_RunCPSZ
-   | Opt_ConvertToZipCfgAndBack
    | Opt_AutoLinkPackages
    | Opt_ImplicitImportQualified
    | Opt_TryNewCodeGen
@@ -1734,7 +1733,6 @@ fFlags = [
   ( "run-cps",                          AlwaysAllowed, Opt_RunCPS, nop ),
   ( "run-cpsz",                         AlwaysAllowed, Opt_RunCPSZ, nop ),
   ( "new-codegen",                      AlwaysAllowed, Opt_TryNewCodeGen, nop ),
-  ( "convert-to-zipper-and-back",       AlwaysAllowed, Opt_ConvertToZipCfgAndBack, nop ),
   ( "vectorise",                        AlwaysAllowed, Opt_Vectorise, nop ),
   ( "regs-graph",                       AlwaysAllowed, Opt_RegsGraph, nop ),
   ( "regs-iterative",                   AlwaysAllowed, Opt_RegsIterative, nop ),

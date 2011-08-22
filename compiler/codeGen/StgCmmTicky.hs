@@ -45,7 +45,6 @@ module StgCmmTicky (
 import StgCmmClosure
 import StgCmmUtils
 import StgCmmMonad
-import SMRep
 
 import StgSyn
 import CmmExpr
@@ -89,8 +88,8 @@ emitTickyCounter :: ClosureInfo -> [Id] -> FCode ()
 emitTickyCounter cl_info args
   = ifTicky $
     do	{ mod_name <- getModuleName
-	; fun_descr_lit <- mkStringCLit (fun_descr mod_name)
-	; arg_descr_lit <- mkStringCLit arg_descr
+	; fun_descr_lit <- newStringCLit (fun_descr mod_name)
+	; arg_descr_lit <- newStringCLit arg_descr
 	; emitDataLits ticky_ctr_label 	-- Must match layout of StgEntCounter
 -- krc: note that all the fields are I32 now; some were I16 before, 
 -- but the code generator wasn't handling that properly and it led to chaos, 
@@ -270,18 +269,17 @@ tickyDynAlloc :: ClosureInfo -> FCode ()
 -- Called when doing a dynamic heap allocation
 tickyDynAlloc cl_info
   = ifTicky $
-    case smRepClosureType (closureSMRep cl_info) of
-	Just Constr           -> tick_alloc_con
-	Just ConstrNoCaf      -> tick_alloc_con
-	Just Fun	      -> tick_alloc_fun
-	Just Thunk 	      -> tick_alloc_thk
-	Just ThunkSelector    -> tick_alloc_thk
-        -- black hole
-        Nothing               -> return ()
+    case () of
+      _ | Just _ <- maybeIsLFCon lf -> tick_alloc_con
+	| isLFThunk lf              -> tick_alloc_thk
+        | isLFReEntrant lf          -> tick_alloc_fun
+        | otherwise                 -> return ()
   where
+    lf = closureLFInfo cl_info
+
 	-- will be needed when we fill in stubs
-    _cl_size   =	closureSize cl_info
-    _slop_size = slopSize cl_info
+    _cl_size   = closureSize cl_info
+--    _slop_size = slopSize cl_info
 
     tick_alloc_thk 
 	| closureUpdReqd cl_info = tick_alloc_up_thk

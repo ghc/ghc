@@ -14,7 +14,7 @@ where
 
 import BlockId
 import Cmm
-import CmmExpr
+import CmmUtils
 import CmmLive
 import OptimizationFuel
 

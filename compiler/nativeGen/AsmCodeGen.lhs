@@ -148,7 +148,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     }
 
 --------------------
-nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
+nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmPgm] -> IO ()
 nativeCodeGen dflags h us cmms
  = let nCG' :: (Outputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
@@ -209,7 +209,7 @@ nativeCodeGen dflags h us cmms
 nativeCodeGen' :: (Outputable statics, PlatformOutputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
-               -> Handle -> UniqSupply -> [RawCmm] -> IO ()
+               -> Handle -> UniqSupply -> [RawCmmPgm] -> IO ()
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
 	let platform = targetPlatform dflags
@@ -264,7 +264,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 
 	return	()
 
- where	add_split (Cmm tops)
+ where  add_split tops
 		| dopt Opt_SplitObjs dflags = split_marker : tops
 		| otherwise		    = tops
 
@@ -356,7 +356,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_opt_cmm "Optimised Cmm"
-		(pprCmm platform $ Cmm [opt_cmm])
+                (pprCmmPgm platform [opt_cmm])
 
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =

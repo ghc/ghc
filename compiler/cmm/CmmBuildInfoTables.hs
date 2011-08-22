@@ -11,10 +11,15 @@ module CmmBuildInfoTables
     , TopSRT, emptySRT, srtToData
     , bundleCAFs
     , lowerSafeForeignCalls
-    , cafTransfers, liveSlotTransfers)
+    , cafTransfers, liveSlotTransfers
+    , mkLiveness )
 where
 
 #include "HsVersions.h"
+
+-- These should not be imported here!
+import StgCmmForeign
+import StgCmmUtils
 
 import Constants
 import Digraph
@@ -26,8 +31,7 @@ import BlockId
 import Bitmap
 import CLabel
 import Cmm
-import CmmDecl
-import CmmExpr
+import CmmUtils
 import CmmStackLayout
 import Module
 import FastString
@@ -41,9 +45,6 @@ import Name
 import OptimizationFuel
 import Outputable
 import SMRep
-import StgCmmClosure
-import StgCmmForeign
-import StgCmmUtils
 import UniqSupply
 
 import Compiler.Hoopl
@@ -87,13 +88,14 @@ type RegSlotInfo
      , LocalReg   -- The register
      , Int)       -- Width of the register
 
-live_ptrs :: ByteOff -> BlockEnv SubAreaSet -> AreaMap -> BlockId -> [Maybe LocalReg]
+live_ptrs :: ByteOff -> BlockEnv SubAreaSet -> AreaMap -> BlockId -> StackLayout
 live_ptrs oldByte slotEnv areaMap bid =
   -- pprTrace "live_ptrs for" (ppr bid <+> text (show oldByte ++ "-" ++ show youngByte) <+>
   --                           ppr liveSlots) $
   -- pprTrace ("stack layout for " ++ show bid ++ ": ") (ppr res) $ res
   res
-  where res = reverse $ slotsToList youngByte liveSlots []
+  where 
+        res = mkLiveness (reverse $ slotsToList youngByte liveSlots [])
  
         slotsToList :: Int -> [RegSlotInfo] -> [Maybe LocalReg] -> [Maybe LocalReg]
         -- n starts at youngByte and is decremented down to oldByte
@@ -160,8 +162,9 @@ live_ptrs oldByte slotEnv areaMap bid =
 -- is not the successor of a call.
 setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmTop -> CmmTop
 setInfoTableStackMap slotEnv areaMap
-     t@(CmmProc (TopInfo {stack_info=StackInfo {updfr_space = Just updfr_off}}) _ (CmmGraph {g_entry = eid})) =
-  updInfo (const (live_ptrs updfr_off slotEnv areaMap eid)) id t
+     t@(CmmProc (TopInfo {stack_info=StackInfo {updfr_space = Just updfr_off}}) _ 
+                (CmmGraph {g_entry = eid}))
+  = updInfo (const (live_ptrs updfr_off slotEnv areaMap eid)) id t
 setInfoTableStackMap _ _ t = t
                  
 
@@ -237,8 +240,8 @@ addCAF caf srt =
       , elt_map  = Map.insert caf last (elt_map srt) }
     where last  = next_elt srt
 
-srtToData :: TopSRT -> Cmm
-srtToData srt = Cmm [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
+srtToData :: TopSRT -> CmmPgm
+srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
     where tbl = map (CmmStaticLit . CmmLabel) (reverse (rev_elts srt))
 
 -- Once we have found the CAFs, we need to do two things:
@@ -336,9 +339,10 @@ localCAFInfo :: CAFEnv -> CmmTop -> Maybe (CLabel, CAFSet)
 localCAFInfo _      (CmmData _ _) = Nothing
 localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
   case info_tbl top_info of
-    CmmInfoTable _ False _ _ _ ->
-      Just (cvtToClosureLbl top_l,
-            expectJust "maybeBindCAFs" $ mapLookup entry cafEnv)
+    CmmInfoTable { cit_rep = rep } 
+      | not (isStaticRep rep) 
+      -> Just (cvtToClosureLbl top_l,
+               expectJust "maybeBindCAFs" $ mapLookup entry cafEnv)
     _ -> Nothing
 
 -- Once we have the local CAF sets for some (possibly) mutually
@@ -368,8 +372,6 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
         g = stronglyConnCompFromEdgedVertices
               (map (\n@(l, cafs) -> (n, l, Map.keys cafs)) localCAFs)
 
-type StackLayout = [Maybe LocalReg]
-
 -- Bundle the CAFs used at a procpoint.
 bundleCAFs :: CAFEnv -> CmmTop -> (CAFSet, CmmTop)
 bundleCAFs cafEnv t@(CmmProc _ _ (CmmGraph {g_entry=entry})) =
@@ -391,20 +393,19 @@ setSRT cafs topCAFMap topSRT t =
        Just tbl -> return (topSRT, [t', tbl])
        Nothing  -> return (topSRT, [t'])
 
+type StackLayout = Liveness
+
 updInfo :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmTop -> CmmTop
 updInfo toVars toSrt (CmmProc top_info top_l g) =
   CmmProc (top_info {info_tbl=updInfoTbl toVars toSrt (info_tbl top_info)}) top_l g
 updInfo _ _ t = t
 
 updInfoTbl :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmInfoTable -> CmmInfoTable
-updInfoTbl toVars toSrt (CmmInfoTable l s p t typeinfo)
-  = CmmInfoTable l s p t typeinfo'
-    where typeinfo' = case typeinfo of
-            t@(ConstrInfo _ _ _)    -> t
-            (FunInfo    c s a d e)  -> FunInfo c (toSrt s) a d e
-            (ThunkInfo  c s)        -> ThunkInfo c (toSrt s)
-            (ThunkSelectorInfo x s) -> ThunkSelectorInfo x (toSrt s)
-            (ContInfo v s)          -> ContInfo (toVars v) (toSrt s)
+updInfoTbl toVars toSrt info_tbl@(CmmInfoTable {})
+  = info_tbl { cit_srt = toSrt (cit_srt info_tbl)
+             , cit_rep = case cit_rep info_tbl of
+                           StackRep ls -> StackRep (toVars ls)
+                           other       -> other }
 updInfoTbl _ _ t@CmmNonInfoTable = t
   
 ----------------------------------------------------------------
@@ -493,3 +494,4 @@ lowerSafeForeignCall entry areaMap blocks bid m
                                            resume  <**> saveRetVals <**> M.mkLast jump
     return $ blocks `mapUnion` toBlockMap graph'
 lowerSafeForeignCall _ _ _ _ _ _ = panic "lowerSafeForeignCall was passed something else"
+

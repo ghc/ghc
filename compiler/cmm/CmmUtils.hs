@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.
@@ -7,17 +8,49 @@
 -----------------------------------------------------------------------------
 
 module CmmUtils( 
+        -- CmmType
 	primRepCmmType, primRepForeignHint,
 	typeCmmType, typeForeignHint,
 
-	isTrivialCmmExpr, hasNoGlobalRegs,
+	-- CmmLit
+	zeroCLit, mkIntCLit, 
+	mkWordCLit, packHalfWordsCLit,
+	mkByteStringCLit, 
+        mkDataLits, mkRODataLits,
 
-	cmmRegOff, cmmLabelOff, cmmOffset, cmmOffsetLit, cmmIndex,
-	cmmOffsetExpr, cmmIndexExpr, cmmLoadIndex,
-
- 	mkIntCLit, zeroCLit,
-
+	-- CmmExpr
 	mkLblExpr,
+	cmmRegOff,  cmmOffset,  cmmLabelOff,  cmmOffsetLit,  cmmOffsetExpr, 
+	cmmRegOffB, cmmOffsetB, cmmLabelOffB, cmmOffsetLitB, cmmOffsetExprB,
+	cmmRegOffW, cmmOffsetW, cmmLabelOffW, cmmOffsetLitW, cmmOffsetExprW,
+	cmmIndex, cmmIndexExpr, cmmLoadIndex, cmmLoadIndexW,
+	cmmNegate, 
+  	cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
+  	cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
+  	cmmUShrWord, cmmAddWord, cmmMulWord,
+
+	isTrivialCmmExpr, hasNoGlobalRegs,
+	
+	-- Statics
+	blankWord,
+
+	-- Tagging
+	cmmTagMask, cmmPointerMask, cmmUntag, cmmGetTag, cmmIsTagged,
+	cmmConstrTag, cmmConstrTag1,
+
+        -- Liveness and bitmaps
+        mkLiveness,
+
+        -- * Operations that probably don't belong here
+        modifyGraph,
+
+        lastNode, replaceLastNode, insertBetween,
+        ofBlockMap, toBlockMap, insertBlock,
+        ofBlockList, toBlockList, bodyToBlockList,
+        foldGraphBlocks, mapGraphNodes, postorderDfs,
+      
+        analFwd, analBwd, analRewFwd, analRewBwd,
+        dataflowPassFwd, dataflowPassBwd
   ) where
 
 #include "HsVersions.h"
@@ -25,10 +58,21 @@ module CmmUtils(
 import TyCon	( PrimRep(..) )
 import Type	( Type, typePrimRep )
 
+import SMRep
+import Cmm
+import BlockId
 import CLabel
-import CmmDecl
-import CmmExpr
 import Outputable
+import OptimizationFuel as F
+import Unique
+import UniqSupply
+import Constants( wORD_SIZE, tAG_MASK )
+
+import Data.Word
+import Data.Maybe
+import Data.Bits
+import Control.Monad
+import Compiler.Hoopl hiding ( Unique )
 
 ---------------------------------------------------
 --
@@ -64,6 +108,58 @@ primRepForeignHint DoubleRep	= NoHint
 typeForeignHint :: Type -> ForeignHint
 typeForeignHint = primRepForeignHint . typePrimRep
 
+---------------------------------------------------
+--
+--	CmmLit
+--
+---------------------------------------------------
+
+mkIntCLit :: Int -> CmmLit
+mkIntCLit i = CmmInt (toInteger i) wordWidth
+
+zeroCLit :: CmmLit
+zeroCLit = CmmInt 0 wordWidth
+
+mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmTop CmmStatics info stmt)
+-- We have to make a top-level decl for the string, 
+-- and return a literal pointing to it
+mkByteStringCLit uniq bytes
+  = (CmmLabel lbl, CmmData ReadOnlyData $ Statics lbl [CmmString bytes])
+  where
+    lbl = mkStringLitLabel uniq
+mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmTop CmmStatics info stmt
+-- Build a data-segment data block
+mkDataLits section lbl lits
+  = CmmData section (Statics lbl $ map CmmStaticLit lits)
+
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatics info stmt
+-- Build a read-only data block
+mkRODataLits lbl lits
+  = mkDataLits section lbl lits
+  where 
+    section | any needsRelocation lits = RelocatableReadOnlyData
+            | otherwise                = ReadOnlyData
+    needsRelocation (CmmLabel _)      = True
+    needsRelocation (CmmLabelOff _ _) = True
+    needsRelocation _                 = False
+
+mkWordCLit :: StgWord -> CmmLit
+mkWordCLit wd = CmmInt (fromIntegral wd) wordWidth
+
+packHalfWordsCLit :: (Integral a, Integral b) => a -> b -> CmmLit
+-- Make a single word literal in which the lower_half_word is
+-- at the lower address, and the upper_half_word is at the 
+-- higher address
+-- ToDo: consider using half-word lits instead
+-- 	 but be careful: that's vulnerable when reversed
+packHalfWordsCLit lower_half_word upper_half_word
+#ifdef WORDS_BIGENDIAN
+   = mkWordCLit ((fromIntegral lower_half_word `shiftL` hALF_WORD_SIZE_IN_BITS)
+		 .|. fromIntegral upper_half_word)
+#else 
+   = mkWordCLit ((fromIntegral lower_half_word) 
+		 .|. (fromIntegral upper_half_word `shiftL` hALF_WORD_SIZE_IN_BITS))
+#endif
 
 ---------------------------------------------------
 --
@@ -71,27 +167,8 @@ typeForeignHint = primRepForeignHint . typePrimRep
 --
 ---------------------------------------------------
 
-isTrivialCmmExpr :: CmmExpr -> Bool
-isTrivialCmmExpr (CmmLoad _ _)   = False
-isTrivialCmmExpr (CmmMachOp _ _) = False
-isTrivialCmmExpr (CmmLit _)      = True
-isTrivialCmmExpr (CmmReg _)      = True
-isTrivialCmmExpr (CmmRegOff _ _) = True
-isTrivialCmmExpr (CmmStackSlot _ _) = panic "isTrivialCmmExpr CmmStackSlot"
-
-hasNoGlobalRegs :: CmmExpr -> Bool
-hasNoGlobalRegs (CmmLoad e _)   	   = hasNoGlobalRegs e
-hasNoGlobalRegs (CmmMachOp _ es) 	   = all hasNoGlobalRegs es
-hasNoGlobalRegs (CmmLit _)      	   = True
-hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
-hasNoGlobalRegs (CmmRegOff (CmmLocal _) _) = True
-hasNoGlobalRegs _ = False
-
----------------------------------------------------
---
---	Expr Construction helpers
---
----------------------------------------------------
+mkLblExpr :: CLabel -> CmmExpr
+mkLblExpr lbl = CmmLit (CmmLabel lbl)
 
 cmmOffsetExpr :: CmmExpr -> CmmExpr -> CmmExpr
 -- assumes base and offset have the same CmmType
@@ -156,17 +233,272 @@ cmmIndexExpr width base idx =
 cmmLoadIndex :: CmmType -> CmmExpr -> Int -> CmmExpr
 cmmLoadIndex ty expr ix = CmmLoad (cmmIndex (typeWidth ty) expr ix) ty
 
+-- The "B" variants take byte offsets
+cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
+cmmRegOffB = cmmRegOff
+
+cmmOffsetB :: CmmExpr -> ByteOff -> CmmExpr
+cmmOffsetB = cmmOffset
+
+cmmOffsetExprB :: CmmExpr -> CmmExpr -> CmmExpr
+cmmOffsetExprB = cmmOffsetExpr
+
+cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
+cmmLabelOffB = cmmLabelOff
+
+cmmOffsetLitB :: CmmLit -> ByteOff -> CmmLit
+cmmOffsetLitB = cmmOffsetLit
+
+-----------------------
+-- The "W" variants take word offsets
+cmmOffsetExprW :: CmmExpr -> CmmExpr -> CmmExpr
+-- The second arg is a *word* offset; need to change it to bytes
+cmmOffsetExprW e (CmmLit (CmmInt n _)) = cmmOffsetW e (fromInteger n)
+cmmOffsetExprW e wd_off = cmmIndexExpr wordWidth e wd_off
+
+cmmOffsetW :: CmmExpr -> WordOff -> CmmExpr
+cmmOffsetW e n = cmmOffsetB e (wORD_SIZE * n)
+
+cmmRegOffW :: CmmReg -> WordOff -> CmmExpr
+cmmRegOffW reg wd_off = cmmRegOffB reg (wd_off * wORD_SIZE)
+
+cmmOffsetLitW :: CmmLit -> WordOff -> CmmLit
+cmmOffsetLitW lit wd_off = cmmOffsetLitB lit (wORD_SIZE * wd_off)
+
+cmmLabelOffW :: CLabel -> WordOff -> CmmLit
+cmmLabelOffW lbl wd_off = cmmLabelOffB lbl (wORD_SIZE * wd_off)
+
+cmmLoadIndexW :: CmmExpr -> Int -> CmmType -> CmmExpr
+cmmLoadIndexW base off ty = CmmLoad (cmmOffsetW base off) ty
+
+-----------------------
+cmmULtWord, cmmUGeWord, cmmUGtWord, cmmSubWord,
+  cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord,
+  cmmUShrWord, cmmAddWord, cmmMulWord
+  :: CmmExpr -> CmmExpr -> CmmExpr
+cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
+cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
+cmmNeWord  e1 e2 = CmmMachOp mo_wordNe  [e1, e2]
+cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
+cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
+cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
+cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
+--cmmShlWord e1 e2 = CmmMachOp mo_wordShl [e1, e2]
+cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
+cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
+cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
+cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
+
+cmmNegate :: CmmExpr -> CmmExpr
+cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
+cmmNegate e			  = CmmMachOp (MO_S_Neg (cmmExprWidth e)) [e]
+
+blankWord :: CmmStatic
+blankWord = CmmUninitialised wORD_SIZE
+
 ---------------------------------------------------
 --
---	Literal construction functions
+--	CmmExpr predicates
 --
 ---------------------------------------------------
 
-mkIntCLit :: Int -> CmmLit
-mkIntCLit i = CmmInt (toInteger i) wordWidth
+isTrivialCmmExpr :: CmmExpr -> Bool
+isTrivialCmmExpr (CmmLoad _ _)   = False
+isTrivialCmmExpr (CmmMachOp _ _) = False
+isTrivialCmmExpr (CmmLit _)      = True
+isTrivialCmmExpr (CmmReg _)      = True
+isTrivialCmmExpr (CmmRegOff _ _) = True
+isTrivialCmmExpr (CmmStackSlot _ _) = panic "isTrivialCmmExpr CmmStackSlot"
 
-zeroCLit :: CmmLit
-zeroCLit = CmmInt 0 wordWidth
+hasNoGlobalRegs :: CmmExpr -> Bool
+hasNoGlobalRegs (CmmLoad e _)   	   = hasNoGlobalRegs e
+hasNoGlobalRegs (CmmMachOp _ es) 	   = all hasNoGlobalRegs es
+hasNoGlobalRegs (CmmLit _)      	   = True
+hasNoGlobalRegs (CmmReg (CmmLocal _))      = True
+hasNoGlobalRegs (CmmRegOff (CmmLocal _) _) = True
+hasNoGlobalRegs _ = False
 
-mkLblExpr :: CLabel -> CmmExpr
-mkLblExpr lbl = CmmLit (CmmLabel lbl)
+---------------------------------------------------
+--
+--	Tagging
+--
+---------------------------------------------------
+
+-- Tag bits mask
+--cmmTagBits = CmmLit (mkIntCLit tAG_BITS)
+cmmTagMask, cmmPointerMask :: CmmExpr
+cmmTagMask = CmmLit (mkIntCLit tAG_MASK)
+cmmPointerMask = CmmLit (mkIntCLit (complement tAG_MASK))
+
+-- Used to untag a possibly tagged pointer
+-- A static label need not be untagged
+cmmUntag, cmmGetTag :: CmmExpr -> CmmExpr
+cmmUntag e@(CmmLit (CmmLabel _)) = e
+-- Default case
+cmmUntag e = (e `cmmAndWord` cmmPointerMask)
+
+cmmGetTag e = (e `cmmAndWord` cmmTagMask)
+
+-- Test if a closure pointer is untagged
+cmmIsTagged :: CmmExpr -> CmmExpr
+cmmIsTagged e = (e `cmmAndWord` cmmTagMask)
+                 `cmmNeWord` CmmLit zeroCLit
+
+cmmConstrTag, cmmConstrTag1 :: CmmExpr -> CmmExpr
+cmmConstrTag e = (e `cmmAndWord` cmmTagMask) `cmmSubWord` (CmmLit (mkIntCLit 1))
+-- Get constructor tag, but one based.
+cmmConstrTag1 e = e `cmmAndWord` cmmTagMask
+
+
+--------------------------------------------
+--
+--        mkLiveness
+--
+---------------------------------------------
+
+mkLiveness :: [Maybe LocalReg] -> Liveness
+mkLiveness [] = []
+mkLiveness (reg:regs) 
+  = take sizeW bits ++ mkLiveness regs 
+  where
+    sizeW = case reg of
+              Nothing -> 1
+              Just r -> (widthInBytes (typeWidth (localRegType r)) + wORD_SIZE - 1)
+                        `quot` wORD_SIZE
+                        -- number of words, rounded up
+    bits = repeat $ is_non_ptr reg -- True <=> Non Ptr
+
+    is_non_ptr Nothing    = True
+    is_non_ptr (Just reg) = not $ isGcPtrType (localRegType reg)
+
+
+-- ============================================== -
+-- ============================================== -
+-- ============================================== -
+
+---------------------------------------------------
+--
+--      Manipulating CmmGraphs
+--
+---------------------------------------------------
+
+modifyGraph :: (Graph n C C -> Graph n' C C) -> GenCmmGraph n -> GenCmmGraph n'
+modifyGraph f g = CmmGraph {g_entry=g_entry g, g_graph=f (g_graph g)}
+
+toBlockMap :: CmmGraph -> LabelMap CmmBlock
+toBlockMap (CmmGraph {g_graph=GMany NothingO body NothingO}) = body
+
+ofBlockMap :: BlockId -> LabelMap CmmBlock -> CmmGraph
+ofBlockMap entry bodyMap = CmmGraph {g_entry=entry, g_graph=GMany NothingO bodyMap NothingO}
+
+insertBlock :: CmmBlock -> LabelMap CmmBlock -> LabelMap CmmBlock
+insertBlock block map =
+  ASSERT (isNothing $ mapLookup id map)
+  mapInsert id block map
+  where id = entryLabel block
+
+toBlockList :: CmmGraph -> [CmmBlock]
+toBlockList g = mapElems $ toBlockMap g
+
+ofBlockList :: BlockId -> [CmmBlock] -> CmmGraph
+ofBlockList entry blocks = CmmGraph {g_entry=entry, g_graph=GMany NothingO body NothingO}
+  where body = foldr addBlock emptyBody blocks
+
+bodyToBlockList :: Body CmmNode -> [CmmBlock]
+bodyToBlockList body = mapElems body
+
+mapGraphNodes :: ( CmmNode C O -> CmmNode C O
+                 , CmmNode O O -> CmmNode O O
+                 , CmmNode O C -> CmmNode O C)
+              -> CmmGraph -> CmmGraph
+mapGraphNodes funs@(mf,_,_) g =
+  ofBlockMap (entryLabel $ mf $ CmmEntry $ g_entry g) $ mapMap (blockMapNodes3 funs) $ toBlockMap g
+
+foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
+foldGraphBlocks k z g = mapFold k z $ toBlockMap g
+
+postorderDfs :: CmmGraph -> [CmmBlock]
+postorderDfs g = postorder_dfs_from (toBlockMap g) (g_entry g)
+
+-------------------------------------------------
+-- Manipulating CmmBlocks
+
+lastNode :: CmmBlock -> CmmNode O C
+lastNode block = foldBlockNodesF3 (nothing, nothing, const) block ()
+  where nothing :: a -> b -> ()
+        nothing _ _ = ()
+
+replaceLastNode :: Block CmmNode e C -> CmmNode O C -> Block CmmNode e C
+replaceLastNode block last = blockOfNodeList (first, middle, JustC last)
+  where (first, middle, _) = blockToNodeList block
+
+----------------------------------------------------------------------
+----- Splicing between blocks
+-- Given a middle node, a block, and a successor BlockId,
+-- we can insert the middle node between the block and the successor.
+-- We return the updated block and a list of new blocks that must be added
+-- to the graph.
+-- The semantics is a bit tricky. We consider cases on the last node:
+-- o For a branch, we can just insert before the branch,
+--   but sometimes the optimizer does better if we actually insert
+--   a fresh basic block, enabling some common blockification.
+-- o For a conditional branch, switch statement, or call, we must insert
+--   a new basic block.
+-- o For a jump or return, this operation is impossible.
+
+insertBetween :: MonadUnique m => CmmBlock -> [CmmNode O O] -> BlockId -> m (CmmBlock, [CmmBlock])
+insertBetween b ms succId = insert $ lastNode b
+  where insert :: MonadUnique m => CmmNode O C -> m (CmmBlock, [CmmBlock])
+        insert (CmmBranch bid) =
+          if bid == succId then
+            do (bid', bs) <- newBlocks
+               return (replaceLastNode b (CmmBranch bid'), bs)
+          else panic "tried invalid block insertBetween"
+        insert (CmmCondBranch c t f) =
+          do (t', tbs) <- if t == succId then newBlocks else return $ (t, [])
+             (f', fbs) <- if f == succId then newBlocks else return $ (f, [])
+             return (replaceLastNode b (CmmCondBranch c t' f'), tbs ++ fbs)
+        insert (CmmSwitch e ks) =
+          do (ids, bs) <- mapAndUnzipM mbNewBlocks ks
+             return (replaceLastNode b (CmmSwitch e ids), join bs)
+        insert (CmmCall {}) =
+          panic "unimp: insertBetween after a call -- probably not a good idea"
+        insert (CmmForeignCall {}) =
+          panic "unimp: insertBetween after a foreign call -- probably not a good idea"
+
+        newBlocks :: MonadUnique m => m (BlockId, [CmmBlock])
+        newBlocks = do id <- liftM mkBlockId $ getUniqueM
+                       return $ (id, [blockOfNodeList (JustC (CmmEntry id), ms, JustC (CmmBranch succId))])
+        mbNewBlocks :: MonadUnique m => Maybe BlockId -> m (Maybe BlockId, [CmmBlock])
+        mbNewBlocks (Just k) = if k == succId then liftM fstJust newBlocks
+                               else return (Just k, [])
+        mbNewBlocks Nothing  = return (Nothing, [])
+        fstJust (id, bs) = (Just id, bs)
+
+-------------------------------------------------
+-- Running dataflow analysis and/or rewrites
+
+-- Constructing forward and backward analysis-only pass
+analFwd    :: Monad m => DataflowLattice f -> FwdTransfer n f -> FwdPass m n f
+analBwd    :: Monad m => DataflowLattice f -> BwdTransfer n f -> BwdPass m n f
+
+analFwd lat xfer = analRewFwd lat xfer noFwdRewrite
+analBwd lat xfer = analRewBwd lat xfer noBwdRewrite
+
+-- Constructing forward and backward analysis + rewrite pass
+analRewFwd :: Monad m => DataflowLattice f -> FwdTransfer n f -> FwdRewrite m n f -> FwdPass m n f
+analRewBwd :: Monad m => DataflowLattice f -> BwdTransfer n f -> BwdRewrite m n f -> BwdPass m n f
+
+analRewFwd lat xfer rew = FwdPass {fp_lattice = lat, fp_transfer = xfer, fp_rewrite = rew}
+analRewBwd lat xfer rew = BwdPass {bp_lattice = lat, bp_transfer = xfer, bp_rewrite = rew}
+
+-- Running forward and backward dataflow analysis + optional rewrite
+dataflowPassFwd :: NonLocal n => GenCmmGraph n -> [(BlockId, f)] -> FwdPass FuelUniqSM n f -> FuelUniqSM (GenCmmGraph n, BlockEnv f)
+dataflowPassFwd (CmmGraph {g_entry=entry, g_graph=graph}) facts fwd = do
+  (graph, facts, NothingO) <- analyzeAndRewriteFwd fwd (JustC [entry]) graph (mkFactBase (fp_lattice fwd) facts)
+  return (CmmGraph {g_entry=entry, g_graph=graph}, facts)
+
+dataflowPassBwd :: NonLocal n => GenCmmGraph n -> [(BlockId, f)] -> BwdPass FuelUniqSM n f -> FuelUniqSM (GenCmmGraph n, BlockEnv f)
+dataflowPassBwd (CmmGraph {g_entry=entry, g_graph=graph}) facts bwd = do
+  (graph, facts, NothingO) <- analyzeAndRewriteBwd bwd (JustC [entry]) graph (mkFactBase (bp_lattice bwd) facts)
+  return (CmmGraph {g_entry=entry, g_graph=graph}, facts)

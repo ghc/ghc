@@ -22,7 +22,7 @@ module CLabel (
 	mkSRTLabel,
 	mkInfoTableLabel,
 	mkEntryLabel,
-	mkSlowEntryLabel,
+	mkSlowEntryLabel, slowEntryFromInfoLabel,
 	mkConEntryLabel,
 	mkStaticConEntryLabel,
 	mkRednCountsLabel,
@@ -354,8 +354,10 @@ data DynamicLinkerLabelInfo
 
 -- Constructing IdLabels 
 -- These are always local:
+mkSlowEntryLabel      	name c 	       = IdLabel name  c Slow
+slowEntryFromInfoLabel (IdLabel n c _) = IdLabel n c Slow
+
 mkSRTLabel		name c	= IdLabel name  c SRT
-mkSlowEntryLabel      	name c 	= IdLabel name  c Slow
 mkRednCountsLabel     	name c 	= IdLabel name  c RednCounts
 
 -- These have local & (possibly) external variants:
@@ -372,8 +374,8 @@ mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
 mkLocalConEntryLabel	    c con = IdLabel con c ConEntry
 mkLocalStaticInfoTableLabel c con = IdLabel con c StaticInfoTable
 mkLocalStaticConEntryLabel  c con = IdLabel con c StaticConEntry
-mkConInfoTableLabel name    c     = IdLabel    name c ConInfoTable
-mkStaticInfoTableLabel name c     = IdLabel    name c StaticInfoTable
+mkConInfoTableLabel name    c     = IdLabel name c ConInfoTable
+mkStaticInfoTableLabel name c     = IdLabel name c StaticInfoTable
 
 mkConEntryLabel name        c     = IdLabel name c ConEntry
 mkStaticConEntryLabel name  c     = IdLabel name c StaticConEntry

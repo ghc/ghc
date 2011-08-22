@@ -17,15 +17,12 @@ import StgCmmEnv
 import StgCmmBind
 import StgCmmCon
 import StgCmmLayout
-import StgCmmHeap
 import StgCmmUtils
 import StgCmmClosure
 import StgCmmHpc
 import StgCmmTicky
 
-import MkGraph
-import CmmExpr
-import CmmDecl
+import Cmm
 import CLabel
 import PprCmm
 
@@ -50,7 +47,7 @@ codeGen :: DynFlags
          -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
 	 -> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	 -> HpcInfo
-	 -> IO [Cmm]		-- Output
+         -> IO [CmmPgm]         -- Output
 
 codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
@@ -64,7 +61,7 @@ codeGen dflags this_mod data_tycons
                 ; cmm_tycons <- mapM cgTyCon data_tycons
                 ; cmm_init   <- getCmm (mkModuleInit cost_centre_info
                                              this_mod hpc_info)
-                ; return (cmm_init : cmm_binds ++ concat cmm_tycons)
+                ; return (cmm_init : cmm_binds ++ cmm_tycons)
                 }
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
@@ -182,7 +179,7 @@ mkModuleInit cost_centre_info this_mod hpc_info
         ; initCostCentres cost_centre_info
             -- For backwards compatibility: user code may refer to this
             -- label for calling hs_add_root().
-        ; emitData Data $ Statics (mkPlainModuleInitLabel this_mod) []
+        ; emitDecl (CmmData Data (Statics (mkPlainModuleInitLabel this_mod) []))
         }
 
 ---------------------------------------------------------------
@@ -216,7 +213,7 @@ For charlike and intlike closures there is a fixed array of static
 closures predeclared.
 -}
 
-cgTyCon :: TyCon -> FCode [Cmm]  -- All constructors merged together
+cgTyCon :: TyCon -> FCode CmmPgm  -- All constructors merged together
 cgTyCon tycon
   = do	{ constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
 
@@ -230,10 +227,10 @@ cgTyCon tycon
             -- code puts it before --- NR 16 Aug 2007
 	; extra <- cgEnumerationTyCon tycon
 
-        ; return (extra ++ constrs)
+        ; return (concat (extra ++ constrs))
         }
 
-cgEnumerationTyCon :: TyCon -> FCode [Cmm]
+cgEnumerationTyCon :: TyCon -> FCode [CmmPgm]
 cgEnumerationTyCon tycon
   | isEnumerationTyCon tycon
   = do	{ tbl <- getCmm $ 
@@ -254,8 +251,13 @@ cgDataCon data_con
 	    -- static data structures (ie those built at compile
 	    -- time), we take care that info-table contains the
 	    -- information we need.
-	    (static_cl_info, _) = layOutStaticConstr data_con arg_reps
-	    (dyn_cl_info, arg_things) = layOutDynConstr data_con arg_reps
+	    static_cl_info = mkConInfo True  no_cafs   data_con tot_wds ptr_wds
+	    dyn_cl_info    = mkConInfo False NoCafRefs data_con tot_wds ptr_wds
+            no_cafs = pprPanic "cgDataCon: CAF field should not be reqd" (ppr data_con)
+
+    	    (tot_wds, --  #ptr_wds + #nonptr_wds
+    	     ptr_wds, --  #ptr_wds
+    	     arg_things) = mkVirtConstrOffsets arg_reps
 
 	    emit_info cl_info ticky_code
 		= emitClosureAndInfoTable cl_info NativeDirectCall []

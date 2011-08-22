@@ -402,7 +402,7 @@ For charlike and intlike closures there is a fixed array of static
 closures predeclared.
 
 \begin{code}
-cgTyCon :: TyCon -> FCode [Cmm]  -- each constructor gets a separate Cmm
+cgTyCon :: TyCon -> FCode CmmPgm  -- each constructor gets a separate CmmPgm
 cgTyCon tycon
   = do	{ constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
 
@@ -423,7 +423,7 @@ cgTyCon tycon
 	   else
 		return []
 
-	; return (extra ++ constrs)
+        ; return (concat (extra ++ constrs))
     }
 \end{code}
 

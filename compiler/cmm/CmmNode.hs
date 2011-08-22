@@ -7,16 +7,14 @@
 {-# OPTIONS_GHC -fwarn-incomplete-patterns #-}
 #endif
 
-module CmmNode
-  ( CmmNode(..)
-  , UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..)
-  , mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf
-  , mapExpM, mapExpDeepM, wrapRecExpM
-  )
-where
+module CmmNode (
+     CmmNode(..), ForeignHint(..), CmmFormal, CmmActual,
+     UpdFrameOffset, Convention(..), ForeignConvention(..), ForeignTarget(..),
+     mapExp, mapExpDeep, wrapRecExp, foldExp, foldExpDeep, wrapRecExpf,
+     mapExpM, mapExpDeepM, wrapRecExpM
+  ) where
 
 import CmmExpr
-import CmmDecl
 import FastString
 import ForeignCall
 import SMRep
@@ -200,6 +198,9 @@ instance HooplNode CmmNode where
 --------------------------------------------------
 -- Various helper types
 
+type CmmActual = CmmExpr
+type CmmFormal = LocalReg
+
 type UpdFrameOffset = ByteOff
 
 data Convention
@@ -234,6 +235,12 @@ data ForeignTarget        -- The target of a foreign call
   | PrimTarget            -- A possibly-side-effecting machine operation
         CallishMachOp            -- Which one
   deriving Eq
+
+data ForeignHint
+  = NoHint | AddrHint | SignedHint
+  deriving( Eq )
+        -- Used to give extra per-argument or per-result
+        -- information needed by foreign calling conventions
 
 --------------------------------------------------
 -- Instances of register and slot users / definers

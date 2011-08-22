@@ -434,6 +434,7 @@ unpackFS (FastString _ n_bytes _ buf enc) =
         ZEncoded      -> peekCAStringLen (castPtr ptr,n_bytes)
         UTF8Encoded _ -> utf8DecodeString ptr n_bytes
 
+-- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS :: FastString -> [Word8]
 bytesFS (FastString _ n_bytes _ buf _) =
   inlinePerformIO $ withForeignPtr buf $ \ptr ->

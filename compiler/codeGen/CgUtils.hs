@@ -43,7 +43,7 @@ module CgUtils (
 
 	addToMem, addToMemE,
 	mkWordCLit,
-	mkStringCLit, mkByteStringCLit,
+	newStringCLit, newByteStringCLit,
 	packHalfWordsCLit,
 	blankWord,
 
@@ -98,7 +98,7 @@ addIdReps ids = [(idCgRep id, id) | id <- ids]
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (MachStr s) = mkByteStringCLit (bytesFS s)
+cgLit (MachStr s) = newByteStringCLit (bytesFS s)
  -- not unpackFS; we want the UTF-8 byte stream.
 cgLit other_lit   = return (mkSimpleLit other_lit)
 
@@ -131,88 +131,7 @@ mkLtOp lit	      = MO_U_Lt (typeWidth (cmmLitType (mkSimpleLit lit)))
 --
 ---------------------------------------------------
 
------------------------
--- The "B" variants take byte offsets
-cmmRegOffB :: CmmReg -> ByteOff -> CmmExpr
-cmmRegOffB = cmmRegOff
 
-cmmOffsetB :: CmmExpr -> ByteOff -> CmmExpr
-cmmOffsetB = cmmOffset
-
-cmmOffsetExprB :: CmmExpr -> CmmExpr -> CmmExpr
-cmmOffsetExprB = cmmOffsetExpr
-
-cmmLabelOffB :: CLabel -> ByteOff -> CmmLit
-cmmLabelOffB = cmmLabelOff
-
-cmmOffsetLitB :: CmmLit -> ByteOff -> CmmLit
-cmmOffsetLitB = cmmOffsetLit
-
------------------------
--- The "W" variants take word offsets
-cmmOffsetExprW :: CmmExpr -> CmmExpr -> CmmExpr
--- The second arg is a *word* offset; need to change it to bytes
-cmmOffsetExprW e (CmmLit (CmmInt n _)) = cmmOffsetW e (fromInteger n)
-cmmOffsetExprW e wd_off = cmmIndexExpr wordWidth e wd_off
-
-cmmOffsetW :: CmmExpr -> WordOff -> CmmExpr
-cmmOffsetW e n = cmmOffsetB e (wORD_SIZE * n)
-
-cmmRegOffW :: CmmReg -> WordOff -> CmmExpr
-cmmRegOffW reg wd_off = cmmRegOffB reg (wd_off * wORD_SIZE)
-
-cmmOffsetLitW :: CmmLit -> WordOff -> CmmLit
-cmmOffsetLitW lit wd_off = cmmOffsetLitB lit (wORD_SIZE * wd_off)
-
-cmmLabelOffW :: CLabel -> WordOff -> CmmLit
-cmmLabelOffW lbl wd_off = cmmLabelOffB lbl (wORD_SIZE * wd_off)
-
-cmmLoadIndexW :: CmmExpr -> Int -> CmmType -> CmmExpr
-cmmLoadIndexW base off ty = CmmLoad (cmmOffsetW base off) ty
-
------------------------
-cmmNeWord, cmmEqWord, cmmOrWord, cmmAndWord :: CmmExpr -> CmmExpr -> CmmExpr
-cmmOrWord  e1 e2 = CmmMachOp mo_wordOr  [e1, e2]
-cmmAndWord e1 e2 = CmmMachOp mo_wordAnd [e1, e2]
-cmmNeWord  e1 e2 = CmmMachOp mo_wordNe  [e1, e2]
-cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
-cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
-cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
-cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
---cmmShlWord e1 e2 = CmmMachOp mo_wordShl [e1, e2]
-cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
-cmmAddWord e1 e2 = CmmMachOp mo_wordAdd [e1, e2]
-cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
-cmmMulWord e1 e2 = CmmMachOp mo_wordMul [e1, e2]
-
-cmmNegate :: CmmExpr -> CmmExpr
-cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
-cmmNegate e			  = CmmMachOp (MO_S_Neg (cmmExprWidth e)) [e]
-
-blankWord :: CmmStatic
-blankWord = CmmUninitialised wORD_SIZE
-
--- Tagging --
--- Tag bits mask
---cmmTagBits = CmmLit (mkIntCLit tAG_BITS)
-cmmTagMask = CmmLit (mkIntCLit tAG_MASK)
-cmmPointerMask = CmmLit (mkIntCLit (complement tAG_MASK))
-
--- Used to untag a possibly tagged pointer
--- A static label need not be untagged
-cmmUntag e@(CmmLit (CmmLabel _)) = e
--- Default case
-cmmUntag e = (e `cmmAndWord` cmmPointerMask)
-
-cmmGetTag e = (e `cmmAndWord` cmmTagMask)
-
--- Test if a closure pointer is untagged
-cmmIsTagged e = (e `cmmAndWord` cmmTagMask)
-                 `cmmNeWord` CmmLit zeroCLit
-
-cmmConstrTag e = (e `cmmAndWord` cmmTagMask) `cmmSubWord` (CmmLit (mkIntCLit 1))
--- Get constructor tag, but one based.
-cmmConstrTag1 e = e `cmmAndWord` cmmTagMask
 
 {-
    The family size of a data type (the number of constructors)
@@ -236,33 +155,6 @@ tagForCon con = tag
 
 --Tag an expression, to do: refactor, this appears in some other module.
 tagCons con expr = cmmOffsetB expr (tagForCon con)
-
--- Copied from CgInfoTbls.hs
--- We keep the *zero-indexed* tag in the srt_len field of the info
--- table of a data constructor.
-dataConTagZ :: DataCon -> ConTagZ
-dataConTagZ con = dataConTag con - fIRST_TAG
-
------------------------
---	Making literals
-
-mkWordCLit :: StgWord -> CmmLit
-mkWordCLit wd = CmmInt (fromIntegral wd) wordWidth
-
-packHalfWordsCLit :: (Integral a, Integral b) => a -> b -> CmmLit
--- Make a single word literal in which the lower_half_word is
--- at the lower address, and the upper_half_word is at the 
--- higher address
--- ToDo: consider using half-word lits instead
--- 	 but be careful: that's vulnerable when reversed
-packHalfWordsCLit lower_half_word upper_half_word
-#ifdef WORDS_BIGENDIAN
-   = mkWordCLit ((fromIntegral lower_half_word `shiftL` hALF_WORD_SIZE_IN_BITS)
-		 .|. fromIntegral upper_half_word)
-#else 
-   = mkWordCLit ((fromIntegral lower_half_word) 
-		 .|. (fromIntegral upper_half_word `shiftL` hALF_WORD_SIZE_IN_BITS))
-#endif
 
 --------------------------------------------------------------------------
 --
@@ -544,44 +436,24 @@ baseRegOffset _			  = panic "baseRegOffset:other"
 
 emitDataLits :: CLabel -> [CmmLit] -> Code
 -- Emit a data-segment data block
-emitDataLits lbl lits
-  = emitData Data (Statics lbl $ map CmmStaticLit lits)
-
-mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatics info graph
--- Emit a data-segment data block
-mkDataLits lbl lits
-  = CmmData Data (Statics lbl $ map CmmStaticLit lits)
+emitDataLits lbl lits = emitDecl (mkDataLits Data lbl lits)
 
 emitRODataLits :: String -> CLabel -> [CmmLit] -> Code
 -- Emit a read-only data block
 emitRODataLits caller lbl lits
-  = emitData section (Statics lbl $ map CmmStaticLit lits)
-    where section | any needsRelocation lits = RelocatableReadOnlyData
-                  | otherwise                = ReadOnlyData
-          needsRelocation (CmmLabel _)      = True
-          needsRelocation (CmmLabelOff _ _) = True
-          needsRelocation _                 = False
+  = emitDecl (mkRODataLits lbl lits)
 
-mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatics info graph
-mkRODataLits lbl lits
-  = CmmData section (Statics lbl $ map CmmStaticLit lits)
-  where section | any needsRelocation lits = RelocatableReadOnlyData
-                | otherwise                = ReadOnlyData
-        needsRelocation (CmmLabel _)      = True
-        needsRelocation (CmmLabelOff _ _) = True
-        needsRelocation _                 = False
-
-mkStringCLit :: String -> FCode CmmLit
+newStringCLit :: String -> FCode CmmLit
 -- Make a global definition for the string,
 -- and return its label
-mkStringCLit str = mkByteStringCLit (map (fromIntegral.ord) str)
+newStringCLit str = newByteStringCLit (map (fromIntegral.ord) str)
 
-mkByteStringCLit :: [Word8] -> FCode CmmLit
-mkByteStringCLit bytes
+newByteStringCLit :: [Word8] -> FCode CmmLit
+newByteStringCLit bytes
   = do 	{ uniq <- newUnique
-	; let lbl = mkStringLitLabel uniq
-	; emitData ReadOnlyData $ Statics lbl [CmmString bytes]
-	; return (CmmLabel lbl) }
+	; let (lit, decl) = mkByteStringCLit uniq bytes
+	; emitDecl decl
+	; return lit }
 
 -------------------------------------------------------------------------
 --

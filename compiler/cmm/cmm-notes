@@ -17,6 +17,9 @@ Things we did
 
 More notes (June 11)
 ~~~~~~~~~~~~~~~~~~~~
+* Check in ClosureInfo:
+     -- NB: Results here should line up with the results of SMRep.rtsClosureType
+
 * Possible refactoring: Nuke AGraph in favour of 
       mkIfThenElse :: Expr -> Graph -> Graph -> FCode Graph
   or even
@@ -246,6 +249,60 @@ Things to do:
      when old rep disappears, 
      move the whole splitting game into the C back end *only*
 	 (guided by the procpoint set)
+
+----------------------------------------------------
+	Modules in codeGen/
+----------------------------------------------------
+
+
+------- Shared ---------
+Bitmap.hs
+SMRep.lhs
+
+CmmParse.y
+CgExtCode.hs   used in CmmParse.y
+
+------- New codegen ---------
+
+StgCmm.hs
+StgCmmBind.hs
+StgCmmClosure.hs     (corresponds to old ClosureInfo)
+StgCmmCon.hs
+StgCmmEnv.hs
+StgCmmExpr.hs
+StgCmmForeign.hs
+StgCmmGran.hs
+StgCmmHeap.hs
+StgCmmHpc.hs
+StgCmmLayout.hs
+StgCmmMonad.hs
+StgCmmPrim.hs
+StgCmmProf.hs
+StgCmmTicky.hs
+StgCmmUtils.hs
+
+------- Old codegen (moribund) ---------
+CodeGen.lhs
+CgBindery.lhs
+CgCallConv.hs
+CgCase.lhs
+CgClosure.lhs
+CgCon.lhs
+CgExpr.lhs
+CgLetNoEscape.lhs
+CgForeignCall.hs
+CgHeapery.lhs
+CgHpc.hs
+CgInfoTbls.hs
+CgMonad.lhs
+CgParallel.hs
+CgPrimOp.hs
+CgProf.hs
+CgStackery.lhs
+CgTailCall.lhs
+CgTicky.hs
+CgUtils.hs
+ClosureInfo.lhs
 
 ----------------------------------------------------
 	Modules in cmm/

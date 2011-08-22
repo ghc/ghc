@@ -7,26 +7,33 @@
 -----------------------------------------------------------------------------
 
 module OldCmm (
-        Cmm, RawCmm, CmmTop, RawCmmTop,
+        CmmPgm, GenCmmPgm, RawCmmPgm, CmmTop, RawCmmTop,
         ListGraph(..),
-        CmmInfo(..), UpdateFrame(..),
+        CmmInfo(..), UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
+        CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
         cmmMapGraph, cmmTopMapGraph,
         cmmMapGraphM, cmmTopMapGraphM,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmStmt(..), CmmReturnInfo(..), CmmHinted(..),
         HintedCmmFormal, HintedCmmActual,
         CmmSafety(..), CmmCallTarget(..),
-        module CmmDecl,
+        New.GenCmmTop(..),
+        New.ForeignHint(..),
         module CmmExpr,
+        Section(..),
+        ProfilingInfo(..), C_SRT(..)
   ) where
 
 #include "HsVersions.h"
 
+import qualified Cmm as New
+import Cmm           ( CmmInfoTable(..), GenCmmPgm, CmmStatics(..), GenCmmTop(..),
+                       CmmFormal, CmmActual, Section(..), CmmStatic(..),
+                       ProfilingInfo(..), ClosureTypeInfo(..) )
+
 import BlockId
-import CmmDecl
 import CmmExpr
 import ForeignCall
-
 import ClosureInfo
 import Outputable
 import FastString
@@ -73,14 +80,14 @@ newtype ListGraph i = ListGraph [GenBasicBlock i]
    -- across a whole compilation unit.
 
 -- | Cmm with the info table as a data type
-type Cmm    = GenCmm    CmmStatics CmmInfo (ListGraph CmmStmt)
+type CmmPgm = GenCmmPgm CmmStatics CmmInfo (ListGraph CmmStmt)
 type CmmTop = GenCmmTop CmmStatics CmmInfo (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic' along with the info
 -- table label. If we are building without tables-next-to-code there will be no statics
 --
 -- INVARIANT: if there is an info table, it has at least one CmmStatic
-type RawCmm    = GenCmm    CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
+type RawCmmPgm = GenCmmPgm CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
 type RawCmmTop = GenCmmTop CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
 
 
@@ -111,17 +118,17 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 --   graph maps
 ----------------------------------------------------------------
 
-cmmMapGraph    :: (g -> g') -> GenCmm    d h g -> GenCmm    d h g'
+cmmMapGraph    :: (g -> g') -> GenCmmPgm d h g -> GenCmmPgm d h g'
 cmmTopMapGraph :: (g -> g') -> GenCmmTop d h g -> GenCmmTop d h g'
 
-cmmMapGraphM    :: Monad m => (String -> g -> m g') -> GenCmm    d h g -> m (GenCmm    d h g')
+cmmMapGraphM    :: Monad m => (String -> g -> m g') -> GenCmmPgm d h g -> m (GenCmmPgm d h g')
 cmmTopMapGraphM :: Monad m => (String -> g -> m g') -> GenCmmTop d h g -> m (GenCmmTop d h g')
 
-cmmMapGraph f (Cmm tops) = Cmm $ map (cmmTopMapGraph f) tops
+cmmMapGraph f tops = map (cmmTopMapGraph f) tops
 cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)
 cmmTopMapGraph _ (CmmData s ds)  = CmmData s ds
 
-cmmMapGraphM f (Cmm tops) = mapM (cmmTopMapGraphM f) tops >>= return . Cmm
+cmmMapGraphM f tops = mapM (cmmTopMapGraphM f) tops
 cmmTopMapGraphM f (CmmProc h l g) =
   f (showSDoc $ ppr l) g >>= return . CmmProc h l
 cmmTopMapGraphM _ (CmmData s ds)  = return $ CmmData s ds
@@ -172,7 +179,7 @@ data CmmStmt	-- Old-style
   | CmmReturn            -- Return from a native C-- function,
       [HintedCmmActual]        -- with these return values. (parameters never used)
 
-data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: ForeignHint }
+data CmmHinted a = CmmHinted { hintlessCmm :: a, cmmHint :: New.ForeignHint }
 	   	 deriving( Eq )
 
 type HintedCmmFormal  = CmmHinted CmmFormal

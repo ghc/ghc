@@ -6,39 +6,34 @@ module CmmInfo (
 
 #include "HsVersions.h"
 
-import OldCmm
+import OldCmm as Old
+
 import CmmUtils
-
 import CLabel
-
-import Bitmap
-import ClosureInfo
-import CgInfoTbls
-import CgCallConv
-import CgUtils
 import SMRep
+import Bitmap
 
+import Maybes
 import Constants
 import Panic
 import StaticFlags
-import Unique
 import UniqSupply
-
+import MonadUtils
 import Data.Bits
+import Data.Word
 
 -- When we split at proc points, we need an empty info table.
 mkEmptyContInfoTable :: CLabel -> CmmInfoTable
-mkEmptyContInfoTable info_lbl = CmmInfoTable info_lbl False (ProfilingInfo zero zero) rET_SMALL
-                                             (ContInfo [] NoC_SRT)
-    where zero = CmmInt 0 wordWidth
+mkEmptyContInfoTable info_lbl 
+  = CmmInfoTable { cit_lbl  = info_lbl
+                 , cit_rep  = mkStackRep []
+                 , cit_prof = NoProfilingInfo
+                 , cit_srt  = NoC_SRT }
 
-cmmToRawCmm :: [Cmm] -> IO [RawCmm]
-cmmToRawCmm cmm = do
-  info_tbl_uniques <- mkSplitUniqSupply 'i'
-  return $ zipWith raw_cmm (listSplitUniqSupply info_tbl_uniques) cmm
-    where
-      raw_cmm uniq_supply (Cmm procs) =
-          Cmm $ concat $ zipWith mkInfoTable (uniqsFromSupply uniq_supply) procs
+cmmToRawCmm :: [Old.CmmPgm] -> IO [Old.RawCmmPgm]
+cmmToRawCmm cmms
+  = do { uniqs <- mkSplitUniqSupply 'i'
+       ; return (initUs_ uniqs (mapM (concatMapM mkInfoTable) cmms)) }
 
 -- Make a concrete info table, represented as a list of CmmStatic
 -- (it can't be simply a list of Word, because the SRT field is
@@ -73,105 +68,165 @@ cmmToRawCmm cmm = do
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
-mkInfoTable _    (CmmData sec dat) = [CmmData sec dat]
-mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label blocks) =
-    case info of
-      -- Code without an info table.  Easy.
-      CmmNonInfoTable -> [CmmProc Nothing entry_label blocks]
+mkInfoTable :: CmmTop -> UniqSM [RawCmmTop]
+mkInfoTable (CmmData sec dat) 
+  = return [CmmData sec dat]
 
-      CmmInfoTable info_label _ (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
-          let ty_prof'   = makeRelativeRefTo info_label ty_prof
-              cl_prof'   = makeRelativeRefTo info_label cl_prof
-          in case type_info of
-          -- A function entry point.
-          FunInfo (ptrs, nptrs) srt fun_arity pap_bitmap slow_entry ->
-              mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
-                                 blocks
-            where
-              fun_type = argDescrType pap_bitmap
-              fun_extra_bits =
-                 [packHalfWordsCLit fun_type fun_arity] ++
-                 case pap_bitmap of
-                 ArgGen liveness ->
-                     (if null srt_label then [mkIntCLit 0] else srt_label) ++
-                     [makeRelativeRefTo info_label $ mkLivenessCLit liveness,
-                      makeRelativeRefTo info_label slow_entry]
-                 _ -> srt_label
-              std_info = mkStdInfoTable ty_prof' cl_prof' type_tag srt_bitmap
-                                        layout
-              (srt_label, srt_bitmap) = mkSRTLit info_label srt
-              layout = packHalfWordsCLit ptrs nptrs
+mkInfoTable (CmmProc (CmmInfo _ _ info) entry_label blocks)
+  | CmmNonInfoTable <- info   -- Code without an info table.  Easy.
+  = return [CmmProc Nothing entry_label blocks]
+                               
+  | CmmInfoTable { cit_lbl = info_lbl } <- info
+  = do { (top_decls, info_cts) <- mkInfoTableContents info
+       ; return (top_decls  ++
+                 mkInfoTableAndCode info_lbl info_cts
+                                    entry_label blocks) }
+  | otherwise = panic "mkInfoTable"  -- Patern match overlap check not clever enough
 
-          -- A constructor.
-          ConstrInfo (ptrs, nptrs) con_tag descr ->
-              mkInfoTableAndCode info_label std_info [con_name] entry_label
-                                 blocks
-              where
-                std_info = mkStdInfoTable ty_prof' cl_prof' type_tag con_tag layout
-                con_name = makeRelativeRefTo info_label descr
-                layout = packHalfWordsCLit ptrs nptrs
-          -- A thunk.
-          ThunkInfo (ptrs, nptrs) srt ->
-              mkInfoTableAndCode info_label std_info srt_label entry_label
-                                 blocks
-              where
-                std_info = mkStdInfoTable ty_prof' cl_prof' type_tag srt_bitmap layout
-                (srt_label, srt_bitmap) = mkSRTLit info_label srt
-                layout = packHalfWordsCLit ptrs nptrs
+-----------------------------------------------------
+type InfoTableContents = ( [CmmLit]	     -- The standard part
+                         , [CmmLit] )	     -- The "extra bits"
+-- These Lits have *not* had mkRelativeTo applied to them
 
-          -- A selector thunk.
-          ThunkSelectorInfo offset _srt ->
-              mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
-                                 blocks
-              where
-                std_info = mkStdInfoTable ty_prof' cl_prof' type_tag 0 (mkWordCLit offset)
+mkInfoTableContents :: CmmInfoTable
+                    -> UniqSM ([RawCmmTop],		-- Auxiliary top decls
+                               InfoTableContents)	-- Info tbl + extra bits
+mkInfoTableContents (CmmInfoTable { cit_lbl  = info_lbl
+                                  , cit_rep  = smrep
+                                  , cit_prof = prof, cit_srt = srt }) 
+  | StackRep frame <- smrep
+  = do { (prof_lits,    prof_data)     <- mkProfLits prof
+       ; (liveness_lit, liveness_data) <- mkLivenessBits frame
+       ; let (extra_bits, srt_bitmap) = mkSRTLit srt
+             std_info = mkStdInfoTable prof_lits rts_tag srt_bitmap liveness_lit
+             rts_tag | null liveness_data = rET_SMALL  -- Fits in extra_bits
+                     | otherwise          = rET_BIG    -- Does not; extra_bits is
+                                                       -- a label
+       ; return (prof_data ++ liveness_data, (std_info, extra_bits)) }
 
-          -- A continuation/return-point.
-          ContInfo stack_layout srt ->
-              liveness_data ++
-              mkInfoTableAndCode info_label std_info srt_label entry_label
-                                 blocks
-              where
-                std_info = mkStdInfoTable ty_prof' cl_prof' maybe_big_type_tag srt_bitmap
-                                          (makeRelativeRefTo info_label liveness_lit)
-                (liveness_lit, liveness_data, liveness_tag) =
-                    mkLiveness uniq stack_layout
-                maybe_big_type_tag = if type_tag == rET_SMALL
-                                     then liveness_tag
-                                     else type_tag
-                (srt_label, srt_bitmap) = mkSRTLit info_label srt
+  | HeapRep _ ptrs nonptrs closure_type <- smrep
+  = do { let rts_tag = rtsClosureType smrep
+             layout  = packHalfWordsCLit ptrs nonptrs
+  	     (srt_label, srt_bitmap) = mkSRTLit srt
 
--- Handle the differences between tables-next-to-code
--- and not tables-next-to-code
-mkInfoTableAndCode :: CLabel
-                   -> [CmmLit]
-                   -> [CmmLit]
-                   -> CLabel
-                   -> ListGraph CmmStmt
+       ; (prof_lits, prof_data) <- mkProfLits prof
+       ; (mb_srt_field, mb_layout, extra_bits, ct_data) 
+                                <- mk_pieces closure_type srt_label
+       ; let std_info = mkStdInfoTable prof_lits rts_tag 
+                                       (mb_srt_field `orElse` srt_bitmap)
+                                       (mb_layout    `orElse` layout)
+       ; return (prof_data ++ ct_data, (std_info, extra_bits)) }
+  where
+    mk_pieces :: ClosureTypeInfo -> [CmmLit]
+              -> UniqSM ( Maybe StgHalfWord  -- Override the SRT field with this
+                 	, Maybe CmmLit       -- Override the layout field with this
+                 	, [CmmLit]           -- "Extra bits" for info table
+                 	, [RawCmmTop])	     -- Auxiliary data decls 
+    mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
+      = do { (descr_lit, decl) <- newStringLit con_descr
+      	   ; return (Just con_tag, Nothing, [descr_lit], [decl]) }
+
+    mk_pieces Thunk srt_label
+      = return (Nothing, Nothing, srt_label, [])
+
+    mk_pieces (ThunkSelector offset) _no_srt
+      = return (Just 0, Just (mkWordCLit offset), [], [])
+         -- Layout known (one free var); we use the layout field for offset
+
+    mk_pieces (Fun arity (ArgSpec fun_type)) srt_label 
+      = do { let extra_bits = packHalfWordsCLit fun_type arity : srt_label
+           ; return (Nothing, Nothing,  extra_bits, []) }
+
+    mk_pieces (Fun arity (ArgGen arg_bits)) srt_label
+      = do { (liveness_lit, liveness_data) <- mkLivenessBits arg_bits
+           ; let fun_type | null liveness_data = aRG_GEN
+                          | otherwise          = aRG_GEN_BIG
+                 extra_bits = [ packHalfWordsCLit fun_type arity
+                              , srt_lit, liveness_lit, slow_entry ]
+           ; return (Nothing, Nothing, extra_bits, liveness_data) }
+      where
+        slow_entry = CmmLabel (slowEntryFromInfoLabel info_lbl)
+        srt_lit = case srt_label of
+                    []          -> mkIntCLit 0
+                    (lit:_rest) -> ASSERT( null _rest ) lit
+
+    mk_pieces BlackHole _ = panic "mk_pieces: BlackHole"
+
+mkInfoTableContents _ = panic "mkInfoTableContents"   -- NonInfoTable dealt with earlier
+
+mkSRTLit :: C_SRT
+         -> ([CmmLit],    -- srt_label, if any
+             StgHalfWord) -- srt_bitmap
+mkSRTLit NoC_SRT                = ([], 0)
+mkSRTLit (C_SRT lbl off bitmap) = ([cmmLabelOffW lbl off], bitmap)
+
+
+-------------------------------------------------------------------------
+--
+--      Lay out the info table and handle relative offsets
+--
+-------------------------------------------------------------------------
+
+-- This function takes
+--   * the standard info table portion (StgInfoTable)
+--   * the "extra bits" (StgFunInfoExtraRev etc.)
+--   * the entry label
+--   * the code
+-- and lays them out in memory, producing a list of RawCmmTop
+
+-- The value of tablesNextToCode determines the relative positioning
+-- of the extra bits and the standard info table, and whether the
+-- former is reversed or not.  It also decides whether pointers in the
+-- info table should be expressed as offsets relative to the info
+-- pointer or not (see "Position Independent Code" below.
+
+mkInfoTableAndCode :: CLabel             -- Info table label
+                   -> InfoTableContents
+                   -> CLabel     	 -- Entry label
+                   -> ListGraph CmmStmt  -- Entry code
                    -> [RawCmmTop]
-mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl blocks
+mkInfoTableAndCode info_lbl (std_info, extra_bits) entry_lbl blocks
   | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
-  = [CmmProc (Just (Statics info_lbl $ map CmmStaticLit (reverse extra_bits ++ std_info)))
+  = [CmmProc (Just $ Statics info_lbl $ map CmmStaticLit $
+                     reverse rel_extra_bits ++ rel_std_info)
              entry_lbl blocks]
 
   | ListGraph [] <- blocks -- No code; only the info table is significant
   =		-- Use a zero place-holder in place of the 
 		-- entry-label in the info table
-    [mkRODataLits info_lbl (zeroCLit : std_info ++ extra_bits)]
+    [mkRODataLits info_lbl (zeroCLit : rel_std_info ++ rel_extra_bits)]
 
   | otherwise	-- Separately emit info table (with the function entry 
   =		-- point as first entry) and the entry code 
     [CmmProc Nothing entry_lbl blocks,
-     mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)]
+     mkDataLits Data info_lbl (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)]
+  where
+    rel_std_info   = map (makeRelativeRefTo info_lbl) std_info
+    rel_extra_bits = map (makeRelativeRefTo info_lbl) extra_bits
 
-mkSRTLit :: CLabel
-         -> C_SRT
-         -> ([CmmLit],    -- srt_label
-             StgHalfWord) -- srt_bitmap
-mkSRTLit _          NoC_SRT = ([], 0)
-mkSRTLit info_label (C_SRT lbl off bitmap) =
-    ([makeRelativeRefTo info_label (cmmLabelOffW lbl off)], bitmap)
+-------------------------------------------------------------------------
+--
+--	Position independent code
+--
+-------------------------------------------------------------------------
+-- In order to support position independent code, we mustn't put absolute
+-- references into read-only space. Info tables in the tablesNextToCode
+-- case must be in .text, which is read-only, so we doctor the CmmLits
+-- to use relative offsets instead.
+
+-- Note that this is done even when the -fPIC flag is not specified,
+-- as we want to keep binary compatibility between PIC and non-PIC.
+
+makeRelativeRefTo :: CLabel -> CmmLit -> CmmLit
+        
+makeRelativeRefTo info_lbl (CmmLabel lbl)
+  | tablesNextToCode
+  = CmmLabelDiffOff lbl info_lbl 0
+makeRelativeRefTo info_lbl (CmmLabelOff lbl off)
+  | tablesNextToCode
+  = CmmLabelDiffOff lbl info_lbl off
+makeRelativeRefTo _ lit = lit
+
 
 -------------------------------------------------------------------------
 --
@@ -193,50 +248,36 @@ mkSRTLit info_label (C_SRT lbl off bitmap) =
 -- The head of the stack layout is the top of the stack and
 -- the least-significant bit.
 
--- TODO: refactor to use utility functions
--- TODO: combine with CgCallConv.mkLiveness (see comment there)
-mkLiveness :: Unique
-           -> [Maybe LocalReg]
-           -> (CmmLit, [RawCmmTop], ClosureTypeTag)
+mkLivenessBits :: Liveness -> UniqSM (CmmLit, [RawCmmTop])
               -- ^ Returns:
               --   1. The bitmap (literal value or label)
               --   2. Large bitmap CmmData if needed
-              --   3. rET_SMALL or rET_BIG
-mkLiveness uniq live =
-  if length bits > mAX_SMALL_BITMAP_SIZE
-    -- does not fit in one word
-    then (CmmLabel big_liveness, [data_lits], rET_BIG)
-    -- fits in one word
-    else (mkWordCLit  small_liveness, [], rET_SMALL)
+
+mkLivenessBits liveness
+  | n_bits > mAX_SMALL_BITMAP_SIZE    -- does not fit in one word
+  = do { uniq <- getUniqueUs
+       ; let bitmap_lbl = mkBitmapLabel uniq
+       ; return (CmmLabel bitmap_lbl, 
+                 [mkRODataLits bitmap_lbl lits]) }
+
+  | otherwise -- Fits in one word
+  = return (mkWordCLit bitmap_word, [])
   where
-    mkBits [] = []
-    mkBits (reg:regs) = take sizeW bits ++ mkBits regs where
-        sizeW = case reg of
-                  Nothing -> 1
-                  Just r -> (widthInBytes (typeWidth (localRegType r)) + wORD_SIZE - 1)
-                            `quot` wORD_SIZE
-                            -- number of words, rounded up
-        bits = repeat $ is_non_ptr reg -- True <=> Non Ptr
-
-    is_non_ptr Nothing    = True
-    is_non_ptr (Just reg) = not $ isGcPtrType (localRegType reg)
-
-    bits :: [Bool]
-    bits = mkBits live
+    n_bits = length liveness
 
     bitmap :: Bitmap
-    bitmap = mkBitmap bits
+    bitmap = mkBitmap liveness
 
     small_bitmap = case bitmap of 
-		   []  -> 0
-                   [b] -> b
-		   _   -> panic "mkLiveness"
-    small_liveness =
-        fromIntegral (length bits) .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT)
+		     []  -> 0
+                     [b] -> b
+		     _   -> panic "mkLiveness"
+    bitmap_word = fromIntegral n_bits
+              .|. (small_bitmap `shiftL` bITMAP_BITS_SHIFT)
 
-    big_liveness = mkBitmapLabel uniq
-    lits = mkWordCLit (fromIntegral (length bits)) : map mkWordCLit bitmap
-    data_lits = mkRODataLits big_liveness lits
+    lits = mkWordCLit (fromIntegral n_bits) : map mkWordCLit bitmap
+      -- The first word is the size.  The structure must match
+      -- StgLargeBitmap in includes/rts/storage/InfoTable.h
 
 -------------------------------------------------------------------------
 --
@@ -245,20 +286,20 @@ mkLiveness uniq live =
 -------------------------------------------------------------------------
 
 -- The standard bits of an info table.  This part of the info table
--- corresponds to the StgInfoTable type defined in InfoTables.h.
+-- corresponds to the StgInfoTable type defined in
+-- includes/rts/storage/InfoTables.h.
 --
 -- Its shape varies with ticky/profiling/tables next to code etc
 -- so we can't use constant offsets from Constants
 
 mkStdInfoTable
-   :: CmmLit		-- closure type descr (profiling)
-   -> CmmLit		-- closure descr (profiling)
-   -> StgHalfWord	-- closure type
+   :: (CmmLit,CmmLit)	-- Closure type descr and closure descr  (profiling)
+   -> StgHalfWord	-- Closure RTS tag 
    -> StgHalfWord	-- SRT length
    -> CmmLit		-- layout field
    -> [CmmLit]
 
-mkStdInfoTable type_descr closure_descr cl_type srt_len layout_lit
+mkStdInfoTable (type_descr, closure_descr) cl_type srt_len layout_lit
  = 	-- Parallel revertible-black hole field
     prof_info
 	-- Ticky info (none at present)
@@ -271,4 +312,22 @@ mkStdInfoTable type_descr closure_descr cl_type srt_len layout_lit
 	| otherwise	     = []
 
     type_lit = packHalfWordsCLit cl_type srt_len
+
+-------------------------------------------------------------------------
+--
+--      Making string literals
+--
+-------------------------------------------------------------------------
+
+mkProfLits :: ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmTop])
+mkProfLits NoProfilingInfo       = return ((zeroCLit, zeroCLit), [])
+mkProfLits (ProfilingInfo td cd)
+  = do { (td_lit, td_decl) <- newStringLit td
+       ; (cd_lit, cd_decl) <- newStringLit cd
+       ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
+
+newStringLit :: [Word8] -> UniqSM (CmmLit, GenCmmTop CmmStatics info stmt)
+newStringLit bytes
+  = do { uniq <- getUniqueUs
+       ; return (mkByteStringCLit uniq bytes) }
 

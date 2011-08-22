@@ -11,7 +11,7 @@ where
 
 import BlockId
 import Cmm
-import CmmExpr
+import CmmUtils
 import Prelude hiding (iterate, succ, unzip, zip)
 
 import Compiler.Hoopl

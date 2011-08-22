@@ -11,11 +11,10 @@
 
 module CgCallConv (
 	-- Argument descriptors
-	mkArgDescr, argDescrType,
+	mkArgDescr, 
 
 	-- Liveness
-	isBigLiveness, mkRegLiveness, 
-	smallLiveness, mkLivenessCLit,
+	mkRegLiveness, 
 
 	-- Register assignment
 	assignCallRegs, assignReturnRegs, assignPrimOpCallRegs,
@@ -28,7 +27,6 @@ module CgCallConv (
 	getSequelAmode
     ) where
 
-import CgUtils
 import CgMonad
 import SMRep
 
@@ -36,20 +34,16 @@ import OldCmm
 import CLabel
 
 import Constants
-import ClosureInfo
 import CgStackery
 import OldCmmUtils
 import Maybes
 import Id
 import Name
-import Bitmap
 import Util
 import StaticFlags
 import Module
 import FastString
 import Outputable
-import Unique
-
 import Data.Bits
 
 -------------------------------------------------------------------------
@@ -68,27 +62,15 @@ import Data.Bits
 #include "../includes/rts/storage/FunTypes.h"
 
 -------------------------
-argDescrType :: ArgDescr -> StgHalfWord
--- The "argument type" RTS field type
-argDescrType (ArgSpec n) = n
-argDescrType (ArgGen liveness)
-  | isBigLiveness liveness = ARG_GEN_BIG
-  | otherwise		   = ARG_GEN
-
-
 mkArgDescr :: Name -> [Id] -> FCode ArgDescr
-mkArgDescr nm args 
+mkArgDescr _nm args 
   = case stdPattern arg_reps of
 	Just spec_id -> return (ArgSpec spec_id)
-	Nothing      -> do { liveness <- mkLiveness nm size bitmap
-			   ; return (ArgGen liveness) }
+	Nothing      -> return (ArgGen arg_bits)
   where
+    arg_bits = argBits arg_reps
     arg_reps = filter nonVoidArg (map idCgRep args)
 	-- Getting rid of voids eases matching of standard patterns
-
-    bitmap   = mkBitmap arg_bits
-    arg_bits = argBits arg_reps
-    size     = length arg_bits
 
 argBits :: [CgRep] -> [Bool]	-- True for non-ptr, False for ptr
 argBits [] 		= []
@@ -122,52 +104,6 @@ stdPattern [PtrArg,PtrArg,PtrArg,PtrArg]	       = Just ARG_PPPP
 stdPattern [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg]        = Just ARG_PPPPP
 stdPattern [PtrArg,PtrArg,PtrArg,PtrArg,PtrArg,PtrArg] = Just ARG_PPPPPP
 stdPattern _ = Nothing
-
-
--------------------------------------------------------------------------
---
---	Liveness info
---
--------------------------------------------------------------------------
-
--- TODO: This along with 'mkArgDescr' should be unified
--- with 'CmmInfo.mkLiveness'.  However that would require
--- potentially invasive changes to the 'ClosureInfo' type.
--- For now, 'CmmInfo.mkLiveness' handles only continuations and
--- this one handles liveness everything else.  Another distinction
--- between these two is that 'CmmInfo.mkLiveness' information
--- about the stack layout, and this one is information about
--- the heap layout of PAPs.
-mkLiveness :: Name -> Int -> Bitmap -> FCode Liveness
-mkLiveness name size bits
-  | size > mAX_SMALL_BITMAP_SIZE		-- Bitmap does not fit in one word
-  = do	{ let lbl = mkBitmapLabel (getUnique name)
-	; emitRODataLits "mkLiveness" lbl ( mkWordCLit (fromIntegral size)
-		             : map mkWordCLit bits)
-	; return (BigLiveness lbl) }
-  
-  | otherwise		-- Bitmap fits in one word
-  = let
-        small_bits = case bits of 
-			[]  -> 0
-                        [b] -> b
-			_   -> panic "livenessToAddrMode"
-    in
-    return (smallLiveness size small_bits)
-
-smallLiveness :: Int -> StgWord -> Liveness
-smallLiveness size small_bits = SmallLiveness bits
-  where bits = fromIntegral size .|. (small_bits `shiftL` bITMAP_BITS_SHIFT)
-
--------------------
-isBigLiveness :: Liveness -> Bool
-isBigLiveness (BigLiveness _)   = True
-isBigLiveness (SmallLiveness _) = False
-
--------------------
-mkLivenessCLit :: Liveness -> CmmLit
-mkLivenessCLit (BigLiveness lbl)    = CmmLabel lbl
-mkLivenessCLit (SmallLiveness bits) = mkWordCLit bits
 
 
 -------------------------------------------------------------------------

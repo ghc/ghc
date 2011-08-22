@@ -12,8 +12,8 @@ module StgCmmHeap (
 
         entryHeapCheck, altHeapCheck,
 
-        layOutDynConstr, layOutStaticConstr,
-        mkVirtHeapOffsets, mkStaticClosureFields, mkStaticClosure,
+        mkVirtHeapOffsets, mkVirtConstrOffsets,
+        mkStaticClosureFields, mkStaticClosure,
 
         allocDynClosure, allocDynClosureCmm, emitSetDynHdr
     ) where
@@ -35,38 +35,14 @@ import StgCmmEnv
 import MkGraph
 
 import SMRep
-import CmmExpr
+import Cmm
 import CmmUtils
-import DataCon
-import TyCon
 import CostCentre
 import Outputable
+import IdInfo( CafInfo(..), mayHaveCafRefs )
 import Module
 import FastString( mkFastString, fsLit )
 import Constants
-
------------------------------------------------------------
---              Layout of heap objects
------------------------------------------------------------
-
-layOutDynConstr, layOutStaticConstr
-        :: DataCon -> [(PrimRep, a)]
-        -> (ClosureInfo, [(NonVoid a, VirtualHpOffset)])
-        -- No Void arguments in result
-
-layOutDynConstr    = layOutConstr False
-layOutStaticConstr = layOutConstr True
-
-layOutConstr :: Bool -> DataCon -> [(PrimRep, a)]
-             -> (ClosureInfo, [(NonVoid a, VirtualHpOffset)])
-layOutConstr is_static data_con args
-   = (mkConInfo is_static data_con tot_wds ptr_wds,
-      things_w_offsets)
-  where
-    (tot_wds, --  #ptr_wds + #nonptr_wds
-     ptr_wds, --  #ptr_wds
-     things_w_offsets) = mkVirtHeapOffsets False{-not a thunk-} args
-
 
 -----------------------------------------------------------
 --              Initialise dynamic heap objects
@@ -175,7 +151,7 @@ hpStore base vals offs
 mkStaticClosureFields
         :: ClosureInfo
         -> CostCentreStack
-        -> Bool                 -- Has CAF refs
+        -> CafInfo
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
 mkStaticClosureFields cl_info ccs caf_refs payload
@@ -210,12 +186,12 @@ mkStaticClosureFields cl_info ccs caf_refs payload
         | is_caf     = [mkIntCLit 0]
         | otherwise  = []
 
-        -- for a static constructor which has NoCafRefs, we set the
+        -- For a static constructor which has NoCafRefs, we set the
         -- static link field to a non-zero value so the garbage
         -- collector will ignore it.
     static_link_value
-        | caf_refs      = mkIntCLit 0
-        | otherwise     = mkIntCLit 1
+        | mayHaveCafRefs caf_refs  = mkIntCLit 0
+        | otherwise                = mkIntCLit 1  -- No CAF refs
 
 
 mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]

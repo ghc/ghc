@@ -187,7 +187,6 @@ Library
         CmmCommonBlockElim
         CmmContFlowOpt
         CmmCvt
-        CmmDecl
         CmmExpr
         CmmInfo
         CmmLex

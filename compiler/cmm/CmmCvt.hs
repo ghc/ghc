@@ -3,90 +3,24 @@
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 
 module CmmCvt
-  ( cmmToZgraph, cmmOfZgraph )
+  ( cmmOfZgraph )
 where
 
 import BlockId
 import Cmm
-import CmmDecl
-import CmmExpr
-import MkGraph
+import CmmUtils
 import qualified OldCmm as Old
 import OldPprCmm ()
-import Platform
 
 import Compiler.Hoopl hiding ((<*>), mkLabel, mkBranch)
-import Control.Monad
 import Data.Maybe
 import Maybes
 import Outputable
-import UniqSupply
 
-cmmToZgraph :: Platform -> Old.Cmm -> UniqSM Cmm
-cmmOfZgraph :: Cmm -> Old.Cmm
-
-cmmToZgraph platform (Cmm tops) = liftM Cmm $ mapM mapTop tops
-  where mapTop (CmmProc (Old.CmmInfo _ _ info_tbl) l g) =
-          do (stack_info, g) <- toZgraph platform (showSDoc $ ppr l) g
-             return $ CmmProc (TopInfo {info_tbl=info_tbl, stack_info=stack_info}) l g
-        mapTop (CmmData s ds) = return $ CmmData s ds
-cmmOfZgraph (Cmm tops) = Cmm $ map mapTop tops
+cmmOfZgraph :: CmmPgm -> Old.CmmPgm
+cmmOfZgraph tops = map mapTop tops
   where mapTop (CmmProc h l g) = CmmProc (Old.CmmInfo Nothing Nothing (info_tbl h)) l (ofZgraph g)
         mapTop (CmmData s ds) = CmmData s ds
-
-toZgraph :: Platform -> String -> Old.ListGraph Old.CmmStmt -> UniqSM (CmmStackInfo, CmmGraph)
-toZgraph _ _ (Old.ListGraph []) =
-  do g <- lgraphOfAGraph emptyAGraph
-     return (StackInfo {arg_space=0, updfr_space=Nothing}, g)
-toZgraph platform fun_name g@(Old.ListGraph (Old.BasicBlock id ss : other_blocks)) =
-           let (offset, entry) = mkCallEntry NativeNodeCall [] in
-           do g <- labelAGraph id $
-                     entry <*> mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
-              return (StackInfo {arg_space = offset, updfr_space = Nothing}, g)
-  where addBlock (Old.BasicBlock id ss) g =
-          mkLabel id <*> mkStmts ss <*> g
-        updfr_sz = 0 -- panic "upd frame size lost in cmm conversion"
-        mkStmts (Old.CmmNop        : ss)  = mkNop        <*> mkStmts ss 
-        mkStmts (Old.CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
-        mkStmts (Old.CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
-        mkStmts (Old.CmmStore  l r : ss)  = mkStore  l r <*> mkStmts ss
-        mkStmts (Old.CmmCall (Old.CmmCallee f conv) res args (Old.CmmSafe _) Old.CmmMayReturn : ss) =
-            mkCall f (conv', conv') (map Old.hintlessCmm res) (map Old.hintlessCmm args) updfr_sz
-            <*> mkStmts ss
-              where conv' = Foreign (ForeignConvention conv [] []) -- JD: DUBIOUS
-        mkStmts (Old.CmmCall (Old.CmmPrim {}) _ _ (Old.CmmSafe _) _ : _) =
-            panic "safe call to a primitive CmmPrim CallishMachOp"
-        mkStmts (Old.CmmCall f res args Old.CmmUnsafe Old.CmmMayReturn : ss) =
-                      mkUnsafeCall (convert_target f res args)
-                        (strip_hints res) (strip_hints args)
-                      <*> mkStmts ss
-        mkStmts (Old.CmmCondBranch e l : fbranch) =
-            mkCmmIfThenElse e (mkBranch l) (mkStmts fbranch)
-        mkStmts (last : []) = mkLast last
-        mkStmts []          = bad "fell off end"
-        mkStmts (_ : _ : _) = bad "last node not at end"
-        bad msg = pprPanic (msg ++ " in function " ++ fun_name) (pprPlatform platform g)
-        mkLast (Old.CmmCall (Old.CmmCallee f conv) []     args _ Old.CmmNeverReturns) =
-            mkFinalCall f conv (map Old.hintlessCmm args) updfr_sz
-        mkLast (Old.CmmCall (Old.CmmPrim {}) _ _ _ Old.CmmNeverReturns) =
-            panic "Call to CmmPrim never returns?!"
-        mkLast (Old.CmmSwitch scrutinee table) = mkSwitch scrutinee table
-        -- SURELY, THESE HINTLESS ARGS ARE WRONG AND WILL BE FIXED WHEN CALLING
-        -- CONVENTIONS ARE HONORED?
-        mkLast (Old.CmmJump tgt args)          = mkJump   tgt (map Old.hintlessCmm args) updfr_sz
-        mkLast (Old.CmmReturn ress)            =
-          mkReturnSimple (map Old.hintlessCmm ress) updfr_sz
-        mkLast (Old.CmmBranch tgt)             = mkBranch tgt
-        mkLast (Old.CmmCall _f (_:_) _args _ Old.CmmNeverReturns) =
-                   panic "Call never returns but has results?!"
-        mkLast _ = panic "fell off end of block"
-
-strip_hints :: [Old.CmmHinted a] -> [a]
-strip_hints = map Old.hintlessCmm
-
-convert_target :: Old.CmmCallTarget -> [Old.HintedCmmFormal] -> [Old.HintedCmmActual] -> ForeignTarget
-convert_target (Old.CmmCallee e cc) ress  args  = ForeignTarget e (ForeignConvention cc (map Old.cmmHint args) (map Old.cmmHint ress))
-convert_target (Old.CmmPrim op)	   _ress _args = PrimTarget op
 
 data ValueDirection = Arguments | Results
 

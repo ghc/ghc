@@ -214,7 +214,7 @@ typedef union {
  */
 typedef struct StgInfoTable_ {
 
-#ifndef TABLES_NEXT_TO_CODE
+#if !defined(TABLES_NEXT_TO_CODE)
     StgFunPtr       entry;	/* pointer to the entry code */
 #endif
 
@@ -344,11 +344,11 @@ typedef struct StgConInfoTable_ {
     StgInfoTable i;
 #endif
 
-#ifndef TABLES_NEXT_TO_CODE
-    char *con_desc;
-#else
+#if defined(TABLES_NEXT_TO_CODE)
     OFFSET_FIELD(con_desc) // the name of the data constructor 
                            // as: Package:Module.Name
+#else
+    char *con_desc;
 #endif
 
 #if defined(TABLES_NEXT_TO_CODE)

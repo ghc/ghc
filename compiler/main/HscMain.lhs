@@ -115,7 +115,7 @@ import TyCon            ( TyCon, isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
-import OldCmm           ( Cmm )
+import OldCmm as Old    ( CmmPgm )
 import PprCmm		( pprCmms )
 import CmmParse		( parseCmmFile )
 import CmmBuildInfoTables
@@ -123,7 +123,6 @@ import CmmPipeline
 import CmmInfo
 import OptimizationFuel ( initOptFuelState )
 import CmmCvt
-import CmmContFlowOpt   ( runCmmContFlowOpts )
 import CodeOutput
 import NameEnv          ( emptyNameEnv )
 import NameSet          ( emptyNameSet )
@@ -1114,17 +1113,14 @@ hscGenHardCode cgguts mod_summary
          ------------------  Code generation ------------------
          
          cmms <- if dopt Opt_TryNewCodeGen dflags
-                 then do cmms <- tryNewCodeGen hsc_env this_mod data_tycons
+                 then tryNewCodeGen hsc_env this_mod data_tycons
                                  cost_centre_info
                                  stg_binds hpc_info
-                         return cmms
                  else {-# SCC "CodeGen" #-}
                        codeGen dflags this_mod data_tycons
                                cost_centre_info
                                stg_binds hpc_info
 
-         --- Optionally run experimental Cmm transformations ---
-         cmms <- optionallyConvertAndOrCPS hsc_env cmms
                  -- unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
@@ -1179,8 +1175,7 @@ hscCompileCmmFile hsc_env filename
       let dflags = hsc_dflags hsc_env
       cmm <- ioMsgMaybe $ parseCmmFile dflags filename
       liftIO $ do
-        cmms <- optionallyConvertAndOrCPS hsc_env [cmm]
-        rawCmms <- cmmToRawCmm cmms
+        rawCmms <- cmmToRawCmm [cmm]
         _ <- codeOutput dflags no_mod no_loc NoStubs [] rawCmms
         return ()
   where
@@ -1195,7 +1190,7 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
                 -> CollectedCCs
                 -> [(StgBinding,[(Id,[Id])])]
                 -> HpcInfo
-                -> IO [Cmm]
+                -> IO [Old.CmmPgm]
 tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info =
   do    { let dflags = hsc_dflags hsc_env
@@ -1215,38 +1210,6 @@ tryNewCodeGen hsc_env this_mod data_tycons
         ; dumpIfSet_dyn dflags Opt_D_dump_cmmz "Output Cmm" (pprPlatform platform prog')
         ; return prog' }
 
-
-optionallyConvertAndOrCPS :: HscEnv -> [Cmm] -> IO [Cmm]
-optionallyConvertAndOrCPS hsc_env cmms =
-    do let dflags = hsc_dflags hsc_env
-        --------  Optionally convert to and from zipper ------
-       cmms <- if dopt Opt_ConvertToZipCfgAndBack dflags
-               then mapM (testCmmConversion hsc_env) cmms
-               else return cmms
-       return cmms
-
-
-testCmmConversion :: HscEnv -> Cmm -> IO Cmm
-testCmmConversion hsc_env cmm =
-    do let dflags = hsc_dflags hsc_env
-           platform = targetPlatform dflags
-       showPass dflags "CmmToCmm"
-       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (pprPlatform platform cmm)
-       --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
-       us <- mkSplitUniqSupply 'C'
-       let zgraph = initUs_ us (cmmToZgraph platform cmm)
-       chosen_graph <-
-        if dopt Opt_RunCPSZ dflags
-            then do us <- mkSplitUniqSupply 'S'
-                    let topSRT = initUs_ us emptySRT
-                    (_, [zgraph]) <- cmmPipeline hsc_env (topSRT, []) zgraph
-                    return zgraph
-            else return (runCmmContFlowOpts zgraph)
-       dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (pprPlatform platform chosen_graph)
-       showPass dflags "Convert from Z back to Cmm"
-       let cvt = cmmOfZgraph chosen_graph
-       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (pprPlatform platform cvt)
-       return cvt
 
 myCoreToStg :: DynFlags -> Module -> [CoreBind]
             -> IO ( [(StgBinding,[(Id,[Id])])]  -- output program

@@ -10,8 +10,7 @@ where
 
 import BlockId
 import Cmm
-import CmmDecl
-import CmmExpr
+import CmmUtils
 import qualified OldCmm as Old
 
 import Maybes
@@ -22,7 +21,7 @@ import Prelude hiding (succ, unzip, zip)
 import Util
 
 ------------------------------------
-runCmmContFlowOpts :: Cmm -> Cmm
+runCmmContFlowOpts :: CmmPgm -> CmmPgm
 runCmmContFlowOpts prog = runCmmOpts cmmCfgOpts prog
 
 oldCmmCfgOpts :: Old.ListGraph Old.CmmStmt -> Old.ListGraph Old.CmmStmt
@@ -34,17 +33,13 @@ cmmCfgOpts    =
         -- Here branchChainElim can ultimately be replaced
         -- with a more exciting combination of optimisations
 
-runCmmOpts :: (g -> g) -> GenCmm d h g -> GenCmm d h g
+runCmmOpts :: (g -> g) -> GenCmmPgm d h g -> GenCmmPgm d h g
 -- Lifts a transformer on a single graph to one on the whole program
-runCmmOpts opt = mapProcs (optProc opt)
+runCmmOpts opt = map (optProc opt)
 
 optProc :: (g -> g) -> GenCmmTop d h g -> GenCmmTop d h g
 optProc _   top@(CmmData {}) = top
 optProc opt (CmmProc info lbl g) = CmmProc info lbl (opt g)
-
-------------------------------------
-mapProcs :: (GenCmmTop d h s -> GenCmmTop d h s) -> GenCmm d h s -> GenCmm d h s
-mapProcs f (Cmm tops) = Cmm (map f tops)
 
 ----------------------------------------------------------------
 oldBranchChainElim :: Old.ListGraph Old.CmmStmt -> Old.ListGraph Old.CmmStmt

@@ -13,7 +13,7 @@ where
 
 import BlockId
 import Cmm
-import CmmExpr
+import CmmUtils
 import Control.Monad
 import OptimizationFuel
 import PprCmmExpr ()

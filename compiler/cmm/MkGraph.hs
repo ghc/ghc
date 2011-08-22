@@ -22,17 +22,11 @@ module MkGraph
          , mkReturn, mkReturnSimple, mkComment, mkCallEntry
          , mkBranch, mkCmmIfThenElse, mkCmmIfThen, mkCmmWhileDo
          , copyInOflow, copyInSlot, copyOutOflow, copyOutSlot
-  -- Reexport of needed Cmm stuff
-  , Convention(..), ForeignConvention(..), ForeignTarget(..)
-  , CmmStackInfo(..), CmmTopInfo(..), CmmGraph, GenCmmGraph(..)
-  , Cmm, CmmTop
   )
 where
 
 import BlockId
 import Cmm
-import CmmDecl
-import CmmExpr
 import CmmCallConv (assignArgumentsPos, ParamLocation(..))
 
 import Compiler.Hoopl hiding (Unique, (<*>), mkFirst, mkMiddle, mkLast, mkLabel, mkBranch, Shape(..))

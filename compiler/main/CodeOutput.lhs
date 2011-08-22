@@ -18,7 +18,7 @@ import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
 import Util
-import OldCmm		( RawCmm )
+import OldCmm           ( RawCmmPgm )
 import HscTypes
 import DynFlags
 import Config
@@ -48,7 +48,7 @@ codeOutput :: DynFlags
 	   -> ModLocation
 	   -> ForeignStubs
 	   -> [PackageId]
-	   -> [RawCmm]			-- Compiled C--
+           -> [RawCmmPgm]                       -- Compiled C--
            -> IO (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-})
 
 codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
@@ -96,7 +96,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 \begin{code}
 outputC :: DynFlags
         -> FilePath
-        -> [RawCmm]
+        -> [RawCmmPgm]
         -> [PackageId]
         -> IO ()
 
@@ -134,7 +134,7 @@ outputC dflags filenm flat_absC packages
 %************************************************************************
 
 \begin{code}
-outputAsm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
+outputAsm :: DynFlags -> FilePath -> [RawCmmPgm] -> IO ()
 outputAsm dflags filenm flat_absC
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
@@ -155,7 +155,7 @@ outputAsm dflags filenm flat_absC
 %************************************************************************
 
 \begin{code}
-outputLlvm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
+outputLlvm :: DynFlags -> FilePath -> [RawCmmPgm] -> IO ()
 outputLlvm dflags filenm flat_absC
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
        doOutput filenm $ \f -> llvmCodeGen dflags f ncg_uniqs flat_absC

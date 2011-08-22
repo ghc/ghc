@@ -22,7 +22,7 @@ import Prelude hiding (succ, zip, unzip, last)
 
 import BlockId
 import Cmm
-import CmmExpr
+import CmmUtils
 import CmmProcPoint
 import Maybes
 import MkGraph (stackStubExpr)

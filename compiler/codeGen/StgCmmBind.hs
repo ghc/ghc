@@ -31,8 +31,7 @@ import StgCmmForeign    (emitPrimCall)
 import MkGraph
 import CoreSyn		( AltCon(..) )
 import SMRep
-import CmmDecl
-import CmmExpr
+import Cmm
 import CmmUtils
 import CLabel
 import StgSyn
@@ -75,7 +74,8 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
 	closure_label = mkLocalClosureLabel name (idCafInfo id)
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
-	closure_rep   = mkStaticClosureFields closure_info ccs True []
+        caffy         = idCafInfo id
+	closure_rep   = mkStaticClosureFields closure_info ccs caffy []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep
@@ -209,7 +209,7 @@ mkRhsClosure	bndr cc bi
 		body@(StgCase (StgApp scrutinee [{-no args-}])
 		      _ _ _ _   -- ignore uniq, etc.
 		      (AlgAlt _)
-		      [(DataAlt con, params, _use_mask,
+		      [(DataAlt _, params, _use_mask,
 			    (StgApp selectee [{-no args-}]))])
   |  the_fv == scrutinee		-- Scrutinee is the only free variable
   && maybeToBool maybe_offset		-- Selectee is a component of the tuple
@@ -226,8 +226,8 @@ mkRhsClosure	bndr cc bi
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
-			-- Just want the layout
+    (_, _, params_w_offsets) = mkVirtConstrOffsets (addIdReps params)
+			       -- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets (NonVoid selectee)
     Just the_offset 	  = maybe_offset
     offset_into_int       = the_offset - fixedHdrSize

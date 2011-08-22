@@ -11,7 +11,6 @@ module CmmPipeline (
 
 import CLabel
 import Cmm
-import CmmDecl
 import CmmLive
 import CmmBuildInfoTables
 import CmmCommonBlockElim
@@ -54,21 +53,31 @@ import StaticFlags
 --    we actually need to do the initial pass.
 cmmPipeline  :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cps-cmm
-             -> (TopSRT, [Cmm])    -- SRT table and accumulating list of compiled procs
-             -> Cmm                -- Input C-- with Procedures
-             -> IO (TopSRT, [Cmm]) -- Output CPS transformed C--
+             -> (TopSRT, [CmmPgm])    -- SRT table and accumulating list of compiled procs
+             -> CmmPgm             -- Input C-- with Procedures
+             -> IO (TopSRT, [CmmPgm]) -- Output CPS transformed C--
 cmmPipeline hsc_env (topSRT, rst) prog =
   do let dflags = hsc_dflags hsc_env
-         (Cmm tops) = runCmmContFlowOpts prog
+     --
      showPass dflags "CPSZ"
+
+     let tops = runCmmContFlowOpts prog
      (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
+     -- tops :: [[(CmmTop,CAFSet]]  (one list per group)
+
      let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
+
+     -- folding over the groups
      (topSRT, tops) <- foldM (toTops hsc_env topCAFEnv) (topSRT, []) tops
-     let cmms = Cmm (reverse (concat tops))
+
+     let cmms = reverse (concat tops)
+
      dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "Post CPS Cmm" (pprPlatform (targetPlatform dflags) cmms)
+
      -- SRT is not affected by control flow optimization pass
-     let prog' = map runCmmContFlowOpts (cmms : rst)
-     return (topSRT, prog')
+     let prog' = runCmmContFlowOpts cmms
+
+     return (topSRT, prog' : rst)
 
 {- [Note global fuel]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -152,6 +161,10 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        gs <- return $ map (bundleCAFs cafEnv) gs
        mapM_ (dumpPlatform platform Opt_D_dump_cmmz_cafs "after bundleCAFs") gs
        return (localCAFs, gs)
+
+              -- gs        :: [ (CAFSet, CmmTop) ]
+              -- localCAFs :: [ (CLabel, CAFSet) ] -- statics filtered out(?)
+
   where dflags = hsc_dflags hsc_env
         platform = targetPlatform dflags
         mbpprTrace x y z = if dopt Opt_D_dump_cmmz dflags then pprTrace x y z else z

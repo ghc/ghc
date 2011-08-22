@@ -24,8 +24,7 @@ import StgCmmUtils
 import StgCmmClosure
 
 import BlockId
-import CmmDecl
-import CmmExpr
+import Cmm
 import CmmUtils
 import OldCmm ( CmmReturnInfo(..) )
 import MkGraph

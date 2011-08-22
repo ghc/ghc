@@ -29,7 +29,7 @@ import StgSyn
 
 import MkGraph
 import BlockId
-import CmmExpr
+import Cmm
 import CoreSyn
 import DataCon
 import ForeignCall

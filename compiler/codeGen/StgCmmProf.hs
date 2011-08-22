@@ -39,8 +39,7 @@ import StgCmmMonad
 import SMRep
 
 import MkGraph
-import CmmExpr
-import CmmDecl
+import Cmm
 import CmmUtils
 import CLabel
 
@@ -358,8 +357,8 @@ initCostCentres (local_CCs, ___extern_CCs, singleton_CCSs)
 
 emitCostCentreDecl :: CostCentre -> FCode ()
 emitCostCentreDecl cc = do 
-  { label <- mkStringCLit (costCentreUserName cc)
-  ; modl  <- mkStringCLit (Module.moduleNameString 
+  { label <- newStringCLit (costCentreUserName cc)
+  ; modl  <- newStringCLit (Module.moduleNameString 
                	               (Module.moduleName (cc_mod cc)))
                 -- All cost centres will be in the main package, since we
                 -- don't normally use -auto-all or add SCCs to other packages.

@@ -31,8 +31,8 @@ import Data.Maybe
 -- Exported entry points:
 
 cmmLint :: (Outputable d, Outputable h)
-        => Platform -> GenCmm d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLint platform (Cmm tops) = runCmmLint platform (mapM_ lintCmmTop) tops
+        => Platform -> GenCmmPgm d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLint platform tops = runCmmLint platform (mapM_ lintCmmTop) tops
 
 cmmLintTop :: (Outputable d, Outputable h)
            => Platform -> GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc

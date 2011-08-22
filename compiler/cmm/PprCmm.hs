@@ -40,8 +40,7 @@ where
 import BlockId ()
 import CLabel
 import Cmm
-import CmmExpr
-import CmmUtils (isTrivialCmmExpr)
+import CmmUtils
 import FastString
 import Outputable
 import PprCmmDecl

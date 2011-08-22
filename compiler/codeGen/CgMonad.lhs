@@ -8,6 +8,7 @@ See the beginning of the top-level @CodeGen@ module, to see how this
 monadic stuff fits into the Big Picture.
 
 \begin{code}
+{-# LANGUAGE BangPatterns #-}
 module CgMonad (
 	Code,	-- type
 	FCode,	-- type
@@ -22,7 +23,7 @@ module CgMonad (
 	noCgStmts, oneCgStmt, consCgStmt,
 
 	getCmm,
-	emitData, emitProc, emitSimpleProc,
+	emitDecl, emitProc, emitSimpleProc,
 
 	forkLabelledCode,
 	forkClosureBody, forkStatics, forkAlts, forkEval,
@@ -67,6 +68,7 @@ import OldCmm
 import OldCmmUtils
 import CLabel
 import StgSyn (SRT)
+import ClosureInfo( ConTagZ )
 import SMRep
 import Module
 import Id
@@ -178,8 +180,6 @@ type SemiTaggingStuff
   = Maybe			-- Maybe[1] we don't have any semi-tagging stuff...
      ([(ConTagZ, CmmLit)],	-- Alternatives
       CmmLit)			-- Default (will be a can't happen RTS label if can't happen)
-
-type ConTagZ = Int	-- A *zero-indexed* contructor tag
 
 -- The case branch is executed only from a successful semitagging
 -- venture, when a case has looked at a variable, found that it's
@@ -415,8 +415,8 @@ thenFC	:: FCode a -> (a -> FCode c) -> FCode c
 thenFC (FCode m) k = FCode (
 	\info_down state ->
 		let 
-			(m_result, new_state) = m info_down state
-			(FCode kcode) = k m_result
+                        (m_result, new_state) = m info_down state
+                        (FCode kcode) = k m_result
 		in 
 			kcode info_down new_state
 	)
@@ -736,12 +736,10 @@ emitCgStmt stmt
 	; setState $ state { cgs_stmts = cgs_stmts state `snocOL` stmt }
 	}
 
-emitData :: Section -> CmmStatics -> Code
-emitData sect lits
+emitDecl :: CmmTop -> Code
+emitDecl decl
   = do 	{ state <- getState
-	; setState $ state { cgs_tops = cgs_tops state `snocOL` data_block } }
-  where
-    data_block = CmmData sect lits
+	; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
 
 emitProc :: CmmInfo -> CLabel -> [CmmFormal] -> [CmmBasicBlock] -> Code
 emitProc info lbl [] blocks
@@ -757,7 +755,7 @@ emitSimpleProc lbl code
 	; blks <- cgStmtsToBlocks stmts
 	; emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks }
 
-getCmm :: Code -> FCode Cmm
+getCmm :: Code -> FCode CmmPgm
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)
@@ -765,7 +763,7 @@ getCmm code
   = do	{ state1 <- getState
 	; ((), state2) <- withState code (state1 { cgs_tops  = nilOL })
 	; setState $ state2 { cgs_tops = cgs_tops state1 } 
-	; return (Cmm (fromOL (cgs_tops state2))) 
+        ; return (fromOL (cgs_tops state2))
         }
 
 -- ----------------------------------------------------------------------------
