@@ -1021,18 +1021,6 @@ A vectorisation pragma, one of
   {-# VECTORISE type T = ty #-}
   {-# VECTORISE SCALAR type T #-}
   
-Note [Typechecked vectorisation pragmas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In case of the first variant of vectorisation pragmas (with an explicit expression),
-we need to infer the type of that expression during type checking and then keep that type
-around until vectorisation, so that it can be checked against the *vectorised* type of 'f'.
-(We cannot determine vectorised types during type checking due to internal information of
-the vectoriser being needed.)
-
-To this end, we annotate the 'Id' of 'f' (the variable mentioned in the PRAGMA) with the
-inferred type of the expression.  This is slightly dodgy, as this is really the type of
-'$v_f' (the name of the vectorised function).
-
 \begin{code}
 type LVectDecl name = Located (VectDecl name)
 

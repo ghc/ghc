@@ -33,9 +33,10 @@ import Util                 ( zipLazy )
 import MonadUtils
 
 import Control.Monad
+import Data.Maybe
 
 
--- | Vectorise a single module.
+-- |Vectorise a single module.
 --
 vectorise :: ModGuts -> CoreM ModGuts
 vectorise guts
@@ -43,7 +44,7 @@ vectorise guts
       ; liftIO $ vectoriseIO hsc_env guts
       }
 
--- | Vectorise a single monad, given the dynamic compiler flags and HscEnv.
+-- Vectorise a single monad, given the dynamic compiler flags and HscEnv.
 --
 vectoriseIO :: HscEnv -> ModGuts -> IO ModGuts
 vectoriseIO hsc_env guts
@@ -58,7 +59,7 @@ vectoriseIO hsc_env guts
       ; return (guts' { mg_vect_info = info' })
       }
 
--- | Vectorise a single module, in the VM monad.
+-- Vectorise a single module, in the VM monad.
 --
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts@(ModGuts { mg_types      = types
@@ -73,21 +74,23 @@ vectModule guts@(ModGuts { mg_types      = types
           -- representaions, and the conrresponding data constructors.  Moreover, we produce
           -- bindings for dfuns and family instances of the classes and type families used in the
           -- DPH library to represent array types.
-      ; (types', new_fam_insts, tc_binds) <- vectTypeEnv types [vd | vd@(VectType _ _) <- vect_decls]
+      ; (types', new_fam_insts, tc_binds) <- vectTypeEnv types [vd 
+                                                               | vd@(VectType _ _) <- vect_decls]
 
       ; (_, fam_inst_env) <- readGEnv global_fam_inst_env
 
-          -- Vectorise all the top level bindings.
-      ; binds'  <- mapM vectTopBind binds
+          -- Vectorise all the top level bindings and VECTORISE declarations on imported identifiers
+      ; binds_top <- mapM vectTopBind binds
+      ; binds_imp <- mapM vectImpBind [imp_id | Vect imp_id _ <- vect_decls, isGlobalId imp_id]
 
       ; return $ guts { mg_types        = types'
-                      , mg_binds        = Rec tc_binds : binds'
+                      , mg_binds        = Rec tc_binds : (binds_top ++ binds_imp)
                       , mg_fam_inst_env = fam_inst_env
                       , mg_fam_insts    = fam_insts ++ new_fam_insts
                       }
       }
 
--- |Try to vectorise a top-level binding.  If it doesn't vectorise then return it unharmed.
+-- Try to vectorise a top-level binding.  If it doesn't vectorise then return it unharmed.
 --
 -- For example, for the binding 
 --
@@ -198,7 +201,25 @@ vectTopBind b@(Rec bs)
              else vectorise                             -- no binding has a 'NOVECTORISE' decl
            }
     noVectoriseErr = "NOVECTORISE must be used on all or no bindings of a recursive group"
-     
+
+-- Add a vectorised binding to an imported top-level variable that has a VECTORISE [SCALAR] pragma
+-- in this module.
+--
+vectImpBind :: Id -> VM CoreBind
+vectImpBind var
+  = do {   -- Vectorise the right-hand side, create an appropriate top-level binding and add it
+           -- to the vectorisation map.  For the non-lifted version, we refer to the original
+           -- definition — i.e., 'Var var'.
+       ; (inline, isScalar, expr') <- vectTopRhs [] var (Var var)
+       ; var' <- vectTopBinder var inline expr'
+       ; when isScalar $ 
+           addGlobalScalar var
+
+           -- We add any newly created hoisted top-level bindings.
+       ; hs <- takeHoisted
+       ; return . Rec $ (var', expr') : hs
+       }
+
 -- | Make the vectorised version of this top level binder, and add the mapping
 --   between it and the original to the state. For some binder @foo@ the vectorised
 --   version is @$v_foo@
@@ -215,13 +236,13 @@ vectTopBinder var inline expr
       ; vty  <- vectType (idType var)
       
           -- If there is a vectorisation declartion for this binding, make sure that its type
-          --  matches
+          -- matches
       ; vectDecl <- lookupVectDecl var
       ; case vectDecl of
-          Nothing                 -> return ()
+          Nothing             -> return ()
           Just (vdty, _) 
             | eqType vty vdty -> return ()
-            | otherwise           -> 
+            | otherwise       -> 
               cantVectorise ("Type mismatch in vectorisation pragma for " ++ show var) $
                 (text "Expected type" <+> ppr vty)
                 $$
@@ -263,10 +284,11 @@ vectTopRhs :: [Var]           -- ^ Names of all functions in the rec block
                  , CoreExpr)  -- (3) the vectorised right-hand side
 vectTopRhs recFs var expr
   = closedV
-  $ do { traceVt ("vectTopRhs of " ++ show var) $ ppr expr
-  
-       ; globalScalar <- isGlobalScalar var
+  $ do { globalScalar <- isGlobalScalar var
        ; vectDecl     <- lookupVectDecl var
+
+       ; traceVt ("vectTopRhs of " ++ show var ++ info globalScalar vectDecl) $ ppr expr
+
        ; rhs globalScalar vectDecl
        }
   where
@@ -278,10 +300,15 @@ vectTopRhs recFs var expr
            }
     rhs False         Nothing                         -- Case (3)
       = do { let fvs = freeVars expr
-           ; (inline, isScalar, vexpr) <- inBind var $
-                                          vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs fvs
+           ; (inline, isScalar, vexpr) 
+               <- inBind var $
+                    vectPolyExpr (isStrongLoopBreaker $ idOccInfo var) recFs fvs
            ; return (inline, isScalar, vectorised vexpr)
            }
+    
+    info True  _                          = " [VECTORISE SCALAR]"
+    info False vectDecl | isJust vectDecl = " [VECTORISE]"
+                        | otherwise       = " (no pragma)"
 
 -- | Project out the vectorised version of a binding from some closure,
 --   or return the original body if that doesn't work or the binding is scalar. 

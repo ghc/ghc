@@ -98,9 +98,6 @@ data GlobalEnv
           -- ^Variables that are not vectorised.  (They may be referenced in the right-hand sides
           -- of vectorisation declarations, though.)
 
-        , global_exported_vars        :: VarEnv (Var, Var)
-          -- ^Exported variables which have a vectorised version.
-
         , global_tycons               :: NameEnv TyCon
           -- ^Mapping from TyCons to their vectorised versions.
           -- TyCons which do not have to be vectorised are mapped to themselves.
@@ -134,7 +131,6 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   , global_scalar_vars          = vectInfoScalarVars info   `extendVarSetList` scalar_vars
   , global_scalar_tycons        = vectInfoScalarTyCons info `addListToNameSet` scalar_tycons
   , global_novect_vars          = mkVarSet novects
-  , global_exported_vars        = emptyVarEnv
   , global_tycons               = mapNameEnv snd $ vectInfoTyCon info
   , global_datacons             = mapNameEnv snd $ vectInfoDataCon info
   , global_pa_funs              = mapNameEnv snd $ vectInfoPADFun info
@@ -144,10 +140,14 @@ initGlobalEnv info vectDecls instEnvs famInstEnvs
   , global_bindings             = []
   }
   where
-    vects         = [(var, (varType var, exp)) | Vect     var   (Just exp) <- vectDecls]
-    scalar_vars   = [var                       | Vect     var   Nothing    <- vectDecls]
-    novects       = [var                       | NoVect   var              <- vectDecls]
-    scalar_tycons = [tyConName tycon           | VectType tycon Nothing    <- vectDecls]
+    vects         = [(var, (ty, exp)) | Vect     var   (Just exp@(Var rhs_var)) <- vectDecls
+                                      , let ty = varType rhs_var]
+                                        -- FIXME: we currently only allow RHSes consisting of a
+                                        --   single variable to be able to obtain the type without
+                                        --   inference — see also 'TcBinds.tcVect'
+    scalar_vars   = [var              | Vect     var   Nothing                  <- vectDecls]
+    novects       = [var              | NoVect   var                            <- vectDecls]
+    scalar_tycons = [tyConName tycon  | VectType tycon Nothing                  <- vectDecls]
 
 
 -- Operators on Global Environments -------------------------------------------
@@ -198,13 +198,14 @@ setPRFunsEnv ps genv
 
 -- |Compute vectorisation information that goes into 'ModGuts' (and is stored in interface files).
 -- The incoming 'vectInfo' is that from the 'HscEnv' and 'EPS'.  The outgoing one contains only the
--- definitions for the currently compiled module; this includes variables, type constructors, and
--- data constructors referenced in VECTORISE pragmas.
+-- declarations for the currently compiled module; this includes variables, type constructors, and
+-- data constructors referenced in VECTORISE pragmas, even if they are defined in an imported
+-- module.
 --
 modVectInfo :: GlobalEnv -> TypeEnv -> [CoreVect]-> VectInfo -> VectInfo
 modVectInfo env tyenv vectDecls info
   = info 
-    { vectInfoVar          = global_exported_vars env
+    { vectInfoVar          = mk_env ids      (global_vars     env)
     , vectInfoTyCon        = mk_env tyCons   (global_tycons   env)
     , vectInfoDataCon      = mk_env dataCons (global_datacons env)
     , vectInfoPADFun       = mk_env tyCons   (global_pa_funs  env)
@@ -212,9 +213,12 @@ modVectInfo env tyenv vectDecls info
     , vectInfoScalarTyCons = global_scalar_tycons env `minusNameSet` vectInfoScalarTyCons info
     }
   where
+    vectIds        = [id    | Vect     id    _ <- vectDecls]
     vectTypeTyCons = [tycon | VectType tycon _ <- vectDecls]
+    vectDataCons   = concatMap tyConDataCons vectTypeTyCons
+    ids            = typeEnvIds      tyenv ++ vectIds
     tyCons         = typeEnvTyCons   tyenv ++ vectTypeTyCons
-    dataCons       = typeEnvDataCons tyenv ++ concatMap tyConDataCons vectTypeTyCons
+    dataCons       = typeEnvDataCons tyenv ++ vectDataCons
     
     -- Produce an entry for every declaration that is mentioned in the domain of the 'inspectedEnv'
     mk_env decls inspectedEnv

@@ -636,13 +636,13 @@ badRuleLhsErr name lhs bad_e
 \begin{code}
 rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
 rnHsVectDecl (HsVect var Nothing)
-  = do { var' <- lookupLocatedTopBndrRn var
+  = do { var' <- lookupLocatedOccRn var
        ; return (HsVect var' Nothing, unitFV (unLoc var'))
        }
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
 rnHsVectDecl (HsVect var (Just rhs@(L _ (HsVar _))))
-  = do { var' <- lookupLocatedTopBndrRn var
+  = do { var' <- lookupLocatedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
        ; return (HsVect var' (Just rhs'), fv_rhs `addOneFV` unLoc var')
        }
@@ -652,7 +652,7 @@ rnHsVectDecl (HsVect _var (Just _rhs))
                , ptext (sLit "must be an identifier")
                ]
 rnHsVectDecl (HsNoVect var)
-  = do { var' <- lookupLocatedTopBndrRn var
+  = do { var' <- lookupLocatedTopBndrRn var           -- only applies to local (not imported) names
        ; return (HsNoVect var', unitFV (unLoc var'))
        }
 rnHsVectDecl (HsVectTypeIn tycon Nothing)

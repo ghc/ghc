@@ -644,20 +644,19 @@ tcVect :: VectDecl Name -> TcM (VectDecl TcId)
 -- FIXME: We can't typecheck the expression of a vectorisation declaration against the vectorised
 --   type of the original definition as this requires internals of the vectoriser not available
 --   during type checking.  Instead, constrain the rhs of a vectorisation declaration to be a single
---   identifier (this is checked in 'rnHsVectDecl').
+--   identifier (this is checked in 'rnHsVectDecl').  Fix this by enabling the use of 'vectType'
+--   from the vectoriser here.
 tcVect (HsVect name Nothing)
   = addErrCtxt (vectCtxt name) $
-    do { id <- wrapLocM tcLookupId name
-       ; return $ HsVect id Nothing
+    do { var <- wrapLocM tcLookupId name
+       ; return $ HsVect var Nothing
        }
-tcVect (HsVect lname@(L loc name) (Just rhs))
-  = addErrCtxt (vectCtxt lname) $
-    do { id <- tcLookupId name
-
+tcVect (HsVect name (Just rhs))
+  = addErrCtxt (vectCtxt name) $
+    do { var <- wrapLocM tcLookupId name
        ; let L rhs_loc (HsVar rhs_var_name) = rhs
        ; rhs_id <- tcLookupId rhs_var_name
-       ; let typedId = setIdType id (idType rhs_id)
-       ; return $ HsVect (L loc typedId) (Just $ L rhs_loc (HsVar rhs_id))
+       ; return $ HsVect var (Just $ L rhs_loc (HsVar rhs_id))
        }
 
 {- OLD CODE:
@@ -688,8 +687,8 @@ tcVect (HsVect lname@(L loc name) (Just rhs))
  -}
 tcVect (HsNoVect name)
   = addErrCtxt (vectCtxt name) $
-    do { id <- wrapLocM tcLookupId name
-       ; return $ HsNoVect id
+    do { var <- wrapLocM tcLookupId name
+       ; return $ HsNoVect var
        }
 tcVect (HsVectTypeIn lname@(L _ name) ty)
   = addErrCtxt (vectCtxt lname) $

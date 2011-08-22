@@ -39,9 +39,9 @@ import TyCon
 import DataCon
 import NameEnv
 import NameSet
-import Var
 import VarEnv
 import VarSet
+import Outputable
 
 
 -- Global Environment ---------------------------------------------------------
@@ -67,13 +67,11 @@ updGEnv f = VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
 -- |Add a mapping between a global var and its vectorised version to the state.
 --
 defGlobalVar :: Var -> Var -> VM ()
-defGlobalVar v v' = updGEnv $ \env ->
-  env { global_vars = extendVarEnv (global_vars env) v v'
-      , global_exported_vars = upd (global_exported_vars env)
-      }
-  where
-    upd env | isExportedId v = extendVarEnv env v (v, v')
-            | otherwise      = env
+defGlobalVar v v'
+  = do { traceVt "add global var mapping:" (ppr v <+> text "-->" <+> ppr v') 
+
+       ; updGEnv $ \env -> env { global_vars = extendVarEnv (global_vars env) v v' }
+       }
 
 
 -- Vectorisation declarations -------------------------------------------------
