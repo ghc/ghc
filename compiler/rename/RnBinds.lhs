@@ -624,7 +624,7 @@ rnMethodBind cls sig_fn
              (L loc bind@(FunBind { fun_id = name, fun_infix = is_infix 
 				  , fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ do
-    sel_name <- wrapLocM (lookupInstDeclBndr cls) name
+    sel_name <- wrapLocM (lookupInstDeclBndr cls (ptext (sLit "method"))) name
     let plain_name = unLoc sel_name
         -- We use the selector name as the binder
 

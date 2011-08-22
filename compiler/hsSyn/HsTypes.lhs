@@ -304,19 +304,19 @@ mkHsAppTys fun_ty (arg_ty:arg_tys)
 
 splitHsInstDeclTy 
     :: OutputableBndr name
-    => HsType name 
-    -> ([LHsTyVarBndr name], HsContext name, name, [LHsType name])
+    => LHsType name 
+    -> ([LHsTyVarBndr name], HsContext name, Located name, [LHsType name])
 	-- Split up an instance decl type, returning the pieces
 
-splitHsInstDeclTy inst_ty
+splitHsInstDeclTy linst_ty@(L _ inst_ty)
   = case inst_ty of
-	HsParTy (L _ ty)	      -> splitHsInstDeclTy ty
-	HsForAllTy _ tvs cxt (L _ ty) -> split_tau tvs (unLoc cxt) ty
-	other 			      -> split_tau []  []          other
+	HsParTy ty       	-> splitHsInstDeclTy ty
+	HsForAllTy _ tvs cxt ty -> split_tau tvs (unLoc cxt) ty
+	_ 			-> split_tau []  []          linst_ty
     -- The type vars should have been computed by now, even if they were implicit
   where
-    split_tau tvs cxt (HsPredTy (HsClassP cls tys)) = (tvs, cxt, cls, tys)
-    split_tau tvs cxt (HsParTy (L _ ty))	    = split_tau tvs cxt ty
+    split_tau tvs cxt (L loc (HsPredTy (HsClassP cls tys))) = (tvs, cxt, L loc cls, tys)
+    split_tau tvs cxt (L _ (HsParTy ty))	            = split_tau tvs cxt ty
     split_tau _ _ _ = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
 
 -- Splits HsType into the (init, last) parts

@@ -302,16 +302,15 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
    let { ldecls  = map noLoc decls } ;
 
-       -- bring the type and class decls into scope
+       -- Bring the type and class decls into scope
        -- ToDo: check that this doesn't need to extract the val binds.
        --       It seems that only the type and class decls need to be in scope below because
        --          (a) tcTyAndClassDecls doesn't need the val binds, and 
        --          (b) tcExtCoreBindings doesn't need anything
        --              (in fact, it might not even need to be in the scope of
        --               this tcg_env at all)
-   avails  <- getLocalNonValBinders (mkFakeGroup ldecls) ;
-   tc_envs <- extendGlobalRdrEnvRn avails emptyFsEnv {- no fixity decls -} ;
-
+   (tc_envs, _bndrs) <- getLocalNonValBinders emptyFsEnv {- no fixity decls -} 
+                                              (mkFakeGroup ldecls) ;
    setEnvs tc_envs $ do {
 
    (rn_decls, _fvs) <- checkNoErrs $ rnTyClDecls [ldecls] ;

@@ -319,7 +319,7 @@ repInstD' (L loc (InstDecl ty binds _ ats))	-- Ignore user pragmas for now
                ; repInst cxt1 inst_ty1 decls }
        ; return (loc, dec) }
  where
-   (tvs, cxt, cls, tys) = splitHsInstDeclTy (unLoc ty)
+   (tvs, cxt, L _ cls, tys) = splitHsInstDeclTy ty
 
 repForD :: Located (ForeignDecl Name) -> DsM (SrcSpan, Core TH.DecQ)
 repForD (L loc (ForeignImport name typ (CImport cc s ch cis)))

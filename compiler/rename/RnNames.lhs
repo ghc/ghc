@@ -7,7 +7,7 @@
 module RnNames (
         rnImports, getLocalNonValBinders,
         rnExports, extendGlobalRdrEnvRn,
-        gresFromAvails,
+        gresFromAvails, lookupTcdName,
         reportUnusedNames, finishWarnings,
     ) where
 
@@ -469,13 +469,99 @@ used for source code.
 
         *** See "THE NAMING STORY" in HsDecls ****
 
-Instances of type families
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Family instances contain data constructors that we need to collect and we also
-need to descend into the type instances of associated families in class
-instances. The type constructor of a family instance is a usage occurence.
-Hence, we don't return it as a subname in 'AvailInfo'; otherwise, we would get
-a duplicate declaration error.
+\begin{code}
+getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName 
+                      -> RnM ((TcGblEnv, TcLclEnv), NameSet)
+-- Get all the top-level binders bound the group *except*
+-- for value bindings, which are treated separately
+-- Specificaly we return AvailInfo for
+--      type decls (incl constructors and record selectors)
+--      class decls (including class ops)
+--      associated types
+--      foreign imports
+--      (in hs-boot files) value signatures
+
+getLocalNonValBinders fixity_env 
+     (HsGroup { hs_valds  = val_binds,
+                hs_tyclds = tycl_decls,
+                hs_instds = inst_decls,
+                hs_fords  = foreign_decls })
+  = do  { -- Separate out the family instance declarations
+          let (tyinst_decls, tycl_decls_noinsts)
+                   = partition (isFamInstDecl . unLoc) (concat tycl_decls)
+
+          -- Process all type/class decls *except* family instances
+        ; tc_avails <- mapM new_tc tycl_decls_noinsts
+        ; envs <- extendGlobalRdrEnvRn tc_avails fixity_env
+	; setEnvs envs $ do {
+	    -- Bring these things into scope first
+            -- See Note [Looking up family names in family instances]
+
+          -- Process all family instances
+	  -- to bring new data constructors into scope
+        ; ti_avails  <- mapM (new_ti Nothing) tyinst_decls
+        ; nti_avails <- concatMapM new_assoc inst_decls
+
+          -- Finish off with value binders:
+	  --    foreign decls for an ordinary module
+	  --    type sigs in case of a hs-boot file only
+        ; is_boot <- tcIsHsBoot 
+        ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
+                        | otherwise = for_hs_bndrs
+        ; val_avails <- mapM new_simple val_bndrs
+
+	; let avails    = ti_avails ++ nti_avails ++ val_avails
+	      new_bndrs = availsToNameSet avails `unionNameSets` 
+                          availsToNameSet tc_avails
+        ; envs <- extendGlobalRdrEnvRn avails fixity_env 
+        ; return (envs, new_bndrs) } }
+  where
+    for_hs_bndrs :: [Located RdrName]
+    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
+
+    -- In a hs-boot file, the value binders come from the
+    --  *signatures*, and there should be no foreign binders
+    hs_boot_sig_bndrs = [n | L _ (TypeSig ns _) <- val_sigs, n <- ns]
+    ValBindsIn _ val_sigs = val_binds
+
+    new_simple :: Located RdrName -> RnM AvailInfo
+    new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
+                            ; return (Avail nm) }
+
+    new_tc tc_decl              -- NOT for type/data instances
+        = do { names@(main_name : _) <- mapM newTopSrcBinder (hsTyClDeclBinders tc_decl)
+             ; return (AvailTC main_name names) }
+
+    new_ti :: Maybe Name -> LTyClDecl RdrName -> RnM AvailInfo
+    new_ti mb_cls ti_decl  -- ONLY for type/data instances
+        = do { main_name <- lookupTcdName mb_cls (unLoc ti_decl)
+             ; sub_names <- mapM newTopSrcBinder (hsTyClDeclBinders ti_decl)
+             ; return (AvailTC (unLoc main_name) sub_names) }
+                        -- main_name is not bound here!
+
+    new_assoc :: LInstDecl RdrName -> RnM [AvailInfo]
+    new_assoc (L _ (InstDecl inst_ty _ _ ats))
+      = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
+           ; mapM (new_ti (Just cls_nm)) ats }
+      where
+        (_, _, L loc cls_rdr, _) = splitHsInstDeclTy inst_ty
+
+lookupTcdName :: Maybe Name -> TyClDecl RdrName -> RnM (Located Name)
+-- Used for TyData and TySynonym only
+-- See Note [Family instance binders]
+lookupTcdName mb_cls tc_decl
+  | not (isFamInstDecl tc_decl)	  -- The normal case
+  = ASSERT2( isNothing mb_cls, ppr tc_rdr )	-- Parser prevents this
+    lookupLocatedTopBndrRn tc_rdr
+
+  | Just cls <- mb_cls	    -- Associated type; c.f RnBinds.rnMethodBind
+  = wrapLocM (lookupInstDeclBndr cls (ptext (sLit "associated type"))) tc_rdr
+
+  | otherwise		    -- Family instance; tc_rdr is an *occurrence*
+  = lookupLocatedOccRn tc_rdr 
+  where
+    tc_rdr = tcdLName tc_decl
+\end{code}
 
 Note [Looking up family names in family instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -491,109 +577,43 @@ the *same* HsGroup as the type instance declaration.  Hence, as we are
 currently collecting the binders declared in that HsGroup, these binders will
 not have been added to the global environment yet.
 
-In the case of type classes, this problem does not arise, as a class instance
-does not define any binders of its own.  So, we simply don't attempt to look
-up the class names of class instances in 'get_local_binders' below.
+Solution is simple: process the type family declarations first, extend
+the environment, and then process the type instances.
 
-If we don't look up class instances, can't we get away without looking up type
-instances, too?  No, we can't.  Data type instances define data constructors
-and we need to
 
-  (1) collect those in 'get_local_binders' and
-  (2) we need to get their parent name in 'get_local_binders', too, to
-      produce an appropriate 'AvailTC'.
+Note [Family instance binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data family F a
+  data instance F T = X1 | X2
 
-This parent name is exactly the family name of the type instance that is so
-difficult to look up.
+The 'data instance' decl has an *occurrence* of F (and T), and *binds*
+X1 and X2.  (This is unlike a normal data type declaration which would
+bind F too.)  So we want an AvailTC F [X1,X2].
 
-We solve this problem as follows:
+Now consider a similar pair:
+  class C a where
+    data G a
+  instance C S where
+    data G S = Y1 | Y2
 
-  (a) We process all type declarations *other* than type instances first.
-  (b) Then, we compute an 'OccEnv' from the result of the first step.
-  (c) Finally, we process all type instances (both those on the toplevel and
-      those nested in class instances) and check for the family names in the
-      'GlobalRdrEnv' produced in the previous step before using 'lookupOccRn'.
+The 'data G S' *binds* Y1 and Y2, and has an *occurrence* of G.
 
-\begin{code}
-getLocalNonValBinders :: HsGroup RdrName -> RnM [AvailInfo]
--- Get all the top-level binders bound the group *except*
--- for value bindings, which are treated separately
--- Specificaly we return AvailInfo for
---      type decls (incl constructors and record selectors)
---      class decls (including class ops)
---      associated types
---      foreign imports
---      (in hs-boot files) value signatures
-
-getLocalNonValBinders group
-  = do { gbl_env <- getGblEnv
-       ; get_local_binders gbl_env group }
-
-get_local_binders :: TcGblEnv -> HsGroup RdrName -> RnM [AvailInfo]
-get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
-                                    hs_tyclds = tycl_decls,
-                                    hs_instds = inst_decls,
-                                    hs_fords  = foreign_decls })
-  = do  { -- separate out the family instance declarations
-          let (tyinst_decls1, tycl_decls_noinsts)
-                           = partition (isFamInstDecl . unLoc) (concat tycl_decls)
-              tyinst_decls = tyinst_decls1 ++ instDeclATs inst_decls
-
-          -- process all type/class decls except family instances
-        ; tc_avails  <- mapM new_tc tycl_decls_noinsts
-
-          -- Create a temporary env of the type binders
-	  -- See Note [Looking up family names in family instances]
-	  -- NB: associated types may be a sub-bndr of a class
-	  -- 		AvailTC C [C,T,op]
-	  -- Hence availNames, not availName
-        ; let local_tc_env :: OccEnv Name
-              local_tc_env = mkOccEnv [ (occ, n) 
-                                      | a <- tc_avails
-                                      , n <- availNames a
-				      , let occ = nameOccName n
-                                      , isTcOcc occ  ]
-
-          -- Process all family instances
-        ; ti_avails <- mapM (new_ti local_tc_env) tyinst_decls
-
-          -- finish off with value binder in case of a hs-boot file
-        ; val_avails <- mapM new_simple val_bndrs
-        ; return (val_avails ++ tc_avails ++ ti_avails) }
-  where
-    is_hs_boot = isHsBoot (tcg_src gbl_env) ;
-
-    for_hs_bndrs :: [Located RdrName]
-    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
-
-    -- In a hs-boot file, the value binders come from the
-    --  *signatures*, and there should be no foreign binders
-    val_bndrs :: [Located RdrName]
-    val_bndrs | is_hs_boot = [n | L _ (TypeSig ns _) <- val_sigs, n <- ns]
-              | otherwise  = for_hs_bndrs
-
-    new_simple :: Located RdrName -> RnM AvailInfo
-    new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
-                            ; return (Avail nm) }
-
-    new_tc tc_decl              -- NOT for type/data instances
-        = do { names@(main_name : _) <- mapM newTopSrcBinder (hsTyClDeclBinders tc_decl)
-             ; return (AvailTC main_name names) }
-
-    new_ti local_tc_env ti_decl  -- ONLY for type/data instances
-        = do { let L loc tc_rdr = tcdLName (unLoc ti_decl)
-             ; main_name <- setSrcSpan loc $
-                            case lookupOccEnv local_tc_env (rdrNameOcc tc_rdr) of
-                              Nothing -> lookupGlobalOccRn tc_rdr
-                              Just n  -> return n
-		    -- See Note [Looking up family names in family instances]
-
-             ; sub_names <- mapM newTopSrcBinder (hsTyClDeclBinders ti_decl)
-             ; return (AvailTC main_name sub_names) }
-                        -- main_name is not bound here!
-
-get_local_binders _ g = pprPanic "get_local_binders" (ppr g)
-\end{code}
+But there is a small complication: in an instance decl, we don't use
+qualified names on the LHS; instead we use the class to disambiguate.
+Thus:
+  module M where
+    import Blib( G )
+    class C a where
+      data G a
+    instance C S where
+      data G S = Y1 | Y2
+Even though there are two G's in scope (M.G and Blib.G), the occurence
+of 'G' in the 'instance C S' decl is unambiguous, becuase C has only
+one associated type called G. This is exactly what happens for methods,
+and it is only consistent to do the same thing for types. That's the
+role of the function lookupTcdName; the (Maybe Name) give the class of
+the encloseing instance decl, if any.
 
 
 %************************************************************************
