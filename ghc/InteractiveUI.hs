@@ -32,7 +32,7 @@ import StringBuffer
 import Packages
 import UniqFM
 
-import HscTypes ( handleFlagWarnings, getSafeMode, dep_pkgs )
+import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, dep_pkgs )
 import HsImpExp
 import RdrName ( RdrName, getGRE_NameQualifier_maybes )
 import Outputable hiding ( printForUser, printForUserPartWay, bold )
@@ -924,7 +924,7 @@ filterOutChildren get_thing xs
   = filterOut has_parent xs
   where
     all_names = mkNameSet (map (getName . get_thing) xs)
-    has_parent x = case pprTyThingParent_maybe (get_thing x) of
+    has_parent x = case tyThingParent_maybe (get_thing x) of
                      Just p  -> getName p `elemNameSet` all_names
                      Nothing -> False
 
@@ -1397,21 +1397,8 @@ guessCurrentModule
 -- with sorted, sort items alphabetically
 browseModule :: Bool -> Module -> Bool -> InputT GHCi ()
 browseModule bang modl exports_only = do
-  -- :browse! reports qualifiers wrt current context
-  current_unqual <- GHC.getPrintUnqual
-
-  -- Temporarily set the context to the module we're interested in,
-  -- just so we can get an appropriate PrintUnqualified
-  -- Use mySetContext so we get an implicit Prelude import 
-  -- for the PrintUnqualified
-  imports <- GHC.getContext
-  lift $ mySetContext (if exports_only	
-                       then [IIDecl $ simpleImportDecl (GHC.moduleName modl)]
-                       else [IIModule modl])
-  target_unqual <- GHC.getPrintUnqual
-  GHC.setContext imports
-
-  let unqual = if bang then current_unqual else target_unqual
+  -- :browse reports qualifiers wrt current context
+  unqual <- GHC.getPrintUnqual
 
   mb_mod_info <- GHC.getModuleInfo modl
   case mb_mod_info of
@@ -1453,10 +1440,14 @@ browseModule bang modl exports_only = do
 
             labels  [] = text "-- not currently imported"
             labels  l  = text $ intercalate "\n" $ map qualifier l
+
+	    qualifier :: Maybe [ModuleName] -> String
             qualifier  = maybe "-- defined locally" 
                              (("-- imported via "++) . intercalate ", " 
                                . map GHC.moduleNameString)
-            importInfo = getGRE_NameQualifier_maybes rdr_env
+            importInfo = RdrName.getGRE_NameQualifier_maybes rdr_env
+
+	    modNames :: [[Maybe [ModuleName]]]
             modNames   = map (importInfo . GHC.getName) things
                                         
             -- annotate groups of imports with their import modules
@@ -1471,7 +1462,8 @@ browseModule bang modl exports_only = do
             group mts@((m,_):_) = (m,map snd g) : group ng
               where (g,ng) = partition ((==m).fst) mts
 
-        let prettyThings = map (pretty pefas) things
+        let prettyThings, prettyThings' :: [SDoc]
+            prettyThings = map (pretty pefas) things
             prettyThings' | bang      = annotate $ zip modNames prettyThings
                           | otherwise = prettyThings
         liftIO $ putStrLn $ showSDocForUser unqual (vcat prettyThings')

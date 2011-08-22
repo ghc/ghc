@@ -1873,28 +1873,36 @@ $ ghci -lm
           <indexterm><primary><literal>:browse</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Displays the identifiers defined by the module
+	  <para>Displays the identifiers exported by the module
 	  <replaceable>module</replaceable>, which must be either
 	  loaded into GHCi or be a member of a package.  If
 	  <replaceable>module</replaceable> is omitted, the most
 	  recently-loaded module is used.</para>
 
-          <para>If the <literal>*</literal> symbol is placed before
-	  the module name, then <emphasis>all</emphasis> the
-	  identifiers in scope in <replaceable>module</replaceable> are
-	  shown; otherwise the list is limited to the exports of
-	  <replaceable>module</replaceable>.  The
-	  <literal>*</literal>-form is only available for modules
-	  which are interpreted; for compiled modules (including
-	  modules from packages) only the non-<literal>*</literal>
-    form of <literal>:browse</literal> is available.
-    If the <literal>!</literal> symbol is appended to the
-    command, data constructors and class methods will be
-    listed individually, otherwise, they will only be listed
-    in the context of their data type or class declaration.
-    The <literal>!</literal>-form also annotates the listing
-    with comments giving possible imports for each group of
-    entries.</para>
+	  <para>Like all other GHCi commands, the output is always 
+          displayed in the current GHCi scope (<xref linkend="ghci-scope"/>).</para>
+
+          <para>There are two variants of the browse command:
+          <itemizedlist>
+          <listitem>  
+             <para>If the <literal>*</literal> symbol is placed before
+	     the module name, then <emphasis>all</emphasis> the
+	     identifiers in scope in <replaceable>module</replaceable> 
+             (rather that just its exports) are shown. </para>
+
+             <para>The <literal>*</literal>-form is only available for modules
+	     which are interpreted; for compiled modules (including
+	     modules from packages) only the non-<literal>*</literal>
+             form of <literal>:browse</literal> is available.</para>
+          </listitem>
+          <listitem>Data constructors and class methods are usually
+          displayed in the context of their data type or class declaration.
+          However, if the <literal>!</literal> symbol is appended to the
+          command, thus <literal>:browse!</literal>, 
+          they are listed individually. 
+    	  The <literal>!</literal>-form also annotates the listing
+    	  with comments giving possible imports for each group of
+    	  entries.  Here is an example:
 <screen>
 Prelude> :browse! Data.Maybe
 -- not currently imported
@@ -1912,15 +1920,15 @@ data Maybe a = Nothing | Just a
 Nothing :: Maybe a
 maybe :: b -> (a -> b) -> Maybe a -> b
 </screen>
-  <para>
-    This output shows that, in the context of the current session, in the scope
-    of <literal>Prelude</literal>, the first group of items from
-    <literal>Data.Maybe</literal> have not been imported (but are available in
+    This output shows that, in the context of the current session (ie in the scope
+    of <literal>Prelude</literal>), the first group of items from
+    <literal>Data.Maybe</literal> are not in scope (althought they are available in
     fully qualified form in the GHCi session - see <xref
-      linkend="ghci-scope"/>), whereas the second group of items have been
-    imported via <literal>Prelude</literal> and are therefore available either
+      linkend="ghci-scope"/>), whereas the second group of items are in scope
+    (via <literal>Prelude</literal>) and are therefore available either
     unqualified, or with a <literal>Prelude.</literal> qualifier.
   </para>
+          </listitem>
 	</listitem>
       </varlistentry>
 
