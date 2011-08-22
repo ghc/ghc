@@ -770,7 +770,7 @@ extractClassDecl c tvs0 (L pos (TypeSig lname ltype)) = case ltype of
   _ -> L pos (TypeSig lname (noLoc (mkImplicitHsForAllTy (lctxt []) ltype)))
   where
     lctxt = noLoc . ctxt
-    ctxt preds = noLoc (HsClassP c (map toTypeNoLoc tvs0)) : preds
+    ctxt preds = nlHsTyConApp c (map toTypeNoLoc tvs0) : preds
 extractClassDecl _ _ _ = error "extractClassDecl: unexpected decl"
 
 
