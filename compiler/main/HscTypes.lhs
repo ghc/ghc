@@ -56,7 +56,8 @@ module HscTypes (
 
         -- * TyThings and type environments
 	TyThing(..),
-	tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId, tyThingCoAxiom,
+	tyThingClass, tyThingTyCon, tyThingDataCon, 
+        tyThingId, tyThingCoAxiom, tyThingParent_maybe,
 	implicitTyThings, implicitTyConThings, implicitClassThings, isImplicitTyThing,
 	
 	TypeEnv, lookupType, lookupTypeHscEnv, mkTypeEnv, emptyTypeEnv,
@@ -124,12 +125,13 @@ import VarEnv
 import VarSet
 import Var
 import Id
+import IdInfo		( IdDetails(..) )
 import Type             
 
 import Annotations
 import Class		( Class, classAllSelIds, classATs, classTyCon )
 import TyCon
-import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
+import DataCon		( DataCon, dataConImplicitIds, dataConWrapId, dataConTyCon )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags
@@ -1129,6 +1131,23 @@ isImplicitTyThing (ACoAxiom {}) = True
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids
   = extendNameEnvList env [(getName id, AnId id) | id <- ids]
+
+tyThingParent_maybe :: TyThing -> Maybe TyThing
+-- (tyThingParent_maybe x) returns (Just p)
+-- when pprTyThingInContext sould print a declaration for p
+-- (albeit with some "..." in it) when asked to show x
+-- It returns the *immediate* parent.  So a datacon returns its tycon
+-- but the tycon could be the assocated type of a class, so it in turn
+-- might have a parent.
+tyThingParent_maybe (ADataCon dc) = Just (ATyCon (dataConTyCon dc))
+tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
+                                      Just cls -> Just (AClass cls)
+                                      Nothing  -> Nothing
+tyThingParent_maybe (AnId id)     = case idDetails id of
+      				      	 RecSelId { sel_tycon = tc } -> Just (ATyCon tc)
+      				      	 ClassOpId cls               -> Just (AClass cls)
+                                      	 _other                      -> Nothing
+tyThingParent_maybe _other = Nothing
 \end{code}
 
 %************************************************************************

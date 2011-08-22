@@ -46,7 +46,7 @@ module TyCon(
         isFamilyTyCon, isSynFamilyTyCon, isDataFamilyTyCon,
         isUnLiftedTyCon,
 	isGadtSyntaxTyCon,
-	isTyConAssoc,
+	isTyConAssoc, tyConAssoc_maybe,
 	isRecursiveTyCon,
 	isHiBootTyCon,
         isImplicitTyCon, 
@@ -1049,9 +1049,12 @@ isInjectiveTyCon tc = not (isSynTyCon tc)
 -- | Are we able to extract informationa 'TyVar' to class argument list
 -- mappping from a given 'TyCon'?
 isTyConAssoc :: TyCon -> Bool
-isTyConAssoc tc = case tyConParent tc of
-                     AssocFamilyTyCon {} -> True
-                     _                   -> False
+isTyConAssoc tc = isJust (tyConAssoc_maybe tc)
+
+tyConAssoc_maybe :: TyCon -> Maybe Class
+tyConAssoc_maybe tc = case tyConParent tc of
+                        AssocFamilyTyCon cls -> Just cls
+                        _                    -> Nothing
 
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it

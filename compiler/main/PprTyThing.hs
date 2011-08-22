@@ -9,7 +9,7 @@
 module PprTyThing (
 	PrintExplicitForalls,
 	pprTyThing,
-	pprTyThingInContext, pprTyThingParent_maybe,
+	pprTyThingInContext, 
 	pprTyThingLoc,
 	pprTyThingInContextLoc,
 	pprTyThingHdr,
@@ -21,9 +21,9 @@ import qualified GHC
 import GHC ( TyThing(..) )
 import DataCon
 import Id
-import IdInfo
 import TyCon
 import Coercion( pprCoAxiom )
+import HscTypes( tyThingParent_maybe )
 import TcType
 import Name
 import Outputable
@@ -37,10 +37,21 @@ import FastString
 
 type PrintExplicitForalls = Bool
 
-type ShowMe = Name -> Bool
--- The ShowMe function says which sub-components to print
---   True  <=> print
---   False <=> elide to "..."
+type ShowSub = [Name]
+--   []     <=> print all sub-components of the current thing
+--   (n:ns) <=> print sub-component 'n' with ShowSub=ns
+--              elide other sub-components to "..."
+showAll :: ShowSub
+showAll = []
+
+showSub :: NamedThing n => ShowSub -> n -> Bool
+showSub []    _     = True
+showSub (n:_) thing = n == getName thing
+
+showSub_maybe :: NamedThing n => ShowSub -> n -> Maybe ShowSub
+showSub_maybe []     _     = Just []
+showSub_maybe (n:ns) thing = if n == getName thing then Just ns
+                                                   else Nothing
 
 ----------------------------
 -- | Pretty-prints a 'TyThing' with its defining location.
@@ -51,14 +62,14 @@ pprTyThingLoc pefas tyThing
 
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: PrintExplicitForalls -> TyThing -> SDoc
-pprTyThing pefas thing = ppr_ty_thing pefas (const True) thing
+pprTyThing pefas thing = ppr_ty_thing pefas showAll thing
 
-ppr_ty_thing :: PrintExplicitForalls -> ShowMe -> TyThing -> SDoc
+ppr_ty_thing :: PrintExplicitForalls -> ShowSub -> TyThing -> SDoc
 ppr_ty_thing pefas _ 	 (AnId id)          = pprId         pefas id
 ppr_ty_thing pefas _ 	 (ADataCon dataCon) = pprDataConSig pefas dataCon
-ppr_ty_thing pefas show_me (ATyCon tyCon)   = pprTyCon      pefas show_me tyCon
+ppr_ty_thing pefas ss (ATyCon tyCon)   = pprTyCon      pefas ss tyCon
 ppr_ty_thing _     _       (ACoAxiom ax)    = pprCoAxiom    ax
-ppr_ty_thing pefas show_me (AClass cls)     = pprClass      pefas show_me cls
+ppr_ty_thing pefas ss (AClass cls)     = pprClass      pefas ss cls
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
 -- is a data constructor, record selector, or class method, then
@@ -66,27 +77,17 @@ ppr_ty_thing pefas show_me (AClass cls)     = pprClass      pefas show_me cls
 -- parts omitted.
 pprTyThingInContext :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingInContext pefas thing
-  | Just parent <- pprTyThingParent_maybe thing
-  = ppr_ty_thing pefas (== GHC.getName thing) parent
-  | otherwise
-  = pprTyThing pefas thing
+  = go [] thing
+  where
+    go ss thing = case tyThingParent_maybe thing of
+                    Just parent -> go (getName thing : ss) parent
+                    Nothing     -> ppr_ty_thing pefas ss thing
 
 -- | Like 'pprTyThingInContext', but adds the defining location.
 pprTyThingInContextLoc :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingInContextLoc pefas tyThing
   = showWithLoc (pprNameLoc (GHC.getName tyThing))
                 (pprTyThingInContext pefas tyThing)
-
-pprTyThingParent_maybe :: TyThing -> Maybe TyThing
--- (pprTyThingParent_maybe x) returns (Just p)
--- when pprTyThingInContext sould print a declaration for p
--- (albeit with some "..." in it) when asked to show x
-pprTyThingParent_maybe (ADataCon dc) = Just (ATyCon (dataConTyCon dc))
-pprTyThingParent_maybe (AnId id)     = case idDetails id of
-      				      	 RecSelId { sel_tycon = tc } -> Just (ATyCon tc)
-      				      	 ClassOpId cls               -> Just (AClass cls)
-                                      	 _other                      -> Nothing
-pprTyThingParent_maybe _other = Nothing
 
 -- | Pretty-prints the 'TyThing' header. For functions and data constructors
 -- the function is equivalent to 'pprTyThing' but for type constructors
@@ -100,8 +101,8 @@ pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr _ tyCon
-  | Just (_fam_tc, tys) <- tyConFamInst_maybe tyCon
-  = ptext keyword <+> ptext (sLit "instance") <+> pprTypeApp tyCon tys
+  | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
+  = ptext keyword <+> ptext (sLit "instance") <+> pprTypeApp fam_tc tys
   | otherwise
   = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
@@ -156,8 +157,8 @@ pprTypeForUser print_foralls ty
     tidy_ty     = tidyTopType ty
     (_, ctxt, ty') = tcSplitSigmaTy tidy_ty
 
-pprTyCon :: PrintExplicitForalls -> ShowMe -> TyCon -> SDoc
-pprTyCon pefas show_me tyCon
+pprTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
+pprTyCon pefas ss tyCon
   | GHC.isSynTyCon tyCon
   = if GHC.isFamilyTyCon tyCon
     then pprTyConHdr pefas tyCon <+> dcolon <+> 
@@ -166,25 +167,25 @@ pprTyCon pefas show_me tyCon
       let rhs_type = GHC.synTyConType tyCon
       in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprTypeForUser pefas rhs_type)
   | otherwise
-  = pprAlgTyCon pefas show_me tyCon
+  = pprAlgTyCon pefas ss tyCon
 
-pprAlgTyCon :: PrintExplicitForalls -> ShowMe -> TyCon -> SDoc
-pprAlgTyCon pefas show_me tyCon
+pprAlgTyCon :: PrintExplicitForalls -> ShowSub -> TyCon -> SDoc
+pprAlgTyCon pefas ss tyCon
   | gadt      = pprTyConHdr pefas tyCon <+> ptext (sLit "where") $$
-		   nest 2 (vcat (ppr_trim show_con datacons))
+		   nest 2 (vcat (ppr_trim (map show_con datacons)))
   | otherwise = hang (pprTyConHdr pefas tyCon)
-    		   2 (add_bars (ppr_trim show_con datacons))
+    		   2 (add_bars (ppr_trim (map show_con datacons)))
   where
     datacons = GHC.tyConDataCons tyCon
     gadt = any (not . GHC.isVanillaDataCon) datacons
 
-    ok_con dc = show_me (dataConName dc) || any show_me (dataConFieldLabels dc)
+    ok_con dc = showSub ss dc || any (showSub ss) (dataConFieldLabels dc)
     show_con dc
-      | ok_con dc = Just (pprDataConDecl pefas show_me gadt dc)
+      | ok_con dc = Just (pprDataConDecl pefas ss gadt dc)
       | otherwise = Nothing
 
-pprDataConDecl :: PrintExplicitForalls -> ShowMe -> Bool -> GHC.DataCon -> SDoc
-pprDataConDecl pefas show_me gadt_style dataCon
+pprDataConDecl :: PrintExplicitForalls -> ShowSub -> Bool -> GHC.DataCon -> SDoc
+pprDataConDecl pefas ss gadt_style dataCon
   | not gadt_style = ppr_fields tys_w_strs
   | otherwise      = ppr_bndr dataCon <+> dcolon <+>
 			sep [ pp_foralls, GHC.pprThetaArrowTy theta, pp_tau ]
@@ -206,8 +207,8 @@ pprDataConDecl pefas show_me gadt_style dataCon
     pprBangTy bang ty = ppr bang <> ppr ty
 
     maybe_show_label (lbl,(strict,tp))
-	| show_me lbl = Just (ppr lbl <+> dcolon <+> pprBangTy strict tp)
-	| otherwise   = Nothing
+	| showSub ss lbl = Just (ppr lbl <+> dcolon <+> pprBangTy strict tp)
+	| otherwise      = Nothing
 
     ppr_fields [ty1, ty2]
 	| GHC.dataConIsInfix dataCon && null labels
@@ -216,21 +217,25 @@ pprDataConDecl pefas show_me gadt_style dataCon
 	| null labels
 	= ppr_bndr dataCon <+> sep (map pprParendBangTy fields)
 	| otherwise
-	= ppr_bndr dataCon <+>
-		braces (sep (punctuate comma (ppr_trim maybe_show_label
-					(zip labels fields))))
+	= ppr_bndr dataCon
+	  <+> (braces $ sep $ punctuate comma $ ppr_trim $
+               map maybe_show_label (zip labels fields))
 
-pprClass :: PrintExplicitForalls -> ShowMe -> GHC.Class -> SDoc
-pprClass pefas show_me cls
+pprClass :: PrintExplicitForalls -> ShowSub -> GHC.Class -> SDoc
+pprClass pefas ss cls
   | null methods
   = pprClassHdr pefas cls
   | otherwise
   = hang (pprClassHdr pefas cls <+> ptext (sLit "where"))
-       2 (vcat (ppr_trim show_meth methods))
+       2 (vcat (ppr_trim (map show_at assoc_ts ++ map show_meth methods)))
   where
     methods = GHC.classMethods cls
-    show_meth id | show_me (idName id) = Just (pprClassMethod pefas id)
-	         | otherwise           = Nothing
+    assoc_ts = GHC.classATs cls
+    show_meth id | showSub ss id  = Just (pprClassMethod pefas id)
+	         | otherwise      = Nothing
+    show_at tc = case showSub_maybe ss tc of
+                      Just ss' -> Just (pprTyCon pefas ss' tc)
+                      Nothing  -> Nothing
 
 pprClassMethod :: PrintExplicitForalls -> Id -> SDoc
 pprClassMethod pefas id
@@ -251,14 +256,14 @@ pprClassMethod pefas id
   (_sel_tyvars, rho_ty) = GHC.splitForAllTys tidy_sel_ty
   op_ty = GHC.funResultTy rho_ty
 
-ppr_trim :: (a -> Maybe SDoc) -> [a] -> [SDoc]
-ppr_trim show xs
+ppr_trim :: [Maybe SDoc] -> [SDoc]
+-- Collapse a group of Nothings to a single "..."
+ppr_trim xs
   = snd (foldr go (False, []) xs)
   where
-    go x (eliding, so_far)
-	| Just doc <- show x = (False, doc : so_far)
-	| otherwise = if eliding then (True, so_far)
-		                 else (True, ptext (sLit "...") : so_far)
+    go (Just doc) (_,     so_far) = (False, doc : so_far)
+    go Nothing    (True,  so_far) = (True, so_far)
+    go Nothing    (False, so_far) = (True, ptext (sLit "...") : so_far)
 
 add_bars :: [SDoc] -> SDoc
 add_bars []      = empty

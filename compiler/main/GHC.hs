@@ -161,7 +161,7 @@ module GHC (
 
 	-- ** Classes
 	Class, 
-	classMethods, classSCTheta, classTvsFds,
+	classMethods, classSCTheta, classTvsFds, classATs,
 	pprFundeps,
 
 	-- ** Instances
