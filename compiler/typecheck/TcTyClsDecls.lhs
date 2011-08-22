@@ -1178,6 +1178,7 @@ E.g.
         data T where
           T1 { f :: Maybe a } :: T [a]
           T2 { f :: Maybe a, y :: b  } :: T [a]
+	  T3 :: T Int
 
 and now the selector takes that result type as its argument:
    f :: forall a. T [a] -> Maybe a
@@ -1192,6 +1193,7 @@ So the selector loooks like this:
      = case t of
 	 T1 c   (g:[a]~[c]) (v:Maybe c)       -> v `cast` Maybe (right (sym g))
          T2 c d (g:[a]~[c]) (v:Maybe c) (w:d) -> v `cast` Maybe (right (sym g))
+         T3 -> error "T3 does not have field f"
 
 Note the forall'd tyvars of the selector are just the free tyvars
 of the result type; there may be other tyvars in the constructor's
