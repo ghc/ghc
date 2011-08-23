@@ -20,14 +20,18 @@ module Haddock.Convert where
 import HsSyn
 import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
+import RnTypes ( mkIPName )
+import Kind ( liftedTypeKind, factKind )
 import Coercion ( splitKindFunTys, synTyConResKind )
 import Name
 import Var
 import Class
 import TyCon
 import DataCon
+import SrcLoc ( noSrcSpan )
+import BasicTypes ( TupleSort(..) )
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName )
+import TysWiredIn ( listTyConName, eqTyCon )
 import Bag ( emptyBag )
 import SrcLoc ( Located, noLoc, unLoc )
 
@@ -260,10 +264,22 @@ synifyType _ (TyVarTy tv) = noLoc $ HsTyVar (getName tv)
 synifyType _ (TyConApp tc tys)
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | isTupleTyCon tc, tyConArity tc == length tys =
-     noLoc $ HsTupleTy (tupleTyConBoxity tc) (map (synifyType WithinType) tys)
+     noLoc $ HsTupleTy (case tupleTyConSort tc of
+                          BoxedTuple   -> HsBoxyTuple liftedTypeKind
+                          FactTuple    -> HsBoxyTuple factKind
+                          UnboxedTuple -> HsUnboxedTuple)
+                       (map (synifyType WithinType) tys)
   -- ditto for lists
   | getName tc == listTyConName, [ty] <- tys =
      noLoc $ HsListTy (synifyType WithinType ty)
+  -- ditto for implicit parameter tycons
+  | Just ip <- tyConIP_maybe tc
+  , [ty] <- tys
+  = noLoc $ HsIParamTy (mkIPName noSrcSpan ip) (synifyType WithinType ty)
+  -- and equalities
+  | tc == eqTyCon
+  , [ty1, ty2] <- tys
+  = noLoc $ HsEqTy (synifyType WithinType ty1) (synifyType WithinType ty2)
   -- Most TyCons:
   | otherwise =
     foldl (\t1 t2 -> noLoc (HsAppTy t1 t2))
@@ -291,3 +307,12 @@ synifyType s forallty@(ForAllTy _tv _ty) =
       sTau = synifyType WithinType tau
      in noLoc $
            HsForAllTy forallPlicitness sTvs sCtx sTau
+
+
+synifyInstHead :: ([TyVar], [PredType], Class, [Type]) ->
+                  ([HsType Name], Name, [HsType Name])
+synifyInstHead (_, preds, cls, ts) =
+  ( map (unLoc . synifyType WithinType) preds
+  , getName cls
+  , map (unLoc . synifyType WithinType) ts
+  )
