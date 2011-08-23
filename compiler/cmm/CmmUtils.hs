@@ -51,7 +51,7 @@ module CmmUtils(
         lastNode, replaceLastNode, insertBetween,
         ofBlockMap, toBlockMap, insertBlock,
         ofBlockList, toBlockList, bodyToBlockList,
-        foldGraphBlocks, mapGraphNodes, postorderDfs,
+        foldGraphBlocks, mapGraphNodes, postorderDfs, mapGraphNodes1,
       
         analFwd, analBwd, analRewFwd, analRewBwd,
         dataflowPassFwd, dataflowPassBwd
@@ -417,6 +417,10 @@ mapGraphNodes :: ( CmmNode C O -> CmmNode C O
               -> CmmGraph -> CmmGraph
 mapGraphNodes funs@(mf,_,_) g =
   ofBlockMap (entryLabel $ mf $ CmmEntry $ g_entry g) $ mapMap (blockMapNodes3 funs) $ toBlockMap g
+
+mapGraphNodes1 :: (forall e x. CmmNode e x -> CmmNode e x) -> CmmGraph -> CmmGraph
+mapGraphNodes1 f g = modifyGraph (graphMapBlocks (blockMapNodes f)) g
+
 
 foldGraphBlocks :: (CmmBlock -> a -> a) -> a -> CmmGraph -> a
 foldGraphBlocks k z g = mapFold k z $ toBlockMap g
