@@ -344,7 +344,8 @@ lvlExpr ctxt_lvl env (_, AnnCase scrut@(scrut_fvs,_) case_bndr ty alts)
   | [(con@(DataAlt {}), bs, rhs)] <- alts
   , exprOkForSpeculation (deAnnotate scrut)
   , not (isTopLvl dest_lvl)	-- Can't have top-level cases
-  = 	-- Float the case
+  = 	-- Always float the case if possible
+  	-- Unlike lets we don't insist that it escapes a value lambda
     do { scrut' <- lvlMFE True ctxt_lvl env scrut
        ; (rhs_env, (case_bndr':bs')) <- cloneVars env (case_bndr:bs) dest_lvl
        	 	   -- We don't need to use extendCaseBndrLvlEnv here
@@ -791,7 +792,7 @@ data LevelEnv
   = LE { le_switches :: FloatOutSwitches
        , le_lvl_env  :: VarEnv Level	-- Domain is *post-cloned* TyVars and Ids
        , le_subst    :: Subst 		-- Domain is pre-cloned Ids; tracks the in-scope set
-					-- 	so that subtitution is capture-avoiding
+					-- 	so that substitution is capture-avoiding
        , le_env      :: IdEnv ([Var], LevelledExpr)	-- Domain is pre-cloned Ids
     }
 	-- We clone let-bound variables so that they are still
