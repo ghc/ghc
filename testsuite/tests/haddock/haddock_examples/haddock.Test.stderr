@@ -62,23 +62,25 @@ newtype N6 a b = <document comment> N6 {n6 :: a b}
 <document comment>
 newtype N7 a b = <document comment> N7 {n7 :: a b}
 class D a => C a where
-  { a :: IO a
-    b :: [a]
-    c :: a }
+  a :: IO a
+  b :: [a]
+  c :: a
 <document comment>
 class D a where
-  { d :: T a b
-    e :: (a, a) }
+  d :: T a b
+  e :: (a, a)
 <document comment>
 instance D Int where
-  { d = undefined
-    e = undefined }
+  d = undefined
+  e = undefined
 instance Test.D Float where
-  { d = undefined
-    e = undefined }
-class E a where { ee :: a }
+  d = undefined
+  e = undefined
+class E a where
+  ee :: a
 <document comment>
-class F a where { ff :: a }
+class F a where
+  ff :: a
 <document comment>
 data R
     = <document comment>
