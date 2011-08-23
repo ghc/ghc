@@ -17,6 +17,10 @@ Things we did
 
 More notes (June 11)
 ~~~~~~~~~~~~~~~~~~~~
+
+* In CmmContFlowOpts.branchChainElim, can a single block be the
+  successor of two calls?
+
 * Check in ClosureInfo:
      -- NB: Results here should line up with the results of SMRep.rtsClosureType
 
