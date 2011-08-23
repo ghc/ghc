@@ -12,7 +12,7 @@ module TcHsType (
 
 		-- Kind checking
 	kcHsTyVars, kcHsSigType, kcHsLiftedSigType, 
-	kcLHsType, kcCheckLHsType, kcHsContext, 
+	kcLHsType, kcCheckLHsType, kcHsContext, kcApps,
 	
 		-- Typechecking kinded types
 	tcHsKindedContext, tcHsKindedType, tcHsBangType,
