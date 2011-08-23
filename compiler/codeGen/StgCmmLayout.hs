@@ -127,16 +127,16 @@ directCall :: CLabel -> Arity -> [StgArg] -> FCode ()
 -- Both arity and args include void args
 directCall lbl arity stg_args 
   = do	{ cmm_args <- getNonVoidArgAmodes stg_args
-	; direct_call "directCall" lbl arity cmm_args (argsLReps stg_args) }
+	; direct_call "directCall" lbl arity cmm_args (argsReps stg_args) }
 
 slowCall :: CmmExpr -> [StgArg] -> FCode ()
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args 
   = do	{ cmm_args <- getNonVoidArgAmodes stg_args
-	; slow_call fun cmm_args (argsLReps stg_args) }
+	; slow_call fun cmm_args (argsReps stg_args) }
 
 --------------
-direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [LRep] -> FCode ()
+direct_call :: String -> CLabel -> Arity -> [CmmExpr] -> [ArgRep] -> FCode ()
 -- NB1: (length args) may be less than (length reps), because
 --     the args exclude the void ones
 -- NB2: 'arity' refers to the *reps* 
@@ -163,7 +163,7 @@ direct_call caller lbl arity args reps
     (fast_args, rest_args) = splitAt arg_arity args
 
 --------------
-slow_call :: CmmExpr -> [CmmExpr] -> [LRep] -> FCode ()
+slow_call :: CmmExpr -> [CmmExpr] -> [ArgRep] -> FCode ()
 slow_call fun args reps
   = do call <- getCode $ direct_call "slow_call" (mkRtsApFastLabel rts_fun) arity args reps
        emit $ mkComment $ mkFastString ("slow_call for " ++ showSDoc (ppr fun) ++
@@ -173,7 +173,7 @@ slow_call fun args reps
     (rts_fun, arity) = slowCallPattern reps
 
 -- These cases were found to cover about 99% of all slow calls:
-slowCallPattern :: [LRep] -> (FastString, Arity)
+slowCallPattern :: [ArgRep] -> (FastString, Arity)
 -- Returns the generic apply function and arity
 slowCallPattern (P: P: P: P: P: P: _) = (fsLit "stg_ap_pppppp", 6)
 slowCallPattern (P: P: P: P: P: _)    = (fsLit "stg_ap_ppppp", 5)
@@ -193,19 +193,19 @@ slowCallPattern []		      = (fsLit "stg_ap_0", 0)
 
 
 -------------------------------------------------------------------------
---	Classifying arguments: LRep
+--	Classifying arguments: ArgRep
 -------------------------------------------------------------------------
 
--- LRep is not exported (even abstractly)
+-- ArgRep is not exported (even abstractly)
 -- It's a local helper type for classification
 
-data LRep = P 	-- GC Ptr
+data ArgRep = P 	-- GC Ptr
 	  | N   -- One-word non-ptr
 	  | L	-- Two-word non-ptr (long)
 	  | V	-- Void
 	  | F	-- Float
 	  | D	-- Double
-instance Outputable LRep where
+instance Outputable ArgRep where
   ppr P = text "P"
   ppr N = text "N"
   ppr L = text "L"
@@ -213,34 +213,34 @@ instance Outputable LRep where
   ppr F = text "F"
   ppr D = text "D"
 
-toLRep :: PrimRep -> LRep
-toLRep VoidRep 	 = V
-toLRep PtrRep  	 = P
-toLRep IntRep  	 = N
-toLRep WordRep 	 = N
-toLRep AddrRep 	 = N
-toLRep Int64Rep  = L
-toLRep Word64Rep = L
-toLRep FloatRep  = F
-toLRep DoubleRep = D
+toArgRep :: PrimRep -> ArgRep
+toArgRep VoidRep   = V
+toArgRep PtrRep    = P
+toArgRep IntRep    = N
+toArgRep WordRep   = N
+toArgRep AddrRep   = N
+toArgRep Int64Rep  = L
+toArgRep Word64Rep = L
+toArgRep FloatRep  = F
+toArgRep DoubleRep = D
 
-isNonV :: LRep -> Bool
+isNonV :: ArgRep -> Bool
 isNonV V = False
 isNonV _ = True
 
-argsLReps :: [StgArg] -> [LRep]
-argsLReps = map (toLRep . argPrimRep)
+argsReps :: [StgArg] -> [ArgRep]
+argsReps = map (toArgRep . argPrimRep)
 
-lRepSizeW :: LRep -> WordOff		-- Size in words
-lRepSizeW N = 1
-lRepSizeW P = 1
-lRepSizeW F = 1
-lRepSizeW L = wORD64_SIZE `quot` wORD_SIZE
-lRepSizeW D = dOUBLE_SIZE `quot` wORD_SIZE
-lRepSizeW V = 0
+argRepSizeW :: ArgRep -> WordOff		-- Size in words
+argRepSizeW N = 1
+argRepSizeW P = 1
+argRepSizeW F = 1
+argRepSizeW L = wORD64_SIZE `quot` wORD_SIZE
+argRepSizeW D = dOUBLE_SIZE `quot` wORD_SIZE
+argRepSizeW V = 0
 
-idLRep :: Id -> LRep
-idLRep = toLRep . idPrimRep
+idArgRep :: Id -> ArgRep
+idArgRep = toArgRep . idPrimRep
 
 -------------------------------------------------------------------------
 ----	Laying out objects on the heap and stack
@@ -286,7 +286,7 @@ mkVirtHeapOffsets is_thunk things
 		| otherwise  = fixedHdrSize
 
     computeOffset wds_so_far (rep, thing)
-      = (wds_so_far + lRepSizeW (toLRep rep), 
+      = (wds_so_far + argRepSizeW (toArgRep rep), 
 	 (NonVoid thing, hdr_size + wds_so_far))
 
 mkVirtConstrOffsets :: [(PrimRep,a)] -> (WordOff, WordOff, [(NonVoid a, VirtualHpOffset)])
@@ -316,16 +316,16 @@ mkArgDescr _nm args
 	Nothing      -> return (ArgGen arg_bits)
   where
     arg_bits = argBits arg_reps
-    arg_reps = filter isNonV (map idLRep args)
+    arg_reps = filter isNonV (map idArgRep args)
 	-- Getting rid of voids eases matching of standard patterns
 
-argBits :: [LRep] -> [Bool]	-- True for non-ptr, False for ptr
+argBits :: [ArgRep] -> [Bool]	-- True for non-ptr, False for ptr
 argBits [] 		= []
 argBits (P   : args) = False : argBits args
-argBits (arg : args) = take (lRepSizeW arg) (repeat True) ++ argBits args
+argBits (arg : args) = take (argRepSizeW arg) (repeat True) ++ argBits args
 
 ----------------------
-stdPattern :: [LRep] -> Maybe StgHalfWord
+stdPattern :: [ArgRep] -> Maybe StgHalfWord
 stdPattern reps 
   = case reps of
 	[]  -> Just ARG_NONE	-- just void args, probably
