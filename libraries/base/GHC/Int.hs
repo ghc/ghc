@@ -149,6 +149,7 @@ instance Bits Int8 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 7#)
     bitSize  _                = 8
     isSigned _                = True
+    popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
@@ -293,6 +294,7 @@ instance Bits Int16 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 15#)
     bitSize  _                 = 16
     isSigned _                 = True
+    popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
 
 
 {-# RULES
@@ -443,6 +445,7 @@ instance Bits Int32 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
     bitSize  _                 = 32
     isSigned _                 = True
+    popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/Word8->Int32"  fromIntegral = \(W8# x#) -> I32# (word2Int# x#)
@@ -626,6 +629,8 @@ instance Bits Int64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                 = 64
     isSigned _                 = True
+    popCount (I64# x#)         =
+        I64# (word64ToInt64# (popCnt64# (int64ToWord64# x#)))
 
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
@@ -751,6 +756,7 @@ instance Bits Int64 where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# 63#)
     bitSize  _                 = 64
     isSigned _                 = True
+    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
 
 {-# RULES
 "fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#

@@ -33,7 +33,8 @@ module Data.Bits (
     bitSize,           -- :: a -> Int
     isSigned,          -- :: a -> Bool
     shiftL, shiftR,    -- :: a -> Int -> a
-    rotateL, rotateR   -- :: a -> Int -> a
+    rotateL, rotateR,  -- :: a -> Int -> a
+    popCount           -- :: a -> Int
   )
 
   -- instance Bits Int
@@ -207,6 +208,17 @@ class Num a => Bits a where
     {-# INLINE rotateR #-}
     x `rotateR` i = x `rotate` (-i)
 
+    {-| Return the number of set bits in the argument.  This number is
+        known as the population count or the Hamming weight. -}
+    popCount          :: a -> Int
+    popCount = go 0
+      where
+        go !c 0 = c
+        go c w = go (c+1) (w .&. w - 1)  -- clear the least significant bit set
+    {- This implementation is intentionally naive.  Instances are
+       expected to override it with something optimized for their
+       size. -}
+
 instance Bits Int where
     {-# INLINE shift #-}
 
@@ -234,6 +246,8 @@ instance Bits Int where
         !i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
         !wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSize  _             = WORD_SIZE_IN_BITS
+
+    popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
 
 #else /* !__GLASGOW_HASKELL__ */
 

@@ -320,7 +320,8 @@ instance Bits T where { \
   complementBit (T x) n = T (complementBit x n) ; \
   testBit       (T x) n = testBit x n ; \
   bitSize       (T x)   = bitSize x ; \
-  isSigned      (T x)   = isSigned x }
+  isSigned      (T x)   = isSigned x ; \
+  popCount      (T x)   = popCount x }
 
 INSTANCE_BITS(CChar)
 INSTANCE_BITS(CSChar)
