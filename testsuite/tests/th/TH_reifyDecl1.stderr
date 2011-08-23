@@ -1,30 +1,67 @@
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     data TH_reifyDecl1.T = TH_reifyDecl1.A | TH_reifyDecl1.B
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     data TH_reifyDecl1.R a_0 = TH_reifyDecl1.C a_0 | TH_reifyDecl1.D
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     data TH_reifyDecl1.List a_0
     = TH_reifyDecl1.Nil
     | TH_reifyDecl1.Cons a_0 (TH_reifyDecl1.List a_0)
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     data TH_reifyDecl1.Tree a_0
     = TH_reifyDecl1.Leaf
     | (TH_reifyDecl1.Tree a_0) TH_reifyDecl1.:+: (TH_reifyDecl1.Tree a_0)
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     type TH_reifyDecl1.IntList = [GHC.Types.Int]
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     newtype TH_reifyDecl1.Length = TH_reifyDecl1.Length GHC.Types.Int
 
-TH_reifyDecl1.hs:33:10:
+TH_reifyDecl1.hs:63:10:
     Constructor from TH_reifyDecl1.Tree: TH_reifyDecl1.Leaf :: forall a_0 . TH_reifyDecl1.Tree a_0
 
-TH_reifyDecl1.hs:33:10:
-    Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_0 . TH_reifyDecl1.C a_0 =>
-                                                               a_0 -> GHC.Types.Int
-                               infixl 3 TH_reifyDecl1.m
+TH_reifyDecl1.hs:63:10:
+    Class op from TH_reifyDecl1.C1: TH_reifyDecl1.m1 :: forall a_0 . TH_reifyDecl1.C1 a_0 =>
+                                                                 a_0 -> GHC.Types.Int
+                                infixl 3 TH_reifyDecl1.m1
+
+TH_reifyDecl1.hs:63:10:
+    class TH_reifyDecl1.C1 a_0
+    where TH_reifyDecl1.m1 :: forall a_0 . TH_reifyDecl1.C1 a_0 =>
+                                           a_0 -> GHC.Types.Int
+
+TH_reifyDecl1.hs:63:10:
+    class TH_reifyDecl1.C2 a_0
+    where TH_reifyDecl1.m2 :: forall a_0 . TH_reifyDecl1.C2 a_0 =>
+                                           a_0 -> GHC.Types.Int
+instance TH_reifyDecl1.C2 GHC.Types.Int
+
+TH_reifyDecl1.hs:63:10:
+    class TH_reifyDecl1.C3 a_0
+instance TH_reifyDecl1.C3 GHC.Types.Int
+
+TH_reifyDecl1.hs:63:10:
+    type family TH_reifyDecl1.AT1 a_0 :: * -> *
+type instance TH_reifyDecl1.AT1 GHC.Types.Int = GHC.Types.Bool
+
+TH_reifyDecl1.hs:63:10:
+    data family TH_reifyDecl1.AT2 a_0 :: * -> *
+data instance TH_reifyDecl1.AT2 GHC.Types.Int
+    = TH_reifyDecl1.AT2Int
+
+TH_reifyDecl1.hs:63:10: type family TH_reifyDecl1.TF1 a_0 :: * -> *
+
+TH_reifyDecl1.hs:63:10:
+    type family TH_reifyDecl1.TF2 a_0 :: * -> *
+type instance TH_reifyDecl1.TF2 GHC.Types.Bool = GHC.Types.Bool
+
+TH_reifyDecl1.hs:63:10: data family TH_reifyDecl1.DF1 a_0 :: * -> *
+
+TH_reifyDecl1.hs:63:10:
+    data family TH_reifyDecl1.DF2 a_0 :: * -> *
+data instance TH_reifyDecl1.DF2 GHC.Types.Bool
+    = TH_reifyDecl1.DBool

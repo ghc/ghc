@@ -71,6 +71,8 @@ test('TH_reifyType1', normal, compile, [''])
 test('TH_reifyType2', normal, compile, [''])
 test('TH_reifyMkName', normal, compile, ['-v0'])
 
+test('TH_reifyInstances', normal, compile, ['-v0'])
+
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3',
@@ -198,3 +200,7 @@ test('T5358', normal, compile_fail, [''])
 test('T5379', normal, compile_and_run, [''])
 test('T5404', normal, compile, ['-v0'])
 test('T5410', normal, compile_and_run, ['-v0'])
+test('TH_lookupName', 
+     extra_clean(['TH_lookupName_Lib.hi', 'TH_lookupName_Lib.o']),
+     multimod_compile_and_run,
+     ['TH_lookupName.hs', ''])
