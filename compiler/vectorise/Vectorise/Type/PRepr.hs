@@ -1,7 +1,9 @@
 
 module Vectorise.Type.PRepr
-	( buildPReprTyCon, buildPAScAndMethods )
-where
+  ( buildPReprTyCon
+  , buildPAScAndMethods 
+  ) where
+
 import Vectorise.Utils
 import Vectorise.Monad
 import Vectorise.Builtins
@@ -30,14 +32,14 @@ mk_fam_inst fam_tc arg_tc
 buildPReprTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon
 buildPReprTyCon orig_tc vect_tc repr
   = do
-      name     <- cloneName mkPReprTyConOcc (tyConName orig_tc)
+      name     <- mkLocalisedName mkPReprTyConOcc (tyConName orig_tc)
       -- rhs_ty   <- buildPReprType vect_tc
       rhs_ty   <- sumReprType repr
       prepr_tc <- builtin preprTyCon
       liftDs $ buildSynTyCon name
                              tyvars
                              (SynonymTyCon rhs_ty)
-			     (typeKind rhs_ty)
+                             (typeKind rhs_ty)
                              NoParentTyCon
                              (Just $ mk_fam_inst prepr_tc vect_tc)
   where

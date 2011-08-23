@@ -30,7 +30,6 @@ import DataCon
 import TyCon
 import Type
 import FamInstEnv
-import OccName
 import Id
 import MkId
 import NameEnv
@@ -248,7 +247,7 @@ vectDataConWorkers orig_tc vect_tc arr_tc
                   liftM (mkLams (tyvars ++ args) . vectorised)
                 $ buildClosures tyvars [] arg_tys res_ty mk_body
 
-          raw_worker <- cloneId mkVectOcc orig_worker (exprType body)
+          raw_worker <- mkVectId orig_worker (exprType body)
           let vect_worker = raw_worker `setIdUnfolding`
                               mkInlineUnfolding (Just arity) body
           defGlobalVar orig_worker vect_worker

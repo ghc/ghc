@@ -1,7 +1,8 @@
 
 module Vectorise.Type.PData
-	(buildPDataTyCon)
-where
+  (buildPDataTyCon
+  ) where
+
 import Vectorise.Monad
 import Vectorise.Builtins
 import Vectorise.Type.Repr
@@ -22,7 +23,7 @@ import Control.Monad
 buildPDataTyCon :: TyCon -> TyCon -> SumRepr -> VM TyCon
 buildPDataTyCon orig_tc vect_tc repr = fixV $ \repr_tc ->
   do
-    name' <- cloneName mkPDataTyConOcc orig_name
+    name' <- mkLocalisedName mkPDataTyConOcc orig_name
     rhs   <- buildPDataTyConRhs orig_name vect_tc repr_tc repr
     pdata <- builtin pdataTyCon
 
@@ -49,7 +50,7 @@ buildPDataTyConRhs orig_name vect_tc repr_tc repr
 buildPDataDataCon :: Name -> TyCon -> TyCon -> SumRepr -> VM DataCon
 buildPDataDataCon orig_name vect_tc repr_tc repr
   = do
-      dc_name  <- cloneName mkPDataDataConOcc orig_name
+      dc_name  <- mkLocalisedName mkPDataDataConOcc orig_name
       comp_tys <- sum_tys repr
 
       liftDs $ buildDataCon dc_name
@@ -61,7 +62,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             []                     -- no eq spec
                             []                     -- no context
                             comp_tys
-			    (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
+                            (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
   where
     tvs   = tyConTyVars vect_tc

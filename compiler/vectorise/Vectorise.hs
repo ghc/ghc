@@ -25,7 +25,6 @@ import CoreSyn
 import CoreMonad            ( CoreM, getHscEnv )
 import Type
 import Id
-import OccName
 import DynFlags
 import BasicTypes           ( isStrongLoopBreaker )
 import Outputable
@@ -250,7 +249,7 @@ vectTopBinder var inline expr
 
           -- Make the vectorised version of binding's name, and set the unfolding used for inlining
       ; var' <- liftM (`setIdUnfoldingLazily` unfolding) 
-                $  cloneId mkVectOcc var vty
+                $  mkVectId var vty
 
           -- Add the mapping between the plain and vectorised name to the state.
       ; defGlobalVar var var'

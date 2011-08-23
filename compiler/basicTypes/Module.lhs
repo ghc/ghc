@@ -11,15 +11,15 @@ the keys.
 \begin{code}
 module Module 
     (
-	-- * The ModuleName type
-	ModuleName,
-	pprModuleName,
-	moduleNameFS,
-	moduleNameString,
-        moduleNameSlashes,
-	mkModuleName,
-	mkModuleNameFS,
-	stableModuleNameCmp,
+        -- * The ModuleName type
+        ModuleName,
+        pprModuleName,
+        moduleNameFS,
+        moduleNameString,
+        moduleNameSlashes, moduleNameColons,
+        mkModuleName,
+        mkModuleNameFS,
+        stableModuleNameCmp,
 
         -- * The PackageId type
         PackageId,
@@ -205,10 +205,17 @@ mkModuleName s = ModuleName (mkFastString s)
 mkModuleNameFS :: FastString -> ModuleName
 mkModuleNameFS s = ModuleName s
 
--- | Returns the string version of the module name, with dots replaced by slashes
+-- |Returns the string version of the module name, with dots replaced by slashes.
+--
 moduleNameSlashes :: ModuleName -> String
 moduleNameSlashes = dots_to_slashes . moduleNameString
   where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
+
+-- |Returns the string version of the module name, with dots replaced by underscores.
+--
+moduleNameColons :: ModuleName -> String
+moduleNameColons = dots_to_colons . moduleNameString
+  where dots_to_colons = map (\c -> if c == '.' then ':' else c)
 \end{code}
 
 %************************************************************************

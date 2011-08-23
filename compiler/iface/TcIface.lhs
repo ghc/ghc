@@ -722,7 +722,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
        }
   where
     vectVarMapping name 
-      = do { vName <- lookupOrig mod (mkVectOcc (nameOccName name))
+      = do { vName <- lookupOrig mod (mkLocalisedOccName mkVectOcc name)
            ; var  <- forkM (text ("vect var")  <+> ppr name)  $
                      tcIfaceExtId name
            ; vVar <- forkM (text ("vect vVar") <+> ppr vName) $
@@ -730,9 +730,9 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
            ; return (var, (var, vVar))
            }
     vectTyConMapping name 
-      = do { vName   <- lookupOrig mod (mkVectTyConOcc (nameOccName name))
-           ; paName  <- lookupOrig mod (mkPADFunOcc    (nameOccName name))
-           ; isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
+      = do { vName   <- lookupOrig mod (mkLocalisedOccName mkVectTyConOcc name)
+           ; paName  <- lookupOrig mod (mkLocalisedOccName mkPADFunOcc    name)
+           ; isoName <- lookupOrig mod (mkLocalisedOccName mkVectIsoOcc   name)
            -- FIXME: we will need to use tcIfaceTyCon/tcIfaceExtId on some of these (but depends
            --   on how we exactly define the 'VECTORISE type' pragma to work)
            ; let { tycon    = lookupTyCon name
@@ -748,8 +748,8 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                     )
            }
     vectTyConReuseMapping scalarNames name 
-      = do { paName  <- lookupOrig mod (mkPADFunOcc  (nameOccName name))
-           ; isoName <- lookupOrig mod (mkVectIsoOcc (nameOccName name))
+      = do { paName  <- lookupOrig mod (mkLocalisedOccName mkPADFunOcc  name)
+           ; isoName <- lookupOrig mod (mkLocalisedOccName mkVectIsoOcc name)
            ; tycon <- forkM (text ("vect reuse tycon") <+> ppr name) $
                       tcIfaceTyCon (IfaceTc name) -- somewhat naughty for wired in tycons, but ok
            ; if name `elemNameSet` scalarNames
@@ -773,7 +773,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
            }}
     vectDataConMapping datacon
       = do { let name = dataConName datacon
-           ; vName <- lookupOrig mod (mkVectDataConOcc (nameOccName name))
+           ; vName <- lookupOrig mod (mkLocalisedOccName mkVectDataConOcc name)
            ; let vDataCon = lookupDataCon vName
            ; return (name, (datacon, vDataCon))
            }

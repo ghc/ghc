@@ -1889,6 +1889,17 @@ concatVectInfo = foldr plusVectInfo noVectInfo
 
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
+
+instance Outputable VectInfo where
+  ppr info = vcat
+             [ ptext (sLit "variables     :") <+> ppr (vectInfoVar          info)
+             , ptext (sLit "tycons        :") <+> ppr (vectInfoTyCon        info)
+             , ptext (sLit "datacons      :") <+> ppr (vectInfoDataCon      info)
+             , ptext (sLit "PA dfuns      :") <+> ppr (vectInfoPADFun       info)
+             , ptext (sLit "iso           :") <+> ppr (vectInfoIso          info)
+             , ptext (sLit "scalar vars   :") <+> ppr (vectInfoScalarVars   info)
+             , ptext (sLit "scalar tycons :") <+> ppr (vectInfoScalarTyCons info)
+             ]
 \end{code}
 
 %************************************************************************

@@ -541,14 +541,12 @@ isDerivedOccName occ =
 
 \begin{code}
 mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkGenDefMethodOcc,
-  	mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkDictOcc,
- 	mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
- 	mkGenD, mkGenR, mkGenRCo,
-	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
-	mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
-	mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
-	mkPDataTyConOcc, mkPDataDataConOcc, mkPReprTyConOcc, mkPADFunOcc
+  mkDerivedTyConOcc, mkClassTyConOcc, mkClassDataConOcc, mkDictOcc,
+  mkIPOcc, mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
+  mkGenD, mkGenR, mkGenRCo,
+  mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
+  mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
+  mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -598,17 +596,23 @@ mkDataTOcc = mk_simple_deriv varName  "$t"
 mkDataCOcc = mk_simple_deriv varName  "$c"
 
 -- Vectorisation
-mkVectOcc          = mk_simple_deriv varName  "$v_"
-mkVectTyConOcc     = mk_simple_deriv tcName   ":V_"
-mkVectDataConOcc   = mk_simple_deriv dataName ":VD_"
-mkVectIsoOcc       = mk_simple_deriv varName  "$VI_"
-mkPDataTyConOcc    = mk_simple_deriv tcName   ":VP_"
-mkPDataDataConOcc  = mk_simple_deriv dataName ":VPD_"
-mkPReprTyConOcc    = mk_simple_deriv tcName   ":VR_"
-mkPADFunOcc        = mk_simple_deriv varName  "$PA_"
+mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc, mkPADFunOcc, mkPReprTyConOcc,
+  mkPDataTyConOcc, mkPDataDataConOcc :: Maybe String -> OccName -> OccName
+mkVectOcc         = mk_simple_deriv_with varName  "$v_"
+mkVectTyConOcc    = mk_simple_deriv_with tcName   ":V_"
+mkVectDataConOcc  = mk_simple_deriv_with dataName ":VD_"
+mkVectIsoOcc      = mk_simple_deriv_with varName  "$VI_"
+mkPADFunOcc       = mk_simple_deriv_with varName  "$PA_"
+mkPReprTyConOcc   = mk_simple_deriv_with tcName   ":VR_"
+mkPDataTyConOcc   = mk_simple_deriv_with tcName   ":VP_"
+mkPDataDataConOcc = mk_simple_deriv_with dataName ":VPD_"
 
 mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
+
+mk_simple_deriv_with :: NameSpace -> String -> Maybe String -> OccName -> OccName
+mk_simple_deriv_with sp px Nothing     occ = mk_deriv sp px                  (occNameString occ)
+mk_simple_deriv_with sp px (Just with) occ = mk_deriv sp (px ++ with ++ "_") (occNameString occ)
 
 -- Data constructor workers are made by setting the name space
 -- of the data constructor OccName (which should be a DataName)

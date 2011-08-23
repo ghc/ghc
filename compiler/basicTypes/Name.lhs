@@ -42,6 +42,7 @@ module Name (
 	mkFCallName, mkIPName,
         mkTickBoxOpName,
 	mkExternalName, mkWiredInName,
+  mkLocalisedOccName,
 
 	-- ** Manipulating and deconstructing 'Name's
 	nameUnique, setNameUnique,
@@ -324,6 +325,18 @@ tidyNameOcc name 			    occ = name { n_occ = occ }
 -- | Make the 'Name' into an internal name, regardless of what it was to begin with
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }
+\end{code}
+
+\begin{code}
+-- |Create a localised variant of a name.  
+--
+-- If the name is external, encode the original's module name to disambiguate.
+--
+mkLocalisedOccName :: (Maybe String -> OccName -> OccName) -> Name -> OccName
+mkLocalisedOccName mk_occ name = mk_occ origin (nameOccName name)
+  where
+    origin | isExternalName name = Just (moduleNameColons . moduleName . nameModule $ name)
+           | otherwise           = Nothing
 \end{code}
 
 %************************************************************************
