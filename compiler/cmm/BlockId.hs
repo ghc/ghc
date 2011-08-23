@@ -14,7 +14,7 @@ import Name
 import Outputable
 import Unique
 
-import Compiler.Hoopl hiding (Unique)
+import Compiler.Hoopl as Hoopl hiding (Unique)
 import Compiler.Hoopl.GHC (uniqueToInt, uniqueToLbl, lblToUnique)
 
 ----------------------------------------------------------------
@@ -29,7 +29,7 @@ most assembly languages allow, a label is visible throughout the entire
 compilation unit in which it appears.
 -}
 
-type BlockId = Label
+type BlockId = Hoopl.Label
 
 instance Uniquable BlockId where
   getUnique label = getUnique (uniqueToInt $ lblToUnique label)
@@ -50,7 +50,7 @@ infoTblLbl :: BlockId -> CLabel
 infoTblLbl label = mkInfoTableLabel (mkFCallName (getUnique label) "block") NoCafRefs
 
 -- Block environments: Id blocks
-type BlockEnv a = LabelMap a
+type BlockEnv a = Hoopl.LabelMap a
 
 instance Outputable a => Outputable (BlockEnv a) where
   ppr = ppr . mapToList
@@ -59,7 +59,7 @@ emptyBlockMap :: BlockEnv a
 emptyBlockMap = mapEmpty
 
 -- Block sets
-type BlockSet = LabelSet
+type BlockSet = Hoopl.LabelSet
 
 instance Outputable BlockSet where
   ppr = ppr . setElems
