@@ -405,7 +405,7 @@ mkCmmInfo :: ClosureInfo -> CmmInfoTable
 mkCmmInfo cl_info
   = CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
                    cit_rep  = closureSMRep cl_info,
-                   cit_prof = closureProf cl_info,
+                   cit_prof = clProfInfo cl_info,
                    cit_srt  = closureSRT cl_info }
 
 -----------------------------------------------------------------------------

@@ -54,7 +54,7 @@ module StgCmmClosure (
 	isStaticClosure,
 	cafBlackHoleClosureInfo, 
 
-	staticClosureNeedsLink, clHasCafRefs 
+        staticClosureNeedsLink, clHasCafRefs, clProfInfo,
     ) where
 
 #include "../includes/MachDeps.h"
@@ -682,6 +682,10 @@ data ClosureInfo
 clHasCafRefs :: ClosureInfo -> CafInfo
 -- Backward compatibility; remove
 clHasCafRefs = closureCafs
+
+clProfInfo :: ClosureInfo -> ProfilingInfo
+clProfInfo ClosureInfo{ closureProf = p } = p
+clProfInfo _                              = NoProfilingInfo
 
 --------------------------------------
 --	Building ClosureInfos
