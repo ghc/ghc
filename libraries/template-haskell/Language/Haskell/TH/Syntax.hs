@@ -24,9 +24,10 @@ module Language.Haskell.TH.Syntax(
 	Quasi(..), Lift(..), liftString,
 
 	Q, runQ, 
-	report,	recover, reify,
+	report,	recover, reify, 
+        lookupTypeName, lookupValueName,
 	location, runIO,
-        isClassInstance, classInstances,
+        isInstance, reifyInstances,
 
 	-- * Names
 	Name(..), mkName, newName, nameBase, nameModule,
@@ -36,7 +37,7 @@ module Language.Haskell.TH.Syntax(
 	-- $infix
 	Dec(..), Exp(..), Con(..), Type(..), TyVarBndr(..), Kind(..),Cxt,
 	Pred(..), Match(..),  Clause(..), Body(..), Guard(..), Stmt(..),
-	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, ClassInstance(..),
+	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
 	InlineSpec(..),	StrictType, VarStrictType, FunDep(..), FamFlavour(..),
 	Info(..), Loc(..), CharPos,
@@ -83,10 +84,14 @@ class (Monad m, Applicative m) => Quasi m where
            -> m a		-- ^ Recover from the monadic 'fail'
  
 	-- Inspect the type-checker's environment
-  qReify :: Name -> m Info
-  qClassInstances :: Name -> [Type] -> m [ClassInstance]
-  		      -- Is (cls tys) an instance?
-		      -- Returns list of matching witnesses
+  qLookupName :: Bool -> String -> m (Maybe Name)
+       -- True <=> type namespace, False <=> value namespace
+  qReify          :: Name -> m Info
+  qReifyInstances :: Name -> [Type] -> m [Dec]
+       -- Is (n tys) an instance?
+       -- Returns list of matching instance Decs 
+       --    (with empty sub-Decs)
+       -- Works for classes and type functions
 
   qLocation :: m Loc
 
@@ -113,8 +118,9 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
+  qLookupName _ _     = badIO "lookupName"
   qReify _            = badIO "reify"
-  qClassInstances _ _ = badIO "classInstances"
+  qReifyInstances _ _ = badIO "classInstances"
   qLocation    	      = badIO "currentLocation"
   qRecover _ _ 	      = badIO "recover" -- Maybe we could fix this?
 
@@ -167,17 +173,26 @@ recover :: Q a -- ^ recover with this one
         -> Q a
 recover (Q r) (Q m) = Q (qRecover r m)
 
+-- We don't export lookupName; the Bool isn't a great API
+-- Instead we export lookupTypeName, lookupValueName
+lookupName :: Bool -> String -> Q (Maybe Name)
+lookupName ns s = Q (qLookupName ns s)
+
+lookupTypeName, lookupValueName :: String -> Q (Maybe Name)
+lookupTypeName  s = Q (qLookupName True s)
+lookupValueName s = Q (qLookupName False s)
+
 -- | 'reify' looks up information about the 'Name'
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
 -- | 'classInstances' looks up instaces of a class
-classInstances :: Name -> [Type] -> Q [ClassInstance]
-classInstances cls tys = Q (qClassInstances cls tys)
+reifyInstances :: Name -> [Type] -> Q [Dec]
+reifyInstances cls tys = Q (qReifyInstances cls tys)
 
-isClassInstance :: Name -> [Type] -> Q Bool
-isClassInstance cls tys = do { dfuns <- classInstances cls tys
-                             ; return (not (null dfuns)) }
+isInstance :: Name -> [Type] -> Q Bool
+isInstance nm tys = do { decs <- reifyInstances nm tys
+                       ; return (not (null decs)) }
 
 -- | 'location' gives you the 'Location' at which this
 -- computation is spliced.
@@ -199,7 +214,8 @@ instance Quasi Q where
   qReport   	  = report
   qRecover  	  = recover 
   qReify    	  = reify
-  qClassInstances = classInstances
+  qReifyInstances = reifyInstances
+  qLookupName     = lookupName
   qLocation 	  = location
   qRunIO    	  = runIO
 
@@ -366,16 +382,12 @@ data Name = Name OccName NameFlavour deriving (Typeable, Data)
 data NameFlavour
   = NameS           -- ^ An unqualified name; dynamically bound
   | NameQ ModName   -- ^ A qualified name; dynamically bound
-
   | NameU Int#      -- ^ A unique local name
-
-
   | NameL Int#      -- ^ Local name bound outside of the TH AST
   | NameG NameSpace PkgName ModName -- ^ Global name bound outside of the TH AST:
                 -- An original name (occurrences only, not binders)
-                --
-				-- Need the namespace too to be sure which 
-				-- thing we are naming
+		-- Need the namespace too to be sure which 
+		-- thing we are naming
   deriving ( Typeable )
 
 -- |
@@ -633,7 +645,7 @@ data Info
     --   and a list of its instances
     ClassI 
         Dec             -- Declaration of the class
-        [ClassInstance]	-- The instances of that class
+        [InstanceDec]	-- The instances of that class
 
   | ClassOpI
 	Name	-- The class op itself
@@ -641,7 +653,12 @@ data Info
 	Name 	-- Name of the parent class
 	Fixity
 
-  | TyConI Dec
+  | TyConI 
+        Dec
+
+  | FamilyI	-- Type/data families
+        Dec
+        [InstanceDec]
 
   | PrimTyConI 	-- Ones that can't be expressed with a data type 
 		-- decl, such as (->), Int#
@@ -668,15 +685,12 @@ data Info
 	Type	-- What it is bound to
   deriving( Show, Data, Typeable )
 
--- | 'ClassInstance' desribes a single instance of a class
-data ClassInstance 
-  = ClassInstance {
-      ci_dfun :: Name,	  -- The witness
-      ci_tvs  :: [TyVarBndr], 
-      ci_cxt  :: Cxt,
-      ci_cls  :: Name,  
-      ci_tys  :: [Type]
-    } deriving( Show, Data, Typeable )
+-- | 'InstanceDec' desribes a single instance of a class or type function
+-- It is just a 'Dec', but guaranteed to be one of the following:
+--   InstanceD (with empty [Dec])
+--   DataInstD or NewtypeInstD (with empty derived [Name])
+--   TySynInstD
+type InstanceDec = Dec
 
 data Fixity          = Fixity Int FixityDirection
     deriving( Eq, Show, Data, Typeable )

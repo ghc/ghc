@@ -12,11 +12,11 @@ module Language.Haskell.TH(
 	reify, 		  -- :: Name -> Q Info
 	location,	  -- :: Q Location
 	runIO, 		  -- :: IO a -> Q a
-	isClassInstance,
-	classInstances,
+	lookupTypeName, lookupValueName,
+        isInstance, reifyInstances,
 
 	-- * Names
-	Name, 
+	Name, NameSpace,	-- Abstract
 	mkName,  	-- :: String -> Name
 	newName, 	-- :: String -> Q Name
 	nameBase,	-- :: Name -> String
@@ -31,8 +31,7 @@ module Language.Haskell.TH(
 	Pred(..), Match(..), Clause(..), Body(..), Guard(..), Stmt(..),
 	Range(..), Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), Pragma(..),
-	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..),
-	ClassInstance(..), Loc(..),
+	InlineSpec(..), FunDep(..), FamFlavour(..), Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
     -- * Library functions
