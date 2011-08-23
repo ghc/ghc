@@ -640,9 +640,9 @@ instance OutputableBndr name
       = top_matter
 
       | otherwise	-- Laid out
-      = hang (hsep [top_matter, ptext (sLit "where")])
-	   2 (bracesSp (sep [ vcat (map ppr ats)
-			    , pprLHsBindsForUser methods sigs ]))
+      = vcat [ top_matter <+> ptext (sLit "where")
+	     , nest 2 $ pprDeclList (map ppr ats ++
+			             pprLHsBindsForUser methods sigs) ]
       where
         top_matter = ptext (sLit "class") 
 		     <+> pp_decl_head (unLoc context) lclas tyvars Nothing
@@ -820,9 +820,9 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
       = top_matter
 
       | otherwise	-- Laid out
-      = hang (top_matter <+> ptext (sLit "where"))
-           2 (bracesSp (vcat [ vcat (map ppr ats)
-	                     , pprLHsBindsForUser binds sigs ]))
+      = vcat [ top_matter <+> ptext (sLit "where")
+             , nest 2 $ pprDeclList (map ppr ats ++
+	                             pprLHsBindsForUser binds sigs) ]
       where
         top_matter = ptext (sLit "instance") <+> ppr inst_ty
 
@@ -830,9 +830,6 @@ instance (OutputableBndr name) => Outputable (InstDecl name) where
 --
 instDeclATs :: [LInstDecl name] -> [LTyClDecl name]
 instDeclATs inst_decls = [at | L _ (InstDecl _ _ _ ats) <- inst_decls, at <- ats]
-
-bracesSp :: SDoc -> SDoc   -- Braces with a space
-bracesSp d = lbrace <+> d <+> rbrace
 \end{code}
 
 %************************************************************************

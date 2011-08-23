@@ -64,13 +64,6 @@ pprTyThingLoc pefas tyThing
 pprTyThing :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThing pefas thing = ppr_ty_thing pefas showAll thing
 
-ppr_ty_thing :: PrintExplicitForalls -> ShowSub -> TyThing -> SDoc
-ppr_ty_thing pefas _ 	 (AnId id)          = pprId         pefas id
-ppr_ty_thing pefas _ 	 (ADataCon dataCon) = pprDataConSig pefas dataCon
-ppr_ty_thing pefas ss (ATyCon tyCon)   = pprTyCon      pefas ss tyCon
-ppr_ty_thing _     _       (ACoAxiom ax)    = pprCoAxiom    ax
-ppr_ty_thing pefas ss (AClass cls)     = pprClass      pefas ss cls
-
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
 -- is a data constructor, record selector, or class method, then
 -- the entity's parent declaration is pretty-printed with irrelevant
@@ -98,6 +91,14 @@ pprTyThingHdr pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
 pprTyThingHdr pefas (ATyCon tyCon)     = pprTyConHdr   pefas tyCon
 pprTyThingHdr _     (ACoAxiom ax)      = pprCoAxiom ax
 pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
+
+------------------------
+ppr_ty_thing :: PrintExplicitForalls -> ShowSub -> TyThing -> SDoc
+ppr_ty_thing pefas _  (AnId id)          = pprId         pefas id
+ppr_ty_thing pefas _  (ADataCon dataCon) = pprDataConSig pefas dataCon
+ppr_ty_thing pefas ss (ATyCon tyCon)   	 = pprTyCon      pefas ss tyCon
+ppr_ty_thing _     _  (ACoAxiom ax)    	 = pprCoAxiom    ax
+ppr_ty_thing pefas ss (AClass cls)     	 = pprClass      pefas ss cls
 
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr _ tyCon
@@ -223,13 +224,14 @@ pprDataConDecl pefas ss gadt_style dataCon
 
 pprClass :: PrintExplicitForalls -> ShowSub -> GHC.Class -> SDoc
 pprClass pefas ss cls
-  | null methods
+  | null methods && null assoc_ts
   = pprClassHdr pefas cls
   | otherwise
-  = hang (pprClassHdr pefas cls <+> ptext (sLit "where"))
-       2 (vcat (ppr_trim (map show_at assoc_ts ++ map show_meth methods)))
+  = vcat [ pprClassHdr pefas cls <+> ptext (sLit "where")
+         , nest 2 (vcat $ ppr_trim $ 
+                   map show_at assoc_ts ++ map show_meth methods)]
   where
-    methods = GHC.classMethods cls
+    methods  = GHC.classMethods cls
     assoc_ts = GHC.classATs cls
     show_meth id | showSub ss id  = Just (pprClassMethod pefas id)
 	         | otherwise      = Nothing
