@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 module SPARC.Ppr (
-	pprNatCmmTop,
+	pprNatCmmDecl,
 	pprBasicBlock,
 	pprSectionHeader,
 	pprData,
@@ -48,20 +48,20 @@ import Data.Word
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: Platform -> NatCmmTop CmmStatics Instr -> Doc
-pprNatCmmTop _ (CmmData section dats) =
+pprNatCmmDecl :: Platform -> NatCmmDecl CmmStatics Instr -> Doc
+pprNatCmmDecl _ (CmmData section dats) =
   pprSectionHeader section $$ pprDatas dats
 
  -- special case for split markers:
-pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
+pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph [])) = pprLabel lbl
 
  -- special case for code without info table:
-pprNatCmmTop _ (CmmProc Nothing lbl (ListGraph blocks)) =
+pprNatCmmDecl _ (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   pprLabel lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map pprBasicBlock blocks)
 
-pprNatCmmTop _ (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+pprNatCmmDecl _ (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS

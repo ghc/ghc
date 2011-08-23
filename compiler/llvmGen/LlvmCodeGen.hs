@@ -33,7 +33,7 @@ import System.IO
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmPgm] -> IO ()
+llvmCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 llvmCodeGen dflags h us cmms
   = let cmm = concat cmms
         (cdata,env) = foldr split ([],initLlvmEnv) cmm
@@ -77,7 +77,7 @@ cmmDataLlvmGens dflags h env (cmm:cmms) lmdata
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms procs.
 --
-cmmProcLlvmGens :: DynFlags -> BufHandle -> UniqSupply -> LlvmEnv -> [RawCmmTop]
+cmmProcLlvmGens :: DynFlags -> BufHandle -> UniqSupply -> LlvmEnv -> [RawCmmDecl]
       -> Int         -- ^ count, used for generating unique subsections
       -> [[LlvmVar]] -- ^ info tables that need to be marked as 'used'
       -> IO ()
@@ -102,26 +102,26 @@ cmmProcLlvmGens dflags h us env ((CmmProc _ _ (ListGraph [])) : cmms) count ivar
 
 cmmProcLlvmGens dflags h us env (cmm : cmms) count ivars = do
     (us', env', llvm) <- cmmLlvmGen dflags us (clearVars env) cmm
-    let (docs, ivar) = mapAndUnzip (pprLlvmCmmTop env' count) llvm
+    let (docs, ivar) = mapAndUnzip (pprLlvmCmmDecl env' count) llvm
     Prt.bufLeftRender h $ Prt.vcat docs
     cmmProcLlvmGens dflags h us' env' cmms (count + 2) (ivar ++ ivars)
 
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
-cmmLlvmGen :: DynFlags -> UniqSupply -> LlvmEnv -> RawCmmTop
-            -> IO ( UniqSupply, LlvmEnv, [LlvmCmmTop] )
+cmmLlvmGen :: DynFlags -> UniqSupply -> LlvmEnv -> RawCmmDecl
+            -> IO ( UniqSupply, LlvmEnv, [LlvmCmmDecl] )
 cmmLlvmGen dflags us env cmm = do
     -- rewrite assignments to global regs
     let fixed_cmm = fixStgRegisters cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm"
-        (pprCmmPgm (targetPlatform dflags) [fixed_cmm])
+        (pprCmmGroup (targetPlatform dflags) [fixed_cmm])
 
     -- generate llvm code from cmm
     let ((env', llvmBC), usGen) = initUs us $ genLlvmProc env fixed_cmm
 
     dumpIfSet_dyn dflags Opt_D_dump_llvm "LLVM Code"
-        (vcat $ map (docToSDoc . fst . pprLlvmCmmTop env' 0) llvmBC)
+        (vcat $ map (docToSDoc . fst . pprLlvmCmmDecl env' 0) llvmBC)
 
     return (usGen, env', llvmBC)
 

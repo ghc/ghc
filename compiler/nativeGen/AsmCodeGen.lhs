@@ -133,22 +133,22 @@ The machine-dependent bits break down as follows:
 -- Top-level of the native codegen
 
 data NcgImpl statics instr jumpDest = NcgImpl {
-    cmmTopCodeGen             :: RawCmmTop -> NatM [NatCmmTop statics instr],
-    generateJumpTableForInstr :: instr -> Maybe (NatCmmTop statics instr),
+    cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
+    generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
     getJumpDestBlockId        :: jumpDest -> Maybe BlockId,
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
-    pprNatCmmTop              :: Platform -> NatCmmTop statics instr -> Doc,
+    pprNatCmmDecl              :: Platform -> NatCmmDecl statics instr -> Doc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
-    ncg_x86fp_kludge          :: [NatCmmTop statics instr] -> [NatCmmTop statics instr],
-    ncgExpandTop              :: [NatCmmTop statics instr] -> [NatCmmTop statics instr],
+    ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
+    ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgMakeFarBranches        :: [NatBasicBlock instr] -> [NatBasicBlock instr]
     }
 
 --------------------
-nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmPgm] -> IO ()
+nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 nativeCodeGen dflags h us cmms
  = let nCG' :: (Outputable statics, PlatformOutputable instr, Instruction instr) => NcgImpl statics instr jumpDest -> IO ()
        nCG' ncgImpl = nativeCodeGen' dflags ncgImpl h us cmms
@@ -159,7 +159,7 @@ nativeCodeGen dflags h us cmms
                         ,canShortcut               = X86.Instr.canShortcut
                         ,shortcutStatics           = X86.Instr.shortcutStatics
                         ,shortcutJump              = X86.Instr.shortcutJump
-                        ,pprNatCmmTop              = X86.Ppr.pprNatCmmTop
+                        ,pprNatCmmDecl              = X86.Ppr.pprNatCmmDecl
                         ,maxSpillSlots             = X86.Instr.maxSpillSlots
                         ,allocatableRegs           = X86.Regs.allocatableRegs
                         ,ncg_x86fp_kludge          = id
@@ -177,7 +177,7 @@ nativeCodeGen dflags h us cmms
                          ,canShortcut               = PPC.RegInfo.canShortcut
                          ,shortcutStatics           = PPC.RegInfo.shortcutStatics
                          ,shortcutJump              = PPC.RegInfo.shortcutJump
-                         ,pprNatCmmTop              = PPC.Ppr.pprNatCmmTop
+                         ,pprNatCmmDecl              = PPC.Ppr.pprNatCmmDecl
                          ,maxSpillSlots             = PPC.Instr.maxSpillSlots
                          ,allocatableRegs           = PPC.Regs.allocatableRegs
                          ,ncg_x86fp_kludge          = id
@@ -192,7 +192,7 @@ nativeCodeGen dflags h us cmms
                          ,canShortcut               = SPARC.ShortcutJump.canShortcut
                          ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
                          ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
-                         ,pprNatCmmTop              = SPARC.Ppr.pprNatCmmTop
+                         ,pprNatCmmDecl              = SPARC.Ppr.pprNatCmmDecl
                          ,maxSpillSlots             = SPARC.Instr.maxSpillSlots
                          ,allocatableRegs           = SPARC.Regs.allocatableRegs
                          ,ncg_x86fp_kludge          = id
@@ -209,7 +209,7 @@ nativeCodeGen dflags h us cmms
 nativeCodeGen' :: (Outputable statics, PlatformOutputable instr, Instruction instr)
                => DynFlags
                -> NcgImpl statics instr jumpDest
-               -> Handle -> UniqSupply -> [RawCmmPgm] -> IO ()
+               -> Handle -> UniqSupply -> [RawCmmGroup] -> IO ()
 nativeCodeGen' dflags ncgImpl h us cmms
  = do
 	let platform = targetPlatform dflags
@@ -227,7 +227,7 @@ nativeCodeGen' dflags ncgImpl h us cmms
 	-- dump native code
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm "Asm code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) $ concat native)
+		(vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) $ concat native)
 
 	-- dump global NCG stats for graph coloring allocator
 	(case concat $ catMaybes colorStats of
@@ -278,14 +278,14 @@ cmmNativeGens :: (Outputable statics, PlatformOutputable instr, Instruction inst
               -> NcgImpl statics instr jumpDest
               -> BufHandle
               -> UniqSupply
-              -> [RawCmmTop]
+              -> [RawCmmDecl]
               -> [[CLabel]]
-              -> [ ([NatCmmTop statics instr],
+              -> [ ([NatCmmDecl statics instr],
                    Maybe [Color.RegAllocStats statics instr],
                    Maybe [Linear.RegAllocStats]) ]
               -> Int
               -> IO ( [[CLabel]],
-                      [([NatCmmTop statics instr],
+                      [([NatCmmDecl statics instr],
                       Maybe [Color.RegAllocStats statics instr],
                       Maybe [Linear.RegAllocStats])] )
 
@@ -298,7 +298,7 @@ cmmNativeGens dflags ncgImpl h us (cmm : cmms) impAcc profAcc count
 		<- cmmNativeGen dflags ncgImpl us cmm count
 
 	Pretty.bufLeftRender h
-		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmTop ncgImpl (targetPlatform dflags)) native
+		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map (pprNatCmmDecl ncgImpl (targetPlatform dflags)) native
 
            -- carefully evaluate this strictly.  Binding it with 'let'
            -- and then using 'seq' doesn't work, because the let
@@ -332,10 +332,10 @@ cmmNativeGen
     => DynFlags
     -> NcgImpl statics instr jumpDest
 	-> UniqSupply
-	-> RawCmmTop					-- ^ the cmm to generate code for
+	-> RawCmmDecl					-- ^ the cmm to generate code for
 	-> Int						-- ^ sequence number of this top thing
 	-> IO	( UniqSupply
-		, [NatCmmTop statics instr]	            -- native code
+		, [NatCmmDecl statics instr]	            -- native code
 		, [CLabel]			            -- things imported by this cmm
 		, Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
 		, Maybe [Linear.RegAllocStats])		    -- stats for the linear register allocators
@@ -356,7 +356,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_opt_cmm "Optimised Cmm"
-                (pprCmmPgm platform [opt_cmm])
+                (pprCmmGroup platform [opt_cmm])
 
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =
@@ -365,7 +365,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_native "Native code"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) native)
+		(vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) native)
 
 	-- tag instructions with register liveness information
 	let (withLiveness, usLive) =
@@ -403,7 +403,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 		-- dump out what happened during register allocation
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
-			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) alloced)
+			(vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) alloced)
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc_stages "Build/spill stages"
@@ -434,7 +434,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
-			(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) alloced)
+			(vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) alloced)
 
 		let mPprStats =
 			if dopt Opt_D_dump_asm_stats dflags
@@ -478,7 +478,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_asm_expanded "Synthetic instructions expanded"
-		(vcat $ map (docToSDoc . pprNatCmmTop ncgImpl platform) expanded)
+		(vcat $ map (docToSDoc . pprNatCmmDecl ncgImpl platform) expanded)
 
 	return 	( usAlloc
 		, expanded
@@ -487,7 +487,7 @@ cmmNativeGen dflags ncgImpl us cmm count
 		, ppr_raStatsLinear)
 
 
-x86fp_kludge :: NatCmmTop (Alignment, CmmStatics) X86.Instr.Instr -> NatCmmTop (Alignment, CmmStatics) X86.Instr.Instr
+x86fp_kludge :: NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr -> NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr
 x86fp_kludge top@(CmmData _ _) = top
 x86fp_kludge (CmmProc info lbl (ListGraph code)) = 
 	CmmProc info lbl (ListGraph $ X86.Instr.i386_insert_ffrees code)
@@ -502,7 +502,7 @@ makeImportsDoc dflags imports
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
                 -- On recent versions of Darwin, the linker supports
                 -- dead-stripping of code and data on a per-symbol basis.
-                -- There's a hack to make this work in PprMach.pprNatCmmTop.
+                -- There's a hack to make this work in PprMach.pprNatCmmDecl.
             Pretty.$$ Pretty.text ".subsections_via_symbols"
 #endif
 #if HAVE_GNU_NONEXEC_STACK
@@ -560,7 +560,7 @@ makeImportsDoc dflags imports
 
 sequenceTop 
 	:: Instruction instr
-    => NcgImpl statics instr jumpDest -> NatCmmTop statics instr -> NatCmmTop statics instr
+    => NcgImpl statics instr jumpDest -> NatCmmDecl statics instr -> NatCmmDecl statics instr
 
 sequenceTop _       top@(CmmData _ _) = top
 sequenceTop ncgImpl (CmmProc info lbl (ListGraph blocks)) = 
@@ -675,7 +675,7 @@ makeFarBranches blocks
 -- table instructions.
 generateJumpTables
 	:: NcgImpl statics instr jumpDest
-    -> [NatCmmTop statics instr] -> [NatCmmTop statics instr]
+    -> [NatCmmDecl statics instr] -> [NatCmmDecl statics instr]
 generateJumpTables ncgImpl xs = concatMap f xs
     where f p@(CmmProc _ _ (ListGraph xs)) = p : concatMap g xs
           f p = [p]
@@ -687,8 +687,8 @@ generateJumpTables ncgImpl xs = concatMap f xs
 shortcutBranches
 	:: DynFlags
     -> NcgImpl statics instr jumpDest
-	-> [NatCmmTop statics instr] 
-	-> [NatCmmTop statics instr]
+	-> [NatCmmDecl statics instr] 
+	-> [NatCmmDecl statics instr]
 
 shortcutBranches dflags ncgImpl tops
   | optLevel dflags < 1 = tops    -- only with -O or higher
@@ -698,8 +698,8 @@ shortcutBranches dflags ncgImpl tops
     mapping = foldr plusUFM emptyUFM mappings
 
 build_mapping :: NcgImpl statics instr jumpDest
-              -> GenCmmTop d t (ListGraph instr)
-              -> (GenCmmTop d t (ListGraph instr), UniqFM jumpDest)
+              -> GenCmmDecl d t (ListGraph instr)
+              -> (GenCmmDecl d t (ListGraph instr), UniqFM jumpDest)
 build_mapping _ top@(CmmData _ _) = (top, emptyUFM)
 build_mapping _ (CmmProc info lbl (ListGraph []))
   = (CmmProc info lbl (ListGraph []), emptyUFM)
@@ -729,8 +729,8 @@ build_mapping ncgImpl (CmmProc info lbl (ListGraph (head:blocks)))
     
 apply_mapping :: NcgImpl statics instr jumpDest
               -> UniqFM jumpDest
-              -> GenCmmTop statics h (ListGraph instr)
-              -> GenCmmTop statics h (ListGraph instr)
+              -> GenCmmDecl statics h (ListGraph instr)
+              -> GenCmmDecl statics h (ListGraph instr)
 apply_mapping ncgImpl ufm (CmmData sec statics)
   = CmmData sec (shortcutStatics ncgImpl (lookupUFM ufm) statics)
 apply_mapping ncgImpl ufm (CmmProc info lbl (ListGraph blocks))
@@ -763,10 +763,10 @@ apply_mapping ncgImpl ufm (CmmProc info lbl (ListGraph blocks))
 
 genMachCode 
 	:: DynFlags 
-        -> (RawCmmTop -> NatM [NatCmmTop statics instr])
-	-> RawCmmTop 
+        -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
+	-> RawCmmDecl 
 	-> UniqSM 
-		( [NatCmmTop statics instr]
+		( [NatCmmDecl statics instr]
 		, [CLabel])
 
 genMachCode dflags cmmTopCodeGen cmm_top
@@ -807,7 +807,7 @@ Ideas for other things we could do (put these in Hoopl please!):
     temp assignments, and certain assigns to mem...)
 -}
 
-cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
+cmmToCmm :: DynFlags -> RawCmmDecl -> (RawCmmDecl, [CLabel])
 cmmToCmm _ top@(CmmData _ _) = (top, [])
 cmmToCmm dflags (CmmProc info lbl (ListGraph blocks)) = runCmmOpt dflags $ do
   blocks' <- mapM cmmBlockConFold (cmmMiniInline (cmmEliminateDeadBlocks blocks))

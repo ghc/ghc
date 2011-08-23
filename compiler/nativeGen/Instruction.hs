@@ -3,7 +3,7 @@ module Instruction (
         RegUsage(..),
         noUsage,
         NatCmm,
-        NatCmmTop,
+        NatCmmDecl,
         NatBasicBlock,
         Instruction(..)
 )
@@ -37,13 +37,13 @@ noUsage  = RU [] []
 -- Our flavours of the Cmm types
 -- Type synonyms for Cmm populated with native code
 type NatCmm instr
-        = GenCmmPgm
+        = GenCmmGroup
                 CmmStatics
                 (Maybe CmmStatics)
                 (ListGraph instr)
 
-type NatCmmTop statics instr
-        = GenCmmTop
+type NatCmmDecl statics instr
+        = GenCmmDecl
                 statics
                 (Maybe CmmStatics)
                 (ListGraph instr)

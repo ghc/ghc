@@ -30,7 +30,7 @@ mkEmptyContInfoTable info_lbl
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 
-cmmToRawCmm :: [Old.CmmPgm] -> IO [Old.RawCmmPgm]
+cmmToRawCmm :: [Old.CmmGroup] -> IO [Old.RawCmmGroup]
 cmmToRawCmm cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
        ; return (initUs_ uniqs (mapM (concatMapM mkInfoTable) cmms)) }
@@ -68,7 +68,7 @@ cmmToRawCmm cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: CmmTop -> UniqSM [RawCmmTop]
+mkInfoTable :: CmmDecl -> UniqSM [RawCmmDecl]
 mkInfoTable (CmmData sec dat) 
   = return [CmmData sec dat]
 
@@ -89,17 +89,21 @@ type InfoTableContents = ( [CmmLit]	     -- The standard part
 -- These Lits have *not* had mkRelativeTo applied to them
 
 mkInfoTableContents :: CmmInfoTable
-                    -> Maybe StgHalfWord    -- override default RTS type tag?
-                    -> UniqSM ([RawCmmTop],             -- Auxiliary top decls
+                    -> Maybe StgHalfWord    -- Override default RTS type tag?
+                    -> UniqSM ([RawCmmDecl],             -- Auxiliary top decls
                                InfoTableContents)	-- Info tbl + extra bits
 
-mkInfoTableContents info@(CmmInfoTable { cit_rep = RTSRep ty rep }) _
- = mkInfoTableContents info{cit_rep = rep} (Just ty)
+mkInfoTableContents info@(CmmInfoTable { cit_lbl  = info_lbl
+                                       , cit_rep  = smrep
+                                       , cit_prof = prof
+                                       , cit_srt = srt }) 
+                    mb_rts_tag
+  | RTSRep rts_tag rep <- smrep
+  = mkInfoTableContents info{cit_rep = rep} (Just rts_tag)
+    -- Completely override the rts_tag that mkInfoTableContents would
+    -- otherwise compute, with the rts_tag stored in the RTSRep
+    -- (which in turn came from a handwritten .cmm file)
 
-mkInfoTableContents (CmmInfoTable { cit_lbl  = info_lbl
-                                  , cit_rep  = smrep
-                                  , cit_prof = prof
-                                  , cit_srt = srt }) mb_rts_tag
   | StackRep frame <- smrep
   = do { (prof_lits, prof_data) <- mkProfLits prof
        ; let (srt_label, srt_bitmap) = mkSRTLit srt
@@ -128,7 +132,7 @@ mkInfoTableContents (CmmInfoTable { cit_lbl  = info_lbl
               -> UniqSM ( Maybe StgHalfWord  -- Override the SRT field with this
                  	, Maybe CmmLit       -- Override the layout field with this
                  	, [CmmLit]           -- "Extra bits" for info table
-                 	, [RawCmmTop])	     -- Auxiliary data decls 
+                 	, [RawCmmDecl])	     -- Auxiliary data decls 
     mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
       = do { (descr_lit, decl) <- newStringLit con_descr
       	   ; return (Just con_tag, Nothing, [descr_lit], [decl]) }
@@ -180,7 +184,7 @@ mkSRTLit (C_SRT lbl off bitmap) = ([cmmLabelOffW lbl off], bitmap)
 --   * the "extra bits" (StgFunInfoExtraRev etc.)
 --   * the entry label
 --   * the code
--- and lays them out in memory, producing a list of RawCmmTop
+-- and lays them out in memory, producing a list of RawCmmDecl
 
 -- The value of tablesNextToCode determines the relative positioning
 -- of the extra bits and the standard info table, and whether the
@@ -192,7 +196,7 @@ mkInfoTableAndCode :: CLabel             -- Info table label
                    -> InfoTableContents
                    -> CLabel     	 -- Entry label
                    -> ListGraph CmmStmt  -- Entry code
-                   -> [RawCmmTop]
+                   -> [RawCmmDecl]
 mkInfoTableAndCode info_lbl (std_info, extra_bits) entry_lbl blocks
   | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
   = [CmmProc (Just $ Statics info_lbl $ map CmmStaticLit $
@@ -256,7 +260,7 @@ makeRelativeRefTo _ lit = lit
 -- The head of the stack layout is the top of the stack and
 -- the least-significant bit.
 
-mkLivenessBits :: Liveness -> UniqSM (CmmLit, [RawCmmTop])
+mkLivenessBits :: Liveness -> UniqSM (CmmLit, [RawCmmDecl])
               -- ^ Returns:
               --   1. The bitmap (literal value or label)
               --   2. Large bitmap CmmData if needed
@@ -327,14 +331,14 @@ mkStdInfoTable (type_descr, closure_descr) cl_type srt_len layout_lit
 --
 -------------------------------------------------------------------------
 
-mkProfLits :: ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmTop])
+mkProfLits :: ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmDecl])
 mkProfLits NoProfilingInfo       = return ((zeroCLit, zeroCLit), [])
 mkProfLits (ProfilingInfo td cd)
   = do { (td_lit, td_decl) <- newStringLit td
        ; (cd_lit, cd_decl) <- newStringLit cd
        ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
-newStringLit :: [Word8] -> UniqSM (CmmLit, GenCmmTop CmmStatics info stmt)
+newStringLit :: [Word8] -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
 newStringLit bytes
   = do { uniq <- getUniqueUs
        ; return (mkByteStringCLit uniq bytes) }

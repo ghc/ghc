@@ -49,8 +49,8 @@ regAlloc
 	=> DynFlags
 	-> UniqFM (UniqSet RealReg)	-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
-	-> [LiveCmmTop statics instr]	-- ^ code annotated with liveness information.
-	-> UniqSM ( [NatCmmTop statics instr], [RegAllocStats statics instr] )
+	-> [LiveCmmDecl statics instr]	-- ^ code annotated with liveness information.
+	-> UniqSM ( [NatCmmDecl statics instr], [RegAllocStats statics instr] )
            -- ^ code with registers allocated and stats for each stage of
            -- allocation
 		
@@ -242,7 +242,7 @@ regAlloc_spin
 -- | Build a graph from the liveness and coalesce information in this code.
 buildGraph 
 	:: Instruction instr
-	=> [LiveCmmTop statics instr]
+	=> [LiveCmmDecl statics instr]
 	-> UniqSM (Color.Graph VirtualReg RegClass RealReg)
 	
 buildGraph code
@@ -325,7 +325,7 @@ graphAddCoalesce _ _
 patchRegsFromGraph 
 	:: (Outputable statics, PlatformOutputable instr, Instruction instr)
 	=> Platform -> Color.Graph VirtualReg RegClass RealReg
-	-> LiveCmmTop statics instr -> LiveCmmTop statics instr
+	-> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
 patchRegsFromGraph platform graph code
  = let

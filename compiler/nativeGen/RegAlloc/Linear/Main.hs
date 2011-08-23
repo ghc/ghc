@@ -129,8 +129,8 @@ import Control.Monad
 regAlloc
         :: (PlatformOutputable instr, Instruction instr)
         => DynFlags
-        -> LiveCmmTop statics instr
-        -> UniqSM (NatCmmTop statics instr, Maybe RegAllocStats)
+        -> LiveCmmDecl statics instr
+        -> UniqSM (NatCmmDecl statics instr, Maybe RegAllocStats)
 
 regAlloc _ (CmmData sec d)
         = return

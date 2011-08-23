@@ -55,7 +55,7 @@ type Slot = Int
 -- | Clean out unneeded spill\/reloads from this top level thing.
 cleanSpills
     :: Instruction instr
-    => Platform -> LiveCmmTop statics instr -> LiveCmmTop statics instr
+    => Platform -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
 cleanSpills platform cmm
     = evalState (cleanSpin platform 0 cmm) initCleanS
@@ -65,8 +65,8 @@ cleanSpin
     :: Instruction instr
     => Platform
     -> Int
-    -> LiveCmmTop statics instr
-    -> CleanM (LiveCmmTop statics instr)
+    -> LiveCmmDecl statics instr
+    -> CleanM (LiveCmmDecl statics instr)
 
 {-
 cleanSpin _ spinCount code
@@ -287,8 +287,8 @@ cleanReload _ _ _ _
 -- 
 cleanTopBackward
 	:: Instruction instr
-	=> LiveCmmTop statics instr
-	-> CleanM (LiveCmmTop statics instr)
+	=> LiveCmmDecl statics instr
+	-> CleanM (LiveCmmDecl statics instr)
 
 cleanTopBackward cmm
  = case cmm of

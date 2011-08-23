@@ -115,7 +115,7 @@ import TyCon            ( TyCon, isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
-import OldCmm as Old    ( CmmPgm )
+import OldCmm as Old    ( CmmGroup )
 import PprCmm		( pprCmms )
 import CmmParse		( parseCmmFile )
 import CmmBuildInfoTables
@@ -1190,7 +1190,7 @@ tryNewCodeGen   :: HscEnv -> Module -> [TyCon]
                 -> CollectedCCs
                 -> [(StgBinding,[(Id,[Id])])]
                 -> HpcInfo
-                -> IO [Old.CmmPgm]
+                -> IO [Old.CmmGroup]
 tryNewCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info =
   do    { let dflags = hsc_dflags hsc_env

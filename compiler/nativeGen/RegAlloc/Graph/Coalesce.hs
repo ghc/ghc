@@ -27,8 +27,8 @@ import Data.List
 --	the same and the move instruction safely erased.
 regCoalesce 
 	:: Instruction instr
-	=> [LiveCmmTop statics instr] 
-	-> UniqSM [LiveCmmTop statics instr]
+	=> [LiveCmmDecl statics instr] 
+	-> UniqSM [LiveCmmDecl statics instr]
 
 regCoalesce code
  = do	
@@ -61,7 +61,7 @@ sinkReg fm r
 --	then we can rename the two regs to the same thing and eliminate the move.
 slurpJoinMovs 
 	:: Instruction instr
-	=> LiveCmmTop statics instr 
+	=> LiveCmmDecl statics instr 
 	-> Bag (Reg, Reg)
 
 slurpJoinMovs live

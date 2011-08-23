@@ -21,7 +21,7 @@ import Prelude hiding (succ, unzip, zip)
 import Util
 
 ------------------------------------
-runCmmContFlowOpts :: CmmPgm -> CmmPgm
+runCmmContFlowOpts :: CmmGroup -> CmmGroup
 runCmmContFlowOpts prog = runCmmOpts cmmCfgOpts prog
 
 oldCmmCfgOpts :: Old.ListGraph Old.CmmStmt -> Old.ListGraph Old.CmmStmt
@@ -33,11 +33,11 @@ cmmCfgOpts    =
         -- Here branchChainElim can ultimately be replaced
         -- with a more exciting combination of optimisations
 
-runCmmOpts :: (g -> g) -> GenCmmPgm d h g -> GenCmmPgm d h g
+runCmmOpts :: (g -> g) -> GenCmmGroup d h g -> GenCmmGroup d h g
 -- Lifts a transformer on a single graph to one on the whole program
 runCmmOpts opt = map (optProc opt)
 
-optProc :: (g -> g) -> GenCmmTop d h g -> GenCmmTop d h g
+optProc :: (g -> g) -> GenCmmDecl d h g -> GenCmmDecl d h g
 optProc _   top@(CmmData {}) = top
 optProc opt (CmmProc info lbl g) = CmmProc info lbl (opt g)
 

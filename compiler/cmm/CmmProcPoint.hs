@@ -381,7 +381,7 @@ add_CopyOuts protos procPoints g = foldGraphBlocks mb_copy_out (return mapEmpty)
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
 splitAtProcPoints :: CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
-                     CmmTop -> FuelUniqSM [CmmTop]
+                     CmmDecl -> FuelUniqSM [CmmDecl]
 splitAtProcPoints entry_label callPPs procPoints procMap
                   (CmmProc (TopInfo {info_tbl=info_tbl,
                                      stack_info=stack_info})

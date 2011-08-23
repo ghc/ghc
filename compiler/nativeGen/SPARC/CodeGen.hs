@@ -51,8 +51,8 @@ import Unique
 import Control.Monad	( mapAndUnzipM )
 
 -- | Top level code generation
-cmmTopCodeGen :: RawCmmTop
-              -> NatM [NatCmmTop CmmStatics Instr]
+cmmTopCodeGen :: RawCmmDecl
+              -> NatM [NatCmmDecl CmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks))
  = do
@@ -77,7 +77,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen :: Platform
                   -> CmmBasicBlock
                   -> NatM ( [NatBasicBlock Instr]
-                          , [NatCmmTop CmmStatics Instr])
+                          , [NatCmmDecl CmmStatics Instr])
 
 basicBlockCodeGen platform cmm@(BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -315,7 +315,7 @@ genSwitch expr ids
 			, JMP_TBL (AddrRegImm dst (ImmInt 0)) ids label
 			, NOP ]
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop CmmStatics Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl CmmStatics Instr)
 generateJumpTableForInstr (JMP_TBL _ ids label) =
 	let jumpTable = map jumpTableEntry ids
 	in Just (CmmData ReadOnlyData (Statics label jumpTable))

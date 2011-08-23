@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 module X86.Ppr (
-        pprNatCmmTop,
+        pprNatCmmDecl,
         pprBasicBlock,
         pprSectionHeader,
         pprData,
@@ -50,21 +50,21 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmTop :: Platform -> NatCmmTop (Alignment, CmmStatics) Instr -> Doc
-pprNatCmmTop platform (CmmData section dats) =
+pprNatCmmDecl :: Platform -> NatCmmDecl (Alignment, CmmStatics) Instr -> Doc
+pprNatCmmDecl platform (CmmData section dats) =
   pprSectionHeader section $$ pprDatas platform dats
 
  -- special case for split markers:
-pprNatCmmTop platform (CmmProc Nothing lbl (ListGraph [])) = pprLabel platform lbl
+pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph [])) = pprLabel platform lbl
 
  -- special case for code without info table:
-pprNatCmmTop platform (CmmProc Nothing lbl (ListGraph blocks)) =
+pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map (pprBasicBlock platform) blocks) $$
   pprSizeDecl platform lbl
 
-pprNatCmmTop platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
+pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
   pprSectionHeader Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS

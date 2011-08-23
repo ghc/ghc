@@ -17,7 +17,7 @@ import Data.Maybe
 import Maybes
 import Outputable
 
-cmmOfZgraph :: CmmPgm -> Old.CmmPgm
+cmmOfZgraph :: CmmGroup -> Old.CmmGroup
 cmmOfZgraph tops = map mapTop tops
   where mapTop (CmmProc h l g) = CmmProc (Old.CmmInfo Nothing Nothing (info_tbl h)) l (ofZgraph g)
         mapTop (CmmData s ds) = CmmData s ds

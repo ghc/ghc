@@ -31,12 +31,12 @@ import Data.Maybe
 -- Exported entry points:
 
 cmmLint :: (Outputable d, Outputable h)
-        => Platform -> GenCmmPgm d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLint platform tops = runCmmLint platform (mapM_ lintCmmTop) tops
+        => Platform -> GenCmmGroup d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLint platform tops = runCmmLint platform (mapM_ lintCmmDecl) tops
 
 cmmLintTop :: (Outputable d, Outputable h)
-           => Platform -> GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc
-cmmLintTop platform top = runCmmLint platform lintCmmTop top
+           => Platform -> GenCmmDecl d h (ListGraph CmmStmt) -> Maybe SDoc
+cmmLintTop platform top = runCmmLint platform lintCmmDecl top
 
 runCmmLint :: PlatformOutputable a
            => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
@@ -48,13 +48,13 @@ runCmmLint platform l p =
                            nest 2 (pprPlatform platform p)])
    Right _  -> Nothing
 
-lintCmmTop :: (GenCmmTop h i (ListGraph CmmStmt)) -> CmmLint ()
-lintCmmTop (CmmProc _ lbl (ListGraph blocks))
+lintCmmDecl :: (GenCmmDecl h i (ListGraph CmmStmt)) -> CmmLint ()
+lintCmmDecl (CmmProc _ lbl (ListGraph blocks))
   = addLintInfo (text "in proc " <> pprCLabel lbl) $
         let labels = foldl (\s b -> setInsert (blockId b) s) setEmpty blocks
 	in  mapM_ (lintCmmBlock labels) blocks
 
-lintCmmTop (CmmData {})
+lintCmmDecl (CmmData {})
   = return ()
 
 lintCmmBlock :: BlockSet -> GenBasicBlock CmmStmt -> CmmLint ()

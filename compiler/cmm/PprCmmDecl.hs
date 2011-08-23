@@ -33,7 +33,7 @@
 --
 
 module PprCmmDecl
-    ( writeCmms, pprCmms, pprCmmPgm, pprSection, pprStatic
+    ( writeCmms, pprCmms, pprCmmGroup, pprSection, pprStatic
     )
 where
 
@@ -54,19 +54,19 @@ import SMRep
 
 
 pprCmms :: (Outputable info, PlatformOutputable g)
-        => Platform -> [GenCmmPgm CmmStatics info g] -> SDoc
+        => Platform -> [GenCmmGroup CmmStatics info g] -> SDoc
 pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pprPlatform platform) cmms))
         where
           separator = space $$ ptext (sLit "-------------------") $$ space
 
 writeCmms :: (Outputable info, PlatformOutputable g)
-          => Platform -> Handle -> [GenCmmPgm CmmStatics info g] -> IO ()
+          => Platform -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
 writeCmms platform handle cmms = printForC handle (pprCmms platform cmms)
 
 -----------------------------------------------------------------------------
 
 instance (Outputable d, Outputable info, PlatformOutputable i)
-      => PlatformOutputable (GenCmmTop d info i) where
+      => PlatformOutputable (GenCmmDecl d info i) where
     pprPlatform platform t = pprTop platform t
 
 instance Outputable CmmStatics where
@@ -81,16 +81,16 @@ instance Outputable CmmInfoTable where
 
 -----------------------------------------------------------------------------
 
-pprCmmPgm :: (Outputable d, Outputable info, PlatformOutputable g)
-       => Platform -> GenCmmPgm d info g -> SDoc
-pprCmmPgm platform tops
+pprCmmGroup :: (Outputable d, Outputable info, PlatformOutputable g)
+       => Platform -> GenCmmGroup d info g -> SDoc
+pprCmmGroup platform tops
     = vcat $ intersperse blankLine $ map (pprTop platform) tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
 pprTop :: (Outputable d, Outputable info, PlatformOutputable i)
-       => Platform -> GenCmmTop d info i -> SDoc
+       => Platform -> GenCmmDecl d info i -> SDoc
 
 pprTop platform (CmmProc info lbl graph)
 

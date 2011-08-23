@@ -7,7 +7,7 @@
 -----------------------------------------------------------------------------
 
 module OldCmm (
-        CmmPgm, GenCmmPgm, RawCmmPgm, CmmTop, RawCmmTop,
+        CmmGroup, GenCmmGroup, RawCmmGroup, CmmDecl, RawCmmDecl,
         ListGraph(..),
         CmmInfo(..), UpdateFrame(..), CmmInfoTable(..), ClosureTypeInfo(..),
         CmmStatic(..), CmmStatics(..), CmmFormal, CmmActual,
@@ -17,7 +17,7 @@ module OldCmm (
         CmmStmt(..), CmmReturnInfo(..), CmmHinted(..),
         HintedCmmFormal, HintedCmmActual,
         CmmSafety(..), CmmCallTarget(..),
-        New.GenCmmTop(..),
+        New.GenCmmDecl(..),
         New.ForeignHint(..),
         module CmmExpr,
         Section(..),
@@ -27,7 +27,7 @@ module OldCmm (
 #include "HsVersions.h"
 
 import qualified Cmm as New
-import Cmm           ( CmmInfoTable(..), GenCmmPgm, CmmStatics(..), GenCmmTop(..),
+import Cmm           ( CmmInfoTable(..), GenCmmGroup, CmmStatics(..), GenCmmDecl(..),
                        CmmFormal, CmmActual, Section(..), CmmStatic(..),
                        ProfilingInfo(..), ClosureTypeInfo(..) )
 
@@ -63,7 +63,7 @@ data UpdateFrame =
       [CmmExpr]  -- Frame remainder.  Behaves like the arguments of a 'jump'.
 
 -----------------------------------------------------------------------------
---  Cmm, CmmTop, CmmBasicBlock
+--  Cmm, CmmDecl, CmmBasicBlock
 -----------------------------------------------------------------------------
 
 -- A file is a list of top-level chunks.  These may be arbitrarily
@@ -80,15 +80,15 @@ newtype ListGraph i = ListGraph [GenBasicBlock i]
    -- across a whole compilation unit.
 
 -- | Cmm with the info table as a data type
-type CmmPgm = GenCmmPgm CmmStatics CmmInfo (ListGraph CmmStmt)
-type CmmTop = GenCmmTop CmmStatics CmmInfo (ListGraph CmmStmt)
+type CmmGroup = GenCmmGroup CmmStatics CmmInfo (ListGraph CmmStmt)
+type CmmDecl = GenCmmDecl CmmStatics CmmInfo (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic' along with the info
 -- table label. If we are building without tables-next-to-code there will be no statics
 --
 -- INVARIANT: if there is an info table, it has at least one CmmStatic
-type RawCmmPgm = GenCmmPgm CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
-type RawCmmTop = GenCmmTop CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
+type RawCmmGroup = GenCmmGroup CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
+type RawCmmDecl = GenCmmDecl CmmStatics (Maybe CmmStatics) (ListGraph CmmStmt)
 
 
 -- A basic block containing a single label, at the beginning.
@@ -118,11 +118,11 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 --   graph maps
 ----------------------------------------------------------------
 
-cmmMapGraph    :: (g -> g') -> GenCmmPgm d h g -> GenCmmPgm d h g'
-cmmTopMapGraph :: (g -> g') -> GenCmmTop d h g -> GenCmmTop d h g'
+cmmMapGraph    :: (g -> g') -> GenCmmGroup d h g -> GenCmmGroup d h g'
+cmmTopMapGraph :: (g -> g') -> GenCmmDecl d h g -> GenCmmDecl d h g'
 
-cmmMapGraphM    :: Monad m => (String -> g -> m g') -> GenCmmPgm d h g -> m (GenCmmPgm d h g')
-cmmTopMapGraphM :: Monad m => (String -> g -> m g') -> GenCmmTop d h g -> m (GenCmmTop d h g')
+cmmMapGraphM    :: Monad m => (String -> g -> m g') -> GenCmmGroup d h g -> m (GenCmmGroup d h g')
+cmmTopMapGraphM :: Monad m => (String -> g -> m g') -> GenCmmDecl d h g -> m (GenCmmDecl d h g')
 
 cmmMapGraph f tops = map (cmmTopMapGraph f) tops
 cmmTopMapGraph f (CmmProc h l g) = CmmProc h l (f g)

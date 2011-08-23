@@ -6,7 +6,7 @@
 
 module LlvmCodeGen.Base (
 
-        LlvmCmmTop, LlvmBasicBlock,
+        LlvmCmmDecl, LlvmBasicBlock,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
         LlvmVersion, defaultLlvmVersion,
@@ -41,7 +41,7 @@ import Unique
 -- * Some Data Types
 --
 
-type LlvmCmmTop = GenCmmTop [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
+type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Unresolved code.

@@ -3,7 +3,7 @@
 --
 
 module LlvmCodeGen.Ppr (
-        pprLlvmHeader, pprLlvmCmmTop, pprLlvmData, infoSection, iTableSuf
+        pprLlvmHeader, pprLlvmCmmDecl, pprLlvmData, infoSection, iTableSuf
     ) where
 
 #include "HsVersions.h"
@@ -85,11 +85,11 @@ pprLlvmData (globals, types) =
 
 
 -- | Pretty print LLVM code
-pprLlvmCmmTop :: LlvmEnv -> Int -> LlvmCmmTop -> (Doc, [LlvmVar])
-pprLlvmCmmTop _ _ (CmmData _ lmdata)
+pprLlvmCmmDecl :: LlvmEnv -> Int -> LlvmCmmDecl -> (Doc, [LlvmVar])
+pprLlvmCmmDecl _ _ (CmmData _ lmdata)
   = (vcat $ map pprLlvmData lmdata, [])
 
-pprLlvmCmmTop env count (CmmProc mb_info entry_lbl (ListGraph blks))
+pprLlvmCmmDecl env count (CmmProc mb_info entry_lbl (ListGraph blks))
   = let (idoc, ivar) = case mb_info of
                         Nothing -> (empty, [])
                         Just (Statics info_lbl dat)

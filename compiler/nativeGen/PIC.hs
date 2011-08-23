@@ -373,7 +373,7 @@ picRelative :: Arch -> OS -> CLabel -> CmmLit
 
 -- Darwin, but not x86_64:
 -- The PIC base register points to the PIC base label at the beginning
--- of the current CmmTop. We just have to use a label difference to
+-- of the current CmmDecl. We just have to use a label difference to
 -- get the offset.
 -- We have already made sure that all labels that are not from the current
 -- module are accessed indirectly ('as' can't calculate differences between
@@ -681,7 +681,7 @@ pprImportedSymbol _ _ _
 -- PIC base register. It adds the appropriate instructions to the
 -- top of the CmmProc.
 
--- It is assumed that the first NatCmmTop in the input list is a Proc
+-- It is assumed that the first NatCmmDecl in the input list is a Proc
 -- and the rest are CmmDatas.
 
 -- Darwin is simple: just fetch the address of a local label.
@@ -709,8 +709,8 @@ pprImportedSymbol _ _ _
 
 initializePicBase_ppc 
 	:: Arch -> OS -> Reg 
-	-> [NatCmmTop CmmStatics PPC.Instr] 
-	-> NatM [NatCmmTop CmmStatics PPC.Instr]
+	-> [NatCmmDecl CmmStatics PPC.Instr] 
+	-> NatM [NatCmmDecl CmmStatics PPC.Instr]
 
 initializePicBase_ppc ArchPPC os picReg
     (CmmProc info lab (ListGraph blocks) : statics)
@@ -761,8 +761,8 @@ initializePicBase_ppc _ _ _ _
 
 initializePicBase_x86
 	:: Arch -> OS -> Reg 
-	-> [NatCmmTop (Alignment, CmmStatics) X86.Instr] 
-	-> NatM [NatCmmTop (Alignment, CmmStatics) X86.Instr]
+	-> [NatCmmDecl (Alignment, CmmStatics) X86.Instr] 
+	-> NatM [NatCmmDecl (Alignment, CmmStatics) X86.Instr]
 
 initializePicBase_x86 ArchX86 os picReg 
 	(CmmProc info lab (ListGraph blocks) : statics)

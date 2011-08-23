@@ -10,8 +10,8 @@
 
 module Cmm (
      -- * Cmm top-level datatypes
-     CmmPgm, GenCmmPgm,
-     CmmTop, GenCmmTop(..),
+     CmmProgram, CmmGroup, GenCmmGroup,
+     CmmDecl, GenCmmDecl(..),
      CmmGraph, GenCmmGraph(..),
      CmmBlock,
      Section(..), CmmStatics(..), CmmStatic(..),
@@ -46,10 +46,22 @@ import Data.Word        ( Word8 )
 --  Cmm, GenCmm
 -----------------------------------------------------------------------------
 
--- A file is a list of top-level chunks.  These may be arbitrarily
--- re-orderd during code generation.
+-- A CmmProgram is a list of CmmGroups  
+-- A CmmGroup is a list of top-level declarations  
 
--- GenCmm is abstracted over
+-- When object-splitting is on,each group is compiled into a separate
+-- .o file. So typically we put closely related stuff in a CmmGroup.
+
+type CmmProgram = [CmmGroup]
+
+type GenCmmGroup d h g = [GenCmmDecl d h g]
+type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
+
+-----------------------------------------------------------------------------
+--  CmmDecl, GenCmmDecl
+-----------------------------------------------------------------------------
+
+-- GenCmmDecl is abstracted over
 --   d, the type of static data elements in CmmData
 --   h, the static info preceding the code of a CmmProc
 --   g, the control-flow graph of a CmmProc
@@ -60,18 +72,10 @@ import Data.Word        ( Word8 )
 --   (b) Native code, populated with data/instructions
 --
 -- A second family of instances based on Hoopl is in Cmm.hs.
---
-type GenCmmPgm d h g = [GenCmmTop d h g]
-
-type CmmPgm = GenCmmPgm CmmStatics CmmTopInfo CmmGraph
-
------------------------------------------------------------------------------
---  CmmTop, GenCmmTop
------------------------------------------------------------------------------
 
 -- | A top-level chunk, abstracted over the type of the contents of
 -- the basic blocks (Cmm or instructions are the likely instantiations).
-data GenCmmTop d h g
+data GenCmmDecl d h g
   = CmmProc     -- A procedure
      h                 -- Extra header such as the info table
      CLabel            -- Entry label
@@ -81,7 +85,7 @@ data GenCmmTop d h g
         Section
         d
 
-type CmmTop = GenCmmTop CmmStatics CmmTopInfo CmmGraph
+type CmmDecl = GenCmmDecl CmmStatics CmmTopInfo CmmGraph
 
 -----------------------------------------------------------------------------
 --     Graphs

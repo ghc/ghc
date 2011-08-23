@@ -41,11 +41,11 @@ import qualified Data.Set	as Set
 --
 regSpill
 	:: Instruction instr
-	=> [LiveCmmTop statics instr]	-- ^ the code
+	=> [LiveCmmDecl statics instr]	-- ^ the code
 	-> UniqSet Int			-- ^ available stack slots
 	-> UniqSet VirtualReg		-- ^ the regs to spill
 	-> UniqSM
-		([LiveCmmTop statics instr] -- code with SPILL and RELOAD meta instructions added.
+		([LiveCmmDecl statics instr] -- code with SPILL and RELOAD meta instructions added.
 		, UniqSet Int		    -- left over slots
 		, SpillStats )		    -- stats about what happened during spilling
 
@@ -81,8 +81,8 @@ regSpill code slotsFree regs
 regSpill_top 
 	:: Instruction instr
 	=> RegMap Int 			-- ^ map of vregs to slots they're being spilled to.
-	-> LiveCmmTop statics instr	-- ^ the top level thing.
-	-> SpillM (LiveCmmTop statics instr)
+	-> LiveCmmDecl statics instr	-- ^ the top level thing.
+	-> SpillM (LiveCmmDecl statics instr)
 	
 regSpill_top regSlotMap cmm
  = case cmm of

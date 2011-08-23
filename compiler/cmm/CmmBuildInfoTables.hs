@@ -160,7 +160,7 @@ live_ptrs oldByte slotEnv areaMap bid =
 -- Construct the stack maps for a procedure _if_ it needs an infotable.
 -- When wouldn't a procedure need an infotable? If it is a procpoint that
 -- is not the successor of a call.
-setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmTop -> CmmTop
+setInfoTableStackMap :: SlotEnv -> AreaMap -> CmmDecl -> CmmDecl
 setInfoTableStackMap slotEnv areaMap
      t@(CmmProc (TopInfo {stack_info=StackInfo {updfr_space = Just updfr_off}}) _ 
                 (CmmGraph {g_entry = eid}))
@@ -240,7 +240,7 @@ addCAF caf srt =
       , elt_map  = Map.insert caf last (elt_map srt) }
     where last  = next_elt srt
 
-srtToData :: TopSRT -> CmmPgm
+srtToData :: TopSRT -> CmmGroup
 srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
     where tbl = map (CmmStaticLit . CmmLabel) (reverse (rev_elts srt))
 
@@ -253,7 +253,7 @@ srtToData srt = [CmmData RelocatableReadOnlyData (Statics (lbl srt) tbl)]
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
 buildSRTs :: TopSRT -> Map CLabel CAFSet -> CAFSet ->
-             FuelUniqSM (TopSRT, Maybe CmmTop, C_SRT)
+             FuelUniqSM (TopSRT, Maybe CmmDecl, C_SRT)
 buildSRTs topSRT topCAFMap cafs =
   do let liftCAF lbl () z = -- get CAFs for functions without static closures
            case Map.lookup lbl topCAFMap of Just cafs -> z `Map.union` cafs
@@ -296,7 +296,7 @@ buildSRTs topSRT topCAFMap cafs =
 -- Construct an SRT bitmap.
 -- Adapted from simpleStg/SRT.lhs, which expects Id's.
 procpointSRT :: CLabel -> Map CLabel Int -> [CLabel] ->
-                FuelUniqSM (Maybe CmmTop, C_SRT)
+                FuelUniqSM (Maybe CmmDecl, C_SRT)
 procpointSRT _ _ [] =
  return (Nothing, NoC_SRT)
 procpointSRT top_srt top_table entries =
@@ -314,7 +314,7 @@ maxBmpSize :: Int
 maxBmpSize = widthInBits wordWidth `div` 2
 
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
-to_SRT :: CLabel -> Int -> Int -> Bitmap -> FuelUniqSM (Maybe CmmTop, C_SRT)
+to_SRT :: CLabel -> Int -> Int -> Bitmap -> FuelUniqSM (Maybe CmmDecl, C_SRT)
 to_SRT top_srt off len bmp
   | len > maxBmpSize || bmp == [fromIntegral srt_escape]
   = do id <- getUniqueM
@@ -335,7 +335,7 @@ to_SRT top_srt off len bmp
 --  keep its CAFs live.)
 -- Any procedure referring to a non-static CAF c must keep live
 -- any CAF that is reachable from c.
-localCAFInfo :: CAFEnv -> CmmTop -> Maybe (CLabel, CAFSet)
+localCAFInfo :: CAFEnv -> CmmDecl -> Maybe (CLabel, CAFSet)
 localCAFInfo _      (CmmData _ _) = Nothing
 localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
   case info_tbl top_info of
@@ -373,19 +373,19 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
               (map (\n@(l, cafs) -> (n, l, Map.keys cafs)) localCAFs)
 
 -- Bundle the CAFs used at a procpoint.
-bundleCAFs :: CAFEnv -> CmmTop -> (CAFSet, CmmTop)
+bundleCAFs :: CAFEnv -> CmmDecl -> (CAFSet, CmmDecl)
 bundleCAFs cafEnv t@(CmmProc _ _ (CmmGraph {g_entry=entry})) =
   (expectJust "bundleCAFs" (mapLookup entry cafEnv), t)
 bundleCAFs _ t = (Map.empty, t)
 
 -- Construct the SRTs for the given procedure.
-setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmTop) ->
-                   FuelUniqSM (TopSRT, [CmmTop])
+setInfoTableSRT :: Map CLabel CAFSet -> TopSRT -> (CAFSet, CmmDecl) ->
+                   FuelUniqSM (TopSRT, [CmmDecl])
 setInfoTableSRT topCAFMap topSRT (cafs, t) =
   setSRT cafs topCAFMap topSRT t
 
 setSRT :: CAFSet -> Map CLabel CAFSet -> TopSRT ->
-          CmmTop -> FuelUniqSM (TopSRT, [CmmTop])
+          CmmDecl -> FuelUniqSM (TopSRT, [CmmDecl])
 setSRT cafs topCAFMap topSRT t =
   do (topSRT, cafTable, srt) <- buildSRTs topSRT topCAFMap cafs
      let t' = updInfo id (const srt) t
@@ -395,7 +395,7 @@ setSRT cafs topCAFMap topSRT t =
 
 type StackLayout = Liveness
 
-updInfo :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmTop -> CmmTop
+updInfo :: (StackLayout -> StackLayout) -> (C_SRT -> C_SRT) -> CmmDecl -> CmmDecl
 updInfo toVars toSrt (CmmProc top_info top_l g) =
   CmmProc (top_info {info_tbl=updInfoTbl toVars toSrt (info_tbl top_info)}) top_l g
 updInfo _ _ t = t
@@ -426,7 +426,7 @@ updInfoTbl _ _ t@CmmNonInfoTable = t
 -- needed to generate the infotables along with the Cmm data and procedures.
 
 -- JD: Why not do this while splitting procedures?
-lowerSafeForeignCalls :: AreaMap -> CmmTop -> FuelUniqSM CmmTop
+lowerSafeForeignCalls :: AreaMap -> CmmDecl -> FuelUniqSM CmmDecl
 lowerSafeForeignCalls _ t@(CmmData _ _) = return t
 lowerSafeForeignCalls areaMap (CmmProc info l g@(CmmGraph {g_entry=entry})) = do
   let block b mblocks = mblocks >>= lowerSafeCallBlock entry areaMap b

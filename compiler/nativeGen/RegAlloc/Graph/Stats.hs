@@ -40,29 +40,29 @@ data RegAllocStats statics instr
 
 	-- initial graph
 	= RegAllocStatsStart
-	{ raLiveCmm	:: [LiveCmmTop statics instr]		  	-- ^ initial code, with liveness
+	{ raLiveCmm	:: [LiveCmmDecl statics instr]		  	-- ^ initial code, with liveness
 	, raGraph	:: Color.Graph VirtualReg RegClass RealReg   	-- ^ the initial, uncolored graph
 	, raSpillCosts	:: SpillCostInfo } 		 		-- ^ information to help choose which regs to spill
 
 	-- a spill stage
 	| RegAllocStatsSpill
-	{ raCode	:: [LiveCmmTop statics instr]			-- ^ the code we tried to allocate registers for
+	{ raCode	:: [LiveCmmDecl statics instr]			-- ^ the code we tried to allocate registers for
 	, raGraph	:: Color.Graph VirtualReg RegClass RealReg	-- ^ the partially colored graph
 	, raCoalesced	:: UniqFM VirtualReg				-- ^ the regs that were coaleced
 	, raSpillStats	:: SpillStats 					-- ^ spiller stats
 	, raSpillCosts	:: SpillCostInfo 				-- ^ number of instrs each reg lives for
-	, raSpilled	:: [LiveCmmTop statics instr] }			-- ^ code with spill instructions added
+	, raSpilled	:: [LiveCmmDecl statics instr] }			-- ^ code with spill instructions added
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raCode	  :: [LiveCmmTop statics instr]			-- ^ the code we tried to allocate registers for
+	{ raCode	  :: [LiveCmmDecl statics instr]			-- ^ the code we tried to allocate registers for
 	, raGraph	  :: Color.Graph VirtualReg RegClass RealReg	-- ^ the uncolored graph
 	, raGraphColored  :: Color.Graph VirtualReg RegClass RealReg 	-- ^ the coalesced and colored graph
 	, raCoalesced	  :: UniqFM VirtualReg				-- ^ the regs that were coaleced
-	, raCodeCoalesced :: [LiveCmmTop statics instr]			-- ^ code with coalescings applied 
-	, raPatched	  :: [LiveCmmTop statics instr] 		-- ^ code with vregs replaced by hregs
-	, raSpillClean    :: [LiveCmmTop statics instr]			-- ^ code with unneeded spill\/reloads cleaned out
-	, raFinal	  :: [NatCmmTop statics instr] 			-- ^ final code
+	, raCodeCoalesced :: [LiveCmmDecl statics instr]			-- ^ code with coalescings applied 
+	, raPatched	  :: [LiveCmmDecl statics instr] 		-- ^ code with vregs replaced by hregs
+	, raSpillClean    :: [LiveCmmDecl statics instr]			-- ^ code with unneeded spill\/reloads cleaned out
+	, raFinal	  :: [NatCmmDecl statics instr] 			-- ^ final code
 	, raSRMs	  :: (Int, Int, Int) }				-- ^ spill\/reload\/reg-reg moves present in this code
 
 instance (Outputable statics, PlatformOutputable instr) => PlatformOutputable (RegAllocStats statics instr) where
@@ -256,7 +256,7 @@ pprStatsLifeConflict stats graph
 --	Lets us see how well the register allocator has done.
 countSRMs 
 	:: Instruction instr
-	=> LiveCmmTop statics instr -> (Int, Int, Int)
+	=> LiveCmmDecl statics instr -> (Int, Int, Int)
 
 countSRMs cmm
 	= execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)

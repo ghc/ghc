@@ -53,7 +53,7 @@ codeGen :: DynFlags
         -> CollectedCCs         -- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	-> HpcInfo
-        -> IO [CmmPgm]          -- Output
+        -> IO [CmmGroup]          -- Output
 
                 -- N.B. returning '[Cmm]' and not 'Cmm' here makes it
                 -- possible for object splitting to split up the

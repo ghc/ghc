@@ -65,7 +65,7 @@ import Control.Monad.ST
 -- --------------------------------------------------------------------------
 -- Top level
 
-pprCs :: DynFlags -> [RawCmmPgm] -> SDoc
+pprCs :: DynFlags -> [RawCmmGroup] -> SDoc
 pprCs dflags cmms
  = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
  where
@@ -73,7 +73,7 @@ pprCs dflags cmms
      | dopt Opt_SplitObjs dflags = ptext (sLit "__STG_SPLIT_MARKER")
      | otherwise                 = empty
 
-writeCs :: DynFlags -> Handle -> [RawCmmPgm] -> IO ()
+writeCs :: DynFlags -> Handle -> [RawCmmGroup] -> IO ()
 writeCs dflags handle cmms 
   = printForC handle (pprCs dflags cmms)
 
@@ -83,13 +83,13 @@ writeCs dflags handle cmms
 -- for fun, we could call cmmToCmm over the tops...
 --
 
-pprC :: RawCmmPgm -> SDoc
+pprC :: RawCmmGroup -> SDoc
 pprC tops = vcat $ intersperse blankLine $ map pprTop tops
 
 --
 -- top level procs
 -- 
-pprTop :: RawCmmTop -> SDoc
+pprTop :: RawCmmDecl -> SDoc
 pprTop (CmmProc mb_info clbl (ListGraph blocks)) =
     (case mb_info of
        Nothing -> empty

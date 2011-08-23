@@ -672,7 +672,7 @@ exactLog2 x_
   except factorial, but what the hell.
 -}
 
-cmmLoopifyForC :: RawCmmTop -> RawCmmTop
+cmmLoopifyForC :: RawCmmDecl -> RawCmmDecl
 cmmLoopifyForC p@(CmmProc Nothing _ _) = p  -- only if there's an info table, ignore case alts
 cmmLoopifyForC p@(CmmProc (Just info@(Statics info_lbl _)) entry_lbl
                  (ListGraph blocks@(BasicBlock top_id _ : _))) =

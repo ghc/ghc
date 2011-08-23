@@ -67,8 +67,8 @@ import FastString
 -- order.
 
 cmmTopCodeGen
-        :: RawCmmTop
-        -> NatM [NatCmmTop CmmStatics Instr]
+        :: RawCmmDecl
+        -> NatM [NatCmmDecl CmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -87,7 +87,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen
         :: CmmBasicBlock
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmTop CmmStatics Instr])
+                , [NatCmmDecl CmmStatics Instr])
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -1184,7 +1184,7 @@ genSwitch expr ids
                     ]
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop CmmStatics Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl CmmStatics Instr)
 generateJumpTableForInstr (BCTR ids (Just lbl)) =
     let jumpTable
             | opt_PIC   = map jumpTableEntryRel ids

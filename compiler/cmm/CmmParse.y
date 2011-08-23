@@ -1061,7 +1061,7 @@ initEnv = listToUFM [
     VarN (CmmLit (CmmInt (fromIntegral stdInfoTableSizeB) wordWidth) ))
   ]
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmPgm)
+parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
 parseCmmFile dflags filename = do
   showPass dflags "ParseCmm"
   buf <- hGetStringBuffer filename

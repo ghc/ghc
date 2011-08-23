@@ -242,7 +242,7 @@ data CgState
   = MkCgState {
      cgs_stmts :: CmmAGraph,	  -- Current procedure
 
-     cgs_tops  :: OrdList CmmTop,
+     cgs_tops  :: OrdList CmmDecl,
 	-- Other procedures and data blocks in this compilation unit
 	-- Both are ordered only so that we can 
 	-- reduce forward references, when it's easy to do so
@@ -591,7 +591,7 @@ emit ag
   = do	{ state <- getState
 	; setState $ state { cgs_stmts = cgs_stmts state <*> ag } }
 
-emitDecl :: CmmTop -> FCode ()
+emitDecl :: CmmDecl -> FCode ()
 emitDecl decl
   = do 	{ state <- getState
 	; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
@@ -614,7 +614,7 @@ emitSimpleProc :: CLabel -> CmmAGraph -> FCode ()
 emitSimpleProc lbl code = 
   emitProc CmmNonInfoTable lbl [] code
 
-getCmm :: FCode () -> FCode CmmPgm
+getCmm :: FCode () -> FCode CmmGroup
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)

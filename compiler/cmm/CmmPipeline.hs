@@ -53,9 +53,9 @@ import StaticFlags
 --    we actually need to do the initial pass.
 cmmPipeline  :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cps-cmm
-             -> (TopSRT, [CmmPgm])    -- SRT table and accumulating list of compiled procs
-             -> CmmPgm             -- Input C-- with Procedures
-             -> IO (TopSRT, [CmmPgm]) -- Output CPS transformed C--
+             -> (TopSRT, [CmmGroup])    -- SRT table and accumulating list of compiled procs
+             -> CmmGroup             -- Input C-- with Procedures
+             -> IO (TopSRT, [CmmGroup]) -- Output CPS transformed C--
 cmmPipeline hsc_env (topSRT, rst) prog =
   do let dflags = hsc_dflags hsc_env
      --
@@ -63,7 +63,7 @@ cmmPipeline hsc_env (topSRT, rst) prog =
 
      let tops = runCmmContFlowOpts prog
      (cafEnvs, tops) <- liftM unzip $ mapM (cpsTop hsc_env) tops
-     -- tops :: [[(CmmTop,CAFSet]]  (one list per group)
+     -- tops :: [[(CmmDecl,CAFSet]]  (one list per group)
 
      let topCAFEnv = mkTopCAFInfo (concat cafEnvs)
 
@@ -90,7 +90,7 @@ global to one compiler session.
 -- input for any given phase, besides just turning it all on with
 -- -ddump-cmmz
 
-cpsTop :: HscEnv -> CmmTop -> IO ([(CLabel, CAFSet)], [(CAFSet, CmmTop)])
+cpsTop :: HscEnv -> CmmDecl -> IO ([(CLabel, CAFSet)], [(CAFSet, CmmDecl)])
 cpsTop _ p@(CmmData {}) = return ([], [(Map.empty, p)])
 cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}}) l g) =
     do
@@ -162,7 +162,7 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
        mapM_ (dumpPlatform platform Opt_D_dump_cmmz_cafs "after bundleCAFs") gs
        return (localCAFs, gs)
 
-              -- gs        :: [ (CAFSet, CmmTop) ]
+              -- gs        :: [ (CAFSet, CmmDecl) ]
               -- localCAFs :: [ (CLabel, CAFSet) ] -- statics filtered out(?)
 
   where dflags = hsc_dflags hsc_env
@@ -186,8 +186,8 @@ cpsTop hsc_env (CmmProc h@(TopInfo {stack_info=StackInfo {arg_space=entry_off}})
 -- This probably belongs in CmmBuildInfoTables?
 -- We're just finishing the job here: once we know what CAFs are defined
 -- in non-static closures, we can build the SRTs.
-toTops :: HscEnv -> Map CLabel CAFSet -> (TopSRT, [[CmmTop]])
-                 -> [(CAFSet, CmmTop)] -> IO (TopSRT, [[CmmTop]])
+toTops :: HscEnv -> Map CLabel CAFSet -> (TopSRT, [[CmmDecl]])
+                 -> [(CAFSet, CmmDecl)] -> IO (TopSRT, [[CmmDecl]])
 toTops hsc_env topCAFEnv (topSRT, tops) gs =
   do let setSRT (topSRT, rst) g =
            do (topSRT, gs) <- setInfoTableSRT topCAFEnv topSRT g

@@ -960,7 +960,7 @@ get_Regtable_addr_from_offset rep offset =
 
 -- | Fixup global registers so that they assign to locations within the
 -- RegTable if they aren't pinned for the current target.
-fixStgRegisters :: RawCmmTop -> RawCmmTop
+fixStgRegisters :: RawCmmDecl -> RawCmmDecl
 fixStgRegisters top@(CmmData _ _) = top
 
 fixStgRegisters (CmmProc info lbl (ListGraph blocks)) =

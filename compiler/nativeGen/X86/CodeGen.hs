@@ -85,8 +85,8 @@ if_sse2 sse2 x87 = do
   if b then sse2 else x87
 
 cmmTopCodeGen
-        :: RawCmmTop
-        -> NatM [NatCmmTop (Alignment, CmmStatics) Instr]
+        :: RawCmmDecl
+        -> NatM [NatCmmDecl (Alignment, CmmStatics) Instr]
 
 cmmTopCodeGen (CmmProc info lab (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -107,7 +107,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen
         :: CmmBasicBlock
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmTop (Alignment, CmmStatics) Instr])
+                , [NatCmmDecl (Alignment, CmmStatics) Instr])
 
 basicBlockCodeGen (BasicBlock id stmts) = do
   instrs <- stmtsToInstrs stmts
@@ -2080,11 +2080,11 @@ genSwitch expr ids
         -- in
         return code
 
-generateJumpTableForInstr :: Instr -> Maybe (NatCmmTop (Alignment, CmmStatics) Instr)
+generateJumpTableForInstr :: Instr -> Maybe (NatCmmDecl (Alignment, CmmStatics) Instr)
 generateJumpTableForInstr (JMP_TBL _ ids section lbl) = Just (createJumpTable ids section lbl)
 generateJumpTableForInstr _ = Nothing
 
-createJumpTable :: [Maybe BlockId] -> Section -> CLabel -> GenCmmTop (Alignment, CmmStatics) h g
+createJumpTable :: [Maybe BlockId] -> Section -> CLabel -> GenCmmDecl (Alignment, CmmStatics) h g
 createJumpTable ids section lbl
     = let jumpTable
             | opt_PIC =

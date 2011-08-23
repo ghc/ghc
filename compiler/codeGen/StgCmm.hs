@@ -47,7 +47,7 @@ codeGen :: DynFlags
          -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
 	 -> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	 -> HpcInfo
-         -> IO [CmmPgm]         -- Output
+         -> IO [CmmGroup]         -- Output
 
 codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
@@ -213,7 +213,7 @@ For charlike and intlike closures there is a fixed array of static
 closures predeclared.
 -}
 
-cgTyCon :: TyCon -> FCode CmmPgm  -- All constructors merged together
+cgTyCon :: TyCon -> FCode CmmGroup  -- All constructors merged together
 cgTyCon tycon
   = do	{ constrs <- mapM (getCmm . cgDataCon) (tyConDataCons tycon)
 
@@ -230,7 +230,7 @@ cgTyCon tycon
         ; return (concat (extra ++ constrs))
         }
 
-cgEnumerationTyCon :: TyCon -> FCode [CmmPgm]
+cgEnumerationTyCon :: TyCon -> FCode [CmmGroup]
 cgEnumerationTyCon tycon
   | isEnumerationTyCon tycon
   = do	{ tbl <- getCmm $ 

@@ -124,19 +124,19 @@ mkIntCLit i = CmmInt (toInteger i) wordWidth
 zeroCLit :: CmmLit
 zeroCLit = CmmInt 0 wordWidth
 
-mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmTop CmmStatics info stmt)
+mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stmt)
 -- We have to make a top-level decl for the string, 
 -- and return a literal pointing to it
 mkByteStringCLit uniq bytes
   = (CmmLabel lbl, CmmData ReadOnlyData $ Statics lbl [CmmString bytes])
   where
     lbl = mkStringLitLabel uniq
-mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmTop CmmStatics info stmt
+mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
 -- Build a data-segment data block
 mkDataLits section lbl lits
   = CmmData section (Statics lbl $ map CmmStaticLit lits)
 
-mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatics info stmt
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
 -- Build a read-only data block
 mkRODataLits lbl lits
   = mkDataLits section lbl lits

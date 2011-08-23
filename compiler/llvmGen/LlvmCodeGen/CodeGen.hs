@@ -35,7 +35,7 @@ type LlvmStatements = OrdList LlvmStatement
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM proc Code generator
 --
-genLlvmProc :: LlvmEnv -> RawCmmTop -> UniqSM (LlvmEnv, [LlvmCmmTop])
+genLlvmProc :: LlvmEnv -> RawCmmDecl -> UniqSM (LlvmEnv, [LlvmCmmDecl])
 genLlvmProc env (CmmProc info lbl (ListGraph blocks)) = do
     (env', lmblocks, lmdata) <- basicBlocksCodeGen env blocks ([], [])
     let proc = CmmProc info lbl (ListGraph lmblocks)
@@ -50,8 +50,8 @@ genLlvmProc _ _ = panic "genLlvmProc: case that shouldn't reach here!"
 -- | Generate code for a list of blocks that make up a complete procedure.
 basicBlocksCodeGen :: LlvmEnv
                    -> [CmmBasicBlock]
-                   -> ( [LlvmBasicBlock] , [LlvmCmmTop] )
-                   -> UniqSM (LlvmEnv, [LlvmBasicBlock] , [LlvmCmmTop] )
+                   -> ( [LlvmBasicBlock] , [LlvmCmmDecl] )
+                   -> UniqSM (LlvmEnv, [LlvmBasicBlock] , [LlvmCmmDecl] )
 basicBlocksCodeGen env ([]) (blocks, tops)
   = do let (blocks', allocs) = mapAndUnzip dominateAllocs blocks
        let allocs' = concat allocs
@@ -80,7 +80,7 @@ dominateAllocs (BasicBlock id stmts)
 -- | Generate code for one block
 basicBlockCodeGen ::  LlvmEnv
                   -> CmmBasicBlock
-                  -> UniqSM ( LlvmEnv, [LlvmBasicBlock], [LlvmCmmTop] )
+                  -> UniqSM ( LlvmEnv, [LlvmBasicBlock], [LlvmCmmDecl] )
 basicBlockCodeGen env (BasicBlock id stmts)
   = do (env', instrs, top) <- stmtsToInstrs env stmts (nilOL, [])
        return (env', [BasicBlock id (fromOL instrs)], top)
@@ -93,12 +93,12 @@ basicBlockCodeGen env (BasicBlock id stmts)
 -- A statement conversion return data.
 --   * LlvmEnv: The new environment
 --   * LlvmStatements: The compiled LLVM statements.
---   * LlvmCmmTop: Any global data needed.
-type StmtData = (LlvmEnv, LlvmStatements, [LlvmCmmTop])
+--   * LlvmCmmDecl: Any global data needed.
+type StmtData = (LlvmEnv, LlvmStatements, [LlvmCmmDecl])
 
 
 -- | Convert a list of CmmStmt's to LlvmStatement's
-stmtsToInstrs :: LlvmEnv -> [CmmStmt] -> (LlvmStatements, [LlvmCmmTop])
+stmtsToInstrs :: LlvmEnv -> [CmmStmt] -> (LlvmStatements, [LlvmCmmDecl])
               -> UniqSM StmtData
 stmtsToInstrs env [] (llvm, top)
   = return (env, llvm, top)
@@ -361,8 +361,8 @@ getFunPtr env funTy targ = case targ of
 -- | Conversion of call arguments.
 arg_vars :: LlvmEnv
          -> [HintedCmmActual]
-         -> ([LlvmVar], LlvmStatements, [LlvmCmmTop])
-         -> UniqSM (LlvmEnv, [LlvmVar], LlvmStatements, [LlvmCmmTop])
+         -> ([LlvmVar], LlvmStatements, [LlvmCmmDecl])
+         -> UniqSM (LlvmEnv, [LlvmVar], LlvmStatements, [LlvmCmmDecl])
 
 arg_vars env [] (vars, stmts, tops)
   = return (env, vars, stmts, tops)
@@ -669,8 +669,8 @@ genSwitch env cond maybe_ids = do
 --   * LlvmEnv: The new enviornment
 --   * LlvmVar: The var holding the result of the expression
 --   * LlvmStatements: Any statements needed to evaluate the expression
---   * LlvmCmmTop: Any global data needed for this expression
-type ExprData = (LlvmEnv, LlvmVar, LlvmStatements, [LlvmCmmTop])
+--   * LlvmCmmDecl: Any global data needed for this expression
+type ExprData = (LlvmEnv, LlvmVar, LlvmStatements, [LlvmCmmDecl])
 
 -- | Values which can be passed to 'exprToVar' to configure its
 -- behaviour in certain circumstances.
