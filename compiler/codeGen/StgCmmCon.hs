@@ -75,7 +75,7 @@ cgTopRhsCon id con args
     	    (tot_wds, --  #ptr_wds + #nonptr_wds
     	     ptr_wds, --  #ptr_wds
     	     nv_args_w_offsets) = mkVirtConstrOffsets (addArgReps args)
-	    closure_info = mkConInfo False caffy con tot_wds ptr_wds
+            closure_info = mkConInfo True caffy con tot_wds ptr_wds
 
 	    get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
 				        ; return lit }
