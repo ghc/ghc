@@ -575,7 +575,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_iface_hash  = iface_hash,
                 mi_exp_hash    = export_hash,
                 mi_orphan_hash = orphan_hash,
-                mi_orphan      = not (null orph_rules && null orph_insts),
+                mi_orphan      = not (null orph_rules && null orph_insts
+                                      && null (ifaceVectInfoVar (mi_vect_info iface0))),
                 mi_finsts      = not . null $ mi_fam_insts iface0,
                 mi_decls       = sorted_decls,
                 mi_hash_fn     = lookupOccEnv local_env }

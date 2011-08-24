@@ -32,10 +32,16 @@ import Control.Monad
 -- always an internal system name.
 --
 mkLocalisedName :: (Maybe String -> OccName -> OccName) -> Name -> VM Name
-mkLocalisedName mk_occ name = liftM make (liftDs newUnique)
-  where
-    occ_name = mkLocalisedOccName mk_occ name
-    make u   = mkSystemName u occ_name
+mkLocalisedName mk_occ name = 
+  do { mod <- liftDs getModuleDs
+     ; u   <- liftDs newUnique
+     ; let occ_name = mkLocalisedOccName mod mk_occ name
+
+           new_name | isExternalName name = mkExternalName u mod occ_name (nameSrcSpan name)
+                    | otherwise           = mkSystemName   u     occ_name
+
+     ; return new_name
+     }
 
 -- |Produce the vectorised variant of an `Id` with the given type.
 --

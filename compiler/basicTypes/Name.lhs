@@ -42,13 +42,13 @@ module Name (
 	mkFCallName, mkIPName,
         mkTickBoxOpName,
 	mkExternalName, mkWiredInName,
-  mkLocalisedOccName,
 
 	-- ** Manipulating and deconstructing 'Name's
 	nameUnique, setNameUnique,
 	nameOccName, nameModule, nameModule_maybe,
 	tidyNameOcc, 
 	hashName, localiseName,
+  mkLocalisedOccName,
 
 	nameSrcLoc, nameSrcSpan, pprNameLoc,
 
@@ -332,11 +332,12 @@ localiseName n = n { n_sort = Internal }
 --
 -- If the name is external, encode the original's module name to disambiguate.
 --
-mkLocalisedOccName :: (Maybe String -> OccName -> OccName) -> Name -> OccName
-mkLocalisedOccName mk_occ name = mk_occ origin (nameOccName name)
+mkLocalisedOccName :: Module -> (Maybe String -> OccName -> OccName) -> Name -> OccName
+mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
   where
-    origin | isExternalName name = Just (moduleNameColons . moduleName . nameModule $ name)
-           | otherwise           = Nothing
+    origin 
+      | nameIsLocalOrFrom this_mod name = Nothing
+      | otherwise                       = Just (moduleNameColons . moduleName . nameModule $ name)
 \end{code}
 
 %************************************************************************
