@@ -75,7 +75,8 @@ cgTopRhsClosure id ccs _ upd_flag srt args body = do
 	closure_label = mkLocalClosureLabel name (idCafInfo id)
     	cg_id_info    = litIdInfo id lf_info (CmmLabel closure_label)
         caffy         = idCafInfo id
-	closure_rep   = mkStaticClosureFields closure_info ccs caffy []
+        info_tbl      = mkCmmInfo closure_info -- XXX short-cut
+        closure_rep   = mkStaticClosureFields info_tbl ccs caffy []
 
   	 -- BUILD THE OBJECT, AND GENERATE INFO TABLE (IF NECESSARY)
   ; emitDataLits closure_label closure_rep

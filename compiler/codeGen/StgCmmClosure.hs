@@ -39,7 +39,7 @@ module StgCmmClosure (
         closureName, infoTableLabelFromCI, entryLabelFromCI,
 	closureLabelFromCI, closureProf, closureSRT,
 	closureLFInfo, closureSMRep, closureUpdReqd, 
-	closureNeedsUpdSpace, closureIsThunk,
+        closureIsThunk,
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
         funTag, tagForArity, 
@@ -763,15 +763,6 @@ mkCmmInfo cl_info
 closureSize :: ClosureInfo -> WordOff
 closureSize cl_info = heapClosureSize (closureSMRep cl_info)
 
-closureNeedsUpdSpace :: ClosureInfo -> Bool
--- We leave space for an update if either (a) the closure is updatable
--- or (b) it is a static thunk.  This is because a static thunk needs
--- a static link field in a predictable place (after the slop), regardless
--- of whether it is updatable or not.
-closureNeedsUpdSpace (ClosureInfo { closureLFInfo = 
-					LFThunk TopLevel _ _ _ _ }) = True
-closureNeedsUpdSpace cl_info = closureUpdReqd cl_info
-
 --------------------------------------
 --   Other functions over ClosureInfo
 --------------------------------------
@@ -800,19 +791,6 @@ blackHoleOnEntry dflags (ClosureInfo { closureLFInfo = lf_info, closureSMRep = r
                   -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
 
 	_other -> panic "blackHoleOnEntry"	-- Should never happen
-
-
-staticClosureNeedsLink :: ClosureInfo -> Bool
--- A static closure needs a link field to aid the GC when traversing
--- the static closure graph.  But it only needs such a field if either
--- 	a) it has an SRT
---	b) it's a constructor with one or more pointer fields
--- In case (b), the constructor's fields themselves play the role
--- of the SRT.
-staticClosureNeedsLink (ClosureInfo { closureSRT = srt })
-  = needsSRT srt
-staticClosureNeedsLink (ConInfo { closureSMRep = rep })
-  = not (isStaticNoCafCon rep)
 
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
@@ -980,7 +958,7 @@ getPredTyDescription (IParam ip _) = getOccString (ipNameName ip)
 getPredTyDescription (EqPred {})   = "Type equality"
 
 --------------------------------------
---   Misc things
+--   CmmInfoTable-related things
 --------------------------------------
 
 mkDataConInfoTable :: DataCon -> Bool -> Int -> Int -> CmmInfoTable
@@ -1005,3 +983,16 @@ mkDataConInfoTable data_con is_static ptr_wds nonptr_wds
 
    ty_descr  = stringToWord8s $ occNameString $ getOccName $ dataConTyCon data_con
    val_descr = stringToWord8s $ occNameString $ getOccName data_con
+
+
+staticClosureNeedsLink :: CmmInfoTable -> Bool
+-- A static closure needs a link field to aid the GC when traversing
+-- the static closure graph.  But it only needs such a field if either
+-- 	a) it has an SRT
+--	b) it's a constructor with one or more pointer fields
+-- In case (b), the constructor's fields themselves play the role
+-- of the SRT.
+staticClosureNeedsLink info_tbl@CmmInfoTable{ cit_rep = smrep }
+  | isConRep smrep         = not (isStaticNoCafCon smrep)
+  | otherwise              = needsSRT (cit_srt info_tbl)
+staticClosureNeedsLink _ = False

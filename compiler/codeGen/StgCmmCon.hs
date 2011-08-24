@@ -67,15 +67,20 @@ cgTopRhsCon id con args
 
 	-- LAY IT OUT
 	; let
-	    name          = idName id
-	    lf_info	  = mkConLFInfo con
-    	    closure_label = mkClosureLabel name caffy
-	    caffy         = idCafInfo id -- any stgArgHasCafRefs args
-            
-    	    (tot_wds, --  #ptr_wds + #nonptr_wds
+            name          = idName id
+            caffy         = idCafInfo id -- any stgArgHasCafRefs args
+            closure_label = mkClosureLabel name caffy
+
+            (tot_wds, --  #ptr_wds + #nonptr_wds
     	     ptr_wds, --  #ptr_wds
     	     nv_args_w_offsets) = mkVirtConstrOffsets (addArgReps args)
-            closure_info = mkConInfo True caffy con tot_wds ptr_wds
+
+            nonptr_wds = tot_wds - ptr_wds
+
+             -- we're not really going to emit an info table, so having
+             -- to make a CmmInfoTable is a bit overkill, but mkStaticClosureFields
+             -- needs to poke around inside it.
+            info_tbl = mkDataConInfoTable con True ptr_wds nonptr_wds
 
 	    get_lit (arg, _offset) = do { CmmLit lit <- getArgAmode arg
 				        ; return lit }
@@ -85,7 +90,7 @@ cgTopRhsCon id con args
 		-- NB2: all the amodes should be Lits!
 
 	; let closure_rep = mkStaticClosureFields
-	    		     closure_info
+                             info_tbl
 	    		     dontCareCCS		-- Because it's static data
 	    		     caffy			-- Has CAF refs
 			     payload
@@ -93,8 +98,8 @@ cgTopRhsCon id con args
 		-- BUILD THE OBJECT
 	; emitDataLits closure_label closure_rep
 
-		-- RETURN
-	; return $ litIdInfo id lf_info (CmmLabel closure_label) }
+                -- RETURN
+        ; return $ litIdInfo id (mkConLFInfo con) (CmmLabel closure_label) }
 
 
 ---------------------------------------------------------------

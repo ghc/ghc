@@ -10,27 +10,33 @@ Other modules should access this info through ClosureInfo.
 
 \begin{code}
 module SMRep (
-	-- Words and bytes
+        -- * Words and bytes
 	StgWord, StgHalfWord, 
 	hALF_WORD_SIZE, hALF_WORD_SIZE_IN_BITS,
 	WordOff, ByteOff,
 
-	-- Closure repesentation
+        -- * Closure repesentation
         SMRep(..),	-- CmmInfo sees the rep; no one else does
         IsStatic, 
         ClosureTypeInfo(..), ArgDescr(..), Liveness,
         ConstrDescription, 
+
+        -- ** Construction
         mkHeapRep, blackHoleRep, mkStackRep, mkRTSRep,
 
-	isStaticRep, isStaticNoCafCon,
+        -- ** Predicates
+        isStaticRep, isConRep, isThunkRep, isStaticNoCafCon,
+
+        -- ** Size-related things
         heapClosureSize,
         fixedHdrSize, arrWordsHdrSize, arrPtrsHdrSize,
         profHdrSize, thunkHdrSize, nonHdrSize,
 
-	rtsClosureType,	rET_SMALL, rET_BIG,
+        -- ** RTS closure types
+        rtsClosureType, rET_SMALL, rET_BIG,
         aRG_GEN, aRG_GEN_BIG,
 
-	-- Operations over [Word8] strings
+        -- * Operations over [Word8] strings that don't belong here
 	pprWord8String, stringToWord8s
     ) where
 
@@ -173,6 +179,31 @@ blackHoleRep :: SMRep
 blackHoleRep = HeapRep False 0 0 BlackHole
 
 -----------------------------------------------------------------------------
+-- Predicates
+
+isStaticRep :: SMRep -> IsStatic
+isStaticRep (HeapRep is_static _ _ _) = is_static
+isStaticRep (StackRep {})             = False
+isStaticRep (RTSRep _ rep)            = isStaticRep rep
+
+isConRep :: SMRep -> Bool
+isConRep (HeapRep _ _ _ Constr{}) = True
+isConRep _                        = False
+
+isThunkRep :: SMRep -> Bool
+isThunkRep (HeapRep _ _ _ Thunk{})         = True
+isThunkRep (HeapRep _ _ _ ThunkSelector{}) = True
+isThunkRep (HeapRep _ _ _ BlackHole{})     = True
+isThunkRep _                               = False
+
+isStaticNoCafCon :: SMRep -> Bool
+-- This should line up exactly with CONSTR_NOCAF_STATIC above
+-- See Note [Static NoCaf constructors]
+isStaticNoCafCon (HeapRep True 0 _ Constr{}) = True
+isStaticNoCafCon _                           = False
+
+
+-----------------------------------------------------------------------------
 -- Size-related things
 
 -- | Size of a closure header (StgHeader in includes/rts/storage/Closures.h)
@@ -201,11 +232,6 @@ thunkHdrSize :: WordOff
 thunkHdrSize = fixedHdrSize + smp_hdr
 	where smp_hdr = sIZEOF_StgSMPThunkHeader `quot` wORD_SIZE
 
-
-isStaticRep :: SMRep -> IsStatic
-isStaticRep (HeapRep is_static _ _ _) = is_static
-isStaticRep (StackRep {})             = False
-isStaticRep (RTSRep _ rep)            = isStaticRep rep
 
 nonHdrSize :: SMRep -> WordOff
 nonHdrSize (HeapRep _ p np _) = p + np
@@ -273,12 +299,6 @@ rtsClosureType (HeapRep False _ _ BlackHole{}) =  BLACKHOLE
 
 rtsClosureType _ = panic "rtsClosureType"
 
-isStaticNoCafCon :: SMRep -> Bool
--- This should line up exactly with CONSTR_NOCAF_STATIC above
--- See Note [Static NoCaf constructors]
-isStaticNoCafCon (HeapRep True 0 _ Constr{}) = True
-isStaticNoCafCon _                           = False
-
 -- We export these ones
 rET_SMALL, rET_BIG, aRG_GEN, aRG_GEN_BIG :: StgHalfWord
 rET_SMALL   = RET_SMALL
@@ -345,6 +365,7 @@ pprTypeInfo (ThunkSelector offset)
 pprTypeInfo Thunk     = ptext (sLit "Thunk")
 pprTypeInfo BlackHole = ptext (sLit "BlackHole")
 
+-- XXX Does not belong here!!
 stringToWord8s :: String -> [Word8]
 stringToWord8s s = map (fromIntegral . ord) s
 

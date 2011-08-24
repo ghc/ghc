@@ -149,16 +149,16 @@ hpStore base vals offs
 -- and adding a static link field if necessary.
 
 mkStaticClosureFields
-        :: ClosureInfo
+        :: CmmInfoTable
         -> CostCentreStack
         -> CafInfo
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields cl_info ccs caf_refs payload
+mkStaticClosureFields info_tbl ccs caf_refs payload
   = mkStaticClosure info_lbl ccs payload padding
         static_link_field saved_info_field
   where
-    info_lbl = infoTableLabelFromCI cl_info
+    info_lbl = cit_lbl info_tbl
 
     -- CAFs must have consistent layout, regardless of whether they
     -- are actually updatable or not.  The layout of a CAF is:
@@ -168,19 +168,19 @@ mkStaticClosureFields cl_info ccs caf_refs payload
     --        1 indirectee
     --        0 info ptr
     --
-    -- the static_link and saved_info fields must always be in the same
-    -- place.  So we use closureNeedsUpdSpace rather than
-    -- closureUpdReqd here:
+    -- the static_link and saved_info fields must always be in the
+    -- same place.  So we use isThunkRep rather than closureUpdReqd
+    -- here:
 
-    is_caf = closureNeedsUpdSpace cl_info
+    is_caf = isThunkRep (cit_rep info_tbl)
 
     padding
         | not is_caf = []
         | otherwise  = ASSERT(null payload) [mkIntCLit 0]
 
     static_link_field
-        | is_caf || staticClosureNeedsLink cl_info = [static_link_value]
-        | otherwise                                = []
+        | is_caf || staticClosureNeedsLink info_tbl = [static_link_value]
+        | otherwise                                 = []
 
     saved_info_field
         | is_caf     = [mkIntCLit 0]
