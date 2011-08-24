@@ -40,7 +40,7 @@ module StgCmmUtils (
 	packHalfWordsCLit,
 	blankWord,
 
-	getSRTInfo, clHasCafRefs, srt_escape
+        getSRTInfo, srt_escape
   ) where
 
 #include "HsVersions.h"

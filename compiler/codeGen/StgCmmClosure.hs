@@ -11,15 +11,12 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE RecordWildCards #-}
 module StgCmmClosure (
-        SMRep, 
-	DynTag,  tagForCon, isSmallFamily,
+        DynTag,  tagForCon, isSmallFamily,
 	ConTagZ, dataConTagZ,
 
-	ArgDescr(..), Liveness, 
-	C_SRT(..), needsSRT,
-
-	isVoidRep, isGcPtrRep, addIdReps, addArgReps,
+        isVoidRep, isGcPtrRep, addIdReps, addArgReps,
 	argPrimRep, 
 
 	-----------------------------------
@@ -36,18 +33,17 @@ module StgCmmClosure (
         mkClosureInfo,
         mkCmmInfo,
 
-        closureSize,
-        closureName, infoTableLabelFromCI, entryLabelFromCI,
-	closureLabelFromCI, closureProf, closureSRT,
-	closureLFInfo, closureSMRep, closureUpdReqd, 
-        closureIsThunk,
-        closureSingleEntry, closureReEntrant,
-	closureFunInfo,	isStandardFormThunk, isKnownFun,
-        funTag, tagForArity, 
+        closureSize, closureName,
 
-        enterIdLabel, enterLocalIdLabel,
+        closureEntryLabel, closureInfoTableLabel, staticClosureLabel,
+        closureRednCountsLabel, closureSlowEntryLabel, closureLocalEntryLabel,
 
-	nodeMustPointToIt, 
+        closureLFInfo,
+        closureUpdReqd, closureSingleEntry,
+	closureReEntrant, closureFunInfo, isStandardFormThunk,
+	isKnownFun, funTag, tagForArity,
+
+        nodeMustPointToIt,
 	CallMethod(..), getCallMethod,
 
 	blackHoleOnEntry,
@@ -55,7 +51,7 @@ module StgCmmClosure (
 	isToplevClosure,
 	isStaticClosure,
 
-        staticClosureNeedsLink, clHasCafRefs,
+        staticClosureNeedsLink,
 
         mkDataConInfoTable,
         cafBlackHoleInfoTable
@@ -661,28 +657,37 @@ but not bindings for data constructors.
 
 Note [Closure CAF info]
 ~~~~~~~~~~~~~~~~~~~~~~~
-The closureCafs field is relevant for *static closures only*.  It records
-  * For an ordinary closure, whether a CAF is reachable from
-    the code for the closure
-  * For a constructor closure, whether a CAF is reachable
-    from the fields of the constructor
-It is initialised simply from the idCafInfo of the Id. 
+The closureCafs field is relevant for *static closures only*.  It
+records whether a CAF is reachable from the code for the closure It is
+initialised simply from the idCafInfo of the Id.
+
 -}
 
 data ClosureInfo
   = ClosureInfo {
-	closureName   :: !Name,		  -- The thing bound to this closure
-	closureLFInfo :: !LambdaFormInfo, -- NOTE: not an LFCon (see below)
-	closureSMRep  :: !SMRep,	  -- representation used by storage mgr
-	closureSRT    :: !C_SRT,	  -- What SRT applies to this closure
-	closureProf   :: !ProfilingInfo,
-        closureCafs   :: !CafInfo,        -- See Note [Closure CAF info]
-	closureInfLcl :: Bool             -- Can the info pointer be a local symbol?
+          -- these three are for making labels related to this closure:
+        closureName    :: !Name,           -- The thing bound to this closure
+        closureCafs    :: !CafInfo,        -- used for making labels only
+        closureLocal   :: !Bool,           -- make local labels?
+
+          -- this tells us about what the closure contains:
+        closureLFInfo  :: !LambdaFormInfo, -- NOTE: not an LFCon
+
+          -- these fields tell us about the representation of the closure,
+          -- and are used for making an info table:
+        closureSMRep   :: !SMRep,          -- representation used by storage mgr
+        closureSRT     :: !C_SRT,          -- What SRT applies to this closure
+        closureProf    :: !ProfilingInfo
     }
 
-clHasCafRefs :: ClosureInfo -> CafInfo
--- Backward compatibility; remove
-clHasCafRefs = closureCafs
+-- | Convert from 'ClosureInfo' to 'CmmInfoTable'.
+mkCmmInfo :: ClosureInfo -> CmmInfoTable
+mkCmmInfo cl_info
+  = CmmInfoTable { cit_lbl  = closureInfoTableLabel cl_info,
+                   cit_rep  = closureSMRep cl_info,
+                   cit_prof = closureProf cl_info,
+                   cit_srt  = closureSRT cl_info }
+
 
 --------------------------------------
 --	Building ClosureInfos
@@ -696,33 +701,25 @@ mkClosureInfo :: Bool		-- Is static
 	      -> String		-- String descriptor
 	      -> ClosureInfo
 mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info val_descr
-  = ClosureInfo { closureName = name, 
-		  closureLFInfo = lf_info,
-		  closureSMRep = sm_rep, 
-		  closureSRT = srt_info,
-		  closureProf = prof,
-                  closureCafs = idCafInfo id,
-		  closureInfLcl = isDataConWorkId id }
-		    -- Make the _info pointer for the implicit datacon worker binding
-		    -- local. The reason we can do this is that importing code always
-		    -- either uses the _closure or _con_info. By the invariants in CorePrep
-		    -- anything else gets eta expanded.
+  = ClosureInfo { closureName    = name,
+                  closureCafs    = cafs,
+                  closureLocal   = is_local,
+                  closureLFInfo  = lf_info,
+                  closureSMRep   = sm_rep,    -- These four fields are a
+                  closureSRT     = srt_info,  --        CmmInfoTable
+                  closureProf    = prof }     -- ---
   where
-    name   = idName id
-    sm_rep = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
-    prof   = mkProfilingInfo id val_descr
+    name       = idName id
+    sm_rep     = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    prof       = mkProfilingInfo id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
-
--- Convert from 'ClosureInfo' to 'CmmInfoTable'.
--- Not used for return points.
-mkCmmInfo :: ClosureInfo -> CmmInfoTable
-mkCmmInfo cl_info
-  = CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
-                   cit_rep  = closureSMRep cl_info,
-                   cit_prof = closureProf cl_info,
-                   cit_srt  = closureSRT cl_info }
-
+    cafs     = idCafInfo id
+    is_local = isDataConWorkId id
+       -- Make the _info pointer for the implicit datacon worker
+       -- binding local. The reason we can do this is that importing
+       -- code always either uses the _closure or _con_info. By the
+       -- invariants in CorePrep anything else gets eta expanded.
 
 --------------------------------------
 --   Functions about closure *sizes*
@@ -772,9 +769,6 @@ lfUpdatable LFBlackHole 	   = True
 	-- alg case with a named default... so they need to be updated.
 lfUpdatable _ = False
 
-closureIsThunk :: ClosureInfo -> Bool
-closureIsThunk ClosureInfo{ closureLFInfo = lf_info } = isLFThunk lf_info
-
 closureSingleEntry :: ClosureInfo -> Bool
 closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
 closureSingleEntry _ = False
@@ -804,14 +798,27 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
 --   Label generation
 --------------------------------------
 
-entryLabelFromCI :: ClosureInfo -> CLabel
-entryLabelFromCI = infoLblToEntryLbl . infoTableLabelFromCI
+closureEntryLabel :: ClosureInfo -> CLabel
+closureEntryLabel = infoLblToEntryLbl . closureInfoTableLabel
 
-infoTableLabelFromCI :: ClosureInfo -> CLabel
-infoTableLabelFromCI (ClosureInfo { closureName = name,
-			    closureLFInfo = lf_info,
-			    closureCafs = cafs,
-			    closureInfLcl = is_lcl })
+staticClosureLabel :: ClosureInfo -> CLabel
+staticClosureLabel = cvtToClosureLbl .  closureInfoTableLabel
+
+closureRednCountsLabel :: ClosureInfo -> CLabel
+closureRednCountsLabel ClosureInfo{..} = mkRednCountsLabel closureName closureCafs
+
+closureSlowEntryLabel :: ClosureInfo -> CLabel
+closureSlowEntryLabel ClosureInfo{..} = mkSlowEntryLabel closureName closureCafs
+
+closureLocalEntryLabel :: ClosureInfo -> CLabel
+closureLocalEntryLabel ClosureInfo{..} = enterLocalIdLabel closureName closureCafs
+
+
+closureInfoTableLabel :: ClosureInfo -> CLabel
+closureInfoTableLabel ClosureInfo { closureName = name
+                                  , closureCafs =  cafs
+                                  , closureLocal = is_local
+                                  , closureLFInfo =  lf_info }
   = case lf_info of
         LFBlackHole -> mkCAFBlackHoleInfoTableLabel
 
@@ -823,21 +830,16 @@ infoTableLabelFromCI (ClosureInfo { closureName = name,
 
         LFThunk{}     -> std_mk_lbl name cafs
         LFReEntrant{} -> std_mk_lbl name cafs
-	_other        -> panic "labelsFromCI"
+        _other        -> panic "closureInfoTableLabel"
 
   where 
-    std_mk_lbl | is_lcl    = mkLocalInfoTableLabel
+    std_mk_lbl | is_local  = mkLocalInfoTableLabel
                | otherwise = mkInfoTableLabel
 
--- ClosureInfo for a closure (as opposed to a constructor) is always local
-closureLabelFromCI :: ClosureInfo -> CLabel
-closureLabelFromCI cl@(ClosureInfo { closureName = nm }) =
-  mkLocalClosureLabel nm $ clHasCafRefs cl
-closureLabelFromCI _ = panic "closureLabelFromCI"
 
 thunkEntryLabel :: Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
--- thunkEntryLabel is a local help function, not exported.  It's used from both
--- entryLabelFromCI and getCallMethod.
+-- thunkEntryLabel is a local help function, not exported.  It's used from
+-- getCallMethod.
 thunkEntryLabel _thunk_id _ (ApThunk arity) upd_flag
   = enterApLabel upd_flag arity
 thunkEntryLabel _thunk_id _ (SelectorThunk offset) upd_flag

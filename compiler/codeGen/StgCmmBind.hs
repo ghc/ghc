@@ -394,8 +394,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
     do  { -- Allocate the global ticky counter,
           -- and establish the ticky-counter
           -- label for this block
-          let ticky_ctr_lbl = mkRednCountsLabel (closureName cl_info) $
-                                  clHasCafRefs cl_info
+        ; let ticky_ctr_lbl = closureRednCountsLabel cl_info
         ; emitTickyCounter cl_info (map stripNV args)
         ; setTickyCtrLabel ticky_ctr_lbl $ do
 
@@ -456,10 +455,8 @@ mkSlowEntryCode cl_info arg_regs -- function closure is already in `Node'
   = emitProcWithConvention Slow CmmNonInfoTable slow_lbl arg_regs jump
   | otherwise = return ()
   where
-     caf_refs = clHasCafRefs cl_info
-     name     = closureName cl_info
-     slow_lbl = mkSlowEntryLabel  name caf_refs
-     fast_lbl = enterLocalIdLabel name caf_refs
+     slow_lbl = closureSlowEntryLabel cl_info
+     fast_lbl = closureLocalEntryLabel cl_info
      -- mkDirectJump does not clobber `Node' containing function closure
      jump = mkDirectJump (mkLblExpr fast_lbl) (map (CmmReg . CmmLocal) arg_regs)
                          initUpdFrameOff

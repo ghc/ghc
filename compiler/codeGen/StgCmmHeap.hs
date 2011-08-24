@@ -345,7 +345,7 @@ entryHeapCheck cl_info offset nodeSet arity args code
     setN = case nodeSet of
                    Just n  -> mkAssign nodeReg (CmmReg $ CmmLocal n)
                    Nothing -> mkAssign nodeReg $
-                       CmmLit (CmmLabel $ closureLabelFromCI cl_info)
+                       CmmLit (CmmLabel $ staticClosureLabel cl_info)
 
     {- Thunks:          Set R1 = node, jump GCEnter1
        Function (fast): Set R1 = node, jump GCFun

@@ -105,10 +105,9 @@ emitTickyCounter cl_info args
 	      zeroCLit 			-- Link
 	    ] }
   where
-    name = closureName cl_info
-    ticky_ctr_label = mkRednCountsLabel name $ clHasCafRefs cl_info
+    ticky_ctr_label = closureRednCountsLabel cl_info
     arg_descr = map (showTypeCategory . idType) args
-    fun_descr mod_name = ppr_for_ticky_name mod_name name
+    fun_descr mod_name = ppr_for_ticky_name mod_name (closureName cl_info)
 
 -- When printing the name of a thing in a ticky file, we want to
 -- give the module name even for *local* things.   We print
