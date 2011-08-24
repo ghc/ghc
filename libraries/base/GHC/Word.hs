@@ -29,9 +29,6 @@ module GHC.Word (
 
 import Data.Bits
 
-#if WORD_SIZE_IN_BITS < 32
-import GHC.IntWord32
-#endif
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
@@ -148,9 +145,7 @@ instance Bounded Word where
 
     -- use unboxed literals for maxBound, because GHC doesn't optimise
     -- (fromInteger 0xffffffff :: Word).
-#if WORD_SIZE_IN_BITS == 31
-    maxBound = W# (int2Word# 0x7FFFFFFF#)
-#elif WORD_SIZE_IN_BITS == 32
+#if WORD_SIZE_IN_BITS == 32
     maxBound = W# (int2Word# 0xFFFFFFFF#)
 #else
     maxBound = W# (int2Word# 0xFFFFFFFFFFFFFFFF#)
@@ -467,105 +462,6 @@ instance Bits Word16 where
 -- type Word32
 ------------------------------------------------------------------------
 
-#if WORD_SIZE_IN_BITS < 32
-
-data Word32 = W32# Word32#
--- ^ 32-bit unsigned integer type
-
-instance Eq Word32 where
-    (W32# x#) == (W32# y#) = x# `eqWord32#` y#
-    (W32# x#) /= (W32# y#) = x# `neWord32#` y#
-
-instance Ord Word32 where
-    (W32# x#) <  (W32# y#) = x# `ltWord32#` y#
-    (W32# x#) <= (W32# y#) = x# `leWord32#` y#
-    (W32# x#) >  (W32# y#) = x# `gtWord32#` y#
-    (W32# x#) >= (W32# y#) = x# `geWord32#` y#
-
-instance Num Word32 where
-    (W32# x#) + (W32# y#)  = W32# (int32ToWord32# (word32ToInt32# x# `plusInt32#` word32ToInt32# y#))
-    (W32# x#) - (W32# y#)  = W32# (int32ToWord32# (word32ToInt32# x# `minusInt32#` word32ToInt32# y#))
-    (W32# x#) * (W32# y#)  = W32# (int32ToWord32# (word32ToInt32# x# `timesInt32#` word32ToInt32# y#))
-    negate (W32# x#)       = W32# (int32ToWord32# (negateInt32# (word32ToInt32# x#)))
-    abs x                  = x
-    signum 0               = 0
-    signum _               = 1
-    fromInteger (S# i#)    = W32# (int32ToWord32# (intToInt32# i#))
-    fromInteger (J# s# d#) = W32# (integerToWord32# s# d#)
-
-instance Enum Word32 where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Word32"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Word32"
-    toEnum i@(I# i#)
-        | i >= 0        = W32# (wordToWord32# (int2Word# i#))
-        | otherwise     = toEnumError "Word32" i (minBound::Word32, maxBound::Word32)
-    fromEnum x@(W32# x#)
-        | x <= fromIntegral (maxBound::Int)
-                        = I# (word2Int# (word32ToWord# x#))
-        | otherwise     = fromEnumError "Word32" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
-
-instance Integral Word32 where
-    quot    x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `quotWord32#` y#)
-        | otherwise                 = divZeroError
-    rem     x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `remWord32#` y#)
-        | otherwise                 = divZeroError
-    div     x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `quotWord32#` y#)
-        | otherwise                 = divZeroError
-    mod     x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = W32# (x# `remWord32#` y#)
-        | otherwise                 = divZeroError
-    quotRem x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (x# `quotWord32#` y#), W32# (x# `remWord32#` y#))
-        | otherwise                 = divZeroError
-    divMod  x@(W32# x#) y@(W32# y#)
-        | y /= 0                    = (W32# (x# `quotWord32#` y#), W32# (x# `remWord32#` y#))
-        | otherwise                 = divZeroError
-    toInteger x@(W32# x#)
-        | x <= fromIntegral (maxBound::Int)  = S# (word2Int# (word32ToWord# x#))
-        | otherwise                 = case word32ToInteger# x# of (# s, d #) -> J# s d
-
-instance Bits Word32 where
-    {-# INLINE shift #-}
-
-    (W32# x#) .&.   (W32# y#)  = W32# (x# `and32#` y#)
-    (W32# x#) .|.   (W32# y#)  = W32# (x# `or32#`  y#)
-    (W32# x#) `xor` (W32# y#)  = W32# (x# `xor32#` y#)
-    complement (W32# x#)       = W32# (not32# x#)
-    (W32# x#) `shift` (I# i#)
-        | i# >=# 0#            = W32# (x# `shiftL32#` i#)
-        | otherwise            = W32# (x# `shiftRL32#` negateInt# i#)
-    (W32# x#) `shiftL` (I# i#) = W32# (x# `shiftL32#` i#)
-    (W32# x#) `shiftR` (I# i#) = W32# (x# `shiftRL32#` i#)
-    (W32# x#) `rotate` (I# i#)
-        | i'# ==# 0# = W32# x#
-        | otherwise  = W32# ((x# `shiftL32#` i'#) `or32#`
-                             (x# `shiftRL32#` (32# -# i'#)))
-        where
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
-    bitSize  _                = 32
-    isSigned _                = False
-
-{-# RULES
-"fromIntegral/Int->Word32"    fromIntegral = \(I#   x#) -> W32# (int32ToWord32# (intToInt32# x#))
-"fromIntegral/Word->Word32"   fromIntegral = \(W#   x#) -> W32# (wordToWord32# x#)
-"fromIntegral/Word32->Int"    fromIntegral = \(W32# x#) -> I#   (word2Int# (word32ToWord# x#))
-"fromIntegral/Word32->Word"   fromIntegral = \(W32# x#) -> W#   (word32ToWord# x#)
-"fromIntegral/Word32->Word32" fromIntegral = id :: Word32 -> Word32
-  #-}
-
-#else 
-
 -- Word32 is represented in the same way as Word.
 #if WORD_SIZE_IN_BITS > 32
 -- Operations may assume and must ensure that it holds only values
@@ -706,8 +602,6 @@ instance Bits Word32 where
 "fromIntegral/a->Word32"       fromIntegral = \x -> case fromIntegral x of W# x# -> W32# (narrow32Word# x#)
 "fromIntegral/Word32->a"       fromIntegral = \(W32# x#) -> fromIntegral (W# x#)
   #-}
-
-#endif
 
 instance Show Word32 where
 #if WORD_SIZE_IN_BITS < 33

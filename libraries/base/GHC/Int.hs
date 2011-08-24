@@ -26,9 +26,6 @@ module GHC.Int (
 
 import Data.Bits
 
-#if WORD_SIZE_IN_BITS < 32
-import GHC.IntWord32
-#endif
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
@@ -340,150 +337,6 @@ instance Bits Int16 where
 -- type Int32
 ------------------------------------------------------------------------
 
-#if WORD_SIZE_IN_BITS < 32
-
-data Int32 = I32# Int32#
--- ^ 32-bit signed integer type
-
-instance Eq Int32 where
-    (I32# x#) == (I32# y#) = x# `eqInt32#` y#
-    (I32# x#) /= (I32# y#) = x# `neInt32#` y#
-
-instance Ord Int32 where
-    (I32# x#) <  (I32# y#) = x# `ltInt32#` y#
-    (I32# x#) <= (I32# y#) = x# `leInt32#` y#
-    (I32# x#) >  (I32# y#) = x# `gtInt32#` y#
-    (I32# x#) >= (I32# y#) = x# `geInt32#` y#
-
-instance Show Int32 where
-    showsPrec p x = showsPrec p (toInteger x)
-
-instance Num Int32 where
-    (I32# x#) + (I32# y#)  = I32# (x# `plusInt32#`  y#)
-    (I32# x#) - (I32# y#)  = I32# (x# `minusInt32#` y#)
-    (I32# x#) * (I32# y#)  = I32# (x# `timesInt32#` y#)
-    negate (I32# x#)       = I32# (negateInt32# x#)
-    abs x | x >= 0         = x
-          | otherwise      = negate x
-    signum x | x > 0       = 1
-    signum 0               = 0
-    signum _               = -1
-    fromInteger (S# i#)    = I32# (intToInt32# i#)
-    fromInteger (J# s# d#) = I32# (integerToInt32# s# d#)
-
-instance Enum Int32 where
-    succ x
-        | x /= maxBound = x + 1
-        | otherwise     = succError "Int32"
-    pred x
-        | x /= minBound = x - 1
-        | otherwise     = predError "Int32"
-    toEnum (I# i#)      = I32# (intToInt32# i#)
-    fromEnum x@(I32# x#)
-        | x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
-                        = I# (int32ToInt# x#)
-        | otherwise     = fromEnumError "Int32" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
-
-instance Integral Int32 where
-    quot    x@(I32# x#) y@(I32# y#)
-        | y == 0                     = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I32# (x# `quotInt32#` y#)
-    rem       (I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-          -- The quotRem CPU instruction fails for minBound `quotRem` -1,
-          -- but minBound `rem` -1 is well-defined (0). We therefore
-          -- special-case it.
-        | y == (-1)               = 0
-        | otherwise               = I32# (x# `remInt32#` y#)
-    div     x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-        | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise               = I32# (x# `divInt32#` y#)
-    mod       (I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-          -- The divMod CPU instruction fails for minBound `divMod` -1,
-          -- but minBound `mod` -1 is well-defined (0). We therefore
-          -- special-case it.
-        | y == (-1)               = 0
-        | otherwise               = I32# (x# `modInt32#` y#)
-    quotRem x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-          -- Note [Order of tests]
-        | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise               = (I32# (x# `quotInt32#` y#),
-                                     I32# (x# `remInt32#` y#))
-    divMod  x@(I32# x#) y@(I32# y#)
-        | y == 0                  = divZeroError
-          -- Note [Order of tests]
-        | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise               = (I32# (x# `divInt32#` y#),
-                                     I32# (x# `modInt32#` y#))
-    toInteger x@(I32# x#)
-	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
-                                  = smallInteger (int32ToInt# x#)
-        | otherwise               = case int32ToInteger# x# of (# s, d #) -> J# s d
-
-divInt32#, modInt32# :: Int32# -> Int32# -> Int32#
-x# `divInt32#` y#
-    | (x# `gtInt32#` intToInt32# 0#) && (y# `ltInt32#` intToInt32# 0#)
-        = ((x# `minusInt32#` y#) `minusInt32#` intToInt32# 1#) `quotInt32#` y#
-    | (x# `ltInt32#` intToInt32# 0#) && (y# `gtInt32#` intToInt32# 0#)
-        = ((x# `minusInt32#` y#) `plusInt32#` intToInt32# 1#) `quotInt32#` y#
-    | otherwise                = x# `quotInt32#` y#
-x# `modInt32#` y#
-    | (x# `gtInt32#` intToInt32# 0#) && (y# `ltInt32#` intToInt32# 0#) ||
-      (x# `ltInt32#` intToInt32# 0#) && (y# `gtInt32#` intToInt32# 0#)
-        = if r# `neInt32#` intToInt32# 0# then r# `plusInt32#` y# else intToInt32# 0#
-    | otherwise = r#
-    where
-    r# = x# `remInt32#` y#
-
-instance Read Int32 where
-    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
-
-instance Bits Int32 where
-    {-# INLINE shift #-}
-
-    (I32# x#) .&.   (I32# y#)  = I32# (word32ToInt32# (int32ToWord32# x# `and32#` int32ToWord32# y#))
-    (I32# x#) .|.   (I32# y#)  = I32# (word32ToInt32# (int32ToWord32# x# `or32#`  int32ToWord32# y#))
-    (I32# x#) `xor` (I32# y#)  = I32# (word32ToInt32# (int32ToWord32# x# `xor32#` int32ToWord32# y#))
-    complement (I32# x#)       = I32# (word32ToInt32# (not32# (int32ToWord32# x#)))
-    (I32# x#) `shift` (I# i#)
-        | i# >=# 0#            = I32# (x# `iShiftL32#` i#)
-        | otherwise            = I32# (x# `iShiftRA32#` negateInt# i#)
-    (I32# x#) `shiftL` (I# i#) = I32# (x# `iShiftL32#` i#)
-    (I32# x#) `shiftR` (I# i#) = I32# (x# `iShiftRA32#` i#)
-    (I32# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
-        = I32# x#
-        | otherwise
-        = I32# (word32ToInt32# ((x'# `shiftL32#` i'#) `or32#`
-                                (x'# `shiftRL32#` (32# -# i'#))))
-        where
-        x'# = int32ToWord32# x#
-        i'# = word2Int# (int2Word# i# `and#` int2Word# 31#)
-    bitSize  _                 = 32
-    isSigned _                 = True
-
-
-{-# RULES
-"fromIntegral/Int->Int32"    fromIntegral = \(I#   x#) -> I32# (intToInt32# x#)
-"fromIntegral/Word->Int32"   fromIntegral = \(W#   x#) -> I32# (word32ToInt32# (wordToWord32# x#))
-"fromIntegral/Word32->Int32" fromIntegral = \(W32# x#) -> I32# (word32ToInt32# x#)
-"fromIntegral/Int32->Int"    fromIntegral = \(I32# x#) -> I#   (int32ToInt# x#)
-"fromIntegral/Int32->Word"   fromIntegral = \(I32# x#) -> W#   (int2Word# (int32ToInt# x#))
-"fromIntegral/Int32->Word32" fromIntegral = \(I32# x#) -> W32# (int32ToWord32# x#)
-"fromIntegral/Int32->Int32"  fromIntegral = id :: Int32 -> Int32
-  #-}
-
--- No rules for RealFrac methods if Int32 is larger than Int
-#else
-
 -- Int32 is represented in the same way as Int.
 #if WORD_SIZE_IN_BITS > 32
 -- Operations may assume and must ensure that it holds only values
@@ -630,8 +483,6 @@ instance Bits Int32 where
 "round/Double->Int32"
     forall x. round    (x :: Double) = (fromIntegral :: Int -> Int32) (round x)
   #-}
-
-#endif
 
 instance Real Int32 where
     toRational x = toInteger x % 1
