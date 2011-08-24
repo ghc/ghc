@@ -29,7 +29,6 @@ Library {
         GHC.Magic
         GHC.Ordering
         GHC.PrimopWrappers
-        GHC.IntWord32
         GHC.IntWord64
         GHC.Tuple
         GHC.Types
