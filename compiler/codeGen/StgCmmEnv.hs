@@ -70,13 +70,13 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidRep (idPrimRep id))]
 
 mkCgIdInfo :: Id -> LambdaFormInfo -> CmmExpr -> CgIdInfo
 mkCgIdInfo id lf expr
-  = CgIdInfo { cg_id = id, cg_rep = idPrimRep id, cg_lf = lf 
+  = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc expr, 
 	       cg_tag = lfDynTag lf }
 
 litIdInfo :: Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
 litIdInfo id lf lit
-  = CgIdInfo { cg_id = id, cg_rep = idPrimRep id, cg_lf = lf
+  = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc (addDynTag (CmmLit lit) tag) 
 	     , cg_tag = tag }
   where
@@ -84,7 +84,7 @@ litIdInfo id lf lit
 
 lneIdInfo :: Id -> [LocalReg] -> CgIdInfo
 lneIdInfo id regs 
-  = CgIdInfo { cg_id = id, cg_rep = idPrimRep id, cg_lf = lf 
+  = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = LneLoc blk_id regs
 	     , cg_tag = lfDynTag lf }
   where

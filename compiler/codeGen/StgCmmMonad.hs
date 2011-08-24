@@ -55,7 +55,6 @@ import DynFlags
 import MkGraph
 import BlockId
 import CLabel
-import TyCon	( PrimRep )
 import SMRep
 import Module
 import Id
@@ -178,7 +177,6 @@ data CgIdInfo
 			-- virtue of being externalised, for splittable C
 	, cg_lf  :: LambdaFormInfo 
 	, cg_loc :: CgLoc		     -- CmmExpr for the *tagged* value
-	, cg_rep :: PrimRep		     -- Cache for (idPrimRep id)
         , cg_tag :: {-# UNPACK #-} !DynTag   -- Cache for (lfDynTag cg_lf)
         }
 
