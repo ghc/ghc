@@ -30,6 +30,7 @@ import PrimOp
 import Constants
 import FastString
 import SMRep
+import ClosureInfo -- CgRep stuff
 import DynFlags
 import Outputable
 import Platform

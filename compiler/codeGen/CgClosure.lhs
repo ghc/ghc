@@ -449,38 +449,14 @@ blackHoleIt closure_info = emitBlackHoleCode (closureSingleEntry closure_info)
 
 emitBlackHoleCode :: Bool -> Code
 emitBlackHoleCode is_single_entry = do
-
-  dflags <- getDynFlags
-
-	-- If we wanted to do eager blackholing with slop filling,
-	-- we'd need to do it at the *end* of a basic block, otherwise
-	-- we overwrite the free variables in the thunk that we still
-	-- need.  We have a patch for this from Andy Cheadle, but not
-	-- incorporated yet. --SDM [6/2004]
-	--
-	-- Profiling needs slop filling (to support LDV profiling), so
-	-- currently eager blackholing doesn't work with profiling.
-	--
-        -- Previously, eager blackholing was enabled when ticky-ticky
-        -- was on. But it didn't work, and it wasn't strictly necessary 
-        -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
-        -- is unconditionally disabled. -- krc 1/2007
-
-  let eager_blackholing =  not opt_SccProfilingOn
-                        && dopt Opt_EagerBlackHoling dflags
-
-  if eager_blackholing
-     then do
-          tickyBlackHole (not is_single_entry)
-          let bh_info = CmmReg (CmmGlobal EagerBlackholeInfo)
-	  stmtsC [
-              CmmStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
-                       (CmmReg (CmmGlobal CurrentTSO)),
-              CmmCall (CmmPrim MO_WriteBarrier) [] [] CmmUnsafe CmmMayReturn,
-	      CmmStore (CmmReg nodeReg) bh_info
-            ]
-     else
-          nopC
+    tickyBlackHole (not is_single_entry)
+    let bh_info = CmmReg (CmmGlobal EagerBlackholeInfo)
+    stmtsC [
+       CmmStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize)
+                (CmmReg (CmmGlobal CurrentTSO)),
+       CmmCall (CmmPrim MO_WriteBarrier) [] [] CmmUnsafe CmmMayReturn,
+       CmmStore (CmmReg nodeReg) bh_info
+     ]
 \end{code}
 
 \begin{code}

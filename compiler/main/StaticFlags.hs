@@ -77,8 +77,7 @@ module StaticFlags (
 	opt_GranMacros,
 	opt_HiVersion,
 	opt_HistorySize,
-	opt_OmitBlackHoling,
-	opt_Unregisterised,
+        opt_Unregisterised,
 	v_Ld_inputs,
 	tablesNextToCode,
         opt_StubDeadValues,
@@ -320,9 +319,6 @@ opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
 
 opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
-
-opt_OmitBlackHoling :: Bool
-opt_OmitBlackHoling		= lookUp  (fsLit "-dno-black-holing")
 
 opt_StubDeadValues  :: Bool
 opt_StubDeadValues		= lookUp  (fsLit "-dstub-dead-values")

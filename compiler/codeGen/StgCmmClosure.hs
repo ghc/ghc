@@ -7,8 +7,6 @@
 --
 -- Nothing monadic in here!
 --
--- (c) The University of Glasgow 2004-2006
---
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE RecordWildCards #-}
@@ -19,8 +17,8 @@ module StgCmmClosure (
         isVoidRep, isGcPtrRep, addIdReps, addArgReps,
 	argPrimRep, 
 
-	-----------------------------------
-	LambdaFormInfo,		-- Abstract
+        -- * LambdaFormInfo
+        LambdaFormInfo,         -- Abstract
 	StandardFormInfo,	-- ...ditto...
 	mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
 	mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
@@ -28,33 +26,37 @@ module StgCmmClosure (
         lfDynTag,
         maybeIsLFCon, isLFThunk, isLFReEntrant, lfUpdatable,
 
-	-----------------------------------
+        nodeMustPointToIt,
+        CallMethod(..), getCallMethod,
+
+        isKnownFun, funTag, tagForArity,
+
+        -- * ClosureInfo
 	ClosureInfo,
         mkClosureInfo,
         mkCmmInfo,
 
-        closureSize, closureName,
+        -- ** Inspection
+        closureLFInfo, closureName,
 
-        closureEntryLabel, closureInfoTableLabel, staticClosureLabel,
+        -- ** Labels
+        -- These just need the info table label
+        closureInfoLabel, staticClosureLabel,
         closureRednCountsLabel, closureSlowEntryLabel, closureLocalEntryLabel,
 
-        closureLFInfo,
+        -- ** Predicates
+        -- These are really just functions on LambdaFormInfo
         closureUpdReqd, closureSingleEntry,
-	closureReEntrant, closureFunInfo, isStandardFormThunk,
-	isKnownFun, funTag, tagForArity,
+        closureReEntrant, closureFunInfo,
+        isToplevClosure,
 
-        nodeMustPointToIt,
-	CallMethod(..), getCallMethod,
+        blackHoleOnEntry,  -- Needs LambdaFormInfo and SMRep
+        isStaticClosure,   -- Needs SMPre
 
-	blackHoleOnEntry,
-
-	isToplevClosure,
-	isStaticClosure,
-
-        staticClosureNeedsLink,
-
+        -- * InfoTables
         mkDataConInfoTable,
-        cafBlackHoleInfoTable
+        cafBlackHoleInfoTable,
+        staticClosureNeedsLink,
     ) where
 
 #include "../includes/MachDeps.h"
@@ -84,6 +86,8 @@ import DynFlags
 -----------------------------------------------------------------------------
 --		Representations
 -----------------------------------------------------------------------------
+
+-- Why are these here?
 
 addIdReps :: [Id] -> [(PrimRep, Id)]
 addIdReps ids = [(idPrimRep id, id) | id <- ids]
@@ -152,36 +156,6 @@ data LambdaFormInfo
                         -- XXX we can very nearly get rid of this, but
                         -- allocDynClosure needs a LambdaFormInfo
 
-
--------------------------
--- An ArgDsecr describes the argument pattern of a function
-
-{-	XXX  -- imported from old ClosureInfo for now
-data ArgDescr
-  = ArgSpec		-- Fits one of the standard patterns
-	!StgHalfWord	-- RTS type identifier ARG_P, ARG_N, ...
-
-  | ArgGen	 	-- General case
-	Liveness	-- Details about the arguments
--}
-
-{-	XXX  -- imported from old ClosureInfo for now
--------------------------
--- We represent liveness bitmaps as a Bitmap (whose internal
--- representation really is a bitmap).  These are pinned onto case return
--- vectors to indicate the state of the stack for the garbage collector.
--- 
--- In the compiled program, liveness bitmaps that fit inside a single
--- word (StgWord) are stored as a single word, while larger bitmaps are
--- stored as a pointer to an array of words. 
-
-data Liveness
-  = SmallLiveness	-- Liveness info that fits in one word
-	StgWord		-- Here's the bitmap
-
-  | BigLiveness		-- Liveness info witha a multi-word bitmap
-	CLabel		-- Label for the bitmap
--}
 
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of 
@@ -543,11 +517,6 @@ getCallMethod _ _name _ LFBlackHole _n_args
 getCallMethod _ _name _ LFLetNoEscape _n_args
   = JumpToIt
 
-isStandardFormThunk :: LambdaFormInfo -> Bool
-isStandardFormThunk (LFThunk _ _ _ (SelectorThunk _) _) = True
-isStandardFormThunk (LFThunk _ _ _ (ApThunk _) _)	= True
-isStandardFormThunk _other_lf_info 			= False
-
 isKnownFun :: LambdaFormInfo -> Bool
 isKnownFun (LFReEntrant _ _ _ _) = True
 isKnownFun LFLetNoEscape	 = True
@@ -640,53 +609,50 @@ staticClosureRequired binder other_binder_info other_lf_info = True
 -}
 
 -----------------------------------------------------------------------------
---		Data types for closure information}
+--              Data types for closure information
 -----------------------------------------------------------------------------
 
 
-{- Information about a closure, from the code generator's point of view.
+{- ClosureInfo: information about a binding
 
-A ClosureInfo decribes the info pointer of a closure.  It has
-enough information 
-  a) to construct the info table itself
-  b) to allocate a closure containing that info pointer (i.e.
-	it knows the info table label)
+   We make a ClosureInfo for each let binding (both top level and not),
+   but not bindings for data constructors: for those we build a CmmInfoTable
+   directly (see mkDataConInfoTable).
 
-We make a ClosureInfo for each let binding (both top level and not),
-but not bindings for data constructors.
+   To a first approximation:
+       ClosureInfo = (LambdaFormInfo, CmmInfoTable)
 
-Note [Closure CAF info]
-~~~~~~~~~~~~~~~~~~~~~~~
-The closureCafs field is relevant for *static closures only*.  It
-records whether a CAF is reachable from the code for the closure It is
-initialised simply from the idCafInfo of the Id.
-
+   A ClosureInfo has enough information
+     a) to construct the info table itself, and build other things
+        related to the binding (e.g. slow entry points for a function)
+     b) to allocate a closure containing that info pointer (i.e.
+   	it knows the info table label)
 -}
 
 data ClosureInfo
   = ClosureInfo {
-          -- these three are for making labels related to this closure:
-        closureName    :: !Name,           -- The thing bound to this closure
-        closureCafs    :: !CafInfo,        -- used for making labels only
-        closureLocal   :: !Bool,           -- make local labels?
+        closureName :: !Name,           -- The thing bound to this closure
+           -- we don't really need this field: it's only used in generating
+           -- code for ticky and profiling, and we could pass the information
+           -- around separately, but it doesn't do much harm to keep it here.
 
-          -- this tells us about what the closure contains:
-        closureLFInfo  :: !LambdaFormInfo, -- NOTE: not an LFCon
+        closureLFInfo :: !LambdaFormInfo, -- NOTE: not an LFCon
+          -- this tells us about what the closure contains: it's right-hand-side.
 
-          -- these fields tell us about the representation of the closure,
-          -- and are used for making an info table:
-        closureSMRep   :: !SMRep,          -- representation used by storage mgr
-        closureSRT     :: !C_SRT,          -- What SRT applies to this closure
-        closureProf    :: !ProfilingInfo
+          -- the rest is just an unpacked CmmInfoTable.
+        closureInfoLabel :: !CLabel,
+        closureSMRep     :: !SMRep,          -- representation used by storage mgr
+        closureSRT       :: !C_SRT,          -- What SRT applies to this closure
+        closureProf      :: !ProfilingInfo
     }
 
 -- | Convert from 'ClosureInfo' to 'CmmInfoTable'.
 mkCmmInfo :: ClosureInfo -> CmmInfoTable
-mkCmmInfo cl_info
-  = CmmInfoTable { cit_lbl  = closureInfoTableLabel cl_info,
-                   cit_rep  = closureSMRep cl_info,
-                   cit_prof = closureProf cl_info,
-                   cit_srt  = closureSRT cl_info }
+mkCmmInfo ClosureInfo {..}
+  = CmmInfoTable { cit_lbl  = closureInfoLabel
+                 , cit_rep  = closureSMRep
+                 , cit_prof = closureProf
+                 , cit_srt  = closureSRT }
 
 
 --------------------------------------
@@ -701,60 +667,64 @@ mkClosureInfo :: Bool		-- Is static
 	      -> String		-- String descriptor
 	      -> ClosureInfo
 mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info val_descr
-  = ClosureInfo { closureName    = name,
-                  closureCafs    = cafs,
-                  closureLocal   = is_local,
-                  closureLFInfo  = lf_info,
-                  closureSMRep   = sm_rep,    -- These four fields are a
-                  closureSRT     = srt_info,  --        CmmInfoTable
-                  closureProf    = prof }     -- ---
+  = ClosureInfo { closureName      = name,
+                  closureLFInfo    = lf_info,
+                  closureInfoLabel = info_lbl,
+                  closureSMRep     = sm_rep,    -- These four fields are a
+                  closureSRT       = srt_info,  --        CmmInfoTable
+                  closureProf      = prof }     -- ---
   where
     name       = idName id
     sm_rep     = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
     prof       = mkProfilingInfo id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
-    cafs     = idCafInfo id
-    is_local = isDataConWorkId id
-       -- Make the _info pointer for the implicit datacon worker
-       -- binding local. The reason we can do this is that importing
-       -- code always either uses the _closure or _con_info. By the
-       -- invariants in CorePrep anything else gets eta expanded.
-
---------------------------------------
---   Functions about closure *sizes*
---------------------------------------
-
-closureSize :: ClosureInfo -> WordOff
-closureSize cl_info = heapClosureSize (closureSMRep cl_info)
+    info_lbl = mkClosureInfoTableLabel id lf_info
 
 --------------------------------------
 --   Other functions over ClosureInfo
 --------------------------------------
 
-blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
--- Static closures are never themselves black-holed.
--- Updatable ones will be overwritten with a CAFList cell, which points to a 
--- black hole;
--- Single-entry ones have no fvs to plug, and we trust they don't form part 
--- of a loop.
+-- Eager blackholing is normally disabled, but can be turned on with
+-- -feager-blackholing.  When it is on, we replace the info pointer of
+-- the thunk with stg_EAGER_BLACKHOLE_info on entry.
 
-blackHoleOnEntry dflags (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
-  | isStaticRep rep
+-- If we wanted to do eager blackholing with slop filling,
+-- we'd need to do it at the *end* of a basic block, otherwise
+-- we overwrite the free variables in the thunk that we still
+-- need.  We have a patch for this from Andy Cheadle, but not
+-- incorporated yet. --SDM [6/2004]
+--
+--
+-- Previously, eager blackholing was enabled when ticky-ticky
+-- was on. But it didn't work, and it wasn't strictly necessary 
+-- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
+-- is unconditionally disabled. -- krc 1/2007
+
+-- Static closures are never themselves black-holed.
+
+blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
+blackHoleOnEntry dflags cl_info
+  | isStaticRep (closureSMRep cl_info)
   = False	-- Never black-hole a static closure
 
   | otherwise
-  = case lf_info of
+  = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
 	LFLetNoEscape 		  -> False
-	LFThunk _ no_fvs updatable _ _
-	  -> if updatable
-	     then not opt_OmitBlackHoling
-	     else doingTickyProfiling dflags || not no_fvs
+        LFThunk _ no_fvs _updatable _ _
+          | eager_blackholing  -> doingTickyProfiling dflags || not no_fvs
                   -- the former to catch double entry,
                   -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
+          | otherwise          -> False
 
-	_other -> panic "blackHoleOnEntry"	-- Should never happen
+           where eager_blackholing =  not opt_SccProfilingOn
+                                   && dopt Opt_EagerBlackHoling dflags
+                        -- Profiling needs slop filling (to support
+                        -- LDV profiling), so currently eager
+                        -- blackholing doesn't work with profiling.
+
+        _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isStaticClosure :: ClosureInfo -> Bool
 isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
@@ -798,27 +768,22 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
 --   Label generation
 --------------------------------------
 
-closureEntryLabel :: ClosureInfo -> CLabel
-closureEntryLabel = infoLblToEntryLbl . closureInfoTableLabel
-
 staticClosureLabel :: ClosureInfo -> CLabel
-staticClosureLabel = cvtToClosureLbl .  closureInfoTableLabel
+staticClosureLabel = toClosureLbl .  closureInfoLabel
 
 closureRednCountsLabel :: ClosureInfo -> CLabel
-closureRednCountsLabel ClosureInfo{..} = mkRednCountsLabel closureName closureCafs
+closureRednCountsLabel = toRednCountsLbl . closureInfoLabel
 
 closureSlowEntryLabel :: ClosureInfo -> CLabel
-closureSlowEntryLabel ClosureInfo{..} = mkSlowEntryLabel closureName closureCafs
+closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
 
 closureLocalEntryLabel :: ClosureInfo -> CLabel
-closureLocalEntryLabel ClosureInfo{..} = enterLocalIdLabel closureName closureCafs
+closureLocalEntryLabel
+  | tablesNextToCode = toInfoLbl  . closureInfoLabel
+  | otherwise        = toEntryLbl . closureInfoLabel
 
-
-closureInfoTableLabel :: ClosureInfo -> CLabel
-closureInfoTableLabel ClosureInfo { closureName = name
-                                  , closureCafs =  cafs
-                                  , closureLocal = is_local
-                                  , closureLFInfo =  lf_info }
+mkClosureInfoTableLabel :: Id -> LambdaFormInfo -> CLabel
+mkClosureInfoTableLabel id lf_info
   = case lf_info of
         LFBlackHole -> mkCAFBlackHoleInfoTableLabel
 
@@ -833,8 +798,17 @@ closureInfoTableLabel ClosureInfo { closureName = name
         _other        -> panic "closureInfoTableLabel"
 
   where 
+    name = idName id
+
     std_mk_lbl | is_local  = mkLocalInfoTableLabel
                | otherwise = mkInfoTableLabel
+
+    cafs     = idCafInfo id
+    is_local = isDataConWorkId id
+       -- Make the _info pointer for the implicit datacon worker
+       -- binding local. The reason we can do this is that importing
+       -- code always either uses the _closure or _con_info. By the
+       -- invariants in CorePrep anything else gets eta expanded.
 
 
 thunkEntryLabel :: Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
@@ -861,11 +835,6 @@ enterIdLabel :: Name -> CafInfo -> CLabel
 enterIdLabel id c
   | tablesNextToCode = mkInfoTableLabel id c
   | otherwise        = mkEntryLabel id c
-
-enterLocalIdLabel :: Name -> CafInfo -> CLabel
-enterLocalIdLabel id c
-  | tablesNextToCode = mkLocalInfoTableLabel id c
-  | otherwise        = mkLocalEntryLabel id c
 
 
 --------------------------------------

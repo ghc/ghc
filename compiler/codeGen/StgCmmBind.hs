@@ -502,34 +502,14 @@ blackHoleIt :: ClosureInfo -> FCode ()
 blackHoleIt closure_info = emitBlackHoleCode (closureSingleEntry closure_info)
 
 emitBlackHoleCode :: Bool -> FCode ()
-emitBlackHoleCode is_single_entry
-  | eager_blackholing = do
-	tickyBlackHole (not is_single_entry)
-        emit (mkStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize) (CmmReg (CmmGlobal CurrentTSO)))
-        emitPrimCall [] MO_WriteBarrier []
-	emit (mkStore (CmmReg nodeReg) (CmmLit (CmmLabel bh_lbl)))
-  | otherwise =
-	nopC
+emitBlackHoleCode is_single_entry = do
+  tickyBlackHole (not is_single_entry)
+  emit (mkStore (cmmOffsetW (CmmReg nodeReg) fixedHdrSize) (CmmReg (CmmGlobal CurrentTSO)))
+  emitPrimCall [] MO_WriteBarrier []
+  emit (mkStore (CmmReg nodeReg) (CmmLit (CmmLabel bh_lbl)))
   where
     bh_lbl | is_single_entry = mkCmmDataLabel rtsPackageId (fsLit "stg_SE_BLACKHOLE_info")
 	   | otherwise	     = mkCmmDataLabel rtsPackageId (fsLit "stg_BLACKHOLE_info")
-
-	-- If we wanted to do eager blackholing with slop filling,
-	-- we'd need to do it at the *end* of a basic block, otherwise
-	-- we overwrite the free variables in the thunk that we still
-	-- need.  We have a patch for this from Andy Cheadle, but not
-	-- incorporated yet. --SDM [6/2004]
-	--
-	-- Profiling needs slop filling (to support LDV profiling), so
-	-- currently eager blackholing doesn't work with profiling.
-	--
-        -- Previously, eager blackholing was enabled when ticky-ticky
-        -- was on. But it didn't work, and it wasn't strictly necessary
-        -- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING
-        -- is unconditionally disabled. -- krc 1/2007
-
-    eager_blackholing = False
-
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
 	-- Nota Bene: this function does not change Node (even if it's a CAF),
 	-- so that the cost centre in the original closure can still be

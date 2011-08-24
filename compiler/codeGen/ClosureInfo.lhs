@@ -33,7 +33,7 @@ module ClosureInfo (
 	isLFThunk, closureUpdReqd,
 	closureNeedsUpdSpace, closureIsThunk,
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
-	closureFunInfo,	isStandardFormThunk, isKnownFun,
+        closureFunInfo, isKnownFun,
         funTag, funTagLFInfo, tagForArity, clHasCafRefs,
 
 	enterIdLabel, enterLocalIdLabel, enterReturnPtLabel,
@@ -118,7 +118,7 @@ data ClosureInfo
 	closureLFInfo :: !LambdaFormInfo, -- NOTE: not an LFCon (see below)
 	closureSMRep  :: !SMRep,	  -- representation used by storage mgr
 	closureSRT    :: !C_SRT,	  -- What SRT applies to this closure
-	closureType   :: !Type,		  -- Type of closure (ToDo: remove)
+        closureType   :: !Type,           -- Type of closure (ToDo: remove)
 	closureDescr  :: !String,	  -- closure description (for profiling)
 	closureInfLcl :: Bool             -- can the info pointer be a local symbol?
     }
@@ -707,35 +707,48 @@ getCallMethod _ name _ (LFLetNoEscape arity) n_args
   | n_args == arity = DirectEntry (enterReturnPtLabel (nameUnique name)) arity
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
-blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
--- Static closures are never themselves black-holed.
--- Updatable ones will be overwritten with a CAFList cell, which points to a 
--- black hole;
--- Single-entry ones have no fvs to plug, and we trust they don't form part 
--- of a loop.
 
+-- Eager blackholing is normally disabled, but can be turned on with
+-- -feager-blackholing.  When it is on, we replace the info pointer of
+-- the thunk with stg_EAGER_BLACKHOLE_info on entry.
+
+-- If we wanted to do eager blackholing with slop filling,
+-- we'd need to do it at the *end* of a basic block, otherwise
+-- we overwrite the free variables in the thunk that we still
+-- need.  We have a patch for this from Andy Cheadle, but not
+-- incorporated yet. --SDM [6/2004]
+--
+--
+-- Previously, eager blackholing was enabled when ticky-ticky
+-- was on. But it didn't work, and it wasn't strictly necessary 
+-- to bring back minimal ticky-ticky, so now EAGER_BLACKHOLING 
+-- is unconditionally disabled. -- krc 1/2007
+
+-- Static closures are never themselves black-holed.
+
+blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
 blackHoleOnEntry _ ConInfo{} = False
-blackHoleOnEntry dflags (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
-  | isStaticRep rep
+blackHoleOnEntry dflags cl_info
+  | isStaticRep (closureSMRep cl_info)
   = False	-- Never black-hole a static closure
 
   | otherwise
-  = case lf_info of
+  = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
-	LFLetNoEscape _		  -> False
+        LFLetNoEscape _           -> False
 	LFThunk _ no_fvs updatable _ _
-	  -> if updatable
-	     then not opt_OmitBlackHoling
-	     else doingTickyProfiling dflags || not no_fvs
+          | eager_blackholing  -> doingTickyProfiling dflags || not no_fvs
                   -- the former to catch double entry,
                   -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
+          | otherwise          -> False
 
-	_ -> panic "blackHoleOnEntry"	-- Should never happen
+           where eager_blackholing =  not opt_SccProfilingOn
+                                   && dopt Opt_EagerBlackHoling dflags
+                        -- Profiling needs slop filling (to support
+                        -- LDV profiling), so currently eager
+                        -- blackholing doesn't work with profiling.
 
-isStandardFormThunk :: LambdaFormInfo -> Bool
-isStandardFormThunk (LFThunk _ _ _ (SelectorThunk _) _) = True
-isStandardFormThunk (LFThunk _ _ _ (ApThunk _) _)	= True
-isStandardFormThunk _ 			= False
+        _other -> panic "blackHoleOnEntry"      -- Should never happen
 
 isKnownFun :: LambdaFormInfo -> Bool
 isKnownFun (LFReEntrant _ _ _ _) = True

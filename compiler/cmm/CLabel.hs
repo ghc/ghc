@@ -22,7 +22,7 @@ module CLabel (
 	mkSRTLabel,
 	mkInfoTableLabel,
 	mkEntryLabel,
-	mkSlowEntryLabel, slowEntryFromInfoLabel,
+        mkSlowEntryLabel,
 	mkConEntryLabel,
 	mkStaticConEntryLabel,
 	mkRednCountsLabel,
@@ -100,11 +100,12 @@ module CLabel (
         mkHpcTicksLabel,
 
         hasCAF,
-	cvtToClosureLbl,
-	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
+        needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
-        infoLblToEntryLbl, entryLblToInfoLbl,
+
+        -- * Conversions
+        toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, toRednCountsLbl,
 
         pprCLabel
     ) where
@@ -359,7 +360,6 @@ data DynamicLinkerLabelInfo
 -- Constructing IdLabels 
 -- These are always local:
 mkSlowEntryLabel      	name c 	       = IdLabel name  c Slow
-slowEntryFromInfoLabel (IdLabel n c _) = IdLabel n c Slow
 
 mkSRTLabel		name c	= IdLabel name  c SRT
 mkRednCountsLabel     	name c 	= IdLabel name  c RednCounts
@@ -506,39 +506,40 @@ mkPlainModuleInitLabel :: Module -> CLabel
 mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
 
 -- -----------------------------------------------------------------------------
--- Brutal method of obtaining a closure label
+-- Convert between different kinds of label
 
-cvtToClosureLbl   (IdLabel n c InfoTable)       = IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c LocalInfoTable)  = IdLabel n c Closure -- XXX?
-cvtToClosureLbl   (IdLabel n c Entry)           = IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c LocalEntry)      = IdLabel n c Closure -- XXX?
-cvtToClosureLbl   (IdLabel n c ConEntry)        = IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c RednCounts)	= IdLabel n c Closure
-cvtToClosureLbl l@(IdLabel n c Closure)		= l
-cvtToClosureLbl l 
-	= pprPanic "cvtToClosureLbl" (pprCLabel l)
+toClosureLbl :: CLabel -> CLabel
+toClosureLbl (IdLabel n c _) = IdLabel n c Closure
+toClosureLbl l = pprPanic "toClosureLbl" (pprCLabel l)
 
-infoLblToEntryLbl :: CLabel -> CLabel 
-infoLblToEntryLbl (IdLabel n c LocalInfoTable) = IdLabel n c LocalEntry
-infoLblToEntryLbl (IdLabel n c InfoTable)      = IdLabel n c Entry
-infoLblToEntryLbl (IdLabel n c ConInfoTable)   = IdLabel n c ConEntry
-infoLblToEntryLbl (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
-infoLblToEntryLbl (CaseLabel n CaseReturnInfo) = CaseLabel n CaseReturnPt
-infoLblToEntryLbl (CmmLabel m str CmmInfo)     = CmmLabel m str CmmEntry
-infoLblToEntryLbl (CmmLabel m str CmmRetInfo)  = CmmLabel m str CmmRet
-infoLblToEntryLbl _
-       = panic "CLabel.infoLblToEntryLbl"
+toSlowEntryLbl :: CLabel -> CLabel
+toSlowEntryLbl (IdLabel n c _) = IdLabel n c Slow
+toSlowEntryLbl l = pprPanic "toSlowEntryLbl" (pprCLabel l)
 
-entryLblToInfoLbl :: CLabel -> CLabel 
-entryLblToInfoLbl (IdLabel n c Entry)          = IdLabel n c InfoTable
-entryLblToInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
-entryLblToInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
-entryLblToInfoLbl (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
-entryLblToInfoLbl (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
-entryLblToInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
-entryLblToInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
-entryLblToInfoLbl l                            
-       = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
+toRednCountsLbl :: CLabel -> CLabel
+toRednCountsLbl (IdLabel n c _) = IdLabel n c RednCounts
+toRednCountsLbl l = pprPanic "toRednCountsLbl" (pprCLabel l)
+
+toEntryLbl :: CLabel -> CLabel
+toEntryLbl (IdLabel n c LocalInfoTable)  = IdLabel n c LocalEntry
+toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
+toEntryLbl (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
+toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
+toEntryLbl (CaseLabel n CaseReturnInfo)  = CaseLabel n CaseReturnPt
+toEntryLbl (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
+toEntryLbl (CmmLabel m str CmmRetInfo)   = CmmLabel m str CmmRet
+toEntryLbl l = pprPanic "toEntryLbl" (pprCLabel l)
+
+toInfoLbl :: CLabel -> CLabel
+toInfoLbl (IdLabel n c Entry)          = IdLabel n c InfoTable
+toInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
+toInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
+toInfoLbl (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
+toInfoLbl (IdLabel n c _)              = IdLabel n c InfoTable
+toInfoLbl (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
+toInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
+toInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
+toInfoLbl l = pprPanic "CLabel.toInfoLbl" (pprCLabel l)
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel refer to a CAF?

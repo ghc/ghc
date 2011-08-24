@@ -21,7 +21,7 @@ module ByteCodeItbls ( ItblEnv, ItblPtr(..), itblCode, mkITbls
 
 import Name		( Name, getName )
 import NameEnv
-import SMRep		( typeCgRep )
+import ClosureInfo
 import DataCon		( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Constants	( mIN_PAYLOAD_SIZE, wORD_SIZE )

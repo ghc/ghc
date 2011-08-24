@@ -26,6 +26,7 @@ import DataCon
 import VarSet
 import PrimOp
 import SMRep
+import ClosureInfo -- CgRep stuff
 
 import Module (Module)
 import GHC.Exts

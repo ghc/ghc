@@ -39,6 +39,7 @@ import Unique
 import FastString
 import Panic
 import SMRep
+import ClosureInfo
 import Bitmap
 import OrdList
 import Constants

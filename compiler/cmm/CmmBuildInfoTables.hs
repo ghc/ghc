@@ -203,7 +203,7 @@ cafTransfers = mkBTransfer3 first middle last
                CmmLit (CmmLabelOff c _)         -> add c set
                CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
                _ -> set
-        add l s = if hasCAF l then Map.insert (cvtToClosureLbl l) () s else s
+        add l s = if hasCAF l then Map.insert (toClosureLbl l) () s else s
 
 cafAnal :: CmmGraph -> FuelUniqSM CAFEnv
 cafAnal g = liftM snd $ dataflowPassBwd g [] $ analBwd cafLattice cafTransfers
@@ -341,7 +341,7 @@ localCAFInfo cafEnv (CmmProc top_info top_l (CmmGraph {g_entry=entry})) =
   case info_tbl top_info of
     CmmInfoTable { cit_rep = rep } 
       | not (isStaticRep rep) 
-      -> Just (cvtToClosureLbl top_l,
+      -> Just (toClosureLbl top_l,
                expectJust "maybeBindCAFs" $ mapLookup entry cafEnv)
     _ -> Nothing
 
