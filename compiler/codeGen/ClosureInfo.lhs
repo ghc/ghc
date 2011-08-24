@@ -736,7 +736,7 @@ blackHoleOnEntry dflags cl_info
   = case closureLFInfo cl_info of
 	LFReEntrant _ _ _ _	  -> False
         LFLetNoEscape _           -> False
-	LFThunk _ no_fvs updatable _ _
+        LFThunk _ no_fvs _updatable _ _
           | eager_blackholing  -> doingTickyProfiling dflags || not no_fvs
                   -- the former to catch double entry,
                   -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
