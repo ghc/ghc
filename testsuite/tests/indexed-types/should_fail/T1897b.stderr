@@ -1,6 +1,6 @@
 
 T1897b.hs:16:1:
-    Could not deduce (Depend a0 ~ Depend a)
+    Could not deduce (Depend a ~ Depend a0)
     from the context (Bug a)
       bound by the inferred type for `isValid':
                  Bug a => [Depend a] -> Bool

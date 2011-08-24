@@ -1,13 +1,13 @@
 
-NoMatchErr.hs:20:12:
-    Could not deduce (Memo d0 ~ Memo d)
+NoMatchErr.hs:20:5:
+    Could not deduce (Memo d ~ Memo d0)
     from the context (Fun d)
       bound by the type signature for f :: Fun d => Memo d a -> Memo d a
       at NoMatchErr.hs:20:1-15
     NB: `Memo' is a type function, and may not be injective
     Expected type: Memo d a
       Actual type: Memo d0 a
-    Expected type: Memo d a -> d0 -> a
-      Actual type: Memo d0 a -> d0 -> a
-    In the second argument of `(.)', namely `appl'
+    Expected type: Memo d a -> Memo d a
+      Actual type: Memo d0 a -> Memo d0 a
     In the expression: abst . appl
+    In an equation for `f': f = abst . appl
