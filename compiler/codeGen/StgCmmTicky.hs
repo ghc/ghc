@@ -51,6 +51,7 @@ import CmmExpr
 import MkGraph
 import CmmUtils
 import CLabel
+import SMRep
 
 import Module
 import Name
@@ -266,25 +267,24 @@ argChar DoubleArg = 'd'
 -- -----------------------------------------------------------------------------
 -- Ticky allocation
 
-tickyDynAlloc :: ClosureInfo -> FCode ()
+tickyDynAlloc :: SMRep -> LambdaFormInfo -> FCode ()
 -- Called when doing a dynamic heap allocation
-tickyDynAlloc cl_info
+-- LambdaFormInfo only needed to distinguish between updatable/non-updatable thunks
+tickyDynAlloc rep lf
   = ifTicky $
     case () of
-      _ | Just _ <- maybeIsLFCon lf -> tick_alloc_con
-	| isLFThunk lf              -> tick_alloc_thk
-        | isLFReEntrant lf          -> tick_alloc_fun
-        | otherwise                 -> return ()
+      _ | isConRep rep   -> tick_alloc_con
+        | isThunkRep rep -> tick_alloc_thk
+        | isFunRep   rep -> tick_alloc_fun
+        | otherwise      -> return ()
   where
-    lf = closureLFInfo cl_info
-
-	-- will be needed when we fill in stubs
-    _cl_size   = closureSize cl_info
+        -- will be needed when we fill in stubs
+    _cl_size   = heapClosureSize rep
 --    _slop_size = slopSize cl_info
 
     tick_alloc_thk 
-	| closureUpdReqd cl_info = tick_alloc_up_thk
-	| otherwise	         = tick_alloc_se_thk
+        | lfUpdatable lf = tick_alloc_up_thk
+        | otherwise      = tick_alloc_se_thk
 
     -- krc: changed from panic to return () 
     -- just to get something working

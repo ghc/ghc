@@ -24,7 +24,6 @@ import StgCmmTicky
 
 import Cmm
 import CLabel
-import PprCmm
 
 import StgSyn
 import DynFlags

@@ -34,7 +34,6 @@ import Module
 import Constants
 import DataCon
 import FastString
-import IdInfo( CafInfo(..) )
 import Id
 import Literal
 import PrelInfo
@@ -202,8 +201,10 @@ buildDynCon binder ccs con args
   = do	{ let (tot_wds, ptr_wds, args_w_offsets) 
                 = mkVirtConstrOffsets (addArgReps args)
 		-- No void args in args_w_offsets
-              cl_info = mkConInfo False NoCafRefs con tot_wds ptr_wds
-	; (tmp, init) <- allocDynClosure cl_info use_cc blame_cc args_w_offsets
+              nonptr_wds = tot_wds - ptr_wds
+              info_tbl = mkDataConInfoTable con False ptr_wds nonptr_wds
+        ; (tmp, init) <- allocDynClosure info_tbl lf_info
+                                         use_cc blame_cc args_w_offsets
 	; regIdInfo binder lf_info tmp init }
   where
     lf_info = mkConLFInfo con

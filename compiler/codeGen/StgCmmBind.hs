@@ -298,7 +298,8 @@ mkRhsClosure bndr cc _ fvs upd_flag srt args body
 	; (use_cc, blame_cc) <- chooseDynCostCentres cc args body
         ; emit (mkComment $ mkFastString "calling allocDynClosure")
         ; let toVarArg (NonVoid a, off) = (NonVoid (StgVarArg a), off)
-	; (tmp, init) <- allocDynClosure closure_info use_cc blame_cc
+        ; let info_tbl = mkCmmInfo closure_info
+        ; (tmp, init) <- allocDynClosure info_tbl lf_info use_cc blame_cc
 				         (map toVarArg fv_details)
 
 	-- RETURN
@@ -334,7 +335,9 @@ cgStdThunk bndr cc _bndr_info body lf_info payload
   ; (use_cc, blame_cc) <- chooseDynCostCentres cc [{- no args-}] body
 
 	-- BUILD THE OBJECT
-  ; (tmp, init) <- allocDynClosure closure_info use_cc blame_cc payload_w_offsets
+  ; let info_tbl = mkCmmInfo closure_info
+  ; (tmp, init) <- allocDynClosure info_tbl lf_info
+                                   use_cc blame_cc payload_w_offsets
 
 	-- RETURN
   ; regIdInfo bndr lf_info tmp init }
@@ -555,7 +558,7 @@ setupUpdate closure_info node body
 
 	; if closureUpdReqd closure_info
 	  then do	-- Blackhole the (updatable) CAF:
-		{ upd_closure <- link_caf closure_info True
+                { upd_closure <- link_caf True
 		; pushUpdateFrame [CmmReg (CmmLocal upd_closure),
                                      mkLblExpr mkUpdInfoLabel] body } -- XXX black hole
 	  else do {tickyUpdateFrameOmitted; body}
@@ -611,8 +614,7 @@ pushUpdateFrame es body
 -- be closer together, and the compiler wouldn't need to know
 -- about off_indirectee etc.
 
-link_caf :: ClosureInfo
-	 -> Bool		-- True <=> updatable, False <=> single-entry
+link_caf :: Bool                -- True <=> updatable, False <=> single-entry
          -> FCode LocalReg      -- Returns amode for closure to be updated
 -- To update a CAF we must allocate a black hole, link the CAF onto the
 -- CAF list, then update the CAF to point to the fresh black hole.
@@ -620,13 +622,14 @@ link_caf :: ClosureInfo
 -- updated with the new value when available.  The reason for all of this
 -- is that we only want to update dynamic heap objects, not static ones,
 -- so that generational GC is easier.
-link_caf cl_info _is_upd = do
+link_caf _is_upd = do
   { 	-- Alloc black hole specifying CC_HDR(Node) as the cost centre
   ; let	use_cc   = costCentreFrom (CmmReg nodeReg)
         blame_cc = use_cc
         tso      = CmmReg (CmmGlobal CurrentTSO)
-    -- XXX ezyang: FIXME
-  ; (hp_rel, init) <- allocDynClosureCmm bh_cl_info use_cc blame_cc [(tso,fixedHdrSize)]
+
+  ; (hp_rel, init) <- allocDynClosureCmm cafBlackHoleInfoTable mkLFBlackHole
+                                         use_cc blame_cc [(tso,fixedHdrSize)]
   ; emit init
 
 	-- Call the RTS function newCAF to add the CAF to the CafList
@@ -646,9 +649,6 @@ link_caf cl_info _is_upd = do
 
   ; return hp_rel }
   where
-    bh_cl_info :: ClosureInfo
-    bh_cl_info = cafBlackHoleClosureInfo cl_info
-
     ind_static_info :: CmmExpr
     ind_static_info = mkLblExpr mkIndStaticInfoLabel
 

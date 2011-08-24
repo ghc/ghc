@@ -25,7 +25,7 @@ module SMRep (
         mkHeapRep, blackHoleRep, mkStackRep, mkRTSRep,
 
         -- ** Predicates
-        isStaticRep, isConRep, isThunkRep, isStaticNoCafCon,
+        isStaticRep, isConRep, isThunkRep, isFunRep, isStaticNoCafCon,
 
         -- ** Size-related things
         heapClosureSize,
@@ -195,6 +195,10 @@ isThunkRep (HeapRep _ _ _ Thunk{})         = True
 isThunkRep (HeapRep _ _ _ ThunkSelector{}) = True
 isThunkRep (HeapRep _ _ _ BlackHole{})     = True
 isThunkRep _                               = False
+
+isFunRep :: SMRep -> Bool
+isFunRep (HeapRep _ _ _ Fun{}) = True
+isFunRep _                     = False
 
 isStaticNoCafCon :: SMRep -> Bool
 -- This should line up exactly with CONSTR_NOCAF_STATIC above

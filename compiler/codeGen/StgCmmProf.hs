@@ -156,10 +156,10 @@ restoreCurrentCostCentre (Just local_cc)
 
 -- | Record the allocation of a closure.  The CmmExpr is the cost
 -- centre stack to which to attribute the allocation.
-profDynAlloc :: ClosureInfo -> CmmExpr -> FCode ()
-profDynAlloc cl_info ccs
+profDynAlloc :: SMRep -> CmmExpr -> FCode ()
+profDynAlloc rep ccs
   = ifProfiling $
-    profAlloc (CmmLit (mkIntCLit (closureSize cl_info))) ccs
+    profAlloc (CmmLit (mkIntCLit (heapClosureSize rep))) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts

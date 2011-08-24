@@ -27,12 +27,13 @@ module StgCmmClosure (
 	StandardFormInfo,	-- ...ditto...
 	mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
 	mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
-	lfDynTag,
-        maybeIsLFCon, isLFThunk, isLFReEntrant,
+        mkLFBlackHole,
+        lfDynTag,
+        maybeIsLFCon, isLFThunk, isLFReEntrant, lfUpdatable,
 
 	-----------------------------------
 	ClosureInfo,
-	mkClosureInfo, mkConInfo, 
+        mkClosureInfo,
         mkCmmInfo,
 
         closureSize,
@@ -40,7 +41,7 @@ module StgCmmClosure (
 	closureLabelFromCI, closureProf, closureSRT,
 	closureLFInfo, closureSMRep, closureUpdReqd, 
         closureIsThunk,
-	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
+        closureSingleEntry, closureReEntrant,
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
         funTag, tagForArity, 
 
@@ -53,11 +54,11 @@ module StgCmmClosure (
 
 	isToplevClosure,
 	isStaticClosure,
-	cafBlackHoleClosureInfo, 
 
-        staticClosureNeedsLink, clHasCafRefs, clProfInfo,
+        staticClosureNeedsLink, clHasCafRefs,
 
         mkDataConInfoTable,
+        cafBlackHoleInfoTable
     ) where
 
 #include "../includes/MachDeps.h"
@@ -151,6 +152,9 @@ data LambdaFormInfo
   | LFBlackHole		-- Used for the closures allocated to hold the result
 			-- of a CAF.  We want the target of the update frame to
 			-- be in the heap, so we make a black hole to hold it.
+
+                        -- XXX we can very nearly get rid of this, but
+                        -- allocDynClosure needs a LambdaFormInfo
 
 
 -------------------------
@@ -285,6 +289,10 @@ mkLFImported id
   = mkLFArgument id -- Not sure of exact arity
   where
     arity = idArity id
+
+------------
+mkLFBlackHole :: LambdaFormInfo
+mkLFBlackHole = LFBlackHole
 
 -----------------------------------------------------
 --		Dynamic pointer tagging
@@ -648,10 +656,8 @@ enough information
   b) to allocate a closure containing that info pointer (i.e.
 	it knows the info table label)
 
-We make a ClosureInfo for
-  - each let binding (both top level and not)
-  - each data constructor (for its shared static and
-	dynamic info tables)
+We make a ClosureInfo for each let binding (both top level and not),
+but not bindings for data constructors.
 
 Note [Closure CAF info]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -674,21 +680,9 @@ data ClosureInfo
 	closureInfLcl :: Bool             -- Can the info pointer be a local symbol?
     }
 
-  -- Constructor closures don't have a unique info table label (they use
-  -- the constructor's info table), and they don't have an SRT.
-  | ConInfo {
-	closureCon   :: !DataCon,
-	closureSMRep :: !SMRep,
-        closureCafs  :: !CafInfo        -- See Note [Closure CAF info]
-    }
-
 clHasCafRefs :: ClosureInfo -> CafInfo
 -- Backward compatibility; remove
 clHasCafRefs = closureCafs
-
-clProfInfo :: ClosureInfo -> ProfilingInfo
-clProfInfo ClosureInfo{ closureProf = p } = p
-clProfInfo _                              = NoProfilingInfo
 
 --------------------------------------
 --	Building ClosureInfos
@@ -719,32 +713,6 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info val_descr
     prof   = mkProfilingInfo id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
-mkConInfo :: Bool	-- Is static
-	  -> CafInfo 
-	  -> DataCon	
-	  -> Int -> Int	-- Total and pointer words
-	  -> ClosureInfo
-mkConInfo is_static cafs data_con tot_wds ptr_wds
-   = ConInfo { closureSMRep = sm_rep
-             , closureCafs = cafs
-	     , closureCon = data_con }
-  where
-    sm_rep  = mkHeapRep is_static ptr_wds nonptr_wds (lfClosureType lf_info)
-    lf_info = mkConLFInfo data_con
-    nonptr_wds = tot_wds - ptr_wds
-
--- We need a black-hole closure info to pass to @allocDynClosure@ when we
--- want to allocate the black hole on entry to a CAF.  These are the only
--- ways to build an LFBlackHole, maintaining the invariant that it really
--- is a black hole and not something else.
-
-cafBlackHoleClosureInfo :: ClosureInfo -> ClosureInfo
-cafBlackHoleClosureInfo cl_info@(ClosureInfo {})
-  = cl_info { closureLFInfo = LFBlackHole
-	    , closureSMRep  = blackHoleRep
-	    , closureSRT    = NoC_SRT
-	    , closureInfLcl = False }
-cafBlackHoleClosureInfo (ConInfo {}) = panic "cafBlackHoleClosureInfo"
 
 -- Convert from 'ClosureInfo' to 'CmmInfoTable'.
 -- Not used for return points.
@@ -752,7 +720,7 @@ mkCmmInfo :: ClosureInfo -> CmmInfoTable
 mkCmmInfo cl_info
   = CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
                    cit_rep  = closureSMRep cl_info,
-                   cit_prof = clProfInfo cl_info,
+                   cit_prof = closureProf cl_info,
                    cit_srt  = closureSRT cl_info }
 
 
@@ -774,7 +742,6 @@ blackHoleOnEntry :: DynFlags -> ClosureInfo -> Bool
 -- Single-entry ones have no fvs to plug, and we trust they don't form part 
 -- of a loop.
 
-blackHoleOnEntry _ ConInfo{} = False
 blackHoleOnEntry dflags (ClosureInfo { closureLFInfo = lf_info, closureSMRep = rep })
   | isStaticRep rep
   = False	-- Never black-hole a static closure
@@ -797,7 +764,6 @@ isStaticClosure cl_info = isStaticRep (closureSMRep cl_info)
 
 closureUpdReqd :: ClosureInfo -> Bool
 closureUpdReqd ClosureInfo{ closureLFInfo = lf_info } = lfUpdatable lf_info
-closureUpdReqd ConInfo{} = False
 
 lfUpdatable :: LambdaFormInfo -> Bool
 lfUpdatable (LFThunk _ _ upd _ _)  = upd
@@ -808,7 +774,6 @@ lfUpdatable _ = False
 
 closureIsThunk :: ClosureInfo -> Bool
 closureIsThunk ClosureInfo{ closureLFInfo = lf_info } = isLFThunk lf_info
-closureIsThunk ConInfo{} = False
 
 closureSingleEntry :: ClosureInfo -> Bool
 closureSingleEntry (ClosureInfo { closureLFInfo = LFThunk _ _ upd _ _}) = not upd
@@ -818,13 +783,8 @@ closureReEntrant :: ClosureInfo -> Bool
 closureReEntrant (ClosureInfo { closureLFInfo = LFReEntrant _ _ _ _ }) = True
 closureReEntrant _ = False
 
-isConstrClosure_maybe :: ClosureInfo -> Maybe DataCon
-isConstrClosure_maybe (ConInfo { closureCon = data_con }) = Just data_con
-isConstrClosure_maybe _ 				  = Nothing
-
 closureFunInfo :: ClosureInfo -> Maybe (Int, ArgDescr)
 closureFunInfo (ClosureInfo { closureLFInfo = lf_info }) = lfFunInfo lf_info
-closureFunInfo _ = Nothing
 
 lfFunInfo :: LambdaFormInfo ->  Maybe (Int, ArgDescr)
 lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
@@ -832,7 +792,6 @@ lfFunInfo _                                 = Nothing
 
 funTag :: ClosureInfo -> DynTag
 funTag (ClosureInfo { closureLFInfo = lf_info }) = lfDynTag lf_info
-funTag (ConInfo {})				 = panic "funTag"
 
 isToplevClosure :: ClosureInfo -> Bool
 isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
@@ -840,7 +799,6 @@ isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
       LFReEntrant TopLevel _ _ _ -> True
       LFThunk TopLevel _ _ _ _   -> True
       _other			 -> False
-isToplevClosure _ = False
 
 --------------------------------------
 --   Label generation
@@ -870,14 +828,6 @@ infoTableLabelFromCI (ClosureInfo { closureName = name,
   where 
     std_mk_lbl | is_lcl    = mkLocalInfoTableLabel
                | otherwise = mkInfoTableLabel
-
-infoTableLabelFromCI (ConInfo { closureCon = con,
-                                closureSMRep = rep,
-                                closureCafs = cafs })
-  | isStaticRep rep = mkStaticInfoTableLabel name cafs
-  | otherwise       = mkConInfoTableLabel name cafs
-  where
-    name = dataConName con
 
 -- ClosureInfo for a closure (as opposed to a constructor) is always local
 closureLabelFromCI :: ClosureInfo -> CLabel
@@ -984,6 +934,15 @@ mkDataConInfoTable data_con is_static ptr_wds nonptr_wds
    ty_descr  = stringToWord8s $ occNameString $ getOccName $ dataConTyCon data_con
    val_descr = stringToWord8s $ occNameString $ getOccName data_con
 
+-- We need a black-hole closure info to pass to @allocDynClosure@ when we
+-- want to allocate the black hole on entry to a CAF.
+
+cafBlackHoleInfoTable :: CmmInfoTable
+cafBlackHoleInfoTable
+  = CmmInfoTable { cit_lbl  = mkCAFBlackHoleInfoTableLabel
+                 , cit_rep  = blackHoleRep
+                 , cit_prof = NoProfilingInfo
+                 , cit_srt  = NoC_SRT }
 
 staticClosureNeedsLink :: CmmInfoTable -> Bool
 -- A static closure needs a link field to aid the GC when traversing
@@ -996,3 +955,4 @@ staticClosureNeedsLink info_tbl@CmmInfoTable{ cit_rep = smrep }
   | isConRep smrep         = not (isStaticNoCafCon smrep)
   | otherwise              = needsSRT (cit_srt info_tbl)
 staticClosureNeedsLink _ = False
+

@@ -49,7 +49,8 @@ import Constants
 -----------------------------------------------------------
 
 allocDynClosure
-        :: ClosureInfo
+        :: CmmInfoTable
+        -> LambdaFormInfo
         -> CmmExpr              -- Cost Centre to stick in the object
         -> CmmExpr              -- Cost Centre to blame for this alloc
                                 -- (usually the same; sometimes "OVERHEAD")
@@ -60,7 +61,7 @@ allocDynClosure
         -> FCode (LocalReg, CmmAGraph)
 
 allocDynClosureCmm
-        :: ClosureInfo -> CmmExpr -> CmmExpr
+        :: CmmInfoTable -> LambdaFormInfo -> CmmExpr -> CmmExpr
         -> [(CmmExpr, VirtualHpOffset)]
         -> FCode (LocalReg, CmmAGraph)
 
@@ -81,18 +82,20 @@ allocDynClosureCmm
 --         but Hp+8 means something quite different...
 
 
-allocDynClosure cl_info use_cc _blame_cc args_w_offsets
+allocDynClosure info_tbl lf_info use_cc _blame_cc args_w_offsets
   = do  { let (args, offsets) = unzip args_w_offsets
         ; cmm_args <- mapM getArgAmode args     -- No void args
-        ; allocDynClosureCmm cl_info use_cc _blame_cc (zip cmm_args offsets)
+        ; allocDynClosureCmm info_tbl lf_info
+                             use_cc _blame_cc (zip cmm_args offsets)
         }
 
-allocDynClosureCmm cl_info use_cc _blame_cc amodes_w_offsets
+allocDynClosureCmm info_tbl lf_info use_cc _blame_cc amodes_w_offsets
   = do  { virt_hp <- getVirtHp
 
         -- SAY WHAT WE ARE ABOUT TO DO
-        ; tickyDynAlloc cl_info
-        ; profDynAlloc cl_info use_cc
+        ; let rep = cit_rep info_tbl
+        ; tickyDynAlloc rep lf_info
+        ; profDynAlloc rep use_cc
                 -- ToDo: This is almost certainly wrong
                 -- We're ignoring blame_cc. But until we've
                 -- fixed the boxing hack in chooseDynCostCentres etc,
@@ -106,7 +109,7 @@ allocDynClosureCmm cl_info use_cc _blame_cc amodes_w_offsets
                 -- Remember, virtHp points to last allocated word,
                 -- ie 1 *before* the info-ptr word of new object.
 
-                info_ptr = CmmLit (CmmLabel (infoTableLabelFromCI cl_info))
+                info_ptr = CmmLit (CmmLabel (cit_lbl info_tbl))
 
         -- ALLOCATE THE OBJECT
         ; base <- getHpRelOffset info_offset
@@ -116,7 +119,7 @@ allocDynClosureCmm cl_info use_cc _blame_cc amodes_w_offsets
         ; hpStore base cmm_args offsets
 
         -- BUMP THE VIRTUAL HEAP POINTER
-        ; setVirtHp (virt_hp + closureSize cl_info)
+        ; setVirtHp (virt_hp + heapClosureSize rep)
 
         -- Assign to a temporary and return
         -- Note [Return a LocalReg]
