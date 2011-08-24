@@ -379,8 +379,11 @@ closureCodeBody :: Bool            -- whether this is a top-level binding
 
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   | length args == 0 -- No args i.e. thunk
-  = emitClosureProcAndInfoTable top_lvl bndr cl_info [] $
+  = emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl [] $
       \(_, node, _) -> thunkCode cl_info fv_details cc node arity body
+   where
+     lf_info  = closureLFInfo cl_info
+     info_tbl = mkCmmInfo cl_info
 
 closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   = ASSERT( length args > 0 )
@@ -392,8 +395,12 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
         ; emitTickyCounter cl_info (map stripNV args)
         ; setTickyCtrLabel ticky_ctr_lbl $ do
 
+        ; let
+             lf_info  = closureLFInfo cl_info
+             info_tbl = mkCmmInfo cl_info
+
         -- Emit the main entry code
-        ; emitClosureProcAndInfoTable top_lvl bndr cl_info args $
+        ; emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args $
             \(offset, node, arg_regs) -> do
                 -- Emit slow-entry code (for entering a closure through a PAP)
                 { mkSlowEntryCode cl_info arg_regs

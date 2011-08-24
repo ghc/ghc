@@ -245,21 +245,18 @@ cgDataCon :: DataCon -> FCode ()
 -- the static closure, for a constructor.
 cgDataCon data_con
   = do	{ let
-	    -- To allow the debuggers, interpreters, etc to cope with
-	    -- static data structures (ie those built at compile
-	    -- time), we take care that info-table contains the
-	    -- information we need.
-	    static_cl_info = mkConInfo True  no_cafs   data_con tot_wds ptr_wds
-	    dyn_cl_info    = mkConInfo False NoCafRefs data_con tot_wds ptr_wds
-            no_cafs = pprPanic "cgDataCon: CAF field should not be reqd" (ppr data_con)
-
-    	    (tot_wds, --  #ptr_wds + #nonptr_wds
+            (tot_wds, --  #ptr_wds + #nonptr_wds
     	     ptr_wds, --  #ptr_wds
     	     arg_things) = mkVirtConstrOffsets arg_reps
 
-	    emit_info cl_info ticky_code
-		= emitClosureAndInfoTable cl_info NativeDirectCall []
-                                        $ mk_code ticky_code
+            nonptr_wds   = tot_wds - ptr_wds
+
+            sta_info_tbl = mkDataConInfoTable data_con True  ptr_wds nonptr_wds
+            dyn_info_tbl = mkDataConInfoTable data_con False ptr_wds nonptr_wds
+
+            emit_info info_tbl ticky_code
+                = emitClosureAndInfoTable info_tbl NativeDirectCall []
+                             $ mk_code ticky_code
 
 	    mk_code ticky_code
 	      = 	-- NB: We don't set CC when entering data (WDP 94/06)
@@ -275,10 +272,10 @@ cgDataCon data_con
 
 	    -- Dynamic closure code for non-nullary constructors only
 	; whenC (not (isNullaryRepDataCon data_con))
-	 	(emit_info dyn_cl_info tickyEnterDynCon)
+                (emit_info dyn_info_tbl tickyEnterDynCon)
 
 		-- Dynamic-Closure first, to reduce forward references
-	; emit_info static_cl_info tickyEnterStaticCon }
+        ; emit_info sta_info_tbl tickyEnterStaticCon }
 
 
 ---------------------------------------------------------------

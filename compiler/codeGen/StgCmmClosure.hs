@@ -33,6 +33,7 @@ module StgCmmClosure (
 	-----------------------------------
 	ClosureInfo,
 	mkClosureInfo, mkConInfo, 
+        mkCmmInfo,
 
         closureSize,
         closureName, infoTableLabelFromCI, entryLabelFromCI,
@@ -43,7 +44,7 @@ module StgCmmClosure (
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
         funTag, tagForArity, 
 
-	enterIdLabel, enterLocalIdLabel, 
+        enterIdLabel, enterLocalIdLabel,
 
 	nodeMustPointToIt, 
 	CallMethod(..), getCallMethod,
@@ -55,6 +56,8 @@ module StgCmmClosure (
 	cafBlackHoleClosureInfo, 
 
         staticClosureNeedsLink, clHasCafRefs, clProfInfo,
+
+        mkDataConInfoTable,
     ) where
 
 #include "../includes/MachDeps.h"
@@ -360,8 +363,8 @@ isLFReEntrant _                = False
 
 lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
 lfClosureType (LFReEntrant _ arity _ argd) = Fun (fromIntegral arity) argd
-lfClosureType (LFCon con)                  =  Constr (fromIntegral (dataConTagZ con))
-                			              (dataConIdentity con)
+lfClosureType (LFCon con)                  = Constr (fromIntegral (dataConTagZ con))
+                                                      (dataConIdentity con)
 lfClosureType (LFThunk _ _ _ is_sel _) 	   = thunkClosureType is_sel
 lfClosureType _                 	   = panic "lfClosureType"
 
@@ -743,6 +746,15 @@ cafBlackHoleClosureInfo cl_info@(ClosureInfo {})
 	    , closureInfLcl = False }
 cafBlackHoleClosureInfo (ConInfo {}) = panic "cafBlackHoleClosureInfo"
 
+-- Convert from 'ClosureInfo' to 'CmmInfoTable'.
+-- Not used for return points.
+mkCmmInfo :: ClosureInfo -> CmmInfoTable
+mkCmmInfo cl_info
+  = CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
+                   cit_rep  = closureSMRep cl_info,
+                   cit_prof = clProfInfo cl_info,
+                   cit_srt  = closureSRT cl_info }
+
 
 --------------------------------------
 --   Functions about closure *sizes*
@@ -856,44 +868,38 @@ isToplevClosure _ = False
 --   Label generation
 --------------------------------------
 
-infoTableLabelFromCI :: ClosureInfo -> CLabel
-infoTableLabelFromCI = fst . labelsFromCI
-
 entryLabelFromCI :: ClosureInfo -> CLabel
-entryLabelFromCI = snd . labelsFromCI
+entryLabelFromCI = infoLblToEntryLbl . infoTableLabelFromCI
 
-labelsFromCI :: ClosureInfo -> (CLabel, CLabel) -- (Info, Entry)
-labelsFromCI (ClosureInfo { closureName = name,
+infoTableLabelFromCI :: ClosureInfo -> CLabel
+infoTableLabelFromCI (ClosureInfo { closureName = name,
 			    closureLFInfo = lf_info,
 			    closureCafs = cafs,
 			    closureInfLcl = is_lcl })
   = case lf_info of
-	LFBlackHole -> (mkCAFBlackHoleInfoTableLabel, mkCAFBlackHoleEntryLabel)
+        LFBlackHole -> mkCAFBlackHoleInfoTableLabel
 
 	LFThunk _ _ upd_flag (SelectorThunk offset) _ 
-		      -> bothL (mkSelectorInfoLabel, mkSelectorEntryLabel) upd_flag offset
+                      -> mkSelectorInfoLabel upd_flag offset
 
 	LFThunk _ _ upd_flag (ApThunk arity) _ 
-		      -> bothL (mkApInfoTableLabel, mkApEntryLabel) upd_flag arity
+                      -> mkApInfoTableLabel upd_flag arity
 
-	LFThunk{}     -> bothL std_mk_lbls name cafs
-	LFReEntrant{} -> bothL std_mk_lbls name cafs
+        LFThunk{}     -> std_mk_lbl name cafs
+        LFReEntrant{} -> std_mk_lbl name cafs
 	_other        -> panic "labelsFromCI"
 
   where 
-    std_mk_lbls | is_lcl    = (mkLocalInfoTableLabel, mkLocalEntryLabel)
-                | otherwise = (mkInfoTableLabel, mkEntryLabel)
+    std_mk_lbl | is_lcl    = mkLocalInfoTableLabel
+               | otherwise = mkInfoTableLabel
 
-labelsFromCI (ConInfo { closureCon = con, closureSMRep = rep, closureCafs = cafs })
-  | isStaticRep rep 
-  = bothL (mkStaticInfoTableLabel, mkStaticConEntryLabel) name cafs
-  | otherwise	    
-  = bothL (mkConInfoTableLabel,    mkConEntryLabel)       name cafs
+infoTableLabelFromCI (ConInfo { closureCon = con,
+                                closureSMRep = rep,
+                                closureCafs = cafs })
+  | isStaticRep rep = mkStaticInfoTableLabel name cafs
+  | otherwise       = mkConInfoTableLabel name cafs
   where
     name = dataConName con
-
-bothL :: (a -> b -> c, a -> b -> c) -> a -> b -> (c, c)
-bothL (f, g) x y = (f x y, g x y)
 
 -- ClosureInfo for a closure (as opposed to a constructor) is always local
 closureLabelFromCI :: ClosureInfo -> CLabel
@@ -973,3 +979,29 @@ getPredTyDescription (ClassP cl _) = getOccString cl
 getPredTyDescription (IParam ip _) = getOccString (ipNameName ip)
 getPredTyDescription (EqPred {})   = "Type equality"
 
+--------------------------------------
+--   Misc things
+--------------------------------------
+
+mkDataConInfoTable :: DataCon -> Bool -> Int -> Int -> CmmInfoTable
+mkDataConInfoTable data_con is_static ptr_wds nonptr_wds
+ = CmmInfoTable { cit_lbl  = info_lbl
+                , cit_rep  = sm_rep
+                , cit_prof = prof
+                , cit_srt  = NoC_SRT }
+ where
+   name = dataConName data_con
+
+   info_lbl | is_static = mkStaticInfoTableLabel name NoCafRefs
+            | otherwise = mkConInfoTableLabel    name NoCafRefs
+
+   sm_rep = mkHeapRep is_static ptr_wds nonptr_wds cl_type
+
+   cl_type = Constr (fromIntegral (dataConTagZ data_con))
+                   (dataConIdentity data_con)
+
+   prof | not opt_SccProfilingOn = NoProfilingInfo
+        | otherwise              = ProfilingInfo ty_descr val_descr
+
+   ty_descr  = stringToWord8s $ occNameString $ getOccName $ dataConTyCon data_con
+   val_descr = stringToWord8s $ occNameString $ getOccName data_con

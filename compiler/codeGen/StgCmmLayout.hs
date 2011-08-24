@@ -369,12 +369,13 @@ stdPattern reps
 
 emitClosureProcAndInfoTable :: Bool                    -- top-level? 
                             -> Id                      -- name of the closure
-                            -> ClosureInfo             -- lots of info abt the closure
+                            -> LambdaFormInfo
+                            -> CmmInfoTable
                             -> [NonVoid Id]            -- incoming arguments
                             -> ((Int, LocalReg, [LocalReg]) -> FCode ()) -- function body
                             -> FCode ()
-emitClosureProcAndInfoTable top_lvl bndr cl_info args body
- = do	{ let lf_info = closureLFInfo cl_info
+emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
+ = do   {
         -- Bind the binder itself, but only if it's not a top-level
         -- binding. We need non-top let-bindings to refer to the
         -- top-level binding, which this binding would incorrectly shadow.
@@ -386,27 +387,18 @@ emitClosureProcAndInfoTable top_lvl bndr cl_info args body
               conv  = if nodeMustPointToIt lf_info then NativeNodeCall
                                                    else NativeDirectCall
               (offset, _) = mkCallEntry conv args'
-        ; emitClosureAndInfoTable cl_info conv args' $ body (offset, node, arg_regs)
+        ; emitClosureAndInfoTable info_tbl conv args' $ body (offset, node, arg_regs)
         }
 
 -- Data constructors need closures, but not with all the argument handling
 -- needed for functions. The shared part goes here.
 emitClosureAndInfoTable ::
-  ClosureInfo -> Convention -> [LocalReg] -> FCode () -> FCode ()
-emitClosureAndInfoTable cl_info conv args body
-  = do { let info = mkCmmInfo cl_info
-       ; blks <- getCode body
-       ; emitProcWithConvention conv info (entryLabelFromCI cl_info) args blks
+  CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
+emitClosureAndInfoTable info_tbl conv args body
+  = do { blks <- getCode body
+       ; let entry_lbl = infoLblToEntryLbl (cit_lbl info_tbl)
+       ; emitProcWithConvention conv info_tbl entry_lbl args blks
        }
-
--- Convert from 'ClosureInfo' to 'CmmInfoTable'.
--- Not used for return points.
-mkCmmInfo :: ClosureInfo -> CmmInfoTable
-mkCmmInfo cl_info
-  = CmmInfoTable { cit_lbl  = infoTableLabelFromCI cl_info,
-                   cit_rep  = closureSMRep cl_info,
-                   cit_prof = clProfInfo cl_info,
-                   cit_srt  = closureSRT cl_info }
 
 -----------------------------------------------------------------------------
 --

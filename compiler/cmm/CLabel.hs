@@ -104,8 +104,9 @@ module CLabel (
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
         isMathFun,
  	isCFunctionLabel, isGcPtrLabel, labelDynamic,
+        infoLblToEntryLbl, entryLblToInfoLbl,
 
-	pprCLabel
+        pprCLabel
     ) where
 
 #include "HsVersions.h"
@@ -285,11 +286,14 @@ type IsLocal = Bool
 data IdLabelInfo
   = Closure		-- ^ Label for closure
   | SRT                 -- ^ Static reference table
-  | InfoTable IsLocal	-- ^ Info tables for closures; always read-only
+  | InfoTable           -- ^ Info tables for closures; always read-only
   | Entry	        -- ^ Entry point
-  | Slow		-- ^ Slow entry point
+  | Slow                -- ^ Slow entry point
 
-  | RednCounts		-- ^ Label of place to keep Ticky-ticky  info for this Id
+  | LocalInfoTable      -- ^ Like InfoTable but not externally visible
+  | LocalEntry          -- ^ Like Entry but not externally visible
+
+  | RednCounts          -- ^ Label of place to keep Ticky-ticky  info for this Id
 
   | ConEntry	  	-- ^ Constructor entry point
   | ConInfoTable 	-- ^ Corresponding info table
@@ -362,12 +366,12 @@ mkRednCountsLabel     	name c 	= IdLabel name  c RednCounts
 
 -- These have local & (possibly) external variants:
 mkLocalClosureLabel	name c 	= IdLabel name  c Closure
-mkLocalInfoTableLabel  	name c 	= IdLabel name  c (InfoTable True)
-mkLocalEntryLabel	name c 	= IdLabel name  c Entry
+mkLocalInfoTableLabel   name c  = IdLabel name  c LocalInfoTable
+mkLocalEntryLabel       name c  = IdLabel name  c LocalEntry
 mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 
 mkClosureLabel name         c     = IdLabel name c Closure
-mkInfoTableLabel name       c     = IdLabel name c (InfoTable False)
+mkInfoTableLabel name       c     = IdLabel name c InfoTable
 mkEntryLabel name           c     = IdLabel name c Entry
 mkClosureTableLabel name    c     = IdLabel name c ClosureTable
 mkLocalConInfoTableLabel    c con = IdLabel con c ConInfoTable
@@ -504,14 +508,37 @@ mkPlainModuleInitLabel mod	= PlainModuleInitLabel mod
 -- -----------------------------------------------------------------------------
 -- Brutal method of obtaining a closure label
 
-cvtToClosureLbl   (IdLabel n c (InfoTable _))	= IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c Entry)	        = IdLabel n c Closure
-cvtToClosureLbl   (IdLabel n c ConEntry)	= IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c InfoTable)       = IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c LocalInfoTable)  = IdLabel n c Closure -- XXX?
+cvtToClosureLbl   (IdLabel n c Entry)           = IdLabel n c Closure
+cvtToClosureLbl   (IdLabel n c LocalEntry)      = IdLabel n c Closure -- XXX?
+cvtToClosureLbl   (IdLabel n c ConEntry)        = IdLabel n c Closure
 cvtToClosureLbl   (IdLabel n c RednCounts)	= IdLabel n c Closure
 cvtToClosureLbl l@(IdLabel n c Closure)		= l
 cvtToClosureLbl l 
 	= pprPanic "cvtToClosureLbl" (pprCLabel l)
 
+infoLblToEntryLbl :: CLabel -> CLabel 
+infoLblToEntryLbl (IdLabel n c LocalInfoTable) = IdLabel n c LocalEntry
+infoLblToEntryLbl (IdLabel n c InfoTable)      = IdLabel n c Entry
+infoLblToEntryLbl (IdLabel n c ConInfoTable)   = IdLabel n c ConEntry
+infoLblToEntryLbl (IdLabel n c StaticInfoTable) = IdLabel n c StaticConEntry
+infoLblToEntryLbl (CaseLabel n CaseReturnInfo) = CaseLabel n CaseReturnPt
+infoLblToEntryLbl (CmmLabel m str CmmInfo)     = CmmLabel m str CmmEntry
+infoLblToEntryLbl (CmmLabel m str CmmRetInfo)  = CmmLabel m str CmmRet
+infoLblToEntryLbl _
+       = panic "CLabel.infoLblToEntryLbl"
+
+entryLblToInfoLbl :: CLabel -> CLabel 
+entryLblToInfoLbl (IdLabel n c Entry)          = IdLabel n c InfoTable
+entryLblToInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
+entryLblToInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
+entryLblToInfoLbl (IdLabel n c StaticConEntry) = IdLabel n c StaticInfoTable
+entryLblToInfoLbl (CaseLabel n CaseReturnPt)   = CaseLabel n CaseReturnInfo
+entryLblToInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
+entryLblToInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
+entryLblToInfoLbl l                            
+       = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel refer to a CAF?
@@ -678,7 +705,8 @@ externallyVisibleCLabel (LargeSRTLabel _)	= False
 
 externallyVisibleIdLabel :: IdLabelInfo -> Bool
 externallyVisibleIdLabel SRT             = False
-externallyVisibleIdLabel (InfoTable lcl) = not lcl
+externallyVisibleIdLabel LocalInfoTable  = False
+externallyVisibleIdLabel LocalEntry      = False
 externallyVisibleIdLabel _               = True
 
 -- -----------------------------------------------------------------------------
@@ -726,8 +754,9 @@ labelType _                                     = DataLabel
 
 idInfoLabelType info =
   case info of
-    InfoTable _   -> DataLabel
-    Closure    	  -> GcPtrLabel
+    InfoTable     -> DataLabel
+    LocalInfoTable -> DataLabel
+    Closure       -> GcPtrLabel
     ConInfoTable  -> DataLabel
     StaticInfoTable -> DataLabel
     ClosureTable  -> DataLabel
@@ -991,9 +1020,11 @@ ppIdFlavor x = pp_cSEP <>
 	       (case x of
 		       Closure	    	-> ptext (sLit "closure")
 		       SRT		-> ptext (sLit "srt")
-		       InfoTable _	-> ptext (sLit "info")
-		       Entry	    	-> ptext (sLit "entry")
-		       Slow	    	-> ptext (sLit "slow")
+                       InfoTable        -> ptext (sLit "info")
+                       LocalInfoTable   -> ptext (sLit "info")
+                       Entry            -> ptext (sLit "entry")
+                       LocalEntry       -> ptext (sLit "entry")
+                       Slow             -> ptext (sLit "slow")
 		       RednCounts	-> ptext (sLit "ct")
 		       ConEntry	    	-> ptext (sLit "con_entry")
 		       ConInfoTable    	-> ptext (sLit "con_info")
