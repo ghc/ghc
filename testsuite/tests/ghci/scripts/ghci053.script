@@ -1,0 +1,10 @@
+--Testing deriving in the presence of shadowing
+data Planet = Mercury | Venus | Earth deriving Eq
+let mercury = Mercury
+Venus == Earth
+data Planet = Mercury | Venus deriving Eq
+Mercury == Mercury
+mercury == Mercury
+Mercury == Venus
+Venus == Earth
+Earth == Earth

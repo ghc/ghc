@@ -1,0 +1,10 @@
+--Testing flexible and Overlapping instances
+class C a where { f :: a -> Int; f _ = 3 }
+instance C Int where { f = id }
+instance C [Int]
+:set -XFlexibleInstances
+instance C [Int]
+instance C a => C [a] where f xs = length xs
+-- ***This should be an overlapping instances error!***
+:set -XOverlappingInstances
+instance C a => C [a] where f xs = length xs
