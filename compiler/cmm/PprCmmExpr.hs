@@ -45,6 +45,7 @@ import Outputable
 import FastString
 
 import Data.Maybe
+import Numeric ( fromRat )
 
 -----------------------------------------------------------------------------
 
@@ -191,7 +192,7 @@ pprLit lit = case lit of
              , ppUnless (rep == wordWidth) $
                space <> dcolon <+> ppr rep ]
 
-    CmmFloat f rep     -> hsep [ rational f, dcolon, ppr rep ]
+    CmmFloat f rep     -> hsep [ double (fromRat f), dcolon, ppr rep ]
     CmmLabel clbl      -> pprCLabel clbl
     CmmLabelOff clbl i -> pprCLabel clbl <> ppr_offset i
     CmmLabelDiffOff clbl1 clbl2 i -> pprCLabel clbl1 <> char '-'  

@@ -59,7 +59,8 @@ import Data.Int
 import Data.Ratio
 import Data.Word
 import Data.Char
-import Data.Data( Data, Typeable )
+import Data.Data ( Data, Typeable )
+import Numeric ( fromRat )
 \end{code}
 
 
@@ -390,8 +391,8 @@ pprLit (MachInt i)    	= pprIntVal i
 pprLit (MachInt64 i)  	= ptext (sLit "__int64") <+> integer i
 pprLit (MachWord w)   	= ptext (sLit "__word") <+> integer w
 pprLit (MachWord64 w) 	= ptext (sLit "__word64") <+> integer w
-pprLit (MachFloat f)  	= ptext (sLit "__float") <+> rational f
-pprLit (MachDouble d) 	= rational d
+pprLit (MachFloat f)  	= ptext (sLit "__float") <+> float (fromRat f)
+pprLit (MachDouble d) 	= double (fromRat d)
 pprLit (MachNullAddr) 	= ptext (sLit "__NULL")
 pprLit (MachLabel l mb fod) = ptext (sLit "__label") <+> b <+> ppr fod
     where b = case mb of
