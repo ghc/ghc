@@ -56,7 +56,8 @@ optProc _   top                  = top
 branchChainElim :: CmmGraph -> CmmGraph
 branchChainElim g
   | null lone_branch_blocks = g    -- No blocks to remove
-  | otherwise               = pprTrace "branchChainElim" (ppr forest) $ replaceLabels (mapFromList edges) g
+  | otherwise               = {- pprTrace "branchChainElim" (ppr forest) $ -}
+                              replaceLabels (mapFromList edges) g
   where
     blocks = toBlockList g
 
