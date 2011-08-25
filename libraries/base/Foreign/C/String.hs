@@ -484,10 +484,9 @@ newCWStringLen str  = newArrayLen (charsToCWchars str)
 withCWString :: String -> (CWString -> IO a) -> IO a
 withCWString  = withArray0 wNUL . charsToCWchars
 
--- | Marshal a Haskell string into a NUL terminated C wide string using
--- temporary storage.
---
--- * the Haskell string may /not/ contain any NUL characters
+-- | Marshal a Haskell string into a C wide string (i.e. wide
+-- character array) in temporary storage, with explicit length
+-- information.
 --
 -- * the memory is freed when the subcomputation terminates (either
 --   normally or via an exception), so the pointer to the temporary
