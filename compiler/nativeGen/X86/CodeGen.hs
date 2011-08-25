@@ -39,6 +39,7 @@ import Platform
 -- Our intermediate code:
 import BasicTypes
 import BlockId
+import Module           ( primPackageId )
 import PprCmm           ()
 import OldCmm
 import OldPprCmm        ()
@@ -1595,10 +1596,15 @@ genCCall (CmmPrim (MO_PopCnt width)) dest_regs@[CmmHinted dst _]
                      else
                          unitOL (POPCNT size (OpReg src_r)
                                  (getRegisterReg False (CmmLocal dst))))
-        else genCCall (CmmCallee (fn width) CCallConv) dest_regs args
-  where size = intSize width
-        fn w = CmmLit (CmmLabel (mkForeignLabel (fsLit (popCntLabel w)) Nothing
-                                 ForeignLabelInExternalPackage IsFunction))
+        else do
+            dflags <- getDynFlagsNat
+            targetExpr <- cmmMakeDynamicReference dflags addImportNat
+                          CallReference lbl
+            let target = CmmCallee targetExpr CCallConv
+            genCCall target dest_regs args
+  where
+    size = intSize width
+    lbl = mkCmmCodeLabel primPackageId (fsLit (popCntLabel width))
 
 genCCall target dest_regs args =
     do dflags <- getDynFlagsNat
