@@ -165,13 +165,12 @@ showTerm term = do
                expr = "show " ++ showSDoc (ppr bname)
            _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
            txt_ <- withExtendedLinkEnv [(bname, val)]
-                                         (GHC.compileExpr expr)
+                                       (GHC.compileExpr expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
            let txt = unsafeCoerce# txt_
            if not (null txt) then
-             return $ Just$ cparen (prec >= myprec &&
-                                         needsParens txt)
-                                   (text txt)
+             return $ Just $ cparen (prec >= myprec && needsParens txt)
+                                    (text txt)
             else return Nothing
          `gfinally` do
            setSession hsc_env

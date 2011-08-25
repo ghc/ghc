@@ -337,7 +337,8 @@ pprTermM y p t = pprDeeper `liftM` ppr_termM y p t
 
 ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
-  return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> pprDeeperList fsep tt_docs)
+  return $ cparen (not (null tt) && p >= app_prec)
+                  (text dc_tag <+> pprDeeperList fsep tt_docs)
   
 ppr_termM y p Term{dc=Right dc, subTerms=tt} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
