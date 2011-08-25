@@ -27,7 +27,7 @@ import GHC.Prim (
     and#, or#, xor#
  )
 
-import GHC.Integer.GMP.Internals (
+import GHC.Integer.GMP.Prim (
     -- GMP-related primitives
     cmpInteger#, cmpIntegerInt#,
     plusInteger#, minusInteger#, timesInteger#,

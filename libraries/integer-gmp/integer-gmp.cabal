@@ -23,6 +23,7 @@ Library {
     build-depends: ghc-prim
     exposed-modules: GHC.Integer
                      GHC.Integer.GMP.Internals
+                     GHC.Integer.GMP.Prim
                      GHC.Integer.Logarithms
                      GHC.Integer.Logarithms.Internals
     other-modules: GHC.Integer.Type
