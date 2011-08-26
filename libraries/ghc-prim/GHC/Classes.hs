@@ -22,11 +22,9 @@ module GHC.Classes where
 
 -- GHC.Magic is used in some derived instances
 import GHC.Magic ()
-import GHC.Ordering
 import GHC.Prim
 import GHC.Tuple
 import GHC.Types
-import GHC.Unit
 -- For defining instances for the generic deriving mechanism
 import GHC.Generics (Arity(..), Associativity(..), Fixity(..))
 

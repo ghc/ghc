@@ -17,7 +17,8 @@
 
 module GHC.Types (
         Bool(..), Char(..), Int(..),
-        Float(..), Double(..), IO(..)
+        Float(..), Double(..),
+        Ordering(..), IO(..)
     ) where
 
 import GHC.Prim
@@ -57,6 +58,9 @@ data Float = F# Float#
 -- It is desirable that this type be at least equal in range and precision
 -- to the IEEE double-precision type.
 data Double = D# Double#
+
+data Ordering = LT | EQ | GT
+        deriving Generic
 
 {- |
 A value of type @'IO' a@ is a computation which, when performed,

@@ -4,7 +4,7 @@ module GHC.Debug ( debugLn, debugErrLn ) where
 
 import GHC.Prim
 import GHC.Types
-import GHC.Unit ()
+import GHC.Tuple ()
 
 debugLn :: [Char] -> IO ()
 debugLn xs = IO (\s0 ->

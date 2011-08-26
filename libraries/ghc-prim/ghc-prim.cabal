@@ -27,12 +27,10 @@ Library {
         GHC.Debug
         GHC.Generics
         GHC.Magic
-        GHC.Ordering
         GHC.PrimopWrappers
         GHC.IntWord64
         GHC.Tuple
         GHC.Types
-        GHC.Unit
 
     if flag(include-ghc-prim) {
         exposed-modules: GHC.Prim

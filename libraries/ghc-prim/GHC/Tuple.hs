@@ -21,6 +21,10 @@ import GHC.Generics (Generic)
 
 default () -- Double and Integer aren't available yet
 
+-- | The unit datatype @()@ has one non-undefined member, the nullary
+-- constructor @()@.
+data () = () deriving Generic
+
 data (,) a b = (,) a b
     deriving Generic
 data (,,) a b c = (,,) a b c
