@@ -53,7 +53,6 @@ import GHC.IntWord64 (
 #endif
 
 import GHC.Classes
-import GHC.Ordering
 import GHC.Types
 
 default ()
