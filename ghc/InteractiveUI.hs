@@ -34,7 +34,7 @@ import UniqFM
 
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, dep_pkgs )
 import HsImpExp
-import RdrName ( RdrName, getGRE_NameQualifier_maybes )
+import RdrName ( getGRE_NameQualifier_maybes )
 import Outputable hiding ( printForUser, printForUserPartWay, bold )
 import Module
 import Name
