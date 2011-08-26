@@ -21,7 +21,7 @@ import HsSyn
 import TcType ( tcSplitTyConApp_maybe, tcSplitSigmaTy )
 import TypeRep
 import RnTypes ( mkIPName )
-import Kind ( liftedTypeKind, factKind )
+import Kind ( liftedTypeKind, constraintKind )
 import Coercion ( splitKindFunTys, synTyConResKind )
 import Name
 import Var
@@ -266,7 +266,7 @@ synifyType _ (TyConApp tc tys)
   | isTupleTyCon tc, tyConArity tc == length tys =
      noLoc $ HsTupleTy (case tupleTyConSort tc of
                           BoxedTuple   -> HsBoxyTuple liftedTypeKind
-                          FactTuple    -> HsBoxyTuple factKind
+                          FactTuple    -> HsBoxyTuple constraintKind
                           UnboxedTuple -> HsUnboxedTuple)
                        (map (synifyType WithinType) tys)
   -- ditto for lists
