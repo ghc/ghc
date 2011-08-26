@@ -490,7 +490,7 @@ gen_wrappers (Info _ entries)
      ++ "module GHC.PrimopWrappers where\n" 
      ++ "import qualified GHC.Prim\n" 
      ++ "import GHC.Types (Bool)\n"
-     ++ "import GHC.Unit ()\n"
+     ++ "import GHC.Tuple ()\n"
      ++ "import GHC.Prim (" ++ types ++ ")\n"
      ++ unlines (concatMap f specs)
      where

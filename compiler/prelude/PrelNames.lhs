@@ -286,7 +286,7 @@ dphKnownKeyNames dphPkg
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
+gHC_PRIM, gHC_TYPES, gHC_GENERICS,
     gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_LIST,
@@ -300,8 +300,6 @@ gHC_PRIM, gHC_TYPES, gHC_UNIT, gHC_ORDERING, gHC_GENERICS,
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
-gHC_UNIT        = mkPrimModule (fsLit "GHC.Unit")
-gHC_ORDERING    = mkPrimModule (fsLit "GHC.Ordering")
 gHC_GENERICS    = mkPrimModule (fsLit "GHC.Generics")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
 gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
@@ -406,7 +404,6 @@ mkMainModule_ m = mkModule mainPackageId m
 
 \begin{code}
 mkTupleModule :: Boxity -> Arity -> Module
-mkTupleModule Boxed   0 = gHC_UNIT
 mkTupleModule Boxed   _ = gHC_TUPLE
 mkTupleModule Unboxed _ = gHC_PRIM
 \end{code}
@@ -437,9 +434,9 @@ le_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<=")
 lt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<")
 gt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit ">")
 compare_RDR             = varQual_RDR  gHC_CLASSES (fsLit "compare")
-ltTag_RDR               = dataQual_RDR gHC_ORDERING (fsLit "LT")
-eqTag_RDR               = dataQual_RDR gHC_ORDERING (fsLit "EQ")
-gtTag_RDR               = dataQual_RDR gHC_ORDERING (fsLit "GT")
+ltTag_RDR               = dataQual_RDR gHC_TYPES (fsLit "LT")
+eqTag_RDR               = dataQual_RDR gHC_TYPES (fsLit "EQ")
+gtTag_RDR               = dataQual_RDR gHC_TYPES (fsLit "GT")
 
 eqClass_RDR, numClass_RDR, ordClass_RDR, enumClass_RDR, monadClass_RDR
     :: RdrName
@@ -649,10 +646,10 @@ runMainIOName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 
 orderingTyConName, ltDataConName, eqDataConName, gtDataConName :: Name
-orderingTyConName = tcQual   gHC_ORDERING (fsLit "Ordering") orderingTyConKey
-ltDataConName = conName gHC_ORDERING (fsLit "LT") ltDataConKey
-eqDataConName = conName gHC_ORDERING (fsLit "EQ") eqDataConKey
-gtDataConName = conName gHC_ORDERING (fsLit "GT") gtDataConKey
+orderingTyConName = tcQual   gHC_TYPES (fsLit "Ordering") orderingTyConKey
+ltDataConName = conName gHC_TYPES (fsLit "LT") ltDataConKey
+eqDataConName = conName gHC_TYPES (fsLit "EQ") eqDataConKey
+gtDataConName = conName gHC_TYPES (fsLit "GT") gtDataConKey
 
 eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
