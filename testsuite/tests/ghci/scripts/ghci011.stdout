@@ -5,7 +5,7 @@ instance Functor [] -- Defined in GHC.Base
 instance Ord a => Ord [a] -- Defined in GHC.Classes
 instance Read a => Read [a] -- Defined in GHC.Read
 instance Show a => Show [a] -- Defined in GHC.Show
-data () = () 	-- Defined in GHC.Unit
+data () = () 	-- Defined in GHC.Tuple
 instance Bounded () -- Defined in GHC.Enum
 instance Enum () -- Defined in GHC.Enum
 instance Eq () -- Defined in GHC.Classes

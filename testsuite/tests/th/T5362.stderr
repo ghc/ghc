@@ -1,4 +1,4 @@
-f_0 :: GHC.Unit.()
+f_0 :: GHC.Tuple.()
 f_0 = GHC.Err.undefined g_1
-g_1 :: GHC.Unit.()
+g_1 :: GHC.Tuple.()
 g_1 = GHC.Err.undefined

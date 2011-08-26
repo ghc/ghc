@@ -9,7 +9,7 @@ xs =
   \ (m :: GHC.Prim.Int#) ->
     case GHC.Prim.<=# m 1 of _ {
       GHC.Types.False -> xs (GHC.Prim.-# m 1);
-      GHC.Types.True -> GHC.Unit.()
+      GHC.Types.True -> GHC.Tuple.()
     }
 end Rec }
 
@@ -20,7 +20,7 @@ T3772.foo =
     case n of _ { GHC.Types.I# n# ->
     case GHC.Prim.<=# n# 0 of _ {
       GHC.Types.False -> xs n#;
-      GHC.Types.True -> GHC.Unit.()
+      GHC.Types.True -> GHC.Tuple.()
     }
     }
 
