@@ -50,7 +50,6 @@ import Linker
 import Util
 import NameSet
 import Maybes ( orElse, expectJust )
-import ListSetOps ( removeRedundant )
 import FastString
 import Encoding
 import Foreign.C
@@ -84,6 +83,7 @@ import Control.Monad as Monad
 import Text.Printf
 import Foreign.Safe
 import GHC.Exts ( unsafeCoerce# )
+import Control.Applicative hiding (empty)
 
 import GHC.IO.Exception ( IOErrorType(InvalidArgument) )
 import GHC.IO.Handle ( hFlushAll )
@@ -271,6 +271,7 @@ helpText =
   "   :show bindings              show the current bindings made at the prompt\n" ++
   "   :show breaks                show the active breakpoints\n" ++
   "   :show context               show the breakpoint context\n" ++
+  "   :show imports               show the current imports\n" ++
   "   :show modules               show the currently loaded modules\n" ++
   "   :show packages              show the currently active package flags\n" ++
   "   :show languages             show the currently active language flags\n" ++
@@ -342,10 +343,6 @@ interactiveUI srcs maybe_exprs = do
         hSetEncoding stdin utf8
 #endif
 
-   -- initial context is just the Prelude
-   let prel_mn = GHC.mkModuleName "Prelude"
-   GHC.setContext [IIDecl (simpleImportDecl prel_mn)]
-
    default_editor <- liftIO $ findEditor
 
    startGHCi (runGHCi srcs maybe_exprs)
@@ -355,7 +352,6 @@ interactiveUI srcs maybe_exprs = do
                    stop = default_stop,
                    editor = default_editor,
                    options = [],
-                   prelude = prel_mn,
                    line_number = 1,
                    break_ctr = 0,
                    breaks = [],
@@ -363,6 +359,7 @@ interactiveUI srcs maybe_exprs = do
                    last_command = Nothing,
                    cmdqueue = [],
                    remembered_ctx = [],
+                   transient_ctx = [],
                    ghc_e = isJust maybe_exprs
                  }
 
@@ -417,6 +414,9 @@ runGHCi paths maybe_exprs = do
                   liftIO (hClose hdl `catchIO` \_ -> return ())
      where
       getDirectory f = case takeDirectory f of "" -> "."; d -> d
+  --
+
+  setGHCContext []
 
   when (read_dot_files) $ do
     mcfgs0 <- sequence $ [ current_dir, app_user_dir, home_dir ]
@@ -559,13 +559,15 @@ mkPrompt = do
         dots | _:rs <- resumes, not (null rs) = text "... "
              | otherwise = empty
 
-        modules_bit = 
-       -- ToDo: maybe...
-       --  let (btoplevs, bexports) = fromMaybe ([],[]) (remembered_ctx st) in
-       --  hsep (map (\m -> text "!*" <> ppr (GHC.moduleName m)) btoplevs) <+>
-       --  hsep (map (\m -> char '!'  <> ppr (GHC.moduleName m)) bexports) <+>
-             hsep [ char '*' <> ppr (GHC.moduleName m) | IIModule m <- imports ] <+>
-             hsep (map ppr (nub [unLoc (ideclName d) | IIDecl d <- imports]))
+        rev_imports = reverse imports -- rightmost are the most recent
+        modules_bit =
+             hsep [ char '*' <> ppr (GHC.moduleName m)
+                  | IIModule m <- rev_imports ] <+>
+             hsep (map ppr [ myIdeclName d | IIDecl d <- rev_imports ])
+
+         --  use the 'as' name if there is one
+        myIdeclName d | Just m <- ideclAs d = m
+                      | otherwise           = unLoc (ideclName d)
 
         deflt_prompt = dots <> context_bit <> modules_bit
 
@@ -724,7 +726,7 @@ runStmt stmt step
  | null (filter (not.isSpace) stmt)
  = return False
  | "import " `isPrefixOf` stmt
- = do newContextCmd (Import stmt); return False
+ = do addImportToContext stmt; return False
  | otherwise
  = do -- In the new IO library, read handles buffer data even if the Handle
       -- is set to NoBuffering.  This causes problems for GHCi where there
@@ -823,6 +825,9 @@ specialCommand str = do
                            ++ shortHelpText)
          return False
 
+shellEscape :: String -> GHCi Bool
+shellEscape str = liftIO (system str >> return False)
+
 lookupCommand :: String -> GHCi (MaybeCommand)
 lookupCommand "" = do
   st <- getGHCiState
@@ -882,7 +887,10 @@ getCurrentBreakModule = do
                 return $ Just $ GHC.getHistoryModule  hist
 
 -----------------------------------------------------------------------------
+--
 -- Commands
+--
+-----------------------------------------------------------------------------
 
 noArgs :: GHCi () -> String -> GHCi ()
 noArgs m "" = m
@@ -896,8 +904,14 @@ withSandboxOnly cmd this = do
                          ptext (sLit "is not supported with -fno-ghci-sandbox"))
       else this
 
+-----------------------------------------------------------------------------
+-- :help
+
 help :: String -> GHCi ()
 help _ = liftIO (putStr helpText)
+
+-----------------------------------------------------------------------------
+-- :info
 
 info :: String -> InputT GHCi ()
 info "" = ghcError (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
@@ -938,6 +952,9 @@ pprInfo pefas (thing, fixity, insts)
         | fix == GHC.defaultFixity = empty
         | otherwise                = ppr fix <+> ppr (GHC.getName thing)
 
+-----------------------------------------------------------------------------
+-- :main
+
 runMain :: String -> GHCi ()
 runMain s = case toArgs s of
             Left err   -> liftIO (hPutStrLn stderr err)
@@ -946,6 +963,9 @@ runMain s = case toArgs s of
                    case mainFunIs dflags of
                        Nothing -> doWithArgs args "main"
                        Just f  -> doWithArgs args f
+
+-----------------------------------------------------------------------------
+-- :run
 
 runRun :: String -> GHCi ()
 runRun s = case toCmdArgs s of
@@ -956,17 +976,8 @@ doWithArgs :: [String] -> String -> GHCi ()
 doWithArgs args cmd = enqueueCommands ["System.Environment.withArgs " ++
                                        show args ++ " (" ++ cmd ++ ")"]
 
-addModule :: [FilePath] -> InputT GHCi ()
-addModule files = do
-  lift revertCAFs -- always revert CAFs on load/add.
-  files <- mapM expandPath files
-  targets <- mapM (\m -> GHC.guessTarget m Nothing) files
-  -- remove old targets with the same id; e.g. for :add *M
-  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
-  mapM_ GHC.addTarget targets
-  prev_context <- GHC.getContext
-  ok <- trySuccess $ GHC.load LoadAllTargets
-  afterLoad ok False prev_context
+-----------------------------------------------------------------------------
+-- :cd
 
 changeDirectory :: String -> InputT GHCi ()
 changeDirectory "" = do
@@ -979,10 +990,9 @@ changeDirectory dir = do
   graph <- GHC.getModuleGraph
   when (not (null graph)) $
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
-  prev_context <- GHC.getContext
   GHC.setTargets []
   _ <- GHC.load LoadAllTargets
-  lift $ setContextAfterLoad prev_context False []
+  lift $ setContextAfterLoad False []
   GHC.workingDirectoryChanged
   dir <- expandPath dir
   liftIO $ setCurrentDirectory dir
@@ -992,6 +1002,9 @@ trySuccess act =
     handleSourceError (\e -> do GHC.printException e
                                 return Failed) $ do
       act
+
+-----------------------------------------------------------------------------
+-- :edit
 
 editFile :: String -> GHCi ()
 editFile str =
@@ -1035,6 +1048,10 @@ chooseEditFile =
   where fromTarget (GHC.Target (GHC.TargetFile f _) _ _) = Just f
         fromTarget _ = Nothing -- when would we get a module target?
 
+
+-----------------------------------------------------------------------------
+-- :def
+
 defineMacro :: Bool{-overwrite-} -> String -> GHCi ()
 defineMacro _ (':':_) =
   liftIO $ putStrLn "macro name cannot start with a colon"
@@ -1075,6 +1092,10 @@ runMacro fun s = do
   enqueueCommands (lines str)
   return False
 
+
+-----------------------------------------------------------------------------
+-- :undef
+
 undefineMacro :: String -> GHCi ()
 undefineMacro str = mapM_ undef (words str) 
  where undef macro_name = do
@@ -1084,6 +1105,10 @@ undefineMacro str = mapM_ undef (words str)
       		("macro '" ++ macro_name ++ "' is not defined"))
       	   else do
             liftIO (writeIORef macros_ref (filter ((/= macro_name) . cmdName) cmds))
+
+
+-----------------------------------------------------------------------------
+-- :cmd
 
 cmdCmd :: String -> GHCi ()
 cmdCmd str = do
@@ -1095,8 +1120,31 @@ cmdCmd str = do
     enqueueCommands (lines cmds)
     return ()
 
-loadModuleName :: GHC.GhcMonad m => ImportDecl RdrName -> m Module
-loadModuleName = flip GHC.findModule Nothing . unLoc . ideclName
+
+-----------------------------------------------------------------------------
+-- :check
+
+checkModule :: String -> InputT GHCi ()
+checkModule m = do
+  let modl = GHC.mkModuleName m
+  ok <- handleSourceError (\e -> GHC.printException e >> return False) $ do
+          r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
+          liftIO $ putStrLn $ showSDoc $
+	   case GHC.moduleInfo r of
+	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
+		let
+		    (local,global) = ASSERT( all isExternalName scope )
+		    		     partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
+		in
+			(text "global names: " <+> ppr global) $$
+		        (text "local  names: " <+> ppr local)
+	     _ -> empty
+          return True
+  afterLoad (successIf ok) False
+
+
+-----------------------------------------------------------------------------
+-- :load, :add, :reload
 
 loadModule :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule fs = timeIt (loadModule' fs)
@@ -1106,8 +1154,6 @@ loadModule_ fs = loadModule (zip fs (repeat Nothing)) >> return ()
 
 loadModule' :: [(FilePath, Maybe Phase)] -> InputT GHCi SuccessFlag
 loadModule' files = do
-  prev_context <- GHC.getContext
-
   -- unload first
   _ <- GHC.abandonAll
   lift discardActiveBreakPoints
@@ -1125,59 +1171,58 @@ loadModule' files = do
   -- as a ToDo for now.
 
   GHC.setTargets targets
-  doLoad False prev_context LoadAllTargets
+  doLoad False LoadAllTargets
 
-checkModule :: String -> InputT GHCi ()
-checkModule m = do
-  let modl = GHC.mkModuleName m
-  prev_context <- GHC.getContext
-  ok <- handleSourceError (\e -> GHC.printException e >> return False) $ do
-          r <- GHC.typecheckModule =<< GHC.parseModule =<< GHC.getModSummary modl
-          liftIO $ putStrLn $ showSDoc $
-	   case GHC.moduleInfo r of
-	     cm | Just scope <- GHC.modInfoTopLevelScope cm ->
-		let
-		    (local,global) = ASSERT( all isExternalName scope )
-		    		     partition ((== modl) . GHC.moduleName . GHC.nameModule) scope
-		in
-			(text "global names: " <+> ppr global) $$
-		        (text "local  names: " <+> ppr local)
-	     _ -> empty
-          return True
-  afterLoad (successIf ok) False prev_context
 
+-- :add
+addModule :: [FilePath] -> InputT GHCi ()
+addModule files = do
+  lift revertCAFs -- always revert CAFs on load/add.
+  files <- mapM expandPath files
+  targets <- mapM (\m -> GHC.guessTarget m Nothing) files
+  -- remove old targets with the same id; e.g. for :add *M
+  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
+  mapM_ GHC.addTarget targets
+  _ <- doLoad False LoadAllTargets
+  return ()
+
+
+-- :reload
 reloadModule :: String -> InputT GHCi ()
 reloadModule m = do
-  prev_context <- GHC.getContext
-  _ <- doLoad True prev_context $
+  _ <- doLoad True $
         if null m then LoadAllTargets 
                   else LoadUpTo (GHC.mkModuleName m)
   return ()
 
-doLoad :: Bool -> [InteractiveImport] -> LoadHowMuch -> InputT GHCi SuccessFlag
-doLoad retain_context prev_context howmuch = do
+
+doLoad :: Bool -> LoadHowMuch -> InputT GHCi SuccessFlag
+doLoad retain_context howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
   lift discardActiveBreakPoints
   ok <- trySuccess $ GHC.load howmuch
-  afterLoad ok retain_context prev_context
+  afterLoad ok retain_context
   return ok
 
-afterLoad :: SuccessFlag -> Bool -> [InteractiveImport] -> InputT GHCi ()
-afterLoad ok retain_context prev_context = do
+
+afterLoad :: SuccessFlag
+          -> Bool   -- keep the remembered_ctx, as far as possible (:reload)
+          -> InputT GHCi ()
+afterLoad ok retain_context = do
   lift revertCAFs  -- always revert CAFs on load.
   lift discardTickArrays
   loaded_mod_summaries <- getLoadedModules
   let loaded_mods = map GHC.ms_mod loaded_mod_summaries
       loaded_mod_names = map GHC.moduleName loaded_mods
   modulesLoadedMsg ok loaded_mod_names
+  lift $ setContextAfterLoad retain_context loaded_mod_summaries
 
-  lift $ setContextAfterLoad prev_context retain_context loaded_mod_summaries
 
-setContextAfterLoad :: [InteractiveImport] -> Bool -> [GHC.ModSummary] -> GHCi ()
-setContextAfterLoad prev keep_ctxt [] = do
-  setContextKeepingPackageModules prev keep_ctxt []
-setContextAfterLoad prev keep_ctxt ms = do
+setContextAfterLoad :: Bool -> [GHC.ModSummary] -> GHCi ()
+setContextAfterLoad keep_ctxt [] = do
+  setContextKeepingPackageModules keep_ctxt []
+setContextAfterLoad keep_ctxt ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- GHC.getTargets
   case [ m | Just m <- map (findTarget ms) targets ] of
@@ -1200,46 +1245,43 @@ setContextAfterLoad prev keep_ctxt ms = do
 	= False
 
    load_this summary | m <- GHC.ms_mod summary = do
-	b <- GHC.moduleIsInterpreted m
-	if b then setContextKeepingPackageModules prev keep_ctxt [IIModule m]
-       	     else do
-                setContextKeepingPackageModules prev keep_ctxt
-                  [IIDecl $ simpleImportDecl (GHC.moduleName m)]
+        is_interp <- GHC.moduleIsInterpreted m
+        let new_ctx | is_interp = [IIModule m]
+                    | otherwise = [IIDecl $ simpleImportDecl (GHC.moduleName m)]
+        setContextKeepingPackageModules keep_ctxt new_ctx
+
 
 -- | Keep any package modules (except Prelude) when changing the context.
 setContextKeepingPackageModules
-        :: [InteractiveImport]          -- previous context
-        -> Bool                         -- re-execute :module commands
-        -> [InteractiveImport]          -- new context
+        :: Bool                 -- True  <=> keep all of remembered_ctx
+                                -- False <=> just keep package imports
+        -> [InteractiveImport]  -- new context
         -> GHCi ()
-setContextKeepingPackageModules prev_context keep_ctxt new_context = do
-  prel_mod <- getPrelude
-  -- filter everything, not just lefts
 
-  let is_pkg_import :: InteractiveImport -> GHCi Bool
-      is_pkg_import (IIDecl d)
-         | let mod_name = unLoc (ideclName d) 
-         , mod_name /= prel_mod
+setContextKeepingPackageModules keep_ctx transient_ctx = do
+
+  st <- getGHCiState
+  let rem_ctx = remembered_ctx st
+  new_rem_ctx <- if keep_ctx then return rem_ctx
+                             else keepPackageImports rem_ctx
+  setGHCiState st{ remembered_ctx = new_rem_ctx,
+                   transient_ctx  = transient_ctx }
+  setGHCContextFromGHCiState
+
+
+keepPackageImports :: [InteractiveImport] -> GHCi [InteractiveImport]
+keepPackageImports = filterM is_pkg_import
+  where
+     is_pkg_import :: InteractiveImport -> GHCi Bool
+     is_pkg_import (IIModule _) = return False
+     is_pkg_import (IIDecl d)
          = do e <- gtry $ GHC.findModule mod_name (ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
                 Right m -> return (not (isHomeModule m))
-      is_pkg_import _ =  return False
+        where
+          mod_name = unLoc (ideclName d)
 
-  prev_pkg_imports <- filterM is_pkg_import prev_context
-
-  mySetContext (prev_pkg_imports ++ new_context)
-       --
-  if keep_ctxt
-     then do
-          st <- getGHCiState
-          playCtxtCmds False (remembered_ctx st)
-     else do
-          st <- getGHCiState
-          setGHCiState st{ remembered_ctx = [] }
-
-isHomeModule :: Module -> Bool
-isHomeModule mod = GHC.modulePackageId mod == mainPackageId
 
 modulesLoadedMsg :: SuccessFlag -> [ModuleName] -> InputT GHCi ()
 modulesLoadedMsg ok mods = do
@@ -1255,6 +1297,10 @@ modulesLoadedMsg ok mods = do
     Succeeded  ->
        liftIO $ putStrLn $ showSDoc (text "Ok, modules loaded: " <> mod_commas)
 
+
+-----------------------------------------------------------------------------
+-- :type
+
 typeOfExpr :: String -> InputT GHCi ()
 typeOfExpr str 
   = handleSourceError GHC.printException
@@ -1264,6 +1310,9 @@ typeOfExpr str
        let pefas = dopt Opt_PrintExplicitForalls dflags
        printForUser $ sep [text str, nest 2 (dcolon <+> pprTypeForUser pefas ty)]
 
+-----------------------------------------------------------------------------
+-- :kind
+
 kindOfType :: String -> InputT GHCi ()
 kindOfType str 
   = handleSourceError GHC.printException
@@ -1271,13 +1320,17 @@ kindOfType str
        ty <- GHC.typeKind str
        printForUser $ text str <+> dcolon <+> ppr ty
 
+
+-----------------------------------------------------------------------------
+-- :quit
+
 quit :: String -> InputT GHCi Bool
 quit _ = return True
 
-shellEscape :: String -> GHCi Bool
-shellEscape str = liftIO (system str >> return False)
 
 -----------------------------------------------------------------------------
+-- :script
+
 -- running a script file #1363
 
 scriptCmd :: String -> InputT GHCi ()
@@ -1311,6 +1364,8 @@ runScript filename = do
               else return ()
 
 -----------------------------------------------------------------------------
+-- :issafe
+
 -- Displaying Safe Haskell properties of a module
 
 isSafeCmd :: String -> InputT GHCi ()
@@ -1319,7 +1374,7 @@ isSafeCmd m =
         [s] | looksLikeModuleName s -> do
             m <- lift $ lookupModule s
             isSafeModule m
-        [] -> do m <- guessCurrentModule
+        [] -> do m <- guessCurrentModule "issafe"
                  isSafeModule m
         _ -> ghcError (CmdLineError "syntax:  :issafe <module>")
 
@@ -1365,6 +1420,8 @@ isSafeModule m = do
               part pkg = trusted $ getPackageDetails state pkg
 
 -----------------------------------------------------------------------------
+-- :browse
+
 -- Browsing a module's contents
 
 browseCmd :: Bool -> String -> InputT GHCi ()
@@ -1376,20 +1433,21 @@ browseCmd bang m =
     [s] | looksLikeModuleName s -> do
         m <- lift $ lookupModule s
         browseModule bang m True
-    [] -> do m <- guessCurrentModule
+    [] -> do m <- guessCurrentModule ("browse" ++ if bang then "!" else "")
              browseModule bang m True
     _ -> ghcError (CmdLineError "syntax:  :browse <module>")
 
-guessCurrentModule :: InputT GHCi Module
+guessCurrentModule :: String -> InputT GHCi Module
 -- Guess which module the user wants to browse.  Pick
 -- modules that are interpreted first.  The most
 -- recently-added module occurs last, it seems.
-guessCurrentModule 
-  = do { imports <- GHC.getContext
-       ; when (null imports) (ghcError (CmdLineError ":issafe: no current module"))
-       ; case (last imports) of
+guessCurrentModule cmd
+  = do imports <- GHC.getContext
+       when (null imports) $ ghcError $
+          CmdLineError (':' : cmd ++ ": no current module")
+       case (head imports) of
           IIModule m -> return m
-          IIDecl d   -> GHC.findModule (unLoc (ideclName d)) (ideclPkgQual d) }
+          IIDecl d   -> GHC.findModule (unLoc (ideclName d)) (ideclPkgQual d)
 
 -- without bang, show items in context of their parents and omit children
 -- with bang, show class methods and data constructors separately, and
@@ -1471,25 +1529,23 @@ browseModule bang modl exports_only = do
         -- package modules.  When it works, we can do this:
         --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
 
+
 -----------------------------------------------------------------------------
--- Setting the module context
--- This handles  Command     Constructor in CtxtCmd
---               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---               :m X        SetContext
---               :m +X       AddModules
---               :m -X       RemModules    
---               import X    Import
+-- :module
+
+-- Setting the module context.  For details on context handling see
+-- "remembered_ctx" and "transient_ctx" in GhciMonad.
 
 moduleCmd :: String -> GHCi ()
 moduleCmd str
-  | all sensible strs = newContextCmd cmd
+  | all sensible strs = cmd
   | otherwise = ghcError (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
   where
     (cmd, strs) =
         case str of 
-                '+':stuff -> rest AddModules stuff
-                '-':stuff -> rest RemModules stuff
-                stuff     -> rest SetContext stuff
+          '+':stuff -> rest addModulesToContext   stuff
+          '-':stuff -> rest remModulesFromContext stuff
+          stuff     -> rest setContext            stuff
 
     rest cmd stuff = (cmd as bs, strs)
        where strs = words stuff
@@ -1501,111 +1557,129 @@ moduleCmd str
     starred ('*':m) = Left m
     starred m       = Right m
 
-newContextCmd :: CtxtCmd -> GHCi ()
-newContextCmd cmd = do
-  playCtxtCmds True [cmd]
+addModulesToContext :: [String] -> [String] -> GHCi ()
+addModulesToContext as bs = do
+   mapM_ (add True)  as
+   mapM_ (add False) bs
+   setGHCContextFromGHCiState
+ where
+   add :: Bool -> String -> GHCi ()
+   add star str = do
+     i <- checkAdd star str
+     modifyGHCiState $ \st ->
+        st { remembered_ctx = addNotSubsumed i (remembered_ctx st) }
+
+remModulesFromContext :: [String] -> [String] -> GHCi ()
+remModulesFromContext as bs = do
+   mapM_ rem (as ++ bs)
+   setGHCContextFromGHCiState
+ where
+   rem :: String -> GHCi ()
+   rem str = do
+     m <- moduleName <$> lookupModule str
+     let filt = filter ((/=) m . iiModuleName)
+     modifyGHCiState $ \st ->
+        st { remembered_ctx = filt (remembered_ctx st)
+           , transient_ctx  = filt (transient_ctx st) }
+
+addImportToContext :: String -> GHCi ()
+addImportToContext str = do
+  idecl <- GHC.parseImportDecl str
+  modifyGHCiState $ \st ->
+     st { remembered_ctx = addNotSubsumed (IIDecl idecl) (remembered_ctx st) }
+  setGHCContextFromGHCiState
+
+setContext :: [String] -> [String] -> GHCi ()
+setContext starred not_starred = do
+  is1 <- mapM (checkAdd True)  starred
+  is2 <- mapM (checkAdd False) not_starred
+  let iss = foldr addNotSubsumed [] (is1++is2)
+  modifyGHCiState $ \st -> st { remembered_ctx = iss, transient_ctx = [] }
+                                -- delete the transient context
+  setGHCContextFromGHCiState
+
+checkAdd :: Bool -> String -> GHCi InteractiveImport
+checkAdd star mstr
+  | star      = do m <- wantInterpretedModule mstr
+                   return (IIModule m)
+  | otherwise = do m <- lookupModule mstr
+                   return (IIDecl (simpleImportDecl (moduleName m)))
+
+
+-- | Sets the GHC context from the GHCi state.  The GHC context is
+-- always set this way, we never modify it incrementally.
+--
+-- We ignore any imports for which the ModuleName does not currently
+-- exist.  This is so that the remembered_ctx can contain imports for
+-- modules that are not currently loaded, perhaps because we just did
+-- a :reload and encountered errors.
+--
+-- Prelude is added if not already present in the list.  Therefore to
+-- override the implicit Prelude import you can say 'import Prelude ()'
+-- at the prompt, just as in Haskell source.
+--
+setGHCContextFromGHCiState :: GHCi ()
+setGHCContextFromGHCiState = do
+  let ok (IIModule m) = checkAdd True  (moduleNameString (moduleName m))
+      ok (IIDecl   d) = checkAdd False (moduleNameString (unLoc (ideclName d)))
   st <- getGHCiState
-  let cmds = remembered_ctx st
-  setGHCiState st{ remembered_ctx = cmds ++ [cmd] }
+  iidecls <- filterM (tryBool . ok) (transient_ctx st ++ remembered_ctx st)
+  setGHCContext iidecls
 
-playCtxtCmds :: Bool -> [CtxtCmd] -> GHCi ()
-playCtxtCmds fail cmds = do
-  ctx <- GHC.getContext
-  ctx' <- foldM (playCtxtCmd fail) ctx cmds
-  mySetContext ctx'	-- Eliminate dups and add Prelude if not there
 
-playCtxtCmd:: Bool -> [InteractiveImport] -> CtxtCmd -> GHCi [InteractiveImport]
-playCtxtCmd fail prev cmd = do
-    case cmd of
-        SetContext as bs -> do
-          (as',bs') <- do_checks as bs
-          return (mk_imps as' bs')
-
-        AddModules as bs -> do
-          (as',bs') <- do_checks as bs
-          return (prev_without as' bs' prev ++ mk_imps as' bs')
-
-        RemModules as bs -> do
-          (as',bs') <- do_checks as bs
-          return (prev_without as' bs' prev)
-
-        Import str -> do
-          m_idecl <- maybe_fail $ GHC.parseImportDecl str
-          case m_idecl of
-            Nothing    -> return prev
-            Just idecl -> do
-              m_mdl <- maybe_fail $ loadModuleName idecl
-              case m_mdl of
-                Nothing -> return prev
-                Just _  -> return (prev ++ [IIDecl idecl])
-                     -- We don't filter the module out of the old declarations,
-                     -- because 'import' is supposed to be cumulative.
+-- | Sets the GHC contexts to the given set of imports, adding a Prelude
+-- import if there isn't an explicit one already.
+setGHCContext :: [InteractiveImport] -> GHCi ()
+setGHCContext iidecls = GHC.setContext (iidecls ++ prel)
+  -- XXX put prel at the end, so that guessCurrentModule doesn't pick it up.
   where
-    maybe_fail | fail      = liftM Just
-               | otherwise = trymaybe
+    prel | any isPreludeImport iidecls = []
+         | otherwise                   = [implicitPreludeImport]
 
-    prev_without :: [Module] -> [ModuleName]
-                 -> [InteractiveImport] -> [InteractiveImport]
-    prev_without as bs imports
-      = filterOut is_new imports
-      where
-        is_new ii = iiModuleName ii `elem` new
-        new = map moduleName as ++ bs
+-- -----------------------------------------------------------------------------
+-- Utils on InteractiveImport
 
-    do_checks :: [String] -> [String] -> GHCi ([Module], [ModuleName])
-    do_checks as bs = do
-         as' <- mapM (maybe_fail . wantInterpretedModule) as
-         bs' <- mapM (maybe_fail . liftM moduleName . lookupModule) bs
-         return (catMaybes as', catMaybes bs')
+-- | Returns True if the left import subsumes the right one.  Doesn't
+-- need to be 100% accurate, conservatively returning False is fine.
+--
+-- Note that an IIModule does not necessarily subsume an IIDecl,
+-- because e.g. a module might export a name that is only available
+-- qualified within the module itself.
+--
+iiSubsumes :: InteractiveImport -> InteractiveImport -> Bool
+iiSubsumes (IIModule m1) (IIModule m2) = m1==m2
+iiSubsumes (IIDecl d1) (IIDecl d2)      -- A bit crude
+  =  unLoc (ideclName d1) == unLoc (ideclName d2)
+     && ideclAs d1 == ideclAs d2
+     && (not (ideclQualified d1) || ideclQualified d2)
+     && (isNothing (ideclHiding d1) || ideclHiding d1 == ideclHiding d2)
+iiSubsumes _ _ = False
 
-    mk_imps :: [Module] -> [ModuleName] -> [InteractiveImport]
-    mk_imps as bs = [IIModule a | a <- as] ++
-                    [IIDecl (simpleImportDecl b) | b <- bs]
-
-trymaybe ::GHCi a -> GHCi (Maybe a)
-trymaybe m = do
-    r <- ghciTry m
-    case r of
-      Left _  -> return Nothing
-      Right a -> return (Just a)
-
-mySetContext :: [InteractiveImport] -> GHCi ()
--- Remove redundant imports
--- and add an implicit Prelude one
-mySetContext imports
-  = do { prel_mod <- getPrelude
-       ; let imports1 = removeRedundant subsumesID imports
-             prel_imports 
-               | any no_prelude_imp imports1 = []
-               | otherwise                   = [IIDecl (simpleImportDecl prel_mod)]
-             no_prelude_imp (IIModule {}) = True
-             no_prelude_imp (IIDecl d)    = unLoc (ideclName d) == prel_mod
-
-       ; GHC.setContext (prel_imports ++ imports1) }
+iiModules :: [InteractiveImport] -> [Module]
+iiModules is = [m | IIModule m <- is]
 
 iiModuleName :: InteractiveImport -> ModuleName
 iiModuleName (IIModule m) = moduleName m
 iiModuleName (IIDecl d)   = unLoc (ideclName d)
 
-iiModules :: [InteractiveImport] -> [Module]
-iiModules is = [m | IIModule m <- is]
+preludeModuleName :: ModuleName
+preludeModuleName = GHC.mkModuleName "Prelude"
 
--- iiDecls :: [InteractiveImport] -> [ImportDecl RdrName]
--- iiDecls is = [d | IIDecl d <- is]
+implicitPreludeImport :: InteractiveImport
+implicitPreludeImport = IIDecl (simpleImportDecl preludeModuleName)
 
-subsumesID :: InteractiveImport -> InteractiveImport -> Bool
--- Remove any redundant imports
-subsumesID (IIModule m1) (IIModule m2) = m1==m2
-subsumesID (IIModule m1) (IIDecl d)    = moduleName m1 == unLoc (ideclName d)
-subsumesID (IIDecl d1) (IIDecl d2)      -- A bit crude
-  =  unLoc (ideclName d1) == unLoc (ideclName d2)
-  && ideclAs d1 == ideclAs d2
-  && not (ideclQualified d1)
-  && isNothing (ideclHiding d1) 
-subsumesID _ _ = False
+isPreludeImport :: InteractiveImport -> Bool
+isPreludeImport (IIModule {}) = True
+isPreludeImport (IIDecl d)    = unLoc (ideclName d) == preludeModuleName
+
+addNotSubsumed :: InteractiveImport
+               -> [InteractiveImport] -> [InteractiveImport]
+addNotSubsumed i is
+  | any (`iiSubsumes` i) is = is
+  | otherwise               = i : filter (not . (i `iiSubsumes`)) is
 
 ----------------------------------------------------------------------------
--- Code for `:set'
+-- :set
 
 -- set options in the interpreter.  Syntax is exactly the same as the
 -- ghc command line, except that certain options aren't available (-C,
@@ -1747,7 +1821,7 @@ newDynFlags minus_opts = do
         _ <- GHC.load LoadAllTargets
         liftIO (linkPackages dflags new_pkgs)
         -- package flags changed, we can't re-use any of the old context
-        setContextAfterLoad [] False []
+        setContextAfterLoad False []
       return ()
 
 
@@ -1813,8 +1887,9 @@ optToStr ShowTiming = "s"
 optToStr ShowType   = "t"
 optToStr RevertCAFs = "r"
 
+
 -- ---------------------------------------------------------------------------
--- code for `:show'
+-- :show
 
 showCmd :: String -> GHCi ()
 showCmd str = do
@@ -1825,7 +1900,8 @@ showCmd str = do
         ["prompt"]   -> liftIO $ putStrLn (show (prompt st))
         ["editor"]   -> liftIO $ putStrLn (show (editor st))
         ["stop"]     -> liftIO $ putStrLn (show (stop st))
-	["modules" ] -> showModules
+        ["imports"]  -> showImports
+        ["modules" ] -> showModules
 	["bindings"] -> showBindings
 	["linker"]   -> liftIO showLinkerState
         ["breaks"]   -> showBkptTable
@@ -1834,6 +1910,25 @@ showCmd str = do
         ["languages"]  -> showLanguages
 	_ -> ghcError (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
                                      "               | breaks | context | packages | languages ]"))
+
+showImports :: GHCi ()
+showImports = do
+  st <- getGHCiState
+  let rem_ctx   = reverse (remembered_ctx st)
+      trans_ctx = transient_ctx st
+
+      show_one (IIModule star_m)
+          = ":module +*" ++ moduleNameString (moduleName star_m)
+      show_one (IIDecl imp) = showSDoc (ppr imp)
+
+      prel_imp
+        | any isPreludeImport (rem_ctx ++ trans_ctx) = []
+        | otherwise = ["import Prelude -- implicit"]
+
+      trans_comment s = s ++ " -- added automatically"
+  --
+  liftIO $ mapM_ putStrLn (prel_imp ++ map show_one rem_ctx
+                                    ++ map (trans_comment . show_one) trans_ctx)
 
 showModules :: GHCi ()
 showModules = do
@@ -1895,6 +1990,7 @@ showLanguages = do
    liftIO $ putStrLn $ showSDoc $ vcat $
       text "active language flags:" :
       [text ("  -X" ++ str) | (str, _, f, _) <- DynFlags.xFlags, xopt f dflags]
+
 
 -- -----------------------------------------------------------------------------
 -- Completion
@@ -2010,104 +2106,6 @@ allExposedModules dflags
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
 
--- ---------------------------------------------------------------------------
--- User code exception handling
-
--- This is the exception handler for exceptions generated by the
--- user's code and exceptions coming from children sessions; 
--- it normally just prints out the exception.  The
--- handler must be recursive, in case showing the exception causes
--- more exceptions to be raised.
---
--- Bugfix: if the user closed stdout or stderr, the flushing will fail,
--- raising another exception.  We therefore don't put the recursive
--- handler arond the flushing operation, so if stderr is closed
--- GHCi will just die gracefully rather than going into an infinite loop.
-handler :: SomeException -> GHCi Bool
-
-handler exception = do
-  flushInterpBuffers
-  liftIO installSignalHandlers
-  ghciHandle handler (showException exception >> return False)
-
-showException :: SomeException -> GHCi ()
-showException se =
-  liftIO $ case fromException se of
-           -- omit the location for CmdLineError:
-           Just (CmdLineError s)    -> putStrLn s
-           -- ditto:
-           Just ph@(PhaseFailed {}) -> putStrLn (showGhcException ph "")
-           Just other_ghc_ex        -> print other_ghc_ex
-           Nothing                  ->
-               case fromException se of
-               Just UserInterrupt -> putStrLn "Interrupted."
-               _                  -> putStrLn ("*** Exception: " ++ show se)
-
------------------------------------------------------------------------------
--- recursive exception handlers
-
--- Don't forget to unblock async exceptions in the handler, or if we're
--- in an exception loop (eg. let a = error a in a) the ^C exception
--- may never be delivered.  Thanks to Marcin for pointing out the bug.
-
-ghciHandle :: MonadException m => (SomeException -> m a) -> m a -> m a
-ghciHandle h m = Haskeline.catch m $ \e -> unblock (h e)
-
-ghciTry :: GHCi a -> GHCi (Either SomeException a)
-ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)
-
--- ----------------------------------------------------------------------------
--- Utils
-
--- TODO: won't work if home dir is encoded.
--- (changeDirectory may not work either in that case.)
-expandPath :: MonadIO m => String -> InputT m String
-expandPath path = do
-    exp_path <- liftIO $ expandPathIO path
-    enc <- fmap BS.unpack $ Encoding.encode exp_path
-    return enc
-
-expandPathIO :: String -> IO String
-expandPathIO path = 
-  case dropWhile isSpace path of
-   ('~':d) -> do
-	tilde <- getHomeDirectory -- will fail if HOME not defined
-	return (tilde ++ '/':d)
-   other -> 
-	return other
-
-wantInterpretedModule :: GHC.GhcMonad m => String -> m Module
-wantInterpretedModule str = do
-   modl <- lookupModule str
-   dflags <- getDynFlags
-   when (GHC.modulePackageId modl /= thisPackage dflags) $
-      ghcError (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
-   is_interpreted <- GHC.moduleIsInterpreted modl
-   when (not is_interpreted) $
-       ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
-   return modl
-
-wantNameFromInterpretedModule :: GHC.GhcMonad m
-                              => (Name -> SDoc -> m ())
-                              -> String
-                              -> (Name -> m ())
-                              -> m ()
-wantNameFromInterpretedModule noCanDo str and_then =
-  handleSourceError GHC.printException $ do
-   names <- GHC.parseName str
-   case names of
-      []    -> return ()
-      (n:_) -> do
-            let modl = ASSERT( isExternalName n ) GHC.nameModule n
-            if not (GHC.isExternalName n)
-               then noCanDo n $ ppr n <>
-                                text " is not defined in an interpreted module"
-               else do
-            is_interpreted <- GHC.moduleIsInterpreted modl
-            if not is_interpreted
-               then noCanDo n $ text "module " <> ppr modl <>
-                                text " is not interpreted"
-               else and_then n
 
 -- -----------------------------------------------------------------------------
 -- commands for debugger
@@ -2399,6 +2397,10 @@ start_bold = "\ESC[1m"
 end_bold :: String
 end_bold   = "\ESC[0m"
 
+
+-----------------------------------------------------------------------------
+-- :list
+
 listCmd :: String -> InputT GHCi ()
 listCmd c = listCmd' c
 
@@ -2539,6 +2541,7 @@ listAround span do_highlight = do
            indent = BS.pack ("  " ++ replicate (length (show no)) ' ')
            nl = BS.singleton '\n'
 
+
 -- --------------------------------------------------------------------------
 -- Tick arrays
 
@@ -2571,10 +2574,6 @@ mkTickArray ticks
                               GHC.srcSpanEndLine span ]
         toRealSpan (RealSrcSpan span) = span
         toRealSpan (UnhelpfulSpan _) = panic "mkTickArray UnhelpfulSpan"
-
-lookupModule :: GHC.GhcMonad m => String -> m Module
-lookupModule modName
-   = GHC.lookupModule (GHC.mkModuleName modName) Nothing
 
 -- don't reset the counter back to zero?
 discardActiveBreakPoints :: GHCi ()
@@ -2613,3 +2612,117 @@ setBreakFlag toggle array index
    | toggle    = GHC.setBreakOn array index 
    | otherwise = GHC.setBreakOff array index
 
+
+-- ---------------------------------------------------------------------------
+-- User code exception handling
+
+-- This is the exception handler for exceptions generated by the
+-- user's code and exceptions coming from children sessions; 
+-- it normally just prints out the exception.  The
+-- handler must be recursive, in case showing the exception causes
+-- more exceptions to be raised.
+--
+-- Bugfix: if the user closed stdout or stderr, the flushing will fail,
+-- raising another exception.  We therefore don't put the recursive
+-- handler arond the flushing operation, so if stderr is closed
+-- GHCi will just die gracefully rather than going into an infinite loop.
+handler :: SomeException -> GHCi Bool
+
+handler exception = do
+  flushInterpBuffers
+  liftIO installSignalHandlers
+  ghciHandle handler (showException exception >> return False)
+
+showException :: SomeException -> GHCi ()
+showException se =
+  liftIO $ case fromException se of
+           -- omit the location for CmdLineError:
+           Just (CmdLineError s)    -> putStrLn s
+           -- ditto:
+           Just ph@(PhaseFailed {}) -> putStrLn (showGhcException ph "")
+           Just other_ghc_ex        -> print other_ghc_ex
+           Nothing                  ->
+               case fromException se of
+               Just UserInterrupt -> putStrLn "Interrupted."
+               _                  -> putStrLn ("*** Exception: " ++ show se)
+
+
+-----------------------------------------------------------------------------
+-- recursive exception handlers
+
+-- Don't forget to unblock async exceptions in the handler, or if we're
+-- in an exception loop (eg. let a = error a in a) the ^C exception
+-- may never be delivered.  Thanks to Marcin for pointing out the bug.
+
+ghciHandle :: MonadException m => (SomeException -> m a) -> m a -> m a
+ghciHandle h m = Haskeline.catch m $ \e -> unblock (h e)
+
+ghciTry :: GHCi a -> GHCi (Either SomeException a)
+ghciTry (GHCi m) = GHCi $ \s -> gtry (m s)
+
+tryBool :: GHCi a -> GHCi Bool
+tryBool m = do
+    r <- ghciTry m
+    case r of
+      Left _  -> return False
+      Right _ -> return True
+
+-- ----------------------------------------------------------------------------
+-- Utils
+
+lookupModule :: GHC.GhcMonad m => String -> m Module
+lookupModule modName
+   = GHC.lookupModule (GHC.mkModuleName modName) Nothing
+
+isHomeModule :: Module -> Bool
+isHomeModule mod = GHC.modulePackageId mod == mainPackageId
+
+-- TODO: won't work if home dir is encoded.
+-- (changeDirectory may not work either in that case.)
+expandPath :: MonadIO m => String -> InputT m String
+expandPath path = do
+    exp_path <- liftIO $ expandPathIO path
+    enc <- fmap BS.unpack $ Encoding.encode exp_path
+    return enc
+
+expandPathIO :: String -> IO String
+expandPathIO path = 
+  case dropWhile isSpace path of
+   ('~':d) -> do
+	tilde <- getHomeDirectory -- will fail if HOME not defined
+	return (tilde ++ '/':d)
+   other -> 
+	return other
+
+wantInterpretedModule :: GHC.GhcMonad m => String -> m Module
+wantInterpretedModule str = do
+   modl <- lookupModule str
+   dflags <- getDynFlags
+   when (GHC.modulePackageId modl /= thisPackage dflags) $
+      ghcError (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
+   is_interpreted <- GHC.moduleIsInterpreted modl
+   when (not is_interpreted) $
+       ghcError (CmdLineError ("module '" ++ str ++ "' is not interpreted; try \':add *" ++ str ++ "' first"))
+   return modl
+
+wantNameFromInterpretedModule :: GHC.GhcMonad m
+                              => (Name -> SDoc -> m ())
+                              -> String
+                              -> (Name -> m ())
+                              -> m ()
+wantNameFromInterpretedModule noCanDo str and_then =
+  handleSourceError GHC.printException $ do
+   names <- GHC.parseName str
+   case names of
+      []    -> return ()
+      (n:_) -> do
+            let modl = ASSERT( isExternalName n ) GHC.nameModule n
+            if not (GHC.isExternalName n)
+               then noCanDo n $ ppr n <>
+                                text " is not defined in an interpreted module"
+               else do
+            is_interpreted <- GHC.moduleIsInterpreted modl
+            if not is_interpreted
+               then noCanDo n $ text "module " <> ppr modl <>
+                                text " is not interpreted"
+               else and_then n

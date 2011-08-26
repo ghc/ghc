@@ -111,7 +111,7 @@ data IE name
   | IEGroup             Int HsDocString  -- ^ Doc section heading
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
-  deriving (Data, Typeable)
+  deriving (Eq, Data, Typeable)
 \end{code}
 
 \begin{code}

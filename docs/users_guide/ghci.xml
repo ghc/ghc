@@ -582,8 +582,12 @@ xs :: [Integer]
 <screen>Prelude></screen>
 
       <para>Which indicates that everything from the module
-      <literal>Prelude</literal> is currently in scope.  If we now
-      load a file into GHCi, the prompt will change:</para>
+      <literal>Prelude</literal> is currently in scope; the visible
+      identifiers are exactly those that would be visible in a Haskell
+      source file with no <literal>import</literal>
+      declarations.</para>
+
+      <para>If we now load a file into GHCi, the prompt will change:</para>
 
 <screen>
 Prelude> :load Main.hs
@@ -620,26 +624,59 @@ Compiling Main             ( Main.hs, interpreted )
       interpreted version of a module, add the <literal>*</literal>
       when loading the module, e.g. <literal>:load *M</literal>.</para>
 
-      <para>The scope is manipulated using the
-      <literal>:module</literal> command.  For example, if the current
-      scope is <literal>Prelude</literal>, then we can bring into
-      scope the exports from the module <literal>IO</literal> like
-      so:</para>
+      <para>To add modules to the scope, use ordinary Haskell
+      <literal>import</literal> syntax:</para>
 
 <screen>
-Prelude> :module +IO
-Prelude IO> hPutStrLn stdout "hello\n"
+Prelude> import System.IO
+Prelude System.IO> hPutStrLn stdout "hello\n"
 hello
-Prelude IO>
+Prelude System.IO>
 </screen>
 
-      <para>(Note: you can use conventional
-      haskell <literal>import</literal> syntax as
-      well, but this does not support
-      <literal>*</literal> forms).
-      <literal>:module</literal> can also be shortened to
-      <literal>:m</literal>. The full syntax of the
-      <literal>:module</literal> command is:</para>
+      <para>The full Haskell import syntax is supported, including
+      <literal>hiding</literal> and <literal>as</literal> clauses.
+      The prompt shows the modules that are currently imported, but it
+      omits details about <literal>hiding</literal>,
+      <literal>as</literal>, and so on.  To see the full story, use
+      <literal>:show imports</literal>:</para>
+
+<screen>
+Prelude> import System.IO
+Prelude System.IO> import Data.Map as Map
+Prelude System.IO Map> :show imports
+import Prelude -- implicit
+import System.IO
+import Data.Map as Map
+Prelude System.IO Map>
+</screen>
+
+      <para>Note that the <literal>Prelude</literal> import is marked
+      as implicit.  It can be overriden with an explicit
+      <literal>Prelude</literal> import, just like in a Haskell
+      module.</para>
+
+      <para>Another way to manipulate the scope is to use the
+      <literal>:module</literal> command, which provides a way to do
+      two things that cannot be done with ordinary
+      <literal>import</literal> declarations:
+      <itemizedlist>
+        <listitem>
+          <para><literal>:module</literal> supports the
+          <literal>*</literal> modifier on modules, which opens the
+          full top-level scope of a module, rather than just its
+          exports.</para>
+        </listitem>
+        <listitem>
+          <para>Imports can be <emphasis>removed</emphasis> from the
+          context, using the syntax <literal>:module -M</literal>.
+          The <literal>import</literal> syntax is cumulative (as in a
+          Haskell module), so this is the only way to subtract from
+          the scope.</para>
+        </listitem>
+      </itemizedlist>
+      The full syntax of the <literal>:module</literal> command
+      is:</para>
 
 <screen>
 :module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable>
@@ -650,14 +687,12 @@ Prelude IO>
       scope, and <literal>-</literal> removes them.  Without either
       <literal>+</literal> or <literal>-</literal>, the current scope
       is replaced by the set of modules specified.  Note that if you
-      use this form and leave out <literal>Prelude</literal>, GHCi
-      will assume that you really wanted the
-      <literal>Prelude</literal> and add it in for you (if you don't
-      want the <literal>Prelude</literal>, then ask to remove it with
-      <literal>:m -Prelude</literal>).</para>
+      use this form and leave out <literal>Prelude</literal>, an
+      implicit <literal>Prelude</literal> import will be added
+      automatically.</para>
 
-      <para>The scope is automatically set after a
-      <literal>:load</literal> command, to the most recently loaded
+      <para>After a <literal>:load</literal> command, an automatic
+      import is added to the scope for the most recently loaded
       "target" module, in a <literal>*</literal>-form if possible.
       For example, if you say <literal>:load foo.hs bar.hs</literal>
       and <filename>bar.hs</filename> contains module
@@ -666,7 +701,23 @@ Prelude IO>
       interpreted, or if <literal>Bar</literal> is compiled it will be
       set to <literal>Prelude Bar</literal> (GHCi automatically adds
       <literal>Prelude</literal> if it isn't present and there aren't
-      any <literal>*</literal>-form modules).</para>
+      any <literal>*</literal>-form modules).  These
+      automatically-added imports can be seen with
+      <literal>:show imports</literal>:
+
+<screen>
+Prelude> :load hello.hs
+[1 of 1] Compiling Main             ( hello.hs, interpreted )
+Ok, modules loaded: Main.
+*Main> :show imports
+:module +*Main -- added automatically
+*Main>
+</screen>
+
+      and the automatically-added import is replaced the next time you
+      use <literal>:load</literal>, <literal>:add</literal>, or
+      <literal>:reload</literal>.  It can also be removed by
+      <literal>:module</literal> as with normal imports.</para>
 
       <para>With multiple modules in scope, especially multiple
       <literal>*</literal>-form modules, it is likely that name
@@ -692,20 +743,20 @@ Prelude IO>
 
         <itemizedlist>
           <listitem>
-            <para>The set of modules that are
-              currently <emphasis>loaded</emphasis>.  This set is
-              modified
-              by <literal>:load</literal>, <literal>:add</literal>
-              and <literal>:reload</literal>.
+            <para>The set of modules that are currently
+            <emphasis>loaded</emphasis>.  This set is modified by
+            <literal>:load</literal>, <literal>:add</literal> and
+            <literal>:reload</literal>, and can be shown with
+            <literal>:show modules</literal>.
             </para>
           </listitem>
           <listitem>
             <para>The set of modules that are currently <emphasis>in
-                scope</emphasis> at the prompt.  This set is modified
-              by <literal>:module</literal>, and it is also set
-              automatically
-                after <literal>:load</literal>, <literal>:add</literal>,
-              and <literal>:reload</literal>.</para>
+            scope</emphasis> at the prompt.  This set is modified by
+            <literal>import</literal>, <literal>:module</literal>, and
+            it is also modified automatically after
+            <literal>:load</literal>, <literal>:add</literal>, and
+            <literal>:reload</literal>, as described above.</para>
           </listitem>
         </itemizedlist>
 
@@ -2531,6 +2582,18 @@ bar
         </term>
 	<listitem>
 	  <para>List the active evaluations that are stopped at breakpoints.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:show imports</literal>
+          <indexterm><primary><literal>:show imports</literal></primary></indexterm>
+        </term>
+	<listitem>
+          <para>Show the imports that are currently in force, as
+          created by <literal>import</literal> and
+          <literal>:module</literal> commands.</para>
 	</listitem>
       </varlistentry>
 

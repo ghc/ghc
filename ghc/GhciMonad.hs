@@ -56,7 +56,6 @@ data GHCiState = GHCiState
 	editor         :: String,
         stop           :: String,
 	options        :: [GHCiOption],
-        prelude        :: GHC.ModuleName,
         line_number    :: !Int,         -- input line
         break_ctr      :: !Int,
         breaks         :: ![(Int, BreakLocation)],
@@ -68,22 +67,26 @@ data GHCiState = GHCiState
         -- remember is here:
         last_command   :: Maybe Command,
         cmdqueue       :: [String],
-        remembered_ctx :: [CtxtCmd],
-             -- we remember the :module commands between :loads, so that
-             -- on a :reload we can replay them.  See bugs #2049,
-             -- \#1873, #1360. Previously we tried to remember modules that
-             -- were supposed to be in the context but currently had errors,
-             -- but this was complicated.  Just replaying the :module commands
-             -- seems to be the right thing.
+
+        remembered_ctx :: [InteractiveImport],
+             -- the imports that the user has asked for, via import
+             -- declarations and :module commands.  This list is
+             -- persistent over :reloads (but any imports for modules
+             -- that are not loaded are temporarily ignored).  After a
+             -- :load, all the home-package imports are stripped from
+             -- this list.
+
+             -- See bugs #2049, #1873, #1360
+
+        transient_ctx  :: [InteractiveImport],
+             -- An import added automatically after a :load, usually of
+             -- the most recently compiled module.  May be empty if
+             -- there are no modules loaded.  This list is replaced by
+             -- :load, :reload, and :add.  In between it may be modified
+             -- by :module.
+
         ghc_e :: Bool -- True if this is 'ghc -e' (or runghc)
      }
-
-data CtxtCmd    -- In each case, the first [String] are the starred modules
-     		-- and the second are the unstarred ones
-  = SetContext [String] [String]
-  | AddModules [String] [String]
-  | RemModules [String] [String]
-  | Import     String
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
 
@@ -161,6 +164,8 @@ getGHCiState :: GHCi GHCiState
 getGHCiState   = GHCi $ \r -> liftIO $ readIORef r
 setGHCiState :: GHCiState -> GHCi ()
 setGHCiState s = GHCi $ \r -> liftIO $ writeIORef r s
+modifyGHCiState :: (GHCiState -> GHCiState) -> GHCi ()
+modifyGHCiState f = GHCi $ \r -> liftIO $ readIORef r >>= writeIORef r . f
 
 liftGhc :: Ghc a -> GHCi a
 liftGhc m = GHCi $ \_ -> m
@@ -208,10 +213,6 @@ instance ExceptionMonad (InputT GHCi) where
   gmask f = Haskeline.block (f Haskeline.unblock) -- slightly wrong
   gblock = Haskeline.block
   gunblock = Haskeline.unblock
-
--- for convenience...
-getPrelude :: GHCi ModuleName
-getPrelude = getGHCiState >>= return . prelude
 
 getDynFlags :: GhcMonad m => m DynFlags
 getDynFlags = do
