@@ -98,7 +98,6 @@ module GHC.Base
         module GHC.Base,
         module GHC.Classes,
         module GHC.CString,
-        module GHC.Ordering,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
         module GHC.Err          -- of people having to import it explicitly
@@ -108,17 +107,16 @@ module GHC.Base
 import GHC.Types
 import GHC.Classes
 import GHC.CString
-import GHC.Ordering
 import GHC.Prim
 import {-# SOURCE #-} GHC.Show
 import {-# SOURCE #-} GHC.Err
 import {-# SOURCE #-} GHC.IO (failIO)
 
--- These two are not strictly speaking required by this module, but they are
--- implicit dependencies whenever () or tuples are mentioned, so adding them
--- as imports here helps to get the dependencies right in the new build system.
+-- This is not strictly speaking required by this module, but is an
+-- implicit dependency whenever () or tuples are mentioned, so adding it
+-- as an import here helps to get the dependencies right in the new
+-- build system.
 import GHC.Tuple ()
-import GHC.Unit ()
 -- Likewise we need Integer when deriving things like Eq instances, and
 -- this is a convenient place to force it to be built
 import GHC.Integer ()

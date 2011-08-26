@@ -45,7 +45,7 @@ module Data.Tuple
 
 import GHC.Base
 -- We need to depend on GHC.Base so that
--- a) so that we get GHC.Classes, GHC.Ordering, GHC.Types
+-- a) so that we get GHC.Classes, GHC.Types
 
 -- b) so that GHC.Base.inline is available, which is used
 --    when expanding instance declarations
@@ -78,10 +78,6 @@ import Prelude
   , fst, snd
   , curry, uncurry
   )
-#endif
-
-#ifdef __GLASGOW_HASKELL__
-import GHC.Unit ()
 #endif
 
 default ()              -- Double isn't available yet
