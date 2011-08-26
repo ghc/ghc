@@ -19,7 +19,7 @@ solution1
 	prob x y 	= minimum [ (sumpri m ,m) 
 				| m <- series [1..3] x
 				, (>y) $ distinct $ map (*2) m]
-   in	prob 7 2000
+   in	prob 5 200
 
 solution2
  = let	primes 		= [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73]
@@ -31,7 +31,7 @@ solution2
 	prob x y 	= minimum [ (sumpri m ,m) 
 					| m <- series [1..3] x
 					, (distinct $ map (*2) m) > y ]
-   in	prob 7 2000
+   in	prob 5 200
 
 
 main 

@@ -11,7 +11,8 @@ solution3'
  = let
      pow x i     = productP (replicateP i x)
      primes      = [: 2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73 :]
-     sumpri xx   = productP [: pow p x | p <- primes | x <- xx :]
+     a `cutTo` b = sliceP 0 (lengthP b) a
+     sumpri xx   = productP [: pow p x | p <- primes `cutTo` xx | x <- xx :]
      distinct xx = productP [: x + 1   | x <- xx :]
      
      series :: [:Int:] -> Int -> [:[:Int:]:]
@@ -28,7 +29,7 @@ solution3'
              i       = minIndexP [: a | (a, b) <- xx :]
         in   xx !: i 
    in
-   prob 7 2000
+   prob 5 200
 
 solution3 :: (Int, PArray Int)
 {-# NOINLINE solution3 #-}
