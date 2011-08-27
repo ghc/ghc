@@ -630,7 +630,7 @@ instance Bits Int64 where
     bitSize  _                 = 64
     isSigned _                 = True
     popCount (I64# x#)         =
-        I64# (word64ToInt64# (popCnt64# (int64ToWord64# x#)))
+        I# (word2Int# (popCnt64# (int64ToWord64# x#)))
 
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
