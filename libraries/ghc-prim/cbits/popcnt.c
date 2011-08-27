@@ -12,23 +12,23 @@ static const unsigned char popcount_tab[] =
     3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8,
 };
 
-extern StgWord8 hs_popcnt8(StgWord8 x);
-StgWord8
+extern StgWord hs_popcnt8(StgWord8 x);
+StgWord
 hs_popcnt8(StgWord8 x)
 {
   return popcount_tab[(unsigned char)x];
 }
 
-extern StgWord16 hs_popcnt16(StgWord16 x);
-StgWord16
+extern StgWord hs_popcnt16(StgWord16 x);
+StgWord
 hs_popcnt16(StgWord16 x)
 {
   return popcount_tab[(unsigned char)x] +
       popcount_tab[(unsigned char)(x >> 8)];
 }
 
-extern StgWord32 hs_popcnt32(StgWord32 x);
-StgWord32
+extern StgWord hs_popcnt32(StgWord32 x);
+StgWord
 hs_popcnt32(StgWord32 x)
 {
   return popcount_tab[(unsigned char)x] +
@@ -37,8 +37,8 @@ hs_popcnt32(StgWord32 x)
       popcount_tab[(unsigned char)(x >> 24)];
 }
 
-extern StgWord64 hs_popcnt64(StgWord64 x);
-StgWord64
+extern StgWord hs_popcnt64(StgWord64 x);
+StgWord
 hs_popcnt64(StgWord64 x)
 {
   return popcount_tab[(unsigned char)x] +
@@ -53,8 +53,8 @@ hs_popcnt64(StgWord64 x)
 
 #ifdef i386_HOST_ARCH
 
-extern StgWord32 hs_popcnt(StgWord32 x);
-StgWord32
+extern StgWord hs_popcnt(StgWord32 x);
+StgWord
 hs_popcnt(StgWord32 x)
 {
   return popcount_tab[(unsigned char)x] +
@@ -65,8 +65,8 @@ hs_popcnt(StgWord32 x)
 
 #else
 
-extern StgWord64 hs_popcnt(StgWord64 x);
-StgWord64
+extern StgWord hs_popcnt(StgWord64 x);
+StgWord
 hs_popcnt(StgWord64 x)
 {
   return popcount_tab[(unsigned char)x] +
