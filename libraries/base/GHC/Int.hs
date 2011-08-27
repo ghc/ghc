@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, 
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash,
              StandaloneDeriving #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -7,7 +7,7 @@
 -- Module      :  GHC.Int
 -- Copyright   :  (c) The University of Glasgow 1997-2002
 -- License     :  see libraries/base/LICENSE
--- 
+--
 -- Maintainer  :  cvs-ghc@haskell.org
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
@@ -139,7 +139,7 @@ instance Bits Int8 where
     (I8# x#) `shiftL` (I# i#) = I8# (narrow8Int# (x# `iShiftL#` i#))
     (I8# x#) `shiftR` (I# i#) = I8# (x# `iShiftRA#` i#)
     (I8# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I8# x#
         | otherwise
         = I8# (narrow8Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -284,7 +284,7 @@ instance Bits Int16 where
     (I16# x#) `shiftL` (I# i#) = I16# (narrow16Int# (x# `iShiftL#` i#))
     (I16# x#) `shiftR` (I# i#) = I16# (x# `iShiftRA#` i#)
     (I16# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I16# x#
         | otherwise
         = I16# (narrow16Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -435,7 +435,7 @@ instance Bits Int32 where
     (I32# x#) `shiftL` (I# i#) = I32# (narrow32Int# (x# `iShiftL#` i#))
     (I32# x#) `shiftR` (I# i#) = I32# (x# `iShiftRA#` i#)
     (I32# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I32# x#
         | otherwise
         = I32# (narrow32Int# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
@@ -619,7 +619,7 @@ instance Bits Int64 where
     (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL64#` i#)
     (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA64#` i#)
     (I64# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I64# x#
         | otherwise
         = I64# (word64ToInt64# ((x'# `uncheckedShiftL64#` i'#) `or64#`
@@ -642,8 +642,8 @@ iShiftL64#, iShiftRA64# :: Int64# -> Int# -> Int64#
 a `iShiftL64#` b  | b >=# 64# = intToInt64# 0#
 		  | otherwise = a `uncheckedIShiftL64#` b
 
-a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#) 
-					then intToInt64# (-1#) 
+a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
+					then intToInt64# (-1#)
 					else intToInt64# 0#
 		  | otherwise = a `uncheckedIShiftRA64#` b
 
@@ -746,7 +746,7 @@ instance Bits Int64 where
     (I64# x#) `shiftL` (I# i#) = I64# (x# `iShiftL#` i#)
     (I64# x#) `shiftR` (I# i#) = I64# (x# `iShiftRA#` i#)
     (I64# x#) `rotate` (I# i#)
-        | i'# ==# 0# 
+        | i'# ==# 0#
         = I64# x#
         | otherwise
         = I64# (word2Int# ((x'# `uncheckedShiftL#` i'#) `or#`
