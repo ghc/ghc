@@ -284,6 +284,25 @@ include rules/bindist.mk
 %/. : | $(MKDIRHIER)
 	"$(MKDIRHIER)" $@
 
+# -----------------------------------------------------------------------------
+# Lax dependencies
+
+ifeq "$(LAX_DEPENDENCIES)" "YES"
+LAX_DEPS_FOLLOW = |
+else
+LAX_DEPS_FOLLOW =
+endif
+
+# This is a bit of a hack. When LAX_DEPS_FOLLOW is | some rules end up
+# looking like
+#     target: a | b | c
+# The first | signals the start of the order-only dependencies, but make
+# treats the second | as a dependency. So we need to tell make how to
+# build that dependency.
+
+.PHONY: |
+| :
+	@:
 
 # -----------------------------------------------------------------------------
 # Properties of packages

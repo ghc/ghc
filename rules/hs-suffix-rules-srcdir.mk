@@ -34,16 +34,16 @@ $1/$2/build/%_hsc.c $1/$2/build/%_hsc.h $1/$2/build/%.hs : $1/$4/%.hsc $$(HSC2HS
 
 # Compiling Haskell source
 
-$1/$2/build/%.$$($3_osuf) : $1/$4/%.hs $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_osuf) : $1/$4/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_osuf) : $1/$4/%.lhs $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_osuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_hcsuf) : $1/$4/%.hs $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_hcsuf) : $1/$4/%.hs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -C $$< -o $$@
 
-$1/$2/build/%.$$($3_hcsuf) : $1/$4/%.lhs $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_hcsuf) : $1/$4/%.lhs $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -C $$< -o $$@
 
 endif
@@ -74,10 +74,10 @@ $1/$2/build/%.hs-boot : $1/$4/%.hs-boot
 $1/$2/build/%.lhs-boot : $1/$4/%.lhs-boot
 	"$$(CP)" $$< $$@
 
-$1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.hs-boot $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.hs-boot $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
-$1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.lhs-boot $$($1_$2_HC_DEP)
+$1/$2/build/%.$$($3_way_)o-boot : $1/$4/%.lhs-boot $$(LAX_DEPS_FOLLOW) $$($1_$2_HC_DEP)
 	"$$($1_$2_HC)" $$($1_$2_$3_ALL_HC_OPTS) -c $$< -o $$@
 
 ifneq "$$(BootingFromHc)" "YES"
