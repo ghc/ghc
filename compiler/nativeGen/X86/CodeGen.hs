@@ -1949,10 +1949,12 @@ genCCall64 target dest_regs args =
              (arg_reg, arg_code) <- getSomeReg arg
              delta <- getDeltaNat
              setDeltaNat (delta-arg_size)
-             let code' = code `appOL` arg_code `appOL` toOL [
+             dflags <- getDynFlagsNat
+             let platform = targetPlatform dflags
+                 code' = code `appOL` arg_code `appOL` toOL [
                             SUB (intSize wordWidth) (OpImm (ImmInt arg_size)) (OpReg rsp) ,
                             DELTA (delta-arg_size),
-                            MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel 0))]
+                            MOV (floatSize width) (OpReg arg_reg) (OpAddr  (spRel platform 0))]
              push_args rest code'
 
            | otherwise = do

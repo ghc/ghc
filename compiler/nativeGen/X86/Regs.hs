@@ -58,6 +58,7 @@ import OldCmm
 import CLabel           ( CLabel )
 import Pretty
 import Outputable	( panic )
+import Platform
 import FastTypes
 import FastBool
 
@@ -202,19 +203,14 @@ addrModeRegs _ = []
 -- applicable, is the same but for the frame pointer.
 
 
-spRel :: Int		-- ^ desired stack offset in words, positive or negative
+spRel :: Platform
+      -> Int -- ^ desired stack offset in words, positive or negative
       -> AddrMode
-
-#if   i386_TARGET_ARCH
-spRel n	= AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE))
-
-#elif x86_64_TARGET_ARCH
-spRel n	= AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE))
-
-#else
-spRel _	= panic "X86.Regs.spRel: not defined for this architecture"
-
-#endif
+spRel platform n
+ | target32Bit platform
+    = AddrBaseIndex (EABaseReg esp) EAIndexNone (ImmInt (n * wORD_SIZE))
+ | otherwise
+    = AddrBaseIndex (EABaseReg rsp) EAIndexNone (ImmInt (n * wORD_SIZE))
 
 -- The register numbers must fit into 32 bits on x86, so that we can
 -- use a Word32 to represent the set of free registers in the register

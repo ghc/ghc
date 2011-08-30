@@ -622,9 +622,9 @@ x86_mkSpillInstr platform reg delta slot
     let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
     in case targetClassOfReg platform reg of
 	   RcInteger   -> MOV IF_ARCH_i386(II32,II64)
-                              (OpReg reg) (OpAddr (spRel off_w))
-	   RcDouble    -> GST FF80 reg (spRel off_w) {- RcFloat/RcDouble -}
-	   RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel off_w))
+                              (OpReg reg) (OpAddr (spRel platform off_w))
+	   RcDouble    -> GST FF80 reg (spRel platform off_w) {- RcFloat/RcDouble -}
+	   RcDoubleSSE -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off_w))
            _         -> panic "X86.mkSpillInstr: no match"
 
 
@@ -642,9 +642,9 @@ x86_mkLoadInstr platform reg delta slot
 	let off_w = (off-delta) `div` IF_ARCH_i386(4,8)
         in case targetClassOfReg platform reg of
               RcInteger -> MOV IF_ARCH_i386(II32,II64) 
-                               (OpAddr (spRel off_w)) (OpReg reg)
-              RcDouble  -> GLD FF80 (spRel off_w) reg {- RcFloat/RcDouble -}
-              RcDoubleSSE -> MOV FF64 (OpAddr (spRel off_w)) (OpReg reg)
+                               (OpAddr (spRel platform off_w)) (OpReg reg)
+              RcDouble  -> GLD FF80 (spRel platform off_w) reg {- RcFloat/RcDouble -}
+              RcDoubleSSE -> MOV FF64 (OpAddr (spRel platform off_w)) (OpReg reg)
               _           -> panic "X86.x86_mkLoadInstr"
 
 spillSlotSize :: Int
