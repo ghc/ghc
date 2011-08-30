@@ -331,16 +331,22 @@ InstallExtraPackages = NO
 # Run "ghc-pkg check" on each package
 CHECK_PACKAGES = NO
 
+# ----------------------------------------------------------------------------
+
 # There are a number of things which technically depend on GHC (e.g. if
 # ghc changes then Haskell files may be compiled differently, or Cabal
-# packages may be configured differently). However, in practice, having
-# a real dependency on GHC is just a pain: We normally don't want to
-# spend time recompiling other things while we're working on the
-# compiler, and even if we did, GHC will normally decide compilation
-# isn't needed anyway. So by default we use order-only dependencies on
-# GHC, i.e. GHC must exist, but if it's newer than other targets then
+# packages may be configured differently). By default we therefore
+# have dependencies on the compiler executable.
+
+# However, in practice, having a dependency on GHC is just a pain: We
+# normally don't want to spend time recompiling other things while
+# we're working on the compiler, and even if we did, GHC will normally
+# decide compilation isn't needed anyway. So by setting LAX_DEPENDENCIES
+# to YES you can turn these dependencies into order-only dependencies,
+# i.e. GHC must exist, but if it's newer than other targets then
 # rebuilding is not necessary.
-LAX_DEPENDENCIES = YES
+
+LAX_DEPENDENCIES = NO
 
 # ----------------------------------------------------------------------------
 # Options for GHC's RTS
