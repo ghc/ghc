@@ -43,29 +43,27 @@ import Outputable       (panic, PlatformOutputable)
 
 import Data.Word
 
-#if i386_TARGET_ARCH && darwin_TARGET_OS
 import Data.Bits
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
 pprNatCmmDecl :: Platform -> NatCmmDecl (Alignment, CmmStatics) Instr -> Doc
 pprNatCmmDecl platform (CmmData section dats) =
-  pprSectionHeader section $$ pprDatas platform dats
+  pprSectionHeader platform section $$ pprDatas platform dats
 
  -- special case for split markers:
 pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph [])) = pprLabel platform lbl
 
  -- special case for code without info table:
 pprNatCmmDecl platform (CmmProc Nothing lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
+  pprSectionHeader platform Text $$
   pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
   vcat (map (pprBasicBlock platform) blocks) $$
   pprSizeDecl platform lbl
 
 pprNatCmmDecl platform (CmmProc (Just (Statics info_lbl info)) _entry_lbl (ListGraph blocks)) =
-  pprSectionHeader Text $$
+  pprSectionHeader platform Text $$
   (
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
        pprCLabel_asm (mkDeadStripPreventer info_lbl)
@@ -117,7 +115,7 @@ pprData platform (CmmUninitialised bytes)
  | platformOS platform == OSDarwin = ptext (sLit ".space ") <> int bytes
  | otherwise                       = ptext (sLit ".skip ")  <> int bytes
 
-pprData _ (CmmStaticLit lit)       = pprDataItem lit
+pprData platform (CmmStaticLit lit) = pprDataItem platform lit
 
 pprGloblDecl :: CLabel -> Doc
 pprGloblDecl lbl
@@ -167,9 +165,11 @@ instance PlatformOutputable Instr where
 
 
 pprReg :: Platform -> Size -> Reg -> Doc
-pprReg _ s r
+pprReg platform s r
   = case r of
-      RegReal    (RealRegSingle i) -> ppr_reg_no s i
+      RegReal    (RealRegSingle i) ->
+          if target32Bit platform then ppr32_reg_no s i
+                                  else ppr64_reg_no s i
       RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
       RegVirtual (VirtualRegI  u)  -> text "%vI_" <> asmSDoc (pprUnique u)
       RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> asmSDoc (pprUnique u)
@@ -177,20 +177,19 @@ pprReg _ s r
       RegVirtual (VirtualRegD  u)  -> text "%vD_" <> asmSDoc (pprUnique u)
       RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> asmSDoc (pprUnique u)
   where
-#if i386_TARGET_ARCH
-    ppr_reg_no :: Size -> Int -> Doc
-    ppr_reg_no II8   = ppr_reg_byte
-    ppr_reg_no II16  = ppr_reg_word
-    ppr_reg_no _    = ppr_reg_long
+    ppr32_reg_no :: Size -> Int -> Doc
+    ppr32_reg_no II8   = ppr32_reg_byte
+    ppr32_reg_no II16  = ppr32_reg_word
+    ppr32_reg_no _     = ppr32_reg_long
 
-    ppr_reg_byte i = ptext
+    ppr32_reg_byte i = ptext
       (case i of {
          0 -> sLit "%al";     1 -> sLit "%bl";
          2 -> sLit "%cl";     3 -> sLit "%dl";
         _  -> sLit "very naughty I386 byte register"
       })
 
-    ppr_reg_word i = ptext
+    ppr32_reg_word i = ptext
       (case i of {
          0 -> sLit "%ax";     1 -> sLit "%bx";
          2 -> sLit "%cx";     3 -> sLit "%dx";
@@ -199,7 +198,7 @@ pprReg _ s r
         _  -> sLit "very naughty I386 word register"
       })
 
-    ppr_reg_long i = ptext
+    ppr32_reg_long i = ptext
       (case i of {
          0 -> sLit "%eax";    1 -> sLit "%ebx";
          2 -> sLit "%ecx";    3 -> sLit "%edx";
@@ -207,14 +206,14 @@ pprReg _ s r
          6 -> sLit "%ebp";    7 -> sLit "%esp";
          _  -> ppr_reg_float i
       })
-#elif x86_64_TARGET_ARCH
-    ppr_reg_no :: Size -> Int -> Doc
-    ppr_reg_no II8   = ppr_reg_byte
-    ppr_reg_no II16  = ppr_reg_word
-    ppr_reg_no II32  = ppr_reg_long
-    ppr_reg_no _    = ppr_reg_quad
 
-    ppr_reg_byte i = ptext
+    ppr64_reg_no :: Size -> Int -> Doc
+    ppr64_reg_no II8   = ppr64_reg_byte
+    ppr64_reg_no II16  = ppr64_reg_word
+    ppr64_reg_no II32  = ppr64_reg_long
+    ppr64_reg_no _     = ppr64_reg_quad
+
+    ppr64_reg_byte i = ptext
       (case i of {
          0 -> sLit "%al";     1 -> sLit "%bl";
          2 -> sLit "%cl";     3 -> sLit "%dl";
@@ -227,7 +226,7 @@ pprReg _ s r
         _  -> sLit "very naughty x86_64 byte register"
       })
 
-    ppr_reg_word i = ptext
+    ppr64_reg_word i = ptext
       (case i of {
          0 -> sLit "%ax";     1 -> sLit "%bx";
          2 -> sLit "%cx";     3 -> sLit "%dx";
@@ -240,7 +239,7 @@ pprReg _ s r
         _  -> sLit "very naughty x86_64 word register"
       })
 
-    ppr_reg_long i = ptext
+    ppr64_reg_long i = ptext
       (case i of {
          0 -> sLit "%eax";    1  -> sLit "%ebx";
          2 -> sLit "%ecx";    3  -> sLit "%edx";
@@ -253,7 +252,7 @@ pprReg _ s r
         _  -> sLit "very naughty x86_64 register"
       })
 
-    ppr_reg_quad i = ptext
+    ppr64_reg_quad i = ptext
       (case i of {
          0 -> sLit "%rax";      1 -> sLit "%rbx";
          2 -> sLit "%rcx";      3 -> sLit "%rdx";
@@ -265,11 +264,7 @@ pprReg _ s r
         14 -> sLit "%r14";    15 -> sLit "%r15";
         _  -> ppr_reg_float i
       })
-#else
-     ppr_reg_no _ = panic "X86.Ppr.ppr_reg_no: no match"
-#endif
 
-#if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 ppr_reg_float :: Int -> LitString
 ppr_reg_float i = case i of
         16 -> sLit "%fake0";  17 -> sLit "%fake1"
@@ -284,7 +279,6 @@ ppr_reg_float i = case i of
         36 -> sLit "%xmm12";  37 -> sLit "%xmm13"
         38 -> sLit "%xmm14";  39 -> sLit "%xmm15"
         _  -> sLit "very naughty x86 register"
-#endif
 
 pprSize :: Size -> Doc
 pprSize x
@@ -367,74 +361,60 @@ pprAddr platform (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm imm
 
 
-pprSectionHeader :: Section -> Doc
-#if  i386_TARGET_ARCH
-
-#    if darwin_TARGET_OS
-pprSectionHeader seg
- = case seg of
-        Text                    -> ptext (sLit ".text\n\t.align 2")
-        Data                    -> ptext (sLit ".data\n\t.align 2")
-        ReadOnlyData            -> ptext (sLit ".const\n.align 2")
-        RelocatableReadOnlyData -> ptext (sLit ".const_data\n.align 2")
-        UninitialisedData       -> ptext (sLit ".data\n\t.align 2")
-        ReadOnlyData16          -> ptext (sLit ".const\n.align 4")
-        OtherSection _          -> panic "X86.Ppr.pprSectionHeader: unknown section"
-
-#    else
-pprSectionHeader seg
- = case seg of
-        Text                    -> ptext (sLit ".text\n\t.align 4,0x90")
-        Data                    -> ptext (sLit ".data\n\t.align 4")
-        ReadOnlyData            -> ptext (sLit ".section .rodata\n\t.align 4")
-        RelocatableReadOnlyData -> ptext (sLit ".section .data\n\t.align 4")
-        UninitialisedData       -> ptext (sLit ".section .bss\n\t.align 4")
-        ReadOnlyData16          -> ptext (sLit ".section .rodata\n\t.align 16")
-        OtherSection _          -> panic "X86.Ppr.pprSectionHeader: unknown section"
-
-#    endif
-
-#elif x86_64_TARGET_ARCH
-#    if  darwin_TARGET_OS
-pprSectionHeader seg
- = case seg of
-        Text                    -> ptext (sLit ".text\n.align 3")
-        Data                    -> ptext (sLit ".data\n.align 3")
-        ReadOnlyData            -> ptext (sLit ".const\n.align 3")
-        RelocatableReadOnlyData -> ptext (sLit ".const_data\n.align 3")
-        UninitialisedData       -> ptext (sLit ".data\n\t.align 3")
-        ReadOnlyData16          -> ptext (sLit ".const\n.align 4")
-        OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
-
-#    else
-pprSectionHeader seg
- = case seg of
-        Text                    -> ptext (sLit ".text\n\t.align 8")
-        Data                    -> ptext (sLit ".data\n\t.align 8")
-        ReadOnlyData            -> ptext (sLit ".section .rodata\n\t.align 8")
-        RelocatableReadOnlyData -> ptext (sLit ".section .data\n\t.align 8")
-        UninitialisedData       -> ptext (sLit ".section .bss\n\t.align 8")
-        ReadOnlyData16          -> ptext (sLit ".section .rodata.cst16\n\t.align 16")
-        OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
-
-#    endif
-
-#else
-pprSectionHeader _              = panic "X86.Ppr.pprSectionHeader: not defined for this architecture"
-
-#endif
+pprSectionHeader :: Platform -> Section -> Doc
+pprSectionHeader platform seg
+ = case platformOS platform of
+   OSDarwin
+    | target32Bit platform ->
+       case seg of
+           Text                    -> ptext (sLit ".text\n\t.align 2")
+           Data                    -> ptext (sLit ".data\n\t.align 2")
+           ReadOnlyData            -> ptext (sLit ".const\n.align 2")
+           RelocatableReadOnlyData -> ptext (sLit ".const_data\n.align 2")
+           UninitialisedData       -> ptext (sLit ".data\n\t.align 2")
+           ReadOnlyData16          -> ptext (sLit ".const\n.align 4")
+           OtherSection _          -> panic "X86.Ppr.pprSectionHeader: unknown section"
+    | otherwise ->
+       case seg of
+           Text                    -> ptext (sLit ".text\n.align 3")
+           Data                    -> ptext (sLit ".data\n.align 3")
+           ReadOnlyData            -> ptext (sLit ".const\n.align 3")
+           RelocatableReadOnlyData -> ptext (sLit ".const_data\n.align 3")
+           UninitialisedData       -> ptext (sLit ".data\n\t.align 3")
+           ReadOnlyData16          -> ptext (sLit ".const\n.align 4")
+           OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
+   _
+    | target32Bit platform ->
+       case seg of
+           Text                    -> ptext (sLit ".text\n\t.align 4,0x90")
+           Data                    -> ptext (sLit ".data\n\t.align 4")
+           ReadOnlyData            -> ptext (sLit ".section .rodata\n\t.align 4")
+           RelocatableReadOnlyData -> ptext (sLit ".section .data\n\t.align 4")
+           UninitialisedData       -> ptext (sLit ".section .bss\n\t.align 4")
+           ReadOnlyData16          -> ptext (sLit ".section .rodata\n\t.align 16")
+           OtherSection _          -> panic "X86.Ppr.pprSectionHeader: unknown section"
+    | otherwise ->
+       case seg of
+           Text                    -> ptext (sLit ".text\n\t.align 8")
+           Data                    -> ptext (sLit ".data\n\t.align 8")
+           ReadOnlyData            -> ptext (sLit ".section .rodata\n\t.align 8")
+           RelocatableReadOnlyData -> ptext (sLit ".section .data\n\t.align 8")
+           UninitialisedData       -> ptext (sLit ".section .bss\n\t.align 8")
+           ReadOnlyData16          -> ptext (sLit ".section .rodata.cst16\n\t.align 16")
+           OtherSection _          -> panic "PprMach.pprSectionHeader: unknown section"
 
 
 
 
-pprDataItem :: CmmLit -> Doc
-pprDataItem lit
+pprDataItem :: Platform -> CmmLit -> Doc
+pprDataItem platform lit
   = vcat (ppr_item (cmmTypeSize $ cmmLitType lit) lit)
     where
         imm = litToImm lit
 
         -- These seem to be common:
         ppr_item II8   _ = [ptext (sLit "\t.byte\t") <> pprImm imm]
+        ppr_item II16  _ = [ptext (sLit "\t.word\t") <> pprImm imm]
         ppr_item II32  _ = [ptext (sLit "\t.long\t") <> pprImm imm]
 
         ppr_item FF32  (CmmFloat r _)
@@ -445,39 +425,41 @@ pprDataItem lit
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
 
-#if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-        ppr_item II16  _ = [ptext (sLit "\t.word\t") <> pprImm imm]
-#endif
-#if i386_TARGET_ARCH && darwin_TARGET_OS
-        ppr_item II64 (CmmInt x _)  =
-                [ptext (sLit "\t.long\t")
-                    <> int (fromIntegral (fromIntegral x :: Word32)),
-                 ptext (sLit "\t.long\t")
-                    <> int (fromIntegral
-                        (fromIntegral (x `shiftR` 32) :: Word32))]
-#endif
-#if i386_TARGET_ARCH || (darwin_TARGET_OS && x86_64_TARGET_ARCH)
-        ppr_item II64  _ = [ptext (sLit "\t.quad\t") <> pprImm imm]
-#endif
-#if x86_64_TARGET_ARCH && !darwin_TARGET_OS
-        -- x86_64: binutils can't handle the R_X86_64_PC64 relocation
-        -- type, which means we can't do pc-relative 64-bit addresses.
-        -- Fortunately we're assuming the small memory model, in which
-        -- all such offsets will fit into 32 bits, so we have to stick
-        -- to 32-bit offset fields and modify the RTS appropriately
-        --
-        -- See Note [x86-64-relative] in includes/rts/storage/InfoTables.h
-        --
-        ppr_item II64  x
-           | isRelativeReloc x =
-                [ptext (sLit "\t.long\t") <> pprImm imm,
-                 ptext (sLit "\t.long\t0")]
-           | otherwise =
-                [ptext (sLit "\t.quad\t") <> pprImm imm]
-           where
-                isRelativeReloc (CmmLabelDiffOff _ _ _) = True
-                isRelativeReloc _ = False
-#endif
+        ppr_item II64 _
+            = case platformOS platform of
+              OSDarwin
+               | target32Bit platform ->
+                  case lit of
+                  CmmInt x _ ->
+                      [ptext (sLit "\t.long\t")
+                          <> int (fromIntegral (fromIntegral x :: Word32)),
+                       ptext (sLit "\t.long\t")
+                          <> int (fromIntegral
+                              (fromIntegral (x `shiftR` 32) :: Word32))]
+                  _ -> panic "X86.Ppr.ppr_item: no match for II64"
+               | otherwise ->
+                  [ptext (sLit "\t.quad\t") <> pprImm imm]
+              _
+               | target32Bit platform ->
+                  [ptext (sLit "\t.quad\t") <> pprImm imm]
+               | otherwise ->
+                  -- x86_64: binutils can't handle the R_X86_64_PC64
+                  -- relocation type, which means we can't do
+                  -- pc-relative 64-bit addresses. Fortunately we're
+                  -- assuming the small memory model, in which all such
+                  -- offsets will fit into 32 bits, so we have to stick
+                  -- to 32-bit offset fields and modify the RTS
+                  -- appropriately
+                  --
+                  -- See Note [x86-64-relative] in includes/rts/storage/InfoTables.h
+                  --
+                  case lit of
+                  -- A relative relocation:
+                  CmmLabelDiffOff _ _ _ ->
+                      [ptext (sLit "\t.long\t") <> pprImm imm,
+                       ptext (sLit "\t.long\t0")]
+                  _ ->
+                      [ptext (sLit "\t.quad\t") <> pprImm imm]
 
         ppr_item _ _
                 = panic "X86.Ppr.ppr_item: no match"
