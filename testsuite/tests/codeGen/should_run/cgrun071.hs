@@ -20,14 +20,14 @@ main = putStr
 popcnt :: Word -> Word
 popcnt (W# w#) = W# (popCnt# w#)
 
-popcnt8 :: Word8 -> Word
-popcnt8 (W8# w#) = W# (popCnt8# w#)
+popcnt8 :: Word -> Word
+popcnt8 (W# w#) = W# (popCnt8# w#)
 
-popcnt16 :: Word16 -> Word
-popcnt16 (W16# w#) = W# (popCnt16# w#)
+popcnt16 :: Word -> Word
+popcnt16 (W# w#) = W# (popCnt16# w#)
 
-popcnt32 :: Word32 -> Word
-popcnt32 (W32# w#) = W# (popCnt32# w#)
+popcnt32 :: Word -> Word
+popcnt32 (W# w#) = W# (popCnt32# w#)
 
 popcnt64 :: Word64 -> Word
 popcnt64 (W64# w#) =
@@ -51,11 +51,17 @@ test_popCnt16 = test popcnt16 (slowPopcnt . fromIntegral . (mask 16 .&.))
 test_popCnt32 = test popcnt32 (slowPopcnt . fromIntegral . (mask 32 .&.))
 test_popCnt64 = test popcnt64 (slowPopcnt . fromIntegral . (mask 64 .&.))
 
-mask n = (2 `shiftL` n) - 1
+mask n = (2 ^ n) - 1
 
 test :: Num a => (a -> Word) -> (a -> Word) -> String
-test slow fast = show $ expected == actual
+test fast slow = case failing of
+    [] -> "OK"
+    ((_, e, a, i):xs) ->
+        "FAIL\n" ++ "   Input: " ++ show i ++ "\nExpected: " ++ show e ++
+        "\n  Actual: " ++ show a
   where
+    failing = dropWhile ( \(b,_,_,_) -> b)
+              . map (\ x -> (slow x == fast x, slow x, fast x, x)) $ cases
     expected = map slow cases
     actual = map fast cases
     -- 10 random numbers
