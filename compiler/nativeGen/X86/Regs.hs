@@ -1,46 +1,46 @@
 module X86.Regs (
-	-- squeese functions for the graph allocator
-	virtualRegSqueeze,
-	realRegSqueeze,
+        -- squeese functions for the graph allocator
+        virtualRegSqueeze,
+        realRegSqueeze,
 
-	-- immediates
-	Imm(..),
-	strImmLit,
-	litToImm,
+        -- immediates
+        Imm(..),
+        strImmLit,
+        litToImm,
 
-	-- addressing modes
-	AddrMode(..),
-	addrOffset,
+        -- addressing modes
+        AddrMode(..),
+        addrOffset,
 
-	-- registers
-	spRel,
-	argRegs,
-	allArgRegs,
-	callClobberedRegs,
-	allMachRegNos,
-	classOfRealReg,
-	showReg,	
+        -- registers
+        spRel,
+        argRegs,
+        allArgRegs,
+        callClobberedRegs,
+        allMachRegNos,
+        classOfRealReg,
+        showReg,
 
-	-- machine specific
-	EABase(..), EAIndex(..), addrModeRegs,
+        -- machine specific
+        EABase(..), EAIndex(..), addrModeRegs,
 
-	eax, ebx, ecx, edx, esi, edi, ebp, esp,
-	fake0, fake1, fake2, fake3, fake4, fake5, firstfake,
+        eax, ebx, ecx, edx, esi, edi, ebp, esp,
+        fake0, fake1, fake2, fake3, fake4, fake5, firstfake,
 
-	rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
-	r8,  r9,  r10, r11, r12, r13, r14, r15,
-  	xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
-  	xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
-	xmm,
+        rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
+        r8,  r9,  r10, r11, r12, r13, r14, r15,
+        xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
+        xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
+        xmm,
 
-	ripRel,
-	allFPArgRegs,
+        ripRel,
+        allFPArgRegs,
 
-	-- horror show
-	freeReg,
-	globalRegMaybe,
-	
-	allocatableRegs
+        -- horror show
+        freeReg,
+        globalRegMaybe,
+
+        allocatableRegs
 )
 
 where
@@ -57,7 +57,7 @@ import BlockId
 import OldCmm
 import CLabel           ( CLabel )
 import Pretty
-import Outputable	( panic )
+import Outputable       ( panic )
 import Platform
 import FastTypes
 import FastBool
@@ -69,30 +69,30 @@ import Constants
 
 
 -- | regSqueeze_class reg
---	Calculuate the maximum number of register colors that could be
---	denied to a node of this class due to having this reg 
---	as a neighbour.
+--      Calculuate the maximum number of register colors that could be
+--      denied to a node of this class due to having this reg
+--      as a neighbour.
 --
 {-# INLINE virtualRegSqueeze #-}
 virtualRegSqueeze :: RegClass -> VirtualReg -> FastInt
 
 virtualRegSqueeze cls vr
  = case cls of
- 	RcInteger
-	 -> case vr of
-	 	VirtualRegI{}		-> _ILIT(1)
-		VirtualRegHi{}		-> _ILIT(1)
+        RcInteger
+         -> case vr of
+                VirtualRegI{}           -> _ILIT(1)
+                VirtualRegHi{}          -> _ILIT(1)
                 _other                  -> _ILIT(0)
 
-	RcDouble
-	 -> case vr of
-		VirtualRegD{}		-> _ILIT(1)
-		VirtualRegF{}		-> _ILIT(0)
+        RcDouble
+         -> case vr of
+                VirtualRegD{}           -> _ILIT(1)
+                VirtualRegF{}           -> _ILIT(0)
                 _other                  -> _ILIT(0)
 
-	RcDoubleSSE
-	 -> case vr of
-		VirtualRegSSE{}		-> _ILIT(1)
+        RcDoubleSSE
+         -> case vr of
+                VirtualRegSSE{}         -> _ILIT(1)
                 _other                  -> _ILIT(0)
 
         _other -> _ILIT(0)
@@ -101,25 +101,25 @@ virtualRegSqueeze cls vr
 realRegSqueeze :: RegClass -> RealReg -> FastInt
 realRegSqueeze cls rr
  = case cls of
- 	RcInteger
-	 -> case rr of
-	 	RealRegSingle regNo
-			| regNo	< firstfake -> _ILIT(1)
-			| otherwise	-> _ILIT(0)
-			
-		RealRegPair{}		-> _ILIT(0)
+        RcInteger
+         -> case rr of
+                RealRegSingle regNo
+                        | regNo < firstfake -> _ILIT(1)
+                        | otherwise     -> _ILIT(0)
 
-	RcDouble
-	 -> case rr of
-	 	RealRegSingle regNo
-			| regNo >= firstfake && regNo <= lastfake -> _ILIT(1)
-			| otherwise	-> _ILIT(0)
-			
-		RealRegPair{}		-> _ILIT(0)
+                RealRegPair{}           -> _ILIT(0)
+
+        RcDouble
+         -> case rr of
+                RealRegSingle regNo
+                        | regNo >= firstfake && regNo <= lastfake -> _ILIT(1)
+                        | otherwise     -> _ILIT(0)
+
+                RealRegPair{}           -> _ILIT(0)
 
         RcDoubleSSE
-	 -> case rr of
-	 	RealRegSingle regNo | regNo >= firstxmm -> _ILIT(1)
+         -> case rr of
+                RealRegSingle regNo | regNo >= firstxmm -> _ILIT(1)
                 _otherwise                        -> _ILIT(0)
 
         _other -> _ILIT(0)
@@ -128,13 +128,13 @@ realRegSqueeze cls rr
 -- Immediates
 
 data Imm
-  = ImmInt	Int
-  | ImmInteger	Integer	    -- Sigh.
-  | ImmCLbl	CLabel	    -- AbstractC Label (with baggage)
-  | ImmLit	Doc	    -- Simple string
+  = ImmInt      Int
+  | ImmInteger  Integer     -- Sigh.
+  | ImmCLbl     CLabel      -- AbstractC Label (with baggage)
+  | ImmLit      Doc         -- Simple string
   | ImmIndex    CLabel Int
-  | ImmFloat	Rational
-  | ImmDouble	Rational
+  | ImmFloat    Rational
+  | ImmDouble   Rational
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
 
@@ -162,8 +162,8 @@ litToImm _                   = panic "X86.Regs.litToImm: no match"
 -- addressing modes ------------------------------------------------------------
 
 data AddrMode
-	= AddrBaseIndex	EABase EAIndex Displacement
-	| ImmAddr Imm Int
+        = AddrBaseIndex EABase EAIndex Displacement
+        | ImmAddr Imm Int
 
 data EABase       = EABaseNone  | EABaseReg Reg | EABaseRip
 data EAIndex      = EAIndexNone | EAIndex Reg Int
@@ -173,17 +173,17 @@ type Displacement = Imm
 addrOffset :: AddrMode -> Int -> Maybe AddrMode
 addrOffset addr off
   = case addr of
-      ImmAddr i off0	  -> Just (ImmAddr i (off0 + off))
+      ImmAddr i off0      -> Just (ImmAddr i (off0 + off))
 
       AddrBaseIndex r i (ImmInt n) -> Just (AddrBaseIndex r i (ImmInt (n + off)))
       AddrBaseIndex r i (ImmInteger n)
-	-> Just (AddrBaseIndex r i (ImmInt (fromInteger (n + toInteger off))))
+        -> Just (AddrBaseIndex r i (ImmInt (fromInteger (n + toInteger off))))
 
       AddrBaseIndex r i (ImmCLbl lbl)
-	-> Just (AddrBaseIndex r i (ImmIndex lbl off))
+        -> Just (AddrBaseIndex r i (ImmIndex lbl off))
 
       AddrBaseIndex r i (ImmIndex lbl ix)
-	-> Just (AddrBaseIndex r i (ImmIndex lbl (ix+off)))
+        -> Just (AddrBaseIndex r i (ImmIndex lbl (ix+off)))
 
       _ -> Nothing  -- in theory, shouldn't happen
 
@@ -246,7 +246,7 @@ floatregnos = fakeregnos ++ xmmregnos;
 -- For archs which pass all args on the stack (x86), is empty.
 -- Sparc passes up to the first 6 args in regs.
 argRegs :: RegNo -> [Reg]
-argRegs _	= panic "MachRegs.argRegs(x86): should not be used!"
+argRegs _       = panic "MachRegs.argRegs(x86): should not be used!"
 
 -- | The complete set of machine registers.
 allMachRegNos :: [RegNo]
@@ -261,23 +261,23 @@ classOfRealReg :: RealReg -> RegClass
 -- only allocatable integer regs are also 8-bit compatible (1, 3, 4).
 classOfRealReg reg
  = case reg of
-	RealRegSingle i
+        RealRegSingle i
           | i <= lastint  -> RcInteger
           | i <= lastfake -> RcDouble
           | otherwise     -> RcDoubleSSE
 
-	RealRegPair{}	-> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
+        RealRegPair{}   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
 showReg :: RegNo -> String
 showReg n
-	| n >= firstxmm	 = "%xmm" ++ show (n-firstxmm)
+        | n >= firstxmm  = "%xmm" ++ show (n-firstxmm)
         | n >= firstfake = "%fake" ++ show (n-firstfake)
-	| n >= 8	 = "%r" ++ show n
-	| otherwise	 = regNames !! n
+        | n >= 8         = "%r" ++ show n
+        | otherwise      = regNames !! n
 
 regNames :: [String]
-regNames 
+regNames
 #if   i386_TARGET_ARCH
    = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
 #elif x86_64_TARGET_ARCH
@@ -306,7 +306,7 @@ regs.  @regClass@ barfs if you give it a VirtualRegF, and mkVReg above should
 never generate them.
 -}
 
-fake0, fake1, fake2, fake3, fake4, fake5, 
+fake0, fake1, fake2, fake3, fake4, fake5,
        eax, ebx, ecx, edx, esp, ebp, esi, edi :: Reg
 
 eax   = regSingle 0
@@ -348,7 +348,7 @@ AMD x86_64 architecture:
   r15b  r15w  r15d  r15
 -}
 
-rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, 
+rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi,
   r8, r9, r10, r11, r12, r13, r14, r15,
   xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
   xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15 :: Reg
@@ -387,10 +387,10 @@ xmm14 = regSingle 38
 xmm15 = regSingle 39
 
 allFPArgRegs :: [Reg]
-allFPArgRegs	= map regSingle [firstxmm .. firstxmm+7]
+allFPArgRegs    = map regSingle [firstxmm .. firstxmm+7]
 
 ripRel :: Displacement -> AddrMode
-ripRel imm	= AddrBaseIndex EABaseRip EAIndexNone imm
+ripRel imm      = AddrBaseIndex EABaseRip EAIndexNone imm
 
 
  -- so we can re-use some x86 code:
@@ -412,10 +412,10 @@ xmm n = regSingle (firstxmm+n)
 
 
 -- horror show -----------------------------------------------------------------
-freeReg 		:: RegNo -> FastBool
-globalRegMaybe 		:: GlobalReg -> Maybe RealReg
-allArgRegs 		:: [Reg]
-callClobberedRegs 	:: [Reg]
+freeReg                 :: RegNo -> FastBool
+globalRegMaybe          :: GlobalReg -> Maybe RealReg
+allArgRegs              :: [Reg]
+callClobberedRegs       :: [Reg]
 
 #if defined(i386_TARGET_ARCH) || defined(x86_64_TARGET_ARCH)
 
@@ -474,11 +474,11 @@ callClobberedRegs 	:: [Reg]
 #define xmm15 39
 
 #if i386_TARGET_ARCH
-freeReg esp = fastBool False  --	%esp is the C stack pointer
+freeReg esp = fastBool False  --        %esp is the C stack pointer
 #endif
 
 #if x86_64_TARGET_ARCH
-freeReg rsp = fastBool False  --	%rsp is the C stack pointer
+freeReg rsp = fastBool False  --        %rsp is the C stack pointer
 #endif
 
 #ifdef REG_Base
@@ -486,26 +486,26 @@ freeReg REG_Base = fastBool False
 #endif
 #ifdef REG_R1
 freeReg REG_R1   = fastBool False
-#endif	
-#ifdef REG_R2  
+#endif
+#ifdef REG_R2
 freeReg REG_R2   = fastBool False
-#endif	
-#ifdef REG_R3  
+#endif
+#ifdef REG_R3
 freeReg REG_R3   = fastBool False
-#endif	
-#ifdef REG_R4  
+#endif
+#ifdef REG_R4
 freeReg REG_R4   = fastBool False
-#endif	
-#ifdef REG_R5  
+#endif
+#ifdef REG_R5
 freeReg REG_R5   = fastBool False
-#endif	
-#ifdef REG_R6  
+#endif
+#ifdef REG_R6
 freeReg REG_R6   = fastBool False
-#endif	
-#ifdef REG_R7  
+#endif
+#ifdef REG_R7
 freeReg REG_R7   = fastBool False
-#endif	
-#ifdef REG_R8  
+#endif
+#ifdef REG_R8
 freeReg REG_R8   = fastBool False
 #endif
 #ifdef REG_F1
@@ -526,16 +526,16 @@ freeReg REG_D1 = fastBool False
 #ifdef REG_D2
 freeReg REG_D2 = fastBool False
 #endif
-#ifdef REG_Sp 
+#ifdef REG_Sp
 freeReg REG_Sp   = fastBool False
-#endif 
+#endif
 #ifdef REG_Su
 freeReg REG_Su   = fastBool False
-#endif 
-#ifdef REG_SpLim 
+#endif
+#ifdef REG_SpLim
 freeReg REG_SpLim = fastBool False
-#endif 
-#ifdef REG_Hp 
+#endif
+#ifdef REG_Hp
 freeReg REG_Hp   = fastBool False
 #endif
 #ifdef REG_HpLim
@@ -549,83 +549,83 @@ freeReg _               = fastBool True
 -- reg is the machine register it is stored in.
 
 #ifdef REG_Base
-globalRegMaybe BaseReg			= Just (RealRegSingle REG_Base)
+globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 #endif
 #ifdef REG_R1
-globalRegMaybe (VanillaReg 1 _)		= Just (RealRegSingle REG_R1)
-#endif 
-#ifdef REG_R2 
-globalRegMaybe (VanillaReg 2 _)		= Just (RealRegSingle REG_R2)
-#endif 
-#ifdef REG_R3 
-globalRegMaybe (VanillaReg 3 _) 	= Just (RealRegSingle REG_R3)
-#endif 
-#ifdef REG_R4 
-globalRegMaybe (VanillaReg 4 _)		= Just (RealRegSingle REG_R4)
-#endif 
-#ifdef REG_R5 
-globalRegMaybe (VanillaReg 5 _)		= Just (RealRegSingle REG_R5)
-#endif 
-#ifdef REG_R6 
-globalRegMaybe (VanillaReg 6 _)		= Just (RealRegSingle REG_R6)
-#endif 
-#ifdef REG_R7 
-globalRegMaybe (VanillaReg 7 _)		= Just (RealRegSingle REG_R7)
-#endif 
-#ifdef REG_R8 
-globalRegMaybe (VanillaReg 8 _)		= Just (RealRegSingle REG_R8)
+globalRegMaybe (VanillaReg 1 _)         = Just (RealRegSingle REG_R1)
 #endif
-#ifdef REG_R9 
-globalRegMaybe (VanillaReg 9 _)		= Just (RealRegSingle REG_R9)
+#ifdef REG_R2
+globalRegMaybe (VanillaReg 2 _)         = Just (RealRegSingle REG_R2)
 #endif
-#ifdef REG_R10 
-globalRegMaybe (VanillaReg 10 _)	= Just (RealRegSingle REG_R10)
+#ifdef REG_R3
+globalRegMaybe (VanillaReg 3 _)         = Just (RealRegSingle REG_R3)
+#endif
+#ifdef REG_R4
+globalRegMaybe (VanillaReg 4 _)         = Just (RealRegSingle REG_R4)
+#endif
+#ifdef REG_R5
+globalRegMaybe (VanillaReg 5 _)         = Just (RealRegSingle REG_R5)
+#endif
+#ifdef REG_R6
+globalRegMaybe (VanillaReg 6 _)         = Just (RealRegSingle REG_R6)
+#endif
+#ifdef REG_R7
+globalRegMaybe (VanillaReg 7 _)         = Just (RealRegSingle REG_R7)
+#endif
+#ifdef REG_R8
+globalRegMaybe (VanillaReg 8 _)         = Just (RealRegSingle REG_R8)
+#endif
+#ifdef REG_R9
+globalRegMaybe (VanillaReg 9 _)         = Just (RealRegSingle REG_R9)
+#endif
+#ifdef REG_R10
+globalRegMaybe (VanillaReg 10 _)        = Just (RealRegSingle REG_R10)
 #endif
 #ifdef REG_F1
-globalRegMaybe (FloatReg 1)		= Just (RealRegSingle REG_F1)
-#endif				 	
-#ifdef REG_F2			 	
-globalRegMaybe (FloatReg 2)		= Just (RealRegSingle REG_F2)
-#endif				 	
-#ifdef REG_F3			 	
-globalRegMaybe (FloatReg 3)		= Just (RealRegSingle REG_F3)
-#endif				 	
-#ifdef REG_F4			 	
-globalRegMaybe (FloatReg 4)		= Just (RealRegSingle REG_F4)
-#endif				 	
-#ifdef REG_D1			 	
-globalRegMaybe (DoubleReg 1)		= Just (RealRegSingle REG_D1)
-#endif				 	
-#ifdef REG_D2			 	
-globalRegMaybe (DoubleReg 2)		= Just (RealRegSingle REG_D2)
+globalRegMaybe (FloatReg 1)             = Just (RealRegSingle REG_F1)
 #endif
-#ifdef REG_Sp	    
-globalRegMaybe Sp		   	= Just (RealRegSingle REG_Sp)
+#ifdef REG_F2
+globalRegMaybe (FloatReg 2)             = Just (RealRegSingle REG_F2)
 #endif
-#ifdef REG_Lng1			 	
-globalRegMaybe (LongReg 1)		= Just (RealRegSingle REG_Lng1)
-#endif				 	
-#ifdef REG_Lng2			 	
-globalRegMaybe (LongReg 2)		= Just (RealRegSingle REG_Lng2)
+#ifdef REG_F3
+globalRegMaybe (FloatReg 3)             = Just (RealRegSingle REG_F3)
 #endif
-#ifdef REG_SpLim	    			
-globalRegMaybe SpLim		   	= Just (RealRegSingle REG_SpLim)
-#endif	    				
-#ifdef REG_Hp	   			
-globalRegMaybe Hp		   	= Just (RealRegSingle REG_Hp)
-#endif	    				
-#ifdef REG_HpLim      			
-globalRegMaybe HpLim		   	= Just (RealRegSingle REG_HpLim)
-#endif	    				
-#ifdef REG_CurrentTSO      			
-globalRegMaybe CurrentTSO	   	= Just (RealRegSingle REG_CurrentTSO)
-#endif	    				
-#ifdef REG_CurrentNursery      			
-globalRegMaybe CurrentNursery	   	= Just (RealRegSingle REG_CurrentNursery)
-#endif	    				
-globalRegMaybe _		   	= Nothing
+#ifdef REG_F4
+globalRegMaybe (FloatReg 4)             = Just (RealRegSingle REG_F4)
+#endif
+#ifdef REG_D1
+globalRegMaybe (DoubleReg 1)            = Just (RealRegSingle REG_D1)
+#endif
+#ifdef REG_D2
+globalRegMaybe (DoubleReg 2)            = Just (RealRegSingle REG_D2)
+#endif
+#ifdef REG_Sp
+globalRegMaybe Sp                       = Just (RealRegSingle REG_Sp)
+#endif
+#ifdef REG_Lng1
+globalRegMaybe (LongReg 1)              = Just (RealRegSingle REG_Lng1)
+#endif
+#ifdef REG_Lng2
+globalRegMaybe (LongReg 2)              = Just (RealRegSingle REG_Lng2)
+#endif
+#ifdef REG_SpLim
+globalRegMaybe SpLim                    = Just (RealRegSingle REG_SpLim)
+#endif
+#ifdef REG_Hp
+globalRegMaybe Hp                       = Just (RealRegSingle REG_Hp)
+#endif
+#ifdef REG_HpLim
+globalRegMaybe HpLim                    = Just (RealRegSingle REG_HpLim)
+#endif
+#ifdef REG_CurrentTSO
+globalRegMaybe CurrentTSO               = Just (RealRegSingle REG_CurrentTSO)
+#endif
+#ifdef REG_CurrentNursery
+globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery)
+#endif
+globalRegMaybe _                        = Nothing
 
--- 
+--
 
 #if   i386_TARGET_ARCH
 allArgRegs = panic "X86.Regs.allArgRegs: should not be used!"
@@ -638,7 +638,7 @@ allArgRegs  = panic "X86.Regs.allArgRegs: not defined for this architecture"
 #endif
 
 
--- | these are the regs which we cannot assume stay alive over a C call.  
+-- | these are the regs which we cannot assume stay alive over a C call.
 
 #if   i386_TARGET_ARCH
 -- caller-saves registers
@@ -648,7 +648,7 @@ callClobberedRegs
 #elif x86_64_TARGET_ARCH
 -- all xmm regs are caller-saves
 -- caller-saves registers
-callClobberedRegs    
+callClobberedRegs
   = map regSingle ([rax,rcx,rdx,rsi,rdi,r8,r9,r10,r11] ++ floatregnos)
 
 #else
@@ -660,11 +660,11 @@ callClobberedRegs
 
 
 
-freeReg	_		= 0#
-globalRegMaybe _	= panic "X86.Regs.globalRegMaybe: not defined"
+freeReg _               = 0#
+globalRegMaybe _        = panic "X86.Regs.globalRegMaybe: not defined"
 
-allArgRegs		= panic "X86.Regs.globalRegMaybe: not defined"
-callClobberedRegs	= panic "X86.Regs.globalRegMaybe: not defined"
+allArgRegs              = panic "X86.Regs.globalRegMaybe: not defined"
+callClobberedRegs       = panic "X86.Regs.globalRegMaybe: not defined"
 
 
 #endif
