@@ -269,22 +269,18 @@ classOfRealReg reg
         RealRegPair{}   -> panic "X86.Regs.classOfRealReg: RegPairs on this arch"
 
 -- | Get the name of the register with this number.
-showReg :: RegNo -> String
-showReg n
+showReg :: Platform -> RegNo -> String
+showReg platform n
         | n >= firstxmm  = "%xmm" ++ show (n-firstxmm)
         | n >= firstfake = "%fake" ++ show (n-firstfake)
         | n >= 8         = "%r" ++ show n
-        | otherwise      = regNames !! n
+        | otherwise      = regNames platform !! n
 
-regNames :: [String]
-regNames
-#if   i386_TARGET_ARCH
-   = ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
-#elif x86_64_TARGET_ARCH
-   = ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp" ]
-#else
-   = []
-#endif
+regNames :: Platform -> [String]
+regNames platform
+    = if target32Bit platform
+      then ["%eax", "%ebx", "%ecx", "%edx", "%esi", "%edi", "%ebp", "%esp"]
+      else ["%rax", "%rbx", "%rcx", "%rdx", "%rsi", "%rdi", "%rbp", "%rsp"]
 
 
 
