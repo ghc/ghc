@@ -432,7 +432,8 @@ tcPolyInfer mono closed tc_sig_fn prag_fn rec_tc bind_list
                                  , abs_ev_vars = givens, abs_ev_binds = ev_binds
                                  , abs_exports = exports, abs_binds = binds' }
 
-       ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
+       ; traceTc "Binding:" (ppr final_closed $$
+                             ppr (poly_ids `zip` map idType poly_ids))
        ; return (unitBag abs_bind, poly_ids, final_closed)   
          -- poly_ids are guaranteed zonked by mkExport
   }
