@@ -2,5 +2,5 @@
 SimpleFail9.hs:13:3:
     Type indexes must match class instance head
     Found `(b, Int)' but expected `(a, Int)'
-    In the associated type instance for `S7'
+    In the data type instance declaration for `S7'
     In the instance declaration for `C7 Char (a, Int)'

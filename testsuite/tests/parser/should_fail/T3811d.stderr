@@ -1,5 +1,4 @@
 
 T3811d.hs:6:11:
-    Type found: D Char
-    where type variable expected, in: b (D Char) b
-
+    Unexpected type `D Char' where type variable expected
+    In the declaration of `C b (D Char) b'

@@ -1,4 +1,4 @@
 
-SimpleFail4.hs:8:3:
-    Type declaration in a class must be a kind signature or synonym default:
-    type instance S2 Int = Char
+SimpleFail4.hs:8:11:
+    Unexpected type `Int' where type variable expected
+    In the declaration of `S2 Int'

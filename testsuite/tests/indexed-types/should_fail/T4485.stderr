@@ -4,7 +4,7 @@ T4485.hs:47:15:
                                 (IdentityT IO) (XMLGenT m0 (XML m0))
       arising from a use of `asChild'
     Matching instances:
-      instance [overlap ok] (m1 ~ m, EmbedAsChild m c) =>
+      instance [overlap ok] (EmbedAsChild m c, m1 ~ m) =>
                             EmbedAsChild m (XMLGenT m1 c)
         -- Defined at T4485.hs:29:10-68
       instance [overlap ok] EmbedAsChild
