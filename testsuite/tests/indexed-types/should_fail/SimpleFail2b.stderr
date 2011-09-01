@@ -1,5 +1,5 @@
 
-SimpleFail2b.hs:9:11:
-    Conflicting definitions for `Sd'
-    Bound at: SimpleFail2b.hs:9:11-12
-              SimpleFail2b.hs:10:11-12
+SimpleFail2b.hs:10:11:
+    Conflicting family instance declarations:
+      data Sd Int -- Defined at SimpleFail2b.hs:10:11-12
+      data Sd Int -- Defined at SimpleFail2b.hs:9:11-12

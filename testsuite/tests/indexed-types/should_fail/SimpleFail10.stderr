@@ -1,6 +1,0 @@
-
-SimpleFail10.hs:13:3:
-    Arguments that do not correspond to a class parameter must be variables
-    Instead of a variable, found Char
-    In the data type instance declaration for `S8'
-    In the instance declaration for `C8 Bool'
