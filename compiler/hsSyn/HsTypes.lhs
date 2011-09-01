@@ -22,7 +22,7 @@ module HsTypes (
 	ConDeclField(..), pprConDeclFields,
 	
 	mkExplicitHsForAllTy, mkImplicitHsForAllTy, hsExplicitTvs,
-	hsTyVarName, hsTyVarNames, replaceTyVarName,
+	hsTyVarName, hsTyVarNames, replaceTyVarName, replaceLTyVarName,
 	hsTyVarKind, hsTyVarNameKind,
 	hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsLTyVarLocNames,
 	splitHsInstDeclTy, splitHsFunType,
@@ -285,6 +285,9 @@ hsLTyVarLocNames = map hsLTyVarLocName
 replaceTyVarName :: HsTyVarBndr name1 -> name2 -> HsTyVarBndr name2
 replaceTyVarName (UserTyVar _ k)   n' = UserTyVar n' k
 replaceTyVarName (KindedTyVar _ k) n' = KindedTyVar n' k
+
+replaceLTyVarName :: LHsTyVarBndr name1 -> name2 -> LHsTyVarBndr name2
+replaceLTyVarName (L loc n1) n2 = L loc (replaceTyVarName n1 n2)
 \end{code}
 
 

@@ -7,7 +7,7 @@
 module RnEnv ( 
 	newTopSrcBinder, 
 	lookupLocatedTopBndrRn, lookupTopBndrRn,
-	lookupLocatedOccRn, lookupOccRn, 
+	lookupLocatedOccRn, lookupOccRn, lookupLocalOccRn_maybe,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 	lookupLocalDataTcNames, lookupSigOccRn,
 	lookupFixityRn, lookupTyFixityRn, 
@@ -423,6 +423,12 @@ getLookupOccRn
 
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
+
+lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
+-- Just look in the local environment
+lookupLocalOccRn_maybe rdr_name 
+  = do { local_env <- getLocalRdrEnv
+       ; return (lookupLocalRdrEnv local_env rdr_name) }
 
 -- lookupOccRn looks up an occurrence of a RdrName
 lookupOccRn :: RdrName -> RnM Name
@@ -947,9 +953,8 @@ bindTyVarsRn tyvar_names enclosed_scope
     do { kind_sigs_ok <- xoptM Opt_KindSignatures
        ; unless (null kinded_tyvars || kind_sigs_ok) 
        	 	(mapM_ (addErr . kindSigErr) kinded_tyvars)
-       ; enclosed_scope (zipWith replace tyvar_names names) }
+       ; enclosed_scope (zipWith replaceLTyVarName tyvar_names names) }
   where 
-    replace (L loc n1) n2 = L loc (replaceTyVarName n1 n2)
     located_tyvars = hsLTyVarLocNames tyvar_names
     kinded_tyvars  = [n | L _ (KindedTyVar n _) <- tyvar_names]
 

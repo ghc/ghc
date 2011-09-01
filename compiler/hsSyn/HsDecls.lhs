@@ -455,13 +455,8 @@ data TyClDecl name
 		tcdLName  :: Located name,	 	-- ^ Type constructor
 
 		tcdTyVars :: [LHsTyVarBndr name], 	-- ^ Type variables
-			
-		tcdTyPats :: Maybe [LHsType name],
-                        -- ^ Type patterns.
-                        --
-			-- @Just [t1..tn]@ for @data instance T t1..tn = ...@
-			--	in this case @tcdTyVars = fv( tcdTyPats )@.
-			-- @Nothing@ for everything else.
+		tcdTyPats :: Maybe [LHsType name],      -- ^ Type patterns.
+                  -- See Note [tcdTyVars and tcdTyPats] 
 
 		tcdKindSig:: Maybe Kind,
                         -- ^ Optional kind signature.
@@ -492,8 +487,7 @@ data TyClDecl name
   | TySynonym {	tcdLName  :: Located name,	        -- ^ type constructor
 		tcdTyVars :: [LHsTyVarBndr name],	-- ^ type variables
 		tcdTyPats :: Maybe [LHsType name],	-- ^ Type patterns
-			-- See comments for tcdTyPats in TyData
-			-- 'Nothing' => vanilla type synonym
+                  -- See Note [tcdTyVars and tcdTyPats] 
 
 		tcdSynRhs :: LHsType name	        -- ^ synonym expansion
     }
@@ -505,9 +499,7 @@ data TyClDecl name
 		tcdSigs    :: [LSig name],		-- ^ Methods' signatures
 		tcdMeths   :: LHsBinds name,		-- ^ Default methods
 		tcdATs	   :: [LTyClDecl name],		-- ^ Associated types; ie
-							--   only 'TyFamily' and
-							--   'TySynonym'; the
-                                                        --   latter for defaults
+							--   only 'TyFamily' 
 		tcdDocs    :: [LDocDecl]		-- ^ Haddock docs
     }
   deriving (Data, Typeable)
@@ -523,6 +515,26 @@ data FamilyFlavour
   deriving (Data, Typeable)
 \end{code}
 
+Note [tcdTyVars and tcdTyPats] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use TyData and TySynonym both for vanilla data/type declarations
+     type T a = Int
+AND for data/type family instance declarations
+     type instance F [a] = (a,Int)
+
+tcdTyPats = Nothing
+   This is a vanilla data type or type synonym
+   tcdTyVars are the quantified type variables
+
+tcdTyPats = Just tys
+   This is a data/type family instance declaration
+   tcdTyVars are fv(tys)
+
+   Eg   instance C (a,b) where
+          type F a x y = x->y
+   After the renamer, the tcdTyVars of the F decl are {x,y}
+
+------------------------------
 Simple classifiers
 
 \begin{code}

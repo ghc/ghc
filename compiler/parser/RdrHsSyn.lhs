@@ -182,7 +182,7 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
   = do { let (binds, sigs, ats, docs) = cvBindsAndSigs (unLoc where_cls)
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams) <- checkTyClHdr tycl_hdr
-       ; tyvars <- checkTyVars tparams      -- Only type vars allowed
+       ; tyvars <- checkTyVars tycl_hdr tparams      -- Only type vars allowed
        ; checkKindSigs ats
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars,
 		             	    tcdFDs = unLoc fds, tcdSigs = sigs, tcdMeths = binds,
@@ -201,7 +201,7 @@ mkTyData loc new_or_data is_family (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_d
 
        ; checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
-       ; (tyvars, typats) <- checkTParams is_family tparams
+       ; (tyvars, typats) <- checkTParams is_family tycl_hdr tparams
        ; return (L loc (TyData { tcdND = new_or_data, tcdCtxt = cxt, tcdLName = tc,
 	                  	 tcdTyVars = tyvars, tcdTyPats = typats, 
                                  tcdCons = data_cons, 
@@ -214,7 +214,7 @@ mkTySynonym :: SrcSpan
             -> P (LTyClDecl RdrName)
 mkTySynonym loc is_family lhs rhs
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; (tyvars, typats) <- checkTParams is_family tparams
+       ; (tyvars, typats) <- checkTParams is_family lhs tparams
        ; return (L loc (TySynonym tc tyvars typats rhs)) }
 
 mkTyFamily :: SrcSpan
@@ -224,7 +224,7 @@ mkTyFamily :: SrcSpan
            -> P (LTyClDecl RdrName)
 mkTyFamily loc flavour lhs ksig
   = do { (tc, tparams) <- checkTyClHdr lhs
-       ; tyvars <- checkTyVars tparams
+       ; tyvars <- checkTyVars lhs tparams
        ; return (L loc (TyFamily flavour tc tyvars ksig)) }
 
 mkTopSpliceDecl :: LHsExpr RdrName -> HsDecl RdrName
@@ -484,6 +484,7 @@ checkDictTy (L spn ty) = check ty []
   done tc args = return (L spn (HsPredTy (HsClassP tc args)))
 
 checkTParams :: Bool	  -- Type/data family
+	     -> LHsType RdrName
 	     -> [LHsType RdrName]
 	     -> P ([LHsTyVarBndr RdrName], Maybe [LHsType RdrName])
 -- checkTParams checks the type parameters of a data/newtype declaration
@@ -501,31 +502,32 @@ checkTParams :: Bool	  -- Type/data family
 --          If there are kind sigs in the type parameters, they
 --          will fix the binder's kind when we kind-check the 
 --          type parameters
-checkTParams is_family tparams
+checkTParams is_family tycl_hdr tparams
   | not is_family        -- Vanilla case (a)
-  = do { tyvars <- checkTyVars tparams
+  = do { tyvars <- checkTyVars tycl_hdr tparams
        ; return (tyvars, Nothing) }
   | otherwise		 -- Family case (b)
   = do { let tyvars = userHsTyVarBndrs (extractHsTysRdrTyVars tparams)
        ; return (tyvars, Just tparams) }
 
-checkTyVars :: [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
+checkTyVars :: LHsType RdrName -> [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
 -- Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).  If the second argument is `False',
 -- only type variables are allowed and we raise an error on encountering a
 -- non-variable; otherwise, we allow non-variable arguments and return the
 -- entire list of parameters.
-checkTyVars tparms = mapM chk tparms
+checkTyVars tycl_hdr tparms = mapM chk tparms
   where
 	-- Check that the name space is correct!
     chk (L l (HsKindSig (L _ (HsTyVar tv)) k))
 	| isRdrTyVar tv    = return (L l (KindedTyVar tv k))
     chk (L l (HsTyVar tv))
         | isRdrTyVar tv    = return (L l (UserTyVar tv placeHolderKind))
-    chk t@(L l _)            =
-	  parseErrorSDoc l (text "Type found:" <+> ppr t
-                     $$ text "where type variable expected, in:" <+>
-                        sep (map (pprParendHsType . unLoc) tparms))
+    chk t@(L l _)           
+	= parseErrorSDoc l $
+          vcat [ sep [ ptext (sLit "Unexpected type") <+> quotes (ppr t)
+                     , ptext (sLit "where type variable expected") ]
+               , ptext (sLit "In the declaration of") <+> quotes (ppr tycl_hdr) ]
 
 checkDatatypeContext :: Maybe (LHsContext RdrName) -> P ()
 checkDatatypeContext Nothing = return ()

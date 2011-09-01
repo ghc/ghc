@@ -9,7 +9,7 @@ Typechecking class declarations
 module TcClassDcl ( tcClassSigs, tcClassDecl2, 
 		    findMethodBind, instantiateMethod, tcInstanceMethodBody,
 		    mkGenericDefMethBind,
-		    tcAddDeclCtxt, badMethodErr, badATErr, omittedATWarn
+		    tcAddDeclCtxt, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
@@ -400,14 +400,6 @@ badGenericMethod clas op
   = hsep [ptext (sLit "Class"), quotes (ppr clas), 
 	  ptext (sLit "has a generic-default signature without a binding"), quotes (ppr op)]
 
-badATErr :: Class -> Name -> SDoc
-badATErr clas at
-  = hsep [ptext (sLit "Class"), quotes (ppr clas), 
-	  ptext (sLit "does not have an associated type"), quotes (ppr at)]
-
-omittedATWarn :: Name -> SDoc
-omittedATWarn at
-  = ptext (sLit "No explicit AT declaration for") <+> quotes (ppr at)
 {-
 badGenericInstanceType :: LHsBinds Name -> SDoc
 badGenericInstanceType binds

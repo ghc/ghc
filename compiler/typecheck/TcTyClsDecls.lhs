@@ -8,7 +8,7 @@ TcTyClsDecls: Typecheck type and class declarations
 \begin{code}
 module TcTyClsDecls (
 	tcTyAndClassDecls, kcDataDecl, tcConDecls, mkRecSelBinds,
-        checkValidTyCon, dataDeclChecks, badFamInstDecl
+        checkValidTyCon, dataDeclChecks
     ) where
 
 #include "HsVersions.h"
@@ -435,11 +435,7 @@ tcTyClDecl1 parent _calc_isrec
              tcdKind = Just kind}) -- NB: kind at latest added during kind checking
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc "type family:" (ppr tc_name) 
-
-	-- Check that we don't use families without -XTypeFamilies
-  ; idx_tys <- xoptM Opt_TypeFamilies
-  ; checkTc idx_tys $ badFamInstDecl tc_name
-
+  ; checkFamFlag tc_name
   ; tycon <- buildSynTyCon tc_name tvs' SynFamilyTyCon kind parent Nothing
   ; return [ATyCon tycon]
   }
@@ -450,21 +446,16 @@ tcTyClDecl1 parent _calc_isrec
 	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = mb_kind})
   = tcTyVarBndrs tvs  $ \ tvs' -> do 
   { traceTc "data family:" (ppr tc_name) 
+  ; checkFamFlag tc_name
   ; extra_tvs <- tcDataKindSig mb_kind
   ; let final_tvs = tvs' ++ extra_tvs    -- we may not need these
-
-
-	-- Check that we don't use families without -XTypeFamilies
-  ; idx_tys <- xoptM Opt_TypeFamilies
-  ; checkTc idx_tys $ badFamInstDecl tc_name
-
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
                DataFamilyTyCon Recursive True 
                parent Nothing
   ; return [ATyCon tycon]
   }
 
-  -- "type"
+  -- "type" synonym declaration
 tcTyClDecl1 _parent _calc_isrec
   (TySynonym {tcdLName = L _ tc_name, tcdTyVars = tvs, tcdSynRhs = rhs_ty})
   = ASSERT( isNoParent _parent )
@@ -1022,6 +1013,17 @@ checkValidClass cls
 		-- forall has an (Eq a) constraint.  Whereas in general, each constraint 
 		-- in the context of a for-all must mention at least one quantified
 		-- type variable.  What a mess!
+
+checkFamFlag :: Name -> TcM ()
+-- Check that we don't use families without -XTypeFamilies
+-- The parser won't even parse them, but I suppose a GHC API
+-- client might have a go!
+checkFamFlag tc_name
+  = do { idx_tys <- xoptM Opt_TypeFamilies
+       ; checkTc idx_tys err_msg }
+  where
+    err_msg = hang (ptext (sLit "Illegal family declaraion for") <+> quotes (ppr tc_name))
+	         2 (ptext (sLit "Use -XTypeFamilies to allow indexed type families"))
 \end{code}
 
 
@@ -1349,12 +1351,6 @@ badSigTyDecl tc_name
   = vcat [ ptext (sLit "Illegal kind signature") <+>
 	   quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext (sLit "Use -XKindSignatures to allow kind signatures")) ]
-
-badFamInstDecl :: Outputable a => a -> SDoc
-badFamInstDecl tc_name
-  = vcat [ ptext (sLit "Illegal family instance for") <+>
-	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
 
 emptyConDeclsErr :: Name -> SDoc
 emptyConDeclsErr tycon
