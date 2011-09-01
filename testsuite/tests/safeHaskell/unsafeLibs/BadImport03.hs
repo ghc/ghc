@@ -7,7 +7,7 @@ module Main where
 
 import Data.Typeable
 
-import BadImport02_A
+import BadImport03_A
 
 deriving instance Typeable Nat
 
