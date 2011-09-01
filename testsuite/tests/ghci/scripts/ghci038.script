@@ -1,0 +1,42 @@
+-- Tests for ":show imports" and import/:module
+:show imports
+import Prelude
+:show imports
+:!echo -- map in scope due to explicit 'import Prelude'
+:t map
+import Prelude ()
+:show imports
+:!echo -- still in scope, 'import Prelude ()' is subsumed by 'import Prelude'
+:t map
+:module -Prelude
+:show imports
+:!echo -- still in scope, implicit import of Prelude
+:t map
+import Prelude ()
+:show imports
+:!echo -- not in scope now
+:t map
+
+:module -Prelude
+:show imports
+:load ghci038.hs
+
+:t x
+:show imports
+:!echo :m -Foo
+:m -Foo
+:show imports
+:t x
+:!echo :m +*Foo
+:m +*Foo
+:show imports
+:t x
+
+import Prelude
+:show imports
+import Data.List hiding (nub)
+:show imports
+import qualified Data.List as Q
+:show imports
+:m -Data.List
+:show imports

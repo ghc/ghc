@@ -54,6 +54,7 @@ test('ghci034', normal, ghci_script, ['ghci034.script'])
 test('ghci035', normal, ghci_script, ['ghci035.script'])
 test('ghci036', normal, ghci_script, ['ghci036.script'])
 test('ghci037', req_interp, run_command, ['$MAKE -s --no-print-directory ghci037'])
+test('ghci038', normal, ghci_script, ['ghci038.script'])
 test('2452', normal, ghci_script, ['2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
 

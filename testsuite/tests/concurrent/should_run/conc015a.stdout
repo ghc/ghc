@@ -1,5 +1,5 @@
 Unmasked
 MaskedInterruptible
 caught1: foo
-MaskedUninterruptible
+MaskedInterruptible
 caught2: bar
