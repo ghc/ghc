@@ -565,10 +565,9 @@ checkKindSigs :: [LTyClDecl RdrName] -> P ()
 checkKindSigs = mapM_ check
   where
     check (L l tydecl) 
-      | isFamilyDecl tydecl
-        || isSynDecl tydecl  = return ()
+      | isFamilyDecl tydecl  = return ()
       | otherwise	     = 
-	parseErrorSDoc l (text "Type declaration in a class must be a kind signature or synonym default:" $$ ppr tydecl)
+	parseErrorSDoc l (text "Type declaration in a class must be a kind signature:" $$ ppr tydecl)
 
 checkContext :: LHsType RdrName -> P (LHsContext RdrName)
 checkContext (L l t)
