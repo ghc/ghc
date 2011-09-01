@@ -1598,6 +1598,7 @@ re_strace_ignore_sigfpe     = re.compile('^--- SIGFPE \(Floating point exception
 re_strace_ignore_sigsegv    = re.compile('^--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
 re_strace_ignore_sigpipe    = re.compile('^--- SIGPIPE \(Broken pipe\) @ 0 \(0\) ---$')
 
+writes_ghci_history = {}
 files_used = {}
 
 def mkPath(curdir, path):
@@ -1639,7 +1640,9 @@ def addTestFilesWrittenHelper(name, fn):
             if m_open:
                 file = m_open.group(1)
                 file = mkPath(working_directories[pid], file)
-                if not file in ['/dev/tty', '/dev/null'] and not file.startswith("/tmp/ghc"):
+                if file.endswith("ghci_history"):
+                    writes_ghci_history[name] = 1
+                elif not file in ['/dev/tty', '/dev/null'] and not file.startswith("/tmp/ghc"):
                     flags = m_open.group(2).split('|')
                     if 'O_WRONLY' in flags or 'O_RDWR' in flags:
                         try:
@@ -1683,18 +1686,27 @@ def addTestFilesWrittenHelper(name, fn):
             else:
                 framework_fail(name, 'strace', "Can't understand strace line: " + line)
  
-def checkForFilesWrittenMoreThanOnce(file):
+def checkForFilesWrittenProblems(file):
     foundProblem = False
 
     for f in files_used.keys():
         if len(files_used[f]) > 1:
             if not foundProblem:
                 foundProblem = True
-                print ""
+                file.write("\n")
                 file.write("\nSome files are written by multiple tests:\n")
             file.write("    " + f + " (" + str(files_used[f]) + ")\n")
 
     if foundProblem:
+        file.write("\n")
+
+    if len(writes_ghci_history) > 0:
+        file.write("\n")
+        file.write("\nSome files wrote to ghci_history:\n")
+        tests = writes_ghci_history.keys()
+        tests.sort()
+        for t in tests:
+            file.write("    " + t + "\n")
         file.write("\n")
 
 # -----------------------------------------------------------------------------
@@ -1858,7 +1870,7 @@ def summary(t, file):
         printFailingTestInfosSummary(file, t.unexpected_failures)
 
     if config.check_files_written:
-        checkForFilesWrittenMoreThanOnce(file)
+        checkForFilesWrittenProblems(file)
 
 def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()
