@@ -269,6 +269,32 @@ See also Note [Wrappers for data instance tycons] in MkId.lhs
   So a data type family is not an injective type function. It's just a
   data type with some axioms that connect it to other data types. 
 
+Note [Associated families and their parent class]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*Associated* families are just like *non-associated* families, except
+that they have a TyConParent of AssocFamilyTyCon, which identifies the
+parent class.
+
+However there is an important sharing relationship between 
+  * the tyConTyVars of the parent Class
+  * the tyConTyvars of the associated TyCon
+
+   class C a b where
+     data T p a
+     type F a q b 
+
+Here the 'a' and 'b' are shared with the 'Class'; that is, they have
+the same Unique.
+ 
+This is important. In an instance declaration we expect 
+  * all the shared variables to be instantiated the same way
+  * the non-shared variables of the associated type should not
+    be instantiated at all
+
+  instance C [x] (Tree y) where
+     data T p [x] = T1 x | T2 p
+     type F [x] q (Tree y) = (x,y,q)
+
 %************************************************************************
 %*									*
 \subsection{The data type}
@@ -506,29 +532,13 @@ data TyConParent
     NoParentTyCon
 
   -- | Type constructors representing a class dictionary.
-  | ClassTyCon      	
+  | ClassTyCon
 	Class		-- INVARIANT: the classTyCon of this Class is the current tycon
 
   -- | An *associated* type of a class.  
-  | AssocFamilyTyCon   
+  | AssocFamilyTyCon   	  
         Class		-- The class in whose declaration the family is declared
-                        -- The 'tyConTyVars' of this 'TyCon' may mention some
-                        -- of the same type variables as the classTyVars of the
-                        -- parent 'Class'.  E.g.
-                        --
-                        -- @
-                        --    class C a b where
-                        --      data T c a
-                        -- @
-                        --
-                        -- Here the 'a' is shared with the 'Class', and that is
-                        -- important. In an instance declaration we expect the
-                        -- two to be instantiated the same way.  Eg.
-                        --
-                        -- @
-                        --    instanc C [x] (Tree y) where
-                        --      data T c [x] = T1 x | T2 c
-                        -- @
+			-- See Note [Associated families and their parent class]
 
   -- | Type constructors representing an instance of a type family. Parameters:
   --
@@ -544,6 +554,7 @@ data TyConParent
     			  -- and Note [Type synonym families]
 	TyCon   -- The family TyCon
 	[Type]	-- Argument types (mentions the tyConTyVars of this TyCon)
+		-- Match in length the tyConTyVars of the family TyCon
         CoAxiom   -- The coercion constructor
 
 	-- E.g.  data intance T [a] = ...
