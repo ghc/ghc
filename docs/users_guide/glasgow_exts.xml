@@ -4527,31 +4527,7 @@ data family Array e
 data family Array :: * -> *
 </programlisting>
     </para>
-
-    <sect4 id="assoc-data-family-decl">
-      <title>Associated data family declarations</title>
-      <para>
-	When a data family is declared as part of a type class, we drop
-	the <literal>family</literal> special.  The <literal>GMap</literal>
-	declaration takes the following form
-<programlisting>
-class GMapKey k where
-  data GMap k :: * -> *
-  ...
-</programlisting>
-	In contrast to toplevel declarations, named arguments must be used for
-	all type parameters that are to be used as type-indexes.  Moreover,
-	the argument names must be class parameters.  Each class parameter may
-	only be used at most once per associated type, but some may be omitted
-	and they may be in an order other than in the class head.  Hence, the
-	following contrived example is admissible:
-<programlisting>
-  class C a b c where
-  data T c a :: *
-</programlisting>
-      </para>
-    </sect4>
-  </sect3>
+    </sect3>
 
   <sect3 id="data-instance-declarations">
     <title>Data instance declarations</title>
@@ -4641,91 +4617,9 @@ instance Foo Char where
       modules.  Supporting pattern matching across different data instances
       would require a form of extensible case construct.)
     </para>
+    </sect3>
 
-    <sect4 id="assoc-data-inst">
-      <title>Associated data instances</title>
-      <para>
-	When an associated data family instance is declared within a type
-	class instance, we drop the <literal>instance</literal> keyword in the
-	family instance.  So, the <literal>Either</literal> instance
-	for <literal>GMap</literal> becomes:
-<programlisting>
-instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
-  data GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
-  ...
-</programlisting>
-        The most important point about associated family instances is that the
-        type indexes corresponding to class parameters must be identical to
-        the type given in the instance head; here this is the first argument
-        of <literal>GMap</literal>, namely <literal>Either a b</literal>,
-        which coincides with the only class parameter.  Any parameters to the
-        family constructor that do not correspond to class parameters, need to
-        be variables in every instance; here this is the
-        variable <literal>v</literal>.
-      </para>
-      <para>
-	Instances for an associated family can only appear as part of
-	instances declarations of the class in which the family was declared -
-	just as with the equations of the methods of a class.  Also in
-	correspondence to how methods are handled, declarations of associated
-	types can be omitted in class instances.  If an associated family
-	instance is omitted, the corresponding instance type is not inhabited;
-	i.e., only diverging expressions, such
-	as <literal>undefined</literal>, can assume the type.
-      </para>
-    </sect4>
-
-    <sect4 id="scoping-class-params">
-      <title>Scoping of class parameters</title>
-      <para>
-	In the case of multi-parameter type classes, the visibility of class
-	parameters in the right-hand side of associated family instances
-	depends <emphasis>solely</emphasis> on the parameters of the data
-	family.  As an example, consider the simple class declaration
-<programlisting>
-class C a b where
-  data T a
-</programlisting>
-        Only one of the two class parameters is a parameter to the data
-        family.  Hence, the following instance declaration is invalid:
-<programlisting>
-instance C [c] d where
-  data T [c] = MkT (c, d)    -- WRONG!!  'd' is not in scope
-</programlisting>
-        Here, the right-hand side of the data instance mentions the type
-        variable <literal>d</literal> that does not occur in its left-hand
-        side.  We cannot admit such data instances as they would compromise
-        type safety.
-      </para>
-    </sect4>
-
-    <sect4 id="family-class-inst">
-      <title>Type class instances of family instances</title>
-      <para>
-	Type class instances of instances of data families can be defined as
-	usual, and in particular data instance declarations can
-	have <literal>deriving</literal> clauses.  For example, we can write
-<programlisting>
-data GMap () v = GMapUnit (Maybe v)
-               deriving Show
-</programlisting>
-        which implicitly defines an instance of the form
-<programlisting>
-instance Show v => Show (GMap () v) where ...
-</programlisting>
-      </para>
-      <para>
-	Note that class instances are always for
-	particular <emphasis>instances</emphasis> of a data family and never
-	for an entire family as a whole.  This is for essentially the same
-	reasons that we cannot define a toplevel function that performs
-	pattern matching on the data constructors
-	of <emphasis>different</emphasis> instances of a single type family.
-	It would require a form of extensible case construct.
-      </para>
-    </sect4>
-
-    <sect4 id="data-family-overlap">
+    <sect3 id="data-family-overlap">
       <title>Overlap of data instances</title>
       <para>
 	The instance declarations of a data family used in a single program
@@ -4733,105 +4627,7 @@ instance Show v => Show (GMap () v) where ...
 	not.  In contrast to type class instances, this is not only a matter
 	of consistency, but one of type safety.
       </para>
-    </sect4>
-
   </sect3>
-
-  <sect3 id="data-family-import-export">
-    <title>Import and export</title>
-
-    <para>
-      The association of data constructors with type families is more dynamic
-      than that is the case with standard data and newtype declarations.  In
-      the standard case, the notation <literal>T(..)</literal> in an import or
-      export list denotes the type constructor and all the data constructors
-      introduced in its declaration.  However, a family declaration never
-      introduces any data constructors; instead, data constructors are
-      introduced by family instances.  As a result, which data constructors
-      are associated with a type family depends on the currently visible
-      instance declarations for that family.  Consequently, an import or
-      export item of the form <literal>T(..)</literal> denotes the family
-      constructor and all currently visible data constructors - in the case of
-      an export item, these may be either imported or defined in the current
-      module.  The treatment of import and export items that explicitly list
-      data constructors, such as <literal>GMap(GMapEither)</literal>, is
-      analogous.
-    </para>
-
-    <sect4 id="data-family-impexp-assoc">
-      <title>Associated families</title>
-      <para>
-	As expected, an import or export item of the
-	form <literal>C(..)</literal> denotes all of the class' methods and
-	associated types.  However, when associated types are explicitly
-	listed as subitems of a class, we need some new syntax, as uppercase
-	identifiers as subitems are usually data constructors, not type
-	constructors.  To clarify that we denote types here, each associated
-	type name needs to be prefixed by the keyword <literal>type</literal>.
-	So for example, when explicitly listing the components of
-	the <literal>GMapKey</literal> class, we write <literal>GMapKey(type
-	GMap, empty, lookup, insert)</literal>.
-      </para>
-    </sect4>
-
-    <sect4 id="data-family-impexp-examples">
-      <title>Examples</title>
-      <para>
-	Assuming our running <literal>GMapKey</literal> class example, let us
-	look at some export lists and their meaning:
-	<itemizedlist>
-	  <listitem>
-	    <para><literal>module GMap (GMapKey) where...</literal>: Exports
-	      just the class name.</para>
-	  </listitem>
-	  <listitem>
-	    <para><literal>module GMap (GMapKey(..)) where...</literal>:
-	      Exports the class, the associated type <literal>GMap</literal>
-	      and the member
-	      functions <literal>empty</literal>, <literal>lookup</literal>,
-	      and <literal>insert</literal>.  None of the data constructors is
-	      exported.</para>
-	  </listitem>
-	  <listitem>
-	    <para><literal>module GMap (GMapKey(..), GMap(..))
-		where...</literal>: As before, but also exports all the data
-	      constructors <literal>GMapInt</literal>,
-	      <literal>GMapChar</literal>,
-	      <literal>GMapUnit</literal>, <literal>GMapPair</literal>,
-	      and <literal>GMapUnit</literal>.</para>
-	  </listitem>
-	  <listitem>
-	    <para><literal>module GMap (GMapKey(empty, lookup, insert),
-	    GMap(..)) where...</literal>: As before.</para>
-	  </listitem>
-	  <listitem>
-	    <para><literal>module GMap (GMapKey, empty, lookup, insert, GMap(..))
-		where...</literal>: As before.</para>
-	  </listitem>
-	</itemizedlist>
-      </para>
-      <para>
-	Finally, you can write <literal>GMapKey(type GMap)</literal> to denote
-	both the class <literal>GMapKey</literal> as well as its associated
-	type <literal>GMap</literal>.  However, you cannot
-	write <literal>GMapKey(type GMap(..))</literal> &mdash; i.e.,
-	sub-component specifications cannot be nested.  To
-	specify <literal>GMap</literal>'s data constructors, you have to list
-	it separately.
-      </para>
-    </sect4>
-
-    <sect4 id="data-family-impexp-instances">
-      <title>Instances</title>
-      <para>
-	Family instances are implicitly exported, just like class instances.
-	However, this applies only to the heads of instances, not to the data
-	constructors an instance defines.
-      </para>
-    </sect4>
-
-  </sect3>
-
 </sect2>
 
 <sect2 id="synonym-families">
@@ -4884,30 +4680,7 @@ F IO Bool          -- WRONG: kind mismatch in the first argument
 F Bool             -- WRONG: unsaturated application
 </programlisting>
       </para>
-
-    <sect4 id="assoc-type-family-decl">
-      <title>Associated type family declarations</title>
-      <para>
-	When a type family is declared as part of a type class, we drop
-	the <literal>family</literal> special.  The <literal>Elem</literal>
-	declaration takes the following form
-<programlisting>
-class Collects ce where
-  type Elem ce :: *
-  ...
-</programlisting>
-        The argument names of the type family must be class parameters.  Each
-        class parameter may only be used at most once per associated type, but
-        some may be omitted and they may be in an order other than in the
-        class head.  Hence, the following contrived example is admissible:
-<programlisting>
-class C a b c where
-  type T c a :: *
-</programlisting>
-        These rules are exactly as for associated data families.
-      </para>
-    </sect4>
-  </sect3>
+    </sect3>
 
   <sect3 id="type-instance-declarations">
     <title>Type instance declarations</title>
@@ -4951,36 +4724,8 @@ type instance G Int            = (,)     -- WRONG: must be two type parameters
 type instance G Int Char Float = Double  -- WRONG: must be two type parameters
 </programlisting>
     </para>
-
-    <sect4 id="assoc-type-instance">
-      <title>Associated type instance declarations</title>
-      <para>
-	When an associated family instance is declared within a type class
-	instance, we drop the <literal>instance</literal> keyword in the family
-	instance.  So, the <literal>[e]</literal> instance
-	for <literal>Elem</literal> becomes:
-<programlisting>
-instance (Eq (Elem [e])) => Collects ([e]) where
-  type Elem [e] = e
-  ...
-</programlisting>
-        The most important point about associated family instances is that the
-	type indexes corresponding to class parameters must be identical to the
-        type given in the instance head; here this is <literal>[e]</literal>,
-        which coincides with the only class parameter.
-      </para>
-      <para>
-        Instances for an associated family can only appear as part of  instances
-	declarations of the class in which the family was declared - just as
-	with the equations of the methods of a class.  Also in correspondence to
-	how methods are handled, declarations of associated types can be omitted
-	in class instances.  If an associated family instance is omitted, the
-	corresponding instance type is not inhabited; i.e., only diverging
-	expressions, such as <literal>undefined</literal>, can assume the type.
-      </para>
-    </sect4>
-
-    <sect4 id="type-family-overlap">
+    </sect3>
+    <sect3 id="type-family-overlap">
       <title>Overlap of type synonym instances</title>
       <para>
 	The instance declarations of a type family used in a single program
@@ -5004,9 +4749,9 @@ type instance G (a, Int)  = [a]
 type instance G (Char, a) = [a]  -- ILLEGAL overlap, as [Char] /= [Int]
 </programlisting>
       </para>
-    </sect4>
+    </sect3>
 
-    <sect4 id="type-family-decidability">
+    <sect3 id="type-family-decidability">
       <title>Decidability of type synonym instances</title>
       <para>
 	In order to guarantee that type inference in the presence of type
@@ -5051,13 +4796,275 @@ type instance F t1 .. tn = t
 	programmer to ensure termination of the normalisation of type families
 	during type inference.
       </para>
-    </sect4>
   </sect3>
+  </sect2>
 
-  <sect3 id="equality-constraints">
+
+<sect2 id="assoc-decl">
+<title>Associated type families</title>
+<para>
+A data or type synonym family can be declared as part of a type class, thus:
+<programlisting>
+class GMapKey k where
+  data GMap k :: * -> *
+  ...
+
+class Collects ce where
+  type Elem ce :: *
+  ...
+</programlisting>
+When doing so, we drop the "<literal>family</literal>" keyword.
+</para>
+<para>
+	The type parameters must all be type variables, of course,
+        and some (but not necessarily all) of then can be the class
+        parameters. Each class parameter may
+	only be used at most once per associated type, but some may be omitted
+	and they may be in an order other than in the class head.  Hence, the
+	following contrived example is admissible:
+<programlisting>
+  class C a b c where
+    type T c a x :: *
+</programlisting>
+        Here <literal>c</literal> and <literal>a</literal> are class parameters,
+        but the type is also indexed on a third parameter <literal>x</literal>.
+      </para>
+
+    <sect3 id="assoc-data-inst">
+      <title>Associated instances</title>
+      <para>
+	When an associated data or type synonym family instance is declared within a type
+	class instance, we drop the <literal>instance</literal> keyword in the
+	family instance:
+<programlisting>
+instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
+  data GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
+  ...
+
+instance (Eq (Elem [e])) => Collects ([e]) where
+  type Elem [e] = e
+  ...
+</programlisting>
+        The most important point about associated family instances is that the
+        type indexes corresponding to class parameters must be identical to
+        the type given in the instance head; here this is the first argument
+        of <literal>GMap</literal>, namely <literal>Either a b</literal>,
+        which coincides with the only class parameter.  
+      </para>
+      <para>
+	Instances for an associated family can only appear as part of
+	instance declarations of the class in which the family was declared -
+	just as with the equations of the methods of a class.  Also in
+	correspondence to how methods are handled, declarations of associated
+	types can be omitted in class instances.  If an associated family
+	instance is omitted, the corresponding instance type is not inhabited;
+	i.e., only diverging expressions, such
+	as <literal>undefined</literal>, can assume the type.
+      </para>
+      <para>
+        Although it is unusual, there can be <emphasis>multiple</emphasis>
+        instances for an associated family in a single instance declaration.
+        For example, this is legitimate:
+<programlisting>
+instance GMapKey Flob where
+  data GMap Flob [v] = G1 v
+  data GMap Flob Int = G2 Int
+  ...
+</programlisting>
+        Here we give two data instance declarations, one in which the last
+        parameter is <literal>[v]</literal>, and one for which it is <literal>Int</literal>.
+        Since you cannot give any <emphasis>subsequent</emphasis> instances for
+        <literal>(GMap Flob ...)</literal>, this facility is most useful when
+        the free indexed parameter is of a kind with a finite number of alternatives
+        (unlike <literal>*</literal>).
+      </para>
+    </sect3>
+
+    <sect3 id="scoping-class-params">
+      <title>Scoping of class parameters</title>
+      <para>
+	The visibility of class
+	parameters in the right-hand side of associated family instances
+	depends <emphasis>solely</emphasis> on the parameters of the 
+	family.  As an example, consider the simple class declaration
+<programlisting>
+class C a b where
+  data T a
+</programlisting>
+        Only one of the two class parameters is a parameter to the data
+        family.  Hence, the following instance declaration is invalid:
+<programlisting>
+instance C [c] d where
+  data T [c] = MkT (c, d)    -- WRONG!!  'd' is not in scope
+</programlisting>
+        Here, the right-hand side of the data instance mentions the type
+        variable <literal>d</literal> that does not occur in its left-hand
+        side.  We cannot admit such data instances as they would compromise
+        type safety.
+      </para>
+    </sect3>
+  </sect2>
+
+  <sect2 id="data-family-import-export">
+    <title>Import and export</title>
+
+    <para>
+      The association of data constructors with type families is more dynamic
+      than that is the case with standard data and newtype declarations.  In
+      the standard case, the notation <literal>T(..)</literal> in an import or
+      export list denotes the type constructor and all the data constructors
+      introduced in its declaration.  However, a family declaration never
+      introduces any data constructors; instead, data constructors are
+      introduced by family instances.  As a result, which data constructors
+      are associated with a type family depends on the currently visible
+      instance declarations for that family.  Consequently, an import or
+      export item of the form <literal>T(..)</literal> denotes the family
+      constructor and all currently visible data constructors - in the case of
+      an export item, these may be either imported or defined in the current
+      module.  The treatment of import and export items that explicitly list
+      data constructors, such as <literal>GMap(GMapEither)</literal>, is
+      analogous.
+    </para>
+
+    <sect3 id="data-family-impexp-assoc">
+      <title>Associated families</title>
+      <para>
+	As expected, an import or export item of the
+	form <literal>C(..)</literal> denotes all of the class' methods and
+	associated types.  However, when associated types are explicitly
+	listed as subitems of a class, we need some new syntax, as uppercase
+	identifiers as subitems are usually data constructors, not type
+	constructors.  To clarify that we denote types here, each associated
+	type name needs to be prefixed by the keyword <literal>type</literal>.
+	So for example, when explicitly listing the components of
+	the <literal>GMapKey</literal> class, we write <literal>GMapKey(type
+	GMap, empty, lookup, insert)</literal>.
+      </para>
+    </sect3>
+
+    <sect3 id="data-family-impexp-examples">
+      <title>Examples</title>
+      <para>
+	Assuming our running <literal>GMapKey</literal> class example, let us
+	look at some export lists and their meaning:
+	<itemizedlist>
+	  <listitem>
+	    <para><literal>module GMap (GMapKey) where...</literal>: Exports
+	      just the class name.</para>
+	  </listitem>
+	  <listitem>
+	    <para><literal>module GMap (GMapKey(..)) where...</literal>:
+	      Exports the class, the associated type <literal>GMap</literal>
+	      and the member
+	      functions <literal>empty</literal>, <literal>lookup</literal>,
+	      and <literal>insert</literal>.  None of the data constructors is
+	      exported.</para>
+	  </listitem>
+	  <listitem>
+	    <para><literal>module GMap (GMapKey(..), GMap(..))
+		where...</literal>: As before, but also exports all the data
+	      constructors <literal>GMapInt</literal>,
+	      <literal>GMapChar</literal>,
+	      <literal>GMapUnit</literal>, <literal>GMapPair</literal>,
+	      and <literal>GMapUnit</literal>.</para>
+	  </listitem>
+	  <listitem>
+	    <para><literal>module GMap (GMapKey(empty, lookup, insert),
+	    GMap(..)) where...</literal>: As before.</para>
+	  </listitem>
+	  <listitem>
+	    <para><literal>module GMap (GMapKey, empty, lookup, insert, GMap(..))
+		where...</literal>: As before.</para>
+	  </listitem>
+	</itemizedlist>
+      </para>
+      <para>
+	Finally, you can write <literal>GMapKey(type GMap)</literal> to denote
+	both the class <literal>GMapKey</literal> as well as its associated
+	type <literal>GMap</literal>.  However, you cannot
+	write <literal>GMapKey(type GMap(..))</literal> &mdash; i.e.,
+	sub-component specifications cannot be nested.  To
+	specify <literal>GMap</literal>'s data constructors, you have to list
+	it separately.
+      </para>
+    </sect3>
+
+    <sect3 id="data-family-impexp-instances">
+      <title>Instances</title>
+      <para>
+	Family instances are implicitly exported, just like class instances.
+	However, this applies only to the heads of instances, not to the data
+	constructors an instance defines.
+      </para>
+    </sect3>
+
+  </sect2>
+
+  <sect2 id="ty-fams-in-instances">
+    <title>Type families and instance declarations</title>
+
+    <para>Type families require us to extend the rules for
+      the form of instance heads, which are given
+      in <xref linkend="flexible-instance-head"/>.
+      Specifically:
+<itemizedlist>
+ <listitem><para>Data type families may appear in an instance head</para></listitem>
+ <listitem><para>Type synonym families may not appear (at all) in an instance head</para></listitem>
+</itemizedlist>
+The reason for the latter restriction is that there is no way to check for instance
+matching. Consider
+<programlisting>
+   type family F a
+   type instance F Bool = Int
+
+   class C a
+
+   instance C Int
+   instance C (F a)
+</programlisting>
+Now a constraint <literal>(C (F Bool))</literal> would match both instances.
+The situation is especially bad because the type instance for <literal>F Bool</literal>
+might be in another module, or even in a module that is not yet written.
+</para>
+<para>
+However, type class instances of instances of data families can be defined 
+much like any other data type. For example, we can say
+<programlisting>
+data instance T Int = T1 Int | T2 Bool
+instance Eq (T Int) where
+  (T1 i) == (T1 j) = i==j
+  (T2 i) == (T2 j) = i==j
+  _      == _      = False
+</programlisting>
+	Note that class instances are always for
+	particular <emphasis>instances</emphasis> of a data family and never
+	for an entire family as a whole.  This is for essentially the same
+	reasons that we cannot define a toplevel function that performs
+	pattern matching on the data constructors
+	of <emphasis>different</emphasis> instances of a single type family.
+	It would require a form of extensible case construct.
+      </para>
+<para>
+Data instance declarations can also
+	have <literal>deriving</literal> clauses.  For example, we can write
+<programlisting>
+data GMap () v = GMapUnit (Maybe v)
+               deriving Show
+</programlisting>
+        which implicitly defines an instance of the form
+<programlisting>
+instance Show v => Show (GMap () v) where ...
+</programlisting>
+      </para>
+
+</sect2>
+
+</sect1>
+
+  <sect1 id="equality-constraints">
     <title>Equality constraints</title>
     <para>
-      Type context can include equality constraints of the form <literal>t1 ~
+      A type context can include equality constraints of the form <literal>t1 ~
       t2</literal>, which denote that the types <literal>t1</literal>
       and <literal>t2</literal> need to be the same.  In the presence of type
       families, whether two types are equal cannot generally be decided
@@ -5094,36 +5101,7 @@ class (F a ~ b) => C a b where
       with the class head.  Method signatures are not affected by that
       process.
     </para>
-  </sect3>
-
-  <sect3 id="ty-fams-in-instances">
-    <title>Type families and instance declarations</title>
-    <para>Type families require us to extend the rules for
-      the form of instance heads, which are given
-      in <xref linkend="flexible-instance-head"/>.
-      Specifically:
-<itemizedlist>
- <listitem><para>Data type families may appear in an instance head</para></listitem>
- <listitem><para>Type synonym families may not appear (at all) in an instance head</para></listitem>
-</itemizedlist>
-The reason for the latter restriction is that there is no way to check for. Consider
-<programlisting>
-   type family F a
-   type instance F Bool = Int
-
-   class C a
-
-   instance C Int
-   instance C (F a)
-</programlisting>
-Now a constraint <literal>(C (F Bool))</literal> would match both instances.
-The situation is especially bad because the type instance for <literal>F Bool</literal>
-might be in another module, or even in a module that is not yet written.
-</para>
-</sect3>
-</sect2>
-
-</sect1>
+  </sect1>
 
 <sect1 id="other-type-extensions">
 <title>Other type system extensions</title>

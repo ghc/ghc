@@ -498,9 +498,26 @@ tcAssocDecl clas mini_env (L loc decl)
       = checkTc (inst_ty `eqType` at_ty) 
                 (wrongATArgErr at_ty inst_ty)
       | otherwise 
-      = checkTc (isTyVarTy at_ty)  
-                (mustBeVarArgErr at_ty)
+      = return ()   -- Allow non-type-variable instantiation
+      	       	    -- See Note [Associated type instances]
 \end{code}
+
+Note [Associated type instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow this:
+  class C a where
+    type T x a
+  instance C Int where
+    type T (S y) Int = y
+    type T Z     Int = Char
+
+Note that 
+  a) The variable 'x' is not bound by the class decl
+  b) 'x' is instantiated to a non-type-variable in the instance
+  c) There are several type instance decls for T in the instance
+
+All this is fine.  Of course, you can't give any *more* instances
+for (T ty Int) elsewhere, becuase it's an *associated* type.
 
 Note [Checking consistent instantiation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1341,19 +1358,6 @@ instDeclCtxt2 dfun_ty
 
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes doc
-
-{-
-atInstCtxt :: Name -> SDoc
-atInstCtxt name = ptext (sLit "In the associated type instance for") <+>
-                  quotes (ppr name)
--}
-
-mustBeVarArgErr :: Type -> SDoc
-mustBeVarArgErr ty =
-  sep [ ptext (sLit "Arguments that do not correspond to a class parameter") <+>
-        ptext (sLit "must be variables")
-      , ptext (sLit "Instead of a variable, found") <+> ppr ty
-      ]
 
 wrongATArgErr :: Type -> Type -> SDoc
 wrongATArgErr ty instTy =

@@ -437,15 +437,10 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 
        -- Rename the associated types
        -- Here the instance variables always scope, regardless of -XScopedTypeVariables					
+       -- NB: we allow duplicate associated-type decls; 
+       --     See Note [Associated type instances] in TcInstDcls
        ; (ats', at_fvs) <- extendTyVarEnvFVRn (map hsLTyVarName inst_tyvars) $
                            rnATInsts cls ats
-
-	-- Check for duplicate associated types
-	-- The typechecker (not the renamer) checks that all 
-	-- the declarations are for the right class
-       ; let at_names = map (tcdLName . unLoc) ats
-       ; checkDupRdrNames at_names
-	-- See notes with checkDupRdrNames for methods, above
 
 	-- Rename the prags and signatures.
 	-- Note that the type variables are not in scope here,
