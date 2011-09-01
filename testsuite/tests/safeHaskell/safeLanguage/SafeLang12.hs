@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Main where
 
-import SafeLang11_A
+import SafeLang12_A
 import SafeLang12_B
 
 $(mkSimpleClass ''A)

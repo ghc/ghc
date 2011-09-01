@@ -1,6 +1,6 @@
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE TemplateHaskell #-}
-module SafeLang11_B ( Class(..), mkSimpleClass ) where
+module SafeLang12_B ( Class(..), mkSimpleClass ) where
 
 import Language.Haskell.TH
 
