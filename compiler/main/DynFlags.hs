@@ -278,6 +278,7 @@ data DynFlag
    | Opt_SSE2
    | Opt_SSE4_2
    | Opt_GhciSandbox
+   | Opt_GhciHistory
    | Opt_HelpfulErrors
 
 	-- temporary flags
@@ -1741,6 +1742,7 @@ fFlags = [
   ( "ext-core",                         AlwaysAllowed, Opt_EmitExternalCore, nop ),
   ( "shared-implib",                    AlwaysAllowed, Opt_SharedImplib, nop ),
   ( "ghci-sandbox",                     AlwaysAllowed, Opt_GhciSandbox, nop ),
+  ( "ghci-history",                     AlwaysAllowed, Opt_GhciHistory, nop ),
   ( "helpful-errors",                   AlwaysAllowed, Opt_HelpfulErrors, nop ),
   ( "building-cabal-package",           AlwaysAllowed, Opt_BuildingCabalPackage, nop ),
   ( "implicit-import-qualified",        AlwaysAllowed, Opt_ImplicitImportQualified, nop )
@@ -1916,6 +1918,7 @@ defaultFlags
       Opt_EmbedManifest,
       Opt_PrintBindContents,
       Opt_GhciSandbox,
+      Opt_GhciHistory,
       Opt_HelpfulErrors
     ]
 
