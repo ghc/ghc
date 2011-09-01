@@ -546,7 +546,41 @@ pprTcTyThingCategory (AThing {})     = ptext (sLit "Kinded thing")
 
 Note [Bindings with closed types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-TODO: write me.  This is all to do with OutsideIn
+Consider
+
+  f x = let g ys = map not ys
+        in ...
+
+Can we generalise 'g' under the OutsideIn algorithm?  Yes, 
+becuase all g's free variables are top-level; that is they themselves
+have no free type variables, and it is the type variables in the
+environment that makes things tricky for OutsideIn generalisation.
+
+Definition:
+
+   A variable is "closed", and has tct_closed set to TopLevel,
+      iff 
+   a) all its free variables are imported, or are themselves closed
+   b) generalisation is not restricted by the monomorphism restriction
+
+Under OutsideIn we are free to generalise a closed let-binding.
+This is an extension compared to the JFP paper on OutsideIn, which
+used "top-level" as a proxy for "closed".  (It's not a good proxy 
+anyway -- the MR can make a top-level binding with a free type
+variable.)
+
+Note that:
+  * A top-level binding may not be closed, if it suffer from the MR
+
+  * A nested binding may be closed (eg 'g' in the example we started with)
+    Indeed, that's the point; whether a function is defined at top level
+    or nested is orthogonal to the question of whether or not it is closed 
+
+  * A binding may be non-closed because it mentions a lexically scoped
+    *type variable*  Eg
+        f :: forall a. blah
+        f x = let g y = ...(y::a)...
+
 
 \begin{code}
 type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, Message))

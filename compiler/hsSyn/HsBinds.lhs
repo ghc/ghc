@@ -119,11 +119,10 @@ data HsBindLR idL idR
 				-- type 	Int -> forall a'. a' -> a'
 				-- Notice that the coercion captures the free a'.
 
-	bind_fvs :: NameSet,	-- ^ After the renamer, this contains a superset of the
-				-- Names of the other binders in this binding group that 
-				-- are free in the RHS of the defn
-				-- Before renaming, and after typechecking, 
-				-- the field is unused; it's just an error thunk
+	bind_fvs :: NameSet,	-- ^ After the renamer, this contains the locally-bound
+		    		-- free variables of this defn.
+				-- See Note [Bind free vars]
+
 
         fun_tick :: Maybe (Int,[Id])   -- ^ This is the (optional) module-local tick number.
     }
@@ -133,7 +132,7 @@ data HsBindLR idL idR
 	pat_lhs    :: LPat idL,
 	pat_rhs    :: GRHSs idR,
 	pat_rhs_ty :: PostTcType,	-- Type of the GRHSs
-	bind_fvs   :: NameSet		-- Same as for FunBind
+	bind_fvs   :: NameSet		-- See Note [Bind free vars]
     }
 
   | VarBind {	-- Dictionary binding and suchlike 
@@ -182,8 +181,47 @@ data ABExport id
 placeHolderNames :: NameSet
 -- Used for the NameSet in FunBind and PatBind prior to the renamer
 placeHolderNames = panic "placeHolderNames"
+\end{code}
 
-------------
+Note [AbsBinds wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Consdider
+   (f,g) = (\x.x, \y.y)
+This ultimately desugars to something like this:
+   tup :: forall a b. (a->a, b->b)
+   tup = /\a b. (\x:a.x, \y:b.y)
+   f :: forall a. a -> a
+   f = /\a. case tup a Any of 
+               (fm::a->a,gm:Any->Any) -> fm
+   ...similarly for g...
+
+The abe_wrap field deals with impedence-matching between
+    (/\a b. case tup a b of { (f,g) -> f })
+and the thing we really want, which may have fewer type
+variables.  The action happens in TcBinds.mkExport.
+
+Note [Bind free vars]
+~~~~~~~~~~~~~~~~~~~~~
+The bind_fvs field of FunBind and PatBind records the free variables
+of the definition.  It is used for two purposes
+
+a) Dependency analysis prior to type checking
+    (see TcBinds.tc_group)
+
+b) Deciding whether we can do generalisation of the binding
+    (see TcBinds.decideGeneralisationPlan)
+
+Specifically, 
+
+  * bind_fvs includes all free vars that are defined in this module
+    (including top-level things and lexically scoped type variables)
+
+  * bind_fvs excludes imported vars; this is just to keep the set smaller
+
+  * Before renaming, and after typechecking, the field is unused;
+    it's just an error thunk
+
+\begin{code}
 instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsLocalBindsLR idL idR) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs

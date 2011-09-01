@@ -1202,9 +1202,12 @@ tcInstSig sig_fn use_skols name
 -------------------------------
 data GeneralisationPlan 
   = NoGen		-- No generalisation, no AbsBinds
+
   | InferGen 	        -- Implicit generalisation; there is an AbsBinds
        Bool    		--   True <=> apply the MR; generalise only unconstrained type vars
        Bool             --   True <=> bindings mention only variables with closed types
+       			--            See Note [Bindings with closed types] in TcRnTypes
+
   | CheckGen TcSigInfo	-- Explicit generalisation; there is an AbsBinds
 
 -- A consequence of the no-AbsBinds choice (NoGen) is that there is
@@ -1243,11 +1246,16 @@ decideGeneralisationPlan dflags type_env bndr_names lbinds sig_fn
 	-- ns are the Names referred to from the RHS of this bind
 
     is_closed_id :: Name -> Bool
+    -- See Note [Bindings with closed types] in TcRnTypes
     is_closed_id name 
       | name `elemNameSet` bndr_set
       = True 		  -- Ignore binders in this groups, of course
-      | Just (ATcId { tct_closed = cl }) <- lookupNameEnv type_env name
-      = isTopLevel cl 	  -- This is the key line
+      | Just thing <- lookupNameEnv type_env name
+      = case thing of
+          ATcId { tct_closed = cl } -> isTopLevel cl  -- This is the key line
+	  ATyVar {}                 -> False	      -- In-scope type variables
+          AGlobal {}		    -> True	      --    are not closed!
+          AThing {}                 -> pprPanic "is_closed_id" (ppr name)
       | otherwise
       = WARN( isInternalName name, ppr name ) True
       	-- The free-var set for a top level binding mentions

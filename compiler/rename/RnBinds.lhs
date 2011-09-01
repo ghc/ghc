@@ -172,8 +172,7 @@ rnTopBindsRHS binds
   = do { is_boot <- tcIsHsBoot
        ; if is_boot 
          then rnTopBindsBoot binds
-         else rnValBindsRHS noTrimFVs -- don't trim free vars
-                            Nothing   -- Allow SPEC prags for imports
+         else rnValBindsRHS Nothing   -- Allow SPEC prags for imports
                             binds }
 
 -- Wrapper if we don't need to do anything in between the left and right,
@@ -186,7 +185,7 @@ rnTopBinds b
   = do { nl <- rnTopBindsLHS emptyFsEnv b
        ; let bound_names = collectHsValBinders nl
        ; bindLocalNames bound_names $ 
-         rnValBindsRHS noTrimFVs (Just (mkNameSet bound_names)) nl }
+         rnValBindsRHS (Just (mkNameSet bound_names)) nl }
        
 
 rnTopBindsBoot :: HsValBindsLR Name RdrName -> RnM (HsValBinds Name, DefUses)
@@ -296,17 +295,14 @@ rnValBindsLHS _ b = pprPanic "rnValBindsLHSFromDoc" (ppr b)
 -- Assumes the LHS vars are in scope
 --
 -- Does not bind the local fixity declarations
-rnValBindsRHS :: (FreeVars -> FreeVars)  -- for trimming free var sets
-                     -- The trimming function trims the free vars we attach to a
-                     -- binding so that it stays reasonably small
-               -> Maybe NameSet	-- Names bound by the LHSes
+rnValBindsRHS :: Maybe NameSet	-- Names bound by the LHSes
 	       	  		-- Nothing if expect sigs for imports
                -> HsValBindsLR Name RdrName
                -> RnM (HsValBinds Name, DefUses)
 
-rnValBindsRHS trim mb_bound_names (ValBindsIn mbinds sigs)
+rnValBindsRHS mb_bound_names (ValBindsIn mbinds sigs)
   = do { sigs' <- renameSigs mb_bound_names okBindSig sigs
-       ; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
+       ; binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs')) mbinds
        ; case depAnalBinds binds_w_dus of
            (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
               where
@@ -317,10 +313,7 @@ rnValBindsRHS trim mb_bound_names (ValBindsIn mbinds sigs)
 			       -- the uses in the sigs
        }
 
-rnValBindsRHS _ _ b = pprPanic "rnValBindsRHS" (ppr b)
-
-noTrimFVs :: FreeVars -> FreeVars
-noTrimFVs fvs = fvs
+rnValBindsRHS _ b = pprPanic "rnValBindsRHS" (ppr b)
 
 -- Wrapper for local binds
 --
@@ -332,12 +325,7 @@ rnLocalValBindsRHS :: NameSet  -- names bound by the LHSes
                    -> HsValBindsLR Name RdrName
                    -> RnM (HsValBinds Name, DefUses)
 rnLocalValBindsRHS bound_names binds
-  = rnValBindsRHS trim (Just bound_names) binds
-  where
-    trim fvs = filterNameSet isInternalName fvs
-     -- Keep Internal Names; these are the non-top-level ones
-     -- As well as dependency analysis, we need these for the
-     -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
+  = rnValBindsRHS (Just bound_names) binds
 
 -- for local binds
 -- wrapper that does both the left- and right-hand sides 
@@ -459,50 +447,54 @@ rnBindLHS _ _ b = pprPanic "rnBindLHS" (ppr b)
 
 -- assumes the left-hands-side vars are in scope
 rnBind :: (Name -> [Name])		-- Signature tyvar function
-       -> (FreeVars -> FreeVars)	-- Trimming function for rhs free vars
        -> LHsBindLR Name RdrName
        -> RnM (LHsBind Name, [Name], Uses)
-rnBind _ trim (L loc bind@(PatBind { pat_lhs = pat
-                                   , pat_rhs = grhss 
+rnBind _ (L loc bind@(PatBind { pat_lhs = pat
+                              , pat_rhs = grhss 
                                       -- pat fvs were stored in bind_fvs
                                       -- after processing the LHS
-                                   , bind_fvs = pat_fvs }))
+                              , bind_fvs = pat_fvs }))
   = setSrcSpan loc $ 
-    do	{ let bndrs = collectPatBinders pat
+    do	{ mod <- getModule
+        ; (grhss', rhs_fvs) <- rnGRHSs PatBindRhs grhss
 
-	; (grhss', fvs) <- rnGRHSs PatBindRhs grhss
 		-- No scoped type variables for pattern bindings
-	; let all_fvs = pat_fvs `plusFV` fvs
-              fvs'    = trim all_fvs
+	; let all_fvs = pat_fvs `plusFV` rhs_fvs
+              fvs'    = filterNameSet (nameIsLocalOrFrom mod) all_fvs
+	        -- Keep locally-defined Names
+		-- As well as dependency analysis, we need these for the
+		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
 	; fvs' `seq` -- See Note [Free-variable space leak]
           return (L loc (bind { pat_rhs  = grhss' 
 			      , bind_fvs = fvs' }),
-		  bndrs, all_fvs) }
+		  collectPatBinders pat, all_fvs) }
 
-rnBind sig_fn trim 
-       (L loc bind@(FunBind { fun_id = name 
-                            , fun_infix = is_infix 
-                            , fun_matches = matches })) 
+rnBind sig_fn (L loc bind@(FunBind { fun_id = name 
+                            	   , fun_infix = is_infix 
+                            	   , fun_matches = matches })) 
        -- invariant: no free vars here when it's a FunBind
   = setSrcSpan loc $
     do	{ let plain_name = unLoc name
 
-	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
+	; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 				-- bindSigTyVars tests for Opt_ScopedTyVars
-			     rnMatchGroup (FunRhs plain_name is_infix) matches
-	; let fvs' = trim fvs
-
+			         rnMatchGroup (FunRhs plain_name is_infix) matches
 	; when is_infix $ checkPrecMatch plain_name matches'
 
-	; fvs' `seq` -- See Note [Free-variable space leak]
+        ; mod <- getModule
+        ; let fvs' = filterNameSet (nameIsLocalOrFrom mod) rhs_fvs
+	        -- Keep locally-defined Names
+		-- As well as dependency analysis, we need these for the
+		-- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
+	; fvs' `seq` -- See Note [Free-variable space leak]
           return (L loc (bind { fun_matches = matches'
 			      , bind_fvs   = fvs' }), 
-		  [plain_name], fvs)
+		  [plain_name], rhs_fvs)
       }
 
-rnBind _ _ b = pprPanic "rnBind" (ppr b)
+rnBind _ b = pprPanic "rnBind" (ppr b)
 
 {-
 Note [Free-variable space leak]
