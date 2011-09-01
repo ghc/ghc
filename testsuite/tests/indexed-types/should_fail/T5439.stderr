@@ -1,0 +1,9 @@
+
+T5439.hs:83:39:
+    Couldn't match expected type `Peano n0'
+                with actual type `Attempt α0'
+    In the return type of a call of `Failure'
+    In the second argument of `($)', namely
+      `Failure (e :: SomeException)'
+    In the second argument of `($)', namely
+      `inj $ Failure (e :: SomeException)'
