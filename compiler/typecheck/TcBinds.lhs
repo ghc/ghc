@@ -716,11 +716,14 @@ recoveryCode :: [Name] -> SigFun -> TcM (LHsBinds TcId, [Id], TopLevelFlag)
 recoveryCode binder_names sig_fn
   = do  { traceTc "tcBindsWithSigs: error recovery" (ppr binder_names)
         ; poly_ids <- mapM mk_dummy binder_names
-        ; return (emptyBag, poly_ids, TopLevel) }
+        ; return (emptyBag, poly_ids, if all is_closed poly_ids
+                                      then TopLevel else NotTopLevel) }
   where
     mk_dummy name 
         | isJust (sig_fn name) = tcLookupId name        -- Had signature; look it up
         | otherwise            = return (mkLocalId name forall_a_a)    -- No signature
+
+    is_closed poly_id = isEmptyVarSet (tyVarsOfType (idType poly_id))
 
 forall_a_a :: TcType
 forall_a_a = mkForAllTy openAlphaTyVar (mkTyVarTy openAlphaTyVar)
