@@ -1,0 +1,4 @@
+
+T5434.hs:12:3:
+    Warning: This binding for `x' shadows the existing binding
+               bound at T5434.hs:7:3

@@ -204,3 +204,6 @@ test('TH_lookupName',
      extra_clean(['TH_lookupName_Lib.hi', 'TH_lookupName_Lib.o']),
      multimod_compile_and_run,
      ['TH_lookupName.hs', ''])
+test('T5452', normal, compile, ['-v0'])
+test('T5434', extra_clean(['T5434a.hi','T5434a.o']), 
+              multimod_compile, ['T5434','-v0 -Wall'])
