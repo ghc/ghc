@@ -5,7 +5,6 @@ T3468.hs-boot:3:6:
                      RecFlag Recursive
                      = F :: forall d a r. a -> Tool d Stricts: _
                      FamilyInstance: none
-    Boot file:   data Tool
+    Boot file:   abstract(False) Tool
                      RecFlag NonRecursive
-                     {- abstract -}
                      FamilyInstance: none
