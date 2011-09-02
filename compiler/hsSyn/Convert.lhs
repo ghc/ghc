@@ -92,6 +92,9 @@ force a = a `seq` return ()
 failWith :: Message -> CvtM a
 failWith m = CvtM (\_ -> Left m)
 
+getL :: CvtM SrcSpan
+getL = CvtM (\loc -> Right loc)
+
 returnL :: a -> CvtM (Located a)
 returnL x = CvtM (\loc -> Right (L loc x))
 
@@ -903,10 +906,13 @@ tconName n = cvtName OccName.tcClsName n
 cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtName ctxt_ns (TH.Name occ flavour)
   | not (okOcc ctxt_ns occ_str) = failWith (badOcc ctxt_ns occ_str)
-  | otherwise 		        = force rdr_name >> return rdr_name
+  | otherwise 		        
+  = do { loc <- getL
+       ; let rdr_name = thRdrName loc ctxt_ns occ_str flavour 
+       ; force rdr_name 
+       ; return rdr_name }
   where
     occ_str = TH.occString occ
-    rdr_name = thRdrName ctxt_ns occ_str flavour
 
 okOcc :: OccName.NameSpace -> String -> Bool
 okOcc _  []      = False
@@ -927,24 +933,28 @@ badOcc ctxt_ns occ
   = ptext (sLit "Illegal") <+> pprNameSpace ctxt_ns
 	<+> ptext (sLit "name:") <+> quotes (text occ)
 
-thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
+thRdrName :: SrcSpan -> OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- This turns a TH Name into a RdrName; used for both binders and occurrences
 -- See Note [Binders in Template Haskell]
 -- The passed-in name space tells what the context is expecting;
 --	use it unless the TH name knows what name-space it comes
 -- 	from, in which case use the latter
 --
+-- We pass in a SrcSpan (gotten from the monad) because this function
+-- is used for *binders* and if we make an Exact Name we want it
+-- to have a binding site inside it.  (cf Trac #5434)
+--
 -- ToDo: we may generate silly RdrNames, by passing a name space
 --       that doesn't match the string, like VarName ":+", 
 -- 	 which will give confusing error messages later
 -- 
 -- The strict applications ensure that any buried exceptions get forced
-thRdrName ctxt_ns th_occ th_name
+thRdrName loc ctxt_ns th_occ th_name
   = case th_name of
      TH.NameG th_ns pkg mod -> thOrigRdrName th_occ th_ns pkg mod
      TH.NameQ mod  -> (mkRdrQual  $! mk_mod mod) $! occ
-     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq uniq) $! occ) noSrcSpan)
-     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemName $! mk_uniq uniq) $! occ))
+     TH.NameL uniq -> nameRdrName $! (((Name.mkInternalName $! mk_uniq uniq) $! occ) loc)
+     TH.NameU uniq -> nameRdrName $! (((Name.mkSystemNameAt $! mk_uniq uniq) $! occ) loc)
      TH.NameS | Just name <- isBuiltInOcc ctxt_ns th_occ -> nameRdrName $! name
               | otherwise			         -> mkRdrUnqual $! occ
   where
@@ -957,8 +967,8 @@ thOrigRdrName occ th_ns pkg mod = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod)
 thRdrNameGuesses :: TH.Name -> [RdrName]
 thRdrNameGuesses (TH.Name occ flavour)
   -- This special case for NameG ensures that we don't generate duplicates in the output list
-  | TH.NameG th_ns pkg mod <- flavour = [thOrigRdrName occ_str th_ns pkg mod]
-  | otherwise                         = [ thRdrName gns occ_str flavour
+  | TH.NameG th_ns pkg mod <- flavour = [ thOrigRdrName occ_str th_ns pkg mod]
+  | otherwise                         = [ thRdrName noSrcSpan gns occ_str flavour
 			                | gns <- guessed_nss]
   where
     -- guessed_ns are the name spaces guessed from looking at the TH name
