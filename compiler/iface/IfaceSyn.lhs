@@ -103,16 +103,16 @@ data IfaceClassOp = IfaceClassOp OccName DefMethSpec IfaceType
         -- Just True  => generic default method
 
 data IfaceConDecls
-  = IfAbstractTyCon             -- No info
+  = IfAbstractTyCon Bool        -- c.f TyCon.AbstractTyCon
   | IfOpenDataTyCon             -- Open data family
   | IfDataTyCon [IfaceConDecl]  -- data type decls
   | IfNewTyCon  IfaceConDecl    -- newtype decls
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
-visibleIfConDecls IfAbstractTyCon  = []
-visibleIfConDecls IfOpenDataTyCon  = []
-visibleIfConDecls (IfDataTyCon cs) = cs
-visibleIfConDecls (IfNewTyCon c)   = [c]
+visibleIfConDecls (IfAbstractTyCon {}) = []
+visibleIfConDecls IfOpenDataTyCon      = []
+visibleIfConDecls (IfDataTyCon cs)     = cs
+visibleIfConDecls (IfNewTyCon c)       = [c]
 
 data IfaceConDecl
   = IfCon {
@@ -338,7 +338,7 @@ ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 -- TyThing.getOccName should define a bijection between the two lists.
 -- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
-ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}  = []
+ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon {}}  = []
 
 -- Newtype
 ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
@@ -443,10 +443,10 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifCtxt = context,
                 pprFamily mbFamInst])
   where
     pp_nd = case condecls of
-                IfAbstractTyCon -> ptext (sLit "data")
-                IfOpenDataTyCon -> ptext (sLit "data family")
-                IfDataTyCon _   -> ptext (sLit "data")
-                IfNewTyCon _    -> ptext (sLit "newtype")
+                IfAbstractTyCon dis -> ptext (sLit "abstract") <> parens (ppr dis)
+                IfOpenDataTyCon     -> ptext (sLit "data family")
+                IfDataTyCon _       -> ptext (sLit "data")
+                IfNewTyCon _        -> ptext (sLit "newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
                           ifFDs = fds, ifATs = ats, ifSigs = sigs,
@@ -472,9 +472,9 @@ pprIfaceDeclHead context thing tyvars
           pprIfaceTvBndrs tyvars]
 
 pp_condecls :: OccName -> IfaceConDecls -> SDoc
-pp_condecls _  IfAbstractTyCon  = ptext (sLit "{- abstract -}")
+pp_condecls _  (IfAbstractTyCon {}) = empty
+pp_condecls _  IfOpenDataTyCon      = empty
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
-pp_condecls _  IfOpenDataTyCon  = empty
 pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
                                                             (map (pprIfaceConDecl tc) cs))
 

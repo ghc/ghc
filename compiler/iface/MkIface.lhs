@@ -1391,7 +1391,7 @@ tyThingToIfaceDecl (ATyCon tycon)
     ifaceConDecls (DataTyCon { data_cons = cons })  = 
       IfDataTyCon (map ifaceConDecl cons)
     ifaceConDecls DataFamilyTyCon {}                = IfOpenDataTyCon
-    ifaceConDecls AbstractTyCon			    = IfAbstractTyCon
+    ifaceConDecls (AbstractTyCon distinct)	    = IfAbstractTyCon distinct
 	-- The last case happens when a TyCon has been trimmed during tidying
 	-- Furthermore, tyThingToIfaceDecl is also used
 	-- in TcRnDriver for GHCi, when browsing a module, in which case the

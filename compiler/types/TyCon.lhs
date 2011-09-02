@@ -45,7 +45,7 @@ module TyCon(
         isNewTyCon, isAbstractTyCon,
         isFamilyTyCon, isSynFamilyTyCon, isDataFamilyTyCon,
         isUnLiftedTyCon,
-	isGadtSyntaxTyCon,
+	isGadtSyntaxTyCon, isDistinctTyCon, isDistinctAlgRhs,
 	isTyConAssoc, tyConAssoc_maybe,
 	isRecursiveTyCon,
 	isHiBootTyCon,
@@ -330,7 +330,7 @@ data TyCon
   | AlgTyCon {		
 	tyConUnique :: Unique,
 	tyConName   :: Name,
-	tc_kind   :: Kind,
+	tc_kind     :: Kind,
 	tyConArity  :: Arity,
 
 	tyConTyVars :: [TyVar],	  -- ^ The type variables used in the type constructor.
@@ -455,6 +455,10 @@ data AlgTyConRhs
     -- it's represented by a pointer.  Used when we export a data type
     -- abstractly into an .hi file.
   = AbstractTyCon
+      Bool	-- True  <=> It's definitely a distinct data type, 
+      		-- 	     equal only to itself; ie not a newtype
+		-- False <=> Not sure
+		-- See Note [AbstractTyCon and type equality]
 
     -- | Represents an open type family without a fixed right hand
     -- side.  Additional instances can appear at any time.
@@ -512,13 +516,20 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check Trac #1072.
     }
+\end{code}
+
+Note [AbstractTyCon and type equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TODO
+
+\begin{code}
 
 -- | Extract those 'DataCon's that we are able to learn about.  Note
 -- that visibility in this sense does not correspond to visibility in
 -- the context of any particular user program!
 visibleDataCons :: AlgTyConRhs -> [DataCon]
-visibleDataCons AbstractTyCon      	      = []
-visibleDataCons DataFamilyTyCon {}		      = []
+visibleDataCons (AbstractTyCon {})   	      = []
+visibleDataCons DataFamilyTyCon {}	      = []
 visibleDataCons (DataTyCon{ data_cons = cs }) = cs
 visibleDataCons (NewTyCon{ data_con = c })    = [c]
 
@@ -919,12 +930,13 @@ isFunTyCon _             = False
 
 -- | Test if the 'TyCon' is algebraic but abstract (invisible data constructors)
 isAbstractTyCon :: TyCon -> Bool
-isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
+isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon {} }) = True
 isAbstractTyCon _ = False
 
 -- | Make an algebraic 'TyCon' abstract. Panics if the supplied 'TyCon' is not algebraic
 makeTyConAbstract :: TyCon -> TyCon
-makeTyConAbstract tc@(AlgTyCon {}) = tc { algTcRhs = AbstractTyCon }
+makeTyConAbstract tc@(AlgTyCon { algTcRhs = rhs }) 
+  = tc { algTcRhs = AbstractTyCon (isDistinctAlgRhs rhs) }
 makeTyConAbstract tc = pprPanic "makeTyConAbstract" (ppr tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
@@ -953,18 +965,39 @@ isDataTyCon :: TyCon -> Bool
 -- 
 -- Generally, the function will be true for all @data@ types and false
 -- for @newtype@s, unboxed tuples and type family 'TyCon's. But it is
--- not guarenteed to return @True@ in all cases that it could.
+-- not guaranteed to return @True@ in all cases that it could.
 -- 
 -- NB: for a data type family, only the /instance/ 'TyCon's
 --     get an info table.  The family declaration 'TyCon' does not
 isDataTyCon (AlgTyCon {algTcRhs = rhs})
   = case rhs of
         DataFamilyTyCon {}  -> False
-	DataTyCon {}  -> True
-	NewTyCon {}   -> False
-	AbstractTyCon -> False	 -- We don't know, so return False
+	DataTyCon {}     -> True
+	NewTyCon {}      -> False
+	AbstractTyCon {} -> False	 -- We don't know, so return False
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon _ = False
+
+-- | 'isDistinctTyCon' is true of 'TyCon's that are equal only to 
+-- themselves, even via coercions (except for unsafeCoerce).
+-- This excludes newtypes, type functions, type synonyms.
+-- It relates directly to the FC consistency story: 
+--     If the axioms are consistent, 
+--     and  co : S tys ~ T tys, and S,T are "distinct" TyCons,
+--     then S=T.
+-- Cf Note [Pruning dead case alternatives] in Unify
+isDistinctTyCon :: TyCon -> Bool
+isDistinctTyCon (AlgTyCon {algTcRhs = rhs}) = isDistinctAlgRhs rhs
+isDistinctTyCon (FunTyCon {})               = True
+isDistinctTyCon (TupleTyCon {})             = True
+isDistinctTyCon (PrimTyCon {})              = True
+isDistinctTyCon _                           = False
+
+isDistinctAlgRhs :: AlgTyConRhs -> Bool
+isDistinctAlgRhs (DataTyCon {})  	  = True
+isDistinctAlgRhs (DataFamilyTyCon {})     = True
+isDistinctAlgRhs (AbstractTyCon distinct) = distinct
+isDistinctAlgRhs (NewTyCon {})            = False
 
 -- | Is this 'TyCon' that for a @newtype@
 isNewTyCon :: TyCon -> Bool
@@ -1108,8 +1141,8 @@ isRecursiveTyCon _                                 = False
 -- | Did this 'TyCon' originate from type-checking a .h*-boot file?
 isHiBootTyCon :: TyCon -> Bool
 -- Used for knot-tying in hi-boot files
-isHiBootTyCon (AlgTyCon {algTcRhs = AbstractTyCon}) = True
-isHiBootTyCon _                                     = False
+isHiBootTyCon (AlgTyCon {algTcRhs = AbstractTyCon False}) = True
+isHiBootTyCon _                                           = False
 
 -- | Is this the 'TyCon' of a foreign-imported type constructor?
 isForeignTyCon :: TyCon -> Bool

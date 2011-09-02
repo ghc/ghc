@@ -268,7 +268,7 @@ The question before the house is this: if I know something about the type
 of x, can I prune away the T1 alternative?
 
 Suppose x::T Char.  It's impossible to construct a (T Char) using T1, 
-	Answer = YES (clearly)
+	Answer = YES we can prune the T1 branch (clearly)
 
 Suppose x::T (F a), where 'a' is in scope.  Then 'a' might be instantiated
 to 'Bool', in which case x::T Int, so
@@ -280,7 +280,7 @@ gives a coercion
 	CoX :: X ~ Int
 So (T CoX) :: T X ~ T Int; hence (T1 `cast` sym (T CoX)) is a non-bottom value
 of type (T X) constructed with T1.  Hence
-	ANSWER = NO (surprisingly)
+	ANSWER = NO we can't prune the T1 branch (surprisingly)
 
 Furthermore, this can even happen; see Trac #1251.  GHC's newtype-deriving
 mechanism uses a cast, just as above, to move from one dictionary to another,
@@ -328,11 +328,11 @@ typesCantMatch prs = any (\(s,t) -> cant_match s t) prs
 	= cant_match a1 a2 || cant_match r1 r2
 
     cant_match (TyConApp tc1 tys1) (TyConApp tc2 tys2)
-	| isDataTyCon tc1 && isDataTyCon tc2
+	| isDistinctTyCon tc1 && isDistinctTyCon tc2
 	= tc1 /= tc2 || typesCantMatch (zipEqual "typesCantMatch" tys1 tys2)
 
-    cant_match (FunTy {}) (TyConApp tc _) = isDataTyCon tc
-    cant_match (TyConApp tc _) (FunTy {}) = isDataTyCon tc
+    cant_match (FunTy {}) (TyConApp tc _) = isDistinctTyCon tc
+    cant_match (TyConApp tc _) (FunTy {}) = isDistinctTyCon tc
 	-- tc can't be FunTyCon by invariant
 
     cant_match (AppTy f1 a1) ty2

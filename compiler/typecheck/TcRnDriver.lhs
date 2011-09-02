@@ -771,7 +771,9 @@ checkBootTyCon tc1 tc2
   where 
         env0 = mkRnEnv2 emptyInScopeSet
 
-        eqAlgRhs AbstractTyCon _ = True
+        eqAlgRhs (AbstractTyCon dis1) rhs2 
+          | dis1      = isDistinctAlgRhs rhs2	--Check compatibility
+          | otherwise = True
         eqAlgRhs DataFamilyTyCon{} DataFamilyTyCon{} = True
         eqAlgRhs tc1@DataTyCon{} tc2@DataTyCon{} =
             eqListBy eqCon (data_cons tc1) (data_cons tc2)

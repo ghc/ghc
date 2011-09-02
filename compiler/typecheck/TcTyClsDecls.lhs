@@ -491,8 +491,8 @@ tcTyClDecl1 _parent calc_isrec
 	{ let res_ty = mkTyConApp tycon (mkTyVarTys final_tvs)
 	; data_cons <- tcConDecls ex_ok tycon (final_tvs, res_ty) cons
 	; tc_rhs <-
-	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
-	    then return AbstractTyCon	-- "don't know"; hence Abstract
+	    if null cons && is_boot 	      -- In a hs-boot file, empty cons means
+	    then return totallyAbstractTyConRhs  -- "don't know"; hence totally Abstract
 	    else case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
 		   NewType  -> ASSERT( not (null data_cons) )

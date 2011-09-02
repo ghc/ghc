@@ -511,7 +511,7 @@ tcFamInst (Just (fam, tys)) = do { famTyCon <- tcIfaceTyCon fam
 tcIfaceDataCons :: Name -> TyCon -> [TyVar] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon _ if_cons
   = case if_cons of
-	IfAbstractTyCon	 -> return mkAbstractTyConRhs
+	IfAbstractTyCon	dis -> return (AbstractTyCon dis)
 	IfOpenDataTyCon	 -> return DataFamilyTyCon
 	IfDataTyCon cons -> do 	{ data_cons <- mapM tc_con_decl cons
 				; return (mkDataTyConRhs data_cons) }

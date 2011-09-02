@@ -9,7 +9,7 @@ module BuildTyCl (
         buildAlgTyCon, 
         buildDataCon,
 	TcMethInfo, buildClass,
-	mkAbstractTyConRhs, 
+	distinctAbstractTyConRhs, totallyAbstractTyConRhs, 
 	mkNewTyConRhs, mkDataTyConRhs, 
         newImplicitBinder
     ) where
@@ -105,8 +105,9 @@ mkFamInstParentInfo tc_name tvs (family, instTys) rep_tycon
        ; return $ FamInstTyCon family instTys co_tycon }
     
 ------------------------------------------------------
-mkAbstractTyConRhs :: AlgTyConRhs
-mkAbstractTyConRhs = AbstractTyCon
+distinctAbstractTyConRhs, totallyAbstractTyConRhs :: AlgTyConRhs
+distinctAbstractTyConRhs = AbstractTyCon True
+totallyAbstractTyConRhs  = AbstractTyCon False
 
 mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
 mkDataTyConRhs cons
