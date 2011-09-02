@@ -1351,8 +1351,7 @@ reify_tc_app tc tys
   = do { tys' <- reifyTypes tys 
        ; return (foldl TH.AppT r_tc tys') }
   where
-    n_tys = length tys
-    r_tc | isTupleTyCon tc          = TH.TupleT n_tys
+    r_tc | isTupleTyCon tc          = TH.TupleT (tyConArity tc)
          | tc `hasKey` listTyConKey = TH.ListT
          | otherwise                = TH.ConT (reifyName tc)
 
