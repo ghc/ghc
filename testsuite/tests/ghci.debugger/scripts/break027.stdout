@@ -6,4 +6,4 @@ _result :: [a] = _
 a :: a = _
 left :: [a] = _
 right :: [a] = _
-a :: a 	-- <no location info>
+a :: a 	-- Defined at <no location info>

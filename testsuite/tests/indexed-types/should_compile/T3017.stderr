@@ -12,8 +12,8 @@ COERCION AXIOMS
   axiom Foo.TFCo:R:ElemListColl [a]
     :: Elem (ListColl a) ~ Foo.R:ElemListColl a
 INSTANCES
-  instance Coll (ListColl a) -- Defined at T3017.hs:12:11-27
+  instance Coll (ListColl a) -- Defined at T3017.hs:12:11
 FAMILY INSTANCES
-  type Elem (ListColl a) -- Defined at T3017.hs:13:9-12
+  type Elem (ListColl a) -- Defined at T3017.hs:13:9
 Dependent modules: []
 Dependent packages: [base, ghc-prim, integer-gmp]

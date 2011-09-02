@@ -1,8 +1,8 @@
 
 tcfail036.hs:6:10:
     Duplicate instance declarations:
-      instance Num NUM -- Defined at tcfail036.hs:6:10-16
-      instance Num NUM -- Defined at tcfail036.hs:8:10-16
+      instance Num NUM -- Defined at tcfail036.hs:6:10
+      instance Num NUM -- Defined at tcfail036.hs:8:10
 
 tcfail036.hs:9:13:
     Class `Num' used as a type

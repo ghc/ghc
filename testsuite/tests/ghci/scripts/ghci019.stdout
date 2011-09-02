@@ -1,2 +1,2 @@
-data Foo = Foo 	-- Defined at ghci019.hs:8:6-8
-instance Prelude.Eq Foo -- Defined at ghci019.hs:9:10-23
+data Foo = Foo 	-- Defined at ghci019.hs:8:6
+instance Prelude.Eq Foo -- Defined at ghci019.hs:9:10

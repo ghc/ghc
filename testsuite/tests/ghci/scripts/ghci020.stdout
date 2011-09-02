@@ -1,1 +1,1 @@
-data (->) a b 	-- Defined in GHC.Prim
+data (->) a b 	-- Defined in `GHC.Prim'

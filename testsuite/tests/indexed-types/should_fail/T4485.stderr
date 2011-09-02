@@ -6,10 +6,10 @@ T4485.hs:47:15:
     Matching instances:
       instance [overlap ok] (EmbedAsChild m c, m1 ~ m) =>
                             EmbedAsChild m (XMLGenT m1 c)
-        -- Defined at T4485.hs:29:10-68
+        -- Defined at T4485.hs:29:10
       instance [overlap ok] EmbedAsChild
                               (IdentityT IO) (XMLGenT Identity ())
-        -- Defined at T4485.hs:42:10-58
+        -- Defined at T4485.hs:42:10
     (The choice depends on the instantiation of `m0'
      To pick the first instance above, use -XIncoherentInstances
      when compiling the other instance declarations)
