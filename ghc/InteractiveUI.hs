@@ -470,8 +470,11 @@ runGHCi paths maybe_exprs = do
 
 runGHCiInput :: InputT GHCi a -> GHCi a
 runGHCiInput f = do
-    histFile <- liftIO $ withGhcAppData (\dir -> return (Just (dir </> "ghci_history")))
-                                        (return Nothing)
+    dflags <- getDynFlags
+    histFile <- if dopt Opt_GhciHistory dflags
+                then liftIO $ withGhcAppData (\dir -> return (Just (dir </> "ghci_history")))
+                                             (return Nothing)
+                else return Nothing
     let settings = setComplete ghciCompleteWord
                     $ defaultSettings {historyFile = histFile}
     runInputT settings f

@@ -2728,6 +2728,12 @@ phase <replaceable>n</replaceable></entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-fno-ghci-history</option></entry>
+	      <entry>Do not use the load/store the GHCi command history from/to <literal>ghci_history</literal>.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-fno-ghci-sandbox</option></entry>
 	      <entry>Turn off the GHCi sandbox. Means computations are run in the main thread, rather than a forked thread.</entry>
 	      <entry>dynamic</entry>
