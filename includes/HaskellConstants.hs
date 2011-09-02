@@ -30,8 +30,8 @@ mAX_TUPLE_SIZE = 62 -- Should really match the number
                     -- of decls in Data.Tuple
 
 mAX_CONTEXT_REDUCTION_DEPTH :: Int
-mAX_CONTEXT_REDUCTION_DEPTH = 20
-
+mAX_CONTEXT_REDUCTION_DEPTH = 200
+  -- Increase to 200; see Trac #5395
 
 -- specialised fun/thunk/constr closure types
 mAX_SPEC_THUNK_SIZE :: Int
