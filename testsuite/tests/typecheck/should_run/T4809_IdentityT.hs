@@ -29,8 +29,8 @@ evalIdentityT = runIdentityT . HSX.unXMLGenT
 -- * HSX.XMLGenerator for IdentityT
 
 instance (Functor m, Monad m) => HSX.XMLGen (IdentityT m) where
-    type HSX.XML (IdentityT m) = XML
-    newtype HSX.Child (IdentityT m) = IChild { unIChild :: XML }
+    type XML (IdentityT m) = XML
+    newtype Child (IdentityT m) = IChild { unIChild :: XML }
     genElement n _attrs children = HSX.XMLGenT $ 
                                   do children' <- HSX.unXMLGenT (fmap (map unIChild . concat) (sequence children))
                                      return (Element n [] children')
