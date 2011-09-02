@@ -801,27 +801,6 @@ catMaybeErr ms =  [ a | Succeeded a <- ms ]
 %*                                                                      *
 %************************************************************************
 
-Note [Exports of data families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose you see (Trac #5306)
-	module M where
-          import X( F )
-          data instance F Int = FInt
-What does M export?  AvailTC F [FInt] 
-                  or AvailTC F [F,FInt]?
-The former is strictly right because F isn't defined in this module.
-But then you can never do an explicit import of M, thus
-    import M( F( FInt ) )
-becuase F isn't exported by M.  Nor can you import FInt alone from here
-    import M( FInt )
-because we don't have syntax to support that.  (It looks like an import of 
-the type FInt.)  
-
-So we compromise.  When constructing exports with no export list, or
-with module M( module M ), we add the parent to the exports as well.
-But not when you see module M( f ), even if f is a class method with
-a parent.  Hence the include_parent flag to greExportAvail.
-
 \begin{code}
 -- | make a 'GlobalRdrEnv' where all the elements point to the same
 -- import declaration (useful for "hiding" imports, or imports with
@@ -938,6 +917,35 @@ Indeed, doing so would big trouble when compiling @PrelBase@, because
 it re-exports @GHC@, which includes @takeMVar#@, whose type includes
 @ConcBase.StateAndSynchVar#@, and so on...
 
+Note [Exports of data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose you see (Trac #5306)
+	module M where
+          import X( F )
+          data instance F Int = FInt
+What does M export?  AvailTC F [FInt] 
+                  or AvailTC F [F,FInt]?
+The former is strictly right because F isn't defined in this module.
+But then you can never do an explicit import of M, thus
+    import M( F( FInt ) )
+becuase F isn't exported by M.  Nor can you import FInt alone from here
+    import M( FInt )
+because we don't have syntax to support that.  (It looks like an import of 
+the type FInt.)  
+
+So we compromise (yukkily):
+
+  * When constructing exports with no export list, 
+                           or with module M( module M ), 
+    we add the parent to the exports as well.
+  
+  * But not when you see module M( f ), even if f is a 
+    class method with a parent.  
+
+  * Nor when you see module M( module N ), with N /= M.
+
+Hence the include_parent flag to greExportAvail.
+
 \begin{code}
 type ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
@@ -985,6 +993,9 @@ rnExports explicit_mod exports
 
         ; (rn_exports, avails) <- exports_from_avail real_exports rdr_env imports this_mod
         ; let final_avails = nubAvails avails    -- Combine families
+
+        ; traceRn (vcat [ text "rnExports: RdrEnv:" <+> ppr rdr_env
+                        , text "     Exports:" <+> ppr final_avails] )
 
         ; return (tcg_env { tcg_exports    = final_avails,
                             tcg_rn_exports = case tcg_rn_exports tcg_env of
@@ -1038,14 +1049,18 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
         = do { implicit_prelude <- xoptM Opt_ImplicitPrelude
              ; warnDodgyExports <- woptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
-                            || (moduleName this_mod == mod)
-                   ; gres = filter (isModuleExported implicit_prelude mod)
-                                   (globalRdrEnvElts rdr_env)
-                   ; names = map gre_name gres
-                   }
+                                   || mod_is_this_mod
+                   ; mod_is_this_mod = moduleName this_mod == mod
+                   ; new_exports = [ greExportAvail mod_is_this_mod gre
+                                   | gre <- globalRdrEnvElts rdr_env
+                                   , isModuleExported implicit_prelude mod gre ]
+                   ; names = foldr ((++) . availNames) [] new_exports }
+		     -- This might be slightly more than (map gre_name gres)
+		     -- because of Note [Exports of data families]
 
              ; checkErr exportValid (moduleNotImported mod)
-             ; warnIf (warnDodgyExports && exportValid && null gres) (nullModuleExport mod)
+             ; warnIf (warnDodgyExports && exportValid && null names) 
+                      (nullModuleExport mod)
 
              ; addUsedRdrNames (concat [ [mkRdrQual mod occ, mkRdrUnqual occ]
                                        | occ <- map nameOccName names ])
@@ -1059,8 +1074,10 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
                       -- 'M.x' is in scope in several ways, we'll have
                       -- several members of mod_avails with the same
                       -- OccName.
+             ; traceRn (vcat [ text "export mod" <+> ppr mod
+                             , ppr new_exports ])
              ; return (L loc (IEModuleContents mod) : ie_names,
-                       occs', map (greExportAvail True) gres ++ exports) }
+                       occs', new_exports ++ exports) }
 
     exports_from_item acc@(lie_names, occs, exports) (L loc ie)
         | isDoc ie
