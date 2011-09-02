@@ -31,9 +31,6 @@ module SrcLoc (
 	srcLocLine,		-- return the line part
 	srcLocCol,		-- return the column part
 	
-	-- ** Misc. operations on SrcLoc
-	pprDefnLoc,
-
         -- * SrcSpan
 	RealSrcSpan,		-- Abstract
 	SrcSpan(..),
@@ -481,10 +478,6 @@ pprUserRealSpan show_path (SrcSpanMultiLine src_path sline scol eline ecol)
 pprUserRealSpan show_path (SrcSpanPoint src_path line col)
   = hcat [ ppWhen show_path $ (pprFastFilePath src_path <> colon)
          , int line, char ':', int col ]
-
-pprDefnLoc :: RealSrcSpan -> SDoc
--- ^ Pretty prints information about the 'SrcSpan' in the style "defined at ..."
-pprDefnLoc loc = ptext (sLit "Defined at") <+> ppr loc
 \end{code}
 
 %************************************************************************

@@ -85,7 +85,7 @@ pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
   = hang (pprFamInstHdr famInst)
        2 (vcat [ ifPprDebug (ptext (sLit "Coercion axiom:") <+> pp_ax)
-               , ptext (sLit "--") <+> pprNameLoc (getName famInst)])
+               , ptext (sLit "--") <+> pprDefinedAt (getName famInst)])
   where
     pp_ax = case tyConFamilyCoercion_maybe (fi_tycon famInst) of
               Just ax -> ppr ax

@@ -37,7 +37,8 @@ module Name (
 	BuiltInSyntax(..),
 
 	-- ** Creating 'Name's
-	mkInternalName, mkSystemName, mkDerivedInternalName, 
+	mkSystemName, mkSystemNameAt,
+        mkInternalName, mkDerivedInternalName, 
 	mkSystemVarName, mkSysTvName, 
 	mkFCallName, mkIPName,
         mkTickBoxOpName,
@@ -50,7 +51,7 @@ module Name (
 	hashName, localiseName,
   mkLocalisedOccName,
 
-	nameSrcLoc, nameSrcSpan, pprNameLoc,
+	nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
 
 	-- ** Predicates on 'Name's
 	isSystemName, isInternalName, isExternalName,
@@ -278,8 +279,11 @@ mkWiredInName mod occ uniq thing built_in
 
 -- | Create a name brought into being by the compiler
 mkSystemName :: Unique -> OccName -> Name
-mkSystemName uniq occ = Name { n_uniq = getKeyFastInt uniq, n_sort = System, 
-			       n_occ = occ, n_loc = noSrcSpan }
+mkSystemName uniq occ = mkSystemNameAt uniq occ noSrcSpan
+
+mkSystemNameAt :: Unique -> OccName -> SrcSpan -> Name
+mkSystemNameAt uniq occ loc = Name { n_uniq = getKeyFastInt uniq, n_sort = System 
+			           , n_occ = occ, n_loc = loc }
 
 mkSystemVarName :: Unique -> FastString -> Name
 mkSystemVarName uniq fs = mkSystemName uniq (mkVarOccFS fs)
@@ -519,15 +523,23 @@ ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
 
 -- Prints (if mod information is available) "Defined at <loc>" or 
 --  "Defined in <mod>" information for a Name.
-pprNameLoc :: Name -> SDoc
-pprNameLoc name = case nameSrcSpan name of
-                  RealSrcSpan s ->
-                      pprDefnLoc s
-                  UnhelpfulSpan _
-                   | isInternalName name || isSystemName name ->
-                      ptext (sLit "<no location info>")
-                   | otherwise ->
-                      ptext (sLit "Defined in ") <> ppr (nameModule name)
+pprDefinedAt :: Name -> SDoc
+pprDefinedAt name = ptext (sLit "Defined") <+> pprNameDefnLoc name
+
+pprNameDefnLoc :: Name -> SDoc
+-- Prints "at <loc>" or 
+--     or "in <mod>" depending on what info is available
+pprNameDefnLoc name 
+  = case nameSrcLoc name of
+         -- nameSrcLoc rather than nameSrcSpan
+	 -- It seems less cluttered to show a location
+	 -- rather than a span for the definition point
+       RealSrcLoc s -> ptext (sLit "at") <+> ppr s
+       UnhelpfulLoc s
+         | isInternalName name || isSystemName name
+         -> ptext (sLit "at") <+> ftext s
+         | otherwise 
+         -> ptext (sLit "in") <+> quotes (ppr (nameModule name))
 \end{code}
 
 %************************************************************************

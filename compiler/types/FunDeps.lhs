@@ -309,8 +309,8 @@ improveFromInstEnv inst_env pred@(ClassP cls tys, _)
     , not (instanceCantMatch inst_tcs trimmed_tcs)
     , let p_inst = (mkClassPred cls tys_inst,
 		    sep [ ptext (sLit "arising from the dependency") <+> quotes (pprFunDep fd)	
-		        , ptext (sLit "in the instance declaration at")
-			            <+> ppr (getSrcLoc ispec)])
+		        , ptext (sLit "in the instance declaration")
+			  <+> pprNameDefnLoc (getName ispec)])
     , (qtvs, eqs) <- checkClsFD qtvs fd cls_tvs tys_inst tys -- NB: orientation
     , not (null eqs)
     ]

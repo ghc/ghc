@@ -57,8 +57,7 @@ showSub_maybe (n:ns) thing = if n == getName thing then Just ns
 -- | Pretty-prints a 'TyThing' with its defining location.
 pprTyThingLoc :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingLoc pefas tyThing
-  = showWithLoc loc (pprTyThing pefas tyThing)
-  where loc = pprNameLoc (GHC.getName tyThing)
+  = showWithLoc (pprDefinedAt (GHC.getName tyThing)) (pprTyThing pefas tyThing)
 
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: PrintExplicitForalls -> TyThing -> SDoc
@@ -79,7 +78,7 @@ pprTyThingInContext pefas thing
 -- | Like 'pprTyThingInContext', but adds the defining location.
 pprTyThingInContextLoc :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingInContextLoc pefas tyThing
-  = showWithLoc (pprNameLoc (GHC.getName tyThing))
+  = showWithLoc (pprDefinedAt (GHC.getName tyThing))
                 (pprTyThingInContext pefas tyThing)
 
 -- | Pretty-prints the 'TyThing' header. For functions and data constructors
