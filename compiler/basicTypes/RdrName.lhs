@@ -67,6 +67,7 @@ import SrcLoc
 import FastString
 import Outputable
 import Util
+import StaticFlags( opt_PprStyle_Debug )
 
 import Data.Data
 \end{code}
@@ -715,8 +716,11 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
   = ptext (sLit "defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
   = case whys of
-	(why:_) -> sep [ppr why, ppr_defn_site why name]
+	(why:_) | opt_PprStyle_Debug -> vcat (map pp_why whys)
+                | otherwise          -> pp_why why
 	[] -> panic "pprNameProvenance"
+  where
+    pp_why why = sep [ppr why, ppr_defn_site why name]
 
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
