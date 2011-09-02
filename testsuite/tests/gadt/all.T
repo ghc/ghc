@@ -107,4 +107,4 @@ test('gadtSyntaxFail001', if_compiler_lt('ghc', '7.1', expect_fail), compile_fai
 test('gadtSyntaxFail002', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
 test('gadtSyntaxFail003', if_compiler_lt('ghc', '7.1', expect_fail), compile_fail, [''])
 test('T3169', normal, compile_fail, [''])
-
+test('T5424', normal, multimod_compile, ['T5424', '-v0 -O0'])
