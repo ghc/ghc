@@ -4909,85 +4909,119 @@ instance C [c] d where
     <title>Import and export</title>
 
     <para>
-      The association of data constructors with type families is more dynamic
-      than that is the case with standard data and newtype declarations.  In
-      the standard case, the notation <literal>T(..)</literal> in an import or
-      export list denotes the type constructor and all the data constructors
-      introduced in its declaration.  However, a family declaration never
-      introduces any data constructors; instead, data constructors are
-      introduced by family instances.  As a result, which data constructors
-      are associated with a type family depends on the currently visible
-      instance declarations for that family.  Consequently, an import or
-      export item of the form <literal>T(..)</literal> denotes the family
-      constructor and all currently visible data constructors - in the case of
-      an export item, these may be either imported or defined in the current
-      module.  The treatment of import and export items that explicitly list
-      data constructors, such as <literal>GMap(GMapEither)</literal>, is
-      analogous.
-    </para>
-
-    <sect3 id="data-family-impexp-assoc">
-      <title>Associated families</title>
-      <para>
-	As expected, an import or export item of the
-	form <literal>C(..)</literal> denotes all of the class' methods and
-	associated types.  However, when associated types are explicitly
-	listed as subitems of a class, we need some new syntax, as uppercase
-	identifiers as subitems are usually data constructors, not type
-	constructors.  To clarify that we denote types here, each associated
-	type name needs to be prefixed by the keyword <literal>type</literal>.
-	So for example, when explicitly listing the components of
-	the <literal>GMapKey</literal> class, we write <literal>GMapKey(type
-	GMap, empty, lookup, insert)</literal>.
-      </para>
-    </sect3>
+The rules for export lists 
+(Haskell Report 
+   <ulink url="http://www.haskell.org/onlinereport/modules.html#sect5.2">Section 5.2</ulink>)
+needs adjustment for type families:
+<itemizedlist>
+<listitem><para>
+  The form <literal>T(..)</literal>, where <literal>T</literal>
+  is a data family, names the family <literal>T</literal> and all the in-scope 
+  constructors (whether in scope qualified or unqualified) that are data 
+  instances of <literal>T</literal>.
+  </para></listitem>
+<listitem><para>
+  The form <literal>T(.., ci, .., fj, ..)</literal>, where <literal>T</literal> is 
+  a data family, names <literal>T</literal> and the specified constructors <literal>ci</literal>
+  and fields <literal>fj</literal> as usual. The constructors and field names must
+  belong to some data instance of <literal>T</literal>, but are not required to belong
+  to the <emphasis>same</emphasis> instance.
+  </para></listitem>
+<listitem><para>
+  The form <literal>C(..)</literal>, where <literal>C</literal>
+  is a class, names the class <literal>C</literal> and all its methods
+  <emphasis>and associated types</emphasis>.
+  </para></listitem>
+<listitem><para>
+  The form <literal>C(.., mi, .., type Tj, ..)</literal>, where <literal>C</literal> is a class,
+  names the class <literal>C</literal>, and the specified methods <literal>mi</literal>
+  and associated types <literal>Tj</literal>. The types need a keyword "<literal>type</literal>"
+  to distinguish them from data constructors.
+  </para></listitem>
+</itemizedlist>
+</para>
 
     <sect3 id="data-family-impexp-examples">
       <title>Examples</title>
       <para>
-	Assuming our running <literal>GMapKey</literal> class example, let us
-	look at some export lists and their meaning:
+	Recall our running <literal>GMapKey</literal> class example:
+<programlisting>
+class GMapKey k where
+  data GMap k :: * -> *
+  insert :: GMap k v -> k -> v -> GMap k v
+  lookup :: GMap k v -> k -> Maybe v
+  empty  :: GMap k v
+
+instance (GMapKey a, GMapKey b) => GMapKey (Either a b) where
+  data GMap (Either a b) v = GMapEither (GMap a v) (GMap b v)
+  ...method declartions...
+</programlisting>
+Here are some export lists and their meaning:
 	<itemizedlist>
 	  <listitem>
-	    <para><literal>module GMap (GMapKey) where...</literal>: Exports
+	    <para><literal>module GMap( GMapKey )</literal>: Exports
 	      just the class name.</para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap (GMapKey(..)) where...</literal>:
+	    <para><literal>module GMap( GMapKey(..) )</literal>:
 	      Exports the class, the associated type <literal>GMap</literal>
 	      and the member
 	      functions <literal>empty</literal>, <literal>lookup</literal>,
-	      and <literal>insert</literal>.  None of the data constructors is
-	      exported.</para>
+	      and <literal>insert</literal>.  The data constructors of <literal>GMap</literal>
+              (in this case <literal>GMapEither</literal>) are not exported.</para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap (GMapKey(..), GMap(..))
-		where...</literal>: As before, but also exports all the data
-	      constructors <literal>GMapInt</literal>,
-	      <literal>GMapChar</literal>,
-	      <literal>GMapUnit</literal>, <literal>GMapPair</literal>,
-	      and <literal>GMapUnit</literal>.</para>
+	    <para><literal>module GMap( GMapKey( type GMap, empty, lookup, insert ) )</literal>: 
+              Same as the pevious item. Note the "<literal>type</literal>" keyword.</para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap (GMapKey(empty, lookup, insert),
-	    GMap(..)) where...</literal>: As before.</para>
+	    <para><literal>module GMap( GMapKey(..), GMap(..) )</literal>: 
+              Same as previous item, but also exports all the data
+	      constructors for <literal>GMap</literal>, namely <literal>GMapEither</literal>.
+	      </para>
 	  </listitem>
 	  <listitem>
-	    <para><literal>module GMap (GMapKey, empty, lookup, insert, GMap(..))
-		where...</literal>: As before.</para>
+	    <para><literal>module GMap ( GMapKey( empty, lookup, insert), GMap(..) )</literal>:  
+              Same as previous item.</para>
+	  </listitem>
+	  <listitem>
+	    <para><literal>module GMap ( GMapKey, empty, lookup, insert, GMap(..) )</literal>: 
+              Same as previous item.</para>
 	  </listitem>
 	</itemizedlist>
       </para>
       <para>
-	Finally, you can write <literal>GMapKey(type GMap)</literal> to denote
-	both the class <literal>GMapKey</literal> as well as its associated
-	type <literal>GMap</literal>.  However, you cannot
-	write <literal>GMapKey(type GMap(..))</literal> &mdash; i.e.,
+Two things to watch out for:
+  <itemizedlist>
+      <listitem><para>
+        You cannot write <literal>GMapKey(type GMap(..))</literal> &mdash; i.e.,
 	sub-component specifications cannot be nested.  To
 	specify <literal>GMap</literal>'s data constructors, you have to list
 	it separately.
-      </para>
-    </sect3>
+      </para></listitem>
+      <listitem><para>
+  Consider this example:
+<programlisting>
+  module X where 
+    data family D
+
+  module Y where
+    import X
+    data instance D Int = D1 | D2
+</programlisting>
+    Module Y exports all the entities defined in Y, namely the data constructrs <literal>D1</literal>
+    and <literal>D2</literal>, <emphasis>but not the data family <literal>D</literal></emphasis>.
+    That (annoyingly) means that you cannot selectively import Y selectively, 
+    thus "<literal>import Y( D(D1,D2) )</literal>", because Y does not export <literal>D</literal>.
+    Instead you should list the exports explicitly, thus:
+<programlisting>
+     module Y( D(..) ) where ...
+or   module Y( module Y, D ) where ...
+</programlisting>
+      </para></listitem>
+  </itemizedlist>
+</para> 
+</sect3>
 
     <sect3 id="data-family-impexp-instances">
       <title>Instances</title>

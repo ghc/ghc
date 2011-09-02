@@ -816,12 +816,10 @@ gresFromAvail prov_fn avail
            gre_prov = prov_fn n}
     | n <- availNames avail ]
 
-greExportAvail :: Bool -> GlobalRdrElt -> AvailInfo
--- For 'include_parent' see Note [Exports of data families]
-greExportAvail include_parent gre 
+greExportAvail :: GlobalRdrElt -> AvailInfo
+greExportAvail gre 
   = case gre_par gre of
-      ParentIs p | include_parent -> AvailTC p  [p,me]
-                 | otherwise      -> AvailTC p  [me]
+      ParentIs p                  -> AvailTC p [me]
       NoParent   | isTyConName me -> AvailTC me [me]
                  | otherwise      -> Avail   me
   where
@@ -931,20 +929,18 @@ But then you can never do an explicit import of M, thus
 becuase F isn't exported by M.  Nor can you import FInt alone from here
     import M( FInt )
 because we don't have syntax to support that.  (It looks like an import of 
-the type FInt.)  
+the type FInt.)
 
-So we compromise (yukkily):
-
-  * When constructing exports with no export list, 
-                           or with module M( module M ), 
-    we add the parent to the exports as well.
-  
+At one point I implemented a compromise:
+  * When constructing exports with no export list, or with module M(
+    module M ), we add the parent to the exports as well.
   * But not when you see module M( f ), even if f is a 
     class method with a parent.  
-
   * Nor when you see module M( module N ), with N /= M.
 
-Hence the include_parent flag to greExportAvail.
+But the compromise seemed too much of a hack, so we backed it out.
+You just have to use an explicit export list:
+    module M( F(..) ) where ...
 
 \begin{code}
 type ExportAccum        -- The type of the accumulating parameter of
@@ -1015,7 +1011,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
  = -- The same as (module M) where M is the current module name,
    -- so that's how we handle it.
    let
-       avails = [ greExportAvail True gre 
+       avails = [ greExportAvail gre 
                 | gre <- globalRdrEnvElts rdr_env
                 , isLocalGRE gre ]
    in
@@ -1049,14 +1045,11 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
         = do { implicit_prelude <- xoptM Opt_ImplicitPrelude
              ; warnDodgyExports <- woptM Opt_WarnDodgyExports
              ; let { exportValid = (mod `elem` imported_modules)
-                                   || mod_is_this_mod
-                   ; mod_is_this_mod = moduleName this_mod == mod
-                   ; new_exports = [ greExportAvail mod_is_this_mod gre
-                                   | gre <- globalRdrEnvElts rdr_env
-                                   , isModuleExported implicit_prelude mod gre ]
-                   ; names = foldr ((++) . availNames) [] new_exports }
-		     -- This might be slightly more than (map gre_name gres)
-		     -- because of Note [Exports of data families]
+                                || (moduleName this_mod == mod)
+		   ; gres = filter (isModuleExported implicit_prelude mod)
+		     	           (globalRdrEnvElts rdr_env)
+                   ; new_exports = map greExportAvail gres
+                   ; names       = map gre_name gres }
 
              ; checkErr exportValid (moduleNotImported mod)
              ; warnIf (warnDodgyExports && exportValid && null names) 
@@ -1098,7 +1091,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     lookup_ie :: IE RdrName -> RnM (IE Name, AvailInfo)
     lookup_ie (IEVar rdr)
         = do gre <- lookupGreRn rdr
-             return (IEVar (gre_name gre), greExportAvail False gre)
+             return (IEVar (gre_name gre), greExportAvail gre)
 
     lookup_ie (IEThingAbs rdr)
         = do gre <- lookupGreRn rdr
