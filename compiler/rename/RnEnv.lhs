@@ -50,9 +50,7 @@ import NameEnv
 import Module           ( ModuleName, moduleName )
 import UniqFM
 import DataCon		( dataConFieldLabels )
-import PrelNames        ( mkUnboundName, rOOT_MAIN, consDataConKey, forall_tv_RDR )
-import Unique
-import BasicTypes
+import PrelNames        ( mkUnboundName, rOOT_MAIN, forall_tv_RDR )
 import ErrUtils		( Message )
 import SrcLoc
 import Outputable
@@ -675,21 +673,11 @@ dataTcOccs :: RdrName -> [RdrName]
 -- constructor.  This is useful when we aren't sure which we are
 -- looking at.
 dataTcOccs rdr_name
-  | Just n <- isExact_maybe rdr_name		-- Ghastly special case
-  , n `hasKey` consDataConKey = [rdr_name]	-- see note below
   | isDataOcc occ 	      = [rdr_name, rdr_name_tc]
   | otherwise 	  	      = [rdr_name]
   where    
     occ 	= rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
-
--- If the user typed "[]" or "(,,)", we'll generate an Exact RdrName,
--- and setRdrNameSpace generates an Orig, which is fine
--- But it's not fine for (:), because there *is* no corresponding type
--- constructor.  If we generate an Orig tycon for GHC.Base.(:), it'll
--- appear to be in scope (because Orig's simply allocate a new name-cache
--- entry) and then we get an error when we use dataTcOccs in 
--- TcRnDriver.tcRnGetInfo.  Large sigh.
 \end{code}
 
 
