@@ -86,26 +86,26 @@ c2 :: forall a b. (C a b, N b, S b) => a -> b
 c3 :: forall a b. C a b => forall a1. a1 -> b
 c4 :: forall a b. C a b => forall a1. a1 -> b
 -- test :browse! <target> relative to different contexts
-:browse! C -- from *C>
+:browse! Ghci025C -- from *Ghci025C>
 -- defined locally
 g :: forall a. Num a => a -> a
 h :: forall a. Integral a => a -> a
--- imported via D
+-- imported via Ghci025D
 f :: forall a. Num a => a -> a
-:browse! C -- from *B>, after :add B
--- imported via C
+:browse! Ghci025C -- from *Ghci025B>, after :add Ghci025B
+-- imported via Ghci025C
 g :: forall a. Num a => a -> a
 h :: forall a. Integral a => a -> a
 f :: forall a. Num a => a -> a
-:browse! C -- from *C>, after :m *C
+:browse! Ghci025C -- from *Ghci025C>, after :m *Ghci025C
 -- defined locally
 g :: forall a. Num a => a -> a
 h :: forall a. Integral a => a -> a
--- imported via D
+-- imported via Ghci025D
 f :: forall a. Num a => a -> a
-:browse! C -- from *D>, after :m *D
+:browse! Ghci025C -- from *Ghci025D>, after :m *Ghci025D
 -- not currently imported
-C.g :: forall a. Num a => a -> a
-C.h :: forall a. Integral a => a -> a
+Ghci025C.g :: forall a. Num a => a -> a
+Ghci025C.h :: forall a. Integral a => a -> a
 -- defined locally
 f :: forall a. Num a => a -> a

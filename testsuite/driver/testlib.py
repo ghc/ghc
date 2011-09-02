@@ -583,8 +583,7 @@ def test_common_work (name, opts, func, args):
                    '.stats', '.comp.stats',
                    '.hi', '.o', '.prof', '.exe.prof', '.hc',
                    '_stub.h', '_stub.c', '_stub.o',
-                   '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog',
-                   '.strace']))
+                   '.hp', '.exe.hp', '.ps', '.aux', '.hcr', '.eventlog']))
 
         clean(getTestOpts().clean_files)
 
@@ -1547,10 +1546,11 @@ def runCmdFor( name, cmd ):
     if config.timeout_prog != '':
         if config.check_files_written:
             fn = name + ".strace"
-            r = rawSystem(["strace", "-o", fn, "-f", "-e", "creat,open",
+            r = rawSystem(["strace", "-o", fn, "-fF", "-e", "creat,open,chdir,clone,vfork",
                            config.timeout_prog, str(config.timeout),
                            cmd])
             addTestFilesWritten(name, fn)
+            rm_no_fail(fn)
         else:
             r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
     else:
@@ -1568,9 +1568,7 @@ def runCmdExitCode( cmd ):
 # * only supported when using the timeout program
 # * 'test.strace' files aren't cleaned, as they end up in the root
 #   directory rather than the test's directory
-# * Doesn't yet track what the current directory is, so finds several
-#   files like "A.o" being written by multiple tests (and conversely,
-#   may be missing writes to the same file from different directories)
+# * Should look for write to package.conf(.d)
 # * Lots of tests write to $HOME/.ghc/ghci_history. We should probably
 #   be passing ghci a flag to stop this from happening.
 # * Some .strace lines aren't understood yet, causing framework failures
@@ -1582,17 +1580,31 @@ def runCmdExitCode( cmd ):
 # 1             16:36.14                25:16.07
 # 5              5:33.95                 8:04.05
 
-re_strace_call_start = '^[0-9]+ +'
 re_strace_call_end = '(\) += ([0-9]+|-1 E.*)| <unfinished ...>)$'
-re_strace_open              = re.compile(re_strace_call_start + 'open\("([^"]*)", ([A-Z_|]*)(, [0-9]+)?' + re_strace_call_end)
-re_strace_open_resumed      = re.compile(re_strace_call_start + '<... open resumed> '                    + re_strace_call_end)
-re_strace_ignore_sigchild   = re.compile(re_strace_call_start + '--- SIGCHLD \(Child exited\) @ 0 \(0\) ---$')
-re_strace_ignore_sigvtalarm = re.compile(re_strace_call_start + '--- SIGVTALRM \(Virtual timer expired\) @ 0 \(0\) ---$')
-re_strace_ignore_sigint     = re.compile(re_strace_call_start + '--- SIGINT \(Interrupt\) @ 0 \(0\) ---$')
-re_strace_ignore_sigfpe     = re.compile(re_strace_call_start + '--- SIGFPE \(Floating point exception\) @ 0 \(0\) ---$')
-re_strace_ignore_sigsegv    = re.compile(re_strace_call_start + '--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
+re_strace_unavailable       = re.compile('^\) += \? <unavailable>$')
+re_strace_pid               = re.compile('^([0-9]+) +(.*)')
+re_strace_clone             = re.compile('^(clone\(|<... clone resumed> ).*\) = ([0-9]+)$')
+re_strace_clone_unfinished  = re.compile('^clone\( <unfinished \.\.\.>$')
+re_strace_vfork             = re.compile('^(vfork\(\)|<\.\.\. vfork resumed> \)) += ([0-9]+)$')
+re_strace_vfork_unfinished  = re.compile('^vfork\( <unfinished \.\.\.>$')
+re_strace_chdir             = re.compile('^chdir\("([^"]*)"(\) += 0| <unfinished ...>)$')
+re_strace_chdir_resumed     = re.compile('^<\.\.\. chdir resumed> \) += 0$')
+re_strace_open              = re.compile('^open\("([^"]*)", ([A-Z_|]*)(, [0-9]+)?' + re_strace_call_end)
+re_strace_open_resumed      = re.compile('^<... open resumed> '                    + re_strace_call_end)
+re_strace_ignore_sigchild   = re.compile('^--- SIGCHLD \(Child exited\) @ 0 \(0\) ---$')
+re_strace_ignore_sigvtalarm = re.compile('^--- SIGVTALRM \(Virtual timer expired\) @ 0 \(0\) ---$')
+re_strace_ignore_sigint     = re.compile('^--- SIGINT \(Interrupt\) @ 0 \(0\) ---$')
+re_strace_ignore_sigfpe     = re.compile('^--- SIGFPE \(Floating point exception\) @ 0 \(0\) ---$')
+re_strace_ignore_sigsegv    = re.compile('^--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
+re_strace_ignore_sigpipe    = re.compile('^--- SIGPIPE \(Broken pipe\) @ 0 \(0\) ---$')
 
+writes_ghci_history = {}
 files_used = {}
+
+def mkPath(curdir, path):
+    # Given the current full directory is 'curdir', what is the full
+    # path to 'path'?
+    return os.path.realpath(os.path.join(curdir, path))
 
 def addTestFilesWritten(name, fn):
     if config.use_threads:
@@ -1602,13 +1614,35 @@ def addTestFilesWritten(name, fn):
         addTestFilesWrittenHelper(name, fn)
 
 def addTestFilesWrittenHelper(name, fn):
+    started = False
+    working_directories = {}
+
     with open(fn, 'r') as f:
         for line in f:
-            m_open = re_strace_open.match(line)
+            m_pid = re_strace_pid.match(line)
+            if m_pid:
+                pid = m_pid.group(1)
+                content = m_pid.group(2)
+            elif re_strace_unavailable.match(line):
+                next
+            else:
+                framework_fail(name, 'strace', "Can't find pid in strace line: " + line)
+
+            m_open = re_strace_open.match(content)
+            m_chdir = re_strace_chdir.match(content)
+            m_clone = re_strace_clone.match(content)
+            m_vfork = re_strace_vfork.match(content)
+
+            if not started:
+                working_directories[pid] = os.getcwd()
+                started = True
 
             if m_open:
                 file = m_open.group(1)
-                if not file in ['/dev/tty', '/dev/null'] and not file.startswith("/tmp/ghc"):
+                file = mkPath(working_directories[pid], file)
+                if file.endswith("ghci_history"):
+                    writes_ghci_history[name] = 1
+                elif not file in ['/dev/tty', '/dev/null'] and not file.startswith("/tmp/ghc"):
                     flags = m_open.group(2).split('|')
                     if 'O_WRONLY' in flags or 'O_RDWR' in flags:
                         try:
@@ -1621,33 +1655,58 @@ def addTestFilesWrittenHelper(name, fn):
                         pass
                     else:
                         framework_fail(name, 'strace', "Can't understand flags in open strace line: " + line)
-            elif re_strace_open_resumed.match(line):
+            elif m_chdir:
+                # We optimistically assume that unfinished chdir's are going to succeed
+                dir = m_chdir.group(1)
+                working_directories[pid] = mkPath(working_directories[pid], dir)
+            elif m_clone:
+                working_directories[m_clone.group(2)] = working_directories[pid]
+            elif m_vfork:
+                working_directories[m_vfork.group(2)] = working_directories[pid]
+            elif re_strace_open_resumed.match(content):
                 pass
-            elif re_strace_ignore_sigchild.match(line):
+            elif re_strace_chdir_resumed.match(content):
                 pass
-            elif re_strace_ignore_sigvtalarm.match(line):
+            elif re_strace_vfork_unfinished.match(content):
                 pass
-            elif re_strace_ignore_sigint.match(line):
+            elif re_strace_clone_unfinished.match(content):
                 pass
-            elif re_strace_ignore_sigfpe.match(line):
+            elif re_strace_ignore_sigchild.match(content):
                 pass
-            elif re_strace_ignore_sigsegv.match(line):
+            elif re_strace_ignore_sigvtalarm.match(content):
+                pass
+            elif re_strace_ignore_sigint.match(content):
+                pass
+            elif re_strace_ignore_sigfpe.match(content):
+                pass
+            elif re_strace_ignore_sigsegv.match(content):
+                pass
+            elif re_strace_ignore_sigpipe.match(content):
                 pass
             else:
                 framework_fail(name, 'strace', "Can't understand strace line: " + line)
  
-def checkForFilesWrittenMoreThanOnce(file):
+def checkForFilesWrittenProblems(file):
     foundProblem = False
 
     for f in files_used.keys():
         if len(files_used[f]) > 1:
             if not foundProblem:
                 foundProblem = True
-                print ""
+                file.write("\n")
                 file.write("\nSome files are written by multiple tests:\n")
             file.write("    " + f + " (" + str(files_used[f]) + ")\n")
 
     if foundProblem:
+        file.write("\n")
+
+    if len(writes_ghci_history) > 0:
+        file.write("\n")
+        file.write("\nSome files wrote to ghci_history:\n")
+        tests = writes_ghci_history.keys()
+        tests.sort()
+        for t in tests:
+            file.write("    " + t + "\n")
         file.write("\n")
 
 # -----------------------------------------------------------------------------
@@ -1811,7 +1870,7 @@ def summary(t, file):
         printFailingTestInfosSummary(file, t.unexpected_failures)
 
     if config.check_files_written:
-        checkForFilesWrittenMoreThanOnce(file)
+        checkForFilesWrittenProblems(file)
 
 def printPassingTestInfosSummary(file, testInfos):
     directories = testInfos.keys()

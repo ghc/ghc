@@ -4,8 +4,7 @@ SafeLang12.hs:2:14:
 
 SafeLang12_B.hs:2:14:
     Warning: XTemplateHaskell is not allowed in Safe Haskell; ignoring XTemplateHaskell
+[1 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
 
-SafeLang12_B.hs:3:8:
-    File name does not match module name:
-    Saw: `SafeLang11_B'
-    Expected: `SafeLang12_B'
+SafeLang12_B.hs:14:68:
+    lexical error in string/character literal at character '\''
