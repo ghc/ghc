@@ -1566,14 +1566,10 @@ def runCmdExitCode( cmd ):
 
 # Work in progress, but largely works. Known issues:
 # * only supported when using the timeout program
-# * 'test.strace' files aren't cleaned, as they end up in the root
-#   directory rather than the test's directory
-# * Should look for write to package.conf(.d)
-# * Lots of tests write to $HOME/.ghc/ghci_history. We should probably
-#   be passing ghci a flag to stop this from happening.
 # * Some .strace lines aren't understood yet, causing framework failures
 # * One .strace file can cause muiltiple framework failures, if it
 #   contains lots of lines that aren't understood
+# * Should detect file that are written but aren't cleaned
 
 # Performance:
 # Threads       fast testsuite time     fast testsuite time with checks
@@ -1598,8 +1594,15 @@ re_strace_ignore_sigfpe     = re.compile('^--- SIGFPE \(Floating point exception
 re_strace_ignore_sigsegv    = re.compile('^--- SIGSEGV \(Segmentation fault\) @ 0 \(0\) ---$')
 re_strace_ignore_sigpipe    = re.compile('^--- SIGPIPE \(Broken pipe\) @ 0 \(0\) ---$')
 
-writes_ghci_history = {}
+bad_file_usages = {}
 files_used = {}
+
+def add_bad_file_usage(name, file):
+    try:
+        if not file in bad_file_usages[name]:
+            bad_file_usages[name].append(file)
+    except:
+        bad_file_usages[name] = [file]
 
 def mkPath(curdir, path):
     # Given the current full directory is 'curdir', what is the full
@@ -1641,16 +1644,18 @@ def addTestFilesWrittenHelper(name, fn):
                 file = m_open.group(1)
                 file = mkPath(working_directories[pid], file)
                 if file.endswith("ghci_history"):
-                    writes_ghci_history[name] = 1
+                    add_bad_file_usage(name, file)
                 elif not file in ['/dev/tty', '/dev/null'] and not file.startswith("/tmp/ghc"):
                     flags = m_open.group(2).split('|')
                     if 'O_WRONLY' in flags or 'O_RDWR' in flags:
-                        try:
-                            cur = files_used[file]
-                            if not name in files_used[file]:
-                                files_used[file].append(name)
-                        except:
-                            files_used[file] = [name]
+                        if re.match('package\.conf\.d', file):
+                            add_bad_file_usage(name, file)
+                        else:
+                            try:
+                                if not name in files_used[file]:
+                                    files_used[file].append(name)
+                            except:
+                                files_used[file] = [name]
                     elif 'O_RDONLY' in flags:
                         pass
                     else:
@@ -1700,13 +1705,14 @@ def checkForFilesWrittenProblems(file):
     if foundProblem:
         file.write("\n")
 
-    if len(writes_ghci_history) > 0:
+    if len(bad_file_usages) > 0:
         file.write("\n")
-        file.write("\nSome files wrote to ghci_history:\n")
-        tests = writes_ghci_history.keys()
+        file.write("\nSome bad file usages:\n")
+        tests = bad_file_usages.keys()
         tests.sort()
         for t in tests:
-            file.write("    " + t + "\n")
+            for f in bad_file_usages[t]:
+                file.write("    " + t + ": " + f + "\n")
         file.write("\n")
 
 # -----------------------------------------------------------------------------
