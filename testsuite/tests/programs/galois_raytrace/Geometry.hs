@@ -61,8 +61,6 @@ module Geometry
     , clampf
     ) where
 
-import List
-
 type Coords = (Double,Double,Double)
 
 type Ray = (Point,Vector)    -- origin of ray, and unit vector giving direction

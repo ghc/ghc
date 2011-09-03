@@ -5,7 +5,7 @@
 
 module Data where
 
-import Array
+import Data.Array
 
 import CSG
 import Geometry

@@ -8,7 +8,7 @@ module Intersections
       quadratic
     ) where
 
-import Maybe(isJust)
+import Data.Maybe(isJust)
 
 import Construct
 import Geometry

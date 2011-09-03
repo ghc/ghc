@@ -5,9 +5,9 @@
 
 module Pixmap where
 
-import Char
-import IO hiding (try)
-import Parsec
+import Data.Char
+import System.IO hiding (try)
+import Text.ParserCombinators.Parsec
 
 readPPM f
   = do  h <- openFile f ReadMode

@@ -12,9 +12,9 @@ module Illumination
     , render
     ) where
 
-import Array
-import Char(chr)
-import Maybe
+import Data.Array
+import Data.Char(chr)
+import Data.Maybe
 
 import Geometry
 import CSG

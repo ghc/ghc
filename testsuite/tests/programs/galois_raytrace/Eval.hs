@@ -5,7 +5,7 @@
 
 module Eval where
 
-import Array
+import Data.Array
 
 import Geometry
 import CSG
