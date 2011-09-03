@@ -48,7 +48,7 @@ number
 
 whiteSpace
   = skipMany (simpleSpace <|> oneLineComment <?> "")
-    where simpleSpace = skipMany1 (oneOf " \t\n\r\v")    
+    where simpleSpace = skipMany1 (oneOf " \t\n\r\v")
 	  oneLineComment =
 	      do  char '#'
 		  skipMany (noneOf "\n\r\v")

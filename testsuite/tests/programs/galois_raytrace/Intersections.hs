@@ -3,7 +3,7 @@
 -- free software under the license in the file "LICENSE",
 -- which is included in the distribution.
 
-module Intersections 
+module Intersections
     ( intersectRayWithObject,
       quadratic
     ) where
@@ -370,7 +370,7 @@ quadratic a b c =
 -- Bounding boxes
 -------------------
 
-data MaybeInterval = Interval !Double !Double 
+data MaybeInterval = Interval !Double !Double
 		   | NoInterval
 
 isInterval (Interval _ _) = True
@@ -397,7 +397,7 @@ intersectRayWithSlab :: Double -> Double -> (Double,Double) -> MaybeInterval
 intersectRayWithSlab xCoord alpha (x1, x2)
   | alpha == 0 = if xCoord < x1 || xCoord > x2 then NoInterval else infInterval
   | alpha >  0 = Interval a b
-  | otherwise  = Interval b a 
+  | otherwise  = Interval b a
   where a = (x1 - xCoord) / alpha
 	b = (x2 - xCoord) / alpha
 

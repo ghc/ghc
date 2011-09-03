@@ -61,7 +61,7 @@ module Geometry
     , clampf
     ) where
 
-import List 
+import List
 
 type Coords = (Double,Double,Double)
 
@@ -131,7 +131,7 @@ point_to_vector :: Point -> Vector
 point_to_vector (P x y z) = V x y z
 
 vector_to_point :: Vector -> Point
-vector_to_point (V x y z)  = P x y z 
+vector_to_point (V x y z)  = P x y z
 
 {-# INLINE vector_to_quad #-}
 vector_to_quad :: Vector -> Quad
@@ -169,23 +169,23 @@ dot4 :: Quad -> Quad -> Double
 dot4 (Q x1 y1 z1 w1) (Q x2 y2 z2 w2) = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2
 
 addVV :: Vector -> Vector -> Vector
-addVV (V x1 y1 z1) (V x2 y2 z2) 
+addVV (V x1 y1 z1) (V x2 y2 z2)
     = V (x1 + x2) (y1 + y2) (z1 + z2)
 
 addPV :: Point -> Vector -> Point
-addPV (P x1 y1 z1) (V x2 y2 z2) 
+addPV (P x1 y1 z1) (V x2 y2 z2)
     = P (x1 + x2) (y1 + y2) (z1 + z2)
 
 subVV :: Vector -> Vector -> Vector
-subVV (V x1 y1 z1) (V x2 y2 z2) 
+subVV (V x1 y1 z1) (V x2 y2 z2)
     = V (x1 - x2) (y1 - y2) (z1 - z2)
 
 negV :: Vector -> Vector
-negV (V x1 y1 z1) 
+negV (V x1 y1 z1)
     = V (-x1) (-y1) (-z1)
 
 subPP :: Point -> Point -> Vector
-subPP (P x1 y1 z1) (P x2 y2 z2) 
+subPP (P x1 y1 z1) (P x2 y2 z2)
     = V (x1 - x2) (y1 - y2) (z1 - z2)
 
 --{-# INLINE norm #-}
@@ -208,7 +208,7 @@ dist2 us vs = sq x + sq y + sq z
 
 {-# INLINE sq #-}
 sq :: Double -> Double
-sq d = d * d 
+sq d = d * d
 
 {-# INLINE distFrom0Sq #-}
 distFrom0Sq :: Point -> Double  -- Distance of point from origin.
@@ -232,7 +232,7 @@ multMM m1@(M q1 q2 q3 q4) m2
   where
      m2' = transposeM m2
 
-{-# INLINE transposeM #-}     
+{-# INLINE transposeM #-}
 transposeM :: Matrix -> Matrix
 transposeM (M (Q e11  e12  e13  e14)
               (Q e21  e22  e23  e24)
@@ -300,7 +300,7 @@ epsilon = 1.0e-10
 inf = 1.0e20
 
 nonZero :: Double -> Double         -- Use before a division. It makes definitions
-nonZero x | x > epsilon  = x        -- more complete and I bet the errors that get 
+nonZero x | x > epsilon  = x        -- more complete and I bet the errors that get
           | x < -epsilon = x        -- introduced will be undetectable if epsilon
           | otherwise    = epsilon  -- is small enough
 

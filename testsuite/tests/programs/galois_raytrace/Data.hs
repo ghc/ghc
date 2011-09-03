@@ -7,7 +7,7 @@ module Data where
 
 import Array
 
-import CSG      
+import CSG
 import Geometry
 import Illumination
 import Primitives
@@ -47,14 +47,14 @@ instance Show GMLToken where
    showsPrec p (TReal d)    = shows d
    showsPrec p (TString s)  = shows s
    showsPrec p (TBody code) = shows code
-   showsPrec p (TArray code) = showString "[ " 
-                            . foldr (\ a b -> a . showChar ' ' . b) id (map shows code) 
+   showsPrec p (TArray code) = showString "[ "
+                            . foldr (\ a b -> a . showChar ' ' . b) id (map shows code)
                             . showString "]"
-   showsPrec p (TApply)     = showString "apply" 
-   showsPrec p (TIf)        = showString "if" 
+   showsPrec p (TApply)     = showString "apply"
+   showsPrec p (TIf)        = showString "if"
 
-   showList  code = showString "{ " 
-                  . foldr (\ a b -> a . showChar ' ' . b) id (map shows code) 
+   showList  code = showString "{ "
+                  . foldr (\ a b -> a . showChar ' ' . b) id (map shows code)
                   . showString "}"
 
 
@@ -71,12 +71,12 @@ data GMLValue
 	| VArray   (Array Int GMLValue)		-- FIXME: Haskell array
         -- uses the interpreter version of point
 	| VPoint   { xPoint :: !Double
-                   , yPoint :: !Double 
-                   , zPoint :: !Double 
-                   } 
+                   , yPoint :: !Double
+                   , zPoint :: !Double
+                   }
         -- these are abstract to the interpreter
 	| VObject  Object
-	| VLight   Light 
+	| VLight   Light
 	-- This is an abstract object, used by the abstract interpreter
 	| VAbsObj  AbsObj
 
@@ -84,9 +84,9 @@ data GMLValue
 -- There are only *3* basic abstract values,
 -- and the combinators also.
 
-data AbsObj 
-    = AbsFACE 
-    | AbsU 
+data AbsObj
+    = AbsFACE
+    | AbsU
     | AbsV
       deriving (Show)
 
@@ -99,9 +99,9 @@ showStkEle (VInt i)       = show i ++ " :: Int"
 showStkEle (VReal r)      = show r ++ " :: Real"
 showStkEle (VString s)    = show s ++ " :: String"
 showStkEle (VClosure {})  = "<closure> :: Closure"
-showStkEle (VArray arr)   
+showStkEle (VArray arr)
      = "<array (" ++  show (succ (snd (bounds arr))) ++ " elements)> :: Array"
-showStkEle (VPoint x y z) = "(" ++ show x 
+showStkEle (VPoint x y z) = "(" ++ show x
                          ++ "," ++ show y
                          ++ "," ++ show z
                          ++ ") :: Point"
@@ -123,7 +123,7 @@ lookupEnv :: Env -> Name -> Maybe GMLValue
 lookupEnv (Env e) n = lookup n e
 
 -- All primitive operators
--- 
+--
 -- There is no Op_apply, Op_false, Op_true and Op_if
 -- (because they appear explcitly in the rules).
 
@@ -199,7 +199,7 @@ opTable :: [(Name,GMLToken)]
 opTable = [ (kwd,op) | (kwd,op,_) <- opcodes ]
 
 opNameTable :: Array GMLOp Name
-opNameTable = array (minBound,maxBound) 
+opNameTable = array (minBound,maxBound)
 	          [ (op,name) | (name,TOp op,_) <- opcodes ]
 
 undef = error "undefined function"
@@ -253,7 +253,7 @@ opcodes =
  , ("real",	  Op_real, 	 Int_Real fromIntegral)
  , ("render",	  Op_render, 	 Render $ render eye)
  , ("rotatex",	  Op_rotatex, 	 Obj_Real_Obj (\ o d -> rotateX (deg2rad d) o))
- , ("rotatey",	  Op_rotatey, 	 Obj_Real_Obj (\ o d -> rotateY (deg2rad d) o)) 
+ , ("rotatey",	  Op_rotatey, 	 Obj_Real_Obj (\ o d -> rotateY (deg2rad d) o))
  , ("rotatez",	  Op_rotatez, 	 Obj_Real_Obj (\ o d -> rotateZ (deg2rad d) o))
  , ("scale",	  Op_scale, 	 Obj_Real_Real_Real_Obj (\ o x y z -> scale (x,y,z) o))
  , ("sin",	  Op_sin, 	 Real_Real (sin . deg2rad))
@@ -275,7 +275,7 @@ opcodes =
 
 data PrimOp
 
-    -- 1 argument 
+    -- 1 argument
     = Int_Int         (Int -> Int)
     | Real_Real       (Double -> Double)
     | Point_Real      (Double -> Double -> Double -> Double)
@@ -284,7 +284,7 @@ data PrimOp
     | Int_Real        (Int -> Double)
     | Arr_Int         (Array Int GMLValue -> Int)
 
-    -- 2 arguments 
+    -- 2 arguments
     | Int_Int_Int     (Int -> Int -> Int)
     | Int_Int_Bool    (Int -> Int -> Bool)
     | Real_Real_Real  (Double -> Double -> Double)
@@ -300,26 +300,26 @@ data PrimOp
     | Obj_Real_Real_Real_Obj (Object -> Double -> Double -> Double -> Object)
     | Value_String_Value     (GMLValue -> String -> GMLValue)
 
-    | Point_Point_Color_Real_Real_Light 
+    | Point_Point_Color_Real_Real_Light
                              (Coords -> Coords -> Color -> Radian -> Radian -> Light)
     -- And finally render
     | Render                 (Color -> [Light] -> Object -> Int -> Double -> Int -> Int -> String -> IO ())
 
-data Type 
-    = TyBool 
-    | TyInt 
-    | TyReal 
-    | TyString 
-    | TyCode 
-    | TyArray 
-    | TyPoint 
-    | TyObject 
+data Type
+    = TyBool
+    | TyInt
+    | TyReal
+    | TyString
+    | TyCode
+    | TyArray
+    | TyPoint
+    | TyObject
     | TyLight
     | TyAlpha
     | TyAbsObj
       deriving (Eq,Ord,Ix,Bounded)
 
-typeTable = 
+typeTable =
   [ ( TyBool,   "Bool")
   , ( TyInt,    "Int")
   , ( TyReal,   "Real")
@@ -357,7 +357,7 @@ getPrimOpType (Real_Real_Real_Point   _) = [TyReal,TyReal,TyReal]
 getPrimOpType (Obj_Real_Obj           _) = [TyObject,TyReal]
 getPrimOpType (Obj_Real_Real_Real_Obj _) = [TyObject,TyReal,TyReal,TyReal]
 getPrimOpType (Value_String_Value     _) = [TyAlpha,TyString]
-getPrimOpType (Point_Point_Color_Real_Real_Light _) 
+getPrimOpType (Point_Point_Color_Real_Real_Light _)
                                          = [TyPoint,TyPoint,TyPoint,TyReal,TyReal]
 getPrimOpType (Render                 _) = [TyPoint,
                                             TyLight,
@@ -377,9 +377,9 @@ mytrace v s = trace (s ++" : "++ show v ++ "\n") v
 ixGet :: Array Int GMLValue -> Int -> GMLValue
 ixGet arr i
    | inRange (bounds arr) i = arr ! i
-   | otherwise = error ("failed access with index value " 
-                     ++ show i 
-                     ++ " (should be between 0 and " 
+   | otherwise = error ("failed access with index value "
+                     ++ show i
+                     ++ " (should be between 0 and "
                      ++ show (snd (bounds arr)) ++ ")")
 
 ourQuot :: Int -> Int -> Int
