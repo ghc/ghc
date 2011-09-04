@@ -92,7 +92,9 @@ test('ffi012', skip_if_not_windows, compile_and_run, [''])
 test('ffi013', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 # threaded2 sometimes gives ffi014: Main_dDu: interrupted
-test('ffi014', only_ways(['threaded1','threaded2']), compile_and_run, ['ffi014_cbits.c'])
+test('ffi014',
+     [only_ways(['threaded1','threaded2']), extra_clean(['ffi014_cbits.o'])],
+     compile_and_run, ['ffi014_cbits.c'])
 
 # GHCi can't handle the separate C file (ToDo: fix this somehow)
 test('ffi015', [ omit_ways(['ghci']), extra_clean(['ffi015_cbits.o']) ],
