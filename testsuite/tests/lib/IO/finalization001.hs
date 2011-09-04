@@ -8,7 +8,7 @@ import System.IO
 
 doTest :: IO ()
 doTest = do
-  sd <- openFile "finalization001.hs" ReadWriteMode
+  sd <- openFile "finalization001.hs" ReadMode
   result <- hGetContents sd
   slurp result
   hClose sd
