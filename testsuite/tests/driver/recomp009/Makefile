@@ -7,6 +7,8 @@ include $(TOP)/mk/test.mk
 clean:
 	rm -f *.o *.hi
 	rm -f B.hs C
+	rm -f Sub.hs
+	rm -f Main$(exeext)
 
 # bug #481
 
